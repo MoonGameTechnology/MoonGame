@@ -18,10 +18,12 @@ describe('pveState — the PvE door', () => {
     const state = pveState(data);
     expect(Object.keys(state.planets).sort()).toEqual([
       'drift',
+      'fork_low',
+      'fork_mid',
+      'fork_north',
       'hive',
       'home_a',
       'home_b',
-      'nexus',
       'ridge',
       'veil',
     ]);
@@ -44,16 +46,39 @@ describe('pveState — the PvE door', () => {
     expect(state.planets.home_b!.garrison.length).toBeGreaterThan(0);
   });
 
-  it('lays the sectors out as a funnel: two lanes off the hub, one gate to the hive', () => {
+  it('lays the sectors out as forks of lines, not a chain of provinces', () => {
     const state = pveState(data);
-    // nexus is where both homes meet and where the two flanks come back together
-    expect(state.planets.nexus!.links).toEqual(['drift', 'home_a', 'home_b', 'veil']);
-    // drift and veil are the two ways between the hub and the gate — a choice, not a corridor
-    expect(state.planets.drift!.links).toEqual(['nexus', 'ridge']);
-    expect(state.planets.veil!.links).toEqual(['nexus', 'ridge']);
-    // the Swarm has exactly one way out, and it is the storm the players can hold
+    // Owner's model: two provinces joined by ONE line, and from that line's middle
+    // another line departs — reaching either a further line or another province.
+    // `home_a — home_b` is that first line; `fork_north` is where it splits.
+    expect(state.planets.fork_north!.links).toEqual(['fork_mid', 'home_a', 'home_b']);
+    expect(state.planets.home_a!.links).toEqual(['fork_north']);
+    expect(state.planets.home_b!.links).toEqual(['fork_north']);
+    // The branch runs down and splits again at `fork_mid` into the two lanes, which
+    // come back together at `fork_low` — so the Swarm still gets a CHOICE of route
+    // and the player still has two lanes to defend (the shape PVR-0.1 aimed at).
+    expect(state.planets.fork_mid!.links).toEqual(['drift', 'fork_north', 'veil']);
+    expect(state.planets.fork_low!.links).toEqual(['drift', 'ridge', 'veil']);
+    expect(state.planets.drift!.links).toEqual(['fork_low', 'fork_mid']);
+    expect(state.planets.veil!.links).toEqual(['fork_low', 'fork_mid']);
+    // the Swarm still has exactly one way out, and it is the storm the player can hold
     expect(state.planets.hive!.links).toEqual(['ridge']);
-    expect(state.planets.ridge!.links).toEqual(['drift', 'hive', 'veil']);
+    expect(state.planets.ridge!.links).toEqual(['fork_low', 'hive']);
+  });
+
+  it('a fork is NOT a province: it cannot be owned, built on or scored', () => {
+    // «Х даже и не должно быть» (владелец): развилка — точка схода линий, а не место.
+    // Держим это данными: `kind: empty` в каталоге НЕ захватывается и НЕ застраивается,
+    // поэтому ни игрок, ни бот не могут превратить развилку в территорию.
+    const state = pveState(data);
+    for (const id of ['fork_north', 'fork_mid', 'fork_low'] as const) {
+      const kind = data.sectorKinds[state.planets[id]!.kind ?? ''];
+      expect(kind?.capturable).toBe(false);
+      expect(kind?.buildable).toBe(false);
+      expect(state.planets[id]!.owner).toBeNull();
+      expect(state.planets[id]!.garrison).toEqual([]);
+      expect(state.planets[id]!.buildings).toEqual([]);
+    }
   });
 });
 
