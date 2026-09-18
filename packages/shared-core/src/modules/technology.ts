@@ -196,15 +196,24 @@ export function conditionMet(
 }
 
 /** The data-driven availability gate of a tech, independent of cost / research-slot
- *  state: prerequisites → day-gate → conditions. Returns the first unmet gate's stable
- *  reject code, or null when the node is researchable. Pure — used by the reducer and
- *  reusable for a read-only "what can I research (and why not)" query. */
+ *  state: grant-only → prerequisites → day-gate → conditions. Returns the first unmet
+ *  gate's stable reject code, or null when the node is researchable. Pure — used by the
+ *  reducer and reusable for a read-only "what can I research (and why not)" query. */
 export function technologyLock(
   def: TechnologyDef,
   state: GameState,
   playerId: string,
   data: GameData,
 ): string | null {
+  // A grant-only node is never researchable BY ANYONE — it is handed out (commander
+  // meta-progression, a run boon), not worked for. The rule belongs here and not only in
+  // the action handler, because this function is what every READING consumer asks: the
+  // seat AI picks its candidates through it (deliberately keeping no private copy of the
+  // rules), and the tech-tree window reads it too. While the ban lived in the handler
+  // alone the gate answered "researchable", so the AI — which sorts cheapest-first, and
+  // these are free — asked for one every step, got E_GRANT_ONLY, and never reached the
+  // real tree: research was dead in every match (BAL-15).
+  if (def.grantOnly) return 'E_GRANT_ONLY';
   const completed = state.players[playerId]?.technologies?.completed ?? [];
   for (const prerequisite of def.prerequisites) {
     if (!completed.includes(prerequisite)) return 'E_PREREQUISITE';
@@ -238,6 +247,13 @@ function startResearch(action: Action, h: HandlerContext): void {
   // Грант-узел исследовать нельзя НИКОМУ и ни в каком матче: он бесплатен и мгновенен
   // по своей сути (награда, а не работа), и без этой отсечки «исследовать» его значило
   // бы взять даром. Прятать из окна мало — окно не единственный отправитель приказа.
+  //
+  // ПРАВИЛО ЖИВЁТ В `technologyLock` (BAL-15) — там его спрашивают читающие потребители,
+  // и там же оно ловится ниже по этому же пути. Здесь отсечка стоит РАНЬШЕ ради ТОЧНОСТИ
+  // КОДА, а не ради самого запрета: грант-узлы приезжают в матч как `completed`, так что
+  // без неё повторная просьба отбивалась бы `E_ALREADY_RESEARCHED` — правдой про этот
+  // матч, но не про узел, который нельзя исследовать в принципе. Удалять её, «раз ворота
+  // и так ловят», значит менять код отказа; удалять ту — вернуть BAL-15.
   if (def.grantOnly) {
     return h.reject('E_GRANT_ONLY');
   }

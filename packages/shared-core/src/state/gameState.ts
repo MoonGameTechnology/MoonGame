@@ -337,6 +337,13 @@ export interface Planet {
   /** Star lanes: ids of directly-connected planets. The map is this graph;
    *  fleets travel along lanes (GDD §1 — секторная структура, узлы-планеты). */
   links?: PlanetId[];
+  /** Which pairs of neighbours connect THROUGH this sector (MAP-TRANSIT), projected
+   *  from the map. Undefined = full interchange (every earlier sector, and most still):
+   *  arrive by any lane, leave by any other. Present = these pairs are the only
+   *  through-connections, so two lanes crossing this province do not meet and a fleet
+   *  running one cannot switch to the other in passing. Read by `planRoute`; a fleet
+   *  that STOPS here is not in transit, so its next order starts fresh. */
+  transit?: Array<[PlanetId, PlanetId]>;
   /** Sector terrain type id (resolved against game data `sectors`); its buffs
    *  /debuffs are applied through hooks. Undefined = plain space, no modifier. */
   terrain?: string;

@@ -6,10 +6,11 @@
   "sectors": {
     "home_a": {
       "position": {
-        "x": -320,
-        "y": -340
+        "x": -380,
+        "y": -420
       },
       "kind": "planet",
+      "terrain": "empty_space",
       "planetType": "terran",
       "owner": "p1",
       "buildings": [
@@ -32,10 +33,11 @@
     },
     "home_b": {
       "position": {
-        "x": 320,
-        "y": -340
+        "x": 380,
+        "y": -420
       },
       "kind": "planet",
+      "terrain": "empty_space",
       "planetType": "terran",
       "buildings": [
         {
@@ -55,40 +57,78 @@
         }
       ]
     },
-    "fork_north": {
+    "gate_north": {
       "position": {
         "x": 0,
-        "y": -340
+        "y": -420
       },
-      "kind": "empty"
-    },
-    "fork_mid": {
-      "position": {
-        "x": 0,
-        "y": -120
-      },
-      "kind": "empty"
+      "kind": "empty",
+      "terrain": "empty_space"
     },
     "drift": {
       "position": {
-        "x": -300,
-        "y": 60
+        "x": -420,
+        "y": -120
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
+    "core": {
+      "position": {
+        "x": 0,
+        "y": -120
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
     "veil": {
       "position": {
-        "x": 300,
-        "y": 60
+        "x": 420,
+        "y": -120
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
+    "cluster": {
+      "position": {
+        "x": -640,
+        "y": 80
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "shoal": {
+      "position": {
+        "x": -420,
+        "y": 200
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "crossing": {
+      "position": {
+        "x": 0,
+        "y": 200
+      },
+      "kind": "empty",
+      "terrain": "empty_space",
+      "transit": [
+        ["core", "ridge"],
+        ["shoal", "shear"]
+      ]
+    },
+    "shear": {
+      "position": {
+        "x": 420,
+        "y": 200
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
     "ridge": {
       "position": {
         "x": 0,
-        "y": 440
+        "y": 480
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
@@ -96,9 +136,10 @@
     "hive": {
       "position": {
         "x": 0,
-        "y": 640
+        "y": 720
       },
       "kind": "planet",
+      "terrain": "empty_space",
       "planetType": "volcanic",
       "owner": "p3",
       "buildings": [
@@ -128,24 +169,24 @@
           "count": 3
         }
       ]
-    },
-    "fork_low": {
-      "position": {
-        "x": 0,
-        "y": 240
-      },
-      "kind": "empty"
     }
   },
   "paths": [
-    ["home_a", "fork_north"],
-    ["fork_north", "home_b"],
-    ["fork_north", "fork_mid"],
-    ["fork_mid", "drift"],
-    ["fork_mid", "veil"],
-    ["drift", "fork_low"],
-    ["veil", "fork_low"],
-    ["fork_low", "ridge"],
+    ["home_a", "gate_north"],
+    ["home_b", "gate_north"],
+    ["gate_north", "core"],
+    ["home_a", "drift"],
+    ["home_a", "core"],
+    ["home_b", "veil"],
+    ["home_b", "core"],
+    ["drift", "cluster"],
+    ["drift", "shoal"],
+    ["core", "veil"],
+    ["core", "crossing"],
+    ["shoal", "crossing"],
+    ["veil", "shear"],
+    ["crossing", "shear"],
+    ["crossing", "ridge"],
     ["ridge", "hive"]
   ],
   "players": {

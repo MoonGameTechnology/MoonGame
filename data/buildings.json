@@ -63,9 +63,7 @@
     },
     "hp": 15,
     "scoreValue": 8,
-    "traits": [
-      "infected"
-    ]
+    "traits": ["infected"]
   },
   "barracks": {
     "name": "Barracks",
@@ -277,11 +275,7 @@
         "hp": 40
       }
     ],
-    "onlyOn": [
-      "dead_world",
-      "asteroid",
-      "void_station"
-    ]
+    "onlyOn": ["dead_world", "asteroid", "asteroid_cluster", "void_station"]
   },
   "power_plant": {
     "name": "Fusion Plant",
