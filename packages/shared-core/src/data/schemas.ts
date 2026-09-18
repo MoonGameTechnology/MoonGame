@@ -402,8 +402,11 @@ export const SectorTypeDefSchema = z.object({
    *  `economy.production` bag. Empty {} = the terrain yields nothing by itself. */
   baseOutput: ResourceBagSchema.default({}),
   /** Per-resource production multipliers for an owned sector of this terrain, e.g.
-   *  `{ metal: 0.5 }` = +50% metal mined here. Layered like the planet-type twin. */
-  productionByResource: z.record(z.string(), z.number()).default({}),
+   *  `{ metal: 0.5 }` = +50% metal mined here, `{ metal: -0.4 }` = a worked-out system
+   *  that yields 40% less. Layered like the planet-type twin. Floored at −1 ("yields
+   *  nothing"): below that the multiplier flips sign and the sector would quietly DRAIN
+   *  the treasury, which no terrain is meant to do. */
+  productionByResource: z.record(z.string(), z.number().gte(-1)).default({}),
 });
 
 /**
