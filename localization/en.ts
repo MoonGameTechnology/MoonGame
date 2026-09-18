@@ -1936,6 +1936,7 @@ export const en: Record<string, string> = {
   'setup.pve.started': 'The run has begun — the Swarm is on its way.',
   'setup.pve.difficulty.weak': 'Swarm: standard',
   'setup.pve.difficulty.strong': 'Swarm: veteran',
+  'setup.pve.restored': 'Run restored — picking up where you left off.',
   'setup.title': 'SKIRMISH SETUP',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.
