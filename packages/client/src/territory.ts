@@ -45,6 +45,11 @@ export interface TerritoryPalette {
   kindAccent: (kind: string) => string | undefined;
   /** Hide only same-owner divisions; frontiers, neutral edges and cells stay intact. */
   hideOwnedInner?: boolean;
+  /** Is the border between these two SEED INDICES shut — they touch on the mosaic but
+   *  no lane joins them? See {@link classifyBorders}. Omit and nothing is drawn as a
+   *  barrier: a caller without link data must not invent one, and a caller that has it
+   *  must also respect fog — an unscouted approach is «unknown», not «closed». */
+  sealed?: (a: number, b: number) => boolean;
 }
 
 /** Sentinel edge-tag: this province edge sits on the map boundary, not a neighbour. */
@@ -255,7 +260,11 @@ export function drawTerritory(
   }
 
   // Pass 2 — classify every cell edge (pure, see classifyBorders), then stroke.
-  const { ownedFront, ownedInner, neutralEdge } = classifyBorders(cells, seeds);
+  const { ownedFront, ownedInner, neutralEdge, sealedEdge } = classifyBorders(
+    cells,
+    seeds,
+    palette.sealed,
+  );
   const strokeSegs = (segs: BorderSegment[], style: string, width: number): void => {
     if (segs.length === 0) return;
     g.strokeStyle = style;
@@ -279,6 +288,15 @@ export function drawTerritory(
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
   for (const [owner, segs] of ownedFront)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.85), 1.15); // frontier crisp
+  // A border with no lane across it, drawn LAST so it reads over whatever political
+  // border it shares the line with. Dashed and off-palette on purpose: everything else
+  // on this map is the cyan family, so «shut» must not be mistaken for a shade of
+  // «whose». Same violet the rift kind carries in the catalogue.
+  if (sealedEdge.length > 0) {
+    g.setLineDash([5, 4]);
+    strokeSegs(sealedEdge, 'rgba(146,104,176,0.85)', 1.6);
+    g.setLineDash([]);
+  }
   g.restore();
   return cells;
 }
@@ -294,6 +312,12 @@ export interface ClassifiedBorders {
   ownedInner: Map<string, BorderSegment[]>;
   /** Neutral-vs-neutral divisions and neutral map-boundary edges, deduped. */
   neutralEdge: BorderSegment[];
+  /** Borders that cannot be crossed: the two provinces touch on the mosaic but no lane
+   *  joins them. Deduped (`idx < t`), and ADDITIVE — the edge is still classified by
+   *  ownership above, so a sealed frontier reads as both «whose» and «shut». In a
+   *  province mosaic adjacency IS the shared border, so without this a border silently
+   *  promises a crossing the map does not have. */
+  sealedEdge: BorderSegment[];
 }
 
 /** Classify every cell edge by what lies across it — the political-border logic
@@ -304,10 +328,17 @@ export interface ClassifiedBorders {
 export function classifyBorders(
   cells: readonly TerritoryCell[],
   seeds: readonly TerritorySeed[],
+  /** Is the border between these two SEED INDICES shut — they touch, but no lane joins
+   *  them? Must be symmetric; asked once per edge pair. Omit and nothing is sealed,
+   *  which is what every caller did before and what a caller without link data should
+   *  keep doing: an unknown crossing is drawn as an ordinary border, never as a barrier
+   *  the player has not earned the right to see. */
+  sealed?: (a: number, b: number) => boolean,
 ): ClassifiedBorders {
   const ownedFront = new Map<string, BorderSegment[]>();
   const ownedInner = new Map<string, BorderSegment[]>();
   const neutralEdge: BorderSegment[] = [];
+  const sealedEdge: BorderSegment[] = [];
   const bucket = (m: Map<string, BorderSegment[]>, key: string): BorderSegment[] => {
     let arr = m.get(key);
     if (!arr) m.set(key, (arr = []));
@@ -322,6 +353,10 @@ export function classifyBorders(
       const p1 = poly[(k + 1) % m]!;
       const seg: BorderSegment = [p0[0], p0[1], p1[0], p1[1]];
       const neigh = t >= 0 ? seeds[t]!.owner : undefined; // undefined ⇒ map boundary
+      // A shut border is additive: classified by ownership below AS WELL, so the player
+      // still reads whose land it is. Never on the map boundary — there is no province
+      // across it to be cut off from.
+      if (t >= 0 && idx < t && sealed?.(idx, t) === true) sealedEdge.push(seg);
       if (t >= 0 && owner !== null && neigh === owner) {
         if (idx < t) bucket(ownedInner, owner).push(seg); // same empire, draw once
       } else if (owner !== null) {
@@ -331,5 +366,5 @@ export function classifyBorders(
       }
     }
   }
-  return { ownedFront, ownedInner, neutralEdge };
+  return { ownedFront, ownedInner, neutralEdge, sealedEdge };
 }
