@@ -261,6 +261,13 @@ import { medalBadges } from '../../decisions/unitMedals';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { waveReadout } from '../../decisions/waveReadout';
 import { boonOffer } from '../../decisions/waveBoons';
+import {
+  RUN_SAVE_VERSION,
+  parseRunSave,
+  serializeRunSave,
+  type RunSaveStore,
+} from '../../decisions/runSave';
+import { localRunSaveStore } from './runSaveLocal';
 import { takeBoon } from '../../decisions/actions';
 import {
   authOutcome,
@@ -12743,6 +12750,93 @@ function renderBoonPick(): void {
   }
 }
 
+/**
+ * Сохранение забега (PVR-0.3).
+ *
+ * Бэкенд подставляется ЗДЕСЬ и только здесь: забег о нём не знает, он знает интерфейс
+ * `RunSaveStore`. В релизной сборке площадки сюда встанет облачное хранилище, и код
+ * ниже не изменится — в этом и была цена асинхронного интерфейса.
+ */
+const runSaveStore: RunSaveStore = localRunSaveStore();
+/** Реальное время последней записи. Снимок пишется НЕ каждый кадр: он весит десятки
+ *  килобайт, а забегу хватает секундной точности. */
+let runSavedAtReal = 0;
+const RUN_SAVE_EVERY_MS = 4000;
+
+/** Идёт ли сейчас забег, который стоит хранить: PvE-матч, который ещё не кончился. */
+function runInProgress(): boolean {
+  return !NET && s.pve !== undefined && s.match.status !== 'ended';
+}
+
+/** Записать снимок (или забыть его, если забег кончился). Провал записи молчалив —
+ *  бэкенд обещает не ронять игру, а не обещает сохранить. */
+function saveRun(): void {
+  if (!runInProgress()) return;
+  const mode = matchMode();
+  if (!mode) return;
+  detach(
+    'save run',
+    runSaveStore.save(
+      serializeRunSave({ v: RUN_SAVE_VERSION, mode, difficulty: pveDifficulty, state: s }),
+    ),
+  );
+}
+
+/** Кадровый такт сохранения: раз в несколько секунд, пока забег идёт. Кончился —
+ *  снимок забывается, иначе следующий запуск воскресил бы доигранный мир. */
+function tickRunSave(nowReal: number): void {
+  if (!NET && s.pve !== undefined && s.match.status === 'ended') {
+    detach('forget run', runSaveStore.clear());
+    return;
+  }
+  if (!runInProgress() || nowReal - runSavedAtReal < RUN_SAVE_EVERY_MS) return;
+  runSavedAtReal = nowReal;
+  saveRun();
+}
+
+/**
+ * Поднять забег из снимка при загрузке страницы. Ничего нет или снимок негоден —
+ * `false`, и игра открывается как обычно: «сохранения нет» это не ошибка.
+ */
+async function restoreRun(): Promise<boolean> {
+  // Пришедшего ПО ССЫЛКЕ забег не перехватывает: он уже дозванивается в сетевой матч,
+  // и поднять поверх этого локальный мир значило бы увести его не туда. Снимок при
+  // этом не трогаем — он дождётся обычного запуска.
+  if (cameFromLink || NET) return false;
+  const save = parseRunSave(await runSaveStore.load());
+  if (!save) return false;
+  const state = save.state as GameState;
+  // Режим из снимка может не существовать в задеплоенных данных (игру обновили) —
+  // тогда восстанавливать нельзя: волны пошли бы по другим правилам, а то и не пошли.
+  if (!data.modes[save.mode]) {
+    detach('forget run', runSaveStore.clear());
+    return false;
+  }
+  const aiSeats = new Map<string, AiProfile>(
+    Object.keys(state.players ?? {})
+      .filter((id) => id !== 'p1')
+      .map((id) => [id, parseRunDifficulty(save.difficulty)]),
+  );
+  try {
+    installMatch(state, aiSeats, save.mode);
+  } catch {
+    // Снимок прошёл разбор, но миром не стал (чужая форма состояния, битая карта).
+    // Забываем его: воскрешать полусобранный мир хуже, чем начать заново.
+    detach('forget run', runSaveStore.clear());
+    return false;
+  }
+  applyTimeSpeed(setupSpeed);
+  // Экраны, через которые игрок обычно ИДЁТ к матчу, закрываются сами — по дороге.
+  // Восстановление в эту дорогу не входит, поэтому закрывает их явно: без этого забег
+  // оживает ПОД экраном приветствия, и игрок видит форму входа с окном усиления
+  // поверх неё (поймано снимком живой сборки, не тестом).
+  showConnect(false);
+  showHub(false);
+  setupEl.style.display = 'none';
+  note(t('setup.pve.restored'));
+  return true;
+}
+
 function frame(nowReal: number) {
   flushPinch();
   const wasHolographic = holographic.active();
@@ -12830,6 +12924,7 @@ function frame(nowReal: number) {
   // PVR-1.2: строка волн стоит рядом с часами, потому что это то же самое измерение —
   // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
   // «нечего», и полоса выглядит ровно как до этого кирпича.
+  tickRunSave(nowReal);
   renderBoonPick();
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
@@ -13958,6 +14053,18 @@ if (diploEl) {
 }
 
 requestAnimationFrame(frameLoop);
+
+// --- сохранение забега (PVR-0.3) --------------------------------------------
+// Страницу закрывают чаще, чем проходит такт записи, поэтому снимок берётся ещё и на
+// уходе. `pagehide` вместо `beforeunload`: второй ненадёжен на мобильных, где вкладку
+// не «закрывают», а вытесняют из памяти.
+addEventListener('pagehide', saveRun);
+addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveRun();
+});
+// Забег, прерванный перезагрузкой, возвращается сам: это и есть обещание кирпича.
+// Провал — не ошибка, игра просто открывается как обычно.
+detach('restore run', restoreRun());
 
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —
