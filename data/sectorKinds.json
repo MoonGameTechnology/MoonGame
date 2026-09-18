@@ -182,5 +182,19 @@
       "label": "dense cluster",
       "shape": "junction"
     }
+  },
+  "rift": {
+    "name": "Spatial Rift",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#7a4a8f",
+      "label": "spatial rift",
+      "shape": "marker"
+    },
+    "traversable": false
   }
 }

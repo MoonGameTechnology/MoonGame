@@ -126,6 +126,26 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     }
   }
 
+  // Impassability (MAP-BARRIER). A kind marked `traversable: false` is a HOLE in the
+  // map, not a place: nothing may route through it and no lane may lead into it. The
+  // flag existed since M2.1 but was read in exactly one place (the hero corridor), so
+  // the shipped black hole was impassable only because its generator happened to give
+  // it no edges — a convention, not a rule. Enforced here instead of in the router:
+  // with no lanes there is nothing to route through, and the sector still does its job
+  // by EXISTING, since the neighbour rule above kills any lane that would pass through
+  // the space it occupies. That is what makes a rift a barrier rather than a label.
+  if (data) {
+    for (const key of seen) {
+      const [a, b] = key.split('|') as [string, string];
+      for (const end of [a, b]) {
+        const kind = map.sectors[end]?.kind;
+        if (kind !== undefined && data.sectorKinds[kind]?.traversable === false) {
+          issues.push(`E_IMPASSABLE_HAS_LANE:${end}`);
+        }
+      }
+    }
+  }
+
   // Transit (MAP-TRANSIT): a sector may declare WHICH pairs of its neighbours connect
   // through it, so two lanes can cross the same province without meeting. The pairs
   // must name real neighbours — a pair pointing at a sector there is no lane to would
@@ -196,8 +216,16 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     if (!isOwnerRef(fl.owner)) issues.push(`E_FLEET_UNKNOWN_OWNER:${id}`);
   }
 
-  // graph connectivity (BFS over the valid undirected edges)
-  if (ids.length > 1) {
+  // graph connectivity (BFS over the valid undirected edges). Impassable sectors are
+  // EXEMPT from the requirement: a rift or a black hole is a hole in the map, so
+  // demanding a route to it would force the author to either drill a lane into the
+  // barrier or switch the check off — and both defeat the barrier. What must stay
+  // connected is everything a fleet can actually reach.
+  const reachRequired = ids.filter((id) => {
+    const kind = map.sectors[id]?.kind;
+    return !(data && kind !== undefined && data.sectorKinds[kind]?.traversable === false);
+  });
+  if (reachRequired.length > 1) {
     const adj = new Map<string, string[]>(ids.map((id) => [id, []]));
     for (const [a, b] of map.paths) {
       if (has(a) && has(b) && a !== b) {
@@ -205,8 +233,8 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
         adj.get(b)!.push(a);
       }
     }
-    const seenN = new Set<string>([ids[0]!]);
-    const queue = [ids[0]!];
+    const seenN = new Set<string>([reachRequired[0]!]);
+    const queue = [reachRequired[0]!];
     while (queue.length) {
       const cur = queue.shift()!;
       for (const n of adj.get(cur) ?? []) {
@@ -216,7 +244,7 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
         }
       }
     }
-    if (seenN.size !== ids.length) issues.push('E_MAP_DISCONNECTED');
+    if (reachRequired.some((id) => !seenN.has(id))) issues.push('E_MAP_DISCONNECTED');
   }
 
   return issues;

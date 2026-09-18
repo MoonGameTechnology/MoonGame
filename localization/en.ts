@@ -675,6 +675,8 @@ export const en: Record<string, string> = {
   'data.amber-concord': 'Amber Concord',
   'data.annihilate': 'Annihilate',
   'data.asteroid-field': 'Asteroid field',
+  'data.spatial-rift': 'Spatial Rift',
+  'data.depleted-system': 'Depleted System',
   'data.dense-asteroid-cluster': 'Dense Asteroid Cluster',
   'data.azure-compact': 'Azure Compact',
   'data.barracks': 'Barracks',

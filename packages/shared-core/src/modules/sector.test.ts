@@ -169,6 +169,7 @@ describe('sector module — terrain yield (MAP-LINK)', () => {
     sectors: {
       empty_space: { speedBonus: 0.15 },
       asteroid_cluster: { speedBonus: -0.5, baseOutput: { metal: 14 }, productionByResource: { metal: 0.5 } },
+      depleted_system: { speedBonus: 0.1, productionByResource: { metal: -0.4 } },
     },
   });
 
@@ -206,6 +207,12 @@ describe('sector module — terrain yield (MAP-LINK)', () => {
   it('it also multiplies what buildings already mined there', () => {
     // 10 mined + 14 held = 24, then the terrain's metal multiplier
     expect(produced('asteroid_cluster', { metal: 10 })).toBeCloseTo(36, 6);
+  });
+
+  it('a worked-out system yields LESS than the same buildings elsewhere (TER-14)', () => {
+    // The first terrain in the catalogue with a negative multiplier: the province is
+    // worth taking for where it SITS, not for what it produces. 10 mined → 6.
+    expect(produced('depleted_system', { metal: 10 })).toBeCloseTo(6, 6);
   });
 
   it('a terrain that holds nothing passes the bag through untouched', () => {

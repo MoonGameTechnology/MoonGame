@@ -494,3 +494,56 @@ describe('validateMatchMap — terrain decides how many lanes a sector carries (
     expect(validateMatchMap(onTheLine, data)).toContain('E_PATH_NOT_NEIGHBOR:a|b');
   });
 });
+
+describe('validateMatchMap — an impassable sector is a hole in the map (MAP-BARRIER)', () => {
+  /** Two provinces far enough apart that geometry would happily join them… */
+  const pair = (middle?: Record<string, unknown>): MatchMap =>
+    parseMatchMap({
+      id: 'rift',
+      seed: 'rift',
+      sectors: {
+        west: { position: { x: -300, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        east: { position: { x: 300, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        north: { position: { x: 0, y: -420 }, kind: 'planet', terrain: 'empty_space' },
+        ...(middle ? { middle } : {}),
+      },
+      paths: [
+        ['west', 'north'],
+        ['north', 'east'],
+      ],
+    });
+
+  it('without the rift the two provinces may be joined directly', () => {
+    const map = pair();
+    map.paths.push(['west', 'east']);
+    expect(validateMatchMap(map, data)).toEqual([]);
+  });
+
+  it('a rift standing between them kills the direct lane — it blocks by EXISTING', () => {
+    // The barrier needs no router support: the neighbour rule already refuses a lane
+    // through the space the rift occupies. That is the whole mechanism.
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'rift' });
+    map.paths.push(['west', 'east']);
+    expect(validateMatchMap(map, data)).toContain('E_PATH_NOT_NEIGHBOR:east|west');
+  });
+
+  it('no lane may lead INTO it', () => {
+    // The flag used to be decorative: the shipped black hole was impassable only
+    // because its generator happened to give it no edges. Now it is a rule.
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'rift' });
+    map.paths.push(['north', 'middle']);
+    expect(validateMatchMap(map, data)).toContain('E_IMPASSABLE_HAS_LANE:middle');
+  });
+
+  it('and nobody has to reach it: connectivity exempts what a fleet cannot enter', () => {
+    // Otherwise the author would have to drill a lane into the barrier or switch the
+    // check off — and both defeat the barrier.
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'rift' });
+    expect(validateMatchMap(map, data)).toEqual([]);
+  });
+
+  it('a passable sector is still required to be reachable', () => {
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'planet', terrain: 'empty_space' });
+    expect(validateMatchMap(map, data)).toContain('E_MAP_DISCONNECTED');
+  });
+});
