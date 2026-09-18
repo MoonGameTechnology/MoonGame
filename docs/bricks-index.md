@@ -825,21 +825,22 @@
 | LARS-2 | 🔒 | srv | `docs/live-arsenal-roadmap.md:152` | Цепочка валют → живой фронт end-to-end |
 | LARS-3 | ✅ | srv data | `docs/live-arsenal-roadmap.md:175` | Баланс и гайки честности [srv/data] — реализовано (частично осознанно) |
 | LARS-4 | ✅ | proto | `docs/live-arsenal-roadmap.md:211` | UI: живая Верфь в матче — реализовано |
-| M0.1 | ✅ | docs | `docs/map-roadmap.md:70` | Зафиксировать модель в дизайн-доках — |
-| M0.2 | ✅ | core | `docs/map-roadmap.md:78` | Развести sectorType → terrain — |
-| M1.1 | ✅ | data | `docs/map-roadmap.md:96` | Схема карты data/maps/.json — |
-| M1.3 | ✅ | core | `docs/map-roadmap.md:115` | Валидация путей: только к соседям — |
-| M2.1 | ✅ | core data | `docs/map-roadmap.md:130` | Виды секторов (kind) в данные — |
-| M2.2 | ✅ | core | `docs/map-roadmap.md:149` | «Захват заходом» как правило ядра — |
-| M2.3 | ✅ | core cli | `docs/map-roadmap.md:160` | Масштаб / вес сектора (планета = меньше) — (интерактивный ресайз — в M3.1) |
-| M2.4 | ✅ | core data | `docs/map-roadmap.md:172` | Связность — свойство местности, а не координат — |
-| M2.5 | ✅ | core data | `docs/map-roadmap.md:219` | Параллельные пути через провинцию — |
-| M2.6 | ✅ | core data | `docs/map-roadmap.md:271` | Непроходимость перестала быть декоративной — |
-| M2.7 | ✅ | cli proto | `docs/map-roadmap.md:321` | Граница, через которую нет пути, видна как барьер — |
-| M3.1 | 🔒 |  | `docs/map-roadmap.md:367` | Редактор карты [tools] |
-| M3.2 | ⏳ |  | `docs/map-roadmap.md:375` | Процедурный пресет → формат карты [tools] |
-| M4.1 | ✅ | cli | `docs/map-roadmap.md:385` | Рендер из данных сектора — /🚧 |
-| M4.2 | ⏳ | docs | `docs/map-roadmap.md:391` | Сверка с метаигрой и отложенным регионом |
+| M0.1 | ✅ | docs | `docs/map-roadmap.md:75` | Зафиксировать модель в дизайн-доках — |
+| M0.2 | ✅ | core | `docs/map-roadmap.md:83` | Развести sectorType → terrain — |
+| M1.1 | ✅ | data | `docs/map-roadmap.md:101` | Схема карты data/maps/.json — |
+| M1.3 | ✅ | core | `docs/map-roadmap.md:120` | Валидация путей: только к соседям — |
+| M2.1 | ✅ | core data | `docs/map-roadmap.md:135` | Виды секторов (kind) в данные — |
+| M2.2 | ✅ | core | `docs/map-roadmap.md:154` | «Захват заходом» как правило ядра — |
+| M2.3 | ✅ | core cli | `docs/map-roadmap.md:165` | Масштаб / вес сектора (планета = меньше) — (интерактивный ресайз — в M3.1) |
+| M2.4 | ✅ | core data | `docs/map-roadmap.md:177` | Связность — свойство местности, а не координат — |
+| M2.5 | ✅ | core data | `docs/map-roadmap.md:224` | Параллельные пути через провинцию — |
+| M2.6 | ✅ | core data | `docs/map-roadmap.md:276` | Непроходимость перестала быть декоративной — |
+| M2.7 | ✅ | cli proto | `docs/map-roadmap.md:326` | Граница, через которую нет пути, видна как барьер — |
+| M3.1 | 🔒 |  | `docs/map-roadmap.md:376` | Редактор карты [tools] |
+| M3.2 | ⏳ |  | `docs/map-roadmap.md:384` | Процедурный пресет → формат карты [tools] |
+| M4.1 | ✅ | cli | `docs/map-roadmap.md:394` | Рендер из данных сектора — /🚧 |
+| M4.3 | ✅ | core data cli | `docs/map-roadmap.md:400` | Соседство выводится из мозаики — |
+| M4.2 | ⏳ | docs | `docs/map-roadmap.md:448` | Сверка с метаигрой и отложенным регионом |
 | MM-0.1 | ⏳ | srv | `docs/matchmaking-roadmap.md:27` | Состояния матча: lobby→active→ended→archived |
 | MM-0.2 | ✅ | core proto srv | `docs/matchmaking-roadmap.md:33` | Подключить victoryModule + баннер |
 | MM-1.1 | 🔒 | srv | `docs/matchmaking-roadmap.md:43` | Лобби (создание/присоединение) |

@@ -70,6 +70,25 @@ export {
   type SlotAssignment,
 } from './state/buildFromMap';
 export {
+  matchMapEdges,
+  type MapEdges,
+} from './state/buildFromMap';
+export {
+  BOUNDARY,
+  MIN_BORDER,
+  SEED_WEIGHT,
+  CLIP_PAD_MIN,
+  CLIP_PAD_RATIO,
+  clampPowerWeights,
+  clipHalfPlaneTagged,
+  mosaicBorders,
+  mosaicFrame,
+  sealPlan,
+  type MosaicBorder,
+  type MosaicSeed,
+  type SealPlan,
+} from './state/mosaic';
+export {
   sectorKindDef,
   provinceScore,
   isCapturable,

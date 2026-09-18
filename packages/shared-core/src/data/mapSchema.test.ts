@@ -16,7 +16,9 @@ describe('map schema (map-roadmap.md M1.1)', () => {
     const map = parseMatchMap(readMap('skirmish-1.json'));
     expect(map.id).toBe('skirmish-1');
     expect(Object.keys(map.sectors)).toContain('nexus');
-    expect(map.paths.length).toBe(4);
+    // Путей у неё больше НЕТ: пропущенный `paths` означает «вывести соседство из
+    // мозаики» (M4.3) — общая граница и есть путь, и разойтись им теперь негде.
+    expect(map.paths).toBeUndefined();
     // defaults: a sector with no owner → null; no kind → 'planet'; empty arrays
     expect(map.sectors.nexus!.owner).toBeNull();
     expect(map.sectors.nexus!.kind).toBe('nebula');
@@ -125,14 +127,14 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       'nebula',
       'solar_flare_zone',
     ]);
-    // `empty` joined the spread with the Sector Zero fork rebuild: a fork is a point
-    // where lines meet, NOT a province, and `empty` is the catalogue's non-capturable,
-    // non-buildable kind — the only way to say "nothing is here but the junction".
+    // `empty` ушёл из набора вместе с развилками (M4.3): в мозаике соседство — это
+    // общая граница, а у точки схода линий клетки нет, значит и границы нет. Пустой
+    // узел перестал быть выразимым, и §0 роадмапа карты требовал ровно этого.
+    // Каталог вид сохраняет — его ставят авторские карты со своим списком путей.
     expect([...kinds].sort()).toEqual([
       'asteroid',
       'asteroid_cluster',
       'dense_nebula',
-      'empty',
       'ion_storm',
       'nebula',
       'planet',
