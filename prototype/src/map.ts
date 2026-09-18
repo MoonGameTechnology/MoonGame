@@ -33,8 +33,8 @@ export interface SectorType {
   buildable: boolean;
   orbit: boolean;
   color: string;
-  /** Province-centric build roster (the buildings raisable here). Absent = the
-   *  default `BUILDABLE` set. Mirrors core `sectorKinds.allowedBuildings`. */
+  /** Province-centric build roster (the buildings raisable here). Absent = any
+   *  building — the core's permissive default. Mirrors `sectorKinds.allowedBuildings`. */
   allowedBuildings?: string[];
 }
 /** The prototype's UI delta per sector kind: display name, `data.sectors` terrain
@@ -84,9 +84,10 @@ export function isImpassableKind(kind: string | undefined): boolean {
 /** SECTOR_TYPES = UI delta + gameplay flags DERIVED from `data.sectorKinds` via the
  *  core's own resolution (permissive default for kinds the data doesn't list) — one
  *  source of truth for capturable/buildable/orbit, so the prototype can't drift from
- *  what the kernel actually enforces. `allowedBuildings` stays the UI roster: the
- *  prototype may be stricter than the core (asteroid), else it mirrors the data
- *  (dead_world's salvage rig comes from `data.sectorKinds`). */
+ *  what the kernel actually enforces. `allowedBuildings` is the same mirror and gates
+ *  nothing on its own: since MIG-10 the build buttons ask `decisions/buildGate.ts`, which
+ *  reads the core helpers directly. It survives for the parity test that pins this
+ *  derivation to `data/sectorKinds.json`. */
 export const SECTOR_TYPES: Record<string, SectorType> = Object.fromEntries(
   Object.entries(SECTOR_TYPE_UI).map(([kind, ui]) => {
     const planet = { kind };
