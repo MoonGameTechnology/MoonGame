@@ -12,7 +12,7 @@
 
 // --- content + map -----------------------------------------------------------
 export { data } from './gameData';
-export { SECTOR_TYPES, MAP, START_CANDIDATES, type SectorType, type MapNode } from './map';
+export { SECTOR_TYPES, isImpassableKind, MAP, START_CANDIDATES, type SectorType, type MapNode } from './map';
 
 // --- wall-clock units of game time -------------------------------------------
 export { HOUR, DAY } from './time';

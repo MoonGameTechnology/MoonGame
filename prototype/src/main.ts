@@ -18,6 +18,7 @@ import {
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
+  isImpassableKind,
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
   DAY,
@@ -4391,12 +4392,32 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
   // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
   // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
+  // MAP-SEAL: в мозаике соседство ЧИТАЕТСЯ по общей границе, поэтому граница без пути
+  // молча обещает переход, которого нет. Но рисовать барьер на КАЖДОЙ такой границе
+  // нельзя: на песочнице их 59% (341 граница против 170 путей — расхождение мозаики
+  // и графа связей, задача выравнивания данных из `map-roadmap.md` §0), и карта стала бы
+  // лабиринтом. Решение владельца 2026-09-18: барьер только там, где мир его ОБЪЯСНЯЕТ —
+  // у непроходимого сектора. Остальные расхождения молчат, пока данные не сведены.
+  //
+  // И только там, где игрок знает ОБЕ стороны: неразведанный подход — «неизвестно», а не
+  // подтверждённо закрыто (правило §3.2 каталога местностей).
+  const sealedBorder = (a: number, b: number): boolean => {
+    const ia = provinceIds[a];
+    const ib = provinceIds[b];
+    if (ia === undefined || ib === undefined) return false;
+    if (!isImpassableKind(s.planets[ia]?.kind) && !isImpassableKind(s.planets[ib]?.kind)) {
+      return false; // мир не объясняет эту границу — молчим
+    }
+    const seen = (id: string): boolean => known(id) || memory.has(id);
+    return seen(ia) && seen(ib);
+  };
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
       : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographicMapOn(),
+    sealed: sealedBorder,
   }, territoryGeometry.project(seeds, clip, cam.scale));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
