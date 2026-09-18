@@ -28,12 +28,6 @@
       "planetType": "gas_giant"
     }
   },
-  "paths": [
-    ["home_green", "nexus"],
-    ["home_red", "nexus"],
-    ["nexus", "drift"],
-    ["nexus", "veil"]
-  ],
   "players": {
     "green": { "name": "Vanguard Compact", "faction": "vanguard", "resources": { "credits": 300, "metal": 300 } },
     "red": { "name": "Swarm Collective", "faction": "swarm", "resources": { "credits": 300, "metal": 300 } }

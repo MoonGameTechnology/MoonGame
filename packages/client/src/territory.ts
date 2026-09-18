@@ -12,7 +12,16 @@
  * colour palette, so any renderer can call it. `computePowerCells` is pure and touches no
  * canvas (unit-testable); `drawTerritory` paints those cells into a provided 2D context.
  */
+import { clampPowerWeights, clipHalfPlaneTagged } from '@void/shared-core';
+
 import { rgba } from './holoDraw';
+
+// MAP-MOSAIC (M4.3): the weight clamp and the tagged clipper live in `@void/shared-core`,
+// because the CORE now derives the lane graph from this very tessellation. Two copies of
+// this math would mean the mosaic drawn and the mosaic travelled are different mosaics —
+// the drift this brick exists to end. Re-exported so this module stays the render surface's
+// single import.
+export { clampPowerWeights, clipHalfPlaneTagged };
 
 /** A sector centre as a power-diagram site: screen-space centre, weight (px²), the owner
  *  as the viewer may know it (`null` = neutral), and the sector kind (for the terrain tint). */
@@ -55,40 +64,6 @@ export interface TerritoryPalette {
 /** Sentinel edge-tag: this province edge sits on the map boundary, not a neighbour. */
 export const BOUNDARY = -1;
 
-/** Clamp the spread of power-diagram (weighted-Voronoi) weights so no province cell is
- *  ever swallowed by a heavier neighbour. In a power diagram a site keeps a non-empty
- *  cell iff `w_j - w_i ≤ d_ij²` for every other site `j`; the binding case is the
- *  closest pair, so capping the total weight RANGE strictly below the minimum squared
- *  inter-seed distance keeps EVERY cell non-empty. Size ordering is preserved (a bigger
- *  world still claims a little more land) — just never enough to erase a close neighbour
- *  (which left that neighbour with no cell and no border). Mutates `w` in place; a no-op
- *  for <2 seeds or coincident points. */
-export function clampPowerWeights(seeds: Array<{ x: number; y: number; w: number }>): void {
-  const n = seeds.length;
-  if (n < 2) return;
-  let minD2 = Infinity;
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const dx = seeds[i]!.x - seeds[j]!.x;
-      const dy = seeds[i]!.y - seeds[j]!.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < minD2) minD2 = d2;
-    }
-  }
-  if (!Number.isFinite(minD2) || minD2 <= 0) return;
-  let wmin = Infinity;
-  let wmax = -Infinity;
-  for (const s of seeds) {
-    if (s.w < wmin) wmin = s.w;
-    if (s.w > wmax) wmax = s.w;
-  }
-  const range = wmax - wmin;
-  const cap = minD2 * 0.9; // strictly below the swallow threshold (d_ij² ≥ minD2 for all pairs)
-  if (range <= cap || range <= 0) return;
-  const k = cap / range;
-  for (const s of seeds) s.w = wmin + (s.w - wmin) * k;
-}
-
 /** Clip a convex polygon to the half-plane a*x + b*y + c ≤ 0 (Sutherland–Hodgman).
  *  Used to carve the weighted-Voronoi (power-diagram) province cells. */
 export function clipHalfPlane(
@@ -110,49 +85,6 @@ export function clipHalfPlane(
     }
   }
   return out;
-}
-
-/** Like {@link clipHalfPlane}, but carries a per-edge tag so the political map can
- *  colour each border by what lies across it. `tags[k]` is what borders the edge
- *  `poly[k]→poly[k+1]`: a neighbour seed index (≥0) or {@link BOUNDARY}. The newly-cut
- *  edge (along the clip line) is tagged `clipTag` (the seed we clipped against); surviving
- *  original edges keep their tag. Lets same-owner borders draw as faint hairlines (the
- *  empire reads as one field) and owner-vs-owner borders as a bright frontier. */
-export function clipHalfPlaneTagged(
-  poly: Array<[number, number]>,
-  tags: number[],
-  a: number,
-  b: number,
-  c: number,
-  clipTag: number,
-): { poly: Array<[number, number]>; tags: number[] } {
-  const out: Array<[number, number]> = [];
-  const outT: number[] = [];
-  const n = poly.length;
-  for (let i = 0; i < n; i++) {
-    const cur = poly[i]!;
-    const nxt = poly[(i + 1) % n]!;
-    const tag = tags[i]!;
-    const dc = a * cur[0] + b * cur[1] + c;
-    const dn = a * nxt[0] + b * nxt[1] + c;
-    const cross = dc < 0 !== dn < 0;
-    if (dc <= 0) {
-      out.push(cur);
-      if (cross) {
-        const t = dc / (dc - dn);
-        out.push([cur[0] + t * (nxt[0] - cur[0]), cur[1] + t * (nxt[1] - cur[1])]);
-        outT.push(tag); // cur → intersection: surviving part of the original edge
-        outT.push(clipTag); // intersection → next: along the new clip line (this neighbour)
-      } else {
-        outT.push(tag); // wholly-inside original edge keeps its tag
-      }
-    } else if (cross) {
-      const t = dc / (dc - dn);
-      out.push([cur[0] + t * (nxt[0] - cur[0]), cur[1] + t * (nxt[1] - cur[1])]);
-      outT.push(tag); // intersection → nxt: re-entering part of the original edge
-    }
-  }
-  return { poly: out, tags: outT };
 }
 
 /** Tessellate the seeds into power-diagram province cells clipped to `clip` (a convex

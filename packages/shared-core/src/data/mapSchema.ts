@@ -120,8 +120,16 @@ export const MatchMapSchema = z.object({
   sectors: z.record(z.string(), MapSectorSchema),
   /** Undirected adjacency: each pair is a two-way path. Order within a pair is
    *  irrelevant; symmetry, no self-loops and the neighbour-only rule are enforced
-   *  in `validateMatchMap`. */
-  paths: z.array(z.tuple([z.string(), z.string()])).default([]),
+   *  in `validateMatchMap`.
+   *
+   *  **OMIT IT to derive adjacency from the mosaic** (M4.3, the model §0 asks for):
+   *  neighbours are then whoever shares a border in the power diagram over the sector
+   *  centres, minus what terrain seals (`maxLinks`). That is the only way the drawn
+   *  border and the travelable lane cannot disagree — an authored list next to a drawn
+   *  mosaic is two graphs, and on every shipped map they diverged. Authored paths stay
+   *  supported (fixtures, the legacy prototype graphs) and keep the neighbour-only rule.
+   *  An explicit `[]` means a map with no lanes at all, which is NOT the same thing. */
+  paths: z.array(z.tuple([z.string(), z.string()])).optional(),
   players: z.record(playerIdSchema, MapPlayerSchema).default({}),
   /** Team-aware start slots (`corporation-wars.md`): start positions decoupled from
    *  concrete players. A sector/fleet `owner` may name a slot id; `buildStateFromMap`

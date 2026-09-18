@@ -344,6 +344,13 @@ export interface Planet {
    *  running one cannot switch to the other in passing. Read by `planRoute`; a fleet
    *  that STOPS here is not in transit, so its next order starts fresh. */
   transit?: Array<[PlanetId, PlanetId]>;
+  /** Neighbours on the MOSAIC that terrain keeps SHUT (M4.3). They share a drawn border
+   *  with this sector but carry no lane, so a fleet cannot cross — the border is a closed
+   *  door, not an open one. Published here because the renderer must be able to draw the
+   *  barrier without re-deriving the geometry (a second copy of the tessellation is
+   *  exactly how the drawn map and the travelable map drifted apart in the first place).
+   *  Symmetric: if `a` lists `b`, `b` lists `a`. Undefined = nothing sealed. */
+  sealed?: PlanetId[];
   /** Sector terrain type id (resolved against game data `sectors`); its buffs
    *  /debuffs are applied through hooks. Undefined = plain space, no modifier. */
   terrain?: string;

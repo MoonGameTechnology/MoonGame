@@ -14,6 +14,7 @@ import {
 } from './gameState';
 import { pairKey } from './diplomacy';
 import { distance } from './route';
+import { mosaicBorders, sealPlan, type MosaicSeed } from './mosaic';
 
 /**
  * Map-as-content loader (map-roadmap.md M1.2 / M1.3). Turns a validated `MatchMap`
@@ -22,6 +23,54 @@ import { distance } from './route';
  * same state. Replaces the procedural prototype map and the hard-coded server
  * scenario with a single "load this map file" path.
  */
+
+/** The adjacency a map actually plays on, plus what terrain shut. */
+export interface MapEdges {
+  /** Travelable lanes — an undirected edge list, canonical and sorted when derived. */
+  paths: Array<[string, string]>;
+  /** Borders that EXIST on the mosaic but carry no lane (derived maps only). */
+  sealed: Array<[string, string]>;
+  /** Sectors terrain could not bring within budget without cutting the map in two. */
+  overBudget: string[];
+  /** Did this come from the mosaic (`true`) or from the map's own `paths` (`false`)? */
+  derived: boolean;
+}
+
+/**
+ * Resolve a map's adjacency (M4.3). A map that declares `paths` plays on exactly those,
+ * as always. A map that OMITS them derives them from the province mosaic: geometry
+ * proposes every shared border, terrain seals the surplus (`maxLinks`), and an impassable
+ * kind seals all of its own — so the drawn border and the travelable lane are one graph
+ * instead of two that silently disagree (see `mosaic.ts`).
+ *
+ * Degrades rather than crashes without `data`: with no catalogue there are no budgets, so
+ * every shared border stays open.
+ */
+export function matchMapEdges(map: MatchMap, data?: GameData): MapEdges {
+  if (map.paths !== undefined) {
+    return { paths: map.paths, sealed: [], overBudget: [], derived: false };
+  }
+  const ids = Object.keys(map.sectors).sort();
+  const seeds: MosaicSeed[] = ids.map((id) => {
+    const sec = map.sectors[id]!;
+    return { id, x: sec.position.x, y: sec.position.y, size: sec.size };
+  });
+  const budgetOf = (id: string): number => {
+    if (!data) return Number.POSITIVE_INFINITY;
+    const sec = map.sectors[id];
+    if (sec?.kind !== undefined && data.sectorKinds[sec.kind]?.traversable === false) return 0;
+    return sec?.terrain !== undefined
+      ? (data.sectors[sec.terrain]?.maxLinks ?? Number.POSITIVE_INFINITY)
+      : Number.POSITIVE_INFINITY;
+  };
+  const plan = sealPlan(mosaicBorders(seeds), budgetOf, ids);
+  return {
+    paths: plan.open.map((b) => [b.a, b.b] as [string, string]),
+    sealed: plan.sealed.map((b) => [b.a, b.b] as [string, string]),
+    overBudget: plan.overBudget,
+    derived: true,
+  };
+}
 
 /**
  * Structural + geometric validation of a map (M1.3). Returns a list of stable
@@ -45,6 +94,9 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   const isOwnerRef = (ref: string): boolean =>
     Object.prototype.hasOwnProperty.call(map.players, ref) ||
     Object.prototype.hasOwnProperty.call(map.slots, ref);
+  // The lanes this map plays on: its own `paths`, or — when it omits them — the mosaic
+  // borders minus what terrain seals (M4.3). Everything below validates THESE.
+  const edges = matchMapEdges(map, data);
 
   // a slot id must not collide with a player id (an ambiguous owner reference)
   for (const sid of Object.keys(map.slots)) {
@@ -70,7 +122,7 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
 
   // paths: known endpoints, no self-loop, no duplicate, neighbour-only
   const seen = new Set<string>();
-  for (const [a, b] of map.paths) {
+  for (const [a, b] of edges.paths) {
     if (!has(a) || !has(b)) {
       issues.push(`E_PATH_UNKNOWN_SECTOR:${a}-${b}`);
       continue;
@@ -85,6 +137,9 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       continue;
     }
     seen.add(key);
+    // Derived lanes ARE mosaic borders, which is a wider (and different) criterion than
+    // Gabriel's — judging them by it would reject the very adjacency the mosaic draws.
+    if (edges.derived) continue;
     // Gabriel criterion: the lane is legal unless a third sector sits inside the
     // circle that has A—B as its diameter — i.e. unless something is genuinely IN
     // THE WAY. Deliberately more permissive than the relative-neighbourhood rule it
@@ -105,12 +160,18 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     if (between) issues.push(`E_PATH_NOT_NEIGHBOR:${key}`);
   }
 
+  // A derived map is already within budget by construction (`sealPlan` shut the surplus).
+  // What it could NOT shut without stranding a province is a real authoring problem — the
+  // dots are placed so that some region carries more approaches than its terrain admits —
+  // so it surfaces under the same code an authored map would get.
+  for (const id of edges.overBudget) issues.push(`E_SECTOR_OVERLINKED:${id}`);
+
   // Link budget (MAP-LINK): terrain decides how many lanes a region can carry.
   // Geometry above says which sectors CAN see each other; this says how many of
   // those a world of that terrain actually admits — a dense asteroid cluster takes
   // one approach and is therefore a dead end, open space routes freely. Counted over
   // the accepted edges only, so a map already rejected above is not blamed twice.
-  if (data) {
+  if (data && !edges.derived) {
     const degree = new Map<string, number>();
     for (const key of seen) {
       const [a, b] = key.split('|') as [string, string];
@@ -134,7 +195,9 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   // with no lanes there is nothing to route through, and the sector still does its job
   // by EXISTING, since the neighbour rule above kills any lane that would pass through
   // the space it occupies. That is what makes a rift a barrier rather than a label.
-  if (data) {
+  // A derived map cannot reach here with a lane into a barrier: an impassable kind is
+  // given a budget of ZERO, so every one of its borders is sealed before this runs.
+  if (data && !edges.derived) {
     for (const key of seen) {
       const [a, b] = key.split('|') as [string, string];
       for (const end of [a, b]) {
@@ -227,7 +290,7 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   });
   if (reachRequired.length > 1) {
     const adj = new Map<string, string[]>(ids.map((id) => [id, []]));
-    for (const [a, b] of map.paths) {
+    for (const [a, b] of edges.paths) {
       if (has(a) && has(b) && a !== b) {
         adj.get(a)!.push(b);
         adj.get(b)!.push(a);
@@ -381,12 +444,23 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     time: options.time ?? map.time,
   });
 
-  // derive per-sector links from the undirected paths (sorted = JSON-stable)
+  // per-sector links from the resolved adjacency (sorted = JSON-stable), plus the
+  // borders terrain shut — a derived map publishes those so the renderer can draw the
+  // barrier without re-deriving the geometry (M4.3).
+  const edges = matchMapEdges(map, data);
   const links: Record<string, string[]> = {};
-  for (const id of Object.keys(map.sectors)) links[id] = [];
-  for (const [a, b] of map.paths) {
+  const sealed: Record<string, string[]> = {};
+  for (const id of Object.keys(map.sectors)) {
+    links[id] = [];
+    sealed[id] = [];
+  }
+  for (const [a, b] of edges.paths) {
     links[a]!.push(b);
     links[b]!.push(a);
+  }
+  for (const [a, b] of edges.sealed) {
+    sealed[a]!.push(b);
+    sealed[b]!.push(a);
   }
 
   // Resolve an owner ref (a player id or a slot id) to a concrete player id.
@@ -407,6 +481,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       owner: sec.owner == null ? null : resolveOwner(sec.owner),
       position: { x: sec.position.x, y: sec.position.y },
       links: [...new Set(links[id])].sort(),
+      ...(sealed[id]!.length ? { sealed: [...new Set(sealed[id])].sort() } : {}),
       ...(sec.transit ? { transit: sec.transit.map(([a, b]) => [a, b] as [string, string]) } : {}),
       resources: {},
       buildings: sec.buildings.map((b) => ({

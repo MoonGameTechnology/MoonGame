@@ -42,20 +42,6 @@
       "garrison": [{ "unit": "militia", "count": 3 }]
     }
   },
-  "paths": [
-    ["home_a1", "west"],
-    ["home_a2", "west"],
-    ["home_a1", "drift"],
-    ["home_a2", "veil"],
-    ["home_b1", "east"],
-    ["home_b2", "east"],
-    ["home_b1", "drift"],
-    ["home_b2", "veil"],
-    ["west", "nexus"],
-    ["east", "nexus"],
-    ["drift", "nexus"],
-    ["veil", "nexus"]
-  ],
   "slots": {
     "slot_a1": { "team": "A", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } },
     "slot_a2": { "team": "A", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } },

@@ -259,6 +259,7 @@ import {
   type RunDifficulty,
 } from '../../decisions/runDifficulty';
 import { medalBadges } from '../../decisions/unitMedals';
+import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { waveReadout } from '../../decisions/waveReadout';
 import { boonOffer } from '../../decisions/waveBoons';
@@ -4392,24 +4393,23 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
   // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
   // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
-  // MAP-SEAL: в мозаике соседство ЧИТАЕТСЯ по общей границе, поэтому граница без пути
-  // молча обещает переход, которого нет. Но рисовать барьер на КАЖДОЙ такой границе
-  // нельзя: на песочнице их 59% (341 граница против 170 путей — расхождение мозаики
-  // и графа связей, задача выравнивания данных из `map-roadmap.md` §0), и карта стала бы
-  // лабиринтом. Решение владельца 2026-09-18: барьер только там, где мир его ОБЪЯСНЯЕТ —
-  // у непроходимого сектора. Остальные расхождения молчат, пока данные не сведены.
-  //
-  // И только там, где игрок знает ОБЕ стороны: неразведанный подход — «неизвестно», а не
-  // подтверждённо закрыто (правило §3.2 каталога местностей).
+  // MAP-SEAL: граница, через которую нет пути, молча обещает переход. С M4.3 клиенту
+  // больше не нужно об этом ДОГАДЫВАТЬСЯ: соседство выводится из мозаики, и ядро
+  // публикует `Planet.sealed` — границы, закрытые местностью. Само правило (что считать
+  // барьером и когда о нём молчать) — чистое решение, общее обоим клиентам:
+  // `decisions/sealedBorder.ts`.
   const sealedBorder = (a: number, b: number): boolean => {
     const ia = provinceIds[a];
     const ib = provinceIds[b];
     if (ia === undefined || ib === undefined) return false;
-    if (!isImpassableKind(s.planets[ia]?.kind) && !isImpassableKind(s.planets[ib]?.kind)) {
-      return false; // мир не объясняет эту границу — молчим
-    }
     const seen = (id: string): boolean => known(id) || memory.has(id);
-    return seen(ia) && seen(ib);
+    const side = (id: string): SealSide => ({
+      id,
+      ...(s.planets[id]?.sealed ? { sealed: s.planets[id]!.sealed } : {}),
+      impassable: isImpassableKind(s.planets[id]?.kind),
+      seen: seen(id),
+    });
+    return isSealedBorder(side(ia), side(ib));
   };
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
