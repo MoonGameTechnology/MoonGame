@@ -268,6 +268,7 @@ import {
   type RunSaveStore,
 } from '../../decisions/runSave';
 import { localRunSaveStore } from './runSaveLocal';
+import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { takeBoon } from '../../decisions/actions';
 import {
   authOutcome,
@@ -9263,12 +9264,18 @@ for (const b of Array.from(document.querySelectorAll('[data-mult]'))) {
 // …), and fast-forward (▶▶) runs at 3× the chosen play. The play/fast buttons carry the
 // live values so pause→resume returns to the chosen pace, not the default.
 const PLAY_BASE = 1 / 3600; // game-hours per real second; 1/3600 ⇒ 1 game-hour per real hour (×1 = wall-clock)
-function applyTimeSpeed(mult: number): void {
+/**
+ * Настроить пару «играть / ускорить». `fastMult` отдельным параметром, потому что у
+ * ЗАБЕГА своё отношение между ними: обычной партии ускорение втрое только помогает, а
+ * забег на нём проскакивает нижнюю границу прохождения (PVR-2.2). По умолчанию — прежние
+ * втрое, так что для всех остальных вызовов ничего не изменилось.
+ */
+function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void {
   const play = PLAY_BASE * mult;
   const playBtn = $('spd-play');
   const fastBtn = $('spd-fast');
   if (playBtn) playBtn.dataset.speed = String(play);
-  if (fastBtn) fastBtn.dataset.speed = String(play * 3);
+  if (fastBtn) fastBtn.dataset.speed = String(PLAY_BASE * fastMult);
   speed = play;
   for (const x of Array.from(document.querySelectorAll('[data-speed]')))
     x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
@@ -10930,7 +10937,9 @@ function startPvEMatch(): void {
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
   installMatch(st, aiSeats, pveModeId());
-  applyTimeSpeed(setupSpeed);
+  // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
+  // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
+  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
   openSetup('hub'); // close setup screen — returns to hub
   note(t('setup.pve.started'));
 }
@@ -12825,7 +12834,7 @@ async function restoreRun(): Promise<boolean> {
     detach('forget run', runSaveStore.clear());
     return false;
   }
-  applyTimeSpeed(setupSpeed);
+  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST); // тот же темп, что у запуска
   // Экраны, через которые игрок обычно ИДЁТ к матчу, закрываются сами — по дороге.
   // Восстановление в эту дорогу не входит, поэтому закрывает их явно: без этого забег
   // оживает ПОД экраном приветствия, и игрок видит форму входа с окном усиления
