@@ -27,9 +27,16 @@ import { distance } from './route';
  * Structural + geometric validation of a map (M1.3). Returns a list of stable
  * issue codes (empty = valid); `buildStateFromMap` rejects on any. Beyond shape
  * (zod already did that), this enforces the **neighbour-only** path rule: a path
- * may join two sectors only if no third sector lies "between" them (closer to
- * both than they are to each other — the relative-neighbourhood criterion). That
- * keeps the graph to immediate neighbours: no long criss-crossing lanes.
+ * may join two sectors only if no third sector lies "between" them — nothing inside
+ * the circle having A—B as its diameter (the Gabriel criterion). That still forbids
+ * long criss-crossing lanes, but it proposes generously: a sector in open space
+ * really does reach everything near it.
+ *
+ * Geometry decides which lanes are POSSIBLE; terrain decides how many of them a
+ * sector actually carries (`SectorTypeDefSchema.maxLinks`, `E_SECTOR_OVERLINKED`).
+ * The two together are why a province is sparse: not because the author drew few
+ * lines, but because that region of space admits few — an asteroid cluster takes a
+ * single approach, open space routes freely. Needs `data` (the budget lives there).
  */
 export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   const issues: string[] = [];
@@ -78,17 +85,109 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       continue;
     }
     seen.add(key);
+    // Gabriel criterion: the lane is legal unless a third sector sits inside the
+    // circle that has A—B as its diameter — i.e. unless something is genuinely IN
+    // THE WAY. Deliberately more permissive than the relative-neighbourhood rule it
+    // replaced (MAP-LINK): geometry is supposed to PROPOSE generously (open space
+    // really does connect to everything nearby) and TERRAIN is what cuts the lanes
+    // back down (`maxLinks` below). Under the old rule geometry alone capped every
+    // node at ~2-3 lanes, so the terrain budget could never bind and "this province
+    // is a dead end" had no in-world cause — it was an accident of coordinates.
+    // Strictly WIDER than the old rule (a Gabriel neighbourhood contains the
+    // relative one), so no previously valid map becomes invalid.
     const pa = map.sectors[a]!.position;
     const pb = map.sectors[b]!.position;
-    const dab = distance(pa, pb);
+    const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+    const radius = distance(pa, pb) / 2;
     const between = ids.some(
-      (c) =>
-        c !== a &&
-        c !== b &&
-        distance(pa, map.sectors[c]!.position) < dab &&
-        distance(pb, map.sectors[c]!.position) < dab,
+      (c) => c !== a && c !== b && distance(mid, map.sectors[c]!.position) < radius,
     );
     if (between) issues.push(`E_PATH_NOT_NEIGHBOR:${key}`);
+  }
+
+  // Link budget (MAP-LINK): terrain decides how many lanes a region can carry.
+  // Geometry above says which sectors CAN see each other; this says how many of
+  // those a world of that terrain actually admits — a dense asteroid cluster takes
+  // one approach and is therefore a dead end, open space routes freely. Counted over
+  // the accepted edges only, so a map already rejected above is not blamed twice.
+  if (data) {
+    const degree = new Map<string, number>();
+    for (const key of seen) {
+      const [a, b] = key.split('|') as [string, string];
+      degree.set(a, (degree.get(a) ?? 0) + 1);
+      degree.set(b, (degree.get(b) ?? 0) + 1);
+    }
+    for (const [id, deg] of [...degree].sort()) {
+      const terrain = map.sectors[id]?.terrain;
+      const budget = terrain ? data.sectors[terrain]?.maxLinks : undefined;
+      if (budget !== undefined && deg > budget) {
+        issues.push(`E_SECTOR_OVERLINKED:${id}:${deg}>${budget}`);
+      }
+    }
+  }
+
+  // Transit (MAP-TRANSIT): a sector may declare WHICH pairs of its neighbours connect
+  // through it, so two lanes can cross the same province without meeting. The pairs
+  // must name real neighbours — a pair pointing at a sector there is no lane to would
+  // silently do nothing, which is the kind of "configured but inert" bug this file
+  // exists to catch.
+  const neighbours = new Map<string, Set<string>>();
+  for (const key of seen) {
+    const [a, b] = key.split('|') as [string, string];
+    if (!neighbours.has(a)) neighbours.set(a, new Set());
+    if (!neighbours.has(b)) neighbours.set(b, new Set());
+    neighbours.get(a)!.add(b);
+    neighbours.get(b)!.add(a);
+  }
+  for (const [id, sec] of Object.entries(map.sectors)) {
+    if (!sec.transit) continue;
+    const near = neighbours.get(id) ?? new Set<string>();
+    const pairSeen = new Set<string>();
+    for (const [a, b] of sec.transit) {
+      if (a === b) {
+        issues.push(`E_TRANSIT_SELF:${id}:${a}`);
+        continue;
+      }
+      for (const end of [a, b]) {
+        if (!near.has(end)) issues.push(`E_TRANSIT_NOT_NEIGHBOR:${id}:${end}`);
+      }
+      const pk = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (pairSeen.has(pk)) issues.push(`E_TRANSIT_DUPLICATE:${id}:${pk}`);
+      pairSeen.add(pk);
+    }
+  }
+
+  // …and the constraint must not strand anyone. Plain connectivity (below) walks the
+  // undirected graph and cannot see transit, so a lane-crossing spec could leave a
+  // sector reachable on the map yet unreachable to any fleet. Checked the way a fleet
+  // actually travels: over (sector, lane it arrived by) states, from every start.
+  if (ids.length > 1 && Object.values(map.sectors).some((sec) => sec.transit)) {
+    const passable = (node: string, from: string | null, to: string): boolean => {
+      const pairs = map.sectors[node]?.transit;
+      if (!pairs || pairs.length === 0 || from === null) return true;
+      return pairs.some(([a, b]) => (a === from && b === to) || (b === from && a === to));
+    };
+    for (const start of ids) {
+      const seenNodes = new Set<string>([start]);
+      const queue: Array<[string, string | null]> = [[start, null]];
+      const seenStates = new Set<string>([`${start}\u0000`]);
+      while (queue.length) {
+        const [cur, from] = queue.shift()!;
+        for (const next of neighbours.get(cur) ?? []) {
+          if (!passable(cur, from, next)) continue;
+          seenNodes.add(next);
+          const sk = `${next}\u0000${cur}`;
+          if (seenStates.has(sk)) continue;
+          seenStates.add(sk);
+          queue.push([next, cur]);
+        }
+      }
+      for (const target of ids) {
+        if (target !== start && !seenNodes.has(target)) {
+          issues.push(`E_TRANSIT_UNREACHABLE:${start}->${target}`);
+        }
+      }
+    }
   }
 
   // fleets reference an existing sector + a declared player
@@ -280,6 +379,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       owner: sec.owner == null ? null : resolveOwner(sec.owner),
       position: { x: sec.position.x, y: sec.position.y },
       links: [...new Set(links[id])].sort(),
+      ...(sec.transit ? { transit: sec.transit.map(([a, b]) => [a, b] as [string, string]) } : {}),
       resources: {},
       buildings: sec.buildings.map((b) => ({
         type: b.type,

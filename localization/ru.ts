@@ -679,6 +679,7 @@ export const ru: Record<string, string> = {
   'data.amber-concord': 'Янтарное согласие',
   'data.annihilate': 'Аннигиляция',
   'data.asteroid-field': 'Астероидное поле',
+  'data.dense-asteroid-cluster': 'Плотное скопление астероидов',
   'data.azure-compact': 'Лазурный пакт',
   'data.barracks': 'Казармы',
   'data.barren': 'Безжизненный',
