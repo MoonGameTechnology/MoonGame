@@ -65,5 +65,17 @@
     "productionByResource": {
       "metal": 0.5
     }
+  },
+  "depleted_system": {
+    "name": "Depleted System",
+    "speedBonus": 0.1,
+    "hpBonus": 0.0,
+    "scoreValue": 1,
+    "maxLinks": 5,
+    "baseOutput": {},
+    "productionByResource": {
+      "metal": -0.4,
+      "credits": -0.25
+    }
   }
 }

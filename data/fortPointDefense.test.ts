@@ -85,7 +85,9 @@ describe('где ставится космическая крепость — р
     // рассуждение: если вид вдруг станет захватываемым, кто-то обязан решить заново,
     // можно ли там крепость, — и тест сообщит об этом падением.
     const uncapturable = Object.keys(data.sectorKinds).filter((k) => !isCapturable(data, { kind: k }));
-    expect(uncapturable.sort()).toEqual(['black_hole', 'debris_field', 'empty']);
+    // `rift` (MAP-BARRIER, M2.6) присоединился к списку по тому же рассуждению: это дыра
+    // в карте, её не захватывают, значит крепости там не будет и без отдельного флага.
+    expect(uncapturable.sort()).toEqual(['black_hole', 'debris_field', 'empty', 'rift']);
   });
 
   it('у КАЖДОГО вида из ростера крепости есть само здание в каталоге', () => {
