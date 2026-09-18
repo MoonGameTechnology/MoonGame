@@ -835,10 +835,11 @@
 | M2.4 | ✅ | core data | `docs/map-roadmap.md:172` | Связность — свойство местности, а не координат — |
 | M2.5 | ✅ | core data | `docs/map-roadmap.md:219` | Параллельные пути через провинцию — |
 | M2.6 | ✅ | core data | `docs/map-roadmap.md:271` | Непроходимость перестала быть декоративной — |
-| M3.1 | 🔒 |  | `docs/map-roadmap.md:325` | Редактор карты [tools] |
-| M3.2 | ⏳ |  | `docs/map-roadmap.md:333` | Процедурный пресет → формат карты [tools] |
-| M4.1 | ✅ | cli | `docs/map-roadmap.md:343` | Рендер из данных сектора — /🚧 |
-| M4.2 | ⏳ | docs | `docs/map-roadmap.md:349` | Сверка с метаигрой и отложенным регионом |
+| M2.7 | ✅ | cli proto | `docs/map-roadmap.md:321` | Граница, через которую нет пути, видна как барьер — |
+| M3.1 | 🔒 |  | `docs/map-roadmap.md:367` | Редактор карты [tools] |
+| M3.2 | ⏳ |  | `docs/map-roadmap.md:375` | Процедурный пресет → формат карты [tools] |
+| M4.1 | ✅ | cli | `docs/map-roadmap.md:385` | Рендер из данных сектора — /🚧 |
+| M4.2 | ⏳ | docs | `docs/map-roadmap.md:391` | Сверка с метаигрой и отложенным регионом |
 | MM-0.1 | ⏳ | srv | `docs/matchmaking-roadmap.md:27` | Состояния матча: lobby→active→ended→archived |
 | MM-0.2 | ✅ | core proto srv | `docs/matchmaking-roadmap.md:33` | Подключить victoryModule + баннер |
 | MM-1.1 | 🔒 | srv | `docs/matchmaking-roadmap.md:43` | Лобби (создание/присоединение) |
