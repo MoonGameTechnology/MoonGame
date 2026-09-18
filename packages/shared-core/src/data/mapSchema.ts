@@ -45,6 +45,15 @@ export const MapSectorSchema = z.object({
   owner: z.string().nullable().default(null),
   buildings: z.array(MapBuildingSchema).default([]),
   garrison: z.array(MapUnitStackSchema).default([]),
+  /** Which pairs of neighbours connect THROUGH this sector (MAP-TRANSIT). Absent =
+   *  the sector is a full interchange: arriving by any lane you may leave by any other,
+   *  which is how every sector behaved before and how most still do. Present = these
+   *  pairs are the ONLY through-connections, so two lanes can cross the same province
+   *  without meeting — a fleet running one of them cannot switch to the other in
+   *  passing. Order within a pair is irrelevant (lanes are two-way). Validated in
+   *  `validateMatchMap`: both ends must be real neighbours, no self-pair, no duplicate,
+   *  and the map must stay reachable with the constraint applied. */
+  transit: z.array(z.tuple([z.string(), z.string()])).optional(),
 });
 
 const MapPlayerSchema = z.object({

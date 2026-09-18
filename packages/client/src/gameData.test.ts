@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { sumUnitStat, type Planet } from '@void/shared-core';
+import { sumUnitStat, planRoute, type Planet } from '@void/shared-core';
 
 import { shippedGameData } from '../../../data/bundle';
 import { pveState, pveModeId, skirmishState } from './gameData';
@@ -92,6 +92,30 @@ describe('pveState — the PvE door', () => {
     // It is worth taking: slow inside, but metal-rich — that is the price/prize pair.
     expect(data.sectors.asteroid_cluster!.speedBonus).toBeLessThan(0);
     expect(data.sectors.asteroid_cluster!.baseOutput.metal).toBeGreaterThan(0);
+  });
+
+  it('two lanes cross at `crossing` without meeting (MAP-TRANSIT)', () => {
+    // Owner's model: parallel paths may pass THROUGH a province. Here the vertical
+    // lane (core ↔ ridge) and the horizontal one (shoal ↔ shear) physically cross at
+    // `crossing` — the coordinates put them on one point — but a fleet running one
+    // cannot peel off onto the other in passing. So the Swarm coming down the spine
+    // cannot cut sideways at the crossroads; it has to go the long way round.
+    const state = pveState(data);
+    expect(state.planets.crossing!.transit).toEqual([
+      ['core', 'ridge'],
+      ['shoal', 'shear'],
+    ]);
+    expect(planRoute(state, 'hive', 'home_a')).toEqual(['ridge', 'crossing', 'core', 'home_a']);
+    expect(planRoute(state, 'shoal', 'shear')).toEqual(['crossing', 'shear']);
+    // …and the sideways cut is genuinely gone, not merely longer by a hop:
+    expect(planRoute(state, 'hive', 'shoal')).toEqual([
+      'ridge',
+      'crossing',
+      'core',
+      'home_a',
+      'drift',
+      'shoal',
+    ]);
   });
 
   it('a junction is NOT a province: it cannot be owned, built on or scored', () => {

@@ -126,6 +126,70 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     }
   }
 
+  // Transit (MAP-TRANSIT): a sector may declare WHICH pairs of its neighbours connect
+  // through it, so two lanes can cross the same province without meeting. The pairs
+  // must name real neighbours — a pair pointing at a sector there is no lane to would
+  // silently do nothing, which is the kind of "configured but inert" bug this file
+  // exists to catch.
+  const neighbours = new Map<string, Set<string>>();
+  for (const key of seen) {
+    const [a, b] = key.split('|') as [string, string];
+    if (!neighbours.has(a)) neighbours.set(a, new Set());
+    if (!neighbours.has(b)) neighbours.set(b, new Set());
+    neighbours.get(a)!.add(b);
+    neighbours.get(b)!.add(a);
+  }
+  for (const [id, sec] of Object.entries(map.sectors)) {
+    if (!sec.transit) continue;
+    const near = neighbours.get(id) ?? new Set<string>();
+    const pairSeen = new Set<string>();
+    for (const [a, b] of sec.transit) {
+      if (a === b) {
+        issues.push(`E_TRANSIT_SELF:${id}:${a}`);
+        continue;
+      }
+      for (const end of [a, b]) {
+        if (!near.has(end)) issues.push(`E_TRANSIT_NOT_NEIGHBOR:${id}:${end}`);
+      }
+      const pk = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (pairSeen.has(pk)) issues.push(`E_TRANSIT_DUPLICATE:${id}:${pk}`);
+      pairSeen.add(pk);
+    }
+  }
+
+  // …and the constraint must not strand anyone. Plain connectivity (below) walks the
+  // undirected graph and cannot see transit, so a lane-crossing spec could leave a
+  // sector reachable on the map yet unreachable to any fleet. Checked the way a fleet
+  // actually travels: over (sector, lane it arrived by) states, from every start.
+  if (ids.length > 1 && Object.values(map.sectors).some((sec) => sec.transit)) {
+    const passable = (node: string, from: string | null, to: string): boolean => {
+      const pairs = map.sectors[node]?.transit;
+      if (!pairs || pairs.length === 0 || from === null) return true;
+      return pairs.some(([a, b]) => (a === from && b === to) || (b === from && a === to));
+    };
+    for (const start of ids) {
+      const seenNodes = new Set<string>([start]);
+      const queue: Array<[string, string | null]> = [[start, null]];
+      const seenStates = new Set<string>([`${start}\u0000`]);
+      while (queue.length) {
+        const [cur, from] = queue.shift()!;
+        for (const next of neighbours.get(cur) ?? []) {
+          if (!passable(cur, from, next)) continue;
+          seenNodes.add(next);
+          const sk = `${next}\u0000${cur}`;
+          if (seenStates.has(sk)) continue;
+          seenStates.add(sk);
+          queue.push([next, cur]);
+        }
+      }
+      for (const target of ids) {
+        if (target !== start && !seenNodes.has(target)) {
+          issues.push(`E_TRANSIT_UNREACHABLE:${start}->${target}`);
+        }
+      }
+    }
+  }
+
   // fleets reference an existing sector + a declared player
   for (const [id, fl] of Object.entries(map.fleets)) {
     if (!has(fl.location)) issues.push(`E_FLEET_UNKNOWN_SECTOR:${id}`);
@@ -315,6 +379,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       owner: sec.owner == null ? null : resolveOwner(sec.owner),
       position: { x: sec.position.x, y: sec.position.y },
       links: [...new Set(links[id])].sort(),
+      ...(sec.transit ? { transit: sec.transit.map(([a, b]) => [a, b] as [string, string]) } : {}),
       resources: {},
       buildings: sec.buildings.map((b) => ({
         type: b.type,
