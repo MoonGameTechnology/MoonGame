@@ -1,4 +1,4 @@
-import type { DomainEvent, GameData, PlayerReward } from '@void/shared-core';
+import { hashJson, type DomainEvent, type GameData, type PlayerReward } from '@void/shared-core';
 import type { ArsenalStore, DropStore } from './store';
 
 /**
@@ -103,6 +103,11 @@ export interface DropRecord {
   pity: number;
   forced: boolean;
   dropped: { kind: 'hull' | 'module'; defId: string } | null;
+  /** ARS-7 — fingerprint of the `DropTables` edition that produced `chance`/`pity`,
+   *  so a logged roll names the odds it was rolled under. Derived from the tables in
+   *  hand rather than passed in: a supplied version could name edition X while the
+   *  roll used edition Y, which is the audit hole this closes. */
+  tablesHash: string;
 }
 
 export interface AwardDeps {
@@ -128,6 +133,7 @@ export async function awardMatchDrops(
   entries: ReadonlyArray<{ accountId: string; reward: PlayerReward }>,
 ): Promise<DropRecord[]> {
   const records: DropRecord[] = [];
+  const tablesHash = hashJson(deps.tables); // ARS-7 — one edition rolls the whole pass
   for (const { accountId, reward } of entries) {
     if (!(await deps.drops.claim(matchId, accountId))) continue; // replay — already rolled
     const pity = await deps.drops.pityOf(accountId);
@@ -142,6 +148,7 @@ export async function awardMatchDrops(
       pity,
       forced,
       dropped: null,
+      tablesHash,
     };
     if (rng() < chance || forced) {
       const line = pickFromPool(deps.tables.pool, rng());
