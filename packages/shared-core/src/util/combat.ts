@@ -423,10 +423,58 @@ export function applyDamage(
   return survivors;
 }
 
+/**
+ * Damage that has already been through the `combat.damage` hook (CORE-DMG-2).
+ *
+ * A compile-time brand, erased at runtime — the value stays the very same `number`,
+ * so the hook still fires from the same places, the same number of times, in the same
+ * order. What changes is the OTHER end: every sink below takes `HookedDamage` and
+ * nothing else, so a firing channel physically cannot apply raw damage. Forgetting the
+ * hook stops being a discipline problem (five channels, each remembering on its own)
+ * and becomes a type error.
+ *
+ * Why that matters beyond tidiness: the hook is where technologies, faction passives,
+ * hero auras, terrain, planet type and fortifications attach. A channel that skips it
+ * silently cancels ALL of them for its share of the damage — no error, no log, just a
+ * smaller number. Three channels had drifted out exactly that way before CORE-DMG-1
+ * put them back.
+ */
+export type HookedDamage = number & { readonly __hookedDamage: unique symbol };
+
+/** What every `combat.damage` subscriber reads off the hook's args. `attacker` and
+ *  `defender` are the two concrete owners the hit is between — subscribers measure
+ *  that relation (whose tech, whose fort), which is why channels call the hook per
+ *  PAIR rather than once per volley. `battleId` exists only inside a melee round. */
+export interface DamageHookArgs {
+  phase: string;
+  location: string;
+  attacker: string | null;
+  defender: string | null;
+  battleId?: string;
+}
+
+/** The ONE producer of {@link HookedDamage}: run `amount` through `combat.damage` and
+ *  mark the result as hooked. Every firing channel goes through here. */
+export function hookedDamage(
+  h: HandlerContext,
+  amount: number,
+  args: DamageHookArgs,
+): HookedDamage {
+  return h.hook<number>('combat.damage', amount, args) as HookedDamage;
+}
+
+/** Add two already-hooked shares. Arithmetic strips the brand, so the melee round —
+ *  which hooks per attacker→defender pair and then applies one total per side — needs
+ *  a way to keep the sum marked. Sound by its signature: both addends must themselves
+ *  be hooked, so no raw number can enter a total through here. */
+export function addHooked(a: HookedDamage, b: HookedDamage): HookedDamage {
+  return (a + b) as HookedDamage;
+}
+
 export function applyDamageToSide(
   h: HandlerContext,
   ref: CombatantRef,
-  dmg: number,
+  dmg: HookedDamage,
   data: GameData,
   location: string,
 ): void {
