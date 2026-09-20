@@ -133,6 +133,17 @@ describe('конец матча — метка выдачи', () => {
 });
 
 describe('конец матча — награда выдаётся один раз', () => {
+  it('Sector Zero reports its own reward without writing commander XP or career counters', () => {
+    let awards = 0;
+    const w = wired({ runAward: () => { awards++; return 7; } });
+    expect(w.api.check()).toMatchObject({ runReward: 7, xp: 0, levelUp: null });
+    expect(w.api.check()).toBeNull();
+    expect(awards).toBe(1);
+    expect(w.saves).toEqual([]);
+    expect(w.marks.size).toBe(0);
+    expect(w.meta()).toEqual(meta());
+  });
+
   it('первый конец матча начисляет опыт и пишет метку', () => {
     const a = awardOnce(null, '777', meta(), { won: true, score: 300, place: 1 });
     expect(a.xp).toBeGreaterThan(0);

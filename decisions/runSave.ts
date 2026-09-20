@@ -56,6 +56,10 @@ export interface RunSave<TState = unknown> {
   /** Сложность, выбранная на запуске. */
   difficulty: string;
   state: TState;
+  /** Sector Zero's persistent attempt serial and prepared ship blueprints. Older
+   * saves omit these; the host adopts them without changing their live world. */
+  sectorZeroAttempt?: number;
+  shipLoadouts?: Record<string, string[]>;
 }
 
 /** Снимок → строка для хранилища. */
@@ -84,5 +88,16 @@ export function parseRunSave(raw: string | null | undefined): RunSave | null {
   if (typeof save.mode !== 'string' || save.mode === '') return null;
   if (typeof save.difficulty !== 'string' || save.difficulty === '') return null;
   if (typeof save.state !== 'object' || save.state === null) return null;
-  return { v: save.v, mode: save.mode, difficulty: save.difficulty, state: save.state };
+  const shipLoadouts: Record<string, string[]> = {};
+  if (save.shipLoadouts && typeof save.shipLoadouts === 'object' && !Array.isArray(save.shipLoadouts)) {
+    for (const [id, modules] of Object.entries(save.shipLoadouts)) {
+      if (Array.isArray(modules) && modules.every(m => typeof m === 'string')) shipLoadouts[id] = modules;
+    }
+  }
+  return {
+    v: save.v, mode: save.mode, difficulty: save.difficulty, state: save.state,
+    ...(Number.isSafeInteger(save.sectorZeroAttempt) && save.sectorZeroAttempt! > 0
+      ? { sectorZeroAttempt: save.sectorZeroAttempt } : {}),
+    ...(save.shipLoadouts ? { shipLoadouts } : {}),
+  };
 }

@@ -379,6 +379,7 @@ export interface BuildFromMapOptions {
 function seedTeamDiplomacy(
   teamOf: Map<string, string | undefined>,
   crossTeamStart: 'war' | 'peace',
+  players: Record<string, Player>,
 ): Record<string, DiplomaticStance> | undefined {
   const ids = [...teamOf.keys()].sort();
   if (ids.length < 2) return undefined;
@@ -388,11 +389,15 @@ function seedTeamDiplomacy(
     for (let j = i + 1; j < ids.length; j++) {
       const ta = teamOf.get(ids[i]!);
       const tb = teamOf.get(ids[j]!);
-      diplomacy[pairKey(ids[i]!, ids[j]!)] = !teamed
-        ? 'peace'
-        : ta !== undefined && ta === tb
-          ? 'alliance'
-          : crossTeamStart;
+      const a = players[ids[i]!]!.npc;
+      const b = players[ids[j]!]!.npc;
+      diplomacy[pairKey(ids[i]!, ids[j]!)] = a === 'pirate' || b === 'pirate'
+        ? 'war'
+        : a === 'neutral' || b === 'neutral' || !teamed
+          ? 'peace'
+          : ta !== undefined && ta === tb
+            ? 'alliance'
+            : crossTeamStart;
     }
   return diplomacy;
 }
@@ -508,6 +513,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       status: 'active',
       resources: { ...pl.resources },
       ...(pl.ai ? { ai: true } : {}),
+      ...(pl.npc ? { npc: pl.npc } : {}),
     };
   }
   // seat assigned slots as concrete players (start kit = the slot's resources)
@@ -597,7 +603,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
   for (const [slotId, a] of Object.entries(slotAssign)) {
     if (map.slots[slotId]) teamOf.set(a.playerId, map.slots[slotId]!.team);
   }
-  const diplomacy = seedTeamDiplomacy(teamOf, options.crossTeamStart ?? 'war');
+  const diplomacy = seedTeamDiplomacy(teamOf, options.crossTeamStart ?? 'war', players);
 
   return {
     ...base,

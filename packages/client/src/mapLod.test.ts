@@ -48,29 +48,32 @@ describe('map detail follows screen density', () => {
     expect(Number.isFinite(mapSpacing([]))).toBe(true);
   });
 
-  it.each(['planet', 'asteroid', 'pirate_base', 'neutral_base', 'unknown'])(
-    '%s has a flat marker without textures, text or effects',
-    (kind) => {
-      const paint = vi.fn();
-      const g = {
-        beginPath: vi.fn(),
-        arc: vi.fn(),
-        rect: vi.fn(),
-        moveTo: vi.fn(),
-        lineTo: vi.fn(),
-        closePath: vi.fn(),
-        stroke: paint,
-        fill: paint,
-      };
-      drawSchematicNode(
-        g as unknown as CanvasRenderingContext2D,
-        { x: 40, y: 30 },
-        kind,
-        '#abcdef',
-        3,
-      );
-      expect(paint).toHaveBeenCalledOnce();
-      expect(g.beginPath).toHaveBeenCalledOnce();
-    },
-  );
+  it('uses a small anonymous ring with no terrain or ownership input', () => {
+    const paint = vi.fn();
+    const g = {
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      rect: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+      stroke: paint,
+      fill: vi.fn(),
+    };
+    drawSchematicNode(g as unknown as CanvasRenderingContext2D, { x: 40, y: 30 }, 3);
+    expect(paint).toHaveBeenCalledOnce();
+    expect(g.beginPath).toHaveBeenCalledOnce();
+    expect(g.arc).toHaveBeenCalledWith(40, 30, 3, 0, Math.PI * 2);
+    expect(g.rect).not.toHaveBeenCalled();
+    expect(g.fill).not.toHaveBeenCalled();
+    expect(mapLod(20).markerRadius).toBeCloseTo(1.8);
+    expect(mapLod(200).markerRadius).toBe(3.2);
+  });
+
+  it('keeps sparse whole-map views schematic as well as dense regions', () => {
+    expect(mapLod(160, 1)).toMatchObject({ art: 0, detail: 0, provinceDetail: 0 });
+    expect(mapLod(160, 1.325)).toMatchObject({ art: 0.5, detail: 0.5, provinceDetail: 0.5 });
+    expect(mapLod(160, 2)).toMatchObject({ art: 1, detail: 1, provinceDetail: 1 });
+    expect(mapLod(20, 6)).toMatchObject({ art: 0, detail: 0, provinceDetail: 0 });
+  });
 });

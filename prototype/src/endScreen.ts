@@ -30,6 +30,8 @@ export interface MatchEnd {
   why: string;
   xp: number;
   levelUp: number | null;
+  /** Persistent expedition data, separate from commander XP. */
+  runReward?: number;
   /** Игрок закрыл панель, чтобы посмотреть на замерший стол. */
   dismissed?: boolean;
 }
@@ -81,8 +83,9 @@ export function endScreenHtml(
   const head = outcomeTitle(end, state.match?.winners);
   const cell = (k: string, v: string): string =>
     `<div class="es-cell"><span class="es-k">${k}</span><span class="es-v">${v}</span></div>`;
-  const xpLine =
-    end.xp > 0
+  const xpLine = end.runReward !== undefined
+    ? `<div class="es-xp">${t('sector-zero.end.reward', { n: end.runReward })}</div>`
+    : end.xp > 0
       ? `<div class="es-xp">${t('end.xp', { n: end.xp })}` +
         (end.levelUp !== null
           ? `<span class="lvl">${t('end.level-up', { lvl: end.levelUp })}</span>`
@@ -91,7 +94,7 @@ export function endScreenHtml(
       : '';
   // Формулировка «ещё раз» честна по режиму: соло перезапускает схватку, сеть — открывает
   // браузер матчей (пересадить тот же стол клиент не может).
-  const againLabel = view.net ? t('end.new-match') : t('end.play-again');
+  const againLabel = end.runReward !== undefined ? t('sector-zero.end.prepare') : view.net ? t('end.new-match') : t('end.play-again');
   return (
     `<div class="es-box">` +
     `<div class="es-head ${cls}">${head}</div>` +

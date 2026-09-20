@@ -65,3 +65,23 @@ it('the shared renderer drops expensive overview art, preserves selection and re
   expect(text.mock.calls.some(([label]) => label === 'b')).toBe(true);
   expect(JSON.stringify(state)).toBe(before);
 });
+
+it('puts the same small circle on every overview sector regardless of hidden contents', () => {
+  const state = stateWith(['p1']);
+  const kinds = ['planet', 'empty', 'asteroid', 'pirate_base', 'neutral_base', 'rift', 'black_hole', 'unknown'];
+  for (const [i, kind] of kinds.entries()) {
+    const id = String(i);
+    state.planets[id] = { id, kind, owner: i % 2 ? 'p1' : null,
+      position: { x: i * 100, y: 200 }, links: [], resources: {}, buildings: [], garrison: [], traits: [] };
+  }
+  const circles: unknown[] = [];
+  const context = { globalAlpha: 1, strokeStyle: '', lineWidth: 1,
+    arc: (...args: number[]) => circles.push([...args, context.strokeStyle, context.lineWidth]) };
+  const g = new Proxy(context, { get: (target, key) => Reflect.get(target, key) ?? (() => {}) }) as unknown as CanvasRenderingContext2D;
+  renderMap(g, state, { x: 0, y: 0, scale: 1 }, { left: 0, top: 0, right: 800, bottom: 600 },
+    { minX: 0, minY: 0, maxX: 700, maxY: 400 }, { data: {} as GameData, now: 0, dpr: 1 });
+  expect(circles).toHaveLength(kinds.length);
+  const looks = circles.map(c => (c as unknown[]).slice(2));
+  expect(looks.every(look => JSON.stringify(look) === JSON.stringify(looks[0]))).toBe(true);
+  expect((looks[0]![0] as number)).toBeLessThanOrEqual(3.2);
+});

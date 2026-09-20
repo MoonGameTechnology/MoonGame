@@ -63,6 +63,9 @@ const MapPlayerSchema = z.object({
   /** AI-driven seat (bot). Rules may key off it (e.g. bots are not invitable to
    *  an alliance). Default: human. */
   ai: z.boolean().default(false),
+  /** Map inhabitant, excluded from player seats and victory. Independent of `ai`:
+   *  an NPC without a field controller holds its starting position and fights normally. */
+  npc: z.enum(['pirate', 'neutral']).optional(),
 });
 
 /** A player id. `|` is barred: it is the diplomacy pair-key separator — an id

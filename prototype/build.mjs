@@ -13,6 +13,7 @@ const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.ur
 const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.meta.url), 'utf8');
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
+const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 
 const bundle = async (playerBuild) => {
   const res = await build({
@@ -72,6 +73,7 @@ body{margin:0;overflow:hidden;color:var(--ink);
   background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
 /* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
+#sector-zero{position:fixed;inset:0;z-index:58;display:none;}
 
 /* Map entry: a calm projection surface, actual work progress, original lore. */
 #maploading{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
@@ -553,6 +555,20 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    Top-right under the top bar; z-32 above the HUD but below toasts/modals. */
 #goals{position:fixed;top:52px;right:14px;z-index:32;display:none;max-width:min(230px,60vw);}
 #goals.show{display:block;}
+#pirate-intro{position:fixed;top:calc(var(--tbh) + 78px);left:78px;z-index:32;
+  width:min(280px,80vw);padding:12px;background:rgba(4,16,22,.96);border:1px solid #a95e48;
+  border-radius:9px;color:var(--ink);font-size:12px;line-height:1.5;}
+#pirate-intro[hidden]{display:none;}
+#pirate-intro .pe-title{color:#ffb399;display:block;padding-right:28px;}
+#pirate-intro .pe-copy{margin:8px 0 10px;}
+#pirate-intro .pe-close{position:absolute;right:4px;top:4px;width:32px;height:32px;
+  border:0;background:transparent;color:var(--ink);cursor:pointer;}
+#pirate-intro .pe-action{min-height:40px;width:100%;border:1px solid #a95e48;border-radius:5px;
+  background:#302128;color:var(--ink);font:inherit;cursor:pointer;}
+body.holo-ui #pirate-intro{left:18px;}
+@media(max-width:640px){#pirate-intro,body.holo-ui #pirate-intro{top:auto;left:auto;right:12px;
+  bottom:calc(112px + env(safe-area-inset-bottom,0px));}}
+body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirate-intro{display:none;}
 #goals .gl-box{background:rgba(4,16,22,.94);border:1px solid var(--cyan-dim);border-radius:9px;overflow:hidden;
   box-shadow:0 4px 16px rgba(0,0,0,.45);}
 #goals .gl-head{display:flex;align-items:center;gap:7px;padding:7px 10px;background:rgba(53,214,230,.08);
@@ -2368,6 +2384,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #hub .hub-play:active{background:linear-gradient(180deg,rgba(53,214,230,.44),rgba(53,214,230,.2));}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
+#hub #hub-sector-zero{min-height:44px;}
 #hub .hub-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin-top:4px;
   padding-bottom:6px;border-bottom:1px solid var(--line);}
 #hub .hub-card{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line-hi);border-radius:10px;
@@ -2680,7 +2697,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,#boonpick,
-  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
+  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
   /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
@@ -2838,12 +2855,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 }
 `;
 
-const page = (js) => `<!doctype html>
+const page = (js, entry = 'void-dominion') => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${mobileStrategyCss}</style></head>
-<body>
+<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${mobileStrategyCss}\n${sectorZeroCss}</style></head>
+<body data-entry="${entry}">
 <section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
   <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
   <p data-i18n="startup.failed.body"></p>
@@ -2933,6 +2950,12 @@ const page = (js) => `<!doctype html>
 <div id="intro"></div>
 <div id="recap"></div>
 <div id="goals"></div>
+<aside id="pirate-intro" hidden>
+  <b class="pe-title" data-i18n="pve.pirates.title"></b>
+  <button type="button" id="pirate-close" class="pe-close" data-i18n-aria="pve.pirates.hide">×</button>
+  <p id="pirate-copy" class="pe-copy" aria-live="polite"></p>
+  <button type="button" id="pirate-action" class="pe-action"></button>
+</aside>
 <div id="playercard"></div>
 <div id="rescard"></div>
 <div id="profile"></div>
@@ -3117,6 +3140,62 @@ const page = (js) => `<!doctype html>
     <button id="ub-later" class="ub-later" type="button" data-i18n="upd.later"></button>
   </div>
 </div>
+<section id="sector-zero" aria-labelledby="sz-title"${entry === 'sector-zero' ? ' style="display:flex"' : ''}>
+  <div class="sz-shell">
+    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span><span data-i18n="sector-zero.offline"></span></div>
+    <div class="sz-main" id="sz-home">
+      <div class="sz-content">
+        <p class="sz-eyebrow" data-i18n="sector-zero.offline"></p>
+        <h1 id="sz-title" data-i18n="sector-zero.title"></h1>
+        <p class="sz-intro" data-i18n="sector-zero.intro"></p>
+        <div class="sz-run"><div id="sz-save-label" data-i18n="sector-zero.offline"></div><p id="sz-summary" role="status" aria-live="polite" data-i18n="sector-zero.loading"></p></div>
+        <div id="sz-actions">
+          <div class="sz-actions">
+            <button id="sz-continue" class="sz-action sz-primary" type="button" hidden disabled data-i18n="sector-zero.continue"></button>
+            <button id="sz-new" class="sz-action sz-primary" type="button" disabled data-i18n="sector-zero.new"></button>
+            <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
+          </div>
+          <fieldset class="sz-difficulty">
+            <legend data-i18n="sector-zero.difficulty"></legend>
+            <div class="sz-options">
+              <button id="sz-weak" type="button" data-difficulty="weak" aria-pressed="true" data-i18n="setup.pve.difficulty.weak"></button>
+              <button id="sz-strong" type="button" data-difficulty="strong" aria-pressed="false" data-i18n="setup.pve.difficulty.strong"></button>
+            </div>
+            <p id="sz-difficulty-hint" hidden data-i18n="sector-zero.difficulty.hint"></p>
+          </fieldset>
+        </div>
+        <div id="sz-confirm" hidden role="group" aria-labelledby="sz-confirm-title">
+          <h2 id="sz-confirm-title" data-i18n="sector-zero.confirm.title"></h2>
+          <p data-i18n="sector-zero.confirm.body"></p>
+          <button id="sz-cancel" class="sz-action" type="button" data-i18n="sector-zero.cancel"></button>
+          <button id="sz-replace" class="sz-action sz-primary" type="button" data-i18n="sector-zero.confirm"></button>
+        </div>
+        <div class="sz-tools"><button id="sz-settings" type="button" data-i18n="hub.tile.settings"></button><button id="sz-back" type="button" data-i18n="sector-zero.back"></button></div>
+      </div>
+      <div class="sz-projection" aria-hidden="true">
+        <svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="currentColor" stroke-width=".65" opacity=".32">
+            <circle cx="250" cy="250" r="220" stroke-dasharray="2 9"/><circle cx="250" cy="250" r="190"/>
+            <path d="M250 15v64m0 342v64M15 250h64m342 0h64M94 94l37 37m238 238 37 37M94 406l37-37m238-238 37-37"/>
+            <ellipse cx="250" cy="250" rx="208" ry="75" transform="rotate(-28 250 250)"/>
+            <ellipse cx="250" cy="250" rx="170" ry="48" transform="rotate(55 250 250)"/>
+          </g>
+          <circle cx="250" cy="250" r="131" stroke="currentColor" stroke-width="1.3" opacity=".7"/>
+          <path d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
+          <ellipse cx="250" cy="250" rx="65" ry="131" stroke="currentColor" opacity=".15"/>
+          <ellipse cx="250" cy="250" rx="131" ry="44" stroke="currentColor" opacity=".22"/>
+          <path d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
+          <path d="m223 304 54-108" stroke="currentColor" opacity=".4"/>
+          <g fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
+          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
+          <path d="M332 397h82l30 30" stroke="#e6b777" opacity=".45"/>
+        </svg>
+      </div>
+    </div>
+    <div id="sz-workshop" hidden></div>
+    <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>
+  </div>
+</section>
 <div id="hub">
   <div class="hub-banner">
     <div class="hub-crest"><span class="dia"></span></div>
@@ -3134,6 +3213,7 @@ const page = (js) => `<!doctype html>
     <div class="hub-panel" id="hp-home">
       <button id="hub-play" class="hub-play" type="button" data-i18n="hub.play"></button>
       <button id="hub-solo" class="hub-solo" type="button" data-i18n="hub.solo"></button>
+      <button id="hub-sector-zero" class="hub-solo" type="button" data-i18n="sector-zero.enter"></button>
       <!-- ONB-0 first-run offer: shown only to a not-yet-onboarded commander -->
       <div class="hub-card ob-nudge" id="onboard-nudge" style="display:none">
         <div class="hc-ic">◎</div>
@@ -3338,9 +3418,15 @@ const adminPage = (js) => `<!doctype html>
 
 mkdirSync('prototype/dist', { recursive: true });
 const devHtml = page(await bundle(false));
-const playerHtml = stripDevMarkup(page(await bundle(true)));
+const playerJs = await bundle(true);
+const playerHtml = stripDevMarkup(page(playerJs));
+// A direct menu entry for review and offline play, still using the shared client.
+// This is not the isolated product dependency graph planned in YAG-1.1.
+const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);
+writeFileSync('prototype/dist/sector-zero.html', sectorZeroHtml);
+console.log('wrote prototype/dist/sector-zero.html (' + (sectorZeroHtml.length / 1024).toFixed(0) + ' KB)');
 console.log(
   'wrote prototype/dist/void-dominion.html (' + (devHtml.length / 1024).toFixed(0) + ' KB)',
 );
