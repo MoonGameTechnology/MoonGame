@@ -394,6 +394,13 @@ assert.equal(getEl('sector-zero').style.display, 'none');
 assert.equal(getEl('setup').style.display, 'none');
 assert.equal(getEl('scipick').classList.contains('show'), false);
 for (let i = 0; i < 12 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
+assert.ok(getEl('devline').innerHTML.includes('data-swarm-intel'));
+for (const handle of (listeners.get(getEl('devline')) ?? {}).click ?? [])
+  handle({ target: { closest: () => ({ dataset: { swarmIntel: '1' } }) } });
+assert.equal(getEl('swarm-dossier').classList.contains('show'), true);
+assert.ok(getEl('swarm-dossier-body').innerHTML.length > 0);
+await click('swarm-dossier-close');
+assert.equal(getEl('swarm-dossier').classList.contains('show'), false);
 await click('tomenu');
 assert.equal(getEl('sz-continue').hidden, false, 'a live run is offered after returning to menu');
 let saved = JSON.parse(storage.get('void.run.v1'));

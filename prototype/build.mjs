@@ -1461,14 +1461,20 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
   color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
 .cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+#devline [data-swarm-intel]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
+.swarm-contact{border-top:1px solid var(--line-hi);padding:12px 0;overflow-wrap:anywhere;}
+.swarm-contact h3{font-size:13px;color:var(--cyan);margin:0 0 6px;}
+.swarm-contact p{font-size:11px;color:var(--dim);margin:0 0 8px;}
+.swarm-contact ul{list-style:none;padding:0;margin:0;}
+.swarm-contact li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;}
 /* scientist council picker (setup-time, over the start-point screen) */
-#scipick,#boonpick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
+#swarm-dossier,#scipick,#boonpick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
-#scipick.show,#boonpick.show{display:flex;}
-#scipick .twbox,#boonpick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
+#swarm-dossier.show,#scipick.show,#boonpick.show{display:flex;}
+#swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
-#scipick .lw-head,#boonpick .lw-head{display:flex;align-items:center;justify-content:space-between;}
-#scipickbody,#boonpickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
+#swarm-dossier .lw-head,#scipick .lw-head,#boonpick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+#swarm-dossier-body,#scipickbody,#boonpickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
 .sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px;}
 .sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
 .sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
@@ -2707,7 +2713,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
-  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,#boonpick,
+  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,#boonpick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
@@ -2753,7 +2759,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
   #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
-  #scipick .twbox,#boonpick .twbox{width:53.4vw;max-height:58.5vh;}
+  #swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{width:53.4vw;max-height:58.5vh;}
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
@@ -2939,6 +2945,7 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
+<div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
 <div id="boonpick"><div class="twbox"><div class="lw-head"><b data-i18n="win.boon.title"></b><button class="sp-cancel" type="button" data-boonlater="1" data-i18n="win.boon.later"></button></div><div id="boonpickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->

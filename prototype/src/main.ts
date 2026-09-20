@@ -1,3 +1,5 @@
+import { swarmDossier } from '../../decisions/swarmDossier';
+import { swarmDossierHtml } from './swarmDossier';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
@@ -1357,7 +1359,30 @@ if (typeof ResizeObserver !== 'undefined')
     if (h > 0) document.body.style.setProperty('--sheeth', sheetHeightVar(h));
   }).observe(side);
 const logEl = $('log');
+const swarmDossierWin = $('swarm-dossier');
+let lastSwarmDossierHtml = '';
+function closeSwarmDossier(): void {
+  swarmDossierWin.classList.remove('show');
+  document.querySelector<HTMLButtonElement>('[data-swarm-intel]')?.focus({ preventScroll: true });
+}
+$('swarm-dossier-close').addEventListener('click', closeSwarmDossier);
+function renderSwarmDossier(): void {
+  if (!inMatch()) { swarmDossierWin.classList.remove('show'); return; }
+  if (!swarmDossierWin.classList.contains('show')) return;
+  const html = swarmDossierHtml(swarmDossier(s, ME, vision?.identify ?? new Set()));
+  if (html !== lastSwarmDossierHtml) {
+    $('swarm-dossier-body').innerHTML = html;
+    lastSwarmDossierHtml = html;
+  }
+}
 const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
+devlineEl.addEventListener('click', (event) => {
+  if (!(event.target as Element).closest('[data-swarm-intel]')) return;
+  swarmDossierWin.classList.add('show');
+  renderSwarmDossier();
+  $('swarm-dossier-close').focus({ preventScroll: true });
+});
+
 const purse = $('purse');
 // top-bar row 1: nick + live standing (left), victory chip (gap), day card (right)
 const topEl = $('top');
@@ -10808,6 +10833,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   AI_PLAYERS = new Map(aiPlayers);
   for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
   pirateIntro.reset();
+  swarmDossierWin.classList.remove('show');
   solo.reset();
   // ONB-2 (found live): a leftover guide from whatever was on screen before (a
   // tutorial the player exited without finishing/skipping, a stale reconnect) must
@@ -12499,6 +12525,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   // --- модалки поверх всего (z60…z57) ---
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
+  { id: 'swarm-dossier', isOpen: () => shown('swarm-dossier'), close: closeSwarmDossier }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
   // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
   {
@@ -13015,6 +13042,7 @@ function frame(nowReal: number) {
   // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
   renderBoonPick();
+  renderSwarmDossier();
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
@@ -13025,6 +13053,7 @@ function frame(nowReal: number) {
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
     waveHtml +
+    (s.pve ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;

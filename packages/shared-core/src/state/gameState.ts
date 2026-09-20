@@ -712,6 +712,8 @@ export interface GameState {
    *  each seen world. Maintained by `visibilityModule`; read by `visibleState`
    *  to show greyed "last known" worlds. Internal — stripped from projections. */
   fog?: Record<PlayerId, FogMemory>;
+  /** Per-observer last identified Swarm fleet composition; persists with this match. */
+  swarmIntel?: Record<PlayerId, Record<FleetId, SwarmContact>>;
   /** Hero instances, keyed by instance id (`Hero.id`), maintained by `heroModule`.
    *  A player may field several — filter by `owner`. (Key was the `PlayerId` in the
    *  one-hero-per-player skeleton; instance-keyed since the roster migration.) */
@@ -1110,4 +1112,12 @@ export function createInitialState(params: {
     scheduled: [],
     scheduleSeq: 0,
   };
+}
+
+/** An observation, never a live fleet or a claim about the entire Swarm. */
+export interface SwarmContact {
+  owner: PlayerId;
+  location: PlanetId;
+  at: number;
+  units: Array<{ unit: UnitId; count: number }>;
 }
