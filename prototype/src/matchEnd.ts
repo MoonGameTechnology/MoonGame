@@ -133,6 +133,8 @@ export interface MatchEndHost {
   writeMarker(key: string, value: string): void;
   loadMeta(): MetaState;
   saveMeta(m: MetaState): void;
+  /** Sector Zero's independent reward; null keeps the existing PvP account path. */
+  runAward?(): number | null;
 }
 
 export interface MatchEndWatch {
@@ -153,6 +155,11 @@ export function initMatchEnd(host: MatchEndHost): MatchEndWatch {
     if (s.match?.status !== 'ended') return null;
     handled = true;
     const { won, draw } = outcomeOf(s.match, host.me());
+    const runReward = host.runAward?.();
+    if (runReward !== undefined && runReward !== null) return {
+      won, draw, why: endReasonText(s.match.reason), xp: 0, levelUp: null,
+      runReward, dismissed: false,
+    };
     const key = awardKeyFor(host.nick());
     const stamp = endStampOf(s.match);
     const award = awardOnce(parseAwardMarker(host.readMarker(key)), stamp, host.loadMeta(), {

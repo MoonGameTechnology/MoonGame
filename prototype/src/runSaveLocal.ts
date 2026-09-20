@@ -30,18 +30,18 @@ function store(): Storage | null {
 }
 
 /** Бэкенд поверх `localStorage`. Хранилища нет — забег просто не сохраняется. */
-export function localRunSaveStore(): RunSaveStore {
+export function localRunSaveStore(key: string = RUN_SAVE_KEY): RunSaveStore {
   return {
     load: () => {
       try {
-        return Promise.resolve(store()?.getItem(RUN_SAVE_KEY) ?? null);
+        return Promise.resolve(store()?.getItem(key) ?? null);
       } catch {
         return Promise.resolve(null);
       }
     },
     save: (blob) => {
       try {
-        store()?.setItem(RUN_SAVE_KEY, blob);
+        store()?.setItem(key, blob);
       } catch {
         /* приватный режим / хранилище полно — забег живёт дальше в памяти */
       }
@@ -49,7 +49,7 @@ export function localRunSaveStore(): RunSaveStore {
     },
     clear: () => {
       try {
-        store()?.removeItem(RUN_SAVE_KEY);
+        store()?.removeItem(key);
       } catch {
         /* нечего забывать — и это не ошибка */
       }
