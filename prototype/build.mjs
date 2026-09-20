@@ -391,6 +391,17 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .hullrow .hbar.low i{background:#ff5a4d;}
 .hullrow .hbar.sh i{background:#35d6e6;}
 .hullrow b{flex:0 0 auto;font-size:11px;}
+.holdmeters{display:grid;gap:8px;margin:8px 0;padding:9px 10px;background:rgba(5,19,29,.65);border:1px solid var(--line);border-radius:8px;}
+.holdmeter-head,.holdmeter-note{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;}
+.holdmeter-head{font-size:11px;color:var(--ink);}
+.holdmeter-head>span{color:var(--hold-color);}
+.holdmeter-head b{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.holdmeter-track{display:flex;height:6px;margin:5px 0;background:rgba(190,219,229,.13);border-radius:2px;overflow:hidden;}
+.holdmeter-track i{display:block;height:100%;background:var(--hold-color);flex:none;}
+.holdmeter-track i.reserved{background:repeating-linear-gradient(120deg,transparent 0 3px,var(--hold-color) 3px 5px);}
+.holdmeter-note{font-size:10px;line-height:1.5;color:#a9bcc6;}
+.holdmeter-loading{color:var(--hold-color);}
+.holdmeter.over .holdmeter-head b,.holdmeter.over .holdmeter-note{color:#ff8b7e;}
 .chip-gold{flex:0 0 auto;padding:3px 8px;font-size:10px;cursor:pointer;color:#ffd76a;
   background:rgba(255,215,106,.08);border:1px solid rgba(255,215,106,.45);border-radius:4px;white-space:nowrap;}
 .chip-gold:hover{background:rgba(255,215,106,.18);box-shadow:0 0 8px rgba(255,215,106,.25);}

@@ -233,6 +233,11 @@ export const ru: Record<string, string> = {
   // --- cargo — Погрузка десанта: отказы трюма и гарнизона.
   'cargo.garrison-empty': 'в гарнизоне не осталось',
   'cargo.hold-full': 'трюм полон',
+  'cargo.meter.free': 'Свободно: {n}',
+  'cargo.meter.hangar': 'Ангар',
+  'cargo.meter.loading': 'Погрузка: {p}% · резерв {n}',
+  'cargo.meter.over': 'Сверх вместимости: {n}',
+  'cargo.meter.troops': 'Десант',
   'cargo.under-assault': 'гарнизон заперт боем — войска не выпустить',
 
   // --- cost — ценники: единые чипы «иконка + число» на всех поверхностях.
