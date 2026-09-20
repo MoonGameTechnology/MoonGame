@@ -310,6 +310,14 @@ describe('pveModule — усиление между волнами (PVR-1.4)', (
     expect(state.pve?.boons?.swarm).toBeUndefined();
   });
 
+  it('map inhabitants receive no survival boons even while holding a base', () => {
+    const start = world();
+    start.players.pirates = { ...player('pirates', 'vanguard'), npc: 'pirate' };
+    start.planets.den = planet('den', 'pirates');
+    const state = ok(advance(8 * MS_PER_HOUR, 'fielded', ok(advance(MS_PER_HOUR, 'fielded', start))));
+    expect(state.pve?.boons).toEqual({ human: 1 });
+  });
+
   it('режим без пула долгов не заводит вовсе', () => {
     const state = ok(advance(8 * MS_PER_HOUR, 'waves', seeded()));
     expect(state.pve?.boons).toBeUndefined();

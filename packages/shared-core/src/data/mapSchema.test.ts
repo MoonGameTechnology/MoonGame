@@ -137,6 +137,7 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       'dense_nebula',
       'ion_storm',
       'nebula',
+      'pirate_base',
       'planet',
     ]);
   });

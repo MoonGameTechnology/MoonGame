@@ -263,6 +263,9 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
+import { runAiSeats } from '../../decisions/runAiSeats';
+import { pirateEncounter } from '../../decisions/pirateEncounter';
+import { initPirateIntro } from './pirateIntro';
 import { boonOffer } from '../../decisions/waveBoons';
 import {
   RUN_SAVE_VERSION,
@@ -9436,6 +9439,14 @@ const battleWindow = initBattleWindow({
     return m.ok ? m : null;
   },
 });
+const pirateIntro = initPirateIntro({
+  root: $('pirate-intro'),
+  copy: $('pirate-copy'),
+  action: $('pirate-action'),
+  close: $('pirate-close'),
+  focus: focusWorld,
+  openBattle: (id) => battleWindow.open(id),
+});
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
 let stewSnapshot: StewardMetrics | null = null;
 
@@ -10828,7 +10839,8 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   syncPlayerNames(s);
   ME = 'p1';
   AI_PLAYERS = new Map(aiPlayers);
-  for (const p of Object.values(s.players)) if (p.npc) AI_PLAYERS.set(p.id, 'weak');
+  for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
+  pirateIntro.reset();
   solo.reset();
   // ONB-2 (found live): a leftover guide from whatever was on screen before (a
   // tutorial the player exited without finishing/skipping, a stale reconnect) must
@@ -10865,7 +10877,8 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   // The match goal, written AFTER the wipe so it is the first line a player can read.
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
-  note(t('hud.goal', { n: SCORE_LIMIT }));
+  const waves = data.modes[modeId ?? '']?.pve?.waves;
+  note(waves ? t('hud.goal.pve', { n: waves }) : t('hud.goal', { n: SCORE_LIMIT }));
   defaultView(); // phone / flagship console: home; simple desktop: whole-map fit
   setupEl.style.display = 'none';
   // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
@@ -10900,18 +10913,11 @@ function startMatch(setup: SetupConfig): void {
   }
 }
 
-/** Запуск ЗАБЕГА: карта `pve-1` через `buildStateFromMap`, дальше — как обычный матч.
- *  Мест на ней два: игрок и Рой (забег одиночный, §0.1/§0.3 `sector-zero-roadmap.md`),
- *  и кто из них бот, говорит сама карта, а не эта функция. */
+/** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
 function startPvEMatch(): void {
   const st = pveState(data);
-  // Боты — все места, кроме `p1`. Силу им даёт ВЫБОР ИГРОКА рядом с кнопкой запуска
-  // (PVR-2.1): у забега нет строки места, где её меняют в обычной партии.
-  const aiSeats = new Map<string, AiProfile>(
-    Object.keys(st.players)
-      .filter((id) => id !== 'p1')
-      .map((id) => [id, pveDifficulty]),
-  );
+  // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
+  const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
@@ -12800,12 +12806,8 @@ async function restoreRun(): Promise<boolean> {
     detach('forget run', runSaveStore.clear());
     return false;
   }
-  const aiSeats = new Map<string, AiProfile>(
-    Object.keys(state.players ?? {})
-      .filter((id) => id !== 'p1')
-      .map((id) => [id, parseRunDifficulty(save.difficulty)]),
-  );
   try {
+    const aiSeats = runAiSeats(state, 'p1', parseRunDifficulty(save.difficulty));
     installMatch(state, aiSeats, save.mode);
   } catch {
     // Снимок прошёл разбор, но миром не стал (чужая форма состояния, битая карта).
@@ -12914,6 +12916,7 @@ function frame(nowReal: number) {
   // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
   renderBoonPick();
+  pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
     wave.kind === 'none'

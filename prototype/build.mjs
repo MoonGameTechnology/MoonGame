@@ -553,6 +553,20 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    Top-right under the top bar; z-32 above the HUD but below toasts/modals. */
 #goals{position:fixed;top:52px;right:14px;z-index:32;display:none;max-width:min(230px,60vw);}
 #goals.show{display:block;}
+#pirate-intro{position:fixed;top:calc(var(--tbh) + 78px);left:78px;z-index:32;
+  width:min(280px,80vw);padding:12px;background:rgba(4,16,22,.96);border:1px solid #a95e48;
+  border-radius:9px;color:var(--ink);font-size:12px;line-height:1.5;}
+#pirate-intro[hidden]{display:none;}
+#pirate-intro .pe-title{color:#ffb399;display:block;padding-right:28px;}
+#pirate-intro .pe-copy{margin:8px 0 10px;}
+#pirate-intro .pe-close{position:absolute;right:4px;top:4px;width:32px;height:32px;
+  border:0;background:transparent;color:var(--ink);cursor:pointer;}
+#pirate-intro .pe-action{min-height:40px;width:100%;border:1px solid #a95e48;border-radius:5px;
+  background:#302128;color:var(--ink);font:inherit;cursor:pointer;}
+body.holo-ui #pirate-intro{left:18px;}
+@media(max-width:640px){#pirate-intro,body.holo-ui #pirate-intro{top:auto;left:auto;right:12px;
+  bottom:calc(112px + env(safe-area-inset-bottom,0px));}}
+body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirate-intro{display:none;}
 #goals .gl-box{background:rgba(4,16,22,.94);border:1px solid var(--cyan-dim);border-radius:9px;overflow:hidden;
   box-shadow:0 4px 16px rgba(0,0,0,.45);}
 #goals .gl-head{display:flex;align-items:center;gap:7px;padding:7px 10px;background:rgba(53,214,230,.08);
@@ -2680,7 +2694,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,#boonpick,
-  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
+  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
   /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
@@ -2933,6 +2947,12 @@ const page = (js) => `<!doctype html>
 <div id="intro"></div>
 <div id="recap"></div>
 <div id="goals"></div>
+<aside id="pirate-intro" hidden>
+  <b class="pe-title" data-i18n="pve.pirates.title"></b>
+  <button type="button" id="pirate-close" class="pe-close" data-i18n-aria="pve.pirates.hide">×</button>
+  <p id="pirate-copy" class="pe-copy" aria-live="polite"></p>
+  <button type="button" id="pirate-action" class="pe-action"></button>
+</aside>
 <div id="playercard"></div>
 <div id="rescard"></div>
 <div id="profile"></div>
