@@ -1,4 +1,5 @@
 import { buildingLevel, type GameData, type UnitDef } from '../data/schemas';
+import { observedSwarm } from './swarmIntel';
 import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
@@ -380,6 +381,11 @@ function project(
   { identify, radar }: Coverage,
 ): VisibleState {
   const view = deepClone(state) as VisibleState;
+  // Private dossier plus this instant's resolved contacts. Never retain another
+  // observer's records, and never put remembered fleets back on the live map.
+  const contacts = { ...view.swarmIntel?.[viewerId], ...observedSwarm(state, viewerId, identify) };
+  if (Object.keys(contacts).length) view.swarmIntel = { [viewerId]: contacts };
+  else delete view.swarmIntel;
 
   // Stolen intel windows (espionage): the viewer's LIVE grants open narrow holes in
   // the fog below. Expired grants open nothing — expiry is enforced HERE, at the
