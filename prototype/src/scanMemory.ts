@@ -42,6 +42,8 @@ export interface ScanMemory {
   ownerOf(id: string): string | null;
   /** Забыть всё: память принадлежит матчу. */
   clear(): void;
+  dump(): Array<[string, Snapshot]>;
+  restore(entries: Array<[string, Snapshot]>): void;
 }
 
 /** Завести память разведки. Внутри обычная карта — состояние живёт здесь, не в хозяине. */
@@ -58,5 +60,10 @@ export function createScanMemory(): ScanMemory {
     has: (id) => seen.has(id),
     ownerOf: (id) => seen.get(id)?.owner ?? null,
     clear: () => seen.clear(),
+    dump: () => [...seen].map(([id, snap]) => [id, structuredClone(snap)]),
+    restore(entries) {
+      seen.clear();
+      for (const [id, snap] of entries) seen.set(id, structuredClone(snap));
+    },
   };
 }

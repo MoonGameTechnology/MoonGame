@@ -1461,7 +1461,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
   color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
 .cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
-#devline [data-swarm-intel]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
+#devline [data-solo-play],#devline [data-solo-save],#devline [data-swarm-intel]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
 .swarm-contact{border-top:1px solid var(--line-hi);padding:12px 0;overflow-wrap:anywhere;}
 .swarm-contact h3{font-size:13px;color:var(--cyan);margin:0 0 6px;}
 .swarm-contact p{font-size:11px;color:var(--dim);margin:0 0 8px;}
@@ -2405,6 +2405,11 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #hub .hub-play:active{background:linear-gradient(180deg,rgba(53,214,230,.44),rgba(53,214,230,.2));}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
+#solo-replace{display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;background:#000b;padding:20px;}
+#solo-replace .solo-box{width:min(440px,100%);padding:24px;background:#091b20;border:1px solid var(--cyan-dim);border-radius:12px;}
+#solo-replace button{min-height:44px;padding:10px 16px;margin:6px;border:1px solid var(--line-hi);border-radius:8px;background:var(--glass);color:var(--ink);cursor:pointer;}
+#solo-save-status{font-size:12px;color:var(--dim);line-height:1.5;}
+#hub-solo-continue[hidden]{display:none;}
 #hub #hub-sector-zero{min-height:44px;}
 #hub .hub-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin-top:4px;
   padding-bottom:6px;border-bottom:1px solid var(--line);}
@@ -2917,6 +2922,12 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
 <div id="devline"></div>
 <!-- slim left rail: only the wired tools (each opens its window). More icons land here as
      features get wired. -->
+<div id="solo-replace" role="dialog" aria-modal="true" aria-labelledby="solo-replace-title">
+  <div class="solo-box"><h2 id="solo-replace-title" data-i18n="solo.save.replace.title"></h2>
+  <p data-i18n="solo.save.replace.body"></p>
+  <button id="solo-replace-cancel" type="button" data-i18n="solo.save.replace.cancel"></button>
+  <button id="solo-replace-confirm" type="button" data-i18n="solo.save.replace.confirm"></button></div>
+</div>
 <nav id="rail">
   <div id="railtools">
     <button id="rail-diplo" data-i18n-title="rail.diplo.title">⬡<span class="rlbl" data-i18n="rail.diplo.label"></span></button>
@@ -3235,6 +3246,8 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
   <div class="hub-body">
     <div class="hub-panel" id="hp-home">
       <button id="hub-play" class="hub-play" type="button" data-i18n="hub.play"></button>
+      <button id="hub-solo-continue" class="hub-solo" type="button" hidden data-i18n="solo.save.continue"></button>
+      <p id="solo-save-status" role="status"></p>
       <button id="hub-solo" class="hub-solo" type="button" data-i18n="hub.solo"></button>
       <button id="hub-sector-zero" class="hub-solo" type="button" data-i18n="sector-zero.enter"></button>
       <!-- ONB-0 first-run offer: shown only to a not-yet-onboarded commander -->
