@@ -4,6 +4,13 @@
   "time": 0,
   "mode": "pve_waves",
   "sectors": {
+    "pirate_den": {
+      "position": { "x": -416, "y": -447 },
+      "kind": "pirate_base",
+      "terrain": "empty_space",
+      "size": 0.65,
+      "owner": "pirates"
+    },
     "home_a": {
       "position": {
         "x": -380,
@@ -159,16 +166,30 @@
     "p3": {
       "name": "Swarm Collective",
       "faction": "swarm",
+      "ai": true,
       "resources": {
         "credits": 800,
         "metal": 800
       }
+    },
+    "pirates": {
+      "name": "Pirate Base",
+      "faction": "vanguard",
+      "npc": "pirate",
+      "ai": false,
+      "resources": { "credits": 0, "metal": 0 }
     }
   },
   "fleets": {
+    "pirate_patrol": {
+      "owner": "pirates",
+      "location": "pirate_den",
+      "units": [{ "unit": "frigate", "count": 2 }]
+    },
     "p1_1": {
       "owner": "p1",
       "location": "home_a",
+      "landing": [{ "unit": "militia", "count": 1 }],
       "units": [
         {
           "unit": "cruiser",

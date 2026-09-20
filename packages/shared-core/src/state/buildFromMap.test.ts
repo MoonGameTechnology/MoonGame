@@ -6,6 +6,7 @@ import type { GameData } from '../data/schemas';
 import { hashGameDataBundle, loadGameData } from '../data/loadGameData';
 import { avaShape, parseMatchMap, type MatchMap } from '../data/mapSchema';
 import { buildStateFromMap, validateMatchMap } from './buildFromMap';
+import { getStance } from './diplomacy';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const readJson = (p: string): unknown => JSON.parse(readFileSync(path.join(repoRoot, p), 'utf8'));
@@ -52,6 +53,21 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     const state = buildStateFromMap(map, data);
     expect(state.players.red!.ai).toBe(true);
     expect(state.players.green!.ai).toBeUndefined();
+  });
+
+  it('preserves an NPC role independently of its field AI controller', () => {
+    const map = parseMatchMap({
+      ...exampleMap(),
+      players: {
+        ...exampleMap().players,
+        pirates: { name: 'Pirate Base', faction: 'vanguard', npc: 'pirate', ai: false },
+      },
+    });
+    const state = buildStateFromMap(map, data);
+    expect(state.players.pirates!.npc).toBe('pirate');
+    expect(state.players.pirates!.ai).not.toBe(true);
+    expect(state.players.green!.npc).toBeUndefined();
+    expect(getStance(state, 'green', 'pirates')).toBe('war');
   });
 
   it('derives sector links from the undirected paths (sorted, symmetric)', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { sumUnitStat, planRoute, type Planet } from '@void/shared-core';
+import { sumUnitStat, planRoute, playablePlayerIds, type Planet } from '@void/shared-core';
 
 import { shippedGameData } from '../../../data/bundle';
 import { pveState, pveModeId, skirmishState } from './gameData';
@@ -22,12 +22,13 @@ describe('pveState — the PvE door', () => {
       'hive',
       'home_a',
       'home_b',
+      'pirate_den',
       'ridge',
       'shear',
       'shoal',
       'veil',
     ]);
-    // Девять провинций и НИ ОДНОГО пустого путевого узла: соседство выводится из
+    // Десять провинций и НИ ОДНОГО пустого путевого узла: соседство выводится из
     // мозаики (M4.3), а точке схода линий в мозаике места нет — клетки у неё быть
     // не может, значит и границы тоже (§0 роадмапа карты).
     expect(state.planets.home_a!.owner).toBe('p1'); // the human seat
@@ -36,13 +37,13 @@ describe('pveState — the PvE door', () => {
     expect(state.fleets.p1_1!.location).toBe('home_a');
   });
 
-  it('seats exactly two sides: the player and the Swarm (PVR-1.6)', () => {
+  it('keeps two contenders: the player and the Swarm; pirates are map inhabitants', () => {
     // Карта возила ВТОРОЕ человеческое место `p2`, а `startPvEMatch()` сажает бота на
     // всё, кроме `p1` — то есть забег за игрока играл союзный бот: он занимал середину
     // к 30-му часу и принимал на себя весь штурм. Забег по решению владельца
     // ОДИНОЧНЫЙ (§0.1/§0.3), поэтому мест ровно два.
     const state = pveState(data);
-    expect(Object.keys(state.players).sort()).toEqual(['p1', 'p3']);
+    expect(playablePlayerIds(state).sort()).toEqual(['p1', 'p3']);
     // `home_b` осталась на карте, но НИЧЬЯ: это компактная зона развития сбоку, за
     // которую игрок платит десантом, а не бесплатный второй дом.
     expect(state.planets.home_b!.owner).toBeNull();
@@ -94,14 +95,14 @@ describe('pveState — the PvE door', () => {
     // И то, что закрыто, НЕ проходимо: печать — это не украшение поверх открытого пути.
     for (const [id, p] of Object.entries(state.planets))
       for (const other of p.sealed ?? []) expect([id, p.links ?? []]).toEqual([id, expect.not.arrayContaining([other])]);
-    // Местность закрыла ровно три границы этой карты, и каждая объяснима: скопление
+    // Местность закрыла четыре границы этой карты, и каждая объяснима: скопление
     // впускает один подход, ионные штормы не смыкаются друг с другом, гнездо не режет
-    // напрямик в астероидную отмель.
+    // напрямик в астероидную отмель; к пиратам ведёт только домашний подход.
     const seals = Object.entries(state.planets)
       .flatMap(([id, p]) => (p.sealed ?? []).map((o) => (id < o ? `${id}|${o}` : `${o}|${id}`)))
       .filter((k, i, all) => all.indexOf(k) === i)
       .sort();
-    expect(seals).toEqual(['cluster|drift', 'hive|shoal', 'ridge|shear']);
+    expect(seals).toEqual(['cluster|drift', 'drift|pirate_den', 'hive|shoal', 'ridge|shear']);
   });
 
   it('the dense cluster sits INSIDE the asteroid massif but admits one approach', () => {

@@ -147,7 +147,7 @@ function oweBoons(h: HandlerContext, pve: NonNullable<GameState['pve']>, cfg: Mo
     if (planet.owner !== null && planet.owner !== pve.npcPlayerId) holds.add(planet.owner);
   }
   for (const id of Object.keys(h.state.players).sort()) {
-    if (id === pve.npcPlayerId || !holds.has(id)) continue;
+    if (id === pve.npcPlayerId || h.state.players[id]!.npc || !holds.has(id)) continue;
     pve.boons = pve.boons ?? {};
     pve.boons[id] = (pve.boons[id] ?? 0) + 1;
   }

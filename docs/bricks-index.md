@@ -626,8 +626,8 @@
 | FOG-10 | ✅ | proto core | `docs/backlog.md:14960` | Память разведки перестала жить только |
 | FOG-9 | ✅ | core | `docs/backlog.md:14984` | Приостановленная стройка чужого мира была видна |
 | TEST-4 | ✅ | srv | `docs/backlog.md:14994` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15191` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:15203` | Ускорение движения раскрытой голографической карты и подготовка |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15200` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:15212` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -840,7 +840,7 @@
 | M3.2 | ⏳ |  | `docs/map-roadmap.md:384` | Процедурный пресет → формат карты [tools] |
 | M4.1 | ✅ | cli | `docs/map-roadmap.md:394` | Рендер из данных сектора — /🚧 |
 | M4.3 | ✅ | core data cli | `docs/map-roadmap.md:400` | Соседство выводится из мозаики — |
-| M4.2 | ⏳ | docs | `docs/map-roadmap.md:448` | Сверка с метаигрой и отложенным регионом |
+| M4.2 | ⏳ | docs | `docs/map-roadmap.md:449` | Сверка с метаигрой и отложенным регионом |
 | MM-0.1 | ⏳ | srv | `docs/matchmaking-roadmap.md:27` | Состояния матча: lobby→active→ended→archived |
 | MM-0.2 | ✅ | core proto srv | `docs/matchmaking-roadmap.md:33` | Подключить victoryModule + баннер |
 | MM-1.1 | 🔒 | srv | `docs/matchmaking-roadmap.md:43` | Лобби (создание/присоединение) |
@@ -961,16 +961,17 @@
 | PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md:1339` | Выбор между волнами |
 | PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md:1396` | Волны Роя враждебны и доходят до боя |
 | PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md:1435` | Забег доходит до вердикта |
-| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1505` | Выбор сложности на запуске забега |
-| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1540` | У забега свой темп и ускорение |
-| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1583` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:1591` | Хранилище PvE-прогресса |
-| PVR-3.3 | 🔒 | proto | `docs/sector-zero-roadmap.md:1598` | Награда за забег |
-| PVR-4.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1612` | Резолюция: что из §3 входит в первую версию |
-| PVR-4.2 | 🔒 | core | `docs/sector-zero-roadmap.md:1620` | Память Роя как состояние |
-| PVR-4.3 | 🔒 | core data | `docs/sector-zero-roadmap.md:1629` | Одна читаемая адаптация от сигнала до формы |
-| PVR-4.4 | 🔒 | data | `docs/sector-zero-roadmap.md:1637` | Структуры первого набора |
-| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:1643` | Журнал адаптаций |
+| PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1504` | Пиратская база для первого боя |
+| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1534` | Выбор сложности на запуске забега |
+| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1569` | У забега свой темп и ускорение |
+| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1612` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:1620` | Хранилище PvE-прогресса |
+| PVR-3.3 | 🔒 | proto | `docs/sector-zero-roadmap.md:1627` | Награда за забег |
+| PVR-4.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1641` | Резолюция: что из §3 входит в первую версию |
+| PVR-4.2 | 🔒 | core | `docs/sector-zero-roadmap.md:1649` | Память Роя как состояние |
+| PVR-4.3 | 🔒 | core data | `docs/sector-zero-roadmap.md:1658` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | 🔒 | data | `docs/sector-zero-roadmap.md:1666` | Структуры первого набора |
+| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:1672` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
