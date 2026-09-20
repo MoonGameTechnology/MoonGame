@@ -3852,7 +3852,11 @@ function drawStrikeTrails(): void {
     cx.translate(-12, -12);
     cx.fillStyle = rgba(R_WING, 0.24);
     cx.strokeStyle = rgba(R_WING, tr.leg === 'back' ? 0.55 : 0.95);
-    drawShipShape(cx, (dom && unitShape(dom.def, dom.unit)) || 'fighter', cam.scale >= 0.9);
+    drawShipShape(
+      cx,
+      (dom && unitShape(dom.def, dom.unit, s.players[ME]?.faction)) || 'fighter',
+      cam.scale >= 0.9,
+    );
     cx.restore();
     // Подпись — позывной и число бортов, ТОТ ЖЕ позывной, что у карточки в порту:
     // игрок обязан узнать в летящем значке звено, которое отправлял.
@@ -5375,7 +5379,7 @@ function render(now: number) {
     }
 
     const dom = dominantUnit(f.units, data);
-    const shape = (dom && unitShape(dom.def, dom.unit)) || 'cruiser';
+    const shape = (dom && unitShape(dom.def, dom.unit, s.players[f.owner]?.faction)) || 'cruiser';
     const arch = dom ? unitArchetype(dom.def) : 'combat';
     const domK = glyphScale(dom ? unitSizeClass(dom.def.stats.hp ?? 0) : 'S');
     // На удалении остаётся внешний контур ТОГО ЖЕ корпуса. Внутренняя детализация,
@@ -5626,7 +5630,7 @@ function squadronTroopsHtml(squadronId: string): string {
       const sign = r.delta > 0 ? '+' : '';
       return (
         `<div class="row">` +
-        `<span class="bicon">${unitIconHtml(r.unit, data, youColor, 18)}</span>${esc(nm)} ` +
+        `<span class="bicon">${unitIconHtml(r.unit, data, youColor, 18, s.players[ME]?.faction)}</span>${esc(nm)} ` +
         `<span class="dim">${r.garrison} ▸ ${r.hold}</span> ` +
         `<button class="b" data-act="wingtstep" data-arg="${esc(squadronId)}" data-unit="${esc(r.unit)}" data-n="-1"${r.delta <= -r.maxUnload ? ' disabled' : ''}>−</button>` +
         `<b>${sign}${r.delta}</b>` +
@@ -5682,7 +5686,7 @@ function unitRows(stacks: Array<UnitStack>): string {
   return kitUnitRows(
     stacks,
     (unit) => ({
-      icon: unitIconHtml(unit, data, youColor, 18),
+      icon: unitIconHtml(unit, data, youColor, 18, s.players[ME]?.faction),
       name: displayUnit(unit),
       domain: isGround(unit) ? t('side.unit.ground') : t('side.unit.space'),
     }),
@@ -5817,7 +5821,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
       const icon =
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-          : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
+          : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: s.players[f.owner]?.faction, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
       // Show installed modules as small tags under the count (RULES-2.1 / SM-0.3):
       // two cruisers with different modules are separate stacks — the tags make
       // the difference visible at a glance, without opening the codex.
@@ -6199,7 +6203,7 @@ function fleetPanelHtml(f: Fleet): string {
         const cnt = (stacks: Array<{ unit: string; count: number }>, u: string): number =>
           stacks.reduce((n, st) => (st.unit === u ? n + st.count : n), 0);
         for (const u of types)
-          ga += `<div class="row"><span class="bicon">${unitIconHtml(u, data, youColor, 16)}</span>${esc(displayUnit(u))} <b>${cnt(groundHere, u)} ▸ ${cnt(carried, u)}</b></div>`;
+          ga += `<div class="row"><span class="bicon">${unitIconHtml(u, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(u))} <b>${cnt(groundHere, u)} ▸ ${cnt(carried, u)}</b></div>`;
       }
       if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
       if (!types.length && !loadingN)
@@ -7167,7 +7171,7 @@ function codexTile(
   const v = {
     kind,
     id,
-    icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor),
+    icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor, 22, s.players[ME]?.faction),
     art: catalogPortraitHtml(kind, id, data, 'thumb'),
     name: kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id),
     label,
@@ -7221,7 +7225,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost, myRes())}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, s.players[ME]?.faction)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost, myRes())}</button>`;
   }
   return '';
 }
@@ -7246,7 +7250,7 @@ function codexEntryLabel(e: CodexEntry): string {
 }
 function codexEntryIcon(e: CodexEntry): string {
   const id = e.key.slice(2);
-  if (e.category === 'unit') return unitIconHtml(id, data, youColor, 20);
+  if (e.category === 'unit') return unitIconHtml(id, data, youColor, 20, s.players[ME]?.faction);
   if (e.category === 'building') return BUILD_ICON[id] ?? '▣';
   return '?';
 }
@@ -7931,7 +7935,7 @@ function renderCmdBar() {
     // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
     (troopsPlan && troopsIn
       ? troopsMenuHtml(troopsModel(troopsIn), {
-          icon: (u) => unitIconHtml(u, data, youColor, 18),
+          icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
           name: displayUnit,
         })
       : '');
@@ -7995,7 +7999,7 @@ function renderSplitDialog() {
   const html = splitDialogHtml(
     { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
     {
-      icon: (u) => unitIconHtml(u, data, youColor, 18),
+      icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
       name: displayUnit,
       moduleName: (m) => {
         const mdef = data.modules[m];
