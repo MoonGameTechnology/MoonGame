@@ -464,26 +464,35 @@ export interface DamageHookArgs {
  */
 export const MITIGATION_CAP = 0.9;
 
-/** The ONE producer of {@link HookedDamage}: run `amount` through `combat.damage`,
+/** The ONE producer of {@link HookedDamage}: run `amount` through the bonus groups,
  *  then through the pooled mitigation of `combat.mitigation`. Every firing channel
  *  goes through here.
  *
- *  Two hooks, because the two sides compose differently (PERK-0.1). Attacker-side
- *  bonuses (technologies, faction passives, hero auras) chain as multipliers on the
- *  way in. Defensive mitigation does NOT: each source adds POINTS to one pool, and
- *  the pool is spent once, so a second fort is worth less than the first — the
- *  slowdown works BETWEEN sources, not only inside one.
+ *  Three groups, because the pieces compose differently (PERK-0.1, formula
+ *  `база × (1 + Σ parallel) × Π(sequential)`):
  *
- *  Before this, four sources each divided the damage on their own (fort, standing
- *  buildings, planet type, sector toughness), which compounded in the defender's
- *  favour: 1/1.5 twice is 0.44, while one pooled 1/2.0 is 0.50. */
+ *  - **parallel** (`combat.damage.parallel`) — the MASS class. Contributions are
+ *    POINTS that add up and are spent once, so each further bonus dilutes itself:
+ *    an eleventh +10% adds a tenth of base onto an already-doubled total.
+ *  - **sequential** (`combat.damage`) — the RARE class. Each contribution multiplies
+ *    whatever came before, so its relative worth never decays. This is the older
+ *    hook and keeps its name: every subscriber that existed before PERK-1.1 is a
+ *    sequential one until PERK-1.2 moves the catalogs deliberately.
+ *  - **mitigation** (`combat.mitigation`) — the defender's side, pooled and spent
+ *    once (PERK-2.1).
+ *
+ *  Order between the first two does not matter (multiplication commutes) and order
+ *  WITHIN each does not matter either (a sum and a product are both commutative) —
+ *  which is what keeps the module manifest (invariant #6) from becoming a balance
+ *  lever the moment a non-multiplier appears. */
 export function hookedDamage(
   h: HandlerContext,
   amount: number,
   args: DamageHookArgs,
 ): HookedDamage {
-  const dealt = h.hook<number>('combat.damage', amount, args);
-  return (dealt * mitigationFactor(h, args)) as HookedDamage;
+  const sequential = h.hook<number>('combat.damage', amount, args);
+  const parallel = h.hook<number>('combat.damage.parallel', 0, args);
+  return (sequential * (1 + parallel) * mitigationFactor(h, args)) as HookedDamage;
 }
 
 /** What fraction of the incoming damage survives the defender's pooled mitigation.
