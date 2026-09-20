@@ -704,6 +704,35 @@ export const HERO_PASSIVE_SCOPES = ['heroFleet', 'ownFleetsNear'] as const;
  *  ВАЖНО: `slots` архетипа и `skillSlots` редкости — РАЗНЫЕ бюджеты. Первый ограничивает
  *  `hero.fit` (компоненты корабля), второй — `hero.equip` (способности). Путать их нельзя:
  *  у `commander` 4 фиттинга и у `main` 4 скилла — совпадение чисел, а не одно правило. */
+/** Одна ступень звёздности Sector Zero: шанс успеха и цена попытки (SZE-0.2).
+ *
+ *  Лестница ОДНА на модули и навыки: звезда модуля и звезда навыка — это уровень заточки
+ *  `EC-2.1` под своим именем, и заводить вторую лестницу запрещено (§0.4
+ *  `hero-progression-roadmap.md`, §0.2 `sector-zero-economy-roadmap.md`). Шанс `1` —
+ *  гарантированная ступень; меньше — бросок.
+ *
+ *  Числа в `data/sectorZeroStars.json` — **v0**, отправная точка для калибровки
+ *  телеметрией, а не утверждённый баланс. */
+export const SectorZeroStarStepSchema = z.object({
+  /** Вероятность успеха попытки, (0, 1]. Ровно `1` = ступень без броска. */
+  chance: z.number().gt(0).lte(1).default(1),
+  /** Цена попытки в Варрантах. Сгорает и при неудаче — но звёздность не падает
+   *  (инвариант провала, резолюция владельца 2026-09-20). */
+  warrants: z.number().int().nonnegative().default(0),
+});
+
+/** Лестница звёздности Sector Zero целиком. */
+export const SectorZeroStarsSchema = z.object({
+  /** Потолок звёзд. Выше него попытка не предлагается вовсе. */
+  cap: z.number().int().nonnegative().default(0),
+  /** Сколько первых ступеней гарантированы. Держится ОТДЕЛЬНЫМ числом, а не выводится из
+   *  `chance === 1`: так «гарант кончается здесь» остаётся авторским решением, а не
+   *  побочным эффектом правки вероятности. Расхождение с `steps` ловит тест. */
+  guaranteed: z.number().int().nonnegative().default(0),
+  /** Ступени по порядку: `steps[0]` — попытка получить первую звезду. */
+  steps: z.array(SectorZeroStarStepSchema).default([]),
+});
+
 export const HeroGradeDefSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
@@ -975,6 +1004,9 @@ export const GameDataSchema = z.object({
   heroPassives: z.record(z.string(), HeroPassiveDefSchema).default({}),
   heroSkillTrees: z.record(z.string(), HeroSkillNodeSchema).default({}),
   heroGrades: z.record(z.string(), HeroGradeDefSchema).default({}),
+  /** Лестница звёздности Sector Zero (SZE-0.2). Пусто = мастерская и академия выключены
+   *  данными, без флага в коде. */
+  sectorZeroStars: SectorZeroStarsSchema.prefault({}),
   modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).

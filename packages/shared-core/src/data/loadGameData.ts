@@ -38,6 +38,7 @@ export function composeGameDataBundle(readJson: JsonReader): Record<string, unkn
     heroPassives: readJson('heroPassives.json'),
     heroSkillTrees: readJson('heroSkillTrees.json'),
     heroGrades: readJson('heroGrades.json'),
+    sectorZeroStars: readJson('sectorZeroStars.json'),
     modes: readJson('modes.json'),
     rewards: readJson('rewards.json'),
     medals: readJson('medalGrades.json'),

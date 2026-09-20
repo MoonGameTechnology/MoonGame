@@ -1,0 +1,11 @@
+{
+  "cap": 5,
+  "guaranteed": 3,
+  "steps": [
+    { "chance": 1, "warrants": 20 },
+    { "chance": 1, "warrants": 45 },
+    { "chance": 1, "warrants": 90 },
+    { "chance": 0.55, "warrants": 180 },
+    { "chance": 0.3, "warrants": 360 }
+  ]
+}
