@@ -12525,7 +12525,6 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   // --- модалки поверх всего (z60…z57) ---
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
-  { id: 'swarm-dossier', isOpen: () => shown('swarm-dossier'), close: closeSwarmDossier }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
   // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
   {
@@ -12537,6 +12536,7 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z60
   { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
+  { id: 'swarm-dossier', isOpen: () => shown('swarm-dossier'), close: closeSwarmDossier }, // z60
   { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
   { id: 'sector-zero', isOpen: () => sectorZeroMenu.canGoBack(), close: () => sectorZeroMenu.back() }, // z58
   // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false

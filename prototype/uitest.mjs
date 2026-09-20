@@ -199,6 +199,7 @@ module.exports = {
   },
   selected: () => ({ fleet: panelFleet(), planet: selPlanet, orders: [...selFleets] }),
   state: () => JSON.stringify(s),
+  back: () => closeTop(BACK_LAYERS.filter(l => l.id === 'swarm-dossier' || l.id === 'boonpick')),
   backLabel: () => t('side.summary.back'),
 };`;
 const res = await build({
@@ -399,6 +400,12 @@ for (const handle of (listeners.get(getEl('devline')) ?? {}).click ?? [])
   handle({ target: { closest: () => ({ dataset: { swarmIntel: '1' } }) } });
 assert.equal(getEl('swarm-dossier').classList.contains('show'), true);
 assert.ok(getEl('swarm-dossier-body').innerHTML.length > 0);
+getEl('boonpick').classList.add('show'); // a wave offers a boon over the open dossier
+const beforeBoonBack = mod.exports.state();
+mod.exports.back();
+assert.equal(getEl('boonpick').classList.contains('show'), false, 'Back defers the upper boon offer');
+assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'the dossier stays underneath');
+assert.equal(mod.exports.state(), beforeBoonBack, 'deferring keeps the earned boon');
 await click('swarm-dossier-close');
 assert.equal(getEl('swarm-dossier').classList.contains('show'), false);
 await click('tomenu');
