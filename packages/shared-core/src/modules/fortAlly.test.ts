@@ -18,6 +18,7 @@ import { constructionModule } from './construction';
 import { createInitialState, type GameState, type Planet, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
 import { setStance } from '../state/diplomacy';
+import { hookedDamage } from '../util/combat';
 import type { Context } from '../action/types';
 
 const data: GameData = parseGameData({
@@ -30,14 +31,19 @@ const data: GameData = parseGameData({
 });
 const ctx = (): Context => ({ now: 0, data });
 
-/** Зонд: прогоняет 100 урона через тот же хук, которым пользуется бой. */
+/** Зонд: прогоняет 100 урона через тот же ПРОИЗВОДИТЕЛЬ, которым пользуется бой.
+ *  Звать `combat.damage` напрямую нельзя: снижение с PERK-2.1 живёт в отдельном пуле
+ *  (`combat.mitigation`) и применяется производителем — проба мимо него не увидела бы
+ *  форт вовсе. */
 const probe: GameModule = {
   id: 'hook-probe',
   version: '1.0.0',
   setup(api) {
     api.onAction('probe.damage', (action, h) => {
       const args = action.payload as { phase: string; location: string; defender: string };
-      h.emit('probe.result', { dmg: h.hook<number>('combat.damage', 100, args) });
+      h.emit('probe.result', {
+        dmg: hookedDamage(h, 100, { ...args, attacker: null, battleId: undefined }),
+      });
     });
   },
 };
@@ -77,7 +83,9 @@ function damageTo(defender: string, s: GameState = world()): number {
 
 describe('FORT — форт прикрывает своих и союзных (решение владельца 5)', () => {
   // 100 / 1.5 = 66.67, затем −1% за одно стоящее здание.
-  const PROTECTED = (100 / 1.5) * 0.99;
+  // Форт 0.5 + одно стоящее здание 0.01 — ОДИН пул очков, одно деление (PERK-2.1).
+  // Раньше здесь было два независимых деления: `(100 / 1.5) * 0.99`.
+  const PROTECTED = 100 / 1.51;
 
   it('ВЛАДЕЛЕЦ прикрыт — как и был', () => {
     expect(damageTo('p1')).toBeCloseTo(PROTECTED, 5);

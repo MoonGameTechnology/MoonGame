@@ -711,8 +711,9 @@ describe('construction module — buildings in combat (GDD §7.4)', () => {
       ctx(HOUR),
     );
     expect(roundDamage(plain)).toBeCloseTo(20); // 4 × attack 5, no reduction
-    // ÷ (1 + 0.5 defenseBonus) × (1 − 0.01 per-building reduction, 1 building)
-    expect(roundDamage(fortified)).toBeCloseTo((20 / 1.5) * 0.99, 5);
+    // PERK-2.1: форт 0.5 и одно стоящее здание 0.01 идут в ОДИН пул очков — одно
+    // деление на 1.51, а не два подряд (раньше было `(20 / 1.5) * 0.99`).
+    expect(roundDamage(fortified)).toBeCloseTo(20 / 1.51, 5);
   });
 
   it('wears down and destroys buildings under assault', () => {

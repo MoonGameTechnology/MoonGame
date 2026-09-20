@@ -66,29 +66,31 @@ export const sectorModule: GameModule = {
       return out;
     });
 
+    // Домашнее преимущество остаётся множителем АТАКУЮЩЕГО — это перк стороны, а не
+    // свойство местности, и складываться с обороной ему незачем.
     api.hook<number>('combat.damage', (dmg, args, h) => {
       const { location, attacker } = args as DamageArgs;
-      if (!location) {
+      if (!location || !attacker) {
         return dmg;
       }
       const planet = h.state.planets[location];
-      if (!planet) {
+      if (!planet || planet.owner !== attacker) {
         return dmg;
       }
-      let result = dmg;
-      // Sector toughness: everyone in the sector effectively gains HP, modelled
-      // as reduced incoming damage (same survivability, no pool rescaling).
-      const type = planet.terrain ? h.ctx.data.sectors[planet.terrain] : undefined;
-      // Guard 1 + bonus > 0 too: a hpBonus of -1 would divide by zero (Infinity),
-      // < -1 would flip the sign — mirrors the planetType.ts twin.
-      if (type && type.hpBonus !== 0 && 1 + type.hpBonus > 0) {
-        result /= 1 + type.hpBonus;
+      return dmg * (1 + HOME_DAMAGE_BONUS);
+    });
+
+    // PERK-2.1: проходимость сектора — снижение, и оно идёт в общий пул очками.
+    // Фазового гейта тут нет и не было: местность держит всех и всегда, в отличие
+    // от форта и типа планеты, которые работают только в наземной фазе.
+    api.hook<number>('combat.mitigation', (pool, args, h) => {
+      const { location } = args as DamageArgs;
+      if (!location) {
+        return pool;
       }
-      // Home advantage: the side owning this sector hits harder.
-      if (attacker && planet.owner === attacker) {
-        result *= 1 + HOME_DAMAGE_BONUS;
-      }
-      return result;
+      const planet = h.state.planets[location];
+      const type = planet?.terrain ? h.ctx.data.sectors[planet.terrain] : undefined;
+      return type ? pool + type.hpBonus : pool;
     });
   },
 };

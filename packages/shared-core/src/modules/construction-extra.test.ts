@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import type { GameModule } from '../kernel/module';
 import { constructionModule } from './construction';
+import { hookedDamage } from '../util/combat';
 import {
   createInitialState,
   type BuildingInstance,
@@ -335,7 +336,11 @@ describe('construction module — combat.damage hook phase guard', () => {
     setup(api) {
       api.onAction('probe.damage', (action, h) => {
         const args = action.payload as { phase: string; location: string; defender: string };
-        h.emit('probe.result', { dmg: h.hook<number>('combat.damage', 100, args) });
+        // Через ПРОИЗВОДИТЕЛЯ, а не голый хук: снижение с PERK-2.1 пулится в
+        // `combat.mitigation` и применяется им, так что проба мимо него форта не увидит.
+        h.emit('probe.result', {
+          dmg: hookedDamage(h, 100, { ...args, attacker: null, battleId: undefined }),
+        });
       });
     },
   };
@@ -362,9 +367,9 @@ describe('construction module — combat.damage hook phase guard', () => {
     return (r.events.find((e) => e.type === 'probe.result')?.payload as { dmg: number }).dmg;
   };
 
-  it('reduces GROUND damage by the standing defenseBonus (fort 0.5 → ÷1.5) and per-building reduction (1 building = 1%)', () => {
-    // defenseBonus: 100 / 1.5 = 66.667; then 1 building = 1% reduction: 66.667 * 0.99 = 66.0
-    expect(damageVia('ground')).toBeCloseTo((100 / 1.5) * 0.99, 5);
+  it('reduces GROUND damage by the pooled defenseBonus and per-building points (fort 0.5 + 1 building 0.01 → ÷1.51)', () => {
+    // PERK-2.1: один пул очков, одно деление. Раньше делений было два: (100/1.5)*0.99.
+    expect(damageVia('ground')).toBeCloseTo(100 / 1.51, 5);
   });
 
   it('does not apply the defense bonus in the orbital phase', () => {

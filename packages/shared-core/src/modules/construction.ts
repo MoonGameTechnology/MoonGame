@@ -1087,31 +1087,27 @@ export const constructionModule: GameModule = {
     // союзник, приведший войска оборонять ВАШ мир, не получал ничего; расхождение было
     // тихим, потому что все тесты проверяли владельца, а после MSB-4 обороняющихся на
     // одном мире может быть несколько.
-    api.hook<number>('combat.damage', (dmg, args, h) => {
+    api.hook<number>('combat.mitigation', (pool, args, h) => {
       const a = args as { phase?: string; location?: string; defender?: string };
-      if (a.phase !== 'ground') return dmg;
+      if (a.phase !== 'ground') return pool;
       const planet = fortificationCovers(h, a.location, a.defender);
-      if (!planet) return dmg;
-      const bonus = totalDefenseBonus(planet, h.ctx.data);
-      return bonus > 0 ? dmg / (1 + bonus) : dmg;
+      if (!planet) return pool;
+      return pool + totalDefenseBonus(planet, h.ctx.data);
     });
 
-    // Each standing building on the planet reduces incoming ground-unit damage
-    // by 1% (flat reduction, not multiplicative with defenseBonus). Max 90% —
-    // a heavily fortified world is tough but not invincible. This is a SEPARATE
-    // parameter from `defenseBonus` (which is a per-building stat); this one
-    // counts ALL buildings: 10 buildings = 10% damage reduction.
+    // Each standing building on the planet adds 1% worth of mitigation POINTS. This is
+    // a SEPARATE parameter from `defenseBonus` (a per-building stat); this one counts
+    // ALL buildings: 10 buildings = 0.1 points. PERK-2.1 removed the local 90% ceiling
+    // this rule used to carry — the cap now belongs to the POOL (`MITIGATION_CAP`), so
+    // four sources can no longer stack four separate ceilings.
     const GROUND_DAMAGE_REDUCTION_PER_BUILDING = 0.01;
-    const GROUND_DAMAGE_REDUCTION_MAX = 0.90;
-    api.hook<number>('combat.damage', (dmg, args, h) => {
+    api.hook<number>('combat.mitigation', (pool, args, h) => {
       const a = args as { phase?: string; location?: string; defender?: string };
-      if (a.phase !== 'ground') return dmg;
+      if (a.phase !== 'ground') return pool;
       const planet = fortificationCovers(h, a.location, a.defender);
-      if (!planet) return dmg;
+      if (!planet) return pool;
       const standing = planet.buildings.filter((b) => b.hp > 0).length;
-      if (standing <= 0) return dmg;
-      const reduction = Math.min(standing * GROUND_DAMAGE_REDUCTION_PER_BUILDING, GROUND_DAMAGE_REDUCTION_MAX);
-      return dmg * (1 - reduction);
+      return pool + standing * GROUND_DAMAGE_REDUCTION_PER_BUILDING;
     });
 
     // The ground assault wears down the contested planet's structures each round

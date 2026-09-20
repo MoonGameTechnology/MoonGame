@@ -453,14 +453,51 @@ export interface DamageHookArgs {
   battleId?: string;
 }
 
-/** The ONE producer of {@link HookedDamage}: run `amount` through `combat.damage` and
- *  mark the result as hooked. Every firing channel goes through here. */
+/**
+ * Balance cap on pooled mitigation (PERK-2.1): however deep the pool, a defender
+ * never takes less than `1 - MITIGATION_CAP` of the incoming damage.
+ *
+ * The pool's own shape (`1 / (1 + R)`) already approaches zero without reaching it,
+ * so this is not a correctness guard — it is the owner's balance ceiling, and it
+ * bites only past R = 9, far beyond anything the shipped catalogs reach. The value
+ * carries over from the per-building rule that used to own the only cap in the game.
+ */
+export const MITIGATION_CAP = 0.9;
+
+/** The ONE producer of {@link HookedDamage}: run `amount` through `combat.damage`,
+ *  then through the pooled mitigation of `combat.mitigation`. Every firing channel
+ *  goes through here.
+ *
+ *  Two hooks, because the two sides compose differently (PERK-0.1). Attacker-side
+ *  bonuses (technologies, faction passives, hero auras) chain as multipliers on the
+ *  way in. Defensive mitigation does NOT: each source adds POINTS to one pool, and
+ *  the pool is spent once, so a second fort is worth less than the first — the
+ *  slowdown works BETWEEN sources, not only inside one.
+ *
+ *  Before this, four sources each divided the damage on their own (fort, standing
+ *  buildings, planet type, sector toughness), which compounded in the defender's
+ *  favour: 1/1.5 twice is 0.44, while one pooled 1/2.0 is 0.50. */
 export function hookedDamage(
   h: HandlerContext,
   amount: number,
   args: DamageHookArgs,
 ): HookedDamage {
-  return h.hook<number>('combat.damage', amount, args) as HookedDamage;
+  const dealt = h.hook<number>('combat.damage', amount, args);
+  return (dealt * mitigationFactor(h, args)) as HookedDamage;
+}
+
+/** What fraction of the incoming damage survives the defender's pooled mitigation.
+ *
+ *  Points below zero AMPLIFY (a hostile world offers its holder no cover, and that
+ *  is how the per-source rules always read a negative `defenseBonus`). A pool at or
+ *  past −1 would divide by zero or flip the sign, so it degrades to "no effect" —
+ *  fail-secure, mirroring the guards the individual sources carried. */
+function mitigationFactor(h: HandlerContext, args: DamageHookArgs): number {
+  const pool = h.hook<number>('combat.mitigation', 0, args);
+  if (!(1 + pool > 0)) {
+    return 1;
+  }
+  return Math.max(1 / (1 + pool), 1 - MITIGATION_CAP);
 }
 
 /** Add two already-hooked shares. Arithmetic strips the brand, so the melee round —
