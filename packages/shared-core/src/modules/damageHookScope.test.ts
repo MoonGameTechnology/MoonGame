@@ -305,8 +305,12 @@ describe('combat.damage — skipping the hook is structurally impossible (CORE-D
     // `api.hook(...)` REGISTERS a subscriber (terrain, forts, techs, hero auras) and is
     // expected in many modules; `h.hook(...)` INVOKES the pipeline and is the call a
     // channel could sneak in on its own. Only the latter is the hole this pins.
+    // Both bonus groups count (PERK-1.1): the parallel one is as skippable as the
+    // sequential if a channel starts calling it itself.
     const invokers = files.filter((name) =>
-      /\bh\.hook<[^>]*>\(\s*'combat\.damage'/.test(readFileSync(new URL(name, root), 'utf8')),
+      /\bh\.hook<[^>]*>\(\s*'combat\.damage(\.parallel)?'/.test(
+        readFileSync(new URL(name, root), 'utf8'),
+      ),
     );
 
     expect(invokers).toEqual(['util/combat.ts']);
