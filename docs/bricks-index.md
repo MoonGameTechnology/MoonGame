@@ -631,9 +631,9 @@
 | PERK-0.1 | ✅ | docs | `docs/backlog.md:15215` | Резолюция владельца: два класса бонусов + третья группа |
 | PERK-1.1 | ⏳ | core | `docs/backlog.md:15234` | Три группы вместо одной цепочки. |
 | PERK-1.2 | 🔒 | data proto | `docs/backlog.md:15248` | (PERK-1.1) Перевести массовые перки в параллельную |
-| PERK-2.1 | ⏳ | core | `docs/backlog.md:15256` | Снижение урона: один пул, одна форма, один кап. |
-| PERK-3.1 | 🔒 | core data | `docs/backlog.md:15271` | Кто и за что выдаёт последовательные множители. |
-| PERK-3.2 | 🔒 | core | `docs/backlog.md:15289` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
+| PERK-2.1 | ✅ | core | `docs/backlog.md:15256` | Снижение урона: один пул, одна форма, один кап. |
+| PERK-3.1 | 🔒 | core data | `docs/backlog.md:15299` | Кто и за что выдаёт последовательные множители. |
+| PERK-3.2 | 🔒 | core | `docs/backlog.md:15317` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
