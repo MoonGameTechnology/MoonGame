@@ -958,17 +958,17 @@
 | ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:459` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
 | ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:497` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
 | SZE-0.1 | ✅ | docs | `docs/sector-zero-economy-roadmap.md:168` | Свести §4.5 с магазином |
-| SZE-0.2 | ⏳ | docs data | `docs/sector-zero-economy-roadmap.md:176` | Цена звезды и потолок |
-| SZE-0.3 | 🔒 | docs proto | `docs/sector-zero-economy-roadmap.md:182` | Детерминизм заточки без сервера |
-| SZE-1.1 | 🔒 | data proto | `docs/sector-zero-economy-roadmap.md:197` | Звезда у модуля: поле и потолок |
-| SZE-1.2 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:204` | Экран Мастерской |
-| SZE-1.3 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:211` | Осколки и pity |
-| SZE-2.1 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:220` | Экран Академии на движке Мастерской |
-| SZE-3.1 | ⏳ | proto | `docs/sector-zero-economy-roadmap.md:231` | Витрина и три способа оплаты |
-| SZE-3.2 | 🔒 | data | `docs/sector-zero-economy-roadmap.md:237` | Ассортимент |
-| SZE-3.3 | 🔒 | docs sec | `docs/sector-zero-economy-roadmap.md:243` | Покупки в Sector Zero и площадка |
-| SZE-4.1 | ⏳ | data | `docs/sector-zero-economy-roadmap.md:252` | Уровень у адаптации |
-| SZE-4.2 | 🔒 | core | `docs/sector-zero-economy-roadmap.md:258` | Контригра против уровня |
+| SZE-0.2 | ✅ | docs data | `docs/sector-zero-economy-roadmap.md:176` | Цена звезды и потолок |
+| SZE-0.3 | ✅ | docs proto | `docs/sector-zero-economy-roadmap.md:188` | Детерминизм заточки без сервера |
+| SZE-1.1 | ⏳ | data proto | `docs/sector-zero-economy-roadmap.md:215` | Звезда у модуля: поле и потолок |
+| SZE-1.2 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:222` | Экран Мастерской |
+| SZE-1.3 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:229` | Осколки и pity |
+| SZE-2.1 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:238` | Экран Академии на движке Мастерской |
+| SZE-3.1 | ⏳ | proto | `docs/sector-zero-economy-roadmap.md:249` | Витрина и три способа оплаты |
+| SZE-3.2 | 🔒 | data | `docs/sector-zero-economy-roadmap.md:255` | Ассортимент |
+| SZE-3.3 | 🔒 | docs sec | `docs/sector-zero-economy-roadmap.md:261` | Покупки в Sector Zero и площадка |
+| SZE-4.1 | ⏳ | data | `docs/sector-zero-economy-roadmap.md:270` | Уровень у адаптации |
+| SZE-4.2 | 🔒 | core | `docs/sector-zero-economy-roadmap.md:276` | Контригра против уровня |
 | PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1065` | Карта pve-1 снова строится |
 | PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1096` | pveModule в ядре прототипа |
 | PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1123` | Сохранение: сперва мета, потом забег |
