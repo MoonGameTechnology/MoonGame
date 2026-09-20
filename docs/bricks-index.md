@@ -790,30 +790,30 @@
 | HC-3.2 | ✅ | core data | `docs/hero-collection-roadmap.md:276` | Варп-прыжок: hero.effect.jump 2026-09-07 |
 | HC-3.3 | ✅ | core data | `docs/hero-collection-roadmap.md:293` | Фантомный радарный сигнал 2026-09-07 |
 | HC-3.4 | ⏳ | core data | `docs/hero-collection-roadmap.md:315` | «Опытный командир»: юниты союзника под управление |
-| HPR-0.1 | ✅ | docs | `docs/hero-progression-roadmap.md:448` | Кому принадлежат звёзды: только главному или всем 2026-09-07 |
-| HPR-0.2 | ⏳ | docs data | `docs/hero-progression-roadmap.md:457` | Ресурс прогрессии: что это, откуда берётся, куда уходит |
-| HPR-0.3 | ⏳ | docs data | `docs/hero-progression-roadmap.md:471` | Лестница редкости скилла и её ЦВЕТА |
-| HPR-0.4 | 🔒 | docs sec | `docs/hero-progression-roadmap.md:486` | Заточка скиллов включена в лутбокс-ревью |
-| HPR-1.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:505` | Четвёртая редкость, main вон из лестницы, слоты ОТ РЕДКОСТИ |
-| HPR-1.2 | ✅ | core | `docs/hero-progression-roadmap.md:523` | Ядро применяет бюджет слотов скиллов 2026-09-07 |
-| HPR-1.3 | 🔒 | core data | `docs/hero-progression-roadmap.md:545` | Звёзды: поле и слот |
-| HPR-1.4 | 🔒 | proto | `docs/hero-progression-roadmap.md:573` | Витрина редкости и звёзд в штабе героев |
-| HPR-1.5.1 | ✅ | data | `docs/hero-progression-roadmap.md:589` | Корабль героя берёт обычные модули 2026-09-08 |
-| HPR-1.5.2 | ✅ | core | `docs/hero-progression-roadmap.md:604` | Лоадаут корабля живёт на герое 2026-09-08 |
-| HPR-1.5.3 | ✅ | data | `docs/hero-progression-roadmap.md:635` | Два «скилла в обёртке» переезжают в скиллы 2026-09-08 |
-| HPR-1.5.4 | ✅ | core proto | `docs/hero-progression-roadmap.md:649` | Снос hero.fit и вкладки фиттингов 2026-09-08 |
-| HPR-1.6.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:679` | Гейты переоснащения для скиллов И модулей |
-| HPR-1.6.2 | 🔒 | proto | `docs/hero-progression-roadmap.md:716` | Экран переоснащения говорит, ГДЕ и ПОЧЁМ |
-| HPR-2.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:731` | Редкость у СКИЛЛА — поле и лестница |
-| HPR-2.2 | 🔒 | srv data | `docs/hero-progression-roadmap.md:740` | heroskill как вид предмета арсенала |
-| HPR-2.3 | 🔒 | srv | `docs/hero-progression-roadmap.md:747` | Дубликаты: инвентарь умеет считать количество |
-| HPR-2.4 | 🔒 | data srv | `docs/hero-progression-roadmap.md:755` | Скиллы и дубликаты в пуле дропа |
-| HPR-3.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:769` | Уровень скилла: данные и кривая |
-| HPR-3.2 | 🔒 | srv | `docs/hero-progression-roadmap.md:782` | Заточка скилла на движке EC-2.1 |
-| HPR-3.3 | 🔒 | core srv | `docs/hero-progression-roadmap.md:794` | Уровень доезжает в матч через снапшот |
-| HPR-3.4 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:806` | Сток, раскрытие шансов и честный UI |
-| HPR-4.1 | 🔒 | srv data | `docs/hero-progression-roadmap.md:816` | Ресурс звёзд: кран и сток |
-| HPR-4.2 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:821` | Ритуал повышения звезды |
+| HPR-0.1 | ✅ | docs | `docs/hero-progression-roadmap.md:489` | Кому принадлежат звёзды: только главному или всем 2026-09-07 |
+| HPR-0.2 | ⏳ | docs data | `docs/hero-progression-roadmap.md:498` | Ресурс прогрессии: что это, откуда берётся, куда уходит |
+| HPR-0.3 | ⏳ | docs data | `docs/hero-progression-roadmap.md:512` | Лестница редкости скилла и её ЦВЕТА |
+| HPR-0.4 | 🔒 | docs sec | `docs/hero-progression-roadmap.md:527` | Заточка скиллов включена в лутбокс-ревью |
+| HPR-1.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:546` | Четвёртая редкость, main вон из лестницы, слоты ОТ РЕДКОСТИ |
+| HPR-1.2 | ✅ | core | `docs/hero-progression-roadmap.md:565` | Ядро применяет бюджет слотов скиллов 2026-09-07 |
+| HPR-1.3 | 🔒 | core data | `docs/hero-progression-roadmap.md:587` | Звёзды: поле и слот |
+| HPR-1.4 | 🔒 | proto | `docs/hero-progression-roadmap.md:617` | Витрина редкости и звёзд в штабе героев |
+| HPR-1.5.1 | ✅ | data | `docs/hero-progression-roadmap.md:633` | Корабль героя берёт обычные модули 2026-09-08 |
+| HPR-1.5.2 | ✅ | core | `docs/hero-progression-roadmap.md:648` | Лоадаут корабля живёт на герое 2026-09-08 |
+| HPR-1.5.3 | ✅ | data | `docs/hero-progression-roadmap.md:679` | Два «скилла в обёртке» переезжают в скиллы 2026-09-08 |
+| HPR-1.5.4 | ✅ | core proto | `docs/hero-progression-roadmap.md:693` | Снос hero.fit и вкладки фиттингов 2026-09-08 |
+| HPR-1.6.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:723` | Гейты переоснащения для скиллов И модулей |
+| HPR-1.6.2 | 🔒 | proto | `docs/hero-progression-roadmap.md:760` | Экран переоснащения говорит, ГДЕ и ПОЧЁМ |
+| HPR-2.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:775` | Редкость у СКИЛЛА — поле и лестница |
+| HPR-2.2 | 🔒 | srv data | `docs/hero-progression-roadmap.md:784` | heroskill как вид предмета арсенала |
+| HPR-2.3 | 🔒 | srv | `docs/hero-progression-roadmap.md:791` | Дубликаты: инвентарь умеет считать количество |
+| HPR-2.4 | 🔒 | data srv | `docs/hero-progression-roadmap.md:799` | Скиллы и дубликаты в пуле дропа |
+| HPR-3.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:813` | Уровень скилла: данные и кривая |
+| HPR-3.2 | 🔒 | srv | `docs/hero-progression-roadmap.md:826` | Заточка скилла на движке EC-2.1 |
+| HPR-3.3 | 🔒 | core srv | `docs/hero-progression-roadmap.md:838` | Уровень доезжает в матч через снапшот |
+| HPR-3.4 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:850` | Сток, раскрытие шансов и честный UI |
+| HPR-4.1 | 🔒 | srv data | `docs/hero-progression-roadmap.md:860` | Ресурс звёзд: кран и сток |
+| HPR-4.2 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:865` | Ритуал повышения звезды |
 | HTTPS-0.1 | ⏳ | docs | `docs/https-roadmap.md:52` | Зафиксировать «TLS терминирует прокси» как стандарт — S → SE-1.2 |
 | HTTPS-1.1 | ✅ | srv sec | `docs/https-roadmap.md:63` | Доверие прокси: X-Forwarded-Proto/Host + Origin — M → SE-6.1, SE-1.2 |
 | HTTPS-1.2 | ⏳ | srv | `docs/https-roadmap.md:90` | (Опц.) In-process TLS как запасной путь — S → SE-1.2 |
