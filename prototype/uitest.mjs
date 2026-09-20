@@ -201,6 +201,9 @@ module.exports = {
   state: () => JSON.stringify(s),
   back: () => closeTop(BACK_LAYERS.filter(l => l.id === 'swarm-dossier' || l.id === 'boonpick')),
   backLabel: () => t('side.summary.back'),
+  dev: () => ({ active: sectorDevActive, fog: sandboxConfig.fog, reveal: vision === null }),
+  finishDev: () => { s.match = { ...s.match, status: 'ended', winner: ME }; awardSectorRun(); tickRunSave(performance.now()); },
+  sandboxBack: () => closeTop(BACK_LAYERS.filter(l => l.id === 'sandbox')),
 };`;
 const res = await build({
   stdin: {
@@ -442,6 +445,53 @@ assert.equal(saved.difficulty, 'weak');
 assert.deepEqual(saved.shipLoadouts.cruiser, ['cargo_bay']);
 assert.equal(saved.sectorZeroAttempt, 2);
 assert.equal(JSON.parse(storage.get('sector-zero.progress.v1')).research, 0, 'a menu exit awards nothing');
+// Dev attempts use real panel handlers and must not touch normal saves or meta.
+const normalSave = storage.get('void.run.v1');
+const normalProgress = storage.get('sector-zero.progress.v1');
+await click('sz-dev');
+assert.equal(mod.exports.dev().active, true);
+assert.equal(getEl('sandboxbtn').style.display, '');
+await click('sandboxbtn');
+assert.equal(getEl('sandbox').style.display, 'flex');
+assert.ok(getEl('sandbox').innerHTML.includes('data-sbx="compare"'));
+const sandboxAction = async (act, key = '', change = false, value = '', checked = false) => {
+  const target = { dataset: { sbx: act, k: key }, value, checked };
+  for (const handle of (listeners.get(getEl('sandbox')) ?? {})[change ? 'change' : 'click'] ?? [])
+    handle({ target: { closest: () => target } });
+  await flush();
+};
+const beforeDevTime = JSON.parse(mod.exports.state()).time;
+await sandboxAction('wave');
+let devState = JSON.parse(mod.exports.state());
+assert.equal(devState.pve.waveNumber, 1);
+assert.equal(devState.time, beforeDevTime + 1);
+assert.ok(devState.fleets['pve:wave:1']);
+await sandboxAction('wave');
+assert.equal(JSON.parse(mod.exports.state()).pve.waveNumber, 2);
+await sandboxAction('compare', 'right', true, 'frigate');
+assert.ok(getEl('sandbox').innerHTML.includes('value="frigate" selected'));
+await sandboxAction('tog', 'fog', true, '', false);
+for (let i = 0; i < 2 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
+assert.equal(mod.exports.dev().reveal, true);
+mod.exports.sandboxBack();
+assert.equal(getEl('sandbox').style.display, 'none');
+mod.exports.finishDev();
+await flush();
+await click('tomenu');
+assert.equal(storage.get('void.run.v1'), normalSave, 'dev does not overwrite or clear the normal attempt');
+assert.equal(storage.get('sector-zero.progress.v1'), normalProgress, 'dev does not consume attempts or grant rewards');
+assert.equal(getEl('sz-continue').hidden, false);
+await click('sz-continue');
+assert.equal(mod.exports.dev().active, false);
+const restoredBefore = mod.exports.state();
+await sandboxAction('wave'); // stale/forged click after leaving dev must do nothing
+await sandboxAction('res', 'metal');
+assert.equal(mod.exports.state(), restoredBefore);
+assert.equal(getEl('sandboxbtn').style.display, 'none');
+for (let i = 0; i < 2 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
+assert.equal(mod.exports.dev().reveal, false, 'normal runs regain real fog');
+await click('tomenu');
+console.log('Sector Zero dev isolation OK');
 // Reboot the real bundled entry with a real save from the flow above, not a guessed fixture.
 if (!sectorEntry) {
   for (const [input, args] of [

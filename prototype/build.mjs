@@ -2282,6 +2282,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #sandbox .sbx-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grn-dim);margin:12px 0 6px;}
 /* Toggles reuse the «Настройки» switch look (.set-row / .set-switch, defined above);
    the grid just stacks the rows. */
+#sandbox .sbx-compare{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;}
+#sandbox .sbx-compare th,#sandbox .sbx-compare td{padding:6px;border-bottom:1px solid var(--line-hi);text-align:left;}
+#sandbox select{width:100%;min-width:0;background:var(--glass);color:var(--grn);padding:8px;}
+#sandbox .sbx-compare-picks{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 #sandbox .sbx-togs{display:grid;gap:2px;}
 #sandbox .sbx-cmd{width:100%;margin-top:7px;padding:11px 12px;border-radius:9px;border:1px solid var(--line-hi);
   background:transparent;color:var(--ink);font-size:12px;letter-spacing:.4px;cursor:pointer;text-align:left;}
@@ -3171,6 +3175,7 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
           <div class="sz-actions">
             <button id="sz-continue" class="sz-action sz-primary" type="button" hidden disabled data-i18n="sector-zero.continue"></button>
             <button id="sz-new" class="sz-action sz-primary" type="button" disabled data-i18n="sector-zero.new"></button>
+            <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
           </div>
           <fieldset class="sz-difficulty">
@@ -3435,7 +3440,9 @@ const adminPage = (js) => `<!doctype html>
 </body></html>`;
 
 mkdirSync('prototype/dist', { recursive: true });
-const devHtml = page(await bundle(false));
+const devJs = await bundle(false);
+const devHtml = page(devJs);
+writeFileSync('prototype/dist/sector-zero-dev.html', page(devJs, 'sector-zero'));
 const playerJs = await bundle(true);
 const playerHtml = stripDevMarkup(page(playerJs));
 // A direct menu entry for review and offline play, still using the shared client.

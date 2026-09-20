@@ -24,7 +24,9 @@
  *      end every war (back to neutral) · unlock every technology.
  */
 import { setStance, getStance } from '../../packages/shared-core/src/index';
-import type { GameState } from '../../packages/shared-core/src/index';
+import { unitComparison } from '../../decisions/unitComparison';
+import { esc, displayUnit } from './format';
+import type { GameData, GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 
 /** Persistent per-match cheat toggles (the four "held" switches). */
@@ -216,6 +218,10 @@ export function enforceSandbox(s: GameState, me: string, homeId: string | null):
 /** The only things the panel borrows from the host — passed in once. */
 export interface SandboxHooks {
   getState: () => GameState;
+  available: () => boolean;
+  data: GameData;
+  waveTools: () => boolean;
+  nextWave: () => boolean;
   me: () => string;
   homeId: () => string | null;
   note: (msg: string) => void;
@@ -244,7 +250,11 @@ export function initSandbox(hooks: SandboxHooks): void {
   const btn = document.getElementById('sandboxbtn');
   if (!el || !btn) return;
 
+  const unitIds = Object.keys(hooks.data.units).sort();
+  let left = unitIds.includes('cruiser') ? 'cruiser' : unitIds[0] ?? '';
+  let right = hooks.data.modes.pve_waves?.pve?.waveFleet?.[0]?.unit ?? left;
   const show = (on: boolean): void => {
+    if (on && !hooks.available()) return;
     el.style.display = on ? 'flex' : 'none';
     if (on) render();
   };
@@ -262,6 +272,19 @@ export function initSandbox(hooks: SandboxHooks): void {
       `<button class="sbx-cmd" data-sbx="res" data-k="${r.key}"><i>${r.icon}</i>+${GRANT} ${t(r.name)}</button>`,
   ).join('');
 
+  function comparison(): string {
+    const pick = (side: string, selected: string, label: string): string =>
+      `<label>${t(label)}<select data-sbx="compare" data-k="${side}">${unitIds.map(id =>
+        `<option value="${esc(id)}"${id === selected ? ' selected' : ''}>${esc(displayUnit(id))}</option>`).join('')}</select></label>`;
+    const rows = unitComparison(hooks.data, left, right);
+    const domain = (id: string): string => t(hooks.data.units[id]?.domain === 'ground' ? 'data.ground' : 'data.space');
+    return `<div class="sbx-label">${t('sandbox.compare')}</div><p>${t('sandbox.compare.hint')}</p>
+      <div class="sbx-compare-picks">${pick('left', left, 'sandbox.compare.left')}${pick('right', right, 'sandbox.compare.right')}</div>
+      <table class="sbx-compare"><thead><tr><th>${t('sandbox.compare.stat')}</th><th>${esc(displayUnit(left))}</th><th>${esc(displayUnit(right))}</th></tr></thead>
+      <tbody><tr><th>${t('sandbox.compare.domain')}</th><td>${domain(left)}</td><td>${domain(right)}</td></tr>
+      ${rows.map(r => `<tr><th>${esc(t(r.label))}</th><td>${r.left}</td><td>${r.right}</td></tr>`).join('')}</tbody></table>`;
+  }
+
   function render(): void {
     if (!el) return;
     const togs = TOGGLES.map((tg) =>
@@ -275,6 +298,8 @@ export function initSandbox(hooks: SandboxHooks): void {
     );
     el.innerHTML = `<div class="sbx-box-w">
       <div class="sbx-title"><span class="dia"></span><b>${t('sandbox.title')}</b><span class="sbx-dev">DEV</span></div>
+      ${hooks.waveTools() ? `<p>${t('sector-zero.dev.hint')}</p><button class="sbx-cmd" data-sbx="wave"${hooks.getState().match.status === 'ended' || !hooks.getState().scheduled.some(e => e.type === 'pve.wave') ? ' disabled' : ''}>${t('sandbox.wave')}</button>` : ''}
+      ${comparison()}
       <div class="sbx-label">${t('sandbox.toggles')}</div>
       <div class="sbx-togs">${togs}${speedRow}</div>
       <div class="sbx-label">${t('sandbox.commands')}</div>
@@ -289,8 +314,13 @@ export function initSandbox(hooks: SandboxHooks): void {
   // `click` for the command buttons and the tap-outside-to-close backdrop.
   el.addEventListener('change', (ev) => {
     const inp = (ev.target as Element).closest('[data-sbx]') as HTMLInputElement | null;
-    if (!inp) return;
-    if (inp.dataset.sbx === 'tog') {
+    if (!inp || !hooks.available()) return;
+    if (inp.dataset.sbx === 'compare') {
+      if (!unitIds.includes(inp.value)) return;
+      if (inp.dataset.k === 'left') left = inp.value;
+      else right = inp.value;
+      render();
+    } else if (inp.dataset.sbx === 'tog') {
       (sandboxConfig[inp.dataset.k as keyof SandboxConfig] as boolean) = inp.checked;
       render();
     } else if (inp.dataset.sbx === 'speed') {
@@ -308,6 +338,12 @@ export function initSandbox(hooks: SandboxHooks): void {
     const act = tgt.dataset.sbx;
     if (act === 'close') {
       show(false);
+    } else if (!hooks.available()) {
+      show(false);
+    } else if (act === 'wave') {
+      const ok = hooks.waveTools() && hooks.nextWave();
+      hooks.note(ok ? t('sandbox.wave.done', { n: hooks.getState().pve?.waveNumber ?? 0 }) : t('sandbox.wave.unavailable'));
+      render();
     } else if (act === 'res') {
       hooks.note('🧪 ' + sbAddResource(hooks.getState(), hooks.me(), tgt.dataset.k ?? ''));
     } else if (act === 'techs') {
