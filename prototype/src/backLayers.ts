@@ -92,6 +92,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['boonpick', 'layer'], // усиление между волнами забега, z60 (PVR-1.4)
   ['emblempick', 'layer'], // выбор эмблемы, z60
   ['settings', 'layer'], // настройки (хаб и матч), z59
+  ['sector-zero', 'layer'], // own home, z58: confirmation first, shared hub second
   ['testmode', 'layer'], // dev-оверлей сценариев, z59
   ['sandbox', 'layer'], // dev-панель практики, z59
   ['intro', 'layer'], // ONB-3 карточка механики, z58 — поверх окна, которое объясняет
