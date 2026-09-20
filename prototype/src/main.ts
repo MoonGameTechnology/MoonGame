@@ -118,18 +118,8 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
-// Хвост маркера флота (пипсы трюма, «×N») — чистая геометрия с тестом на разворот
-// наружу у стоящего флота (пипсы не должны ложиться на диск планеты).
-import {
-  CARGO_CELL,
-  cargoRowLayout,
-  cargoRows,
-  loadFill,
-  squareRowY,
-  tailAt as tailPoint,
-  tailTheta,
-  tallyY,
-} from './markerTail';
+import { fleetHolds } from '../../decisions/fleetHolds';
+import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -2720,15 +2710,6 @@ document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboardi
 // ядро (`shared-core/modules/army.ts`): заказ живёт в состоянии мира как ЗАЯВКА
 // (`fleet.loading`), переживает офлайн и одинаково идёт в соло и в сети. Клиенту осталось
 // только ЧИТАТЬ её — правил здесь больше нет.
-
-/** Заявки этого флота, развёрнутые ПОШТУЧНО: маркер рисует по пипсу на единицу. */
-function loadPips(fleetId: string): Array<{ unit: string; startAt: number; doneAt: number }> {
-  const out: Array<{ unit: string; startAt: number; doneAt: number }> = [];
-  for (const c of s.fleets[fleetId]?.loading ?? []) {
-    for (let i = 0; i < c.count; i++) out.push({ unit: c.unit, startAt: c.startAt, doneAt: c.doneAt });
-  }
-  return out;
-}
 
 /** Объём трюма, уже обещанный идущими подъёмами этого флота. */
 function pendingLoadCargo(fleetId: string): number {
@@ -5356,19 +5337,8 @@ function render(now: number) {
     const A = fleetAnchor(f);
     if (!A || !visible(A, 120)) continue;
     const col = ownerColor(f.owner);
-    // Shuttles ABOARD a carrier live in the hold, not in the battle line: with any
-    // non-shuttle hull present they leave the triangle pyramid and ride the cargo
-    // tail as diamonds. A pure strike wing in flight IS its shuttles — triangles.
-    // Три числа эмблемы — `fleetTally.ts` (REFM-115). Развилка там же: пока есть хоть
-    // один КОРПУС, крыло едет грузом; корпусов нет — крыло и есть флот.
-    // ROS-3.2: сам НОСИТЕЛЬ — корпус и стоит в линии, а машины из его ангара
-    // (`f.hangar`, SHU-2.1) едут в том же хвосте груза, что и крыло на борту.
-    const { ships, wingPips, troops } = emblemTally(
-      f.units,
-      f.landing ?? [],
-      isShuttle,
-      hangarMachines(f), // SHU-4.2: машины трюма лежат внутри эскадр
-    );
+    // Aircraft aboard never inflate the combat hull count.
+    const { ships } = emblemTally(f.units, [], isShuttle);
     // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
     // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
     const engine = fxBreath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });
@@ -5437,10 +5407,10 @@ function render(now: number) {
 
     // Fleet emblem (постер «Типы кораблей»): ОДИН силуэт ДОМИНАНТА — сильнейшего
     // корабля флота — вместо пирамиды треугольников; количество несёт счётчик
-    // «×N» за хвостом («флот на карте = доминант + счёт», полный состав — в
+    // «×N» в горизонтальном бейдже («флот на карте = доминант + счёт», полный состав — в
     // панели выделения). Размер S/M/L по hp доминанта, гало-кольцо при щите
     // (у флагмана — всегда), нос по курсу — heading от fleetAnchor, как раньше;
-    // карго-хвост и счётчик едут по тому же курсу.
+    // шкалы вместимости и счётчик остаются горизонтальными.
     // Размер — из ЕДИНОЙ таблицы постера (`unitGlyphs.ts`, правило 1). Здесь стояла
     // своя (S 0.62 · M 0.8), и один и тот же разведчик был в панели заметно крупнее,
     // чем на карте: «размер = hp» переставал быть шкалой ровно там, где ею пользуются.
@@ -5471,101 +5441,6 @@ function render(now: number) {
     drawShipShape(cx, shape, true);
     cx.restore();
 
-    // cargo glued to the tail (behind the base, following the heading), SPLIT by
-    // shape so counts read at a glance: row 1 — only diamonds (carried divisions,
-    // hold shuttles — «ромбик размером с квадратик»), row 2 — only squares (ground
-    // troops). A loading pip (~1h) fills up in place inside its shape's row. Cell
-    // centres ride the rotated baseline, the pips themselves stay upright.
-    const loads = loadPips(f.id); // empty for enemy/idle fleets
-    // Кто в каком ряду — `markerTail.ts` (REFM-116): ряды делятся по ФОРМЕ, и
-    // грузящаяся единица встаёт в ряд своей формы, а не отдельным рядом «в пути».
-    const { diamonds: diaRow, squares: sqRow } = cargoRows(wingPips, troops, loads, isShuttle);
-    type CargoPip = (typeof diaRow)[number];
-    // The same rotation the pyramid uses; local +y = the tail. Pips and the ship
-    // count are placed through this, drawn upright at their rotated spots.
-    // Стоящий у мира флот ниже ORBIT_ZOOM_IN стоит РАДИАЛЬНО, и его хвост смотрел
-    // внутрь орбиты — после ужатия кольца пипсы ложились на диск планеты; для этой
-    // позы хвост разворачивается наружу (геометрия и причина — markerTail.ts).
-    const staticDock = !f.movement && f.location !== null && !orbitsLive();
-    const th = tailTheta(A.ang, staticDock);
-    const tailAt = (lx: number, ly: number): { x: number; y: number } =>
-      tailPoint(A.x, A.y, th, lx, ly);
-    const CELL = CARGO_CELL,
-      SQ = 5,
-      DS = 3.1; // shuttle pip: a diamond with the footprint of the square
-    const diamond = (cxr: number, cyr: number, r: number, fill: boolean): void => {
-      cx.beginPath();
-      cx.moveTo(cxr, cyr - r);
-      cx.lineTo(cxr + r, cyr);
-      cx.lineTo(cxr, cyr + r);
-      cx.lineTo(cxr - r, cyr);
-      cx.closePath();
-      if (fill) cx.fill();
-      cx.stroke();
-    };
-    const drawCargoRow = (row: CargoPip[], ly: number): void => {
-      if (!row.length) return;
-      // Обрезка по пределу и центровка (с учётом «+N») — `markerTail.ts`.
-      const { shown: n, over, firstX } = cargoRowLayout(row.length);
-      let lx = firstX;
-      cx.save();
-      cx.shadowColor = col;
-      cx.shadowBlur = fxBlur(3);
-      cx.lineWidth = 1;
-      for (let i = 0; i < n; i++) {
-        const pip = row[i]!;
-        const c0 = tailAt(lx, ly);
-        if (pip.kind === 'wing') {
-          // hold shuttle → a solid diamond ("ромбик")
-          cx.fillStyle = rgba(col, 0.85);
-          cx.strokeStyle = rgba(col, 0.95);
-          diamond(c0.x, c0.y, DS, true);
-        } else if (pip.kind === 'troop') {
-          // loaded troop → solid square
-          const x = c0.x - SQ / 2,
-            y = c0.y - SQ / 2;
-          cx.fillStyle = rgba(col, 0.85);
-          cx.fillRect(x, y, SQ, SQ);
-          cx.strokeStyle = rgba(col, 0.95);
-          cx.strokeRect(x + 0.5, y + 0.5, SQ - 1, SQ - 1);
-        } else {
-          // loading pip → fills in place over ~1h (shuttle = growing diamond,
-          // ground troop = empty square filling bottom-up)
-          const p = pip.load!;
-          const prog = loadFill(s.time, p.startAt, p.doneAt); // зажат — `markerTail.ts`
-          if (isShuttle(p.unit)) {
-            cx.strokeStyle = rgba(col, 0.85);
-            diamond(c0.x, c0.y, DS, false);
-            if (prog > 0) {
-              cx.fillStyle = rgba(col, 0.8);
-              cx.strokeStyle = rgba(col, 0);
-              diamond(c0.x, c0.y, DS * prog, true);
-            }
-          } else {
-            const x = c0.x - SQ / 2,
-              y = c0.y - SQ / 2;
-            cx.strokeStyle = rgba(col, 0.85);
-            cx.strokeRect(x + 0.5, y + 0.5, SQ - 1, SQ - 1);
-            if (prog > 0) {
-              const fh = (SQ - 1) * prog;
-              cx.fillStyle = rgba(col, 0.8);
-              cx.fillRect(x + 0.5, y + 0.5 + (SQ - 1 - fh), SQ - 1, fh);
-            }
-          }
-        }
-        lx += CELL;
-      }
-      cx.restore();
-      if (over > 0) {
-        const o = tailAt(lx, ly);
-        cx.fillStyle = rgba(col, 0.92);
-        cx.font = '700 8px ui-monospace,Menlo,monospace';
-        cx.fillText(`+${over}`, o.x, o.y + SQ / 2);
-      }
-    };
-    drawCargoRow(diaRow, 5); // ромбы — ближний к базе ряд
-    drawCargoRow(sqRow, squareRowY(5, diaRow.length)); // квадраты — ниже, если ромбы есть
-
     if (f.owner === ME && chainStepsOf(f.id)) {
       // TGT-1: an army carrying a standing plan breathes a dashed accent ring —
       // one glance tells which fleets are already "spoken for".
@@ -5585,12 +5460,15 @@ function render(now: number) {
     // (REFM-123). Осталась только рамка выбора.
     if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 15, now);
 
-    // ship count («×N» — счёт при доминанте, как на постере), small, past the
-    // cargo tail — placed along the heading like the pips, glyph upright.
-    const cnt = tailAt(0, tallyY(21, diaRow.length, sqRow.length));
-    cx.fillStyle = rgba(col, 0.95);
-    cx.font = '700 10px ui-monospace,Menlo,monospace';
-    cx.fillText(`×${ships}`, cnt.x, cnt.y);
+    // Own hold occupancy is read from the snapshot; foreign manifests stay private.
+    // The badge remains horizontal and outside the orbit even as heading changes.
+    const dock = !f.movement && f.location ? s.planets[f.location] : null;
+    drawFleetHoldBadge(
+      cx, A, dock ? world(dock.position) : null, ships,
+      f.owner === ME ? fleetHolds(f, data, s.time) : [],
+      selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
+      col,
+    );
 
     cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
   }
@@ -5996,7 +5874,8 @@ function fleetSummaryHtml(f: Fleet): string {
   rows.push(
     `<div class="row">⚡ ${t('side.summary.speed')}: <b>${sm.speed > 0 ? Math.round(sm.speed) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('side.summary.speed.note')}</span></div>`,
   );
-  if (sm.cargo)
+  if (f.owner === ME) rows.push(fleetHoldsHtml(fleetHolds(f, data, s.time)));
+  else if (sm.cargo)
     rows.push(
       `<div class="row">📦 ${t('side.summary.cargo')}: <b>${sm.cargo.used}/${sm.cargo.cap}</b></div>`,
     );
@@ -6091,6 +5970,7 @@ function fleetPanelHtml(f: Fleet): string {
     if (sm.shield.max > 0)
       h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
+  if (f.owner === ME) h += fleetHoldsHtml(fleetHolds(f, data, s.time));
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
   // корпусам, лимп <30% учтён), с меткой форс-марша. The hero aura (+5%, noted
@@ -6314,7 +6194,7 @@ function fleetPanelHtml(f: Fleet): string {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
-      const loadingN = loadPips(f.id).length;
+      const loadingN = (f.loading ?? []).reduce((n, claim) => n + claim.count, 0);
       const types: string[] = [];
       for (const st of [...groundHere, ...carried])
         if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
