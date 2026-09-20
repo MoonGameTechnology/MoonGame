@@ -1652,7 +1652,6 @@ export const ru: Record<string, string> = {
   'hud.mobile.target-none': 'Цель не выбрана',
   'hud.mobile.target-stale': 'Цель больше недоступна. Выберите другую.',
   'hud.window.move': 'Переместить окно — потяните за заголовок или используйте стрелки',
-  'hud.holography.hint': 'Голографическая карта и оформление. Выключите, чтобы вернуть простой вид карты.',
   'hud.main-menu': 'В главное меню',
   'hud.map': 'Карта',
   'hud.tools': 'Ещё',
@@ -2023,7 +2022,6 @@ export const ru: Record<string, string> = {
   'settings.gfx.glow': 'Свечение и ореолы',
   'settings.gfx.glow.hint':
     'мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости',
-  'settings.gfx.holography': 'Голографический интерфейс',
   'settings.gfx.motion': 'Движение слоёв',
   'settings.gfx.motion.hint':
     'дыхание меток, свечений и двигателей; выкл замораживает их, но не прячет',

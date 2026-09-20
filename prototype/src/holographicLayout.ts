@@ -10,7 +10,7 @@ import {
   type Bounds,
 } from '../../packages/client/src/camera';
 
-/** A skin toggle must not teleport the selected region or reset the user's zoom. */
+/** A responsive layout change must not teleport the selection or reset zoom. */
 export function reframePresentation(
   cam: Cam,
   before: Viewport,
@@ -70,5 +70,5 @@ export function selectionWindowPosition(
 
 /** Phones keep their existing layout, including a phone rotated into landscape. */
 export function supportsHolography(width: number, height: number, coarse: boolean): boolean {
-  return width > 720 && !isMobileViewport(width, height, coarse);
+  return !isMobileViewport(width, height, coarse);
 }
