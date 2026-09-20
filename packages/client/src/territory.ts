@@ -54,6 +54,8 @@ export interface TerritoryPalette {
   kindAccent: (kind: string) => string | undefined;
   /** Hide only same-owner divisions; frontiers, neutral edges and cells stay intact. */
   hideOwnedInner?: boolean;
+  /** Zoom detail in [0,1]; outer political frontiers remain legible at zero. */
+  provinceDetail?: number;
   /** Is the border between these two SEED INDICES shut — they touch on the mosaic but
    *  no lane joins them? See {@link classifyBorders}. Omit and nothing is drawn as a
    *  barrier: a caller without link data must not invent one, and a caller that has it
@@ -167,6 +169,7 @@ export function drawTerritory(
   palette: TerritoryPalette,
   cells: TerritoryCell[] = computePowerCells(seeds, clip),
 ): TerritoryCell[] {
+  const detail = palette.provinceDetail ?? 1;
   const trace = (poly: Array<[number, number]>): void => {
     g.beginPath();
     g.moveTo(poly[0]![0], poly[0]![1]);
@@ -183,10 +186,10 @@ export function drawTerritory(
       cell.owner ? 0.075 : 0.018,
     );
     g.fill();
-    const accent = palette.kindAccent(cell.kind);
+    const accent = detail > 0 ? palette.kindAccent(cell.kind) : undefined;
     if (accent) {
       trace(cell.poly);
-      g.fillStyle = rgba(accent, cell.owner ? 0.025 : 0.07);
+      g.fillStyle = rgba(accent, (cell.owner ? 0.025 : 0.07) * detail);
       g.fill();
     }
   }
@@ -211,11 +214,11 @@ export function drawTerritory(
   g.save();
   g.lineJoin = 'round';
   g.lineCap = 'round';
-  if (!palette.hideOwnedInner) {
+  if (!palette.hideOwnedInner && detail > 0) {
     for (const [owner, segs] of ownedInner)
-      strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3), 0.65); // inner hairlines
+      strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3 * detail), 0.65); // inner hairlines
   }
-  strokeSegs(neutralEdge, 'rgba(95,176,197,0.55)', 0.75); // neutral divisions
+  if (detail > 0) strokeSegs(neutralEdge, rgba('#5fb0c5', 0.55 * detail), 0.75);
   for (const [owner, segs] of ownedFront)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
   for (const [owner, segs] of ownedFront)
@@ -224,9 +227,9 @@ export function drawTerritory(
   // border it shares the line with. Dashed and off-palette on purpose: everything else
   // on this map is the cyan family, so «shut» must not be mistaken for a shade of
   // «whose». Same violet the rift kind carries in the catalogue.
-  if (sealedEdge.length > 0) {
+  if (sealedEdge.length > 0 && detail > 0) {
     g.setLineDash([5, 4]);
-    strokeSegs(sealedEdge, 'rgba(146,104,176,0.85)', 1.6);
+    strokeSegs(sealedEdge, rgba('#9268b0', 0.85 * detail), 1.6);
     g.setLineDash([]);
   }
   g.restore();

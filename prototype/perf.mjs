@@ -170,6 +170,7 @@ globalThis.window = {
   setTimeout,
   clearTimeout,
 };
+globalThis.addEventListener = globalThis.window.addEventListener;
 globalThis.history = { pushState() {}, back() {} };
 globalThis.location = { protocol: 'file:', host: '', hostname: '', href: 'file:///', search: '' };
 const rafCbs = [];
@@ -204,10 +205,26 @@ module.exports = {
     clearSelection(); selPlanet = home.id;
     render(2000); // warm static layers and atlases at this density
     perfSpheres = 0;
+    const rings = [];
+    let questions = 0;
+    const arc = cx.arc, fillText = cx.fillText;
+    cx.arc = function(x, y, r, ...rest) {
+      if (cx.strokeStyle === '#506773' && cx.lineWidth === 0.85) rings.push([x, y, r]);
+      return arc.call(cx, x, y, r, ...rest);
+    };
+    cx.fillText = function(label, ...rest) {
+      if (label === '?') questions++;
+      return fillText.call(cx, label, ...rest);
+    };
     render(2000);
+    cx.arc = arc; cx.fillText = fillText;
+    const lod = currentMapLod();
+    const expected = MAP.filter(n => s.planets[n.id] && visible(world(n), 10))
+      .map(n => { const p = world(n); return [p.x, p.y, lod.markerRadius]; });
     const a = fleetAnchor(fleet);
     selectAt(a.x, a.y); // same map-tap path as pointer/touch input
-    return { lod: currentMapLod(), spheres: perfSpheres, terrain: terrainFields.length,
+    return { lod, spheres: perfSpheres, terrain: terrainFields.length,
+      allMarkers: JSON.stringify(rings) === JSON.stringify(expected), questions,
       pickedFleet: selFleet === fleet.id || selFleets.has(fleet.id),
       sensing: sweepOn && sweepArms.length > 0,
       known: MAP.filter(n => known(n.id)).length,
@@ -249,7 +266,7 @@ console.error = (...args) => {
 const fn = new Function('module', 'exports', 'require', res.outputFiles[0].text);
 fn(mod, mod.exports, () => ({}));
 mod.exports.configure(process.env.PERF_MAP, Number(process.env.PERF_SCALE) || 0,
-  process.env.PERF_REVEAL === '1', process.env.PERF_PAUSE === '1');
+  process.env.PERF_REVEAL === '1', process.env.PERF_PAUSE === '1' || process.env.PERF_VERIFY_LOD === '1');
 
 // Profile a visible match. The real entry screens are opaque, so their covered
 // canvas must not be mistaken for the renderer workload this harness measures.
@@ -323,6 +340,8 @@ if (process.env.PERF_VERIFY_LOD === '1') {
       if (sample.lod.art === 0) {
         assert.equal(sample.spheres, 0, 'overview must not call the sphere renderer');
         assert.equal(sample.terrain, 0, 'overview must not prepare or draw terrain');
+        assert(sample.allMarkers, 'every province and empty waypoint must have one identical ring');
+        assert.equal(sample.questions, 0, 'overview contains no revealing question marks');
       }
       if (gap === 110) {
         assert.equal(sample.lod.detail, 1);

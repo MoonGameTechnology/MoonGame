@@ -528,8 +528,9 @@ import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatib
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation, supportsHolography } from './holographicLayout';
-import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
+import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
 import { TerrainRasterCache } from './terrainRasterCache';
+import { TerrainGeometryCache } from './terrainGeometryCache';
 import { holographyOn, setHolography } from './graphicsPrefs';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
@@ -744,7 +745,8 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
-import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
+import { artScale, calloutAlpha, chevronAlpha, sphereBloom } from './semanticZoom';
+import { mapLod, mapSpacing, drawSchematicNode, type MapLod } from '../../packages/client/src/mapLod';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
 import {
   BATTLE_RINGS,
@@ -758,7 +760,6 @@ import {
   chevronAngle,
   orbitBloom,
   orbitRadius,
-  orbitsLive as ringsLive,
   ringShown,
   slotAngle,
 } from './orbitRing';
@@ -1754,8 +1755,12 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
 let galaxyOutline: Array<{ x: number; y: number }> = [];
+let mapNodeSpacing = mapSpacing(MAP);
 function installMapGeometry(state: GameState): void {
   MAP = mapNodesFromState(state);
+  mapNodeSpacing = mapSpacing(MAP);
+  terrainGeometry.clear();
+  terrainRaster.clear();
   galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
@@ -1780,6 +1785,9 @@ function world(p: { x: number; y: number }): { x: number; y: number } {
  *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */
 function worldDist(d: number): number {
   return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
+}
+function currentMapLod(): MapLod {
+  return mapLod(worldDist(mapNodeSpacing), cam.scale);
 }
 function visible(c: { x: number; y: number }, pad = 80): boolean {
   return c.x >= -pad && c.x <= VW + pad && c.y >= -pad && c.y <= VH + pad;
@@ -2013,7 +2021,7 @@ let orbitPhase = 0; // accumulated sim-time ms (frozen on pause) — drives the 
 let hologramTime = 0; // visual-only clock; also freezes when decorative motion is disabled
 /** Ring/animation are gated on the same close-zoom threshold. */
 function orbitsLive(): boolean {
-  return ringsLive(cam.scale);
+  return currentMapLod().detail > 0;
 }
 /** Orbit-ring radius for a planet at the current zoom, in screen px. The ring blooms with
  *  zoom but is capped to a fraction of the on-screen gap to the nearest LINKED neighbour,
@@ -2028,7 +2036,7 @@ function orbitRingRadius(pl: { position: { x: number; y: number }; links?: strin
     const npc = world(np.position);
     nearest = Math.min(nearest, Math.hypot(npc.x - pc.x, npc.y - pc.y));
   }
-  return orbitRadius(orbitBloom(cam.scale), nearest);
+  return orbitRadius(orbitBloom(currentMapLod().scale), nearest);
 }
 /** Angular position (radians) of a stationed fleet's orbit slot at index `idx` of
  *  `nPeers` sharing the ring — fanned out, and spinning when zoomed in close. */
@@ -2328,21 +2336,27 @@ function seesDetails(p: Planet): boolean {
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
  *  marker if it has never been identified. */
-function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined): void {
+function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined, lod: MapLod): void {
   cx.save();
+  if (lod.detail === 0) {
+    drawSchematicNode(cx, c, lod.markerRadius);
+    cx.restore();
+    return;
+  }
   if (mem) {
     const col = ownerColor(mem.owner);
     cx.setLineDash([2, 4]);
     cx.strokeStyle = rgba(col, 0.34);
     cx.lineWidth = 1;
     cx.beginPath();
-    cx.arc(c.x, c.y, 9, 0, TAU);
+    cx.arc(c.x, c.y, lod.markerRadius + (9 - lod.markerRadius) * lod.detail, 0, TAU);
     cx.stroke();
     cx.setLineDash([]);
     cx.fillStyle = rgba(col, 0.4);
     cx.beginPath();
     cx.arc(c.x, c.y, 1.6, 0, TAU);
     cx.fill();
+    cx.globalAlpha *= lod.detail;
     cx.textAlign = 'left';
     cx.fillStyle = rgba(col, 0.5);
     cx.font = '700 11px ui-monospace,Menlo,monospace';
@@ -2355,8 +2369,9 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
     cx.strokeStyle = 'rgba(125,161,176,0.5)';
     cx.lineWidth = 1;
     cx.beginPath();
-    cx.arc(c.x, c.y, 6, 0, TAU);
+    cx.arc(c.x, c.y, lod.markerRadius + (6 - lod.markerRadius) * lod.detail, 0, TAU);
     cx.stroke();
+    cx.globalAlpha *= lod.detail;
     cx.fillStyle = 'rgba(125,161,176,0.65)';
     cx.font = '9px ui-monospace,Menlo,monospace';
     cx.textAlign = 'center';
@@ -4180,6 +4195,7 @@ let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = nu
 const bg = document.createElement('canvas');
 const bgx = (mapContextOptions ? bg.getContext('2d', mapContextOptions) : bg.getContext('2d')) as CanvasRenderingContext2D;
 const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
+const terrainGeometry = new TerrainGeometryCache();
 const mapContextEvents = { lost: 0, restored: 0 };
 const backgroundContextEvents = { lost: 0, restored: 0 };
 let bgContent = ''; // viewport + ownership signature (camera-independent)
@@ -4255,6 +4271,7 @@ function provinceClip(): Array<[number, number]> {
 const territoryGeometry = new TerritoryGeometryCache();
 
 function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
+  const lod = currentMapLod();
   // Always cover newly exposed edges at the current camera. Only the stationary
   // offscreen bake can be reused; the viewer's knowledge remains its invalidator.
   const content = bakeSignature({
@@ -4266,7 +4283,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     starfield: starfieldOn(),
   }) + `|sky:${starfieldOn() && spaceBackdropReady(holographicMapOn()) ? 1 : 0}` +
     `|holo:${holographicMapOn()}|glow:${glowOn()}` +
-    (holographicMapOn() ? `|terrain:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` : '');
+    `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}`;
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (g === bgx) {
@@ -4328,6 +4345,10 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     provinceIds.push(n.id);
     return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
   });
+  for (let i = 0; i < seeds.length; i++) {
+    const id = provinceIds[i]!;
+    if (!known(id) && !memory.has(id)) seeds[i]!.kind = 'unknown';
+  }
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
   // gives the map a defined edge that pans/zooms with the camera.
@@ -4379,31 +4400,37 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
       : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographicMapOn(),
+    provinceDetail: lod.provinceDetail,
     sealed: sealedBorder,
   }, territoryGeometry.project(seeds, clip, cam.scale));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
-  if (holographicMapOn()) {
+  if (holographicMapOn() && lod.art > 0) {
+    g.save();
+    g.globalAlpha *= lod.art;
     for (const n of MAP) {
       const poly = provincePolygons.get(n.id);
       if (!poly) continue;
-      const field = makeTerrainField(n.id, n.sector, sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
+      // Cull using the cheap polygon bounds BEFORE constructing rock geometry.
+      if (poly.every(([x]) => x < 0) || poly.every(([x]) => x > VW) ||
+        poly.every(([, y]) => y < 0) || poly.every(([, y]) => y > VH)) continue;
+      const field = terrainGeometry.project(n.id, n.sector, sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
         known(n.id) || memory.has(n.id), world(n));
       if (!field || field.box.x > VW || field.box.y > VH ||
         field.box.x + field.box.width < 0 || field.box.y + field.box.height < 0) continue;
       terrainFields.push(field);
       if (preparing) continue; // prewarm these fields in bounded loading slices
-      // Panning only translates the cached native-resolution terrain. During a
-      // zoom keep the original vector path, avoiding texture churn or soft scaling.
-      if (zooming) drawTerrainField(g, field);
-      else terrainRaster.draw(g, field, DPR);
+      // Reuse the last sharp bake through the gesture; refine in bounded slices
+      // once settled, instead of redrawing thousands of vector strokes per tick.
+      terrainRaster.draw(g, field, DPR, zooming);
     }
+    g.restore();
   }
 
   // PATH NETWORK — thin roads between adjacent provinces (the visible "пути").
   // Movement runs along these; an army marches province-to-adjacent-province and
   // its route (drawAimPreview / drawFleetRoutes) traces them.
-  g.strokeStyle = 'rgba(150,185,195,0.32)';
+  g.strokeStyle = rgba('#96b9c3', 0.32 * lod.provinceDetail);
   g.lineWidth = 0.7;
   // Каждая дорога рисуется ОДИН раз — `setupMap.ts` (правило 1, REFM-127), та же
   // функция, что раскладывает трассы мини-карты сетапа. Здесь стоял свой цикл с тем же
@@ -4417,7 +4444,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // толщину штриха, чтобы дорога, касающаяся кромки, не пропала.
   const M = 1 + g.lineWidth;
   g.beginPath();
-  for (const road of lanes(MAP.filter((n) => !!s.planets[n.id]))) {
+  for (const road of lod.provinceDetail > 0 ? lanes(MAP.filter((n) => !!s.planets[n.id])) : []) {
     const a = world(road.from);
     const b = world(road.to);
     if (Math.max(a.x, b.x) < -M || Math.min(a.x, b.x) > VW + M ||
@@ -4450,13 +4477,14 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     }
   }
   if (g === bgx && !bgx.isContextLost?.()) {
-    bgContent = content;
+    bgContent = terrainRaster.pending ? '' : content;
     bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
   }
 }
 
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
 function blitStaticLayer(): void {
+  terrainRaster.beginFrame(2);
   const moving = presentedCam && (presentedCam.x !== cam.x || presentedCam.y !== cam.y || presentedCam.scale !== cam.scale);
   const pinching = pinchStart !== null;
   if (moving || pinching || bgx.isContextLost?.()) {
@@ -4539,10 +4567,16 @@ function prepareEnteringMap(): boolean {
     }
     const jobs: PreparationJob[] = [
       { label: t('map-loading.background'), run: () => starfieldOn() ? prepareSpaceBackdrop(holographicMapOn()) : undefined },
-      { label: t('map-loading.geometry'), run: () => { bgContent = ''; buildStaticLayer(bgx, false, true); } },
+      { label: t('map-loading.geometry'), run: () => {
+        terrainRaster.beginFrame(Infinity);
+        bgContent = ''; buildStaticLayer(bgx, false, true);
+      } },
       ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
-        // Only art the viewer knows is present in terrainFields. No hidden intel
-        // is read or prepared; offscreen/oversized textures stay outside the budget.
+        // Prepare known geometry beyond the first screen, in cooperative loading
+        // slices. Unexplored provinces never enter either terrain cache.
+        const poly = provincePolygons.get(n.id);
+        if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, n.sector,
+          sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly, known(n.id) || memory.has(n.id), world(n));
         const field = terrainFields.find(f => f.id === n.id);
         if (field) terrainRaster.prepare(field, DPR);
       } })),
@@ -4628,17 +4662,22 @@ function render(now: number) {
   cx.setTransform(DPR, 0, 0, DPR, 0, 0); // draw in CSS pixels, crisp on hi-DPI
   // Semantic zoom (LOD): zoomed far out the map turns SCHEMATIC — holo type
   // badges, callout text, fleet pyramids/cargo/counts, orbit rings and battle
-  // timers dissolve away (a globalAlpha cross-fade over scale 1.2→1.45, fully
-  // schematic below), leaving territories, node art, fleet chevrons, battle
+  // timers dissolve with screen density and the whole-map camera overview,
+  // leaving territories, uniform rings, fleet chevrons, battle
   // pulses and pings. Skipping those draws over the widest views — where the
   // most nodes are on screen at once — is also the frame-time win.
   // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
-  const detail = detailAt(cam.scale);
+  const lod = currentMapLod();
+  const detail = lod.detail;
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
   if (holographicMapOn()) {
     cx.save();
     clipGlassSurface(cx, holographicFrame);
-    for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
+    if (detail > 0) {
+      cx.save(); cx.globalAlpha *= detail;
+      for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
+      cx.restore();
+    }
     drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
   }
   if (paintedSelection !== selPlanet) {
@@ -4746,7 +4785,7 @@ function render(now: number) {
   // imprint lingers (fading) until the arm comes back round — drawn behind the
   // blips so it reads as the contact glowing, not an overlay. Skips void nodes and
   // anything still fully unexplored.
-  if (sweepOn) {
+  if (sweepOn && lod.art > 0) {
     cx.save();
     cx.globalCompositeOperation = 'lighter';
     for (const n of MAP) {
@@ -4777,6 +4816,26 @@ function render(now: number) {
   cx.textAlign = 'left';
   const ns = artScale(detail); // node scale: schematic → detail (тот же закон, что у залпа)
   const R = 13 * ns;
+  if (lod.art < 1) {
+    cx.save();
+    cx.globalAlpha *= 1 - lod.art;
+    for (const n of MAP) {
+      const p = s.planets[n.id];
+      if (!p) continue;
+      const c = world(n);
+      if (!visible(c, 10)) continue;
+      drawSchematicNode(cx, c, lod.markerRadius);
+      if (p.owner === ME && known(n.id) && n.sector === 'planet') {
+        cx.fillStyle = ownerColor(ME);
+        cx.font = '700 12px ui-monospace,Menlo,monospace';
+        cx.fillText(n.id, c.x + lod.markerRadius + 6, c.y - 1);
+      }
+    }
+    cx.restore();
+  }
+  cx.save();
+  cx.globalAlpha *= lod.art;
+  if (lod.art > 0)
   for (const n of MAP) {
     const p = s.planets[n.id];
     if (!p) continue;
@@ -4784,7 +4843,7 @@ function render(now: number) {
     if (!visible(c, 110)) continue;
     // Variant B: fog hides capturable systems (void cells stay as pure geometry).
     // Какой вид у узла — `fogView.ts` (REFM-62): пустой всегда виден, неопознанный
-    // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса.
+    // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса только вблизи.
     if (n.sector === 'black_hole') {
       cx.save();
       cx.fillStyle = '#03030a'; cx.strokeStyle = '#8764ce'; cx.lineWidth = 3;
@@ -4797,7 +4856,7 @@ function render(now: number) {
     const mem = memory.get(n.id);
     const view = nodeView({ sector: n.sector, identified: kn, remembered: !!mem });
     if (view === 'remembered' || view === 'unexplored') {
-      drawFogMarker(c, n.id, mem);
+      drawFogMarker(c, n.id, mem, lod);
       continue;
     }
     const showOwner = p.owner;
@@ -4884,7 +4943,7 @@ function render(now: number) {
     // fat hub where the lanes meet, no orbits. Captured by simply arriving. Raising a
     // fortress here stops making it an asteroid field at all: `station.deploy` turns the
     // node into `void_station`, which draws (with its hull bar) in its own branch below.
-    if (n.sector === 'asteroid') {
+    if (n.sector === 'asteroid' && !holographicMapOn()) {
       blitGlow(col, c.x, c.y, 30, p.owner ? 0.16 : 0.06); // cached glow disc
       cx.save();
       cx.strokeStyle = 'rgba(186,170,140,0.7)';
@@ -4999,7 +5058,7 @@ function render(now: number) {
     } else if (n.sector === 'planet') {
       // A transparent rotating wire volume, with no opaque core obscuring its mesh.
       // The visual clock is independent of game speed and freezes on pause/reduced motion.
-      blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(cam.scale)), hologramTime + phaseAt(n.x, n.y) * 400);
+      blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(lod.scale)), detail > 0 ? hologramTime + phaseAt(n.x, n.y) * 400 : 0);
       blitGlow(col, c.x, c.y, R + 7, showOwner ? 0.08 : 0.035);
 
       // N/E/S/W crosshair ticks
@@ -5231,6 +5290,8 @@ function render(now: number) {
     }
     cx.restore();
   }
+
+  cx.restore();
 
   // the orbit ring around any CITY that holds a stationed fleet (a single orbit).
   // Asteroid-field junctions have no orbits, so they are skipped.
@@ -5936,7 +5997,7 @@ function fleetSummaryHtml(f: Fleet): string {
   return (
     `<div class="sec">${t('side.summary.title')}</div>` +
     rows.join('') +
-    `<div class="row">${btn('fleetinfo', '', t('side.summary.back'), true)}</div>`
+    `<div class="row">${btn('summaryback', '', t('side.summary.back'), true)}</div>`
   );
 }
 
@@ -5997,18 +6058,6 @@ function fleetPanelHtml(f: Fleet): string {
   );
   // Тап по имени открыл сводку армии — карточка целиком уступает ей место.
   if (fleetInfoFor === f.id) return h + fleetSummaryHtml(f);
-  // UI-14. ЧУЖОЙ флот — только осмотр: тот же разбор состава, что игрок уже знает по
-  // своим (тап по имени), и ни одной кнопки приказа. Кнопки тут были бы не «строгостью
-  // интерфейса», а обманом: ядро всё равно отвечает `E_FORBIDDEN` на приказ чужому
-  // флоту. Строка-подсказка объясняет, ПОЧЕМУ приказов нет, — иначе пустая карточка
-  // читается как поломка, а именно с этого и началась находка владельца.
-  if (f.owner !== ME) {
-    return (
-      h +
-      `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>` +
-      fleetSummaryHtml(f)
-    );
-  }
   // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
   // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
   // (цены — те же формулы, что в гейте).
@@ -6091,6 +6140,12 @@ function fleetPanelHtml(f: Fleet): string {
     // Radar contact: show only the signature (coarse size), not the composition
     h += `<div class="sec">${t('side.fleet.ships')}</div><div class="row dim">${t('side.fleet.signature', { n: nShips })}</div>`;
   }
+
+  // UI-14: чужой флот тоже имеет обычную карточку и сводку по тапу на имя.
+  // Постоянная сводка здесь показывала «Назад» без карточки, к которой можно вернуться.
+  // Осмотр заканчивается ДО приказов: этот флот не попадает в набор управления.
+  if (f.owner !== ME)
+    return h + `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>`;
 
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
@@ -6367,7 +6422,7 @@ function planetSummaryHtml(p: Planet): string {
   return (
     `<div class="sec">${t('side.world.summary')}</div>` +
     rows.join('') +
-    `<div class="row">${btn('planetinfo', '', t('side.summary.back'), true)}</div>`
+    `<div class="row">${btn('summaryback', '', t('side.summary.back'), true)}</div>`
   );
 }
 
@@ -8276,14 +8331,23 @@ side.addEventListener('click', (ev) => {
     // ECON-3а: экспресс-ремонт за metal — кнопка видна только у своего дока.
     playerOrder(repairFleet(ME, arg || selFleet!));
   } else if (act === 'fleetinfo') {
-    // Тап по имени армии: карточка ⇄ сводка (для текущего выбранного флота).
-    if (selFleet) fleetInfoFor = fleetInfoFor === selFleet ? null : selFleet;
+    // Осматриваемый чужой флот живёт вне selFleet — действие относится к карточке.
+    const id = panelFleet();
+    if (id) fleetInfoFor = fleetInfoFor === id ? null : id;
   } else if (act === 'planetinfo') {
     // Тап по имени мира: карточка ⇄ сводка статистики (для выбранной планеты).
     if (selPlanet) planetInfoFor = planetInfoFor === selPlanet ? null : selPlanet;
+  } else if (act === 'summaryback') {
+    // «Назад» только закрывает сводку; повторный тап не открывает её заново.
+    fleetInfoFor = null;
+    planetInfoFor = null;
   }
   lastPanelHtml = '';
   renderPanel();
+  if (act === 'summaryback' || act === 'fleetinfo' || act === 'planetinfo') {
+    const scroll = side.querySelector<HTMLElement>('.pscroll');
+    if (scroll) scroll.scrollTop = 0;
+  }
 });
 
 // Side-panel object hover → dossier. On PC the docked pane is hidden (it ate a slab
