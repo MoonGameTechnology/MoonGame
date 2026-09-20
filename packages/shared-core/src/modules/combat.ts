@@ -17,7 +17,9 @@ import { isCapturable } from '../state/sectorKind';
 import { attackerOf, defenderOf } from '../state/battle';
 import { splitVolley } from '../util/volley';
 import {
+  addHooked,
   applyDamageToSide,
+  hookedDamage,
   INTERCEPT_TOL,
   isHostile,
   laneOccupancy,
@@ -29,6 +31,7 @@ import {
   creditVolley,
   sideDamageBreakdown,
   sideUnits,
+  type HookedDamage,
 } from '../util/combat';
 
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
@@ -1035,7 +1038,7 @@ export const combatModule: GameModule = {
       // обороняющийся отвечает `defense`. При N участниках атакующими могут быть сразу
       // несколько, и «атакующий ↔ обороняющийся» перестаёт описывать бой целиком.
       const live = battle.sides.filter((side) => sideAlive(h.state, side.ref));
-      const incoming = new Map<BattleSide, number>();
+      const incoming = new Map<BattleSide, HookedDamage>();
       for (const side of live) {
         // Враги — только ВРАЖДЕБНЫЕ живые стороны. Спрятаться за спину союзника нельзя
         // (ради этого выбор и сделан), но и бить союзника залп не имеет права.
@@ -1062,14 +1065,15 @@ export const combatModule: GameModule = {
           // подписчики — местность, укрепления, пассивы фракции и ауры героя — меряют
           // именно отношение двух конкретных владельцев. Один вызов на всех врагов
           // сделал бы их вклад неразличимым.
-          const dealt = h.hook<number>('combat.damage', share.damage, {
+          const dealt = hookedDamage(h, share.damage, {
             battleId,
             phase: battle.phase,
             location: battle.location,
             attacker: side.owner,
             defender: target.owner,
           });
-          incoming.set(target, (incoming.get(target) ?? 0) + dealt);
+          const running = incoming.get(target);
+          incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
           landed += dealt;
         }
         // Пишется ДО применения урона — по тому же ПРЕДРАУНДОВОМУ снимку, из которого

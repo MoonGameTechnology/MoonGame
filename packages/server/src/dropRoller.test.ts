@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DomainEvent } from '@void/shared-core';
+import { hashJson, type DomainEvent } from '@void/shared-core';
 import {
   awardMatchDrops,
   chanceForPlace,
@@ -132,6 +132,33 @@ describe('awardMatchDrops (ARS-4)', () => {
     const [item] = await d.arsenal.listOf('lucky');
     expect(item).toMatchObject({ form: 'blueprint', origin: 'drop', soulbound: false });
     expect(await d.drops.pityOf('dry')).toBe(1);
+  });
+
+  // ARS-7 — the record names the table edition that produced its odds.
+  it('the record stamps the hash of the tables that rolled it', async () => {
+    const d = deps();
+    const [record] = await awardMatchDrops(d, 'm-stamp', [
+      { accountId: 'acc', reward: { place: 1, xp: 0 } },
+    ]);
+    expect(record?.tablesHash).toBe(hashJson(d.tables));
+    expect(record?.tablesHash).not.toBe('');
+  });
+
+  it('editing the tables changes the stamp — silent odds edits cannot hide', async () => {
+    const before = await awardMatchDrops(deps(), 'm-before', [
+      { accountId: 'acc', reward: { place: 1, xp: 0 } },
+    ]);
+    // One nudged weight is the whole difference: the pool that produced the roll differs.
+    const nudged = deps({
+      pool: [
+        { kind: 'hull', defId: 'siege_lance', weight: 1 },
+        { kind: 'module', defId: 'targeting_array', weight: 4 },
+      ],
+    });
+    const after = await awardMatchDrops(nudged, 'm-after', [
+      { accountId: 'acc', reward: { place: 1, xp: 0 } },
+    ]);
+    expect(after[0]?.tablesHash).not.toBe(before[0]?.tablesHash);
   });
 });
 
