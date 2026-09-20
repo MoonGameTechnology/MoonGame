@@ -4,6 +4,7 @@
 // init, the real-time loop, rendering calls, the side panel and input.
 import { build } from 'esbuild';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
@@ -137,6 +138,7 @@ globalThis.window = {
   setTimeout,
   clearTimeout,
 };
+globalThis.addEventListener = globalThis.window.addEventListener;
 globalThis.history = { pushState() {}, back() {} };
 globalThis.location = { protocol: 'file:', host: '', hostname: '', href: 'file:///', search: '' };
 const rafCbs = [];
@@ -145,8 +147,30 @@ globalThis.requestAnimationFrame = (cb) => {
   return rafCbs.length;
 };
 
+// Test-only access to selection; clicks still go through the shipped side-panel delegate.
+const bridge = `
+module.exports = {
+  cards: () => ({
+    planet: Object.values(s.planets).find(p => p.owner === ME).id,
+    fleet: Object.values(s.fleets).find(f => f.owner === ME).id,
+    foreign: Object.values(s.fleets).find(f => f.owner !== ME).id,
+  }),
+  selectCard: (kind, id) => {
+    clearSelection();
+    if (kind === 'planet') selPlanet = id;
+    else setFleetSelection([id]);
+    renderPanel();
+  },
+  selected: () => ({ fleet: panelFleet(), planet: selPlanet, orders: [...selFleets] }),
+  state: () => JSON.stringify(s),
+  backLabel: () => t('side.summary.back'),
+};`;
 const res = await build({
-  entryPoints: ['prototype/src/main.ts'],
+  stdin: {
+    contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
+    resolveDir: process.cwd() + '/prototype/src',
+    loader: 'ts',
+  },
   bundle: true,
   platform: 'node',
   format: 'cjs',
@@ -198,6 +222,41 @@ for (const type of ['pointerdown', 'pointerup']) {
 }
 const sideEl = getEl('side');
 const sideClicks = (listeners.get(sideEl) ?? {}).click ?? [];
+const clickSide = (dataset) => {
+  const button = { disabled: false, dataset };
+  for (const handle of sideClicks)
+    handle({ target: { closest: (selector) => selector === 'button' ? button : null } });
+};
+// A foreign fleet is inspected outside the order selection. Both the title and
+// the rendered Back button must operate on that card without issuing an order.
+for (const [kind, id] of Object.entries(mod.exports.cards())) {
+  mod.exports.selectCard(kind, id);
+  const selected = mod.exports.selected();
+  const state = mod.exports.state();
+  const backButton = () => [...sideEl.innerHTML.matchAll(/<button[^>]*data-act="([^"]+)"[^>]*>([^<]*)<\/button>/g)]
+    .find((match) => match[2] === mod.exports.backLabel()) ?? null;
+  assert.equal(backButton(), null, `${kind}: the regular card must not offer Back to itself`);
+  const title = kind === 'planet' ? 'planetinfo' : 'fleetinfo';
+  clickSide({ act: title });
+  assert.ok(backButton(), `${kind}: title must open its summary`);
+  const back = backButton()[1];
+  clickSide({ act: back });
+  assert.equal(backButton(), null, `${kind}: Back must restore the regular card`);
+  clickSide({ act: back });
+  assert.equal(backButton(), null, `${kind}: repeated Back must not reopen the summary`);
+  assert.deepEqual(mod.exports.selected(), selected, `${kind}: Back must retain selection`);
+  assert.equal(mod.exports.state(), state, `${kind}: card navigation must not change the match`);
+  // Reopening and closing by the title remains supported as well.
+  clickSide({ act: title });
+  assert.ok(backButton(), `${kind}: summary must reopen after Back`);
+  clickSide({ act: title });
+  assert.equal(backButton(), null, `${kind}: title must close its summary`);
+  if (kind === 'foreign') {
+    assert.deepEqual(mod.exports.selected().orders, [], 'inspected fleet must never enter orders');
+    assert.doesNotMatch(sideEl.innerHTML, /data-act="(?:bombard|assault|retreat|instantrepair|dockrepair)"/);
+  }
+}
+console.log('Card navigation OK — planet, own fleet and inspected foreign fleet');
 for (const fn2 of sideClicks)
   fn2({
     target: { closest: () => ({ disabled: false, dataset: { act: 'build', arg: 'refinery' } }) },
