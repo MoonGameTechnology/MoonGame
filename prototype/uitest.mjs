@@ -5,12 +5,14 @@
 import { build } from 'esbuild';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
   const classes = new Set();
   const el = {
     id,
+    value: '',
     style: { removeProperty(name) { delete this[name]; }, setProperty(name, value) { this[name] = value; }, getPropertyPriority() { return ''; } },
     setAttribute(name, value) { this[name] = String(value); },
     removeAttribute(name) { delete this[name]; },
@@ -131,11 +133,21 @@ globalThis.performance = new Proxy(realPerformance, {
 globalThis.Path2D = class Path2D {};
 // Net-mode reads localStorage for the saved server URL; stub it (no persistence).
 const storage = new Map();
+// A returning player's old skin choice must not revive the retired interface.
+storage.set('void.holography', '0');
+const bootCheck = process.argv.includes('--boot-check');
+const savedAtBoot = bootCheck ? readFileSync(0, 'utf8') : null;
+if (savedAtBoot) {
+  storage.set('void.run.v1', savedAtBoot);
+  storage.set('void.nick', 'ReturningCommander');
+}
 globalThis.localStorage = {
   getItem: key => storage.get(key) ?? null,
   setItem: (key, value) => storage.set(key, String(value)),
   removeItem: key => storage.delete(key),
 };
+// The local entry has no account server. Never send real HTTP requests from this harness.
+globalThis.fetch = async () => new globalThis.Response('', { status: 404 });
 // resize() probes coarse-pointer media to spot phones; the fake DOM is a desktop.
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.getComputedStyle = (el) => ({ display: el.style.display ?? 'block' });
@@ -222,6 +234,10 @@ if (sectorEntry) {
   assert.equal(getEl('sector-zero').style.display, 'flex', 'direct entry opens Sector Zero home');
   assert.equal(getEl('connect').style.display, 'none', 'no identity screen on the local entry');
   assert.equal(getEl('sz-new').disabled, false);
+} else {
+  assert.equal(getEl('connect').style.display, 'flex', 'the shared entry always starts at login');
+  assert.equal(getEl('hub').style.display, 'none', 'login precedes the hub');
+  assert.notEqual(getEl('sector-zero').style.display, 'flex', 'a saved run must not hijack login');
 }
 
 // drive ~40 frames (~0.6s real → with speed 2 ≈ many game hours)
@@ -230,6 +246,28 @@ for (let i = 0; i < 40 && rafCbs.length; i++) {
   const cb = rafCbs.shift();
   cb(performance.now());
   frames++;
+}
+assert.equal(globalThis.document.body.classList.contains('holo-ui'), true, 'old preferences cannot disable the modern desktop UI');
+if (bootCheck) {
+  await flush();
+  assert.equal(storage.get('void.run.v1'), savedAtBoot, 'opening the page preserves the run');
+  if (sectorEntry) assert.equal(getEl('sz-continue').hidden, false, 'direct entry still offers Continue');
+  else {
+    assert.equal(getEl('connect').style.display, 'flex', 'login survives asynchronous save loading');
+    assert.notEqual(getEl('sector-zero').style.display, 'flex');
+    await click('cwgo'); // the existing offline callsign flow; no auth bypass in the app
+    assert.equal(getEl('connect').style.display, 'none');
+    assert.equal(getEl('hub').style.display, 'flex', 'sign-in leads to the main hub');
+    assert.notEqual(getEl('sector-zero').style.display, 'flex', 'sign-in does not choose a mode');
+    await click('hub-sector-zero');
+    assert.equal(getEl('sector-zero').style.display, 'flex', 'the explicit hub entry still works');
+    assert.equal(getEl('sz-continue').hidden, savedAtBoot === '{broken', 'valid runs remain available');
+    await click('sz-back');
+    assert.equal(getEl('hub').style.display, 'flex');
+  }
+  assert.equal(frameErrors.length, 0);
+  console.log('Boot regression OK — login, legacy preference and saved run');
+  process.exit(0);
 }
 
 // Drive the actual pointer handlers: a synthetic `click` no longer reaches map input.
@@ -390,6 +428,20 @@ assert.equal(saved.difficulty, 'weak');
 assert.deepEqual(saved.shipLoadouts.cruiser, ['cargo_bay']);
 assert.equal(saved.sectorZeroAttempt, 2);
 assert.equal(JSON.parse(storage.get('sector-zero.progress.v1')).research, 0, 'a menu exit awards nothing');
+// Reboot the real bundled entry with a real save from the flow above, not a guessed fixture.
+if (!sectorEntry) {
+  for (const [input, args] of [
+    [storage.get('void.run.v1'), []],
+    ['{broken', []],
+    [storage.get('void.run.v1'), ['--sector-zero']],
+  ]) {
+    const reboot = spawnSync(process.execPath, ['prototype/uitest.mjs', '--boot-check', ...args], {
+      input, encoding: 'utf8', timeout: 120_000,
+    });
+    assert.equal(reboot.status, 0, reboot.stderr || reboot.error?.message);
+    console.log(reboot.stdout.trim());
+  }
+}
 assert.equal(frameErrors.length, 0, 'the render loop must not silently recover from a broken frame');
 console.error = printError;
 console.log(

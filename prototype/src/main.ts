@@ -524,11 +524,10 @@ import { initSettings } from './settingsOverlay';
 import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
-import { reframePresentation, supportsHolography } from './holographicLayout';
+import { reframePresentation } from './holographicLayout';
 import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
 import { TerrainRasterCache } from './terrainRasterCache';
 import { TerrainGeometryCache } from './terrainGeometryCache';
-import { holographyOn, setHolography } from './graphicsPrefs';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -4240,7 +4239,7 @@ function mapLabel(mapId: string | undefined): string {
 
 /** Map art is shared by desktop and phone; floating windows remain desktop-only. */
 function holographicMapOn(): boolean {
-  return holographic.active() || (MOBILE && holographyOn());
+  return holographic.active() || MOBILE;
 }
 
 /** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
@@ -10236,8 +10235,6 @@ const settings = initSettings({
     glow: glowOn(),
     starfield: starfieldOn(),
     motion: motionOn(),
-    holography: holographyOn(),
-    holographySupported: MOBILE || supportsHolography(VW, VH, holoCoarsePointer?.matches ?? false),
     renderCompatibility: canvasCompatibilityRequested(),
     renderCompatibilityActive: canvasCompatibilityActive(),
     renderCompatibilitySupported: /Android/i.test(navigator.userAgent),
@@ -10253,7 +10250,6 @@ const settings = initSettings({
   setGlow: setGlowFx,
   setStarfield: setStarfield,
   setMotion: setMotion,
-  setHolography,
   setRenderCompatibility: setCanvasCompatibility,
   renderingReport: mapRenderingReport,
   setFps: setShowFps,
@@ -10267,11 +10263,11 @@ $('hub-settings').addEventListener('click', () => settings.open());
 // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
 document.getElementById('rail-settings')?.addEventListener('click', () => settings.open());
 
-// First-run gate: a returning commander (a saved callsign) skips the identity card
-// and boots straight into the hub — the raw "Новый командир / войти" screen is only
-// for a genuinely new device. "Сменить командира" in the hub goes back to identity.
+// The shared entry always starts at login, including returning commanders with a
+// saved callsign or local Sector Zero run. Identity leads to the main hub; the
+// player chooses a mode there. A save is data to continue, not a navigation request.
 //
-// Deep-link overrides (checked before the returning-player shortcut):
+// Explicit deep-link overrides (checked before the ordinary login entry):
 //  «?reset=<token>» — a mailed password-reset link → the reset page (set a new password).
 //  «?join=<id>»     — a new tab spawned by «Войти» in the match list → straight into THAT
 //                     session, reusing this browser's stored identity (nick / session JWT).
@@ -14156,14 +14152,11 @@ addEventListener('pagehide', saveRun);
 addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveRun();
 });
-// A direct Sector Zero entry always opens home. The shared prototype offers a
-// saved run there too, but never steals an invitation or password-reset link.
-if (!bootJoinId && !bootReset) {
-  if (document.body.dataset.entry === 'sector-zero') openSectorZero();
-  else detach('offer saved run', runSaveStore.load().then(raw => {
-    if (raw && connectShown() && !NET && !sectorZeroMenu.isOpen()) openSectorZero();
-  }));
-}
+// Only the explicit standalone page opens Sector Zero at boot. The shared entry
+// must keep its login screen even when a run exists (or its stored data is invalid).
+// The hub button loads that save on demand, without losing or resuming it here.
+if (!bootJoinId && !bootReset && document.body.dataset.entry === 'sector-zero')
+  openSectorZero();
 
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —
