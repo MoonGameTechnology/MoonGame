@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { shippedGameData } from '../../../data/bundle';
+import { pveState } from './gameData';
 import { dominantUnit, unitGlyphSvg, unitShape } from './shipGlyphs';
 import { drawShipShape, SHIP_SHAPES, shipPaths } from './shipShapes';
 
@@ -7,6 +8,55 @@ const data = shippedGameData();
 afterEach(() => vi.unstubAllGlobals());
 
 describe('approved ship hulls', () => {
+  it('skins the shipped PvE enemy by its owner, even while waves use shared unit definitions', () => {
+    const state = pveState(data);
+    const fleet = state.fleets.p3_1!;
+    const dom = dominantUnit(fleet.units, data)!;
+    expect(dom.def.faction).toBe('vanguard');
+    expect(unitShape(dom.def, dom.unit, state.players[fleet.owner]!.faction)).toBe('swarmHunter');
+    expect(unitShape(dom.def, dom.unit, 'vanguard')).toBe('cruiser');
+    const svg = unitGlyphSvg(dom.def, {
+      unitId: dom.unit,
+      ownerFaction: 'swarm',
+      color: '#3ad17a',
+      shield: true,
+    });
+    expect(svg).toContain('data-hull="swarmHunter"');
+    expect(svg).toContain(SHIP_SHAPES.swarmHunter.hull);
+    expect(svg).toContain('#3ad17a'); // faction must not overwrite the owner colour
+    expect(svg).toContain('stroke-dasharray');
+  });
+
+  it('gives the eight Swarm forms distinct silhouettes without reskinning ground cargo', () => {
+    const forms = [
+      ['scout_drone', 'swarmScout'],
+      ['frigate', 'swarmFlock'],
+      ['cruiser', 'swarmHunter'],
+      ['landing_shuttle', 'swarmDevourer'],
+      ['strike_carrier', 'swarmSporeCarrier'],
+      ['siege_lance', 'swarmDestroyer'],
+      ['shuttle_carrier', 'swarmMatriarch'],
+      ['hero', 'swarmLeviathan'],
+    ] as const;
+    for (const [unit, shape] of forms) {
+      expect(unitShape(data.units[unit]!, unit, 'swarm')).toBe(shape);
+    }
+    expect(new Set(forms.map(([, shape]) => SHIP_SHAPES[shape].hull)).size).toBe(8);
+    expect(unitShape(data.units.tank!, 'tank', 'swarm')).toBeNull();
+    expect(unitGlyphSvg(data.units.tank!, { ownerFaction: 'swarm', color: '#fff' })).toBe('');
+    expect(dominantUnit([{ unit: 'unknown', count: 1 }], data)).toBeNull();
+  });
+
+  it('uses organic role fallbacks for new Swarm units and explicit ownership for transferred hulls', () => {
+    const swarmCruiser = { ...data.units.cruiser!, faction: 'swarm' };
+    expect(unitShape(swarmCruiser)).toBe('swarmHunter');
+    expect(unitShape({ ...swarmCruiser, traits: ['hero'] })).toBe('swarmLeviathan');
+    expect(unitShape({ ...data.units.strike_carrier!, faction: 'swarm' })).toBe('swarmDevourer');
+    expect(unitShape({ ...data.units.scout!, faction: 'swarm' })).toBe('swarmScout');
+    expect(unitShape(swarmCruiser, 'cruiser', 'vanguard')).toBe('cruiser');
+    expect(unitShape(swarmCruiser, undefined, 'vanguard')).toBe('cruiser');
+  });
+
   it('distinguishes the frigate and the wide landing craft from combat triangles', () => {
     expect(unitShape(data.units.frigate!, 'frigate')).toBe('frigate');
     expect(unitShape(data.units.landing_shuttle!, 'landing_shuttle')).toBe('dropship');
@@ -44,5 +94,23 @@ describe('approved ship hulls', () => {
     expect(g.stroke.mock.calls.map((c) => c[0])).toEqual([paths.hull]);
     expect(g.fill).toHaveBeenLastCalledWith(paths.hull, 'evenodd');
     expect(ctor).toHaveBeenCalledTimes(3);
+  });
+
+  it('caches all organic contours and retains their identity at distance', () => {
+    const ctor = vi.fn(function (this: { source: string }, source: string) {
+      this.source = source;
+    });
+    vi.stubGlobal('Path2D', ctor);
+    const g = { fill: vi.fn(), stroke: vi.fn(), shadowBlur: 6 };
+    for (const id of Object.keys(SHIP_SHAPES) as Array<keyof typeof SHIP_SHAPES>) {
+      if (!id.startsWith('swarm')) continue;
+      drawShipShape(g as unknown as CanvasRenderingContext2D, id, true);
+      const paths = shipPaths(id);
+      g.stroke.mockClear();
+      drawShipShape(g as unknown as CanvasRenderingContext2D, id, false);
+      expect(g.stroke.mock.calls.map((c) => c[0])).toEqual([paths.hull]);
+      expect(g.fill).toHaveBeenLastCalledWith(paths.hull, 'evenodd');
+    }
+    expect(ctor).toHaveBeenCalledTimes(8 * 3);
   });
 });

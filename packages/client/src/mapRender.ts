@@ -235,7 +235,7 @@ export function renderMap(
     const col = colors.get(f.owner) ?? theme.cyan;
     if (lod.detail > 0) blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5 * lod.detail);
     const dom = dominantUnit(f.units, opts.data);
-    const shape = dom && unitShape(dom.def, dom.unit);
+    const shape = dom && unitShape(dom.def, dom.unit, state.players[f.owner]?.faction);
     g.save();
     g.translate(c.x, c.y);
     g.strokeStyle = col;

@@ -84,9 +84,10 @@ export function unitIconHtml(
   data: GameData,
   color: string,
   px = 22,
+  ownerFaction?: string,
 ): string {
   const def = data.units[unit];
-  if (def && def.domain !== 'ground') return unitGlyphSvg(def, { unitId: unit, color, px });
+  if (def && def.domain !== 'ground') return unitGlyphSvg(def, { unitId: unit, ownerFaction, color, px });
   return unitIcon(unit, data);
 }
 
