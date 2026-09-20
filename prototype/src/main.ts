@@ -1,3 +1,7 @@
+import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
+import { soloSaveStore } from './soloSaveLocal';
+import { hashJson } from '../../packages/shared-core/src/index';
+import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierHtml } from './swarmDossier';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
@@ -1378,6 +1382,16 @@ function renderSwarmDossier(): void {
 }
 const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
 devlineEl.addEventListener('click', (event) => {
+  if ((event.target as Element).closest('[data-solo-play]')) {
+    if (soloSaveActive && !NET) {
+      speed = Number($('spd-play').dataset.speed);
+      lastReal = performance.now();
+      for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+        x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
+    }
+    return;
+  }
+  if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
   if (!(event.target as Element).closest('[data-swarm-intel]')) return;
   swarmDossierWin.classList.add('show');
   renderSwarmDossier();
@@ -2598,7 +2612,7 @@ function startGuidedMatch(): void {
   };
   showHub(false);
   showConnect(false);
-  startMatch(buildSetupConfig()); // installMatch → maybeStartPendingTour runs the guide
+  startMatch(buildSetupConfig(), false); // installMatch → maybeStartPendingTour runs the guide
   // ONB-2: a brand-new commander shouldn't sit through the Mine's real build-time
   // (hours of game time) on the default ×10 wall-clock-ish preset — that's real
   // MINUTES of nothing happening on the very first beat. No rivals/fairness stakes
@@ -9861,6 +9875,8 @@ async function syncCommanderFromServer(): Promise<void> {
   }
 }
 function openHub(note = ''): void {
+  if (soloSaveActive) { saveSolo(); speed = 0; }
+  refreshSoloContinue();
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   const nick = nickInput.value.trim();
   $('hub-name').textContent = nick || t('auth.commander');
@@ -10204,6 +10220,7 @@ $('hub-solo').addEventListener('click', () => {
   showHub(false);
   openSetup('hub');
 });
+$('hub-solo-continue').addEventListener('click', restoreSolo);
 $('hub-sector-zero').addEventListener('click', () => openSectorZero());
 $('hub-msg').addEventListener('click', () => {
   hubNote.textContent = t('hub.messages.soon');
@@ -10722,6 +10739,8 @@ const openSciPick = (): void => sciPick.open();
 setupCouncilEl.addEventListener('click', openSciPick);
 
 function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
+  saveSolo();
+  if (!NET) speed = 0;
   setupReturn = from;
   // Каждый заход начинается ОДИНОЧНЫМ: сетевой режим ставит `openSeatPicker`
   // сразу после этого вызова. Иначе брошенный сетевой заход утёк бы в следующую
@@ -10833,6 +10852,10 @@ topEl.addEventListener('click', (ev) => {
 });
 
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
+  saveSolo();
+  soloSaveActive = false;
+  autoAssault.clear();
+  patrols.clear();
   sectorRunActive = false;
   sectorDevActive = false;
   mapNeedsPreparation = true;
@@ -10898,11 +10921,10 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   // Start the queued tour after the prepared HUD is actually visible.
   snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
-function startMatch(setup: SetupConfig): void {
+function startMatch(setup: SetupConfig, persist = true): void {
   const st = newGame(setup);
   // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
-  // Она НЕ едет в `SetupConfig` и, значит, не попадает ни в состояние, ни в сохранение:
-  // это политика локального хоста, как и всё остальное в `soloDrivers`.
+  // Политика локального хоста хранится рядом с миром в одиночном сохранении.
   const profiles = new Map<string, AiProfile>();
   for (const seat of setup.seats) {
     if (!seat.ai) continue;
@@ -10918,6 +10940,8 @@ function startMatch(setup: SetupConfig): void {
     sandboxHomeId = setup.seats[0]?.start ?? null;
     setSandboxButton(sandboxConfig.enabled);
   }
+  soloSaveActive = persist && !NET && (__PLAYER_BUILD__ || !sandboxConfig.enabled);
+  saveSolo();
 }
 
 /** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
@@ -11104,6 +11128,13 @@ setupGoEl.addEventListener('click', () => {
       setupFaction || null,
       setupScientists,
     );
+    return;
+  }
+  const stored = soloStore.load();
+  const sandbox = !__PLAYER_BUILD__ && ($('setupsandbox') as HTMLInputElement).checked;
+  if (!sandbox && (!stored.ok || stored.raw !== null)) {
+    $('solo-replace').style.display = 'flex';
+    $('solo-replace-cancel').focus({ preventScroll: true });
     return;
   }
   startMatch(buildSetupConfig());
@@ -11323,6 +11354,8 @@ function netClientFor(seat: string): MultiplayerClient {
 }
 
 function connect(): void {
+  saveSolo();
+  soloSaveActive = false;
   sectorRunActive = false;
   const srv = resolveServer();
   if (!srv) return;
@@ -12548,6 +12581,7 @@ const flexed = (id: string): boolean => document.getElementById(id)?.style.displ
 const BACK_LAYERS: BackLayer[] = [
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   // --- модалки поверх всего (z60…z57) ---
+  { id: 'solo-replace', isOpen: () => flexed('solo-replace'), close: closeSoloReplace }, // z60
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
   // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
@@ -12773,6 +12807,92 @@ function renderBoonPick(): void {
   }
 }
 
+// The normal skirmish slot is independent of Sector Zero and the tutorial.
+const soloStore = soloSaveStore();
+const soloRules = hashJson({ data, modules: soloKernel.manifest });
+let soloSaveActive = false;
+let soloSavedAtReal = 0;
+let soloSaveFailed = false;
+
+function currentSoloSave(): SoloSave {
+  return {
+    state: s, ai: [...AI_PLAYERS],
+    normalSpeed: Number($('spd-play').dataset.speed) / PLAY_BASE,
+    fastSpeed: Number($('spd-fast').dataset.speed) / PLAY_BASE,
+    autoAssault: [...autoAssault], patrols: [...patrols], memory: memory.dump(),
+  };
+}
+function saveSolo(explicit = false): void {
+  if (!soloSaveActive || NET || s.pve || (!__PLAYER_BUILD__ && sandboxConfig.enabled)) return;
+  let ok = false;
+  try {
+    ok = s.match.status === 'ended' ? soloStore.clear() : soloStore.save(serializeSoloSave(currentSoloSave(), soloRules));
+  } catch { /* Serialization/storage failure leaves the previous checkpoint intact. */ }
+  if (!ok && (!soloSaveFailed || explicit)) note(t('solo.save.failed'));
+  if (ok && explicit) note(t('solo.save.saved'));
+  soloSaveFailed = !ok;
+  if (s.match.status === 'ended' && ok) soloSaveActive = false;
+}
+function suspendSolo(): void {
+  if (!soloSaveActive || NET) return;
+  saveSolo();
+  speed = 0;
+}
+function tickSoloSave(now: number): void {
+  if (!soloSaveActive || !inMatch()) return;
+  if (s.match.status === 'ended') { saveSolo(); return; }
+  if (now - soloSavedAtReal < 15000) return;
+  soloSavedAtReal = now;
+  saveSolo();
+}
+function refreshSoloContinue(): void {
+  const stored = soloStore.load();
+  const valid = stored.ok && parseSoloSave(stored.raw, soloRules) !== null;
+  const button = $('hub-solo-continue') as HTMLButtonElement;
+  button.hidden = stored.ok && stored.raw === null;
+  button.disabled = !valid;
+  $('solo-save-status').textContent = !stored.ok || soloSaveFailed ? t('solo.save.failed') :
+    stored.raw && !valid ? t('solo.save.invalid') : t('solo.save.info');
+}
+function closeSoloReplace(): void {
+  $('solo-replace').style.display = 'none';
+  $('setupgo').focus({ preventScroll: true });
+}
+$('solo-replace-cancel').addEventListener('click', closeSoloReplace);
+$('solo-replace-confirm').addEventListener('click', () => {
+  closeSoloReplace();
+  startMatch(buildSetupConfig());
+});
+function restoreSolo(): void {
+  if (NET) return;
+  const stored = soloStore.load();
+  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  if (!save) { refreshSoloContinue(); return; }
+  // Verify the map before replacing the in-memory match; future maps need an
+  // explicit migration, not an accidental fallback to another board.
+  try { mapPreset(save.state.mapId); mapNodesFromState(save.state); }
+  catch { $('solo-save-status').textContent = t('solo.save.invalid'); return; }
+  soloSaveActive = false; // installMatch must not overwrite the checkpoint being read
+  userClosed = true;
+  netAdmitted = false;
+  cameFromLink = false;
+  installMatch(save.state, new Map(save.ai));
+  for (const id of save.autoAssault) autoAssault.add(id);
+  for (const [id, order] of save.patrols) patrols.set(id, order);
+  memory.restore(save.memory);
+  applyTimeSpeed(save.normalSpeed, save.fastSpeed);
+  speed = 0;
+  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === 0);
+  lastReal = performance.now(); // never catch up the wall time spent away
+  soloSaveActive = true;
+  soloSaveFailed = false;
+  sectorZeroMenu.hide();
+  showConnect(false);
+  showHub(false);
+  note(t('solo.save.restored'));
+}
+
 /**
  * Сохранение забега (PVR-0.3).
  *
@@ -12846,6 +12966,7 @@ const sectorZeroMenu = initSectorZeroMenu({
 });
 
 function openSectorZero(preparation = false): void {
+  saveSolo();
   speed = 0;
   userClosed = true;
   if (NET && netSock) netSock.close();
@@ -13071,6 +13192,7 @@ function frame(nowReal: number) {
   // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
   // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
+  tickSoloSave(nowReal);
   renderBoonPick();
   renderSwarmDossier();
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
@@ -13084,6 +13206,8 @@ function frame(nowReal: number) {
     `<span id="clock">${clockHM(s.time)}</span>` +
     waveHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
+    (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
+    (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
     (s.pve ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
@@ -14209,6 +14333,10 @@ requestAnimationFrame(frameLoop);
 // уходе. `pagehide` вместо `beforeunload`: второй ненадёжен на мобильных, где вкладку
 // не «закрывают», а вытесняют из памяти.
 addEventListener('pagehide', saveRun);
+addEventListener('pagehide', suspendSolo);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') suspendSolo();
+});
 addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveRun();
 });

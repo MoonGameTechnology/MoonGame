@@ -11,6 +11,7 @@ it('keeps login ahead of the hub and preserves Sector Zero saves with the modern
     timeout: 120_000,
   });
   expect(output.match(/Boot regression OK/g)).toHaveLength(3);
+  expect(output.match(/Solo boot regression OK/g)).toHaveLength(3);
   expect(output).toContain('Card navigation OK');
   expect(output).toContain('UI OK');
 }, 130_000);

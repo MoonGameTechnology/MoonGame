@@ -110,7 +110,7 @@ const getEl = (id) => {
 };
 
 globalThis.document = {
-  addEventListener() {},
+  addEventListener(type, fn) { const m = listeners.get(this) ?? {}; (m[type] ??= []).push(fn); listeners.set(this, m); },
   getElementById: getEl,
   querySelector: () => mkEl('q'), // tab/overlay wiring uses it; a stub element is enough
   querySelectorAll: () => [],
@@ -136,9 +136,10 @@ const storage = new Map();
 // A returning player's old skin choice must not revive the retired interface.
 storage.set('void.holography', '0');
 const bootCheck = process.argv.includes('--boot-check');
-const savedAtBoot = bootCheck ? readFileSync(0, 'utf8') : null;
+const soloBootCheck = process.argv.includes('--solo-boot-check');
+const savedAtBoot = (bootCheck || soloBootCheck) ? readFileSync(0, 'utf8') : null;
 if (savedAtBoot) {
-  storage.set('void.run.v1', savedAtBoot);
+  storage.set(soloBootCheck ? 'void.solo.v1' : 'void.run.v1', savedAtBoot);
   storage.set('void.nick', 'ReturningCommander');
 }
 globalThis.localStorage = {
@@ -203,6 +204,11 @@ module.exports = {
   backLabel: () => t('side.summary.back'),
   dev: () => ({ active: sectorDevActive, fog: sandboxConfig.fog, reveal: vision === null }),
   finishDev: () => { s.match = { ...s.match, status: 'ended', winner: ME }; awardSectorRun(); tickRunSave(performance.now()); },
+  solo: () => ({ active: soloSaveActive, speed, save: currentSoloSave() }),
+  soloBack: () => closeTop(BACK_LAYERS.filter(l => l.id === 'solo-replace')),
+  tutorial: startGuidedMatch,
+  saveSolo: () => saveSolo(true),
+  autoSaveSolo: () => { s.players[ME].resources.metal += 1; tickSoloSave(performance.now() + 15000); },
   sandboxBack: () => closeTop(BACK_LAYERS.filter(l => l.id === 'sandbox')),
 };`;
 const res = await build({
@@ -219,7 +225,7 @@ const res = await build({
   write: false,
   // The build profile is a REQUIRED define (see main.ts) — the smoke test drives
   // the full dev client, same as dist/void-dominion.html.
-  define: { __PLAYER_BUILD__: 'false' },
+  define: { __PLAYER_BUILD__: process.argv.includes('--player') ? 'true' : 'false' },
 });
 
 const mod = { exports: {} };
@@ -252,6 +258,28 @@ for (let i = 0; i < 40 && rafCbs.length; i++) {
   frames++;
 }
 assert.equal(globalThis.document.body.classList.contains('holo-ui'), true, 'old preferences cannot disable the modern desktop UI');
+if (soloBootCheck) {
+  assert.equal(storage.get('void.solo.v1'), savedAtBoot, 'boot leaves the normal slot untouched');
+  await click('cwgo');
+  assert.equal(getEl('hub').style.display, 'flex');
+  const valid = savedAtBoot !== '{broken';
+  assert.equal(getEl('hub-solo-continue').disabled, !valid);
+  if (valid) {
+    const expected = JSON.parse(savedAtBoot).payload;
+    await click('hub-solo-continue');
+    assert.deepEqual(JSON.parse(mod.exports.state()), expected.state);
+    assert.deepEqual(mod.exports.solo().save.ai, expected.ai);
+    assert.deepEqual(mod.exports.solo().save.memory, expected.memory);
+    assert.equal(mod.exports.solo().speed, 0, 'reload resumes paused');
+    for (let i = 0; i < 5 && rafCbs.length; i++) await rafCbs.shift()(performance.now());
+    assert.equal(JSON.parse(mod.exports.state()).time, expected.state.time, 'no offline advancement');
+    assert.ok(getEl('devline').innerHTML.includes('data-solo-play'), 'resume is visible even when the PC speed bar is hidden');
+  } else assert.equal(storage.get('void.solo.v1'), savedAtBoot, 'bad saves are not silently deleted');
+  assert.equal(frameErrors.length, 0);
+  console.log('Solo boot regression OK');
+  process.exit(0);
+}
+
 if (bootCheck) {
   await flush();
   assert.equal(storage.get('void.run.v1'), savedAtBoot, 'opening the page preserves the run');
@@ -347,6 +375,9 @@ const selectMap = (id) => {
   input.value = id;
   for (const handle of (listeners.get(input) ?? {}).change ?? []) handle({ target: input });
 };
+if (sectorEntry) await click('sz-back');
+await click('cwgo');
+await click('hub-solo');
 selectMap('frontier-50');
 assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 50);
 assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 50);
@@ -360,6 +391,22 @@ for (let i = 0; i < 30 && rafCbs.length; i++) {
   await rafCbs.shift()(performance.now());
   frames++;
 }
+const beforeAuto = storage.get('void.solo.v1');
+mod.exports.autoSaveSolo();
+assert.notEqual(storage.get('void.solo.v1'), beforeAuto, 'autosave checkpoints live changes');
+globalThis.document.visibilityState = 'hidden';
+for (const handler of (listeners.get(globalThis.document) ?? {}).visibilitychange ?? []) handler();
+assert.equal(mod.exports.solo().speed, 0, 'hiding the page pauses the normal game');
+globalThis.document.visibilityState = 'visible';
+// Menu exit persists the running world; Continue loads the same map on pause.
+await click('tomenu');
+const soloCheckpoint = storage.get('void.solo.v1');
+assert.ok(soloCheckpoint);
+assert.equal(getEl('hub-solo-continue').disabled, false);
+await click('hub-solo-continue');
+assert.deepEqual(JSON.parse(mod.exports.state()), JSON.parse(soloCheckpoint).payload.state);
+assert.equal(mod.exports.solo().speed, 0);
+await click('hub-solo');
 selectMap('nexus');
 assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 10);
 for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
@@ -367,6 +414,27 @@ for (let i = 0; i < 10 && rafCbs.length; i++) {
   await rafCbs.shift()(performance.now());
   frames++;
 }
+
+assert.equal(getEl('solo-replace').style.display, 'flex');
+const beforeReplace = storage.get('void.solo.v1');
+mod.exports.soloBack();
+assert.equal(getEl('solo-replace').style.display, 'none');
+assert.equal(storage.get('void.solo.v1'), beforeReplace, 'Back cancels replacement');
+await click('setupgo');
+await click('solo-replace-confirm');
+assert.equal(JSON.parse(storage.get('void.solo.v1')).payload.state.mapId, 'nexus');
+for (const [checkpoint, extra] of [[soloCheckpoint, []], ['{broken', []], [soloCheckpoint, ['--player']]]) {
+  const child = spawnSync(process.execPath, ['prototype/uitest.mjs', '--solo-boot-check', ...extra], {
+    input: checkpoint, encoding: 'utf8', timeout: 120000,
+  });
+  assert.equal(child.status, 0, child.stdout + child.stderr);
+  process.stdout.write(child.stdout);
+}
+await click('tomenu');
+const beforeTutorial = storage.get('void.solo.v1');
+mod.exports.tutorial();
+mod.exports.saveSolo();
+assert.equal(storage.get('void.solo.v1'), beforeTutorial, 'training does not overwrite the normal game');
 
 // Sector Zero's real event handlers: preparation → new run → menu → Continue,
 // preserving the saved world's difficulty and set when next-run choices change.
@@ -400,7 +468,7 @@ assert.equal(getEl('scipick').classList.contains('show'), false);
 for (let i = 0; i < 12 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
 assert.ok(getEl('devline').innerHTML.includes('data-swarm-intel'));
 for (const handle of (listeners.get(getEl('devline')) ?? {}).click ?? [])
-  handle({ target: { closest: () => ({ dataset: { swarmIntel: '1' } }) } });
+  handle({ target: { closest: selector => selector === '[data-swarm-intel]' ? ({ dataset: { swarmIntel: '1' } }) : null } });
 assert.equal(getEl('swarm-dossier').classList.contains('show'), true);
 assert.ok(getEl('swarm-dossier-body').innerHTML.length > 0);
 getEl('boonpick').classList.add('show'); // a wave offers a boon over the open dossier
@@ -446,6 +514,7 @@ assert.deepEqual(saved.shipLoadouts.cruiser, ['cargo_bay']);
 assert.equal(saved.sectorZeroAttempt, 2);
 assert.equal(JSON.parse(storage.get('sector-zero.progress.v1')).research, 0, 'a menu exit awards nothing');
 // Dev attempts use real panel handlers and must not touch normal saves or meta.
+assert.equal(storage.get('void.solo.v1'), beforeTutorial, 'Sector Zero preserves the normal game');
 const normalSave = storage.get('void.run.v1');
 const normalProgress = storage.get('sector-zero.progress.v1');
 await click('sz-dev');
