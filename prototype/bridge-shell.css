@@ -199,6 +199,7 @@ body.holo-ui #hub .hub-panel { gap: 15px; }
 body.holo-ui #hub #hp-home { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
 body.holo-ui #hub #hp-home > * { flex: 1 0 100%; min-width: 0; }
 body.holo-ui #hub #hp-home > :is(.hub-play, .hub-solo) { flex: 1 1 calc(50% - 8px); width: auto; }
+body.holo-ui #hub #hp-home > #hub-sector-zero { flex-basis: 100%; }
 body.holo-ui #hub #hp-home > .hub-card:not(.ob-nudge) { flex: 1 1 calc(50% - 8px); }
 body.holo-ui #hub :is(.hub-play, .hub-solo) {
   min-height: 58px;

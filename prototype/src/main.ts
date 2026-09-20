@@ -253,9 +253,7 @@ import {
 } from '../../decisions/sessionStore';
 import {
   DEFAULT_RUN_DIFFICULTY,
-  nextRunDifficulty,
   parseRunDifficulty,
-  runDifficultyKey,
   type RunDifficulty,
 } from '../../decisions/runDifficulty';
 import { medalBadges } from '../../decisions/unitMedals';
@@ -271,9 +269,18 @@ import {
   RUN_SAVE_VERSION,
   parseRunSave,
   serializeRunSave,
+  type RunSave,
   type RunSaveStore,
 } from '../../decisions/runSave';
 import { localRunSaveStore } from './runSaveLocal';
+import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
+import { initSectorZeroMenu } from './sectorZeroMenu';
+import { initSectorZeroPreparation } from './sectorZeroPreparation';
+import {
+  SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
+  changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
+  type SectorZeroProgress,
+} from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { takeBoon } from '../../decisions/actions';
 import {
@@ -3642,6 +3649,7 @@ const matchEnd = initMatchEnd({
   writeMarker: (k, v) => localStorage.setItem(k, v),
   loadMeta,
   saveMeta,
+  runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
 });
 
 // --- rendering ---------------------------------------------------------------
@@ -9332,9 +9340,14 @@ function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void {
 // Restart → back to the skirmish setup (bot selection). The speedbar button serves the
 // no-bots sandbox; the end-banner button (delegated) serves a finished bot match.
 // Player build: the button is stripped with the rest of the time controls (no skirmish).
-if (!__PLAYER_BUILD__) restartBtn.addEventListener('click', () => openSetup());
+if (!__PLAYER_BUILD__) restartBtn.addEventListener('click', () => {
+  if (isSectorZeroRun()) openSectorZero();
+  else openSetup();
+});
 bannerEl.addEventListener('click', (ev) => {
-  if ((ev.target as Element).closest('[data-restart]')) openSetup();
+  if (!(ev.target as Element).closest('[data-restart]')) return;
+  if (isSectorZeroRun()) openSectorZero();
+  else openSetup();
 });
 
 // --- end screen (match over): outcome + stats + rematch ----------------------
@@ -9352,7 +9365,7 @@ const endScreenPanel = initEndScreen({
   clearEnd: () => {
     endScreen = null;
   },
-  hubVisible: () => !!hubEl && hubEl.style.display !== 'none',
+  hubVisible: () => (!!hubEl && hubEl.style.display !== 'none') || sectorZeroMenu.isOpen(),
   net: () => NET,
   worldsFallback: () => worldsOf(ME),
   fmtStamp,
@@ -9367,6 +9380,10 @@ const endScreenPanel = initEndScreen({
     // ONB-2: матч мог закончиться посреди гайда — незакрытый тур продолжил бы рисовать
     // свой #spotlight поверх хаба и следующего матча.
     activeTour?.stop();
+    if (!wasNet && isSectorZeroRun()) {
+      openSectorZero(which === 'again');
+      return;
+    }
     if (which === 'again') {
       // Соло — сразу в настройку схватки; сеть — в браузер матчей (пересадить тот же
       // стол клиент не может, это отдельный серверный кирпич).
@@ -9391,6 +9408,8 @@ const renderEndScreen = (): void => endScreenPanel.render();
 // authoritative (it keeps ticking regardless), but the end-screen overlay is suppressed
 // while the hub is visible (see renderEndScreen guard).
 $('tomenu').addEventListener('click', () => {
+  const wasRun = isSectorZeroRun();
+  if (wasRun) saveRun();
   if (NET) {
     userClosed = true;
     NET = false;
@@ -9408,7 +9427,8 @@ $('tomenu').addEventListener('click', () => {
   // Any exit from a live match must kill the tour, not just the ones that walk off
   // its own end (`done`) or its own «Пропустить обучение».
   activeTour?.stop();
-  openHub();
+  if (wasRun) openSectorZero();
+  else openHub();
 });
 // Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too.
 document.getElementById('rail-exit')?.addEventListener('click', () => $('tomenu').click());
@@ -9575,6 +9595,7 @@ const shipyard = initShipyard({
   note: (msg) => note(msg),
   errText,
   arsenalItems: () => arsenal.items(),
+  preparedModules: (hull) => isSectorZeroRun() ? [...(runShipLoadouts[hull] ?? [])] : undefined,
   onOpen: () => maybeIntro('constructor'),
   // The «Герои» pane: the hero roster/штаб lives in `heroStaff.ts` (REFM-14) — the
   // yard only asks it for markup and hands its clicks over.
@@ -10262,6 +10283,7 @@ $('hub-solo').addEventListener('click', () => {
   showHub(false);
   openSetup('hub');
 });
+$('hub-sector-zero').addEventListener('click', () => openSectorZero());
 $('hub-msg').addEventListener('click', () => {
   hubNote.textContent = t('hub.messages.soon');
 });
@@ -10452,6 +10474,11 @@ if (bootReset) {
       wPassInput.focus();
     })(),
   );
+} else if (document.body.dataset.entry === 'sector-zero') {
+  // The direct Sector Zero page enters its own home after the host is initialized.
+  // No identity or server request is needed for this local run.
+  showConnect(false);
+  showHub(false);
 } else {
   // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
   // hub — like every game's login screen. Previously a cached `void.nick` in
@@ -10476,7 +10503,7 @@ if (bootReset) {
       }
       if (mode === 'accounts') {
         wPassRowEl.style.display = 'flex';
-        wPassInput.focus();
+        if (connectShown()) wPassInput.focus();
       } else {
         wPassRowEl.style.display = 'none';
       }
@@ -10640,14 +10667,11 @@ function renderSetupSlots(): void {
   setupFactionsEl.innerHTML = f2;
   // Team-battle toggle: sides fight as allies. Only meaningful with ≥2 rivals (a 2v2
   // needs three AI seats on); shown always so the player can arm it before adding them.
-  // PvE button: starts a match on the PvE map (2 players vs 1 strong AI).
+  // Sector Zero has its own home; this entry no longer launches a run directly.
   let h =
     `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
-    `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
-    // Сложность забега — своя кнопка, а не строка места: место в нём РОВНО ОДНО (Рой),
-    // и выключить его нельзя (PVR-2.1).
-    `<button class="tmtog pve-diff" data-pvediff="1">${t(runDifficultyKey(pveDifficulty))}</button>` +
+    `<button class="tmtog pve-btn" data-pvestart="1">${t('sector-zero.enter')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
   if (isFrontier(setupMapId)) {
@@ -10800,8 +10824,6 @@ function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   // stays one tap away — the ×1 chip.
   const savedSpeed = Number(localStorage.getItem('void.setupSpeed'));
   setupSpeed = SETUP_SPEEDS.includes(savedSpeed) ? savedSpeed : 10;
-  // Хранилище — внешний вход, поэтому разбор фейл-сейфный: всё непонятное это дефолт.
-  pveDifficulty = parseRunDifficulty(localStorage.getItem('void.pveDifficulty'));
   showConnect(false);
   setupEl.style.display = 'flex';
   $('setup-start').style.display = '';
@@ -10893,6 +10915,7 @@ topEl.addEventListener('click', (ev) => {
 });
 
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
+  sectorRunActive = false;
   mapNeedsPreparation = true;
   // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
   // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
@@ -10979,17 +11002,30 @@ function startMatch(setup: SetupConfig): void {
 
 /** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
 function startPvEMatch(): void {
-  const st = pveState(data);
+  pveDifficulty = nextSectorDifficulty;
+  sectorAttempt = sectorProgress.nextAttempt;
+  saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
+  runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
+  const st = prepareSectorZeroRun(pveState(data), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
   const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
   installMatch(st, aiSeats, pveModeId());
+  sectorRunActive = true;
+  // Seed the PvE section through the kernel before the first save. A page can
+  // close before its first animation frame; that must not lose a fresh attempt.
+  apply(advance(s, s.time + 1));
+  boonLaterAtWave = -1;
   // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
   // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
   applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
-  openSetup('hub'); // close setup screen — returns to hub
+  showConnect(false);
+  showHub(false);
+  setupEl.style.display = 'none';
+  sciWin.classList.remove('show');
+  saveRun();
   note(t('setup.pve.started'));
 }
 
@@ -11100,14 +11136,8 @@ setupSlotsEl.addEventListener('click', (ev) => {
     renderSetup();
     return;
   }
-  if ((ev.target as Element).closest('[data-pvediff]')) {
-    pveDifficulty = nextRunDifficulty(pveDifficulty);
-    localStorage.setItem('void.pveDifficulty', pveDifficulty);
-    renderSetup();
-    return;
-  }
   if ((ev.target as Element).closest('[data-pvestart]')) {
-    startPvEMatch();
+    openSectorZero();
     return;
   }
   const ts = (ev.target as Element).closest('[data-teamseat]');
@@ -11363,6 +11393,7 @@ function netClientFor(seat: string): MultiplayerClient {
 }
 
 function connect(): void {
+  sectorRunActive = false;
   const srv = resolveServer();
   if (!srv) return;
   const { base, nick } = srv;
@@ -11556,6 +11587,7 @@ async function probeAuthMode(base: string): Promise<IdentityMode> {
 // an early tap can't race /auth/status into the guest branch; revealing the form
 // applies to first visits only (a remembered nick skipped the welcome card above).
 const authProbe: Promise<void> = (async () => {
+  if (document.body.dataset.entry === 'sector-zero' && !bootJoinId && !bootReset) return;
   const base = srvInput.value.trim();
   if (!base) return;
   await probeAuthMode(base);
@@ -12561,6 +12593,7 @@ function inMatch(): boolean {
   return (
     connectEl.style.display === 'none' &&
     hubEl.style.display === 'none' &&
+    !sectorZeroMenu.isOpen() &&
     setupEl.style.display === 'none'
   );
 }
@@ -12598,6 +12631,7 @@ const BACK_LAYERS: BackLayer[] = [
   }, // z60
   { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
   { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
+  { id: 'sector-zero', isOpen: () => sectorZeroMenu.canGoBack(), close: () => sectorZeroMenu.back() }, // z58
   // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false
   { id: 'testmode', isOpen: () => flexed('testmode'), close: () => hideFlex('testmode') }, // z59
   { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
@@ -12786,7 +12820,7 @@ function renderBoonPick(): void {
     completed: s.players[ME]?.technologies?.completed ?? [],
   });
   const deferred = offer.kind === 'offer' && boonLaterAtWave === (pve?.waveNumber ?? -1);
-  const show = offer.kind === 'offer' && !deferred;
+  const show = inMatch() && offer.kind === 'offer' && !deferred;
   boonWin.classList.toggle('show', show);
   if (!show) return;
   const cards = offer.choices
@@ -12816,6 +12850,90 @@ function renderBoonPick(): void {
  * ниже не изменится — в этом и была цена асинхронного интерфейса.
  */
 const runSaveStore: RunSaveStore = localRunSaveStore();
+const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY);
+let sectorProgress = freshSectorZeroProgress(data);
+let sectorAttempt = 0;
+let sectorRunActive = false;
+let runShipLoadouts: Record<string, string[]> = {};
+let savedRun: RunSave | null = null;
+let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
+let runWrite = Promise.resolve();
+let progressWrite = sectorProgressStore.load().then(raw => {
+  sectorProgress = parseSectorZeroProgress(raw, data);
+});
+let clearedAttempt = 0;
+
+function saveSectorProgress(next: SectorZeroProgress): void {
+  sectorProgress = next;
+  const blob = JSON.stringify(next);
+  progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
+}
+
+const sectorPreparation = initSectorZeroPreparation({
+  data,
+  progress: () => sectorProgress,
+  change: action => {
+    const next = changeSectorZeroProgress(sectorProgress, action, data);
+    if (!next) return false;
+    saveSectorProgress(next);
+    return true;
+  },
+});
+const sectorZeroMenu = initSectorZeroMenu({
+  root: $('sector-zero'),
+  standalone: document.body.dataset.entry === 'sector-zero',
+  preparation: sectorPreparation,
+  load: async () => {
+    await progressWrite;
+    await runWrite;
+    savedRun = parseRunSave(await runSaveStore.load());
+    // Persistence can be unavailable. A paused run still exists in this tab.
+    if (runInProgress()) savedRun = currentRunSave();
+    if (savedRun && savedRun.mode === pveModeId() && (savedRun.state as GameState).match?.status === 'ended') {
+      const next = settleSectorZeroRun(sectorProgress, savedRun.sectorZeroAttempt ?? 0, savedRun.state as GameState);
+      if (next !== sectorProgress) saveSectorProgress(next);
+      await progressWrite;
+      await runSaveStore.clear();
+      savedRun = null;
+    }
+    return sectorZeroRunPreview(savedRun, pveModeId() ?? '');
+  },
+  difficulty: () => nextSectorDifficulty,
+  setDifficulty: value => {
+    nextSectorDifficulty = value;
+    writeRaw('void.pveDifficulty', value);
+  },
+  start: startPvEMatch,
+  resume: restoreRun,
+  settings: () => settings.open(),
+  back: () => {
+    openHub();
+    $('hub-sector-zero').focus({ preventScroll: true });
+  },
+});
+
+function openSectorZero(preparation = false): void {
+  speed = 0;
+  userClosed = true;
+  if (NET && netSock) netSock.close();
+  NET = false;
+  netAdmitted = false;
+  cameFromLink = false; // explicit local entry after a network visit may resume its own run
+  activeTour?.stop();
+  stopFirstGoals();
+  hideMapLoading();
+  // Close the map's layers before the new screen takes over. Do not route the
+  // setup's Back button through the multiplayer hub on the way here.
+  sectorZeroMenu.hide();
+  setupEl.style.display = 'none';
+  for (const layer of BACK_LAYERS) if (layer.id !== 'setup' && layer.isOpen()) layer.close();
+  showConnect(false);
+  showHub(false);
+  endscreenEl.style.display = 'none';
+  detach('Sector Zero menu', sectorZeroMenu.open().then(() => {
+    if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open();
+  }));
+}
 /** Реальное время последней записи. Снимок пишется НЕ каждый кадр: он весит десятки
  *  килобайт, а забегу хватает секундной точности. */
 let runSavedAtReal = 0;
@@ -12823,62 +12941,98 @@ const RUN_SAVE_EVERY_MS = 4000;
 
 /** Идёт ли сейчас забег, который стоит хранить: PvE-матч, который ещё не кончился. */
 function runInProgress(): boolean {
-  return !NET && s.pve !== undefined && s.match.status !== 'ended';
+  return isSectorZeroRun() && s.match.status !== 'ended';
+}
+function isSectorZeroRun(): boolean {
+  return sectorRunActive && !NET && s.pve !== undefined;
 }
 
 /** Записать снимок (или забыть его, если забег кончился). Провал записи молчалив —
  *  бэкенд обещает не ронять игру, а не обещает сохранить. */
-function saveRun(): void {
-  if (!runInProgress()) return;
+function currentRunSave(): RunSave<GameState> | null {
+  if (!isSectorZeroRun()) return null;
   const mode = matchMode();
-  if (!mode) return;
-  detach(
-    'save run',
-    runSaveStore.save(
-      serializeRunSave({ v: RUN_SAVE_VERSION, mode, difficulty: pveDifficulty, state: s }),
-    ),
-  );
+  if (!mode) return null;
+  return { v: RUN_SAVE_VERSION, mode, difficulty: pveDifficulty, state: s,
+    sectorZeroAttempt: sectorAttempt, shipLoadouts: runShipLoadouts };
+}
+function saveRun(): void {
+  const save = currentRunSave();
+  if (!save || (s.match.status === 'ended' && clearedAttempt === sectorAttempt)) return;
+  const blob = serializeRunSave(save);
+  runWrite = runWrite.then(() => runSaveStore.save(blob));
+}
+
+function awardSectorRun(): number {
+  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s);
+  if (next !== sectorProgress) {
+    // Journal the terminal run before its award. If the page closes between the
+    // two writes, opening the menu settles the same serial exactly once.
+    saveRun();
+    const terminalWrite = runWrite;
+    progressWrite = progressWrite.then(() => terminalWrite);
+    saveSectorProgress(next);
+  }
+  return sectorProgress.lastReward;
 }
 
 /** Кадровый такт сохранения: раз в несколько секунд, пока забег идёт. Кончился —
  *  снимок забывается, иначе следующий запуск воскресил бы доигранный мир. */
 function tickRunSave(nowReal: number): void {
-  if (!NET && s.pve !== undefined && s.match.status === 'ended') {
-    detach('forget run', runSaveStore.clear());
+  if (isSectorZeroRun() && s.match.status === 'ended') {
+    if (sectorAttempt > 0 && clearedAttempt !== sectorAttempt) {
+      awardSectorRun();
+      clearedAttempt = sectorAttempt;
+      const awardWrite = progressWrite;
+      runWrite = runWrite.then(() => awardWrite).then(() => runSaveStore.clear());
+    }
     return;
   }
-  if (!runInProgress() || nowReal - runSavedAtReal < RUN_SAVE_EVERY_MS) return;
+  if (!inMatch() || !runInProgress() || nowReal - runSavedAtReal < RUN_SAVE_EVERY_MS) return;
   runSavedAtReal = nowReal;
   saveRun();
 }
 
 /**
- * Поднять забег из снимка при загрузке страницы. Ничего нет или снимок негоден —
- * `false`, и игра открывается как обычно: «сохранения нет» это не ошибка.
+ * Поднять забег только по кнопке «Продолжить». Чтение карточки сохранения не
+ * устанавливает мир и не запускает часы за главным меню.
  */
-async function restoreRun(): Promise<boolean> {
+function restoreRun(): boolean {
   // Пришедшего ПО ССЫЛКЕ забег не перехватывает: он уже дозванивается в сетевой матч,
   // и поднять поверх этого локальный мир значило бы увести его не туда. Снимок при
   // этом не трогаем — он дождётся обычного запуска.
   if (cameFromLink || NET) return false;
-  const save = parseRunSave(await runSaveStore.load());
-  if (!save) return false;
+  const save = savedRun;
+  if (!save || !sectorZeroRunPreview(save, pveModeId() ?? '')) return false;
   const state = save.state as GameState;
   // Режим из снимка может не существовать в задеплоенных данных (игру обновили) —
   // тогда восстанавливать нельзя: волны пошли бы по другим правилам, а то и не пошли.
   if (!data.modes[save.mode]) {
-    detach('forget run', runSaveStore.clear());
     return false;
   }
+  const priorState = s;
+  const priorMode = matchMode();
+  const priorRunActive = sectorRunActive;
   try {
     const aiSeats = runAiSeats(state, 'p1', parseRunDifficulty(save.difficulty));
     installMatch(state, aiSeats, save.mode);
   } catch {
     // Снимок прошёл разбор, но миром не стал (чужая форма состояния, битая карта).
-    // Забываем его: воскрешать полусобранный мир хуже, чем начать заново.
-    detach('forget run', runSaveStore.clear());
+    // Оставляем файл на месте; меню сообщает об отказе и предлагает новый запуск.
+    s = priorState;
+    setMatchMode(priorMode);
+    sectorRunActive = priorRunActive;
+    speed = 0;
     return false;
   }
+  pveDifficulty = parseRunDifficulty(save.difficulty);
+  sectorRunActive = true;
+  boonLaterAtWave = -1;
+  sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
+  if (sectorProgress.nextAttempt <= sectorAttempt) {
+    saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
+  }
+  runShipLoadouts = save.shipLoadouts ?? {};
   applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST); // тот же темп, что у запуска
   // Экраны, через которые игрок обычно ИДЁТ к матчу, закрываются сами — по дороге.
   // Восстановление в эту дорогу не входит, поэтому закрывает их явно: без этого забег
@@ -12887,6 +13041,7 @@ async function restoreRun(): Promise<boolean> {
   showConnect(false);
   showHub(false);
   setupEl.style.display = 'none';
+  saveRun();
   note(t('setup.pve.restored'));
   return true;
 }
@@ -14117,9 +14272,14 @@ addEventListener('pagehide', saveRun);
 addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveRun();
 });
-// Забег, прерванный перезагрузкой, возвращается сам: это и есть обещание кирпича.
-// Провал — не ошибка, игра просто открывается как обычно.
-detach('restore run', restoreRun());
+// A direct Sector Zero entry always opens home. The shared prototype offers a
+// saved run there too, but never steals an invitation or password-reset link.
+if (!bootJoinId && !bootReset) {
+  if (document.body.dataset.entry === 'sector-zero') openSectorZero();
+  else detach('offer saved run', runSaveStore.load().then(raw => {
+    if (raw && connectShown() && !NET && !sectorZeroMenu.isOpen()) openSectorZero();
+  }));
+}
 
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —

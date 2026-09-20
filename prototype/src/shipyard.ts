@@ -376,6 +376,8 @@ export interface YardHost {
   errText(code: string): string;
   /** The hub Arsenal's cached collection, for the LARS-4 "откуда" tags. */
   arsenalItems(): readonly ArsenalItem[];
+  /** Snapshot of Sector Zero's pre-run set, never a live read of meta progress. */
+  preparedModules?(hull: string): string[] | undefined;
   /** Fired when the window opens — the host shows its just-in-time intro card here. */
   onOpen(): void;
   /** The «Герои» pane, still owned by the host (its own brick). */
@@ -444,7 +446,7 @@ export function initShipyard(host: YardHost): {
     }
     const hull = (tg.closest('.cn-hbtn') as HTMLElement | null)?.dataset.cnhull;
     if (hull) {
-      draft = { ...draft, hull, modules: [] }; // a fresh draft per hull (its slot types differ)
+      draft = { ...draft, hull, modules: host.preparedModules?.(hull) ?? [] };
       paint();
       return;
     }
@@ -492,6 +494,8 @@ export function initShipyard(host: YardHost): {
 
   return {
     open: () => {
+      const prepared = host.preparedModules?.(draft.hull);
+      if (prepared) draft = { ...draft, modules: [...prepared] };
       host.root().classList.add('show');
       paint();
       host.onOpen();

@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 
 const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
+  const classes = new Set();
   const el = {
     id,
     style: { removeProperty(name) { delete this[name]; }, setProperty(name, value) { this[name] = value; }, getPropertyPriority() { return ''; } },
@@ -19,7 +20,13 @@ function mkEl(id) {
       return siblings[siblings.indexOf(this) + 1] ?? null;
     },
     dataset: {},
-    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+    classList: {
+      toggle(name, on) { const value = on ?? !classes.has(name); if (value) classes.add(name); else classes.delete(name); return value; },
+      add(...names) { names.forEach(name => classes.add(name)); },
+      remove(...names) { names.forEach(name => classes.delete(name)); },
+      contains(name) { return classes.has(name); },
+    },
+    focus() { globalThis.document.activeElement = this; },
     _children: [],
     set innerHTML(v) {
       this._html = v;
@@ -123,7 +130,12 @@ globalThis.performance = new Proxy(realPerformance, {
 });
 globalThis.Path2D = class Path2D {};
 // Net-mode reads localStorage for the saved server URL; stub it (no persistence).
-globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+const storage = new Map();
+globalThis.localStorage = {
+  getItem: key => storage.get(key) ?? null,
+  setItem: (key, value) => storage.set(key, String(value)),
+  removeItem: key => storage.delete(key),
+};
 // resize() probes coarse-pointer media to spot phones; the fake DOM is a desktop.
 globalThis.matchMedia = () => ({ matches: false });
 globalThis.getComputedStyle = (el) => ({ display: el.style.display ?? 'block' });
@@ -145,6 +157,18 @@ const rafCbs = [];
 globalThis.requestAnimationFrame = (cb) => {
   rafCbs.push(cb);
   return rafCbs.length;
+};
+const sectorEntry = process.argv.includes('--sector-zero');
+if (sectorEntry) globalThis.document.body.dataset.entry = 'sector-zero';
+getEl('sz-workshop').hidden = true;
+getEl('sz-confirm').hidden = true;
+getEl('sz-weak').dataset.difficulty = 'weak';
+getEl('sz-strong').dataset.difficulty = 'strong';
+const flush = async () => { for (let i = 0; i < 24; i++) await Promise.resolve(); };
+const click = async id => {
+  const el = getEl(id);
+  for (const handle of (listeners.get(el) ?? {}).click ?? []) handle({ target: el });
+  await flush();
 };
 
 // Test-only access to selection; clicks still go through the shipped side-panel delegate.
@@ -193,6 +217,12 @@ console.error = (...args) => {
 };
 const fn = new Function('module', 'exports', 'require', res.outputFiles[0].text);
 fn(mod, mod.exports, () => ({}));
+await flush();
+if (sectorEntry) {
+  assert.equal(getEl('sector-zero').style.display, 'flex', 'direct entry opens Sector Zero home');
+  assert.equal(getEl('connect').style.display, 'none', 'no identity screen on the local entry');
+  assert.equal(getEl('sz-new').disabled, false);
+}
 
 // drive ~40 frames (~0.6s real → with speed 2 ≈ many game hours)
 let frames = 0;
@@ -296,6 +326,70 @@ for (let i = 0; i < 10 && rafCbs.length; i++) {
   frames++;
 }
 
+// Sector Zero's real event handlers: preparation → new run → menu → Continue,
+// preserving the saved world's difficulty and set when next-run choices change.
+await click('hub-sector-zero');
+assert.equal(getEl('sector-zero').style.display, 'flex');
+assert.equal(getEl('hub').style.display, 'none', 'Sector Zero replaces the main hub');
+assert.equal(getEl('setup').style.display, 'none', 'the separate entry skips skirmish setup');
+await click('sz-back');
+assert.equal(getEl('sector-zero').style.display, 'none');
+assert.equal(getEl('hub').style.display, 'flex', 'Back returns to the main hub');
+await click('hub-sector-zero');
+assert.equal(getEl('sz-continue').hidden, true);
+await click('sz-prep');
+const prep = async (kind, id = '') => {
+  const target = { dataset: { prep: kind, id }, disabled: false };
+  for (const handle of (listeners.get(getEl('sz-workshop')) ?? {}).click ?? [])
+    handle({ target: { closest: () => target } });
+  await flush();
+};
+await prep('fit', 'ion_engine');
+assert.deepEqual(JSON.parse(storage.get('sector-zero.progress.v1')).loadouts.cruiser, ['ion_engine']);
+await prep('tab', 'heroes');
+assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="upgrade-hero"'));
+assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="skill"'));
+await prep('back');
+await click('sz-strong');
+await click('sz-new');
+assert.equal(getEl('sector-zero').style.display, 'none');
+assert.equal(getEl('setup').style.display, 'none');
+assert.equal(getEl('scipick').classList.contains('show'), false);
+for (let i = 0; i < 12 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
+await click('tomenu');
+assert.equal(getEl('sz-continue').hidden, false, 'a live run is offered after returning to menu');
+let saved = JSON.parse(storage.get('void.run.v1'));
+assert.equal(saved.difficulty, 'strong');
+assert.deepEqual(saved.shipLoadouts.cruiser, ['ion_engine']);
+assert.equal(Object.values(saved.state.heroes).filter(h => h.owner === 'p1').length, 1);
+const pausedAt = saved.state.time;
+for (let i = 0; i < 12 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
+assert.equal(getEl('boonpick').classList.contains('show'), false);
+await click('sz-weak'); // next attempt only
+await click('sz-new');
+assert.equal(getEl('sz-confirm').hidden, false);
+await click('sz-cancel');
+assert.equal(getEl('sz-confirm').hidden, true);
+await click('sz-prep');
+await prep('tab', 'ships');
+await prep('fit', 'ion_engine');
+await prep('fit', 'cargo_bay');
+await prep('back');
+await click('sz-continue');
+await click('tomenu');
+saved = JSON.parse(storage.get('void.run.v1'));
+assert.equal(saved.difficulty, 'strong', 'Continue keeps the saved difficulty');
+assert.equal(saved.state.time, pausedAt, 'the run does not advance while the menu is open');
+assert.deepEqual(saved.shipLoadouts.cruiser, ['ion_engine'], 'Continue keeps the saved ship set');
+await click('sz-new');
+await click('sz-replace');
+for (let i = 0; i < 4 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
+await click('tomenu');
+saved = JSON.parse(storage.get('void.run.v1'));
+assert.equal(saved.difficulty, 'weak');
+assert.deepEqual(saved.shipLoadouts.cruiser, ['cargo_bay']);
+assert.equal(saved.sectorZeroAttempt, 2);
+assert.equal(JSON.parse(storage.get('sector-zero.progress.v1')).research, 0, 'a menu exit awards nothing');
 assert.equal(frameErrors.length, 0, 'the render loop must not silently recover from a broken frame');
 console.error = printError;
 console.log(
