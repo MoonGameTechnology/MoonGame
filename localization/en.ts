@@ -1126,6 +1126,18 @@ export const en: Record<string, string> = {
   'res.of.microelectronics': 'microelectronics',
 
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
+  'sector-zero.dev.start': 'Dev run',
+  'sector-zero.dev.hint': 'Test attempt: no saving or rewards. Your normal run remains available.',
+  'sandbox.compare': 'Compare units',
+  'sandbox.compare.hint': 'Base stats of one unit from the current catalog, without modules, technology or bonuses.',
+  'sandbox.compare.left': 'First unit',
+  'sandbox.compare.right': 'Second unit',
+  'sandbox.compare.stat': 'Stat',
+  'sandbox.compare.domain': 'Domain',
+  'sandbox.wave': 'Call next wave',
+  'sandbox.wave.done': 'Wave {n} called',
+  'sandbox.wave.unavailable': 'No pending wave',
+  'sandbox.dev.active': 'DEV · no saving or rewards',
   'sandbox.commands': 'Commands',
   'sandbox.end-wars': 'End the war with every faction',
   'sandbox.no-player': 'no player',

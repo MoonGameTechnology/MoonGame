@@ -616,6 +616,7 @@ import { initMetaMarket } from './metaMarketScreen';
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
 // esbuild tree-shakes the whole module out of that bundle.)
 import { initTestMode, openTestMode } from './testmode';
+import { pullNextDevWave } from './sectorZeroDev';
 // SANDBOX — self-contained dev-only single-player "practice tools"; remove this
 // import + the fenced hooks below (setup checkbox, frame enforce/fog, free-build
 // snapshot, initSandbox call) + the #sandbox HTML/CSS to cut it cleanly.
@@ -9564,6 +9565,18 @@ if (!__PLAYER_BUILD__) {
   // opener stays hidden until a match launches with the setup checkbox ticked.
   initSandbox({
     getState: () => s,
+    available: () => !NET && inMatch() && sandboxConfig.enabled,
+    data,
+    waveTools: () => sectorDevActive,
+    nextWave: () => {
+      if (NET || !sectorDevActive || !inMatch()) return false;
+      const next = pullNextDevWave(s);
+      if (!next) return false;
+      const out = advance(next, next.time + 1);
+      if (out.error || out.state.pve?.waveNumber === s.pve?.waveNumber) return false;
+      apply(out);
+      return true;
+    },
     me: () => ME,
     homeId: () => sandboxHomeId,
     note: (msg) => note(msg),
@@ -10821,6 +10834,7 @@ topEl.addEventListener('click', (ev) => {
 
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
   sectorRunActive = false;
+  sectorDevActive = false;
   mapNeedsPreparation = true;
   // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
   // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
@@ -10907,10 +10921,12 @@ function startMatch(setup: SetupConfig): void {
 }
 
 /** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
-function startPvEMatch(): void {
+function startPvEMatch(dev = false): void {
+  const testing = !__PLAYER_BUILD__ && dev;
+  saveRun(); // preserve a paused normal attempt before replacing the in-memory world
   pveDifficulty = nextSectorDifficulty;
-  sectorAttempt = sectorProgress.nextAttempt;
-  saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
+  sectorAttempt = testing ? 0 : sectorProgress.nextAttempt;
+  if (!testing) saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
   const st = prepareSectorZeroRun(pveState(data), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
@@ -10920,6 +10936,14 @@ function startPvEMatch(): void {
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
   installMatch(st, aiSeats, pveModeId());
   sectorRunActive = true;
+  sectorDevActive = testing;
+  if (!__PLAYER_BUILD__ && testing) {
+    resetSandboxConfig();
+    sandboxConfig.enabled = true;
+    sandboxHomeId = Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null;
+    setSandboxButton(true);
+    setDevSpeedControl(true);
+  }
   // Seed the PvE section through the kernel before the first save. A page can
   // close before its first animation frame; that must not lose a fresh attempt.
   apply(advance(s, s.time + 1));
@@ -12761,6 +12785,7 @@ const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY);
 let sectorProgress = freshSectorZeroProgress(data);
 let sectorAttempt = 0;
 let sectorRunActive = false;
+let sectorDevActive = false;
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
@@ -12795,7 +12820,7 @@ const sectorZeroMenu = initSectorZeroMenu({
     await runWrite;
     savedRun = parseRunSave(await runSaveStore.load());
     // Persistence can be unavailable. A paused run still exists in this tab.
-    if (runInProgress()) savedRun = currentRunSave();
+    if (runInProgress() && !sectorDevActive) savedRun = currentRunSave();
     if (savedRun && savedRun.mode === pveModeId() && (savedRun.state as GameState).match?.status === 'ended') {
       const next = settleSectorZeroRun(sectorProgress, savedRun.sectorZeroAttempt ?? 0, savedRun.state as GameState);
       if (next !== sectorProgress) saveSectorProgress(next);
@@ -12810,7 +12835,8 @@ const sectorZeroMenu = initSectorZeroMenu({
     nextSectorDifficulty = value;
     writeRaw('void.pveDifficulty', value);
   },
-  start: startPvEMatch,
+  start: () => startPvEMatch(),
+  startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
   resume: restoreRun,
   settings: () => settings.open(),
   back: () => {
@@ -12857,7 +12883,7 @@ function isSectorZeroRun(): boolean {
 /** Записать снимок (или забыть его, если забег кончился). Провал записи молчалив —
  *  бэкенд обещает не ронять игру, а не обещает сохранить. */
 function currentRunSave(): RunSave<GameState> | null {
-  if (!isSectorZeroRun()) return null;
+  if (!isSectorZeroRun() || sectorDevActive) return null;
   const mode = matchMode();
   if (!mode) return null;
   return { v: RUN_SAVE_VERSION, mode, difficulty: pveDifficulty, state: s,
@@ -12871,6 +12897,7 @@ function saveRun(): void {
 }
 
 function awardSectorRun(): number {
+  if (sectorDevActive) return 0;
   const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s);
   if (next !== sectorProgress) {
     // Journal the terminal run before its award. If the page closes between the
@@ -12886,6 +12913,7 @@ function awardSectorRun(): number {
 /** Кадровый такт сохранения: раз в несколько секунд, пока забег идёт. Кончился —
  *  снимок забывается, иначе следующий запуск воскресил бы доигранный мир. */
 function tickRunSave(nowReal: number): void {
+  if (sectorDevActive) return;
   if (isSectorZeroRun() && s.match.status === 'ended') {
     if (sectorAttempt > 0 && clearedAttempt !== sectorAttempt) {
       awardSectorRun();
@@ -12920,6 +12948,7 @@ function restoreRun(): boolean {
   const priorState = s;
   const priorMode = matchMode();
   const priorRunActive = sectorRunActive;
+  const priorDevActive = sectorDevActive;
   try {
     const aiSeats = runAiSeats(state, 'p1', parseRunDifficulty(save.difficulty));
     installMatch(state, aiSeats, save.mode);
@@ -12929,6 +12958,7 @@ function restoreRun(): boolean {
     s = priorState;
     setMatchMode(priorMode);
     sectorRunActive = priorRunActive;
+    sectorDevActive = priorDevActive;
     speed = 0;
     return false;
   }
@@ -13053,6 +13083,7 @@ function frame(nowReal: number) {
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
     waveHtml +
+    (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (s.pve ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {

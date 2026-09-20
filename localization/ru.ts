@@ -1129,6 +1129,18 @@ export const ru: Record<string, string> = {
   'res.of.microelectronics': 'микроэлектроники',
 
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
+  'sector-zero.dev.start': 'Dev-забег',
+  'sector-zero.dev.hint': 'Тестовая попытка: без сохранения и наград. Обычный забег останется доступен.',
+  'sandbox.compare': 'Сравнение юнитов',
+  'sandbox.compare.hint': 'Базовые характеристики одной единицы из текущего каталога, без модулей, технологий и бонусов.',
+  'sandbox.compare.left': 'Первый юнит',
+  'sandbox.compare.right': 'Второй юнит',
+  'sandbox.compare.stat': 'Параметр',
+  'sandbox.compare.domain': 'Среда',
+  'sandbox.wave': 'Вызвать следующую волну',
+  'sandbox.wave.done': 'Волна {n} вызвана',
+  'sandbox.wave.unavailable': 'Нет ожидающей волны',
+  'sandbox.dev.active': 'DEV · без сохранения и наград',
   'sandbox.commands': 'Команды',
   'sandbox.end-wars': 'Прекратить войну со всеми фракциями',
   'sandbox.no-player': 'нет игрока',

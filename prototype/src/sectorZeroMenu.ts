@@ -14,6 +14,7 @@ export interface SectorZeroMenuHooks {
   difficulty(): RunDifficulty;
   setDifficulty(value: RunDifficulty): void;
   start(): void;
+  startDev?: () => void;
   resume(): boolean;
   settings(): void;
   back(): void;
@@ -37,6 +38,8 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     continueButton.hidden = !preview;
     continueButton.disabled = loading;
     newButton.disabled = loading;
+    const devButton = el<HTMLButtonElement>('sz-dev');
+    if (devButton) { devButton.disabled = loading; devButton.hidden = !h.startDev; }
     el<HTMLButtonElement>('sz-prep').disabled = loading;
     newButton.classList.toggle('sz-primary', !preview);
     el('sz-save-label').textContent = t(preview ? 'sector-zero.saved' : 'sector-zero.offline');
@@ -96,6 +99,11 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     actions.hidden = true;
     confirmation.hidden = false;
     el('sz-cancel').focus({ preventScroll: true });
+  });
+  el('sz-dev')?.addEventListener('click', () => {
+    if (loading || !h.startDev) return;
+    hide();
+    h.startDev();
   });
   el('sz-cancel').addEventListener('click', cancel);
   el('sz-replace').addEventListener('click', () => {
