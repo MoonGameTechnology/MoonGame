@@ -110,6 +110,12 @@
 | `docs/explanations/06-pve-wave-spawn-via-schedule.md` | 06. Спавн волн через schedule(), тактика NPC — нет | Дата: 2026-08-18 |
 | `docs/explanations/README.md` | docs/explanations/ — библиотека решений (ADR) | Architecture Decision Records: почему так, а не иначе. Не что делает код (это в |
 
+## docs/research/
+
+| Документ | Заголовок | Про что |
+| --- | --- | --- |
+| `docs/research/2026-09-18-development-methods-research.md` | Void Dominion / Sector Zero — исследование методов разработки | Дата проверки источников: 18 сентября 2026 года. |
+
 ## docs/reviews/
 
 | Документ | Заголовок | Про что |
