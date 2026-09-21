@@ -273,6 +273,7 @@ import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
 import { createWebPlatform } from './platform/web';
+import { advanceShopDay, localShopDay } from '../../decisions/sectorZeroShop';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
@@ -12933,10 +12934,20 @@ function saveSectorProgress(next: SectorZeroProgress): void {
 // нельзя: это ровно «обещать механику, которой у него не будет».
 const platform = createWebPlatform({ simulate: !__PLAYER_BUILD__ });
 
+// Витрина магазина ротируется посуточно (`SZE-3.2`). Единственные часы у офлайнового
+// клиента — часы игрока, поэтому номер дня МОНОТОНЕН: `advanceShopDay` никогда его не
+// уменьшает. Часы назад не откатывают витрину, часы вперёд двигают её навсегда и сжигают
+// промотанные дни вместе с товаром — накрутка наказывает сама себя.
+function syncShopDay(): void {
+  const next = advanceShopDay(sectorProgress, localShopDay(Date.now()));
+  if (next !== sectorProgress) saveSectorProgress(next);
+}
+
 const sectorPreparation = initSectorZeroPreparation({
   data,
   // Решения UI принимаются по capability, а не по имени площадки (`platform-adapters.md`).
   platform: { sovereigns: platform.capabilities.iap, ads: platform.capabilities.rewardedAds },
+  sync: syncShopDay,
   watchAd: async placement => {
     platform.analytics.emit('rewarded_ad_offered', { placement });
     const shown = await platform.ads.showRewardedAd({ placement });

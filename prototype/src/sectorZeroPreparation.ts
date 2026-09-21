@@ -31,6 +31,9 @@ interface PreparationHost {
    *  досмотрел. Награду выдаёт игра и только после этого (`platform-adapters.md`), поэтому
    *  покупка за рекламу идёт двумя шагами, а не одним. */
   watchAd(placement: string): Promise<boolean>;
+  /** Свериться с календарём перед показом экрана: витрина магазина ротируется посуточно
+   *  (`SZE-3.2`). Часы живут у хозяина — `decisions/` обязаны оставаться чистыми. */
+  sync(): void;
   progress(): SectorZeroProgress;
   change(action: SectorProgressAction): boolean;
 }
@@ -308,6 +311,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
   });
   return {
     open: (): void => {
+      h.sync();
       heroId = h.progress().selectedHero;
       message = '';
       home.hidden = true;
