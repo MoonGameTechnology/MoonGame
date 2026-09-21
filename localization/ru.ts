@@ -859,6 +859,7 @@ export const ru: Record<string, string> = {
   'data.targeting-array': 'Система наведения',
   'data.tax-office': 'Налоговая управа',
   'data.terran': 'Земной',
+  'data.intercept-veil': 'Перехватывающий покров',
   'data.the-swarm': 'Рой',
   'data.vanguard-coalition': 'Коалиция авангарда',
   'data.vanguard-impulse': 'Импульс авангарда',
@@ -1366,6 +1367,12 @@ export const ru: Record<string, string> = {
   'err.no-dock': 'чинятся только у своего дока',
   'err.no-effect': 'эффект ещё не реализован',
   'err.no-fitting': 'неизвестный фиттинг',
+  'err.adapt-busy': 'Рой уже растит другой ответ',
+  'err.adapt-maxed': 'лестница модуля пройдена',
+  'err.no-adaptation': 'этот модуль ответом не является',
+  'err.no-organ': 'нет живого органа выращивания',
+  'err.no-signal': 'боевого опыта ещё недостаточно',
+  'err.not-swarm': 'формы Роя заказывает только Рой',
   'err.no-fleet': 'флот не найден',
   'err.no-fuel': 'нет топлива',
   'err.no-funds': 'не хватает средств',
@@ -2360,6 +2367,8 @@ export const ru: Record<string, string> = {
   'steward.stance.defense.note':
     'Поза «Оборона»: держит и отбивает, застраивает очередь, торгует — без наступлений и дипломатии. Управление вернётся автоматически, с утренней сводкой.',
   'steward.take-back': 'Вернуть управление',
+
+  'swarm.veil.desc': 'Живой покров перехвата: гасит часть ударных машин вокруг сопровождаемой группы.',
 
   // --- tech — Дерево технологий: названия веток.
   'tech.branch.command': 'Командование',

@@ -972,7 +972,7 @@
 | SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:449` | Ассортимент |
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md:481` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md:490` | Уровень у модуля Роя |
-| SZE-4.2 | 🔒 | core | `docs/sector-zero-economy-roadmap.md:532` | Контригра против уровня |
+| SZE-4.2 | ⏳ | core | `docs/sector-zero-economy-roadmap.md:532` | Контригра против уровня |
 | PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1211` | Карта pve-1 снова строится |
 | PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1242` | pveModule в ядре прототипа |
 | PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1269` | Сохранение: сперва мета, потом забег |
@@ -991,9 +991,9 @@
 | PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1837` | Награда за забег |
 | PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1862` | Резолюция: что из §3 входит в первую версию |
 | PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md:1880` | Память Роя как состояние |
-| PVR-4.3 | ⏳ | core data | `docs/sector-zero-roadmap.md:1917` | Одна читаемая адаптация от сигнала до формы |
-| PVR-4.4 | ⏳ | data | `docs/sector-zero-roadmap.md:1925` | Структуры первого набора |
-| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:1933` | Журнал адаптаций |
+| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md:1917` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | ⏳ | data | `docs/sector-zero-roadmap.md:1959` | Структуры первого набора |
+| PVR-4.5 | ⏳ | proto | `docs/sector-zero-roadmap.md:1967` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |

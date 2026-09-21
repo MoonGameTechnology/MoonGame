@@ -459,6 +459,7 @@ export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
 export { pveModule } from './modules/pve';
 export { swarmMemoryModule, recalled, STRIKE_KIND } from './modules/swarmMemory';
+export { swarmAdaptModule, swarmModuleLevel, MIN_SIGNAL } from './modules/swarmAdapt';
 export { fleetBroodModule } from './modules/fleetBrood';
 export {
   taxModule,
