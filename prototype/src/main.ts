@@ -101,7 +101,6 @@ import {
   unitSizeClass,
 } from './unitGlyphs';
 import { drawShipShape } from '../../packages/client/src/shipShapes';
-import { catalogPortraitHtml } from './shipArt';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName } from './planetName';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
@@ -174,7 +173,6 @@ import {
   type MultiplayerPing,
   type MultiplayerChatMessage,
   createBattleModel,
-  type BattleSideView,
 } from '../../packages/client/src/index';
 import { pveState, pveModeId } from '../../packages/client/src/gameData';
 import {
@@ -231,14 +229,7 @@ import {
 } from './squadronPanel';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
-import {
-  builtTileHtml,
-  catalogRowHtml,
-  catalogTileHtml,
-  tileLock,
-  type CatalogShape,
-  type TileLock,
-} from './catalogTile';
+import { builtTileHtml, tileLock, type TileLock } from './catalogTile';
 import {
   anyToken,
   clearSession,
@@ -461,7 +452,6 @@ import {
   TECH_CUR,
   resLine,
   cost,
-  costText,
   displayUnit,
   buildingName,
   fmtEta,
@@ -510,7 +500,7 @@ import {
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel, techFx } from './techTree';
-import { initBuildScreen } from './buildScreen';
+import { initBuildScreen, type UnitCatalogTab } from './buildScreen';
 import { initSciPick, sciCouncilRowHtml } from './sciPick';
 import { initPasswordReset } from './passwordReset';
 import { initEndScreen, type MatchEnd } from './endScreen';
@@ -606,7 +596,7 @@ import {
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
 import { initBattleWindow } from './battleScreen';
-import { battleAtTap } from '../../decisions/battleTap';
+import { battleAtTap, battleBadgePoint } from '../../decisions/battleTap';
 import {
   initSteward,
   stewFmtDur,
@@ -2039,6 +2029,16 @@ function battleAnchor(b: Battle): { x: number; y: number } | null {
     .filter((f) => f.battleId === b.id)
     .map((f) => fleetPos(f));
   return clashPoint(fighting, s.planets[b.location]?.position ?? null);
+}
+
+/** Последняя секунда перед раундом: кольцо значка стягивается к центру (эффект
+ *  `drawHolographicBattle`). Считается ИЗ состояния, без своей памяти о кадрах, —
+ *  поэтому вспышка не может разъехаться с тем же отсчётом в подписи и в окне боя. */
+const ROUND_FLASH_MS = 1200;
+function roundFlash(b: Battle): number {
+  if (typeof b.nextRoundAt !== 'number') return 0;
+  const left = b.nextRoundAt - s.time;
+  return left > 0 && left < ROUND_FLASH_MS ? 1 - left / ROUND_FLASH_MS : 0;
 }
 
 /** The fleets the command bar / move order currently act on (mine only). */
@@ -4749,10 +4749,22 @@ function render(now: number) {
       nextRoundAt: roundAt,
     });
     if (mark.do !== 'draw' || !anchor) continue;
-    const c = world(anchor);
+    // Значок висит НАД точкой схватки (`battleBadgePoint`) — одна точка на рисование и
+    // на тап: кольцо поверх самих кораблей воровало бы у них тап, а разъехавшись с
+    // целью тапа, оно отправляло бы палец мимо того, что видно.
+    const c = battleBadgePoint(world(anchor));
     if (!visible(c, 120)) continue;
     if (holographicMapOn())
-      drawHolographicBattle(cx, c.x, c.y, hologramTime, b.phase ?? 'orbital', glowOn());
+      drawHolographicBattle(
+        cx,
+        c.x,
+        c.y,
+        hologramTime,
+        b.phase ?? 'orbital',
+        glowOn(),
+        detail,
+        roundFlash(b),
+      );
     else drawBattlePulse(c.x, c.y, wave, b.phase);
     if (mark.timer) {
       // `mark.timer` истинно только при назначенном раунде — отсюда и `!` ниже.
@@ -5550,6 +5562,19 @@ function cardHeader(color: string, title: string, sub: string, titleAct?: string
     ...(titleAct ? { titleAct } : {}),
   });
 }
+/**
+ * Осмотр объекта: краткая карточка слева, ОДНА подробная секция справа.
+ *
+ * Прежде подробности ВЫТЕСНЯЛИ карточку: тап по имени убирал и состав, и кнопки, и
+ * игрок читал сводку, потеряв из виду то, о чём она. Обе половины живут рядом, поэтому
+ * приказ остаётся под рукой, пока читаешь цифры. Пустая `detail` — обычная карточка без
+ * обёрток: сетка (`#side.details-open`) нужна только когда справа правда что-то есть.
+ */
+function objectPanelHtml(brief: string, detail: string): string {
+  return detail
+    ? `<div class="object-brief">${brief}</div><div class="object-detail">${detail}</div>`
+    : brief;
+}
 function tabButton(tab: PlanetTab, label: string, count: number, desc?: string): string {
   return kitTabButton(tab, label, count, planetTab === tab, desc);
 }
@@ -5785,41 +5810,20 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
     },
   );
 }
-// Buildable options as codex tiles (icon + cost). Tapping a tile opens the full-info
-// panel, which carries a "Build here" button for the selected province — so browsing
-// specs and committing the build share one control (no separate text button row).
-function buildButtons(
-  _planetId: string,
-  ids: string[],
-  kind: 'building' | 'unit',
-  as: CatalogShape = 'tile',
-): string {
-  const k = kind === 'unit' ? 'u' : 'b';
-  const tiles = ids
-    .map((id) =>
-      codexTile(
-        k,
-        id,
-        costText(kind === 'unit' ? data.units[id]?.cost : data.buildings[id]?.cost),
-        true,
-        // Buildings are one-per-planet by default (`maxPerPlanet`, RULES-2) — grey out a
-        // committed (queued/building/paused)
-        // one so a second order can't be placed. On EVERY layout and in net play too:
-        // условие `pcUi() && !NET` оставляло плитку кликабельной на телефоне и на
-        // сервере, и налоговую управу можно было заказать дважды (живой плейтест).
-        // buildingLocked читает p.buildings + scheduled + pausedConstruction — всё это
-        // есть и в сетевых снапшотах. Units stack freely so they're never locked.
-        kind === 'building' ? (buildingLocked(_planetId, id) ?? undefined) : undefined,
-        as,
-      ),
-    )
-    .join('');
-  if (!tiles) return '';
-  // Столбик строк живёт в том же `blist`, что и список построенного: на телефоне у
-  // каталога и у состава одна ширина колонки, и разъехаться им нечем.
-  return as === 'row' ? `<div class="blist">${tiles}</div>` : `<div class="ptiles">${tiles}</div>`;
+/**
+ * Вход в каталог ЮНИТОВ — той же кнопкой, какой BUILD-1 увёл в окно каталог зданий:
+ * «плитки непостроенного ушли; вместо них одна кнопка, только там, где строить можно».
+ * Юнитные вкладки жили по старому правилу и держали в панели вторую вёрстку списка,
+ * цены и срока — ту самую, что окно уже умеет.
+ *
+ * Кнопки нет там, где вкладке нечего предложить (CMD-VIS: нет приказа — нет кнопки):
+ * пустой ростер на этом мире — не повод обещать окно, в котором будет пусто.
+ */
+function unitCatalogButton(tab: UnitCatalogTab): string {
+  return buildRoster(tab, BUILD_UNITS, data).length
+    ? `<button class="bw-open" data-act="openunits" data-arg="${tab}">▣ ${t('production.units')}</button>`
+    : '';
 }
-
 /** Side-panel: the multi-fleet TASK-GROUP card (Shift-frame selection). */
 function taskGroupPanelHtml(group: Fleet[]): string {
   const totals = groupTotals(group);
@@ -5926,7 +5930,7 @@ function fleetSummaryHtml(f: Fleet): string {
   const up = resLine(sm.upkeep, { per: 'd' });
   if (up) rows.push(`<div class="row dim">${t('side.summary.upkeep')}: ${up}</div>`);
   return (
-    `<div class="sec">${t('side.summary.title')}</div>` +
+    `<div class="sec detail-head">${t('side.summary.title')}</div>` +
     rows.join('') +
     `<div class="row">${btn('summaryback', '', t('side.summary.back'), true)}</div>`
   );
@@ -5987,8 +5991,9 @@ function fleetPanelHtml(f: Fleet): string {
       (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : ''),
     'fleetinfo',
   );
-  // Тап по имени открыл сводку армии — карточка целиком уступает ей место.
-  if (fleetInfoFor === f.id) return h + fleetSummaryHtml(f);
+  // Тап по имени открыл сводку армии — она встаёт РЯДОМ с карточкой (`objectPanelHtml`),
+  // а не вместо неё.
+  const detail = fleetInfoFor === f.id ? fleetSummaryHtml(f) : '';
   // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
   // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
   // (цены — те же формулы, что в гейте).
@@ -6077,7 +6082,10 @@ function fleetPanelHtml(f: Fleet): string {
   // Постоянная сводка здесь показывала «Назад» без карточки, к которой можно вернуться.
   // Осмотр заканчивается ДО приказов: этот флот не попадает в набор управления.
   if (f.owner !== ME)
-    return h + `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>`;
+    return objectPanelHtml(
+      h + `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>`,
+      detail,
+    );
 
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
@@ -6140,36 +6148,12 @@ function fleetPanelHtml(f: Fleet): string {
   // выглядит как «ничего не произошло», а прогноз пустого боя читается как расклад.
   const docked = fleetDocked(!!here, !!f.movement, !!f.battleId);
   if (f.battleId) {
-    // The battle card (framework-agnostic view-model from @void/client): both
-    // sides, hull bars, phase, live round countdown — and the one action, retreat.
-    const bm = createBattleModel(s, f.battleId, ME, data);
-    if (bm.ok) {
-      const bar = (v: { current: number; max: number } | undefined, glyph: string): string =>
-        v && v.max > 0 ? ` · ${glyph} ${kfmt(v.current)}/${kfmt(v.max)}` : '';
-      const sideRow = (sv: BattleSideView, tag: string): string => {
-        const troops = sv.units.map((u) => `${u.count}× ${u.unit}`).join(', ') || '—';
-        return `<div class="row${sv.mine ? '' : ' dim'}">${sv.mine ? '▶' : '·'} <b>${esc(sv.ownerName)}</b> (${tag}, ${
-          sv.kind === 'garrison'
-            ? t('side.battle.side.garrison')
-            : sv.kind === 'landing'
-              ? t('side.battle.side.landing')
-              : t('side.battle.side.fleet')
-        }): ${esc(troops)}${bar(sv.hull, '♥')}${bar(sv.shield, '◈')}</div>`;
-      };
-      h += `<div class="sec">${t('side.battle.title', { phase: bm.phase === 'ground' ? t('side.battle.phase.ground') : t('side.battle.phase.orbit'), r: bm.round })}</div>`;
-      // MSB-6: строка на КАЖДУЮ сторону, роль берётся у самой стороны. На дуэли список
-      // ровно `[атакующий, обороняющийся]`, поэтому двусторонний бой выглядит как
-      // выглядел; на пяти сторонах появляются пять строк вместо двух.
-      h += bm.sides
-        .map((sv) =>
-          sideRow(sv, t(sv.role === 'attacker' ? 'side.battle.attacker' : 'side.battle.defender')),
-        )
-        .join('');
-      if (bm.nextRoundAt != null)
-        h += `<div class="row">${t('side.battle.next-round')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
-      h += `<div class="row">${btn('retreat', '', t('side.battle.retreat'), bm.retreatFleetId === f.id)}</div>`;
-      h += `<div class="hint">${t('side.battle.retreat.hint')}</div>`;
-    }
+    // Карточка боя переехала в ОКНО (`battleScreen.ts`): там те же стороны, полосы
+    // корпуса, фаза, отсчёт раунда и отступление, но во весь экран и с доступом к
+    // ЧУЖОМУ бою — значок на карте открывает то же окно. Панель поэтому не дублирует
+    // расклад, а ведёт к нему одной кнопкой: две копии одного расклада неизбежно
+    // разъехались бы, и расходиться они стали бы молча.
+    h += `<div class="row">${btn('openbattle', f.battleId, t('battle.win.open'), true)}</div>`;
   }
   if (docked) {
     // enemy/neutral world you can act on — empty space is pass-through only
@@ -6253,7 +6237,7 @@ function fleetPanelHtml(f: Fleet): string {
     }
     h += pcols(cols);
   }
-  return h;
+  return objectPanelHtml(h, detail);
 }
 
 /** Side-panel: a world outside sensor coverage — last-scan memory, or no telemetry. */
@@ -6352,7 +6336,7 @@ function planetSummaryHtml(p: Planet): string {
       `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b></div>`,
     );
   return (
-    `<div class="sec">${t('side.world.summary')}</div>` +
+    `<div class="sec detail-head">${t('side.world.summary')}</div>` +
     rows.join('') +
     `<div class="row">${btn('summaryback', '', t('side.summary.back'), true)}</div>`
   );
@@ -6380,8 +6364,8 @@ function planetPanelHtml(p: Planet): string {
     `${esc(p.id)} · ${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
     'planetinfo',
   );
-  // Тап по имени открыл сводку мира — панель целиком уступает ей место.
-  if (planetInfoFor === p.id) return header + planetSummaryHtml(p);
+  // Тап по имени открыл сводку мира — она встаёт РЯДОМ с панелью (`objectPanelHtml`).
+  const detail = planetInfoFor === p.id ? planetSummaryHtml(p) : '';
   let h =
     header +
     `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
@@ -6469,11 +6453,10 @@ function planetPanelHtml(p: Planet): string {
         unitRows(ground),
     );
     if (mine) {
-      const groundBuilds = buildRoster('ground', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.ground.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
-          buildButtons(p.id, groundBuilds, 'unit'),
+          unitCatalogButton('ground'),
       );
     }
     if (!pcUi()) {
@@ -6497,15 +6480,10 @@ function planetPanelHtml(p: Planet): string {
       cols.push(orbit);
     }
     if (mine) {
-      const shipBuilds = buildRoster('ships', BUILD_UNITS, data);
-      // Каталог заказа — СТРОКАМИ, как состав над ним и как список зданий (заказ
-      // владельца). Сетка плиток давала одну иконку и цену: что за корабль под глифом,
-      // игрок узнавал только тапнув, а состав рядом уже называл те же корабли по имени —
-      // одна вкладка говорила о своём ростере на двух языках.
       cols.push(
         `<div class="sec">${t('side.shipyard.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
-          buildButtons(p.id, shipBuilds, 'unit', 'row'),
+          unitCatalogButton('ships'),
       );
     }
     if (!pcUi()) {
@@ -6544,11 +6522,10 @@ function planetPanelHtml(p: Planet): string {
         `<div class="row dim">${t('side.wing.no-port')}</div>`);
     }
     if (mine) {
-      const wingBuilds = buildRoster('shuttle', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.wing.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
-          buildButtons(p.id, wingBuilds, 'unit', 'row'), // строками — см. вкладку ФЛОТ
+          unitCatalogButton('shuttle'),
       );
     }
     if (!pcUi()) {
@@ -6611,7 +6588,7 @@ function planetPanelHtml(p: Planet): string {
     }
     cols.push(blds);
   }
-  return h + pcols(cols);
+  return objectPanelHtml(h + pcols(cols), detail);
 }
 
 /** The side-panel dispatcher: task group → single fleet → unknown world → known world. */
@@ -7197,29 +7174,6 @@ function incomeOf(type: string, level: number): string {
   const def = data.buildings[type];
   return def ? resLine(buildingLevel(def, level).produces, { per: 'h' }) : '';
 }
-function codexTile(
-  kind: 'b' | 'u',
-  id: string,
-  label: string,
-  orderable = false,
-  lockedFor?: TileLock,
-  as: CatalogShape = 'tile',
-): string {
-  if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
-  // Разметку плитки собирает `catalogTile.ts` (REFM-42) — там же правило «запертая
-  // теряет ОБА якоря заказа, оставляя досье» и обе подачи одного каталога.
-  const v = {
-    kind,
-    id,
-    icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor, 22, s.players[ME]?.faction),
-    art: catalogPortraitHtml(kind, id, data, 'thumb'),
-    name: kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id),
-    label,
-    orderable,
-    lock: lockedFor ?? null,
-  };
-  return as === 'row' ? catalogRowHtml(v) : catalogTileHtml(v);
-}
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
 function openCodex(key: string): void {
@@ -7534,9 +7488,14 @@ function renderPanel() {
     // открытии кэш скажет «уже нарисовано», а DOM пуст, и лист откроется пустым.
     ({ panel: lastPanelHtml, objDesc: lastObjDescHtml } = FORGOTTEN);
     hoverObj = null;
+    side.classList.remove('details-open');
     return;
   }
   const html = panelHtml();
+  // Раскрытая секция подробностей — это ШИРИНА листа (две колонки в `#side.details-open`),
+  // а не только его содержимое. Класс снимается с самой разметки, а не со второго флага:
+  // `fleetInfoFor`/`planetInfoFor` могут указывать на объект, которого в панели уже нет.
+  side.classList.toggle('details-open', html.includes('class="object-detail"'));
   if (panelChanged(html, lastPanelHtml)) {
     // Scrollable content on the left, a fixed dossier pane glued to the right edge
     // (filling the panel's empty space — see #side / .pdesc CSS). Re-rendering the
@@ -8151,6 +8110,11 @@ side.addEventListener('click', (ev) => {
     }
   } else if (act === 'openbuild') {
     buildWin.open(selPlanet!);
+  } else if (act === 'openunits') {
+    // Вкладка панели и вкладка окна — одно и то же слово, но пришло оно из разметки:
+    // сужаем строку до ростера, который окно умеет показывать.
+    if (selPlanet && (arg === 'ground' || arg === 'ships' || arg === 'shuttle'))
+      buildWin.open(selPlanet, arg);
   } else if (act === 'fortress') {
     playerOrder(deployStation(ME, selPlanet!));
   } else if (act === 'build') {
@@ -8253,6 +8217,8 @@ side.addEventListener('click', (ev) => {
     playerOrder(bombardFleet(ME, selFleet!, arg === 'on'));
   } else if (act === 'assault') {
     playerOrder(assaultFleet(ME, selFleet!));
+  } else if (act === 'openbattle') {
+    if (arg) battleWindow.open(arg);
   } else if (act === 'retreat') {
     playerOrder(retreatFleet(ME, selFleet!));
   } else if (act === 'instantrepair') {
@@ -8870,6 +8836,28 @@ function selectAt(mx: number, my: number) {
       return;
     }
   }
+  // ЗНАЧОК БОЯ (`decisions/battleTap.ts`) — у него своя цель над точкой схватки, и тап
+  // он берёт РАНЬШЕ выбора объекта. Прежде он стоял последним, «под ним ничего нет», —
+  // и не срабатывал никогда: запасной выбор по площади провинции накрывает почти всю
+  // карту, поэтому «под пальцем пусто» не случалось. Вооружённый приказ по-прежнему
+  // важнее: разбор боя не стоит потерянного хода.
+  const battleHit = battleAtTap(
+    Object.values(s.battles).map((b) => {
+      const anchor = battleAnchor(b);
+      return {
+        id: b.id,
+        at: anchor ? battleBadgePoint(world(anchor)) : null,
+        identified: known(b.location),
+      };
+    }),
+    { x: mx, y: my },
+    tapByTouch,
+    owner === 'move',
+  );
+  if (battleHit) {
+    battleWindow.open(battleHit);
+    return;
+  }
   // Move armed → send the selected fleet(s) to the tapped world (or the nearest lane
   // point if no world is hit). A route crossing a player you're at peace with stages a
   // war prompt instead of dispatching.
@@ -8916,27 +8904,6 @@ function selectAt(mx: number, my: number) {
     my,
     rFleet,
   );
-  // ЗНАЧОК БОЯ забирает тап ПОСЛЕДНИМ (`decisions/battleTap.ts`): по кораблю и по миру
-  // тапают, чтобы отдать приказ, и отнять у них тап значило бы менять разбор боя на
-  // потерянный ход. Поэтому сюда приходит только тап, под которым больше ничего нет, —
-  // и тогда кольцо, которое и так показывает фазу и отсчёт, открывает окно с раскладом.
-  const battleHit = battleAtTap(
-    Object.values(s.battles).map((b) => {
-      const anchor = battleAnchor(b);
-      return {
-        id: b.id,
-        at: anchor ? world(anchor) : null,
-        identified: known(b.location),
-      };
-    }),
-    { x: mx, y: my },
-    tapByTouch,
-    fleetIds.length > 0 || n !== null,
-  );
-  if (battleHit) {
-    battleWindow.open(battleHit);
-    return;
-  }
   // Что следует из выбора — `pickApply.ts` (REFM-166): пустой тап это «отменить», и он
   // гасит НЕ только выделение, но и незавершённые намерения (слияние, деление, десант) —
   // иначе они применились бы к следующему выбранному флоту, молча. Выбор мира гасит
@@ -9405,6 +9372,12 @@ const buildWin = initBuildScreen({
   localQueued: (pid, id) =>
     coreQueue(pid, 'buildings').some((q) => q.building === id),
   build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
+  // Юнитные вкладки окна стройки (BUILD-2): тот же путь, которым их строила боковая
+  // панель, — ростер по вкладке, заказ через ту же очередь, карточка через тот же кодекс.
+  // Новой логики здесь нет и быть не должно: окно переехало, правила остались.
+  unitIds: (tab) => buildRoster(tab, BUILD_UNITS, data),
+  buildUnit: (pid, id) => enqueueBuild(pid, { kind: 'unit', id, count: 1 }),
+  openUnitInfo: (id) => openCodex(`u:${id}`),
   openInfo: (id) => openCodex(`b:${id}`),
   lockText: errText,
   dossierBody: (id, level) => buildingDossier(id, level)?.body ?? '',
@@ -9446,6 +9419,8 @@ const battleWindow = initBattleWindow({
     const m = createBattleModel(s, id, ME, data);
     return m.ok ? m : null;
   },
+  // Отступление из окна боя — тот же приказ, что и кнопкой боковой панели.
+  retreat: (fleetId) => playerOrder(retreatFleet(ME, fleetId)),
 });
 const pirateIntro = initPirateIntro({
   root: $('pirate-intro'),

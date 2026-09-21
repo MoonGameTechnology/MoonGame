@@ -22,7 +22,6 @@ export const en: Record<string, string> = {
   "map.frontier": "Frontier",
   "setup.map.hole": "Black hole · no paths",
   // --- map-loading — initial map preparation ---
-  'card.details': 'Details',
   'battle.win.open': '⚔ Open battle',
   'production.units': 'Build units',
   'battle.win.beachhead': 'beachhead',
@@ -2228,6 +2227,7 @@ export const en: Record<string, string> = {
   'side.stat.atk': 'ATK',
   'side.stat.def': 'DEF',
   'side.stat.spd': 'SPD',
+  'side.strike.assault': '⚔ Assault',
   'side.strike.bombard': '⊗ Bombard',
   'side.strike.bombard.stop': '⊗ Stop bombard',
   'side.strike.forecast':

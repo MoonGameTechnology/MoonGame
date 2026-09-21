@@ -394,6 +394,18 @@ assert.ok(getEl('battlewinbody').innerHTML.includes('bw-empty'), 'resolved battl
 battleScene.restore();
 console.log('Battle badge and targeted retreat OK');
 console.log('Card navigation OK — planet, own fleet and inspected foreign fleet');
+// Unit catalogs live in the production window, like the buildings one (BUILD-1): the
+// tab offers a single entry, and it must open THAT tab's roster, not the buildings list.
+mod.exports.selectCard('planet', mod.exports.cards().planet);
+clickSide({ act: 'tab', arg: 'ships' });
+assert.ok(sideEl.innerHTML.includes('data-act="openunits"'), 'a unit tab offers its catalog');
+assert.ok(!sideEl.innerHTML.includes('data-codex="u:'), 'the panel no longer carries a second catalog');
+clickSide({ act: 'openunits', arg: 'ships' });
+assert.ok(getEl('buildwin').classList.contains('show'), 'the entry opens the production window');
+assert.ok(getEl('buildwinbody').innerHTML.includes('data-unit-info='), 'units, not buildings');
+for (const handle of (listeners.get(getEl('buildwin')) ?? {}).click ?? [])
+  handle({ target: getEl('buildwin') });
+console.log('Unit production entry OK');
 for (const fn2 of sideClicks)
   fn2({
     target: { closest: () => ({ disabled: false, dataset: { act: 'build', arg: 'refinery' } }) },

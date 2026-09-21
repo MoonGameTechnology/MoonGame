@@ -25,7 +25,6 @@ export const ru: Record<string, string> = {
   "map.frontier": "Фронтир",
   "setup.map.hole": "Чёрная дыра · путей нет",
   // --- map-loading — initial map preparation ---
-  'card.details': 'Подробнее',
   'battle.win.open': '⚔ Открыть бой',
   'production.units': 'Построить юнитов',
   'battle.win.beachhead': 'плацдарм',
@@ -2229,6 +2228,7 @@ export const ru: Record<string, string> = {
   'side.stat.atk': 'АТК',
   'side.stat.def': 'ЗАЩ',
   'side.stat.spd': 'СКР',
+  'side.strike.assault': '⚔ Штурм',
   'side.strike.bombard': '⊗ Бомбардировать',
   'side.strike.bombard.stop': '⊗ Прекратить бомбардировку',
   'side.strike.forecast':
