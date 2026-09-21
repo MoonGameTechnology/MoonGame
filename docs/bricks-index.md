@@ -637,6 +637,7 @@
 | OBJP-1 | ✅ | proto | `docs/backlog.md:15384` | Значок боя наконец открывает окно, а окно даёт |
 | OBJP-2 | ✅ | proto | `docs/backlog.md:15410` | Подробности объекта встают РЯДОМ с карточкой, а не |
 | OBJP-3 | ✅ | proto | `docs/backlog.md:15422` | Каталог юнитов уехал в окно производства — туда же, |
+| CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15440` | Кнопка штурма появляется только когда есть кем |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
