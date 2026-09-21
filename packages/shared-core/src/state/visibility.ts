@@ -568,6 +568,12 @@ function project(
   // место, возвращая клиенту поток.
   delete (view as Partial<GameState>).rng;
 
+  // PVR-4.2: память Роя снимается целиком. Это не «серверная кухня», а правило игры:
+  // §3.4 требует, чтобы игрок узнавал вывод противника из ЖУРНАЛА адаптаций (PVR-4.5),
+  // где подтверждённый факт отделён от гипотезы, — а не читал счётчик наблюдений прямо
+  // из состояния. Отдать его клиенту значило бы выдать и то, чего Рой ещё не показал.
+  delete (view as Partial<GameState>).swarmMemory;
+
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.
   const signatures: SignatureContact[] = [];

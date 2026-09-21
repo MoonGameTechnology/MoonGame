@@ -62,6 +62,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
   rng: 'stripped', // кости мира: держащий поток предсказывает будущие броски
+  swarmMemory: 'stripped', // PVR-4.2: вывод Роя игрок читает журналом, не состоянием
   players: 'filtered', // см. PLAYER_EXPOSURE ниже
   planets: 'filtered', // топология публична, содержимое неопознанного мира — нет
   fleets: 'filtered', // чужой флот виден только опознанным (иначе — засветка)
@@ -368,6 +369,7 @@ function maximalState(): GameState {
     // Ни одной канарейки: волны публичны целиком (см. опись), и подсадить сюда чужой
     // секрет было бы неправдой о поле — оно его не носит.
     pve: { waveNumber: 3, totalWaves: 10, npcPlayerId: 'swarm', nextWaveAt: 7 },
+    swarmMemory: { engagements: 1, observations: [{ ordinal: 1, kind: 'strike', engagement: 'strike:s1' }] },
   };
 }
 

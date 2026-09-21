@@ -45,6 +45,7 @@ import {
   marketModule,
   fleetBroodModule,
   pveModule,
+  swarmMemoryModule,
   resolveMatchConfig,
   type GameModule,
   type GameState,
@@ -97,6 +98,7 @@ export const MODULES: GameModule[] = [
   // первая волна попала бы в вердикт только следующим ходом часов.
   pveModule, // PVE-3: волны NPC, вооружается секцией `pve` режима матча (в PvP инертен)
   fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
+  swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
   fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
   // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя

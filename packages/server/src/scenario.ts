@@ -32,6 +32,7 @@ import {
   planetTypeModule,
   fleetBroodModule,
   pveModule,
+  swarmMemoryModule,
   scientistModule,
   sectorModule,
   standingOrdersModule,
@@ -151,6 +152,7 @@ export const DEV_MODULES: GameModule[] = [
   forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
   pveModule, // PVE-3: NPC wave assault, armed by the mode's `pve` section (inert in PvP)
   fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
+  swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
   // H4's `divisionModule` used to sit here, at the END. It is GONE (H4-REVERT): the
@@ -178,7 +180,8 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '23'; // Added fleetBrood: paid onboard ground growth.
+export const MODULE_MANIFEST_VERSION = '24'; // Added swarmMemory: Рой копит наблюдения боёв.
+// export const MODULE_MANIFEST_VERSION = '23'; // Added fleetBrood: paid onboard ground growth.
 // Previous manifest 22: // PVR-1.4: у `state.pve` появился долг по усилениям.
 // Форма состояния изменилась ДОБАВЛЕНИЕМ: у `UnitStack` два новых необязательных поля —
 // `damageDealt` и `battles` (оба «на юнит»). Старый матч читается без ошибки: полей нет,
