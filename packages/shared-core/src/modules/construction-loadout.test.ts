@@ -109,3 +109,41 @@ describe('unit.build with a loadout (MOD-3) — charge, stamp, lock, merge ident
     expect(done.state.planets.A?.garrison[0]?.modules).toBeUndefined();
   });
 });
+
+describe('SZE-1.1 — верфь ставит модули той звёздности, что в снимке арсенала', () => {
+  // Без этого стартовый флот забега летал бы на ★N, а всё построенное на верфи — на ★0:
+  // один и тот же модуль с двумя разными числами в одном матче.
+  const starred = (s: GameState, stars: Record<string, number>): GameState => ({
+    ...s,
+    players: {
+      ...s.players,
+      p1: { ...s.players.p1!, arsenal: { hulls: ['cruiser'], modules: ['targeting', 'cargo'], stars } },
+    },
+  });
+
+  it('свежий корабль встаёт со звёздами из арсенала', () => {
+    const ordered = ok(
+      kernel.applyAction(starred(world(1000), { targeting: 2 }), build(['targeting']), ctx(0)),
+    );
+    const done = okAdv(kernel.advanceTo(ordered.state, ctx(0)));
+    expect(done.state.planets.A?.garrison[0]?.moduleStars).toEqual({ targeting: 2 });
+  });
+
+  it('без звёзд в арсенале состояние остаётся прежним, байт-в-байт', () => {
+    const ordered = ok(kernel.applyAction(world(1000), build(['targeting']), ctx(0)));
+    const done = okAdv(kernel.advanceTo(ordered.state, ctx(0)));
+    expect(done.state.planets.A?.garrison[0]).toEqual({ unit: 'cruiser', count: 1, modules: ['targeting'] });
+  });
+
+  it('звёзды не приписываются модулям, которых на корабле нет', () => {
+    const ordered = ok(
+      kernel.applyAction(
+        starred(world(1000), { targeting: 2, cargo: 3 }),
+        build(['targeting']),
+        ctx(0),
+      ),
+    );
+    const done = okAdv(kernel.advanceTo(ordered.state, ctx(0)));
+    expect(done.state.planets.A?.garrison[0]?.moduleStars).toEqual({ targeting: 2 });
+  });
+});

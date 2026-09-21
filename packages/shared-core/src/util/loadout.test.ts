@@ -205,3 +205,70 @@ describe('HPR-1.5.1 — the shipped hero hull takes ordinary ship modules', () =
     });
   });
 });
+
+describe('SZE-1.1 — звёздность модуля усиливает его вклад', () => {
+  // Лестница живёт в `data.sectorZeroStars` (SZE-0.2); `bonus` — доля БАЗОВОГО вклада
+  // модуля, которую добавляет ступень. Ноль звёзд обязан давать прежние числа
+  // байт-в-байт, иначе звёздность молча пересчитала бы весь основной режим.
+  const starred: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: { cruiser: { faction: 'x', stats: { attack: 10, defense: 0, speed: 1, hp: 10 }, slots: { weapon: 1 } } },
+    factions: {},
+    buildings: {},
+    events: {},
+    modules: {
+      targeting: { name: 'T', slot: 'weapon', tag: 'vertical', effects: { stats: { attack: 4 } }, cost: {} },
+    },
+    sectorZeroStars: {
+      cap: 3,
+      guaranteed: 1,
+      steps: [
+        { chance: 1, warrants: 10, bonus: 0.25 },
+        { chance: 0.5, warrants: 20, bonus: 0.5 },
+        { chance: 0.25, warrants: 40, bonus: 1 },
+      ],
+    },
+  });
+  const hull = starred.units.cruiser!;
+
+  it('ноль звёзд = прежние числа, байт-в-байт', () => {
+    expect(effectiveStats(hull, { modules: ['targeting'] }, starred).attack).toBe(14);
+    expect(
+      effectiveStats(hull, { modules: ['targeting'], moduleStars: { targeting: 0 } }, starred).attack,
+    ).toBe(14);
+  });
+
+  it('звезда множит ВКЛАД МОДУЛЯ, а не характеристику корпуса', () => {
+    // 10 базы корпуса не трогаем: 4 × (1 + 0.25) = 5 → 15. Иначе звезда модуля
+    // усиливала бы и голый корпус, то есть корабль без модулей.
+    expect(
+      effectiveStats(hull, { modules: ['targeting'], moduleStars: { targeting: 1 } }, starred).attack,
+    ).toBe(15);
+    // ★3 = 1 + 0.25 + 0.5 + 1 → 4 × 2.75 = 11 → 21
+    expect(
+      effectiveStats(hull, { modules: ['targeting'], moduleStars: { targeting: 3 } }, starred).attack,
+    ).toBe(21);
+  });
+
+  it('звёзды выше лестницы не растут дальше последней ступени', () => {
+    const top = effectiveStats(hull, { modules: ['targeting'], moduleStars: { targeting: 3 } }, starred).attack;
+    expect(
+      effectiveStats(hull, { modules: ['targeting'], moduleStars: { targeting: 99 } }, starred).attack,
+    ).toBe(top);
+  });
+
+  it('звезда НЕ НАДЕТОГО модуля ни на что не влияет', () => {
+    expect(
+      effectiveStats(hull, { modules: [], moduleStars: { targeting: 3 } }, starred).attack,
+    ).toBe(10);
+  });
+
+  it('пустая лестница (основной режим) обнуляет ось целиком', () => {
+    // `data.sectorZeroStars` по умолчанию пуст — значит звёздность выключается ДАННЫМИ,
+    // без флага в коде, ровно как медали и мастерская.
+    expect(
+      effectiveStats(cruiser, { modules: ['targeting'], moduleStars: { targeting: 5 } }, data).attack,
+    ).toBe(14);
+  });
+});

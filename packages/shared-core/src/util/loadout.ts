@@ -21,23 +21,45 @@ export interface SlotCounts {
   utility: number;
 }
 
+/** Множитель вклада модуля на звезде `star` (SZE-1.1): `1 + Σ bonus` первых `star`
+ *  ступеней лестницы `data.sectorZeroStars`. Звёзды сверх лестницы дальше не растут —
+ *  потолок держат данные, а не вызывающий.
+ *
+ *  Пустая лестница (обычный матч, где `sectorZeroStars` — дефолт схемы) даёт ровно `1`,
+ *  то есть ось выключается ДАННЫМИ, без флага в коде. Сложение идёт в фиксированном
+ *  порядке массива, поэтому результат детерминирован. */
+export function moduleStarMultiplier(star: number, data: GameData): number {
+  const steps = data.sectorZeroStars.steps;
+  const upTo = Math.min(Math.max(0, Math.floor(star)), steps.length);
+  let mult = 1;
+  for (let i = 0; i < upTo; i++) mult += steps[i]!.bonus;
+  return mult;
+}
+
 /** Effective per-ship stats = base `def.stats` + Σ flat additive deltas from each
  *  installed module. Unknown module ids are skipped (base-default, never crash),
  *  exactly as `sumUnitStat` skips unknown units. No modules (undefined/empty) →
- *  a fresh copy of `def.stats`, byte-for-byte the base. */
+ *  a fresh copy of `def.stats`, byte-for-byte the base.
+ *
+ *  Звёздность модуля (`stack.moduleStars`, SZE-1.1) множит ВКЛАД САМОГО МОДУЛЯ, а не
+ *  характеристику корпуса: ★ на пушке усиливает пушку, а голый корабль остаётся голым.
+ *  ★0 / отсутствующая карта звёзд → прежняя сумма байт-в-байт. */
 export function effectiveStats(
   def: UnitDef,
-  stack: Pick<UnitStack, 'modules'>,
+  stack: Pick<UnitStack, 'modules' | 'moduleStars'>,
   data: GameData,
 ): Record<string, number> {
   const out: Record<string, number> = { ...def.stats };
   const mods = stack.modules;
   if (!mods) return out;
+  const stars = stack.moduleStars;
   for (const id of mods) {
     const m = data.modules[id];
     if (!m) continue;
+    const star = stars?.[id] ?? 0;
+    const mult = star > 0 ? moduleStarMultiplier(star, data) : 1;
     for (const [k, v] of Object.entries(m.effects.stats)) {
-      out[k] = (out[k] ?? 0) + v;
+      out[k] = (out[k] ?? 0) + v * mult;
     }
   }
   return out;

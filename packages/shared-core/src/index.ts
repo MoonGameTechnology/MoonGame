@@ -417,11 +417,13 @@ export {
   cappedUnitStat,
   COMBAT_UNIT_CAP,
   loadoutKey,
+  starsOf,
   takeFromStacks,
   mergeStacks,
 } from './util/stacks';
 export {
   effectiveStats,
+  moduleStarMultiplier,
   slotUsage,
   moduleAllowed,
   canEquip,

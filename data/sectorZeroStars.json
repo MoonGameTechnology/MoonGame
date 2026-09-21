@@ -2,10 +2,10 @@
   "cap": 5,
   "guaranteed": 3,
   "steps": [
-    { "chance": 1, "warrants": 20 },
-    { "chance": 1, "warrants": 45 },
-    { "chance": 1, "warrants": 90 },
-    { "chance": 0.55, "warrants": 180 },
-    { "chance": 0.3, "warrants": 360 }
+    { "chance": 1, "warrants": 20, "bonus": 0.1 },
+    { "chance": 1, "warrants": 45, "bonus": 0.1 },
+    { "chance": 1, "warrants": 90, "bonus": 0.15 },
+    { "chance": 0.55, "warrants": 180, "bonus": 0.25 },
+    { "chance": 0.3, "warrants": 360, "bonus": 0.4 }
   ]
 }

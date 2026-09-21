@@ -1052,6 +1052,10 @@ export const constructionModule: GameModule = {
         // Челнок сдают В ПОРТ (SHU-1.1) — он не гарнизон (не держит мир, не гибнет в
         // наземном штурме) и не флот (`autoRally` его не поднимает).
         const built = h.ctx.data.units[p.unit];
+        // Звёздность модулей (SZE-1.1) берётся из СНИМКА арсенала места, а не из меты:
+        // ядро во время матча мету не читает. Нет снимка (обычный матч) → ★0 у всех.
+        const stars =
+          typeof p.playerId === 'string' ? h.state.players[p.playerId]?.arsenal?.stars : undefined;
         if (built?.traits.includes('shuttle')) {
           // Готовая машина встаёт в ЭСКАДРУ (SHU-4.2), а не россыпью. Правило живёт в
           // `state/shuttle.ts` — там же, где вся арифметика ангара: своя копия здесь
@@ -1065,9 +1069,10 @@ export const constructionModule: GameModule = {
             p.count,
             `sq:${p.playerId}:${seq}`,
             p.modules,
+            stars,
           );
         } else {
-          addUnits(planet.garrison, p.unit, p.count, p.modules);
+          addUnits(planet.garrison, p.unit, p.count, p.modules, stars);
         }
         h.emit('unit.built', {
           planetId: planet.id,

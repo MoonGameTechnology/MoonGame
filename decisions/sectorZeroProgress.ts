@@ -4,6 +4,7 @@
  * are the first playable tuning, not the final campaign economy. */
 import {
   canEquip,
+  starsOf,
   type GameData,
   type GameState,
   type Hero,
@@ -21,6 +22,11 @@ export interface SectorZeroProgress {
   settledThrough: number;
   lastReward: number;
   modules: string[];
+  /** Звёздность модулей (SZE-1.1), `id → ★`: вертикальная ось Мастерской. Открытие
+   *  модуля («Данные экспедиций») и его заточка («Варранты») — разные оси и разные
+   *  валюты, §0.1 роадмапа экономики, поэтому звезда живёт здесь, а не в `modules`.
+   *  Потолок — `data.sectorZeroStars.cap`; отсутствие записи = ★0. */
+  stars: Record<string, number>;
   loadouts: Record<string, string[]>;
   heroes: Record<string, SectorHero>;
   selectedHero: string;
@@ -43,6 +49,7 @@ export function freshSectorZeroProgress(data: GameData): SectorZeroProgress {
     settledThrough: 0,
     lastReward: 0,
     modules: STARTER_MODULES.filter((id) => data.modules[id]),
+    stars: {},
     loadouts: {},
     heroes: first ? { [first]: { level: 1, skills: [], equipped } } : {},
     selectedHero: first,
@@ -200,6 +207,14 @@ export function parseSectorZeroProgress(raw: string | null, data: GameData): Sec
     fresh.modules = [
       ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),
     ];
+    // Профиль лежит в localStorage — то есть правится игроком. Звезда сверх потолка,
+    // дробная, отрицательная и звезда несуществующего модуля не доезжают: срезаем здесь,
+    // один раз, а не в каждом месте, которое потом звезду прочтёт.
+    for (const [id, value] of Object.entries(p.stars ?? {})) {
+      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      const star = Math.min(data.sectorZeroStars.cap, value);
+      if (star > 0) fresh.stars[id] = star;
+    }
     for (const [hull, ids] of Object.entries(p.loadouts ?? {})) {
       if (!sectorHullIds(data).includes(hull)) continue;
       const equipped: string[] = [];
@@ -281,15 +296,25 @@ export function prepareSectorZeroRun(
   const next: GameState = JSON.parse(JSON.stringify(state));
   const player = next.players.p1;
   if (!player) return next;
+  // Звёздность едет в забег ТЕМ ЖЕ снимком, что арсенал и совет учёных (SZE-1.1):
+  // мету ядро читает ровно один раз, на старте. Поэтому заточка во время идущего забега
+  // на него не влияет, а реплей уже сыгранного остаётся воспроизводимым.
+  const stars = { ...progress.stars };
   player.arsenal = {
     hulls: Object.keys(data.units)
       .filter((id) => data.units[id]?.domain === 'space')
       .sort(),
     modules: [...progress.modules].sort(),
+    ...(Object.keys(stars).length > 0 ? { stars } : {}),
   };
   for (const fleet of Object.values(next.fleets))
     if (fleet.owner === 'p1') {
-      for (const stack of fleet.units) stack.modules = [...(progress.loadouts[stack.unit] ?? [])];
+      for (const stack of fleet.units) {
+        stack.modules = [...(progress.loadouts[stack.unit] ?? [])];
+        const own = starsOf(stack.modules, stars);
+        if (own) stack.moduleStars = own;
+        else delete stack.moduleStars;
+      }
     }
   const selected = progress.heroes[progress.selectedHero];
   const def = data.heroes[progress.selectedHero];

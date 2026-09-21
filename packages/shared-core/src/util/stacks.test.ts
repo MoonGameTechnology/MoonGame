@@ -9,6 +9,7 @@ import {
   loadoutKey,
   takeFromStacks,
   mergeStacks,
+  addUnits,
 } from './stacks';
 
 // gun out-shoots pea; howitzer is the only artillery piece; targeting is a +4
@@ -190,5 +191,65 @@ describe('sideDamageBreakdown rides the cap for every combatant kind', () => {
     expect(
       sideDamageBreakdown(state, { kind: 'garrison', planetId: 'P' }, data, 'defense').total,
     ).toBe(10 * 2);
+  });
+});
+
+describe('SZE-1.1 — звёздность модуля едет ВМЕСТЕ с кораблём', () => {
+  // Носитель звезды — стек, а не игрок: `effectiveStats` видит только `(def, stack, data)`,
+  // и звезда обязана доехать до КАЖДОГО потребителя статов, иначе HUD и бой разойдутся
+  // в числах. Отсюда требование: всякий путь, который копирует стек, копирует и звёзды.
+  const starred = (): UnitStack => ({
+    unit: 'gun',
+    count: 4,
+    modules: ['targeting'],
+    moduleStars: { targeting: 2 },
+  });
+
+  it('разделение флота уносит звёзды с отделённой частью', () => {
+    // `takeFromStacks` перечисляет поля поимённо — забытое поле тут теряется МОЛЧА.
+    const src = [starred()];
+    const [taken] = takeFromStacks(src, 'gun', 2, ['targeting']);
+    expect(taken?.moduleStars).toEqual({ targeting: 2 });
+    expect(src[0]?.moduleStars).toEqual({ targeting: 2 });
+  });
+
+  it('слияние флотов не роняет звёзды и не делит их объект на двоих', () => {
+    const base = [starred()];
+    const out = mergeStacks(base, [starred()]);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.count).toBe(8);
+    expect(out[0]?.moduleStars).toEqual({ targeting: 2 });
+    // Копия, а не общая ссылка: иначе правка одного флота меняла бы чужой.
+    expect(out[0]?.moduleStars).not.toBe(base[0]?.moduleStars);
+  });
+
+  it('свежая постройка встаёт со своими звёздами', () => {
+    const stacks: UnitStack[] = [];
+    addUnits(stacks, 'gun', 3, ['targeting'], { targeting: 2 });
+    expect(stacks[0]?.moduleStars).toEqual({ targeting: 2 });
+    // Нулевые звёзды поля не заводят — состояние остаётся байт-в-байт прежним.
+    const bare: UnitStack[] = [];
+    addUnits(bare, 'gun', 3, ['targeting'], { targeting: 0 });
+    expect(bare[0]).toEqual({ unit: 'gun', count: 3, modules: ['targeting'] });
+  });
+
+  it('звёзды доезжают до боевого веса', () => {
+    // Лестницу надо подложить: в этих данных её нет, а пустая лестница ось выключает.
+    const withLadder: GameData = parseGameData({
+      version: '0.1.0',
+      resources: ['metal'],
+      units: { gun: { faction: 'x', stats: { attack: 10, defense: 6, speed: 5, hp: 5 } } },
+      factions: {},
+      buildings: {},
+      events: {},
+      modules: {
+        targeting: { name: 'T', slot: 'weapon', tag: 'vertical', cost: {}, effects: { stats: { attack: 4 } } },
+      },
+      sectorZeroStars: { cap: 2, guaranteed: 1, steps: [{ warrants: 1, bonus: 0.5 }, { chance: 0.5, warrants: 2, bonus: 0.5 }] },
+    });
+    const plain = sumUnitStat([{ unit: 'gun', count: 1, modules: ['targeting'] }], withLadder, 'attack');
+    const withStars = sumUnitStat([{ ...starred(), count: 1 }], withLadder, 'attack');
+    expect(plain).toBe(14); // 10 + 4
+    expect(withStars).toBe(18); // 10 + 4 × (1 + 0.5 + 0.5)
   });
 });
