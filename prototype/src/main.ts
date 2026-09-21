@@ -655,7 +655,12 @@ import {
   type SplitSlot,
 } from '../../decisions/splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
-import { canAssaultFromOrbit, canMerge, canSplit } from '../../decisions/cmdAvailability';
+import {
+  canAssaultAim,
+  canAssaultFromOrbit,
+  canMerge,
+  canSplit,
+} from '../../decisions/cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
 import {
   IDLE,
@@ -7781,8 +7786,12 @@ function renderCmdBar() {
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC and phone target a world (fly there + storm on arrival). The phone confirms
   // before dispatch; the legacy tablet button remains in-orbit-only.
+  // Гасить прицельную кнопку НЕЧЕМ: цель выбирается после нажатия, и про её оборону в
+  // этот момент не известно ничего. Есть ли вообще кем штурмовать — вопрос СОСТАВА, и
+  // он решает ПОКАЗ кнопки (`shown.assault`), а не её серость. Орбитальная ветка бьёт
+  // по миру под флотом, там цель уже известна — она кнопку и гасит.
   const canAssault = pcUi() || MOBILE
-    ? fleets.some((f) => sumUnits(f.units) > 0)
+    ? true
     : docked.some((f) =>
         canAssaultFromOrbit(
           {
@@ -7841,6 +7850,10 @@ function renderCmdBar() {
   const shown = cmdShown({
     stoppable: anyStoppable,
     castHero: !!castHero,
+    // ШТУРМ спрашивает ДЕСАНТ, а не корабли (`cmdAvailability.ts`, правило 6): без него
+    // штурмовать некем, и кнопки не бывает вовсе. Пригодность ЦЕЛИ её по-прежнему гасит.
+    troops: canAssaultAim(fleets.map((f) => sumUnits(f.landing ?? []))),
+    assaultArmed: assaultAim,
     more: cmdMore,
     picking: pickMode,
   });
@@ -7851,14 +7864,16 @@ function renderCmdBar() {
     // ШТУРМА ниже), поэтому и кнопка отдельная, и прицел отдельный.
     cmdBtn('engage', '⚡', t('cmd.engage'), engageAim ? 'on' : '', false, t('cmd.engage.hint')) +
     (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
-    cmdBtn(
-      'attack',
-      '⚔',
-      t('cmd.assault'),
-      assaultAim ? 'on' : '',
-      !canAssault,
-      t('cmd.assault.hint'),
-    ) +
+    (shown.assault
+      ? cmdBtn(
+          'attack',
+          '⚔',
+          t('cmd.assault'),
+          assaultAim ? 'on' : '',
+          !canAssault,
+          t('cmd.assault.hint'),
+        )
+      : '') +
     cmdBtn('target', '◎', t('cmd.target'), '', false, t('cmd.target.hint')) +
     (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
