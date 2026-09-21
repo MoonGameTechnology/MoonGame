@@ -12927,6 +12927,11 @@ function saveSectorProgress(next: SectorZeroProgress): void {
 
 const sectorPreparation = initSectorZeroPreparation({
   data,
+  // Что умеет площадка. Оба флага выключены ЧЕСТНО, а не «пока»: ни IAP, ни `PlatformAds`
+  // в продукте не существует (`platform-adapters.md` их описывает, кода ноль). Рисовать
+  // живые кнопки под несуществующую машинерию — это и есть «код есть, а игры нет».
+  // Появится адаптер (`YAG-*`) — включение станет сменой этих двух флагов.
+  platform: { sovereigns: false, ads: false },
   progress: () => sectorProgress,
   change: action => {
     const next = changeSectorZeroProgress(sectorProgress, action, data);
