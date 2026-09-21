@@ -71,18 +71,24 @@ one mechanism.
    `origin` also has terminal push credentials.
 2. If a terminal `git push` fails authentication once, do not retry it. Switch once to the
    authenticated GitHub API/app, or report that no writable transport is available.
-3. Before creating a PR, verify that the remote head branch exists, is based on current `main`,
+3. **Final sync before PR:** after the implementation is complete and immediately before remote
+   publication, refresh the current `main` again and compare the task branch against it. If the
+   branch is behind or diverged, integrate the fresh `main` first (normally rebase a short-lived
+   branch), resolve any conflicts, and re-run the checks that the integration could invalidate.
+   Do not create a PR from a branch already known to be stale. If the owner explicitly asked to
+   skip checks, still perform the sync/preflight but do not invent extra test runs.
+4. Before creating a PR, verify that the remote head branch exists, is based on current `main`,
    and has at least one commit/change ahead of `main`. Search for an existing open PR with the
    same head branch and reuse it instead of creating a duplicate.
-4. Keep a PR as draft while more code changes are expected. Mark it ready only when the intended
+5. Keep a PR as draft while more code changes are expected. Mark it ready only when the intended
    change is complete enough for CI/review and no planned edits remain.
-5. This repository's `.github/workflows/automerge.yml` owns merge-queue enrollment. Do **not**
+6. This repository's `.github/workflows/automerge.yml` owns merge-queue enrollment. Do **not**
    call generic GitHub auto-merge and do not manually enqueue a normal green PR: the workflow
    automatically enqueues eligible ready PRs after required checks.
-6. Once a PR is in the merge queue, its head branch is effectively frozen for updates. Never loop
+7. Once a PR is in the merge queue, its head branch is effectively frozen for updates. Never loop
    on push/update failures against a queued branch. If a new fix is required, the PR must be
    dequeued first; if the available tools cannot dequeue it, report that exact blocker.
-7. For a PR that is not merging, read its sticky “🚦 Почему этот PR не вливается” diagnosis and
+8. For a PR that is not merging, read its sticky “🚦 Почему этот PR не вливается” diagnosis and
    `docs/pr-merge-rule.md` before trying mutations.
 
 ## Task completion discipline
