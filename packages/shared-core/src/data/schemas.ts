@@ -747,6 +747,31 @@ export const SectorZeroStarsSchema = z.object({
   steps: z.array(SectorZeroStarStepSchema).default([]),
 });
 
+/** Цена товара магазина Sector Zero по способам оплаты (§0.4 `sector-zero-economy-roadmap`).
+ *  Товар знает, какими способами он продаётся, — это ДАННЫЕ, а не ветки в коде: нет ключа
+ *  = этим способом товар не продаётся. `ad` — сколько просмотров rewarded требуется. */
+export const SectorZeroPriceSchema = z.object({
+  warrants: z.number().int().positive().optional(),
+  sovereigns: z.number().int().positive().optional(),
+  ad: z.number().int().positive().optional(),
+});
+
+/** Один лот витрины. `grants` трактуется по `kind`: id модуля, id узла навыка либо имя
+ *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount`. */
+export const SectorZeroOfferSchema = z.object({
+  kind: z.enum(['module', 'skill', 'resource']),
+  grants: z.string(),
+  /** Сколько выдать. Значим только для `kind: 'resource'`. */
+  amount: z.number().int().positive().default(1),
+  prices: SectorZeroPriceSchema.prefault({}),
+});
+
+/** Витрина магазина Sector Zero целиком. Пустая = магазина в этой сборке нет — та же
+ *  форма выключения данными, что у лестницы звёздности и медалей. */
+export const SectorZeroShopSchema = z.object({
+  offers: z.record(z.string(), SectorZeroOfferSchema).default({}),
+});
+
 export const HeroGradeDefSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
@@ -1021,6 +1046,7 @@ export const GameDataSchema = z.object({
   /** Лестница звёздности Sector Zero (SZE-0.2). Пусто = мастерская и академия выключены
    *  данными, без флага в коде. */
   sectorZeroStars: SectorZeroStarsSchema.prefault({}),
+  sectorZeroShop: SectorZeroShopSchema.prefault({}),
   modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).

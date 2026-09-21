@@ -32,6 +32,12 @@ export interface SectorZeroProgress {
    *  ⚠️ Имя взято у аукционной валюты основной игры, но СЧЁТ СВОЙ: у Sector Zero свой
    *  профиль и своя награда, без записей в карьеру командующего (`PVR-3.1`). */
   warrants: number;
+  /** Кошелёк Суверенов ◆ — золотая валюта (§0.1). Кран у неё ОДИН: покупка за деньги.
+   *  ⚠️ IAP в продукте сегодня нет (`platform-adapters.md` его описывает, кода ноль),
+   *  поэтому кошелёк честно стоит на нуле, а магазин отказывает `E_SHOP_UNAVAILABLE`.
+   *  Поле заведено заранее не «на будущее», а чтобы витрина умела называть цену в
+   *  Суверенах уже сейчас: `EC-2.3` требует показывать стоимость до возможности платить. */
+  sovereigns: number;
   /** Сколько попыток улучшения уже потрачено НА КАЖДЫЙ предмет, `id → n`.
    *
    *  ⚠️ Счётчик именно ПОИМЁННЫЙ, а не общий на профиль, и это защита от эксплойта.
@@ -88,6 +94,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     seed,
     research: 0,
     warrants: 0,
+    sovereigns: 0,
     forgeTries: {},
     forgeShards: {},
     nextAttempt: 1,
@@ -129,6 +136,24 @@ export function sectorSkillCost(id: string, data: GameData): number {
   };
   return 2 * depth(id, new Set());
 }
+/** Может ли ВЫБРАННЫЙ герой изучить узел прямо сейчас: ветка его, узел не изучен,
+ *  предпосылки взяты. Правила каталога, и деньги их не отменяют — поэтому проверка
+ *  вынесена сюда, а не продублирована в магазине второй копией. */
+export function sectorSkillLegal(
+  progress: SectorZeroProgress,
+  id: string,
+  data: GameData,
+): boolean {
+  const hero = progress.heroes[progress.selectedHero];
+  const node = data.heroSkillTrees[id];
+  if (!hero || !node) return false;
+  return (
+    node.branch === data.heroes[progress.selectedHero]?.branch &&
+    !hero.skills.includes(id) &&
+    node.requires.every((r) => hero.skills.includes(r))
+  );
+}
+
 export function sectorHullIds(data: GameData): string[] {
   return Object.keys(data.units).filter((id) => {
     const def = data.units[id]!;
@@ -139,6 +164,7 @@ export function sectorHullIds(data: GameData): string[] {
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
   | { kind: 'forge'; id: string }
+  | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
   | { kind: 'unlock-hero'; id: string }
   | { kind: 'select-hero'; id: string }
@@ -190,6 +216,40 @@ export function changeSectorZeroProgress(
         next.stars[action.id] = out.star;
         delete next.forgeShards[action.id]; // ступень пройдена — гарантия начинается заново
       } else next.forgeShards[action.id] = shards + 1;
+      break;
+    }
+    case 'buy': {
+      // Выдача и списание живут ВМЕСТЕ: разведи их — и однажды товар выдастся без оплаты.
+      const offer = data.sectorZeroShop.offers[action.id];
+      if (!offer) return null;
+      const price = offer.prices[action.pay];
+      if (price === undefined) return null; // этим способом товар не продаётся
+      if (action.pay === 'warrants') {
+        if (next.warrants < price) return null;
+        next.warrants -= price;
+      } else if (action.pay === 'sovereigns') {
+        if (next.sovereigns < price) return null;
+        next.sovereigns -= price;
+      }
+      // `ad` не списывает НИЧЕГО: просмотр уже состоялся, и подтвердил его адаптер
+      // площадки. Награду выдаёт игра только после подтверждённого результата
+      // (`platform-adapters.md`), поэтому сюда действие доходит уже оплаченным.
+      switch (offer.kind) {
+        case 'module':
+          if (!data.modules[offer.grants] || next.modules.includes(offer.grants)) return null;
+          next.modules.push(offer.grants);
+          break;
+        case 'skill': {
+          if (!sectorSkillLegal(next, offer.grants, data)) return null;
+          next.heroes[next.selectedHero]!.skills.push(offer.grants);
+          break;
+        }
+        case 'resource':
+          if (offer.grants === 'research') next.research += offer.amount;
+          else if (offer.grants === 'warrants') next.warrants += offer.amount;
+          else return null;
+          break;
+      }
       break;
     }
     case 'fit': {
@@ -284,6 +344,7 @@ export function parseSectorZeroProgress(
     fresh.settledThrough = Math.min(fresh.nextAttempt - 1, counter(p.settledThrough));
     fresh.lastReward = counter(p.lastReward);
     fresh.warrants = counter(p.warrants);
+    fresh.sovereigns = counter(p.sovereigns);
     if (typeof p.seed === 'string') fresh.seed = p.seed;
     fresh.modules = [
       ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),
