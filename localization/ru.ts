@@ -859,6 +859,7 @@ export const ru: Record<string, string> = {
   'data.targeting-array': 'Система наведения',
   'data.tax-office': 'Налоговая управа',
   'data.terran': 'Земной',
+  'data.hive': 'Улей',
   'data.intercept-veil': 'Перехватывающий покров',
   'data.the-swarm': 'Рой',
   'data.vanguard-coalition': 'Коалиция авангарда',

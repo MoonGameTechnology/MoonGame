@@ -63,7 +63,9 @@
     },
     "hp": 15,
     "scoreValue": 8,
-    "traits": ["infected"]
+    "traits": [
+      "infected"
+    ]
   },
   "barracks": {
     "name": "Barracks",
@@ -275,7 +277,12 @@
         "hp": 40
       }
     ],
-    "onlyOn": ["dead_world", "asteroid", "asteroid_cluster", "void_station"]
+    "onlyOn": [
+      "dead_world",
+      "asteroid",
+      "asteroid_cluster",
+      "void_station"
+    ]
   },
   "power_plant": {
     "name": "Fusion Plant",
@@ -634,6 +641,23 @@
     },
     "hp": 20,
     "scoreValue": 8,
+    "traits": [
+      "infected"
+    ]
+  },
+  "swarm_hive": {
+    "name": "Hive",
+    "cost": {
+      "biomass": 90,
+      "metal": 120
+    },
+    "buildTimeHours": 10,
+    "upkeep": {
+      "biomass": 6
+    },
+    "enablesInfantryConstruction": true,
+    "hp": 25,
+    "scoreValue": 10,
     "traits": [
       "infected"
     ]

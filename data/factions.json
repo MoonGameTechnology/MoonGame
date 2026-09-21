@@ -2,87 +2,188 @@
   "azure": {
     "name": "Azure Compact",
     "description": "faction.azure.desc",
-    "traits": ["disciplined"],
+    "traits": [
+      "disciplined"
+    ],
     "abilities": [],
     "uniqueUnits": [],
     "startingLoadout": {
-      "resources": { "credits": 300, "metal": 300 },
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
       "fleet": [
-        { "unit": "cruiser", "count": 2 },
-        { "unit": "scout_drone", "count": 1 }
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
       ],
-      "garrison": [{ "unit": "militia", "count": 2 }],
-      "homeBuildings": ["mine_t1"]
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ],
+      "homeBuildings": [
+        "mine_t1"
+      ]
     },
-    "passives": { "productionBonus": 0.12 }
+    "passives": {
+      "productionBonus": 0.12
+    }
   },
   "crimson": {
     "name": "Crimson Hegemony",
     "description": "faction.crimson.desc",
-    "traits": ["aggressive"],
+    "traits": [
+      "aggressive"
+    ],
     "abilities": [],
     "uniqueUnits": [],
     "startingLoadout": {
-      "resources": { "credits": 300, "metal": 300 },
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
       "fleet": [
-        { "unit": "cruiser", "count": 2 },
-        { "unit": "scout_drone", "count": 1 }
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
       ],
-      "garrison": [{ "unit": "militia", "count": 2 }],
-      "homeBuildings": ["mine_t1"]
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ],
+      "homeBuildings": [
+        "mine_t1"
+      ]
     },
-    "passives": { "combatDamageBonus": 0.1 }
+    "passives": {
+      "combatDamageBonus": 0.1
+    }
   },
   "amber": {
     "name": "Amber Concord",
     "description": "faction.amber.desc",
-    "traits": ["swift"],
+    "traits": [
+      "swift"
+    ],
     "abilities": [],
     "uniqueUnits": [],
     "startingLoadout": {
-      "resources": { "credits": 300, "metal": 300 },
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
       "fleet": [
-        { "unit": "cruiser", "count": 2 },
-        { "unit": "scout_drone", "count": 1 }
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
       ],
-      "garrison": [{ "unit": "militia", "count": 2 }],
-      "homeBuildings": ["mine_t1"]
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ],
+      "homeBuildings": [
+        "mine_t1"
+      ]
     },
-    "passives": { "fleetSpeedBonus": 0.05 }
+    "passives": {
+      "fleetSpeedBonus": 0.05
+    }
   },
   "violet": {
     "name": "Violet Ascendancy",
     "description": "faction.violet.desc",
-    "traits": ["balanced"],
+    "traits": [
+      "balanced"
+    ],
     "abilities": [],
     "uniqueUnits": [],
     "startingLoadout": {
-      "resources": { "credits": 300, "metal": 300 },
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
       "fleet": [
-        { "unit": "cruiser", "count": 2 },
-        { "unit": "scout_drone", "count": 1 }
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
       ],
-      "garrison": [{ "unit": "militia", "count": 2 }],
-      "homeBuildings": ["mine_t1"]
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ],
+      "homeBuildings": [
+        "mine_t1"
+      ]
     },
-    "passives": { "productionBonus": 0.05, "combatDamageBonus": 0.05 }
+    "passives": {
+      "productionBonus": 0.05,
+      "combatDamageBonus": 0.05
+    }
   },
   "vanguard": {
     "name": "Vanguard Coalition",
     "description": "The last organized remnant of humanity, holding the line with disciplined fleets and hardened doctrine.",
-    "traits": ["disciplined"],
+    "traits": [
+      "disciplined"
+    ],
     "abilities": [],
     "uniqueUnits": [],
     "startingLoadout": {
-      "resources": { "credits": 300, "metal": 300 },
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      },
       "fleet": [
-        { "unit": "cruiser", "count": 2 },
-        { "unit": "scout_drone", "count": 1 }
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
       ],
-      "garrison": [{ "unit": "militia", "count": 2 }],
-      "homeBuildings": ["mine_t1"]
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ],
+      "homeBuildings": [
+        "mine_t1"
+      ]
     },
-    "passives": { "combatDamageBonus": 0.1 }
+    "passives": {
+      "combatDamageBonus": 0.1
+    }
   },
   "swarm": {
     "name": "The Swarm",
@@ -119,7 +220,8 @@
       "homeBuildings": [
         "biomass_pit",
         "mine_t1",
-        "swarm_synapse"
+        "swarm_synapse",
+        "swarm_hive"
       ]
     },
     "passives": {
