@@ -2,6 +2,7 @@
  * XP and the commander's PvP tree. Catalog abilities, skill requirements, module
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
+import { forgeOutcome, type ForgeLadder } from './sectorZeroForge';
 import {
   canEquip,
   starsOf,
@@ -17,7 +18,29 @@ export interface SectorHero {
 }
 export interface SectorZeroProgress {
   v: 1;
+  /** Сид профиля — постоянная часть ключа броска Мастерской (SZE-0.3). Задаётся
+   *  хозяином ОДИН РАЗ при рождении профиля: `decisions/` обязаны оставаться чистыми,
+   *  поэтому источник случайности живёт на стороне вызывающего. Пусто — тоже рабочий
+   *  профиль: тогда последовательность бросков у всех игроков одна. */
+  seed: string;
   research: number;
+  /** Кошелёк Варрантов ⌖ — валюта ВЕРТИКАЛИ (§0.1 роадмапа экономики): попытки в
+   *  Мастерской и Академии, позже магазин. Отдельно от `research`, который открывает
+   *  НОВОЕ: на одной валюте заточка конкурировала бы с открытием контента, и это был
+   *  бы ложный выбор — игрок всегда берёт новое.
+   *
+   *  ⚠️ Имя взято у аукционной валюты основной игры, но СЧЁТ СВОЙ: у Sector Zero свой
+   *  профиль и своя награда, без записей в карьеру командующего (`PVR-3.1`). */
+  warrants: number;
+  /** Сколько попыток улучшения уже потрачено НА КАЖДЫЙ предмет, `id → n`.
+   *
+   *  ⚠️ Счётчик именно ПОИМЁННЫЙ, а не общий на профиль, и это защита от эксплойта.
+   *  Бросок — чистая функция от ключа, а игрок в офлайновой игре может его посчитать.
+   *  Будь счётчик общим, стало бы выгодно жечь ДЕШЁВЫЕ попытки на дешёвом модуле,
+   *  пока номер не встанет на удачный для дорогого. С поимённым счётчиком единственный
+   *  способ сдвинуть бросок предмета — заплатить цену ЭТОГО предмета, то есть подкрутка
+   *  стоит ровно столько же, сколько честная попытка. */
+  forgeTries: Record<string, number>;
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
@@ -37,14 +60,28 @@ export const MODULE_UNLOCK_COST = 3;
 const GRADES = ['common', 'rare', 'legendary'] as const;
 const STARTER_MODULES = ['cargo_bay', 'ion_engine'];
 
-export function freshSectorZeroProgress(data: GameData): SectorZeroProgress {
+/** Лестница звёздности из каталога. Пустая (`cap` 0 / нет ступеней) = Мастерской и
+ *  Академии в этой сборке нет — механика выключается ДАННЫМИ, без флага в коде. */
+export function forgeLadderOf(data: GameData): ForgeLadder {
+  return data.sectorZeroStars;
+}
+
+/** Множитель награды за забег, переведённый в Варранты (§2 роадмапа экономики: вторая
+ *  половина награды). **v0**: забег с четырьмя волнами и победой даёт 40 ⌖, первая звезда
+ *  стоит 20, полная лестница одного модуля — 695. Числа калибруются телеметрией. */
+export const WARRANTS_PER_REWARD = 5;
+
+export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroProgress {
   const first = data.heroes.commander ? 'commander' : (Object.keys(data.heroes)[0] ?? '');
   const equipped = (data.heroes[first]?.startAbilities ?? [])
     .filter((id) => !data.heroAbilities[id]?.type.startsWith('spawn_'))
     .slice(0, 1);
   return {
     v: 1,
+    seed,
     research: 0,
+    warrants: 0,
+    forgeTries: {},
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
@@ -93,6 +130,7 @@ export function sectorHullIds(data: GameData): string[] {
 
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
+  | { kind: 'forge'; id: string }
   | { kind: 'fit'; hull: string; id: string }
   | { kind: 'unlock-hero'; id: string }
   | { kind: 'select-hero'; id: string }
@@ -119,6 +157,23 @@ export function changeSectorZeroProgress(
         return null;
       next.modules.push(action.id);
       break;
+    case 'forge': {
+      // Попытка улучшения — один движок на Мастерскую и Академию (§0.3 роадмапа
+      // экономики): заводить вторую лестницу запрещено. Здесь только предмет и кошелёк,
+      // правило исхода целиком в `sectorZeroForge.ts`.
+      if (!data.modules[action.id] || !next.modules.includes(action.id)) return null;
+      const tries = next.forgeTries[action.id] ?? 0;
+      const out = forgeOutcome(
+        { seed: next.seed, attempt: tries, target: action.id, star: next.stars[action.id] ?? 0 },
+        forgeLadderOf(data),
+        next.warrants,
+      );
+      if (!out.allowed) return null;
+      next.warrants -= out.warrants; // сгорает и при неудаче
+      next.forgeTries[action.id] = tries + 1;
+      if (out.success) next.stars[action.id] = out.star;
+      break;
+    }
     case 'fit': {
       if (!sectorHullIds(data).includes(action.hull) || !next.modules.includes(action.id))
         return null;
@@ -194,8 +249,14 @@ const counter = (n: unknown, fallback = 0): number =>
 const strings = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string'))] : [];
 
-export function parseSectorZeroProgress(raw: string | null, data: GameData): SectorZeroProgress {
-  const fresh = freshSectorZeroProgress(data);
+/** `seed` нужен только НОВОМУ профилю: у сохранённого свой, и он важнее (перебьёт).
+ *  Источник случайности — на стороне хозяина, тут по-прежнему чистая функция. */
+export function parseSectorZeroProgress(
+  raw: string | null,
+  data: GameData,
+  seed = '',
+): SectorZeroProgress {
+  const fresh = freshSectorZeroProgress(data, seed);
   if (!raw) return fresh;
   try {
     const p = JSON.parse(raw) as Partial<SectorZeroProgress>;
@@ -204,12 +265,20 @@ export function parseSectorZeroProgress(raw: string | null, data: GameData): Sec
     fresh.nextAttempt = Math.max(1, counter(p.nextAttempt, 1));
     fresh.settledThrough = Math.min(fresh.nextAttempt - 1, counter(p.settledThrough));
     fresh.lastReward = counter(p.lastReward);
+    fresh.warrants = counter(p.warrants);
+    if (typeof p.seed === 'string') fresh.seed = p.seed;
     fresh.modules = [
       ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),
     ];
     // Профиль лежит в localStorage — то есть правится игроком. Звезда сверх потолка,
     // дробная, отрицательная и звезда несуществующего модуля не доезжают: срезаем здесь,
     // один раз, а не в каждом месте, которое потом звезду прочтёт.
+    // Счётчик попыток живёт по тем же правилам, что и звёзды: профиль лежит в
+    // localStorage, так что дробное, отрицательное и чужое до механики не доезжает.
+    for (const [id, value] of Object.entries(p.forgeTries ?? {})) {
+      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (value > 0) fresh.forgeTries[id] = value;
+    }
     for (const [id, value] of Object.entries(p.stars ?? {})) {
       if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       const star = Math.min(data.sectorZeroStars.cap, value);
@@ -281,6 +350,9 @@ export function settleSectorZeroRun(
   return {
     ...progress,
     research: progress.research + reward,
+    // Забег — кран ОБЕИХ валют (§2 роадмапа экономики): данные открывают горизонталь,
+    // Варранты обслуживают вертикаль. Без второго крана Мастерская недостижима.
+    warrants: progress.warrants + reward * WARRANTS_PER_REWARD,
     settledThrough: attempt,
     lastReward: reward,
   };

@@ -13,9 +13,11 @@ import {
   sectorHeroUpgradeCost,
   sectorHullIds,
   sectorSkillCost,
+  WARRANTS_PER_REWARD,
   type SectorProgressAction,
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
+import { workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
 import { esc, displayUnit } from './format';
 
 interface PreparationHost {
@@ -33,15 +35,19 @@ const stats: Record<string, string> = {
   radarRange: 'loadout.stat.radar',
   pointDefense: 'data.area-defense-array',
 };
+/** Вклад звёздного модуля — дробный (6 × 1.1 в плавающей точке даёт 6.6000000000000005),
+ *  поэтому показываем округлённым до десятых. Округление ТОЛЬКО для показа: считает
+ *  матч по неокруглённому, иначе HUD и бой разошлись бы. */
+const num = (value: number): string => String(Math.round(value * 10) / 10);
 const effectText = (values: Record<string, number>): string =>
   Object.entries(values)
-    .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${value > 0 ? '+' : ''}${value}`)
+    .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${value > 0 ? '+' : ''}${num(value)}`)
     .join(' · ');
 
 export function initSectorZeroPreparation(h: PreparationHost) {
   const panel = document.getElementById('sz-workshop')!;
   const home = document.getElementById('sz-home')!;
-  let tab: 'ships' | 'heroes' = 'ships';
+  let tab: 'ships' | 'heroes' | 'workshop' = 'ships';
   let hull = sectorHullIds(h.data).includes('cruiser')
     ? 'cruiser'
     : (sectorHullIds(h.data)[0] ?? '');
@@ -93,6 +99,34 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     return `<div class="sz-picker">${hulls}</div><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-bays">${bays}</div><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${statsNow[key] ?? 0}</b></span>`).join('')}</div><div class="sz-cards">${modules}</div>`;
   }
 
+  /** Одно деление звёздности. Символами, а не картинкой: экран подготовки и так
+   *  текстовый, а лишний ассет пришлось бы тащить в самодостаточный HTML. */
+  const starBar = (row: WorkshopRow): string =>
+    '★'.repeat(row.star) + '☆'.repeat(Math.max(0, row.cap - row.star));
+
+  function workshop(p: SectorZeroProgress): string {
+    const rows = workshopRows(p, h.data);
+    if (rows.length === 0)
+      return `<p class="sz-sub">${t('sector-zero.forge.empty')}</p>`;
+    const cards = rows
+      .map((row) => {
+        const module = h.data.modules[row.id]!;
+        const label = row.can
+          ? t('sector-zero.forge.price', { n: row.warrants })
+          : row.reason === 'E_FORGE_NOT_ENOUGH'
+            ? t('sector-zero.forge.poor')
+            : t('sector-zero.forge.cap');
+        // Шанс и цена стоят в карточке ВСЕГДА, даже когда нажать нельзя: `EC-2.3`
+        // требует, чтобы игрок понимал стоимость до того, как сможет заплатить.
+        const offer = row.next
+          ? `<p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: Math.round(row.chance * 100) })} · ${t('sector-zero.forge.cost', { n: row.warrants })}</p><p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)} → ${t('sector-zero.forge.gain')}: ${effectText(row.next)}</p><p class="sz-sub">${t('sector-zero.forge.burn')}</p>`
+          : `<p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)}</p>`;
+        return `<article class="sz-card"><div class="sz-card-type">${t(`yard.slot.${module.slot}`)}</div><h3>${esc(tData(module.name))}</h3><p class="sz-forge-stars">${starBar(row)} · ${t('sector-zero.forge.stars', { n: row.star, cap: row.cap })}</p>${offer}${button('forge', row.id, label, !row.can)}</article>`;
+      })
+      .join('');
+    return `<p class="sz-sub">${t('sector-zero.forge.hint')}</p><div class="sz-cards">${cards}</div>`;
+  }
+
   function heroes(p: SectorZeroProgress): string {
     const data = h.data;
     const roster = Object.entries(data.heroes)
@@ -129,7 +163,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const active = document.activeElement as HTMLElement | null;
     const focusAction = active?.dataset.prep;
     const focusId = active?.dataset.id;
-    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<b>${t('sector-zero.prep.research', { n: p.research })}</b></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')}</p><p class="sz-reward">${p.lastReward ? t('sector-zero.prep.reward', { n: p.lastReward }) : t('sector-zero.prep.earn')}</p><div class="sz-tabs">${button('tab', 'ships', t('sector-zero.prep.modules'), false, tab === 'ships')}${button('tab', 'heroes', t('sector-zero.prep.heroes'), false, tab === 'heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : heroes(p)}`;
+    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<b>${t('sector-zero.prep.research', { n: p.research })}</b><b>${t('sector-zero.forge.warrants', { n: p.warrants })}</b></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')}</p><p class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</p><div class="sz-tabs">${button('tab', 'ships', t('sector-zero.prep.modules'), false, tab === 'ships')}${button('tab', 'workshop', t('sector-zero.prep.workshop'), false, tab === 'workshop')}${button('tab', 'heroes', t('sector-zero.prep.heroes'), false, tab === 'heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : heroes(p)}`;
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)
@@ -155,11 +189,26 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       close();
       return;
     }
-    if (kind === 'tab') tab = id === 'heroes' ? 'heroes' : 'ships';
+    if (kind === 'tab') tab = id === 'heroes' ? 'heroes' : id === 'workshop' ? 'workshop' : 'ships';
     else if (kind === 'hull') hull = id;
     else if (kind === 'hero') heroId = id;
     else {
       let action: SectorProgressAction | null = null;
+      if (kind === 'forge') {
+        // Исход читаем по ЗВЁЗДНОСТИ, а не по «удалось ли изменить профиль»: неудачная
+        // попытка тоже меняет профиль (сгорели Варранты, вырос счётчик), и по успеху
+        // вызова их было бы не отличить. Никакой «почти удачи» — ровно два сообщения.
+        const before = h.progress().stars[id] ?? 0;
+        if (h.change({ kind, id })) {
+          const after = h.progress().stars[id] ?? 0;
+          message =
+            after > before
+              ? t('sector-zero.forge.won', { n: after })
+              : t('sector-zero.forge.lost');
+        } else message = t('sector-zero.prep.unavailable');
+        render();
+        return;
+      }
       if (kind === 'fit') action = { kind, hull, id };
       else if (kind === 'skill' || kind === 'ability') action = { kind, hero: heroId, id };
       else if (
