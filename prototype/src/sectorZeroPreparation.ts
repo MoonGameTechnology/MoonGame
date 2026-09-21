@@ -18,10 +18,15 @@ import {
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
+import { shopRows, type PayKind, type ShopCapabilities } from '../../decisions/sectorZeroShop';
 import { esc, displayUnit } from './format';
 
 interface PreparationHost {
   data: GameData;
+  /** Что умеет ПЛОЩАДКА (`platform-adapters.md`): решения UI принимаются по capability,
+   *  а не по имени площадки. Сегодня оба флага выключены — ни IAP, ни `PlatformAds` в
+   *  продукте нет, и рисовать живые кнопки под несуществующую машинерию нельзя. */
+  platform: ShopCapabilities;
   progress(): SectorZeroProgress;
   change(action: SectorProgressAction): boolean;
 }
@@ -47,7 +52,7 @@ const effectText = (values: Record<string, number>): string =>
 export function initSectorZeroPreparation(h: PreparationHost) {
   const panel = document.getElementById('sz-workshop')!;
   const home = document.getElementById('sz-home')!;
-  let tab: 'ships' | 'heroes' | 'workshop' = 'ships';
+  let tab: 'ships' | 'heroes' | 'workshop' | 'shop' = 'ships';
   let hull = sectorHullIds(h.data).includes('cruiser')
     ? 'cruiser'
     : (sectorHullIds(h.data)[0] ?? '');
@@ -133,6 +138,51 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     return `<p class="sz-sub">${t('sector-zero.forge.hint')}</p><div class="sz-cards">${cards}</div>`;
   }
 
+  const PAY_LABEL: Record<PayKind, string> = {
+    warrants: 'sector-zero.shop.pay.warrants',
+    sovereigns: 'sector-zero.shop.pay.sovereigns',
+    ad: 'sector-zero.shop.pay.ad',
+  };
+
+  function shop(p: SectorZeroProgress): string {
+    const rows = shopRows(p, h.data, h.platform);
+    if (rows.length === 0) return `<p class="sz-sub">${t('sector-zero.shop.empty')}</p>`;
+    const cards = rows
+      .map((row) => {
+        const title =
+          row.kind === 'module'
+            ? esc(tData(h.data.modules[row.grants]?.name ?? row.grants))
+            : row.kind === 'skill'
+              ? esc(tData(h.data.heroSkillTrees[row.grants]?.name ?? row.grants))
+              : t(`sector-zero.shop.grants.${row.grants}`, { n: row.amount });
+        const what =
+          row.kind === 'resource' ? '' : `<div class="sz-card-type">${t(`sector-zero.shop.grants.${row.kind}`)}</div>`;
+        // Способ, которого НЕТ У ПЛОЩАДКИ, не рисуется вовсе — это прямое требование
+        // `platform-adapters.md` («если `rewardedAds === false`, кнопка не показывается»),
+        // а не экономия места. Погашенная кнопка «за рекламу» там, где рекламы не бывает,
+        // обещает игроку механику, которой у него не будет никогда.
+        const offered = row.prices.filter((price) => price.available);
+        if (offered.length === 0) return ''; // купить нечем ни одним способом — не показываем
+        // Цена остаётся видимой даже у погашенной кнопки (не хватает денег, узел закрыт):
+        // `EC-2.3` требует понимать стоимость до того, как сможешь заплатить.
+        const buttons = offered
+          .map((price) =>
+            button(`buy:${price.kind}`, row.id, t(PAY_LABEL[price.kind], { n: price.amount }), !price.can),
+          )
+          .join('');
+        // Подпись — только когда купить нельзя НИЧЕМ из показанного: иначе она висела бы
+        // над живой кнопкой и объясняла не то, на что игрок смотрит.
+        const blocked = offered.every((price) => !price.can) ? offered[0]!.reason : null;
+        const note =
+          blocked === 'E_SHOP_OWNED' || blocked === 'E_SHOP_LOCKED'
+            ? `<p class="sz-sub">${t(blocked === 'E_SHOP_OWNED' ? 'sector-zero.shop.owned' : 'sector-zero.shop.locked')}</p>`
+            : '';
+        return `<article class="sz-card${row.owned ? ' selected' : ''}">${what}<h3>${title}</h3>${note}${buttons}</article>`;
+      })
+      .join('');
+    return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p><div class="sz-cards">${cards}</div>`;
+  }
+
   function heroes(p: SectorZeroProgress): string {
     const data = h.data;
     const roster = Object.entries(data.heroes)
@@ -169,7 +219,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const active = document.activeElement as HTMLElement | null;
     const focusAction = active?.dataset.prep;
     const focusId = active?.dataset.id;
-    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<b>${t('sector-zero.prep.research', { n: p.research })}</b><b>${t('sector-zero.forge.warrants', { n: p.warrants })}</b></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')}</p><p class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</p><div class="sz-tabs">${button('tab', 'ships', t('sector-zero.prep.modules'), false, tab === 'ships')}${button('tab', 'workshop', t('sector-zero.prep.workshop'), false, tab === 'workshop')}${button('tab', 'heroes', t('sector-zero.prep.heroes'), false, tab === 'heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : heroes(p)}`;
+    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<b>${t('sector-zero.prep.research', { n: p.research })}</b><b>${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b>${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')}</p><p class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</p><div class="sz-tabs">${button('tab', 'ships', t('sector-zero.prep.modules'), false, tab === 'ships')}${button('tab', 'workshop', t('sector-zero.prep.workshop'), false, tab === 'workshop')}${button('tab', 'shop', t('sector-zero.prep.shop'), false, tab === 'shop')}${button('tab', 'heroes', t('sector-zero.prep.heroes'), false, tab === 'heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)
@@ -195,11 +245,22 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       close();
       return;
     }
-    if (kind === 'tab') tab = id === 'heroes' ? 'heroes' : id === 'workshop' ? 'workshop' : 'ships';
+    if (kind === 'tab')
+      tab =
+        id === 'heroes' ? 'heroes' : id === 'workshop' ? 'workshop' : id === 'shop' ? 'shop' : 'ships';
     else if (kind === 'hull') hull = id;
     else if (kind === 'hero') heroId = id;
     else {
       let action: SectorProgressAction | null = null;
+      if (kind?.startsWith('buy:')) {
+        const pay = kind.slice(4) as PayKind;
+        // Реклама: показать её обязан адаптер площадки, и награду игра выдаёт только
+        // после ПОДТВЕРЖДЁННОГО результата (`platform-adapters.md`). Адаптера сегодня
+        // нет, поэтому до сюда способ `ad` и не доходит — кнопка погашена витриной.
+        message = t(h.change({ kind: 'buy', id, pay }) ? 'sector-zero.shop.bought' : 'sector-zero.prep.unavailable');
+        render();
+        return;
+      }
       if (kind === 'forge') {
         // Исход читаем по ЗВЁЗДНОСТИ, а не по «удалось ли изменить профиль»: неудачная
         // попытка тоже меняет профиль (сгорели Варранты, вырос счётчик), и по успеху

@@ -186,6 +186,11 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
     built_by: 'runDifficultyKey() в /decisions — из значения сложности забега (PVR-2.1)',
   },
   {
+    prefix: 'sector-zero.shop.grants.',
+    built_by:
+      'shop() в sectorZeroPreparation.ts — из `kind` товара (module/skill) либо из `grants` ресурса (research/warrants), SZE-3.1',
+  },
+  {
     prefix: 'medal.',
     built_by:
       'medalsOf() в ядре строит `medal.<линия>.<степень>` из данных `data/medalGrades.json`, ' +

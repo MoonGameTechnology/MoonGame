@@ -39,6 +39,7 @@ import heroPassives from './heroPassives.json';
 import heroSkillTrees from './heroSkillTrees.json';
 import heroGrades from './heroGrades.json';
 import sectorZeroStars from './sectorZeroStars.json';
+import sectorZeroShop from './sectorZeroShop.json';
 import modes from './modes.json';
 import rewards from './rewards.json';
 import medalGrades from './medalGrades.json';
@@ -66,6 +67,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'heroSkillTrees.json': heroSkillTrees,
   'heroGrades.json': heroGrades,
   'sectorZeroStars.json': sectorZeroStars,
+  'sectorZeroShop.json': sectorZeroShop,
   'modes.json': modes,
   'rewards.json': rewards,
   'medalGrades.json': medalGrades,
