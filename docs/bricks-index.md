@@ -1014,14 +1014,14 @@
 | SE-6.3 | ⏳ | srv | `docs/secure-environment-roadmap.md:198` | Per-player очередь (анти-double-spend) |
 | SE-6.4 | ✅ | srv | `docs/secure-environment-roadmap.md:204` | Фильтр видимости перед отправкой |
 | SE-6.5 | ⏳ | srv | `docs/secure-environment-roadmap.md:211` | Масштаб WS без поломки auth/видимости |
-| SE-7.1 | ⏳ | cli sec | `docs/secure-environment-roadmap.md:220` | CSP + Trusted Types + HSTS |
-| SE-7.2 | ⏳ | cli sec | `docs/secure-environment-roadmap.md:225` | SRI и безопасные куки |
-| SE-8.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:234` | Структурное аудит-логирование |
-| SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md:239` | Алерты на аномалии |
-| SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:244` | Метрики и трекинг ошибок |
-| SE-9.1 | ⏳ | srv | `docs/secure-environment-roadmap.md:253` | Переживание рестарта посреди матча |
-| SE-9.2 | 🔒 | docs sec | `docs/secure-environment-roadmap.md:258` | DR: RTO/RPO, runbooks, kill-switch |
-| SE-10.1 | 🔒 | docs | `docs/secure-environment-roadmap.md:267` | Минимизация данных и GDPR-база |
+| SE-7.1 | 🔶 | cli sec | `docs/secure-environment-roadmap.md:220` | CSP + Trusted Types + HSTS 2026-09-21 |
+| SE-7.2 | ⏳ | cli sec | `docs/secure-environment-roadmap.md:254` | SRI и безопасные куки |
+| SE-8.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:263` | Структурное аудит-логирование |
+| SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md:268` | Алерты на аномалии |
+| SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:273` | Метрики и трекинг ошибок |
+| SE-9.1 | ⏳ | srv | `docs/secure-environment-roadmap.md:282` | Переживание рестарта посреди матча |
+| SE-9.2 | 🔒 | docs sec | `docs/secure-environment-roadmap.md:287` | DR: RTO/RPO, runbooks, kill-switch |
+| SE-10.1 | 🔒 | docs | `docs/secure-environment-roadmap.md:296` | Минимизация данных и GDPR-база |
 | SD-0.1 | ⏳ | docs sec | `docs/secure-sdlc-roadmap.md:65` | Цель ASVS L2 + threat-model-кадэнс |
 | SD-0.2 | ✅ | sec | `docs/secure-sdlc-roadmap.md:70` | SEC-1: триаж и baseline сканеров |
 | SD-1.1 | ⏳ | core act srv | `docs/secure-sdlc-roadmap.md:87` | Валидация на каждой границе доверия |
