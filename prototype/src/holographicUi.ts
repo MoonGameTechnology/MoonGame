@@ -133,6 +133,7 @@ export function initHolographicUi(host: HolographicHost) {
         const info = host.side.style.display !== 'none';
         const commands = host.commands.classList.contains('show');
         selection.classList.toggle('has-info', info);
+        selection.classList.toggle('details-open', host.side.classList.contains('details-open'));
         selection.classList.toggle('has-commands', commands);
         selection.style.display = inGame && (info || commands) ? 'flex' : 'none';
         // The command header replaces the former dossier header; keep its live
@@ -142,7 +143,7 @@ export function initHolographicUi(host: HolographicHost) {
           const details = host.side.querySelector<HTMLElement>('.ptitle span')?.textContent;
           if (caption && details && caption.textContent !== details) caption.textContent = details;
         }
-        const key = host.selectionKey();
+        const key = host.selectionKey() + (host.side.classList.contains('details-open') ? ':details' : '');
         if (inGame && (info || commands) && key !== selected) {
           const anchor = host.selectionAnchor();
           if (anchor) {

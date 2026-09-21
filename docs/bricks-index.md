@@ -634,6 +634,9 @@
 | PERK-2.1 | ✅ | core | `docs/backlog.md:15306` | Снижение урона: один пул, одна форма, один кап. |
 | PERK-3.1 | ⏳ | core data | `docs/backlog.md:15349` | Кто и за что выдаёт последовательные множители. |
 | PERK-3.2 | 🔒 | core | `docs/backlog.md:15369` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
+| OBJP-1 | ✅ | proto | `docs/backlog.md:15384` | Значок боя наконец открывает окно, а окно даёт |
+| OBJP-2 | ✅ | proto | `docs/backlog.md:15410` | Подробности объекта встают РЯДОМ с карточкой, а не |
+| OBJP-3 | ✅ | proto | `docs/backlog.md:15422` | Каталог юнитов уехал в окно производства — туда же, |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

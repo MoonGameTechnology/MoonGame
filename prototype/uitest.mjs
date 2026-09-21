@@ -187,6 +187,24 @@ const click = async id => {
 // Test-only access to selection; clicks still go through the shipped side-panel delegate.
 const bridge = `
 module.exports = {
+  battleFixture: () => {
+    const before = s;
+    s = structuredClone(s);
+    const own = Object.values(s.fleets).find(f => f.owner === ME);
+    const foe = Object.values(s.fleets).find(f => f.owner !== ME);
+    const loc = Object.values(s.planets).find(p => p.owner === ME).id;
+    for (const f of [own, foe]) { f.location = loc; f.movement = null; delete f.edge; f.battleId = 'ui-battle'; }
+    s.battles['ui-battle'] = { id: 'ui-battle', location: loc, phase: 'orbital', round: 2,
+      nextRoundAt: s.time + HOUR, sides: [
+        { ref: { kind: 'fleet', fleetId: own.id }, owner: own.owner, role: 'attacker' },
+        { ref: { kind: 'fleet', fleetId: foe.id }, owner: foe.owner, role: 'defender' },
+      ] };
+    const oldVision = vision; vision = null;
+    clearSelection();
+    const badge = battleBadgePoint(world(battleAnchor(s.battles['ui-battle'])));
+    selectAt(badge.x, badge.y);
+    return { own: own.id, foe: foe.id, restore: () => { s = before; vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
+  },
   cards: () => ({
     planet: Object.values(s.planets).find(p => p.owner === ME).id,
     fleet: Object.values(s.fleets).find(f => f.owner === ME).id,
@@ -195,7 +213,10 @@ module.exports = {
   selectCard: (kind, id) => {
     clearSelection();
     if (kind === 'planet') selPlanet = id;
-    else setFleetSelection([id]);
+    else {
+      setFleetSelection([id]);
+      if (kind === 'foreign' && vision) vision.identify.add(fleetNode(s.fleets[id]));
+    }
     renderPanel();
   },
   selected: () => ({ fleet: panelFleet(), planet: selPlanet, orders: [...selFleets] }),
@@ -338,7 +359,10 @@ for (const [kind, id] of Object.entries(mod.exports.cards())) {
   assert.equal(backButton(), null, `${kind}: the regular card must not offer Back to itself`);
   const title = kind === 'planet' ? 'planetinfo' : 'fleetinfo';
   clickSide({ act: title });
-  assert.ok(backButton(), `${kind}: title must open its summary`);
+  assert.ok(backButton(), `${kind}: Details must open its section`);
+  assert.ok(sideEl.innerHTML.includes('class="object-brief"'));
+  assert.ok(sideEl.innerHTML.includes('class="object-detail"'));
+  assert.equal((sideEl.innerHTML.match(/data-act="(?:fleetinfo|planetinfo)"/g) ?? []).length, 1);
   const back = backButton()[1];
   clickSide({ act: back });
   assert.equal(backButton(), null, `${kind}: Back must restore the regular card`);
@@ -356,7 +380,32 @@ for (const [kind, id] of Object.entries(mod.exports.cards())) {
     assert.doesNotMatch(sideEl.innerHTML, /data-act="(?:bombard|assault|retreat|instantrepair|dockrepair)"/);
   }
 }
+const battleScene = mod.exports.battleFixture();
+assert.ok(getEl('battlewin').classList.contains('show'), 'province fallback must not swallow the battle badge');
+assert.equal((getEl('battlewinbody').innerHTML.match(/class="bw-who"/g) ?? []).length, 2);
+assert.ok(getEl('battlewinbody').innerHTML.includes('data-battle-retreat="' + battleScene.own + '"'));
+assert.ok(!getEl('battlewinbody').innerHTML.includes('data-battle-retreat="' + battleScene.foe + '"'));
+// Selection behind the modal is unrelated; retreat still uses its explicit participant.
+for (const handle of (listeners.get(getEl('battlewin')) ?? {}).click ?? [])
+  handle({ target: { classList: { contains: () => false }, closest: selector =>
+    selector === '[data-battle-retreat]' ? { dataset: { battleRetreat: battleScene.own } } : null } });
+assert.equal(JSON.parse(mod.exports.state()).fleets[battleScene.own].battleId, null);
+assert.ok(getEl('battlewinbody').innerHTML.includes('bw-empty'), 'resolved battle does not retain stale controls');
+battleScene.restore();
+console.log('Battle badge and targeted retreat OK');
 console.log('Card navigation OK — planet, own fleet and inspected foreign fleet');
+// Unit catalogs live in the production window, like the buildings one (BUILD-1): the
+// tab offers a single entry, and it must open THAT tab's roster, not the buildings list.
+mod.exports.selectCard('planet', mod.exports.cards().planet);
+clickSide({ act: 'tab', arg: 'ships' });
+assert.ok(sideEl.innerHTML.includes('data-act="openunits"'), 'a unit tab offers its catalog');
+assert.ok(!sideEl.innerHTML.includes('data-codex="u:'), 'the panel no longer carries a second catalog');
+clickSide({ act: 'openunits', arg: 'ships' });
+assert.ok(getEl('buildwin').classList.contains('show'), 'the entry opens the production window');
+assert.ok(getEl('buildwinbody').innerHTML.includes('data-unit-info='), 'units, not buildings');
+for (const handle of (listeners.get(getEl('buildwin')) ?? {}).click ?? [])
+  handle({ target: getEl('buildwin') });
+console.log('Unit production entry OK');
 for (const fn2 of sideClicks)
   fn2({
     target: { closest: () => ({ disabled: false, dataset: { act: 'build', arg: 'refinery' } }) },

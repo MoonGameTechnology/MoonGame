@@ -22,9 +22,9 @@ import { buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
-import { buildingName, cost, esc, resLine } from './format';
-import { BUILD_ICON } from './icons';
-import { buildBuilding } from '../../decisions/actions';
+import { buildingName, cost, esc, resLine, displayUnit } from './format';
+import { BUILD_ICON, unitIcon } from './icons';
+import { buildBuilding, buildUnit } from '../../decisions/actions';
 import { planetName } from './planetName';
 
 type BuildingDef = (typeof data.buildings)[string];
@@ -164,7 +164,8 @@ export function buildScreenHtml(
     const maxLvl = buildingMaxLevel(def);
     const shownLvl = st.st === 'built' ? st.level : 1;
     const name =
-      esc(buildingName(def.name, id)) + (maxLvl > 1 ? ` <i class="bw-lv">${roman(shownLvl)}</i>` : '');
+      esc(buildingName(def.name, id)) +
+      (maxLvl > 1 ? ` <i class="bw-lv">${roman(shownLvl)}</i>` : '');
     const right =
       st.st === 'built'
         ? `<span class="bw-st done">✓ ${t('build.state.done')}${st.count > 1 ? ` ×${st.count}` : ''}</span>`
@@ -221,6 +222,42 @@ export function buildScreenHtml(
   return head + `<div class="bw-scroll"><div class="bw-list">${tabs}${list}</div></div>`;
 }
 
+export type UnitCatalogTab = 'ground' | 'ships' | 'shuttle';
+
+/** Buildings and units share the same list, price, duration and action hierarchy. */
+export function unitScreenHtml(
+  state: GameState,
+  me: string,
+  planetId: string,
+  ids: readonly string[],
+  probe: (a: Action) => string | null,
+  lockText: (code: string) => string,
+): string {
+  if (state.planets[planetId]?.owner !== me) return '';
+  const res = state.players[me]?.resources ?? {};
+  const rows = ids
+    .map((id) => {
+      const def = data.units[id];
+      if (!def) return '';
+      const code = probe(buildUnit(me, planetId, id, 1));
+      if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
+      const locked = code !== null && code !== 'E_INSUFFICIENT';
+      const right = locked
+        ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>`
+        : `<button class="bw-take" data-unit-go="${esc(id)}"${code ? ' disabled' : ''}>▷ ${t(code ? 'build.action.no-res' : 'build.action.build')}</button>`;
+      return (
+        `<div class="bw-item st-${locked ? 'lock' : 'ready'}" data-unit-info="${esc(id)}"><div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
+        `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
+        `<div class="bw-foot"><span>${cost(def.cost, res)}</span><span class="bw-dur">${t('fmt.hours', { n: def.buildTimeHours })}</span></div></div>`
+      );
+    })
+    .join('');
+  return (
+    `<div class="bw-top"><div class="bw-world"><b>${esc(planetName(planetId))}</b><span>${t('production.units')}</span></div></div>` +
+    `<div class="bw-scroll"><div class="bw-list">${rows}</div></div>`
+  );
+}
+
 /** Что окну нужно от матч-экрана. */
 export interface BuildHost {
   /** Само окно (`#buildwin`) — показ/скрытие классом .show и делегат кликов. */
@@ -235,6 +272,9 @@ export interface BuildHost {
   localQueued(planetId: string, id: string): boolean;
   /** Заказ стройки хостовым путём (enqueueBuild: сеть → приказ, соло → очередь). */
   build(planetId: string, id: string): void;
+  unitIds(tab: UnitCatalogTab): string[];
+  buildUnit(planetId: string, id: string): void;
+  openUnitInfo(id: string): void;
   /** Тап по строке → полная карточка здания (кодекс с листалкой уровней). */
   openInfo(id: string): void;
   /** Незнакомый код отказа → слова (errText хоста). */
@@ -244,11 +284,12 @@ export interface BuildHost {
 }
 
 export function initBuildScreen(host: BuildHost): {
-  open: (planetId: string) => void;
+  open: (planetId: string, units?: UnitCatalogTab) => void;
   repaint: () => void;
   isOpen: () => boolean;
 } {
   let planetId: string | null = null;
+  let units: UnitCatalogTab | null = null;
   let activeCat: BuildCategory | null = null;
   // Кэш разметки как у techTree: одинаковую строку не переприсваиваем — innerHTML
   // пересоздаёт DOM даже на идентичном тексте и выбивал бы кнопку из-под пальца.
@@ -256,16 +297,25 @@ export function initBuildScreen(host: BuildHost): {
 
   function repaint(): void {
     if (!planetId) return;
-    const html = buildScreenHtml(
-      host.state(),
-      host.me(),
-      planetId,
-      (a) => host.probe(a),
-      (pid, id) => host.localQueued(pid, id),
-      (code) => host.lockText(code),
-      (id, level) => host.dossierBody(id, level),
-      activeCat,
-    );
+    const html = units
+      ? unitScreenHtml(
+          host.state(),
+          host.me(),
+          planetId,
+          host.unitIds(units),
+          (a) => host.probe(a),
+          (code) => host.lockText(code),
+        )
+      : buildScreenHtml(
+          host.state(),
+          host.me(),
+          planetId,
+          (a) => host.probe(a),
+          (pid, id) => host.localQueued(pid, id),
+          (code) => host.lockText(code),
+          (id, level) => host.dossierBody(id, level),
+          activeCat,
+        );
     if (html === lastHtml) return;
     const body = host.body();
     const before = body.querySelector('.bw-scroll');
@@ -280,6 +330,17 @@ export function initBuildScreen(host: BuildHost): {
     const tg = e.target as HTMLElement;
     if (tg === host.root() || tg.classList.contains('tw-close')) {
       host.root().classList.remove('show');
+      return;
+    }
+    const unitGo = tg.closest<HTMLElement>('[data-unit-go]')?.dataset.unitGo;
+    if (unitGo && planetId && units && host.unitIds(units).includes(unitGo)) {
+      host.buildUnit(planetId, unitGo);
+      repaint();
+      return;
+    }
+    const unitInfo = tg.closest<HTMLElement>('[data-unit-info]')?.dataset.unitInfo;
+    if (unitInfo) {
+      host.openUnitInfo(unitInfo);
       return;
     }
     // Вкладка категории — переключает фильтр и перерисовывает список.
@@ -303,7 +364,8 @@ export function initBuildScreen(host: BuildHost): {
   });
 
   return {
-    open: (pid: string) => {
+    open: (pid: string, unitTab?: UnitCatalogTab) => {
+      units = unitTab ?? null;
       planetId = pid;
       activeCat = null; // новый мир открывается на «все»
       lastHtml = ''; // другой мир — прошлая разметка не годится даже совпав строкой
