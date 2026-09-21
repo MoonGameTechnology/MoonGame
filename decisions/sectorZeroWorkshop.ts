@@ -44,6 +44,11 @@ export interface WorkshopRow {
   now: Record<string, number>;
   /** Вклад ПОСЛЕ следующей звезды, или `null` на потолке: предлагать нечего. */
   next: Record<string, number> | null;
+  /** Осколки — сгоревших попыток на текущей ступени (`EC-2.2`). */
+  shards: number;
+  /** Потолок попыток ступени: на этой по счёту попытке звезда даётся без броска.
+   *  Ноль = гарантии у ступени нет, и показывать накопление незачем. */
+  pity: number;
 }
 
 /** Вклад модуля на звезде `star` — базовые дельты, помноженные на множитель ступени. */
@@ -71,8 +76,9 @@ export function workshopRows(
   for (const id of progress.modules) {
     if (!data.modules[id]) continue;
     const star = progress.stars[id] ?? 0;
+    const shards = progress.forgeShards[id] ?? 0;
     const out = forgeOutcome(
-      { seed: progress.seed, attempt: progress.forgeTries[id] ?? 0, target: id, star },
+      { seed: progress.seed, attempt: progress.forgeTries[id] ?? 0, target: id, star, shards },
       ladder,
       progress.warrants,
     );
@@ -84,6 +90,8 @@ export function workshopRows(
       warrants: out.warrants,
       can: out.allowed,
       reason: out.reason,
+      shards,
+      pity: ladder.steps[star]?.pity ?? 0,
       now: contribution(id, star, data),
       next: out.reason === 'E_FORGE_AT_CAP' ? null : contribution(id, star + 1, data),
     });

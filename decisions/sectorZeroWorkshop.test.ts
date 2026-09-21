@@ -46,3 +46,32 @@ describe('sectorZeroWorkshop — что видно ДО подтверждени
     expect(workshopRows(profile({ warrants: 9999 }), bare)).toEqual([]);
   });
 });
+
+describe('sectorZeroWorkshop — поток осколков виден', () => {
+  const ladder = forgeLadder(data);
+  const top = ladder.cap - 1;
+
+  it('строка несёт осколки и порог гарантии', () => {
+    const rows = workshopRows(
+      profile({ warrants: 9999, stars: { cargo_bay: top }, forgeShards: { cargo_bay: 2 } }),
+      data,
+    );
+    const row = rows.find((r) => r.id === 'cargo_bay')!;
+    expect([row.shards, row.pity]).toEqual([2, ladder.steps[top]!.pity ?? 0]);
+  });
+
+  it('на гарантии показывается сто процентов, а не номинальный шанс', () => {
+    // Иначе экран обещал бы бросок там, где его уже не будет (`EC-2.3`).
+    const pity = ladder.steps[top]!.pity ?? 0;
+    const rows = workshopRows(
+      profile({ warrants: 9999, stars: { cargo_bay: top }, forgeShards: { cargo_bay: pity - 1 } }),
+      data,
+    );
+    expect(rows.find((r) => r.id === 'cargo_bay')!.chance).toBe(1);
+  });
+
+  it('на ступени без гарантии порог нулевой — рисовать нечего', () => {
+    const rows = workshopRows(profile({ warrants: 9999 }), data);
+    expect([rows[0]!.shards, rows[0]!.pity]).toEqual([0, 0]);
+  });
+});
