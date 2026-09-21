@@ -14,8 +14,17 @@ const profile = (over: Partial<SectorZeroProgress> = {}): SectorZeroProgress => 
   ...freshSectorZeroProgress(data, 'shopper'),
   ...over,
 });
+/** Витрина ротируется посуточно (`SZE-3.2`), поэтому нужный лот ищется по дню, а не
+ *  предполагается на месте: иначе тест проверял бы удачу ротации, а не правило. */
+const dayWith = (p: SectorZeroProgress, id: string): SectorZeroProgress => {
+  for (let day = 0; day < 400; day++) {
+    const on = { ...p, day };
+    if (shopRows(on, data, ALL).some((r) => r.id === id)) return on;
+  }
+  throw new Error(`лот ${id} не выпал ни на одни сутки из 400 — проверь веса`);
+};
 const row = (p: SectorZeroProgress, caps: ShopCapabilities, id: string) =>
-  shopRows(p, data, caps).find((r) => r.id === id)!;
+  shopRows(dayWith(p, id), data, caps).find((r) => r.id === id)!;
 const priceOf = (p: SectorZeroProgress, caps: ShopCapabilities, id: string, kind: string) =>
   row(p, caps, id).prices.find((x) => x.kind === kind)!;
 
@@ -49,7 +58,13 @@ describe('sectorZeroShop — витрина знает, чем можно пла
   });
 
   it('пустая витрина выключает магазин данными', () => {
-    expect(shopRows(profile(), { ...data, sectorZeroShop: { offers: {} } }, ALL)).toEqual([]);
+    expect(shopRows(profile(), { ...data, sectorZeroShop: { slots: 5, offers: {} } }, ALL)).toEqual([]);
+    // Ноль слотов выключает так же: каталог есть, показывать нечего.
+    expect(shopRows(profile(), { ...data, sectorZeroShop: { ...data.sectorZeroShop, slots: 0 } }, ALL)).toEqual([]);
+  });
+
+  it('витрина суток короче каталога — в этом и смысл ротации', () => {
+    expect(shopRows(profile(), data, ALL).length).toBe(data.sectorZeroShop.slots);
   });
 });
 
