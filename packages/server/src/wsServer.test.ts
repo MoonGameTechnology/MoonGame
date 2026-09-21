@@ -10,6 +10,7 @@ import {
 } from '@void/shared-core';
 import { MatchRoom } from './matchRoom';
 import { createMultiplayerServer } from './wsServer';
+import { inlineHashes } from './securityHeaders';
 import { MemoryAccountStore } from './store';
 import type { ServerMessage } from './protocol';
 
@@ -220,6 +221,64 @@ describe('createMultiplayerServer · сбой обработки сообщен�
       await new Promise((r) => setTimeout(r, 50));
       expect(ws.readyState).toBe(WebSocket.OPEN);
       ws.close();
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+// SE-7.1 — заголовки доставки. Правило живёт в `securityHeaders.ts` и покрыто там;
+// здесь проверяется ПРОВОДКА: что политика правда уезжает с ответом и что её хеш
+// совпадает с тем самым документом, а не с абстрактным.
+describe('заголовки доставки клиента (SE-7.1)', () => {
+  const CLIENT = '<!doctype html><title>c</title><style>b{color:#000}</style><script>go()</script>';
+  const httpBase = (wsUrl: string): string =>
+    wsUrl.replace(/^ws/, 'http').replace(/\/matches(\/.*)?$/, '');
+
+  it('документ уходит с политикой, построенной по ЕГО инлайновым блокам', async () => {
+    const server = createMultiplayerServer({ room: makeRoom(), indexHtml: CLIENT });
+    const base = httpBase(await server.listen());
+    try {
+      const res = await fetch(`${base}/`);
+      const csp = res.headers.get('content-security-policy') ?? '';
+      const { scripts, styles } = inlineHashes(CLIENT);
+      expect(csp).toContain(`script-src ${scripts[0]}`);
+      expect(csp).toContain(`style-src ${styles[0]}`);
+      expect(csp).not.toContain('unsafe-inline');
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+      // По http HSTS не ставится: он запомнился бы браузером на весь localhost.
+      expect(res.headers.get('strict-transport-security')).toBeNull();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('площадке-порталу встраивание разрешается параметром, а не снятием заголовка', async () => {
+    const server = createMultiplayerServer({
+      room: makeRoom(),
+      indexHtml: CLIENT,
+      frameAncestors: ['https://portal.example'],
+    });
+    const base = httpBase(await server.listen());
+    try {
+      const csp = (await fetch(`${base}/`)).headers.get('content-security-policy') ?? '';
+      expect(csp).toContain('frame-ancestors https://portal.example');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('JSON-ответ тоже защищён: исполнять там нечего, и тип угадывать не надо', async () => {
+    const server = createMultiplayerServer({ room: makeRoom() });
+    const base = httpBase(await server.listen());
+    try {
+      const res = await fetch(`${base}/health`);
+      expect(res.headers.get('content-security-policy')).toBe(
+        "default-src 'none'; frame-ancestors 'none'",
+      );
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(res.headers.get('referrer-policy')).toBe('no-referrer');
     } finally {
       await server.close();
     }

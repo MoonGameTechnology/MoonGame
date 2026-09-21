@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { advance, canOrder, newGame, order, HOUR } from './game';
 import { moveFleet, stopFleet } from '../../decisions/actions';
+import { canAssaultAim } from '../../decisions/cmdAvailability';
 
 /** Живое состояние прототипа: свой флот стоит дома. */
 const base = () => {
@@ -69,5 +70,36 @@ describe('CMD-VIS — кнопка и обработчик подключены 
     expect(probes.length).toBeGreaterThanOrEqual(2);
     // Рукописного предиката «а движется ли флот» у стопа больше нет.
     expect(src).not.toContain('if (s.fleets[id]?.movement) playerOrder(stopFleet');
+  });
+});
+
+// Заказ владельца 2026-09-21: «кнопка штурм появляется только если есть во флоте кем
+// штурмовать». Тот же CMD-VIS, только проба не у ядра: приказ издаётся ПОСЛЕ выбора
+// цели, спросить про мир нечего — поэтому правило про СОСТАВ живёт чистой функцией
+// (`decisions/cmdAvailability.canAssaultAim`), а сторож ниже держит её подключение.
+describe('CMD-VIS — штурм спрашивает десант, а не корабли', () => {
+  const total = (stacks: ReadonlyArray<{ count: number }> = []): number =>
+    stacks.reduce((n, st) => n + st.count, 0);
+
+  it('у стартового флота есть корабли, но штурмовать ими некого', () => {
+    const { f } = base();
+    // Если однажды стартовый состав изменится и десант появится — тест это заметит, и
+    // менять надо будет не правило, а фикстуру.
+    expect(total(f.units)).toBeGreaterThan(0);
+    expect(canAssaultAim([total(f.landing)])).toBe(false);
+  });
+
+  it('погрузили десант — штурмовать стало кем', () => {
+    const { f } = base();
+    const withTroops = { ...f, landing: [{ unit: 'militia', count: 2 }] };
+    expect(canAssaultAim([total(withTroops.landing)])).toBe(true);
+  });
+
+  it('main.ts даёт кнопке ряда именно ДЕСАНТ выделения и прячет её без него', () => {
+    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    expect(src).toContain('troops: canAssaultAim(fleets.map((f) => sumUnits(f.landing ?? [])))');
+    expect(src).toContain('shown.assault');
+    // Прежний предикат считал КОРАБЛИ — с ним кнопка горела у эскадры без десанта.
+    expect(src).not.toMatch(/canAssault =[\s\S]{0,120}sumUnits\(f\.units\)/);
   });
 });
