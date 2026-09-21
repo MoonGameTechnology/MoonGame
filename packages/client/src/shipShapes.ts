@@ -86,6 +86,7 @@ export const SWARM_UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
   siege: 'swarmDestroyer',
   siege_lance: 'swarmDestroyer',
   shuttle_carrier: 'swarmMatriarch',
+  swarm_brood_mother: 'swarmMatriarch',
   hero: 'swarmLeviathan',
 };
 

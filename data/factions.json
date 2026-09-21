@@ -86,18 +86,44 @@
   },
   "swarm": {
     "name": "The Swarm",
-    "description": "A ravenous bio-collective that converts captured worlds into biomass and breeds infected hulls.",
-    "traits": ["consume_biomass"],
+    "description": "An artificial biotech collective that grows living forms from biomass, metal and microelectronics. Industrial worlds supply its structural tissues and neural organs.",
+    "traits": [
+      "consume_biomass"
+    ],
     "abilities": [],
-    "uniqueUnits": [],
+    "uniqueUnits": [
+      "swarm_brood_mother",
+      "swarm_lander"
+    ],
     "startingLoadout": {
-      "resources": { "credits": 200, "metal": 200, "food": 150, "energy": 60 },
+      "resources": {
+        "biomass": 200,
+        "metal": 200,
+        "microelectronics": 60
+      },
       "fleet": [
-        { "unit": "scout_drone", "count": 1 }
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1,
+          "modules": [
+            "swarm_brood_chamber"
+          ]
+        }
       ],
-      "garrison": [{ "unit": "militia", "count": 2 }],
-      "homeBuildings": ["biomass_pit", "power_plant"]
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ],
+      "homeBuildings": [
+        "biomass_pit",
+        "mine_t1",
+        "swarm_synapse"
+      ]
     },
-    "passives": { "productionBonus": 0.15 }
+    "passives": {
+      "productionBonus": 0.15
+    }
   }
 }

@@ -59,7 +59,7 @@
     },
     "buildTimeHours": 8,
     "produces": {
-      "food": 30
+      "biomass": 30
     },
     "hp": 15,
     "scoreValue": 8,
@@ -617,5 +617,25 @@
     "hp": 16,
     "scoreValue": 3,
     "creditsBonus": 0.25
+  },
+  "swarm_synapse": {
+    "name": "Synaptic Digester",
+    "cost": {
+      "biomass": 60,
+      "metal": 80
+    },
+    "buildTimeHours": 6,
+    "produces": {
+      "microelectronics": 4
+    },
+    "upkeep": {
+      "metal": 8,
+      "biomass": 2
+    },
+    "hp": 20,
+    "scoreValue": 8,
+    "traits": [
+      "infected"
+    ]
   }
 }

@@ -154,6 +154,7 @@ export const UnitDefSchema = z.object({
 export const StartingStackSchema = z.object({
   unit: z.string(),
   count: z.number().int().positive(),
+  modules: z.array(z.string()).optional(),
 });
 
 /** What a player of this faction begins a match with (consumed by the match-start
@@ -623,11 +624,21 @@ export const ModuleEffectsSchema = z.object({
 export const ModuleDefSchema = z
   .object({
     name: z.string(),
+    /** Optional localized description key, shared by both clients. */
+    description: z.string().optional(),
     slot: ShipSlotTypeSchema,
     tag: z.enum(['horizontal', 'vertical']),
     effects: ModuleEffectsSchema.default({ stats: {}, enables: [] }),
     cost: ResourceBagSchema.default({}),
     allowed: ModuleAllowedSchema.optional(),
+    /** Automatic onboard growth: one ground organism per fitted hull and cycle.
+     * Costs come from the organism's unit definition, never from the client. */
+    brood: z
+      .object({
+        unit: z.string(),
+        intervalHours: z.number().positive(),
+      })
+      .optional(),
     /** Bound to the owning player (anti-RMT). A `vertical` module must never be
      *  soulbound — a paid source can't sell combat power (refined below). */
     soulbound: z.boolean().optional(),

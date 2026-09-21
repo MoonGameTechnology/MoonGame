@@ -1474,6 +1474,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
 #swarm-dossier .lw-head,#scipick .lw-head,#boonpick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+.swarm-sync{display:none;}
+@keyframes swarm-intel-scan{to{transform:rotate(360deg);}}
 #swarm-dossier-body,#scipickbody,#boonpickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
 .sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px;}
 .sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
@@ -2769,6 +2771,22 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
   #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
   #swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{width:53.4vw;max-height:58.5vh;}
+  /* Persistent intelligence stays beside the map and never intercepts map input
+     outside its own box. Its height follows the desktop HUD's actual zoom. */
+  #swarm-dossier.pinned{inset:auto;left:70px;bottom:62px;padding:0;z-index:18;
+    width:min(270px,25vw);background:none;backdrop-filter:none;align-items:stretch;}
+  #swarm-dossier.pinned .twbox{width:100%;max-height:min(42vh,calc(var(--vph) - var(--tbh) - 120px));}
+  #swarm-dossier.pinned #swarm-dossier-close{display:none;}
+  #swarm-dossier.pinned .swarm-sync{display:inline-flex;align-items:center;gap:6px;visibility:hidden;
+    color:var(--cyan);font-size:10px;font-weight:400;white-space:nowrap;}
+  #swarm-dossier.pinned .swarm-sync::before{content:'';width:11px;height:11px;flex:none;
+    border:1px solid var(--cyan-dim);border-top-color:var(--cyan);border-right-color:var(--cyan);border-radius:50%;}
+  #swarm-dossier.pinned.updating .swarm-sync{visibility:visible;}
+  #swarm-dossier.pinned.updating.scan-motion .swarm-sync::before{animation:swarm-intel-scan .7s linear infinite;}
+  #swarm-dossier.pinned .swarm-contact{border-top:1px solid var(--cyan-dim);padding-top:8px;}
+  #swarm-dossier.pinned .swarm-contact h3{font-size:12px;overflow-wrap:anywhere;}
+  #swarm-dossier.pinned .swarm-contact ul{padding-left:16px;}
+  #swarm-dossier.pinned .swarm-biology{margin-bottom:10px;}
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
@@ -2960,7 +2978,7 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
-<div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
+<div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><span class="swarm-sync" aria-hidden="true" data-i18n="swarm.intel.updated"></span><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
 <div id="boonpick"><div class="twbox"><div class="lw-head"><b data-i18n="win.boon.title"></b><button class="sp-cancel" type="button" data-boonlater="1" data-i18n="win.boon.later"></button></div><div id="boonpickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->

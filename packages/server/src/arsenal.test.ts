@@ -90,7 +90,7 @@ describe('достижимость содержимого на гейтиров�
   /** Кого вообще спрашивает гейт владения: корабли. Наземка идёт мимо него (см. шапку). */
   const gated = (): string[] =>
     Object.entries(data.units)
-      .filter(([, u]) => u.domain !== 'ground')
+      .filter(([, u]) => u.domain !== 'ground' && u.faction !== 'swarm') // NPC organisms are never human loot.
       .map(([id]) => id);
 
   /** `hero` — корабль флагмана: он не строится ни на одной верфи, его СЕЕТ `hero.spawn`,

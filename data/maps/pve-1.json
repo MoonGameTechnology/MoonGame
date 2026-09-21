@@ -126,6 +126,8 @@
       "planetType": "volcanic",
       "owner": "p3",
       "buildings": [
+        { "type": "biomass_pit" },
+        { "type": "swarm_synapse" },
         {
           "type": "mine_t2"
         },
@@ -169,7 +171,9 @@
       "ai": true,
       "resources": {
         "credits": 800,
-        "metal": 800
+        "metal": 800,
+        "biomass": 300,
+        "microelectronics": 80
       }
     },
     "pirates": {
@@ -206,8 +210,9 @@
       "location": "hive",
       "units": [
         {
-          "unit": "cruiser",
-          "count": 3
+          "unit": "swarm_brood_mother",
+          "count": 3,
+          "modules": ["swarm_brood_chamber"]
         },
         {
           "unit": "scout_drone",

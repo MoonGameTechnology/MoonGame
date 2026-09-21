@@ -458,6 +458,7 @@ export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
 export { pveModule } from './modules/pve';
+export { fleetBroodModule } from './modules/fleetBrood';
 export {
   taxModule,
   civicTax,

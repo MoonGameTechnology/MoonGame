@@ -11,6 +11,7 @@
  */
 import {
   createInitialState,
+  factionStart,
   pairKey,
   type DiplomaticStance,
   type GameState,
@@ -241,6 +242,18 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     const home = planets[seat.start];
     if (!home) continue;
     home.owner = seat.id;
+    if (seat.faction === 'swarm') {
+      const start = factionStart(data, seat.faction);
+      home.buildings = start.buildings;
+      home.garrison = start.garrison;
+      players[seat.id] = player(seat.id, seat.name, seat.faction, start.resources, seat.ai);
+      fleets[`${seat.id}-1`] = {
+        id: `${seat.id}-1`, owner: seat.id, location: seat.start, movement: null,
+        units: start.fleet, traits: [], orbit: 'near',
+      };
+      continue; // The Swarm has growth organs, no human hero or scientist council.
+    }
+
     home.buildings = [
       { type: 'mine', level: 1, hp: hpOfLevel('mine', 1) },
       { type: 'radar', level: 1, hp: hpOfLevel('radar', 1) },

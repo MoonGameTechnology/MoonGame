@@ -22,8 +22,23 @@ function passive(player: Player | undefined, data: GameData, key: PassiveKey): n
 
 export const factionModule: GameModule = {
   id: 'faction',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
+    // Signature organisms belong to their declared faction, even for direct intents.
+    api.hook<{ allowed: boolean; code?: string }>(
+      'construction.requirement',
+      (requirement, args, h) => {
+        if (!requirement.allowed) return requirement;
+        const { playerId, kind, id } = args as { playerId: string; kind: string; id: string };
+        if (kind !== 'unit') return requirement;
+        const owner = Object.entries(h.ctx.data.factions).find(([, def]) =>
+          def.uniqueUnits.includes(id),
+        );
+        return owner && owner[0] !== h.state.players[playerId]?.faction
+          ? { allowed: false, code: 'E_FORBIDDEN' }
+          : requirement;
+      },
+    );
     // Owned-world production ×(1 + productionBonus).
     api.hook<ResourceBag>('economy.production', (bag, args, h) => {
       const planetId = (args as { planetId?: string }).planetId;

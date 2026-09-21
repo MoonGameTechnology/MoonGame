@@ -1362,18 +1362,64 @@ if (typeof ResizeObserver !== 'undefined')
   }).observe(side);
 const logEl = $('log');
 const swarmDossierWin = $('swarm-dossier');
+const swarmDossierDesktop = window.matchMedia?.('(min-width:900px) and (hover:hover) and (pointer:fine)');
+let swarmDossierPinned = false;
 let lastSwarmDossierHtml = '';
+let lastSwarmDossierRefresh = -Infinity;
+let lastSwarmDossierContactKey = '';
+let swarmDossierScanUntil = 0;
+const SWARM_DOSSIER_REFRESH_MS = 500;
 function closeSwarmDossier(): void {
+  if (swarmDossierPinned) return;
   swarmDossierWin.classList.remove('show');
   document.querySelector<HTMLButtonElement>('[data-swarm-intel]')?.focus({ preventScroll: true });
 }
 $('swarm-dossier-close').addEventListener('click', closeSwarmDossier);
-function renderSwarmDossier(): void {
-  if (!inMatch()) { swarmDossierWin.classList.remove('show'); return; }
-  if (!swarmDossierWin.classList.contains('show')) return;
-  const html = swarmDossierHtml(swarmDossier(s, ME, vision?.identify ?? new Set()));
+function renderSwarmDossier(now = performance.now()): void {
+  const pinned = Boolean(inMatch() && s.pve && swarmDossierDesktop?.matches);
+  if (pinned !== swarmDossierPinned) {
+    swarmDossierPinned = pinned;
+    lastSwarmDossierRefresh = -Infinity;
+    swarmDossierWin.classList.toggle('pinned', pinned);
+    swarmDossierWin.classList.toggle('show', pinned);
+    swarmDossierWin.setAttribute('role', pinned ? 'complementary' : 'dialog');
+    if (pinned) swarmDossierWin.removeAttribute('aria-modal');
+    else swarmDossierWin.setAttribute('aria-modal', 'true');
+  }
+  if (pinned) swarmDossierWin.classList.add('show');
+  if (!inMatch()) swarmDossierWin.classList.remove('show');
+  if (!swarmDossierWin.classList.contains('show')) {
+    lastSwarmDossierRefresh = -Infinity;
+    lastSwarmDossierContactKey = '';
+    swarmDossierScanUntil = 0;
+    swarmDossierWin.classList.remove('updating');
+    return;
+  }
+  swarmDossierWin.classList.toggle('scan-motion', pinned && motionOn());
+  swarmDossierWin.classList.toggle('updating', pinned && now < swarmDossierScanUntil);
+  // Coalesce incoming state changes before building contacts/HTML, not only DOM writes.
+  // The simulation and fog keep their full cadence; only this desktop panel is sampled.
+  if (pinned && now - lastSwarmDossierRefresh < SWARM_DOSSIER_REFRESH_MS) return;
+  lastSwarmDossierRefresh = now;
+  const contacts = swarmDossier(s, ME, vision?.identify ?? new Set());
+  // A live observation's clock advances continuously. It must not spin the scanner.
+  const contactKey = JSON.stringify(contacts.map(c => ({
+    id: c.id, location: c.location, units: c.units, live: c.live, at: c.live ? undefined : c.at,
+  })));
+  if (pinned && contactKey !== lastSwarmDossierContactKey && (contacts.length || lastSwarmDossierContactKey)) {
+    swarmDossierScanUntil = now + 750;
+    swarmDossierWin.classList.add('updating');
+  }
+  lastSwarmDossierContactKey = contactKey;
+  const html = swarmDossierHtml(contacts);
   if (html !== lastSwarmDossierHtml) {
-    $('swarm-dossier-body').innerHTML = html;
+    const body = $('swarm-dossier-body');
+    const scroll = body.scrollTop;
+    const biologyOpen = body.querySelector<HTMLDetailsElement>('.swarm-biology')?.open;
+    body.innerHTML = html;
+    const biology = body.querySelector<HTMLDetailsElement>('.swarm-biology');
+    if (biology && biologyOpen) biology.open = true;
+    body.scrollTop = scroll;
     lastSwarmDossierHtml = html;
   }
 }
@@ -12586,7 +12632,7 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z60
   { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
-  { id: 'swarm-dossier', isOpen: () => shown('swarm-dossier'), close: closeSwarmDossier }, // z60
+  { id: 'swarm-dossier', isOpen: () => !swarmDossierPinned && shown('swarm-dossier'), close: closeSwarmDossier }, // z60 modal only
   { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
   { id: 'sector-zero', isOpen: () => sectorZeroMenu.canGoBack(), close: () => sectorZeroMenu.back() }, // z58
   // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false
@@ -13215,7 +13261,7 @@ function frame(nowReal: number) {
   tickRunSave(nowReal);
   tickSoloSave(nowReal);
   renderBoonPick();
-  renderSwarmDossier();
+  renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
@@ -13229,7 +13275,7 @@ function frame(nowReal: number) {
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
-    (s.pve ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
+    (s.pve && !swarmDossierPinned ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
@@ -13314,7 +13360,8 @@ function frame(nowReal: number) {
     chip(RES_SVG['metal']!, 'metal') +
     chip(RES_SVG['food']!, 'food') +
     chip(RES_SVG['energy']!, 'energy') +
-    chip(RES_SVG['microelectronics']!, 'microelectronics');
+    chip(RES_SVG['microelectronics']!, 'microelectronics') +
+    ((r.biomass ?? 0) > 0 || (inc.biomass ?? 0) !== 0 ? chip(RES_SVG['biomass']!, 'biomass') : '');
   if (hudHtml !== lastHudHtml) {
     purse.innerHTML = hudHtml;
     lastHudHtml = hudHtml;
