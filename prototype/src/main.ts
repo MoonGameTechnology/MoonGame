@@ -12902,7 +12902,11 @@ function restoreSolo(): void {
  */
 const runSaveStore: RunSaveStore = localRunSaveStore();
 const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY);
-let sectorProgress = freshSectorZeroProgress(data);
+// Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
+// Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
+// он один раз — у сохранённого профиля свой сид, и разбор его сохраняет.
+const sectorSeed = `${Date.now().toString(36)}.${Math.random().toString(36).slice(2, 10)}`;
+let sectorProgress = freshSectorZeroProgress(data, sectorSeed);
 let sectorAttempt = 0;
 let sectorRunActive = false;
 let sectorDevActive = false;
@@ -12911,7 +12915,7 @@ let savedRun: RunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
 let runWrite = Promise.resolve();
 let progressWrite = sectorProgressStore.load().then(raw => {
-  sectorProgress = parseSectorZeroProgress(raw, data);
+  sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
 });
 let clearedAttempt = 0;
 
