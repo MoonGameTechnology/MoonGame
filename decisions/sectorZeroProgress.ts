@@ -54,6 +54,9 @@ export interface SectorZeroProgress {
    *  Поимённые, как и {@link SectorZeroProgress.forgeTries}, и по той же причине: общий
    *  счёт позволил бы копить гарантию дешёвыми неудачами, а тратить на дорогой ступени. */
   forgeShards: Record<string, number>;
+  /** Номер суток витрины магазина (`SZE-3.2`), МОНОТОННЫЙ. Двигает его только
+   *  `advanceShopDay`; см. там, почему уменьшать его нельзя. */
+  day: number;
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
@@ -97,6 +100,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     sovereigns: 0,
     forgeTries: {},
     forgeShards: {},
+    day: 0,
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
@@ -345,6 +349,7 @@ export function parseSectorZeroProgress(
     fresh.lastReward = counter(p.lastReward);
     fresh.warrants = counter(p.warrants);
     fresh.sovereigns = counter(p.sovereigns);
+    fresh.day = counter(p.day);
     if (typeof p.seed === 'string') fresh.seed = p.seed;
     fresh.modules = [
       ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),

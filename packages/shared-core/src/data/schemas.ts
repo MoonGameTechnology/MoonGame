@@ -764,11 +764,16 @@ export const SectorZeroOfferSchema = z.object({
   /** Сколько выдать. Значим только для `kind: 'resource'`. */
   amount: z.number().int().positive().default(1),
   prices: SectorZeroPriceSchema.prefault({}),
+  /** Вес в суточной ротации (`SZE-3.2`): чем больше, тем чаще лот попадает на витрину.
+   *  Ноль = из ротации исключён, но товаром остаётся — пригодится для событийных лотов. */
+  weight: z.number().int().nonnegative().default(1),
 });
 
 /** Витрина магазина Sector Zero целиком. Пустая = магазина в этой сборке нет — та же
  *  форма выключения данными, что у лестницы звёздности и медалей. */
 export const SectorZeroShopSchema = z.object({
+  /** Сколько лотов показывать в сутки. Больше каталога — покажется весь каталог. */
+  slots: z.number().int().nonnegative().default(0),
   offers: z.record(z.string(), SectorZeroOfferSchema).default({}),
 });
 

@@ -110,9 +110,12 @@ export interface ForgeOutcome {
  *
  * Экспортируется ради тестов и отладки: показать игроку, что исход не подкручен, проще
  * всего умея его воспроизвести.
+ *
+ * Сам хеш вынесен в {@link hashUnit}: ротация витрины магазина (`SZE-3.2`) выводится из
+ * своего ключа тем же приёмом, и вторая копия FNV в репозитории не нужна — разойдясь,
+ * копии дали бы два «детерминированных» правила с разным поведением.
  */
-export function forgeRoll(a: ForgeAttempt): number {
-  const key = `${a.seed}\u0000${a.attempt}\u0000${a.target}\u0000${a.star}`;
+export function hashUnit(key: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) {
     hash ^= key.charCodeAt(i);
@@ -120,6 +123,10 @@ export function forgeRoll(a: ForgeAttempt): number {
     hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
   }
   return hash / 0x100000000;
+}
+
+export function forgeRoll(a: ForgeAttempt): number {
+  return hashUnit(`${a.seed}\u0000${a.attempt}\u0000${a.target}\u0000${a.star}`);
 }
 
 /**
