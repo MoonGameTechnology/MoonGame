@@ -233,7 +233,16 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 - Run `pnpm run check` before committing; keep CI green.
 - When you finish a roadmap milestone, update the "Статус реализации" section in
   `docs/roadmap.md`.
-- Development happens on the feature branch; open a PR (draft) after pushing.
+- Development happens on a feature branch. For remote publication, do **not** assume the
+  shell's `git push` is authenticated just because fetch works. In hosted agent sessions,
+  prefer the connected GitHub API/app when it has write access. If terminal push gets one auth
+  failure, do not retry it or bounce back and forth between transports.
+- Before opening a PR, verify the remote head exists, is ahead of current `main`, and has no
+  existing open PR to reuse. Keep the PR draft while more edits are expected.
+- **Do not manually enable generic auto-merge or enqueue normal PRs.** This repository's
+  `.github/workflows/automerge.yml` automatically puts eligible ready PRs into the merge queue
+  after required checks. A queued head branch cannot be updated; if a post-queue fix is needed,
+  dequeue first or report the blocker. See `docs/pr-merge-rule.md`.
 - **Subscribe to every PR you open, right after opening it** (`subscribe_pr_activity`),
   and stay on it until it is merged or closed. Owning a PR means driving it to green:
   on a CI failure either push a fix or reply in the thread with the concrete blocker —

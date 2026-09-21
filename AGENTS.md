@@ -61,19 +61,44 @@ reasoning loops.
 8. During long work, provide short progress updates that state what has actually changed, not merely
    that work is continuing.
 
+## GitHub publication path
+
+Do not mix local Git transport, the connected GitHub API/app, and the merge queue as if they were
+one mechanism.
+
+1. Decide the remote write transport before publication. In hosted agent sessions, prefer the
+   connected GitHub API/app when it has repository write access. Do not assume that a readable
+   `origin` also has terminal push credentials.
+2. If a terminal `git push` fails authentication once, do not retry it. Switch once to the
+   authenticated GitHub API/app, or report that no writable transport is available.
+3. Before creating a PR, verify that the remote head branch exists, is based on current `main`,
+   and has at least one commit/change ahead of `main`. Search for an existing open PR with the
+   same head branch and reuse it instead of creating a duplicate.
+4. Keep a PR as draft while more code changes are expected. Mark it ready only when the intended
+   change is complete enough for CI/review and no planned edits remain.
+5. This repository's `.github/workflows/automerge.yml` owns merge-queue enrollment. Do **not**
+   call generic GitHub auto-merge and do not manually enqueue a normal green PR: the workflow
+   automatically enqueues eligible ready PRs after required checks.
+6. Once a PR is in the merge queue, its head branch is effectively frozen for updates. Never loop
+   on push/update failures against a queued branch. If a new fix is required, the PR must be
+   dequeued first; if the available tools cannot dequeue it, report that exact blocker.
+7. For a PR that is not merging, read its sticky “🚦 Почему этот PR не вливается” diagnosis and
+   `docs/pr-merge-rule.md` before trying mutations.
+
 ## Task completion discipline
 
 When a requested task is complete and ready for integration, do not leave the finished work only
 on a feature branch and do not wait for a separate request to publish it.
 
-1. Create the pull request immediately after the task is ready.
-2. Make sure the PR contains the complete intended change and targets the current `main`.
+1. Publish the complete branch through the chosen authenticated write transport.
+2. Create or reuse the pull request targeting current `main`.
 3. Follow the PR through CI and review. If a check, conflict, permission error, or tool failure
    blocks it, make at most one retry of the same failed action; then report the exact blocker
    instead of looping.
-4. When the PR is green and eligible, put it into the repository's merge queue / enable auto-merge
-   so it is revalidated against fresh `main` and merged automatically.
-5. A task is not considered fully handed off while completed code is stranded only in a branch.
+4. Do not manually enable auto-merge or enqueue the PR. Let `automerge.yml` put a ready, eligible
+   PR into the merge queue and let the queue revalidate it against fresh `main`.
+5. A task is not considered fully handed off while completed code is stranded only in a local or
+   remote branch without a PR.
 
 ## Project rules live elsewhere — read them before writing code
 
