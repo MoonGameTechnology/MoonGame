@@ -137,5 +137,48 @@
       "unit": "swarm_lander",
       "intervalHours": 3
     }
+  },
+  "swarm_intercept_veil": {
+    "name": "Intercept Veil",
+    "description": "swarm.veil.desc",
+    "slot": "defense",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "pointDefense": 6
+      }
+    },
+    "cost": {
+      "biomass": 25,
+      "metal": 15,
+      "microelectronics": 6
+    },
+    "allowed": {
+      "domain": "space",
+      "traits": [
+        "brood_host"
+      ]
+    },
+    "adaptation": {
+      "signal": "strike",
+      "levels": [
+        {
+          "cost": {
+            "biomass": 30,
+            "metal": 20,
+            "microelectronics": 8
+          },
+          "hours": 6
+        },
+        {
+          "cost": {
+            "biomass": 55,
+            "metal": 35,
+            "microelectronics": 14
+          },
+          "hours": 9
+        }
+      ]
+    }
   }
 }

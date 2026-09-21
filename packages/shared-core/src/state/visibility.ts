@@ -573,6 +573,11 @@ function project(
   // где подтверждённый факт отделён от гипотезы, — а не читал счётчик наблюдений прямо
   // из состояния. Отдать его клиенту значило бы выдать и то, чего Рой ещё не показал.
   delete (view as Partial<GameState>).swarmMemory;
+  // PVR-4.3: идущий проект адаптации снимается по той же причине, что и память.
+  // §3.9: игрок узнаёт об уровне ПОСЛЕ того, как тот проявился в завершённом бою, а не
+  // из состояния. Видимый счётчик «до перехватчика осталось 4 часа» — это разведка,
+  // которой не было.
+  delete (view as Partial<GameState>).swarmAdapt;
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.

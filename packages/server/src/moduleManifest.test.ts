@@ -37,7 +37,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  22 — PVR-1.4: снова тот же случай. Членство и порядок не тронуты, форму изменило
  *  ДОБАВЛЕНИЕ поля `boons` на `PveState` — долга по усилениям между волнами; список
  *  перезакреплён без единой правки.) */
-const PINNED_FOR_VERSION = '24';
+const PINNED_FOR_VERSION = '25';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -79,6 +79,7 @@ const PINNED_MODULE_IDS = [
   'pve',
   'fleetBrood',
   'swarmMemory',
+  'swarmAdapt',
   'victory',
   'visibility',
   // 'division' СНЯТ ОСОЗНАННО (H4-REVERT, 2026-07-31), не потерян при правке.

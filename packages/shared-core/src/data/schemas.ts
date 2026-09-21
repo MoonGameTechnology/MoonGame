@@ -631,6 +631,23 @@ export const ModuleDefSchema = z
     effects: ModuleEffectsSchema.default({ stats: {}, enables: [] }),
     cost: ResourceBagSchema.default({}),
     allowed: ModuleAllowedSchema.optional(),
+    /**
+     * PVR-4.3: модуль — ОТВЕТ Роя на класс оружия. Лестница живёт рядом с модулем
+     * (`SZE-4.1`), а не отдельной таблицей: уровень осмыслен только вместе с тем,
+     * что он усиливает, и разнесённые данные разъехались бы молча.
+     *
+     * `signal` — класс наблюдения из `swarmMemory` (v1 — `strike`). `levels` — шаги
+     * лестницы по порядку: цена в ресурсах Роя и срок выращивания в игровых часах.
+     * Длина массива и есть потолок: пустого уровня «сверх лестницы» не существует.
+     */
+    adaptation: z
+      .object({
+        signal: z.string().min(1),
+        levels: z
+          .array(z.object({ cost: ResourceBagSchema, hours: z.number().positive() }))
+          .min(1),
+      })
+      .optional(),
     /** Automatic onboard growth: one ground organism per fitted hull and cycle.
      * Costs come from the organism's unit definition, never from the client. */
     brood: z

@@ -855,6 +855,7 @@ export const en: Record<string, string> = {
   'data.targeting-array': 'Targeting Array',
   'data.tax-office': 'Tax Office',
   'data.terran': 'Terran',
+  'data.intercept-veil': 'Intercept Veil',
   'data.the-swarm': 'The Swarm',
   'data.vanguard-coalition': 'Vanguard Coalition',
   'data.vanguard-impulse': 'Vanguard Impulse',
@@ -1362,6 +1363,12 @@ export const en: Record<string, string> = {
   'err.no-dock': 'repairs happen only at your own dock',
   'err.no-effect': 'that effect is not implemented yet',
   'err.no-fitting': 'unknown fitting',
+  'err.adapt-busy': 'the Swarm is already growing another answer',
+  'err.adapt-maxed': 'the module ladder is complete',
+  'err.no-adaptation': 'this module is not an answer',
+  'err.no-organ': 'no living growth organ',
+  'err.no-signal': 'not enough combat experience yet',
+  'err.not-swarm': 'only the Swarm orders Swarm forms',
   'err.no-fleet': 'fleet not found',
   'err.no-fuel': 'out of fuel',
   'err.no-funds': 'insufficient funds',
@@ -2360,6 +2367,8 @@ export const en: Record<string, string> = {
   'steward.stance.defense.note':
     'The “Defend” posture: holds and repels, keeps building and trading — no offensives, no diplomacy. Control returns automatically, with a morning report.',
   'steward.take-back': 'Take back control',
+
+  'swarm.veil.desc': 'A living intercept veil: it downs part of the strike craft around the group it escorts.',
 
   // --- tech — Дерево технологий: названия веток.
   'tech.branch.command': 'Command',
