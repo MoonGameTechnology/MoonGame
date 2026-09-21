@@ -710,25 +710,25 @@
 | CP7.3 | ⏳ |  | `docs/cross-platform-roadmap.md:376` | Серверные триггеры пушей [→F3] |
 | EC-0.1 | ✅ | docs | `docs/economy-roadmap.md:88` | Жанровое решение — решено (см. «Зафиксированные решения» выше) |
 | EC-0.2 | ✅ | docs | `docs/economy-roadmap.md:97` | Денежная модель на бумаге — решено (2026-07-19) |
-| EC-0.3 | ✅ | docs sec | `docs/economy-roadmap.md:125` | RMT/фрод threat-model — решено (2026-07-19) |
-| EC-0.4 | ⏳ | docs sec | `docs/economy-roadmap.md:151` | Юридический/сторовый ревью |
-| EC-0.5 | ✅ | docs | `docs/economy-roadmap.md:234` | Зависимость от платформенного стека — решено (см. «Жёсткий гейт» выше) |
-| EC-1.1 | ⏳ | data core | `docs/economy-roadmap.md:246` | Data-driven модель предметов/модулей/чертежей |
-| EC-1.2 | ⏳ | srv | `docs/economy-roadmap.md:250` | Две валюты: серверный кошелёк |
-| EC-1.3 | 🔒 | srv | `docs/economy-roadmap.md:255` | Персистентный инвентарь финансового качества |
-| EC-2.1 | 🔒 | srv core | `docs/economy-roadmap.md:263` | Заточка: гарант низа + серверный RNG выше |
-| EC-2.2 | 🔒 | srv data | `docs/economy-roadmap.md:268` | Осколки → сборка soulbound-модуля |
-| EC-2.3 | 🔒 | srv cli | `docs/economy-roadmap.md:272` | Раскрытие шансов |
-| EC-3.1 | 🔒 | srv sec | `docs/economy-roadmap.md:309` | Леджер аукциона |
-| EC-3.2 | 🔒 | srv | `docs/economy-roadmap.md:313` | Листинг/покупка за рыночную валюту + комиссия-бёрн |
-| EC-3.3 | ⏳ | srv sec | `docs/economy-roadmap.md:317` | Анти-абьюз рынка |
-| EC-4.1 | 🔒 | srv sec | `docs/economy-roadmap.md:326` | Платежи/биллинг сторов |
-| EC-4.2 | 🔒 | srv | `docs/economy-roadmap.md:330` | Бонусные варранты с покупки — осознанно |
-| EC-4.3 | 🔒 | srv cli | `docs/economy-roadmap.md:334` | Подписка + косметика + донат-предметы (soulbound) |
-| EC-5.1 | 🔒 | srv | `docs/economy-roadmap.md:342` | Экономическая телеметрия |
-| EC-5.2 | 🔒 | data | `docs/economy-roadmap.md:346` | Балансные рычаги через данные (live-ops) |
-| EC-6.1 | 🔒 | srv sec | `docs/economy-roadmap.md:359` | Детекция RMT-паттернов |
-| EC-6.2 | 🔒 | srv docs | `docs/economy-roadmap.md:363` | Модерация торговли и споры |
+| EC-0.3 | ✅ | docs sec | `docs/economy-roadmap.md:134` | RMT/фрод threat-model — решено (2026-07-19) |
+| EC-0.4 | ⏳ | docs sec | `docs/economy-roadmap.md:160` | Юридический/сторовый ревью |
+| EC-0.5 | ✅ | docs | `docs/economy-roadmap.md:243` | Зависимость от платформенного стека — решено (см. «Жёсткий гейт» выше) |
+| EC-1.1 | ⏳ | data core | `docs/economy-roadmap.md:255` | Data-driven модель предметов/модулей/чертежей |
+| EC-1.2 | ⏳ | srv | `docs/economy-roadmap.md:259` | Две валюты: серверный кошелёк |
+| EC-1.3 | 🔒 | srv | `docs/economy-roadmap.md:264` | Персистентный инвентарь финансового качества |
+| EC-2.1 | 🔒 | srv core | `docs/economy-roadmap.md:272` | Заточка: гарант низа + серверный RNG выше |
+| EC-2.2 | 🔒 | srv data | `docs/economy-roadmap.md:277` | Осколки → сборка soulbound-модуля |
+| EC-2.3 | 🔒 | srv cli | `docs/economy-roadmap.md:281` | Раскрытие шансов |
+| EC-3.1 | 🔒 | srv sec | `docs/economy-roadmap.md:318` | Леджер аукциона |
+| EC-3.2 | 🔒 | srv | `docs/economy-roadmap.md:322` | Листинг/покупка за рыночную валюту + комиссия-бёрн |
+| EC-3.3 | ⏳ | srv sec | `docs/economy-roadmap.md:326` | Анти-абьюз рынка |
+| EC-4.1 | 🔒 | srv sec | `docs/economy-roadmap.md:335` | Платежи/биллинг сторов |
+| EC-4.2 | 🔒 | srv | `docs/economy-roadmap.md:339` | Бонусные варранты с покупки — осознанно |
+| EC-4.3 | 🔒 | srv cli | `docs/economy-roadmap.md:343` | Подписка + косметика + донат-предметы (soulbound) |
+| EC-5.1 | 🔒 | srv | `docs/economy-roadmap.md:351` | Экономическая телеметрия |
+| EC-5.2 | 🔒 | data | `docs/economy-roadmap.md:355` | Балансные рычаги через данные (live-ops) |
+| EC-6.1 | 🔒 | srv sec | `docs/economy-roadmap.md:368` | Детекция RMT-паттернов |
+| EC-6.2 | 🔒 | srv docs | `docs/economy-roadmap.md:372` | Модерация торговли и споры |
 | FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:350` | Узлы empty в картах канона — снято 2026-09-15 |
 | FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:365` | Крепость в прототипе: модуль, правило, кнопка |
 | FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:400` | Технический юнит + технология — снято 2026-09-15 |
@@ -790,30 +790,30 @@
 | HC-3.2 | ✅ | core data | `docs/hero-collection-roadmap.md:276` | Варп-прыжок: hero.effect.jump 2026-09-07 |
 | HC-3.3 | ✅ | core data | `docs/hero-collection-roadmap.md:293` | Фантомный радарный сигнал 2026-09-07 |
 | HC-3.4 | ⏳ | core data | `docs/hero-collection-roadmap.md:315` | «Опытный командир»: юниты союзника под управление |
-| HPR-0.1 | ✅ | docs | `docs/hero-progression-roadmap.md:489` | Кому принадлежат звёзды: только главному или всем 2026-09-07 |
-| HPR-0.2 | ⏳ | docs data | `docs/hero-progression-roadmap.md:498` | Ресурс прогрессии: что это, откуда берётся, куда уходит |
-| HPR-0.3 | ⏳ | docs data | `docs/hero-progression-roadmap.md:512` | Лестница редкости скилла и её ЦВЕТА |
-| HPR-0.4 | 🔒 | docs sec | `docs/hero-progression-roadmap.md:527` | Заточка скиллов включена в лутбокс-ревью |
-| HPR-1.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:546` | Четвёртая редкость, main вон из лестницы, слоты ОТ РЕДКОСТИ |
-| HPR-1.2 | ✅ | core | `docs/hero-progression-roadmap.md:565` | Ядро применяет бюджет слотов скиллов 2026-09-07 |
-| HPR-1.3 | 🔒 | core data | `docs/hero-progression-roadmap.md:587` | Звёзды: поле и слот |
-| HPR-1.4 | 🔒 | proto | `docs/hero-progression-roadmap.md:617` | Витрина редкости и звёзд в штабе героев |
-| HPR-1.5.1 | ✅ | data | `docs/hero-progression-roadmap.md:633` | Корабль героя берёт обычные модули 2026-09-08 |
-| HPR-1.5.2 | ✅ | core | `docs/hero-progression-roadmap.md:648` | Лоадаут корабля живёт на герое 2026-09-08 |
-| HPR-1.5.3 | ✅ | data | `docs/hero-progression-roadmap.md:679` | Два «скилла в обёртке» переезжают в скиллы 2026-09-08 |
-| HPR-1.5.4 | ✅ | core proto | `docs/hero-progression-roadmap.md:693` | Снос hero.fit и вкладки фиттингов 2026-09-08 |
-| HPR-1.6.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:723` | Гейты переоснащения для скиллов И модулей |
-| HPR-1.6.2 | 🔒 | proto | `docs/hero-progression-roadmap.md:760` | Экран переоснащения говорит, ГДЕ и ПОЧЁМ |
-| HPR-2.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:775` | Редкость у СКИЛЛА — поле и лестница |
-| HPR-2.2 | 🔒 | srv data | `docs/hero-progression-roadmap.md:784` | heroskill как вид предмета арсенала |
-| HPR-2.3 | 🔒 | srv | `docs/hero-progression-roadmap.md:791` | Дубликаты: инвентарь умеет считать количество |
-| HPR-2.4 | 🔒 | data srv | `docs/hero-progression-roadmap.md:799` | Скиллы и дубликаты в пуле дропа |
-| HPR-3.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:813` | Уровень скилла: данные и кривая |
-| HPR-3.2 | 🔒 | srv | `docs/hero-progression-roadmap.md:826` | Заточка скилла на движке EC-2.1 |
-| HPR-3.3 | 🔒 | core srv | `docs/hero-progression-roadmap.md:838` | Уровень доезжает в матч через снапшот |
-| HPR-3.4 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:850` | Сток, раскрытие шансов и честный UI |
-| HPR-4.1 | 🔒 | srv data | `docs/hero-progression-roadmap.md:860` | Ресурс звёзд: кран и сток |
-| HPR-4.2 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:865` | Ритуал повышения звезды |
+| HPR-0.1 | ✅ | docs | `docs/hero-progression-roadmap.md:554` | Кому принадлежат звёзды: только главному или всем 2026-09-07 |
+| HPR-0.2 | ✅ | docs | `docs/hero-progression-roadmap.md:563` | Ресурс прогрессии: что это, откуда берётся, куда уходит |
+| HPR-0.3 | ⏳ | docs data | `docs/hero-progression-roadmap.md:595` | Лестница редкости скилла и её ЦВЕТА |
+| HPR-0.4 | 🔒 | docs sec | `docs/hero-progression-roadmap.md:610` | Заточка скиллов включена в лутбокс-ревью |
+| HPR-1.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:629` | Четвёртая редкость, main вон из лестницы, слоты ОТ РЕДКОСТИ |
+| HPR-1.2 | ✅ | core | `docs/hero-progression-roadmap.md:648` | Ядро применяет бюджет слотов скиллов 2026-09-07 |
+| HPR-1.3 | 🔒 | core data | `docs/hero-progression-roadmap.md:670` | Звёзды: поле и слот |
+| HPR-1.4 | 🔒 | proto | `docs/hero-progression-roadmap.md:700` | Витрина редкости и звёзд в штабе героев |
+| HPR-1.5.1 | ✅ | data | `docs/hero-progression-roadmap.md:716` | Корабль героя берёт обычные модули 2026-09-08 |
+| HPR-1.5.2 | ✅ | core | `docs/hero-progression-roadmap.md:731` | Лоадаут корабля живёт на герое 2026-09-08 |
+| HPR-1.5.3 | ✅ | data | `docs/hero-progression-roadmap.md:762` | Два «скилла в обёртке» переезжают в скиллы 2026-09-08 |
+| HPR-1.5.4 | ✅ | core proto | `docs/hero-progression-roadmap.md:776` | Снос hero.fit и вкладки фиттингов 2026-09-08 |
+| HPR-1.6.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:806` | Гейты переоснащения для скиллов И модулей |
+| HPR-1.6.2 | 🔒 | proto | `docs/hero-progression-roadmap.md:843` | Экран переоснащения говорит, ГДЕ и ПОЧЁМ |
+| HPR-2.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:858` | Редкость у СКИЛЛА — поле и лестница |
+| HPR-2.2 | 🔒 | srv data | `docs/hero-progression-roadmap.md:867` | heroskill как вид предмета арсенала |
+| HPR-2.3 | 🔒 | srv | `docs/hero-progression-roadmap.md:874` | Дубликаты: инвентарь умеет считать количество |
+| HPR-2.4 | 🔒 | data srv | `docs/hero-progression-roadmap.md:882` | Скиллы и дубликаты в пуле дропа |
+| HPR-3.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:896` | Уровень скилла: данные и кривая |
+| HPR-3.2 | 🔒 | srv | `docs/hero-progression-roadmap.md:909` | Заточка скилла на движке EC-2.1 |
+| HPR-3.3 | 🔒 | core srv | `docs/hero-progression-roadmap.md:921` | Уровень доезжает в матч через снапшот |
+| HPR-3.4 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:933` | Сток, раскрытие шансов и честный UI |
+| HPR-4.1 | ⏳ | srv data | `docs/hero-progression-roadmap.md:943` | Ресурсы прогрессии: кран и сток |
+| HPR-4.2 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:959` | Ритуал повышения звезды |
 | HTTPS-0.1 | ⏳ | docs | `docs/https-roadmap.md:52` | Зафиксировать «TLS терминирует прокси» как стандарт — S → SE-1.2 |
 | HTTPS-1.1 | ✅ | srv sec | `docs/https-roadmap.md:63` | Доверие прокси: X-Forwarded-Proto/Host + Origin — M → SE-6.1, SE-1.2 |
 | HTTPS-1.2 | ⏳ | srv | `docs/https-roadmap.md:90` | (Опц.) In-process TLS как запасной путь — S → SE-1.2 |
