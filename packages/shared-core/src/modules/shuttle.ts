@@ -1069,7 +1069,7 @@ export const shuttleModule: GameModule = {
       const into = requireSquadron(h, base, p.intoId);
 
       const units = into.units.map((st) => ({ ...st }));
-      for (const st of from.units) addUnits(units, st.unit, st.count, st.modules);
+      for (const st of from.units) addUnits(units, st.unit, st.count, st.modules, st.moduleStars);
       const cargo = (into.cargo ?? []).map((st) => ({ ...st }));
       for (const st of from.cargo ?? []) addUnits(cargo, st.unit, st.count);
       const merged: Squadron = { id: into.id, units, ...(cargo.length > 0 ? { cargo } : {}) };

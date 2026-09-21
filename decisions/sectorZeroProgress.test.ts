@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { pveState, pveModeId } from '../packages/client/src/gameData';
 import { effectiveStats } from '../packages/shared-core/src/index';
+import type { GameState } from '../packages/shared-core/src/index';
 import {
   changeSectorZeroProgress,
   freshSectorZeroProgress,
@@ -176,5 +177,87 @@ describe('Sector Zero persistent preparation', () => {
     expect(p.research).toBe(0);
     expect(p.heroes.commander).toEqual({ level: 3, skills: [], equipped: ['rally'] });
     expect(p.loadouts.cruiser).toEqual(['ion_engine']);
+  });
+});
+
+describe('SZE-1.1 — звёздность модуля: профиль, потолок, снимок в забег', () => {
+  const cap = data.sectorZeroStars.cap;
+
+  it('свежий профиль звёзд не имеет, а потолок берётся из данных', () => {
+    expect(fresh().stars).toEqual({});
+    expect(cap).toBeGreaterThan(0);
+  });
+
+  it('разбор профиля срезает звёзды по потолку и чинит мусор', () => {
+    // Профиль лежит в localStorage — то есть правится игроком. Больше потолка,
+    // дробное, отрицательное и звезда несуществующего модуля не должны доехать.
+    const raw = JSON.stringify({
+      ...fresh(),
+      stars: { cargo_bay: cap + 7, ion_engine: -3, radar_module: 1.5, ghost_module: 2 },
+    });
+    const p = parseSectorZeroProgress(raw, data);
+    expect(p.stars.cargo_bay).toBe(cap);
+    expect(p.stars.ion_engine).toBeUndefined();
+    expect(p.stars.radar_module).toBeUndefined();
+    expect(p.stars.ghost_module).toBeUndefined();
+  });
+
+  it('звезда доезжает в забег снимком: и на корабли, и в арсенал места', () => {
+    const p = { ...change(fresh(), { kind: 'fit', hull: 'cruiser', id: 'ion_engine' }) };
+    p.stars = { ion_engine: 2 };
+    const s = prepareSectorZeroRun(pveState(data), p, data);
+    const cruiser = s.fleets.p1_1!.units.find((u) => u.unit === 'cruiser')!;
+    expect(cruiser.moduleStars).toEqual({ ion_engine: 2 });
+    // Арсенал — источник для того, что ПОСТРОЯТ в забеге: без него верфь выдавала бы
+    // ★0, пока стартовый флот летает на ★2, и игрок видел бы два разных модуля.
+    expect(s.players.p1?.arsenal?.stars).toEqual({ ion_engine: 2 });
+    const bare = prepareSectorZeroRun(pveState(data), { ...p, stars: {} }, data);
+    expect(bare.fleets.p1_1!.units.find((u) => u.unit === 'cruiser')!.moduleStars).toBeUndefined();
+  });
+
+  it('звезда МЕНЯЕТ ЧИСЛА модуля в матче', () => {
+    const p = { ...change(fresh(), { kind: 'fit', hull: 'cruiser', id: 'ion_engine' }) };
+    const plain = prepareSectorZeroRun(pveState(data), p, data);
+    const starred = prepareSectorZeroRun(pveState(data), { ...p, stars: { ion_engine: cap } }, data);
+    const speedOf = (s: typeof plain): number =>
+      effectiveStats(
+        data.units.cruiser!,
+        s.fleets.p1_1!.units.find((u) => u.unit === 'cruiser')!,
+        data,
+      ).speed!;
+    expect(speedOf(starred)).toBeGreaterThan(speedOf(plain));
+  });
+
+  it('ЛОВУШКА HPR-3.3: заточка во время идущего забега забег не меняет', () => {
+    // Мета читается РОВНО ОДИН раз — на старте. Иначе реплей уже сыгранного забега
+    // перестал бы воспроизводиться, как только игрок заточит тот же модуль.
+    const p = { ...change(fresh(), { kind: 'fit', hull: 'cruiser', id: 'ion_engine' }) };
+    p.stars = { ion_engine: 1 };
+    const running = prepareSectorZeroRun(pveState(data), p, data);
+    const before = JSON.parse(JSON.stringify(running)) as unknown;
+    p.stars = { ion_engine: cap }; // игрок ушёл в Мастерскую и получил звезду
+    expect(running).toEqual(before);
+    expect(running.fleets.p1_1!.units.find((u) => u.unit === 'cruiser')!.moduleStars).toEqual({
+      ion_engine: 1,
+    });
+  });
+
+  it('сохранённый забег возвращается со СВОИМИ звёздами, а не с нынешними', () => {
+    const p = { ...change(fresh(), { kind: 'fit', hull: 'cruiser', id: 'ion_engine' }) };
+    p.stars = { ion_engine: 1 };
+    const s = prepareSectorZeroRun(pveState(data), p, data);
+    const save = serializeRunSave({
+      v: RUN_SAVE_VERSION,
+      mode: pveModeId()!,
+      difficulty: 'strong',
+      state: s,
+      sectorZeroAttempt: 1,
+      shipLoadouts: p.loadouts,
+    });
+    p.stars = { ion_engine: cap };
+    const restored = parseRunSave(save) as { state: GameState } | null;
+    expect(
+      restored?.state.fleets.p1_1!.units.find((u) => u.unit === 'cruiser')?.moduleStars,
+    ).toEqual({ ion_engine: 1 });
   });
 });
