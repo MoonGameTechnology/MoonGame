@@ -1,9 +1,33 @@
 import { t, tData } from '../../localization/runtime';
 import type { swarmDossier } from '../../decisions/swarmDossier';
+import type { JournalRow } from '../../decisions/swarmJournal';
 import { esc, clockHM } from './format';
 
-export function swarmDossierHtml(contacts: ReturnType<typeof swarmDossier>): string {
-  return `<p class="hint">${esc(t('swarm.intel.lore'))}</p>` +
+/**
+ * PVR-4.5: журнал адаптаций идёт ПЕРВЫМ блоком досье. Порядок содержательный: игрок
+ * открывает панель, чтобы понять, почему его тактика перестала работать, и ответ на
+ * это — журнал, а не список контактов. Каждая строка помечена уверенностью, иначе
+ * гипотеза читается как факт, а адаптация — как читерство ИИ (§3.4).
+ */
+function journalHtml(rows: JournalRow[]): string {
+  return (
+    `<section class="swarm-journal"><h3>${esc(t('swarm.journal.title'))}</h3><ul>` +
+    rows
+      .map(
+        (r) =>
+          `<li class="j-${esc(r.tier)}"><b>${esc(t('swarm.journal.tier.' + r.tier))}</b> ` +
+          `${esc(t(r.key, r.vars ?? {}))}</li>`,
+      )
+      .join('') +
+    `</ul></section>`
+  );
+}
+
+export function swarmDossierHtml(
+  contacts: ReturnType<typeof swarmDossier>,
+  journal: JournalRow[] = [],
+): string {
+  return (journal.length ? journalHtml(journal) : '') + `<p class="hint">${esc(t('swarm.intel.lore'))}</p>` +
     `<details class="swarm-biology"><summary>${esc(t('data.brood-chamber'))}</summary>` +
     `<p>${esc(t('swarm.intel.economy'))}</p><p>${esc(t('swarm.intel.brood'))}</p>` +
     `<p>${esc(t('swarm.brood.desc'))}</p></details>` + (contacts.length

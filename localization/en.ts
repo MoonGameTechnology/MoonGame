@@ -2370,6 +2370,14 @@ export const en: Record<string, string> = {
 
   'swarm.veil.desc': 'A living intercept veil: it downs part of the strike craft around the group it escorts.',
 
+  'swarm.journal.title': 'Adaptation log',
+  'swarm.journal.tier.fact': 'CONFIRMED:',
+  'swarm.journal.tier.hypothesis': 'HYPOTHESIS:',
+  'swarm.journal.tier.unknown': 'UNKNOWN:',
+  'swarm.journal.intercept': 'The Swarm intercepts strike craft — sorties repelled: {n}',
+  'swarm.journal.stronger': 'interception looks reinforced — point defence rose from {from} to {to}',
+  'swarm.journal.unknown': 'the Swarm growth organ has not been scouted',
+
   // --- tech — Дерево технологий: названия веток.
   'tech.branch.command': 'Command',
   'tech.branch.ground': 'Ground',
