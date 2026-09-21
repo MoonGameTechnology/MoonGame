@@ -2370,6 +2370,14 @@ export const ru: Record<string, string> = {
 
   'swarm.veil.desc': 'Живой покров перехвата: гасит часть ударных машин вокруг сопровождаемой группы.',
 
+  'swarm.journal.title': 'Журнал адаптаций',
+  'swarm.journal.tier.fact': 'ПОДТВЕРЖДЕНО:',
+  'swarm.journal.tier.hypothesis': 'ГИПОТЕЗА:',
+  'swarm.journal.tier.unknown': 'НЕИЗВЕСТНО:',
+  'swarm.journal.intercept': 'Рой перехватывает ударные машины — ваших вылетов отражено: {n}',
+  'swarm.journal.stronger': 'перехват, похоже, усилен — огонь ПВО вырос с {from} до {to}',
+  'swarm.journal.unknown': 'производственный орган Роя не разведан',
+
   // --- tech — Дерево технологий: названия веток.
   'tech.branch.command': 'Командование',
   'tech.branch.ground': 'Земля',

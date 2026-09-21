@@ -387,6 +387,13 @@ function project(
   if (Object.keys(contacts).length) view.swarmIntel = { [viewerId]: contacts };
   else delete view.swarmIntel;
 
+  // PVR-4.5: журнал адаптаций — знание ИГРОКА, поэтому фильтруется по зрителю тем же
+  // правилом, что досье: своё видно, чужое снято целиком. Чужой журнал показал бы, что
+  // успел выяснить сосед, — это разведка чужой разведки.
+  const journal = view.swarmJournal?.[viewerId];
+  if (journal) view.swarmJournal = { [viewerId]: journal };
+  else delete view.swarmJournal;
+
   // Stolen intel windows (espionage): the viewer's LIVE grants open narrow holes in
   // the fog below. Expired grants open nothing — expiry is enforced HERE, at the
   // security boundary, not only by the module's housekeeping.

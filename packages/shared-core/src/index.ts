@@ -460,6 +460,7 @@ export { planetTypeModule } from './modules/planetType';
 export { pveModule } from './modules/pve';
 export { swarmMemoryModule, recalled, STRIKE_KIND } from './modules/swarmMemory';
 export { swarmAdaptModule, swarmModuleLevel, MIN_SIGNAL } from './modules/swarmAdapt';
+export { swarmJournalModule } from './modules/swarmJournal';
 export { fleetBroodModule } from './modules/fleetBrood';
 export {
   taxModule,
@@ -529,3 +530,5 @@ export {
 } from './modules/market';
 export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
+
+export type { SwarmRepelRecord } from './state/gameState';

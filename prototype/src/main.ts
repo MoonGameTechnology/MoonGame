@@ -4,6 +4,7 @@ import { hashJson } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierHtml } from './swarmDossier';
+import { swarmJournal } from '../../decisions/swarmJournal';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
@@ -1411,7 +1412,9 @@ function renderSwarmDossier(now = performance.now()): void {
     swarmDossierWin.classList.add('updating');
   }
   lastSwarmDossierContactKey = contactKey;
-  const html = swarmDossierHtml(contacts);
+  // PVR-4.5: журнал строится из ПРОЕКЦИИ — в ней лежит только свой журнал, чужой снят
+  // фильтром зрителя, а память и проект Роя не приезжают вовсе.
+  const html = swarmDossierHtml(contacts, swarmJournal(s.swarmJournal?.[ME]));
   if (html !== lastSwarmDossierHtml) {
     const body = $('swarm-dossier-body');
     const scroll = body.scrollTop;

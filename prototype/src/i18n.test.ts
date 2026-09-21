@@ -182,6 +182,10 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
   { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },
   {
+    prefix: 'swarm.journal.tier.',
+    built_by: 'swarmDossierHtml() — из уверенности строки журнала (PVR-4.5)',
+  },
+  {
     prefix: 'setup.pve.difficulty.',
     built_by: 'runDifficultyKey() в /decisions — из значения сложности забега (PVR-2.1)',
   },
