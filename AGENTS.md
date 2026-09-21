@@ -13,10 +13,24 @@ Before starting any backlog brick, refresh the repository from `main` first:
 
 The detailed Git workflow remains in `CONTRIBUTING.md`.
 
+## Task completion discipline
+
+When a requested task is complete and ready for integration, do not leave the finished work only
+on a feature branch and do not wait for a separate request to publish it.
+
+1. Create the pull request immediately after the task is ready.
+2. Make sure the PR contains the complete intended change and targets the current `main`.
+3. Follow the PR through CI and review. If a check, conflict, permission error, or tool failure
+   blocks it, make at most one retry of the same failed action; then report the exact blocker
+   instead of looping.
+4. When the PR is green and eligible, put it into the repository's merge queue / enable auto-merge
+   so it is revalidated against fresh `main` and merged automatically.
+5. A task is not considered fully handed off while completed code is stranded only in a branch.
+
 ## Project rules live elsewhere — read them before writing code
 
-This file only covers the refresh discipline above. The rules that decide whether a change
-is *correct* in this repository are not here:
+This file only covers the refresh and completion discipline above. The rules that decide whether a
+change is *correct* in this repository are not here:
 
 - **`CLAUDE.md`** — the non-negotiable invariants: determinism of `packages/shared-core`
   (no `Math.random`, no `Date.now`, no implementation-approximated `Math.*`), purity of
