@@ -41,6 +41,13 @@ export interface SectorZeroProgress {
    *  способ сдвинуть бросок предмета — заплатить цену ЭТОГО предмета, то есть подкрутка
    *  стоит ровно столько же, сколько честная попытка. */
   forgeTries: Record<string, number>;
+  /** Осколки (`EC-2.2`): сколько попыток сгорело на ТЕКУЩЕЙ ступени каждого предмета.
+   *  Копятся при неудаче, обнуляются взятой звездой — гарантия принадлежит СТУПЕНИ, а не
+   *  предмету навсегда, иначе один раз накопив, игрок покупал бы все следующие звёзды.
+   *
+   *  Поимённые, как и {@link SectorZeroProgress.forgeTries}, и по той же причине: общий
+   *  счёт позволил бы копить гарантию дешёвыми неудачами, а тратить на дорогой ступени. */
+  forgeShards: Record<string, number>;
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
@@ -82,6 +89,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     research: 0,
     warrants: 0,
     forgeTries: {},
+    forgeShards: {},
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
@@ -163,15 +171,25 @@ export function changeSectorZeroProgress(
       // правило исхода целиком в `sectorZeroForge.ts`.
       if (!data.modules[action.id] || !next.modules.includes(action.id)) return null;
       const tries = next.forgeTries[action.id] ?? 0;
+      const shards = next.forgeShards[action.id] ?? 0;
       const out = forgeOutcome(
-        { seed: next.seed, attempt: tries, target: action.id, star: next.stars[action.id] ?? 0 },
+        {
+          seed: next.seed,
+          attempt: tries,
+          target: action.id,
+          star: next.stars[action.id] ?? 0,
+          shards,
+        },
         forgeLadderOf(data),
         next.warrants,
       );
       if (!out.allowed) return null;
       next.warrants -= out.warrants; // сгорает и при неудаче
       next.forgeTries[action.id] = tries + 1;
-      if (out.success) next.stars[action.id] = out.star;
+      if (out.success) {
+        next.stars[action.id] = out.star;
+        delete next.forgeShards[action.id]; // ступень пройдена — гарантия начинается заново
+      } else next.forgeShards[action.id] = shards + 1;
       break;
     }
     case 'fit': {
@@ -278,6 +296,10 @@ export function parseSectorZeroProgress(
     for (const [id, value] of Object.entries(p.forgeTries ?? {})) {
       if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       if (value > 0) fresh.forgeTries[id] = value;
+    }
+    for (const [id, value] of Object.entries(p.forgeShards ?? {})) {
+      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (value > 0) fresh.forgeShards[id] = value;
     }
     for (const [id, value] of Object.entries(p.stars ?? {})) {
       if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;

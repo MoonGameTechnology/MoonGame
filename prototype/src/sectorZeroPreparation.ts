@@ -118,8 +118,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
             : t('sector-zero.forge.cap');
         // Шанс и цена стоят в карточке ВСЕГДА, даже когда нажать нельзя: `EC-2.3`
         // требует, чтобы игрок понимал стоимость до того, как сможет заплатить.
+        // Поток осколков виден только там, где у ступени ЕСТЬ потолок попыток: на
+        // гарантированных ступенях копить нечего, и счётчик 0/0 был бы шумом.
+        const shards =
+          row.next && row.pity > 0
+            ? `<p class="sz-forge-shards">${t('sector-zero.forge.shards', { n: row.shards, cap: row.pity })}${row.shards >= row.pity - 1 ? ` · ${t('sector-zero.forge.sure')}` : ''}</p>`
+            : '';
         const offer = row.next
-          ? `<p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: Math.round(row.chance * 100) })} · ${t('sector-zero.forge.cost', { n: row.warrants })}</p><p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)} → ${t('sector-zero.forge.gain')}: ${effectText(row.next)}</p><p class="sz-sub">${t('sector-zero.forge.burn')}</p>`
+          ? `<p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: Math.round(row.chance * 100) })} · ${t('sector-zero.forge.cost', { n: row.warrants })}</p><p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)} → ${t('sector-zero.forge.gain')}: ${effectText(row.next)}</p><p class="sz-sub">${t('sector-zero.forge.burn')}</p>${shards}`
           : `<p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)}</p>`;
         return `<article class="sz-card"><div class="sz-card-type">${t(`yard.slot.${module.slot}`)}</div><h3>${esc(tData(module.name))}</h3><p class="sz-forge-stars">${starBar(row)} · ${t('sector-zero.forge.stars', { n: row.star, cap: row.cap })}</p>${offer}${button('forge', row.id, label, !row.can)}</article>`;
       })
