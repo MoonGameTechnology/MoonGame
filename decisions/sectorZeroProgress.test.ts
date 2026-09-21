@@ -356,3 +356,56 @@ describe('SZE-1.2 — Мастерская: кошелёк, попытка, ин
     expect(p.forgeTries).toEqual({ radar_module: 4 });
   });
 });
+
+describe('SZE-1.3 — осколки: серия неудач упирается в гарантию', () => {
+  const ladder = data.sectorZeroStars;
+  const top = ladder.cap - 1; // верхняя ступень: самый длинный хвост неудач
+  const seeded = (over: Partial<SectorZeroProgress> = {}): SectorZeroProgress => ({
+    ...freshSectorZeroProgress(data, 'profile-7'),
+    warrants: 999999,
+    ...over,
+  });
+
+  it('свежий профиль осколков не имеет', () => {
+    expect(freshSectorZeroProgress(data, 'x').forgeShards).toEqual({});
+  });
+
+  it('неудача копит осколок, успех его обнуляет', () => {
+    let p = seeded({ stars: { cargo_bay: top } });
+    const burned: number[] = [];
+    while ((p.stars.cargo_bay ?? 0) === top) {
+      p = change(p, { kind: 'forge', id: 'cargo_bay' });
+      burned.push(p.forgeShards.cargo_bay ?? 0);
+    }
+    expect(burned.slice(0, -1)).toEqual(burned.slice(0, -1).map((_, i) => i + 1));
+    expect(p.forgeShards.cargo_bay).toBeUndefined(); // звезда взята — гарантия отработана
+  });
+
+  it('серия неудач ГАРАНТИРОВАННО приводит к звезде, а не в бесконечность', () => {
+    // Это и есть смысл кирпича: без потолка попыток игрок может лить Варранты без предела.
+    const pity = ladder.steps[top]!.pity ?? 0;
+    expect(pity).toBeGreaterThan(0);
+    let p = seeded({ stars: { cargo_bay: top } });
+    let spent = 0;
+    while ((p.stars.cargo_bay ?? 0) === top) {
+      p = change(p, { kind: 'forge', id: 'cargo_bay' });
+      spent++;
+    }
+    expect(p.stars.cargo_bay).toBe(ladder.cap);
+    expect(spent).toBeLessThanOrEqual(pity); // потолок попыток, а не «когда-нибудь повезёт»
+  });
+
+  it('осколки поимённые: чужие неудачи чужую гарантию не приближают', () => {
+    let p = seeded({ stars: { cargo_bay: top, ion_engine: top } });
+    p = change(p, { kind: 'forge', id: 'ion_engine' });
+    expect(p.forgeShards.cargo_bay).toBeUndefined();
+  });
+
+  it('разбор профиля чинит осколки', () => {
+    const raw = JSON.stringify({
+      ...freshSectorZeroProgress(data, 'x'),
+      forgeShards: { cargo_bay: -2, ion_engine: 1.5, ghost: 3, radar_module: 2 },
+    });
+    expect(parseSectorZeroProgress(raw, data).forgeShards).toEqual({ radar_module: 2 });
+  });
+});

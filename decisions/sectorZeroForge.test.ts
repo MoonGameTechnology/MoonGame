@@ -8,6 +8,7 @@ import {
   type ForgeLadder,
 } from './sectorZeroForge';
 
+
 const LADDER: ForgeLadder = JSON.parse(
   readFileSync('data/sectorZeroStars.json', 'utf8'),
 ) as ForgeLadder;
@@ -17,6 +18,7 @@ const at = (over: Partial<ForgeAttempt> = {}): ForgeAttempt => ({
   attempt: 3,
   target: 'cargo_bay',
   star: 0,
+  shards: 0,
   ...over,
 });
 
@@ -95,5 +97,57 @@ describe('sectorZeroForge — правила лестницы', () => {
   it('цена растёт по ступеням — иначе верхние звёзды ничего не стоят', () => {
     for (let i = 1; i < LADDER.steps.length; i++)
       expect([i, LADDER.steps[i]!.warrants > LADDER.steps[i - 1]!.warrants]).toEqual([i, true]);
+  });
+});
+
+describe('sectorZeroForge — pity: серия неудач упирается в потолок, а не в бесконечность', () => {
+  // `EC-2.2`: накопление сгоревшего ГАРАНТИРУЕТ результат. Без этого игрок с плохим
+  // броском может лить Варранты бесконечно — а это и есть то, за что штрафуют сторы.
+  const PITY: ForgeLadder = {
+    cap: 2,
+    guaranteed: 0,
+    // `pity: 3` = «третья попытка на этой ступени гарантирована», то есть после двух
+    // сгоревших. Ноль = гарантии нет вовсе.
+    steps: [
+      { chance: 0.2, warrants: 10, bonus: 0.5, pity: 3 },
+      { chance: 0.2, warrants: 20, bonus: 0.5, pity: 0 },
+    ],
+  };
+  const at = (over: Partial<ForgeAttempt> = {}): ForgeAttempt => ({
+    seed: 'p',
+    attempt: 0,
+    target: 'cargo_bay',
+    star: 0,
+    shards: 0,
+    ...over,
+  });
+
+  it('накопив осколки до порога, попытка перестаёт бросать', () => {
+    // Проверяем по ВСЕМ номерам попытки: одиночный вызов при шансе 0.2 угадал бы
+    // успех и без всякой гарантии — такой тест ничего бы не доказывал.
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const out = forgeOutcome(at({ attempt, shards: 2 }), PITY, 9999);
+      expect([attempt, out.success, out.star]).toEqual([attempt, true, 1]);
+    }
+  });
+
+  it('объявленный шанс на гарантии — сто процентов, а не прежние 20', () => {
+    // Показать 20%, когда бросок уже не делается, значит соврать игроку ровно там,
+    // где `EC-2.3` требует честности.
+    expect(forgeOutcome(at({ shards: 2 }), PITY, 9999).chance).toBe(1);
+    expect(forgeOutcome(at({ shards: 1 }), PITY, 9999).chance).toBe(0.2);
+  });
+
+  it('ступень без pity гарантии не даёт даже при горе осколков', () => {
+    const out = forgeOutcome(at({ star: 1, shards: 99 }), PITY, 9999);
+    expect(out.chance).toBe(0.2);
+  });
+
+  it('до порога бросок остаётся броском', () => {
+    // С шансом 0.2 из десяти попыток обязана найтись неудачная.
+    const outcomes = Array.from({ length: 10 }, (_, i) =>
+      forgeOutcome(at({ attempt: i, shards: 0 }), PITY, 9999),
+    );
+    expect(outcomes.some((o) => !o.success)).toBe(true);
   });
 });
