@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 6774 зелёных** (70 skip; 542 файла проверено, 1 файл пропущен). Пропуски — тесты durable-пути и учение бэкапов, которым нужна база; в CI база есть, но нет пакета `age`, поэтому там дополнительно пропущен один тест — реальный криптокруг (проводку шифрования CI проверяет заглушкой, см. §10).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 6790 зелёных** (70 skip; 543 файла проверено, 1 файл пропущен). Пропуски — тесты durable-пути и учение бэкапов, которым нужна база; в CI база есть, но нет пакета `age`, поэтому там дополнительно пропущен один тест — реальный криптокруг (проводку шифрования CI проверяет заглушкой, см. §10).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -292,7 +292,7 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, arsenalSync, autoRally, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, pve, scientist, seatClaim, sector, shuttle, standingOrders, station, steward, tax, technology, victory, visibility  (35 модулей, + *.test.ts; сколько из них СОБИРАЕТ каждое ядро — §9)
+  modules/       army, arsenalSync, autoRally, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetBrood, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, pve, scientist, seatClaim, sector, shuttle, standingOrders, station, steward, swarmMemory, tax, technology, victory, visibility  (37 модулей, + *.test.ts; сколько из них СОБИРАЕТ каждое ядро — §9)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 packages/client/src/  holoDraw.ts, holoSphere.ts (каркасные атласы), territory.ts, territoryGeometry.ts (кэш геометрии провинций: подпись снимается с координат, нормализованных по первой точке клипа и масштабу, поэтому панорама и зум камеры из неё СОКРАЩАЮТСЯ — квадратичная тесселяция считается только на смену формы, а на движении камеры идёт O(вершин) перепроекция; владелец и тип берутся из свежих seeds, чтобы кэш не донёс чужой туман), mapLod.ts (три уровня детализации по расстоянию между узлами в CSS-пикселях: `mapSpacing` берёт МЕДИАНУ ближайшего связанного соседа — одиночная чёрная дыра или битая связь не перекашивают плотность; `art` гасит дорогой арт узлов, `detail` — подписи и анимацию, `drawSchematicNode` рисует дальний план без текстур, текста и теней), provinceSelection.ts, spaceBackdrop.ts, shipShapes.ts (векторные корпуса и кеш Path2D), swarmShapes.ts (восемь органических форм Роя), shipGlyphs.ts (выбор корпуса/доминанта, SVG и модификаторы), art/deep-space.webp (общий рендер карты)
@@ -2929,7 +2929,7 @@ APK собирается в двух лейнах (matrix в `android.yml`): д�
 economy, movement, hero, heroEffects, orbital, combat, intercept, captureOnArrival,
 construction, arsenalSync, technology, scientist, steward, army, victory, fleetOps, autoRally,
 diplomacy, espionage, botDiplomacy, market, capital, standingOrders, shuttle, forcedMarch,
-instantRepair, fleetRepair, effects, seatClaim, visibility])` (35 модулей — состав и его отличие от
+instantRepair, fleetRepair, effects, seatClaim, visibility])` (37 модулей — состав и его отличие от
 серверного `DEV_MODULES` разобраны в §9), тик в реальном
   времени (скорость ⏸/▶/⏩). Концовка матча — из авторитетного `state.match` (`victoryModule`),
   полноэкранный экран итогов победы/поражения/ничьи (счёт+место+статы+XP, рематч; см.
@@ -4335,7 +4335,7 @@ Memory + Postgres `ava_feed`) — только публичные факты: и
 > Компактный агрегат; помашинная матрица — [`readiness.md`](readiness.md),
 > запуск для живых игроков — [`launch-runbook.md`](launch-runbook.md).
 
-**✅ Этап 1 (ядро) — готово целиком:** **36 модулей** на микроядре (шина/хуки/манифест,
+**✅ Этап 1 (ядро) — готово целиком:** **37 модулей** на микроядре (шина/хуки/манифест,
 seeded RNG + golden, `advanceTo`; список — §3, разбор — §5): экономика + рынок,
 карта/движение/перехват, типы
 секторов и планет, бой (мелэ + орбитальное ПВО/бомбардировка) с двухфазным
@@ -4349,14 +4349,14 @@ seeded RNG + golden, `advanceTo`; список — §3, разбор — §5): �
 `scripts/docs-check.mjs` — разъехаться с кодом молча они больше не могут.
 
 **Оба ядра собирают ВЕСЬ каталог; расхождения по модулям ядра больше нет
-(PVR-0.2, 2026-09-17).** В каталоге 36 модулей, и оба списка берут все 36 — прототип
+(PVR-0.2, 2026-09-17).** В каталоге 37 модулей, и оба списка берут все 37 — прототип
 сверх них держит два СВОИХ (`hunger`, `botDiplomacy`; они живут в `prototype/src`, а не в
 ядре, и у сервера их быть не должно):
 
 | Сборка | Модулей | Чего нет |
 | --- | --: | --- |
-| `DEV_MODULES` (канонический сервер, `scenario.ts`) | **36** | — берёт весь каталог ядра |
-| `MODULES` (ядро прототипа, `protoKernel.ts`) | **38** | — весь каталог + 2 своих |
+| `DEV_MODULES` (канонический сервер, `scenario.ts`) | **37** | — берёт весь каталог ядра |
+| `MODULES` (ядро прототипа, `protoKernel.ts`) | **39** | — весь каталог + 2 своих |
 
 **PVR-0.2 (2026-09-17): `pve` доехал до прототипа — и закрыл счёт.** Последний модуль
 каталога, которого хост не грузил: волны Роя были написаны, покрыты тестами и не могли
