@@ -855,6 +855,7 @@ export const en: Record<string, string> = {
   'data.targeting-array': 'Targeting Array',
   'data.tax-office': 'Tax Office',
   'data.terran': 'Terran',
+  'data.hive': 'Hive',
   'data.intercept-veil': 'Intercept Veil',
   'data.the-swarm': 'The Swarm',
   'data.vanguard-coalition': 'Vanguard Coalition',
