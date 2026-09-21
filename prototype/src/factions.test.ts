@@ -28,7 +28,8 @@ describe('factions (H3) — passive house bonuses over the prototype data', () =
     // Правило H3 проверяется по ВСЕМУ каталогу, а не только по посаженным: фракция,
     // заведённая с уникальным юнитом или радарным бонусом, нарушит его ещё до того,
     // как её посадят за стол.
-    for (const f of Object.values(data.factions)) {
+    for (const [id, f] of Object.entries(data.factions)) {
+      if (id === 'swarm') continue; // NPC organisms are outside the symmetric human roster.
       // pure passives: no unique units / faction abilities, no radar reach —
       // strictly «экономика или юниты» (production / damage / fleet speed).
       expect(f.uniqueUnits).toEqual([]);

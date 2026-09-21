@@ -265,7 +265,7 @@ export function loadoutPaneHtml(
         const eff = md
           ? Object.entries(md.effects.stats)
               .map(([k, v]) => `+${v} ${t(STAT_KEY[k] ?? k)}`)
-              .join(' ')
+              .join(' ') + (md.description ? `<p>${esc(t(md.description))}</p>` : '')
           : '';
         return (
           `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +

@@ -191,8 +191,14 @@ export const pveModule: GameModule = {
         const fleetId = `pve:wave:${pve.waveNumber}`;
         // Wave N fields N times the declared force — the crudest ramp that is
         // deterministic and lives entirely in content.
-        const scaled = (stacks: readonly { unit: string; count: number }[]): UnitStack[] =>
-          stacks.map((stack) => ({ unit: stack.unit, count: stack.count * pve.waveNumber }));
+        const scaled = (
+          stacks: readonly { unit: string; count: number; modules?: string[] }[],
+        ): UnitStack[] =>
+          stacks.map((stack) => ({
+            unit: stack.unit,
+            count: stack.count * pve.waveNumber,
+            ...(stack.modules?.length ? { modules: [...stack.modules] } : {}),
+          }));
         const landing = scaled(cfg.waveLanding ?? []);
         const fleet: Fleet = {
           id: fleetId,

@@ -6,11 +6,14 @@ import { drawShipShape, SHIP_SHAPES, shipPaths } from './shipShapes';
 
 const data = shippedGameData();
 afterEach(() => vi.unstubAllGlobals());
+it('gives the brood producer its Matriarch silhouette', () => {
+  expect(unitShape(data.units.swarm_brood_mother!, 'swarm_brood_mother', 'swarm')).toBe('swarmMatriarch');
+});
 
 describe('approved ship hulls', () => {
   it('skins the shipped PvE enemy by its owner, even while waves use shared unit definitions', () => {
     const state = pveState(data);
-    const fleet = state.fleets.p3_1!;
+    const fleet = state.fleets.p3_2!;
     const dom = dominantUnit(fleet.units, data)!;
     expect(dom.def.faction).toBe('vanguard');
     expect(unitShape(dom.def, dom.unit, state.players[fleet.owner]!.faction)).toBe('swarmHunter');

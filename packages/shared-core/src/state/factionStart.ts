@@ -30,7 +30,11 @@ export function factionStart(data: GameData, factionId: string): FactionStart {
   return {
     resources: { ...loadout.resources },
     garrison: loadout.garrison.map((s) => ({ unit: s.unit, count: s.count })),
-    fleet: loadout.fleet.map((s) => ({ unit: s.unit, count: s.count })),
+    fleet: loadout.fleet.map((s) => ({
+      unit: s.unit,
+      count: s.count,
+      ...(s.modules?.length ? { modules: [...s.modules] } : {}),
+    })),
     buildings: loadout.homeBuildings.map((type) => {
       const def = data.buildings[type];
       return { type, level: 1, hp: def ? buildingLevel(def, 1).hp : 0 };

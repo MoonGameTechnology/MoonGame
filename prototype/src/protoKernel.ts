@@ -43,6 +43,7 @@ import {
   fleetOpsModule,
   autoRallyModule,
   marketModule,
+  fleetBroodModule,
   pveModule,
   resolveMatchConfig,
   type GameModule,
@@ -95,6 +96,7 @@ export const MODULES: GameModule[] = [
   // судит кооп-исход (`pve-failed`/`pve-cleared`) первым — встань `pve` после него, и
   // первая волна попала бы в вердикт только следующим ходом часов.
   pveModule, // PVE-3: волны NPC, вооружается секцией `pve` режима матча (в PvP инертен)
+  fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
   fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
   // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя

@@ -960,39 +960,39 @@
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md:422` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
 | ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:459` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
 | ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:497` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
-| SZE-0.1 | ✅ | docs | `docs/sector-zero-economy-roadmap.md:232` | Свести §4.5 с магазином |
-| SZE-0.2 | ✅ | docs data | `docs/sector-zero-economy-roadmap.md:240` | Цена звезды и потолок |
-| SZE-0.3 | ✅ | docs proto | `docs/sector-zero-economy-roadmap.md:252` | Детерминизм заточки без сервера |
-| SZE-1.1 | ✅ | data core proto | `docs/sector-zero-economy-roadmap.md:279` | Звезда у модуля: поле и потолок |
-| SZE-1.2 | ✅ | proto | `docs/sector-zero-economy-roadmap.md:317` | Экран Мастерской |
-| SZE-1.3 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:360` | Осколки и pity |
-| SZE-2.1 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:396` | Экран Академии на движке Мастерской |
-| SZE-3.1 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:411` | Витрина и три способа оплаты |
-| SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:453` | Ассортимент |
-| SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md:485` | Покупки в Sector Zero и площадка |
-| SZE-4.1 | ⏳ | data | `docs/sector-zero-economy-roadmap.md:494` | Уровень у адаптации |
-| SZE-4.2 | 🔒 | core | `docs/sector-zero-economy-roadmap.md:500` | Контригра против уровня |
-| PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1065` | Карта pve-1 снова строится |
-| PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1096` | pveModule в ядре прототипа |
-| PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1123` | Сохранение: сперва мета, потом забег |
-| PVR-0.4 | ✅ | data | `docs/sector-zero-roadmap.md:1201` | Карта — развилки из линий |
-| PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md:1258` | Соло-запуск задаёт modeId |
-| PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1300` | HUD забега: волна N из M и время до следующей |
-| PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md:1332` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md:1393` | Выбор между волнами |
-| PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md:1450` | Волны Роя враждебны и доходят до боя |
-| PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md:1489` | Забег доходит до вердикта |
-| PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1558` | Пиратская база для первого боя |
-| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1588` | Выбор сложности на запуске забега |
-| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1624` | У забега свой темп и ускорение |
-| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1667` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1679` | Хранилище PvE-прогресса |
-| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1691` | Награда за забег |
-| PVR-4.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1714` | Резолюция: что из §3 входит в первую версию |
-| PVR-4.2 | 🔒 | core | `docs/sector-zero-roadmap.md:1722` | Память Роя как состояние |
-| PVR-4.3 | 🔒 | core data | `docs/sector-zero-roadmap.md:1731` | Одна читаемая адаптация от сигнала до формы |
-| PVR-4.4 | 🔒 | data | `docs/sector-zero-roadmap.md:1739` | Структуры первого набора |
-| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:1745` | Журнал адаптаций |
+| SZE-0.1 | ✅ | docs | `docs/sector-zero-economy-roadmap.md:228` | Свести §4.5 с магазином |
+| SZE-0.2 | ✅ | docs data | `docs/sector-zero-economy-roadmap.md:236` | Цена звезды и потолок |
+| SZE-0.3 | ✅ | docs proto | `docs/sector-zero-economy-roadmap.md:248` | Детерминизм заточки без сервера |
+| SZE-1.1 | ✅ | data core proto | `docs/sector-zero-economy-roadmap.md:275` | Звезда у модуля: поле и потолок |
+| SZE-1.2 | ✅ | proto | `docs/sector-zero-economy-roadmap.md:313` | Экран Мастерской |
+| SZE-1.3 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:356` | Осколки и pity |
+| SZE-2.1 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md:392` | Экран Академии на движке Мастерской |
+| SZE-3.1 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:407` | Витрина и три способа оплаты |
+| SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:449` | Ассортимент |
+| SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md:481` | Покупки в Sector Zero и площадка |
+| SZE-4.1 | ⏳ | data | `docs/sector-zero-economy-roadmap.md:490` | Уровень у модуля Роя |
+| SZE-4.2 | 🔒 | core | `docs/sector-zero-economy-roadmap.md:498` | Контригра против уровня |
+| PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1082` | Карта pve-1 снова строится |
+| PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1113` | pveModule в ядре прототипа |
+| PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1140` | Сохранение: сперва мета, потом забег |
+| PVR-0.4 | ✅ | data | `docs/sector-zero-roadmap.md:1218` | Карта — развилки из линий |
+| PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md:1275` | Соло-запуск задаёт modeId |
+| PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1317` | HUD забега: волна N из M и время до следующей |
+| PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md:1349` | Состав волны перестаёт быть одним дроном |
+| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md:1410` | Выбор между волнами |
+| PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md:1467` | Волны Роя враждебны и доходят до боя |
+| PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md:1506` | Забег доходит до вердикта |
+| PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1575` | Пиратская база для первого боя |
+| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1605` | Выбор сложности на запуске забега |
+| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1641` | У забега свой темп и ускорение |
+| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1684` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1696` | Хранилище PvE-прогресса |
+| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1708` | Награда за забег |
+| PVR-4.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1732` | Резолюция: что из §3 входит в первую версию |
+| PVR-4.2 | 🔒 | core | `docs/sector-zero-roadmap.md:1740` | Память Роя как состояние |
+| PVR-4.3 | 🔒 | core data | `docs/sector-zero-roadmap.md:1749` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | 🔒 | data | `docs/sector-zero-roadmap.md:1757` | Структуры первого набора |
+| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:1763` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |

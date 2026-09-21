@@ -32,6 +32,7 @@ export const BUILD_ICON: Record<string, string> = {
   hospital: '✚', // полевой госпиталь: единственный источник лечения гарнизона
   factory: '⌬', // завод техники: постройка наземной техники и эскадрилий
   shipyard: '⊟', // верфь: без неё корабль на мире не заложить (YARD-1)
+  swarm_synapse: '▣',
   biomass_pit: '❀', // биомасса бандла
   mine_t1: '❒', // те же шахты бандла, что и `mine` прототипа
   mine_t2: '❒',
@@ -40,6 +41,7 @@ export const BUILD_ICON: Record<string, string> = {
 /** Text glyph per unit — the fallback for ground units and for anything the poster
  *  silhouette family (space-only) does not cover. */
 export const UNIT_ICON: Record<string, string> = {
+  swarm_lander: '♆',
   cruiser: '▲',
   scout: '◌',
   siege: '✦',
@@ -102,6 +104,8 @@ export const SOV_SVG =
 // top bar, cost rows, the market book, tech-tree prices. One dictionary, one look:
 // a player who learned the bar reads every other surface for free.
 export const RES_SVG: Record<string, string> = {
+  biomass: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 1C12 1 15 5 13 10S6 16 3 12 2 4 8 1Z"/><circle cx="8" cy="7" r="2"/><path d="m5 11 2 1m4-3 1 2"/></svg>',
+
   credits:
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6.2" r="3.9"/><circle cx="10" cy="9.8" r="3.9"/></svg>',
   metal:

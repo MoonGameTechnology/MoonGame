@@ -20,10 +20,10 @@
       "waveIntervalHours": 6,
       "waveFleet": [
         { "unit": "frigate", "count": 2 },
-        { "unit": "cruiser", "count": 1 }
+        { "unit": "swarm_brood_mother", "count": 1, "modules": ["swarm_brood_chamber"] }
       ],
       "waveLanding": [
-        { "unit": "drop_infantry", "count": 2 }
+        { "unit": "swarm_lander", "count": 2 }
       ],
       "boons": [
         "boon_gunnery",

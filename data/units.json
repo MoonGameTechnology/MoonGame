@@ -424,5 +424,58 @@
       "defense": 2,
       "utility": 1
     }
+  },
+  "swarm_brood_mother": {
+    "faction": "swarm",
+    "stats": {
+      "attack": 12,
+      "defense": 14,
+      "speed": 40,
+      "hp": 60,
+      "cargoCapacity": 8
+    },
+    "line": "rear",
+    "signature": 4,
+    "traits": [
+      "brood_host"
+    ],
+    "cost": {
+      "biomass": 80,
+      "metal": 60,
+      "microelectronics": 12
+    },
+    "buildTimeHours": 4,
+    "upkeep": {
+      "biomass": 4
+    },
+    "slots": {
+      "defense": 1,
+      "utility": 2
+    }
+  },
+  "swarm_lander": {
+    "faction": "swarm",
+    "domain": "ground",
+    "kind": "infantry",
+    "stats": {
+      "attack": 8,
+      "defense": 5,
+      "hp": 16,
+      "speed": 1,
+      "cargoSize": 1
+    },
+    "line": "front",
+    "cost": {
+      "biomass": 20,
+      "metal": 8,
+      "microelectronics": 2
+    },
+    "buildTimeHours": 3,
+    "upkeep": {
+      "biomass": 1
+    },
+    "traits": [
+      "swarm_ground"
+    ]
   }
 }

@@ -150,7 +150,8 @@ globalThis.localStorage = {
 // The local entry has no account server. Never send real HTTP requests from this harness.
 globalThis.fetch = async () => new globalThis.Response('', { status: 404 });
 // resize() probes coarse-pointer media to spot phones; the fake DOM is a desktop.
-globalThis.matchMedia = () => ({ matches: false });
+const dossierMedia = { matches: false };
+globalThis.matchMedia = query => query.includes('(hover:hover)') ? dossierMedia : ({ matches: false });
 globalThis.getComputedStyle = (el) => ({ display: el.style.display ?? 'block' });
 // The APK Back integration wires popstate/history straight on window at module
 // load — give the fake DOM a minimal window + history so init runs headless.
@@ -220,6 +221,12 @@ module.exports = {
     renderPanel();
   },
   selected: () => ({ fleet: panelFleet(), planet: selPlanet, orders: [...selFleets] }),
+  repaintDossier: renderSwarmDossier,
+  dossierProbe: count => {
+    const intel = ((s.swarmIntel ??= {})[ME] ??= {});
+    if (count) intel['ui-intel'] = { owner: 'p3', location: 'ui-hidden', at: s.time, units: [{ unit: 'swarm_lander', count }] };
+    else delete intel['ui-intel'];
+  },
   state: () => JSON.stringify(s),
   back: () => closeTop(BACK_LAYERS.filter(l => l.id === 'swarm-dossier' || l.id === 'boonpick')),
   backLabel: () => t('side.summary.back'),
@@ -528,6 +535,36 @@ assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'the dossi
 assert.equal(mod.exports.state(), beforeBoonBack, 'deferring keeps the earned boon');
 await click('swarm-dossier-close');
 assert.equal(getEl('swarm-dossier').classList.contains('show'), false);
+dossierMedia.matches = true;
+const dossierNow = performance.now();
+mod.exports.repaintDossier(dossierNow);
+assert.equal(getEl('swarm-dossier').classList.contains('pinned'), true);
+assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'PC dossier opens automatically');
+assert.equal(getEl('swarm-dossier').role, 'complementary');
+assert.equal(getEl('swarm-dossier')['aria-modal'], undefined);
+const dossierBeforeBurst = getEl('swarm-dossier-body').innerHTML;
+mod.exports.dossierProbe(3);
+mod.exports.repaintDossier(dossierNow + 100);
+assert.equal(getEl('swarm-dossier-body').innerHTML, dossierBeforeBurst, 'rapid updates keep existing intel readable');
+mod.exports.dossierProbe(7);
+mod.exports.repaintDossier(dossierNow + 500);
+assert.ok(getEl('swarm-dossier-body').innerHTML.includes('×7'), 'the next refresh uses the latest update in the burst');
+assert.equal(getEl('swarm-dossier').classList.contains('updating'), true, 'fresh contact data triggers scan feedback');
+mod.exports.repaintDossier(dossierNow + 1000);
+mod.exports.repaintDossier(dossierNow + 1300);
+assert.equal(getEl('swarm-dossier').classList.contains('updating'), false, 'unchanged contacts do not restart the scanner');
+mod.exports.dossierProbe(0);
+await click('swarm-dossier-close');
+mod.exports.back();
+assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'a docked dossier does not consume Back');
+getEl('boonpick').classList.add('show');
+mod.exports.back();
+assert.equal(getEl('boonpick').classList.contains('show'), false);
+assert.equal(getEl('swarm-dossier').classList.contains('show'), true);
+dossierMedia.matches = false;
+mod.exports.repaintDossier();
+assert.equal(getEl('swarm-dossier').classList.contains('show'), false, 'resize restores the compact modal');
+assert.equal(getEl('swarm-dossier').role, 'dialog');
 await click('tomenu');
 assert.equal(getEl('sz-continue').hidden, false, 'a live run is offered after returning to menu');
 let saved = JSON.parse(storage.get('void.run.v1'));
