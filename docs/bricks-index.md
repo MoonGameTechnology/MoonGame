@@ -972,7 +972,7 @@
 | SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md:449` | Ассортимент |
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md:481` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md:490` | Уровень у модуля Роя |
-| SZE-4.2 | ⏳ | core | `docs/sector-zero-economy-roadmap.md:532` | Контригра против уровня |
+| SZE-4.2 | ✅ | core | `docs/sector-zero-economy-roadmap.md:532` | Контригра против уровня |
 | PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1211` | Карта pve-1 снова строится |
 | PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1242` | pveModule в ядре прототипа |
 | PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1269` | Сохранение: сперва мета, потом забег |
