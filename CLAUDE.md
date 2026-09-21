@@ -237,6 +237,11 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
   shell's `git push` is authenticated just because fetch works. In hosted agent sessions,
   prefer the connected GitHub API/app when it has write access. If terminal push gets one auth
   failure, do not retry it or bounce back and forth between transports.
+- **Final sync before PR:** when the implementation is complete, refresh the current `main`
+  again immediately before publication. If the task branch is behind/diverged, integrate fresh
+  `main` first (normally rebase the short-lived branch), resolve conflicts, then re-run checks
+  that the integration could invalidate. Never knowingly open a PR from a stale branch. If the
+  owner explicitly requested no checks, still sync/compare but do not add extra test runs.
 - Before opening a PR, verify the remote head exists, is ahead of current `main`, and has no
   existing open PR to reuse. Keep the PR draft while more edits are expected.
 - **Do not manually enable generic auto-merge or enqueue normal PRs.** This repository's
