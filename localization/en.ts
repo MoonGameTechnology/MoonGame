@@ -2054,6 +2054,7 @@ export const en: Record<string, string> = {
   'sector-zero.prep.workshop': 'Workshop',
   'sector-zero.restore-failed': 'Could not open the saved run. You can start a new one.',
   'sector-zero.saved': 'Run in progress',
+  'sector-zero.shop.ad-declined': 'The ad was not shown. Nothing was spent.',
   'sector-zero.shop.bought': 'Purchased.',
   'sector-zero.shop.empty': 'The shelf is empty.',
   'sector-zero.shop.grants.module': 'Ship module',

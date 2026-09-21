@@ -2055,6 +2055,7 @@ export const ru: Record<string, string> = {
   'sector-zero.prep.workshop': 'Мастерская',
   'sector-zero.restore-failed': 'Не удалось открыть сохранение. Можно начать новый забег.',
   'sector-zero.saved': 'Забег в процессе',
+  'sector-zero.shop.ad-declined': 'Реклама не показана. Ничего не списано.',
   'sector-zero.shop.bought': 'Куплено.',
   'sector-zero.shop.empty': 'Витрина пуста.',
   'sector-zero.shop.grants.module': 'Модуль корабля',
