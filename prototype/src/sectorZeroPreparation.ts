@@ -27,6 +27,10 @@ interface PreparationHost {
    *  а не по имени площадки. Сегодня оба флага выключены — ни IAP, ни `PlatformAds` в
    *  продукте нет, и рисовать живые кнопки под несуществующую машинерию нельзя. */
   platform: ShopCapabilities;
+  /** Показать rewarded-рекламу и дождаться ПОДТВЕРЖДЁННОГО результата. `true` = игрок
+   *  досмотрел. Награду выдаёт игра и только после этого (`platform-adapters.md`), поэтому
+   *  покупка за рекламу идёт двумя шагами, а не одним. */
+  watchAd(placement: string): Promise<boolean>;
   progress(): SectorZeroProgress;
   change(action: SectorProgressAction): boolean;
 }
@@ -254,9 +258,21 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       let action: SectorProgressAction | null = null;
       if (kind?.startsWith('buy:')) {
         const pay = kind.slice(4) as PayKind;
-        // Реклама: показать её обязан адаптер площадки, и награду игра выдаёт только
-        // после ПОДТВЕРЖДЁННОГО результата (`platform-adapters.md`). Адаптера сегодня
-        // нет, поэтому до сюда способ `ad` и не доходит — кнопка погашена витриной.
+        if (pay === 'ad') {
+          // Два шага, а не один: сперва подтверждённый показ, потом выдача. Отказ от
+          // рекламы не должен ничего ломать и не должен ничего отнимать, поэтому при
+          // `false` мы просто не зовём выдачу — списывать тут нечего по определению.
+          // Сломавшийся адаптер читается как «не досмотрел»: fail-secure, товар не
+          // выдаётся. Иначе исключение в SDK площадки превратилось бы в бесплатный лот.
+          const settle = (watched: boolean): void => {
+            message = !watched
+              ? t('sector-zero.shop.ad-declined')
+              : t(h.change({ kind: 'buy', id, pay }) ? 'sector-zero.shop.bought' : 'sector-zero.prep.unavailable');
+            render();
+          };
+          void h.watchAd(`shop:${id}`).then(settle, () => settle(false));
+          return;
+        }
         message = t(h.change({ kind: 'buy', id, pay }) ? 'sector-zero.shop.bought' : 'sector-zero.prep.unavailable');
         render();
         return;

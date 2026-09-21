@@ -272,6 +272,7 @@ import { localRunSaveStore } from './runSaveLocal';
 import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
+import { createWebPlatform } from './platform/web';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
@@ -12925,13 +12926,23 @@ function saveSectorProgress(next: SectorZeroProgress): void {
   progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
 }
 
+// Площадка (`YAG-1.1a`). В сборке игрока это обычный браузер: rewarded-рекламы и платежей
+// там нет, и `capabilities` честно говорят `false` — магазин по ним просто не рисует такие
+// кнопки. В дев-сборке поднимается управляемая симуляция, чтобы путь «посмотрел рекламу →
+// товар выдан» проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку
+// нельзя: это ровно «обещать механику, которой у него не будет».
+const platform = createWebPlatform({ simulate: !__PLAYER_BUILD__ });
+
 const sectorPreparation = initSectorZeroPreparation({
   data,
-  // Что умеет площадка. Оба флага выключены ЧЕСТНО, а не «пока»: ни IAP, ни `PlatformAds`
-  // в продукте не существует (`platform-adapters.md` их описывает, кода ноль). Рисовать
-  // живые кнопки под несуществующую машинерию — это и есть «код есть, а игры нет».
-  // Появится адаптер (`YAG-*`) — включение станет сменой этих двух флагов.
-  platform: { sovereigns: false, ads: false },
+  // Решения UI принимаются по capability, а не по имени площадки (`platform-adapters.md`).
+  platform: { sovereigns: platform.capabilities.iap, ads: platform.capabilities.rewardedAds },
+  watchAd: async placement => {
+    platform.analytics.emit('rewarded_ad_offered', { placement });
+    const shown = await platform.ads.showRewardedAd({ placement });
+    if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement });
+    return shown.status === 'ok';
+  },
   progress: () => sectorProgress,
   change: action => {
     const next = changeSectorZeroProgress(sectorProgress, action, data);
