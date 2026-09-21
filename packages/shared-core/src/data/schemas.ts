@@ -621,6 +621,24 @@ export const ModuleEffectsSchema = z.object({
  *  `horizontal` (logistics/utility) vs `vertical` (combat power). A paid/lootbox
  *  source must never carry a `vertical` module — enforced downstream and by the
  *  soulbound refine here. Extensible via data, like `UnitDef`. */
+/**
+ * SZE-4.2 — чем класс сигнала контрится.
+ *
+ * Уровень адаптации Роя имеет право усиливать ТОЛЬКО эти характеристики. Без правила
+ * прокачанный Рой становится всезнающим: дай модулю-ответу обычный `attack`, и
+ * «перехватывающий покров» третьего уровня начнёт бить сильнее по группе, в которой
+ * ударных машин нет вовсе, — а §3.4 требует ровно обратного, чтобы контригра против
+ * памяти существовала.
+ *
+ * Таблица живёт в КОДЕ, а не в данных, намеренно: это инвариант, как соседние refine
+ * («модуль не правит вместимость слотов», «боевой модуль не бывает soulbound»), а не
+ * балансное число. Данные, объявляющие себе разрешённое, запрет не удержали бы.
+ */
+export const SIGNAL_COUNTERS: Record<string, readonly string[]> = {
+  /** Ударный вылет челноков и бомбардировщиков — его гасит зональное ПВО. */
+  strike: ['pointDefense', 'pointDefenseRange'],
+};
+
 export const ModuleDefSchema = z
   .object({
     name: z.string(),
@@ -663,6 +681,19 @@ export const ModuleDefSchema = z
   .refine((m) => !Object.keys(m.effects.stats).some((k) => /slot/i.test(k)), {
     message: 'a module may not modify slot capacity (anti self-expansion)',
   })
+  .refine(
+    (m) =>
+      !m.adaptation ||
+      (SIGNAL_COUNTERS[m.adaptation.signal] !== undefined &&
+        Object.keys(m.effects.stats).every((k) =>
+          SIGNAL_COUNTERS[m.adaptation!.signal]!.includes(k),
+        )),
+    {
+      message:
+        'SZE-4.2: an adaptation module may only carry stats that counter its own signal ' +
+        '(a level must not raise general combat power)',
+    },
+  )
   .refine((m) => !(m.tag === 'vertical' && m.soulbound === true), {
     message: 'a vertical (combat) module may not be soulbound (anti pay-to-win)',
   });
