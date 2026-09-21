@@ -291,3 +291,19 @@ body.holo-ui .holo-drag-handle::before{content:'⠿';display:inline-block;flex:0
 body.holo-ui .holo-drag-handle:focus-visible{outline-offset:-3px;}
 body.holo-window-dragging,body.holo-window-dragging *{cursor:grabbing!important;user-select:none!important;}
 body.holo-no-glow #holo-selection-window{backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;}
+/* Object inspection: short overview left, one optional detailed section right. */
+#side .object-detail{border-left:1px solid var(--line-hi);padding-left:16px;min-width:0;}
+#side .object-brief{min-width:0;}
+#side.details-open .pscroll{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.2fr);gap:16px;align-items:start;}
+#side .detail-head{position:sticky;top:0;background:#0b1d28;z-index:3;padding:6px 0;}
+#side .object-detail .pcols{columns:1;}
+#side .object-brief .pstats{flex-wrap:wrap;}
+body.holo-ui #holo-selection-window.details-open{width:min(740px,calc(100vw - 36px));}
+body.holo-ui #holo-selection-window #side.details-open .pscroll{display:grid;}
+body.holo-ui #holo-selection-window.details-open #cmdbar .holo-command-body{max-width:340px;}
+@media (max-width:700px){
+  #side.details-open .pscroll,body.holo-ui #holo-selection-window #side.details-open .pscroll{display:block;}
+  #side .object-detail{border-left:0;border-top:1px solid var(--line-hi);padding:12px 0 0;margin-top:12px;}
+}
+#battlewin .bw-orders{display:flex;gap:8px;flex-wrap:wrap;}
+#battlewin .bw-orders button{padding:10px;border:1px solid var(--line-hi);background:#102632;color:var(--cyan);cursor:pointer;}

@@ -25,6 +25,9 @@ export const ru: Record<string, string> = {
   "map.frontier": "Фронтир",
   "setup.map.hole": "Чёрная дыра · путей нет",
   // --- map-loading — initial map preparation ---
+  'card.details': 'Подробнее',
+  'battle.win.open': '⚔ Открыть бой',
+  'production.units': 'Построить юнитов',
   'battle.win.beachhead': 'плацдарм',
   'battle.win.empty': 'об этом бое ничего не известно',
   'battle.win.head': '⚔ Бой',
@@ -1236,7 +1239,7 @@ export const ru: Record<string, string> = {
   'win.boon.later': 'Позже',
   'win.boon.owed': 'Волна пережита. Доступно выборов: {n}',
   'win.boon.title': 'УСИЛЕНИЕ ЗАБЕГА',
-  'win.build.title': 'ПОСТРОЙКИ',
+  'win.build.title': 'ПРОИЗВОДСТВО',
   'yard.arsenal.note':
     '⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда вы это ПОСТРОИТЕ — постройка и логистика, не мгновенно.',
   'yard.build': 'Построить ×{n} →',
@@ -2127,16 +2130,12 @@ export const ru: Record<string, string> = {
   'side.arch.transport': 'транспорты',
   'side.battle.attacker': 'атака',
   'side.battle.defender': 'оборона',
-  'side.battle.next-round': 'следующий раунд через',
-  'side.battle.phase.ground': 'высадка',
-  'side.battle.phase.orbit': 'орбита',
   'side.battle.retreat': '⤺ Отступить',
   'side.battle.retreat.hint':
     'Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно.',
   'side.battle.side.fleet': 'флот',
   'side.battle.side.garrison': 'гарнизон',
   'side.battle.side.landing': 'десант',
-  'side.battle.title': '⚔ Бой — {phase} · раунд {r}',
   'side.build.conveyor': 'Строительный конвейер',
   'side.build.enemy-hidden': 'Строительная телеметрия врага недоступна',
   'side.build.upgrade': '▲ Улучшить {c}',
@@ -2215,7 +2214,6 @@ export const ru: Record<string, string> = {
   'side.stat.atk': 'АТК',
   'side.stat.def': 'ЗАЩ',
   'side.stat.spd': 'СКР',
-  'side.strike.assault': '⚔ Штурм',
   'side.strike.bombard': '⊗ Бомбардировать',
   'side.strike.bombard.stop': '⊗ Прекратить бомбардировку',
   'side.strike.forecast':
