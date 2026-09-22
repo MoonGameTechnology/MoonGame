@@ -127,6 +127,10 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       'dense_nebula',
       'depleted_system',
       'derelict_graveyard',
+      // M2.9: `dust_lane` — средняя ступень астероидной лестницы (поле 3 → полоса 2 →
+      // скопление 1). Поставлена на `pve-2` оболочкой вокруг скопления: клетке кольца
+      // нужно ДВА подхода, и без этой ступени массив не собирался.
+      'dust_lane',
       'empty_space',
       'ion_storm',
       'nebula',
@@ -153,6 +157,9 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       'nebula',
       'pirate_base',
       'planet',
+      // M2.9: штормовой пояс на востоке `pve-2` — зона вспышек рядом с ионным штормом.
+      // Быстрая, но по живучести штрафная: пролететь можно, драться там дорого.
+      'solar_flare',
     ]);
   });
 });

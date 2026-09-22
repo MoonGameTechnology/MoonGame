@@ -16,16 +16,16 @@ SPEC = {
  'a1': ('planet','empty_space','p1',[{'unit':'militia','count':2}],[{'type':'mine_t1'},{'type':'shipyard','level':2},{'type':'radar'}]),
  'a2': ('nebula','nebula','p1',[],[]),
  'a3': ('nebula','nebula',S,[{'unit':'swarm_lander','count':2}],[]),
- 'a4': ('empty','deep_void',None,[],[]),
+ 'a4': ('asteroid','asteroid_field',None,[],[]),
  'b1': ('asteroid','asteroid_field',None,[],[]),
  'b2': ('empty','deep_void',None,[],[]),
  'b3': ('empty','deep_void',None,[],[]),
- 'b4': ('nebula','nebula',None,[],[]),
+ 'b4': ('asteroid','dust_lane',None,[],[]),
  'b5': ('asteroid_cluster','asteroid_cluster',S,[{'unit':'swarm_lander','count':3}],[]),
  'c1': ('dead_world','depleted_system',S,[{'unit':'swarm_lander','count':3}],[]),
  'c2': ('graveyard','derelict_graveyard',S,[],[]),
  'c3': ('empty','deep_void',None,[],[]),
- 'c4': ('nebula','nebula',None,[],[]),
+ 'c4': ('solar_flare','solar_flare_zone',None,[],[]),
  'd1': ('planet','empty_space',S,[{'unit':'swarm_lander','count':4}],[{'type':'biomass_pit'},{'type':'shipyard','level':2},{'type':'fort'}]),
  'd2': ('empty','deep_void',None,[],[]),
  'd3': ('empty','empty_space',None,[],[]),
@@ -36,7 +36,7 @@ SPEC = {
  'e3': ('empty','empty_space',None,[],[]),
  'e4': ('planet','empty_space',S,[{'unit':'swarm_lander','count':6}],[{'type':'swarm_hive'},{'type':'biomass_pit'},{'type':'shipyard','level':2},{'type':'barracks'},{'type':'fort'},{'type':'orbital_aa'}]),
   'f1': ('graveyard','derelict_graveyard',S,[{'unit':'swarm_lander','count':2}],[]),
-  'f2': ('nebula','nebula',None,[],[]),
+  'f2': ('graveyard','derelict_graveyard',None,[],[]),
   'f3': ('graveyard','derelict_graveyard',S,[],[]),
 }
 # Размеры НЕ трогаем: решётка уже даёт узлам шесть подходов, а раздутая клетка
@@ -46,11 +46,34 @@ SIZE = {}
 # Две трассы пересекаются в центре и НЕ соединяются (M2.5): по диагоналям.
 TRANSIT = {'c1': [['b1','d2'], ['b2','d1']]}
 
+# РАСШАТЫВАНИЕ ЦЕНТРОВ (M2.9, решение владельца «в космосе нет прямых углов»). Сдвиг
+# детерминированный — от id провинции, а не от случайного числа: карта обязана собираться
+# одинаково у всех и в любой момент. Амплитуда 90 мировых единиц взята замером: до неё
+# число проходов, средний перелёт и обоснованный тупик держатся, а на 130 ломается транзит.
+JITTER = 90
+# Соль сдвига выбрана ПЕРЕБОРОМ по замеру, а не на глаз: из девяти вариантов этот
+# единственный держит 40 проходов, единственный тупик (и тот обоснован скоплением
+# астероидов) и чистый валидатор. Соседние варианты ломали транзит `c1` или заводили
+# второй тупик на просторной местности — то есть тупик без обоснования.
+SALT = 'a'
+def shake(sid):
+    h = 2166136261
+    for ch in (sid + SALT):
+        h ^= ord(ch); h = (h * 16777619) & 0xFFFFFFFF
+    def nxt():
+        nonlocal h
+        h ^= (h >> 15); h = (h * 2246822507) & 0xFFFFFFFF
+        h ^= (h >> 13); h = (h * 3266489909) & 0xFFFFFFFF
+        return ((h ^ (h >> 16)) & 0xFFFFFFFF) / 0xFFFFFFFF
+    return round((nxt()*2-1)*JITTER), round((nxt()*2-1)*JITTER)
+
 sectors = collections.OrderedDict()
 for y,row in ROWS:
     for x,sid in row:
+        dx,dy = shake(sid)
+        x, y0 = x+dx, y+dy
         kind,terrain,owner,garr,blds = SPEC[sid]
-        sec = collections.OrderedDict([('position',{'x':x,'y':y}),('kind',kind),('terrain',terrain)])
+        sec = collections.OrderedDict([('position',{'x':x,'y':y0}),('kind',kind),('terrain',terrain)])
         if sid in SIZE: sec['size']=SIZE[sid]
         if owner: sec['owner']=owner
         if blds: sec['buildings']=blds
