@@ -182,7 +182,8 @@
       ]
     },
     "passives": {
-      "combatDamageBonus": 0.1
+      "combatDamageBonus": 0.1,
+      "fortGarrisonBonus": 2
     }
   },
   "swarm": {
@@ -225,7 +226,8 @@
       ]
     },
     "passives": {
-      "productionBonus": 0.15
+      "productionBonus": 0.15,
+      "fortGarrisonBonus": -1
     }
   }
 }

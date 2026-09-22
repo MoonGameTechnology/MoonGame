@@ -5,10 +5,13 @@ import type {
   PausedConstructionSite,
   Player,
   QueuedConstruction,
+  UnitStack,
 } from '../state/gameState';
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
+import { fleetAtOwnDock } from '../util/repair';
+import { battleAt, battleLocations } from '../state/battle';
 import { allowedBuildings, isBuildable } from '../state/sectorKind';
 import type { Action } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
@@ -134,6 +137,89 @@ function scheduleCompletion(h: HandlerContext, hours: number, payload: CompleteP
 function atInstanceCap(h: HandlerContext, planet: Planet, building: string): boolean {
   const cap = h.ctx.data.buildings[building]?.maxPerPlanet ?? 1;
   return planet.buildings.filter((b) => b.type === building).length >= cap;
+}
+
+/** Юнит-гарнизон, который выставляет форт (FORT-2.2). Он `issued`: заказать его нельзя,
+ *  он приходит и уходит вместе со зданием. */
+const GARRISON_UNIT = 'garrison';
+
+/** Базовый потолок выданного гарнизона на ПЛАНЕТУ (решение владельца). Фракция двигает
+ *  его через хук `fort.garrisonCap`. */
+const FORT_GARRISON_CAP = 3;
+
+/**
+ * Привести гарнизон, ВЫДАННЫЙ зданиями, в соответствие с ними — один дом на три повода
+ * (постройка, прокачка, разрушение). Тот же приём, которым крепость держит свои орудия
+ * (`syncStationGuns`), и по той же причине: три копии этого правила разошлись бы молча.
+ *
+ * Правило: сколько суммарно объявили живые здания, столько юнитов и стоит. Ноль — стека
+ * нет вовсе. Прокачка ДОБАВЛЯЕТ защитников, но потерь боя не лечит: иначе апгрейд
+ * работал бы мгновенным подкреплением посреди штурма.
+ *
+ * Игроковы войска в том же `garrison` не трогаются: выданные отличимы по id юнита,
+ * заказать который нельзя (`issued`), — поэтому «чей это стек» не надо угадывать.
+ */
+function syncIssuedGarrison(h: HandlerContext, planet: Planet): void {
+  let target = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue;
+    const def = h.ctx.data.buildings[b.type];
+    if (def) target += buildingLevel(def, b.level).issuesGarrison;
+  }
+  // ПОТОЛОК СЧИТАЕТСЯ ПО ПЛАНЕТЕ, а не по зданию (FORT-2.3, решение владельца): иначе
+  // два форта обошли бы его сложением, и «потолок 3» означал бы «3 на каждый форт».
+  // Значение идёт хуком: база живёт здесь, фракция двигает её своей пассивкой, а без
+  // модуля фракций работает база — инвариант «расширение деградирует до дефолта».
+  const cap = h.hook<number>('fort.garrisonCap', FORT_GARRISON_CAP, { planetId: planet.id });
+  target = Math.min(target, Math.max(0, cap));
+  const idx = planet.garrison.findIndex((s) => s.unit === GARRISON_UNIT);
+  if (target <= 0) {
+    if (idx >= 0) planet.garrison.splice(idx, 1);
+    return;
+  }
+  if (idx < 0) {
+    planet.garrison.push({ unit: GARRISON_UNIT, count: target });
+    return;
+  }
+  const stack = planet.garrison[idx]!;
+  if (stack.count < target) stack.count = target;
+}
+
+/**
+ * СЛОТЫ ПОСТРОЕК (FORT-5.3, решения владельца 10 и 11): сколько мест несёт узел и
+ * сколько уже занято. `null` — лимита нет вовсе.
+ *
+ * Лимит включается САМИМ НАЛИЧИЕМ мест: пока ни одно стоящее сооружение не объявило
+ * `buildSlots`, узел застраивается как раньше. Поэтому планета и прочие виды не тронуты
+ * — отдельного флага «а тут лимит есть» не понадобилось.
+ *
+ * Сооружение, НЕСУЩЕЕ места, само слота не занимает: корпус крепости держит причалы, а
+ * не стоит в одном из них. Правило по свойству, а не по имени здания, — новое
+ * сооружение с местами получит его само.
+ *
+ * Очередь считается вместе со стоящим, иначе лимит обходится заказом впрок: пять
+ * построек в очередь на крепость первого уровня, и все пять доедут до готовности.
+ */
+function slotsAt(h: HandlerContext, planet: Planet): { capacity: number; used: number } | null {
+  let capacity = 0;
+  let used = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue; // разрушенное не несёт мест и не занимает их
+    const def = h.ctx.data.buildings[b.type];
+    const slots = def ? buildingLevel(def, b.level).buildSlots : 0;
+    if (slots > 0) capacity += slots;
+    else used += 1;
+  }
+  if (capacity <= 0) return null; // мест никто не объявил → лимита нет
+  for (const e of h.state.scheduled) {
+    if (e.type !== 'construction.complete') continue;
+    const p = e.payload as CompletePayload;
+    if (p.kind === 'building' && p.planetId === planet.id) used += 1;
+  }
+  for (const q of planet.buildQueue ?? []) {
+    if (q.kind === 'building') used += 1;
+  }
+  return { capacity, used };
 }
 
 function isQueued(
@@ -281,9 +367,23 @@ function scheduleQueuePump(h: HandlerContext, planetId: string, lane: BuildLane)
  * Порядок проверок — фикс: полоса занята → нечего решать; заказ протух → выбросить и
  * взяться за следующий; денег нет → ЖДАТЬ (заказ остаётся головой, назначается повтор).
  */
+/**
+ * УЗЕЛ НЕ РАБОТАЕТ — и почему именно. Две разные беды с разными сообщениями игроку:
+ * обстрел с орбиты и бой прямо здесь (решение владельца 17). Один дом на все ворота,
+ * иначе шесть копий этого «или» разойдутся, как уже расходились два хука форта.
+ *
+ * Отдельный код для боя нужен, потому что `E_BOMBARDED` в этом случае СОВРЁТ: игрок
+ * пойдёт искать чужой флот на орбите, а бой идёт у него под окнами.
+ */
+function suppressed(h: HandlerContext, planetId: string): 'E_BOMBARDED' | 'E_BATTLE_HERE' | null {
+  if (isBombarded(h.state, planetId, h.ctx.data)) return 'E_BOMBARDED';
+  if (battleAt(h.state, planetId)) return 'E_BATTLE_HERE';
+  return null;
+}
+
 function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): void {
   if (laneBusy(h, planet.id, lane)) return;
-  if (isBombarded(h.state, planet.id, h.ctx.data)) return; // производство заморожено — не старт, а пауза
+  if (suppressed(h, planet.id)) return; // узел не работает — не старт, а пауза
   for (;;) {
     const queue = planet.buildQueue ?? [];
     const head = queue.find((q) => laneOfKind(q.kind) === lane);
@@ -371,6 +471,28 @@ function hasCapability(planet: Planet, data: GameData, key: ConstructionCapabili
  *  units never check this. */
 function hasShipyard(planet: Planet, data: GameData): boolean {
   return hasCapability(planet, data, 'enablesShipConstruction');
+}
+
+/** Какой уровень верфи нужен корпусу этого класса (решение владельца 15). Класс не
+ *  объявлен — корабль довольствуется любой верфью, как было до FORT-5.5. */
+const YARD_LEVEL_FOR: Record<string, number> = { light: 1, medium: 2, heavy: 3 };
+
+/** Самый большой СТАПЕЛЬ узла: максимальный уровень среди живых верфей. Максимум, а не
+ *  сумма: две верфи первого уровня не собирают линкор — нужен один стапель нужного
+ *  размера. (Ср. `shuttleBay`, где вместимость как раз СКЛАДЫВАЕТСЯ: причалов может быть
+ *  много, а стапель для корпуса нужен один.) */
+function yardLevelAt(planet: Planet, data: GameData): number {
+  let best = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue;
+    const def = data.buildings[b.type];
+    // Способность читается через `capabilityAt`, а НЕ через `buildingLevel`: разбор
+    // уровня отдаёт числовые поля, а флаги способностей в него не входят вовсе, и
+    // `buildingLevel(def, 1).enablesShipConstruction` молча равен `undefined`. На этом
+    // первая версия и попалась — лёгкий корпус не проходил на верфи первого уровня.
+    if (def && capabilityAt(def, b.level, 'enablesShipConstruction')) best = Math.max(best, b.level);
+  }
+  return best;
 }
 
 /** Сколько ЕЩЁ челноков примет мир (SHU-1.1): вместимость стоящих портов минус уже
@@ -540,6 +662,9 @@ function damageBuildings(
     }
   }
   planet.buildings = survivors;
+  // Разрушенное здание уносит выданный им гарнизон: иначе защитники пережили бы то, что
+  // их породило, и мир остался бы «занят» призраками снесённого форта.
+  syncIssuedGarrison(h, planet);
 }
 
 /**
@@ -569,8 +694,9 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED'); // production frozen under bombardment
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       const def = h.ctx.data.buildings[payload.building];
       if (!def) {
@@ -604,6 +730,16 @@ export const constructionModule: GameModule = {
       const onlyOn = h.ctx.data.buildings[payload.building]?.onlyOn;
       if (onlyOn !== undefined && !onlyOn.includes(planet.kind ?? '')) {
         return h.reject('E_WRONG_SECTOR');
+      }
+      // 4. `buildSlots` — СКОЛЬКО построек узел вообще вмещает (решения 10 и 11). Своё
+      //    место в порядке ворот: первые три отвечают «что сюда ставят», это — «влезет
+      //    ли ещё одна». Код отказа поэтому другой: «сюда нельзя» и «места кончились»
+      //    игроку говорят разное, и второе лечится прокачкой. Не `E_NO_SLOTS` — тот уже
+      //    занят фиттингами корабля, и его текст («слоты фиттингов заняты») в ответ на
+      //    заказ постройки соврал бы.
+      const slots = slotsAt(h, planet);
+      if (slots && slots.used >= slots.capacity) {
+        return h.reject('E_NO_BUILD_SLOTS');
       }
       requireUnlocked(h, action.playerId, 'building', payload.building);
       if (atInstanceCap(h, planet, payload.building)) {
@@ -654,8 +790,9 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED');
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       // RULES-2.1: address a SPECIFIC instance by uid when maxPerPlanet > 1.
       // Without uid (old client / maxPerPlanet=1), fall back to find-by-type.
@@ -723,12 +860,24 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED');
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       const def = h.ctx.data.units[payload.unit];
       if (!def) {
         return h.reject('E_UNKNOWN_UNIT');
+      }
+      // ВЫДАВАЕМОЕ НЕ ЗАКАЗЫВАЮТ: трейт `issued` значит «этот отряд приходит вместе с
+      // сооружением, которому принадлежит» — орудия крепости (FORT-5.4), гарнизон форта
+      // (FORT-2.2). Без этих ворот орудия крепости заказывались бы на любой верфи как
+      // обычный корабль: домен у них космический, а верфь в ростере крепости есть.
+      //
+      // Мерять по `immobile` было БЫ ОШИБКОЙ, и её поймал сторож `autoRally`: неподвижность
+      // и «не заказывается» — разные вещи. Стационарная зенитка в гарнизоне тоже неподвижна,
+      // но её игрок как раз строит, и близкий зенитный залп на этом и держится.
+      if (def.traits.includes('issued')) {
+        return h.reject('E_NOT_BUILDABLE');
       }
       requireUnlocked(h, action.playerId, 'unit', payload.unit);
       // Челнок строится В КОСМОПОРТЕ и остаётся в нём: порт — и гейт, и предел
@@ -745,6 +894,16 @@ export const constructionModule: GameModule = {
       }
       if (!isShuttle && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');
+      }
+      // Класс корпуса против размера стапеля (решение владельца 15). Отдельный код от
+      // `E_NO_SHIPYARD`: «верфи нет» и «верфь мала» игроку говорят разное — первое лечится
+      // постройкой, второе прокачкой, и подменять их значило бы отправить его строить
+      // вторую верфь там, где нужна та же, но выше.
+      if (!isShuttle && def.domain === 'space' && def.hullClass) {
+        const need = YARD_LEVEL_FOR[def.hullClass] ?? 1;
+        if (yardLevelAt(planet, h.ctx.data) < need) {
+          return h.reject('E_YARD_TOO_SMALL');
+        }
       }
       // Наземный юнит идёт в СВОЁ здание: пехота в казармы, техника на завод
       // (ROS-1.1). Отказ называет недостающее здание, а не «наземное производство» —
@@ -903,8 +1062,9 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED');
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       const paused = planet.pausedConstruction ?? [];
       const site = paused.find((s) => s.id === payload.id);
@@ -977,8 +1137,8 @@ export const constructionModule: GameModule = {
       if (!planet || planet.owner !== p.playerId) {
         return; // planet gone or captured mid-build → investment forfeited
       }
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        // production frozen under bombardment → re-defer until it lifts (scale the
+      if (suppressed(h, planet.id)) {
+        // узел не работает (обстрел или бой) → отложить до лучших времён (scale the
         // retry by timeScale like every other duration, so a fast match isn't stuck)
         h.schedule(h.ctx.now + hoursToMs(h.ctx, 1), 'construction.complete', p);
         return;
@@ -1023,6 +1183,7 @@ export const constructionModule: GameModule = {
         const hp = def ? buildingLevel(def, 1).hp : 0;
         const uid = `b:${planet.id}:${p.building}:${h.ctx.now}:${p.seq ?? 0}`;
         planet.buildings.push({ uid, type: p.building, level: 1, hp });
+        syncIssuedGarrison(h, planet);
         h.emit('building.constructed', {
           planetId: planet.id,
           building: p.building,
@@ -1042,6 +1203,7 @@ export const constructionModule: GameModule = {
         }
         instance.level = p.level;
         instance.hp = buildingLevel(def, p.level).hp;
+        syncIssuedGarrison(h, planet);
         h.emit('building.upgraded', {
           planetId: planet.id,
           building: p.building,
@@ -1168,17 +1330,43 @@ export const constructionModule: GameModule = {
       const hours = (span / MS_PER_HOUR) * scale;
       const data = h.ctx.data;
 
-      // Planets hosting a live ground assault — their garrisons don't regen
-      // mid-battle (mirrors the ship `battleId` guard in the fleet loop below;
-      // a planet carries no in-battle flag, so derive it from `state.battles`).
-      const groundBattleLocations = new Set<string>();
-      for (const b of Object.values(h.state.battles)) {
-        if (b.phase === 'ground') groundBattleLocations.add(b.location);
+      // Узлы, где идёт бой ЛЮБОЙ фазы, не лечат гарнизон (решение владельца 17).
+      // Прежде условием был только НАЗЕМНЫЙ бой, и это давало странность: флот врага
+      // режется с крепостью на орбите, а её госпиталь спокойно штопает гарнизон.
+      const fighting = battleLocations(h.state);
+
+      /** Подлечить один стек наземных войск — доля от полного HP за час, как и было. */
+      const mend = (stack: UnitStack, rate: number): void => {
+        const unitDef = data.units[stack.unit];
+        if (!unitDef) return;
+        const fullHp = stack.count * (effectiveStats(unitDef, stack, data).hp ?? 0);
+        const currentHp = stack.hp ?? fullHp;
+        if (currentHp >= fullHp) return;
+        const newHp = Math.min(fullHp, currentHp + rate * hours * fullHp);
+        stack.hp = newHp >= fullHp ? undefined : newHp;
+      };
+
+      // Кого лечит госпиталь, стоящий на узле: гарнизон САМОГО узла и десант в трюме
+      // припаркованных рядом флотов — своих и СОЮЗНЫХ (FORT-5.9, из описания построек
+      // крепости: «когда флот игрока или союзника рядом, лечатся наземные войска в трюме»).
+      // Прежде трюм не лечил никто и нигде: раненый десант оставался раненым навсегда,
+      // если его не высадить.
+      const landingsAt = new Map<string, UnitStack[]>();
+      for (const fleet of Object.values(h.state.fleets)) {
+        if (fleet.movement || fleet.battleId || !fleet.location) continue;
+        const host = h.state.planets[fleet.location];
+        if (!host || host.owner === null) continue;
+        if (host.owner !== fleet.owner && !isAllied(h, fleet.owner, host.owner)) continue;
+        const bucket = landingsAt.get(fleet.location) ?? [];
+        for (const stack of fleet.landing ?? []) bucket.push(stack);
+        if (bucket.length > 0) landingsAt.set(fleet.location, bucket);
       }
 
       for (const planet of Object.values(h.state.planets)) {
-        if (planet.owner === null || planet.garrison.length === 0) continue;
-        if (groundBattleLocations.has(planet.id)) continue;
+        if (planet.owner === null) continue;
+        if (fighting.has(planet.id)) continue;
+        const landings = landingsAt.get(planet.id) ?? [];
+        if (planet.garrison.length === 0 && landings.length === 0) continue;
         let totalHealRate = 0;
         for (const b of planet.buildings) {
           if (b.hp <= 0) continue; // destroyed building contributes nothing
@@ -1186,16 +1374,8 @@ export const constructionModule: GameModule = {
           if (def) totalHealRate += buildingLevel(def, b.level).healRate;
         }
         if (totalHealRate <= 0) continue;
-        for (const stack of planet.garrison) {
-          const unitDef = data.units[stack.unit];
-          if (!unitDef) continue;
-          const fullHp = stack.count * (effectiveStats(unitDef, stack, data).hp ?? 0);
-          const currentHp = stack.hp ?? fullHp;
-          if (currentHp >= fullHp) continue;
-          const healed = totalHealRate * hours * fullHp;
-          const newHp = Math.min(fullHp, currentHp + healed);
-          stack.hp = newHp >= fullHp ? undefined : newHp;
-        }
+        for (const stack of planet.garrison) mend(stack, totalHealRate);
+        for (const stack of landings) mend(stack, totalHealRate);
       }
 
       // Ship regen/repair — the two pools mend differently (shields-roadmap §1):
@@ -1209,12 +1389,18 @@ export const constructionModule: GameModule = {
       const SHIELD_REGEN_DELAY = MS_PER_HOUR; // shields stay down this long after a hit
       for (const fleet of Object.values(h.state.fleets)) {
         if (fleet.battleId) continue; // a fleet in combat regenerates nothing
+        // Решение владельца 17: пока на узле идёт бой, док не чинит — даже флот, который
+        // сам в драку не втянут. Прежде такой флот спокойно чинился посреди сражения.
+        if (fleet.location !== null && fighting.has(fleet.location)) continue;
 
-        // Hull mends only while parked over a FRIENDLY world with a repair yard
-        // (shipyard/spaceport `shipRepair`, shields-roadmap SH-2.1) — no yard, no mend.
+        // Корпус чинится только у ДРУЖЕСТВЕННОГО мира с верфью или космопортом
+        // (`shipRepair`, shields-roadmap SH-2.1) — нет дока, нет починки. «Дружественный»
+        // с FORT-5.8 значит свой ИЛИ союзный: правило одно на все три пути ремонта, и
+        // живёт оно в `fleetAtOwnDock`. Частичный эффект здесь был бы необъяснимым —
+        // ровно так разъезжались два хука наземной защиты форта.
         let hullRate = 0;
         const planet = fleet.location ? h.state.planets[fleet.location] : undefined;
-        if (planet && !fleet.movement && planet.owner === fleet.owner) {
+        if (planet && fleetAtOwnDock(fleet, h.state, data, (a, b) => isAllied(h, a, b))) {
           for (const b of planet.buildings) {
             if (b.hp <= 0) continue;
             const def = data.buildings[b.type];
@@ -1241,13 +1427,20 @@ export const constructionModule: GameModule = {
           }
 
           // Shield (`shieldHp`): free out-of-combat regen once past the damage delay.
+          //
+          // Темп = общая база ПЛЮС добавка юнита (`shieldRegen`, FORT-5.10: со ступенью
+          // щита крепости растёт не только размер пула, но и скорость его набора).
+          // Именно ДОБАВКА, а не замена: корпус без этого стата обязан копить щит ровно
+          // с прежней скоростью, иначе правка молча переписала бы весь флот игры.
           if (stack.shieldHp !== undefined) {
-            const fullShield = stack.count * (effectiveStats(unitDef, stack, data).shield ?? 0);
+            const eff = effectiveStats(unitDef, stack, data);
+            const fullShield = stack.count * (eff.shield ?? 0);
+            const shieldRate = SHIELD_REGEN + (eff.shieldRegen ?? 0);
             if (fullShield <= 0 || stack.shieldHp >= fullShield) stack.shieldHp = undefined;
             else if (shieldHours > 0) {
               const cur = Math.min(
                 fullShield,
-                stack.shieldHp + SHIELD_REGEN * shieldHours * fullShield,
+                stack.shieldHp + shieldRate * shieldHours * fullShield,
               );
               stack.shieldHp = cur >= fullShield ? undefined : cur;
             }

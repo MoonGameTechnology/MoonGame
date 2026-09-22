@@ -31,6 +31,17 @@ export const UnitStatsSchema = z
      *  shield pool before the hull; a ship dies when its HULL reaches 0. 0 = no
      *  shield. (Out-of-combat regen is a later brick, SH-1.1.) */
     shield: z.number().nonnegative().default(0),
+    /** ДОБАВКА к скорости восстановления щита (доля пула в игровой час) поверх общей
+     *  базовой скорости (`SHIELD_REGEN`, `construction.ts`). 0 = восстанавливается с
+     *  общей скоростью, как весь флот игры.
+     *
+     *  Добавкой, а не полной величиной, НАМЕРЕННО. База — одно число на всю игру, и
+     *  корпус без этого поля обязан вести себя ровно как прежде. Если бы стат означал
+     *  полную скорость, то «поле не заполнено» читалось бы как «щит не восстанавливается
+     *  вовсе», и каждый существующий корабль молча лишился бы регенерации — ровно тот
+     *  способ, которым дефолт схемы тихо переписывает баланс (прецедент: `defenseBonus`
+     *  в уровнях зданий). */
+    shieldRegen: z.number().nonnegative().default(0),
     /** Legacy standoff firing radius in MAP UNITS. Nothing reads it since the
      *  standoff-fire subsystem was removed; kept so shipped content that still
      *  states it keeps parsing. Shuttle reach is `strikeRange`, not this. */
@@ -142,6 +153,17 @@ export const UnitDefSchema = z.object({
    *  sum of count × signature; radar reveals a coarse size bucket, never the
    *  exact composition (fog-of-war — `visibleState`). */
   signature: z.number().nonnegative().default(1),
+  /**
+   * КЛАСС КОРПУСА (решение владельца 15): какого размера стапель нужен кораблю.
+   * `light` → верфь 1 уровня, `medium` → 2, `heavy` → 3.
+   *
+   * До этого поля отличить «небольшой корабль» от линкора было НЕЧЕМ: у наземных есть
+   * род войск (`kind`), а у кораблей не было ничего. Поле необязательное, потому что
+   * касается только строящихся КОРАБЛЕЙ: у наземных свой гейт (казармы/завод), челноки
+   * гейтит ангар, а выдаваемое (`issued`) не заказывают вовсе. Явность там, где поле
+   * значимо, держит сторож в `schemas.test.ts` — как и у рода наземных войск.
+   */
+  hullClass: z.enum(['light', 'medium', 'heavy']).optional(),
   /** Radar reach (Euclidean distance, map units) the unit projects as a radar-ship (0 = none). */
   radarRange: z.number().nonnegative().default(0),
   /** Typed module slots this hull exposes (ship-modules-roadmap.md). A player
@@ -184,6 +206,9 @@ export const FactionPassivesSchema = z.object({
   /** Multiplier on the reach of every radar the player fields (buildings and
    *  ships). Read by the `visibleState` projection (A2), like the tech effect. */
   radarRangeBonus: z.number().default(0),
+  /** Насколько у этой фракции выше ПОТОЛОК выданного гарнизона (FORT-2.3) — в штуках,
+   *  а не долей: потолок считается головами, и множитель дал бы дробных защитников. */
+  fortGarrisonBonus: z.number().default(0),
 });
 
 export const FactionDefSchema = z.object({
@@ -234,6 +259,29 @@ export const BuildingLevelSchema = z.object({
    *  ("can a shuttle be built here at all") and the cap ("how many"). 0 = this building
    *  bases no shuttles. */
   shuttleBay: z.number().nonnegative().default(0),
+  /**
+   * Сколько ПОСТРОЕК несёт это сооружение (решения владельца 10 и 11). Ноль у всех,
+   * кроме ядра крепости: у неё мест ровно столько, сколько уровней прокачано.
+   *
+   * ЛИМИТ ВКЛЮЧАЕТСЯ САМИМ НАЛИЧИЕМ мест, а не отдельным флагом: пока на узле нет ни
+   * одного сооружения с местами, лимита нет вовсе — планета застраивается как раньше
+   * (решение 11: слоты только у крепости). Поэтому «0 у всех» и «нет лимита» — одно и
+   * то же состояние, и второго поля заводить не пришлось.
+   *
+   * Само место-носитель слот НЕ занимает: корпус крепости несёт причалы, а не стоит в
+   * одном из них. Правило по свойству, а не по имени здания, — новое сооружение с
+   * местами получит его само.
+   */
+  buildSlots: z.number().nonnegative().default(0),
+  /**
+   * Сколько ЮНИТОВ ГАРНИЗОНА выставляет этот уровень сооружения (FORT-2.2). Ноль у всех,
+   * кроме форта. Гарнизон — не войско на довольствии, а часть здания: пока здание стоит,
+   * стоит и он, разрушили — ушёл вместе с ним.
+   *
+   * Число, а не флаг: прокачка форта должна ДОБАВЛЯТЬ защитников, и «сколько» обязано
+   * жить в данных рядом с остальными свойствами уровня, а не лестницей в коде.
+   */
+  issuesGarrison: z.number().nonnegative().default(0),
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
   creditsBonus: z.number().default(0),
@@ -272,6 +320,29 @@ export const BuildingDefSchema = z.object({
   hp: z.number().nonnegative().default(0),
   /** Shuttle capacity of the building's FIRST level (see BuildingLevelSchema). */
   shuttleBay: z.number().nonnegative().default(0),
+  /**
+   * Сколько ПОСТРОЕК несёт это сооружение (решения владельца 10 и 11). Ноль у всех,
+   * кроме ядра крепости: у неё мест ровно столько, сколько уровней прокачано.
+   *
+   * ЛИМИТ ВКЛЮЧАЕТСЯ САМИМ НАЛИЧИЕМ мест, а не отдельным флагом: пока на узле нет ни
+   * одного сооружения с местами, лимита нет вовсе — планета застраивается как раньше
+   * (решение 11: слоты только у крепости). Поэтому «0 у всех» и «нет лимита» — одно и
+   * то же состояние, и второго поля заводить не пришлось.
+   *
+   * Само место-носитель слот НЕ занимает: корпус крепости несёт причалы, а не стоит в
+   * одном из них. Правило по свойству, а не по имени здания, — новое сооружение с
+   * местами получит его само.
+   */
+  buildSlots: z.number().nonnegative().default(0),
+  /**
+   * Сколько ЮНИТОВ ГАРНИЗОНА выставляет этот уровень сооружения (FORT-2.2). Ноль у всех,
+   * кроме форта. Гарнизон — не войско на довольствии, а часть здания: пока здание стоит,
+   * стоит и он, разрушили — ушёл вместе с ним.
+   *
+   * Число, а не флаг: прокачка форта должна ДОБАВЛЯТЬ защитников, и «сколько» обязано
+   * жить в данных рядом с остальными свойствами уровня, а не лестницей в коде.
+   */
+  issuesGarrison: z.number().nonnegative().default(0),
   /** Ground-defense bonus the building grants the garrison (0.01 = +1%); a
    *  fortress grants much more, and it grows with level. */
   defenseBonus: z.number().default(0.01),
@@ -574,6 +645,16 @@ export const SectorKindDefSchema = z.object({
    *  Незахватываемые виды (`empty`, обломки, чёрная дыра) флага не требуют: крепость
    *  ставится только на СВОЁМ узле, а своим незахватываемое не станет никогда. */
   stationable: z.boolean().default(true),
+  /**
+   * Можно ли обстреливать этот узел с орбиты. По умолчанию да.
+   *
+   * ОТДЕЛЬНЫЙ ФЛАГ, А НЕ «СНЯТЬ ОРБИТУ», и это не перестраховка: обстрел требует у узла
+   * орбитального слоя, но слой нужен узлу и для СОБСТВЕННОЙ зенитки. Снимешь орбиту у
+   * крепости, чтобы её не обстреливали, — она перестанет и отстреливаться. Поэтому
+   * запрет живёт своим полем (решение владельца 16: «бомбардировка невозможна крепости;
+   * прилетевший флот вступает в бой и бьёт по корпусу»).
+   */
+  bombardable: z.boolean().default(true),
   /** Province-centric build roster: the building ids raisable on this province type.
    *  Absent/undefined = ANY building (the permissive default, so kind-less / roster-less
    *  worlds keep building as before). Explicit `[]` = no construction here (empty /
@@ -1164,8 +1245,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

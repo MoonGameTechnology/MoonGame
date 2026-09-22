@@ -19,6 +19,7 @@ const DEFAULT_KIND: SectorKindDef = {
   capturable: true,
   buildable: true,
   stationable: true,
+  bombardable: true,
   orbit: true,
   allowedBuildings: undefined,
   appearance: DEFAULT_APPEARANCE,
@@ -51,6 +52,13 @@ export function isBuildable(data: GameData, planet: Pick<Planet, 'kind'>): boole
  *  туманность (`buildable: false`) её принимает, а планета (`buildable: true`) — нет. */
 export function isStationable(data: GameData, planet: Pick<Planet, 'kind'>): boolean {
   return sectorKindDef(data, planet).stationable;
+}
+
+/** Можно ли обстреливать этот узел с орбиты? НЕ то же самое, что {@link hasOrbit}:
+ *  орбитальный слой нужен узлу и для собственной зенитки, поэтому «не обстреливается»
+ *  нельзя выразить его отсутствием — крепость перестала бы отстреливаться заодно. */
+export function isBombardable(data: GameData, planet: Pick<Planet, 'kind'>): boolean {
+  return sectorKindDef(data, planet).bombardable;
 }
 
 /** Does this sector have the orbital layer (fleets can station in orbit)? */

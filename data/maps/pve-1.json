@@ -5,7 +5,10 @@
   "mode": "pve_waves",
   "sectors": {
     "pirate_den": {
-      "position": { "x": -416, "y": -447 },
+      "position": {
+        "x": -416,
+        "y": -447
+      },
       "kind": "pirate_base",
       "terrain": "empty_space",
       "size": 0.65,
@@ -25,7 +28,8 @@
           "type": "mine_t1"
         },
         {
-          "type": "shipyard"
+          "type": "shipyard",
+          "level": 2
         },
         {
           "type": "radar"
@@ -51,7 +55,8 @@
           "type": "mine_t1"
         },
         {
-          "type": "shipyard"
+          "type": "shipyard",
+          "level": 2
         },
         {
           "type": "radar"
@@ -72,8 +77,14 @@
       "kind": "asteroid",
       "terrain": "asteroid_field",
       "transit": [
-        ["home_a", "shoal"],
-        ["home_a", "veil"]
+        [
+          "home_a",
+          "shoal"
+        ],
+        [
+          "home_a",
+          "veil"
+        ]
       ]
     },
     "veil": {
@@ -126,13 +137,18 @@
       "planetType": "volcanic",
       "owner": "p3",
       "buildings": [
-        { "type": "biomass_pit" },
-        { "type": "swarm_synapse" },
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "swarm_synapse"
+        },
         {
           "type": "mine_t2"
         },
         {
-          "type": "shipyard"
+          "type": "shipyard",
+          "level": 2
         },
         {
           "type": "orbital_aa"
@@ -181,19 +197,32 @@
       "faction": "vanguard",
       "npc": "pirate",
       "ai": false,
-      "resources": { "credits": 0, "metal": 0 }
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
     }
   },
   "fleets": {
     "pirate_patrol": {
       "owner": "pirates",
       "location": "pirate_den",
-      "units": [{ "unit": "frigate", "count": 2 }]
+      "units": [
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
     },
     "p1_1": {
       "owner": "p1",
       "location": "home_a",
-      "landing": [{ "unit": "militia", "count": 1 }],
+      "landing": [
+        {
+          "unit": "militia",
+          "count": 1
+        }
+      ],
       "units": [
         {
           "unit": "cruiser",
@@ -212,7 +241,9 @@
         {
           "unit": "swarm_brood_mother",
           "count": 3,
-          "modules": ["swarm_brood_chamber"]
+          "modules": [
+            "swarm_brood_chamber"
+          ]
         },
         {
           "unit": "scout_drone",
