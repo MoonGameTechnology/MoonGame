@@ -4453,9 +4453,11 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // weighted Voronoi (power diagram) over the sector centres: the cells tile the
   // map and share borders, so a bigger `size` claims more territory and resizing
   // one shifts the shared borders with its neighbours evenly. Adjacency IS the
-  // shared border — no lanes. (Empty void waypoints aren't real provinces → skipped.)
-  // Отбор узлов и вес семени — `provinceMap.ts` (REFM-61): пустой узел не провинция,
-  // вес растёт квадратично по масштабу, иначе карта перекраивается при зуме.
+  // shared border — no lanes. EVERY sector gets a cell, `empty` crossroads included:
+  // the kernel derives its lanes from the diagram over all of them, so skipping one here
+  // would draw a different map than the one being played (provinceMap.ts, rule 1).
+  // Вес семени — там же (REFM-61): растёт квадратично по масштабу, иначе карта
+  // перекраивается при зуме.
   const provinceIds: string[] = [];
   const seeds = provinceSeeds(MAP, cam.scale, (n) => {
     const p = s.planets[n.id];

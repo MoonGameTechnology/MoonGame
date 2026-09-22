@@ -1,10 +1,20 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, it, expect } from 'vitest';
+
+import {
+  loadGameData,
+  matchMapEdges,
+  mosaicBorders,
+  parseMatchMap,
+} from '../../packages/shared-core/src/index';
+
 import {
   CLIP_PAD_MIN,
   clipPad,
   clipPolygon,
   clipRect,
-  isProvince,
   provinceSeeds,
   seedWeight,
   type SeedSource,
@@ -19,11 +29,13 @@ const src = (over: Partial<SeedSource> = {}): SeedSource => ({
 });
 
 describe('политическая карта — какие узлы дают клетки', () => {
-  it('ПУСТОЙ УЗЕЛ — НЕ ПРОВИНЦИЯ: его семя отъело бы территорию у настоящих соседей', () => {
-    expect(isProvince('empty')).toBe(false);
-    expect(isProvince('core')).toBe(true);
+  it('КЛЕТКУ ДАЁТ КАЖДЫЙ СЕКТОР, пустой в том числе — иначе рисуется другая карта', () => {
+    // Правило было обратным, пока пустые узлы были путевыми точками мимо правил. С M4.3
+    // ядро выводит проходы из диаграммы по ВСЕМ секторам, и выкинутое семя — это уже
+    // другой набор границ, а не «сэкономленная» клетка.
     const seeds = provinceSeeds([node('a'), node('void', 'empty')], 1, () => src());
-    expect(seeds).toHaveLength(1);
+    expect(seeds).toHaveLength(2);
+    expect(seeds.map((s) => s.kind)).toEqual(['core', 'empty']);
   });
 
   it('УЗЕЛ БЕЗ МИРА ПРОПУСКАЕТСЯ — несогласованная карта не повод падать', () => {
@@ -148,5 +160,44 @@ describe('мозаика ОДНА на всех, кто её строит (REFM-
     const flash = clipPolygon(clipRect(b).topLeft, clipRect(b).bottomRight);
     expect(flash).toEqual(fill);
     expect(fill[0]).toEqual([-clipPad(b), -clipPad(b)]);
+  });
+});
+
+describe('СТОРОЖ: рендер рисует ту же мозаику, что играет ядро', () => {
+  // Этот тест — исполняемая часть правила 1. Рендер собирает семена САМ, и единственный
+  // способ не разойтись с ядром — собирать их из того же набора секторов. Разойдясь, он
+  // не падает и ничего не сообщает: игрок просто видит границу там, где пути нет, и не
+  // видит там, где путь есть. На `pve-2` так и было — 29 границ вместо 57.
+  const root = path.resolve(__dirname, '..', '..');
+  const data = loadGameData((name) =>
+    JSON.parse(readFileSync(path.join(root, 'data', name), 'utf8')),
+  );
+  const files = readdirSync(path.join(root, 'data', 'maps')).filter((f) => f.endsWith('.json'));
+
+  it.each(files)('%s: границы рендера = границы ядра', (file) => {
+    const map = parseMatchMap(
+      JSON.parse(readFileSync(path.join(root, 'data', 'maps', file), 'utf8')),
+    );
+    const nodes = Object.keys(map.sectors)
+      .sort()
+      .map((id) => ({ id, sector: map.sectors[id]!.kind }));
+    const seeds = provinceSeeds(nodes, 1, (n) => ({
+      size: map.sectors[n.id]!.size,
+      at: map.sectors[n.id]!.position,
+      owner: map.sectors[n.id]!.owner,
+    }));
+    // Масштаб 1 — вес семени тот же, что у ядра (`SEED_WEIGHT`), значит и диаграмма та же.
+    const drawn = mosaicBorders(
+      seeds.map((seed, i) => ({ id: nodes[i]!.id, x: seed.x, y: seed.y, size: seed.w / 9000 })),
+    )
+      .map((b) => `${b.a}|${b.b}`)
+      .sort();
+    const edges = matchMapEdges(map, data);
+    const real = [...edges.paths, ...edges.sealed]
+      .map(([a, b]) => [a, b].sort().join('|'))
+      .sort();
+    // Карта со своим списком путей (легаси) мозаику не выводит — сверять не с чем.
+    if (map.paths !== undefined) return;
+    expect(drawn).toEqual(real);
   });
 });
