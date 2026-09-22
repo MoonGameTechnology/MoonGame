@@ -865,7 +865,7 @@
 | M2.5 | ✅ | core data | `docs/map-roadmap.md` | Параллельные пути через провинцию — |
 | M2.6 | ✅ | core data | `docs/map-roadmap.md` | Непроходимость перестала быть декоративной — |
 | M2.7 | ✅ | cli proto | `docs/map-roadmap.md` | Граница, через которую нет пути, видна как барьер — |
-| M2.8 | ⏳ | core data | `docs/map-roadmap.md` | Сродство к семейству местности |
+| M2.8 | ✅ | core data | `docs/map-roadmap.md` | Сродство к семейству местности — 2026-09-22 |
 | M3.1 | 🔒 |  | `docs/map-roadmap.md` | Редактор карты [tools] |
 | M3.2 | ⏳ |  | `docs/map-roadmap.md` | Процедурный пресет → формат карты [tools] |
 | M4.1 | ✅ | cli | `docs/map-roadmap.md` | Рендер из данных сектора — /🚧 |

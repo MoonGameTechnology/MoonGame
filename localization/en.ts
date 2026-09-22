@@ -724,6 +724,8 @@ export const en: Record<string, string> = {
   'data.amber-concord': 'Amber Concord',
   'data.annihilate': 'Annihilate',
   'data.asteroid-field': 'Asteroid field',
+  'data.asteroid-navigation': 'Asteroid Navigation',
+  'data.asteroid-pilot': 'Asteroid Pilot',
   'data.spatial-rift': 'Spatial Rift',
   'data.depleted-system': 'Depleted System',
   'data.dense-asteroid-cluster': 'Dense Asteroid Cluster',
@@ -760,6 +762,7 @@ export const en: Record<string, string> = {
   'data.deep-void': 'Deep Void',
   'data.dense-nebula': 'Dense Nebula',
   'data.derelict-graveyard': 'Derelict Graveyard',
+  'data.dust-lane': 'Dust Lane',
   'data.diplomatic-landing': 'Diplomatic Landing',
   'data.drop-infantry': 'drop infantry',
   'data.empty-space': 'Empty Space',
@@ -1566,6 +1569,8 @@ export const en: Record<string, string> = {
     'The hero runs the staging: fleets departing nodes within 300 fly 8% faster.',
   'hero.passive.rally-beacon.desc':
     'Fleets near the hero fight harder: +8% damage for your fleets within 300.',
+  'hero.passive.asteroid-pilot.desc':
+    "The hero's ship loses less way among the rocks: +20% speed entering any asteroid terrain.",
   'hero.passive.vanguard-impulse.desc':
     "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
   'hero.tree.corridor-open.desc':
@@ -1580,6 +1585,8 @@ export const en: Record<string, string> = {
     'The other side of psi-sight: the hero learns not only to read a rival radar, but to write into it what is not there.',
   'hero.tree.fleet-uplink.desc':
     'The neural link spreads to the whole order: not just the hero ship, but nearby fleets get under way faster.',
+  'hero.tree.asteroid-navigation.desc':
+    "Dead reckoning between the rocks. Unlocks Asteroid Pilot: +20% speed for the hero's ship in asteroid terrain.",
   'hero.tree.neural-lace.desc': "A direct brain-to-helm implant: the hero's ship gains +10% speed.",
   'hero.tree.overclocked-helm.desc':
     'Overclocking the neural interface lets the hero lay corridors.',

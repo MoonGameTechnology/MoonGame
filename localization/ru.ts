@@ -732,6 +732,8 @@ export const ru: Record<string, string> = {
   'data.amber-concord': 'Янтарное согласие',
   'data.annihilate': 'Аннигиляция',
   'data.asteroid-field': 'Астероидное поле',
+  'data.asteroid-navigation': 'Астероидная навигация',
+  'data.asteroid-pilot': 'Астероидный лоцман',
   'data.spatial-rift': 'Пространственный разлом',
   'data.depleted-system': 'Истощённая система',
   'data.dense-asteroid-cluster': 'Плотное скопление астероидов',
@@ -768,6 +770,7 @@ export const ru: Record<string, string> = {
   'data.deep-void': 'Глубокая пустота',
   'data.dense-nebula': 'Плотная туманность',
   'data.derelict-graveyard': 'Кладбище кораблей',
+  'data.dust-lane': 'Пылевая полоса',
   'data.diplomatic-landing': 'Дипломатическая высадка',
   'data.drop-infantry': 'десантная пехота',
   'data.empty-space': 'Пустое пространство',
@@ -1577,6 +1580,8 @@ export const ru: Record<string, string> = {
     'Герой ведёт сбор: флоты, выходящие из узлов в радиусе 300, летят на 8% быстрее.',
   'hero.passive.rally-beacon.desc':
     'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 300.',
+  'hero.passive.asteroid-pilot.desc':
+    'Корабль героя теряет меньше хода в астероидах: +20% к скорости входа в любую астероидную местность.',
   'hero.passive.vanguard-impulse.desc':
     'Корабль героя ведёт свой флот на форсаже: +10% к скорости флота героя.',
   'hero.tree.corridor-open.desc':
@@ -1591,6 +1596,8 @@ export const ru: Record<string, string> = {
     'Обратная сторона пси-зрения: герой учится не только читать чужой радар, но и писать в него то, чего нет.',
   'hero.tree.fleet-uplink.desc':
     'Нейроканал расходится на весь ордер: с места быстрее снимается не только корабль героя, но и флоты рядом.',
+  'hero.tree.asteroid-navigation.desc':
+    'Счисление пути по обломкам породы. Открывает «Астероидного лоцмана»: +20% к скорости корабля героя в астероидной местности.',
   'hero.tree.neural-lace.desc':
     'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
   'hero.tree.overclocked-helm.desc': 'Форсаж нейроинтерфейса открывает герою прокладку коридоров.',
