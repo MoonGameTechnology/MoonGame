@@ -476,6 +476,8 @@ export const ru: Record<string, string> = {
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Штурм',
   'cmd.assault.hint': 'лететь к чужому миру и высадить десант при подходе',
+  'cmd.auto-retreat': 'Авто-отход',
+  'cmd.auto-retreat.hint': 'флот сам выходит из боя, когда корпус просядет до порога',
   'cmd.auto-assault': 'Авто-штурм',
   'cmd.auto-assault.hint': 'флот сам штурмует вражеский мир по прибытии',
   'cmd.cast': 'Каст',
@@ -1061,6 +1063,9 @@ export const ru: Record<string, string> = {
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-armed': '⤳ выберите цель — камера двигается двумя пальцами',
   'hint.assault-enemy-only': '⚔ штурмовать можно только чужой мир',
+  'hint.auto-retreat': '⮐ авто-отход при {n}% корпуса → {at}',
+  'hint.auto-retreat.off': '⮐ авто-отход снят',
+  'hint.auto-retreat.nowhere': '⮐ некуда отходить: выбери свой мир или назначь столицу',
   'hint.auto-assault': '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии',
   'hint.cast-cancelled': '✖ каст отменён',
   'hint.deploy-cancelled': '✖ развёртывание отменено',

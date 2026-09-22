@@ -650,8 +650,8 @@
 | EVT-2 | ✅ | core data proto | `docs/backlog.md` | Трофеи за бой: победитель |
 | EVT-3 | ✅ | core data | `docs/backlog.md` | Пассивка героя «мародёр»: лестница из пяти |
 | RETR-1 | ✅ | core | `docs/backlog.md` | Отступление получило ТОЧКУ: уводит, а не только |
-| RETR-2 | 🔶 | core srv proto | `docs/backlog.md` | Авто-отступление: ядро и драйверы |
-| RETR-3 | ⏳ | proto | `docs/backlog.md` | Авто-отступление в интерфейсе: порог и точка. |
+| RETR-2 | ✅ | core srv proto | `docs/backlog.md` | Авто-отступление: порог по остатку |
+| RETR-3 | ✅ | proto | `docs/backlog.md` | Авто-отход в интерфейсе, проверенный браузером. |
 | TXT-0.1 | ✅ | docs | `docs/backlog.md` | Канон формулировок: записать правило и эталон, пока чистка не |
 | TXT-1 | ⏳ | proto | `docs/backlog.md` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
 | TXT-2 | ⏳ | proto | `docs/backlog.md` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |

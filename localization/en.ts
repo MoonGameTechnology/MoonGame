@@ -470,6 +470,8 @@ export const en: Record<string, string> = {
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
   'cmd.assault.hint': 'fly to an enemy world and land troops on arrival',
+  'cmd.auto-retreat': 'Auto-retreat',
+  'cmd.auto-retreat.hint': 'the fleet leaves a battle by itself once its hull drops to the threshold',
   'cmd.auto-assault': 'Auto-storm',
   'cmd.auto-assault.hint': 'the fleet storms an enemy world by itself on arrival',
   'cmd.cast': 'Cast',
@@ -1053,6 +1055,9 @@ export const en: Record<string, string> = {
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-armed': '⤳ pick a target — two fingers move the camera',
   'hint.assault-enemy-only': "⚔ only someone else's world can be stormed",
+  'hint.auto-retreat': '⮐ auto-retreat at {n}% hull → {at}',
+  'hint.auto-retreat.off': '⮐ auto-retreat cleared',
+  'hint.auto-retreat.nowhere': '⮐ nowhere to fall back to: select your own world or set a capital',
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
   'hint.cast-cancelled': '✖ cast cancelled',

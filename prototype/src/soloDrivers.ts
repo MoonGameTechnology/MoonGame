@@ -17,6 +17,7 @@
  * хозяин отдаёт оба, и драйверы проверяются на настоящем состоянии без DOM.
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
+import { autoRetreatDue } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
 import type { StewardPosture } from './stewardScreen';
 import { StaggeredAi } from './aiScheduler';
@@ -31,6 +32,7 @@ import {
   HOUR,
   order,
   orbitFleet,
+  retreatFleet,
   serverChainActions,
   stewardActive,
   strikeShuttle,
@@ -82,6 +84,8 @@ export interface SoloDrivers {
   driveChains(): void;
   /** CC-4: дежурные вылеты — перезарядка по часам и удар по опознанной цели. */
   drivePatrols(): void;
+  /** RETR-2: авто-отступление — увести флоты, чей корпус просел до порога приказа. */
+  driveAutoRetreat(): void;
   /** Первый вставший дежурный вылет: считать перезарядку ОТСЮДА, а не от эпохи —
    *  иначе крыло получило бы разом все часы, что матч шёл до него. */
   /** Новый матч: часы ИИ и память проб начинаются заново. */
@@ -239,12 +243,27 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     }
   }
 
+  /**
+   * RETR-2 — авто-отступление в СОЛО. Кого уводить, решает ядро (`autoRetreatDue`:
+   * приказ стоит, флот в бою, корпус просел до порога); здесь только выдача приказа
+   * своим путём для своего места и локально для мест под ИИ. Тот же ответ ядра
+   * читает сетевой хост (`serverAutoRetreatActions`) — правило одно на оба режима.
+   */
+  function driveAutoRetreat(): void {
+    const current = host.state();
+    if (current.match.status === 'ended') return;
+    for (const { fleetId, owner, to } of autoRetreatDue(current, data)) {
+      issue(owner, retreatFleet(owner, fleetId, to));
+    }
+  }
+
   return {
     runAI,
     autoEngage,
     checkFleetClashes,
     driveChains,
     drivePatrols,
+    driveAutoRetreat,
     reset: () => {
       ai.reset(host.state().time);
       probed.clear();

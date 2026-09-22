@@ -59,6 +59,7 @@ import {
   shareMap,
   netIncome,
   retreatFleet,
+  orderRetreat,
   STANCE_RANK,
   hasMapShare,
   hasMapShareOffer,
@@ -66,6 +67,7 @@ import {
   START_CANDIDATES,
   designateCapital,
   capitalOf,
+  RETREAT_THRESHOLDS,
   isInhabited,
   type SetupConfig,
   type SeatConfig,
@@ -3718,6 +3720,25 @@ function patrolOn(baseId: string): boolean {
     ? !!(s as { patrols?: Record<string, unknown> }).patrols?.[baseId]
     : patrols.has(baseId);
 }
+/**
+ * RETR-2: порог авто-отхода, стоящий на флоте, или `null`, если приказа нет.
+ *
+ * Читается ИЗ СОСТОЯНИЯ в обоих режимах, в отличие от авто-штурма рядом: тот в соло
+ * живёт локальной картой клиента, а этот — приказ ядра (`order.retreat`), и ядро
+ * крутится в соло тоже. Своей копии заводить не нужно, а завести — значит разойтись
+ * с тем, по чему считает драйвер.
+ */
+function autoRetreatAt(fleetId: string): number | null {
+  return (s as { autoRetreat?: Record<string, { at: number }> }).autoRetreat?.[fleetId]?.at ?? null;
+}
+
+/** Ступени авто-отхода по кругу: нет → 20% → 30% → 40% → 50% → нет. Список закрыт в
+ *  ядре (`RETREAT_THRESHOLDS`), здесь только обход по кругу. */
+function nextRetreatStep(at: number | null): number | null {
+  const i = at === null ? -1 : RETREAT_THRESHOLDS.indexOf(at as (typeof RETREAT_THRESHOLDS)[number]);
+  return RETREAT_THRESHOLDS[i + 1] ?? null;
+}
+
 /** CC-2: set the auto-storm stance UNIFORMLY on the given own fleets (☰-row toggle —
  *  a mixed group snaps to one state instead of flipping each). Authoritative in NET
  *  (order.auto — the server presses the storm while you're offline), local Set solo. */
@@ -8044,6 +8065,15 @@ function renderCmdBar() {
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
+        // RETR-2: авто-отход — соседний стоячий приказ, и живёт он там же.
+        cmdBtn(
+          'qretr',
+          '⮐',
+          t('cmd.auto-retreat'),
+          allOn(ids, (id) => autoRetreatAt(id) !== null) ? 'on' : '',
+          ids.length === 0,
+          t('cmd.auto-retreat.hint'),
+        ) +
         ''
       : '') +
     // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
@@ -8745,6 +8775,28 @@ cmdbar.addEventListener('click', (ev) => {
     const on = !ids.every((id) => isAutoAssault(id));
     setAutoAssault(ids, on);
     if (on) note(t('hint.auto-assault'));
+  } else if (cmd === 'qretr') {
+    // RETR-2: авто-отход. Одна кнопка обходит ступени по кругу (нет → 20 → 30 → 40 → 50
+    // → нет), группой единообразно: у смешанного выделения берётся порог ПЕРВОГО, чтобы
+    // вся группа снялась с места одинаково, а не разъехалась по разным отметкам.
+    //
+    // Точка отхода: ВЫБРАННЫЙ свой мир, иначе столица. Выбор игроку оставлен (владелец
+    // просил именно его), но без выбора приказ всё равно осмыслен — столица есть всегда,
+    // пока она назначена. Нет ни того, ни другого — приказ не ставится, и игроку
+    // говорят, чего не хватает, а не молчат.
+    const at = nextRetreatStep(autoRetreatAt(ids[0] ?? ''));
+    if (at === null) {
+      for (const id of ids) playerOrder(orderRetreat(ME, id, false));
+      note(t('hint.auto-retreat.off'));
+    } else {
+      const picked = selPlanet && s.planets[selPlanet]?.owner === ME ? selPlanet : null;
+      const to = picked ?? capitalOf(s, ME) ?? null;
+      if (to === null) note(t('hint.auto-retreat.nowhere'));
+      else {
+        for (const id of ids) playerOrder(orderRetreat(ME, id, true, at, to));
+        note(t('hint.auto-retreat', { n: Math.round(at * 100), at: to }));
+      }
+    }
   } else if (cmd === 'pick') {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
     pickMode = !pickMode;
@@ -13335,6 +13387,9 @@ function frame(nowReal: number) {
     // с той же быстротой, а не медленнее (правило 3).
     const target = advanceTarget(s.time, dt, speed, HOUR);
     apply(advance(s, target));
+    // RETR-2 ПЕРВЫМ среди драйверов: смысл приказа — выйти из боя до следующего
+    // раунда, а не после того, как флот отработает остальные намерения.
+    solo.driveAutoRetreat();
     solo.autoEngage();
     solo.checkFleetClashes();
     solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе

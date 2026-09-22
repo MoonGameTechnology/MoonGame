@@ -525,6 +525,7 @@ export {
 export { effectsModule, type EffectImpl, type EffectOccurrence } from './modules/effects';
 export { salvageModule, SALVAGE_SHARE } from './modules/salvage';
 export { autoRetreatDue, type AutoRetreatDue } from './state/autoRetreat';
+export { RETREAT_THRESHOLDS, type RetreatThreshold } from './modules/standingOrders';
 export { hullFraction, maxHull } from './util/repair';
 export { defHasTrait, unitHasTrait, stacksHaveTrait } from './data/traits';
 export {
