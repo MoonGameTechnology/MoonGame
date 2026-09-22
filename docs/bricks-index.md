@@ -986,14 +986,14 @@
 | PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1704` | Пиратская база для первого боя |
 | PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1734` | Выбор сложности на запуске забега |
 | PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1770` | У забега свой темп и ускорение |
-| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1813` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1825` | Хранилище PvE-прогресса |
-| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1837` | Награда за забег |
-| PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1862` | Резолюция: что из §3 входит в первую версию |
-| PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md:1880` | Память Роя как состояние |
-| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md:1917` | Одна читаемая адаптация от сигнала до формы |
-| PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md:1959` | Структуры первого набора |
-| PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md:1989` | Журнал адаптаций |
+| PVR-3.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1813` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1848` | Хранилище PvE-прогресса |
+| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1860` | Награда за забег |
+| PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1885` | Резолюция: что из §3 входит в первую версию |
+| PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md:1903` | Память Роя как состояние |
+| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md:1940` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md:1982` | Структуры первого набора |
+| PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md:2012` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
