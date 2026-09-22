@@ -627,18 +627,18 @@
 | FOG-10 | ✅ | proto core | `docs/backlog.md:14970` | Память разведки перестала жить только |
 | FOG-9 | ✅ | core | `docs/backlog.md:14994` | Приостановленная стройка чужого мира была видна |
 | TEST-4 | ✅ | srv | `docs/backlog.md:15004` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15219` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:15231` | Ускорение движения раскрытой голографической карты и подготовка |
-| PERK-0.1 | ✅ | docs | `docs/backlog.md:15257` | Резолюция владельца: два класса бонусов + третья группа |
-| PERK-1.1 | ✅ | core | `docs/backlog.md:15276` | Три группы вместо одной цепочки. |
-| PERK-1.2 | ⏳ | data proto | `docs/backlog.md:15310` | Перевести массовые перки в параллельную |
-| PERK-2.1 | ✅ | core | `docs/backlog.md:15320` | Снижение урона: один пул, одна форма, один кап. |
-| PERK-3.1 | ⏳ | core data | `docs/backlog.md:15363` | Кто и за что выдаёт последовательные множители. |
-| PERK-3.2 | 🔒 | core | `docs/backlog.md:15383` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
-| OBJP-1 | ✅ | proto | `docs/backlog.md:15398` | Значок боя наконец открывает окно, а окно даёт |
-| OBJP-2 | ✅ | proto | `docs/backlog.md:15424` | Подробности объекта встают РЯДОМ с карточкой, а не |
-| OBJP-3 | ✅ | proto | `docs/backlog.md:15436` | Каталог юнитов уехал в окно производства — туда же, |
-| CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15454` | Кнопка штурма появляется только когда есть кем |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15229` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:15241` | Ускорение движения раскрытой голографической карты и подготовка |
+| PERK-0.1 | ✅ | docs | `docs/backlog.md:15267` | Резолюция владельца: два класса бонусов + третья группа |
+| PERK-1.1 | ✅ | core | `docs/backlog.md:15286` | Три группы вместо одной цепочки. |
+| PERK-1.2 | ⏳ | data proto | `docs/backlog.md:15320` | Перевести массовые перки в параллельную |
+| PERK-2.1 | ✅ | core | `docs/backlog.md:15330` | Снижение урона: один пул, одна форма, один кап. |
+| PERK-3.1 | ⏳ | core data | `docs/backlog.md:15373` | Кто и за что выдаёт последовательные множители. |
+| PERK-3.2 | 🔒 | core | `docs/backlog.md:15393` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
+| OBJP-1 | ✅ | proto | `docs/backlog.md:15408` | Значок боя наконец открывает окно, а окно даёт |
+| OBJP-2 | ✅ | proto | `docs/backlog.md:15434` | Подробности объекта встают РЯДОМ с карточкой, а не |
+| OBJP-3 | ✅ | proto | `docs/backlog.md:15446` | Каталог юнитов уехал в окно производства — туда же, |
+| CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15464` | Кнопка штурма появляется только когда есть кем |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -1127,20 +1127,20 @@
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md:285` | Грейды и пороги |
 | VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
 | VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md:341` | Медали в карточке юнита |
-| YAG-0.1 | 🔶 | docs | `docs/yandex-games-roadmap.md:355` | Сверить требования с первоисточником 2026-09-22 |
-| YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md:398` | Контракты GamePlatform и WebPlatformAdapter |
-| YAG-1.1b | ⏳ | proto | `docs/yandex-games-roadmap.md:432` | Платформенная цель сборки и раскладка архива |
-| YAG-1.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:469` | YandexGamesAdapter: инициализация и жизненный цикл |
-| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:475` | Язык от площадки |
-| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:484` | PortableMetaSave: компактный дескриптор забега |
-| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:494` | PlatformSave в адаптере Яндекса |
-| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:504` | PlatformAds в адаптере Яндекса |
-| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:511` | Placements по правилам |
-| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:523` | Эндпойнт проверки подписи |
-| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:529` | PlatformIAP в адаптере Яндекса |
-| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:540` | PlatformAnalytics: словарь событий |
-| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:560` | Карточка игры и подача в модерацию |
-| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:571` | Серверное время вместо системного |
-| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:579` | Пауза площадки: что делает мир |
-| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:588` | Удалённый конфиг баланса |
-| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:596` | Кнопка «назад» и выход |
+| YAG-0.1 | ✅ | docs | `docs/yandex-games-roadmap.md:500` | Сверить требования с первоисточником 2026-09-22 |
+| YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md:562` | Контракты GamePlatform и WebPlatformAdapter |
+| YAG-1.1b | ⏳ | proto | `docs/yandex-games-roadmap.md:596` | Платформенная цель сборки и раскладка архива |
+| YAG-1.2 | ⏳ | proto | `docs/yandex-games-roadmap.md:633` | YandexGamesAdapter: инициализация и жизненный цикл |
+| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:650` | Язык от площадки |
+| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:659` | PortableMetaSave: компактный дескриптор забега |
+| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:669` | PlatformSave в адаптере Яндекса |
+| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:679` | PlatformAds в адаптере Яндекса |
+| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:686` | Placements по правилам |
+| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:698` | Эндпойнт проверки подписи |
+| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:717` | PlatformIAP в адаптере Яндекса |
+| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:728` | PlatformAnalytics: словарь событий |
+| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:748` | Карточка игры и подача в модерацию |
+| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:759` | Серверное время вместо системного |
+| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:767` | Пауза площадки: что делает мир |
+| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:776` | Удалённый конфиг баланса |
+| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:784` | Кнопка «назад» и выход |
