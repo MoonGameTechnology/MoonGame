@@ -863,11 +863,11 @@
 | M2.6 | ✅ | core data | `docs/map-roadmap.md:276` | Непроходимость перестала быть декоративной — |
 | M2.7 | ✅ | cli proto | `docs/map-roadmap.md:326` | Граница, через которую нет пути, видна как барьер — |
 | M2.8 | ⏳ | core data | `docs/map-roadmap.md:376` | Сродство к семейству местности |
-| M3.1 | 🔒 |  | `docs/map-roadmap.md:411` | Редактор карты [tools] |
-| M3.2 | ⏳ |  | `docs/map-roadmap.md:419` | Процедурный пресет → формат карты [tools] |
-| M4.1 | ✅ | cli | `docs/map-roadmap.md:429` | Рендер из данных сектора — /🚧 |
-| M4.3 | ✅ | core data cli | `docs/map-roadmap.md:435` | Соседство выводится из мозаики — |
-| M4.2 | ⏳ | docs | `docs/map-roadmap.md:484` | Сверка с метаигрой и отложенным регионом |
+| M3.1 | 🔒 |  | `docs/map-roadmap.md:419` | Редактор карты [tools] |
+| M3.2 | ⏳ |  | `docs/map-roadmap.md:427` | Процедурный пресет → формат карты [tools] |
+| M4.1 | ✅ | cli | `docs/map-roadmap.md:437` | Рендер из данных сектора — /🚧 |
+| M4.3 | ✅ | core data cli | `docs/map-roadmap.md:443` | Соседство выводится из мозаики — |
+| M4.2 | ⏳ | docs | `docs/map-roadmap.md:492` | Сверка с метаигрой и отложенным регионом |
 | MM-0.1 | ⏳ | srv | `docs/matchmaking-roadmap.md:27` | Состояния матча: lobby→active→ended→archived |
 | MM-0.2 | ✅ | core proto srv | `docs/matchmaking-roadmap.md:33` | Подключить victoryModule + баннер |
 | MM-1.1 | 🔒 | srv | `docs/matchmaking-roadmap.md:43` | Лобби (создание/присоединение) |
