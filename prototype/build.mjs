@@ -1241,18 +1241,43 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-badge.on{border-color:#7df0d0;color:#9ff0da;}
 #herobody .hx-badge.cd{border-color:#e2a15a;color:#e2a15a;}
 /* «Штаб героев» redesign (STAFF-1): chips · identity · tabs · real tree · dossier */
-#herobody{--hx-ps:#b98cff;}
+#herobody{--hx-ps:#b98cff;
+  /* Палитра РЕДКОСТИ (HERO-12). Копия таблицы HERO_GRADE_COLORS из
+     decisions/heroIdentity.ts — тот же цвет рисует канвас на карте. Сверяется
+     текстом в prototype/src/heroStaff.test.ts: правка там без правки здесь падает. */
+  --hx-g-common:#8fa6ad;--hx-g-rare:#5aa9ff;--hx-g-legendary:#e8b45a;--hx-g-main:#b98cff;}
 #herobody .hx-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;}
 #herobody .hx-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 6px;border-radius:999px;border:1px solid var(--line-hi);background:rgba(53,214,230,.05);color:var(--dim);font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap;}
 #herobody .hx-chip .hx-cr{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:rgba(53,214,230,.14);color:var(--cyan);}
 #herobody .hx-chip.ps .hx-cr{background:rgba(185,140,255,.16);color:var(--hx-ps);}
+#herobody .hx-chip.g-common{border-color:var(--hx-g-common);}
+#herobody .hx-chip.g-rare{border-color:var(--hx-g-rare);}
+#herobody .hx-chip.g-legendary{border-color:var(--hx-g-legendary);}
+#herobody .hx-chip.g-main{border-color:var(--hx-g-main);}
 #herobody .hx-chip.sel{color:#eafffb;border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);background:rgba(53,214,230,.12);}
 #herobody .hx-chip.ps.sel{border-color:var(--hx-ps);box-shadow:0 0 0 1px var(--hx-ps);}
+/* Фокус НЕ съедает редкость: выбранный чип оставляет рамку своего цвета, а выделение
+   несёт ореол. Иначе у правила «обводка = редкость» было бы исключение ровно на том
+   герое, которого игрок сейчас и смотрит. Три класса — специфичнее, чем .sel выше. */
+#herobody .hx-chip.sel.g-common{border-color:var(--hx-g-common);}
+#herobody .hx-chip.sel.g-rare{border-color:var(--hx-g-rare);}
+#herobody .hx-chip.sel.g-legendary{border-color:var(--hx-g-legendary);}
+#herobody .hx-chip.sel.g-main{border-color:var(--hx-g-main);}
 #herobody .hx-chip .hx-cst{font-size:9px;letter-spacing:.5px;color:var(--dim);}
 #herobody .hx-chip .hx-cst.on{color:#9ff0da;}
 #herobody .hx-cap{margin-left:auto;font-size:10px;color:var(--dim);letter-spacing:.5px;}
 #herobody .hx-ident{border:1px solid var(--line-hi);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:linear-gradient(180deg,rgba(53,214,230,.07),rgba(53,214,230,.02));}
 #herobody .hx-ident.ps{background:linear-gradient(180deg,rgba(185,140,255,.08),rgba(185,140,255,.02));}
+/* Обводка карточки героя — по РЕДКОСТИ (HERO-12): рамка плюс мягкий ореол того же
+   цвета, чтобы степень читалась и на маленьком экране, где рамка в 1px теряется. */
+#herobody .hx-ident.g-common{border-color:var(--hx-g-common);box-shadow:0 0 0 1px rgba(143,166,173,.28);}
+#herobody .hx-ident.g-rare{border-color:var(--hx-g-rare);box-shadow:0 0 0 1px rgba(90,169,255,.3);}
+#herobody .hx-ident.g-legendary{border-color:var(--hx-g-legendary);box-shadow:0 0 0 1px rgba(232,180,90,.32);}
+#herobody .hx-ident.g-main{border-color:var(--hx-g-main);box-shadow:0 0 0 1px rgba(185,140,255,.34);}
+#herobody .hx-ident.g-common .hx-gtag{color:var(--hx-g-common);background:rgba(143,166,173,.14);border-color:rgba(143,166,173,.45);}
+#herobody .hx-ident.g-rare .hx-gtag{color:var(--hx-g-rare);background:rgba(90,169,255,.14);border-color:rgba(90,169,255,.45);}
+#herobody .hx-ident.g-legendary .hx-gtag{color:var(--hx-g-legendary);background:rgba(232,180,90,.14);border-color:rgba(232,180,90,.45);}
+#herobody .hx-ident.g-main .hx-gtag{color:var(--hx-g-main);background:rgba(185,140,255,.14);border-color:rgba(185,140,255,.45);}
 #herobody .hx-irow{display:flex;align-items:center;gap:8px;}
 #herobody .hx-tag{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:5px;color:var(--cyan);background:rgba(53,214,230,.12);border:1px solid var(--cyan-dim);white-space:nowrap;}
 #herobody .hx-ident.ps .hx-tag{color:var(--hx-ps);background:rgba(185,140,255,.14);border-color:rgba(185,140,255,.4);}

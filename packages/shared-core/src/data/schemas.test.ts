@@ -24,6 +24,20 @@ function loadShippedBundle(): Record<string, unknown> {
   return composeGameDataBundle(readJson);
 }
 
+/**
+ * Припаркованная ветка героя/узла (HERO-11). Ветки убраны ИЗ ИГРЫ, но не из репозитория:
+ * значение лежит под ключом `parkedBranch`, которого схема не знает, поэтому в
+ * РАЗОБРАННОМ каталоге его нет — читать надо сырой бандл. Утверждения о форме дерева
+ * ниже переведены на него намеренно: они стерегут лестницу («ветка — это прогрессия, а не
+ * пара перков»), и потерять этот сторож на время парковки значило бы вернуть ветки в день
+ * распарковки уже сломанными. Живое отсутствие ветки стережёт `data/heroBranchParked.test.ts`.
+ */
+function parkedBranch(fragment: 'heroes' | 'heroSkillTrees', id: string): string | undefined {
+  const bag = loadShippedBundle()[fragment] as Record<string, { parkedBranch?: unknown }>;
+  const v = bag?.[id]?.parkedBranch;
+  return typeof v === 'string' ? v : undefined;
+}
+
 /** Исходник ворот заказа юнитов — читается СЫРЫМ текстом, как это делает `deadContent`
  *  для репертуара бота: утверждение о коде берётся из кода, поэтому не может разъехаться
  *  с ним молча. Нужен сторожу пометки `issued` ниже. */
@@ -502,18 +516,23 @@ describe('game data schema (docs/architecture.md §2)', () => {
 describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
   it('validates the shipped hero content and its shape', () => {
     const data = parseGameData(loadShippedBundle());
-    // Archetypes carry a branch, a ship, module slots and start abilities.
+    // Archetypes carry a ship, module slots and start abilities — and USED to carry a
+    // branch. HERO-11 parked the branch: the value is still in the catalog file under
+    // `parkedBranch`, the parsed archetype no longer has one.
     const commander = data.heroes.commander;
     expect(commander).toBeDefined();
-    expect(commander!.branch).toBe('transhuman');
+    expect(commander!.branch).toBeUndefined();
+    expect(parkedBranch('heroes', 'commander')).toBe('transhuman');
     expect(commander!.ship.unit).toBe('hero');
     expect(commander!.slots).toBe(4);
     // «Коридор» больше НЕ стартовая способность (заказ владельца): его открывает узел
     // дерева `overclocked_helm`, иначе узел выдавал бы то, что у героя и так есть.
     expect(commander!.startAbilities).not.toContain('corridor');
     expect(data.heroSkillTrees.overclocked_helm?.grants.ability).toBe('corridor');
-    // A hero branch is its OWN axis (transhuman/psionic), not a tech branch.
-    expect(data.heroes.ravager?.branch).toBe('psionic');
+    // A hero branch is its OWN axis (transhuman/psionic), not a tech branch — parked
+    // whole, both values together, so the axis stays coherent when it comes back.
+    expect(data.heroes.ravager?.branch).toBeUndefined();
+    expect(parkedBranch('heroes', 'ravager')).toBe('psionic');
     // Abilities are data-driven effects: a dispatch type + cooldown/range/params.
     const annihilate = data.heroAbilities.annihilate;
     expect(annihilate!.type).toBe('annihilate');
@@ -634,17 +653,23 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
         expect(passives.has(pid), `node ${id} grants unknown passive "${pid}"`).toBe(true);
       }
     }
-    // Both design branches ship a root node.
-    expect(nodes.neural_lace?.branch).toBe('transhuman');
-    expect(nodes.void_attunement?.branch).toBe('psionic');
+    // Both design branches ship a root node — parked (HERO-11), so read from the file.
+    expect(nodes.neural_lace?.branch).toBeUndefined();
+    expect(nodes.void_attunement?.branch).toBeUndefined();
+    expect(parkedBranch('heroSkillTrees', 'neural_lace')).toBe('transhuman');
+    expect(parkedBranch('heroSkillTrees', 'void_attunement')).toBe('psionic');
     // Both ship a full LADDER of four: `corridor` up the transhuman side, `scan` up the
     // psionic one. A branch is a progression, not a pair of perks — and the owner's
     // complaint that started this ("I don't see nodes 3 and 4") is only ever answered
     // by a check, never by looking. HC-3 adds three more nodes, and the shape of what
     // they hang off is the point of the assertions below: two forks and one summit.
+    const parkedNodes = loadShippedBundle().heroSkillTrees as Record<
+      string,
+      { parkedBranch?: unknown }
+    >;
     const ladder = (branch: string): string[] =>
-      Object.entries(nodes)
-        .filter(([, n]) => n.branch === branch)
+      Object.entries(parkedNodes)
+        .filter(([, n]) => n.parkedBranch === branch)
         .map(([id]) => id)
         .sort();
     expect(ladder('transhuman')).toEqual([

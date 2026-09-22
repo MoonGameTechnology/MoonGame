@@ -121,6 +121,8 @@
 | HERO-FX2 | ✅ | core | `docs/backlog.md` | Второй провайдер — hero.effect.aura (rally/bulwark): |
 | HERO-FX3 | ✅ | core | `docs/backlog.md` | Третий провайдер шва — hero.effect.reveal (scan): |
 | HERO-10 | ✅ | core | `docs/backlog.md` | Каждый герой ведёт СВОЙ флот |
+| HERO-11 | ✅ | data | `docs/backlog.md` | Разделение на трансгуманизм и псионику убрано ИЗ |
+| HERO-12 | ✅ | proto | `docs/backlog.md` | Обводка героя — по редкости. |
 | HERO-AURA-R | ✅ | data | `docs/backlog.md` | Радиус ауры: начать маленьким и растить навыком |
 | SHIP-1 | ✅ | proto | `docs/backlog.md` | Модель: prototype/src/ships.ts — корпуса (SHIPHULLS: cruiser 3 · |
 | SHIP-2 | ✅ | proto | `docs/backlog.md` | →♻ UI «Верфь». Первая версия — pre-match вкладка в setup — была |

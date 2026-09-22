@@ -11,6 +11,7 @@
  * ступень, за которую игрок платит, может ничего не менять.
  */
 import { describe, expect, it } from 'vitest';
+import heroesJson from './heroes.json';
 import {
   createInitialState,
   type Action,
@@ -75,9 +76,14 @@ describe('лестница радиуса аур — каталог (HERO-AURA-R
     // `bulwark` есть у `commander` (transhuman) и у `warden` (psionic). Узел с веткой
     // был бы одному из них запрещён (`E_WRONG_BRANCH`), и половина владельцев ауры
     // осталась бы без прокачки — при том что в каталоге всё выглядело бы правильно.
-    const owners = Object.entries(data.heroes)
-      .filter(([, def]) => def.startAbilities.includes('bulwark'))
-      .map(([, def]) => def.branch);
+    //
+    // Ветки припаркованы (HERO-11): в ЗАГРУЖЕННОМ каталоге их нет, поэтому владельцев
+    // ауры здесь разводит не `def.branch`, а `parkedBranch` из сырого JSON. Так проверка
+    // переживает парковку: сегодня она подтверждает, что узлы общие и без всякой ветки,
+    // а в день распарковки снова ловит ровно тот дефект, ради которого написана.
+    const owners = Object.entries(heroesJson as Record<string, { startAbilities?: string[]; parkedBranch?: string }>)
+      .filter(([, def]) => def.startAbilities?.includes('bulwark'))
+      .map(([, def]) => def.parkedBranch);
     expect(new Set(owners).size).toBeGreaterThan(1);
     expect(data.heroSkillTrees.command_relay!.branch).toBeUndefined();
     expect(data.heroSkillTrees.command_grid!.branch).toBeUndefined();

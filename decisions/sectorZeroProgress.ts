@@ -154,11 +154,38 @@ export function sectorSkillLegal(
   const node = data.heroSkillTrees[id];
   if (!hero || !node) return false;
   return (
-    node.branch === data.heroes[progress.selectedHero]?.branch &&
+    nodeOpenTo(node, progress.selectedHero, data) &&
     !hero.skills.includes(id) &&
     node.requires.every((r) => hero.skills.includes(r))
   );
 }
+
+/**
+ * Узел открыт герою? Правило ровно то же, что в ядре (`hero.skill.unlock`): узел БЕЗ
+ * ветки — общий и доступен любому, узел с веткой — только своей.
+ *
+ * Здесь раньше стояло строгое равенство `node.branch === def.branch`, и оно тихо
+ * расходилось с ядром: безветочный узел (`undefined !== 'transhuman'`) в подготовке
+ * Sector Zero НЕ покупался, хотя на настоящей карте то же ядро его пускало. Восемь из
+ * девятнадцати узлов каталога были общими — то есть треть дерева на экране подготовки
+ * была недостижима, и выглядело это как «узла просто нет».
+ *
+ * Парковка веток (HERO-11) сделала дефект невидимым: сейчас обе стороны `undefined`, и
+ * строгое равенство случайно даёт верный ответ. Именно поэтому правило приведено к
+ * ядерному СЕЙЧАС, а не «когда понадобится»: иначе распарковка вернула бы вместе с
+ * ветками и эту дыру, и искать её пришлось бы заново.
+ */
+function nodeOpenTo(
+  node: { branch?: string },
+  archetype: string | undefined,
+  data: GameData,
+): boolean {
+  return (
+    node.branch === undefined ||
+    node.branch === (archetype !== undefined ? data.heroes[archetype]?.branch : undefined)
+  );
+}
+
 
 export function sectorHullIds(data: GameData): string[] {
   return Object.keys(data.units).filter((id) => {
@@ -299,7 +326,7 @@ export function changeSectorZeroProgress(
       if (
         !hero ||
         !node ||
-        node.branch !== data.heroes[action.hero]?.branch ||
+        !nodeOpenTo(node, action.hero, data) ||
         hero.skills.includes(action.id) ||
         !node.requires.every((id) => hero.skills.includes(id)) ||
         !pay(sectorSkillCost(action.id, data))
@@ -396,7 +423,7 @@ export function parseSectorZeroProgress(
           const node = data.heroSkillTrees[skill];
           if (
             node &&
-            node.branch === data.heroes[id]?.branch &&
+            nodeOpenTo(node, id, data) &&
             !hero.skills.includes(skill) &&
             node.requires.every((r) => hero.skills.includes(r))
           )
