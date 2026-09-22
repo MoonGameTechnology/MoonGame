@@ -598,8 +598,9 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
   it('every ability STEP names a real tree node — otherwise the step is unreachable', () => {
     // `HeroAbilityDef.tiers[].skill` is the ONE link between an ability's ladder and the
     // tree that sells it, and nothing else validates it: a typo there parses fine and
-    // simply never fires, so the node the player paid for does nothing. Both ladders
-    // (corridor, scan) ride this link.
+    // simply never fires, so the node the player paid for does nothing. All four ladders
+    // ride this link: corridor, scan, and the two auras whose radius grows with the
+    // command-net nodes (HERO-AURA-R).
     const data = parseGameData(loadShippedBundle());
     const nodes = new Set(Object.keys(data.heroSkillTrees));
     const laddered: string[] = [];
@@ -609,7 +610,7 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
         laddered.push(id);
       }
     }
-    expect([...new Set(laddered)].sort()).toEqual(['corridor', 'scan']);
+    expect([...new Set(laddered)].sort()).toEqual(['bulwark', 'corridor', 'rally', 'scan']);
   });
 
   it('the shipped skill tree is internally consistent (HERO-7 referential integrity)', () => {
@@ -626,6 +627,11 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
       }
       if (def.grants.passive !== undefined) {
         expect(passives.has(def.grants.passive), `node ${id} grants unknown passive`).toBe(true);
+      }
+      // EVT-3: список проверяется наравне с одиночным полем — иначе опечатка в
+      // `passives` проезжает молча, а узел тихо не выдаёт половину обещанного.
+      for (const pid of def.grants.passives) {
+        expect(passives.has(pid), `node ${id} grants unknown passive "${pid}"`).toBe(true);
       }
     }
     // Both design branches ship a root node.

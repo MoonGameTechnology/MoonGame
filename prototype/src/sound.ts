@@ -155,6 +155,17 @@ export interface SoundApi {
   /** Громкость 0..1 (поверх встроенного трима −8 дБ). */
   volume(): number;
   setVolume(v: number): void;
+  /**
+   * Пауза ПЛОЩАДКИ — не то же, что выключенный звук (требование Яндекс Игр 1.3: при
+   * потере фокуса звук обязан замолкнуть, допустимы две секунды).
+   *
+   * ⚠️ Отличие от {@link SoundApi.setEnabled} принципиальное, а не стилистическое:
+   * `setEnabled` — это выбор ИГРОКА, он пишется в стор и переживает перезагрузку.
+   * Пауза же приходит извне (реклама, сворачивание вкладки) и обязана исчезнуть без
+   * следа. Свести их в одно значило бы вернуть игрока после ролика в тишину, которую
+   * он не просил и которую пришлось бы чинить руками в настройках.
+   */
+  setPaused(on: boolean): void;
 }
 
 // Префикс проекта для настроек — void.* (vd.* носит только dev-флаг).
@@ -171,6 +182,8 @@ export function initSound(store: Store | null): SoundApi {
   let on = readBool(STORE_ON, true, store); // по умолчанию ВКЛ — но тихо
   let vol = readNum(STORE_VOL, 0.7, 0, 1, store);
 
+  /** Пауза площадки: живёт ТОЛЬКО в памяти — в стор не пишется (см. `setPaused`). */
+  let paused = false;
   let ctx: AudioContext | null = null;
   let master: GainNode | null = null;
   let echoIn: GainNode | null = null;
@@ -179,7 +192,11 @@ export function initSound(store: Store | null): SoundApi {
   const lastAt = new Map<SoundId, number>();
 
   function ensure(): boolean {
-    if (dead || !on) return false;
+    // `paused` здесь наравне с `dead` и `!on`, и это не перестраховка: ниже стоит
+    // «приостановленный контекст — возобновить», и без этой проверки ЛЮБОЙ звук во
+    // время рекламы или свёрнутой вкладки включал бы синт обратно. Требование 1.3
+    // нарушалось бы первым же тапом, а не забытым вызовом.
+    if (dead || !on || paused) return false;
     if (ctx) {
       if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
       return true;
@@ -292,6 +309,17 @@ export function initSound(store: Store | null): SoundApi {
       vol = Math.max(0, Math.min(1, v));
       writeRaw(STORE_VOL, String(vol), store);
       if (master) master.gain.value = vol * MASTER_TRIM;
+    },
+    setPaused(next) {
+      if (next === paused) return;
+      paused = next;
+      // Контекст трогаем, только если он уже есть: синт создаётся лениво при первом
+      // play(), и поднимать его РАДИ ПАУЗЫ было бы ровно наоборот.
+      if (!ctx) return;
+      if (next) void ctx.suspend().catch(() => {});
+      // Снятие паузы не включает звук, который выключил сам игрок: возобновляем
+      // контекст, только если он ему нужен. Иначе следующий play() сделает это сам.
+      else if (on) void ctx.resume().catch(() => {});
     },
   };
 }

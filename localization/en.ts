@@ -804,6 +804,8 @@ export const en: Record<string, string> = {
   'data.militia': 'militia',
   'data.nebula': 'Nebula',
   'data.neural-lace': 'Neural Lace',
+  'data.command-relay': 'Command Relay',
+  'data.command-grid': 'Command Grid',
   'data.oceanic': 'Oceanic',
   'data.open-space': 'Open space',
   'data.area-defense-battery': 'Area Defense Battery',
@@ -1484,6 +1486,29 @@ export const en: Record<string, string> = {
   'event.solar-flare': '☀️ A stellar flare burned {n} energy',
   'event.void-anomaly': '🌀 A Void anomaly feeds the reactors: +{n} energy',
 
+  'data.field-foundry': "Field Foundry",
+  'data.hull-cutters': "Hull Cutters",
+  'data.hull-shears': "Hull Shears",
+  'data.master-batteries': "Master Batteries",
+  'data.master-scavenger': "Master Scavenger",
+  'data.reclaimed-barrels': "Reclaimed Barrels",
+  'data.salvage-rig': "Salvage Rig",
+  'data.scavenged-battery': "Scavenged Battery",
+  'data.scavenged-guns': "Scavenged Guns",
+  'data.scavenger-mastery': "Scavenger Mastery",
+  'data.wreck-optics': "Wreck Optics",
+  'hero.passive.hull-cutters.desc': "A further +2% salvage share — 5% in total.",
+  'hero.passive.master-batteries.desc': "A further +3% damage — 10% in total.",
+  'hero.passive.master-scavenger.desc': "A further +5% salvage share — 10% in total.",
+  'hero.passive.reclaimed-barrels.desc': "A further +2% damage — 7% in total.",
+  'hero.passive.scavenged-guns.desc': "+5% damage for the ship the hero commands.",
+  'hero.passive.wreck-optics.desc': "+3% salvage share in battles this hero fought.",
+  'hero.tree.field-foundry.desc': "Salvaged metal is melted down in the hold and fed to the barrels.",
+  'hero.tree.hull-shears.desc': "Powered shears open plating faster than it can cool.",
+  'hero.tree.salvage-rig.desc': "Grapples and cutters on external mounts: the hero starts stripping more off a battlefield than anyone else.",
+  'hero.tree.scavenged-battery.desc': "What comes off enemy hulls goes straight back into service — the hero’s guns hit harder.",
+  'hero.tree.scavenger-mastery.desc': "The peak of the craft: a battlefield the hero leaves is bare, and the guns are the best in the squadron.",
+
   // --- hero — Герои: грейды, способности (имя + описание).
   "hero.person.commander.name": "Mark Weir",
   "hero.person.commander.bio": "A veteran of deep-space campaigns. When surrounded, he led scattered ships through a sequence of feints and brought their crews home. A neural interface helps him hold the wider battle in view, but he never delegates decisions about lives to automation. Reserved and demanding, he always keeps a reserve for withdrawal.",
@@ -1504,7 +1529,8 @@ export const en: Record<string, string> = {
   'hero.ability.annihilate.name': 'Annihilate',
   'hero.ability.boarding-translocation.desc':
     'The hero arrives where one of your fleets is PARKED — as a separate fleet alongside it. Every hero leads their own squadron, so they never join another; a fleet in transit is not a landing point. Passive skill: widens the deployment points.',
-  'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
+  'hero.ability.bulwark.desc':
+    'A temporary shield: +15% defense to your fleets within 42 of the hero, for 2 hours. The command net widens it to 220, then 334.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
     'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to your allies — an open corridor is shared, so the enemy may walk in too.',
@@ -1514,7 +1540,7 @@ export const en: Record<string, string> = {
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
   'hero.ability.rally.desc':
-    'A battle cry: a temporary extra aura bonus for your fleets near the hero.',
+    'A battle cry: +10% damage for your fleets within 42 of the hero, for 2 hours. The command net widens it to 220, then 334.',
   'hero.ability.rally.name': 'Rally',
   'hero.ability.recall.desc': 'Instantly recalls the hero ship to the capital.',
   'hero.ability.recall.name': 'Recall',
@@ -1546,6 +1572,10 @@ export const en: Record<string, string> = {
     'Opens the corridor to your ALLIES: their fleets use your passage as their own, at the same speed bonus. It becomes a shared road, so a neutral — or the enemy — can step in as well, but for them it is only a road: no bonus.',
   'hero.tree.corridor-sustained.desc':
     "The corridor lives on a clock instead of closing behind the hero's army.",
+  'hero.tree.command-relay.desc':
+    'The relay carries an order to the next node: the Rally and Bulwark radius grows from 42 to 220.',
+  'hero.tree.command-grid.desc':
+    'The grid covers the neighbours outright: the Rally and Bulwark radius grows from 220 to 334.',
   'hero.tree.false-echo.desc':
     'The other side of psi-sight: the hero learns not only to read a rival radar, but to write into it what is not there.',
   'hero.tree.fleet-uplink.desc':
@@ -1807,6 +1837,7 @@ export const en: Record<string, string> = {
   'log.market.buy': 'buy',
   'log.market.sell': 'sell',
   'log.market.trade': '⇄ market: {n} {res} for {paid} ¤ ({side})',
+  'log.salvage': '🔧 Battlefield stripped: {what}',
   'log.shuttle.repelled.mine': '✳ Flak downed {n} of our craft · {at}',
   'log.shuttle.repelled.theirs': '✳ Our flak downed {n} enemy craft · {at}',
   'log.spy.caught': '🛡 Counter-intel: agent {who} caught stealing ({what})!',

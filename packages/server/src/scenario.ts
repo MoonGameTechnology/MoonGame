@@ -4,6 +4,7 @@ import {
   armyModule,
   arsenalSyncModule,
   autoRallyModule,
+  salvageModule,
   captureOnArrivalModule,
   combatModule,
   constructionModule,
@@ -135,6 +136,10 @@ export const DEV_MODULES: GameModule[] = [
   combatModule, // melee battles: engage / tick / assault / retreat / capture
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
   captureOnArrivalModule, // walk-in capture of undefended neutral sectors (after combat)
+  // EVT-2: трофеи победителю. ПЕРЕД `construction` намеренно и это единственное его
+  // ребро по порядку — оба слышат `station.destroyed`, и стройка сносит постройки,
+  // по которым салваж считает цену погибшей крепости. Место зеркалит прототип.
+  salvageModule,
   constructionModule,
   arsenalSyncModule, // LARS-1: server-driver refresh of live build-catalog ownership (bypasses gate)
   stationModule, // deploy void stations on empty nodes (then build radar/fort there)
@@ -184,7 +189,8 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '26'; // Added swarmJournal: что игрок видел про Рой.
+export const MODULE_MANIFEST_VERSION = '27'; // Added salvage (EVT-2): трофеи победителю боя.
+// export const MODULE_MANIFEST_VERSION = '26'; // Added swarmJournal: что игрок видел про Рой.
 // export const MODULE_MANIFEST_VERSION = '25'; // Added swarmAdapt: Рой растит уровень модуля.
 // export const MODULE_MANIFEST_VERSION = '24'; // Added swarmMemory: Рой копит наблюдения боёв.
 // export const MODULE_MANIFEST_VERSION = '23'; // Added fleetBrood: paid onboard ground growth.

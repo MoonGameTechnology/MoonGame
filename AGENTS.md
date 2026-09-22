@@ -23,7 +23,8 @@ answer where to look.
 2. **`CODE-MAP.md`** — first stop for where executable code lives and which entry point actually
    runs in production, playtests, the prototype, server, and clients.
 3. **`docs/bricks-index.md`** — first stop for “does a task for this already exist?”, its status,
-   zone, source roadmap/backlog file, and exact location.
+   zone and source roadmap/backlog file. It carries no line number on purpose (WIKI-2): with one,
+   the file conflicted in nearly every parallel PR. Find the brick in that file by its id.
 4. **`docs/index.md`** — first stop for “where is this topic documented?”. Use it to jump to the
    relevant roadmap/design document instead of opening many docs.
 5. After the index points to the relevant area, read that roadmap/design doc and then the actual

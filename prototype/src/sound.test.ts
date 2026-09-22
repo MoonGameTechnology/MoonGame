@@ -124,3 +124,124 @@ describe('initSound — настройки живут и без WebAudio (Node)'
     expect(api.volume()).toBe(0);
   });
 });
+
+// Требование площадки 1.3: при потере фокуса звук обязан замолкнуть (допустимы две
+// секунды). Пауза площадки — НЕ то же самое, что выключенный звук: настройка игрока
+// обязана пережить рекламу и сворачивание вкладки.
+describe('setPaused — пауза площадки не трогает настройку игрока (YAG-1.1b, требование 1.3)', () => {
+  const fakeStore = () => {
+    const m = new Map<string, string>();
+    return { m, getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
+  };
+
+  it('пауза не пишет в стор и не меняет `enabled()`', () => {
+    const st = fakeStore();
+    const api = initSound(st);
+    const before = new Map(st.m);
+    api.setPaused(true);
+    // Игрок звук НЕ выключал — выключила площадка. Перепутать значит вернуть игрока
+    // после рекламы в тишину, которую он не просил и которую надо чинить руками.
+    expect(api.enabled()).toBe(true);
+    expect([...st.m]).toEqual([...before]);
+  });
+
+  it('снятие паузы возвращает ровно то, что было: выключенный звук остаётся выключенным', () => {
+    const api = initSound(fakeStore());
+    api.setEnabled(false);
+    api.setPaused(true);
+    api.setPaused(false);
+    expect(api.enabled()).toBe(false);
+  });
+
+  it('пауза и снятие идемпотентны и не бросают без AudioContext', () => {
+    const api = initSound(null);
+    expect(() => {
+      api.setPaused(true);
+      api.setPaused(true);
+      api.setPaused(false);
+      api.setPaused(false);
+    }).not.toThrow();
+    expect(api.enabled()).toBe(true);
+  });
+});
+
+// Отдельно от настроек: здесь проверяется САМ ЗВУК на паузе, а не флаг. Поддельный
+// AudioContext нужен ровно затем, что в Node его нет, а требование 1.3 — про звук.
+describe('setPaused — на паузе площадки синт молчит и не оживает от play()', () => {
+  class FakeParam {
+    value = 0;
+    setValueAtTime(): void {}
+    linearRampToValueAtTime(): void {}
+    exponentialRampToValueAtTime(): void {}
+  }
+  class FakeNode {
+    gain = new FakeParam();
+    frequency = new FakeParam();
+    delayTime = new FakeParam();
+    detune = new FakeParam();
+    type = '';
+    buffer: unknown = null;
+    connect(): void {}
+    start(): void {}
+    stop(): void {}
+  }
+  const makeCtx = () => {
+    const calls = { suspend: 0, resume: 0 };
+    const node = (): FakeNode => new FakeNode();
+    const ctx = {
+      calls,
+      state: 'running' as string,
+      currentTime: 0,
+      sampleRate: 48000,
+      destination: node(),
+      createGain: node,
+      createDelay: node,
+      createBiquadFilter: node,
+      createOscillator: node,
+      createBufferSource: node,
+      createBuffer: () => ({ getChannelData: () => new Float32Array(8) }),
+      suspend(): Promise<void> {
+        calls.suspend++;
+        ctx.state = 'suspended';
+        return Promise.resolve();
+      },
+      resume(): Promise<void> {
+        calls.resume++;
+        ctx.state = 'running';
+        return Promise.resolve();
+      },
+    };
+    return ctx;
+  };
+
+  it('пауза приостанавливает контекст, а play() его НЕ возвращает к жизни', () => {
+    const ctx = makeCtx();
+    const g = globalThis as unknown as { AudioContext?: unknown };
+    const had = 'AudioContext' in g;
+    const prev = g.AudioContext;
+    g.AudioContext = function () {
+      return ctx;
+    } as unknown;
+    try {
+      const api = initSound(null);
+      api.play('tap'); // поднять синт
+      expect(ctx.calls.resume).toBe(0);
+
+      api.setPaused(true);
+      expect(ctx.calls.suspend).toBe(1);
+
+      // Вот ради чего тест: раньше `ensure()` видел suspended и звал resume(), то есть
+      // любой тап во время рекламы включал звук обратно — прямое нарушение п. 1.3.
+      api.play('tap');
+      api.play('send');
+      expect(ctx.calls.resume).toBe(0);
+      expect(ctx.state).toBe('suspended');
+
+      api.setPaused(false);
+      expect(ctx.calls.resume).toBe(1);
+    } finally {
+      if (had) g.AudioContext = prev;
+      else delete g.AudioContext;
+    }
+  });
+});

@@ -32,6 +32,42 @@ const bundle = async (playerBuild) => {
   return res.outputFiles[0].text;
 };
 
+/**
+ * Платформенная цель (`YAG-1.1b`) — РАЗЛОЖЕННЫЙ артефакт, а не один HTML.
+ *
+ * Решение владельца 2026-09-17: `index.html` в корне архива плюс `assets/` рядом.
+ * Остальные три цели инлайнят всё в один файл (`loader: dataurl`), и для площадки это
+ * был бы самый простой архив — ровно один файл. Но data-URL это base64, то есть около
+ * +33% на каждом бинарнике, и кэшировать по частям нечего: правка одной строки заставляет
+ * игрока перекачать весь бандл. Раскладка принята ДО того, как приедет настоящий арт.
+ *
+ * Имена ассетов задаём мы (`[name]-[hash]`), потому что требование 1.22 запрещает
+ * пробелы и кириллицу в именах файлов и папок архива; сторож в `buildTarget.test.mjs`
+ * проверяет это на готовом артефакте, а не на обещании.
+ */
+const bundlePlatform = async () => {
+  const res = await build({
+    entryPoints: ['prototype/src/bootstrap.ts'],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    // Не `dataurl`: бинарники едут отдельными файлами в assets/ (см. шапку).
+    loader: { '.webp': 'file' },
+    assetNames: 'assets/[name]-[hash]',
+    entryNames: 'assets/app',
+    outdir: 'prototype/dist/yandex',
+    // Пути внутри бандла — ОТНОСИТЕЛЬНЫЕ: архив распаковывают в произвольный префикс на
+    // стороне площадки, и абсолютный `/assets/...` там просто не найдётся.
+    publicPath: '.',
+    minify: true,
+    legalComments: 'none',
+    write: false,
+    define: { __PLAYER_BUILD__: 'true' },
+  });
+  return res.outputFiles;
+};
+
 /** Пульт администратора (ADM-1) — свой вход, без `__PLAYER_BUILD__`: этой странице
  *  нечего вырезать, она и так не знает про игру ничего. */
 const bundleAdmin = async () => {
@@ -2900,11 +2936,32 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 }
 `;
 
-const page = (js, entry = 'void-dominion') => `<!doctype html>
+/** Все листы одной строкой: платформенная цель пишет их файлом, остальные — инлайном. */
+const allCss = () =>
+  `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`;
+
+/**
+ * Лоадер SDK площадки — ДОСЛОВНО как в документации (требование 1.19.1).
+ *
+ * Путь ОТНОСИТЕЛЬНЫЙ: это вариант «архив загружен через Консоль разработчика», который
+ * площадка и рекомендует; абсолютный `https://sdk.games.s3.yandex.net/sdk.js` нужен
+ * только при интеграции через свой домен. Модерация смотрит версию лоадера индикатором
+ * на debug-панели: `IT` — верно, `IF` — старый. Поэтому тег не «примерно такой», а
+ * ровно такой, и сторож `buildTarget.test.mjs` сверяет его по готовому артефакту.
+ *
+ * `initSDK()` намеренно ничего не инициализирует: и `YaGames.init()`, и фолбэк, и
+ * обработка отказа живут в `bootstrap.ts` (`platform/host.ts`). Тег лишь будит хост,
+ * если тот уже ждёт, — `<script async>` может доехать и позже игры.
+ */
+const SDK_LOADER = `<!-- Yandex Games SDK -->
+<script async src="/sdk.js" onload="initSDK()"></script>
+<script>function initSDK(){window.dispatchEvent(new Event('ya-sdk-ready'));}</script>`;
+
+const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}</style></head>
+<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title>${external ? `<link rel="stylesheet" href="assets/app.css">\n${SDK_LOADER}` : `<style>${allCss()}</style>`}</head>
 <body data-entry="${entry}">
 <section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
   <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
@@ -3411,7 +3468,7 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
 <!--dev-only--><div id="testmode"></div><!--/dev-only-->
 <!-- SANDBOX — floating opener + overlay (content rendered by sandbox.ts); delete to cut the markup -->
 <!--dev-only--><button id="sandboxbtn" data-i18n-title="hub.sandbox.title" style="display:none">🧪</button><div id="sandbox"></div><!--/dev-only-->
-<script>${js}</script>
+${external ? '<script src="assets/app.js"></script>' : `<script>${js}</script>`}
 </body></html>`;
 
 // Player artifact: drop every <!--dev-only--> … <!--/dev-only--> fence. The matching
@@ -3499,6 +3556,33 @@ console.log(
     (playerHtml.length / 1024).toFixed(0) +
     ' KB)',
 );
+// --- Платформенная цель (`YAG-1.1b`): index.html в корне + assets/ рядом ---------
+// Требование 1.22: `index.html` именно в КОРНЕ архива, а имена файлов и папок — без
+// пробелов и кириллицы. Требование 1.21: всё вместе не больше 100 МБ в распакованном
+// виде. Сторож `prototype/buildTarget.test.mjs` проверяет это по готовым файлам.
+const platformFiles = await bundlePlatform();
+mkdirSync('prototype/dist/yandex/assets', { recursive: true });
+let platformBytes = 0;
+for (const file of platformFiles) {
+  // esbuild отдаёт абсолютные пути; кладём их под dist/yandex, сохраняя assets/.
+  const rel = file.path.slice(file.path.indexOf('dist/yandex/') + 'dist/yandex/'.length);
+  const out = `prototype/dist/yandex/${rel}`;
+  mkdirSync(out.slice(0, out.lastIndexOf('/')), { recursive: true });
+  writeFileSync(out, file.contents);
+  platformBytes += file.contents.byteLength;
+}
+const platformCss = allCss();
+writeFileSync('prototype/dist/yandex/assets/app.css', platformCss);
+platformBytes += Buffer.byteLength(platformCss);
+const platformIndex = stripDevMarkup(page('', 'sector-zero', true));
+writeFileSync('prototype/dist/yandex/index.html', platformIndex);
+platformBytes += Buffer.byteLength(platformIndex);
+console.log(
+  'wrote prototype/dist/yandex/ (index.html + assets, ' +
+    (platformBytes / 1024).toFixed(0) +
+    ' KB распакованных)',
+);
+
 const adminHtml = adminPage(await bundleAdmin());
 writeFileSync('prototype/dist/void-dominion-admin.html', adminHtml);
 console.log(
