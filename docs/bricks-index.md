@@ -119,539 +119,540 @@
 | HERO-FX2 | ✅ | core | `docs/backlog.md:1340` | Второй провайдер — hero.effect.aura (rally/bulwark): |
 | HERO-FX3 | ✅ | core | `docs/backlog.md:1351` | Третий провайдер шва — hero.effect.reveal (scan): |
 | HERO-10 | ✅ | core | `docs/backlog.md:1363` | Каждый герой ведёт СВОЙ флот |
-| SHIP-1 | ✅ | proto | `docs/backlog.md:1398` | Модель: prototype/src/ships.ts — корпуса (SHIPHULLS: cruiser 3 · |
-| SHIP-2 | ✅ | proto | `docs/backlog.md:1402` | →♻ UI «Верфь». Первая версия — pre-match вкладка в setup — была |
-| CON-1 | ✅ | proto | `docs/backlog.md:1405` | Единый таб-конструктор «Верфь» |
-| CON-2 | ✅ | proto | `docs/backlog.md:1413` | Эскадрильи |
-| CON-3 | 🗑 | proto | `docs/backlog.md:1416` | Армия |
-| CON-4 | ✅ | proto | `docs/backlog.md:1423` | Герои |
-| CON-5 | ✅ | proto | `docs/backlog.md:1426` | Мобильная адаптация «Верфи» |
-| SHIP-3 | ✅ | core | `docs/backlog.md:1431` | Эффекты живые: util/loadout.ts (effectiveStats) читается боем |
-| SHIP-4 | ✅ | core | `docs/backlog.md:1435` | Обобщён фиттинг-движок: один генерик инсталл-гейт |
-| SHIP-5 | 🔒 | srv | `docs/backlog.md:1445` | предметы мета-экономики |
-| SHIP-6 | ✅ |  | `docs/backlog.md:1447` | Типизированные слоты: корпуса в data/units.json несут |
-| NETP0-1 | ✅ | proto | `docs/backlog.md:1460` | (PR #128) Порог победы в сети: netserver не передаёт config в |
-| NETP0-2 | ✅ | proto | `docs/backlog.md:1463` | (PR #128) Совет учёных для p2: DEFAULTSETUP помечает p2 как AI и |
-| NETP0-3 | ✅ | cli proto | `docs/backlog.md:1467` | (PR #128) Доменные события по сети: сервер уже шлёт |
-| NETP0-4 | ✅ | proto srv cli | `docs/backlog.md:1471` | Сетевой чат: relay по образцу ally-пингов — |
-| NETP0-5 | ✅ | proto | `docs/backlog.md:1475` | Переговоры между людьми: consent-офферы в прототипной |
-| NETP0-6 | ✅ | proto | `docs/backlog.md:1483` | (PR #128) EN-локализация свежих окон: steward («Хранитель») и |
-| ONB-0 | ✅ | proto | `docs/backlog.md:1496` | Флаг первого запуска + воронка. |
-| ONB-1 | ✅ | proto | `docs/backlog.md:1502` | Движок гайд-марок (spotlight). |
-| ONB-2 | ✅ | proto | `docs/backlog.md:1518` | Гайдовый первый матч. |
-| ONB-3 | ✅ | proto | `docs/backlog.md:1525` | Just-in-time интро механик. |
-| ONB-4 | ✅ | proto | `docs/backlog.md:1539` | Help/кодекс-хаб («?» везде). |
-| ONB-5 | 🔶 | proto srv | `docs/backlog.md:1544` | Async-модель + дневной дайджест. |
-| ONB-6 | ✅ | core proto | `docs/backlog.md:1556` | Combat-preview. |
-| ONB-7 | ✅ | proto | `docs/backlog.md:1567` | Цели первой сессии. |
-| ONB-8 | ✅ | proto | `docs/backlog.md:1571` | Онбординг в соц/мета-слой (корпорации/AvA) — ONB-3-механизмом, |
-| ONB-9 | ✅ | proto | `docs/backlog.md:1575` | Состав мира — списком, у групп есть описание по удержанию |
-| ONB-10 | ✅ | proto | `docs/backlog.md:1600` | Обучение показывало в пустоту: «постройте корабль» — а нажимать |
-| ONB-11 | ✅ | proto | `docs/backlog.md:1635` | Обучение не объясняло, КАК смотреть на мир. |
-| ST-3.1 | ✅ | core | `docs/backlog.md:1668` | Доля потерь по прогнозу + трипваер «враг близко». |
-| ST-3.2 | ✅ | srv proto | `docs/backlog.md:1678` | Эвакуация под угрозой (поза defend). |
-| THREAT-HUD | ✅ | proto | `docs/backlog.md:1687` | «Враг у ваших рубежей» живому игроку. |
-| ST-3.4 | ✅ | srv proto | `docs/backlog.md:1691` | Анти-шаттл гистерезис. |
-| ST-2.4 | ✅ | core srv cli | `docs/backlog.md:1695` | SITREP — журнал решений + утренний рапорт. |
-| ST-3.3 | ✅ | core srv proto | `docs/backlog.md:1702` | Поза «Активная оборона». |
-| ST-2.1 | ✅ | core srv proto | `docs/backlog.md:1709` | Guard-режим: точки удержания. |
-| ST-4 | ✅ | proto | `docs/backlog.md:1719` | Окно «Хранителя» не закрывается по Back/Escape. |
-| SES-2.1 | ✅ | srv proto | `docs/backlog.md:1740` | Автостарт сессий — мир живёт с создания. |
-| SES-2.2 | ✅ | srv | `docs/backlog.md:1749` | ИИ-заместитель после 3 РЕАЛЬНЫХ дней отсутствия. |
-| SES-2.3 | ✅ | srv | `docs/backlog.md:1762` | Окно входа 4 реальных дня. |
-| SES-2.4 | ✅ | proto | `docs/backlog.md:1777` | Лента сессий в главном меню. |
-| SES-2.5 | ✅ | srv proto | `docs/backlog.md:1788` | Регистрация/логин на игровом пути. |
-| SES-2.6 | ✅ | srv ops | `docs/backlog.md:1806` | Плейтест-цикл ×24 — полный цикл живьём. |
-| BRW-0 | ✅ | srv proto | `docs/backlog.md:1844` | Разные сессии — предпосылка ВСЕХ трёх фильтров. |
-| BRW-1 | ✅ | srv | `docs/backlog.md:1914` | Режим в read-model. |
-| BRW-2 | ✅ | proto | `docs/backlog.md:1930` | Чистый модуль фильтрации matchFilter.ts (без UI). |
-| BRW-3 | ✅ | proto | `docs/backlog.md:1946` | Панель фильтров над списком «Доступные». |
-| BRW-4 | ✅ | proto | `docs/backlog.md:1972` | Режим на карточке. |
-| ENTRY-1 | ✅ | srv | `docs/backlog.md:2012` | join в боевом сервере теряет slot и faction — молча. |
-| ENTRY-2 | ✅ | proto | `docs/backlog.md:2031` | Экран сетевого входа по образцу «Настройки схватки». |
-| ENTRY-3 | ✅ | srv | `docs/backlog.md:2055` | Совет учёных доезжает до сетевого матча. |
-| ENTRY-4 | ✅ | proto | `docs/backlog.md:2077` | Строка «Совет учёных» на экране сетевого входа. |
-| ADDR-1 | ✅ | srv | `docs/backlog.md:2108` | Партия как сущность, а не комната из MATCHES=N. |
-| ADDR-2 | ✅ | srv proto | `docs/backlog.md:2150` | Развести адрес партии и приглашение. |
-| ADDR-3 | ✅ | proto srv | `docs/backlog.md:2185` | Путь вместо параметра. |
-| ADDR-4 | ✅ | proto | `docs/backlog.md:2219` | «Мои партии» в хабе. |
-| ADDR-5 | ✅ | proto | `docs/backlog.md:2257` | Чужой или неизвестный id сессии не должен давать пустой экран. |
-| ADDR-6 | ✅ | srv proto | `docs/backlog.md:2284` | GET /matches/:id/seats отдаёт расклад партии кому угодно (IDOR, A01). |
-| OPS-1 | ✅ | ops | `docs/backlog.md:2318` | update-dev.sh генерируется установщиком, поэтому не может обновить сам себя. |
-| ADM-0 | ✅ | srv | `docs/backlog.md:2366` | Лобби целиком регистрируется с одного адреса. |
-| ADM-1 | ✅ | srv core proto | `docs/backlog.md:2378` | Кик: названная власть над ЗАКРЕПЛЁННЫМ местом. |
-| ADM-2 | ✅ | srv core | `docs/backlog.md:2399` | Кресло, сменившее владельца, несёт поколение. |
-| ADM-3 | ✅ | core | `docs/backlog.md:2412` | Крыло эскадрильи: чистый состав и одна координата. |
-| ADM-4 | ✅ | proto | `docs/backlog.md:2432` | Песочница: открыть все технологии одной кнопкой. |
-| CONV-1 | ✅ | proto | `docs/backlog.md:2519` | Мгновенный ремонт и форс-марш: копии удаляются, ядро включается. |
-| CONV-2 | ✅ | proto | `docs/backlog.md:2554` | Доковый ремонт (econScrews → fleetRepair). |
-| CONV-3 | ✅ | proto | `docs/backlog.md:2576` | Гражданский налог. |
-| CONV-4 | ✅ | proto | `docs/backlog.md:2600` | Столица (capital.designate). |
-| CONV-5 | ✅ | core proto | `docs/backlog.md:2624` | Слоты совета учёных: прототип начинает грузить scientistModule. |
-| CONV-6 | ✅ | proto | `docs/backlog.md:2658` | Хелперы крыла (src/shuttle.ts → state/shuttle.ts). |
-| CONV-7 | ✅ | proto | `docs/backlog.md:2698` | Постоянные приказы. |
-| CONV-8 | ✅ | proto | `docs/backlog.md:2734` | Операции с флотом (fleetLaunch → fleetOps). |
-| CONV-10 | ✅ | core | `docs/backlog.md:2776` | Авто-сбора построенного нет в каноне — это пробел, а не дубль. |
-| CONV-9 | ✅ | core proto | `docs/backlog.md:2812` | Рынок — единственный кирпич, где сводить придётся В ЯДРО. |
-| CONV-11 | ✅ | proto data | `docs/backlog.md:2862` | Дрейф двух каталогов контента ничем не остановлен. |
-| CONV-12 | ✅ | proto data | `docs/backlog.md:2912` | Свести контент к одному каталогу. |
-| CORE-PARITY | ✅ | srv | `docs/backlog.md:3047` | Канон не грузил четыре модуля, которые прототип грузил — |
-| CONV-13 | ✅ | docs | `docs/backlog.md:3075` | Статус кирпича врал, и проверить это было нечем. |
-| CONV-14 | ✅ | docs | `docs/backlog.md:3100` | Та же гниль в роадмапах — и её оказалось вдвое больше, чем видел |
-| CONV-15 | ✅ | data | `docs/backlog.md:3137` | Дефолт схемы молча менял правила: в шипнутом каталоге флот |
-| CONV-16 | ✅ | proto | `docs/backlog.md:3165` | Три технологии прототипа не может открыть никто. |
-| CONV-17 | ✅ | data | `docs/backlog.md:3200` | В каноническом каталоге лежала готовая проза вместо ключа — |
-| CONV-18 | ✅ | docs | `docs/backlog.md:3233` | Эталон приёмки протух, и на него ссылались два кирпича. |
-| AI-BAL-1 | ✅ | proto | `docs/backlog.md:3275` | Бот исследует технологии + харнес их видит. |
-| AI-BAL-2 | ✅ | proto | `docs/backlog.md:3302` | Бот строит оборону и держит миры. |
-| AI-BAL-3 | ✅ | proto | `docs/backlog.md:3332` | Наземная армия и десант. |
-| AI-BAL-4 | ✅ | proto | `docs/backlog.md:3378` | Эскадрильи, артиллерия, герой. |
-| AI-BAL-6 | ✅ | proto | `docs/backlog.md:3416` | Сессия фиксированной длины вместо гонки к порогу очков |
-| AI-BAL-5 | ✅ | proto | `docs/backlog.md:3451` | Разброс между сидами — прибор НЕ ДАВАЛ статистики. |
-| AI-BAL-7 | ✅ | proto | `docs/backlog.md:3483` | Бот умеет проигрывать бой. |
-| AI-BAL-8 | ✅ | proto core | `docs/backlog.md:3544` | Герой вошёл в измерение. |
-| AI-BAL-9 | ✅ | proto | `docs/backlog.md:3593` | Рынок ожил в обе стороны. |
-| AI-BAL-10 | ✅ | proto core | `docs/backlog.md:3637` | Отчёт смешивал три вида «мёртвого» — теперь называет каждый. |
-| AI-BAL-11 | ✅ | proto | `docs/backlog.md:3701` | Отступление не удешевило размен — выигрыш кто-то съедает. |
-| AI-BAL-12 | ✅ | proto | `docs/backlog.md:3745` | Две фракции из четырёх вне измерения. |
-| CORE-DMG-1 | ✅ | core | `docs/backlog.md:3764` | Все каналы урона идут через хук combat.damage. |
-| CORE-DMG-2 | ✅ | core | `docs/backlog.md:3803` | Пропустить хук combat.damage всё ещё МОЖНО — примитив урона |
-| CORE-DMG-3 | ⏳ | core | `docs/backlog.md:3848` | Ауры и пассивы героя не доходят до неближнего боя — асимметрия, |
-| AI-BAL-13 | ✅ | proto | `docs/backlog.md:3861` | Бот не знает правила «один герой на флот» — и от этого стоит |
-| AI-BAL-1.1 | ✅ | proto | `docs/backlog.md:3915` | Тест-боты отделены от игровых. |
-| BAL-1 | ✅ | proto | `docs/backlog.md:3955` | Стартовые позиции больше не решают матч — карта-«колесо». |
-| BAL-2 | ✅ | proto data | `docs/backlog.md:3988` | Фракции: перекос есть, но ВДВОЕ МЕНЬШЕ и в другую сторону. |
-| BAL-3 | 🔶 | proto data | `docs/backlog.md:4027` | Кредиты, энергия и еда — декорации, а не ресурсы. |
-| BAL-4 | ✅ | core proto | `docs/backlog.md:4072` | Захват прилётом обесценивает армию. |
-| BAL-5 | ✅ | proto core | `docs/backlog.md:4110` | Снежный ком: 71–75%, камбэк есть у каждого четвёртого. |
-| BAL-10 | ✅ | proto data core | `docs/backlog.md:4154` | Восемь дней сессии ничего не решают — что с этим |
-| BAL-11 | ✅ | proto data | `docs/backlog.md:4182` | Скорость флота — сильнейший пассив, а «сбалансированный» |
-| BAL-6 | 🔶 | proto data | `docs/backlog.md:4233` | Дерево технологий не даёт выбора — но причина НЕ цена. |
-| BAL-7 | ⏳ | proto data | `docs/backlog.md:4273` | У heavyinfantry нет ниши. |
-| BAL-8 | ✅ | proto data | `docs/backlog.md:4280` | Типы планет вернулись на карту — но только косметически. |
-| BAL-9 | ✅ | proto | `docs/backlog.md:4319` | Карта была честной ценой того, что стала плоской. |
-| BAL-12 | ✅ | proto | `docs/backlog.md:4372` | Прибор не достаёт до слоя hasscientist — ни один такой узел |
-| BAL-13 | ✅ | proto data | `docs/backlog.md:4426` | Достроить ростер учёных: три ветки из пяти без |
-| BAL-14 | ✅ | proto | `docs/backlog.md:4482` | Бот исследует псевдоузлы мета-прокачки — и получает даром то, |
-| BAL-15 | ✅ | core | `docs/backlog.md:4549` | Бот не исследует НИЧЕГО: запрет грант-узлов поставлен в |
-| PC-UI | ✅ | proto | `docs/backlog.md:4601` | Десктоп-полировка правой панели (consolidation, ветка |
-| PERF-2 | ✅ |  | `docs/backlog.md:4625` | Оптимизационный проход по shared-core (3-линзовый агент-ревью: горячие пути |
-| PERF-1 | ✅ |  | `docs/backlog.md:4640` | Сведено и проверено |
-| WIKI-1 | ✅ | docs | `docs/backlog.md:4645` | найти, в каком из 98 доков искать правило про X, можно только |
-| SEC-0 | ✅ |  | `docs/backlog.md:4711` | Базовый DevSecOps-пайплайн: SAST (Semgrep) + SCA (pnpm audit + osv-scanner) |
-| SEC-1 | ✅ |  | `docs/backlog.md:4714` | Триаж + baseline: находок — ноль (Gitleaks v8.18.4 локально + pnpm audit + |
-| SEC-2 | ✅ |  | `docs/backlog.md:4720` | Кастомные Semgrep-правила под инварианты ядра: запрет Math.random/ |
-| SEC-3 | ✅ |  | `docs/backlog.md:4735` | Безопасность самого пайплайна: пин образов сканеров по sha256, |
-| SEC-4 | ✅ |  | `docs/backlog.md:4739` | (аудитом доков — GitHub Code Scanning половина уже была реализована, не |
-| SEC-5 | ✅ |  | `docs/backlog.md:4748` | Container scanning: Dockerfile (multi-stage, пин distroless-базы) + |
-| SEC-6 | ✅ |  | `docs/backlog.md:4751` | DAST: dast-zap-джоба в security.yml (не было закомментированной |
-| SEC-7 | ✅ |  | `docs/backlog.md:4763` | (SEC-5 — замок снят) Supply-chain integrity (A08): подпись |
-| SEC-8 | 🔒 |  | `docs/backlog.md:4783` | OWASP Top 10 2021 |
-| SEC-10 | ✅ | sec | `docs/backlog.md:4784` | Еженедельный ре-скан: security.yml получил schedule: cron |
-| SEC-11 | ✅ | sec | `docs/backlog.md:4792` | Сканирование сторонних образов прода: джоба trivy-deps. |
-| SEC-12 | ✅ | sec | `docs/backlog.md:4800` | Хардненинг рантайма контейнеров + честная запись о том, что на |
-| SEC-14 | ✅ | sec | `docs/backlog.md:4817` | Триаж 71 находки, накопившейся после посадки trivy-deps/SEC-11. |
-| SEC-18 | ✅ | sec | `docs/backlog.md:4837` | Поимённый триаж десяти находок Trivy в бинаре caddy + починка |
-| SEC-22 | ✅ | sec | `docs/backlog.md:4868` | две LOW в glibc закрыли очередь мержа всему репозиторию. |
-| SEC-23 | ✅ | sec | `docs/backlog.md:4884` | красный trivy-image теперь объясняет себя в логе. |
-| SEC-29 | ✅ | sec ops | `docs/backlog.md:4900` | пин postgres отстал на пересборку, и предупреждение об |
-| SEC-30 | ✅ | sec | `docs/backlog.md:4921` | триаж caddy протух: набор вырос вдвое, в нём CRITICAL, а два |
-| SEC-32 | ✅ | sec | `docs/backlog.md:4956` | разобран весь остаток находок: postgres 35, TruffleHog 10, и |
-| SEC-33 | ✅ | srv sec | `docs/backlog.md:4996` | личный JSON игрока оседал в кэше браузера: cache-control |
-| SEC-34 | ✅ | sec ops | `docs/backlog.md:5024` | за пинами в Dockerfile не следил никто, и пин рантайм-базы |
-| SEC-35 | ✅ | sec ops | `docs/backlog.md:5044` | свой образ Caddy публикуется и подписывается, как серверный. |
-| SEC-36 | ⏳ | sec ops | `docs/backlog.md:5091` | увести Caddy с root внутри контейнера. |
-| SEC-39 | ✅ | sec ops | `docs/backlog.md:5130` | исправленная libc6 в серверном образе без новых исключений. |
-| SEC-40 | ✅ | sec ops | `docs/backlog.md:5142` | 43 🔴 сводного отчёта были протухшими базами, а не нашим |
-| SEC-37 | ✅ | sec proto | `docs/backlog.md:5192` | браузерный сторож был мёртв с 2026-08-15 и молчал об |
-| SEC-31 | ✅ | sec ops | `docs/backlog.md:5228` | собственная сборка Caddy: закрыты ВСЕ СЕМЬ достижимых CVE, |
-| SEC-24 | ✅ | sec | `docs/backlog.md:5305` | неоценённая CVE в glibc снова закрыла очередь мержа. |
-| SEC-27 | ✅ | sec ops | `docs/backlog.md:5319` | гейт trivy image фильтрует по ЧИНИМОСТИ, а не по |
-| SEC-28 | ✅ | sec | `docs/backlog.md:5342` | вычищены подавления, ставшие после SEC-27 избыточными и |
-| SEC-26 | ✅ | sec | `docs/backlog.md:5369` | пятый за две недели красный trivy-image на пустом месте, и |
-| SEC-25 | ✅ | sec ops | `docs/backlog.md:5388` | бамп дайджеста базового образа + ревизия подавлений. |
-| SEC-19 | ✅ | sec | `docs/backlog.md:5419` | Находки trivy-deps не доезжали до Code Scanning вообще. |
-| SEC-20 | ✅ | sec | `docs/backlog.md:5443` | Триаж всего остатка находок: KICS 23, ZAP 4, TruffleHog 2. |
-| SEC-21 | ✅ | srv sec | `docs/backlog.md:5475` | HTTP-периметр не уважал Origin-allowlist — теперь уважает. |
-| SEC-15 | ✅ | sec | `docs/backlog.md:5512` | Второй SCA-движок: джоба dependency-check (OWASP Dependency-Check, |
-| SEC-17 | ✅ | sec ops | `docs/backlog.md:5534` | [sec/ops] Прод-образ больше не везёт дев-тулчейн + гейт «образ вообще |
-| SEC-13 | ✅ | sec ops | `docs/backlog.md:5567` | [sec/ops] Closed loop «просканировано → то же самое в проде»: воркфлоу |
-| SEC-9 | ✅ |  | `docs/backlog.md:5590` | Ремедиация Code Scanning (dashboard-триаж 2026-07-24): CodeQL-варнинги |
-| H4-REVERT | ✅ | core srv proto data | `docs/backlog.md:5599` | Снос системы дивизий, возврат к |
-| GRND-1 | ✅ | proto | `docs/backlog.md:5636` | Десант — кнопка в ряду команд + меню «кого и сколько». |
-| CHAIN-UX | ✅ | proto | `docs/backlog.md:5678` | Режим «Приказ» — цепочка тапами по карте с иконками и |
-| SND-1 | ✅ | proto | `docs/backlog.md:5720` | Синтезированные звуки интерфейса. |
-| SND-2 | ✅ | proto | `docs/backlog.md:5757` | Пинг гидролокатора: развёртка засекла цель. |
-| HUD-DOCK | ✅ | proto | `docs/backlog.md:5778` | Низ экрана ведёт себя как одно целое. |
-| BACK-1 | ✅ | proto | `docs/backlog.md:5812` | Реестр слоёв Back/Escape достроен — и закрыт как КЛАСС. |
-| H4-TAIL | ✅ | proto | `docs/backlog.md:5857` | Уборка мёртвого кода за снесёнными фичами. |
-| RANGE-UX | ✅ | proto core | `docs/backlog.md:5887` | Радиусы огня видно, и они РАВНЫ ядерным. |
-| CAST-UX | ✅ | proto | `docs/backlog.md:5918` | Прицел каста: хаб уходит, дальность и область видны. |
-| RECAP-FOG | ✅ | proto sec | `docs/backlog.md:5941` | Сводка перестала раскрывать чужую экономику. |
-| HERO-CORRIDOR | ✅ | core data | `docs/backlog.md:5968` | Коридор стал ЛИЧНЫМ: дыра в общий граф закрыта. |
-| HERO-CORRIDOR-2 | ✅ | core proto | `docs/backlog.md:6007` | Коридор стало ВИДНО, и посреди него больше |
-| AIM-PAN | ✅ | proto | `docs/backlog.md:6038` | При вооружённом приказе камеру снова можно двигать. |
-| MAPSHARE-1 | ✅ | core proto | `docs/backlog.md:6175` | Договор об обмене картами + высадка к своим. |
-| PING-PANEL | ✅ | proto | `docs/backlog.md:6219` | Окно «Метки коалиции»: свои и союзные в одном списке. |
-| UI-STD | ✅ | proto | `docs/backlog.md:6245` | Кнопки окна меток — стандартные; дерево технологий — |
-| CMD-VIS | ✅ | core proto | `docs/backlog.md:6270` | Стоп в коридоре запрещён; «нет приказа — нет |
-| FRIENDS-1 | ✅ | srv proto | `docs/backlog.md:6297` | Вкладка «Друзья» в хабе — с настоящим сервером. |
-| BUILD-1 | ✅ | proto | `docs/backlog.md:6339` | Окно построек мира + карточка здания с уровнями. |
-| ABIL-RING | ✅ | proto | `docs/backlog.md:6386` | Радиусы способностей — фиолетовым пунктиром, и не только |
-| SENSOR-1 | ✅ | data core proto | `docs/backlog.md:6415` | Сенсорный фрегат: носитель радара — и сам радар |
-| TABS-GRID | ✅ | proto | `docs/backlog.md:6456` | Вкладки штаба героев и дерева технологий — сеткой, |
-| CORP-HUB | ✅ | proto | `docs/backlog.md:6477` | Хаб корпорации по макету: вкладки сеткой, «Штаб», «Битвы», |
-| UI-RES2 | ✅ | proto | `docs/backlog.md:6530` | Ресурс нигде не печатается словом — везде иконка и цвет. |
-| TT-4 | ✅ | proto | `docs/backlog.md:6566` | Вкладка технологий в матче — список ярусами вместо сетки. |
-| RANK-1 | ✅ | srv proto | `docs/backlog.md:6603` | Вкладка «Рейтинги» в хабе — с настоящим сервером. |
-| RETASK | ✅ | core | `docs/backlog.md:6650` | Флоту в пути можно дать новый «Курс». |
-| ORBIT-ORIGIN | ✅ | proto | `docs/backlog.md:6685` | Кольцо — картинка, отсчёт — от центра мира. |
-| RULES-5 | ✅ | core proto | `docs/backlog.md:6710` | Туман карты спрашивается у ядра, а не выводится |
-| RULES-4 | ✅ | core proto | `docs/backlog.md:6743` | Клиентские предикаты: решение — ядру, подача — |
-| RULES-3 | ✅ | core srv proto | `docs/backlog.md:6800` | Драйверы постоянных приказов спрашивают |
-| RULES-2 | ✅ | core data proto | `docs/backlog.md:6864` | Правила про контент стали данными. |
-| RULES-2.1 | ✅ | core proto | `docs/backlog.md:6909` | Довести maxPerPlanet > 1 до рабочего состояния. |
-| RULES-1 | ✅ | core proto | `docs/backlog.md:6932` | «Можно ли?» — один вопрос к одним правилам. |
-| SEC-16 | ✅ | core srv | `docs/backlog.md:6978` | Два сторожа под авто-мердж: правила, которые до сих пор |
-| SEC-41 | ✅ | sec ops | `docs/backlog.md:6998` | весь наш security-контур смотрит в репозиторий; на |
-| NETA2-0a | ✅ | srv | `docs/backlog.md:7057` | Начисление XP на reject-but-advanced: observeEndIfNeeded не |
-| NETA2-0b | ✅ | cli | `docs/backlog.md:7061` | Клиент ре-шлёт конверт и на EUNAVAILABLE (сервер откатывает |
-| NETA2-0c | ✅ | proto | `docs/backlog.md:7063` | playerOrder в net-матче на реконнекте отклоняет приказ с |
-| NETA2-0d | ✅ | srv | `docs/backlog.md:7065` | ping.clientTime требует Number.isFinite (как desync/perf). |
-| NETA2-1 | ✅ | srv cli | `docs/backlog.md:7066` | Прозрачные причины отказа хендшейка |
-| NETA2-2 | ✅ | proto | `docs/backlog.md:7076` | Бюджет реконнекта > окна reap'а сокета |
-| NETA2-3 | ✅ | srv | `docs/backlog.md:7083` | netserver не дублирует запись квитанций |
-| NETA2-4 | ✅ | srv cli | `docs/backlog.md:7089` | Единый источник wire-протокола — контракт объявлен ОДИН раз. |
-| NETA2-5 | ✅ | proto cli | `docs/backlog.md:7116` | Прототип использует outbox транспорта на |
-| NETA2-6 | ✅ | srv proto | `docs/backlog.md:7148` | Один оффлайн-шедулер |
-| NETA2-7 | ✅ | srv | `docs/backlog.md:7158` | Один джойн-хендшейк |
-| NETA2-8 | ✅ | srv | `docs/backlog.md:7167` | Единое apply-ядро |
-| NETA2-9 | ✅ | srv cli | `docs/backlog.md:7200` | Полировка протокола |
-| NETA2-10 | ✅ | srv | `docs/backlog.md:7211` | Восстановление seat-ticket под SEATLOCK |
-| NETA2-mon | ✅ | srv | `docs/backlog.md:7224` | Сигналы сбоев наружу + durable-логи |
-| REFP-1 | ✅ | proto | `docs/backlog.md:7245` | prototypeData.ts |
-| REFP-2 | ✅ | proto | `docs/backlog.md:7250` | map.ts |
-| REFP-3 | ✅ | proto | `docs/backlog.md:7253` | fleetStacks.ts |
-| REFP-4 | ✅ | proto | `docs/backlog.md:7256` | tax.ts |
-| REFP-5 | ✅ | proto | `docs/backlog.md:7259` | formations.ts |
-| REFP-6 | ✅ | proto | `docs/backlog.md:7263` | botFavour.ts |
-| REFP-7 | ✅ | proto | `docs/backlog.md:7266` | shuttle.ts |
-| REFP-8 | ✅ | proto | `docs/backlog.md:7271` | chain.ts |
-| REFP-9 | ✅ | proto | `docs/backlog.md:7274` | hunger.ts |
-| REFP-10 | ✅ | proto | `docs/backlog.md:7276` | fleetLaunch.ts |
-| REFP-11 | ✅ | proto | `docs/backlog.md:7283` | botDiplomacy.ts |
-| REFP-12 | ✅ | proto | `docs/backlog.md:7286` | sessionMarket.ts |
-| REFP-13 | 🗑 | proto | `docs/backlog.md:7289` | division.ts |
-| REFP-14 | ✅ | proto | `docs/backlog.md:7307` | capital.ts |
-| REFP-15 | ✅ | proto | `docs/backlog.md:7310` | standingOrders.ts |
-| REFP-16 | ✅ | proto | `docs/backlog.md:7313` | forcedMarch.ts |
-| REFP-17 | ✅ | proto | `docs/backlog.md:7316` | instantRepair.ts |
-| REFP-18 | ✅ | proto | `docs/backlog.md:7319` | econScrews.ts |
-| REFP-19 | ✅ | proto | `docs/backlog.md:7322` | economy.ts |
-| REFP-20 | ✅ | proto | `docs/backlog.md:7328` | matchSetup.ts |
-| REFP-21 | ✅ | proto | `docs/backlog.md:7339` | protoKernel.ts |
-| REFP-22 | ✅ | proto | `docs/backlog.md:7345` | actions.ts |
-| REFP-23 | ✅ | proto | `docs/backlog.md:7353` | patrol.ts |
-| REFP-24 | ✅ | proto | `docs/backlog.md:7360` | serverDrivers.ts |
-| REFP-25 | ✅ | proto | `docs/backlog.md:7375` | stewardGuard.ts |
-| REFP-26 | ✅ | proto | `docs/backlog.md:7382` | ai.ts |
-| REFP-27 | ✅ | proto | `docs/backlog.md:7389` | canTraverse |
-| REFP-28 | ✅ | proto | `docs/backlog.md:7393` | Финальная очистка |
-| REFM-0 | ✅ | proto | `docs/backlog.md:7422` | Страховка: typecheck прототипа в гейте. |
-| REFM-0.1 | ✅ | proto | `docs/backlog.md:7435` | ESLint для prototype/ |
-| REFM-1 | ✅ | proto | `docs/backlog.md:7454` | Инвентаризация main.ts |
-| REFM-2 | ✅ | proto | `docs/backlog.md:7560` | format.ts |
-| REFM-3 | ✅ | proto | `docs/backlog.md:7572` | icons.ts |
-| REFM-4 | ✅ | proto | `docs/backlog.md:7578` | dossiers.ts |
-| REFM-5 | ✅ | proto | `docs/backlog.md:7596` | arsenalScreen.ts |
-| REFM-6 | ✅ | proto | `docs/backlog.md:7617` | marketScreen.ts |
-| REFM-7 | ✅ | proto | `docs/backlog.md:7635` | stewardScreen.ts |
-| REFM-8 | 🗑 | proto | `docs/backlog.md:7656` | divisionDesigner.ts |
-| REFM-9 | ✅ | proto | `docs/backlog.md:7679` | techTree.ts |
-| REFM-10 | ✅ | proto | `docs/backlog.md:7700` | profileScreen.ts |
-| REFM-11 | ✅ | proto | `docs/backlog.md:7725` | corpScreen.ts |
-| REFM-12 | ✅ | proto | `docs/backlog.md:7745` | chatWindow.ts |
-| UI-RES | ✅ | proto | `docs/backlog.md:7783` | Единая семья иконок ресурсов + «сколько не хватает». |
-| REFM-13 | ✅ | proto | `docs/backlog.md:7801` | «Верфь» |
-| REFM-14 | ✅ | proto | `docs/backlog.md:7824` | «Штаб героев» |
-| REFM-15 | ✅ | proto | `docs/backlog.md:7850` | Конверсации |
-| REFM-16 | ✅ | proto | `docs/backlog.md:7870` | prefs.ts — клиентские настройки одним правилом. |
-| REFM-17 | ✅ | proto | `docs/backlog.md:7900` | sideColors.ts — цвет стороны: одна палитра, два |
-| REFM-18 | ✅ | proto | `docs/backlog.md:7940` | Выбор совета учёных |
-| REFM-19 | ✅ | proto | `docs/backlog.md:7961` | Сброс пароля |
-| REFM-20 | ✅ | proto | `docs/backlog.md:7984` | Экран итогов матча |
-| REFM-21 | ✅ | proto | `docs/backlog.md:8005` | Графические настройки |
-| REFM-22 | ✅ | proto | `docs/backlog.md:8024` | Оверлей настроек |
-| REFM-23 | ✅ | proto | `docs/backlog.md:8046` | Самообновление APK |
-| REFM-24 | ✅ | proto | `docs/backlog.md:8066` | Вьюпорт и звёздный фон |
-| REFM-25 | ✅ | proto | `docs/backlog.md:8088` | Витрина меток провинций |
-| REFM-26 | ✅ | proto | `docs/backlog.md:8111` | Соло-драйверы |
-| REFM-27 | ✅ | proto | `docs/backlog.md:8132` | Конец матча и награда |
-| REFM-28 | ✅ | proto | `docs/backlog.md:8153` | Окна краденой разведки |
-| REFM-29 | ✅ | proto | `docs/backlog.md:8173` | Политика оповещений и радарная память |
-| REFM-30 | ✅ | proto | `docs/backlog.md:8192` | Сравнение дипломатии снимков |
-| REFM-31 | ✅ | proto | `docs/backlog.md:8213` | Ход стройки |
-| REFM-32 | ✅ | proto | `docs/backlog.md:8233` | Клиентская очередь стройки |
-| REFM-33 | ✅ | proto | `docs/backlog.md:8254` | Геометрия ввода |
-| REFM-34 | ✅ | proto | `docs/backlog.md:8274` | Геометрия фигур карты |
-| REFM-35 | ✅ | proto | `docs/backlog.md:8293` | Кирпичики боковой панели |
-| REFM-36 | ✅ | proto | `docs/backlog.md:8315` | Конвейер стройки |
-| REFM-37 | ✅ | proto | `docs/backlog.md:8340` | Сводка армии |
-| REFM-38 | ✅ | proto | `docs/backlog.md:8366` | Сводка мира |
-| REFM-39 | ✅ | proto | `docs/backlog.md:8393` | Выбор карточки панели |
-| REFM-40 | ✅ | proto | `docs/backlog.md:8418` | Карточка флота: пулы и порог хромоты из одного места |
-| REFM-41 | ✅ | proto | `docs/backlog.md:8434` | Вкладки карточки мира |
-| REFM-42 | ✅ | proto | `docs/backlog.md:8457` | Плитка каталога и замок повторного заказа |
-| REFM-43 | ✅ | proto | `docs/backlog.md:8479` | Память разведки |
-| REFM-44 | ✅ | proto | `docs/backlog.md:8502` | Раскладка мест сетапа |
-| REFM-45 | ✅ | proto | `docs/backlog.md:8528` | Мини-карта экрана сетапа |
-| UI-BLD | ✅ | proto | `docs/backlog.md:8551` | Плитки зданий и ряд скорости на телефоне |
-| UI-BLD2 | ✅ | proto | `docs/backlog.md:8572` | Построенные здания — снова списком в столбик |
-| REFM-46 | ✅ | proto | `docs/backlog.md:8592` | Хранение сессии |
-| REFM-47 | ✅ | proto | `docs/backlog.md:8617` | Правила учётных данных и разбор ответов auth |
-| REFM-48 | ✅ | proto | `docs/backlog.md:8642` | Обмен сессии на место в матче |
-| REFM-49 | ✅ | proto | `docs/backlog.md:8671` | Выбор дома при входе в матч |
-| REFM-50 | ✅ | proto | `docs/backlog.md:8696` | Строка обозревателя матчей |
-| REFM-51 | ✅ | proto | `docs/backlog.md:8723` | Отложенный вход в матч |
-| REFM-52 | ✅ | proto | `docs/backlog.md:8747` | Форма регистрации и подсказка позывного |
-| REFM-53 | ✅ | proto | `docs/backlog.md:8777` | Зеркало опыта командующего |
-| REFM-54 | ✅ | proto | `docs/backlog.md:8795` | Припуск камеры под открытой панелью |
-| REFM-55 | ✅ | proto | `docs/backlog.md:8815` | Разбор нажатия на карту |
-| REFM-56 | ✅ | proto | `docs/backlog.md:8839` | Стартовый вид карты |
-| REFM-57 | ✅ | proto | `docs/backlog.md:8858` | Сборка окна войны |
-| REFM-58 | ✅ | proto | `docs/backlog.md:8884` | Очередь «штурм по прилёте» |
-| REFM-59 | ✅ | proto | `docs/backlog.md:8910` | Порядок подтверждения войны и марш по лейну |
-| REFM-60 | ✅ | proto | `docs/backlog.md:8931` | Решение о перепечке статического слоя |
-| REFM-61 | ✅ | proto | `docs/backlog.md:8953` | Семена политической карты и её рамка |
-| REFM-62 | ✅ | proto | `docs/backlog.md:8977` | Уровень видимости узла под туманом |
-| REFM-63 | ✅ | proto | `docs/backlog.md:8999` | Источники радарного покрытия |
-| REFM-64 | ✅ | proto | `docs/backlog.md:9021` | Приоритет тапа по карте |
-| REFM-65 | ✅ | proto | `docs/backlog.md:9043` | Выбор под тапом и перебор стопки |
-| REFM-66 | ✅ | proto | `docs/backlog.md:9071` | Точка плана: прицел и вид точки |
-| REFM-67 | ✅ | proto | `docs/backlog.md:9097` | Время в пути с форс-маршем |
-| REFM-68 | ✅ | proto | `docs/backlog.md:9119` | Способности героя-флагмана |
-| REFM-69 | ✅ | proto | `docs/backlog.md:9142` | Якорь DOM над точкой карты |
-| REFM-70 | ✅ | proto | `docs/backlog.md:9166` | Жизнь экранной вспышки |
-| REFM-71 | ✅ | proto | `docs/backlog.md:9193` | Раскладка плана на карте |
-| REFM-72 | ✅ | proto | `docs/backlog.md:9221` | Пульс метки и сонарные кольца |
-| REFM-73 | ✅ | proto | `docs/backlog.md:9251` | Отбор и группировка планов (◎-бейджи) |
-| REFM-74 | ✅ | proto | `docs/backlog.md:9278` | Политика брифинга возвращения |
-| REFM-75 | ✅ | proto | `docs/backlog.md:9301` | Размещение подсказок и политика удержания |
-| REFM-76 | ✅ | proto | `docs/backlog.md:9323` | Арифметика деления флота |
-| REFM-77 | ✅ | proto | `docs/backlog.md:9347` | Живые числа панели — свести к одной формуле |
-| REFM-78 | ✅ | proto | `docs/backlog.md:9368` | Доступность командных кнопок |
-| REFM-79 | ✅ | proto | `docs/backlog.md:9390` | Состояние полоски режима «Приказ» |
-| REFM-80 | ✅ | proto | `docs/backlog.md:9416` | Жизнь долгого нажатия |
-| REFM-81 | ✅ | proto | `docs/backlog.md:9436` | Источники ⇅-меню десанта |
-| REFM-82 | ✅ | proto | `docs/backlog.md:9463` | Досье под указателем |
-| REFM-83 | ✅ | proto | `docs/backlog.md:9499` | Подъём камеры из-под нижнего листа |
-| REFM-84 | ✅ | proto | `docs/backlog.md:9527` | Время жизни всплывающих меню командного ряда |
-| REFM-85 | ✅ | proto | `docs/backlog.md:9552` | Быстрый заказ стройки правым кликом |
-| REFM-86 | ✅ | proto | `docs/backlog.md:9589` | Видимость событий в журнале |
-| REFM-87 | ✅ | proto | `docs/backlog.md:9615` | Часы кадра: когда мир идёт и на сколько |
-| REFM-88 | ✅ | proto | `docs/backlog.md:9641` | Судьба вооружённого приказа при тапе |
-| REFM-89 | ✅ | proto | `docs/backlog.md:9663` | Пометки о долгах владельца |
-| REFM-90 | ✅ | proto | `docs/backlog.md:9691` | Условия кнопок ремонта |
-| REFM-91 | ✅ | proto | `docs/backlog.md:9715` | Предложения панели мира: столица и точка удержания |
-| REFM-92 | ✅ | proto | `docs/backlog.md:9737` | Предложение шпионажа на панели мира |
-| REFM-93 | ✅ | proto | `docs/backlog.md:9758` | Семантический зум карты: что растворяется на схеме |
-| REFM-94 | ✅ | proto | `docs/backlog.md:9792` | Геометрия орбитального кольца |
-| REFM-95 | ✅ | proto | `docs/backlog.md:9825` | Пунктирный маршрут идущего флота |
-| REFM-96 | ✅ | proto | `docs/backlog.md:9856` | Кто может стать радарной отметкой |
-| REFM-97 | ✅ | proto | `docs/backlog.md:9882` | Очередь часовой погрузки десанта |
-| REFM-98 | ✅ | proto | `docs/backlog.md:9906` | Постановка стоек: авто-штурм и дежурный вылет |
-| REFM-99 | ✅ | proto | `docs/backlog.md:9930` | Чем меряется прогресс первых целей ONB-7 |
-| REFM-100 | ✅ | proto | `docs/backlog.md:9951` | Когда приказ поднимает обучающую вставку ONB-3 |
-| REFM-101 | ✅ | proto | `docs/backlog.md:9968` | Как сообщение попадает в журнал матча |
-| REFM-102 | ✅ | proto | `docs/backlog.md:9989` | Что теряет силу, когда состояние сменилось |
-| REFM-103 | ✅ | proto | `docs/backlog.md:10006` | Видимость ФЛОТА под туманом |
-| REFM-104 | ✅ | proto | `docs/backlog.md:10024` | Когда песочница возвращает ресурсы за стройку |
-| REFM-105 | ✅ | proto | `docs/backlog.md:10046` | Всплывающее уведомление над картой |
-| REFM-106 | ✅ | proto | `docs/backlog.md:10063` | Какие миры обводятся при взведённом ШТУРМЕ |
-| REFM-107 | ✅ | proto | `docs/backlog.md:10086` | Догоняющее слияние флотов |
-| REFM-108 | ✅ | proto | `docs/backlog.md:10109` | Переход камеры к точке карты |
-| REFM-109 | ✅ | proto | `docs/backlog.md:10143` | Дальномер выбранного мира |
-| REFM-110 | ✅ | proto | `docs/backlog.md:10167` | Координатная сетка фона |
-| REFM-111 | ✅ | proto | `docs/backlog.md:10193` | Расписание баллистического залпа |
-| REFM-112 | ✅ | proto | `docs/backlog.md:10224` | Два тира зенитного огня |
-| REFM-113 | ✅ | proto | `docs/backlog.md:10257` | Послесвечение радарной развёртки |
-| REFM-114 | ✅ | proto | `docs/backlog.md:10294` | У каких узлов есть орбитальное кольцо |
-| REFM-115 | ✅ | proto | `docs/backlog.md:10318` | Из чего складывается эмблема флота |
-| REFM-116 | ✅ | proto | `docs/backlog.md:10324` | Читаемая вместимость трюмов флота. |
-| REFM-117 | ✅ | proto | `docs/backlog.md:10342` | Подпись узла на карте |
-| REFM-117.1 | ✅ | proto | `docs/backlog.md:10365` | Ветка «нет телеметрии» у подписи узла — МЁРТВЫЙ КОД. |
-| REFM-118 | ✅ | proto | `docs/backlog.md:10399` | Отметка боя на карте |
-| REFM-119 | ✅ | proto | `docs/backlog.md:10430` | Лучи радарной развёртки |
-| REFM-120 | ✅ | proto | `docs/backlog.md:10453` | Сводная граница видимости |
-| REFM-120.1 | ✅ | proto | `docs/backlog.md:10487` | Гейты «прозрачность > 0» и «толщина > 0» внутри тира — |
-| REFM-121 | ✅ | proto | `docs/backlog.md:10515` | Голографический бейдж типа провинции |
-| REFM-122 | ✅ | proto | `docs/backlog.md:10550` | Ряд значков построек под узлом |
-| REFM-123 | ✅ | proto | `docs/backlog.md:10581` | Дальность артиллерии рисовалась ДВАЖДЫ |
-| REFM-124 | ✅ | proto | `docs/backlog.md:10611` | Вспышка захвата строила клетку СВОЕЙ копией формул мозаики |
-| REFM-125 | ✅ | proto | `docs/backlog.md:10635` | Прицельное превью ловило узел СВОЕЙ копией радиуса захвата |
-| REFM-126 | ✅ | proto | `docs/backlog.md:10660` | Тап по мини-карте расстановки |
-| REFM-126.1 | ✅ | proto | `docs/backlog.md:10686` | Окно выбора совета учёных перекрывает мини-карту |
-| REFM-127 | ✅ | proto | `docs/backlog.md:10719` | Сеть путей большой карты рисовалась своим циклом |
-| REFM-128 | ✅ | proto | `docs/backlog.md:10741` | Точка на трассе под пальцем считалась своей геометрией |
-| REFM-129 | ✅ | proto | `docs/backlog.md:10767` | Модификаторы постера считались дважды, разными числами |
-| REFM-130 | ✅ | proto | `docs/backlog.md:10794` | Форма дуги осадного залпа считалась в кадровом цикле |
-| REFM-131 | ✅ | proto | `docs/backlog.md:10818` | У карты была СВОЯ КОПИЯ долгого нажатия |
-| REFM-132 | ✅ | proto | `docs/backlog.md:10846` | Перевод «дальность карты → пиксели» существовал в ПЯТИ |
-| REFM-133 | ✅ | proto | `docs/backlog.md:10877` | Поправки посадки применяла только ОДНА из двух коробок над |
-| REFM-134 | ✅ | proto | `docs/backlog.md:10903` | Обратный перевод «страница → холст» жил двумя копиями в |
-| REFM-135 | ✅ | proto | `docs/backlog.md:10924` | Панель и обработчики по-разному понимали, что такое |
-| REFM-136 | ✅ | proto | `docs/backlog.md:10952` | Перевод игрового времени в часы стоял ЧЕТЫРЬМЯ выражениями |
-| REFM-137 | ✅ | proto | `docs/backlog.md:10976` | «Дыхание» живых слоёв фазировалось четырьмя способами, и |
-| REFM-138 | ✅ | proto | `docs/backlog.md:11002` | Право вкладки хаба ходить в сеть стояло ПЯТЬЮ байт-в-байт |
-| REFM-139 | ✅ | proto | `docs/backlog.md:11024` | Разбор дипломатического клика стоял ДВАЖДЫ |
-| REFM-140 | ✅ | proto | `docs/backlog.md:11048` | Развилка «пустить в матч или послать на вход» стояла тремя |
-| REFM-141 | ✅ | proto | `docs/backlog.md:11072` | Связка приказов штурма была выписана дважды |
-| REFM-142 | ✅ | proto | `docs/backlog.md:11090` | Адрес дозвона в матч собирался прямо в connect() |
-| REFM-143 | ✅ | proto | `docs/backlog.md:11114` | Жизнь сетевого сокета разбиралась прямо в обработчиках |
-| REFM-144 | ✅ | proto | `docs/backlog.md:11138` | Приветственный снимок разбирался внутри connect() |
-| REFM-145 | ✅ | proto | `docs/backlog.md:11172` | Политика цикла переподключения стояла внутри |
-| REFM-146 | ✅ | proto | `docs/backlog.md:11204` | Разбор входящего снимка стоял хвостом внутри onSnapshot |
-| REFM-147 | ✅ | proto | `docs/backlog.md:11227` | Маршрут исходящего приказа стоял тремя ветвями внутри |
-| REFM-148 | ✅ | proto | `docs/backlog.md:11253` | Разбор ретранслированной строки ленты стоял двумя копиями |
-| REFM-149 | ✅ | proto | `docs/backlog.md:11277` | Развилка «куда показать отказ сервера» стояла лесенкой if-ов |
-| REFM-150 | ✅ | proto | `docs/backlog.md:11304` | Адреса запросов к серверу матчей собирались строкой в четырёх |
-| REFM-151 | ✅ | proto | `docs/backlog.md:11330` | «Что показать вместо списка матчей» стояло тремя вложенными |
-| REFM-152 | ✅ | proto | `docs/backlog.md:11364` | Что значит выбор места и во что превращается «Играть» |
-| REFM-153 | ✅ | proto | `docs/backlog.md:11386` | Когда переопрашивать список матчей и что писать в строку |
-| REFM-154 | ✅ | proto | `docs/backlog.md:11416` | Как клиент узнаёт, чем на этом сервере является позывной |
-| REFM-155 | ✅ | proto | `docs/backlog.md:11440` | Что окно выбора места показывает вместо списка домов |
-| REFM-156 | ✅ | proto | `docs/backlog.md:11469` | Что клиент кладёт в запрос к /auth и какой ответ считает |
-| REFM-157 | ✅ | proto | `docs/backlog.md:11498` | Чем кончается «в архив» / «вернуть» и что игрок при этом |
-| REFM-158 | ✅ | proto | `docs/backlog.md:11525` | Режим огня артиллерии |
-| REFM-159 | ✅ | proto | `docs/backlog.md:11554` | Жизнь и разметка окна «Разделить» |
-| REFM-160 | ✅ | proto | `docs/backlog.md:11576` | выносы по карте REFM-1, один кирпич = одна секция = один |
-| REFM-161 | ✅ | proto | `docs/backlog.md:11601` | Просьба выслать ссылку для сброса пароля |
-| REFM-162 | ✅ | proto | `docs/backlog.md:11635` | Как из набранного игроком получается адрес сервера |
-| REFM-163 | ✅ | proto | `docs/backlog.md:11665` | Что значит выделить флот и как выделение меняется по |
-| REFM-164 | ✅ | proto | `docs/backlog.md:11701` | Какие флоты попадают под тап по карте и в каком порядке |
-| REFM-165 | ✅ | proto | `docs/backlog.md:11725` | Что значит приказ «слить флоты» |
-| REFM-166 | ✅ | proto | `docs/backlog.md:11758` | Что происходит с выделением, когда тап выбрал объект |
-| REFM-167 | ✅ | proto | `docs/backlog.md:11777` | Что значит «штурмовать» для каждого флота группы |
-| REFM-168 | ✅ | proto | `docs/backlog.md:11798` | Что написано в запросе «объявить войну?» и что на его |
-| REFM-169 | ✅ | proto | `docs/backlog.md:11823` | «тревога „враг у ваших рубежей“: когда звенит и что говорит» |
-| REFM-170 | ✅ | proto | `docs/backlog.md:11854` | «сколько шума даёт флот и как далеко слышит мир» |
-| REFM-171 | ✅ | proto | `docs/backlog.md:11883` | «с каким запасом крыло встаёт на дежурство и что от него |
-| REFM-172 | ✅ | proto | `docs/backlog.md:11913` | «когда очередь мира пускает следующий заказ и когда сборный |
-| REFM-173 | ✅ | proto | `docs/backlog.md:11946` | «когда меню десанта открывается и чьи числа в него попадают» |
-| REFM-174 | ✅ | proto | `docs/backlog.md:11974` | «что игрок узнаёт о дипломатии и куда это попадает» |
-| REFM-175 | ✅ | proto | `docs/backlog.md:12002` | «что стройка сообщает игроку» (prototype/src/buildLog.ts + |
-| REFM-176 | ✅ | proto | `docs/backlog.md:12030` | «что „Хранитель“ сообщает при постановке, снятии и возврате |
-| REFM-177 | ✅ | proto | `docs/backlog.md:12058` | «шпионаж: кому адресовано событие и что оно говорит» |
-| REFM-178 | ✅ | proto | `docs/backlog.md:12083` | «куда рисовать вспышку залпа и сколько вспышек держать» |
-| REFM-179 | ✅ | proto | `docs/backlog.md:12106` | «что игрок узнаёт о бое» (prototype/src/battleLog.ts + |
-| REFM-180 | ✅ | proto | `docs/backlog.md:12130` | «военный счёт и ведомость потерь» (prototype/src/warTally.ts |
-| REFM-181 | ✅ | proto | `docs/backlog.md:12166` | «кому есть дело до флотских новостей» |
-| REFM-182 | ✅ | proto | `docs/backlog.md:12201` | «кому адресована дипломатия в СОЛО» |
-| REFM-183 | ✅ | proto | `docs/backlog.md:12238` | «подача списка первых целей и награда за него» |
-| REFM-184 | ✅ | proto | `docs/backlog.md:12266` | «что игрок узнаёт о приобретениях: мир и открытие» |
-| REFM-185 | ✅ | proto | `docs/backlog.md:12302` | «какие команды появляются в ряду, а какие просто гаснут» |
-| REFM-186 | ✅ | proto | `docs/backlog.md:12338` | «какая кнопка ряда горит и почему» |
-| REFM-187 | ✅ | proto | `docs/backlog.md:12368` | «кого можно взять целью взведённого приказа» |
-| REFM-188 | ✅ | proto | `docs/backlog.md:12402` | «когда лист перестраивается и что при этом нельзя потерять» |
-| REFM-189 | ✅ | proto | `docs/backlog.md:12430` | «кого зовут значки внимания и куда ложится цифра» |
-| REFM-190 | ✅ | proto | `docs/backlog.md:12459` | «как число на фишке ресурса говорит правду» |
-| REFM-191 | ✅ | proto | `docs/backlog.md:12490` | «живое положение игрока в верхней строке» |
-| REFM-192 | ✅ | proto | `docs/backlog.md:12526` | «служебное наложение: FPS, задержка и десинк» |
-| REFM-193 | ✅ | proto | `docs/backlog.md:12562` | «чем кадр даёт выйти из матча и начать заново» |
-| REFM-194 | ✅ | proto | `docs/backlog.md:12594` | «как часто живёт открытое окно и почему сроки разные» |
-| REFM-195 | ✅ | proto | `docs/backlog.md:12631` | «что гаснет от СОСЕДНЕЙ команды ряда» |
-| REFM-196 | ✅ | proto | `docs/backlog.md:12668` | «превью взведённого „Хода“: куда идёт линия и что она обещает» |
-| REFM-197 | ✅ | proto | `docs/backlog.md:12708` | «что карточка флота признаёт о его состоянии» |
-| REFM-198 | ✅ | proto | `docs/backlog.md:12744` | «что ЗНАЧИТ нажатие „Назад“» |
-| REFM-199 | ✅ | proto | `docs/backlog.md:12787` | «что означает ЕДУЩИЙ палец» |
-| REFM-200 | ✅ | proto | `docs/backlog.md:12838` | «что карточка пришвартованного флота ПРЕДЛАГАЕТ сделать» |
-| REFM-201 | ✅ | proto | `docs/backlog.md:12882` | «чей сейчас ход в переговорах» |
-| REFM-202 | ✅ | proto | `docs/backlog.md:12927` | «как подписано место в списке» + починка того, что подпись |
-| MIG-1 | ✅ | cli proto | `docs/backlog.md:13015` | Вход в сетевой матч переехал в /decisions. |
-| MIG-2 | ✅ | cli srv | `docs/backlog.md:13031` | Клиент ПОТРЕБЛЯЕТ переехавшее: вход, обзор, место, отказы. |
-| MIG-3 | ✅ | cli | `docs/backlog.md:13069` | HUD-модели наконец РИСУЮТСЯ, и интентов стало три. |
-| MIG-4 | ✅ | cli proto | `docs/backlog.md:13109` | Цепочка «приказ выделенному флоту» переехала в /decisions. |
-| MIG-5 | ✅ | cli proto | `docs/backlog.md:13133` | ВСЕ строители приказов переехали в /decisions — и клиент бросил свои копии. |
-| MIG-6 | ✅ | cli proto | `docs/backlog.md:13164` | Словарь ЖЕСТОВ переехал в /decisions — третья, последняя недостающая половина. |
-| MIG-7 | ✅ | cli | `docs/backlog.md:13203` | КНОПКИ: панель состава наконец отдаёт приказы, интентов стало семь. |
-| MIG-8 | ✅ | cli core | `docs/backlog.md:13243` | ПАНЕЛЬ МИРА: тап по миру перестал уходить в пустоту, интентов девять. |
-| MIG-9 | ✅ | cli | `docs/backlog.md:13274` | ДЕЛЕНИЕ и СЛИЯНИЕ флотов: интентов одиннадцать. |
-| MIG-10 | ✅ | cli proto | `docs/backlog.md:13303` | Ворота стройки: зеркало заменено решением. |
-| AUD-1 | ✅ | cli | `docs/backlog.md:13347` | клиент собирал 11 фрагментов из 18. |
-| AUD-2 | ✅ | srv core | `docs/backlog.md:13367` | фог-роутинг событий не покрыт тестом. |
-| AUD-11 | ✅ | core | `docs/backlog.md:13396` | effect.applied всегда называет адресата. |
-| AUD-15 | ✅ | srv | `docs/backlog.md:13428` | сканер фог-контракта больше не слеп к комментариям. |
-| AUD-3 | ✅ | data | `docs/backlog.md:13451` | 28 непереводимых имён игровых данных вычищены. |
-| AUD-4 | ✅ | proto | `docs/backlog.md:13482` | гейт локализации увидел шипнутый контент. |
-| AUD-14 | ✅ | proto | `docs/backlog.md:13514` | имена домов доезжают до игрока переводом. |
-| AUD-12 | ✅ | proto | `docs/backlog.md:13536` | шапка досье героя больше не показывает игроку сам ключ. |
-| AUD-13 | ✅ | core proto | `docs/backlog.md:13552` | hero.name — отображаемый текст, вшитый в |
-| AUD-5 | ✅ | core | `docs/backlog.md:13596` | экспортирован runUntil(kernel, state, ctx, opts?). |
-| AUD-6 | ✅ | core | `docs/backlog.md:13611` | actionPayloadSchemas и CLIENTACTIONTYPES публичны. |
-| AUD-7 | ✅ | proto | `docs/backlog.md:13619` | SELFPLAYJSON отдаёт всё, что печатает человеку. |
-| AUD-8 | 🗑 | proto | `docs/backlog.md:13627` | сведён в CONV-12 |
-| AUD-9 | ✅ | sec | `docs/backlog.md:13635` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
-| AUD-10 | ✅ | sec | `docs/backlog.md:13663` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
-| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13806` | Отбор при делении адресует СТЕК, а не тип корабля. |
-| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13816` | Десант делится вместе с кораблями, по трюму обеих половин. |
-| AIDIFF-1 | ✅ | proto | `docs/backlog.md:13844` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ✅ | proto | `docs/backlog.md:13998` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ✅ | proto | `docs/backlog.md:14025` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ✅ | srv | `docs/backlog.md:14042` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:14062` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:14080` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:14115` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:14257` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:14295` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:14317` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:14332` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:14352` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:14392` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:14418` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:14434` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14460` | Реалистичные портреты в постройке и описаниях, |
-| HEROART-1 | ✅ | proto cli | `docs/backlog.md:14472` | Портреты, досье и читаемый счёт флота |
-| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14582` | Корабли строит ВЕРФЬ, челноки — |
-| YARD-2 | ✅ | data | `docs/backlog.md:14616` | У верфи два яруса: дешёвый строит, дорогой |
-| CMB-7 | ✅ | core | `docs/backlog.md:14640` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:14661` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:14693` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:14741` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:14764` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:14795` | Орбитальный слой объявлен в |
-| ORB-4 | ✅ | core data proto | `docs/backlog.md:14831` | в астероидном поле строилось всё, что угодно: |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14872` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14900` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14937` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14967` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14987` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:15011` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:15021` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15246` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:15258` | Ускорение движения раскрытой голографической карты и подготовка |
-| PERK-0.1 | ✅ | docs | `docs/backlog.md:15284` | Резолюция владельца: два класса бонусов + третья группа |
-| PERK-1.1 | ✅ | core | `docs/backlog.md:15303` | Три группы вместо одной цепочки. |
-| PERK-1.2 | ⏳ | data proto | `docs/backlog.md:15337` | Перевести массовые перки в параллельную |
-| PERK-2.1 | ✅ | core | `docs/backlog.md:15347` | Снижение урона: один пул, одна форма, один кап. |
-| PERK-3.1 | ⏳ | core data | `docs/backlog.md:15390` | Кто и за что выдаёт последовательные множители. |
-| PERK-3.2 | 🔒 | core | `docs/backlog.md:15410` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
-| OBJP-1 | ✅ | proto | `docs/backlog.md:15425` | Значок боя наконец открывает окно, а окно даёт |
-| OBJP-2 | ✅ | proto | `docs/backlog.md:15451` | Подробности объекта встают РЯДОМ с карточкой, а не |
-| OBJP-3 | ✅ | proto | `docs/backlog.md:15463` | Каталог юнитов уехал в окно производства — туда же, |
-| CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15481` | Кнопка штурма появляется только когда есть кем |
-| EVT-1 | ✅ | core data proto | `docs/backlog.md:15511` | Тёмные события наконец видны игроку, |
-| EVT-2 | ⏳ | core data | `docs/backlog.md:15561` | Трофеи за бой: доля от стоимости уничтоженного. |
-| EVT-3 | 🔒 | core data | `docs/backlog.md:15585` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
-| RETR-1 | ⏳ | core | `docs/backlog.md:15629` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
-| RETR-2 | 🔒 | core srv proto | `docs/backlog.md:15642` | (RETR-1) Авто-отступление: условие выхода из боя |
-| TXT-0.1 | ✅ | docs | `docs/backlog.md:15740` | Канон формулировок: записать правило и эталон, пока чистка не |
-| TXT-1 | ⏳ | proto | `docs/backlog.md:15777` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
-| TXT-2 | ⏳ | proto | `docs/backlog.md:15790` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |
-| TXT-3 | ⏳ | proto | `docs/backlog.md:15801` | Тавтологии и дубли в досье — чистая вырезка, самый дешёвый |
-| TXT-4 | ⏳ | proto | `docs/backlog.md:15816` | Герои: описание способности не называет величину — 10 из |
-| TXT-5 | ⏳ | proto | `docs/backlog.md:15833` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
-| TXT-6 | ⏳ | proto | `docs/backlog.md:15847` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
-| TXT-7 | 🔒 | proto docs | `docs/backlog.md:15856` | Сторож в гейте: чтобы вода не вернулась. |
+| HERO-AURA-R | ⏳ | data core | `docs/backlog.md:1382` | Радиус ауры: начать маленьким и растить навыком |
+| SHIP-1 | ✅ | proto | `docs/backlog.md:1422` | Модель: prototype/src/ships.ts — корпуса (SHIPHULLS: cruiser 3 · |
+| SHIP-2 | ✅ | proto | `docs/backlog.md:1426` | →♻ UI «Верфь». Первая версия — pre-match вкладка в setup — была |
+| CON-1 | ✅ | proto | `docs/backlog.md:1429` | Единый таб-конструктор «Верфь» |
+| CON-2 | ✅ | proto | `docs/backlog.md:1437` | Эскадрильи |
+| CON-3 | 🗑 | proto | `docs/backlog.md:1440` | Армия |
+| CON-4 | ✅ | proto | `docs/backlog.md:1447` | Герои |
+| CON-5 | ✅ | proto | `docs/backlog.md:1450` | Мобильная адаптация «Верфи» |
+| SHIP-3 | ✅ | core | `docs/backlog.md:1455` | Эффекты живые: util/loadout.ts (effectiveStats) читается боем |
+| SHIP-4 | ✅ | core | `docs/backlog.md:1459` | Обобщён фиттинг-движок: один генерик инсталл-гейт |
+| SHIP-5 | 🔒 | srv | `docs/backlog.md:1469` | предметы мета-экономики |
+| SHIP-6 | ✅ |  | `docs/backlog.md:1471` | Типизированные слоты: корпуса в data/units.json несут |
+| NETP0-1 | ✅ | proto | `docs/backlog.md:1484` | (PR #128) Порог победы в сети: netserver не передаёт config в |
+| NETP0-2 | ✅ | proto | `docs/backlog.md:1487` | (PR #128) Совет учёных для p2: DEFAULTSETUP помечает p2 как AI и |
+| NETP0-3 | ✅ | cli proto | `docs/backlog.md:1491` | (PR #128) Доменные события по сети: сервер уже шлёт |
+| NETP0-4 | ✅ | proto srv cli | `docs/backlog.md:1495` | Сетевой чат: relay по образцу ally-пингов — |
+| NETP0-5 | ✅ | proto | `docs/backlog.md:1499` | Переговоры между людьми: consent-офферы в прототипной |
+| NETP0-6 | ✅ | proto | `docs/backlog.md:1507` | (PR #128) EN-локализация свежих окон: steward («Хранитель») и |
+| ONB-0 | ✅ | proto | `docs/backlog.md:1520` | Флаг первого запуска + воронка. |
+| ONB-1 | ✅ | proto | `docs/backlog.md:1526` | Движок гайд-марок (spotlight). |
+| ONB-2 | ✅ | proto | `docs/backlog.md:1542` | Гайдовый первый матч. |
+| ONB-3 | ✅ | proto | `docs/backlog.md:1549` | Just-in-time интро механик. |
+| ONB-4 | ✅ | proto | `docs/backlog.md:1563` | Help/кодекс-хаб («?» везде). |
+| ONB-5 | 🔶 | proto srv | `docs/backlog.md:1568` | Async-модель + дневной дайджест. |
+| ONB-6 | ✅ | core proto | `docs/backlog.md:1580` | Combat-preview. |
+| ONB-7 | ✅ | proto | `docs/backlog.md:1591` | Цели первой сессии. |
+| ONB-8 | ✅ | proto | `docs/backlog.md:1595` | Онбординг в соц/мета-слой (корпорации/AvA) — ONB-3-механизмом, |
+| ONB-9 | ✅ | proto | `docs/backlog.md:1599` | Состав мира — списком, у групп есть описание по удержанию |
+| ONB-10 | ✅ | proto | `docs/backlog.md:1624` | Обучение показывало в пустоту: «постройте корабль» — а нажимать |
+| ONB-11 | ✅ | proto | `docs/backlog.md:1659` | Обучение не объясняло, КАК смотреть на мир. |
+| ST-3.1 | ✅ | core | `docs/backlog.md:1692` | Доля потерь по прогнозу + трипваер «враг близко». |
+| ST-3.2 | ✅ | srv proto | `docs/backlog.md:1702` | Эвакуация под угрозой (поза defend). |
+| THREAT-HUD | ✅ | proto | `docs/backlog.md:1711` | «Враг у ваших рубежей» живому игроку. |
+| ST-3.4 | ✅ | srv proto | `docs/backlog.md:1715` | Анти-шаттл гистерезис. |
+| ST-2.4 | ✅ | core srv cli | `docs/backlog.md:1719` | SITREP — журнал решений + утренний рапорт. |
+| ST-3.3 | ✅ | core srv proto | `docs/backlog.md:1726` | Поза «Активная оборона». |
+| ST-2.1 | ✅ | core srv proto | `docs/backlog.md:1733` | Guard-режим: точки удержания. |
+| ST-4 | ✅ | proto | `docs/backlog.md:1743` | Окно «Хранителя» не закрывается по Back/Escape. |
+| SES-2.1 | ✅ | srv proto | `docs/backlog.md:1764` | Автостарт сессий — мир живёт с создания. |
+| SES-2.2 | ✅ | srv | `docs/backlog.md:1773` | ИИ-заместитель после 3 РЕАЛЬНЫХ дней отсутствия. |
+| SES-2.3 | ✅ | srv | `docs/backlog.md:1786` | Окно входа 4 реальных дня. |
+| SES-2.4 | ✅ | proto | `docs/backlog.md:1801` | Лента сессий в главном меню. |
+| SES-2.5 | ✅ | srv proto | `docs/backlog.md:1812` | Регистрация/логин на игровом пути. |
+| SES-2.6 | ✅ | srv ops | `docs/backlog.md:1830` | Плейтест-цикл ×24 — полный цикл живьём. |
+| BRW-0 | ✅ | srv proto | `docs/backlog.md:1868` | Разные сессии — предпосылка ВСЕХ трёх фильтров. |
+| BRW-1 | ✅ | srv | `docs/backlog.md:1938` | Режим в read-model. |
+| BRW-2 | ✅ | proto | `docs/backlog.md:1954` | Чистый модуль фильтрации matchFilter.ts (без UI). |
+| BRW-3 | ✅ | proto | `docs/backlog.md:1970` | Панель фильтров над списком «Доступные». |
+| BRW-4 | ✅ | proto | `docs/backlog.md:1996` | Режим на карточке. |
+| ENTRY-1 | ✅ | srv | `docs/backlog.md:2036` | join в боевом сервере теряет slot и faction — молча. |
+| ENTRY-2 | ✅ | proto | `docs/backlog.md:2055` | Экран сетевого входа по образцу «Настройки схватки». |
+| ENTRY-3 | ✅ | srv | `docs/backlog.md:2079` | Совет учёных доезжает до сетевого матча. |
+| ENTRY-4 | ✅ | proto | `docs/backlog.md:2101` | Строка «Совет учёных» на экране сетевого входа. |
+| ADDR-1 | ✅ | srv | `docs/backlog.md:2132` | Партия как сущность, а не комната из MATCHES=N. |
+| ADDR-2 | ✅ | srv proto | `docs/backlog.md:2174` | Развести адрес партии и приглашение. |
+| ADDR-3 | ✅ | proto srv | `docs/backlog.md:2209` | Путь вместо параметра. |
+| ADDR-4 | ✅ | proto | `docs/backlog.md:2243` | «Мои партии» в хабе. |
+| ADDR-5 | ✅ | proto | `docs/backlog.md:2281` | Чужой или неизвестный id сессии не должен давать пустой экран. |
+| ADDR-6 | ✅ | srv proto | `docs/backlog.md:2308` | GET /matches/:id/seats отдаёт расклад партии кому угодно (IDOR, A01). |
+| OPS-1 | ✅ | ops | `docs/backlog.md:2342` | update-dev.sh генерируется установщиком, поэтому не может обновить сам себя. |
+| ADM-0 | ✅ | srv | `docs/backlog.md:2390` | Лобби целиком регистрируется с одного адреса. |
+| ADM-1 | ✅ | srv core proto | `docs/backlog.md:2402` | Кик: названная власть над ЗАКРЕПЛЁННЫМ местом. |
+| ADM-2 | ✅ | srv core | `docs/backlog.md:2423` | Кресло, сменившее владельца, несёт поколение. |
+| ADM-3 | ✅ | core | `docs/backlog.md:2436` | Крыло эскадрильи: чистый состав и одна координата. |
+| ADM-4 | ✅ | proto | `docs/backlog.md:2456` | Песочница: открыть все технологии одной кнопкой. |
+| CONV-1 | ✅ | proto | `docs/backlog.md:2543` | Мгновенный ремонт и форс-марш: копии удаляются, ядро включается. |
+| CONV-2 | ✅ | proto | `docs/backlog.md:2578` | Доковый ремонт (econScrews → fleetRepair). |
+| CONV-3 | ✅ | proto | `docs/backlog.md:2600` | Гражданский налог. |
+| CONV-4 | ✅ | proto | `docs/backlog.md:2624` | Столица (capital.designate). |
+| CONV-5 | ✅ | core proto | `docs/backlog.md:2648` | Слоты совета учёных: прототип начинает грузить scientistModule. |
+| CONV-6 | ✅ | proto | `docs/backlog.md:2682` | Хелперы крыла (src/shuttle.ts → state/shuttle.ts). |
+| CONV-7 | ✅ | proto | `docs/backlog.md:2722` | Постоянные приказы. |
+| CONV-8 | ✅ | proto | `docs/backlog.md:2758` | Операции с флотом (fleetLaunch → fleetOps). |
+| CONV-10 | ✅ | core | `docs/backlog.md:2800` | Авто-сбора построенного нет в каноне — это пробел, а не дубль. |
+| CONV-9 | ✅ | core proto | `docs/backlog.md:2836` | Рынок — единственный кирпич, где сводить придётся В ЯДРО. |
+| CONV-11 | ✅ | proto data | `docs/backlog.md:2886` | Дрейф двух каталогов контента ничем не остановлен. |
+| CONV-12 | ✅ | proto data | `docs/backlog.md:2936` | Свести контент к одному каталогу. |
+| CORE-PARITY | ✅ | srv | `docs/backlog.md:3071` | Канон не грузил четыре модуля, которые прототип грузил — |
+| CONV-13 | ✅ | docs | `docs/backlog.md:3099` | Статус кирпича врал, и проверить это было нечем. |
+| CONV-14 | ✅ | docs | `docs/backlog.md:3124` | Та же гниль в роадмапах — и её оказалось вдвое больше, чем видел |
+| CONV-15 | ✅ | data | `docs/backlog.md:3161` | Дефолт схемы молча менял правила: в шипнутом каталоге флот |
+| CONV-16 | ✅ | proto | `docs/backlog.md:3189` | Три технологии прототипа не может открыть никто. |
+| CONV-17 | ✅ | data | `docs/backlog.md:3224` | В каноническом каталоге лежала готовая проза вместо ключа — |
+| CONV-18 | ✅ | docs | `docs/backlog.md:3257` | Эталон приёмки протух, и на него ссылались два кирпича. |
+| AI-BAL-1 | ✅ | proto | `docs/backlog.md:3299` | Бот исследует технологии + харнес их видит. |
+| AI-BAL-2 | ✅ | proto | `docs/backlog.md:3326` | Бот строит оборону и держит миры. |
+| AI-BAL-3 | ✅ | proto | `docs/backlog.md:3356` | Наземная армия и десант. |
+| AI-BAL-4 | ✅ | proto | `docs/backlog.md:3402` | Эскадрильи, артиллерия, герой. |
+| AI-BAL-6 | ✅ | proto | `docs/backlog.md:3440` | Сессия фиксированной длины вместо гонки к порогу очков |
+| AI-BAL-5 | ✅ | proto | `docs/backlog.md:3475` | Разброс между сидами — прибор НЕ ДАВАЛ статистики. |
+| AI-BAL-7 | ✅ | proto | `docs/backlog.md:3507` | Бот умеет проигрывать бой. |
+| AI-BAL-8 | ✅ | proto core | `docs/backlog.md:3568` | Герой вошёл в измерение. |
+| AI-BAL-9 | ✅ | proto | `docs/backlog.md:3617` | Рынок ожил в обе стороны. |
+| AI-BAL-10 | ✅ | proto core | `docs/backlog.md:3661` | Отчёт смешивал три вида «мёртвого» — теперь называет каждый. |
+| AI-BAL-11 | ✅ | proto | `docs/backlog.md:3725` | Отступление не удешевило размен — выигрыш кто-то съедает. |
+| AI-BAL-12 | ✅ | proto | `docs/backlog.md:3769` | Две фракции из четырёх вне измерения. |
+| CORE-DMG-1 | ✅ | core | `docs/backlog.md:3788` | Все каналы урона идут через хук combat.damage. |
+| CORE-DMG-2 | ✅ | core | `docs/backlog.md:3827` | Пропустить хук combat.damage всё ещё МОЖНО — примитив урона |
+| CORE-DMG-3 | ⏳ | core | `docs/backlog.md:3872` | Ауры и пассивы героя не доходят до неближнего боя — асимметрия, |
+| AI-BAL-13 | ✅ | proto | `docs/backlog.md:3891` | Бот не знает правила «один герой на флот» — и от этого стоит |
+| AI-BAL-1.1 | ✅ | proto | `docs/backlog.md:3945` | Тест-боты отделены от игровых. |
+| BAL-1 | ✅ | proto | `docs/backlog.md:3985` | Стартовые позиции больше не решают матч — карта-«колесо». |
+| BAL-2 | ✅ | proto data | `docs/backlog.md:4018` | Фракции: перекос есть, но ВДВОЕ МЕНЬШЕ и в другую сторону. |
+| BAL-3 | 🔶 | proto data | `docs/backlog.md:4057` | Кредиты, энергия и еда — декорации, а не ресурсы. |
+| BAL-4 | ✅ | core proto | `docs/backlog.md:4102` | Захват прилётом обесценивает армию. |
+| BAL-5 | ✅ | proto core | `docs/backlog.md:4140` | Снежный ком: 71–75%, камбэк есть у каждого четвёртого. |
+| BAL-10 | ✅ | proto data core | `docs/backlog.md:4184` | Восемь дней сессии ничего не решают — что с этим |
+| BAL-11 | ✅ | proto data | `docs/backlog.md:4212` | Скорость флота — сильнейший пассив, а «сбалансированный» |
+| BAL-6 | 🔶 | proto data | `docs/backlog.md:4263` | Дерево технологий не даёт выбора — но причина НЕ цена. |
+| BAL-7 | ⏳ | proto data | `docs/backlog.md:4303` | У heavyinfantry нет ниши. |
+| BAL-8 | ✅ | proto data | `docs/backlog.md:4310` | Типы планет вернулись на карту — но только косметически. |
+| BAL-9 | ✅ | proto | `docs/backlog.md:4349` | Карта была честной ценой того, что стала плоской. |
+| BAL-12 | ✅ | proto | `docs/backlog.md:4402` | Прибор не достаёт до слоя hasscientist — ни один такой узел |
+| BAL-13 | ✅ | proto data | `docs/backlog.md:4456` | Достроить ростер учёных: три ветки из пяти без |
+| BAL-14 | ✅ | proto | `docs/backlog.md:4512` | Бот исследует псевдоузлы мета-прокачки — и получает даром то, |
+| BAL-15 | ✅ | core | `docs/backlog.md:4579` | Бот не исследует НИЧЕГО: запрет грант-узлов поставлен в |
+| PC-UI | ✅ | proto | `docs/backlog.md:4631` | Десктоп-полировка правой панели (consolidation, ветка |
+| PERF-2 | ✅ |  | `docs/backlog.md:4655` | Оптимизационный проход по shared-core (3-линзовый агент-ревью: горячие пути |
+| PERF-1 | ✅ |  | `docs/backlog.md:4670` | Сведено и проверено |
+| WIKI-1 | ✅ | docs | `docs/backlog.md:4675` | найти, в каком из 98 доков искать правило про X, можно только |
+| SEC-0 | ✅ |  | `docs/backlog.md:4741` | Базовый DevSecOps-пайплайн: SAST (Semgrep) + SCA (pnpm audit + osv-scanner) |
+| SEC-1 | ✅ |  | `docs/backlog.md:4744` | Триаж + baseline: находок — ноль (Gitleaks v8.18.4 локально + pnpm audit + |
+| SEC-2 | ✅ |  | `docs/backlog.md:4750` | Кастомные Semgrep-правила под инварианты ядра: запрет Math.random/ |
+| SEC-3 | ✅ |  | `docs/backlog.md:4765` | Безопасность самого пайплайна: пин образов сканеров по sha256, |
+| SEC-4 | ✅ |  | `docs/backlog.md:4769` | (аудитом доков — GitHub Code Scanning половина уже была реализована, не |
+| SEC-5 | ✅ |  | `docs/backlog.md:4778` | Container scanning: Dockerfile (multi-stage, пин distroless-базы) + |
+| SEC-6 | ✅ |  | `docs/backlog.md:4781` | DAST: dast-zap-джоба в security.yml (не было закомментированной |
+| SEC-7 | ✅ |  | `docs/backlog.md:4793` | (SEC-5 — замок снят) Supply-chain integrity (A08): подпись |
+| SEC-8 | 🔒 |  | `docs/backlog.md:4813` | OWASP Top 10 2021 |
+| SEC-10 | ✅ | sec | `docs/backlog.md:4814` | Еженедельный ре-скан: security.yml получил schedule: cron |
+| SEC-11 | ✅ | sec | `docs/backlog.md:4822` | Сканирование сторонних образов прода: джоба trivy-deps. |
+| SEC-12 | ✅ | sec | `docs/backlog.md:4830` | Хардненинг рантайма контейнеров + честная запись о том, что на |
+| SEC-14 | ✅ | sec | `docs/backlog.md:4847` | Триаж 71 находки, накопившейся после посадки trivy-deps/SEC-11. |
+| SEC-18 | ✅ | sec | `docs/backlog.md:4867` | Поимённый триаж десяти находок Trivy в бинаре caddy + починка |
+| SEC-22 | ✅ | sec | `docs/backlog.md:4898` | две LOW в glibc закрыли очередь мержа всему репозиторию. |
+| SEC-23 | ✅ | sec | `docs/backlog.md:4914` | красный trivy-image теперь объясняет себя в логе. |
+| SEC-29 | ✅ | sec ops | `docs/backlog.md:4930` | пин postgres отстал на пересборку, и предупреждение об |
+| SEC-30 | ✅ | sec | `docs/backlog.md:4951` | триаж caddy протух: набор вырос вдвое, в нём CRITICAL, а два |
+| SEC-32 | ✅ | sec | `docs/backlog.md:4986` | разобран весь остаток находок: postgres 35, TruffleHog 10, и |
+| SEC-33 | ✅ | srv sec | `docs/backlog.md:5026` | личный JSON игрока оседал в кэше браузера: cache-control |
+| SEC-34 | ✅ | sec ops | `docs/backlog.md:5054` | за пинами в Dockerfile не следил никто, и пин рантайм-базы |
+| SEC-35 | ✅ | sec ops | `docs/backlog.md:5074` | свой образ Caddy публикуется и подписывается, как серверный. |
+| SEC-36 | ⏳ | sec ops | `docs/backlog.md:5121` | увести Caddy с root внутри контейнера. |
+| SEC-39 | ✅ | sec ops | `docs/backlog.md:5160` | исправленная libc6 в серверном образе без новых исключений. |
+| SEC-40 | ✅ | sec ops | `docs/backlog.md:5172` | 43 🔴 сводного отчёта были протухшими базами, а не нашим |
+| SEC-37 | ✅ | sec proto | `docs/backlog.md:5222` | браузерный сторож был мёртв с 2026-08-15 и молчал об |
+| SEC-31 | ✅ | sec ops | `docs/backlog.md:5258` | собственная сборка Caddy: закрыты ВСЕ СЕМЬ достижимых CVE, |
+| SEC-24 | ✅ | sec | `docs/backlog.md:5335` | неоценённая CVE в glibc снова закрыла очередь мержа. |
+| SEC-27 | ✅ | sec ops | `docs/backlog.md:5349` | гейт trivy image фильтрует по ЧИНИМОСТИ, а не по |
+| SEC-28 | ✅ | sec | `docs/backlog.md:5372` | вычищены подавления, ставшие после SEC-27 избыточными и |
+| SEC-26 | ✅ | sec | `docs/backlog.md:5399` | пятый за две недели красный trivy-image на пустом месте, и |
+| SEC-25 | ✅ | sec ops | `docs/backlog.md:5418` | бамп дайджеста базового образа + ревизия подавлений. |
+| SEC-19 | ✅ | sec | `docs/backlog.md:5449` | Находки trivy-deps не доезжали до Code Scanning вообще. |
+| SEC-20 | ✅ | sec | `docs/backlog.md:5473` | Триаж всего остатка находок: KICS 23, ZAP 4, TruffleHog 2. |
+| SEC-21 | ✅ | srv sec | `docs/backlog.md:5505` | HTTP-периметр не уважал Origin-allowlist — теперь уважает. |
+| SEC-15 | ✅ | sec | `docs/backlog.md:5542` | Второй SCA-движок: джоба dependency-check (OWASP Dependency-Check, |
+| SEC-17 | ✅ | sec ops | `docs/backlog.md:5564` | [sec/ops] Прод-образ больше не везёт дев-тулчейн + гейт «образ вообще |
+| SEC-13 | ✅ | sec ops | `docs/backlog.md:5597` | [sec/ops] Closed loop «просканировано → то же самое в проде»: воркфлоу |
+| SEC-9 | ✅ |  | `docs/backlog.md:5620` | Ремедиация Code Scanning (dashboard-триаж 2026-07-24): CodeQL-варнинги |
+| H4-REVERT | ✅ | core srv proto data | `docs/backlog.md:5629` | Снос системы дивизий, возврат к |
+| GRND-1 | ✅ | proto | `docs/backlog.md:5666` | Десант — кнопка в ряду команд + меню «кого и сколько». |
+| CHAIN-UX | ✅ | proto | `docs/backlog.md:5708` | Режим «Приказ» — цепочка тапами по карте с иконками и |
+| SND-1 | ✅ | proto | `docs/backlog.md:5750` | Синтезированные звуки интерфейса. |
+| SND-2 | ✅ | proto | `docs/backlog.md:5787` | Пинг гидролокатора: развёртка засекла цель. |
+| HUD-DOCK | ✅ | proto | `docs/backlog.md:5808` | Низ экрана ведёт себя как одно целое. |
+| BACK-1 | ✅ | proto | `docs/backlog.md:5842` | Реестр слоёв Back/Escape достроен — и закрыт как КЛАСС. |
+| H4-TAIL | ✅ | proto | `docs/backlog.md:5887` | Уборка мёртвого кода за снесёнными фичами. |
+| RANGE-UX | ✅ | proto core | `docs/backlog.md:5917` | Радиусы огня видно, и они РАВНЫ ядерным. |
+| CAST-UX | ✅ | proto | `docs/backlog.md:5948` | Прицел каста: хаб уходит, дальность и область видны. |
+| RECAP-FOG | ✅ | proto sec | `docs/backlog.md:5971` | Сводка перестала раскрывать чужую экономику. |
+| HERO-CORRIDOR | ✅ | core data | `docs/backlog.md:5998` | Коридор стал ЛИЧНЫМ: дыра в общий граф закрыта. |
+| HERO-CORRIDOR-2 | ✅ | core proto | `docs/backlog.md:6037` | Коридор стало ВИДНО, и посреди него больше |
+| AIM-PAN | ✅ | proto | `docs/backlog.md:6068` | При вооружённом приказе камеру снова можно двигать. |
+| MAPSHARE-1 | ✅ | core proto | `docs/backlog.md:6205` | Договор об обмене картами + высадка к своим. |
+| PING-PANEL | ✅ | proto | `docs/backlog.md:6249` | Окно «Метки коалиции»: свои и союзные в одном списке. |
+| UI-STD | ✅ | proto | `docs/backlog.md:6275` | Кнопки окна меток — стандартные; дерево технологий — |
+| CMD-VIS | ✅ | core proto | `docs/backlog.md:6300` | Стоп в коридоре запрещён; «нет приказа — нет |
+| FRIENDS-1 | ✅ | srv proto | `docs/backlog.md:6327` | Вкладка «Друзья» в хабе — с настоящим сервером. |
+| BUILD-1 | ✅ | proto | `docs/backlog.md:6369` | Окно построек мира + карточка здания с уровнями. |
+| ABIL-RING | ✅ | proto | `docs/backlog.md:6416` | Радиусы способностей — фиолетовым пунктиром, и не только |
+| SENSOR-1 | ✅ | data core proto | `docs/backlog.md:6445` | Сенсорный фрегат: носитель радара — и сам радар |
+| TABS-GRID | ✅ | proto | `docs/backlog.md:6486` | Вкладки штаба героев и дерева технологий — сеткой, |
+| CORP-HUB | ✅ | proto | `docs/backlog.md:6507` | Хаб корпорации по макету: вкладки сеткой, «Штаб», «Битвы», |
+| UI-RES2 | ✅ | proto | `docs/backlog.md:6560` | Ресурс нигде не печатается словом — везде иконка и цвет. |
+| TT-4 | ✅ | proto | `docs/backlog.md:6596` | Вкладка технологий в матче — список ярусами вместо сетки. |
+| RANK-1 | ✅ | srv proto | `docs/backlog.md:6633` | Вкладка «Рейтинги» в хабе — с настоящим сервером. |
+| RETASK | ✅ | core | `docs/backlog.md:6680` | Флоту в пути можно дать новый «Курс». |
+| ORBIT-ORIGIN | ✅ | proto | `docs/backlog.md:6715` | Кольцо — картинка, отсчёт — от центра мира. |
+| RULES-5 | ✅ | core proto | `docs/backlog.md:6740` | Туман карты спрашивается у ядра, а не выводится |
+| RULES-4 | ✅ | core proto | `docs/backlog.md:6773` | Клиентские предикаты: решение — ядру, подача — |
+| RULES-3 | ✅ | core srv proto | `docs/backlog.md:6830` | Драйверы постоянных приказов спрашивают |
+| RULES-2 | ✅ | core data proto | `docs/backlog.md:6894` | Правила про контент стали данными. |
+| RULES-2.1 | ✅ | core proto | `docs/backlog.md:6939` | Довести maxPerPlanet > 1 до рабочего состояния. |
+| RULES-1 | ✅ | core proto | `docs/backlog.md:6962` | «Можно ли?» — один вопрос к одним правилам. |
+| SEC-16 | ✅ | core srv | `docs/backlog.md:7008` | Два сторожа под авто-мердж: правила, которые до сих пор |
+| SEC-41 | ✅ | sec ops | `docs/backlog.md:7028` | весь наш security-контур смотрит в репозиторий; на |
+| NETA2-0a | ✅ | srv | `docs/backlog.md:7087` | Начисление XP на reject-but-advanced: observeEndIfNeeded не |
+| NETA2-0b | ✅ | cli | `docs/backlog.md:7091` | Клиент ре-шлёт конверт и на EUNAVAILABLE (сервер откатывает |
+| NETA2-0c | ✅ | proto | `docs/backlog.md:7093` | playerOrder в net-матче на реконнекте отклоняет приказ с |
+| NETA2-0d | ✅ | srv | `docs/backlog.md:7095` | ping.clientTime требует Number.isFinite (как desync/perf). |
+| NETA2-1 | ✅ | srv cli | `docs/backlog.md:7096` | Прозрачные причины отказа хендшейка |
+| NETA2-2 | ✅ | proto | `docs/backlog.md:7106` | Бюджет реконнекта > окна reap'а сокета |
+| NETA2-3 | ✅ | srv | `docs/backlog.md:7113` | netserver не дублирует запись квитанций |
+| NETA2-4 | ✅ | srv cli | `docs/backlog.md:7119` | Единый источник wire-протокола — контракт объявлен ОДИН раз. |
+| NETA2-5 | ✅ | proto cli | `docs/backlog.md:7146` | Прототип использует outbox транспорта на |
+| NETA2-6 | ✅ | srv proto | `docs/backlog.md:7178` | Один оффлайн-шедулер |
+| NETA2-7 | ✅ | srv | `docs/backlog.md:7188` | Один джойн-хендшейк |
+| NETA2-8 | ✅ | srv | `docs/backlog.md:7197` | Единое apply-ядро |
+| NETA2-9 | ✅ | srv cli | `docs/backlog.md:7230` | Полировка протокола |
+| NETA2-10 | ✅ | srv | `docs/backlog.md:7241` | Восстановление seat-ticket под SEATLOCK |
+| NETA2-mon | ✅ | srv | `docs/backlog.md:7254` | Сигналы сбоев наружу + durable-логи |
+| REFP-1 | ✅ | proto | `docs/backlog.md:7275` | prototypeData.ts |
+| REFP-2 | ✅ | proto | `docs/backlog.md:7280` | map.ts |
+| REFP-3 | ✅ | proto | `docs/backlog.md:7283` | fleetStacks.ts |
+| REFP-4 | ✅ | proto | `docs/backlog.md:7286` | tax.ts |
+| REFP-5 | ✅ | proto | `docs/backlog.md:7289` | formations.ts |
+| REFP-6 | ✅ | proto | `docs/backlog.md:7293` | botFavour.ts |
+| REFP-7 | ✅ | proto | `docs/backlog.md:7296` | shuttle.ts |
+| REFP-8 | ✅ | proto | `docs/backlog.md:7301` | chain.ts |
+| REFP-9 | ✅ | proto | `docs/backlog.md:7304` | hunger.ts |
+| REFP-10 | ✅ | proto | `docs/backlog.md:7306` | fleetLaunch.ts |
+| REFP-11 | ✅ | proto | `docs/backlog.md:7313` | botDiplomacy.ts |
+| REFP-12 | ✅ | proto | `docs/backlog.md:7316` | sessionMarket.ts |
+| REFP-13 | 🗑 | proto | `docs/backlog.md:7319` | division.ts |
+| REFP-14 | ✅ | proto | `docs/backlog.md:7337` | capital.ts |
+| REFP-15 | ✅ | proto | `docs/backlog.md:7340` | standingOrders.ts |
+| REFP-16 | ✅ | proto | `docs/backlog.md:7343` | forcedMarch.ts |
+| REFP-17 | ✅ | proto | `docs/backlog.md:7346` | instantRepair.ts |
+| REFP-18 | ✅ | proto | `docs/backlog.md:7349` | econScrews.ts |
+| REFP-19 | ✅ | proto | `docs/backlog.md:7352` | economy.ts |
+| REFP-20 | ✅ | proto | `docs/backlog.md:7358` | matchSetup.ts |
+| REFP-21 | ✅ | proto | `docs/backlog.md:7369` | protoKernel.ts |
+| REFP-22 | ✅ | proto | `docs/backlog.md:7375` | actions.ts |
+| REFP-23 | ✅ | proto | `docs/backlog.md:7383` | patrol.ts |
+| REFP-24 | ✅ | proto | `docs/backlog.md:7390` | serverDrivers.ts |
+| REFP-25 | ✅ | proto | `docs/backlog.md:7405` | stewardGuard.ts |
+| REFP-26 | ✅ | proto | `docs/backlog.md:7412` | ai.ts |
+| REFP-27 | ✅ | proto | `docs/backlog.md:7419` | canTraverse |
+| REFP-28 | ✅ | proto | `docs/backlog.md:7423` | Финальная очистка |
+| REFM-0 | ✅ | proto | `docs/backlog.md:7452` | Страховка: typecheck прототипа в гейте. |
+| REFM-0.1 | ✅ | proto | `docs/backlog.md:7465` | ESLint для prototype/ |
+| REFM-1 | ✅ | proto | `docs/backlog.md:7484` | Инвентаризация main.ts |
+| REFM-2 | ✅ | proto | `docs/backlog.md:7590` | format.ts |
+| REFM-3 | ✅ | proto | `docs/backlog.md:7602` | icons.ts |
+| REFM-4 | ✅ | proto | `docs/backlog.md:7608` | dossiers.ts |
+| REFM-5 | ✅ | proto | `docs/backlog.md:7626` | arsenalScreen.ts |
+| REFM-6 | ✅ | proto | `docs/backlog.md:7647` | marketScreen.ts |
+| REFM-7 | ✅ | proto | `docs/backlog.md:7665` | stewardScreen.ts |
+| REFM-8 | 🗑 | proto | `docs/backlog.md:7686` | divisionDesigner.ts |
+| REFM-9 | ✅ | proto | `docs/backlog.md:7709` | techTree.ts |
+| REFM-10 | ✅ | proto | `docs/backlog.md:7730` | profileScreen.ts |
+| REFM-11 | ✅ | proto | `docs/backlog.md:7755` | corpScreen.ts |
+| REFM-12 | ✅ | proto | `docs/backlog.md:7775` | chatWindow.ts |
+| UI-RES | ✅ | proto | `docs/backlog.md:7813` | Единая семья иконок ресурсов + «сколько не хватает». |
+| REFM-13 | ✅ | proto | `docs/backlog.md:7831` | «Верфь» |
+| REFM-14 | ✅ | proto | `docs/backlog.md:7854` | «Штаб героев» |
+| REFM-15 | ✅ | proto | `docs/backlog.md:7880` | Конверсации |
+| REFM-16 | ✅ | proto | `docs/backlog.md:7900` | prefs.ts — клиентские настройки одним правилом. |
+| REFM-17 | ✅ | proto | `docs/backlog.md:7930` | sideColors.ts — цвет стороны: одна палитра, два |
+| REFM-18 | ✅ | proto | `docs/backlog.md:7970` | Выбор совета учёных |
+| REFM-19 | ✅ | proto | `docs/backlog.md:7991` | Сброс пароля |
+| REFM-20 | ✅ | proto | `docs/backlog.md:8014` | Экран итогов матча |
+| REFM-21 | ✅ | proto | `docs/backlog.md:8035` | Графические настройки |
+| REFM-22 | ✅ | proto | `docs/backlog.md:8054` | Оверлей настроек |
+| REFM-23 | ✅ | proto | `docs/backlog.md:8076` | Самообновление APK |
+| REFM-24 | ✅ | proto | `docs/backlog.md:8096` | Вьюпорт и звёздный фон |
+| REFM-25 | ✅ | proto | `docs/backlog.md:8118` | Витрина меток провинций |
+| REFM-26 | ✅ | proto | `docs/backlog.md:8141` | Соло-драйверы |
+| REFM-27 | ✅ | proto | `docs/backlog.md:8162` | Конец матча и награда |
+| REFM-28 | ✅ | proto | `docs/backlog.md:8183` | Окна краденой разведки |
+| REFM-29 | ✅ | proto | `docs/backlog.md:8203` | Политика оповещений и радарная память |
+| REFM-30 | ✅ | proto | `docs/backlog.md:8222` | Сравнение дипломатии снимков |
+| REFM-31 | ✅ | proto | `docs/backlog.md:8243` | Ход стройки |
+| REFM-32 | ✅ | proto | `docs/backlog.md:8263` | Клиентская очередь стройки |
+| REFM-33 | ✅ | proto | `docs/backlog.md:8284` | Геометрия ввода |
+| REFM-34 | ✅ | proto | `docs/backlog.md:8304` | Геометрия фигур карты |
+| REFM-35 | ✅ | proto | `docs/backlog.md:8323` | Кирпичики боковой панели |
+| REFM-36 | ✅ | proto | `docs/backlog.md:8345` | Конвейер стройки |
+| REFM-37 | ✅ | proto | `docs/backlog.md:8370` | Сводка армии |
+| REFM-38 | ✅ | proto | `docs/backlog.md:8396` | Сводка мира |
+| REFM-39 | ✅ | proto | `docs/backlog.md:8423` | Выбор карточки панели |
+| REFM-40 | ✅ | proto | `docs/backlog.md:8448` | Карточка флота: пулы и порог хромоты из одного места |
+| REFM-41 | ✅ | proto | `docs/backlog.md:8464` | Вкладки карточки мира |
+| REFM-42 | ✅ | proto | `docs/backlog.md:8487` | Плитка каталога и замок повторного заказа |
+| REFM-43 | ✅ | proto | `docs/backlog.md:8509` | Память разведки |
+| REFM-44 | ✅ | proto | `docs/backlog.md:8532` | Раскладка мест сетапа |
+| REFM-45 | ✅ | proto | `docs/backlog.md:8558` | Мини-карта экрана сетапа |
+| UI-BLD | ✅ | proto | `docs/backlog.md:8581` | Плитки зданий и ряд скорости на телефоне |
+| UI-BLD2 | ✅ | proto | `docs/backlog.md:8602` | Построенные здания — снова списком в столбик |
+| REFM-46 | ✅ | proto | `docs/backlog.md:8622` | Хранение сессии |
+| REFM-47 | ✅ | proto | `docs/backlog.md:8647` | Правила учётных данных и разбор ответов auth |
+| REFM-48 | ✅ | proto | `docs/backlog.md:8672` | Обмен сессии на место в матче |
+| REFM-49 | ✅ | proto | `docs/backlog.md:8701` | Выбор дома при входе в матч |
+| REFM-50 | ✅ | proto | `docs/backlog.md:8726` | Строка обозревателя матчей |
+| REFM-51 | ✅ | proto | `docs/backlog.md:8753` | Отложенный вход в матч |
+| REFM-52 | ✅ | proto | `docs/backlog.md:8777` | Форма регистрации и подсказка позывного |
+| REFM-53 | ✅ | proto | `docs/backlog.md:8807` | Зеркало опыта командующего |
+| REFM-54 | ✅ | proto | `docs/backlog.md:8825` | Припуск камеры под открытой панелью |
+| REFM-55 | ✅ | proto | `docs/backlog.md:8845` | Разбор нажатия на карту |
+| REFM-56 | ✅ | proto | `docs/backlog.md:8869` | Стартовый вид карты |
+| REFM-57 | ✅ | proto | `docs/backlog.md:8888` | Сборка окна войны |
+| REFM-58 | ✅ | proto | `docs/backlog.md:8914` | Очередь «штурм по прилёте» |
+| REFM-59 | ✅ | proto | `docs/backlog.md:8940` | Порядок подтверждения войны и марш по лейну |
+| REFM-60 | ✅ | proto | `docs/backlog.md:8961` | Решение о перепечке статического слоя |
+| REFM-61 | ✅ | proto | `docs/backlog.md:8983` | Семена политической карты и её рамка |
+| REFM-62 | ✅ | proto | `docs/backlog.md:9007` | Уровень видимости узла под туманом |
+| REFM-63 | ✅ | proto | `docs/backlog.md:9029` | Источники радарного покрытия |
+| REFM-64 | ✅ | proto | `docs/backlog.md:9051` | Приоритет тапа по карте |
+| REFM-65 | ✅ | proto | `docs/backlog.md:9073` | Выбор под тапом и перебор стопки |
+| REFM-66 | ✅ | proto | `docs/backlog.md:9101` | Точка плана: прицел и вид точки |
+| REFM-67 | ✅ | proto | `docs/backlog.md:9127` | Время в пути с форс-маршем |
+| REFM-68 | ✅ | proto | `docs/backlog.md:9149` | Способности героя-флагмана |
+| REFM-69 | ✅ | proto | `docs/backlog.md:9172` | Якорь DOM над точкой карты |
+| REFM-70 | ✅ | proto | `docs/backlog.md:9196` | Жизнь экранной вспышки |
+| REFM-71 | ✅ | proto | `docs/backlog.md:9223` | Раскладка плана на карте |
+| REFM-72 | ✅ | proto | `docs/backlog.md:9251` | Пульс метки и сонарные кольца |
+| REFM-73 | ✅ | proto | `docs/backlog.md:9281` | Отбор и группировка планов (◎-бейджи) |
+| REFM-74 | ✅ | proto | `docs/backlog.md:9308` | Политика брифинга возвращения |
+| REFM-75 | ✅ | proto | `docs/backlog.md:9331` | Размещение подсказок и политика удержания |
+| REFM-76 | ✅ | proto | `docs/backlog.md:9353` | Арифметика деления флота |
+| REFM-77 | ✅ | proto | `docs/backlog.md:9377` | Живые числа панели — свести к одной формуле |
+| REFM-78 | ✅ | proto | `docs/backlog.md:9398` | Доступность командных кнопок |
+| REFM-79 | ✅ | proto | `docs/backlog.md:9420` | Состояние полоски режима «Приказ» |
+| REFM-80 | ✅ | proto | `docs/backlog.md:9446` | Жизнь долгого нажатия |
+| REFM-81 | ✅ | proto | `docs/backlog.md:9466` | Источники ⇅-меню десанта |
+| REFM-82 | ✅ | proto | `docs/backlog.md:9493` | Досье под указателем |
+| REFM-83 | ✅ | proto | `docs/backlog.md:9529` | Подъём камеры из-под нижнего листа |
+| REFM-84 | ✅ | proto | `docs/backlog.md:9557` | Время жизни всплывающих меню командного ряда |
+| REFM-85 | ✅ | proto | `docs/backlog.md:9582` | Быстрый заказ стройки правым кликом |
+| REFM-86 | ✅ | proto | `docs/backlog.md:9619` | Видимость событий в журнале |
+| REFM-87 | ✅ | proto | `docs/backlog.md:9645` | Часы кадра: когда мир идёт и на сколько |
+| REFM-88 | ✅ | proto | `docs/backlog.md:9671` | Судьба вооружённого приказа при тапе |
+| REFM-89 | ✅ | proto | `docs/backlog.md:9693` | Пометки о долгах владельца |
+| REFM-90 | ✅ | proto | `docs/backlog.md:9721` | Условия кнопок ремонта |
+| REFM-91 | ✅ | proto | `docs/backlog.md:9745` | Предложения панели мира: столица и точка удержания |
+| REFM-92 | ✅ | proto | `docs/backlog.md:9767` | Предложение шпионажа на панели мира |
+| REFM-93 | ✅ | proto | `docs/backlog.md:9788` | Семантический зум карты: что растворяется на схеме |
+| REFM-94 | ✅ | proto | `docs/backlog.md:9822` | Геометрия орбитального кольца |
+| REFM-95 | ✅ | proto | `docs/backlog.md:9855` | Пунктирный маршрут идущего флота |
+| REFM-96 | ✅ | proto | `docs/backlog.md:9886` | Кто может стать радарной отметкой |
+| REFM-97 | ✅ | proto | `docs/backlog.md:9912` | Очередь часовой погрузки десанта |
+| REFM-98 | ✅ | proto | `docs/backlog.md:9936` | Постановка стоек: авто-штурм и дежурный вылет |
+| REFM-99 | ✅ | proto | `docs/backlog.md:9960` | Чем меряется прогресс первых целей ONB-7 |
+| REFM-100 | ✅ | proto | `docs/backlog.md:9981` | Когда приказ поднимает обучающую вставку ONB-3 |
+| REFM-101 | ✅ | proto | `docs/backlog.md:9998` | Как сообщение попадает в журнал матча |
+| REFM-102 | ✅ | proto | `docs/backlog.md:10019` | Что теряет силу, когда состояние сменилось |
+| REFM-103 | ✅ | proto | `docs/backlog.md:10036` | Видимость ФЛОТА под туманом |
+| REFM-104 | ✅ | proto | `docs/backlog.md:10054` | Когда песочница возвращает ресурсы за стройку |
+| REFM-105 | ✅ | proto | `docs/backlog.md:10076` | Всплывающее уведомление над картой |
+| REFM-106 | ✅ | proto | `docs/backlog.md:10093` | Какие миры обводятся при взведённом ШТУРМЕ |
+| REFM-107 | ✅ | proto | `docs/backlog.md:10116` | Догоняющее слияние флотов |
+| REFM-108 | ✅ | proto | `docs/backlog.md:10139` | Переход камеры к точке карты |
+| REFM-109 | ✅ | proto | `docs/backlog.md:10173` | Дальномер выбранного мира |
+| REFM-110 | ✅ | proto | `docs/backlog.md:10197` | Координатная сетка фона |
+| REFM-111 | ✅ | proto | `docs/backlog.md:10223` | Расписание баллистического залпа |
+| REFM-112 | ✅ | proto | `docs/backlog.md:10254` | Два тира зенитного огня |
+| REFM-113 | ✅ | proto | `docs/backlog.md:10287` | Послесвечение радарной развёртки |
+| REFM-114 | ✅ | proto | `docs/backlog.md:10324` | У каких узлов есть орбитальное кольцо |
+| REFM-115 | ✅ | proto | `docs/backlog.md:10348` | Из чего складывается эмблема флота |
+| REFM-116 | ✅ | proto | `docs/backlog.md:10354` | Читаемая вместимость трюмов флота. |
+| REFM-117 | ✅ | proto | `docs/backlog.md:10372` | Подпись узла на карте |
+| REFM-117.1 | ✅ | proto | `docs/backlog.md:10395` | Ветка «нет телеметрии» у подписи узла — МЁРТВЫЙ КОД. |
+| REFM-118 | ✅ | proto | `docs/backlog.md:10429` | Отметка боя на карте |
+| REFM-119 | ✅ | proto | `docs/backlog.md:10460` | Лучи радарной развёртки |
+| REFM-120 | ✅ | proto | `docs/backlog.md:10483` | Сводная граница видимости |
+| REFM-120.1 | ✅ | proto | `docs/backlog.md:10517` | Гейты «прозрачность > 0» и «толщина > 0» внутри тира — |
+| REFM-121 | ✅ | proto | `docs/backlog.md:10545` | Голографический бейдж типа провинции |
+| REFM-122 | ✅ | proto | `docs/backlog.md:10580` | Ряд значков построек под узлом |
+| REFM-123 | ✅ | proto | `docs/backlog.md:10611` | Дальность артиллерии рисовалась ДВАЖДЫ |
+| REFM-124 | ✅ | proto | `docs/backlog.md:10641` | Вспышка захвата строила клетку СВОЕЙ копией формул мозаики |
+| REFM-125 | ✅ | proto | `docs/backlog.md:10665` | Прицельное превью ловило узел СВОЕЙ копией радиуса захвата |
+| REFM-126 | ✅ | proto | `docs/backlog.md:10690` | Тап по мини-карте расстановки |
+| REFM-126.1 | ✅ | proto | `docs/backlog.md:10716` | Окно выбора совета учёных перекрывает мини-карту |
+| REFM-127 | ✅ | proto | `docs/backlog.md:10749` | Сеть путей большой карты рисовалась своим циклом |
+| REFM-128 | ✅ | proto | `docs/backlog.md:10771` | Точка на трассе под пальцем считалась своей геометрией |
+| REFM-129 | ✅ | proto | `docs/backlog.md:10797` | Модификаторы постера считались дважды, разными числами |
+| REFM-130 | ✅ | proto | `docs/backlog.md:10824` | Форма дуги осадного залпа считалась в кадровом цикле |
+| REFM-131 | ✅ | proto | `docs/backlog.md:10848` | У карты была СВОЯ КОПИЯ долгого нажатия |
+| REFM-132 | ✅ | proto | `docs/backlog.md:10876` | Перевод «дальность карты → пиксели» существовал в ПЯТИ |
+| REFM-133 | ✅ | proto | `docs/backlog.md:10907` | Поправки посадки применяла только ОДНА из двух коробок над |
+| REFM-134 | ✅ | proto | `docs/backlog.md:10933` | Обратный перевод «страница → холст» жил двумя копиями в |
+| REFM-135 | ✅ | proto | `docs/backlog.md:10954` | Панель и обработчики по-разному понимали, что такое |
+| REFM-136 | ✅ | proto | `docs/backlog.md:10982` | Перевод игрового времени в часы стоял ЧЕТЫРЬМЯ выражениями |
+| REFM-137 | ✅ | proto | `docs/backlog.md:11006` | «Дыхание» живых слоёв фазировалось четырьмя способами, и |
+| REFM-138 | ✅ | proto | `docs/backlog.md:11032` | Право вкладки хаба ходить в сеть стояло ПЯТЬЮ байт-в-байт |
+| REFM-139 | ✅ | proto | `docs/backlog.md:11054` | Разбор дипломатического клика стоял ДВАЖДЫ |
+| REFM-140 | ✅ | proto | `docs/backlog.md:11078` | Развилка «пустить в матч или послать на вход» стояла тремя |
+| REFM-141 | ✅ | proto | `docs/backlog.md:11102` | Связка приказов штурма была выписана дважды |
+| REFM-142 | ✅ | proto | `docs/backlog.md:11120` | Адрес дозвона в матч собирался прямо в connect() |
+| REFM-143 | ✅ | proto | `docs/backlog.md:11144` | Жизнь сетевого сокета разбиралась прямо в обработчиках |
+| REFM-144 | ✅ | proto | `docs/backlog.md:11168` | Приветственный снимок разбирался внутри connect() |
+| REFM-145 | ✅ | proto | `docs/backlog.md:11202` | Политика цикла переподключения стояла внутри |
+| REFM-146 | ✅ | proto | `docs/backlog.md:11234` | Разбор входящего снимка стоял хвостом внутри onSnapshot |
+| REFM-147 | ✅ | proto | `docs/backlog.md:11257` | Маршрут исходящего приказа стоял тремя ветвями внутри |
+| REFM-148 | ✅ | proto | `docs/backlog.md:11283` | Разбор ретранслированной строки ленты стоял двумя копиями |
+| REFM-149 | ✅ | proto | `docs/backlog.md:11307` | Развилка «куда показать отказ сервера» стояла лесенкой if-ов |
+| REFM-150 | ✅ | proto | `docs/backlog.md:11334` | Адреса запросов к серверу матчей собирались строкой в четырёх |
+| REFM-151 | ✅ | proto | `docs/backlog.md:11360` | «Что показать вместо списка матчей» стояло тремя вложенными |
+| REFM-152 | ✅ | proto | `docs/backlog.md:11394` | Что значит выбор места и во что превращается «Играть» |
+| REFM-153 | ✅ | proto | `docs/backlog.md:11416` | Когда переопрашивать список матчей и что писать в строку |
+| REFM-154 | ✅ | proto | `docs/backlog.md:11446` | Как клиент узнаёт, чем на этом сервере является позывной |
+| REFM-155 | ✅ | proto | `docs/backlog.md:11470` | Что окно выбора места показывает вместо списка домов |
+| REFM-156 | ✅ | proto | `docs/backlog.md:11499` | Что клиент кладёт в запрос к /auth и какой ответ считает |
+| REFM-157 | ✅ | proto | `docs/backlog.md:11528` | Чем кончается «в архив» / «вернуть» и что игрок при этом |
+| REFM-158 | ✅ | proto | `docs/backlog.md:11555` | Режим огня артиллерии |
+| REFM-159 | ✅ | proto | `docs/backlog.md:11584` | Жизнь и разметка окна «Разделить» |
+| REFM-160 | ✅ | proto | `docs/backlog.md:11606` | выносы по карте REFM-1, один кирпич = одна секция = один |
+| REFM-161 | ✅ | proto | `docs/backlog.md:11631` | Просьба выслать ссылку для сброса пароля |
+| REFM-162 | ✅ | proto | `docs/backlog.md:11665` | Как из набранного игроком получается адрес сервера |
+| REFM-163 | ✅ | proto | `docs/backlog.md:11695` | Что значит выделить флот и как выделение меняется по |
+| REFM-164 | ✅ | proto | `docs/backlog.md:11731` | Какие флоты попадают под тап по карте и в каком порядке |
+| REFM-165 | ✅ | proto | `docs/backlog.md:11755` | Что значит приказ «слить флоты» |
+| REFM-166 | ✅ | proto | `docs/backlog.md:11788` | Что происходит с выделением, когда тап выбрал объект |
+| REFM-167 | ✅ | proto | `docs/backlog.md:11807` | Что значит «штурмовать» для каждого флота группы |
+| REFM-168 | ✅ | proto | `docs/backlog.md:11828` | Что написано в запросе «объявить войну?» и что на его |
+| REFM-169 | ✅ | proto | `docs/backlog.md:11853` | «тревога „враг у ваших рубежей“: когда звенит и что говорит» |
+| REFM-170 | ✅ | proto | `docs/backlog.md:11884` | «сколько шума даёт флот и как далеко слышит мир» |
+| REFM-171 | ✅ | proto | `docs/backlog.md:11913` | «с каким запасом крыло встаёт на дежурство и что от него |
+| REFM-172 | ✅ | proto | `docs/backlog.md:11943` | «когда очередь мира пускает следующий заказ и когда сборный |
+| REFM-173 | ✅ | proto | `docs/backlog.md:11976` | «когда меню десанта открывается и чьи числа в него попадают» |
+| REFM-174 | ✅ | proto | `docs/backlog.md:12004` | «что игрок узнаёт о дипломатии и куда это попадает» |
+| REFM-175 | ✅ | proto | `docs/backlog.md:12032` | «что стройка сообщает игроку» (prototype/src/buildLog.ts + |
+| REFM-176 | ✅ | proto | `docs/backlog.md:12060` | «что „Хранитель“ сообщает при постановке, снятии и возврате |
+| REFM-177 | ✅ | proto | `docs/backlog.md:12088` | «шпионаж: кому адресовано событие и что оно говорит» |
+| REFM-178 | ✅ | proto | `docs/backlog.md:12113` | «куда рисовать вспышку залпа и сколько вспышек держать» |
+| REFM-179 | ✅ | proto | `docs/backlog.md:12136` | «что игрок узнаёт о бое» (prototype/src/battleLog.ts + |
+| REFM-180 | ✅ | proto | `docs/backlog.md:12160` | «военный счёт и ведомость потерь» (prototype/src/warTally.ts |
+| REFM-181 | ✅ | proto | `docs/backlog.md:12196` | «кому есть дело до флотских новостей» |
+| REFM-182 | ✅ | proto | `docs/backlog.md:12231` | «кому адресована дипломатия в СОЛО» |
+| REFM-183 | ✅ | proto | `docs/backlog.md:12268` | «подача списка первых целей и награда за него» |
+| REFM-184 | ✅ | proto | `docs/backlog.md:12296` | «что игрок узнаёт о приобретениях: мир и открытие» |
+| REFM-185 | ✅ | proto | `docs/backlog.md:12332` | «какие команды появляются в ряду, а какие просто гаснут» |
+| REFM-186 | ✅ | proto | `docs/backlog.md:12368` | «какая кнопка ряда горит и почему» |
+| REFM-187 | ✅ | proto | `docs/backlog.md:12398` | «кого можно взять целью взведённого приказа» |
+| REFM-188 | ✅ | proto | `docs/backlog.md:12432` | «когда лист перестраивается и что при этом нельзя потерять» |
+| REFM-189 | ✅ | proto | `docs/backlog.md:12460` | «кого зовут значки внимания и куда ложится цифра» |
+| REFM-190 | ✅ | proto | `docs/backlog.md:12489` | «как число на фишке ресурса говорит правду» |
+| REFM-191 | ✅ | proto | `docs/backlog.md:12520` | «живое положение игрока в верхней строке» |
+| REFM-192 | ✅ | proto | `docs/backlog.md:12556` | «служебное наложение: FPS, задержка и десинк» |
+| REFM-193 | ✅ | proto | `docs/backlog.md:12592` | «чем кадр даёт выйти из матча и начать заново» |
+| REFM-194 | ✅ | proto | `docs/backlog.md:12624` | «как часто живёт открытое окно и почему сроки разные» |
+| REFM-195 | ✅ | proto | `docs/backlog.md:12661` | «что гаснет от СОСЕДНЕЙ команды ряда» |
+| REFM-196 | ✅ | proto | `docs/backlog.md:12698` | «превью взведённого „Хода“: куда идёт линия и что она обещает» |
+| REFM-197 | ✅ | proto | `docs/backlog.md:12738` | «что карточка флота признаёт о его состоянии» |
+| REFM-198 | ✅ | proto | `docs/backlog.md:12774` | «что ЗНАЧИТ нажатие „Назад“» |
+| REFM-199 | ✅ | proto | `docs/backlog.md:12817` | «что означает ЕДУЩИЙ палец» |
+| REFM-200 | ✅ | proto | `docs/backlog.md:12868` | «что карточка пришвартованного флота ПРЕДЛАГАЕТ сделать» |
+| REFM-201 | ✅ | proto | `docs/backlog.md:12912` | «чей сейчас ход в переговорах» |
+| REFM-202 | ✅ | proto | `docs/backlog.md:12957` | «как подписано место в списке» + починка того, что подпись |
+| MIG-1 | ✅ | cli proto | `docs/backlog.md:13045` | Вход в сетевой матч переехал в /decisions. |
+| MIG-2 | ✅ | cli srv | `docs/backlog.md:13061` | Клиент ПОТРЕБЛЯЕТ переехавшее: вход, обзор, место, отказы. |
+| MIG-3 | ✅ | cli | `docs/backlog.md:13099` | HUD-модели наконец РИСУЮТСЯ, и интентов стало три. |
+| MIG-4 | ✅ | cli proto | `docs/backlog.md:13139` | Цепочка «приказ выделенному флоту» переехала в /decisions. |
+| MIG-5 | ✅ | cli proto | `docs/backlog.md:13163` | ВСЕ строители приказов переехали в /decisions — и клиент бросил свои копии. |
+| MIG-6 | ✅ | cli proto | `docs/backlog.md:13194` | Словарь ЖЕСТОВ переехал в /decisions — третья, последняя недостающая половина. |
+| MIG-7 | ✅ | cli | `docs/backlog.md:13233` | КНОПКИ: панель состава наконец отдаёт приказы, интентов стало семь. |
+| MIG-8 | ✅ | cli core | `docs/backlog.md:13273` | ПАНЕЛЬ МИРА: тап по миру перестал уходить в пустоту, интентов девять. |
+| MIG-9 | ✅ | cli | `docs/backlog.md:13304` | ДЕЛЕНИЕ и СЛИЯНИЕ флотов: интентов одиннадцать. |
+| MIG-10 | ✅ | cli proto | `docs/backlog.md:13333` | Ворота стройки: зеркало заменено решением. |
+| AUD-1 | ✅ | cli | `docs/backlog.md:13377` | клиент собирал 11 фрагментов из 18. |
+| AUD-2 | ✅ | srv core | `docs/backlog.md:13397` | фог-роутинг событий не покрыт тестом. |
+| AUD-11 | ✅ | core | `docs/backlog.md:13426` | effect.applied всегда называет адресата. |
+| AUD-15 | ✅ | srv | `docs/backlog.md:13458` | сканер фог-контракта больше не слеп к комментариям. |
+| AUD-3 | ✅ | data | `docs/backlog.md:13481` | 28 непереводимых имён игровых данных вычищены. |
+| AUD-4 | ✅ | proto | `docs/backlog.md:13512` | гейт локализации увидел шипнутый контент. |
+| AUD-14 | ✅ | proto | `docs/backlog.md:13544` | имена домов доезжают до игрока переводом. |
+| AUD-12 | ✅ | proto | `docs/backlog.md:13566` | шапка досье героя больше не показывает игроку сам ключ. |
+| AUD-13 | ✅ | core proto | `docs/backlog.md:13582` | hero.name — отображаемый текст, вшитый в |
+| AUD-5 | ✅ | core | `docs/backlog.md:13626` | экспортирован runUntil(kernel, state, ctx, opts?). |
+| AUD-6 | ✅ | core | `docs/backlog.md:13641` | actionPayloadSchemas и CLIENTACTIONTYPES публичны. |
+| AUD-7 | ✅ | proto | `docs/backlog.md:13649` | SELFPLAYJSON отдаёт всё, что печатает человеку. |
+| AUD-8 | 🗑 | proto | `docs/backlog.md:13657` | сведён в CONV-12 |
+| AUD-9 | ✅ | sec | `docs/backlog.md:13665` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
+| AUD-10 | ✅ | sec | `docs/backlog.md:13693` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
+| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13836` | Отбор при делении адресует СТЕК, а не тип корабля. |
+| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13846` | Десант делится вместе с кораблями, по трюму обеих половин. |
+| AIDIFF-1 | ✅ | proto | `docs/backlog.md:13874` | Строка места переключается «выкл → слабый → сильный». |
+| RESIL-1 | ✅ | proto | `docs/backlog.md:14028` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ✅ | proto | `docs/backlog.md:14055` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ✅ | srv | `docs/backlog.md:14072` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:14092` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:14110` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:14145` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:14287` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:14325` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:14347` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:14362` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:14382` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:14422` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:14448` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:14464` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14490` | Реалистичные портреты в постройке и описаниях, |
+| HEROART-1 | ✅ | proto cli | `docs/backlog.md:14502` | Портреты, досье и читаемый счёт флота |
+| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14612` | Корабли строит ВЕРФЬ, челноки — |
+| YARD-2 | ✅ | data | `docs/backlog.md:14646` | У верфи два яруса: дешёвый строит, дорогой |
+| CMB-7 | ✅ | core | `docs/backlog.md:14670` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:14691` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:14723` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:14771` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:14794` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:14825` | Орбитальный слой объявлен в |
+| ORB-4 | ✅ | core data proto | `docs/backlog.md:14861` | в астероидном поле строилось всё, что угодно: |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14902` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14930` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14967` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14997` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:15017` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:15041` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:15051` | topXp падал на живой базе разработчика. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15276` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:15288` | Ускорение движения раскрытой голографической карты и подготовка |
+| PERK-0.1 | ✅ | docs | `docs/backlog.md:15314` | Резолюция владельца: два класса бонусов + третья группа |
+| PERK-1.1 | ✅ | core | `docs/backlog.md:15333` | Три группы вместо одной цепочки. |
+| PERK-1.2 | ⏳ | data proto | `docs/backlog.md:15367` | Перевести массовые перки в параллельную |
+| PERK-2.1 | ✅ | core | `docs/backlog.md:15377` | Снижение урона: один пул, одна форма, один кап. |
+| PERK-3.1 | ⏳ | core data | `docs/backlog.md:15420` | Кто и за что выдаёт последовательные множители. |
+| PERK-3.2 | 🔒 | core | `docs/backlog.md:15440` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
+| OBJP-1 | ✅ | proto | `docs/backlog.md:15455` | Значок боя наконец открывает окно, а окно даёт |
+| OBJP-2 | ✅ | proto | `docs/backlog.md:15481` | Подробности объекта встают РЯДОМ с карточкой, а не |
+| OBJP-3 | ✅ | proto | `docs/backlog.md:15493` | Каталог юнитов уехал в окно производства — туда же, |
+| CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15511` | Кнопка штурма появляется только когда есть кем |
+| EVT-1 | ✅ | core data proto | `docs/backlog.md:15541` | Тёмные события наконец видны игроку, |
+| EVT-2 | ⏳ | core data | `docs/backlog.md:15591` | Трофеи за бой: доля от стоимости уничтоженного. |
+| EVT-3 | 🔒 | core data | `docs/backlog.md:15615` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
+| RETR-1 | ⏳ | core | `docs/backlog.md:15659` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
+| RETR-2 | 🔒 | core srv proto | `docs/backlog.md:15672` | (RETR-1) Авто-отступление: условие выхода из боя |
+| TXT-0.1 | ✅ | docs | `docs/backlog.md:15770` | Канон формулировок: записать правило и эталон, пока чистка не |
+| TXT-1 | ⏳ | proto | `docs/backlog.md:15807` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
+| TXT-2 | ⏳ | proto | `docs/backlog.md:15820` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |
+| TXT-3 | ⏳ | proto | `docs/backlog.md:15831` | Тавтологии и дубли в досье — чистая вырезка, самый дешёвый |
+| TXT-4 | ⏳ | proto | `docs/backlog.md:15846` | Герои: описание способности не называет величину — 10 из |
+| TXT-5 | ⏳ | proto | `docs/backlog.md:15863` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
+| TXT-6 | ⏳ | proto | `docs/backlog.md:15877` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
+| TXT-7 | 🔒 | proto docs | `docs/backlog.md:15886` | Сторож в гейте: чтобы вода не вернулась. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
