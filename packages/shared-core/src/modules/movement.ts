@@ -1,10 +1,21 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, FleetEdge, GameState, PlanetId } from '../state/gameState';
+import type { Fleet, FleetEdge, GameState, PlayerId, PlanetId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
 import { distance, fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
 import { corridorVeto, isCorridorEdge } from '../state/corridor';
 import { getStance } from '../state/diplomacy';
+
+/**
+ * Контракт возможности `fleet.course` (RETR-1): «дай этому флоту курс на узел».
+ * Предоставляет модуль движения, потребляет модуль боя — так отступление уводит флот,
+ * не заводя второй маршрутизатор. Возвращает код отказа строкой или `null` при успехе;
+ * владение флотом проверяется внутри, потому что вызывающий приходит со своей дверью.
+ */
+export type FleetCourse = (
+  args: { fleetId: string; to: PlanetId; playerId: PlayerId },
+  h: HandlerContext,
+) => string | null;
 
 /** A target a `fleet.move` can aim at: a node, or a continuous point on a lane. */
 interface MovePayload {
@@ -316,19 +327,27 @@ export const movementModule: GameModule = {
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
     const routes = new RouteCache();
 
-    api.onAction('fleet.move', (action, h) => {
-      const payload = action.payload as Partial<MovePayload>;
-      if (typeof payload?.fleetId !== 'string' || (payload.to === undefined && !payload.toEdge)) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      const fleet = h.state.fleets[payload.fleetId];
-      // Absent OR not-yours → one opaque code, so a client can't enumerate ids to
-      // confirm fog-hidden enemy fleets exist (A06 — reject-code side-channel).
-      if (!fleet || fleet.owner !== action.playerId) {
-        return h.reject('E_NO_FLEET');
-      }
+    /**
+     * RETR-1 — постановка курса ОДНОЙ функцией, общей для приказа и для шва.
+     *
+     * Здесь живёт всё, что делает курс курсом: перепланирование уже идущего флота,
+     * маршрут по графу, право прохода (дипломатия) и объявление вылета. Отступление с
+     * точкой отхода обязано ходить ТЕМ ЖЕ путём — иначе у одного правила («куда флот
+     * вправе лететь») стало бы две реализации, и вторая неизбежно отстала бы от первой.
+     *
+     * Возвращает код отказа строкой либо `null` при успехе: вызывающий сам решает, что
+     * это — отказ игроку (`fleet.move`) или отказ всего составного приказа (отступление).
+     * Владение флотом и форму payload проверяет ВЫЗЫВАЮЩИЙ: у приказа и у шва разные
+     * двери, и подменять чужую проверку своей эта функция не должна.
+     */
+    const setCourse = (
+      h: HandlerContext,
+      fleet: Fleet,
+      payload: MovePayload,
+      playerId: PlayerId,
+    ): string | null => {
       if (fleet.battleId) {
-        return h.reject('E_FLEET_BUSY'); // in battle → not free to re-task
+        return 'E_FLEET_BUSY'; // in battle → not free to re-task
       }
       if (fleet.movement) {
         // RETASK: a NEW course to a fleet already under way is legal — halt it at its
@@ -352,7 +371,7 @@ export const movementModule: GameModule = {
         // EXACTLY like a stop does, so the ban has to hold at both doors — otherwise
         // «Курс» becomes a second way to do the thing «Стоп» refuses.
         if (isCorridorEdge(h.state, fleet.movement.from, fleet.movement.to)) {
-          return h.reject('E_NOT_A_LANE');
+          return 'E_NOT_A_LANE';
         }
         const mv = fleet.movement;
         const frac = Math.min(1 - EPS, Math.max(EPS, legT(mv, h.ctx.now)));
@@ -360,17 +379,17 @@ export const movementModule: GameModule = {
         fleet.movement = null;
         fleet.location = null;
       } else if (fleet.location === null && !fleet.edge) {
-        return h.reject('E_FLEET_BUSY'); // no anchor at all → nothing to route from
+        return 'E_FLEET_BUSY'; // no anchor at all → nothing to route from
       }
       if (payload.to !== undefined && payload.to === fleet.location) {
-        return h.reject('E_SAME_LOCATION');
+        return 'E_SAME_LOCATION';
       }
       let plan = planJourney(h.state, routes, fleet, payload as MovePayload);
       if (plan === null) {
-        return h.reject('E_NO_ROUTE'); // not connected by lanes
+        return 'E_NO_ROUTE'; // not connected by lanes
       }
       if ('error' in plan) {
-        return h.reject(plan.error);
+        return plan.error;
       }
       // Diplomacy gate (D2 — right of way): a fleet may not enter a node owned by a
       // player it's at PEACE with (must declare war first). Neutral, own, and
@@ -383,26 +402,26 @@ export const movementModule: GameModule = {
       // path outright (the pre-fix behaviour) cut fleets off from the entire map as
       // soon as bots' walk-in captures peppered the lanes — one peace-owned node on
       // the unique shortest path read as «no route anywhere», even to own worlds.
-      if (crossesPeace(h.state, action.playerId, plan.hops)) {
+      if (crossesPeace(h.state, playerId, plan.hops)) {
         const detour = planJourney(h.state, routes, fleet, payload as MovePayload, (id) => {
           const owner = h.state.planets[id]?.owner ?? null;
           return (
             owner !== null &&
-            owner !== action.playerId &&
-            getStance(h.state, action.playerId, owner) === 'peace'
+            owner !== playerId &&
+            getStance(h.state, playerId, owner) === 'peace'
           );
         });
         // Re-check the detour: the veto exempts the DESTINATION node on purpose
         // (landing on a peace-locked world must reject as right-of-way, so the
         // client can offer the war declaration — not as a bogus «no route»).
-        if (detour === null || 'error' in detour || crossesPeace(h.state, action.playerId, detour.hops)) {
-          return h.reject('E_NO_RIGHT_OF_WAY');
+        if (detour === null || 'error' in detour || crossesPeace(h.state, playerId, detour.hops)) {
+          return 'E_NO_RIGHT_OF_WAY';
         }
         plan = detour;
       }
       const origin = fleet.location ?? fleet.edge?.from ?? null;
       if (!beginLeg(h, fleet, plan.fromId, plan.hops, plan.startT, plan.parkT)) {
-        return h.reject('E_FLEET_IMMOBILE');
+        return 'E_FLEET_IMMOBILE';
       }
       h.emit('fleet.departed', {
         fleetId: fleet.id,
@@ -410,6 +429,34 @@ export const movementModule: GameModule = {
         to: payload.to ?? plan.hops[plan.hops.length - 1],
         path: plan.hops,
       });
+      return null;
+    };
+
+    /**
+     * Шов для отступления с точкой отхода (RETR-1): модуль боя не импортирует модуль
+     * движения (инвариант №3), поэтому курс он получает через реестр возможностей.
+     * Нет модуля движения — возможности нет, и отступление просто расцепляет бой:
+     * деградация к базовому поведению, а не падение.
+     */
+    api.provideCapability<FleetCourse>('fleet.course', ({ fleetId, to, playerId }, h) => {
+      const fleet = h.state.fleets[fleetId];
+      if (!fleet || fleet.owner !== playerId) return 'E_NO_FLEET';
+      return setCourse(h, fleet, { fleetId, to }, playerId);
+    });
+
+    api.onAction('fleet.move', (action, h) => {
+      const payload = action.payload as Partial<MovePayload>;
+      if (typeof payload?.fleetId !== 'string' || (payload.to === undefined && !payload.toEdge)) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const fleet = h.state.fleets[payload.fleetId];
+      // Absent OR not-yours → one opaque code, so a client can't enumerate ids to
+      // confirm fog-hidden enemy fleets exist (A06 — reject-code side-channel).
+      if (!fleet || fleet.owner !== action.playerId) {
+        return h.reject('E_NO_FLEET');
+      }
+      const err = setCourse(h, fleet, payload as MovePayload, action.playerId);
+      if (err !== null) return h.reject(err);
     });
 
     api.onAction('fleet.stop', (action, h) => {

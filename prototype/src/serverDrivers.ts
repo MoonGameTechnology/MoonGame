@@ -20,13 +20,14 @@ import {
 import { data } from './gameData';
 import { canOrderAll } from './protoKernel';
 import { fleetIdle, type ChainStep, type FleetChain } from '../../packages/shared-core/src/index';
-import { patrolScrambles } from '../../packages/shared-core/src/index';
+import { patrolScrambles, autoRetreatDue } from '../../packages/shared-core/src/index';
 import {
   moveFleet,
   orbitFleet,
   assaultFleet,
   castHeroAbility,
   strikeShuttle,
+  retreatFleet,
 } from '../../decisions/actions';
 
 const HOUR = 3_600_000;
@@ -205,5 +206,20 @@ export function serverPatrolActions(
         { targetFleetId: sc.targetFleetId },
       ),
     ],
+  }));
+}
+
+/**
+ * RETR-2 — авто-отступление на прототипном хосте. Решение целиком в ЯДРЕ
+ * (`autoRetreatDue`), здесь только упаковка в приказ: у серверного драйвера
+ * (`packages/server/src/standingOrderDriver.ts`) ровно то же тело, и это не дубль
+ * правила, а два входа в одно.
+ */
+export function serverAutoRetreatActions(
+  state: GameState,
+): Array<{ owner: string; actions: Action[] }> {
+  return autoRetreatDue(state, data).map(({ fleetId, owner, to }) => ({
+    owner,
+    actions: [retreatFleet(owner, fleetId, to)],
   }));
 }

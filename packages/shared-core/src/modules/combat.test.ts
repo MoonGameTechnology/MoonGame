@@ -1367,3 +1367,74 @@ describe('combat — после ничьей третий получает св�
     expect(after.state.fleets.C?.battleId).toBe(after.state.fleets.A?.battleId);
   });
 });
+
+describe('fleet retreat — точка отхода (RETR-1)', () => {
+  // С модулем ДВИЖЕНИЯ: он и предоставляет возможность `fleet.course`.
+  const kernel = createKernel([movementModule, ...combatFamily, arrivalModule]);
+
+  function retreatTo(fleetId: string, to: string, playerId = 'p1'): Action {
+    return {
+      id: `s:${playerId}:7`,
+      type: 'fleet.retreat',
+      playerId,
+      payload: { fleetId, to },
+      issuedAt: 0,
+    };
+  }
+
+  /** P (поле боя) соединён с H (дом p1); X висит в стороне без единой линии. */
+  function engagedOnLane(): GameState {
+    const p = planet('P', null, 0, 0);
+    const home = planet('H', 'p1', 100, 0);
+    const lone = planet('X', null, 500, 0);
+    p.links = ['H'];
+    home.links = ['P'];
+    const st = baseState(
+      [fleet('A', 'p1', 'P', [['fighter', 2]]), fleet('D', 'p2', 'P', [['fighter', 3]])],
+      [p, home, lone],
+    );
+    return okApply(kernel.applyAction(st, arrive('A'), ctx(0))).state;
+  }
+
+  it('уводит флот курсом на названный узел, а не просто расцепляет бой', () => {
+    const r = okApply(kernel.applyAction(engagedOnLane(), retreatTo('A', 'H'), ctx(0)));
+    expect(r.state.fleets.A?.battleId).toBe(null);
+    expect(r.state.fleets.A?.movement?.to).toBe('H'); // курс поставлен
+    expect(r.state.fleets.A?.location).toBe(null); // уже не на поле боя
+    expect(r.events.map((e) => e.type)).toContain('fleet.departed');
+  });
+
+  it('недостижимая точка отбивает ВЕСЬ приказ — флот остаётся в бою, а не стоит под огнём', () => {
+    const before = engagedOnLane();
+    const r = kernel.applyAction(before, retreatTo('A', 'X'), ctx(0));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('E_NO_ROUTE');
+    // Черновик отброшен целиком: бой на месте, пошлина не взята.
+    expect(before.fleets.A?.battleId).toBeTruthy();
+  });
+
+  it('без точки — прежнее поведение: расцепился и стоит', () => {
+    const r = okApply(kernel.applyAction(engagedOnLane(), retreat('A'), ctx(0)));
+    expect(r.state.fleets.A?.battleId).toBe(null);
+    expect(r.state.fleets.A?.location).toBe('P');
+    expect(r.state.fleets.A?.movement ?? null).toBe(null);
+  });
+
+  it('без модуля движения возможности нет — отступление всё равно расцепляет', () => {
+    // Деградация к базовому поведению (инвариант №3): точка просто не сработает,
+    // и это НЕ падение и не отказ.
+    const bare = createKernel([...combatFamily, arrivalModule]);
+    const p = planet('P', null, 0, 0);
+    const home = planet('H', 'p1', 100, 0);
+    p.links = ['H'];
+    home.links = ['P'];
+    const st = baseState(
+      [fleet('A', 'p1', 'P', [['fighter', 2]]), fleet('D', 'p2', 'P', [['fighter', 3]])],
+      [p, home],
+    );
+    const started = okApply(bare.applyAction(st, arrive('A'), ctx(0))).state;
+    const r = okApply(bare.applyAction(started, retreatTo('A', 'H'), ctx(0)));
+    expect(r.state.fleets.A?.battleId).toBe(null);
+    expect(r.state.fleets.A?.location).toBe('P');
+  });
+});

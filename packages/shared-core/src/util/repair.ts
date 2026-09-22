@@ -30,6 +30,32 @@ export function missingHull(f: Fleet, data: GameData): number {
   return missing;
 }
 
+/** Full hull of the fleet at its fitted stats — the denominator RETR-2 reads, because
+ *  the owner's rule is «остаток от МАКСИМАЛЬНОГО HP флота». Counts ships and the landing
+ *  force they carry together, exactly as {@link missingHull} counts them: a threshold
+ *  measured over a different set than the damage would drift the moment a transport
+ *  takes a hit. */
+export function maxHull(f: Fleet, data: GameData): number {
+  let full = 0;
+  for (const stack of [...f.units, ...(f.landing ?? [])]) {
+    if (stack.count <= 0) continue;
+    const def = data.units[stack.unit];
+    if (!def) continue;
+    full += stack.count * (effectiveStats(def, stack, data).hp ?? 0);
+  }
+  return full;
+}
+
+/** Share of the fleet's hull still standing, 0..1 (RETR-2's threshold). A fleet with no
+ *  hull to speak of — empty, or statless content — reads as FULL, not as zero: a
+ *  threshold rule that answers «0%» there would order a permanent retreat for a fleet
+ *  that was never damaged (fail-secure, and the direction that does nothing). */
+export function hullFraction(f: Fleet, data: GameData): number {
+  const full = maxHull(f, data);
+  if (!(full > 0)) return 1;
+  return Math.max(0, Math.min(1, (full - missingHull(f, data)) / full));
+}
+
 /** Price of an instant (credits) repair — 0 = nothing to repair. One formula for
  *  both the server gate and the client's price display. */
 export function instantRepairCost(f: Fleet, data: GameData): number {

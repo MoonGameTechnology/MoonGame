@@ -130,7 +130,12 @@ export {
   FORCED_MARCH_WEAR,
   forcedMarchModule,
 } from '../../packages/shared-core/src/index';
-export { serverAutoAssaultActions, serverChainActions, serverPatrolActions } from './serverDrivers';
+export {
+  serverAutoAssaultActions,
+  serverAutoRetreatActions,
+  serverChainActions,
+  serverPatrolActions,
+} from './serverDrivers';
 
 // --- ground war --------------------------------------------------------------
 

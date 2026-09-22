@@ -469,7 +469,7 @@ function project(
   // and the prototype-style `forcedMarch`) are future intent — exactly what `scheduled`
   // is stripped for below. Keep only the entries of the viewer's OWN fleets; a map left
   // empty is removed (same delta hygiene as offers).
-  for (const key of ['orders', 'autoAssault', 'forcedMarch'] as const) {
+  for (const key of ['orders', 'autoAssault', 'autoRetreat', 'forcedMarch'] as const) {
     const host = view as unknown as Record<string, Record<string, unknown> | undefined>;
     const map = host[key];
     if (!map) continue;

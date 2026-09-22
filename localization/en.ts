@@ -1382,6 +1382,7 @@ export const en: Record<string, string> = {
   'err.no-army': 'not that many troops',
   'err.no-artillery': 'no artillery',
   'err.no-boon': 'nothing to choose right now',
+  'err.no-destination': 'no such destination',
   'err.no-building': 'no such building here',
   'err.battle-here': 'a battle is raging here — all work has stopped',
   'err.no-build-slots': 'no build slots left — upgrade the fortress',
