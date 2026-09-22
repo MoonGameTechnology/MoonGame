@@ -722,30 +722,31 @@
 | EC-5.2 | 🔒 | data | `docs/economy-roadmap.md:315` | Балансные рычаги через данные (live-ops) |
 | EC-6.1 | 🔒 | srv sec | `docs/economy-roadmap.md:328` | Детекция RMT-паттернов |
 | EC-6.2 | 🔒 | srv docs | `docs/economy-roadmap.md:332` | Модерация торговли и споры |
-| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:350` | Узлы empty в картах канона — снято 2026-09-15 |
-| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:365` | Крепость в прототипе: модуль, правило, кнопка |
-| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:400` | Технический юнит + технология — снято 2026-09-15 |
-| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:415` | Конверсия расходует техюнит — снято 2026-09-15 |
-| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:429` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
-| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:441` | Недостающие ключи отказов |
-| FORT-2.1 | ✅ | data | `docs/fortress-roadmap.md:463` | Юнит «Гарнизон» |
-| FORT-2.2 | ✅ | core data | `docs/fortress-roadmap.md:481` | Форт выдаёт и забирает гарнизон |
-| FORT-2.3 | ✅ | data core | `docs/fortress-roadmap.md:500` | Потолок гарнизона и фракционный модификатор |
-| FORT-3.1 | ✅ | data | `docs/fortress-roadmap.md:519` | Уровни зенитных батарей |
-| FORT-3.2 | ✅ |  | `docs/fortress-roadmap.md:532` | Выполнен ЧУЖОЙ работой; остаток снят как противоречащий более позднему решению |
-| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:559` | Какие ещё узлы конвертируются |
-| FORT-5.1 | ✅ | data core | `docs/fortress-roadmap.md:583` | Технологию крепости надо ИЗУЧИТЬ |
-| FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:613` | Ядро крепости: starfort дорос до пяти уровней |
-| FORT-5.3 | ✅ | core data | `docs/fortress-roadmap.md:659` | Слоты построек |
-| FORT-5.4 | ✅ | core data | `docs/fortress-roadmap.md:686` | Крепость ВСТУПАЕТ В БОЙ |
-| FORT-5.12 | ✅ | core data | `docs/fortress-roadmap.md:738` | Крепость под ударом: не обстреливают, и бой глушит работу |
-| FORT-5.5 | ✅ | data core | `docs/fortress-roadmap.md:772` | Класс корпуса у кораблей |
-| FORT-5.6 | ✅ | data | `docs/fortress-roadmap.md:808` | Верфь крепости: три уровня |
-| FORT-5.7 | ✅ | data core | `docs/fortress-roadmap.md:818` | Ангар крепости |
-| FORT-5.8 | ✅ | core | `docs/fortress-roadmap.md:839` | Док чинит СОЮЗНИКУ |
-| FORT-5.9 | ✅ | core data | `docs/fortress-roadmap.md:863` | Госпиталь лечит ТРЮМ |
-| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:882` | Щиты крепости — L, развилка ИЗМЕРЕНА 2026-09-16 |
-| FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md:910` | Технологии открывают постройки крепости |
+| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:397` | Узлы empty в картах канона — снято 2026-09-15 |
+| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:412` | Крепость в прототипе: модуль, правило, кнопка |
+| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:447` | Технический юнит + технология — снято 2026-09-15 |
+| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:462` | Конверсия расходует техюнит — снято 2026-09-15 |
+| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:476` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
+| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:488` | Недостающие ключи отказов |
+| FORT-2.1 | ✅ | data | `docs/fortress-roadmap.md:510` | Юнит «Гарнизон» |
+| FORT-2.2 | ✅ | core data | `docs/fortress-roadmap.md:528` | Форт выдаёт и забирает гарнизон |
+| FORT-2.3 | ✅ | data core | `docs/fortress-roadmap.md:547` | Потолок гарнизона и фракционный модификатор |
+| FORT-3.1 | ✅ | data | `docs/fortress-roadmap.md:566` | Уровни зенитных батарей |
+| FORT-3.2 | ✅ |  | `docs/fortress-roadmap.md:579` | Выполнен ЧУЖОЙ работой; остаток снят как противоречащий более позднему решению |
+| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:606` | Какие ещё узлы конвертируются |
+| FORT-5.1 | ✅ | data core | `docs/fortress-roadmap.md:630` | Технологию крепости надо ИЗУЧИТЬ |
+| FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:660` | Ядро крепости: starfort дорос до пяти уровней |
+| FORT-5.3 | ✅ | core data | `docs/fortress-roadmap.md:706` | Слоты построек |
+| FORT-5.4 | ✅ | core data | `docs/fortress-roadmap.md:733` | Крепость ВСТУПАЕТ В БОЙ |
+| FORT-5.12 | ✅ | core data | `docs/fortress-roadmap.md:785` | Крепость под ударом: не обстреливают, и бой глушит работу |
+| FORT-5.5 | ✅ | data core | `docs/fortress-roadmap.md:819` | Класс корпуса у кораблей |
+| FORT-5.6 | ✅ | data | `docs/fortress-roadmap.md:855` | Верфь крепости: три уровня |
+| FORT-5.7 | ✅ | data core | `docs/fortress-roadmap.md:865` | Ангар крепости |
+| FORT-5.8 | ✅ | core | `docs/fortress-roadmap.md:886` | Док чинит СОЮЗНИКУ |
+| FORT-5.9 | ✅ | core data | `docs/fortress-roadmap.md:910` | Госпиталь лечит ТРЮМ |
+| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:929` | Щиты крепости — M, развилка ЗАКРЫТА владельцем 2026-09-22 |
+| FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md:967` | Технологии открывают постройки крепости |
+| FORT-5.13 | ⏳ | core | `docs/fortress-roadmap.md:994` | Сбитая крепость переходит покорёженной |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |
@@ -1015,9 +1016,10 @@
 | SH-0.1 | ✅ | data core | `docs/shields-roadmap.md:45` | Стат shield + двойной пул в UnitStack |
 | SH-0.2 | ✅ | core | `docs/shields-roadmap.md:50` | applyDamage двухслойно |
 | SH-1.1 | ✅ | core | `docs/shields-roadmap.md:60` | Реген щита на time.advanced |
-| SH-2.1 | ✅ | core data | `docs/shields-roadmap.md:71` | Ремонт в порту |
-| SH-2.2 | 🔒 | core | `docs/shields-roadmap.md:78` | Ремонтные дроны — единственный in-combat ремонт |
-| SH-2.3 | 🔒 | core data | `docs/shields-roadmap.md:85` | Ремонтный модуль |
+| SH-1.2 | ⏳ | core | `docs/shields-roadmap.md:69` | Щит восстанавливается В БОЮ |
+| SH-2.1 | ✅ | core data | `docs/shields-roadmap.md:95` | Ремонт в порту |
+| SH-2.2 | 🔒 | core | `docs/shields-roadmap.md:102` | Ремонтные дроны — единственный in-combat ремонт |
+| SH-2.3 | 🔒 | core data | `docs/shields-roadmap.md:109` | Ремонтный модуль |
 | SM-0.1 | 🔒 | data | `docs/ship-modules-roadmap.md:77` | Схема ModuleDef + каталог data/modules.json |
 | SM-0.2 | 🔒 | data core | `docs/ship-modules-roadmap.md:90` | Стат moduleSlots + поле UnitStack.modules |
 | SM-0.3 | 🔒 | core | `docs/ship-modules-roadmap.md:98` | Лоадаут-aware идентичность стека |
