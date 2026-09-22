@@ -649,8 +649,9 @@
 | EVT-1 | ✅ | core data proto | `docs/backlog.md` | Тёмные события наконец видны игроку, |
 | EVT-2 | ✅ | core data proto | `docs/backlog.md` | Трофеи за бой: победитель |
 | EVT-3 | ✅ | core data | `docs/backlog.md` | Пассивка героя «мародёр»: лестница из пяти |
-| RETR-1 | ⏳ | core | `docs/backlog.md` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
-| RETR-2 | 🔒 | core srv proto | `docs/backlog.md` | (RETR-1) Авто-отступление: условие выхода из боя |
+| RETR-1 | ✅ | core | `docs/backlog.md` | Отступление получило ТОЧКУ: уводит, а не только |
+| RETR-2 | ✅ | core srv proto | `docs/backlog.md` | Авто-отступление: порог по остатку |
+| RETR-3 | ✅ | proto | `docs/backlog.md` | Авто-отход в интерфейсе, проверенный браузером. |
 | TXT-0.1 | ✅ | docs | `docs/backlog.md` | Канон формулировок: записать правило и эталон, пока чистка не |
 | TXT-1 | ⏳ | proto | `docs/backlog.md` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
 | TXT-2 | ⏳ | proto | `docs/backlog.md` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |
@@ -659,6 +660,8 @@
 | TXT-5 | ⏳ | proto | `docs/backlog.md` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
 | TXT-6 | ⏳ | proto | `docs/backlog.md` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
+| BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
+| BRWH-2 | ⏳ | proto | `docs/backlog.md` | Четыре харнеса сгнили: чинить, а не удалять. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |

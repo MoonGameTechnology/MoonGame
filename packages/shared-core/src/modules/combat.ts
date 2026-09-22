@@ -15,6 +15,7 @@ import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
 import { isCapturable } from '../state/sectorKind';
 import { attackerOf, defenderOf } from '../state/battle';
+import type { FleetCourse } from './movement';
 import { splitVolley } from '../util/volley';
 import {
   addHooked,
@@ -945,8 +946,8 @@ export const combatModule: GameModule = {
     // opponent is freed to give chase. The toll wounds but never kills — leaving
     // orbit OUTSIDE a battle stays free (a plain fleet.move).
     api.onAction('fleet.retreat', (action, h) => {
-      const { fleetId } = action.payload as { fleetId?: string };
-      if (typeof fleetId !== 'string') {
+      const { fleetId, to } = action.payload as { fleetId?: string; to?: string };
+      if (typeof fleetId !== 'string' || (to !== undefined && typeof to !== 'string')) {
         return h.reject('E_BAD_PAYLOAD');
       }
       const fleet = ownFleet(h.state, fleetId); // own-key — rejects an injected `__proto__`
@@ -988,6 +989,24 @@ export const combatModule: GameModule = {
         return;
       }
       fleet.retreatHasteUntil = h.ctx.now + RETREAT_HASTE_MS;
+      // RETR-1. Отступление УВОДИТ, а не просто расцепляет. До этого окно ускорения
+      // (`retreatHasteUntil`) существовало ради бегства, а бежать было некуда: флот
+      // оставался на том же узле, и следующий враг сцеплял его тем же часом — разгон
+      // был, а отхода не было.
+      //
+      // Курс ставит модуль ДВИЖЕНИЯ через реестр возможностей: там живут маршрут, право
+      // прохода и коридоры, и второй такой маршрутизатор здесь был бы копией, которая
+      // отстанет от оригинала. Нет модуля движения — нет возможности, и приказ работает
+      // как прежде (деградация к базовому поведению, инвариант №3).
+      //
+      // Отказ курса роняет ВЕСЬ приказ: кернел отбрасывает черновик целиком, поэтому
+      // «отступить в недостижимую точку» оставляет флот в бою и говорит об этом кодом,
+      // вместо того чтобы вывести его из боя и бросить стоять под огнём.
+      if (to !== undefined) {
+        const course = h.capability<FleetCourse>('fleet.course');
+        const err = course?.({ fleetId, to, playerId: action.playerId }, h);
+        if (err != null) return h.reject(err);
+      }
       h.emit('fleet.retreated', { fleetId, owner: action.playerId, battleId, escaped: true });
     });
 

@@ -812,6 +812,12 @@ export interface GameState {
    *  armed (`standingOrdersModule`, `order.auto`). A driver reads this; the module
    *  itself only stores the flag and garbage-collects it for dead fleets. */
   autoAssault?: Record<FleetId, true>;
+  /** RETR-2, владелец `standingOrdersModule`: авто-отступление. `at` — доля ОСТАВШЕГОСЯ
+   *  корпуса от максимального (решение владельца: 0.2/0.3/0.4/0.5), `to` — узел, куда
+   *  уходить. Приказ, а не состояние боя: живёт, пока игрок его не снял, и убирается
+   *  вместе с погибшим флотом. Туманом фильтруется как остальные стоячие приказы —
+   *  будущее намерение видит только хозяин флота. */
+  autoRetreat?: Record<FleetId, { at: number; to: PlanetId }>;
   /** CC-4 дежурный вылет: БАЗЫ (мир с портом или носитель), которым разрешено самим
    *  поднимать эскадру навстречу опознанному врагу поблизости. Ключ — id базы, значение
    *  называет, в каком пространстве имён этот id живёт.
