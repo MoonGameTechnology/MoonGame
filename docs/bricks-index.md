@@ -628,31 +628,31 @@
 | FOG-10 | ✅ | proto core | `docs/backlog.md:15017` | Память разведки перестала жить только |
 | FOG-9 | ✅ | core | `docs/backlog.md:15041` | Приостановленная стройка чужого мира была видна |
 | TEST-4 | ✅ | srv | `docs/backlog.md:15051` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15276` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:15288` | Ускорение движения раскрытой голографической карты и подготовка |
-| PERK-0.1 | ✅ | docs | `docs/backlog.md:15314` | Резолюция владельца: два класса бонусов + третья группа |
-| PERK-1.1 | ✅ | core | `docs/backlog.md:15333` | Три группы вместо одной цепочки. |
-| PERK-1.2 | ⏳ | data proto | `docs/backlog.md:15367` | Перевести массовые перки в параллельную |
-| PERK-2.1 | ✅ | core | `docs/backlog.md:15377` | Снижение урона: один пул, одна форма, один кап. |
-| PERK-3.1 | ⏳ | core data | `docs/backlog.md:15420` | Кто и за что выдаёт последовательные множители. |
-| PERK-3.2 | 🔒 | core | `docs/backlog.md:15440` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
-| OBJP-1 | ✅ | proto | `docs/backlog.md:15455` | Значок боя наконец открывает окно, а окно даёт |
-| OBJP-2 | ✅ | proto | `docs/backlog.md:15481` | Подробности объекта встают РЯДОМ с карточкой, а не |
-| OBJP-3 | ✅ | proto | `docs/backlog.md:15493` | Каталог юнитов уехал в окно производства — туда же, |
-| CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15511` | Кнопка штурма появляется только когда есть кем |
-| EVT-1 | ✅ | core data proto | `docs/backlog.md:15541` | Тёмные события наконец видны игроку, |
-| EVT-2 | ⏳ | core data | `docs/backlog.md:15591` | Трофеи за бой: доля от стоимости уничтоженного. |
-| EVT-3 | 🔒 | core data | `docs/backlog.md:15615` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
-| RETR-1 | ⏳ | core | `docs/backlog.md:15659` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
-| RETR-2 | 🔒 | core srv proto | `docs/backlog.md:15672` | (RETR-1) Авто-отступление: условие выхода из боя |
-| TXT-0.1 | ✅ | docs | `docs/backlog.md:15770` | Канон формулировок: записать правило и эталон, пока чистка не |
-| TXT-1 | ⏳ | proto | `docs/backlog.md:15807` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
-| TXT-2 | ⏳ | proto | `docs/backlog.md:15820` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |
-| TXT-3 | ⏳ | proto | `docs/backlog.md:15831` | Тавтологии и дубли в досье — чистая вырезка, самый дешёвый |
-| TXT-4 | ⏳ | proto | `docs/backlog.md:15846` | Герои: описание способности не называет величину — 10 из |
-| TXT-5 | ⏳ | proto | `docs/backlog.md:15863` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
-| TXT-6 | ⏳ | proto | `docs/backlog.md:15877` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
-| TXT-7 | 🔒 | proto docs | `docs/backlog.md:15886` | Сторож в гейте: чтобы вода не вернулась. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15282` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:15294` | Ускорение движения раскрытой голографической карты и подготовка |
+| PERK-0.1 | ✅ | docs | `docs/backlog.md:15320` | Резолюция владельца: два класса бонусов + третья группа |
+| PERK-1.1 | ✅ | core | `docs/backlog.md:15339` | Три группы вместо одной цепочки. |
+| PERK-1.2 | ⏳ | data proto | `docs/backlog.md:15373` | Перевести массовые перки в параллельную |
+| PERK-2.1 | ✅ | core | `docs/backlog.md:15383` | Снижение урона: один пул, одна форма, один кап. |
+| PERK-3.1 | ⏳ | core data | `docs/backlog.md:15426` | Кто и за что выдаёт последовательные множители. |
+| PERK-3.2 | 🔒 | core | `docs/backlog.md:15446` | (PERK-3.1) Случайный промоушен: параллельный бонус становится |
+| OBJP-1 | ✅ | proto | `docs/backlog.md:15461` | Значок боя наконец открывает окно, а окно даёт |
+| OBJP-2 | ✅ | proto | `docs/backlog.md:15487` | Подробности объекта встают РЯДОМ с карточкой, а не |
+| OBJP-3 | ✅ | proto | `docs/backlog.md:15499` | Каталог юнитов уехал в окно производства — туда же, |
+| CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15517` | Кнопка штурма появляется только когда есть кем |
+| EVT-1 | ✅ | core data proto | `docs/backlog.md:15547` | Тёмные события наконец видны игроку, |
+| EVT-2 | ⏳ | core data | `docs/backlog.md:15597` | Трофеи за бой: доля от стоимости уничтоженного. |
+| EVT-3 | 🔒 | core data | `docs/backlog.md:15621` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
+| RETR-1 | ⏳ | core | `docs/backlog.md:15665` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
+| RETR-2 | 🔒 | core srv proto | `docs/backlog.md:15678` | (RETR-1) Авто-отступление: условие выхода из боя |
+| TXT-0.1 | ✅ | docs | `docs/backlog.md:15776` | Канон формулировок: записать правило и эталон, пока чистка не |
+| TXT-1 | ⏳ | proto | `docs/backlog.md:15813` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
+| TXT-2 | ⏳ | proto | `docs/backlog.md:15826` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |
+| TXT-3 | ⏳ | proto | `docs/backlog.md:15837` | Тавтологии и дубли в досье — чистая вырезка, самый дешёвый |
+| TXT-4 | ⏳ | proto | `docs/backlog.md:15852` | Герои: описание способности не называет величину — 10 из |
+| TXT-5 | ⏳ | proto | `docs/backlog.md:15869` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
+| TXT-6 | ⏳ | proto | `docs/backlog.md:15883` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
+| TXT-7 | 🔒 | proto docs | `docs/backlog.md:15892` | Сторож в гейте: чтобы вода не вернулась. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -992,24 +992,24 @@
 | PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1240` | Карта pve-1 снова строится |
 | PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1271` | pveModule в ядре прототипа |
 | PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1298` | Сохранение: сперва мета, потом забег |
-| PVR-0.4 | ✅ | data | `docs/sector-zero-roadmap.md:1377` | Карта — развилки из линий |
-| PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md:1434` | Соло-запуск задаёт modeId |
-| PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1476` | HUD забега: волна N из M и время до следующей |
-| PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md:1508` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md:1569` | Выбор между волнами |
-| PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md:1626` | Волны Роя враждебны и доходят до боя |
-| PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md:1665` | Забег доходит до вердикта |
-| PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1734` | Пиратская база для первого боя |
-| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1764` | Выбор сложности на запуске забега |
-| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1800` | У забега свой темп и ускорение |
-| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1843` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1855` | Хранилище PvE-прогресса |
-| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1867` | Награда за забег |
-| PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1892` | Резолюция: что из §3 входит в первую версию |
-| PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md:1910` | Память Роя как состояние |
-| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md:1947` | Одна читаемая адаптация от сигнала до формы |
-| PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md:1989` | Структуры первого набора |
-| PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md:2019` | Журнал адаптаций |
+| PVR-0.4 | ✅ | data | `docs/sector-zero-roadmap.md:1384` | Карта — развилки из линий |
+| PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md:1441` | Соло-запуск задаёт modeId |
+| PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1483` | HUD забега: волна N из M и время до следующей |
+| PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md:1515` | Состав волны перестаёт быть одним дроном |
+| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md:1576` | Выбор между волнами |
+| PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md:1633` | Волны Роя враждебны и доходят до боя |
+| PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md:1672` | Забег доходит до вердикта |
+| PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1741` | Пиратская база для первого боя |
+| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1771` | Выбор сложности на запуске забега |
+| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1807` | У забега свой темп и ускорение |
+| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1850` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1862` | Хранилище PvE-прогресса |
+| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1874` | Награда за забег |
+| PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1899` | Резолюция: что из §3 входит в первую версию |
+| PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md:1917` | Память Роя как состояние |
+| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md:1954` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md:1996` | Структуры первого набора |
+| PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md:2026` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
@@ -1141,21 +1141,22 @@
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md:285` | Грейды и пороги |
 | VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
 | VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md:341` | Медали в карточке юнита |
-| YAG-0.1 | ✅ | docs | `docs/yandex-games-roadmap.md:559` | Сверить требования с первоисточником 2026-09-22 |
-| YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md:621` | Контракты GamePlatform и WebPlatformAdapter |
-| YAG-1.1b | ⏳ | proto | `docs/yandex-games-roadmap.md:655` | Платформенная цель сборки и раскладка архива |
-| YAG-1.2 | 🔶 | proto | `docs/yandex-games-roadmap.md:692` | YandexGamesAdapter: инициализация и жизненный цикл 2026-09-22 |
-| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:744` | Язык от площадки |
-| YAG-1.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:749` | Гость и повышение до аккаунта площадки |
-| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:790` | PortableMetaSave: компактный дескриптор забега |
-| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:800` | PlatformSave в адаптере Яндекса |
-| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:810` | PlatformAds в адаптере Яндекса |
-| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:817` | Placements по правилам |
-| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:829` | Эндпойнт проверки подписи |
-| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:848` | PlatformIAP в адаптере Яндекса |
-| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:859` | PlatformAnalytics: словарь событий |
-| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:879` | Карточка игры и подача в модерацию |
-| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:890` | Серверное время вместо системного |
-| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:898` | Пауза площадки: что делает мир |
-| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:907` | Удалённый конфиг баланса |
-| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:915` | Кнопка «назад» и выход |
+| YAG-0.1 | ✅ | docs | `docs/yandex-games-roadmap.md:627` | Сверить требования с первоисточником 2026-09-22 |
+| YAG-0.2 | ✅ | docs | `docs/yandex-games-roadmap.md:687` | Сверить страницы SDK с первоисточником 2026-09-22 |
+| YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md:728` | Контракты GamePlatform и WebPlatformAdapter |
+| YAG-1.1b | ⏳ | proto | `docs/yandex-games-roadmap.md:762` | Платформенная цель сборки и раскладка архива |
+| YAG-1.2 | 🔶 | proto | `docs/yandex-games-roadmap.md:808` | YandexGamesAdapter: инициализация и жизненный цикл 2026-09-22 |
+| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:860` | Язык от площадки |
+| YAG-1.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:879` | Гость и повышение до аккаунта площадки |
+| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:927` | PortableMetaSave: компактный дескриптор забега |
+| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:942` | PlatformSave в адаптере Яндекса |
+| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:959` | PlatformAds в адаптере Яндекса |
+| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:966` | Placements по правилам |
+| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:989` | Эндпойнт проверки подписи |
+| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:1008` | PlatformIAP в адаптере Яндекса |
+| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:1019` | PlatformAnalytics: словарь событий |
+| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:1039` | Карточка игры и подача в модерацию |
+| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:1050` | Серверное время вместо системного |
+| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:1058` | Пауза площадки: что делает мир |
+| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:1067` | Удалённый конфиг баланса |
+| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:1075` | Кнопка «назад» и выход |
