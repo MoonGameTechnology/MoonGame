@@ -110,7 +110,8 @@
       "orbital_aa",
       "metal_station",
       "void_hangar",
-      "hospital"
+      "hospital",
+      "void_shield"
     ],
     "appearance": {
       "color": "#5f8f8c",

@@ -451,5 +451,25 @@
         "void_hangar"
       ]
     }
+  },
+  "void_shielding": {
+    "name": "Void Shielding",
+    "description": "tech.node.void-shielding.desc",
+    "branch": "space",
+    "tier": 3,
+    "cost": {
+      "credits": 300,
+      "metal": 220,
+      "microelectronics": 50
+    },
+    "researchTimeHours": 10,
+    "prerequisites": [
+      "void_fortification"
+    ],
+    "unlocks": {
+      "buildings": [
+        "void_shield"
+      ]
+    }
   }
 }

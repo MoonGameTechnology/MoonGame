@@ -1426,13 +1426,20 @@ export const constructionModule: GameModule = {
           }
 
           // Shield (`shieldHp`): free out-of-combat regen once past the damage delay.
+          //
+          // Темп = общая база ПЛЮС добавка юнита (`shieldRegen`, FORT-5.10: со ступенью
+          // щита крепости растёт не только размер пула, но и скорость его набора).
+          // Именно ДОБАВКА, а не замена: корпус без этого стата обязан копить щит ровно
+          // с прежней скоростью, иначе правка молча переписала бы весь флот игры.
           if (stack.shieldHp !== undefined) {
-            const fullShield = stack.count * (effectiveStats(unitDef, stack, data).shield ?? 0);
+            const eff = effectiveStats(unitDef, stack, data);
+            const fullShield = stack.count * (eff.shield ?? 0);
+            const shieldRate = SHIELD_REGEN + (eff.shieldRegen ?? 0);
             if (fullShield <= 0 || stack.shieldHp >= fullShield) stack.shieldHp = undefined;
             else if (shieldHours > 0) {
               const cur = Math.min(
                 fullShield,
-                stack.shieldHp + SHIELD_REGEN * shieldHours * fullShield,
+                stack.shieldHp + shieldRate * shieldHours * fullShield,
               );
               stack.shieldHp = cur >= fullShield ? undefined : cur;
             }

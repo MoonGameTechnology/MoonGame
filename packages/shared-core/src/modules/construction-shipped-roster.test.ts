@@ -86,6 +86,10 @@ const SELF_RESTRICTED = [
   // Ангар крепости (owner decision 14): её собственное здание под челноки, `onlyOn`
   // держит его на крепости и нигде больше.
   'void_hangar',
+  // Щитовой контур крепости (owner decision 20): тем же `onlyOn` он стоит только на
+  // крепости — щит он даёт ЕЙ, надевая ступень на её орудия, и на планете надевать его
+  // было бы не на что.
+  'void_shield',
 ];
 
 /** Every shipped province type, and what it hosts. `null` = roster-less: anything in the
@@ -119,6 +123,8 @@ const EXPECTED: Record<string, string[] | null> = {
     // FORT-5.9: госпиталь лечит не только гарнизон узла, но и десант в трюме
     // припаркованных рядом флотов — своих и союзных.
     'hospital',
+    // FORT-5.10: здание щитов — оно надевает на орудия крепости ступень модуля.
+    'void_shield',
   ],
 };
 

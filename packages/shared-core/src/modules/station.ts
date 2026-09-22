@@ -1,6 +1,8 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
+import type { Context } from '../action/types';
 import { buildingLevel, type ResourceBag } from '../data/schemas';
-import type { Planet } from '../state/gameState';
+import type { Planet, UnitStack } from '../state/gameState';
+import { effectiveStats } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
 import { isStationable } from '../state/sectorKind';
 
@@ -78,9 +80,56 @@ const GUNS_UNIT = 'fortress_guns';
  *  чистым поиском по ключу, а не перебором с угадыванием. */
 const gunsFleetId = (planetId: string): string => `fleet:station:${planetId}`;
 
+/** Обратное к {@link gunsFleetId}: чьи это орудия. Не совпало — не крепость, и это
+ *  обычный флот, до которого станции дела нет. */
+function planetOfGunsFleet(fleetId: string): string | null {
+  const prefix = 'fleet:station:';
+  return fleetId.startsWith(prefix) ? fleetId.slice(prefix.length) : null;
+}
+
 /**
- * Привести орудия крепости в соответствие с ядром — ОДИН дом на все четыре повода
- * (конверсия, прокачка, разрушение ядра, смена владельца узла). Четыре копии этого
+ * ЩИТ КРЕПОСТИ (FORT-5.10, решение владельца 20: «снаряжение на крепости»).
+ *
+ * Здание щитов не считает щит само — оно НАДЕВАЕТ на орудия одну из трёх ступеней
+ * модуля, и дальше щит живёт по общим корабельным правилам: `effectiveStats` суммирует
+ * модули, поглощение и восстановление читают её же. Поэтому путь боевого урона этот
+ * кирпич не трогает ВООБЩЕ — а трогать его пришлось бы у обоих отклонённых путей
+ * (свой хук в `damageUnits`; свой пул у здания).
+ *
+ * Ступень выбирается УРОВНЕМ здания, а не повтором одного модуля: каталог запрещает
+ * один и тот же id дважды (`E_DUP_MODULE`), так что «три уровня = три модуля» —
+ * единственная форма, при которой `canEquip` остаётся правдой.
+ */
+const SHIELD_BUILDING = 'void_shield';
+const SHIELD_STEPS = ['void_shield_i', 'void_shield_ii', 'void_shield_iii'] as const;
+
+/** Какая ступень щита надета на крепость: по уровню живого здания щитов. Нет здания
+ *  (не построено или снесено) → щита нет, и это не «ноль щита», а отсутствие модуля. */
+function shieldStep(planet: Planet): string | null {
+  const b = planet.buildings.find((x) => x.type === SHIELD_BUILDING && x.hp > 0);
+  if (!b) return null;
+  return SHIELD_STEPS[Math.min(Math.max(b.level, 1), SHIELD_STEPS.length) - 1] ?? null;
+}
+
+/** Надеть/снять ступень щита на стек орудий.
+ *
+ *  Накопленный `shieldHp` при СНИЖЕНИИ ступени подрезается: пул считается от надетого
+ *  модуля, и оставить старое число значило бы дать щиту поглотить больше, чем он теперь
+ *  вмещает. При РОСТЕ ступени не трогаем — щит дозаряжается обычной регенерацией, а не
+ *  мгновенно (та же причина, по которой прокачка не лечит орудия). */
+function fitShield(stack: UnitStack, step: string | null, ctx: Context): void {
+  stack.modules = step ? [step] : undefined;
+  if (stack.shieldHp === undefined) return;
+  const def = ctx.data.units[GUNS_UNIT];
+  if (!def) return;
+  const full = stack.count * (effectiveStats(def, stack, ctx.data).shield ?? 0);
+  stack.shieldHp = Math.min(stack.shieldHp, full);
+}
+
+/**
+ * Привести орудия крепости в соответствие с ядром — ОДИН дом на все поводы (конверсия,
+ * прокачка и разрушение ядра, смена владельца узла, а с FORT-5.10 ещё и постройка,
+ * прокачка и снос здания ЩИТОВ: щит — снаряжение орудий). Копии этого
  * правила разошлись бы молча: ровно так в этом репозитории уже расходились два хука
  * наземной защиты форта.
  *
@@ -100,13 +149,16 @@ function syncStationGuns(h: HandlerContext, planet: Planet): void {
     if (existing) delete h.state.fleets[id];
     return;
   }
+  const step = shieldStep(planet);
   if (!existing) {
+    const fresh: UnitStack = { unit: GUNS_UNIT, count: core.level };
+    fitShield(fresh, step, h.ctx);
     h.state.fleets[id] = {
       id,
       owner: planet.owner,
       location: planet.id,
       movement: null,
-      units: [{ unit: GUNS_UNIT, count: core.level }],
+      units: [fresh],
       landing: [],
       traits: [],
       battleId: null,
@@ -116,9 +168,14 @@ function syncStationGuns(h: HandlerContext, planet: Planet): void {
   existing.owner = planet.owner;
   const stack = existing.units.find((u) => u.unit === GUNS_UNIT);
   if (!stack) {
-    existing.units.push({ unit: GUNS_UNIT, count: core.level });
-  } else if (stack.count < core.level) {
-    stack.count = core.level; // прокачка ДОБАВЛЯЕТ орудия; потери чинит док, не она
+    const fresh: UnitStack = { unit: GUNS_UNIT, count: core.level };
+    fitShield(fresh, step, h.ctx);
+    existing.units.push(fresh);
+  } else {
+    if (stack.count < core.level) {
+      stack.count = core.level; // прокачка ДОБАВЛЯЕТ орудия; потери чинит док, не она
+    }
+    fitShield(stack, step, h.ctx);
   }
 }
 
@@ -167,15 +224,55 @@ export const stationModule: GameModule = {
       h.emit('station.deployed', { planetId, owner: action.playerId });
     });
 
-    // Прокачка ядра добавляет орудия; разрушение — снимает их вместе с ядром.
-    for (const evt of ['building.upgraded', 'building.destroyed'] as const) {
+    // Прокачка ядра добавляет орудия; разрушение — снимает их вместе с ядром. Здание
+    // ЩИТОВ ходит теми же событиями, но у него значима ещё и ПОСТРОЙКА: ядро игрок не
+    // строит (оно приходит с конверсией), а щит — обычная стройка из ростера.
+    const WATCHED: readonly string[] = [CORE_BUILDING, SHIELD_BUILDING];
+    for (const evt of ['building.constructed', 'building.upgraded', 'building.destroyed'] as const) {
       api.on(evt, (event, h) => {
         const p = event.payload as { planetId?: string; building?: string };
-        if (p.building !== CORE_BUILDING || typeof p.planetId !== 'string') return;
+        if (typeof p.building !== 'string' || !WATCHED.includes(p.building)) return;
+        if (typeof p.planetId !== 'string') return;
         const planet = h.state.planets[p.planetId];
         if (planet) syncStationGuns(h, planet);
       });
     }
+
+    /**
+     * СБИТАЯ КРЕПОСТЬ ПЕРЕХОДИТ ПОКОРЁЖЕННОЙ (FORT-5.13, решение владельца 22).
+     *
+     * До этого крепость нельзя было разрушить — её можно было только отнять, причём
+     * ДАРОМ: пока орудия живы, узел не берут прилётом, а как только их выбили,
+     * захватчик занимал узел и получал чужую крепость целой — все постройки плюс
+     * заново выданный по уровню ядра расчёт. Вложение защитника переходило победителю
+     * в полном объёме, и сильный бесплатно забирал базу у слабого.
+     *
+     * Теперь гибель расчёта роняет уровень ядра. Постройки остаются на узле, но расчёт,
+     * который получит захватчик, считается уже от упавшего уровня — `syncStationGuns`
+     * менять не пришлось, она и так читает уровень ядра.
+     *
+     * ОРУДИЯ ЗДЕСЬ НЕ ПЕРЕВЫДАЮТСЯ НАМЕРЕННО. Позвать отсюда `syncStationGuns` значило
+     * бы воскресить крепость в тот же миг, посреди боя, и узел не взяли бы никогда:
+     * `captureOnArrival` снова увидел бы чужой отряд. Расчёт возвращается там же, где и
+     * раньше, — при смене владельца или прокачке.
+     *
+     * Ниже первого уровня ядро не падает: крепость перестаёт быть крепостью только
+     * сносом ядра, а не делением.
+     */
+    api.on('fleet.destroyed', (event, h) => {
+      const p = event.payload as { fleetId?: string };
+      if (typeof p.fleetId !== 'string') return;
+      const planetId = planetOfGunsFleet(p.fleetId);
+      if (planetId === null) return;
+      const planet = h.state.planets[planetId];
+      const core = planet?.buildings.find((b) => b.type === CORE_BUILDING);
+      if (!core || core.level <= 1) return;
+      core.level -= 1;
+      const def = h.ctx.data.buildings[CORE_BUILDING];
+      // HP ядра всегда полное для своего уровня (оно не убывает — бьют по орудиям),
+      // так что при откате уровня его надо привести к новому, а не оставить прежним.
+      if (def) core.hp = buildingLevel(def, core.level).hp;
+    });
 
     // Захват крепости отдаёт орудия новому владельцу — вместе со зданиями, которые и так
     // переходят к нему. Взять узел, пока орудия живы, нельзя (`captureOnArrival` видит

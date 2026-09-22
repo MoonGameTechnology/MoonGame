@@ -711,5 +711,45 @@
     "onlyOn": [
       "void_station"
     ]
+  },
+  "void_shield": {
+    "name": "Void Shield Array",
+    "cost": {
+      "metal": 170,
+      "microelectronics": 30
+    },
+    "buildTimeHours": 6,
+    "hp": 22,
+    "upkeep": {
+      "energy": 25
+    },
+    "scoreValue": 4,
+    "onlyOn": [
+      "void_station"
+    ],
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 290,
+          "microelectronics": 60
+        },
+        "buildTimeHours": 9,
+        "hp": 34,
+        "upkeep": {
+          "energy": 45
+        }
+      },
+      {
+        "cost": {
+          "metal": 450,
+          "microelectronics": 110
+        },
+        "buildTimeHours": 13,
+        "hp": 48,
+        "upkeep": {
+          "energy": 70
+        }
+      }
+    ]
   }
 }

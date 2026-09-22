@@ -113,5 +113,53 @@
     "allowed": {
       "domain": "space"
     }
+  },
+  "void_shield_i": {
+    "name": "Void Shield I",
+    "slot": "defense",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "shield": 20,
+        "shieldRegen": 0.02
+      }
+    },
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    }
+  },
+  "void_shield_ii": {
+    "name": "Void Shield II",
+    "slot": "defense",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "shield": 35,
+        "shieldRegen": 0.05
+      }
+    },
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    }
+  },
+  "void_shield_iii": {
+    "name": "Void Shield III",
+    "slot": "defense",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "shield": 55,
+        "shieldRegen": 0.09
+      }
+    },
+    "allowed": {
+      "units": [
+        "fortress_guns"
+      ]
+    }
   }
 }

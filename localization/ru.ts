@@ -761,6 +761,11 @@ export const ru: Record<string, string> = {
   'data.orbital-defense-battery': 'Орбитальное ПКО',
   'data.orbital-defense-grid': 'Орбитальная оборонная сеть',
   'data.void-fortification': 'Фортификация пустоты',
+  'data.void-shield-array': 'щитовой контур крепости',
+  'data.void-shield-i': 'щит пустоты I',
+  'data.void-shield-ii': 'щит пустоты II',
+  'data.void-shield-iii': 'щит пустоты III',
+  'data.void-shielding': 'Экранирование пустоты',
   'data.void-shipworks': 'Верфи пустоты',
   'data.orbital-logistics': 'Орбитальная логистика',
   'data.overclocked-helm': 'Разогнанный шлем',
@@ -2236,6 +2241,8 @@ export const ru: Record<string, string> = {
   'tech.node.microelectronics-fabrication.desc': 'Орбитальные фабрики: +5% к производству.',
   'tech.node.void-shipworks.desc':
     'Причальная палуба, топливные цистерны и ремонтные леса прямо на теле крепости. Открывает её собственный ангар — челнокам больше не нужен наземный космопорт.',
+  'tech.node.void-shielding.desc':
+    'Эмиттеры поля, развешенные по корпусу крепости: залп гасится оболочкой раньше, чем доходит до брони. Открывает щитовой контур — три ступени, каждая шире и быстрее набирается.',
   'tech.node.void-fortification.desc':
     'Опорный узел вне планетной системы: несущий каркас, реакторный пояс и причалы, на которых захваченная пустота становится развиваемым владением. Открывает возведение космической крепости.',
   'tech.node.orbital-defense-grid.desc':

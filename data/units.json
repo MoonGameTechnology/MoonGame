@@ -455,7 +455,12 @@
     "traits": [
       "immobile",
       "issued"
-    ]
+    ],
+    "slots": {
+      "weapon": 0,
+      "defense": 1,
+      "utility": 0
+    }
   },
   "garrison": {
     "name": "Garrison",

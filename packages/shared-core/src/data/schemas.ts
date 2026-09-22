@@ -31,6 +31,17 @@ export const UnitStatsSchema = z
      *  shield pool before the hull; a ship dies when its HULL reaches 0. 0 = no
      *  shield. (Out-of-combat regen is a later brick, SH-1.1.) */
     shield: z.number().nonnegative().default(0),
+    /** ДОБАВКА к скорости восстановления щита (доля пула в игровой час) поверх общей
+     *  базовой скорости (`SHIELD_REGEN`, `construction.ts`). 0 = восстанавливается с
+     *  общей скоростью, как весь флот игры.
+     *
+     *  Добавкой, а не полной величиной, НАМЕРЕННО. База — одно число на всю игру, и
+     *  корпус без этого поля обязан вести себя ровно как прежде. Если бы стат означал
+     *  полную скорость, то «поле не заполнено» читалось бы как «щит не восстанавливается
+     *  вовсе», и каждый существующий корабль молча лишился бы регенерации — ровно тот
+     *  способ, которым дефолт схемы тихо переписывает баланс (прецедент: `defenseBonus`
+     *  в уровнях зданий). */
+    shieldRegen: z.number().nonnegative().default(0),
     /** Legacy standoff firing radius in MAP UNITS. Nothing reads it since the
      *  standoff-fire subsystem was removed; kept so shipped content that still
      *  states it keeps parsing. Shuttle reach is `strikeRange`, not this. */
