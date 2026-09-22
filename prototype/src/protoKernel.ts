@@ -11,6 +11,7 @@ import {
   createKernel,
   economyModule,
   effectsModule,
+  salvageModule,
   seatClaimModule,
   visibilityModule,
   movementModule,
@@ -76,6 +77,10 @@ export const MODULES: GameModule[] = [
   combatModule, // melee battles: engage / tick / assault / retreat / capture
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
   captureOnArrivalModule, // walk-in capture now a kernel rule (was client-side seizeSector)
+  // EVT-2: трофеи победителю. Стоит ПЕРЕД `construction` намеренно и это единственное
+  // его ребро по порядку: гибель крепости оба модуля слышат одним событием
+  // (`station.destroyed`), и стройка сносит постройки, по которым салваж считает цену.
+  salvageModule,
   constructionModule,
   arsenalSyncModule, // LARS-1: server-driver refresh of live build-catalog ownership (bypasses gate)
   // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ наконец достижима на хосте, где играют. Модуль давно

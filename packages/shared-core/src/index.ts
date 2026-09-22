@@ -521,6 +521,7 @@ export {
   type StewardPosture,
 } from './modules/steward';
 export { effectsModule, type EffectImpl, type EffectOccurrence } from './modules/effects';
+export { salvageModule, SALVAGE_SHARE } from './modules/salvage';
 export { defHasTrait, unitHasTrait, stacksHaveTrait } from './data/traits';
 export {
   marketModule,

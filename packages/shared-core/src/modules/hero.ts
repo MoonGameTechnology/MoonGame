@@ -371,7 +371,7 @@ export function equippedOf(hero: Hero): string[] {
 
 function applyGrants(
   hero: Hero,
-  grants: { ability?: string; passive?: string },
+  grants: { ability?: string; passive?: string; passives?: readonly string[] },
   slots?: number,
 ): void {
   if (grants.ability !== undefined && !(hero.abilities ?? []).includes(grants.ability)) {
@@ -389,8 +389,15 @@ function applyGrants(
       hero.equipped = [...hero.equipped, grants.ability];
     }
   }
-  if (grants.passive !== undefined && !(hero.passives ?? []).includes(grants.passive)) {
-    (hero.passives ??= []).push(grants.passive);
+  // `passive` и `passives` складываются (EVT-3): одиночное поле — прежняя форма, список
+  // нужен ступени, которая поднимает обе половины сразу. Порядок фиксированный (поле, потом
+  // список по порядку данных), повтор игнорируется — пассивка не копится дважды.
+  const granted = [
+    ...(grants.passive !== undefined ? [grants.passive] : []),
+    ...(grants.passives ?? []),
+  ];
+  for (const id of granted) {
+    if (!(hero.passives ?? []).includes(id)) (hero.passives ??= []).push(id);
   }
 }
 
@@ -745,6 +752,21 @@ export const heroModule: GameModule = {
         node: hit.battle.location,
       });
       return passives !== 0 ? out * (1 + passives) : out;
+    });
+
+    // EVT-3: доля трофеев (`salvage.share`, модуль `salvage`). СКЛАДЫВАЕТСЯ с базой, а
+    // не умножает её, в отличие от двух хуков выше: база тут — сама доля (5%), и ×1.1
+    // дало бы полпроцента вместо обещанных игроку десяти.
+    //
+    // «Только бои, в которых участвовал герой» — это не отдельная проверка, а СКОУП
+    // пассивки: `ownFleetsNear` с `radius: 0` значит «тот же узел», а узел боя герою
+    // и есть поле, на котором он дрался. Своего кода на участие не заводим — иначе у
+    // одного правила стало бы две реализации.
+    api.hook<number>('salvage.share', (base, args, h) => {
+      const { playerId, location } = (args ?? {}) as { playerId?: string; location?: string };
+      if (typeof playerId !== 'string' || typeof location !== 'string') return base;
+      const bonus = passiveBonus(h, 'salvage', playerId, { node: location });
+      return bonus !== 0 ? base + bonus : base;
     });
 
     // The hero went down (its ship was destroyed) → start the respawn timer once.

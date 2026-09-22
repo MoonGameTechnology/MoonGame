@@ -19,5 +19,47 @@
     "hook": "fleet.speed",
     "scope": "ownFleetsNear",
     "params": { "bonus": 0.08, "radius": 300 }
+  },
+  "wreck_optics": {
+    "name": "Wreck Optics",
+    "description": "hero.passive.wreck-optics.desc",
+    "hook": "salvage",
+    "scope": "ownFleetsNear",
+    "params": { "bonus": 0.03, "radius": 0 }
+  },
+  "wreck_guns": {
+    "name": "Scavenged Guns",
+    "description": "hero.passive.scavenged-guns.desc",
+    "hook": "combat.damage",
+    "scope": "heroFleet",
+    "params": { "bonus": 0.05 }
+  },
+  "wreck_cutters": {
+    "name": "Hull Cutters",
+    "description": "hero.passive.hull-cutters.desc",
+    "hook": "salvage",
+    "scope": "ownFleetsNear",
+    "params": { "bonus": 0.02, "radius": 0 }
+  },
+  "wreck_barrels": {
+    "name": "Reclaimed Barrels",
+    "description": "hero.passive.reclaimed-barrels.desc",
+    "hook": "combat.damage",
+    "scope": "heroFleet",
+    "params": { "bonus": 0.02 }
+  },
+  "wreck_mastery_salvage": {
+    "name": "Master Scavenger",
+    "description": "hero.passive.master-scavenger.desc",
+    "hook": "salvage",
+    "scope": "ownFleetsNear",
+    "params": { "bonus": 0.05, "radius": 0 }
+  },
+  "wreck_mastery_guns": {
+    "name": "Master Batteries",
+    "description": "hero.passive.master-batteries.desc",
+    "hook": "combat.damage",
+    "scope": "heroFleet",
+    "params": { "bonus": 0.03 }
   }
 }

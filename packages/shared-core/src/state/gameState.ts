@@ -723,6 +723,13 @@ export interface GameState {
   battles: Record<BattleId, Battle>;
   /** Monotonic counter handing each battle its id. */
   battleSeq: number;
+  /** EVT-2, owned by `salvageModule`: per-node value of what died in the battle running
+   *  there, waiting to be claimed by its winners, plus (for the rest of one drain) who
+   *  those winners were — `station.destroyed` arrives after `battle.resolved` and needs
+   *  an address. It lives in the state because a battle spans many steps while events
+   *  drain within one; `visibleState` strips it, since it names losses on nodes a viewer
+   *  may not see. Absent = nothing is being fought over. */
+  salvage?: Record<PlanetId, { pool: Record<string, number>; winners?: PlayerId[] }>;
   /** Челночные удары в полёте (SHU-1.2). Пусто/отсутствует = никто никуда не летит. */
   strikes?: ShuttleStrike[];
   /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */

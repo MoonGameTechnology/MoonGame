@@ -1081,7 +1081,7 @@ export const combatModule: GameModule = {
         creditVolley(h.state, side.ref, shot, landed);
       }
       for (const [side, dmg] of incoming) {
-        if (dmg > 0) applyDamageToSide(h, side.ref, dmg, data, battle.location);
+        if (dmg > 0) applyDamageToSide(h, side.ref, dmg, data, battle.location, battle.id);
       }
 
       // Полезная нагрузка события — единственная двойственность боя, которая уезжает ПО

@@ -464,6 +464,7 @@ import {
   dayHour,
   clockHM,
   countdownHMS,
+  costText,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
@@ -3650,6 +3651,17 @@ function handleEvents(events: DomainEvent[]) {
           t(`event.${(p.ruleId as string).replace(/_/g, '-')}`, vars),
           p.planetId as string | undefined,
         );
+        break;
+      }
+      // EVT-2: трофеи с поля боя. Гейт тот же, что у тёмного события, и по той же
+      // причине: адресат приезжает как `playerId`, а чужая добыча — чужая экономика.
+      // Мешок печатается значками (`costText`), а не прозой: склонять «20 металла /
+      // 4 кредита» пришлось бы в коде, а ресурсы задаются данными и список открыт.
+      case 'salvage.paid': {
+        if (p.playerId !== ME) break;
+        const bag = p.resources as Record<string, number> | undefined;
+        if (!bag || Object.keys(bag).length === 0) break;
+        note(t('log.salvage', { what: costText(bag) }), p.location as string | undefined);
         break;
       }
       case 'unit.died': {

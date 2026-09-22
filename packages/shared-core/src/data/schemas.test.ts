@@ -627,6 +627,11 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
       if (def.grants.passive !== undefined) {
         expect(passives.has(def.grants.passive), `node ${id} grants unknown passive`).toBe(true);
       }
+      // EVT-3: список проверяется наравне с одиночным полем — иначе опечатка в
+      // `passives` проезжает молча, а узел тихо не выдаёт половину обещанного.
+      for (const pid of def.grants.passives) {
+        expect(passives.has(pid), `node ${id} grants unknown passive "${pid}"`).toBe(true);
+      }
     }
     // Both design branches ship a root node.
     expect(nodes.neural_lace?.branch).toBe('transhuman');

@@ -523,6 +523,11 @@ export function applyDamageToSide(
   dmg: HookedDamage,
   data: GameData,
   location: string,
+  /** The battle these casualties belong to, when they belong to one. Stamped onto
+   *  `unit.died` so a listener can tell a battlefield loss from an orbital AA burst,
+   *  a bombardment or a shuttle strike — those kill units outside any battle (EVT-2:
+   *  only a battlefield is salvageable). Omitted by exactly those callers. */
+  battleId?: string,
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -533,6 +538,7 @@ export function applyDamageToSide(
   const source: Record<string, string> = onPlanet
     ? { at: location, planetId: ref.planetId }
     : { at: location, fleetId: ref.fleetId };
+  if (battleId !== undefined) source.battleId = battleId;
   // Tag the casualty's owner NOW: a wiped fleet is deleted before the `unit.died`
   // event drains, so listeners (heroes / score) can't re-find it. У плацдарма
   // владелец СВОЙ — он не хозяин мира, он на него высадился.

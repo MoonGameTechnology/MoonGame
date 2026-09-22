@@ -80,5 +80,39 @@
     "requires": ["psi_veil"],
     "cost": { "energy": 160, "credits": 120 },
     "grants": { "ability": "decoy_signal" }
+  },
+  "wreck_rig": {
+    "name": "Salvage Rig",
+    "description": "hero.tree.salvage-rig.desc",
+    "cost": { "microelectronics": 15 },
+    "grants": { "passive": "wreck_optics" }
+  },
+  "wreck_battery": {
+    "name": "Scavenged Battery",
+    "description": "hero.tree.scavenged-battery.desc",
+    "requires": ["wreck_rig"],
+    "cost": { "microelectronics": 30, "credits": 60 },
+    "grants": { "passive": "wreck_guns" }
+  },
+  "wreck_shears": {
+    "name": "Hull Shears",
+    "description": "hero.tree.hull-shears.desc",
+    "requires": ["wreck_battery"],
+    "cost": { "microelectronics": 45, "credits": 100 },
+    "grants": { "passive": "wreck_cutters" }
+  },
+  "wreck_foundry": {
+    "name": "Field Foundry",
+    "description": "hero.tree.field-foundry.desc",
+    "requires": ["wreck_shears"],
+    "cost": { "microelectronics": 65, "credits": 150 },
+    "grants": { "passive": "wreck_barrels" }
+  },
+  "wreck_mastery": {
+    "name": "Scavenger Mastery",
+    "description": "hero.tree.scavenger-mastery.desc",
+    "requires": ["wreck_foundry"],
+    "cost": { "microelectronics": 95, "credits": 220 },
+    "grants": { "passives": ["wreck_mastery_salvage", "wreck_mastery_guns"] }
   }
 }
