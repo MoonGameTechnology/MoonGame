@@ -74,6 +74,11 @@ one mechanism.
    `origin` also has terminal push credentials.
 2. If a terminal `git push` fails authentication once, do not retry it. Switch once to the
    authenticated GitHub API/app, or report that no writable transport is available.
+   If the GitHub MCP itself returns a transport/session error such as
+   `Invalid MCP request metadata`, mark that MCP write transport unusable for the session:
+   do not retry it and do not call lower-level Git Data operations through the same connector.
+   Use at most one genuinely independent write transport, otherwise stop with the local recovery
+   checkpoint described by `publish-pr`.
 3. **Final sync before PR:** after the implementation is complete and immediately before remote
    publication, refresh the current `main` again and compare the task branch against it. If the
    branch is behind or diverged, integrate the fresh `main` first (normally rebase a short-lived
