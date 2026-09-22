@@ -1453,6 +1453,21 @@ export const en: Record<string, string> = {
   'err.wrong-sector': 'invalid sector type',
 
   // --- hero — Герои: грейды, способности (имя + описание).
+  "hero.person.commander.name": "Mark Weir",
+  "hero.person.commander.bio": "A veteran of deep-space campaigns. When surrounded, he led scattered ships through a sequence of feints and brought their crews home. A neural interface helps him hold the wider battle in view, but he never delegates decisions about lives to automation. Reserved and demanding, he always keeps a reserve for withdrawal.",
+  "hero.person.ravager.name": "Lyra Sain",
+  "hero.person.ravager.bio": "She survived the destruction of the research station where her psionic gift first emerged. Since then she has studied the limits of her influence on space. Quiet and decisive, she holds herself to the strictest discipline. To her, power is justified only when a strike ends a battle instead of prolonging it.",
+  "hero.person.vanguard.name": "Darian Cross",
+  "hero.person.vanguard.bio": "He began as an escort commander on dangerous trade routes. After a severe injury, he returned to the bridge with communications and tactical-processing implants. He tests uncertain routes first and leads reinforcements in person. Direct and quick to decide, he values initiative in his crew.",
+  "hero.person.warden.name": "Elena Mor",
+  "hero.person.warden.bio": "For years she escorted evacuation convoys at the edge of settled space. She developed her psionic discipline to protect people, not to stand above them. Calm under fire, she remembers the cost of every order. Her ship leaves last, once the others have reached a safe course.",
+  "hero.person.main.bio": "You command this flagship. Its callsign follows your name in the match. Your history is shaped by your decisions: whom to protect, where to take a risk, and when to withdraw. This card shows your abilities, learned skills, and ship equipment.",
+  "hero.person.dossier": "Personal dossier",
+  "hero.person.archetype": "Specialization",
+  "hero.person.grade": "Rarity",
+  "hero.person.ships": "Ships in fleet",
+  "hero.person.reserve": "Flagship in reserve",
+  'hero.person.ship-stats': 'Flagship stats with installed modules',
   'hero.ability.annihilate.desc': 'Destroys a planet in range — it becomes a dead world.',
   'hero.ability.annihilate.name': 'Annihilate',
   'hero.ability.boarding-translocation.desc':

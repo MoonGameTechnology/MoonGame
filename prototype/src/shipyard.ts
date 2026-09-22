@@ -392,11 +392,13 @@ export interface YardHost {
 /** Wire the window up: tabs, hull picking, fitting modules, the order. Call once at
  *  boot (it attaches the window's delegates); `open()` is what the rail button calls. */
 export function initShipyard(host: YardHost): {
-  open: () => void;
+  open: (nextTab?: YardTab) => void;
+  refreshHeroes: () => void;
   render: () => void;
   close: () => void;
 } {
   let tab: YardTab = 'ships';
+  let renderedHeroBody = '';
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
 
   const hullsOf = (): string[] => hullsOfTab(tab);
@@ -406,6 +408,7 @@ export function initShipyard(host: YardHost): {
     let body: string;
     if (tab === 'heroes') {
       body = host.heroPaneHtml();
+      renderedHeroBody = body;
     } else {
       draft = normalizeDraft(host.state(), host.me(), draft, hullsOf());
       body = loadoutPaneHtml(host.state(), host.me(), draft, hullsOf(), {
@@ -493,12 +496,29 @@ export function initShipyard(host: YardHost): {
   });
 
   return {
-    open: () => {
+    open: (nextTab) => {
+      if (nextTab) tab = nextTab;
       const prepared = host.preparedModules?.(draft.hull);
       if (prepared) draft = { ...draft, modules: [...prepared] };
       host.root().classList.add('show');
       paint();
       host.onOpen();
+    },
+    refreshHeroes: () => {
+      if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
+      if (host.heroPaneHtml() === renderedHeroBody) return;
+      const scroll = host.root().querySelector('#constructorbody')?.scrollTop ?? 0;
+      const focused = document.activeElement as HTMLElement | null;
+      const focusAttrs = focused && host.root().contains(focused)
+        ? Array.from(focused.attributes).filter((a) => a.name.startsWith('data-h'))
+          .map((a) => [a.name, a.value] as const) : [];
+      paint();
+      const box = host.root().querySelector('#constructorbody');
+      if (box) box.scrollTop = scroll;
+      if (focusAttrs.length) {
+        Array.from(host.root().querySelectorAll<HTMLElement>('button')).find((el) =>
+          focusAttrs.every(([name, value]) => el.getAttribute(name) === value))?.focus({ preventScroll: true });
+      }
     },
     render: paint,
     close,
