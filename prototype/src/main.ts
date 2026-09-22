@@ -1886,29 +1886,9 @@ function worldDist(d: number): number {
  * Амплитуда взята долей от шага между провинциями (~260 мировых единиц на шипнутых
  * картах): заметно глазу, но далеко от того, чтобы клетка полезла на соседнюю.
  */
-/** Шаг ветра в миллисекундах. Фаза КВАНТУЕТСЯ, и это не мелочь: границы провинций
- *  живут в запечённом статик-слое, который перепекается по смене подписи. Непрерывная
- *  фаза означала бы полное перепекание КАЖДЫЙ кадр — на телефоне это батарея и
- *  троттлинг (`mobile-game-feel`). На этом шаге слой обновляется ~4 раза в секунду, а
- *  дрейф настолько медленный, что ступенька меньше пикселя. */
-const WIND_STEP_MS = 99999999;
-
-/** Текущая фаза ветра. Ноль — покой: движение выключено системой или тумблером. */
-function windPhase(): number {
-  if (!motionOn()) return 0;
-  const step = Math.floor(performance.now() / WIND_STEP_MS);
-  // Полный оборот — около минуты: на глаз медленный дрейф линии, а не качание.
-  return (step * (WIND_STEP_MS / 11000)) % (Math.PI * 2);
-}
-
-function provinceWave(): {
-  amp: number;
-  wavelength: number;
-  segment: number;
-  phase: number;
-} {
+function provinceWave(): { amp: number; wavelength: number; segment: number } {
   const fit = camFitTransform(insets(), mapBounds()).scale;
-  return { amp: 11 * fit, wavelength: 190 * fit, segment: 26 * fit, phase: windPhase() };
+  return { amp: 11 * fit, wavelength: 190 * fit, segment: 26 * fit };
 }
 
 function currentMapLod(): MapLod {
@@ -4448,11 +4428,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     starfield: starfieldOn(),
   }) + `|sky:${starfieldOn() && spaceBackdropReady(holographicMapOn()) ? 1 : 0}` +
     `|holo:${holographicMapOn()}|glow:${glowOn()}` +
-    `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` +
-    // Ветер на границах (M2.9): фаза обязана быть в подписи, иначе слой не перепечётся
-    // и линия замрёт. Она квантована (`WIND_STEP_MS`), поэтому это ~4 перепекания в
-    // секунду, а не одно на кадр.
-    `|wind:${windPhase().toFixed(3)}`;
+    `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}`;
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (g === bgx) {

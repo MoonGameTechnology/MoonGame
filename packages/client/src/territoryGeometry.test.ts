@@ -115,28 +115,4 @@ describe('camera-independent province geometry', () => {
       straight.map((c) => c.poly),
     );
   });
-
-  it('ВЕТЕР НЕ ПЕРЕСЧИТЫВАЕТ МОЗАИКУ: меняется фаза — тесселяция остаётся одна', () => {
-    // Цена правила: тесселяция квадратична по числу семян, а волна линейна по вершинам.
-    // Считай их вместе — и «чуть-чуть двигающаяся» линия съела бы кадр на большой карте.
-    const compute = vi.spyOn(territory, 'computePowerCells');
-    const cache = new TerritoryGeometryCache();
-    const base = { amp: 4, wavelength: 60, segment: 12 };
-    const a = cache.project(seeds, clip, 1, { ...base, phase: 0 });
-    const b = cache.project(seeds, clip, 1, { ...base, phase: 0.8 });
-    const c = cache.project(seeds, clip, 1, { ...base, phase: 1.6 });
-    expect(compute).toHaveBeenCalledTimes(1);
-    // И при этом линия ДЕЙСТВИТЕЛЬНО поехала, а не осталась на месте.
-    expect(b.map((x) => x.poly)).not.toEqual(a.map((x) => x.poly));
-    expect(c.map((x) => x.poly)).not.toEqual(b.map((x) => x.poly));
-    compute.mockRestore();
-  });
-
-  it('ОДНА И ТА ЖЕ ФАЗА — ОДНА И ТА ЖЕ ЛИНИЯ: ветер не делает карту случайной', () => {
-    const cache = new TerritoryGeometryCache();
-    const wave = { amp: 4, wavelength: 60, segment: 12, phase: 2.5 };
-    expect(cache.project(seeds, clip, 1, wave).map((c) => c.poly)).toEqual(
-      new TerritoryGeometryCache().project(seeds, clip, 1, wave).map((c) => c.poly),
-    );
-  });
 });

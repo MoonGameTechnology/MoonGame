@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { computePowerCells, type TerritoryCell, type TerritorySeed } from './territory';
-import {
-  edgeSteps,
-  waveCells,
-  waveOffset,
-  WIND_SHARE,
-  type WaveConfig,
-} from './territoryWave';
+import { edgeSteps, waveCells, waveOffset, type WaveConfig } from './territoryWave';
 
 /**
  * M2.9 — волна на границе провинций, закреплённая тестом.
@@ -68,28 +62,7 @@ describe('M2.9 — волна на границе', () => {
         const [dx, dy] = waveOffset(x, y, cfg);
         expect(Math.abs(dx)).toBeLessThanOrEqual(cfg.amp + 1e-9);
         expect(Math.abs(dy)).toBeLessThanOrEqual(cfg.amp + 1e-9);
-        // С ветром — не больше амплитуды плюс доля дыхания, и ни каплей больше.
-        const [wx, wy] = waveOffset(x, y, { ...cfg, phase: 2.2 });
-        expect(Math.abs(wx)).toBeLessThanOrEqual(cfg.amp * (1 + WIND_SHARE) + 1e-9);
-        expect(Math.abs(wy)).toBeLessThanOrEqual(cfg.amp * (1 + WIND_SHARE) + 1e-9);
       }
-  });
-
-  it('ВЕТЕР ЕЛЕ ВИДЕН: дышит доля амплитуды, форма стоит на месте', () => {
-    // Просьба владельца — «еле видно, аккуратно, как на голографической карте».
-    // Значит двигается НЕ вся линия: неподвижная форма плюс маленькая рябь.
-    let worst = 0;
-    for (let x = -300; x <= 300; x += 13)
-      for (let y = -300; y <= 300; y += 19) {
-        const [ax, ay] = waveOffset(x, y, { ...cfg, phase: 0 });
-        for (const phase of [0.5, 1.3, 2.9, 4.6]) {
-          const [bx, by] = waveOffset(x, y, { ...cfg, phase });
-          worst = Math.max(worst, Math.hypot(bx - ax, by - ay));
-        }
-      }
-    // Ходит не больше двух долей дыхания от амплитуды: рябь, а не переезд линии.
-    expect(worst).toBeLessThanOrEqual(cfg.amp * WIND_SHARE * 2 + 1e-9);
-    expect(worst).toBeGreaterThan(0); // и всё-таки ходит
   });
 
   it('TAGS ИДУТ ПАРАЛЛЕЛЬНО ТОЧКАМ — иначе куски одной границы покрасятся по-разному', () => {

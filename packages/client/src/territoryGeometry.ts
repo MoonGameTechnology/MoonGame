@@ -5,10 +5,7 @@ import { waveCells, type WaveConfig } from './territoryWave';
  * Reprojection is O(vertices); the quadratic tessellation runs only on shape changes. */
 export class TerritoryGeometryCache {
   private signature = '';
-  /** Сырая тесселяция — она КВАДРАТИЧНА по числу семян, и только ради неё этот кэш и
-   *  существует. Волна поверх неё линейна по вершинам, поэтому накладывается каждый кадр:
-   *  иначе «ветер» (меняющаяся фаза) пересчитывал бы всю мозаику на каждом кадре. */
-  private tess: TerritoryCell[] = [];
+  private cells: TerritoryCell[] = [];
 
   /**
    * @param wave Живая линия границы (M2.9). Накладывается ЗДЕСЬ, в локальных координатах
@@ -37,15 +34,14 @@ export class TerritoryGeometryCache {
       local.map((s) => `${q(s.x)},${q(s.y)},${q(s.w)}`).join(';') +
       '|' +
       boundary.map(([x, y]) => `${q(x)},${q(y)}`).join(';') +
-      // Дробление — часть ФОРМЫ (оно меняет сами вершины), а вот ФАЗА в подпись не
-      // входит: ветер не повод пересчитывать тесселяцию.
+      // Волна — часть ФОРМЫ: сменилась настройка — форму надо пересчитать.
       `|${wave ? `${q(wave.amp)},${q(wave.wavelength)},${q(wave.segment)}` : ''}`;
     if (signature !== this.signature) {
-      this.tess = computePowerCells(local, boundary);
+      const tess = computePowerCells(local, boundary);
+      this.cells = wave ? waveCells(tess, wave) : tess;
       this.signature = signature;
     }
-    const shaped = wave ? waveCells(this.tess, wave) : this.tess;
-    return shaped.map((cell) => ({
+    return this.cells.map((cell) => ({
       ...cell,
       poly: cell.poly.map(([x, y]): [number, number] => [x * scale + ox, y * scale + oy]),
       // Never retain the owner/kind from a previous viewer or fog snapshot.
