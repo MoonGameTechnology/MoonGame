@@ -641,7 +641,9 @@
 | CMD-VIS-2 | ✅ | proto | `docs/backlog.md:15481` | Кнопка штурма появляется только когда есть кем |
 | EVT-1 | ✅ | core data proto | `docs/backlog.md:15511` | Тёмные события наконец видны игроку, |
 | EVT-2 | ⏳ | core data | `docs/backlog.md:15561` | Трофеи за бой: доля от стоимости уничтоженного. |
-| EVT-3 | 🔒 | core data | `docs/backlog.md:15583` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
+| EVT-3 | 🔒 | core data | `docs/backlog.md:15585` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
+| RETR-1 | ⏳ | core | `docs/backlog.md:15629` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
+| RETR-2 | 🔒 | core srv proto | `docs/backlog.md:15642` | (RETR-1) Авто-отступление: условие выхода из боя |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
