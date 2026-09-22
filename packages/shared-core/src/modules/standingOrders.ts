@@ -30,6 +30,12 @@ import { validateChainSteps } from '../state/chain';
 import { hangarMachines, shuttleBayAt } from '../state/shuttle';
 import { ownFleet } from '../util/combat';
 
+/** Ступени авто-отступления (RETR-2, решение владельца 2026-09-22): доля ОСТАВШЕГОСЯ
+ *  корпуса от максимального, при которой флот уходит. Список закрыт намеренно — игрок
+ *  выбирает отметку, а не вводит число, и этот же список валидирует приказ. */
+export const RETREAT_THRESHOLDS = [0.2, 0.3, 0.4, 0.5] as const;
+export type RetreatThreshold = (typeof RETREAT_THRESHOLDS)[number];
+
 export const standingOrdersModule: GameModule = {
   id: 'standing-orders',
   version: '1.0.0',
@@ -52,6 +58,38 @@ export const standingOrdersModule: GameModule = {
         delete h.state.autoAssault[f.id];
         if (Object.keys(h.state.autoAssault).length === 0) delete h.state.autoAssault;
       }
+    });
+
+    /**
+     * RETR-2: авто-отступление. Хранит и проверяет НАМЕРЕНИЕ — «когда корпус просядет
+     * до `at`, уходи на `to`». Решать, что момент настал, будет ядро (`autoRetreatDue`),
+     * звать приказ — серверный драйвер: здесь ни того, ни другого, только приказ игрока.
+     *
+     * Порог — доля ОСТАВШЕГОСЯ корпуса от максимального (решение владельца 2026-09-22),
+     * и список ступеней закрыт: это четыре понятные отметки в интерфейсе, а не свободное
+     * число. Закрытый список заодно и есть валидация — произвольное `at` отбивается.
+     */
+    api.onAction('order.retreat', (action, h) => {
+      const p = action.payload as { fleetId?: unknown; on?: unknown; at?: unknown; to?: unknown };
+      if (typeof p?.on !== 'boolean') return h.reject('E_BAD_PAYLOAD');
+      const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p.fleetId);
+      if (!f) return h.reject('E_NO_FLEET');
+      if (!p.on) {
+        if (h.state.autoRetreat) {
+          delete h.state.autoRetreat[f.id];
+          if (Object.keys(h.state.autoRetreat).length === 0) delete h.state.autoRetreat;
+        }
+        return;
+      }
+      if (typeof p.at !== 'number' || !RETREAT_THRESHOLDS.includes(p.at as RetreatThreshold)) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      // Точка отхода проверяется ЗДЕСЬ только на существование узла: достижим ли он,
+      // решит сам `fleet.retreat` в момент отхода, и решит тем же маршрутизатором, что
+      // и обычный курс. Проверять маршрут при постановке приказа было бы враньём —
+      // за часы боя карта успевает измениться.
+      if (typeof p.to !== 'string' || !h.state.planets[p.to]) return h.reject('E_NO_DESTINATION');
+      (h.state.autoRetreat ??= {})[f.id] = { at: p.at, to: p.to };
     });
 
     /**
@@ -141,7 +179,7 @@ export const standingOrdersModule: GameModule = {
     });
 
     api.on('time.advanced', (_ev, h) => {
-      for (const key of ['autoAssault', 'orders'] as const) {
+      for (const key of ['autoAssault', 'autoRetreat', 'orders'] as const) {
         const map = h.state[key];
         if (!map) continue;
         for (const fid of Object.keys(map)) {

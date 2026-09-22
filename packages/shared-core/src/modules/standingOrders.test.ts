@@ -404,3 +404,60 @@ describe('standingOrders — time.advanced garbage-collects dead fleets', () => 
     expect(swept.state.patrols).toBeUndefined();
   });
 });
+
+describe('order.retreat — приказ на авто-отступление (RETR-2)', () => {
+  const kernel = createKernel([standingOrdersModule]);
+  const base = (): GameState =>
+    stateWith({
+      players: [player('p1')],
+      planets: [planet('H', 'p1')],
+      fleets: [fleet('A', 'p1', 'H')],
+    });
+  const arm = (at: unknown, to: unknown = 'H') =>
+    act('order.retreat', 'p1', { fleetId: 'A', on: true, at, to });
+
+  it('ставит порог и точку отхода', () => {
+    const r = okApply(kernel.applyAction(base(), arm(0.3), ctx));
+    expect(r.state.autoRetreat?.A).toEqual({ at: 0.3, to: 'H' });
+  });
+
+  it.each([0.2, 0.3, 0.4, 0.5])('ступень %s принимается', (at) => {
+    expect(okApply(kernel.applyAction(base(), arm(at), ctx)).state.autoRetreat?.A?.at).toBe(at);
+  });
+
+  it('порог ВНЕ списка ступеней отбивается — это не свободное число', () => {
+    expect(errCode(kernel.applyAction(base(), arm(0.35), ctx))).toBe('E_BAD_PAYLOAD');
+    expect(errCode(kernel.applyAction(base(), arm(0), ctx))).toBe('E_BAD_PAYLOAD');
+    expect(errCode(kernel.applyAction(base(), arm('низко'), ctx))).toBe('E_BAD_PAYLOAD');
+  });
+
+  it('несуществующая точка отхода отбивается', () => {
+    expect(errCode(kernel.applyAction(base(), arm(0.3, 'НЕТ_ТАКОГО'), ctx))).toBe(
+      'E_NO_DESTINATION',
+    );
+  });
+
+  it('чужой флот не армится — один непрозрачный код, как у соседей', () => {
+    const s = stateWith({
+      players: [player('p1'), player('p2')],
+      planets: [planet('H', 'p1')],
+      fleets: [fleet('A', 'p2', 'H')],
+    });
+    expect(errCode(kernel.applyAction(s, arm(0.3), ctx))).toBe('E_NO_FLEET');
+  });
+
+  it('снимается одним `on: false`, без порога и точки', () => {
+    const armed = okApply(kernel.applyAction(base(), arm(0.3), ctx)).state;
+    const off = okApply(
+      kernel.applyAction(armed, act('order.retreat', 'p1', { fleetId: 'A', on: false }), ctx),
+    );
+    expect(off.state.autoRetreat).toBeUndefined(); // пустая карта убирается целиком
+  });
+
+  it('приказ погибшего флота убирается ходом часов', () => {
+    const armed = okApply(kernel.applyAction(base(), arm(0.3), ctx)).state;
+    const orphaned: GameState = { ...armed, fleets: {} };
+    const advanced = okAdvance(kernel.advanceTo(orphaned, { now: 3_600_000, data }));
+    expect(advanced.state.autoRetreat).toBeUndefined();
+  });
+});
