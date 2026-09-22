@@ -239,7 +239,10 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 - Development happens on a feature branch. For remote publication, do **not** assume the
   shell's `git push` is authenticated just because fetch works. In hosted agent sessions,
   prefer the connected GitHub API/app when it has write access. If terminal push gets one auth
-  failure, do not retry it or bounce back and forth between transports.
+  failure, do not retry it or bounce back and forth between transports. If the GitHub MCP itself
+  returns a transport/session error such as `Invalid MCP request metadata`, do not retry that
+  connector and do not attempt Git Data fallback through the same MCP. Follow `publish-pr` and
+  use at most one genuinely independent write transport; otherwise stop with a recovery checkpoint.
 - **Final sync before PR:** when the implementation is complete, refresh the current `main`
   again immediately before publication. If the task branch is behind/diverged, integrate fresh
   `main` first (normally rebase the short-lived branch), resolve conflicts, then re-run checks
