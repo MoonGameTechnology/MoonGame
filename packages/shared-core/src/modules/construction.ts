@@ -1159,6 +1159,49 @@ export const constructionModule: GameModule = {
       startNextQueued(h, planet, lane);
     });
 
+    /**
+     * ГИБЕЛЬ КРЕПОСТИ СНОСИТ ВСЁ, ЧТО НА НЕЙ СТОЯЛО (FORT-5.13, решение владельца 22).
+     *
+     * Станция объявляет событие, а сносит ЭТОТ модуль — потому что здания его дом, и
+     * вместе с ними здесь живут три вещи, которые прямое обнуление массива оставило бы
+     * сиротами, каждая со своим видимым последствием:
+     *
+     *   · ВЫДАННЫЙ ФОРТОМ ГАРНИЗОН. `syncIssuedGarrison` ходит только путями стройки, и
+     *     без него бойцы пережили бы породивший их форт. `captureOnArrival` увидел бы
+     *     живой гарнизон и отказал в том самом «голом месте», ради которого решение 22
+     *     и принималось.
+     *   · ОЧЕРЕДЬ И ПРИОСТАНОВЛЕННЫЕ СТРОЙКИ. Ждущие заказы не оплачены, но остались бы
+     *     планами на узле, которого больше нет.
+     *   · ОПЛАЧЕННЫЕ ЗАВЕРШЕНИЯ В ТАЙМЛАЙНЕ. Вот это хуже всего: `landCompletion`
+     *     вернувшийся вид узла НЕ перепроверяет, так что радар или верфь выросли бы на
+     *     туманности уже ПОСЛЕ гибели крепости. Владельца гибель намеренно не меняет
+     *     (узел стал своим захватом), поэтому проверка владельца в `construction.complete`
+     *     такое завершение пропустила бы.
+     *
+     * Снос идёт теми же событиями `building.destroyed`, что и обстрел: журнал клиента и
+     * сводка возвращения их уже понимают, и заводить рядом второе имя для того же факта
+     * значило бы учить клиента одному и тому же дважды.
+     */
+    api.on('station.destroyed', (event, h) => {
+      const p = (event.payload ?? {}) as { planetId?: unknown; owner?: unknown };
+      if (typeof p.planetId !== 'string') return;
+      const planet = h.state.planets[p.planetId];
+      if (!planet) return;
+      const owner = typeof p.owner === 'string' ? p.owner : planet.owner;
+      for (const b of planet.buildings) {
+        h.emit('building.destroyed', { planetId: planet.id, building: b.type, owner });
+      }
+      planet.buildings = [];
+      syncIssuedGarrison(h, planet);
+      delete planet.buildQueue;
+      delete planet.pausedConstruction;
+      h.state.scheduled = h.state.scheduled.filter(
+        (e) =>
+          e.type !== 'construction.complete' ||
+          (e.payload as CompletePayload | undefined)?.planetId !== planet.id,
+      );
+    });
+
     // Захват стирает очередь прежнего хозяина (правило 6). Терять нечего — ждущие
     // заказы не оплачены; а оставить их значило бы показать новому владельцу планы
     // старого и однажды списать деньги с игрока за чужой мир.

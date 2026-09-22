@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
+import { dialIdentity, dialUrl, matchAt, seatTicketKey } from './netDial';
 
 describe('чем представляемся при дозвоне', () => {
   it('режим аккаунтов с выписанным токеном — представляемся токеном', () => {
@@ -66,5 +66,29 @@ describe('ключ билета места', () => {
 
   it('та же тройка — тот же ключ, иначе билет терялся бы каждый вход', () => {
     expect(seatTicketKey('wss://srv', 'm-1', 'Ost')).toBe(seatTicketKey('wss://srv', 'm-1', 'Ost'));
+  });
+});
+
+describe('разбор адреса дозвона (CP2.3)', () => {
+  it('из собранного адреса достаются РОВНО сервер и матч', () => {
+    const url = dialUrl('wss://srv', 'm-1', { kind: 'nick', nick: 'Ost', ticket: 't-9' });
+    expect(matchAt(url)).toEqual({ base: 'wss://srv', matchId: 'm-1' });
+  });
+
+  it('обратное разложение переживает экранирование', () => {
+    const url = dialUrl('wss://srv', 'м матч/1', { kind: 'token', token: 'jwt' });
+    expect(matchAt(url)).toEqual({ base: 'wss://srv', matchId: 'м матч/1' });
+  });
+
+  it('секреты из адреса НЕ возвращаются', () => {
+    const url = dialUrl('wss://srv', 'm-1', { kind: 'token', token: 'секрет' });
+    expect(JSON.stringify(matchAt(url))).not.toContain('секрет');
+  });
+
+  it('не матч и не адрес — отказ, а не выдуманный матч', () => {
+    expect(matchAt('wss://srv/matches/')).toBeNull();
+    expect(matchAt('wss://srv/matches/m-1/seats')).toBeNull();
+    expect(matchAt('wss://srv/health')).toBeNull();
+    expect(matchAt('не адрес')).toBeNull();
   });
 });

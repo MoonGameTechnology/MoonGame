@@ -446,6 +446,15 @@ export const ru: Record<string, string> = {
   'client.net.online': '● Онлайн · вы {me} · {hint}',
   'client.net.order': '▸ Приказ: {fleet} → {planet}',
   'client.net.waiting': '⏳ Ожидание игроков…{suffix}',
+  // CP2.3 — кэш последнего мира. Две разные ситуации, и путать их нельзя: в первой
+  // сервер ещё ответит, во второй его вообще не звали.
+  'client.net.cached': '◍ Последний известный мир — ждём сервер',
+  'client.net.cached-only': '◍ Последний известный мир · приказы недоступны',
+  // CP2.2 — оболочка приложения: новая сборка скачана и ждёт перезапуска. Кнопка
+  // названа тем, что она делает: применить обновление можно только перезагрузкой.
+  'client.update.apply': 'Перезапустить',
+  'client.update.ready': '● Новая версия готова',
+  'client.world.continue': 'Последний мир · день {d}',
   'client.net.waiting-you': ' · вы {me}',
   'client.provider.soon': 'скоро',
   'client.status.error': '✖ {text}',
@@ -1469,6 +1478,17 @@ export const ru: Record<string, string> = {
   'err.wrong-branch': 'узел чужой ветви',
   'err.wrong-orbit': 'недопустимая орбита',
   'err.wrong-sector': 'недопустимый тип сектора',
+
+  // --- event — тёмные события (`data/events.json`). Ключ строится из id правила:
+  // `salvage_wrecks` → `event.salvage-wrecks`. Подстановки приходят из `params`:
+  // одиночная пара {resource, amount} даёт `{n}`, карта `resources` — по имени
+  // каждого ресурса. Строка авторская целиком, чтобы склонения писал человек.
+  'event.derelict-cache': '📦 Заброшенный схрон разграблен: +{n} металла',
+  'event.grain-blight': '🌾 Гниль на фермах: −{n} еды',
+  'event.infect-planet': '☣️ Мир заражён — споры расползаются по захваченной колонии',
+  'event.salvage-wrecks': '🔩 Обломки разобраны: +{metal} металла, +{microelectronics} микросхем',
+  'event.solar-flare': '☀️ Вспышка звезды сожгла {n} энергии',
+  'event.void-anomaly': '🌀 Аномалия Пустоты питает реакторы: +{n} энергии',
 
   // --- hero — Герои: грейды, способности (имя + описание).
   "hero.person.commander.name": "Марк Вейр",

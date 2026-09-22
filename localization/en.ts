@@ -444,6 +444,11 @@ export const en: Record<string, string> = {
   'client.net.online': '● Online · you are {me} · {hint}',
   'client.net.order': '▸ Order: {fleet} → {planet}',
   'client.net.waiting': '⏳ Waiting for players…{suffix}',
+  'client.net.cached': '◍ Last known world — waiting for the server',
+  'client.net.cached-only': '◍ Last known world · orders unavailable',
+  'client.update.apply': 'Restart',
+  'client.update.ready': '● A new version is ready',
+  'client.world.continue': 'Last world · day {d}',
   'client.net.waiting-you': ' · you are {me}',
   'client.provider.soon': 'soon',
   'client.status.error': '✖ {text}',
@@ -1465,6 +1470,15 @@ export const en: Record<string, string> = {
   'err.wrong-branch': 'that node belongs to another branch',
   'err.wrong-orbit': 'invalid orbit',
   'err.wrong-sector': 'invalid sector type',
+
+  // --- event — тёмные события (`data/events.json`). Ключ строится из id правила:
+  // `salvage_wrecks` → `event.salvage-wrecks`.
+  'event.derelict-cache': '📦 Derelict cache stripped: +{n} metal',
+  'event.grain-blight': '🌾 Blight in the farms: −{n} food',
+  'event.infect-planet': '☣️ World infected — spores spread across the captured colony',
+  'event.salvage-wrecks': '🔩 Wrecks salvaged: +{metal} metal, +{microelectronics} chips',
+  'event.solar-flare': '☀️ A stellar flare burned {n} energy',
+  'event.void-anomaly': '🌀 A Void anomaly feeds the reactors: +{n} energy',
 
   // --- hero — Герои: грейды, способности (имя + описание).
   "hero.person.commander.name": "Mark Weir",

@@ -19,7 +19,10 @@ import { renderMap } from './mapRender';
 import { openLiveMatch } from './net';
 import { nearestPlanet, myFleetAt } from './matchInput';
 import { browserIo, createSession, type NetSession } from './session';
+import { browserUpdateIo, watchForUpdate } from './appUpdate';
+import { indexedDbStore, isRestorable, rememberLatest } from './snapshotCache';
 import { socketBase } from '../../../decisions/serverAddress';
+import { matchAt } from '../../../decisions/netDial';
 import { errorTarget, refusalKey } from '../../../decisions/errorRoute';
 import { refusalText } from '../../../decisions/refusalText';
 import { act, moveFleet, retreatFleet } from '../../../decisions/actions';
@@ -481,6 +484,11 @@ async function joinMatch(matchId: string): Promise<void> {
  *  без него модели отдают панели без корпуса/щита — они деградируют, а не падают. */
 const HUD_DATA = shippedGameData();
 
+/** CP2.3: где живёт последний известный мир и кто его туда кладёт. Заводится один раз
+ *  на вкладку — писатель гасит очередь записей, и второй экземпляр гасил бы свою. */
+const worldStore = indexedDbStore();
+const rememberWorld = rememberLatest(worldStore);
+
 /** Корпуса своего дома (плюс общие). Это КОРОТКИЙ список для меню, а не право на
  *  постройку: право проверяет сервер, и его отказ теперь доходит словами. */
 function buildableUnits(faction: string | undefined): string[] {
@@ -517,6 +525,73 @@ function setNetStatus(text: string): void {
   el.textContent = text;
 }
 
+/**
+ * CP2.2: a newer build is installed and waiting. The player decides when to take it,
+ * because taking it costs a reload — and a reload mid-order loses the order. Built from
+ * nodes rather than markup: the banner carries a button, and `innerHTML` with a
+ * localized string in it is the one place this file must not get lazy.
+ */
+function showUpdateBanner(apply: () => void): void {
+  if (document.getElementById('update')) return;
+  const bar = document.createElement('div');
+  bar.id = 'update';
+  bar.style.cssText =
+    'position:fixed;right:10px;bottom:10px;z-index:11;display:flex;align-items:center;gap:8px;' +
+    'padding:8px 10px;border-radius:8px;font:12px ui-monospace,monospace;color:var(--ink,#bfeee6);' +
+    'background:rgba(3,14,18,.92);border:1px solid var(--cyan,#35d6e6);';
+  const text = document.createElement('span');
+  text.textContent = t('client.update.ready');
+  const button = document.createElement('button');
+  button.className = 'btn tiny';
+  button.textContent = t('client.update.apply');
+  button.addEventListener('click', () => {
+    bar.remove();
+    apply();
+  });
+  bar.append(text, button);
+  document.body.appendChild(bar);
+}
+
+/**
+ * CP2.3: предложить на карточке входа последний известный мир — но только если он есть
+ * и только как КАРТИНКУ.
+ *
+ * Домашний экран PWA открывается на `/` (`manifest.webmanifest` → `start_url`), без
+ * `?join=`, поэтому запуск «с телефона» не ведёт ни в какой матч: без этой кнопки
+ * сохранённый мир в таком запуске недостижим, и обещание «открытие показывает последний
+ * известный мир» держалось бы только для тех, кто пришёл по ссылке.
+ *
+ * Кнопку рисует ХОЗЯИН ЭКРАНА, а не вью-модель `welcomeScreen.ts`: та описывает
+ * статичные ворота личности (чистая, без эффектов), а наличие кэша — эффект, и он
+ * выясняется уже после первой отрисовки.
+ *
+ * Мир открывается БЕЗ обработчиков ввода: приказ строится только на серверном состоянии
+ * (инвариант #5), а здесь состояния нет — здесь воспоминание о нём.
+ */
+function offerLastWorld(): void {
+  void worldStore.read().then((cached) => {
+    if (matchStarted || !isRestorable(cached, HUD_DATA)) return;
+    const bar = cached.playerId
+      ? createStatusBarModel(cached.state, cached.playerId, HUD_DATA)
+      : { ok: false as const, code: 'E_NO_PLAYER' };
+    // Без дня кнопку не подписать честно («какой именно мир?»), а подписать наугад —
+    // хуже, чем не предлагать вовсе.
+    if (!bar.ok) return;
+    const card = document.querySelector('.welcome');
+    if (!card) return;
+    const button = document.createElement('button');
+    button.className = 'btn ghost';
+    button.textContent = t('client.world.continue', { d: bar.day + 1 });
+    button.addEventListener('click', () => {
+      if (matchStarted) return;
+      matchStarted = true;
+      setNetStatus(t('client.net.cached-only'));
+      runMatch(() => cached.state, boundsOf(cached.state));
+    });
+    card.appendChild(button);
+  });
+}
+
 /** CP1.1: connect to a live match over WebSocket, render the server's authoritative
  *  snapshots, AND send orders back — the closed online loop. World extent comes from the
  *  first snapshot; deltas patch the state and the loop always draws the latest. Tap your
@@ -525,6 +600,9 @@ function setNetStatus(text: string): void {
  *  (dev/first-cut — a real lobby-wait UI is a later CP). */
 function connectLive(url: string): void {
   if (matchStarted) return;
+  // Куда мы звоним (CP2.3). Из адреса берутся только сервер и матч: секреты дозвона —
+  // токен и билет места — в кэш не попадают вовсе (`decisions/netDial.ts`).
+  const at = matchAt(url);
   let live: GameState | null = null;
   let running = false;
   let started = false;
@@ -810,6 +888,16 @@ function connectLive(url: string): void {
       live = snap.state;
       remembered = snap.remembered;
       if (snap.playerId) me = snap.playerId;
+      if (at) {
+        rememberWorld({
+          matchId: at.matchId,
+          base: at.base,
+          seq: snap.seq,
+          state: snap.state,
+          ...(me ? { playerId: me } : {}),
+          ...(snap.remembered ? { remembered: snap.remembered } : {}),
+        });
+      }
       if (!started && snap.lobby && !snap.lobby.started && snap.lobby.host === snap.playerId) {
         started = true;
         client.start(); // host of an unstarted lobby → run the world
@@ -820,64 +908,84 @@ function connectLive(url: string): void {
         setNetStatus(t('client.net.waiting', { suffix: me ? t('client.net.waiting-you', { me }) : '' }));
       }
       else hint();
-      if (!running) {
-        running = true;
-        matchStarted = true;
-        const first = live;
-        runMatch(() => live ?? first, boundsOf(first), {
-          getSelected: () =>
-            selectedFleet && live ? (live.fleets[selectedFleet]?.location ?? null) : null,
-          onPickPlanet: (planetId) => {
-            if (!planetId || !live || !me) {
-              selectedFleet = null;
-              panel = 'none';
-              renderHud();
-              hint();
-              return;
-            }
-            if (selectedFleet) {
-              // second tap → order the selected fleet to move there (server-authoritative)
-              const f = live.fleets[selectedFleet];
-              if (f && f.location && f.location !== planetId) {
-                client.sendAction(moveFleet(me, selectedFleet, planetId));
-                setNetStatus(t('client.net.order', { fleet: selectedFleet, planet: planetId }));
-                selectedFleet = null;
-                panel = 'none';
-                renderHud();
-                return;
-              }
-              selectedFleet = null;
-              panel = 'none';
-              renderHud();
-              hint();
-              return;
-            }
-            // first tap → select one of my fleets at this planet (if any)
-            selectedFleet = myFleetAt(live, planetId, me);
-            if (selectedFleet) {
-              // Флот в бою открывает панель БОЯ, а не состава: там есть единственное
-              // действие, которое в этот момент вообще имеет смысл, — отступить.
-              const inBattle = live.fleets[selectedFleet]?.battleId;
-              if (inBattle) {
-                battleId = inBattle;
-                panel = 'battle';
-              } else {
-                panel = 'fleet';
-              }
-            } else {
-              // Мир без моего флота — панель мира. Раньше свой мир прыгал прямо в
-              // верфь (мимо столицы и точки удержания), а чужой и ничей не отвечали
-              // вовсе: тап уходил в пустоту.
-              worldId = planetId;
-              panel = 'world';
-            }
-            renderHud();
-            hint();
-          },
-        });
-      }
+      startWorld(live);
     },
   });
+
+  // CP2.3: сервер ещё не ответил — а офлайн не ответит вовсе, — поэтому рисуем
+  // последний известный мир ЭТОГО матча. Живой снапшот заменит его целиком: кэш здесь
+  // картинка, а не состояние, и ни один приказ на нём не строится.
+  if (at) {
+    void worldStore.read().then((cached) => {
+      if (running || !isRestorable(cached, HUD_DATA, at.matchId)) return;
+      live = cached.state;
+      remembered = cached.remembered;
+      if (cached.playerId) me = cached.playerId;
+      setNetStatus(t('client.net.cached'));
+      renderHud();
+      startWorld(cached.state);
+    });
+  }
+
+  /** Начать рисовать мир. Дверь ОДНА на оба источника картинки: живой снапшот сервера
+   *  и мир из кэша прошлого запуска (CP2.3). Второй путь рисования разъехался бы с
+   *  первым на ближайшей правке HUD, а разница была бы видна только офлайн. */
+  function startWorld(first: GameState): void {
+    if (running) return;
+    running = true;
+    matchStarted = true;
+    runMatch(() => live ?? first, boundsOf(first), {
+      getSelected: () =>
+        selectedFleet && live ? (live.fleets[selectedFleet]?.location ?? null) : null,
+      onPickPlanet: (planetId) => {
+        if (!planetId || !live || !me) {
+          selectedFleet = null;
+          panel = 'none';
+          renderHud();
+          hint();
+          return;
+        }
+        if (selectedFleet) {
+          // second tap → order the selected fleet to move there (server-authoritative)
+          const f = live.fleets[selectedFleet];
+          if (f && f.location && f.location !== planetId) {
+            client.sendAction(moveFleet(me, selectedFleet, planetId));
+            setNetStatus(t('client.net.order', { fleet: selectedFleet, planet: planetId }));
+            selectedFleet = null;
+            panel = 'none';
+            renderHud();
+            return;
+          }
+          selectedFleet = null;
+          panel = 'none';
+          renderHud();
+          hint();
+          return;
+        }
+        // first tap → select one of my fleets at this planet (if any)
+        selectedFleet = myFleetAt(live, planetId, me);
+        if (selectedFleet) {
+          // Флот в бою открывает панель БОЯ, а не состава: там есть единственное
+          // действие, которое в этот момент вообще имеет смысл, — отступить.
+          const inBattle = live.fleets[selectedFleet]?.battleId;
+          if (inBattle) {
+            battleId = inBattle;
+            panel = 'battle';
+          } else {
+            panel = 'fleet';
+          }
+        } else {
+          // Мир без моего флота — панель мира. Раньше свой мир прыгал прямо в
+          // верфь (мимо столицы и точки удержания), а чужой и ничей не отвечали
+          // вовсе: тап уходил в пустоту.
+          worldId = planetId;
+          panel = 'world';
+        }
+        renderHud();
+        hint();
+      },
+    });
+  }
 }
 
 applyTheme();
@@ -889,4 +997,11 @@ showEngine();
 // CP1.1 deep-link: `?join=<url-encoded ws url>` connects straight to a live match (a shared
 // invite, or the dev proto-server). The ws url is encoded so its own ?query survives.
 const joinUrl = new URLSearchParams(location.search).get('join');
+// CP2.3: без ссылки в матч вести некуда — тогда предлагаем последний известный мир.
 if (joinUrl) connectLive(joinUrl);
+else offerLastWorld();
+
+// CP2.2: install the offline shell. It never takes over a running page by itself — when
+// a newer build is waiting, the banner offers it and the player picks the moment.
+void watchForUpdate(browserUpdateIo(), showUpdateBanner);
+

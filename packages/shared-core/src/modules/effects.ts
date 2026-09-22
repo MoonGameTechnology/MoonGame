@@ -12,6 +12,12 @@
  *     The capturing force is the `by` fleet of the `planet.captured` event, or, when
  *     the event carries no fleet (capture-on-arrival), every fleet of the new owner
  *     parked at the world.
+ *   - `province_captured` — PROVINCE-SCOPED: fires when a capture lands on a node whose
+ *     `kind` is listed in `params.kinds`, whatever took it. The mirror image of
+ *     `planet_captured`: there the rule asks WHO captured (a unit trait), here WHAT was
+ *     captured (a sector kind) — so salvaging a wreck field cannot be expressed by the
+ *     first one. An absent or empty `kinds` makes the rule inert: an empty filter means
+ *     "nothing", never "every province" (fail-secure).
  *   - `schedule` — GLOBAL dark event. Fires at every multiple of `params.cadenceHours`
  *     (match-time, compressed by `timeScale` like every other duration) crossed by a
  *     `time.advanced` span, for EACH active player independently — so `chance` reads
@@ -23,7 +29,10 @@
  * effect without touching this interpreter), then the built-ins:
  *   - `add_trait { trait }`         — tag the trigger's planet with a trait.
  *   - `modify_resource { resource, amount }` — credit/debit the scoped player
- *     (clamped at 0; negative amounts are penalties).
+ *     (clamped at 0; negative amounts are penalties). A `{ resources: { <id>: <amount> } }`
+ *     map pays several resources at once, so one salvage haul stays ONE rule — and
+ *     therefore one `effect.applied`, one log line, one toast. Spelling both forms keeps
+ *     the shipped single-resource rules working untouched.
  * An unknown effect (or malformed params) makes the rule inert, never a crash.
  *
  * Every applied rule emits `effect.applied { ruleId, effect, playerId, planetId? }`
@@ -65,13 +74,19 @@ const builtinEffects: Record<string, EffectImpl> = {
     if (!planet.traits.includes(trait)) planet.traits.push(trait);
   },
   modify_resource(occurrence, h) {
-    const resource = occurrence.rule.params['resource'];
-    const amount = occurrence.rule.params['amount'];
     const player = h.state.players[occurrence.playerId];
-    if (typeof resource !== 'string' || resource.length === 0) return;
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || !player) return;
-    const current = player.resources[resource] ?? 0;
-    player.resources[resource] = Math.max(0, current + amount);
+    if (!player) return;
+    const credit = (resource: unknown, amount: unknown): void => {
+      if (typeof resource !== 'string' || resource.length === 0) return;
+      if (typeof amount !== 'number' || !Number.isFinite(amount)) return;
+      player.resources[resource] = Math.max(0, (player.resources[resource] ?? 0) + amount);
+    };
+    const bundle = occurrence.rule.params['resources'];
+    if (typeof bundle === 'object' && bundle !== null && !Array.isArray(bundle)) {
+      for (const [resource, amount] of Object.entries(bundle)) credit(resource, amount);
+      return;
+    }
+    credit(occurrence.rule.params['resource'], occurrence.rule.params['amount']);
   },
 };
 
@@ -124,6 +139,18 @@ export const effectsModule: GameModule = {
       for (const [ruleId, rule] of rulesFor(h, 'planet_captured')) {
         stacks ??= capturingStacks(h, payload);
         if (!stacksHaveTrait(h.ctx.data, stacks, ruleId)) continue; // trait-scoped
+        if (!h.rng.chance(rule.chance)) continue;
+        applyRule(h, { ruleId, rule, planetId: payload.planetId, playerId: payload.owner });
+      }
+      // The province-scoped half: what was taken, not who took it. The kind is read from
+      // the node itself rather than the event, so a rule cannot be fooled by a payload.
+      // The `chance` draw sits AFTER the filter (as above): a rule that does not apply
+      // here must not consume an rng draw, or the stream would depend on map layout.
+      const kind = h.state.planets[payload.planetId]?.kind;
+      for (const [ruleId, rule] of rulesFor(h, 'province_captured')) {
+        const kinds = rule.params['kinds'];
+        if (!Array.isArray(kinds) || kinds.length === 0) continue; // empty filter → inert
+        if (typeof kind !== 'string' || !kinds.includes(kind)) continue;
         if (!h.rng.chance(rule.chance)) continue;
         applyRule(h, { ruleId, rule, planetId: payload.planetId, playerId: payload.owner });
       }

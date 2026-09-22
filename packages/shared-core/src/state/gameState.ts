@@ -379,6 +379,12 @@ export interface Planet {
    *  data `sectorKinds`) — decides capturable / buildable / orbit. Undefined
    *  degrades to the permissive defaults (see `sectorKindDef`). */
   kind?: string;
+  /** Чем узел был ДО того, как его превратили в космическую крепость (`station.deploy`
+   *  затирает `kind`). Гибель крепости возвращает узел к этому виду, иначе разрушенная
+   *  крепость навсегда стирала бы то, что под ней стояло: астероидное поле не выдумать
+   *  заново, когда вид уже перезаписан. Присутствует только у стоящей крепости и
+   *  снимается вместе с ней; отсутствует у всех остальных узлов. */
+  priorKind?: string;
   /** Relative size / weight of the sector (default 1). Drives how much territory
    *  it claims: a sector's border with a neighbour sits proportionally to their
    *  sizes, so resizing one shifts its neighbours' borders evenly. Undefined = 1. */

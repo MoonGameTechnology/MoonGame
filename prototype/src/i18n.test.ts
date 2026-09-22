@@ -200,6 +200,12 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       'medalsOf() в ядре строит `medal.<линия>.<степень>` из данных `data/medalGrades.json`, ' +
       'medalBadges() в /decisions добавляет `medal.<линия>` для подписи (VET-3/VET-5)',
   },
+  {
+    prefix: 'event.',
+    built_by:
+      'свиток журнала в main.ts строит `event.<id правила>` из `effect.applied` — ' +
+      'id приезжает из data/events.json, kebab-case вместо подчёркиваний',
+  },
 ];
 const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.prefix));
 
@@ -282,6 +288,18 @@ describe('локализация — ключи', () => {
       .filter(([, key]) => !(key in ru) || !(key in en))
       .map(([code, key]) => `${code} → ${key}`);
     expect(missing.sort()).toEqual([]);
+  });
+
+  it('каждое тёмное событие названо словами в обеих локалях', () => {
+    // Ключ журнала СТРОИТСЯ из id правила (`event.${id}`), а значит проверка «ключ из
+    // кода заведён в локали» его не видит: в исходнике нет литерала, который она ищет.
+    // Прикрыт он здесь — со стороны ДАННЫХ. Без этого теста новое правило в
+    // data/events.json уезжает к игроку голым ключом (`event.solar-flare`), и гейт
+    // молчит, потому что формально всё на месте: и allowlist `event.`, и сам вызов.
+    const keys = Object.keys(data.events).map((id) => `event.${id.replace(/_/g, '-')}`);
+    expect(keys.length).toBeGreaterThan(0); // разбор не должен молча опустеть
+    const missing = keys.filter((k) => !(k in ru) || !(k in en)).sort();
+    expect(missing).toEqual([]);
   });
 
   it('статичная разметка переведена ключами, старой формы не осталось', () => {
