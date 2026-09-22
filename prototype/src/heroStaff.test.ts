@@ -165,6 +165,34 @@ describe('штаб героев — словарь способностей', ()
 });
 
 describe('штаб героев — разметка панели', () => {
+  it('portrait opens the matching personal dossier and refuses a foreign hero', () => {
+    const s = staffed();
+    const staff = initHeroStaff(hostOf({ state: () => s }));
+    expect(staff.focus('hero:p1:2')).toBe(true);
+    const html = staff.paneHtml();
+    expect(html).toContain('Лира Сейн');
+    expect(html).toContain('Личное досье');
+    expect(html).toContain('исследовательской станции');
+    expect(html).toContain('hero-portrait');
+    expect(html).toContain('data-hcast=');
+    expect(staff.focus('hero:p2:1')).toBe(false);
+    expect(staff.paneHtml()).toContain('Лира Сейн');
+  });
+
+  it('a callsign remains the player identity and dossier counts follow losses', () => {
+    const s = staffed();
+    s.heroes!['hero:p1:1']!.name = '<Captain>';
+    const staff = initHeroStaff(hostOf({ state: () => s }));
+    staff.focus('hero:p1:1');
+    const fleet = s.fleets[s.heroes!['hero:p1:1']!.fleetId!]!;
+    fleet.units = [{ unit: 'hero', count: 1 }, { unit: 'cruiser', count: 7 }];
+    expect(staff.paneHtml()).toContain('&lt;Captain&gt;');
+    expect(staff.paneHtml()).toContain('<dd>8</dd>');
+    fleet.units[1]!.count = 2;
+    expect(staff.paneHtml()).toContain('<dd>3</dd>');
+    expect(staff.paneHtml()).not.toContain('Марк Вейр');
+  });
+
   it('панель несёт свой контейнер, чипы ростера и вкладки', () => {
     const html = initHeroStaff(hostOf()).paneHtml();
     expect(html).toContain('id="herobody"');
@@ -198,7 +226,7 @@ describe('штаб героев — разметка панели', () => {
     const staff = initHeroStaff(hostOf());
     staff.click(click('[data-hsel]', { hsel: 'hero:p1:2' }));
     const html = staff.paneHtml();
-    expect(identName(html)).toBe('Разрушитель');
+    expect(identName(html)).toBe('Лира Сейн');
     expect(html).not.toContain('hero.arch.');
   });
 

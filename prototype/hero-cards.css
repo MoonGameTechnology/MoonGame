@@ -1,0 +1,62 @@
+/* Portrait pixels stay natural; only the dossier chrome uses the console palette. */
+#herobody .hx-chip .hero-portrait {
+  width: 34px;
+  flex: 0 0 34px;
+}
+#herobody .hx-irow > .hero-portrait {
+  width: 64px;
+  flex: 0 0 64px;
+}
+#herobody .hx-person {
+  display: grid;
+  grid-template-columns: minmax(110px, 190px) 1fr;
+  gap: 18px;
+  padding: 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line-hi);
+  background: rgba(3, 14, 22, 0.72);
+  border-radius: 8px;
+}
+#herobody .hx-person > .hero-portrait {
+  width: 100%;
+  align-self: start;
+  border-bottom: 1px solid var(--cyan);
+}
+#herobody .hx-person h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--cyan);
+}
+#herobody .hx-person p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text, #e0edf2);
+}
+#herobody .hx-person dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+#herobody .hx-person dt {
+  color: var(--dim);
+}
+#herobody .hx-person dd {
+  margin: 0;
+  color: #edf7fb;
+}
+@media (max-width: 580px) {
+  #herobody .hx-person {
+    grid-template-columns: 1fr;
+  }
+  #herobody .hx-person > .hero-portrait {
+    max-width: 190px;
+    justify-self: center;
+  }
+}
+
+#herobody .hx-irow { flex-wrap:wrap; }
+#herobody .hx-ov { flex-wrap:wrap; }
+#herobody .hx-ovc { min-width:82px; }

@@ -2,6 +2,7 @@
 import { holdBadgePosition, type FleetHold } from '../../decisions/fleetHolds';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { drawFleetCount, fleetCountWidth } from '../../packages/client/src/fleetCountBadge';
 
 const number = (n: number): string => String(Math.round(n * 10) / 10);
 const color = (m: FleetHold): string => (m.kind === 'hangar' ? '#7bdce8' : '#e6bc7b');
@@ -48,28 +49,28 @@ export function drawFleetHoldBadge(
   ownerColor: string,
 ): void {
   cx.save();
-  cx.font = '600 10px ui-monospace,Menlo,monospace';
+  cx.font = '700 16px ui-monospace,Menlo,monospace';
   cx.textBaseline = 'middle';
   cx.textAlign = 'left';
   const figures = meters.map((m) => `${number(m.used)}/${number(m.capacity)}`);
   const textWidth = detailed ? Math.max(0, ...figures.map((s) => cx.measureText(s).width)) : 0;
   const width = Math.max(
     meters.length ? 44 + (detailed ? textWidth + 5 : 0) : 0,
-    cx.measureText(`×${ships}`).width + 10,
+    fleetCountWidth(cx, ships),
   );
-  const height = 14 + meters.length * 12;
+  const height = 26 + meters.length * 12;
   const box = holdBadgePosition(anchor, planet, width, height);
-  if (meters.length) {
+  {
     cx.fillStyle = 'rgba(3,14,22,.88)';
     cx.fillRect(box.x, box.y, width, height);
-    cx.strokeStyle = 'rgba(153,196,210,.22)';
+    cx.strokeStyle = ownerColor;
     cx.lineWidth = 1;
     cx.strokeRect(box.x + 0.5, box.y + 0.5, width - 1, height - 1);
   }
-  cx.fillStyle = ownerColor;
-  cx.fillText(`×${ships}`, box.x + 5, box.y + 7);
+  drawFleetCount(cx, box.x, box.y, ships, ownerColor);
+  cx.font = '600 10px ui-monospace,Menlo,monospace';
   meters.forEach((m, index) => {
-    const y = box.y + 14 + index * 12;
+    const y = box.y + 26 + index * 12;
     cx.fillStyle = color(m);
     cx.fillText(icon(m), box.x + 4, y + 4);
     const x = box.x + 15,

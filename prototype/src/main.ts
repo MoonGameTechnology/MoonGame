@@ -112,6 +112,8 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
 import { initHeroStaff, HERO_CASTABLE, heroCdKey, heroDisplayName } from './heroStaff';
+import { drawHeroPortrait } from '../../packages/client/src/heroPortraits';
+import { heroAtPoint, mapHeroes, type PortraitHit } from '../../decisions/heroIdentity';
 import {
   initConversations,
   COALITION,
@@ -1129,6 +1131,8 @@ let chainMode: {
   menu: { id: string; kind: ChainPointKind } | null;
 } | null = null;
 // Хитбоксы ◎-бейджей отправленных планов (тап вне режима = редактирование плана).
+let heroPortraitHits: PortraitHit[] = [];
+let lastHeroCardRefresh = 0;
 let chainHits: Array<{ target: string; fleetIds: string[]; x: number; y: number }> = [];
 // Кэш маршрутов для отрисовки цепочек: граф лейнов статичен всю партию.
 const chainRouteCache = new Map<string, string[] | null>();
@@ -5433,6 +5437,9 @@ function render(now: number) {
     cx.restore();
   }
 
+  // Portraits are resolved only from our own roster, even in full-state solo games.
+  const heroesByFleet = mapHeroes(s, ME);
+  heroPortraitHits = [];
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
   for (const f of Object.values(s.fleets)) {
@@ -5506,6 +5513,7 @@ function render(now: number) {
       cx.restore();
     }
     if (detail === 0) {
+      drawFleetHoldBadge(cx, A, null, ships, [], false, col);
       // selection still reads on the schematic view; the rest of the kit is gone
       if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 12, now);
       continue;
@@ -5567,17 +5575,29 @@ function render(now: number) {
     // (REFM-123). Осталась только рамка выбора.
     if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 15, now);
 
+    cx.globalAlpha = 1; // Counts remain readable throughout the LOD cross-fade.
     // Own hold occupancy is read from the snapshot; foreign manifests stay private.
     // The badge remains horizontal and outside the orbit even as heading changes.
     const dock = !f.movement && f.location ? s.planets[f.location] : null;
     drawFleetHoldBadge(
-      cx, A, dock ? world(dock.position) : null, ships,
+      cx, A, heroesByFleet.has(f.id) ? null : dock ? world(dock.position) : null, ships,
       f.owner === ME ? fleetHolds(f, data, s.time) : [],
       selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
       col,
     );
 
     cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
+  }
+
+  // Draw portraits after hulls, in screen pixels; they never rotate with the ships.
+  for (const [fleetId, hero] of heroesByFleet) {
+    const selected = selFleet === fleetId || selFleets.has(fleetId);
+    if (detail < 0.45 && !selected) continue;
+    const f = s.fleets[fleetId]!;
+    const anchor = fleetAnchor(f);
+    if (!anchor || !visible(anchor, 120)) continue;
+    const hit = drawHeroPortrait(cx, hero, anchor, ownerColor(f.owner), heroPortraitHits);
+    if (hit) heroPortraitHits.push(hit);
   }
 
   drawRadarContacts(now); // swept enemy signatures — last-known ghosts until repainted
@@ -8887,6 +8907,13 @@ function selectAt(mx: number, my: number) {
     const tm = nearestHit(chainHits, (h) => h, mx, my, rPing);
     if (tm) {
       enterChainMode(tm.fleetIds);
+      return;
+    }
+  }
+  if (!aiming) {
+    const heroId = heroAtPoint(heroPortraitHits, mx, my);
+    if (heroId && heroStaff.focus(heroId)) {
+      shipyard.open('heroes');
       return;
     }
   }
@@ -13247,6 +13274,10 @@ function frame(nowReal: number) {
     renderPanel();
     renderCmdBar();
     renderSplitDialog();
+    if (nowReal - lastHeroCardRefresh >= 1000) {
+      shipyard.refreshHeroes();
+      lastHeroCardRefresh = nowReal;
+    }
     holographic.layoutWindows();
     updateMobileHud();
     if (mapPreparation.active && mapPreparation.ready && !cx.isContextLost?.()) {
