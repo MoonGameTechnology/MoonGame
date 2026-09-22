@@ -19,7 +19,8 @@
     "buildTimeHours": 1,
     "upkeep": {
       "credits": 16
-    }
+    },
+    "hullClass": "light"
   },
   "frigate": {
     "faction": "vanguard",
@@ -43,7 +44,8 @@
     "slots": {
       "defense": 1,
       "utility": 3
-    }
+    },
+    "hullClass": "light"
   },
   "cruiser": {
     "faction": "vanguard",
@@ -69,7 +71,8 @@
       "weapon": 1,
       "defense": 1,
       "utility": 1
-    }
+    },
+    "hullClass": "medium"
   },
   "siege_lance": {
     "faction": "vanguard",
@@ -90,7 +93,8 @@
     "buildTimeHours": 5,
     "upkeep": {
       "credits": 96
-    }
+    },
+    "hullClass": "medium"
   },
   "militia": {
     "faction": "vanguard",
@@ -234,7 +238,8 @@
       "weapon": 1,
       "defense": 1,
       "utility": 1
-    }
+    },
+    "hullClass": "heavy"
   },
   "interceptor": {
     "faction": "vanguard",
@@ -243,7 +248,8 @@
       "defense": 3,
       "speed": 92,
       "hp": 10,
-      "strikeRange": 180, "chaseRadius": 20,
+      "strikeRange": 180,
+      "chaseRadius": 20,
       "fuel": 3,
       "rearmRounds": 2,
       "siegeDamage": 1,
@@ -274,7 +280,8 @@
       "defense": 4,
       "speed": 62,
       "hp": 16,
-      "strikeRange": 150, "chaseRadius": 12,
+      "strikeRange": 150,
+      "chaseRadius": 12,
       "fuel": 2,
       "rearmRounds": 3,
       "siegeDamage": 18,
@@ -347,7 +354,8 @@
     "slots": {
       "defense": 1,
       "utility": 2
-    }
+    },
+    "hullClass": "heavy"
   },
   "scout": {
     "faction": "blue",
@@ -369,7 +377,8 @@
     "radarRange": 105,
     "slots": {
       "utility": 1
-    }
+    },
+    "hullClass": "light"
   },
   "siege": {
     "faction": "blue",
@@ -395,7 +404,8 @@
     "slots": {
       "weapon": 1,
       "utility": 1
-    }
+    },
+    "hullClass": "heavy"
   },
   "shuttle_carrier": {
     "faction": "blue",
@@ -423,7 +433,54 @@
     "slots": {
       "defense": 2,
       "utility": 1
+    },
+    "hullClass": "heavy"
+  },
+  "fortress_guns": {
+    "name": "Fortress Guns",
+    "faction": "neutral",
+    "domain": "space",
+    "stats": {
+      "attack": 14,
+      "defense": 18,
+      "speed": 0,
+      "hp": 60
+    },
+    "cost": {
+      "metal": 0
+    },
+    "buildTimeHours": 0,
+    "signature": 14,
+    "upkeep": {},
+    "traits": [
+      "immobile",
+      "issued"
+    ],
+    "slots": {
+      "weapon": 0,
+      "defense": 1,
+      "utility": 0
     }
+  },
+  "garrison": {
+    "name": "Garrison",
+    "faction": "neutral",
+    "domain": "ground",
+    "kind": "infantry",
+    "stats": {
+      "attack": 3,
+      "defense": 9,
+      "speed": 0,
+      "hp": 26,
+      "cargoSize": 1
+    },
+    "cost": {},
+    "buildTimeHours": 0,
+    "upkeep": {},
+    "traits": [
+      "immobile",
+      "issued"
+    ]
   },
   "swarm_brood_mother": {
     "faction": "swarm",
@@ -451,7 +508,8 @@
     "slots": {
       "defense": 1,
       "utility": 2
-    }
+    },
+    "hullClass": "medium"
   },
   "swarm_lander": {
     "faction": "swarm",

@@ -110,7 +110,10 @@ describe('ROS-3.2 — носитель и его ангар: корпус в л�
   });
 
   it('ангара нет — поведение ровно прежнее (мягкая деградация)', () => {
-    const units = [{ unit: 'cruiser', count: 2 }, { unit: 'interceptor', count: 1 }];
+    const units = [
+      { unit: 'cruiser', count: 2 },
+      { unit: 'interceptor', count: 1 },
+    ];
     const isWing = (u: string): boolean => u === 'interceptor';
     expect(emblemTally(units, [], isWing, [])).toEqual(emblemTally(units, [], isWing));
   });

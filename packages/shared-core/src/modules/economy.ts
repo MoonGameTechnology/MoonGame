@@ -3,6 +3,7 @@ import type { GameState, Planet, UnitStack } from '../state/gameState';
 import type { GameData, ResourceBag } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
 import { bombardedPlanets } from '../state/orbit';
+import { battleLocations } from '../state/battle';
 import type { Context } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
 import { buildProgress, thresholdRamp } from '../util/construction';
@@ -264,6 +265,10 @@ export const economyModule: GameModule = {
       const days = (span / MS_PER_DAY) * scale;
       const data = h.ctx.data;
       const bombarded = bombardedPlanets(h.state, data); // O(fleets) once, then O(1) per planet
+      // Решение владельца 17: бой на узле глушит производство так же, как обстрел. Оба
+      // набора считаются ОДНИМ проходом каждый — иначе на каждый узел пришлось бы
+      // перебирать все бои и все флоты.
+      const fighting = battleLocations(h.state);
 
       // Sorted (BF-13): several planets credit the same treasury cell — float
       // addition order must not depend on JSONB key order after hibernation.
@@ -276,8 +281,8 @@ export const economyModule: GameModule = {
         if (!player) {
           continue; // owner without a player record → nothing to credit
         }
-        if (bombarded.has(planetId)) {
-          continue; // production frozen while the world is bombarded (GDD §7.4)
+        if (bombarded.has(planetId) || fighting.has(planetId)) {
+          continue; // узел не работает: обстрел (GDD §7.4) либо бой прямо здесь
         }
         const rate = h.hook<ResourceBag>(
           'economy.production',

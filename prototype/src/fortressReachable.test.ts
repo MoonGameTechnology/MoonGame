@@ -25,7 +25,16 @@ function world(kind: string, owner: string | null, metal = 500): GameState {
   };
   return {
     ...base,
-    players: { p1: { id: 'p1', name: 'p1', faction: 'ember', status: 'active', resources: { metal } } },
+    players: {
+      p1: {
+        id: 'p1', name: 'p1', faction: 'ember', status: 'active', resources: { metal },
+        // FORT-5.1: крепость теперь за технологией (решение владельца 12). Тест ПРО
+        // ПРОВОДКУ, а не про дерево — сам гейт проверяет `data/fortressTech.test.ts`, —
+        // поэтому ветка считается пройденной, и в фокусе остаётся то, ради чего кирпич:
+        // доходит ли действие до ядра прототипа вообще.
+        technologies: { completed: ['orbital_defense_grid', 'void_fortification'] },
+      },
+    },
     planets: { N: node },
   };
 }

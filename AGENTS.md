@@ -23,7 +23,8 @@ answer where to look.
 2. **`CODE-MAP.md`** — first stop for where executable code lives and which entry point actually
    runs in production, playtests, the prototype, server, and clients.
 3. **`docs/bricks-index.md`** — first stop for “does a task for this already exist?”, its status,
-   zone, source roadmap/backlog file, and exact location.
+   zone and source roadmap/backlog file. It carries no line number on purpose (WIKI-2): with one,
+   the file conflicted in nearly every parallel PR. Find the brick in that file by its id.
 4. **`docs/index.md`** — first stop for “where is this topic documented?”. Use it to jump to the
    relevant roadmap/design document instead of opening many docs.
 5. After the index points to the relevant area, read that roadmap/design doc and then the actual
@@ -63,6 +64,9 @@ reasoning loops.
 
 ## GitHub publication path
 
+For every request to push/publish/create a PR, follow `.claude/skills/publish-pr/SKILL.md`.
+That skill is the canonical publication ritual, including the binary Git Data API fallback.
+
 Do not mix local Git transport, the connected GitHub API/app, and the merge queue as if they were
 one mechanism.
 
@@ -71,6 +75,11 @@ one mechanism.
    `origin` also has terminal push credentials.
 2. If a terminal `git push` fails authentication once, do not retry it. Switch once to the
    authenticated GitHub API/app, or report that no writable transport is available.
+   If the GitHub MCP itself returns a transport/session error such as
+   `Invalid MCP request metadata`, mark that MCP write transport unusable for the session:
+   do not retry it and do not call lower-level Git Data operations through the same connector.
+   Use at most one genuinely independent write transport, otherwise stop with the local recovery
+   checkpoint described by `publish-pr`.
 3. **Final sync before PR:** after the implementation is complete and immediately before remote
    publication, refresh the current `main` again and compare the task branch against it. If the
    branch is behind or diverged, integrate the fresh `main` first (normally rebase a short-lived
@@ -117,6 +126,7 @@ that decide whether a change is *correct* in this repository are elsewhere:
   stable `E_*` code, never a leaked detail), server authority, fixed module order.
 - **`CONTRIBUTING.md`** — the full Git and review regimen.
 - **`.claude/skills/`** — the executable rituals: `brick` (take a backlog task),
+  `publish-pr` (publish local work + create/reuse PR, including binary assets),
   `localization` (player-visible text is a KEY, never a literal), `new-module`,
   `add-game-content`, `sync-state-doc`.
 

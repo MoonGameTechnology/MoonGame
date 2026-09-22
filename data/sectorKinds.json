@@ -99,20 +99,23 @@
     "orbit": true,
     "allowedBuildings": [
       "shipyard",
-      "spaceport",
       "radar",
       "fort",
       "power_plant",
       "fabricator",
       "orbital_aa",
-      "metal_station"
+      "metal_station",
+      "void_hangar",
+      "hospital",
+      "void_shield"
     ],
     "appearance": {
       "color": "#5f8f8c",
       "label": "void fortress",
       "shape": "station"
     },
-    "stationable": false
+    "stationable": false,
+    "bombardable": false
   },
   "pirate_base": {
     "name": "Pirate Base",

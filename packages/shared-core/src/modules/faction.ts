@@ -11,7 +11,7 @@ import type { Player } from '../state/gameState';
  * don't apply (graceful degradation), like every other extension point.
  */
 
-type PassiveKey = 'productionBonus' | 'fleetSpeedBonus' | 'combatDamageBonus';
+type PassiveKey = 'productionBonus' | 'fleetSpeedBonus' | 'combatDamageBonus' | 'fortGarrisonBonus';
 
 /** The faction passive `key` for `player`, or 0 (no faction / unknown faction / no module). */
 function passive(player: Player | undefined, data: GameData, key: PassiveKey): number {
@@ -57,6 +57,15 @@ export const factionModule: GameModule = {
       const owner = fleetId ? h.state.fleets[fleetId]?.owner : undefined;
       const bonus = owner ? passive(h.state.players[owner], h.ctx.data, 'fleetSpeedBonus') : 0;
       return bonus !== 0 ? speed * (1 + bonus) : speed;
+    });
+
+    // Потолок выданного гарнизона + fortGarrisonBonus (FORT-2.3). Слагаемое, а не
+    // множитель: потолок считается головами, и доля дала бы дробных защитников.
+    api.hook<number>('fort.garrisonCap', (cap, args, h) => {
+      const planetId = (args as { planetId?: string }).planetId;
+      const owner = planetId ? h.state.planets[planetId]?.owner : null;
+      if (owner === null || owner === undefined) return cap;
+      return cap + passive(h.state.players[owner], h.ctx.data, 'fortGarrisonBonus');
     });
 
     // Outgoing combat damage ×(1 + combatDamageBonus).

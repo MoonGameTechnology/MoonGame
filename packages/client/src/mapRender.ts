@@ -9,6 +9,8 @@
  * star lanes, holographic planet spheres coloured by owner with a floating type badge, and
  * fleets at their interpolated positions. Node sizes stay constant in screen px.
  */
+import { drawFleetCount, fleetCountWidth } from './fleetCountBadge';
+import { emblemTally } from '../../../decisions/fleetTally';
 import { effectiveStats, fleetPositionAt, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
@@ -248,6 +250,13 @@ export function renderMap(
       g.restore();
       continue;
     }
+    const ships = emblemTally(f.units, [], (id) => (opts.data.units[id]?.traits ?? []).includes('shuttle')).ships;
+    // Reset the ship transform before drawing screen-aligned count text.
+    g.restore();
+    drawFleetCount(g, c.x - fleetCountWidth(g, ships) / 2, c.y + 20, ships, col);
+    g.save();
+    g.translate(c.x, c.y);
+    g.strokeStyle = col;
     const k = glyphScale(unitSizeClass(dom.def.stats.hp));
     if (lod.detail > 0) {
       const stack = f.units.find((st) => st.unit === dom.unit && st.count > 0)!;

@@ -42,6 +42,35 @@ export function dialUrl(base: string, matchId: string, who: DialIdentity): strin
 }
 
 /**
+ * Обратное разложение адреса дозвона: на какой сервер и в какой матч он ведёт (CP2.3).
+ *
+ * Живёт здесь, рядом с `dialUrl`, по той же причине, по которой сам `dialUrl` здесь
+ * оказался: формат адреса — одно решение, и у него должен быть ОДИН хозяин. Разобранный
+ * в другом файле адрес разъедется с собранным на первой же правке, и разъедется молча.
+ *
+ * Возвращается только то, что можно показывать и хранить: сервер и матч. Токен и билет
+ * места из адреса НЕ извлекаются намеренно — это секреты одного дозвона, и у вызывающего
+ * не должно появиться удобного способа их куда-нибудь положить.
+ *
+ * `null` — адрес не разбирается или ведёт не в матч.
+ */
+export function matchAt(url: string): { base: string; matchId: string } | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const marker = '/matches/';
+  const at = parsed.pathname.indexOf(marker);
+  if (at === -1) return null;
+  const rest = parsed.pathname.slice(at + marker.length);
+  // Матч — это ровно один сегмент: `/matches/m-1/seats` ведёт не в матч, а в его API.
+  if (rest === '' || rest.includes('/')) return null;
+  return { base: parsed.origin, matchId: decodeURIComponent(rest) };
+}
+
+/**
  * Кем представляться при этом дозвоне (правило 1). Токен есть только в режиме аккаунтов и
  * только сразу после того, как его выписали, — иначе идём позывным.
  */

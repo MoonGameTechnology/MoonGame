@@ -191,6 +191,20 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
   фолбэк на русский запекается в файл языка на сборке клиента.
 - Комментарии в коде — не локализуются: они для разработчика, а не для игрока.
 
+**Канон формулировок (резолюция владельца 2026-09-21, кирпич TXT-0.1): функциональный
+текст несёт только нужную информацию.** Описание кнопки, способности, характеристики —
+это справка, а не проза: лишние предложения работают визуальным шумом, и суть в них
+тонет. Пять правил: (1) есть у эффекта число, радиус, длительность — назови их в тексте;
+(2) `.desc`, пересказывающий свой `.name`, удаляется, а не переписывается; (3) очевидное
+следствие не объясняется («ведь голод беспощаден»), неочевидное правило — объясняется;
+(4) никаких «Здесь вы можете…» там, где игрок уже стоит перед кнопкой; (5) лор допустим
+как ОДИН оборот перед числом, но не вместо числа. Эталон не надо выдумывать — он в
+репозитории: `err.*` (26 симв.), `cmd.*.hint` (50), `tech.node.*.desc` (58 у 30 узлов из
+35, «Войска связи: единая картина боя. +8% к радиусу радаров.»). Разбор с цифрами и порядок чистки
+существующих доменов — блок TXT в `docs/backlog.md`; подробный канон — §3 скилла
+`localization`. **Канон обязателен для НОВОГО текста и не мандат переписывать старый
+попутно** — правило хирургических правок сильнее.
+
 **Переходного периода больше нет (`LOC-2` закрыт).** Исторически msgid'ом была сама
 русская строка (`t('трюм полон')`), и её держал мост `/localization/legacy/`. Мост
 снят: `t()`/`tData()` принимают ТОЛЬКО ключ, русский литерал в них не переведётся —
@@ -233,10 +247,16 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 - Run `pnpm run check` before committing; keep CI green.
 - When you finish a roadmap milestone, update the "Статус реализации" section in
   `docs/roadmap.md`.
+- On any request to push/publish/create a PR, first follow `.claude/skills/publish-pr/SKILL.md`.
+  It is the canonical path for hosted publication and includes the Git Data API fallback for
+  local-only commits and binary assets such as PNG/WebP.
 - Development happens on a feature branch. For remote publication, do **not** assume the
   shell's `git push` is authenticated just because fetch works. In hosted agent sessions,
   prefer the connected GitHub API/app when it has write access. If terminal push gets one auth
-  failure, do not retry it or bounce back and forth between transports.
+  failure, do not retry it or bounce back and forth between transports. If the GitHub MCP itself
+  returns a transport/session error such as `Invalid MCP request metadata`, do not retry that
+  connector and do not attempt Git Data fallback through the same MCP. Follow `publish-pr` and
+  use at most one genuinely independent write transport; otherwise stop with a recovery checkpoint.
 - **Final sync before PR:** when the implementation is complete, refresh the current `main`
   again immediately before publication. If the task branch is behind/diverged, integrate fresh
   `main` first (normally rebase the short-lived branch), resolve conflicts, then re-run checks

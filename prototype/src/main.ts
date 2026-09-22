@@ -112,6 +112,8 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
 import { initHeroStaff, HERO_CASTABLE, heroCdKey, heroDisplayName } from './heroStaff';
+import { drawHeroPortrait } from '../../packages/client/src/heroPortraits';
+import { heroAtPoint, mapHeroes, type PortraitHit } from '../../decisions/heroIdentity';
 import {
   initConversations,
   COALITION,
@@ -264,7 +266,7 @@ import { localRunSaveStore } from './runSaveLocal';
 import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
-import { createWebPlatform } from './platform/web';
+import { getPlatform, type PlatformHost } from './platform/host';
 import { advanceShopDay, localShopDay } from '../../decisions/sectorZeroShop';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
@@ -1129,6 +1131,8 @@ let chainMode: {
   menu: { id: string; kind: ChainPointKind } | null;
 } | null = null;
 // Хитбоксы ◎-бейджей отправленных планов (тап вне режима = редактирование плана).
+let heroPortraitHits: PortraitHit[] = [];
+let lastHeroCardRefresh = 0;
 let chainHits: Array<{ target: string; fleetIds: string[]; x: number; y: number }> = [];
 // Кэш маршрутов для отрисовки цепочек: граф лейнов статичен всю партию.
 const chainRouteCache = new Map<string, string[] | null>();
@@ -3625,6 +3629,29 @@ function handleEvents(events: DomainEvent[]) {
         if (destroyHeard())
           note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
+      // Тёмное событие (`data/events.json`). Гейт СВОЙ, а не общий `admits()`: тот читает
+      // `p.owner`, а здесь адресат приезжает как `playerId` — чужая аномалия прошла бы
+      // мимо проверки и утекла бы ко мне в журнал вместе с чужой экономикой.
+      // Подстановки берутся из `params` правила: карта `resources` даёт по ключу на
+      // ресурс (`{metal}`), одиночная пара — `{n}`. Знак несёт сама строка локали, поэтому
+      // в подстановку едет модуль: «сожгла 60 энергии», а не «сожгла −60».
+      case 'effect.applied': {
+        if (p.playerId !== ME) break;
+        const params = data.events[p.ruleId as string]?.params ?? {};
+        const bundle = params['resources'];
+        const amount = params['amount'];
+        const vars =
+          typeof bundle === 'object' && bundle !== null && !Array.isArray(bundle)
+            ? Object.fromEntries(
+                Object.entries(bundle).map(([res, v]) => [res, Math.abs(Number(v) || 0)]),
+              )
+            : { n: Math.abs(Number(amount) || 0) };
+        note(
+          t(`event.${(p.ruleId as string).replace(/_/g, '-')}`, vars),
+          p.planetId as string | undefined,
+        );
+        break;
+      }
       case 'unit.died': {
         // Счёт и ведомость наполняются по РАЗНЫМ условиям — `warTally.ts` (REFM-180):
         // счёт это личная статистика (только мои бои), ведомость питает строку ленты,
@@ -5433,6 +5460,9 @@ function render(now: number) {
     cx.restore();
   }
 
+  // Portraits are resolved only from our own roster, even in full-state solo games.
+  const heroesByFleet = mapHeroes(s, ME);
+  heroPortraitHits = [];
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
   for (const f of Object.values(s.fleets)) {
@@ -5506,6 +5536,7 @@ function render(now: number) {
       cx.restore();
     }
     if (detail === 0) {
+      drawFleetHoldBadge(cx, A, null, ships, [], false, col);
       // selection still reads on the schematic view; the rest of the kit is gone
       if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 12, now);
       continue;
@@ -5567,17 +5598,29 @@ function render(now: number) {
     // (REFM-123). Осталась только рамка выбора.
     if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 15, now);
 
+    cx.globalAlpha = 1; // Counts remain readable throughout the LOD cross-fade.
     // Own hold occupancy is read from the snapshot; foreign manifests stay private.
     // The badge remains horizontal and outside the orbit even as heading changes.
     const dock = !f.movement && f.location ? s.planets[f.location] : null;
     drawFleetHoldBadge(
-      cx, A, dock ? world(dock.position) : null, ships,
+      cx, A, heroesByFleet.has(f.id) ? null : dock ? world(dock.position) : null, ships,
       f.owner === ME ? fleetHolds(f, data, s.time) : [],
       selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
       col,
     );
 
     cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
+  }
+
+  // Draw portraits after hulls, in screen pixels; they never rotate with the ships.
+  for (const [fleetId, hero] of heroesByFleet) {
+    const selected = selFleet === fleetId || selFleets.has(fleetId);
+    if (detail < 0.45 && !selected) continue;
+    const f = s.fleets[fleetId]!;
+    const anchor = fleetAnchor(f);
+    if (!anchor || !visible(anchor, 120)) continue;
+    const hit = drawHeroPortrait(cx, hero, anchor, ownerColor(f.owner), heroPortraitHits);
+    if (hit) heroPortraitHits.push(hit);
   }
 
   drawRadarContacts(now); // swept enemy signatures — last-known ghosts until repainted
@@ -6056,7 +6099,14 @@ function fleetPanelHtml(f: Fleet): string {
   // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
   const repairCost = instantRepairCost(f, data);
   const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
-  const atDock = canDockRepair(repairable, fleetAtOwnDock(f, s, data));
+  // FORT-5.8: док открыт своему И СОЮЗНОМУ флоту. Союзность кнопка резолвит стойкой —
+  // capability `diplomacy` живёт в ядре и требует `HandlerContext`, которого у рендера
+  // нет; база самой capability — та же стойка, поэтому ответы сходятся. Правило «что
+  // считается доком» при этом НЕ переписано: зовётся та же функция ядра.
+  const atDock = canDockRepair(
+    repairable,
+    fleetAtOwnDock(f, s, data, (a, b) => getStance(s, a, b) === 'alliance'),
+  );
   if (hull.max > 0) {
     h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${pct < LIMP_PCT ? ' low' : ''}"><i style="width:${pct}%"></i></span><b>${kfmt(hull.cur)}/${kfmt(hull.max)}</b>${
       atDock
@@ -8890,6 +8940,13 @@ function selectAt(mx: number, my: number) {
       return;
     }
   }
+  if (!aiming) {
+    const heroId = heroAtPoint(heroPortraitHits, mx, my);
+    if (heroId && heroStaff.focus(heroId)) {
+      shipyard.open('heroes');
+      return;
+    }
+  }
   // Plain tap = selection. Movement happens only when "Move" is armed (aiming), so a
   // fleet selection never blocks picking a planet (and vice versa).
   // A tap on an ally ping marker opens its description popup (takes priority over
@@ -10897,7 +10954,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   soloSaveActive = false;
   autoAssault.clear();
   patrols.clear();
-  sectorRunActive = false;
+  setRunActive(false);
   sectorDevActive = false;
   mapNeedsPreparation = true;
   // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
@@ -11000,7 +11057,7 @@ function startPvEMatch(dev = false): void {
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
   installMatch(st, aiSeats, pveModeId());
-  sectorRunActive = true;
+  setRunActive(true);
   sectorDevActive = testing;
   if (!__PLAYER_BUILD__ && testing) {
     resetSandboxConfig();
@@ -11397,7 +11454,7 @@ function netClientFor(seat: string): MultiplayerClient {
 function connect(): void {
   saveSolo();
   soloSaveActive = false;
-  sectorRunActive = false;
+  setRunActive(false);
   const srv = resolveServer();
   if (!srv) return;
   const { base, nick } = srv;
@@ -12950,6 +13007,33 @@ const sectorSeed = `${Date.now().toString(36)}.${Math.random().toString(36).slic
 let sectorProgress = freshSectorZeroProgress(data, sectorSeed);
 let sectorAttempt = 0;
 let sectorRunActive = false;
+
+/**
+ * Единственная дверь к {@link sectorRunActive} — и заодно разметка геймплея для площадки
+ * (`YAG-1.2a`, требование 1.19).
+ *
+ * ⚠️ Почему сеттер, а не пять вызовов рядом с пятью присваиваниями. Точек, где забег
+ * начинается или кончается, уже пять: новый забег, установка другой партии, уход в сеть,
+ * успешное восстановление снимка и откат неудачного. Расставить `gameplayStart/stop` по
+ * ним значит завести шестую в следующем кирпиче и НЕ заметить этого: индикатор на
+ * debug-панели просто останется зелёным после выхода в меню, а модерация смотрит именно
+ * его. Сторож в `platform/gameplayMarking.test.ts` падает, если присвоить мимо сеттера.
+ *
+ * Площадка берётся через `getPlatform()`, а не через модульный `const platform` ниже:
+ * присваивания стоят ВЫШЕ по файлу, и обращение к константе из функции, вызванной до её
+ * инициализации, упало бы на временной мёртвой зоне.
+ *
+ * Повторный `start` и `stop` без `start` адаптер гасит сам (`decisions/platformLifecycle`),
+ * поэтому здесь нет проверки «а не то же ли самое значение» — она была бы вторым местом,
+ * где живёт одно правило.
+ */
+function setRunActive(on: boolean): void {
+  sectorRunActive = on;
+  const api = getPlatform() as Partial<PlatformHost>;
+  if (on) api.gameplayStart?.();
+  else api.gameplayStop?.();
+}
+
 let sectorDevActive = false;
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
@@ -12966,12 +13050,26 @@ function saveSectorProgress(next: SectorZeroProgress): void {
   progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
 }
 
-// Площадка (`YAG-1.1a`). В сборке игрока это обычный браузер: rewarded-рекламы и платежей
-// там нет, и `capabilities` честно говорят `false` — магазин по ним просто не рисует такие
-// кнопки. В дев-сборке поднимается управляемая симуляция, чтобы путь «посмотрел рекламу →
-// товар выдан» проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку
-// нельзя: это ровно «обещать механику, которой у него не будет».
-const platform = createWebPlatform({ simulate: !__PLAYER_BUILD__ });
+// Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
+// (`bootstrap.ts`): здесь площадка уже готова, и игра про её имя ничего не знает. В
+// обычном браузере это веб-адаптер: rewarded-рекламы и платежей там нет, и `capabilities`
+// честно говорят `false` — магазин по ним просто не рисует такие кнопки. В дев-сборке
+// поднимается управляемая симуляция, чтобы путь «посмотрел рекламу → товар выдан»
+// проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку нельзя: это
+// ровно «обещать механику, которой у него не будет».
+const platform = getPlatform();
+
+// Разметка жизненного цикла для площадки (`YAG-1.2`). Хост отдаёт её, только если под
+// нами правда площадка; в браузере методов нет, и вызывать нечего — поэтому `host?.`, а
+// не сравнение с именем площадки. Сторож в `platform/yandex.test.ts` следит, чтобы имя
+// сюда не проникло даже строкой: он поймал ровно эту фразу, когда она была примером.
+const host = platform as Partial<PlatformHost>;
+
+// Требование площадки 1.3: при потере фокуса звук обязан замолкнуть (дают две секунды).
+// Пауза приходит ОТ ПЛОЩАДКИ (реклама, свёрнутая вкладка), поэтому глушим через
+// `setPaused`, а не `setEnabled`: настройка игрока обязана пережить ролик, иначе он
+// вернётся в тишину, которую не просил и которую надо чинить руками.
+host.onPlatformPause?.((paused) => snd.setPaused(paused));
 
 // Витрина магазина ротируется посуточно (`SZE-3.2`). Единственные часы у офлайнового
 // клиента — часы игрока, поэтому номер дня МОНОТОНЕН: `advanceShopDay` никогда его не
@@ -13148,13 +13246,13 @@ function restoreRun(): boolean {
     // Оставляем файл на месте; меню сообщает об отказе и предлагает новый запуск.
     s = priorState;
     setMatchMode(priorMode);
-    sectorRunActive = priorRunActive;
+    setRunActive(priorRunActive);
     sectorDevActive = priorDevActive;
     speed = 0;
     return false;
   }
   pveDifficulty = parseRunDifficulty(save.difficulty);
-  sectorRunActive = true;
+  setRunActive(true);
   boonLaterAtWave = -1;
   sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
@@ -13247,6 +13345,10 @@ function frame(nowReal: number) {
     renderPanel();
     renderCmdBar();
     renderSplitDialog();
+    if (nowReal - lastHeroCardRefresh >= 1000) {
+      shipyard.refreshHeroes();
+      lastHeroCardRefresh = nowReal;
+    }
     holographic.layoutWindows();
     updateMobileHud();
     if (mapPreparation.active && mapPreparation.ready && !cx.isContextLost?.()) {

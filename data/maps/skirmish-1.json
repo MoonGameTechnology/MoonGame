@@ -3,41 +3,125 @@
   "seed": "skirmish-1",
   "time": 0,
   "sectors": {
-    "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
+    "nexus": {
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
     "home_green": {
-      "position": { "x": -260, "y": 0 },
+      "position": {
+        "x": -260,
+        "y": 0
+      },
       "kind": "planet",
       "planetType": "terran",
       "owner": "green",
-      "buildings": [{ "type": "mine_t1" }, { "type": "radar" }, { "type": "shipyard" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "radar"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
     },
     "home_red": {
-      "position": { "x": 260, "y": 0 },
+      "position": {
+        "x": 260,
+        "y": 0
+      },
       "kind": "planet",
       "planetType": "terran",
       "owner": "red",
-      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
     },
-    "drift": { "position": { "x": 0, "y": -210 }, "kind": "asteroid", "terrain": "asteroid_field" },
+    "drift": {
+      "position": {
+        "x": 0,
+        "y": -210
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
     "veil": {
-      "position": { "x": 0, "y": 210 },
+      "position": {
+        "x": 0,
+        "y": 210
+      },
       "kind": "dense_nebula",
       "terrain": "dense_nebula",
       "planetType": "gas_giant"
     }
   },
   "players": {
-    "green": { "name": "Vanguard Compact", "faction": "vanguard", "resources": { "credits": 300, "metal": 300 } },
-    "red": { "name": "Swarm Collective", "faction": "swarm", "resources": { "credits": 300, "metal": 300 } }
+    "green": {
+      "name": "Vanguard Compact",
+      "faction": "vanguard",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "red": {
+      "name": "Swarm Collective",
+      "faction": "swarm",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    }
   },
   "fleets": {
     "green_1": {
       "owner": "green",
       "location": "home_green",
-      "units": [{ "unit": "cruiser", "count": 2 }, { "unit": "scout_drone", "count": 1 }]
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
+      ]
     },
-    "red_1": { "owner": "red", "location": "home_red", "units": [{ "unit": "cruiser", "count": 2 }] }
+    "red_1": {
+      "owner": "red",
+      "location": "home_red",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    }
   }
 }

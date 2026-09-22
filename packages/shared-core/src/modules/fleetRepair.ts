@@ -8,6 +8,7 @@
  */
 import type { GameModule } from '../kernel/module';
 import { missingHull, dockRepairCost, fleetAtOwnDock } from '../util/repair';
+import { isAllied } from '../util/combat';
 import { canAfford, payCost } from '../util/treasury';
 import { ownFleet } from '../util/combat';
 
@@ -22,7 +23,8 @@ export const fleetRepairModule: GameModule = {
       // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
       if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
       if (f.battleId) return h.reject('E_IN_BATTLE');
-      if (!fleetAtOwnDock(f, h.state, h.ctx.data)) return h.reject('E_NO_DOCK');
+      const allied = (a: string, b: string): boolean => isAllied(h, a, b);
+      if (!fleetAtOwnDock(f, h.state, h.ctx.data, allied)) return h.reject('E_NO_DOCK');
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_NO_PLAYER');
       const hull = missingHull(f, h.ctx.data);

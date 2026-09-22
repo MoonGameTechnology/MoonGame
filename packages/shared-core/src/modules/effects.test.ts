@@ -21,7 +21,7 @@ const HOUR = 3_600_000;
 function makeData(events: Record<string, unknown>): GameData {
   return parseGameData({
     version: '0.1.0',
-    resources: ['energy'],
+    resources: ['energy', 'metal', 'microelectronics'],
     units: {
       scout: { faction: 'x', stats: { attack: 1, defense: 1, speed: 10, hp: 6 } },
       plaguebearer: {
@@ -39,6 +39,10 @@ function makeData(events: Record<string, unknown>): GameData {
     events,
     sectorKinds: {
       planet: { capturable: true, buildable: true, orbit: true },
+      // Два вида-«обломка» из боевой карты: кладбище кораблей ничего не строит,
+      // мёртвый мир строит только добычу. Оба захватываемы — на них и висит салваж.
+      graveyard: { capturable: true, buildable: false, orbit: false },
+      dead_world: { capturable: true, buildable: true, orbit: false },
     },
   });
 }
@@ -56,12 +60,12 @@ const ANOMALY = {
   chance: 1,
 };
 
-function planet(id: string, owner: string | null, x: number): Planet {
+function planet(id: string, owner: string | null, x: number, kind = 'planet'): Planet {
   return {
     id,
     owner,
     position: { x, y: 0 },
-    kind: 'planet',
+    kind,
     resources: {},
     buildings: [],
     garrison: [],
@@ -106,10 +110,11 @@ function captureB(
   data: GameData,
   unitTypes: string[],
   extraModules: GameModule[] = [],
+  kindOfB = 'planet',
 ): { state: GameState; events: { type: string; payload: unknown }[] } {
   const ctx = (now: number): Context => ({ now, data });
   const a = planet('A', 'p1', 0);
-  const b = planet('B', null, 30);
+  const b = planet('B', null, 30, kindOfB);
   a.links = ['B'];
   b.links = ['A'];
   const kernel = createKernel([
@@ -259,6 +264,124 @@ describe('effectsModule — `effect.applied` names its audience (AUD-11)', () =>
     const payloads = applied(advanced.events as { type: string; payload: unknown }[]);
     expect(payloads.map((p) => p['playerId'])).toEqual(['p1', 'p2']);
     expect(payloads.every((p) => !('planetId' in p))).toBe(true);
+  });
+});
+
+// Разбор обломков: награда за взятие провинции ОПРЕДЁЛЁННОГО вида. Почему не
+// `planet_captured` — тот триггер привязан к трейту ЮНИТА-захватчика («мой чумной
+// корабль заражает всё, что берёт»), и вида провинции не видит вовсе. Здесь условие
+// обратное: важно ЧТО взяли, а не КЕМ, поэтому это отдельный триггер, а не второй
+// режим у первого — один триггер, одно правило отбора.
+describe('effectsModule — province_captured rules (salvage)', () => {
+  const SALVAGE = {
+    trigger: 'province_captured',
+    effect: 'modify_resource',
+    params: { kinds: ['graveyard', 'dead_world'], resources: { metal: 40, microelectronics: 10 } },
+    chance: 1,
+  };
+
+  it('взятие провинции названного вида выдаёт захватчику все ресурсы правила', () => {
+    const { state, events } = captureB(
+      makeData({ salvage_wrecks: SALVAGE }),
+      ['scout'], // никаких трейтов: отбор идёт по виду узла, а не по составу флота
+      [],
+      'graveyard',
+    );
+    expect(state.planets['B']!.owner).toBe('p1');
+    expect(state.players['p1']!.resources['metal']).toBe(40);
+    expect(state.players['p1']!.resources['microelectronics']).toBe(10);
+    expect(events.some((e) => e.type === 'effect.applied')).toBe(true);
+  });
+
+  it('второй вид из списка срабатывает так же', () => {
+    const { state } = captureB(makeData({ salvage_wrecks: SALVAGE }), ['scout'], [], 'dead_world');
+    expect(state.players['p1']!.resources['metal']).toBe(40);
+  });
+
+  it('вид вне списка не платит ничего', () => {
+    const { state, events } = captureB(makeData({ salvage_wrecks: SALVAGE }), ['scout'], [], 'planet');
+    expect(state.planets['B']!.owner).toBe('p1'); // сам захват не тронут
+    expect(state.players['p1']!.resources['metal']).toBeUndefined();
+    expect(events.some((e) => e.type === 'effect.applied')).toBe(false);
+  });
+
+  it('правило без списка видов инертно (fail-secure: пустой фильтр не значит «все»)', () => {
+    const { state } = captureB(
+      makeData({ salvage_wrecks: { ...SALVAGE, params: { resources: { metal: 40 } } } }),
+      ['scout'],
+      [],
+      'graveyard',
+    );
+    expect(state.players['p1']!.resources['metal']).toBeUndefined();
+  });
+
+  it('chance 0 не платит', () => {
+    const { state } = captureB(
+      makeData({ salvage_wrecks: { ...SALVAGE, chance: 0 } }),
+      ['scout'],
+      [],
+      'graveyard',
+    );
+    expect(state.players['p1']!.resources['metal']).toBeUndefined();
+  });
+
+  it('`effect.applied` называет и захватчика, и узел', () => {
+    const { events } = captureB(makeData({ salvage_wrecks: SALVAGE }), ['scout'], [], 'graveyard');
+    const payload = events.find((e) => e.type === 'effect.applied')!.payload as Record<
+      string,
+      unknown
+    >;
+    expect(payload['playerId']).toBe('p1');
+    expect(payload['planetId']).toBe('B');
+    expect(payload['ruleId']).toBe('salvage_wrecks');
+  });
+});
+
+describe('effectsModule — modify_resource принимает карту ресурсов', () => {
+  const ctxOf =
+    (data: GameData) =>
+    (now: number): Context => ({ now, data });
+
+  it('карта `resources` начисляет несколько ресурсов одним правилом', () => {
+    const data = makeData({
+      windfall: {
+        trigger: 'schedule',
+        effect: 'modify_resource',
+        params: { resources: { energy: 20, metal: 5 }, cadenceHours: 8 },
+        chance: 1,
+      },
+    });
+    const kernel = createKernel([effectsModule]);
+    const advanced = okAdvance(
+      kernel.advanceTo(baseState([], [], [player('p1', 0)]), ctxOf(data)(9 * HOUR)),
+    );
+    expect(advanced.state.players['p1']!.resources['energy']).toBe(20);
+    expect(advanced.state.players['p1']!.resources['metal']).toBe(5);
+  });
+
+  it('отрицательная позиция в карте — штраф, и он тоже зажат нулём', () => {
+    const data = makeData({
+      windfall: {
+        trigger: 'schedule',
+        effect: 'modify_resource',
+        params: { resources: { energy: -100 }, cadenceHours: 8 },
+        chance: 1,
+      },
+    });
+    const kernel = createKernel([effectsModule]);
+    const advanced = okAdvance(
+      kernel.advanceTo(baseState([], [], [player('p1', 30)]), ctxOf(data)(9 * HOUR)),
+    );
+    expect(advanced.state.players['p1']!.resources['energy']).toBe(0);
+  });
+
+  it('старая пара {resource, amount} продолжает работать', () => {
+    const data = makeData({ void_anomaly: ANOMALY });
+    const kernel = createKernel([effectsModule]);
+    const advanced = okAdvance(
+      kernel.advanceTo(baseState([], [], [player('p1', 0)]), ctxOf(data)(9 * HOUR)),
+    );
+    expect(advanced.state.players['p1']!.resources['energy']).toBe(50);
   });
 });
 
