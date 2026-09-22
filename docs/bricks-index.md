@@ -734,31 +734,31 @@
 | EC-5.2 | 🔒 | data | `docs/economy-roadmap.md:355` | Балансные рычаги через данные (live-ops) |
 | EC-6.1 | 🔒 | srv sec | `docs/economy-roadmap.md:368` | Детекция RMT-паттернов |
 | EC-6.2 | 🔒 | srv docs | `docs/economy-roadmap.md:372` | Модерация торговли и споры |
-| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:397` | Узлы empty в картах канона — снято 2026-09-15 |
-| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:412` | Крепость в прототипе: модуль, правило, кнопка |
-| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:447` | Технический юнит + технология — снято 2026-09-15 |
-| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:462` | Конверсия расходует техюнит — снято 2026-09-15 |
-| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:476` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
-| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:488` | Недостающие ключи отказов |
-| FORT-2.1 | ✅ | data | `docs/fortress-roadmap.md:510` | Юнит «Гарнизон» |
-| FORT-2.2 | ✅ | core data | `docs/fortress-roadmap.md:528` | Форт выдаёт и забирает гарнизон |
-| FORT-2.3 | ✅ | data core | `docs/fortress-roadmap.md:547` | Потолок гарнизона и фракционный модификатор |
-| FORT-3.1 | ✅ | data | `docs/fortress-roadmap.md:566` | Уровни зенитных батарей |
-| FORT-3.2 | ✅ |  | `docs/fortress-roadmap.md:579` | Выполнен ЧУЖОЙ работой; остаток снят как противоречащий более позднему решению |
-| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:606` | Какие ещё узлы конвертируются |
-| FORT-5.1 | ✅ | data core | `docs/fortress-roadmap.md:630` | Технологию крепости надо ИЗУЧИТЬ |
-| FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:660` | Ядро крепости: starfort дорос до пяти уровней |
-| FORT-5.3 | ✅ | core data | `docs/fortress-roadmap.md:706` | Слоты построек |
-| FORT-5.4 | ✅ | core data | `docs/fortress-roadmap.md:733` | Крепость ВСТУПАЕТ В БОЙ |
-| FORT-5.12 | ✅ | core data | `docs/fortress-roadmap.md:785` | Крепость под ударом: не обстреливают, и бой глушит работу |
-| FORT-5.5 | ✅ | data core | `docs/fortress-roadmap.md:819` | Класс корпуса у кораблей |
-| FORT-5.6 | ✅ | data | `docs/fortress-roadmap.md:855` | Верфь крепости: три уровня |
-| FORT-5.7 | ✅ | data core | `docs/fortress-roadmap.md:865` | Ангар крепости |
-| FORT-5.8 | ✅ | core | `docs/fortress-roadmap.md:886` | Док чинит СОЮЗНИКУ |
-| FORT-5.9 | ✅ | core data | `docs/fortress-roadmap.md:910` | Госпиталь лечит ТРЮМ |
-| FORT-5.10 | ✅ | core data | `docs/fortress-roadmap.md:929` | Щиты крепости |
-| FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md:971` | Технологии открывают постройки крепости |
-| FORT-5.13 | ✅ | core | `docs/fortress-roadmap.md:1000` | Сбитая крепость переходит покорёженной |
+| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:406` | Узлы empty в картах канона — снято 2026-09-15 |
+| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:421` | Крепость в прототипе: модуль, правило, кнопка |
+| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:456` | Технический юнит + технология — снято 2026-09-15 |
+| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:471` | Конверсия расходует техюнит — снято 2026-09-15 |
+| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:485` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
+| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:497` | Недостающие ключи отказов |
+| FORT-2.1 | ✅ | data | `docs/fortress-roadmap.md:519` | Юнит «Гарнизон» |
+| FORT-2.2 | ✅ | core data | `docs/fortress-roadmap.md:537` | Форт выдаёт и забирает гарнизон |
+| FORT-2.3 | ✅ | data core | `docs/fortress-roadmap.md:556` | Потолок гарнизона и фракционный модификатор |
+| FORT-3.1 | ✅ | data | `docs/fortress-roadmap.md:575` | Уровни зенитных батарей |
+| FORT-3.2 | ✅ |  | `docs/fortress-roadmap.md:588` | Выполнен ЧУЖОЙ работой; остаток снят как противоречащий более позднему решению |
+| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:615` | Какие ещё узлы конвертируются |
+| FORT-5.1 | ✅ | data core | `docs/fortress-roadmap.md:639` | Технологию крепости надо ИЗУЧИТЬ |
+| FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:669` | Ядро крепости: starfort дорос до пяти уровней |
+| FORT-5.3 | ✅ | core data | `docs/fortress-roadmap.md:715` | Слоты построек |
+| FORT-5.4 | ✅ | core data | `docs/fortress-roadmap.md:742` | Крепость ВСТУПАЕТ В БОЙ |
+| FORT-5.12 | ✅ | core data | `docs/fortress-roadmap.md:794` | Крепость под ударом: не обстреливают, и бой глушит работу |
+| FORT-5.5 | ✅ | data core | `docs/fortress-roadmap.md:828` | Класс корпуса у кораблей |
+| FORT-5.6 | ✅ | data | `docs/fortress-roadmap.md:864` | Верфь крепости: три уровня |
+| FORT-5.7 | ✅ | data core | `docs/fortress-roadmap.md:874` | Ангар крепости |
+| FORT-5.8 | ✅ | core | `docs/fortress-roadmap.md:895` | Док чинит СОЮЗНИКУ |
+| FORT-5.9 | ✅ | core data | `docs/fortress-roadmap.md:919` | Госпиталь лечит ТРЮМ |
+| FORT-5.10 | ✅ | core data | `docs/fortress-roadmap.md:938` | Щиты крепости |
+| FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md:980` | Технологии открывают постройки крепости |
+| FORT-5.13 | ✅ | core | `docs/fortress-roadmap.md:1016` | Сбитая крепость уничтожается |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |

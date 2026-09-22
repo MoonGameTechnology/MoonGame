@@ -479,6 +479,57 @@ describe('visibleState — province kind is fog-gated (no appearance leak)', () 
   });
 });
 
+describe('visibleState — память конверсии крепости наружу не идёт (FORT-5.13)', () => {
+  // `priorKind` хранит, чем узел был ДО того, как стал крепостью, — служебное поле ядра,
+  // которое гибель крепости читает, чтобы вернуть узлу прежний вид. Наружу оно не идёт
+  // никому: САМО ЕГО НАЛИЧИЕ выдаёт стоящую крепость, а значение — исходный вид местности
+  // под ней. Неопознанный узел отдавал бы и то и другое, а запомненный — конверсию,
+  // случившуюся уже после последнего наблюдения.
+  function state(fog?: GameState['fog']): GameState {
+    const base = createInitialState({ seed: 'prior', version: { data: '0.1.0', manifest: '1' } });
+    const s: GameState = {
+      ...base,
+      players: { p1: player('p1'), p2: player('p2') },
+      planets: {
+        X: planet('X', null, [], { position: { x: 0, y: 0 }, kind: 'empty' }),
+        E: planet('E', 'p2', [], {
+          position: { x: 9000, y: 0 },
+          kind: 'void_station',
+          priorKind: 'asteroid',
+        }),
+      },
+      fleets: { lone: fleet('lone', 'p1', 'X', [['cruiser', 1]]) },
+    };
+    if (fog) s.fog = fog;
+    return s;
+  }
+
+  it('неопознанный узел не отдаёт ни память конверсии, ни прежний вид', () => {
+    const view = visibleState(state(), 'p1', data);
+    expect(view.planets.E?.priorKind).toBeUndefined();
+    expect(JSON.stringify(view)).not.toContain('asteroid');
+  });
+
+  it('запомненный узел тоже не отдаёт её — снимок памяти такого поля не несёт', () => {
+    const view = visibleState(
+      state({ p1: { E: { owner: null, garrison: [], buildings: [], kind: 'empty', at: 0 } } }),
+      'p1',
+      data,
+    );
+    expect(view.planets.E?.priorKind).toBeUndefined();
+    expect(view.remembered).toContain('E');
+  });
+
+  it('и у СВОЕГО узла тоже: поле внутреннее, клиенту в нём нужды нет', () => {
+    // Контроль к двум тестам выше: правило не «прячем от чужих», а «не публикуем вовсе»,
+    // как `fog` и поток ГСЧ. Иначе у поля осталась бы дверь, через которую оно однажды
+    // уедет в проекцию вместе с новым способом смотреть на узел.
+    const view = visibleState(state(), 'p2', data);
+    expect(view.planets.E?.priorKind).toBeUndefined();
+    expect(view.planets.E?.kind, 'свой узел обязан остаться видимым целиком').toBe('void_station');
+  });
+});
+
 describe('radar tracks the moving ship, not its destination', () => {
   const at = (x: number): Partial<Planet> => ({ position: { x, y: 0 } });
 
