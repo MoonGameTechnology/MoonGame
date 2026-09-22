@@ -62,6 +62,14 @@ describe('YAG-1.1b — сниппет подключения SDK (п. 1.19.1)', 
 
   it('страница площадки подключает стили и скрипт игры ФАЙЛАМИ, лоадер — первым', () => {
     // `external` — тот самый параметр `page()`, который делает цель разложенной.
+    //
+    // Semgrep помечает соседство переменной и тега `<script>` как возможный XSS
+    // (`unknown-value-with-script-tag`). Здесь это ложное срабатывание по форме, и
+    // проверяется оно легко: `BUILD_SCRIPT` — это `readFileSync` НАШЕГО СОБСТВЕННОГО
+    // `prototype/build.mjs`, ничего внешнего в него не приходит, и ни одна строка
+    // отсюда никуда не рендерится — тест только ищет подстроки в тексте файла.
+    // Правило ищет вывод HTML, а тут чтение исходника; подавляем точечно, с причиной.
+    // nosemgrep: javascript.lang.security.audit.unknown-value-with-script-tag.unknown-value-with-script-tag
     const gameScript = '<script src="assets/app.js"></script>';
     expect(BUILD_SCRIPT).toContain(gameScript);
     expect(BUILD_SCRIPT).toContain('<link rel="stylesheet" href="assets/app.css">');
