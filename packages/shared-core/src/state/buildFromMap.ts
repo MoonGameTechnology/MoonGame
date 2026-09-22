@@ -14,6 +14,7 @@ import {
 } from './gameState';
 import { pairKey } from './diplomacy';
 import { distance } from './route';
+import { mosaicBorders, sealPlan, type MosaicSeed } from './mosaic';
 
 /**
  * Map-as-content loader (map-roadmap.md M1.2 / M1.3). Turns a validated `MatchMap`
@@ -23,13 +24,68 @@ import { distance } from './route';
  * scenario with a single "load this map file" path.
  */
 
+/** The adjacency a map actually plays on, plus what terrain shut. */
+export interface MapEdges {
+  /** Travelable lanes — an undirected edge list, canonical and sorted when derived. */
+  paths: Array<[string, string]>;
+  /** Borders that EXIST on the mosaic but carry no lane (derived maps only). */
+  sealed: Array<[string, string]>;
+  /** Sectors terrain could not bring within budget without cutting the map in two. */
+  overBudget: string[];
+  /** Did this come from the mosaic (`true`) or from the map's own `paths` (`false`)? */
+  derived: boolean;
+}
+
+/**
+ * Resolve a map's adjacency (M4.3). A map that declares `paths` plays on exactly those,
+ * as always. A map that OMITS them derives them from the province mosaic: geometry
+ * proposes every shared border, terrain seals the surplus (`maxLinks`), and an impassable
+ * kind seals all of its own — so the drawn border and the travelable lane are one graph
+ * instead of two that silently disagree (see `mosaic.ts`).
+ *
+ * Degrades rather than crashes without `data`: with no catalogue there are no budgets, so
+ * every shared border stays open.
+ */
+export function matchMapEdges(map: MatchMap, data?: GameData): MapEdges {
+  if (map.paths !== undefined) {
+    return { paths: map.paths, sealed: [], overBudget: [], derived: false };
+  }
+  const ids = Object.keys(map.sectors).sort();
+  const seeds: MosaicSeed[] = ids.map((id) => {
+    const sec = map.sectors[id]!;
+    return { id, x: sec.position.x, y: sec.position.y, size: sec.size };
+  });
+  const budgetOf = (id: string): number => {
+    if (!data) return Number.POSITIVE_INFINITY;
+    const sec = map.sectors[id];
+    if (sec?.kind !== undefined && data.sectorKinds[sec.kind]?.traversable === false) return 0;
+    return sec?.terrain !== undefined
+      ? (data.sectors[sec.terrain]?.maxLinks ?? Number.POSITIVE_INFINITY)
+      : Number.POSITIVE_INFINITY;
+  };
+  const plan = sealPlan(mosaicBorders(seeds), budgetOf, ids);
+  return {
+    paths: plan.open.map((b) => [b.a, b.b] as [string, string]),
+    sealed: plan.sealed.map((b) => [b.a, b.b] as [string, string]),
+    overBudget: plan.overBudget,
+    derived: true,
+  };
+}
+
 /**
  * Structural + geometric validation of a map (M1.3). Returns a list of stable
  * issue codes (empty = valid); `buildStateFromMap` rejects on any. Beyond shape
  * (zod already did that), this enforces the **neighbour-only** path rule: a path
- * may join two sectors only if no third sector lies "between" them (closer to
- * both than they are to each other — the relative-neighbourhood criterion). That
- * keeps the graph to immediate neighbours: no long criss-crossing lanes.
+ * may join two sectors only if no third sector lies "between" them — nothing inside
+ * the circle having A—B as its diameter (the Gabriel criterion). That still forbids
+ * long criss-crossing lanes, but it proposes generously: a sector in open space
+ * really does reach everything near it.
+ *
+ * Geometry decides which lanes are POSSIBLE; terrain decides how many of them a
+ * sector actually carries (`SectorTypeDefSchema.maxLinks`, `E_SECTOR_OVERLINKED`).
+ * The two together are why a province is sparse: not because the author drew few
+ * lines, but because that region of space admits few — an asteroid cluster takes a
+ * single approach, open space routes freely. Needs `data` (the budget lives there).
  */
 export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   const issues: string[] = [];
@@ -38,6 +94,9 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   const isOwnerRef = (ref: string): boolean =>
     Object.prototype.hasOwnProperty.call(map.players, ref) ||
     Object.prototype.hasOwnProperty.call(map.slots, ref);
+  // The lanes this map plays on: its own `paths`, or — when it omits them — the mosaic
+  // borders minus what terrain seals (M4.3). Everything below validates THESE.
+  const edges = matchMapEdges(map, data);
 
   // a slot id must not collide with a player id (an ambiguous owner reference)
   for (const sid of Object.keys(map.slots)) {
@@ -63,7 +122,7 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
 
   // paths: known endpoints, no self-loop, no duplicate, neighbour-only
   const seen = new Set<string>();
-  for (const [a, b] of map.paths) {
+  for (const [a, b] of edges.paths) {
     if (!has(a) || !has(b)) {
       issues.push(`E_PATH_UNKNOWN_SECTOR:${a}-${b}`);
       continue;
@@ -78,17 +137,140 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       continue;
     }
     seen.add(key);
+    // Derived lanes ARE mosaic borders, which is a wider (and different) criterion than
+    // Gabriel's — judging them by it would reject the very adjacency the mosaic draws.
+    if (edges.derived) continue;
+    // Gabriel criterion: the lane is legal unless a third sector sits inside the
+    // circle that has A—B as its diameter — i.e. unless something is genuinely IN
+    // THE WAY. Deliberately more permissive than the relative-neighbourhood rule it
+    // replaced (MAP-LINK): geometry is supposed to PROPOSE generously (open space
+    // really does connect to everything nearby) and TERRAIN is what cuts the lanes
+    // back down (`maxLinks` below). Under the old rule geometry alone capped every
+    // node at ~2-3 lanes, so the terrain budget could never bind and "this province
+    // is a dead end" had no in-world cause — it was an accident of coordinates.
+    // Strictly WIDER than the old rule (a Gabriel neighbourhood contains the
+    // relative one), so no previously valid map becomes invalid.
     const pa = map.sectors[a]!.position;
     const pb = map.sectors[b]!.position;
-    const dab = distance(pa, pb);
+    const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+    const radius = distance(pa, pb) / 2;
     const between = ids.some(
-      (c) =>
-        c !== a &&
-        c !== b &&
-        distance(pa, map.sectors[c]!.position) < dab &&
-        distance(pb, map.sectors[c]!.position) < dab,
+      (c) => c !== a && c !== b && distance(mid, map.sectors[c]!.position) < radius,
     );
     if (between) issues.push(`E_PATH_NOT_NEIGHBOR:${key}`);
+  }
+
+  // A derived map is already within budget by construction (`sealPlan` shut the surplus).
+  // What it could NOT shut without stranding a province is a real authoring problem — the
+  // dots are placed so that some region carries more approaches than its terrain admits —
+  // so it surfaces under the same code an authored map would get.
+  for (const id of edges.overBudget) issues.push(`E_SECTOR_OVERLINKED:${id}`);
+
+  // Link budget (MAP-LINK): terrain decides how many lanes a region can carry.
+  // Geometry above says which sectors CAN see each other; this says how many of
+  // those a world of that terrain actually admits — a dense asteroid cluster takes
+  // one approach and is therefore a dead end, open space routes freely. Counted over
+  // the accepted edges only, so a map already rejected above is not blamed twice.
+  if (data && !edges.derived) {
+    const degree = new Map<string, number>();
+    for (const key of seen) {
+      const [a, b] = key.split('|') as [string, string];
+      degree.set(a, (degree.get(a) ?? 0) + 1);
+      degree.set(b, (degree.get(b) ?? 0) + 1);
+    }
+    for (const [id, deg] of [...degree].sort()) {
+      const terrain = map.sectors[id]?.terrain;
+      const budget = terrain ? data.sectors[terrain]?.maxLinks : undefined;
+      if (budget !== undefined && deg > budget) {
+        issues.push(`E_SECTOR_OVERLINKED:${id}:${deg}>${budget}`);
+      }
+    }
+  }
+
+  // Impassability (MAP-BARRIER). A kind marked `traversable: false` is a HOLE in the
+  // map, not a place: nothing may route through it and no lane may lead into it. The
+  // flag existed since M2.1 but was read in exactly one place (the hero corridor), so
+  // the shipped black hole was impassable only because its generator happened to give
+  // it no edges — a convention, not a rule. Enforced here instead of in the router:
+  // with no lanes there is nothing to route through, and the sector still does its job
+  // by EXISTING, since the neighbour rule above kills any lane that would pass through
+  // the space it occupies. That is what makes a rift a barrier rather than a label.
+  // A derived map cannot reach here with a lane into a barrier: an impassable kind is
+  // given a budget of ZERO, so every one of its borders is sealed before this runs.
+  if (data && !edges.derived) {
+    for (const key of seen) {
+      const [a, b] = key.split('|') as [string, string];
+      for (const end of [a, b]) {
+        const kind = map.sectors[end]?.kind;
+        if (kind !== undefined && data.sectorKinds[kind]?.traversable === false) {
+          issues.push(`E_IMPASSABLE_HAS_LANE:${end}`);
+        }
+      }
+    }
+  }
+
+  // Transit (MAP-TRANSIT): a sector may declare WHICH pairs of its neighbours connect
+  // through it, so two lanes can cross the same province without meeting. The pairs
+  // must name real neighbours — a pair pointing at a sector there is no lane to would
+  // silently do nothing, which is the kind of "configured but inert" bug this file
+  // exists to catch.
+  const neighbours = new Map<string, Set<string>>();
+  for (const key of seen) {
+    const [a, b] = key.split('|') as [string, string];
+    if (!neighbours.has(a)) neighbours.set(a, new Set());
+    if (!neighbours.has(b)) neighbours.set(b, new Set());
+    neighbours.get(a)!.add(b);
+    neighbours.get(b)!.add(a);
+  }
+  for (const [id, sec] of Object.entries(map.sectors)) {
+    if (!sec.transit) continue;
+    const near = neighbours.get(id) ?? new Set<string>();
+    const pairSeen = new Set<string>();
+    for (const [a, b] of sec.transit) {
+      if (a === b) {
+        issues.push(`E_TRANSIT_SELF:${id}:${a}`);
+        continue;
+      }
+      for (const end of [a, b]) {
+        if (!near.has(end)) issues.push(`E_TRANSIT_NOT_NEIGHBOR:${id}:${end}`);
+      }
+      const pk = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (pairSeen.has(pk)) issues.push(`E_TRANSIT_DUPLICATE:${id}:${pk}`);
+      pairSeen.add(pk);
+    }
+  }
+
+  // …and the constraint must not strand anyone. Plain connectivity (below) walks the
+  // undirected graph and cannot see transit, so a lane-crossing spec could leave a
+  // sector reachable on the map yet unreachable to any fleet. Checked the way a fleet
+  // actually travels: over (sector, lane it arrived by) states, from every start.
+  if (ids.length > 1 && Object.values(map.sectors).some((sec) => sec.transit)) {
+    const passable = (node: string, from: string | null, to: string): boolean => {
+      const pairs = map.sectors[node]?.transit;
+      if (!pairs || pairs.length === 0 || from === null) return true;
+      return pairs.some(([a, b]) => (a === from && b === to) || (b === from && a === to));
+    };
+    for (const start of ids) {
+      const seenNodes = new Set<string>([start]);
+      const queue: Array<[string, string | null]> = [[start, null]];
+      const seenStates = new Set<string>([`${start}\u0000`]);
+      while (queue.length) {
+        const [cur, from] = queue.shift()!;
+        for (const next of neighbours.get(cur) ?? []) {
+          if (!passable(cur, from, next)) continue;
+          seenNodes.add(next);
+          const sk = `${next}\u0000${cur}`;
+          if (seenStates.has(sk)) continue;
+          seenStates.add(sk);
+          queue.push([next, cur]);
+        }
+      }
+      for (const target of ids) {
+        if (target !== start && !seenNodes.has(target)) {
+          issues.push(`E_TRANSIT_UNREACHABLE:${start}->${target}`);
+        }
+      }
+    }
   }
 
   // fleets reference an existing sector + a declared player
@@ -97,17 +279,25 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     if (!isOwnerRef(fl.owner)) issues.push(`E_FLEET_UNKNOWN_OWNER:${id}`);
   }
 
-  // graph connectivity (BFS over the valid undirected edges)
-  if (ids.length > 1) {
+  // graph connectivity (BFS over the valid undirected edges). Impassable sectors are
+  // EXEMPT from the requirement: a rift or a black hole is a hole in the map, so
+  // demanding a route to it would force the author to either drill a lane into the
+  // barrier or switch the check off — and both defeat the barrier. What must stay
+  // connected is everything a fleet can actually reach.
+  const reachRequired = ids.filter((id) => {
+    const kind = map.sectors[id]?.kind;
+    return !(data && kind !== undefined && data.sectorKinds[kind]?.traversable === false);
+  });
+  if (reachRequired.length > 1) {
     const adj = new Map<string, string[]>(ids.map((id) => [id, []]));
-    for (const [a, b] of map.paths) {
+    for (const [a, b] of edges.paths) {
       if (has(a) && has(b) && a !== b) {
         adj.get(a)!.push(b);
         adj.get(b)!.push(a);
       }
     }
-    const seenN = new Set<string>([ids[0]!]);
-    const queue = [ids[0]!];
+    const seenN = new Set<string>([reachRequired[0]!]);
+    const queue = [reachRequired[0]!];
     while (queue.length) {
       const cur = queue.shift()!;
       for (const n of adj.get(cur) ?? []) {
@@ -117,7 +307,7 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
         }
       }
     }
-    if (seenN.size !== ids.length) issues.push('E_MAP_DISCONNECTED');
+    if (reachRequired.some((id) => !seenN.has(id))) issues.push('E_MAP_DISCONNECTED');
   }
 
   return issues;
@@ -189,6 +379,7 @@ export interface BuildFromMapOptions {
 function seedTeamDiplomacy(
   teamOf: Map<string, string | undefined>,
   crossTeamStart: 'war' | 'peace',
+  players: Record<string, Player>,
 ): Record<string, DiplomaticStance> | undefined {
   const ids = [...teamOf.keys()].sort();
   if (ids.length < 2) return undefined;
@@ -198,11 +389,15 @@ function seedTeamDiplomacy(
     for (let j = i + 1; j < ids.length; j++) {
       const ta = teamOf.get(ids[i]!);
       const tb = teamOf.get(ids[j]!);
-      diplomacy[pairKey(ids[i]!, ids[j]!)] = !teamed
-        ? 'peace'
-        : ta !== undefined && ta === tb
-          ? 'alliance'
-          : crossTeamStart;
+      const a = players[ids[i]!]!.npc;
+      const b = players[ids[j]!]!.npc;
+      diplomacy[pairKey(ids[i]!, ids[j]!)] = a === 'pirate' || b === 'pirate'
+        ? 'war'
+        : a === 'neutral' || b === 'neutral' || !teamed
+          ? 'peace'
+          : ta !== undefined && ta === tb
+            ? 'alliance'
+            : crossTeamStart;
     }
   return diplomacy;
 }
@@ -254,12 +449,23 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     time: options.time ?? map.time,
   });
 
-  // derive per-sector links from the undirected paths (sorted = JSON-stable)
+  // per-sector links from the resolved adjacency (sorted = JSON-stable), plus the
+  // borders terrain shut — a derived map publishes those so the renderer can draw the
+  // barrier without re-deriving the geometry (M4.3).
+  const edges = matchMapEdges(map, data);
   const links: Record<string, string[]> = {};
-  for (const id of Object.keys(map.sectors)) links[id] = [];
-  for (const [a, b] of map.paths) {
+  const sealed: Record<string, string[]> = {};
+  for (const id of Object.keys(map.sectors)) {
+    links[id] = [];
+    sealed[id] = [];
+  }
+  for (const [a, b] of edges.paths) {
     links[a]!.push(b);
     links[b]!.push(a);
+  }
+  for (const [a, b] of edges.sealed) {
+    sealed[a]!.push(b);
+    sealed[b]!.push(a);
   }
 
   // Resolve an owner ref (a player id or a slot id) to a concrete player id.
@@ -280,6 +486,8 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       owner: sec.owner == null ? null : resolveOwner(sec.owner),
       position: { x: sec.position.x, y: sec.position.y },
       links: [...new Set(links[id])].sort(),
+      ...(sealed[id]!.length ? { sealed: [...new Set(sealed[id])].sort() } : {}),
+      ...(sec.transit ? { transit: sec.transit.map(([a, b]) => [a, b] as [string, string]) } : {}),
       resources: {},
       buildings: sec.buildings.map((b) => ({
         type: b.type,
@@ -305,6 +513,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       status: 'active',
       resources: { ...pl.resources },
       ...(pl.ai ? { ai: true } : {}),
+      ...(pl.npc ? { npc: pl.npc } : {}),
     };
   }
   // seat assigned slots as concrete players (start kit = the slot's resources)
@@ -394,7 +603,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
   for (const [slotId, a] of Object.entries(slotAssign)) {
     if (map.slots[slotId]) teamOf.set(a.playerId, map.slots[slotId]!.team);
   }
-  const diplomacy = seedTeamDiplomacy(teamOf, options.crossTeamStart ?? 'war');
+  const diplomacy = seedTeamDiplomacy(teamOf, options.crossTeamStart ?? 'war', players);
 
   return {
     ...base,

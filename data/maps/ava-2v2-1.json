@@ -5,10 +5,10 @@
   "time": 0,
   "sectors": {
     "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
-    "west": { "position": { "x": -230, "y": 0 }, "kind": "planet", "planetType": "barren" },
-    "east": { "position": { "x": 230, "y": 0 }, "kind": "planet", "planetType": "barren" },
+    "west": { "position": { "x": -230, "y": 0 }, "kind": "planet", "terrain": "solar_flare_zone", "planetType": "barren" },
+    "east": { "position": { "x": 230, "y": 0 }, "kind": "planet", "terrain": "solar_flare_zone", "planetType": "barren" },
     "drift": { "position": { "x": 0, "y": -210 }, "kind": "asteroid", "terrain": "asteroid_field" },
-    "veil": { "position": { "x": 0, "y": 210 }, "kind": "nebula", "terrain": "nebula", "planetType": "barren" },
+    "veil": { "position": { "x": 0, "y": 210 }, "kind": "dense_nebula", "terrain": "dense_nebula", "planetType": "gas_giant" },
     "home_a1": {
       "position": { "x": -260, "y": -160 },
       "kind": "planet",
@@ -42,20 +42,6 @@
       "garrison": [{ "unit": "militia", "count": 3 }]
     }
   },
-  "paths": [
-    ["home_a1", "west"],
-    ["home_a2", "west"],
-    ["home_a1", "drift"],
-    ["home_a2", "veil"],
-    ["home_b1", "east"],
-    ["home_b2", "east"],
-    ["home_b1", "drift"],
-    ["home_b2", "veil"],
-    ["west", "nexus"],
-    ["east", "nexus"],
-    ["drift", "nexus"],
-    ["veil", "nexus"]
-  ],
   "slots": {
     "slot_a1": { "team": "A", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } },
     "slot_a2": { "team": "A", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } },

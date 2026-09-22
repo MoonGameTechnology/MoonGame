@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { reframePresentation, supportsHolography, selectionWindowPosition, selectionThread } from './holographicLayout';
 import { worldToScreen } from '../../packages/client/src/camera';
+import { isMobileViewport } from './viewport';
 
 it('changing the skin preserves map positions and physical zoom in both directions', () => {
   const before = { left: 160, right: 1000, top: 180, bottom: 680 };
@@ -27,17 +28,24 @@ describe('holographic appearance is limited to computers and tablets', () => {
   it.each([
     [414, 896],
     [896, 414],
-    [720, 1024],
-  ])('keeps phone %s × %s simple', (w, h) => {
+    [719, 1024],
+  ])('keeps the dedicated phone layout at %s × %s', (w, h) => {
     expect(supportsHolography(w, h, true)).toBe(false);
   });
   it.each([
+    [720, 1024, true],
     [834, 1112, true],
     [1194, 834, true],
     [1366, 768, false],
     [1280, 500, false],
   ])('supports %s × %s', (w, h, coarse) => {
     expect(supportsHolography(Number(w), Number(h), Boolean(coarse))).toBe(true);
+  });
+  it('every viewport uses either the modern console or the dedicated phone layout', () => {
+    for (const width of [320, 414, 719, 720, 721, 900, 1280])
+      for (const height of [414, 519, 520, 900])
+        for (const coarse of [true, false])
+          expect(supportsHolography(width, height, coarse)).toBe(!isMobileViewport(width, height, coarse));
   });
 });
 

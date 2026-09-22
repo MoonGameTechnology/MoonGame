@@ -63,9 +63,7 @@
     },
     "hp": 15,
     "scoreValue": 8,
-    "traits": [
-      "infected"
-    ]
+    "traits": ["infected"]
   },
   "barracks": {
     "name": "Barracks",
@@ -276,7 +274,8 @@
         },
         "hp": 40
       }
-    ]
+    ],
+    "onlyOn": ["dead_world", "asteroid", "asteroid_cluster", "void_station"]
   },
   "power_plant": {
     "name": "Fusion Plant",
@@ -557,7 +556,56 @@
     "buildTimeHours": 6,
     "hp": 70,
     "defenseBonus": 0.4,
-    "scoreValue": 6
+    "aaDamage": 6,
+    "pointDefense": 6,
+    "scoreValue": 6,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 260,
+          "credits": 110
+        },
+        "buildTimeHours": 8,
+        "hp": 110,
+        "defenseBonus": 0.4,
+        "aaDamage": 9,
+        "pointDefense": 9
+      },
+      {
+        "cost": {
+          "metal": 380,
+          "credits": 180
+        },
+        "buildTimeHours": 10,
+        "hp": 160,
+        "defenseBonus": 0.4,
+        "aaDamage": 13,
+        "pointDefense": 12
+      },
+      {
+        "cost": {
+          "metal": 540,
+          "credits": 270
+        },
+        "buildTimeHours": 13,
+        "hp": 220,
+        "defenseBonus": 0.4,
+        "aaDamage": 18,
+        "pointDefense": 16
+      },
+      {
+        "cost": {
+          "metal": 760,
+          "credits": 400
+        },
+        "buildTimeHours": 16,
+        "hp": 300,
+        "defenseBonus": 0.4,
+        "aaDamage": 24,
+        "pointDefense": 20
+      }
+    ],
+    "onlyOn": []
   },
   "tax_office": {
     "name": "Tax Office",

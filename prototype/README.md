@@ -9,12 +9,15 @@ throwaway demo to _see and feel_ the core, not the Stage-4 client.
 Open the built file in any browser — no server needed:
 
 ```bash
-pnpm run prototype          # bundles everything into one HTML file
+pnpm run prototype          # самодостаточные HTML-файлы игровых экранов
 # then open prototype/dist/void-dominion.html
+# Sector Zero: prototype/dist/sector-zero.html
 ```
 
-The whole game (simulation core + UI) is inlined into that single ~360 KB HTML
-via esbuild, so you can double-click it or send it anywhere.
+Ядро, UI и ресурсы вшиты esbuild в каждый игровой HTML; сервер для локального
+запуска не нужен. `sector-zero.html` открывает собственное меню с продолжением,
+подготовкой корабельных сетов, героями и навыками. Это прямой вход общего клиента,
+а не окончательная изолированная сборка продукта.
 
 ### How to play
 
@@ -44,7 +47,12 @@ a natural future addition to the core).
 - `src/main.ts` — canvas rendering, input, the Red AI and the real-time loop.
 - `src/smoke.ts` — Node scenario test of the wiring (`node` + esbuild).
 - `uitest.mjs` — headless DOM smoke test of the UI bundle.
-- `build.mjs` — bundles `src/main.ts` into two artifacts: `dist/void-dominion.html`
-  (dev client — everything) and `dist/void-dominion-player.html` (player client — no
-  test mode, no single-player skirmish, no time-acceleration controls; the netserver
-  serves it at `/`, keeping the dev client at `/dev`).
+- `build.mjs` — собирает `src/bootstrap.ts`: `dist/void-dominion.html` (dev),
+  `dist/void-dominion-player.html` (игрок) и `dist/sector-zero.html` (тот же профиль
+  игрока со своим стартовым экраном). Отдельный `src/admin.ts` собирается в
+  `dist/void-dominion-admin.html`.
+- `src/sectorZeroMenu.ts`, `src/sectorZeroPreparation.ts`, `sector-zero.css` —
+  главное меню Sector Zero и подготовка между забегами; чистая логика профиля —
+  `../decisions/sectorZeroProgress.ts`.
+- `node prototype/uitest.mjs --sector-zero` — проверка прямого входа и переходов
+  подготовки/забега/сохранения на DOM-харнесе, не замена визуальной проверки браузером.

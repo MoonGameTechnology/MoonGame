@@ -15,16 +15,21 @@ export interface MapLod {
   art: number;
   /** Labels, cargo, rings and decorative animation return only after the art. */
   detail: number;
+  /** Inner borders, terrain tint and roads dissolve into political regions. */
+  provinceDetail: number;
   markerRadius: number;
 }
 
-export function mapLod(gap: number): MapLod {
+export function mapLod(gap: number, cameraScale = Infinity): MapLod {
   const scale = gap / REFERENCE_GAP;
+  const overview = detailAt(cameraScale);
+  const province = clamp01((gap - 40) / 56);
   return {
     scale,
-    art: clamp01((gap - 32) / 32),
-    detail: detailAt(scale),
-    markerRadius: Math.max(1.5, Math.min(4.5, gap * 0.12)),
+    art: Math.min(clamp01((gap - 32) / 32), overview),
+    detail: Math.min(detailAt(scale), overview),
+    provinceDetail: Math.min(province * province * (3 - 2 * province), overview),
+    markerRadius: Math.max(1.2, Math.min(3.2, gap * 0.09)),
   };
 }
 
@@ -54,32 +59,17 @@ export function mapSpacing(nodes: readonly MapPoint[]): number {
   return gaps[Math.floor(gaps.length / 2)] ?? REFERENCE_GAP;
 }
 
-/** A bounded-cost marker with no textures, text, shadows or procedural geometry.
- * The caller supplies only known terrain / ownership; unknown nodes stay anonymous. */
+/** Every overview node has the same neutral ring. No kind, owner or memory input:
+ * neither the shape nor the presence of a marker can disclose hidden contents. */
 export function drawSchematicNode(
   g: CanvasRenderingContext2D,
   at: { x: number; y: number },
-  kind: string,
-  color: string,
   radius: number,
 ): void {
   const { x, y } = at;
-  g.fillStyle = color;
-  g.strokeStyle = color;
-  g.lineWidth = 1;
+  g.strokeStyle = '#506773';
+  g.lineWidth = 0.85;
   g.beginPath();
-  if (kind === 'void_station' || kind === 'pirate_base' || kind === 'neutral_base') {
-    g.moveTo(x, y - radius - 1);
-    g.lineTo(x + radius + 1, y);
-    g.lineTo(x, y + radius + 1);
-    g.lineTo(x - radius - 1, y);
-    g.closePath();
-    g.stroke();
-  } else if (kind === 'planet' || kind === 'dead_world' || kind === 'unknown') {
-    g.arc(x, y, radius, 0, Math.PI * 2);
-    g.stroke();
-  } else {
-    g.rect(x - radius / 2, y - radius / 2, radius, radius);
-    g.fill();
-  }
+  g.arc(x, y, radius, 0, Math.PI * 2);
+  g.stroke();
 }

@@ -26,6 +26,14 @@ function game2(): GameState {
   });
 }
 
+/** Та же партия, но места В ВОЙНЕ. С решения владельца 2026-09-16 погрузка войск на
+ *  корабли идёт ТОЛЬКО под атаку (правило №5), поэтому мирная партия её больше не
+ *  показывает — и тесты погрузки обязаны объявлять войну явно. */
+const atWar = (s: GameState): GameState => ({
+  ...s,
+  diplomacy: { ...(s.diplomacy ?? {}), 'p1|p2': 'war' },
+});
+
 const only = (actions: Action[], type: string): Action[] => actions.filter((a) => a.type === type);
 /** Заказы построек данного типа — с планетой, на которой их разместили. */
 const built = (actions: Action[], building: string): string[] =>
@@ -112,11 +120,14 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
     expect(loads(orders)).toHaveLength(0);
   });
 
-  it('десант грузится по вместимости трюма, но домашняя стража остаётся', () => {
-    const s = game2();
+  it('НА ВОЙНЕ десант грузится по вместимости трюма, но ПОЛ гарнизона остаётся', () => {
+    const s = atWar(game2());
     const home = homeOf(s, 'p2');
-    // 7 наземных дома, домашняя стража — 3 ⇒ увезти можно ровно 4, и трюм крейсера (5)
-    // это позволяет. Порядок погрузки — от ударного к дешёвому.
+    // ПОЛ СТОЛИЦЫ выше пола голого мира (правило владельца №4): три здания первого
+    // уровня дают развитость 3, то есть 16 + 4×3 = 28 очков обороны. Дома 6 ополченцев
+    // (48) + тяжёлый (20) = 68, значит увезти можно 40 очков: тяжёлого (20) и двух
+    // ополченцев (16) — трое, и первым уезжает УДАРНЫЙ род, а не ополчение.
+    // Связывает здесь ПОЛ, а не трюм: крейсер увёз бы и пятерых.
     const staged = withPlanet(s, home, {
       garrison: [
         { unit: 'militia', count: 6 },
@@ -131,12 +142,28 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
       fleets: { 'f:test': fleetAt('f:test', home, [{ unit: 'cruiser', count: 1 }]) },
     };
     const lifted = loads(aiOrders(withFleet, 'p2', 'expand', 'strong'));
-    expect(lifted.reduce((n, l) => n + l.count, 0)).toBe(4);
-    expect(lifted[0]!.unit).toBe('heavy_infantry'); // тяжёлое вперёд
+    expect(lifted.reduce((n, l) => n + l.count, 0)).toBe(3);
+    expect(lifted[0]!.unit).toBe('heavy_infantry'); // ударное вперёд
+    // Дом не вычерпан досуха: четверо остались, и это ровно пол столицы.
+    expect(7 - lifted.reduce((n, l) => n + l.count, 0)).toBe(4);
+  });
+
+  it('В МИРНОЕ ВРЕМЯ НЕ ГРУЗИТ ВОВСЕ — войска ждут операции на планете (правило №5)', () => {
+    // Войска в трюме гибнут ВМЕСТЕ с флотом: `combat.ts` удаляет погибший флот целиком,
+    // и `landing` уходит с ним без отдельного броска. Возить их «на всякий случай»
+    // значит держать ресурсы под списание.
+    const s = game2(); // мир, войны нет
+    const home = homeOf(s, 'p2');
+    const staged = withPlanet(s, home, { garrison: [{ unit: 'militia', count: 9 }] });
+    const withFleet: GameState = {
+      ...staged,
+      fleets: { 'f:test': fleetAt('f:test', home, [{ unit: 'cruiser', count: 1 }]) },
+    };
+    expect(loads(aiOrders(withFleet, 'p2', 'expand', 'strong'))).toHaveLength(0);
   });
 
   it('трюм не переполняется: маленький корпус увозит ровно свою вместимость', () => {
-    const s = game2();
+    const s = atWar(game2());
     const home = homeOf(s, 'p2');
     const staged = withPlanet(s, home, { garrison: [{ unit: 'militia', count: 9 }] });
     const withFleet: GameState = {
@@ -147,17 +174,23 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
     expect(loads(aiOrders(withFleet, 'p2', 'expand', 'strong')).reduce((n, l) => n + l.count, 0)).toBe(1);
   });
 
-  it('ШТУРМУЕТ гарнизонный вражеский мир — но только имея десант в трюме', () => {
+  it('ШТУРМУЕТ гарнизонный вражеский мир — но только будучи УВЕРЕННЫМ, что возьмёт', () => {
+    // Правило владельца №2 (2026-09-16). Прежде хватало любого бойца в трюме, и десант
+    // из двух ополченцев ложился под ротой тяжёлой пехоты, не сдвинув ничего: приказ
+    // уходил, бой шёл, войска гибли, мир оставался чужим. Теперь порог — прогноз.
     const s = game2();
-    const target = homeOf(s, 'p1'); // чужой мир с живым гарнизоном
-    const atWar: GameState = { ...s, diplomacy: { ...(s.diplomacy ?? {}), 'p1|p2': 'war' } };
+    const target = homeOf(s, 'p1'); // чужой мир с живым гарнизоном (2 ополченца + тяжёлый)
+    const war: GameState = { ...s, diplomacy: { ...(s.diplomacy ?? {}), 'p1|p2': 'war' } };
     const fleet = (landing: Array<{ unit: string; count: number }>): GameState => ({
-      ...atWar,
+      ...war,
       fleets: { 'f:strike': fleetAt('f:strike', target, [{ unit: 'cruiser', count: 2 }], landing) },
     });
-    const withTroops = only(aiOrders(fleet([{ unit: 'militia', count: 2 }]), 'p2', 'expand', 'strong'), 'fleet.assault');
-    expect(withTroops).toHaveLength(1);
-    expect((withTroops[0]!.payload as { fleetId: string }).fleetId).toBe('f:strike');
+    const strong = only(aiOrders(fleet([{ unit: 'tank', count: 8 }]), 'p2', 'expand', 'strong'), 'fleet.assault');
+    expect(strong).toHaveLength(1);
+    expect((strong[0]!.payload as { fleetId: string }).fleetId).toBe('f:strike');
+    // Слабый десант больше не бросают: он не возьмёт мир, а погибнет весь.
+    expect(only(aiOrders(fleet([{ unit: 'militia', count: 2 }]), 'p2', 'expand', 'strong'), 'fleet.assault')).toHaveLength(0);
+    // Пустой трюм — как и раньше, штурмовать нечем.
     expect(only(aiOrders(fleet([]), 'p2', 'expand', 'strong'), 'fleet.assault')).toHaveLength(0);
   });
 

@@ -182,6 +182,10 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
   { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },
   {
+    prefix: 'setup.pve.difficulty.',
+    built_by: 'runDifficultyKey() в /decisions — из значения сложности забега (PVR-2.1)',
+  },
+  {
     prefix: 'medal.',
     built_by:
       'medalsOf() в ядре строит `medal.<линия>.<степень>` из данных `data/medalGrades.json`, ' +

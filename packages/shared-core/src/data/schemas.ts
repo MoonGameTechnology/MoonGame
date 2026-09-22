@@ -276,6 +276,22 @@ export const BuildingDefSchema = z.object({
   defenseBonus: z.number().default(0.01),
   /** Overrides for levels 2..N (index 0 = level 2). maxLevel = 1 + length. */
   upgrades: z.array(BuildingLevelSchema).default([]),
+  /**
+   * Виды провинций, где это здание вообще возводится. Отсутствует — где угодно (роль
+   * играет только ростер вида).
+   *
+   * ЗАЧЕМ ОГРАНИЧЕНИЕ СО СТОРОНЫ ЗДАНИЯ, когда уже есть `sectorKinds.allowedBuildings`.
+   * Ростер вида отвечает на вопрос «что тут можно», и этого достаточно, пока правило
+   * формулируется от МЕСТА. Решение владельца 3 сформулировано от ЗДАНИЯ — «добывающая
+   * станция строится ТОЛЬКО в мёртвых мирах и астероидных полях», — и ростером его не
+   * выразить: у планеты ростера нет вовсе (`undefined` = любое здание), так что запретить
+   * ей станцию можно было бы только выписав ей поимённый список ВСЕХ прочих зданий. Такой
+   * список устаревает на первом же новом здании, причём молча.
+   *
+   * Здесь же правило живёт в одном месте и переживает новые виды местности само: вид, о
+   * котором здание не знает, станцию не получит.
+   */
+  onlyOn: z.array(z.string()).optional(),
   traits: z.array(z.string()).default([]),
   /** Victory-score worth of this building; the victory module multiplies it by
    *  the instance's level, so investing in upgrades raises (and losing the
@@ -372,6 +388,25 @@ export const SectorTypeDefSchema = z.object({
   /** Victory-score worth of controlling a node in this sector (terrain like an
    *  asteroid field is worth holding even without a habitable planet). */
   scoreValue: z.number().nonnegative().default(0),
+  /** How many lanes the terrain can physically carry (MAP-LINK). Geometry proposes
+   *  the candidates — the relative-neighbourhood rule already says which sectors can
+   *  see each other — and this says how many of them a region of THIS kind actually
+   *  admits: open space routes freely, a dense asteroid cluster admits a single
+   *  approach and is therefore a dead end. Enforced by `validateMatchMap`
+   *  (`E_SECTOR_OVERLINKED`), so a map cannot draw a lane the world would not allow.
+   *  The generous default keeps every pre-existing map legal. */
+  maxLinks: z.number().int().positive().default(8),
+  /** Passive per-hour output an OWNED sector of this terrain yields, mirroring
+   *  `PlanetTypeDefSchema.baseOutput` (a metal-rich asteroid cluster is worth taking
+   *  even though nothing can be built on it). Added by `sectorModule` into the
+   *  `economy.production` bag. Empty {} = the terrain yields nothing by itself. */
+  baseOutput: ResourceBagSchema.default({}),
+  /** Per-resource production multipliers for an owned sector of this terrain, e.g.
+   *  `{ metal: 0.5 }` = +50% metal mined here, `{ metal: -0.4 }` = a worked-out system
+   *  that yields 40% less. Layered like the planet-type twin. Floored at −1 ("yields
+   *  nothing"): below that the multiplier flips sign and the sector would quietly DRAIN
+   *  the treasury, which no terrain is meant to do. */
+  productionByResource: z.record(z.string(), z.number().gte(-1)).default({}),
 });
 
 /**
@@ -473,6 +508,12 @@ export const TechnologyDefSchema = z.object({
   conditions: z.array(TechnologyConditionSchema).default([]),
   cost: ResourceBagSchema.default({}),
   researchTimeHours: z.number().nonnegative().default(0),
+  /** Узел, который в сессии НЕ исследуется: его только ВЫДАЮТ (мета-прокачка
+   *  командира, усиление забега). Такие узлы бесплатны и мгновенны по самой сути —
+   *  они награда, а не работа, — и без этого флага любой игрок исследовал бы их
+   *  даром в любом матче. Модуль технологий отбивает их `E_GRANT_ONLY`, дерево
+   *  технологий не показывает. */
+  grantOnly: z.boolean().default(false),
   prerequisites: z.array(z.string()).default([]),
   // `.prefault({})` re-runs the nested schema, keeping its per-field defaults
   // the single source of truth instead of a duplicate literal that can drift.
@@ -663,6 +704,35 @@ export const HERO_PASSIVE_SCOPES = ['heroFleet', 'ownFleetsNear'] as const;
  *  ВАЖНО: `slots` архетипа и `skillSlots` редкости — РАЗНЫЕ бюджеты. Первый ограничивает
  *  `hero.fit` (компоненты корабля), второй — `hero.equip` (способности). Путать их нельзя:
  *  у `commander` 4 фиттинга и у `main` 4 скилла — совпадение чисел, а не одно правило. */
+/** Одна ступень звёздности Sector Zero: шанс успеха и цена попытки (SZE-0.2).
+ *
+ *  Лестница ОДНА на модули и навыки: звезда модуля и звезда навыка — это уровень заточки
+ *  `EC-2.1` под своим именем, и заводить вторую лестницу запрещено (§0.4
+ *  `hero-progression-roadmap.md`, §0.2 `sector-zero-economy-roadmap.md`). Шанс `1` —
+ *  гарантированная ступень; меньше — бросок.
+ *
+ *  Числа в `data/sectorZeroStars.json` — **v0**, отправная точка для калибровки
+ *  телеметрией, а не утверждённый баланс. */
+export const SectorZeroStarStepSchema = z.object({
+  /** Вероятность успеха попытки, (0, 1]. Ровно `1` = ступень без броска. */
+  chance: z.number().gt(0).lte(1).default(1),
+  /** Цена попытки в Варрантах. Сгорает и при неудаче — но звёздность не падает
+   *  (инвариант провала, резолюция владельца 2026-09-20). */
+  warrants: z.number().int().nonnegative().default(0),
+});
+
+/** Лестница звёздности Sector Zero целиком. */
+export const SectorZeroStarsSchema = z.object({
+  /** Потолок звёзд. Выше него попытка не предлагается вовсе. */
+  cap: z.number().int().nonnegative().default(0),
+  /** Сколько первых ступеней гарантированы. Держится ОТДЕЛЬНЫМ числом, а не выводится из
+   *  `chance === 1`: так «гарант кончается здесь» остаётся авторским решением, а не
+   *  побочным эффектом правки вероятности. Расхождение с `steps` ловит тест. */
+  guaranteed: z.number().int().nonnegative().default(0),
+  /** Ступени по порядку: `steps[0]` — попытка получить первую звезду. */
+  steps: z.array(SectorZeroStarStepSchema).default([]),
+});
+
 export const HeroGradeDefSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
@@ -846,6 +916,36 @@ export const ModePveSchema = z
     npcFaction: z.string(),
     /** Game-hours between waves — a real-time duration, timeScale-scaled like every other. */
     waveIntervalHours: z.number().positive(),
+    /** What ONE wave is made of (unit ids → `data.units`), fielded ×N on wave N.
+     *
+     *  The mode owns this rather than the NPC faction's `startingLoadout.fleet`
+     *  because those are two different questions with one answer only by accident:
+     *  the loadout says what a PLAYER of that faction opens a match with, and the
+     *  Swarm is playable. Tuning the assault through it would re-balance every match
+     *  someone picks the Swarm, and tuning the faction would silently re-balance the
+     *  assault. Omitted ⇒ the wave falls back to the faction's opening force, which
+     *  is the pre-existing behaviour (invariant #3: absent data → base default).
+     *
+     *  Declared EMPTY is rejected rather than treated as "omitted": the module skips
+     *  a wave it has nothing to field, so an empty list would ship a mute assault that
+     *  reads as configured. Fail-closed at load (A05/A08), like every other catalog. */
+    waveFleet: z.array(StartingStackSchema).min(1).optional(),
+    /** Ground troops each wave carries as cargo (unit ids → `data.units`), fielded ×N
+     *  on wave N exactly like {@link ModePve.waveFleet}.
+     *
+     *  Without one a wave can take an EMPTY sector by arrival and nothing else: taking
+     *  a garrisoned world is a two-phase capture, and phase two needs boots. A defended
+     *  homeworld was therefore unloseable — the assault parked in orbit forever and
+     *  `pve-failed` could not be reached (PVR-1.6). Scaling with the wave keeps the
+     *  landing party proportional to the hulls carrying it. */
+    waveLanding: z.array(StartingStackSchema).min(1).optional(),
+    /** Boons the run offers between waves (PVR-1.4) — ids from `data.technologies`.
+     *
+     *  Reuses the seam `metaGrant` proved: a hidden session technology handed out as
+     *  `completed`, whose bonuses ride the ordinary technology hooks. No engine code
+     *  per boon, and a new one is a JSON entry. Absent ⇒ the run offers nothing, which
+     *  is the pre-existing behaviour. */
+    boons: z.array(z.string()).min(1).optional(),
   })
   .strict();
 
@@ -904,6 +1004,9 @@ export const GameDataSchema = z.object({
   heroPassives: z.record(z.string(), HeroPassiveDefSchema).default({}),
   heroSkillTrees: z.record(z.string(), HeroSkillNodeSchema).default({}),
   heroGrades: z.record(z.string(), HeroGradeDefSchema).default({}),
+  /** Лестница звёздности Sector Zero (SZE-0.2). Пусто = мастерская и академия выключены
+   *  данными, без флага в коде. */
+  sectorZeroStars: SectorZeroStarsSchema.prefault({}),
   modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).

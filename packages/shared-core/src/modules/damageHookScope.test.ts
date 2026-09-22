@@ -1,6 +1,8 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createKernel } from '../kernel/kernel';
-import type { GameModule } from '../kernel/module';
+import type { GameModule, HandlerContext } from '../kernel/module';
+import { applyDamageToSide, hookedDamage } from '../util/combat';
 import { combatModule } from './combat';
 import { orbitalModule } from './orbital';
 import { shuttleModule } from './shuttle';
@@ -280,3 +282,63 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
     expect(phases.has('ground')).toBe(false);
   });
 });
+
+/**
+ * CORE-DMG-2 — the hook can no longer be SKIPPED, not merely "is called everywhere".
+ *
+ * CORE-DMG-1 put every channel back on the hook; it could not stop the next one from
+ * drifting out again, because the damage sinks took a plain `number` and could not tell
+ * a hooked figure from a raw one. Now `hookedDamage` is the only producer of the
+ * `HookedDamage` brand and the sinks accept nothing else, so the reach above is held by
+ * the compiler rather than by five channels each remembering.
+ *
+ * Two guards, because there are two ways to get around it: calling the hook inline
+ * (bypassing the producer) and applying damage that never met the hook.
+ */
+describe('combat.damage — skipping the hook is structurally impossible (CORE-DMG-2)', () => {
+  it('the hook is INVOKED from exactly one place — the producer', () => {
+    const root = new URL('../', import.meta.url);
+    const files = readdirSync(root, { recursive: true, encoding: 'utf8' })
+      .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+      .sort();
+
+    // `api.hook(...)` REGISTERS a subscriber (terrain, forts, techs, hero auras) and is
+    // expected in many modules; `h.hook(...)` INVOKES the pipeline and is the call a
+    // channel could sneak in on its own. Only the latter is the hole this pins.
+    // Both bonus groups count (PERK-1.1): the parallel one is as skippable as the
+    // sequential if a channel starts calling it itself.
+    const invokers = files.filter((name) =>
+      /\bh\.hook<[^>]*>\(\s*'combat\.damage(\.parallel)?'/.test(
+        readFileSync(new URL(name, root), 'utf8'),
+      ),
+    );
+
+    expect(invokers).toEqual(['util/combat.ts']);
+  });
+
+  it('a sink refuses damage that never went through the hook', () => {
+    const h = null as unknown as HandlerContext;
+    const ref = { kind: 'fleet', fleetId: 'F' } as const;
+
+    // @ts-expect-error a raw number is not HookedDamage — a channel that forgot the hook
+    // cannot reach the units. Should this stop erroring, the directive itself fails the
+    // typecheck, so the guard cannot rot into a comment.
+    const skipped = () => applyDamageToSide(h, ref, 100, data, 'P');
+
+    // The hooked value IS accepted — the guard rejects raw damage, not all damage.
+    const proper = () =>
+      applyDamageToSide(h, ref, hookedDamage(h, 100, PROBE_ARGS), data, 'P');
+
+    // Neither is executed: the point is what the COMPILER said above. Наличие обеих
+    // функций держит их живыми для tsc (и для линтера — это не мёртвый код).
+    expect(typeof skipped).toBe('function');
+    expect(typeof proper).toBe('function');
+  });
+});
+
+const PROBE_ARGS = {
+  phase: 'orbital',
+  location: 'P',
+  attacker: 'p1',
+  defender: 'p2',
+} as const;

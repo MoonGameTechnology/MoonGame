@@ -1,0 +1,185 @@
+import { describe, it, expect, afterEach } from 'vitest';
+
+import { advance, order, setMatchMode, moveFleet, orbitFleet, assaultFleet } from './game';
+import { data } from './gameData';
+import { initSoloDrivers } from './soloDrivers';
+import { pveState, pveModeId } from '../../packages/client/src/gameData';
+import type { Action, GameState } from '../../packages/shared-core/src/index';
+import { runAiSeats } from '../../decisions/runAiSeats';
+import { pirateEncounter } from '../../decisions/pirateEncounter';
+import { sensorCoverage, playablePlayerIds } from '../../packages/shared-core/src/index';
+
+/**
+ * PVR-1.6 — сквозной прогон ЗАБЕГА на шипнутой карте `pve-1`, через настоящие функции
+ * хоста: `advance`/`order` плюс те же `soloDrivers`, что гоняет кадр прототипа. Копии
+ * их политики здесь нет намеренно — подделаны только пути приказов.
+ *
+ * Зачем такой тест вообще. Модульные тесты волн были зелёными всё время, пока забег
+ * был непроходим: волны исправно создавались и стояли в улье (PVR-1.5), состав был
+ * слабее стартового флота игрока (PVR-1.3), матч кончался чужой победой по
+ * доминированию на 30-м часу, а защищённый дом игрока нельзя было взять вовсе.
+ * Каждая из этих поломок жила МЕЖДУ модулями — между картой, режимом, дипломатией,
+ * победой и клиентскими драйверами, — и ловится только прогоном целиком.
+ *
+ * Игрок здесь ПАССИВЕН: ни одного своего приказа, авто-штурм не включён. Это нижняя
+ * граница — «что карта делает сама». Она обязана кончаться вердиктом.
+ */
+
+const HOUR = 3_600_000;
+
+interface RunOut {
+  state: GameState;
+  endedAtHour?: number;
+  groundBattleAtHome?: number;
+}
+
+function runIdlePlayer(maxHours: number): RunOut {
+  setMatchMode(pveModeId());
+  let s: GameState = pveState(data);
+  let groundBattleAtHome: number | undefined;
+  let hour = 0;
+
+  const apply = (a: Action): void => {
+    const out = order(s, a, s.time);
+    if (!out.error) {
+      s = out.state;
+      for (const e of out.events) {
+        if (
+          groundBattleAtHome === undefined &&
+          e.type === 'battle.started' &&
+          (e.payload as { location?: string; phase?: string }).location === 'home_a' &&
+          (e.payload as { phase?: string }).phase === 'ground'
+        ) {
+          groundBattleAtHome = hour;
+        }
+      }
+    }
+  };
+
+  const drivers = initSoloDrivers({
+    state: () => s,
+    me: () => 'p1',
+    aiSeats: () => runAiSeats(s, 'p1', 'weak'),
+    applyLocal: apply,
+    playerOrder: apply,
+    autoAssault: () => false, // игрок пассивен: свой флот сам не штурмует
+    patrols: () => new Map(),
+    known: () => true,
+  });
+
+  for (hour = 1; hour <= maxHours; hour++) {
+    s = advance(s, hour * HOUR).state;
+    if (s.match.status === 'ended') return { state: s, endedAtHour: hour, groundBattleAtHome };
+    drivers.runAI();
+    drivers.autoEngage();
+    drivers.checkFleetClashes();
+  }
+  return { state: s, groundBattleAtHome };
+}
+
+describe('забег на карте pve-1 доходит до вердикта (PVR-1.6)', () => {
+  // Режим принадлежит МАТЧУ: следующий не должен унаследовать чужой.
+  afterEach(() => setMatchMode(undefined));
+
+  it('пассивный игрок ПРОИГРЫВАЕТ забег — и именно по-PvE-шному', () => {
+    const { state, endedAtHour } = runIdlePlayer(400);
+    expect({ ended: state.match.status, reason: state.match.reason }).toEqual({
+      ended: 'ended',
+      reason: 'pve-failed',
+    });
+    expect(state.match.winner).toBe('p3');
+    // Верхняя граница, а не точное число: она ловит «забег не кончается никогда»,
+    // не ломаясь от любой правки баланса. Замер на момент кирпича — 139-й час.
+    expect(endedAtHour).toBeLessThan(300);
+  });
+
+  it('штурм доходит до дома игрока и высаживается — а не стоит на орбите', () => {
+    // Раньше волна могла взять только ПУСТОЙ сектор (приходом). Дом с гарнизоном
+    // требует второй фазы, и без десанта флот копился на орбите вечно.
+    const { groundBattleAtHome } = runIdlePlayer(400);
+    expect(groundBattleAtHome).toBeDefined();
+  });
+
+  it('волны идут по расписанию всё это время, а не глохнут на первой', () => {
+    const { state } = runIdlePlayer(400);
+    expect(state.pve?.waveNumber).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe('pirates teach the first fight on the actual PvE map', () => {
+  afterEach(() => setMatchMode(undefined));
+
+  it('starts visible, nearby and outside the player roster', () => {
+    const state = pveState(data);
+    expect(sensorCoverage(state, 'p1', data).identify.has('pirate_den')).toBe(true);
+    expect(state.planets.pirate_den!.links).toEqual(['home_a']);
+    expect(playablePlayerIds(state).sort()).toEqual(['p1', 'p3']);
+  });
+
+  it('the opening fleet wins a real multi-round battle and the run continues', () => {
+    setMatchMode(pveModeId());
+    let state = advance(pveState(data), 1).state;
+    expect(pirateEncounter(state, 'p1')?.stage).toBe('approach');
+    const moved = order(state, moveFleet('p1', 'p1_1', 'pirate_den'), state.time);
+    expect(moved.error).toBeUndefined();
+    state = moved.state;
+    // A teaching encounter must arrive before the first Swarm wave, even with
+    // the slow starting scout attached. Four game-hours = 96 seconds at ×150.
+    expect(state.fleets.p1_1!.movement!.arrivesAt - state.time).toBeLessThan(4 * HOUR);
+    expect(pirateEncounter(state, 'p1')?.stage).toBe('travel');
+    const stages = new Set<string>();
+    let rounds = 0;
+    let victor: string | null = null;
+    for (let hour = 1; hour <= 40; hour++) {
+      const next = advance(state, hour * HOUR);
+      state = next.state;
+      for (const e of next.events) {
+        if (e.type !== 'battle.resolved') continue;
+        const p = e.payload as { location: string; winner: string; rounds: number };
+        if (p.location === 'pirate_den') { rounds = p.rounds; victor = p.winner; }
+      }
+      const encounter = pirateEncounter(state, 'p1');
+      if (encounter) stages.add(encounter.stage);
+      for (const b of Object.values(state.battles)) {
+        if (b.location === 'pirate_den') rounds = Math.max(rounds, b.round);
+      }
+      if (encounter?.stage === 'occupy') {
+        // The player explicitly gives the second order; victory in space does not
+        // silently capture a hostile base. The landing squad comes from map data.
+        for (const action of [orbitFleet('p1', 'p1_1', 'near'), assaultFleet('p1', 'p1_1')]) {
+          const out = order(state, action, state.time);
+          expect(out.error).toBeUndefined();
+          state = out.state;
+        }
+      }
+      if (pirateEncounter(state, 'p1')?.stage === 'won') break;
+    }
+    expect(stages).toContain('battle');
+    expect(stages).toContain('occupy');
+    expect(rounds).toBeGreaterThanOrEqual(2);
+    expect(victor).toBe('p1');
+    expect(pirateEncounter(state, 'p1')?.stage).toBe('won');
+    expect(state.fleets.p1_1?.units.some((u) => u.count > 0)).toBe(true);
+    expect(state.fleets.p1_1?.units.find((u) => u.unit === 'cruiser')?.count).toBe(2);
+    expect(Object.values(state.fleets).some((f) => f.owner === 'pirates')).toBe(false);
+    expect(state.pve?.waveNumber).toBe(0); // the first fight finishes before the first wave
+    state = advance(state, 8 * HOUR).state;
+    expect(state.pve?.waveNumber).toBeGreaterThan(0);
+    expect(state.pve?.boons?.pirates).toBeUndefined();
+    expect(state.match.status).toBe('ongoing');
+    expect(pirateEncounter(JSON.parse(JSON.stringify(state)), 'p1')?.stage).toBe('won');
+  });
+
+  it('skipping pirates neither blocks a PvE win nor saves a defeated human', () => {
+    setMatchMode(pveModeId());
+    const start = advance(pveState(data), 1).state;
+    const won = structuredClone(start);
+    won.pve!.waveNumber = won.pve!.totalWaves;
+    won.planets.hive!.owner = 'p1';
+    expect(advance(won, HOUR).state.match).toMatchObject({ reason: 'pve-cleared', winner: 'p1' });
+    const lost = structuredClone(start);
+    lost.planets.home_a!.owner = 'p3';
+    expect(advance(lost, HOUR).state.match).toMatchObject({ reason: 'pve-failed', winner: 'p3' });
+  });
+
+});

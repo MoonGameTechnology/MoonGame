@@ -55,6 +55,34 @@ export interface MatchMeta {
 // отношения не имеют. ЛОГИКА осталась здесь: `matchKind()` ниже выводит `kind` из
 // пресета режима — клиент читает готовое поле и правило не переизобретает.
 
+/**
+ * Метаданные ленты для ЖИВОЙ сессии — то, что хост кладёт в {@link MatchRegistry.register}.
+ *
+ * Функция существует, чтобы у этой сборки был ОДИН экземпляр (BRW-0). Раньше она была
+ * литералом внутри прото-хоста, и пока сессии не различались, это ничего не стоило: все
+ * поля были константами. Как только карта и режим стали разными, литерал у хоста стал бы
+ * ровно тем зеркалом, которое в этом репозитории уже дорого обходилось — тест на ленту
+ * собирал бы мету сам и зеленел бы при сломанном хосте.
+ *
+ * Оба переменных поля читаются ИЗ САМОЙ сессии: карта из состояния (переживает рестарт),
+ * режим — из резолвнутого конфига комнаты. `modeId` не подставляется дефолтом: «нет
+ * режима» и «режим standard» — разные утверждения, и клиент обязан читать молчание как
+ * «неизвестно», а не отсеивать строку (правило 3 в `matchRow.ts`).
+ */
+export function sessionMeta(
+  room: { state: { mapId?: string; time: number }; modeId?: string },
+  opts: { timeScale: number; createdAt: number; entryWindowMs?: number },
+): MatchMeta {
+  return {
+    mapId: room.state.mapId ?? 'nexus',
+    rules: { timeScale: opts.timeScale },
+    ...(room.modeId !== undefined ? { modeId: room.modeId } : {}),
+    createdAt: opts.createdAt,
+    startedAt: room.state.time,
+    ...(opts.entryWindowMs !== undefined ? { entryWindowMs: opts.entryWindowMs } : {}),
+  };
+}
+
 /** The mode's kind, or undefined when the match has no mode / the mode is unknown.
  *  «PvE» is defined exactly once, here: the preset carries a `pve` section. */
 export function matchKind(data: GameData | undefined, modeId: string | undefined): MatchKind | undefined {

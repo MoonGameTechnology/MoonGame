@@ -96,7 +96,12 @@ export function buildingDossier(id: string, level: number): Dossier | null {
     case 'starfort':
       return {
         name,
-        body: t('dossier.building.starfort', { d: hl(pct(lv.defenseBonus ?? 0)), hp: hl(lv.hp) }),
+        body: t('dossier.building.starfort', {
+          hp: hl(lv.hp),
+          aa: hl(lv.aaDamage ?? 0),
+          pd: hl(lv.pointDefense ?? 0),
+          d: hl(pct(lv.defenseBonus ?? 0)),
+        }),
       };
     case 'orbital_aa':
       return {

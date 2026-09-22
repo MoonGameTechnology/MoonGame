@@ -2,7 +2,7 @@
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
-import { holographyOn, motionOn, glowOn } from './graphicsPrefs';
+import { motionOn, glowOn } from './graphicsPrefs';
 import { supportsHolography, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
 
@@ -98,7 +98,9 @@ export function initHolographicUi(host: HolographicHost) {
     active: (): boolean => enabled,
     sync(w: number, h: number, coarse: boolean, inMatch: boolean): void {
       const supported = supportsHolography(w, h, coarse);
-      const next = supported && holographyOn();
+      // The redesigned console is the only desktop/tablet UI. Ignore the retired
+      // void.holography preference; phones keep their dedicated responsive layout.
+      const next = supported;
       const sig = `${w}|${h}|${supported}|${next}|${inMatch}|${motionOn()}|${glowOn()}`;
       if (sig === signature) return;
       signature = sig;

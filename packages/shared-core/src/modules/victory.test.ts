@@ -846,14 +846,62 @@ describe('victory — PvE-исход (PVE-4)', () => {
     expect(r.state.match).toMatchObject({ status: 'ended', winner: 'p1', reason: 'domination' });
   });
 
-  it('РЕГРЕССИЯ: в PvE-матче обычные исходы не перехватываются раньше времени', () => {
-    // Люди живы, волны не кончились — PvE-блок молчит, и доминирование Роя считается
-    // обычным путём (Рой держит 2 из 3 миров при пороге 0.6).
+  // PVR-1.6. ЭТОТ ТЕСТ РАЗВЁРНУТ: раньше он требовал обратного — «в PvE-матче обычные
+  // исходы не перехватываются раньше времени», то есть Рой мог выиграть забег по
+  // доминированию, держа 2 из 3 миров. Правило поменяно намеренно, а не подогнано:
+  // на шипнутой карте из семи секторов базовые 60% — это ровно четыре НЕЙТРАЛЬНЫХ
+  // сектора посередине, и забег стабильно заканчивался тем, что кто-то в них зашёл,
+  // раньше чем первая волна доходила до игрока (прогон: 30-й час, победа союзного
+  // бота; 73-й — победа Роя). Гонка за землю и штурм измеряют разное.
+  it('доминирование Роя НЕ заканчивает забег, пока у игрока есть мир и волны идут', () => {
     const state = pveWorld({
       pve: { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' },
       planets: { A: planet('A', 'p1'), B: planet('B', 'swarm'), H: planet('H', 'swarm') },
     });
     const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
-    expect(r.state.match).toMatchObject({ status: 'ended', winner: 'swarm', reason: 'domination' });
+    // Положение проигрышное, но это не поражение: у игрока остаётся мир, а у забега —
+    // волны, то есть остаётся и отыгрыш, ради которого цикл §0.3 и построен.
+    expect(r.state.match.status).toBe('ongoing');
+  });
+
+  it('гонка по очкам тоже не заканчивает забег', () => {
+    // Второй путь той же ошибки: очки растут от территории, и союзное место добирало
+    // порог просто отстраиваясь. Расклад НЕСИММЕТРИЧНЫЙ намеренно — при равных счётах
+    // гонка не присуждает никому, и тест был бы зелен ни на чём. Порог доминирования
+    // при этом не взят (у p2 два мира из пяти), так что перехватить может только счёт.
+    const state = pveWorld({
+      pve: { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' },
+      planets: {
+        A: planet('A', 'p1'),
+        B: planet('B', 'p2'),
+        B2: planet('B2', 'p2'),
+        H: planet('H', 'swarm'),
+        N: planet('N', null),
+      },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR, { timeScale: 1, victory: { scoreLimit: 1 } })));
+    expect(r.state.match.status).toBe('ongoing');
+  });
+
+  it('зачистка логова раньше срока не выигрывает забег через исход «остался один»', () => {
+    // Ровно то, что комментарий к `pve-cleared` обещал и чего код не делал: Рой без
+    // миров выбывает, людей остаётся «один активный», и матч заканчивался исходом
+    // `elimination` строкой ниже обещания.
+    const state = pveWorld({
+      pve: { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' },
+      players: { p1: player('p1'), swarm: player('swarm') },
+      planets: { A: planet('A', 'p1'), H: planet('H', null) },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match.status).toBe('ongoing');
+  });
+
+  it('но предел длины сессии забег всё-таки заканчивает — зависнуть он не может', () => {
+    const state = pveWorld({
+      pve: { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' },
+      planets: { A: planet('A', 'p1'), B: planet('B', 'p2'), H: planet('H', 'swarm') },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR, { timeScale: 1, victory: { endsAt: HOUR } })));
+    expect(r.state.match).toMatchObject({ status: 'ended', reason: 'timeout' });
   });
 });

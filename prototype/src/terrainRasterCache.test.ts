@@ -51,6 +51,46 @@ function surfaces() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('province raster cache', () => {
+  it('reuses pixels throughout a zoom and sharpens only after it settles', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    cache.prepare(field(), 2);
+    f.strokes.mockClear();
+    const base = field();
+    const scaled = (scale: number): TerrainField => ({
+      ...base,
+      box: { x: 10, y: -5, width: 120 * scale, height: 90 * scale },
+      poly: base.poly.map(([x, y]) => [10 + x * scale, -5 + y * scale]),
+      marker: { x: 10 + base.marker!.x * scale, y: -5 + base.marker!.y * scale },
+    });
+    for (const scale of [1.1, 1.47, 2]) cache.draw(f.target, scaled(scale), 2, true);
+    expect(f.strokes).not.toHaveBeenCalled();
+    expect(f.created).toHaveLength(1);
+    expect(f.drawImage.mock.calls.at(-1)?.slice(1)).toEqual([6, -9, 248, 188]);
+    cache.draw(f.target, scaled(2), 2);
+    expect(f.created).toHaveLength(2);
+    expect(f.strokes).toHaveBeenCalled();
+  });
+
+  it('spreads new bakes across frames without expensive vector fallbacks or stale pixels', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    const batch = Array.from({ length: 5 }, (_, i) => ({ ...field(), id: String(i) }));
+    for (const expected of [2, 4, 5]) {
+      cache.beginFrame(2);
+      for (const item of batch) cache.draw(f.target, item, 1);
+      expect(f.created).toHaveLength(expected);
+      expect(cache.pending).toBe(expected < 5);
+    }
+    cache.beginFrame(0);
+    f.strokes.mockClear();
+    f.drawImage.mockClear();
+    cache.draw(f.target, { ...batch[0]!, kind: 'ion_storm' }, 1, true);
+    expect(cache.pending).toBe(true);
+    expect(f.drawImage).not.toHaveBeenCalled();
+    expect(f.strokes).not.toHaveBeenCalled();
+  });
+
   it('keeps lazy and rebuilt terrain on the requested context policy', () => {
     const f = surfaces();
     const cache = new TerrainRasterCache(undefined, { willReadFrequently: true });

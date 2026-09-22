@@ -337,6 +337,20 @@ export interface Planet {
   /** Star lanes: ids of directly-connected planets. The map is this graph;
    *  fleets travel along lanes (GDD §1 — секторная структура, узлы-планеты). */
   links?: PlanetId[];
+  /** Which pairs of neighbours connect THROUGH this sector (MAP-TRANSIT), projected
+   *  from the map. Undefined = full interchange (every earlier sector, and most still):
+   *  arrive by any lane, leave by any other. Present = these pairs are the only
+   *  through-connections, so two lanes crossing this province do not meet and a fleet
+   *  running one cannot switch to the other in passing. Read by `planRoute`; a fleet
+   *  that STOPS here is not in transit, so its next order starts fresh. */
+  transit?: Array<[PlanetId, PlanetId]>;
+  /** Neighbours on the MOSAIC that terrain keeps SHUT (M4.3). They share a drawn border
+   *  with this sector but carry no lane, so a fleet cannot cross — the border is a closed
+   *  door, not an open one. Published here because the renderer must be able to draw the
+   *  barrier without re-deriving the geometry (a second copy of the tessellation is
+   *  exactly how the drawn map and the travelable map drifted apart in the first place).
+   *  Symmetric: if `a` lists `b`, `b` lists `a`. Undefined = nothing sealed. */
+  sealed?: PlanetId[];
   /** Sector terrain type id (resolved against game data `sectors`); its buffs
    *  /debuffs are applied through hooks. Undefined = plain space, no modifier. */
   terrain?: string;
@@ -651,6 +665,18 @@ export interface GameVersion {
 export interface GameState {
   /** Authored map identity, persisted and public; absent on legacy saves. */
   mapId?: string;
+  /** Game mode the match was created with (`data.modes`), pinned at birth like the map
+   *  and persisted for the same reason: the snapshot is the ONLY thing that survives a
+   *  restart, and a mode that lived solely in the host's `MatchConfig` would evaporate
+   *  with the process — the room would come back applying base rules while the state
+   *  still carries `pve` progress. That is exactly the "rules changed under the match"
+   *  failure `resolveMatchConfig` refuses for an unknown mode (BRW-0).
+   *
+   *  The reducer never reads this field: rules come from `ctx.config.modeId`, resolved
+   *  once at room construction. It is the persisted ORIGIN of that config, and the
+   *  match browser's `modeId` — so there is one source, not two. Absent on matches
+   *  created before modes existed, and on any match deliberately run without one. */
+  modeId?: string;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
@@ -686,6 +712,8 @@ export interface GameState {
    *  each seen world. Maintained by `visibilityModule`; read by `visibleState`
    *  to show greyed "last known" worlds. Internal — stripped from projections. */
   fog?: Record<PlayerId, FogMemory>;
+  /** Per-observer last identified Swarm fleet composition; persists with this match. */
+  swarmIntel?: Record<PlayerId, Record<FleetId, SwarmContact>>;
   /** Hero instances, keyed by instance id (`Hero.id`), maintained by `heroModule`.
    *  A player may field several — filter by `owner`. (Key was the `PlayerId` in the
    *  one-hero-per-player skeleton; instance-keyed since the roster migration.) */
@@ -789,6 +817,11 @@ export interface PveState {
   /** World time the next wave is due — an echo of the scheduled event, for the HUD.
    *  Absent once the last wave has landed. */
   nextWaveAt?: number;
+  /** Unspent boon picks per human seat (PVR-1.4): a wave that LANDS while you still
+   *  hold ground owes you one choice. Per seat rather than one shared counter because
+   *  co-op PvE seats each survive for themselves — a shared number would let one
+   *  player spend the other's pick. Absent/0 = nothing owed. */
+  boons?: Record<PlayerId, number>;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */
@@ -1079,4 +1112,12 @@ export function createInitialState(params: {
     scheduled: [],
     scheduleSeq: 0,
   };
+}
+
+/** An observation, never a live fleet or a claim about the entire Swarm. */
+export interface SwarmContact {
+  owner: PlayerId;
+  location: PlanetId;
+  at: number;
+  units: Array<{ unit: UnitId; count: number }>;
 }

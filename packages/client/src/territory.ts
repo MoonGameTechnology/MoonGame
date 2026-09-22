@@ -12,7 +12,16 @@
  * colour palette, so any renderer can call it. `computePowerCells` is pure and touches no
  * canvas (unit-testable); `drawTerritory` paints those cells into a provided 2D context.
  */
+import { clampPowerWeights, clipHalfPlaneTagged } from '@void/shared-core';
+
 import { rgba } from './holoDraw';
+
+// MAP-MOSAIC (M4.3): the weight clamp and the tagged clipper live in `@void/shared-core`,
+// because the CORE now derives the lane graph from this very tessellation. Two copies of
+// this math would mean the mosaic drawn and the mosaic travelled are different mosaics —
+// the drift this brick exists to end. Re-exported so this module stays the render surface's
+// single import.
+export { clampPowerWeights, clipHalfPlaneTagged };
 
 /** A sector centre as a power-diagram site: screen-space centre, weight (px²), the owner
  *  as the viewer may know it (`null` = neutral), and the sector kind (for the terrain tint). */
@@ -45,44 +54,17 @@ export interface TerritoryPalette {
   kindAccent: (kind: string) => string | undefined;
   /** Hide only same-owner divisions; frontiers, neutral edges and cells stay intact. */
   hideOwnedInner?: boolean;
+  /** Zoom detail in [0,1]; outer political frontiers remain legible at zero. */
+  provinceDetail?: number;
+  /** Is the border between these two SEED INDICES shut — they touch on the mosaic but
+   *  no lane joins them? See {@link classifyBorders}. Omit and nothing is drawn as a
+   *  barrier: a caller without link data must not invent one, and a caller that has it
+   *  must also respect fog — an unscouted approach is «unknown», not «closed». */
+  sealed?: (a: number, b: number) => boolean;
 }
 
 /** Sentinel edge-tag: this province edge sits on the map boundary, not a neighbour. */
 export const BOUNDARY = -1;
-
-/** Clamp the spread of power-diagram (weighted-Voronoi) weights so no province cell is
- *  ever swallowed by a heavier neighbour. In a power diagram a site keeps a non-empty
- *  cell iff `w_j - w_i ≤ d_ij²` for every other site `j`; the binding case is the
- *  closest pair, so capping the total weight RANGE strictly below the minimum squared
- *  inter-seed distance keeps EVERY cell non-empty. Size ordering is preserved (a bigger
- *  world still claims a little more land) — just never enough to erase a close neighbour
- *  (which left that neighbour with no cell and no border). Mutates `w` in place; a no-op
- *  for <2 seeds or coincident points. */
-export function clampPowerWeights(seeds: Array<{ x: number; y: number; w: number }>): void {
-  const n = seeds.length;
-  if (n < 2) return;
-  let minD2 = Infinity;
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const dx = seeds[i]!.x - seeds[j]!.x;
-      const dy = seeds[i]!.y - seeds[j]!.y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < minD2) minD2 = d2;
-    }
-  }
-  if (!Number.isFinite(minD2) || minD2 <= 0) return;
-  let wmin = Infinity;
-  let wmax = -Infinity;
-  for (const s of seeds) {
-    if (s.w < wmin) wmin = s.w;
-    if (s.w > wmax) wmax = s.w;
-  }
-  const range = wmax - wmin;
-  const cap = minD2 * 0.9; // strictly below the swallow threshold (d_ij² ≥ minD2 for all pairs)
-  if (range <= cap || range <= 0) return;
-  const k = cap / range;
-  for (const s of seeds) s.w = wmin + (s.w - wmin) * k;
-}
 
 /** Clip a convex polygon to the half-plane a*x + b*y + c ≤ 0 (Sutherland–Hodgman).
  *  Used to carve the weighted-Voronoi (power-diagram) province cells. */
@@ -105,49 +87,6 @@ export function clipHalfPlane(
     }
   }
   return out;
-}
-
-/** Like {@link clipHalfPlane}, but carries a per-edge tag so the political map can
- *  colour each border by what lies across it. `tags[k]` is what borders the edge
- *  `poly[k]→poly[k+1]`: a neighbour seed index (≥0) or {@link BOUNDARY}. The newly-cut
- *  edge (along the clip line) is tagged `clipTag` (the seed we clipped against); surviving
- *  original edges keep their tag. Lets same-owner borders draw as faint hairlines (the
- *  empire reads as one field) and owner-vs-owner borders as a bright frontier. */
-export function clipHalfPlaneTagged(
-  poly: Array<[number, number]>,
-  tags: number[],
-  a: number,
-  b: number,
-  c: number,
-  clipTag: number,
-): { poly: Array<[number, number]>; tags: number[] } {
-  const out: Array<[number, number]> = [];
-  const outT: number[] = [];
-  const n = poly.length;
-  for (let i = 0; i < n; i++) {
-    const cur = poly[i]!;
-    const nxt = poly[(i + 1) % n]!;
-    const tag = tags[i]!;
-    const dc = a * cur[0] + b * cur[1] + c;
-    const dn = a * nxt[0] + b * nxt[1] + c;
-    const cross = dc < 0 !== dn < 0;
-    if (dc <= 0) {
-      out.push(cur);
-      if (cross) {
-        const t = dc / (dc - dn);
-        out.push([cur[0] + t * (nxt[0] - cur[0]), cur[1] + t * (nxt[1] - cur[1])]);
-        outT.push(tag); // cur → intersection: surviving part of the original edge
-        outT.push(clipTag); // intersection → next: along the new clip line (this neighbour)
-      } else {
-        outT.push(tag); // wholly-inside original edge keeps its tag
-      }
-    } else if (cross) {
-      const t = dc / (dc - dn);
-      out.push([cur[0] + t * (nxt[0] - cur[0]), cur[1] + t * (nxt[1] - cur[1])]);
-      outT.push(tag); // intersection → nxt: re-entering part of the original edge
-    }
-  }
-  return { poly: out, tags: outT };
 }
 
 /** Tessellate the seeds into power-diagram province cells clipped to `clip` (a convex
@@ -230,6 +169,7 @@ export function drawTerritory(
   palette: TerritoryPalette,
   cells: TerritoryCell[] = computePowerCells(seeds, clip),
 ): TerritoryCell[] {
+  const detail = palette.provinceDetail ?? 1;
   const trace = (poly: Array<[number, number]>): void => {
     g.beginPath();
     g.moveTo(poly[0]![0], poly[0]![1]);
@@ -246,16 +186,20 @@ export function drawTerritory(
       cell.owner ? 0.075 : 0.018,
     );
     g.fill();
-    const accent = palette.kindAccent(cell.kind);
+    const accent = detail > 0 ? palette.kindAccent(cell.kind) : undefined;
     if (accent) {
       trace(cell.poly);
-      g.fillStyle = rgba(accent, cell.owner ? 0.025 : 0.07);
+      g.fillStyle = rgba(accent, (cell.owner ? 0.025 : 0.07) * detail);
       g.fill();
     }
   }
 
   // Pass 2 — classify every cell edge (pure, see classifyBorders), then stroke.
-  const { ownedFront, ownedInner, neutralEdge } = classifyBorders(cells, seeds);
+  const { ownedFront, ownedInner, neutralEdge, sealedEdge } = classifyBorders(
+    cells,
+    seeds,
+    palette.sealed,
+  );
   const strokeSegs = (segs: BorderSegment[], style: string, width: number): void => {
     if (segs.length === 0) return;
     g.strokeStyle = style;
@@ -270,15 +214,24 @@ export function drawTerritory(
   g.save();
   g.lineJoin = 'round';
   g.lineCap = 'round';
-  if (!palette.hideOwnedInner) {
+  if (!palette.hideOwnedInner && detail > 0) {
     for (const [owner, segs] of ownedInner)
-      strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3), 0.65); // inner hairlines
+      strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3 * detail), 0.65); // inner hairlines
   }
-  strokeSegs(neutralEdge, 'rgba(95,176,197,0.55)', 0.75); // neutral divisions
+  if (detail > 0) strokeSegs(neutralEdge, rgba('#5fb0c5', 0.55 * detail), 0.75);
   for (const [owner, segs] of ownedFront)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
   for (const [owner, segs] of ownedFront)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.85), 1.15); // frontier crisp
+  // A border with no lane across it, drawn LAST so it reads over whatever political
+  // border it shares the line with. Dashed and off-palette on purpose: everything else
+  // on this map is the cyan family, so «shut» must not be mistaken for a shade of
+  // «whose». Same violet the rift kind carries in the catalogue.
+  if (sealedEdge.length > 0 && detail > 0) {
+    g.setLineDash([5, 4]);
+    strokeSegs(sealedEdge, rgba('#9268b0', 0.85 * detail), 1.6);
+    g.setLineDash([]);
+  }
   g.restore();
   return cells;
 }
@@ -294,6 +247,12 @@ export interface ClassifiedBorders {
   ownedInner: Map<string, BorderSegment[]>;
   /** Neutral-vs-neutral divisions and neutral map-boundary edges, deduped. */
   neutralEdge: BorderSegment[];
+  /** Borders that cannot be crossed: the two provinces touch on the mosaic but no lane
+   *  joins them. Deduped (`idx < t`), and ADDITIVE — the edge is still classified by
+   *  ownership above, so a sealed frontier reads as both «whose» and «shut». In a
+   *  province mosaic adjacency IS the shared border, so without this a border silently
+   *  promises a crossing the map does not have. */
+  sealedEdge: BorderSegment[];
 }
 
 /** Classify every cell edge by what lies across it — the political-border logic
@@ -304,10 +263,17 @@ export interface ClassifiedBorders {
 export function classifyBorders(
   cells: readonly TerritoryCell[],
   seeds: readonly TerritorySeed[],
+  /** Is the border between these two SEED INDICES shut — they touch, but no lane joins
+   *  them? Must be symmetric; asked once per edge pair. Omit and nothing is sealed,
+   *  which is what every caller did before and what a caller without link data should
+   *  keep doing: an unknown crossing is drawn as an ordinary border, never as a barrier
+   *  the player has not earned the right to see. */
+  sealed?: (a: number, b: number) => boolean,
 ): ClassifiedBorders {
   const ownedFront = new Map<string, BorderSegment[]>();
   const ownedInner = new Map<string, BorderSegment[]>();
   const neutralEdge: BorderSegment[] = [];
+  const sealedEdge: BorderSegment[] = [];
   const bucket = (m: Map<string, BorderSegment[]>, key: string): BorderSegment[] => {
     let arr = m.get(key);
     if (!arr) m.set(key, (arr = []));
@@ -322,6 +288,10 @@ export function classifyBorders(
       const p1 = poly[(k + 1) % m]!;
       const seg: BorderSegment = [p0[0], p0[1], p1[0], p1[1]];
       const neigh = t >= 0 ? seeds[t]!.owner : undefined; // undefined ⇒ map boundary
+      // A shut border is additive: classified by ownership below AS WELL, so the player
+      // still reads whose land it is. Never on the map boundary — there is no province
+      // across it to be cut off from.
+      if (t >= 0 && idx < t && sealed?.(idx, t) === true) sealedEdge.push(seg);
       if (t >= 0 && owner !== null && neigh === owner) {
         if (idx < t) bucket(ownedInner, owner).push(seg); // same empire, draw once
       } else if (owner !== null) {
@@ -331,5 +301,5 @@ export function classifyBorders(
       }
     }
   }
-  return { ownedFront, ownedInner, neutralEdge };
+  return { ownedFront, ownedInner, neutralEdge, sealedEdge };
 }

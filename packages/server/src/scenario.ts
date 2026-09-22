@@ -124,9 +124,9 @@ export const DEV_MODULES: GameModule[] = [
   diplomacyModule, // declarations + consent offers + the `diplomacy` capability combat consults
   espionageModule, // SPY-1/2: espionage.spy → окна краденого intel + контрразведка
   // The combat family, split along the bus seams. Order matters (invariant #6):
-  // `orbital` stamps orbit on `fleet.arrived` BEFORE `combat` engages, and runs
-  // its AA/bombard span BEFORE `artillery`'s standoff span — the exact sequence
-  // the old single module had internally.
+  // `orbital` stamps orbit on `fleet.arrived` BEFORE `combat` engages — the exact
+  // sequence the old single module had internally. (The third member of that span,
+  // `artillery`, is gone: standoff fire was removed whole, see manifest 14 below.)
   orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
   combatModule, // melee battles: engage / tick / assault / retreat / capture
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
@@ -176,7 +176,7 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '21'; // VET-2: у стека появилась заслуга ветерана.
+export const MODULE_MANIFEST_VERSION = '22'; // PVR-1.4: у `state.pve` появился долг по усилениям.
 // Форма состояния изменилась ДОБАВЛЕНИЕМ: у `UnitStack` два новых необязательных поля —
 // `damageDealt` и `battles` (оба «на юнит»). Старый матч читается без ошибки: полей нет,
 // значит ветеранов нет. Бампаю всё равно, и вот почему это не перестраховка. Счётчики
@@ -287,6 +287,10 @@ export interface DevMatchOptions {
   /** Ruleset for this match (time scale + victory conditions). Defaults in `MatchRoom`
    *  to `{ timeScale: 1 }`; the match browser shows it as the match's "rules". */
   config?: MatchConfig;
+  /** Map identity stamped on the seeded state (`GameState.mapId`). The dev scenario
+   *  builds its own nexus layout regardless — this only names it, so a test can seat
+   *  two matches on distinguishable maps the way the hosts do. Absent ⇒ unnamed. */
+  mapId?: string;
   /** Observation stream (persistence / metrics wiring — see `main.ts` F8). */
   observe?: (event: RoomObservation) => void;
   /** Deterministic-replay recorder (see `MatchRoom.record`, RPL-2). */
@@ -410,7 +414,14 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     const heroId = `hero:${id}`;
     heroes[heroId] = { id: heroId, owner: id, location: `home_${id}`, cooldowns: {} };
   });
-  const state: GameState = options.initialState ?? { ...base, players, planets, fleets, heroes };
+  const state: GameState = options.initialState ?? {
+    ...base,
+    ...(options.mapId !== undefined ? { mapId: options.mapId } : {}),
+    players,
+    planets,
+    fleets,
+    heroes,
+  };
   return new MatchRoom({
     id: options.id ?? 'dev',
     initialState: state,

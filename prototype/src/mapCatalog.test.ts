@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { mapPreset, mapNodesFromState, scoreLimitFor } from './mapCatalog';
+import { MAP_IDS, mapPreset, mapNodesFromState, scoreLimitFor } from './mapCatalog';
 import { newGame, networkSeats } from './matchSetup';
 
-describe('Frontier 100', () => {
-  it('keeps 100 starts two provinces apart, three provinces inside the rim, and bases buffered', () => {
-    const map = mapPreset('frontier-100');
+describe('Frontier 50', () => {
+  it('keeps 50 starts two provinces apart, three provinces inside the rim, and bases buffered', () => {
+    const map = mapPreset('frontier-50');
     const nodes = new Map(map.nodes.map((n) => [n.id, n]));
-    expect(map.starts).toHaveLength(100);
-    expect(new Set(map.starts).size).toBe(100);
-    expect(nodes.size).toBe(1675);
+    expect(map.starts).toHaveLength(50);
+    expect(new Set(map.starts).size).toBe(50);
+    expect(nodes.size).toBe(831);
+    expect(nodes.size).toBeLessThanOrEqual(1675 / 2);
     const distances = (start: string) => {
       const d = new Map([[start, 0]]);
       const queue = [start];
@@ -33,7 +34,7 @@ describe('Frontier 100', () => {
     }
     for (const kind of ['pirate_base', 'neutral_base']) {
       const bases = map.nodes.filter((n) => n.sector === kind);
-      expect(bases).toHaveLength(12);
+      expect(bases).toHaveLength(6);
       for (const base of bases) {
         expect(base.links.length).toBeGreaterThan(0);
         for (const id of base.links) {
@@ -49,18 +50,28 @@ describe('Frontier 100', () => {
     expect(hole[0]).toMatchObject({ x: 5000, y: 5000, links: [], owner: null });
   });
 
-  it('seeds 100 playable seats plus 24 NPCs and survives JSON restoration', () => {
-    const seats = networkSeats('ffa', 'frontier-100');
-    expect(seats).toHaveLength(100);
-    const state = newGame({ mapId: 'frontier-100', seats });
-    expect(Object.values(state.players).filter((p) => !p.npc)).toHaveLength(100);
-    expect(Object.values(state.players).filter((p) => p.npc && p.ai)).toHaveLength(24);
-    expect(new Set(seats.map((s) => s.start)).size).toBe(100);
+  it('seeds 50 playable seats plus 12 NPCs and survives JSON restoration', () => {
+    const seats = networkSeats('ffa', 'frontier-50');
+    expect(seats).toHaveLength(50);
+    const state = newGame({ mapId: 'frontier-50', seats });
+    expect(Object.values(state.players).filter((p) => !p.npc)).toHaveLength(50);
+    expect(Object.values(state.players).filter((p) => p.npc && p.ai)).toHaveLength(12);
+    expect(new Set(seats.map((s) => s.start)).size).toBe(50);
     const restored = JSON.parse(JSON.stringify(state));
     expect(mapNodesFromState(restored).map((n) => [n.id, n.x, n.y, n.links])).toEqual(
-      mapPreset('frontier-100').nodes.map((n) => [n.id, n.x, n.y, n.links]),
+      mapPreset('frontier-50').nodes.map((n) => [n.id, n.x, n.y, n.links]),
     );
     expect(scoreLimitFor(restored)).toBeGreaterThan(scoreLimitFor(newGame()));
+  });
+
+  it('offers only the compact preset but preserves existing 100-seat snapshots', () => {
+    expect(MAP_IDS).toEqual(['nexus', 'frontier-50']);
+    const old = newGame({ mapId: 'frontier-100', seats: networkSeats('ffa', 'frontier-100') });
+    expect(Object.keys(old.planets)).toHaveLength(1675);
+    expect(mapPreset('frontier-100').starts).toHaveLength(100);
+    expect(mapNodesFromState(JSON.parse(JSON.stringify(old)))).toHaveLength(1675);
+    expect(scoreLimitFor(old)).toBe(15000);
+    expect(mapPreset('frontier-50').scoreLimit).toBe(7500);
   });
 
   it('preserves the existing map and rejects unknown presets', () => {

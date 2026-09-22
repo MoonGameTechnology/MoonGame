@@ -23,17 +23,11 @@
     "drift": { "position": { "x": 0, "y": -210 }, "kind": "asteroid", "terrain": "asteroid_field" },
     "veil": {
       "position": { "x": 0, "y": 210 },
-      "kind": "nebula",
-      "terrain": "nebula",
-      "planetType": "barren"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "gas_giant"
     }
   },
-  "paths": [
-    ["home_green", "nexus"],
-    ["home_red", "nexus"],
-    ["nexus", "drift"],
-    ["nexus", "veil"]
-  ],
   "players": {
     "green": { "name": "Vanguard Compact", "faction": "vanguard", "resources": { "credits": 300, "metal": 300 } },
     "red": { "name": "Swarm Collective", "faction": "swarm", "resources": { "credits": 300, "metal": 300 } }

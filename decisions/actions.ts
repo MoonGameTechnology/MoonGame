@@ -284,6 +284,10 @@ export const marketCancel = (playerId: string, id: string) =>
 export const designateCapital = (playerId: string, planetId: string) =>
   act(playerId, 'capital.designate', { planetId });
 
+/** Забрать усиление, предложенное забегом между волнами (PVR-1.4). Что предложить —
+ *  `decisions/waveBoons.ts`; кому и сколько должно — `pveModule`, он же и проверяет. */
+export const takeBoon = (playerId: string, tech: string) => act(playerId, 'pve.boon', { tech });
+
 // --- hero engine (core heroModule, HERO-3..9): the data-driven hero actions ---
 // `castHeroAbility` moved to `actions.ts` (REFP-24) — imported/re-exported in the
 // REFP-22 block above alongside its siblings.

@@ -406,3 +406,91 @@ describe('SHU-4.2 — место в порту занимает БОРТ, а н�
     expect(after).toBe(12);
   });
 });
+
+/**
+ * ТРЮМ ФЛОТА ⇄ ТРЮМ ДЕСАНТНОГО ЧЕЛНОКА (правка владельца 2026-09-16).
+ *
+ * «Если шаттл находится во флоте вместе с другими кораблями, у которых есть наземные
+ * юниты в трюме, то наземных юнитов можно свободно перебрасывать между трюмом флота и
+ * трюмом десантного челнока».
+ *
+ * Механика для этого была с SHU-4.2: `troopSource` у базы-НОСИТЕЛЯ читает `fleet.landing`,
+ * ровно как у базы-МИРА читает гарнизон. Но ВСЕ тесты погрузки ходили через `planetId`,
+ * и ветка носителя не проверялась НИ ОДНИМ из них — работала, а держать её было нечему.
+ */
+describe('переброска войск между трюмом флота и трюмом звена', () => {
+  /** Носитель с ангаром и войсками в трюме ФЛОТА; корпус трюма не имеет — войска
+   *  приехали на соседних кораблях соединения, как и описывает правка. */
+  function carrier(landing: Array<[string, number]>, moving = false): GameState {
+    const s = createInitialState({ seed: 'shu42c', version: { data: '0.1.0', manifest: '1' } });
+    const fleet: Fleet = {
+      id: 'C1',
+      owner: 'p1',
+      location: moving ? null : 'A',
+      movement: moving
+        ? { from: 'A', to: 'B', departedAt: 0, arrivesAt: 10 * HOUR }
+        : null,
+      units: [{ unit: 'cruiser', count: 2 }],
+      hangar: [sq('sq:p1:1', [['lander', 2]])],
+      landing: landing.map(([unit, count]) => ({ unit, count })),
+      traits: [],
+      battleId: null,
+    } as Fleet;
+    return {
+      ...s,
+      players: { p1: player('p1'), p2: player('p2') },
+      planets: { A: planet('A', 'p1', 0), B: planet('B', 'p2', 100) },
+      fleets: { C1: fleet },
+      heroes: {},
+      battles: {},
+    };
+  }
+  const holdOf = (s: GameState) => s.fleets.C1?.hangar?.[0]?.cargo;
+
+  it('ИЗ ТРЮМА ФЛОТА В ЗВЕНО: войска уходят с корабля в челнок', () => {
+    const s = apply(
+      carrier([['marine', 5]]),
+      act('shuttle.loadTroops', { fleetId: 'C1', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 5 }] }),
+    );
+    expect(holdOf(s)).toEqual([{ unit: 'marine', count: 5 }]);
+    expect(s.fleets.C1?.landing).toEqual([]); // в двух местах разом взвод не числится
+  });
+
+  it('И ОБРАТНО: выгрузка возвращает их в трюм ФЛОТА, а не на землю', () => {
+    let s = apply(
+      carrier([['marine', 5]]),
+      act('shuttle.loadTroops', { fleetId: 'C1', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 3 }] }),
+    );
+    s = apply(s, act('shuttle.unloadTroops', { fleetId: 'C1', squadronId: 'sq:p1:1' }));
+    expect(holdOf(s)).toBeUndefined();
+    expect(s.fleets.C1?.landing).toEqual([{ unit: 'marine', count: 5 }]);
+  });
+
+  it('СВОБОДНО — значит и НА ХОДУ: перекладывать внутри соединения стоянки не требует', () => {
+    // Оба трюма едут ВМЕСТЕ с носителем, поэтому «двое в одном месте» соблюдено всегда.
+    // Этим переброска и отличается от перегрузки порт ⇄ носитель, которой стоянка нужна.
+    const s = apply(
+      carrier([['marine', 4]], true),
+      act('shuttle.loadTroops', { fleetId: 'C1', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 4 }] }),
+    );
+    expect(holdOf(s)).toEqual([{ unit: 'marine', count: 4 }]);
+  });
+
+  it('ЧЕГО В ТРЮМЕ ФЛОТА НЕТ — в звено не переложить', () => {
+    expect(
+      reject(
+        carrier([['marine', 2]]),
+        act('shuttle.loadTroops', { fleetId: 'C1', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 3 }] }),
+      ),
+    ).toBe('E_NO_ARMY');
+  });
+
+  it('ВМЕСТИМОСТЬ ЗВЕНА держит и здесь: два борта по три места — шестеро, не семеро', () => {
+    expect(
+      reject(
+        carrier([['marine', 9]]),
+        act('shuttle.loadTroops', { fleetId: 'C1', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 7 }] }),
+      ),
+    ).toBe('E_NO_CAPACITY');
+  });
+});

@@ -18,7 +18,9 @@ https://github.com/MoonGameTechnology/MoonGame/releases/download/alpha/void-domi
 `prototype/dist/void-dominion.html`. Поднять сессию для друзей — `pnpm host` (раздаёт
 игру и WebSocket на одном порту; полный путь и туннель — [`docs/launch-runbook.md`](./docs/launch-runbook.md)),
 или боевой контур в контейнере — `pnpm stack` (docker-compose: сервер + Postgres). GitHub
-Pages настроен (`pages.yml`), но на приватном репозитории Pages недоступен.
+Pages настроен (`pages.yml`) и репозиторий публичный, но публикация живёт, только пока
+в Settings → Pages стоит Source «GitHub Actions»: без этого ссылка отдаёт 404, а прогон
+`pages.yml` краснеет — подробности в шапке самого воркфлоу.
 
 ## Что играбельно сейчас
 

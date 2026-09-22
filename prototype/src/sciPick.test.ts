@@ -98,9 +98,17 @@ describe('совет учёных — влияние кандидата', () => 
       const b = data.scientists[id]!.branch;
       return b && gated.some((td) => td.branch === b);
     });
-    if (!withGate) return; // в бандле нет гейченных техов — правило проверять не на чем
-    const text = sciInfluenceText(withGate, data, branchLabel);
-    const mine = gated.filter((td) => td.branch === data.scientists[withGate]!.branch);
+    // BAL-13: прежде здесь стоял `if (!withGate) return` — тест молча выходил, когда
+    // такого учёного в каталоге нет, и дыру в ростере поймать не мог (ровно из-за неё
+    // он и оставался зелёным). Теперь отсутствие кандидата — ПАДЕНИЕ: гейченный узел
+    // без лидера ветки означает, что узел недостижим, и молчать об этом нельзя.
+    // Парная проверка на стороне данных — в `schemas.test.ts`.
+    expect(
+      withGate,
+      'в каталоге нет учёного, чья ветка несёт гейченный узел — узел недостижим',
+    ).toBeDefined();
+    const text = sciInfluenceText(withGate!, data, branchLabel);
+    const mine = gated.filter((td) => td.branch === data.scientists[withGate!]!.branch);
     // Имя из каталога попало в строку — ЛОКАЛИЗОВАННОЕ. Прежде тут стоял кусок
     // английского `name`, и тест был зелёным ровно потому, что перевода не было:
     // на TT-4 у технологий завелись ключи `data.*`, и сырое имя перестало доезжать.
@@ -245,10 +253,17 @@ describe('совет учёных — клики', () => {
 });
 
 describe('совет учёных — строка на экране настройки (REFM-126.1)', () => {
-  it('показывает обоих посвящённых по именам', () => {
+  it('показывает обоих посвящённых по именам — ЛОКАЛИЗОВАННЫМ', () => {
+    // `tData`, а не `t`: строка совета и карточка ростера обязаны называть учёного
+    // одинаково. До BAL-13 строка звала `t(name)`, промахивалась по английскому имени
+    // и печатала «Void Admiral» там, где карточка рядом писала «Космоадмирал».
     const two = ids().slice(0, COUNCIL_SIZE);
     const html = sciCouncilRowHtml(two, data);
-    for (const id of two) expect(html).toContain(t(data.scientists[id]!.name));
+    for (const id of two) {
+      const name = data.scientists[id]!.name;
+      expect(html).toContain(tData(name));
+      expect(html, `имя «${name}» доехало непереведённым`).not.toContain(name);
+    }
   });
 
   it('пустой совет назван пустым, а не пустотой', () => {

@@ -179,6 +179,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   }),
   // capital (hero respawn / re-fit anchor)
   'capital.designate': z.object({ planetId: id }),
+  // забег: усиление, выбранное между волнами (PVR-1.4). `tech` сверяется с пулом
+  // режима в модуле — схема отвечает только за форму конверта.
+  'pve.boon': z.object({ tech: id }),
   // steward («Хранитель») — postures are data-driven; the module gates the value
   'steward.delegate': z.object({ posture: z.string().min(1), until: z.number().finite() }),
   'steward.recall': z.object({}),

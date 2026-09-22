@@ -1,48 +1,81 @@
 {
   "empty_space": {
     "name": "Open space",
-    "speedBonus": 0.15
+    "speedBonus": 0.15,
+    "maxLinks": 5
   },
   "asteroid_field": {
     "name": "Asteroid field",
     "speedBonus": -0.25,
     "hpBonus": 0.1,
-    "scoreValue": 5
+    "scoreValue": 5,
+    "maxLinks": 3
   },
   "nebula": {
     "name": "Nebula",
     "speedBonus": -0.1,
     "hpBonus": 0.05,
-    "scoreValue": 3
+    "scoreValue": 3,
+    "maxLinks": 4
   },
   "ion_storm": {
     "name": "Ion Storm",
     "speedBonus": -0.35,
     "hpBonus": -0.15,
-    "scoreValue": 2
+    "scoreValue": 2,
+    "maxLinks": 2
   },
   "dense_nebula": {
     "name": "Dense Nebula",
     "speedBonus": -0.2,
     "hpBonus": 0.2,
-    "scoreValue": 4
+    "scoreValue": 4,
+    "maxLinks": 3
   },
   "solar_flare_zone": {
     "name": "Solar Flare Zone",
     "speedBonus": 0.05,
     "hpBonus": -0.25,
-    "scoreValue": 6
+    "scoreValue": 6,
+    "maxLinks": 4
   },
   "derelict_graveyard": {
     "name": "Derelict Graveyard",
     "speedBonus": -0.15,
     "hpBonus": 0.05,
-    "scoreValue": 9
+    "scoreValue": 9,
+    "maxLinks": 2
   },
   "deep_void": {
     "name": "Deep Void",
     "speedBonus": 0.3,
     "hpBonus": -0.1,
-    "scoreValue": 1
+    "scoreValue": 1,
+    "maxLinks": 6
+  },
+  "asteroid_cluster": {
+    "name": "Dense Asteroid Cluster",
+    "speedBonus": -0.5,
+    "hpBonus": 0.35,
+    "scoreValue": 12,
+    "maxLinks": 1,
+    "baseOutput": {
+      "metal": 14
+    },
+    "productionByResource": {
+      "metal": 0.5
+    }
+  },
+  "depleted_system": {
+    "name": "Depleted System",
+    "speedBonus": 0.1,
+    "hpBonus": 0.0,
+    "scoreValue": 1,
+    "maxLinks": 5,
+    "baseOutput": {},
+    "productionByResource": {
+      "metal": -0.4,
+      "credits": -0.25
+    }
   }
 }

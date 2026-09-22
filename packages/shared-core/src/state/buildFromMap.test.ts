@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import type { GameData } from '../data/schemas';
 import { hashGameDataBundle, loadGameData } from '../data/loadGameData';
 import { avaShape, parseMatchMap, type MatchMap } from '../data/mapSchema';
 import { buildStateFromMap, validateMatchMap } from './buildFromMap';
+import { getStance } from './diplomacy';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const readJson = (p: string): unknown => JSON.parse(readFileSync(path.join(repoRoot, p), 'utf8'));
@@ -16,6 +17,21 @@ function shippedData(): GameData {
 
 const data = shippedData();
 const exampleMap = (): MatchMap => parseMatchMap(readJson('data/maps/skirmish-1.json'));
+
+/** Тот же пример, но с АВТОРСКИМ списком путей — как карты писались до M4.3. Правила
+ *  авторских путей (соседство по Габриэлю, бюджет связей, самопетли) живут только на
+ *  этой ветке: у выведенной из мозаики карты нарушить их нечем, потому что список путей
+ *  не пишет человек. Держим обе, пока формат поддерживает обе. */
+const authoredMap = (): MatchMap => {
+  const map = exampleMap();
+  map.paths = [
+    ['nexus', 'home_green'],
+    ['nexus', 'home_red'],
+    ['nexus', 'drift'],
+    ['nexus', 'veil'],
+  ];
+  return map;
+};
 
 describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
   it('builds a GameState from the example map', () => {
@@ -39,12 +55,57 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     expect(state.players.green!.ai).toBeUndefined();
   });
 
+  it('preserves an NPC role independently of its field AI controller', () => {
+    const map = parseMatchMap({
+      ...exampleMap(),
+      players: {
+        ...exampleMap().players,
+        pirates: { name: 'Pirate Base', faction: 'vanguard', npc: 'pirate', ai: false },
+      },
+    });
+    const state = buildStateFromMap(map, data);
+    expect(state.players.pirates!.npc).toBe('pirate');
+    expect(state.players.pirates!.ai).not.toBe(true);
+    expect(state.players.green!.npc).toBeUndefined();
+    expect(getStance(state, 'green', 'pirates')).toBe('war');
+  });
+
   it('derives sector links from the undirected paths (sorted, symmetric)', () => {
-    const state = buildStateFromMap(exampleMap(), data);
+    const state = buildStateFromMap(authoredMap(), data);
     // nexus is the hub → linked to all four spokes; a spoke links back to nexus
     expect(state.planets.nexus!.links).toEqual(['drift', 'home_green', 'home_red', 'veil']);
     expect(state.planets.home_green!.links).toEqual(['nexus']);
     expect(state.planets.drift!.links).toEqual(['nexus']);
+  });
+
+  it('a map WITHOUT `paths` takes its neighbours from the mosaic (M4.3)', () => {
+    // Та же карта, но без авторского списка. Раньше звезда обещала переход по каждой
+    // общей границе и давала его только через центр: четыре границы из восьми молча
+    // врали. Теперь соседи — те, с кем клетка делит границу, и лжи взяться неоткуда.
+    const state = buildStateFromMap(exampleMap(), data);
+    expect(state.planets.home_green!.links).toEqual(['drift', 'nexus', 'veil']);
+    expect(state.planets.nexus!.links).toEqual(['drift', 'home_green', 'home_red', 'veil']);
+    // Симметрия соседства — не следствие аккуратности автора, а следствие геометрии.
+    for (const [id, p] of Object.entries(state.planets))
+      for (const n of p.links ?? [])
+        expect([id, n, state.planets[n]?.links ?? []]).toEqual([
+          id,
+          n,
+          expect.arrayContaining([id]),
+        ]);
+    expect(validateMatchMap(exampleMap(), data)).toEqual([]);
+  });
+
+  it('an impassable kind gets NO lanes and strands nobody (M2.6 by construction)', () => {
+    // Разлом — дыра в карте. Раньше это проверялось постфактум («у непроходимого не
+    // должно быть путей»), и держалось тем, что генератор случайно не дал ему рёбер.
+    // Теперь это тот же бюджет связей, равный нулю: все его границы закрыты сразу.
+    const map = exampleMap();
+    map.sectors.drift!.kind = 'rift';
+    const state = buildStateFromMap(map, data);
+    expect(state.planets.drift!.links).toEqual([]);
+    expect(state.planets.drift!.sealed).toEqual(['home_green', 'home_red', 'nexus']);
+    expect(validateMatchMap(map, data)).toEqual([]); // остальная карта осталась связной
   });
 
   it('sets building HP from the data and carries terrain/planetType', () => {
@@ -53,7 +114,7 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     expect(mine).toBeDefined();
     expect(mine!.hp).toBe(data.buildings.mine_t1!.hp);
     expect(state.planets.drift!.terrain).toBe('asteroid_field');
-    expect(state.planets.veil!.planetType).toBe('barren');
+    expect(state.planets.veil!.planetType).toBe('gas_giant');
   });
 
   it('is deterministic — same map+data → identical state', () => {
@@ -72,25 +133,25 @@ describe('validateMatchMap — neighbour-only paths + integrity (M1.3)', () => {
   });
 
   it('rejects a path that is not between neighbours (a third sector lies between)', () => {
-    const map = exampleMap();
+    const map = authoredMap();
     // home_green↔home_red would cross straight through nexus (which sits between)
-    map.paths.push(['home_green', 'home_red']);
+    map.paths!.push(['home_green', 'home_red']);
     const issues = validateMatchMap(map, data);
     expect(issues.some((c) => c.startsWith('E_PATH_NOT_NEIGHBOR'))).toBe(true);
     expect(() => buildStateFromMap(map, data)).toThrow(/E_INVALID_MAP/);
   });
 
   it('flags a disconnected sector', () => {
-    const map = exampleMap();
+    const map = authoredMap();
     map.sectors.isle = { position: { x: 999, y: 999 }, kind: 'planet', size: 1, owner: null, buildings: [], garrison: [] };
     expect(validateMatchMap(map, data)).toContain('E_MAP_DISCONNECTED');
   });
 
   it('flags unknown owners, units and a self-loop', () => {
-    const map = exampleMap();
+    const map = authoredMap();
     map.sectors.home_green!.owner = 'ghost';
     map.sectors.home_red!.garrison.push({ unit: 'nope', count: 1 });
-    map.paths.push(['nexus', 'nexus']);
+    map.paths!.push(['nexus', 'nexus']);
     const issues = validateMatchMap(map, data);
     expect(issues).toContain('E_SECTOR_UNKNOWN_OWNER:home_green');
     expect(issues).toContain('E_UNKNOWN_UNIT:nope');
@@ -392,5 +453,158 @@ describe('AvA pool eligibility (AVA-5) — avaEligible tag + shape derived from 
     expect(state.planets.home_b2!.owner).toBe('b2');
     expect(state.fleets.fleet_a2!.owner).toBe('a2');
     expect(state.planets.west!.owner).toBeNull(); // side prizes start neutral
+  });
+});
+
+describe('every shipped map validates (M1.3)', () => {
+  // A map is content, and content nobody loads rots silently: `pve-1.json` shipped
+  // four criss-crossing lanes for as long as no test ever built it, so the only PvE
+  // door in the prototype died on `E_INVALID_MAP` without a word. This loop is the
+  // guard — a new map joins it by existing.
+  const files = readdirSync(path.join(repoRoot, 'data/maps')).filter((f) => f.endsWith('.json'));
+
+  it('there are shipped maps at all — otherwise the cases below are green on nothing', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  for (const file of files) {
+    it(`${file}: valid — known refs, neighbour-only lanes, one connected graph`, () => {
+      const map = parseMatchMap(readJson(`data/maps/${file}`));
+      expect([file, validateMatchMap(map, data)]).toEqual([file, []]);
+    });
+  }
+});
+
+describe('validateMatchMap — terrain decides how many lanes a sector carries (MAP-LINK)', () => {
+  /** Four sectors around a centre, close enough that geometry offers every spoke. */
+  const star = (centreTerrain: string): MatchMap =>
+    parseMatchMap({
+      id: 'star',
+      seed: 'star',
+      sectors: {
+        hub: { position: { x: 0, y: 0 }, kind: 'empty', terrain: centreTerrain },
+        n: { position: { x: 0, y: -200 }, kind: 'planet', terrain: 'empty_space' },
+        s: { position: { x: 0, y: 200 }, kind: 'planet', terrain: 'empty_space' },
+        e: { position: { x: 200, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        w: { position: { x: -200, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+      },
+      paths: [
+        ['hub', 'n'],
+        ['hub', 's'],
+        ['hub', 'e'],
+        ['hub', 'w'],
+      ],
+    });
+
+  it('open space carries all four spokes', () => {
+    // `empty_space` budgets 5 lanes, so the same geometry is legal here.
+    expect(validateMatchMap(star('empty_space'), data)).toEqual([]);
+  });
+
+  it('a dense asteroid cluster carries one, and the map is rejected for drawing four', () => {
+    // This is the whole point: the author did not "draw fewer lines", the WORLD
+    // refuses to carry them. Same coordinates, same paths — only the terrain differs.
+    const issues = validateMatchMap(star('asteroid_cluster'), data);
+    expect(issues).toContain('E_SECTOR_OVERLINKED:hub:4>1');
+  });
+
+  it('an ion storm carries two', () => {
+    expect(validateMatchMap(star('ion_storm'), data)).toContain('E_SECTOR_OVERLINKED:hub:4>2');
+  });
+
+  it('the budget is a ceiling, not a quota — fewer lanes is fine', () => {
+    const map = star('ion_storm');
+    // Drop the two spokes the storm cannot carry, and the sectors they served with
+    // them — an ion storm legally carries two, and a two-lane map is valid.
+    delete map.sectors.e;
+    delete map.sectors.w;
+    map.paths = [
+      ['hub', 'n'],
+      ['hub', 's'],
+    ];
+    expect(validateMatchMap(map, data)).toEqual([]);
+  });
+
+  it('geometry proposes by the Gabriel rule: a lane is legal unless something is IN it', () => {
+    // The relative-neighbourhood rule this replaced capped every node at ~2-3 lanes on
+    // its own, so no terrain budget could ever bind. Gabriel still forbids a lane with
+    // a sector genuinely in the way, but offers the rest — leaving terrain as the real
+    // limiter. `c` sits beside the a—b line, not on it, so a—b stays legal.
+    const beside = parseMatchMap({
+      id: 'beside',
+      seed: 'beside',
+      sectors: {
+        a: { position: { x: -100, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        b: { position: { x: 100, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        c: { position: { x: 0, y: 140 }, kind: 'planet', terrain: 'empty_space' },
+      },
+      paths: [
+        ['a', 'b'],
+        ['a', 'c'],
+        ['c', 'b'],
+      ],
+    });
+    expect(validateMatchMap(beside, data)).toEqual([]);
+
+    // Move the same sector ONTO the line and the direct lane dies — a junction on a
+    // line does not add to it, it cuts it (PVR-0.4).
+    const onTheLine = parseMatchMap({
+      ...beside,
+      sectors: { ...beside.sectors, c: { position: { x: 0, y: 0 }, kind: 'planet', terrain: 'empty_space' } },
+    });
+    expect(validateMatchMap(onTheLine, data)).toContain('E_PATH_NOT_NEIGHBOR:a|b');
+  });
+});
+
+describe('validateMatchMap — an impassable sector is a hole in the map (MAP-BARRIER)', () => {
+  /** Two provinces far enough apart that geometry would happily join them… */
+  const pair = (middle?: Record<string, unknown>): MatchMap =>
+    parseMatchMap({
+      id: 'rift',
+      seed: 'rift',
+      sectors: {
+        west: { position: { x: -300, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        east: { position: { x: 300, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        north: { position: { x: 0, y: -420 }, kind: 'planet', terrain: 'empty_space' },
+        ...(middle ? { middle } : {}),
+      },
+      paths: [
+        ['west', 'north'],
+        ['north', 'east'],
+      ],
+    });
+
+  it('without the rift the two provinces may be joined directly', () => {
+    const map = pair();
+    map.paths!.push(['west', 'east']);
+    expect(validateMatchMap(map, data)).toEqual([]);
+  });
+
+  it('a rift standing between them kills the direct lane — it blocks by EXISTING', () => {
+    // The barrier needs no router support: the neighbour rule already refuses a lane
+    // through the space the rift occupies. That is the whole mechanism.
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'rift' });
+    map.paths!.push(['west', 'east']);
+    expect(validateMatchMap(map, data)).toContain('E_PATH_NOT_NEIGHBOR:east|west');
+  });
+
+  it('no lane may lead INTO it', () => {
+    // The flag used to be decorative: the shipped black hole was impassable only
+    // because its generator happened to give it no edges. Now it is a rule.
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'rift' });
+    map.paths!.push(['north', 'middle']);
+    expect(validateMatchMap(map, data)).toContain('E_IMPASSABLE_HAS_LANE:middle');
+  });
+
+  it('and nobody has to reach it: connectivity exempts what a fleet cannot enter', () => {
+    // Otherwise the author would have to drill a lane into the barrier or switch the
+    // check off — and both defeat the barrier.
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'rift' });
+    expect(validateMatchMap(map, data)).toEqual([]);
+  });
+
+  it('a passable sector is still required to be reachable', () => {
+    const map = pair({ position: { x: 0, y: 0 }, kind: 'planet', terrain: 'empty_space' });
+    expect(validateMatchMap(map, data)).toContain('E_MAP_DISCONNECTED');
   });
 });

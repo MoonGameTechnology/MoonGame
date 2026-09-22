@@ -89,7 +89,7 @@ export function renderMap(
   const vh = vp.bottom;
   const planets = Object.values(state.planets);
   const gap = mapSpacing(planets.map((p) => ({ id: p.id, ...p.position, links: p.links })));
-  const lod = mapLod(gap * fitTransform(vp, bounds).scale * cam.scale);
+  const lod = mapLod(gap * fitTransform(vp, bounds).scale * cam.scale, cam.scale);
   g.clearRect(vp.left, vp.top, vw - vp.left, vh - vp.top);
   drawSpaceBackdrop(g, vw, vh, cam.x, cam.y, true);
 
@@ -124,6 +124,7 @@ export function renderMap(
       ownerColor,
       neutralFill: NEUTRAL,
       kindAccent: (kind) => KIND_COLOR[kind],
+      provinceDetail: lod.provinceDetail,
     }, geometry.project(seeds, clip, cam.scale));
     const selected = cells.find((cell) => planets[cell.idx]?.id === opts.selected);
     if (selected) drawProvinceSelection(g, selected.poly);
@@ -131,7 +132,7 @@ export function renderMap(
 
   // Star lanes (each undirected edge once), over the territory fill.
   g.lineWidth = 0.7;
-  g.strokeStyle = rgba(theme.cyan, 0.28);
+  g.strokeStyle = rgba(theme.cyan, 0.28 * lod.provinceDetail);
   const drawn = new Set<string>();
   g.beginPath();
   for (const p of planets) {
@@ -160,7 +161,7 @@ export function renderMap(
     if (lod.art < 1) {
       g.save();
       g.globalAlpha *= 1 - lod.art;
-      drawSchematicNode(g, c, p.kind ?? 'unknown', col, lod.markerRadius);
+      drawSchematicNode(g, c, lod.markerRadius);
       g.restore();
     }
     if (lod.art === 0 && p.id !== opts.selected) continue;
@@ -235,7 +236,7 @@ export function renderMap(
     const col = colors.get(f.owner) ?? theme.cyan;
     if (lod.detail > 0) blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5 * lod.detail);
     const dom = dominantUnit(f.units, opts.data);
-    const shape = dom && unitShape(dom.def, dom.unit);
+    const shape = dom && unitShape(dom.def, dom.unit, state.players[f.owner]?.faction);
     g.save();
     g.translate(c.x, c.y);
     g.strokeStyle = col;

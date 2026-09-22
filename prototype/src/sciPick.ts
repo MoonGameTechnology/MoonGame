@@ -60,7 +60,7 @@ export function sciPickBodyHtml(
     const def = data.scientists[id];
     return (
       `<div class="sp-slot filled"><button class="sp-rm" data-sprm="${i}" title="${t('ping.remove')}">✕</button>` +
-      `<div class="sp-sn">${esc(t(def?.name ?? id))}</div>` +
+      `<div class="sp-sn">${esc(tData(def?.name ?? id))}</div>` +
       `<div class="sp-inf">${esc(influence(id))}</div></div>`
     );
   }).join('');
@@ -92,7 +92,12 @@ export function sciPickBodyHtml(
  *  мимо запертого подтверждения, поэтому без этой строки выбор пропадал с глаз
  *  насовсем — а пустой совет было ничем не отличить от полного. */
 export function sciCouncilRowHtml(chosen: readonly string[], data: GameData): string {
-  const names = chosen.map((id) => esc(t(data.scientists[id]?.name ?? id)));
+  // `tData`, а не `t`: в каталоге лежит АНГЛИЙСКОЕ имя (`'Void Admiral'`), а перевод —
+  // под слагом `data.void-admiral`. `t()` на имени промахивался и отдавал его как есть,
+  // поэтому строка совета показывала «Void Admiral» рядом с карточкой «Космоадмирал» —
+  // та рисовалась через `tData` с самого начала. Остаток CONV-12b, ставший заметным на
+  // шести учёных (BAL-13).
+  const names = chosen.map((id) => esc(tData(data.scientists[id]?.name ?? id)));
   const full = names.length >= COUNCIL_SIZE;
   return (
     `<button class="scouncil${full ? '' : ' partial'}" type="button" data-council="open">` +

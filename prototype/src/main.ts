@@ -1,4 +1,10 @@
-import { mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
+import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
+import { soloSaveStore } from './soloSaveLocal';
+import { hashJson } from '../../packages/shared-core/src/index';
+import { kernel as soloKernel } from './protoKernel';
+import { swarmDossier } from '../../decisions/swarmDossier';
+import { swarmDossierHtml } from './swarmDossier';
+import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -13,9 +19,12 @@ import {
   canOrder,
   canOrderAll,
   ctx,
+  setMatchMode,
+  matchMode,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
+  isImpassableKind,
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
   DAY,
@@ -115,18 +124,8 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
-// Хвост маркера флота (пипсы трюма, «×N») — чистая геометрия с тестом на разворот
-// наружу у стоящего флота (пипсы не должны ложиться на диск планеты).
-import {
-  CARGO_CELL,
-  cargoRowLayout,
-  cargoRows,
-  loadFill,
-  squareRowY,
-  tailAt as tailPoint,
-  tailTheta,
-  tallyY,
-} from './markerTail';
+import { fleetHolds } from '../../decisions/fleetHolds';
+import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -177,7 +176,7 @@ import {
   createBattleModel,
   type BattleSideView,
 } from '../../packages/client/src/index';
-import { pveState } from '../../packages/client/src/gameData';
+import { pveState, pveModeId } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -192,11 +191,7 @@ import {
   blitSphere as hdBlitSphere,
   clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
-import {
-  drawTerritory,
-  computePowerCell,
-  type TerritorySeed,
-} from '../../packages/client/src/territory';
+import { drawTerritory } from '../../packages/client/src/territory';
 import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
@@ -252,8 +247,38 @@ import {
   tokenFor,
   type SessionRec,
 } from '../../decisions/sessionStore';
+import {
+  DEFAULT_RUN_DIFFICULTY,
+  parseRunDifficulty,
+  type RunDifficulty,
+} from '../../decisions/runDifficulty';
 import { medalBadges } from '../../decisions/unitMedals';
+import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
+import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
+import { waveReadout } from '../../decisions/waveReadout';
+import { runAiSeats } from '../../decisions/runAiSeats';
+import { pirateEncounter } from '../../decisions/pirateEncounter';
+import { initPirateIntro } from './pirateIntro';
+import { boonOffer } from '../../decisions/waveBoons';
+import {
+  RUN_SAVE_VERSION,
+  parseRunSave,
+  serializeRunSave,
+  type RunSave,
+  type RunSaveStore,
+} from '../../decisions/runSave';
+import { localRunSaveStore } from './runSaveLocal';
+import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
+import { initSectorZeroMenu } from './sectorZeroMenu';
+import { initSectorZeroPreparation } from './sectorZeroPreparation';
+import {
+  SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
+  changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
+  type SectorZeroProgress,
+} from '../../decisions/sectorZeroProgress';
+import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
+import { takeBoon } from '../../decisions/actions';
 import {
   authOutcome,
   shouldRegister,
@@ -276,6 +301,7 @@ import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
+import { frontierOutline } from './frontierOutline';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
 import {
   hasCoverage,
@@ -482,7 +508,7 @@ import {
 // `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
-import { initTechTree, branchLabel } from './techTree';
+import { initTechTree, branchLabel, techFx } from './techTree';
 import { initBuildScreen } from './buildScreen';
 import { initSciPick, sciCouncilRowHtml } from './sciPick';
 import { initPasswordReset } from './passwordReset';
@@ -504,10 +530,10 @@ import { initSettings } from './settingsOverlay';
 import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
-import { reframePresentation, supportsHolography } from './holographicLayout';
-import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
+import { reframePresentation } from './holographicLayout';
+import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
 import { TerrainRasterCache } from './terrainRasterCache';
-import { holographyOn, setHolography } from './graphicsPrefs';
+import { TerrainGeometryCache } from './terrainGeometryCache';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -594,6 +620,7 @@ import { initMetaMarket } from './metaMarketScreen';
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
 // esbuild tree-shakes the whole module out of that bundle.)
 import { initTestMode, openTestMode } from './testmode';
+import { pullNextDevWave } from './sectorZeroDev';
 // SANDBOX — self-contained dev-only single-player "practice tools"; remove this
 // import + the fenced hooks below (setup checkbox, frame enforce/fog, free-build
 // snapshot, initSandbox call) + the #sandbox HTML/CSS to cut it cleanly.
@@ -721,7 +748,8 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
-import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
+import { artScale, calloutAlpha, chevronAlpha, sphereBloom } from './semanticZoom';
+import { mapLod, mapSpacing, drawSchematicNode, type MapLod } from '../../packages/client/src/mapLod';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
 import {
   BATTLE_RINGS,
@@ -735,7 +763,6 @@ import {
   chevronAngle,
   orbitBloom,
   orbitRadius,
-  orbitsLive as ringsLive,
   ringShown,
   slotAngle,
 } from './orbitRing';
@@ -971,27 +998,6 @@ const ABILITY_RING = '#b78cff';
 const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
-const BUILDABLE = [
-  'mine',
-  'refinery',
-  'farm',
-  'power_plant',
-  'fabricator',
-  'tax_office',
-  'barracks',
-  'radar',
-  'fort',
-  'orbital_aa',
-  'zonal_aa',
-];
-// ROS-2.2 — `zonal_aa` (зональное ПВО) стоит рядом с ПКО и НЕ дублирует его: ПКО
-// (`aaDamage`) бьёт КОРАБЛИ на орбите, зональное ПВО (`pointDefense`) — ЧЕЛНОКИ, и
-// без него удар челноков по миру безответен. Игрок выбирает, от кого защищаться.
-// `orbital_aa` (орбитальное ПКО — anti-ship near-orbit emplacement) is a defensive BUILDING:
-// the player builds it like a fort. It fires on hostile fleets over the world (core
-// `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
-// do that. Nothing hands it out for free: it is researched (`orbital_defense_grid`)
-// and then built like any other structure — ORB-3.
 // H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
 // дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
 // бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
@@ -1281,7 +1287,7 @@ const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
 const freshSetupSlots = (): SeatRole[] =>
-  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : setupMapId === 'frontier-100' || i === 1 ? 'ai' : 'off'));
+  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : isFrontier(setupMapId) || i === 1 ? 'ai' : 'off'));
 let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
@@ -1313,6 +1319,12 @@ let sandboxHomeId: string | null = null;
 // (and the in-match pace chips) only ever affect the local sim (see `frame()`'s `!NET` guard).
 const SETUP_SPEEDS = [1, 2, 5, 10, 50, 100];
 let setupSpeed = 10;
+/** Сила Роя в забеге (PVR-2.1). Живёт рядом со `setupSpeed`, потому что это тот же род
+ *  настройки: выбор игрока ДО запуска, переживающий перезагрузку. */
+let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
+/** Номер волны, на котором игрок нажал «Позже» (PVR-1.4). Долг при этом НЕ сгорает —
+ *  окно просто не лезет поверх боя до следующей волны. `-1` = не откладывали. */
+let boonLaterAtWave = -1;
 let lastPanelHtml = '';
 let lastCmdHtml = '';
 let lastSplitHtml = '';
@@ -1352,7 +1364,40 @@ if (typeof ResizeObserver !== 'undefined')
     if (h > 0) document.body.style.setProperty('--sheeth', sheetHeightVar(h));
   }).observe(side);
 const logEl = $('log');
+const swarmDossierWin = $('swarm-dossier');
+let lastSwarmDossierHtml = '';
+function closeSwarmDossier(): void {
+  swarmDossierWin.classList.remove('show');
+  document.querySelector<HTMLButtonElement>('[data-swarm-intel]')?.focus({ preventScroll: true });
+}
+$('swarm-dossier-close').addEventListener('click', closeSwarmDossier);
+function renderSwarmDossier(): void {
+  if (!inMatch()) { swarmDossierWin.classList.remove('show'); return; }
+  if (!swarmDossierWin.classList.contains('show')) return;
+  const html = swarmDossierHtml(swarmDossier(s, ME, vision?.identify ?? new Set()));
+  if (html !== lastSwarmDossierHtml) {
+    $('swarm-dossier-body').innerHTML = html;
+    lastSwarmDossierHtml = html;
+  }
+}
 const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
+devlineEl.addEventListener('click', (event) => {
+  if ((event.target as Element).closest('[data-solo-play]')) {
+    if (soloSaveActive && !NET) {
+      speed = Number($('spd-play').dataset.speed);
+      lastReal = performance.now();
+      for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+        x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
+    }
+    return;
+  }
+  if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
+  if (!(event.target as Element).closest('[data-swarm-intel]')) return;
+  swarmDossierWin.classList.add('show');
+  renderSwarmDossier();
+  $('swarm-dossier-close').focus({ preventScroll: true });
+});
+
 const purse = $('purse');
 // top-bar row 1: nick + live standing (left), victory chip (gap), day card (right)
 const topEl = $('top');
@@ -1745,8 +1790,14 @@ const cam = { scale: 1, x: 0, y: 0 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+let galaxyOutline: Array<{ x: number; y: number }> = [];
+let mapNodeSpacing = mapSpacing(MAP);
 function installMapGeometry(state: GameState): void {
   MAP = mapNodesFromState(state);
+  mapNodeSpacing = mapSpacing(MAP);
+  terrainGeometry.clear();
+  terrainRaster.clear();
+  galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
   MINX = Math.min(...MAP.map((n) => n.x));
@@ -1762,22 +1813,6 @@ function sectorTypeOf(id: string) {
   const kind = SECTOR_OF[id];
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
 }
-/** Зеркало ворот конструкции ядра (`construction.ts`): вид провинции пускает здание,
- *  только если на нём вообще можно строить (`buildable`) И его ростер (undefined =
- *  любое) это здание допускает. Одна копия на все кнопки: три собственных
- *  `?? BUILDABLE` по коду и были тем, из-за чего клиентское правило разъехалось с
- *  данными (ORB-4) — кнопка обещала стройку, которую сервер отклонял. */
-function sectorAllowsBuilding(planetId: string, building: string): boolean {
-  const type = sectorTypeOf(planetId);
-  if (type && !type.buildable) return false;
-  return (type?.allowedBuildings ?? BUILDABLE).includes(building);
-}
-/** Есть ли на провинции хоть одно допустимое здание — гейт кнопки «Постройки». */
-function sectorBuildsAnything(planetId: string): boolean {
-  const type = sectorTypeOf(planetId);
-  if (type && !type.buildable) return false;
-  return (type?.allowedBuildings ?? BUILDABLE).length > 0;
-}
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
 }
@@ -1786,6 +1821,9 @@ function world(p: { x: number; y: number }): { x: number; y: number } {
  *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */
 function worldDist(d: number): number {
   return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
+}
+function currentMapLod(): MapLod {
+  return mapLod(worldDist(mapNodeSpacing), cam.scale);
 }
 function visible(c: { x: number; y: number }, pad = 80): boolean {
   return c.x >= -pad && c.x <= VW + pad && c.y >= -pad && c.y <= VH + pad;
@@ -1833,7 +1871,7 @@ function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
   const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
   if (view.kind === 'home') {
-    centerOn(view.at, view.scale * (s.mapId === 'frontier-100' ? 5 : 1));
+    centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
     return;
   }
   cam.scale = 1;
@@ -2019,7 +2057,7 @@ let orbitPhase = 0; // accumulated sim-time ms (frozen on pause) — drives the 
 let hologramTime = 0; // visual-only clock; also freezes when decorative motion is disabled
 /** Ring/animation are gated on the same close-zoom threshold. */
 function orbitsLive(): boolean {
-  return ringsLive(cam.scale);
+  return currentMapLod().detail > 0;
 }
 /** Orbit-ring radius for a planet at the current zoom, in screen px. The ring blooms with
  *  zoom but is capped to a fraction of the on-screen gap to the nearest LINKED neighbour,
@@ -2034,7 +2072,7 @@ function orbitRingRadius(pl: { position: { x: number; y: number }; links?: strin
     const npc = world(np.position);
     nearest = Math.min(nearest, Math.hypot(npc.x - pc.x, npc.y - pc.y));
   }
-  return orbitRadius(orbitBloom(cam.scale), nearest);
+  return orbitRadius(orbitBloom(currentMapLod().scale), nearest);
 }
 /** Angular position (radians) of a stationed fleet's orbit slot at index `idx` of
  *  `nPeers` sharing the ring — fanned out, and spinning when zoomed in close. */
@@ -2334,21 +2372,27 @@ function seesDetails(p: Planet): boolean {
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
  *  marker if it has never been identified. */
-function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined): void {
+function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined, lod: MapLod): void {
   cx.save();
+  if (lod.detail === 0) {
+    drawSchematicNode(cx, c, lod.markerRadius);
+    cx.restore();
+    return;
+  }
   if (mem) {
     const col = ownerColor(mem.owner);
     cx.setLineDash([2, 4]);
     cx.strokeStyle = rgba(col, 0.34);
     cx.lineWidth = 1;
     cx.beginPath();
-    cx.arc(c.x, c.y, 9, 0, TAU);
+    cx.arc(c.x, c.y, lod.markerRadius + (9 - lod.markerRadius) * lod.detail, 0, TAU);
     cx.stroke();
     cx.setLineDash([]);
     cx.fillStyle = rgba(col, 0.4);
     cx.beginPath();
     cx.arc(c.x, c.y, 1.6, 0, TAU);
     cx.fill();
+    cx.globalAlpha *= lod.detail;
     cx.textAlign = 'left';
     cx.fillStyle = rgba(col, 0.5);
     cx.font = '700 11px ui-monospace,Menlo,monospace';
@@ -2361,8 +2405,9 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
     cx.strokeStyle = 'rgba(125,161,176,0.5)';
     cx.lineWidth = 1;
     cx.beginPath();
-    cx.arc(c.x, c.y, 6, 0, TAU);
+    cx.arc(c.x, c.y, lod.markerRadius + (6 - lod.markerRadius) * lod.detail, 0, TAU);
     cx.stroke();
+    cx.globalAlpha *= lod.detail;
     cx.fillStyle = 'rgba(125,161,176,0.65)';
     cx.font = '9px ui-monospace,Menlo,monospace';
     cx.textAlign = 'center';
@@ -2567,7 +2612,7 @@ function startGuidedMatch(): void {
   };
   showHub(false);
   showConnect(false);
-  startMatch(buildSetupConfig()); // installMatch → maybeStartPendingTour runs the guide
+  startMatch(buildSetupConfig(), false); // installMatch → maybeStartPendingTour runs the guide
   // ONB-2: a brand-new commander shouldn't sit through the Mine's real build-time
   // (hours of game time) on the default ×10 wall-clock-ish preset — that's real
   // MINUTES of nothing happening on the very first beat. No rivals/fairness stakes
@@ -2704,15 +2749,6 @@ document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboardi
 // ядро (`shared-core/modules/army.ts`): заказ живёт в состоянии мира как ЗАЯВКА
 // (`fleet.loading`), переживает офлайн и одинаково идёт в соло и в сети. Клиенту осталось
 // только ЧИТАТЬ её — правил здесь больше нет.
-
-/** Заявки этого флота, развёрнутые ПОШТУЧНО: маркер рисует по пипсу на единицу. */
-function loadPips(fleetId: string): Array<{ unit: string; startAt: number; doneAt: number }> {
-  const out: Array<{ unit: string; startAt: number; doneAt: number }> = [];
-  for (const c of s.fleets[fleetId]?.loading ?? []) {
-    for (let i = 0; i < c.count; i++) out.push({ unit: c.unit, startAt: c.startAt, doneAt: c.doneAt });
-  }
-  return out;
-}
 
 /** Объём трюма, уже обещанный идущими подъёмами этого флота. */
 function pendingLoadCargo(fleetId: string): number {
@@ -3633,6 +3669,7 @@ const matchEnd = initMatchEnd({
   writeMarker: (k, v) => localStorage.setItem(k, v),
   loadMeta,
   saveMeta,
+  runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
 });
 
 // --- rendering ---------------------------------------------------------------
@@ -3854,7 +3891,11 @@ function drawStrikeTrails(): void {
     cx.translate(-12, -12);
     cx.fillStyle = rgba(R_WING, 0.24);
     cx.strokeStyle = rgba(R_WING, tr.leg === 'back' ? 0.55 : 0.95);
-    drawShipShape(cx, (dom && unitShape(dom.def, dom.unit)) || 'fighter', cam.scale >= 0.9);
+    drawShipShape(
+      cx,
+      (dom && unitShape(dom.def, dom.unit, s.players[ME]?.faction)) || 'fighter',
+      cam.scale >= 0.9,
+    );
     cx.restore();
     // Подпись — позывной и число бортов, ТОТ ЖЕ позывной, что у карточки в порту:
     // игрок обязан узнать в летящем значке звено, которое отправлял.
@@ -4186,6 +4227,7 @@ let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = nu
 const bg = document.createElement('canvas');
 const bgx = (mapContextOptions ? bg.getContext('2d', mapContextOptions) : bg.getContext('2d')) as CanvasRenderingContext2D;
 const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
+const terrainGeometry = new TerrainGeometryCache();
 const mapContextEvents = { lost: 0, restored: 0 };
 const backgroundContextEvents = { lost: 0, restored: 0 };
 let bgContent = ''; // viewport + ownership signature (camera-independent)
@@ -4228,9 +4270,31 @@ function ownersSig(): string {
   );
 }
 
+/** Подпись карты в списках партий. Обе карты Фронтира показываются одним именем —
+ *  раньше это был тернарник, скопированный в два места, и два ключа локали с
+ *  ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
+function mapLabel(mapId: string | undefined): string {
+  return isFrontier(mapId) ? t('map.frontier') : (mapId ?? '');
+}
+
 /** Map art is shared by desktop and phone; floating windows remain desktop-only. */
 function holographicMapOn(): boolean {
-  return holographic.active() || (MOBILE && holographyOn());
+  return holographic.active() || MOBILE;
+}
+
+/** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
+ *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
+ *  (`territoryGeometry.ts`) нормализует вход по первой точке клипа и масштабу сам,
+ *  поэтому панорама и зум из его подписи сокращаются, а на выход он отдаёт ячейки в том
+ *  же экранном пространстве, в котором их рисуют и по которым потом бьют хит-тестом. */
+function provinceClip(): Array<[number, number]> {
+  if (galaxyOutline.length)
+    return galaxyOutline.map((pt): [number, number] => {
+      const v = world(pt);
+      return [v.x, v.y];
+    });
+  const frame = clipRect(mapBounds());
+  return clipPolygon(world(frame.topLeft), world(frame.bottomRight));
 }
 
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
@@ -4239,6 +4303,7 @@ function holographicMapOn(): boolean {
 const territoryGeometry = new TerritoryGeometryCache();
 
 function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
+  const lod = currentMapLod();
   // Always cover newly exposed edges at the current camera. Only the stationary
   // offscreen bake can be reused; the viewer's knowledge remains its invalidator.
   const content = bakeSignature({
@@ -4250,7 +4315,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     starfield: starfieldOn(),
   }) + `|sky:${starfieldOn() && spaceBackdropReady(holographicMapOn()) ? 1 : 0}` +
     `|holo:${holographicMapOn()}|glow:${glowOn()}` +
-    (holographicMapOn() ? `|terrain:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` : '');
+    `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}`;
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (g === bgx) {
@@ -4312,13 +4377,17 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     provinceIds.push(n.id);
     return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
   });
+  for (let i = 0; i < seeds.length; i++) {
+    const id = provinceIds[i]!;
+    if (!known(id) && !memory.has(id)) seeds[i]!.kind = 'unknown';
+  }
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
   // gives the map a defined edge that pans/zooms with the camera.
-  const frame = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
+  const frame = clipRect(mapBounds());
   const tl = world(frame.topLeft);
   const br = world(frame.bottomRight);
-  const clip = clipPolygon(tl, br);
+  const clip = provinceClip();
   holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
   if (holographicMapOn()) {
     drawGlassScreen(g, holographicFrame);
@@ -4339,36 +4408,61 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
   // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
   // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
+  // MAP-SEAL: граница, через которую нет пути, молча обещает переход. С M4.3 клиенту
+  // больше не нужно об этом ДОГАДЫВАТЬСЯ: соседство выводится из мозаики, и ядро
+  // публикует `Planet.sealed` — границы, закрытые местностью. Само правило (что считать
+  // барьером и когда о нём молчать) — чистое решение, общее обоим клиентам:
+  // `decisions/sealedBorder.ts`.
+  const sealedBorder = (a: number, b: number): boolean => {
+    const ia = provinceIds[a];
+    const ib = provinceIds[b];
+    if (ia === undefined || ib === undefined) return false;
+    const seen = (id: string): boolean => known(id) || memory.has(id);
+    const side = (id: string): SealSide => ({
+      id,
+      ...(s.planets[id]?.sealed ? { sealed: s.planets[id]!.sealed } : {}),
+      impassable: isImpassableKind(s.planets[id]?.kind),
+      seen: seen(id),
+    });
+    return isSealedBorder(side(ia), side(ib));
+  };
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
       : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographicMapOn(),
+    provinceDetail: lod.provinceDetail,
+    sealed: sealedBorder,
   }, territoryGeometry.project(seeds, clip, cam.scale));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
-  if (holographicMapOn()) {
+  if (holographicMapOn() && lod.art > 0) {
+    g.save();
+    g.globalAlpha *= lod.art;
     for (const n of MAP) {
       const poly = provincePolygons.get(n.id);
       if (!poly) continue;
-      const field = makeTerrainField(n.id, n.sector, sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
+      // Cull using the cheap polygon bounds BEFORE constructing rock geometry.
+      if (poly.every(([x]) => x < 0) || poly.every(([x]) => x > VW) ||
+        poly.every(([, y]) => y < 0) || poly.every(([, y]) => y > VH)) continue;
+      const field = terrainGeometry.project(n.id, n.sector, sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
         known(n.id) || memory.has(n.id), world(n));
       if (!field || field.box.x > VW || field.box.y > VH ||
         field.box.x + field.box.width < 0 || field.box.y + field.box.height < 0) continue;
       terrainFields.push(field);
       if (preparing) continue; // prewarm these fields in bounded loading slices
-      // Panning only translates the cached native-resolution terrain. During a
-      // zoom keep the original vector path, avoiding texture churn or soft scaling.
-      if (zooming) drawTerrainField(g, field);
-      else terrainRaster.draw(g, field, DPR);
+      // Reuse the last sharp bake through the gesture; refine in bounded slices
+      // once settled, instead of redrawing thousands of vector strokes per tick.
+      terrainRaster.draw(g, field, DPR, zooming);
     }
+    g.restore();
   }
 
   // PATH NETWORK — thin roads between adjacent provinces (the visible "пути").
   // Movement runs along these; an army marches province-to-adjacent-province and
   // its route (drawAimPreview / drawFleetRoutes) traces them.
-  g.strokeStyle = 'rgba(150,185,195,0.32)';
+  g.strokeStyle = rgba('#96b9c3', 0.32 * lod.provinceDetail);
   g.lineWidth = 0.7;
   // Каждая дорога рисуется ОДИН раз — `setupMap.ts` (правило 1, REFM-127), та же
   // функция, что раскладывает трассы мини-карты сетапа. Здесь стоял свой цикл с тем же
@@ -4382,7 +4476,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // толщину штриха, чтобы дорога, касающаяся кромки, не пропала.
   const M = 1 + g.lineWidth;
   g.beginPath();
-  for (const road of lanes(MAP.filter((n) => !!s.planets[n.id]))) {
+  for (const road of lod.provinceDetail > 0 ? lanes(MAP.filter((n) => !!s.planets[n.id])) : []) {
     const a = world(road.from);
     const b = world(road.to);
     if (Math.max(a.x, b.x) < -M || Math.min(a.x, b.x) > VW + M ||
@@ -4396,15 +4490,33 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   if (holographicMapOn()) g.restore();
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  if (!holographicMapOn()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (!holographicMapOn()) {
+    // На картах Фронтира территория обрезается выпуклым контуром галактики
+    // (`provinceClip`), а рамка рисовалась прежним прямоугольником — между ними
+    // оставалась широкая пустая полоса, и рамка переставала обозначать край доски.
+    // Рисуем то же, чем обрезаем; прочие карты сохраняют прямоугольник.
+    if (galaxyOutline.length) {
+      g.beginPath();
+      galaxyOutline.forEach((pt, i) => {
+        const v = world(pt);
+        if (i === 0) g.moveTo(v.x, v.y);
+        else g.lineTo(v.x, v.y);
+      });
+      g.closePath();
+      g.stroke();
+    } else {
+      g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    }
+  }
   if (g === bgx && !bgx.isContextLost?.()) {
-    bgContent = content;
+    bgContent = terrainRaster.pending ? '' : content;
     bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
   }
 }
 
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
 function blitStaticLayer(): void {
+  terrainRaster.beginFrame(2);
   const moving = presentedCam && (presentedCam.x !== cam.x || presentedCam.y !== cam.y || presentedCam.scale !== cam.scale);
   const pinching = pinchStart !== null;
   if (moving || pinching || bgx.isContextLost?.()) {
@@ -4487,10 +4599,16 @@ function prepareEnteringMap(): boolean {
     }
     const jobs: PreparationJob[] = [
       { label: t('map-loading.background'), run: () => starfieldOn() ? prepareSpaceBackdrop(holographicMapOn()) : undefined },
-      { label: t('map-loading.geometry'), run: () => { bgContent = ''; buildStaticLayer(bgx, false, true); } },
+      { label: t('map-loading.geometry'), run: () => {
+        terrainRaster.beginFrame(Infinity);
+        bgContent = ''; buildStaticLayer(bgx, false, true);
+      } },
       ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
-        // Only art the viewer knows is present in terrainFields. No hidden intel
-        // is read or prepared; offscreen/oversized textures stay outside the budget.
+        // Prepare known geometry beyond the first screen, in cooperative loading
+        // slices. Unexplored provinces never enter either terrain cache.
+        const poly = provincePolygons.get(n.id);
+        if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, n.sector,
+          sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly, known(n.id) || memory.has(n.id), world(n));
         const field = terrainFields.find(f => f.id === n.id);
         if (field) terrainRaster.prepare(field, DPR);
       } })),
@@ -4576,17 +4694,22 @@ function render(now: number) {
   cx.setTransform(DPR, 0, 0, DPR, 0, 0); // draw in CSS pixels, crisp on hi-DPI
   // Semantic zoom (LOD): zoomed far out the map turns SCHEMATIC — holo type
   // badges, callout text, fleet pyramids/cargo/counts, orbit rings and battle
-  // timers dissolve away (a globalAlpha cross-fade over scale 1.2→1.45, fully
-  // schematic below), leaving territories, node art, fleet chevrons, battle
+  // timers dissolve with screen density and the whole-map camera overview,
+  // leaving territories, uniform rings, fleet chevrons, battle
   // pulses and pings. Skipping those draws over the widest views — where the
   // most nodes are on screen at once — is also the frame-time win.
   // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
-  const detail = detailAt(cam.scale);
+  const lod = currentMapLod();
+  const detail = lod.detail;
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
   if (holographicMapOn()) {
     cx.save();
     clipGlassSurface(cx, holographicFrame);
-    for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
+    if (detail > 0) {
+      cx.save(); cx.globalAlpha *= detail;
+      for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
+      cx.restore();
+    }
     drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
   }
   if (paintedSelection !== selPlanet) {
@@ -4694,7 +4817,7 @@ function render(now: number) {
   // imprint lingers (fading) until the arm comes back round — drawn behind the
   // blips so it reads as the contact glowing, not an overlay. Skips void nodes and
   // anything still fully unexplored.
-  if (sweepOn) {
+  if (sweepOn && lod.art > 0) {
     cx.save();
     cx.globalCompositeOperation = 'lighter';
     for (const n of MAP) {
@@ -4725,6 +4848,26 @@ function render(now: number) {
   cx.textAlign = 'left';
   const ns = artScale(detail); // node scale: schematic → detail (тот же закон, что у залпа)
   const R = 13 * ns;
+  if (lod.art < 1) {
+    cx.save();
+    cx.globalAlpha *= 1 - lod.art;
+    for (const n of MAP) {
+      const p = s.planets[n.id];
+      if (!p) continue;
+      const c = world(n);
+      if (!visible(c, 10)) continue;
+      drawSchematicNode(cx, c, lod.markerRadius);
+      if (p.owner === ME && known(n.id) && n.sector === 'planet') {
+        cx.fillStyle = ownerColor(ME);
+        cx.font = '700 12px ui-monospace,Menlo,monospace';
+        cx.fillText(n.id, c.x + lod.markerRadius + 6, c.y - 1);
+      }
+    }
+    cx.restore();
+  }
+  cx.save();
+  cx.globalAlpha *= lod.art;
+  if (lod.art > 0)
   for (const n of MAP) {
     const p = s.planets[n.id];
     if (!p) continue;
@@ -4732,7 +4875,7 @@ function render(now: number) {
     if (!visible(c, 110)) continue;
     // Variant B: fog hides capturable systems (void cells stay as pure geometry).
     // Какой вид у узла — `fogView.ts` (REFM-62): пустой всегда виден, неопознанный
-    // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса.
+    // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса только вблизи.
     if (n.sector === 'black_hole') {
       cx.save();
       cx.fillStyle = '#03030a'; cx.strokeStyle = '#8764ce'; cx.lineWidth = 3;
@@ -4745,7 +4888,7 @@ function render(now: number) {
     const mem = memory.get(n.id);
     const view = nodeView({ sector: n.sector, identified: kn, remembered: !!mem });
     if (view === 'remembered' || view === 'unexplored') {
-      drawFogMarker(c, n.id, mem);
+      drawFogMarker(c, n.id, mem, lod);
       continue;
     }
     const showOwner = p.owner;
@@ -4829,10 +4972,10 @@ function render(now: number) {
     }
 
     // asteroid-field sector: a lane junction, not a city — scattered rocks + a
-    // fat hub where the lanes meet, no orbits. Captured by simply arriving — unless
-    // a space fortress is raised here, which fortifies it (orbit + AA, must storm).
-    if (n.sector === 'asteroid') {
-      const fort = p.buildings.find((b) => b.type === 'starfort');
+    // fat hub where the lanes meet, no orbits. Captured by simply arriving. Raising a
+    // fortress here stops making it an asteroid field at all: `station.deploy` turns the
+    // node into `void_station`, which draws (with its hull bar) in its own branch below.
+    if (n.sector === 'asteroid' && !holographicMapOn()) {
       blitGlow(col, c.x, c.y, 30, p.owner ? 0.16 : 0.06); // cached glow disc
       cx.save();
       cx.strokeStyle = 'rgba(186,170,140,0.7)';
@@ -4868,44 +5011,17 @@ function render(now: number) {
       cx.beginPath();
       cx.arc(c.x, c.y, 7.5 + 0.6 * ownerPulse, 0, TAU);
       cx.stroke();
-      // Orbital fortress: the station concept's six-spoke vector, with its HP bar.
-      if (fort) {
-        cx.save();
-        cx.strokeStyle = col;
-        cx.lineWidth = 1.6;
-        cx.shadowColor = col;
-        cx.shadowBlur = fxBlur(8);
-        cx.fillStyle = rgba(col, 0.24);
-        cx.translate(c.x - 12, c.y - 12);
-        drawShipShape(cx, 'station', detail > 0.5);
-        cx.restore();
-        const frac = Math.max(0, Math.min(1, fort.hp / hpOfLevel('starfort', fort.level)));
-        cx.fillStyle = 'rgba(2,9,13,.7)';
-        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
-        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
-        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
-      }
-      if (selPlanet === n.id) targetBrackets(c.x, c.y, fort ? 18 : 15, now);
+      if (selPlanet === n.id) targetBrackets(c.x, c.y, 15, now);
       cx.save();
       cx.shadowColor = 'rgba(0,0,0,0.85)';
       cx.shadowBlur = fxBlur(3);
-      if (fort) {
-        // a fortress stays a prominent, special designation (unchanged)
-        cx.fillStyle = p.owner ? col : '#9fc9c4';
-        cx.font = '700 11px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.55)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('void fortress ✦', c.x + 16, c.y + 11);
-      } else {
-        // a plain asteroid field is a minor sector — de-emphasised (dim, smaller)
-        cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
-        cx.font = '600 10px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.38)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('asteroid field', c.x + 16, c.y + 11);
-      }
+      // An asteroid field is a minor sector — de-emphasised (dim, smaller).
+      cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
+      cx.font = '600 10px ui-monospace,Menlo,monospace';
+      cx.fillText(n.id, c.x + 16, c.y - 1);
+      cx.fillStyle = 'rgba(150,210,205,0.38)';
+      cx.font = '9px ui-monospace,Menlo,monospace';
+      cx.fillText('asteroid field', c.x + 16, c.y + 11);
       cx.restore();
       continue;
     }
@@ -4974,7 +5090,7 @@ function render(now: number) {
     } else if (n.sector === 'planet') {
       // A transparent rotating wire volume, with no opaque core obscuring its mesh.
       // The visual clock is independent of game speed and freezes on pause/reduced motion.
-      blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(cam.scale)), hologramTime + phaseAt(n.x, n.y) * 400);
+      blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(lod.scale)), detail > 0 ? hologramTime + phaseAt(n.x, n.y) * 400 : 0);
       blitGlow(col, c.x, c.y, R + 7, showOwner ? 0.08 : 0.035);
 
       // N/E/S/W crosshair ticks
@@ -5127,6 +5243,27 @@ function render(now: number) {
       poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
       cx.stroke();
       cx.restore();
+      // КОРПУС крепости — полоса прочности её ядра (FORT-5.2). Полоса и силуэт стояли в
+      // ветке астероида, пока крепостью было здание на астероидном поле; теперь крепость
+      // это сам узел, и её здоровье принадлежит сюда. Пиратская и нейтральная базы ядра
+      // не несут — у них полосы просто нет.
+      const core = p.buildings.find((b) => b.type === 'starfort');
+      if (core) {
+        cx.save();
+        cx.strokeStyle = col;
+        cx.lineWidth = 1.6;
+        cx.shadowColor = col;
+        cx.shadowBlur = fxBlur(8);
+        cx.fillStyle = rgba(col, 0.24);
+        cx.translate(c.x - 12, c.y - 12);
+        drawShipShape(cx, 'station', detail > 0.5);
+        cx.restore();
+        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+        cx.fillStyle = 'rgba(2,9,13,.7)';
+        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
+        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
+        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+      }
     } else {
       // Fallback for any other non-planet type: small hexagon marker
       const kc = sectorTypeOf(n.id)?.color ?? col;
@@ -5186,6 +5323,8 @@ function render(now: number) {
     cx.restore();
   }
 
+  cx.restore();
+
   // the orbit ring around any CITY that holds a stationed fleet (a single orbit).
   // Asteroid-field junctions have no orbits, so they are skipped.
   const stationed: Record<string, Fleet[]> = {};
@@ -5237,19 +5376,8 @@ function render(now: number) {
     const A = fleetAnchor(f);
     if (!A || !visible(A, 120)) continue;
     const col = ownerColor(f.owner);
-    // Shuttles ABOARD a carrier live in the hold, not in the battle line: with any
-    // non-shuttle hull present they leave the triangle pyramid and ride the cargo
-    // tail as diamonds. A pure strike wing in flight IS its shuttles — triangles.
-    // Три числа эмблемы — `fleetTally.ts` (REFM-115). Развилка там же: пока есть хоть
-    // один КОРПУС, крыло едет грузом; корпусов нет — крыло и есть флот.
-    // ROS-3.2: сам НОСИТЕЛЬ — корпус и стоит в линии, а машины из его ангара
-    // (`f.hangar`, SHU-2.1) едут в том же хвосте груза, что и крыло на борту.
-    const { ships, wingPips, troops } = emblemTally(
-      f.units,
-      f.landing ?? [],
-      isShuttle,
-      hangarMachines(f), // SHU-4.2: машины трюма лежат внутри эскадр
-    );
+    // Aircraft aboard never inflate the combat hull count.
+    const { ships } = emblemTally(f.units, [], isShuttle);
     // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
     // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
     const engine = fxBreath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });
@@ -5290,7 +5418,7 @@ function render(now: number) {
     }
 
     const dom = dominantUnit(f.units, data);
-    const shape = (dom && unitShape(dom.def, dom.unit)) || 'cruiser';
+    const shape = (dom && unitShape(dom.def, dom.unit, s.players[f.owner]?.faction)) || 'cruiser';
     const arch = dom ? unitArchetype(dom.def) : 'combat';
     const domK = glyphScale(dom ? unitSizeClass(dom.def.stats.hp ?? 0) : 'S');
     // На удалении остаётся внешний контур ТОГО ЖЕ корпуса. Внутренняя детализация,
@@ -5318,10 +5446,10 @@ function render(now: number) {
 
     // Fleet emblem (постер «Типы кораблей»): ОДИН силуэт ДОМИНАНТА — сильнейшего
     // корабля флота — вместо пирамиды треугольников; количество несёт счётчик
-    // «×N» за хвостом («флот на карте = доминант + счёт», полный состав — в
+    // «×N» в горизонтальном бейдже («флот на карте = доминант + счёт», полный состав — в
     // панели выделения). Размер S/M/L по hp доминанта, гало-кольцо при щите
     // (у флагмана — всегда), нос по курсу — heading от fleetAnchor, как раньше;
-    // карго-хвост и счётчик едут по тому же курсу.
+    // шкалы вместимости и счётчик остаются горизонтальными.
     // Размер — из ЕДИНОЙ таблицы постера (`unitGlyphs.ts`, правило 1). Здесь стояла
     // своя (S 0.62 · M 0.8), и один и тот же разведчик был в панели заметно крупнее,
     // чем на карте: «размер = hp» переставал быть шкалой ровно там, где ею пользуются.
@@ -5352,101 +5480,6 @@ function render(now: number) {
     drawShipShape(cx, shape, true);
     cx.restore();
 
-    // cargo glued to the tail (behind the base, following the heading), SPLIT by
-    // shape so counts read at a glance: row 1 — only diamonds (carried divisions,
-    // hold shuttles — «ромбик размером с квадратик»), row 2 — only squares (ground
-    // troops). A loading pip (~1h) fills up in place inside its shape's row. Cell
-    // centres ride the rotated baseline, the pips themselves stay upright.
-    const loads = loadPips(f.id); // empty for enemy/idle fleets
-    // Кто в каком ряду — `markerTail.ts` (REFM-116): ряды делятся по ФОРМЕ, и
-    // грузящаяся единица встаёт в ряд своей формы, а не отдельным рядом «в пути».
-    const { diamonds: diaRow, squares: sqRow } = cargoRows(wingPips, troops, loads, isShuttle);
-    type CargoPip = (typeof diaRow)[number];
-    // The same rotation the pyramid uses; local +y = the tail. Pips and the ship
-    // count are placed through this, drawn upright at their rotated spots.
-    // Стоящий у мира флот ниже ORBIT_ZOOM_IN стоит РАДИАЛЬНО, и его хвост смотрел
-    // внутрь орбиты — после ужатия кольца пипсы ложились на диск планеты; для этой
-    // позы хвост разворачивается наружу (геометрия и причина — markerTail.ts).
-    const staticDock = !f.movement && f.location !== null && !orbitsLive();
-    const th = tailTheta(A.ang, staticDock);
-    const tailAt = (lx: number, ly: number): { x: number; y: number } =>
-      tailPoint(A.x, A.y, th, lx, ly);
-    const CELL = CARGO_CELL,
-      SQ = 5,
-      DS = 3.1; // shuttle pip: a diamond with the footprint of the square
-    const diamond = (cxr: number, cyr: number, r: number, fill: boolean): void => {
-      cx.beginPath();
-      cx.moveTo(cxr, cyr - r);
-      cx.lineTo(cxr + r, cyr);
-      cx.lineTo(cxr, cyr + r);
-      cx.lineTo(cxr - r, cyr);
-      cx.closePath();
-      if (fill) cx.fill();
-      cx.stroke();
-    };
-    const drawCargoRow = (row: CargoPip[], ly: number): void => {
-      if (!row.length) return;
-      // Обрезка по пределу и центровка (с учётом «+N») — `markerTail.ts`.
-      const { shown: n, over, firstX } = cargoRowLayout(row.length);
-      let lx = firstX;
-      cx.save();
-      cx.shadowColor = col;
-      cx.shadowBlur = fxBlur(3);
-      cx.lineWidth = 1;
-      for (let i = 0; i < n; i++) {
-        const pip = row[i]!;
-        const c0 = tailAt(lx, ly);
-        if (pip.kind === 'wing') {
-          // hold shuttle → a solid diamond ("ромбик")
-          cx.fillStyle = rgba(col, 0.85);
-          cx.strokeStyle = rgba(col, 0.95);
-          diamond(c0.x, c0.y, DS, true);
-        } else if (pip.kind === 'troop') {
-          // loaded troop → solid square
-          const x = c0.x - SQ / 2,
-            y = c0.y - SQ / 2;
-          cx.fillStyle = rgba(col, 0.85);
-          cx.fillRect(x, y, SQ, SQ);
-          cx.strokeStyle = rgba(col, 0.95);
-          cx.strokeRect(x + 0.5, y + 0.5, SQ - 1, SQ - 1);
-        } else {
-          // loading pip → fills in place over ~1h (shuttle = growing diamond,
-          // ground troop = empty square filling bottom-up)
-          const p = pip.load!;
-          const prog = loadFill(s.time, p.startAt, p.doneAt); // зажат — `markerTail.ts`
-          if (isShuttle(p.unit)) {
-            cx.strokeStyle = rgba(col, 0.85);
-            diamond(c0.x, c0.y, DS, false);
-            if (prog > 0) {
-              cx.fillStyle = rgba(col, 0.8);
-              cx.strokeStyle = rgba(col, 0);
-              diamond(c0.x, c0.y, DS * prog, true);
-            }
-          } else {
-            const x = c0.x - SQ / 2,
-              y = c0.y - SQ / 2;
-            cx.strokeStyle = rgba(col, 0.85);
-            cx.strokeRect(x + 0.5, y + 0.5, SQ - 1, SQ - 1);
-            if (prog > 0) {
-              const fh = (SQ - 1) * prog;
-              cx.fillStyle = rgba(col, 0.8);
-              cx.fillRect(x + 0.5, y + 0.5 + (SQ - 1 - fh), SQ - 1, fh);
-            }
-          }
-        }
-        lx += CELL;
-      }
-      cx.restore();
-      if (over > 0) {
-        const o = tailAt(lx, ly);
-        cx.fillStyle = rgba(col, 0.92);
-        cx.font = '700 8px ui-monospace,Menlo,monospace';
-        cx.fillText(`+${over}`, o.x, o.y + SQ / 2);
-      }
-    };
-    drawCargoRow(diaRow, 5); // ромбы — ближний к базе ряд
-    drawCargoRow(sqRow, squareRowY(5, diaRow.length)); // квадраты — ниже, если ромбы есть
-
     if (f.owner === ME && chainStepsOf(f.id)) {
       // TGT-1: an army carrying a standing plan breathes a dashed accent ring —
       // one glance tells which fleets are already "spoken for".
@@ -5466,12 +5499,15 @@ function render(now: number) {
     // (REFM-123). Осталась только рамка выбора.
     if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 15, now);
 
-    // ship count («×N» — счёт при доминанте, как на постере), small, past the
-    // cargo tail — placed along the heading like the pips, glyph upright.
-    const cnt = tailAt(0, tallyY(21, diaRow.length, sqRow.length));
-    cx.fillStyle = rgba(col, 0.95);
-    cx.font = '700 10px ui-monospace,Menlo,monospace';
-    cx.fillText(`×${ships}`, cnt.x, cnt.y);
+    // Own hold occupancy is read from the snapshot; foreign manifests stay private.
+    // The badge remains horizontal and outside the orbit even as heading changes.
+    const dock = !f.movement && f.location ? s.planets[f.location] : null;
+    drawFleetHoldBadge(
+      cx, A, dock ? world(dock.position) : null, ships,
+      f.owner === ME ? fleetHolds(f, data, s.time) : [],
+      selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
+      col,
+    );
 
     cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
   }
@@ -5633,7 +5669,7 @@ function squadronTroopsHtml(squadronId: string): string {
       const sign = r.delta > 0 ? '+' : '';
       return (
         `<div class="row">` +
-        `<span class="bicon">${unitIconHtml(r.unit, data, youColor, 18)}</span>${esc(nm)} ` +
+        `<span class="bicon">${unitIconHtml(r.unit, data, youColor, 18, s.players[ME]?.faction)}</span>${esc(nm)} ` +
         `<span class="dim">${r.garrison} ▸ ${r.hold}</span> ` +
         `<button class="b" data-act="wingtstep" data-arg="${esc(squadronId)}" data-unit="${esc(r.unit)}" data-n="-1"${r.delta <= -r.maxUnload ? ' disabled' : ''}>−</button>` +
         `<b>${sign}${r.delta}</b>` +
@@ -5689,7 +5725,7 @@ function unitRows(stacks: Array<UnitStack>): string {
   return kitUnitRows(
     stacks,
     (unit) => ({
-      icon: unitIconHtml(unit, data, youColor, 18),
+      icon: unitIconHtml(unit, data, youColor, 18, s.players[ME]?.faction),
       name: displayUnit(unit),
       domain: isGround(unit) ? t('side.unit.ground') : t('side.unit.space'),
     }),
@@ -5824,7 +5860,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
       const icon =
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-          : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
+          : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: s.players[f.owner]?.faction, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
       // Show installed modules as small tags under the count (RULES-2.1 / SM-0.3):
       // two cruisers with different modules are separate stacks — the tags make
       // the difference visible at a glance, without opening the codex.
@@ -5877,7 +5913,8 @@ function fleetSummaryHtml(f: Fleet): string {
   rows.push(
     `<div class="row">⚡ ${t('side.summary.speed')}: <b>${sm.speed > 0 ? Math.round(sm.speed) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('side.summary.speed.note')}</span></div>`,
   );
-  if (sm.cargo)
+  if (f.owner === ME) rows.push(fleetHoldsHtml(fleetHolds(f, data, s.time)));
+  else if (sm.cargo)
     rows.push(
       `<div class="row">📦 ${t('side.summary.cargo')}: <b>${sm.cargo.used}/${sm.cargo.cap}</b></div>`,
     );
@@ -5890,7 +5927,7 @@ function fleetSummaryHtml(f: Fleet): string {
   return (
     `<div class="sec">${t('side.summary.title')}</div>` +
     rows.join('') +
-    `<div class="row">${btn('fleetinfo', '', t('side.summary.back'), true)}</div>`
+    `<div class="row">${btn('summaryback', '', t('side.summary.back'), true)}</div>`
   );
 }
 
@@ -5951,18 +5988,6 @@ function fleetPanelHtml(f: Fleet): string {
   );
   // Тап по имени открыл сводку армии — карточка целиком уступает ей место.
   if (fleetInfoFor === f.id) return h + fleetSummaryHtml(f);
-  // UI-14. ЧУЖОЙ флот — только осмотр: тот же разбор состава, что игрок уже знает по
-  // своим (тап по имени), и ни одной кнопки приказа. Кнопки тут были бы не «строгостью
-  // интерфейса», а обманом: ядро всё равно отвечает `E_FORBIDDEN` на приказ чужому
-  // флоту. Строка-подсказка объясняет, ПОЧЕМУ приказов нет, — иначе пустая карточка
-  // читается как поломка, а именно с этого и началась находка владельца.
-  if (f.owner !== ME) {
-    return (
-      h +
-      `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>` +
-      fleetSummaryHtml(f)
-    );
-  }
   // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
   // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
   // (цены — те же формулы, что в гейте).
@@ -5984,6 +6009,7 @@ function fleetPanelHtml(f: Fleet): string {
     if (sm.shield.max > 0)
       h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
+  if (f.owner === ME) h += fleetHoldsHtml(fleetHolds(f, data, s.time));
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
   // корпусам, лимп <30% учтён), с меткой форс-марша. The hero aura (+5%, noted
@@ -6045,6 +6071,12 @@ function fleetPanelHtml(f: Fleet): string {
     // Radar contact: show only the signature (coarse size), not the composition
     h += `<div class="sec">${t('side.fleet.ships')}</div><div class="row dim">${t('side.fleet.signature', { n: nShips })}</div>`;
   }
+
+  // UI-14: чужой флот тоже имеет обычную карточку и сводку по тапу на имя.
+  // Постоянная сводка здесь показывала «Назад» без карточки, к которой можно вернуться.
+  // Осмотр заканчивается ДО приказов: этот флот не попадает в набор управления.
+  if (f.owner !== ME)
+    return h + `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>`;
 
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
@@ -6201,7 +6233,7 @@ function fleetPanelHtml(f: Fleet): string {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
-      const loadingN = loadPips(f.id).length;
+      const loadingN = (f.loading ?? []).reduce((n, claim) => n + claim.count, 0);
       const types: string[] = [];
       for (const st of [...groundHere, ...carried])
         if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
@@ -6210,7 +6242,7 @@ function fleetPanelHtml(f: Fleet): string {
         const cnt = (stacks: Array<{ unit: string; count: number }>, u: string): number =>
           stacks.reduce((n, st) => (st.unit === u ? n + st.count : n), 0);
         for (const u of types)
-          ga += `<div class="row"><span class="bicon">${unitIconHtml(u, data, youColor, 16)}</span>${esc(displayUnit(u))} <b>${cnt(groundHere, u)} ▸ ${cnt(carried, u)}</b></div>`;
+          ga += `<div class="row"><span class="bicon">${unitIconHtml(u, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(u))} <b>${cnt(groundHere, u)} ▸ ${cnt(carried, u)}</b></div>`;
       }
       if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
       if (!types.length && !loadingN)
@@ -6321,7 +6353,7 @@ function planetSummaryHtml(p: Planet): string {
   return (
     `<div class="sec">${t('side.world.summary')}</div>` +
     rows.join('') +
-    `<div class="row">${btn('planetinfo', '', t('side.summary.back'), true)}</div>`
+    `<div class="row">${btn('summaryback', '', t('side.summary.back'), true)}</div>`
   );
 }
 
@@ -6561,8 +6593,8 @@ function planetPanelHtml(p: Planet): string {
     }
     // Каталог непостроенного больше не живёт плитками в панели — его показывает
     // полноэкранное окно построек. Кнопка есть только там, где строить можно
-    // (свой мир И ростер сектора непуст — CMD-VIS: нет приказа — нет кнопки).
-    if (mine && sectorBuildsAnything(p.id)) {
+    // (свой мир И каталог что-то здесь предлагает — CMD-VIS: нет приказа — нет кнопки).
+    if (mine && buildsAnything(p, data)) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
     // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
@@ -7178,7 +7210,7 @@ function codexTile(
   const v = {
     kind,
     id,
-    icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor),
+    icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor, 22, s.players[ME]?.faction),
     art: catalogPortraitHtml(kind, id, data, 'thumb'),
     name: kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id),
     label,
@@ -7223,7 +7255,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
       const c = def ? buildingLevel(def, inst.level + 1).cost : undefined;
       return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
     }
-    const buildable = sectorAllowsBuilding(p.id, id);
+    const buildable = canBuildHere(p, id, data);
     // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
@@ -7232,7 +7264,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost, myRes())}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16, s.players[ME]?.faction)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost, myRes())}</button>`;
   }
   return '';
 }
@@ -7257,7 +7289,7 @@ function codexEntryLabel(e: CodexEntry): string {
 }
 function codexEntryIcon(e: CodexEntry): string {
   const id = e.key.slice(2);
-  if (e.category === 'unit') return unitIconHtml(id, data, youColor, 20);
+  if (e.category === 'unit') return unitIconHtml(id, data, youColor, 20, s.players[ME]?.faction);
   if (e.category === 'building') return BUILD_ICON[id] ?? '▣';
   return '?';
 }
@@ -7942,7 +7974,7 @@ function renderCmdBar() {
     // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
     (troopsPlan && troopsIn
       ? troopsMenuHtml(troopsModel(troopsIn), {
-          icon: (u) => unitIconHtml(u, data, youColor, 18),
+          icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
           name: displayUnit,
         })
       : '');
@@ -8006,7 +8038,7 @@ function renderSplitDialog() {
   const html = splitDialogHtml(
     { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
     {
-      icon: (u) => unitIconHtml(u, data, youColor, 18),
+      icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
       name: displayUnit,
       moduleName: (m) => {
         const mdef = data.modules[m];
@@ -8230,14 +8262,23 @@ side.addEventListener('click', (ev) => {
     // ECON-3а: экспресс-ремонт за metal — кнопка видна только у своего дока.
     playerOrder(repairFleet(ME, arg || selFleet!));
   } else if (act === 'fleetinfo') {
-    // Тап по имени армии: карточка ⇄ сводка (для текущего выбранного флота).
-    if (selFleet) fleetInfoFor = fleetInfoFor === selFleet ? null : selFleet;
+    // Осматриваемый чужой флот живёт вне selFleet — действие относится к карточке.
+    const id = panelFleet();
+    if (id) fleetInfoFor = fleetInfoFor === id ? null : id;
   } else if (act === 'planetinfo') {
     // Тап по имени мира: карточка ⇄ сводка статистики (для выбранной планеты).
     if (selPlanet) planetInfoFor = planetInfoFor === selPlanet ? null : selPlanet;
+  } else if (act === 'summaryback') {
+    // «Назад» только закрывает сводку; повторный тап не открывает её заново.
+    fleetInfoFor = null;
+    planetInfoFor = null;
   }
   lastPanelHtml = '';
   renderPanel();
+  if (act === 'summaryback' || act === 'fleetinfo' || act === 'planetinfo') {
+    const scroll = side.querySelector<HTMLElement>('.pscroll');
+    if (scroll) scroll.scrollTop = 0;
+  }
 });
 
 // Side-panel object hover → dossier. On PC the docked pane is hidden (it ate a slab
@@ -8321,8 +8362,7 @@ side.addEventListener('contextmenu', (ev) => {
   const order = quickBuildOrder(tile.dataset.buildorder, {
     worldOwner: p?.owner ?? null,
     me: ME,
-    sectorAllows:
-      !!p && !!anchorId && sectorAllowsBuilding(p.id, anchorId),
+    sectorAllows: !!p && !!anchorId && canBuildHere(p, anchorId, data),
     locked: !!p && !!anchorId && !!buildingLocked(p.id, anchorId),
   });
   if (!order || !selPlanet) return;
@@ -9201,12 +9241,18 @@ for (const b of Array.from(document.querySelectorAll('[data-mult]'))) {
 // …), and fast-forward (▶▶) runs at 3× the chosen play. The play/fast buttons carry the
 // live values so pause→resume returns to the chosen pace, not the default.
 const PLAY_BASE = 1 / 3600; // game-hours per real second; 1/3600 ⇒ 1 game-hour per real hour (×1 = wall-clock)
-function applyTimeSpeed(mult: number): void {
+/**
+ * Настроить пару «играть / ускорить». `fastMult` отдельным параметром, потому что у
+ * ЗАБЕГА своё отношение между ними: обычной партии ускорение втрое только помогает, а
+ * забег на нём проскакивает нижнюю границу прохождения (PVR-2.2). По умолчанию — прежние
+ * втрое, так что для всех остальных вызовов ничего не изменилось.
+ */
+function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void {
   const play = PLAY_BASE * mult;
   const playBtn = $('spd-play');
   const fastBtn = $('spd-fast');
   if (playBtn) playBtn.dataset.speed = String(play);
-  if (fastBtn) fastBtn.dataset.speed = String(play * 3);
+  if (fastBtn) fastBtn.dataset.speed = String(PLAY_BASE * fastMult);
   speed = play;
   for (const x of Array.from(document.querySelectorAll('[data-speed]')))
     x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
@@ -9217,9 +9263,14 @@ function applyTimeSpeed(mult: number): void {
 // Restart → back to the skirmish setup (bot selection). The speedbar button serves the
 // no-bots sandbox; the end-banner button (delegated) serves a finished bot match.
 // Player build: the button is stripped with the rest of the time controls (no skirmish).
-if (!__PLAYER_BUILD__) restartBtn.addEventListener('click', () => openSetup());
+if (!__PLAYER_BUILD__) restartBtn.addEventListener('click', () => {
+  if (isSectorZeroRun()) openSectorZero();
+  else openSetup();
+});
 bannerEl.addEventListener('click', (ev) => {
-  if ((ev.target as Element).closest('[data-restart]')) openSetup();
+  if (!(ev.target as Element).closest('[data-restart]')) return;
+  if (isSectorZeroRun()) openSectorZero();
+  else openSetup();
 });
 
 // --- end screen (match over): outcome + stats + rematch ----------------------
@@ -9237,7 +9288,7 @@ const endScreenPanel = initEndScreen({
   clearEnd: () => {
     endScreen = null;
   },
-  hubVisible: () => !!hubEl && hubEl.style.display !== 'none',
+  hubVisible: () => (!!hubEl && hubEl.style.display !== 'none') || sectorZeroMenu.isOpen(),
   net: () => NET,
   worldsFallback: () => worldsOf(ME),
   fmtStamp,
@@ -9252,6 +9303,10 @@ const endScreenPanel = initEndScreen({
     // ONB-2: матч мог закончиться посреди гайда — незакрытый тур продолжил бы рисовать
     // свой #spotlight поверх хаба и следующего матча.
     activeTour?.stop();
+    if (!wasNet && isSectorZeroRun()) {
+      openSectorZero(which === 'again');
+      return;
+    }
     if (which === 'again') {
       // Соло — сразу в настройку схватки; сеть — в браузер матчей (пересадить тот же
       // стол клиент не может, это отдельный серверный кирпич).
@@ -9276,6 +9331,8 @@ const renderEndScreen = (): void => endScreenPanel.render();
 // authoritative (it keeps ticking regardless), but the end-screen overlay is suppressed
 // while the hub is visible (see renderEndScreen guard).
 $('tomenu').addEventListener('click', () => {
+  const wasRun = isSectorZeroRun();
+  if (wasRun) saveRun();
   if (NET) {
     userClosed = true;
     NET = false;
@@ -9293,7 +9350,8 @@ $('tomenu').addEventListener('click', () => {
   // Any exit from a live match must kill the tour, not just the ones that walk off
   // its own end (`done`) or its own «Пропустить обучение».
   activeTour?.stop();
-  openHub();
+  if (wasRun) openSectorZero();
+  else openHub();
 });
 // Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too.
 document.getElementById('rail-exit')?.addEventListener('click', () => $('tomenu').click());
@@ -9388,6 +9446,14 @@ const battleWindow = initBattleWindow({
     return m.ok ? m : null;
   },
 });
+const pirateIntro = initPirateIntro({
+  root: $('pirate-intro'),
+  copy: $('pirate-copy'),
+  action: $('pirate-action'),
+  close: $('pirate-close'),
+  focus: focusWorld,
+  openBattle: (id) => battleWindow.open(id),
+});
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
 let stewSnapshot: StewardMetrics | null = null;
 
@@ -9452,6 +9518,7 @@ const shipyard = initShipyard({
   note: (msg) => note(msg),
   errText,
   arsenalItems: () => arsenal.items(),
+  preparedModules: (hull) => isSectorZeroRun() ? [...(runShipLoadouts[hull] ?? [])] : undefined,
   onOpen: () => maybeIntro('constructor'),
   // The «Герои» pane: the hero roster/штаб lives in `heroStaff.ts` (REFM-14) — the
   // yard only asks it for markup and hands its clicks over.
@@ -9512,6 +9579,18 @@ if (!__PLAYER_BUILD__) {
   // opener stays hidden until a match launches with the setup checkbox ticked.
   initSandbox({
     getState: () => s,
+    available: () => !NET && inMatch() && sandboxConfig.enabled,
+    data,
+    waveTools: () => sectorDevActive,
+    nextWave: () => {
+      if (NET || !sectorDevActive || !inMatch()) return false;
+      const next = pullNextDevWave(s);
+      if (!next) return false;
+      const out = advance(next, next.time + 1);
+      if (out.error || out.state.pve?.waveNumber === s.pve?.waveNumber) return false;
+      apply(out);
+      return true;
+    },
     me: () => ME,
     homeId: () => sandboxHomeId,
     note: (msg) => note(msg),
@@ -9796,6 +9875,8 @@ async function syncCommanderFromServer(): Promise<void> {
   }
 }
 function openHub(note = ''): void {
+  if (soloSaveActive) { saveSolo(); speed = 0; }
+  refreshSoloContinue();
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   const nick = nickInput.value.trim();
   $('hub-name').textContent = nick || t('auth.commander');
@@ -10139,6 +10220,8 @@ $('hub-solo').addEventListener('click', () => {
   showHub(false);
   openSetup('hub');
 });
+$('hub-solo-continue').addEventListener('click', restoreSolo);
+$('hub-sector-zero').addEventListener('click', () => openSectorZero());
 $('hub-msg').addEventListener('click', () => {
   hubNote.textContent = t('hub.messages.soon');
 });
@@ -10207,8 +10290,6 @@ const settings = initSettings({
     glow: glowOn(),
     starfield: starfieldOn(),
     motion: motionOn(),
-    holography: holographyOn(),
-    holographySupported: MOBILE || supportsHolography(VW, VH, holoCoarsePointer?.matches ?? false),
     renderCompatibility: canvasCompatibilityRequested(),
     renderCompatibilityActive: canvasCompatibilityActive(),
     renderCompatibilitySupported: /Android/i.test(navigator.userAgent),
@@ -10224,7 +10305,6 @@ const settings = initSettings({
   setGlow: setGlowFx,
   setStarfield: setStarfield,
   setMotion: setMotion,
-  setHolography,
   setRenderCompatibility: setCanvasCompatibility,
   renderingReport: mapRenderingReport,
   setFps: setShowFps,
@@ -10238,11 +10318,11 @@ $('hub-settings').addEventListener('click', () => settings.open());
 // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
 document.getElementById('rail-settings')?.addEventListener('click', () => settings.open());
 
-// First-run gate: a returning commander (a saved callsign) skips the identity card
-// and boots straight into the hub — the raw "Новый командир / войти" screen is only
-// for a genuinely new device. "Сменить командира" in the hub goes back to identity.
+// The shared entry always starts at login, including returning commanders with a
+// saved callsign or local Sector Zero run. Identity leads to the main hub; the
+// player chooses a mode there. A save is data to continue, not a navigation request.
 //
-// Deep-link overrides (checked before the returning-player shortcut):
+// Explicit deep-link overrides (checked before the ordinary login entry):
 //  «?reset=<token>» — a mailed password-reset link → the reset page (set a new password).
 //  «?join=<id>»     — a new tab spawned by «Войти» in the match list → straight into THAT
 //                     session, reusing this browser's stored identity (nick / session JWT).
@@ -10329,6 +10409,11 @@ if (bootReset) {
       wPassInput.focus();
     })(),
   );
+} else if (document.body.dataset.entry === 'sector-zero') {
+  // The direct Sector Zero page enters its own home after the host is initialized.
+  // No identity or server request is needed for this local run.
+  showConnect(false);
+  showHub(false);
 } else {
   // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
   // hub — like every game's login screen. Previously a cached `void.nick` in
@@ -10353,7 +10438,7 @@ if (bootReset) {
       }
       if (mode === 'accounts') {
         wPassRowEl.style.display = 'flex';
-        wPassInput.focus();
+        if (connectShown()) wPassInput.focus();
       } else {
         wPassRowEl.style.display = 'none';
       }
@@ -10517,16 +10602,16 @@ function renderSetupSlots(): void {
   setupFactionsEl.innerHTML = f2;
   // Team-battle toggle: sides fight as allies. Only meaningful with ≥2 rivals (a 2v2
   // needs three AI seats on); shown always so the player can arm it before adding them.
-  // PvE button: starts a match on the PvE map (2 players vs 1 strong AI).
+  // Sector Zero has its own home; this entry no longer launches a run directly.
   let h =
     `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
-    `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
+    `<button class="tmtog pve-btn" data-pvestart="1">${t('sector-zero.enter')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
-  if (setupMapId === 'frontier-100') {
+  if (isFrontier(setupMapId)) {
     const count = rivalCount(setupSlots);
-    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="99" value="${count}" /></label>`;
+    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="${setupSeatCount() - 1}" value="${count}" /></label>`;
     return;
   }
   const fids = seatFactionIds();
@@ -10566,7 +10651,7 @@ function renderSetup(): void {
   const mapSelect = $('setup-map-id') as HTMLSelectElement;
   mapSelect.value = setupMapId;
   mapSelect.disabled = !!netSetup;
-  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
+  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-legacy-info' : isFrontier(setupMapId) ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
   const homeSelect = $('setup-home-id') as HTMLSelectElement;
   homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
   homeSelect.value = setupStart;
@@ -10613,6 +10698,24 @@ let setupReturn: 'welcome' | 'hub' = 'welcome';
 // Окно живёт в `sciPick.ts` (REFM-18); здесь только проводка. Список выбранных —
 // `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 const sciWin = $('scipick');
+// Окно усиления между волнами (PVR-1.4).
+const boonWin = $('boonpick');
+const boonPickBody = $('boonpickbody');
+let lastBoonBody = '';
+boonWin.addEventListener('click', (ev) => {
+  const target = ev.target as Element;
+  if (target.closest('[data-boonlater]')) {
+    boonLaterAtWave = s.pve?.waveNumber ?? -1;
+    boonWin.classList.remove('show');
+    return;
+  }
+  const card = target.closest('[data-boon]');
+  if (!card) return;
+  const tech = card.getAttribute('data-boon');
+  // Приказ идёт ОБЫЧНЫМ путём игрока: в сети он уехал бы на сервер, и проверяет его
+  // ядро. Клиент тут не выдаёт технологию, он её просит.
+  if (tech) playerOrder(takeBoon(ME, tech));
+});
 const setupCouncilEl = $('setupcouncil');
 function renderSetupCouncil(): void {
   setupCouncilEl.innerHTML = sciCouncilRowHtml(setupScientists, data);
@@ -10636,6 +10739,8 @@ const openSciPick = (): void => sciPick.open();
 setupCouncilEl.addEventListener('click', openSciPick);
 
 function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
+  saveSolo();
+  if (!NET) speed = 0;
   setupReturn = from;
   // Каждый заход начинается ОДИНОЧНЫМ: сетевой режим ставит `openSeatPicker`
   // сразу после этого вызова. Иначе брошенный сетевой заход утёк бы в следующую
@@ -10746,14 +10851,26 @@ topEl.addEventListener('click', (ev) => {
   );
 });
 
-function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
+function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
+  saveSolo();
+  soloSaveActive = false;
+  autoAssault.clear();
+  patrols.clear();
+  sectorRunActive = false;
+  sectorDevActive = false;
   mapNeedsPreparation = true;
+  // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
+  // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
+  // снимает режим предыдущего матча: без сброса PvE-волны утекли бы в следующую соло-игру.
+  setMatchMode(modeId);
   s = state;
   installMapGeometry(s);
   syncPlayerNames(s);
   ME = 'p1';
   AI_PLAYERS = new Map(aiPlayers);
-  for (const p of Object.values(s.players)) if (p.npc) AI_PLAYERS.set(p.id, 'weak');
+  for (const p of Object.values(s.players)) if (p.npc && p.ai) AI_PLAYERS.set(p.id, 'weak');
+  pirateIntro.reset();
+  swarmDossierWin.classList.remove('show');
   solo.reset();
   // ONB-2 (found live): a leftover guide from whatever was on screen before (a
   // tutorial the player exited without finishing/skipping, a stale reconnect) must
@@ -10790,7 +10907,8 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   // The match goal, written AFTER the wipe so it is the first line a player can read.
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
-  note(t('hud.goal', { n: SCORE_LIMIT }));
+  const waves = data.modes[modeId ?? '']?.pve?.waves;
+  note(waves ? t('hud.goal.pve', { n: waves }) : t('hud.goal', { n: SCORE_LIMIT }));
   defaultView(); // phone / flagship console: home; simple desktop: whole-map fit
   setupEl.style.display = 'none';
   // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
@@ -10803,11 +10921,10 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   // Start the queued tour after the prepared HUD is actually visible.
   snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
-function startMatch(setup: SetupConfig): void {
+function startMatch(setup: SetupConfig, persist = true): void {
   const st = newGame(setup);
   // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
-  // Она НЕ едет в `SetupConfig` и, значит, не попадает ни в состояние, ни в сохранение:
-  // это политика локального хоста, как и всё остальное в `soloDrivers`.
+  // Политика локального хоста хранится рядом с миром в одиночном сохранении.
   const profiles = new Map<string, AiProfile>();
   for (const seat of setup.seats) {
     if (!seat.ai) continue;
@@ -10823,24 +10940,46 @@ function startMatch(setup: SetupConfig): void {
     sandboxHomeId = setup.seats[0]?.start ?? null;
     setSandboxButton(sandboxConfig.enabled);
   }
+  soloSaveActive = persist && !NET && (__PLAYER_BUILD__ || !sandboxConfig.enabled);
+  saveSolo();
 }
 
-/** Start a PvE match: load the PvE map (2 players vs 1 strong AI) via
- *  buildStateFromMap, then install it like a regular match. The AI seat
- *  is determined from the map's player slots. */
-function startPvEMatch(): void {
-  const st = pveState(data);
-  // AI seats = all players except p1 (the human host). Карта PvE своей строки настройки
-  // не имеет, поэтому её боты остаются прежними, слабыми — выбор сложности живёт на
-  // экране настройки (AIDIFF-1).
-  const aiSeats = new Map<string, AiProfile>(
-    Object.keys(st.players)
-      .filter((id) => id !== 'p1')
-      .map((id) => [id, 'weak' as const]),
-  );
-  installMatch(st, aiSeats);
-  applyTimeSpeed(setupSpeed);
-  openSetup('hub'); // close setup screen — returns to hub
+/** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
+function startPvEMatch(dev = false): void {
+  const testing = !__PLAYER_BUILD__ && dev;
+  saveRun(); // preserve a paused normal attempt before replacing the in-memory world
+  pveDifficulty = nextSectorDifficulty;
+  sectorAttempt = testing ? 0 : sectorProgress.nextAttempt;
+  if (!testing) saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
+  runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
+  const st = prepareSectorZeroRun(pveState(data), sectorProgress, data);
+  // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
+  const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
+  // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
+  // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
+  // `pve` он не видел, потому что конфиг ехал без `modeId`.
+  installMatch(st, aiSeats, pveModeId());
+  sectorRunActive = true;
+  sectorDevActive = testing;
+  if (!__PLAYER_BUILD__ && testing) {
+    resetSandboxConfig();
+    sandboxConfig.enabled = true;
+    sandboxHomeId = Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null;
+    setSandboxButton(true);
+    setDevSpeedControl(true);
+  }
+  // Seed the PvE section through the kernel before the first save. A page can
+  // close before its first animation frame; that must not lose a fresh attempt.
+  apply(advance(s, s.time + 1));
+  boonLaterAtWave = -1;
+  // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
+  // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
+  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
+  showConnect(false);
+  showHub(false);
+  setupEl.style.display = 'none';
+  sciWin.classList.remove('show');
+  saveRun();
   note(t('setup.pve.started'));
 }
 
@@ -10894,8 +11033,8 @@ $('setup-home-id').addEventListener('change', (ev) => {
 setupSlotsEl.addEventListener('change', (ev) => {
   const input = ev.target as HTMLInputElement;
   if (input.id !== 'setup-bot-count') return;
-  const count = Math.max(0, Math.min(99, Math.floor(Number(input.value) || 0)));
-  setupSlots = Array.from({ length: 100 }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
+  const count = Math.max(0, Math.min(setupSeatCount() - 1, Math.floor(Number(input.value) || 0)));
+  setupSlots = Array.from({ length: setupSeatCount() }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
   renderSetup();
 });
 
@@ -10952,7 +11091,7 @@ setupSlotsEl.addEventListener('click', (ev) => {
     return;
   }
   if ((ev.target as Element).closest('[data-pvestart]')) {
-    startPvEMatch();
+    openSectorZero();
     return;
   }
   const ts = (ev.target as Element).closest('[data-teamseat]');
@@ -10989,6 +11128,13 @@ setupGoEl.addEventListener('click', () => {
       setupFaction || null,
       setupScientists,
     );
+    return;
+  }
+  const stored = soloStore.load();
+  const sandbox = !__PLAYER_BUILD__ && ($('setupsandbox') as HTMLInputElement).checked;
+  if (!sandbox && (!stored.ok || stored.raw !== null)) {
+    $('solo-replace').style.display = 'flex';
+    $('solo-replace-cancel').focus({ preventScroll: true });
     return;
   }
   startMatch(buildSetupConfig());
@@ -11208,6 +11354,9 @@ function netClientFor(seat: string): MultiplayerClient {
 }
 
 function connect(): void {
+  saveSolo();
+  soloSaveActive = false;
+  sectorRunActive = false;
   const srv = resolveServer();
   if (!srv) return;
   const { base, nick } = srv;
@@ -11401,6 +11550,7 @@ async function probeAuthMode(base: string): Promise<IdentityMode> {
 // an early tap can't race /auth/status into the guest branch; revealing the form
 // applies to first visits only (a remembered nick skipped the welcome card above).
 const authProbe: Promise<void> = (async () => {
+  if (document.body.dataset.entry === 'sector-zero' && !bootJoinId && !bootReset) return;
   const base = srvInput.value.trim();
   if (!base) return;
   await probeAuthMode(base);
@@ -12010,7 +12160,7 @@ function renderMatches(): void {
       modeLine = `${badge}${esc(tData(mode.modeId))} · `;
     }
     info.innerHTML =
-      `<div class="mname">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
+      `<div class="mname">${esc(mapLabel(m.mapId))} <span class="mid">${esc(m.matchId)}</span></div>` +
       `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
@@ -12077,7 +12227,7 @@ function renderMyMatches(serverHttp: string): void {
       // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
       // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
       // смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)}</div>` +
+      `<div class="hc-t">${esc(mapLabel(m.mapId))}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
@@ -12406,6 +12556,7 @@ function inMatch(): boolean {
   return (
     connectEl.style.display === 'none' &&
     hubEl.style.display === 'none' &&
+    !sectorZeroMenu.isOpen() &&
     setupEl.style.display === 'none'
   );
 }
@@ -12430,10 +12581,22 @@ const flexed = (id: string): boolean => document.getElementById(id)?.style.displ
 const BACK_LAYERS: BackLayer[] = [
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   // --- модалки поверх всего (z60…z57) ---
+  { id: 'solo-replace', isOpen: () => flexed('solo-replace'), close: closeSoloReplace }, // z60
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
+  // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
+  {
+    id: 'boonpick',
+    isOpen: () => shown('boonpick'),
+    close: () => {
+      boonLaterAtWave = s.pve?.waveNumber ?? -1;
+      hide('boonpick');
+    },
+  }, // z60
   { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
+  { id: 'swarm-dossier', isOpen: () => shown('swarm-dossier'), close: closeSwarmDossier }, // z60
   { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
+  { id: 'sector-zero', isOpen: () => sectorZeroMenu.canGoBack(), close: () => sectorZeroMenu.back() }, // z58
   // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false
   { id: 'testmode', isOpen: () => flexed('testmode'), close: () => hideFlex('testmode') }, // z59
   { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
@@ -12602,6 +12765,345 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+/**
+ * Окно усиления между волнами (PVR-1.4).
+ *
+ * Что предложить, решает `/decisions/waveBoons.ts`; кому и сколько должно — ядро
+ * (`state.pve.boons`), и оно же проверяет выбор. Здесь только показ: собрать карточки,
+ * открыть окно, когда долг появился, и закрыть, когда предлагать нечего.
+ *
+ * Окно НЕ блокирующее: «Позже» прячет его до следующей волны, а долг остаётся. Забег
+ * идёт в реальном времени, и модальное окно поверх подходящего штурма отняло бы у
+ * игрока ровно те секунды, ради которых он это усиление и берёт.
+ */
+function renderBoonPick(): void {
+  const pve = s.pve;
+  const cfg = data.modes[matchMode() ?? '']?.pve;
+  const offer = boonOffer({
+    owed: pve?.boons?.[ME] ?? 0,
+    pool: cfg?.boons ?? [],
+    completed: s.players[ME]?.technologies?.completed ?? [],
+  });
+  const deferred = offer.kind === 'offer' && boonLaterAtWave === (pve?.waveNumber ?? -1);
+  const show = inMatch() && offer.kind === 'offer' && !deferred;
+  boonWin.classList.toggle('show', show);
+  if (!show) return;
+  const cards = offer.choices
+    .map((id) => {
+      const td = data.technologies[id];
+      if (!td) return '';
+      return (
+        `<button class="sp-card" type="button" data-boon="${esc(id)}">` +
+        `<span class="sp-cn">${esc(tData(td.name))}</span>` +
+        `<span class="sp-ci">${techFx(td)}</span>` +
+        `</button>`
+      );
+    })
+    .join('');
+  const body = `<p class="bp-owed">${t('win.boon.owed', { n: offer.owed })}</p><div class="bp-list">${cards}</div>`;
+  if (body !== lastBoonBody) {
+    boonPickBody.innerHTML = body;
+    lastBoonBody = body;
+  }
+}
+
+// The normal skirmish slot is independent of Sector Zero and the tutorial.
+const soloStore = soloSaveStore();
+const soloRules = hashJson({ data, modules: soloKernel.manifest });
+let soloSaveActive = false;
+let soloSavedAtReal = 0;
+let soloSaveFailed = false;
+
+function currentSoloSave(): SoloSave {
+  return {
+    state: s, ai: [...AI_PLAYERS],
+    normalSpeed: Number($('spd-play').dataset.speed) / PLAY_BASE,
+    fastSpeed: Number($('spd-fast').dataset.speed) / PLAY_BASE,
+    autoAssault: [...autoAssault], patrols: [...patrols], memory: memory.dump(),
+  };
+}
+function saveSolo(explicit = false): void {
+  if (!soloSaveActive || NET || s.pve || (!__PLAYER_BUILD__ && sandboxConfig.enabled)) return;
+  let ok = false;
+  try {
+    ok = s.match.status === 'ended' ? soloStore.clear() : soloStore.save(serializeSoloSave(currentSoloSave(), soloRules));
+  } catch { /* Serialization/storage failure leaves the previous checkpoint intact. */ }
+  if (!ok && (!soloSaveFailed || explicit)) note(t('solo.save.failed'));
+  if (ok && explicit) note(t('solo.save.saved'));
+  soloSaveFailed = !ok;
+  if (s.match.status === 'ended' && ok) soloSaveActive = false;
+}
+function suspendSolo(): void {
+  if (!soloSaveActive || NET) return;
+  saveSolo();
+  speed = 0;
+}
+function tickSoloSave(now: number): void {
+  if (!soloSaveActive || !inMatch()) return;
+  if (s.match.status === 'ended') { saveSolo(); return; }
+  if (now - soloSavedAtReal < 15000) return;
+  soloSavedAtReal = now;
+  saveSolo();
+}
+function refreshSoloContinue(): void {
+  const stored = soloStore.load();
+  const valid = stored.ok && parseSoloSave(stored.raw, soloRules) !== null;
+  const button = $('hub-solo-continue') as HTMLButtonElement;
+  button.hidden = stored.ok && stored.raw === null;
+  button.disabled = !valid;
+  $('solo-save-status').textContent = !stored.ok || soloSaveFailed ? t('solo.save.failed') :
+    stored.raw && !valid ? t('solo.save.invalid') : t('solo.save.info');
+}
+function closeSoloReplace(): void {
+  $('solo-replace').style.display = 'none';
+  $('setupgo').focus({ preventScroll: true });
+}
+$('solo-replace-cancel').addEventListener('click', closeSoloReplace);
+$('solo-replace-confirm').addEventListener('click', () => {
+  closeSoloReplace();
+  startMatch(buildSetupConfig());
+});
+function restoreSolo(): void {
+  if (NET) return;
+  const stored = soloStore.load();
+  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  if (!save) { refreshSoloContinue(); return; }
+  // Verify the map before replacing the in-memory match; future maps need an
+  // explicit migration, not an accidental fallback to another board.
+  try { mapPreset(save.state.mapId); mapNodesFromState(save.state); }
+  catch { $('solo-save-status').textContent = t('solo.save.invalid'); return; }
+  soloSaveActive = false; // installMatch must not overwrite the checkpoint being read
+  userClosed = true;
+  netAdmitted = false;
+  cameFromLink = false;
+  installMatch(save.state, new Map(save.ai));
+  for (const id of save.autoAssault) autoAssault.add(id);
+  for (const [id, order] of save.patrols) patrols.set(id, order);
+  memory.restore(save.memory);
+  applyTimeSpeed(save.normalSpeed, save.fastSpeed);
+  speed = 0;
+  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === 0);
+  lastReal = performance.now(); // never catch up the wall time spent away
+  soloSaveActive = true;
+  soloSaveFailed = false;
+  sectorZeroMenu.hide();
+  showConnect(false);
+  showHub(false);
+  note(t('solo.save.restored'));
+}
+
+/**
+ * Сохранение забега (PVR-0.3).
+ *
+ * Бэкенд подставляется ЗДЕСЬ и только здесь: забег о нём не знает, он знает интерфейс
+ * `RunSaveStore`. В релизной сборке площадки сюда встанет облачное хранилище, и код
+ * ниже не изменится — в этом и была цена асинхронного интерфейса.
+ */
+const runSaveStore: RunSaveStore = localRunSaveStore();
+const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY);
+let sectorProgress = freshSectorZeroProgress(data);
+let sectorAttempt = 0;
+let sectorRunActive = false;
+let sectorDevActive = false;
+let runShipLoadouts: Record<string, string[]> = {};
+let savedRun: RunSave | null = null;
+let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
+let runWrite = Promise.resolve();
+let progressWrite = sectorProgressStore.load().then(raw => {
+  sectorProgress = parseSectorZeroProgress(raw, data);
+});
+let clearedAttempt = 0;
+
+function saveSectorProgress(next: SectorZeroProgress): void {
+  sectorProgress = next;
+  const blob = JSON.stringify(next);
+  progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
+}
+
+const sectorPreparation = initSectorZeroPreparation({
+  data,
+  progress: () => sectorProgress,
+  change: action => {
+    const next = changeSectorZeroProgress(sectorProgress, action, data);
+    if (!next) return false;
+    saveSectorProgress(next);
+    return true;
+  },
+});
+const sectorZeroMenu = initSectorZeroMenu({
+  root: $('sector-zero'),
+  standalone: document.body.dataset.entry === 'sector-zero',
+  preparation: sectorPreparation,
+  load: async () => {
+    await progressWrite;
+    await runWrite;
+    savedRun = parseRunSave(await runSaveStore.load());
+    // Persistence can be unavailable. A paused run still exists in this tab.
+    if (runInProgress() && !sectorDevActive) savedRun = currentRunSave();
+    if (savedRun && savedRun.mode === pveModeId() && (savedRun.state as GameState).match?.status === 'ended') {
+      const next = settleSectorZeroRun(sectorProgress, savedRun.sectorZeroAttempt ?? 0, savedRun.state as GameState);
+      if (next !== sectorProgress) saveSectorProgress(next);
+      await progressWrite;
+      await runSaveStore.clear();
+      savedRun = null;
+    }
+    return sectorZeroRunPreview(savedRun, pveModeId() ?? '');
+  },
+  difficulty: () => nextSectorDifficulty,
+  setDifficulty: value => {
+    nextSectorDifficulty = value;
+    writeRaw('void.pveDifficulty', value);
+  },
+  start: () => startPvEMatch(),
+  startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
+  resume: restoreRun,
+  settings: () => settings.open(),
+  back: () => {
+    openHub();
+    $('hub-sector-zero').focus({ preventScroll: true });
+  },
+});
+
+function openSectorZero(preparation = false): void {
+  saveSolo();
+  speed = 0;
+  userClosed = true;
+  if (NET && netSock) netSock.close();
+  NET = false;
+  netAdmitted = false;
+  cameFromLink = false; // explicit local entry after a network visit may resume its own run
+  activeTour?.stop();
+  stopFirstGoals();
+  hideMapLoading();
+  // Close the map's layers before the new screen takes over. Do not route the
+  // setup's Back button through the multiplayer hub on the way here.
+  sectorZeroMenu.hide();
+  setupEl.style.display = 'none';
+  for (const layer of BACK_LAYERS) if (layer.id !== 'setup' && layer.isOpen()) layer.close();
+  showConnect(false);
+  showHub(false);
+  endscreenEl.style.display = 'none';
+  detach('Sector Zero menu', sectorZeroMenu.open().then(() => {
+    if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open();
+  }));
+}
+/** Реальное время последней записи. Снимок пишется НЕ каждый кадр: он весит десятки
+ *  килобайт, а забегу хватает секундной точности. */
+let runSavedAtReal = 0;
+const RUN_SAVE_EVERY_MS = 4000;
+
+/** Идёт ли сейчас забег, который стоит хранить: PvE-матч, который ещё не кончился. */
+function runInProgress(): boolean {
+  return isSectorZeroRun() && s.match.status !== 'ended';
+}
+function isSectorZeroRun(): boolean {
+  return sectorRunActive && !NET && s.pve !== undefined;
+}
+
+/** Записать снимок (или забыть его, если забег кончился). Провал записи молчалив —
+ *  бэкенд обещает не ронять игру, а не обещает сохранить. */
+function currentRunSave(): RunSave<GameState> | null {
+  if (!isSectorZeroRun() || sectorDevActive) return null;
+  const mode = matchMode();
+  if (!mode) return null;
+  return { v: RUN_SAVE_VERSION, mode, difficulty: pveDifficulty, state: s,
+    sectorZeroAttempt: sectorAttempt, shipLoadouts: runShipLoadouts };
+}
+function saveRun(): void {
+  const save = currentRunSave();
+  if (!save || (s.match.status === 'ended' && clearedAttempt === sectorAttempt)) return;
+  const blob = serializeRunSave(save);
+  runWrite = runWrite.then(() => runSaveStore.save(blob));
+}
+
+function awardSectorRun(): number {
+  if (sectorDevActive) return 0;
+  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s);
+  if (next !== sectorProgress) {
+    // Journal the terminal run before its award. If the page closes between the
+    // two writes, opening the menu settles the same serial exactly once.
+    saveRun();
+    const terminalWrite = runWrite;
+    progressWrite = progressWrite.then(() => terminalWrite);
+    saveSectorProgress(next);
+  }
+  return sectorProgress.lastReward;
+}
+
+/** Кадровый такт сохранения: раз в несколько секунд, пока забег идёт. Кончился —
+ *  снимок забывается, иначе следующий запуск воскресил бы доигранный мир. */
+function tickRunSave(nowReal: number): void {
+  if (sectorDevActive) return;
+  if (isSectorZeroRun() && s.match.status === 'ended') {
+    if (sectorAttempt > 0 && clearedAttempt !== sectorAttempt) {
+      awardSectorRun();
+      clearedAttempt = sectorAttempt;
+      const awardWrite = progressWrite;
+      runWrite = runWrite.then(() => awardWrite).then(() => runSaveStore.clear());
+    }
+    return;
+  }
+  if (!inMatch() || !runInProgress() || nowReal - runSavedAtReal < RUN_SAVE_EVERY_MS) return;
+  runSavedAtReal = nowReal;
+  saveRun();
+}
+
+/**
+ * Поднять забег только по кнопке «Продолжить». Чтение карточки сохранения не
+ * устанавливает мир и не запускает часы за главным меню.
+ */
+function restoreRun(): boolean {
+  // Пришедшего ПО ССЫЛКЕ забег не перехватывает: он уже дозванивается в сетевой матч,
+  // и поднять поверх этого локальный мир значило бы увести его не туда. Снимок при
+  // этом не трогаем — он дождётся обычного запуска.
+  if (cameFromLink || NET) return false;
+  const save = savedRun;
+  if (!save || !sectorZeroRunPreview(save, pveModeId() ?? '')) return false;
+  const state = save.state as GameState;
+  // Режим из снимка может не существовать в задеплоенных данных (игру обновили) —
+  // тогда восстанавливать нельзя: волны пошли бы по другим правилам, а то и не пошли.
+  if (!data.modes[save.mode]) {
+    return false;
+  }
+  const priorState = s;
+  const priorMode = matchMode();
+  const priorRunActive = sectorRunActive;
+  const priorDevActive = sectorDevActive;
+  try {
+    const aiSeats = runAiSeats(state, 'p1', parseRunDifficulty(save.difficulty));
+    installMatch(state, aiSeats, save.mode);
+  } catch {
+    // Снимок прошёл разбор, но миром не стал (чужая форма состояния, битая карта).
+    // Оставляем файл на месте; меню сообщает об отказе и предлагает новый запуск.
+    s = priorState;
+    setMatchMode(priorMode);
+    sectorRunActive = priorRunActive;
+    sectorDevActive = priorDevActive;
+    speed = 0;
+    return false;
+  }
+  pveDifficulty = parseRunDifficulty(save.difficulty);
+  sectorRunActive = true;
+  boonLaterAtWave = -1;
+  sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
+  if (sectorProgress.nextAttempt <= sectorAttempt) {
+    saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
+  }
+  runShipLoadouts = save.shipLoadouts ?? {};
+  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST); // тот же темп, что у запуска
+  // Экраны, через которые игрок обычно ИДЁТ к матчу, закрываются сами — по дороге.
+  // Восстановление в эту дорогу не входит, поэтому закрывает их явно: без этого забег
+  // оживает ПОД экраном приветствия, и игрок видит форму входа с окном усиления
+  // поверх неё (поймано снимком живой сборки, не тестом).
+  showConnect(false);
+  showHub(false);
+  setupEl.style.display = 'none';
+  saveRun();
+  note(t('setup.pve.restored'));
+  return true;
+}
+
 function frame(nowReal: number) {
   flushPinch();
   const wasHolographic = holographic.active();
@@ -12686,8 +13188,27 @@ function frame(nowReal: number) {
   // (Суверены ◆) pushed to the right end — one level down from the resource row.
   // Day + countdown live in the #daycard, victory progress in the #tbscore chip
   // (row 1 of the bar, below). (World/fleet counts stay on the player card.)
+  // PVR-1.2: строка волн стоит рядом с часами, потому что это то же самое измерение —
+  // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
+  // «нечего», и полоса выглядит ровно как до этого кирпича.
+  tickRunSave(nowReal);
+  tickSoloSave(nowReal);
+  renderBoonPick();
+  renderSwarmDossier();
+  pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
+  const wave = waveReadout(s.pve, s.time);
+  const waveHtml =
+    wave.kind === 'none'
+      ? ''
+      : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'cleared' ? wave.total : wave.wave, m: wave.total })}` +
+        ` · ${wave.kind === 'cleared' ? t('hud.wave.done') : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>`;
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
+    waveHtml +
+    (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
+    (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
+    (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
+    (s.pve ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
@@ -13654,30 +14175,11 @@ function drawGoFlash(now: number): void {
   cx.restore();
 }
 const CAPTURE_FLASH_MS = 1500;
-/** A province that changed hands lights up in its NEW owner's colour: a bright wave
- *  sweeps across the flipped cell from its centre and the frontier ignites, fading
- *  over ~1.5s. The cell polygon is recomputed each frame with the SAME weighted-
- *  Voronoi math the political map bakes (computePowerCell), so the wave lines up
- *  pixel-for-pixel with the fill and tracks pan/zoom. Only runs while a flash is live
- *  (captures are rare), so the O(n) recompute costs nothing on a quiet frame. */
+/** Capture waves use the exact projected polygons just painted by blitStaticLayer.
+ * No per-flash weight clamp or n² geometry pass, including while the camera moves. */
 function drawCaptureFlashes(now: number): void {
   if (captureFlashes.size === 0) return;
-  // ТЕ ЖЕ семена и рамка, что у политической заливки — `provinceMap.ts` (REFM-61,
-  // правило 6): волна обрезается по клетке, и разъедься копия формул хоть на пиксель,
-  // волна потекла бы за границу провинции или не дошла бы до неё. Здесь своя копия и
-  // стояла: `9000 * scale²` и `max(40, ширина × 0.05)` литералами прямо в кадре.
-  // Проекция — этим кадром, чтобы волна ехала вместе с камерой.
-  const idxByNode = new Map<string, number>();
-  let seedIdx = 0;
-  const seeds: TerritorySeed[] = provinceSeeds(MAP, cam.scale, (n) => {
-    const p = s.planets[n.id];
-    if (!p) return null;
-    idxByNode.set(n.id, seedIdx++);
-    return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
-  });
-  const frameB = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
-  const clip = clipPolygon(world(frameB.topLeft), world(frameB.bottomRight));
-  const trace = (poly: Array<[number, number]>): void => {
+  const trace = (poly: readonly (readonly [number, number])[]): void => {
     cx.beginPath();
     cx.moveTo(poly[0]![0], poly[0]![1]);
     for (let i = 1; i < poly.length; i++) cx.lineTo(poly[i]![0], poly[i]![1]);
@@ -13688,11 +14190,11 @@ function drawCaptureFlashes(now: number): void {
       captureFlashes.delete(node);
       continue;
     }
-    const idx = idxByNode.get(node);
-    if (idx === undefined) continue; // province gone (shouldn't happen mid-flash)
-    const cell = computePowerCell(seeds, clip, idx);
-    if (!cell) continue;
-    const c = { x: seeds[idx]!.x, y: seeds[idx]!.y }; // seeds are already screen-space
+    const poly = provincePolygons.get(node);
+    const planet = s.planets[node];
+    if (!poly || !planet) continue;
+    const cell = { poly };
+    const c = world(planet.position);
     // Кламп прогресса и затухание — `flashFx.ts`: метка кадра rAF может опередить
     // постановку вспышки, а отрицательный радиус роняет cx.arc().
     const k = flashProgress(now, flash.at, CAPTURE_FLASH_MS); // 0 → 1
@@ -13825,6 +14327,24 @@ if (diploEl) {
 }
 
 requestAnimationFrame(frameLoop);
+
+// --- сохранение забега (PVR-0.3) --------------------------------------------
+// Страницу закрывают чаще, чем проходит такт записи, поэтому снимок берётся ещё и на
+// уходе. `pagehide` вместо `beforeunload`: второй ненадёжен на мобильных, где вкладку
+// не «закрывают», а вытесняют из памяти.
+addEventListener('pagehide', saveRun);
+addEventListener('pagehide', suspendSolo);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') suspendSolo();
+});
+addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveRun();
+});
+// Only the explicit standalone page opens Sector Zero at boot. The shared entry
+// must keep its login screen even when a run exists (or its stored data is invalid).
+// The hub button loads that save on demand, without losing or resuming it here.
+if (!bootJoinId && !bootReset && document.body.dataset.entry === 'sector-zero')
+  openSectorZero();
 
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —

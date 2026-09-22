@@ -6,15 +6,19 @@ name: Play in browser (GitHub Pages)
 # доках стояло `/Nygame/` — такого репозитория нет, ссылка вела бы в 404 даже после
 # включения Pages. Кастомного домена (CNAME) в репозитории нет.)
 #
-# ⚠ ONE-TIME MANUAL STEP (the reason every run failed until now — 0 green out of 119):
-# GitHub Pages must be enabled in the repo settings FIRST — Settings → Pages →
-# "Build and deployment" → Source: "GitHub Actions". Until then the
-# `environment: github-pages` gate refuses the job BEFORE its first step (failure
-# signature: the run fails in ~3s, the job shows NO steps, logs 404) — so
-# configure-pages `enablement: true` never gets a chance to run and cannot self-enable
-# out of this state. After that single toggle, every push to main deploys and the Pages
-# link is always the latest build (the browser "auto-update": nothing to update — the
-# link IS the current version).
+# ⚠ MANUAL STEP, AND IT CAN COME BACK: GitHub Pages must be enabled in the repo
+# settings — Settings → Pages → "Build and deployment" → Source: "GitHub Actions".
+# Without it there is nothing to publish into and the game link 404s. It bit us twice:
+# first as "0 green out of 119" before Pages was ever switched on, then again on
+# 2026-09-14, when the site went away by itself and ten pushes in a row failed.
+# `configure-pages` `enablement: true` cannot dig us out — creating a Pages site needs
+# rights the workflow token lacks. The two failure signatures differ, which is why the
+# second one confused us: with no `github-pages` environment the run dies in ~3s showing
+# NO steps, while a live environment without a site gets all the way to configure-pages
+# and fails there with "Resource not accessible by integration". The "Pages site must
+# exist" step below now names the remedy in both cases instead of leaking that wording.
+# While Pages IS on, every push to main deploys and the link is always the latest build
+# (the browser "auto-update": nothing to update — the link IS the current version).
 # This workflow deploys on every push to main. Actions are SHA-pinned (SD-6.1 / F-16).
 
 on:
@@ -50,7 +54,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -66,6 +70,39 @@ jobs:
         run: |
           mkdir -p _site
           cp prototype/dist/void-dominion.html _site/index.html
+
+      # Pages must EXIST before this job can publish, and `configure-pages` below cannot
+      # always create it: `enablement: true` needs rights the workflow token does not
+      # have, so a missing site fails with "Resource not accessible by integration" —
+      # which reads like a broken workflow and sends the next person to debug the build.
+      # It cost time twice; the second time was ten red runs in a row (2026-09-14) after
+      # the site went away on its own. So ask GitHub first and, if the site is gone, say
+      # the remedy out loud instead of leaking the API's wording.
+      #
+      # This step never turns a would-be-green run red: only the two answers that would
+      # fail the job anyway (404 = no site, 403 = forbidden) stop it. Anything else —
+      # including the 502 that GitHub's own Pages outage returned on 2026-09-13 — is a
+      # warning, and the real actions below decide the run's fate.
+      - name: Pages site must exist (and name the fix if it does not)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/pages" || echo 000)
+          case "$code" in
+            200)
+              echo "Pages-сайт у репозитория есть — публикуем." ;;
+            404)
+              echo "::error title=GitHub Pages выключен::У репозитория НЕТ Pages-сайта, поэтому публиковать некуда и ссылка на игру отдаёт 404. Чинится НЕ кодом: Settings → Pages → Build and deployment → Source: «GitHub Actions». Воркфлоу сам включить его не может — токену Actions не хватает прав на создание сайта. Если в настройках источник уже стоит верно, смотри ограничения организации: Organization settings → Member privileges → Pages."
+              exit 1 ;;
+            403)
+              echo "::error title=Pages запрещён политикой::GitHub ответил 403 на запрос Pages-сайта — это не наш код, а запрет уровня организации или репозитория. Смотри Organization settings → Member privileges → Pages, затем Settings → Pages."
+              exit 1 ;;
+            *)
+              echo "::warning title=Состояние Pages неизвестно::GitHub ответил HTTP $code на запрос Pages-сайта — проверить состояние не удалось (так выглядел сбой самого GitHub 2026-09-13). Идём дальше: судьбу прогона решат шаги публикации ниже." ;;
+          esac
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         with:

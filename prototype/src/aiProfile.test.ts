@@ -95,9 +95,23 @@ describe('профиль бота — сложность соперника', ()
       );
     }
     // Соло-драйвер сам профиль не выбирает — он передаёт тот, что назначен КРЕСЛУ.
-    expect(read('prototype/src/soloDrivers.ts')).toContain(
-      "aiOrders(host.state(), ai, 'expand', profile)",
+    // Сверяем аргументы вызова, а не его форматирование: перенос строки в этом вызове
+    // однажды уже уронил тест, ничего не изменив по существу.
+    expect(read('prototype/src/soloDrivers.ts')).toMatch(
+      /aiOrders\(\s*host\.state\(\),\s*seat,\s*posture[^,]*,\s*profile \?\? 'weak'/,
     );
+  });
+
+  it('ЗАБЕГ берёт сложность из выбора игрока, а не из литерала (PVR-2.1)', () => {
+    // У забега нет строки места — место в нём ровно одно (Рой) и выключить его нельзя,
+    // — поэтому сложность пришла своей кнопкой рядом с запуском. Сторож по исходнику:
+    // вернётся зашитый литерал, и кнопка станет декорацией, которая ничего не меняет.
+    const src = read('prototype/src/main.ts');
+    const from = src.indexOf('function startPvEMatch');
+    expect(from, 'startPvEMatch не найден — сторож ослеп').toBeGreaterThan(-1);
+    const body = src.slice(from, src.indexOf('\n}', from));
+    expect(body).toContain('pveDifficulty');
+    expect(body, 'сложность забега не должна быть литералом').not.toContain("'weak'");
   });
 
   it('профиль НЕ живёт в состоянии, протоколе и сохранении — по проводу не подделать', () => {

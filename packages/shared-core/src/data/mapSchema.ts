@@ -45,6 +45,15 @@ export const MapSectorSchema = z.object({
   owner: z.string().nullable().default(null),
   buildings: z.array(MapBuildingSchema).default([]),
   garrison: z.array(MapUnitStackSchema).default([]),
+  /** Which pairs of neighbours connect THROUGH this sector (MAP-TRANSIT). Absent =
+   *  the sector is a full interchange: arriving by any lane you may leave by any other,
+   *  which is how every sector behaved before and how most still do. Present = these
+   *  pairs are the ONLY through-connections, so two lanes can cross the same province
+   *  without meeting — a fleet running one of them cannot switch to the other in
+   *  passing. Order within a pair is irrelevant (lanes are two-way). Validated in
+   *  `validateMatchMap`: both ends must be real neighbours, no self-pair, no duplicate,
+   *  and the map must stay reachable with the constraint applied. */
+  transit: z.array(z.tuple([z.string(), z.string()])).optional(),
 });
 
 const MapPlayerSchema = z.object({
@@ -54,6 +63,9 @@ const MapPlayerSchema = z.object({
   /** AI-driven seat (bot). Rules may key off it (e.g. bots are not invitable to
    *  an alliance). Default: human. */
   ai: z.boolean().default(false),
+  /** Map inhabitant, excluded from player seats and victory. Independent of `ai`:
+   *  an NPC without a field controller holds its starting position and fights normally. */
+  npc: z.enum(['pirate', 'neutral']).optional(),
 });
 
 /** A player id. `|` is barred: it is the diplomacy pair-key separator — an id
@@ -101,11 +113,26 @@ export const MatchMapSchema = z.object({
   avaEligible: z.boolean().default(false),
   /** World time the scenario starts at (default 0). */
   time: z.number().default(0),
+  /** The mode this map DEFAULTS to being played under — an id from `data.modes`,
+   *  resolved by {@link resolveMatchConfig}. It is the map's suggestion, not a lock:
+   *  the host may arm a different mode, and a map without one is played under whatever
+   *  the host picks (the pre-existing behaviour). Exists so that "which rules does this
+   *  map want" is DATA rather than a branch at every call site — a PvE map and the
+   *  `pve_waves` mode used to both exist and never be introduced to each other. */
+  mode: z.string().optional(),
   sectors: z.record(z.string(), MapSectorSchema),
   /** Undirected adjacency: each pair is a two-way path. Order within a pair is
    *  irrelevant; symmetry, no self-loops and the neighbour-only rule are enforced
-   *  in `validateMatchMap`. */
-  paths: z.array(z.tuple([z.string(), z.string()])).default([]),
+   *  in `validateMatchMap`.
+   *
+   *  **OMIT IT to derive adjacency from the mosaic** (M4.3, the model §0 asks for):
+   *  neighbours are then whoever shares a border in the power diagram over the sector
+   *  centres, minus what terrain seals (`maxLinks`). That is the only way the drawn
+   *  border and the travelable lane cannot disagree — an authored list next to a drawn
+   *  mosaic is two graphs, and on every shipped map they diverged. Authored paths stay
+   *  supported (fixtures, the legacy prototype graphs) and keep the neighbour-only rule.
+   *  An explicit `[]` means a map with no lanes at all, which is NOT the same thing. */
+  paths: z.array(z.tuple([z.string(), z.string()])).optional(),
   players: z.record(playerIdSchema, MapPlayerSchema).default({}),
   /** Team-aware start slots (`corporation-wars.md`): start positions decoupled from
    *  concrete players. A sector/fleet `owner` may name a slot id; `buildStateFromMap`

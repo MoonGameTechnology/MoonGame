@@ -174,13 +174,8 @@ describe('настройки — разметка', () => {
     expect(settingsBoxHtml(viewOf())).not.toContain('set-compact');
   });
 
-  it('оформление доступно на ПК и планшете даже из простого режима, но скрыто на телефоне', () => {
-    expect(settingsBoxHtml(viewOf({ holographySupported: true, holography: false }))).toContain(
-      'id="set-holography" type="checkbox"',
-    );
-    expect(settingsBoxHtml(viewOf({ holographySupported: false, holography: true }))).not.toContain(
-      'id="set-holography"',
-    );
+  it('устаревший интерфейс нельзя вернуть через настройки', () => {
+    expect(settingsBoxHtml(viewOf())).not.toContain('set-holography');
   });
 
   it('совместимость отрисовки предлагается только при поддержке', () => {
@@ -267,22 +262,13 @@ describe('настройки — окно и обработчики', () => {
     expect(w.calls.map(([k]) => k)).toEqual(['ownpings', 'glow', 'starfield', 'fps']);
   });
 
-  it('настройки независимо переключают оформление и движение', () => {
-    const changes: boolean[] = [];
-    const w = wired(
-      { setHolography: (v) => changes.push(v) },
-      viewOf({ holographySupported: true }),
-    );
+  it('движение можно отключить без переключения на старый интерфейс', () => {
+    const w = wired();
     w.api.open();
-    w.win.node('set-holography')!.checked = false;
-    w.win.fire('set-holography');
+    expect(w.win.node('set-holography')).toBeUndefined();
     w.win.node('set-motion')!.checked = false;
     w.win.fire('set-motion');
-    expect(changes).toEqual([false]);
     expect(w.calls).toEqual([['motion', false]]);
-    w.win.node('set-holography')!.checked = true;
-    w.win.fire('set-holography');
-    expect(changes).toEqual([false, true]);
   });
 
   it('совместимость обновляет сохранённое значение и ожидание без сброса остальных полей', () => {
