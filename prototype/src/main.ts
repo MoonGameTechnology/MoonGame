@@ -3629,6 +3629,29 @@ function handleEvents(events: DomainEvent[]) {
         if (destroyHeard())
           note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
+      // Тёмное событие (`data/events.json`). Гейт СВОЙ, а не общий `admits()`: тот читает
+      // `p.owner`, а здесь адресат приезжает как `playerId` — чужая аномалия прошла бы
+      // мимо проверки и утекла бы ко мне в журнал вместе с чужой экономикой.
+      // Подстановки берутся из `params` правила: карта `resources` даёт по ключу на
+      // ресурс (`{metal}`), одиночная пара — `{n}`. Знак несёт сама строка локали, поэтому
+      // в подстановку едет модуль: «сожгла 60 энергии», а не «сожгла −60».
+      case 'effect.applied': {
+        if (p.playerId !== ME) break;
+        const params = data.events[p.ruleId as string]?.params ?? {};
+        const bundle = params['resources'];
+        const amount = params['amount'];
+        const vars =
+          typeof bundle === 'object' && bundle !== null && !Array.isArray(bundle)
+            ? Object.fromEntries(
+                Object.entries(bundle).map(([res, v]) => [res, Math.abs(Number(v) || 0)]),
+              )
+            : { n: Math.abs(Number(amount) || 0) };
+        note(
+          t(`event.${(p.ruleId as string).replace(/_/g, '-')}`, vars),
+          p.planetId as string | undefined,
+        );
+        break;
+      }
       case 'unit.died': {
         // Счёт и ведомость наполняются по РАЗНЫМ условиям — `warTally.ts` (REFM-180):
         // счёт это личная статистика (только мои бои), ведомость питает строку ленты,

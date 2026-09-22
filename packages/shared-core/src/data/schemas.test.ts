@@ -459,7 +459,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // scout_drone declares no traits in JSON → schema default [].
     expect(data.units.scout_drone?.traits).toEqual([]);
     // a custom `chance` is preserved, not defaulted to 1.
-    expect(data.events.void_anomaly?.chance).toBeCloseTo(0.5);
+    expect(data.events.void_anomaly?.chance).toBeCloseTo(0.15);
   });
 
   it('allows extra numeric unit stats (data-driven, open stat set)', () => {

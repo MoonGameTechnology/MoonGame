@@ -1468,6 +1468,15 @@ export const en: Record<string, string> = {
   'err.wrong-orbit': 'invalid orbit',
   'err.wrong-sector': 'invalid sector type',
 
+  // --- event — тёмные события (`data/events.json`). Ключ строится из id правила:
+  // `salvage_wrecks` → `event.salvage-wrecks`.
+  'event.derelict-cache': '📦 Derelict cache stripped: +{n} metal',
+  'event.grain-blight': '🌾 Blight in the farms: −{n} food',
+  'event.infect-planet': '☣️ World infected — spores spread across the captured colony',
+  'event.salvage-wrecks': '🔩 Wrecks salvaged: +{metal} metal, +{microelectronics} chips',
+  'event.solar-flare': '☀️ A stellar flare burned {n} energy',
+  'event.void-anomaly': '🌀 A Void anomaly feeds the reactors: +{n} energy',
+
   // --- hero — Герои: грейды, способности (имя + описание).
   "hero.person.commander.name": "Mark Weir",
   "hero.person.commander.bio": "A veteran of deep-space campaigns. When surrounded, he led scattered ships through a sequence of feints and brought their crews home. A neural interface helps him hold the wider battle in view, but he never delegates decisions about lives to automation. Reserved and demanding, he always keeps a reserve for withdrawal.",
