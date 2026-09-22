@@ -4,7 +4,7 @@ import { buildingLevel, type ResourceBag } from '../data/schemas';
 import type { Planet, UnitStack } from '../state/gameState';
 import { effectiveStats } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
-import { isStationable } from '../state/sectorKind';
+import { isCapturable, isStationable } from '../state/sectorKind';
 
 /**
  * КОСМИЧЕСКАЯ КРЕПОСТЬ (`fortress-roadmap.md` §0.6, решение владельца 2026-09-15).
@@ -282,11 +282,21 @@ export const stationModule: GameModule = {
       if (planetId === null) return;
       const planet = h.state.planets[planetId];
       if (!planet || !planet.buildings.some((b) => b.type === CORE_BUILDING)) return;
-      const lost = planet.buildings.map((b) => b.type);
-      planet.buildings = [];
+      const owner = planet.owner;
       planet.kind = planet.priorKind ?? DEFAULT_PRIOR_KIND;
       delete planet.priorKind;
-      h.emit('station.destroyed', { planetId, owner: planet.owner, buildings: lost });
+      // УЗЕЛ, КОТОРЫЙ НЕЛЬЗЯ ЗАХВАТИТЬ, НЕЛЬЗЯ И ДЕРЖАТЬ. Вернувшийся вид бывает
+      // незахватываемым — пустое пространство прежде всего, — и оставить у него хозяина
+      // значило бы завести неуязвимое владение: `captureOnArrival` такой узел не
+      // отдаёт никогда, а счёт победы считает любой принадлежащий узел, так что игрока
+      // с одним таким «владением» нельзя было бы устранить до конца матча.
+      // Правило по СВОЙСТВУ вида, а не по имени `empty`: новый незахватываемый вид
+      // получит его сам.
+      if (!isCapturable(h.ctx.data, planet)) planet.owner = null;
+      // Постройки сносит модуль стройки по этому событию — они его дом, и там же живут
+      // выданный фортом гарнизон, очередь и оплаченные стройки. Снести их отсюда руками
+      // значило бы оставить всё перечисленное сиротами (модули говорят только через шину).
+      h.emit('station.destroyed', { planetId, owner });
     });
 
     // Захват крепости отдаёт орудия новому владельцу — вместе со зданиями, которые и так

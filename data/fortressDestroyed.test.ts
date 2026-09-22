@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import {
   captureOnArrivalModule,
   combatModule,
+  constructionModule,
   createInitialState,
   createKernel,
   orbitalModule,
@@ -31,7 +32,16 @@ import { shippedGameData } from './bundle';
 
 const data = shippedGameData();
 const ctx = (now = 0): Context => ({ now, data });
-const kernel = createKernel([orbitalModule, combatModule, stationModule, captureOnArrivalModule]);
+// Снос построек живёт в модуле СТРОЙКИ: станция только объявляет гибель. Без него
+// крепость гибнет наполовину, и это не изъян теста, а настоящая зависимость — крепость
+// вся состоит из зданий, и без их модуля она не строится и не качается.
+const kernel = createKernel([
+  orbitalModule,
+  combatModule,
+  stationModule,
+  constructionModule,
+  captureOnArrivalModule,
+]);
 const GUNS_FLEET = 'fleet:station:A';
 const CORE = 'starfort';
 const HOUR = 3_600_000;
@@ -49,7 +59,12 @@ const arrival = (at: number, fleetId = 'R'): ScheduledEvent => ({
 
 /** Крепость уровня `level`, на которую сейчас прилетит превосходящий флот.
  *  `priorKind` — память конверсии: чем узел был до того, как стал крепостью. */
-function underFire(level: number, extraBuildings: string[] = [], priorKind = 'asteroid'): GameState {
+function underFire(
+  level: number,
+  extraBuildings: string[] = [],
+  priorKind = 'asteroid',
+  extra: { garrison?: GameState['planets'][string]['garrison']; scheduled?: ScheduledEvent[] } = {},
+): GameState {
   const s = createInitialState({ seed: 'fd', version: { data: data.version, manifest: '1' } });
   return {
     ...s,
@@ -60,7 +75,7 @@ function underFire(level: number, extraBuildings: string[] = [], priorKind = 'as
     planets: {
       A: {
         id: 'A', owner: 'p1', kind: 'void_station', priorKind, position: { x: 0, y: 0 }, links: [],
-        resources: {}, garrison: [], traits: [],
+        resources: {}, garrison: extra.garrison ?? [], traits: [],
         buildings: [
           { type: CORE, level, hp: 300 },
           ...extraBuildings.map((type) => ({ type, level: 1, hp: 40 })),
@@ -74,8 +89,8 @@ function underFire(level: number, extraBuildings: string[] = [], priorKind = 'as
       },
       R: raider(),
     },
-    scheduled: [arrival(1)],
-    scheduleSeq: 1,
+    scheduled: [arrival(1), ...(extra.scheduled ?? [])],
+    scheduleSeq: 1 + (extra.scheduled?.length ?? 0),
   } as unknown as GameState;
 }
 
@@ -101,16 +116,25 @@ describe('гибель крепости — решение владельца 22
     expect(after.planets.A?.priorKind, 'память конверсии пережила саму конверсию').toBeUndefined();
   });
 
-  it('БЕЗ памяти о прежнем виде узел становится пустым пространством, а не крепостью', () => {
+  it('БЕЗ памяти о прежнем виде узел становится пустым пространством И теряет хозяина', () => {
     // Так бывает у крепости, посеянной картой сразу как `void_station`: конверсии не
     // было, запоминать было нечего. Оставить `void_station` значило бы оставить на карте
     // бестелесную крепость, которую можно достроить заново бесплатно.
+    //
+    // ХОЗЯИНА ТУТ ОБЯЗАНО СНЯТЬ, и это не косметика: пустое пространство объявлено
+    // НЕЗАХВАТЫВАЕМЫМ, так что узел с владельцем стал бы неуязвимым владением — прилётом
+    // его не отдать никогда, а счёт победы считает любой принадлежащий узел, и игрока с
+    // одним таким «владением» нельзя было бы устранить до конца матча.
     const seeded = underFire(2);
     delete (seeded.planets.A as { priorKind?: string }).priorKind;
-    expect(fought(seeded).planets.A?.kind).toBe('empty');
+    const after = fought(seeded);
+    expect(after.planets.A?.kind).toBe('empty');
+    expect(after.planets.A?.owner, 'неуязвимое владение на незахватываемом узле').toBeNull();
   });
 
-  it('ВЛАДЕЛЕЦ узла не меняется гибелью — узел стал своим захватом, а не крепостью', () => {
+  it('ВЛАДЕЛЕЦ узла не меняется гибелью, когда вид ЗАХВАТЫВАЕМЫЙ', () => {
+    // Контроль к тесту выше: правило снимает хозяина по СВОЙСТВУ вида, а не всегда.
+    // Астероид захватываемый — значит узел остаётся своим и берётся обычным прилётом.
     const after = fought(underFire(3));
     expect(after.planets.A?.owner).toBe('p1');
     // Но защищать его больше нечем: обычный прилёт теперь узел ЗАБИРАЕТ.
@@ -141,6 +165,33 @@ describe('гибель крепости — решение владельца 22
     expect(r.state.planets.A?.kind).toBe('void_station');
     expect(r.state.planets.A?.priorKind, 'новая конверсия обязана запомнить вид заново').toBe('nebula');
     expect(r.state.players.p1?.resources.metal, 'крепость досталась даром').toBeLessThan(9000);
+  });
+
+  it('ВЫДАННЫЙ ФОРТОМ ГАРНИЗОН уходит вместе с фортом — иначе «голого места» не выйдет', () => {
+    // Гарнизон форта — настоящие юниты на узле, и живут они ровно столько, сколько их
+    // здание. Переживи они гибель крепости — `captureOnArrival` увидел бы чужой отряд и
+    // отказал в обычном захвате, то есть обещанное решением 22 голое место не досталось
+    // бы никому.
+    const after = fought(
+      underFire(3, ['fort'], 'asteroid', { garrison: [{ unit: 'garrison', count: 2 }] }),
+    );
+    expect(after.planets.A?.garrison, 'гарнизон пережил породивший его форт').toEqual([]);
+  });
+
+  it('ОПЛАЧЕННАЯ СТРОЙКА не достраивается на пепелище', () => {
+    // Худший из случаев: завершение уже лежит в таймлайне, владельца гибель намеренно не
+    // меняет, а `landCompletion` вернувшийся вид узла не перепроверяет. Без отмены радар
+    // вырос бы на астероиде уже ПОСЛЕ того, как крепость перестала существовать.
+    const pending: ScheduledEvent = {
+      id: 'e:build', at: 150 * HOUR, seq: 7, type: 'construction.complete',
+      payload: { planetId: 'A', playerId: 'p1', kind: 'building', building: 'radar', seq: 7 },
+    };
+    const after = fought(underFire(3, [], 'asteroid', { scheduled: [pending] }));
+    expect(after.planets.A?.buildings, 'здание выросло после гибели крепости').toEqual([]);
+    expect(
+      after.scheduled.some((e) => e.type === 'construction.complete'),
+      'оплаченное завершение осталось в таймлайне',
+    ).toBe(false);
   });
 
   it('контроль: гибель ЧУЖОГО флота на том же узле крепость не трогает', () => {
