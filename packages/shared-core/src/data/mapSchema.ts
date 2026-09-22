@@ -102,6 +102,27 @@ export const MapSlotSchema = z.object({
   resources: ResourceBagSchema.default({}),
 });
 
+/**
+ * ДОПОЛНИТЕЛЬНАЯ ЗАДАЧА КАРТЫ — «миссия», которую игрок может выполнить по дороге
+ * (решение владельца 2026-09-22). Объявляется здесь, а ПРОВЕРЯЕТСЯ чистым предикатом в
+ * `decisions/missionObjectives.ts`: всё, что владелец назвал задачей, читается из
+ * состояния матча напрямую, поэтому ни секции состояния, ни модуля ядра под это не
+ * заводится. Тип объявлен ОДИН раз и здесь, потому что это форма ДАННЫХ карты; логика
+ * живёт в `/decisions`, которые импортируют его отсюда.
+ */
+export const MapObjectiveSchema = z.object({
+  /** Ключ локализации заголовка: в коде и в данных живёт КЛЮЧ, не текст. */
+  id: z.string(),
+  kind: z.enum(['control', 'raze', 'scout']),
+  /** `control` — id провинций; `raze` — виды построек; `scout` не читает. */
+  targets: z.array(z.string()).default([]),
+  /** `scout` — сколько провинций опознать. */
+  count: z.number().int().positive().optional(),
+  /** Надбавка к награде за забег; складывается с выплатой за волны, а не заменяет её. */
+  reward: z.number().nonnegative().default(0),
+});
+export type MapObjective = z.infer<typeof MapObjectiveSchema>;
+
 export const MatchMapSchema = z.object({
   id: z.string(),
   seed: z.string(),
@@ -121,6 +142,9 @@ export const MatchMapSchema = z.object({
    *  `pve_waves` mode used to both exist and never be introduced to each other. */
   mode: z.string().optional(),
   sectors: z.record(z.string(), MapSectorSchema),
+  /** Дополнительные задачи забега на этой карте. Пусто — карта без задач, и это
+   *  нормальный случай: задачи ДОПОЛНИТЕЛЬНЫЕ, победа от них не зависит. */
+  objectives: z.array(MapObjectiveSchema).default([]),
   /** Undirected adjacency: each pair is a two-way path. Order within a pair is
    *  irrelevant; symmetry, no self-loops and the neighbour-only rule are enforced
    *  in `validateMatchMap`.

@@ -3266,6 +3266,13 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
           </div>
           <fieldset class="sz-difficulty">
+            <legend data-i18n="sector-zero.mission"></legend>
+            <div class="sz-options">
+              <button id="sz-mission-0" type="button" data-mission="0" aria-pressed="true" data-i18n="sector-zero.mission.1"></button>
+              <button id="sz-mission-1" type="button" data-mission="1" aria-pressed="false" data-i18n="sector-zero.mission.2"></button>
+            </div>
+          </fieldset>
+          <fieldset class="sz-difficulty">
             <legend data-i18n="sector-zero.difficulty"></legend>
             <div class="sz-options">
               <button id="sz-weak" type="button" data-difficulty="weak" aria-pressed="true" data-i18n="setup.pve.difficulty.weak"></button>

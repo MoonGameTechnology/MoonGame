@@ -13,6 +13,9 @@ export interface SectorZeroMenuHooks {
   load(): Promise<RunPreview | null>;
   difficulty(): RunDifficulty;
   setDifficulty(value: RunDifficulty): void;
+  /** Номер главы (0 — первая). Карта главы живёт в данных, экран только выбирает. */
+  mission(): number;
+  setMission(value: number): void;
   start(): void;
   startDev?: () => void;
   resume(): boolean;
@@ -30,6 +33,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   const confirmation = el('sz-confirm');
   const actions = el('sz-actions');
   const difficulties = ['weak', 'strong'].map((id) => el<HTMLButtonElement>(`sz-${id}`));
+  const missions = [0, 1].map((i) => el<HTMLButtonElement>(`sz-mission-${i}`));
   let preview: RunPreview | null = null;
   let loading = false;
   let generation = 0;
@@ -55,6 +59,11 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     el('sz-difficulty-hint').hidden = !preview;
     for (const button of difficulties) {
       const active = button.dataset.difficulty === h.difficulty();
+      button.setAttribute('aria-pressed', String(active));
+      button.disabled = loading;
+    }
+    for (const button of missions) {
+      const active = Number(button.dataset.mission ?? 0) === h.mission();
       button.setAttribute('aria-pressed', String(active));
       button.disabled = loading;
     }
@@ -120,6 +129,12 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     button.addEventListener('click', () => {
       if (loading) return;
       h.setDifficulty(parseRunDifficulty(button.dataset.difficulty));
+      render();
+    });
+  for (const button of missions)
+    button.addEventListener('click', () => {
+      if (loading) return;
+      h.setMission(Number(button.dataset.mission ?? 0));
       render();
     });
   el('sz-settings').addEventListener('click', h.settings);

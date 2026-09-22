@@ -3,128 +3,244 @@
     "name": "Neural Lace",
     "description": "hero.tree.neural-lace.desc",
     "branch": "transhuman",
-    "cost": { "microelectronics": 20 },
-    "grants": { "passive": "vanguard_impulse" }
+    "cost": {
+      "microelectronics": 20
+    },
+    "grants": {
+      "passive": "vanguard_impulse"
+    }
   },
   "overclocked_helm": {
     "name": "Overclocked Helm",
     "description": "hero.tree.overclocked-helm.desc",
     "branch": "transhuman",
-    "requires": ["neural_lace"],
-    "cost": { "microelectronics": 45, "credits": 100 },
-    "grants": { "ability": "corridor" }
+    "requires": [
+      "neural_lace"
+    ],
+    "cost": {
+      "microelectronics": 45,
+      "credits": 100
+    },
+    "grants": {
+      "ability": "corridor"
+    }
   },
   "corridor_sustained": {
     "name": "Sustained Corridor",
     "description": "hero.tree.corridor-sustained.desc",
     "branch": "transhuman",
-    "requires": ["overclocked_helm"],
-    "cost": { "microelectronics": 70, "credits": 150 }
+    "requires": [
+      "overclocked_helm"
+    ],
+    "cost": {
+      "microelectronics": 70,
+      "credits": 150
+    }
   },
   "corridor_open": {
     "name": "Shared Corridor",
     "description": "hero.tree.corridor-open.desc",
     "branch": "transhuman",
-    "requires": ["corridor_sustained"],
-    "cost": { "microelectronics": 110, "credits": 250 }
+    "requires": [
+      "corridor_sustained"
+    ],
+    "cost": {
+      "microelectronics": 110,
+      "credits": 250
+    }
   },
   "void_attunement": {
     "name": "Void Attunement",
     "description": "hero.tree.void-attunement.desc",
     "branch": "psionic",
-    "cost": { "energy": 56 },
-    "grants": { "passive": "rally_beacon" }
+    "cost": {
+      "energy": 56
+    },
+    "grants": {
+      "passive": "rally_beacon"
+    }
   },
   "psi_veil": {
     "name": "Psi Veil",
     "description": "hero.tree.psi-veil.desc",
     "branch": "psionic",
-    "requires": ["void_attunement"],
-    "cost": { "energy": 126, "credits": 100 },
-    "grants": { "ability": "scan" }
+    "requires": [
+      "void_attunement"
+    ],
+    "cost": {
+      "energy": 126,
+      "credits": 100
+    },
+    "grants": {
+      "ability": "scan"
+    }
   },
   "psi_weak_points": {
     "name": "Weak Points",
     "description": "hero.tree.psi-weak-points.desc",
     "branch": "psionic",
-    "requires": ["psi_veil"],
-    "cost": { "energy": 196, "credits": 150 }
+    "requires": [
+      "psi_veil"
+    ],
+    "cost": {
+      "energy": 196,
+      "credits": 150
+    }
   },
   "psi_evasion": {
     "name": "Evasive Vectors",
     "description": "hero.tree.psi-evasion.desc",
     "branch": "psionic",
-    "requires": ["psi_weak_points"],
-    "cost": { "energy": 308, "credits": 250 }
+    "requires": [
+      "psi_weak_points"
+    ],
+    "cost": {
+      "energy": 308,
+      "credits": 250
+    }
   },
   "fleet_uplink": {
     "name": "Fleet Uplink",
     "description": "hero.tree.fleet-uplink.desc",
     "branch": "transhuman",
-    "requires": ["neural_lace"],
-    "cost": { "microelectronics": 60, "credits": 80 },
-    "grants": { "passive": "convoy_impulse" }
+    "requires": [
+      "neural_lace"
+    ],
+    "cost": {
+      "microelectronics": 60,
+      "credits": 80
+    },
+    "grants": {
+      "passive": "convoy_impulse"
+    }
   },
   "void_translocator": {
     "name": "Void Translocator",
     "description": "hero.tree.void-translocator.desc",
     "branch": "transhuman",
-    "requires": ["corridor_open"],
-    "cost": { "microelectronics": 180, "credits": 400 },
-    "grants": { "ability": "warp_jump" }
+    "requires": [
+      "corridor_open"
+    ],
+    "cost": {
+      "microelectronics": 180,
+      "credits": 400
+    },
+    "grants": {
+      "ability": "warp_jump"
+    }
   },
   "false_echo": {
     "name": "False Echo",
     "description": "hero.tree.false-echo.desc",
     "branch": "psionic",
-    "requires": ["psi_veil"],
-    "cost": { "energy": 160, "credits": 120 },
-    "grants": { "ability": "decoy_signal" }
+    "requires": [
+      "psi_veil"
+    ],
+    "cost": {
+      "energy": 160,
+      "credits": 120
+    },
+    "grants": {
+      "ability": "decoy_signal"
+    }
   },
   "wreck_rig": {
     "name": "Salvage Rig",
     "description": "hero.tree.salvage-rig.desc",
-    "cost": { "microelectronics": 15 },
-    "grants": { "passive": "wreck_optics" }
+    "cost": {
+      "microelectronics": 15
+    },
+    "grants": {
+      "passive": "wreck_optics"
+    }
   },
   "wreck_battery": {
     "name": "Scavenged Battery",
     "description": "hero.tree.scavenged-battery.desc",
-    "requires": ["wreck_rig"],
-    "cost": { "microelectronics": 30, "credits": 60 },
-    "grants": { "passive": "wreck_guns" }
+    "requires": [
+      "wreck_rig"
+    ],
+    "cost": {
+      "microelectronics": 30,
+      "credits": 60
+    },
+    "grants": {
+      "passive": "wreck_guns"
+    }
   },
   "wreck_shears": {
     "name": "Hull Shears",
     "description": "hero.tree.hull-shears.desc",
-    "requires": ["wreck_battery"],
-    "cost": { "microelectronics": 45, "credits": 100 },
-    "grants": { "passive": "wreck_cutters" }
+    "requires": [
+      "wreck_battery"
+    ],
+    "cost": {
+      "microelectronics": 45,
+      "credits": 100
+    },
+    "grants": {
+      "passive": "wreck_cutters"
+    }
   },
   "wreck_foundry": {
     "name": "Field Foundry",
     "description": "hero.tree.field-foundry.desc",
-    "requires": ["wreck_shears"],
-    "cost": { "microelectronics": 65, "credits": 150 },
-    "grants": { "passive": "wreck_barrels" }
+    "requires": [
+      "wreck_shears"
+    ],
+    "cost": {
+      "microelectronics": 65,
+      "credits": 150
+    },
+    "grants": {
+      "passive": "wreck_barrels"
+    }
   },
   "wreck_mastery": {
     "name": "Scavenger Mastery",
     "description": "hero.tree.scavenger-mastery.desc",
-    "requires": ["wreck_foundry"],
-    "cost": { "microelectronics": 95, "credits": 220 },
-    "grants": { "passives": ["wreck_mastery_salvage", "wreck_mastery_guns"] }
+    "requires": [
+      "wreck_foundry"
+    ],
+    "cost": {
+      "microelectronics": 95,
+      "credits": 220
+    },
+    "grants": {
+      "passives": [
+        "wreck_mastery_salvage",
+        "wreck_mastery_guns"
+      ]
+    }
   },
   "command_relay": {
     "name": "Command Relay",
     "description": "hero.tree.command-relay.desc",
     "requires": [],
-    "cost": { "credits": 300, "metal": 200 }
+    "cost": {
+      "credits": 300,
+      "metal": 200
+    }
   },
   "command_grid": {
     "name": "Command Grid",
     "description": "hero.tree.command-grid.desc",
-    "requires": ["command_relay"],
-    "cost": { "credits": 600, "metal": 400 }
+    "requires": [
+      "command_relay"
+    ],
+    "cost": {
+      "credits": 600,
+      "metal": 400
+    }
+  },
+  "asteroid_navigation": {
+    "name": "Asteroid Navigation",
+    "description": "hero.tree.asteroid-navigation.desc",
+    "cost": {
+      "microelectronics": 25
+    },
+    "grants": {
+      "passive": "asteroid_pilot"
+    }
   }
 }

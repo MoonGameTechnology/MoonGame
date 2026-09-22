@@ -1,6 +1,12 @@
 import { sectorKindDef } from '../state/sectorKind';
 import { hoursToMs } from '../action/types';
-import type { HeroAbilityDef, HeroPassiveDef, ModuleDef, ShipSlotType } from '../data/schemas';
+import type {
+  GameData,
+  HeroAbilityDef,
+  HeroPassiveDef,
+  ModuleDef,
+  ShipSlotType,
+} from '../data/schemas';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   Fleet,
@@ -210,13 +216,35 @@ export interface HeroEffectArgs {
  *  a plain return means success and commits cost + cooldown). */
 export type HeroEffect = (args: HeroEffectArgs, h: HandlerContext) => void;
 
-/** Does `passive` apply to this fleet/node for a hero? Pure scope evaluation. */
+/** Does the ground satisfy the passive's terrain condition (M2.8)? No condition = yes,
+ *  which is how every passive behaved before this seam existed. A condition is answered
+ *  from `terrainNode` — the province the corrected rule itself reads, NOT the hero's
+ *  node — and an unresolvable terrain or an unfamilied one answers NO: a rule that
+ *  cannot see its ground does not fire (fail-secure). */
+function terrainAllows(
+  state: GameState,
+  data: GameData,
+  passive: HeroPassiveDef,
+  terrainNode: PlanetId | undefined,
+): boolean {
+  if (passive.terrainFamily === undefined) return true;
+  if (terrainNode === undefined) return false;
+  const terrain = state.planets[terrainNode]?.terrain;
+  if (terrain === undefined) return false;
+  return data.sectors[terrain]?.family === passive.terrainFamily;
+}
+
+/** Does `passive` apply to this fleet/node for a hero? Pure scope evaluation, plus the
+ *  terrain condition — two independent questions (whose fleet, which ground) and both
+ *  must hold. */
 function passiveApplies(
   state: GameState,
+  data: GameData,
   hero: Hero,
   passive: HeroPassiveDef,
-  args: { fleetId?: string; node?: PlanetId },
+  args: { fleetId?: string; node?: PlanetId; terrainNode?: PlanetId },
 ): boolean {
+  if (!terrainAllows(state, data, passive, args.terrainNode)) return false;
   if (passive.scope === 'heroFleet') {
     return args.fleetId !== undefined && hero.fleetId === args.fleetId;
   }
@@ -235,7 +263,7 @@ function passiveBonus(
   h: HandlerContext,
   hook: HeroPassiveDef['hook'],
   owner: PlayerId,
-  args: { fleetId?: string; node?: PlanetId },
+  args: { fleetId?: string; node?: PlanetId; terrainNode?: PlanetId },
 ): number {
   if (h.state.heroes === undefined) return 0; // hero-less match: keep the hot hooks free
   let total = 0;
@@ -248,7 +276,7 @@ function passiveBonus(
     for (const id of hero.passives ?? []) {
       const def = h.ctx.data.heroPassives[id];
       if (!def || def.hook !== hook) continue;
-      if (passiveApplies(h.state, hero, def, args)) total += def.params.bonus;
+      if (passiveApplies(h.state, h.ctx.data, hero, def, args)) total += def.params.bonus;
     }
   }
   return total;
@@ -731,7 +759,10 @@ export const heroModule: GameModule = {
           (l.owner === owner || (laneIsPublic(l) && isAllied(h, l.owner, owner))),
       );
       if (lane) out *= 1 + lane.speedBonus;
-      const passives = passiveBonus(h, 'fleet.speed', owner, { fleetId, node: from });
+      // `terrainNode: to` — СРЕДА ПРИБЫТИЯ, та же клетка, с которой берёт штраф
+      // `sectorModule`. Спроси условие про `from`, и навык сработал бы наоборот:
+      // бонус на вылете из астероидов и тишина на влёте (M2.8).
+      const passives = passiveBonus(h, 'fleet.speed', owner, { fleetId, node: from, terrainNode: to });
       return passives !== 0 ? out * (1 + passives) : out;
     });
 
@@ -750,6 +781,8 @@ export const heroModule: GameModule = {
       const passives = passiveBonus(h, 'combat.damage', attacker, {
         fleetId: hit.side.ref.fleetId,
         node: hit.battle.location,
+        // Бой стоит на одной клетке — она же и земля под условием.
+        terrainNode: hit.battle.location,
       });
       return passives !== 0 ? out * (1 + passives) : out;
     });
@@ -765,7 +798,7 @@ export const heroModule: GameModule = {
     api.hook<number>('salvage.share', (base, args, h) => {
       const { playerId, location } = (args ?? {}) as { playerId?: string; location?: string };
       if (typeof playerId !== 'string' || typeof location !== 'string') return base;
-      const bonus = passiveBonus(h, 'salvage', playerId, { node: location });
+      const bonus = passiveBonus(h, 'salvage', playerId, { node: location, terrainNode: location });
       return bonus !== 0 ? base + bonus : base;
     });
 

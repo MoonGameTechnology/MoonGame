@@ -177,7 +177,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveObjectives } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -251,6 +251,7 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
+import { missionProgress } from '../../decisions/missionObjectives';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
@@ -1325,6 +1326,8 @@ let setupSpeed = 10;
 /** Сила Роя в забеге (PVR-2.1). Живёт рядом со `setupSpeed`, потому что это тот же род
  *  настройки: выбор игрока ДО запуска, переживающий перезагрузку. */
 let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
+/** Глава, на которой идёт ТЕКУЩИЙ забег (в отличие от выбранной для следующего). */
+let sectorMission = 0;
 /** Номер волны, на котором игрок нажал «Позже» (PVR-1.4). Долг при этом НЕ сгорает —
  *  окно просто не лезет поверх боя до следующей волны. `-1` = не откладывали. */
 let boonLaterAtWave = -1;
@@ -4462,9 +4465,11 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // weighted Voronoi (power diagram) over the sector centres: the cells tile the
   // map and share borders, so a bigger `size` claims more territory and resizing
   // one shifts the shared borders with its neighbours evenly. Adjacency IS the
-  // shared border — no lanes. (Empty void waypoints aren't real provinces → skipped.)
-  // Отбор узлов и вес семени — `provinceMap.ts` (REFM-61): пустой узел не провинция,
-  // вес растёт квадратично по масштабу, иначе карта перекраивается при зуме.
+  // shared border — no lanes. EVERY sector gets a cell, `empty` crossroads included:
+  // the kernel derives its lanes from the diagram over all of them, so skipping one here
+  // would draw a different map than the one being played (provinceMap.ts, rule 1).
+  // Вес семени — там же (REFM-61): растёт квадратично по масштабу, иначе карта
+  // перекраивается при зуме.
   const provinceIds: string[] = [];
   const seeds = provinceSeeds(MAP, cam.scale, (n) => {
     const p = s.planets[n.id];
@@ -11062,13 +11067,14 @@ function startPvEMatch(dev = false): void {
   sectorAttempt = testing ? 0 : sectorProgress.nextAttempt;
   if (!testing) saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
-  const st = prepareSectorZeroRun(pveState(data), sectorProgress, data);
+  sectorMission = nextSectorMission;
+  const st = prepareSectorZeroRun(pveState(data, sectorMission), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
   const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
-  installMatch(st, aiSeats, pveModeId());
+  installMatch(st, aiSeats, pveModeId(sectorMission));
   setRunActive(true);
   sectorDevActive = testing;
   if (!__PLAYER_BUILD__ && testing) {
@@ -13050,6 +13056,10 @@ let sectorDevActive = false;
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
+/** Выбранная ГЛАВА забега (0 — первая). Живёт рядом со сложностью и хранится так же:
+ *  это тот же род настройки запуска. Клампит `pveState` — испорченное хранилище открывает
+ *  первую главу, а не роняет вход. */
+let nextSectorMission = Number(readRaw('void.pveMission') ?? 0) || 0;
 let runWrite = Promise.resolve();
 let progressWrite = sectorProgressStore.load().then(raw => {
   sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
@@ -13122,7 +13132,12 @@ const sectorZeroMenu = initSectorZeroMenu({
     // Persistence can be unavailable. A paused run still exists in this tab.
     if (runInProgress() && !sectorDevActive) savedRun = currentRunSave();
     if (savedRun && savedRun.mode === pveModeId() && (savedRun.state as GameState).match?.status === 'ended') {
-      const next = settleSectorZeroRun(sectorProgress, savedRun.sectorZeroAttempt ?? 0, savedRun.state as GameState);
+      const next = settleSectorZeroRun(
+        sectorProgress,
+        savedRun.sectorZeroAttempt ?? 0,
+        savedRun.state as GameState,
+        pveObjectives(sectorMission),
+      );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
       await runSaveStore.clear();
@@ -13134,6 +13149,11 @@ const sectorZeroMenu = initSectorZeroMenu({
   setDifficulty: value => {
     nextSectorDifficulty = value;
     writeRaw('void.pveDifficulty', value);
+  },
+  mission: () => nextSectorMission,
+  setMission: value => {
+    nextSectorMission = value;
+    writeRaw('void.pveMission', String(value));
   },
   start: () => startPvEMatch(),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
@@ -13386,9 +13406,23 @@ function frame(nowReal: number) {
       ? ''
       : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'cleared' ? wave.total : wave.wave, m: wave.total })}` +
         ` · ${wave.kind === 'cleared' ? t('hud.wave.done') : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>`;
+  // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
+  // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
+  // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
+  const missions = sectorRunActive ? missionProgress(pveObjectives(sectorMission), s, ME) : [];
+  const missionsDone = missions.filter(m => m.complete).length;
+  const missionHtml =
+    missions.length === 0
+      ? ''
+      : `<span class="dl-wave" title="${esc(
+          missions
+            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${m.reward})`)
+            .join('\n'),
+        )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
     waveHtml +
+    missionHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
