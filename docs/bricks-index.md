@@ -1127,20 +1127,20 @@
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md:285` | Грейды и пороги |
 | VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
 | VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md:341` | Медали в карточке юнита |
-| YAG-0.1 | 🔶 | docs | `docs/yandex-games-roadmap.md:355` | Сверить требования с первоисточником 2026-09-22 |
-| YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md:398` | Контракты GamePlatform и WebPlatformAdapter |
-| YAG-1.1b | ⏳ | proto | `docs/yandex-games-roadmap.md:432` | Платформенная цель сборки и раскладка архива |
-| YAG-1.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:469` | YandexGamesAdapter: инициализация и жизненный цикл |
-| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:475` | Язык от площадки |
-| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:484` | PortableMetaSave: компактный дескриптор забега |
-| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:494` | PlatformSave в адаптере Яндекса |
-| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:504` | PlatformAds в адаптере Яндекса |
-| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:511` | Placements по правилам |
-| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:523` | Эндпойнт проверки подписи |
-| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:529` | PlatformIAP в адаптере Яндекса |
-| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:540` | PlatformAnalytics: словарь событий |
-| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:560` | Карточка игры и подача в модерацию |
-| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:571` | Серверное время вместо системного |
-| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:579` | Пауза площадки: что делает мир |
-| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:588` | Удалённый конфиг баланса |
-| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:596` | Кнопка «назад» и выход |
+| YAG-0.1 | 🔶 | docs | `docs/yandex-games-roadmap.md:406` | Сверить требования с первоисточником 2026-09-22 |
+| YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md:449` | Контракты GamePlatform и WebPlatformAdapter |
+| YAG-1.1b | ⏳ | proto | `docs/yandex-games-roadmap.md:483` | Платформенная цель сборки и раскладка архива |
+| YAG-1.2 | 🔶 | proto | `docs/yandex-games-roadmap.md:520` | YandexGamesAdapter: инициализация и жизненный цикл 2026-09-22 |
+| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:567` | Язык от площадки |
+| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:576` | PortableMetaSave: компактный дескриптор забега |
+| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:586` | PlatformSave в адаптере Яндекса |
+| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:596` | PlatformAds в адаптере Яндекса |
+| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:603` | Placements по правилам |
+| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:615` | Эндпойнт проверки подписи |
+| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:621` | PlatformIAP в адаптере Яндекса |
+| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:632` | PlatformAnalytics: словарь событий |
+| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:652` | Карточка игры и подача в модерацию |
+| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:663` | Серверное время вместо системного |
+| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:671` | Пауза площадки: что делает мир |
+| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:680` | Удалённый конфиг баланса |
+| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:688` | Кнопка «назад» и выход |
