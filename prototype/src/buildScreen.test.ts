@@ -235,12 +235,25 @@ describe('окно построек — проводка', () => {
       probe: (a) => canOrder(s, a),
       localQueued: () => false,
       build: (pid, id) => built.push([pid, id]),
+      unitIds: () => ['militia'],
+      buildUnit: (pid, id) => built.push([pid, id]),
+      openUnitInfo: (id) => opened.push(id),
       openInfo: (id) => opened.push(id),
       lockText,
       dossierBody: () => 'описание',
     };
     return { api: initBuildScreen(host), root, body, s, built, opened };
   }
+
+  it('units reuse the catalog and send a unit order, without opening the dossier', () => {
+    const { api, root, body, s, built, opened } = wire();
+    api.open(home(s), 'ground');
+    expect(body.html()).toContain('bw-list');
+    expect(body.html()).toContain('data-unit-info="militia"');
+    root.fire(tap('[data-unit-go]', { unitGo: 'militia' }));
+    expect(built).toEqual([[home(s), 'militia']]);
+    expect(opened).toEqual([]);
+  });
 
   it('open() красит тело для нужного мира и показывает окно', () => {
     const { api, root, body, s } = wire();

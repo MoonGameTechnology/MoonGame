@@ -89,8 +89,12 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   // --- слои: Back закрывает, порядок задаётся z-index'ом в лестнице main.ts ---
   ['corp', 'layer'], // кабинет корпорации, z60 — перекрывает всё, включая свой скрим
   ['scipick', 'layer'], // выбор учёных поверх экрана настройки матча, z60
+  ['solo-replace', 'layer'], // replace the local skirmish slot, z60
+  ['swarm-dossier', 'layer'], // observed Swarm composition, z60
+  ['boonpick', 'layer'], // усиление между волнами забега, z60 (PVR-1.4)
   ['emblempick', 'layer'], // выбор эмблемы, z60
   ['settings', 'layer'], // настройки (хаб и матч), z59
+  ['sector-zero', 'layer'], // own home, z58: confirmation first, shared hub second
   ['testmode', 'layer'], // dev-оверлей сценариев, z59
   ['sandbox', 'layer'], // dev-панель практики, z59
   ['intro', 'layer'], // ONB-3 карточка механики, z58 — поверх окна, которое объясняет

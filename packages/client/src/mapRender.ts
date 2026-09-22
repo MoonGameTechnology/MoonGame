@@ -9,6 +9,8 @@
  * star lanes, holographic planet spheres coloured by owner with a floating type badge, and
  * fleets at their interpolated positions. Node sizes stay constant in screen px.
  */
+import { drawFleetCount, fleetCountWidth } from './fleetCountBadge';
+import { emblemTally } from '../../../decisions/fleetTally';
 import { effectiveStats, fleetPositionAt, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
@@ -89,7 +91,7 @@ export function renderMap(
   const vh = vp.bottom;
   const planets = Object.values(state.planets);
   const gap = mapSpacing(planets.map((p) => ({ id: p.id, ...p.position, links: p.links })));
-  const lod = mapLod(gap * fitTransform(vp, bounds).scale * cam.scale);
+  const lod = mapLod(gap * fitTransform(vp, bounds).scale * cam.scale, cam.scale);
   g.clearRect(vp.left, vp.top, vw - vp.left, vh - vp.top);
   drawSpaceBackdrop(g, vw, vh, cam.x, cam.y, true);
 
@@ -124,6 +126,7 @@ export function renderMap(
       ownerColor,
       neutralFill: NEUTRAL,
       kindAccent: (kind) => KIND_COLOR[kind],
+      provinceDetail: lod.provinceDetail,
     }, geometry.project(seeds, clip, cam.scale));
     const selected = cells.find((cell) => planets[cell.idx]?.id === opts.selected);
     if (selected) drawProvinceSelection(g, selected.poly);
@@ -131,7 +134,7 @@ export function renderMap(
 
   // Star lanes (each undirected edge once), over the territory fill.
   g.lineWidth = 0.7;
-  g.strokeStyle = rgba(theme.cyan, 0.28);
+  g.strokeStyle = rgba(theme.cyan, 0.28 * lod.provinceDetail);
   const drawn = new Set<string>();
   g.beginPath();
   for (const p of planets) {
@@ -160,7 +163,7 @@ export function renderMap(
     if (lod.art < 1) {
       g.save();
       g.globalAlpha *= 1 - lod.art;
-      drawSchematicNode(g, c, p.kind ?? 'unknown', col, lod.markerRadius);
+      drawSchematicNode(g, c, lod.markerRadius);
       g.restore();
     }
     if (lod.art === 0 && p.id !== opts.selected) continue;
@@ -235,7 +238,7 @@ export function renderMap(
     const col = colors.get(f.owner) ?? theme.cyan;
     if (lod.detail > 0) blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5 * lod.detail);
     const dom = dominantUnit(f.units, opts.data);
-    const shape = dom && unitShape(dom.def, dom.unit);
+    const shape = dom && unitShape(dom.def, dom.unit, state.players[f.owner]?.faction);
     g.save();
     g.translate(c.x, c.y);
     g.strokeStyle = col;
@@ -247,6 +250,13 @@ export function renderMap(
       g.restore();
       continue;
     }
+    const ships = emblemTally(f.units, [], (id) => (opts.data.units[id]?.traits ?? []).includes('shuttle')).ships;
+    // Reset the ship transform before drawing screen-aligned count text.
+    g.restore();
+    drawFleetCount(g, c.x - fleetCountWidth(g, ships) / 2, c.y + 20, ships, col);
+    g.save();
+    g.translate(c.x, c.y);
+    g.strokeStyle = col;
     const k = glyphScale(unitSizeClass(dom.def.stats.hp));
     if (lod.detail > 0) {
       const stack = f.units.find((st) => st.unit === dom.unit && st.count > 0)!;

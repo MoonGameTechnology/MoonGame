@@ -4,6 +4,8 @@ import { cmdShown, type CmdSelection } from './cmdPresence';
 const пусто: CmdSelection = {
   stoppable: false,
   castHero: false,
+  troops: false,
+  assaultArmed: false,
   more: false,
   picking: false,
 };
@@ -20,6 +22,18 @@ describe('cmdPresence — что показывается отсутствием
     expect(cmdShown(с({ castHero: true })).cast).toBe(true);
   });
 
+  // Правило 3а (заказ владельца 2026-09-21). Прежде штурм ВСЕГДА стоял в ряду и лишь
+  // гас: эскадра без десанта обещала приказ, который ядро встретит `E_NO_TROOPS`.
+  it('ШТУРМ появляется только когда есть кем штурмовать', () => {
+    expect(cmdShown(пусто).assault).toBe(false);
+    expect(cmdShown(с({ troops: true })).assault).toBe(true);
+  });
+
+  // Та же причина, что у набора группы (правило 4): сменил выделение, не сняв прицел —
+  // и кнопка унесла бы с собой единственную подпись о том, что он ещё взведён.
+  it('ВЗВЕДЁННЫЙ штурм остаётся в ряду, даже когда штурмовать уже некем', () => {
+    expect(cmdShown(с({ assaultArmed: true })).assault).toBe(true);
+  });
 });
 
 describe('cmdPresence — набор группы (правило 4)', () => {

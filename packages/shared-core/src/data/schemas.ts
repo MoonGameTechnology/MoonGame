@@ -176,6 +176,7 @@ export const UnitDefSchema = z.object({
 export const StartingStackSchema = z.object({
   unit: z.string(),
   count: z.number().int().positive(),
+  modules: z.array(z.string()).optional(),
 });
 
 /** What a player of this faction begins a match with (consumed by the match-start
@@ -459,6 +460,25 @@ export const SectorTypeDefSchema = z.object({
   /** Victory-score worth of controlling a node in this sector (terrain like an
    *  asteroid field is worth holding even without a habitable planet). */
   scoreValue: z.number().nonnegative().default(0),
+  /** How many lanes the terrain can physically carry (MAP-LINK). Geometry proposes
+   *  the candidates — the relative-neighbourhood rule already says which sectors can
+   *  see each other — and this says how many of them a region of THIS kind actually
+   *  admits: open space routes freely, a dense asteroid cluster admits a single
+   *  approach and is therefore a dead end. Enforced by `validateMatchMap`
+   *  (`E_SECTOR_OVERLINKED`), so a map cannot draw a lane the world would not allow.
+   *  The generous default keeps every pre-existing map legal. */
+  maxLinks: z.number().int().positive().default(8),
+  /** Passive per-hour output an OWNED sector of this terrain yields, mirroring
+   *  `PlanetTypeDefSchema.baseOutput` (a metal-rich asteroid cluster is worth taking
+   *  even though nothing can be built on it). Added by `sectorModule` into the
+   *  `economy.production` bag. Empty {} = the terrain yields nothing by itself. */
+  baseOutput: ResourceBagSchema.default({}),
+  /** Per-resource production multipliers for an owned sector of this terrain, e.g.
+   *  `{ metal: 0.5 }` = +50% metal mined here, `{ metal: -0.4 }` = a worked-out system
+   *  that yields 40% less. Layered like the planet-type twin. Floored at −1 ("yields
+   *  nothing"): below that the multiplier flips sign and the sector would quietly DRAIN
+   *  the treasury, which no terrain is meant to do. */
+  productionByResource: z.record(z.string(), z.number().gte(-1)).default({}),
 });
 
 /**
@@ -560,6 +580,12 @@ export const TechnologyDefSchema = z.object({
   conditions: z.array(TechnologyConditionSchema).default([]),
   cost: ResourceBagSchema.default({}),
   researchTimeHours: z.number().nonnegative().default(0),
+  /** Узел, который в сессии НЕ исследуется: его только ВЫДАЮТ (мета-прокачка
+   *  командира, усиление забега). Такие узлы бесплатны и мгновенны по самой сути —
+   *  они награда, а не работа, — и без этого флага любой игрок исследовал бы их
+   *  даром в любом матче. Модуль технологий отбивает их `E_GRANT_ONLY`, дерево
+   *  технологий не показывает. */
+  grantOnly: z.boolean().default(false),
   prerequisites: z.array(z.string()).default([]),
   // `.prefault({})` re-runs the nested schema, keeping its per-field defaults
   // the single source of truth instead of a duplicate literal that can drift.
@@ -676,14 +702,59 @@ export const ModuleEffectsSchema = z.object({
  *  `horizontal` (logistics/utility) vs `vertical` (combat power). A paid/lootbox
  *  source must never carry a `vertical` module — enforced downstream and by the
  *  soulbound refine here. Extensible via data, like `UnitDef`. */
+/**
+ * SZE-4.2 — чем класс сигнала контрится.
+ *
+ * Уровень адаптации Роя имеет право усиливать ТОЛЬКО эти характеристики. Без правила
+ * прокачанный Рой становится всезнающим: дай модулю-ответу обычный `attack`, и
+ * «перехватывающий покров» третьего уровня начнёт бить сильнее по группе, в которой
+ * ударных машин нет вовсе, — а §3.4 требует ровно обратного, чтобы контригра против
+ * памяти существовала.
+ *
+ * Таблица живёт в КОДЕ, а не в данных, намеренно: это инвариант, как соседние refine
+ * («модуль не правит вместимость слотов», «боевой модуль не бывает soulbound»), а не
+ * балансное число. Данные, объявляющие себе разрешённое, запрет не удержали бы.
+ */
+export const SIGNAL_COUNTERS: Record<string, readonly string[]> = {
+  /** Ударный вылет челноков и бомбардировщиков — его гасит зональное ПВО. */
+  strike: ['pointDefense', 'pointDefenseRange'],
+};
+
 export const ModuleDefSchema = z
   .object({
     name: z.string(),
+    /** Optional localized description key, shared by both clients. */
+    description: z.string().optional(),
     slot: ShipSlotTypeSchema,
     tag: z.enum(['horizontal', 'vertical']),
     effects: ModuleEffectsSchema.default({ stats: {}, enables: [] }),
     cost: ResourceBagSchema.default({}),
     allowed: ModuleAllowedSchema.optional(),
+    /**
+     * PVR-4.3: модуль — ОТВЕТ Роя на класс оружия. Лестница живёт рядом с модулем
+     * (`SZE-4.1`), а не отдельной таблицей: уровень осмыслен только вместе с тем,
+     * что он усиливает, и разнесённые данные разъехались бы молча.
+     *
+     * `signal` — класс наблюдения из `swarmMemory` (v1 — `strike`). `levels` — шаги
+     * лестницы по порядку: цена в ресурсах Роя и срок выращивания в игровых часах.
+     * Длина массива и есть потолок: пустого уровня «сверх лестницы» не существует.
+     */
+    adaptation: z
+      .object({
+        signal: z.string().min(1),
+        levels: z
+          .array(z.object({ cost: ResourceBagSchema, hours: z.number().positive() }))
+          .min(1),
+      })
+      .optional(),
+    /** Automatic onboard growth: one ground organism per fitted hull and cycle.
+     * Costs come from the organism's unit definition, never from the client. */
+    brood: z
+      .object({
+        unit: z.string(),
+        intervalHours: z.number().positive(),
+      })
+      .optional(),
     /** Bound to the owning player (anti-RMT). A `vertical` module must never be
      *  soulbound — a paid source can't sell combat power (refined below). */
     soulbound: z.boolean().optional(),
@@ -691,6 +762,19 @@ export const ModuleDefSchema = z
   .refine((m) => !Object.keys(m.effects.stats).some((k) => /slot/i.test(k)), {
     message: 'a module may not modify slot capacity (anti self-expansion)',
   })
+  .refine(
+    (m) =>
+      !m.adaptation ||
+      (SIGNAL_COUNTERS[m.adaptation.signal] !== undefined &&
+        Object.keys(m.effects.stats).every((k) =>
+          SIGNAL_COUNTERS[m.adaptation!.signal]!.includes(k),
+        )),
+    {
+      message:
+        'SZE-4.2: an adaptation module may only carry stats that counter its own signal ' +
+        '(a level must not raise general combat power)',
+    },
+  )
   .refine((m) => !(m.tag === 'vertical' && m.soulbound === true), {
     message: 'a vertical (combat) module may not be soulbound (anti pay-to-win)',
   });
@@ -760,6 +844,79 @@ export const HERO_PASSIVE_SCOPES = ['heroFleet', 'ownFleetsNear'] as const;
  *  ВАЖНО: `slots` архетипа и `skillSlots` редкости — РАЗНЫЕ бюджеты. Первый ограничивает
  *  `hero.fit` (компоненты корабля), второй — `hero.equip` (способности). Путать их нельзя:
  *  у `commander` 4 фиттинга и у `main` 4 скилла — совпадение чисел, а не одно правило. */
+/** Одна ступень звёздности Sector Zero: шанс успеха и цена попытки (SZE-0.2).
+ *
+ *  Лестница ОДНА на модули и навыки: звезда модуля и звезда навыка — это уровень заточки
+ *  `EC-2.1` под своим именем, и заводить вторую лестницу запрещено (§0.4
+ *  `hero-progression-roadmap.md`, §0.2 `sector-zero-economy-roadmap.md`). Шанс `1` —
+ *  гарантированная ступень; меньше — бросок.
+ *
+ *  Числа в `data/sectorZeroStars.json` — **v0**, отправная точка для калибровки
+ *  телеметрией, а не утверждённый баланс. */
+export const SectorZeroStarStepSchema = z.object({
+  /** Вероятность успеха попытки, (0, 1]. Ровно `1` = ступень без броска. */
+  chance: z.number().gt(0).lte(1).default(1),
+  /** Цена попытки в Варрантах. Сгорает и при неудаче — но звёздность не падает
+   *  (инвариант провала, резолюция владельца 2026-09-20). */
+  warrants: z.number().int().nonnegative().default(0),
+  /** Насколько эта ступень усиливает предмет — ДОЛЯ его собственного вклада, а не
+   *  характеристики носителя (SZE-1.1). Для модуля: `+4 к атаке` при `bonus` 0.25
+   *  становится `+5`, а базовая атака корпуса не трогается — иначе звезда модуля
+   *  усиливала бы корабль, на котором модуля нет. Прибавки ступеней складываются:
+   *  множитель на ★N = 1 + Σ bonus первых N ступеней. Ноль = ступень даёт только
+   *  право на следующую. */
+  bonus: z.number().nonnegative().default(0),
+  /** Потолок попыток на ЭТОЙ ступени (`EC-2.2`): попытка с этим номером уже не бросает,
+   *  а удаётся. `pity: 3` = «третья попытка гарантирована», то есть после двух сгоревших.
+   *  Ноль = гарантии нет, ступень остаётся чистым броском.
+   *
+   *  Зачем вообще: без потолка серия неудач упирается в бесконечность, и игрок может
+   *  лить валюту без предела. Это и есть то, за что штрафуют сторы, — а не сам бросок. */
+  pity: z.number().int().nonnegative().default(0),
+});
+
+/** Лестница звёздности Sector Zero целиком. */
+export const SectorZeroStarsSchema = z.object({
+  /** Потолок звёзд. Выше него попытка не предлагается вовсе. */
+  cap: z.number().int().nonnegative().default(0),
+  /** Сколько первых ступеней гарантированы. Держится ОТДЕЛЬНЫМ числом, а не выводится из
+   *  `chance === 1`: так «гарант кончается здесь» остаётся авторским решением, а не
+   *  побочным эффектом правки вероятности. Расхождение с `steps` ловит тест. */
+  guaranteed: z.number().int().nonnegative().default(0),
+  /** Ступени по порядку: `steps[0]` — попытка получить первую звезду. */
+  steps: z.array(SectorZeroStarStepSchema).default([]),
+});
+
+/** Цена товара магазина Sector Zero по способам оплаты (§0.4 `sector-zero-economy-roadmap`).
+ *  Товар знает, какими способами он продаётся, — это ДАННЫЕ, а не ветки в коде: нет ключа
+ *  = этим способом товар не продаётся. `ad` — сколько просмотров rewarded требуется. */
+export const SectorZeroPriceSchema = z.object({
+  warrants: z.number().int().positive().optional(),
+  sovereigns: z.number().int().positive().optional(),
+  ad: z.number().int().positive().optional(),
+});
+
+/** Один лот витрины. `grants` трактуется по `kind`: id модуля, id узла навыка либо имя
+ *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount`. */
+export const SectorZeroOfferSchema = z.object({
+  kind: z.enum(['module', 'skill', 'resource']),
+  grants: z.string(),
+  /** Сколько выдать. Значим только для `kind: 'resource'`. */
+  amount: z.number().int().positive().default(1),
+  prices: SectorZeroPriceSchema.prefault({}),
+  /** Вес в суточной ротации (`SZE-3.2`): чем больше, тем чаще лот попадает на витрину.
+   *  Ноль = из ротации исключён, но товаром остаётся — пригодится для событийных лотов. */
+  weight: z.number().int().nonnegative().default(1),
+});
+
+/** Витрина магазина Sector Zero целиком. Пустая = магазина в этой сборке нет — та же
+ *  форма выключения данными, что у лестницы звёздности и медалей. */
+export const SectorZeroShopSchema = z.object({
+  /** Сколько лотов показывать в сутки. Больше каталога — покажется весь каталог. */
+  slots: z.number().int().nonnegative().default(0),
+  offers: z.record(z.string(), SectorZeroOfferSchema).default({}),
+});
+
 export const HeroGradeDefSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
@@ -943,6 +1100,36 @@ export const ModePveSchema = z
     npcFaction: z.string(),
     /** Game-hours between waves — a real-time duration, timeScale-scaled like every other. */
     waveIntervalHours: z.number().positive(),
+    /** What ONE wave is made of (unit ids → `data.units`), fielded ×N on wave N.
+     *
+     *  The mode owns this rather than the NPC faction's `startingLoadout.fleet`
+     *  because those are two different questions with one answer only by accident:
+     *  the loadout says what a PLAYER of that faction opens a match with, and the
+     *  Swarm is playable. Tuning the assault through it would re-balance every match
+     *  someone picks the Swarm, and tuning the faction would silently re-balance the
+     *  assault. Omitted ⇒ the wave falls back to the faction's opening force, which
+     *  is the pre-existing behaviour (invariant #3: absent data → base default).
+     *
+     *  Declared EMPTY is rejected rather than treated as "omitted": the module skips
+     *  a wave it has nothing to field, so an empty list would ship a mute assault that
+     *  reads as configured. Fail-closed at load (A05/A08), like every other catalog. */
+    waveFleet: z.array(StartingStackSchema).min(1).optional(),
+    /** Ground troops each wave carries as cargo (unit ids → `data.units`), fielded ×N
+     *  on wave N exactly like {@link ModePve.waveFleet}.
+     *
+     *  Without one a wave can take an EMPTY sector by arrival and nothing else: taking
+     *  a garrisoned world is a two-phase capture, and phase two needs boots. A defended
+     *  homeworld was therefore unloseable — the assault parked in orbit forever and
+     *  `pve-failed` could not be reached (PVR-1.6). Scaling with the wave keeps the
+     *  landing party proportional to the hulls carrying it. */
+    waveLanding: z.array(StartingStackSchema).min(1).optional(),
+    /** Boons the run offers between waves (PVR-1.4) — ids from `data.technologies`.
+     *
+     *  Reuses the seam `metaGrant` proved: a hidden session technology handed out as
+     *  `completed`, whose bonuses ride the ordinary technology hooks. No engine code
+     *  per boon, and a new one is a JSON entry. Absent ⇒ the run offers nothing, which
+     *  is the pre-existing behaviour. */
+    boons: z.array(z.string()).min(1).optional(),
   })
   .strict();
 
@@ -1001,6 +1188,10 @@ export const GameDataSchema = z.object({
   heroPassives: z.record(z.string(), HeroPassiveDefSchema).default({}),
   heroSkillTrees: z.record(z.string(), HeroSkillNodeSchema).default({}),
   heroGrades: z.record(z.string(), HeroGradeDefSchema).default({}),
+  /** Лестница звёздности Sector Zero (SZE-0.2). Пусто = мастерская и академия выключены
+   *  данными, без флага в коде. */
+  sectorZeroStars: SectorZeroStarsSchema.prefault({}),
+  sectorZeroShop: SectorZeroShopSchema.prefault({}),
   modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).

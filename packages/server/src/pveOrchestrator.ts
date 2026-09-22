@@ -1,4 +1,14 @@
-import { isCapturable, type Action, type GameData, type GameState, type Planet, type PlayerId } from '@void/shared-core';
+import {
+  isCapturable,
+  recalled,
+  swarmModuleLevel,
+  MIN_SIGNAL,
+  type Action,
+  type GameData,
+  type GameState,
+  type Planet,
+  type PlayerId,
+} from '@void/shared-core';
 
 /**
  * PvE orchestrator (PVE-5.1) — the tactics that make a spawned wave actually GO
@@ -30,6 +40,24 @@ export interface PveOrdersOptions {
   /** Monotonic counter OWNED BY THE CALLER: two ticks must not mint the same id, or
    *  the room's receipt cache would dedupe the second wave's orders as retries. */
   seq: number;
+  /**
+   * PVR-4.3 — глубина памяти Роя в ЗАВЕРШЁННЫХ СТОЛКНОВЕНИЯХ; `null` — весь забег.
+   *
+   * Это и есть сложность (§0.4/§3.9: `weak` — последние 4, `strong` — весь забег).
+   * Она живёт здесь, а не в `GameState`, потому что по ADR 05 недетерминированная
+   * настройка ИИ вне реплей-контракта; ядро держит только честный пол `MIN_SIGNAL`.
+   * Не задана ⇒ Рой не адаптируется вовсе: молча «помнить всё» было бы тихим
+   * повышением сложности у всякого, кто забыл передать окно.
+   */
+  memoryWindow?: number | null;
+}
+
+/** Флоты места в стабильном порядке: `Object.values` отдаёт порядок вставки, и два
+ *  хоста, собравшие мир по-разному, минтили бы приказы в разном порядке. */
+function fleetsOf(state: GameState, owner: PlayerId) {
+  return Object.values(state.fleets)
+    .filter((f) => f.owner === owner)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 /** Squared Euclidean distance — the comparison never needs the root, and skipping it
@@ -79,11 +107,37 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
 
   const out: Action[] = [];
   let seq = opts.seq;
+
+  // PVR-4.3 — адаптация. Драйвер решает «пора», ядро решает «имел ли право»: порог
+  // считается по ОКНУ сложности, а `swarmAdaptModule` независимо проверяет, что класс
+  // вообще наблюдался за забег. Поэтому сложность двигает МОМЕНТ адаптации, а не её
+  // законность, и жульничающий драйвер ничего себе не выторгует.
+  if (opts.memoryWindow !== undefined && !state.swarmAdapt) {
+    const host = fleetsOf(state, npc).find((f) =>
+      f.units.some((st) => st.modules?.some((id) => data.modules[id]?.brood !== undefined)),
+    );
+    if (host) {
+      // Модули перебираются по отсортированным id: два хоста обязаны выбрать один и
+      // тот же ответ на одну и ту же память.
+      for (const moduleId of Object.keys(data.modules).sort()) {
+        const ladder = data.modules[moduleId]?.adaptation;
+        if (!ladder) continue;
+        if (swarmModuleLevel(state, npc, moduleId) >= ladder.levels.length) continue;
+        if (recalled(state.swarmMemory, ladder.signal, opts.memoryWindow) < MIN_SIGNAL) continue;
+        out.push({
+          id: `${opts.session}:${npc}:${seq++}`,
+          issuedAt: state.time,
+          type: 'swarm.adapt',
+          playerId: npc,
+          payload: { moduleId, fleetId: host.id },
+        });
+        break; // проект одновременно один — второй приказ ядро отклонит `E_ADAPT_BUSY`
+      }
+    }
+  }
   // Sorted by id: the order of `Object.values` is insertion order, and two hosts that
   // built the same world differently would otherwise mint orders in a different order.
-  const fleets = Object.values(state.fleets)
-    .filter((f) => f.owner === npc)
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const fleets = fleetsOf(state, npc);
 
   for (const fleet of fleets) {
     // Busy fleets are left alone: one already under way is committed to its leg, and

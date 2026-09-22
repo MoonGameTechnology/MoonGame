@@ -60,7 +60,14 @@ import {
   tickRearm,
   trimHangar,
 } from '../state/shuttle';
-import { applyDamageToSide, beachheadOf, isAllied, removeIfWiped } from '../util/combat';
+import {
+  applyDamageToSide,
+  beachheadOf,
+  hookedDamage,
+  isAllied,
+  removeIfWiped,
+  type HookedDamage,
+} from '../util/combat';
 import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
 import { addUnits, cappedUnitStat, findHealthyStack, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
@@ -314,7 +321,7 @@ function shootDownStrike(strike: ShuttleStrike, amount: number): number {
  * трассе, перехват, ответка в момент удара) обязаны считать ОДИНАКОВО — счёт живёт здесь
  * в одном экземпляре, а не тремя копиями по месту.
  */
-function absorbIntoStrike(strike: ShuttleStrike, damage: number, data: GameData): number {
+function absorbIntoStrike(strike: ShuttleStrike, damage: HookedDamage, data: GameData): number {
   const first = strike.units[0];
   if (!first) return 0;
   const hull = Math.max(1, data.units[first.unit]?.stats.hp ?? 1);
@@ -492,7 +499,7 @@ function repelStrike(
   target: { id: string; owner: string | null; location: string },
 ): void {
   if (amount <= 0) return;
-  const dealt = h.hook<number>('combat.damage', amount, {
+  const dealt = hookedDamage(h, amount, {
     phase: 'returnFire',
     location: target.location,
     attacker: target.owner ?? '',
@@ -809,7 +816,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
           // артиллерии, где залпы считаются из состояния до отрезка.
           const answer = returnFireAgainstFleet(target, h.ctx.data);
           if (power > 0) {
-            const dealt = h.hook<number>('combat.damage', power, {
+            const dealt = hookedDamage(h, power, {
               phase: 'shuttle',
               location: target.location ?? '',
               attacker: strike.owner,
@@ -836,7 +843,9 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
         if (target && target.owner !== strike.owner) {
           const answer = planetPointDefense(target, h.ctx.data);
           if (power > 0) {
-            const dealt = h.hook<number>('combat.damage', power, {
+            // Второй шов по шине, как у обстрела с орбиты: урон миру накладывает
+            // `construction`, получив `planet.bombarded` (CORE-DMG-2).
+            const dealt = hookedDamage(h, power, {
               phase: 'shuttle',
               location: target.id,
               attacker: strike.owner,
@@ -1060,7 +1069,7 @@ export const shuttleModule: GameModule = {
       const into = requireSquadron(h, base, p.intoId);
 
       const units = into.units.map((st) => ({ ...st }));
-      for (const st of from.units) addUnits(units, st.unit, st.count, st.modules);
+      for (const st of from.units) addUnits(units, st.unit, st.count, st.modules, st.moduleStars);
       const cargo = (into.cargo ?? []).map((st) => ({ ...st }));
       for (const st of from.cargo ?? []) addUnits(cargo, st.unit, st.count);
       const merged: Squadron = { id: into.id, units, ...(cargo.length > 0 ? { cargo } : {}) };
@@ -1455,7 +1464,7 @@ export const shuttleModule: GameModule = {
 
         const perTarget = pd / targets.length;
         for (const target of targets) {
-          const dealt = h.hook<number>('combat.damage', perTarget, {
+          const dealt = hookedDamage(h, perTarget, {
             phase: 'pointDefense',
             location: fleet.location ?? '',
             attacker: fleet.owner,
@@ -1519,7 +1528,7 @@ export const shuttleModule: GameModule = {
         const target = nearestHostileStrike(strikes, base, reach, h);
         if (!target) continue;
 
-        const dealt = h.hook<number>('combat.damage', power, {
+        const dealt = hookedDamage(h, power, {
           phase: 'intercept',
           location: base.ref.kind === 'planet' ? base.ref.id : '',
           attacker: base.owner,

@@ -97,6 +97,9 @@ const SELF_RESTRICTED = [
 const EXPECTED: Record<string, string[] | null> = {
   planet: null, // the prize: the only roster-less province
   asteroid: ['metal_station'], // ore field: the rig that mines it — the fortress core moved out (decision 18)
+  // M2.4: the dense core of an asteroid massif. Same rig as ordinary field — the
+  // density is what makes it slow and rich, not what makes it buildable differently.
+  asteroid_cluster: ['metal_station'],
   nebula: [],
   empty: [],
   debris_field: [],
@@ -106,6 +109,9 @@ const EXPECTED: Record<string, string[] | null> = {
   dense_nebula: [],
   solar_flare: [],
   black_hole: [],
+  // MAP-BARRIER: a rift is a HOLE in the map — nothing routes through it and no lane
+  // may lead into it, so nothing can be raised there either.
+  rift: [],
   pirate_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   neutral_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   // owner decision 8: a fortress does not exclude mining — the rig can be rebuilt here

@@ -28,14 +28,35 @@ export function findHealthyStack(
   );
 }
 
+/** Звёздность надетых модулей в виде поля стека (SZE-1.1): только НЕнулевые звёзды
+ *  и только НАДЕТЫХ модулей. Пусто → поле не заводится вовсе, и состояние остаётся
+ *  байт-в-байт прежним — иначе каждый обычный матч потолстел бы на пустую карту. */
+export function starsOf(
+  modules: readonly string[] | undefined,
+  stars: Record<string, number> | undefined,
+): Record<string, number> | undefined {
+  if (!modules || !stars) return undefined;
+  const out: Record<string, number> = {};
+  for (const id of modules) {
+    const star = stars[id];
+    if (star !== undefined && star > 0) out[id] = star;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Adds `count` units to a stack array, merging into an existing healthy stack of
  *  the same type AND loadout when one exists, else appending a fresh stack (which
- *  carries `modules` when a loadout was given). */
+ *  carries `modules` — and the звёздность `stars` of those modules — when given).
+ *
+ *  Звёзды в идентичность слияния НЕ входят: они замороженное свойство владельца,
+ *  снятое один раз на матч, так что два стека одного игрока с одним лоадаутом всегда
+ *  несут одинаковые звёзды (см. {@link UnitStack.moduleStars}). */
 export function addUnits(
   stacks: UnitStack[],
   unit: string,
   count: number,
   modules?: readonly string[],
+  stars?: Record<string, number>,
 ): void {
   const stack = findHealthyStack(stacks, unit, modules);
   if (stack) {
@@ -47,6 +68,8 @@ export function addUnits(
   } else {
     const fresh: UnitStack = { unit, count };
     if (modules && modules.length > 0) fresh.modules = [...modules];
+    const own = starsOf(fresh.modules, stars);
+    if (own) fresh.moduleStars = own;
     stacks.push(fresh);
   }
 }
@@ -103,6 +126,10 @@ export function takeFromStacks(
       st.shieldHp -= t.shieldHp;
     }
     if (st.modules && st.modules.length > 0) t.modules = [...st.modules];
+    // Звёздность (SZE-1.1) — свойство надетых модулей, а не пул: отделённая часть
+    // несёт те же звёзды. Поля тут перечисляются поимённо, поэтому забытое теряется
+    // МОЛЧА — ровно так растворилась бы половина заточки при любом делении флота.
+    if (st.moduleStars) t.moduleStars = { ...st.moduleStars };
     // Заслуга ветерана (VET-2) КОПИРУЕТСЯ, а не делится: она уже «на юнит», и от того,
     // сколько кораблей отделили, величина на юнит не зависит. Делить её здесь, как
     // делится пул `hp`, значило бы наказывать за разделение флота.
@@ -124,6 +151,7 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
   const clone = (st: UnitStack): UnitStack => ({
     ...st,
     ...(st.modules ? { modules: [...st.modules] } : {}),
+    ...(st.moduleStars ? { moduleStars: { ...st.moduleStars } } : {}),
   });
   const out = base.map(clone);
   for (const st of add) {

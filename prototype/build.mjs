@@ -11,8 +11,10 @@ import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
 const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.meta.url), 'utf8');
+const heroCardsCss = readFileSync(new URL('./hero-cards.css', import.meta.url), 'utf8');
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
+const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 
 const bundle = async (playerBuild) => {
   const res = await build({
@@ -72,6 +74,7 @@ body{margin:0;overflow:hidden;color:var(--ink);
   background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
 /* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
+#sector-zero{position:fixed;inset:0;z-index:58;display:none;}
 
 /* Map entry: a calm projection surface, actual work progress, original lore. */
 #maploading{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
@@ -230,6 +233,17 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   box-shadow:inset 0 0 10px rgba(53,214,230,.14),0 0 10px rgba(53,214,230,.12);
   text-shadow:0 0 8px rgba(53,214,230,.5);}
 #crestmark:hover,#crestmark:active{background:rgba(53,214,230,.16);}
+/* PvE wave readout (PVR-1.2) — стоит сразу за часами, потому что это то же измерение:
+   сколько осталось до следующего события мира.
+   КРАСНЫЙ, а не амбер: первая редакция была амберной, и на снимке она оказалась близнецом
+   золотого чипа Суверенов в двух сантиметрах правее — угроза и деньги читались одинаково.
+   Красный (--red) в этой палитре занят опасностью и с золотом не путается.
+   Без пульсации: строка висит весь матч, мигающая угроза на полчаса утомляет и перестаёт
+   читаться как сигнал вообще. */
+#devline .dl-wave{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
+  color:#ffb3aa;font-weight:700;font-size:12px;line-height:1;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:rgba(255,90,77,.08);border:1px solid rgba(255,90,77,.42);}
 /* donate currency (Суверены ◆, gold) sits UNDER the resource bar on the status line,
    pushed to the right end — so the resource chips get the full top-bar width for numbers. */
 #devline .dl-donate{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;
@@ -378,6 +392,17 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .hullrow .hbar.low i{background:#ff5a4d;}
 .hullrow .hbar.sh i{background:#35d6e6;}
 .hullrow b{flex:0 0 auto;font-size:11px;}
+.holdmeters{display:grid;gap:8px;margin:8px 0;padding:9px 10px;background:rgba(5,19,29,.65);border:1px solid var(--line);border-radius:8px;}
+.holdmeter-head,.holdmeter-note{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;}
+.holdmeter-head{font-size:11px;color:var(--ink);}
+.holdmeter-head>span{color:var(--hold-color);}
+.holdmeter-head b{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.holdmeter-track{display:flex;height:6px;margin:5px 0;background:rgba(190,219,229,.13);border-radius:2px;overflow:hidden;}
+.holdmeter-track i{display:block;height:100%;background:var(--hold-color);flex:none;}
+.holdmeter-track i.reserved{background:repeating-linear-gradient(120deg,transparent 0 3px,var(--hold-color) 3px 5px);}
+.holdmeter-note{font-size:10px;line-height:1.5;color:#a9bcc6;}
+.holdmeter-loading{color:var(--hold-color);}
+.holdmeter.over .holdmeter-head b,.holdmeter.over .holdmeter-note{color:#ff8b7e;}
 .chip-gold{flex:0 0 auto;padding:3px 8px;font-size:10px;cursor:pointer;color:#ffd76a;
   background:rgba(255,215,106,.08);border:1px solid rgba(255,215,106,.45);border-radius:4px;white-space:nowrap;}
 .chip-gold:hover{background:rgba(255,215,106,.18);box-shadow:0 0 8px rgba(255,215,106,.25);}
@@ -542,6 +567,20 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    Top-right under the top bar; z-32 above the HUD but below toasts/modals. */
 #goals{position:fixed;top:52px;right:14px;z-index:32;display:none;max-width:min(230px,60vw);}
 #goals.show{display:block;}
+#pirate-intro{position:fixed;top:calc(var(--tbh) + 78px);left:78px;z-index:32;
+  width:min(280px,80vw);padding:12px;background:rgba(4,16,22,.96);border:1px solid #a95e48;
+  border-radius:9px;color:var(--ink);font-size:12px;line-height:1.5;}
+#pirate-intro[hidden]{display:none;}
+#pirate-intro .pe-title{color:#ffb399;display:block;padding-right:28px;}
+#pirate-intro .pe-copy{margin:8px 0 10px;}
+#pirate-intro .pe-close{position:absolute;right:4px;top:4px;width:32px;height:32px;
+  border:0;background:transparent;color:var(--ink);cursor:pointer;}
+#pirate-intro .pe-action{min-height:40px;width:100%;border:1px solid #a95e48;border-radius:5px;
+  background:#302128;color:var(--ink);font:inherit;cursor:pointer;}
+body.holo-ui #pirate-intro{left:18px;}
+@media(max-width:640px){#pirate-intro,body.holo-ui #pirate-intro{top:auto;left:auto;right:12px;
+  bottom:calc(112px + env(safe-area-inset-bottom,0px));}}
+body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirate-intro{display:none;}
 #goals .gl-box{background:rgba(4,16,22,.94);border:1px solid var(--cyan-dim);border-radius:9px;overflow:hidden;
   box-shadow:0 4px 16px rgba(0,0,0,.45);}
 #goals .gl-head{display:flex;align-items:center;gap:7px;padding:7px 10px;background:rgba(53,214,230,.08);
@@ -1423,14 +1462,22 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
   color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
 .cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+#devline [data-solo-play],#devline [data-solo-save],#devline [data-swarm-intel]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
+.swarm-contact{border-top:1px solid var(--line-hi);padding:12px 0;overflow-wrap:anywhere;}
+.swarm-contact h3{font-size:13px;color:var(--cyan);margin:0 0 6px;}
+.swarm-contact p{font-size:11px;color:var(--dim);margin:0 0 8px;}
+.swarm-contact ul{list-style:none;padding:0;margin:0;}
+.swarm-contact li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;}
 /* scientist council picker (setup-time, over the start-point screen) */
-#scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
+#swarm-dossier,#scipick,#boonpick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
-#scipick.show{display:flex;}
-#scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
+#swarm-dossier.show,#scipick.show,#boonpick.show{display:flex;}
+#swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
-#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
-#scipickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
+#swarm-dossier .lw-head,#scipick .lw-head,#boonpick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+.swarm-sync{display:none;}
+@keyframes swarm-intel-scan{to{transform:rotate(360deg);}}
+#swarm-dossier-body,#scipickbody,#boonpickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
 .sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px;}
 .sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
 .sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
@@ -1450,6 +1497,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .sp-warn{margin-top:12px;display:flex;gap:8px;padding:10px 12px;border:1px solid #6a4a17;border-radius:9px;background:rgba(255,180,58,.09);color:#f4d199;font-size:11.5px;line-height:1.5;}
 .sp-h{margin:15px 0 8px;font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);}
 .sp-roster{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+/* усиление забега (PVR-1.4): те же карточки, что у совета, в один столбец —
+   выбор здесь делается в бою, и колонка читается быстрее решётки. */
+#boonpickbody .bp-list{display:flex;flex-direction:column;gap:9px;}
+#boonpickbody .bp-owed{color:var(--dim);font-size:11px;margin:0 0 10px;}
 .sp-card{text-align:left;cursor:pointer;border:1px solid var(--line-hi);border-radius:9px;padding:9px 10px;background:rgba(53,214,230,.04);color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:3px;}
 .sp-card:hover:not(:disabled){border-color:var(--cyan);background:rgba(53,214,230,.11);box-shadow:0 0 12px rgba(53,214,230,.16);}
 .sp-card:disabled{opacity:.34;cursor:not-allowed;}
@@ -1734,6 +1785,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .res i svg{width:14px;height:14px;}
   .res b{font-size:12px;}
   #devline .dl-donate{font-size:11px;padding:2px 8px;}
+  #devline .dl-wave{font-size:11px;padding:2px 8px;margin-left:8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
      identify the window, so the «ДИПЛОМАТИЯ» caption yields its room to them */
@@ -2018,11 +2070,17 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   border-radius:6px;padding:6px 12px;min-width:64px;cursor:pointer;background:transparent;color:var(--dim);}
 #setup .srow .stog.ai{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
 #setup .srow .stog.strong{border-color:var(--amber);color:var(--amber);background:rgba(255,180,58,.14);}
-#setup .tmrow{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+#setup .tmrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px;}
 #setup .tmtog{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:700 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;text-align:left;}
 #setup .tmtog.on{border-color:var(--amber);color:var(--amber);background:rgba(232,178,74,.12);}
 #setup .pve-btn{flex:0 0 auto;padding:9px 12px;border-radius:8px;border:1px solid var(--cyan);background:rgba(53,214,230,.12);color:var(--cyan);}
+/* Сложность забега (PVR-2.1) — спутник кнопки запуска, а не вторая кнопка запуска:
+   тише по контрасту, тот же размер, чтобы на телефоне пара читалась как одна строка. */
+#setup .pve-diff{flex:0 0 auto;padding:9px 12px;border-radius:8px;border:1px solid rgba(53,214,230,.35);background:transparent;color:var(--dim);}
+/* Третья кнопка в строке не влезает в узкий экран: строка переносится (flex-wrap выше),
+   а подпись сложности не ломается посередине. */
+#setup .pve-diff{white-space:nowrap;}
 #setup .tmhint{font-size:10px;color:var(--dim);letter-spacing:.3px;}
 #setup .srow .tmchip{width:30px;height:30px;flex:none;border-radius:7px;border:1px solid var(--line-hi);
   background:transparent;font:800 13px ui-monospace,monospace;cursor:pointer;color:var(--dim);}
@@ -2227,6 +2285,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #sandbox .sbx-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grn-dim);margin:12px 0 6px;}
 /* Toggles reuse the «Настройки» switch look (.set-row / .set-switch, defined above);
    the grid just stacks the rows. */
+#sandbox .sbx-compare{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;}
+#sandbox .sbx-compare th,#sandbox .sbx-compare td{padding:6px;border-bottom:1px solid var(--line-hi);text-align:left;}
+#sandbox select{width:100%;min-width:0;background:var(--glass);color:var(--grn);padding:8px;}
+#sandbox .sbx-compare-picks{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 #sandbox .sbx-togs{display:grid;gap:2px;}
 #sandbox .sbx-cmd{width:100%;margin-top:7px;padding:11px 12px;border-radius:9px;border:1px solid var(--line-hi);
   background:transparent;color:var(--ink);font-size:12px;letter-spacing:.4px;cursor:pointer;text-align:left;}
@@ -2346,6 +2408,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #hub .hub-play:active{background:linear-gradient(180deg,rgba(53,214,230,.44),rgba(53,214,230,.2));}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
+#solo-replace{display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;background:#000b;padding:20px;}
+#solo-replace .solo-box{width:min(440px,100%);padding:24px;background:#091b20;border:1px solid var(--cyan-dim);border-radius:12px;}
+#solo-replace button{min-height:44px;padding:10px 16px;margin:6px;border:1px solid var(--line-hi);border-radius:8px;background:var(--glass);color:var(--ink);cursor:pointer;}
+#solo-save-status{font-size:12px;color:var(--dim);line-height:1.5;}
+#hub-solo-continue[hidden]{display:none;}
+#hub #hub-sector-zero{min-height:44px;}
 #hub .hub-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin-top:4px;
   padding-bottom:6px;border-bottom:1px solid var(--line);}
 #hub .hub-card{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line-hi);border-radius:10px;
@@ -2657,8 +2725,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
-  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,
-  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
+  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,#boonpick,
+  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
   /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
@@ -2703,7 +2771,23 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
   #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
-  #scipick .twbox{width:53.4vw;max-height:58.5vh;}
+  #swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{width:53.4vw;max-height:58.5vh;}
+  /* Persistent intelligence stays beside the map and never intercepts map input
+     outside its own box. Its height follows the desktop HUD's actual zoom. */
+  #swarm-dossier.pinned{inset:auto;left:70px;bottom:62px;padding:0;z-index:18;
+    width:min(270px,25vw);background:none;backdrop-filter:none;align-items:stretch;}
+  #swarm-dossier.pinned .twbox{width:100%;max-height:min(42vh,calc(var(--vph) - var(--tbh) - 120px));}
+  #swarm-dossier.pinned #swarm-dossier-close{display:none;}
+  #swarm-dossier.pinned .swarm-sync{display:inline-flex;align-items:center;gap:6px;visibility:hidden;
+    color:var(--cyan);font-size:10px;font-weight:400;white-space:nowrap;}
+  #swarm-dossier.pinned .swarm-sync::before{content:'';width:11px;height:11px;flex:none;
+    border:1px solid var(--cyan-dim);border-top-color:var(--cyan);border-right-color:var(--cyan);border-radius:50%;}
+  #swarm-dossier.pinned.updating .swarm-sync{visibility:visible;}
+  #swarm-dossier.pinned.updating.scan-motion .swarm-sync::before{animation:swarm-intel-scan .7s linear infinite;}
+  #swarm-dossier.pinned .swarm-contact{border-top:1px solid var(--cyan-dim);padding-top:8px;}
+  #swarm-dossier.pinned .swarm-contact h3{font-size:12px;overflow-wrap:anywhere;}
+  #swarm-dossier.pinned .swarm-contact ul{padding-left:16px;}
+  #swarm-dossier.pinned .swarm-biology{margin-bottom:10px;}
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
@@ -2816,12 +2900,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 }
 `;
 
-const page = (js) => `<!doctype html>
+const page = (js, entry = 'void-dominion') => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${mobileStrategyCss}</style></head>
-<body>
+<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}</style></head>
+<body data-entry="${entry}">
 <section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
   <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
   <p data-i18n="startup.failed.body"></p>
@@ -2857,6 +2941,12 @@ const page = (js) => `<!doctype html>
 <div id="devline"></div>
 <!-- slim left rail: only the wired tools (each opens its window). More icons land here as
      features get wired. -->
+<div id="solo-replace" role="dialog" aria-modal="true" aria-labelledby="solo-replace-title">
+  <div class="solo-box"><h2 id="solo-replace-title" data-i18n="solo.save.replace.title"></h2>
+  <p data-i18n="solo.save.replace.body"></p>
+  <button id="solo-replace-cancel" type="button" data-i18n="solo.save.replace.cancel"></button>
+  <button id="solo-replace-confirm" type="button" data-i18n="solo.save.replace.confirm"></button></div>
+</div>
 <nav id="rail">
   <div id="railtools">
     <button id="rail-diplo" data-i18n-title="rail.diplo.title">⬡<span class="rlbl" data-i18n="rail.diplo.label"></span></button>
@@ -2888,6 +2978,9 @@ const page = (js) => `<!doctype html>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
+<!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
+<div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><span class="swarm-sync" aria-hidden="true" data-i18n="swarm.intel.updated"></span><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
+<div id="boonpick"><div class="twbox"><div class="lw-head"><b data-i18n="win.boon.title"></b><button class="sp-cancel" type="button" data-boonlater="1" data-i18n="win.boon.later"></button></div><div id="boonpickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
@@ -2909,6 +3002,12 @@ const page = (js) => `<!doctype html>
 <div id="intro"></div>
 <div id="recap"></div>
 <div id="goals"></div>
+<aside id="pirate-intro" hidden>
+  <b class="pe-title" data-i18n="pve.pirates.title"></b>
+  <button type="button" id="pirate-close" class="pe-close" data-i18n-aria="pve.pirates.hide">×</button>
+  <p id="pirate-copy" class="pe-copy" aria-live="polite"></p>
+  <button type="button" id="pirate-action" class="pe-action"></button>
+</aside>
 <div id="playercard"></div>
 <div id="rescard"></div>
 <div id="profile"></div>
@@ -3093,6 +3192,63 @@ const page = (js) => `<!doctype html>
     <button id="ub-later" class="ub-later" type="button" data-i18n="upd.later"></button>
   </div>
 </div>
+<section id="sector-zero" aria-labelledby="sz-title"${entry === 'sector-zero' ? ' style="display:flex"' : ''}>
+  <div class="sz-shell">
+    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span><span data-i18n="sector-zero.offline"></span></div>
+    <div class="sz-main" id="sz-home">
+      <div class="sz-content">
+        <p class="sz-eyebrow" data-i18n="sector-zero.offline"></p>
+        <h1 id="sz-title" data-i18n="sector-zero.title"></h1>
+        <p class="sz-intro" data-i18n="sector-zero.intro"></p>
+        <div class="sz-run"><div id="sz-save-label" data-i18n="sector-zero.offline"></div><p id="sz-summary" role="status" aria-live="polite" data-i18n="sector-zero.loading"></p></div>
+        <div id="sz-actions">
+          <div class="sz-actions">
+            <button id="sz-continue" class="sz-action sz-primary" type="button" hidden disabled data-i18n="sector-zero.continue"></button>
+            <button id="sz-new" class="sz-action sz-primary" type="button" disabled data-i18n="sector-zero.new"></button>
+            <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
+            <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
+          </div>
+          <fieldset class="sz-difficulty">
+            <legend data-i18n="sector-zero.difficulty"></legend>
+            <div class="sz-options">
+              <button id="sz-weak" type="button" data-difficulty="weak" aria-pressed="true" data-i18n="setup.pve.difficulty.weak"></button>
+              <button id="sz-strong" type="button" data-difficulty="strong" aria-pressed="false" data-i18n="setup.pve.difficulty.strong"></button>
+            </div>
+            <p id="sz-difficulty-hint" hidden data-i18n="sector-zero.difficulty.hint"></p>
+          </fieldset>
+        </div>
+        <div id="sz-confirm" hidden role="group" aria-labelledby="sz-confirm-title">
+          <h2 id="sz-confirm-title" data-i18n="sector-zero.confirm.title"></h2>
+          <p data-i18n="sector-zero.confirm.body"></p>
+          <button id="sz-cancel" class="sz-action" type="button" data-i18n="sector-zero.cancel"></button>
+          <button id="sz-replace" class="sz-action sz-primary" type="button" data-i18n="sector-zero.confirm"></button>
+        </div>
+        <div class="sz-tools"><button id="sz-settings" type="button" data-i18n="hub.tile.settings"></button><button id="sz-back" type="button" data-i18n="sector-zero.back"></button></div>
+      </div>
+      <div class="sz-projection" aria-hidden="true">
+        <svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="currentColor" stroke-width=".65" opacity=".32">
+            <circle cx="250" cy="250" r="220" stroke-dasharray="2 9"/><circle cx="250" cy="250" r="190"/>
+            <path d="M250 15v64m0 342v64M15 250h64m342 0h64M94 94l37 37m238 238 37 37M94 406l37-37m238-238 37-37"/>
+            <ellipse cx="250" cy="250" rx="208" ry="75" transform="rotate(-28 250 250)"/>
+            <ellipse cx="250" cy="250" rx="170" ry="48" transform="rotate(55 250 250)"/>
+          </g>
+          <circle cx="250" cy="250" r="131" stroke="currentColor" stroke-width="1.3" opacity=".7"/>
+          <path d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
+          <ellipse cx="250" cy="250" rx="65" ry="131" stroke="currentColor" opacity=".15"/>
+          <ellipse cx="250" cy="250" rx="131" ry="44" stroke="currentColor" opacity=".22"/>
+          <path d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
+          <path d="m223 304 54-108" stroke="currentColor" opacity=".4"/>
+          <g fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
+          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
+          <path d="M332 397h82l30 30" stroke="#e6b777" opacity=".45"/>
+        </svg>
+      </div>
+    </div>
+    <div id="sz-workshop" hidden></div>
+    <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>
+  </div>
+</section>
 <div id="hub">
   <div class="hub-banner">
     <div class="hub-crest"><span class="dia"></span></div>
@@ -3109,7 +3265,10 @@ const page = (js) => `<!doctype html>
   <div class="hub-body">
     <div class="hub-panel" id="hp-home">
       <button id="hub-play" class="hub-play" type="button" data-i18n="hub.play"></button>
+      <button id="hub-solo-continue" class="hub-solo" type="button" hidden data-i18n="solo.save.continue"></button>
+      <p id="solo-save-status" role="status"></p>
       <button id="hub-solo" class="hub-solo" type="button" data-i18n="hub.solo"></button>
+      <button id="hub-sector-zero" class="hub-solo" type="button" data-i18n="sector-zero.enter"></button>
       <!-- ONB-0 first-run offer: shown only to a not-yet-onboarded commander -->
       <div class="hub-card ob-nudge" id="onboard-nudge" style="display:none">
         <div class="hc-ic">◎</div>
@@ -3313,10 +3472,18 @@ const adminPage = (js) => `<!doctype html>
 </body></html>`;
 
 mkdirSync('prototype/dist', { recursive: true });
-const devHtml = page(await bundle(false));
-const playerHtml = stripDevMarkup(page(await bundle(true)));
+const devJs = await bundle(false);
+const devHtml = page(devJs);
+writeFileSync('prototype/dist/sector-zero-dev.html', page(devJs, 'sector-zero'));
+const playerJs = await bundle(true);
+const playerHtml = stripDevMarkup(page(playerJs));
+// A direct menu entry for review and offline play, still using the shared client.
+// This is not the isolated product dependency graph planned in YAG-1.1.
+const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);
+writeFileSync('prototype/dist/sector-zero.html', sectorZeroHtml);
+console.log('wrote prototype/dist/sector-zero.html (' + (sectorZeroHtml.length / 1024).toFixed(0) + ' KB)');
 console.log(
   'wrote prototype/dist/void-dominion.html (' + (devHtml.length / 1024).toFixed(0) + ' KB)',
 );

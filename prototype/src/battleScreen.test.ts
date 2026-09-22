@@ -6,8 +6,9 @@
  * REFM-экранов.
  */
 import { describe, it, expect } from 'vitest';
-import { battleWindowHtml, sideRowHtml } from './battleScreen';
+import { battleWindowHtml, sideRowHtml, battleRetreats } from './battleScreen';
 import '../../localization/runtime';
+import { displayUnit } from './format';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
 const side = (
@@ -69,7 +70,7 @@ describe('окно боя', () => {
     const s = side('p1', 'defender');
     s.hull = { current: 120, max: 200 };
     const html = sideRowHtml(s);
-    expect(html).toContain('3× cruiser');
+    expect(html).toContain(`3× ${displayUnit('cruiser')}`);
     expect(html).toContain('120/200');
   });
 
@@ -93,4 +94,28 @@ describe('окно боя', () => {
     expect(html).toContain('bw-empty');
     expect(html).not.toContain('bw-side');
   });
+});
+
+import { newGame } from './game';
+it('retreat is available only for living own ship sides, never landing or foreign forces', () => {
+  const state = newGame();
+  const mine = Object.values(state.fleets).find((f) => f.owner === 'p1')!;
+  const foe = Object.values(state.fleets).find((f) => f.owner !== 'p1')!;
+  mine.battleId = 'b';
+  foe.battleId = 'b';
+  state.battles.b = {
+    id: 'b',
+    location: mine.location!,
+    phase: 'orbital',
+    round: 1,
+    sides: [
+      { owner: mine.owner, role: 'attacker', ref: { kind: 'fleet', fleetId: mine.id } },
+      { owner: foe.owner, role: 'defender', ref: { kind: 'fleet', fleetId: foe.id } },
+      { owner: mine.owner, role: 'attacker', ref: { kind: 'landing', fleetId: mine.id } },
+    ],
+  };
+  expect(battleRetreats(state, 'b', 'p1')).toEqual([mine.id]);
+  mine.battleId = null;
+  expect(battleRetreats(state, 'b', 'p1')).toEqual([]);
+  expect(battleRetreats(state, 'missing', 'p1')).toEqual([]);
 });

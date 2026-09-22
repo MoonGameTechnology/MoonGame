@@ -28,5 +28,12 @@
 
 {$DOMAIN} {
 	encode zstd gzip
+	# SE-7.1: HSTS ставит ТОТ, КТО ТЕРМИНИРУЕТ TLS. Приложение ставит его само, только
+	# когда доверяет прокси (TRUST_PROXY=1 + X-Forwarded-Proto), а здесь схема известна
+	# достоверно: до Caddy запрос дошёл по https, иначе его бы тут не было. Остальные
+	# заголовки (CSP по хешам документа, nosniff, referrer, permissions) ставит
+	# приложение — оно одно знает, что именно отдаёт, и дублировать их здесь значило бы
+	# завести вторую версию политики, которая разъедется с первой.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	reverse_proxy server:8788
 }

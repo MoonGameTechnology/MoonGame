@@ -35,7 +35,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.23'); // Frontier adds pirate/neutral bases and the isolated black hole
+    expect(data.version).toBe('0.1.25'); // BAL-13 completes the scientist roster: a leader per tech branch
     expect(data.resources).toContain('microelectronics');
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
@@ -309,12 +309,16 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // прячет из окна исследований по префиксу. Любая другая бесплатная технология —
     // забытые числа, а не задумка, и увидит её сначала игрок, а не ревьюер.
     const data = parseGameData(loadShippedBundle());
+    // PVR-1.4 заменил ПРЕФИКС на данные: бесплатность теперь извиняет не имя, а флаг
+    // `grantOnly`, и он же реально запирает исследование в ядре (`E_GRANT_ONLY`), а не
+    // только прячет узел из окна. Префиксного исключения больше нет — если `meta_*`
+    // забудут пометить, тест это увидит.
     const free = Object.entries(data.technologies)
       .filter(([, def]) => Object.keys(def.cost).length === 0 && def.researchTimeHours <= 0)
+      .filter(([, def]) => !def.grantOnly)
       .map(([id]) => id)
-      .filter((id) => !id.startsWith('meta_'))
       .sort();
-    expect(free, 'технология бесплатна и мгновенна, но это не мета-грант').toEqual([]);
+    expect(free, 'технология бесплатна и мгновенна, но выдачей не помечена').toEqual([]);
   });
 
   it('ships producers for every economy resource (ECON-3: energy + microelectronics)', () => {
@@ -379,6 +383,50 @@ describe('game data schema (docs/architecture.md §2)', () => {
     for (const [id, def] of Object.entries(data.heroSkillTrees)) {
       check(def.cost, `skill node ${id} cost`);
     }
+  });
+
+  it('у каждого гейта `has_scientist{branch}` есть лидер этой ветки (BAL-13)', () => {
+    // Сторож против МЁРТВОГО узла. Гейт `has_scientist { branch }` запирает технологию
+    // на учёного нужной ветки; нет такого учёного в каталоге — узел не может взять
+    // НИКТО, в сессии любой длины, и заметить это по игре нельзя (узел просто всегда
+    // серый). Именно так когда-то родились три капстоуна, которых не исследовал ни
+    // один игрок; гейты с них потом сняли, но защиты от повторения не осталось.
+    //
+    // Проверка идёт от ТЕХНОЛОГИЙ к учёным, а не наоборот: ветка без лидера — это
+    // нормально (пока в ней нет гейченных узлов), а вот гейченный узел без лидера —
+    // всегда баг. `sciPick.test.ts` это поймать не мог: он искал первого учёного с
+    // гейченной веткой и при пустом результате молча выходил.
+    const data = parseGameData(loadShippedBundle());
+    const leaderBranches = new Set(
+      Object.values(data.scientists)
+        .map((sci) => sci.branch)
+        .filter((b): b is NonNullable<typeof b> => b !== undefined),
+    );
+    for (const [id, def] of Object.entries(data.technologies)) {
+      for (const cond of def.conditions) {
+        if (cond.type !== 'has_scientist' || cond.branch === undefined) continue;
+        expect(
+          leaderBranches.has(cond.branch),
+          `technology "${id}" is gated on a ${cond.branch} scientist, but no scientist in the catalog leads that branch — the node is unreachable`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('каждая ветка дерева технологий имеет лидера — совет «2 из N» это развилка (BAL-13)', () => {
+    // Другая половина того же факта, и она про ЗАМЫСЕЛ, а не про мёртвый контент:
+    // совет посвящается ДО старта и внутри матча неизменен, значит он обязан быть
+    // выбором. Пока лидеров было два на пять веток, «взять 2 из 3» развилкой не было —
+    // третий кандидат безветочный, и фокус просто некуда было направить.
+    const data = parseGameData(loadShippedBundle());
+    const branches = new Set(Object.values(data.technologies).map((def) => def.branch));
+    const led = new Set(Object.values(data.scientists).map((sci) => sci.branch));
+    for (const branch of branches) {
+      expect(led.has(branch), `tech branch "${branch}" has no scientist leading it`).toBe(true);
+    }
+    // …и безветочный генералист остаётся: «+слот вместо фокуса» — та самая
+    // альтернативная стоимость, ради которой он и заведён.
+    expect(Object.values(data.scientists).some((sci) => sci.branch === undefined)).toBe(true);
   });
 
   it('builds the fortress up to level 3 (HP and defense both grow)', () => {
@@ -771,6 +819,62 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     expect(unknown.sort()).toEqual([]);
   });
 
+  it('every declared wave composition names known units (PVR-1.3 referential integrity)', () => {
+    // Состав волны — такой же контент, как ростер фракции, и ошибка в нём молчалива:
+    // `pveModule` пропускает неизвестный юнит, и волна приходит ТОНЬШЕ заявленной, а
+    // не падает. Опечатку ловить здесь, на загрузке, а не по жалобе на лёгкий забег.
+    const data = parseGameData(loadShippedBundle());
+    const unknown = Object.entries(data.modes).flatMap(([id, mode]) =>
+      [...(mode.pve?.waveFleet ?? []), ...(mode.pve?.waveLanding ?? [])]
+        .filter((stack) => !(stack.unit in data.units))
+        .map((stack) => `${id}: ${stack.unit}`),
+    );
+    expect(unknown.sort()).toEqual([]);
+  });
+
+  it('пул усилений забега называет известные технологии (PVR-1.4)', () => {
+    // Опечатка здесь молчалива вдвойне: карточка не нарисуется (имени нет), а действие
+    // отобьётся `E_UNKNOWN_BOON` — игрок увидит выбор, который не выбирается.
+    const data = parseGameData(loadShippedBundle());
+    const unknown = Object.entries(data.modes).flatMap(([id, mode]) =>
+      (mode.pve?.boons ?? [])
+        .filter((tech) => !(tech in data.technologies))
+        .map((tech) => `${id}: ${tech}`),
+    );
+    expect(unknown.sort()).toEqual([]);
+  });
+
+  it('усиление забега не исследуется обычным путём — оно только выдаётся (PVR-1.4)', () => {
+    // Усиление бесплатно и мгновенно: это награда, а не работа. Не будь оно помечено
+    // `grantOnly`, любой игрок исследовал бы его даром в ЛЮБОМ матче — и забег стал бы
+    // способом протащить бонусы в обычную партию.
+    const data = parseGameData(loadShippedBundle());
+    const wrong: string[] = [];
+    for (const mode of Object.values(data.modes)) {
+      for (const tech of mode.pve?.boons ?? []) {
+        if (data.technologies[tech]?.grantOnly !== true) wrong.push(tech);
+      }
+    }
+    expect([...new Set(wrong)].sort()).toEqual([]);
+  });
+
+  it('десант волны — наземные юниты, а флот волны — космические (PVR-1.6)', () => {
+    // Перепутанные половины молчаливы: наземник в `waveFleet` не полетит воевать в
+    // орбитальном бою, корабль в `waveLanding` не высадится. Обе ошибки выглядят как
+    // «штурм слабее, чем заявлено», и ловить их на глаз по JSON — безнадёжно.
+    const data = parseGameData(loadShippedBundle());
+    const wrong: string[] = [];
+    for (const [id, mode] of Object.entries(data.modes)) {
+      for (const st of mode.pve?.waveFleet ?? []) {
+        if (data.units[st.unit]?.domain === 'ground') wrong.push(`${id}.waveFleet: ${st.unit}`);
+      }
+      for (const st of mode.pve?.waveLanding ?? []) {
+        if (data.units[st.unit]?.domain !== 'ground') wrong.push(`${id}.waveLanding: ${st.unit}`);
+      }
+    }
+    expect(wrong.sort()).toEqual([]);
+  });
+
   it('rejects an unknown team format and a malformed PvE section (fail-closed)', () => {
     expect(withModes({ m: { name: 'M', teamFormat: '6v6' } }).success).toBe(false);
     expect(withModes({ m: { name: 'M', pve: { waves: 0, npcFaction: 'swarm', waveIntervalHours: 6 } } }).success).toBe(
@@ -780,6 +884,15 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     expect(withModes({ m: { name: 'M', pve: { waves: 5, npcFaction: 'swarm', waveIntervalHours: 0 } } }).success).toBe(
       false,
     );
+    // Пустой состав волны — не «омитнутое поле», а описка, и модуль пропустил бы такую
+    // волну молча: получился бы штурм, который читается настроенным и не приходит.
+    const pve = { waves: 5, npcFaction: 'swarm', waveIntervalHours: 6 };
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ unit: 'x', count: 0 }] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ count: 2 }] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ unit: 'x', count: 2 }] } } }).success).toBe(true);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveLanding: [] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveLanding: [{ unit: 'g', count: 1 }] } } }).success).toBe(true);
   });
 
   it('rejects a per-match timestamp in a mode victory preset (content pins rules, not a clock)', () => {

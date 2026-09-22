@@ -30,7 +30,11 @@ import {
   parseMatchMap,
   orbitalModule,
   planetTypeModule,
+  fleetBroodModule,
   pveModule,
+  swarmMemoryModule,
+  swarmAdaptModule,
+  swarmJournalModule,
   scientistModule,
   sectorModule,
   standingOrdersModule,
@@ -149,6 +153,10 @@ export const DEV_MODULES: GameModule[] = [
   fleetRepairModule, // fleet.repair: paid-in-metal hull top-up, at an owned dock
   forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
   pveModule, // PVE-3: NPC wave assault, armed by the mode's `pve` section (inert in PvP)
+  fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
+  swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
+  swarmAdaptModule, // PVR-4.3: проект развития модуля Роя; читает память, платит, растит
+  swarmJournalModule, // PVR-4.5: что игрок ВИДЕЛ про ответы Роя; зеркало swarmMemory
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
   // H4's `divisionModule` used to sit here, at the END. It is GONE (H4-REVERT): the
@@ -176,7 +184,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '21'; // VET-2: у стека появилась заслуга ветерана.
+export const MODULE_MANIFEST_VERSION = '26'; // Added swarmJournal: что игрок видел про Рой.
+// export const MODULE_MANIFEST_VERSION = '25'; // Added swarmAdapt: Рой растит уровень модуля.
+// export const MODULE_MANIFEST_VERSION = '24'; // Added swarmMemory: Рой копит наблюдения боёв.
+// export const MODULE_MANIFEST_VERSION = '23'; // Added fleetBrood: paid onboard ground growth.
+// Previous manifest 22: // PVR-1.4: у `state.pve` появился долг по усилениям.
 // Форма состояния изменилась ДОБАВЛЕНИЕМ: у `UnitStack` два новых необязательных поля —
 // `damageDealt` и `battles` (оба «на юнит»). Старый матч читается без ошибки: полей нет,
 // значит ветеранов нет. Бампаю всё равно, и вот почему это не перестраховка. Счётчики
@@ -287,6 +299,10 @@ export interface DevMatchOptions {
   /** Ruleset for this match (time scale + victory conditions). Defaults in `MatchRoom`
    *  to `{ timeScale: 1 }`; the match browser shows it as the match's "rules". */
   config?: MatchConfig;
+  /** Map identity stamped on the seeded state (`GameState.mapId`). The dev scenario
+   *  builds its own nexus layout regardless — this only names it, so a test can seat
+   *  two matches on distinguishable maps the way the hosts do. Absent ⇒ unnamed. */
+  mapId?: string;
   /** Observation stream (persistence / metrics wiring — see `main.ts` F8). */
   observe?: (event: RoomObservation) => void;
   /** Deterministic-replay recorder (see `MatchRoom.record`, RPL-2). */
@@ -415,7 +431,14 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     const heroId = `hero:${id}`;
     heroes[heroId] = { id: heroId, owner: id, location: `home_${id}`, cooldowns: {} };
   });
-  const state: GameState = options.initialState ?? { ...base, players, planets, fleets, heroes };
+  const state: GameState = options.initialState ?? {
+    ...base,
+    ...(options.mapId !== undefined ? { mapId: options.mapId } : {}),
+    players,
+    planets,
+    fleets,
+    heroes,
+  };
   return new MatchRoom({
     id: options.id ?? 'dev',
     initialState: state,

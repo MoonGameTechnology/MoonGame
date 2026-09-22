@@ -13,6 +13,7 @@ import type { AccountStore } from './store';
 import { verifyJoinToken, type JoinTokenVerifyConfig } from './auth';
 import { serializeServerMessage, type ServerErrorCode } from './protocol';
 import { detach } from './detach';
+import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
 
 export interface MultiplayerServerOptions {
   /** Single-match shortcut. Exactly one of `room` / `registry` must be given; `room`
@@ -28,6 +29,10 @@ export interface MultiplayerServerOptions {
    *  the client the game itself, so a peer just opens `http://host:port/` (no file
    *  transfer, and the connect overlay auto-fills the same-origin ws:// URL). */
   indexHtml?: string;
+  /** Кому разрешено встраивать документ в свой iframe (SE-7.1, правило 5). По умолчанию
+   *  никому. Площадка-портал (`YAG`) показывает игру в своём фрейме — её origin
+   *  перечисляется здесь, а не вырезанием заголовка. */
+  frameAncestors?: readonly string[];
   /** Optional nick-login: when a client connects with `?nick=…` (instead of
    *  `?player=`), the seat is resolved/assigned here so a returning nick gets its
    *  own side back. Absent ⇒ only the direct `?player=` handshake works. */
@@ -117,6 +122,11 @@ function baseUrl(request: IncomingMessage): string {
  * (то, что HTTPS-2.1 запрещает выставлять наружу), либо прокси настроен неверно —
  * в обоих случаях считать соединение защищённым нельзя (fail-secure, инвариант #4).
  */
+/** Ушёл ли ответ по HTTPS: свой TLS или доверенный прокси (SE-7.1, правило 4). */
+function overHttps(options: MultiplayerServerOptions, request: IncomingMessage): boolean {
+  return !!options.tls || (!!options.trustProxy && forwardedHttps(request));
+}
+
 function forwardedHttps(request: IncomingMessage): boolean {
   const raw = request.headers['x-forwarded-proto'];
   const first = Array.isArray(raw) ? raw[0] : raw;
@@ -196,6 +206,9 @@ export function createMultiplayerServer(
   const wss = new WebSocketServer({ noServer: true, maxPayload: 32_768 });
 
   const indexHtml = options.indexHtml;
+  // SE-7.1: хеши инлайновых блоков считаются ОДИН раз на сборку документа — политика
+  // не может разъехаться с тем, что уходит игроку, а на запрос ничего не считается.
+  const indexInline = indexHtml === undefined ? undefined : inlineHashes(indexHtml);
   const ready = options.ready;
   let draining = false; // flips at close() so /ready reports 503 during graceful drain
 
@@ -277,6 +290,10 @@ export function createMultiplayerServer(
     }
     void reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
     void reply.header('access-control-allow-headers', 'authorization, content-type');
+    // SE-7.1: базовый набор на КАЖДЫЙ ответ — JSON исполнять нечего, и браузер не должен
+    // додумывать его тип. Документ игры (`serveIndex`) ставит поверх свою политику.
+    for (const [name, value] of Object.entries(apiSecurityHeaders(overHttps(options, req.raw))))
+      void reply.header(name, value);
     // Ответы API персональные: `/commander/me`, `/arsenal/me`, `/corps/me`, весь `/ava/*`
     // отдают состояние КОНКРЕТНОГО игрока, а директив кэширования не ставил никто.
     // Чей это кэш на самом деле — важно не перепутать. ОБЩИЙ кэш аутентифицированный
@@ -324,9 +341,16 @@ export function createMultiplayerServer(
   if (indexHtml !== undefined) {
     // The single-file client changes every rebuild; never let a browser serve a stale
     // cached copy (else client fixes silently don't reach the player).
-    const serveIndex = async (_request: FastifyRequest, reply: FastifyReply): Promise<string> => {
+    const serveIndex = async (request: FastifyRequest, reply: FastifyReply): Promise<string> => {
       void reply.header('content-type', 'text/html; charset=utf-8');
       void reply.header('cache-control', 'no-store, must-revalidate');
+      // SE-7.1: политика документа — по хешам его же инлайновых блоков.
+      const headers = securityHeaders({
+        ...(indexInline ? { inline: indexInline } : {}),
+        https: overHttps(options, request.raw),
+        ...(options.frameAncestors ? { frameAncestors: options.frameAncestors } : {}),
+      });
+      for (const [name, value] of Object.entries(headers)) void reply.header(name, value);
       return indexHtml;
     };
     app.get('/', serveIndex);

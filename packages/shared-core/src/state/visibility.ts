@@ -1,4 +1,5 @@
 import { buildingLevel, type GameData, type UnitDef } from '../data/schemas';
+import { observedSwarm } from './swarmIntel';
 import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
@@ -380,6 +381,18 @@ function project(
   { identify, radar }: Coverage,
 ): VisibleState {
   const view = deepClone(state) as VisibleState;
+  // Private dossier plus this instant's resolved contacts. Never retain another
+  // observer's records, and never put remembered fleets back on the live map.
+  const contacts = { ...view.swarmIntel?.[viewerId], ...observedSwarm(state, viewerId, identify) };
+  if (Object.keys(contacts).length) view.swarmIntel = { [viewerId]: contacts };
+  else delete view.swarmIntel;
+
+  // PVR-4.5: журнал адаптаций — знание ИГРОКА, поэтому фильтруется по зрителю тем же
+  // правилом, что досье: своё видно, чужое снято целиком. Чужой журнал показал бы, что
+  // успел выяснить сосед, — это разведка чужой разведки.
+  const journal = view.swarmJournal?.[viewerId];
+  if (journal) view.swarmJournal = { [viewerId]: journal };
+  else delete view.swarmJournal;
 
   // Stolen intel windows (espionage): the viewer's LIVE grants open narrow holes in
   // the fog below. Expired grants open nothing — expiry is enforced HERE, at the
@@ -561,6 +574,17 @@ function project(
   // и отвечает `E_NO_RNG` тому, кто до костей дотянулся (kernel.ts). Не «чините» это
   // место, возвращая клиенту поток.
   delete (view as Partial<GameState>).rng;
+
+  // PVR-4.2: память Роя снимается целиком. Это не «серверная кухня», а правило игры:
+  // §3.4 требует, чтобы игрок узнавал вывод противника из ЖУРНАЛА адаптаций (PVR-4.5),
+  // где подтверждённый факт отделён от гипотезы, — а не читал счётчик наблюдений прямо
+  // из состояния. Отдать его клиенту значило бы выдать и то, чего Рой ещё не показал.
+  delete (view as Partial<GameState>).swarmMemory;
+  // PVR-4.3: идущий проект адаптации снимается по той же причине, что и память.
+  // §3.9: игрок узнаёт об уровне ПОСЛЕ того, как тот проявился в завершённом бою, а не
+  // из состояния. Видимый счётчик «до перехватчика осталось 4 часа» — это разведка,
+  // которой не было.
+  delete (view as Partial<GameState>).swarmAdapt;
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.

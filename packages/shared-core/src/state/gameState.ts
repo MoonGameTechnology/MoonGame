@@ -43,6 +43,21 @@ export interface UnitStack {
    *  Part of the stack's merge identity: stacks with different loadouts never
    *  merge (ship-modules-roadmap.md SM-0.3). Absent = no modules. */
   modules?: ModuleId[];
+  /** Звёздность УСТАНОВЛЕННЫХ модулей этого стека (SZE-1.1), `id → ★`. Снимок меты
+   *  Sector Zero, снятый в момент, когда стек родился: `prepareSectorZeroRun` на старте
+   *  забега, верфь — из {@link PlayerArsenal.stars} при постройке. Ядро во время матча
+   *  мету НЕ перечитывает, поэтому заточка на ходу уже летающий корабль не меняет —
+   *  та же доктрина «нет рефита», что и у самого {@link UnitStack.modules}.
+   *
+   *  ⚠️ **В идентичность слияния НЕ входит** (`loadoutKey` её не видит), и это
+   *  осознанно: звёзды — замороженное свойство ВЛАДЕЛЬЦА, снятое один раз на матч,
+   *  поэтому два стека одного игрока с одним лоадаутом всегда несут одинаковые звёзды,
+   *  и слияние ничего не теряет. Начни звёзды меняться под живым матчем — правило
+   *  сломается, и тогда их придётся заводить в ключ.
+   *
+   *  Отсутствует / пусто = ★0 у всех, то есть прежние числа байт-в-байт. Записываются
+   *  только НЕнулевые звёзды НАДЕТЫХ модулей. */
+  moduleStars?: Record<ModuleId, number>;
   /** Заслуга ветерана: сколько урона нанёс ОДИН юнит этого стека за матч, и сколько
    *  сражений он пережил (VET-2). Из этих двух чисел VET-3 считает грейд медали; сам
    *  грейд в состоянии НЕ лежит — значит пороги можно перебалансировать на живом матче,
@@ -196,6 +211,12 @@ export interface PlayerArsenal {
   hulls: string[];
   /** Installable ship modules → `data.modules` ids. */
   modules: string[];
+  /** Звёздность модулей этого места (SZE-1.1), `id → ★` — снимок меты Sector Zero,
+   *  из которого верфь штампует {@link UnitStack.moduleStars} на всё, что построит за
+   *  забег. Без него стартовый флот летал бы на ★N, а построенное на верфи — на ★0:
+   *  один модуль с двумя разными числами в одном матче. Отсутствует = ★0 у всех
+   *  (обычные матчи — мягкая деградация, как и у самого арсенала). */
+  stars?: Record<string, number>;
 }
 
 /** A live Steward delegation on a player (see `Player.steward`). */
@@ -337,6 +358,20 @@ export interface Planet {
   /** Star lanes: ids of directly-connected planets. The map is this graph;
    *  fleets travel along lanes (GDD §1 — секторная структура, узлы-планеты). */
   links?: PlanetId[];
+  /** Which pairs of neighbours connect THROUGH this sector (MAP-TRANSIT), projected
+   *  from the map. Undefined = full interchange (every earlier sector, and most still):
+   *  arrive by any lane, leave by any other. Present = these pairs are the only
+   *  through-connections, so two lanes crossing this province do not meet and a fleet
+   *  running one cannot switch to the other in passing. Read by `planRoute`; a fleet
+   *  that STOPS here is not in transit, so its next order starts fresh. */
+  transit?: Array<[PlanetId, PlanetId]>;
+  /** Neighbours on the MOSAIC that terrain keeps SHUT (M4.3). They share a drawn border
+   *  with this sector but carry no lane, so a fleet cannot cross — the border is a closed
+   *  door, not an open one. Published here because the renderer must be able to draw the
+   *  barrier without re-deriving the geometry (a second copy of the tessellation is
+   *  exactly how the drawn map and the travelable map drifted apart in the first place).
+   *  Symmetric: if `a` lists `b`, `b` lists `a`. Undefined = nothing sealed. */
+  sealed?: PlanetId[];
   /** Sector terrain type id (resolved against game data `sectors`); its buffs
    *  /debuffs are applied through hooks. Undefined = plain space, no modifier. */
   terrain?: string;
@@ -651,6 +686,18 @@ export interface GameVersion {
 export interface GameState {
   /** Authored map identity, persisted and public; absent on legacy saves. */
   mapId?: string;
+  /** Game mode the match was created with (`data.modes`), pinned at birth like the map
+   *  and persisted for the same reason: the snapshot is the ONLY thing that survives a
+   *  restart, and a mode that lived solely in the host's `MatchConfig` would evaporate
+   *  with the process — the room would come back applying base rules while the state
+   *  still carries `pve` progress. That is exactly the "rules changed under the match"
+   *  failure `resolveMatchConfig` refuses for an unknown mode (BRW-0).
+   *
+   *  The reducer never reads this field: rules come from `ctx.config.modeId`, resolved
+   *  once at room construction. It is the persisted ORIGIN of that config, and the
+   *  match browser's `modeId` — so there is one source, not two. Absent on matches
+   *  created before modes existed, and on any match deliberately run without one. */
+  modeId?: string;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
@@ -686,6 +733,8 @@ export interface GameState {
    *  each seen world. Maintained by `visibilityModule`; read by `visibleState`
    *  to show greyed "last known" worlds. Internal — stripped from projections. */
   fog?: Record<PlayerId, FogMemory>;
+  /** Per-observer last identified Swarm fleet composition; persists with this match. */
+  swarmIntel?: Record<PlayerId, Record<FleetId, SwarmContact>>;
   /** Hero instances, keyed by instance id (`Hero.id`), maintained by `heroModule`.
    *  A player may field several — filter by `owner`. (Key was the `PlayerId` in the
    *  one-hero-per-player skeleton; instance-keyed since the roster migration.) */
@@ -775,6 +824,83 @@ export interface GameState {
    *  occurrence — `nextWaveAt` is a READ-ONLY echo for the HUD, never the source of
    *  truth about when the wave fires. */
   pve?: PveState;
+  /** PVR-4.2: память Роя — что против него ФАКТИЧЕСКИ применили в завершённых
+   *  столкновениях. Появляется только с первым зачтённым наблюдением, поэтому матч
+   *  без Роя (и забег, в котором его ещё ни разу не задели) следов механики не несёт.
+   *  Здесь лежат только ФАКТЫ симуляции — реплеируемые и сериализуемые; насколько
+   *  далеко Рой смотрит назад, решает не состояние, а драйвер (см. `swarmMemory.ts`). */
+  swarmMemory?: SwarmMemory;
+  /** PVR-4.3: идущий проект развития модуля Роя. Одновременно он ровно один (§3.4:
+   *  один запас нельзя потратить дважды), поэтому поле, а не список. Отсутствует,
+   *  пока Рой ничего не растит. Форма описана в `modules/swarmAdapt.ts`. */
+  swarmAdapt?: SwarmAdaptProject;
+  /** PVR-4.5: журнал адаптаций — что об ответах Роя знает КАЖДЫЙ ИГРОК. Пишется из
+   *  того, что игрок наблюдал лично (его удар отражён), и фильтруется по зрителю тем
+   *  же швом, что `swarmIntel`. Память самого Роя лежит отдельно и клиенту не уходит
+   *  вовсе: журнал — это знание игрока, а не подсмотренная правда. */
+  swarmJournal?: Record<PlayerId, SwarmRepelRecord>;
+}
+
+/**
+ * Что игрок лично видел про перехват Роя (PVR-4.5).
+ *
+ * Первое и последнее наблюдение хранятся ОБА, потому что из них строится единственная
+ * честная гипотеза: «перехват стал сильнее» — это сравнение двух собственных замеров
+ * игрока, а не взгляд в уровень модуля. Уровень игроку не показывается никогда: §3.9
+ * говорит, что он узнаёт об адаптации по её проявлению, а не по счётчику.
+ */
+export interface SwarmRepelRecord {
+  firstAt: number;
+  lastAt: number;
+  /** Сколько вылетов игрока Рой отразил. */
+  sorties: number;
+  /** Урон ПВО в первом и последнем отражении — основа гипотезы об усилении. */
+  firstDamage: number;
+  lastDamage: number;
+}
+
+/**
+ * Одно наблюдение Роя: в столкновении `engagement` против него применили класс `kind`,
+ * и это дало измеримый эффект (`sector-zero-roadmap.md` §3.9).
+ *
+ * `ordinal` — порядковый номер столкновения в забеге, а не время. Окно памяти считается
+ * в столкновениях («последние 4 боя»), и хранить для этого игровые часы значило бы
+ * пересчитывать окно при каждой смене темпа забега.
+ */
+export interface SwarmObservation {
+  ordinal: number;
+  /** Класс применённого оружия. Строка, а не enum: классы добавляются данными и
+   *  механиками (v1 — только `strike`, ударный вылет), и закрытый союз пришлось бы
+   *  расширять в ядре ради каждого нового. */
+  kind: string;
+  /** Идентификатор столкновения. Защита от повторной телеметрии: одно столкновение
+   *  даёт классу не больше одного наблюдения, сколько бы попаданий в нём ни было. */
+  engagement: string;
+}
+
+/**
+ * Идущий проект развития модуля Роя (`swarmAdaptModule`, PVR-4.3).
+ *
+ * Одновременно он ровно один: §3.4 запрещает потратить один запас дважды, поэтому в
+ * `GameState` это поле, а не список. Срок дублирует запланированное событие и нужен
+ * журналу — источник правды о времени по-прежнему `scheduled`, как у волн.
+ */
+export interface SwarmAdaptProject {
+  moduleId: string;
+  /** Уровень, который проект ДАСТ (1 — первый шаг лестницы модуля). */
+  level: number;
+  /** Флот-носитель с камерой вывода: его гибель проект прекращает. */
+  fleetId: string;
+  dueAt: number;
+}
+
+/** Память Роя внутри одного забега (`swarmMemoryModule`, PVR-4.2). */
+export interface SwarmMemory {
+  /** Сколько столкновений Рой уже зачёл. Монотонный счётчик — он же выдаёт `ordinal`. */
+  engagements: number;
+  /** Наблюдения в порядке появления. Порядок детерминирован: наблюдение добавляется
+   *  в обработчике события, а события ядро доставляет в фиксированном порядке. */
+  observations: SwarmObservation[];
 }
 
 /** PvE wave progress (`pveModule`, docs/pve-team-modes-roadmap.md Фаза 3). */
@@ -789,6 +915,11 @@ export interface PveState {
   /** World time the next wave is due — an echo of the scheduled event, for the HUD.
    *  Absent once the last wave has landed. */
   nextWaveAt?: number;
+  /** Unspent boon picks per human seat (PVR-1.4): a wave that LANDS while you still
+   *  hold ground owes you one choice. Per seat rather than one shared counter because
+   *  co-op PvE seats each survive for themselves — a shared number would let one
+   *  player spend the other's pick. Absent/0 = nothing owed. */
+  boons?: Record<PlayerId, number>;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */
@@ -1079,4 +1210,12 @@ export function createInitialState(params: {
     scheduled: [],
     scheduleSeq: 0,
   };
+}
+
+/** An observation, never a live fleet or a claim about the entire Swarm. */
+export interface SwarmContact {
+  owner: PlayerId;
+  location: PlanetId;
+  at: number;
+  units: Array<{ unit: UnitId; count: number }>;
 }

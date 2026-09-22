@@ -21,8 +21,11 @@ import {
 beforeAll(() => setLocale('ru'));
 
 /** Live tech defs minus the account-perk pseudo-nodes the tree never shows. */
+/** Настоящие узлы дерева. Грант-узлы (мета-прокачка, усиления забега) окну не
+ *  принадлежат: их выдают, а не исследуют. Отбор по ФЛАГУ данных `grantOnly`, а не по
+ *  префиксу имени — PVR-1.4 перенёс это правило из соглашения об именах в данные. */
 const TECHS = Object.fromEntries(
-  Object.entries(data.technologies).filter(([id]) => !id.startsWith('meta_')),
+  Object.entries(data.technologies).filter(([, def]) => !def.grantOnly),
 );
 
 /** Node with the smallest day-gate in a branch — always visible on the first day. */

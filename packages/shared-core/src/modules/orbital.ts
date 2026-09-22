@@ -9,7 +9,7 @@ import { requireOwnedIdleFleet } from '../util/fleet';
 import { isActivelyBombarding } from '../state/orbit';
 import { hasOrbit } from '../state/sectorKind';
 import { BLACKOUT_MULT } from '../state/visibility';
-import { applyDamageToSide, isHostile, removeIfWiped } from '../util/combat';
+import { applyDamageToSide, hookedDamage, isHostile, removeIfWiped } from '../util/combat';
 import { splitVolley } from '../util/volley';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
@@ -172,7 +172,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
             // indistinguishable.
             // Scaled BEFORE the announcement: the tracer must carry the number that really
             // lands, or the client draws one volley and the hull loses another.
-            const dealt = h.hook<number>('combat.damage', share.damage, {
+            const dealt = hookedDamage(h, share.damage, {
               phase: 'orbital',
               location: planetId,
               attacker: planet.owner,
@@ -220,7 +220,11 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
             // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
             // on the bus — `construction` applies whatever arrives, so hooking here is
             // the only place that knows who is firing.
-            const shelling = h.hook<number>('combat.damage', power, {
+            // Единственный канал, чей урон НЕ проходит через приёмник с брендом:
+            // обстрел уезжает по шине, а `construction` уже сам стачивает им постройки.
+            // Тип в payload события не уедет (по шине идёт JSON), поэтому шов тут
+            // остаётся явным и держится тестом `damageHookScope.test.ts` (CORE-DMG-2).
+            const shelling = hookedDamage(h, power, {
               phase: 'bombard',
               location: planetId,
               attacker: f.owner,

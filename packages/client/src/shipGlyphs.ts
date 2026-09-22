@@ -4,7 +4,7 @@
  */
 import type { GameData, UnitDef, UnitStack } from '../../shared-core/src/index';
 
-import { SHIP_SHAPES, UNIT_SHAPE, type ShipShapeId } from './shipShapes';
+import { SHIP_SHAPES, SWARM_UNIT_SHAPE, UNIT_SHAPE, type ShipShapeId } from './shipShapes';
 
 export type ShipArchetype = 'scout' | 'combat' | 'transport' | 'flagship' | 'swarm';
 
@@ -14,9 +14,9 @@ export const TRANSPORT_CARGO_MIN = 8;
 
 /** Роль корабля из полей unit-def — порядок проверок фиксирует приоритет
  *  (флагман > рой > транспорт > скаут > боевой по умолчанию). */
-export function unitArchetype(def: UnitDef): ShipArchetype {
+export function unitArchetype(def: UnitDef, ownerFaction?: string): ShipArchetype {
   if (def.traits.includes('hero')) return 'flagship';
-  if (def.faction === 'swarm') return 'swarm';
+  if ((ownerFaction ?? def.faction) === 'swarm') return 'swarm';
   if ((def.stats.cargoCapacity ?? 0) >= TRANSPORT_CARGO_MIN) return 'transport';
   if ((def.signature ?? 1) <= 1 && (def.radarRange ?? 0) > 0) return 'scout';
   return 'combat';
@@ -50,21 +50,40 @@ const ARCHETYPE_SHAPE: Record<ShipArchetype, ShipShapeId> = {
   combat: 'cruiser',
   transport: 'transport',
   flagship: 'dreadnought',
-  swarm: 'swarm',
+  swarm: 'swarmHunter',
 };
 export const ARCHETYPE_PATH = Object.fromEntries(
   Object.entries(ARCHETYPE_SHAPE).map(([arch, shape]) => [arch, SHIP_SHAPES[shape].hull]),
 ) as Record<ShipArchetype, string>;
 
-/** Ground units keep their own visual vocabulary; known hull IDs beat generic roles. */
-export function unitShape(def: UnitDef, unitId?: string): ShipShapeId | null {
+/** Ownership selects the faction appearance; the definition is a catalog fallback.
+ * PvE waves reuse Vanguard definitions, so def.faction alone cannot identify them.
+ * Ground units keep their own visual vocabulary; known hull IDs beat generic roles.
+ */
+export function unitShape(
+  def: UnitDef,
+  unitId?: string,
+  ownerFaction?: string,
+): ShipShapeId | null {
   if (def.domain === 'ground') return null;
-  return (unitId ? UNIT_SHAPE[unitId] : undefined) ?? ARCHETYPE_SHAPE[unitArchetype(def)];
+  if ((ownerFaction ?? def.faction) === 'swarm') {
+    const known = unitId ? SWARM_UNIT_SHAPE[unitId] : undefined;
+    if (known) return known;
+    if (def.traits.includes('hero')) return 'swarmLeviathan';
+    if ((def.stats.cargoCapacity ?? 0) >= TRANSPORT_CARGO_MIN) return 'swarmDevourer';
+    if ((def.signature ?? 1) <= 1 && (def.radarRange ?? 0) > 0) return 'swarmScout';
+    return 'swarmHunter';
+  }
+  return (
+    (unitId ? UNIT_SHAPE[unitId] : undefined) ?? ARCHETYPE_SHAPE[unitArchetype(def, ownerFaction)]
+  );
 }
 
 export interface GlyphOpts {
   /** Explicit roster ID distinguishes hulls with similar combat stats. */
   unitId?: string;
+  /** Live fleet owner's faction; independent of its colour and unit-definition origin. */
+  ownerFaction?: string;
   /** Цвет стороны (принадлежность) — единственный канал цвета. */
   color: string;
   /** Сторона квадратного бокса в css px (по умолчанию 22). */
@@ -78,7 +97,7 @@ export interface GlyphOpts {
 /** DOM-глиф для тайлов панели: силуэт по архетипу + модификаторы постера
  *  (размер S/M/L по hp, гало при щите, у флагмана — всегда пунктирная орбита). */
 export function unitGlyphSvg(def: UnitDef, o: GlyphOpts): string {
-  const shapeId = unitShape(def, o.unitId);
+  const shapeId = unitShape(def, o.unitId, o.ownerFaction);
   if (!shapeId) return '';
   const shape = SHIP_SHAPES[shapeId];
   const arch = unitArchetype(def);

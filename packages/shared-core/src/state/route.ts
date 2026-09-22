@@ -49,6 +49,19 @@ export function fleetBaseSpeed(fleet: Fleet, data: GameData): number {
  * Dijkstra over the lane graph (planets + `links`, weighted by distance).
  * Returns the hops after `fromId` up to and including `toId`, or null if there
  * is no route. Deterministic: ties broken by planet id.
+ *
+ * **Transit (MAP-TRANSIT).** A sector that declares `transit` is not a full
+ * interchange: only the neighbour pairs it lists connect THROUGH it, so two lanes
+ * can cross the same province without meeting. The search therefore walks states of
+ * (sector, lane it was entered by), not bare sectors — otherwise a route could
+ * silently hop between two lanes that never touch. The state space only widens where
+ * `transit` is actually declared: everywhere else the arrival lane cannot change the
+ * answer, so those sectors keep exactly one state and big maps pay nothing.
+ *
+ * Departing from `fromId` is never constrained: the fleet is parked there, not in
+ * transit. That is the honest cost of the rule — a fleet CAN switch lanes at a
+ * transit sector by stopping in it and issuing a second order, paying the arrival
+ * time for the privilege.
  */
 export function planRoute(
   state: GameState,
@@ -72,61 +85,98 @@ export function planRoute(
   if (fromId === toId) {
     return [];
   }
+  // A search state is a sector PLUS the lane it was entered by, but only where that
+  // can change the answer — i.e. where the sector declares `transit`. Elsewhere one
+  // state per sector, exactly as before.
+  const gated = (id: PlanetId): boolean => (state.planets[id]?.transit?.length ?? 0) > 0;
+  const keyOf = (node: PlanetId, from: PlanetId | null): string =>
+    gated(node) ? `${node}\u0000${from ?? ''}` : node;
+  const nodeOf = new Map<string, PlanetId>();
+  const fromOf = new Map<string, PlanetId | null>();
+  const remember = (node: PlanetId, from: PlanetId | null): string => {
+    const k = keyOf(node, from);
+    nodeOf.set(k, node);
+    fromOf.set(k, from);
+    return k;
+  };
+  /** May a fleet that entered `node` from `from` carry on to `to`? */
+  const passable = (node: PlanetId, from: PlanetId | null, to: PlanetId): boolean => {
+    const pairs = state.planets[node]?.transit;
+    if (pairs === undefined || pairs.length === 0) return true; // full interchange
+    if (from === null) return true; // departing from where we are parked, not passing through
+    return pairs.some(([a, b]) => (a === from && b === to) || (b === from && a === to));
+  };
+
   const dist = new Map<string, number>();
   const prev = new Map<string, string>();
   const visited = new Set<string>();
-  dist.set(fromId, 0);
+  dist.set(remember(fromId, null), 0);
 
+  let reached: string | null = null;
   for (;;) {
     let u: string | null = null;
     let best = Infinity;
-    for (const [node, d] of dist) {
-      if (visited.has(node)) {
+    for (const [k, d] of dist) {
+      if (visited.has(k)) {
         continue;
       }
-      if (u === null || d < best || (d === best && node < u)) {
+      if (u === null || d < best || (d === best && k < u)) {
         best = d;
-        u = node;
+        u = k;
       }
     }
-    if (u === null || u === toId) {
+    if (u === null) {
+      break;
+    }
+    const uNode = nodeOf.get(u)!;
+    if (uNode === toId) {
+      reached = u;
       break;
     }
     visited.add(u);
-    const planet = state.planets[u];
+    const planet = state.planets[uNode];
     if (!planet) {
       continue;
     }
+    const uFrom = fromOf.get(u) ?? null;
     for (const v of [...(planet.links ?? [])].sort()) {
       const vp = state.planets[v];
-      if (!vp || visited.has(v)) {
+      if (!vp) {
+        continue;
+      }
+      if (!passable(uNode, uFrom, v)) {
+        continue; // MAP-TRANSIT: these two lanes cross here, they do not meet
+      }
+      const vk = remember(v, uNode);
+      if (visited.has(vk)) {
         continue;
       }
       if (blocked !== undefined && v !== toId && blocked(v)) {
         continue; // diplomacy veto: don't enter, detour around
       }
-      if (blockedEdge !== undefined && blockedEdge(u, v)) {
+      if (blockedEdge !== undefined && blockedEdge(uNode, v)) {
         continue; // HERO-CORRIDOR: чужой личный коридор — ребра для нас нет
       }
       const nd = best + distance(planet.position, vp.position);
-      const cur = dist.get(v);
+      const cur = dist.get(vk);
       if (cur === undefined || nd < cur) {
-        dist.set(v, nd);
-        prev.set(v, u);
+        dist.set(vk, nd);
+        prev.set(vk, u);
       }
     }
   }
 
-  if (!dist.has(toId)) {
+  if (reached === null) {
     return null;
   }
-  const path: string[] = [];
-  let cur: string | undefined = toId;
-  while (cur !== undefined && cur !== fromId) {
-    path.unshift(cur);
+  const path: PlanetId[] = [];
+  let cur: string | undefined = reached;
+  const originKey = keyOf(fromId, null);
+  while (cur !== undefined && cur !== originKey) {
+    path.unshift(nodeOf.get(cur)!);
     cur = prev.get(cur);
   }
-  return cur === fromId ? path : null;
+  return cur === originKey ? path : null;
 }
 
 /** Total lane distance of a route (the hops after `fromId`, in order). */

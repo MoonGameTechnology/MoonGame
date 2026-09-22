@@ -423,10 +423,104 @@ export function applyDamage(
   return survivors;
 }
 
+/**
+ * Damage that has already been through the `combat.damage` hook (CORE-DMG-2).
+ *
+ * A compile-time brand, erased at runtime — the value stays the very same `number`,
+ * so the hook still fires from the same places, the same number of times, in the same
+ * order. What changes is the OTHER end: every sink below takes `HookedDamage` and
+ * nothing else, so a firing channel physically cannot apply raw damage. Forgetting the
+ * hook stops being a discipline problem (five channels, each remembering on its own)
+ * and becomes a type error.
+ *
+ * Why that matters beyond tidiness: the hook is where technologies, faction passives,
+ * hero auras, terrain, planet type and fortifications attach. A channel that skips it
+ * silently cancels ALL of them for its share of the damage — no error, no log, just a
+ * smaller number. Three channels had drifted out exactly that way before CORE-DMG-1
+ * put them back.
+ */
+export type HookedDamage = number & { readonly __hookedDamage: unique symbol };
+
+/** What every `combat.damage` subscriber reads off the hook's args. `attacker` and
+ *  `defender` are the two concrete owners the hit is between — subscribers measure
+ *  that relation (whose tech, whose fort), which is why channels call the hook per
+ *  PAIR rather than once per volley. `battleId` exists only inside a melee round. */
+export interface DamageHookArgs {
+  phase: string;
+  location: string;
+  attacker: string | null;
+  defender: string | null;
+  battleId?: string;
+}
+
+/**
+ * Balance cap on pooled mitigation (PERK-2.1): however deep the pool, a defender
+ * never takes less than `1 - MITIGATION_CAP` of the incoming damage.
+ *
+ * The pool's own shape (`1 / (1 + R)`) already approaches zero without reaching it,
+ * so this is not a correctness guard — it is the owner's balance ceiling, and it
+ * bites only past R = 9, far beyond anything the shipped catalogs reach. The value
+ * carries over from the per-building rule that used to own the only cap in the game.
+ */
+export const MITIGATION_CAP = 0.9;
+
+/** The ONE producer of {@link HookedDamage}: run `amount` through the bonus groups,
+ *  then through the pooled mitigation of `combat.mitigation`. Every firing channel
+ *  goes through here.
+ *
+ *  Three groups, because the pieces compose differently (PERK-0.1, formula
+ *  `база × (1 + Σ parallel) × Π(sequential)`):
+ *
+ *  - **parallel** (`combat.damage.parallel`) — the MASS class. Contributions are
+ *    POINTS that add up and are spent once, so each further bonus dilutes itself:
+ *    an eleventh +10% adds a tenth of base onto an already-doubled total.
+ *  - **sequential** (`combat.damage`) — the RARE class. Each contribution multiplies
+ *    whatever came before, so its relative worth never decays. This is the older
+ *    hook and keeps its name: every subscriber that existed before PERK-1.1 is a
+ *    sequential one until PERK-1.2 moves the catalogs deliberately.
+ *  - **mitigation** (`combat.mitigation`) — the defender's side, pooled and spent
+ *    once (PERK-2.1).
+ *
+ *  Order between the first two does not matter (multiplication commutes) and order
+ *  WITHIN each does not matter either (a sum and a product are both commutative) —
+ *  which is what keeps the module manifest (invariant #6) from becoming a balance
+ *  lever the moment a non-multiplier appears. */
+export function hookedDamage(
+  h: HandlerContext,
+  amount: number,
+  args: DamageHookArgs,
+): HookedDamage {
+  const sequential = h.hook<number>('combat.damage', amount, args);
+  const parallel = h.hook<number>('combat.damage.parallel', 0, args);
+  return (sequential * (1 + parallel) * mitigationFactor(h, args)) as HookedDamage;
+}
+
+/** What fraction of the incoming damage survives the defender's pooled mitigation.
+ *
+ *  Points below zero AMPLIFY (a hostile world offers its holder no cover, and that
+ *  is how the per-source rules always read a negative `defenseBonus`). A pool at or
+ *  past −1 would divide by zero or flip the sign, so it degrades to "no effect" —
+ *  fail-secure, mirroring the guards the individual sources carried. */
+function mitigationFactor(h: HandlerContext, args: DamageHookArgs): number {
+  const pool = h.hook<number>('combat.mitigation', 0, args);
+  if (!(1 + pool > 0)) {
+    return 1;
+  }
+  return Math.max(1 / (1 + pool), 1 - MITIGATION_CAP);
+}
+
+/** Add two already-hooked shares. Arithmetic strips the brand, so the melee round —
+ *  which hooks per attacker→defender pair and then applies one total per side — needs
+ *  a way to keep the sum marked. Sound by its signature: both addends must themselves
+ *  be hooked, so no raw number can enter a total through here. */
+export function addHooked(a: HookedDamage, b: HookedDamage): HookedDamage {
+  return (a + b) as HookedDamage;
+}
+
 export function applyDamageToSide(
   h: HandlerContext,
   ref: CombatantRef,
-  dmg: number,
+  dmg: HookedDamage,
   data: GameData,
   location: string,
 ): void {

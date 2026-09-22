@@ -4,68 +4,220 @@
   "avaEligible": true,
   "time": 0,
   "sectors": {
-    "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
-    "west": { "position": { "x": -230, "y": 0 }, "kind": "planet", "terrain": "solar_flare_zone", "planetType": "barren" },
-    "east": { "position": { "x": 230, "y": 0 }, "kind": "planet", "terrain": "solar_flare_zone", "planetType": "barren" },
-    "drift": { "position": { "x": 0, "y": -210 }, "kind": "asteroid", "terrain": "asteroid_field" },
-    "veil": { "position": { "x": 0, "y": 210 }, "kind": "dense_nebula", "terrain": "dense_nebula", "planetType": "gas_giant" },
+    "nexus": {
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "west": {
+      "position": {
+        "x": -230,
+        "y": 0
+      },
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "barren"
+    },
+    "east": {
+      "position": {
+        "x": 230,
+        "y": 0
+      },
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "barren"
+    },
+    "drift": {
+      "position": {
+        "x": 0,
+        "y": -210
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "veil": {
+      "position": {
+        "x": 0,
+        "y": 210
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "gas_giant"
+    },
     "home_a1": {
-      "position": { "x": -260, "y": -160 },
+      "position": {
+        "x": -260,
+        "y": -160
+      },
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_a1",
-      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
     },
     "home_a2": {
-      "position": { "x": -260, "y": 160 },
+      "position": {
+        "x": -260,
+        "y": 160
+      },
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_a2",
-      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
     },
     "home_b1": {
-      "position": { "x": 260, "y": -160 },
+      "position": {
+        "x": 260,
+        "y": -160
+      },
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_b1",
-      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
     },
     "home_b2": {
-      "position": { "x": 260, "y": 160 },
+      "position": {
+        "x": 260,
+        "y": 160
+      },
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_b2",
-      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
     }
   },
-  "paths": [
-    ["home_a1", "west"],
-    ["home_a2", "west"],
-    ["home_a1", "drift"],
-    ["home_a2", "veil"],
-    ["home_b1", "east"],
-    ["home_b2", "east"],
-    ["home_b1", "drift"],
-    ["home_b2", "veil"],
-    ["west", "nexus"],
-    ["east", "nexus"],
-    ["drift", "nexus"],
-    ["veil", "nexus"]
-  ],
   "slots": {
-    "slot_a1": { "team": "A", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } },
-    "slot_a2": { "team": "A", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } },
-    "slot_b1": { "team": "B", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } },
-    "slot_b2": { "team": "B", "spawn": "fixed", "resources": { "credits": 300, "metal": 300 } }
+    "slot_a1": {
+      "team": "A",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_a2": {
+      "team": "A",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_b1": {
+      "team": "B",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_b2": {
+      "team": "B",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    }
   },
   "fleets": {
-    "fleet_a1": { "owner": "slot_a1", "location": "home_a1", "units": [{ "unit": "cruiser", "count": 2 }] },
-    "fleet_a2": { "owner": "slot_a2", "location": "home_a2", "units": [{ "unit": "cruiser", "count": 2 }] },
-    "fleet_b1": { "owner": "slot_b1", "location": "home_b1", "units": [{ "unit": "cruiser", "count": 2 }] },
-    "fleet_b2": { "owner": "slot_b2", "location": "home_b2", "units": [{ "unit": "cruiser", "count": 2 }] }
+    "fleet_a1": {
+      "owner": "slot_a1",
+      "location": "home_a1",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_a2": {
+      "owner": "slot_a2",
+      "location": "home_a2",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_b1": {
+      "owner": "slot_b1",
+      "location": "home_b1",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_b2": {
+      "owner": "slot_b2",
+      "location": "home_b2",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    }
   }
 }

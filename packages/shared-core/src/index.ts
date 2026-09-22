@@ -70,6 +70,25 @@ export {
   type SlotAssignment,
 } from './state/buildFromMap';
 export {
+  matchMapEdges,
+  type MapEdges,
+} from './state/buildFromMap';
+export {
+  BOUNDARY,
+  MIN_BORDER,
+  SEED_WEIGHT,
+  CLIP_PAD_MIN,
+  CLIP_PAD_RATIO,
+  clampPowerWeights,
+  clipHalfPlaneTagged,
+  mosaicBorders,
+  mosaicFrame,
+  sealPlan,
+  type MosaicBorder,
+  type MosaicSeed,
+  type SealPlan,
+} from './state/mosaic';
+export {
   sectorKindDef,
   provinceScore,
   isCapturable,
@@ -398,11 +417,13 @@ export {
   cappedUnitStat,
   COMBAT_UNIT_CAP,
   loadoutKey,
+  starsOf,
   takeFromStacks,
   mergeStacks,
 } from './util/stacks';
 export {
   effectiveStats,
+  moduleStarMultiplier,
   slotUsage,
   moduleAllowed,
   canEquip,
@@ -437,6 +458,10 @@ export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
 export { pveModule } from './modules/pve';
+export { swarmMemoryModule, recalled, STRIKE_KIND } from './modules/swarmMemory';
+export { swarmAdaptModule, swarmModuleLevel, MIN_SIGNAL } from './modules/swarmAdapt';
+export { swarmJournalModule } from './modules/swarmJournal';
+export { fleetBroodModule } from './modules/fleetBrood';
 export {
   taxModule,
   civicTax,
@@ -505,3 +530,5 @@ export {
 } from './modules/market';
 export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
+
+export type { SwarmRepelRecord } from './state/gameState';

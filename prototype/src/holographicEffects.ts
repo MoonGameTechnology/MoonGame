@@ -11,6 +11,8 @@ export function drawHolographicBattle(
   clock: number,
   phase: 'orbital' | 'ground',
   glow: boolean,
+  detail = 1,
+  roundFlash = 0,
 ): void {
   const ground = phase === 'ground';
   const color = ground ? '#f5bd68' : '#ff827c';
@@ -20,6 +22,15 @@ export function drawHolographicBattle(
   g.translate(x, y);
   g.shadowColor = color;
   g.shadowBlur = glow ? 7 : 0;
+  if (detail <= 0) {
+    g.strokeStyle = color;
+    g.lineWidth = 1.4;
+    g.beginPath();
+    g.arc(0, 0, 12, 0, TAU);
+    g.stroke();
+    g.restore();
+    return;
+  }
   // A low-luminance contact wash, never a full-screen flash or a damage claim.
   const wash = g.createRadialGradient(0, 0, 5, 0, 0, 46);
   wash.addColorStop(0, rgba(color, 0.055));
@@ -81,7 +92,32 @@ export function drawHolographicBattle(
       g.stroke();
     }
   }
+  if (roundFlash > 0) {
+    g.setLineDash([]);
+    g.strokeStyle = rgba(color, roundFlash * 0.7);
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(0, 0, 8 + (1 - roundFlash) * 22, 0, TAU);
+    g.stroke();
+  }
+  // Bounded local activity: two opposed traces in orbit, three surface impacts.
+  // No particle collection or world queries; the caller only passes visible battles.
+  g.setLineDash([]);
   g.shadowBlur = 0;
+  const shots = ground ? 3 : 2;
+  for (let i = 0; i < shots; i++) {
+    const k = (((clock / 1500 + i / shots) % 1) + 1) % 1;
+    const dx = ground ? (i - 1) * 12 : (i ? -1 : 1) * (24 - k * 40);
+    const dy = ground ? 4 + k * 8 : i ? 6 : -6;
+    g.strokeStyle = rgba(color, 0.55 * Math.sin(k * Math.PI));
+    g.beginPath();
+    if (ground) g.arc(dx, dy, 2 + k * 5, 0, TAU);
+    else {
+      g.moveTo(dx, dy);
+      g.lineTo(dx + (i ? 7 : -7), dy);
+    }
+    g.stroke();
+  }
   g.restore();
 }
 
@@ -100,7 +136,7 @@ export function drawHolographicPing(
   g.shadowColor = color;
   g.shadowBlur = glow ? 6 : 0;
   for (let i = 0; i < 2; i++) {
-    const k = ((clock / 3000 + phase / TAU + i / 2) % 1 + 1) % 1;
+    const k = (((clock / 3000 + phase / TAU + i / 2) % 1) + 1) % 1;
     g.strokeStyle = rgba(color, (1 - k) * 0.62);
     g.lineWidth = 1.4 - k * 0.7;
     g.beginPath();

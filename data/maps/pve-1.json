@@ -2,94 +2,264 @@
   "id": "pve-1",
   "seed": "pve-1",
   "time": 0,
+  "mode": "pve_waves",
   "sectors": {
-    "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
+    "pirate_den": {
+      "position": {
+        "x": -416,
+        "y": -447
+      },
+      "kind": "pirate_base",
+      "terrain": "empty_space",
+      "size": 0.65,
+      "owner": "pirates"
+    },
     "home_a": {
-      "position": { "x": -200, "y": -100 },
+      "position": {
+        "x": -380,
+        "y": -420
+      },
       "kind": "planet",
+      "terrain": "empty_space",
       "planetType": "terran",
       "owner": "p1",
-      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }, { "type": "radar" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
     },
     "home_b": {
-      "position": { "x": 200, "y": -100 },
+      "position": {
+        "x": 380,
+        "y": -420
+      },
       "kind": "planet",
+      "terrain": "empty_space",
       "planetType": "terran",
-      "owner": "p2",
-      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }, { "type": "radar" }],
-      "garrison": [{ "unit": "militia", "count": 3 }]
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "drift": {
+      "position": {
+        "x": -420,
+        "y": -120
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field",
+      "transit": [
+        [
+          "home_a",
+          "shoal"
+        ],
+        [
+          "home_a",
+          "veil"
+        ]
+      ]
+    },
+    "veil": {
+      "position": {
+        "x": 420,
+        "y": -120
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "cluster": {
+      "position": {
+        "x": -640,
+        "y": 80
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "shoal": {
+      "position": {
+        "x": -420,
+        "y": 200
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "shear": {
+      "position": {
+        "x": 420,
+        "y": 200
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "ridge": {
+      "position": {
+        "x": 0,
+        "y": 480
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
     },
     "hive": {
-      "position": { "x": 0, "y": 300 },
+      "position": {
+        "x": 0,
+        "y": 720
+      },
       "kind": "planet",
+      "terrain": "empty_space",
       "planetType": "volcanic",
       "owner": "p3",
       "buildings": [
-        { "type": "mine_t2" },
-        { "type": "shipyard" },
-        { "type": "orbital_aa" },
-        { "type": "barracks" },
-        { "type": "factory" }
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "swarm_synapse"
+        },
+        {
+          "type": "mine_t2"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "orbital_aa"
+        },
+        {
+          "type": "barracks"
+        },
+        {
+          "type": "factory"
+        }
       ],
       "garrison": [
-        { "unit": "militia", "count": 5 },
-        { "unit": "heavy_infantry", "count": 3 }
+        {
+          "unit": "militia",
+          "count": 5
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 3
+        }
       ]
-    },
-    "drift": { "position": { "x": -150, "y": 100 }, "kind": "asteroid", "terrain": "asteroid_field" },
-    "veil": { "position": { "x": 150, "y": 100 }, "kind": "dense_nebula", "terrain": "dense_nebula" },
-    "ridge": { "position": { "x": 0, "y": 150 }, "kind": "ion_storm", "terrain": "ion_storm" }
+    }
   },
-  "paths": [
-    ["home_a", "nexus"],
-    ["home_b", "nexus"],
-    ["nexus", "ridge"],
-    ["ridge", "hive"],
-    ["home_a", "drift"],
-    ["drift", "nexus"],
-    ["home_b", "veil"],
-    ["veil", "nexus"],
-    ["drift", "ridge"],
-    ["veil", "ridge"]
-  ],
   "players": {
     "p1": {
       "name": "Azure Compact",
       "faction": "vanguard",
-      "resources": { "credits": 400, "metal": 400 }
-    },
-    "p2": {
-      "name": "Amber Concord",
-      "faction": "vanguard",
-      "resources": { "credits": 400, "metal": 400 }
+      "resources": {
+        "credits": 400,
+        "metal": 400
+      }
     },
     "p3": {
       "name": "Swarm Collective",
       "faction": "swarm",
-      "resources": { "credits": 800, "metal": 800 }
+      "ai": true,
+      "resources": {
+        "credits": 800,
+        "metal": 800,
+        "biomass": 300,
+        "microelectronics": 80
+      }
+    },
+    "pirates": {
+      "name": "Pirate Base",
+      "faction": "vanguard",
+      "npc": "pirate",
+      "ai": false,
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
     }
   },
   "fleets": {
+    "pirate_patrol": {
+      "owner": "pirates",
+      "location": "pirate_den",
+      "units": [
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    },
     "p1_1": {
       "owner": "p1",
       "location": "home_a",
-      "units": [{ "unit": "cruiser", "count": 2 }, { "unit": "scout_drone", "count": 1 }]
-    },
-    "p2_1": {
-      "owner": "p2",
-      "location": "home_b",
-      "units": [{ "unit": "cruiser", "count": 2 }, { "unit": "scout_drone", "count": 1 }]
+      "landing": [
+        {
+          "unit": "militia",
+          "count": 1
+        }
+      ],
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
+      ]
     },
     "p3_1": {
       "owner": "p3",
       "location": "hive",
-      "units": [{ "unit": "cruiser", "count": 3 }, { "unit": "scout_drone", "count": 2 }]
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 3,
+          "modules": [
+            "swarm_brood_chamber"
+          ]
+        },
+        {
+          "unit": "scout_drone",
+          "count": 2
+        }
+      ]
     },
     "p3_2": {
       "owner": "p3",
       "location": "hive",
-      "units": [{ "unit": "cruiser", "count": 2 }]
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
     }
   }
 }

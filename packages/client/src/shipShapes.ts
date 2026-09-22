@@ -1,3 +1,5 @@
+import { SWARM_SHAPES } from './swarmShapes';
+
 /** Approved hulls, drawn from above in a 24×24 box, bow up.
  * Geometry only: SVG icons and cached Canvas paths consume the same contours.
  * Interiors are omitted at distance; the recognisable hull never becomes a triangle.
@@ -48,11 +50,7 @@ export const SHIP_SHAPES = {
     detail: 'M12 1V8M12 16V23M2 7 8 10M16 14 22 17M2 17 8 14M16 10 22 7M10 10H14V14H10Z',
     engines: 'M10 12H14M12 10V14',
   },
-  swarm: {
-    hull: 'M12 2 14.6 8.8 21.8 9.2 16.2 13.8 18.1 20.8 12 16.8 5.9 20.8 7.8 13.8 2.2 9.2 9.4 8.8Z',
-    detail: 'M12 6V14M6 11 12 14 18 11M9 17 12 14 15 17',
-    engines: 'M11 14H13',
-  },
+  ...SWARM_SHAPES,
 } as const;
 
 export type ShipShapeId = keyof typeof SHIP_SHAPES;
@@ -71,6 +69,25 @@ export const UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
   strike_carrier: 'transport',
   shuttle_carrier: 'transport',
   landing_shuttle: 'dropship',
+};
+
+/** Swarm appearances for the shared roster, including the units used by PvE waves.
+ * An appearance does not grant harvesting, infection, spawning or other abilities.
+ */
+export const SWARM_UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
+  scout_drone: 'swarmScout',
+  scout: 'swarmScout',
+  interceptor: 'swarmFlock',
+  bomber: 'swarmFlock',
+  frigate: 'swarmFlock',
+  cruiser: 'swarmHunter',
+  landing_shuttle: 'swarmDevourer',
+  strike_carrier: 'swarmSporeCarrier',
+  siege: 'swarmDestroyer',
+  siege_lance: 'swarmDestroyer',
+  shuttle_carrier: 'swarmMatriarch',
+  swarm_brood_mother: 'swarmMatriarch',
+  hero: 'swarmLeviathan',
 };
 
 type ShipPaths = { hull: Path2D; detail: Path2D; engines: Path2D };

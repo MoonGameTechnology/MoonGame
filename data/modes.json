@@ -17,7 +17,22 @@
     "pve": {
       "waves": 10,
       "npcFaction": "swarm",
-      "waveIntervalHours": 6
+      "waveIntervalHours": 6,
+      "waveFleet": [
+        { "unit": "frigate", "count": 2 },
+        { "unit": "swarm_brood_mother", "count": 1, "modules": ["swarm_brood_chamber"] }
+      ],
+      "waveLanding": [
+        { "unit": "swarm_lander", "count": 2 }
+      ],
+      "boons": [
+        "boon_gunnery",
+        "boon_engines",
+        "boon_foundry",
+        "boon_sensors",
+        "boon_barrage",
+        "boon_logistics"
+      ]
     }
   },
   "duel": {

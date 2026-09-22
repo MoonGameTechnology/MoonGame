@@ -95,7 +95,12 @@ describe('достижимость содержимого на гейтиров�
    *  правило касается: недостижимым считается то, что игрок ДОЛЖЕН БЫЛ бы получить. */
   const gated = (): string[] =>
     Object.entries(data.units)
-      .filter(([, u]) => u.domain !== 'ground' && !(u.traits ?? []).includes('issued'))
+      .filter(
+        ([, u]) =>
+          u.domain !== 'ground' &&
+          u.faction !== 'swarm' && // NPC organisms are never human loot.
+          !(u.traits ?? []).includes('issued'),
+      )
       .map(([id]) => id);
 
   /** `hero` — корабль флагмана: он не строится ни на одной верфи, его СЕЕТ `hero.spawn`,

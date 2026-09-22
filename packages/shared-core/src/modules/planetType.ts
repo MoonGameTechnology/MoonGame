@@ -52,20 +52,22 @@ export const planetTypeModule: GameModule = {
       return out;
     });
 
-    api.hook<number>('combat.damage', (dmg, args, h) => {
+    // PERK-2.1: тип планеты больше не делит урон сам — он кладёт ОЧКИ в общий пул
+    // снижения, который производитель урона тратит один раз. Отрицательный бонус
+    // (враждебный мир) кладёт отрицательные очки и по-прежнему усиливает урон.
+    api.hook<number>('combat.mitigation', (pool, args, h) => {
       const { phase, location, defender } = args as DamageArgs;
       if (phase !== 'ground' || !location) {
-        return dmg;
+        return pool;
       }
       const planet = h.state.planets[location];
       // Only the world's holder (the side being damaged is the defender that owns
       // the planet) gets its terrain defense edge — invaders don't.
       if (!planet || planet.owner !== defender || !planet.planetType) {
-        return dmg;
+        return pool;
       }
       const def = h.ctx.data.planetTypes[planet.planetType];
-      const bonus = def?.defenseBonus ?? 0;
-      return bonus !== 0 && 1 + bonus > 0 ? dmg / (1 + bonus) : dmg;
+      return pool + (def?.defenseBonus ?? 0);
     });
   },
 };

@@ -182,6 +182,19 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
   { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },
   {
+    prefix: 'swarm.journal.tier.',
+    built_by: 'swarmDossierHtml() — из уверенности строки журнала (PVR-4.5)',
+  },
+  {
+    prefix: 'setup.pve.difficulty.',
+    built_by: 'runDifficultyKey() в /decisions — из значения сложности забега (PVR-2.1)',
+  },
+  {
+    prefix: 'sector-zero.shop.grants.',
+    built_by:
+      'shop() в sectorZeroPreparation.ts — из `kind` товара (module/skill) либо из `grants` ресурса (research/warrants), SZE-3.1',
+  },
+  {
     prefix: 'medal.',
     built_by:
       'medalsOf() в ядре строит `medal.<линия>.<степень>` из данных `data/medalGrades.json`, ' +

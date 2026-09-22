@@ -90,7 +90,7 @@ describe('faction data (B1 / CR-1.1)', () => {
   it('the factions are genuinely distinct — by passive, not by roster (FND-5, anchor 6)', () => {
     // game-vision-roadmap.md anchor 6: factions are symmetric (same units, same
     // gameplay) — distinctness is cosmetics + a small flat passive, never a
-    // unique unit/building. All six ship an EMPTY uniqueUnits (see the schema
+    // unique unit/building. Human houses ship an EMPTY uniqueUnits (see the schema
     // coverage test above); this checks the one axis that's actually allowed
     // to differ.
     const v = FactionDefSchema.parse(factions.vanguard);
@@ -98,11 +98,11 @@ describe('faction data (B1 / CR-1.1)', () => {
     expect(v.passives.combatDamageBonus).toBeGreaterThan(0);
     expect(s.passives.productionBonus).toBeGreaterThan(0);
     expect(v.uniqueUnits).toEqual([]);
-    expect(s.uniqueUnits).toEqual([]);
+    expect(s.uniqueUnits).toEqual(['swarm_brood_mother', 'swarm_lander']);
   });
 
-  it('no faction has a unique unit (FND-5: symmetric roster, anchor 6)', () => {
-    for (const id of ids) {
+  it('human factions retain their symmetric roster', () => {
+    for (const id of ids.filter(id => id !== 'swarm')) {
       expect(FactionDefSchema.parse(factions[id]).uniqueUnits, id).toEqual([]);
     }
   });

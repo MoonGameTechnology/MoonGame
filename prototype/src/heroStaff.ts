@@ -16,6 +16,7 @@
  * pure `normalizeHeroView`; only `initHeroStaff(host)` holds anything mutable.
  */
 import {
+  effectiveStats,
   moduleAllowed,
   slotUsage,
   type Action,
@@ -36,6 +37,10 @@ import {
   unequipHeroAbility,
 } from '../../decisions/actions';
 import { houseDisplayName } from './setupSeats';
+import { heroIdentity } from '../../decisions/heroIdentity';
+import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
+import { emblemTally } from './fleetTally';
+import { isWingUnit } from './planetSummary';
 
 type HeroInst = NonNullable<GameState['heroes']>[string];
 export type HeroTab = 'overview' | 'tree' | 'abilities' | 'ship';
@@ -72,6 +77,8 @@ export function ownHeroes(state: GameState, me: string): HeroInst[] {
 export function heroDisplayName(hero: HeroInst): string {
   const fallback = hero.name ?? hero.id;
   if (hero.grade === 'main') return houseDisplayName(fallback);
+  const identity = heroIdentity(hero.archetype);
+  if (identity) return t(identity.name);
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   // Две РАЗНЫЕ формы, и один вызов на обе не годится (CONV-12b). Имя архетипа приходит
   // из каталога и теперь английское (`Ravager`) — его переводит `tData()` по слагу
@@ -172,7 +179,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
       h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
     chips +=
       `<button class="hx-chip${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
-      `<span class="hx-cr">♔</span>${esc(t(d?.name ?? h.archetype ?? h.id))}` +
+      `${heroPortraitHtml(h.archetype)}${esc(heroDisplayName(h))}` +
       `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
   }
   chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
@@ -193,9 +200,10 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     slots > 0
       ? `<span class="hx-trait">${t('hero.hq.modules')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
       : '';
+  const portrait = heroPortraitHtml(hero.archetype);
   const ident =
     `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
-    `<div class="hx-irow"><span class="hx-name">♔ ${esc(heroDisplayName(hero))}</span>` +
+    `<div class="hx-irow">${portrait}<span class="hx-name">♔ ${esc(heroDisplayName(hero))}</span>` +
     (def?.branch
       ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>`
       : '') +
@@ -220,7 +228,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
         ? heroAbilitiesHtml(hero, state.time)
         : view.tab === 'ship'
           ? heroShipHtml(hero)
-          : heroOverviewHtml(hero);
+          : heroOverviewHtml(hero, state.time, fleet);
 
   const dossier = view.dossier ? heroDossierHtml(hero, view.dossier, res) : '';
   return chips + ident + tabs + `<div class="hx-view">${body}</div>` + dossier;
@@ -543,14 +551,25 @@ function heroShipHtml(hero: HeroInst): string {
 
 /** The overview tab — archetype line, a stat strip (abilities / tree progress / ship bays)
  *  and the hero's live passive bonuses. */
-function heroOverviewHtml(hero: HeroInst): string {
+function heroOverviewHtml(hero: HeroInst, now: number, fleet?: GameState['fleets'][string]): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   const learned = (hero.skills ?? []).length;
   const treeTotal = Object.values(data.heroSkillTrees).filter(
     (n) => n.branch === undefined || n.branch === def?.branch,
   ).length;
   const abil = (hero.abilities ?? []).filter((a) => a !== null).length;
+  const identity = heroIdentity(hero.archetype);
+  const bio = hero.grade === 'main' ? t('hero.person.main.bio') : identity ? t(identity.bio) : '';
+  const gradeKeys: Record<string, string> = {
+    main: 'hero.grade.main', legendary: 'hero.grade.legendary', rare: 'hero.grade.rare', common: 'hero.grade.common',
+  };
   let html =
+    `<section class="hx-person">${heroPortraitHtml(hero.archetype)}<div>` +
+    `<h3>${esc(t('hero.person.dossier'))}</h3><p>${esc(bio)}</p>` +
+    `<dl><dt>${t('hero.person.archetype')}</dt><dd>${esc(tData(def?.name ?? hero.archetype ?? ''))}</dd>` +
+    `<dt>${t('hero.person.grade')}</dt><dd>${esc(t(gradeKeys[hero.grade ?? 'common'] ?? 'hero.grade.common'))}</dd>` +
+    `<dt>${t('hero.person.ships')}</dt><dd>${fleet ? emblemTally(fleet.units, [], (id) => isWingUnit(id, data)).ships : esc(t('hero.person.reserve'))}</dd></dl>` +
+    `</div></section>` +
     `<div class="hx-note" style="margin-bottom:10px;">${esc(t(def?.description ?? ''))}</div>` +
     `<div class="hx-ov">` +
     `<div class="hx-ovc"><b>${abil}</b><span>${t('hero.stat.abilities')}</span></div>` +
@@ -567,6 +586,24 @@ function heroOverviewHtml(hero: HeroInst): string {
     )
     .join('');
   if (bonuses) html += `<div class="hx-h">${t('hero.stat.bonuses')}</div>${bonuses}`;
+  const hull = heroHullOf(hero);
+  const hullDef = data.units[hull];
+  if (hullDef) {
+    const stack = fleet?.units.find((st) => st.unit === hull && st.count > 0);
+    const stats = effectiveStats(hullDef, stack ?? { unit: hull, count: 1, modules: hero.modules ?? [] }, data);
+    const hullHp = stack ? `${Math.round(stack.hp === undefined ? (stats.hp ?? 0) : stack.hp / stack.count)} / ${Math.round(stats.hp ?? 0)}` : String(Math.round(stats.hp ?? 0));
+    const shieldHp = stack ? `${Math.round(stack.shieldHp === undefined ? (stats.shield ?? 0) : stack.shieldHp / stack.count)} / ${Math.round(stats.shield ?? 0)}` : String(Math.round(stats.shield ?? 0));
+    const statsRows: Array<[string, string]> = [
+      ['dossier.stat.atk.name', String(stats.attack ?? 0)],
+      ['dossier.stat.def.name', String(stats.defense ?? 0)],
+      ['dossier.stat.hull.name', hullHp],
+      ['dossier.stat.shield.name', shieldHp],
+      ['dossier.stat.spd.name', String(stats.speed ?? 0)],
+    ];
+    html += `<div class="hx-h">${t('hero.person.ship-stats')}</div><div class="hx-ov">` +
+      statsRows.map(([key, value]) => `<div class="hx-ovc"><b>${esc(value)}</b><span>${t(key)}</span></div>`).join('') + '</div>';
+  }
+  html += heroAbilitiesHtml(hero, now);
   return html;
 }
 
@@ -641,6 +678,7 @@ export interface HeroStaffHost {
 export function initHeroStaff(host: HeroStaffHost): {
   paneHtml: () => string;
   click: (target: HTMLElement) => 'repaint' | 'close' | null;
+  focus: (heroId: string) => boolean;
 } {
   let view: HeroView = { sel: null, tab: 'tree', dossier: null };
 
@@ -736,5 +774,10 @@ export function initHeroStaff(host: HeroStaffHost): {
     return null;
   };
 
-  return { paneHtml, click };
+  const focus = (heroId: string): boolean => {
+    if (host.state().heroes?.[heroId]?.owner !== host.me()) return false;
+    view = { sel: heroId, tab: 'overview', dossier: null };
+    return true;
+  };
+  return { paneHtml, click, focus };
 }

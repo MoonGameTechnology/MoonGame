@@ -23,15 +23,20 @@
  *    module stays inert rather than inventing one.
  *
  * Wave composition is deliberately the crudest thing that is data-driven and
- * deterministic: the NPC faction's own `startingLoadout.fleet`, scaled by the wave
- * number, so wave N is N times the opening force. Every number lives in content
- * (`data/modes.json` — count and spacing; `data/factions.json` — composition), so
- * balancing waves is a JSON edit, never a code change.
+ * deterministic: one declared force, fielded N times over on wave N. The mode's own
+ * `waveFleet` says what that force is; a mode that omits it falls back to the NPC
+ * faction's `startingLoadout.fleet` (the pre-existing behaviour). The fallback is the
+ * compatible default, not the intended knob — `startingLoadout` answers "what does a
+ * PLAYER of this faction open with", and the Swarm is playable, so balancing the
+ * assault through it would re-balance every match someone picks the Swarm (PVR-1.3).
+ * Either way every number lives in content (`data/modes.json`), so balancing waves is
+ * a JSON edit, never a code change.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, GameState, PlayerId } from '../state/gameState';
+import type { Fleet, GameState, PlayerId, UnitStack } from '../state/gameState';
 import type { ModePve } from '../data/schemas';
 import { hoursToMs } from '../action/types';
+import { setStance } from '../state/diplomacy';
 
 /** The scheduled event a due wave fires. Internal: it has no payload schema, so the
  *  action gate treats it as non-submittable — a player cannot call a wave down. */
@@ -95,6 +100,59 @@ function armNextWave(
   h.schedule(at, WAVE_EVENT, { wave: pve.waveNumber + 1 });
 }
 
+/**
+ * Declare the NPC at war with every other seat (PVR-1.5).
+ *
+ * Without this the mechanic was inert in the only way that matters: waves spawned on
+ * schedule and then SAT in the hive. A map that declares plain players seeds every pair
+ * at `peace` (the free-for-all convention — the engine's bare default is war, but the
+ * loader overrides it), and a bot never opens a war on its own. So a PvE match ran to
+ * its last wave without a single battle, and the player met the assault as a growing
+ * pile of parked fleets.
+ *
+ * Declared HERE because this module is the only place that knows who the enemy is: the
+ * mode names `npcFaction`, `npcSeat` resolves it. Done at seeding, once, so the stance
+ * is set before the first wave is even armed.
+ *
+ * Only pairs INVOLVING the NPC are touched — an alliance between the human seats is
+ * theirs to keep, and co-op PvE is exactly the case where rewriting it would be wrong.
+ */
+function declareWarOnEveryone(h: HandlerContext, npcPlayerId: PlayerId): void {
+  // Ids are compared, not insertion order, so a replay sets the same stances in the
+  // same order (determinism, invariant #1).
+  for (const id of Object.keys(h.state.players).sort()) {
+    if (id === npcPlayerId) continue;
+    setStance(h.state, npcPlayerId, id, 'war');
+    h.emit('diplomacy.changed', { a: npcPlayerId, b: id, stance: 'war' });
+  }
+}
+
+/**
+ * Owe every surviving human seat one boon pick, for the wave that just landed (PVR-1.4).
+ *
+ * The beat is the wave's ARRIVAL, not its destruction, and that is deliberate. "Repelled"
+ * has no crisp moment on this timeline: waves are six hours apart and take far longer to
+ * cross the map, so several are in flight at once, and the seat AI MERGES them — the
+ * fleet that dies is rarely the fleet that spawned, so counting dead `pve:wave:N` ids
+ * would pay out at the mercy of a merge. "You were still standing when the next one
+ * arrived" is the same promise, stated in a way the timeline can actually keep.
+ *
+ * A seat holding no world is skipped: it is losing, not surviving. Iteration is over
+ * sorted ids so a replay owes the same seats in the same order (invariant #1).
+ */
+function oweBoons(h: HandlerContext, pve: NonNullable<GameState['pve']>, cfg: ModePve): void {
+  if (!cfg.boons || cfg.boons.length === 0) return; // режим усилений не объявлял
+  const holds = new Set<PlayerId>();
+  for (const planet of Object.values(h.state.planets)) {
+    if (planet.owner !== null && planet.owner !== pve.npcPlayerId) holds.add(planet.owner);
+  }
+  for (const id of Object.keys(h.state.players).sort()) {
+    if (id === pve.npcPlayerId || h.state.players[id]!.npc || !holds.has(id)) continue;
+    pve.boons = pve.boons ?? {};
+    pve.boons[id] = (pve.boons[id] ?? 0) + 1;
+  }
+}
+
 export const pveModule: GameModule = {
   id: 'pve',
   version: '1.0.0',
@@ -111,6 +169,7 @@ export const pveModule: GameModule = {
       if (npcPlayerId === undefined) return; // no seat plays the enemy — stay inert
       const pve = { waveNumber: 0, totalWaves: cfg.waves, npcPlayerId };
       h.state.pve = pve;
+      declareWarOnEveryone(h, npcPlayerId);
       const { from } = event.payload as { from: number };
       armNextWave(h, pve, cfg, from);
       h.emit('pve.started', { owner: npcPlayerId, waves: cfg.waves });
@@ -127,19 +186,31 @@ export const pveModule: GameModule = {
       pve.waveNumber += 1;
 
       const at = npcStagingWorld(h.state, pve.npcPlayerId);
-      const loadout = h.ctx.data.factions[cfg.npcFaction]?.startingLoadout.fleet;
+      const loadout = cfg.waveFleet ?? h.ctx.data.factions[cfg.npcFaction]?.startingLoadout.fleet;
       if (at !== undefined && loadout && loadout.length > 0) {
         const fleetId = `pve:wave:${pve.waveNumber}`;
+        // Wave N fields N times the declared force — the crudest ramp that is
+        // deterministic and lives entirely in content.
+        const scaled = (
+          stacks: readonly { unit: string; count: number; modules?: string[] }[],
+        ): UnitStack[] =>
+          stacks.map((stack) => ({
+            unit: stack.unit,
+            count: stack.count * pve.waveNumber,
+            ...(stack.modules?.length ? { modules: [...stack.modules] } : {}),
+          }));
+        const landing = scaled(cfg.waveLanding ?? []);
         const fleet: Fleet = {
           id: fleetId,
           owner: pve.npcPlayerId,
           location: at,
           movement: null,
-          // Wave N fields N times the faction's opening force — the crudest ramp that
-          // is deterministic and lives entirely in content.
-          units: loadout.map((stack) => ({ unit: stack.unit, count: stack.count * pve.waveNumber })),
+          units: scaled(loadout),
           traits: [],
           orbit: 'near',
+          // Omitted rather than empty when the mode declares no landing party: a mode
+          // without one keeps producing exactly the fleet shape it produced before.
+          ...(landing.length > 0 ? { landing } : {}),
         };
         h.state.fleets[fleetId] = fleet;
         h.emit('pve.wave.spawned', {
@@ -149,7 +220,28 @@ export const pveModule: GameModule = {
           wave: pve.waveNumber,
         });
       }
+      oweBoons(h, pve, cfg);
       armNextWave(h, pve, cfg, h.ctx.now);
+    });
+
+    // Забрать усиление. ИНТЕНТ игрока, а не событие: выбор делает человек, и сервер
+    // обязан его проверить (инвариант №5). Всё, что не сошлось, — отказ со стабильным
+    // кодом, а не тихая выдача (инвариант №4).
+    api.onAction('pve.boon', (action, h) => {
+      const cfg = pveOf(h);
+      const pve = h.state.pve;
+      if (!cfg || !pve) return h.reject('E_NOT_PVE');
+      const tech = (action.payload as { tech?: unknown })?.tech;
+      if (typeof tech !== 'string') return h.reject('E_BAD_PAYLOAD');
+      if ((pve.boons?.[action.playerId] ?? 0) <= 0) return h.reject('E_NO_BOON');
+      if (!(cfg.boons ?? []).includes(tech)) return h.reject('E_UNKNOWN_BOON');
+      const player = h.state.players[action.playerId];
+      if (!player) return h.reject('E_FORBIDDEN');
+      const completed = player.technologies?.completed ?? [];
+      if (completed.includes(tech)) return h.reject('E_ALREADY_TAKEN');
+      player.technologies = { ...player.technologies, completed: [...completed, tech] };
+      pve.boons![action.playerId] = (pve.boons![action.playerId] ?? 0) - 1;
+      h.emit('pve.boon.taken', { owner: action.playerId, tech });
     });
   },
 };

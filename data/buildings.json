@@ -69,7 +69,7 @@
     },
     "buildTimeHours": 8,
     "produces": {
-      "food": 30
+      "biomass": 30
     },
     "hp": 15,
     "scoreValue": 8,
@@ -345,6 +345,7 @@
     "onlyOn": [
       "dead_world",
       "asteroid",
+      "asteroid_cluster",
       "void_station"
     ]
   },
@@ -750,6 +751,43 @@
           "energy": 70
         }
       }
+    ]
+  },
+  "swarm_synapse": {
+    "name": "Synaptic Digester",
+    "cost": {
+      "biomass": 60,
+      "metal": 80
+    },
+    "buildTimeHours": 6,
+    "produces": {
+      "microelectronics": 4
+    },
+    "upkeep": {
+      "metal": 8,
+      "biomass": 2
+    },
+    "hp": 20,
+    "scoreValue": 8,
+    "traits": [
+      "infected"
+    ]
+  },
+  "swarm_hive": {
+    "name": "Hive",
+    "cost": {
+      "biomass": 90,
+      "metal": 120
+    },
+    "buildTimeHours": 10,
+    "upkeep": {
+      "biomass": 6
+    },
+    "enablesInfantryConstruction": true,
+    "hp": 25,
+    "scoreValue": 10,
+    "traits": [
+      "infected"
     ]
   }
 }

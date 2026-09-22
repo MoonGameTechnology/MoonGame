@@ -27,7 +27,7 @@
  *    честная строка лучше пустой рамки.
  */
 import { t } from '../../localization/runtime';
-import { esc } from './format';
+import { esc, displayUnit } from './format';
 import type { GameState, PlayerId } from '../../packages/shared-core/src/index';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
@@ -39,6 +39,7 @@ export interface BattleWindowHost {
   me: () => PlayerId;
   /** Модель боя (из `@void/client`), либо null — бой исчез или под туманом. */
   model: (battleId: string) => BattleModel | null;
+  retreat: (fleetId: string) => void;
 }
 
 const bar = (v: { current: number; max: number } | undefined, label: string): string =>
@@ -57,7 +58,7 @@ export function sideRowHtml(side: BattleModel['sides'][number]): string {
           ? t('battle.win.beachhead')
           : t('side.battle.side.fleet');
   const role = t(side.role === 'attacker' ? 'side.battle.attacker' : 'side.battle.defender');
-  const troops = side.units.map((u) => `${u.count}× ${esc(u.unit)}`).join(', ') || '—';
+  const troops = side.units.map((u) => `${u.count}× ${esc(displayUnit(u.unit))}`).join(', ') || '—';
   return (
     `<div class="bw-side${side.mine ? ' mine' : ''} ${side.role}">` +
     `<p class="bw-who">${side.mine ? '▶ ' : ''}<b>${esc(side.ownerName)}</b>` +
@@ -68,7 +69,7 @@ export function sideRowHtml(side: BattleModel['sides'][number]): string {
 }
 
 /** Тело окна целиком. */
-export function battleWindowHtml(m: BattleModel | null): string {
+export function battleWindowHtml(m: BattleModel | null, retreats: readonly string[] = []): string {
   if (!m) return `<p class="bw-empty">${esc(t('battle.win.empty'))}</p>`; // правило 4
   const phase = t(m.phase === 'ground' ? 'battle.win.phase.ground' : 'battle.win.phase.orbit');
   return (
@@ -77,7 +78,27 @@ export function battleWindowHtml(m: BattleModel | null): string {
     (m.nextRoundAt != null
       ? `<p class="bw-next">${esc(t('battle.win.next'))} <span class="pn-timer" data-at="${m.nextRoundAt}">…</span></p>`
       : '') +
-    `<div class="bw-sides">${m.sides.map(sideRowHtml).join('')}</div>`
+    `<div class="bw-sides">${m.sides.map(sideRowHtml).join('')}</div>` +
+    (retreats.length
+      ? `<div class="bw-orders">${retreats
+          .map(
+            (id) =>
+              `<button class="b" data-battle-retreat="${esc(id)}">${esc(t('side.battle.retreat'))} · ${esc(id)}</button>`,
+          )
+          .join('')}</div><p class="hint">${esc(t('side.battle.retreat.hint'))}</p>`
+      : '')
+  );
+}
+
+/** Current membership, never the unrelated fleet selected behind the window. */
+export function battleRetreats(state: GameState, id: string, me: PlayerId): string[] {
+  return (state.battles[id]?.sides ?? []).flatMap((side) =>
+    side.ref.kind === 'fleet' &&
+    side.owner === me &&
+    state.fleets[side.ref.fleetId]?.owner === me &&
+    state.fleets[side.ref.fleetId]?.battleId === id
+      ? [side.ref.fleetId]
+      : [],
   );
 }
 
@@ -88,12 +109,34 @@ export function initBattleWindow(host: BattleWindowHost): {
 } {
   let shown: string | null = null;
   const isOpen = (): boolean => host.root().classList.contains('show');
+  let lastHtml = '';
   const repaint = (): void => {
     if (!isOpen() || shown === null) return;
-    host.body().innerHTML = battleWindowHtml(host.model(shown));
+    const model = host.model(shown);
+    const html = battleWindowHtml(
+      model,
+      model ? battleRetreats(host.state(), shown, host.me()) : [],
+    );
+    if (html !== lastHtml) {
+      const scroll = host.body().scrollTop;
+      host.body().innerHTML = html;
+      host.body().scrollTop = scroll;
+      lastHtml = html;
+    }
   };
   host.root().addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
+    const fleet = tg.closest<HTMLElement>('[data-battle-retreat]')?.dataset.battleRetreat;
+    if (
+      fleet &&
+      shown &&
+      host.model(shown) &&
+      battleRetreats(host.state(), shown, host.me()).includes(fleet)
+    ) {
+      host.retreat(fleet);
+      repaint();
+      return;
+    }
     if (tg === host.root() || tg.classList.contains('tw-close')) {
       host.root().classList.remove('show');
       shown = null;
@@ -102,6 +145,7 @@ export function initBattleWindow(host: BattleWindowHost): {
   return {
     open: (battleId: string): void => {
       shown = battleId;
+      lastHtml = '';
       host.root().classList.add('show');
       repaint();
     },

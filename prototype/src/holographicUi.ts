@@ -2,7 +2,7 @@
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
-import { holographyOn, motionOn, glowOn } from './graphicsPrefs';
+import { motionOn, glowOn } from './graphicsPrefs';
 import { supportsHolography, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
 
@@ -98,7 +98,9 @@ export function initHolographicUi(host: HolographicHost) {
     active: (): boolean => enabled,
     sync(w: number, h: number, coarse: boolean, inMatch: boolean): void {
       const supported = supportsHolography(w, h, coarse);
-      const next = supported && holographyOn();
+      // The redesigned console is the only desktop/tablet UI. Ignore the retired
+      // void.holography preference; phones keep their dedicated responsive layout.
+      const next = supported;
       const sig = `${w}|${h}|${supported}|${next}|${inMatch}|${motionOn()}|${glowOn()}`;
       if (sig === signature) return;
       signature = sig;
@@ -131,6 +133,7 @@ export function initHolographicUi(host: HolographicHost) {
         const info = host.side.style.display !== 'none';
         const commands = host.commands.classList.contains('show');
         selection.classList.toggle('has-info', info);
+        selection.classList.toggle('details-open', host.side.classList.contains('details-open'));
         selection.classList.toggle('has-commands', commands);
         selection.style.display = inGame && (info || commands) ? 'flex' : 'none';
         // The command header replaces the former dossier header; keep its live
@@ -140,7 +143,7 @@ export function initHolographicUi(host: HolographicHost) {
           const details = host.side.querySelector<HTMLElement>('.ptitle span')?.textContent;
           if (caption && details && caption.textContent !== details) caption.textContent = details;
         }
-        const key = host.selectionKey();
+        const key = host.selectionKey() + (host.side.classList.contains('details-open') ? ':details' : '');
         if (inGame && (info || commands) && key !== selected) {
           const anchor = host.selectionAnchor();
           if (anchor) {

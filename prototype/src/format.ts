@@ -52,6 +52,7 @@ export const TECH_CUR: Record<string, string> = {
   metal: '❒',
   energy: 'ϟ',
   microelectronics: '▣',
+  biomass: '❀',
 };
 
 /** Resource token for innerHTML strings: the SAME inline-SVG line icon the top bar

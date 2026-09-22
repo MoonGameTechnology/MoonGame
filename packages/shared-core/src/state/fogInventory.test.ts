@@ -53,10 +53,18 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   pve: 'public',
   version: 'public',
   mapId: 'public', // правила матча — общий факт
+  // BRW-0: режим — тот же класс факта, что и карта, и прятать его не от кого. Он уже
+  // публичен ДО входа: строка браузера партий показывает его каждому, кто смотрит ленту
+  // (`MatchSummary.modeId`), — снимать его в проекции значило бы скрыть от игрока за
+  // столом то, что он видел, пока выбирал стол.
+  modeId: 'public',
   time: 'public',
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
   rng: 'stripped', // кости мира: держащий поток предсказывает будущие броски
+  swarmMemory: 'stripped', // PVR-4.2: вывод Роя игрок читает журналом, не состоянием
+  swarmAdapt: 'stripped', // PVR-4.3: идущий проект — не разведан, пока не проявился
+  swarmJournal: 'filtered', // PVR-4.5: свой журнал видно, чужой — нет
   players: 'filtered', // см. PLAYER_EXPOSURE ниже
   planets: 'filtered', // топология публична, содержимое неопознанного мира — нет
   fleets: 'filtered', // чужой флот виден только опознанным (иначе — засветка)
@@ -71,6 +79,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
  // счётчик, не факт о мире
   scheduled: 'filtered', // чужие таймеры — это будущие намерения
   scheduleSeq: 'public',
+  swarmIntel: 'filtered', // only the viewer's observed Swarm composition
   fog: 'stripped', // память тумана — серверная кухня
   heroes: 'filtered', // только свои
   tempLanes: 'public', // настоящие рёбра графа: их видно всем
@@ -169,6 +178,7 @@ function maximalState(): GameState {
   return {
     ...base,
     mapId: 'frontier-100',
+    modeId: 'pve_waves',
     startedAt: 0,
     match: {
       status: 'ongoing',
@@ -303,6 +313,10 @@ function maximalState(): GameState {
     scheduleSeq: 2,
     // Память зрителя о `Z` — ОБЫЧНАЯ, не канареечная: проекция обязана показать именно
     // её (устаревший снимок), а не живую правду мира за туманом.
+    swarmIntel: {
+      [VIEWER]: { seen: { owner: RIVAL, location: 'Z', at: 50, units: [] } },
+      [RIVAL]: { CANARY_contact: { owner: VIEWER, location: 'A', at: 60, units: [] } },
+    },
     fog: {
       [VIEWER]: {
         Z: { owner: RIVAL, garrison: [{ unit: 'scout', count: 1 }], buildings: [], at: 50 },
@@ -357,6 +371,9 @@ function maximalState(): GameState {
     // Ни одной канарейки: волны публичны целиком (см. опись), и подсадить сюда чужой
     // секрет было бы неправдой о поле — оно его не носит.
     pve: { waveNumber: 3, totalWaves: 10, npcPlayerId: 'swarm', nextWaveAt: 7 },
+    swarmMemory: { engagements: 1, observations: [{ ordinal: 1, kind: 'strike', engagement: 'strike:s1' }] },
+    swarmAdapt: { moduleId: 'swarm_intercept_veil', level: 1, fleetId: 'CANARY_fleet', dueAt: 9 },
+    swarmJournal: { mine: { firstAt: 1, lastAt: 5, sorties: 2, firstDamage: 3, lastDamage: 9 }, CANARY_player: { firstAt: 1, lastAt: 1, sorties: 1, firstDamage: 1, lastDamage: 1 } },
   };
 }
 

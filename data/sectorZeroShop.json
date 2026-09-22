@@ -1,0 +1,98 @@
+{
+  "slots": 5,
+  "offers": {
+    "shield_booster": {
+      "kind": "module",
+      "grants": "shield_booster",
+      "prices": {
+        "warrants": 220,
+        "sovereigns": 30
+      },
+      "weight": 2
+    },
+    "point_defense_array": {
+      "kind": "module",
+      "grants": "point_defense_array",
+      "prices": {
+        "warrants": 260,
+        "sovereigns": 35
+      },
+      "weight": 2
+    },
+    "targeting_array": {
+      "kind": "module",
+      "grants": "targeting_array",
+      "prices": {
+        "warrants": 180,
+        "sovereigns": 25
+      },
+      "weight": 3
+    },
+    "ablative_plating": {
+      "kind": "module",
+      "grants": "ablative_plating",
+      "prices": {
+        "warrants": 180,
+        "sovereigns": 25
+      },
+      "weight": 3
+    },
+    "radar_module": {
+      "kind": "module",
+      "grants": "radar_module",
+      "prices": {
+        "warrants": 120,
+        "sovereigns": 18,
+        "ad": 3
+      },
+      "weight": 4
+    },
+    "void_attunement": {
+      "kind": "skill",
+      "grants": "void_attunement",
+      "prices": {
+        "warrants": 200,
+        "sovereigns": 28
+      },
+      "weight": 2
+    },
+    "neural_lace": {
+      "kind": "skill",
+      "grants": "neural_lace",
+      "prices": {
+        "warrants": 200,
+        "sovereigns": 28
+      },
+      "weight": 2
+    },
+    "data_small": {
+      "kind": "resource",
+      "grants": "research",
+      "amount": 4,
+      "prices": {
+        "warrants": 80,
+        "ad": 1
+      },
+      "weight": 5
+    },
+    "data_large": {
+      "kind": "resource",
+      "grants": "research",
+      "amount": 12,
+      "prices": {
+        "warrants": 200,
+        "sovereigns": 15
+      },
+      "weight": 3
+    },
+    "warrants_pack": {
+      "kind": "resource",
+      "grants": "warrants",
+      "amount": 250,
+      "prices": {
+        "sovereigns": 20
+      },
+      "weight": 2
+    }
+  }
+}
