@@ -20,7 +20,8 @@ import {
   validateMatchMap,
   type MatchMap,
 } from '../packages/shared-core/src/index';
-import { pveState, pveModeId, PVE_MISSION_COUNT } from '../packages/client/src/gameData';
+import { pveState, pveModeId, pveObjectives, PVE_MISSION_COUNT } from '../packages/client/src/gameData';
+import { objectiveProgress } from '../decisions/missionObjectives';
 import { shippedGameData } from './bundle';
 import mapJson from './maps/pve-2.json';
 
@@ -119,6 +120,67 @@ describe('карта второй главы — «Кладбище экспед
     const swarmSectors = Object.values(map.sectors).filter((s) => s.owner === 'swarm');
     expect(swarmSectors.some((s) => s.garrison.length > 0)).toBe(true);
     expect(swarmSectors.some((s) => s.garrison.length === 0)).toBe(true);
+  });
+});
+
+describe('дополнительные задачи карты (PVR-5.2)', () => {
+  const objectives = map.objectives;
+
+  it('задач ТРИ, и все с разными глаголами — взять, снести, пройти', () => {
+    // Три задачи одного рода слились бы в одну: смысл «дополнительных миссий» в том,
+    // что они требуют РАЗНОГО, а не одного и того же по три раза.
+    expect(objectives).toHaveLength(3);
+    expect([...new Set(objectives.map((o) => o.kind))].sort()).toEqual(['control', 'raze', 'scout']);
+  });
+
+  it('цели задач СУЩЕСТВУЮТ — опечатка в id не должна означать «выполнено»', () => {
+    for (const o of objectives.filter((x) => x.kind === 'control'))
+      for (const id of o.targets)
+        expect([o.id, id, id in map.sectors], `${o.id}: нет провинции ${id}`).toEqual([o.id, id, true]);
+    for (const o of objectives.filter((x) => x.kind === 'raze'))
+      for (const b of o.targets)
+        expect([o.id, b, b in data.buildings], `${o.id}: нет здания ${b}`).toEqual([o.id, b, true]);
+  });
+
+  it('сбор материалов начинается НЕВЫПОЛНЕННЫМ и идёт по полям обломков', () => {
+    const salvage = objectives.find((o) => o.kind === 'control')!;
+    for (const id of salvage.targets) {
+      const sec = map.sectors[id]!;
+      expect([id, sec.terrain]).toEqual([id, 'derelict_graveyard']);
+      expect([id, sec.owner], 'поле уже у игрока — задача выполнена на старте').not.toEqual([id, 'p1']);
+    }
+    expect(objectiveProgress(salvage, pveState(data, 1), 'p1').complete).toBe(false);
+  });
+
+  it('снос производства требует того, что на карте РЕАЛЬНО стоит', () => {
+    const raze = objectives.find((o) => o.kind === 'raze')!;
+    const standing = Object.values(map.sectors).filter((s) =>
+      (s.buildings ?? []).some((b) => raze.targets.includes(b.type)),
+    );
+    expect(standing.length, 'снести нечего — задача выполнена на старте').toBeGreaterThan(0);
+    expect(objectiveProgress(raze, pveState(data, 1), 'p1').complete).toBe(false);
+  });
+
+  it('разведка требует МЕНЬШЕ, чем вся карта, но больше половины', () => {
+    // Требовать всю карту значило бы обязать игрока обойти каждый угол; требовать
+    // треть — выдать награду за то, что случится само.
+    const recon = objectives.find((o) => o.kind === 'scout')!;
+    const total = Object.keys(map.sectors).length;
+    expect(recon.count!).toBeGreaterThan(total / 2);
+    expect(recon.count!).toBeLessThan(total);
+  });
+
+  it('у каждой задачи есть награда, и она не перевешивает сам забег', () => {
+    // Выплата за забег — `1 + номер волны + 3 за победу`, то есть до 14 на десяти волнах.
+    // Сумма надбавок должна быть заметной, но не превращать задачи в основной источник.
+    const sum = objectives.reduce((n, o) => n + o.reward, 0);
+    for (const o of objectives) expect([o.id, o.reward > 0]).toEqual([o.id, true]);
+    expect(sum).toBeLessThan(14);
+  });
+
+  it('первая глава задач НЕ получила — они не приехали в неё молча', () => {
+    expect(pveObjectives(0)).toEqual([]);
+    expect(pveObjectives(1)).toHaveLength(3);
   });
 });
 

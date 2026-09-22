@@ -26,6 +26,10 @@ export const ru: Record<string, string> = {
   "setup.map.hole": "Чёрная дыра · путей нет",
   // --- map-loading — initial map preparation ---
   'battle.win.open': '⚔ Открыть бой',
+  'hud.missions': 'Задачи: {n}/{m}',
+  'mission.raze-biomass': 'Зачистка производства: снести биореакторы Роя',
+  'mission.recon': 'Разведка: опознать {n} провинций',
+  'mission.salvage': 'Сбор материалов: взять поля обломков',
   'production.units': 'Построить юнитов',
   'battle.win.beachhead': 'плацдарм',
   'battle.win.empty': 'об этом бое ничего не известно',

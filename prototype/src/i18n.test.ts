@@ -201,6 +201,13 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       'medalBadges() в /decisions добавляет `medal.<линия>` для подписи (VET-3/VET-5)',
   },
   {
+    prefix: 'mission.',
+    built_by:
+      'строка задач в main.ts берёт ключ из `id` задачи, объявленной в карте ' +
+      '(`data/maps/*.json` → `objectives[].id`, PVR-5.2): идентификатор задачи И ЕСТЬ ' +
+      'ключ локализации, поэтому в коде его не встретить литералом',
+  },
+  {
     prefix: 'event.',
     built_by:
       'свиток журнала в main.ts строит `event.<id правила>` из `effect.applied` — ' +

@@ -6,7 +6,7 @@
  * Maps stay local: they are the client's own screens, not shared content.
  */
 import { parseMatchMap, buildStateFromMap } from '@void/shared-core';
-import type { GameData, GameState } from '@void/shared-core';
+import type { GameData, GameState, MapObjective } from '@void/shared-core';
 
 import { FRAGMENTS, shippedGameData } from '../../../data/bundle';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
@@ -54,6 +54,13 @@ function missionMap(mission: number): unknown {
 /** A ready-to-render PvE `GameState` built from the shipped map of that mission. */
 export function pveState(data: GameData, mission = 0): GameState {
   return buildStateFromMap(parseMatchMap(missionMap(mission)), data);
+}
+
+/** Дополнительные задачи главы — объявлены в карте, проверяются чистым предикатом
+ *  (`decisions/missionObjectives.ts`). Карта без задач отдаёт пустой список, и это
+ *  нормальный случай: задачи ДОПОЛНИТЕЛЬНЫЕ. */
+export function pveObjectives(mission = 0): MapObjective[] {
+  return parseMatchMap(missionMap(mission)).objectives;
 }
 
 /** The mode the mission's map declares itself played under (`data.modes` id), for the host

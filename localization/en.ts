@@ -23,6 +23,10 @@ export const en: Record<string, string> = {
   "setup.map.hole": "Black hole · no paths",
   // --- map-loading — initial map preparation ---
   'battle.win.open': '⚔ Open battle',
+  'hud.missions': 'Missions: {n}/{m}',
+  'mission.raze-biomass': 'Raze production: destroy the Swarm biomass pits',
+  'mission.recon': 'Recon: identify {n} provinces',
+  'mission.salvage': 'Salvage: take the wreck fields',
   'production.units': 'Build units',
   'battle.win.beachhead': 'beachhead',
   'battle.win.empty': 'nothing is known about this battle',

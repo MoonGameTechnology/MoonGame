@@ -1011,6 +1011,7 @@
 | PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md:1989` | Структуры первого набора |
 | PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md:2019` | Журнал адаптаций |
 | PVR-5.1 | ✅ | data cli | `docs/sector-zero-roadmap.md:2055` | Карта второй главы и дверь к ней |
+| PVR-5.2 | ✅ | data cli | `docs/sector-zero-roadmap.md:2106` | Задачи на карте и награда за них |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |

@@ -147,6 +147,29 @@ describe('Sector Zero persistent preparation', () => {
     expect(settleSectorZeroRun(p, 1, s).research).toBeGreaterThan(settled.research);
   });
 
+  it('ЗАДАЧИ КАРТЫ добавляют к выплате, а не заменяют её (PVR-5.2)', () => {
+    // Надбавка складывается с выплатой за волны намеренно: иначе игрок, сделавший задачи
+    // и проигравший рано, получил бы больше дошедшего до конца, и «дополнительная»
+    // задача перестала бы быть дополнительной.
+    const s = pveState(data);
+    s.pve = { waveNumber: 4, totalWaves: 10, npcPlayerId: 'p3' };
+    s.match.status = 'ended';
+    s.match.winner = 'p3';
+    const base = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s).research;
+
+    // Задача, которая на этом состоянии ЗАВЕДОМО выполнена: снести то, чего на карте нет.
+    const done = { id: 'mission.x', kind: 'raze' as const, targets: ['no_such_building'], reward: 5 };
+    const withBonus = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [done]).research;
+    expect(withBonus).toBe(base + 5);
+
+    // Контроль: НЕвыполненная задача не платит, и выплата остаётся прежней.
+    const notDone = { id: 'mission.y', kind: 'control' as const, targets: ['no_such_planet'], reward: 5 };
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [notDone]).research).toBe(base);
+
+    // И контроль формы: пустой список задач — ровно прежнее поведение.
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, []).research).toBe(base);
+  });
+
   it('does not confuse two different attempts ending at the same game time', () => {
     const s = pveState(data);
     s.pve = { waveNumber: 2, totalWaves: 10, npcPlayerId: 'p3' };

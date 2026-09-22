@@ -177,7 +177,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveObjectives } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -251,6 +251,7 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
+import { missionProgress } from '../../decisions/missionObjectives';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
@@ -13076,7 +13077,12 @@ const sectorZeroMenu = initSectorZeroMenu({
     // Persistence can be unavailable. A paused run still exists in this tab.
     if (runInProgress() && !sectorDevActive) savedRun = currentRunSave();
     if (savedRun && savedRun.mode === pveModeId() && (savedRun.state as GameState).match?.status === 'ended') {
-      const next = settleSectorZeroRun(sectorProgress, savedRun.sectorZeroAttempt ?? 0, savedRun.state as GameState);
+      const next = settleSectorZeroRun(
+        sectorProgress,
+        savedRun.sectorZeroAttempt ?? 0,
+        savedRun.state as GameState,
+        pveObjectives(sectorMission),
+      );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
       await runSaveStore.clear();
@@ -13345,9 +13351,23 @@ function frame(nowReal: number) {
       ? ''
       : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'cleared' ? wave.total : wave.wave, m: wave.total })}` +
         ` · ${wave.kind === 'cleared' ? t('hud.wave.done') : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>`;
+  // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
+  // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
+  // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
+  const missions = sectorRunActive ? missionProgress(pveObjectives(sectorMission), s, ME) : [];
+  const missionsDone = missions.filter(m => m.complete).length;
+  const missionHtml =
+    missions.length === 0
+      ? ''
+      : `<span class="dl-wave" title="${esc(
+          missions
+            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${m.reward})`)
+            .join('\n'),
+        )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
     waveHtml +
+    missionHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +

@@ -5,6 +5,10 @@ ROWS = [
     (0,    [(-390,'c1'), (-130,'c2'), (130,'c3'), (390,'c4')]),
     (225,  [(-520,'d1'), (-260,'d2'), (0,'d3'), (260,'d4'), (520,'d5')]),
     (450,  [(-390,'e1'), (-130,'e2'), (130,'e3'), (390,'e4')]),
+    # Ряд F — КАРМАН КЛАДБИЩА, добавлен под задачу сбора материалов (решение владельца
+    # 2026-09-22: «можно под эти миссии новые области добавить»). Держится на том же
+    # шаге решётки, поэтому перелёты туда такие же короткие, как везде.
+    (675,  [(-260,'f1'), (0,'f2'), (260,'f3')]),
 ]
 S = 'swarm'
 # вид, местность, владелец, гарнизон, постройки
@@ -29,8 +33,11 @@ SPEC = {
  'd5': ('ion_storm','ion_storm',None,[],[]),
  'e1': ('asteroid','asteroid_field',S,[],[]),
  'e2': ('planet','empty_space',S,[{'unit':'swarm_lander','count':4}],[{'type':'swarm_synapse'},{'type':'shipyard','level':2},{'type':'orbital_aa'}]),
- 'e3': ('nebula','nebula',None,[],[]),
+ 'e3': ('empty','empty_space',None,[],[]),
  'e4': ('planet','empty_space',S,[{'unit':'swarm_lander','count':6}],[{'type':'swarm_hive'},{'type':'biomass_pit'},{'type':'shipyard','level':2},{'type':'barracks'},{'type':'fort'},{'type':'orbital_aa'}]),
+  'f1': ('graveyard','derelict_graveyard',S,[{'unit':'swarm_lander','count':2}],[]),
+  'f2': ('nebula','nebula',None,[],[]),
+  'f3': ('graveyard','derelict_graveyard',S,[],[]),
 }
 # Размеры НЕ трогаем: решётка уже даёт узлам шесть подходов, а раздутая клетка
 # отнимает границы у соседей — первым делом горизонтальные внутри ряда.
@@ -51,9 +58,20 @@ for y,row in ROWS:
         if sid in TRANSIT: sec['transit']=TRANSIT[sid]
         sectors[sid]=sec
 
+# ЗАДАЧИ ЗАБЕГА — три разных ГЛАГОЛА, иначе они сольются в одну: взять, снести, пройти.
+OBJECTIVES = [
+  collections.OrderedDict([('id','mission.salvage'),('kind','control'),
+                           ('targets',['c2','d4','f1','f3']),('reward',3)]),
+  collections.OrderedDict([('id','mission.raze-biomass'),('kind','raze'),
+                           ('targets',['biomass_pit']),('reward',3)]),
+  collections.OrderedDict([('id','mission.recon'),('kind','scout'),
+                           ('count',14),('reward',2)]),
+]
+
 m = collections.OrderedDict([
  ('id','pve-2'),('seed','pve-2'),('time',0),('mode','pve_waves'),
  ('sectors',sectors),
+ ('objectives',OBJECTIVES),
  ('players', collections.OrderedDict([
    ('p1', {'name':'Azure Compact','faction':'vanguard','resources':{'credits':400,'metal':400}}),
    ('swarm', {'name':'Swarm Collective','faction':'swarm','ai':True,

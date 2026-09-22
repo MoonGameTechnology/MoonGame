@@ -308,6 +308,8 @@ export {
   MapSlotSchema,
   SpawnPolicySchema,
   avaShape,
+  MapObjectiveSchema,
+  type MapObjective,
   parseMatchMap,
   safeParseMatchMap,
   type MatchMap,

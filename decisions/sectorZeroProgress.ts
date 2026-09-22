@@ -3,12 +3,14 @@
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
 import { forgeOutcome, type ForgeLadder } from './sectorZeroForge';
+import { objectiveBonus } from './missionObjectives';
 import {
   canEquip,
   starsOf,
   type GameData,
   type GameState,
   type Hero,
+  type MapObjective,
 } from '../packages/shared-core/src/index';
 
 export interface SectorHero {
@@ -419,6 +421,9 @@ export function settleSectorZeroRun(
   progress: SectorZeroProgress,
   attempt: number,
   state: GameState,
+  /** Дополнительные задачи карты (решение владельца 2026-09-22). Пусто — забег платит
+   *  ровно как раньше: задачи ДОПОЛНИТЕЛЬНЫЕ, и карта без них — нормальная карта. */
+  objectives: readonly MapObjective[] = [],
 ): SectorZeroProgress {
   if (
     !Number.isSafeInteger(attempt) ||
@@ -434,7 +439,11 @@ export function settleSectorZeroRun(
   )
     return progress;
   const won = state.match.winner === 'p1' || state.match.winners?.includes('p1');
-  const reward = 1 + Math.max(0, state.pve.waveNumber) + (won ? 3 : 0);
+  // Надбавка за ВЫПОЛНЕННЫЕ задачи складывается с выплатой за волны, а не заменяет её:
+  // иначе игрок, сделавший задачи и проигравший рано, получал бы больше того, кто дошёл
+  // до конца, — и «дополнительная» задача перестала бы быть дополнительной.
+  const reward =
+    1 + Math.max(0, state.pve.waveNumber) + (won ? 3 : 0) + objectiveBonus(objectives, state, 'p1');
   return {
     ...progress,
     research: progress.research + reward,

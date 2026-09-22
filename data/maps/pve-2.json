@@ -267,8 +267,8 @@
         "x": 130,
         "y": 450
       },
-      "kind": "nebula",
-      "terrain": "nebula"
+      "kind": "empty",
+      "terrain": "empty_space"
     },
     "e4": {
       "position": {
@@ -305,8 +305,67 @@
           "count": 6
         }
       ]
+    },
+    "f1": {
+      "position": {
+        "x": -260,
+        "y": 675
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "f2": {
+      "position": {
+        "x": 0,
+        "y": 675
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "f3": {
+      "position": {
+        "x": 260,
+        "y": 675
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm"
     }
   },
+  "objectives": [
+    {
+      "id": "mission.salvage",
+      "kind": "control",
+      "targets": [
+        "c2",
+        "d4",
+        "f1",
+        "f3"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.raze-biomass",
+      "kind": "raze",
+      "targets": [
+        "biomass_pit"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.recon",
+      "kind": "scout",
+      "count": 14,
+      "reward": 2
+    }
+  ],
   "players": {
     "p1": {
       "name": "Azure Compact",
