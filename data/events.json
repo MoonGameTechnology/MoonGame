@@ -5,10 +5,37 @@
     "params": { "trait": "infected" },
     "chance": 1
   },
+  "salvage_wrecks": {
+    "trigger": "province_captured",
+    "effect": "modify_resource",
+    "params": {
+      "kinds": ["graveyard", "dead_world"],
+      "resources": { "metal": 40, "microelectronics": 5 }
+    },
+    "chance": 1
+  },
   "void_anomaly": {
     "trigger": "schedule",
     "effect": "modify_resource",
-    "params": { "resource": "energy", "amount": 50, "cadenceHours": 8 },
-    "chance": 0.5
+    "params": { "resource": "energy", "amount": 50, "cadenceHours": 48 },
+    "chance": 0.15
+  },
+  "derelict_cache": {
+    "trigger": "schedule",
+    "effect": "modify_resource",
+    "params": { "resource": "metal", "amount": 120, "cadenceHours": 60 },
+    "chance": 0.15
+  },
+  "solar_flare": {
+    "trigger": "schedule",
+    "effect": "modify_resource",
+    "params": { "resource": "energy", "amount": -60, "cadenceHours": 72 },
+    "chance": 0.12
+  },
+  "grain_blight": {
+    "trigger": "schedule",
+    "effect": "modify_resource",
+    "params": { "resource": "food", "amount": -50, "cadenceHours": 96 },
+    "chance": 0.1
   }
 }
