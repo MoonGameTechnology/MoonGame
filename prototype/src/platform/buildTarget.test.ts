@@ -48,6 +48,14 @@ describe('YAG-1.1b — сниппет подключения SDK (п. 1.19.1)', 
    *  строке документации; проверять надо то, что реально уедет в разметку. */
   const loader = /const SDK_LOADER = `([\s\S]*?)`;/.exec(BUILD_SCRIPT)?.[1] ?? '';
 
+  /** Шаблон `page()` целиком — от стрелки до закрывающего бэктика с точкой с запятой.
+   *  Ровно он решает, что попадёт в разметку платформенной цели. */
+  const pageTemplate = /const page = \([^)]*\) => `([\s\S]*?)`;\n/.exec(BUILD_SCRIPT)?.[1] ?? '';
+
+  it('шаблон страницы найден — иначе проверки ниже молча проверяют пустоту', () => {
+    expect(pageTemplate.length).toBeGreaterThan(1000);
+  });
+
   it('константа лоадера найдена — иначе сторож молча проверяет пустоту', () => {
     expect(loader).not.toBe('');
   });
@@ -63,17 +71,22 @@ describe('YAG-1.1b — сниппет подключения SDK (п. 1.19.1)', 
   it('страница площадки подключает стили и скрипт игры ФАЙЛАМИ, лоадер — первым', () => {
     // `external` — тот самый параметр `page()`, который делает цель разложенной.
     //
-    // Semgrep помечает соседство переменной и тега `<script>` как возможный XSS
-    // (`unknown-value-with-script-tag`). Здесь это ложное срабатывание по форме, и
-    // проверяется оно легко: `BUILD_SCRIPT` — это `readFileSync` НАШЕГО СОБСТВЕННОГО
-    // `prototype/build.mjs`, ничего внешнего в него не приходит, и ни одна строка
-    // отсюда никуда не рендерится — тест только ищет подстроки в тексте файла.
-    // Правило ищет вывод HTML, а тут чтение исходника; подавляем точечно, с причиной.
-    // nosemgrep: javascript.lang.security.audit.unknown-value-with-script-tag.unknown-value-with-script-tag
-    const gameScript = '<script src="assets/app.js"></script>';
-    expect(BUILD_SCRIPT).toContain(gameScript);
-    expect(BUILD_SCRIPT).toContain('<link rel="stylesheet" href="assets/app.css">');
-    expect(BUILD_SCRIPT.indexOf('SDK_LOADER')).toBeLessThan(BUILD_SCRIPT.indexOf(gameScript));
+    // ⚠️ Порядок проверяется ВНУТРИ шаблона страницы, а не по всему файлу, и это
+    // не педантизм: первая редакция искала `SDK_LOADER` где угодно и находила его
+    // ОБЪЯВЛЕНИЕ — мутация «убрать лоадер из шапки страницы» прошла мимо неё. Сторож
+    // был слеп ровно к той поломке, ради которой заведён.
+    //
+    // Тег в переменной не держим: Semgrep (`unknown-value-with-script-tag`) помечает
+    // соседство неизвестного значения с тегом `<script>`, и первая редакция получила
+    // два алерта. Подавить директивой честно не выходит — правило приезжает из registry
+    // (`p/javascript`), закрытого egress-политикой сессии, то есть проверить подавление
+    // локально нечем, и оно осталось бы обещанием.
+    expect(pageTemplate).toContain('<script src="assets/app.js"></script>');
+    expect(pageTemplate).toContain('<link rel="stylesheet" href="assets/app.css">');
+    expect(pageTemplate.indexOf('SDK_LOADER')).toBeGreaterThan(-1);
+    expect(pageTemplate.indexOf('SDK_LOADER')).toBeLessThan(
+      pageTemplate.indexOf('assets/app.js'),
+    );
   });
 });
 
