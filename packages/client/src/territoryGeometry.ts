@@ -1,4 +1,5 @@
 import { computePowerCells, type TerritoryCell, type TerritorySeed } from './territory';
+import { waveCells, type WaveConfig } from './territoryWave';
 
 /** One geometry snapshot, independent of camera translation/zoom and viewer intel.
  * Reprojection is O(vertices); the quadratic tessellation runs only on shape changes. */
@@ -6,7 +7,19 @@ export class TerritoryGeometryCache {
   private signature = '';
   private cells: TerritoryCell[] = [];
 
-  project(seeds: TerritorySeed[], clip: Array<[number, number]>, scale: number): TerritoryCell[] {
+  /**
+   * @param wave Живая линия границы (M2.9). Накладывается ЗДЕСЬ, в локальных координатах
+   *  — то есть ДО обратной проекции и после деления на зум. Поэтому изгиб не зависит от
+   *  приближения и не ползёт при панораме; посчитай его в экранных, и форма поплыла бы.
+   *  Единицы — локальные, перевод из мировых на вызывающем. Кэшируется вместе с формой,
+   *  так что на дрожание камеры волна ничего не стоит.
+   */
+  project(
+    seeds: TerritorySeed[],
+    clip: Array<[number, number]>,
+    scale: number,
+    wave?: WaveConfig,
+  ): TerritoryCell[] {
     const [ox, oy] = clip[0]!;
     const point = (x: number, y: number): [number, number] => [(x - ox) / scale, (y - oy) / scale];
     const local = seeds.map((s) => {
@@ -20,9 +33,12 @@ export class TerritoryGeometryCache {
     const signature =
       local.map((s) => `${q(s.x)},${q(s.y)},${q(s.w)}`).join(';') +
       '|' +
-      boundary.map(([x, y]) => `${q(x)},${q(y)}`).join(';');
+      boundary.map(([x, y]) => `${q(x)},${q(y)}`).join(';') +
+      // Волна — часть ФОРМЫ: сменилась настройка — форму надо пересчитать.
+      `|${wave ? `${q(wave.amp)},${q(wave.wavelength)},${q(wave.segment)}` : ''}`;
     if (signature !== this.signature) {
-      this.cells = computePowerCells(local, boundary);
+      const tess = computePowerCells(local, boundary);
+      this.cells = wave ? waveCells(tess, wave) : tess;
       this.signature = signature;
     }
     return this.cells.map((cell) => ({

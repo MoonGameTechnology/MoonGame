@@ -1876,6 +1876,21 @@ function world(p: { x: number; y: number }): { x: number; y: number } {
 function worldDist(d: number): number {
   return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
 }
+/**
+ * Волна на границах провинций (M2.9, решение владельца: «в космосе нет прямых углов»).
+ *
+ * Числа заданы в МИРОВЫХ единицах и переводятся в локальные координаты мозаики умножением
+ * на подгон карты под экран: `territoryGeometry.project` уже поделил экранные на зум, но
+ * не на подгон. Из-за этого изгиб не зависит от приближения — правило кирпича.
+ *
+ * Амплитуда взята долей от шага между провинциями (~260 мировых единиц на шипнутых
+ * картах): заметно глазу, но далеко от того, чтобы клетка полезла на соседнюю.
+ */
+function provinceWave(): { amp: number; wavelength: number; segment: number } {
+  const fit = camFitTransform(insets(), mapBounds()).scale;
+  return { amp: 11 * fit, wavelength: 190 * fit, segment: 26 * fit };
+}
+
 function currentMapLod(): MapLod {
   return mapLod(worldDist(mapNodeSpacing), cam.scale);
 }
@@ -4534,7 +4549,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     hideOwnedInner: holographicMapOn(),
     provinceDetail: lod.provinceDetail,
     sealed: sealedBorder,
-  }, territoryGeometry.project(seeds, clip, cam.scale));
+  }, territoryGeometry.project(seeds, clip, cam.scale, provinceWave()));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
   if (holographicMapOn() && lod.art > 0) {
