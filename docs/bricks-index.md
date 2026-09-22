@@ -660,6 +660,8 @@
 | TXT-5 | ⏳ | proto | `docs/backlog.md` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
 | TXT-6 | ⏳ | proto | `docs/backlog.md` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
+| BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
+| BRWH-2 | ⏳ | proto | `docs/backlog.md` | Четыре харнеса сгнили: чинить, а не удалять. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |
