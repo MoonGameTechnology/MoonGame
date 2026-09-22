@@ -63,6 +63,9 @@ reasoning loops.
 
 ## GitHub publication path
 
+For every request to push/publish/create a PR, follow `.claude/skills/publish-pr/SKILL.md`.
+That skill is the canonical publication ritual, including the binary Git Data API fallback.
+
 Do not mix local Git transport, the connected GitHub API/app, and the merge queue as if they were
 one mechanism.
 
@@ -117,6 +120,7 @@ that decide whether a change is *correct* in this repository are elsewhere:
   stable `E_*` code, never a leaked detail), server authority, fixed module order.
 - **`CONTRIBUTING.md`** — the full Git and review regimen.
 - **`.claude/skills/`** — the executable rituals: `brick` (take a backlog task),
+  `publish-pr` (publish local work + create/reuse PR, including binary assets),
   `localization` (player-visible text is a KEY, never a literal), `new-module`,
   `add-game-content`, `sync-state-doc`.
 
