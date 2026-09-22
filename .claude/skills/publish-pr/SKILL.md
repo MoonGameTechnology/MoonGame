@@ -47,6 +47,41 @@ description: >
 - НЕ переключайся потом обратно на terminal push;
 - переходи к GitHub API fallback ниже.
 
+### 2.1 MCP transport failure — отдельный класс блокера
+
+Ошибки уровня transport/session происходят **до нормального ответа GitHub API**. К ним
+относятся, в частности:
+- `Invalid MCP request metadata`;
+- connector unavailable / disconnected;
+- malformed or invalid request metadata на границе MCP;
+- session/transport failure, когда GitHub HTTP status/response вообще не получен.
+
+При такой ошибке:
+1. Считай текущий GitHub MCP transport неисправным для write-операций в этой сессии.
+2. **Не повторяй тот же MCP-вызов.** Один transport failure уже достаточен.
+3. **Не переходи на `create_blob/create_tree/create_commit/update_ref` через тот же MCP.**
+   Это не другой fallback, а тот же сломанный transport под другой GitHub операцией.
+4. Разрешён максимум **один переход на действительно другой write-транспорт**:
+   - terminal Git, только если write-credentials уже подтверждены;
+   - отдельно авторизованный GitHub client/app/connector, если он реально независим от
+     упавшего MCP-сеанса.
+5. Если независимого write-транспорта нет — публикация считается заблокированной.
+   Не повторяй реализацию задачи и не создавай новые ветки «на удачу».
+
+Перед остановкой зафиксируй recovery checkpoint:
+- имя локальной ветки;
+- локальный commit SHA (если работа ещё не закоммичена — сначала создай локальный commit);
+- SHA свежего `main`, относительно которого подготовлена работа;
+- краткий список changed files, отдельно отметив бинарные ассеты;
+- какие проверки уже прошли / какие были пропущены по просьбе владельца;
+- точный текст transport error.
+
+Сообщение владельцу должно говорить, что **код/арты готовы локально, но remote branch/PR
+не созданы из-за transport failure**. Никогда не выдавай локальный commit за опубликованный.
+
+Новая сессия/восстановленный независимый transport должна продолжить **с recovery
+checkpoint**, а не выполнять задачу заново.
+
 ## 3. Preflight GitHub до PR
 
 Проверь:
@@ -55,7 +90,9 @@ description: >
 - если PR есть — переиспользуй его, не создавай дубль;
 - если PR уже в merge queue, ветку не обновляй: queued head считается замороженным.
 
-Если remote-ветка ещё не существует и terminal push недоступен — используй раздел 4.
+Если remote-ветка ещё не существует и terminal push недоступен — используй раздел 4,
+**но только если GitHub connector/API transport исправен**. После transport-level ошибки
+из §2.1 этот API fallback через тот же connector запрещён.
 
 ## 4. GitHub API fallback: локальная ветка → remote без git push
 

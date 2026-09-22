@@ -1028,30 +1028,30 @@
 | SD-0.2 | ✅ | sec | `docs/secure-sdlc-roadmap.md:70` | SEC-1: триаж и baseline сканеров |
 | SD-1.1 | ⏳ | core act srv | `docs/secure-sdlc-roadmap.md:87` | Валидация на каждой границе доверия |
 | SD-1.2 | ⏳ | cli proto | `docs/secure-sdlc-roadmap.md:93` | Вывод/экранирование — XSS в клиенте |
-| SD-1.3 | ⏳ | srv | `docs/secure-sdlc-roadmap.md:99` | Инъекции — БД |
-| SD-1.4 | ⏳ | core | `docs/secure-sdlc-roadmap.md:105` | Prototype pollution и безопасная десериализация |
-| SD-1.5 | ⏳ | core act srv | `docs/secure-sdlc-roadmap.md:111` | ReDoS-гигиена |
-| SD-2.1 | ✅ | sec | `docs/secure-sdlc-roadmap.md:120` | Кастомные Semgrep-правила под инварианты ядра |
-| SD-2.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:136` | ESLint security-плагины + типизованные правила |
-| SD-2.3 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:141` | CodeQL default setup |
-| SD-2.4 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:146` | Секреты: Gitleaks + GitHub push protection |
-| SD-3.1 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:158` | pnpm: блокировка lifecycle-скриптов + cooldown |
-| SD-3.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:164` | SCA-гейт + автообновления с политикой |
-| SD-3.3 | ✅ | sec | `docs/secure-sdlc-roadmap.md:170` | Провенанс артефактов + проверка (SEC-5 ) |
-| SD-3.4 | ✅ | sec | `docs/secure-sdlc-roadmap.md:183` | SBOM в IR-поток → |
-| SD-4.1 | ⏳ | docs sec | `docs/secure-sdlc-roadmap.md:192` | Threat-model-as-code в репо |
-| SD-4.2 | 🔒 | docs | `docs/secure-sdlc-roadmap.md:197` | Кадэнс per-feature |
-| SD-5.1 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:206` | CODEOWNERS + защита ветки |
-| SD-5.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:211` | Pre-commit хуки + подпись коммитов |
-| SD-6.1 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:220` | SHA-пин экшенов и образов + least-priv токены |
-| SD-6.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:226` | OIDC вместо долгоживущих секретов |
-| SD-6.3 | ✅ | sec | `docs/secure-sdlc-roadmap.md:231` | Агрегация находок (SARIF) |
-| SD-7.1 | ⏳ | act | `docs/secure-sdlc-roadmap.md:244` | Расширить abuse-тесты слоя действий |
-| SD-7.2 | ⏳ | core srv | `docs/secure-sdlc-roadmap.md:249` | Фаззинг валидаторов и парсеров (частично ) |
-| SD-7.3 | ✅ | core | `docs/secure-sdlc-roadmap.md:259` | Property-based тесты детерминизма |
-| SD-8.1 | 🔒 | docs sec | `docs/secure-sdlc-roadmap.md:276` | ASVS L2 self-verification |
-| SD-8.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:281` | DAST против живого сервера |
-| SD-8.3 | ⏳ | docs | `docs/secure-sdlc-roadmap.md:286` | Процесс реакции на уязвимости |
+| SD-1.3 | ✅ | srv | `docs/secure-sdlc-roadmap.md:99` | Инъекции — БД 2026-09-22 |
+| SD-1.4 | ⏳ | core | `docs/secure-sdlc-roadmap.md:135` | Prototype pollution и безопасная десериализация |
+| SD-1.5 | ⏳ | core act srv | `docs/secure-sdlc-roadmap.md:141` | ReDoS-гигиена |
+| SD-2.1 | ✅ | sec | `docs/secure-sdlc-roadmap.md:150` | Кастомные Semgrep-правила под инварианты ядра |
+| SD-2.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:166` | ESLint security-плагины + типизованные правила |
+| SD-2.3 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:171` | CodeQL default setup |
+| SD-2.4 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:176` | Секреты: Gitleaks + GitHub push protection |
+| SD-3.1 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:188` | pnpm: блокировка lifecycle-скриптов + cooldown |
+| SD-3.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:194` | SCA-гейт + автообновления с политикой |
+| SD-3.3 | ✅ | sec | `docs/secure-sdlc-roadmap.md:200` | Провенанс артефактов + проверка (SEC-5 ) |
+| SD-3.4 | ✅ | sec | `docs/secure-sdlc-roadmap.md:213` | SBOM в IR-поток → |
+| SD-4.1 | ⏳ | docs sec | `docs/secure-sdlc-roadmap.md:222` | Threat-model-as-code в репо |
+| SD-4.2 | 🔒 | docs | `docs/secure-sdlc-roadmap.md:227` | Кадэнс per-feature |
+| SD-5.1 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:236` | CODEOWNERS + защита ветки |
+| SD-5.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:241` | Pre-commit хуки + подпись коммитов |
+| SD-6.1 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:250` | SHA-пин экшенов и образов + least-priv токены |
+| SD-6.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:256` | OIDC вместо долгоживущих секретов |
+| SD-6.3 | ✅ | sec | `docs/secure-sdlc-roadmap.md:261` | Агрегация находок (SARIF) |
+| SD-7.1 | ⏳ | act | `docs/secure-sdlc-roadmap.md:274` | Расширить abuse-тесты слоя действий |
+| SD-7.2 | ⏳ | core srv | `docs/secure-sdlc-roadmap.md:279` | Фаззинг валидаторов и парсеров (частично ) |
+| SD-7.3 | ✅ | core | `docs/secure-sdlc-roadmap.md:289` | Property-based тесты детерминизма |
+| SD-8.1 | 🔒 | docs sec | `docs/secure-sdlc-roadmap.md:306` | ASVS L2 self-verification |
+| SD-8.2 | ⏳ | sec | `docs/secure-sdlc-roadmap.md:311` | DAST против живого сервера |
+| SD-8.3 | ⏳ | docs | `docs/secure-sdlc-roadmap.md:316` | Процесс реакции на уязвимости |
 | SV-0.1 | ✅ | srv | `docs/server-roadmap.md:44` | Fastify-скелет + health/readiness |
 | SV-0.2 | ✅ | srv | `docs/server-roadmap.md:50` | Match-actor модель |
 | SV-1.1 | ✅ | srv act | `docs/server-roadmap.md:60` | Подключить @void/action-layer к WS-потоку |
