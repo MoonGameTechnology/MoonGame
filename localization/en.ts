@@ -800,6 +800,8 @@ export const en: Record<string, string> = {
   'data.militia': 'militia',
   'data.nebula': 'Nebula',
   'data.neural-lace': 'Neural Lace',
+  'data.command-relay': 'Command Relay',
+  'data.command-grid': 'Command Grid',
   'data.oceanic': 'Oceanic',
   'data.open-space': 'Open space',
   'data.area-defense-battery': 'Area Defense Battery',
@@ -1523,7 +1525,8 @@ export const en: Record<string, string> = {
   'hero.ability.annihilate.name': 'Annihilate',
   'hero.ability.boarding-translocation.desc':
     'The hero arrives where one of your fleets is PARKED — as a separate fleet alongside it. Every hero leads their own squadron, so they never join another; a fleet in transit is not a landing point. Passive skill: widens the deployment points.',
-  'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
+  'hero.ability.bulwark.desc':
+    'A temporary shield: +15% defense to your fleets within 42 of the hero, for 2 hours. The command net widens it to 220, then 334.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
     'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to your allies — an open corridor is shared, so the enemy may walk in too.',
@@ -1533,7 +1536,7 @@ export const en: Record<string, string> = {
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
   'hero.ability.rally.desc':
-    'A battle cry: a temporary extra aura bonus for your fleets near the hero.',
+    'A battle cry: +10% damage for your fleets within 42 of the hero, for 2 hours. The command net widens it to 220, then 334.',
   'hero.ability.rally.name': 'Rally',
   'hero.ability.recall.desc': 'Instantly recalls the hero ship to the capital.',
   'hero.ability.recall.name': 'Recall',
@@ -1565,6 +1568,10 @@ export const en: Record<string, string> = {
     'Opens the corridor to your ALLIES: their fleets use your passage as their own, at the same speed bonus. It becomes a shared road, so a neutral — or the enemy — can step in as well, but for them it is only a road: no bonus.',
   'hero.tree.corridor-sustained.desc':
     "The corridor lives on a clock instead of closing behind the hero's army.",
+  'hero.tree.command-relay.desc':
+    'The relay carries an order to the next node: the Rally and Bulwark radius grows from 42 to 220.',
+  'hero.tree.command-grid.desc':
+    'The grid covers the neighbours outright: the Rally and Bulwark radius grows from 220 to 334.',
   'hero.tree.false-echo.desc':
     'The other side of psi-sight: the hero learns not only to read a rival radar, but to write into it what is not there.',
   'hero.tree.fleet-uplink.desc':

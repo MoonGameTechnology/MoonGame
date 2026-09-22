@@ -114,5 +114,17 @@
     "requires": ["wreck_foundry"],
     "cost": { "microelectronics": 95, "credits": 220 },
     "grants": { "passives": ["wreck_mastery_salvage", "wreck_mastery_guns"] }
+  },
+  "command_relay": {
+    "name": "Command Relay",
+    "description": "hero.tree.command-relay.desc",
+    "requires": [],
+    "cost": { "credits": 300, "metal": 200 }
+  },
+  "command_grid": {
+    "name": "Command Grid",
+    "description": "hero.tree.command-grid.desc",
+    "requires": ["command_relay"],
+    "cost": { "credits": 600, "metal": 400 }
   }
 }
