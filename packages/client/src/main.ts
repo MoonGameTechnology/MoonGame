@@ -19,6 +19,7 @@ import { renderMap } from './mapRender';
 import { openLiveMatch } from './net';
 import { nearestPlanet, myFleetAt } from './matchInput';
 import { browserIo, createSession, type NetSession } from './session';
+import { browserUpdateIo, watchForUpdate } from './appUpdate';
 import { socketBase } from '../../../decisions/serverAddress';
 import { errorTarget, refusalKey } from '../../../decisions/errorRoute';
 import { refusalText } from '../../../decisions/refusalText';
@@ -517,6 +518,33 @@ function setNetStatus(text: string): void {
   el.textContent = text;
 }
 
+/**
+ * CP2.2: a newer build is installed and waiting. The player decides when to take it,
+ * because taking it costs a reload — and a reload mid-order loses the order. Built from
+ * nodes rather than markup: the banner carries a button, and `innerHTML` with a
+ * localized string in it is the one place this file must not get lazy.
+ */
+function showUpdateBanner(apply: () => void): void {
+  if (document.getElementById('update')) return;
+  const bar = document.createElement('div');
+  bar.id = 'update';
+  bar.style.cssText =
+    'position:fixed;right:10px;bottom:10px;z-index:11;display:flex;align-items:center;gap:8px;' +
+    'padding:8px 10px;border-radius:8px;font:12px ui-monospace,monospace;color:var(--ink,#bfeee6);' +
+    'background:rgba(3,14,18,.92);border:1px solid var(--cyan,#35d6e6);';
+  const text = document.createElement('span');
+  text.textContent = t('client.update.ready');
+  const button = document.createElement('button');
+  button.className = 'btn tiny';
+  button.textContent = t('client.update.apply');
+  button.addEventListener('click', () => {
+    bar.remove();
+    apply();
+  });
+  bar.append(text, button);
+  document.body.appendChild(bar);
+}
+
 /** CP1.1: connect to a live match over WebSocket, render the server's authoritative
  *  snapshots, AND send orders back — the closed online loop. World extent comes from the
  *  first snapshot; deltas patch the state and the loop always draws the latest. Tap your
@@ -890,3 +918,8 @@ showEngine();
 // invite, or the dev proto-server). The ws url is encoded so its own ?query survives.
 const joinUrl = new URLSearchParams(location.search).get('join');
 if (joinUrl) connectLive(joinUrl);
+
+// CP2.2: install the offline shell. It never takes over a running page by itself — when
+// a newer build is waiting, the banner offers it and the player picks the moment.
+void watchForUpdate(browserUpdateIo(), showUpdateBanner);
+
