@@ -142,6 +142,21 @@ describe('дополнительные задачи карты (PVR-5.2)', () =>
         expect([o.id, b, b in data.buildings], `${o.id}: нет здания ${b}`).toEqual([o.id, b, true]);
   });
 
+  it('цель «держать» ЗАХВАТЫВАЕМА — иначе это задача, которую нельзя выполнить', () => {
+    // Самая частая беда этого проекта: правило объявлено, а выполнить его нечем. На карте
+    // полно провинций вида `empty` (перекрёстки решётки) — они не присваиваются вообще,
+    // и задача «держи перекрёсток» висела бы вечно невыполненной.
+    for (const o of objectives.filter((x) => x.kind === 'control'))
+      for (const id of o.targets) {
+        const kind = data.sectorKinds[map.sectors[id]!.kind];
+        expect([o.id, id, kind?.capturable], `${o.id}: ${id} нельзя присвоить`).toEqual([
+          o.id,
+          id,
+          true,
+        ]);
+      }
+  });
+
   it('сбор материалов начинается НЕВЫПОЛНЕННЫМ и идёт по полям обломков', () => {
     const salvage = objectives.find((o) => o.kind === 'control')!;
     for (const id of salvage.targets) {
