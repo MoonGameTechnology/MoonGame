@@ -6,8 +6,8 @@
   "sectors": {
     "pirate_den": {
       "position": {
-        "x": -416,
-        "y": -447
+        "x": -394,
+        "y": -563
       },
       "kind": "pirate_base",
       "terrain": "empty_space",
@@ -16,8 +16,8 @@
     },
     "home_a": {
       "position": {
-        "x": -380,
-        "y": -420
+        "x": -358,
+        "y": -536
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -44,8 +44,8 @@
     },
     "home_b": {
       "position": {
-        "x": 380,
-        "y": -420
+        "x": 420,
+        "y": -609
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -71,8 +71,8 @@
     },
     "drift": {
       "position": {
-        "x": -420,
-        "y": -120
+        "x": -381,
+        "y": -220
       },
       "kind": "asteroid",
       "terrain": "asteroid_field",
@@ -89,48 +89,48 @@
     },
     "veil": {
       "position": {
-        "x": 420,
-        "y": -120
+        "x": 492,
+        "y": -366
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "cluster": {
       "position": {
-        "x": -640,
-        "y": 80
+        "x": -530,
+        "y": -44
       },
       "kind": "asteroid_cluster",
       "terrain": "asteroid_cluster"
     },
     "shoal": {
       "position": {
-        "x": -420,
-        "y": 200
+        "x": -335,
+        "y": 150
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "shear": {
       "position": {
-        "x": 420,
-        "y": 200
+        "x": 553,
+        "y": -10
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "ridge": {
       "position": {
-        "x": 0,
-        "y": 480
+        "x": 17,
+        "y": 377
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "hive": {
       "position": {
-        "x": 0,
-        "y": 720
+        "x": 70,
+        "y": 603
       },
       "kind": "planet",
       "terrain": "empty_space",
