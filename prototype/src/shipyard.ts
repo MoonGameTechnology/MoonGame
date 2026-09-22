@@ -399,6 +399,8 @@ export function initShipyard(host: YardHost): {
 } {
   let tab: YardTab = 'ships';
   let renderedHeroBody = '';
+  let heroScrolling = false;
+  let heroScrollTimer: ReturnType<typeof setTimeout> | null = null;
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
 
   const hullsOf = (): string[] => hullsOfTab(tab);
@@ -433,6 +435,24 @@ export function initShipyard(host: YardHost): {
     if (r.ok) draft = { ...draft, modules: r.modules };
     else host.note('✖ ' + host.errText(r.code));
   }
+
+  // Mobile dossier scrolling must stay compositor-cheap. The periodic hero refresh
+  // rebuilds the whole pane when cooldown/time-derived markup changes; doing that while
+  // a finger is actively scrolling causes visible jank and can stall slower phones.
+  // Scroll does not bubble, so listen in capture on the stable window root.
+  host.root().addEventListener(
+    'scroll',
+    () => {
+      if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
+      heroScrolling = true;
+      if (heroScrollTimer !== null) clearTimeout(heroScrollTimer);
+      heroScrollTimer = setTimeout(() => {
+        heroScrolling = false;
+        heroScrollTimer = null;
+      }, 180);
+    },
+    true,
+  );
 
   host.root().addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
@@ -506,6 +526,9 @@ export function initShipyard(host: YardHost): {
     },
     refreshHeroes: () => {
       if (tab !== 'heroes' || !host.root().classList.contains('show')) return;
+      // Do not even build the expensive hero HTML while touch/inertial scrolling is active.
+      // The next 1s host tick catches up after the 180ms idle guard expires.
+      if (heroScrolling) return;
       if (host.heroPaneHtml() === renderedHeroBody) return;
       const scroll = host.root().querySelector('#constructorbody')?.scrollTop ?? 0;
       const focused = document.activeElement as HTMLElement | null;
