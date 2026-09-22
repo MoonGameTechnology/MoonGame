@@ -266,7 +266,7 @@ import { localRunSaveStore } from './runSaveLocal';
 import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
-import { createWebPlatform } from './platform/web';
+import { getPlatform, type PlatformHost } from './platform/host';
 import { advanceShopDay, localShopDay } from '../../decisions/sectorZeroShop';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
@@ -13023,12 +13023,26 @@ function saveSectorProgress(next: SectorZeroProgress): void {
   progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
 }
 
-// Площадка (`YAG-1.1a`). В сборке игрока это обычный браузер: rewarded-рекламы и платежей
-// там нет, и `capabilities` честно говорят `false` — магазин по ним просто не рисует такие
-// кнопки. В дев-сборке поднимается управляемая симуляция, чтобы путь «посмотрел рекламу →
-// товар выдан» проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку
-// нельзя: это ровно «обещать механику, которой у него не будет».
-const platform = createWebPlatform({ simulate: !__PLAYER_BUILD__ });
+// Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
+// (`bootstrap.ts`): здесь площадка уже готова, и игра про её имя ничего не знает. В
+// обычном браузере это веб-адаптер: rewarded-рекламы и платежей там нет, и `capabilities`
+// честно говорят `false` — магазин по ним просто не рисует такие кнопки. В дев-сборке
+// поднимается управляемая симуляция, чтобы путь «посмотрел рекламу → товар выдан»
+// проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку нельзя: это
+// ровно «обещать механику, которой у него не будет».
+const platform = getPlatform();
+
+// Разметка жизненного цикла для площадки (`YAG-1.2`). Хост отдаёт её, только если под
+// нами правда площадка; в браузере методов нет, и вызывать нечего — поэтому `host?.`, а
+// не сравнение с именем площадки. Сторож в `platform/yandex.test.ts` следит, чтобы имя
+// сюда не проникло даже строкой: он поймал ровно эту фразу, когда она была примером.
+const host = platform as Partial<PlatformHost>;
+
+// Требование площадки 1.3: при потере фокуса звук обязан замолкнуть (дают две секунды).
+// Пауза приходит ОТ ПЛОЩАДКИ (реклама, свёрнутая вкладка), поэтому глушим через
+// `setPaused`, а не `setEnabled`: настройка игрока обязана пережить ролик, иначе он
+// вернётся в тишину, которую не просил и которую надо чинить руками.
+host.onPlatformPause?.((paused) => snd.setPaused(paused));
 
 // Витрина магазина ротируется посуточно (`SZE-3.2`). Единственные часы у офлайнового
 // клиента — часы игрока, поэтому номер дня МОНОТОНЕН: `advanceShopDay` никогда его не
