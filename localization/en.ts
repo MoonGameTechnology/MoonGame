@@ -444,6 +444,8 @@ export const en: Record<string, string> = {
   'client.net.online': '● Online · you are {me} · {hint}',
   'client.net.order': '▸ Order: {fleet} → {planet}',
   'client.net.waiting': '⏳ Waiting for players…{suffix}',
+  'client.update.apply': 'Restart',
+  'client.update.ready': '● A new version is ready',
   'client.net.waiting-you': ' · you are {me}',
   'client.provider.soon': 'soon',
   'client.status.error': '✖ {text}',

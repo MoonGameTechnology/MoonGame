@@ -446,6 +446,10 @@ export const ru: Record<string, string> = {
   'client.net.online': '● Онлайн · вы {me} · {hint}',
   'client.net.order': '▸ Приказ: {fleet} → {planet}',
   'client.net.waiting': '⏳ Ожидание игроков…{suffix}',
+  // CP2.2 — оболочка приложения: новая сборка скачана и ждёт перезапуска. Кнопка
+  // названа тем, что она делает: применить обновление можно только перезагрузкой.
+  'client.update.apply': 'Перезапустить',
+  'client.update.ready': '● Новая версия готова',
   'client.net.waiting-you': ' · вы {me}',
   'client.provider.soon': 'скоро',
   'client.status.error': '✖ {text}',
