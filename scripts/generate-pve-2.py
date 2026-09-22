@@ -24,53 +24,76 @@
 import json, collections
 
 # Провинции: id → (x, y, вид, местность, владелец, гарнизон, постройки).
-# Координаты расставлены вручную и нарочно неровно — ни рядов, ни общего шага.
+#
+# Координаты сначала расставлены вручную по областям, потом доведены локальным поиском
+# под требования главы (`data/pveSecondMission.test.ts`) — поэтому числа «неровные»:
+#   * узлов, где сходятся пять дорог и больше, не меньше четырёх, и все они — миры;
+#   * у большинства провинций три подхода и больше («сетка, а не коридор»);
+#   * тупик только там, где его требует местность (скопление — один подход);
+#   * средний перелёт короче 300 — главу просили без длинных путей;
+#   * МАСШТАБ — баланс, а не вид: маршруты от миров Роя до причала держатся у прежней
+#     карты главы (842 / 1092 / 1365 ± 8%), иначе волны шли бы к дому дольше или быстрее;
+#   * двойной путь через раскоп цел, валидатор чист.
+# Двигая провинцию руками, перемерь всё перечисленное: соседство выводится из мозаики, и
+# любая правка координат может молча его поменять.
 P = collections.OrderedDict([
     # СЕВЕРО-ЗАПАД — сюда входит игрок, это ещё край сектора.
-    ('landing',   (-600, -460, 'planet', 'empty_space', 'p1',
+    ('landing',   (-437, -415, 'planet', 'empty_space', 'p1',
                    [{'unit': 'militia', 'count': 2}],
                    [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'}])),
-    ('rim_veil',  (-280, -560, 'nebula', 'nebula', None, [], [])),
-    ('cold_shoal',(-680, -120, 'asteroid', 'asteroid_field', None, [], [])),
+    ('rim_veil',  (-397, -600, 'nebula', 'nebula', None, [], [])),
+    ('cold_shoal',(-218, -145, 'asteroid', 'asteroid_field', None, [], [])),
 
     # СЕВЕР — след экспедиции: раскоп и разбитый караван.
-    ('dig_site',  (-120, -260, 'dead_world', 'depleted_system', 'swarm',
+    ('dig_site',  (-139, -358, 'dead_world', 'depleted_system', 'swarm',
                    [{'unit': 'swarm_lander', 'count': 3}], [])),
-    ('wreck_spine',(200, -430, 'graveyard', 'derelict_graveyard', 'swarm', [], [])),
-    ('flare_belt', (520, -380, 'solar_flare', 'solar_flare_zone', None, [], [])),
+    ('wreck_spine',(111, -338, 'graveyard', 'derelict_graveyard', 'swarm', [], [])),
+    ('flare_belt', (300, -317, 'solar_flare', 'solar_flare_zone', None, [], [])),
 
     # ВОСТОК — астероидный массив лестницей: поле → пылевая полоса → скопление.
-    ('rockfield', (700, -120, 'asteroid', 'asteroid_field', None, [], [])),
-    ('dust_reach',(760, 160, 'asteroid', 'dust_lane', None, [], [])),
-    ('ore_knot',  (960, 500, 'asteroid_cluster', 'asteroid_cluster', 'swarm',
+    ('rockfield', (303, 3, 'asteroid', 'asteroid_field', None, [], [])),
+    ('dust_reach',(649, 191, 'asteroid', 'dust_lane', None, [], [])),
+    ('ore_knot',  (755, 354, 'asteroid_cluster', 'asteroid_cluster', 'swarm',
                    [{'unit': 'swarm_lander', 'count': 3}], [])),
-    ('ion_wall',  (640, 330, 'ion_storm', 'ion_storm', None, [], [])),
+    ('ion_wall',  (458, 257, 'ion_storm', 'ion_storm', None, [], [])),
 
     # ЦЕНТР — большая туманность и хвост обломков.
-    ('hollow',    (-40, 40, 'nebula', 'nebula', None, [], [])),
-    ('wreck_tail',(420, 100, 'graveyard', 'derelict_graveyard', 'swarm',
+    ('hollow',    (-43, -103, 'nebula', 'nebula', None, [], [])),
+    ('wreck_tail',(128, 94, 'graveyard', 'derelict_graveyard', 'swarm',
                    [{'unit': 'swarm_lander', 'count': 2}], [])),
 
+    # МЕСТА-УЗЛЫ. Перекрёстки на этой карте есть и должны быть (раннее указание владельца:
+    # «побольше провинций, перекрёстков и двойных путей»), но перекрёсток — это МИР, где
+    # сходятся дороги, а не пустая клетка ради развилки. Поэтому узлы — лагерь экспедиции,
+    # ретранслятор Роя, луна в дрейфе: места со своим смыслом и просторной местностью.
+    ('camp',      (139, -88, 'dead_world', 'depleted_system', 'swarm', [], [])),
+    ('relay',     (176, 293, 'planet', 'empty_space', 'swarm',
+                   [{'unit': 'swarm_lander', 'count': 2}],
+                   [{'type': 'shipyard', 'level': 2}, {'type': 'orbital_aa'}])),
+    ('drift_moon',(-251, 198, 'dead_world', 'deep_void', None, [], [])),
+    ('spore_cloud',(-231, 26, 'nebula', 'nebula', 'swarm', [], [])),
+    ('scree',     (576, -209, 'asteroid', 'asteroid_field', None, [], [])),
+
     # ЗАПАД — выработанный мир и плотная вуаль.
-    ('deep_drift',(-560, 220, 'dead_world', 'deep_void', None, [], [])),
-    ('veil_deep', (-300, 400, 'dense_nebula', 'dense_nebula', None, [], [])),
+    ('deep_drift',(-417, 3, 'dead_world', 'deep_void', None, [], [])),
+    ('veil_deep', (-21, 203, 'dense_nebula', 'dense_nebula', None, [], [])),
 
     # ЮГ — Рой.
-    ('biopit',    (-60, 520, 'planet', 'empty_space', 'swarm',
+    ('biopit',    (-217, 413, 'planet', 'empty_space', 'swarm',
                    [{'unit': 'swarm_lander', 'count': 4}],
                    [{'type': 'biomass_pit'}, {'type': 'shipyard', 'level': 2}, {'type': 'fort'}])),
-    ('brood_yard',(280, 560, 'planet', 'empty_space', 'swarm',
+    ('brood_yard',(16, 413, 'planet', 'empty_space', 'swarm',
                    [{'unit': 'swarm_lander', 'count': 4}],
                    [{'type': 'swarm_synapse'}, {'type': 'shipyard', 'level': 2},
                     {'type': 'orbital_aa'}])),
-    ('nest',      (600, 700, 'planet', 'empty_space', 'swarm',
+    ('nest',      (304, 439, 'planet', 'empty_space', 'swarm',
                    [{'unit': 'swarm_lander', 'count': 6}],
                    [{'type': 'swarm_hive'}, {'type': 'biomass_pit'},
                     {'type': 'shipyard', 'level': 2}, {'type': 'barracks'},
                     {'type': 'fort'}, {'type': 'orbital_aa'}])),
-    ('salvage_pocket',(-480, 660, 'graveyard', 'derelict_graveyard', 'swarm',
+    ('salvage_pocket',(-689, 565, 'graveyard', 'derelict_graveyard', 'swarm',
                       [{'unit': 'swarm_lander', 'count': 2}], [])),
-    ('bone_drift',(100, 860, 'graveyard', 'derelict_graveyard', 'swarm', [], [])),
+    ('bone_drift',(213, 735, 'graveyard', 'derelict_graveyard', 'swarm', [], [])),
 ])
 
 # ДОРОГИ ВНУТРИ ПРОВИНЦИИ (M2.5). Раскоп — единственный узел, где две трассы идут
@@ -86,20 +109,11 @@ OBJECTIVES = [
     collections.OrderedDict([('id', 'mission.raze-biomass'), ('kind', 'raze'),
                              ('targets', ['biomass_pit']), ('reward', 3)]),
     collections.OrderedDict([('id', 'mission.recon'), ('kind', 'scout'),
-                             ('count', 11), ('reward', 2)]),
+                             ('count', 14), ('reward', 2)]),
 ]
-
-# МАСШТАБ — это баланс, а не вид. Время в пути решает, как скоро волна Роя дойдёт до дома,
-# поэтому длины маршрутов держатся у прежней карты этой главы: от миров Роя до причала
-# было 842 / 1092 / 1365. Координаты выше расставлены крупнее ради удобства правки, и
-# без этого множителя те же маршруты вышли бы в полтора раза длиннее. Размеров (`size`)
-# у провинций нет, поэтому мозаика от масштаба не зависит: сжатие меняет длины, но не
-# соседство.
-SCALE = 0.67
 
 sectors = collections.OrderedDict()
 for sid, (x, y, kind, terrain, owner, garr, blds) in P.items():
-    x, y = round(x * SCALE), round(y * SCALE)
     sec = collections.OrderedDict([('position', {'x': x, 'y': y}), ('kind', kind),
                                    ('terrain', terrain)])
     if owner:

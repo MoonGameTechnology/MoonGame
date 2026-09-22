@@ -6,8 +6,8 @@
   "sectors": {
     "landing": {
       "position": {
-        "x": -402,
-        "y": -308
+        "x": -437,
+        "y": -415
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -33,24 +33,24 @@
     },
     "rim_veil": {
       "position": {
-        "x": -188,
-        "y": -375
+        "x": -397,
+        "y": -600
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "cold_shoal": {
       "position": {
-        "x": -456,
-        "y": -80
+        "x": -218,
+        "y": -145
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "dig_site": {
       "position": {
-        "x": -80,
-        "y": -174
+        "x": -139,
+        "y": -358
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -74,8 +74,8 @@
     },
     "wreck_spine": {
       "position": {
-        "x": 134,
-        "y": -288
+        "x": 111,
+        "y": -338
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard",
@@ -83,32 +83,32 @@
     },
     "flare_belt": {
       "position": {
-        "x": 348,
-        "y": -255
+        "x": 300,
+        "y": -317
       },
       "kind": "solar_flare",
       "terrain": "solar_flare_zone"
     },
     "rockfield": {
       "position": {
-        "x": 469,
-        "y": -80
+        "x": 303,
+        "y": 3
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
     },
     "dust_reach": {
       "position": {
-        "x": 509,
-        "y": 107
+        "x": 649,
+        "y": 191
       },
       "kind": "asteroid",
       "terrain": "dust_lane"
     },
     "ore_knot": {
       "position": {
-        "x": 643,
-        "y": 335
+        "x": 755,
+        "y": 354
       },
       "kind": "asteroid_cluster",
       "terrain": "asteroid_cluster",
@@ -122,24 +122,24 @@
     },
     "ion_wall": {
       "position": {
-        "x": 429,
-        "y": 221
+        "x": 458,
+        "y": 257
       },
       "kind": "ion_storm",
       "terrain": "ion_storm"
     },
     "hollow": {
       "position": {
-        "x": -27,
-        "y": 27
+        "x": -43,
+        "y": -103
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
     "wreck_tail": {
       "position": {
-        "x": 281,
-        "y": 67
+        "x": 128,
+        "y": 94
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard",
@@ -151,26 +151,84 @@
         }
       ]
     },
+    "camp": {
+      "position": {
+        "x": 139,
+        "y": -88
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "owner": "swarm"
+    },
+    "relay": {
+      "position": {
+        "x": 176,
+        "y": 293
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "drift_moon": {
+      "position": {
+        "x": -251,
+        "y": 198
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "spore_cloud": {
+      "position": {
+        "x": -231,
+        "y": 26
+      },
+      "kind": "nebula",
+      "terrain": "nebula",
+      "owner": "swarm"
+    },
+    "scree": {
+      "position": {
+        "x": 576,
+        "y": -209
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
     "deep_drift": {
       "position": {
-        "x": -375,
-        "y": 147
+        "x": -417,
+        "y": 3
       },
       "kind": "dead_world",
       "terrain": "deep_void"
     },
     "veil_deep": {
       "position": {
-        "x": -201,
-        "y": 268
+        "x": -21,
+        "y": 203
       },
       "kind": "dense_nebula",
       "terrain": "dense_nebula"
     },
     "biopit": {
       "position": {
-        "x": -40,
-        "y": 348
+        "x": -217,
+        "y": 413
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -196,8 +254,8 @@
     },
     "brood_yard": {
       "position": {
-        "x": 188,
-        "y": 375
+        "x": 16,
+        "y": 413
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -223,8 +281,8 @@
     },
     "nest": {
       "position": {
-        "x": 402,
-        "y": 469
+        "x": 304,
+        "y": 439
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -259,8 +317,8 @@
     },
     "salvage_pocket": {
       "position": {
-        "x": -322,
-        "y": 442
+        "x": -689,
+        "y": 565
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard",
@@ -274,8 +332,8 @@
     },
     "bone_drift": {
       "position": {
-        "x": 67,
-        "y": 576
+        "x": 213,
+        "y": 735
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard",
@@ -305,7 +363,7 @@
     {
       "id": "mission.recon",
       "kind": "scout",
-      "count": 11,
+      "count": 14,
       "reward": 2
     }
   ],
