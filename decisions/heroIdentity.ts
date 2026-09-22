@@ -41,6 +41,47 @@ export function heroGradeGlyph(grade: string | undefined): string {
   }
 }
 
+/**
+ * Цвет РЕДКОСТИ героя (HERO-12, заказ владельца 2026-09-22): обводка портрета на карте
+ * и в штабе берётся отсюда — и только отсюда.
+ *
+ * Один дом на канвас и на CSS намеренно. Разошлись бы они молча: канвас пишет цвет
+ * строкой в `strokeStyle`, таблица стилей — в своей переменной `--hx-g-*`, и «золотой»
+ * в двух местах оказался бы двумя разными золотыми, причём заметил бы это только игрок.
+ * Собрать CSS из этой таблицы на сборке нельзя — `prototype/build.mjs` не тянет TS, —
+ * поэтому копия в шапке сверяется С ЭТОЙ таблицей текстом: сторож в
+ * `prototype/src/heroStaff.test.ts` читает `build.mjs` и требует посимвольного
+ * совпадения. Правка цвета здесь без правки там роняет гейт.
+ *
+ * Почему это НЕ цвет владельца. На карте обводка владельца уже есть — это линия-выноска
+ * и щиток со значком степени, они остаются цвета хозяина. Ответ на «чей герой» портрет
+ * не теряет; редкость добавляется вторым, независимым сигналом. Подменять одно другим
+ * нельзя: «чей» важнее «какой», и в бою его читают первым.
+ *
+ * Неизвестная степень опускается до `common` — ровно как `heroGradeGlyph` и как
+ * `heroSkillSlots` в штабе: герой без степени рисуется скромно, но рисуется.
+ */
+export const HERO_GRADE_COLORS = {
+  common: '#8fa6ad',
+  rare: '#5aa9ff',
+  legendary: '#e8b45a',
+  main: '#b98cff',
+} as const;
+
+export type HeroGradeKey = keyof typeof HERO_GRADE_COLORS;
+
+/** Степень в её ключ палитры; неизвестная — `common`. */
+export function heroGradeKey(grade: string | undefined): HeroGradeKey {
+  return grade !== undefined && Object.hasOwn(HERO_GRADE_COLORS, grade)
+    ? (grade as HeroGradeKey)
+    : 'common';
+}
+
+/** Цвет обводки для степени героя. */
+export function heroGradeColor(grade: string | undefined): string {
+  return HERO_GRADE_COLORS[heroGradeKey(grade)];
+}
+
 export interface PortraitHit {
   heroId: string;
   x: number;

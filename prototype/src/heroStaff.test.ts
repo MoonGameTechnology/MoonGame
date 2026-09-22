@@ -5,6 +5,7 @@ import { newGame } from './game';
 import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
+import { HERO_GRADE_COLORS } from '../../decisions/heroIdentity';
 import {
   HERO_TABS,
   ownHeroes,
@@ -329,6 +330,34 @@ describe('штаб героев — разметка панели', () => {
     }
     expect(new Set(HERO_TABS.map((x) => x.icon)).size).toBe(HERO_TABS.length);
     expect(initHeroStaff(hostOf()).paneHtml()).toContain('<i>\u22d4</i>'); // «Дерево»
+  });
+
+  it('палитра редкости в CSS — ПОСИМВОЛЬНАЯ копия `HERO_GRADE_COLORS`', () => {
+    // HERO-12. `build.mjs` не тянет TS, поэтому переменные `--hx-g-*` — копия таблицы
+    // из `decisions/heroIdentity.ts`. Копия без сторожа расходится молча: карту рисует
+    // канвас по таблице, штаб — по CSS, и «золотой» стал бы двумя разными золотыми.
+    const css = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+    for (const [grade, color] of Object.entries(HERO_GRADE_COLORS)) {
+      expect(css, grade).toContain(`--hx-g-${grade}:${color};`);
+    }
+    // И наоборот: переменная без записи в таблице — тоже расхождение.
+    const declared = [...css.matchAll(/--hx-g-([a-z]+):/g)].map((m) => m[1]);
+    expect(new Set(declared)).toEqual(new Set(Object.keys(HERO_GRADE_COLORS)));
+    // Фокус не съедает редкость: у ВЫБРАННОГО чипа рамка остаётся своего цвета, иначе
+    // у правила «обводка = редкость» появилось бы исключение ровно на том герое, на
+    // которого игрок сейчас и смотрит.
+    for (const grade of Object.keys(HERO_GRADE_COLORS)) {
+      expect(css, grade).toContain(`.hx-chip.sel.g-${grade}{border-color:var(--hx-g-${grade});}`);
+    }
+  });
+
+  it('карточка героя обводится по редкости и подписывает её словом', () => {
+    // Цветом одним нельзя: его не различит дальтоник и не передаст серый скриншот.
+    const html = initHeroStaff(hostOf()).paneHtml();
+    expect(html).toMatch(/class="hx-ident g-(common|rare|legendary|main)/);
+    expect(html).toContain('hx-gtag');
+    expect(html).toContain(t('hero.grade.main')); // главный герой места — степень `main`
+    expect(html).toMatch(/class="hx-chip g-(common|rare|legendary|main)/);
   });
 
   it('вкладки идут СЕТКОЙ 2\u00d72, а не четырьмя ячейками в строку', () => {
