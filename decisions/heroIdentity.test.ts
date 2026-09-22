@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createInitialState, type GameState } from '../packages/shared-core/src/index';
 
@@ -25,7 +26,15 @@ function newGame(): GameState {
   }
   return s;
 }
-import { heroAtPoint, heroIdentity, mapHeroes } from './heroIdentity';
+import {
+  HERO_GRADE_COLORS,
+  heroAtPoint,
+  heroGradeColor,
+  heroGradeGlyph,
+  heroGradeKey,
+  heroIdentity,
+  mapHeroes,
+} from './heroIdentity';
 
 describe('hero map privacy and targeting', () => {
   it('never exposes an enemy identity from full solo state, even on an identified fleet', () => {
@@ -45,6 +54,43 @@ describe('hero map privacy and targeting', () => {
     expect(mapHeroes(s, 'p1').size).toBe(0);
     delete s.fleets[id!];
     expect(mapHeroes(s, 'p1').size).toBe(0);
+  });
+
+  it('редкость даёт цвет обводки, неизвестная степень опускается до common', () => {
+    // HERO-12. Четыре степени — четыре РАЗНЫХ цвета: совпади два, игрок перестал бы
+    // видеть разницу ровно там, где она и нужна.
+    expect(new Set(Object.values(HERO_GRADE_COLORS)).size).toBe(
+      Object.keys(HERO_GRADE_COLORS).length,
+    );
+    expect(Object.keys(HERO_GRADE_COLORS)).toEqual(['common', 'rare', 'legendary', 'main']);
+    for (const [grade, color] of Object.entries(HERO_GRADE_COLORS)) {
+      expect(heroGradeColor(grade)).toBe(color);
+      expect(heroGradeKey(grade)).toBe(grade);
+      expect(color).toMatch(/^#[0-9a-f]{6}$/); // канвас кладёт строку в `strokeStyle` как есть
+    }
+    // Степень есть не у всякого героя (`Hero.grade` необязателен) — и это не повод
+    // не нарисовать обводку: падаем на `common`, как `heroGradeGlyph` рядом.
+    expect(heroGradeKey(undefined)).toBe('common');
+    expect(heroGradeKey('обломки')).toBe('common');
+    expect(heroGradeColor(undefined)).toBe(HERO_GRADE_COLORS.common);
+    expect(heroGradeGlyph(undefined)).toBe('\u25e6');
+  });
+
+  it('обводка редкости НЕ съедает цвет владельца на карте', () => {
+    // Портрет на карте несёт два сигнала: выноска и щиток — цвета ХОЗЯИНА, рамка —
+    // цвета редкости. Рамка ставит свой `strokeStyle` посреди отрисовки, поэтому здесь
+    // сторожится порядок: цвет владельца обязан быть возвращён ДО того, как щиток
+    // обведут. Иначе «чей это герой» молча стало бы «какой он редкости».
+    const src = readFileSync(
+      new URL('../packages/client/src/heroPortraits.ts', import.meta.url),
+      'utf8',
+    );
+    const frame = src.indexOf('heroGradeColor(hero.grade)');
+    const restore = src.indexOf('cx.strokeStyle = color;', frame);
+    const shield = src.indexOf("cx.fillStyle = '#081823'", frame);
+    expect(frame).toBeGreaterThan(-1);
+    expect(restore).toBeGreaterThan(frame);
+    expect(shield).toBeGreaterThan(restore);
   });
 
   it('uses the displayed portrait bounds rather than the hull position', () => {

@@ -796,7 +796,16 @@ export const ModuleDefSchema = z
 /** A hero's skill-tree branch (docs/heroes.md): `transhuman` (implant-users) vs
  *  `psionic`. Deliberately distinct from the tech-tree `BranchSchema` — a hero belongs
  *  to a hero branch, not a research branch. Optional on an archetype (a branchless hero
- *  simply draws from no branch tree until skill trees land, HERO-7). */
+ *  simply draws from no branch tree until skill trees land, HERO-7).
+ *
+ *  ⚠️ **PARKED IN THE SHIPPED CATALOG (HERO-11, owner's order 2026-09-22.)** The
+ *  mechanism below is intact and still gates `hero.skill.unlock` — but no shipped
+ *  archetype and no shipped tree node declares a `branch` any more: every one of them
+ *  carries the value under `parkedBranch` instead, a key this schema deliberately does
+ *  NOT know, so zod drops it and the game sees one common tree. Bringing the split back
+ *  is a rename of that key in `data/heroes.json` + `data/heroSkillTrees.json` and
+ *  nothing else. `data/heroBranchParked.test.ts` guards both halves: that nothing ships
+ *  a live branch, and that no parked value gets lost on the way. */
 export const HERO_BRANCHES = ['transhuman', 'psionic'] as const;
 export const HeroBranchSchema = z.enum(HERO_BRANCHES);
 

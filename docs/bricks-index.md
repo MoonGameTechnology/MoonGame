@@ -121,6 +121,8 @@
 | HERO-FX2 | ✅ | core | `docs/backlog.md` | Второй провайдер — hero.effect.aura (rally/bulwark): |
 | HERO-FX3 | ✅ | core | `docs/backlog.md` | Третий провайдер шва — hero.effect.reveal (scan): |
 | HERO-10 | ✅ | core | `docs/backlog.md` | Каждый герой ведёт СВОЙ флот |
+| HERO-11 | ✅ | data | `docs/backlog.md` | Разделение на трансгуманизм и псионику убрано ИЗ |
+| HERO-12 | ✅ | proto | `docs/backlog.md` | Обводка героя — по редкости. |
 | HERO-AURA-R | ✅ | data | `docs/backlog.md` | Радиус ауры: начать маленьким и растить навыком |
 | SHIP-1 | ✅ | proto | `docs/backlog.md` | Модель: prototype/src/ships.ts — корпуса (SHIPHULLS: cruiser 3 · |
 | SHIP-2 | ✅ | proto | `docs/backlog.md` | →♻ UI «Верфь». Первая версия — pre-match вкладка в setup — была |
@@ -205,6 +207,7 @@
 | CONV-16 | ✅ | proto | `docs/backlog.md` | Три технологии прототипа не может открыть никто. |
 | CONV-17 | ✅ | data | `docs/backlog.md` | В каноническом каталоге лежала готовая проза вместо ключа — |
 | CONV-18 | ✅ | docs | `docs/backlog.md` | Эталон приёмки протух, и на него ссылались два кирпича. |
+| CONV-19 | ✅ | docs | `docs/backlog.md` | Индексация проверяла только ИСХОДЯЩИЕ ссылки: док мог лежать в |
 | AI-BAL-1 | ✅ | proto | `docs/backlog.md` | Бот исследует технологии + харнес их видит. |
 | AI-BAL-2 | ✅ | proto | `docs/backlog.md` | Бот строит оборону и держит миры. |
 | AI-BAL-3 | ✅ | proto | `docs/backlog.md` | Наземная армия и десант. |
