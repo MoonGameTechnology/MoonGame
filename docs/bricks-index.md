@@ -644,6 +644,14 @@
 | EVT-3 | 🔒 | core data | `docs/backlog.md:15585` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
 | RETR-1 | ⏳ | core | `docs/backlog.md:15629` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
 | RETR-2 | 🔒 | core srv proto | `docs/backlog.md:15642` | (RETR-1) Авто-отступление: условие выхода из боя |
+| TXT-0.1 | ✅ | docs | `docs/backlog.md:15740` | Канон формулировок: записать правило и эталон, пока чистка не |
+| TXT-1 | ⏳ | proto | `docs/backlog.md:15777` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
+| TXT-2 | ⏳ | proto | `docs/backlog.md:15790` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |
+| TXT-3 | ⏳ | proto | `docs/backlog.md:15801` | Тавтологии и дубли в досье — чистая вырезка, самый дешёвый |
+| TXT-4 | ⏳ | proto | `docs/backlog.md:15816` | Герои: описание способности не называет величину — 10 из |
+| TXT-5 | ⏳ | proto | `docs/backlog.md:15833` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
+| TXT-6 | ⏳ | proto | `docs/backlog.md:15847` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
+| TXT-7 | 🔒 | proto docs | `docs/backlog.md:15856` | Сторож в гейте: чтобы вода не вернулась. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
