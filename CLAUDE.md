@@ -233,6 +233,9 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 - Run `pnpm run check` before committing; keep CI green.
 - When you finish a roadmap milestone, update the "Статус реализации" section in
   `docs/roadmap.md`.
+- On any request to push/publish/create a PR, first follow `.claude/skills/publish-pr/SKILL.md`.
+  It is the canonical path for hosted publication and includes the Git Data API fallback for
+  local-only commits and binary assets such as PNG/WebP.
 - Development happens on a feature branch. For remote publication, do **not** assume the
   shell's `git push` is authenticated just because fetch works. In hosted agent sessions,
   prefer the connected GitHub API/app when it has write access. If terminal push gets one auth
