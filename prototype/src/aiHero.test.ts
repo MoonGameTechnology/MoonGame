@@ -116,7 +116,10 @@ describe('AI-BAL-8 — дерево навыков (`hero.skill.unlock`)', () =>
     expect(picks).toHaveLength(1);
     const hero = s.heroes![picks[0]!.heroId]!;
     const branch = data.heroes[hero.archetype!]!.branch;
-    expect(data.heroSkillTrees[picks[0]!.node]!.branch).toBe(branch);
+    // EVT-3 завёл ОБЩИЕ узлы (без `branch`) — лестница мародёра доступна любому герою,
+    // и взять такой узел законно. Утверждение держит то, ради чего написано: бот не
+    // тянется в ЧУЖУЮ ветку. Требовать здесь именно свою значило бы запретить общие.
+    expect([branch, undefined]).toContain(data.heroSkillTrees[picks[0]!.node]!.branch);
   });
 
   it('узел ЧУЖОЙ ветки не берётся — ядро ответило бы `E_WRONG_BRANCH`', () => {
@@ -125,7 +128,13 @@ describe('AI-BAL-8 — дерево навыков (`hero.skill.unlock`)', () =>
     const s = rich(game2());
     const hero = mainHero(s, 'p2'); // commander → transhuman
     const all = Object.keys(data.heroSkillTrees);
-    const own = all.filter((id) => data.heroSkillTrees[id]!.branch === 'transhuman');
+    // Всё, что герою ЗАКОННО: своя ветка плюс общие узлы (EVT-3). Без общих постановка
+    // «взято всё доступное» перестала бы быть правдой, и тест мерил бы не ветку, а то,
+    // что боту ещё есть что купить.
+    const own = all.filter((id) => {
+      const branch = data.heroSkillTrees[id]!.branch;
+      return branch === 'transhuman' || branch === undefined;
+    });
     let staged = withHero(s, hero.id, { skills: own });
     // и остальные герои места — тоже «всё взяли», чтобы очередь дошла до проверки ветки
     for (const x of heroesOf(staged, 'p2')) {

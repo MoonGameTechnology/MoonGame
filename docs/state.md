@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 7036 зелёных** (75 skip; 575 файлов проверено, 1 файл пропущен; в CI ещё 7 пропусков — сторож формы платформенного артефакта ждёт `pnpm run prototype`, как durable-тесты ждут базы). Пропуски — тесты durable-пути и учение бэкапов, которым нужна база; в CI база есть, но нет пакета `age`, поэтому там дополнительно пропущен один тест — реальный криптокруг (проводку шифрования CI проверяет заглушкой, см. §10).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 7057 зелёных** (75 skip; 576 файлов проверено, 1 файл пропущен; в CI ещё 7 пропусков — сторож формы платформенного артефакта ждёт `pnpm run prototype`, как durable-тесты ждут базы). Пропуски — тесты durable-пути и учение бэкапов, которым нужна база; в CI база есть, но нет пакета `age`, поэтому там дополнительно пропущен один тест — реальный криптокруг (проводку шифрования CI проверяет заглушкой, см. §10).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -329,7 +329,8 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, arsenalSync, autoRally, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetBrood, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, pve, scientist, seatClaim, sector, shuttle, standingOrders, station, steward, swarmAdapt, swarmJournal, swarmMemory, tax, technology, victory, visibility  (39 модулей, + *.test.ts; сколько из них СОБИРАЕТ каждое ядро — §9)
+  modules/       army, arsenalSync, autoRally, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetBrood, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, pve, salvage, scientist, seatClaim, sector, shuttle, standingOrders, station, steward, swarmAdapt, swarmJournal, swarmMemory, tax, technology, victory, visibility  (40 модулей, + *.test.ts; сколько из них СОБИРАЕТ каждое ядро — §9)
+                 tax, technology, victory, visibility  (40 модулей, + *.test.ts; сколько из них СОБИРАЕТ каждое ядро — §9)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 packages/client/src/  holoDraw.ts, holoSphere.ts (каркасные атласы), territory.ts, territoryGeometry.ts (кэш геометрии провинций: подпись снимается с координат, нормализованных по первой точке клипа и масштабу, поэтому панорама и зум камеры из неё СОКРАЩАЮТСЯ — квадратичная тесселяция считается только на смену формы, а на движении камеры идёт O(вершин) перепроекция; владелец и тип берутся из свежих seeds, чтобы кэш не донёс чужой туман), mapLod.ts (три уровня детализации по расстоянию между узлами в CSS-пикселях: `mapSpacing` берёт МЕДИАНУ ближайшего связанного соседа — одиночная чёрная дыра или битая связь не перекашивают плотность; `art` гасит дорогой арт узлов, `detail` — подписи и анимацию, `drawSchematicNode` рисует дальний план без текстур, текста и теней), provinceSelection.ts, spaceBackdrop.ts, shipShapes.ts (векторные корпуса и кеш Path2D), swarmShapes.ts (восемь органических форм Роя), shipGlyphs.ts (выбор корпуса/доминанта, SVG и модификаторы), art/deep-space.webp (общий рендер карты)
@@ -2043,13 +2044,19 @@ E_NOT_DESTRUCTIBLE, E_OUT_OF_RANGE, E_COOLDOWN`.
   было нечего: два его гранта дублировали узлы дерева (`psi_veil` → `scan`,
   `void_attunement` → `rally_beacon`), третий — настоящий модуль с тем же id.
 - **Пассивки (HERO-5, `data/heroPassives.json`):** `HeroPassiveDef {hook, scope,
-params{bonus, radius}}`, хуки — enum `fleet.speed|combat.damage` (fail-closed, новый
-  хук = запись в enum + кейс-интерпретатор), scope — `heroFleet` (флот героя) |
+params{bonus, radius}}`, хуки — enum `fleet.speed|combat.damage|salvage` (fail-closed,
+  новый хук = запись в enum + кейс-интерпретатор), scope — `heroFleet` (флот героя) |
   `ownFleetsNear` (свои флоты в `radius` от ноды героя, `heroNode`). Живой герой
   множит значение хука на ×(1+Σ применимых бонусов) ПОВЕРХ лейн-бонуса и базовой
-  +5% ауры; мёртвый герой и неизвестный id пассивки — ноль. Несёт `Hero.passives?`
-  (сеется из `startPassives` архетипа). Шипованы: `vanguard_impulse` (+10% скорость
-  флота героя), `rally_beacon` (+8% урона своих флотов в 300 от героя).
+  +5% ауры; мёртвый герой и неизвестный id пассивки — ноль. **`salvage` (EVT-3) —
+  исключение: он СКЛАДЫВАЕТСЯ с базой, а не множит её**, потому что база там сама
+  доля трофеев (5%), и ×1.1 дало бы полпроцента вместо обещанных игроку десяти.
+  Несёт `Hero.passives?` (сеется из `startPassives` архетипа). Шипованы:
+  `vanguard_impulse` (+10% скорость флота героя), `rally_beacon` (+8% урона своих
+  флотов в 300 от героя) и лестница «мародёра» EVT-3 — шесть пассивок, которые пять
+  узлов дерева выдают ступенями до потолка 10% трофеев и 10% урона; «только бои с
+  участием героя» выражено скоупом (`ownFleetsNear` с `radius: 0` = тот же узел), а
+  не своей проверкой.
 - Действие **`hero.ability {heroId, abilityId, target?}`** (HERO-4) — **обобщённый
   data-driven диспетчер**: способность берётся из каталога `data.heroAbilities`
   (`HeroAbilityDef {type, cooldownHours, range, cost, params}`), гейты выводятся из
@@ -2479,7 +2486,8 @@ vanguard/warden`; `branch` — своя ось `transhuman|psionic`, `ship.unit`
   `startAbilities`/`startPassives`), `heroAbilities.json` (`{type, cooldownHours, range,
 cost, params}` — включая маркер-типы `spawn_fleet`/`spawn_allied`), `heroPassives.json`
   (`{hook, scope, params}`), `heroSkillTrees.json` (`{branch?, requires[], cost,
-grants}`), `heroGrades.json` (`{name, skillSlots, moduleSlots}` — бюджеты обеих осей).
+grants}` — `grants` держит и одиночную `passive`, и список `passives` для ступени,
+выдающей две сразу), `heroGrades.json` (`{name, skillSlots, moduleSlots}` — бюджеты обеих осей).
 **Обе ветки дерева — по
   четыре узла и по одной цене** (решение владельца после балансного разбора): ветки
   берут разные ресурсы, поэтому сравнены в ЧАСАХ ПРОИЗВОДИТЕЛЯ — 4 + 9 + 14 + 22 часа
@@ -3129,7 +3137,7 @@ APK собирается в двух лейнах (matrix в `android.yml`): д�
 economy, movement, hero, heroEffects, orbital, combat, intercept, captureOnArrival,
 construction, arsenalSync, technology, scientist, steward, army, victory, fleetOps, autoRally,
 diplomacy, espionage, botDiplomacy, market, capital, standingOrders, shuttle, forcedMarch,
-instantRepair, fleetRepair, effects, seatClaim, visibility])` (39 модулей — состав и его отличие от
+instantRepair, fleetRepair, effects, seatClaim, visibility])` (40 модулей — состав и его отличие от
 серверного `DEV_MODULES` разобраны в §9), тик в реальном
   времени (скорость ⏸/▶/⏩). Концовка матча — из авторитетного `state.match` (`victoryModule`),
   полноэкранный экран итогов победы/поражения/ничьи (счёт+место+статы+XP, рематч; см.
@@ -4268,6 +4276,11 @@ instantRepair, fleetRepair, effects, seatClaim, visibility])` (39 модулей
   скрывается на конце гайд-тура и выходе в меню. RU/EN. Проверено вживую (headless-бут):
   чеклист появляется 0/4 в гайд-матче (без ложных тиков — baseline корректен), сворачивается,
   прячется на выходе. Только онбординг-сессия (DoD «чеклист скрыт после онбординга»).
+- **Трофеи видны в журнале (EVT-2)** — `case 'salvage.paid'` рядом с тёмным событием и с
+  тем же гейтом (`playerId === ME`): адресат приезжает именем, а чужая добыча — чужая
+  экономика. Мешок печатается ЗНАЧКАМИ через существующий `costText` (`80❒ 20⛁`), а не
+  прозой: склонять «20 металла / 4 кредита» пришлось бы в коде, а список ресурсов задаётся
+  данными и открыт. Значок 🔧 подобран вне `HIGH_MARKERS` — трофей не «требует внимания».
 - **Тёмные события видны в журнале (EVT-1)** — `case 'effect.applied'` в свитке `main.ts`
   печатает строку через `note()` (лента + память ONB-5 + тост). До EVT-1 кейса не было вовсе:
   правила `data/events.json` исполнялись молча, и узнать о них игрок не мог. Гейт СВОЙ, а не
@@ -4556,13 +4569,15 @@ Memory + Postgres `ava_feed`) — только публичные факты: и
 > Компактный агрегат; помашинная матрица — [`readiness.md`](readiness.md),
 > запуск для живых игроков — [`launch-runbook.md`](launch-runbook.md).
 
-**✅ Этап 1 (ядро) — готово целиком:** **39 модулей** на микроядре (шина/хуки/манифест,
+**✅ Этап 1 (ядро) — готово целиком:** **40 модулей** на микроядре (шина/хуки/манифест,
 seeded RNG + golden, `advanceTo`; список — §3, разбор — §5): экономика + рынок,
 карта/движение/перехват, типы
 секторов и планет, бой (мелэ + орбитальное ПВО/бомбардировка) с двухфазным
 захватом, здания + станции, флот ⊕ армия + транспорт, технологии + учёные, фракции,
 дипломатия (стойки + consent-офферы), шпионаж + контрразведка, герои, «Хранитель»,
-кооп-волны PvE, победа/счёт, туман (`visibleState` + память + radar), движок эффектов (EFX-1:
+кооп-волны PvE, победа/счёт, туман (`visibleState` + память + radar), трофеи за бой
+(EVT-2: победитель забирает 5% стоимости всего погибшего на поле — своего и чужого;
+проигравший не получает ничего, доля идёт через хук `salvage.share`), движок эффектов (EFX-1:
 `data.events` trigger→effect, трейты читаются генерически; триггеры `planet_captured`
 по трейту захватчика, `province_captured` по виду узла и глобальный `schedule`).
 
@@ -4571,14 +4586,14 @@ seeded RNG + golden, `advanceTo`; список — §3, разбор — §5): �
 `scripts/docs-check.mjs` — разъехаться с кодом молча они больше не могут.
 
 **Оба ядра собирают ВЕСЬ каталог; расхождения по модулям ядра больше нет
-(PVR-0.2, 2026-09-17).** В каталоге 39 модулей, и оба списка берут все 39 — прототип
+(PVR-0.2, 2026-09-17).** В каталоге 40 модулей, и оба списка берут все 40 — прототип
 сверх них держит два СВОИХ (`hunger`, `botDiplomacy`; они живут в `prototype/src`, а не в
 ядре, и у сервера их быть не должно):
 
 | Сборка | Модулей | Чего нет |
 | --- | --: | --- |
-| `DEV_MODULES` (канонический сервер, `scenario.ts`) | **39** | — берёт весь каталог ядра |
-| `MODULES` (ядро прототипа, `protoKernel.ts`) | **41** | — весь каталог + 2 своих |
+| `DEV_MODULES` (канонический сервер, `scenario.ts`) | **40** | — берёт весь каталог ядра |
+| `MODULES` (ядро прототипа, `protoKernel.ts`) | **42** | — весь каталог + 2 своих |
 
 **PVR-0.2 (2026-09-17): `pve` доехал до прототипа — и закрыл счёт.** Последний модуль
 каталога, которого хост не грузил: волны Роя были написаны, покрыты тестами и не могли

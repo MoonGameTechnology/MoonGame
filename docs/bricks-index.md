@@ -644,8 +644,8 @@
 | OBJP-3 | ✅ | proto | `docs/backlog.md` | Каталог юнитов уехал в окно производства — туда же, |
 | CMD-VIS-2 | ✅ | proto | `docs/backlog.md` | Кнопка штурма появляется только когда есть кем |
 | EVT-1 | ✅ | core data proto | `docs/backlog.md` | Тёмные события наконец видны игроку, |
-| EVT-2 | ⏳ | core data | `docs/backlog.md` | Трофеи за бой: доля от стоимости уничтоженного. |
-| EVT-3 | 🔒 | core data | `docs/backlog.md` | (EVT-2) Пассивка героя: «мародёр» — лестница из пяти |
+| EVT-2 | ✅ | core data proto | `docs/backlog.md` | Трофеи за бой: победитель |
+| EVT-3 | ✅ | core data | `docs/backlog.md` | Пассивка героя «мародёр»: лестница из пяти |
 | RETR-1 | ⏳ | core | `docs/backlog.md` | Отступление получает ТОЧКУ: fleet.retreat умеет уводить, а не |
 | RETR-2 | 🔒 | core srv proto | `docs/backlog.md` | (RETR-1) Авто-отступление: условие выхода из боя |
 | TXT-0.1 | ✅ | docs | `docs/backlog.md` | Канон формулировок: записать правило и эталон, пока чистка не |

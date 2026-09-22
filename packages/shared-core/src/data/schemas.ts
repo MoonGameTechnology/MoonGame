@@ -827,7 +827,10 @@ export const HeroAbilityDefSchema = z.object({
 /** The hook pipelines a hero passive may feed (HERO-5). A curated enum, not an open
  *  string — each hook needs an interpreter in the hero module (like the tech-condition
  *  catalog §7.5); a new hook = one enum entry + one evaluator case. */
-export const HERO_PASSIVE_HOOKS = ['fleet.speed', 'combat.damage'] as const;
+/** `salvage` (EVT-3) кормит долю трофеев (`salvage.share`, модуль `salvage`) и, в
+ *  отличие от двух соседей, СКЛАДЫВАЕТСЯ с базой, а не умножает её: база — сама доля
+ *  (5%), и множитель ×1.1 превратил бы всю лестницу прокачки в полпроцента. */
+export const HERO_PASSIVE_HOOKS = ['fleet.speed', 'combat.damage', 'salvage'] as const;
 /** Where a passive applies: the hero's OWN ship's fleet, or every owner fleet within
  *  `params.radius` of the hero's node (the fleet-empowerment aura of docs/heroes.md). */
 export const HERO_PASSIVE_SCOPES = ['heroFleet', 'ownFleetsNear'] as const;
@@ -954,6 +957,11 @@ export const HeroSkillGrantsSchema = z.object({
   ability: z.string().optional(),
   /** Passive id (→ `data.heroPassives`) switched on for the hero. */
   passive: z.string().optional(),
+  /** Несколько пассивок одним узлом (EVT-3). Последняя ступень лестницы «мародёра»
+   *  поднимает СРАЗУ обе половины — и долю трофеев, и урон, — а узел дерева это одна
+   *  ступень: дробить его на два узла ради формы поля значило бы соврать игроку в
+   *  дереве. Складывается с `passive`, не заменяет его. */
+  passives: z.array(z.string()).default([]),
 });
 
 /** One node of the hero skill tree (docs/heroes.md — «дерево = бонусы к способностям»,
@@ -969,7 +977,7 @@ export const HeroSkillNodeSchema = z.object({
   requires: z.array(z.string()).default([]),
   /** Treasury cost to unlock. */
   cost: NonnegativeCostSchema.default({}),
-  grants: HeroSkillGrantsSchema.default({}),
+  grants: HeroSkillGrantsSchema.prefault({}),
 });
 
 /** The ship a hero commands: either an existing unit archetype (`unit` → `data.units`) or
