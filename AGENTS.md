@@ -35,6 +35,13 @@ answer where to look.
 hand-maintain their contents. Regenerate them through the existing docs-check workflow when their
 source documents change.
 
+A NEW document under `docs/` is only half done when the file exists: link it from its parent
+(normally the roadmap of the same topic). Appearing in the generated index is not enough — the
+index is a table of contents nobody reads end to end, and a document reached from nowhere else is
+invisible in practice. `docs-check` enforces this (CONV-19): a document no other living `.md`
+names fails the gate. Dated report zones (`docs/reviews/`, `docs/research/`) are exempt by zone;
+a deliberately standalone document goes into `STANDALONE` in that script with a reason and a date.
+
 When sources disagree, use this precedence for implementation state:
 
 `main` code → tests on `main` → green CI for that SHA → open PRs → generated indexes →
