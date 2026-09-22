@@ -975,27 +975,27 @@
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md:481` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md:490` | Уровень у модуля Роя |
 | SZE-4.2 | ✅ | core | `docs/sector-zero-economy-roadmap.md:532` | Контригра против уровня |
-| PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1211` | Карта pve-1 снова строится |
-| PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1242` | pveModule в ядре прототипа |
-| PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1269` | Сохранение: сперва мета, потом забег |
-| PVR-0.4 | ✅ | data | `docs/sector-zero-roadmap.md:1348` | Карта — развилки из линий |
-| PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md:1405` | Соло-запуск задаёт modeId |
-| PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1447` | HUD забега: волна N из M и время до следующей |
-| PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md:1479` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md:1540` | Выбор между волнами |
-| PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md:1597` | Волны Роя враждебны и доходят до боя |
-| PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md:1636` | Забег доходит до вердикта |
-| PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1705` | Пиратская база для первого боя |
-| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1735` | Выбор сложности на запуске забега |
-| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1771` | У забега свой темп и ускорение |
-| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1814` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1826` | Хранилище PvE-прогресса |
-| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1838` | Награда за забег |
-| PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1863` | Резолюция: что из §3 входит в первую версию |
-| PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md:1881` | Память Роя как состояние |
-| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md:1918` | Одна читаемая адаптация от сигнала до формы |
-| PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md:1960` | Структуры первого набора |
-| PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md:1990` | Журнал адаптаций |
+| PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:1240` | Карта pve-1 снова строится |
+| PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1271` | pveModule в ядре прототипа |
+| PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1298` | Сохранение: сперва мета, потом забег |
+| PVR-0.4 | ✅ | data | `docs/sector-zero-roadmap.md:1377` | Карта — развилки из линий |
+| PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md:1434` | Соло-запуск задаёт modeId |
+| PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1476` | HUD забега: волна N из M и время до следующей |
+| PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md:1508` | Состав волны перестаёт быть одним дроном |
+| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md:1569` | Выбор между волнами |
+| PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md:1626` | Волны Роя враждебны и доходят до боя |
+| PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md:1665` | Забег доходит до вердикта |
+| PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md:1734` | Пиратская база для первого боя |
+| PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md:1764` | Выбор сложности на запуске забега |
+| PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1800` | У забега свой темп и ускорение |
+| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1843` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md:1855` | Хранилище PvE-прогресса |
+| PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md:1867` | Награда за забег |
+| PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md:1892` | Резолюция: что из §3 входит в первую версию |
+| PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md:1910` | Память Роя как состояние |
+| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md:1947` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md:1989` | Структуры первого набора |
+| PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md:2019` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
@@ -1132,15 +1132,16 @@
 | YAG-1.1b | ⏳ | proto | `docs/yandex-games-roadmap.md:596` | Платформенная цель сборки и раскладка архива |
 | YAG-1.2 | ⏳ | proto | `docs/yandex-games-roadmap.md:633` | YandexGamesAdapter: инициализация и жизненный цикл |
 | YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:650` | Язык от площадки |
-| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:659` | PortableMetaSave: компактный дескриптор забега |
-| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:669` | PlatformSave в адаптере Яндекса |
-| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:679` | PlatformAds в адаптере Яндекса |
-| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:686` | Placements по правилам |
-| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:698` | Эндпойнт проверки подписи |
-| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:717` | PlatformIAP в адаптере Яндекса |
-| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:728` | PlatformAnalytics: словарь событий |
-| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:748` | Карточка игры и подача в модерацию |
-| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:759` | Серверное время вместо системного |
-| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:767` | Пауза площадки: что делает мир |
-| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:776` | Удалённый конфиг баланса |
-| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:784` | Кнопка «назад» и выход |
+| YAG-1.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:655` | Гость и повышение до аккаунта площадки |
+| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md:696` | PortableMetaSave: компактный дескриптор забега |
+| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:706` | PlatformSave в адаптере Яндекса |
+| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:716` | PlatformAds в адаптере Яндекса |
+| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:723` | Placements по правилам |
+| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:735` | Эндпойнт проверки подписи |
+| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:754` | PlatformIAP в адаптере Яндекса |
+| YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md:765` | PlatformAnalytics: словарь событий |
+| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:785` | Карточка игры и подача в модерацию |
+| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:796` | Серверное время вместо системного |
+| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:804` | Пауза площадки: что делает мир |
+| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:813` | Удалённый конфиг баланса |
+| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:821` | Кнопка «назад» и выход |
