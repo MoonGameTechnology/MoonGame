@@ -1,10 +1,16 @@
 /**
- * Сторож платформенной цели (`YAG-1.1b`) — проверяет ГОТОВЫЙ артефакт, а не намерение.
+ * Сторож платформенной цели (`YAG-1.1b`) — в двух частях, и это не симметрия.
  *
- * Требования площадки к архиву проверяются модерацией по тому, что мы отправили, поэтому
- * и здесь источник истины — `prototype/dist/yandex/`, а не строки в `build.mjs`. Сборка
- * долгая, а `dist/` не коммитится, поэтому тесты пропускаются, когда артефакта нет:
- * фальшивый зелёный тут хуже пропуска. Собрать: `pnpm run prototype`.
+ * **Всегда** проверяется САМ СНИППЕТ по `prototype/build.mjs`: это единственное место,
+ * где ошибка стоит отказа модерации (п. 1.19.1 — «строго так, как указано»), и она не
+ * требует сборки. Абсолютный адрес вместо относительного, потерянный `async`, тег после
+ * скрипта игры — всё это ловится статически, в каждом прогоне гейта.
+ *
+ * **При наличии артефакта** проверяется его форма: раскладка, имена файлов, размер.
+ * `dist/` не коммитится и в гейте не собирается, поэтому здесь `skipIf` — ровно та же
+ * конвенция, что у durable-тестов с Postgres: фальшивый зелёный хуже честного пропуска.
+ * Собрать: `pnpm run prototype`. В CI эту половину покрывает браузерный смоук, который
+ * поднимает уже СОБРАННЫЙ бандл.
  *
  * Что именно проверяется и почему:
  *
@@ -25,6 +31,7 @@ import { join } from 'node:path';
 
 const ROOT = new URL('../../dist/yandex/', import.meta.url).pathname;
 const BUILT = existsSync(join(ROOT, 'index.html'));
+const BUILD_SCRIPT = readFileSync(new URL('../../build.mjs', import.meta.url), 'utf8');
 
 const walk = (dir: string, prefix = ''): { path: string; size: number }[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -34,9 +41,41 @@ const walk = (dir: string, prefix = ''): { path: string; size: number }[] =>
       : [{ path: rel, size: statSync(join(dir, entry.name)).size }];
   });
 
+// Эта половина работает ВСЕГДА — сборка ей не нужна.
+describe('YAG-1.1b — сниппет подключения SDK (п. 1.19.1)', () => {
+  /** ЗНАЧЕНИЕ константы, а не весь файл: упоминание адреса в комментарии — не подстановка
+   *  его в тег. Первая редакция этого теста проверяла файл целиком и упала на соседней
+   *  строке документации; проверять надо то, что реально уедет в разметку. */
+  const loader = /const SDK_LOADER = `([\s\S]*?)`;/.exec(BUILD_SCRIPT)?.[1] ?? '';
+
+  it('константа лоадера найдена — иначе сторож молча проверяет пустоту', () => {
+    expect(loader).not.toBe('');
+  });
+
+  it('тег дословно такой, как в документации, и путь ОТНОСИТЕЛЬНЫЙ', () => {
+    expect(loader).toContain('<script async src="/sdk.js" onload="initSDK()"></script>');
+  });
+
+  it('абсолютный адрес S3 не подставлен: это вариант «свой домен», а мы грузим архив', () => {
+    expect(loader).not.toContain('sdk.games.s3.yandex.net');
+  });
+
+  it('страница площадки подключает стили и скрипт игры ФАЙЛАМИ, лоадер — первым', () => {
+    // `external` — тот самый параметр `page()`, который делает цель разложенной.
+    const gameScript = '<script src="assets/app.js"></script>';
+    expect(BUILD_SCRIPT).toContain(gameScript);
+    expect(BUILD_SCRIPT).toContain('<link rel="stylesheet" href="assets/app.css">');
+    expect(BUILD_SCRIPT.indexOf('SDK_LOADER')).toBeLessThan(BUILD_SCRIPT.indexOf(gameScript));
+  });
+});
+
+// Форма артефакта: нужна собранная цель (см. шапку).
 describe.skipIf(!BUILT)('YAG-1.1b — архив для площадки', () => {
-  const files = walk(ROOT);
-  const index = readFileSync(join(ROOT, 'index.html'), 'utf8');
+  // ⚠️ Ленивое чтение, а не в теле `describe`: тело выполняется даже у пропущенного
+  // набора (vitest собирает его, чтобы знать состав), и `scandir` по несуществующему
+  // `dist/` уронил бы ВЕСЬ файл. Ровно это и случилось в CI на первом же прогоне.
+  const files = BUILT ? walk(ROOT) : [];
+  const index = BUILT ? readFileSync(join(ROOT, 'index.html'), 'utf8') : '';
 
   it('`index.html` лежит в корне, а рядом — assets/ (п. 1.22)', () => {
     expect(files.map((f) => f.path)).toContain('index.html');
