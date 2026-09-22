@@ -40,8 +40,12 @@
     "params": {
       "combatBonus": 0.1,
       "durationHours": 2,
-      "radius": 300
-    }
+      "radius": 42
+    },
+    "tiers": [
+      { "skill": "command_relay", "params": { "radius": 220 } },
+      { "skill": "command_grid", "params": { "radius": 334 } }
+    ]
   },
   "scan": {
     "name": "Scan",
@@ -85,8 +89,12 @@
     "params": {
       "defenseBonus": 0.15,
       "durationHours": 2,
-      "radius": 300
-    }
+      "radius": 42
+    },
+    "tiers": [
+      { "skill": "command_relay", "params": { "radius": 220 } },
+      { "skill": "command_grid", "params": { "radius": 334 } }
+    ]
   },
   "boarding_translocation": {
     "name": "Boarding Translocation",
