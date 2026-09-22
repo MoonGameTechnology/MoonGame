@@ -708,25 +708,25 @@
 | CP1.4 | ✅ | cli | `docs/cross-platform-roadmap.md:170` | Реконнект и резюме |
 | CP2.1 | ✅ | cli | `docs/cross-platform-roadmap.md:206` | Web App Manifest |
 | CP2.2 | ✅ | cli | `docs/cross-platform-roadmap.md:213` | Service Worker + app-shell |
-| CP2.3 | ⏳ | cli | `docs/cross-platform-roadmap.md:261` | Кэш снапшота (IndexedDB) |
-| CP2.4 | ⏳ | cli | `docs/cross-platform-roadmap.md:268` | Install UX и Lighthouse-бюджет |
-| CP2.5 | 🔒 | cli srv | `docs/cross-platform-roadmap.md:275` | Авто-обновление + force-update handshake |
-| CP3.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:291` | Предпросмотр-прогон |
-| CP3.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:298` | Сверка предпросмотр ↔ сервер |
-| CP3.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:305` | «Что будет, если…» |
-| CP4.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:319` | Интеграция Pixi v8 (слой карты) |
-| CP4.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:326` | Камера, culling, DPI |
-| CP4.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:333` | Off-thread рендер/симуляция (опц.) |
-| CP4.4 | 🔒 | cli | `docs/cross-platform-roadmap.md:340` | Перф-бюджет в CI |
-| CP5.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:351` | Pointer vs touch |
-| CP5.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:358` | Жесты и хаптика |
-| CP5.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:365` | Адаптивные раскладки |
-| CP6.1 | 🔒 | cli sec | `docs/cross-platform-roadmap.md:376` | Android TWA |
-| CP6.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:383` | iOS (и альт-Android) через Capacitor |
-| CP6.3 | 🔒 | sec | `docs/cross-platform-roadmap.md:395` | CI-артефакты сборок |
-| CP7.1 | ⏳ | cli | `docs/cross-platform-roadmap.md:409` | Web Push (браузеры / Android PWA) |
-| CP7.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:413` | iOS native push через Capacitor |
-| CP7.3 | ⏳ |  | `docs/cross-platform-roadmap.md:417` | Серверные триггеры пушей [→F3] |
+| CP2.3 | ✅ | cli | `docs/cross-platform-roadmap.md:261` | Кэш снапшота (IndexedDB) |
+| CP2.4 | ⏳ | cli | `docs/cross-platform-roadmap.md:317` | Install UX и Lighthouse-бюджет |
+| CP2.5 | 🔒 | cli srv | `docs/cross-platform-roadmap.md:324` | Авто-обновление + force-update handshake |
+| CP3.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:340` | Предпросмотр-прогон |
+| CP3.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:347` | Сверка предпросмотр ↔ сервер |
+| CP3.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:354` | «Что будет, если…» |
+| CP4.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:368` | Интеграция Pixi v8 (слой карты) |
+| CP4.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:375` | Камера, culling, DPI |
+| CP4.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:382` | Off-thread рендер/симуляция (опц.) |
+| CP4.4 | 🔒 | cli | `docs/cross-platform-roadmap.md:389` | Перф-бюджет в CI |
+| CP5.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:400` | Pointer vs touch |
+| CP5.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:407` | Жесты и хаптика |
+| CP5.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:414` | Адаптивные раскладки |
+| CP6.1 | 🔒 | cli sec | `docs/cross-platform-roadmap.md:425` | Android TWA |
+| CP6.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:432` | iOS (и альт-Android) через Capacitor |
+| CP6.3 | 🔒 | sec | `docs/cross-platform-roadmap.md:444` | CI-артефакты сборок |
+| CP7.1 | ⏳ | cli | `docs/cross-platform-roadmap.md:458` | Web Push (браузеры / Android PWA) |
+| CP7.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:462` | iOS native push через Capacitor |
+| CP7.3 | ⏳ |  | `docs/cross-platform-roadmap.md:466` | Серверные триггеры пушей [→F3] |
 | EC-0.1 | ✅ | docs | `docs/economy-roadmap.md:88` | Жанровое решение — решено (см. «Зафиксированные решения» выше) |
 | EC-0.2 | ✅ | docs | `docs/economy-roadmap.md:97` | Денежная модель на бумаге — решено (2026-07-19) |
 | EC-0.3 | ✅ | docs sec | `docs/economy-roadmap.md:134` | RMT/фрод threat-model — решено (2026-07-19) |
