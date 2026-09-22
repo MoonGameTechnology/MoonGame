@@ -872,6 +872,8 @@
 | M2.6 | ✅ | core data | `docs/map-roadmap.md` | Непроходимость перестала быть декоративной — |
 | M2.7 | ✅ | cli proto | `docs/map-roadmap.md` | Граница, через которую нет пути, видна как барьер — |
 | M2.8 | ✅ | core data | `docs/map-roadmap.md` | Сродство к семейству местности — 2026-09-22 |
+| M2.9 | ✅ | cli proto data | `docs/map-roadmap.md` | Космос без прямых углов: волнистые границы и неровные области — 2026-09-22 |
+| M2.10 | ✅ | data | `docs/map-roadmap.md` | Развилка — не провинция: обе карты Сектора Зеро переложены — 2026-09-22 |
 | M3.1 | 🔒 |  | `docs/map-roadmap.md` | Редактор карты [tools] |
 | M3.2 | ⏳ |  | `docs/map-roadmap.md` | Процедурный пресет → формат карты [tools] |
 | M4.1 | ✅ | cli | `docs/map-roadmap.md` | Рендер из данных сектора — /🚧 |
@@ -1025,6 +1027,7 @@
 | PVR-5.1 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Карта второй главы и дверь к ней |
 | PVR-5.2 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Задачи на карте и награда за них |
 | PVR-5.3 | ⏳ | data cli | `docs/sector-zero-roadmap.md` | Рост числа задач по главам |
+| PVR-5.4 | ⏳ | proto cli | `docs/sector-zero-roadmap.md` | Экран итогов забега |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

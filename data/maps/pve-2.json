@@ -4,10 +4,10 @@
   "time": 0,
   "mode": "pve_waves",
   "sectors": {
-    "a1": {
+    "landing": {
       "position": {
-        "x": -390,
-        "y": -450
+        "x": -437,
+        "y": -415
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -31,89 +31,26 @@
         }
       ]
     },
-    "a2": {
+    "rim_veil": {
       "position": {
-        "x": -130,
-        "y": -450
-      },
-      "kind": "nebula",
-      "terrain": "nebula",
-      "owner": "p1"
-    },
-    "a3": {
-      "position": {
-        "x": 130,
-        "y": -450
-      },
-      "kind": "nebula",
-      "terrain": "nebula",
-      "owner": "swarm",
-      "garrison": [
-        {
-          "unit": "swarm_lander",
-          "count": 2
-        }
-      ]
-    },
-    "a4": {
-      "position": {
-        "x": 390,
-        "y": -450
-      },
-      "kind": "empty",
-      "terrain": "deep_void"
-    },
-    "b1": {
-      "position": {
-        "x": -520,
-        "y": -225
-      },
-      "kind": "asteroid",
-      "terrain": "asteroid_field"
-    },
-    "b2": {
-      "position": {
-        "x": -260,
-        "y": -225
-      },
-      "kind": "empty",
-      "terrain": "deep_void"
-    },
-    "b3": {
-      "position": {
-        "x": 0,
-        "y": -225
-      },
-      "kind": "empty",
-      "terrain": "deep_void"
-    },
-    "b4": {
-      "position": {
-        "x": 260,
-        "y": -225
+        "x": -397,
+        "y": -600
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
-    "b5": {
+    "cold_shoal": {
       "position": {
-        "x": 520,
-        "y": -225
+        "x": -218,
+        "y": -145
       },
-      "kind": "asteroid_cluster",
-      "terrain": "asteroid_cluster",
-      "owner": "swarm",
-      "garrison": [
-        {
-          "unit": "swarm_lander",
-          "count": 3
-        }
-      ]
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
     },
-    "c1": {
+    "dig_site": {
       "position": {
-        "x": -390,
-        "y": 0
+        "x": -139,
+        "y": -358
       },
       "kind": "dead_world",
       "terrain": "depleted_system",
@@ -126,44 +63,172 @@
       ],
       "transit": [
         [
-          "b1",
-          "d2"
+          "rim_veil",
+          "wreck_spine"
         ],
         [
-          "b2",
-          "d1"
+          "cold_shoal",
+          "hollow"
         ]
       ]
     },
-    "c2": {
+    "wreck_spine": {
       "position": {
-        "x": -130,
-        "y": 0
+        "x": 111,
+        "y": -338
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard",
       "owner": "swarm"
     },
-    "c3": {
+    "flare_belt": {
       "position": {
-        "x": 130,
-        "y": 0
+        "x": 300,
+        "y": -317
       },
-      "kind": "empty",
-      "terrain": "deep_void"
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
     },
-    "c4": {
+    "rockfield": {
       "position": {
-        "x": 390,
-        "y": 0
+        "x": 303,
+        "y": 3
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "dust_reach": {
+      "position": {
+        "x": 649,
+        "y": 191
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "ore_knot": {
+      "position": {
+        "x": 755,
+        "y": 354
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ]
+    },
+    "ion_wall": {
+      "position": {
+        "x": 458,
+        "y": 257
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "hollow": {
+      "position": {
+        "x": -43,
+        "y": -103
       },
       "kind": "nebula",
       "terrain": "nebula"
     },
-    "d1": {
+    "wreck_tail": {
       "position": {
-        "x": -520,
-        "y": 225
+        "x": 128,
+        "y": 94
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "camp": {
+      "position": {
+        "x": 139,
+        "y": -88
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "owner": "swarm"
+    },
+    "relay": {
+      "position": {
+        "x": 176,
+        "y": 293
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "drift_moon": {
+      "position": {
+        "x": -251,
+        "y": 198
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "spore_cloud": {
+      "position": {
+        "x": -231,
+        "y": 26
+      },
+      "kind": "nebula",
+      "terrain": "nebula",
+      "owner": "swarm"
+    },
+    "scree": {
+      "position": {
+        "x": 576,
+        "y": -209
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "deep_drift": {
+      "position": {
+        "x": -417,
+        "y": 3
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "veil_deep": {
+      "position": {
+        "x": -21,
+        "y": 203
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "biopit": {
+      "position": {
+        "x": -217,
+        "y": 413
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -187,58 +252,10 @@
         }
       ]
     },
-    "d2": {
+    "brood_yard": {
       "position": {
-        "x": -260,
-        "y": 225
-      },
-      "kind": "empty",
-      "terrain": "deep_void"
-    },
-    "d3": {
-      "position": {
-        "x": 0,
-        "y": 225
-      },
-      "kind": "empty",
-      "terrain": "empty_space"
-    },
-    "d4": {
-      "position": {
-        "x": 260,
-        "y": 225
-      },
-      "kind": "graveyard",
-      "terrain": "derelict_graveyard",
-      "owner": "swarm",
-      "garrison": [
-        {
-          "unit": "swarm_lander",
-          "count": 2
-        }
-      ]
-    },
-    "d5": {
-      "position": {
-        "x": 520,
-        "y": 225
-      },
-      "kind": "ion_storm",
-      "terrain": "ion_storm"
-    },
-    "e1": {
-      "position": {
-        "x": -390,
-        "y": 450
-      },
-      "kind": "asteroid",
-      "terrain": "asteroid_field",
-      "owner": "swarm"
-    },
-    "e2": {
-      "position": {
-        "x": -130,
-        "y": 450
+        "x": 16,
+        "y": 413
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -262,18 +279,10 @@
         }
       ]
     },
-    "e3": {
+    "nest": {
       "position": {
-        "x": 130,
-        "y": 450
-      },
-      "kind": "empty",
-      "terrain": "empty_space"
-    },
-    "e4": {
-      "position": {
-        "x": 390,
-        "y": 450
+        "x": 304,
+        "y": 439
       },
       "kind": "planet",
       "terrain": "empty_space",
@@ -306,10 +315,10 @@
         }
       ]
     },
-    "f1": {
+    "salvage_pocket": {
       "position": {
-        "x": -260,
-        "y": 675
+        "x": -689,
+        "y": 565
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard",
@@ -321,18 +330,10 @@
         }
       ]
     },
-    "f2": {
+    "bone_drift": {
       "position": {
-        "x": 0,
-        "y": 675
-      },
-      "kind": "nebula",
-      "terrain": "nebula"
-    },
-    "f3": {
-      "position": {
-        "x": 260,
-        "y": 675
+        "x": 213,
+        "y": 735
       },
       "kind": "graveyard",
       "terrain": "derelict_graveyard",
@@ -344,10 +345,10 @@
       "id": "mission.salvage",
       "kind": "control",
       "targets": [
-        "c2",
-        "d4",
-        "f1",
-        "f3"
+        "wreck_spine",
+        "wreck_tail",
+        "salvage_pocket",
+        "bone_drift"
       ],
       "reward": 3
     },
@@ -390,7 +391,7 @@
   "fleets": {
     "p1_1": {
       "owner": "p1",
-      "location": "a1",
+      "location": "landing",
       "landing": [
         {
           "unit": "militia",
@@ -410,7 +411,7 @@
     },
     "swarm_1": {
       "owner": "swarm",
-      "location": "e4",
+      "location": "nest",
       "units": [
         {
           "unit": "swarm_brood_mother",
@@ -420,7 +421,7 @@
     },
     "swarm_2": {
       "owner": "swarm",
-      "location": "d1",
+      "location": "biopit",
       "units": [
         {
           "unit": "swarm_brood_mother",
