@@ -1324,6 +1324,8 @@ let setupSpeed = 10;
 /** Сила Роя в забеге (PVR-2.1). Живёт рядом со `setupSpeed`, потому что это тот же род
  *  настройки: выбор игрока ДО запуска, переживающий перезагрузку. */
 let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
+/** Глава, на которой идёт ТЕКУЩИЙ забег (в отличие от выбранной для следующего). */
+let sectorMission = 0;
 /** Номер волны, на котором игрок нажал «Позже» (PVR-1.4). Долг при этом НЕ сгорает —
  *  окно просто не лезет поверх боя до следующей волны. `-1` = не откладывали. */
 let boonLaterAtWave = -1;
@@ -11027,13 +11029,14 @@ function startPvEMatch(dev = false): void {
   sectorAttempt = testing ? 0 : sectorProgress.nextAttempt;
   if (!testing) saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
-  const st = prepareSectorZeroRun(pveState(data), sectorProgress, data);
+  sectorMission = nextSectorMission;
+  const st = prepareSectorZeroRun(pveState(data, sectorMission), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
   const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
-  installMatch(st, aiSeats, pveModeId());
+  installMatch(st, aiSeats, pveModeId(sectorMission));
   sectorRunActive = true;
   sectorDevActive = testing;
   if (!__PLAYER_BUILD__ && testing) {
@@ -12988,6 +12991,10 @@ let sectorDevActive = false;
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
+/** Выбранная ГЛАВА забега (0 — первая). Живёт рядом со сложностью и хранится так же:
+ *  это тот же род настройки запуска. Клампит `pveState` — испорченное хранилище открывает
+ *  первую главу, а не роняет вход. */
+let nextSectorMission = Number(readRaw('void.pveMission') ?? 0) || 0;
 let runWrite = Promise.resolve();
 let progressWrite = sectorProgressStore.load().then(raw => {
   sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
@@ -13058,6 +13065,11 @@ const sectorZeroMenu = initSectorZeroMenu({
   setDifficulty: value => {
     nextSectorDifficulty = value;
     writeRaw('void.pveDifficulty', value);
+  },
+  mission: () => nextSectorMission,
+  setMission: value => {
+    nextSectorMission = value;
+    writeRaw('void.pveMission', String(value));
   },
   start: () => startPvEMatch(),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),

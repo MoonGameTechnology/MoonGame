@@ -11,6 +11,7 @@ import type { GameData, GameState } from '@void/shared-core';
 import { FRAGMENTS, shippedGameData } from '../../../data/bundle';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
 import pveMap from '../../../data/maps/pve-1.json';
+import pveMap2 from '../../../data/maps/pve-2.json';
 
 export { FRAGMENTS, shippedGameData };
 
@@ -19,14 +20,45 @@ export function skirmishState(data: GameData): GameState {
   return buildStateFromMap(parseMatchMap(skirmishMap), data);
 }
 
-/** A ready-to-render PvE `GameState` built from the shipped PvE map. */
-export function pveState(data: GameData): GameState {
-  return buildStateFromMap(parseMatchMap(pveMap), data);
+/**
+ * МИССИИ Сектора Зеро по порядку глав — единственная дверь к их картам.
+ *
+ * До этого `pveState` статически импортировала ровно `pve-1`, и выбора не было нигде:
+ * вторая карта могла лежать в репозитории и не открываться НИКОГДА. В этом проекте так
+ * уже случалось трижды (крепость, которую нельзя построить; модуль волн не в том ядре;
+ * `station.deploy` без подходящих узлов), поэтому карта и дверь к ней едут вместе.
+ *
+ * Порядок массива и есть порядок глав. Номер миссии приходит снаружи и КЛАМПИТСЯ:
+ * испорченное хранилище или старая ссылка не должны ронять вход в игру — они открывают
+ * первую главу, а не падают.
+ */
+const PVE_MISSIONS = [pveMap, pveMap2];
+
+/** Сколько глав у Сектора Зеро сегодня — чтобы интерфейс не держал своего числа. */
+export const PVE_MISSION_COUNT = PVE_MISSIONS.length;
+
+/**
+ * Карта главы по её номеру (0 — первая). Любой номер вне диапазона → ПЕРВАЯ глава.
+ *
+ * Именно первая, а не ближайшая: сюда номер приходит из хранилища браузера и из ссылки,
+ * то есть испорченное значение — обычный случай, а не авария. Подтянуть его к последней
+ * главе значило бы молча ПРОПУСТИТЬ игроку содержимое кампании; открыть первую —
+ * поведение, которое он точно поймёт.
+ */
+function missionMap(mission: number): unknown {
+  const i = Number.isInteger(mission) ? mission : Math.trunc(Number(mission));
+  const ok = Number.isFinite(i) && i >= 0 && i < PVE_MISSIONS.length;
+  return (ok ? PVE_MISSIONS[i] : PVE_MISSIONS[0]) ?? pveMap;
 }
 
-/** The mode the PvE map declares itself played under (`data.modes` id), for the host to
- *  arm the match with. The map carries it so the binding is DATA: the map and the mode
+/** A ready-to-render PvE `GameState` built from the shipped map of that mission. */
+export function pveState(data: GameData, mission = 0): GameState {
+  return buildStateFromMap(parseMatchMap(missionMap(mission)), data);
+}
+
+/** The mode the mission's map declares itself played under (`data.modes` id), for the host
+ *  to arm the match with. The map carries it so the binding is DATA: the map and the mode
  *  both existed for a long time and nothing said they belonged together. */
-export function pveModeId(): string | undefined {
-  return parseMatchMap(pveMap).mode;
+export function pveModeId(mission = 0): string | undefined {
+  return parseMatchMap(missionMap(mission)).mode;
 }

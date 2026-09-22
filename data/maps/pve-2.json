@@ -1,0 +1,373 @@
+{
+  "id": "pve-2",
+  "seed": "pve-2",
+  "time": 0,
+  "mode": "pve_waves",
+  "sectors": {
+    "a1": {
+      "position": {
+        "x": -390,
+        "y": -450
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "p1",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "a2": {
+      "position": {
+        "x": -130,
+        "y": -450
+      },
+      "kind": "nebula",
+      "terrain": "nebula",
+      "owner": "p1"
+    },
+    "a3": {
+      "position": {
+        "x": 130,
+        "y": -450
+      },
+      "kind": "nebula",
+      "terrain": "nebula",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "a4": {
+      "position": {
+        "x": 390,
+        "y": -450
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "b1": {
+      "position": {
+        "x": -520,
+        "y": -225
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "b2": {
+      "position": {
+        "x": -260,
+        "y": -225
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "b3": {
+      "position": {
+        "x": 0,
+        "y": -225
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "b4": {
+      "position": {
+        "x": 260,
+        "y": -225
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "b5": {
+      "position": {
+        "x": 520,
+        "y": -225
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ]
+    },
+    "c1": {
+      "position": {
+        "x": -390,
+        "y": 0
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ],
+      "transit": [
+        [
+          "b1",
+          "d2"
+        ],
+        [
+          "b2",
+          "d1"
+        ]
+      ]
+    },
+    "c2": {
+      "position": {
+        "x": -130,
+        "y": 0
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm"
+    },
+    "c3": {
+      "position": {
+        "x": 130,
+        "y": 0
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "c4": {
+      "position": {
+        "x": 390,
+        "y": 0
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "d1": {
+      "position": {
+        "x": -520,
+        "y": 225
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "fort"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 4
+        }
+      ]
+    },
+    "d2": {
+      "position": {
+        "x": -260,
+        "y": 225
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "d3": {
+      "position": {
+        "x": 0,
+        "y": 225
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "d4": {
+      "position": {
+        "x": 260,
+        "y": 225
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "d5": {
+      "position": {
+        "x": 520,
+        "y": 225
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "e1": {
+      "position": {
+        "x": -390,
+        "y": 450
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field",
+      "owner": "swarm"
+    },
+    "e2": {
+      "position": {
+        "x": -130,
+        "y": 450
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "swarm_synapse"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 4
+        }
+      ]
+    },
+    "e3": {
+      "position": {
+        "x": 130,
+        "y": 450
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "e4": {
+      "position": {
+        "x": 390,
+        "y": 450
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "swarm_hive"
+        },
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "barracks"
+        },
+        {
+          "type": "fort"
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 6
+        }
+      ]
+    }
+  },
+  "players": {
+    "p1": {
+      "name": "Azure Compact",
+      "faction": "vanguard",
+      "resources": {
+        "credits": 400,
+        "metal": 400
+      }
+    },
+    "swarm": {
+      "name": "Swarm Collective",
+      "faction": "swarm",
+      "ai": true,
+      "resources": {
+        "credits": 800,
+        "metal": 800,
+        "biomass": 300,
+        "microelectronics": 80
+      }
+    }
+  },
+  "fleets": {
+    "p1_1": {
+      "owner": "p1",
+      "location": "a1",
+      "landing": [
+        {
+          "unit": "militia",
+          "count": 1
+        }
+      ],
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
+      ]
+    },
+    "swarm_1": {
+      "owner": "swarm",
+      "location": "e4",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 2
+        }
+      ]
+    },
+    "swarm_2": {
+      "owner": "swarm",
+      "location": "d1",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

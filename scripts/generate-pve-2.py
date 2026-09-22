@@ -1,0 +1,70 @@
+import json, collections
+ROWS = [
+    (-450, [(-390,'a1'), (-130,'a2'), (130,'a3'), (390,'a4')]),
+    (-225, [(-520,'b1'), (-260,'b2'), (0,'b3'), (260,'b4'), (520,'b5')]),
+    (0,    [(-390,'c1'), (-130,'c2'), (130,'c3'), (390,'c4')]),
+    (225,  [(-520,'d1'), (-260,'d2'), (0,'d3'), (260,'d4'), (520,'d5')]),
+    (450,  [(-390,'e1'), (-130,'e2'), (130,'e3'), (390,'e4')]),
+]
+S = 'swarm'
+# вид, местность, владелец, гарнизон, постройки
+SPEC = {
+ 'a1': ('planet','empty_space','p1',[{'unit':'militia','count':2}],[{'type':'mine_t1'},{'type':'shipyard','level':2},{'type':'radar'}]),
+ 'a2': ('nebula','nebula','p1',[],[]),
+ 'a3': ('nebula','nebula',S,[{'unit':'swarm_lander','count':2}],[]),
+ 'a4': ('empty','deep_void',None,[],[]),
+ 'b1': ('asteroid','asteroid_field',None,[],[]),
+ 'b2': ('empty','deep_void',None,[],[]),
+ 'b3': ('empty','deep_void',None,[],[]),
+ 'b4': ('nebula','nebula',None,[],[]),
+ 'b5': ('asteroid_cluster','asteroid_cluster',S,[{'unit':'swarm_lander','count':3}],[]),
+ 'c1': ('dead_world','depleted_system',S,[{'unit':'swarm_lander','count':3}],[]),
+ 'c2': ('graveyard','derelict_graveyard',S,[],[]),
+ 'c3': ('empty','deep_void',None,[],[]),
+ 'c4': ('nebula','nebula',None,[],[]),
+ 'd1': ('planet','empty_space',S,[{'unit':'swarm_lander','count':4}],[{'type':'biomass_pit'},{'type':'shipyard','level':2},{'type':'fort'}]),
+ 'd2': ('empty','deep_void',None,[],[]),
+ 'd3': ('empty','empty_space',None,[],[]),
+ 'd4': ('graveyard','derelict_graveyard',S,[{'unit':'swarm_lander','count':2}],[]),
+ 'd5': ('ion_storm','ion_storm',None,[],[]),
+ 'e1': ('asteroid','asteroid_field',S,[],[]),
+ 'e2': ('planet','empty_space',S,[{'unit':'swarm_lander','count':4}],[{'type':'swarm_synapse'},{'type':'shipyard','level':2},{'type':'orbital_aa'}]),
+ 'e3': ('nebula','nebula',None,[],[]),
+ 'e4': ('planet','empty_space',S,[{'unit':'swarm_lander','count':6}],[{'type':'swarm_hive'},{'type':'biomass_pit'},{'type':'shipyard','level':2},{'type':'barracks'},{'type':'fort'},{'type':'orbital_aa'}]),
+}
+# Размеры НЕ трогаем: решётка уже даёт узлам шесть подходов, а раздутая клетка
+# отнимает границы у соседей — первым делом горизонтальные внутри ряда.
+SIZE = {}
+# Двойной путь: через центральный перекрёсток идут ДВЕ трассы и не соединяются.
+# Две трассы пересекаются в центре и НЕ соединяются (M2.5): по диагоналям.
+TRANSIT = {'c1': [['b1','d2'], ['b2','d1']]}
+
+sectors = collections.OrderedDict()
+for y,row in ROWS:
+    for x,sid in row:
+        kind,terrain,owner,garr,blds = SPEC[sid]
+        sec = collections.OrderedDict([('position',{'x':x,'y':y}),('kind',kind),('terrain',terrain)])
+        if sid in SIZE: sec['size']=SIZE[sid]
+        if owner: sec['owner']=owner
+        if blds: sec['buildings']=blds
+        if garr: sec['garrison']=garr
+        if sid in TRANSIT: sec['transit']=TRANSIT[sid]
+        sectors[sid]=sec
+
+m = collections.OrderedDict([
+ ('id','pve-2'),('seed','pve-2'),('time',0),('mode','pve_waves'),
+ ('sectors',sectors),
+ ('players', collections.OrderedDict([
+   ('p1', {'name':'Azure Compact','faction':'vanguard','resources':{'credits':400,'metal':400}}),
+   ('swarm', {'name':'Swarm Collective','faction':'swarm','ai':True,
+              'resources':{'credits':800,'metal':800,'biomass':300,'microelectronics':80}}),
+ ])),
+ ('fleets', collections.OrderedDict([
+   ('p1_1', {'owner':'p1','location':'a1','landing':[{'unit':'militia','count':1}],
+             'units':[{'unit':'cruiser','count':2},{'unit':'scout_drone','count':1}]}),
+   ('swarm_1', {'owner':'swarm','location':'e4','units':[{'unit':'swarm_brood_mother','count':2}]}),
+   ('swarm_2', {'owner':'swarm','location':'d1','units':[{'unit':'swarm_brood_mother','count':1}]}),
+ ])),
+])
+open('/home/user/MoonGame/data/maps/pve-2.json','w',encoding='utf-8').write(json.dumps(m,indent=2,ensure_ascii=False)+'\n')
+print('провинций:', len(sectors))
