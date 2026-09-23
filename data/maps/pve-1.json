@@ -33,12 +33,24 @@
         },
         {
           "type": "radar"
+        },
+        {
+          "type": "fort",
+          "level": 2
         }
       ],
       "garrison": [
         {
           "unit": "militia",
           "count": 3
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 4
+        },
+        {
+          "unit": "garrison",
+          "count": 2
         }
       ]
     },
@@ -253,6 +265,16 @@
         {
           "unit": "scout_drone",
           "count": 1
+        }
+      ]
+    },
+    "p1_2": {
+      "owner": "p1",
+      "location": "home_a",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
         }
       ]
     },
