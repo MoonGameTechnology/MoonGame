@@ -99,3 +99,59 @@ export function lanePieces(from: string, to: string, road: readonly NetPoint[]):
 export function lanePieceT(piece: LanePiece, k: number): number {
   return piece.t0 + (piece.t1 - piece.t0) * k;
 }
+
+/** Развилка на карте — МЕСТО (ROADS-4): где она, чья это тропа и к каким соседям она ведёт. */
+export interface ForkMark {
+  province: string;
+  at: NetPoint;
+  exits: string[];
+}
+
+/**
+ * Развилки, которые надо показать. Развилка — единственная точка тропы, что видит все её
+ * дороги (засада ROADS-3), но на рисунке сети она лишь излом дороги, и понять, что там
+ * можно встать, не из чего. Каждая — один раз; только та, у чьей тропы есть хоть одна
+ * рисуемая дорога (правила 3 и 4 выше), иначе значок висел бы над пустым местом.
+ */
+export function forkMarks(planets: Readonly<Record<string, NetPlanet>>): ForkMark[] {
+  const out: ForkMark[] = [];
+  for (const id of Object.keys(planets).sort()) {
+    const p = planets[id]!;
+    const links = new Set(p.links ?? []);
+    for (const trail of p.roads?.trails ?? []) {
+      if (!trail.fork) continue;
+      const exits = trail.exits.filter(
+        (n) => links.has(n) && planets[n] && hasRoad(planets, id, n),
+      );
+      if (exits.length > 0) out.push({ province: id, at: trail.fork, exits });
+    }
+  }
+  return out;
+}
+
+/**
+ * Куда смотрит корабль на дороге: направление куска ломаной `road`, на котором лежит доля
+ * `t` её длины. Нос по прямой «мир → мир» на ветке развилки смотрел бы мимо дороги, по
+ * которой корабль летит. Ровно на изломе — направление куска, что начинается там: корабль
+ * уже повернул. Нулевой вектор — только у дороги нулевой длины.
+ */
+export function roadHeading(road: readonly NetPoint[], t: number): NetPoint {
+  const lens: number[] = [];
+  let total = 0;
+  for (let i = 1; i < road.length; i++) {
+    const len = Math.hypot(road[i]!.x - road[i - 1]!.x, road[i]!.y - road[i - 1]!.y);
+    lens.push(len);
+    total += len;
+  }
+  if (!(total > 0)) return { x: 0, y: 0 };
+  let left = Math.min(1, Math.max(0, t)) * total;
+  for (let i = 1; i < road.length; i++) {
+    const len = lens[i - 1]!;
+    // Ровно на изломе (left === len) берём СЛЕДУЮЩИЙ кусок, кроме последнего.
+    if (len > 0 && (left < len || i === road.length - 1)) {
+      return { x: (road[i]!.x - road[i - 1]!.x) / len, y: (road[i]!.y - road[i - 1]!.y) / len };
+    }
+    left -= len;
+  }
+  return { x: 0, y: 0 };
+}

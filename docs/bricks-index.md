@@ -984,7 +984,7 @@
 | ROADS-1 | ✅ | core data | `docs/roads-roadmap.md` | Сеть дорог в ядре — 2026-09-23 |
 | ROADS-2 | ✅ | core proto | `docs/roads-roadmap.md` | Движение по дорогам — 2026-09-23 |
 | ROADS-3 | ✅ | core proto | `docs/roads-roadmap.md` | Встречи на дорогах и засада на развилке — 2026-09-23 |
-| ROADS-4 | ⏳ | proto cli | `docs/roads-roadmap.md` | Засада на рисунке — |
+| ROADS-4 | ✅ | proto cli | `docs/roads-roadmap.md` | Засада на рисунке — 2026-09-23 |
 | ROADS-5 | ⏳ | proto data | `docs/roads-roadmap.md` | Баланс и ИИ — |
 | ROS-0.1 | ✅ | data proto core | `docs/roster-roadmap.md` | ПКО и зональное ПВО: имя насквозь 2026-09-09 |
 | ROS-0.2 | ✅ | proto | `docs/roster-roadmap.md` | «Верфь» → «Производство» 2026-09-09 |

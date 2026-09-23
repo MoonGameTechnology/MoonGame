@@ -2304,6 +2304,7 @@ export const ru: Record<string, string> = {
   'effect.hunger': 'голод: −25% наземный урон',
   'effect.point-defense': 'зональное ПВО {n}',
   'side.fleet.in-orbit': 'на орбите',
+  'side.fleet.ambush': '⟟ засада на развилке {planet} · ловит всех на тропе к {exits}',
   'side.fleet.on-lane': '⟜ стоит на трассе {lane} · {p}% пути',
   'side.fleet.repair.dock.title': 'Экспресс-ремонт у своего дока за металл',
   'side.fleet.repair.instant.title': 'Мгновенный ремонт всего корпуса за кредиты',

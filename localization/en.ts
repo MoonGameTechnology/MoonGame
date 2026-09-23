@@ -2298,6 +2298,7 @@ export const en: Record<string, string> = {
   'effect.hunger': 'hunger: −25% ground damage',
   'effect.point-defense': 'area defense {n}',
   'side.fleet.in-orbit': 'in orbit',
+  'side.fleet.ambush': '⟟ ambush at the {planet} fork · catches all traffic toward {exits}',
   'side.fleet.on-lane': '⟜ holding on the {lane} lane · {p}% across',
   'side.fleet.repair.dock.title': 'Express repair at your own dock for metal',
   'side.fleet.repair.instant.title': 'Instant full-hull repair for credits',
