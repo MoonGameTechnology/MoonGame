@@ -22,8 +22,10 @@ import {
 import { workshopRows } from '../../decisions/sectorZeroWorkshop';
 import { moduleRarity, starRow } from '../../decisions/itemRarity';
 import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
+import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
 import {
   adSovereigns,
+  doubleReward,
   shopRefresh,
   shopRows,
   type PayKind,
@@ -43,7 +45,9 @@ interface PreparationHost {
   /** Показать rewarded-рекламу и дождаться ПОДТВЕРЖДЁННОГО результата. `true` = игрок
    *  досмотрел. Награду выдаёт игра и только после этого (`platform-adapters.md`), поэтому
    *  покупка за рекламу идёт двумя шагами, а не одним. */
-  watchAd(placement: string): Promise<boolean>;
+  /** Показать rewarded-ролик и вернуть ИСХОД (`YAG-3.2`): «не досмотрел» и «рекламы
+   *  нет» игрок видит по-разному. `props` — к аналитике, в id места не входят. */
+  watchAd(placement: AdPlacement, props?: Record<string, string>): Promise<AdOutcome>;
   /** Свериться с календарём перед показом экрана: витрина магазина ротируется посуточно
    *  (`SZE-3.2`). Часы живут у хозяина — `decisions/` обязаны оставаться чистыми. */
   sync(): void;
@@ -424,11 +428,22 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const active = document.activeElement as HTMLElement | null;
     const focusAction = active?.dataset.prep;
     const focusId = active?.dataset.id;
+    // Двойная награда за забег (`YAG-3.2`) — рядом с самой наградой, и на кнопке видно,
+    // СКОЛЬКО придёт (п. 4.5.1: и что будет реклама, и что игрок получит).
+    const twice = doubleReward(p, h.platform);
+    const doubleButton =
+      twice.state === 'ready'
+        ? button(
+            'double-reward',
+            '',
+            t('sector-zero.prep.double', { n: twice.research, m: twice.warrants }),
+          )
+        : '';
     const tabButton = (id: typeof tab, icon: string, key: string): string =>
       button('tab', id, `<i aria-hidden="true">${icon}</i><span>${t(key)}</span>`, false, tab === id);
     // Шапка: назад + кошелёк одной строкой, одна строка подсказки (PVR-6.6: меньше
     // абзацев), вкладки с иконкой — на телефоне четыре в ряд, без переполнения.
-    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</span></p><div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('workshop', '⚒\uFE0E', 'sector-zero.prep.workshop')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
+    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('workshop', '⚒\uFE0E', 'sector-zero.prep.workshop')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)
@@ -444,6 +459,25 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     home.hidden = false;
     document.getElementById('sz-prep')?.focus({ preventScroll: true });
   };
+  /**
+   * Ролик по нажатию, потом действие — единственный путь к рекламе на этом экране
+   * (`YAG-3.2`). Порядок жёсткий: сперва подтверждённый показ, потом выдача; не досмотрел
+   * или рекламы нет — действие не зовётся, попытка не тратится и ничего не списано.
+   * Сломавшийся адаптер (отклонённый промис) читается как «рекламы нет» — fail-secure:
+   * исключение в SDK площадки не должно превращаться в бесплатную награду.
+   */
+  const viaAd = (
+    placement: AdPlacement,
+    onWatched: () => string,
+    props?: Record<string, string>,
+  ): void => {
+    const settle = (status: AdOutcome): void => {
+      message = status === 'ok' ? onWatched() : t(adRefusalKey(status));
+      render();
+    };
+    void h.watchAd(placement, props).then(settle, () => settle('unavailable'));
+  };
+
   panel.addEventListener('click', (event) => {
     const target = (event.target as Element).closest<HTMLButtonElement>('[data-prep]');
     if (!target || target.disabled) return;
@@ -461,56 +495,53 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     else if (kind === 'hero') heroId = id;
     else {
       let action: SectorProgressAction | null = null;
+      if (kind === 'double-reward') {
+        viaAd('run.double', () => {
+          const { research, warrants } = doubleReward(h.progress(), h.platform);
+          return h.change({ kind: 'double-reward' })
+            ? t('sector-zero.prep.doubled', { n: research, m: warrants })
+            : t('sector-zero.prep.unavailable');
+        });
+        return;
+      }
       if (kind === 'ad-sovereigns') {
-        // Сперва подтверждённый показ, потом начисление; отказ попытку не тратит. Сутки
-        // сверяются перед начислением — лимит считается по сегодняшним, а не вчерашним.
-        const settle = (watched: boolean): void => {
-          if (watched) h.sync();
+        // Сутки сверяются перед начислением — лимит считается по сегодняшним, а не
+        // вчерашним.
+        viaAd('shop.sovereigns', () => {
+          h.sync();
           const amount = h.data.sectorZeroShop.adSovereigns.amount;
-          message = !watched
-            ? t('sector-zero.shop.ad-declined')
-            : h.change({ kind: 'ad-sovereigns' })
-              ? t('sector-zero.shop.ad-sovereigns.got', { n: amount })
-              : t('sector-zero.prep.unavailable');
-          render();
-        };
-        void h.watchAd('shop:sovereigns').then(settle, () => settle(false));
+          return h.change({ kind: 'ad-sovereigns' })
+            ? t('sector-zero.shop.ad-sovereigns.got', { n: amount })
+            : t('sector-zero.prep.unavailable');
+        });
         return;
       }
       if (kind === 'refresh-shop') {
-        // Как покупка за рекламу: сперва подтверждённый показ, потом действие. Отказ от
-        // ролика действие не зовёт — попытка не тратится и витрина не меняется. Сутки
-        // сверяются ПЕРЕД действием: иначе ролик, досмотренный после полуночи, обновил бы
-        // уже вчерашнюю витрину.
-        const settle = (watched: boolean): void => {
-          if (watched) h.sync();
-          message = !watched
-            ? t('sector-zero.shop.ad-declined')
-            : t(
-                h.change({ kind: 'refresh-shop' })
-                  ? 'sector-zero.shop.refreshed'
-                  : 'sector-zero.prep.unavailable',
-              );
-          render();
-        };
-        void h.watchAd('shop:refresh').then(settle, () => settle(false));
+        // Сутки сверяются ПЕРЕД действием: иначе ролик, досмотренный после полуночи,
+        // обновил бы уже вчерашнюю витрину.
+        viaAd('shop.refresh', () => {
+          h.sync();
+          return t(
+            h.change({ kind: 'refresh-shop' })
+              ? 'sector-zero.shop.refreshed'
+              : 'sector-zero.prep.unavailable',
+          );
+        });
         return;
       }
       if (kind?.startsWith('buy:')) {
         const pay = kind.slice(4) as PayKind;
         if (pay === 'ad') {
-          // Два шага, а не один: сперва подтверждённый показ, потом выдача. Отказ от
-          // рекламы не должен ничего ломать и не должен ничего отнимать, поэтому при
-          // `false` мы просто не зовём выдачу — списывать тут нечего по определению.
-          // Сломавшийся адаптер читается как «не досмотрел»: fail-secure, товар не
-          // выдаётся. Иначе исключение в SDK площадки превратилось бы в бесплатный лот.
-          const settle = (watched: boolean): void => {
-            message = !watched
-              ? t('sector-zero.shop.ad-declined')
-              : t(h.change({ kind: 'buy', id, pay }) ? 'sector-zero.shop.bought' : 'sector-zero.prep.unavailable');
-            render();
-          };
-          void h.watchAd(`shop:${id}`).then(settle, () => settle(false));
+          viaAd(
+            'shop.lot',
+            () =>
+              t(
+                h.change({ kind: 'buy', id, pay })
+                  ? 'sector-zero.shop.bought'
+                  : 'sector-zero.prep.unavailable',
+              ),
+            { lot: id },
+          );
           return;
         }
         message = t(h.change({ kind: 'buy', id, pay }) ? 'sector-zero.shop.bought' : 'sector-zero.prep.unavailable');

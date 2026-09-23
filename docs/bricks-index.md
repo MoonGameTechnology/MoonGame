@@ -1194,7 +1194,7 @@
 | YAG-2.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PortableMetaSave: компактный дескриптор забега 2026-09-22 |
 | YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformSave в адаптере Яндекса |
 | YAG-3.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | PlatformAds в адаптере Яндекса |
-| YAG-3.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
+| YAG-3.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
 | YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |

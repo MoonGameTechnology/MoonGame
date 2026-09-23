@@ -2144,6 +2144,8 @@ export const ru: Record<string, string> = {
   'setup.title': 'НАСТРОЙКА СХВАТКИ',
 
   // --- sector-zero — Главное меню и постоянная подготовка между попытками.
+  'sector-zero.ad.cancelled': 'Ролик не досмотрен. Ничего не списано.',
+  'sector-zero.ad.unavailable': 'Реклама сейчас недоступна. Ничего не списано.',
   'sector-zero.back': 'В главный хаб',
   'sector-zero.cancel': 'Сохранить текущий забег',
   'sector-zero.confirm': 'Начать заново',
@@ -2185,6 +2187,8 @@ export const ru: Record<string, string> = {
   'sector-zero.prep': 'Подготовка к забегу',
   'sector-zero.prep.abilities': 'Набор активных навыков',
   'sector-zero.prep.back': 'В главное меню',
+  'sector-zero.prep.double': 'Удвоить за рекламу: +{n} данных · +{m} ⌖',
+  'sector-zero.prep.doubled': 'Награда удвоена: +{n} данных · +{m} ⌖.',
   'sector-zero.prep.earn': 'Данные выдаются за завершённые забеги — и за победу, и за поражение.',
   'sector-zero.prep.equip': 'Установить',
   'sector-zero.prep.equipped': 'Установлено · снять',
@@ -2216,7 +2220,6 @@ export const ru: Record<string, string> = {
   'sector-zero.route.core': 'Эпицентр',
   'sector-zero.route.edge': 'Край сектора',
   'sector-zero.saved': 'Забег в процессе',
-  'sector-zero.shop.ad-declined': 'Реклама не показана. Ничего не списано.',
   'sector-zero.shop.ad-sovereigns': '+{n} ◆ за рекламу · осталось {left}',
   'sector-zero.shop.ad-sovereigns.got': 'Получено: +{n} ◆.',
   'sector-zero.shop.ad-sovereigns.used': 'Суверены за рекламу — завтра',
