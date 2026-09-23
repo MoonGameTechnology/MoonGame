@@ -10,6 +10,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { resolveChromium } from '../scripts/chromium.mjs';
+import { enterSkirmish } from './harnessKit.mjs';
 import { checkMobileStrategy } from './mobileStrategyTest.mjs';
 
 const require = createRequire(import.meta.url);
@@ -141,10 +142,7 @@ try {
   await checkMobileStrategy(browser, `http://127.0.0.1:${server.address().port}`);
   await p.addInitScript(() => localStorage.setItem('vd.locale', 'ru'));
   await p.goto(`http://127.0.0.1:${server.address().port}`);
-  await p.locator('#cnew').tap();
-  await p.locator('#hub-solo').tap();
-  await p.locator('#sp-go').tap();
-  await p.locator('#setupgo').tap();
+  await enterSkirmish(p, { tap: true });
   await p.locator('#spd-pause').tap();
   await pause();
   assert((await ui()).mobile);
@@ -167,10 +165,14 @@ try {
   await sheet.locator('.mobile-quick [data-mobile="details"]').tap();
   assert(await sheet.locator('#side').isVisible());
   await sheet.locator('[data-mobile="summary"]').tap();
-  assert(
-    await sheet.locator('[data-act="fleetinfo"]').last().isVisible(),
-    'full statistics retain their return action',
-  );
+  // Сводка встаёт РЯДОМ с карточкой (`objectPanelHtml`), а назад из неё ведёт своя
+  // кнопка `summaryback`, а не повторный `fleetinfo` — так устроено с тех пор, как сводка
+  // перестала подменять карточку (BRWH-2: харнес ждал старую форму).
+  await sheet.locator('.object-detail').waitFor({ state: 'attached' });
+  const back = sheet.locator('[data-act="summaryback"]');
+  await back.scrollIntoViewIfNeeded();
+  assert(await back.isVisible(), 'full statistics retain their return action');
+  await p.screenshot({ path: 'prototype/dist/mobile-summary.png' });
   await p.keyboard.press('Escape');
   await pause();
   assert(!(await sheet.locator('#side').isVisible()));
@@ -233,13 +235,16 @@ try {
   console.log('PASS confirmed Course and Stop reach the reducer');
 
   const stopped = await snapshot();
+  // Прицел, взведённый при раскрытом «Ещё». После ATK-1 «Атака» — это `engage` (цель —
+  // флот); `attack` стал ШТУРМОМ и по `cmdPresence` есть только у флота с десантом,
+  // которого у стартового флота нет (BRWH-2: харнес ждал старую кнопку).
   await sheet.locator('[data-cmd="more"]').tap();
-  await sheet.locator('[data-cmd="attack"]').tap();
+  await sheet.locator('[data-cmd="engage"]').tap();
   await pause();
-  assert((await ui()).assaultAim);
+  assert((await ui()).engageAim);
   await p.keyboard.press('Escape');
   await pause();
-  assert(!(await ui()).assaultAim, 'Back cancels targeting entered through More in one step');
+  assert(!(await ui()).engageAim, 'Back cancels targeting entered through More in one step');
   assert.equal(await snapshot(), stopped);
   await sheet.locator('[data-cmd="more"]').tap();
   await sheet.locator('[data-cmd="pick"]').tap();
@@ -304,18 +309,14 @@ try {
 
   for (const route of ['/built', '/player']) {
     await p.goto(`http://127.0.0.1:${server.address().port}${route}`);
-    await p.locator('#cnew').tap();
-    await p.locator('#hub-solo').tap();
-    await p.locator('#sp-go').tap();
-    await p.locator('#setupgo').tap();
+    await enterSkirmish(p, { tap: true });
     assert(await p.locator('body.mobile-ui').count());
     assert.equal(await p.locator('#purse .res').count(), 5);
   }
   const desktop = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   desktop.on('pageerror', (e) => errors.push(e.message));
   await desktop.goto(`http://127.0.0.1:${server.address().port}`);
-  for (const id of ['cnew', 'hub-solo', 'sp-go', 'setupgo'])
-    await desktop.locator(`#${id}`).click();
+  await enterSkirmish(desktop);
   const mine = (await desktop.evaluate(() => window.__mobileTest.fleets())).find(
     (x) => x.owner === 'p1',
   );

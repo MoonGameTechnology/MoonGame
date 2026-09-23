@@ -1,6 +1,8 @@
 /* global window, document, localStorage, innerWidth, innerHeight -- browser */
 import assert from 'node:assert/strict';
 
+import { enterSkirmish } from './harnessKit.mjs';
+
 /** Real phone layouts and actions through the existing controllers/reducer. */
 export async function checkMobileStrategy(browser, url) {
   const page = await browser.newPage({
@@ -15,8 +17,9 @@ export async function checkMobileStrategy(browser, url) {
   const enter = async (locale) => {
     await page.addInitScript((locale) => localStorage.setItem('vd.locale', locale), locale);
     await page.goto(url);
-    for (const id of ['cnew', 'hub-solo', 'sp-go', 'setupgo', 'spd-pause'])
-      await page.locator('#' + id).tap();
+    // Вторая локаль — второй запуск: сохранение уже есть, `enterSkirmish` его заменяет.
+    await enterSkirmish(page, { tap: true });
+    await page.locator('#spd-pause').tap();
   };
   const open = async (id) => {
     if (!(await page.locator('#rail-' + id).isVisible())) await page.locator('#railtoggle').tap();

@@ -10,6 +10,7 @@ import {
   type PlatformHost,
   type YaGamesGlobal,
 } from './platform/host';
+import { sdkLoaderPresent } from './platform/sdkWait';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
@@ -36,6 +37,8 @@ const SDK_WAIT_MS = 3000;
 function loaderReady(): Promise<YaGamesGlobal | undefined> {
   const at = () => (window as unknown as { YaGames?: YaGamesGlobal }).YaGames;
   if (at()) return Promise.resolve(at());
+  // Без тега лоадера `ya-sdk-ready` не придёт никогда — не держать игру весь потолок.
+  if (!sdkLoaderPresent(document)) return Promise.resolve(undefined);
   return new Promise((resolve) => {
     const done = (): void => {
       window.removeEventListener('ya-sdk-ready', done);
