@@ -67,6 +67,17 @@
 #sz-workshop button.selected { color: #b3f1e9; border-color: #75b6b6; background: #16333d; }
 .sz-workhead { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
 .sz-workhead b { color: #ecd09b; font: 13px/1.5 ui-monospace, monospace; }
+/* Валюта — «фишка» своего цвета (PVR-6.3). Цвет говорит, ЧЕМ платишь: одна и та же
+   фишка в шапке и на кнопке, которая эту валюту тратит. */
+.sz-workhead .sz-cur { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 14px; border: 1px solid currentColor; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font: 600 13px/1.4 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.sz-workhead .sz-cur-data { color: var(--cur-data); }
+.sz-workhead .sz-cur-warrants { color: var(--cur-warrants); }
+.sz-workhead .sz-cur-sovereigns { color: var(--cur-sovereigns); }
+/* Кнопка траты окрашена валютой, которую она списывает. Кузня и магазин платят
+   Варрантами, открытия — данными, донат — Суверенами. */
+#sz-workshop [data-prep="forge"]:not(:disabled), #sz-workshop [data-prep="buy:warrants"]:not(:disabled) { color: var(--cur-warrants); border-color: var(--cur-warrants); }
+#sz-workshop [data-prep="buy:sovereigns"]:not(:disabled) { color: var(--cur-sovereigns); border-color: var(--cur-sovereigns); }
+#sz-workshop [data-prep="unlock-module"]:not(:disabled), #sz-workshop [data-prep="unlock-hero"]:not(:disabled), #sz-workshop [data-prep="upgrade-hero"]:not(:disabled) { color: var(--cur-data); border-color: var(--cur-data); }
 .sz-sub, .sz-reward { color: #a9c1c9; font-size: 13px; line-height: 1.65; max-width: 720px; }
 .sz-reward { color: #d5ba87; }
 .sz-tabs { display: flex; gap: 12px; margin: 24px 0 12px; }

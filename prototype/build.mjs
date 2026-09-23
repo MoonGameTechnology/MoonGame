@@ -93,6 +93,9 @@ const css = `
      orange bolt / orchid chip — inherited everywhere a resource token appears */
   --rc-credits:#d9b872;--rc-metal:#bfc8dc;--rc-food:#8ccf96;--rc-energy:#f09a52;
   --rc-microelectronics:#d795cf;
+  /* Валюты Sector Zero (PVR-6.3, решение владельца 2026-09-23): несут смысл, как --rc-*.
+     Суверены — донат, золото; Варранты — валюта магазина и кузни, фиолетовый; данные — cyan. */
+  --cur-sovereigns:#f2c14e;--cur-warrants:#b48cff;--cur-data:#35d6e6;
   --cyan:#35d6e6;--cyan-dim:#1c6f78;
   --grn:#5ff0c0;--grn-dim:#2b7a66;
   --red:#ff5a4d;--amber:#ffb43a;
