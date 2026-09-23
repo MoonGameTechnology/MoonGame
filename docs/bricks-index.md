@@ -125,6 +125,7 @@
 | HERO-12 | ✅ | proto | `docs/backlog.md` | Обводка героя — по редкости. |
 | HERO-AURA-R | ✅ | data | `docs/backlog.md` | Радиус ауры: начать маленьким и растить навыком |
 | HERO-PASS-R | ✅ | data | `docs/backlog.md` | Пассивные ауры героя тоже опущены до 42 — |
+| HERO-REQ-T | ✅ | proto | `docs/backlog.md` | Имена узлов в списке требований переведены: |
 | SHIP-1 | ✅ | proto | `docs/backlog.md` | Модель: prototype/src/ships.ts — корпуса (SHIPHULLS: cruiser 3 · |
 | SHIP-2 | ✅ | proto | `docs/backlog.md` | →♻ UI «Верфь». Первая версия — pre-match вкладка в setup — была |
 | CON-1 | ✅ | proto | `docs/backlog.md` | Единый таб-конструктор «Верфь» |
