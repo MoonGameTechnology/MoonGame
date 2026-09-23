@@ -73,6 +73,14 @@
 .sz-chapter p { margin: 4px 0 0; color: #b0c7ce; font-size: 12px; line-height: 1.5; }
 .sz-chapter p:empty { display: none; }
 #sz-chapter-stats { color: #8ccbcc; font-family: ui-monospace, monospace; }
+/* Герой-награда главы: силуэт «?» до первой победы, звезда — когда пришёл (решение владельца 2026-09-23). */
+.sz-chapter p.sz-chapter-hero { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #ffd27a; }
+.sz-chapter p.sz-chapter-hero[hidden] { display: none; }
+.sz-hero-sil { display: inline-grid; place-items: center; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #3a3322, #14110a); border: 1px solid rgba(255, 210, 122, 0.55);
+  font-weight: 700; color: #ffd27a; box-shadow: 0 0 10px rgba(255, 190, 80, 0.3); }
+.sz-chapter p.sz-chapter-hero.joined { color: #90e2dd; }
+.sz-chapter-hero.joined .sz-hero-sil { border-color: #90e2dd; color: #90e2dd; box-shadow: 0 0 10px rgba(144, 226, 221, 0.35); }
 /* Карта главы (заказ владельца 2026-09-23): панель справа, в стиле игровой карты — мозаика
    провинций, бирюзовые границы, туман штриховкой над неразведанным. */
 .sz-map-panel { position: relative; z-index: 2; grid-column: 2; grid-row: 1; align-self: start; display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #2c5663; border-radius: 10px; background: linear-gradient(180deg, #06141ccc, #030a11ee); box-shadow: 0 0 0 1px #0d2a33, 0 24px 60px -30px #79dfdf55, inset 0 0 60px #0a2a3444; animation: sz-map-in .28s ease-out; }
@@ -157,6 +165,7 @@
 #sz-workshop [data-prep="buy:sovereigns"]:not(:disabled) { color: var(--cur-sovereigns); border-color: var(--cur-sovereigns); }
 #sz-workshop [data-prep="unlock-module"]:not(:disabled), #sz-workshop [data-prep="unlock-hero"]:not(:disabled), #sz-workshop [data-prep="upgrade-hero"]:not(:disabled) { color: var(--cur-data); border-color: var(--cur-data); }
 .sz-sub, .sz-reward { color: #a9c1c9; font-size: 13px; line-height: 1.65; max-width: 720px; }
+.sz-hero-reward { margin: 6px 0 10px; padding: 7px 10px; border-left: 2px solid #ffd27a; background: rgba(255, 210, 122, 0.07); color: #ffd27a; font-size: 12px; line-height: 1.5; }
 .sz-reward { color: #d5ba87; }
 /* Вкладки (PVR-6.6): иконка над словом, четыре в ряд на любой ширине; прилипают к верху
    при прокрутке длинного списка — перейти можно, не листая обратно. */

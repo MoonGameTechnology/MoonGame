@@ -35,6 +35,8 @@ import { featuredOffer } from '../../decisions/shopFeatured';
 import { esc, displayUnit } from './format';
 import { catalogPortraitHtml } from './shipArt';
 import { splitSupport } from '../../decisions/supportShips';
+import { heroChapter } from '../../decisions/heroRecruits';
+import { romanChapter } from '../../decisions/chapterRoute';
 
 interface PreparationHost {
   data: GameData;
@@ -373,8 +375,11 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const roster = Object.entries(data.heroes)
       .map(([id, def]) => {
         const hero = p.heroes[id];
+        const chapter = heroChapter(id);
         const state = !hero
-          ? t('sector-zero.academy.locked')
+          ? chapter !== null
+            ? t('sector-zero.academy.by-chapter', { n: romanChapter(chapter) })
+            : t('sector-zero.academy.locked')
           : p.selectedHero === id
             ? t('sector-zero.prep.hero-selected')
             : t('sector-zero.academy.rank', { n: hero.level });
@@ -386,8 +391,13 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const hero = p.heroes[heroId];
     const name = esc(tData(def.name));
     let body = `<div class="sz-hero">${crest(tData(def.name))}<div><h2>${name}</h2><p class="sz-sub">${esc(t(def.description ?? ''))}</p>`;
+    const byChapter = heroChapter(heroId);
     if (!hero)
-      return `<div class="sz-roster">${roster}</div>${body}${button('unlock-hero', heroId, t('sector-zero.prep.unlock', { n: HERO_UNLOCK_COST }), p.research < HERO_UNLOCK_COST)}</div></div>`;
+      return `<div class="sz-roster">${roster}</div>${body}${
+        byChapter !== null
+          ? `<p class="sz-hero-reward">${t('sector-zero.academy.by-chapter.hint', { n: romanChapter(byChapter) })}</p>`
+          : ''
+      }${button('unlock-hero', heroId, t('sector-zero.prep.unlock', { n: HERO_UNLOCK_COST }), p.research < HERO_UNLOCK_COST)}</div></div>`;
     const selected = p.selectedHero === heroId;
     const slots = sectorHeroSlots(hero, data);
     // Ступень подготовки — делениями: 3 ступени видны сразу, а не угадываются из текста.

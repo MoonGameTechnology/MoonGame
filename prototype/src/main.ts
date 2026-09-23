@@ -257,6 +257,7 @@ import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
 import { chapterMapView } from '../../decisions/chapterMap';
+import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
 import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
@@ -13371,7 +13372,17 @@ let nextSectorMission = Number(readRaw('void.pveMission') ?? 0) || 0;
 let runWrite = Promise.resolve();
 let progressWrite = sectorProgressStore.load().then(raw => {
   sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
+  // Профиль с главами, выигранными до наград-героев, догоняет их при чтении (heroRecruits §3).
+  const granted = grantChapterHeroes(sectorProgress, sectorChapterIds(), data);
+  if (granted.progress === sectorProgress) return;
+  sectorProgress = granted.progress;
+  return sectorProgressStore.save(JSON.stringify(granted.progress));
 });
+
+/** Id глав по номерам — для правила «герой за главу» (`heroRecruits.ts`). */
+function sectorChapterIds(): string[] {
+  return Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveChapter(i).id);
+}
 let clearedAttempt = 0;
 
 /** Задачи главы, видимые в забеге по текущему профилю (PVR-5.3). Профиль меняется только
@@ -13382,6 +13393,11 @@ function chapterShown(mission: number) {
 }
 
 function saveSectorProgress(next: SectorZeroProgress): void {
+  // Победа в главе приводит её героя (решение владельца 2026-09-23) — на любом пути засчёта.
+  const granted = grantChapterHeroes(next, sectorChapterIds(), data);
+  next = granted.progress;
+  for (const id of granted.joined)
+    note(t('sector-zero.hero.joined', { name: tData(data.heroes[id]?.name ?? id) }));
   sectorProgress = next;
   const blob = JSON.stringify(next);
   progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
@@ -13481,6 +13497,7 @@ const sectorZeroMenu = initSectorZeroMenu({
     tasks: chapterShown(index).length,
     pool: pveChapter(index).objectives.length,
     cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
+    ...heroReward(index),
   }),
   // Карта главы: мир на старте главы + память тумана прошлых забегов из профиля.
   chapterMap: index => {
@@ -13505,6 +13522,13 @@ const sectorZeroMenu = initSectorZeroMenu({
     $('hub-sector-zero').focus({ preventScroll: true });
   },
 });
+
+/** Герой-награда главы для карточки на маршруте: кто придёт и пришёл ли уже. */
+function heroReward(index: number): { hero?: { name: string; joined: boolean } } {
+  const id = chapterHero(index);
+  const def = id ? data.heroes[id] : undefined;
+  return id && def ? { hero: { name: tData(def.name), joined: !!sectorProgress.heroes[id] } } : {};
+}
 
 /** `replay` — сразу новая попытка той же главы (кнопка итогов «Сыграть главу снова»). Идёт
  *  через открытие меню: оно засчитывает и стирает закончившийся забег, и только потом

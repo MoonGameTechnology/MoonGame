@@ -3355,7 +3355,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <legend data-i18n="sector-zero.mission"></legend>
             <div id="sz-route" class="sz-route"></div>
             <div class="sz-route-ends" aria-hidden="true"><span data-i18n="sector-zero.route.edge"></span><span data-i18n="sector-zero.route.core"></span></div>
-            <div class="sz-chapter" role="status" aria-live="polite"><b id="sz-chapter-name"></b><p id="sz-chapter-brief"></p><p id="sz-chapter-stats"></p></div>
+            <div class="sz-chapter" role="status" aria-live="polite"><b id="sz-chapter-name"></b><p id="sz-chapter-brief"></p><p id="sz-chapter-stats"></p><p id="sz-chapter-hero" class="sz-chapter-hero" hidden></p></div>
           </fieldset>
           <fieldset class="sz-difficulty">
             <legend data-i18n="sector-zero.difficulty"></legend>
