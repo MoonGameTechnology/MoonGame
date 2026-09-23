@@ -312,28 +312,25 @@ describe('ROADS-3 — встать на развилку', () => {
     expect(r.state.fleets.f1!.edge).toEqual({ from: 'A', to: 'B', t: fork });
   });
 
-  it('вставший на развилке берёт пустую провинцию — «остановился в ней»', () => {
+  it('вставший на развилке провинцию НЕ берёт — захват только в точке захвата, у планеты', () => {
+    // Решение владельца 2026-09-23: остановка на дорогах провинции (и на развилке) — не
+    // захват. Берёт тот, кто дошёл до самой планеты.
     const s = world();
     put(s, 'f1', 'p1', 'A');
     const moved = order(s, 'f1', 'p1', { from: 'A', to: 'B', t: forkTAtEnd(s, 'A', 'B') }, 0);
-    const r = until(moved.state, 21, moved.events);
-    expect(r.state.planets.B!.owner).toBe('p1');
-    expect(r.events.find((e) => e.type === 'planet.captured')!.payload).toMatchObject({
-      planetId: 'B',
-      owner: 'p1',
-      via: 'stop',
+    const parked = until(moved.state, 21, moved.events);
+    expect(parked.state.fleets.f1!.edge).toEqual({
+      from: 'A',
+      to: 'B',
+      t: forkTAtEnd(s, 'A', 'B'),
     });
-  });
-
-  it('…но не когда в провинции стоит чужой флот — даже на другой её дороге', () => {
-    const s = world();
-    put(s, 'f1', 'p1', 'A');
-    put(s, 'g2', 'p2', { from: 'B', to: 'D', t: 0.3 }); // своя тропа B, 90 ед. от мира
-    const moved = order(s, 'f1', 'p1', { from: 'A', to: 'B', t: forkTAtEnd(s, 'A', 'B') }, 0);
-    const r = until(moved.state, 21, moved.events);
-    expect(r.state.fleets.f1!.edge).not.toBeNull();
-    expect(started(r.events)).toHaveLength(0); // разные тропы — не встречаются
-    expect(r.state.planets.B!.owner).toBeNull();
+    expect(parked.state.planets.B!.owner).toBeNull();
+    expect(parked.events.some((e) => e.type === 'planet.captured')).toBe(false);
+    // Со стоянки — к самой планете: 60 единиц ствола, 6 часов.
+    const onward = order(parked.state, 'f1', 'p1', 'B', 21 * HOUR);
+    const taken = until(onward.state, 27, onward.events);
+    expect(taken.state.fleets.f1!.location).toBe('B');
+    expect(taken.state.planets.B!.owner).toBe('p1');
   });
 
   it('с развилки уходят прямо по нужной ветке, а не через планету и обратно', () => {
