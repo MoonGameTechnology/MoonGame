@@ -8,7 +8,8 @@
  * ссылка на рынок из карточки ресурса. Каждая проверка идёт ПАРОЙ: в обычной схватке то же
  * самое обязано быть видно — иначе «кнопки нет» прошло бы и тогда, когда селектор просто
  * устарел. Третий прогон — выход из забега в обычную партию на той же странице: кнопки
- * обязаны вернуться. Попутно — PVR-6.8: меню анимировано, а при reduced motion замирает.
+ * обязаны вернуться. Попутно — PVR-6.8: меню анимировано, а при reduced motion замирает;
+ * PVR-6.9: маршрут глав выбирает главу, а закрытый узел — нет.
  *
  *   node prototype/sectorzerotest.mjs      # или pnpm run smoke:sector-zero
  */
@@ -103,6 +104,16 @@ try {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     assert.deepEqual(await motion(), ['none', 'none', 'none'], 'reduced motion — покой');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    // PVR-6.9: маршрут глав — шесть узлов до эпицентра; закрытый узел показывает карточку,
+    // но главу не меняет, играбельный — выбирает.
+    assert.equal(await page.locator('#sz-route .sz-node').count(), 6, 'путь во всю кампанию');
+    await page.locator('#sz-route [data-lost]').first().click({ force: true });
+    assert.equal(await page.locator('#sz-route [aria-pressed="true"]').getAttribute('data-mission'), '0');
+    assert.notEqual(await page.locator('#sz-chapter-stats').textContent(), null);
+    await page.locator('#sz-mission-1').click();
+    assert.equal(await page.locator('#sz-mission-1').getAttribute('aria-pressed'), 'true');
+    assert.match(await page.locator('#sz-chapter-stats').textContent(), /3/, 'задачи главы II');
+    await page.locator('#sz-mission-0').click();
     await page.locator('#sz-new').click();
     await check('Sector Zero', true);
 

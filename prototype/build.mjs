@@ -3296,12 +3296,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
           </div>
-          <fieldset class="sz-difficulty">
+          <fieldset class="sz-difficulty sz-route-box">
             <legend data-i18n="sector-zero.mission"></legend>
-            <div class="sz-options">
-              <button id="sz-mission-0" type="button" data-mission="0" aria-pressed="true" data-i18n="sector-zero.mission.1"></button>
-              <button id="sz-mission-1" type="button" data-mission="1" aria-pressed="false" data-i18n="sector-zero.mission.2"></button>
-            </div>
+            <div id="sz-route" class="sz-route"></div>
+            <div class="sz-route-ends" aria-hidden="true"><span data-i18n="sector-zero.route.edge"></span><span data-i18n="sector-zero.route.core"></span></div>
+            <div class="sz-chapter" role="status" aria-live="polite"><b id="sz-chapter-name"></b><p id="sz-chapter-brief"></p><p id="sz-chapter-stats"></p></div>
           </fieldset>
           <fieldset class="sz-difficulty">
             <legend data-i18n="sector-zero.difficulty"></legend>

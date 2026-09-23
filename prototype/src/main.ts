@@ -179,7 +179,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveObjectives } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveObjectives, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -13319,6 +13319,11 @@ const sectorZeroMenu = initSectorZeroMenu({
     writeRaw('void.pveDifficulty', value);
   },
   mission: () => nextSectorMission,
+  chapters: PVE_MISSION_COUNT,
+  chapterInfo: index => ({
+    waves: data.modes[pveModeId(index) ?? '']?.pve?.waves ?? 0,
+    tasks: pveObjectives(index).length,
+  }),
   setMission: value => {
     nextSectorMission = value;
     writeRaw('void.pveMission', String(value));

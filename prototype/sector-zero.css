@@ -51,6 +51,26 @@
 .sz-options button { flex: 1; min-height: 42px; padding: 8px; border: 1px solid #294550; color: var(--sz-muted); background: #07151f; font-size: 12px !important; }
 .sz-options button[aria-pressed="true"] { border-color: #8bbec2; color: #d7eeee; background: #16313d; }
 #sz-difficulty-hint { margin: 9px 0 0; color: var(--sz-muted); font-size: 11px; line-height: 1.5; }
+/* Маршрут глав (PVR-6.9): от края сектора (слева) к эпицентру (справа). Линия пути
+   «заражается» к центру — бирюза края переходит в фиолетовый и красный эпицентра. */
+.sz-route { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.sz-route::before { content: ""; position: absolute; left: 20px; right: 24px; top: 50%; height: 2px; transform: translateY(-50%); background: linear-gradient(90deg, #79dfdf, #79dfdf 22%, var(--rar-mythic) 62%, var(--rar-legendary)); opacity: .55; }
+#sector-zero .sz-node { position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1px solid #5d9094; background: #07151f; color: #b9d9dc; font: 600 12px/1 ui-monospace, monospace; }
+.sz-node b { font-weight: inherit; }
+#sector-zero .sz-node:hover { border-color: #b3f1e9; }
+#sector-zero .sz-node[aria-pressed="true"] { background: #90e2dd; border-color: #90e2dd; color: #05232b; box-shadow: 0 0 0 4px #90e2dd33, 0 0 22px #90e2dd66; }
+#sector-zero .sz-node.sz-passed { border-color: #90e2dd; color: #d7f5f1; }
+#sector-zero .sz-node.sz-lost { border-style: dashed; border-color: #4b3a5e; color: #6f5f86; background: #0b0f1a; }
+#sector-zero .sz-node.sz-lost.peek { border-color: var(--rar-mythic); color: #d7c3f5; }
+#sector-zero .sz-node.sz-core-node { width: 48px; height: 48px; border-color: var(--rar-legendary); color: #ffb3ae; }
+.sz-node.sz-core-node::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid var(--rar-legendary); animation: sz-ping 3.2s ease-out infinite; }
+.sz-route-ends { display: flex; justify-content: space-between; margin-top: 6px; color: var(--sz-muted); font: 10px/1.5 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.sz-route-ends span:last-child { color: #ff8f88; }
+.sz-chapter { margin: 12px 0 6px; padding: 10px 14px; border-left: 2px solid #90e2dd; background: #0a1c26; min-height: 64px; }
+.sz-chapter b { color: #e1f4f4; font-size: 14px; font-weight: 600; }
+.sz-chapter p { margin: 4px 0 0; color: #b0c7ce; font-size: 12px; line-height: 1.5; }
+.sz-chapter p:empty { display: none; }
+#sz-chapter-stats { color: #8ccbcc; font-family: ui-monospace, monospace; }
 .sz-tools { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; }
 .sz-tools button { min-height: 44px; border: 0; padding: 8px 0; background: transparent; color: #b1cbd1; font-size: 13px !important; }
 .sz-tools button:hover { color: #a9f5ee; }
@@ -68,7 +88,7 @@
 @keyframes sz-breathe { 50% { opacity: .35; } }
 @keyframes sz-ping { from { transform: scale(.6); opacity: .8; } to { transform: scale(2.2); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .sz-spin, .sz-core, .sz-ping { animation: none; }
+  .sz-spin, .sz-core, .sz-ping, .sz-node.sz-core-node::after { animation: none; }
 }
 .sz-bottomline { border-top: 1px solid #24404b; padding-top: 18px; font-size: 10px; }
 #sz-workshop { padding: 28px 0 40px; flex: 1; }
