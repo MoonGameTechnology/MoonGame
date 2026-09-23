@@ -20,13 +20,15 @@ export interface ResourceCardHost {
   me: () => string;
   icons: Record<string, string>;
   onOpenMarket: (resource: string) => void;
+  /** Есть ли рынок у игрока сейчас; в забеге Sector Zero его нет (PVR-6.1). */
+  marketShown?: () => boolean;
 }
 
 export function initResourceCard(host: ResourceCardHost): { open: (resource: string) => void } {
   function paint(resource: string): void {
     const root = host.root();
     if (!root) return;
-    root.innerHTML = resourceCardHtml(host.state(), host.me(), resource, host.icons);
+    root.innerHTML = resourceCardHtml(host.state(), host.me(), resource, host.icons, host.marketShown?.() ?? true);
   }
 
   function open(resource: string): void {
@@ -55,7 +57,7 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
 }
 
 /** Pure HTML for the resource card. Exported so tests can assert on structure. */
-export function resourceCardHtml(state: GameState, me: string, resource: string, icons: Record<string, string>): string {
+export function resourceCardHtml(state: GameState, me: string, resource: string, icons: Record<string, string>, market = true): string {
   const player = state.players[me];
   const stock = Math.round(player?.resources?.[resource] ?? 0);
   const bd = incomeBreakdown(state, me)[resource] ?? { production: 0, buildingUpkeep: 0, unitUpkeep: 0, net: 0 };
@@ -82,9 +84,9 @@ export function resourceCardHtml(state: GameState, me: string, resource: string,
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.army'))}</span><span class="rc-v neg">−${fmt(bd.unitUpkeep)}</span></div>
     <div class="rc-sec">${esc(t('rescard.net'))}</div>
     <div class="rc-flow ${netCls}">${netStr}/ч</div>
-    <button class="rc-market ${canTrade ? '' : 'disabled'}" data-rc-market="${esc(resource)}">
+    ${market ? `<button class="rc-market ${canTrade ? '' : 'disabled'}" data-rc-market="${esc(resource)}">
       ${canTrade ? esc(t('rescard.market')) : esc(t('rescard.no-trade'))}
-    </button>
+    </button>` : ''}
     <button class="rc-close">${esc(t('rescard.close'))}</button>
   </div>`;
 }
