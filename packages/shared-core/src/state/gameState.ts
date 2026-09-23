@@ -998,7 +998,8 @@ export interface MarketOrder {
 }
 
 /** A player's hero — a per-player entity with a position on the map and ability
- *  cooldowns. Acts from its current node (`location`); relocates with `hero.move`. */
+ *  cooldowns. Acts from its current node (`location`); a reserve hero is raised where the
+ *  player chooses with `hero.spawn` (the legacy `hero.move` is gone, AUD-18). */
 export interface Hero {
   /** Instance id — the key under which this hero lives in `GameState.heroes`.
    *  Identifies the hero across events (death/respawn) independently of `owner`. */

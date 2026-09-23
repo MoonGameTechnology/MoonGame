@@ -696,6 +696,7 @@ import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenTail } from './eventVisibility';
 import { recordLoss, tallyDeath } from './warTally';
 import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
+import { heroDiedNews, heroRespawnedNews, type HeroNews } from './heroNews';
 import {
   declineHeard,
   diploConcernsMe,
@@ -1308,9 +1309,9 @@ const aaShots: Array<{
   to: { x: number; y: number };
   at: number;
   // ТИР, а не «ближняя ли это зенитка»: с остатком SHU-3.1 сюда же встаёт ВСТРЕЧНЫЙ
-  // ПЕРЕХВАТ (`shuttle.intercepted`), у которого признака «ближний/орбитальный» нет
-  // вовсе. Очередь и кадр отрисовки у всех трёх один — расходится только вид
-  // (`flakTiers.ts`), поэтому второй копии этого блока не заводим.
+  // ПЕРЕХВАТ (`shuttle.intercepted`), а с AUD-17 — КОРАБЕЛЬНОЕ ПВО (`pd.fired`); признака
+  // «ближний/орбитальный» у них нет вовсе. Очередь и кадр отрисовки у всех тиров один —
+  // расходится только вид (`flakTiers.ts`), поэтому второй копии этого блока не заводим.
   tier: FlakTier;
 }> = [];
 // Capture flashes: a province that changed hands lights up in its NEW owner's colour —
@@ -3374,6 +3375,21 @@ function tellSteward(kind: StewardEvent, p: Record<string, unknown>): void {
   if (steward?.isOpen()) steward.repaint();
 }
 
+/** Рассказать игроку о СВОЁМ герое — правила в `heroNews.ts` (AUD-16): гибель со сроком
+ *  попытки возрождения и возвращение в строй. Имя — то же, что в штабе героев. */
+function tellHero(news: HeroNews | null): void {
+  if (!news) return;
+  const hero = s.heroes?.[news.heroId];
+  const who = hero ? heroDisplayName(hero) : news.heroId;
+  const text =
+    news.key === 'log.hero.died'
+      ? t(news.key, { who, h: fmtHrs(news.leftMs / HOUR) })
+      : news.key === 'log.hero.died.bare'
+        ? t(news.key, { who })
+        : t(news.key, { who, at: news.at ?? '' });
+  note(text, news.at);
+}
+
 /** Рассказать игроку о событии стройки — правила в `buildLog.ts` (REFM-175). */
 function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
   const line = buildLogLine(kind);
@@ -3672,6 +3688,27 @@ function handleEvents(events: DomainEvent[]) {
         capShots(aaShots, AA_SHOTS_MAX);
         break;
       }
+      // КОРАБЕЛЬНОЕ ПВО (AUD-17) — четвёртый тир огня (`flakTiers.ts`, правило 6). Ядро
+      // давно издавало `pd.fired`, но его никто не слушал: зенитка МИРА рисовалась, а
+      // эскорт стрелял невидимо, и сбитые им машины исчезали будто сами. Концы и гейт —
+      // как у перехвата: старт у корабля, удар по вылету СЕЙЧАС (правило 1
+      // `fireEffects.ts` — вылет мог погибнуть этим же залпом, и тогда вспышка встаёт над
+      // самим кораблём), видно своё и чужое на опознанном узле.
+      case 'pd.fired': {
+        const ship = s.fleets[p.fleetId as string];
+        const from = ship ? fleetPos(ship) : null;
+        if (!ship || !from) break;
+        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), known(fleetNode(ship))))
+          break;
+        aaShots.push({
+          from: { ...from },
+          to: aaImpact(strikeWorldPos(p.strikeId as string), from),
+          at: performance.now(),
+          tier: 'pointDefense',
+        });
+        capShots(aaShots, AA_SHOTS_MAX);
+        break;
+      }
       // ROS-2.2 — ответка по челнокам в момент удара. Две точки зрения на одно
       // событие, и обе нужны: свои машины сбили — это счёт за налёт, свои зенитки
       // отработали — это то, ради чего их и строили. Чужую ответку по чужим челнокам
@@ -3708,6 +3745,16 @@ function handleEvents(events: DomainEvent[]) {
         // Чужую реорганизацию наблюдать нечем — на карте виден значок, а не то, что
         // два соединения свели в одно (`fleetNews.ts`, правило 2).
         if (reorgHeard(p.owner, ME)) note(t(reorgKey('split'), { at: p.at as string }));
+        break;
+      // AUD-16: герой больше не гибнет молча. Только свой — в сети геройские события и
+      // так строго адресны владельцу, соло повторяет тот же фильтр (`heroNews.ts`).
+      case 'hero.died':
+        tellHero(
+          heroDiedNews(p, s.heroes?.[p.heroId as string], ME, s.time, (id) => !!s.planets[id]),
+        );
+        break;
+      case 'hero.respawned':
+        tellHero(heroRespawnedNews(p, ME, (id) => !!s.planets[id]));
         break;
       case 'fleet.destroyed':
         // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
