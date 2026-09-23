@@ -64,9 +64,9 @@ describe('ALWAYS_DISARMED', () => {
 
 describe('the table itself', () => {
   // Правило 6: `chainMode` в таблицу не входит — полоска цепочки заменяет ряд целиком.
-  it('covers the five row states and not the chain mode', () => {
+  it('covers the row states and not the chain mode', () => {
     expect(STATES.sort()).toEqual(
-      ['assault', 'cast', 'engage', 'merge', 'pick', 'troops'].sort(),
+      ['assault', 'cast', 'engage', 'merge', 'pick', 'retreat', 'troops'].sort(),
     );
     expect(STATES).not.toContain('chain' as ArmedState);
   });
@@ -74,5 +74,7 @@ describe('the table itself', () => {
   it('lists every state under its own name first', () => {
     expect(KEEPS_ARMED.merge[0]).toBe('merge');
     expect(KEEPS_ARMED.troops[0]).toBe('troops');
+    // Окошко порога отхода закрывает выбор ступени — это уже приказ (2026-09-23).
+    expect(keepsArmed('retreat', 'retrset')).toBe(false);
   });
 });

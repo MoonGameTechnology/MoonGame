@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { battleWindowHtml, sideRowHtml, battleRetreats } from './battleScreen';
-import '../../localization/runtime';
+import { t } from '../../localization/runtime';
 import { displayUnit } from './format';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
@@ -52,7 +52,7 @@ describe('окно боя', () => {
   it('роль берётся У СТОРОНЫ, а не из места в списке', () => {
     // Двое атакующих подряд: вывести роль из порядка нельзя в принципе.
     const rows = [side('p1', 'attacker'), side('p2', 'attacker'), side('p3', 'defender')].map(
-      sideRowHtml,
+      (sd) => sideRowHtml(sd),
     );
     expect(rows[0]).toContain('attacker');
     expect(rows[1]).toContain('attacker');
@@ -70,7 +70,7 @@ describe('окно боя', () => {
     const s = side('p1', 'defender');
     s.hull = { current: 120, max: 200 };
     const html = sideRowHtml(s);
-    expect(html).toContain(`3× ${displayUnit('cruiser')}`);
+    expect(html.replace(/<[^>]+>/g, '')).toContain(`3× ${displayUnit('cruiser')}`);
     expect(html).toContain('120/200');
   });
 
@@ -87,6 +87,46 @@ describe('окно боя', () => {
     expect(battleWindowHtml(battle([side('p1', 'attacker'), side('p2', 'defender')]))).toContain(
       'data-at="9000"',
     );
+  });
+
+  it('шкала корпуса светофором и словом: цвет не единственный носитель смысла', () => {
+    const s = side('p1', 'defender');
+    s.hull = { current: 40, max: 200 };
+    const html = sideRowHtml(s);
+    expect(html).toContain('tone-low');
+    expect(html).toContain('width:20%');
+    expect(html).toContain(t('battle.win.tone.low'));
+  });
+
+  it('полоса остатка сил — доли цветами владельцев; без корпуса полосы нет', () => {
+    const a = side('p1', 'attacker', true);
+    const b = side('p2', 'defender');
+    a.hull = { current: 300, max: 300 };
+    b.hull = { current: 100, max: 300 };
+    const color = (o: string | null): string => (o === 'p1' ? '#00ffff' : '#ff0000');
+    const html = battleWindowHtml(battle([a, b]), [], { color });
+    expect(html).toContain('bw-bal');
+    expect(html).toContain('flex:0.7500;background:#00ffff');
+    expect(html).toContain('P2 25%');
+    expect(
+      battleWindowHtml(battle([side('p1', 'attacker'), side('p2', 'defender')])),
+    ).not.toContain('bw-bal');
+  });
+
+  it('свой флот в бою назван позывным и показывает авто-отход', () => {
+    const html = battleWindowHtml(
+      battle([side('p1', 'attacker', true), side('p2', 'defender')]),
+      ['p1-1'],
+      {
+        fleetName: () => 'ПАЛАДИН 2',
+        autoRetreatAt: () => 0.3,
+        placeName: () => 'Комета',
+      },
+    );
+    expect(html).toContain('ПАЛАДИН 2');
+    expect(html).toContain(t('battle.win.auto.on', { n: 30 }));
+    expect(html).toContain('data-battle-retreat="p1-1"');
+    expect(html).toContain(t('battle.win.at', { w: 'Комета' }));
   });
 
   it('БОЙ ИСЧЕЗ, пока палец летел к экрану — честная строка, а не пустая рамка', () => {
