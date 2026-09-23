@@ -200,6 +200,14 @@ function cellOf(
   return { poly, tags };
 }
 
+/** A shared border WITH its geometry: the edge itself, as the cell that measured it
+ *  longest drew it. Roads (`roads.ts`) need the edge, not just its length — the road
+ *  crosses into the neighbour somewhere ON it. */
+export interface MosaicBorderSegment extends MosaicBorder {
+  p: [number, number];
+  q: [number, number];
+}
+
 /**
  * Every shared border of the mosaic, canonical and sorted (so the derivation is
  * JSON-stable). A pair is collected from BOTH cells and deduplicated: along a thin
@@ -207,7 +215,13 @@ function cellOf(
  * only one side would silently drop that border.
  */
 export function mosaicBorders(seeds: readonly MosaicSeed[]): MosaicBorder[] {
-  const longest = new Map<string, number>();
+  return mosaicBorderSegments(seeds).map(({ a, b, length }) => ({ a, b, length }));
+}
+
+/** {@link mosaicBorders} with each border's edge kept — the ONE loop both read, so the
+ *  borders a lane is derived from and the edge its road crosses cannot disagree. */
+export function mosaicBorderSegments(seeds: readonly MosaicSeed[]): MosaicBorderSegment[] {
+  const longest = new Map<string, { length: number; p: [number, number]; q: [number, number] }>();
   const frame = mosaicFrame(seeds);
   const sites = seeds.map((s) => ({ x: s.x, y: s.y, w: s.size * SEED_WEIGHT }));
   clampPowerWeights(sites); // same capping the renderer applies — one mosaic, not two
@@ -226,14 +240,16 @@ export function mosaicBorders(seeds: readonly MosaicSeed[]): MosaicBorder[] {
       const key = ida < idb ? `${ida}|${idb}` : `${idb}|${ida}`;
       // Both sides measure the same edge; keep the longer reading so a border is never
       // lost to the side that clipped it shorter.
-      if (len > (longest.get(key) ?? 0)) longest.set(key, len);
+      if (len > (longest.get(key)?.length ?? 0)) {
+        longest.set(key, { length: len, p: [p[0], p[1]], q: [q[0], q[1]] });
+      }
     }
   }
-  const out: MosaicBorder[] = [];
-  for (const [key, length] of longest) {
-    if (length < MIN_BORDER) continue;
+  const out: MosaicBorderSegment[] = [];
+  for (const [key, edge] of longest) {
+    if (edge.length < MIN_BORDER) continue;
     const [a, b] = key.split('|') as [string, string];
-    out.push({ a, b, length });
+    out.push({ a, b, length: edge.length, p: edge.p, q: edge.q });
   }
   out.sort((p, q) => (p.a === q.a ? (p.b < q.b ? -1 : 1) : p.a < q.a ? -1 : 1));
   return out;

@@ -26,6 +26,9 @@ export {
   type Fleet,
   type FleetMovement,
   type FleetEdge,
+  type PlanetRoads,
+  type RoadPoint,
+  type RoadTrail,
   type Battle,
   type BattleSide,
   type CombatantRef,
@@ -81,13 +84,16 @@ export {
   CLIP_PAD_RATIO,
   clampPowerWeights,
   clipHalfPlaneTagged,
+  mosaicBorderSegments,
   mosaicBorders,
   mosaicFrame,
   sealPlan,
   type MosaicBorder,
+  type MosaicBorderSegment,
   type MosaicSeed,
   type SealPlan,
 } from './state/mosaic';
+export { FORK_AT, FORK_DETOUR, THROUGH_WORLD, deriveRoads, type RoadInput } from './state/roads';
 export {
   sectorKindDef,
   provinceScore,
