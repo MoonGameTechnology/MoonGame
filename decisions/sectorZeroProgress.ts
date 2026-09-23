@@ -3,9 +3,15 @@
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
 import { forgeOutcome, type ForgeLadder } from './sectorZeroForge';
-import { objectiveBonus } from './missionObjectives';
+import {
+  DEFAULT_OBJECTIVE_SLOTS,
+  settleObjectives,
+  type ObjectiveResult,
+  type ObjectiveSlots,
+} from './missionObjectives';
 import {
   canEquip,
+  moduleAllowed,
   starsOf,
   type GameData,
   type GameState,
@@ -70,6 +76,17 @@ export interface SectorZeroProgress {
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
+  /** Номер забега, чья награда уже удвоена за ролик (`YAG-3.2`). Удвоение доступно, пока
+   *  он меньше {@link settledThrough}: один забег — одно удвоение, и новый расчёт открывает
+   *  его снова. */
+  doubledThrough: number;
+  /** Задачи, закрытые НАВСЕГДА, по главам: `id главы (карты) → id задач` (PVR-5.3). Счёт у
+   *  каждой главы свой — решение владельца против общего на профиль. */
+  objectivesDone: Record<string, string[]>;
+  /** Главы, выигранные хоть раз (id карты): отметка «пройдена» на маршруте глав. */
+  chaptersWon: string[];
+  /** Разбивка последнего засчитанного забега — экран итогов (PVR-5.4). `null` — ещё не было. */
+  lastRun: RunSummary | null;
   modules: string[];
   /** Звёздность модулей (SZE-1.1), `id → ★`: вертикальная ось Мастерской. Открытие
    *  модуля («Данные экспедиций») и его заточка («Варранты») — разные оси и разные
@@ -80,6 +97,34 @@ export interface SectorZeroProgress {
   heroes: Record<string, SectorHero>;
   selectedHero: string;
 }
+/** Глава забега: id карты, её запас задач и правило показа (PVR-5.3). */
+export interface SectorChapter {
+  id: string;
+  objectives: readonly MapObjective[];
+  slots?: ObjectiveSlots;
+}
+const NO_CHAPTER: SectorChapter = { id: '', objectives: [] };
+
+/** Итог засчитанного забега по частям (PVR-5.4): сам забег отдельно от надбавки за задачи. */
+export interface RunSummary {
+  /** Номер засчитанной попытки: экран итогов сверяет его со своим забегом. */
+  attempt: number;
+  chapter: string;
+  won: boolean;
+  waves: number;
+  totalWaves: number;
+  /** Плата за сам забег: 1 + волны + 3 за победу. */
+  base: number;
+  objectives: ObjectiveResult[];
+  /** Сумма за задачи. */
+  bonus: number;
+  /** Всего данных экспедиций (`base + bonus`) и Варрантов за них. */
+  total: number;
+  warrants: number;
+  /** Сколько новых задач главы откроется к следующему заходу. */
+  unlocked: number;
+}
+
 export const SECTOR_ZERO_PROGRESS_KEY = 'sector-zero.progress.v1';
 export const HERO_UNLOCK_COST = 6;
 export const MODULE_UNLOCK_COST = 3;
@@ -116,6 +161,10 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
+    doubledThrough: 0,
+    objectivesDone: {},
+    chaptersWon: [],
+    lastRun: null,
     modules: STARTER_MODULES.filter((id) => data.modules[id]),
     stars: {},
     loadouts: {},
@@ -196,11 +245,24 @@ function nodeOpenTo(
   );
 }
 
-
+/**
+ * Корпуса, которые игрок забега реально СТРОИТ (PVR-6.2). Раньше сюда шёл любой
+ * космический юнит со слотами — и в подготовке лежали матка Роя и пушки крепости.
+ * Фильтр повторяет ворота ядра, а не заводит свои: уникальный юнит фракции строит
+ * только она (`faction.ts`, `uniqueUnits` — у Роя матка и десантник), а `issued` значит
+ * «приходит вместе с сооружением и не заказывается» (`construction.ts`, орудия крепости).
+ */
 export function sectorHullIds(data: GameData): string[] {
+  const factionOnly = new Set(Object.values(data.factions).flatMap((f) => f.uniqueUnits));
   return Object.keys(data.units).filter((id) => {
     const def = data.units[id]!;
-    return def.domain === 'space' && id !== 'hero' && Object.values(def.slots).some((n) => n > 0);
+    return (
+      def.domain === 'space' &&
+      id !== 'hero' &&
+      Object.values(def.slots).some((n) => n > 0) &&
+      !def.traits.includes('issued') &&
+      !factionOnly.has(id)
+    );
   });
 }
 
@@ -208,10 +270,24 @@ export function sectorHullIds(data: GameData): string[] {
  *  роадмапа экономики): «1 раз в сутки + 1 раз за рекламу». */
 export const SHOP_AD_REFRESHES_PER_DAY = 1;
 
+/**
+ * Модули, которые игрок забега может хоть куда-то ПОСТАВИТЬ (PVR-6.5). Список подготовки
+ * брал весь каталог — и в нём лежали модули Роя (только для `brood_host`) и щиты пустоты
+ * (только для пушек крепости): игрок платил бы данные за то, что поставить некуда. Правило —
+ * то же, что у корпусов: модуль остаётся, если встаёт хотя бы на один корпус игрока.
+ */
+export function sectorModuleIds(data: GameData): string[] {
+  const hulls = sectorHullIds(data);
+  return Object.keys(data.modules).filter((id) =>
+    hulls.some((hull) => moduleAllowed(hull, data.units[hull]!, data.modules[id]!)),
+  );
+}
+
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
   | { kind: 'refresh-shop' }
   | { kind: 'ad-sovereigns' }
+  | { kind: 'double-reward' }
   | { kind: 'forge'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
@@ -272,6 +348,15 @@ export function changeSectorZeroProgress(
       // Отказ от ролика действие не зовёт вовсе, поэтому попытку он не тратит.
       if (next.shopRound >= SHOP_AD_REFRESHES_PER_DAY) return null;
       next.shopRound += 1;
+      break;
+    case 'double-reward':
+      // Повтор награды ПОСЛЕДНЕГО рассчитанного забега — ровно той, что пришла за волны
+      // и задачи, обеими валютами. Платой служит досмотренный ролик: до действия дело
+      // доходит только после подтверждения адаптера.
+      if (next.lastReward <= 0 || next.doubledThrough >= next.settledThrough) return null;
+      next.research += next.lastReward;
+      next.warrants += next.lastReward * WARRANTS_PER_REWARD;
+      next.doubledThrough = next.settledThrough;
       break;
     case 'ad-sovereigns': {
       // Порция и лимит — в данных (§0.6б: числа — предмет плейтеста). Ноль в любом из
@@ -392,6 +477,52 @@ const counter = (n: unknown, fallback = 0): number =>
 const strings = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((id): id is string => typeof id === 'string'))] : [];
 
+/** Разбивка из хранилища: только целые неотрицательные числа и строки, иначе `null` —
+ *  экран итогов не покажет правленый мусор. */
+function parseRunSummary(v: unknown): RunSummary | null {
+  if (!v || typeof v !== 'object') return null;
+  const r = v as Record<string, unknown>;
+  const n = (x: unknown): number | null =>
+    typeof x === 'number' && Number.isSafeInteger(x) && x >= 0 ? x : null;
+  const nums = [
+    'attempt',
+    'waves',
+    'totalWaves',
+    'base',
+    'bonus',
+    'total',
+    'warrants',
+    'unlocked',
+  ].map((k) => n(r[k]));
+  if (nums.some((x) => x === null) || typeof r.chapter !== 'string' || !Array.isArray(r.objectives))
+    return null;
+  const objectives: ObjectiveResult[] = [];
+  for (const o of r.objectives as unknown[]) {
+    const x = o as Record<string, unknown> | null;
+    if (!x || typeof x.id !== 'string' || n(x.total) === null || n(x.paid) === null) return null;
+    objectives.push({
+      id: x.id,
+      total: x.total as number,
+      complete: x.complete === true,
+      paid: x.paid as number,
+    });
+  }
+  const [attempt, waves, totalWaves, base, bonus, total, warrants, unlocked] = nums as number[];
+  return {
+    attempt: attempt!,
+    chapter: r.chapter,
+    won: r.won === true,
+    waves: waves!,
+    totalWaves: totalWaves!,
+    base: base!,
+    objectives,
+    bonus: bonus!,
+    total: total!,
+    warrants: warrants!,
+    unlocked: unlocked!,
+  };
+}
+
 /** `seed` нужен только НОВОМУ профилю: у сохранённого свой, и он важнее (перебьёт).
  *  Источник случайности — на стороне хозяина, тут по-прежнему чистая функция. */
 export function parseSectorZeroProgress(
@@ -408,6 +539,17 @@ export function parseSectorZeroProgress(
     fresh.nextAttempt = Math.max(1, counter(p.nextAttempt, 1));
     fresh.settledThrough = Math.min(fresh.nextAttempt - 1, counter(p.settledThrough));
     fresh.lastReward = counter(p.lastReward);
+    // Отметка удвоения не может обогнать расчёт: «из будущего» она закрыла бы удвоение
+    // следующего забега заранее.
+    fresh.doubledThrough = Math.min(counter(p.doubledThrough), fresh.settledThrough);
+    // Профиль правится игроком: только строки, без дублей. Чужие id задач безвредны — их
+    // нет в запасе карты, значит они ничего не закрывают и не открывают.
+    for (const [chapter, ids] of Object.entries(p.objectivesDone ?? {})) {
+      const list = strings(ids);
+      if (list.length > 0) fresh.objectivesDone[chapter] = list;
+    }
+    fresh.chaptersWon = strings(p.chaptersWon);
+    fresh.lastRun = parseRunSummary(p.lastRun);
     fresh.warrants = counter(p.warrants);
     fresh.sovereigns = counter(p.sovereigns);
     fresh.day = counter(p.day);
@@ -487,9 +629,9 @@ export function settleSectorZeroRun(
   progress: SectorZeroProgress,
   attempt: number,
   state: GameState,
-  /** Дополнительные задачи карты (решение владельца 2026-09-22). Пусто — забег платит
-   *  ровно как раньше: задачи ДОПОЛНИТЕЛЬНЫЕ, и карта без них — нормальная карта. */
-  objectives: readonly MapObjective[] = [],
+  /** Глава забега: её запас задач (решение владельца 2026-09-22) и правило показа
+   *  (PVR-5.3). Без запаса забег платит ровно как раньше: задачи ДОПОЛНИТЕЛЬНЫЕ. */
+  chapter: SectorChapter = NO_CHAPTER,
 ): SectorZeroProgress {
   if (
     !Number.isSafeInteger(attempt) ||
@@ -508,16 +650,48 @@ export function settleSectorZeroRun(
   // Надбавка за ВЫПОЛНЕННЫЕ задачи складывается с выплатой за волны, а не заменяет её:
   // иначе игрок, сделавший задачи и проигравший рано, получал бы больше того, кто дошёл
   // до конца, — и «дополнительная» задача перестала бы быть дополнительной.
-  const reward =
-    1 + Math.max(0, state.pve.waveNumber) + (won ? 3 : 0) + objectiveBonus(objectives, state, 'p1');
+  // Платят только задачи, ПОКАЗАННЫЕ в этом забеге: закрытые раньше в показ не входят и
+  // второй раз не платят (PVR-5.3).
+  const base = 1 + Math.max(0, state.pve.waveNumber) + (won ? 3 : 0);
+  const done = progress.objectivesDone[chapter.id] ?? [];
+  const tasks = settleObjectives(
+    chapter.objectives,
+    done,
+    state,
+    'p1',
+    chapter.slots ?? DEFAULT_OBJECTIVE_SLOTS,
+  );
+  const reward = base + tasks.bonus;
+  const warrants = reward * WARRANTS_PER_REWARD;
   return {
     ...progress,
     research: progress.research + reward,
     // Забег — кран ОБЕИХ валют (§2 роадмапа экономики): данные открывают горизонталь,
     // Варранты обслуживают вертикаль. Без второго крана Мастерская недостижима.
-    warrants: progress.warrants + reward * WARRANTS_PER_REWARD,
+    warrants: progress.warrants + warrants,
     settledThrough: attempt,
     lastReward: reward,
+    objectivesDone:
+      chapter.id && tasks.done.length > done.length
+        ? { ...progress.objectivesDone, [chapter.id]: tasks.done }
+        : progress.objectivesDone,
+    chaptersWon:
+      won && chapter.id && !progress.chaptersWon.includes(chapter.id)
+        ? [...progress.chaptersWon, chapter.id]
+        : progress.chaptersWon,
+    lastRun: {
+      attempt,
+      chapter: chapter.id,
+      won: !!won,
+      waves: state.pve.waveNumber,
+      totalWaves: state.pve.totalWaves,
+      base,
+      objectives: tasks.results,
+      bonus: tasks.bonus,
+      total: reward,
+      warrants,
+      unlocked: tasks.unlocked,
+    },
   };
 }
 

@@ -10,6 +10,8 @@ import {
   prepareSectorZeroRun,
   settleSectorZeroRun,
   sectorHeroSlots,
+  sectorHullIds,
+  sectorModuleIds,
   WARRANTS_PER_REWARD,
   type SectorZeroProgress,
   type SectorProgressAction,
@@ -201,15 +203,15 @@ describe('Sector Zero persistent preparation', () => {
 
     // Задача, которая на этом состоянии ЗАВЕДОМО выполнена: снести то, чего на карте нет.
     const done = { id: 'mission.x', kind: 'raze' as const, targets: ['no_such_building'], reward: 5 };
-    const withBonus = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [done]).research;
+    const withBonus = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, { id: 'ch', objectives: [done] }).research;
     expect(withBonus).toBe(base + 5);
 
     // Контроль: НЕвыполненная задача не платит, и выплата остаётся прежней.
     const notDone = { id: 'mission.y', kind: 'control' as const, targets: ['no_such_planet'], reward: 5 };
-    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [notDone]).research).toBe(base);
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, { id: 'ch', objectives: [notDone] }).research).toBe(base);
 
     // И контроль формы: пустой список задач — ровно прежнее поведение.
-    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, []).research).toBe(base);
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, { id: 'ch', objectives: [] }).research).toBe(base);
   });
 
   it('does not confuse two different attempts ending at the same game time', () => {
@@ -474,3 +476,40 @@ describe('SZE-1.3 — осколки: серия неудач упирается
     expect(parseSectorZeroProgress(raw, data).forgeShards).toEqual({ radar_module: 2 });
   });
 });
+
+describe('PVR-6.2 — в подготовке только корпуса, которые игрок строит', () => {
+  const hulls = sectorHullIds(data);
+
+  it('нет вражеских и выдаваемых корпусов', () => {
+    for (const id of ['swarm_brood_mother', 'swarm_lander', 'fortress_guns'])
+      expect(hulls, id).not.toContain(id);
+  });
+
+  it('обычные корабли игрока на месте', () => {
+    for (const id of ['frigate', 'cruiser', 'scout', 'strike_carrier', 'shuttle_carrier'])
+      expect(hulls, id).toContain(id);
+  });
+
+  it('фильтр держится на данных: новый уникальный юнит фракции сюда не попадёт', () => {
+    const extra = structuredClone(data);
+    extra.units.test_hive = { ...extra.units.cruiser!, faction: 'swarm' };
+    extra.factions.swarm!.uniqueUnits = [...extra.factions.swarm!.uniqueUnits, 'test_hive'];
+    expect(sectorHullIds(extra)).not.toContain('test_hive');
+  });
+});
+
+describe('PVR-6.5 — в подготовке только модули, которые есть куда поставить', () => {
+  const modules = sectorModuleIds(data);
+
+  it('нет модулей Роя и щитов крепости', () => {
+    for (const id of ['swarm_brood_chamber', 'swarm_intercept_veil', 'void_shield_i', 'void_shield_ii', 'void_shield_iii'])
+      expect(modules, id).not.toContain(id);
+  });
+
+  it('модули кораблей игрока на месте — и узкие тоже', () => {
+    // Радар встаёт только на разведчика: это не повод его прятать, разведчик у игрока есть.
+    for (const id of ['cargo_bay', 'ion_engine', 'targeting_array', 'shield_booster', 'radar_module'])
+      expect(modules, id).toContain(id);
+  });
+});
+

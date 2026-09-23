@@ -8,13 +8,13 @@
   "pool": [
     { "kind": "hull", "defId": "siege_lance", "weight": 2 },
     { "kind": "hull", "defId": "interceptor", "weight": 2 },
-    { "kind": "hull", "defId": "siege", "weight": 2 },
     { "kind": "hull", "defId": "bomber", "weight": 2 },
     { "kind": "hull", "defId": "strike_carrier", "weight": 1 },
     { "kind": "hull", "defId": "shuttle_carrier", "weight": 1 },
     { "kind": "module", "defId": "targeting_array", "weight": 3 },
     { "kind": "module", "defId": "shield_booster", "weight": 3 },
-    { "kind": "module", "defId": "ablative_plating", "weight": 3 }
+    { "kind": "module", "defId": "ablative_plating", "weight": 3 },
+    { "kind": "module", "defId": "siege_platform", "weight": 2 }
   ],
   "salvage": {
     "default": 1,

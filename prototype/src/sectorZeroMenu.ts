@@ -7,6 +7,7 @@ import {
   type RunDifficulty,
 } from '../../decisions/runDifficulty';
 import type { RunPreview } from '../../decisions/sectorZeroMenu';
+import { CHAPTER_KEYS, chapterRoute, romanChapter } from '../../decisions/chapterRoute';
 
 export interface SectorZeroMenuHooks {
   root: HTMLElement;
@@ -16,6 +17,11 @@ export interface SectorZeroMenuHooks {
   /** Номер главы (0 — первая). Карта главы живёт в данных, экран только выбирает. */
   mission(): number;
   setMission(value: number): void;
+  /** Сколько глав играбельно (`PVE_MISSION_COUNT`) — число живёт у карт, не у экрана. */
+  chapters: number;
+  /** Что глава просит: волн до победы, сколько задач видно в следующем забеге и сколько
+   *  их в запасе главы (PVR-5.3), и выиграна ли она хоть раз. */
+  chapterInfo(index: number): { waves: number; tasks: number; pool: number; cleared: boolean };
   start(): void;
   startDev?: () => void;
   resume(): boolean;
@@ -33,7 +39,46 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   const confirmation = el('sz-confirm');
   const actions = el('sz-actions');
   const difficulties = ['weak', 'strong'].map((id) => el<HTMLButtonElement>(`sz-${id}`));
-  const missions = [0, 1].map((i) => el<HTMLButtonElement>(`sz-mission-${i}`));
+  // Маршрут глав (PVR-6.9): узел на главу от края сектора к эпицентру. Закрытые главы —
+  // безымянным «сигнал потерян»: нажать можно (карточка скажет, что там), выбрать нельзя.
+  const route = chapterRoute(h.chapters);
+  el('sz-route').innerHTML = route
+    .map(
+      (node) =>
+        `<button id="sz-mission-${node.index}" type="button" class="sz-node${node.core ? ' sz-core-node' : ''}${node.playable ? '' : ' sz-lost'}" data-${node.playable ? 'mission' : 'lost'}="${node.index}"${node.playable ? ' aria-pressed="false"' : ' aria-disabled="true"'}><b>${romanChapter(node.index)}</b></button>`,
+    )
+    .join('');
+  for (const node of route)
+    el(`sz-mission-${node.index}`).setAttribute(
+      'aria-label',
+      node.playable ? t(CHAPTER_KEYS[node.index]!.name) : t('sector-zero.mission.lost'),
+    );
+  const missions = [...el('sz-route').querySelectorAll<HTMLButtonElement>('[data-mission]')];
+  /** Выбранная глава; номер из хранилища вне пути читается первой главой — так же, как
+   *  его клампит `pveState`, чтобы экран не выделял не ту главу, что запустится. */
+  const current = (): number => {
+    const m = h.mission();
+    return Number.isInteger(m) && m >= 0 && m < missions.length ? m : 0;
+  };
+  const lostNodes = [...el('sz-route').querySelectorAll<HTMLButtonElement>('[data-lost]')];
+  /** Узел, который игрок сейчас разглядывает (закрытый); `null` — карточка выбранной главы. */
+  let peek: number | null = null;
+  function renderChapter(): void {
+    const index = peek ?? current();
+    const keys = peek === null ? CHAPTER_KEYS[index] : undefined;
+    el('sz-chapter-name').textContent = keys ? t(keys.name) : t('sector-zero.mission.lost');
+    el('sz-chapter-brief').textContent = keys ? t(keys.brief) : t('sector-zero.mission.lost.brief');
+    const info = keys ? h.chapterInfo(index) : null;
+    el('sz-chapter-stats').textContent = info
+      ? [
+          t('sector-zero.chapter.waves', { n: info.waves }),
+          ...(info.tasks ? [t('sector-zero.chapter.tasks', { n: info.tasks, m: info.pool })] : []),
+          ...(info.cleared ? [t('sector-zero.chapter.cleared')] : []),
+        ].join(' · ')
+      : '';
+    for (const node of lostNodes)
+      node.classList.toggle('peek', Number(node.dataset.lost) === peek);
+  }
   let preview: RunPreview | null = null;
   let loading = false;
   let generation = 0;
@@ -63,10 +108,13 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
       button.disabled = loading;
     }
     for (const button of missions) {
-      const active = Number(button.dataset.mission ?? 0) === h.mission();
-      button.setAttribute('aria-pressed', String(active));
+      const index = Number(button.dataset.mission ?? 0);
+      button.setAttribute('aria-pressed', String(index === current()));
+      // Выигранная хоть раз глава отмечена на пути (PVR-5.4).
+      button.classList.toggle('sz-passed', h.chapterInfo(index).cleared);
       button.disabled = loading;
     }
+    renderChapter();
     el('sz-back').hidden = h.standalone;
   }
 
@@ -134,8 +182,15 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   for (const button of missions)
     button.addEventListener('click', () => {
       if (loading) return;
+      peek = null;
       h.setMission(Number(button.dataset.mission ?? 0));
       render();
+    });
+  for (const node of lostNodes)
+    node.addEventListener('click', () => {
+      const index = Number(node.dataset.lost);
+      peek = peek === index ? null : index;
+      renderChapter();
     });
   el('sz-settings').addEventListener('click', h.settings);
   el('sz-prep').addEventListener('click', () => {

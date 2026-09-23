@@ -162,3 +162,20 @@ jobs:
             exit 1
           fi
         continue-on-error: true
+
+      # YAG-1.1c: робот играет в СОБРАННЫЙ архив площадки (`prototype/dist/yandex/`) —
+      # запуск, забег, «Продолжить», ролик за награду, закрытые двери по ссылке. Архив
+      # собран с `__SECTOR_ZERO_ONLY__`, и его кода не повторяет ни одна другая сборка:
+      # смоук выше открывает `void-dominion.html`. Поза та же — не блокирует, а сбой
+      # всплывает аннотацией; `--install` идемпотентен и лишь подтверждает Chromium.
+      - name: Platform archive smoke (non-blocking)
+        run: |
+          if ! pnpm run smoke:browser:install; then
+            echo "::warning title=Platform archive smoke::смоук не смог установиться (Chromium недоступен) — архив НЕ проверялся"
+            exit 1
+          fi
+          if ! pnpm run smoke:yandex; then
+            echo "::error title=Platform archive smoke::робот нашёл ошибку в архиве площадки — смотри лог шага"
+            exit 1
+          fi
+        continue-on-error: true

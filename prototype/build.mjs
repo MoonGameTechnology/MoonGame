@@ -7,6 +7,7 @@
 //     markup (fenced with <!--dev-only--> … <!--/dev-only--> below) is stripped.
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { platformBuildOptions } from './platformBuild.mjs';
 
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
@@ -27,46 +28,14 @@ const bundle = async (playerBuild) => {
     minify: true,
     legalComments: 'none',
     write: false,
-    define: { __PLAYER_BUILD__: String(playerBuild) },
+    define: { __PLAYER_BUILD__: String(playerBuild), __SECTOR_ZERO_ONLY__: 'false' },
   });
   return res.outputFiles[0].text;
 };
 
-/**
- * Платформенная цель (`YAG-1.1b`) — РАЗЛОЖЕННЫЙ артефакт, а не один HTML.
- *
- * Решение владельца 2026-09-17: `index.html` в корне архива плюс `assets/` рядом.
- * Остальные три цели инлайнят всё в один файл (`loader: dataurl`), и для площадки это
- * был бы самый простой архив — ровно один файл. Но data-URL это base64, то есть около
- * +33% на каждом бинарнике, и кэшировать по частям нечего: правка одной строки заставляет
- * игрока перекачать весь бандл. Раскладка принята ДО того, как приедет настоящий арт.
- *
- * Имена ассетов задаём мы (`[name]-[hash]`), потому что требование 1.22 запрещает
- * пробелы и кириллицу в именах файлов и папок архива; сторож в `buildTarget.test.mjs`
- * проверяет это на готовом артефакте, а не на обещании.
- */
-const bundlePlatform = async () => {
-  const res = await build({
-    entryPoints: ['prototype/src/bootstrap.ts'],
-    bundle: true,
-    format: 'iife',
-    platform: 'browser',
-    target: 'es2020',
-    // Не `dataurl`: бинарники едут отдельными файлами в assets/ (см. шапку).
-    loader: { '.webp': 'file' },
-    assetNames: 'assets/[name]-[hash]',
-    entryNames: 'assets/app',
-    outdir: 'prototype/dist/yandex',
-    // Пути внутри бандла — ОТНОСИТЕЛЬНЫЕ: архив распаковывают в произвольный префикс на
-    // стороне площадки, и абсолютный `/assets/...` там просто не найдётся.
-    publicPath: '.',
-    minify: true,
-    legalComments: 'none',
-    write: false,
-    define: { __PLAYER_BUILD__: 'true' },
-  });
-  return res.outputFiles;
-};
+/** Платформенная цель (`YAG-1.1b`, `YAG-1.1c`): настройки — в `platformBuild.mjs`, общие со
+ *  сторожем описи архива. */
+const bundlePlatform = async () => (await build(platformBuildOptions)).outputFiles;
 
 /** Пульт администратора (ADM-1) — свой вход, без `__PLAYER_BUILD__`: этой странице
  *  нечего вырезать, она и так не знает про игру ничего. */
@@ -93,6 +62,12 @@ const css = `
      orange bolt / orchid chip — inherited everywhere a resource token appears */
   --rc-credits:#d9b872;--rc-metal:#bfc8dc;--rc-food:#8ccf96;--rc-energy:#f09a52;
   --rc-microelectronics:#d795cf;
+  /* Валюты Sector Zero (PVR-6.3, решение владельца 2026-09-23): несут смысл, как --rc-*.
+     Суверены — донат, золото; Варранты — валюта магазина и кузни, фиолетовый; данные — cyan. */
+  --cur-sovereigns:#f2c14e;--cur-warrants:#b48cff;--cur-data:#35d6e6;
+  /* Редкость предмета (PVR-6.4) — лестница героев, hero-progression §0.2: простой зелёный,
+     уникальный синий, мифический фиолетовый, легендарный красный. */
+  --rar-simple:#5fd07a;--rar-unique:#4aa8ff;--rar-mythic:#bb7dff;--rar-legendary:#ff5f57;
   --cyan:#35d6e6;--cyan-dim:#1c6f78;
   --grn:#5ff0c0;--grn-dim:#2b7a66;
   --red:#ff5a4d;--amber:#ffb43a;
@@ -699,6 +674,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
   font:11px ui-monospace,monospace;user-select:text;-webkit-user-select:text;touch-action:pan-y;}
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink);}
 .set-lbl .set-sub{font-size:10px;color:var(--dim);letter-spacing:.2px;}
+/* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
+.set-keys{display:grid;gap:6px;margin:0 0 12px;}
+.set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
+.set-keys dt{font:600 11px/1.4 ui-monospace,monospace;color:var(--cyan);}
+.set-keys dd{margin:0;font-size:11px;line-height:1.45;color:var(--ink);}
 .set-ctl{display:flex;align-items:center;gap:10px;}
 .set-ctl input[type=range]{flex:1;accent-color:var(--cyan);height:22px;cursor:pointer;}
 .set-val{min-width:42px;text-align:right;font-variant-numeric:tabular-nums;color:var(--cyan);font-weight:700;}
@@ -1824,6 +1804,15 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-v small{font-size:11px;color:var(--dim);font-weight:400;}
 #endscreen .es-xp{margin:8px 0 2px;font-size:13px;color:var(--amber);font-weight:700;}
 #endscreen .es-xp .lvl{display:block;margin-top:3px;font-size:11px;color:var(--cyan);font-weight:400;}
+/* Итог забега Sector Zero по частям (PVR-5.4): забег и задачи — строками, сумма — внизу. */
+#endscreen .es-run{text-align:left;margin:12px 0 4px;border:1px solid var(--line-hi);border-radius:8px;padding:8px 10px;background:rgba(6,18,22,.6);}
+#endscreen .es-run ul{list-style:none;margin:0;padding:0;display:grid;gap:5px;}
+#endscreen .es-run li{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--dim);}
+#endscreen .es-run li b{font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;}
+#endscreen .es-run li.task.done span{color:var(--ink);}
+#endscreen .es-run li.task.done b{color:#5fd07a;}
+#endscreen .es-total{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin-top:8px;padding-top:7px;border-top:1px solid var(--line-hi);font-size:13px;color:var(--amber);font-weight:700;}
+#endscreen .es-next{margin:7px 0 0;font-size:11px;color:var(--cyan);}
 #endscreen .es-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px;}
 #endscreen .es-btn{flex:1 1 45%;min-width:120px;padding:12px;border-radius:8px;cursor:pointer;
   font:700 13px ui-monospace,monospace;letter-spacing:.5px;border:1px solid var(--line-hi);
@@ -2986,7 +2975,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title>${external ? `<link rel="stylesheet" href="assets/app.css">\n${SDK_LOADER}` : `<style>${allCss()}</style>`}</head>
+<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title>${external ? `${SDK_LOADER}\n<link rel="stylesheet" href="assets/app.css">` : `<style>${allCss()}</style>`}</head>
 <body data-entry="${entry}">
 <section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
   <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
@@ -3290,12 +3279,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
           </div>
-          <fieldset class="sz-difficulty">
+          <fieldset class="sz-difficulty sz-route-box">
             <legend data-i18n="sector-zero.mission"></legend>
-            <div class="sz-options">
-              <button id="sz-mission-0" type="button" data-mission="0" aria-pressed="true" data-i18n="sector-zero.mission.1"></button>
-              <button id="sz-mission-1" type="button" data-mission="1" aria-pressed="false" data-i18n="sector-zero.mission.2"></button>
-            </div>
+            <div id="sz-route" class="sz-route"></div>
+            <div class="sz-route-ends" aria-hidden="true"><span data-i18n="sector-zero.route.edge"></span><span data-i18n="sector-zero.route.core"></span></div>
+            <div class="sz-chapter" role="status" aria-live="polite"><b id="sz-chapter-name"></b><p id="sz-chapter-brief"></p><p id="sz-chapter-stats"></p></div>
           </fieldset>
           <fieldset class="sz-difficulty">
             <legend data-i18n="sector-zero.difficulty"></legend>
@@ -3316,20 +3304,20 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
       <div class="sz-projection" aria-hidden="true">
         <svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g stroke="currentColor" stroke-width=".65" opacity=".32">
+          <g class="sz-spin sz-spin-slow" stroke="currentColor" stroke-width=".65" opacity=".32">
             <circle cx="250" cy="250" r="220" stroke-dasharray="2 9"/><circle cx="250" cy="250" r="190"/>
             <path d="M250 15v64m0 342v64M15 250h64m342 0h64M94 94l37 37m238 238 37 37M94 406l37-37m238-238 37-37"/>
             <ellipse cx="250" cy="250" rx="208" ry="75" transform="rotate(-28 250 250)"/>
             <ellipse cx="250" cy="250" rx="170" ry="48" transform="rotate(55 250 250)"/>
           </g>
           <circle cx="250" cy="250" r="131" stroke="currentColor" stroke-width="1.3" opacity=".7"/>
-          <path d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
+          <path class="sz-spin sz-spin-scan" d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
           <ellipse cx="250" cy="250" rx="65" ry="131" stroke="currentColor" opacity=".15"/>
           <ellipse cx="250" cy="250" rx="131" ry="44" stroke="currentColor" opacity=".22"/>
-          <path d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
+          <path class="sz-core" d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
           <path d="m223 304 54-108" stroke="currentColor" opacity=".4"/>
-          <g fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
-          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
+          <g class="sz-spin sz-spin-back" fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
+          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle class="sz-ping" cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
           <path d="M332 397h82l30 30" stroke="#e6b777" opacity=".45"/>
         </svg>
       </div>
@@ -3567,7 +3555,7 @@ writeFileSync('prototype/dist/sector-zero-dev.html', page(devJs, 'sector-zero'))
 const playerJs = await bundle(true);
 const playerHtml = stripDevMarkup(page(playerJs));
 // A direct menu entry for review and offline play, still using the shared client.
-// This is not the isolated product dependency graph planned in YAG-1.1.
+// It keeps the full player bundle: only the platform archive is cut to Sector Zero (YAG-1.1c).
 const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);

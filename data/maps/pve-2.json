@@ -365,6 +365,21 @@
       "kind": "scout",
       "count": 14,
       "reward": 2
+    },
+    {
+      "id": "mission.hold-out",
+      "kind": "wave",
+      "count": 7,
+      "reward": 2
+    },
+    {
+      "id": "mission.fortify",
+      "kind": "build",
+      "targets": [
+        "fort"
+      ],
+      "count": 2,
+      "reward": 2
     }
   ],
   "players": {

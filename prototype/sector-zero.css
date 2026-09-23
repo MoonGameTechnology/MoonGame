@@ -1,5 +1,6 @@
 /* Sector Zero's own home. The projection is decorative: no running match behind
-   the menu, no animated starfield work, and no new raster asset to load. */
+   the menu and no new raster asset to load. Its motion (PVR-6.8) is CSS-only transforms
+   and opacity — compositor work, no script, stopped entirely under reduced motion. */
 #sector-zero {
   --sz-muted: #91aeb9;
   isolation: isolate;
@@ -50,12 +51,47 @@
 .sz-options button { flex: 1; min-height: 42px; padding: 8px; border: 1px solid #294550; color: var(--sz-muted); background: #07151f; font-size: 12px !important; }
 .sz-options button[aria-pressed="true"] { border-color: #8bbec2; color: #d7eeee; background: #16313d; }
 #sz-difficulty-hint { margin: 9px 0 0; color: var(--sz-muted); font-size: 11px; line-height: 1.5; }
+/* Маршрут глав (PVR-6.9): от края сектора (слева) к эпицентру (справа). Линия пути
+   «заражается» к центру — бирюза края переходит в фиолетовый и красный эпицентра. */
+.sz-route { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.sz-route::before { content: ""; position: absolute; left: 20px; right: 24px; top: 50%; height: 2px; transform: translateY(-50%); background: linear-gradient(90deg, #79dfdf, #79dfdf 22%, var(--rar-mythic) 62%, var(--rar-legendary)); opacity: .55; }
+#sector-zero .sz-node { position: relative; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1px solid #5d9094; background: #07151f; color: #b9d9dc; font: 600 12px/1 ui-monospace, monospace; }
+.sz-node b { font-weight: inherit; }
+#sector-zero .sz-node:hover { border-color: #b3f1e9; }
+#sector-zero .sz-node[aria-pressed="true"] { background: #90e2dd; border-color: #90e2dd; color: #05232b; box-shadow: 0 0 0 4px #90e2dd33, 0 0 22px #90e2dd66; }
+#sector-zero .sz-node.sz-passed { border-color: #90e2dd; color: #d7f5f1; }
+/* Глава выиграна хоть раз (PVR-5.4) — галочка на узле. */
+#sector-zero .sz-node.sz-passed::before { content: "✓"; position: absolute; top: -7px; right: -7px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--rar-simple); color: #04161c; font: 700 10px/1 system-ui, sans-serif; }
+#sector-zero .sz-node.sz-lost { border-style: dashed; border-color: #4b3a5e; color: #6f5f86; background: #0b0f1a; }
+#sector-zero .sz-node.sz-lost.peek { border-color: var(--rar-mythic); color: #d7c3f5; }
+#sector-zero .sz-node.sz-core-node { width: 48px; height: 48px; border-color: var(--rar-legendary); color: #ffb3ae; }
+.sz-node.sz-core-node::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid var(--rar-legendary); animation: sz-ping 3.2s ease-out infinite; }
+.sz-route-ends { display: flex; justify-content: space-between; margin-top: 6px; color: var(--sz-muted); font: 10px/1.5 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.sz-route-ends span:last-child { color: #ff8f88; }
+.sz-chapter { margin: 12px 0 6px; padding: 10px 14px; border-left: 2px solid #90e2dd; background: #0a1c26; min-height: 64px; }
+.sz-chapter b { color: #e1f4f4; font-size: 14px; font-weight: 600; }
+.sz-chapter p { margin: 4px 0 0; color: #b0c7ce; font-size: 12px; line-height: 1.5; }
+.sz-chapter p:empty { display: none; }
+#sz-chapter-stats { color: #8ccbcc; font-family: ui-monospace, monospace; }
 .sz-tools { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; }
 .sz-tools button { min-height: 44px; border: 0; padding: 8px 0; background: transparent; color: #b1cbd1; font-size: 13px !important; }
 .sz-tools button:hover { color: #a9f5ee; }
 .sz-projection { position: relative; aspect-ratio: 1; width: 100%; color: #8acecd; }
 .sz-projection svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .sz-projection::before { content: ""; position: absolute; inset: 20%; border-radius: 50%; background: radial-gradient(circle, #85d4da14, transparent 70%); box-shadow: 0 0 100px #87e4f010; }
+/* Живое меню (PVR-6.8): кольца орбиты медленно плывут, луч сканера обходит круг, ядро
+   дышит, золотая метка пульсирует. Всё вращается вокруг центра проекции (250, 250). */
+.sz-spin { transform-box: view-box; transform-origin: 250px 250px; animation: sz-spin 140s linear infinite; }
+.sz-spin-scan { animation-duration: 14s; }
+.sz-spin-back { animation-duration: 90s; animation-direction: reverse; }
+.sz-core { animation: sz-breathe 4.5s ease-in-out infinite; }
+.sz-ping { transform-box: fill-box; transform-origin: center; animation: sz-ping 2.8s ease-out infinite; }
+@keyframes sz-spin { to { transform: rotate(360deg); } }
+@keyframes sz-breathe { 50% { opacity: .35; } }
+@keyframes sz-ping { from { transform: scale(.6); opacity: .8; } to { transform: scale(2.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sz-spin, .sz-core, .sz-ping, .sz-node.sz-core-node::after { animation: none; }
+}
 .sz-bottomline { border-top: 1px solid #24404b; padding-top: 18px; font-size: 10px; }
 #sz-workshop { padding: 28px 0 40px; flex: 1; }
 #sz-workshop h1 { font-size: clamp(22px, 4vw, 32px); color: #e1f4f4; font-weight: 450; margin: 24px 0 8px; }
@@ -67,12 +103,40 @@
 #sz-workshop button.selected { color: #b3f1e9; border-color: #75b6b6; background: #16333d; }
 .sz-workhead { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; }
 .sz-workhead b { color: #ecd09b; font: 13px/1.5 ui-monospace, monospace; }
+/* Валюта — «фишка» своего цвета (PVR-6.3). Цвет говорит, ЧЕМ платишь: одна и та же
+   фишка в шапке и на кнопке, которая эту валюту тратит. */
+.sz-workhead .sz-cur { display: inline-flex; align-items: center; min-height: 32px; padding: 4px 14px; border: 1px solid currentColor; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); font: 600 13px/1.4 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.sz-workhead .sz-cur-data { color: var(--cur-data); }
+.sz-workhead .sz-cur-warrants { color: var(--cur-warrants); }
+.sz-workhead .sz-cur-sovereigns { color: var(--cur-sovereigns); }
+/* Кнопка траты окрашена валютой, которую она списывает. Кузня и магазин платят
+   Варрантами, открытия — данными, донат — Суверенами. */
+#sz-workshop [data-prep="forge"]:not(:disabled), #sz-workshop [data-prep="buy:warrants"]:not(:disabled) { color: var(--cur-warrants); border-color: var(--cur-warrants); }
+#sz-workshop [data-prep="buy:sovereigns"]:not(:disabled) { color: var(--cur-sovereigns); border-color: var(--cur-sovereigns); }
+#sz-workshop [data-prep="unlock-module"]:not(:disabled), #sz-workshop [data-prep="unlock-hero"]:not(:disabled), #sz-workshop [data-prep="upgrade-hero"]:not(:disabled) { color: var(--cur-data); border-color: var(--cur-data); }
 .sz-sub, .sz-reward { color: #a9c1c9; font-size: 13px; line-height: 1.65; max-width: 720px; }
 .sz-reward { color: #d5ba87; }
-.sz-tabs { display: flex; gap: 12px; margin: 24px 0 12px; }
-.sz-tabs button { flex: 1; max-width: 320px; }
-#sz-prep-status { min-height: 25px; color: #a6dfd4; font-size: 12px; }
+/* Вкладки (PVR-6.6): иконка над словом, четыре в ряд на любой ширине; прилипают к верху
+   при прокрутке длинного списка — перейти можно, не листая обратно. */
+.sz-tabs { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 20px 0 12px; padding: 8px 0; background: #051019e6; backdrop-filter: blur(6px); }
+#sz-workshop .sz-tabs button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; font-size: 13px; white-space: nowrap; }
+.sz-tabs i { font-style: normal; font-size: 20px; line-height: 1; color: #79dfdf; }
+.sz-tabs button.selected { box-shadow: inset 0 -3px 0 #79dfdf; }
+.sz-purse { display: flex; flex-wrap: wrap; gap: 8px; }
+#sz-prep-status { min-height: 18px; color: #a6dfd4; font-size: 12px; }
 .sz-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 20px; }
+/* Имена из `data.*` строчные — они встают и в середину фраз; на кнопке нужна заглавная. */
+.sz-picker button::first-letter { text-transform: uppercase; }
+/* Корпус (PVR-6.6): выбор — плитки с артом; выбранный — крупным портретом рядом со
+   статами и отсеками. */
+#sz-workshop .sz-hulls button { flex: none; display: grid; justify-items: center; gap: 6px; padding: 8px 10px; min-width: 96px; }
+.sz-hulls span:not(.ship-art) { display: block; }
+.sz-hulls span:not(.ship-art)::first-letter { text-transform: uppercase; }
+.sz-hulls .ship-art--thumb { width: 84px; height: 56px; border: 0; }
+.sz-hull { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; align-items: start; margin: 8px 0 22px; }
+.sz-hull .ship-art--portrait { margin: 0; }
+.sz-hull h2 { margin: 0 0 4px; color: #e1f4f4; }
+.sz-hull h2::first-letter { text-transform: uppercase; }
 .sz-bays { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 18px 0; }
 .sz-bay { border-left: 2px solid #5d9094; padding: 12px 16px; background: #0a1c26; display: grid; gap: 8px; }
 .sz-bay b { color: #aad6d6; font-size: 12px; font-weight: 500; }
@@ -88,6 +152,62 @@
 .sz-card button { margin-top: auto; width: 100%; }
 .sz-card-type { color: #81adb3; font: 10px/1.5 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .1em; }
 .sz-card p.sz-prereq { color: #d2b98b; }
+/* Карточка предмета (PVR-6.4). Редкость — это РАМКА: обводка и полоса сверху её цвета,
+   а не заливка — так фиолетовый «мифический» не путается с фиолетовой фишкой Варрантов.
+   Надетый модуль отмечен отдельно — светлым контуром поверх рамки редкости. */
+.sz-item.r-simple { --rar: var(--rar-simple); }
+.sz-item.r-unique { --rar: var(--rar-unique); }
+.sz-item.r-mythic { --rar: var(--rar-mythic); }
+.sz-item.r-legendary { --rar: var(--rar-legendary); }
+.sz-card.sz-item { border-color: color-mix(in srgb, var(--rar) 55%, #28444e); border-top: 3px solid var(--rar); }
+.sz-card.sz-item.selected { outline: 2px solid #d8f6f2; outline-offset: 2px; }
+.sz-item .sz-card-type { display: flex; justify-content: space-between; gap: 12px; width: 100%; }
+.sz-item .sz-rarity { color: var(--rar); font-weight: 700; }
+/* Имена из `data.*` строчные (встают и в середину фраз) — в заголовке нужна заглавная. */
+.sz-item h3::first-letter { text-transform: uppercase; }
+.sz-stars { margin: -4px 0 14px; font-size: 18px; letter-spacing: 3px; color: #22404a; line-height: 1; }
+.sz-stars .lit { color: var(--rar); text-shadow: 0 0 8px color-mix(in srgb, var(--rar) 60%, transparent); }
+/* «Было → станет» (PVR-6.5): строка на стат, прибавка справа своим цветом. */
+.sz-delta { list-style: none; width: 100%; margin: -6px 0 16px; padding: 10px 12px; border: 1px solid #1d3a44; background: #06131b; display: grid; gap: 6px; }
+.sz-delta li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; font-size: 12px; color: #9fbcc4; }
+.sz-delta b { color: #e1f4f4; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sz-delta em { white-space: nowrap; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
+.sz-delta em.up { color: var(--rar-simple); }
+.sz-delta em.down { color: var(--red); }
+/* Шанс кузни полосой (PVR-6.6). */
+.sz-odds { width: 100%; margin-bottom: 14px; }
+.sz-odds p { margin-bottom: 6px !important; }
+.sz-bar { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--rar, #79dfdf) var(--p), #17313b var(--p)); }
+/* Академия (PVR-6.6): ростер карточками с гербом, деления подготовки, навыки ступенями. */
+.sz-roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px; margin: 8px 0 24px; }
+#sz-workshop .sz-roster button { display: flex; align-items: center; gap: 14px; padding: 12px 14px; text-align: left; }
+.sz-roster b { display: block; color: #e1f4f4; font-size: 15px; font-weight: 600; }
+.sz-roster small { color: #8fb3bb; font-size: 12px; }
+.sz-roster button > span { min-width: 0; overflow-wrap: anywhere; }
+.sz-roster .selected small { color: #b3f1e9; }
+.sz-crest { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #79dfdf; transform: rotate(45deg); background: #0f2a35; color: #b3f1e9; font-weight: 700; font-size: 18px; }
+.sz-crest em { transform: rotate(-45deg); font-style: normal; }
+.sz-roster .sz-crest { width: 34px; height: 34px; font-size: 15px; margin: 4px; }
+.sz-hero { display: flex; gap: 26px; align-items: flex-start; margin-bottom: 18px; }
+.sz-hero > .sz-crest { width: 64px; height: 64px; font-size: 26px; margin: 14px 10px; }
+.sz-hero > div { flex: 1; min-width: 0; }
+.sz-hero h2 { margin: 0 0 6px; color: #e1f4f4; }
+.sz-pips { display: inline-flex; gap: 4px; margin-right: 10px; vertical-align: middle; }
+.sz-pips i { width: 16px; height: 6px; background: #1d3a44; }
+.sz-pips i.lit { background: #79dfdf; }
+.sz-tier { margin: 18px 0 8px; color: #79dfdf; font: 11px/1.5 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.sz-card.sz-locked { opacity: .62; }
+/* Магазин-витрина (PVR-6.7): главное предложение шире остальных и с лентой; у товаров
+   без арта — крупный значок цвета того, что они дают. */
+.sz-shopbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.sz-offer { position: relative; }
+.sz-featured { grid-column: span 2; background: linear-gradient(135deg, color-mix(in srgb, var(--rar, #79dfdf) 16%, #091923), #091923 60%); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rar, #79dfdf) 40%, transparent), 0 10px 40px -18px var(--rar, #79dfdf); }
+.sz-featured h3 { font-size: 20px !important; }
+.sz-ribbon { align-self: flex-start; margin: -4px 0 10px; padding: 3px 10px; border-radius: 999px; background: var(--rar, #79dfdf); color: #04161c; font: 700 10px/1.5 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.sz-glyph { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 10px; border: 1px solid currentColor; border-radius: 12px; font-size: 24px; background: color-mix(in srgb, currentColor 12%, transparent); }
+.sz-glyph-research { color: var(--cur-data); }
+.sz-glyph-warrants { color: var(--cur-warrants); }
+.sz-glyph-skill { color: #79dfdf; }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }
 .sz-hero-head span { font-size: 13px; color: #aad3d1; margin-right: auto; }
 #sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }
@@ -105,6 +225,17 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   #sz-title { max-width: 300px; font-size: clamp(52px, 12vw, 74px); }
   .sz-intro { margin-top: 22px; }
   .sz-topline, .sz-bottomline { letter-spacing: .08em; gap: 10px; }
+  .sz-tabs { gap: 6px; }
+  #sz-workshop .sz-tabs button { font-size: 11px; padding: 8px 2px; }
+  .sz-hull { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  /* Корпуса — лентой с прокруткой: семь плиток в три ряда съедали весь экран. */
+  .sz-hulls { flex-wrap: nowrap; overflow-x: auto; margin-inline: -22px; padding-inline: 22px; scrollbar-width: none; touch-action: pan-x pan-y; }
+  .sz-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sz-featured { grid-column: auto; }
+  #sz-workshop .sz-roster button { gap: 10px; padding: 10px; }
+  .sz-roster b { font-size: 14px; }
+  .sz-hero { gap: 18px; }
+  .sz-hero > .sz-crest { width: 44px; height: 44px; font-size: 18px; margin: 8px 6px; }
 }
 @media (max-height: 660px) and (min-width: 761px) {
   .sz-main { padding: 26px 0; gap: 40px; }

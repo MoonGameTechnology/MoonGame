@@ -53,6 +53,39 @@ export function builtPage(name = 'void-dominion.html') {
 }
 
 /**
+ * Игра с харнесовыми хуками: `main.ts` собирается заново с дописанным `hooks` (код в
+ * области видимости игры — видит `s`, выделение, камеру) и встаёт в слот инлайнового
+ * бандла собранной страницы. Так тест читает состояние, не заводя ради него экспортов в
+ * проде. Возвращает маршруты для {@link serve}: страницу и её `/app.js`.
+ */
+export async function instrumentedGame(hooks, { page = 'void-dominion.html' } = {}) {
+  const { build } = await import('esbuild');
+  const bundle = await build({
+    stdin: {
+      contents: readFileSync('prototype/src/main.ts', 'utf8') + hooks,
+      resolveDir: process.cwd() + '/prototype/src',
+      loader: 'ts',
+    },
+    bundle: true,
+    write: false,
+    format: 'iife',
+    platform: 'browser',
+    loader: { '.webp': 'dataurl' },
+    define: { __PLAYER_BUILD__: 'false', __SECTOR_ZERO_ONLY__: 'false' },
+  });
+  const built = builtPage(page).toString('utf8');
+  // build.mjs кладёт ровно один известный инлайновый бандл в конец доверенной сборки —
+  // меняется именно этот слот; это не санитайзер HTML.
+  const start = built.lastIndexOf('<script>');
+  const end = built.lastIndexOf('</script>');
+  if (start < 0 || end < start) throw new Error(`в ${page} нет инлайнового бандла`);
+  return {
+    '/': built.slice(0, start) + '<script src="/app.js"></script>' + built.slice(end + 9),
+    '/app.js': { type: 'text/javascript', body: bundle.outputFiles[0].text },
+  };
+}
+
+/**
  * Локальный сервер для страниц игры. `routes` — путь → тело (строка/Buffer) или
  * `{ type, body }`; неизвестный путь отдаёт `fallback` (по умолчанию первый маршрут).
  * `/auth/status` всегда отвечает «аккаунтов нет»: без этого стартовый экран ждёт пробы

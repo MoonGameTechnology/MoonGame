@@ -662,9 +662,14 @@
 | TXT-5 | ⏳ | proto | `docs/backlog.md` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
 | TXT-6 | ⏳ | proto | `docs/backlog.md` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
+| UX-SEL-1 | 🗑 | proto | `docs/backlog.md` | На ПК выделять рамкой обычным ЛКМ — снято решением |
+| UX-KEYS-1 | ✅ | proto | `docs/backlog.md` | Раздел «Управление» в настройках: какие клавиши и жесты есть. |
+| ROS-SUP-1 | ✅ | proto data | `docs/backlog.md` | Корабли поддержки — своей вкладкой. |
+| SIEGE-1 | ✅ | data proto | `docs/backlog.md` | Юнита siege в игре нет, урон по постройкам — модулем. |
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
 | BRWH-2 | ✅ | proto | `docs/backlog.md` | Четыре сгнивших харнеса починены — и два из них ловили |
 | BRWH-3 | ✅ | proto docs | `docs/backlog.md` | Общая база харнесов и снимок экрана одной |
+| BRWH-4 | ✅ | proto | `docs/backlog.md` | Штурм через «Ещё» снова под браузерной проверкой. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |
@@ -1037,8 +1042,17 @@
 | PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Журнал адаптаций |
 | PVR-5.1 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Карта второй главы и дверь к ней |
 | PVR-5.2 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Задачи на карте и награда за них |
-| PVR-5.3 | ⏳ | data cli | `docs/sector-zero-roadmap.md` | Рост числа задач по главам |
-| PVR-5.4 | ⏳ | proto cli | `docs/sector-zero-roadmap.md` | Экран итогов забега |
+| PVR-5.3 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Рост числа задач по главам |
+| PVR-5.4 | ✅ | proto cli | `docs/sector-zero-roadmap.md` | Экран итогов забега |
+| PVR-6.1 | ✅ | proto | `docs/sector-zero-roadmap.md` | Инструменты мультиплеера не едут в забег |
+| PVR-6.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | Список корпусов — только то, что игрок строит |
+| PVR-6.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Валюты: цвет и «фишка» |
+| PVR-6.4 | ✅ | data proto | `docs/sector-zero-roadmap.md` | Карточка предмета: рамка редкости и звёзды |
+| PVR-6.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Сравнение «до/после» |
+| PVR-6.6 | ✅ | proto | `docs/sector-zero-roadmap.md` | Академия и Мастерская для «взрослых детей» |
+| PVR-6.7 | ✅ | proto | `docs/sector-zero-roadmap.md` | Магазин-витрина |
+| PVR-6.8 | ✅ | proto | `docs/sector-zero-roadmap.md` | Живое главное меню |
+| PVR-6.9 | ✅ | proto | `docs/sector-zero-roadmap.md` | Выбор главы — маршрут от края сектора к эпицентру |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |
@@ -1174,14 +1188,15 @@
 | YAG-0.2 | ✅ | docs | `docs/yandex-games-roadmap.md` | Сверить страницы SDK с первоисточником 2026-09-22 |
 | YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md` | Контракты GamePlatform и WebPlatformAdapter |
 | YAG-1.1b | ✅ | proto | `docs/yandex-games-roadmap.md` | Платформенная цель сборки и раскладка архива 2026-09-22 |
+| YAG-1.1c | ✅ | proto | `docs/yandex-games-roadmap.md` | В архиве площадки — только Sector Zero 2026-09-23 |
 | YAG-1.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | YandexGamesAdapter: инициализация и жизненный цикл 2026-09-22 |
 | YAG-1.2a | ✅ | proto | `docs/yandex-games-roadmap.md` | Разметка геймплея на забеге 2026-09-22 |
 | YAG-1.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | Язык от площадки |
 | YAG-1.4 | 🔶 | proto | `docs/yandex-games-roadmap.md` | Гость и повышение до аккаунта площадки 2026-09-23 |
-| YAG-2.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PortableMetaSave: компактный дескриптор забега 2026-09-22 |
-| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformSave в адаптере Яндекса |
+| YAG-2.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | PortableMetaSave: компактный дескриптор забега 2026-09-23 |
+| YAG-2.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | PlatformSave в адаптере Яндекса |
 | YAG-3.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | PlatformAds в адаптере Яндекса |
-| YAG-3.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
+| YAG-3.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
 | YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |

@@ -45,7 +45,10 @@
       "defense": 1,
       "utility": 3
     },
-    "hullClass": "light"
+    "hullClass": "light",
+    "traits": [
+      "support"
+    ]
   },
   "cruiser": {
     "faction": "vanguard",
@@ -378,34 +381,10 @@
     "slots": {
       "utility": 1
     },
-    "hullClass": "light"
-  },
-  "siege": {
-    "faction": "blue",
-    "stats": {
-      "attack": 6,
-      "defense": 10,
-      "speed": 22,
-      "hp": 120,
-      "siegeDamage": 60
-    },
-    "line": "rear",
-    "traits": [],
-    "cost": {
-      "metal": 90,
-      "credits": 40,
-      "microelectronics": 4
-    },
-    "buildTimeHours": 5,
-    "upkeep": {
-      "credits": 48
-    },
-    "signature": 5,
-    "slots": {
-      "weapon": 1,
-      "utility": 1
-    },
-    "hullClass": "heavy"
+    "hullClass": "light",
+    "traits": [
+      "support"
+    ]
   },
   "shuttle_carrier": {
     "faction": "blue",
@@ -418,7 +397,8 @@
     },
     "line": "rear",
     "traits": [
-      "carrier"
+      "carrier",
+      "support"
     ],
     "signature": 6,
     "cost": {

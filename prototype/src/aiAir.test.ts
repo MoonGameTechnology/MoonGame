@@ -46,17 +46,28 @@ function rich(s: GameState, war = true): GameState {
 }
 
 
-describe('AI-BAL-4 — артиллерия', () => {
-  it('на войне строит `siege` — дальний огонь ведёт само ядро, приказ не нужен', () => {
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('siege');
+/** Заказанные крейсеры с осадным модулем (SIEGE-1: осада — модуль, а не корпус). */
+const siegeBuilt = (actions: Action[]): number =>
+  only(actions, 'unit.build').filter((a) => {
+    const p = a.payload as { unit: string; modules?: string[] };
+    return p.unit === 'cruiser' && !!p.modules?.includes('siege_platform');
+  }).length;
+
+describe('SIEGE-1 — осада модулем', () => {
+  it('на войне строит крейсер с модулем «Осадная платформа»', () => {
+    expect(siegeBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toBe(1);
   });
 
-  it('в мирное время артиллерию не строит', () => {
-    expect(unitsBuilt(aiOrders(rich(game2(), false), 'p2', 'expand', 'strong'))).not.toContain('siege');
+  it('в мирное время осадных крейсеров не строит', () => {
+    expect(siegeBuilt(aiOrders(rich(game2(), false), 'p2', 'expand', 'strong'))).toBe(0);
   });
 
-  it('ИГРОВОЙ бот артиллерию не строит даже на войне', () => {
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand'))).not.toContain('siege');
+  it('ИГРОВОЙ бот осадных крейсеров не строит даже на войне', () => {
+    expect(siegeBuilt(aiOrders(rich(game2()), 'p2', 'expand'))).toBe(0);
+  });
+
+  it('юнита `siege` бот не заказывает никогда — его нет в данных', () => {
+    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).not.toContain('siege');
   });
 });
 

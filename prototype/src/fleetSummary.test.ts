@@ -169,9 +169,9 @@ describe('сводка армии — ход', () => {
     expect(
       sum([
         { unit: 'scout', count: 1 },
-        { unit: 'siege', count: 1 },
+        { unit: 'shuttle_carrier', count: 1 },
       ]).speed,
-    ).toBe(data.units.siege!.stats.speed);
+    ).toBe(data.units.shuttle_carrier!.stats.speed);
   });
 
   it('СПЕШНЫЙ ОТХОД помечается только пока он действует', () => {

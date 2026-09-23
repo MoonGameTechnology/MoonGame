@@ -39,7 +39,7 @@ for (const player of [false, true]) {
     format: 'iife',
     platform: 'browser',
     loader: { '.webp': 'dataurl' },
-    define: { __PLAYER_BUILD__: String(player) },
+    define: { __PLAYER_BUILD__: String(player), __SECTOR_ZERO_ONLY__: 'false' },
   });
   const built = readFileSync(`prototype/dist/void-dominion${player ? '-player' : ''}.html`, 'utf8');
   const start = built.lastIndexOf('<script>');

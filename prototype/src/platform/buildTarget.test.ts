@@ -88,6 +88,17 @@ describe('YAG-1.1b — сниппет подключения SDK (п. 1.19.1)', 
       pageTemplate.indexOf('assets/app.js'),
     );
   });
+
+  it('лоадер SDK стоит ДО стилей, иначе `initSDK` объявляется позже, чем зовётся', () => {
+    // YAG-1.1c, нашёл робот `yandextest.mjs`. Встроенный `<script>` с `initSDK` ждёт уже
+    // запрошенные стили, а `async`-скрипт SDK — нет. Стоял лоадер после `app.css` (323 КБ)
+    // — маленький SDK доезжал раньше, его `onload` звал ещё не объявленный `initSDK`, и
+    // каждый запуск писал в консоль ReferenceError. Игра стартовала (хост видит готовый
+    // `YaGames` сам), но ошибку в консоли видит и модерация.
+    expect(pageTemplate.indexOf('SDK_LOADER')).toBeLessThan(
+      pageTemplate.indexOf('<link rel="stylesheet" href="assets/app.css">'),
+    );
+  });
 });
 
 // Форма артефакта: нужна собранная цель (см. шапку).

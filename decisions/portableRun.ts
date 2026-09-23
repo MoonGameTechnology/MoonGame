@@ -20,10 +20,11 @@
  *
  * ## Что делает форму возможной
  *
- * Мир забега **не случаен**: он строится из фиксированной карты (`pveMap`) одним и тем же
- * `buildStateFromMap`. Значит восстанавливать нечего, кроме выбора игрока — сложность,
- * докуда дошёл, что взял. Сид сюда не нужен вовсе, и это не экономия, а отсутствие
- * зависимости: дескриптор не ломается при смене генератора, потому что генератора нет.
+ * Мир забега **не случаен**: он строится из фиксированной карты главы одним и тем же
+ * `buildStateFromMap`. Значит восстанавливать нечего, кроме выбора игрока — какая глава,
+ * сложность, докуда дошёл, что взял. Сид сюда не нужен вовсе, и это не экономия, а
+ * отсутствие зависимости: дескриптор не ломается при смене генератора, потому что
+ * генератора нет. Главу несёт id карты (`map`), а не режим: у глав Sector Zero режим один.
  *
  * ⚠️ **Восстановление НЕ побайтовое, и это принято осознанно** (§2.1(а)
  * `yandex-games-roadmap.md`). Позиции флотов, идущие бои и накопленные ресурсы из
@@ -42,7 +43,7 @@
 /** Версия формата. Чужая версия читается как «сохранения нет» — см. {@link parsePortableRun}. */
 export const PORTABLE_RUN_VERSION = 1;
 
-/** Забег в переносимом виде. Шесть полей, из них два необязательных. */
+/** Забег в переносимом виде. Семь полей, из них три необязательных. */
 export interface PortableRunSave {
   v: number;
   /** Режим, под которым забег вооружён (`data.modes` id) — он же выбирает карту. */
@@ -55,11 +56,15 @@ export interface PortableRunSave {
   attempt?: number;
   /** Взятые усиления (`grantOnly`-технологии), в порядке взятия. */
   boons?: string[];
+  /** Id карты главы (`GameState.mapId`). Режим главу не определяет — у глав он общий; без
+   *  этого поля восстановление отказывает, а не угадывает главу. */
+  map?: string;
 }
 
 /** Минимум, который нужен описателю от состояния. Своя форма, а не импорт `GameState`:
  *  `decisions/` остаются чистыми, а тест не собирает мир целиком. */
 export interface RunFacts {
+  mapId?: string;
   pve?: { waveNumber?: number };
   players?: Record<string, { technologies?: { completed?: string[] } } | undefined>;
 }
@@ -90,6 +95,7 @@ export function describeRun(
     wave: Number.isSafeInteger(wave) && wave! > 0 ? wave! : 0,
     ...(Number.isSafeInteger(meta.attempt) && meta.attempt! > 0 ? { attempt: meta.attempt } : {}),
     ...(boons.length > 0 ? { boons } : {}),
+    ...(typeof facts.mapId === 'string' && facts.mapId !== '' ? { map: facts.mapId } : {}),
   };
 }
 
@@ -134,5 +140,49 @@ export function parsePortableRun(raw: string | null | undefined): PortableRunSav
     wave: save.wave!,
     ...(Number.isSafeInteger(save.attempt) && save.attempt! > 0 ? { attempt: save.attempt } : {}),
     ...(boons.length > 0 ? { boons } : {}),
+    ...(typeof save.map === 'string' && save.map !== '' ? { map: save.map } : {}),
   };
+}
+
+/** Минимум мира, который нужен восстановлению. Своя форма, а не `GameState` — по той же
+ *  причине, что {@link RunFacts}; на вход приходит настоящий мир, и он же выходит. */
+export interface ResumableState {
+  pve?: { waveNumber: number; totalWaves: number; nextWaveAt?: number };
+  players?: Record<string, { technologies?: { completed?: string[] } } | undefined>;
+}
+
+/**
+ * Свежий мир забега → тот же забег на волне из дескриптора (`YAG-2.1`). Чистая функция:
+ * вход не меняется, выход — новый мир.
+ *
+ * На вход — мир, собранный ровно как у нового запуска той же миссии и уже засеянный
+ * модулем PvE (волна 0, следующая назначена). Отсюда два решения:
+ *
+ * - **номер волны выставляется, а расписание — нет.** Следующая волна придёт через
+ *   обычный интервал: игрок вернулся — ему дают время осмотреться, а не встречают штурмом.
+ *   Волна сверх длины забега срезается до последней, и отсчёт к следующей снимается;
+ * - **усиления — только из списка режима.** Дескриптор приезжает из хранилища, которое
+ *   правит кто угодно, и без этой проверки через него можно было бы выдать себе любую
+ *   технологию каталога. Порядок сохраняется — это порядок взятия.
+ *
+ * `null` — мир не засеян или игрока в нём нет: «восстановить нечем», а не полумир.
+ */
+export function resumePortableRun<T extends ResumableState>(
+  state: T,
+  save: PortableRunSave,
+  playerId: string,
+  allowedBoons: readonly string[],
+): T | null {
+  if (!state.pve || !state.players?.[playerId]) return null;
+  const next = JSON.parse(JSON.stringify(state)) as T;
+  const pve = next.pve!;
+  pve.waveNumber = Math.min(Math.max(0, save.wave), pve.totalWaves);
+  if (pve.waveNumber >= pve.totalWaves) delete pve.nextWaveAt;
+  const player = next.players![playerId]!;
+  const completed = player.technologies?.completed ?? [];
+  const taken = (save.boons ?? []).filter(
+    (id, i, all) => allowedBoons.includes(id) && !completed.includes(id) && all.indexOf(id) === i,
+  );
+  player.technologies = { ...player.technologies, completed: [...completed, ...taken] };
+  return next;
 }

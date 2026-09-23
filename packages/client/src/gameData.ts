@@ -53,7 +53,17 @@ function missionMap(mission: number): unknown {
 
 /** A ready-to-render PvE `GameState` built from the shipped map of that mission. */
 export function pveState(data: GameData, mission = 0): GameState {
-  return buildStateFromMap(parseMatchMap(missionMap(mission)), data);
+  const map = parseMatchMap(missionMap(mission));
+  // Id карты — в сам мир: у глав один режим, и только по карте видно, КАКАЯ это глава.
+  // Его читает дескриптор забега (`YAG-2.1`), чтобы восстановить ту же главу, а не первую.
+  return { ...buildStateFromMap(map, data), mapId: map.id };
+}
+
+/** Глава по id её карты — обратное к {@link pveState}. `null` — такой главы в поставке
+ *  нет (карту переименовали или убрали): восстанавливать нечего, угадывать нельзя. */
+export function pveMissionOfMap(mapId: string | undefined): number | null {
+  const at = PVE_MISSIONS.findIndex((map) => parseMatchMap(map).id === mapId);
+  return mapId === undefined || at < 0 ? null : at;
 }
 
 /** Дополнительные задачи главы — объявлены в карте, проверяются чистым предикатом
@@ -61,6 +71,21 @@ export function pveState(data: GameData, mission = 0): GameState {
  *  нормальный случай: задачи ДОПОЛНИТЕЛЬНЫЕ. */
 export function pveObjectives(mission = 0): MapObjective[] {
   return parseMatchMap(missionMap(mission)).objectives;
+}
+
+/** Глава забега одной структурой (PVR-5.3): id карты — ключ счёта выполненных задач в
+ *  профиле, запас задач и правило их показа. */
+export function pveChapter(mission = 0): {
+  id: string;
+  objectives: MapObjective[];
+  slots?: { base: number; cap: number };
+} {
+  const map = parseMatchMap(missionMap(mission));
+  return {
+    id: map.id,
+    objectives: map.objectives,
+    ...(map.objectiveSlots ? { slots: map.objectiveSlots } : {}),
+  };
 }
 
 /** The mode the mission's map declares itself played under (`data.modes` id), for the host

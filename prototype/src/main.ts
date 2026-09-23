@@ -180,7 +180,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveObjectives } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveChapter, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -254,7 +254,7 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
-import { missionProgress } from '../../decisions/missionObjectives';
+import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
@@ -266,8 +266,16 @@ import {
   type RunSave,
   type RunSaveStore,
 } from '../../decisions/runSave';
-import { localRunSaveStore } from './runSaveLocal';
-import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
+import { localRunSaveStore, PORTABLE_RUN_KEY } from './runSaveLocal';
+import { portableRunPreview, sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
+import {
+  describeRun,
+  parsePortableRun,
+  resumePortableRun,
+  serializePortableRun,
+  type PortableRunSave,
+} from '../../decisions/portableRun';
+import { SECTOR_ZERO_ABSENT_TOOLS, toolShown, type SessionTool } from '../../decisions/sectorZeroTools';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
 import { getPlatform, type PlatformHost } from './platform/host';
@@ -950,6 +958,16 @@ function stanceCol(st: DiplomaticStance): string {
 // `const` alias would fold but not propagate), and build.mjs strips their markup.
 // `false` = the full dev client, today's behavior unchanged.
 declare const __PLAYER_BUILD__: boolean;
+// Product profile (`YAG-1.1c`) — REQUIRED by every bundler, like `__PLAYER_BUILD__`.
+// `true` bakes ONLY the platform archive (dist/yandex/): Sector Zero without the rest of
+// Void Dominion. The hub screens, the live-match tools a run never shows (chat, pings,
+// corporation, market, steward — `decisions/sectorZeroTools.ts`), the link doors
+// (`?join=`, `?reset=`) and the APK updater are compiled out. Cut with a CONDITION —
+// `__SECTOR_ZERO_ONLY__ ? null : initX(…)` or `if (!__SECTOR_ZERO_ONLY__) …` — never with
+// an early `return`: esbuild drops the imports of an unreachable branch, but code after a
+// `return` still holds on to them. What must stay out is checked against the bundler's
+// own inventory in `platform/productCut.test.ts`.
+declare const __SECTOR_ZERO_ONLY__: boolean;
 // Runtime dev chrome (FPS overlay, the welcome-screen «Тесты» button): hidden from
 // players, flipped on with `?dev` in the URL or localStorage 'vd.dev'='1' (persists
 // per device). A live DESYNC still surfaces the overlay to everyone — that's a bug
@@ -1020,7 +1038,6 @@ const RAIL = 50; // left-rail width
 const BUILD_UNITS = [
   'cruiser',
   'scout',
-  'siege',
   'strike_carrier',
   'shuttle_carrier',
   'interceptor',
@@ -1181,31 +1198,33 @@ let sessionMessages: SessionMsg[] = [];
 // бы загрузку целиком. Все зависимости взяты ленивo — стрелками, поэтому объявленные
 // ниже `NAME`/`VW`/`MOBILE` читаются в момент вызова, а не сейчас.
 // пользуются рейл, реестр слоёв Back/Escape и приход нового сообщения.
-const chatWin = initChat(
-  {
-    root: () => document.getElementById('chatwin'),
-    viewport: () => ({ w: VW, h: VH }),
-    isMobile: () => MOBILE,
-    groupTabs: () => [
-      { key: CH_SESSION, label: t('chat.tab.session'), icon: '△' },
-      { key: CH_GLOBAL, label: t('chat.tab.global'), icon: '🌐' },
-      { key: COALITION, label: t('chat.tab.coalition'), icon: '⬡' },
-    ],
-    isGroup: (key) => GROUP_CHANNELS.has(key),
-    messages: () => sessionMessages,
-    me: () => ME,
-    seatExists: (id) => !!s.players[id],
-    seatLabel: (id) => NAME[id] ?? id,
-    seatIcon: (id) => seatBadge(id).icon,
-    convoMessages: (key) => conversations.messagesOf(key),
-    lineHtml: (m, stamp) => conversations.lineHtml(m as SessionMsg, stamp),
-    dispatch: dispatchChat,
-    openSeatCard,
-    jumpToPing,
-  },
-  CH_SESSION,
-);
-document.getElementById('rail-chat')?.addEventListener('click', () => chatWin.toggle());
+const chatWin = __SECTOR_ZERO_ONLY__
+  ? null
+  : initChat(
+      {
+        root: () => document.getElementById('chatwin'),
+        viewport: () => ({ w: VW, h: VH }),
+        isMobile: () => MOBILE,
+        groupTabs: () => [
+          { key: CH_SESSION, label: t('chat.tab.session'), icon: '△' },
+          { key: CH_GLOBAL, label: t('chat.tab.global'), icon: '🌐' },
+          { key: COALITION, label: t('chat.tab.coalition'), icon: '⬡' },
+        ],
+        isGroup: (key) => GROUP_CHANNELS.has(key),
+        messages: () => sessionMessages,
+        me: () => ME,
+        seatExists: (id) => !!s.players[id],
+        seatLabel: (id) => NAME[id] ?? id,
+        seatIcon: (id) => seatBadge(id).icon,
+        convoMessages: (key) => conversations.messagesOf(key),
+        lineHtml: (m, stamp) => conversations.lineHtml(m as SessionMsg, stamp),
+        dispatch: dispatchChat,
+        openSeatCard,
+        jumpToPing,
+      },
+      CH_SESSION,
+    );
+document.getElementById('rail-chat')?.addEventListener('click', () => chatWin?.toggle());
 
 let diploOpen = false;
 let diploTab: 'diplo' | 'msgs' | 'intel' = 'diplo';
@@ -1570,7 +1589,7 @@ function resize() {
   if (canvas.height !== height) canvas.height = height;
   canvas.style.width = VW + 'px';
   canvas.style.height = VH + 'px';
-  chatWin.onViewportResize(); // the half-screen cap follows the new viewport
+  chatWin?.onViewportResize(); // the half-screen cap follows the new viewport
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', resize);
 resize();
@@ -3330,7 +3349,7 @@ function tellSteward(kind: StewardEvent, p: Record<string, unknown>): void {
   } else {
     note(t(r.key));
   }
-  if (steward.isOpen()) steward.repaint();
+  if (steward?.isOpen()) steward.repaint();
 }
 
 /** Рассказать игроку о событии стройки — правила в `buildLog.ts` (REFM-175). */
@@ -3829,6 +3848,9 @@ const matchEnd = initMatchEnd({
   loadMeta,
   saveMeta,
   runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
+  // Dev-забег не засчитывается — его разбивки нет, и чужую (прошлого забега) не показываем.
+  runSummary: () =>
+    sectorDevActive || sectorProgress.lastRun?.attempt !== sectorAttempt ? null : sectorProgress.lastRun,
 });
 
 // --- rendering ---------------------------------------------------------------
@@ -6472,10 +6494,17 @@ function fleetPanelHtml(f: Fleet): string {
   return objectPanelHtml(h, detail);
 }
 
+/** Кнопка «Пинг» карточки мира. Маркер коалиции делится с союзником-человеком, поэтому
+ *  в одиночном забеге Sector Zero её нет (PVR-6.1). */
+function pingRowHtml(): string {
+  if (!toolShown('pings', sectorZeroToolsHidden())) return '';
+  return `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+}
+
 /** Side-panel: a world outside sensor coverage — last-scan memory, or no telemetry. */
 function unknownPlanetHtml(p: Planet): string {
   const mem = memory.get(p.id);
-  const ping = `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+  const ping = pingRowHtml();
   if (mem) {
     const icons =
       mem.buildings
@@ -6644,7 +6673,7 @@ function planetPanelHtml(p: Planet): string {
   }
 
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
-  h += `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+  h += pingRowHtml();
 
   // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
   // window lives its countdown replaces the button — the node stays identified.
@@ -6944,7 +6973,7 @@ function refreshSeatCard(id: string): void {
   const el = document.getElementById('playercard');
   if (el && el.dataset.seat === id) el.innerHTML = `<div class="pcbox">${seatCardHtml(id)}</div>`;
   if (diploOpen) renderDiplo();
-  chatWin.refreshIfVisible();
+  chatWin?.refreshIfVisible();
 }
 
 // --- session diplomacy & comms menu ------------------------------------------
@@ -7028,7 +7057,7 @@ function pushMsg(to: string, text: string, sys: boolean, from = ME, ping?: strin
   sessionMessages.push({ at: s.time, from, to, text, sys, ping, realAt: Date.now() });
   if (sessionMessages.length > 300) sessionMessages.shift();
   if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-  chatWin.refreshIfVisible();
+  chatWin?.refreshIfVisible();
 }
 
 /** Route an outgoing chat line for conversation key `key` (a group channel const or
@@ -8463,7 +8492,7 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'holdpoint') {
     playerOrder(setHoldPoint(ME, selPlanet!, arg === 'on'));
   } else if (act === 'ping') {
-    pings.openMenu();
+    pings?.openMenu();
   } else if (act === 'bombard') {
     playerOrder(bombardFleet(ME, selFleet!, arg === 'on'));
   } else if (act === 'assault') {
@@ -8902,7 +8931,7 @@ cmdbar.addEventListener('click', (ev) => {
 
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
 function selectAt(mx: number, my: number) {
-  pings.closePop(); // any map tap dismisses an open ping popup (a marker tap reopens below)
+  pings?.closePop(); // any map tap dismisses an open ping popup (a marker tap reopens below)
   // CHAIN-UX: в режиме «Приказ» карта — рабочая поверхность построения плана.
   // Ветка стоит ПЕРВОЙ: пока режим жив, ни выделение, ни прочие перехваты тапов
   // не работают — тап это всегда «точка плана или закрыть меню».
@@ -9112,7 +9141,7 @@ function selectAt(mx: number, my: number) {
   if (!aiming) {
     const ping = nearestHit(pingHits, (h) => h, mx, my, rPing);
     if (ping) {
-      pings.openPop(ping.loc);
+      pings?.openPop(ping.loc);
       return;
     }
   }
@@ -9635,7 +9664,7 @@ const techTree = initTechTree({
   onOpen: () => maybeIntro('tech'),
 });
 // PING-PANEL: кнопка рельсы (окна ведёт `pingUi.ts`).
-document.getElementById('rail-pings')?.addEventListener('click', () => pings.togglePanel());
+document.getElementById('rail-pings')?.addEventListener('click', () => pings?.togglePanel());
 document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
 
 // --- BUILD-1: окно построек мира ---------------------------------------------
@@ -9674,16 +9703,18 @@ let lastStewAt = 0;
 let lastBattleWinAt = 0;
 let lastBuildAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
-const steward = initSteward({
-  root: () => stewWin,
-  body: () => $('stewardbody'),
-  state: () => s,
-  me: () => ME,
-  order: playerOrder,
-  onOpen: () => maybeIntro('steward'),
-  openTech: () => techTree.open(),
-});
-document.getElementById('rail-steward')?.addEventListener('click', () => steward.open());
+const steward = __SECTOR_ZERO_ONLY__
+  ? null
+  : initSteward({
+      root: () => stewWin,
+      body: () => $('stewardbody'),
+      state: () => s,
+      me: () => ME,
+      order: playerOrder,
+      onOpen: () => maybeIntro('steward'),
+      openTech: () => techTree.open(),
+    });
+document.getElementById('rail-steward')?.addEventListener('click', () => steward?.open());
 
 // --- окно боя (заказ владельца 2026-09-15) -----------------------------------
 // Значок боя на карте и так показывал фазу и отсчёт до раунда; теперь он ОТКРЫВАЕТСЯ.
@@ -9738,14 +9769,16 @@ const heroStaff = initHeroStaff({
 // The Android-Back / Escape layer stack still needs the node itself (it is a registry
 // of «layer → how to close it», see the REFM-1 note) — one handle, shared.
 const marketWin = $('market');
-const market = initMarket({
-  root: () => marketWin,
-  state: () => s,
-  me: () => ME,
-  order: playerOrder,
-  onOpen: () => maybeIntro('market'),
-});
-document.getElementById('rail-market')?.addEventListener('click', () => market.open());
+const market = __SECTOR_ZERO_ONLY__
+  ? null
+  : initMarket({
+      root: () => marketWin,
+      state: () => s,
+      me: () => ME,
+      order: playerOrder,
+      onOpen: () => maybeIntro('market'),
+    });
+document.getElementById('rail-market')?.addEventListener('click', () => market?.open());
 
 // --- resource card (RC-1): tap a resource chip → popup with stats + market button -
 const resCardEl = $('rescard');
@@ -9754,7 +9787,8 @@ const resourceCard = initResourceCard({
   state: () => s,
   me: () => ME,
   icons: RES_SVG,
-  onOpenMarket: (res) => market.open(res),
+  onOpenMarket: (res) => market?.open(res),
+  marketShown: () => toolShown('market', sectorZeroToolsHidden()),
 });
 
 
@@ -9773,7 +9807,7 @@ const shipyard = initShipyard({
   order: playerOrder,
   note: (msg) => note(msg),
   errText,
-  arsenalItems: () => arsenal.items(),
+  arsenalItems: () => arsenal?.items() ?? [],
   preparedModules: (hull) => isSectorZeroRun() ? [...(runShipLoadouts[hull] ?? [])] : undefined,
   onOpen: () => maybeIntro('constructor'),
   // The «Герои» pane: the hero roster/штаб lives in `heroStaff.ts` (REFM-14) — the
@@ -9938,10 +9972,10 @@ function hubTab(tab: string): void {
   // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
   if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
-  if (tab === 'friends') detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
-  if (tab === 'rank') detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
-  if (tab === 'arsenal') detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
-  if (tab === 'auction') detach('хаб: аукцион', metaMarket.refresh());
+  if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
+  if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
+  if (tab === 'arsenal' && arsenal) detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
+  if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
@@ -10015,20 +10049,24 @@ async function hubAuthorizedBase(): Promise<{ base: string; token: string } | nu
   );
 }
 
-const friends = initFriends({
-  root: () => $('hp-friends'),
-  authorizedBase: hubAuthorizedBase,
-});
+const friends = __SECTOR_ZERO_ONLY__
+  ? null
+  : initFriends({
+      root: () => $('hp-friends'),
+      authorizedBase: hubAuthorizedBase,
+    });
 
 // --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
 // Доски считает сервер (`leaderboardApi.ts`): своё место — по ВСЕЙ популяции, а не по
 // присланной странице, поэтому клиент его вывести и не смог бы. Доступ — та же
 // политика, что у «Друзей»: переиспользуем добытую входом сессию, пароль ради
 // просмотра не спрашиваем; нет сессии — гостевое состояние с причиной.
-const rank = initRank({
-  root: () => $('hp-rank'),
-  authorizedBase: hubAuthorizedBase,
-});
+const rank = __SECTOR_ZERO_ONLY__
+  ? null
+  : initRank({
+      root: () => $('hp-rank'),
+      authorizedBase: hubAuthorizedBase,
+    });
 
 // --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
 // The витрина itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks.
@@ -10036,29 +10074,33 @@ const rank = initRank({
 // policy: it may reuse a session token a prior join already stashed, but must never
 // prompt for a password just to LOOK at the collection — no server, no accounts or
 // no stashed session all read the same way (null ⇒ keep the cached paint).
-const arsenal = initArsenal({
-  root: () => $('hp-arsenal'),
-  readCache: () => {
-    try {
-      return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
-    } catch {
-      return null;
-    }
-  },
-  writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
-  openCodex,
-  authorizedBase: hubAuthorizedBase,
-});
+const arsenal = __SECTOR_ZERO_ONLY__
+  ? null
+  : initArsenal({
+      root: () => $('hp-arsenal'),
+      readCache: () => {
+        try {
+          return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
+        } catch {
+          return null;
+        }
+      },
+      writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
+      openCodex,
+      authorizedBase: hubAuthorizedBase,
+    });
 // EC-3 «Аукцион»: витрина торговли мета-предметами. Лоты и кошелёк живут на сервере,
 // поэтому кэша, как у арсенала, здесь нет — экран всегда спрашивает свежее.
-const metaMarket = initMetaMarket({
-  root: () => $('hp-auction'),
-  arsenal: () => arsenal.items(),
-  authorizedBase: hubAuthorizedBase,
-  note: (message) => {
-    hubNote.textContent = message;
-  },
-});
+const metaMarket = __SECTOR_ZERO_ONLY__
+  ? null
+  : initMetaMarket({
+      root: () => $('hp-auction'),
+      arsenal: () => arsenal?.items() ?? [],
+      authorizedBase: hubAuthorizedBase,
+      note: (message) => {
+        hubNote.textContent = message;
+      },
+    });
 
 function arsenalKey(): string {
   return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
@@ -10069,31 +10111,33 @@ function arsenalKey(): string {
 // Само досье живёт в `profileScreen.ts` (REFM-10); здесь только его хуки. Ключ кэша
 // медалей — по позывному, рядом с остальными ключами. `authorizedBase` кодирует ту же
 // политику, что у «Арсенала»: за паролем ради ПОСМОТРЕТЬ витрину не ходим.
-const profile = initProfile({
-  root: () => $('profile'),
-  view: () => {
-    const st = loadMeta();
-    return {
-      nick: nickInput.value,
-      xp: st.xp,
-      stats: st.stats,
-      corp: (() => {
-        const c = corp.mine().corp;
-        return c ? { name: c.name, influence: c.influence } : null;
-      })(),
-      sovereigns: SOVEREIGNS,
-    };
-  },
-  readCache: () => {
-    try {
-      return JSON.parse(localStorage.getItem(medalsKey()) ?? 'null');
-    } catch {
-      return null;
-    }
-  },
-  writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
-  authorizedBase: hubAuthorizedBase,
-});
+const profile = __SECTOR_ZERO_ONLY__
+  ? null
+  : initProfile({
+      root: () => $('profile'),
+      view: () => {
+        const st = loadMeta();
+        return {
+          nick: nickInput.value,
+          xp: st.xp,
+          stats: st.stats,
+          corp: (() => {
+            const c = corp?.mine().corp;
+            return c ? { name: c.name, influence: c.influence } : null;
+          })(),
+          sovereigns: SOVEREIGNS,
+        };
+      },
+      readCache: () => {
+        try {
+          return JSON.parse(localStorage.getItem(medalsKey()) ?? 'null');
+        } catch {
+          return null;
+        }
+      },
+      writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
+      authorizedBase: hubAuthorizedBase,
+    });
 const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
 
 // --- вход в хаб и зеркало аккаунтного XP ---------------------------------------
@@ -10405,59 +10449,62 @@ $('crecback').addEventListener('click', () => {
 // сервер отдаёт сессию в ответе, поэтому дальше сразу хаб.
 const cresetPassInput = $('cresetpass') as HTMLInputElement;
 const cresetPass2Input = $('cresetpass2') as HTMLInputElement;
-const passwordReset = initPasswordReset({
-  fields: () => ({ pass: cresetPassInput, pass2: cresetPass2Input }),
-  status: (msg) => {
-    statusEl.textContent = msg;
-  },
-  busy: () => signingIn,
-  setBusy: (v) => {
-    signingIn = v;
-  },
-  submit: async (token, password) => {
-    const srv = resolveServer();
-    if (!srv) return null;
-    const res = await fetch(`${httpBase(srv.base)}/auth/reset`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token, password }),
-    }).catch(() => null);
-    if (!res) return null;
-    return { ok: res.ok, body: await res.json().catch(() => ({})) };
-  },
-  onSuccess: (login, token) => {
-    const srv = resolveServer();
-    if (srv) saveSession(localStorage, srv.base, { login, token });
-    localStorage.setItem('void.nick', login);
-    nickInput.value = login;
-    note('✔ ' + t('auth.reset.done'));
-    openHub();
-  },
-  showStage: () => {
-    showConnect(true);
-    showHub(false);
-    showStage('reset');
-    // Подсказать менеджеру паролей, К КАКОМУ аккаунту этот новый пароль (скрытое
-    // `autocomplete="username"`); без этого запись сохранится ни к чему не привязанной.
-    const resetUser = document.getElementById('cresetuser');
-    if (resetUser instanceof HTMLInputElement) {
-      resetUser.value = (localStorage.getItem('void.nick') ?? '').trim();
-    }
-  },
+const passwordReset = __SECTOR_ZERO_ONLY__
+  ? null
+  : initPasswordReset({
+      fields: () => ({ pass: cresetPassInput, pass2: cresetPass2Input }),
+      status: (msg) => {
+        statusEl.textContent = msg;
+      },
+      busy: () => signingIn,
+      setBusy: (v) => {
+        signingIn = v;
+      },
+      submit: async (token, password) => {
+        const srv = resolveServer();
+        if (!srv) return null;
+        const res = await fetch(`${httpBase(srv.base)}/auth/reset`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ token, password }),
+        }).catch(() => null);
+        if (!res) return null;
+        return { ok: res.ok, body: await res.json().catch(() => ({})) };
+      },
+      onSuccess: (login, token) => {
+        const srv = resolveServer();
+        if (srv) saveSession(localStorage, srv.base, { login, token });
+        localStorage.setItem('void.nick', login);
+        nickInput.value = login;
+        note('✔ ' + t('auth.reset.done'));
+        openHub();
+      },
+      showStage: () => {
+        showConnect(true);
+        showHub(false);
+        showStage('reset');
+        // Подсказать менеджеру паролей, К КАКОМУ аккаунту этот новый пароль (скрытое
+        // `autocomplete="username"`); без этого запись сохранится ни к чему не привязанной.
+        const resetUser = document.getElementById('cresetuser');
+        if (resetUser instanceof HTMLInputElement) {
+          resetUser.value = (localStorage.getItem('void.nick') ?? '').trim();
+        }
+      },
+    });
+$('cresetgo').addEventListener('click', () => {
+  if (passwordReset) detach('сброс пароля: отправка', passwordReset.submit());
 });
-$('cresetgo').addEventListener('click', () =>
-  detach('сброс пароля: отправка', passwordReset.submit()),
-);
 cresetPassInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') cresetPass2Input.focus();
 });
 cresetPass2Input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') detach('сброс пароля: отправка', passwordReset.submit());
+  if (e.key === 'Enter' && passwordReset) detach('сброс пароля: отправка', passwordReset.submit());
 });
 /** Open the reset stage for a «?reset=<token>» deep-link (called from the first-run gate). */
 function openReset(token: string): void {
   // Токен — живая 15-минутная возможность угона аккаунта, поэтому он не должен остаться
   // в адресной строке и истории (referer, «назад», синхронизация между устройствами).
+  if (!passwordReset) return;
   const cleaned = passwordReset.open(token, location.href);
   try {
     if (cleaned !== location.href) history.replaceState(null, '', cleaned);
@@ -10555,6 +10602,7 @@ const settings = initSettings({
     youColor,
     neutralColor,
     palette: rivalPaletteId,
+    touchOnly: !pcUi(),
   }),
   setSweepOpacity,
   setOwnPings: setShowOwnPings,
@@ -10604,10 +10652,13 @@ let cameFromLink = false;
  *  `pendingJoin.ts` (REFM-51) for why that matters. */
 const pendingJoinAfterAuth = createPendingJoin();
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
-const bootReset = (bootParams?.get('reset') ?? '').trim();
+// YAG-1.1c: в архиве площадки обе двери по ссылке закрыты — и сброс пароля, и вход в
+// партию ведут в основную игру, которой там нет. Любой адрес открывает Sector Zero.
+const bootReset = __SECTOR_ZERO_ONLY__ ? '' : (bootParams?.get('reset') ?? '').trim();
 // ADDR-3: партия адресуется ПУТЁМ (`/game/<id>`), но старый хвост (`?join=<id>`) уже
 // роздан игрокам и лежит в закладках — читаем обе формы, пишем только новую.
-const bootJoinId = bootParams ? matchIdFrom(location.pathname, bootParams) : '';
+const bootJoinId =
+  !__SECTOR_ZERO_ONLY__ && bootParams ? matchIdFrom(location.pathname, bootParams) : '';
 // ADDR-2: что ссылка просит СВЕРХ адреса партии. Отдельный вопрос от «куда вести» —
 // решение в `decisions/matchAddress.ts` (правила: адрес несёт только id, параметры
 // захвата одноразовы, сидящему в партии они не адресованы вовсе).
@@ -11551,11 +11602,11 @@ function netClientFor(seat: string): MultiplayerClient {
           realAt: Date.now(),
         });
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        chatWin.refreshIfVisible();
+        chatWin?.refreshIfVisible();
       },
       onPingRemoved: (pingId: string) => {
         sessionMessages = sessionMessages.filter((m) => m.pingId !== pingId);
-        pings.closePop();
+        pings?.closePop();
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
       },
       // Server-relayed chat (recipients decided server-side, like fog). Our own lines
@@ -11585,7 +11636,7 @@ function netClientFor(seat: string): MultiplayerClient {
         if (sessionMessages.length > 300) sessionMessages.shift();
         if (m.from !== ME) unreadMsgs++;
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        chatWin.refreshIfVisible();
+        chatWin?.refreshIfVisible();
       },
       onError: (code) => {
         // Где игрок увидит отказ — `errorRoute.ts` (REFM-149): отказ устаревшего сокета
@@ -12839,7 +12890,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   // --- модалки поверх всего (z60…z57) ---
   { id: 'solo-replace', isOpen: () => flexed('solo-replace'), close: closeSoloReplace }, // z60
-  { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
+  { id: 'corp', isOpen: () => flexed('corp'), close: () => corp?.close() }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
   // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
   {
@@ -12868,7 +12919,7 @@ const BACK_LAYERS: BackLayer[] = [
     },
   }, // z58
   { id: 'recap', isOpen: () => shown('recap'), close: () => hide('recap') }, // z57
-  { id: 'profile', isOpen: () => shown('profile'), close: () => profile.close() }, // z57
+  { id: 'profile', isOpen: () => shown('profile'), close: () => profile?.close() }, // z57
   // --- окна и карточки (z51…z44) ---
   { id: 'rescard', isOpen: () => resCardEl.classList.contains('show'), close: () => resCardEl.classList.remove('show') }, // z51
   // Обучающий тур (ONB-1): его панели глотают клики, так что без этой ступени игрок в
@@ -12896,7 +12947,7 @@ const BACK_LAYERS: BackLayer[] = [
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
   { id: 'warprompt', isOpen: () => warPrompt !== null, close: () => cancelWarPrompt() }, // z48
-  { id: 'pingmenu', isOpen: () => pings.menuOpen(), close: () => pings.closeMenu() }, // z47
+  { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
   // Окно боя — та же ступень z47, что и «Хранитель»: оно модалка поверх карты, и Back
@@ -12919,11 +12970,11 @@ const BACK_LAYERS: BackLayer[] = [
   }, // z46
   { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
-  { id: 'pingpanel', isOpen: () => pings.panelOpen(), close: () => pings.closePanel() }, // z60
-  { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings.closePop() }, // z45
+  { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
+  { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
   // --- низ экрана (z27…z20) ---
-  { id: 'chatwin', isOpen: () => chatWin.isOpen(), close: () => chatWin.close() }, // z27
+  { id: 'chatwin', isOpen: () => chatWin?.isOpen() ?? false, close: () => chatWin?.close() }, // z27
   { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => { mobileChoices = []; } },
   // Поповеры ряда команд живут ВНУТРИ #cmdbar: прячет их ближайший renderCmdBar, но
   // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
@@ -13158,6 +13209,9 @@ function restoreSolo(): void {
  * ниже не изменится — в этом и была цена асинхронного интерфейса.
  */
 const runSaveStore: RunSaveStore = localRunSaveStore();
+// Дескриптор забега (`YAG-2.1`) — рядом с полным снимком. Снимок точнее, дескриптор живучее:
+// шесть полей переживают смену формы мира после обновления игры, блоб — нет.
+const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY);
 const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY);
 // Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
 // Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
@@ -13187,19 +13241,40 @@ let sectorRunActive = false;
  * где живёт одно правило.
  *
  * Та же дверь включает и выключает темп перемещения забега (PVR-2.3): ×5 ко всем скоростям
- * карты живёт ровно столько, сколько живёт забег, по тем же пяти точкам.
+ * карты живёт ровно столько, сколько живёт забег, во всех тех же точках.
  */
 function setRunActive(on: boolean): void {
   sectorRunActive = on;
   setMatchTravelSpeed(on ? RUN_TRAVEL_SPEED : 1);
+  syncSectorZeroTools();
   const api = getPlatform() as Partial<PlatformHost>;
   if (on) api.gameplayStart?.();
   else api.gameplayStop?.();
 }
 
+/** Идёт ли забег Sector Zero — для ИНТЕРФЕЙСА. Не `isSectorZeroRun()`: тот ждёт ещё и
+ *  секцию `s.pve`, а она появляется позже, чем `setRunActive(true)`, — синхронизация на
+ *  нём видела «не забег» и оставляла кнопки (поймал `sectorzerotest.mjs`). Флаг же ставят
+ *  только забеги Sector Zero. */
+function sectorZeroToolsHidden(): boolean {
+  return sectorRunActive && !NET;
+}
+/** PVR-6.1: мультиплеерных кнопок рельса в забеге Sector Zero нет — чат, почта, маркеры,
+ *  корпорация, рынок, «Сон» (`decisions/sectorZeroTools.ts`). Флаг забега меняется только
+ *  через `setRunActive`, поэтому синхронизация живёт там и возвращает кнопки на выходе. */
+function syncSectorZeroTools(): void {
+  const run = sectorZeroToolsHidden();
+  for (const [tool, id] of Object.entries(SECTOR_ZERO_ABSENT_TOOLS)) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = toolShown(tool as SessionTool, run) ? '' : 'none';
+  }
+}
+
 let sectorDevActive = false;
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
+/** Дескриптор с прошлой сессии — запасной путь, когда полный снимок не читается. */
+let savedPortable: PortableRunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
 /** Выбранная ГЛАВА забега (0 — первая). Живёт рядом со сложностью и хранится так же:
  *  это тот же род настройки запуска. Клампит `pveState` — испорченное хранилище открывает
@@ -13210,6 +13285,13 @@ let progressWrite = sectorProgressStore.load().then(raw => {
   sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
 });
 let clearedAttempt = 0;
+
+/** Задачи главы, видимые в забеге по текущему профилю (PVR-5.3). Профиль меняется только
+ *  засчётом, поэтому набор стоит неизменным весь забег. */
+function chapterShown(mission: number) {
+  const chapter = pveChapter(mission);
+  return shownObjectives(chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? [], chapter.slots);
+}
 
 function saveSectorProgress(next: SectorZeroProgress): void {
   sectorProgress = next;
@@ -13253,11 +13335,11 @@ const sectorPreparation = initSectorZeroPreparation({
   // Суверены тратятся там, где у них есть кран — покупка ИЛИ ролик (`SZE-3.5`).
   platform: shopCapabilities(platform.capabilities),
   sync: syncShopDay,
-  watchAd: async placement => {
-    platform.analytics.emit('rewarded_ad_offered', { placement });
+  watchAd: async (placement, props) => {
+    platform.analytics.emit('rewarded_ad_offered', { placement, ...props });
     const shown = await platform.ads.showRewardedAd({ placement });
-    if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement });
-    return shown.status === 'ok';
+    if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement, ...props });
+    return shown.status;
   },
   progress: () => sectorProgress,
   change: action => {
@@ -13282,14 +13364,22 @@ const sectorZeroMenu = initSectorZeroMenu({
         sectorProgress,
         savedRun.sectorZeroAttempt ?? 0,
         savedRun.state as GameState,
-        pveObjectives(sectorMission),
+        pveChapter(savedRun.sectorZeroMission ?? sectorMission),
       );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
       await runSaveStore.clear();
+      await portableRunStore.clear();
       savedRun = null;
     }
-    return sectorZeroRunPreview(savedRun, pveModeId() ?? '');
+    const full = sectorZeroRunPreview(savedRun, pveModeId() ?? '');
+    if (full) return full;
+    // Полного снимка нет или он не читается (игру обновили, форма мира сменилась) —
+    // карточка по дескриптору: тот же забег, та же волна, но мир соберётся заново.
+    savedPortable = parsePortableRun(await portableRunStore.load());
+    const mode = pveModeId() ?? '';
+    const known = pveMissionOfMap(savedPortable?.map) !== null;
+    return portableRunPreview(known ? savedPortable : null, mode, data.modes[mode]?.pve?.waves ?? 0);
   },
   difficulty: () => nextSectorDifficulty,
   setDifficulty: value => {
@@ -13297,6 +13387,13 @@ const sectorZeroMenu = initSectorZeroMenu({
     writeRaw('void.pveDifficulty', value);
   },
   mission: () => nextSectorMission,
+  chapters: PVE_MISSION_COUNT,
+  chapterInfo: index => ({
+    waves: data.modes[pveModeId(index) ?? '']?.pve?.waves ?? 0,
+    tasks: chapterShown(index).length,
+    pool: pveChapter(index).objectives.length,
+    cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
+  }),
   setMission: value => {
     nextSectorMission = value;
     writeRaw('void.pveMission', String(value));
@@ -13354,18 +13451,28 @@ function currentRunSave(): RunSave<GameState> | null {
   const mode = matchMode();
   if (!mode) return null;
   return { v: RUN_SAVE_VERSION, mode, difficulty: pveDifficulty, state: s,
-    sectorZeroAttempt: sectorAttempt, shipLoadouts: runShipLoadouts };
+    sectorZeroAttempt: sectorAttempt, shipLoadouts: runShipLoadouts, sectorZeroMission: sectorMission };
 }
 function saveRun(): void {
   const save = currentRunSave();
   if (!save || (s.match.status === 'ended' && clearedAttempt === sectorAttempt)) return;
   const blob = serializeRunSave(save);
-  runWrite = runWrite.then(() => runSaveStore.save(blob));
+  const boons = data.modes[save.mode]?.pve?.boons ?? [];
+  const portable = serializePortableRun(
+    describeRun(s, ME, (id) => boons.includes(id), {
+      mode: save.mode,
+      difficulty: save.difficulty,
+      attempt: sectorAttempt,
+    }),
+  );
+  runWrite = runWrite.then(() => runSaveStore.save(blob)).then(() => portableRunStore.save(portable));
 }
 
 function awardSectorRun(): number {
   if (sectorDevActive) return 0;
-  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s);
+  // Задачи главы платят и здесь, в обычном конце забега (раньше их платил только засчёт
+  // после перезагрузки — PVR-5.3 нашёл это при переходе на запас задач).
+  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, pveChapter(sectorMission));
   if (next !== sectorProgress) {
     // Journal the terminal run before its award. If the page closes between the
     // two writes, opening the menu settles the same serial exactly once.
@@ -13386,7 +13493,10 @@ function tickRunSave(nowReal: number): void {
       awardSectorRun();
       clearedAttempt = sectorAttempt;
       const awardWrite = progressWrite;
-      runWrite = runWrite.then(() => awardWrite).then(() => runSaveStore.clear());
+      runWrite = runWrite
+        .then(() => awardWrite)
+        .then(() => runSaveStore.clear())
+        .then(() => portableRunStore.clear());
     }
     return;
   }
@@ -13405,12 +13515,13 @@ function restoreRun(): boolean {
   // этом не трогаем — он дождётся обычного запуска.
   if (cameFromLink || NET) return false;
   const save = savedRun;
-  if (!save || !sectorZeroRunPreview(save, pveModeId() ?? '')) return false;
+  // Полный снимок недоступен — запасной путь по дескриптору (`YAG-2.1`).
+  if (!save || !sectorZeroRunPreview(save, pveModeId() ?? '')) return restorePortable();
   const state = save.state as GameState;
   // Режим из снимка может не существовать в задеплоенных данных (игру обновили) —
   // тогда восстанавливать нельзя: волны пошли бы по другим правилам, а то и не пошли.
   if (!data.modes[save.mode]) {
-    return false;
+    return restorePortable();
   }
   const priorState = s;
   const priorMode = matchMode();
@@ -13427,12 +13538,13 @@ function restoreRun(): boolean {
     setRunActive(priorRunActive);
     sectorDevActive = priorDevActive;
     speed = 0;
-    return false;
+    return restorePortable();
   }
   pveDifficulty = parseRunDifficulty(save.difficulty);
   setRunActive(true);
   boonLaterAtWave = -1;
   sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
+  sectorMission = save.sectorZeroMission ?? sectorMission;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
     saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   }
@@ -13447,6 +13559,61 @@ function restoreRun(): boolean {
   setupEl.style.display = 'none';
   saveRun();
   note(t('setup.pve.restored'));
+  return true;
+}
+
+/**
+ * Забег по ДЕСКРИПТОРУ (`YAG-2.1`) — когда полного снимка нет или он не стал миром.
+ *
+ * Мир собирается так же, как у нового запуска той же главы (карта, снаряжение, сложность),
+ * засевается модулем PvE и только потом получает волну и усиления из дескриптора —
+ * чистой функцией `resumePortableRun`. ⚠️ Восстановление НЕ побайтовое, и это принято
+ * осознанно (§2.1(а) роадмапа площадки): флоты, бои и ресурсы начинаются заново, и игрок
+ * это видит в журнале, а не догадывается. Номер попытки берётся из дескриптора — награда
+ * за этот забег не выдастся дважды.
+ */
+function restorePortable(): boolean {
+  const save = savedPortable;
+  const mission = pveMissionOfMap(save?.map);
+  const pve = save ? data.modes[save.mode]?.pve : undefined;
+  if (!save || mission === null || !pve || pveModeId(mission) !== save.mode) return false;
+  const priorState = s;
+  const priorMode = matchMode();
+  const priorRunActive = sectorRunActive;
+  const priorDevActive = sectorDevActive;
+  const priorMission = sectorMission;
+  try {
+    sectorMission = mission;
+    const world = prepareSectorZeroRun(pveState(data, mission), sectorProgress, data);
+    installMatch(world, runAiSeats(world, 'p1', parseRunDifficulty(save.difficulty)), save.mode);
+    apply(advance(s, s.time + 1)); // засеять PvE: волна 0, следующая назначена
+    const resumed = resumePortableRun(s, save, ME, pve.boons ?? []);
+    if (!resumed) throw new Error('E_RESUME_UNSEEDED');
+    s = resumed;
+  } catch {
+    s = priorState;
+    setMatchMode(priorMode);
+    setRunActive(priorRunActive);
+    sectorDevActive = priorDevActive;
+    sectorMission = priorMission;
+    speed = 0;
+    return false;
+  }
+  pveDifficulty = parseRunDifficulty(save.difficulty);
+  setRunActive(true);
+  sectorDevActive = false;
+  boonLaterAtWave = -1;
+  sectorAttempt = save.attempt ?? sectorProgress.nextAttempt;
+  if (sectorProgress.nextAttempt <= sectorAttempt) {
+    saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
+  }
+  runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
+  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
+  showConnect(false);
+  showHub(false);
+  setupEl.style.display = 'none';
+  saveRun();
+  note(t('setup.pve.restored-portable', { n: s.pve?.waveNumber ?? 0 }));
   return true;
 }
 
@@ -13558,14 +13725,15 @@ function frame(nowReal: number) {
   // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
   // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
   // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
-  const missions = sectorRunActive ? missionProgress(pveObjectives(sectorMission), s, ME) : [];
+  // Видимы только задачи ЭТОГО забега — запас главы минус закрытое навсегда (PVR-5.3).
+  const missions = sectorRunActive ? missionProgress(chapterShown(sectorMission), s, ME) : [];
   const missionsDone = missions.filter(m => m.complete).length;
   const missionHtml =
     missions.length === 0
       ? ''
       : `<span class="dl-wave" title="${esc(
           missions
-            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${m.reward})`)
+            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${objectiveNominal(m.reward, missions.length)})`)
             .join('\n'),
         )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
   const statusHtml =
@@ -13742,7 +13910,7 @@ function frame(nowReal: number) {
     buildWin.repaint();
   }
   // Keep the steward window live while open (countdown to control returning), throttled.
-  if (repaintDue(steward.isOpen(), nowReal, lastStewAt, PROGRESS_MS)) {
+  if (steward && repaintDue(steward.isOpen(), nowReal, lastStewAt, PROGRESS_MS)) {
     lastStewAt = nowReal;
     steward.repaint();
   }
@@ -13867,7 +14035,7 @@ function openEmblemPick(): void {
 document.getElementById('hubav')?.addEventListener('click', openEmblemPick);
 // The identity strip opens the career dossier — the avatar itself keeps the emblem
 // picker (its ✎ badge advertises that), so the name/status column is the door.
-document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile.open());
+document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile?.open());
 document
   .getElementById('ep-close')
   ?.addEventListener('click', () => emblemPick?.classList.remove('show'));
@@ -13892,7 +14060,7 @@ if (playerCardEl) {
     if (tg.closest('.pc-dossier')) {
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
-      profile.open();
+      profile?.open();
       return;
     }
     if (tg.id === 'playercard' || tg.closest('.pc-close')) {
@@ -13995,43 +14163,48 @@ function sendProvincePing(loc: string, label: string): void {
 // сюда» в его ветке). Сама витрина — три окна (композер, список меток, попап маркера) —
 // живёт в `pingUi.ts` (REFM-25) поверх чистой модели прав `pingPanel.ts`; здесь только
 // её хуки. Камера, лента сессии и сетевой клиент остаются у хоста.
-const pings = initPingUi({
-  menuRoot: () => document.getElementById('pingmenu'),
-  panelRoot: () => document.getElementById('pingpanel'),
-  popRoot: () => document.getElementById('pingpop'),
-  me: () => ME,
-  selected: () => selPlanet,
-  hasProvince: (loc) => !!s.planets[loc],
-  messages: () => sessionMessages,
-  setMessages: (next) => {
-    sessionMessages = next;
-  },
-  push: (to, text, loc) => pushMsg(to, text, false, ME, loc),
-  net: () => (NET && netClient ? {
-    placePing: (ping) => sendProvincePing(ping.target.node, ping.label),
-    clearPing: (id) => netClient?.clearPing(id),
-  } : null),
-  seats: diploSeats,
-  coalitionSize: () => conversations.coalition().length,
-  name: (id) => NAME[id] ?? id,
-  color: ownerColor,
-  badge: seatBadge,
-  provinceName: planetName,
-  note,
-  focus: focusWorld,
-  jump: jumpToPing,
-  anchor: (loc) => {
-    const pl = s.planets[loc];
-    if (!pl) return null;
-    const at = toScreen(world(pl.position), canvas.getBoundingClientRect(), VW, VH);
-    return { left: Math.round(at.x), top: Math.round(at.y) };
-  },
-  viewportW: () => window.innerWidth,
-  ask: (current) => prompt(t('ping.panel.edit'), current),
-  onFeedChanged: () => {
-    if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-  },
-});
+const pings = __SECTOR_ZERO_ONLY__
+  ? null
+  : initPingUi({
+      menuRoot: () => document.getElementById('pingmenu'),
+      panelRoot: () => document.getElementById('pingpanel'),
+      popRoot: () => document.getElementById('pingpop'),
+      me: () => ME,
+      selected: () => selPlanet,
+      hasProvince: (loc) => !!s.planets[loc],
+      messages: () => sessionMessages,
+      setMessages: (next) => {
+        sessionMessages = next;
+      },
+      push: (to, text, loc) => pushMsg(to, text, false, ME, loc),
+      net: () =>
+        NET && netClient
+          ? {
+              placePing: (ping) => sendProvincePing(ping.target.node, ping.label),
+              clearPing: (id) => netClient?.clearPing(id),
+            }
+          : null,
+      seats: diploSeats,
+      coalitionSize: () => conversations.coalition().length,
+      name: (id) => NAME[id] ?? id,
+      color: ownerColor,
+      badge: seatBadge,
+      provinceName: planetName,
+      note,
+      focus: focusWorld,
+      jump: jumpToPing,
+      anchor: (loc) => {
+        const pl = s.planets[loc];
+        if (!pl) return null;
+        const at = toScreen(world(pl.position), canvas.getBoundingClientRect(), VW, VH);
+        return { left: Math.round(at.x), top: Math.round(at.y) };
+      },
+      viewportW: () => window.innerWidth,
+      ask: (current) => prompt(t('ping.panel.edit'), current),
+      onFeedChanged: () => {
+        if (diploOpen && diploTab === 'msgs') renderDiploFeed();
+      },
+    });
 
 // --- TGT-1: target-order composer (CC-1 chains rendered target-side) ---------
 /** BOOST-1: is this fleet on форс-марш? (authoritative map, both modes). */
@@ -14271,7 +14444,7 @@ document.getElementById('tgted')?.addEventListener('click', (ev) => {
  *  own pins can be hidden with the settings switch (allies' are always drawn). */
 function drawPings(now: number): void {
   pingHits = [];
-  for (const m of pings.drawable()) {
+  for (const m of pings?.drawable() ?? []) {
     // `drawable()` уже отбросил спрятанные ЛОКАЛЬНО (у союзника метка цела).
     if (m.from === ME && !showOwnPings) continue; // hidden by «Свои метки» switch
     const pl = s.planets[m.ping!];
@@ -14717,21 +14890,23 @@ if (!bootJoinId && !bootReset && document.body.dataset.entry === 'sector-zero')
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —
 // в `apkUpdate.ts`. Вне APK вызов тихо ничего не делает.
-initApkUpdater();
+if (!__SECTOR_ZERO_ONLY__) initApkUpdater();
 
 // --- corporation cabinet (AVA-C1/C2) -----------------------------------------
 // Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки и две двери,
 // которые его открывают (кнопка хаба и рельса матча). `authorizedBase` — та же
 // политика, что у «Арсенала» и профиля; кэша у кабинета сознательно нет.
-const corp = initCorp({
-  root: () => $('corp'),
-  head: () => $('corphd'),
-  tabs: () => $('corptabs'),
-  body: () => $('corpbody'),
-  note,
-  errText,
-  onIntro: maybeIntro,
-  authorizedBase: hubAuthorizedBase,
-});
-$('ccorp').addEventListener('click', () => corp.open());
-$('railcorp').addEventListener('click', () => corp.open());
+const corp = __SECTOR_ZERO_ONLY__
+  ? null
+  : initCorp({
+      root: () => $('corp'),
+      head: () => $('corphd'),
+      tabs: () => $('corptabs'),
+      body: () => $('corpbody'),
+      note,
+      errText,
+      onIntro: maybeIntro,
+      authorizedBase: hubAuthorizedBase,
+    });
+$('ccorp').addEventListener('click', () => corp?.open());
+$('railcorp').addEventListener('click', () => corp?.open());

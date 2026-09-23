@@ -38,13 +38,25 @@ const PRESETS = new Map<string, MapPreset>([
   ],
 ]);
 const nodeId = (i: number): string => `F${i}`;
+/** Архив площадки (`YAG-1.1c`): Sector Zero играет только на картах глав, и две большие
+ *  карты фронтира (~140 КБ) туда не кладутся. Флаг проверяется через `typeof`, потому
+ *  что модуль читают и тесты, где сборщика с его `define` нет. */
+declare const __SECTOR_ZERO_ONLY__: boolean | undefined;
 
 /** Frozen authored content; instantiate the large retired graph only when requested. */
 export function mapPreset(id: string = 'nexus'): MapPreset {
   const cached = PRESETS.get(id);
   if (cached) return cached;
   if (id !== 'frontier-50' && id !== 'frontier-100') throw new Error('E_UNKNOWN_MAP');
-  const content = id === 'frontier-50' ? frontier50 : frontier100;
+  // Условие, а не ранний `throw`: сборщик выкидывает НЕДОСТИЖИМУЮ ветку вместе с тем, что
+  // в ней импортировано, а код после `throw` для него всё ещё ссылается на карты.
+  const content =
+    typeof __SECTOR_ZERO_ONLY__ !== 'undefined' && __SECTOR_ZERO_ONLY__
+      ? null
+      : id === 'frontier-50'
+        ? frontier50
+        : frontier100;
+  if (!content) throw new Error('E_UNKNOWN_MAP');
   // Keep local province/route distances close to the old map while reducing its area.
   const radius = id === 'frontier-50' ? 3200 : 4500;
   const nodes: MapNode[] = content.points.map(([x, y], i) => ({
