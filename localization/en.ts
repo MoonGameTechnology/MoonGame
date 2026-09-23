@@ -901,7 +901,7 @@ export const en: Record<string, string> = {
   'data.shield-booster': 'Shield Booster',
   'data.area-defense-array': 'Area Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
-  'data.shuttle-carrier': 'Shuttle',
+  'data.shuttle-carrier': 'Carrier',
   'data.siege-platform': 'Siege Platform',
   'data.signal-corps': 'Signal Corps',
   'data.solar-flare-zone': 'Solar Flare Zone',
@@ -1061,8 +1061,8 @@ export const en: Record<string, string> = {
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
-    'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it carries craft the way a carrier carries aircraft, stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
-  'dossier.unit.shuttle-carrier.name': 'Shuttle',
+    'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
+  'dossier.unit.shuttle-carrier.name': 'Carrier',
   'dossier.unit.strike-carrier.desc':
     "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. It carries no shuttles: only the Shuttle has a hangar.",
   'dossier.unit.strike-carrier.name': 'Landing Ship',
