@@ -58,7 +58,7 @@ describe('sectorZeroShop — витрина знает, чем можно пла
   });
 
   it('пустая витрина выключает магазин данными', () => {
-    expect(shopRows(profile(), { ...data, sectorZeroShop: { slots: 5, offers: {} } }, ALL)).toEqual([]);
+    expect(shopRows(profile(), { ...data, sectorZeroShop: { ...data.sectorZeroShop, slots: 5, offers: {} } }, ALL)).toEqual([]);
     // Ноль слотов выключает так же: каталог есть, показывать нечего.
     expect(shopRows(profile(), { ...data, sectorZeroShop: { ...data.sectorZeroShop, slots: 0 } }, ALL)).toEqual([]);
   });
