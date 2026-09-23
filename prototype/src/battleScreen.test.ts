@@ -70,7 +70,7 @@ describe('окно боя', () => {
     const s = side('p1', 'defender');
     s.hull = { current: 120, max: 200 };
     const html = sideRowHtml(s);
-    expect(html.replace(/<[^>]+>/g, '')).toContain(`3× ${displayUnit('cruiser')}`);
+    expect(html).toContain(`<b>3×</b> ${displayUnit('cruiser')}`);
     expect(html).toContain('120/200');
   });
 
