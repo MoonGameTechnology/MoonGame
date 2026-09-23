@@ -1177,6 +1177,9 @@ export const ru: Record<string, string> = {
   'res.of.metal': 'металла',
   'res.of.microelectronics': 'микроэлектроники',
 
+  'sector-zero.academy.locked': 'Закрыт',
+  'sector-zero.academy.rank': 'Подготовка {n}',
+  'sector-zero.academy.tier': 'Ступень {n}',
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
   'sector-zero.dev.start': 'Dev-забег',
   'sector-zero.dev.hint': 'Тестовая попытка: без сохранения и наград. Обычный забег останется доступен.',
@@ -2163,10 +2166,10 @@ export const ru: Record<string, string> = {
   'sector-zero.prep.hero-select': 'Взять в забег',
   'sector-zero.prep.hero-selected': 'В следующем забеге',
   'sector-zero.prep.hero-upgrade': 'Добавить слот навыка · {n} данных',
-  'sector-zero.prep.heroes': 'Герои и навыки',
+  'sector-zero.prep.heroes': 'Академия',
   'sector-zero.prep.hint': 'Выбор сохраняется для следующей попытки. Текущий забег не меняется.',
   'sector-zero.prep.incompatible': 'Не подходит этому корпусу',
-  'sector-zero.prep.modules': 'Корабли и модули',
+  'sector-zero.prep.modules': 'Корабли',
   'sector-zero.prep.owned': 'Открыто',
   'sector-zero.prep.research': 'Данные экспедиций: {n}',
   'sector-zero.prep.reward': 'Последний забег: +{n} данных',

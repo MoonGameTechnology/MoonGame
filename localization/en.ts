@@ -1170,6 +1170,9 @@ export const en: Record<string, string> = {
   'res.of.metal': 'metal',
   'res.of.microelectronics': 'microelectronics',
 
+  'sector-zero.academy.locked': 'Locked',
+  'sector-zero.academy.rank': 'Rank {n}',
+  'sector-zero.academy.tier': 'Tier {n}',
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
   'sector-zero.dev.start': 'Dev run',
   'sector-zero.dev.hint': 'Test attempt: no saving or rewards. Your normal run remains available.',
@@ -2155,10 +2158,10 @@ export const en: Record<string, string> = {
   'sector-zero.prep.hero-select': 'Take on the run',
   'sector-zero.prep.hero-selected': 'Ready for the next run',
   'sector-zero.prep.hero-upgrade': 'Add a skill slot · {n} data',
-  'sector-zero.prep.heroes': 'Heroes and skills',
+  'sector-zero.prep.heroes': 'Academy',
   'sector-zero.prep.hint': 'Selections are saved for your next attempt. Your current run stays unchanged.',
   'sector-zero.prep.incompatible': 'Incompatible with this hull',
-  'sector-zero.prep.modules': 'Ships and modules',
+  'sector-zero.prep.modules': 'Ships',
   'sector-zero.prep.owned': 'Unlocked',
   'sector-zero.prep.research': 'Expedition data: {n}',
   'sector-zero.prep.reward': 'Last run: +{n} data',

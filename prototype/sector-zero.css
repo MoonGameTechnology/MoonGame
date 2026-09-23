@@ -80,12 +80,27 @@
 #sz-workshop [data-prep="unlock-module"]:not(:disabled), #sz-workshop [data-prep="unlock-hero"]:not(:disabled), #sz-workshop [data-prep="upgrade-hero"]:not(:disabled) { color: var(--cur-data); border-color: var(--cur-data); }
 .sz-sub, .sz-reward { color: #a9c1c9; font-size: 13px; line-height: 1.65; max-width: 720px; }
 .sz-reward { color: #d5ba87; }
-.sz-tabs { display: flex; gap: 12px; margin: 24px 0 12px; }
-.sz-tabs button { flex: 1; max-width: 320px; }
-#sz-prep-status { min-height: 25px; color: #a6dfd4; font-size: 12px; }
+/* Вкладки (PVR-6.6): иконка над словом, четыре в ряд на любой ширине; прилипают к верху
+   при прокрутке длинного списка — перейти можно, не листая обратно. */
+.sz-tabs { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 20px 0 12px; padding: 8px 0; background: #051019e6; backdrop-filter: blur(6px); }
+#sz-workshop .sz-tabs button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; font-size: 13px; white-space: nowrap; }
+.sz-tabs i { font-style: normal; font-size: 20px; line-height: 1; color: #79dfdf; }
+.sz-tabs button.selected { box-shadow: inset 0 -3px 0 #79dfdf; }
+.sz-purse { display: flex; flex-wrap: wrap; gap: 8px; }
+#sz-prep-status { min-height: 18px; color: #a6dfd4; font-size: 12px; }
 .sz-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 20px; }
 /* Имена из `data.*` строчные — они встают и в середину фраз; на кнопке нужна заглавная. */
 .sz-picker button::first-letter { text-transform: uppercase; }
+/* Корпус (PVR-6.6): выбор — плитки с артом; выбранный — крупным портретом рядом со
+   статами и отсеками. */
+#sz-workshop .sz-hulls button { flex: none; display: grid; justify-items: center; gap: 6px; padding: 8px 10px; min-width: 96px; }
+.sz-hulls span:not(.ship-art) { display: block; }
+.sz-hulls span:not(.ship-art)::first-letter { text-transform: uppercase; }
+.sz-hulls .ship-art--thumb { width: 84px; height: 56px; border: 0; }
+.sz-hull { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; align-items: start; margin: 8px 0 22px; }
+.sz-hull .ship-art--portrait { margin: 0; }
+.sz-hull h2 { margin: 0 0 4px; color: #e1f4f4; }
+.sz-hull h2::first-letter { text-transform: uppercase; }
 .sz-bays { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 18px 0; }
 .sz-bay { border-left: 2px solid #5d9094; padding: 12px 16px; background: #0a1c26; display: grid; gap: 8px; }
 .sz-bay b { color: #aad6d6; font-size: 12px; font-weight: 500; }
@@ -123,6 +138,29 @@
 .sz-delta em { white-space: nowrap; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
 .sz-delta em.up { color: var(--rar-simple); }
 .sz-delta em.down { color: var(--red); }
+/* Шанс кузни полосой (PVR-6.6). */
+.sz-odds { width: 100%; margin-bottom: 14px; }
+.sz-odds p { margin-bottom: 6px !important; }
+.sz-bar { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--rar, #79dfdf) var(--p), #17313b var(--p)); }
+/* Академия (PVR-6.6): ростер карточками с гербом, деления подготовки, навыки ступенями. */
+.sz-roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px; margin: 8px 0 24px; }
+#sz-workshop .sz-roster button { display: flex; align-items: center; gap: 14px; padding: 12px 14px; text-align: left; }
+.sz-roster b { display: block; color: #e1f4f4; font-size: 15px; font-weight: 600; }
+.sz-roster small { color: #8fb3bb; font-size: 12px; }
+.sz-roster button > span { min-width: 0; overflow-wrap: anywhere; }
+.sz-roster .selected small { color: #b3f1e9; }
+.sz-crest { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #79dfdf; transform: rotate(45deg); background: #0f2a35; color: #b3f1e9; font-weight: 700; font-size: 18px; }
+.sz-crest em { transform: rotate(-45deg); font-style: normal; }
+.sz-roster .sz-crest { width: 34px; height: 34px; font-size: 15px; margin: 4px; }
+.sz-hero { display: flex; gap: 26px; align-items: flex-start; margin-bottom: 18px; }
+.sz-hero > .sz-crest { width: 64px; height: 64px; font-size: 26px; margin: 14px 10px; }
+.sz-hero > div { flex: 1; min-width: 0; }
+.sz-hero h2 { margin: 0 0 6px; color: #e1f4f4; }
+.sz-pips { display: inline-flex; gap: 4px; margin-right: 10px; vertical-align: middle; }
+.sz-pips i { width: 16px; height: 6px; background: #1d3a44; }
+.sz-pips i.lit { background: #79dfdf; }
+.sz-tier { margin: 18px 0 8px; color: #79dfdf; font: 11px/1.5 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+.sz-card.sz-locked { opacity: .62; }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }
 .sz-hero-head span { font-size: 13px; color: #aad3d1; margin-right: auto; }
 #sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }
@@ -140,6 +178,16 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   #sz-title { max-width: 300px; font-size: clamp(52px, 12vw, 74px); }
   .sz-intro { margin-top: 22px; }
   .sz-topline, .sz-bottomline { letter-spacing: .08em; gap: 10px; }
+  .sz-tabs { gap: 6px; }
+  #sz-workshop .sz-tabs button { font-size: 11px; padding: 8px 2px; }
+  .sz-hull { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  /* Корпуса — лентой с прокруткой: семь плиток в три ряда съедали весь экран. */
+  .sz-hulls { flex-wrap: nowrap; overflow-x: auto; margin-inline: -22px; padding-inline: 22px; scrollbar-width: none; touch-action: pan-x pan-y; }
+  .sz-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #sz-workshop .sz-roster button { gap: 10px; padding: 10px; }
+  .sz-roster b { font-size: 14px; }
+  .sz-hero { gap: 18px; }
+  .sz-hero > .sz-crest { width: 44px; height: 44px; font-size: 18px; margin: 8px 6px; }
 }
 @media (max-height: 660px) and (min-width: 761px) {
   .sz-main { padding: 26px 0; gap: 40px; }

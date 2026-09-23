@@ -30,6 +30,7 @@ import {
   type ShopCapabilities,
 } from '../../decisions/sectorZeroShop';
 import { esc, displayUnit } from './format';
+import { catalogPortraitHtml } from './shipArt';
 
 interface PreparationHost {
   data: GameData;
@@ -93,6 +94,13 @@ const deltaHtml = (rows: readonly StatDelta[]): string =>
         )
         .join('')}</ul>`;
 
+/** Шанс кузни полосой: доля читается глазом раньше, чем цифра (PVR-6.6). Цена стоит
+ *  рядом всегда — `EC-2.3`: стоимость видна до того, как хватит Варрантов. */
+const oddsHtml = (chance: number, warrants: number): string => {
+  const pct = Math.round(chance * 100);
+  return `<div class="sz-odds"><p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: pct })} · ${t('sector-zero.forge.cost', { n: warrants })}</p><span class="sz-bar" style="--p:${pct}%"></span></div>`;
+};
+
 export function initSectorZeroPreparation(h: PreparationHost) {
   const panel = document.getElementById('sz-workshop')!;
   const home = document.getElementById('sz-home')!;
@@ -117,8 +125,12 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     if (!def) return '';
     const selected = p.loadouts[hull] ?? [];
     const statsNow = effectiveStats(def, { modules: selected }, data);
+    // Корпус выбирают по картинке, а не по слову (PVR-6.6): тот же арт, что в
+    // конструкторе основной игры. Нет арта у корпуса — остаётся имя, без пустой рамки.
     const hulls = sectorHullIds(data)
-      .map((id) => button('hull', id, esc(displayUnit(id)), false, hull === id))
+      .map((id) =>
+        button('hull', id, `${catalogPortraitHtml('u', id, data, 'thumb')}<span>${esc(displayUnit(id))}</span>`, false, hull === id),
+      )
       .join('');
     const bays = Object.entries(def.slots)
       .filter(([, n]) => n > 0)
@@ -173,7 +185,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${fitsOnly}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
       })
       .join('');
-    return `<div class="sz-picker">${hulls}</div><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-bays">${bays}</div><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${statsNow[key] ?? 0}</b></span>`).join('')}</div><div class="sz-cards">${modules}</div>`;
+    return `<div class="sz-picker sz-hulls">${hulls}</div><div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div><div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
   }
 
   /**
@@ -217,13 +229,15 @@ export function initSectorZeroPreparation(h: PreparationHost) {
             ? `<p class="sz-forge-shards">${t('sector-zero.forge.shards', { n: row.shards, cap: row.pity })}${row.shards >= row.pity - 1 ? ` · ${t('sector-zero.forge.sure')}` : ''}</p>`
             : '';
         const offer = row.next
-          ? `<p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: Math.round(row.chance * 100) })} · ${t('sector-zero.forge.cost', { n: row.warrants })}</p>${deltaHtml(statDeltas(row.now, row.next, STAT_ORDER))}<p class="sz-sub">${t('sector-zero.forge.burn')}</p>${shards}`
+          ? `${oddsHtml(row.chance, row.warrants)}${deltaHtml(statDeltas(row.now, row.next, STAT_ORDER))}${shards}`
           : `<p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)}</p>`;
         const head = itemHead(row.id, p);
         return `<article class="sz-card${head.cls}">${head.html}${offer}${button('forge', row.id, label, !row.can)}</article>`;
       })
       .join('');
-    return `<p class="sz-sub">${t('sector-zero.forge.hint')}</p><div class="sz-cards">${cards}</div>`;
+    // Правило «при неудаче Варранты сгорают» одно на всю кузню — оно стоит один раз над
+    // карточками, а не повторяется в каждой (PVR-6.6).
+    return `<p class="sz-sub">${t('sector-zero.forge.hint')} ${t('sector-zero.forge.burn')}</p><div class="sz-cards">${cards}</div>`;
   }
 
   const PAY_LABEL: Record<PayKind, string> = {
@@ -300,35 +314,78 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton}${tapButton}<div class="sz-cards">${cards}</div>`;
   }
 
+  /** Глубина узла в дереве навыков: без предпосылок — 1, иначе на один глубже самой
+   *  глубокой. Ступени делают дерево читаемым: что открыть сначала, что потом. */
+  const skillTier = (id: string, seen: Set<string> = new Set()): number => {
+    const node = h.data.heroSkillTrees[id];
+    if (!node || seen.has(id) || node.requires.length === 0) return 1;
+    seen.add(id);
+    return 1 + Math.max(...node.requires.map((r) => skillTier(r, seen)));
+  };
+  /** Герб героя — первая буква имени в ромбе: арта героев нет, а пустая рамка хуже. */
+  const crest = (name: string): string =>
+    `<span class="sz-crest" aria-hidden="true"><em>${esc(name.charAt(0).toUpperCase())}</em></span>`;
+
+  /**
+   * Академия (PVR-6.6, была «Герои и навыки»): ростер — карточки с гербом и состоянием
+   * («в забеге», «закрыт», ступень подготовки); навыки героя — ступенями, закрытое
+   * приглушено и говорит, чего ему не хватает.
+   */
   function heroes(p: SectorZeroProgress): string {
     const data = h.data;
     const roster = Object.entries(data.heroes)
-      .map(([id, def]) => button('hero', id, esc(tData(def.name)), false, heroId === id))
+      .map(([id, def]) => {
+        const hero = p.heroes[id];
+        const state = !hero
+          ? t('sector-zero.academy.locked')
+          : p.selectedHero === id
+            ? t('sector-zero.prep.hero-selected')
+            : t('sector-zero.academy.rank', { n: hero.level });
+        return button('hero', id, `${crest(tData(def.name))}<span><b>${esc(tData(def.name))}</b><small>${state}</small></span>`, false, heroId === id);
+      })
       .join('');
     const def = data.heroes[heroId];
-    if (!def) return roster;
+    if (!def) return `<div class="sz-roster">${roster}</div>`;
     const hero = p.heroes[heroId];
-    let body = `<h2>${esc(tData(def.name))}</h2><p class="sz-sub">${esc(t(def.description ?? ''))}</p>`;
+    const name = esc(tData(def.name));
+    let body = `<div class="sz-hero">${crest(tData(def.name))}<div><h2>${name}</h2><p class="sz-sub">${esc(t(def.description ?? ''))}</p>`;
     if (!hero)
-      return `<div class="sz-picker">${roster}</div>${body}${button('unlock-hero', heroId, t('sector-zero.prep.unlock', { n: HERO_UNLOCK_COST }), p.research < HERO_UNLOCK_COST)}`;
+      return `<div class="sz-roster">${roster}</div>${body}${button('unlock-hero', heroId, t('sector-zero.prep.unlock', { n: HERO_UNLOCK_COST }), p.research < HERO_UNLOCK_COST)}</div></div>`;
     const selected = p.selectedHero === heroId;
-    body += `<div class="sz-hero-head"><span>${t('sector-zero.prep.hero-level', { n: hero.level, slots: sectorHeroSlots(hero, data) })}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}${button('upgrade-hero', heroId, hero.level >= 3 ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { n: sectorHeroUpgradeCost(hero) }), hero.level >= 3 || p.research < sectorHeroUpgradeCost(hero))}</div>`;
-    body += `<h3>${t('sector-zero.prep.abilities')} · ${hero.equipped.length}/${sectorHeroSlots(hero, data)}</h3><div class="sz-cards">`;
+    const slots = sectorHeroSlots(hero, data);
+    // Ступень подготовки — делениями: 3 ступени видны сразу, а не угадываются из текста.
+    const pips = [1, 2, 3].map((n) => `<i class="${n <= hero.level ? 'lit' : ''}"></i>`).join('');
+    body += `<div class="sz-hero-head"><span><span class="sz-pips" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}${button('upgrade-hero', heroId, hero.level >= 3 ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { n: sectorHeroUpgradeCost(hero) }), hero.level >= 3 || p.research < sectorHeroUpgradeCost(hero))}</div></div></div>`;
+    body += `<h3>${t('sector-zero.prep.abilities')} · ${hero.equipped.length}/${slots}</h3><div class="sz-cards">`;
     for (const id of sectorHeroAbilities(heroId, hero, data)) {
       const ability = data.heroAbilities[id]!;
       if (ability.type.startsWith('spawn_')) continue;
       const equipped = hero.equipped.includes(id);
-      body += `<article class="sz-card${equipped ? ' selected' : ''}"><h3>${esc(tData(ability.name))}</h3><p>${esc(t(ability.description ?? ''))}</p>${button('ability', id, t(equipped ? 'hero.slot.remove' : 'hero.slot.equip'), !equipped && hero.equipped.length >= sectorHeroSlots(hero, data), equipped)}</article>`;
+      body += `<article class="sz-card${equipped ? ' selected' : ''}"><h3>${esc(tData(ability.name))}</h3><p>${esc(t(ability.description ?? ''))}</p>${button('ability', id, t(equipped ? 'hero.slot.remove' : 'hero.slot.equip'), !equipped && hero.equipped.length >= slots, equipped)}</article>`;
     }
-    body += `</div><h3>${t('sector-zero.prep.skills')}</h3><p class="sz-sub">${t('sector-zero.prep.skill-hint')}</p><div class="sz-cards">`;
+    body += `</div><h3>${t('sector-zero.prep.skills')}</h3><p class="sz-sub">${t('sector-zero.prep.skill-hint')}</p>`;
+    const tiers = new Map<number, string[]>();
     for (const [id, node] of Object.entries(data.heroSkillTrees)) {
       if (node.branch !== def.branch) continue;
-      const owned = hero.skills.includes(id);
-      const prerequisites = node.requires.every((r) => hero.skills.includes(r));
-      const cost = sectorSkillCost(id, data);
-      body += `<article class="sz-card${owned ? ' selected' : ''}"><h3>${esc(tData(node.name))}</h3><p>${esc(t(node.description ?? ''))}</p>${node.requires.length ? `<p class="sz-prereq">${t('hero.tree.requires')}: ${node.requires.map((r) => esc(tData(data.heroSkillTrees[r]!.name))).join(', ')}</p>` : ''}${button('skill', id, owned ? t('sector-zero.prep.owned') : t('sector-zero.prep.skill-buy', { n: cost }), owned || !prerequisites || p.research < cost, owned)}</article>`;
+      const tier = skillTier(id);
+      tiers.set(tier, [...(tiers.get(tier) ?? []), id]);
     }
-    return `<div class="sz-picker">${roster}</div>${body}`;
+    for (const tier of [...tiers.keys()].sort((x, y) => x - y)) {
+      body += `<p class="sz-tier">${t('sector-zero.academy.tier', { n: tier })}</p><div class="sz-cards">`;
+      for (const id of tiers.get(tier)!) {
+        const node = data.heroSkillTrees[id]!;
+        const owned = hero.skills.includes(id);
+        const missing = node.requires.filter((r) => !hero.skills.includes(r));
+        const cost = sectorSkillCost(id, data);
+        // Предпосылки называются только когда их НЕ хватает: у открытого узла это шум.
+        const prereq = missing.length
+          ? `<p class="sz-prereq">${t('hero.tree.requires')}: ${missing.map((r) => esc(tData(data.heroSkillTrees[r]!.name))).join(', ')}</p>`
+          : '';
+        body += `<article class="sz-card${owned ? ' selected' : missing.length ? ' sz-locked' : ''}"><h3>${esc(tData(node.name))}</h3><p>${esc(t(node.description ?? ''))}</p>${prereq}${button('skill', id, owned ? t('sector-zero.prep.owned') : t('sector-zero.prep.skill-buy', { n: cost }), owned || missing.length > 0 || p.research < cost, owned)}</article>`;
+      }
+      body += '</div>';
+    }
+    return `<div class="sz-roster">${roster}</div>${body}`;
   }
 
   function render(): void {
@@ -336,7 +393,11 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const active = document.activeElement as HTMLElement | null;
     const focusAction = active?.dataset.prep;
     const focusId = active?.dataset.id;
-    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')}</p><p class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</p><div class="sz-tabs">${button('tab', 'ships', t('sector-zero.prep.modules'), false, tab === 'ships')}${button('tab', 'workshop', t('sector-zero.prep.workshop'), false, tab === 'workshop')}${button('tab', 'shop', t('sector-zero.prep.shop'), false, tab === 'shop')}${button('tab', 'heroes', t('sector-zero.prep.heroes'), false, tab === 'heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
+    const tabButton = (id: typeof tab, icon: string, key: string): string =>
+      button('tab', id, `<i aria-hidden="true">${icon}</i><span>${t(key)}</span>`, false, tab === id);
+    // Шапка: назад + кошелёк одной строкой, одна строка подсказки (PVR-6.6: меньше
+    // абзацев), вкладки с иконкой — на телефоне четыре в ряд, без переполнения.
+    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</span></p><div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('workshop', '⚒\uFE0E', 'sector-zero.prep.workshop')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)

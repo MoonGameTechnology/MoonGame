@@ -1048,7 +1048,7 @@
 | PVR-6.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Валюты: цвет и «фишка» |
 | PVR-6.4 | ✅ | data proto | `docs/sector-zero-roadmap.md` | Карточка предмета: рамка редкости и звёзды |
 | PVR-6.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Сравнение «до/после» |
-| PVR-6.6 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Академия и Мастерская для «взрослых детей» |
+| PVR-6.6 | ✅ | proto | `docs/sector-zero-roadmap.md` | Академия и Мастерская для «взрослых детей» |
 | PVR-6.7 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Магазин-витрина |
 | PVR-6.8 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Живое главное меню |
 | PVR-6.9 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Выбор главы — маршрут от края сектора к эпицентру |
