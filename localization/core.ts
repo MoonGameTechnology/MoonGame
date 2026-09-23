@@ -37,18 +37,41 @@ export function registerMessages(id: LocaleId, messages: Messages): void {
   TABLES[id] = messages;
 }
 
-function detect(): LocaleId {
+/** Язык, который игрок выбрал САМ (переключателем). `null` — не выбирал или хранилище
+ *  недоступно. */
+function savedLocale(): LocaleId | null {
   try {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(STORE_KEY) : null;
     if (isLocaleId(saved)) return saved;
   } catch {
     /* storage disabled — fall through to the browser language */
   }
+  return null;
+}
+
+function detect(): LocaleId {
+  const saved = savedLocale();
+  if (saved) return saved;
   const nav = typeof navigator !== 'undefined' ? navigator.language : DEFAULT_LOCALE;
   return nav?.toLowerCase().startsWith('ru') ? 'ru' : 'en';
 }
 
 export let LOCALE: LocaleId = detect();
+
+/**
+ * Язык, подсказанный окружением ПОСЛЕ старта рантайма — сегодня это площадка (`YAG-1.3`):
+ * её SDK поднимается позже, чем `detect()` успевает выбрать язык по браузеру.
+ *
+ * Явный выбор игрока сильнее подсказки: переключил язык — площадка его не перебьёт.
+ * Подсказка НЕ сохраняется, иначе она сама стала бы «выбором» и пережила смену языка на
+ * площадке. Возвращает, сменился ли язык: вызывающему нужно перерисовать то, что уже
+ * успело отрисоваться (`localizeStaticDom`).
+ */
+export function suggestLocale(id: LocaleId): boolean {
+  if (savedLocale() !== null || id === LOCALE) return false;
+  LOCALE = id;
+  return true;
+}
 
 /** Persist the new locale. The caller reloads the page (see the picker wiring). */
 export function setLocale(id: LocaleId): void {

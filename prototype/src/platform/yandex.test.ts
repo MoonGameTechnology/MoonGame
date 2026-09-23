@@ -189,6 +189,22 @@ describe('возможности объявляются по тому, что у
   });
 });
 
+describe('язык игрока (YAG-1.3, требование 2.14)', () => {
+  it('язык площадки доезжает как есть — решение о локали принимает не адаптер', () => {
+    const { sdk } = fakeSdk({ environment: { i18n: { lang: 'tr', tld: 'com.tr' } } });
+    // `tr` нарочно: локали у нас такой нет, и адаптер обязан не «помогать» — выбор
+    // резерва живёт в `decisions/platformLocale.ts`, одно правило на все площадки.
+    expect(createYandexPlatform(sdk).language).toBe('tr');
+  });
+
+  it('площадка языка не сообщила — поля нет, а не пустая строка или мусор', () => {
+    expect(createYandexPlatform({}).language).toBeUndefined();
+    expect(createYandexPlatform({ environment: {} }).language).toBeUndefined();
+    const junk = { environment: { i18n: { lang: 7 as unknown as string } } };
+    expect(createYandexPlatform(junk).language).toBeUndefined();
+  });
+});
+
 describe('аналитика копится, пока её некуда отправлять', () => {
   it('без sink события складываются в адаптер', () => {
     const platform = createYandexPlatform(fakeSdk().sdk);

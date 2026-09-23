@@ -1,7 +1,8 @@
 // Entry labels must not depend on game/map initialization reaching the welcome
 // handlers. esbuild keeps this dynamic import inside the self-contained bundle;
 // no network request is needed to start the game, including in the APK.
-import { localizeStaticDom, LOCALE, LOCALE_LABEL } from '../../localization/runtime';
+import { localizeStaticDom, LOCALE, LOCALE_LABEL, suggestLocale } from '../../localization/runtime';
+import { platformLocale } from '../../decisions/platformLocale';
 import { currentBuild } from './updater';
 import {
   createPlatform,
@@ -15,10 +16,15 @@ import { sdkLoaderPresent } from './platform/sdkWait';
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
 
+/** Статическая разметка и подпись переключателя — на текущем языке рантайма. */
+function labelStaticDom(): void {
+  localizeStaticDom();
+  const language = document.getElementById('clang');
+  if (language) language.textContent = LOCALE_LABEL[LOCALE] + ' ▾';
+}
+
 document.body.classList.add('app-starting');
-localizeStaticDom();
-const language = document.getElementById('clang');
-if (language) language.textContent = LOCALE_LABEL[LOCALE] + ' ▾';
+labelStaticDom();
 
 /**
  * Площадка поднимается ДО игры (`YAG-1.1b`).
@@ -60,7 +66,15 @@ loaderReady()
       onSdkError: (where, error) => console.error('E_PLATFORM_SDK', where, error),
     }),
   )
-  .then(setPlatform)
+  .then((platform) => {
+    setPlatform(platform);
+    // Язык площадки (`YAG-1.3`, требование 2.14) — ДО импорта игры: её рендереры строятся
+    // один раз и на том языке, что стоит в момент импорта, а переключение языка в игре
+    // вообще перезагружает страницу. Статика выше уже отрисована на языке браузера —
+    // сменился язык, перерисовываем её. Явный выбор игрока подсказка не перебивает.
+    const locale = platformLocale(platform.language);
+    if (locale && suggestLocale(locale)) labelStaticDom();
+  })
   .then(() => import('./main'))
   .then(
     () => {
