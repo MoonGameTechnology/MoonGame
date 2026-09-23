@@ -32,6 +32,7 @@ import {
 import { featuredOffer } from '../../decisions/shopFeatured';
 import { esc, displayUnit } from './format';
 import { catalogPortraitHtml } from './shipArt';
+import { splitSupport } from '../../decisions/supportShips';
 
 interface PreparationHost {
   data: GameData;
@@ -59,6 +60,7 @@ const stats: Record<string, string> = {
   radarRange: 'loadout.stat.radar',
   pointDefense: 'data.area-defense-array',
   shieldRegen: 'loadout.stat.shield-regen',
+  siegeDamage: 'loadout.stat.siege',
 };
 /** Статы-ДОЛИ за игровой час (`shieldRegen` — доля щита, `construction.ts`). Округление до
  *  десятых превращало +0.02 в «+0»: такие показываются процентом в час (PVR-6.4). */
@@ -79,7 +81,7 @@ const effectText = (values: Record<string, number>): string =>
     .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${statValue(key, value, true)}`)
     .join(' · ');
 /** Порядок строк сравнения — тот же, что у полосы статов корабля. */
-const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'cargoCapacity', 'radarRange', 'pointDefense'];
+const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'cargoCapacity', 'radarRange', 'pointDefense', 'siegeDamage'];
 /**
  * «Было → станет» списком (PVR-6.5): одна разметка на подготовку и Мастерскую. Прибавка
  * зелёная, потеря красная — цвет несёт смысл, а число рядом дублирует его для тех, кто
@@ -128,10 +130,18 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const statsNow = effectiveStats(def, { modules: selected }, data);
     // Корпус выбирают по картинке, а не по слову (PVR-6.6): тот же арт, что в
     // конструкторе основной игры. Нет арта у корпуса — остаётся имя, без пустой рамки.
-    const hulls = sectorHullIds(data)
-      .map((id) =>
-        button('hull', id, `${catalogPortraitHtml('u', id, data, 'thumb')}<span>${esc(displayUnit(id))}</span>`, false, hull === id),
-      )
+    const hullTile = (id: string): string =>
+      button('hull', id, `${catalogPortraitHtml('u', id, data, 'thumb')}<span>${esc(displayUnit(id))}</span>`, false, hull === id);
+    // Корабли линии и корабли поддержки — двумя рядами (ROS-SUP-1), признак из данных.
+    const groups = splitSupport(sectorHullIds(data), data);
+    const hulls = (
+      [
+        ['yard.tab.ships', groups.line],
+        ['yard.tab.support', groups.support],
+      ] as const
+    )
+      .filter(([, ids]) => ids.length > 0)
+      .map(([key, ids]) => `<p class="sz-tier">${t(key)}</p><div class="sz-picker sz-hulls">${ids.map(hullTile).join('')}</div>`)
       .join('');
     const bays = Object.entries(def.slots)
       .filter(([, n]) => n > 0)
@@ -186,7 +196,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${fitsOnly}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
       })
       .join('');
-    return `<div class="sz-picker sz-hulls">${hulls}</div><div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div><div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
+    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div><div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
   }
 
   /**

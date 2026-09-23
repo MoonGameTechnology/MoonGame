@@ -44,6 +44,7 @@ import {
   launchFleet,
   buildBuilding,
   buildUnit,
+  buildShip,
   declareWar,
   canTraverse,
   marketList,
@@ -150,11 +151,10 @@ const GROUND_STOCK = 8;
 const GARRISON_ORDERS_PER_TICK = 3;
 /** Верхний предел десантных кораблей — трюм 16 против 5 у крейсера, больше не нужно. */
 const DROPSHIP_CAP = 2;
-/** Осадных платформ — две. Дальнего огня в игре больше нет вовсе, но платформа —
- *  единственный корабль ЗАДНЕЙ
- *  линии, а линия без корабля не участвует в раздаче урона: не строй бот платформу —
- *  и замер разбирал бы бой, в котором задней линии просто нет. */
+/** Осадных крейсеров — два (SIEGE-1: осада — модуль `siege_platform` на крейсере, а не
+ *  отдельный корпус). Столько же держал бот и платформ, пока они были юнитом. */
 const SIEGE_CAP = 2;
+const SIEGE_MODULE = 'siege_platform';
 /** Предел челноков КАЖДОГО рода — картонные, дорогие по микроэлектронике, конкурируют
  *  с крейсерами за тот же дефицитный ресурс. Считается по АНГАРУ порта, а не по флотам:
  *  челнок с SHU-1.1 живёт в `planet.hangar` и во флот не попадает никогда. */
@@ -1074,6 +1074,12 @@ export function aiOrders(
           const q = e.payload as { kind?: string; planetId?: string; unit?: string };
           return q.kind === 'unit' && q.planetId === planetId && q.unit === unit;
         });
+      const pendingSiege = (planetId: string): boolean =>
+        state.scheduled.some((e) => {
+          if (e.type !== 'construction.complete') return false;
+          const q = e.payload as { kind?: string; planetId?: string; modules?: string[] };
+          return q.kind === 'unit' && q.planetId === planetId && !!q.modules?.includes(SIEGE_MODULE);
+        });
       const affordableUnit = (unit: string, count: number): boolean => {
         const cost = data.units[unit]?.cost ?? {};
         return Object.keys(cost).every(
@@ -1173,12 +1179,17 @@ export function aiOrders(
       }
       // Сколько таких корпусов у места ВСЕГО: во флотах плюс ещё не поднятые в
       //    гарнизоне дома (авто-рандеву кладёт новый корабль именно туда).
-      const shipsOwned = (unit: string): number =>
-        Object.values(state.fleets).reduce(
-          (n, fl) =>
-            n + (fl.owner === ai ? fl.units.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0) : 0),
-          0,
-        ) + base.garrison.reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
+      // `withModule` — считать только корпуса с этим модулем (осадные крейсеры SIEGE-1).
+      const shipsOwned = (unit: string, withModule?: string): number => {
+        const hit = (st: UnitStack): number =>
+          st.unit === unit && (!withModule || (st.modules ?? []).includes(withModule)) ? st.count : 0;
+        return (
+          Object.values(state.fleets).reduce(
+            (n, fl) => n + (fl.owner === ai ? fl.units.reduce((k, st) => k + hit(st), 0) : 0),
+            0,
+          ) + base.garrison.reduce((n, st) => n + hit(st), 0)
+        );
+      };
       // 4. Десантный корабль: трюм 16 против 5 у крейсера — без него ударная группа
       //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
       if (
@@ -1210,16 +1221,24 @@ export function aiOrders(
       // Правило же осталось и заказывало его КАЖДЫЙ тик — ядро отбивало `E_UNKNOWN_UNIT`
       // молча, 2493 отказа за 8 матчей замера. Линии приёма урона это не касается: они
       // живы, и заднюю линию держит осадная платформа ниже.
-      // Осадная платформа — задняя линия (GDD §7.2). Огня с дистанции она не даёт, но
-      // без неё у бота не бывает ЗАДНЕЙ линии вовсе, и раздача урона по линиям меряется
-      // лишь наполовину.
+      // Осада — модулем, а не корпусом (SIEGE-1, резолюция владельца 2026-09-23): юнита
+      // «осадная платформа» больше нет, её роль — модуль `siege_platform` на крейсере.
+      // Бот держит пару таких крейсеров на войне: без них миры он рушил бы только
+      // `attack × BOMBARD_FRACTION` линейных корпусов. Заднюю линию теперь держит
+      // шаттл-носитель выше.
+      const siegeCost = data.modules[SIEGE_MODULE]?.cost ?? {};
       if (
         warFooting &&
-        shipsOwned('siege') < SIEGE_CAP &&
-        !pendingUnit(base.id, 'siege') &&
-        affordableUnit('siege', 1)
+        data.modules[SIEGE_MODULE] &&
+        shipsOwned('cruiser', SIEGE_MODULE) < SIEGE_CAP &&
+        !pendingSiege(base.id) &&
+        Object.keys({ ...(data.units.cruiser?.cost ?? {}), ...siegeCost }).every(
+          (r) =>
+            (pl.resources[r] ?? 0) >=
+            (data.units.cruiser?.cost[r] ?? 0) + (siegeCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+        )
       ) {
-        out.push(buildUnit(ai, base.id, 'siege', 1));
+        out.push(buildShip(ai, base.id, 'cruiser', 1, [SIEGE_MODULE]));
       }
       // ═══ ЧЕЛНОКИ (SHU-1.1 + SHU-3.2) ═══
       // Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём, поэтому цепочка

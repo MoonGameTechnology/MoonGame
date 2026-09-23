@@ -238,5 +238,27 @@
         }
       ]
     }
+  },
+  "siege_platform": {
+    "name": "Siege Platform",
+    "rarity": "unique",
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "siegeDamage": 60
+      }
+    },
+    "cost": {
+      "metal": 60,
+      "credits": 30,
+      "microelectronics": 2
+    },
+    "allowed": {
+      "domain": "space",
+      "units": [
+        "cruiser"
+      ]
+    }
   }
 }

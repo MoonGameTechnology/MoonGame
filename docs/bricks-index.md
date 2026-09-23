@@ -664,7 +664,7 @@
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
 | UX-SEL-1 | 🗑 | proto | `docs/backlog.md` | На ПК выделять рамкой обычным ЛКМ — снято решением |
 | UX-KEYS-1 | ✅ | proto | `docs/backlog.md` | Раздел «Управление» в настройках: какие клавиши и жесты есть. |
-| ROS-SUP-1 | ⏳ | proto | `docs/backlog.md` | Отдельная вкладка «Корабли поддержки» в Производстве, |
+| ROS-SUP-1 | ✅ | proto data | `docs/backlog.md` | Корабли поддержки — своей вкладкой. |
 | SIEGE-1 | ⏳ | data proto | `docs/backlog.md` | Убрать юнит siege из игры, урон по постройкам — модулем. |
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
 | BRWH-2 | ✅ | proto | `docs/backlog.md` | Четыре сгнивших харнеса починены — и два из них ловили |

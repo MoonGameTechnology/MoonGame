@@ -888,7 +888,7 @@ export const en: Record<string, string> = {
   'data.area-defense-array': 'Area Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
   'data.shuttle-carrier': 'Shuttle',
-  'data.siege': 'siege',
+  'data.siege-platform': 'Siege Platform',
   'data.signal-corps': 'Signal Corps',
   'data.solar-flare-zone': 'Solar Flare Zone',
   'data.space': 'space',
@@ -1049,9 +1049,6 @@ export const en: Record<string, string> = {
   'dossier.unit.shuttle-carrier.desc':
     'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it carries craft the way a carrier carries aircraft, stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
   'dossier.unit.shuttle-carrier.name': 'Shuttle',
-  'dossier.unit.siege.desc':
-    "A siege platform: it rains bombs from orbit onto the world below — {s} damage per hour to BUILDINGS, more than anything else in the fleet. Against ships and shuttles it is nearly useless ({a} attack), but it is tough ({hp} hull, {d} defense) and stands in the REAR line, so it can hold a siege for a long time. It has no standoff fire: against a fleet it joins the battle like everyone else.",
-  'dossier.unit.siege.name': 'Siege Platform',
   'dossier.unit.strike-carrier.desc':
     "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. It carries no shuttles: only the Shuttle has a hangar.",
   'dossier.unit.strike-carrier.name': 'Landing Ship',
@@ -1106,6 +1103,7 @@ export const en: Record<string, string> = {
   'loadout.stat.shield-regen': 'Shield regen',
   'loadout.stat.share-per-hour': '{n}%/h',
   'loadout.stat.shield': 'Shield',
+  'loadout.stat.siege': 'Damage to buildings',
   'loadout.stat.speed': 'Speed',
 
   // --- map — Значки на карте: фазы боя.
@@ -1346,6 +1344,7 @@ export const en: Record<string, string> = {
   'yard.tab.infantry': 'Infantry',
   'yard.tab.ships': 'Ships',
   'yard.tab.squads': 'Shuttles',
+  'yard.tab.support': 'Support',
   'yard.tab.vehicles': 'Vehicles',
   'yard.title': 'PRODUCTION',
 

@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.26'); // PVR-6.4/6.5: module rarity; radar_module only on the scout (owner, 2026-09-23)
+    expect(data.version).toBe('0.1.27'); // SIEGE-1: the siege unit is gone, its role is the siege_platform module; ROS-SUP-1: support trait (owner, 2026-09-23)
     expect(data.resources).toContain('microelectronics');
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
@@ -62,7 +62,10 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // Линии — строй КОРАБЛЕЙ (GDD §7.2), и ростер заполняет все три.
     expect(data.units.cruiser?.line).toBe('front');
     expect(data.units.scout?.line).toBe('mid');
-    expect(data.units.siege?.line).toBe('rear');
+    // Заднюю линию держит шаттл-носитель: осадной платформы как юнита нет (SIEGE-1) —
+    // её роль стала модулем `siege_platform` на крейсере.
+    expect(data.units.siege).toBeUndefined();
+    expect(data.modules.siege_platform?.effects.stats.siegeDamage).toBeGreaterThan(0);
     // Carriers are mobile spaceports (SHU-2.1): `shuttleBay` on the HULL is what bases
     // shuttles aboard, so a hull with 0 simply cannot base any.
     // «Шаттл» — ЕДИНСТВЕННЫЙ носитель челноков после того, как десантный корабль

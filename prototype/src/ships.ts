@@ -30,7 +30,7 @@ export interface ShipHull {
 
 export const SHIP_HULLS: Record<string, ShipHull> = {
   cruiser: { name: 'ship.hull.cruiser', icon: '▲', slots: 3, base: 'cruiser' },
-  siege_lance: { name: 'ship.hull.siege_lance', icon: '✦', slots: 2, base: 'siege' },
+  siege_lance: { name: 'ship.hull.siege_lance', icon: '✦', slots: 2, base: 'siege_lance' },
   scout_drone: { name: 'ship.hull.scout_drone', icon: '◌', slots: 1, base: 'scout' },
   dropship: { name: 'ship.hull.dropship', icon: '⊟', slots: 2, base: 'strike_carrier' },
 };

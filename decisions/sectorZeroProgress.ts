@@ -198,10 +198,6 @@ function nodeOpenTo(
 }
 
 
-/** Корпуса, которые владелец убрал из игры, а данные ещё несут. Осадную платформу как юнит
- *  снимает SIEGE-1 (`docs/backlog.md`) — тогда её здесь не станет и этот список опустеет. */
-export const RETIRED_HULLS: ReadonlySet<string> = new Set(['siege']);
-
 /**
  * Корпуса, которые игрок забега реально СТРОИТ (PVR-6.2). Раньше сюда шёл любой
  * космический юнит со слотами — и в подготовке лежали матка Роя и пушки крепости.
@@ -218,8 +214,7 @@ export function sectorHullIds(data: GameData): string[] {
       id !== 'hero' &&
       Object.values(def.slots).some((n) => n > 0) &&
       !def.traits.includes('issued') &&
-      !factionOnly.has(id) &&
-      !RETIRED_HULLS.has(id)
+      !factionOnly.has(id)
     );
   });
 }

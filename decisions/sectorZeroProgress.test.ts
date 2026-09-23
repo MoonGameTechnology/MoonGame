@@ -480,8 +480,8 @@ describe('SZE-1.3 — осколки: серия неудач упирается
 describe('PVR-6.2 — в подготовке только корпуса, которые игрок строит', () => {
   const hulls = sectorHullIds(data);
 
-  it('нет вражеских, выдаваемых и снятых корпусов', () => {
-    for (const id of ['swarm_brood_mother', 'swarm_lander', 'fortress_guns', 'siege'])
+  it('нет вражеских и выдаваемых корпусов', () => {
+    for (const id of ['swarm_brood_mother', 'swarm_lander', 'fortress_guns'])
       expect(hulls, id).not.toContain(id);
   });
 
