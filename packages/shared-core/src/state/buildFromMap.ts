@@ -15,7 +15,7 @@ import {
 import { pairKey } from './diplomacy';
 import { distance } from './route';
 import { mosaicBorderSegments, mosaicBorders, sealPlan, type MosaicSeed } from './mosaic';
-import { deriveRoads } from './roads';
+import { deriveRoads, shareRoadNetwork } from './roads';
 
 /**
  * Map-as-content loader (map-roadmap.md M1.2 / M1.3). Turns a validated `MatchMap`
@@ -633,7 +633,9 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
   return {
     ...base,
     players,
-    planets,
+    // The road network never changes for the match: shared, not copied, by every kernel
+    // step's clone (ROADS-7, `shareRoadNetwork`).
+    planets: shareRoadNetwork(planets),
     fleets,
     ...(diplomacy ? { diplomacy } : {}),
     ...(Object.keys(heroes).length ? { heroes } : {}),

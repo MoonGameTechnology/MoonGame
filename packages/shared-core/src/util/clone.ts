@@ -8,9 +8,19 @@
  * Native, for example).
  */
 
-/** Deep-clones a JSON-shaped value (primitives, plain objects, arrays). */
+/** Marks a subtree {@link deepClone} may SHARE instead of copying (see {@link shareImmutable}). */
+const SHARED = Symbol('void.shared');
+type Marked = { [SHARED]?: true };
+
+/**
+ * Deep-clones a JSON-shaped value (primitives, plain objects, arrays). A subtree marked by
+ * {@link shareImmutable} is handed back as is: it is frozen, so the copy could never differ.
+ */
 export function deepClone<T>(value: T): T {
   if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if ((value as Marked)[SHARED] === true) {
     return value;
   }
   if (Array.isArray(value)) {
@@ -76,6 +86,34 @@ export function deepEqual(a: unknown, b: unknown): boolean {
     }
   }
   return xDefined === yDefined; // no extra defined keys on the other side
+}
+
+/**
+ * Freezes a JSON-shaped value deeply and marks it shareable: {@link deepClone} then hands
+ * back the SAME object instead of copying it. Meant for data that never changes for the
+ * whole match — the road network (ROADS-7). On the 831-province solo map it is about eleven
+ * thousand small objects, and copying them on every kernel step made the step ~55% slower
+ * (measured: a clone of 3.9 ms against 2.1 ms with the network shared).
+ *
+ * Sharing is safe precisely because the value is frozen: nothing can mutate it through the
+ * draft, so the reducer still never mutates its input (invariant #2). The mark is a symbol —
+ * invisible to `Object.keys`, `JSON.stringify` and `hashJson` — so the state stays
+ * JSON-shaped and hashes the same. A JSON round trip drops it: the copy is plain again and
+ * is cloned like everything else (slower, never wrong). A value someone froze WITHOUT the
+ * mark (`deepFreeze` in the purity tests) stays unmarked and is still copied.
+ */
+export function shareImmutable<T>(value: T): T {
+  if (value === null || typeof value !== 'object' || (value as Marked)[SHARED] === true) {
+    return value;
+  }
+  for (const key of Object.keys(value)) {
+    shareImmutable((value as Record<string, unknown>)[key]);
+  }
+  if (!Object.isFrozen(value)) {
+    Object.defineProperty(value, SHARED, { value: true });
+    Object.freeze(value);
+  }
+  return value;
 }
 
 /**

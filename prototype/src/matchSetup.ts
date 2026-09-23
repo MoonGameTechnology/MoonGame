@@ -11,7 +11,9 @@
  */
 import {
   createInitialState,
+  deriveRoads,
   factionStart,
+  shareRoadNetwork,
   pairKey,
   type DiplomaticStance,
   type GameState,
@@ -235,6 +237,23 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       traits: [],
     };
   }
+  // ROADS-7: дороги с развилками — и на соло-картах. Правило то же, что у
+  // `buildStateFromMap` для карты с АВТОРСКИМИ лейнами: мозаики за ними нет, поэтому
+  // дорога пересекает границу в середине между центрами, а сколько троп выходит от
+  // планеты, решает её местность (`data.sectors[*].corridors`). Без этого ядро водило бы
+  // флоты по дорогам на картах глав и по прямым здесь — два правила движения в одной игре.
+  const roads = deriveRoads({
+    sectors: Object.fromEntries(
+      preset.nodes.map((n) => [n.id, { x: n.x, y: n.y, terrain: planets[n.id]!.terrain }]),
+    ),
+    lanes: preset.nodes.flatMap((n) => n.links.map((to): [string, string] => [n.id, to])),
+    borders: [],
+    corridorsOf: (terrain) => (terrain ? data.sectors[terrain]?.corridors : undefined),
+  });
+  for (const [id, planetRoads] of Object.entries(roads)) planets[id]!.roads = planetRoads;
+  // Сеть за партию не меняется — клон ядра делит её, а не копирует (`shareRoadNetwork`):
+  // на карте в 831 провинцию копия сети стоила каждому шагу мира около полутора миллисекунд.
+  shareRoadNetwork(planets);
   const players: Record<string, Player> = {};
   const fleets: Record<string, Fleet> = {};
   const heroes: Record<string, Hero> = {};

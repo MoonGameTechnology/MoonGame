@@ -114,6 +114,7 @@ export {
   pointAlong,
   polylineLength,
   roadAhead,
+  shareRoadNetwork,
   snapToFork,
   subPolyline,
   type RoadInput,
@@ -439,7 +440,7 @@ export {
 } from './data/loadGameData';
 
 // Utilities
-export { deepClone, deepFreeze } from './util/clone';
+export { deepClone, deepFreeze, shareImmutable } from './util/clone';
 export { MS_PER_HOUR, MS_PER_DAY } from './util/time';
 export {
   unitTier,

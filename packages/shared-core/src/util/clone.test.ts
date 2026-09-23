@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { deepClone, deepEqual, deepFreeze } from './clone';
+import { deepClone, deepEqual, deepFreeze, shareImmutable } from './clone';
+import { hashJson } from '../state/hash';
 
 describe('deepClone', () => {
   it('produces an equal but fully independent copy', () => {
@@ -78,5 +79,58 @@ describe('deepFreeze', () => {
     expect(Object.isFrozen(obj.a.b)).toBe(true);
     expect(Object.isFrozen(obj.list)).toBe(true);
     expect(Object.isFrozen(obj.list[0])).toBe(true);
+  });
+});
+
+describe('shareImmutable — a subtree the clone shares instead of copying (ROADS-7)', () => {
+  it('deepClone hands the marked subtree back as is and still copies the rest', () => {
+    const roads = shareImmutable({
+      crossings: { B: { x: 1, y: 2 } },
+      trails: [{ exits: ['B'], fork: null }],
+    });
+    const state = { planet: { id: 'A', roads }, owner: { name: 'p1' } };
+    const copy = deepClone(state);
+    expect(copy.planet.roads).toBe(roads);
+    expect(copy.planet).not.toBe(state.planet);
+    expect(copy.owner).not.toBe(state.owner);
+  });
+
+  it('the shared value is frozen through and through — sharing cannot leak a mutation', () => {
+    const roads = shareImmutable({ trails: [{ exits: ['B'], fork: { x: 1, y: 2 } }] });
+    expect(Object.isFrozen(roads.trails[0]!.fork)).toBe(true);
+    expect(() => {
+      (roads.trails[0]!.fork as { x: number }).x = 9;
+    }).toThrow(TypeError);
+  });
+
+  it('the mark is invisible to keys, JSON and the state hash', () => {
+    const plain = { crossings: { B: { x: 1, y: 2 } }, trails: [{ exits: ['B'], fork: null }] };
+    const marked = shareImmutable(JSON.parse(JSON.stringify(plain)) as typeof plain);
+    expect(Object.keys(marked)).toEqual(Object.keys(plain));
+    expect(JSON.stringify(marked)).toBe(JSON.stringify(plain));
+    expect(hashJson(marked)).toBe(hashJson(plain));
+    expect(deepEqual(marked, plain)).toBe(true);
+  });
+
+  it('a value frozen WITHOUT the mark is still copied — the purity tests keep their meaning', () => {
+    const frozen = deepFreeze({ a: { b: 1 } });
+    const copy = deepClone(frozen);
+    expect(copy).not.toBe(frozen);
+    expect(copy.a).not.toBe(frozen.a);
+    expect(Object.isFrozen(copy)).toBe(false);
+  });
+
+  it('a JSON round trip drops the mark: the copy is cloned like everything else', () => {
+    const marked = shareImmutable({ a: { b: 1 } });
+    const revived = JSON.parse(JSON.stringify(marked)) as typeof marked;
+    expect(deepClone(revived)).not.toBe(revived);
+  });
+
+  it('an already frozen, unmarked object does not throw; its children are still shared', () => {
+    const inner = { x: 1 };
+    const outer = Object.freeze({ inner });
+    expect(() => shareImmutable(outer)).not.toThrow();
+    expect(deepClone(outer)).not.toBe(outer);
+    expect(deepClone(outer).inner).toBe(inner);
   });
 });
