@@ -136,12 +136,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // конструкторе основной игры. Нет арта у корпуса — остаётся имя, без пустой рамки.
     const hullTile = (id: string): string =>
       button('hull', id, `${catalogPortraitHtml('u', id, data, 'thumb')}<span>${esc(displayUnit(id))}</span>`, false, hull === id);
-    // Корабли линии и корабли поддержки — двумя рядами (ROS-SUP-1), признак из данных.
+    // Корабли линии, поддержка и челноки — рядами, как вкладки Производства (ROS-SUP-1);
+    // признаки из данных.
     const groups = splitSupport(sectorHullIds(data), data);
     const hulls = (
       [
         ['yard.tab.ships', groups.line],
         ['yard.tab.support', groups.support],
+        ['yard.tab.squads', groups.shuttles],
       ] as const
     )
       .filter(([, ids]) => ids.length > 0)

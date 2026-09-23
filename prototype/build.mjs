@@ -675,6 +675,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink);}
 .set-lbl .set-sub{font-size:10px;color:var(--dim);letter-spacing:.2px;}
 /* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
+.set-tabs{display:flex;gap:6px;margin:0 0 12px;}
+.set-tabs button{flex:1;min-height:36px;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;}
+.set-tabs button.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
 .set-keys{display:grid;gap:6px;margin:0 0 12px;}
 .set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
 .set-keys dt{font:600 11px/1.4 ui-monospace,monospace;color:var(--cyan);}
@@ -1820,6 +1823,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-btn.primary{border-color:var(--cyan);background:rgba(53,214,230,.16);color:var(--cyan);}
 #endscreen .es-btn.primary:hover{background:rgba(53,214,230,.28);box-shadow:0 0 12px rgba(53,214,230,.35);}
 #endscreen .es-btn:hover{border-color:var(--cyan-dim);}
+#endscreen .es-btn.wide{flex-basis:100%;}
 #endscreen .es-btn.ghost{flex-basis:100%;background:transparent;color:var(--dim);border-color:var(--line);}
 
 @media (max-width:720px), ((hover: none) and (pointer: coarse) and (max-height: 520px)){

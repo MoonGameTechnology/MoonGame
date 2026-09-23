@@ -9605,7 +9605,7 @@ const endScreenPanel = initEndScreen({
     // свой #spotlight поверх хаба и следующего матча.
     activeTour?.stop();
     if (!wasNet && isSectorZeroRun()) {
-      openSectorZero(which === 'again');
+      openSectorZero(which === 'again', which === 'replay');
       return;
     }
     if (which === 'again') {
@@ -13435,7 +13435,10 @@ const sectorZeroMenu = initSectorZeroMenu({
   },
 });
 
-function openSectorZero(preparation = false): void {
+/** `replay` — сразу новая попытка той же главы (кнопка итогов «Сыграть главу снова»). Идёт
+ *  через открытие меню: оно засчитывает и стирает закончившийся забег, и только потом
+ *  стартует новый — тем же путём, что кнопка «Новый забег». */
+function openSectorZero(preparation = false, replay = false): void {
   saveSolo();
   speed = 0;
   userClosed = true;
@@ -13454,8 +13457,15 @@ function openSectorZero(preparation = false): void {
   showConnect(false);
   showHub(false);
   endscreenEl.style.display = 'none';
+  const chapter = sectorMission;
   detach('Sector Zero menu', sectorZeroMenu.open().then(() => {
     if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open();
+    if (replay && sectorZeroMenu.isOpen()) {
+      nextSectorMission = chapter;
+      writeRaw('void.pveMission', String(chapter));
+      sectorZeroMenu.hide();
+      startPvEMatch();
+    }
   }));
 }
 /** Реальное время последней записи. Снимок пишется НЕ каждый кадр: он весит десятки
