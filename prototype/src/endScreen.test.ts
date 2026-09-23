@@ -6,6 +6,7 @@ import {
   placementOf,
   outcomeTitle,
   endScreenHtml,
+  runSummaryHtml,
   initEndScreen,
   type MatchEnd,
   type EndAction,
@@ -274,5 +275,51 @@ describe('итоги матча — уход', () => {
     w.api.render();
     w.ov.click('board');
     expect(w.left).toEqual([]);
+  });
+});
+
+describe('итог забега Sector Zero — по частям (PVR-5.4)', () => {
+  const summary = {
+    attempt: 3,
+    chapter: 'pve-2',
+    won: true,
+    waves: 10,
+    totalWaves: 10,
+    base: 14,
+    objectives: [
+      { id: 'mission.salvage', total: 4, complete: true, paid: 3 },
+      { id: 'mission.recon', total: 14, complete: false, paid: 0 },
+    ],
+    bonus: 3,
+    total: 17,
+    warrants: 85,
+    unlocked: 2,
+  };
+
+  it('забег, победа и каждая задача — отдельными строками, сумма и открытое — внизу', () => {
+    const html = runSummaryHtml(summary);
+    expect(html).toContain('Забег: волн 10 из 10');
+    expect(html).toContain('+11'); // забег без победы: 1 + 10 волн
+    expect(html).toContain('Победа');
+    expect(html).toContain('✓ Сбор материалов');
+    expect(html).toContain('✗ Разведка: опознать 14 провинций');
+    expect(html).toContain('+17 данных экспедиций · +85 ⌖');
+    expect(html).toContain('откроется новых задач: 2');
+  });
+
+  it('без победы строки «Победа» нет, без открытого — нет строки про следующий заход', () => {
+    const html = runSummaryHtml({ ...summary, won: false, base: 11, unlocked: 0 });
+    expect(html).not.toContain('Победа');
+    expect(html).not.toContain('откроется');
+  });
+
+  it('панель берёт разбивку вместо одной суммы, когда она есть', () => {
+    const html = endScreenHtml(scored(), 'p1', endOf({ runReward: 17, runSummary: summary }), {
+      net: false,
+      worldsFallback: 0,
+      fmtStamp: () => '',
+    });
+    expect(html).toContain('es-run');
+    expect(endScreenHtml(scored(), 'p1', endOf({ runReward: 17 }), { net: false, worldsFallback: 0, fmtStamp: () => '' })).not.toContain('es-run');
   });
 });

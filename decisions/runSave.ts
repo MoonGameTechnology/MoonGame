@@ -63,6 +63,9 @@ export interface RunSave<TState = unknown> {
    * saves omit these; the host adopts them without changing their live world. */
   sectorZeroAttempt?: number;
   shipLoadouts?: Record<string, string[]>;
+  /** Глава забега (номер карты, 0 — первая). Без неё засчёт после перезагрузки платил бы
+   *  задачи той главы, что выбрана в меню СЕЙЧАС, а не той, что игралась (PVR-5.3). */
+  sectorZeroMission?: number;
 }
 
 /** Снимок → строка для хранилища. */
@@ -102,5 +105,7 @@ export function parseRunSave(raw: string | null | undefined): RunSave | null {
     ...(Number.isSafeInteger(save.sectorZeroAttempt) && save.sectorZeroAttempt! > 0
       ? { sectorZeroAttempt: save.sectorZeroAttempt } : {}),
     ...(save.shipLoadouts ? { shipLoadouts } : {}),
+    ...(Number.isSafeInteger(save.sectorZeroMission) && save.sectorZeroMission! >= 0
+      ? { sectorZeroMission: save.sectorZeroMission } : {}),
   };
 }

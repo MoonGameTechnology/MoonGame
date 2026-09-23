@@ -126,11 +126,17 @@ describe('карта второй главы — «Кладбище экспед
 describe('дополнительные задачи карты (PVR-5.2)', () => {
   const objectives = map.objectives;
 
-  it('задач ТРИ, и все с разными глаголами — взять, снести, пройти', () => {
-    // Три задачи одного рода слились бы в одну: смысл «дополнительных миссий» в том,
-    // что они требуют РАЗНОГО, а не одного и того же по три раза.
-    expect(objectives).toHaveLength(3);
-    expect([...new Set(objectives.map((o) => o.kind))].sort()).toEqual(['control', 'raze', 'scout']);
+  it('запас ПЯТЬ, и все с разными глаголами (PVR-5.3: запас растёт с номером главы)', () => {
+    // Задачи одного рода слились бы в одну: смысл «дополнительных миссий» в том, что они
+    // требуют РАЗНОГО, а не одного и того же много раз.
+    expect(objectives).toHaveLength(5);
+    expect([...new Set(objectives.map((o) => o.kind))].sort()).toEqual([
+      'build',
+      'control',
+      'raze',
+      'scout',
+      'wave',
+    ]);
   });
 
   it('цели задач СУЩЕСТВУЮТ — опечатка в id не должна означать «выполнено»', () => {
@@ -193,9 +199,9 @@ describe('дополнительные задачи карты (PVR-5.2)', () =>
     expect(sum).toBeLessThan(14);
   });
 
-  it('первая глава задач НЕ получила — они не приехали в неё молча', () => {
-    expect(pveObjectives(0)).toEqual([]);
-    expect(pveObjectives(1)).toHaveLength(3);
+  it('запас первой главы — три, второй — пять (PVR-5.3)', () => {
+    expect(pveObjectives(0)).toHaveLength(3);
+    expect(pveObjectives(1)).toHaveLength(5);
   });
 });
 

@@ -113,10 +113,11 @@ export const MapSlotSchema = z.object({
 export const MapObjectiveSchema = z.object({
   /** Ключ локализации заголовка: в коде и в данных живёт КЛЮЧ, не текст. */
   id: z.string(),
-  kind: z.enum(['control', 'raze', 'scout']),
-  /** `control` — id провинций; `raze` — виды построек; `scout` не читает. */
+  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build']),
+  /** `control` — id провинций; `raze` и `build` — виды построек; `scout`/`wave` не читают. */
   targets: z.array(z.string()).default([]),
-  /** `scout` — сколько провинций опознать. */
+  /** `scout` — сколько провинций опознать; `wave` — до какой волны дожить; `build` —
+   *  сколько построек названных видов держать (PVR-5.3). */
   count: z.number().int().positive().optional(),
   /** Надбавка к награде за забег; складывается с выплатой за волны, а не заменяет её. */
   reward: z.number().nonnegative().default(0),
@@ -145,6 +146,12 @@ export const MatchMapSchema = z.object({
   /** Дополнительные задачи забега на этой карте. Пусто — карта без задач, и это
    *  нормальный случай: задачи ДОПОЛНИТЕЛЬНЫЕ, победа от них не зависит. */
   objectives: z.array(MapObjectiveSchema).default([]),
+  /** Сколько задач из запаса видно за один забег (PVR-5.3): `base` — с первого захода,
+   *  дальше +1 за каждую выполненную задачи этой главы, но не больше `cap`. Нет поля —
+   *  3 и 5, резолюция владельца 2026-09-22. */
+  objectiveSlots: z
+    .object({ base: z.number().int().positive(), cap: z.number().int().positive() })
+    .optional(),
   /** Undirected adjacency: each pair is a two-way path. Order within a pair is
    *  irrelevant; symmetry, no self-loops and the neighbour-only rule are enforced
    *  in `validateMatchMap`.

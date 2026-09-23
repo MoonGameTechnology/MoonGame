@@ -73,6 +73,21 @@ export function pveObjectives(mission = 0): MapObjective[] {
   return parseMatchMap(missionMap(mission)).objectives;
 }
 
+/** Глава забега одной структурой (PVR-5.3): id карты — ключ счёта выполненных задач в
+ *  профиле, запас задач и правило их показа. */
+export function pveChapter(mission = 0): {
+  id: string;
+  objectives: MapObjective[];
+  slots?: { base: number; cap: number };
+} {
+  const map = parseMatchMap(missionMap(mission));
+  return {
+    id: map.id,
+    objectives: map.objectives,
+    ...(map.objectiveSlots ? { slots: map.objectiveSlots } : {}),
+  };
+}
+
 /** The mode the mission's map declares itself played under (`data.modes` id), for the host
  *  to arm the match with. The map carries it so the binding is DATA: the map and the mode
  *  both existed for a long time and nothing said they belonged together. */

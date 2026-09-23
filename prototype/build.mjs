@@ -1835,6 +1835,15 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-v small{font-size:11px;color:var(--dim);font-weight:400;}
 #endscreen .es-xp{margin:8px 0 2px;font-size:13px;color:var(--amber);font-weight:700;}
 #endscreen .es-xp .lvl{display:block;margin-top:3px;font-size:11px;color:var(--cyan);font-weight:400;}
+/* Итог забега Sector Zero по частям (PVR-5.4): забег и задачи — строками, сумма — внизу. */
+#endscreen .es-run{text-align:left;margin:12px 0 4px;border:1px solid var(--line-hi);border-radius:8px;padding:8px 10px;background:rgba(6,18,22,.6);}
+#endscreen .es-run ul{list-style:none;margin:0;padding:0;display:grid;gap:5px;}
+#endscreen .es-run li{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--dim);}
+#endscreen .es-run li b{font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;}
+#endscreen .es-run li.task.done span{color:var(--ink);}
+#endscreen .es-run li.task.done b{color:#5fd07a;}
+#endscreen .es-total{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin-top:8px;padding-top:7px;border-top:1px solid var(--line-hi);font-size:13px;color:var(--amber);font-weight:700;}
+#endscreen .es-next{margin:7px 0 0;font-size:11px;color:var(--cyan);}
 #endscreen .es-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px;}
 #endscreen .es-btn{flex:1 1 45%;min-width:120px;padding:12px;border-radius:8px;cursor:pointer;
   font:700 13px ui-monospace,monospace;letter-spacing:.5px;border:1px solid var(--line-hi);
