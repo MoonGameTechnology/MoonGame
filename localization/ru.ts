@@ -47,8 +47,8 @@ export const ru: Record<string, string> = {
   'controls.touch-drag.keys': 'Провести пальцем',
   'controls.wheel.does': 'Масштаб под курсором',
   'controls.wheel.keys': 'Колесо мыши',
-  'controls.window.does': 'Двигать окно; с Shift — шаг больше',
-  'controls.window.keys': 'Стрелки на ручке окна в фокусе',
+  'controls.panel-move.does': 'Двигать окно; с Shift — шаг больше',
+  'controls.panel-move.keys': 'Стрелки на ручке окна в фокусе',
 
   'hud.missions': 'Задачи: {n}/{m}',
   'mission.raze-biomass': 'Зачистка производства: снести биореакторы Роя',

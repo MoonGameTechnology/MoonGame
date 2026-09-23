@@ -44,8 +44,8 @@ export const en: Record<string, string> = {
   'controls.touch-drag.keys': 'Drag a finger',
   'controls.wheel.does': 'Zoom at the cursor',
   'controls.wheel.keys': 'Mouse wheel',
-  'controls.window.does': 'Move the window; Shift for bigger steps',
-  'controls.window.keys': 'Arrow keys on a focused window handle',
+  'controls.panel-move.does': 'Move the window; Shift for bigger steps',
+  'controls.panel-move.keys': 'Arrow keys on a focused window handle',
 
   'hud.missions': 'Missions: {n}/{m}',
   'mission.raze-biomass': 'Raze production: destroy the Swarm biomass pits',

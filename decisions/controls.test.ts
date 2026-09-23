@@ -39,7 +39,7 @@ const PROOF: Record<string, () => void> = {
     expect(main).toContain("closest('[data-buildorder]')");
   },
   back: () => expect(src('../prototype/src/backGesture.ts')).toContain("key === 'Escape'"),
-  window: () => {
+  'panel-move': () => {
     const windows = src('../prototype/src/floatingWindows.ts');
     expect(windows).toContain('ArrowLeft');
     expect(windows).toContain('e.shiftKey ? 30 : 10');

@@ -34,7 +34,12 @@ export const CONTROLS: readonly ControlRow[] = [
     does: 'controls.quick-build.does',
   },
   { id: 'back', device: 'pc', keys: 'controls.back.keys', does: 'controls.back.does' },
-  { id: 'window', device: 'pc', keys: 'controls.window.keys', does: 'controls.window.does' },
+  {
+    id: 'panel-move',
+    device: 'pc',
+    keys: 'controls.panel-move.keys',
+    does: 'controls.panel-move.does',
+  },
   {
     id: 'touch-drag',
     device: 'touch',
