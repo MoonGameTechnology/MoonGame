@@ -179,7 +179,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveObjectives, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveObjectives, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -265,8 +265,15 @@ import {
   type RunSave,
   type RunSaveStore,
 } from '../../decisions/runSave';
-import { localRunSaveStore } from './runSaveLocal';
-import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
+import { localRunSaveStore, PORTABLE_RUN_KEY } from './runSaveLocal';
+import { portableRunPreview, sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
+import {
+  describeRun,
+  parsePortableRun,
+  resumePortableRun,
+  serializePortableRun,
+  type PortableRunSave,
+} from '../../decisions/portableRun';
 import { SECTOR_ZERO_ABSENT_TOOLS, toolShown, type SessionTool } from '../../decisions/sectorZeroTools';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
@@ -13165,6 +13172,9 @@ function restoreSolo(): void {
  * ниже не изменится — в этом и была цена асинхронного интерфейса.
  */
 const runSaveStore: RunSaveStore = localRunSaveStore();
+// Дескриптор забега (`YAG-2.1`) — рядом с полным снимком. Снимок точнее, дескриптор живучее:
+// шесть полей переживают смену формы мира после обновления игры, блоб — нет.
+const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY);
 const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY);
 // Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
 // Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
@@ -13222,6 +13232,8 @@ function syncSectorZeroTools(): void {
 let sectorDevActive = false;
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
+/** Дескриптор с прошлой сессии — запасной путь, когда полный снимок не читается. */
+let savedPortable: PortableRunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
 /** Выбранная ГЛАВА забега (0 — первая). Живёт рядом со сложностью и хранится так же:
  *  это тот же род настройки запуска. Клампит `pveState` — испорченное хранилище открывает
@@ -13309,9 +13321,17 @@ const sectorZeroMenu = initSectorZeroMenu({
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
       await runSaveStore.clear();
+      await portableRunStore.clear();
       savedRun = null;
     }
-    return sectorZeroRunPreview(savedRun, pveModeId() ?? '');
+    const full = sectorZeroRunPreview(savedRun, pveModeId() ?? '');
+    if (full) return full;
+    // Полного снимка нет или он не читается (игру обновили, форма мира сменилась) —
+    // карточка по дескриптору: тот же забег, та же волна, но мир соберётся заново.
+    savedPortable = parsePortableRun(await portableRunStore.load());
+    const mode = pveModeId() ?? '';
+    const known = pveMissionOfMap(savedPortable?.map) !== null;
+    return portableRunPreview(known ? savedPortable : null, mode, data.modes[mode]?.pve?.waves ?? 0);
   },
   difficulty: () => nextSectorDifficulty,
   setDifficulty: value => {
@@ -13387,7 +13407,15 @@ function saveRun(): void {
   const save = currentRunSave();
   if (!save || (s.match.status === 'ended' && clearedAttempt === sectorAttempt)) return;
   const blob = serializeRunSave(save);
-  runWrite = runWrite.then(() => runSaveStore.save(blob));
+  const boons = data.modes[save.mode]?.pve?.boons ?? [];
+  const portable = serializePortableRun(
+    describeRun(s, ME, (id) => boons.includes(id), {
+      mode: save.mode,
+      difficulty: save.difficulty,
+      attempt: sectorAttempt,
+    }),
+  );
+  runWrite = runWrite.then(() => runSaveStore.save(blob)).then(() => portableRunStore.save(portable));
 }
 
 function awardSectorRun(): number {
@@ -13413,7 +13441,10 @@ function tickRunSave(nowReal: number): void {
       awardSectorRun();
       clearedAttempt = sectorAttempt;
       const awardWrite = progressWrite;
-      runWrite = runWrite.then(() => awardWrite).then(() => runSaveStore.clear());
+      runWrite = runWrite
+        .then(() => awardWrite)
+        .then(() => runSaveStore.clear())
+        .then(() => portableRunStore.clear());
     }
     return;
   }
@@ -13432,12 +13463,13 @@ function restoreRun(): boolean {
   // этом не трогаем — он дождётся обычного запуска.
   if (cameFromLink || NET) return false;
   const save = savedRun;
-  if (!save || !sectorZeroRunPreview(save, pveModeId() ?? '')) return false;
+  // Полный снимок недоступен — запасной путь по дескриптору (`YAG-2.1`).
+  if (!save || !sectorZeroRunPreview(save, pveModeId() ?? '')) return restorePortable();
   const state = save.state as GameState;
   // Режим из снимка может не существовать в задеплоенных данных (игру обновили) —
   // тогда восстанавливать нельзя: волны пошли бы по другим правилам, а то и не пошли.
   if (!data.modes[save.mode]) {
-    return false;
+    return restorePortable();
   }
   const priorState = s;
   const priorMode = matchMode();
@@ -13454,7 +13486,7 @@ function restoreRun(): boolean {
     setRunActive(priorRunActive);
     sectorDevActive = priorDevActive;
     speed = 0;
-    return false;
+    return restorePortable();
   }
   pveDifficulty = parseRunDifficulty(save.difficulty);
   setRunActive(true);
@@ -13474,6 +13506,61 @@ function restoreRun(): boolean {
   setupEl.style.display = 'none';
   saveRun();
   note(t('setup.pve.restored'));
+  return true;
+}
+
+/**
+ * Забег по ДЕСКРИПТОРУ (`YAG-2.1`) — когда полного снимка нет или он не стал миром.
+ *
+ * Мир собирается так же, как у нового запуска той же главы (карта, снаряжение, сложность),
+ * засевается модулем PvE и только потом получает волну и усиления из дескриптора —
+ * чистой функцией `resumePortableRun`. ⚠️ Восстановление НЕ побайтовое, и это принято
+ * осознанно (§2.1(а) роадмапа площадки): флоты, бои и ресурсы начинаются заново, и игрок
+ * это видит в журнале, а не догадывается. Номер попытки берётся из дескриптора — награда
+ * за этот забег не выдастся дважды.
+ */
+function restorePortable(): boolean {
+  const save = savedPortable;
+  const mission = pveMissionOfMap(save?.map);
+  const pve = save ? data.modes[save.mode]?.pve : undefined;
+  if (!save || mission === null || !pve || pveModeId(mission) !== save.mode) return false;
+  const priorState = s;
+  const priorMode = matchMode();
+  const priorRunActive = sectorRunActive;
+  const priorDevActive = sectorDevActive;
+  const priorMission = sectorMission;
+  try {
+    sectorMission = mission;
+    const world = prepareSectorZeroRun(pveState(data, mission), sectorProgress, data);
+    installMatch(world, runAiSeats(world, 'p1', parseRunDifficulty(save.difficulty)), save.mode);
+    apply(advance(s, s.time + 1)); // засеять PvE: волна 0, следующая назначена
+    const resumed = resumePortableRun(s, save, ME, pve.boons ?? []);
+    if (!resumed) throw new Error('E_RESUME_UNSEEDED');
+    s = resumed;
+  } catch {
+    s = priorState;
+    setMatchMode(priorMode);
+    setRunActive(priorRunActive);
+    sectorDevActive = priorDevActive;
+    sectorMission = priorMission;
+    speed = 0;
+    return false;
+  }
+  pveDifficulty = parseRunDifficulty(save.difficulty);
+  setRunActive(true);
+  sectorDevActive = false;
+  boonLaterAtWave = -1;
+  sectorAttempt = save.attempt ?? sectorProgress.nextAttempt;
+  if (sectorProgress.nextAttempt <= sectorAttempt) {
+    saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
+  }
+  runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
+  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
+  showConnect(false);
+  showHub(false);
+  setupEl.style.display = 'none';
+  saveRun();
+  note(t('setup.pve.restored-portable', { n: s.pve?.waveNumber ?? 0 }));
   return true;
 }
 

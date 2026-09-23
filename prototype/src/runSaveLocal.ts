@@ -19,6 +19,8 @@ import type { RunSaveStore } from '../../decisions/runSave';
 
 /** Ключ снимка. Один на устройство: забег у игрока одновременно один. */
 export const RUN_SAVE_KEY = 'void.run.v1';
+/** Дескриптор забега (`YAG-2.1`) — рядом с полным снимком, под своим ключом. */
+export const PORTABLE_RUN_KEY = 'void.run.portable.v1';
 
 /** Хранилище или `null` — его нет либо доступ к нему запрещён. */
 function store(): Storage | null {
