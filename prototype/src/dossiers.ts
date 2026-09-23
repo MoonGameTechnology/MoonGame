@@ -177,6 +177,18 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           r: hl(def.radarRange ?? 0),
         }),
       };
+    case 'picket_frigate':
+      return {
+        name: t('dossier.unit.picket-frigate.name'),
+        body: t('dossier.unit.picket-frigate.desc', {
+          r: hl(def.radarRange ?? 0),
+          m: hl(data.modules.radar_module?.effects.stats.radarRange ?? 0),
+          a: hl(st.attack),
+          d: hl(st.defense),
+          hp: hl(st.hp),
+          n: hl((def.slots?.weapon ?? 0) + (def.slots?.defense ?? 0) + (def.slots?.utility ?? 0)),
+        }),
+      };
     case 'strike_carrier':
       return {
         name: t('dossier.unit.strike-carrier.name'),

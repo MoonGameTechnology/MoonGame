@@ -267,7 +267,10 @@ export function initSectorZeroPreparation(h: PreparationHost) {
 
   function shop(p: SectorZeroProgress): string {
     const rows = shopRows(p, h.data, h.platform);
-    if (rows.length === 0) return `<p class="sz-sub">${t('sector-zero.shop.empty')}</p>`;
+    // Витрины нет в каталоге вовсе — магазин выключен данными. Раскупленный прилавок — другое:
+    // кнопки роликов остаются, а вместо карточек — «приходите завтра».
+    if (Object.keys(h.data.sectorZeroShop.offers).length === 0)
+      return `<p class="sz-sub">${t('sector-zero.shop.empty')}</p>`;
     const featured = featuredOffer(rows, h.data);
     const cards = rows
       .map((row) => {
@@ -350,7 +353,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               : t('sector-zero.shop.ad-sovereigns.used'),
             tap.state !== 'ready',
           );
-    return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton || tapButton ? `<div class="sz-shopbar">${refreshButton}${tapButton}</div>` : ''}<div class="sz-cards sz-shelf">${cards}</div>`;
+    return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton || tapButton ? `<div class="sz-shopbar">${refreshButton}${tapButton}</div>` : ''}${rows.length ? `<div class="sz-cards sz-shelf">${cards}</div>` : `<p class="sz-sub">${t('sector-zero.shop.sold-out')}</p>`}`;
   }
 
   /** Глубина узла в дереве навыков: без предпосылок — 1, иначе на один глубже самой

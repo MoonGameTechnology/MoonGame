@@ -905,6 +905,7 @@ export const en: Record<string, string> = {
   'data.vehicle-factory': 'Vehicle Factory',
   'data.scout': 'scout',
   'data.frigate': 'frigate',
+  'data.picket-frigate': 'picket frigate',
   'data.shield-booster': 'Shield Booster',
   'data.area-defense-array': 'Area Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
@@ -1059,11 +1060,14 @@ export const en: Record<string, string> = {
     "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or carrier — and burns the base's fuel doing it.",
   'dossier.unit.interceptor.name': 'Interceptor',
   'dossier.unit.frigate.desc':
-    "A frigate: a SUPPORT hull. It barely fights on its own ({a} attack, {d} defense) and lives off what you bolt onto it — {n} module bays, more than any other hull carries. Tougher than a scout ({hp} hull), it stands in the mid line. It is the ONLY ship the radar module fits: its own antenna is modest ({r}), the long sight comes from the pairing.",
+    "A frigate: a SUPPORT hull. It barely fights on its own ({a} attack, {d} defense) and lives off what you bolt onto it — {n} module bays, more than any other hull carries. Tougher than a scout ({hp} hull), it stands in the mid line.",
   'dossier.unit.frigate.name': 'Frigate',
   'dossier.unit.hero.desc':
     "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the shuttle together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
   'dossier.unit.hero.name': 'Flagship',
+  'dossier.unit.picket-frigate.desc':
+    'A picket frigate: the eyes of the fleet. Its own antenna reaches {r}, and the radar module (+{m}) fits this hull only. It barely fights ({a} attack, {d} defense, {hp} hull) and keeps to the rear line. Module bays: {n}.',
+  'dossier.unit.picket-frigate.name': 'Picket Frigate',
   'dossier.unit.scout.desc':
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'dossier.unit.scout.name': 'Scout',
@@ -2260,6 +2264,7 @@ export const en: Record<string, string> = {
   'sector-zero.shop.ad-sovereigns.used': 'Sovereigns for ads: tomorrow',
   'sector-zero.shop.bought': 'Purchased.',
   'sector-zero.shop.empty': 'The shelf is empty.',
+  'sector-zero.shop.sold-out': 'Sold out — the shelf restocks tomorrow.',
   'sector-zero.shop.featured': 'Deal of the day',
   'sector-zero.shop.grants.module': 'Ship module',
   'sector-zero.shop.grants.research': '+{n} expedition data',

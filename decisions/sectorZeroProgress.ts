@@ -73,6 +73,11 @@ export interface SectorZeroProgress {
   /** Сколько роликов за Суверены засчитано В ЭТИ сутки (`SZE-3.5`). Растёт только
    *  действием `ad-sovereigns`, обнуляется только сменой суток — как {@link shopRound}. */
   adSovereignsToday: number;
+  /** Лоты, купленные В ЭТИ сутки (решение владельца 2026-09-23): купленный товар уходит с
+   *  прилавка до смены суток, каким бы способом за него ни заплатили. Без этого лот с
+   *  ресурсом (он «своим» не становится) покупался за ролик снова и снова. Обнуляется
+   *  только сменой суток — как {@link shopRound}. */
+  shopSold: string[];
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
@@ -161,6 +166,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     day: 0,
     shopRound: 0,
     adSovereignsToday: 0,
+    shopSold: [],
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
@@ -388,7 +394,7 @@ export function changeSectorZeroProgress(
     case 'buy': {
       // Выдача и списание живут ВМЕСТЕ: разведи их — и однажды товар выдастся без оплаты.
       const offer = data.sectorZeroShop.offers[action.id];
-      if (!offer) return null;
+      if (!offer || next.shopSold.includes(action.id)) return null;
       const price = offer.prices[action.pay];
       if (price === undefined) return null; // этим способом товар не продаётся
       if (action.pay === 'warrants') {
@@ -417,6 +423,7 @@ export function changeSectorZeroProgress(
           else return null;
           break;
       }
+      next.shopSold.push(action.id);
       break;
     }
     case 'fit': {
@@ -575,6 +582,7 @@ export function parseSectorZeroProgress(
       counter(p.adSovereignsToday),
       data.sectorZeroShop.adSovereigns.perDay,
     );
+    fresh.shopSold = [...new Set(strings(p.shopSold).filter((id) => data.sectorZeroShop.offers[id]))];
     if (typeof p.seed === 'string') fresh.seed = p.seed;
     fresh.modules = [
       ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),

@@ -3,6 +3,7 @@
   { "kind": "hull", "defId": "scout" },
   { "kind": "hull", "defId": "cruiser" },
   { "kind": "hull", "defId": "frigate" },
+  { "kind": "hull", "defId": "picket_frigate" },
   { "kind": "hull", "defId": "strike_carrier" },
   { "kind": "hull", "defId": "interceptor" },
   { "kind": "hull", "defId": "landing_shuttle" },
