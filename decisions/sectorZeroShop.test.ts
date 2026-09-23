@@ -5,7 +5,8 @@ import {
   freshSectorZeroProgress,
   type SectorZeroProgress,
 } from './sectorZeroProgress';
-import { shopRows, type ShopCapabilities } from './sectorZeroShop';
+import { advanceShopDay, shopRows, type ShopCapabilities } from './sectorZeroShop';
+import { parseSectorZeroProgress } from './sectorZeroProgress';
 
 const data = shippedGameData();
 const ALL: ShopCapabilities = { sovereigns: true, ads: true };
@@ -131,5 +132,38 @@ describe('sectorZeroShop — «площадка не умеет» и «тебе 
     const p = profile({ warrants: 9999 });
     for (const id of ['data_small', 'radar_module'])
       expect([id, priceOf(p, ALL, id, 'ad')?.available]).toEqual([id, true]);
+  });
+});
+
+describe('sectorZeroShop — купленный лот уходит с прилавка до смены суток', () => {
+  it('ресурс за ролик второй раз не купить: лота на витрине больше нет', () => {
+    // До решения владельца (2026-09-23) ресурс «своим» не становился, и лот за рекламу
+    // покупался бесконечно.
+    const before = dayWith(profile(), 'data_small');
+    const once = changeSectorZeroProgress(before, { kind: 'buy', id: 'data_small', pay: 'ad' }, data)!;
+    expect(once.shopSold).toEqual(['data_small']);
+    expect(shopRows(once, data, ALL).some((r) => r.id === 'data_small')).toBe(false);
+    expect(changeSectorZeroProgress(once, { kind: 'buy', id: 'data_small', pay: 'ad' }, data)).toBeNull();
+    expect(
+      changeSectorZeroProgress(once, { kind: 'buy', id: 'data_small', pay: 'warrants' }, data),
+    ).toBeNull();
+  });
+
+  it('новые сутки возвращают прилавок', () => {
+    const sold = changeSectorZeroProgress(
+      dayWith(profile(), 'data_small'),
+      { kind: 'buy', id: 'data_small', pay: 'ad' },
+      data,
+    )!;
+    expect(advanceShopDay(sold, sold.day + 1).shopSold).toEqual([]);
+  });
+
+  it('проданное переживает перезагрузку, а мусор из хранилища отбрасывается', () => {
+    const sold = { ...profile(), shopSold: ['data_small', 'ghost', 7] as unknown as string[] };
+    expect(parseSectorZeroProgress(JSON.stringify(sold), data, 'shopper').shopSold).toEqual([
+      'data_small',
+    ]);
+    const { shopSold: _drop, ...legacy } = profile();
+    expect(parseSectorZeroProgress(JSON.stringify(legacy), data, 'shopper').shopSold).toEqual([]);
   });
 });

@@ -109,7 +109,8 @@ export function shopRows(
   // ротация и он фиксирован для дня: иначе экран прыгал бы между рендерами.
   for (const { id } of dailyOffers(progress.seed, progress.day, data, progress.shopRound)) {
     const offer = data.sectorZeroShop.offers[id];
-    if (!offer) continue;
+    // Купленный сегодня лот ушёл с прилавка (`shopSold`) — до смены суток его нет.
+    if (!offer || progress.shopSold.includes(id)) continue;
     const owned = offerOwned(offer, progress);
     // Узел навыка продаётся, только если его ВООБЩЕ можно изучить выбранному герою:
     // ветка и предпосылки — правила каталога, и деньги их не отменяют.
@@ -181,7 +182,7 @@ export function advanceShopDay(
   if (!Number.isSafeInteger(day) || day <= progress.day) return progress;
   // Новые сутки — новая суточная ротация, новое обновление за ролик (`SZE-3.4`) и новые
   // Суверены за ролик (`SZE-3.5`).
-  return { ...progress, day, shopRound: 0, adSovereignsToday: 0 };
+  return { ...progress, day, shopRound: 0, adSovereignsToday: 0, shopSold: [] };
 }
 
 /**

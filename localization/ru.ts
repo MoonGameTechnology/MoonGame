@@ -2268,6 +2268,7 @@ export const ru: Record<string, string> = {
   'sector-zero.shop.ad-sovereigns.used': 'Суверены за рекламу — завтра',
   'sector-zero.shop.bought': 'Куплено.',
   'sector-zero.shop.empty': 'Витрина пуста.',
+  'sector-zero.shop.sold-out': 'Прилавок раскуплен — новый завоз со сменой суток.',
   'sector-zero.shop.featured': 'Предложение дня',
   'sector-zero.shop.grants.module': 'Модуль корабля',
   'sector-zero.shop.grants.research': '+{n} данных экспедиций',
