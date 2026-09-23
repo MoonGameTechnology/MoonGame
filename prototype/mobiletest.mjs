@@ -5,18 +5,10 @@
  * Run after `pnpm run prototype`: node prototype/mobiletest.mjs
  */
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { createRequire } from 'node:module';
-import { build } from 'esbuild';
-import { resolveChromium } from '../scripts/chromium.mjs';
-import { enterSkirmish } from './harnessKit.mjs';
+import { writeFileSync } from 'node:fs';
+import { builtPage, enterSkirmish, instrumentedGame, launchBrowser, serve } from './harnessKit.mjs';
 import { checkMobileStrategy } from './mobileStrategyTest.mjs';
 
-const require = createRequire(import.meta.url);
-const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json'))(
-  'playwright-core',
-);
 const hooks = `window.__mobileTest = {
   state: () => s,
   camera: () => ({...cam}),
@@ -25,48 +17,14 @@ const hooks = `window.__mobileTest = {
   worlds: () => MAP.map(n => ({ id:n.id, p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) }))
 };`;
-const bundle = await build({
-  stdin: {
-    contents: readFileSync('prototype/src/main.ts', 'utf8') + hooks,
-    resolveDir: process.cwd() + '/prototype/src',
-    loader: 'ts',
-  },
-  bundle: true,
-  write: false,
-  format: 'iife',
-  platform: 'browser',
-  loader: { '.webp': 'dataurl' },
-  define: { __PLAYER_BUILD__: 'false' },
+// Корень — игра с хуками; `/built` и `/player` — сборки как есть, без инструментовки.
+const site = await serve({
+  ...(await instrumentedGame(hooks)),
+  '/built': builtPage(),
+  '/player': builtPage('void-dominion-player.html'),
 });
-const built = readFileSync('prototype/dist/void-dominion.html', 'utf8');
-const playerBuilt = readFileSync('prototype/dist/void-dominion-player.html', 'utf8');
-// build.mjs emits one known inline bundle at the end of this trusted test fixture.
-// Replace that exact slot; this is not an HTML sanitizer or a tag-filtering regex.
-const scriptStart = built.lastIndexOf('<script>');
-const scriptEnd = built.lastIndexOf('</script>');
-assert(scriptStart >= 0 && scriptEnd > scriptStart, 'the built fixture has its inline bundle');
-const instrumented =
-  built.slice(0, scriptStart) +
-  '<script src="/app.js"></script>' +
-  built.slice(scriptEnd + '</script>'.length);
-const server = createServer((req, res) => {
-  if (req.url === '/auth/status') {
-    res.setHeader('content-type', 'application/json');
-    return res.end('{"enabled":false}');
-  }
-  if (req.url === '/app.js') {
-    res.setHeader('content-type', 'text/javascript');
-    return res.end(bundle.outputFiles[0].text);
-  }
-  res.setHeader('content-type', 'text/html');
-  res.end(req.url === '/built' ? built : req.url === '/player' ? playerBuilt : instrumented);
-});
-await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-const browser = await chromium.launch({
-  headless: true,
-  ...(resolveChromium() ? { executablePath: resolveChromium() } : {}),
-  args: ['--no-sandbox', '--disable-dev-shm-usage'],
-});
+const server = site.server;
+const browser = await launchBrowser();
 const p = await browser.newPage({
   viewport: { width: 390, height: 844 },
   isMobile: true,
@@ -307,6 +265,63 @@ try {
   assert.equal(await sheet.locator('#side').count(), 1);
   assert.equal(await p.locator('#side').count(), 1);
 
+  // ШТУРМ через «Ещё» (BRWH-4). Кнопка `attack` есть только у флота с десантом
+  // (`cmdPresence`), поэтому сперва десант грузится НАСТОЯЩИМ путём игрока: ⇅ → максимум
+  // → OK. Погрузка ложится в часовую очередь, так что часы идут до посадки — на ▶▶ ×100
+  // это ~12 с. Свежая партия: снимки состояния шагов выше этим не задеты.
+  await p.goto(`http://127.0.0.1:${server.address().port}`);
+  await enterSkirmish(p, { tap: true });
+  await p.locator('#spd-pause').tap();
+  await pause();
+  const trooper = (await p.evaluate(() => window.__mobileTest.fleets())).find(
+    (x) => x.owner === me,
+  );
+  const selectTrooper = async () => {
+    const at = (await p.evaluate(() => window.__mobileTest.fleets())).find(
+      (x) => x.id === trooper.id,
+    );
+    await p.touchscreen.tap(at.p.x, at.p.y);
+    await pause();
+    const choices = (await ui()).choices;
+    const index = choices.findIndex((c) => c.kind === 'fleet' && c.id === trooper.id);
+    if (index >= 0) await p.locator(`[data-mobile="choose"][data-index="${index}"]`).tap();
+    await pause();
+    assert.deepEqual((await ui()).ids, [trooper.id]);
+  };
+  await selectTrooper();
+  assert.equal(await sheet.locator('[data-cmd="attack"]').count(), 0, 'no troops, no assault');
+  await sheet.locator('[data-cmd="more"]').tap();
+  await sheet.locator('[data-cmd="troops"]').tap();
+  for (const unit of await p
+    .locator('[data-cmd="tmax"][data-dir="1"]')
+    .evaluateAll((els) => els.map((e) => e.dataset.unit)))
+    await p.locator(`[data-cmd="tmax"][data-dir="1"][data-unit="${unit}"]`).tap();
+  await p.locator('[data-cmd="tok"]').tap();
+  // Панель скорости на телефоне прячется под открытой карточкой.
+  await p.locator('[data-mobile="close"]').tap();
+  await pause();
+  await p.locator('#spd-fast').tap();
+  await p.locator('.spd-mult-legacy [data-mult="100"]').tap();
+  await p.waitForFunction(
+    (id) => (window.__mobileTest.state().fleets[id].landing ?? []).length > 0,
+    trooper.id,
+    { timeout: 60000, polling: 250 },
+  );
+  await p.locator('#spd-pause').tap();
+  await pause();
+  await selectTrooper();
+  const loaded = await snapshot();
+  if (!(await sheet.locator('[data-cmd="attack"]').isVisible()))
+    await sheet.locator('[data-cmd="more"]').tap();
+  await sheet.locator('[data-cmd="attack"]').tap();
+  await pause();
+  assert((await ui()).assaultAim, 'assault aim is armed');
+  await p.keyboard.press('Escape');
+  await pause();
+  assert(!(await ui()).assaultAim, 'Back cancels assault targeting in one step');
+  assert.equal(await snapshot(), loaded, 'arming and cancelling the assault sends nothing');
+  console.log('PASS troops load through the real popover, assault via More and one-step Back');
+
   for (const route of ['/built', '/player']) {
     await p.goto(`http://127.0.0.1:${server.address().port}${route}`);
     await enterSkirmish(p, { tap: true });
@@ -349,5 +364,5 @@ try {
   throw error;
 } finally {
   await browser.close();
-  await new Promise((resolve) => server.close(resolve));
+  await site.close();
 }

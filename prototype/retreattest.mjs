@@ -17,10 +17,13 @@
  *   node prototype/retreattest.mjs      # или pnpm run smoke:retreat
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { build } from 'esbuild';
-
-import { builtPage, enterSkirmish, launchBrowser, serve, withDiagnostics } from './harnessKit.mjs';
+import {
+  enterSkirmish,
+  instrumentedGame,
+  launchBrowser,
+  serve,
+  withDiagnostics,
+} from './harnessKit.mjs';
 
 const hooks = `window.__retreatTest = {
   state: () => s,
@@ -29,35 +32,7 @@ const hooks = `window.__retreatTest = {
   fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
 };`;
 
-const bundle = await build({
-  stdin: {
-    contents: readFileSync('prototype/src/main.ts', 'utf8') + hooks,
-    resolveDir: process.cwd() + '/prototype/src',
-    loader: 'ts',
-  },
-  bundle: true,
-  write: false,
-  format: 'iife',
-  platform: 'browser',
-  loader: { '.webp': 'dataurl' },
-  define: { __PLAYER_BUILD__: 'false' },
-});
-
-const built = builtPage().toString('utf8');
-// build.mjs emits one known inline bundle at the end of this trusted fixture; we swap
-// exactly that slot for the instrumented build (same move as mobiletest.mjs).
-const scriptStart = built.lastIndexOf('<script>');
-const scriptEnd = built.lastIndexOf('</script>');
-assert(scriptStart >= 0 && scriptEnd > scriptStart, 'у собранной игры есть инлайновый бандл');
-const instrumented =
-  built.slice(0, scriptStart) +
-  '<script src="/app.js"></script>' +
-  built.slice(scriptEnd + '</script>'.length);
-
-const site = await serve({
-  '/': instrumented,
-  '/app.js': { type: 'text/javascript', body: bundle.outputFiles[0].text },
-});
+const site = await serve(await instrumentedGame(hooks));
 const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(15000);

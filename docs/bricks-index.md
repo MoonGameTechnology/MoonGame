@@ -665,6 +665,7 @@
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
 | BRWH-2 | ✅ | proto | `docs/backlog.md` | Четыре сгнивших харнеса починены — и два из них ловили |
 | BRWH-3 | ✅ | proto docs | `docs/backlog.md` | Общая база харнесов и снимок экрана одной |
+| BRWH-4 | ✅ | proto | `docs/backlog.md` | Штурм через «Ещё» снова под браузерной проверкой. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |
