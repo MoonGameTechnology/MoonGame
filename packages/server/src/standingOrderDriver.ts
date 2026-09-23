@@ -27,6 +27,7 @@
  * retried forever (the CC-2 rejected-churn lesson the prototype already learned).
  */
 import {
+  autoRetreatDue,
   patrolScrambles,
   type Action,
   type GameData,
@@ -123,10 +124,38 @@ export function patrolActions(
  *  single call site `serverWiring.ts` needs. `probe` is the room's kernel verdict
  *  (`MatchRoom.canApplyAll`): auto-storm asks it instead of re-stating the assault
  *  rules (RULES-3). */
+/**
+ * RETR-2 — авто-отступление. Решает ЯДРО (`autoRetreatDue`: приказ стоит, флот в бою,
+ * корпус просел до порога), драйвер только оборачивает ответ в приказ. Второй копии
+ * порога здесь нет намеренно: посчитай его тут — и он разъедется с прототипным
+ * драйвером, как уже разъезжались стоячие приказы до CONV-7.
+ */
+export function autoRetreatActions(
+  state: GameState,
+  data: GameData,
+): Array<{ playerId: string; action: Action }> {
+  return autoRetreatDue(state, data).map(({ fleetId, owner, to }) => ({
+    playerId: owner,
+    action: {
+      id: driverActionId('retreat', fleetId),
+      type: 'fleet.retreat',
+      playerId: owner,
+      payload: { fleetId, to },
+      issuedAt: state.time,
+    },
+  }));
+}
+
 export function standingOrderTickActions(
   state: GameState,
   data: GameData,
   probe: (state: GameState, actions: readonly Action[]) => string | null,
 ): Array<{ playerId: string; action: Action }> {
-  return [...autoAssaultActions(state, probe), ...patrolActions(state, data)];
+  return [
+    // Отход идёт ПЕРВЫМ: смысл приказа в том, чтобы выйти из боя до следующего
+    // раунда, а не после того, как флот отработает остальные намерения.
+    ...autoRetreatActions(state, data),
+    ...autoAssaultActions(state, probe),
+    ...patrolActions(state, data),
+  ];
 }

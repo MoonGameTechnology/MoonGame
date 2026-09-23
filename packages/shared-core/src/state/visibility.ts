@@ -381,6 +381,11 @@ function project(
   { identify, radar }: Coverage,
 ): VisibleState {
   const view = deepClone(state) as VisibleState;
+  // EVT-2 bookkeeping is SERVER-SIDE ONLY. It is keyed by node and priced from what
+  // died there, so shipping it would report a battle's toll on worlds the viewer
+  // cannot see — including ones they have never scouted. The player learns what they
+  // salvaged from `salvage.paid`, which is addressed to them by name.
+  delete view.salvage;
   // Private dossier plus this instant's resolved contacts. Never retain another
   // observer's records, and never put remembered fleets back on the live map.
   const contacts = { ...view.swarmIntel?.[viewerId], ...observedSwarm(state, viewerId, identify) };
@@ -464,7 +469,7 @@ function project(
   // and the prototype-style `forcedMarch`) are future intent — exactly what `scheduled`
   // is stripped for below. Keep only the entries of the viewer's OWN fleets; a map left
   // empty is removed (same delta hygiene as offers).
-  for (const key of ['orders', 'autoAssault', 'forcedMarch'] as const) {
+  for (const key of ['orders', 'autoAssault', 'autoRetreat', 'forcedMarch'] as const) {
     const host = view as unknown as Record<string, Record<string, unknown> | undefined>;
     const map = host[key];
     if (!map) continue;

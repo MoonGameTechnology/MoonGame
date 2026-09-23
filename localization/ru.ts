@@ -26,6 +26,10 @@ export const ru: Record<string, string> = {
   "setup.map.hole": "Чёрная дыра · путей нет",
   // --- map-loading — initial map preparation ---
   'battle.win.open': '⚔ Открыть бой',
+  'hud.missions': 'Задачи: {n}/{m}',
+  'mission.raze-biomass': 'Зачистка производства: снести биореакторы Роя',
+  'mission.recon': 'Разведка: опознать {n} провинций',
+  'mission.salvage': 'Сбор материалов: взять поля обломков',
   'production.units': 'Построить юнитов',
   'battle.win.beachhead': 'плацдарм',
   'battle.win.empty': 'об этом бое ничего не известно',
@@ -472,6 +476,8 @@ export const ru: Record<string, string> = {
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Штурм',
   'cmd.assault.hint': 'лететь к чужому миру и высадить десант при подходе',
+  'cmd.auto-retreat': 'Авто-отход',
+  'cmd.auto-retreat.hint': 'флот сам выходит из боя, когда корпус просядет до порога',
   'cmd.auto-assault': 'Авто-штурм',
   'cmd.auto-assault.hint': 'флот сам штурмует вражеский мир по прибытии',
   'cmd.cast': 'Каст',
@@ -728,6 +734,8 @@ export const ru: Record<string, string> = {
   'data.amber-concord': 'Янтарное согласие',
   'data.annihilate': 'Аннигиляция',
   'data.asteroid-field': 'Астероидное поле',
+  'data.asteroid-navigation': 'Астероидная навигация',
+  'data.asteroid-pilot': 'Астероидный лоцман',
   'data.spatial-rift': 'Пространственный разлом',
   'data.depleted-system': 'Истощённая система',
   'data.dense-asteroid-cluster': 'Плотное скопление астероидов',
@@ -764,6 +772,7 @@ export const ru: Record<string, string> = {
   'data.deep-void': 'Глубокая пустота',
   'data.dense-nebula': 'Плотная туманность',
   'data.derelict-graveyard': 'Кладбище кораблей',
+  'data.dust-lane': 'Пылевая полоса',
   'data.diplomatic-landing': 'Дипломатическая высадка',
   'data.drop-infantry': 'десантная пехота',
   'data.empty-space': 'Пустое пространство',
@@ -808,6 +817,8 @@ export const ru: Record<string, string> = {
   'data.militia': 'ополчение',
   'data.nebula': 'Туманность',
   'data.neural-lace': 'Нейрокружево',
+  'data.command-relay': 'Командный ретранслятор',
+  'data.command-grid': 'Командная сеть',
   'data.oceanic': 'Океанический',
   'data.open-space': 'Открытый космос',
   'data.area-defense-battery': 'Зональное ПВО',
@@ -1052,6 +1063,9 @@ export const ru: Record<string, string> = {
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-armed': '⤳ выберите цель — камера двигается двумя пальцами',
   'hint.assault-enemy-only': '⚔ штурмовать можно только чужой мир',
+  'hint.auto-retreat': '⮐ авто-отход при {n}% корпуса → {at}',
+  'hint.auto-retreat.off': '⮐ авто-отход снят',
+  'hint.auto-retreat.nowhere': '⮐ некуда отходить: выбери свой мир или назначь столицу',
   'hint.auto-assault': '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии',
   'hint.cast-cancelled': '✖ каст отменён',
   'hint.deploy-cancelled': '✖ развёртывание отменено',
@@ -1381,6 +1395,7 @@ export const ru: Record<string, string> = {
   'err.no-army': 'столько войск не наберётся',
   'err.no-artillery': 'нет артиллерии',
   'err.no-boon': 'сейчас выбирать нечего',
+  'err.no-destination': 'нет такой точки',
   'err.no-building': 'такого здания здесь нет',
   'err.battle-here': 'здесь идёт бой — работы остановлены',
   'err.no-build-slots': 'мест под постройки больше нет — прокачайте крепость',
@@ -1490,6 +1505,30 @@ export const ru: Record<string, string> = {
   'event.solar-flare': '☀️ Вспышка звезды сожгла {n} энергии',
   'event.void-anomaly': '🌀 Аномалия Пустоты питает реакторы: +{n} энергии',
 
+  'data.field-foundry': "Полевая литейная",
+  'data.hull-cutters': "Корпусные резаки",
+  'data.hull-shears': "Корпусные ножницы",
+  'data.master-batteries': "Мастерские батареи",
+  'data.master-scavenger': "Мастер-мародёр",
+  'data.reclaimed-barrels': "Перебранные стволы",
+  'data.salvage-rig': "Разборочная оснастка",
+  'data.scavenged-battery': "Трофейная батарея",
+  'data.scavenged-guns': "Трофейные орудия",
+  'data.scavenger-mastery': "Мастерство мародёра",
+  'data.wreck-optics': "Оптика обломков",
+  'hero.passive.hull-cutters.desc': "Ещё +2% к доле трофеев — итого 5%.",
+  'hero.passive.master-batteries.desc': "Ещё +3% к урону — итого 10%.",
+  'hero.passive.master-scavenger.desc': "Ещё +5% к доле трофеев — итого 10%.",
+  'hero.passive.reclaimed-barrels.desc': "Ещё +2% к урону — итого 7%.",
+  'hero.passive.scavenged-guns.desc': "+5% к урону корабля, которым командует герой.",
+  'hero.passive.wreck-optics.desc': "+3% к доле трофеев в боях, где дрался этот герой.",
+  'hero.tree.field-foundry.desc': "Трофейный металл переплавляется прямо в трюме и уходит в стволы.",
+  'hero.tree.hull-shears.desc': "Силовые ножницы вскрывают обшивку быстрее, чем она успевает остыть.",
+  'hero.tree.salvage-rig.desc': "Захваты и резаки на внешней подвеске: герой начинает снимать с поля боя больше, чем остальные.",
+  'hero.tree.scavenged-battery.desc': "Снятое с чужих корпусов идёт в дело — орудия корабля героя бьют сильнее.",
+  'hero.tree.scavenger-mastery.desc':
+    'Вершина ремесла: поле боя после героя остаётся голым, а его орудия — лучшими в эскадре.',
+
   // --- hero — Герои: грейды, способности (имя + описание).
   "hero.person.commander.name": "Марк Вейр",
   "hero.person.commander.bio": "Ветеран дальних походов. Во время окружения вывел разрозненные корабли по цепочке ложных манёвров и сохранил экипажи. Нейроинтерфейс помогает ему удерживать общую картину боя, но решения о судьбе людей он не доверяет автоматике. Сдержан, требователен и всегда оставляет резерв для отступления.",
@@ -1510,7 +1549,8 @@ export const ru: Record<string, string> = {
   'hero.ability.annihilate.name': 'Аннигиляция',
   'hero.ability.boarding-translocation.desc':
     'Герой выходит там, где СТОИТ один из его флотов, — своим отдельным флотом рядом. Каждый герой ведёт свою эскадру, поэтому на борт чужой он не садится; флот в пути точкой выхода не служит. Пассивный навык: расширяет точки развёртывания.',
-  'hero.ability.bulwark.desc': 'Временный щит: +оборона своим флотам рядом с героем.',
+  'hero.ability.bulwark.desc':
+    'Временный щит: +15% к обороне своих флотов в радиусе 42 от героя, на 2 часа. Радиус растёт с командной сетью — до 220 и 334.',
   'hero.ability.bulwark.name': 'Бастион',
   'hero.ability.corridor.desc':
     'Пробивает коридор до близкого мира. Одноразовый: пройти по нему может только армия с этим героем, и он закрывается, как только она прибыла. Улучшения продлевают ему жизнь, а затем открывают проход союзникам — но открытый проход общий, и враг войдёт в него тоже.',
@@ -1520,7 +1560,7 @@ export const ru: Record<string, string> = {
   'hero.ability.diplomatic-landing.desc':
     'Союзные миры принимают героя как своего: корабль может подняться и на планете союзника. Пассивный навык: расширяет точки развёртывания.',
   'hero.ability.rally.desc':
-    'Боевой клич: временный доп. бонус к ауре для своих флотов рядом с героем.',
+    'Боевой клич: +10% к урону своих флотов в радиусе 42 от героя, на 2 часа. Радиус растёт с командной сетью — до 220 и 334.',
   'hero.ability.rally.name': 'Сбор',
   'hero.ability.recall.desc': 'Мгновенно отзывает корабль-героя в столицу.',
   'hero.ability.recall.name': 'Отзыв',
@@ -1546,16 +1586,24 @@ export const ru: Record<string, string> = {
     'Герой ведёт сбор: флоты, выходящие из узлов в радиусе 300, летят на 8% быстрее.',
   'hero.passive.rally-beacon.desc':
     'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 300.',
+  'hero.passive.asteroid-pilot.desc':
+    'Корабль героя теряет меньше хода в астероидах: +20% к скорости входа в любую астероидную местность.',
   'hero.passive.vanguard-impulse.desc':
     'Корабль героя ведёт свой флот на форсаже: +10% к скорости флота героя.',
   'hero.tree.corridor-open.desc':
     'Открывает коридор СОЮЗНИКАМ: их флоты идут вашим проходом, как своим, — с тем же ускорением. Проход при этом становится общим: войти сможет и нейтрал, и противник, но им коридор даёт только дорогу, без ускорения.',
   'hero.tree.corridor-sustained.desc':
     'Коридор держится по часам, а не гаснет с первым же проходом армии героя.',
+  'hero.tree.command-relay.desc':
+    'Ретранслятор добивает приказ до соседнего узла: радиус аур «Сбор» и «Бастион» растёт с 42 до 220.',
+  'hero.tree.command-grid.desc':
+    'Сеть покрывает соседей целиком: радиус аур «Сбор» и «Бастион» растёт с 220 до 334.',
   'hero.tree.false-echo.desc':
     'Обратная сторона пси-зрения: герой учится не только читать чужой радар, но и писать в него то, чего нет.',
   'hero.tree.fleet-uplink.desc':
     'Нейроканал расходится на весь ордер: с места быстрее снимается не только корабль героя, но и флоты рядом.',
+  'hero.tree.asteroid-navigation.desc':
+    'Счисление пути по обломкам породы. Открывает «Астероидного лоцмана»: +20% к скорости корабля героя в астероидной местности.',
   'hero.tree.neural-lace.desc':
     'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
   'hero.tree.overclocked-helm.desc': 'Форсаж нейроинтерфейса открывает герою прокладку коридоров.',
@@ -1812,6 +1860,7 @@ export const ru: Record<string, string> = {
   'log.market.buy': 'покупка',
   'log.market.sell': 'продажа',
   'log.market.trade': '⇄ биржа: {n} {res} за {paid} ¤ ({side})',
+  'log.salvage': '🔧 Поле боя разобрано: {what}',
   'log.shuttle.repelled.mine': '✳ ПВО сбило наших машин: {n} · {at}',
   'log.shuttle.repelled.theirs': '✳ Наше ПВО сбило чужих машин: {n} · {at}',
   'log.spy.caught': '🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!',
@@ -2093,6 +2142,9 @@ export const ru: Record<string, string> = {
   'sector-zero.new': 'Новый забег',
   'sector-zero.no-save': 'Ваш следующий рубеж — сектор ноль.',
   'sector-zero.offline': 'Одиночная игра',
+  'sector-zero.mission': 'Глава',
+  'sector-zero.mission.1': 'I · Заглохший сигнал',
+  'sector-zero.mission.2': 'II · Кладбище экспедиции',
   'sector-zero.prep': 'Подготовка к забегу',
   'sector-zero.prep.abilities': 'Набор активных навыков',
   'sector-zero.prep.back': 'В главное меню',

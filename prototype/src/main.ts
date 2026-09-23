@@ -59,6 +59,7 @@ import {
   shareMap,
   netIncome,
   retreatFleet,
+  orderRetreat,
   STANCE_RANK,
   hasMapShare,
   hasMapShareOffer,
@@ -66,6 +67,7 @@ import {
   START_CANDIDATES,
   designateCapital,
   capitalOf,
+  RETREAT_THRESHOLDS,
   isInhabited,
   type SetupConfig,
   type SeatConfig,
@@ -177,7 +179,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveObjectives } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -251,6 +253,7 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
+import { missionProgress } from '../../decisions/missionObjectives';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
@@ -266,7 +269,7 @@ import { localRunSaveStore } from './runSaveLocal';
 import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
-import { createWebPlatform } from './platform/web';
+import { getPlatform, type PlatformHost } from './platform/host';
 import { advanceShopDay, localShopDay } from '../../decisions/sectorZeroShop';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
@@ -464,6 +467,7 @@ import {
   dayHour,
   clockHM,
   countdownHMS,
+  costText,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
@@ -1324,6 +1328,8 @@ let setupSpeed = 10;
 /** Сила Роя в забеге (PVR-2.1). Живёт рядом со `setupSpeed`, потому что это тот же род
  *  настройки: выбор игрока ДО запуска, переживающий перезагрузку. */
 let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
+/** Глава, на которой идёт ТЕКУЩИЙ забег (в отличие от выбранной для следующего). */
+let sectorMission = 0;
 /** Номер волны, на котором игрок нажал «Позже» (PVR-1.4). Долг при этом НЕ сгорает —
  *  окно просто не лезет поверх боя до следующей волны. `-1` = не откладывали. */
 let boonLaterAtWave = -1;
@@ -1872,6 +1878,21 @@ function world(p: { x: number; y: number }): { x: number; y: number } {
 function worldDist(d: number): number {
   return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
 }
+/**
+ * Волна на границах провинций (M2.9, решение владельца: «в космосе нет прямых углов»).
+ *
+ * Числа заданы в МИРОВЫХ единицах и переводятся в локальные координаты мозаики умножением
+ * на подгон карты под экран: `territoryGeometry.project` уже поделил экранные на зум, но
+ * не на подгон. Из-за этого изгиб не зависит от приближения — правило кирпича.
+ *
+ * Амплитуда взята долей от шага между провинциями (~260 мировых единиц на шипнутых
+ * картах): заметно глазу, но далеко от того, чтобы клетка полезла на соседнюю.
+ */
+function provinceWave(): { amp: number; wavelength: number; segment: number } {
+  const fit = camFitTransform(insets(), mapBounds()).scale;
+  return { amp: 11 * fit, wavelength: 190 * fit, segment: 26 * fit };
+}
+
 function currentMapLod(): MapLod {
   return mapLod(worldDist(mapNodeSpacing), cam.scale);
 }
@@ -3652,6 +3673,17 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       }
+      // EVT-2: трофеи с поля боя. Гейт тот же, что у тёмного события, и по той же
+      // причине: адресат приезжает как `playerId`, а чужая добыча — чужая экономика.
+      // Мешок печатается значками (`costText`), а не прозой: склонять «20 металла /
+      // 4 кредита» пришлось бы в коде, а ресурсы задаются данными и список открыт.
+      case 'salvage.paid': {
+        if (p.playerId !== ME) break;
+        const bag = p.resources as Record<string, number> | undefined;
+        if (!bag || Object.keys(bag).length === 0) break;
+        note(t('log.salvage', { what: costText(bag) }), p.location as string | undefined);
+        break;
+      }
       case 'unit.died': {
         // Счёт и ведомость наполняются по РАЗНЫМ условиям — `warTally.ts` (REFM-180):
         // счёт это личная статистика (только мои бои), ведомость питает строку ленты,
@@ -3703,6 +3735,25 @@ function patrolOn(baseId: string): boolean {
     ? !!(s as { patrols?: Record<string, unknown> }).patrols?.[baseId]
     : patrols.has(baseId);
 }
+/**
+ * RETR-2: порог авто-отхода, стоящий на флоте, или `null`, если приказа нет.
+ *
+ * Читается ИЗ СОСТОЯНИЯ в обоих режимах, в отличие от авто-штурма рядом: тот в соло
+ * живёт локальной картой клиента, а этот — приказ ядра (`order.retreat`), и ядро
+ * крутится в соло тоже. Своей копии заводить не нужно, а завести — значит разойтись
+ * с тем, по чему считает драйвер.
+ */
+function autoRetreatAt(fleetId: string): number | null {
+  return (s as { autoRetreat?: Record<string, { at: number }> }).autoRetreat?.[fleetId]?.at ?? null;
+}
+
+/** Ступени авто-отхода по кругу: нет → 20% → 30% → 40% → 50% → нет. Список закрыт в
+ *  ядре (`RETREAT_THRESHOLDS`), здесь только обход по кругу. */
+function nextRetreatStep(at: number | null): number | null {
+  const i = at === null ? -1 : RETREAT_THRESHOLDS.indexOf(at as (typeof RETREAT_THRESHOLDS)[number]);
+  return RETREAT_THRESHOLDS[i + 1] ?? null;
+}
+
 /** CC-2: set the auto-storm stance UNIFORMLY on the given own fleets (☰-row toggle —
  *  a mixed group snaps to one state instead of flipping each). Authoritative in NET
  *  (order.auto — the server presses the storm while you're offline), local Set solo. */
@@ -4450,9 +4501,11 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // weighted Voronoi (power diagram) over the sector centres: the cells tile the
   // map and share borders, so a bigger `size` claims more territory and resizing
   // one shifts the shared borders with its neighbours evenly. Adjacency IS the
-  // shared border — no lanes. (Empty void waypoints aren't real provinces → skipped.)
-  // Отбор узлов и вес семени — `provinceMap.ts` (REFM-61): пустой узел не провинция,
-  // вес растёт квадратично по масштабу, иначе карта перекраивается при зуме.
+  // shared border — no lanes. EVERY sector gets a cell, `empty` crossroads included:
+  // the kernel derives its lanes from the diagram over all of them, so skipping one here
+  // would draw a different map than the one being played (provinceMap.ts, rule 1).
+  // Вес семени — там же (REFM-61): растёт квадратично по масштабу, иначе карта
+  // перекраивается при зуме.
   const provinceIds: string[] = [];
   const seeds = provinceSeeds(MAP, cam.scale, (n) => {
     const p = s.planets[n.id];
@@ -4517,7 +4570,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     hideOwnedInner: holographicMapOn(),
     provinceDetail: lod.provinceDetail,
     sealed: sealedBorder,
-  }, territoryGeometry.project(seeds, clip, cam.scale));
+  }, territoryGeometry.project(seeds, clip, cam.scale, provinceWave()));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
   if (holographicMapOn() && lod.art > 0) {
@@ -8027,6 +8080,15 @@ function renderCmdBar() {
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
+        // RETR-2: авто-отход — соседний стоячий приказ, и живёт он там же.
+        cmdBtn(
+          'qretr',
+          '⮐',
+          t('cmd.auto-retreat'),
+          allOn(ids, (id) => autoRetreatAt(id) !== null) ? 'on' : '',
+          ids.length === 0,
+          t('cmd.auto-retreat.hint'),
+        ) +
         ''
       : '') +
     // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
@@ -8728,6 +8790,28 @@ cmdbar.addEventListener('click', (ev) => {
     const on = !ids.every((id) => isAutoAssault(id));
     setAutoAssault(ids, on);
     if (on) note(t('hint.auto-assault'));
+  } else if (cmd === 'qretr') {
+    // RETR-2: авто-отход. Одна кнопка обходит ступени по кругу (нет → 20 → 30 → 40 → 50
+    // → нет), группой единообразно: у смешанного выделения берётся порог ПЕРВОГО, чтобы
+    // вся группа снялась с места одинаково, а не разъехалась по разным отметкам.
+    //
+    // Точка отхода: ВЫБРАННЫЙ свой мир, иначе столица. Выбор игроку оставлен (владелец
+    // просил именно его), но без выбора приказ всё равно осмыслен — столица есть всегда,
+    // пока она назначена. Нет ни того, ни другого — приказ не ставится, и игроку
+    // говорят, чего не хватает, а не молчат.
+    const at = nextRetreatStep(autoRetreatAt(ids[0] ?? ''));
+    if (at === null) {
+      for (const id of ids) playerOrder(orderRetreat(ME, id, false));
+      note(t('hint.auto-retreat.off'));
+    } else {
+      const picked = selPlanet && s.planets[selPlanet]?.owner === ME ? selPlanet : null;
+      const to = picked ?? capitalOf(s, ME) ?? null;
+      if (to === null) note(t('hint.auto-retreat.nowhere'));
+      else {
+        for (const id of ids) playerOrder(orderRetreat(ME, id, true, at, to));
+        note(t('hint.auto-retreat', { n: Math.round(at * 100), at: to }));
+      }
+    }
   } else if (cmd === 'pick') {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
     pickMode = !pickMode;
@@ -10954,7 +11038,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   soloSaveActive = false;
   autoAssault.clear();
   patrols.clear();
-  sectorRunActive = false;
+  setRunActive(false);
   sectorDevActive = false;
   mapNeedsPreparation = true;
   // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
@@ -11050,14 +11134,15 @@ function startPvEMatch(dev = false): void {
   sectorAttempt = testing ? 0 : sectorProgress.nextAttempt;
   if (!testing) saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
-  const st = prepareSectorZeroRun(pveState(data), sectorProgress, data);
+  sectorMission = nextSectorMission;
+  const st = prepareSectorZeroRun(pveState(data, sectorMission), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
   const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
   // `pve` он не видел, потому что конфиг ехал без `modeId`.
-  installMatch(st, aiSeats, pveModeId());
-  sectorRunActive = true;
+  installMatch(st, aiSeats, pveModeId(sectorMission));
+  setRunActive(true);
   sectorDevActive = testing;
   if (!__PLAYER_BUILD__ && testing) {
     resetSandboxConfig();
@@ -11454,7 +11539,7 @@ function netClientFor(seat: string): MultiplayerClient {
 function connect(): void {
   saveSolo();
   soloSaveActive = false;
-  sectorRunActive = false;
+  setRunActive(false);
   const srv = resolveServer();
   if (!srv) return;
   const { base, nick } = srv;
@@ -13007,10 +13092,41 @@ const sectorSeed = `${Date.now().toString(36)}.${Math.random().toString(36).slic
 let sectorProgress = freshSectorZeroProgress(data, sectorSeed);
 let sectorAttempt = 0;
 let sectorRunActive = false;
+
+/**
+ * Единственная дверь к {@link sectorRunActive} — и заодно разметка геймплея для площадки
+ * (`YAG-1.2a`, требование 1.19).
+ *
+ * ⚠️ Почему сеттер, а не пять вызовов рядом с пятью присваиваниями. Точек, где забег
+ * начинается или кончается, уже пять: новый забег, установка другой партии, уход в сеть,
+ * успешное восстановление снимка и откат неудачного. Расставить `gameplayStart/stop` по
+ * ним значит завести шестую в следующем кирпиче и НЕ заметить этого: индикатор на
+ * debug-панели просто останется зелёным после выхода в меню, а модерация смотрит именно
+ * его. Сторож в `platform/gameplayMarking.test.ts` падает, если присвоить мимо сеттера.
+ *
+ * Площадка берётся через `getPlatform()`, а не через модульный `const platform` ниже:
+ * присваивания стоят ВЫШЕ по файлу, и обращение к константе из функции, вызванной до её
+ * инициализации, упало бы на временной мёртвой зоне.
+ *
+ * Повторный `start` и `stop` без `start` адаптер гасит сам (`decisions/platformLifecycle`),
+ * поэтому здесь нет проверки «а не то же ли самое значение» — она была бы вторым местом,
+ * где живёт одно правило.
+ */
+function setRunActive(on: boolean): void {
+  sectorRunActive = on;
+  const api = getPlatform() as Partial<PlatformHost>;
+  if (on) api.gameplayStart?.();
+  else api.gameplayStop?.();
+}
+
 let sectorDevActive = false;
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
+/** Выбранная ГЛАВА забега (0 — первая). Живёт рядом со сложностью и хранится так же:
+ *  это тот же род настройки запуска. Клампит `pveState` — испорченное хранилище открывает
+ *  первую главу, а не роняет вход. */
+let nextSectorMission = Number(readRaw('void.pveMission') ?? 0) || 0;
 let runWrite = Promise.resolve();
 let progressWrite = sectorProgressStore.load().then(raw => {
   sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
@@ -13023,12 +13139,26 @@ function saveSectorProgress(next: SectorZeroProgress): void {
   progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
 }
 
-// Площадка (`YAG-1.1a`). В сборке игрока это обычный браузер: rewarded-рекламы и платежей
-// там нет, и `capabilities` честно говорят `false` — магазин по ним просто не рисует такие
-// кнопки. В дев-сборке поднимается управляемая симуляция, чтобы путь «посмотрел рекламу →
-// товар выдан» проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку
-// нельзя: это ровно «обещать механику, которой у него не будет».
-const platform = createWebPlatform({ simulate: !__PLAYER_BUILD__ });
+// Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
+// (`bootstrap.ts`): здесь площадка уже готова, и игра про её имя ничего не знает. В
+// обычном браузере это веб-адаптер: rewarded-рекламы и платежей там нет, и `capabilities`
+// честно говорят `false` — магазин по ним просто не рисует такие кнопки. В дев-сборке
+// поднимается управляемая симуляция, чтобы путь «посмотрел рекламу → товар выдан»
+// проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку нельзя: это
+// ровно «обещать механику, которой у него не будет».
+const platform = getPlatform();
+
+// Разметка жизненного цикла для площадки (`YAG-1.2`). Хост отдаёт её, только если под
+// нами правда площадка; в браузере методов нет, и вызывать нечего — поэтому `host?.`, а
+// не сравнение с именем площадки. Сторож в `platform/yandex.test.ts` следит, чтобы имя
+// сюда не проникло даже строкой: он поймал ровно эту фразу, когда она была примером.
+const host = platform as Partial<PlatformHost>;
+
+// Требование площадки 1.3: при потере фокуса звук обязан замолкнуть (дают две секунды).
+// Пауза приходит ОТ ПЛОЩАДКИ (реклама, свёрнутая вкладка), поэтому глушим через
+// `setPaused`, а не `setEnabled`: настройка игрока обязана пережить ролик, иначе он
+// вернётся в тишину, которую не просил и которую надо чинить руками.
+host.onPlatformPause?.((paused) => snd.setPaused(paused));
 
 // Витрина магазина ротируется посуточно (`SZE-3.2`). Единственные часы у офлайнового
 // клиента — часы игрока, поэтому номер дня МОНОТОНЕН: `advanceShopDay` никогда его не
@@ -13069,7 +13199,12 @@ const sectorZeroMenu = initSectorZeroMenu({
     // Persistence can be unavailable. A paused run still exists in this tab.
     if (runInProgress() && !sectorDevActive) savedRun = currentRunSave();
     if (savedRun && savedRun.mode === pveModeId() && (savedRun.state as GameState).match?.status === 'ended') {
-      const next = settleSectorZeroRun(sectorProgress, savedRun.sectorZeroAttempt ?? 0, savedRun.state as GameState);
+      const next = settleSectorZeroRun(
+        sectorProgress,
+        savedRun.sectorZeroAttempt ?? 0,
+        savedRun.state as GameState,
+        pveObjectives(sectorMission),
+      );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
       await runSaveStore.clear();
@@ -13081,6 +13216,11 @@ const sectorZeroMenu = initSectorZeroMenu({
   setDifficulty: value => {
     nextSectorDifficulty = value;
     writeRaw('void.pveDifficulty', value);
+  },
+  mission: () => nextSectorMission,
+  setMission: value => {
+    nextSectorMission = value;
+    writeRaw('void.pveMission', String(value));
   },
   start: () => startPvEMatch(),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
@@ -13205,13 +13345,13 @@ function restoreRun(): boolean {
     // Оставляем файл на месте; меню сообщает об отказе и предлагает новый запуск.
     s = priorState;
     setMatchMode(priorMode);
-    sectorRunActive = priorRunActive;
+    setRunActive(priorRunActive);
     sectorDevActive = priorDevActive;
     speed = 0;
     return false;
   }
   pveDifficulty = parseRunDifficulty(save.difficulty);
-  sectorRunActive = true;
+  setRunActive(true);
   boonLaterAtWave = -1;
   sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
@@ -13262,6 +13402,9 @@ function frame(nowReal: number) {
     // с той же быстротой, а не медленнее (правило 3).
     const target = advanceTarget(s.time, dt, speed, HOUR);
     apply(advance(s, target));
+    // RETR-2 ПЕРВЫМ среди драйверов: смысл приказа — выйти из боя до следующего
+    // раунда, а не после того, как флот отработает остальные намерения.
+    solo.driveAutoRetreat();
     solo.autoEngage();
     solo.checkFleetClashes();
     solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
@@ -13333,9 +13476,23 @@ function frame(nowReal: number) {
       ? ''
       : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'cleared' ? wave.total : wave.wave, m: wave.total })}` +
         ` · ${wave.kind === 'cleared' ? t('hud.wave.done') : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>`;
+  // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
+  // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
+  // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
+  const missions = sectorRunActive ? missionProgress(pveObjectives(sectorMission), s, ME) : [];
+  const missionsDone = missions.filter(m => m.complete).length;
+  const missionHtml =
+    missions.length === 0
+      ? ''
+      : `<span class="dl-wave" title="${esc(
+          missions
+            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${m.reward})`)
+            .join('\n'),
+        )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
     waveHtml +
+    missionHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +

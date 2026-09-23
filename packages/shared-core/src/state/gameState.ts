@@ -723,6 +723,13 @@ export interface GameState {
   battles: Record<BattleId, Battle>;
   /** Monotonic counter handing each battle its id. */
   battleSeq: number;
+  /** EVT-2, owned by `salvageModule`: per-node value of what died in the battle running
+   *  there, waiting to be claimed by its winners, plus (for the rest of one drain) who
+   *  those winners were — `station.destroyed` arrives after `battle.resolved` and needs
+   *  an address. It lives in the state because a battle spans many steps while events
+   *  drain within one; `visibleState` strips it, since it names losses on nodes a viewer
+   *  may not see. Absent = nothing is being fought over. */
+  salvage?: Record<PlanetId, { pool: Record<string, number>; winners?: PlayerId[] }>;
   /** Челночные удары в полёте (SHU-1.2). Пусто/отсутствует = никто никуда не летит. */
   strikes?: ShuttleStrike[];
   /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */
@@ -805,6 +812,12 @@ export interface GameState {
    *  armed (`standingOrdersModule`, `order.auto`). A driver reads this; the module
    *  itself only stores the flag and garbage-collects it for dead fleets. */
   autoAssault?: Record<FleetId, true>;
+  /** RETR-2, владелец `standingOrdersModule`: авто-отступление. `at` — доля ОСТАВШЕГОСЯ
+   *  корпуса от максимального (решение владельца: 0.2/0.3/0.4/0.5), `to` — узел, куда
+   *  уходить. Приказ, а не состояние боя: живёт, пока игрок его не снял, и убирается
+   *  вместе с погибшим флотом. Туманом фильтруется как остальные стоячие приказы —
+   *  будущее намерение видит только хозяин флота. */
+  autoRetreat?: Record<FleetId, { at: number; to: PlanetId }>;
   /** CC-4 дежурный вылет: БАЗЫ (мир с портом или носитель), которым разрешено самим
    *  поднимать эскадру навстречу опознанному врагу поблизости. Ключ — id базы, значение
    *  называет, в каком пространстве имён этот id живёт.

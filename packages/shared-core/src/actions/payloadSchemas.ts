@@ -34,7 +34,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'fleet.bombard': z.object({ fleetId: id, on: z.boolean() }),
   // combat.ts (melee battles)
   'fleet.assault': z.object({ fleetId: id }),
-  'fleet.retreat': z.object({ fleetId: id }),
+  // `to` — точка отхода (RETR-1). Необязательна: без неё отступление только расцепляет
+  // бой, как и раньше, поэтому старый клиент остаётся валидным.
+  'fleet.retreat': z.object({ fleetId: id, to: id.optional() }),
   // army.ts
   'army.load': z.object({ fleetId: id, unit: id, count: count.optional() }),
   'army.unload': z.object({ fleetId: id, unit: id, count: count.optional() }),
@@ -191,6 +193,14 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'steward.holdpoint': z.object({ planetId: id, on: z.boolean() }),
   // standing orders (CC-2 auto-storm / CC-4 дежурный вылет) — client toggles only.
   'order.auto': z.object({ fleetId: id, on: z.boolean() }),
+  // RETR-2: порог и точка нужны только при включении — снимается приказ одним `on: false`.
+  // Ступени порога закрыты списком в самом модуле; здесь достаточно формы.
+  'order.retreat': z.object({
+    fleetId: id,
+    on: z.boolean(),
+    at: z.number().optional(),
+    to: id.optional(),
+  }),
   // CC-4 армит БАЗУ (SHU-2.2): мир с портом ИЛИ носитель — ровно одна из двух, как у
   // `shuttle.strike`; «обе или ни одной» схема не выражает, это гейт обработчика.
   // Прежний серверный штамп `patrol.stamp` снят вместе с моделью «крыло как флот»:

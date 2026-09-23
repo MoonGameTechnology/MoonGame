@@ -81,6 +81,10 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   scheduleSeq: 'public',
   swarmIntel: 'filtered', // only the viewer's observed Swarm composition
   fog: 'stripped', // память тумана — серверная кухня
+  // EVT-2: котёл трофеев ключуется узлом и считается по тому, кто там погиб, — то есть
+  // рассказал бы про цену боя на мирах, которых зритель не видит. Своё начисление игрок
+  // узнаёт адресным `salvage.paid`, а не состоянием.
+  salvage: 'stripped',
   heroes: 'filtered', // только свои
   tempLanes: 'public', // настоящие рёбра графа: их видно всем
   topology: 'public',
@@ -94,6 +98,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   marketSeq: 'public',
   capital: 'filtered', // чужая столица — точка респавна героя, наводка
   autoAssault: 'filtered', // всё это — постоянные приказы, будущие намерения
+  autoRetreat: 'filtered', // RETR-2: порог отхода и точка — намерение хозяина флота
   patrols: 'filtered',
   orders: 'filtered',
   forcedMarch: 'filtered',
@@ -362,12 +367,16 @@ function maximalState(): GameState {
     marketSeq: 1,
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },
+    autoRetreat: { mine: { at: 0.3, to: 'A' }, CANARY_fleet: { at: 0.3, to: 'CANARY_target' } },
     patrols: { mine: { kind: 'fleet' }, CANARY_fleet: { kind: 'fleet' } },
     orders: {
       mine: { steps: [{ kind: 'move', to: 'A' }] },
       CANARY_fleet: { steps: [{ kind: 'move', to: 'CANARY_dest' }] },
     },
     forcedMarch: { mine: true, CANARY_fleet: true },
+    // EVT-2: котёл трофеев. Канарейка на чужом узле — вырезаться обязано ВСЁ поле
+    // целиком, так что своей записи тут не нужно: она снимется вместе с чужой.
+    salvage: { CANARY_target: { pool: { metal: 100 }, winners: ['CANARY_third'] } },
     // Ни одной канарейки: волны публичны целиком (см. опись), и подсадить сюда чужой
     // секрет было бы неправдой о поле — оно его не носит.
     pve: { waveNumber: 3, totalWaves: 10, npcPlayerId: 'swarm', nextWaveAt: 7 },

@@ -84,18 +84,23 @@ describe('hero actions — the core engine over the prototype catalogs', () => {
     expect(r.state.heroes![main.id]!.cooldowns?.['fx:reveal']).toBeGreaterThan(s.time);
   });
 
-  it('hero.skill.unlock walks the branch tree and grants the node', () => {
+  it('hero.skill.unlock walks the tree and grants the node', () => {
     const s = newGame();
-    const main = mainOf(s, 'p1'); // commander → transhuman
+    const main = mainOf(s, 'p1'); // commander
     const r1 = order(s, unlockHeroSkill('p1', main.id, 'neural_lace'), s.time);
     expect(r1.error).toBeUndefined();
     const h1 = r1.state.heroes![main.id]!;
     expect(h1.skills).toContain('neural_lace');
     expect(h1.passives).toContain('vanguard_impulse'); // the node's grant landed
-    // wrong branch fails secure: a psionic node on a transhuman hero
-    expect(order(s, unlockHeroSkill('p1', main.id, 'void_attunement'), s.time).error).toBe(
-      'E_WRONG_BRANCH',
-    );
+    // Раньше здесь мерилась ветка: `void_attunement` (psionic) на трансгуманисте падал
+    // `E_WRONG_BRANCH`. Ветки припаркованы (HERO-11) — в каталоге их нет, дерево одно
+    // общее, и этот корень законен любому герою. Утверждение переписано под то, что
+    // действительно происходит; сам гейт цел и проверен на фикстурном каталоге в
+    // `packages/shared-core/src/modules/hero.test.ts`.
+    expect(order(s, unlockHeroSkill('p1', main.id, 'void_attunement'), s.time).error).toBeUndefined();
+    // Fail-secure никуда не делся — его держат РОДИТЕЛИ: узел ниже по лестнице закрыт,
+    // пока не взят его `requires`.
+    expect(order(s, unlockHeroSkill('p1', main.id, 'psi_veil'), s.time).error).toBe('E_REQUIRES');
   });
 
   it('лестница коридора доходит до игрока: узлы дерева поднимают ступень каста', () => {

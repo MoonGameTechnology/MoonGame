@@ -37,7 +37,7 @@ import {
   unequipHeroAbility,
 } from '../../decisions/actions';
 import { houseDisplayName } from './setupSeats';
-import { heroIdentity } from '../../decisions/heroIdentity';
+import { heroGradeKey, heroIdentity } from '../../decisions/heroIdentity';
 import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { emblemTally } from './fleetTally';
 import { isWingUnit } from './planetSummary';
@@ -107,6 +107,15 @@ const HERO_ACTIVE_CAP = 3; // mirrors the core heroModule's active cap (not expo
 const HERO_BRANCH_RU: Record<string, string> = {
   transhuman: 'hero.branch.transhuman',
   psionic: 'hero.branch.psionic',
+};
+// Ключи степеней — ОДИН дом на карточку, чип и досье (HERO-12). Раньше эта карта жила
+// локальной переменной внутри досье, и «редкость» была подписана ровно в одном месте
+// экрана; теперь по ней же красится обводка, и вторая копия разошлась бы молча.
+const HERO_GRADE_KEY: Record<string, string> = {
+  common: 'hero.grade.common',
+  rare: 'hero.grade.rare',
+  legendary: 'hero.grade.legendary',
+  main: 'hero.grade.main',
 };
 /** The cooldown slot an ability occupies — mirrors the core's `cooldownKey`. Exported
  *  because the map's command menu shows the same cooldown on the same ability. */
@@ -178,7 +187,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     const st =
       h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
     chips +=
-      `<button class="hx-chip${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
+      `<button class="hx-chip g-${heroGradeKey(h.grade)}${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
       `${heroPortraitHtml(h.archetype)}${esc(heroDisplayName(h))}` +
       `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
   }
@@ -201,9 +210,13 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
       ? `<span class="hx-trait">${t('hero.hq.modules')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
       : '';
   const portrait = heroPortraitHtml(hero.archetype);
+  const gradeKey = heroGradeKey(hero.grade);
   const ident =
-    `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
+    `<div class="hx-ident g-${gradeKey}${def?.branch === 'psionic' ? ' ps' : ''}">` +
     `<div class="hx-irow">${portrait}<span class="hx-name">♔ ${esc(heroDisplayName(hero))}</span>` +
+    // Редкость подписана СЛОВОМ, а не только цветом обводки: цветом одним нельзя —
+    // его не различит дальтоник и не передаст скриншот в оттенках серого.
+    `<span class="hx-tag hx-gtag">${esc(t(HERO_GRADE_KEY[gradeKey] ?? 'hero.grade.common'))}</span>` +
     (def?.branch
       ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>`
       : '') +
@@ -560,14 +573,11 @@ function heroOverviewHtml(hero: HeroInst, now: number, fleet?: GameState['fleets
   const abil = (hero.abilities ?? []).filter((a) => a !== null).length;
   const identity = heroIdentity(hero.archetype);
   const bio = hero.grade === 'main' ? t('hero.person.main.bio') : identity ? t(identity.bio) : '';
-  const gradeKeys: Record<string, string> = {
-    main: 'hero.grade.main', legendary: 'hero.grade.legendary', rare: 'hero.grade.rare', common: 'hero.grade.common',
-  };
   let html =
     `<section class="hx-person">${heroPortraitHtml(hero.archetype)}<div>` +
     `<h3>${esc(t('hero.person.dossier'))}</h3><p>${esc(bio)}</p>` +
     `<dl><dt>${t('hero.person.archetype')}</dt><dd>${esc(tData(def?.name ?? hero.archetype ?? ''))}</dd>` +
-    `<dt>${t('hero.person.grade')}</dt><dd>${esc(t(gradeKeys[hero.grade ?? 'common'] ?? 'hero.grade.common'))}</dd>` +
+    `<dt>${t('hero.person.grade')}</dt><dd>${esc(t(HERO_GRADE_KEY[heroGradeKey(hero.grade)] ?? 'hero.grade.common'))}</dd>` +
     `<dt>${t('hero.person.ships')}</dt><dd>${fleet ? emblemTally(fleet.units, [], (id) => isWingUnit(id, data)).ships : esc(t('hero.person.reserve'))}</dd></dl>` +
     `</div></section>` +
     `<div class="hx-note" style="margin-bottom:10px;">${esc(t(def?.description ?? ''))}</div>` +

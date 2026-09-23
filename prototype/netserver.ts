@@ -83,6 +83,7 @@ import {
   stewardActive,
   HOUR,
   serverAutoAssaultActions,
+  serverAutoRetreatActions,
   serverPatrolActions,
   serverChainActions,
   chainStamp,
@@ -646,6 +647,11 @@ async function createHostedMatch(
   // принадлежит БАЗЕ и тратится самим `shuttle.strike`.
   async function runServerStanding(): Promise<void> {
     if (!room.isStarted) return;
+    // RETR-2 идёт ПЕРВЫМ: смысл приказа — выйти из боя до следующего раунда, а не
+    // после того, как флот отработает остальные намерения.
+    for (const r of serverAutoRetreatActions(room.state)) {
+      for (const act of r.actions) await room.submitServerAction(r.owner, act);
+    }
     for (const a of serverAutoAssaultActions(room.state)) {
       for (const act of a.actions) if (!(await room.submitServerAction(a.owner, act)).ok) break;
     }

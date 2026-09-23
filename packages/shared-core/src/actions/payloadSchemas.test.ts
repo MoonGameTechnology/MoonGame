@@ -54,6 +54,7 @@ const CLIENT_ACTION_TYPES = [
   'steward.recall',
   'steward.holdpoint',
   'order.auto',
+  'order.retreat',
   'order.scramble',
   'order.chain',
   'fleet.forcemarch',
@@ -75,6 +76,9 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.assault', { fleetId: 'f1' }],
       ['fleet.bombard', { fleetId: 'f1', on: true }],
       ['fleet.retreat', { fleetId: 'f1' }],
+      ['fleet.retreat', { fleetId: 'f1', to: 'p1' }],
+      ['order.retreat', { fleetId: 'f1', on: false }],
+      ['order.retreat', { fleetId: 'f1', on: true, at: 0.3, to: 'p1' }],
       // CONV-9: книга двусторонняя, поэтому `side` обязателен; дробное количество
       // по-прежнему законно (ресурсы копятся непрерывно). `market.buy` и отмена по
       // `orderId` принадлежали односторонней версии и ушли вместе с ней.

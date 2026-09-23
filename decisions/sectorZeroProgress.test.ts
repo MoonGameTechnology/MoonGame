@@ -51,7 +51,7 @@ describe('Sector Zero persistent preparation', () => {
     expect(p.loadouts.cruiser).toEqual(['cargo_bay']);
   });
 
-  it('persists a hero upgrade and skill chain, rejecting wrong branches and missing prerequisites', () => {
+  it('persists a hero upgrade and skill chain, rejecting missing prerequisites', () => {
     let p = { ...fresh(), research: 40 };
     expect(
       changeSectorZeroProgress(
@@ -60,13 +60,18 @@ describe('Sector Zero persistent preparation', () => {
         data,
       ),
     ).toBeNull();
+    // Раньше здесь же проверялась ЧУЖАЯ ветка: `void_attunement` (psionic) на
+    // `commander` (transhuman) не покупался. Ветки припаркованы (HERO-11) — чужих узлов
+    // в каталоге больше нет, и этот узел законен. Проверяем именно это, а не оставляем
+    // утверждение, которое молча перестало что-либо ловить: корень без `requires`
+    // покупается, а всё, что ниже по лестнице, по-прежнему закрыто родителями (выше).
     expect(
       changeSectorZeroProgress(
         p,
         { kind: 'skill', hero: 'commander', id: 'void_attunement' },
         data,
       ),
-    ).toBeNull();
+    ).not.toBeNull();
     p = change(p, { kind: 'upgrade-hero', id: 'commander' });
     p = change(p, { kind: 'skill', hero: 'commander', id: 'neural_lace' });
     p = change(p, { kind: 'skill', hero: 'commander', id: 'overclocked_helm' });
@@ -83,6 +88,43 @@ describe('Sector Zero persistent preparation', () => {
         p,
         { kind: 'skill', hero: 'commander', id: 'overclocked_helm' },
         data,
+      ),
+    ).toBeNull();
+  });
+
+  it('общий узел покупается в подготовке — правило ветки то же, что в ядре', () => {
+    // Сторож над расхождением, которое парковка веток (HERO-11) СКРЫЛА бы: здесь стояло
+    // строгое равенство `node.branch === def.branch`, и безветочный узел
+    // (`undefined !== 'transhuman'`) в подготовке не покупался, хотя ядро на настоящей
+    // карте его пускало — восемь узлов из девятнадцати, треть дерева.
+    //
+    // Пока ветки припаркованы, обе стороны `undefined`, и строгое равенство случайно
+    // даёт верный ответ, поэтому проверять надо на каталоге С ВЕТКАМИ — иначе тест
+    // молчал бы ровно до дня распарковки. Каталог здесь распаркован вручную.
+    const unparked = {
+      ...data,
+      heroes: { ...data.heroes, commander: { ...data.heroes.commander!, branch: 'transhuman' as const } },
+      heroSkillTrees: {
+        ...data.heroSkillTrees,
+        // общий узел без ветки, без родителей — ядро пускает такой любому герою
+        command_relay: { ...data.heroSkillTrees.command_relay!, branch: undefined },
+        // чужой узел — по-прежнему закрыт
+        void_attunement: { ...data.heroSkillTrees.void_attunement!, branch: 'psionic' as const },
+      },
+    };
+    const p = { ...fresh(), research: 40 };
+    expect(
+      changeSectorZeroProgress(
+        p,
+        { kind: 'skill', hero: 'commander', id: 'command_relay' },
+        unparked,
+      ),
+    ).not.toBeNull();
+    expect(
+      changeSectorZeroProgress(
+        p,
+        { kind: 'skill', hero: 'commander', id: 'void_attunement' },
+        unparked,
       ),
     ).toBeNull();
   });
@@ -145,6 +187,29 @@ describe('Sector Zero persistent preparation', () => {
     expect(settleSectorZeroRun(loaded, 1, s)).toBe(loaded);
     s.match.winner = 'p1';
     expect(settleSectorZeroRun(p, 1, s).research).toBeGreaterThan(settled.research);
+  });
+
+  it('ЗАДАЧИ КАРТЫ добавляют к выплате, а не заменяют её (PVR-5.2)', () => {
+    // Надбавка складывается с выплатой за волны намеренно: иначе игрок, сделавший задачи
+    // и проигравший рано, получил бы больше дошедшего до конца, и «дополнительная»
+    // задача перестала бы быть дополнительной.
+    const s = pveState(data);
+    s.pve = { waveNumber: 4, totalWaves: 10, npcPlayerId: 'p3' };
+    s.match.status = 'ended';
+    s.match.winner = 'p3';
+    const base = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s).research;
+
+    // Задача, которая на этом состоянии ЗАВЕДОМО выполнена: снести то, чего на карте нет.
+    const done = { id: 'mission.x', kind: 'raze' as const, targets: ['no_such_building'], reward: 5 };
+    const withBonus = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [done]).research;
+    expect(withBonus).toBe(base + 5);
+
+    // Контроль: НЕвыполненная задача не платит, и выплата остаётся прежней.
+    const notDone = { id: 'mission.y', kind: 'control' as const, targets: ['no_such_planet'], reward: 5 };
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [notDone]).research).toBe(base);
+
+    // И контроль формы: пустой список задач — ровно прежнее поведение.
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, []).research).toBe(base);
   });
 
   it('does not confuse two different attempts ending at the same game time', () => {

@@ -55,8 +55,19 @@ export const orbitFleet = (playerId: string, fleetId: string, orbit: 'near' = 'n
   act(playerId, 'fleet.orbit', { fleetId, orbit });
 export const assaultFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.assault', { fleetId });
-export const retreatFleet = (playerId: string, fleetId: string) =>
-  act(playerId, 'fleet.retreat', { fleetId });
+/** Отступить из боя. `to` (RETR-1) уводит флот курсом на узел сразу после расцепления;
+ *  без него флот только выходит из боя и остаётся на месте, как было до RETR-1. */
+export const retreatFleet = (playerId: string, fleetId: string, to?: string) =>
+  act(playerId, 'fleet.retreat', to === undefined ? { fleetId } : { fleetId, to });
+/** Поставить/снять авто-отступление (RETR-2): `at` — доля оставшегося корпуса от
+ *  максимального, `to` — куда уходить. Снятие — один `on: false`. */
+export const orderRetreat = (
+  playerId: string,
+  fleetId: string,
+  on: boolean,
+  at?: number,
+  to?: string,
+) => act(playerId, 'order.retreat', on ? { fleetId, on, at, to } : { fleetId, on });
 export const bombardFleet = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'fleet.bombard', { fleetId, on });
 /** Поднять ЭСКАДРУ из порта мира по цели (SHU-1.2, адресация — SHU-4.2). Груз десанта

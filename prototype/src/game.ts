@@ -130,7 +130,12 @@ export {
   FORCED_MARCH_WEAR,
   forcedMarchModule,
 } from '../../packages/shared-core/src/index';
-export { serverAutoAssaultActions, serverChainActions, serverPatrolActions } from './serverDrivers';
+export {
+  serverAutoAssaultActions,
+  serverAutoRetreatActions,
+  serverChainActions,
+  serverPatrolActions,
+} from './serverDrivers';
 
 // --- ground war --------------------------------------------------------------
 
@@ -152,6 +157,9 @@ export {
 // --- heroes + capital --------------------------------------------------------
 export { heroRosterOf } from './heroes';
 export { capitalOf } from '../../packages/shared-core/src/index';
+// RETR-2: ступени авто-отхода закрыты списком в ЯДРЕ — интерфейс обходит его по кругу,
+// а не держит свою копию чисел.
+export { RETREAT_THRESHOLDS } from '../../packages/shared-core/src/index';
 
 // --- the player-order action builders ----------------------------------------
 export {
@@ -192,6 +200,7 @@ export {
   canTraverse,
   castHeroAbility,
   orderAuto,
+  orderRetreat,
   orderScramble,
   orderChain,
   forceMarchFleet,

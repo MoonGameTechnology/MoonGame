@@ -183,6 +183,7 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'steward.recall': {},
   'steward.holdpoint': { planetId: 'home_p1', on: true },
   'order.auto': { fleetId: 'p1_1', on: true },
+  'order.retreat': { fleetId: 'p1_1', on: true, at: 0.3, to: 'home_p1' },
   'order.scramble': { fleetId: 'p1_1', on: true },
   'fleet.forcemarch': { fleetId: 'p1_1', on: true },
   'fleet.instantRepair': { fleetId: 'p1_1' },

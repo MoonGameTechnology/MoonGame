@@ -32,6 +32,42 @@ const bundle = async (playerBuild) => {
   return res.outputFiles[0].text;
 };
 
+/**
+ * Платформенная цель (`YAG-1.1b`) — РАЗЛОЖЕННЫЙ артефакт, а не один HTML.
+ *
+ * Решение владельца 2026-09-17: `index.html` в корне архива плюс `assets/` рядом.
+ * Остальные три цели инлайнят всё в один файл (`loader: dataurl`), и для площадки это
+ * был бы самый простой архив — ровно один файл. Но data-URL это base64, то есть около
+ * +33% на каждом бинарнике, и кэшировать по частям нечего: правка одной строки заставляет
+ * игрока перекачать весь бандл. Раскладка принята ДО того, как приедет настоящий арт.
+ *
+ * Имена ассетов задаём мы (`[name]-[hash]`), потому что требование 1.22 запрещает
+ * пробелы и кириллицу в именах файлов и папок архива; сторож в `buildTarget.test.mjs`
+ * проверяет это на готовом артефакте, а не на обещании.
+ */
+const bundlePlatform = async () => {
+  const res = await build({
+    entryPoints: ['prototype/src/bootstrap.ts'],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    // Не `dataurl`: бинарники едут отдельными файлами в assets/ (см. шапку).
+    loader: { '.webp': 'file' },
+    assetNames: 'assets/[name]-[hash]',
+    entryNames: 'assets/app',
+    outdir: 'prototype/dist/yandex',
+    // Пути внутри бандла — ОТНОСИТЕЛЬНЫЕ: архив распаковывают в произвольный префикс на
+    // стороне площадки, и абсолютный `/assets/...` там просто не найдётся.
+    publicPath: '.',
+    minify: true,
+    legalComments: 'none',
+    write: false,
+    define: { __PLAYER_BUILD__: 'true' },
+  });
+  return res.outputFiles;
+};
+
 /** Пульт администратора (ADM-1) — свой вход, без `__PLAYER_BUILD__`: этой странице
  *  нечего вырезать, она и так не знает про игру ничего. */
 const bundleAdmin = async () => {
@@ -1205,18 +1241,43 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-badge.on{border-color:#7df0d0;color:#9ff0da;}
 #herobody .hx-badge.cd{border-color:#e2a15a;color:#e2a15a;}
 /* «Штаб героев» redesign (STAFF-1): chips · identity · tabs · real tree · dossier */
-#herobody{--hx-ps:#b98cff;}
+#herobody{--hx-ps:#b98cff;
+  /* Палитра РЕДКОСТИ (HERO-12). Копия таблицы HERO_GRADE_COLORS из
+     decisions/heroIdentity.ts — тот же цвет рисует канвас на карте. Сверяется
+     текстом в prototype/src/heroStaff.test.ts: правка там без правки здесь падает. */
+  --hx-g-common:#8fa6ad;--hx-g-rare:#5aa9ff;--hx-g-legendary:#e8b45a;--hx-g-main:#b98cff;}
 #herobody .hx-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;}
 #herobody .hx-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 6px;border-radius:999px;border:1px solid var(--line-hi);background:rgba(53,214,230,.05);color:var(--dim);font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap;}
 #herobody .hx-chip .hx-cr{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:rgba(53,214,230,.14);color:var(--cyan);}
 #herobody .hx-chip.ps .hx-cr{background:rgba(185,140,255,.16);color:var(--hx-ps);}
+#herobody .hx-chip.g-common{border-color:var(--hx-g-common);}
+#herobody .hx-chip.g-rare{border-color:var(--hx-g-rare);}
+#herobody .hx-chip.g-legendary{border-color:var(--hx-g-legendary);}
+#herobody .hx-chip.g-main{border-color:var(--hx-g-main);}
 #herobody .hx-chip.sel{color:#eafffb;border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan);background:rgba(53,214,230,.12);}
 #herobody .hx-chip.ps.sel{border-color:var(--hx-ps);box-shadow:0 0 0 1px var(--hx-ps);}
+/* Фокус НЕ съедает редкость: выбранный чип оставляет рамку своего цвета, а выделение
+   несёт ореол. Иначе у правила «обводка = редкость» было бы исключение ровно на том
+   герое, которого игрок сейчас и смотрит. Три класса — специфичнее, чем .sel выше. */
+#herobody .hx-chip.sel.g-common{border-color:var(--hx-g-common);}
+#herobody .hx-chip.sel.g-rare{border-color:var(--hx-g-rare);}
+#herobody .hx-chip.sel.g-legendary{border-color:var(--hx-g-legendary);}
+#herobody .hx-chip.sel.g-main{border-color:var(--hx-g-main);}
 #herobody .hx-chip .hx-cst{font-size:9px;letter-spacing:.5px;color:var(--dim);}
 #herobody .hx-chip .hx-cst.on{color:#9ff0da;}
 #herobody .hx-cap{margin-left:auto;font-size:10px;color:var(--dim);letter-spacing:.5px;}
 #herobody .hx-ident{border:1px solid var(--line-hi);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:linear-gradient(180deg,rgba(53,214,230,.07),rgba(53,214,230,.02));}
 #herobody .hx-ident.ps{background:linear-gradient(180deg,rgba(185,140,255,.08),rgba(185,140,255,.02));}
+/* Обводка карточки героя — по РЕДКОСТИ (HERO-12): рамка плюс мягкий ореол того же
+   цвета, чтобы степень читалась и на маленьком экране, где рамка в 1px теряется. */
+#herobody .hx-ident.g-common{border-color:var(--hx-g-common);box-shadow:0 0 0 1px rgba(143,166,173,.28);}
+#herobody .hx-ident.g-rare{border-color:var(--hx-g-rare);box-shadow:0 0 0 1px rgba(90,169,255,.3);}
+#herobody .hx-ident.g-legendary{border-color:var(--hx-g-legendary);box-shadow:0 0 0 1px rgba(232,180,90,.32);}
+#herobody .hx-ident.g-main{border-color:var(--hx-g-main);box-shadow:0 0 0 1px rgba(185,140,255,.34);}
+#herobody .hx-ident.g-common .hx-gtag{color:var(--hx-g-common);background:rgba(143,166,173,.14);border-color:rgba(143,166,173,.45);}
+#herobody .hx-ident.g-rare .hx-gtag{color:var(--hx-g-rare);background:rgba(90,169,255,.14);border-color:rgba(90,169,255,.45);}
+#herobody .hx-ident.g-legendary .hx-gtag{color:var(--hx-g-legendary);background:rgba(232,180,90,.14);border-color:rgba(232,180,90,.45);}
+#herobody .hx-ident.g-main .hx-gtag{color:var(--hx-g-main);background:rgba(185,140,255,.14);border-color:rgba(185,140,255,.45);}
 #herobody .hx-irow{display:flex;align-items:center;gap:8px;}
 #herobody .hx-tag{font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:2px 7px;border-radius:5px;color:var(--cyan);background:rgba(53,214,230,.12);border:1px solid var(--cyan-dim);white-space:nowrap;}
 #herobody .hx-ident.ps .hx-tag{color:var(--hx-ps);background:rgba(185,140,255,.14);border-color:rgba(185,140,255,.4);}
@@ -2900,11 +2961,32 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 }
 `;
 
-const page = (js, entry = 'void-dominion') => `<!doctype html>
+/** Все листы одной строкой: платформенная цель пишет их файлом, остальные — инлайном. */
+const allCss = () =>
+  `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`;
+
+/**
+ * Лоадер SDK площадки — ДОСЛОВНО как в документации (требование 1.19.1).
+ *
+ * Путь ОТНОСИТЕЛЬНЫЙ: это вариант «архив загружен через Консоль разработчика», который
+ * площадка и рекомендует; абсолютный `https://sdk.games.s3.yandex.net/sdk.js` нужен
+ * только при интеграции через свой домен. Модерация смотрит версию лоадера индикатором
+ * на debug-панели: `IT` — верно, `IF` — старый. Поэтому тег не «примерно такой», а
+ * ровно такой, и сторож `buildTarget.test.mjs` сверяет его по готовому артефакту.
+ *
+ * `initSDK()` намеренно ничего не инициализирует: и `YaGames.init()`, и фолбэк, и
+ * обработка отказа живут в `bootstrap.ts` (`platform/host.ts`). Тег лишь будит хост,
+ * если тот уже ждёт, — `<script async>` может доехать и позже игры.
+ */
+const SDK_LOADER = `<!-- Yandex Games SDK -->
+<script async src="/sdk.js" onload="initSDK()"></script>
+<script>function initSDK(){window.dispatchEvent(new Event('ya-sdk-ready'));}</script>`;
+
+const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}</style></head>
+<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title>${external ? `<link rel="stylesheet" href="assets/app.css">\n${SDK_LOADER}` : `<style>${allCss()}</style>`}</head>
 <body data-entry="${entry}">
 <section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
   <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
@@ -3209,6 +3291,13 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
           </div>
           <fieldset class="sz-difficulty">
+            <legend data-i18n="sector-zero.mission"></legend>
+            <div class="sz-options">
+              <button id="sz-mission-0" type="button" data-mission="0" aria-pressed="true" data-i18n="sector-zero.mission.1"></button>
+              <button id="sz-mission-1" type="button" data-mission="1" aria-pressed="false" data-i18n="sector-zero.mission.2"></button>
+            </div>
+          </fieldset>
+          <fieldset class="sz-difficulty">
             <legend data-i18n="sector-zero.difficulty"></legend>
             <div class="sz-options">
               <button id="sz-weak" type="button" data-difficulty="weak" aria-pressed="true" data-i18n="setup.pve.difficulty.weak"></button>
@@ -3404,7 +3493,7 @@ const page = (js, entry = 'void-dominion') => `<!doctype html>
 <!--dev-only--><div id="testmode"></div><!--/dev-only-->
 <!-- SANDBOX — floating opener + overlay (content rendered by sandbox.ts); delete to cut the markup -->
 <!--dev-only--><button id="sandboxbtn" data-i18n-title="hub.sandbox.title" style="display:none">🧪</button><div id="sandbox"></div><!--/dev-only-->
-<script>${js}</script>
+${external ? '<script src="assets/app.js"></script>' : `<script>${js}</script>`}
 </body></html>`;
 
 // Player artifact: drop every <!--dev-only--> … <!--/dev-only--> fence. The matching
@@ -3492,6 +3581,33 @@ console.log(
     (playerHtml.length / 1024).toFixed(0) +
     ' KB)',
 );
+// --- Платформенная цель (`YAG-1.1b`): index.html в корне + assets/ рядом ---------
+// Требование 1.22: `index.html` именно в КОРНЕ архива, а имена файлов и папок — без
+// пробелов и кириллицы. Требование 1.21: всё вместе не больше 100 МБ в распакованном
+// виде. Сторож `prototype/buildTarget.test.mjs` проверяет это по готовым файлам.
+const platformFiles = await bundlePlatform();
+mkdirSync('prototype/dist/yandex/assets', { recursive: true });
+let platformBytes = 0;
+for (const file of platformFiles) {
+  // esbuild отдаёт абсолютные пути; кладём их под dist/yandex, сохраняя assets/.
+  const rel = file.path.slice(file.path.indexOf('dist/yandex/') + 'dist/yandex/'.length);
+  const out = `prototype/dist/yandex/${rel}`;
+  mkdirSync(out.slice(0, out.lastIndexOf('/')), { recursive: true });
+  writeFileSync(out, file.contents);
+  platformBytes += file.contents.byteLength;
+}
+const platformCss = allCss();
+writeFileSync('prototype/dist/yandex/assets/app.css', platformCss);
+platformBytes += Buffer.byteLength(platformCss);
+const platformIndex = stripDevMarkup(page('', 'sector-zero', true));
+writeFileSync('prototype/dist/yandex/index.html', platformIndex);
+platformBytes += Buffer.byteLength(platformIndex);
+console.log(
+  'wrote prototype/dist/yandex/ (index.html + assets, ' +
+    (platformBytes / 1024).toFixed(0) +
+    ' KB распакованных)',
+);
+
 const adminHtml = adminPage(await bundleAdmin());
 writeFileSync('prototype/dist/void-dominion-admin.html', adminHtml);
 console.log(

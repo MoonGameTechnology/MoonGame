@@ -37,7 +37,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  22 — PVR-1.4: снова тот же случай. Членство и порядок не тронуты, форму изменило
  *  ДОБАВЛЕНИЕ поля `boons` на `PveState` — долга по усилениям между волнами; список
  *  перезакреплён без единой правки.) */
-const PINNED_FOR_VERSION = '26';
+const PINNED_FOR_VERSION = '27';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -59,6 +59,7 @@ const PINNED_MODULE_IDS = [
   'combat',
   'intercept',
   'capture-on-arrival',
+  'salvage', // EVT-2: перед construction — оба слышат station.destroyed
   'construction',
   'arsenal-sync',
   'station',

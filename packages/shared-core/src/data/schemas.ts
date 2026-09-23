@@ -468,6 +468,20 @@ export const SectorTypeDefSchema = z.object({
    *  (`E_SECTOR_OVERLINKED`), so a map cannot draw a lane the world would not allow.
    *  The generous default keeps every pre-existing map legal. */
   maxLinks: z.number().int().positive().default(8),
+  /** Which FAMILY of environments this terrain belongs to (`asteroid`, `nebula`,
+   *  `storm`, `void`, `wreck`) — the handle rules take hold of when they mean "in the
+   *  asteroids" rather than one exact terrain id (M2.8).
+   *
+   *  It exists because a ladder has steps: asteroids alone are a field, a dust lane and
+   *  a dense cluster. A rule naming ids would silently miss every step added after it —
+   *  and the ladder grows, that is its whole point. Absent = the terrain belongs to no
+   *  family, and a family-conditioned rule does NOT take it: an unnamed member is not a
+   *  member (fail-closed, A10).
+   *
+   *  A family is NOT a map region. Regions are an authoring/generation template with no
+   *  game entity behind them (`map-terrain-regions-concept.md` §1), so the core must
+   *  never key off a region's name — a rule that did would force regions into the state. */
+  family: z.string().optional(),
   /** Passive per-hour output an OWNED sector of this terrain yields, mirroring
    *  `PlanetTypeDefSchema.baseOutput` (a metal-rich asteroid cluster is worth taking
    *  even though nothing can be built on it). Added by `sectorModule` into the
@@ -782,7 +796,16 @@ export const ModuleDefSchema = z
 /** A hero's skill-tree branch (docs/heroes.md): `transhuman` (implant-users) vs
  *  `psionic`. Deliberately distinct from the tech-tree `BranchSchema` — a hero belongs
  *  to a hero branch, not a research branch. Optional on an archetype (a branchless hero
- *  simply draws from no branch tree until skill trees land, HERO-7). */
+ *  simply draws from no branch tree until skill trees land, HERO-7).
+ *
+ *  ⚠️ **PARKED IN THE SHIPPED CATALOG (HERO-11, owner's order 2026-09-22.)** The
+ *  mechanism below is intact and still gates `hero.skill.unlock` — but no shipped
+ *  archetype and no shipped tree node declares a `branch` any more: every one of them
+ *  carries the value under `parkedBranch` instead, a key this schema deliberately does
+ *  NOT know, so zod drops it and the game sees one common tree. Bringing the split back
+ *  is a rename of that key in `data/heroes.json` + `data/heroSkillTrees.json` and
+ *  nothing else. `data/heroBranchParked.test.ts` guards both halves: that nothing ships
+ *  a live branch, and that no parked value gets lost on the way. */
 export const HERO_BRANCHES = ['transhuman', 'psionic'] as const;
 export const HeroBranchSchema = z.enum(HERO_BRANCHES);
 
@@ -827,7 +850,10 @@ export const HeroAbilityDefSchema = z.object({
 /** The hook pipelines a hero passive may feed (HERO-5). A curated enum, not an open
  *  string — each hook needs an interpreter in the hero module (like the tech-condition
  *  catalog §7.5); a new hook = one enum entry + one evaluator case. */
-export const HERO_PASSIVE_HOOKS = ['fleet.speed', 'combat.damage'] as const;
+/** `salvage` (EVT-3) кормит долю трофеев (`salvage.share`, модуль `salvage`) и, в
+ *  отличие от двух соседей, СКЛАДЫВАЕТСЯ с базой, а не умножает её: база — сама доля
+ *  (5%), и множитель ×1.1 превратил бы всю лестницу прокачки в полпроцента. */
+export const HERO_PASSIVE_HOOKS = ['fleet.speed', 'combat.damage', 'salvage'] as const;
 /** Where a passive applies: the hero's OWN ship's fleet, or every owner fleet within
  *  `params.radius` of the hero's node (the fleet-empowerment aura of docs/heroes.md). */
 export const HERO_PASSIVE_SCOPES = ['heroFleet', 'ownFleetsNear'] as const;
@@ -935,6 +961,18 @@ export const HeroPassiveDefSchema = z.object({
   description: z.string().optional(),
   hook: z.enum(HERO_PASSIVE_HOOKS),
   scope: z.enum(HERO_PASSIVE_SCOPES),
+  /** WHERE the passive counts (M2.8): only where the terrain belongs to this family
+   *  (`SectorTypeDefSchema.family`). Absent = everywhere, which is how every passive
+   *  behaved before and still does — old data keeps its meaning.
+   *
+   *  `scope` and this are different questions and both are asked: `scope` says WHOSE
+   *  fleet (the hero's own ship, or the owner's fleets near it), this says on WHICH
+   *  ground. A pilot skilled in asteroids helps the ship he flies, in the asteroids.
+   *
+   *  The terrain read is the one the rule it corrects reads: for `fleet.speed` that is
+   *  the province being ENTERED, because that is where `sectorModule` takes its toll.
+   *  Unresolvable terrain contributes nothing rather than defaulting to "applies". */
+  terrainFamily: z.string().optional(),
   params: z
     .object({
       /** Multiplier contribution, e.g. 0.1 = +10% — applied as ×(1 + Σ bonuses). */
@@ -954,6 +992,11 @@ export const HeroSkillGrantsSchema = z.object({
   ability: z.string().optional(),
   /** Passive id (→ `data.heroPassives`) switched on for the hero. */
   passive: z.string().optional(),
+  /** Несколько пассивок одним узлом (EVT-3). Последняя ступень лестницы «мародёра»
+   *  поднимает СРАЗУ обе половины — и долю трофеев, и урон, — а узел дерева это одна
+   *  ступень: дробить его на два узла ради формы поля значило бы соврать игроку в
+   *  дереве. Складывается с `passive`, не заменяет его. */
+  passives: z.array(z.string()).default([]),
 });
 
 /** One node of the hero skill tree (docs/heroes.md — «дерево = бонусы к способностям»,
@@ -969,7 +1012,7 @@ export const HeroSkillNodeSchema = z.object({
   requires: z.array(z.string()).default([]),
   /** Treasury cost to unlock. */
   cost: NonnegativeCostSchema.default({}),
-  grants: HeroSkillGrantsSchema.default({}),
+  grants: HeroSkillGrantsSchema.prefault({}),
 });
 
 /** The ship a hero commands: either an existing unit archetype (`unit` → `data.units`) or

@@ -1,0 +1,433 @@
+{
+  "id": "pve-2",
+  "seed": "pve-2",
+  "time": 0,
+  "mode": "pve_waves",
+  "sectors": {
+    "landing": {
+      "position": {
+        "x": -437,
+        "y": -415
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "p1",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "rim_veil": {
+      "position": {
+        "x": -397,
+        "y": -600
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "cold_shoal": {
+      "position": {
+        "x": -218,
+        "y": -145
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "dig_site": {
+      "position": {
+        "x": -139,
+        "y": -358
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ],
+      "transit": [
+        [
+          "rim_veil",
+          "wreck_spine"
+        ],
+        [
+          "cold_shoal",
+          "hollow"
+        ]
+      ]
+    },
+    "wreck_spine": {
+      "position": {
+        "x": 111,
+        "y": -338
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm"
+    },
+    "flare_belt": {
+      "position": {
+        "x": 300,
+        "y": -317
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "rockfield": {
+      "position": {
+        "x": 303,
+        "y": 3
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "dust_reach": {
+      "position": {
+        "x": 649,
+        "y": 191
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "ore_knot": {
+      "position": {
+        "x": 755,
+        "y": 354
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ]
+    },
+    "ion_wall": {
+      "position": {
+        "x": 458,
+        "y": 257
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "hollow": {
+      "position": {
+        "x": -43,
+        "y": -103
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "wreck_tail": {
+      "position": {
+        "x": 128,
+        "y": 94
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "camp": {
+      "position": {
+        "x": 139,
+        "y": -88
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "owner": "swarm"
+    },
+    "relay": {
+      "position": {
+        "x": 176,
+        "y": 293
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "drift_moon": {
+      "position": {
+        "x": -251,
+        "y": 198
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "spore_cloud": {
+      "position": {
+        "x": -231,
+        "y": 26
+      },
+      "kind": "nebula",
+      "terrain": "nebula",
+      "owner": "swarm"
+    },
+    "scree": {
+      "position": {
+        "x": 576,
+        "y": -209
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "deep_drift": {
+      "position": {
+        "x": -417,
+        "y": 3
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "veil_deep": {
+      "position": {
+        "x": -21,
+        "y": 203
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "biopit": {
+      "position": {
+        "x": -217,
+        "y": 413
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "fort"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 4
+        }
+      ]
+    },
+    "brood_yard": {
+      "position": {
+        "x": 16,
+        "y": 413
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "swarm_synapse"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 4
+        }
+      ]
+    },
+    "nest": {
+      "position": {
+        "x": 304,
+        "y": 439
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "swarm_hive"
+        },
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "barracks"
+        },
+        {
+          "type": "fort"
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 6
+        }
+      ]
+    },
+    "salvage_pocket": {
+      "position": {
+        "x": -689,
+        "y": 565
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "bone_drift": {
+      "position": {
+        "x": 213,
+        "y": 735
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard",
+      "owner": "swarm"
+    }
+  },
+  "objectives": [
+    {
+      "id": "mission.salvage",
+      "kind": "control",
+      "targets": [
+        "wreck_spine",
+        "wreck_tail",
+        "salvage_pocket",
+        "bone_drift"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.raze-biomass",
+      "kind": "raze",
+      "targets": [
+        "biomass_pit"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.recon",
+      "kind": "scout",
+      "count": 14,
+      "reward": 2
+    }
+  ],
+  "players": {
+    "p1": {
+      "name": "Azure Compact",
+      "faction": "vanguard",
+      "resources": {
+        "credits": 400,
+        "metal": 400
+      }
+    },
+    "swarm": {
+      "name": "Swarm Collective",
+      "faction": "swarm",
+      "ai": true,
+      "resources": {
+        "credits": 800,
+        "metal": 800,
+        "biomass": 300,
+        "microelectronics": 80
+      }
+    }
+  },
+  "fleets": {
+    "p1_1": {
+      "owner": "p1",
+      "location": "landing",
+      "landing": [
+        {
+          "unit": "militia",
+          "count": 1
+        }
+      ],
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
+      ]
+    },
+    "swarm_1": {
+      "owner": "swarm",
+      "location": "nest",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 2
+        }
+      ]
+    },
+    "swarm_2": {
+      "owner": "swarm",
+      "location": "biopit",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

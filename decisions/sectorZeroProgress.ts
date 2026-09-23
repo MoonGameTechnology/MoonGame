@@ -3,12 +3,14 @@
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
 import { forgeOutcome, type ForgeLadder } from './sectorZeroForge';
+import { objectiveBonus } from './missionObjectives';
 import {
   canEquip,
   starsOf,
   type GameData,
   type GameState,
   type Hero,
+  type MapObjective,
 } from '../packages/shared-core/src/index';
 
 export interface SectorHero {
@@ -152,11 +154,38 @@ export function sectorSkillLegal(
   const node = data.heroSkillTrees[id];
   if (!hero || !node) return false;
   return (
-    node.branch === data.heroes[progress.selectedHero]?.branch &&
+    nodeOpenTo(node, progress.selectedHero, data) &&
     !hero.skills.includes(id) &&
     node.requires.every((r) => hero.skills.includes(r))
   );
 }
+
+/**
+ * Узел открыт герою? Правило ровно то же, что в ядре (`hero.skill.unlock`): узел БЕЗ
+ * ветки — общий и доступен любому, узел с веткой — только своей.
+ *
+ * Здесь раньше стояло строгое равенство `node.branch === def.branch`, и оно тихо
+ * расходилось с ядром: безветочный узел (`undefined !== 'transhuman'`) в подготовке
+ * Sector Zero НЕ покупался, хотя на настоящей карте то же ядро его пускало. Восемь из
+ * девятнадцати узлов каталога были общими — то есть треть дерева на экране подготовки
+ * была недостижима, и выглядело это как «узла просто нет».
+ *
+ * Парковка веток (HERO-11) сделала дефект невидимым: сейчас обе стороны `undefined`, и
+ * строгое равенство случайно даёт верный ответ. Именно поэтому правило приведено к
+ * ядерному СЕЙЧАС, а не «когда понадобится»: иначе распарковка вернула бы вместе с
+ * ветками и эту дыру, и искать её пришлось бы заново.
+ */
+function nodeOpenTo(
+  node: { branch?: string },
+  archetype: string | undefined,
+  data: GameData,
+): boolean {
+  return (
+    node.branch === undefined ||
+    node.branch === (archetype !== undefined ? data.heroes[archetype]?.branch : undefined)
+  );
+}
+
 
 export function sectorHullIds(data: GameData): string[] {
   return Object.keys(data.units).filter((id) => {
@@ -297,7 +326,7 @@ export function changeSectorZeroProgress(
       if (
         !hero ||
         !node ||
-        node.branch !== data.heroes[action.hero]?.branch ||
+        !nodeOpenTo(node, action.hero, data) ||
         hero.skills.includes(action.id) ||
         !node.requires.every((id) => hero.skills.includes(id)) ||
         !pay(sectorSkillCost(action.id, data))
@@ -394,7 +423,7 @@ export function parseSectorZeroProgress(
           const node = data.heroSkillTrees[skill];
           if (
             node &&
-            node.branch === data.heroes[id]?.branch &&
+            nodeOpenTo(node, id, data) &&
             !hero.skills.includes(skill) &&
             node.requires.every((r) => hero.skills.includes(r))
           )
@@ -419,6 +448,9 @@ export function settleSectorZeroRun(
   progress: SectorZeroProgress,
   attempt: number,
   state: GameState,
+  /** Дополнительные задачи карты (решение владельца 2026-09-22). Пусто — забег платит
+   *  ровно как раньше: задачи ДОПОЛНИТЕЛЬНЫЕ, и карта без них — нормальная карта. */
+  objectives: readonly MapObjective[] = [],
 ): SectorZeroProgress {
   if (
     !Number.isSafeInteger(attempt) ||
@@ -434,7 +466,11 @@ export function settleSectorZeroRun(
   )
     return progress;
   const won = state.match.winner === 'p1' || state.match.winners?.includes('p1');
-  const reward = 1 + Math.max(0, state.pve.waveNumber) + (won ? 3 : 0);
+  // Надбавка за ВЫПОЛНЕННЫЕ задачи складывается с выплатой за волны, а не заменяет её:
+  // иначе игрок, сделавший задачи и проигравший рано, получал бы больше того, кто дошёл
+  // до конца, — и «дополнительная» задача перестала бы быть дополнительной.
+  const reward =
+    1 + Math.max(0, state.pve.waveNumber) + (won ? 3 : 0) + objectiveBonus(objectives, state, 'p1');
   return {
     ...progress,
     research: progress.research + reward,
