@@ -1,5 +1,6 @@
-import type { GameState, PlanetId, PlanetRoads, RoadPoint, RoadTrail } from './gameState';
+import type { GameState, Planet, PlanetId, PlanetRoads, RoadPoint, RoadTrail } from './gameState';
 import type { MosaicBorderSegment } from './mosaic';
+import { shareImmutable } from '../util/clone';
 
 /**
  * Roads inside provinces (ROADS-1, `docs/roads-roadmap.md` §0.3).
@@ -261,6 +262,20 @@ export function bypassFork(
  * with no road on either side — a state built before roads, a hero's temporary lane —
  * is the straight line, exactly the pre-road rule, so such a match plays on unchanged.
  */
+/**
+ * Marks every province's road network shareable ({@link shareImmutable}): the network never
+ * changes for the whole match, so the kernel's per-step clone need not copy it (ROADS-7 —
+ * on the 831-province map that copy made each step ~55% slower). Both state builders call
+ * it; a host calls it again for a state that came through JSON — a save, the network — since
+ * a round trip drops the mark. Returns the same record.
+ */
+export function shareRoadNetwork(planets: Record<PlanetId, Planet>): Record<PlanetId, Planet> {
+  for (const planet of Object.values(planets)) {
+    if (planet.roads) shareImmutable(planet.roads);
+  }
+  return planets;
+}
+
 export function laneRoad(state: GameState, from: PlanetId, to: PlanetId): RoadPoint[] | null {
   const a = state.planets[from];
   const b = state.planets[to];
