@@ -34,13 +34,7 @@
  */
 
 /** Взводимое состояние командного ряда, которое гаснет от чужой команды. */
-export type ArmedState =
-  | 'merge'
-  | 'cast'
-  | 'troops'
-  | 'assault'
-  | 'engage'
-  | 'pick';
+export type ArmedState = 'merge' | 'cast' | 'troops' | 'assault' | 'engage' | 'retreat' | 'pick';
 
 /**
  * Команды, при которых состояние ОСТАЁТСЯ взведённым. Правила 2–3: сюда входят и
@@ -53,6 +47,9 @@ export const KEEPS_ARMED: Record<ArmedState, readonly string[]> = {
   assault: ['attack'],
   // ATK-1: «Атака» держится только своей кнопкой — как и остальные прицелы.
   engage: ['engage'],
+  // Окошко порога авто-отхода держит только своя кнопка: выбор ступени (`retrset`) — это
+  // уже приказ, и окошко после него закрывается.
+  retreat: ['qretr'],
   pick: ['pick', 'more'],
 };
 

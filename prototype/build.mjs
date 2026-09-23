@@ -348,6 +348,15 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
   padding:7px 10px;text-align:left;}
 #cmdbar .cmdpop button b{font-size:11px;letter-spacing:.5px;white-space:nowrap;}
 #cmdbar .cmdpop button span{font-size:9px;color:var(--dim);letter-spacing:.3px;text-transform:none;}
+/* ⮐ окошко авто-отхода (2026-09-23): порог корпуса одним тапом — ряд крупных «таблеток»,
+   текущий порог подсвечен; ниже — где флот соберётся. */
+#cmdbar .cmdpop.cmdpop-retr{min-width:min(300px,88vw);gap:8px;padding:10px;}
+#cmdbar .cmdpop-retr p{margin:0;color:var(--cyan);font:700 11px ui-monospace,monospace;letter-spacing:1px;}
+#cmdbar .cmdpop-retr .retr-row{display:flex;gap:6px;}
+#cmdbar .cmdpop-retr .retr-row button{flex:1;justify-content:center;padding:9px 4px;border-radius:6px;min-height:38px;}
+#cmdbar .cmdpop-retr .retr-row button b{font-size:13px;}
+#cmdbar .cmdpop-retr .retr-row button.on{border-color:var(--cyan);background:rgba(53,214,230,.18);color:var(--cyan);box-shadow:0 0 10px rgba(53,214,230,.35);}
+#cmdbar .cmdpop-retr .retr-hint{font-size:10px;color:var(--dim);}
 /* ⇅ десант (GRND-1): тот же поповер, но не список приказов, а строки «кого и сколько».
    Кнопки в нём — компактные глифы в ряд, поэтому базовые правила .cmdpop button
    (широкая строка с текстом слева) для .tbtns переопределяются. */
@@ -1361,15 +1370,57 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-dbtn.danger{background:transparent;border:1px solid #ff5a4d;color:#ff5a4d;}
 #herobody .hx-dbtn:disabled{opacity:.4;cursor:not-allowed;}
 /* Steward («Хранитель») delegate panel */
-#battlewinbody .bw-head{font-size:12px;color:var(--cyan);letter-spacing:.04em;text-transform:uppercase;}
-#battlewinbody .bw-next{font-size:12px;color:var(--dim);margin:4px 0 10px;}
-#battlewinbody .bw-side{padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;background:rgba(255,255,255,.02);}
+/* Окно боя «для взрослых детей» (заказ владельца 2026-09-23): шапка «где и когда
+   следующий залп», полоса остатка сил цветами владельцев, карточки сторон со шкалами
+   корпуса/щита светофором и чипами кораблей, свои флоты — с кнопкой отхода. */
+#battlewinbody .bw-top{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--line-hi);
+  border-radius:10px;background:linear-gradient(120deg,rgba(255,90,77,.14),rgba(53,214,230,.08));}
+#battlewinbody .bw-top.ground{background:linear-gradient(120deg,rgba(255,180,77,.16),rgba(53,214,230,.06));}
+#battlewinbody .bw-ico{font-size:26px;line-height:1;filter:drop-shadow(0 0 6px rgba(255,120,90,.5));}
+#battlewinbody .bw-title{flex:1;min-width:0;}
+#battlewinbody .bw-title b{display:block;font-size:15px;color:var(--txt,#e8f6fa);overflow-wrap:anywhere;}
+#battlewinbody .bw-head{margin:2px 0 0;font-size:11px;color:var(--cyan);letter-spacing:.04em;text-transform:uppercase;}
+#battlewinbody .bw-next{display:flex;flex-direction:column;align-items:flex-end;flex:0 0 auto;text-align:right;}
+#battlewinbody .bw-next span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;}
+#battlewinbody .bw-next b{font:700 18px ui-monospace,monospace;color:#ffb44d;text-shadow:0 0 8px rgba(255,180,77,.45);}
+#battlewinbody .bw-sub{margin:0 0 6px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;}
+#battlewinbody .bw-balance{margin-bottom:12px;}
+#battlewinbody .bw-bal{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;background:rgba(255,255,255,.05);}
+#battlewinbody .bw-bal i{display:block;min-width:3px;transition:flex .6s ease;}
+#battlewinbody .bw-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:12px;color:var(--dim);}
+#battlewinbody .bw-legend span{display:inline-flex;align-items:center;gap:5px;}
+#battlewinbody .bw-legend span.mine{color:var(--cyan);font-weight:700;}
+#battlewinbody .bw-legend i{width:9px;height:9px;border-radius:50%;}
+#battlewinbody .bw-side{padding:10px 12px 10px 14px;border:1px solid var(--line);border-left:4px solid var(--own,#8aa0ad);border-radius:10px;
+  margin-bottom:8px;background:rgba(255,255,255,.02);}
 /* Своя сторона подсвечена рамкой: в свалке на пять сторон «где я» — первый вопрос. */
-#battlewinbody .bw-side.mine{border-color:var(--cyan-dim);background:rgba(53,214,230,.08);}
-#battlewinbody .bw-who{margin:0;font-size:13px;}
-#battlewinbody .bw-who i{font-style:normal;font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin-left:6px;}
-#battlewinbody .bw-force{margin:5px 0 0;font-size:12px;color:var(--dim);}
-#battlewinbody .bw-bar{margin-left:8px;white-space:nowrap;}
+#battlewinbody .bw-side.mine{border-color:var(--cyan-dim);border-left-color:var(--own,var(--cyan));background:rgba(53,214,230,.08);}
+#battlewinbody .bw-who{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 7px;font-size:14px;}
+#battlewinbody .bw-you{font-style:normal;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:var(--cyan);color:#05161c;text-transform:uppercase;}
+#battlewinbody .bw-role{font-size:11px;padding:2px 7px;border-radius:8px;border:1px solid var(--line-hi);}
+#battlewinbody .attacker .bw-role{color:#ff7a6b;border-color:rgba(255,122,107,.5);}
+#battlewinbody .defender .bw-role{color:#7fc8ff;border-color:rgba(127,200,255,.5);}
+#battlewinbody .bw-kind{font-size:11px;color:var(--dim);margin-left:auto;}
+#battlewinbody .bw-meter{position:relative;height:18px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:4px;}
+#battlewinbody .bw-meter i{position:absolute;inset:0 auto 0 0;border-radius:5px;transition:width .6s ease;}
+#battlewinbody .bw-meter span{position:relative;display:block;padding:0 7px;font-size:11px;line-height:18px;color:#f2fbff;text-shadow:0 1px 2px #000;}
+#battlewinbody .bw-meter.tone-ok i{background:linear-gradient(90deg,#1f9d6a,#3ddc97);}
+#battlewinbody .bw-meter.tone-hurt i{background:linear-gradient(90deg,#b7791f,#ffc14d);}
+#battlewinbody .bw-meter.tone-low i{background:linear-gradient(90deg,#a3261d,#ff5a4d);}
+#battlewinbody .bw-meter.shield i{background:linear-gradient(90deg,#1c6aa6,#5fb8ff);}
+#battlewinbody .bw-units{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+#battlewinbody .bw-unit{font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--dim);}
+#battlewinbody .bw-unit b{color:var(--txt,#e8f6fa);}
+#battlewinbody .bw-orders{margin-top:12px;}
+#battlewinbody .bw-ret{display:flex;align-items:center;gap:10px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.06);}
+#battlewinbody .bw-ret div{flex:1;min-width:0;}
+#battlewinbody .bw-ret div b{display:block;font-size:13px;}
+#battlewinbody .bw-ret div span{font-size:11px;color:var(--dim);}
+#battlewinbody .bw-ret button{flex:0 0 auto;min-height:36px;}
+#battlewinbody .hint{font-size:11px;color:var(--dim);line-height:1.45;margin:4px 0 0;}
+#battlewinbody .bw-rule{font-size:11px;color:var(--dim);line-height:1.45;margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line);}
+@media (max-width:520px){#battlewinbody .bw-top{flex-wrap:wrap;}
+  #battlewinbody .bw-next{flex-basis:100%;flex-direction:row;justify-content:space-between;align-items:baseline;padding-top:6px;border-top:1px solid var(--line);}}
 #battlewinbody .bw-empty{font-size:12px;color:var(--dim);}
 #stewardbody .st-status{padding:11px 13px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.08);font-size:12px;color:var(--cyan);line-height:1.55;}
 #stewardbody .st-status.locked{border-color:var(--line);background:rgba(255,255,255,.03);color:var(--dim);}
