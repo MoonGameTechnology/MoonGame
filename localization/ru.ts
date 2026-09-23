@@ -2141,6 +2141,7 @@ export const ru: Record<string, string> = {
   'setup.pve.difficulty.weak': 'Рой: обычный',
   'setup.pve.difficulty.strong': 'Рой: матёрый',
   'setup.pve.restored': 'Забег восстановлен — продолжаем с того же места.',
+  'setup.pve.restored-portable': 'Забег восстановлен с волны {n}: флоты и ресурсы — заново.',
   'setup.title': 'НАСТРОЙКА СХВАТКИ',
 
   // --- sector-zero — Главное меню и постоянная подготовка между попытками.

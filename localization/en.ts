@@ -2133,6 +2133,7 @@ export const en: Record<string, string> = {
   'setup.pve.difficulty.weak': 'Swarm: standard',
   'setup.pve.difficulty.strong': 'Swarm: veteran',
   'setup.pve.restored': 'Run restored — picking up where you left off.',
+  'setup.pve.restored-portable': 'Run restored at wave {n}: fleets and resources start over.',
   'setup.title': 'SKIRMISH SETUP',
 
   // --- sector-zero — Home and persistent preparation between runs.

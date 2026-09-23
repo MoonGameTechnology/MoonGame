@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { sumUnitStat, planRoute, playablePlayerIds, type Planet } from '@void/shared-core';
 
 import { shippedGameData } from '../../../data/bundle';
-import { pveState, pveModeId, skirmishState } from './gameData';
+import { pveState, pveModeId, pveMissionOfMap, skirmishState } from './gameData';
 
 /**
  * The client's doors into a playable state. Both were uncovered, and the PvE one was
@@ -195,5 +195,25 @@ describe('the shipped PvE scenario — the assault the player actually meets (PV
     const speeds = wave(1).map((s) => data.units[s.unit]!.stats.speed ?? 0);
     expect(speeds.length).toBeGreaterThan(0); // иначе Math.min пустого — Infinity, и проверка зелена ни на чём
     expect(Math.min(...speeds)).toBeGreaterThanOrEqual(40);
+  });
+});
+
+describe('YAG-2.1 — мир забега знает свою главу', () => {
+  // У глав один режим (`pve_waves`), поэтому главу отличает только карта. Без её id в мире
+  // дескриптор забега не смог бы восстановить ту же главу.
+  it('id карты едет в сам мир, у каждой главы — свой', () => {
+    expect(pveState(data, 0).mapId).toBe('pve-1');
+    expect(pveState(data, 1).mapId).toBe('pve-2');
+    expect(pveModeId(0)).toBe(pveModeId(1));
+  });
+
+  it('глава находится по id карты и обратно', () => {
+    expect(pveMissionOfMap(pveState(data, 1).mapId)).toBe(1);
+    expect(pveMissionOfMap('pve-1')).toBe(0);
+  });
+
+  it('незнакомая карта или её отсутствие — null, а не первая глава', () => {
+    expect(pveMissionOfMap('pve-99')).toBeNull();
+    expect(pveMissionOfMap(undefined)).toBeNull();
   });
 });
