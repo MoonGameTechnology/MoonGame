@@ -441,6 +441,11 @@ selectMap('frontier-50');
 assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 50);
 assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 50);
 assert.ok(getEl('setupslots').innerHTML.includes('max="49"'));
+// Играть можно только за ДОМА: Улей и легаси-`vanguard` лежат в каталоге фракций, но в
+// выбор игрока не попадают (баг «можно играть за Улей», владелец 2026-09-23).
+assert.ok(getEl('setupfactions').innerHTML.includes('data-fpick="azure"'));
+assert.ok(!getEl('setupfactions').innerHTML.includes('data-fpick="swarm"'), 'the Swarm is not a playable house');
+assert.ok(!getEl('setupfactions').innerHTML.includes('data-fpick="vanguard"'));
 for (const handle of (listeners.get(getEl('setupslots')) ?? {}).change ?? [])
   handle({ target: { id: 'setup-bot-count', value: '999' } });
 assert.ok(getEl('setupslots').innerHTML.includes('value="49"'));

@@ -94,6 +94,7 @@ import {
   MAX_CHAIN_STEPS,
   type AiProfile,
   type ChainStep,
+  PLAYABLE_FACTIONS,
 } from './game';
 import {
   dominantUnit,
@@ -10918,7 +10919,9 @@ function renderSetupSlots(): void {
   // Lives in its own container (#setupfactions, the left setup column); the team
   // toggle + seat rows fill #setupslots (the right column).
   let f2 = `<div class="fph">${t('setup.faction.note')}</div><div class="fpick">`;
-  for (const fid of Object.keys(data.factions)) {
+  // Только ДОМА: каталог фракций несёт ещё Рой и легаси-`vanguard`, и перебор каталога
+  // давал сыграть за Улей в обычной партии (баг, замечен владельцем 2026-09-23).
+  for (const fid of PLAYABLE_FACTIONS) {
     const f = data.factions[fid];
     if (!f) continue;
     const on = fid === setupFaction;
@@ -11394,7 +11397,8 @@ setupMapEl.addEventListener('click', (ev) => {
 setupFactionsEl.addEventListener('click', (ev) => {
   const fp = (ev.target as Element).closest('[data-fpick]');
   if (!fp) return;
-  setupFaction = fp.getAttribute('data-fpick') ?? setupFaction;
+  const pick = fp.getAttribute('data-fpick');
+  if (pick && PLAYABLE_FACTIONS.includes(pick)) setupFaction = pick;
   renderSetup();
 });
 setupSlotsEl.addEventListener('click', (ev) => {
