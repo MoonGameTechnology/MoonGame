@@ -189,7 +189,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '28'; // ROADS-2/3: флоты летают по дорогам, развилка — место встречи.
+export const MODULE_MANIFEST_VERSION = '29'; // CORE-DMG-3: ауры и пассивы героя — на все каналы огня.
+// Состав и порядок модулей те же. Бамп — потому что сменились ПРАВИЛА УРОНА: бонусы героя,
+// которые до сих пор действовали только в ближнем бою, теперь доходят до обстрела с
+// орбиты, корабельного ПВО, удара челноков и ответки. Поднятая под новым кодом старая
+// партия молча получила бы другой урон посреди игры — ровно то, от чего бамп и стережёт.
+// export const MODULE_MANIFEST_VERSION = '28'; // ROADS-2/3: флоты летают по дорогам, развилка — место встречи.
 // Состав и порядок модулей те же. Бамп — потому что партия, СОЗДАННАЯ после ROADS-1, уже
 // несёт сеть дорог в `Planet.roads`, а летала по прямым: подняв её под новым кодом, мы
 // молча сменили бы ей правила движения, захвата и боя посреди игры. Партии без сети дорог

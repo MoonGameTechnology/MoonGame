@@ -484,6 +484,12 @@ function strikePower(
   });
 }
 
+/** Носитель, пустивший этот вылет, для `DamageHookArgs.attackerFleet` (CORE-DMG-3).
+ *  Вылет с МИРА флотом не является — тогда поле не ставится вовсе. */
+function strikeAttackerFleet(strike: ShuttleStrike): { attackerFleet?: string } {
+  return strike.base.kind === 'fleet' ? { attackerFleet: strike.base.id } : {};
+}
+
 /**
  * Пустить ответку по вылету и записать, чего она стоила (ROS-2.2).
  *
@@ -496,7 +502,7 @@ function repelStrike(
   h: HandlerContext,
   strike: ShuttleStrike,
   amount: number,
-  target: { id: string; owner: string | null; location: string },
+  target: { kind: 'fleet' | 'planet'; id: string; owner: string | null; location: string },
 ): void {
   if (amount <= 0) return;
   const dealt = hookedDamage(h, amount, {
@@ -504,6 +510,8 @@ function repelStrike(
     location: target.location,
     attacker: target.owner ?? '',
     defender: strike.owner,
+    // CORE-DMG-3: огрызается ЦЕЛЬ — флот своими орудиями, мир своим ПВО.
+    ...(target.kind === 'fleet' ? { attackerFleet: target.id } : {}),
   });
   const downed = absorbIntoStrike(strike, dealt, h.ctx.data);
   h.emit('shuttle.repelled', {
@@ -823,6 +831,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
               location: target.location ?? '',
               attacker: strike.owner,
               defender: target.owner,
+              ...strikeAttackerFleet(strike),
             });
             h.emit('shuttle.hit', {
               strikeId: strike.id,
@@ -835,6 +844,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
             removeIfWiped(h, target.id);
           }
           repelStrike(h, strike, answer, {
+            kind: 'fleet',
             id: strike.target.id,
             owner: target.owner,
             location: target.location ?? '',
@@ -852,6 +862,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
               location: target.id,
               attacker: strike.owner,
               defender: target.owner ?? '',
+              ...strikeAttackerFleet(strike),
             });
             h.emit('shuttle.hit', {
               strikeId: strike.id,
@@ -867,6 +878,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
             });
           }
           repelStrike(h, strike, answer, {
+            kind: 'planet',
             id: target.id,
             owner: target.owner,
             location: target.id,
@@ -1471,6 +1483,7 @@ export const shuttleModule: GameModule = {
             location: fleet.location ?? '',
             attacker: fleet.owner,
             defender: target.owner,
+            attackerFleet: fleet.id, // зональное ПВО ведёт сам корабль (CORE-DMG-3)
           });
           // Урон переводится в СБИТЫЕ МАШИНЫ по корпусу челнока — счёт один на все
           // каналы, см. `absorbIntoStrike`.
@@ -1532,9 +1545,17 @@ export const shuttleModule: GameModule = {
 
         const dealt = hookedDamage(h, power, {
           phase: 'intercept',
-          location: base.ref.kind === 'planet' ? base.ref.id : '',
+          // CORE-DMG-3: у базы-НОСИТЕЛЯ узел тоже есть — он был потерян пустой строкой,
+          // и вместе с ним для этого канала пропадали все позиционные хуки (сектор,
+          // ауры героя), хотя перехват идёт над вполне конкретной клеткой.
+          location:
+            base.ref.kind === 'planet'
+              ? base.ref.id
+              : (h.state.fleets[base.ref.id]?.location ?? ''),
           attacker: base.owner,
           defender: target.owner,
+          // Перехватчики с МИРА — не флот; с носителя — он самый.
+          ...(base.ref.kind === 'fleet' ? { attackerFleet: base.ref.id } : {}),
         });
         // Тот же перевод урона в сбитые машины, что у зонального ПВО (`absorbIntoStrike`).
         const downed = absorbIntoStrike(target, dealt, data);

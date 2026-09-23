@@ -177,6 +177,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
               location: planetId,
               attacker: planet.owner,
               defender: target.owner,
+              // `attackerFleet` нет намеренно: стреляет МИР. Ауры героя — бонус флотам.
             });
             // Announce BEFORE applying: the client draws the flak burst planet→fleet
             // even when this very volley destroys the target (H2 — visible AA fire).
@@ -229,6 +230,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
               location: planetId,
               attacker: f.owner,
               defender: planet.owner,
+              attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
             });
             h.emit('planet.bombarded', {
               planetId,
