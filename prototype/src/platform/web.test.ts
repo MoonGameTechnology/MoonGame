@@ -60,6 +60,17 @@ describe('WebPlatformAdapter — площадка по умолчанию', () =
     expect(PLATFORM_EVENTS).toContain('iap_completed');
   });
 
+  it('входа нет: кнопки быть не должно, а вызов честно `unavailable` (YAG-1.4)', async () => {
+    // Логин нашего сервера сюда не подставляется: для площадки он «сторонний сервис»
+    // (п. 1.2), а вне площадки аккаунта площадки нет по определению.
+    const p = createWebPlatform({ simulate: true });
+    expect(p.auth.canSignIn).toBe(false);
+    expect(await p.auth.signIn()).toEqual({
+      status: 'unavailable',
+      player: { id: 'web:guest', authenticated: false },
+    });
+  });
+
   it('языка не подсказывает: язык браузера рантайм локализации уже взял сам (YAG-1.3)', () => {
     // Повторить здесь `navigator.language` значило бы завести второе правило выбора
     // языка рядом с `detect()` — и двум правилам недолго разойтись.

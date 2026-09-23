@@ -58,6 +58,7 @@ import type {
   PlatformEvent,
   PlatformPlayer,
   PlatformPurchase,
+  PlatformSignIn,
   RewardedAdResult,
 } from './types';
 
@@ -75,6 +76,8 @@ export interface YandexSdk {
   on?: (event: 'game_api_pause' | 'game_api_resume', observer: () => void) => (() => void) | void;
   off?: (event: 'game_api_pause' | 'game_api_resume', observer: () => void) => void;
   getPlayer?: (opts?: { signed?: boolean }) => Promise<YandexPlayer>;
+  /** Окно входа Яндекс ID. Отказ игрока ОТКЛОНЯЕТ промис (страница «Авторизация»). */
+  auth?: { openAuthDialog?: () => Promise<unknown> };
   /** Реклама — колбэками, возврат `void`, а не промис (§1.1 роадмапа). */
   adv?: {
     showRewardedVideo?: (opts?: { callbacks?: YandexRewardedCallbacks }) => void;
@@ -185,6 +188,50 @@ export function createYandexPlatform(
   const offPause = sdk.on?.('game_api_pause', onPause);
   const offResume = sdk.on?.('game_api_resume', onResume);
 
+  /** Кто играет — СВЕЖИМ запросом: после входа прежний объект игрока остаётся гостем. */
+  const readPlayer = async (): Promise<PlatformPlayer> => {
+    // Гость — это НОРМА, а не ошибка (требование 1.2.2): игра обязана работать без
+    // авторизации, поэтому неудача запроса даёт гостя, а не исключение.
+    if (typeof sdk.getPlayer !== 'function') return { id: 'guest', authenticated: false };
+    try {
+      const player = await sdk.getPlayer();
+      const authenticated = player.isAuthorized?.() ?? false;
+      const name = player.getName?.();
+      return {
+        id: player.getUniqueID?.() ?? 'guest',
+        authenticated,
+        ...(name ? { displayName: name } : {}),
+      };
+    } catch (error) {
+      options.onSdkError?.('getPlayer', error);
+      return { id: 'guest', authenticated: false };
+    }
+  };
+
+  const canSignIn =
+    typeof sdk.getPlayer === 'function' && typeof sdk.auth?.openAuthDialog === 'function';
+  /** Окно уже открыто: второй тап ждёт его исхода, а не открывает второе окно. */
+  let signingIn: Promise<PlatformSignIn> | null = null;
+
+  const signInOnce = async (): Promise<PlatformSignIn> => {
+    const before = await readPlayer();
+    if (!canSignIn) return { status: 'unavailable', player: before };
+    if (before.authenticated) return { status: 'ok', player: before };
+    try {
+      await sdk.auth?.openAuthDialog?.();
+    } catch {
+      // Отклонение — это отказ игрока, по нему площадка и различает исходы. Отличить его
+      // от сбоя SDK по тексту ошибки нельзя, поэтому любое отклонение читается как
+      // `cancelled`: кнопка входа остаётся, игрок ничего не теряет. В журнал сбоев не
+      // пишем — иначе туда лёг бы каждый «не сейчас».
+      return { status: 'cancelled', player: before };
+    }
+    // Игрок запрашивается ЗАНОВО — прежний объект остаётся гостем и после входа.
+    const after = await readPlayer();
+    // Окно закрылось «успехом», а игрок всё ещё гость — `ok` обещал бы то, чего нет.
+    return { status: after.authenticated ? 'ok' : 'cancelled', player: after };
+  };
+
   /**
    * Rewarded-ролик: колбэки SDK → один исход (правила — `decisions/rewardedAd.ts`).
    * Промис не отклоняется никогда: сбой площадки — это `unavailable`, а не исключение в
@@ -246,23 +293,13 @@ export function createYandexPlatform(
       else sdk.off?.('game_api_resume', onResume);
     },
     auth: {
-      async player(): Promise<PlatformPlayer> {
-        // Гость — это НОРМА, а не ошибка (требование 1.2.2): игра обязана работать без
-        // авторизации, поэтому неудача запроса даёт гостя, а не исключение.
-        if (typeof sdk.getPlayer !== 'function') return { id: 'guest', authenticated: false };
-        try {
-          const player = await sdk.getPlayer();
-          const authenticated = player.isAuthorized?.() ?? false;
-          const name = player.getName?.();
-          return {
-            id: player.getUniqueID?.() ?? 'guest',
-            authenticated,
-            ...(name ? { displayName: name } : {}),
-          };
-        } catch (error) {
-          options.onSdkError?.('getPlayer', error);
-          return { id: 'guest', authenticated: false };
-        }
+      player: readPlayer,
+      canSignIn,
+      signIn() {
+        signingIn ??= signInOnce().finally(() => {
+          signingIn = null;
+        });
+        return signingIn;
       },
     },
     // Ниже — то, чего адаптер не умеет. Честное `unavailable` вместо заглушки, которая
