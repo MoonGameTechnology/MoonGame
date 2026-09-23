@@ -11,6 +11,7 @@ import {
   settleSectorZeroRun,
   sectorHeroSlots,
   sectorHullIds,
+  sectorModuleIds,
   WARRANTS_PER_REWARD,
   type SectorZeroProgress,
   type SectorProgressAction,
@@ -494,6 +495,21 @@ describe('PVR-6.2 — в подготовке только корпуса, ко�
     extra.units.test_hive = { ...extra.units.cruiser!, faction: 'swarm' };
     extra.factions.swarm!.uniqueUnits = [...extra.factions.swarm!.uniqueUnits, 'test_hive'];
     expect(sectorHullIds(extra)).not.toContain('test_hive');
+  });
+});
+
+describe('PVR-6.5 — в подготовке только модули, которые есть куда поставить', () => {
+  const modules = sectorModuleIds(data);
+
+  it('нет модулей Роя и щитов крепости', () => {
+    for (const id of ['swarm_brood_chamber', 'swarm_intercept_veil', 'void_shield_i', 'void_shield_ii', 'void_shield_iii'])
+      expect(modules, id).not.toContain(id);
+  });
+
+  it('модули кораблей игрока на месте — и узкие тоже', () => {
+    // Радар встаёт только на разведчика: это не повод его прятать, разведчик у игрока есть.
+    for (const id of ['cargo_bay', 'ion_engine', 'targeting_array', 'shield_booster', 'radar_module'])
+      expect(modules, id).toContain(id);
   });
 });
 

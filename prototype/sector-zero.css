@@ -116,6 +116,13 @@
 .sz-item h3::first-letter { text-transform: uppercase; }
 .sz-stars { margin: -4px 0 14px; font-size: 18px; letter-spacing: 3px; color: #22404a; line-height: 1; }
 .sz-stars .lit { color: var(--rar); text-shadow: 0 0 8px color-mix(in srgb, var(--rar) 60%, transparent); }
+/* «Было → станет» (PVR-6.5): строка на стат, прибавка справа своим цветом. */
+.sz-delta { list-style: none; width: 100%; margin: -6px 0 16px; padding: 10px 12px; border: 1px solid #1d3a44; background: #06131b; display: grid; gap: 6px; }
+.sz-delta li { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: baseline; font-size: 12px; color: #9fbcc4; }
+.sz-delta b { color: #e1f4f4; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sz-delta em { white-space: nowrap; font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
+.sz-delta em.up { color: var(--rar-simple); }
+.sz-delta em.down { color: var(--red); }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }
 .sz-hero-head span { font-size: 13px; color: #aad3d1; margin-right: auto; }
 #sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }

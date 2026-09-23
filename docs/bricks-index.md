@@ -662,6 +662,8 @@
 | TXT-5 | ⏳ | proto | `docs/backlog.md` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
 | TXT-6 | ⏳ | proto | `docs/backlog.md` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
+| UX-SEL-1 | ⏳ | proto | `docs/backlog.md` | На ПК выделять юниты рамкой обычным зажатием ЛКМ, «как в RTS». |
+| ROS-SUP-1 | ⏳ | proto | `docs/backlog.md` | Отдельная вкладка «Корабли поддержки» в Производстве, |
 | SIEGE-1 | ⏳ | data proto | `docs/backlog.md` | Убрать юнит siege из игры, урон по постройкам — модулем. |
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
 | BRWH-2 | ✅ | proto | `docs/backlog.md` | Четыре сгнивших харнеса починены — и два из них ловили |
@@ -1044,7 +1046,7 @@
 | PVR-6.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | Список корпусов — только то, что игрок строит |
 | PVR-6.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Валюты: цвет и «фишка» |
 | PVR-6.4 | ✅ | data proto | `docs/sector-zero-roadmap.md` | Карточка предмета: рамка редкости и звёзды |
-| PVR-6.5 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Сравнение «до/после» |
+| PVR-6.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Сравнение «до/после» |
 | PVR-6.6 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Академия и Мастерская для «взрослых детей» |
 | PVR-6.7 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Магазин-витрина |
 | PVR-6.8 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Живое главное меню |

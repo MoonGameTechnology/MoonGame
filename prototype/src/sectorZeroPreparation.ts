@@ -13,6 +13,7 @@ import {
   sectorHeroUpgradeCost,
   forgeLadderOf,
   sectorHullIds,
+  sectorModuleIds,
   sectorSkillCost,
   WARRANTS_PER_REWARD,
   type SectorProgressAction,
@@ -20,6 +21,7 @@ import {
 } from '../../decisions/sectorZeroProgress';
 import { workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
 import { moduleRarity, starRow } from '../../decisions/itemRarity';
+<<<<<<< HEAD
 import {
   adSovereigns,
   shopRefresh,
@@ -27,6 +29,10 @@ import {
   type PayKind,
   type ShopCapabilities,
 } from '../../decisions/sectorZeroShop';
+=======
+import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
+import { shopRows, type PayKind, type ShopCapabilities } from '../../decisions/sectorZeroShop';
+>>>>>>> 096d07c (feat(sector-zero): сравнение «было → станет» при установке и прокачке модуля (PVR-6.5))
 import { esc, displayUnit } from './format';
 
 interface PreparationHost {
@@ -63,16 +69,33 @@ const PER_HOUR_SHARE = new Set(['shieldRegen']);
  *  поэтому показываем округлённым до десятых. Округление ТОЛЬКО для показа: считает
  *  матч по неокруглённому, иначе HUD и бой разошлись бы. */
 const num = (value: number): string => String(Math.round(value * 10) / 10);
+/** Значение стата для показа; `signed` — со знаком «+», как у прибавки. */
+const statValue = (key: string, value: number, signed = false): string => {
+  const sign = signed && value > 0 ? '+' : '';
+  return PER_HOUR_SHARE.has(key)
+    ? t('loadout.stat.share-per-hour', { n: `${sign}${num(value * 100)}` })
+    : `${sign}${num(value)}`;
+};
 const effectText = (values: Record<string, number>): string =>
   Object.entries(values)
-    .map(([key, value]) => {
-      const sign = value > 0 ? '+' : '';
-      const shown = PER_HOUR_SHARE.has(key)
-        ? t('loadout.stat.share-per-hour', { n: `${sign}${num(value * 100)}` })
-        : `${sign}${num(value)}`;
-      return `${esc(t(stats[key] ?? key))} ${shown}`;
-    })
+    .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${statValue(key, value, true)}`)
     .join(' · ');
+/** Порядок строк сравнения — тот же, что у полосы статов корабля. */
+const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'cargoCapacity', 'radarRange', 'pointDefense'];
+/**
+ * «Было → станет» списком (PVR-6.5): одна разметка на подготовку и Мастерскую. Прибавка
+ * зелёная, потеря красная — цвет несёт смысл, а число рядом дублирует его для тех, кто
+ * цвет не различает.
+ */
+const deltaHtml = (rows: readonly StatDelta[]): string =>
+  rows.length === 0
+    ? ''
+    : `<ul class="sz-delta">${rows
+        .map(
+          (r) =>
+            `<li><span>${esc(t(stats[r.key] ?? r.key))}</span><b>${statValue(r.key, r.before)} → ${statValue(r.key, r.after)}</b><em class="${r.diff > 0 ? 'up' : 'down'}">${statValue(r.key, r.diff, true)}</em></li>`,
+        )
+        .join('')}</ul>`;
 
 export function initSectorZeroPreparation(h: PreparationHost) {
   const panel = document.getElementById('sz-workshop')!;
@@ -108,7 +131,8 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return `<div class="sz-bay"><b>${esc(t(`yard.slot.${slot}`))} · ${modules.length}/${n}</b><span>${modules.map((id) => esc(tData(data.modules[id]!.name))).join(', ') || t('hero.slot.empty')}</span></div>`;
       })
       .join('');
-    const modules = Object.entries(data.modules)
+    const modules = sectorModuleIds(data)
+      .map((id) => [id, data.modules[id]!] as const)
       .map(([id, module]) => {
         const owned = p.modules.includes(id);
         const fitted = selected.includes(id);
@@ -124,7 +148,33 @@ export function initSectorZeroPreparation(h: PreparationHost) {
                 ? t('sector-zero.prep.full')
                 : t('sector-zero.prep.equip');
         const head = itemHead(id, p);
-        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
+        // Что станет с ЭТИМ корпусом: надетый — если снять, ненадетый — если надеть.
+        // Не влезает или не подходит — сравнивать не с чем, строки нет.
+        const compare =
+          allowed && (fitted || fits)
+            ? deltaHtml(
+                statDeltas(
+                  statsNow,
+                  effectiveStats(
+                    def,
+                    { modules: fitted ? selected.filter((m) => m !== id) : [...selected, id] },
+                    data,
+                  ),
+                  STAT_ORDER,
+                ),
+              )
+            : '';
+        // Не встаёт на ЭТОТ корпус — сказать, на какие встаёт, ДО того как игрок заплатит
+        // данные за открытие: «Открыть» на радаре у крейсера обещало то, чего не будет.
+        const fitsOnly = allowed
+          ? ''
+          : `<p class="sz-prereq">${t('sector-zero.prep.fits-only', {
+              list: sectorHullIds(data)
+                .filter((other) => moduleAllowed(other, data.units[other]!, module))
+                .map((other) => esc(displayUnit(other)))
+                .join(', '),
+            })}</p>`;
+        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${fitsOnly}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
       })
       .join('');
     return `<div class="sz-picker">${hulls}</div><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-bays">${bays}</div><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${statsNow[key] ?? 0}</b></span>`).join('')}</div><div class="sz-cards">${modules}</div>`;
@@ -171,7 +221,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
             ? `<p class="sz-forge-shards">${t('sector-zero.forge.shards', { n: row.shards, cap: row.pity })}${row.shards >= row.pity - 1 ? ` · ${t('sector-zero.forge.sure')}` : ''}</p>`
             : '';
         const offer = row.next
-          ? `<p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: Math.round(row.chance * 100) })} · ${t('sector-zero.forge.cost', { n: row.warrants })}</p><p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)} → ${t('sector-zero.forge.gain')}: ${effectText(row.next)}</p><p class="sz-sub">${t('sector-zero.forge.burn')}</p>${shards}`
+          ? `<p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: Math.round(row.chance * 100) })} · ${t('sector-zero.forge.cost', { n: row.warrants })}</p>${deltaHtml(statDeltas(row.now, row.next, STAT_ORDER))}<p class="sz-sub">${t('sector-zero.forge.burn')}</p>${shards}`
           : `<p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)}</p>`;
         const head = itemHead(row.id, p);
         return `<article class="sz-card${head.cls}">${head.html}${offer}${button('forge', row.id, label, !row.can)}</article>`;

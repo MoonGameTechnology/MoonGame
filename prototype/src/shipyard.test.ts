@@ -255,15 +255,15 @@ describe('верфь — панель конструктора', () => {
   // Радар — роль ОДНОГО корпуса. Правило живёт в данных (`allowed.units`), а верфь
   // обязана его честно объяснить: на крейсере утилита свободна, и подпись «нужен
   // слот» читалась бы как враньё.
-  it('радар предлагается на фрегате и заперт с внятной причиной на остальных', () => {
-    const frigate = loadoutPaneHtml(
+  it('радар предлагается на разведчике и заперт с внятной причиной на остальных', () => {
+    const scout = loadoutPaneHtml(
       s,
       'p1',
-      normalizeDraft(s, 'p1', draftOf({ hull: 'frigate' }), YARD_HULLS),
+      normalizeDraft(s, 'p1', draftOf({ hull: 'scout' }), YARD_HULLS),
       YARD_HULLS,
       view,
     );
-    expect(frigate).toContain('data-cnmod="radar_module"');
+    expect(scout).toContain('data-cnmod="radar_module"');
 
     const cruiser = loadoutPaneHtml(
       s,
