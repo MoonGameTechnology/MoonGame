@@ -312,6 +312,111 @@ describe('язык игрока (YAG-1.3, требование 2.14)', () => {
   });
 });
 
+describe('rewarded-реклама (YAG-3.1)', () => {
+  type Callbacks = Partial<
+    Record<'onOpen' | 'onRewarded' | 'onClose' | 'onError', (e?: Error) => void>
+  >;
+  /** Площадка, которая проигрывает ролик по сценарию: имена колбэков по порядку. */
+  function adSdk(script: (keyof Callbacks)[]) {
+    const fullscreen = vi.fn();
+    const { sdk, calls } = fakeSdk({
+      adv: {
+        showRewardedVideo: ({ callbacks }: { callbacks?: Callbacks } = {}) => {
+          for (const name of script)
+            callbacks?.[name]?.(name === 'onError' ? new Error('no fill') : undefined);
+        },
+        showFullscreenAdv: fullscreen,
+      },
+    });
+    return { sdk, calls, fullscreen };
+  }
+
+  it('площадка умеет rewarded — флаг поднят; интерстишлов нет по решению владельца', () => {
+    const { capabilities } = createYandexPlatform(adSdk([]).sdk);
+    expect(capabilities.rewardedAds).toBe(true);
+    // Резолюция 2026-09-22: в Sector Zero реклама только по нажатию игрока.
+    expect(capabilities.interstitialAds).toBe(false);
+  });
+
+  it('досмотрел — `ok`', async () => {
+    const platform = createYandexPlatform(adSdk(['onOpen', 'onRewarded', 'onClose']).sdk);
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({ status: 'ok' });
+  });
+
+  it('ЗАКРЫЛ КРЕСТИКОМ — `cancelled`, а не награда', async () => {
+    const platform = createYandexPlatform(adSdk(['onOpen', 'onClose']).sdk);
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({
+      status: 'cancelled',
+    });
+  });
+
+  it('ролика нет — `unavailable`, и сбой уходит в журнал разработчика', async () => {
+    const onSdkError = vi.fn();
+    const platform = createYandexPlatform(adSdk(['onError']).sdk, { onSdkError });
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({
+      status: 'unavailable',
+    });
+    expect(onSdkError).toHaveBeenCalledWith('showRewardedVideo', expect.any(Error));
+  });
+
+  it('SDK бросил синхронно — `unavailable`, а не отклонённый промис', async () => {
+    const onSdkError = vi.fn();
+    const { sdk } = fakeSdk({
+      adv: {
+        showRewardedVideo: () => {
+          throw new Error('boom');
+        },
+      },
+    });
+    const result = await createYandexPlatform(sdk, { onSdkError }).ads.showRewardedAd({
+      placement: 'shop.lot',
+    });
+    expect(result).toEqual({ status: 'unavailable' });
+    expect(onSdkError).toHaveBeenCalledWith('showRewardedVideo', expect.any(Error));
+  });
+
+  it('на время ролика звук глушится и геймплей стоит, после — возвращаются (п. 4.7)', async () => {
+    const { sdk, calls } = adSdk(['onOpen', 'onRewarded', 'onClose']);
+    const platform = createYandexPlatform(sdk);
+    const paused: boolean[] = [];
+    platform.onPlatformPause((p) => paused.push(p));
+    platform.ready();
+    platform.gameplayStart();
+    await platform.ads.showRewardedAd({ placement: 'run.double' });
+    // Не полагаемся на то, что площадка сама пришлёт `game_api_pause`: требование
+    // проверяет модерация, и держать его должна игра.
+    expect(paused).toEqual([true, false]);
+    expect(calls).toEqual(['ready', 'start', 'stop', 'start']);
+  });
+
+  it('ролик не открылся — глушить было нечего и снимать нечего', async () => {
+    const platform = createYandexPlatform(adSdk(['onError']).sdk);
+    const paused: boolean[] = [];
+    platform.onPlatformPause((p) => paused.push(p));
+    await platform.ads.showRewardedAd({ placement: 'shop.lot' });
+    expect(paused).toEqual([]);
+  });
+
+  it('колбэки после исхода не выдают вторую награду и не снимают паузу дважды', async () => {
+    const platform = createYandexPlatform(
+      adSdk(['onOpen', 'onClose', 'onRewarded', 'onClose']).sdk,
+    );
+    const paused: boolean[] = [];
+    platform.onPlatformPause((p) => paused.push(p));
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({
+      status: 'cancelled',
+    });
+    expect(paused).toEqual([true, false]);
+  });
+
+  it('интерстишл честно `unavailable`, даже если SDK его умеет', async () => {
+    const { sdk, fullscreen } = adSdk([]);
+    const result = await createYandexPlatform(sdk).ads.showInterstitial({ placement: 'x' });
+    expect(result).toEqual({ status: 'unavailable' });
+    expect(fullscreen).not.toHaveBeenCalled();
+  });
+});
+
 describe('аналитика копится, пока её некуда отправлять', () => {
   it('без sink события складываются в адаптер', () => {
     const platform = createYandexPlatform(fakeSdk().sdk);
