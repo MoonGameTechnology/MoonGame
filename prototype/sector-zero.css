@@ -101,6 +101,21 @@
 .sz-card button { margin-top: auto; width: 100%; }
 .sz-card-type { color: #81adb3; font: 10px/1.5 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .1em; }
 .sz-card p.sz-prereq { color: #d2b98b; }
+/* Карточка предмета (PVR-6.4). Редкость — это РАМКА: обводка и полоса сверху её цвета,
+   а не заливка — так фиолетовый «мифический» не путается с фиолетовой фишкой Варрантов.
+   Надетый модуль отмечен отдельно — светлым контуром поверх рамки редкости. */
+.sz-item.r-simple { --rar: var(--rar-simple); }
+.sz-item.r-unique { --rar: var(--rar-unique); }
+.sz-item.r-mythic { --rar: var(--rar-mythic); }
+.sz-item.r-legendary { --rar: var(--rar-legendary); }
+.sz-card.sz-item { border-color: color-mix(in srgb, var(--rar) 55%, #28444e); border-top: 3px solid var(--rar); }
+.sz-card.sz-item.selected { outline: 2px solid #d8f6f2; outline-offset: 2px; }
+.sz-item .sz-card-type { display: flex; justify-content: space-between; gap: 12px; width: 100%; }
+.sz-item .sz-rarity { color: var(--rar); font-weight: 700; }
+/* Имена из `data.*` строчные (встают и в середину фраз) — в заголовке нужна заглавная. */
+.sz-item h3::first-letter { text-transform: uppercase; }
+.sz-stars { margin: -4px 0 14px; font-size: 18px; letter-spacing: 3px; color: #22404a; line-height: 1; }
+.sz-stars .lit { color: var(--rar); text-shadow: 0 0 8px color-mix(in srgb, var(--rar) 60%, transparent); }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }
 .sz-hero-head span { font-size: 13px; color: #aad3d1; margin-right: auto; }
 #sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }

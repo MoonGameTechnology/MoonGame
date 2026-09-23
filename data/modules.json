@@ -1,6 +1,7 @@
 {
   "cargo_bay": {
     "name": "Cargo Bay",
+    "rarity": "simple",
     "slot": "utility",
     "tag": "horizontal",
     "effects": {
@@ -17,6 +18,7 @@
   },
   "radar_module": {
     "name": "Radar Module",
+    "rarity": "simple",
     "slot": "utility",
     "tag": "horizontal",
     "effects": {
@@ -36,6 +38,7 @@
   },
   "ion_engine": {
     "name": "Ion Engine",
+    "rarity": "simple",
     "slot": "utility",
     "tag": "vertical",
     "effects": {
@@ -52,6 +55,7 @@
   },
   "targeting_array": {
     "name": "Targeting Array",
+    "rarity": "unique",
     "slot": "weapon",
     "tag": "vertical",
     "effects": {
@@ -68,6 +72,7 @@
   },
   "ablative_plating": {
     "name": "Ablative Plating",
+    "rarity": "simple",
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -84,6 +89,7 @@
   },
   "shield_booster": {
     "name": "Shield Booster",
+    "rarity": "unique",
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -100,6 +106,7 @@
   },
   "point_defense_array": {
     "name": "Area Defense Array",
+    "rarity": "simple",
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -116,6 +123,7 @@
   },
   "void_shield_i": {
     "name": "Void Shield I",
+    "rarity": "unique",
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -132,6 +140,7 @@
   },
   "void_shield_ii": {
     "name": "Void Shield II",
+    "rarity": "mythic",
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -148,6 +157,7 @@
   },
   "void_shield_iii": {
     "name": "Void Shield III",
+    "rarity": "legendary",
     "slot": "defense",
     "tag": "vertical",
     "effects": {

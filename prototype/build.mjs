@@ -96,6 +96,9 @@ const css = `
   /* Валюты Sector Zero (PVR-6.3, решение владельца 2026-09-23): несут смысл, как --rc-*.
      Суверены — донат, золото; Варранты — валюта магазина и кузни, фиолетовый; данные — cyan. */
   --cur-sovereigns:#f2c14e;--cur-warrants:#b48cff;--cur-data:#35d6e6;
+  /* Редкость предмета (PVR-6.4) — лестница героев, hero-progression §0.2: простой зелёный,
+     уникальный синий, мифический фиолетовый, легендарный красный. */
+  --rar-simple:#5fd07a;--rar-unique:#4aa8ff;--rar-mythic:#bb7dff;--rar-legendary:#ff5f57;
   --cyan:#35d6e6;--cyan-dim:#1c6f78;
   --grn:#5ff0c0;--grn-dim:#2b7a66;
   --red:#ff5a4d;--amber:#ffb43a;

@@ -11,6 +11,7 @@ import {
   sectorHeroAbilities,
   sectorHeroSlots,
   sectorHeroUpgradeCost,
+  forgeLadderOf,
   sectorHullIds,
   sectorSkillCost,
   WARRANTS_PER_REWARD,
@@ -18,6 +19,7 @@ import {
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
+import { moduleRarity, starRow } from '../../decisions/itemRarity';
 import {
   adSovereigns,
   shopRefresh,
@@ -52,14 +54,24 @@ const stats: Record<string, string> = {
   cargoCapacity: 'loadout.stat.cargo',
   radarRange: 'loadout.stat.radar',
   pointDefense: 'data.area-defense-array',
+  shieldRegen: 'loadout.stat.shield-regen',
 };
+/** Статы-ДОЛИ за игровой час (`shieldRegen` — доля щита, `construction.ts`). Округление до
+ *  десятых превращало +0.02 в «+0»: такие показываются процентом в час (PVR-6.4). */
+const PER_HOUR_SHARE = new Set(['shieldRegen']);
 /** Вклад звёздного модуля — дробный (6 × 1.1 в плавающей точке даёт 6.6000000000000005),
  *  поэтому показываем округлённым до десятых. Округление ТОЛЬКО для показа: считает
  *  матч по неокруглённому, иначе HUD и бой разошлись бы. */
 const num = (value: number): string => String(Math.round(value * 10) / 10);
 const effectText = (values: Record<string, number>): string =>
   Object.entries(values)
-    .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${value > 0 ? '+' : ''}${num(value)}`)
+    .map(([key, value]) => {
+      const sign = value > 0 ? '+' : '';
+      const shown = PER_HOUR_SHARE.has(key)
+        ? t('loadout.stat.share-per-hour', { n: `${sign}${num(value * 100)}` })
+        : `${sign}${num(value)}`;
+      return `${esc(t(stats[key] ?? key))} ${shown}`;
+    })
     .join(' · ');
 
 export function initSectorZeroPreparation(h: PreparationHost) {
@@ -111,16 +123,33 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               : !fits
                 ? t('sector-zero.prep.full')
                 : t('sector-zero.prep.equip');
-        return `<article class="sz-card${fitted ? ' selected' : ''}"><div class="sz-card-type">${t(`yard.slot.${module.slot}`)}</div><h3>${esc(tData(module.name))}</h3><p>${effectText(module.effects.stats)}</p>${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
+        const head = itemHead(id, p);
+        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
       })
       .join('');
     return `<div class="sz-picker">${hulls}</div><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-bays">${bays}</div><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${statsNow[key] ?? 0}</b></span>`).join('')}</div><div class="sz-cards">${modules}</div>`;
   }
 
-  /** Одно деление звёздности. Символами, а не картинкой: экран подготовки и так
-   *  текстовый, а лишний ассет пришлось бы тащить в самодостаточный HTML. */
-  const starBar = (row: WorkshopRow): string =>
-    '★'.repeat(row.star) + '☆'.repeat(Math.max(0, row.cap - row.star));
+  /**
+   * Шапка карточки ПРЕДМЕТА — одна на подготовку, Мастерскую и Магазин (PVR-6.4): слот,
+   * ступень редкости и звёзды. Цвет рамки карточки задаёт класс `r-<редкость>`, звёзды —
+   * символами, а не картинкой: самодостаточному HTML лишний ассет ни к чему. Число звёзд
+   * дублируется для экранного диктора, иначе ряд значков он прочитал бы как мусор.
+   */
+  const itemHead = (id: string, p: SectorZeroProgress): { cls: string; html: string } => {
+    const module = h.data.modules[id]!;
+    const rarity = moduleRarity(module);
+    const cap = forgeLadderOf(h.data).cap;
+    const { lit, empty } = starRow(p.stars[id] ?? 0, cap);
+    const stars =
+      cap > 0
+        ? `<div class="sz-stars" role="img" aria-label="${esc(t('sector-zero.forge.stars', { n: lit, cap }))}"><span class="lit">${'★'.repeat(lit)}</span>${'★'.repeat(empty)}</div>`
+        : '';
+    return {
+      cls: ` sz-item r-${rarity}`,
+      html: `<div class="sz-card-type"><span>${t(`yard.slot.${module.slot}`)}</span><span class="sz-rarity">${t(`rarity.${rarity}`)}</span></div><h3>${esc(tData(module.name))}</h3>${stars}`,
+    };
+  };
 
   function workshop(p: SectorZeroProgress): string {
     const rows = workshopRows(p, h.data);
@@ -128,7 +157,6 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       return `<p class="sz-sub">${t('sector-zero.forge.empty')}</p>`;
     const cards = rows
       .map((row) => {
-        const module = h.data.modules[row.id]!;
         const label = row.can
           ? t('sector-zero.forge.price', { n: row.warrants })
           : row.reason === 'E_FORGE_NOT_ENOUGH'
@@ -145,7 +173,8 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         const offer = row.next
           ? `<p class="sz-forge-odds">${t('sector-zero.forge.chance', { n: Math.round(row.chance * 100) })} · ${t('sector-zero.forge.cost', { n: row.warrants })}</p><p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)} → ${t('sector-zero.forge.gain')}: ${effectText(row.next)}</p><p class="sz-sub">${t('sector-zero.forge.burn')}</p>${shards}`
           : `<p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)}</p>`;
-        return `<article class="sz-card"><div class="sz-card-type">${t(`yard.slot.${module.slot}`)}</div><h3>${esc(tData(module.name))}</h3><p class="sz-forge-stars">${starBar(row)} · ${t('sector-zero.forge.stars', { n: row.star, cap: row.cap })}</p>${offer}${button('forge', row.id, label, !row.can)}</article>`;
+        const head = itemHead(row.id, p);
+        return `<article class="sz-card${head.cls}">${head.html}${offer}${button('forge', row.id, label, !row.can)}</article>`;
       })
       .join('');
     return `<p class="sz-sub">${t('sector-zero.forge.hint')}</p><div class="sz-cards">${cards}</div>`;
@@ -190,7 +219,10 @@ export function initSectorZeroPreparation(h: PreparationHost) {
           blocked === 'E_SHOP_OWNED' || blocked === 'E_SHOP_LOCKED'
             ? `<p class="sz-sub">${t(blocked === 'E_SHOP_OWNED' ? 'sector-zero.shop.owned' : 'sector-zero.shop.locked')}</p>`
             : '';
-        return `<article class="sz-card${row.owned ? ' selected' : ''}">${what}<h3>${title}</h3>${note}${buttons}</article>`;
+        // Модуль в витрине — та же карточка предмета, что в подготовке и Мастерской (PVR-6.4).
+        const head =
+          row.kind === 'module' && h.data.modules[row.grants] ? itemHead(row.grants, p) : null;
+        return `<article class="sz-card${head?.cls ?? ''}${row.owned ? ' selected' : ''}">${head ? head.html : `${what}<h3>${title}</h3>`}${note}${buttons}</article>`;
       })
       .join('');
     // Обновление витрины за ролик (`SZE-3.4`): нет рекламы у площадки — кнопки нет вовсе;

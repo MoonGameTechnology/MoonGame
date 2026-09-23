@@ -115,6 +115,16 @@ export const UnitStatsSchema = z
  *  cost, not an open stack (ship-modules-roadmap.md §0). */
 export const SHIP_SLOT_TYPES = ['weapon', 'defense', 'utility'] as const;
 export const ShipSlotTypeSchema = z.enum(SHIP_SLOT_TYPES);
+
+/**
+ * PVR-6.4: редкость предмета — та же лестница цветов, что у героев (hero-progression §0.2,
+ * решение владельца): простой · уникальный · мифический · легендарный = зелёный · синий ·
+ * фиолетовый · красный. Порядок массива и есть порядок ступеней. Пока это только ВИД:
+ * на силу модуля редкость не влияет (решение владельца 2026-09-23).
+ */
+export const RARITIES = ['simple', 'unique', 'mythic', 'legendary'] as const;
+export const RaritySchema = z.enum(RARITIES);
+export type Rarity = z.infer<typeof RaritySchema>;
 /** How many slots of each category a hull carries. Default 0 everywhere ⇒ the
  *  hull fits no modules (backward-compatible: existing units are unaffected). */
 export const ShipSlotsSchema = z.object({
@@ -751,6 +761,8 @@ export const ModuleDefSchema = z
     effects: ModuleEffectsSchema.default({ stats: {}, enables: [] }),
     cost: ResourceBagSchema.default({}),
     allowed: ModuleAllowedSchema.optional(),
+    /** PVR-6.4: ступень редкости; нет поля — «простой». */
+    rarity: RaritySchema.optional(),
     /**
      * PVR-4.3: модуль — ОТВЕТ Роя на класс оружия. Лестница живёт рядом с модулем
      * (`SZE-4.1`), а не отдельной таблицей: уровень осмыслен только вместе с тем,

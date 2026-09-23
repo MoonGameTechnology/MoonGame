@@ -181,6 +181,7 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   { prefix: 'err.', built_by: 'errText() — из кода отказа ядра: E_NO_CAPACITY → err.no-capacity' },
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
   { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },
+  { prefix: 'rarity.', built_by: 'карточка предмета Sector Zero — из ступени редкости модуля (PVR-6.4)' },
   {
     prefix: 'swarm.journal.tier.',
     built_by: 'swarmDossierHtml() — из уверенности строки журнала (PVR-4.5)',
