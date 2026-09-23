@@ -19,6 +19,7 @@ import {
 } from '../../decisions/sectorZeroProgress';
 import { workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
 import {
+  adSovereigns,
   shopRefresh,
   shopRows,
   type PayKind,
@@ -204,7 +205,21 @@ export function initSectorZeroPreparation(h: PreparationHost) {
             t(refresh === 'ready' ? 'sector-zero.shop.refresh' : 'sector-zero.shop.refresh.used'),
             refresh !== 'ready',
           );
-    return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton}<div class="sz-cards">${cards}</div>`;
+    // Суверены за ролик (`SZE-3.5`): те же правила — нет рекламы или кран выключен
+    // данными — кнопки нет; попытки на сегодня кончились — погашена, но видна.
+    const tap = adSovereigns(p, h.data, h.platform);
+    const tapButton =
+      tap.state === 'hidden'
+        ? ''
+        : button(
+            'ad-sovereigns',
+            '',
+            tap.state === 'ready'
+              ? t('sector-zero.shop.ad-sovereigns', { n: tap.amount, left: tap.left })
+              : t('sector-zero.shop.ad-sovereigns.used'),
+            tap.state !== 'ready',
+          );
+    return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton}${tapButton}<div class="sz-cards">${cards}</div>`;
   }
 
   function heroes(p: SectorZeroProgress): string {
@@ -276,6 +291,22 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     else if (kind === 'hero') heroId = id;
     else {
       let action: SectorProgressAction | null = null;
+      if (kind === 'ad-sovereigns') {
+        // Сперва подтверждённый показ, потом начисление; отказ попытку не тратит. Сутки
+        // сверяются перед начислением — лимит считается по сегодняшним, а не вчерашним.
+        const settle = (watched: boolean): void => {
+          if (watched) h.sync();
+          const amount = h.data.sectorZeroShop.adSovereigns.amount;
+          message = !watched
+            ? t('sector-zero.shop.ad-declined')
+            : h.change({ kind: 'ad-sovereigns' })
+              ? t('sector-zero.shop.ad-sovereigns.got', { n: amount })
+              : t('sector-zero.prep.unavailable');
+          render();
+        };
+        void h.watchAd('shop:sovereigns').then(settle, () => settle(false));
+        return;
+      }
       if (kind === 'refresh-shop') {
         // Как покупка за рекламу: сперва подтверждённый показ, потом действие. Отказ от
         // ролика действие не зовёт — попытка не тратится и витрина не меняется. Сутки

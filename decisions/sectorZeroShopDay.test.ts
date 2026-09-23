@@ -68,6 +68,6 @@ describe('SZE-3.2 — витрина выводится, а не хранитс�
   });
 
   it('пустой каталог даёт пустую витрину, а не падение', () => {
-    expect(dailyOffers('x', 1, { ...data, sectorZeroShop: { offers: {}, slots: 4 } })).toEqual([]);
+    expect(dailyOffers('x', 1, { ...data, sectorZeroShop: { ...data.sectorZeroShop, offers: {}, slots: 4 } })).toEqual([]);
   });
 });

@@ -178,8 +178,41 @@ export function advanceShopDay(
   day: number,
 ): SectorZeroProgress {
   if (!Number.isSafeInteger(day) || day <= progress.day) return progress;
-  // Новые сутки — новая суточная ротация и новое обновление за ролик (`SZE-3.4`).
-  return { ...progress, day, shopRound: 0 };
+  // Новые сутки — новая суточная ротация, новое обновление за ролик (`SZE-3.4`) и новые
+  // Суверены за ролик (`SZE-3.5`).
+  return { ...progress, day, shopRound: 0, adSovereignsToday: 0 };
+}
+
+/**
+ * Способы оплаты по возможностям площадки (`SZE-3.5`).
+ *
+ * Суверены тратятся там, где их можно ПОЛУЧИТЬ: за деньги (IAP) или за ролик. До
+ * `SZE-3.5` кран был один — покупка, и тратить разрешалось только при IAP; с роликами на
+ * площадке без покупок игрок копил бы валюту, которую некуда деть. Реклама как способ
+ * оплаты лота — по-прежнему только за `rewardedAds`.
+ */
+export function shopCapabilities(platform: {
+  iap: boolean;
+  rewardedAds: boolean;
+}): ShopCapabilities {
+  return { sovereigns: platform.iap || platform.rewardedAds, ads: platform.rewardedAds };
+}
+
+/**
+ * Кнопка «Суверены за ролик» (`SZE-3.5`): порция, остаток на сегодня и состояние.
+ *
+ * `hidden` — у площадки нет рекламы или кран выключен данными: кнопки нет вовсе.
+ * `used` — сегодняшние попытки кончились: погашена, но видна, возможность вернётся завтра.
+ */
+export function adSovereigns(
+  progress: SectorZeroProgress,
+  data: GameData,
+  caps: ShopCapabilities,
+): { state: 'hidden' | 'ready' | 'used'; amount: number; left: number } {
+  const { amount, perDay } = data.sectorZeroShop.adSovereigns;
+  const left = Math.max(0, perDay - progress.adSovereignsToday);
+  if (!caps.ads || amount <= 0 || perDay <= 0) return { state: 'hidden', amount, left };
+  return { state: left > 0 ? 'ready' : 'used', amount, left };
 }
 
 /**
