@@ -33,8 +33,8 @@ describe('route — path + travel time (map-roadmap.md)', () => {
   });
 
   it('travel time scales with path length — farther takes longer', () => {
-    const hoursAB = estimateTravelHours(chain(), data, 'A', 'B', fleet)!; // 30 / 10
-    const hoursAC = estimateTravelHours(chain(), data, 'A', 'C', fleet)!; // 90 / 10
+    const hoursAB = estimateTravelHours(chain(), { data }, 'A', 'B', fleet)!; // 30 / 10
+    const hoursAC = estimateTravelHours(chain(), { data }, 'A', 'C', fleet)!; // 90 / 10
     expect(hoursAB).toBe(3);
     expect(hoursAC).toBe(9);
     expect(hoursAC).toBeGreaterThan(hoursAB);
@@ -42,9 +42,9 @@ describe('route — path + travel time (map-roadmap.md)', () => {
 
   it('returns null when there is no route or the fleet cannot move', () => {
     const island = state([planet('A', 0, []), planet('Z', 5, [])]);
-    expect(estimateTravelHours(island, data, 'A', 'Z', fleet)).toBeNull();
+    expect(estimateTravelHours(island, { data }, 'A', 'Z', fleet)).toBeNull();
     const stuck: Fleet = { ...fleet, units: [] };
-    expect(estimateTravelHours(chain(), data, 'A', 'C', stuck)).toBeNull();
+    expect(estimateTravelHours(chain(), { data }, 'A', 'C', stuck)).toBeNull();
   });
 });
 

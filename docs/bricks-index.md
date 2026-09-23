@@ -1031,6 +1031,7 @@
 | PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Пиратская база для первого боя |
 | PVR-2.1 | ✅ | proto | `docs/sector-zero-roadmap.md` | Выбор сложности на запуске забега |
 | PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | У забега свой темп и ускорение |
+| PVR-2.3 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Корабли забега впятеро быстрее |
 | PVR-3.1 | ✅ | docs | `docs/sector-zero-roadmap.md` | Резолюция: чем PvE-прокачка НЕ является |
 | PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | Хранилище PvE-прогресса |
 | PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Награда за забег |

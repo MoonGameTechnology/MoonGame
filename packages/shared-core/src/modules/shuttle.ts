@@ -71,7 +71,7 @@ import {
 import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
 import { addUnits, cappedUnitStat, findHealthyStack, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
-import { timeScaleOf } from '../action/types';
+import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 
 /** Total point-defense (anti-shuttle/anti-missile) firepower of a fleet —
@@ -740,19 +740,21 @@ function baseFromPayload(
   return fleetBase(fleet, h.state, h.ctx.data, h.ctx.now);
 }
 
-/** Скорость соединения — самая медленная машина в нём: летят вместе, не порознь. */
-function slowestSpeed(units: readonly UnitStack[], data: GameData): number {
+/** Скорость соединения — самая медленная машина в нём: летят вместе, не порознь.
+ *  Помножена на темп перемещения матча (`travelSpeedFactor`, ×5 в Sector Zero) — тот же,
+ *  что у флотов: ускорь одни флоты, и истребитель отстал бы от фрегата, за которым охотится. */
+function slowestSpeed(units: readonly UnitStack[], ctx: Context): number {
   let slowest = Infinity;
   for (const st of units) {
     if (st.count <= 0) continue;
-    slowest = Math.min(slowest, data.units[st.unit]?.stats.speed ?? 0);
+    slowest = Math.min(slowest, ctx.data.units[st.unit]?.stats.speed ?? 0);
   }
-  return Number.isFinite(slowest) ? slowest : 0;
+  return Number.isFinite(slowest) ? slowest * travelSpeedFactorOf(ctx) : 0;
 }
 
 /** Скорость вылета — самая медленная машина в нём. */
-function strikeSpeed(strike: ShuttleStrike, data: GameData): number {
-  return slowestSpeed(strike.units, data);
+function strikeSpeed(strike: ShuttleStrike, ctx: Context): number {
+  return slowestSpeed(strike.units, ctx);
 }
 
 /**
@@ -771,7 +773,7 @@ function turnHome(h: HandlerContext, strike: ShuttleStrike): void {
   const from = strike.at ?? strike.to;
   const home = basePosition(strike.base, h.state, h.ctx.now);
   const back = home ? distance(from, home) : 0;
-  const speed = strikeSpeed(strike, h.ctx.data);
+  const speed = strikeSpeed(strike, h.ctx);
   const flightMs = speed > 0 ? Math.max(1, Math.round((back / speed) * hourMs(h))) : 1;
   strike.to = from;
   delete strike.at;
@@ -892,7 +894,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
 
 export const shuttleModule: GameModule = {
   id: 'shuttle',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -968,7 +970,7 @@ export const shuttleModule: GameModule = {
       if (range <= 0) return h.reject('E_NO_RANGE');
       if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
 
-      const speed = slowestSpeed(squad.units, h.ctx.data);
+      const speed = slowestSpeed(squad.units, h.ctx);
       if (speed <= 0) return h.reject('E_NO_SPEED');
       const flightMs = Math.max(1, Math.round((distance(from, to) / speed) * hourMs(h)));
 
@@ -1332,7 +1334,7 @@ export const shuttleModule: GameModule = {
       const data = h.ctx.data;
       const hour = hourMs(h);
       const stepMs = Math.max(1, (CHASE_STEP_MINUTES / 60) * hour);
-      const speed = strikeSpeed(strike, data);
+      const speed = strikeSpeed(strike, h.ctx);
       const radius = chaseRadius(strike.units, data);
       const leash = squadronReach({ id: strike.squadronId, units: strike.units }, data);
 

@@ -150,6 +150,17 @@ describe('ROADS-6 — «Хранитель» встаёт в засаду на �
     expect(stewardAmbushes(s, 'p1', ctx, opts())).toHaveLength(1);
   });
 
+  it('в забеге крыло впятеро быстрее (PVR-2.3): ствол 60 ед. это 1,2 ч, плюс запас 2 ч', () => {
+    const s = world();
+    const run: Context = { ...ctx, config: { timeScale: 1, travelSpeedFactor: 5 } };
+    s.fleets.w1 = fleet('w1', 'p1', 4, { location: 'B' });
+    s.fleets.e1 = bypassing(s, 'e1', 1, 3.25);
+    expect(stewardAmbushes(s, 'p1', ctx, opts())).toEqual([]); // на ×1 нужно 8 ч
+    expect(stewardAmbushes(s, 'p1', run, opts())).toHaveLength(1);
+    s.fleets.e1 = bypassing(s, 'e1', 1, 3.15);
+    expect(stewardAmbushes(s, 'p1', run, opts())).toEqual([]);
+  });
+
   it('проигрышную встречу не устраивает', () => {
     const s = world();
     s.fleets.e1 = bypassing(s, 'e1', 6, 20);

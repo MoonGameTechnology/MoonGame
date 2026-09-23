@@ -2,7 +2,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, FleetEdge, GameState, PlayerId, PlanetId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
-import { fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
+import { fleetTravelSpeed, planRoute, routeDistance } from '../state/route';
 import { forkAt, forkTAtStart, laneRoadLength, legEndT, snapToFork } from '../state/roads';
 import { corridorVeto, isCorridorEdge } from '../state/corridor';
 import { getStance } from '../state/diplomacy';
@@ -112,7 +112,10 @@ function beginLeg(
   if (span <= 0) {
     return false;
   }
-  const speed = h.hook<number>('fleet.speed', fleetBaseSpeed(fleet, h.ctx.data), {
+  // The match's travel factor (Sector Zero ×5) rides the base, not a hook: every
+  // `fleet.speed` contribution multiplies, so the order is immaterial, and the
+  // estimates (`estimateTravelHours`, `journeyEtaMs`) read the very same base.
+  const speed = h.hook<number>('fleet.speed', fleetTravelSpeed(fleet, h.ctx), {
     fleetId: fleet.id,
     from: fromId,
     to: nextHop,
@@ -356,7 +359,7 @@ function planJourney(
  */
 export const movementModule: GameModule = {
   id: 'movement',
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).

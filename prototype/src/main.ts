@@ -22,6 +22,7 @@ import {
   ctx,
   setMatchMode,
   matchMode,
+  setMatchTravelSpeed,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
@@ -154,7 +155,7 @@ import {
   estimateTravelHours,
   journeyDestination,
   findHealthyStack,
-  fleetBaseSpeed,
+  fleetTravelSpeed,
   sumUnitStat,
   getStance,
   getOffer,
@@ -284,7 +285,7 @@ import {
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
-import { RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
+import { RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import { takeBoon } from '../../decisions/actions';
 import {
   authOutcome,
@@ -2334,11 +2335,12 @@ function laneAim(
   from: string,
   lane: { from: string; to: string; t: number },
 ): { endId: string; hrs: number } {
-  const speed = fleetBaseSpeed(f, data) || 1;
+  const rules = ctx(s.time);
+  const speed = fleetTravelSpeed(f, rules) || 1;
   // The lane's ROAD length (ROADS-2): `t` is a share of the road, so is the partial leg.
   const len = laneRoadLength(s, lane.from, lane.to);
   const toNode = (to: string): number =>
-    from === to ? 0 : (estimateTravelHours(s, data, from, to, f) ?? Infinity);
+    from === to ? 0 : (estimateTravelHours(s, rules, from, to, f) ?? Infinity);
   const hFrom = toNode(lane.from) + (len * lane.t) / speed; // reach `from`, then advance t
   const hTo = toNode(lane.to) + (len * (1 - lane.t)) / speed; // reach `to`, then back (1-t)
   return hFrom <= hTo ? { endId: lane.from, hrs: hFrom } : { endId: lane.to, hrs: hTo };
@@ -4398,7 +4400,7 @@ function drawAimPreview() {
     let hrs: number | null = null;
     if (f0 && from) {
       if (laneTarget) hrs = laneAim(f0, from, laneTarget).hrs;
-      else if (targetId) hrs = estimateTravelHours(s, data, from, targetId, f0);
+      else if (targetId) hrs = estimateTravelHours(s, ctx(s.time), from, targetId, f0);
     }
     if (etaShown(hrs)) {
       cx.font = '11px ui-monospace,Menlo,monospace';
@@ -6380,7 +6382,7 @@ function fleetPanelHtml(f: Fleet): string {
     // учётом форс-марша (×1.5 с СЛЕДУЮЩЕГО лейна — текущий уже расписан
     // авторитетно в arrivesAt, его не трогаем). Выключил буст — оценка удлиняется.
     const rawRestH =
-      dest !== f.movement.to ? estimateTravelHours(s, data, f.movement.to, dest, f) : 0;
+      dest !== f.movement.to ? estimateTravelHours(s, ctx(s.time), f.movement.to, dest, f) : 0;
     const restH = restRouteHours(rawRestH, boosted, FORCED_MARCH_MULT);
     h += `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(dest)}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
   } else if (f.edge) {
@@ -13237,9 +13239,13 @@ let sectorRunActive = false;
  * Повторный `start` и `stop` без `start` адаптер гасит сам (`decisions/platformLifecycle`),
  * поэтому здесь нет проверки «а не то же ли самое значение» — она была бы вторым местом,
  * где живёт одно правило.
+ *
+ * Та же дверь включает и выключает темп перемещения забега (PVR-2.3): ×5 ко всем скоростям
+ * карты живёт ровно столько, сколько живёт забег, во всех тех же точках.
  */
 function setRunActive(on: boolean): void {
   sectorRunActive = on;
+  setMatchTravelSpeed(on ? RUN_TRAVEL_SPEED : 1);
   syncSectorZeroTools();
   const api = getPlatform() as Partial<PlatformHost>;
   if (on) api.gameplayStart?.();
@@ -14262,7 +14268,7 @@ function chainStart(f: Fleet): { fromId: string | null; baseH: number } {
   if (f.movement) {
     const mv = f.movement;
     const dest = journeyDestination(mv);
-    const rawRestH = dest !== mv.to ? estimateTravelHours(s, data, mv.to, dest, f) : 0;
+    const rawRestH = dest !== mv.to ? estimateTravelHours(s, ctx(s.time), mv.to, dest, f) : 0;
     const restH = restRouteHours(rawRestH, marchFlagged(f.id), FORCED_MARCH_MULT);
     return { fromId: dest, baseH: arrivalHours(mv.arrivesAt, s.time, HOUR, restH) };
   }
@@ -14272,7 +14278,7 @@ function chainStart(f: Fleet): { fromId: string | null; baseH: number } {
 function chainTravelH(f: Fleet): (from: string, to: string) => number | null {
   const boosted = marchFlagged(f.id);
   return (from, to) =>
-    marchHours(estimateTravelHours(s, data, from, to, f), boosted, FORCED_MARCH_MULT);
+    marchHours(estimateTravelHours(s, ctx(s.time), from, to, f), boosted, FORCED_MARCH_MULT);
 }
 /** Маршрут для полилинии цепочки. Граф лейнов статичен всю партию — кэш на матч
  *  (Дейкстра на каждый кадр для каждого шага была бы расточительна). */

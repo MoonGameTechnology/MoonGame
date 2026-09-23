@@ -49,6 +49,7 @@ export {
   ctx,
   setMatchMode,
   matchMode,
+  setMatchTravelSpeed,
   advance,
   order,
   canOrder,
