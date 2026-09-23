@@ -228,7 +228,7 @@ module.exports = {
     else delete intel['ui-intel'];
   },
   state: () => JSON.stringify(s),
-  back: () => closeTop(BACK_LAYERS.filter(l => l.id === 'swarm-dossier' || l.id === 'boonpick')),
+  back: () => closeTop(BACK_LAYERS.filter(l => l.id === 'swarm-dossier')),
   backLabel: () => t('side.summary.back'),
   dev: () => ({ active: sectorDevActive, fog: sandboxConfig.fog, reveal: vision === null }),
   finishDev: () => { s.match = { ...s.match, status: 'ended', winner: ME }; awardSectorRun(); tickRunSave(performance.now()); },
@@ -530,12 +530,6 @@ for (const handle of (listeners.get(getEl('devline')) ?? {}).click ?? [])
   handle({ target: { closest: selector => selector === '[data-swarm-intel]' ? ({ dataset: { swarmIntel: '1' } }) : null } });
 assert.equal(getEl('swarm-dossier').classList.contains('show'), true);
 assert.ok(getEl('swarm-dossier-body').innerHTML.length > 0);
-getEl('boonpick').classList.add('show'); // a wave offers a boon over the open dossier
-const beforeBoonBack = mod.exports.state();
-mod.exports.back();
-assert.equal(getEl('boonpick').classList.contains('show'), false, 'Back defers the upper boon offer');
-assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'the dossier stays underneath');
-assert.equal(mod.exports.state(), beforeBoonBack, 'deferring keeps the earned boon');
 await click('swarm-dossier-close');
 assert.equal(getEl('swarm-dossier').classList.contains('show'), false);
 dossierMedia.matches = true;
@@ -560,10 +554,6 @@ mod.exports.dossierProbe(0);
 await click('swarm-dossier-close');
 mod.exports.back();
 assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'a docked dossier does not consume Back');
-getEl('boonpick').classList.add('show');
-mod.exports.back();
-assert.equal(getEl('boonpick').classList.contains('show'), false);
-assert.equal(getEl('swarm-dossier').classList.contains('show'), true);
 dossierMedia.matches = false;
 mod.exports.repaintDossier();
 assert.equal(getEl('swarm-dossier').classList.contains('show'), false, 'resize restores the compact modal');
@@ -576,7 +566,6 @@ assert.deepEqual(saved.shipLoadouts.cruiser, ['ion_engine']);
 assert.equal(Object.values(saved.state.heroes).filter(h => h.owner === 'p1').length, 1);
 const pausedAt = saved.state.time;
 for (let i = 0; i < 12 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
-assert.equal(getEl('boonpick').classList.contains('show'), false);
 await click('sz-weak'); // next attempt only
 await click('sz-new');
 assert.equal(getEl('sz-confirm').hidden, false);

@@ -259,7 +259,6 @@ import { chapterMapView } from '../../decisions/chapterMap';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
-import { boonOffer } from '../../decisions/waveBoons';
 import {
   RUN_SAVE_VERSION,
   parseRunSave,
@@ -287,7 +286,6 @@ import {
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
-import { takeBoon } from '../../decisions/actions';
 import {
   authOutcome,
   shouldRegister,
@@ -517,7 +515,7 @@ import {
 // `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
-import { initTechTree, branchLabel, techFx } from './techTree';
+import { initTechTree, branchLabel } from './techTree';
 import { initBuildScreen, type UnitCatalogTab } from './buildScreen';
 import { initSciPick, sciCouncilRowHtml } from './sciPick';
 import { initPasswordReset } from './passwordReset';
@@ -1362,9 +1360,6 @@ let setupSpeed = 10;
 let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
 /** Глава, на которой идёт ТЕКУЩИЙ забег (в отличие от выбранной для следующего). */
 let sectorMission = 0;
-/** Номер волны, на котором игрок нажал «Позже» (PVR-1.4). Долг при этом НЕ сгорает —
- *  окно просто не лезет поверх боя до следующей волны. `-1` = не откладывали. */
-let boonLaterAtWave = -1;
 let lastPanelHtml = '';
 let lastCmdHtml = '';
 let lastSplitHtml = '';
@@ -1480,6 +1475,7 @@ devlineEl.addEventListener('click', (event) => {
     return;
   }
   if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
+  if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
   if (!(event.target as Element).closest('[data-swarm-intel]')) return;
   swarmDossierWin.classList.add('show');
   renderSwarmDossier();
@@ -11030,24 +11026,6 @@ let setupReturn: 'welcome' | 'hub' = 'welcome';
 // Окно живёт в `sciPick.ts` (REFM-18); здесь только проводка. Список выбранных —
 // `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 const sciWin = $('scipick');
-// Окно усиления между волнами (PVR-1.4).
-const boonWin = $('boonpick');
-const boonPickBody = $('boonpickbody');
-let lastBoonBody = '';
-boonWin.addEventListener('click', (ev) => {
-  const target = ev.target as Element;
-  if (target.closest('[data-boonlater]')) {
-    boonLaterAtWave = s.pve?.waveNumber ?? -1;
-    boonWin.classList.remove('show');
-    return;
-  }
-  const card = target.closest('[data-boon]');
-  if (!card) return;
-  const tech = card.getAttribute('data-boon');
-  // Приказ идёт ОБЫЧНЫМ путём игрока: в сети он уехал бы на сервер, и проверяет его
-  // ядро. Клиент тут не выдаёт технологию, он её просит.
-  if (tech) playerOrder(takeBoon(ME, tech));
-});
 const setupCouncilEl = $('setupcouncil');
 function renderSetupCouncil(): void {
   setupCouncilEl.innerHTML = sciCouncilRowHtml(setupScientists, data);
@@ -11307,7 +11285,6 @@ function startPvEMatch(dev = false): void {
   // Seed the PvE section through the kernel before the first save. A page can
   // close before its first animation frame; that must not lose a fresh attempt.
   apply(advance(s, s.time + 1));
-  boonLaterAtWave = -1;
   // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
   // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
   applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
@@ -12920,15 +12897,6 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'solo-replace', isOpen: () => flexed('solo-replace'), close: closeSoloReplace }, // z60
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp?.close() }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
-  // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
-  {
-    id: 'boonpick',
-    isOpen: () => shown('boonpick'),
-    close: () => {
-      boonLaterAtWave = s.pve?.waveNumber ?? -1;
-      hide('boonpick');
-    },
-  }, // z60
   { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
   { id: 'swarm-dossier', isOpen: () => !swarmDossierPinned && shown('swarm-dossier'), close: closeSwarmDossier }, // z60 modal only
   { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
@@ -13100,48 +13068,6 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
   }
 });
-
-/**
- * Окно усиления между волнами (PVR-1.4).
- *
- * Что предложить, решает `/decisions/waveBoons.ts`; кому и сколько должно — ядро
- * (`state.pve.boons`), и оно же проверяет выбор. Здесь только показ: собрать карточки,
- * открыть окно, когда долг появился, и закрыть, когда предлагать нечего.
- *
- * Окно НЕ блокирующее: «Позже» прячет его до следующей волны, а долг остаётся. Забег
- * идёт в реальном времени, и модальное окно поверх подходящего штурма отняло бы у
- * игрока ровно те секунды, ради которых он это усиление и берёт.
- */
-function renderBoonPick(): void {
-  const pve = s.pve;
-  const cfg = data.modes[matchMode() ?? '']?.pve;
-  const offer = boonOffer({
-    owed: pve?.boons?.[ME] ?? 0,
-    pool: cfg?.boons ?? [],
-    completed: s.players[ME]?.technologies?.completed ?? [],
-  });
-  const deferred = offer.kind === 'offer' && boonLaterAtWave === (pve?.waveNumber ?? -1);
-  const show = inMatch() && offer.kind === 'offer' && !deferred;
-  boonWin.classList.toggle('show', show);
-  if (!show) return;
-  const cards = offer.choices
-    .map((id) => {
-      const td = data.technologies[id];
-      if (!td) return '';
-      return (
-        `<button class="sp-card" type="button" data-boon="${esc(id)}">` +
-        `<span class="sp-cn">${esc(tData(td.name))}</span>` +
-        `<span class="sp-ci">${techFx(td)}</span>` +
-        `</button>`
-      );
-    })
-    .join('');
-  const body = `<p class="bp-owed">${t('win.boon.owed', { n: offer.owed })}</p><div class="bp-list">${cards}</div>`;
-  if (body !== lastBoonBody) {
-    boonPickBody.innerHTML = body;
-    lastBoonBody = body;
-  }
-}
 
 // The normal skirmish slot is independent of Sector Zero and the tutorial.
 const soloStore = soloSaveStore();
@@ -13590,7 +13516,6 @@ function restoreRun(): boolean {
   }
   pveDifficulty = parseRunDifficulty(save.difficulty);
   setRunActive(true);
-  boonLaterAtWave = -1;
   sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
   sectorMission = save.sectorZeroMission ?? sectorMission;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
@@ -13650,7 +13575,6 @@ function restorePortable(): boolean {
   pveDifficulty = parseRunDifficulty(save.difficulty);
   setRunActive(true);
   sectorDevActive = false;
-  boonLaterAtWave = -1;
   sectorAttempt = save.attempt ?? sectorProgress.nextAttempt;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
     saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
@@ -13761,7 +13685,6 @@ function frame(nowReal: number) {
   // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
   tickSoloSave(nowReal);
-  renderBoonPick();
   renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   const wave = waveReadout(s.pve, s.time);
@@ -13792,7 +13715,9 @@ function frame(nowReal: number) {
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
     (s.pve && !swarmDossierPinned ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
-    `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
+    // Суверены — приманка (заказ владельца 2026-09-23): кнопка с «+», золотом и бликом.
+    // Нажатие поведёт в магазин Суверенов; пока магазина нет — честная подсказка.
+    `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.aria', { n: kfmt(SOVEREIGNS) })}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em aria-hidden="true">+</em></button>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
     lastClockText = statusHtml;

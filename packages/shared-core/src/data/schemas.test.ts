@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.27'); // SIEGE-1: the siege unit is gone, its role is the siege_platform module; ROS-SUP-1: support trait (owner, 2026-09-23)
+    expect(data.version).toBe('0.1.28'); // run boons between waves cut: no boon pool, no boon_* techs (owner, 2026-09-23)
     expect(data.resources).toContain('microelectronics');
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
