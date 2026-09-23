@@ -21,7 +21,8 @@ import { esc } from './format';
 import type { RunSummary } from '../../decisions/sectorZeroProgress';
 
 /** Что игрок выбрал на панели: сыграть ещё или уйти в меню. */
-export type EndAction = 'again' | 'menu';
+/** `replay` — новая попытка той же главы Sector Zero, мимо меню (итоги забега). */
+export type EndAction = 'again' | 'menu' | 'replay';
 
 /** Итог матча глазами клиента — его ставит `checkEnd`. */
 export interface MatchEnd {
@@ -113,7 +114,10 @@ export function endScreenHtml(
     `</div>` +
     xpLine +
     `<div class="es-acts">` +
-    `<button class="es-btn primary" data-es="again">${againLabel}</button>` +
+    // Повтор главы — только у засчитанного забега Sector Zero: у dev-забега разбивки нет.
+    (end.runSummary ? `<button class="es-btn primary wide" data-es="replay">↻ ${t('sector-zero.end.replay')}</button>` : '') +
+    // Главная кнопка одна: при повторе главы «подготовка» становится второстепенной.
+    `<button class="es-btn${end.runSummary ? '' : ' primary'}" data-es="again">${againLabel}</button>` +
     `<button class="es-btn" data-es="menu">⌂ ${t('end.to-menu')}</button>` +
     `<button class="es-btn ghost" data-es="board">${t('end.board')}</button>` +
     `</div></div>`
@@ -216,7 +220,7 @@ export function initEndScreen(host: EndScreenHost): { render: () => void } {
     const wasNet = host.net();
     host.clearEnd(); // уходим из законченного матча — итог не должен всплыть над хабом
     lastHtml = '';
-    host.onLeave(which === 'again' ? 'again' : 'menu', wasNet);
+    host.onLeave(which === 'again' || which === 'replay' ? which : 'menu', wasNet);
   });
 
   return { render };

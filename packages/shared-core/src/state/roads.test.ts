@@ -15,6 +15,8 @@ import {
 } from './mosaic';
 import { FORK_AT, FORK_DETOUR, deriveRoads, type RoadInput } from './roads';
 import type { PlanetRoads, RoadPoint } from './gameState';
+import { createKernel } from '../kernel/kernel';
+import { deepClone } from '../util/clone';
 
 /**
  * ROADS-1 — the road network (`docs/roads-roadmap.md` §0.3).
@@ -258,6 +260,22 @@ describe('ROADS-1 — сеть приезжает в состояние', () => 
       if ((p.links ?? []).length === 0) expect(p.roads).toBeUndefined();
       else expect(Object.keys(p.roads!.crossings).sort()).toEqual([...p.links!].sort());
     }
+  });
+
+  it('ROADS-7: сеть за партию не меняется — шаг ядра делит её, а не копирует', () => {
+    const map = parseMatchMap(JSON.parse(readFileSync(new URL('pve-1.json', mapsDir), 'utf8')));
+    const state = buildStateFromMap(map, data);
+    const ids = Object.keys(state.planets).filter((id) => state.planets[id]!.roads);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids)
+      expect(deepClone(state).planets[id]!.roads).toBe(state.planets[id]!.roads);
+    // Шаг ядра — тот же клон: новое состояние делит сеть со старым, и вход не тронут.
+    const before = JSON.stringify(state);
+    const r = createKernel([]).advanceTo(state, { now: state.time + 3_600_000, data });
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state).not.toBe(state);
+    for (const id of ids) expect(r.state.planets[id]!.roads).toBe(state.planets[id]!.roads);
+    expect(JSON.stringify(state)).toBe(before);
   });
 
   it('та же карта — та же сеть, байт в байт', () => {

@@ -1,6 +1,6 @@
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
-import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, snapToFork } from '../../packages/shared-core/src/index';
+import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierHtml } from './swarmDossier';
@@ -786,6 +786,8 @@ import {
   lanePieces,
   roadHeading,
   roadStrokes,
+  type ForkMark,
+  type NetPoint,
 } from '../../decisions/roadNetwork';
 import { ambushOf } from '../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from '../../packages/client/src/forkMark';
@@ -1877,7 +1879,29 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
 let galaxyOutline: Array<{ x: number; y: number }> = [];
 let mapNodeSpacing = mapSpacing(MAP);
+/**
+ * ROADS-7: рисунок сети дорог — штрихи и отметки развилок — меняется только вместе с
+ * топологией (временный коридор героя бьёт `state.topology`), а статический слой во время
+ * движения камеры рисуется КАЖДЫЙ кадр. Пересчёт сети на каждом кадре стоил ~3 мс кадра на
+ * frontier-50; теперь она считается раз на топологию и сбрасывается вместе с геометрией
+ * карты. Объявлено здесь, выше первого вызова `installMapGeometry`: иначе сброс при
+ * инициализации модуля упал бы на временной мёртвой зоне.
+ */
+let roadDrawing: { topology: number; strokes: NetPoint[][]; marks: ForkMark[] } | null = null;
+function roadDrawingOf(state: GameState): { strokes: NetPoint[][]; marks: ForkMark[] } {
+  const topology = state.topology ?? 0;
+  if (roadDrawing?.topology !== topology) {
+    roadDrawing = {
+      topology,
+      strokes: roadStrokes(state.planets),
+      marks: forkMarks(state.planets),
+    };
+  }
+  return roadDrawing;
+}
+
 function installMapGeometry(state: GameState): void {
+  roadDrawing = null; // другая карта — другая сеть
   MAP = mapNodesFromState(state);
   mapNodeSpacing = mapSpacing(MAP);
   terrainGeometry.clear();
@@ -4683,7 +4707,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // без дороги) — чистое решение `decisions/roadNetwork.ts`; здесь проекция и отсев.
   const M = 1 + g.lineWidth;
   g.beginPath();
-  for (const line of lod.provinceDetail > 0 ? roadStrokes(s.planets) : []) {
+  for (const line of lod.provinceDetail > 0 ? roadDrawingOf(s).strokes : []) {
     const pts = line.map((p) => world(p));
     let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
     for (const p of pts) {
@@ -4702,7 +4726,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // чем рисовать — общий с клиентом `drawForkMark`.
   if (lod.provinceDetail > 0) {
     g.fillStyle = rgba('#96b9c3', 0.55 * lod.provinceDetail);
-    for (const m of forkMarks(s.planets)) {
+    for (const m of roadDrawingOf(s).marks) {
       const c = world(m.at);
       if (c.x < -6 || c.x > VW + 6 || c.y < -6 || c.y > VH + 6) continue;
       drawForkMark(g, c.x, c.y);
@@ -9581,7 +9605,7 @@ const endScreenPanel = initEndScreen({
     // свой #spotlight поверх хаба и следующего матча.
     activeTour?.stop();
     if (!wasNet && isSectorZeroRun()) {
-      openSectorZero(which === 'again');
+      openSectorZero(which === 'again', which === 'replay');
       return;
     }
     if (which === 'again') {
@@ -11171,6 +11195,9 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   // снимает режим предыдущего матча: без сброса PvE-волны утекли бы в следующую соло-игру.
   setMatchMode(modeId);
   s = state;
+  // ROADS-7: состояние из сохранения прошло через JSON и потеряло метку разделяемой сети
+  // дорог — без неё каждый шаг мира копировал бы всю сеть заново.
+  shareRoadNetwork(s.planets);
   installMapGeometry(s);
   syncPlayerNames(s);
   ME = 'p1';
@@ -13408,7 +13435,10 @@ const sectorZeroMenu = initSectorZeroMenu({
   },
 });
 
-function openSectorZero(preparation = false): void {
+/** `replay` — сразу новая попытка той же главы (кнопка итогов «Сыграть главу снова»). Идёт
+ *  через открытие меню: оно засчитывает и стирает закончившийся забег, и только потом
+ *  стартует новый — тем же путём, что кнопка «Новый забег». */
+function openSectorZero(preparation = false, replay = false): void {
   saveSolo();
   speed = 0;
   userClosed = true;
@@ -13427,8 +13457,15 @@ function openSectorZero(preparation = false): void {
   showConnect(false);
   showHub(false);
   endscreenEl.style.display = 'none';
+  const chapter = sectorMission;
   detach('Sector Zero menu', sectorZeroMenu.open().then(() => {
     if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open();
+    if (replay && sectorZeroMenu.isOpen()) {
+      nextSectorMission = chapter;
+      writeRaw('void.pveMission', String(chapter));
+      sectorZeroMenu.hide();
+      startPvEMatch();
+    }
   }));
 }
 /** Реальное время последней записи. Снимок пишется НЕ каждый кадр: он весит десятки
