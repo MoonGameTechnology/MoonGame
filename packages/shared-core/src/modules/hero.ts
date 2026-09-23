@@ -844,6 +844,9 @@ export const heroModule: GameModule = {
     };
     api.on('fleet.transit', followShip);
     api.on('fleet.arrived', followShip);
+    // ROADS-2: past a province's world by its fork — the ship is in that province all the
+    // same, and the hero rides with it (ability origin, the capital check).
+    api.on('fleet.fork', followShip);
 
     // Respawn: the hero re-forms as a fresh one-ship fleet at its capital (`home`) if
     // still held, else its last node, else any world the player holds. Homeless — or

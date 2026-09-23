@@ -482,6 +482,13 @@ export const SectorTypeDefSchema = z.object({
    *  game entity behind them (`map-terrain-regions-concept.md` §1), so the core must
    *  never key off a region's name — a rule that did would force regions into the state. */
   family: z.string().optional(),
+  /** How many ROADS leave a world of this terrain (ROADS-1, `docs/roads-roadmap.md` §0.3).
+   *  Open space sends a straight road to every neighbour; a dense field funnels its
+   *  neighbours into a few trails that fork further out, and a fork is where a fleet can
+   *  be caught. Absent = one road per neighbour. A count, not a list: which neighbours
+   *  share a trail is decided by geometry (the widest angular gaps between them split the
+   *  trails), so a map edit can never leave a stale assignment behind. */
+  corridors: z.number().int().positive().optional(),
   /** Passive per-hour output an OWNED sector of this terrain yields, mirroring
    *  `PlanetTypeDefSchema.baseOutput` (a metal-rich asteroid cluster is worth taking
    *  even though nothing can be built on it). Added by `sectorModule` into the

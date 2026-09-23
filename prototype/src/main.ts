@@ -1,6 +1,6 @@
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
-import { hashJson } from '../../packages/shared-core/src/index';
+import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierHtml } from './swarmDossier';
@@ -770,7 +770,8 @@ import {
   ringShown,
   slotAngle,
 } from './orbitRing';
-import { routeShown, routeStops, routeStroke } from '../../decisions/fleetRoute';
+import { routeShown, routeStroke } from '../../decisions/fleetRoute';
+import { lanePieceT, lanePieces, roadStrokes } from '../../decisions/roadNetwork';
 import { fleetOrigin } from './fleetOrigin';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
@@ -2070,7 +2071,11 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
 /** Где флот НАХОДИТСЯ по правилам, в МИРОВЫХ координатах — правила и вся интерполяция
  *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
 function fleetPos(f: Fleet): { x: number; y: number } | null {
-  return fleetOrigin(f, s.time, (id) => s.planets[id]?.position ?? null);
+  // По ДОРОГЕ лейна (ROADS-2) — тем же счётом, что ядро (`fleetPositionAt`).
+  return fleetOrigin(f, s.time, (id) => s.planets[id]?.position ?? null, (from, to, t) => {
+    const road = laneRoad(s, from, to);
+    return road ? pointAlong(road, t) : null;
+  });
 }
 /** Где сейчас БАЗА вылета — космопорт мира или носитель. Точка живая (правило 2
  *  `strikeTrail.ts`): носитель волен уйти, пока челноки летят. */
@@ -2244,19 +2249,12 @@ function toast(msg: string, at?: string): void {
 
 /** The map node a fleet occupies / is travelling over / is parked nearest to. */
 function fleetNode(f: Fleet): string | null {
-  if (f.location) return f.location;
-  if (f.movement) {
-    // The node the ship is NEAREST to right now — tracks it along the leg, not the
-    // destination (so its radar/identify anchor follows the fleet).
-    const m = f.movement;
-    const span = m.arrivesAt - m.departedAt;
-    const prog = span > 0 ? Math.min(1, Math.max(0, (s.time - m.departedAt) / span)) : 1;
-    const s0 = m.startT ?? 0;
-    const t = s0 + ((m.endT ?? 1) - s0) * prog;
-    return t <= 0.5 ? m.from : m.to;
-  }
-  if (f.edge) return f.edge.t <= 0.5 ? f.edge.from : f.edge.to;
-  return null;
+  // The node the ship is NEAREST to right now — tracks it along the leg, not the
+  // destination (so its radar/identify anchor follows the fleet). The core's rule
+  // (`fleetNodeAt`), not a copy: with roads (ROADS-2) "nearest" is the province the
+  // ship is IN — split by the border crossing, not by half the lane — and a second copy
+  // of that rule would anchor the radar in the wrong province near every fork.
+  return fleetNodeAt(s, f, s.time);
 }
 
 /** The closest point ON a lane to a screen point: which lane (`from`,`to`), the
@@ -2277,10 +2275,25 @@ function nearestLanePoint(
     ...world(p.position),
     links: p.links ?? [],
   }));
-  // Прижатие к отрезку и выбор ближайшей трассы — `pointerPick.ts` (REFM-128).
-  const hit = nearestSegment(lanes(nodes), (l) => ({ a: l.from, b: l.to }), mx, my, maxPx);
+  // Прижатие к отрезку и выбор ближайшей трассы — `pointerPick.ts` (REFM-128). Трасса —
+  // ДОРОГА (ROADS-2): ловим нарисованную ломаную по кускам, а долю переводим в долю всей
+  // дороги лейна — ею ядро и держит точку стоянки (`roadNetwork.ts`).
+  const pieces = lanes(nodes).flatMap((l) => {
+    const road = laneRoad(s, l.from.id, l.to.id);
+    return road ? lanePieces(l.from.id, l.to.id, road) : [];
+  });
+  // Доли — по МИРОВОЙ дороге (их знает ядро), экран — только для расстояния до пальца:
+  // доля вдоль отрезка при проекции не меняется.
+  const hit = nearestSegment(pieces, (piece) => ({ a: world(piece.a), b: world(piece.b) }), mx, my, maxPx);
   if (!hit) return null;
-  return { from: hit.seg.from.id, to: hit.seg.to.id, t: hit.at.t, x: hit.at.x, y: hit.at.y };
+  const { from, to } = hit.seg;
+  const raw = lanePieceT(hit.seg, hit.at.t);
+  // У развилки ядро ставит флот НА неё (`snapToFork`, ROADS-3) — туда же и целимся, иначе
+  // прицел обещал бы одну точку, а приказ встал бы в другую.
+  const t = snapToFork(s, from, to, raw);
+  const road = t === raw ? null : laneRoad(s, from, to);
+  const at = road ? world(pointAlong(road, t)) : hit.at;
+  return { from, to, t, x: at.x, y: at.y };
 }
 
 /** For a march to a lane point: which endpoint the fleet routes through and the
@@ -2292,9 +2305,8 @@ function laneAim(
   lane: { from: string; to: string; t: number },
 ): { endId: string; hrs: number } {
   const speed = fleetBaseSpeed(f, data) || 1;
-  const a = s.planets[lane.from]?.position;
-  const b = s.planets[lane.to]?.position;
-  const len = a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  // The lane's ROAD length (ROADS-2): `t` is a share of the road, so is the partial leg.
+  const len = laneRoadLength(s, lane.from, lane.to);
   const toNode = (to: string): number =>
     from === to ? 0 : (estimateTravelHours(s, data, from, to, f) ?? Infinity);
   const hFrom = toNode(lane.from) + (len * lane.t) / speed; // reach `from`, then advance t
@@ -3960,8 +3972,10 @@ function drawFleetRoutes() {
     const start = fleetOriginPx(f);
     if (!start) continue;
     const sel = selFleet === f.id || selFleets.has(f.id);
-    const stops = routeStops(f.movement, (id) => s.planets[id]?.position);
-    const pts = [{ x: start.x, y: start.y }, ...stops.map((p) => world(p))];
+    // Путь впереди — по ДОРОГАМ, тем же правилом развилок, что водит флот ядро
+    // (`roadAhead`, ROADS-2): линия не обещает дорогу, по которой флот не полетит.
+    const ahead = roadAhead(s, f.movement, legT(f.movement, s.time)).slice(1);
+    const pts = [{ x: start.x, y: start.y }, ...ahead.map((p) => world(p))];
     if (pts.length < 2) continue;
     const stroke = routeStroke(sel);
     cx.save();
@@ -4305,16 +4319,35 @@ function drawAimPreview() {
     const routeEndId = routeViaLane(!!laneTarget, from)
       ? laneAim(f, from!, laneTarget!).endId
       : targetId;
-    const hops: Array<{ x: number; y: number }> = [];
-    if (routeNeeded(from, routeEndId)) {
-      const route = planRoute(s, from!, routeEndId!);
-      if (route)
-        for (const hop of route) {
-          const pl = s.planets[hop];
-          if (pl) hops.push(world(pl.position));
-        }
-    }
-    const pts = aimPath(a, hops, laneTarget ? { x: laneTarget.x, y: laneTarget.y } : null, tip);
+    // The march along ROADS (ROADS-2), with the kernel's fork rule (`roadAhead`): through a
+    // fork past a world where the fleet will go round it, and on a lane target the last
+    // stretch along that lane's road to the point — not straight hops between centres.
+    let route: string[] = [];
+    if (routeNeeded(from, routeEndId)) route = planRoute(s, from!, routeEndId!) ?? [];
+    const park =
+      laneTarget && routeEndId
+        ? routeEndId === laneTarget.from
+          ? { to: laneTarget.to, t: laneTarget.t }
+          : { to: laneTarget.from, t: 1 - laneTarget.t }
+        : null;
+    const marchHops = park ? [...route, park.to] : route;
+    const hops =
+      from && marchHops.length > 0
+        ? roadAhead(
+            s,
+            {
+              from,
+              to: marchHops[0]!,
+              path: marchHops.slice(1),
+              endT: legEndT(s, from, marchHops[0]!, marchHops[1], 0, park ? park.t : 1),
+              ...(park ? { parkT: park.t } : {}),
+            },
+            0,
+          )
+            .slice(1)
+            .map((p) => world(p))
+        : [];
+    const pts = aimPath(a, hops, null, tip);
     cx.beginPath();
     cx.moveTo(pts[0]!.x, pts[0]!.y);
     for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i]!.x, pts[i]!.y);
@@ -4610,15 +4643,23 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // холста вместо двух на дорогу. Плюс отсев по рамке: дорога, ОБА конца которой вышли
   // за один и тот же край экрана, пересечь его не может. Запас в лишний пиксель — на
   // толщину штриха, чтобы дорога, касающаяся кромки, не пропала.
+  // ROADS-2: дороги — СЕТЬ, а не прямые: тропы от миров, развилки, переходы на общей
+  // грани. Какими отрезками её рисовать (каждый кусок один раз, прямая — только у лейна
+  // без дороги) — чистое решение `decisions/roadNetwork.ts`; здесь проекция и отсев.
   const M = 1 + g.lineWidth;
   g.beginPath();
-  for (const road of lod.provinceDetail > 0 ? lanes(MAP.filter((n) => !!s.planets[n.id])) : []) {
-    const a = world(road.from);
-    const b = world(road.to);
-    if (Math.max(a.x, b.x) < -M || Math.min(a.x, b.x) > VW + M ||
-      Math.max(a.y, b.y) < -M || Math.min(a.y, b.y) > VH + M) continue;
-    g.moveTo(a.x, a.y);
-    g.lineTo(b.x, b.y);
+  for (const line of lod.provinceDetail > 0 ? roadStrokes(s.planets) : []) {
+    const pts = line.map((p) => world(p));
+    let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
+    for (const p of pts) {
+      if (p.x < x0) x0 = p.x;
+      if (p.x > x1) x1 = p.x;
+      if (p.y < y0) y0 = p.y;
+      if (p.y > y1) y1 = p.y;
+    }
+    if (x1 < -M || x0 > VW + M || y1 < -M || y0 > VH + M) continue;
+    g.moveTo(pts[0]!.x, pts[0]!.y);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x, pts[i]!.y);
   }
   g.stroke();
 

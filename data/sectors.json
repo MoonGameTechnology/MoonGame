@@ -11,7 +11,8 @@
     "hpBonus": 0.1,
     "scoreValue": 5,
     "maxLinks": 3,
-    "family": "asteroid"
+    "family": "asteroid",
+    "corridors": 2
   },
   "nebula": {
     "name": "Nebula",
@@ -19,7 +20,8 @@
     "hpBonus": 0.05,
     "scoreValue": 3,
     "maxLinks": 4,
-    "family": "nebula"
+    "family": "nebula",
+    "corridors": 2
   },
   "ion_storm": {
     "name": "Ion Storm",
@@ -27,7 +29,8 @@
     "hpBonus": -0.15,
     "scoreValue": 2,
     "maxLinks": 2,
-    "family": "storm"
+    "family": "storm",
+    "corridors": 1
   },
   "dense_nebula": {
     "name": "Dense Nebula",
@@ -35,7 +38,8 @@
     "hpBonus": 0.2,
     "scoreValue": 4,
     "maxLinks": 3,
-    "family": "nebula"
+    "family": "nebula",
+    "corridors": 2
   },
   "solar_flare_zone": {
     "name": "Solar Flare Zone",
@@ -43,7 +47,8 @@
     "hpBonus": -0.25,
     "scoreValue": 6,
     "maxLinks": 4,
-    "family": "storm"
+    "family": "storm",
+    "corridors": 2
   },
   "derelict_graveyard": {
     "name": "Derelict Graveyard",
@@ -51,7 +56,8 @@
     "hpBonus": 0.05,
     "scoreValue": 9,
     "maxLinks": 2,
-    "family": "wreck"
+    "family": "wreck",
+    "corridors": 1
   },
   "deep_void": {
     "name": "Deep Void",
@@ -73,7 +79,8 @@
     "productionByResource": {
       "metal": 0.5
     },
-    "family": "asteroid"
+    "family": "asteroid",
+    "corridors": 1
   },
   "depleted_system": {
     "name": "Depleted System",
@@ -94,6 +101,7 @@
     "hpBonus": 0.2,
     "scoreValue": 8,
     "maxLinks": 2,
-    "family": "asteroid"
+    "family": "asteroid",
+    "corridors": 1
   }
 }

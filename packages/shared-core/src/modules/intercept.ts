@@ -1,5 +1,13 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import { INTERCEPT_TOL, isHostile, laneOccupancy, posAt } from '../util/combat';
+import {
+  INTERCEPT_TOL,
+  isHostile,
+  laneOccupancy,
+  posAt,
+  sameLane,
+  trunkOccupancies,
+  trunkPosAt,
+} from '../util/combat';
 
 /**
  * Schedules a `fleet.intercept` for every hostile fleet whose lane occupancy
@@ -67,27 +75,80 @@ function scanLaneIntercepts(h: HandlerContext, fleetId: string): void {
 }
 
 /**
+ * Meetings on a TRUNK (ROADS-3): the stretch from a world to its trail's fork is shared by
+ * every road on the trail, so fleets bound for different neighbours ride it together, and
+ * its end is the fork every bypass touches. Same analytic solve as on a lane, over each
+ * shared trunk — a fleet parked AT the fork (share 1) therefore meets everyone who
+ * passes it: the owner's ambush («ловят на развилке», `roads-roadmap.md` §0.2). Two
+ * fleets on the SAME lane are the lane detector's to meet (it sees the whole road, trunk
+ * included), so one meeting is never scheduled twice. Scheduled as `fleet.meet`; the
+ * melee module re-validates and fights it.
+ */
+function scanTrunkIntercepts(h: HandlerContext, fleetId: string): void {
+  const fleet = h.state.fleets[fleetId];
+  if (!fleet || fleet.battleId || !fleet.units.some((s) => s.count > 0)) return;
+  const mine = trunkOccupancies(h.state, fleet);
+  if (mine.length === 0) return;
+  const now = h.ctx.now;
+  // Sorted (BF-13): the schedule's tiebreak follows call order.
+  for (const id of Object.keys(h.state.fleets).sort()) {
+    if (id === fleetId) continue;
+    const other = h.state.fleets[id];
+    if (!other || other.battleId || !isHostile(h, fleet.owner, other.owner)) continue;
+    if (!other.units.some((s) => s.count > 0) || sameLane(fleet, other)) continue;
+    const theirs = trunkOccupancies(h.state, other);
+    for (const occA of mine) {
+      for (const occB of theirs) {
+        if (occB.key !== occA.key) continue;
+        const lo = Math.max(occA.t0, occB.t0, now);
+        const hi = Math.min(occA.t1, occB.t1);
+        if (!(hi >= lo)) continue;
+        let tc: number | null = null;
+        if (!occA.moving && !occB.moving) {
+          // Both parked: a meeting only if they stand on the very same point.
+          if (Math.abs(occA.s0 - occB.s0) <= INTERCEPT_TOL) tc = lo;
+        } else {
+          const dLo = trunkPosAt(occA, lo) - trunkPosAt(occB, lo);
+          const dHi = trunkPosAt(occA, hi) - trunkPosAt(occB, hi);
+          if (Math.abs(dLo) <= INTERCEPT_TOL) tc = lo;
+          else if (Math.abs(dHi) <= INTERCEPT_TOL) tc = hi;
+          else if (dLo < 0 !== dHi < 0) {
+            tc = lo + ((hi - lo) * Math.abs(dLo)) / (Math.abs(dLo) + Math.abs(dHi));
+          }
+        }
+        if (tc !== null) h.schedule(tc, 'fleet.meet', { a: fleetId, b: id, trunk: occA.key });
+      }
+    }
+  }
+}
+
+/**
  * Intercept — the lane-crossing DETECTOR (GDD §7.4), split out of the melee
  * combat module along the bus seams. On every leg start / mid-lane park it
  * solves the crossing instant analytically and schedules `fleet.intercept` —
  * the melee `combat` module re-validates and resolves the meeting into a battle
- * when it fires. Degrades gracefully both ways: without this module fleets only
- * collide at nodes (no lane meetings are ever scheduled); without the melee
- * module the scheduled `fleet.intercept` events harmlessly fade (nobody listens).
+ * when it fires. With a road network (ROADS-3) it also meets fleets of different
+ * lanes on a trail's shared trunk and at its fork, as `fleet.meet`. Degrades
+ * gracefully both ways: without this module fleets only collide at nodes (no road
+ * meetings are ever scheduled); without the melee module the scheduled
+ * `fleet.intercept` / `fleet.meet` events harmlessly fade (nobody listens).
  */
 export const interceptModule: GameModule = {
   id: 'intercept',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     // Lane combat: a fleet just began a leg / parked on a lane → look for a hostile
-    // fleet it will cross ON the lane (not only at a node) and schedule the meeting.
+    // fleet it will cross ON the lane (not only at a node), or on a trunk it shares with
+    // another lane, and schedule the meeting.
     api.on('fleet.leg', (event, h) => {
       const { fleetId } = event.payload as { fleetId: string };
       scanLaneIntercepts(h, fleetId);
+      scanTrunkIntercepts(h, fleetId);
     });
     api.on('fleet.parked', (event, h) => {
       const { fleetId } = event.payload as { fleetId: string };
       scanLaneIntercepts(h, fleetId);
+      scanTrunkIntercepts(h, fleetId);
     });
   },
 };

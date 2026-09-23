@@ -3,6 +3,7 @@ import type { GameData } from '../data/schemas';
 import type { Context } from '../action/types';
 import { hoursToMs } from '../action/types';
 import { effectiveStats } from '../util/loadout';
+import { bypassFork, halfRoadLength, passRoadLength } from './roads';
 
 /**
  * Routing + travel-time over the lane graph (map-roadmap.md). The single source
@@ -86,9 +87,13 @@ export function planRoute(
     return [];
   }
   // A search state is a sector PLUS the lane it was entered by, but only where that
-  // can change the answer — i.e. where the sector declares `transit`. Elsewhere one
-  // state per sector, exactly as before.
-  const gated = (id: PlanetId): boolean => (state.planets[id]?.transit?.length ?? 0) > 0;
+  // can change the answer — where the sector declares `transit`, or where a forked
+  // trail lets a fleet pass WITHOUT visiting the world (ROADS-2), so the way on costs a
+  // different length depending on the way in. Elsewhere one state per sector.
+  const forked = (id: PlanetId): boolean =>
+    state.planets[id]?.roads?.trails.some((t) => t.fork !== null) ?? false;
+  const gated = (id: PlanetId): boolean =>
+    (state.planets[id]?.transit?.length ?? 0) > 0 || forked(id);
   const keyOf = (node: PlanetId, from: PlanetId | null): string =>
     gated(node) ? `${node}\u0000${from ?? ''}` : node;
   const nodeOf = new Map<string, PlanetId>();
@@ -105,6 +110,23 @@ export function planRoute(
     if (pairs === undefined || pairs.length === 0) return true; // full interchange
     if (from === null) return true; // departing from where we are parked, not passing through
     return pairs.some(([a, b]) => (a === from && b === to) || (b === from && a === to));
+  };
+
+  // Road lengths are counted PER PROVINCE (ROADS-2), because the way through a forked
+  // province depends on the way in AND the way out. Leaving a province pays the road
+  // inside it — from the world, or from the entry crossing through the fork, or in to
+  // the world and out. Entering a province that cannot be bypassed pays the half-road to
+  // its world right away (one search state per such province, as before); entering a
+  // forked one pays nothing yet — it is settled on leaving, or at the SINK when the
+  // province is the destination. Every step is non-negative, so Dijkstra stays exact,
+  // and on a map without roads the halves add up to the old straight-lane lengths.
+  const SINK = '\u0001';
+  const enterCost = (node: PlanetId, from: PlanetId): number =>
+    forked(node) ? 0 : halfRoadLength(state, node, from);
+  const leaveCost = (node: PlanetId, from: PlanetId | null, to: PlanetId): number => {
+    if (from === null) return halfRoadLength(state, node, to);
+    if (!forked(node)) return halfRoadLength(state, node, to); // the way in was paid on entering
+    return passRoadLength(state, node, from, to);
   };
 
   const dist = new Map<string, number>();
@@ -128,12 +150,15 @@ export function planRoute(
     if (u === null) {
       break;
     }
-    const uNode = nodeOf.get(u)!;
-    if (uNode === toId) {
-      reached = u;
+    if (u === SINK) {
+      reached = prev.get(SINK)!;
       break;
     }
+    const uNode = nodeOf.get(u)!;
     visited.add(u);
+    if (uNode === toId) {
+      continue; // arrived: the journey ends here, its cost is settled at the sink
+    }
     const planet = state.planets[uNode];
     if (!planet) {
       continue;
@@ -157,11 +182,22 @@ export function planRoute(
       if (blockedEdge !== undefined && blockedEdge(uNode, v)) {
         continue; // HERO-CORRIDOR: чужой личный коридор — ребра для нас нет
       }
-      const nd = best + distance(planet.position, vp.position);
+      const nd = best + leaveCost(uNode, uFrom, v) + enterCost(v, uNode);
       const cur = dist.get(vk);
       if (cur === undefined || nd < cur) {
         dist.set(vk, nd);
         prev.set(vk, u);
+      }
+      if (v === toId) {
+        // The destination's world: a forked province still owes the road in from its
+        // crossing (it was not paid on entering). Keyed through the sink so the
+        // cheapest ARRIVAL wins, not the cheapest entry.
+        const total = nd + (forked(v) ? halfRoadLength(state, v, uNode) : 0);
+        const sink = dist.get(SINK);
+        if (sink === undefined || total < sink) {
+          dist.set(SINK, total);
+          prev.set(SINK, vk);
+        }
       }
     }
   }
@@ -179,17 +215,45 @@ export function planRoute(
   return cur === originKey ? path : null;
 }
 
-/** Total lane distance of a route (the hops after `fromId`, in order). */
-export function routeDistance(state: GameState, fromId: PlanetId, route: readonly PlanetId[]): number {
+/**
+ * Total road length of a route (the hops after `fromId`, in order), counted the way a
+ * fleet flies it (ROADS-2): out of `fromId`'s world, through every province on the way —
+ * by its fork when the way in and the way out share a forked trail, else past its world
+ * — and in to the last world. On a map without roads every lane is the straight line and
+ * this is the old sum of lane lengths.
+ *
+ * `entry` is for a fleet that is not at `fromId`'s world but has just ARRIVED in it by
+ * the lane from `entry`: its leg ended at the fork when the next hop shares that trail,
+ * so the road already flown is not counted twice.
+ */
+export function routeDistance(
+  state: GameState,
+  fromId: PlanetId,
+  route: readonly PlanetId[],
+  entry?: PlanetId,
+): number {
+  if (route.length === 0) return 0;
   let total = 0;
-  let cur = state.planets[fromId];
-  for (const hop of route) {
-    const next = state.planets[hop];
-    if (cur && next) {
-      total += distance(cur.position, next.position);
+  let prevId: PlanetId | null = entry ?? null;
+  let cur = fromId;
+  for (let i = 0; i < route.length; i++) {
+    const next = route[i]!;
+    if (!state.planets[cur] || !state.planets[next]) return total;
+    if (i === 0 && prevId !== null) {
+      // Standing at the end of the leg in: at the fork if the way on shares its trail,
+      // otherwise at the world.
+      const fork = bypassFork(state, cur, prevId, next);
+      const xout = state.planets[cur]?.roads?.crossings[next];
+      total += fork && xout ? distance(fork, xout) : halfRoadLength(state, cur, next);
+    } else {
+      total += prevId === null ? halfRoadLength(state, cur, next) : passRoadLength(state, cur, prevId, next);
+      if (prevId !== null) total -= halfRoadLength(state, cur, prevId); // paid on the way in
     }
+    total += halfRoadLength(state, next, cur);
+    prevId = cur;
     cur = next;
   }
+  // The last province was entered to its world above; nothing more to add.
   return total;
 }
 
@@ -245,5 +309,5 @@ export function journeyEtaMs(
   if (!mv.path || mv.path.length === 0) return mv.arrivesAt;
   const speed = fleetBaseSpeed(fleet, ctx.data);
   if (speed <= 0) return mv.arrivesAt;
-  return mv.arrivesAt + hoursToMs(ctx, routeDistance(state, mv.to, mv.path) / speed);
+  return mv.arrivesAt + hoursToMs(ctx, routeDistance(state, mv.to, mv.path, mv.from) / speed);
 }

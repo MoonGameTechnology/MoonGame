@@ -1,4 +1,5 @@
 import type { Fleet, GameState, PlanetId } from './gameState';
+import { crossingT, laneRoad, pointAlong } from './roads';
 
 /** The interpolation parameter along a leg at `now`: how far the fleet sits
  *  within the lane's [0,1] span, honoring the leg's own [startT, endT]
@@ -25,11 +26,12 @@ export function fleetPositionAt(
   if (fleet.location !== null) {
     return state.planets[fleet.location]?.position ?? null;
   }
+  // Along the lane's ROAD (ROADS-2): `t` is the share of the road's length, so the ship
+  // sits where it would be had it flown the forks and the crossing — the point range,
+  // sensors and the drawing all read. A lane without a road is the straight line.
   const lerp = (from: PlanetId, to: PlanetId, t: number): { x: number; y: number } | null => {
-    const a = state.planets[from]?.position;
-    const b = state.planets[to]?.position;
-    if (!a || !b) return null;
-    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+    const road = laneRoad(state, from, to);
+    return road ? pointAlong(road, t) : null;
   };
   const mv = fleet.movement;
   if (mv) return lerp(mv.from, mv.to, legT(mv, now));
@@ -44,7 +46,12 @@ export function fleetPositionAt(
 export function fleetNodeAt(state: GameState, fleet: Fleet, now: number): PlanetId | null {
   if (fleet.location) return fleet.location;
   const mv = fleet.movement;
-  if (mv) return legT(mv, now) <= 0.5 ? mv.from : mv.to;
-  if (fleet.edge) return fleet.edge.t <= 0.5 ? fleet.edge.from : fleet.edge.to;
+  // Which province the ship is in: the border crossing splits the lane (ROADS-2). On a
+  // straight lane that is the midpoint, the rule this used before roads.
+  if (mv) return legT(mv, now) <= crossingT(state, mv.from, mv.to) ? mv.from : mv.to;
+  if (fleet.edge) {
+    const e = fleet.edge;
+    return e.t <= crossingT(state, e.from, e.to) ? e.from : e.to;
+  }
   return null;
 }

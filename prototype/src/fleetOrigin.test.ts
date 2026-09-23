@@ -31,7 +31,14 @@ describe('fleetOrigin', () => {
 
   it('нога покрывает только кусок лейна (startT..endT)', () => {
     const f = {
-      movement: { from: 'alpha', to: 'beta', departedAt: 0, arrivesAt: 1_000, startT: 0.5, endT: 1 },
+      movement: {
+        from: 'alpha',
+        to: 'beta',
+        departedAt: 0,
+        arrivesAt: 1_000,
+        startT: 0.5,
+        endT: 1,
+      },
     };
     expect(fleetOrigin(f, 0, at)).toEqual({ x: 200, y: 100 }); // старт на половине дороги
     expect(fleetOrigin(f, 1_000, at)).toEqual({ x: 300, y: 100 });
@@ -62,6 +69,28 @@ describe('fleetOrigin', () => {
   it('флот без места — null', () => {
     expect(fleetOrigin({}, 0, at)).toBeNull();
     expect(fleetOrigin({ location: null, movement: null }, 0, at)).toBeNull();
+  });
+
+  it('С ДОРОГАМИ точка берётся на дороге лейна по доле её длины (ROADS-2)', () => {
+    // Ядро водит флот по дорогам с развилками; доля `t` — доля длины ДОРОГИ, и точку на
+    // ней знает только она. Прямая между узлами здесь соврала бы у каждой развилки.
+    const calls: Array<[string, string, number]> = [];
+    const onRoad = (from: string, to: string, t: number): OriginPoint => {
+      calls.push([from, to, t]);
+      return { x: 7, y: 9 };
+    };
+    const moving = {
+      movement: { from: 'alpha', to: 'beta', departedAt: 0, arrivesAt: 10, startT: 0.2, endT: 0.6 },
+    };
+    expect(fleetOrigin(moving, 5, at, onRoad)).toEqual({ x: 7, y: 9 });
+    expect(calls.at(-1)![2]).toBeCloseTo(0.4, 12); // 0.2 + (0.6 − 0.2) · ½
+    expect(fleetOrigin({ edge: { from: 'alpha', to: 'beta', t: 0.3 } }, 0, at, onRoad)).toEqual({
+      x: 7,
+      y: 9,
+    });
+    expect(calls.at(-1)).toEqual(['alpha', 'beta', 0.3]);
+    // Стоящий на орбите — по-прежнему центр мира: дорога тут ни при чём.
+    expect(fleetOrigin({ location: 'alpha' }, 0, at, onRoad)).toEqual({ x: 100, y: 100 });
   });
 
   it('возвращает КОПИЮ точки: рисующий не может испортить карту', () => {

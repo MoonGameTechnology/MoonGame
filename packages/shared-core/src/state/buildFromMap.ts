@@ -14,7 +14,8 @@ import {
 } from './gameState';
 import { pairKey } from './diplomacy';
 import { distance } from './route';
-import { mosaicBorders, sealPlan, type MosaicSeed } from './mosaic';
+import { mosaicBorderSegments, mosaicBorders, sealPlan, type MosaicSeed } from './mosaic';
+import { deriveRoads } from './roads';
 
 /**
  * Map-as-content loader (map-roadmap.md M1.2 / M1.3). Turns a validated `MatchMap`
@@ -46,15 +47,24 @@ export interface MapEdges {
  * Degrades rather than crashes without `data`: with no catalogue there are no budgets, so
  * every shared border stays open.
  */
+/** The mosaic's sites for a map — sorted ids, positions, sizes. ONE place builds them,
+ *  because the lanes and the roads (`roads.ts`) must be read off the same mosaic: seeds
+ *  in a different order or scale would be a different diagram. */
+function mosaicSeedsOf(map: MatchMap): MosaicSeed[] {
+  return Object.keys(map.sectors)
+    .sort()
+    .map((id) => {
+      const sec = map.sectors[id]!;
+      return { id, x: sec.position.x, y: sec.position.y, size: sec.size };
+    });
+}
+
 export function matchMapEdges(map: MatchMap, data?: GameData): MapEdges {
   if (map.paths !== undefined) {
     return { paths: map.paths, sealed: [], overBudget: [], derived: false };
   }
   const ids = Object.keys(map.sectors).sort();
-  const seeds: MosaicSeed[] = ids.map((id) => {
-    const sec = map.sectors[id]!;
-    return { id, x: sec.position.x, y: sec.position.y, size: sec.size };
-  });
+  const seeds = mosaicSeedsOf(map);
   const budgetOf = (id: string): number => {
     if (!data) return Number.POSITIVE_INFINITY;
     const sec = map.sectors[id];
@@ -467,6 +477,20 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     sealed[a]!.push(b);
     sealed[b]!.push(a);
   }
+  // The roads inside each province (ROADS-1), read off the same mosaic as the lanes. An
+  // authored `paths` map has no mosaic behind its lanes, so there the road crosses at the
+  // midpoint between the centres.
+  const roads = deriveRoads({
+    sectors: Object.fromEntries(
+      Object.entries(map.sectors).map(([id, sec]) => [
+        id,
+        { x: sec.position.x, y: sec.position.y, ...(sec.terrain ? { terrain: sec.terrain } : {}) },
+      ]),
+    ),
+    lanes: edges.paths,
+    borders: edges.derived ? mosaicBorderSegments(mosaicSeedsOf(map)) : [],
+    corridorsOf: (terrain) => (terrain ? data.sectors[terrain]?.corridors : undefined),
+  });
 
   // Resolve an owner ref (a player id or a slot id) to a concrete player id.
   // `validateMatchMap` already proved the ref is a known player or slot; a slot
@@ -488,6 +512,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       links: [...new Set(links[id])].sort(),
       ...(sealed[id]!.length ? { sealed: [...new Set(sealed[id])].sort() } : {}),
       ...(sec.transit ? { transit: sec.transit.map(([a, b]) => [a, b] as [string, string]) } : {}),
+      ...(roads[id] ? { roads: roads[id] } : {}),
       resources: {},
       buildings: sec.buildings.map((b) => ({
         type: b.type,

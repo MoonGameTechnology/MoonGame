@@ -28,6 +28,12 @@ import { isCapturable } from '../state/sectorKind';
  *
  * Ordered AFTER combat in the module list, so a contested arrival starts its
  * battle first and the guards below then decline to capture.
+ *
+ * ROADS (owner decision 2026-09-23, `roads-roadmap.md` §0.2): a province is taken only
+ * at its CAPTURE POINT — the world: arriving at it or passing through it. A fleet going
+ * round the world by a side road (through the fork of its trail) does not take it — no
+ * `fleet.transit` fires there — and neither does a fleet that stops on the province's
+ * roads, at the fork included (`fleet.parked` is deliberately NOT listened to).
  */
 
 function tryCapture(h: HandlerContext, payload: unknown): void {

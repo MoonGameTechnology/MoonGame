@@ -372,6 +372,13 @@ export interface Planet {
    *  exactly how the drawn map and the travelable map drifted apart in the first place).
    *  Symmetric: if `a` lists `b`, `b` lists `a`. Undefined = nothing sealed. */
   sealed?: PlanetId[];
+  /** The roads inside this province (ROADS-1, `docs/roads-roadmap.md` §0.3): where each
+   *  lane crosses the border and how the trails leaving the world fork towards the
+   *  neighbours. Derived from the mosaic at map build, like `links` and `sealed`, so the
+   *  server and every client read ONE network. Undefined = no road geometry (a state
+   *  built before roads, or a province without lanes) — movement then runs the straight
+   *  lane, the pre-road rule, instead of failing. */
+  roads?: PlanetRoads;
   /** Sector terrain type id (resolved against game data `sectors`); its buffs
    *  /debuffs are applied through hooks. Undefined = plain space, no modifier. */
   terrain?: string;
@@ -502,6 +509,31 @@ export interface FleetMovement {
   /** Journey-wide park fraction carried across hops: when the LAST leg fires it
    *  parks at `parkT` (becomes that leg's `endT`). Absent = arrive at a node. */
   parkT?: number;
+}
+
+/** A point of the road network, in world units. */
+export interface RoadPoint {
+  x: number;
+  y: number;
+}
+
+/** One trail leaving a province's world (ROADS-1). */
+export interface RoadTrail {
+  /** Neighbours this trail leads to, in angular order around the world. */
+  exits: PlanetId[];
+  /** Where the trail splits towards its exits. Null when the trail runs straight (it
+   *  serves one neighbour) or its exits lie so far apart that it runs through the world
+   *  itself — a fork on top of the planet would be a fork in name only. */
+  fork: RoadPoint | null;
+}
+
+/** A province's share of the road network (`Planet.roads`). */
+export interface PlanetRoads {
+  /** Where each lane crosses this province's border, keyed by the neighbour. The same
+   *  point is stored on both sides of the border. */
+  crossings: Record<PlanetId, RoadPoint>;
+  /** The trails leaving the world; every neighbour with a lane is on exactly one. */
+  trails: RoadTrail[];
 }
 
 /** A fleet parked at a continuous point ALONG a lane (it stopped mid-march, or

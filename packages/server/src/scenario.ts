@@ -189,7 +189,14 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '27'; // Added salvage (EVT-2): трофеи победителю боя.
+export const MODULE_MANIFEST_VERSION = '28'; // ROADS-2/3: флоты летают по дорогам, развилка — место встречи.
+// Состав и порядок модулей те же. Бамп — потому что партия, СОЗДАННАЯ после ROADS-1, уже
+// несёт сеть дорог в `Planet.roads`, а летала по прямым: подняв её под новым кодом, мы
+// молча сменили бы ей правила движения, захвата и боя посреди игры. Партии без сети дорог
+// (собранные до ROADS-1) и так летают по прямым — откат по инварианту 3, — но ROADS-3
+// меняет правила и им: бой на дороге больше не втягивает стоящих у мира. Оба кирпича едут
+// под одним номером — 28 ещё не выпущен.
+// export const MODULE_MANIFEST_VERSION = '27'; // Added salvage (EVT-2): трофеи победителю боя.
 // export const MODULE_MANIFEST_VERSION = '26'; // Added swarmJournal: что игрок видел про Рой.
 // export const MODULE_MANIFEST_VERSION = '25'; // Added swarmAdapt: Рой растит уровень модуля.
 // export const MODULE_MANIFEST_VERSION = '24'; // Added swarmMemory: Рой копит наблюдения боёв.
