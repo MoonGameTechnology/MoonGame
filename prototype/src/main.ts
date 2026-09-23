@@ -771,7 +771,15 @@ import {
   slotAngle,
 } from './orbitRing';
 import { routeShown, routeStroke } from '../../decisions/fleetRoute';
-import { lanePieceT, lanePieces, roadStrokes } from '../../decisions/roadNetwork';
+import {
+  forkMarks,
+  lanePieceT,
+  lanePieces,
+  roadHeading,
+  roadStrokes,
+} from '../../decisions/roadNetwork';
+import { ambushOf } from '../../decisions/forkAmbush';
+import { drawAmbushMark, drawForkMark } from '../../packages/client/src/forkMark';
 import { fleetOrigin } from './fleetOrigin';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
@@ -2182,11 +2190,14 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
     let ang = -Math.PI / 2;
     const lane = f.movement ?? f.edge; // heading = along the lane it is on
     if (lane) {
-      const a = s.planets[lane.from]?.position;
-      const b = s.planets[lane.to]?.position;
-      if (a && b) {
-        const wa = world(a);
-        const wb = world(b);
+      // Нос — вдоль КУСКА ДОРОГИ, на котором корабль (ROADS-4, `roadHeading`), а не по
+      // прямой «мир → мир»: на ветке развилки та смотрела бы мимо дороги.
+      const road = laneRoad(s, lane.from, lane.to);
+      const t = f.movement ? legT(f.movement, s.time) : (f.edge?.t ?? 0);
+      const d = road ? roadHeading(road, t) : { x: 0, y: 0 };
+      if (d.x !== 0 || d.y !== 0) {
+        const wa = world(mp);
+        const wb = world({ x: mp.x + d.x, y: mp.y + d.y });
         ang = Math.atan2(wb.y - wa.y, wb.x - wa.x);
       }
     }
@@ -4662,6 +4673,17 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x, pts[i]!.y);
   }
   g.stroke();
+  // ROADS-4: развилка — МЕСТО, а не излом дороги: на ней можно встать, и стоящий там ловит
+  // всю тропу (ROADS-3). Какие отметки ставить — `forkMarks` (`decisions/roadNetwork.ts`),
+  // чем рисовать — общий с клиентом `drawForkMark`.
+  if (lod.provinceDetail > 0) {
+    g.fillStyle = rgba('#96b9c3', 0.55 * lod.provinceDetail);
+    for (const m of forkMarks(s.planets)) {
+      const c = world(m.at);
+      if (c.x < -6 || c.x > VW + 6 || c.y < -6 || c.y > VH + 6) continue;
+      drawForkMark(g, c.x, c.y);
+    }
+  }
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
   if (holographicMapOn()) g.restore();
@@ -5568,6 +5590,9 @@ function render(now: number) {
     const A = fleetAnchor(f);
     if (!A || !visible(A, 120)) continue;
     const col = ownerColor(f.owner);
+    // ROADS-4: флот на развилке — засада (`ambushOf` спрашивает у ядра, стоит ли он РОВНО на
+    // ней): пунктирный ромб цвета владельца под корпусом.
+    if (ambushOf(s, f)) drawAmbushMark(cx, A.x, A.y, rgba(col, 0.85));
     // Aircraft aboard never inflate the combat hull count.
     const { ships } = emblemTally(f.units, [], isShuttle);
     // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
@@ -6337,8 +6362,14 @@ function fleetPanelHtml(f: Fleet): string {
     const restH = restRouteHours(rawRestH, boosted, FORCED_MARCH_MULT);
     h += `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(dest)}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
   } else if (f.edge) {
-    const pct = Math.round(f.edge.t * 100);
-    h += `<div class="row">${t('side.fleet.on-lane', { lane: `<b>${esc(f.edge.from)}–${esc(f.edge.to)}</b>`, p: pct })}</div>`;
+    // ROADS-4: стоит ровно на развилке — засада, и строка говорит, что она сторожит.
+    const ambush = ambushOf(s, f);
+    if (ambush) {
+      h += `<div class="row">${t('side.fleet.ambush', { planet: `<b>${esc(ambush.province)}</b>`, exits: ambush.exits.map(esc).join(', ') })}</div>`;
+    } else {
+      const pct = Math.round(f.edge.t * 100);
+      h += `<div class="row">${t('side.fleet.on-lane', { lane: `<b>${esc(f.edge.from)}–${esc(f.edge.to)}</b>`, p: pct })}</div>`;
+    }
   }
 
   const here = planet(f.location);

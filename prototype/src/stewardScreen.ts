@@ -87,6 +87,8 @@ export function stewLogLine(e: StewardLogEntry): string {
       return t('steward.log.held', { node, pct });
     case 'reinforce':
       return t('steward.log.reinforce', { node, pct });
+    case 'ambush':
+      return t('steward.log.ambush', { node, pct });
     default:
       return `${e.kind}: ${node}`;
   }

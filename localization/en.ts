@@ -2298,6 +2298,7 @@ export const en: Record<string, string> = {
   'effect.hunger': 'hunger: −25% ground damage',
   'effect.point-defense': 'area defense {n}',
   'side.fleet.in-orbit': 'in orbit',
+  'side.fleet.ambush': '⟟ ambush at the {planet} fork · catches all traffic toward {exits}',
   'side.fleet.on-lane': '⟜ holding on the {lane} lane · {p}% across',
   'side.fleet.repair.dock.title': 'Express repair at your own dock for metal',
   'side.fleet.repair.instant.title': 'Instant full-hull repair for credits',
@@ -2437,6 +2438,7 @@ export const en: Record<string, string> = {
     'Research it in the technology window — then you can hand your seat to the AI while you sleep.',
   'steward.locked.where':
     'The <b>Command</b> branch, opens on <b>Day 16</b> for the <b>Overseer</b> scientist (now day {day}).',
+  'steward.log.ambush': '⟟ Ambush set at the {node} fork: forecast losses {pct}%',
   'steward.log.ago': '{dur} ago',
   'steward.log.counter': '⚔ Counterstrike at {node}: loss forecast {pct}%',
   'steward.log.evac':

@@ -90,7 +90,16 @@ describe('хранитель — счётчики и формат', () => {
 
 describe('хранитель — журнал вахты', () => {
   it('каждый известный вид решения получает свою строку', () => {
-    for (const kind of ['evac', 'ferry', 'stranded', 'strike', 'watch', 'hold', 'reinforce']) {
+    for (const kind of [
+      'evac',
+      'ferry',
+      'stranded',
+      'strike',
+      'watch',
+      'hold',
+      'reinforce',
+      'ambush',
+    ]) {
       const line = stewLogLine({ kind, node: 'KRONOS-2', fraction: 0.5, count: 3, to: 'ARES-1' });
       expect(line, kind).not.toContain('steward.log'); // ключ наружу не течёт
       expect(line, kind).toContain('KRONOS-2');

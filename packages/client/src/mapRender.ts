@@ -11,6 +11,9 @@
  */
 import { drawFleetCount, fleetCountWidth } from './fleetCountBadge';
 import { emblemTally } from '../../../decisions/fleetTally';
+import { forkMarks, roadStrokes } from '../../../decisions/roadNetwork';
+import { ambushOf } from '../../../decisions/forkAmbush';
+import { drawAmbushMark, drawForkMark } from './forkMark';
 import { effectiveStats, fleetPositionAt, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
@@ -132,27 +135,32 @@ export function renderMap(
     if (selected) drawProvinceSelection(g, selected.poly);
   }
 
-  // Star lanes (each undirected edge once), over the territory fill.
+  // Roads (ROADS-4), over the territory fill: the road NETWORK the core flies fleets along —
+  // trails, forks, crossings on the shared border — each piece once (`roadStrokes`, the same
+  // decision the prototype draws with). Straight lanes here put ships off the drawn lines,
+  // since `fleetPositionAt` already walks the roads; a lane without roads is still the
+  // straight line (the core's own fallback).
   g.lineWidth = 0.7;
   g.strokeStyle = rgba(theme.cyan, 0.28 * lod.provinceDetail);
-  const drawn = new Set<string>();
   g.beginPath();
-  for (const p of planets) {
-    const a = worldToScreen(p.position, cam, vp, bounds);
-    for (const nId of p.links ?? []) {
-      const key = p.id < nId ? `${p.id}|${nId}` : `${nId}|${p.id}`;
-      if (drawn.has(key)) continue;
-      drawn.add(key);
-      const n = state.planets[nId];
-      if (!n) continue;
-      const b = worldToScreen(n.position, cam, vp, bounds);
-      if (Math.max(a.x, b.x) < vp.left || Math.min(a.x, b.x) > vp.right ||
-        Math.max(a.y, b.y) < vp.top || Math.min(a.y, b.y) > vp.bottom) continue;
-      g.moveTo(a.x, a.y);
-      g.lineTo(b.x, b.y);
-    }
+  for (const line of roadStrokes(state.planets)) {
+    const pts = line.map((p) => worldToScreen(p, cam, vp, bounds));
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    if (Math.max(...xs) < vp.left || Math.min(...xs) > vp.right ||
+      Math.max(...ys) < vp.top || Math.min(...ys) > vp.bottom) continue;
+    g.moveTo(pts[0]!.x, pts[0]!.y);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x, pts[i]!.y);
   }
   g.stroke();
+  // Forks — a place, not a bend: standing on one catches everyone on its trail (ROADS-3).
+  if (lod.provinceDetail > 0) {
+    g.fillStyle = rgba(theme.cyan, 0.55 * lod.provinceDetail);
+    for (const mark of forkMarks(state.planets)) {
+      const c = worldToScreen(mark.at, cam, vp, bounds);
+      if (inView(c, vw, vh, 6)) drawForkMark(g, c.x, c.y);
+    }
+  }
 
   // Planet nodes — a holographic sphere + owner aura + a floating type badge + id label.
   const R = 8;
@@ -236,6 +244,7 @@ export function renderMap(
     const c = worldToScreen(pt, cam, vp, bounds);
     if (!inView(c, vw, vh, 24)) continue;
     const col = colors.get(f.owner) ?? theme.cyan;
+    if (ambushOf(state, f)) drawAmbushMark(g, c.x, c.y, col);
     if (lod.detail > 0) blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5 * lod.detail);
     const dom = dominantUnit(f.units, opts.data);
     const shape = dom && unitShape(dom.def, dom.unit, state.players[f.owner]?.faction);

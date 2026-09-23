@@ -2304,6 +2304,7 @@ export const ru: Record<string, string> = {
   'effect.hunger': 'голод: −25% наземный урон',
   'effect.point-defense': 'зональное ПВО {n}',
   'side.fleet.in-orbit': 'на орбите',
+  'side.fleet.ambush': '⟟ засада на развилке {planet} · ловит всех на тропе к {exits}',
   'side.fleet.on-lane': '⟜ стоит на трассе {lane} · {p}% пути',
   'side.fleet.repair.dock.title': 'Экспресс-ремонт у своего дока за металл',
   'side.fleet.repair.instant.title': 'Мгновенный ремонт всего корпуса за кредиты',
@@ -2445,6 +2446,7 @@ export const ru: Record<string, string> = {
     'Изучите его в окне технологий — затем сможете передать место ИИ на время сна.',
   'steward.locked.where':
     'Ветка <b>Командование</b>, открывается в <b>День 16</b> учёному <b>Куратор</b> (сейчас день {day}).',
+  'steward.log.ambush': '⟟ Засада на развилке у {node}: прогноз потерь {pct}%',
   'steward.log.ago': '{dur} назад',
   'steward.log.counter': '⚔ Контрудар у {node}: прогноз потерь {pct}%',
   'steward.log.evac': '🏃 Эвакуация с {node} → {to}: прогноз потерь {pct}%, крыльев уведено: {n}',

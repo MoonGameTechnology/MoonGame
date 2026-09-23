@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { lanePieceT, lanePieces, roadStrokes, type NetPlanet } from './roadNetwork';
+import {
+  forkMarks,
+  lanePieceT,
+  lanePieces,
+  roadHeading,
+  roadStrokes,
+  type NetPlanet,
+} from './roadNetwork';
 
 /**
  * Рисунок сети дорог (ROADS-2). Карта руками: у B соседи A и C на одной тропе с
@@ -93,5 +100,53 @@ describe('попадание пальцем по дороге', () => {
     const road = [{ x: 200, y: -150 }, X_AB, F, { x: 0, y: 0 }];
     const second = lanePieces('A', 'B', road)[1]!;
     expect(lanePieceT(second, 0.5)).toBeCloseTo((125 + 42.5) / 270, 12);
+  });
+});
+
+describe('ROADS-4 — развилка видна как место', () => {
+  it('одна отметка на развилку — там, где тропа ветвится, с её соседями', () => {
+    expect(forkMarks(planets)).toEqual([{ province: 'B', at: F, exits: ['A', 'C'] }]);
+  });
+
+  it('тропа без развилки и лейн без дороги отметки не дают', () => {
+    const marks = forkMarks(planets);
+    expect(marks.some((m) => m.exits.includes('D'))).toBe(false);
+    expect(marks.some((m) => m.exits.includes('E'))).toBe(false);
+  });
+
+  it('развилка, у чьей тропы не осталось рисуемых дорог, не рисуется', () => {
+    // Соседей тропы на карте нет (например, партия без них) — значку не над чем висеть.
+    const lonely: Record<string, NetPlanet> = { B: planets.B! };
+    expect(forkMarks(lonely)).toEqual([]);
+  });
+});
+
+describe('ROADS-4 — нос корабля смотрит вдоль дороги, а не по прямой между мирами', () => {
+  // Дорога A→B: A(200,−150) → переход (100,−75) → развилка (60,0) → B(0,0); 125 + 85 + 60.
+  const road = [{ x: 200, y: -150 }, X_AB, F, { x: 0, y: 0 }];
+
+  it('на первом куске — к переходу, на ветке — к развилке, на стволе — к миру', () => {
+    expect(roadHeading(road, 0.1)).toEqual({ x: -0.8, y: 0.6 });
+    const branch = roadHeading(road, 150 / 270);
+    expect(branch.x).toBeCloseTo(-40 / 85, 12);
+    expect(branch.y).toBeCloseTo(75 / 85, 12);
+    expect(roadHeading(road, 0.95)).toEqual({ x: -1, y: 0 });
+  });
+
+  it('ровно на изломе корабль уже повернул; в конце дороги смотрит по последнему куску', () => {
+    expect(roadHeading(road, 210 / 270)).toEqual({ x: -1, y: 0 });
+    expect(roadHeading(road, 1)).toEqual({ x: -1, y: 0 });
+  });
+
+  it('у дороги нулевой длины направления нет', () => {
+    expect(
+      roadHeading(
+        [
+          { x: 5, y: 5 },
+          { x: 5, y: 5 },
+        ],
+        0.5,
+      ),
+    ).toEqual({ x: 0, y: 0 });
   });
 });

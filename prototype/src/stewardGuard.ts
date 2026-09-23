@@ -28,7 +28,15 @@ import {
 } from '../../packages/shared-core/src/index';
 import { findHealthyStack, sumUnitStat } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
-import { act, moveFleet, loadArmy, engageFleet, orderScramble } from '../../decisions/actions';
+import {
+  act,
+  moveFleet,
+  moveFleetEdge,
+  loadArmy,
+  engageFleet,
+  orderScramble,
+} from '../../decisions/actions';
+import { stewardAmbushes } from '../../decisions/stewardAmbush';
 import { data } from './gameData';
 import { ctx } from './protoKernel';
 import { hangarMachines } from '../../packages/shared-core/src/index';
@@ -417,6 +425,30 @@ export function stewardGuardOrders(
           fraction: frac(stand.defender.damageFraction),
         });
       }
+    }
+  }
+  // Засада на развилке (ROADS-6, только «Активная оборона»). Враг, идущий к нашим мирам
+  // МИМО нашей планеты боковой дорогой, стоящих у неё не встречает (решение владельца,
+  // `roads-roadmap.md` §0.2) — встретить его можно только на развилке этой тропы. Кого и
+  // куда послать — `stewardAmbushes` (`decisions/stewardAmbush.ts`); крыло с угрожаемой
+  // провинции или с точки удержания не снимается.
+  if (posture === 'active_defend') {
+    const ambushes = stewardAmbushes(state, ai, c, {
+      identified,
+      busy: (id) => tasked.has(id),
+      guarded: (node) => holdPoints.has(node) || threatsOf(node).length > 0,
+      margin: hoursToMs(c, 2),
+    });
+    for (const plan of ambushes) {
+      out.push(moveFleetEdge(ai, plan.fleetId, { from: plan.node, to: plan.exit, t: plan.t }));
+      tasked.add(plan.fleetId);
+      report.push({
+        at: state.time,
+        kind: 'ambush',
+        node: plan.node,
+        fleetId: plan.fleetId,
+        fraction: frac(plan.fraction),
+      });
     }
   }
   // Дежурная вахта (ST-3.3, только «Активная оборона»): поставить CC-4 на каждый СВОЙ
