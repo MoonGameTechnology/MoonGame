@@ -1,5 +1,6 @@
 /* Sector Zero's own home. The projection is decorative: no running match behind
-   the menu, no animated starfield work, and no new raster asset to load. */
+   the menu and no new raster asset to load. Its motion (PVR-6.8) is CSS-only transforms
+   and opacity — compositor work, no script, stopped entirely under reduced motion. */
 #sector-zero {
   --sz-muted: #91aeb9;
   isolation: isolate;
@@ -56,6 +57,19 @@
 .sz-projection { position: relative; aspect-ratio: 1; width: 100%; color: #8acecd; }
 .sz-projection svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .sz-projection::before { content: ""; position: absolute; inset: 20%; border-radius: 50%; background: radial-gradient(circle, #85d4da14, transparent 70%); box-shadow: 0 0 100px #87e4f010; }
+/* Живое меню (PVR-6.8): кольца орбиты медленно плывут, луч сканера обходит круг, ядро
+   дышит, золотая метка пульсирует. Всё вращается вокруг центра проекции (250, 250). */
+.sz-spin { transform-box: view-box; transform-origin: 250px 250px; animation: sz-spin 140s linear infinite; }
+.sz-spin-scan { animation-duration: 14s; }
+.sz-spin-back { animation-duration: 90s; animation-direction: reverse; }
+.sz-core { animation: sz-breathe 4.5s ease-in-out infinite; }
+.sz-ping { transform-box: fill-box; transform-origin: center; animation: sz-ping 2.8s ease-out infinite; }
+@keyframes sz-spin { to { transform: rotate(360deg); } }
+@keyframes sz-breathe { 50% { opacity: .35; } }
+@keyframes sz-ping { from { transform: scale(.6); opacity: .8; } to { transform: scale(2.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .sz-spin, .sz-core, .sz-ping { animation: none; }
+}
 .sz-bottomline { border-top: 1px solid #24404b; padding-top: 18px; font-size: 10px; }
 #sz-workshop { padding: 28px 0 40px; flex: 1; }
 #sz-workshop h1 { font-size: clamp(22px, 4vw, 32px); color: #e1f4f4; font-weight: 450; margin: 24px 0 8px; }

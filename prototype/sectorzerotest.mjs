@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window, document -- эти имена живут внутри page.evaluate */
+/* global window, document, getComputedStyle -- эти имена живут внутри page.evaluate */
 /**
  * PVR-6.1 — в забеге Sector Zero нет инструментов мультиплеера, а в остальной игре они на месте.
  *
@@ -8,7 +8,7 @@
  * ссылка на рынок из карточки ресурса. Каждая проверка идёт ПАРОЙ: в обычной схватке то же
  * самое обязано быть видно — иначе «кнопки нет» прошло бы и тогда, когда селектор просто
  * устарел. Третий прогон — выход из забега в обычную партию на той же странице: кнопки
- * обязаны вернуться.
+ * обязаны вернуться. Попутно — PVR-6.8: меню анимировано, а при reduced motion замирает.
  *
  *   node prototype/sectorzerotest.mjs      # или pnpm run smoke:sector-zero
  */
@@ -92,6 +92,17 @@ try {
     await page.goto(site.url + '/sz');
     await waitForApp(page);
     await page.waitForFunction(() => !document.getElementById('sz-new').disabled);
+    // PVR-6.8: проекция меню живёт — и замирает, когда игрок просит меньше движения.
+    const motion = () =>
+      page.evaluate(() =>
+        ['.sz-spin-scan', '.sz-core', '.sz-ping'].map(
+          (sel) => getComputedStyle(document.querySelector(sel)).animationName,
+        ),
+      );
+    assert.deepEqual(await motion(), ['sz-spin', 'sz-breathe', 'sz-ping'], 'меню анимировано');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.deepEqual(await motion(), ['none', 'none', 'none'], 'reduced motion — покой');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.locator('#sz-new').click();
     await check('Sector Zero', true);
 

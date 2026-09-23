@@ -3322,20 +3322,20 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
       <div class="sz-projection" aria-hidden="true">
         <svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g stroke="currentColor" stroke-width=".65" opacity=".32">
+          <g class="sz-spin sz-spin-slow" stroke="currentColor" stroke-width=".65" opacity=".32">
             <circle cx="250" cy="250" r="220" stroke-dasharray="2 9"/><circle cx="250" cy="250" r="190"/>
             <path d="M250 15v64m0 342v64M15 250h64m342 0h64M94 94l37 37m238 238 37 37M94 406l37-37m238-238 37-37"/>
             <ellipse cx="250" cy="250" rx="208" ry="75" transform="rotate(-28 250 250)"/>
             <ellipse cx="250" cy="250" rx="170" ry="48" transform="rotate(55 250 250)"/>
           </g>
           <circle cx="250" cy="250" r="131" stroke="currentColor" stroke-width="1.3" opacity=".7"/>
-          <path d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
+          <path class="sz-spin sz-spin-scan" d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
           <ellipse cx="250" cy="250" rx="65" ry="131" stroke="currentColor" opacity=".15"/>
           <ellipse cx="250" cy="250" rx="131" ry="44" stroke="currentColor" opacity=".22"/>
-          <path d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
+          <path class="sz-core" d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
           <path d="m223 304 54-108" stroke="currentColor" opacity=".4"/>
-          <g fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
-          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
+          <g class="sz-spin sz-spin-back" fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
+          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle class="sz-ping" cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
           <path d="M332 397h82l30 30" stroke="#e6b777" opacity=".45"/>
         </svg>
       </div>
