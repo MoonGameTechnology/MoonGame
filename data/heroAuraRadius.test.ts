@@ -81,7 +81,9 @@ describe('лестница радиуса аур — каталог (HERO-AURA-R
     // ауры здесь разводит не `def.branch`, а `parkedBranch` из сырого JSON. Так проверка
     // переживает парковку: сегодня она подтверждает, что узлы общие и без всякой ветки,
     // а в день распарковки снова ловит ровно тот дефект, ради которого написана.
-    const owners = Object.entries(heroesJson as Record<string, { startAbilities?: string[]; parkedBranch?: string }>)
+    const owners = Object.entries(
+      heroesJson as Record<string, { startAbilities?: string[]; parkedBranch?: string }>,
+    )
       .filter(([, def]) => def.startAbilities?.includes('bulwark'))
       .map(([, def]) => def.parkedBranch);
     expect(new Set(owners).size).toBeGreaterThan(1);
@@ -134,6 +136,27 @@ describe('лестница радиуса аур — сверка с карта�
     // и именно этого от абсолютного радиуса и ждут.
     const p = spans(pve);
     expect(ladder[2]).toBeLessThan(p[Math.floor(p.length / 2)]!);
+  });
+});
+
+describe('радиус ПАССИВНЫХ аур (HERO-PASS-R)', () => {
+  // Пассивки — второй, всегда включённый носитель того же обещания «позиция героя решает».
+  // Активные ауры опустили до 42 (HERO-AURA-R), а пассивки остались на 300 — почти
+  // полкарты, — и обещание для них было неправдой. Теперь база общая.
+  const near = Object.entries(data.heroPassives).filter(([, def]) => def.scope === 'ownFleetsNear');
+
+  it('каждая пассивка «рядом» стоит на базе аур или ближе', () => {
+    expect(near.length).toBeGreaterThan(0);
+    for (const [id, def] of near) {
+      expect(def.params.radius, `пассивка ${id}`).toBeLessThanOrEqual(BASE);
+    }
+  });
+
+  it.each(Object.entries(maps))('на карте %s пассивка не достаёт до соседа', (_id, map) => {
+    // Тот же замер, что у активных аур: круг не накрывает НИ ОДНОЙ пары узлов, то есть
+    // работает только там, где герой стоит сам. Лестницы у пассивок нет — `tiers` есть
+    // только у способностей, — поэтому здесь одна ступень, а не три.
+    for (const [, def] of near) expect(reach(map, def.params.radius)).toBe(0);
   });
 });
 
