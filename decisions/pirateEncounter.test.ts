@@ -22,7 +22,9 @@ describe('pirate encounter readout', () => {
 
   it('losing the fleet suggests rebuilding, and restoring a captured base keeps progress', () => {
     const state = run();
-    delete state.fleets.p1_1;
+    // Флотов у игрока на старте два: учебный и стража дома (PVR-2.4). «Флот потерян» —
+    // это когда кораблей не осталось вовсе: со стражей дома к пиратам ещё есть с чем идти.
+    for (const [id, f] of Object.entries(state.fleets)) if (f.owner === 'p1') delete state.fleets[id];
     expect(pirateEncounter(state, 'p1')?.stage).toBe('recover');
     state.planets.pirate_den!.owner = 'p1';
     expect(pirateEncounter(JSON.parse(JSON.stringify(state)), 'p1')?.stage).toBe('won');
