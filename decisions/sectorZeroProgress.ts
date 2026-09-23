@@ -130,7 +130,9 @@ export interface RunSummary {
 }
 
 export const SECTOR_ZERO_PROGRESS_KEY = 'sector-zero.progress.v1';
-export const HERO_UNLOCK_COST = 6;
+/** Покупка героя за данные — запасной путь; главный — награда за главу (`heroRecruits.ts`),
+ *  поэтому цена в несколько забегов, а не в один (решение владельца 2026-09-23). */
+export const HERO_UNLOCK_COST = 18;
 export const MODULE_UNLOCK_COST = 3;
 const GRADES = ['common', 'rare', 'legendary'] as const;
 const STARTER_MODULES = ['cargo_bay', 'ion_engine'];
@@ -148,9 +150,6 @@ export const WARRANTS_PER_REWARD = 5;
 
 export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroProgress {
   const first = data.heroes.commander ? 'commander' : (Object.keys(data.heroes)[0] ?? '');
-  const equipped = (data.heroes[first]?.startAbilities ?? [])
-    .filter((id) => !data.heroAbilities[id]?.type.startsWith('spawn_'))
-    .slice(0, 1);
   return {
     v: 1,
     seed,
@@ -173,8 +172,21 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     modules: STARTER_MODULES.filter((id) => data.modules[id]),
     stars: {},
     loadouts: {},
-    heroes: first ? { [first]: { level: 1, skills: [], equipped } } : {},
+    heroes: first ? { [first]: newSectorHero(first, data) } : {},
     selectedHero: first,
+  };
+}
+
+/** Герой, только что пришедший в отряд: первая ступень, без навыков, с одной стартовой
+ *  способностью (призывы — не в счёт). Один рецепт на все пути прихода: стартовый герой,
+ *  покупка за данные и награда за главу (`heroRecruits.ts`). */
+export function newSectorHero(id: string, data: GameData): SectorHero {
+  return {
+    level: 1,
+    skills: [],
+    equipped: (data.heroes[id]?.startAbilities ?? [])
+      .filter((key) => !data.heroAbilities[key]?.type.startsWith('spawn_'))
+      .slice(0, 1),
   };
 }
 
@@ -423,13 +435,7 @@ export function changeSectorZeroProgress(
     case 'unlock-hero': {
       const def = data.heroes[action.id];
       if (!def || next.heroes[action.id] || !pay(HERO_UNLOCK_COST)) return null;
-      next.heroes[action.id] = {
-        level: 1,
-        skills: [],
-        equipped: def.startAbilities
-          .filter((id) => !data.heroAbilities[id]?.type.startsWith('spawn_'))
-          .slice(0, 1),
-      };
+      next.heroes[action.id] = newSectorHero(action.id, data);
       break;
     }
     case 'select-hero':

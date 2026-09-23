@@ -1,6 +1,7 @@
 /** Sector Zero's home screen. Rendering and DOM only; the host owns the run and
  * storage. Reading a save never resumes it, and replacing it is an explicit act. */
 import { t } from '../../localization/runtime';
+import { esc } from './format';
 import {
   parseRunDifficulty,
   runDifficultyKey,
@@ -22,7 +23,14 @@ export interface SectorZeroMenuHooks {
   chapters: number;
   /** Что глава просит: волн до победы, сколько задач видно в следующем забеге и сколько
    *  их в запасе главы (PVR-5.3), и выиграна ли она хоть раз. */
-  chapterInfo(index: number): { waves: number; tasks: number; pool: number; cleared: boolean };
+  chapterInfo(index: number): {
+    waves: number;
+    tasks: number;
+    pool: number;
+    cleared: boolean;
+    /** Герой-награда главы (`heroRecruits.ts`): имя и пришёл ли он уже. Нет — у главы награды-героя нет. */
+    hero?: { name: string; joined: boolean };
+  };
   /** Карта главы с тем, что игрок о ней знает (панель справа при выборе главы). */
   chapterMap(index: number): ChapterMapView | null;
   start(): void;
@@ -117,6 +125,15 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
           ...(info.cleared ? [t('sector-zero.chapter.cleared')] : []),
         ].join(' · ')
       : '';
+    // Награда-герой: силуэт, пока он не пришёл, — цель видна до забега.
+    const heroLine = el('sz-chapter-hero');
+    heroLine.hidden = !info?.hero;
+    if (info?.hero) {
+      heroLine.classList.toggle('joined', info.hero.joined);
+      heroLine.innerHTML =
+        `<span class="sz-hero-sil" aria-hidden="true">${info.hero.joined ? '★' : '?'}</span>` +
+        `<span>${esc(t(info.hero.joined ? 'sector-zero.chapter.hero.joined' : 'sector-zero.chapter.hero', { name: info.hero.name }))}</span>`;
+    }
     for (const node of lostNodes)
       node.classList.toggle('peek', Number(node.dataset.lost) === peek);
     if (!mapPanel.hidden) renderMap(index, !keys);

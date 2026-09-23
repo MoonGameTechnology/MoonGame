@@ -66,7 +66,7 @@ describe('окно построек — строка эффекта', () => {
     // YARD-1: «строит корабли» — примета ВЕРФИ, а у порта своя строка про ангар. До
     // разделения обе висели на одном здании, и про челноки экран не говорил ничего.
     expect(buildFx(data.buildings.shipyard!, 1)).toContain('кораблей');
-    expect(buildFx(data.buildings.spaceport!, 1)).toContain('челноки');
+    expect(buildFx(data.buildings.spaceport!, 1)).toContain('шаттлы');
     expect(buildFx(data.buildings.spaceport!, 1)).not.toContain('кораблей');
   });
 

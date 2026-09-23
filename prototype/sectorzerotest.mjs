@@ -120,6 +120,10 @@ try {
     assert.equal(await page.locator('#sz-map-body polygon').count(), 24, 'мозаика главы II');
     const scoutedBefore = await page.locator('#sz-map-body polygon.known').count();
     assert.match(await page.locator('#sz-chapter-stats').textContent(), /3/, 'задачи главы II');
+    // Герой-награда главы виден ДО забега: силуэт «?» и имя того, кто придёт за победу.
+    const reward = page.locator('#sz-chapter-hero');
+    assert.equal(await reward.isVisible(), true, 'у главы II есть герой-награда');
+    assert.equal(await reward.locator('.sz-hero-sil').textContent(), '?', 'герой ещё не пришёл');
     await page.locator('#sz-mission-0').click();
     await page.locator('#sz-new').click();
     await check('Sector Zero', true);
