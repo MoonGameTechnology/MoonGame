@@ -164,6 +164,24 @@ describe('засчёт забега', () => {
     expect(p.chaptersWon).toEqual([]);
   });
 
+  it('разведка забега копится в профиле главы и переживает сохранение', () => {
+    const s = ended();
+    s.fog = { p1: { a: {}, b: {} } } as unknown as GameState['fog'];
+    const first = settleSectorZeroRun(
+      { ...freshSectorZeroProgress(data), nextAttempt: 3 },
+      1,
+      s,
+      chapter('ch', []),
+    );
+    expect(first.chapterScouted.ch).toEqual(['a', 'b']);
+    s.fog = { p1: { b: {}, c: {} } } as unknown as GameState['fog'];
+    const second = settleSectorZeroRun(first, 2, s, chapter('ch', []));
+    expect(second.chapterScouted.ch).toEqual(['a', 'b', 'c']); // объединение, а не замена
+    expect(parseSectorZeroProgress(JSON.stringify(second), data).chapterScouted).toEqual({
+      ch: ['a', 'b', 'c'],
+    });
+  });
+
   it('победа отмечает главу пройденной один раз', () => {
     const won = ended();
     won.match.winner = 'p1';

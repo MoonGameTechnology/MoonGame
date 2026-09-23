@@ -73,6 +73,48 @@
 .sz-chapter p { margin: 4px 0 0; color: #b0c7ce; font-size: 12px; line-height: 1.5; }
 .sz-chapter p:empty { display: none; }
 #sz-chapter-stats { color: #8ccbcc; font-family: ui-monospace, monospace; }
+/* Карта главы (заказ владельца 2026-09-23): панель справа, в стиле игровой карты — мозаика
+   провинций, бирюзовые границы, туман штриховкой над неразведанным. */
+.sz-map-panel { position: relative; z-index: 2; grid-column: 2; grid-row: 1; align-self: start; display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #2c5663; border-radius: 10px; background: linear-gradient(180deg, #06141ccc, #030a11ee); box-shadow: 0 0 0 1px #0d2a33, 0 24px 60px -30px #79dfdf55, inset 0 0 60px #0a2a3444; animation: sz-map-in .28s ease-out; }
+@keyframes sz-map-in { from { opacity: 0; transform: translateX(18px); } }
+#sector-zero.sz-map-open .sz-projection { opacity: .12; transition: opacity .3s; }
+.sz-map-head { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; }
+.sz-map-head .sz-map-eyebrow { flex-basis: 100%; order: -1; }
+.sz-map-eyebrow { color: #79dfdf; font: 10px/1.5 ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
+.sz-map-head b { color: #e1f4f4; font-size: 15px; font-weight: 600; margin-right: auto; }
+#sector-zero #sz-map-close { width: 32px; height: 32px; border: 1px solid #2c5663; border-radius: 50%; background: transparent; color: #9fc6cc; font-size: 18px; line-height: 1; }
+#sector-zero #sz-map-close:hover { border-color: #79dfdf; color: #e1f4f4; }
+.sz-map-body { position: relative; height: min(52vh, 460px); border: 1px solid #16323b; border-radius: 6px; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #0b2430, #030a11 75%); }
+.sz-map-body::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(#79dfdf22 1px, transparent 1px), linear-gradient(90deg, #79dfdf22 1px, transparent 1px); background-size: 28px 28px; }
+.sz-map-body svg { position: relative; display: block; width: 100%; height: 100%; }
+.sz-map-body polygon { vector-effect: non-scaling-stroke; stroke-width: 1; stroke-linejoin: round; }
+.sz-map-body polygon.fog { fill: url(#sz-fog); stroke: #1a2c35; }
+.sz-map-body .fog-bg { fill: #050d14; }
+.sz-map-body .fog-hatch { stroke: #16303a; stroke-width: 3; }
+.sz-map-body polygon.known { fill: #0f2a33; stroke: #3f8f96; }
+.sz-map-body polygon.known.side-you { fill: #104048; stroke: #90e2dd; }
+.sz-map-body polygon.known.side-hostile { fill: #3a1418; stroke: #ff6f63; }
+.sz-map-body polygon.known.kind-asteroid, .sz-map-body polygon.known.kind-asteroid_cluster { fill: #2a2418; }
+.sz-map-body polygon.known.kind-dense_nebula { fill: #241a36; }
+.sz-map-body polygon.known.kind-ion_storm { fill: #14263f; }
+.sz-map-body polygon.known.kind-empty { fill: #0a1c24; }
+.sz-map-body polygon.known.kind-nebula { fill: #1f1830; }
+.sz-map-body polygon.known.kind-dead_world, .sz-map-body polygon.known.kind-graveyard { fill: #1c1c22; }
+.sz-map-body polygon.known.kind-solar_flare { fill: #33230f; }
+.sz-map-body polygon.known.kind-pirate_base { fill: #33200f; }
+.sz-map-body .lanes line { vector-effect: non-scaling-stroke; stroke: #79dfdf; stroke-width: 1.2; stroke-dasharray: 4 4; opacity: .7; }
+.sz-map-body .home { fill: #90e2dd; filter: drop-shadow(0 0 6px #90e2dd); }
+.sz-map-body .dot { fill: #9fc6cc; }
+.sz-map-body .dot.side-hostile { fill: #ff6f63; }
+.sz-map-body .target { fill: none; stroke: #f2c14e; vector-effect: non-scaling-stroke; stroke-width: 1.6; stroke-dasharray: 3 3; }
+.sz-map-lost { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: #b99ad8; font: 12px/1.6 ui-monospace, monospace; letter-spacing: .08em; background: repeating-linear-gradient(0deg, #ffffff05 0 2px, transparent 2px 4px); }
+.sz-map-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: #9fbcc4; font-size: 11px; }
+.sz-map-foot b { color: #e1f4f4; font-weight: 600; margin-right: auto; }
+.sz-map-foot .lg::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border: 1px solid; }
+.sz-map-foot .lg.you::before { background: #104048; border-color: #90e2dd; }
+.sz-map-foot .lg.hostile::before { background: #3a1418; border-color: #ff6f63; }
+.sz-map-foot .lg.target::before { border: 1px dashed #f2c14e; border-radius: 50%; }
+.sz-map-foot .lg.fog::before { background: repeating-linear-gradient(35deg, #16303a 0 2px, #050d14 2px 5px); border-color: #1a2c35; }
 .sz-tools { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; }
 .sz-tools button { min-height: 44px; border: 0; padding: 8px 0; background: transparent; color: #b1cbd1; font-size: 13px !important; }
 .sz-tools button:hover { color: #a9f5ee; }
@@ -90,7 +132,7 @@
 @keyframes sz-breathe { 50% { opacity: .35; } }
 @keyframes sz-ping { from { transform: scale(.6); opacity: .8; } to { transform: scale(2.2); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .sz-spin, .sz-core, .sz-ping, .sz-node.sz-core-node::after { animation: none; }
+  .sz-spin, .sz-core, .sz-ping, .sz-node.sz-core-node::after, .sz-map-panel { animation: none; }
 }
 .sz-bottomline { border-top: 1px solid #24404b; padding-top: 18px; font-size: 10px; }
 #sz-workshop { padding: 28px 0 40px; flex: 1; }
@@ -228,6 +270,9 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   .sz-tabs { gap: 6px; }
   #sz-workshop .sz-tabs button { font-size: 11px; padding: 8px 2px; }
   .sz-hull { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  /* Телефон: карта — блоком под выбором главы, во всю ширину. */
+  .sz-map-panel { grid-column: 1; grid-row: auto; width: 100%; max-width: 440px; margin: 18px auto 0; }
+  .sz-map-body { height: min(62vw, 300px); }
   /* Корпуса — лентой с прокруткой: семь плиток в три ряда съедали весь экран. */
   .sz-hulls { flex-wrap: nowrap; overflow-x: auto; margin-inline: -22px; padding-inline: 22px; scrollbar-width: none; touch-action: pan-x pan-y; }
   .sz-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

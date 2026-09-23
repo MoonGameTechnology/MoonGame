@@ -3325,6 +3325,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <path d="M332 397h82l30 30" stroke="#e6b777" opacity=".45"/>
         </svg>
       </div>
+      <aside id="sz-map-panel" class="sz-map-panel" hidden aria-labelledby="sz-map-title">
+        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.map.title"></span><b id="sz-map-title"></b><button id="sz-map-close" type="button" data-i18n-aria="sector-zero.map.close" data-i18n-title="sector-zero.map.close">×</button></div>
+        <div id="sz-map-body" class="sz-map-body"></div>
+        <div id="sz-map-foot" class="sz-map-foot"></div>
+      </aside>
     </div>
     <div id="sz-workshop" hidden></div>
     <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>

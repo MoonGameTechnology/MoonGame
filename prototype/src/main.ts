@@ -255,6 +255,7 @@ import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
+import { chapterMapView } from '../../decisions/chapterMap';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
@@ -13421,6 +13422,16 @@ const sectorZeroMenu = initSectorZeroMenu({
     pool: pveChapter(index).objectives.length,
     cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
   }),
+  // Карта главы: мир на старте главы + память тумана прошлых забегов из профиля.
+  chapterMap: index => {
+    const chapter = pveChapter(index);
+    return chapterMapView(
+      pveState(data, index),
+      sectorProgress.chapterScouted[chapter.id] ?? [],
+      'p1',
+      chapter.objectives.flatMap(o => (o.kind === 'control' ? o.targets : [])),
+    );
+  },
   setMission: value => {
     nextSectorMission = value;
     writeRaw('void.pveMission', String(value));
