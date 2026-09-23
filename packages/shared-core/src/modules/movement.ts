@@ -3,7 +3,7 @@ import type { Fleet, FleetEdge, GameState, PlayerId, PlanetId } from '../state/g
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
 import { fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
-import { forkTAtStart, laneRoadLength, legEndT } from '../state/roads';
+import { forkAt, forkTAtStart, laneRoadLength, legEndT, snapToFork } from '../state/roads';
 import { corridorVeto, isCorridorEdge } from '../state/corridor';
 import { getStance } from '../state/diplomacy';
 
@@ -170,8 +170,26 @@ interface Target {
   cost: number;
 }
 
+/**
+ * The lanes a parked fleet can set off along. On a lane: that one. At a FORK (ROADS-3):
+ * every lane of the fork's trail, each seen from the fork — it is one point on all of them,
+ * so a fleet waiting there leaves by the road it needs rather than via the world and back.
+ */
+function anchorsOf(state: GameState, e: FleetEdge): FleetEdge[] {
+  const fork = forkAt(state, e.from, e.to, e.t);
+  if (!fork) {
+    return [e];
+  }
+  return fork.exits.map((x) => ({
+    from: fork.province,
+    to: x,
+    t: forkTAtStart(state, fork.province, x),
+  }));
+}
+
 /** The places a fleet can begin a journey from. At a node: just that node. Parked
- *  on a lane: either end (the cheaper one wins after routing). */
+ *  on a lane: either end (the cheaper one wins after routing) — of every lane its
+ *  point lies on (`anchorsOf`). */
 function originsOf(state: GameState, fleet: Fleet): Origin[] {
   if (fleet.location) {
     return [{ fromId: fleet.location, routingNode: fleet.location, lead: [], startT: 0, cost: 0 }];
@@ -180,13 +198,15 @@ function originsOf(state: GameState, fleet: Fleet): Origin[] {
   if (!e) {
     return [];
   }
-  const len = laneLength(state, e.from, e.to);
-  return [
-    // forward to `to`
-    { fromId: e.from, routingNode: e.to, lead: [e.to], startT: e.t, cost: len * (1 - e.t) },
-    // back to `from`
-    { fromId: e.to, routingNode: e.from, lead: [e.from], startT: 1 - e.t, cost: len * e.t },
-  ];
+  return anchorsOf(state, e).flatMap((a) => {
+    const len = laneLength(state, a.from, a.to);
+    return [
+      // forward to `to`
+      { fromId: a.from, routingNode: a.to, lead: [a.to], startT: a.t, cost: len * (1 - a.t) },
+      // back to `from`
+      { fromId: a.to, routingNode: a.from, lead: [a.from], startT: 1 - a.t, cost: len * a.t },
+    ];
+  });
 }
 
 /** The node(s) a journey can route toward. A node target: that node. An
@@ -257,7 +277,14 @@ function planJourney(
   // которой его обходит дипломатическое вето. Нет личных коридоров → `undefined`, и
   // быстрый кэшированный путь остаётся нетронутым.
   const edgeVeto = corridorVeto(state, fleet.id);
-  const targets = targetsOf(state, payload);
+  // ROADS-3: a stop ordered near a fork is a stop AT it — the one point on a trail that
+  // sees every road of it (`snapToFork`). Once, here, so both paths below aim the same.
+  const te0 = payload.toEdge;
+  const aim: MovePayload =
+    te0 && typeof te0.from === 'string' && typeof te0.to === 'string' && typeof te0.t === 'number'
+      ? { ...payload, toEdge: { ...te0, t: snapToFork(state, te0.from, te0.to, te0.t) } }
+      : payload;
+  const targets = targetsOf(state, aim);
   if ('error' in targets) {
     return targets;
   }
@@ -269,19 +296,21 @@ function planJourney(
   // Fast path: repositioning ALONG the lane the fleet is already parked on — a
   // single direct leg, no detour to an endpoint (Bytro "drag the army down the
   // road"). Only when the target point is interior; node-ish targets fall through.
+  // A fleet at a fork stands on every lane of its trail, so each of them counts.
   const e = fleet.edge;
-  if (e && payload.toEdge) {
-    const te = payload.toEdge;
-    const same =
-      (te.from === e.from && te.to === e.to) || (te.from === e.to && te.to === e.from);
-    const q = te.from === e.from ? te.t : 1 - te.t; // target fraction along (e.from,e.to)
-    if (same && q > EPS && q < 1 - EPS) {
-      if (Math.abs(q - e.t) <= EPS) {
-        return { error: 'E_SAME_LOCATION' };
+  if (e && aim.toEdge) {
+    const te = aim.toEdge;
+    for (const a of anchorsOf(state, e)) {
+      const same = (te.from === a.from && te.to === a.to) || (te.from === a.to && te.to === a.from);
+      const q = te.from === a.from ? te.t : 1 - te.t; // target fraction along (a.from,a.to)
+      if (same && q > EPS && q < 1 - EPS) {
+        if (Math.abs(q - a.t) <= EPS) {
+          return { error: 'E_SAME_LOCATION' };
+        }
+        return q > a.t
+          ? { fromId: a.from, hops: [a.to], startT: a.t, parkT: q }
+          : { fromId: a.to, hops: [a.from], startT: 1 - a.t, parkT: 1 - q };
       }
-      return q > e.t
-        ? { fromId: e.from, hops: [e.to], startT: e.t, parkT: q }
-        : { fromId: e.to, hops: [e.from], startT: 1 - e.t, parkT: 1 - q };
     }
   }
 
@@ -548,7 +577,9 @@ export const movementModule: GameModule = {
         if (fleet.battleId) return;
         const startT = forkTAtStart(h.state, at, next);
         if (!beginLeg(h, fleet, at, remaining, startT, parkT)) {
-          // Cannot go on (speed 0 / a node gone): stop at the fork, on the road ahead.
+          // Nothing left to fly — the journey ends AT this fork (a stop ordered there,
+          // ROADS-3) — or it cannot go on (speed 0 / a node gone): stop at the fork, on the
+          // road ahead.
           const edge: FleetEdge = { from: at, to: next, t: startT };
           fleet.edge = edge;
           h.emit('fleet.parked', { fleetId, edge });

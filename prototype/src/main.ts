@@ -1,6 +1,6 @@
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
-import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead } from '../../packages/shared-core/src/index';
+import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierHtml } from './swarmDossier';
@@ -2286,7 +2286,14 @@ function nearestLanePoint(
   // доля вдоль отрезка при проекции не меняется.
   const hit = nearestSegment(pieces, (piece) => ({ a: world(piece.a), b: world(piece.b) }), mx, my, maxPx);
   if (!hit) return null;
-  return { from: hit.seg.from, to: hit.seg.to, t: lanePieceT(hit.seg, hit.at.t), x: hit.at.x, y: hit.at.y };
+  const { from, to } = hit.seg;
+  const raw = lanePieceT(hit.seg, hit.at.t);
+  // У развилки ядро ставит флот НА неё (`snapToFork`, ROADS-3) — туда же и целимся, иначе
+  // прицел обещал бы одну точку, а приказ встал бы в другую.
+  const t = snapToFork(s, from, to, raw);
+  const road = t === raw ? null : laneRoad(s, from, to);
+  const at = road ? world(pointAlong(road, t)) : hit.at;
+  return { from, to, t, x: at.x, y: at.y };
 }
 
 /** For a march to a lane point: which endpoint the fleet routes through and the

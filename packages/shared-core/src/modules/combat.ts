@@ -32,8 +32,12 @@ import {
   creditVolley,
   sideDamageBreakdown,
   sideUnits,
+  trunkOccupancies,
+  trunkPosAt,
   type HookedDamage,
 } from '../util/combat';
+import { legT } from '../state/fleetPosition';
+import { crossingT } from '../state/roads';
 
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
  *  node-equivalent edge); mirrors movement's own EPS. */
@@ -222,6 +226,15 @@ function runningBattleFor(h: HandlerContext, at: string, owner: string): Battle 
   for (const id of Object.keys(h.state.battles).sort()) {
     const b = h.state.battles[id];
     if (!b || b.location !== at || b.phase !== 'orbital') continue;
+    // A fight ON A ROAD — a lane crossing, a fork (ROADS-3) — carries its province as
+    // `location`, but it is not at the world: whoever stands there is not in it. The
+    // owner's rule «стоящие у планеты не ловят проходящего боковой дорогой» would
+    // otherwise leak back in here — one fleet arriving at the world would drag every
+    // fleet stationed there into the fight at the fork.
+    const atWorld = b.sides.some(
+      (side) => side.ref.kind === 'fleet' && h.state.fleets[side.ref.fleetId]?.location === at,
+    );
+    if (!atWorld) continue;
     const hostile = b.sides.some(
       (side) => side.owner !== null && isHostile(h, owner, side.owner) && sideAlive(h.state, side.ref),
     );
@@ -737,7 +750,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  */
 export const combatModule: GameModule = {
   id: 'combat',
-  version: '2.0.0',
+  version: '2.1.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -818,7 +831,43 @@ export const combatModule: GameModule = {
       pinToEdge(fb, oa.lo, oa.hi, t);
       startBattle(h, {
         id: `battle:${h.state.battleSeq++}`,
-        location: t <= 0.5 ? oa.lo : oa.hi, // nearest node — for display / event labels
+        // The province the meeting point is in — split by the border crossing (ROADS-2),
+        // which on a straight lane is the midpoint. For display / event labels.
+        location: t <= crossingT(h.state, oa.lo, oa.hi) ? oa.lo : oa.hi,
+        phase: 'orbital',
+        sides: [
+          { ref: { kind: 'fleet', fleetId: fa.id }, owner: fa.owner, role: 'attacker' },
+          { ref: { kind: 'fleet', fleetId: fb.id }, owner: fb.owner, role: 'defender' },
+        ],
+        round: 0,
+      });
+    });
+
+    // ROADS-3: a meeting on a shared TRUNK (scheduled by `intercept`) — two fleets of
+    // different lanes on the same stretch world→fork, or one parked AT the fork and one
+    // passing it (the owner's ambush). Re-validated at the instant: both still on that
+    // trunk and at the same share of it. The moving side stops where it stands; the
+    // battle is fought in the province whose trail it is.
+    api.on('fleet.meet', (event, h) => {
+      const { a, b, trunk } = event.payload as { a: string; b: string; trunk: string };
+      const fa = h.state.fleets[a];
+      const fb = h.state.fleets[b];
+      if (!fa || !fb || fa.battleId || fb.battleId) return;
+      if (!isHostile(h, fa.owner, fb.owner)) return;
+      if (!fa.units.some((s) => s.count > 0) || !fb.units.some((s) => s.count > 0)) return;
+      const oa = trunkOccupancies(h.state, fa).find((o) => o.key === trunk);
+      const ob = trunkOccupancies(h.state, fb).find((o) => o.key === trunk);
+      if (!oa || !ob) return; // one left the trunk (re-routed / arrived) — stale
+      if (Math.abs(trunkPosAt(oa, h.ctx.now) - trunkPosAt(ob, h.ctx.now)) > INTERCEPT_TOL) return;
+      for (const f of [fa, fb]) {
+        const mv = f.movement;
+        if (!mv) continue; // parked: already where the fight is
+        const t = Math.min(1 - EDGE_EPS, Math.max(EDGE_EPS, legT(mv, h.ctx.now)));
+        pinToEdge(f, mv.from, mv.to, t);
+      }
+      startBattle(h, {
+        id: `battle:${h.state.battleSeq++}`,
+        location: oa.province,
         phase: 'orbital',
         sides: [
           { ref: { kind: 'fleet', fleetId: fa.id }, owner: fa.owner, role: 'attacker' },

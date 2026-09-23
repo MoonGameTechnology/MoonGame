@@ -449,3 +449,113 @@ export function roadAhead(
   }
   return out;
 }
+
+// ── Shared stretches (ROADS-3): where fleets of different lanes meet ──
+
+/**
+ * A TRUNK — the stretch from a world to its trail's fork, shared by every road on that
+ * trail. It is the one place where fleets bound for DIFFERENT neighbours ride the same
+ * road, and its end is the fork, which every bypass touches. Positions on it are counted
+ * from the world (`u`, world units).
+ */
+export interface TrunkSpan {
+  /** `province#trail` — the same key from every lane of the trail. */
+  key: string;
+  /** The province whose trail it is — where a meeting on it is fought. */
+  province: PlanetId;
+  /** Trunk length: world → fork. */
+  length: number;
+  /** The lane-fraction interval of the road `from`→`to` that runs on this trunk. */
+  t0: number;
+  t1: number;
+  /** Distance from the world at lane fraction `t` (linear on the interval). */
+  uAt: (t: number) => number;
+}
+
+function trailIndex(state: GameState, at: PlanetId, toward: PlanetId): number {
+  return state.planets[at]?.roads?.trails.findIndex((t) => t.exits.includes(toward)) ?? -1;
+}
+
+/** Two fractions of one lane this close are one point: the rounding between a fraction and
+ *  its mirror `1 − t`, seen from the other end of the lane. */
+export const T_EPS = 1e-9;
+
+/** The fork a lane point stands ON — `from`'s (serving `to`) or `to`'s (serving `from`) —
+ *  with its trail's exits; null when the point is not a fork. */
+export function forkAt(
+  state: GameState,
+  from: PlanetId,
+  to: PlanetId,
+  t: number,
+): { province: PlanetId; exits: PlanetId[] } | null {
+  const exitsOf = (at: PlanetId, toward: PlanetId): PlanetId[] =>
+    state.planets[at]?.roads?.trails.find((tr) => tr.exits.includes(toward))?.exits ?? [];
+  if (forkToward(state, from, to) && Math.abs(t - forkTAtStart(state, from, to)) <= T_EPS) {
+    return { province: from, exits: [...exitsOf(from, to)] };
+  }
+  if (forkToward(state, to, from) && Math.abs(t - forkTAtEnd(state, from, to)) <= T_EPS) {
+    return { province: to, exits: [...exitsOf(to, from)] };
+  }
+  return null;
+}
+
+/**
+ * How near a fork a stop snaps onto it: this share of the shorter road piece the fork joins
+ * (its trunk, or the branch to the border). The fork is the one point that sees every road
+ * of its trail (ROADS-3), a stop a hair short of it sees one road only, and a finger on a
+ * phone cannot tell the two apart. On the shipped maps that is 6 … 32 units each way
+ * (median 11.5); the shorter piece is the trunk at 41 of the 43 branches.
+ */
+export const FORK_SNAP = 0.25;
+
+/** A stop at fraction `t` of the road `from`→`to`, moved onto a fork it is near
+ *  ({@link FORK_SNAP}); unchanged otherwise, and on a lane without forks. */
+export function snapToFork(state: GameState, from: PlanetId, to: PlanetId, t: number): number {
+  const road = laneRoad(state, from, to);
+  if (!road || road.length === 2) return t;
+  const x = crossingT(state, from, to);
+  if (forkToward(state, from, to)) {
+    const f = forkTAtStart(state, from, to);
+    if (Math.abs(t - f) <= FORK_SNAP * Math.min(f, x - f)) return f;
+  }
+  if (forkToward(state, to, from)) {
+    const f = forkTAtEnd(state, from, to);
+    if (Math.abs(t - f) <= FORK_SNAP * Math.min(1 - f, f - x)) return f;
+  }
+  return t;
+}
+
+/** The trunks the road `from`→`to` runs on: `from`'s (at its start) and `to`'s (at its
+ *  end), each only when that side's trail forks. */
+export function laneTrunks(state: GameState, from: PlanetId, to: PlanetId): TrunkSpan[] {
+  const road = laneRoad(state, from, to);
+  if (!road || road.length === 2) return [];
+  const total = polylineLength(road);
+  if (!(total > 0)) return [];
+  const out: TrunkSpan[] = [];
+  const fa = forkToward(state, from, to);
+  if (fa) {
+    const t1 = forkTAtStart(state, from, to);
+    out.push({
+      key: `${from}#${trailIndex(state, from, to)}`,
+      province: from,
+      length: t1 * total,
+      t0: 0,
+      t1,
+      uAt: (t) => t * total,
+    });
+  }
+  const fb = forkToward(state, to, from);
+  if (fb) {
+    const t0 = forkTAtEnd(state, from, to);
+    out.push({
+      key: `${to}#${trailIndex(state, to, from)}`,
+      province: to,
+      length: (1 - t0) * total,
+      t0,
+      t1: 1,
+      uAt: (t) => (1 - t) * total,
+    });
+  }
+  return out;
+}

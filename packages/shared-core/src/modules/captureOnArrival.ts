@@ -1,6 +1,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import { getStance } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
+import { fleetNodeAt } from '../state/fleetPosition';
 
 /**
  * Capture-on-arrival (map-roadmap.md M2.2). A fleet that reaches an undefended,
@@ -28,9 +29,22 @@ import { isCapturable } from '../state/sectorKind';
  *
  * Ordered AFTER combat in the module list, so a contested arrival starts its
  * battle first and the guards below then decline to capture.
+ *
+ * ROADS (owner decision, `roads-roadmap.md` §0.2): a fleet going round a world by a side
+ * road — through the fork of its trail — does NOT take the province (no `fleet.transit`
+ * fires there). What takes it is going through the world, arriving at it, or STOPPING in
+ * the province: a fleet that parks on its roads (at the fork, say) holds the ground as
+ * surely as one at the world. That stop is contested by any other fleet standing in the
+ * province — at the world or parked on its roads.
  */
 
-function tryCapture(h: HandlerContext, payload: unknown): void {
+/** `via`: how the fleet came to hold the province — `arrival` (at the world, or passing
+ *  through it) or `stop` (parked on the province's roads). */
+function tryCapture(
+  h: HandlerContext,
+  payload: unknown,
+  via: 'arrival' | 'stop' = 'arrival',
+): void {
   const { fleetId, at } = (payload ?? {}) as { fleetId?: string; at?: string };
   if (typeof fleetId !== 'string' || typeof at !== 'string') return;
   const fleet = h.state.fleets[fleetId];
@@ -40,18 +54,29 @@ function tryCapture(h: HandlerContext, payload: unknown): void {
   if (planet.owner !== null && getStance(h.state, fleet.owner, planet.owner) !== 'war') return;
   if (planet.garrison.some((s) => s.count > 0)) return; // ≥1 garrison unit → assault only
   const contested = Object.values(h.state.fleets).some(
-    (g) => g.owner !== fleet.owner && g.location === at && g.units.some((u) => u.count > 0),
+    (g) =>
+      g.owner !== fleet.owner &&
+      g.units.some((u) => u.count > 0) &&
+      (g.location === at ||
+        (via === 'stop' && g.edge != null && fleetNodeAt(h.state, g, h.ctx.now) === at)),
   );
   if (contested) return;
   planet.owner = fleet.owner;
-  h.emit('planet.captured', { planetId: at, owner: fleet.owner, via: 'arrival' });
+  h.emit('planet.captured', { planetId: at, owner: fleet.owner, via });
 }
 
 export const captureOnArrivalModule: GameModule = {
   id: 'capture-on-arrival',
-  version: '0.1.0',
+  version: '0.2.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => tryCapture(h, event.payload));
     api.on('fleet.transit', (event, h) => tryCapture(h, event.payload));
+    api.on('fleet.parked', (event, h) => {
+      const { fleetId } = (event.payload ?? {}) as { fleetId?: string };
+      const fleet = typeof fleetId === 'string' ? h.state.fleets[fleetId] : undefined;
+      if (!fleet || fleet.battleId || !fleet.edge) return;
+      const at = fleetNodeAt(h.state, fleet, h.ctx.now);
+      if (at !== null) tryCapture(h, { fleetId, at }, 'stop');
+    });
   },
 };

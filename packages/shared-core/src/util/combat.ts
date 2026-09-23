@@ -4,6 +4,7 @@ import type { GameData, UnitDef } from '../data/schemas';
 import { cappedUnitBreakdown, type StackContribution } from './stacks';
 import { effectiveStats } from './loadout';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
+import { laneTrunks, T_EPS, type TrunkSpan } from '../state/roads';
 
 /**
  * Shared combat primitives — the damage model, combatant-side accessors,
@@ -647,4 +648,89 @@ export function posAt(occ: LaneOcc, t: number): number {
     return occ.s0;
   }
   return occ.s0 + ((occ.s1 - occ.s0) * (t - occ.t0)) / (occ.t1 - occ.t0);
+}
+
+/**
+ * A fleet on a TRUNK (ROADS-3): the stretch from a world to its trail's fork, shared by
+ * every road on that trail. `s` is the position as a share of the trunk from the world
+ * (1 = at the fork). Two fleets on DIFFERENT lanes meet only here — on a trunk they ride
+ * the same road, and its end is the fork every bypass touches.
+ */
+export interface TrunkOcc {
+  /** `province#trail` — one key for the trunk, whichever lane it is seen from. */
+  key: string;
+  /** The province whose trail it is — where a meeting on it is fought. */
+  province: PlanetId;
+  s0: number;
+  s1: number;
+  t0: number;
+  t1: number;
+  moving: boolean;
+}
+
+/** Where on trunks a fleet is: its leg's share of each trunk the lane runs on (a window
+ *  in time — a single instant for a bypass, which only touches the fork), or the point it
+ *  is parked at. Empty when it is at a world or on no trunk. */
+export function trunkOccupancies(state: GameState, fleet: Fleet): TrunkOcc[] {
+  const out: TrunkOcc[] = [];
+  const share = (span: TrunkSpan, t: number): number =>
+    Math.min(1, Math.max(0, span.uAt(t) / span.length));
+  const mv = fleet.movement;
+  if (mv) {
+    const a = mv.startT ?? 0;
+    const b = mv.endT ?? 1;
+    if (!(b > a) || !(mv.arrivesAt >= mv.departedAt)) return out;
+    const timeAt = (f: number): number =>
+      mv.departedAt + ((f - a) / (b - a)) * (mv.arrivesAt - mv.departedAt);
+    for (const span of laneTrunks(state, mv.from, mv.to)) {
+      const lo = Math.max(a, span.t0);
+      const hi = Math.min(b, span.t1);
+      if (lo > hi + T_EPS || !(span.length > 0)) continue;
+      out.push({
+        key: span.key,
+        province: span.province,
+        s0: share(span, lo),
+        s1: share(span, Math.max(lo, hi)),
+        t0: timeAt(lo),
+        t1: timeAt(Math.max(lo, hi)),
+        moving: true,
+      });
+    }
+    return out;
+  }
+  const e = fleet.edge;
+  if (e) {
+    for (const span of laneTrunks(state, e.from, e.to)) {
+      // Rounding: a fleet parked AT the fork from the far end of the lane stands at
+      // `1 − t`, which may miss the span's end by an ulp.
+      if (e.t < span.t0 - T_EPS || e.t > span.t1 + T_EPS || !(span.length > 0)) continue;
+      const s = share(span, e.t);
+      out.push({
+        key: span.key,
+        province: span.province,
+        s0: s,
+        s1: s,
+        t0: -Infinity,
+        t1: Infinity,
+        moving: false,
+      });
+    }
+  }
+  return out;
+}
+
+/** Share of the trunk an occupant is at, at time `t` (constant if parked). */
+export function trunkPosAt(occ: TrunkOcc, t: number): number {
+  if (!occ.moving || occ.t1 <= occ.t0) return occ.s0;
+  const k = Math.min(1, Math.max(0, (t - occ.t0) / (occ.t1 - occ.t0)));
+  return occ.s0 + (occ.s1 - occ.s0) * k;
+}
+
+/** Whether two fleets are on the same lane (moving along it or parked on it), either way
+ *  round — where the lane detector, not the trunk one, owns their meeting. */
+export function sameLane(a: Fleet, b: Fleet): boolean {
+  const la = a.movement ?? a.edge;
+  const lb = b.movement ?? b.edge;
+  if (!la || !lb) return false;
+  return (la.from === lb.from && la.to === lb.to) || (la.from === lb.to && la.to === lb.from);
 }
