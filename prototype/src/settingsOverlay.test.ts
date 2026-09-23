@@ -138,6 +138,15 @@ function wired(over: Partial<SettingsHost> = {}, view: SettingsView = viewOf()) 
 }
 
 describe('настройки — разметка', () => {
+  it('«Управление»: на ПК — клавиши и жесты, на телефоне — только жесты (UX-KEYS-1)', () => {
+    const pc = settingsBoxHtml(viewOf());
+    const phone = settingsBoxHtml(viewOf({ touchOnly: true }));
+    expect(pc).toContain('class="set-keys"');
+    expect(pc).toContain(t('controls.box.keys'));
+    expect(phone).not.toContain(t('controls.box.keys'));
+    expect(phone).toContain(t('controls.long-press.keys'));
+  });
+
   it('окно несёт все секции и кнопку закрытия', () => {
     const html = settingsBoxHtml(viewOf());
     for (const id of [

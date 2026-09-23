@@ -6,6 +6,7 @@ import { forgeOutcome, type ForgeLadder } from './sectorZeroForge';
 import { objectiveBonus } from './missionObjectives';
 import {
   canEquip,
+  moduleAllowed,
   starsOf,
   type GameData,
   type GameState,
@@ -197,16 +198,43 @@ function nodeOpenTo(
 }
 
 
+/**
+ * Корпуса, которые игрок забега реально СТРОИТ (PVR-6.2). Раньше сюда шёл любой
+ * космический юнит со слотами — и в подготовке лежали матка Роя и пушки крепости.
+ * Фильтр повторяет ворота ядра, а не заводит свои: уникальный юнит фракции строит
+ * только она (`faction.ts`, `uniqueUnits` — у Роя матка и десантник), а `issued` значит
+ * «приходит вместе с сооружением и не заказывается» (`construction.ts`, орудия крепости).
+ */
 export function sectorHullIds(data: GameData): string[] {
+  const factionOnly = new Set(Object.values(data.factions).flatMap((f) => f.uniqueUnits));
   return Object.keys(data.units).filter((id) => {
     const def = data.units[id]!;
-    return def.domain === 'space' && id !== 'hero' && Object.values(def.slots).some((n) => n > 0);
+    return (
+      def.domain === 'space' &&
+      id !== 'hero' &&
+      Object.values(def.slots).some((n) => n > 0) &&
+      !def.traits.includes('issued') &&
+      !factionOnly.has(id)
+    );
   });
 }
 
 /** Сколько раз в сутки витрину можно обновить за ролик — резолюция владельца (§0.7
  *  роадмапа экономики): «1 раз в сутки + 1 раз за рекламу». */
 export const SHOP_AD_REFRESHES_PER_DAY = 1;
+
+/**
+ * Модули, которые игрок забега может хоть куда-то ПОСТАВИТЬ (PVR-6.5). Список подготовки
+ * брал весь каталог — и в нём лежали модули Роя (только для `brood_host`) и щиты пустоты
+ * (только для пушек крепости): игрок платил бы данные за то, что поставить некуда. Правило —
+ * то же, что у корпусов: модуль остаётся, если встаёт хотя бы на один корпус игрока.
+ */
+export function sectorModuleIds(data: GameData): string[] {
+  const hulls = sectorHullIds(data);
+  return Object.keys(data.modules).filter((id) =>
+    hulls.some((hull) => moduleAllowed(hull, data.units[hull]!, data.modules[id]!)),
+  );
+}
 
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }

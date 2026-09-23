@@ -37,11 +37,11 @@ export interface TestModeHooks {
 const SPEEDS = [1, 2, 6, 20]; // selectable game-speed multipliers
 
 // Scenario-1 force config: the spacecraft each side's fleets are built from.
-const SHIP_UNITS = ['cruiser', 'scout', 'siege'] as const;
+const SHIP_UNITS = ['cruiser', 'scout', 'frigate'] as const;
 type ShipUnit = (typeof SHIP_UNITS)[number];
 type Force = Record<ShipUnit, number>;
-const SHIP_RU: Record<ShipUnit, string> = { cruiser: 'Крейсер', scout: 'Скаут', siege: 'Осада' };
-const SHIP_ICON: Record<ShipUnit, string> = { cruiser: '▲', scout: '◌', siege: '✦' };
+const SHIP_RU: Record<ShipUnit, string> = { cruiser: 'Крейсер', scout: 'Скаут', frigate: 'Фрегат' };
+const SHIP_ICON: Record<ShipUnit, string> = { cruiser: '▲', scout: '◌', frigate: '◇' };
 const forceTotal = (f: Force): number => SHIP_UNITS.reduce((a, u) => a + f[u], 0);
 
 export function initTestMode(hooks: TestModeHooks): void {
@@ -52,8 +52,8 @@ export function initTestMode(hooks: TestModeHooks): void {
   let mult = 2; // chosen speed multiplier
   let view: 'menu' | 'force' = 'menu';
   // Scenario-1 force config: composition per side (applied to that side's fleets).
-  const forceA: Force = { cruiser: 3, scout: 0, siege: 0 };
-  const forceD: Force = { cruiser: 3, scout: 0, siege: 0 };
+  const forceA: Force = { cruiser: 3, scout: 0, frigate: 0 };
+  const forceD: Force = { cruiser: 3, scout: 0, frigate: 0 };
   // Scenario-2 lab: an editable template per side.
 
   const show = (on: boolean): void => {

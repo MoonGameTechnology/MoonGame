@@ -93,6 +93,12 @@ const css = `
      orange bolt / orchid chip — inherited everywhere a resource token appears */
   --rc-credits:#d9b872;--rc-metal:#bfc8dc;--rc-food:#8ccf96;--rc-energy:#f09a52;
   --rc-microelectronics:#d795cf;
+  /* Валюты Sector Zero (PVR-6.3, решение владельца 2026-09-23): несут смысл, как --rc-*.
+     Суверены — донат, золото; Варранты — валюта магазина и кузни, фиолетовый; данные — cyan. */
+  --cur-sovereigns:#f2c14e;--cur-warrants:#b48cff;--cur-data:#35d6e6;
+  /* Редкость предмета (PVR-6.4) — лестница героев, hero-progression §0.2: простой зелёный,
+     уникальный синий, мифический фиолетовый, легендарный красный. */
+  --rar-simple:#5fd07a;--rar-unique:#4aa8ff;--rar-mythic:#bb7dff;--rar-legendary:#ff5f57;
   --cyan:#35d6e6;--cyan-dim:#1c6f78;
   --grn:#5ff0c0;--grn-dim:#2b7a66;
   --red:#ff5a4d;--amber:#ffb43a;
@@ -699,6 +705,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
   font:11px ui-monospace,monospace;user-select:text;-webkit-user-select:text;touch-action:pan-y;}
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink);}
 .set-lbl .set-sub{font-size:10px;color:var(--dim);letter-spacing:.2px;}
+/* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
+.set-keys{display:grid;gap:6px;margin:0 0 12px;}
+.set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
+.set-keys dt{font:600 11px/1.4 ui-monospace,monospace;color:var(--cyan);}
+.set-keys dd{margin:0;font-size:11px;line-height:1.45;color:var(--ink);}
 .set-ctl{display:flex;align-items:center;gap:10px;}
 .set-ctl input[type=range]{flex:1;accent-color:var(--cyan);height:22px;cursor:pointer;}
 .set-val{min-width:42px;text-align:right;font-variant-numeric:tabular-nums;color:var(--cyan);font-weight:700;}
@@ -3290,12 +3301,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
           </div>
-          <fieldset class="sz-difficulty">
+          <fieldset class="sz-difficulty sz-route-box">
             <legend data-i18n="sector-zero.mission"></legend>
-            <div class="sz-options">
-              <button id="sz-mission-0" type="button" data-mission="0" aria-pressed="true" data-i18n="sector-zero.mission.1"></button>
-              <button id="sz-mission-1" type="button" data-mission="1" aria-pressed="false" data-i18n="sector-zero.mission.2"></button>
-            </div>
+            <div id="sz-route" class="sz-route"></div>
+            <div class="sz-route-ends" aria-hidden="true"><span data-i18n="sector-zero.route.edge"></span><span data-i18n="sector-zero.route.core"></span></div>
+            <div class="sz-chapter" role="status" aria-live="polite"><b id="sz-chapter-name"></b><p id="sz-chapter-brief"></p><p id="sz-chapter-stats"></p></div>
           </fieldset>
           <fieldset class="sz-difficulty">
             <legend data-i18n="sector-zero.difficulty"></legend>
@@ -3316,20 +3326,20 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
       <div class="sz-projection" aria-hidden="true">
         <svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g stroke="currentColor" stroke-width=".65" opacity=".32">
+          <g class="sz-spin sz-spin-slow" stroke="currentColor" stroke-width=".65" opacity=".32">
             <circle cx="250" cy="250" r="220" stroke-dasharray="2 9"/><circle cx="250" cy="250" r="190"/>
             <path d="M250 15v64m0 342v64M15 250h64m342 0h64M94 94l37 37m238 238 37 37M94 406l37-37m238-238 37-37"/>
             <ellipse cx="250" cy="250" rx="208" ry="75" transform="rotate(-28 250 250)"/>
             <ellipse cx="250" cy="250" rx="170" ry="48" transform="rotate(55 250 250)"/>
           </g>
           <circle cx="250" cy="250" r="131" stroke="currentColor" stroke-width="1.3" opacity=".7"/>
-          <path d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
+          <path class="sz-spin sz-spin-scan" d="M142 324a131 131 0 0 1 215-149" stroke="#bdede4" stroke-width="3"/>
           <ellipse cx="250" cy="250" rx="65" ry="131" stroke="currentColor" opacity=".15"/>
           <ellipse cx="250" cy="250" rx="131" ry="44" stroke="currentColor" opacity=".22"/>
-          <path d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
+          <path class="sz-core" d="M223 196h54v108h-54z" stroke="currentColor" stroke-width="2" opacity=".8"/>
           <path d="m223 304 54-108" stroke="currentColor" opacity=".4"/>
-          <g fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
-          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
+          <g class="sz-spin sz-spin-back" fill="#b3e8df"><circle cx="69" cy="332" r="4"/><circle cx="391" cy="132" r="3"/></g>
+          <circle cx="332" cy="397" r="5" fill="#e6b777"/><circle class="sz-ping" cx="332" cy="397" r="12" stroke="#e6b777" opacity=".5"/>
           <path d="M332 397h82l30 30" stroke="#e6b777" opacity=".45"/>
         </svg>
       </div>

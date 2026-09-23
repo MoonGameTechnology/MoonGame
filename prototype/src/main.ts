@@ -179,7 +179,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveObjectives } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveObjectives, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -267,6 +267,7 @@ import {
 } from '../../decisions/runSave';
 import { localRunSaveStore } from './runSaveLocal';
 import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
+import { SECTOR_ZERO_ABSENT_TOOLS, toolShown, type SessionTool } from '../../decisions/sectorZeroTools';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
 import { getPlatform, type PlatformHost } from './platform/host';
@@ -1019,7 +1020,6 @@ const RAIL = 50; // left-rail width
 const BUILD_UNITS = [
   'cruiser',
   'scout',
-  'siege',
   'strike_carrier',
   'shuttle_carrier',
   'interceptor',
@@ -6470,10 +6470,17 @@ function fleetPanelHtml(f: Fleet): string {
   return objectPanelHtml(h, detail);
 }
 
+/** Кнопка «Пинг» карточки мира. Маркер коалиции делится с союзником-человеком, поэтому
+ *  в одиночном забеге Sector Zero её нет (PVR-6.1). */
+function pingRowHtml(): string {
+  if (!toolShown('pings', sectorZeroToolsHidden())) return '';
+  return `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+}
+
 /** Side-panel: a world outside sensor coverage — last-scan memory, or no telemetry. */
 function unknownPlanetHtml(p: Planet): string {
   const mem = memory.get(p.id);
-  const ping = `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+  const ping = pingRowHtml();
   if (mem) {
     const icons =
       mem.buildings
@@ -6642,7 +6649,7 @@ function planetPanelHtml(p: Planet): string {
   }
 
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
-  h += `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+  h += pingRowHtml();
 
   // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
   // window lives its countdown replaces the button — the node stays identified.
@@ -9753,6 +9760,7 @@ const resourceCard = initResourceCard({
   me: () => ME,
   icons: RES_SVG,
   onOpenMarket: (res) => market.open(res),
+  marketShown: () => toolShown('market', sectorZeroToolsHidden()),
 });
 
 
@@ -10553,6 +10561,7 @@ const settings = initSettings({
     youColor,
     neutralColor,
     palette: rivalPaletteId,
+    touchOnly: !pcUi(),
   }),
   setSweepOpacity,
   setOwnPings: setShowOwnPings,
@@ -13186,9 +13195,28 @@ let sectorRunActive = false;
  */
 function setRunActive(on: boolean): void {
   sectorRunActive = on;
+  syncSectorZeroTools();
   const api = getPlatform() as Partial<PlatformHost>;
   if (on) api.gameplayStart?.();
   else api.gameplayStop?.();
+}
+
+/** Идёт ли забег Sector Zero — для ИНТЕРФЕЙСА. Не `isSectorZeroRun()`: тот ждёт ещё и
+ *  секцию `s.pve`, а она появляется позже, чем `setRunActive(true)`, — синхронизация на
+ *  нём видела «не забег» и оставляла кнопки (поймал `sectorzerotest.mjs`). Флаг же ставят
+ *  только забеги Sector Zero. */
+function sectorZeroToolsHidden(): boolean {
+  return sectorRunActive && !NET;
+}
+/** PVR-6.1: мультиплеерных кнопок рельса в забеге Sector Zero нет — чат, почта, маркеры,
+ *  корпорация, рынок, «Сон» (`decisions/sectorZeroTools.ts`). Флаг забега меняется только
+ *  через `setRunActive`, поэтому синхронизация живёт там и возвращает кнопки на выходе. */
+function syncSectorZeroTools(): void {
+  const run = sectorZeroToolsHidden();
+  for (const [tool, id] of Object.entries(SECTOR_ZERO_ABSENT_TOOLS)) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = toolShown(tool as SessionTool, run) ? '' : 'none';
+  }
 }
 
 let sectorDevActive = false;
@@ -13291,6 +13319,11 @@ const sectorZeroMenu = initSectorZeroMenu({
     writeRaw('void.pveDifficulty', value);
   },
   mission: () => nextSectorMission,
+  chapters: PVE_MISSION_COUNT,
+  chapterInfo: index => ({
+    waves: data.modes[pveModeId(index) ?? '']?.pve?.waves ?? 0,
+    tasks: pveObjectives(index).length,
+  }),
   setMission: value => {
     nextSectorMission = value;
     writeRaw('void.pveMission', String(value));

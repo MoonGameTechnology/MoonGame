@@ -166,16 +166,6 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           c: hl(st.cargoCapacity ?? 0),
         }),
       };
-    case 'siege':
-      return {
-        name: t('dossier.unit.siege.name'),
-        body: t('dossier.unit.siege.desc', {
-          s: hl(st.siegeDamage ?? 0),
-          a: hl(st.attack),
-          hp: hl(st.hp),
-          d: hl(st.defense),
-        }),
-      };
     case 'frigate':
       return {
         name: t('dossier.unit.frigate.name'),

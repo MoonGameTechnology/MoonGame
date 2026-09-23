@@ -26,6 +26,7 @@
  * (`YardDraft`) normalised by a pure `normalizeDraft`; only `initShipyard(host)`
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
+import { splitSupport } from '../../decisions/supportShips';
 import {
   unitBuildSiteBlocker,
   type Action,
@@ -49,12 +50,14 @@ import {
   type LoadoutEditorResult,
 } from '../../packages/client/src/loadoutEditor';
 
-export type YardTab = 'ships' | 'squads' | 'infantry' | 'vehicles' | 'heroes';
+export type YardTab = 'ships' | 'support' | 'squads' | 'infantry' | 'vehicles' | 'heroes';
 
 /** Порядок вкладок — заказ владельца дословно: Корабли · Челноки · Пехота · Техника ·
  *  Герои. Наземные посередине, а не в конце: они дешевле и заказываются чаще. */
 const YARD_TABS: [YardTab, string][] = [
   ['ships', 'yard.tab.ships'],
+  // ROS-SUP-1: корабли не для линии боя — своя вкладка; признак в данных (`support`).
+  ['support', 'yard.tab.support'],
   ['squads', 'yard.tab.squads'],
   ['infantry', 'yard.tab.infantry'],
   ['vehicles', 'yard.tab.vehicles'],
@@ -64,7 +67,6 @@ const YARD_TABS: [YardTab, string][] = [
 /** Buildable space hulls the «Корабли» pane fits; shuttle/carrier hulls → «Челноки». */
 export const YARD_HULLS = [
   'cruiser',
-  'siege',
   'scout',
   'frigate',
   'strike_carrier',
@@ -93,8 +95,10 @@ export function hullsOfTab(tab: YardTab): string[] {
       return groundHullsOf('infantry');
     case 'vehicles':
       return groundHullsOf('vehicle');
+    case 'support':
+      return splitSupport(YARD_HULLS, data).support;
     default:
-      return YARD_HULLS;
+      return splitSupport(YARD_HULLS, data).line;
   }
 }
 
@@ -114,6 +118,7 @@ const MODULE_ICON: Record<string, string> = {
   ion_engine: '🚀',
   radar_module: '📡',
   cargo_bay: '📦',
+  siege_platform: '💥',
 };
 const RES_KEY: Record<string, string> = {
   metal: 'res.of.metal',

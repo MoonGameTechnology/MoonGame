@@ -110,6 +110,7 @@ const STAT_LABELS: Record<string, string> = {
   cargoCapacity: t('loadout.stat.cargo'),
   shuttleBay: t('loadout.stat.bay'),
   radarRange: t('loadout.stat.radar'),
+  siegeDamage: t('loadout.stat.siege'),
 };
 
 /** Always shown, even at 0 — a ship's attack and defence are its combat identity. */

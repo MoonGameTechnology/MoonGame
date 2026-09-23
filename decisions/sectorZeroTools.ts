@@ -1,0 +1,27 @@
+/**
+ * Инструменты основной игры, которых в забеге Sector Zero НЕТ.
+ *
+ * Правило владельца (§0.1 `docs/sector-zero-roadmap.md`, 2026-09-17): «Sector Zero не тянет
+ * из основной игры то, что ей по сути не нужно». Забег одиночный, живых игроков в нём нет,
+ * поэтому всё, что говорит с другими людьми или держит мир без тебя, — мёртвые кнопки.
+ * Список утверждён владельцем 2026-09-23 (PVR-6.1): чат, почта, маркеры коалиции, корпорация,
+ * рынок и «Сон» (Хранитель). Дипломатию владелец оставил.
+ *
+ * Значение — id кнопки в рельсе «☰ Ещё» (`prototype/build.mjs`). Сторож в тесте сверяет
+ * их с разметкой: переименованная кнопка иначе молча вернулась бы в забег.
+ */
+export const SECTOR_ZERO_ABSENT_TOOLS = {
+  chat: 'rail-chat',
+  mail: 'rail-msgs',
+  pings: 'rail-pings',
+  corp: 'railcorp',
+  market: 'rail-market',
+  steward: 'rail-steward',
+} as const;
+
+export type SessionTool = keyof typeof SECTOR_ZERO_ABSENT_TOOLS;
+
+/** Есть ли инструмент у игрока прямо сейчас: в забеге Sector Zero — нет, в остальной игре — да. */
+export function toolShown(_tool: SessionTool, sectorZeroRun: boolean): boolean {
+  return !sectorZeroRun;
+}
