@@ -2136,6 +2136,8 @@ export const en: Record<string, string> = {
   'setup.title': 'SKIRMISH SETUP',
 
   // --- sector-zero — Home and persistent preparation between runs.
+  'sector-zero.ad.cancelled': 'The ad was closed early. Nothing was spent.',
+  'sector-zero.ad.unavailable': 'No ad is available right now. Nothing was spent.',
   'sector-zero.back': 'Back to main hub',
   'sector-zero.cancel': 'Keep current run',
   'sector-zero.confirm': 'Start over',
@@ -2177,6 +2179,8 @@ export const en: Record<string, string> = {
   'sector-zero.prep': 'Prepare for a run',
   'sector-zero.prep.abilities': 'Active skill set',
   'sector-zero.prep.back': 'Main menu',
+  'sector-zero.prep.double': 'Double for an ad: +{n} data · +{m} ⌖',
+  'sector-zero.prep.doubled': 'Reward doubled: +{n} data · +{m} ⌖.',
   'sector-zero.prep.earn': 'Completed runs award data for both victory and defeat.',
   'sector-zero.prep.equip': 'Equip',
   'sector-zero.prep.equipped': 'Equipped · remove',
@@ -2208,7 +2212,6 @@ export const en: Record<string, string> = {
   'sector-zero.route.core': 'Epicentre',
   'sector-zero.route.edge': 'Sector edge',
   'sector-zero.saved': 'Run in progress',
-  'sector-zero.shop.ad-declined': 'The ad was not shown. Nothing was spent.',
   'sector-zero.shop.ad-sovereigns': '+{n} ◆ for an ad · {left} left',
   'sector-zero.shop.ad-sovereigns.got': 'Received: +{n} ◆.',
   'sector-zero.shop.ad-sovereigns.used': 'Sovereigns for ads: tomorrow',

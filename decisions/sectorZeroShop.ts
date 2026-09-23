@@ -28,6 +28,7 @@ import { hashUnit } from './sectorZeroForge';
 import {
   sectorSkillLegal,
   SHOP_AD_REFRESHES_PER_DAY,
+  WARRANTS_PER_REWARD,
   type SectorZeroProgress,
 } from './sectorZeroProgress';
 
@@ -228,6 +229,23 @@ export function shopRefresh(
 ): 'hidden' | 'ready' | 'used' {
   if (!caps.ads) return 'hidden';
   return progress.shopRound < SHOP_AD_REFRESHES_PER_DAY ? 'ready' : 'used';
+}
+
+/**
+ * Кнопка «удвоить награду за ролик» (`YAG-3.2`) и то, сколько она принесёт.
+ *
+ * `hidden` — у площадки нет рекламы, удваивать нечего или этот забег уже удвоен. Состояния
+ * «погашена» здесь нет: удвоение принадлежит забегу, а не суткам, и «вернётся завтра»
+ * было бы неправдой — оно вернётся со следующим забегом.
+ */
+export function doubleReward(
+  progress: SectorZeroProgress,
+  caps: ShopCapabilities,
+): { state: 'hidden' | 'ready'; research: number; warrants: number } {
+  const research = progress.lastReward;
+  const warrants = research * WARRANTS_PER_REWARD;
+  const open = research > 0 && progress.doubledThrough < progress.settledThrough;
+  return { state: caps.ads && open ? 'ready' : 'hidden', research, warrants };
 }
 
 /** Лот витрины: сам товар плюс его id. */

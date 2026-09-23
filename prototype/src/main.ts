@@ -13275,11 +13275,11 @@ const sectorPreparation = initSectorZeroPreparation({
   // Суверены тратятся там, где у них есть кран — покупка ИЛИ ролик (`SZE-3.5`).
   platform: shopCapabilities(platform.capabilities),
   sync: syncShopDay,
-  watchAd: async placement => {
-    platform.analytics.emit('rewarded_ad_offered', { placement });
+  watchAd: async (placement, props) => {
+    platform.analytics.emit('rewarded_ad_offered', { placement, ...props });
     const shown = await platform.ads.showRewardedAd({ placement });
-    if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement });
-    return shown.status === 'ok';
+    if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement, ...props });
+    return shown.status;
   },
   progress: () => sectorProgress,
   change: action => {

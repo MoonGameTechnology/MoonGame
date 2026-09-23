@@ -71,6 +71,10 @@ export interface SectorZeroProgress {
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
+  /** Номер забега, чья награда уже удвоена за ролик (`YAG-3.2`). Удвоение доступно, пока
+   *  он меньше {@link settledThrough}: один забег — одно удвоение, и новый расчёт открывает
+   *  его снова. */
+  doubledThrough: number;
   modules: string[];
   /** Звёздность модулей (SZE-1.1), `id → ★`: вертикальная ось Мастерской. Открытие
    *  модуля («Данные экспедиций») и его заточка («Варранты») — разные оси и разные
@@ -117,6 +121,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
+    doubledThrough: 0,
     modules: STARTER_MODULES.filter((id) => data.modules[id]),
     stars: {},
     loadouts: {},
@@ -240,6 +245,7 @@ export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
   | { kind: 'refresh-shop' }
   | { kind: 'ad-sovereigns' }
+  | { kind: 'double-reward' }
   | { kind: 'forge'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
@@ -300,6 +306,15 @@ export function changeSectorZeroProgress(
       // Отказ от ролика действие не зовёт вовсе, поэтому попытку он не тратит.
       if (next.shopRound >= SHOP_AD_REFRESHES_PER_DAY) return null;
       next.shopRound += 1;
+      break;
+    case 'double-reward':
+      // Повтор награды ПОСЛЕДНЕГО рассчитанного забега — ровно той, что пришла за волны
+      // и задачи, обеими валютами. Платой служит досмотренный ролик: до действия дело
+      // доходит только после подтверждения адаптера.
+      if (next.lastReward <= 0 || next.doubledThrough >= next.settledThrough) return null;
+      next.research += next.lastReward;
+      next.warrants += next.lastReward * WARRANTS_PER_REWARD;
+      next.doubledThrough = next.settledThrough;
       break;
     case 'ad-sovereigns': {
       // Порция и лимит — в данных (§0.6б: числа — предмет плейтеста). Ноль в любом из
@@ -436,6 +451,9 @@ export function parseSectorZeroProgress(
     fresh.nextAttempt = Math.max(1, counter(p.nextAttempt, 1));
     fresh.settledThrough = Math.min(fresh.nextAttempt - 1, counter(p.settledThrough));
     fresh.lastReward = counter(p.lastReward);
+    // Отметка удвоения не может обогнать расчёт: «из будущего» она закрыла бы удвоение
+    // следующего забега заранее.
+    fresh.doubledThrough = Math.min(counter(p.doubledThrough), fresh.settledThrough);
     fresh.warrants = counter(p.warrants);
     fresh.sovereigns = counter(p.sovereigns);
     fresh.day = counter(p.day);
