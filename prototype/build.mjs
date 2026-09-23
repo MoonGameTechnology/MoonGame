@@ -256,20 +256,40 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   font-variant-numeric:tabular-nums;white-space:nowrap;
   background:rgba(255,90,77,.08);border:1px solid rgba(255,90,77,.42);}
 /* donate currency (Суверены ◆, gold) sits UNDER the resource bar on the status line,
-   pushed to the right end — so the resource chips get the full top-bar width for numbers. */
-#devline .dl-donate{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;
-  padding:2px 9px;border-radius:11px;color:#fff2cf;font-weight:800;font-size:12px;line-height:1;
-  letter-spacing:.3px;font-variant-numeric:tabular-nums;
-  background:rgba(255,206,92,.08);border:1px solid rgba(255,208,96,.5);
-  box-shadow:0 0 10px rgba(255,198,72,.25),inset 0 0 6px rgba(255,214,120,.12);
-  animation:donatePulse 2.8s ease-in-out infinite;white-space:nowrap;}
-/* faceted gem (SOV_SVG), gold with a soft halo */
-#devline .dl-donate i{color:#ffd45e;text-shadow:0 0 9px rgba(255,212,94,.85);font-style:normal;font-size:14px;}
-#devline .dl-donate i svg{display:block;width:14px;height:14px;
-  filter:drop-shadow(0 0 3px rgba(255,212,94,.75));}
+   pushed to the right end — so the resource chips get the full top-bar width for numbers.
+   Заказ владельца 2026-09-23: фишка — ПРИМАНКА. Золотая заливка, самоцвет с искрой, блик
+   раз в несколько секунд и кнопка «+» — привычный жест «пополнить» из F2P-игр. */
+#devline .dl-donate{position:relative;overflow:hidden;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:6px;
+  padding:3px 4px 3px 9px;border-radius:14px;color:#2a1a00;font:800 12px/1 inherit;cursor:pointer;
+  letter-spacing:.3px;font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:linear-gradient(180deg,#ffe9a3 0%,#ffc94d 45%,#e89a1c 100%);border:1px solid #fff0b8;
+  box-shadow:0 0 12px rgba(255,198,72,.55),0 2px 0 #9a5a00,inset 0 1px 0 rgba(255,255,255,.7);
+  animation:donatePulse 2.4s ease-in-out infinite;transition:transform .12s;}
+#devline .dl-donate:hover{transform:translateY(-1px) scale(1.04);}
+#devline .dl-donate:active{transform:translateY(1px);box-shadow:0 0 8px rgba(255,198,72,.5),0 0 0 #9a5a00;}
+#devline .dl-donate b{font-weight:900;}
+/* блик: светлая полоса пробегает по фишке */
+#devline .dl-donate::after{content:"";position:absolute;top:-50%;left:-60%;width:40%;height:200%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:rotate(20deg);
+  animation:donateShine 3.6s ease-in-out infinite;pointer-events:none;}
+/* faceted gem (SOV_SVG) — крупнее, с тёмным контуром на золоте и искрой */
+#devline .dl-donate i{position:relative;color:#fff7d6;font-style:normal;font-size:15px;}
+#devline .dl-donate i svg{display:block;width:16px;height:16px;
+  filter:drop-shadow(0 0 1px #7a4400) drop-shadow(0 0 4px rgba(255,255,255,.8));}
+#devline .dl-donate i::after{content:"✦";position:absolute;top:-6px;right:-6px;font-size:8px;color:#fff;
+  text-shadow:0 0 4px #fff;animation:donateSpark 2.4s ease-in-out infinite;}
+/* «+» — пополнить */
+#devline .dl-donate em{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;
+  font-style:normal;font-weight:900;font-size:14px;color:#fff;background:#2fb35a;
+  box-shadow:0 0 6px rgba(47,179,90,.8),inset 0 1px 0 rgba(255,255,255,.5);}
 @keyframes donatePulse{
-  0%,100%{box-shadow:0 0 8px rgba(255,198,72,.22),inset 0 0 6px rgba(255,214,120,.12);}
-  50%{box-shadow:0 0 14px rgba(255,205,90,.5),inset 0 0 8px rgba(255,220,130,.22);}}
+  0%,100%{box-shadow:0 0 10px rgba(255,198,72,.45),0 2px 0 #9a5a00,inset 0 1px 0 rgba(255,255,255,.7);}
+  50%{box-shadow:0 0 20px rgba(255,205,90,.9),0 2px 0 #9a5a00,inset 0 1px 0 rgba(255,255,255,.7);}}
+@keyframes donateShine{0%,60%{left:-60%;}100%{left:130%;}}
+@keyframes donateSpark{0%,100%{opacity:0;transform:scale(.4);}50%{opacity:1;transform:scale(1);}}
+@media (prefers-reduced-motion:reduce){
+  #devline .dl-donate,#devline .dl-donate::after,#devline .dl-donate i::after{animation:none;}
+  #devline .dl-donate::after{display:none;}}
 #toasts{position:fixed;left:50%;top:calc(var(--tbh) + 50px);transform:translateX(-50%);z-index:40;display:flex;
   flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(92vw,520px);}
 #toasts .toast{pointer-events:auto;cursor:pointer;background:rgba(3,14,18,.88);border:1px solid var(--line-hi);
@@ -1513,15 +1533,15 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .swarm-contact ul{list-style:none;padding:0;margin:0;}
 .swarm-contact li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;}
 /* scientist council picker (setup-time, over the start-point screen) */
-#swarm-dossier,#scipick,#boonpick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
+#swarm-dossier,#scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
-#swarm-dossier.show,#scipick.show,#boonpick.show{display:flex;}
-#swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
+#swarm-dossier.show,#scipick.show{display:flex;}
+#swarm-dossier .twbox,#scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
-#swarm-dossier .lw-head,#scipick .lw-head,#boonpick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+#swarm-dossier .lw-head,#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
 .swarm-sync{display:none;}
 @keyframes swarm-intel-scan{to{transform:rotate(360deg);}}
-#swarm-dossier-body,#scipickbody,#boonpickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
+#swarm-dossier-body,#scipickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
 .sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px;}
 .sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
 .sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
@@ -1543,8 +1563,6 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .sp-roster{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 /* усиление забега (PVR-1.4): те же карточки, что у совета, в один столбец —
    выбор здесь делается в бою, и колонка читается быстрее решётки. */
-#boonpickbody .bp-list{display:flex;flex-direction:column;gap:9px;}
-#boonpickbody .bp-owed{color:var(--dim);font-size:11px;margin:0 0 10px;}
 .sp-card{text-align:left;cursor:pointer;border:1px solid var(--line-hi);border-radius:9px;padding:9px 10px;background:rgba(53,214,230,.04);color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:3px;}
 .sp-card:hover:not(:disabled){border-color:var(--cyan);background:rgba(53,214,230,.11);box-shadow:0 0 12px rgba(53,214,230,.16);}
 .sp-card:disabled{opacity:.34;cursor:not-allowed;}
@@ -1838,7 +1856,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .res i{font-size:13px;}
   .res i svg{width:14px;height:14px;}
   .res b{font-size:12px;}
-  #devline .dl-donate{font-size:11px;padding:2px 8px;}
+  #devline .dl-donate{font-size:11px;padding:2px 3px 2px 8px;}
   #devline .dl-wave{font-size:11px;padding:2px 8px;margin-left:8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
@@ -2779,7 +2797,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
-  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,#boonpick,
+  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
@@ -2825,7 +2843,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
   #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
-  #swarm-dossier .twbox,#scipick .twbox,#boonpick .twbox{width:53.4vw;max-height:58.5vh;}
+  #swarm-dossier .twbox,#scipick .twbox{width:53.4vw;max-height:58.5vh;}
   /* Persistent intelligence stays beside the map and never intercepts map input
      outside its own box. Its height follows the desktop HUD's actual zoom. */
   #swarm-dossier.pinned{inset:auto;left:70px;bottom:62px;padding:0;z-index:18;
@@ -3055,7 +3073,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
 <div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><span class="swarm-sync" aria-hidden="true" data-i18n="swarm.intel.updated"></span><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
-<div id="boonpick"><div class="twbox"><div class="lw-head"><b data-i18n="win.boon.title"></b><button class="sp-cancel" type="button" data-boonlater="1" data-i18n="win.boon.later"></button></div><div id="boonpickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
@@ -3325,6 +3342,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <path d="M332 397h82l30 30" stroke="#e6b777" opacity=".45"/>
         </svg>
       </div>
+      <aside id="sz-map-panel" class="sz-map-panel" hidden aria-labelledby="sz-map-title">
+        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.map.title"></span><b id="sz-map-title"></b><button id="sz-map-close" type="button" data-i18n-aria="sector-zero.map.close" data-i18n-title="sector-zero.map.close">×</button></div>
+        <div id="sz-map-body" class="sz-map-body"></div>
+        <div id="sz-map-foot" class="sz-map-foot"></div>
+      </aside>
     </div>
     <div id="sz-workshop" hidden></div>
     <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>

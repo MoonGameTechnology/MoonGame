@@ -24,14 +24,6 @@
       ],
       "waveLanding": [
         { "unit": "swarm_lander", "count": 2 }
-      ],
-      "boons": [
-        "boon_gunnery",
-        "boon_engines",
-        "boon_foundry",
-        "boon_sensors",
-        "boon_barrage",
-        "boon_logistics"
       ]
     }
   },

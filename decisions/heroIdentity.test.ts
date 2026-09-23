@@ -76,21 +76,16 @@ describe('hero map privacy and targeting', () => {
     expect(heroGradeGlyph(undefined)).toBe('\u25e6');
   });
 
-  it('обводка редкости НЕ съедает цвет владельца на карте', () => {
-    // Портрет на карте несёт два сигнала: выноска и щиток — цвета ХОЗЯИНА, рамка —
-    // цвета редкости. Рамка ставит свой `strokeStyle` посреди отрисовки, поэтому здесь
-    // сторожится порядок: цвет владельца обязан быть возвращён ДО того, как щиток
-    // обведут. Иначе «чей это герой» молча стало бы «какой он редкости».
+  it('портрет героя на карте — без рамки (заказ владельца 2026-09-23)', () => {
+    // Обводку редкости с карты сняли: редкость читается значком на щитке, а портрет
+    // идёт без рамки. Выноска и щиток остаются цвета владельца — «чей это герой».
     const src = readFileSync(
       new URL('../packages/client/src/heroPortraits.ts', import.meta.url),
       'utf8',
     );
-    const frame = src.indexOf('heroGradeColor(hero.grade)');
-    const restore = src.indexOf('cx.strokeStyle = color;', frame);
-    const shield = src.indexOf("cx.fillStyle = '#081823'", frame);
-    expect(frame).toBeGreaterThan(-1);
-    expect(restore).toBeGreaterThan(frame);
-    expect(shield).toBeGreaterThan(restore);
+    expect(src).not.toContain('strokeRect(box.x');
+    expect(src).not.toContain('heroGradeColor(');
+    expect(src).toContain('heroGradeGlyph(hero.grade)');
   });
 
   it('uses the displayed portrait bounds rather than the hull position', () => {

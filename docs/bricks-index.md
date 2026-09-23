@@ -1027,7 +1027,7 @@
 | PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md` | Соло-запуск задаёт modeId |
 | PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | HUD забега: волна N из M и время до следующей |
 | PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md` | Выбор между волнами |
+| PVR-1.4 | 🗑 | proto core | `docs/sector-zero-roadmap.md` | Выбор между волнами |
 | PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md` | Волны Роя враждебны и доходят до боя |
 | PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md` | Забег доходит до вердикта |
 | PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Пиратская база для первого боя |

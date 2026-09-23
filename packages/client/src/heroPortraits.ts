@@ -1,7 +1,6 @@
 /** One transparent atlas shared by the offline client and the PWA. No per-frame decoding. */
 import atlasUrl from './art/heroes/portraits.webp';
 import {
-  heroGradeColor,
   heroGradeGlyph,
   heroIdentity,
   type PortraitHit,
@@ -78,15 +77,8 @@ export function drawHeroPortrait(
     width,
     width,
   );
-  // HERO-12 — обводка портрета по РЕДКОСТИ. Рисуется поверх картинки, а не под ней:
-  // портрет занимает бокс целиком, и рамка под ним была бы не видна ни на пиксель.
-  // Выноска и щиток выше/ниже остаются цвета ВЛАДЕЛЬЦА — «чей герой» читают первым,
-  // редкость идёт вторым сигналом и его не подменяет.
-  cx.lineWidth = 2;
-  cx.strokeStyle = heroGradeColor(hero.grade);
-  cx.strokeRect(box.x + 1, box.y + 1, width - 2, width - 2);
-  cx.lineWidth = 1;
-  cx.strokeStyle = color;
+  // Рамки вокруг портрета на карте НЕТ (заказ владельца 2026-09-23 снял обводку HERO-12):
+  // редкость читается значком на щитке ниже. Выноска и щиток — цвета ВЛАДЕЛЬЦА.
   cx.fillStyle = '#081823';
   cx.beginPath();
   cx.moveTo(box.x + 15, box.y + 53);
