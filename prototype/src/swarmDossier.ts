@@ -1,25 +1,64 @@
 import { t, tData } from '../../localization/runtime';
 import type { swarmDossier } from '../../decisions/swarmDossier';
+import { orderContacts, swarmDossierSummary } from '../../decisions/swarmDossier';
 import type { JournalRow } from '../../decisions/swarmJournal';
-import { esc, clockHM } from './format';
+import { esc } from './format';
 
 /**
- * PVR-4.5: журнал адаптаций идёт ПЕРВЫМ блоком досье. Порядок содержательный: игрок
- * открывает панель, чтобы понять, почему его тактика перестала работать, и ответ на
- * это — журнал, а не список контактов. Каждая строка помечена уверенностью, иначе
- * гипотеза читается как факт, а адаптация — как читерство ИИ (§3.4).
+ * Досье Роя — что игрок знает о противнике (PVR-4.5; пересобрано по заказу владельца
+ * 2026-09-23: «окошко информации о Рое неинтуитивное, пусть справа открывается и
+ * сворачивается»).
+ *
+ * Прежняя лента шла в порядке РАЗРАБОТКИ, а не вопросов игрока: абзац лора, раскрывашка
+ * про биологию, контакты вида «Контакт swarm-3 · C5R2» с часами наблюдения. Теперь порядок —
+ * вопросами, которые игрок задаёт, открывая досье:
+ *
+ * 1. **Сколько их и что видно сейчас** — сводка сверху. Она же остаётся в шапке, когда
+ *    досье свёрнуто, поэтому отвечает без раскрытия.
+ * 2. **Почему моя тактика перестала работать** — журнал адаптаций, с меткой уверенности
+ *    чипом: гипотеза не должна читаться как факт, а адаптация — как читерство ИИ (§3.4).
+ * 3. **Где они** — карточки сил: мир (нажатие ведёт туда камеру), на радаре ли сейчас и
+ *    состав. Порядок — `orderContacts`: живое сверху, затем свежее.
+ * 4. **Что такое Рой** — лор и биология свёрнуты внизу: их читают один раз.
+ *
+ * Часов наблюдения в досье больше нет (заказ владельца: «цифры подсчёта времени там не
+ * нужны»). Устаревшее наблюдение говорит, что оно устарело, словами.
  */
+
+type Contact = ReturnType<typeof swarmDossier>[number];
+
+/** Сводка одной строкой — для шапки, в том числе свёрнутой. */
+export function swarmDossierBadge(contacts: readonly Contact[]): string {
+  const { seen, live } = swarmDossierSummary(contacts);
+  return seen === 0 ? t('swarm.intel.badge.none') : t('swarm.intel.badge', { seen, live });
+}
+
 function journalHtml(rows: JournalRow[]): string {
   return (
-    `<section class="swarm-journal"><h3>${esc(t('swarm.journal.title'))}</h3><ul>` +
+    `<section class="sd-sec sd-adapt"><h3>${esc(t('swarm.journal.title'))}</h3><ul class="sd-journal">` +
     rows
       .map(
         (r) =>
-          `<li class="j-${esc(r.tier)}"><b>${esc(t('swarm.journal.tier.' + r.tier))}</b> ` +
-          `${esc(t(r.key, r.vars ?? {}))}</li>`,
+          `<li class="j-${esc(r.tier)}"><span class="sd-tag">${esc(t('swarm.journal.tier.' + r.tier))}</span>` +
+          `<span>${esc(t(r.key, r.vars ?? {}))}</span></li>`,
       )
       .join('') +
     `</ul></section>`
+  );
+}
+
+function contactHtml(c: Contact): string {
+  const status = c.live ? t('swarm.intel.live') : t('swarm.intel.stale.short');
+  return (
+    `<article class="sd-contact${c.live ? ' live' : ''}">` +
+    `<header><button type="button" class="sd-loc" data-jump="${esc(c.location)}" ` +
+    `title="${esc(t('swarm.intel.jump'))}">${esc(c.location)}</button>` +
+    `<span class="sd-chip">${esc(status)}</span></header>` +
+    `<ul class="sd-units">${c.units
+      .map((u) => `<li><span>${esc(tData(u.unit.replace(/_/g, ' ')))}</span><b>×${u.count}</b></li>`)
+      .join('')}</ul>` +
+    (c.live ? '' : `<p class="sd-note">${esc(t('swarm.intel.stale'))}</p>`) +
+    `</article>`
   );
 }
 
@@ -27,12 +66,19 @@ export function swarmDossierHtml(
   contacts: ReturnType<typeof swarmDossier>,
   journal: JournalRow[] = [],
 ): string {
-  return (journal.length ? journalHtml(journal) : '') + `<p class="hint">${esc(t('swarm.intel.lore'))}</p>` +
-    `<details class="swarm-biology"><summary>${esc(t('data.brood-chamber'))}</summary>` +
+  const ordered = orderContacts(contacts);
+  return (
+    `<p class="sd-summary">${esc(swarmDossierBadge(contacts))}</p>` +
+    (journal.length ? journalHtml(journal) : '') +
+    `<section class="sd-sec sd-forces"><h3>${esc(t('swarm.intel.forces'))}</h3>` +
+    (ordered.length
+      ? ordered.map(contactHtml).join('')
+      : `<p class="sd-empty">${esc(t('swarm.intel.empty'))}</p>`) +
+    `</section>` +
+    `<details class="sd-sec swarm-biology"><summary>${esc(t('swarm.intel.about'))}</summary>` +
+    `<p>${esc(t('swarm.intel.lore'))}</p>` +
+    `<h4>${esc(t('data.brood-chamber'))}</h4>` +
     `<p>${esc(t('swarm.intel.economy'))}</p><p>${esc(t('swarm.intel.brood'))}</p>` +
-    `<p>${esc(t('swarm.brood.desc'))}</p></details>` + (contacts.length
-    ? contacts.map(c => `<section class="swarm-contact"><h3>${esc(t('swarm.intel.contact', { id: c.id, location: c.location }))}</h3>` +
-      `<p>${esc(c.live ? t('swarm.intel.live') : t('swarm.intel.stale'))} · ${esc(t('swarm.intel.time', { day: Math.floor(c.at / 86400000) + 1, time: clockHM(c.at) }))}</p>` +
-      `<ul>${c.units.map(u => `<li>${esc(tData(u.unit.replace(/_/g, ' ')))} <b>×${u.count}</b></li>`).join('')}</ul></section>`).join('')
-    : `<p>${esc(t('swarm.intel.empty'))}</p>`);
+    `<p>${esc(t('swarm.brood.desc'))}</p></details>`
+  );
 }

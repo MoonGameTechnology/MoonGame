@@ -1578,18 +1578,59 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
 .cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
 #devline [data-solo-play],#devline [data-solo-save],#devline [data-swarm-intel]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
-.swarm-contact{border-top:1px solid var(--line-hi);padding:12px 0;overflow-wrap:anywhere;}
-.swarm-contact h3{font-size:13px;color:var(--cyan);margin:0 0 6px;}
-.swarm-contact p{font-size:11px;color:var(--dim);margin:0 0 8px;}
-.swarm-contact ul{list-style:none;padding:0;margin:0;}
-.swarm-contact li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;}
+/* Досье Роя (заказ владельца 2026-09-23): сводка → адаптации → силы → «О Рое».
+   Порядок — вопросами игрока, а не разработки; см. шапку prototype/src/swarmDossier.ts. */
+.sd-summary{margin:0 0 12px;padding:8px 10px;border:1px solid var(--cyan-dim);border-radius:8px;
+  background:rgba(53,214,230,.06);color:var(--ink);font-size:12px;}
+.sd-sec{margin:0 0 14px;}
+.sd-sec h3{margin:0 0 8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);}
+.sd-journal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.sd-journal li{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.4;color:var(--ink);}
+.sd-tag{flex:none;font-size:9px;letter-spacing:.6px;text-transform:uppercase;padding:2px 6px;border-radius:5px;
+  border:1px solid var(--line-hi);color:var(--dim);margin-top:1px;}
+.sd-journal .j-fact .sd-tag{color:#7df0d0;border-color:rgba(125,240,208,.5);background:rgba(125,240,208,.08);}
+.sd-journal .j-hypothesis .sd-tag{color:#e2a15a;border-color:rgba(226,161,90,.5);background:rgba(226,161,90,.08);}
+.sd-contact{border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin:0 0 8px;background:rgba(255,255,255,.02);}
+.sd-contact.live{border-color:var(--cyan-dim);box-shadow:inset 3px 0 0 var(--cyan);}
+.sd-contact header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px;}
+.sd-loc{border:0;background:none;padding:0;font:700 12px ui-monospace,monospace;color:var(--cyan);cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px;overflow-wrap:anywhere;text-align:left;}
+.sd-loc:hover,.sd-loc:focus-visible{color:#eafffb;}
+.sd-chip{flex:none;font-size:9px;letter-spacing:.5px;text-transform:uppercase;padding:2px 6px;border-radius:5px;
+  color:var(--dim);border:1px solid var(--line-hi);}
+.sd-contact.live .sd-chip{color:#9ff0da;border-color:rgba(125,240,208,.5);}
+.sd-units{list-style:none;margin:0;padding:0;}
+.sd-units li{display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:12px;color:var(--ink);}
+.sd-note{margin:6px 0 0;font-size:10.5px;color:var(--dim);}
+.sd-empty{margin:0;font-size:12px;color:var(--dim);}
+.swarm-biology summary{cursor:pointer;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);}
+.swarm-biology p{font-size:12px;line-height:1.5;color:var(--ink);}
+.swarm-biology h4{margin:10px 0 4px;font-size:12px;color:var(--cyan);}
 /* scientist council picker (setup-time, over the start-point screen) */
-#swarm-dossier,#scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
+#scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
-#swarm-dossier.show,#scipick.show{display:flex;}
-#swarm-dossier .twbox,#scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
+#scipick.show{display:flex;}
+#scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
-#swarm-dossier .lw-head,#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+/* Досье Роя открывается СПРАВА (заказ владельца 2026-09-23): на телефоне — выдвижная
+   панель во всю высоту у правого края, на ПК — приколото в правом столбце (ниже). */
+#swarm-dossier{position:fixed;inset:0;z-index:60;display:none;align-items:stretch;justify-content:flex-end;padding:0;
+  background:rgba(1,5,9,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#swarm-dossier.show{display:flex;}
+#swarm-dossier .twbox{display:flex;flex-direction:column;width:min(420px,88vw);height:100%;overflow:hidden;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box;
+  background:var(--glass);border:1px solid var(--cyan);border-right:0;border-radius:14px 0 0 14px;
+  box-shadow:-12px 0 48px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);animation:sd-in .22s ease-out;}
+@keyframes sd-in{from{transform:translateX(28px);opacity:0;}to{transform:none;opacity:1;}}
+@media (prefers-reduced-motion:reduce){#swarm-dossier .twbox{animation:none;}}
+#swarm-dossier .lw-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sd-fold{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:3px;
+  flex:1;min-width:0;border:0;background:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:default;}
+.sd-fold b{grid-column:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* Сводка в шапке — только у СВЁРНУТОГО досье: в развёрнутом она первой строкой тела. */
+.sd-badge{grid-column:1 / -1;display:none;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sd-chev{display:none;grid-column:2;grid-row:1;}
 .swarm-sync{display:none;}
 @keyframes swarm-intel-scan{to{transform:rotate(360deg);}}
 #swarm-dossier-body,#scipickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
@@ -2894,23 +2935,33 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
   #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
-  #swarm-dossier .twbox,#scipick .twbox{width:53.4vw;max-height:58.5vh;}
+  #scipick .twbox{width:53.4vw;max-height:58.5vh;}
   /* Persistent intelligence stays beside the map and never intercepts map input
      outside its own box. Its height follows the desktop HUD's actual zoom. */
-  #swarm-dossier.pinned{inset:auto;left:70px;bottom:62px;padding:0;z-index:18;
-    width:min(270px,25vw);background:none;backdrop-filter:none;align-items:stretch;}
-  #swarm-dossier.pinned .twbox{width:100%;max-height:min(42vh,calc(var(--vph) - var(--tbh) - 120px));}
+  /* Приколото в ПРАВОМ столбце (заказ владельца 2026-09-23); свёрнутое — одна шапка со
+     сводкой. В голографическом интерфейсе (единственный на ПК) карточка выбранного плавает
+     у объекта и столбец свободен. Без него карточка встаёт в тот же правый столбец — тогда
+     досье уступает ей место (body.sheet-open) и возвращается в том виде, в каком его оставили. */
+  #swarm-dossier.pinned{inset:auto;right:12px;top:calc(var(--tbh) + 28px);padding:0;z-index:18;
+    width:min(300px,24vw);background:none;backdrop-filter:none;align-items:stretch;justify-content:stretch;}
+  #swarm-dossier.pinned .twbox{width:100%;height:auto;max-height:calc(var(--vph) - var(--tbh) - 150px);
+    padding:0;border-right:1px solid var(--cyan);border-radius:12px;animation:none;}
+  body.sheet-open:not(.holo-ui) #swarm-dossier.pinned{display:none;}
   #swarm-dossier.pinned #swarm-dossier-close{display:none;}
+  #swarm-dossier.pinned .sd-fold{cursor:pointer;}
+  #swarm-dossier.pinned.folded .sd-badge{display:block;}
+  #swarm-dossier.pinned .sd-chev{display:inline-block;align-self:center;width:8px;height:8px;
+    border-right:1.5px solid var(--cyan);border-bottom:1.5px solid var(--cyan);transform:rotate(45deg);
+    transition:transform .15s ease;}
+  #swarm-dossier.pinned.folded .sd-chev{transform:rotate(-45deg);}
+  #swarm-dossier.pinned.folded #swarm-dossier-body{display:none;}
   #swarm-dossier.pinned .swarm-sync{display:inline-flex;align-items:center;gap:6px;visibility:hidden;
     color:var(--cyan);font-size:10px;font-weight:400;white-space:nowrap;}
   #swarm-dossier.pinned .swarm-sync::before{content:'';width:11px;height:11px;flex:none;
     border:1px solid var(--cyan-dim);border-top-color:var(--cyan);border-right-color:var(--cyan);border-radius:50%;}
   #swarm-dossier.pinned.updating .swarm-sync{visibility:visible;}
   #swarm-dossier.pinned.updating.scan-motion .swarm-sync::before{animation:swarm-intel-scan .7s linear infinite;}
-  #swarm-dossier.pinned .swarm-contact{border-top:1px solid var(--cyan-dim);padding-top:8px;}
-  #swarm-dossier.pinned .swarm-contact h3{font-size:12px;overflow-wrap:anywhere;}
-  #swarm-dossier.pinned .swarm-contact ul{padding-left:16px;}
-  #swarm-dossier.pinned .swarm-biology{margin-bottom:10px;}
+
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
@@ -3123,7 +3174,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
-<div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><span class="swarm-sync" aria-hidden="true" data-i18n="swarm.intel.updated"></span><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
+<div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><button id="swarm-dossier-fold" class="sd-fold" type="button" aria-expanded="true" aria-controls="swarm-dossier-body"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><span id="swarm-dossier-badge" class="sd-badge"></span><span class="sd-chev" aria-hidden="true"></span></button><span class="swarm-sync" aria-hidden="true" data-i18n="swarm.intel.updated"></span><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
