@@ -93,7 +93,27 @@ export {
   type MosaicSeed,
   type SealPlan,
 } from './state/mosaic';
-export { FORK_AT, FORK_DETOUR, THROUGH_WORLD, deriveRoads, type RoadInput } from './state/roads';
+export {
+  FORK_AT,
+  FORK_DETOUR,
+  THROUGH_WORLD,
+  bypassFork,
+  crossingT,
+  deriveRoads,
+  forkTAtEnd,
+  forkTAtStart,
+  forkToward,
+  halfRoadLength,
+  laneRoad,
+  laneRoadLength,
+  legEndT,
+  passRoadLength,
+  pointAlong,
+  polylineLength,
+  roadAhead,
+  subPolyline,
+  type RoadInput,
+} from './state/roads';
 export {
   sectorKindDef,
   provinceScore,

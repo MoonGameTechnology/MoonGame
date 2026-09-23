@@ -82,30 +82,34 @@ function lerp(a: OriginPoint, b: OriginPoint, t: number): OriginPoint {
  * Где флот НАХОДИТСЯ по правилам — мировая точка, от которой меряют дальности и от
  * которой начинают маршруты. `nodeAt` отдаёт позицию узла карты (или `null`, если узел
  * неизвестен), `now` — игровое время кадра.
+ *
+ * `lanePoint` — точка на ДОРОГЕ лейна по доле её длины (ROADS-2): ядро водит флот по
+ * дорогам с развилками, и доля `t` у ноги и у стоянки — доля длины дороги, а не прямой.
+ * Без него — прямая между узлами, прежнее правило (состояние без сети дорог).
  */
 export function fleetOrigin(
   f: OriginFleet,
   now: number,
   nodeAt: (planetId: string) => OriginPoint | null,
+  lanePoint?: (from: string, to: string, t: number) => OriginPoint | null,
 ): OriginPoint | null {
+  const along = (from: string, to: string, t: number): OriginPoint | null => {
+    if (lanePoint) return lanePoint(from, to, t);
+    const a = nodeAt(from);
+    const b = nodeAt(to);
+    return a && b ? lerp(a, b, t) : null;
+  };
   // Правило 1: стоит на орбите — центр мира, кольцо ни при чём.
   if (f.location) {
     const p = nodeAt(f.location);
     return p ? { x: p.x, y: p.y } : null;
   }
   // Правило 3: стоянка в точке на лейне.
-  if (f.edge) {
-    const a = nodeAt(f.edge.from);
-    const b = nodeAt(f.edge.to);
-    return a && b ? lerp(a, b, f.edge.t) : null;
-  }
+  if (f.edge) return along(f.edge.from, f.edge.to, f.edge.t);
   // Правило 2: в пути — доля внутри границ ноги.
   const m = f.movement;
   if (!m) return null; // правило 4
-  const a = nodeAt(m.from);
-  const b = nodeAt(m.to);
-  if (!a || !b) return null;
   const s0 = m.startT ?? 0;
   const e0 = m.endT ?? 1;
-  return lerp(a, b, s0 + (e0 - s0) * progress(m.departedAt, m.arrivesAt, now));
+  return along(m.from, m.to, s0 + (e0 - s0) * progress(m.departedAt, m.arrivesAt, now));
 }

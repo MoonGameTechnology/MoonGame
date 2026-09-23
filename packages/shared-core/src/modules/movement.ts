@@ -2,7 +2,8 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, FleetEdge, GameState, PlayerId, PlanetId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
-import { distance, fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
+import { fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
+import { forkTAtStart, laneRoadLength, legEndT } from '../state/roads';
 import { corridorVeto, isCorridorEdge } from '../state/corridor';
 import { getStance } from '../state/diplomacy';
 
@@ -75,10 +76,11 @@ function crossesPeace(state: GameState, playerId: string, hops: readonly PlanetI
 }
 
 /** Euclidean length of the lane between two nodes (0 if either is missing). */
+/** Length of the lane's ROAD (ROADS-2) — forks and the crossing included; the straight
+ *  line where the lane has no road. Every fraction a leg carries (`startT`, `endT`, a
+ *  parked `t`) is a share of THIS length, so time, position and interception agree. */
 function laneLength(state: GameState, a: PlanetId, b: PlanetId): number {
-  const pa = state.planets[a]?.position;
-  const pb = state.planets[b]?.position;
-  return pa && pb ? distance(pa, pb) : 0;
+  return laneRoadLength(state, a, b);
 }
 
 /**
@@ -101,7 +103,11 @@ function beginLeg(
   if (!nextHop || !origin || !dest) {
     return false;
   }
-  const endT = hops.length === 1 ? parkT : 1;
+  // Where this leg stops: the park point on the last hop; on the way, the fork of the
+  // next province when the way on shares its trail (ROADS-2) — the fleet goes round the
+  // world, not through it. A fleet that set off from a point already past that fork
+  // (parked on the trunk) goes on to the world instead of turning back.
+  const endT = legEndT(h.state, fromId, nextHop, hops[1], startT, parkT);
   const span = endT - startT;
   if (span <= 0) {
     return false;
@@ -114,8 +120,8 @@ function beginLeg(
   if (speed <= 0) {
     return false;
   }
-  // Distance covered = the fraction [startT,endT] of the full lane length.
-  const legDist = distance(origin.position, dest.position) * span;
+  // Distance covered = the fraction [startT,endT] of the lane's road.
+  const legDist = laneLength(h.state, fromId, nextHop) * span;
   // timeScale compresses all real-time durations (GDD §3.1) — via hoursToMs.
   const legMs = hoursToMs(h.ctx, legDist / speed);
   fleet.movement = {
@@ -321,7 +327,7 @@ function planJourney(
  */
 export const movementModule: GameModule = {
   id: 'movement',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
@@ -516,18 +522,39 @@ export const movementModule: GameModule = {
       ) {
         return;
       }
-      // Final leg ends at a point ON the lane → park there (no node arrival).
-      if (mv.endT !== undefined && mv.endT < 1) {
-        const edge: FleetEdge = { from: mv.from, to: mv.to, t: mv.endT };
-        fleet.movement = null;
-        fleet.location = null;
-        fleet.edge = edge;
-        h.emit('fleet.parked', { fleetId, edge });
-        return;
-      }
       const at = mv.to;
       const remaining = mv.path ?? [];
       const parkT = mv.parkT ?? 1;
+      if (mv.endT !== undefined && mv.endT < 1) {
+        // Final leg ends at a point ON the lane → park there (no node arrival).
+        if (remaining.length === 0) {
+          const edge: FleetEdge = { from: mv.from, to: mv.to, t: mv.endT };
+          fleet.movement = null;
+          fleet.location = null;
+          fleet.edge = edge;
+          h.emit('fleet.parked', { fleetId, edge });
+          return;
+        }
+        // A FORK on the way (ROADS-2): the road goes on without visiting this world. The
+        // owner's rule — the fleets stationed at the planet do not meet it, an empty
+        // province is not taken — is kept by what does NOT fire here: no `fleet.transit`.
+        // `fleet.fork` is its own event (a hero rides along into the province; ROADS-3
+        // hangs the ambush on it).
+        const next = remaining[0]!;
+        fleet.movement = null;
+        fleet.location = null;
+        fleet.edge = null;
+        h.emit('fleet.fork', { fleetId, at, from: mv.from, to: next });
+        if (fleet.battleId) return;
+        const startT = forkTAtStart(h.state, at, next);
+        if (!beginLeg(h, fleet, at, remaining, startT, parkT)) {
+          // Cannot go on (speed 0 / a node gone): stop at the fork, on the road ahead.
+          const edge: FleetEdge = { from: at, to: next, t: startT };
+          fleet.edge = edge;
+          h.emit('fleet.parked', { fleetId, edge });
+        }
+        return;
+      }
       fleet.location = at;
       fleet.edge = null;
       fleet.movement = null;

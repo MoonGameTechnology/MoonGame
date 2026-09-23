@@ -979,10 +979,10 @@
 | PVE-6.4 | ✅ | docs | `docs/pve-team-modes-roadmap.md` | ADR 05/06 → accepted |
 | ROADS-0 | ✅ | docs | `docs/roads-roadmap.md` | Модель и решения владельца — 2026-09-23 |
 | ROADS-1 | ✅ | core data | `docs/roads-roadmap.md` | Сеть дорог в ядре — 2026-09-23 |
-| ROADS-2 | ⏳ | core | `docs/roads-roadmap.md` | Движение по дорогам — |
-| ROADS-3 | 🔒 | core | `docs/roads-roadmap.md` | Встречи на дорогах и засада на развилке — |
+| ROADS-2 | ✅ | core proto | `docs/roads-roadmap.md` | Движение по дорогам — 2026-09-23 |
+| ROADS-3 | ⏳ | core | `docs/roads-roadmap.md` | Встречи на дорогах и засада на развилке — |
 | ROADS-4 | 🔒 | proto cli | `docs/roads-roadmap.md` | Рисунок и приказы — |
-| ROADS-5 | 🔒 | proto data | `docs/roads-roadmap.md` | Баланс и ИИ — |
+| ROADS-5 | ⏳ | proto data | `docs/roads-roadmap.md` | Баланс и ИИ — |
 | ROS-0.1 | ✅ | data proto core | `docs/roster-roadmap.md` | ПКО и зональное ПВО: имя насквозь 2026-09-09 |
 | ROS-0.2 | ✅ | proto | `docs/roster-roadmap.md` | «Верфь» → «Производство» 2026-09-09 |
 | ROS-1.1 | ✅ | core data proto | `docs/roster-roadmap.md` | Пехота и техника: два рода наземных войск 2026-09-09 |

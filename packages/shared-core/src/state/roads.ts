@@ -1,4 +1,4 @@
-import type { PlanetId, PlanetRoads, RoadPoint, RoadTrail } from './gameState';
+import type { GameState, PlanetId, PlanetRoads, RoadPoint, RoadTrail } from './gameState';
 import type { MosaicBorderSegment } from './mosaic';
 
 /**
@@ -42,18 +42,23 @@ export const FORK_AT = 0.5;
  * crossing is at most this much longer than the straight way to it. Without a cap a fork
  * halfway out, serving exits spread wide, made one road of the first chapter half again
  * as long as the line — and travel time is the game's pace. The fork moves closer to the
- * world instead, exactly as far as the cap needs; the trunk gets shorter, the road does
- * not get slower than this.
+ * world instead, exactly as far as the cap needs.
+ *
+ * The cap is a trade, measured on the shipped maps: at 10% half the forks sat within a
+ * quarter of the way from their world (the nearest at 3%) — a fork on top of the planet,
+ * where a road "from a road" reads as a road from the world. At 20% the median fork is
+ * 39% of the way out and roads run 3.6% longer on average (the longest 10.3%).
  */
-export const FORK_DETOUR = 0.1;
+export const FORK_DETOUR = 0.2;
 
 /**
- * When a trail's exits pull in opposite directions, their mean lands near the world and
- * a "fork" would sit on top of the planet — a fork in name only. Below this share of the
- * exits' mean distance the trail runs THROUGH the world instead (fork = null). For two
- * exits at equal distance that is an angle of about 139° between them.
+ * When a trail's exits pull apart, their mean lands near the world and a "fork" would sit
+ * on top of the planet — a fork in name only. Below this share of the exits' mean distance
+ * the trail runs THROUGH the world instead (fork = null). For two exits at equal distance
+ * that is an angle of about 106° between them: wider than that, the two roads meet at the
+ * world, not at a place of their own.
  */
-export const THROUGH_WORLD = 0.35;
+export const THROUGH_WORLD = 0.6;
 
 /** What the derivation reads: centres and terrain, the lanes, the shared edges. */
 export interface RoadInput {
@@ -221,6 +226,226 @@ export function deriveRoads(input: RoadInput): Record<PlanetId, PlanetRoads> {
       crossings: byId,
       trails: trailsOf({ x: sec.x, y: sec.y }, exits, input.corridorsOf(sec.terrain)),
     };
+  }
+  return out;
+}
+
+// ── Reading the network (ROADS-2): what movement, routing and positions ask of it ──
+
+/** The fork of `at`'s trail that serves `toward`; null when that trail runs straight or
+ *  through the world, or `at` has no roads. */
+export function forkToward(state: GameState, at: PlanetId, toward: PlanetId): RoadPoint | null {
+  const trail = state.planets[at]?.roads?.trails.find((t) => t.exits.includes(toward));
+  return trail?.fork ?? null;
+}
+
+/**
+ * The fork a fleet takes when it goes through `at` from `from` to `to` WITHOUT visiting
+ * the world: both neighbours hang off the same trail and that trail forks. Null = the way
+ * through `at` leads past its planet (owner's rule, `roads-roadmap.md` §0.2: only that way
+ * meets the fleets stationed there and takes an empty province).
+ */
+export function bypassFork(
+  state: GameState,
+  at: PlanetId,
+  from: PlanetId,
+  to: PlanetId,
+): RoadPoint | null {
+  if (from === to) return null;
+  const trail = state.planets[at]?.roads?.trails.find((t) => t.exits.includes(from));
+  return trail?.fork && trail.exits.includes(to) ? trail.fork : null;
+}
+
+/**
+ * The road of a lane, world to world: `[world, fork?, crossing, fork?, world]`. A lane
+ * with no road on either side — a state built before roads, a hero's temporary lane —
+ * is the straight line, exactly the pre-road rule, so such a match plays on unchanged.
+ */
+export function laneRoad(state: GameState, from: PlanetId, to: PlanetId): RoadPoint[] | null {
+  const a = state.planets[from];
+  const b = state.planets[to];
+  if (!a || !b) return null;
+  const x = a.roads?.crossings[to];
+  if (!x || !b.roads?.crossings[from]) return [a.position, b.position];
+  const pts: RoadPoint[] = [a.position];
+  const fa = forkToward(state, from, to);
+  if (fa) pts.push(fa);
+  pts.push(x);
+  const fb = forkToward(state, to, from);
+  if (fb) pts.push(fb);
+  pts.push(b.position);
+  return pts;
+}
+
+/** Length of a polyline. */
+export function polylineLength(pts: readonly RoadPoint[]): number {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i]!.x - pts[i - 1]!.x;
+    const dy = pts[i]!.y - pts[i - 1]!.y;
+    total += Math.sqrt(dx * dx + dy * dy);
+  }
+  return total;
+}
+
+/** The point at arc-length fraction `t` ∈ [0,1] of a polyline (clamped). */
+export function pointAlong(pts: readonly RoadPoint[], t: number): RoadPoint {
+  if (pts.length === 1 || t <= 0) return { x: pts[0]!.x, y: pts[0]!.y };
+  const total = polylineLength(pts);
+  if (t >= 1 || total <= 0) {
+    const last = pts[pts.length - 1]!;
+    return { x: last.x, y: last.y };
+  }
+  let left = total * t;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!;
+    const b = pts[i]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const seg = Math.sqrt(dx * dx + dy * dy);
+    if (left <= seg && seg > 0) {
+      const k = left / seg;
+      return { x: a.x + dx * k, y: a.y + dy * k };
+    }
+    left -= seg;
+  }
+  const last = pts[pts.length - 1]!;
+  return { x: last.x, y: last.y };
+}
+
+/** Length of the lane's road (the straight line where the lane has no road). */
+export function laneRoadLength(state: GameState, from: PlanetId, to: PlanetId): number {
+  const road = laneRoad(state, from, to);
+  return road ? polylineLength(road) : 0;
+}
+
+/** Arc fraction, along the road `from`→`to`, of its vertex `index` (0 = `from`'s world). */
+function vertexT(road: readonly RoadPoint[], index: number): number {
+  const total = polylineLength(road);
+  return total > 0 ? polylineLength(road.slice(0, index + 1)) / total : 0;
+}
+
+/** Where along the road `from`→`to` it crosses the border — the province line on the lane.
+ *  0.5 on a straight lane, which is where the midpoint rule always put it. */
+export function crossingT(state: GameState, from: PlanetId, to: PlanetId): number {
+  const road = laneRoad(state, from, to);
+  if (!road || road.length === 2) return 0.5;
+  return vertexT(road, forkToward(state, from, to) ? 2 : 1);
+}
+
+/** Where along the road `from`→`to` it reaches `to`'s fork (serving `from`); 1 when `to`
+ *  has no fork on that trail — the road runs on to the world. */
+export function forkTAtEnd(state: GameState, from: PlanetId, to: PlanetId): number {
+  const road = laneRoad(state, from, to);
+  if (!road || road.length === 2 || !forkToward(state, to, from)) return 1;
+  return vertexT(road, road.length - 2);
+}
+
+/** Where along the road `from`→`to` it leaves `from`'s fork (serving `to`); 0 when `from`
+ *  has no fork on that trail — the road starts at the world. */
+export function forkTAtStart(state: GameState, from: PlanetId, to: PlanetId): number {
+  const road = laneRoad(state, from, to);
+  if (!road || road.length === 2 || !forkToward(state, from, to)) return 0;
+  return vertexT(road, 1);
+}
+
+/** The road inside `at` from its world to the border with `toward` (via the trail's fork).
+ *  Without a road: half the straight lane, the share the midpoint rule gave each side. */
+export function halfRoadLength(state: GameState, at: PlanetId, toward: PlanetId): number {
+  const road = laneRoad(state, at, toward);
+  if (!road) return 0;
+  if (road.length === 2) return polylineLength(road) / 2;
+  return polylineLength(road.slice(0, forkToward(state, at, toward) ? 3 : 2));
+}
+
+/** The road inside `at` for a fleet entering from `from` and leaving to `to`: through the
+ *  fork when the two share a forked trail, otherwise in to the world and out again. */
+export function passRoadLength(
+  state: GameState,
+  at: PlanetId,
+  from: PlanetId,
+  to: PlanetId,
+): number {
+  const fork = bypassFork(state, at, from, to);
+  const xin = state.planets[at]?.roads?.crossings[from];
+  const xout = state.planets[at]?.roads?.crossings[to];
+  if (fork && xin && xout) return polylineLength([xin, fork, xout]);
+  return halfRoadLength(state, at, from) + halfRoadLength(state, at, to);
+}
+
+/**
+ * Where a leg `from`→`to` ends when the journey goes on to `after` (ROADS-2): at `to`'s
+ * fork if the way on shares its trail — unless the leg starts past that fork (a fleet
+ * parked on the trunk goes on to the world rather than turn back) — else at the world.
+ * The last leg (`after` undefined) ends at `parkT`. ONE rule for movement and for the
+ * route line, so the line cannot promise a way the fleet will not fly.
+ */
+export function legEndT(
+  state: GameState,
+  from: PlanetId,
+  to: PlanetId,
+  after: PlanetId | undefined,
+  startT: number,
+  parkT = 1,
+): number {
+  if (after === undefined) return parkT;
+  if (bypassFork(state, to, from, after)) {
+    const atFork = forkTAtEnd(state, from, to);
+    if (atFork > startT) return atFork;
+  }
+  return 1;
+}
+
+/** The part of a polyline between arc fractions `t0` ≤ `t1`: the point at `t0`, the
+ *  vertices strictly between, the point at `t1`. */
+export function subPolyline(pts: readonly RoadPoint[], t0: number, t1: number): RoadPoint[] {
+  const total = polylineLength(pts);
+  const out: RoadPoint[] = [pointAlong(pts, t0)];
+  if (total > 0) {
+    let run = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const dx = pts[i]!.x - pts[i - 1]!.x;
+      const dy = pts[i]!.y - pts[i - 1]!.y;
+      run += Math.sqrt(dx * dx + dy * dy);
+      const t = run / total;
+      if (t > t0 && t < t1) out.push({ x: pts[i]!.x, y: pts[i]!.y });
+    }
+  }
+  out.push(pointAlong(pts, t1));
+  return out;
+}
+
+/**
+ * The road a journey still has to fly, from arc fraction `t` of its current leg: that leg
+ * to its end, then every leg after it — through a fork where the fleet will go round a
+ * world, exactly as `movement` will fly it. What a route line draws.
+ */
+export function roadAhead(
+  state: GameState,
+  mv: { from: PlanetId; to: PlanetId; path?: PlanetId[]; endT?: number; parkT?: number },
+  t: number,
+): RoadPoint[] {
+  const out: RoadPoint[] = [];
+  const path = mv.path ?? [];
+  let from = mv.from;
+  let to = mv.to;
+  let startT = t;
+  let endT = mv.endT ?? 1;
+  for (let i = 0; ; i++) {
+    const road = laneRoad(state, from, to);
+    if (!road) break;
+    for (const p of subPolyline(road, startT, endT)) {
+      const last = out[out.length - 1];
+      if (!last || last.x !== p.x || last.y !== p.y) out.push(p);
+    }
+    const next = path[i];
+    if (next === undefined) break;
+    // A leg that stopped short of the world stopped at its fork: the next one sets off
+    // from that fork (the same point, seen from the lane ahead).
+    startT = endT < 1 ? forkTAtStart(state, to, next) : 0;
+    endT = legEndT(state, to, next, path[i + 1], startT, mv.parkT ?? 1);
+    from = to;
+    to = next;
   }
   return out;
 }
