@@ -91,6 +91,15 @@ export function createWebPlatform(options: WebPlatformOptions = {}): WebPlatform
     events,
     auth: {
       player: () => Promise.resolve({ id: GUEST_ID, authenticated: false }),
+      // Аккаунта площадки вне площадки нет, а логин нашего сервера для неё — «сторонний
+      // сервис» (п. 1.2). Поэтому входа здесь нет и в симуляции: кнопка «Войти», которая
+      // ничего не даёт, обещала бы механику, которой у игрока не будет.
+      canSignIn: false,
+      signIn: () =>
+        Promise.resolve({
+          status: 'unavailable',
+          player: { id: GUEST_ID, authenticated: false },
+        }),
     },
     save: {
       load: () => Promise.resolve(readLocal(saveKey)),

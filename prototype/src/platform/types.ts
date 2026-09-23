@@ -55,8 +55,19 @@ export interface PlatformPurchase {
   receipt?: string;
 }
 
+/** Исход входа: что вышло и кто играет ПОСЛЕ попытки (вошёл — уже новый игрок). */
+export interface PlatformSignIn {
+  status: PlatformOutcome;
+  player: PlatformPlayer;
+}
+
 export interface PlatformAuth {
   player(): Promise<PlatformPlayer>;
+  /** Можно ли предложить вход ЗДЕСЬ. `false` — кнопки быть не должно (capability-правило). */
+  canSignIn: boolean;
+  /** Открыть окно входа площадки — только по нажатию игрока (требование 1.2.1). Отказ
+   *  игрока — `cancelled`, а не ошибка; «здесь входа нет» — `unavailable`. */
+  signIn(): Promise<PlatformSignIn>;
 }
 
 /** Загрузка/сохранение метапрогресса. Формат наш; квоты и ретраи — забота адаптера. */

@@ -60,6 +60,17 @@ describe('WebPlatformAdapter — площадка по умолчанию', () =
     expect(PLATFORM_EVENTS).toContain('iap_completed');
   });
 
+  it('входа нет: кнопки быть не должно, а вызов честно `unavailable` (YAG-1.4)', async () => {
+    // Логин нашего сервера сюда не подставляется: для площадки он «сторонний сервис»
+    // (п. 1.2), а вне площадки аккаунта площадки нет по определению.
+    const p = createWebPlatform({ simulate: true });
+    expect(p.auth.canSignIn).toBe(false);
+    expect(await p.auth.signIn()).toEqual({
+      status: 'unavailable',
+      player: { id: 'web:guest', authenticated: false },
+    });
+  });
+
   it('недоступное хранилище не роняет игру', async () => {
     // В node (а равно в приватном окне и при запрете сайту) `localStorage` нет вовсе.
     // Инвариант: сейв не переживёт вкладку, но игра идёт — ни одного исключения наружу.

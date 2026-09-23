@@ -163,6 +163,113 @@ describe('игрок: гость — это норма (требование 1.2
   });
 });
 
+describe('вход по кнопке (YAG-1.4, требование 1.2.1)', () => {
+  /** Площадка, где игрок — гость, пока окно входа не закрылось успехом. */
+  function signInSdk(dialog: () => Promise<void>) {
+    let authorized = false;
+    let getPlayerCalls = 0;
+    const openAuthDialog = vi.fn(async () => {
+      await dialog();
+      authorized = true;
+    });
+    const sdk: YandexSdk = {
+      getPlayer: async () => {
+        getPlayerCalls += 1;
+        // Снимок, а не живой объект: так ведёт себя площадка — прежний объект игрока
+        // остаётся неавторизованным и после входа (страница «Авторизация», `YAG-0.2`).
+        const now = authorized;
+        return { getUniqueID: () => (now ? 'u-7' : 'anon-7'), isAuthorized: () => now };
+      },
+      auth: { openAuthDialog },
+    };
+    return { sdk, openAuthDialog, getPlayerCalls: () => getPlayerCalls };
+  }
+
+  it('кнопку есть кому показать, только когда у площадки есть и окно входа, и игрок', () => {
+    expect(createYandexPlatform(signInSdk(async () => undefined).sdk).auth.canSignIn).toBe(true);
+    expect(createYandexPlatform({ getPlayer: fakeSdk().sdk.getPlayer }).auth.canSignIn).toBe(false);
+    expect(
+      createYandexPlatform({ auth: { openAuthDialog: async () => undefined } }).auth.canSignIn,
+    ).toBe(false);
+  });
+
+  it('успешный вход — игрок запрашивается ЗАНОВО, иначе интерфейс покажет гостя', async () => {
+    const { sdk, getPlayerCalls } = signInSdk(async () => undefined);
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result).toEqual({ status: 'ok', player: { id: 'u-7', authenticated: true } });
+    // Первый запрос — узнать, что игрок гость; второй — уже ПОСЛЕ окна.
+    expect(getPlayerCalls()).toBe(2);
+  });
+
+  it('отказ игрока — `cancelled`, а не ошибка и не сбой SDK', async () => {
+    const onSdkError = vi.fn();
+    const { sdk } = signInSdk(() => Promise.reject(new Error('closed')));
+    const result = await createYandexPlatform(sdk, { onSdkError }).auth.signIn();
+    expect(result).toEqual({ status: 'cancelled', player: { id: 'anon-7', authenticated: false } });
+    // Отказ — нормальный исход: писать его в журнал сбоев значило бы засорить журнал
+    // каждым «не сейчас».
+    expect(onSdkError).not.toHaveBeenCalled();
+  });
+
+  it('окно бросило синхронно — тоже `cancelled`: кнопка остаётся, игра не падает', async () => {
+    const { sdk } = signInSdk(async () => undefined);
+    sdk.auth = {
+      openAuthDialog: () => {
+        throw new Error('boom');
+      },
+    };
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result.status).toBe('cancelled');
+  });
+
+  it('уже вошедшему окно не показывается вовсе', async () => {
+    const { sdk, openAuthDialog } = fakeSdkWithDialog();
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result.status).toBe('ok');
+    expect(openAuthDialog).not.toHaveBeenCalled();
+  });
+
+  it('окно закрылось «успехом», а игрок всё ещё гость — не `ok`: обещать вход нечем', async () => {
+    const { sdk } = signInSdk(async () => undefined);
+    sdk.getPlayer = async () => ({ getUniqueID: () => 'anon-7', isAuthorized: () => false });
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result).toEqual({ status: 'cancelled', player: { id: 'anon-7', authenticated: false } });
+  });
+
+  it('площадка не умеет входа — `unavailable`, окно не зовётся', async () => {
+    const result = await createYandexPlatform(fakeSdk().sdk).auth.signIn();
+    expect(result.status).toBe('unavailable');
+  });
+
+  it('двойной тап по кнопке открывает ОДНО окно, и оба ждут его исхода', async () => {
+    let finish = (): void => undefined;
+    const { sdk, openAuthDialog } = signInSdk(() => new Promise<void>((r) => (finish = r)));
+    const auth = createYandexPlatform(sdk).auth;
+    const first = auth.signIn();
+    const second = auth.signIn();
+    await vi.waitFor(() => expect(openAuthDialog).toHaveBeenCalledTimes(1));
+    finish();
+    expect((await first).status).toBe('ok');
+    expect((await second).status).toBe('ok');
+    expect(openAuthDialog).toHaveBeenCalledTimes(1);
+  });
+
+  it('после исхода окно снова можно открыть — «в полёте» не залипает', async () => {
+    const { sdk, openAuthDialog } = signInSdk(() => Promise.reject(new Error('closed')));
+    const auth = createYandexPlatform(sdk).auth;
+    await auth.signIn();
+    await auth.signIn();
+    expect(openAuthDialog).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** Уже авторизованный игрок и окно входа, которое звать незачем. */
+function fakeSdkWithDialog() {
+  const openAuthDialog = vi.fn(async () => undefined);
+  const { sdk } = fakeSdk({ auth: { openAuthDialog } });
+  return { sdk, openAuthDialog };
+}
+
 describe('возможности объявляются по тому, что умеет АДАПТЕР', () => {
   it('нереализованные кирпичи стоят false, а их вызовы честно недоступны', async () => {
     const { sdk } = fakeSdk();
