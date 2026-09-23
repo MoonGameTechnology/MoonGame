@@ -12,22 +12,22 @@
  * `if (kind === 'ad')` в коде витрины нет и заводить её не надо: добавить товар «только
  * за рекламу» должно быть правкой JSON.
  *
- * ## Чего здесь ЗАВЕДОМО нет
+ * ## Способы, которых у площадки может не быть
  *
- * ⚠️ Ни кошелька Суверенов, ни показа рекламы в продукте сегодня не существует: IAP и
- * `PlatformAds` описаны в `platform-adapters.md`, но в коде их ноль (сверено `rg`, ни один
- * `YAG-*` кирпич не закрыт). Поэтому оба способа приходят сюда ВЫКЛЮЧЕННЫМИ через
- * {@link ShopCapabilities} и честно отказывают кодом `E_SHOP_UNAVAILABLE`.
+ * Суверены и просмотр рекламы приходят сюда через {@link ShopCapabilities} — флаги площадки,
+ * а не её имя. Рекламу показывает адаптер площадки (`YAG-3.1`; в дев-сборке веба —
+ * симуляция), покупок за деньги в продукте нет до `YAG-4.*`. Нет способа у площадки —
+ * он честно отказывает кодом `E_SHOP_UNAVAILABLE`.
  *
- * Это не заглушка «как будто работает», а прямое требование `platform-adapters.md`:
- * «если `rewardedAds === false`, кнопка бонуса за рекламу не показывается», и отсутствие
- * рекламы — нормальное состояние, а не поломка игрового цикла. Когда адаптер появится,
- * включение обоих способов будет сменой флага, а не переписыванием витрины.
+ * Это прямое требование `platform-adapters.md`: «если `rewardedAds === false`, кнопка бонуса
+ * за рекламу не показывается», и отсутствие рекламы — нормальное состояние, а не поломка
+ * игрового цикла. Включение способа — смена флага, а не переписывание витрины.
  */
 import type { GameData } from '../packages/shared-core/src/index';
 import { hashUnit } from './sectorZeroForge';
 import {
   sectorSkillLegal,
+  SHOP_AD_REFRESHES_PER_DAY,
   type SectorZeroProgress,
 } from './sectorZeroProgress';
 
@@ -106,7 +106,7 @@ export function shopRows(
   const rows: ShopRow[] = [];
   // Витрина — та, что выпала НА ЭТИ сутки (`SZE-3.2`), а не весь каталог. Порядок задаёт
   // ротация и он фиксирован для дня: иначе экран прыгал бы между рендерами.
-  for (const { id } of dailyOffers(progress.seed, progress.day, data)) {
+  for (const { id } of dailyOffers(progress.seed, progress.day, data, progress.shopRound)) {
     const offer = data.sectorZeroShop.offers[id];
     if (!offer) continue;
     const owned = offerOwned(offer, progress);
@@ -178,7 +178,23 @@ export function advanceShopDay(
   day: number,
 ): SectorZeroProgress {
   if (!Number.isSafeInteger(day) || day <= progress.day) return progress;
-  return { ...progress, day };
+  // Новые сутки — новая суточная ротация и новое обновление за ролик (`SZE-3.4`).
+  return { ...progress, day, shopRound: 0 };
+}
+
+/**
+ * Кнопка «обновить витрину за ролик» (`SZE-3.4`).
+ *
+ * `hidden` — у площадки рекламы нет: кнопки нет вовсе, погашенная обещала бы механику,
+ * которой у игрока не будет никогда. `used` — сегодняшнее обновление потрачено: кнопка
+ * видна, но погашена, чтобы было понятно, что возможность есть и вернётся завтра.
+ */
+export function shopRefresh(
+  progress: SectorZeroProgress,
+  caps: ShopCapabilities,
+): 'hidden' | 'ready' | 'used' {
+  if (!caps.ads) return 'hidden';
+  return progress.shopRound < SHOP_AD_REFRESHES_PER_DAY ? 'ready' : 'used';
 }
 
 /** Лот витрины: сам товар плюс его id. */
@@ -198,8 +214,12 @@ export interface DailyOffer {
  *
  * Сортировка по (ключу, затем id) — порядок фиксирован даже при совпадении ключей, иначе
  * витрина прыгала бы между рендерами одного и того же дня.
+ *
+ * `round` — раунд суток (`SZE-3.4`). ⚠️ Раунд 0 хешируется ПРЕЖНЕЙ строкой
+ * `сид ∥ день ∥ id`, без номера: иначе в день выхода обновления витрина молча сменилась
+ * бы у каждого существующего профиля. Раунды дальше дописывают номер в конец ключа.
  */
-export function dailyOffers(seed: string, day: number, data: GameData): DailyOffer[] {
+export function dailyOffers(seed: string, day: number, data: GameData, round = 0): DailyOffer[] {
   const shop = data.sectorZeroShop;
   const pool = Object.entries(shop.offers).filter(([, offer]) => offer.weight > 0);
   if (pool.length === 0 || shop.slots <= 0) return [];
@@ -207,8 +227,14 @@ export function dailyOffers(seed: string, day: number, data: GameData): DailyOff
     id,
     weight: offer.weight,
     // `u^(1/w)`: чем больше вес, тем ближе значение к единице, то есть тем выше в списке.
-    key: Math.pow(hashUnit(`${seed}\u0000${day}\u0000${id}`), 1 / offer.weight),
+    key: Math.pow(hashUnit(offerKey(seed, day, id, round)), 1 / offer.weight),
   }));
   scored.sort((a, b) => (b.key - a.key) || (a.id < b.id ? -1 : 1));
   return scored.slice(0, shop.slots).map(({ id, weight }) => ({ id, weight }));
+}
+
+/** Ключ броска лота. Раунд 0 — прежняя строка без номера (см. {@link dailyOffers}). */
+function offerKey(seed: string, day: number, id: string, round: number): string {
+  const base = `${seed}\u0000${day}\u0000${id}`;
+  return round === 0 ? base : `${base}\u0000${round}`;
 }

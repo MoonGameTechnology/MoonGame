@@ -59,6 +59,11 @@ export interface SectorZeroProgress {
   /** Номер суток витрины магазина (`SZE-3.2`), МОНОТОННЫЙ. Двигает его только
    *  `advanceShopDay`; см. там, почему уменьшать его нельзя. */
   day: number;
+  /** Раунд витрины в пределах суток (`SZE-3.4`): 0 — суточная ротация, дальше — обновления
+   *  за ролик, не больше {@link SHOP_AD_REFRESHES_PER_DAY}. Растёт только действием
+   *  `refresh-shop`, обнуляется только сменой суток — поэтому часы назад попытку не
+   *  возвращают. */
+  shopRound: number;
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
@@ -103,6 +108,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     forgeTries: {},
     forgeShards: {},
     day: 0,
+    shopRound: 0,
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
@@ -194,8 +200,13 @@ export function sectorHullIds(data: GameData): string[] {
   });
 }
 
+/** Сколько раз в сутки витрину можно обновить за ролик — резолюция владельца (§0.7
+ *  роадмапа экономики): «1 раз в сутки + 1 раз за рекламу». */
+export const SHOP_AD_REFRESHES_PER_DAY = 1;
+
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
+  | { kind: 'refresh-shop' }
   | { kind: 'forge'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
@@ -251,6 +262,12 @@ export function changeSectorZeroProgress(
       } else next.forgeShards[action.id] = shards + 1;
       break;
     }
+    case 'refresh-shop':
+      // Платой служит просмотр ролика, подтверждённый адаптером, — списывать здесь нечего.
+      // Отказ от ролика действие не зовёт вовсе, поэтому попытку он не тратит.
+      if (next.shopRound >= SHOP_AD_REFRESHES_PER_DAY) return null;
+      next.shopRound += 1;
+      break;
     case 'buy': {
       // Выдача и списание живут ВМЕСТЕ: разведи их — и однажды товар выдастся без оплаты.
       const offer = data.sectorZeroShop.offers[action.id];
@@ -379,6 +396,9 @@ export function parseSectorZeroProgress(
     fresh.warrants = counter(p.warrants);
     fresh.sovereigns = counter(p.sovereigns);
     fresh.day = counter(p.day);
+    // Сверху — срез до лимита: «999» из правленого localStorage значит только «сегодня
+    // уже обновлял», а не бесконечные обновления.
+    fresh.shopRound = Math.min(counter(p.shopRound), SHOP_AD_REFRESHES_PER_DAY);
     if (typeof p.seed === 'string') fresh.seed = p.seed;
     fresh.modules = [
       ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),
