@@ -88,7 +88,7 @@
 | 3 | `tax` | `tax.ts` | — | — | `economy.production` | — |
 | 4 | `economy` | `economy.ts` | — | `time.advanced` | — | — |
 | 5 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | `fleet.arrival` | — | `fleet.arrived`, `fleet.departed`, `fleet.leg`, `fleet.parked`, `fleet.stranded`, `fleet.transit` · sched: `fleet.arrival` |
-| 6 | `hero` | `hero.ts` | `hero.ability`, `hero.fit`, `hero.move`, `hero.skill.unlock`, `hero.spawn`, `planet.annihilate` | `fleet.arrived`, `fleet.destroyed`, `fleet.transit`, `hero.path.expire`, `hero.respawn`, `unit.died` | `combat.damage`, `fleet.speed` | `hero.ability.used`, `hero.died`, `hero.fitted`, `hero.moved`, `hero.path.created`, `hero.path.expired`, `hero.respawned`, `hero.skill.unlocked`, `hero.spawned`, `planet.destroyed` · sched: `hero.path.expire`, `hero.respawn` |
+| 6 | `hero` | `hero.ts` | `hero.ability`, `hero.equip`, `hero.install`, `hero.skill.unlock`, `hero.spawn`, `hero.unequip`, `hero.uninstall` | `fleet.arrived`, `fleet.destroyed`, `fleet.fork`, `fleet.transit`, `hero.path.expire`, `hero.respawn`, `unit.died` | `combat.damage`, `fleet.speed`, `salvage.share` | `hero.ability.used`, `hero.died`, `hero.equipped`, `hero.installed`, `hero.path.created`, `hero.path.expired`, `hero.respawned`, `hero.skill.unlocked`, `hero.spawned`, `hero.unequipped`, `hero.uninstalled`, `planet.destroyed` · sched: `hero.path.expire`, `hero.respawn` |
 | 7 | `heroEffects` | `heroEffects.ts` | — | — | `combat.damage` | `hero.aura`, `hero.recalled`, `hero.revealed` |
 | 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `diplomacy.mapshare` | `player.eliminated` | — | `diplomacy.changed`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered`, `diplomacy.offered` |
 | 9 | `espionage` | `espionage.ts` | `espionage.spy` | `time.advanced` | — | `espionage.detected`, `espionage.failed`, `intel.stolen` |
@@ -184,8 +184,8 @@
 | `hero.ability.used` | `hero` | — |
 | `hero.aura` | `heroEffects` | — |
 | `hero.died` | `hero` | — |
-| `hero.fitted` | `hero` | — |
-| `hero.moved` | `hero` | — |
+| `hero.equipped` | `hero` | — |
+| `hero.installed` | `hero` | — |
 | `hero.path.created` | `hero` | — |
 | `hero.path.expire` | `hero`* | `hero` |
 | `hero.path.expired` | `hero` | — |
@@ -195,6 +195,8 @@
 | `hero.revealed` | `heroEffects` | — |
 | `hero.skill.unlocked` | `hero` | — |
 | `hero.spawned` | `hero` | — |
+| `hero.unequipped` | `hero` | — |
+| `hero.uninstalled` | `hero` | — |
 | `intel.stolen` | `espionage` | — |
 | `market.cancelled` | `market` | — |
 | `market.listed` | `market` | — |

@@ -12,7 +12,6 @@ const CLIENT_ACTION_TYPES = [
   'fleet.retreat',
   'army.load',
   'army.unload',
-  'hero.move',
   'hero.ability',
   'hero.spawn',
   'hero.skill.unlock',
@@ -20,7 +19,6 @@ const CLIENT_ACTION_TYPES = [
   'hero.unequip',
   'hero.install',
   'hero.uninstall',
-  'planet.annihilate',
   'pve.boon',
   'station.deploy',
   'seat.claim',
@@ -86,7 +84,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['market.cancel', { id: 'market:1' }],
       ['army.load', { fleetId: 'f1', unit: 'marine' }],
       ['army.unload', { fleetId: 'f1', unit: 'marine', count: 3 }],
-      ['hero.move', { to: 'p1' }],
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'corridor', target: 'p2' }],
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'recall' }], // untargeted cast
       ['hero.spawn', { heroId: 'hero:p1', at: 'home_a' }],
@@ -94,7 +91,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['hero.equip', { heroId: 'hero:p1', abilityId: 'corridor' }],
       ['hero.install', { heroId: 'hero:p1', moduleId: 'ion_engine' }],
       ['hero.unequip', { heroId: 'hero:p1', abilityId: 'corridor' }],
-      ['planet.annihilate', { planetId: 'p1' }],
       ['pve.boon', { tech: 'boon_gunnery' }],
       ['station.deploy', { planetId: 'p1' }],
       ['building.construct', { planetId: 'p1', building: 'radar' }],
@@ -187,7 +183,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['technology.research', {}], // missing technology
       ['technology.boost', {}], // missing technology
       ['station.deploy', { planetId: '' }], // empty id
-      ['hero.move', { to: null }], // wrong type
       ['hero.ability', { heroId: 'hero:p1' }], // missing abilityId
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'corridor', target: 7 }], // target not an id
       ['hero.spawn', { heroId: 'hero:p1' }], // missing spawn world
@@ -241,5 +236,17 @@ describe('SV-1.2 · action payload schemas', () => {
     ]) {
       expect(isValidActionPayload(type, { planetId: 'p1', template: 0 })).toBe(false);
     }
+  });
+});
+
+describe('AUD-18 — наследные действия героя сняты с шлюза', () => {
+  it('`hero.move` и `planet.annihilate` больше не клиентские: схемы нет — шлюз не примет', () => {
+    // `planet.annihilate` был живым обходом: аннигилировал мир ПЕРВЫМ по id героем игрока,
+    // даже если тот не владел способностью, не носил её и ничего за неё не платил. Путь
+    // к эффекту остался один — `hero.ability`, где проверены все три условия.
+    expect(actionPayloadSchemas['hero.move']).toBeUndefined();
+    expect(actionPayloadSchemas['planet.annihilate']).toBeUndefined();
+    expect(isValidActionPayload('hero.move', { to: 'p1' })).toBe(false);
+    expect(isValidActionPayload('planet.annihilate', { planetId: 'p1' })).toBe(false);
   });
 });

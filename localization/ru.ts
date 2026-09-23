@@ -1900,6 +1900,11 @@ export const ru: Record<string, string> = {
   'log.diplo.stance': '{a} и {b}: {stance}',
   'log.diplo.war': '{a} объявил войну {b}',
   'log.fleet.destroyed': '☠️ флот {who} уничтожен',
+  // AUD-16: гибель и возвращение СВОЕГО героя. «Не раньше чем» — ядро назначает только
+  // ПОПЫТКУ возрождения, она может не состояться (потолок героев, некуда подняться).
+  'log.hero.died': '♔ герой {who} погиб · вернётся не раньше чем через {h}',
+  'log.hero.died.bare': '♔ герой {who} погиб',
+  'log.hero.respawned': '♔ герой {who} снова в строю · {at}',
   'log.fleet.launched': '🚀 {who} поднял флот с {at}',
   'log.fleet.merged': '⛬ флоты объединены у {at}',
   'log.fleet.split': '⊟ флот разделён у {at}',

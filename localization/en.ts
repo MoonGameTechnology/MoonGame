@@ -1890,6 +1890,11 @@ export const en: Record<string, string> = {
   'log.diplo.stance': '{a} and {b}: {stance}',
   'log.diplo.war': '{a} declared war on {b}',
   'log.fleet.destroyed': '☠️ a {who} fleet was destroyed',
+  // AUD-16: our own hero falling and returning. "No sooner than" — the core schedules
+  // only a respawn ATTEMPT, which can fail (hero cap reached, nowhere to rise).
+  'log.hero.died': '♔ hero {who} has fallen · back no sooner than in {h}',
+  'log.hero.died.bare': '♔ hero {who} has fallen',
+  'log.hero.respawned': '♔ hero {who} is back in the fight · {at}',
   'log.fleet.launched': '🚀 {who} launched a fleet from {at}',
   'log.fleet.merged': '⛬ fleets merged at {at}',
   'log.fleet.split': '⊟ fleet split at {at}',
