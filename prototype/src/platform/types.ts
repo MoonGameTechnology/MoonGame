@@ -111,6 +111,10 @@ export interface PlatformAnalytics {
 /** Площадка целиком. */
 export interface GamePlatform {
   capabilities: PlatformCapabilities;
+  /** Язык игрока, как его сообщила площадка: код ISO 639-1, возможно с регионом. Сырой —
+   *  выбор локали по нему общий для всех площадок (`decisions/platformLocale.ts`). Нет
+   *  поля — площадка язык не сообщает, и остаётся язык браузера (`YAG-1.3`). */
+  language?: string;
   auth: PlatformAuth;
   save: PlatformSave;
   ads: PlatformAds;

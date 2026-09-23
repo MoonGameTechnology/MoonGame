@@ -125,6 +125,7 @@
 | HERO-12 | ✅ | proto | `docs/backlog.md` | Обводка героя — по редкости. |
 | HERO-AURA-R | ✅ | data | `docs/backlog.md` | Радиус ауры: начать маленьким и растить навыком |
 | HERO-PASS-R | ✅ | data | `docs/backlog.md` | Пассивные ауры героя тоже опущены до 42 — |
+| HERO-REQ-T | ✅ | proto | `docs/backlog.md` | Имена узлов в списке требований переведены: |
 | SHIP-1 | ✅ | proto | `docs/backlog.md` | Модель: prototype/src/ships.ts — корпуса (SHIPHULLS: cruiser 3 · |
 | SHIP-2 | ✅ | proto | `docs/backlog.md` | →♻ UI «Верфь». Первая версия — pre-match вкладка в setup — была |
 | CON-1 | ✅ | proto | `docs/backlog.md` | Единый таб-конструктор «Верфь» |
@@ -1167,7 +1168,7 @@
 | YAG-1.1b | ✅ | proto | `docs/yandex-games-roadmap.md` | Платформенная цель сборки и раскладка архива 2026-09-22 |
 | YAG-1.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | YandexGamesAdapter: инициализация и жизненный цикл 2026-09-22 |
 | YAG-1.2a | ✅ | proto | `docs/yandex-games-roadmap.md` | Разметка геймплея на забеге 2026-09-22 |
-| YAG-1.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Язык от площадки |
+| YAG-1.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | Язык от площадки |
 | YAG-1.4 | 🔶 | proto | `docs/yandex-games-roadmap.md` | Гость и повышение до аккаунта площадки 2026-09-23 |
 | YAG-2.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PortableMetaSave: компактный дескриптор забега 2026-09-22 |
 | YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformSave в адаптере Яндекса |

@@ -36,7 +36,9 @@
  * разметке сборки, поэтому его место — `YAG-1.1b` (цель сборки), а адаптер принимает
  * готовый объект. Заодно это делает его тестируемым без сети.
  *
- * **Языка площадки.** `environment.i18n.lang` → наша локаль — отдельный кирпич `YAG-1.3`.
+ * **Выбора локали.** Адаптер отдаёт `environment.i18n.lang` сырым (`language`), а какую
+ * локаль показать игроку, чьего языка у нас нет, решает `decisions/platformLocale.ts` —
+ * одно правило на все площадки, а не своё в каждом адаптере (`YAG-1.3`).
  */
 import {
   initialLifecycle,
@@ -215,8 +217,11 @@ export function createYandexPlatform(
     return { status: after.authenticated ? 'ok' : 'cancelled', player: after };
   };
 
+  const lang = sdk.environment?.i18n?.lang;
+
   return {
     capabilities: capabilitiesOf(sdk),
+    ...(typeof lang === 'string' ? { language: lang } : {}),
     calls,
     events,
     ready: () => apply(lifecycleReady(state)),
