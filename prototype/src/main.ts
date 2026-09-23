@@ -1043,6 +1043,7 @@ const RAIL = 50; // left-rail width
 const BUILD_UNITS = [
   'cruiser',
   'scout',
+  'picket_frigate',
   'strike_carrier',
   'shuttle_carrier',
   'interceptor',

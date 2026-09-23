@@ -32,7 +32,7 @@
     "allowed": {
       "domain": "space",
       "units": [
-        "scout"
+        "picket_frigate"
       ]
     }
   },

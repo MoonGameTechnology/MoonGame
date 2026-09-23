@@ -69,6 +69,7 @@ export const YARD_HULLS = [
   'cruiser',
   'scout',
   'frigate',
+  'picket_frigate',
   'strike_carrier',
   // ROS-3.2: «Шаттл» — КОРАБЛЬ, который возит челноки, а не челнок. Он заказывается
   // среди кораблей, как и всякий корпус со своей линией боя.

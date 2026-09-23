@@ -386,6 +386,33 @@
       "support"
     ]
   },
+  "picket_frigate": {
+    "faction": "blue",
+    "stats": {
+      "attack": 2,
+      "defense": 6,
+      "speed": 52,
+      "hp": 36
+    },
+    "line": "rear",
+    "cost": {
+      "metal": 70,
+      "microelectronics": 4
+    },
+    "buildTimeHours": 3,
+    "upkeep": {
+      "credits": 18
+    },
+    "radarRange": 120,
+    "slots": {
+      "defense": 1,
+      "utility": 2
+    },
+    "hullClass": "light",
+    "traits": [
+      "support"
+    ]
+  },
   "shuttle_carrier": {
     "faction": "blue",
     "stats": {

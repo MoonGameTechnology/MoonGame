@@ -44,6 +44,11 @@ describe('Sector Zero persistent preparation', () => {
     expect(
       changeSectorZeroProgress(p, { kind: 'fit', hull: 'cruiser', id: 'radar_module' }, data),
     ).toBeNull();
+    // Радар — роль дозорного фрегата (решение владельца 2026-09-23): на него встаёт.
+    expect(
+      change(p, { kind: 'fit', hull: 'picket_frigate', id: 'radar_module' }).loadouts
+        .picket_frigate,
+    ).toEqual(['radar_module']);
     p = change(p, { kind: 'fit', hull: 'cruiser', id: 'ion_engine' });
     expect(
       changeSectorZeroProgress(p, { kind: 'fit', hull: 'cruiser', id: 'cargo_bay' }, data),

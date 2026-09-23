@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.28'); // run boons between waves cut: no boon pool, no boon_* techs (owner, 2026-09-23)
+    expect(data.version).toBe('0.1.29'); // picket_frigate: radar module moves to a dedicated support hull (owner, 2026-09-23)
     expect(data.resources).toContain('microelectronics');
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
@@ -140,21 +140,23 @@ describe('game data schema (docs/architecture.md §2)', () => {
   // Дальнее зрение — роль ОДНОГО корабля, а не опция для любого крейсера. Правило
   // объявлено данными (`allowed.units`) и исполняется общим гейтом `canEquip`; тест
   // держит и данные, и гейт — чтобы «только фрегат» не осталось на словах.
-  it('радар-модуль ставится ТОЛЬКО на разведчика (решение владельца 2026-09-23)', () => {
-    // Было «только фрегат». Владелец: «Радар модуль только разведчику (отдельный юнит, на
-    // корпусе фрегата)» — радар делает разведчика разведчиком, фрегату он не положен.
+  it('радар-модуль ставится ТОЛЬКО на дозорный фрегат (решение владельца 2026-09-23)', () => {
+    // История: «только фрегат» → «только разведчик» → отдельный корабль поддержки
+    // «фрегат-радар» (владелец: «в поддержку нужен фрегат разведки или радар… на который и
+    // одевается модуль радара»). Радар — роль этого корпуса, остальным он не положен.
     const data = parseGameData(loadShippedBundle());
     const radar = data.modules.radar_module!;
-    expect(radar.allowed?.units).toEqual(['scout']);
-    const scout = data.units.scout!;
-    expect(moduleAllowed('scout', scout, radar)).toBe(true);
-    expect(canEquip('scout', scout, [], 'radar_module', data)).toEqual({ ok: true });
+    expect(radar.allowed?.units).toEqual(['picket_frigate']);
+    const picket = data.units.picket_frigate!;
+    expect(picket.traits).toContain('support');
+    expect(moduleAllowed('picket_frigate', picket, radar)).toBe(true);
+    expect(canEquip('picket_frigate', picket, [], 'radar_module', data)).toEqual({ ok: true });
     // …и ни на кого больше. Причина ВСЕГДА `E_NOT_ALLOWED`, даже у корпуса без
     // utility-слота: гейт спрашивает «этому кораблю вообще можно?» раньше, чем «есть
     // ли место», и это правильный порядок — иначе крейсер со свободным отсеком и
     // эскадрилья без него объяснялись бы игроку по-разному.
     for (const id of Object.keys(data.units)) {
-      if (id === 'scout') continue;
+      if (id === 'picket_frigate') continue;
       const def = data.units[id]!;
       expect(moduleAllowed(id, def, radar), id).toBe(false);
       expect(canEquip(id, def, [], 'radar_module', data), id).toEqual({
