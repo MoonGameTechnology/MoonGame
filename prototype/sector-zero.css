@@ -161,6 +161,17 @@
 .sz-pips i.lit { background: #79dfdf; }
 .sz-tier { margin: 18px 0 8px; color: #79dfdf; font: 11px/1.5 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
 .sz-card.sz-locked { opacity: .62; }
+/* Магазин-витрина (PVR-6.7): главное предложение шире остальных и с лентой; у товаров
+   без арта — крупный значок цвета того, что они дают. */
+.sz-shopbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.sz-offer { position: relative; }
+.sz-featured { grid-column: span 2; background: linear-gradient(135deg, color-mix(in srgb, var(--rar, #79dfdf) 16%, #091923), #091923 60%); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rar, #79dfdf) 40%, transparent), 0 10px 40px -18px var(--rar, #79dfdf); }
+.sz-featured h3 { font-size: 20px !important; }
+.sz-ribbon { align-self: flex-start; margin: -4px 0 10px; padding: 3px 10px; border-radius: 999px; background: var(--rar, #79dfdf); color: #04161c; font: 700 10px/1.5 ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }
+.sz-glyph { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 10px; border: 1px solid currentColor; border-radius: 12px; font-size: 24px; background: color-mix(in srgb, currentColor 12%, transparent); }
+.sz-glyph-research { color: var(--cur-data); }
+.sz-glyph-warrants { color: var(--cur-warrants); }
+.sz-glyph-skill { color: #79dfdf; }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }
 .sz-hero-head span { font-size: 13px; color: #aad3d1; margin-right: auto; }
 #sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }
@@ -184,6 +195,7 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   /* Корпуса — лентой с прокруткой: семь плиток в три ряда съедали весь экран. */
   .sz-hulls { flex-wrap: nowrap; overflow-x: auto; margin-inline: -22px; padding-inline: 22px; scrollbar-width: none; touch-action: pan-x pan-y; }
   .sz-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .sz-featured { grid-column: auto; }
   #sz-workshop .sz-roster button { gap: 10px; padding: 10px; }
   .sz-roster b { font-size: 14px; }
   .sz-hero { gap: 18px; }

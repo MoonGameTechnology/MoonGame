@@ -29,6 +29,7 @@ import {
   type PayKind,
   type ShopCapabilities,
 } from '../../decisions/sectorZeroShop';
+import { featuredOffer } from '../../decisions/shopFeatured';
 import { esc, displayUnit } from './format';
 import { catalogPortraitHtml } from './shipArt';
 
@@ -249,6 +250,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
   function shop(p: SectorZeroProgress): string {
     const rows = shopRows(p, h.data, h.platform);
     if (rows.length === 0) return `<p class="sz-sub">${t('sector-zero.shop.empty')}</p>`;
+    const featured = featuredOffer(rows, h.data);
     const cards = rows
       .map((row) => {
         const title =
@@ -259,12 +261,26 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               : t(`sector-zero.shop.grants.${row.grants}`, { n: row.amount });
         const what =
           row.kind === 'resource' ? '' : `<div class="sz-card-type">${t(`sector-zero.shop.grants.${row.kind}`)}</div>`;
+        // Что товар ДАЁТ — одной строкой (PVR-6.7): у модуля — его статы, у узла навыка —
+        // его описание. Ресурс говорит за себя заголовком «+12 данных».
+        const gives =
+          row.kind === 'module'
+            ? effectText(h.data.modules[row.grants]?.effects.stats ?? {})
+            : row.kind === 'skill'
+              ? esc(t(h.data.heroSkillTrees[row.grants]?.description ?? ''))
+              : '';
+        // Значок у товаров без арта: ресурс — фишкой своей валюты, узел навыка — звездой Академии.
+        const glyph =
+          row.kind === 'module'
+            ? ''
+            : `<span class="sz-glyph sz-glyph-${row.kind === 'skill' ? 'skill' : esc(row.grants)}" aria-hidden="true">${row.kind === 'skill' ? '✦' : row.grants === 'warrants' ? '⌖' : '◇'}</span>`;
         // Способ, которого НЕТ У ПЛОЩАДКИ, не рисуется вовсе — это прямое требование
         // `platform-adapters.md` («если `rewardedAds === false`, кнопка не показывается»),
         // а не экономия места. Погашенная кнопка «за рекламу» там, где рекламы не бывает,
         // обещает игроку механику, которой у него не будет никогда.
         const offered = row.prices.filter((price) => price.available);
-        if (offered.length === 0) return ''; // купить нечем ни одним способом — не показываем
+        // купить нечем ни одним способом — не показываем
+        if (offered.length === 0) return { star: false, card: '' };
         // Цена остаётся видимой даже у погашенной кнопки (не хватает денег, узел закрыт):
         // `EC-2.3` требует понимать стоимость до того, как сможешь заплатить.
         const buttons = offered
@@ -282,8 +298,13 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         // Модуль в витрине — та же карточка предмета, что в подготовке и Мастерской (PVR-6.4).
         const head =
           row.kind === 'module' && h.data.modules[row.grants] ? itemHead(row.grants, p) : null;
-        return `<article class="sz-card${head?.cls ?? ''}${row.owned ? ' selected' : ''}">${head ? head.html : `${what}<h3>${title}</h3>`}${note}${buttons}</article>`;
+        const star = row.id === featured;
+        const card = `<article class="sz-card sz-offer${head?.cls ?? ''}${row.owned ? ' selected' : ''}${star ? ' sz-featured' : ''}">${star ? `<span class="sz-ribbon">${t('sector-zero.shop.featured')}</span>` : ''}${glyph}${head ? head.html : `${what}<h3>${title}</h3>`}${gives ? `<p>${gives}</p>` : ''}${note}${buttons}</article>`;
+        return { star, card };
       })
+      // Главное предложение — первым и шире остальных (`featuredOffer`, PVR-6.7).
+      .sort((a, b) => Number(b.star) - Number(a.star))
+      .map((offer) => offer.card)
       .join('');
     // Обновление витрины за ролик (`SZE-3.4`): нет рекламы у площадки — кнопки нет вовсе;
     // сегодняшнее потрачено — погашена, но видна: возможность вернётся завтра.
@@ -311,7 +332,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               : t('sector-zero.shop.ad-sovereigns.used'),
             tap.state !== 'ready',
           );
-    return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton}${tapButton}<div class="sz-cards">${cards}</div>`;
+    return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton || tapButton ? `<div class="sz-shopbar">${refreshButton}${tapButton}</div>` : ''}<div class="sz-cards sz-shelf">${cards}</div>`;
   }
 
   /** Глубина узла в дереве навыков: без предпосылок — 1, иначе на один глубже самой

@@ -2183,6 +2183,7 @@ export const en: Record<string, string> = {
   'sector-zero.shop.ad-sovereigns.used': 'Sovereigns for ads: tomorrow',
   'sector-zero.shop.bought': 'Purchased.',
   'sector-zero.shop.empty': 'The shelf is empty.',
+  'sector-zero.shop.featured': 'Deal of the day',
   'sector-zero.shop.grants.module': 'Ship module',
   'sector-zero.shop.grants.research': '+{n} expedition data',
   'sector-zero.shop.grants.skill': 'Hero skill node',
