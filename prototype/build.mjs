@@ -705,6 +705,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
   font:11px ui-monospace,monospace;user-select:text;-webkit-user-select:text;touch-action:pan-y;}
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink);}
 .set-lbl .set-sub{font-size:10px;color:var(--dim);letter-spacing:.2px;}
+/* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
+.set-keys{display:grid;gap:6px;margin:0 0 12px;}
+.set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
+.set-keys dt{font:600 11px/1.4 ui-monospace,monospace;color:var(--cyan);}
+.set-keys dd{margin:0;font-size:11px;line-height:1.45;color:var(--ink);}
 .set-ctl{display:flex;align-items:center;gap:10px;}
 .set-ctl input[type=range]{flex:1;accent-color:var(--cyan);height:22px;cursor:pointer;}
 .set-val{min-width:42px;text-align:right;font-variant-numeric:tabular-nums;color:var(--cyan);font-weight:700;}

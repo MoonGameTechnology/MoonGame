@@ -11,6 +11,7 @@
  * разметка полностью чистая — её можно проверить, не открывая браузер.
  */
 import { t } from '../../localization/runtime';
+import { controlsFor } from '../../decisions/controls';
 
 /** Снимок всех настроек на момент отрисовки. */
 export interface SettingsView {
@@ -34,6 +35,8 @@ export interface SettingsView {
   neutralColor: string;
   /** Выбранная палитра соперников (`classic` | `warm` | `cvd`). */
   palette: string;
+  /** Интерфейс телефона: в «Управлении» — только жесты, клавиш у пальца нет. */
+  touchOnly?: boolean;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -135,6 +138,11 @@ export function settingsBoxHtml(view: SettingsView, renderingReportAvailable = f
     `<div class="pc-sec">${t('settings.snd.title')}</div>` +
     switchRow('snd', t('settings.snd.ui'), t('settings.snd.ui.hint'), view.soundOn) +
     rangeRow('snd-vol', t('settings.snd.vol'), '', view.volume) +
+    // «Управление» (UX-KEYS-1): что нажать → что будет. Таблица и её сторож — `decisions/controls.ts`.
+    `<div class="pc-sec">${t('settings.controls.title')}</div>` +
+    `<dl class="set-keys">${controlsFor(!!view.touchOnly)
+      .map((row) => `<div><dt>${t(row.keys)}</dt><dd>${t(row.does)}</dd></div>`)
+      .join('')}</dl>` +
     `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
     `</div>`
   );

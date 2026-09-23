@@ -10562,6 +10562,7 @@ const settings = initSettings({
     youColor,
     neutralColor,
     palette: rivalPaletteId,
+    touchOnly: !pcUi(),
   }),
   setSweepOpacity,
   setOwnPings: setShowOwnPings,
