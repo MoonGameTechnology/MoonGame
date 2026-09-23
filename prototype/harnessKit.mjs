@@ -71,7 +71,7 @@ export async function instrumentedGame(hooks, { page = 'void-dominion.html' } = 
     format: 'iife',
     platform: 'browser',
     loader: { '.webp': 'dataurl' },
-    define: { __PLAYER_BUILD__: 'false' },
+    define: { __PLAYER_BUILD__: 'false', __SECTOR_ZERO_ONLY__: 'false' },
   });
   const built = builtPage(page).toString('utf8');
   // build.mjs кладёт ровно один известный инлайновый бандл в конец доверенной сборки —

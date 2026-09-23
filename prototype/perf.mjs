@@ -253,7 +253,7 @@ const res = await build({
   // The build profile is a REQUIRED define (see main.ts) — without it the bundle
   // keeps a bare `__PLAYER_BUILD__` and dies with a ReferenceError on first read.
   // Profile the full dev client, same as uitest.mjs and dist/void-dominion.html.
-  define: { __PLAYER_BUILD__: 'false' },
+  define: { __PLAYER_BUILD__: 'false', __SECTOR_ZERO_ONLY__: 'false' },
 });
 
 const mod = { exports: {} };
