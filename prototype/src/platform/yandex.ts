@@ -22,10 +22,11 @@
  *
  * Соблазн выставить `rewardedAds: true` только потому, что у `ysdk.adv` есть метод,
  * велик — и это ровно тот баг, от которого `platform-adapters.md` защищает
- * capability-флагами: UI нарисует кнопку, а нажатие ничего не сделает, пока не закрыт
- * `YAG-3.1`. Здесь флаг значит «эта игра умеет это ЗДЕСЬ И СЕЙЧАС». Реклама, покупки и
- * облачный сейв поднимут свои флаги в своих кирпичах; до тех пор их вызовы честно отвечают
- * `unavailable` — документированный третий исход, а не заглушка-обман.
+ * capability-флагами: UI нарисует кнопку, а нажатие ничего не сделает. Здесь флаг значит
+ * «эта игра умеет это ЗДЕСЬ И СЕЙЧАС». Rewarded поднят `YAG-3.1`; покупки и облачный сейв
+ * поднимут свои флаги в своих кирпичах, а интерстишлов не будет вовсе (резолюция владельца
+ * 2026-09-22). До тех пор их вызовы честно отвечают `unavailable` — документированный
+ * третий исход, а не заглушка-обман.
  *
  * ## Чего здесь нет, и это не забывчивость
  *
@@ -50,12 +51,14 @@ import {
   type LifecycleCall,
   type LifecycleState,
 } from '../../../decisions/platformLifecycle';
+import { initialRewarded, rewardedStep, type RewardedEvent } from '../../../decisions/rewardedAd';
 import type {
   GamePlatform,
   PlatformCapabilities,
   PlatformEvent,
   PlatformPlayer,
   PlatformPurchase,
+  RewardedAdResult,
 } from './types';
 
 /**
@@ -72,8 +75,20 @@ export interface YandexSdk {
   on?: (event: 'game_api_pause' | 'game_api_resume', observer: () => void) => (() => void) | void;
   off?: (event: 'game_api_pause' | 'game_api_resume', observer: () => void) => void;
   getPlayer?: (opts?: { signed?: boolean }) => Promise<YandexPlayer>;
+  /** Реклама — колбэками, возврат `void`, а не промис (§1.1 роадмапа). */
+  adv?: {
+    showRewardedVideo?: (opts?: { callbacks?: YandexRewardedCallbacks }) => void;
+    showFullscreenAdv?: (opts?: { callbacks?: Record<string, unknown> }) => void;
+  };
   environment?: { i18n?: { lang?: string; tld?: string } };
   deviceInfo?: { isMobile?: () => boolean; isDesktop?: () => boolean; isTV?: () => boolean };
+}
+
+export interface YandexRewardedCallbacks {
+  onOpen?: () => void;
+  onRewarded?: () => void;
+  onClose?: () => void;
+  onError?: (error?: unknown) => void;
 }
 
 export interface YandexPlayer {
@@ -111,8 +126,8 @@ const UNAVAILABLE: PlatformPurchase = { status: 'unavailable' };
 
 /**
  * Возможности на СЕГОДНЯ. `auth` и `cloudSave` — свойства площадки, но флаг поднимает
- * только реализованное: облачный сейв ждёт `YAG-2.2`, реклама — `YAG-3.1`, покупки —
- * `YAG-4.2`. Отдельно про покупки: даже когда кирпич будет закрыт, флаг придётся
+ * только реализованное: облачный сейв ждёт `YAG-2.2`, покупки — `YAG-4.2`. Интерстишлов
+ * нет по резолюции владельца, даже если SDK их умеет. Отдельно про покупки: даже когда кирпич будет закрыт, флаг придётся
  * проверять живым запросом — покупки подключаются заявкой и могут быть не включены у
  * конкретной игры (требование 1.12/1.13).
  */
@@ -120,7 +135,7 @@ function capabilitiesOf(sdk: YandexSdk): PlatformCapabilities {
   return {
     auth: typeof sdk.getPlayer === 'function',
     cloudSave: false,
-    rewardedAds: false,
+    rewardedAds: typeof sdk.adv?.showRewardedVideo === 'function',
     interstitialAds: false,
     iap: false,
     analytics: false,
@@ -170,6 +185,45 @@ export function createYandexPlatform(
   const offPause = sdk.on?.('game_api_pause', onPause);
   const offResume = sdk.on?.('game_api_resume', onResume);
 
+  /**
+   * Rewarded-ролик: колбэки SDK → один исход (правила — `decisions/rewardedAd.ts`).
+   * Промис не отклоняется никогда: сбой площадки — это `unavailable`, а не исключение в
+   * магазине. На время ролика звук глушится и геймплей встаёт (п. 4.7) — сами, а не в
+   * расчёте на `game_api_pause`: требование проверяет модерация, и держать его должна
+   * игра. Двойная пауза безопасна — переходы жизненного цикла идемпотентны.
+   */
+  const showRewardedAd = (): Promise<RewardedAdResult> =>
+    new Promise((resolve) => {
+      const show = sdk.adv?.showRewardedVideo;
+      if (typeof show !== 'function') return resolve({ status: 'unavailable' });
+      let ad = initialRewarded;
+      const on = (event: RewardedEvent): void => {
+        const wasOpen = ad.opened;
+        const settled = ad.outcome !== null;
+        ad = rewardedStep(ad, event);
+        if (!wasOpen && ad.opened) onPause();
+        if (settled || !ad.outcome) return;
+        if (ad.opened) onResume();
+        resolve({ status: ad.outcome });
+      };
+      try {
+        show.call(sdk.adv, {
+          callbacks: {
+            onOpen: () => on('open'),
+            onRewarded: () => on('rewarded'),
+            onClose: () => on('close'),
+            onError: (error) => {
+              options.onSdkError?.('showRewardedVideo', error);
+              on('error');
+            },
+          },
+        });
+      } catch (error) {
+        options.onSdkError?.('showRewardedVideo', error);
+        on('error');
+      }
+    });
+
   const lang = sdk.environment?.i18n?.lang;
 
   return {
@@ -211,15 +265,15 @@ export function createYandexPlatform(
         }
       },
     },
-    // Ниже — то, чьи кирпичи ещё не закрыты. Честное `unavailable` вместо заглушки,
-    // которая делает вид, что получилось: capability-флаги выше стоят `false`, поэтому
-    // UI этих путей и не предлагает.
+    // Ниже — то, чего адаптер не умеет. Честное `unavailable` вместо заглушки, которая
+    // делает вид, что получилось: capability-флаги выше стоят `false`, поэтому UI этих
+    // путей и не предлагает.
     save: {
       load: async () => null,
       save: async () => undefined,
     },
     ads: {
-      showRewardedAd: async () => ({ status: 'unavailable' }),
+      showRewardedAd,
       showInterstitial: async () => ({ status: 'unavailable' }),
     },
     iap: {
