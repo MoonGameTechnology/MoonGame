@@ -1002,7 +1002,7 @@
 | SZE-3.1 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Витрина и три способа оплаты |
 | SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Ассортимент |
 | SZE-3.4 | ✅ | proto | `docs/sector-zero-economy-roadmap.md` | Обновление витрины за рекламу |
-| SZE-3.5 | ⏳ | proto data | `docs/sector-zero-economy-roadmap.md` | Суверены за рекламу |
+| SZE-3.5 | ✅ | proto data | `docs/sector-zero-economy-roadmap.md` | Суверены за рекламу |
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md` | Уровень у модуля Роя |
 | SZE-4.2 | ✅ | core | `docs/sector-zero-economy-roadmap.md` | Контригра против уровня |
