@@ -662,6 +662,7 @@
 | TXT-5 | ⏳ | proto | `docs/backlog.md` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
 | TXT-6 | ⏳ | proto | `docs/backlog.md` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
+| SIEGE-1 | ⏳ | data proto | `docs/backlog.md` | Убрать юнит siege из игры, урон по постройкам — модулем. |
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
 | BRWH-2 | ✅ | proto | `docs/backlog.md` | Четыре сгнивших харнеса починены — и два из них ловили |
 | BRWH-3 | ✅ | proto docs | `docs/backlog.md` | Общая база харнесов и снимок экрана одной |
@@ -1040,6 +1041,13 @@
 | PVR-5.3 | ⏳ | data cli | `docs/sector-zero-roadmap.md` | Рост числа задач по главам |
 | PVR-5.4 | ⏳ | proto cli | `docs/sector-zero-roadmap.md` | Экран итогов забега |
 | PVR-6.1 | ✅ | proto | `docs/sector-zero-roadmap.md` | Инструменты мультиплеера не едут в забег |
+| PVR-6.2 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Список корпусов — только то, что игрок строит |
+| PVR-6.3 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Валюты: цвет и «фишка» |
+| PVR-6.4 | ⏳ | data proto | `docs/sector-zero-roadmap.md` | Карточка предмета: рамка редкости и звёзды |
+| PVR-6.5 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Сравнение «до/после» |
+| PVR-6.6 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Академия и Мастерская для «взрослых детей» |
+| PVR-6.7 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Магазин-витрина |
+| PVR-6.8 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Живое главное меню |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |
