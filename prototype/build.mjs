@@ -7,6 +7,7 @@
 //     markup (fenced with <!--dev-only--> … <!--/dev-only--> below) is stripped.
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { platformBuildOptions } from './platformBuild.mjs';
 
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
@@ -27,46 +28,14 @@ const bundle = async (playerBuild) => {
     minify: true,
     legalComments: 'none',
     write: false,
-    define: { __PLAYER_BUILD__: String(playerBuild) },
+    define: { __PLAYER_BUILD__: String(playerBuild), __SECTOR_ZERO_ONLY__: 'false' },
   });
   return res.outputFiles[0].text;
 };
 
-/**
- * Платформенная цель (`YAG-1.1b`) — РАЗЛОЖЕННЫЙ артефакт, а не один HTML.
- *
- * Решение владельца 2026-09-17: `index.html` в корне архива плюс `assets/` рядом.
- * Остальные три цели инлайнят всё в один файл (`loader: dataurl`), и для площадки это
- * был бы самый простой архив — ровно один файл. Но data-URL это base64, то есть около
- * +33% на каждом бинарнике, и кэшировать по частям нечего: правка одной строки заставляет
- * игрока перекачать весь бандл. Раскладка принята ДО того, как приедет настоящий арт.
- *
- * Имена ассетов задаём мы (`[name]-[hash]`), потому что требование 1.22 запрещает
- * пробелы и кириллицу в именах файлов и папок архива; сторож в `buildTarget.test.mjs`
- * проверяет это на готовом артефакте, а не на обещании.
- */
-const bundlePlatform = async () => {
-  const res = await build({
-    entryPoints: ['prototype/src/bootstrap.ts'],
-    bundle: true,
-    format: 'iife',
-    platform: 'browser',
-    target: 'es2020',
-    // Не `dataurl`: бинарники едут отдельными файлами в assets/ (см. шапку).
-    loader: { '.webp': 'file' },
-    assetNames: 'assets/[name]-[hash]',
-    entryNames: 'assets/app',
-    outdir: 'prototype/dist/yandex',
-    // Пути внутри бандла — ОТНОСИТЕЛЬНЫЕ: архив распаковывают в произвольный префикс на
-    // стороне площадки, и абсолютный `/assets/...` там просто не найдётся.
-    publicPath: '.',
-    minify: true,
-    legalComments: 'none',
-    write: false,
-    define: { __PLAYER_BUILD__: 'true' },
-  });
-  return res.outputFiles;
-};
+/** Платформенная цель (`YAG-1.1b`, `YAG-1.1c`): настройки — в `platformBuild.mjs`, общие со
+ *  сторожем описи архива. */
+const bundlePlatform = async () => (await build(platformBuildOptions)).outputFiles;
 
 /** Пульт администратора (ADM-1) — свой вход, без `__PLAYER_BUILD__`: этой странице
  *  нечего вырезать, она и так не знает про игру ничего. */
@@ -3006,7 +2975,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title>${external ? `<link rel="stylesheet" href="assets/app.css">\n${SDK_LOADER}` : `<style>${allCss()}</style>`}</head>
+<title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title>${external ? `${SDK_LOADER}\n<link rel="stylesheet" href="assets/app.css">` : `<style>${allCss()}</style>`}</head>
 <body data-entry="${entry}">
 <section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
   <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
@@ -3586,7 +3555,7 @@ writeFileSync('prototype/dist/sector-zero-dev.html', page(devJs, 'sector-zero'))
 const playerJs = await bundle(true);
 const playerHtml = stripDevMarkup(page(playerJs));
 // A direct menu entry for review and offline play, still using the shared client.
-// This is not the isolated product dependency graph planned in YAG-1.1.
+// It keeps the full player bundle: only the platform archive is cut to Sector Zero (YAG-1.1c).
 const sectorZeroHtml = stripDevMarkup(page(playerJs, 'sector-zero'));
 writeFileSync('prototype/dist/void-dominion.html', devHtml);
 writeFileSync('prototype/dist/void-dominion-player.html', playerHtml);

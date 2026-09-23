@@ -253,7 +253,10 @@ const res = await build({
   write: false,
   // The build profile is a REQUIRED define (see main.ts) — the smoke test drives
   // the full dev client, same as dist/void-dominion.html.
-  define: { __PLAYER_BUILD__: process.argv.includes('--player') ? 'true' : 'false' },
+  define: {
+    __PLAYER_BUILD__: process.argv.includes('--player') ? 'true' : 'false',
+    __SECTOR_ZERO_ONLY__: 'false',
+  },
 });
 
 const mod = { exports: {} };
