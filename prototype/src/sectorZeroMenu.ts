@@ -19,8 +19,9 @@ export interface SectorZeroMenuHooks {
   setMission(value: number): void;
   /** Сколько глав играбельно (`PVE_MISSION_COUNT`) — число живёт у карт, не у экрана. */
   chapters: number;
-  /** Что глава просит: волн до победы и дополнительных задач — из её режима и карты. */
-  chapterInfo(index: number): { waves: number; tasks: number };
+  /** Что глава просит: волн до победы, сколько задач видно в следующем забеге и сколько
+   *  их в запасе главы (PVR-5.3), и выиграна ли она хоть раз. */
+  chapterInfo(index: number): { waves: number; tasks: number; pool: number; cleared: boolean };
   start(): void;
   startDev?: () => void;
   resume(): boolean;
@@ -71,7 +72,8 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     el('sz-chapter-stats').textContent = info
       ? [
           t('sector-zero.chapter.waves', { n: info.waves }),
-          ...(info.tasks ? [t('sector-zero.chapter.tasks', { n: info.tasks })] : []),
+          ...(info.tasks ? [t('sector-zero.chapter.tasks', { n: info.tasks, m: info.pool })] : []),
+          ...(info.cleared ? [t('sector-zero.chapter.cleared')] : []),
         ].join(' · ')
       : '';
     for (const node of lostNodes)
@@ -108,8 +110,8 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     for (const button of missions) {
       const index = Number(button.dataset.mission ?? 0);
       button.setAttribute('aria-pressed', String(index === current()));
-      // Путь пройден до выбранной главы — линия к ней горит.
-      button.classList.toggle('sz-passed', index < current());
+      // Выигранная хоть раз глава отмечена на пути (PVR-5.4).
+      button.classList.toggle('sz-passed', h.chapterInfo(index).cleared);
       button.disabled = loading;
     }
     renderChapter();

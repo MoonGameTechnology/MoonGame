@@ -172,6 +172,28 @@
       ]
     }
   },
+  "objectives": [
+    {
+      "id": "mission.claim-colony",
+      "kind": "control",
+      "targets": [
+        "home_b"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.hold-out",
+      "kind": "wave",
+      "count": 5,
+      "reward": 2
+    },
+    {
+      "id": "mission.recon",
+      "kind": "scout",
+      "count": 6,
+      "reward": 2
+    }
+  ],
   "players": {
     "p1": {
       "name": "Azure Compact",

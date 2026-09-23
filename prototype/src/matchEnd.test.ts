@@ -144,6 +144,14 @@ describe('конец матча — награда выдаётся один р�
     expect(w.meta()).toEqual(meta());
   });
 
+  it('Sector Zero отдаёт экрану разбивку засчёта (PVR-5.4)', () => {
+    const summary = { attempt: 1, chapter: 'pve-1', won: false, waves: 4, totalWaves: 10, base: 5, objectives: [], bonus: 0, total: 5, warrants: 25, unlocked: 0 };
+    const w = wired({ runAward: () => 5, runSummary: () => summary });
+    expect(w.api.check()).toMatchObject({ runReward: 5, runSummary: summary });
+    const bare = wired({ runAward: () => 5, runSummary: () => null });
+    expect(bare.api.check()).not.toHaveProperty('runSummary');
+  });
+
   it('первый конец матча начисляет опыт и пишет метку', () => {
     const a = awardOnce(null, '777', meta(), { won: true, score: 300, place: 1 });
     expect(a.xp).toBeGreaterThan(0);

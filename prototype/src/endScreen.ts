@@ -18,6 +18,7 @@
 import type { GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import type { RunSummary } from '../../decisions/sectorZeroProgress';
 
 /** Что игрок выбрал на панели: сыграть ещё или уйти в меню. */
 export type EndAction = 'again' | 'menu';
@@ -32,6 +33,8 @@ export interface MatchEnd {
   levelUp: number | null;
   /** Persistent expedition data, separate from commander XP. */
   runReward?: number;
+  /** Разбивка засчитанного забега Sector Zero (PVR-5.4). Нет — показывается одна сумма. */
+  runSummary?: RunSummary;
   /** Игрок закрыл панель, чтобы посмотреть на замерший стол. */
   dismissed?: boolean;
 }
@@ -83,15 +86,17 @@ export function endScreenHtml(
   const head = outcomeTitle(end, state.match?.winners);
   const cell = (k: string, v: string): string =>
     `<div class="es-cell"><span class="es-k">${k}</span><span class="es-v">${v}</span></div>`;
-  const xpLine = end.runReward !== undefined
-    ? `<div class="es-xp">${t('sector-zero.end.reward', { n: end.runReward })}</div>`
-    : end.xp > 0
-      ? `<div class="es-xp">${t('end.xp', { n: end.xp })}` +
-        (end.levelUp !== null
-          ? `<span class="lvl">${t('end.level-up', { lvl: end.levelUp })}</span>`
-          : '') +
-        `</div>`
-      : '';
+  const xpLine = end.runSummary
+    ? runSummaryHtml(end.runSummary)
+    : end.runReward !== undefined
+      ? `<div class="es-xp">${t('sector-zero.end.reward', { n: end.runReward })}</div>`
+      : end.xp > 0
+        ? `<div class="es-xp">${t('end.xp', { n: end.xp })}` +
+          (end.levelUp !== null
+            ? `<span class="lvl">${t('end.level-up', { lvl: end.levelUp })}</span>`
+            : '') +
+          `</div>`
+        : '';
   // Формулировка «ещё раз» честна по режиму: соло перезапускает схватку, сеть — открывает
   // браузер матчей (пересадить тот же стол клиент не может).
   const againLabel = end.runReward !== undefined ? t('sector-zero.end.prepare') : view.net ? t('end.new-match') : t('end.play-again');
@@ -112,6 +117,37 @@ export function endScreenHtml(
     `<button class="es-btn" data-es="menu">⌂ ${t('end.to-menu')}</button>` +
     `<button class="es-btn ghost" data-es="board">${t('end.board')}</button>` +
     `</div></div>`
+  );
+}
+
+/**
+ * Итог забега по частям (PVR-5.4): сам забег (волны, победа) — отдельной строкой от
+ * надбавки за задачи; каждая задача — выполнена или нет и сколько заплатила; внизу — сумма
+ * и что откроется к следующему заходу. Одной суммой рост числа задач был бы не виден.
+ */
+export function runSummaryHtml(r: RunSummary): string {
+  const row = (cls: string, label: string, value: string): string =>
+    `<li class="${cls}"><span>${label}</span><b>${value}</b></li>`;
+  const runPart = r.base - (r.won ? 3 : 0);
+  const rows = [
+    row('run', t('sector-zero.end.waves', { n: r.waves, m: r.totalWaves }), `+${runPart}`),
+    ...(r.won ? [row('run', t('sector-zero.end.victory'), '+3')] : []),
+    ...r.objectives.map((o) =>
+      row(
+        o.complete ? 'task done' : 'task',
+        `${o.complete ? '✓' : '✗'} ${esc(t(o.id, { n: o.total }))}`,
+        o.complete ? `+${o.paid}` : '—',
+      ),
+    ),
+  ].join('');
+  const next =
+    r.unlocked > 0
+      ? `<p class="es-next">${t('sector-zero.end.unlocked', { n: r.unlocked })}</p>`
+      : '';
+  return (
+    `<div class="es-run"><ul>${rows}</ul>` +
+    `<div class="es-total"><span>${t('sector-zero.end.total')}</span><b>${t('sector-zero.end.reward', { n: r.total })} · +${r.warrants} ⌖</b></div>` +
+    `${next}</div>`
   );
 }
 

@@ -13,6 +13,7 @@
  * вместо обманчивого «+0». Счётчики карьеры едут на той же метке — их тоже нельзя
  * фармить перезаходом.
  */
+import type { RunSummary } from '../../decisions/sectorZeroProgress';
 import { t } from '../../localization/runtime';
 import type { GameState } from '../../packages/shared-core/src/index';
 import type { MatchEnd } from './endScreen';
@@ -135,6 +136,8 @@ export interface MatchEndHost {
   saveMeta(m: MetaState): void;
   /** Sector Zero's independent reward; null keeps the existing PvP account path. */
   runAward?(): number | null;
+  /** Разбивка этого засчёта для экрана итогов (PVR-5.4); зовётся после `runAward`. */
+  runSummary?(): RunSummary | null;
 }
 
 export interface MatchEndWatch {
@@ -156,10 +159,13 @@ export function initMatchEnd(host: MatchEndHost): MatchEndWatch {
     handled = true;
     const { won, draw } = outcomeOf(s.match, host.me());
     const runReward = host.runAward?.();
-    if (runReward !== undefined && runReward !== null) return {
-      won, draw, why: endReasonText(s.match.reason), xp: 0, levelUp: null,
-      runReward, dismissed: false,
-    };
+    if (runReward !== undefined && runReward !== null) {
+      const runSummary = host.runSummary?.() ?? undefined;
+      return {
+        won, draw, why: endReasonText(s.match.reason), xp: 0, levelUp: null,
+        runReward, ...(runSummary ? { runSummary } : {}), dismissed: false,
+      };
+    }
     const key = awardKeyFor(host.nick());
     const stamp = endStampOf(s.match);
     const award = awardOnce(parseAwardMarker(host.readMarker(key)), stamp, host.loadMeta(), {

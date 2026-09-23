@@ -32,6 +32,8 @@ const hooks = `window.__szTest = {
   // предмет проверки, а не попадание мышью по карте, где камера у Sector Zero близко к дому.
   select: id => { selPlanet = id; selFleet = null; selFleets = new Set(); lastPanelHtml = ''; renderPanel(); },
   selected: () => selPlanet,
+  // Конец забега победой — как его ставит модуль победы ядра.
+  end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
 };`;
 
 const ABSENT = Object.values(SECTOR_ZERO_ABSENT_TOOLS);
@@ -134,9 +136,26 @@ try {
     await page.locator('#sz-back').click();
     await enterSkirmish(page, { fromWelcome: false });
     await check('схватка после забега', false);
+
+    // 4. PVR-5.3/5.4: обычный конец забега засчитывает главу С её задачами и показывает
+    // разбивку, а выигранная глава получает отметку на маршруте.
+    await page.goto(site.url + '/sz');
+    await waitForApp(page);
+    await page.waitForFunction(() => !document.getElementById('sz-new').disabled);
+    await page.locator('#sz-mission-1').click();
+    await page.locator('#sz-new').click();
+    if (await page.locator('#sz-replace').isVisible()) await page.locator('#sz-replace').click();
+    await page.waitForFunction(() => window.__szTest.run() === true);
+    await page.locator('#maploading').waitFor({ state: 'hidden' });
+    await page.evaluate(() => window.__szTest.end());
+    await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#endscreen .es-run li.task').count(), 3, 'три задачи главы II');
+    await page.locator('#endscreen [data-es="menu"]').click();
+    await page.waitForFunction(() => document.getElementById('sz-mission-1').classList.contains('sz-passed'));
   });
   console.log(
-    '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте\n',
+    '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
+      ' итог забега — по частям, глава отмечена пройденной\n',
   );
 } finally {
   await browser.close();

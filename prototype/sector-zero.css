@@ -60,6 +60,8 @@
 #sector-zero .sz-node:hover { border-color: #b3f1e9; }
 #sector-zero .sz-node[aria-pressed="true"] { background: #90e2dd; border-color: #90e2dd; color: #05232b; box-shadow: 0 0 0 4px #90e2dd33, 0 0 22px #90e2dd66; }
 #sector-zero .sz-node.sz-passed { border-color: #90e2dd; color: #d7f5f1; }
+/* Глава выиграна хоть раз (PVR-5.4) — галочка на узле. */
+#sector-zero .sz-node.sz-passed::before { content: "✓"; position: absolute; top: -7px; right: -7px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--rar-simple); color: #04161c; font: 700 10px/1 system-ui, sans-serif; }
 #sector-zero .sz-node.sz-lost { border-style: dashed; border-color: #4b3a5e; color: #6f5f86; background: #0b0f1a; }
 #sector-zero .sz-node.sz-lost.peek { border-color: var(--rar-mythic); color: #d7c3f5; }
 #sector-zero .sz-node.sz-core-node { width: 48px; height: 48px; border-color: var(--rar-legendary); color: #ffb3ae; }

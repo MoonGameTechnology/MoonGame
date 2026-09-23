@@ -179,7 +179,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveMissionOfMap, pveObjectives, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveChapter, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -253,7 +253,7 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
-import { missionProgress } from '../../decisions/missionObjectives';
+import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
@@ -3834,6 +3834,9 @@ const matchEnd = initMatchEnd({
   loadMeta,
   saveMeta,
   runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
+  // Dev-забег не засчитывается — его разбивки нет, и чужую (прошлого забега) не показываем.
+  runSummary: () =>
+    sectorDevActive || sectorProgress.lastRun?.attempt !== sectorAttempt ? null : sectorProgress.lastRun,
 });
 
 // --- rendering ---------------------------------------------------------------
@@ -13245,6 +13248,13 @@ let progressWrite = sectorProgressStore.load().then(raw => {
 });
 let clearedAttempt = 0;
 
+/** Задачи главы, видимые в забеге по текущему профилю (PVR-5.3). Профиль меняется только
+ *  засчётом, поэтому набор стоит неизменным весь забег. */
+function chapterShown(mission: number) {
+  const chapter = pveChapter(mission);
+  return shownObjectives(chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? [], chapter.slots);
+}
+
 function saveSectorProgress(next: SectorZeroProgress): void {
   sectorProgress = next;
   const blob = JSON.stringify(next);
@@ -13316,7 +13326,7 @@ const sectorZeroMenu = initSectorZeroMenu({
         sectorProgress,
         savedRun.sectorZeroAttempt ?? 0,
         savedRun.state as GameState,
-        pveObjectives(sectorMission),
+        pveChapter(savedRun.sectorZeroMission ?? sectorMission),
       );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
@@ -13342,7 +13352,9 @@ const sectorZeroMenu = initSectorZeroMenu({
   chapters: PVE_MISSION_COUNT,
   chapterInfo: index => ({
     waves: data.modes[pveModeId(index) ?? '']?.pve?.waves ?? 0,
-    tasks: pveObjectives(index).length,
+    tasks: chapterShown(index).length,
+    pool: pveChapter(index).objectives.length,
+    cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
   }),
   setMission: value => {
     nextSectorMission = value;
@@ -13401,7 +13413,7 @@ function currentRunSave(): RunSave<GameState> | null {
   const mode = matchMode();
   if (!mode) return null;
   return { v: RUN_SAVE_VERSION, mode, difficulty: pveDifficulty, state: s,
-    sectorZeroAttempt: sectorAttempt, shipLoadouts: runShipLoadouts };
+    sectorZeroAttempt: sectorAttempt, shipLoadouts: runShipLoadouts, sectorZeroMission: sectorMission };
 }
 function saveRun(): void {
   const save = currentRunSave();
@@ -13420,7 +13432,9 @@ function saveRun(): void {
 
 function awardSectorRun(): number {
   if (sectorDevActive) return 0;
-  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s);
+  // Задачи главы платят и здесь, в обычном конце забега (раньше их платил только засчёт
+  // после перезагрузки — PVR-5.3 нашёл это при переходе на запас задач).
+  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, pveChapter(sectorMission));
   if (next !== sectorProgress) {
     // Journal the terminal run before its award. If the page closes between the
     // two writes, opening the menu settles the same serial exactly once.
@@ -13492,6 +13506,7 @@ function restoreRun(): boolean {
   setRunActive(true);
   boonLaterAtWave = -1;
   sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
+  sectorMission = save.sectorZeroMission ?? sectorMission;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
     saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   }
@@ -13672,14 +13687,15 @@ function frame(nowReal: number) {
   // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
   // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
   // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
-  const missions = sectorRunActive ? missionProgress(pveObjectives(sectorMission), s, ME) : [];
+  // Видимы только задачи ЭТОГО забега — запас главы минус закрытое навсегда (PVR-5.3).
+  const missions = sectorRunActive ? missionProgress(chapterShown(sectorMission), s, ME) : [];
   const missionsDone = missions.filter(m => m.complete).length;
   const missionHtml =
     missions.length === 0
       ? ''
       : `<span class="dl-wave" title="${esc(
           missions
-            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${m.reward})`)
+            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${objectiveNominal(m.reward, missions.length)})`)
             .join('\n'),
         )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
   const statusHtml =

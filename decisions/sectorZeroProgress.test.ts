@@ -203,15 +203,15 @@ describe('Sector Zero persistent preparation', () => {
 
     // Задача, которая на этом состоянии ЗАВЕДОМО выполнена: снести то, чего на карте нет.
     const done = { id: 'mission.x', kind: 'raze' as const, targets: ['no_such_building'], reward: 5 };
-    const withBonus = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [done]).research;
+    const withBonus = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, { id: 'ch', objectives: [done] }).research;
     expect(withBonus).toBe(base + 5);
 
     // Контроль: НЕвыполненная задача не платит, и выплата остаётся прежней.
     const notDone = { id: 'mission.y', kind: 'control' as const, targets: ['no_such_planet'], reward: 5 };
-    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, [notDone]).research).toBe(base);
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, { id: 'ch', objectives: [notDone] }).research).toBe(base);
 
     // И контроль формы: пустой список задач — ровно прежнее поведение.
-    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, []).research).toBe(base);
+    expect(settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s, { id: 'ch', objectives: [] }).research).toBe(base);
   });
 
   it('does not confuse two different attempts ending at the same game time', () => {
