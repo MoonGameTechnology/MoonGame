@@ -73,6 +73,8 @@
 .sz-tabs button { flex: 1; max-width: 320px; }
 #sz-prep-status { min-height: 25px; color: #a6dfd4; font-size: 12px; }
 .sz-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 20px; }
+/* Имена из `data.*` строчные — они встают и в середину фраз; на кнопке нужна заглавная. */
+.sz-picker button::first-letter { text-transform: uppercase; }
 .sz-bays { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 18px 0; }
 .sz-bay { border-left: 2px solid #5d9094; padding: 12px 16px; background: #0a1c26; display: grid; gap: 8px; }
 .sz-bay b { color: #aad6d6; font-size: 12px; font-weight: 500; }

@@ -197,10 +197,29 @@ function nodeOpenTo(
 }
 
 
+/** Корпуса, которые владелец убрал из игры, а данные ещё несут. Осадную платформу как юнит
+ *  снимает SIEGE-1 (`docs/backlog.md`) — тогда её здесь не станет и этот список опустеет. */
+export const RETIRED_HULLS: ReadonlySet<string> = new Set(['siege']);
+
+/**
+ * Корпуса, которые игрок забега реально СТРОИТ (PVR-6.2). Раньше сюда шёл любой
+ * космический юнит со слотами — и в подготовке лежали матка Роя и пушки крепости.
+ * Фильтр повторяет ворота ядра, а не заводит свои: уникальный юнит фракции строит
+ * только она (`faction.ts`, `uniqueUnits` — у Роя матка и десантник), а `issued` значит
+ * «приходит вместе с сооружением и не заказывается» (`construction.ts`, орудия крепости).
+ */
 export function sectorHullIds(data: GameData): string[] {
+  const factionOnly = new Set(Object.values(data.factions).flatMap((f) => f.uniqueUnits));
   return Object.keys(data.units).filter((id) => {
     const def = data.units[id]!;
-    return def.domain === 'space' && id !== 'hero' && Object.values(def.slots).some((n) => n > 0);
+    return (
+      def.domain === 'space' &&
+      id !== 'hero' &&
+      Object.values(def.slots).some((n) => n > 0) &&
+      !def.traits.includes('issued') &&
+      !factionOnly.has(id) &&
+      !RETIRED_HULLS.has(id)
+    );
   });
 }
 

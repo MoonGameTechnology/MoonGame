@@ -10,6 +10,7 @@ import {
   prepareSectorZeroRun,
   settleSectorZeroRun,
   sectorHeroSlots,
+  sectorHullIds,
   WARRANTS_PER_REWARD,
   type SectorZeroProgress,
   type SectorProgressAction,
@@ -474,3 +475,25 @@ describe('SZE-1.3 — осколки: серия неудач упирается
     expect(parseSectorZeroProgress(raw, data).forgeShards).toEqual({ radar_module: 2 });
   });
 });
+
+describe('PVR-6.2 — в подготовке только корпуса, которые игрок строит', () => {
+  const hulls = sectorHullIds(data);
+
+  it('нет вражеских, выдаваемых и снятых корпусов', () => {
+    for (const id of ['swarm_brood_mother', 'swarm_lander', 'fortress_guns', 'siege'])
+      expect(hulls, id).not.toContain(id);
+  });
+
+  it('обычные корабли игрока на месте', () => {
+    for (const id of ['frigate', 'cruiser', 'scout', 'strike_carrier', 'shuttle_carrier'])
+      expect(hulls, id).toContain(id);
+  });
+
+  it('фильтр держится на данных: новый уникальный юнит фракции сюда не попадёт', () => {
+    const extra = structuredClone(data);
+    extra.units.test_hive = { ...extra.units.cruiser!, faction: 'swarm' };
+    extra.factions.swarm!.uniqueUnits = [...extra.factions.swarm!.uniqueUnits, 'test_hive'];
+    expect(sectorHullIds(extra)).not.toContain('test_hive');
+  });
+});
+
