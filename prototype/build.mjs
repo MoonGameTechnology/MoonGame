@@ -1820,6 +1820,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-btn.primary{border-color:var(--cyan);background:rgba(53,214,230,.16);color:var(--cyan);}
 #endscreen .es-btn.primary:hover{background:rgba(53,214,230,.28);box-shadow:0 0 12px rgba(53,214,230,.35);}
 #endscreen .es-btn:hover{border-color:var(--cyan-dim);}
+#endscreen .es-btn.wide{flex-basis:100%;}
 #endscreen .es-btn.ghost{flex-basis:100%;background:transparent;color:var(--dim);border-color:var(--line);}
 
 @media (max-width:720px), ((hover: none) and (pointer: coarse) and (max-height: 520px)){

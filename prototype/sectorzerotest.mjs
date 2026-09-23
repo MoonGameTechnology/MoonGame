@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window, document, getComputedStyle -- эти имена живут внутри page.evaluate */
+/* global window, document, getComputedStyle, localStorage -- эти имена живут внутри page.evaluate */
 /**
  * PVR-6.1 — в забеге Sector Zero нет инструментов мультиплеера, а в остальной игре они на месте.
  *
@@ -150,12 +150,23 @@ try {
     await page.evaluate(() => window.__szTest.end());
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#endscreen .es-run li.task').count(), 3, 'три задачи главы II');
-    await page.locator('#endscreen [data-es="menu"]').click();
+    // «Сыграть главу снова» запускает новую попытку ТОЙ ЖЕ главы — её родной мир `landing`.
+    const attempt = await page.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).nextAttempt);
+    await page.locator('#endscreen [data-es="replay"]').click();
+    await page.waitForFunction(
+      (before) =>
+        window.__szTest.run() === true &&
+        window.__szTest.home() === 'landing' &&
+        JSON.parse(localStorage.getItem('sector-zero.progress.v1')).nextAttempt === before + 1,
+      attempt,
+    );
+    await page.locator('#maploading').waitFor({ state: 'hidden' });
+    await leave();
     await page.waitForFunction(() => document.getElementById('sz-mission-1').classList.contains('sz-passed'));
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' итог забега — по частям, глава отмечена пройденной\n',
+      ' итог забега — по частям, глава повторяется с итогов и отмечена пройденной\n',
   );
 } finally {
   await browser.close();

@@ -2152,6 +2152,7 @@ export const en: Record<string, string> = {
   'sector-zero.difficulty': 'New run difficulty',
   'sector-zero.difficulty.hint': 'Your saved run keeps its original difficulty.',
   'sector-zero.end.prepare': 'Upgrade and prepare',
+  'sector-zero.end.replay': 'Play this chapter again',
   'sector-zero.end.reward': '+{n} expedition data',
   'sector-zero.end.total': 'Total',
   'sector-zero.end.unlocked': 'New objectives next run: {n}',
