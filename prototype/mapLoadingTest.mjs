@@ -1,6 +1,8 @@
 /* global window, document, localStorage, HTMLImageElement, requestAnimationFrame -- browser callbacks */
 import assert from 'node:assert/strict';
 
+import { enterSkirmish } from './harnessKit.mjs';
+
 /** Real entry and cancellation while an actual embedded-image decode is pending. */
 export async function checkMapLoading(browser, url) {
   for (const phone of [false, true]) {
@@ -26,12 +28,13 @@ export async function checkMapLoading(browser, url) {
       };
     }, phone);
     await page.goto(url);
-    const start = async () => {
-      for (const id of ['hub-solo', 'sp-go', 'setupgo']) await page.locator('#' + id).click();
+    // Второй вход — уже с сохранением, и игра спрашивает, заменить ли его:
+    // `enterSkirmish` подтверждает диалог (BRWH-2 — харнес падал ровно на нём).
+    const start = async (fromWelcome = false) => {
+      await enterSkirmish(page, { fromWelcome });
       await page.locator('#maploading').waitFor({ state: 'visible' });
     };
-    await page.locator('#cnew').click();
-    await start();
+    await start(true);
     const read = () =>
       page.evaluate(() => ({
         value: document.querySelector('#maploading-progress').value,
@@ -69,7 +72,7 @@ export async function checkMapLoading(browser, url) {
     assert.equal(await page.evaluate(() => document.activeElement.id), 'map');
     // A warm re-entry must finish without another externally released decode.
     await page.evaluate(() => document.querySelector('#tomenu').click());
-    for (const id of ['hub-solo', 'sp-go', 'setupgo']) await page.locator('#' + id).click();
+    await enterSkirmish(page, { fromWelcome: false });
     await page.waitForFunction(
       () =>
         document.querySelector('#maploading').style.display === 'none' &&

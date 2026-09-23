@@ -270,7 +270,7 @@ import { sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import { initSectorZeroMenu } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
 import { getPlatform, type PlatformHost } from './platform/host';
-import { advanceShopDay, localShopDay } from '../../decisions/sectorZeroShop';
+import { advanceShopDay, localShopDay, shopCapabilities } from '../../decisions/sectorZeroShop';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
@@ -13213,7 +13213,8 @@ function syncShopDay(): void {
 const sectorPreparation = initSectorZeroPreparation({
   data,
   // Решения UI принимаются по capability, а не по имени площадки (`platform-adapters.md`).
-  platform: { sovereigns: platform.capabilities.iap, ads: platform.capabilities.rewardedAds },
+  // Суверены тратятся там, где у них есть кран — покупка ИЛИ ролик (`SZE-3.5`).
+  platform: shopCapabilities(platform.capabilities),
   sync: syncShopDay,
   watchAd: async placement => {
     platform.analytics.emit('rewarded_ad_offered', { placement });

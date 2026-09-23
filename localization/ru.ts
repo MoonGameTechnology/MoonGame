@@ -1583,9 +1583,9 @@ export const ru: Record<string, string> = {
   'hero.hook.combat-damage': 'урон флотам рядом',
   'hero.hook.fleet-speed': 'скорость флота',
   'hero.passive.convoy-impulse.desc':
-    'Герой ведёт сбор: флоты, выходящие из узлов в радиусе 300, летят на 8% быстрее.',
+    'Герой ведёт сбор: флоты, выходящие из узлов в радиусе 42, летят на 8% быстрее.',
   'hero.passive.rally-beacon.desc':
-    'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 300.',
+    'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 42.',
   'hero.passive.asteroid-pilot.desc':
     'Корабль героя теряет меньше хода в астероидах: +20% к скорости входа в любую астероидную местность.',
   'hero.passive.vanguard-impulse.desc':
@@ -1613,7 +1613,7 @@ export const ru: Record<string, string> = {
   'hero.tree.psi-weak-points.desc':
     'Радар не просто светит: он читает бреши в чужой броне. Флоты противника внутри просвеченной зоны получают на 5% больше урона. Свои, союзные и нейтральные флоты не задеты.',
   'hero.tree.void-attunement.desc':
-    'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.',
+    'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 42.',
   'hero.tree.void-translocator.desc':
     'Вершина коридорной ветки: герой перестаёт прокладывать путь и просто исчезает в одном узле, чтобы появиться в другом.',
   'hero.unit.commander.desc':
@@ -2177,6 +2177,9 @@ export const ru: Record<string, string> = {
   'sector-zero.restore-failed': 'Не удалось открыть сохранение. Можно начать новый забег.',
   'sector-zero.saved': 'Забег в процессе',
   'sector-zero.shop.ad-declined': 'Реклама не показана. Ничего не списано.',
+  'sector-zero.shop.ad-sovereigns': '+{n} ◆ за рекламу · осталось {left}',
+  'sector-zero.shop.ad-sovereigns.got': 'Получено: +{n} ◆.',
+  'sector-zero.shop.ad-sovereigns.used': 'Суверены за рекламу — завтра',
   'sector-zero.shop.bought': 'Куплено.',
   'sector-zero.shop.empty': 'Витрина пуста.',
   'sector-zero.shop.grants.module': 'Модуль корабля',
@@ -2189,6 +2192,9 @@ export const ru: Record<string, string> = {
   'sector-zero.shop.pay.ad': 'За рекламу · {n}',
   'sector-zero.shop.pay.sovereigns': 'Купить · {n} ◆',
   'sector-zero.shop.pay.warrants': 'Купить · {n} ⌖',
+  'sector-zero.shop.refresh': 'Новая витрина за рекламу',
+  'sector-zero.shop.refresh.used': 'Новая витрина — завтра',
+  'sector-zero.shop.refreshed': 'Витрина обновлена.',
   'sector-zero.shop.sovereigns': 'Суверены: {n} ◆',
   'sector-zero.summary': 'Волны: {wave} / {total} · {difficulty}',
   'sector-zero.title': 'SECTOR ZERO',

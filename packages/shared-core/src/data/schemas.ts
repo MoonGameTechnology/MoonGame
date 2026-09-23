@@ -948,6 +948,15 @@ export const SectorZeroShopSchema = z.object({
   /** Сколько лотов показывать в сутки. Больше каталога — покажется весь каталог. */
   slots: z.number().int().nonnegative().default(0),
   offers: z.record(z.string(), SectorZeroOfferSchema).default({}),
+  /** Суверены за rewarded-ролик (SZE-3.5, резолюция владельца §0.6б): малая порция и
+   *  дневной лимит. Числа — предмет плейтеста, поэтому здесь, а не в коде. Ноль в любом
+   *  поле выключает кран целиком: кнопки нет, действие отказывает. */
+  adSovereigns: z
+    .object({
+      amount: z.number().int().nonnegative().default(0),
+      perDay: z.number().int().nonnegative().default(0),
+    })
+    .prefault({}),
 });
 
 export const HeroGradeDefSchema = z.object({

@@ -370,6 +370,48 @@ describe('штаб героев — разметка панели', () => {
   });
 });
 
+describe('штаб героев — имена узлов в списке требований (HERO-REQ-T)', () => {
+  /** Имя узла — это имя игровых ДАННЫХ (`data/heroSkillTrees.json` держит их
+   *  по-английски), значит спрашивать его надо через `tData()`: слаг `data.neural-lace`
+   *  и лежит в локали. Оба списка `requires` звали `t()`, для которого «Neural Lace» —
+   *  ключ; ключа такого нет, и `t()` честно возвращал саму строку. Итог: заголовок узла
+   *  по-русски, а его же имя строкой ниже — по-английски. */
+  const treeName = (id: string): string => tData(data.heroSkillTrees[id]!.name);
+
+  it('под запертым узлом требование названо по-русски', () => {
+    const html = initHeroStaff(hostOf()).paneHtml();
+    // `overclocked_helm` заперт на старте и требует ровно `neural_lace`.
+    const needs = [...html.matchAll(/<span class="hx-st">([^<]*)<\/span>/g)]
+      .map((m) => m[1]!)
+      .filter((x) => x.startsWith(t('hero.tree.needs', { n: '' }).trim()));
+    expect(needs.length).toBeGreaterThan(0);
+    expect(needs.some((x) => x.includes(treeName('neural_lace')))).toBe(true); // «Нейрокружево»
+    expect(needs.some((x) => x.includes(data.heroSkillTrees.neural_lace!.name))).toBe(false);
+  });
+
+  it('в досье узла список требований тоже переведён', () => {
+    const staff = initHeroStaff(hostOf());
+    staff.click(click('[data-hnode]', { hnode: 'overclocked_helm' }));
+    const html = staff.paneHtml();
+    expect(html).toContain('hx-dossier');
+    const req = html.match(/<span class="hx-(?:ok|no)">[✓✗] ([^<]*)<\/span>/);
+    expect(req).not.toBeNull();
+    expect(req![1]).toBe(treeName('neural_lace'));
+  });
+
+  it('НИ ОДНО английское имя узла не доезжает до игрока на русской локали', () => {
+    // Сторож шире двух починенных мест: ловит любой будущий вызов `t()` там, где
+    // нужен `tData()`, включая узлы, которых сегодня в каталоге ещё нет.
+    const staff = initHeroStaff(hostOf());
+    staff.click(click('[data-hnode]', { hnode: 'corridor_open' })); // досье с двумя рейками
+    const html = staff.paneHtml();
+    for (const [id, nd] of Object.entries(data.heroSkillTrees)) {
+      if (tData(nd.name) === nd.name) continue; // имя без перевода сторожить нечем
+      expect(html, id).not.toContain(nd.name);
+    }
+  });
+});
+
 describe('штаб героев — клики', () => {
   it('выбор героя перекрашивает панель и сбрасывает досье', () => {
     const s = staffed();

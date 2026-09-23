@@ -163,6 +163,113 @@ describe('игрок: гость — это норма (требование 1.2
   });
 });
 
+describe('вход по кнопке (YAG-1.4, требование 1.2.1)', () => {
+  /** Площадка, где игрок — гость, пока окно входа не закрылось успехом. */
+  function signInSdk(dialog: () => Promise<void>) {
+    let authorized = false;
+    let getPlayerCalls = 0;
+    const openAuthDialog = vi.fn(async () => {
+      await dialog();
+      authorized = true;
+    });
+    const sdk: YandexSdk = {
+      getPlayer: async () => {
+        getPlayerCalls += 1;
+        // Снимок, а не живой объект: так ведёт себя площадка — прежний объект игрока
+        // остаётся неавторизованным и после входа (страница «Авторизация», `YAG-0.2`).
+        const now = authorized;
+        return { getUniqueID: () => (now ? 'u-7' : 'anon-7'), isAuthorized: () => now };
+      },
+      auth: { openAuthDialog },
+    };
+    return { sdk, openAuthDialog, getPlayerCalls: () => getPlayerCalls };
+  }
+
+  it('кнопку есть кому показать, только когда у площадки есть и окно входа, и игрок', () => {
+    expect(createYandexPlatform(signInSdk(async () => undefined).sdk).auth.canSignIn).toBe(true);
+    expect(createYandexPlatform({ getPlayer: fakeSdk().sdk.getPlayer }).auth.canSignIn).toBe(false);
+    expect(
+      createYandexPlatform({ auth: { openAuthDialog: async () => undefined } }).auth.canSignIn,
+    ).toBe(false);
+  });
+
+  it('успешный вход — игрок запрашивается ЗАНОВО, иначе интерфейс покажет гостя', async () => {
+    const { sdk, getPlayerCalls } = signInSdk(async () => undefined);
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result).toEqual({ status: 'ok', player: { id: 'u-7', authenticated: true } });
+    // Первый запрос — узнать, что игрок гость; второй — уже ПОСЛЕ окна.
+    expect(getPlayerCalls()).toBe(2);
+  });
+
+  it('отказ игрока — `cancelled`, а не ошибка и не сбой SDK', async () => {
+    const onSdkError = vi.fn();
+    const { sdk } = signInSdk(() => Promise.reject(new Error('closed')));
+    const result = await createYandexPlatform(sdk, { onSdkError }).auth.signIn();
+    expect(result).toEqual({ status: 'cancelled', player: { id: 'anon-7', authenticated: false } });
+    // Отказ — нормальный исход: писать его в журнал сбоев значило бы засорить журнал
+    // каждым «не сейчас».
+    expect(onSdkError).not.toHaveBeenCalled();
+  });
+
+  it('окно бросило синхронно — тоже `cancelled`: кнопка остаётся, игра не падает', async () => {
+    const { sdk } = signInSdk(async () => undefined);
+    sdk.auth = {
+      openAuthDialog: () => {
+        throw new Error('boom');
+      },
+    };
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result.status).toBe('cancelled');
+  });
+
+  it('уже вошедшему окно не показывается вовсе', async () => {
+    const { sdk, openAuthDialog } = fakeSdkWithDialog();
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result.status).toBe('ok');
+    expect(openAuthDialog).not.toHaveBeenCalled();
+  });
+
+  it('окно закрылось «успехом», а игрок всё ещё гость — не `ok`: обещать вход нечем', async () => {
+    const { sdk } = signInSdk(async () => undefined);
+    sdk.getPlayer = async () => ({ getUniqueID: () => 'anon-7', isAuthorized: () => false });
+    const result = await createYandexPlatform(sdk).auth.signIn();
+    expect(result).toEqual({ status: 'cancelled', player: { id: 'anon-7', authenticated: false } });
+  });
+
+  it('площадка не умеет входа — `unavailable`, окно не зовётся', async () => {
+    const result = await createYandexPlatform(fakeSdk().sdk).auth.signIn();
+    expect(result.status).toBe('unavailable');
+  });
+
+  it('двойной тап по кнопке открывает ОДНО окно, и оба ждут его исхода', async () => {
+    let finish = (): void => undefined;
+    const { sdk, openAuthDialog } = signInSdk(() => new Promise<void>((r) => (finish = r)));
+    const auth = createYandexPlatform(sdk).auth;
+    const first = auth.signIn();
+    const second = auth.signIn();
+    await vi.waitFor(() => expect(openAuthDialog).toHaveBeenCalledTimes(1));
+    finish();
+    expect((await first).status).toBe('ok');
+    expect((await second).status).toBe('ok');
+    expect(openAuthDialog).toHaveBeenCalledTimes(1);
+  });
+
+  it('после исхода окно снова можно открыть — «в полёте» не залипает', async () => {
+    const { sdk, openAuthDialog } = signInSdk(() => Promise.reject(new Error('closed')));
+    const auth = createYandexPlatform(sdk).auth;
+    await auth.signIn();
+    await auth.signIn();
+    expect(openAuthDialog).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** Уже авторизованный игрок и окно входа, которое звать незачем. */
+function fakeSdkWithDialog() {
+  const openAuthDialog = vi.fn(async () => undefined);
+  const { sdk } = fakeSdk({ auth: { openAuthDialog } });
+  return { sdk, openAuthDialog };
+}
+
 describe('возможности объявляются по тому, что умеет АДАПТЕР', () => {
   it('нереализованные кирпичи стоят false, а их вызовы честно недоступны', async () => {
     const { sdk } = fakeSdk();
@@ -186,6 +293,127 @@ describe('возможности объявляются по тому, что у
 
   it('без getPlayer площадка не обещает и авторизацию', () => {
     expect(createYandexPlatform({}).capabilities.auth).toBe(false);
+  });
+});
+
+describe('язык игрока (YAG-1.3, требование 2.14)', () => {
+  it('язык площадки доезжает как есть — решение о локали принимает не адаптер', () => {
+    const { sdk } = fakeSdk({ environment: { i18n: { lang: 'tr', tld: 'com.tr' } } });
+    // `tr` нарочно: локали у нас такой нет, и адаптер обязан не «помогать» — выбор
+    // резерва живёт в `decisions/platformLocale.ts`, одно правило на все площадки.
+    expect(createYandexPlatform(sdk).language).toBe('tr');
+  });
+
+  it('площадка языка не сообщила — поля нет, а не пустая строка или мусор', () => {
+    expect(createYandexPlatform({}).language).toBeUndefined();
+    expect(createYandexPlatform({ environment: {} }).language).toBeUndefined();
+    const junk = { environment: { i18n: { lang: 7 as unknown as string } } };
+    expect(createYandexPlatform(junk).language).toBeUndefined();
+  });
+});
+
+describe('rewarded-реклама (YAG-3.1)', () => {
+  type Callbacks = Partial<
+    Record<'onOpen' | 'onRewarded' | 'onClose' | 'onError', (e?: Error) => void>
+  >;
+  /** Площадка, которая проигрывает ролик по сценарию: имена колбэков по порядку. */
+  function adSdk(script: (keyof Callbacks)[]) {
+    const fullscreen = vi.fn();
+    const { sdk, calls } = fakeSdk({
+      adv: {
+        showRewardedVideo: ({ callbacks }: { callbacks?: Callbacks } = {}) => {
+          for (const name of script)
+            callbacks?.[name]?.(name === 'onError' ? new Error('no fill') : undefined);
+        },
+        showFullscreenAdv: fullscreen,
+      },
+    });
+    return { sdk, calls, fullscreen };
+  }
+
+  it('площадка умеет rewarded — флаг поднят; интерстишлов нет по решению владельца', () => {
+    const { capabilities } = createYandexPlatform(adSdk([]).sdk);
+    expect(capabilities.rewardedAds).toBe(true);
+    // Резолюция 2026-09-22: в Sector Zero реклама только по нажатию игрока.
+    expect(capabilities.interstitialAds).toBe(false);
+  });
+
+  it('досмотрел — `ok`', async () => {
+    const platform = createYandexPlatform(adSdk(['onOpen', 'onRewarded', 'onClose']).sdk);
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({ status: 'ok' });
+  });
+
+  it('ЗАКРЫЛ КРЕСТИКОМ — `cancelled`, а не награда', async () => {
+    const platform = createYandexPlatform(adSdk(['onOpen', 'onClose']).sdk);
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({
+      status: 'cancelled',
+    });
+  });
+
+  it('ролика нет — `unavailable`, и сбой уходит в журнал разработчика', async () => {
+    const onSdkError = vi.fn();
+    const platform = createYandexPlatform(adSdk(['onError']).sdk, { onSdkError });
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({
+      status: 'unavailable',
+    });
+    expect(onSdkError).toHaveBeenCalledWith('showRewardedVideo', expect.any(Error));
+  });
+
+  it('SDK бросил синхронно — `unavailable`, а не отклонённый промис', async () => {
+    const onSdkError = vi.fn();
+    const { sdk } = fakeSdk({
+      adv: {
+        showRewardedVideo: () => {
+          throw new Error('boom');
+        },
+      },
+    });
+    const result = await createYandexPlatform(sdk, { onSdkError }).ads.showRewardedAd({
+      placement: 'shop.lot',
+    });
+    expect(result).toEqual({ status: 'unavailable' });
+    expect(onSdkError).toHaveBeenCalledWith('showRewardedVideo', expect.any(Error));
+  });
+
+  it('на время ролика звук глушится и геймплей стоит, после — возвращаются (п. 4.7)', async () => {
+    const { sdk, calls } = adSdk(['onOpen', 'onRewarded', 'onClose']);
+    const platform = createYandexPlatform(sdk);
+    const paused: boolean[] = [];
+    platform.onPlatformPause((p) => paused.push(p));
+    platform.ready();
+    platform.gameplayStart();
+    await platform.ads.showRewardedAd({ placement: 'run.double' });
+    // Не полагаемся на то, что площадка сама пришлёт `game_api_pause`: требование
+    // проверяет модерация, и держать его должна игра.
+    expect(paused).toEqual([true, false]);
+    expect(calls).toEqual(['ready', 'start', 'stop', 'start']);
+  });
+
+  it('ролик не открылся — глушить было нечего и снимать нечего', async () => {
+    const platform = createYandexPlatform(adSdk(['onError']).sdk);
+    const paused: boolean[] = [];
+    platform.onPlatformPause((p) => paused.push(p));
+    await platform.ads.showRewardedAd({ placement: 'shop.lot' });
+    expect(paused).toEqual([]);
+  });
+
+  it('колбэки после исхода не выдают вторую награду и не снимают паузу дважды', async () => {
+    const platform = createYandexPlatform(
+      adSdk(['onOpen', 'onClose', 'onRewarded', 'onClose']).sdk,
+    );
+    const paused: boolean[] = [];
+    platform.onPlatformPause((p) => paused.push(p));
+    expect(await platform.ads.showRewardedAd({ placement: 'shop.lot' })).toEqual({
+      status: 'cancelled',
+    });
+    expect(paused).toEqual([true, false]);
+  });
+
+  it('интерстишл честно `unavailable`, даже если SDK его умеет', async () => {
+    const { sdk, fullscreen } = adSdk([]);
+    const result = await createYandexPlatform(sdk).ads.showInterstitial({ placement: 'x' });
+    expect(result).toEqual({ status: 'unavailable' });
+    expect(fullscreen).not.toHaveBeenCalled();
   });
 });
 

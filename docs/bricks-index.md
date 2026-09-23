@@ -124,6 +124,8 @@
 | HERO-11 | ✅ | data | `docs/backlog.md` | Разделение на трансгуманизм и псионику убрано ИЗ |
 | HERO-12 | ✅ | proto | `docs/backlog.md` | Обводка героя — по редкости. |
 | HERO-AURA-R | ✅ | data | `docs/backlog.md` | Радиус ауры: начать маленьким и растить навыком |
+| HERO-PASS-R | ✅ | data | `docs/backlog.md` | Пассивные ауры героя тоже опущены до 42 — |
+| HERO-REQ-T | ✅ | proto | `docs/backlog.md` | Имена узлов в списке требований переведены: |
 | SHIP-1 | ✅ | proto | `docs/backlog.md` | Модель: prototype/src/ships.ts — корпуса (SHIPHULLS: cruiser 3 · |
 | SHIP-2 | ✅ | proto | `docs/backlog.md` | →♻ UI «Верфь». Первая версия — pre-match вкладка в setup — была |
 | CON-1 | ✅ | proto | `docs/backlog.md` | Единый таб-конструктор «Верфь» |
@@ -661,7 +663,8 @@
 | TXT-6 | ⏳ | proto | `docs/backlog.md` | Кодекс: 7 статей, средн. 187 симв. — тренерский хвост в |
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
-| BRWH-2 | ⏳ | proto | `docs/backlog.md` | Четыре харнеса сгнили: чинить, а не удалять. |
+| BRWH-2 | ✅ | proto | `docs/backlog.md` | Четыре сгнивших харнеса починены — и два из них ловили |
+| BRWH-3 | ✅ | proto docs | `docs/backlog.md` | Общая база харнесов и снимок экрана одной |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |
@@ -1004,8 +1007,8 @@
 | SZE-2.1 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md` | Экран Академии на движке Мастерской |
 | SZE-3.1 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Витрина и три способа оплаты |
 | SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Ассортимент |
-| SZE-3.4 | ⏳ | proto | `docs/sector-zero-economy-roadmap.md` | Обновление витрины за рекламу |
-| SZE-3.5 | 🔒 | proto data | `docs/sector-zero-economy-roadmap.md` | Суверены за рекламу |
+| SZE-3.4 | ✅ | proto | `docs/sector-zero-economy-roadmap.md` | Обновление витрины за рекламу |
+| SZE-3.5 | ✅ | proto data | `docs/sector-zero-economy-roadmap.md` | Суверены за рекламу |
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md` | Уровень у модуля Роя |
 | SZE-4.2 | ✅ | core | `docs/sector-zero-economy-roadmap.md` | Контригра против уровня |
@@ -1171,17 +1174,17 @@
 | YAG-1.1b | ✅ | proto | `docs/yandex-games-roadmap.md` | Платформенная цель сборки и раскладка архива 2026-09-22 |
 | YAG-1.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | YandexGamesAdapter: инициализация и жизненный цикл 2026-09-22 |
 | YAG-1.2a | ✅ | proto | `docs/yandex-games-roadmap.md` | Разметка геймплея на забеге 2026-09-22 |
-| YAG-1.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Язык от площадки |
-| YAG-1.4 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Гость и повышение до аккаунта площадки |
-| YAG-2.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | PortableMetaSave: компактный дескриптор забега |
+| YAG-1.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | Язык от площадки |
+| YAG-1.4 | 🔶 | proto | `docs/yandex-games-roadmap.md` | Гость и повышение до аккаунта площадки 2026-09-23 |
+| YAG-2.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PortableMetaSave: компактный дескриптор забега 2026-09-22 |
 | YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformSave в адаптере Яндекса |
-| YAG-3.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | PlatformAds в адаптере Яндекса |
-| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
+| YAG-3.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | PlatformAds в адаптере Яндекса |
+| YAG-3.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
 | YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
 | YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию |
-| YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время вместо системного |
+| YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
 | YAG-6.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир |
 | YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
 | YAG-6.4 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход |

@@ -34,11 +34,11 @@ export interface SectorZeroProgress {
    *  ⚠️ Имя взято у аукционной валюты основной игры, но СЧЁТ СВОЙ: у Sector Zero свой
    *  профиль и своя награда, без записей в карьеру командующего (`PVR-3.1`). */
   warrants: number;
-  /** Кошелёк Суверенов ◆ — золотая валюта (§0.1). Кран у неё ОДИН: покупка за деньги.
-   *  ⚠️ IAP в продукте сегодня нет (`platform-adapters.md` его описывает, кода ноль),
-   *  поэтому кошелёк честно стоит на нуле, а магазин отказывает `E_SHOP_UNAVAILABLE`.
-   *  Поле заведено заранее не «на будущее», а чтобы витрина умела называть цену в
-   *  Суверенах уже сейчас: `EC-2.3` требует показывать стоимость до возможности платить. */
+  /** Кошелёк Суверенов ◆ — золотая валюта (§0.1). Кранов ДВА: покупка за деньги и
+   *  rewarded-ролик малой порцией с дневным лимитом (`SZE-3.5`, §0.6б). IAP в продукте
+   *  пока нет (`YAG-4.*`), так что сегодня кран один — ролик, там, где площадка его умеет.
+   *  Нет ни одного крана — Суверены не тратятся вовсе (`shopCapabilities`), а витрина всё
+   *  равно называет цену: `EC-2.3` требует показывать стоимость до возможности платить. */
   sovereigns: number;
   /** Сколько попыток улучшения уже потрачено НА КАЖДЫЙ предмет, `id → n`.
    *
@@ -59,6 +59,14 @@ export interface SectorZeroProgress {
   /** Номер суток витрины магазина (`SZE-3.2`), МОНОТОННЫЙ. Двигает его только
    *  `advanceShopDay`; см. там, почему уменьшать его нельзя. */
   day: number;
+  /** Раунд витрины в пределах суток (`SZE-3.4`): 0 — суточная ротация, дальше — обновления
+   *  за ролик, не больше {@link SHOP_AD_REFRESHES_PER_DAY}. Растёт только действием
+   *  `refresh-shop`, обнуляется только сменой суток — поэтому часы назад попытку не
+   *  возвращают. */
+  shopRound: number;
+  /** Сколько роликов за Суверены засчитано В ЭТИ сутки (`SZE-3.5`). Растёт только
+   *  действием `ad-sovereigns`, обнуляется только сменой суток — как {@link shopRound}. */
+  adSovereignsToday: number;
   nextAttempt: number;
   settledThrough: number;
   lastReward: number;
@@ -103,6 +111,8 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     forgeTries: {},
     forgeShards: {},
     day: 0,
+    shopRound: 0,
+    adSovereignsToday: 0,
     nextAttempt: 1,
     settledThrough: 0,
     lastReward: 0,
@@ -194,8 +204,14 @@ export function sectorHullIds(data: GameData): string[] {
   });
 }
 
+/** Сколько раз в сутки витрину можно обновить за ролик — резолюция владельца (§0.7
+ *  роадмапа экономики): «1 раз в сутки + 1 раз за рекламу». */
+export const SHOP_AD_REFRESHES_PER_DAY = 1;
+
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
+  | { kind: 'refresh-shop' }
+  | { kind: 'ad-sovereigns' }
   | { kind: 'forge'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
@@ -249,6 +265,22 @@ export function changeSectorZeroProgress(
         next.stars[action.id] = out.star;
         delete next.forgeShards[action.id]; // ступень пройдена — гарантия начинается заново
       } else next.forgeShards[action.id] = shards + 1;
+      break;
+    }
+    case 'refresh-shop':
+      // Платой служит просмотр ролика, подтверждённый адаптером, — списывать здесь нечего.
+      // Отказ от ролика действие не зовёт вовсе, поэтому попытку он не тратит.
+      if (next.shopRound >= SHOP_AD_REFRESHES_PER_DAY) return null;
+      next.shopRound += 1;
+      break;
+    case 'ad-sovereigns': {
+      // Порция и лимит — в данных (§0.6б: числа — предмет плейтеста). Ноль в любом из
+      // двух выключает кран. Как и у обновления витрины, платой служит просмотр,
+      // подтверждённый адаптером: отказ от ролика действие не зовёт.
+      const { amount, perDay } = data.sectorZeroShop.adSovereigns;
+      if (amount <= 0 || next.adSovereignsToday >= perDay) return null;
+      next.sovereigns += amount;
+      next.adSovereignsToday += 1;
       break;
     }
     case 'buy': {
@@ -379,6 +411,13 @@ export function parseSectorZeroProgress(
     fresh.warrants = counter(p.warrants);
     fresh.sovereigns = counter(p.sovereigns);
     fresh.day = counter(p.day);
+    // Сверху — срез до лимита: «999» из правленого localStorage значит только «сегодня
+    // уже обновлял», а не бесконечные обновления.
+    fresh.shopRound = Math.min(counter(p.shopRound), SHOP_AD_REFRESHES_PER_DAY);
+    fresh.adSovereignsToday = Math.min(
+      counter(p.adSovereignsToday),
+      data.sectorZeroShop.adSovereigns.perDay,
+    );
     if (typeof p.seed === 'string') fresh.seed = p.seed;
     fresh.modules = [
       ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),

@@ -564,7 +564,7 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     // The two shipped passives: the hero-fleet impulse and the nearby-fleets war beacon.
     expect(data.heroPassives.vanguard_impulse?.hook).toBe('fleet.speed');
     expect(data.heroPassives.vanguard_impulse?.scope).toBe('heroFleet');
-    expect(data.heroPassives.rally_beacon?.params.radius).toBe(300);
+    expect(data.heroPassives.rally_beacon?.params.radius).toBe(42);
     expect(data.heroes.vanguard?.startPassives).toContain('vanguard_impulse');
     // Params default when omitted (bonus 0 / radius 0), and enums are fail-closed.
     const min = parseGameData({

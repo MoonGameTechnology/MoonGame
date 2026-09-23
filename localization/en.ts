@@ -1572,9 +1572,9 @@ export const en: Record<string, string> = {
   'hero.hook.combat-damage': 'damage to nearby fleets',
   'hero.hook.fleet-speed': 'fleet speed',
   'hero.passive.convoy-impulse.desc':
-    'The hero runs the staging: fleets departing nodes within 300 fly 8% faster.',
+    'The hero runs the staging: fleets departing nodes within 42 fly 8% faster.',
   'hero.passive.rally-beacon.desc':
-    'Fleets near the hero fight harder: +8% damage for your fleets within 300.',
+    'Fleets near the hero fight harder: +8% damage for your fleets within 42.',
   'hero.passive.asteroid-pilot.desc':
     "The hero's ship loses less way among the rocks: +20% speed entering any asteroid terrain.",
   'hero.passive.vanguard-impulse.desc':
@@ -1602,7 +1602,7 @@ export const en: Record<string, string> = {
   'hero.tree.psi-weak-points.desc':
     'The radar does more than light the dark: it reads the gaps in hostile armour. Enemy fleets inside the lit zone take 5% more damage. Your own, allied and neutral fleets are untouched.',
   'hero.tree.void-attunement.desc':
-    "The hero's psi resonance inspires nearby fleets: +8% damage within 300.",
+    "The hero's psi resonance inspires nearby fleets: +8% damage within 42.",
   'hero.tree.void-translocator.desc':
     'The top of the corridor branch: the hero stops laying a path and simply vanishes at one node to appear at another.',
   'hero.unit.commander.desc':
@@ -2169,6 +2169,9 @@ export const en: Record<string, string> = {
   'sector-zero.restore-failed': 'Could not open the saved run. You can start a new one.',
   'sector-zero.saved': 'Run in progress',
   'sector-zero.shop.ad-declined': 'The ad was not shown. Nothing was spent.',
+  'sector-zero.shop.ad-sovereigns': '+{n} ◆ for an ad · {left} left',
+  'sector-zero.shop.ad-sovereigns.got': 'Received: +{n} ◆.',
+  'sector-zero.shop.ad-sovereigns.used': 'Sovereigns for ads: tomorrow',
   'sector-zero.shop.bought': 'Purchased.',
   'sector-zero.shop.empty': 'The shelf is empty.',
   'sector-zero.shop.grants.module': 'Ship module',
@@ -2181,6 +2184,9 @@ export const en: Record<string, string> = {
   'sector-zero.shop.pay.ad': 'For an ad · {n}',
   'sector-zero.shop.pay.sovereigns': 'Buy · {n} ◆',
   'sector-zero.shop.pay.warrants': 'Buy · {n} ⌖',
+  'sector-zero.shop.refresh': 'New shelf for an ad',
+  'sector-zero.shop.refresh.used': 'New shelf tomorrow',
+  'sector-zero.shop.refreshed': 'Shelf refreshed.',
   'sector-zero.shop.sovereigns': 'Sovereigns: {n} ◆',
   'sector-zero.summary': 'Waves: {wave} / {total} · {difficulty}',
   'sector-zero.title': 'SECTOR ZERO',

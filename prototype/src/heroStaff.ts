@@ -338,7 +338,7 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
       } else if (!reqMet) {
         cls += ' locked';
         crest = '🔒';
-        const need = esc(nd.requires.map((r) => t(data.heroSkillTrees[r]?.name ?? r)).join(', '));
+        const need = esc(nd.requires.map((r) => tData(data.heroSkillTrees[r]?.name ?? r)).join(', '));
         foot = `<span class="hx-st">${t('hero.tree.needs', { n: need })}</span>`;
       } else {
         cls += ' avail';
@@ -644,7 +644,7 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
     const reqHtml = nd.requires
       .map(
         (r) =>
-          `<span class="${skills.includes(r) ? 'hx-ok' : 'hx-no'}">${skills.includes(r) ? '✓' : '✗'} ${esc(t(data.heroSkillTrees[r]?.name ?? r))}</span>`,
+          `<span class="${skills.includes(r) ? 'hx-ok' : 'hx-no'}">${skills.includes(r) ? '✓' : '✗'} ${esc(tData(data.heroSkillTrees[r]?.name ?? r))}</span>`,
       )
       .join(' ');
     const canBuy = branchOk && reqMet && !owned && affordable(res, nd.cost) && !dead;
