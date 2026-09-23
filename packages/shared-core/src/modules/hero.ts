@@ -20,7 +20,7 @@ import type {
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
 import { getStance, stanceToRelation } from '../state/diplomacy';
-import { fleetSideDealingHit, heroByFleet, heroNode } from '../state/heroes';
+import { heroByFleet, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
@@ -30,21 +30,28 @@ import { moduleAllowed, type SlotCounts } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
- * Hero — a per-player entity (one hero each) with a position on the map and ability
- * cooldowns (GDD hero concept). It acts from its current node and registers two
- * abilities through the bus, plus the `fleet.speed` bonus for its temp lanes:
+ * Hero — a per-player roster of heroes, each with a position on the map and ability
+ * cooldowns (GDD hero concept). Every ability is cast through ONE data-driven dispatcher,
+ * `hero.ability {heroId, abilityId, target?}` (HERO-4), plus the `fleet.speed` bonus for
+ * its temp lanes. The `annihilate` ability destroys a planet in range: it stays a node
+ * (you can still fly through) but its `kind`/`planetType` flip to a `dead_world`,
+ * garrison + buildings are gone, ownership drops. Victory recomputes automatically
+ * (lost score + one fewer ownable world).
  *
- *   - `hero.move {to}` — redeploy the hero to a node the player owns.
- *   - `planet.annihilate {planetId}` — destroy a planet in range: it stays a node
- *     (you can still fly through) but its `kind`/`planetType` flip to an uncapturable
- *     `dead_world`, garrison + buildings are gone, ownership drops. Victory recomputes
- *     automatically (lost score + one fewer ownable world).
+ * AUD-18 — the last two actions of the one-hero-per-player skeleton are GONE:
+ * `hero.move {to}` and `planet.annihilate {planetId}`. Both addressed "the player's first
+ * hero by sorted id", neither had a builder or a button, and the second was a live
+ * bypass: it cast annihilation from whichever hero sorted first — one that did not own
+ * the ability, did not wear it and paid nothing for it — and it was on the wire gate's
+ * list, so any client could send it. The same effect is reachable only through
+ * `hero.ability`, which checks all three; a reserve hero is raised where the player
+ * chooses by `hero.spawn {heroId, at}`, which is what `hero.move` used to approximate.
  *
  * HERO-2 (docs/heroes.md) — the hero's position IS its ship: while deployed
  * (`Hero.fleetId`) every ability acts from the SHIP's current node (`heroNode`), the
  * hero's `location` trails the ship on `fleet.transit`/`fleet.arrived` (ability origin
- * mid-flight + respawn anchor), `hero.move` is rejected (`E_HERO_DEPLOYED` — move the
- * fleet instead), and `fleet.destroyed` is a death signal alongside `unit.died`.
+ * mid-flight + respawn anchor), and `fleet.destroyed` is a death signal alongside
+ * `unit.died`.
  *
  * HERO-3 (docs/heroes.md) — manual deploy: `hero.spawn {heroId, at}` raises the hero's
  * ship at an OWNED world (unit from the archetype's `ship.unit`, default `hero`),
@@ -101,7 +108,6 @@ const PATH_SPEED_BONUS = 0.5; // +50% for the owner's fleets along the lane
 const PATH_DURATION_HOURS = 6;
 const PATH_RANGE = 300; // max Euclidean span the hero can bridge (−50% from 600)
 const ANNIHILATE_RANGE = 500;
-const ANNIHILATE_COOLDOWN_HOURS = 48;
 const DEAD_KIND = 'dead_world';
 const DEAD_PLANET_TYPE = 'dead_world';
 // Projection hero — the player's first hero: a ship that rides in a fleet, granting
@@ -160,24 +166,6 @@ function onCooldown(hero: Hero, ability: string, now: number): boolean {
 function gateLiveDeployed(h: HandlerContext, hero: Hero): void {
   if (hero.alive === false) h.reject('E_HERO_DEAD');
   if (hero.alive !== true) h.reject('E_HERO_NOT_DEPLOYED');
-}
-
-/** The legacy caster's gate tail (`planet.annihilate`): the same origin/target/
- *  range/cooldown sequence `hero.ability` derives from a `HeroAbilityDef`, hand-rolled
- *  ONCE — per-action copies drifted before and opened a bypass. Origin is the hero's
- *  node; every failed gate rejects. */
-function gateRangedCast(
-  h: HandlerContext,
-  hero: Hero,
-  targetId: string,
-  range: number,
-  cooldown: string,
-): void {
-  const origin = h.state.planets[heroNode(h.state, hero)];
-  const dest = h.state.planets[targetId];
-  if (!origin || !dest) h.reject('E_NO_PLANET');
-  if (distance(origin.position, dest.position) > range) h.reject('E_OUT_OF_RANGE');
-  if (onCooldown(hero, cooldown, h.ctx.now)) h.reject('E_COOLDOWN');
 }
 
 /** Adds an undirected `links` edge a→b; returns true if it was newly added. */
@@ -562,8 +550,7 @@ function closeTempLane(h: HandlerContext, laneId: string): void {
 
 /** The annihilation TARGET gate: a real, ownable world that isn't already a dead
  *  world. Empty space (uncapturable) and a previously-annihilated dead world are
- *  both rejected. Shared by the legacy `planet.annihilate` pre-gate (which checks
- *  the target before range/cooldown — pinned by tests) and the cast body. */
+ *  both rejected. Called by the cast body. */
 function requireDestructible(
   h: HandlerContext,
   planetId: PlanetId,
@@ -576,9 +563,9 @@ function requireDestructible(
   return planet;
 }
 
-/** The annihilation effect body (shared by `planet.annihilate` and `hero.ability`):
- *  flip the world to a neutral dead world and emit. Rejects unknown / undestructible
- *  targets; range/cooldown gates belong to callers. */
+/** The annihilation effect body (the `annihilate` type of `hero.ability`): flip the
+ *  world to a neutral dead world and emit. Rejects unknown / undestructible targets;
+ *  range/cooldown/equip gates belong to the dispatcher. */
 function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetId): void {
   const planet = requireDestructible(h, planetId);
   const previousOwner = planet.owner;
@@ -592,23 +579,11 @@ function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetI
 
 export const heroModule: GameModule = {
   id: 'hero',
-  version: '3.0.0',
+  // 4.0.0 — AUD-18: сняты наследные `hero.move` и `planet.annihilate` (контракт действий
+  // сузился, отсюда мажор). 3.1.0 — CORE-DMG-3: пассивы и +5% носителю героя во всех
+  // каналах, где стреляет флот.
+  version: '4.0.0',
   setup(api) {
-    api.onAction('hero.move', (action, h) => {
-      const { to } = action.payload as { to?: string };
-      if (typeof to !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const hero = heroOf(h.state, action.playerId);
-      if (!hero) return h.reject('E_NO_HERO');
-      if (hero.alive === false) return h.reject('E_HERO_DEAD'); // a dead hero can't act
-      // HERO-2: a deployed hero rides its SHIP — redeploy it with `fleet.move`. The
-      // teleport-style redeploy remains only for a shipless hero (legacy model).
-      if (hero.fleetId && h.state.fleets[hero.fleetId]) return h.reject('E_HERO_DEPLOYED');
-      const planet = h.state.planets[to];
-      if (!planet) return h.reject('E_NO_PLANET');
-      if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN'); // redeploy to your own world
-      hero.location = to;
-      h.emit('hero.moved', { owner: action.playerId, to });
-    });
 
     // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
     // ПРИБЫЛА — не когда вышла: иначе она летела бы по уже закрытому коридору, а
@@ -629,20 +604,6 @@ export const heroModule: GameModule = {
       const { laneId } = event.payload as { laneId?: string };
       if (typeof laneId !== 'string') return;
       closeTempLane(h, laneId);
-    });
-
-    api.onAction('planet.annihilate', (action, h) => {
-      const { planetId } = action.payload as { planetId?: string };
-      if (typeof planetId !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const hero = heroOf(h.state, action.playerId);
-      if (!hero) return h.reject('E_NO_HERO');
-      gateLiveDeployed(h, hero);
-      requireDestructible(h, planetId); // target gate first — pinned gate order
-      gateRangedCast(h, hero, planetId, ANNIHILATE_RANGE, 'annihilate');
-
-      castAnnihilate(h, action.playerId, planetId);
-      hero.cooldowns = hero.cooldowns ?? {};
-      hero.cooldowns.annihilate = after(h, ANNIHILATE_COOLDOWN_HOURS);
     });
 
     // HERO-4 — the generic, data-driven ability dispatcher. Every gate is derived
@@ -769,20 +730,33 @@ export const heroModule: GameModule = {
     // --- projection hero: fleet combat aura + death/respawn --------------------
 
     // +5% to a fleet that carries the hero, then the owner's hero passives (HERO-5)
-    // for the battle's node. combat.damage fires once per side per round;
-    // `args.attacker` is the owner DEALING this hit, so buffing that side's fleet
-    // covers both its attack (vs the foe) and its return-fire defense.
+    // for the node the shot is fired at. `args.attacker` is the owner DEALING this hit,
+    // so buffing that side's fleet covers both its attack (vs the foe) and its
+    // return-fire defense.
+    //
+    // CORE-DMG-3: сторона берётся из `attackerFleet` и `location`, а НЕ через
+    // `battleId`. Раньше здесь стоял `fleetSideDealingHit`, и он требовал боя — вне боя
+    // `battleId` нет, хук возвращал базу, и пассивка «+8% урона своим флотам рядом»
+    // работала в свалке и молчала на обстреле с орбиты, на челноках и на корабельном
+    // ПВО. Решение владельца 2026-09-22: это пробел, а не замысел — бонус героя вещь
+    // РАДИУСА, и клетка у выстрела есть всегда, а бой бывает не всегда.
     api.hook<number>('combat.damage', (base, args, h) => {
-      const { battleId, attacker } = (args ?? {}) as { battleId?: string; attacker?: string };
-      const hit = fleetSideDealingHit(h.state, battleId, attacker);
-      if (!hit || typeof attacker !== 'string') return base;
+      const { attacker, attackerFleet, location } = (args ?? {}) as {
+        attacker?: string;
+        attackerFleet?: string;
+        location?: string;
+      };
+      // Стреляет не флот (ПВО мира, перехватчики с мира, гарнизон) — бонусов нет:
+      // семья героев усиливает флоты, и это ровно то правило, что держал
+      // `side.ref.kind === 'fleet'` в ближнем бою.
+      if (typeof attacker !== 'string' || typeof attackerFleet !== 'string') return base;
       let out = base;
-      if (fleetHasHero(h, hit.side.ref.fleetId)) out *= 1 + HERO_COMBAT_BONUS;
+      if (fleetHasHero(h, attackerFleet)) out *= 1 + HERO_COMBAT_BONUS;
       const passives = passiveBonus(h, 'combat.damage', attacker, {
-        fleetId: hit.side.ref.fleetId,
-        node: hit.battle.location,
-        // Бой стоит на одной клетке — она же и земля под условием.
-        terrainNode: hit.battle.location,
+        fleetId: attackerFleet,
+        node: location,
+        // Выстрел приписан одной клетке — она же и земля под условием трейта.
+        terrainNode: location,
       });
       return passives !== 0 ? out * (1 + passives) : out;
     });

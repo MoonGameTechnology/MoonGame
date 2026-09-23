@@ -234,33 +234,22 @@ function corridorWorld(skills: string[] = []): GameState {
 const corridor = (to: string, seq = 1): Action =>
   act('hero.ability', 'p1', { heroId: 'hero:p1', abilityId: 'corridor', target: to }, seq);
 
-describe('hero — move (redeploy)', () => {
+describe('AUD-18 — наследных действий героя больше нет', () => {
   const kernel = createKernel([heroModule]);
 
-  it('redeploys the hero to a world the player owns', () => {
-    const r = okApply(kernel.applyAction(world(), act('hero.move', 'p1', { to: 'B' }), ctx(0)));
-    expect(heroOf(r.state, 'p1')?.location).toBe('B');
-    expect(r.events.map((e) => e.type)).toContain('hero.moved');
-  });
-
-  it('rejects bad, heroless, unknown and unowned targets', () => {
-    const st = world();
-    expect(errCode(kernel.applyAction(st, act('hero.move', 'p1', {}), ctx(0)))).toBe('E_BAD_PAYLOAD');
-    expect(errCode(kernel.applyAction(st, act('hero.move', 'p2', { to: 'C' }), ctx(0)))).toBe(
-      'E_NO_HERO', // p2 has no hero
-    );
-    expect(errCode(kernel.applyAction(st, act('hero.move', 'p1', { to: 'ZZ' }), ctx(0)))).toBe(
-      'E_NO_PLANET',
-    );
-    expect(errCode(kernel.applyAction(st, act('hero.move', 'p1', { to: 'C' }), ctx(0)))).toBe(
-      'E_FORBIDDEN', // C belongs to p2
-    );
-  });
-
-  it('does not mutate the input state', () => {
+  it('`hero.move` и `planet.annihilate` ядро не знает — и состояние не трогает', () => {
+    // Оба адресовали «первого героя игрока по id» — модель одного героя на игрока.
+    // Резервного героя поднимает там, где выбрал игрок, `hero.spawn`; аннигиляция идёт
+    // только через `hero.ability` (тесты этого пути — в блоке аннигиляции ниже).
     const st = deepFreeze(world());
-    okApply(kernel.applyAction(st, act('hero.move', 'p1', { to: 'B' }), ctx(0)));
+    expect(errCode(kernel.applyAction(st, act('hero.move', 'p1', { to: 'B' }), ctx(0)))).toBe(
+      'E_UNKNOWN_ACTION',
+    );
+    expect(
+      errCode(kernel.applyAction(st, act('planet.annihilate', 'p1', { planetId: 'C' }), ctx(0))),
+    ).toBe('E_UNKNOWN_ACTION');
     expect(heroOf(st, 'p1')?.location).toBe('A');
+    expect(st.planets.C?.kind).not.toBe('dead_world');
   });
 });
 
@@ -573,59 +562,76 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
   });
 });
 
-describe('hero — planet annihilation', () => {
+describe('hero — planet annihilation (через hero.ability)', () => {
   const kernel = createKernel([heroModule]);
+  /** world() + герой владеет аннигиляцией (без `equipped` — «владеть = носить»). */
+  function annihilator(): GameState {
+    const st = world();
+    st.heroes!['hero:p1']!.abilities = ['annihilate'];
+    return st;
+  }
+  const annihilate = (target: string, seq = 1, playerId = 'p1', heroId = 'hero:p1') =>
+    act('hero.ability', playerId, { heroId, abilityId: 'annihilate', target }, seq);
 
   it('turns a world into a re-claimable, metal-rich dead world, cleared and ownerless', () => {
-    const st = world();
+    const st = annihilator();
     st.planets.C!.buildings = [{ type: 'mine', level: 1, hp: 0 }];
     st.planets.C!.garrison = [{ unit: 'scout', count: 3 }];
-    const r = okApply(kernel.applyAction(st, act('planet.annihilate', 'p1', { planetId: 'C' }), ctx(0)));
+    const r = okApply(kernel.applyAction(st, annihilate('C'), ctx(0)));
     const c = r.state.planets.C!;
     expect(c.owner).toBe(null);
     expect(c.kind).toBe('dead_world');
     expect(c.planetType).toBe('dead_world');
     expect(c.buildings).toHaveLength(0);
     expect(c.garrison).toHaveLength(0);
-    expect(heroOf(r.state, 'p1')?.cooldowns.annihilate).toBe(48 * HOUR); // ANNIHILATE_COOLDOWN_HOURS
+    expect(heroOf(r.state, 'p1')?.cooldowns.annihilate).toBe(48 * HOUR); // cooldownHours каталога
     expect(r.events.map((e) => e.type)).toContain('planet.destroyed');
     // The node remains routable — annihilation does not delete it from the map.
     expect(r.state.planets.C).toBeDefined();
   });
 
-  it('rejects heroless, unknown, out-of-range and already-dead targets', () => {
-    const st = world();
-    expect(
-      errCode(kernel.applyAction(st, act('planet.annihilate', 'p2', { planetId: 'C' }), ctx(0))),
-    ).toBe('E_NO_HERO');
-    expect(
-      errCode(kernel.applyAction(st, act('planet.annihilate', 'p1', { planetId: 'ZZ' }), ctx(0))),
-    ).toBe('E_NO_PLANET');
+  it('rejects foreign, unknown, out-of-range and already-dead targets', () => {
+    const st = annihilator();
+    expect(errCode(kernel.applyAction(st, annihilate('C', 1, 'p2'), ctx(0)))).toBe('E_FORBIDDEN');
+    expect(errCode(kernel.applyAction(st, annihilate('C', 1, 'p1', 'nobody'), ctx(0)))).toBe(
+      'E_NO_HERO',
+    );
+    expect(errCode(kernel.applyAction(st, annihilate('ZZ'), ctx(0)))).toBe('E_NO_PLANET');
     // F is 700 units away (> 500).
-    expect(
-      errCode(kernel.applyAction(st, act('planet.annihilate', 'p1', { planetId: 'F' }), ctx(0))),
-    ).toBe('E_OUT_OF_RANGE');
+    expect(errCode(kernel.applyAction(st, annihilate('F'), ctx(0)))).toBe('E_OUT_OF_RANGE');
     // A dead world can't be destroyed again — the kind guard rejects it even though
     // a dead world is now re-capturable (you can re-claim and mine it, not re-kill it).
-    const dead = okApply(kernel.applyAction(st, act('planet.annihilate', 'p1', { planetId: 'C' }), ctx(0)));
-    expect(
-      errCode(
-        kernel.applyAction(dead.state, act('planet.annihilate', 'p1', { planetId: 'C' }, 2), ctx(0)),
-      ),
-    ).toBe('E_NOT_DESTRUCTIBLE');
+    // Кулдаун снят вручную, чтобы отказ пришёл именно от цели, а не от перезарядки.
+    const dead = okApply(kernel.applyAction(st, annihilate('C'), ctx(0)));
+    dead.state.heroes!['hero:p1']!.cooldowns = {};
+    expect(errCode(kernel.applyAction(dead.state, annihilate('C', 2), ctx(0)))).toBe(
+      'E_NOT_DESTRUCTIBLE',
+    );
   });
 
   it('rejects a second annihilation while on cooldown', () => {
-    const st = world();
-    const first = okApply(
-      kernel.applyAction(st, act('planet.annihilate', 'p1', { planetId: 'C' }), ctx(0)),
-    );
+    const first = okApply(kernel.applyAction(annihilator(), annihilate('C'), ctx(0)));
     // B is in range and still capturable, but the ability is on cooldown.
+    expect(errCode(kernel.applyAction(first.state, annihilate('B', 2), ctx(HOUR)))).toBe(
+      'E_COOLDOWN',
+    );
+  });
+
+  it('AUD-18: герой БЕЗ аннигиляции мир не уничтожит — ни способностью, ни в обход', () => {
+    // Ровно та дыра, что закрыта: наследный `planet.annihilate` брал первого героя игрока и
+    // не спрашивал, владеет ли тот способностью. На шипнутом каталоге это воспроизводилось
+    // командиром (rally/scan/bulwark/diplomatic_landing) — он превращал в мёртвые все шесть
+    // ближайших миров. Единственный оставшийся путь проверяет владение и слот.
+    const st = world();
+    st.heroes!['hero:p1']!.abilities = ['corridor'];
+    expect(errCode(kernel.applyAction(st, annihilate('C'), ctx(0)))).toBe('E_NOT_EQUIPPED');
     expect(
-      errCode(
-        kernel.applyAction(first.state, act('planet.annihilate', 'p1', { planetId: 'B' }, 2), ctx(HOUR)),
-      ),
-    ).toBe('E_COOLDOWN');
+      errCode(kernel.applyAction(st, act('planet.annihilate', 'p1', { planetId: 'C' }), ctx(0))),
+    ).toBe('E_UNKNOWN_ACTION');
+    // Владеет, но НЕ носит (слоты HPR-1.2) — тоже нет.
+    const unworn = annihilator();
+    unworn.heroes!['hero:p1']!.equipped = [];
+    expect(errCode(kernel.applyAction(unworn, annihilate('C'), ctx(0)))).toBe('E_NOT_EQUIPPED');
   });
 });
 
@@ -744,17 +750,12 @@ describe('hero — generic data-driven ability (hero.ability, HERO-4)', () => {
     const dead = abilityWorld();
     dead.heroes![HERO_ID]!.alive = false;
     expect(errCode(kernel.applyAction(dead, cast('corridor', 'C'), ctx(0)))).toBe('E_HERO_DEAD');
-    // …and the legacy sibling actions honor the SAME liveness gate — a dead hero
-    // cannot act through any route (review finding: gate must not be bypassable).
+    // …and every route to an effect honours the SAME liveness gate — a dead hero cannot
+    // act at all (review finding: gate must not be bypassable). Since AUD-18 there is
+    // only one route, `hero.ability`; the legacy `planet.annihilate`/`hero.move` are gone.
     expect(
       errCode(kernel.applyAction(dead, corridor('C'), ctx(0))),
     ).toBe('E_HERO_DEAD');
-    expect(
-      errCode(kernel.applyAction(dead, act('planet.annihilate', 'p1', { planetId: 'C' }), ctx(0))),
-    ).toBe('E_HERO_DEAD');
-    expect(errCode(kernel.applyAction(dead, act('hero.move', 'p1', { to: 'B' }), ctx(0)))).toBe(
-      'E_HERO_DEAD',
-    );
     expect(
       errCode(kernel.applyAction(st, act('hero.ability', 'p1', { heroId: HERO_ID }), ctx(0))),
     ).toBe('E_BAD_PAYLOAD');
@@ -814,21 +815,8 @@ describe('hero — ship-borne position and death (HERO-2)', () => {
       ),
     );
     expect(r.state.planets.F?.kind).toBe('dead_world');
-    // The legacy route measures from the ship too (same heroNode origin).
-    const viaLegacy = okApply(
-      kernel.applyAction(shipWorld(), act('planet.annihilate', 'p1', { planetId: 'F' }), ctx(0)),
-    );
-    expect(viaLegacy.state.planets.F?.kind).toBe('dead_world');
   });
 
-  it('rejects the teleport-style hero.move while the hero is deployed on a ship', () => {
-    expect(errCode(kernel.applyAction(shipWorld(), act('hero.move', 'p1', { to: 'B' }), ctx(0)))).toBe(
-      'E_HERO_DEPLOYED',
-    );
-    // The shipless legacy hero still redeploys (unchanged behavior).
-    const r = okApply(kernel.applyAction(world(), act('hero.move', 'p1', { to: 'B' }), ctx(0)));
-    expect(heroOf(r.state, 'p1')?.location).toBe('B');
-  });
 
   it("hero.location trails the ship on transit and arrival", () => {
     const viaTransit = okApply(
@@ -1381,17 +1369,36 @@ describe('hero — death and respawn', () => {
 // JSONB round-trip re-orders keys, so after a hibernation the same action could
 // land on a DIFFERENT hero than in the replay. The pick is now sorted-id stable.
 describe('hero — heroOf picks by sorted instance id, not insertion order (BF-13)', () => {
-  it('moves the alphabetically-first hero even when keys were inserted in reverse', () => {
-    const kernel = createKernel([heroModule]);
+  // Выбор «первого героя игрока» остался у одного читателя — запасного пути гибели: сигнал
+  // `unit.died` по корпусу героя без `fleetId` находит героя по владельцу. Раньше свойство
+  // проверялось через `hero.move`, снятый AUD-18; сам выбор жив, и сторож переехал сюда.
+  it('kills the alphabetically-first hero even when keys were inserted in reverse', () => {
+    const signal: GameModule = {
+      id: 'test-signal-bf13',
+      version: '1.0.0',
+      setup(api) {
+        api.onAction('signal', (a, h) => {
+          const { type, payload } = a.payload as { type: string; payload: unknown };
+          h.emit(type, payload);
+        });
+      },
+    };
+    const kernel = createKernel([heroModule, signal]);
     const st = world();
     // Re-insert two shipless heroes in REVERSE id order (simulates a store re-order).
     st.heroes = {
       'hero:p1:2': { id: 'hero:p1:2', owner: 'p1', location: 'A', cooldowns: {}, alive: true },
       'hero:p1:1': { id: 'hero:p1:1', owner: 'p1', location: 'A', cooldowns: {}, alive: true },
     };
-    const r = okApply(kernel.applyAction(st, act('hero.move', 'p1', { to: 'B' }), ctx(0)));
-    expect(r.state.heroes!['hero:p1:1']!.location).toBe('B'); // sorted-first moved
-    expect(r.state.heroes!['hero:p1:2']!.location).toBe('A'); // the other untouched
+    const r = okApply(
+      kernel.applyAction(
+        st,
+        act('signal', 'p1', { type: 'unit.died', payload: { unit: 'hero', owner: 'p1' } }),
+        ctx(0),
+      ),
+    );
+    expect(r.state.heroes!['hero:p1:1']!.alive).toBe(false); // sorted-first fell
+    expect(r.state.heroes!['hero:p1:2']!.alive).toBe(true); // the other untouched
   });
 });
 

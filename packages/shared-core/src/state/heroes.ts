@@ -35,31 +35,20 @@ export function heroNode(state: GameState, hero: Hero): PlanetId {
   return hero.location;
 }
 
-/** The FLEET side dealing this `combat.damage` hit, or null when the hook args
- *  don't resolve to one (malformed args, unknown battle, or a garrison side —
- *  hero auras are fleet bonuses only). `args.attacker` is the owner DEALING the
- *  hit, so buffing that side covers both its attack and its return-fire defense.
- *  The one copy of the preamble both hero-family `combat.damage` hooks share. */
-export function fleetSideDealingHit(
-  state: GameState,
-  battleId: unknown,
-  attacker: unknown,
-): { battle: Battle; side: BattleSide & { ref: { kind: 'fleet'; fleetId: string } } } | null {
-  if (typeof battleId !== 'string' || typeof attacker !== 'string') return null;
-  const battle = state.battles[battleId];
-  if (!battle) return null;
-  // MSB-1: сторона ищется по владельцу СРЕДИ СТОРОН. Раньше здесь стоял тернарник
-  // «атакующий или иначе обороняющийся» — на двух сторонах это то же самое, при N
-  // «иначе» перестаёт быть определённым.
-  const side = battle.sides.find((s) => s.owner === attacker);
-  if (!side || side.ref.kind !== 'fleet') return null;
-  return { battle, side: side as BattleSide & { ref: { kind: 'fleet'; fleetId: string } } };
-}
-
-/** The FLEET side TAKING this `combat.damage` hit, or null when the args don't resolve
- *  to one. The mirror of {@link fleetSideDealingHit}: `args.defender` is the owner the
- *  damage lands on, so a modifier keyed off this side is INCOMING damage for it. Fleet
- *  sides only, same reason as its twin — the hero family buffs fleets, not garrisons. */
+/**
+ * The FLEET side TAKING this `combat.damage` hit, or null when the args don't resolve
+ * to one. `args.defender` is the owner the damage lands on, so a modifier keyed off
+ * this side is INCOMING damage for it. Fleet sides only — the hero family buffs
+ * fleets, not garrisons.
+ *
+ * ⚠️ **Требует БОЯ, и это оставшаяся половина CORE-DMG-3.** Близнец этой функции,
+ * `fleetSideDealingHit`, здесь БЫЛ и снят: ауры и пассивы героя перешли на позиционный
+ * поиск стороны (`DamageHookArgs.attackerFleet` + `location`) и потому дошли до всех
+ * неближних каналов. Лестница пси-зоны (`revealZoneFactor`) осталась на `battleId`, то
+ * есть работает только в свалке — ровно тот дефект, который CORE-DMG-3 чинил для аур.
+ * Симметричная правка (поле `defenderFleet`) — отдельный кирпич: это сдвиг баланса, и
+ * его нельзя мерить тем же прогоном, что и этот.
+ */
 export function fleetSideTakingHit(
   state: GameState,
   battleId: unknown,

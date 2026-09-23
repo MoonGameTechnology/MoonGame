@@ -94,6 +94,7 @@ import {
   MAX_CHAIN_STEPS,
   type AiProfile,
   type ChainStep,
+  PLAYABLE_FACTIONS,
 } from './game';
 import {
   dominantUnit,
@@ -255,10 +256,11 @@ import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
+import { chapterMapView } from '../../decisions/chapterMap';
+import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
-import { boonOffer } from '../../decisions/waveBoons';
 import {
   RUN_SAVE_VERSION,
   parseRunSave,
@@ -286,7 +288,6 @@ import {
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
-import { takeBoon } from '../../decisions/actions';
 import {
   authOutcome,
   shouldRegister,
@@ -516,7 +517,7 @@ import {
 // `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
-import { initTechTree, branchLabel, techFx } from './techTree';
+import { initTechTree, branchLabel } from './techTree';
 import { initBuildScreen, type UnitCatalogTab } from './buildScreen';
 import { initSciPick, sciCouncilRowHtml } from './sciPick';
 import { initPasswordReset } from './passwordReset';
@@ -696,6 +697,7 @@ import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenTail } from './eventVisibility';
 import { recordLoss, tallyDeath } from './warTally';
 import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
+import { heroDiedNews, heroRespawnedNews, type HeroNews } from './heroNews';
 import {
   declineHeard,
   diploConcernsMe,
@@ -1175,6 +1177,7 @@ const chainRouteCache = new Map<string, string[] | null>();
 let pickMode = false;
 let cmdMore = false; // ☰ — the second row of the command bar (extras live there)
 let castMenu = false; // ✨ — способности героя-флагмана: поповер-меню каста над рядом
+let retreatMenu = false; // ⮐ — окошко выбора порога авто-отхода (заказ владельца 2026-09-23)
 let merging = false; // "Merge" armed → next tap on a friendly fleet picks the anchor
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
 // Split-fleet dialog: which fleet, and how many of each ship type peel off.
@@ -1308,9 +1311,9 @@ const aaShots: Array<{
   to: { x: number; y: number };
   at: number;
   // ТИР, а не «ближняя ли это зенитка»: с остатком SHU-3.1 сюда же встаёт ВСТРЕЧНЫЙ
-  // ПЕРЕХВАТ (`shuttle.intercepted`), у которого признака «ближний/орбитальный» нет
-  // вовсе. Очередь и кадр отрисовки у всех трёх один — расходится только вид
-  // (`flakTiers.ts`), поэтому второй копии этого блока не заводим.
+  // ПЕРЕХВАТ (`shuttle.intercepted`), а с AUD-17 — КОРАБЕЛЬНОЕ ПВО (`pd.fired`); признака
+  // «ближний/орбитальный» у них нет вовсе. Очередь и кадр отрисовки у всех тиров один —
+  // расходится только вид (`flakTiers.ts`), поэтому второй копии этого блока не заводим.
   tier: FlakTier;
 }> = [];
 // Capture flashes: a province that changed hands lights up in its NEW owner's colour —
@@ -1361,9 +1364,6 @@ let setupSpeed = 10;
 let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
 /** Глава, на которой идёт ТЕКУЩИЙ забег (в отличие от выбранной для следующего). */
 let sectorMission = 0;
-/** Номер волны, на котором игрок нажал «Позже» (PVR-1.4). Долг при этом НЕ сгорает —
- *  окно просто не лезет поверх боя до следующей волны. `-1` = не откладывали. */
-let boonLaterAtWave = -1;
 let lastPanelHtml = '';
 let lastCmdHtml = '';
 let lastSplitHtml = '';
@@ -1479,6 +1479,7 @@ devlineEl.addEventListener('click', (event) => {
     return;
   }
   if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
+  if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
   if (!(event.target as Element).closest('[data-swarm-intel]')) return;
   swarmDossierWin.classList.add('show');
   renderSwarmDossier();
@@ -2250,8 +2251,22 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   const pl = s.planets[f.location];
   if (!pl) return null;
   const pc = world(pl.position);
-  // a single orbit: every stationed (non-transit) fleet here shares the one ring
-  const peers = Object.values(s.fleets).filter((g) => g.location === f.location && !g.movement);
+  // Боевая стойка (заказ владельца 2026-09-23): флот в бою не кружит — стоит в строю своей
+  // стороны лицом к противнику (`decisions/battleStance.ts`).
+  if (f.battleId) {
+    const fighting = Object.values(s.fleets).filter(
+      (g) => g.battleId === f.battleId && g.location === f.location && !g.movement,
+    );
+    const slot = battleStance(fighting, ME).get(f.id);
+    if (slot) {
+      const r = orbitRingRadius(pl);
+      return { x: pc.x + Math.cos(slot.angle) * r, y: pc.y + Math.sin(slot.angle) * r, ang: slot.heading };
+    }
+  }
+  // a single orbit: every stationed (non-transit, not fighting) fleet here shares the one ring
+  const peers = Object.values(s.fleets).filter(
+    (g) => g.location === f.location && !g.movement && !g.battleId,
+  );
   const idx = Math.max(
     0,
     peers.findIndex((g) => g.id === f.id),
@@ -2262,6 +2277,45 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   const ang = chevronAngle(a0, orbitsLive());
   return { x: pc.x + Math.cos(a0) * r, y: pc.y + Math.sin(a0) * r, ang };
 }
+/** Трассы огня между строями боя (заказ владельца 2026-09-23): от каждого флота к ближайшему
+ *  флоту другой стороны — пунктир цвета стрелка, бегущий к цели, пока бой идёт. При
+ *  выключенном движении пунктир стоит. Только видимые флоты: трасса к невидимому выдала бы
+ *  его место. */
+function drawBattleTracers(now: number): void {
+  for (const b of Object.values(s.battles)) {
+    const sides = Object.values(s.fleets)
+      .filter((f) => f.battleId === b.id && !f.movement && fleetSeen(f))
+      .map((f) => ({ f, a: fleetAnchor(f) }))
+      .filter((x): x is { f: Fleet; a: { x: number; y: number; ang: number } } => !!x.a);
+    for (const { f, a } of sides) {
+      let best: { x: number; y: number } | null = null;
+      let bestD = Infinity;
+      for (const o of sides) {
+        if (o.f.owner === f.owner) continue;
+        const d = Math.hypot(o.a.x - a.x, o.a.y - a.y);
+        if (d < bestD) {
+          bestD = d;
+          best = o.a;
+        }
+      }
+      if (!best || !visible(a, 120)) continue;
+      const col = ownerColor(f.owner);
+      cx.save();
+      cx.strokeStyle = rgba(col, 0.55);
+      cx.lineWidth = 1.4;
+      cx.setLineDash([6, 9]);
+      cx.lineDashOffset = motionOn() ? -now / 40 : 0;
+      cx.shadowColor = col;
+      cx.shadowBlur = fxBlur(8);
+      cx.beginPath();
+      cx.moveTo(a.x, a.y);
+      cx.lineTo(best.x, best.y);
+      cx.stroke();
+      cx.restore();
+    }
+  }
+}
+
 // ONB-5: a structured, bounded mirror of the event log — feeds the return digest.
 const eventLog: RecapEvent[] = [];
 let lastNoteMsg = '';
@@ -3376,6 +3430,21 @@ function tellSteward(kind: StewardEvent, p: Record<string, unknown>): void {
   if (steward?.isOpen()) steward.repaint();
 }
 
+/** Рассказать игроку о СВОЁМ герое — правила в `heroNews.ts` (AUD-16): гибель со сроком
+ *  попытки возрождения и возвращение в строй. Имя — то же, что в штабе героев. */
+function tellHero(news: HeroNews | null): void {
+  if (!news) return;
+  const hero = s.heroes?.[news.heroId];
+  const who = hero ? heroDisplayName(hero) : news.heroId;
+  const text =
+    news.key === 'log.hero.died'
+      ? t(news.key, { who, h: fmtHrs(news.leftMs / HOUR) })
+      : news.key === 'log.hero.died.bare'
+        ? t(news.key, { who })
+        : t(news.key, { who, at: news.at ?? '' });
+  note(text, news.at);
+}
+
 /** Рассказать игроку о событии стройки — правила в `buildLog.ts` (REFM-175). */
 function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
   const line = buildLogLine(kind);
@@ -3674,6 +3743,27 @@ function handleEvents(events: DomainEvent[]) {
         capShots(aaShots, AA_SHOTS_MAX);
         break;
       }
+      // КОРАБЕЛЬНОЕ ПВО (AUD-17) — четвёртый тир огня (`flakTiers.ts`, правило 6). Ядро
+      // давно издавало `pd.fired`, но его никто не слушал: зенитка МИРА рисовалась, а
+      // эскорт стрелял невидимо, и сбитые им машины исчезали будто сами. Концы и гейт —
+      // как у перехвата: старт у корабля, удар по вылету СЕЙЧАС (правило 1
+      // `fireEffects.ts` — вылет мог погибнуть этим же залпом, и тогда вспышка встаёт над
+      // самим кораблём), видно своё и чужое на опознанном узле.
+      case 'pd.fired': {
+        const ship = s.fleets[p.fleetId as string];
+        const from = ship ? fleetPos(ship) : null;
+        if (!ship || !from) break;
+        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), known(fleetNode(ship))))
+          break;
+        aaShots.push({
+          from: { ...from },
+          to: aaImpact(strikeWorldPos(p.strikeId as string), from),
+          at: performance.now(),
+          tier: 'pointDefense',
+        });
+        capShots(aaShots, AA_SHOTS_MAX);
+        break;
+      }
       // ROS-2.2 — ответка по челнокам в момент удара. Две точки зрения на одно
       // событие, и обе нужны: свои машины сбили — это счёт за налёт, свои зенитки
       // отработали — это то, ради чего их и строили. Чужую ответку по чужим челнокам
@@ -3710,6 +3800,16 @@ function handleEvents(events: DomainEvent[]) {
         // Чужую реорганизацию наблюдать нечем — на карте виден значок, а не то, что
         // два соединения свели в одно (`fleetNews.ts`, правило 2).
         if (reorgHeard(p.owner, ME)) note(t(reorgKey('split'), { at: p.at as string }));
+        break;
+      // AUD-16: герой больше не гибнет молча. Только свой — в сети геройские события и
+      // так строго адресны владельцу, соло повторяет тот же фильтр (`heroNews.ts`).
+      case 'hero.died':
+        tellHero(
+          heroDiedNews(p, s.heroes?.[p.heroId as string], ME, s.time, (id) => !!s.planets[id]),
+        );
+        break;
+      case 'hero.respawned':
+        tellHero(heroRespawnedNews(p, ME, (id) => !!s.planets[id]));
         break;
       case 'fleet.destroyed':
         // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
@@ -3815,12 +3915,6 @@ function autoRetreatAt(fleetId: string): number | null {
   return (s as { autoRetreat?: Record<string, { at: number }> }).autoRetreat?.[fleetId]?.at ?? null;
 }
 
-/** Ступени авто-отхода по кругу: нет → 20% → 30% → 40% → 50% → нет. Список закрыт в
- *  ядре (`RETREAT_THRESHOLDS`), здесь только обход по кругу. */
-function nextRetreatStep(at: number | null): number | null {
-  const i = at === null ? -1 : RETREAT_THRESHOLDS.indexOf(at as (typeof RETREAT_THRESHOLDS)[number]);
-  return RETREAT_THRESHOLDS[i + 1] ?? null;
-}
 
 /** CC-2: set the auto-storm stance UNIFORMLY on the given own fleets (☰-row toggle —
  *  a mixed group snaps to one state instead of flipping each). Authoritative in NET
@@ -5623,6 +5717,8 @@ function render(now: number) {
     cx.stroke();
     cx.restore();
   }
+
+  drawBattleTracers(now);
 
   // Portraits are resolved only from our own roster, even in full-state solo games.
   const heroesByFleet = mapHeroes(s, ME);
@@ -8038,6 +8134,7 @@ function renderCmdBar() {
     if (merging) merging = false;
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
+    retreatMenu = false;
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
     return;
@@ -8235,6 +8332,18 @@ function renderCmdBar() {
           .join('') +
         `</div>`
       : '') +
+    // ⮐ окошко авто-отхода: выбор порога корпуса одним тапом, текущий подсвечен.
+    (retreatMenu && ids.length > 0
+      ? `<div class="cmdpop cmdpop-retr"><p>${t('cmd.retreat.title')}</p><div class="retr-row">` +
+        [0, ...RETREAT_THRESHOLDS]
+          .map((at) => {
+            const cur = autoRetreatAt(ids[0] ?? '') ?? 0;
+            const on = Math.abs(cur - at) < 1e-9;
+            return `<button data-cmd="retrset" data-at="${at}"${on ? ' class="on"' : ''}><b>${at === 0 ? t('cmd.retreat.off') : `${Math.round(at * 100)}%`}</b></button>`;
+          })
+          .join('') +
+        `</div><span class="retr-hint">${t('cmd.retreat.hint')}</span></div>`
+      : '') +
     // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
     (troopsPlan && troopsIn
       ? troopsMenuHtml(troopsModel(troopsIn), {
@@ -8248,8 +8357,14 @@ function renderCmdBar() {
     html = commandWindowHtml(html, title, sub, !!lone && !aiming && !merging && !pickMode);
   }
   if (html !== lastCmdHtml) {
+    const hadPop = cmdbar.querySelector('.cmdpop') !== null;
     cmdbar.innerHTML = html;
     lastCmdHtml = html;
+    // На ПК ряд — боковая панель с прокруткой, и окошко встаёт в поток ПОД кнопкой: у
+    // нижнего края оно открывалось за краем панели (видны были только верхушки порогов).
+    // Только что открытое окошко докручиваем в вид; дальше прокрутка — за игроком.
+    const pop = cmdbar.querySelector('.cmdpop');
+    if (!hadPop && pop && holographic.active()) pop.scrollIntoView({ block: 'nearest' });
   }
   cmdbar.classList.add('show');
 }
@@ -8765,6 +8880,7 @@ cmdbar.addEventListener('click', (ev) => {
   // Back и Escape.
   if (disarms('merge', cmd)) merging = false;
   if (disarms('cast', cmd)) castMenu = false;
+  if (disarms('retreat', cmd)) retreatMenu = false;
   if (disarms('troops', cmd)) troopsPlan = null;
   if (disarms('assault', cmd)) assaultAim = false;
   if (disarms('engage', cmd)) engageAim = false;
@@ -8918,15 +9034,18 @@ cmdbar.addEventListener('click', (ev) => {
     setAutoAssault(ids, on);
     if (on) note(t('hint.auto-assault'));
   } else if (cmd === 'qretr') {
-    // RETR-2: авто-отход. Одна кнопка обходит ступени по кругу (нет → 20 → 30 → 40 → 50
-    // → нет), группой единообразно: у смешанного выделения берётся порог ПЕРВОГО, чтобы
-    // вся группа снялась с места одинаково, а не разъехалась по разным отметкам.
+    // RETR-2: авто-отход. Кнопка открывает окошко с порогами (заказ владельца 2026-09-23;
+    // раньше она обходила ступени по кругу, и нужный порог приходилось «прощёлкивать»).
+    retreatMenu = !retreatMenu;
+  } else if (cmd === 'retrset') {
+    // Группой единообразно: вся группа снимается с места на одной отметке.
     //
     // Точка отхода: ВЫБРАННЫЙ свой мир, иначе столица. Выбор игроку оставлен (владелец
     // просил именно его), но без выбора приказ всё равно осмыслен — столица есть всегда,
     // пока она назначена. Нет ни того, ни другого — приказ не ставится, и игроку
     // говорят, чего не хватает, а не молчат.
-    const at = nextRetreatStep(autoRetreatAt(ids[0] ?? ''));
+    const raw = Number(bEl.dataset.at);
+    const at = RETREAT_THRESHOLDS.find((x) => Math.abs(x - raw) < 1e-9) ?? null;
     if (at === null) {
       for (const id of ids) playerOrder(orderRetreat(ME, id, false));
       note(t('hint.auto-retreat.off'));
@@ -8939,6 +9058,7 @@ cmdbar.addEventListener('click', (ev) => {
         note(t('hint.auto-retreat', { n: Math.round(at * 100), at: to }));
       }
     }
+    retreatMenu = false;
   } else if (cmd === 'pick') {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
     pickMode = !pickMode;
@@ -9756,6 +9876,13 @@ const battleWindow = initBattleWindow({
   },
   // Отступление из окна боя — тот же приказ, что и кнопкой боковой панели.
   retreat: (fleetId) => playerOrder(retreatFleet(ME, fleetId)),
+  view: {
+    color: ownerColor,
+    fleetName: fleetCallsign,
+    placeName: planetName,
+    autoRetreatAt,
+    timeLeft,
+  },
 });
 const pirateIntro = initPirateIntro({
   root: $('pirate-intro'),
@@ -10921,7 +11048,9 @@ function renderSetupSlots(): void {
   // Lives in its own container (#setupfactions, the left setup column); the team
   // toggle + seat rows fill #setupslots (the right column).
   let f2 = `<div class="fph">${t('setup.faction.note')}</div><div class="fpick">`;
-  for (const fid of Object.keys(data.factions)) {
+  // Только ДОМА: каталог фракций несёт ещё Рой и легаси-`vanguard`, и перебор каталога
+  // давал сыграть за Улей в обычной партии (баг, замечен владельцем 2026-09-23).
+  for (const fid of PLAYABLE_FACTIONS) {
     const f = data.factions[fid];
     if (!f) continue;
     const on = fid === setupFaction;
@@ -11029,24 +11158,6 @@ let setupReturn: 'welcome' | 'hub' = 'welcome';
 // Окно живёт в `sciPick.ts` (REFM-18); здесь только проводка. Список выбранных —
 // `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 const sciWin = $('scipick');
-// Окно усиления между волнами (PVR-1.4).
-const boonWin = $('boonpick');
-const boonPickBody = $('boonpickbody');
-let lastBoonBody = '';
-boonWin.addEventListener('click', (ev) => {
-  const target = ev.target as Element;
-  if (target.closest('[data-boonlater]')) {
-    boonLaterAtWave = s.pve?.waveNumber ?? -1;
-    boonWin.classList.remove('show');
-    return;
-  }
-  const card = target.closest('[data-boon]');
-  if (!card) return;
-  const tech = card.getAttribute('data-boon');
-  // Приказ идёт ОБЫЧНЫМ путём игрока: в сети он уехал бы на сервер, и проверяет его
-  // ядро. Клиент тут не выдаёт технологию, он её просит.
-  if (tech) playerOrder(takeBoon(ME, tech));
-});
 const setupCouncilEl = $('setupcouncil');
 function renderSetupCouncil(): void {
   setupCouncilEl.innerHTML = sciCouncilRowHtml(setupScientists, data);
@@ -11306,7 +11417,6 @@ function startPvEMatch(dev = false): void {
   // Seed the PvE section through the kernel before the first save. A page can
   // close before its first animation frame; that must not lose a fresh attempt.
   apply(advance(s, s.time + 1));
-  boonLaterAtWave = -1;
   // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
   // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
   applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
@@ -11416,7 +11526,8 @@ setupMapEl.addEventListener('click', (ev) => {
 setupFactionsEl.addEventListener('click', (ev) => {
   const fp = (ev.target as Element).closest('[data-fpick]');
   if (!fp) return;
-  setupFaction = fp.getAttribute('data-fpick') ?? setupFaction;
+  const pick = fp.getAttribute('data-fpick');
+  if (pick && PLAYABLE_FACTIONS.includes(pick)) setupFaction = pick;
   renderSetup();
 });
 setupSlotsEl.addEventListener('click', (ev) => {
@@ -12919,15 +13030,6 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'solo-replace', isOpen: () => flexed('solo-replace'), close: closeSoloReplace }, // z60
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp?.close() }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
-  // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
-  {
-    id: 'boonpick',
-    isOpen: () => shown('boonpick'),
-    close: () => {
-      boonLaterAtWave = s.pve?.waveNumber ?? -1;
-      hide('boonpick');
-    },
-  }, // z60
   { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
   { id: 'swarm-dossier', isOpen: () => !swarmDossierPinned && shown('swarm-dossier'), close: closeSwarmDossier }, // z60 modal only
   { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
@@ -13007,10 +13109,11 @@ const BACK_LAYERS: BackLayer[] = [
   // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
   {
     id: 'cmdbar',
-    isOpen: () => troopsPlan !== null || castMenu || (MOBILE && cmdMore),
+    isOpen: () => troopsPlan !== null || castMenu || retreatMenu || (MOBILE && cmdMore),
     close: () => {
       troopsPlan = null;
       castMenu = false;
+      retreatMenu = false;
       if (MOBILE) cmdMore = false;
       lastCmdHtml = '';
     },
@@ -13099,48 +13202,6 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
   }
 });
-
-/**
- * Окно усиления между волнами (PVR-1.4).
- *
- * Что предложить, решает `/decisions/waveBoons.ts`; кому и сколько должно — ядро
- * (`state.pve.boons`), и оно же проверяет выбор. Здесь только показ: собрать карточки,
- * открыть окно, когда долг появился, и закрыть, когда предлагать нечего.
- *
- * Окно НЕ блокирующее: «Позже» прячет его до следующей волны, а долг остаётся. Забег
- * идёт в реальном времени, и модальное окно поверх подходящего штурма отняло бы у
- * игрока ровно те секунды, ради которых он это усиление и берёт.
- */
-function renderBoonPick(): void {
-  const pve = s.pve;
-  const cfg = data.modes[matchMode() ?? '']?.pve;
-  const offer = boonOffer({
-    owed: pve?.boons?.[ME] ?? 0,
-    pool: cfg?.boons ?? [],
-    completed: s.players[ME]?.technologies?.completed ?? [],
-  });
-  const deferred = offer.kind === 'offer' && boonLaterAtWave === (pve?.waveNumber ?? -1);
-  const show = inMatch() && offer.kind === 'offer' && !deferred;
-  boonWin.classList.toggle('show', show);
-  if (!show) return;
-  const cards = offer.choices
-    .map((id) => {
-      const td = data.technologies[id];
-      if (!td) return '';
-      return (
-        `<button class="sp-card" type="button" data-boon="${esc(id)}">` +
-        `<span class="sp-cn">${esc(tData(td.name))}</span>` +
-        `<span class="sp-ci">${techFx(td)}</span>` +
-        `</button>`
-      );
-    })
-    .join('');
-  const body = `<p class="bp-owed">${t('win.boon.owed', { n: offer.owed })}</p><div class="bp-list">${cards}</div>`;
-  if (body !== lastBoonBody) {
-    boonPickBody.innerHTML = body;
-    lastBoonBody = body;
-  }
-}
 
 // The normal skirmish slot is independent of Sector Zero and the tutorial.
 const soloStore = soloSaveStore();
@@ -13421,6 +13482,16 @@ const sectorZeroMenu = initSectorZeroMenu({
     pool: pveChapter(index).objectives.length,
     cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
   }),
+  // Карта главы: мир на старте главы + память тумана прошлых забегов из профиля.
+  chapterMap: index => {
+    const chapter = pveChapter(index);
+    return chapterMapView(
+      pveState(data, index),
+      sectorProgress.chapterScouted[chapter.id] ?? [],
+      'p1',
+      chapter.objectives.flatMap(o => (o.kind === 'control' ? o.targets : [])),
+    );
+  },
   setMission: value => {
     nextSectorMission = value;
     writeRaw('void.pveMission', String(value));
@@ -13579,7 +13650,6 @@ function restoreRun(): boolean {
   }
   pveDifficulty = parseRunDifficulty(save.difficulty);
   setRunActive(true);
-  boonLaterAtWave = -1;
   sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
   sectorMission = save.sectorZeroMission ?? sectorMission;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
@@ -13639,7 +13709,6 @@ function restorePortable(): boolean {
   pveDifficulty = parseRunDifficulty(save.difficulty);
   setRunActive(true);
   sectorDevActive = false;
-  boonLaterAtWave = -1;
   sectorAttempt = save.attempt ?? sectorProgress.nextAttempt;
   if (sectorProgress.nextAttempt <= sectorAttempt) {
     saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
@@ -13750,7 +13819,6 @@ function frame(nowReal: number) {
   // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
   tickSoloSave(nowReal);
-  renderBoonPick();
   renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   const wave = waveReadout(s.pve, s.time);
@@ -13781,7 +13849,9 @@ function frame(nowReal: number) {
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
     (s.pve && !swarmDossierPinned ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
-    `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
+    // Суверены — приманка (заказ владельца 2026-09-23): кнопка с «+», золотом и бликом.
+    // Нажатие поведёт в магазин Суверенов; пока магазина нет — честная подсказка.
+    `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.aria', { n: kfmt(SOVEREIGNS) })}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em aria-hidden="true">+</em></button>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
     lastClockText = statusHtml;

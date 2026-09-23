@@ -14,7 +14,7 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { PlanetId } from '../state/gameState';
-import { fleetSideDealingHit, fleetSideTakingHit, heroNode } from '../state/heroes';
+import { fleetSideTakingHit, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isAllied, isHostile } from '../util/combat';
 import type { HeroEffect } from './hero';
@@ -255,7 +255,7 @@ function revealZoneFactor(h: HandlerContext, taking: string, at: PlanetId): numb
 
 export const heroEffectsModule: GameModule = {
   id: 'heroEffects',
-  version: '1.1.0',
+  version: '1.2.0', // CORE-DMG-3: аура — во всех каналах, где стреляет флот, а не только в бою
   setup(api) {
     api.provideCapability<HeroEffect>('hero.effect.recall', recall);
     api.provideCapability<HeroEffect>('hero.effect.aura', aura);
@@ -267,11 +267,20 @@ export const heroEffectsModule: GameModule = {
     // heroModule contributions (multiple registrants chain; ×-factors commute, so the
     // module order is immaterial). Same side/attacker read as the HERO-5 aura: the buff
     // rides the side DEALING the hit (covers its attack and its return-fire defense).
+    //
+    // CORE-DMG-3: читается `attackerFleet` + `location`, а не `battleId`. `auraBonus`
+    // и раньше считал ПОЗИЦИОННО — «герой жив, аура не истекла, узел в радиусе», — но
+    // добраться до него можно было только через бой, и радиус кончался там же, где
+    // свалка. Клетка у выстрела есть в каждом канале, и аура теперь доходит до всех.
     api.hook<number>('combat.damage', (base, args, h) => {
-      const { battleId, attacker } = (args ?? {}) as { battleId?: string; attacker?: string };
-      const hit = fleetSideDealingHit(h.state, battleId, attacker);
-      if (!hit || typeof attacker !== 'string') return base;
-      const bonus = auraBonus(h, attacker, hit.battle.location);
+      const { attacker, attackerFleet, location } = (args ?? {}) as {
+        attacker?: string;
+        attackerFleet?: string;
+        location?: string;
+      };
+      if (typeof attacker !== 'string' || typeof attackerFleet !== 'string') return base;
+      if (typeof location !== 'string' || location === '') return base;
+      const bonus = auraBonus(h, attacker, location);
       return bonus !== 0 ? base * (1 + bonus) : base;
     });
 

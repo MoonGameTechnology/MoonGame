@@ -85,6 +85,10 @@ export interface SectorZeroProgress {
   objectivesDone: Record<string, string[]>;
   /** Главы, выигранные хоть раз (id карты): отметка «пройдена» на маршруте глав. */
   chaptersWon: string[];
+  /** Разведка главы, накопленная за все засчитанные забеги: `id главы → id провинций`,
+   *  опознанных игроком (его память тумана). Панель карты главы в меню показывает по ней,
+   *  что уже известно, а что лежит в тумане. */
+  chapterScouted: Record<string, string[]>;
   /** Разбивка последнего засчитанного забега — экран итогов (PVR-5.4). `null` — ещё не было. */
   lastRun: RunSummary | null;
   modules: string[];
@@ -164,6 +168,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     doubledThrough: 0,
     objectivesDone: {},
     chaptersWon: [],
+    chapterScouted: {},
     lastRun: null,
     modules: STARTER_MODULES.filter((id) => data.modules[id]),
     stars: {},
@@ -549,6 +554,10 @@ export function parseSectorZeroProgress(
       if (list.length > 0) fresh.objectivesDone[chapter] = list;
     }
     fresh.chaptersWon = strings(p.chaptersWon);
+    for (const [chapter, ids] of Object.entries(p.chapterScouted ?? {})) {
+      const list = strings(ids);
+      if (list.length > 0) fresh.chapterScouted[chapter] = list;
+    }
     fresh.lastRun = parseRunSummary(p.lastRun);
     fresh.warrants = counter(p.warrants);
     fresh.sovereigns = counter(p.sovereigns);
@@ -679,6 +688,17 @@ export function settleSectorZeroRun(
       won && chapter.id && !progress.chaptersWon.includes(chapter.id)
         ? [...progress.chaptersWon, chapter.id]
         : progress.chaptersWon,
+    chapterScouted: chapter.id
+      ? {
+          ...progress.chapterScouted,
+          [chapter.id]: [
+            ...new Set([
+              ...(progress.chapterScouted[chapter.id] ?? []),
+              ...Object.keys(state.fog?.p1 ?? {}),
+            ]),
+          ].sort(),
+        }
+      : progress.chapterScouted,
     lastRun: {
       attempt,
       chapter: chapter.id,

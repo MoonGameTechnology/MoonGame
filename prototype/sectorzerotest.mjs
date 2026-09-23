@@ -114,6 +114,11 @@ try {
     assert.notEqual(await page.locator('#sz-chapter-stats').textContent(), null);
     await page.locator('#sz-mission-1').click();
     assert.equal(await page.locator('#sz-mission-1').getAttribute('aria-pressed'), 'true');
+    // Выбор главы открывает её карту справа: клетка на каждый из 24 секторов главы II,
+    // до первого забега известен только старт.
+    await page.locator('#sz-map-panel').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#sz-map-body polygon').count(), 24, 'мозаика главы II');
+    const scoutedBefore = await page.locator('#sz-map-body polygon.known').count();
     assert.match(await page.locator('#sz-chapter-stats').textContent(), /3/, 'задачи главы II');
     await page.locator('#sz-mission-0').click();
     await page.locator('#sz-new').click();
@@ -163,10 +168,18 @@ try {
     await page.locator('#maploading').waitFor({ state: 'hidden' });
     await leave();
     await page.waitForFunction(() => document.getElementById('sz-mission-1').classList.contains('sz-passed'));
+    // Засчитанный забег добавил разведку главы: на её карте опознанного стало больше.
+    await page.locator('#sz-mission-1').click();
+    await page.locator('#sz-map-panel').waitFor({ state: 'visible' });
+    assert(
+      (await page.locator('#sz-map-body polygon.known').count()) > scoutedBefore,
+      'разведка забега попала на карту главы',
+    );
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' итог забега — по частям, глава повторяется с итогов и отмечена пройденной\n',
+      ' итог забега — по частям, глава повторяется с итогов и отмечена пройденной;' +
+      ' карта главы показывает накопленную разведку\n',
   );
 } finally {
   await browser.close();

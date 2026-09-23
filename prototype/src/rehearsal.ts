@@ -128,8 +128,6 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'fleet.retreat': { fleetId: 'p1_1' },
   'army.load': { fleetId: 'p1_1', unit: 'militia', count: 1 },
   'army.unload': { fleetId: 'p1_1', unit: 'militia', count: 1 },
-  'hero.move': { to: 'home_p1' },
-  'planet.annihilate': { planetId: 'nexus' },
   'hero.ability': { heroId: 'hero:p1', abilityId: 'scan', target: 'nexus' },
   'hero.spawn': { heroId: 'hero:p1', at: 'home_p1' },
   'hero.skill.unlock': { heroId: 'hero:p1', node: 'neural_lace' },

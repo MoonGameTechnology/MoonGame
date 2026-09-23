@@ -28,6 +28,7 @@
  */
 import { t } from '../../localization/runtime';
 import { esc, displayUnit } from './format';
+import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
 import type { GameState, PlayerId } from '../../packages/shared-core/src/index';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
@@ -40,15 +41,53 @@ export interface BattleWindowHost {
   /** Модель боя (из `@void/client`), либо null — бой исчез или под туманом. */
   model: (battleId: string) => BattleModel | null;
   retreat: (fleetId: string) => void;
+  /** Оформление (заказ владельца 2026-09-23) — всё необязательно: без него окно честно
+   *  рисуется нейтральным цветом, сырым id и без строки авто-отхода. */
+  view?: BattleView;
 }
 
-const bar = (v: { current: number; max: number } | undefined, label: string): string =>
-  v && v.max > 0
-    ? `<span class="bw-bar">${esc(label)} ${Math.round(v.current)}/${Math.round(v.max)}</span>`
-    : '';
+/** Как хост называет и красит то, что окно показывает. */
+export interface BattleView {
+  /** Цвет владельца — тот же, что у его флотов и границ на карте. */
+  color?: (owner: string | null) => string;
+  /** Позывной флота вместо сырого id. */
+  fleetName?: (fleetId: string) => string;
+  /** Имя мира, за который бой. */
+  placeName?: (planetId: string) => string;
+  /** Порог авто-отхода флота (доля корпуса) или null — приказа нет. */
+  autoRetreatAt?: (fleetId: string) => number | null;
+  /** Остаток до отметки времени мира — текст отсчёта до следующего раунда. */
+  timeLeft?: (at: number) => string;
+}
 
-/** Одна строка стороны: кто, в какой роли, чем держит узел. */
-export function sideRowHtml(side: BattleModel['sides'][number]): string {
+type Side = BattleModel['sides'][number];
+
+const NEUTRAL = '#8aa0ad';
+
+/** Словом рядом с цветом шкалы: цвет не единственный носитель смысла. */
+const TONE_KEY = {
+  ok: 'battle.win.tone.ok',
+  hurt: 'battle.win.tone.hurt',
+  low: 'battle.win.tone.low',
+} as const;
+
+/** Шкала: заливка по доле + подпись поверх. Нет максимума — шкалы нет. */
+function meter(
+  v: { current: number; max: number } | undefined,
+  cls: string,
+  label: string,
+  note = '',
+): string {
+  if (!v || !(v.max > 0)) return '';
+  const pct = Math.round(meterShare(v.current, v.max) * 100);
+  return (
+    `<div class="bw-meter ${cls}"><i style="width:${pct}%"></i>` +
+    `<span>${esc(label)} ${Math.round(v.current)}/${Math.round(v.max)}${note ? ` · ${esc(note)}` : ''}</span></div>`
+  );
+}
+
+/** Одна карточка стороны: кто, в какой роли, чем держит узел и сколько осталось. */
+export function sideRowHtml(side: Side, view: BattleView = {}): string {
   const kind =
     side.kind === 'garrison'
       ? t('side.battle.side.garrison')
@@ -57,36 +96,86 @@ export function sideRowHtml(side: BattleModel['sides'][number]): string {
         : side.kind === 'beachhead'
           ? t('battle.win.beachhead')
           : t('side.battle.side.fleet');
-  const role = t(side.role === 'attacker' ? 'side.battle.attacker' : 'side.battle.defender');
-  const troops = side.units.map((u) => `${u.count}× ${esc(displayUnit(u.unit))}`).join(', ') || '—';
+  const role = t(
+    side.role === 'attacker' ? 'battle.win.role.attacker' : 'battle.win.role.defender',
+  );
+  const tone = side.hull ? hullTone(side.hull.current, side.hull.max) : 'ok';
+  const col = view.color?.(side.owner) ?? NEUTRAL;
+  const units =
+    side.units
+      .map((u) => `<span class="bw-unit"><b>${u.count}×</b> ${esc(displayUnit(u.unit))}</span>`)
+      .join('') || '<span class="bw-unit">—</span>';
   return (
-    `<div class="bw-side${side.mine ? ' mine' : ''} ${side.role}">` +
-    `<p class="bw-who">${side.mine ? '▶ ' : ''}<b>${esc(side.ownerName)}</b>` +
-    ` <i>${esc(role)}</i> <span class="dim">${esc(kind)}</span></p>` +
-    `<p class="bw-force">${troops} ${bar(side.hull, t('battle.win.hull'))}${bar(side.shield, t('battle.win.shield'))}</p>` +
+    `<div class="bw-side${side.mine ? ' mine' : ''} ${side.role}" style="--own:${esc(col)}">` +
+    `<p class="bw-who"><b>${esc(side.ownerName)}</b>` +
+    (side.mine ? `<em class="bw-you">${esc(t('battle.win.you'))}</em>` : '') +
+    `<span class="bw-role">${esc(role)}</span><span class="bw-kind">${esc(kind)}</span></p>` +
+    meter(side.hull, `hull tone-${tone}`, t('battle.win.hull'), t(TONE_KEY[tone])) +
+    meter(side.shield, 'shield', t('battle.win.shield')) +
+    `<div class="bw-units">${units}</div>` +
     `</div>`
   );
 }
 
-/** Тело окна целиком. */
-export function battleWindowHtml(m: BattleModel | null, retreats: readonly string[] = []): string {
-  if (!m) return `<p class="bw-empty">${esc(t('battle.win.empty'))}</p>`; // правило 4
-  const phase = t(m.phase === 'ground' ? 'battle.win.phase.ground' : 'battle.win.phase.orbit');
+/** Полоса «запас прочности»: доли сторон цветами владельцев. Меньше двух долей — нет. */
+function balanceHtml(sides: readonly Side[], view: BattleView): string {
+  const shares = powerShares(sides);
+  if (shares.length < 2) return '';
+  const col = (s: Side): string => esc(view.color?.(s.owner) ?? NEUTRAL);
   return (
+    `<div class="bw-balance"><p class="bw-sub">${esc(t('battle.win.balance'))}</p><div class="bw-bal">` +
+    sides
+      .map((s, i) => `<i style="flex:${(shares[i] ?? 0).toFixed(4)};background:${col(s)}"></i>`)
+      .join('') +
+    `</div><div class="bw-legend">` +
+    sides
+      .map(
+        (s, i) =>
+          `<span${s.mine ? ' class="mine"' : ''}><i style="background:${col(s)}"></i>${esc(s.ownerName)} ${Math.round((shares[i] ?? 0) * 100)}%</span>`,
+      )
+      .join('') +
+    `</div></div>`
+  );
+}
+
+/** Тело окна целиком. */
+export function battleWindowHtml(
+  m: BattleModel | null,
+  retreats: readonly string[] = [],
+  view: BattleView = {},
+): string {
+  if (!m) return `<p class="bw-empty">${esc(t('battle.win.empty'))}</p>`; // правило 4
+  const ground = m.phase === 'ground';
+  const phase = t(ground ? 'battle.win.phase.ground' : 'battle.win.phase.orbit');
+  const place = view.placeName?.(m.location) ?? m.location;
+  return (
+    `<div class="bw-top ${ground ? 'ground' : 'orbit'}">` +
+    `<span class="bw-ico">${ground ? '🪐' : '🛰️'}</span>` +
+    `<div class="bw-title"><b>${esc(t('battle.win.at', { w: place }))}</b>` +
     `<p class="bw-head">${esc(phase)} · ${esc(t('battle.win.round', { r: m.round }))}` +
-    ` · ${esc(t('battle.win.sides', { n: m.sides.length }))}</p>` +
+    ` · ${esc(t('battle.win.sides', { n: m.sides.length }))}</p></div>` +
     (m.nextRoundAt != null
-      ? `<p class="bw-next">${esc(t('battle.win.next'))} <span class="pn-timer" data-at="${m.nextRoundAt}">…</span></p>`
+      ? `<div class="bw-next"><span>${esc(t('battle.win.next'))}</span><b class="pn-timer" data-at="${m.nextRoundAt}">…</b></div>`
       : '') +
-    `<div class="bw-sides">${m.sides.map(sideRowHtml).join('')}</div>` +
+    `</div>` +
+    balanceHtml(m.sides, view) +
+    `<div class="bw-sides">${m.sides.map((sd) => sideRowHtml(sd, view)).join('')}</div>` +
     (retreats.length
-      ? `<div class="bw-orders">${retreats
-          .map(
-            (id) =>
-              `<button class="b" data-battle-retreat="${esc(id)}">${esc(t('side.battle.retreat'))} · ${esc(id)}</button>`,
-          )
+      ? `<div class="bw-orders"><p class="bw-sub">${esc(t('battle.win.yours'))}</p>${retreats
+          .map((id) => {
+            const at = view.autoRetreatAt?.(id) ?? null;
+            const auto =
+              at === null
+                ? t('battle.win.auto.off')
+                : t('battle.win.auto.on', { n: Math.round(at * 100) });
+            return (
+              `<div class="bw-ret"><div><b>${esc(view.fleetName?.(id) ?? id)}</b><span>${esc(auto)}</span></div>` +
+              `<button class="b" data-battle-retreat="${esc(id)}">${esc(t('side.battle.retreat'))}</button></div>`
+            );
+          })
           .join('')}</div><p class="hint">${esc(t('side.battle.retreat.hint'))}</p>`
-      : '')
+      : '') +
+    `<p class="bw-rule">${esc(t('battle.win.rule'))}</p>`
   );
 }
 
@@ -116,6 +205,7 @@ export function initBattleWindow(host: BattleWindowHost): {
     const html = battleWindowHtml(
       model,
       model ? battleRetreats(host.state(), shown, host.me()) : [],
+      host.view,
     );
     if (html !== lastHtml) {
       const scroll = host.body().scrollTop;
@@ -123,6 +213,13 @@ export function initBattleWindow(host: BattleWindowHost): {
       host.body().scrollTop = scroll;
       lastHtml = html;
     }
+    // Отсчёт живёт ВНЕ подписи разметки: вписанный в HTML, он менял бы её каждую
+    // секунду, и окно пересобиралось бы под пальцем — нажатие «Отступить», чьи down/up
+    // пришлись на разные кадры, терялось бы. Поэтому узел патчится на месте.
+    const left = host.view?.timeLeft;
+    if (left)
+      for (const el of Array.from(host.body().querySelectorAll<HTMLElement>('.pn-timer')))
+        el.textContent = left(Number(el.dataset.at));
   };
   host.root().addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;

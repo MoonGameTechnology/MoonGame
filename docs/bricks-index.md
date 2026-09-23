@@ -224,7 +224,8 @@
 | AI-BAL-12 | ✅ | proto | `docs/backlog.md` | Две фракции из четырёх вне измерения. |
 | CORE-DMG-1 | ✅ | core | `docs/backlog.md` | Все каналы урона идут через хук combat.damage. |
 | CORE-DMG-2 | ✅ | core | `docs/backlog.md` | Пропустить хук combat.damage всё ещё МОЖНО — примитив урона |
-| CORE-DMG-3 | ⏳ | core | `docs/backlog.md` | Ауры и пассивы героя не доходят до неближнего боя — асимметрия, |
+| CORE-DMG-3 | ✅ | core | `docs/backlog.md` | Ауры и пассивы героя не доходят до неближнего боя — асимметрия, |
+| CORE-DMG-4 | ⏳ | core | `docs/backlog.md` | Пси-зона героя (лестница scan) работает только в свалке — |
 | AI-BAL-13 | ✅ | proto | `docs/backlog.md` | Бот не знает правила «один герой на флот» — и от этого стоит |
 | AI-BAL-1.1 | ✅ | proto | `docs/backlog.md` | Тест-боты отделены от игровых. |
 | BAL-1 | ✅ | proto | `docs/backlog.md` | Стартовые позиции больше не решают матч — карта-«колесо». |
@@ -601,6 +602,13 @@
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-9 | ✅ | sec | `docs/backlog.md` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
 | AUD-10 | ✅ | sec | `docs/backlog.md` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
+| AUD-16 | ✅ | proto | `docs/backlog.md` | Герой больше не гибнет молча. |
+| AUD-17 | ✅ | proto | `docs/backlog.md` | Корабельное ПВО стало видно. |
+| AUD-18 | ✅ | core | `docs/backlog.md` | Сняты наследные hero.move и planet.annihilate — второй |
+| AUD-19 | ✅ | docs | `docs/backlog.md` | Сводка решений ГДД (п. 8) описывала артиллерию, |
+| AUD-20 | ⏳ | srv proto | `docs/backlog.md` | Адаптация Роя (AD-01) не подключена ни к одному живому |
+| AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
+| AUD-22 | ⏳ | data | `docs/backlog.md` | Пустые покупки в дереве навыков. |
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md` | Строка места переключается «выкл → слабый → сильный». |
@@ -1026,7 +1034,7 @@
 | PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md` | Соло-запуск задаёт modeId |
 | PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | HUD забега: волна N из M и время до следующей |
 | PVR-1.3 | ✅ | data | `docs/sector-zero-roadmap.md` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | ✅ | proto core | `docs/sector-zero-roadmap.md` | Выбор между волнами |
+| PVR-1.4 | 🗑 | proto core | `docs/sector-zero-roadmap.md` | Выбор между волнами |
 | PVR-1.5 | ✅ | core | `docs/sector-zero-roadmap.md` | Волны Роя враждебны и доходят до боя |
 | PVR-1.6 | ✅ | core data | `docs/sector-zero-roadmap.md` | Забег доходит до вердикта |
 | PVR-1.7 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Пиратская база для первого боя |
@@ -1039,7 +1047,7 @@
 | PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Награда за забег |
 | PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md` | Резолюция: что из §3 входит в первую версию |
 | PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md` | Память Роя как состояние |
-| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.3 | 🔶 | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
 | PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md` | Структуры первого набора |
 | PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Журнал адаптаций |
 | PVR-5.1 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Карта второй главы и дверь к ней |

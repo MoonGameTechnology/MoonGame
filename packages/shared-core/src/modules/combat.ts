@@ -1139,6 +1139,10 @@ export const combatModule: GameModule = {
             location: battle.location,
             attacker: side.owner,
             defender: target.owner,
+            // CORE-DMG-3: сторона боя и есть ответ на «кто стреляет». Гарнизон остаётся
+            // без `attackerFleet` — ауры и пассивы героя усиливают флоты, не гарнизоны,
+            // и это правило ближнего боя здесь ровно то же, что было.
+            ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
           });
           const running = incoming.get(target);
           incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));

@@ -8,6 +8,7 @@ import {
 } from '../../decisions/runDifficulty';
 import type { RunPreview } from '../../decisions/sectorZeroMenu';
 import { CHAPTER_KEYS, chapterRoute, romanChapter } from '../../decisions/chapterRoute';
+import type { ChapterMapView } from '../../decisions/chapterMap';
 
 export interface SectorZeroMenuHooks {
   root: HTMLElement;
@@ -22,6 +23,8 @@ export interface SectorZeroMenuHooks {
   /** Что глава просит: волн до победы, сколько задач видно в следующем забеге и сколько
    *  их в запасе главы (PVR-5.3), и выиграна ли она хоть раз. */
   chapterInfo(index: number): { waves: number; tasks: number; pool: number; cleared: boolean };
+  /** Карта главы с тем, что игрок о ней знает (панель справа при выборе главы). */
+  chapterMap(index: number): ChapterMapView | null;
   start(): void;
   startDev?: () => void;
   resume(): boolean;
@@ -29,6 +32,44 @@ export interface SectorZeroMenuHooks {
   back(): void;
   standalone: boolean;
   preparation: { open(): void; close(): void; isOpen(): boolean };
+}
+
+/** Класс из id данных: только `[a-z0-9_-]`, чтобы вид сектора не нёс в разметку ничего чужого. */
+const cls = (id: string): string => id.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+const pts = (poly: ReadonlyArray<[number, number]>): string =>
+  poly.map(([x, y]) => `${Math.round(x)},${Math.round(y)}`).join(' ');
+
+/**
+ * Карта главы в стиле игровой: мозаика провинций, линии проходов, туман над неопознанным.
+ * Опознанное красится стороной (вы / противник / ничьё) и видом сектора, цели задач —
+ * кольцом. Толщины линий не зависят от масштаба (`non-scaling-stroke`).
+ */
+export function chapterMapSvg(view: ChapterMapView): string {
+  const { x, y, w, h } = view.frame;
+  const cells = view.cells
+    .map(
+      (c) =>
+        `<polygon class="${c.known ? `known side-${c.side} kind-${cls(c.kind ?? '')}` : 'fog'}" points="${pts(c.poly)}"/>`,
+    )
+    .join('');
+  const lanes = view.lanes
+    .map(([x1, y1, x2, y2]) => `<line x1="${Math.round(x1)}" y1="${Math.round(y1)}" x2="${Math.round(x2)}" y2="${Math.round(y2)}"/>`)
+    .join('');
+  const r = Math.max(w, h) / 60;
+  const marks = view.cells
+    .filter((c) => c.known)
+    .map((c) =>
+      c.side === 'you'
+        ? `<rect class="home" x="${Math.round(c.x - r)}" y="${Math.round(c.y - r)}" width="${Math.round(r * 2)}" height="${Math.round(r * 2)}" transform="rotate(45 ${Math.round(c.x)} ${Math.round(c.y)})"/>`
+        : `<circle class="dot side-${c.side}" cx="${Math.round(c.x)}" cy="${Math.round(c.y)}" r="${Math.round(r * 0.55)}"/>` +
+          (c.objective ? `<circle class="target" cx="${Math.round(c.x)}" cy="${Math.round(c.y)}" r="${Math.round(r * 1.8)}"/>` : ''),
+    )
+    .join('');
+  return (
+    `<svg viewBox="${Math.round(x)} ${Math.round(y)} ${Math.round(w)} ${Math.round(h)}" preserveAspectRatio="xMidYMid meet" role="img">` +
+    `<defs><pattern id="sz-fog" width="${Math.round(r * 1.6)}" height="${Math.round(r * 1.6)}" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><rect width="100%" height="100%" class="fog-bg"/><line x1="0" y1="0" x2="0" y2="${Math.round(r * 1.6)}" class="fog-hatch"/></pattern></defs>` +
+    `<g class="cells">${cells}</g><g class="lanes">${lanes}</g><g class="marks">${marks}</g></svg>`
+  );
 }
 
 export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
@@ -78,7 +119,35 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
       : '';
     for (const node of lostNodes)
       node.classList.toggle('peek', Number(node.dataset.lost) === peek);
+    if (!mapPanel.hidden) renderMap(index, !keys);
   }
+
+  // Панель карты главы: открывается выбором главы на маршруте и закрывается крестиком.
+  const mapPanel = el('sz-map-panel');
+  function renderMap(index: number, lost: boolean): void {
+    const view = lost ? null : h.chapterMap(index);
+    el('sz-map-title').textContent = lost ? t('sector-zero.mission.lost') : t(CHAPTER_KEYS[index]!.name);
+    el('sz-map-body').innerHTML = view
+      ? chapterMapSvg(view)
+      : `<div class="sz-map-lost"><span>${t('sector-zero.map.lost')}</span></div>`;
+    el('sz-map-foot').innerHTML = view
+      ? `<b>${t('sector-zero.map.scouted', { n: view.known, m: view.total })}</b>` +
+        `<span class="lg you">${t('sector-zero.map.you')}</span><span class="lg hostile">${t('sector-zero.map.hostile')}</span>` +
+        `<span class="lg target">${t('sector-zero.map.target')}</span><span class="lg fog">${t('sector-zero.map.fog')}</span>`
+      : '';
+  }
+  function openMap(): void {
+    mapPanel.hidden = false;
+    h.root.classList.add('sz-map-open');
+    renderChapter();
+    // На телефоне карта стоит блоком ниже меню — подвести к ней, иначе тап «ничего не сделал».
+    if (window.matchMedia?.('(max-width: 760px)').matches)
+      mapPanel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  el('sz-map-close').addEventListener('click', () => {
+    mapPanel.hidden = true;
+    h.root.classList.remove('sz-map-open');
+  });
   let preview: RunPreview | null = null;
   let loading = false;
   let generation = 0;
@@ -185,12 +254,14 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
       peek = null;
       h.setMission(Number(button.dataset.mission ?? 0));
       render();
+      openMap();
     });
   for (const node of lostNodes)
     node.addEventListener('click', () => {
       const index = Number(node.dataset.lost);
       peek = peek === index ? null : index;
-      renderChapter();
+      if (peek === null) renderChapter();
+      else openMap();
     });
   el('sz-settings').addEventListener('click', h.settings);
   el('sz-prep').addEventListener('click', () => {
