@@ -3,7 +3,7 @@ import { soloSaveStore } from './soloSaveLocal';
 import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
-import { swarmDossierHtml } from './swarmDossier';
+import { swarmDossierBadge, swarmDossierHtml } from './swarmDossier';
 import { swarmJournal } from '../../decisions/swarmJournal';
 import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
@@ -1417,6 +1417,44 @@ function closeSwarmDossier(): void {
   document.querySelector<HTMLButtonElement>('[data-swarm-intel]')?.focus({ preventScroll: true });
 }
 $('swarm-dossier-close').addEventListener('click', closeSwarmDossier);
+// Досье сворачивается до шапки со сводкой (заказ владельца 2026-09-23). Свёрнутость —
+// удобство ЗРИТЕЛЯ, а не состояние партии: хранится в localStorage и переживает перезагрузку;
+// хранилище может быть недоступно (приватное окно) — тогда досье просто развёрнуто.
+// Сворачивает только приколотое досье: у выдвижной панели на телефоне есть «Закрыть».
+const SWARM_DOSSIER_FOLD_KEY = 'vd.swarmDossier.folded';
+let swarmDossierFolded = (() => {
+  try {
+    return localStorage.getItem(SWARM_DOSSIER_FOLD_KEY) === '1';
+  } catch {
+    return false;
+  }
+})();
+let lastSwarmDossierBadge = '';
+function applySwarmDossierFold(): void {
+  const folded = swarmDossierPinned && swarmDossierFolded;
+  swarmDossierWin.classList.toggle('folded', folded);
+  const fold = $('swarm-dossier-fold');
+  fold.setAttribute('aria-expanded', String(!folded));
+  fold.title = swarmDossierPinned ? t(folded ? 'swarm.intel.unfold' : 'swarm.intel.fold') : '';
+}
+$('swarm-dossier-fold').addEventListener('click', () => {
+  if (!swarmDossierPinned) return;
+  swarmDossierFolded = !swarmDossierFolded;
+  try {
+    localStorage.setItem(SWARM_DOSSIER_FOLD_KEY, swarmDossierFolded ? '1' : '0');
+  } catch {
+    /* хранилище недоступно — свёрнутость проживёт до перезагрузки */
+  }
+  applySwarmDossierFold();
+});
+// Мир в карточке силы — ссылка: камера едет туда. На телефоне панель закрывает карту,
+// поэтому после перехода она уступает место тому, ради чего игрок нажал.
+$('swarm-dossier-body').addEventListener('click', (e) => {
+  const node = (e.target as Element).closest<HTMLElement>('[data-jump]')?.dataset.jump;
+  if (!node) return;
+  jumpToPing(node);
+  if (!swarmDossierPinned) closeSwarmDossier();
+});
 function renderSwarmDossier(now = performance.now()): void {
   const pinned = Boolean(inMatch() && s.pve && swarmDossierDesktop?.matches);
   if (pinned !== swarmDossierPinned) {
@@ -1427,6 +1465,7 @@ function renderSwarmDossier(now = performance.now()): void {
     swarmDossierWin.setAttribute('role', pinned ? 'complementary' : 'dialog');
     if (pinned) swarmDossierWin.removeAttribute('aria-modal');
     else swarmDossierWin.setAttribute('aria-modal', 'true');
+    applySwarmDossierFold();
   }
   if (pinned) swarmDossierWin.classList.add('show');
   if (!inMatch()) swarmDossierWin.classList.remove('show');
@@ -1455,6 +1494,11 @@ function renderSwarmDossier(now = performance.now()): void {
   lastSwarmDossierContactKey = contactKey;
   // PVR-4.5: журнал строится из ПРОЕКЦИИ — в ней лежит только свой журнал, чужой снят
   // фильтром зрителя, а память и проект Роя не приезжают вовсе.
+  const badge = swarmDossierBadge(contacts);
+  if (badge !== lastSwarmDossierBadge) {
+    $('swarm-dossier-badge').textContent = badge;
+    lastSwarmDossierBadge = badge;
+  }
   const html = swarmDossierHtml(contacts, swarmJournal(s.swarmJournal?.[ME]));
   if (html !== lastSwarmDossierHtml) {
     const body = $('swarm-dossier-body');
