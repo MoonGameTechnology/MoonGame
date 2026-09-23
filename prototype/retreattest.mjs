@@ -83,11 +83,19 @@ try {
       page.evaluate((id) => window.__retreatTest.state().autoRetreat?.[id] ?? null, mine.id);
     assert.equal(await orderOf(), null, 'приказа изначально нет');
 
-    // Ступени по кругу: 20 → 30 → 40 → 50 → снят.
-    for (const at of [0.2, 0.3, 0.4, 0.5]) {
+    // Кнопка открывает окошко порогов (заказ владельца 2026-09-23): выбор ставит приказ
+    // и закрывает окошко; «Выкл» снимает.
+    const pick = async (at) => {
       await retr.click();
+      const choice = page.locator(`#cmdbar .cmdpop-retr [data-cmd="retrset"][data-at="${at}"]`);
+      await choice.waitFor({ state: 'visible' });
+      await choice.click();
+      assert.equal(await page.locator('#cmdbar .cmdpop-retr').count(), 0, 'выбор закрывает окошко');
+    };
+    for (const at of [0.2, 0.3, 0.4, 0.5]) {
+      await pick(at);
       const order = await orderOf();
-      assert(order, `после нажатия приказ стоит (ждали порог ${at})`);
+      assert(order, `после выбора приказ стоит (ждали порог ${at})`);
       assert.equal(order.at, at, `ступень ${at}`);
       assert(typeof order.to === 'string' && order.to.length > 0, 'точка отхода названа');
       assert.equal(
@@ -98,8 +106,18 @@ try {
         'кнопка подсвечена, пока приказ стоит',
       );
     }
+    // Текущий порог подсвечен в окошке.
     await retr.click();
-    assert.equal(await orderOf(), null, 'пятое нажатие снимает приказ');
+    assert.equal(
+      await page.locator('#cmdbar .cmdpop-retr [data-at="0.5"]').getAttribute('class'),
+      'on',
+      'в окошке подсвечен действующий порог',
+    );
+    await retr.click(); // повторное нажатие закрывает окошко без приказа
+    assert.equal(await page.locator('#cmdbar .cmdpop-retr').count(), 0);
+    assert.equal((await orderOf()).at, 0.5, 'закрытие окошка приказ не трогает');
+    await pick(0);
+    assert.equal(await orderOf(), null, '«Выкл» снимает приказ');
     assert.equal(
       await page.evaluate(() =>
         document.querySelector('#cmdbar [data-cmd="qretr"]').className.includes('on'),
@@ -111,13 +129,15 @@ try {
     // Снимок ряда — по требованию (`RETREAT_SHOT=путь.png`). По умолчанию тест артефактов
     // не пишет: смотреть глазами нужно, когда правишь вид кнопки, а не на каждом прогоне.
     if (process.env.RETREAT_SHOT) {
-      await retr.click(); // вернуть приказ, чтобы на снимке была подсвеченная кнопка
-      await page.locator('#cmdbar').screenshot({ path: process.env.RETREAT_SHOT });
+      await retr.click(); // открыть окошко — на снимке видны пороги
+      await page.screenshot({ path: process.env.RETREAT_SHOT });
     }
 
     assert.deepEqual(errors, [], 'страница не выбросила исключений');
   });
-  console.log('\n✓ retreat smoke: кнопка авто-отхода видна, обходит 20/30/40/50 и снимается\n');
+  console.log(
+    '\n✓ retreat smoke: кнопка авто-отхода открывает окошко 20/30/40/50/Выкл, выбор ставит и снимает приказ\n',
+  );
 } finally {
   await browser.close();
   await site.close();

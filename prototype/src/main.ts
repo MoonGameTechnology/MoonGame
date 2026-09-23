@@ -257,6 +257,7 @@ import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
 import { chapterMapView } from '../../decisions/chapterMap';
+import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
@@ -1176,6 +1177,7 @@ const chainRouteCache = new Map<string, string[] | null>();
 let pickMode = false;
 let cmdMore = false; // ☰ — the second row of the command bar (extras live there)
 let castMenu = false; // ✨ — способности героя-флагмана: поповер-меню каста над рядом
+let retreatMenu = false; // ⮐ — окошко выбора порога авто-отхода (заказ владельца 2026-09-23)
 let merging = false; // "Merge" armed → next tap on a friendly fleet picks the anchor
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
 // Split-fleet dialog: which fleet, and how many of each ship type peel off.
@@ -2249,8 +2251,22 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   const pl = s.planets[f.location];
   if (!pl) return null;
   const pc = world(pl.position);
-  // a single orbit: every stationed (non-transit) fleet here shares the one ring
-  const peers = Object.values(s.fleets).filter((g) => g.location === f.location && !g.movement);
+  // Боевая стойка (заказ владельца 2026-09-23): флот в бою не кружит — стоит в строю своей
+  // стороны лицом к противнику (`decisions/battleStance.ts`).
+  if (f.battleId) {
+    const fighting = Object.values(s.fleets).filter(
+      (g) => g.battleId === f.battleId && g.location === f.location && !g.movement,
+    );
+    const slot = battleStance(fighting, ME).get(f.id);
+    if (slot) {
+      const r = orbitRingRadius(pl);
+      return { x: pc.x + Math.cos(slot.angle) * r, y: pc.y + Math.sin(slot.angle) * r, ang: slot.heading };
+    }
+  }
+  // a single orbit: every stationed (non-transit, not fighting) fleet here shares the one ring
+  const peers = Object.values(s.fleets).filter(
+    (g) => g.location === f.location && !g.movement && !g.battleId,
+  );
   const idx = Math.max(
     0,
     peers.findIndex((g) => g.id === f.id),
@@ -2261,6 +2277,45 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   const ang = chevronAngle(a0, orbitsLive());
   return { x: pc.x + Math.cos(a0) * r, y: pc.y + Math.sin(a0) * r, ang };
 }
+/** Трассы огня между строями боя (заказ владельца 2026-09-23): от каждого флота к ближайшему
+ *  флоту другой стороны — пунктир цвета стрелка, бегущий к цели, пока бой идёт. При
+ *  выключенном движении пунктир стоит. Только видимые флоты: трасса к невидимому выдала бы
+ *  его место. */
+function drawBattleTracers(now: number): void {
+  for (const b of Object.values(s.battles)) {
+    const sides = Object.values(s.fleets)
+      .filter((f) => f.battleId === b.id && !f.movement && fleetSeen(f))
+      .map((f) => ({ f, a: fleetAnchor(f) }))
+      .filter((x): x is { f: Fleet; a: { x: number; y: number; ang: number } } => !!x.a);
+    for (const { f, a } of sides) {
+      let best: { x: number; y: number } | null = null;
+      let bestD = Infinity;
+      for (const o of sides) {
+        if (o.f.owner === f.owner) continue;
+        const d = Math.hypot(o.a.x - a.x, o.a.y - a.y);
+        if (d < bestD) {
+          bestD = d;
+          best = o.a;
+        }
+      }
+      if (!best || !visible(a, 120)) continue;
+      const col = ownerColor(f.owner);
+      cx.save();
+      cx.strokeStyle = rgba(col, 0.55);
+      cx.lineWidth = 1.4;
+      cx.setLineDash([6, 9]);
+      cx.lineDashOffset = motionOn() ? -now / 40 : 0;
+      cx.shadowColor = col;
+      cx.shadowBlur = fxBlur(8);
+      cx.beginPath();
+      cx.moveTo(a.x, a.y);
+      cx.lineTo(best.x, best.y);
+      cx.stroke();
+      cx.restore();
+    }
+  }
+}
+
 // ONB-5: a structured, bounded mirror of the event log — feeds the return digest.
 const eventLog: RecapEvent[] = [];
 let lastNoteMsg = '';
@@ -3860,12 +3915,6 @@ function autoRetreatAt(fleetId: string): number | null {
   return (s as { autoRetreat?: Record<string, { at: number }> }).autoRetreat?.[fleetId]?.at ?? null;
 }
 
-/** Ступени авто-отхода по кругу: нет → 20% → 30% → 40% → 50% → нет. Список закрыт в
- *  ядре (`RETREAT_THRESHOLDS`), здесь только обход по кругу. */
-function nextRetreatStep(at: number | null): number | null {
-  const i = at === null ? -1 : RETREAT_THRESHOLDS.indexOf(at as (typeof RETREAT_THRESHOLDS)[number]);
-  return RETREAT_THRESHOLDS[i + 1] ?? null;
-}
 
 /** CC-2: set the auto-storm stance UNIFORMLY on the given own fleets (☰-row toggle —
  *  a mixed group snaps to one state instead of flipping each). Authoritative in NET
@@ -5668,6 +5717,8 @@ function render(now: number) {
     cx.stroke();
     cx.restore();
   }
+
+  drawBattleTracers(now);
 
   // Portraits are resolved only from our own roster, even in full-state solo games.
   const heroesByFleet = mapHeroes(s, ME);
@@ -8083,6 +8134,7 @@ function renderCmdBar() {
     if (merging) merging = false;
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
+    retreatMenu = false;
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
     return;
@@ -8280,6 +8332,18 @@ function renderCmdBar() {
           .join('') +
         `</div>`
       : '') +
+    // ⮐ окошко авто-отхода: выбор порога корпуса одним тапом, текущий подсвечен.
+    (retreatMenu && ids.length > 0
+      ? `<div class="cmdpop cmdpop-retr"><p>${t('cmd.retreat.title')}</p><div class="retr-row">` +
+        [0, ...RETREAT_THRESHOLDS]
+          .map((at) => {
+            const cur = autoRetreatAt(ids[0] ?? '') ?? 0;
+            const on = Math.abs(cur - at) < 1e-9;
+            return `<button data-cmd="retrset" data-at="${at}"${on ? ' class="on"' : ''}><b>${at === 0 ? t('cmd.retreat.off') : `${Math.round(at * 100)}%`}</b></button>`;
+          })
+          .join('') +
+        `</div><span class="retr-hint">${t('cmd.retreat.hint')}</span></div>`
+      : '') +
     // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
     (troopsPlan && troopsIn
       ? troopsMenuHtml(troopsModel(troopsIn), {
@@ -8293,8 +8357,14 @@ function renderCmdBar() {
     html = commandWindowHtml(html, title, sub, !!lone && !aiming && !merging && !pickMode);
   }
   if (html !== lastCmdHtml) {
+    const hadPop = cmdbar.querySelector('.cmdpop') !== null;
     cmdbar.innerHTML = html;
     lastCmdHtml = html;
+    // На ПК ряд — боковая панель с прокруткой, и окошко встаёт в поток ПОД кнопкой: у
+    // нижнего края оно открывалось за краем панели (видны были только верхушки порогов).
+    // Только что открытое окошко докручиваем в вид; дальше прокрутка — за игроком.
+    const pop = cmdbar.querySelector('.cmdpop');
+    if (!hadPop && pop && holographic.active()) pop.scrollIntoView({ block: 'nearest' });
   }
   cmdbar.classList.add('show');
 }
@@ -8810,6 +8880,7 @@ cmdbar.addEventListener('click', (ev) => {
   // Back и Escape.
   if (disarms('merge', cmd)) merging = false;
   if (disarms('cast', cmd)) castMenu = false;
+  if (disarms('retreat', cmd)) retreatMenu = false;
   if (disarms('troops', cmd)) troopsPlan = null;
   if (disarms('assault', cmd)) assaultAim = false;
   if (disarms('engage', cmd)) engageAim = false;
@@ -8963,15 +9034,18 @@ cmdbar.addEventListener('click', (ev) => {
     setAutoAssault(ids, on);
     if (on) note(t('hint.auto-assault'));
   } else if (cmd === 'qretr') {
-    // RETR-2: авто-отход. Одна кнопка обходит ступени по кругу (нет → 20 → 30 → 40 → 50
-    // → нет), группой единообразно: у смешанного выделения берётся порог ПЕРВОГО, чтобы
-    // вся группа снялась с места одинаково, а не разъехалась по разным отметкам.
+    // RETR-2: авто-отход. Кнопка открывает окошко с порогами (заказ владельца 2026-09-23;
+    // раньше она обходила ступени по кругу, и нужный порог приходилось «прощёлкивать»).
+    retreatMenu = !retreatMenu;
+  } else if (cmd === 'retrset') {
+    // Группой единообразно: вся группа снимается с места на одной отметке.
     //
     // Точка отхода: ВЫБРАННЫЙ свой мир, иначе столица. Выбор игроку оставлен (владелец
     // просил именно его), но без выбора приказ всё равно осмыслен — столица есть всегда,
     // пока она назначена. Нет ни того, ни другого — приказ не ставится, и игроку
     // говорят, чего не хватает, а не молчат.
-    const at = nextRetreatStep(autoRetreatAt(ids[0] ?? ''));
+    const raw = Number(bEl.dataset.at);
+    const at = RETREAT_THRESHOLDS.find((x) => Math.abs(x - raw) < 1e-9) ?? null;
     if (at === null) {
       for (const id of ids) playerOrder(orderRetreat(ME, id, false));
       note(t('hint.auto-retreat.off'));
@@ -8984,6 +9058,7 @@ cmdbar.addEventListener('click', (ev) => {
         note(t('hint.auto-retreat', { n: Math.round(at * 100), at: to }));
       }
     }
+    retreatMenu = false;
   } else if (cmd === 'pick') {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
     pickMode = !pickMode;
@@ -9801,6 +9876,13 @@ const battleWindow = initBattleWindow({
   },
   // Отступление из окна боя — тот же приказ, что и кнопкой боковой панели.
   retreat: (fleetId) => playerOrder(retreatFleet(ME, fleetId)),
+  view: {
+    color: ownerColor,
+    fleetName: fleetCallsign,
+    placeName: planetName,
+    autoRetreatAt,
+    timeLeft,
+  },
 });
 const pirateIntro = initPirateIntro({
   root: $('pirate-intro'),
@@ -13027,10 +13109,11 @@ const BACK_LAYERS: BackLayer[] = [
   // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
   {
     id: 'cmdbar',
-    isOpen: () => troopsPlan !== null || castMenu || (MOBILE && cmdMore),
+    isOpen: () => troopsPlan !== null || castMenu || retreatMenu || (MOBILE && cmdMore),
     close: () => {
       troopsPlan = null;
       castMenu = false;
+      retreatMenu = false;
       if (MOBILE) cmdMore = false;
       lastCmdHtml = '';
     },

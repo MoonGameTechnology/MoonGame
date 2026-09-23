@@ -306,5 +306,4 @@ body.holo-ui #holo-selection-window.details-open #cmdbar .holo-command-body{max-
   #side.details-open .pscroll,body.holo-ui #holo-selection-window #side.details-open .pscroll{display:block;}
   #side .object-detail{border-left:0;border-top:1px solid var(--line-hi);padding:12px 0 0;margin-top:12px;}
 }
-#battlewin .bw-orders{display:flex;gap:8px;flex-wrap:wrap;}
-#battlewin .bw-orders button{padding:10px;border:1px solid var(--line-hi);background:#102632;color:var(--cyan);cursor:pointer;}
+#battlewin .bw-ret button{padding:8px 12px;border:1px solid var(--line-hi);background:#102632;color:var(--cyan);cursor:pointer;}
