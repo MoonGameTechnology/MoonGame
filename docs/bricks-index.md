@@ -1001,7 +1001,7 @@
 | SZE-2.1 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md` | Экран Академии на движке Мастерской |
 | SZE-3.1 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Витрина и три способа оплаты |
 | SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Ассортимент |
-| SZE-3.4 | ⏳ | proto | `docs/sector-zero-economy-roadmap.md` | Обновление витрины за рекламу |
+| SZE-3.4 | ✅ | proto | `docs/sector-zero-economy-roadmap.md` | Обновление витрины за рекламу |
 | SZE-3.5 | ⏳ | proto data | `docs/sector-zero-economy-roadmap.md` | Суверены за рекламу |
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md` | Уровень у модуля Роя |
@@ -1178,7 +1178,7 @@
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
 | YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию |
-| YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время вместо системного |
+| YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
 | YAG-6.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир |
 | YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
 | YAG-6.4 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход |
