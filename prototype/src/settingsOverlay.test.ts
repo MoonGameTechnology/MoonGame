@@ -139,8 +139,12 @@ function wired(over: Partial<SettingsHost> = {}, view: SettingsView = viewOf()) 
 
 describe('настройки — разметка', () => {
   it('«Управление»: на ПК — клавиши и жесты, на телефоне — только жесты (UX-KEYS-1)', () => {
-    const pc = settingsBoxHtml(viewOf());
-    const phone = settingsBoxHtml(viewOf({ touchOnly: true }));
+    const pc = settingsBoxHtml(viewOf(), false, 'controls');
+    const phone = settingsBoxHtml(viewOf({ touchOnly: true }), false, 'controls');
+    // Отдельная вкладка: на «Общих» таблицы нет, настроек на «Управлении» — тоже.
+    expect(settingsBoxHtml(viewOf())).not.toContain('class="set-keys"');
+    expect(pc).not.toContain('id="set-sweep"');
+    expect(pc).toContain('data-settab="controls" aria-selected="true"');
     expect(pc).toContain('class="set-keys"');
     expect(pc).toContain(t('controls.box.keys'));
     expect(phone).not.toContain(t('controls.box.keys'));

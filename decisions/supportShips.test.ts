@@ -22,8 +22,14 @@ describe('supportShips — вкладка «Поддержка» по призн
     }
   });
 
+  it('челноки — своим рядом, как вкладка «Челноки» в Производстве', () => {
+    const { line, shuttles } = splitSupport(['cruiser', 'interceptor', 'bomber'], data);
+    expect(shuttles).toEqual(['interceptor', 'bomber']);
+    expect(line).toEqual(['cruiser']);
+  });
+
   it('неизвестный корпус остаётся в линии', () => {
-    expect(splitSupport(['nope'], data)).toEqual({ line: ['nope'], support: [] });
+    expect(splitSupport(['nope'], data)).toEqual({ line: ['nope'], support: [], shuttles: [] });
     expect(isSupportHull(undefined)).toBe(false);
   });
 });

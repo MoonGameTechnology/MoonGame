@@ -14,14 +14,24 @@ export function isSupportHull(def: Pick<UnitDef, 'traits'> | undefined): boolean
   return def?.traits.includes(SUPPORT_TRAIT) ?? false;
 }
 
-/** Разложить корпуса на линию боя и поддержку, сохранив порядок. Неизвестный id — в линию:
- *  вкладка «Корабли» остаётся местом по умолчанию. */
+/** Челнок — машина, которая базируется в ангаре и летает вылетами, а не корабль
+ *  (трейт `shuttle`). В Производстве у челноков своя вкладка «Челноки». */
+export function isShuttleHull(def: Pick<UnitDef, 'traits'> | undefined): boolean {
+  return def?.traits.includes('shuttle') ?? false;
+}
+
+/** Разложить корпуса на линию боя, поддержку и челноки, сохранив порядок. Неизвестный id —
+ *  в линию: вкладка «Корабли» остаётся местом по умолчанию. */
 export function splitSupport(
   ids: readonly string[],
   data: GameData,
-): { line: string[]; support: string[] } {
+): { line: string[]; support: string[]; shuttles: string[] } {
   const line: string[] = [];
   const support: string[] = [];
-  for (const id of ids) (isSupportHull(data.units[id]) ? support : line).push(id);
-  return { line, support };
+  const shuttles: string[] = [];
+  for (const id of ids) {
+    const def = data.units[id];
+    (isShuttleHull(def) ? shuttles : isSupportHull(def) ? support : line).push(id);
+  }
+  return { line, support, shuttles };
 }

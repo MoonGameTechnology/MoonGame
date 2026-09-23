@@ -78,8 +78,24 @@ function rangeRow(id: string, label: string, hint: string, value: number, aria =
   );
 }
 
+/** Вкладки окна: настройки отдельно, справка по управлению отдельно — таблица клавиш
+ *  длинная и в общем списке прятала под собой кнопку «Готово». */
+export type SettingsTab = 'general' | 'controls';
+
+/** «Управление» (UX-KEYS-1): что нажать → что будет. Таблица и её сторож —
+ *  `decisions/controls.ts`. */
+function controlsHtml(view: SettingsView): string {
+  return `<dl class="set-keys">${controlsFor(!!view.touchOnly)
+    .map((row) => `<div><dt>${t(row.keys)}</dt><dd>${t(row.does)}</dd></div>`)
+    .join('')}</dl>`;
+}
+
 /** Окно настроек целиком. Чистая функция от снимка — ни DOM, ни хранилища. */
-export function settingsBoxHtml(view: SettingsView, renderingReportAvailable = false): string {
+export function settingsBoxHtml(
+  view: SettingsView,
+  renderingReportAvailable = false,
+  tab: SettingsTab = 'general',
+): string {
   const palettes =
     PALETTES.map(
       (p) =>
@@ -89,6 +105,26 @@ export function settingsBoxHtml(view: SettingsView, renderingReportAvailable = f
   return (
     `<div class="setbox">` +
     `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
+    `<div class="set-tabs" role="tablist">${(
+      [
+        ['general', 'settings.tab.general'],
+        ['controls', 'settings.controls.title'],
+      ] as const
+    )
+      .map(
+        ([id, key]) =>
+          `<button type="button" role="tab" data-settab="${id}" aria-selected="${tab === id}"${tab === id ? ' class="on"' : ''}>${t(key)}</button>`,
+      )
+      .join('')}</div>` +
+    (tab === 'controls' ? controlsHtml(view) : generalHtml(view, palettes, renderingReportAvailable)) +
+    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
+    `</div>`
+  );
+}
+
+/** Вкладка «Общие»: развёртка, метки, цвета, графика, звук. */
+function generalHtml(view: SettingsView, palettes: string, renderingReportAvailable: boolean): string {
+  return (
     rangeRow(
       'sweep',
       t('settings.sweep'),
@@ -137,14 +173,7 @@ export function settingsBoxHtml(view: SettingsView, renderingReportAvailable = f
     // SND-1: секция «Звук» — тумблер синтезированных откликов + громкость.
     `<div class="pc-sec">${t('settings.snd.title')}</div>` +
     switchRow('snd', t('settings.snd.ui'), t('settings.snd.ui.hint'), view.soundOn) +
-    rangeRow('snd-vol', t('settings.snd.vol'), '', view.volume) +
-    // «Управление» (UX-KEYS-1): что нажать → что будет. Таблица и её сторож — `decisions/controls.ts`.
-    `<div class="pc-sec">${t('settings.controls.title')}</div>` +
-    `<dl class="set-keys">${controlsFor(!!view.touchOnly)
-      .map((row) => `<div><dt>${t(row.keys)}</dt><dd>${t(row.does)}</dd></div>`)
-      .join('')}</dl>` +
-    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
-    `</div>`
+    rangeRow('snd-vol', t('settings.snd.vol'), '', view.volume)
   );
 }
 
@@ -183,9 +212,18 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     if (el) el.textContent = text;
   };
 
+  let tab: SettingsTab = 'general';
+
   function render(): void {
     const v = host.view();
-    host.root().innerHTML = settingsBoxHtml(v, typeof host.renderingReport === 'function');
+    host.root().innerHTML = settingsBoxHtml(v, typeof host.renderingReport === 'function', tab);
+    for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-settab]'))) {
+      b.addEventListener('click', () => {
+        tab = b.dataset.settab === 'controls' ? 'controls' : 'general';
+        render();
+        host.root().querySelector<HTMLElement>(`[data-settab="${tab}"]`)?.focus();
+      });
+    }
 
     // Тумблеры: каждый пишет настройку и тут же обновляет свою подпись — иначе значение
     // рядом с переключателем разъедется с ним до следующей перерисовки.
@@ -274,6 +312,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
 
   return {
     open: () => {
+      tab = 'general'; // окно открывается на настройках, а не на справке
       render();
       host.root().classList.add('show');
     },

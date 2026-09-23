@@ -2160,6 +2160,7 @@ export const ru: Record<string, string> = {
   'sector-zero.difficulty': 'Сложность нового забега',
   'sector-zero.difficulty.hint': 'Сложность сохранённого забега остаётся прежней.',
   'sector-zero.end.prepare': 'Улучшить и подготовить',
+  'sector-zero.end.replay': 'Сыграть главу снова',
   'sector-zero.end.reward': '+{n} данных экспедиций',
   'sector-zero.end.total': 'Итого',
   'sector-zero.end.unlocked': 'К следующему заходу откроется новых задач: {n}',
@@ -2296,6 +2297,7 @@ export const ru: Record<string, string> = {
   'settings.sweep': 'Радарная развёртка',
   'settings.sweep.hint': 'вращающийся луч на карте — только вид, не влияет на обнаружение',
   'settings.sweep.opacity': 'Прозрачность радарной развёртки',
+  'settings.tab.general': 'Общие',
   'settings.tag': 'интерфейс',
   'settings.title': 'НАСТРОЙКИ',
 
