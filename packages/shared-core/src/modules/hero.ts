@@ -20,7 +20,7 @@ import type {
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
 import { getStance, stanceToRelation } from '../state/diplomacy';
-import { fleetSideDealingHit, heroByFleet, heroNode } from '../state/heroes';
+import { heroByFleet, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
@@ -592,7 +592,7 @@ function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetI
 
 export const heroModule: GameModule = {
   id: 'hero',
-  version: '3.0.0',
+  version: '3.1.0', // CORE-DMG-3: пассивы и +5% носителю героя — во всех каналах, где стреляет флот
   setup(api) {
     api.onAction('hero.move', (action, h) => {
       const { to } = action.payload as { to?: string };
@@ -769,20 +769,33 @@ export const heroModule: GameModule = {
     // --- projection hero: fleet combat aura + death/respawn --------------------
 
     // +5% to a fleet that carries the hero, then the owner's hero passives (HERO-5)
-    // for the battle's node. combat.damage fires once per side per round;
-    // `args.attacker` is the owner DEALING this hit, so buffing that side's fleet
-    // covers both its attack (vs the foe) and its return-fire defense.
+    // for the node the shot is fired at. `args.attacker` is the owner DEALING this hit,
+    // so buffing that side's fleet covers both its attack (vs the foe) and its
+    // return-fire defense.
+    //
+    // CORE-DMG-3: сторона берётся из `attackerFleet` и `location`, а НЕ через
+    // `battleId`. Раньше здесь стоял `fleetSideDealingHit`, и он требовал боя — вне боя
+    // `battleId` нет, хук возвращал базу, и пассивка «+8% урона своим флотам рядом»
+    // работала в свалке и молчала на обстреле с орбиты, на челноках и на корабельном
+    // ПВО. Решение владельца 2026-09-22: это пробел, а не замысел — бонус героя вещь
+    // РАДИУСА, и клетка у выстрела есть всегда, а бой бывает не всегда.
     api.hook<number>('combat.damage', (base, args, h) => {
-      const { battleId, attacker } = (args ?? {}) as { battleId?: string; attacker?: string };
-      const hit = fleetSideDealingHit(h.state, battleId, attacker);
-      if (!hit || typeof attacker !== 'string') return base;
+      const { attacker, attackerFleet, location } = (args ?? {}) as {
+        attacker?: string;
+        attackerFleet?: string;
+        location?: string;
+      };
+      // Стреляет не флот (ПВО мира, перехватчики с мира, гарнизон) — бонусов нет:
+      // семья героев усиливает флоты, и это ровно то правило, что держал
+      // `side.ref.kind === 'fleet'` в ближнем бою.
+      if (typeof attacker !== 'string' || typeof attackerFleet !== 'string') return base;
       let out = base;
-      if (fleetHasHero(h, hit.side.ref.fleetId)) out *= 1 + HERO_COMBAT_BONUS;
+      if (fleetHasHero(h, attackerFleet)) out *= 1 + HERO_COMBAT_BONUS;
       const passives = passiveBonus(h, 'combat.damage', attacker, {
-        fleetId: hit.side.ref.fleetId,
-        node: hit.battle.location,
-        // Бой стоит на одной клетке — она же и земля под условием.
-        terrainNode: hit.battle.location,
+        fleetId: attackerFleet,
+        node: location,
+        // Выстрел приписан одной клетке — она же и земля под условием трейта.
+        terrainNode: location,
       });
       return passives !== 0 ? out * (1 + passives) : out;
     });

@@ -224,7 +224,8 @@
 | AI-BAL-12 | ✅ | proto | `docs/backlog.md` | Две фракции из четырёх вне измерения. |
 | CORE-DMG-1 | ✅ | core | `docs/backlog.md` | Все каналы урона идут через хук combat.damage. |
 | CORE-DMG-2 | ✅ | core | `docs/backlog.md` | Пропустить хук combat.damage всё ещё МОЖНО — примитив урона |
-| CORE-DMG-3 | ⏳ | core | `docs/backlog.md` | Ауры и пассивы героя не доходят до неближнего боя — асимметрия, |
+| CORE-DMG-3 | ✅ | core | `docs/backlog.md` | Ауры и пассивы героя не доходят до неближнего боя — асимметрия, |
+| CORE-DMG-4 | ⏳ | core | `docs/backlog.md` | Пси-зона героя (лестница scan) работает только в свалке — |
 | AI-BAL-13 | ✅ | proto | `docs/backlog.md` | Бот не знает правила «один герой на флот» — и от этого стоит |
 | AI-BAL-1.1 | ✅ | proto | `docs/backlog.md` | Тест-боты отделены от игровых. |
 | BAL-1 | ✅ | proto | `docs/backlog.md` | Стартовые позиции больше не решают матч — карта-«колесо». |
