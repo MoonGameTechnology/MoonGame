@@ -19,9 +19,9 @@ import {
   type SectorProgressAction,
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
-import { workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
+import { workshopRows } from '../../decisions/sectorZeroWorkshop';
 import { moduleRarity, starRow } from '../../decisions/itemRarity';
-<<<<<<< HEAD
+import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
 import {
   adSovereigns,
   shopRefresh,
@@ -29,10 +29,6 @@ import {
   type PayKind,
   type ShopCapabilities,
 } from '../../decisions/sectorZeroShop';
-=======
-import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
-import { shopRows, type PayKind, type ShopCapabilities } from '../../decisions/sectorZeroShop';
->>>>>>> 096d07c (feat(sector-zero): сравнение «было → станет» при установке и прокачке модуля (PVR-6.5))
 import { esc, displayUnit } from './format';
 
 interface PreparationHost {
