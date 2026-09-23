@@ -2438,6 +2438,7 @@ export const en: Record<string, string> = {
     'Research it in the technology window — then you can hand your seat to the AI while you sleep.',
   'steward.locked.where':
     'The <b>Command</b> branch, opens on <b>Day 16</b> for the <b>Overseer</b> scientist (now day {day}).',
+  'steward.log.ambush': '⟟ Ambush set at the {node} fork: forecast losses {pct}%',
   'steward.log.ago': '{dur} ago',
   'steward.log.counter': '⚔ Counterstrike at {node}: loss forecast {pct}%',
   'steward.log.evac':

@@ -2446,6 +2446,7 @@ export const ru: Record<string, string> = {
     'Изучите его в окне технологий — затем сможете передать место ИИ на время сна.',
   'steward.locked.where':
     'Ветка <b>Командование</b>, открывается в <b>День 16</b> учёному <b>Куратор</b> (сейчас день {day}).',
+  'steward.log.ambush': '⟟ Засада на развилке у {node}: прогноз потерь {pct}%',
   'steward.log.ago': '{dur} назад',
   'steward.log.counter': '⚔ Контрудар у {node}: прогноз потерь {pct}%',
   'steward.log.evac': '🏃 Эвакуация с {node} → {to}: прогноз потерь {pct}%, крыльев уведено: {n}',
