@@ -1,7 +1,7 @@
 import type { Fleet, GameState, PlanetId } from './gameState';
 import type { GameData } from '../data/schemas';
 import type { Context } from '../action/types';
-import { hoursToMs } from '../action/types';
+import { hoursToMs, travelSpeedFactorOf } from '../action/types';
 import { effectiveStats } from '../util/loadout';
 import { bypassFork, halfRoadLength, passRoadLength } from './roads';
 
@@ -44,6 +44,16 @@ export function fleetBaseSpeed(fleet: Fleet, data: GameData): number {
     speed = Math.min(speed, s);
   }
   return Number.isFinite(speed) ? speed : 0;
+}
+
+/**
+ * The speed a fleet travels at in THIS match before per-leg modifiers: its slowest ship
+ * ({@link fleetBaseSpeed}) × the match's `travelSpeedFactor` (×5 in Sector Zero). What
+ * the movement module feeds the `fleet.speed` hook, and what every travel estimate must
+ * divide by — an estimate that skipped the factor would misreport every ETA by all of it.
+ */
+export function fleetTravelSpeed(fleet: Fleet, rules: Pick<Context, 'data' | 'config'>): number {
+  return fleetBaseSpeed(fleet, rules.data) * travelSpeedFactorOf(rules);
 }
 
 /**
@@ -259,14 +269,18 @@ export function routeDistance(
 
 /**
  * Estimated travel time in game-hours from `fromId` to `toId` along the shortest
- * lane route, at the fleet's base speed (the slowest unit). The client-side
- * preview estimate; the authoritative duration the server schedules additionally
- * runs each leg's speed through the `fleet.speed` hook (terrain), so the real
- * time can differ slightly. null if there is no route, or the fleet can't move.
+ * lane route, at the fleet's travel speed ({@link fleetTravelSpeed}: the slowest unit
+ * × the match's travel factor). The client-side preview estimate; the authoritative
+ * duration the server schedules additionally runs each leg's speed through the
+ * `fleet.speed` hook (terrain), so the real time can differ slightly. null if there
+ * is no route, or the fleet can't move.
+ *
+ * Takes the match `rules` rather than bare `data` so a caller cannot forget the travel
+ * factor: in Sector Zero that would read every ETA five times too long.
  */
 export function estimateTravelHours(
   state: GameState,
-  data: GameData,
+  rules: Pick<Context, 'data' | 'config'>,
   fromId: PlanetId,
   toId: PlanetId,
   fleet: Fleet,
@@ -275,7 +289,7 @@ export function estimateTravelHours(
   if (!route || route.length === 0) {
     return null;
   }
-  const speed = fleetBaseSpeed(fleet, data);
+  const speed = fleetTravelSpeed(fleet, rules);
   if (speed <= 0) {
     return null;
   }
@@ -295,7 +309,7 @@ export function journeyDestination(mv: NonNullable<Fleet['movement']>): PlanetId
 
 /** ETA (absolute ms) of a moving fleet at its journey's end: the current leg is
  *  authoritative (`arrivesAt`); remaining hops are estimated over the COMMITTED
- *  `path` at the fleet's base speed ÷ timeScale (the authoritative legs
+ *  `path` at the fleet's travel speed ÷ timeScale (the authoritative legs
  *  additionally run the `fleet.speed` hook, so the estimate can drift a
  *  little). No estimate possible (zero speed / broken map) → the current leg's
  *  arrival, the earliest plausible bound (fail-safe: callers react sooner,
@@ -307,7 +321,7 @@ export function journeyEtaMs(
   ctx: Context,
 ): number {
   if (!mv.path || mv.path.length === 0) return mv.arrivesAt;
-  const speed = fleetBaseSpeed(fleet, ctx.data);
+  const speed = fleetTravelSpeed(fleet, ctx);
   if (speed <= 0) return mv.arrivesAt;
   return mv.arrivesAt + hoursToMs(ctx, routeDistance(state, mv.to, mv.path, mv.from) / speed);
 }

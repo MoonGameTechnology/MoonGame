@@ -179,11 +179,25 @@ export function matchMode(): string | undefined {
   return matchModeId;
 }
 
+/**
+ * Темп перемещения ТЕКУЩЕГО матча (PVR-2.3): множитель на все скорости карты. Лежит рядом
+ * с режимом по той же причине — это правило, которое матч получает при рождении. Ставит
+ * его ХОСТ забега, а не режим: онлайн-партия на том же `pve_waves` летает на ×1.
+ */
+let matchTravelSpeed = 1;
+
+/** Задать темп перемещения матча (`1` — обычный). Зовётся при установке матча, до первого
+ *  хода часов; каждая оценка пути на клиенте читает его через тот же `ctx`, что и ядро. */
+export function setMatchTravelSpeed(factor: number): void {
+  matchTravelSpeed = factor;
+}
+
 export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
   const config: MatchConfig = {
     timeScale: 1,
     victory: { scoreLimit: scoreLimitFor(state ?? {}) },
     ...(matchModeId !== undefined ? { modeId: matchModeId } : {}),
+    ...(matchTravelSpeed !== 1 ? { travelSpeedFactor: matchTravelSpeed } : {}),
   };
   // Единственный дом правила «режим → правила»: пресет победы режима подстилается ПОД
   // победу матча, свою копию слоения здесь не заводим. Отказать он может только на

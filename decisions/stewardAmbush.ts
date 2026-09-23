@@ -1,6 +1,6 @@
 import {
   STEWARD_LOSS_LIMIT,
-  fleetBaseSpeed,
+  fleetTravelSpeed,
   forkTAtStart,
   getStance,
   hoursToMs,
@@ -102,7 +102,7 @@ export function stewardAmbushes(
           (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
       );
     for (const wing of wings) {
-      const speed = fleetBaseSpeed(wing, ctx.data);
+      const speed = fleetTravelSpeed(wing, ctx);
       if (!(speed > 0)) continue;
       const arrives = ctx.now + hoursToMs(ctx, trunk / speed);
       if (arrives + opts.margin > mv.arrivesAt) continue; // не успеет — не посылать

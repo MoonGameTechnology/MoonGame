@@ -1,6 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { advance, order, setMatchMode, moveFleet, orbitFleet, assaultFleet } from './game';
+import {
+  advance,
+  order,
+  setMatchMode,
+  setMatchTravelSpeed,
+  moveFleet,
+  orbitFleet,
+  assaultFleet,
+} from './game';
 import { data } from './gameData';
 import { initSoloDrivers } from './soloDrivers';
 import { pveState, pveModeId } from '../../packages/client/src/gameData';
@@ -8,6 +16,7 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { sensorCoverage, playablePlayerIds } from '../../packages/shared-core/src/index';
+import { RUN_SPINE_HOURS, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 
 /**
  * PVR-1.6 — сквозной прогон ЗАБЕГА на шипнутой карте `pve-1`, через настоящие функции
@@ -27,6 +36,17 @@ import { sensorCoverage, playablePlayerIds } from '../../packages/shared-core/sr
 
 const HOUR = 3_600_000;
 
+/** Правила ЗАБЕГА — те же, что ставит хост (`installMatch` + `setRunActive`): режим карты и
+ *  темп перемещения ×5 (PVR-2.3). Без второго прогон мерил бы не ту игру, в которую играют. */
+function armRun(): void {
+  setMatchMode(pveModeId());
+  setMatchTravelSpeed(RUN_TRAVEL_SPEED);
+}
+function disarmRun(): void {
+  setMatchMode(undefined);
+  setMatchTravelSpeed(1);
+}
+
 interface RunOut {
   state: GameState;
   endedAtHour?: number;
@@ -34,7 +54,7 @@ interface RunOut {
 }
 
 function runIdlePlayer(maxHours: number): RunOut {
-  setMatchMode(pveModeId());
+  armRun();
   let s: GameState = pveState(data);
   let groundBattleAtHome: number | undefined;
   let hour = 0;
@@ -79,7 +99,7 @@ function runIdlePlayer(maxHours: number): RunOut {
 
 describe('забег на карте pve-1 доходит до вердикта (PVR-1.6)', () => {
   // Режим принадлежит МАТЧУ: следующий не должен унаследовать чужой.
-  afterEach(() => setMatchMode(undefined));
+  afterEach(disarmRun);
 
   it('пассивный игрок ПРОИГРЫВАЕТ забег — и именно по-PvE-шному', () => {
     const { state, endedAtHour } = runIdlePlayer(400);
@@ -89,7 +109,7 @@ describe('забег на карте pve-1 доходит до вердикта 
     });
     expect(state.match.winner).toBe('p3');
     // Верхняя граница, а не точное число: она ловит «забег не кончается никогда»,
-    // не ломаясь от любой правки баланса. Замер на момент кирпича — 139-й час.
+    // не ломаясь от любой правки баланса. Замер на темпе забега ×5 (PVR-2.3) — 30-й час.
     expect(endedAtHour).toBeLessThan(300);
   });
 
@@ -98,16 +118,26 @@ describe('забег на карте pve-1 доходит до вердикта 
     // требует второй фазы, и без десанта флот копился на орбите вечно.
     const { groundBattleAtHome } = runIdlePlayer(400);
     expect(groundBattleAtHome).toBeDefined();
+    // И доходит, ПОКА ВОЛНЫ ЕЩЁ ИДУТ (PVR-2.3). На ×1 Рой шёл до дома так долго, что
+    // первый штурм начинался уже после последней волны — на 64-м часу при хребте в 60.
+    // Ради этого темп и ускорен; замер на кирпиче — 29-й час.
+    expect(groundBattleAtHome!).toBeLessThan(RUN_SPINE_HOURS);
   });
 
-  it('волны идут по расписанию всё это время, а не глохнут на первой', () => {
-    const { state } = runIdlePlayer(400);
-    expect(state.pve?.waveNumber).toBeGreaterThanOrEqual(10);
+  it('волны идут по расписанию до самого вердикта, а не глохнут на первой', () => {
+    // На темпе забега ×5 (PVR-2.3) Рой доходит до дома впятеро быстрее, и пассивный игрок
+    // падает раньше десятой волны: замер на кирпиче — 30-й час, пятая волна. Поэтому
+    // сторож держит не «десять волн», а то, ради чего стоит: ни одна волна, чей срок
+    // наступил до вердикта, не пропала.
+    const { state, endedAtHour } = runIdlePlayer(400);
+    const interval = data.modes[pveModeId()!]!.pve!.waveIntervalHours;
+    expect(state.pve!.waveNumber).toBeGreaterThan(1);
+    expect(state.pve!.waveNumber).toBeGreaterThanOrEqual(Math.floor((endedAtHour! - 1) / interval));
   });
 });
 
 describe('pirates teach the first fight on the actual PvE map', () => {
-  afterEach(() => setMatchMode(undefined));
+  afterEach(disarmRun);
 
   it('starts visible, nearby and outside the player roster', () => {
     const state = pveState(data);
@@ -117,7 +147,7 @@ describe('pirates teach the first fight on the actual PvE map', () => {
   });
 
   it('the opening fleet wins a real multi-round battle and the run continues', () => {
-    setMatchMode(pveModeId());
+    armRun();
     let state = advance(pveState(data), 1).state;
     expect(pirateEncounter(state, 'p1')?.stage).toBe('approach');
     const moved = order(state, moveFleet('p1', 'p1_1', 'pirate_den'), state.time);
@@ -171,7 +201,7 @@ describe('pirates teach the first fight on the actual PvE map', () => {
   });
 
   it('skipping pirates neither blocks a PvE win nor saves a defeated human', () => {
-    setMatchMode(pveModeId());
+    armRun();
     const start = advance(pveState(data), 1).state;
     const won = structuredClone(start);
     won.pve!.waveNumber = won.pve!.totalWaves;

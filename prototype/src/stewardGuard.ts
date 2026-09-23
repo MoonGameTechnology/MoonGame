@@ -238,7 +238,7 @@ export function stewardGuardOrders(
           // Same no-poach rule as the ferry: a wing on another threatened node
           // (or another anchor) is needed where it stands.
           if (threatsOf(f.location!).length > 0 || holdPoints.has(f.location!)) continue;
-          const hours = estimateTravelHours(state, data, f.location!, p.id, f);
+          const hours = estimateTravelHours(state, c, f.location!, p.id, f);
           if (hours === null) continue;
           const arrives = state.time + hoursToMs(c, hours);
           if (arrives + hoursToMs(c, 2) > earliest) continue; // too late to matter
@@ -402,7 +402,7 @@ export function stewardGuardOrders(
         // Never poach a transport off ANOTHER threatened node (its own evac
         // branch tasks it) or off a hold point (the anchor keeps its wing).
         if (threatsOf(f.location!).length > 0 || holdPoints.has(f.location!)) continue;
-        const hours = estimateTravelHours(state, data, f.location!, p.id, f);
+        const hours = estimateTravelHours(state, c, f.location!, p.id, f);
         if (hours === null) continue;
         const arrives = state.time + hoursToMs(c, hours);
         if (arrives + hoursToMs(c, 2) > earliest) continue; // too late to load — don't feed it in

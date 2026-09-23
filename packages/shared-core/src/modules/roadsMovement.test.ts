@@ -115,7 +115,7 @@ function run(
 describe('ROADS-2 — проход мимо планеты по развилке', () => {
   it('путь A→C идёт через развилку: 420 по дорогам, 42 часа на скорости 10', () => {
     expect(routeDistance(world(), 'A', ['B', 'C'])).toBeCloseTo(420, 9);
-    expect(estimateTravelHours(world(), data, 'A', 'C', world().fleets.f1!)).toBeCloseTo(42, 9);
+    expect(estimateTravelHours(world(), { data }, 'A', 'C', world().fleets.f1!)).toBeCloseTo(42, 9);
     const done = run(world(), 'C', 42);
     expect(done.state.fleets.f1!.location).toBe('C');
     // На 41-м часу флот ещё в пути: время — длина ДОРОГИ, а не прямой (50 ч) и не пути

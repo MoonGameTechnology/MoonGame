@@ -51,6 +51,13 @@ export interface MatchConfig {
    *  mode's preset into `victory` once, before the room exists. Absent ⇒ no mode,
    *  the base rules (every match created before PVE-0.2). */
   modeId?: string;
+  /** Multiplier on every speed on the map — fleets and shuttle sorties alike, so their
+   *  relative speeds stay what the unit data says. A match-level knob like `timeScale`,
+   *  but narrower: only travel gets faster, while production, research, construction
+   *  and wave schedules keep their clocks. Set by the host, never by a mode: Sector
+   *  Zero runs at ×5 (docs/sector-zero-roadmap.md PVR-2.3), while an online match on the
+   *  same `pve_waves` mode keeps ×1. Absent ⇒ ×1 — every match created before it. */
+  travelSpeedFactor?: number;
 }
 
 /**
@@ -71,6 +78,13 @@ export interface Context {
 export function timeScaleOf(ctx: Context): number {
   const scale = ctx.config?.timeScale;
   return scale && scale > 0 ? scale : 1;
+}
+
+/** Reads the match travel-speed factor from a context, defaulting to ×1. Anything but a
+ *  finite positive number reads as ×1: a broken factor must not freeze or teleport fleets. */
+export function travelSpeedFactorOf(ctx: Pick<Context, 'config'>): number {
+  const factor = ctx.config?.travelSpeedFactor;
+  return factor !== undefined && Number.isFinite(factor) && factor > 0 ? factor : 1;
 }
 
 /** Milliseconds for `hours` of game time, compressed by the match timeScale (GDD §3.1).
