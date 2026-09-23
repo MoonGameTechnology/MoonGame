@@ -116,8 +116,10 @@ interface Hero {
   `capability('hero.effect.' + type)` если есть, иначе встроенный обработчик типа →
   ставит кулдаун, списывает стоимость, эмитит `hero.ability.used`. Существующие
   `path.create`/`annihilate` переезжают сюда как **типы-эффекты в данных**.
-- **`hero.move`** — **сохранено** (`hero.ts` `onAction('hero.move')`): телепорт-редеплой для
-  героя-без-корабля; для героя-на-корабле движение идёт обычным `fleet.move`.
+- ~~`hero.move`~~ — **снято (AUD-18)**: телепорт-редеплой героя-без-корабля адресовал
+  «первого героя игрока по id» и не имел ни строителя, ни кнопки. Резервного героя
+  поднимает `hero.spawn {heroId, at}` там, где выбрал игрок; героем-на-корабле ходят
+  обычным `fleet.move`.
 - **`hero.install` / `hero.uninstall {heroId, moduleId}` · `hero.skill.unlock {heroId, node}`**
   — переоснащение корабля и прокачка дерева. Бюджет отсеков — корпус плюс прибавка ступени
   (§0.38), гейт — общий `canInstall`; переоснащение только вне поля (`E_HERO_DEPLOYED`),
@@ -224,7 +226,7 @@ _Второе следствие — замерено._ Слоты режут `e
 |---|---|
 | `Hero {owner, location, cooldowns}`, ключ = `PlayerId` | `Hero {id, owner, archetype, fleetId, fittings, skills, cooldowns, respawnAt}`, ключ = инстанс; до 3 на игрока |
 | `location: PlanetId` (телепорт-сущность) | корабль-`Fleet` (`fleetId`), движение/гибель через `movement`/`combat` |
-| хардкод `hero.path.create` / `planet.annihilate` / `hero.move` | типы-эффекты в `data/heroAbilities.json`, диспетчер `hero.ability` (коридор переехал целиком — `hero.path.create` снято HERO-CORRIDOR-СПЕКА) |
+| хардкод `hero.path.create` / `planet.annihilate` / `hero.move` | типы-эффекты в `data/heroAbilities.json`, диспетчер `hero.ability` (коридор переехал целиком — `hero.path.create` снято HERO-CORRIDOR-СПЕКА; `planet.annihilate` и `hero.move` сняты AUD-18, первый — как обход владения способностью) |
 | фиксированные константы в `hero.ts` | поля данных (cooldown/range/params) |
 
 `tempLanes` / `topology` / `dead_world` / приватность героя в `visibleState` —

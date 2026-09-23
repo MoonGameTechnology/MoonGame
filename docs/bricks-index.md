@@ -602,6 +602,13 @@
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-9 | ✅ | sec | `docs/backlog.md` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
 | AUD-10 | ✅ | sec | `docs/backlog.md` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
+| AUD-16 | ✅ | proto | `docs/backlog.md` | Герой больше не гибнет молча. |
+| AUD-17 | ✅ | proto | `docs/backlog.md` | Корабельное ПВО стало видно. |
+| AUD-18 | ✅ | core | `docs/backlog.md` | Сняты наследные hero.move и planet.annihilate — второй |
+| AUD-19 | ✅ | docs | `docs/backlog.md` | Сводка решений ГДД (п. 8) описывала артиллерию, |
+| AUD-20 | ⏳ | srv proto | `docs/backlog.md` | Адаптация Роя (AD-01) не подключена ни к одному живому |
+| AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
+| AUD-22 | ⏳ | data | `docs/backlog.md` | Пустые покупки в дереве навыков. |
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md` | Строка места переключается «выкл → слабый → сильный». |
@@ -1039,7 +1046,7 @@
 | PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Награда за забег |
 | PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md` | Резолюция: что из §3 входит в первую версию |
 | PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md` | Память Роя как состояние |
-| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.3 | 🔶 | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
 | PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md` | Структуры первого набора |
 | PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Журнал адаптаций |
 | PVR-5.1 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Карта второй главы и дверь к ней |

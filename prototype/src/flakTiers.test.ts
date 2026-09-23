@@ -8,7 +8,7 @@ import {
   type FlakTier,
 } from './flakTiers';
 
-const ТИРЫ: FlakTier[] = ['orbital', 'close', 'intercept'];
+const ТИРЫ: FlakTier[] = ['orbital', 'close', 'intercept', 'pointDefense'];
 
 describe('зенитный огонь — какой тир', () => {
   it('признак «ближняя» выбирает тир, а не отдельные свойства', () => {
@@ -101,5 +101,33 @@ describe('SHU-3.1 — перехват это ТРЕТИЙ тир, а не пе�
   it('ОН ЗАМЕТНЕЕ БЛИЖНЕЙ ЗЕНИТКИ: сбитая эскадра — событие дороже дежурной очереди', () => {
     expect(flakLook('intercept').alpha).toBeGreaterThan(flakLook('close').alpha);
     expect(flakLook('intercept').burstGrow).toBeGreaterThan(flakLook('close').burstGrow);
+  });
+});
+
+describe('зенитный огонь — корабельное ПВО (AUD-17)', () => {
+  it('ЭСКОРТ НЕ СЛИВАЕТСЯ НИ С КЕМ: цвет трассы и вспышки свой у каждого из четырёх тиров', () => {
+    // Попарно, а не «новый против старых»: пятый тир должен будет пройти ту же проверку,
+    // и совпадение двух старых между собой тоже ловится здесь.
+    const colors = ТИРЫ.map((t) => flakLook(t).color);
+    const bursts = ТИРЫ.map((t) => flakLook(t).burstColor);
+    expect(new Set(colors).size).toBe(ТИРЫ.length);
+    expect(new Set(bursts).size).toBe(ТИРЫ.length);
+  });
+
+  it('и не повторяет цвета, уже занятые на карте: отметку ПКО и цвета владельцев', () => {
+    // `R_AA` (main.ts) и `OWNER_COLORS` (packages/client/src/mapRender.ts) — копии здесь
+    // намеренно: это список «чего избегать», а не источник цвета.
+    const taken = ['#c07dff', '#35d6e6', '#ff5a4d', '#ffb43a', '#b07cff'];
+    expect(taken).not.toContain(flakLook('pointDefense').color);
+  });
+
+  it('ВЕС — КАК У БЛИЖНЕЙ ЗЕНИТКИ: очередь раз в 20 минут — та же частая мелочь', () => {
+    const pd = flakLook('pointDefense');
+    const close = flakLook('close');
+    expect(pd.alpha).toBe(close.alpha);
+    expect(pd.width).toBe(close.width);
+    expect(pd.burstGrow).toBe(close.burstGrow);
+    // …и потому тише редкого орбитального залпа, как требует правило 2.
+    expect(pd.alpha).toBeLessThan(flakLook('orbital').alpha);
   });
 });
