@@ -51,13 +51,24 @@ interface RunOut {
   state: GameState;
   endedAtHour?: number;
   groundBattleAtHome?: number;
+  /** Кем кончились наземные бои у дома, по порядку (`null` — боем без победителя). */
+  groundOutcomes: Array<string | null>;
 }
 
 function runIdlePlayer(maxHours: number): RunOut {
   armRun();
   let s: GameState = pveState(data);
   let groundBattleAtHome: number | undefined;
+  const groundOutcomes: Array<string | null> = [];
   let hour = 0;
+  const scan = (events: readonly { type: string; payload: unknown }[]): void => {
+    for (const e of events) {
+      const p = e.payload as { location?: string; phase?: string; winner?: string | null };
+      if (e.type === 'battle.resolved' && p.location === 'home_a' && p.phase === 'ground') {
+        groundOutcomes.push(p.winner ?? null);
+      }
+    }
+  };
 
   const apply = (a: Action): void => {
     const out = order(s, a, s.time);
@@ -88,13 +99,17 @@ function runIdlePlayer(maxHours: number): RunOut {
   });
 
   for (hour = 1; hour <= maxHours; hour++) {
-    s = advance(s, hour * HOUR).state;
-    if (s.match.status === 'ended') return { state: s, endedAtHour: hour, groundBattleAtHome };
+    const step = advance(s, hour * HOUR);
+    s = step.state;
+    scan(step.events);
+    if (s.match.status === 'ended') {
+      return { state: s, endedAtHour: hour, groundBattleAtHome, groundOutcomes };
+    }
     drivers.runAI();
     drivers.autoEngage();
     drivers.checkFleetClashes();
   }
-  return { state: s, groundBattleAtHome };
+  return { state: s, groundBattleAtHome, groundOutcomes };
 }
 
 describe('забег на карте pve-1 доходит до вердикта (PVR-1.6)', () => {
@@ -109,8 +124,18 @@ describe('забег на карте pve-1 доходит до вердикта 
     });
     expect(state.match.winner).toBe('p3');
     // Верхняя граница, а не точное число: она ловит «забег не кончается никогда»,
-    // не ломаясь от любой правки баланса. Замер на темпе забега ×5 (PVR-2.3) — 30-й час.
+    // не ломаясь от любой правки баланса. Замер на темпе ×5 с крепким стартом — 35-й час.
     expect(endedAtHour).toBeLessThan(300);
+  });
+
+  it('крепкий старт держит дом на первом штурме — падает он не с первого раза (PVR-2.4)', () => {
+    // После ×5 дом пассивного игрока падал на ПЕРВОМ же наземном штурме (30-й час).
+    // Владелец выбрал рычаг «крепче старт игрока»: форт, тяжёлая пехота и стража дома.
+    // Замер на кирпиче: первый штурм кончается без победителя (33-й час), дом падает на
+    // втором (35-й) — и пассивный всё равно проигрывает, это держит тест выше.
+    const { groundOutcomes } = runIdlePlayer(400);
+    expect(groundOutcomes.length).toBeGreaterThanOrEqual(2);
+    expect(groundOutcomes[0]).not.toBe('p3');
   });
 
   it('штурм доходит до дома игрока и высаживается — а не стоит на орбите', () => {
@@ -120,13 +145,13 @@ describe('забег на карте pve-1 доходит до вердикта 
     expect(groundBattleAtHome).toBeDefined();
     // И доходит, ПОКА ВОЛНЫ ЕЩЁ ИДУТ (PVR-2.3). На ×1 Рой шёл до дома так долго, что
     // первый штурм начинался уже после последней волны — на 64-м часу при хребте в 60.
-    // Ради этого темп и ускорен; замер на кирпиче — 29-й час.
+    // Ради этого темп и ускорен; замер — 31-й час.
     expect(groundBattleAtHome!).toBeLessThan(RUN_SPINE_HOURS);
   });
 
   it('волны идут по расписанию до самого вердикта, а не глохнут на первой', () => {
     // На темпе забега ×5 (PVR-2.3) Рой доходит до дома впятеро быстрее, и пассивный игрок
-    // падает раньше десятой волны: замер на кирпиче — 30-й час, пятая волна. Поэтому
+    // падает раньше десятой волны: замер — 35-й час, пятая волна. Поэтому
     // сторож держит не «десять волн», а то, ради чего стоит: ни одна волна, чей срок
     // наступил до вердикта, не пропала.
     const { state, endedAtHour } = runIdlePlayer(400);
