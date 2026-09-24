@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import {
+  keepLocalMark,
   parseCloudProfile,
   parseSyncMark,
   planCloudSync,
   profileHasProgress,
+  profileNumbers,
   serializeCloudProfile,
   type CloudProfile,
   type LocalSync,
@@ -106,5 +108,59 @@ describe('YAG-2.2 — отметка сверки на устройстве', ()
 
   it('сверка не может быть впереди своей правки — срезается до неё', () => {
     expect(parseSyncMark('{"rev":3,"syncedRev":9}')).toEqual({ rev: 3, syncedRev: 3 });
+  });
+});
+
+describe('YAG-1.4 — развилка: «Оставить этот»', () => {
+  // Устройство Б последним записало облако (правка 8) и с тех пор не играло.
+  const deviceB = local({ seed: 's1', rev: 8, syncedRev: 8 });
+
+  it('облако уходит ВПЕРЁД последней сверки Б — Б берёт выбор игрока, а не пишет поверх', () => {
+    // Здесь правок меньше, чем в облаке: своим номером запись оказалась бы ПОЗАДИ облака,
+    // и Б прочло бы её как «наша запись не дошла» и молча отправило свой профиль.
+    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, 8);
+    expect(kept.rev).toBeGreaterThan(8);
+    expect(planCloudSync(deviceB, cloud({ rev: kept.rev }), true)).toBe('adopt');
+  });
+
+  it('здесь правок больше, чем в облаке, — номер всё равно растёт', () => {
+    expect(keepLocalMark({ rev: 20, syncedRev: 5 }, 8).rev).toBe(21);
+  });
+
+  it('отметка сверки — облако, которое игрок видел: не дойдёт запись — старт отправит снова', () => {
+    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, 8);
+    expect(kept.syncedRev).toBe(8);
+    // Запись не дошла: в облаке по-прежнему правка 8, а своя правка впереди.
+    expect(planCloudSync({ ...local(), ...kept }, cloud({ rev: 8 }), true)).toBe('upload');
+  });
+
+  it('после выбора развилки нет: то же устройство на следующем старте видит «совпадает»', () => {
+    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, 8);
+    const pushed = { ...local(), rev: kept.rev, syncedRev: kept.rev };
+    expect(planCloudSync(pushed, cloud({ rev: kept.rev }), true)).toBe('same');
+  });
+});
+
+describe('YAG-1.4 — числа профиля на экране выбора', () => {
+  it('забеги, главы и три валюты — как они лежат в профиле', () => {
+    const p = {
+      ...freshSectorZeroProgress(shippedGameData(), 's'),
+      nextAttempt: 13,
+      chaptersWon: ['a', 'b'],
+      research: 340,
+      warrants: 25,
+      sovereigns: 7,
+    };
+    expect(profileNumbers(p)).toEqual({
+      runs: 12,
+      chapters: 2,
+      research: 340,
+      warrants: 25,
+      sovereigns: 7,
+    });
+  });
+
+  it('свежий профиль — ноль забегов, а не минус один', () => {
+    expect(profileNumbers(freshSectorZeroProgress(shippedGameData(), 's')).runs).toBe(0);
   });
 });

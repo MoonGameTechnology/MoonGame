@@ -22,7 +22,8 @@
  * 7. пауза забега (`YAG-6.2`): кнопка и уход со страницы замораживают мир, на возврате он
  *    ждёт кнопки, а площадка слышит «геймплей встал / пошёл» — в том числе в меню;
  * 8. облако вошедшего игрока (`YAG-2.2`): пустое получает профиль, а облачный прогресс на
- *    пустом устройстве берётся молча;
+ *    пустом устройстве берётся молча; гость входит кнопкой «Войти», и если прогресс есть
+ *    и здесь, и в облаке, профиль выбирает игрок — любой из двух (`YAG-1.4`).
  * 9. язык (`YAG-1.1d`): игрок скачивает файл только своего языка, и разметка подписана
  *    текстом, а не ключами, — и для русского, и для англоязычного игрока.
  *
@@ -64,7 +65,7 @@ window.YaGames = {
   init: () => Promise.resolve({
     getPlayer: async () => ({
       getUniqueID: () => 'u-1',
-      isAuthorized: () => true,
+      isAuthorized: () => !window.__guest,
       setData: async (data, flush) => {
         window.__ya.writes.push({ data, flush });
         Object.assign(cloud, data);
@@ -84,6 +85,13 @@ window.YaGames = {
         window.__ya.log.push('rewarded');
         for (const [i, name] of ['onOpen', 'onRewarded', 'onClose'].entries())
           setTimeout(() => callbacks[name] && callbacks[name](), 30 * (i + 1));
+      },
+    },
+    // Вход (YAG-1.4): гость (\`__guest\`) после окна становится вошедшим.
+    auth: {
+      openAuthDialog: async () => {
+        window.__ya.log.push('auth');
+        window.__guest = false;
       },
     },
   }),
@@ -234,6 +242,74 @@ try {
       await onSectorZeroMenu(tail);
     }
   });
+  // 8а. Развилка (YAG-1.4): гость с прогрессом входит, а в облаке — другой профиль.
+  // Игрок видит числа обоих и выбирает; выбранный становится единственным.
+  for (const pick of ['take-cloud', 'keep-here']) {
+    const fork = await browser.newContext({ locale: 'ru-RU' });
+    const forkPage = await fork.newPage();
+    forkPage.on('pageerror', (error) => errors.push(`pageerror (${pick}): ${error.message}`));
+    await forkPage.addInitScript(() => {
+      window.__guest = true;
+      window.__cloudInit = {
+        meta: JSON.stringify({
+          v: 1,
+          seed: 'account',
+          rev: 12,
+          progress: JSON.stringify({ v: 1, seed: 'account', research: 50, nextAttempt: 41 }),
+        }),
+      };
+      if (!localStorage.getItem('sector-zero.progress.v1'))
+        localStorage.setItem(
+          'sector-zero.progress.v1',
+          JSON.stringify({ v: 1, seed: 'device', research: 9, nextAttempt: 13 }),
+        );
+    });
+    await forkPage.goto(origin + '/');
+    await waitForApp(forkPage);
+    // Гость: облака нет, пока он не войдёт, — и вход только по кнопке.
+    await forkPage.locator('#sz-signin').waitFor({ state: 'visible' });
+    assert.equal(
+      await forkPage.evaluate(() => window.__ya.writes.length),
+      0,
+      `${pick}: гость в облако не пишет`,
+    );
+    await forkPage.locator('#sz-signin').click();
+    await forkPage.locator('#sz-cloud-choice').waitFor({ state: 'visible' });
+    assert.equal(
+      await forkPage.locator('#sz-new').isVisible(),
+      false,
+      `${pick}: до выбора не играют`,
+    );
+    assert.match(
+      await forkPage.locator('#sz-cloud-here').textContent(),
+      /12/,
+      'числа этого профиля',
+    );
+    assert.match(await forkPage.locator('#sz-cloud-cloud').textContent(), /40/, 'числа облачного');
+    await forkPage.locator(`#sz-${pick}`).click();
+    await forkPage.locator('#sz-new').waitFor({ state: 'visible' });
+    assert.equal(await forkPage.locator('#sz-cloud-choice').isVisible(), false);
+    assert.equal(await forkPage.locator('#sz-signin').isVisible(), false, 'вошедшему «Войти» нет');
+    const kept = pick === 'keep-here' ? 'device' : 'account';
+    assert.equal(
+      await forkPage.evaluate(
+        () => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).seed,
+      ),
+      kept,
+      `${pick}: на устройстве выбранный профиль`,
+    );
+    if (pick === 'keep-here') {
+      // Облако заменено этим профилем, и номер правки ушёл ВПЕРЁД облачного.
+      const meta = await forkPage.waitForFunction(() => {
+        const last = window.__ya.writes.at(-1)?.data;
+        return last && JSON.parse(Object.values(last)[0]);
+      });
+      const written = await meta.jsonValue();
+      assert.equal(written.seed, 'device', 'в облаке — выбранный профиль');
+      assert.ok(written.rev > 12, 'номер правки впереди облачного');
+    }
+    await fork.close();
+  }
   // 8. Облако (YAG-2.2): здесь пусто, в облаке прогресс — он берётся молча и сразу.
   const other = await browser.newContext({ locale: 'ru-RU' });
   const otherPage = await other.newPage();
@@ -290,7 +366,7 @@ try {
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, один язык — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, вход и выбор профиля, один язык — без ошибок\n',
   );
 } finally {
   await browser.close();

@@ -276,6 +276,18 @@
 #sz-confirm h2 { color: #efd1a1; font-size: 19px; font-weight: 500; margin: 0 0 10px; }
 #sz-confirm p { color: #bacdd3; font-size: 13px; line-height: 1.65; margin: 0 0 22px; }
 #sz-confirm button + button { margin-top: 10px; }
+/* Развилка облака (YAG-1.4): два профиля с числами, выбор — одной кнопкой под каждым. */
+#sz-cloud-choice { border-top: 1px solid #a88758; padding-top: 20px; }
+#sz-cloud-choice h2 { color: #efd1a1; font-size: 19px; font-weight: 500; margin: 0 0 10px; }
+#sz-cloud-choice > p { color: #bacdd3; font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+.sz-cloud-side { border-left: 2px solid #527a83; padding-left: 14px; margin-bottom: 18px; }
+.sz-cloud-side b { color: #d4e8e9; font-size: 13px; font-weight: 600; }
+.sz-cloud-side p { color: #bacdd3; font-size: 13px; line-height: 1.6; margin: 6px 0 10px; }
+/* Вход площадки (YAG-1.4): польза названа рядом с кнопкой — до окна, а не после. */
+.sz-signin { display: flex; align-items: center; gap: 12px; margin: 12px 0 0; color: var(--sz-muted); font-size: 12px; line-height: 1.5; }
+.sz-signin[hidden] { display: none; }
+.sz-signin button { flex: none; min-height: 40px; padding: 8px 16px; border: 1px solid #35535f; background: #0c1e28; color: #d4e8e9; font-size: 13px !important; }
+.sz-signin button:hover { border-color: #86d5d7; background: #132f3b; }
 body[data-entry="sector-zero"] #connect:not([style]) { display: none; }
 body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-home #rail, body.sector-zero-home #holo-back { visibility: hidden; }
 @media (max-width: 760px) {

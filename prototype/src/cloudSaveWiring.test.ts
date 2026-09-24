@@ -11,6 +11,14 @@
  *    подменился облачный — игрок успел потратить валюту в чужом профиле.
  * 3. **Уход со страницы без отправки.** Таймер окна квоты после выгрузки не сработает, и
  *    последний прогресс останется на одном устройстве.
+ *
+ * Вход и развилка (`YAG-1.4`) добавляют ещё два:
+ *
+ * 4. **Облачный профиль под живым забегом.** Выбор «взять из облака» делается и после
+ *    выхода из забега в меню, а забег на паузе принадлежит прежнему профилю — «Продолжить»
+ *    засчитал бы облачному профилю чужой забег.
+ * 5. **«Оставить этот» своим номером правки.** Облако оказалось бы позади сверки другого
+ *    устройства, и то молча записало бы свой профиль поверх выбора игрока.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -44,7 +52,9 @@ describe('YAG-2.2 — сверка на старте', () => {
   it('решение принимает общее правило, развилка облако не трогает', () => {
     const sync = body('syncCloud');
     expect(sync).toContain('planCloudSync(');
-    expect(sync).toMatch(/if \(plan === 'choose'\) \{\s+cloudState = 'held';\s+return;/);
+    expect(sync).toMatch(
+      /if \(plan === 'choose'[^)]*\) \{\s+cloudState = 'held';\s+cloudFork = [^;]+;\s+return;/,
+    );
     expect(body('pushCloud')).toContain("if (cloudState !== 'on') return;");
   });
 
@@ -59,5 +69,34 @@ describe('YAG-2.2 — уход со страницы', () => {
   it('отправляет копию сразу, а не в окно квоты', () => {
     expect(SRC).toContain("addEventListener('pagehide', () => pushCloud(true));");
     expect(SRC).toMatch(/if \(document\.visibilityState === 'hidden'\) pushCloud\(true\);/);
+  });
+});
+
+/** Объект меню `sectorZeroAccount` — от объявления до закрывающей скобки. */
+const account = /const sectorZeroAccount[\s\S]*?\n\};/.exec(SRC)?.[0] ?? '';
+
+describe('YAG-1.4 — вход и развилка', () => {
+  it('гость видит «Войти» только там, где облако есть, а вход площадка умеет', () => {
+    expect(body('syncCloud')).toMatch(/\.authenticated\) \{\s+cloudState = 'guest';/);
+    expect(account).toContain(
+      "canSignIn: () => cloudState === 'guest' && getPlatform().auth.canSignIn",
+    );
+  });
+
+  it('после входа — та же сверка, что на старте, и меню её дожидается', () => {
+    expect(account).toContain("if ((await getPlatform().auth.signIn()).status !== 'ok') return;");
+    expect(account).toContain(
+      'progressWrite = progressWrite.then(syncCloud).catch(cloudSyncFailed);',
+    );
+  });
+
+  it('облачный профиль снимает забег, стоящий на паузе в этой вкладке', () => {
+    expect(body('adoptCloud')).toContain('if (runInProgress()) setRunActive(false);');
+  });
+
+  it('«Оставить этот» — номер правки по общему правилу, и облако получает профиль', () => {
+    expect(account).toMatch(
+      /syncMark = keepLocalMark\(syncMark, fork\.cloud\.rev\);[\s\S]*cloudState = 'on';\s+pushCloud\(\);/,
+    );
   });
 });
