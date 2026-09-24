@@ -93,7 +93,7 @@ export const autoRallyModule: GameModule = {
       }
       // Звёздность едет с тем же стеком, что и лоадаут (SZE-1.1) — иначе корабль
       // терял бы заточку ровно в тот момент, когда его поднимают с верфи во флот.
-      addUnits(rally.units, p.unit, take, mods, stack.moduleStars);
+      addUnits(rally.units, p.unit, take, mods, stack.moduleStars, stack.moduleRarity);
     });
   },
 };

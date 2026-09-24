@@ -230,15 +230,16 @@ export function basedMachine(
   freshId: string,
   modules?: readonly string[],
   stars?: Record<string, number>,
+  rarity?: Record<string, string>,
 ): Squadron[] {
   const out = hangar.map((q) => ({ ...q, units: q.units.map((st) => ({ ...st })) }));
   const home = out.find((q) => q.units.some((st) => st.unit === unit));
   if (home) {
-    addUnits(home.units, unit, count, modules, stars);
+    addUnits(home.units, unit, count, modules, stars, rarity);
     return out;
   }
   const fresh: Squadron = { id: freshId, units: [] };
-  addUnits(fresh.units, unit, count, modules, stars);
+  addUnits(fresh.units, unit, count, modules, stars, rarity);
   out.push(fresh);
   return out;
 }

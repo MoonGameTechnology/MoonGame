@@ -1,4 +1,11 @@
-import type { GameData, ModuleDef, ShipSlotType, UnitDef, ResourceBag } from '../data/schemas';
+import {
+  RARITIES,
+  type GameData,
+  type ModuleDef,
+  type ShipSlotType,
+  type UnitDef,
+  type ResourceBag,
+} from '../data/schemas';
 import type { UnitStack } from '../state/gameState';
 import { canInstall, validateInstalled, type FittingSpec, type InstallFailure } from './fitting';
 
@@ -46,7 +53,7 @@ export function moduleStarMultiplier(star: number, data: GameData): number {
  *  ★0 / отсутствующая карта звёзд → прежняя сумма байт-в-байт. */
 export function effectiveStats(
   def: UnitDef,
-  stack: Pick<UnitStack, 'modules' | 'moduleStars'>,
+  stack: Pick<UnitStack, 'modules' | 'moduleStars' | 'moduleRarity'>,
   data: GameData,
 ): Record<string, number> {
   const out: Record<string, number> = { ...def.stats };
@@ -61,6 +68,29 @@ export function effectiveStats(
     for (const [k, v] of Object.entries(m.effects.stats)) {
       out[k] = (out[k] ?? 0) + v * mult;
     }
+    // Параметры редкости (SZE-5.1) — такой же вклад модуля, поэтому и звезда их множит:
+    // «редкость даёт параметр, звёздность усиливает параметры».
+    const rarity = stack.moduleRarity?.[id];
+    if (rarity !== undefined)
+      for (const [k, v] of Object.entries(moduleRarityBonus(m, rarity))) {
+        out[k] = (out[k] ?? 0) + v * mult;
+      }
+  }
+  return out;
+}
+
+/** Прибавка редкости модуля на ступени `rarity` (SZE-5.1): сумма `rarityBonus` всех
+ *  ступеней выше базовой и не выше `rarity`, в порядке лестницы — детерминированно.
+ *  Ступень не выше базовой, неизвестная ступень или модуль без таблицы — пустая прибавка. */
+export function moduleRarityBonus(m: ModuleDef, rarity: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  const base = RARITIES.indexOf(m.rarity ?? 'simple');
+  const top = RARITIES.indexOf(rarity as (typeof RARITIES)[number]);
+  if (!m.rarityBonus || top <= base) return out;
+  for (let i = base + 1; i <= top; i++) {
+    const step = RARITIES[i]!;
+    if (step === 'simple') continue;
+    for (const [k, v] of Object.entries(m.rarityBonus[step] ?? {})) out[k] = (out[k] ?? 0) + v;
   }
   return out;
 }
