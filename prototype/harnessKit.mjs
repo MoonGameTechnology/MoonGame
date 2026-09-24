@@ -78,7 +78,7 @@ export async function instrumentedGame(hooks, { page = 'void-dominion.html', sim
     write: false,
     format: 'iife',
     platform: 'browser',
-    loader: { '.webp': 'dataurl' },
+    loader: { '.webp': 'dataurl', '.svg': 'dataurl' },
     define: { __PLAYER_BUILD__: 'false', __SECTOR_ZERO_ONLY__: 'false' },
   });
   const built = builtPage(page).toString('utf8');

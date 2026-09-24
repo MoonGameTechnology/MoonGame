@@ -24,7 +24,7 @@ const bundle = async (playerBuild) => {
     format: 'iife',
     platform: 'browser',
     target: 'es2020',
-    loader: { '.webp': 'dataurl' },
+    loader: { '.webp': 'dataurl', '.svg': 'dataurl' },
     minify: true,
     legalComments: 'none',
     write: false,

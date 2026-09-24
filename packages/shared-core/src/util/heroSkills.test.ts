@@ -129,5 +129,7 @@ describe('AUD-22 — шипнутый каталог: ни одна пара г�
     expect(innate('ravager')).toEqual(['psi_veil']);
     expect(innate('vanguard')).toEqual(['neural_lace']);
     expect(innate('warden')).toEqual([]);
+    // PVR-6.16: «Разведка» Учёного — награда «Пси-вуали»; узел у него изучен от рождения.
+    expect(innate('scientist')).toEqual(['psi_veil']);
   });
 });

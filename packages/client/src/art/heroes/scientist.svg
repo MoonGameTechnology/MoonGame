@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 627 627" width="627" height="627">
+  <!-- Векторный черновик портрета Учёного (решение владельца 2026-09-24), до арта.
+       Кадр — как у клеток атласа portraits.webp: бюст на прозрачном фоне, без текста.
+       Без имплантов и свечения на коже: это спойлер финала (sector-zero-roadmap §3.1.4). -->
+  <defs>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e4b999"/>
+      <stop offset="0.5" stop-color="#d3a383"/>
+      <stop offset="1" stop-color="#a97759"/>
+    </linearGradient>
+    <linearGradient id="neck" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#bf8e6f"/>
+      <stop offset="1" stop-color="#8f614a"/>
+    </linearGradient>
+    <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef2f4"/>
+      <stop offset="1" stop-color="#9fadb5"/>
+    </linearGradient>
+    <linearGradient id="coatSide" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1c2a31" stop-opacity="0.12"/>
+      <stop offset="0.45" stop-color="#1c2a31" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1c2a31" stop-opacity="0.34"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d3733"/>
+      <stop offset="1" stop-color="#1f1b19"/>
+    </linearGradient>
+    <linearGradient id="grey" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9a958f" stop-opacity="0"/>
+      <stop offset="1" stop-color="#a39e98" stop-opacity="0.9"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+    <filter id="softer" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+
+  <g transform="translate(313 627) scale(1.2) translate(-313 -627)">
+    <!-- Плечи и форма научного флагмана -->
+    <path d="M40 627 C52 548 118 494 214 470 L270 456 L356 456 L412 470 C508 494 575 548 587 627 Z" fill="url(#coat)"/>
+    <path d="M40 627 C52 548 118 494 214 470 L270 456 L356 456 L412 470 C508 494 575 548 587 627 Z" fill="url(#coatSide)"/>
+    <path d="M122 512 C162 490 202 477 238 470" stroke="#2f8f99" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M504 512 C464 490 424 477 388 470" stroke="#2f8f99" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M332 478 C342 530 352 580 358 627" stroke="#8a979e" stroke-width="3" fill="none"/>
+    <path d="M343 478 C353 530 363 580 369 627" stroke="#2f8f99" stroke-width="4" fill="none"/>
+    <!-- Знак научной службы: орбиты вокруг ядра -->
+    <circle cx="436" cy="566" r="19" fill="#1f3a44" stroke="#d6b25e" stroke-width="3"/>
+    <ellipse cx="436" cy="566" rx="12.5" ry="5" fill="none" stroke="#d6b25e" stroke-width="2" transform="rotate(-30 436 566)"/>
+    <ellipse cx="436" cy="566" rx="12.5" ry="5" fill="none" stroke="#d6b25e" stroke-width="2" transform="rotate(30 436 566)"/>
+    <circle cx="436" cy="566" r="3" fill="#d6b25e"/>
+
+    <!-- Шея -->
+    <path d="M273 388 L273 470 C293 482 333 482 353 470 L353 388 Z" fill="url(#neck)"/>
+    <path d="M273 400 C293 424 333 424 353 400 L353 426 C333 442 293 442 273 426 Z" fill="#5e3b2b" opacity="0.4" filter="url(#softer)"/>
+
+    <!-- Стойка воротника -->
+    <path d="M256 470 C258 444 262 428 268 420 C292 436 334 436 358 420 C364 428 368 444 370 470 C340 482 286 482 256 470 Z" fill="#d6dee3"/>
+    <path d="M268 420 C292 436 334 436 358 420" stroke="#2f8f99" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="313" cy="476" rx="70" ry="9" fill="#1c2a31" opacity="0.18" filter="url(#softer)"/>
+
+    <!-- Уши -->
+    <path d="M222 250 C205 242 195 260 199 282 C202 302 212 314 227 311 Z" fill="#c69372"/>
+    <path d="M211 262 C207 272 208 286 214 296" stroke="#9c6b50" stroke-width="3" fill="none" opacity="0.6"/>
+    <path d="M404 250 C421 242 431 260 427 282 C424 302 414 314 399 311 Z" fill="#a47256"/>
+
+    <!-- Голова -->
+    <path d="M313 128 C375 128 408 175 407 245 C406 300 399 345 379 376 C361 404 337 420 313 422 C289 420 265 404 247 376 C227 345 220 300 219 245 C218 175 251 128 313 128 Z" fill="url(#skin)"/>
+    <!-- Объём: тень правой щеки и челюсти, свет на лбу -->
+    <path d="M372 262 C388 300 384 350 356 392 C372 360 380 316 366 276 Z" fill="#7d513b" opacity="0.35" filter="url(#soft)"/>
+    <ellipse cx="300" cy="190" rx="52" ry="26" fill="#f3d2b8" opacity="0.35" filter="url(#soft)"/>
+    <!-- Щетина по челюсти — мягко -->
+    <path d="M250 322 C258 376 286 410 313 412 C340 410 368 376 376 322 C358 344 338 340 313 342 C288 340 268 344 250 322 Z" fill="#3a2f2a" opacity="0.2" filter="url(#softer)"/>
+
+    <!-- Волосы: залысины, седина на висках -->
+    <path d="M217 258 C209 204 224 142 288 118 C300 113 314 112 326 114 C384 122 418 170 409 258 L400 258 C400 238 397 224 392 213 C386 192 373 176 357 170 C343 175 327 180 313 182 C299 180 284 175 270 170 C255 176 242 192 234 213 C229 224 226 238 226 258 Z" fill="url(#hair)"/>
+    <path d="M226 258 C226 240 229 227 234 215 L225 212 C219 228 216 244 217 258 Z" fill="url(#grey)"/>
+    <path d="M400 258 C400 240 397 227 392 215 L401 212 C407 228 410 244 409 258 Z" fill="url(#grey)"/>
+    <path d="M262 150 C282 138 306 134 330 138" stroke="#5a534d" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <path d="M276 160 C296 150 322 150 344 156" stroke="#58514b" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M238 196 C246 176 260 162 276 154" stroke="#6b645e" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M388 196 C380 176 366 162 350 154" stroke="#4a4440" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+
+    <!-- Брови — чуть сведены: усталость, сосредоточенность -->
+    <path d="M250 238 C264 229 284 228 299 236" stroke="#2a2522" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M327 236 C342 228 362 229 376 238" stroke="#2a2522" stroke-width="7" stroke-linecap="round" fill="none"/>
+
+    <!-- Глаза -->
+    <path d="M256 260 C264 252 284 252 292 260 C284 266 264 266 256 260 Z" fill="#f1ece6"/>
+    <path d="M334 260 C342 252 362 252 370 260 C362 266 342 266 334 260 Z" fill="#f1ece6"/>
+    <circle cx="274" cy="259" r="6.5" fill="#3b4d57"/>
+    <circle cx="352" cy="259" r="6.5" fill="#3b4d57"/>
+    <circle cx="274" cy="259" r="3" fill="#111"/>
+    <circle cx="352" cy="259" r="3" fill="#111"/>
+    <circle cx="276" cy="257" r="1.6" fill="#fff"/>
+    <circle cx="354" cy="257" r="1.6" fill="#fff"/>
+    <path d="M255 259 C263 250 285 250 293 259" stroke="#4d352b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M333 259 C341 250 363 250 371 259" stroke="#4d352b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <!-- Тени под глазами: бессонные ночи -->
+    <path d="M258 270 C266 276 282 276 290 270" stroke="#8e5f48" stroke-width="3" fill="none" opacity="0.45" filter="url(#softer)"/>
+    <path d="M336 270 C344 276 360 276 368 270" stroke="#8e5f48" stroke-width="3" fill="none" opacity="0.45" filter="url(#softer)"/>
+
+    <!-- Очки -->
+    <rect x="243" y="241" width="60" height="38" rx="9" fill="#a9d7ea" fill-opacity="0.14" stroke="#1b2023" stroke-width="4.5"/>
+    <rect x="323" y="241" width="60" height="38" rx="9" fill="#a9d7ea" fill-opacity="0.14" stroke="#1b2023" stroke-width="4.5"/>
+    <path d="M303 257 C309 251 317 251 323 257" stroke="#1b2023" stroke-width="4.5" fill="none"/>
+    <path d="M243 253 L221 250" stroke="#1b2023" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M383 253 L405 250" stroke="#1b2023" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M251 247 L263 247" stroke="#fff" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
+    <path d="M331 247 L343 247" stroke="#fff" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Нос -->
+    <path d="M314 268 C311 290 305 309 302 320 C307 328 320 328 325 320" stroke="#9c6a4f" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M326 284 C331 298 334 310 331 320" stroke="#7d513b" stroke-width="6" stroke-opacity="0.35" fill="none" filter="url(#softer)"/>
+
+    <!-- Рот — ровный, без улыбки -->
+    <path d="M292 362 C304 364 322 364 334 362" stroke="#86533f" stroke-width="5" stroke-linecap="round" fill="none"/>
+    <path d="M300 373 C309 376 317 376 326 373" stroke="#b98a6e" stroke-opacity="0.55" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <!-- Носогубные складки -->
+    <path d="M288 330 C281 343 281 355 286 366" stroke="#9c6a4f" stroke-opacity="0.4" stroke-width="3" fill="none"/>
+    <path d="M338 330 C345 343 345 355 340 366" stroke="#83573f" stroke-opacity="0.4" stroke-width="3" fill="none"/>
+  </g>
+</svg>
