@@ -1947,6 +1947,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-btn:hover{border-color:var(--cyan-dim);}
 #endscreen .es-btn.wide{flex-basis:100%;}
 #endscreen .es-btn.ghost{flex-basis:100%;background:transparent;color:var(--dim);border-color:var(--line);}
+/* ×2 за ролик (YAG-3.2) — под наградой забега, во всю ширину, золотом наград */
+#endscreen .es-btn.ad{display:block;width:100%;margin-top:10px;border-color:#c99a3b;color:#ffcf6b;background:rgba(255,190,80,.08);}
+#endscreen .es-btn.ad:hover{border-color:#ffcf6b;background:rgba(255,190,80,.16);}
+#endscreen .es-note{margin:8px 0 0;font-size:12px;color:var(--cyan);}
 
 @media (max-width:720px), ((hover: none) and (pointer: coarse) and (max-height: 520px)){
   /* phones: same two rows, everything a touch tighter (nick + standing stay visible) */
