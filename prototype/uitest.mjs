@@ -523,6 +523,12 @@ assert.deepEqual(JSON.parse(storage.get('sector-zero.progress.v1')).loadouts.cru
 await prep('tab', 'heroes');
 assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="upgrade-hero"'));
 assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="skill"'));
+// Академия показывает лица из общего атласа, а не буквы: четыре карточки ростера и
+// открытый герой. Закрытые (награды глав) — приглушены, открытый командир — нет.
+const academy = getEl('sz-workshop').innerHTML;
+assert.equal(academy.match(/class="hero-portrait"/g)?.length, 5, 'every hero shows a portrait');
+assert.equal(academy.match(/sz-face sz-face-locked/g)?.length, 3, 'locked heroes are dimmed');
+assert.ok(!academy.includes('sz-crest'), 'the letter crest is only a fallback for heroes without art');
 await prep('back');
 await click('sz-strong');
 await click('sz-new');

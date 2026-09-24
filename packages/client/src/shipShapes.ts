@@ -67,7 +67,10 @@ export const UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
   siege: 'dreadnought',
   siege_lance: 'dreadnought',
   hero: 'dreadnought',
-  strike_carrier: 'transport',
+  // Owner decision 2026-09-24: the landing ship joins the landing family next to the
+  // landing shuttle; the freighter stays with the carrier, so two different classes
+  // never share one picture again.
+  strike_carrier: 'dropship',
   shuttle_carrier: 'transport',
   landing_shuttle: 'dropship',
 };
