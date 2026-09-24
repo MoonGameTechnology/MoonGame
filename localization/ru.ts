@@ -69,6 +69,7 @@ export const ru: Record<string, string> = {
   'battle.win.role.attacker': '⚔ нападает',
   'battle.win.role.defender': '🛡 обороняется',
   'battle.win.rule': 'Раунд — раз в час: стороны обмениваются залпами. Сторона выбывает, когда у неё не осталось сил или она отступила; предел — 240 раундов.',
+  'battle.win.rule.run': 'Раунд — каждые {n} с: стороны обмениваются залпами. Сторона выбывает, когда у неё не осталось сил или она отступила; предел — 240 раундов.',
   'battle.win.veteran': 'Выслуга: +{n}% урона за пережитые бои',
   'battle.win.tone.hurt': 'потрёпан',
   'battle.win.tone.low': 'на грани',
@@ -1226,6 +1227,7 @@ export const ru: Record<string, string> = {
   // --- res — Ресурсы в косвенных падежах (для фраз «не хватает …») и суффиксы скорости.
   'res.per.day': '/д',
   'res.per.hour': '/ч',
+  'res.per.minute': '/мин',
   'res.of.credits': 'кредитов',
   'res.of.energy': 'энергии',
   'res.of.food': 'еды',
