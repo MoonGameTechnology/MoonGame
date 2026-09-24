@@ -28,6 +28,7 @@ import {
   arsenalSyncModule,
   stationModule,
   armyModule,
+  veteranModule,
   victoryModule,
   technologyModule,
   espionageModule,
@@ -75,6 +76,12 @@ export const MODULES: GameModule[] = [
   // orbital stamps orbit on fleet.arrived BEFORE combat engages, and runs its
   orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
   combatModule, // melee battles: engage / tick / assault / retreat / capture
+  // PERK-3.1: надбавка за пережитые бои. Место то же, что в серверном `DEV_MODULES`, и
+  // оно не про порядок хуков — все вклады в `combat.damage` перемножаются, так что
+  // порядок внутри группы на число не влияет. Списков два, и разъезжались они тут уже не
+  // раз (PVR-0.2/FORT-0.2/FOG-10 ниже): модуль, который есть у сервера и нет здесь, на
+  // живом хосте не сработает НИ РАЗУ.
+  veteranModule,
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
   captureOnArrivalModule, // walk-in capture now a kernel rule (was client-side seizeSector)
   // EVT-2: трофеи победителю. Стоит ПЕРЕД `construction` намеренно и это единственное

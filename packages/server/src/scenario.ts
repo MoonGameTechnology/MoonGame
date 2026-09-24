@@ -6,6 +6,7 @@ import {
   autoRallyModule,
   salvageModule,
   captureOnArrivalModule,
+
   combatModule,
   constructionModule,
   createInitialState,
@@ -44,6 +45,7 @@ import {
   seatClaimModule,
   taxModule,
   technologyModule,
+  veteranModule,
   victoryModule,
   visibilityModule,
   type Fleet,
@@ -134,6 +136,11 @@ export const DEV_MODULES: GameModule[] = [
   // `artillery`, is gone: standoff fire was removed whole, see manifest 14 below.)
   orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
   combatModule, // melee battles: engage / tick / assault / retreat / capture
+  // PERK-3.1: надбавка за пережитые бои. Сразу за combat и это не про порядок хуков —
+  // все вклады в `combat.damage` перемножаются, так что порядок внутри группы на число
+  // не влияет (см. `hookedDamage`). Место выбрано ради читателя: модуль не имеет смысла
+  // в отрыве от `combatModule`, который единственный и начисляет счётчик боёв.
+  veteranModule,
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
   captureOnArrivalModule, // walk-in capture of undefended neutral sectors (after combat)
   // EVT-2: трофеи победителю. ПЕРЕД `construction` намеренно и это единственное его
@@ -189,7 +196,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '29'; // CORE-DMG-3: ауры и пассивы героя — на все каналы огня.
+export const MODULE_MANIFEST_VERSION = '30'; // PERK-3.1: добавлен veteranModule —
+// надбавка за пережитые бои. Тут изменилось ЧЛЕНСТВО графа, а не только правила, так что
+// бамп обязателен по самому правилу выше. Номер новый, а не повторно 29: 29 уже лежит в
+// `main`, партии на нём создаются, и поднять такую партию под графом с лишним модулем
+// значило бы молча сменить ей боевые числа посреди игры. Отказ загрузки стоит перезапуска
+// дев-матча, тихая подмена правил — доверия к реплею.
+// export const MODULE_MANIFEST_VERSION = '29'; // CORE-DMG-3: ауры и пассивы героя — на все каналы огня.
 // Состав и порядок модулей те же. Бамп — потому что сменились ПРАВИЛА УРОНА: бонусы героя,
 // которые до сих пор действовали только в ближнем бою, теперь доходят до обстрела с
 // орбиты, корабельного ПВО, удара челноков и ответки. Поднятая под новым кодом старая
