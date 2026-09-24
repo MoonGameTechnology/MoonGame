@@ -22,6 +22,8 @@
 /** Что умеет площадка. UI принимает решения по этим флагам, а не по её названию. */
 export interface PlatformCapabilities {
   auth: boolean;
+  /** Облачный сейв ВОШЕДШЕГО игрока (`YAG-2.2`). Гость живёт локально (`YAG-1.4`): флаг
+   *  говорит, что облако есть у площадки, а есть ли оно у ЭТОГО игрока — `auth.player()`. */
   cloudSave: boolean;
   rewardedAds: boolean;
   interstitialAds: boolean;
@@ -72,8 +74,11 @@ export interface PlatformAuth {
 
 /** Загрузка/сохранение метапрогресса. Формат наш; квоты и ретраи — забота адаптера. */
 export interface PlatformSave {
+  /** `null` — сохранения нет или облака у этого игрока нет (гость). */
   load(): Promise<string | null>;
-  save(snapshot: string): Promise<void>;
+  /** Промис не отклоняется: облако — копия, сбой не роняет то, что его вызвало.
+   *  `flush` — страница уходит: отправить сейчас, а не в ближайшее окно квоты. */
+  save(snapshot: string, options?: { flush?: boolean }): Promise<void>;
 }
 
 export interface PlatformAds {

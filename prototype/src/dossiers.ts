@@ -155,7 +155,11 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
     case 'scout':
       return {
         name: t('dossier.unit.scout.name'),
-        body: t('dossier.unit.scout.desc', { sp: hl(st.speed), sig: hl(def.signature ?? 1) }),
+        body: t('dossier.unit.scout.desc', {
+          sp: hl(st.speed),
+          sig: hl(def.signature ?? 1),
+          m: hl(data.modules.compact_radar?.effects.stats.radarRange ?? 0),
+        }),
       };
     case 'cruiser':
       return {

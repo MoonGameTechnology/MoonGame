@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.30'); // PERK-3.1: новый фрагмент `veteran.json` — боевая надбавка за пережитые бои
+    expect(data.version).toBe('0.1.31'); // compact_radar: the scout's own smaller radar (owner, 2026-09-24)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -169,6 +169,22 @@ describe('game data schema (docs/architecture.md §2)', () => {
         code: 'E_NOT_ALLOWED',
       });
     }
+  });
+
+  it('у разведчика свой радар — компактный, меньше и слабее (решение владельца 2026-09-24)', () => {
+    // «Можно и разведчику, но ему отдельный, свой, поменьше и послабее».
+    const data = parseGameData(loadShippedBundle());
+    const small = data.modules.compact_radar!;
+    const big = data.modules.radar_module!;
+    expect(small.allowed?.units).toEqual(['scout']);
+    expect(small.effects.stats.radarRange!).toBeLessThan(big.effects.stats.radarRange!);
+    expect(small.cost.metal!).toBeLessThan(big.cost.metal!);
+    const scout = data.units.scout!;
+    expect(canEquip('scout', scout, [], 'compact_radar', data)).toEqual({ ok: true });
+    expect(canEquip('picket_frigate', data.units.picket_frigate!, [], 'compact_radar', data)).toEqual({
+      ok: false,
+      code: 'E_NOT_ALLOWED',
+    });
   });
 
   it('фрегат — платформа поддержки с самой широкой навеской (ROS-1.2)', () => {

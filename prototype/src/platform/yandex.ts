@@ -52,6 +52,7 @@ import {
   type LifecycleState,
 } from '../../../decisions/platformLifecycle';
 import { initialRewarded, rewardedStep, type RewardedEvent } from '../../../decisions/rewardedAd';
+import { createCloudWriter } from './cloudWriter';
 import type {
   GamePlatform,
   PlatformCapabilities,
@@ -98,6 +99,10 @@ export interface YandexPlayer {
   getUniqueID?: () => string;
   getName?: () => string;
   isAuthorized?: () => boolean;
+  /** Облачные данные игрока: 200 КБ, 100 запросов за 5 минут (§1.1). `flush: false` ставит
+   *  запись в очередь SDK, и промис говорит о валидности данных, а не об отправке. */
+  setData?: (data: Record<string, unknown>, flush?: boolean) => Promise<void>;
+  getData?: (keys?: string[]) => Promise<Record<string, unknown>>;
 }
 
 export interface YandexPlatformOptions {
@@ -127,9 +132,15 @@ export interface YandexPlatform extends GamePlatform {
 
 const UNAVAILABLE: PlatformPurchase = { status: 'unavailable' };
 
+/** Ключ облачных данных игры. Одно поле: формат снимка — наш (`PlatformSave`). */
+export const CLOUD_KEY = 'meta';
+/** Лимит `setData` — 200 КБ на игрока (§1.1). Считаем в байтах UTF-8 ЦЕЛОГО объекта, как
+ *  его отправит SDK, и берём тысячи, а не 1024: трактовку «КБ» площадка не уточняет. */
+export const CLOUD_LIMIT_BYTES = 200_000;
+
 /**
  * Возможности на СЕГОДНЯ. `auth` и `cloudSave` — свойства площадки, но флаг поднимает
- * только реализованное: облачный сейв ждёт `YAG-2.2`, покупки — `YAG-4.2`. Интерстишлов
+ * только реализованное: облачный сейв поднят `YAG-2.2`, покупки ждут `YAG-4.2`. Интерстишлов
  * нет по резолюции владельца, даже если SDK их умеет. Отдельно про покупки: даже когда кирпич будет закрыт, флаг придётся
  * проверять живым запросом — покупки подключаются заявкой и могут быть не включены у
  * конкретной игры (требование 1.12/1.13).
@@ -137,7 +148,8 @@ const UNAVAILABLE: PlatformPurchase = { status: 'unavailable' };
 function capabilitiesOf(sdk: YandexSdk): PlatformCapabilities {
   return {
     auth: typeof sdk.getPlayer === 'function',
-    cloudSave: false,
+    // Облако — у вошедшего игрока (`YAG-2.2`); есть ли вход у ЭТОГО — `auth.player()`.
+    cloudSave: typeof sdk.getPlayer === 'function',
     rewardedAds: typeof sdk.adv?.showRewardedVideo === 'function',
     interstitialAds: false,
     iap: false,
@@ -188,6 +200,10 @@ export function createYandexPlatform(
   const offPause = sdk.on?.('game_api_pause', onPause);
   const offResume = sdk.on?.('game_api_resume', onResume);
 
+  /** Последний полученный объект игрока. Облако берёт его отсюда, а не новым запросом:
+   *  у `getPlayer` своя квота — 20 запросов за 5 минут (§1.1), а пишем мы по событиям. */
+  let lastPlayer: YandexPlayer | null = null;
+
   /** Кто играет — СВЕЖИМ запросом: после входа прежний объект игрока остаётся гостем. */
   const readPlayer = async (): Promise<PlatformPlayer> => {
     // Гость — это НОРМА, а не ошибка (требование 1.2.2): игра обязана работать без
@@ -195,6 +211,7 @@ export function createYandexPlatform(
     if (typeof sdk.getPlayer !== 'function') return { id: 'guest', authenticated: false };
     try {
       const player = await sdk.getPlayer();
+      lastPlayer = player;
       const authenticated = player.isAuthorized?.() ?? false;
       const name = player.getName?.();
       return {
@@ -271,6 +288,35 @@ export function createYandexPlatform(
       }
     });
 
+  /**
+   * Облачный сейв (`YAG-2.2`) — только у ВОШЕДШЕГО игрока. Гость живёт локально
+   * (`YAG-1.4`): его прогресс не пишется в облако вовсе, и то, как площадка хранит данные
+   * неавторизованных, на игру не влияет. Объект игрока — последний полученный; первый раз
+   * он запрашивается здесь же.
+   */
+  let cloudAsked = false;
+  const cloudPlayer = async (): Promise<YandexPlayer | null> => {
+    // Сам облачный путь спрашивает игрока один раз: упади этот запрос, повтор на каждую
+    // запись выжег бы квоту `getPlayer`. Дальше объект обновляют вход и `auth.player()`.
+    if (!lastPlayer && !cloudAsked) {
+      cloudAsked = true;
+      await readPlayer();
+    }
+    const player = lastPlayer;
+    if (!player || !(player.isAuthorized?.() ?? false)) return null;
+    if (typeof player.setData !== 'function' || typeof player.getData !== 'function') return null;
+    return player;
+  };
+  const cloud = createCloudWriter({
+    send: async (snapshot, flush) => {
+      const player = await cloudPlayer();
+      if (player) await player.setData!({ [CLOUD_KEY]: snapshot }, flush);
+    },
+    onError: (error) => options.onSdkError?.('setData', error),
+  });
+  const cloudBytes = (snapshot: string): number =>
+    new TextEncoder().encode(JSON.stringify({ [CLOUD_KEY]: snapshot })).length;
+
   const lang = sdk.environment?.i18n?.lang;
 
   return {
@@ -302,13 +348,31 @@ export function createYandexPlatform(
         return signingIn;
       },
     },
+    save: {
+      async load() {
+        const player = await cloudPlayer();
+        if (!player) return null;
+        try {
+          const value = (await player.getData!([CLOUD_KEY]))?.[CLOUD_KEY];
+          return typeof value === 'string' ? value : null;
+        } catch (error) {
+          options.onSdkError?.('getData', error);
+          return null;
+        }
+      },
+      save(snapshot, saveOptions) {
+        // Сверх лимита площадка запись отвергнет — не тратим на неё квоту. Локальная копия
+        // остаётся источником, а сбой уходит в журнал разработчика.
+        if (cloudBytes(snapshot) > CLOUD_LIMIT_BYTES) {
+          options.onSdkError?.('setData', new Error('E_CLOUD_SAVE_TOO_BIG'));
+          return Promise.resolve();
+        }
+        return cloud.save(snapshot, saveOptions?.flush ?? false);
+      },
+    },
     // Ниже — то, чего адаптер не умеет. Честное `unavailable` вместо заглушки, которая
     // делает вид, что получилось: capability-флаги выше стоят `false`, поэтому UI этих
     // путей и не предлагает.
-    save: {
-      load: async () => null,
-      save: async () => undefined,
-    },
     ads: {
       showRewardedAd,
       showInterstitial: async () => ({ status: 'unavailable' }),

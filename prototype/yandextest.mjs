@@ -21,7 +21,9 @@
  * 6. игра не просит ничего, кроме файлов архива и SDK, — ни нашего сервера, ни чужого;
  * 7. пауза забега (`YAG-6.2`): кнопка и уход со страницы замораживают мир, на возврате он
  *    ждёт кнопки, а площадка слышит «геймплей встал / пошёл» — в том числе в меню;
- * 8. язык (`YAG-1.1d`): игрок скачивает файл только своего языка, и разметка подписана
+ * 8. облако вошедшего игрока (`YAG-2.2`): пустое получает профиль, а облачный прогресс на
+ *    пустом устройстве берётся молча;
+ * 9. язык (`YAG-1.1d`): игрок скачивает файл только своего языка, и разметка подписана
  *    текстом, а не ключами, — и для русского, и для англоязычного игрока.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
@@ -55,9 +57,20 @@ if (!existsSync(join(ROOT, 'index.html'))) {
 }
 
 /** Поддельный SDK: ровно то, что зовёт адаптер, и журнал вызовов для проверок. */
-const FAKE_SDK = `window.__ya = { log: [] };
+const FAKE_SDK = `window.__ya = { log: [], writes: [] };
+// Облако вошедшего игрока (YAG-2.2): стартовое содержимое задаёт тест (\`__cloudInit\`).
+const cloud = Object.assign({}, window.__cloudInit || {});
 window.YaGames = {
   init: () => Promise.resolve({
+    getPlayer: async () => ({
+      getUniqueID: () => 'u-1',
+      isAuthorized: () => true,
+      setData: async (data, flush) => {
+        window.__ya.writes.push({ data, flush });
+        Object.assign(cloud, data);
+      },
+      getData: async () => cloud,
+    }),
     environment: { i18n: { lang: window.__yaLang || 'ru' } },
     features: {
       LoadingAPI: { ready: () => window.__ya.log.push('ready') },
@@ -149,6 +162,8 @@ try {
       builtText('ru', 'sector-zero.new'),
       'кнопка подписана по-русски',
     );
+    // YAG-2.2: облако пустое — профиль вошедшего игрока уходит туда сразу.
+    await page.waitForFunction(() => window.__ya.writes.length > 0);
 
     // 2. Новый забег.
     await page.waitForFunction(() => !document.getElementById('sz-new').disabled);
@@ -219,8 +234,37 @@ try {
       await onSectorZeroMenu(tail);
     }
   });
+  // 8. Облако (YAG-2.2): здесь пусто, в облаке прогресс — он берётся молча и сразу.
+  const other = await browser.newContext({ locale: 'ru-RU' });
+  const otherPage = await other.newPage();
+  otherPage.on('pageerror', (error) => errors.push(`pageerror (cloud): ${error.message}`));
+  const cloudProfile = {
+    v: 1,
+    seed: 'account',
+    research: 50,
+    warrants: 30,
+    sovereigns: 7,
+    nextAttempt: 4,
+    settledThrough: 3,
+  };
+  await otherPage.addInitScript((progress) => {
+    window.__cloudInit = {
+      meta: JSON.stringify({ v: 1, seed: 'account', rev: 12, progress: JSON.stringify(progress) }),
+    };
+  }, cloudProfile);
+  await otherPage.goto(origin + '/');
+  await waitForApp(otherPage);
+  await otherPage.waitForFunction(
+    () => JSON.parse(localStorage.getItem('sector-zero.progress.v1') ?? '{}').seed === 'account',
+  );
+  const adopted = await otherPage.evaluate(() =>
+    JSON.parse(localStorage.getItem('sector-zero.progress.v1')),
+  );
+  assert.equal(adopted.sovereigns, 7, 'облачный прогресс взят');
+  assert.equal(adopted.nextAttempt, 4, 'и счёт попыток с ним');
+  await other.close();
 
-  // 7. Площадка говорит `en`, а браузер — по-русски: язык берётся у площадки (требование
+  // 9. Площадка говорит `en`, а браузер — по-русски: язык берётся у площадки (требование
   // 2.14), и скачан только английский файл. Браузер нарочно другой: совпади они, проверка
   // прошла бы и с игрой, которая площадку не слушает.
   const english = await browser.newContext({ locale: 'ru-RU' });
@@ -241,11 +285,12 @@ try {
     'кнопка подписана по-английски',
   );
   await english.close();
+
   // 6. Ни ошибок, ни запросов мимо архива.
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, один язык — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, один язык — без ошибок\n',
   );
 } finally {
   await browser.close();
