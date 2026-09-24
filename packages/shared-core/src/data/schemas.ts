@@ -1255,6 +1255,17 @@ export const ModePveSchema = z
   })
   .strict();
 
+/** Радиусы зрения режима (`SightRules`, `state/gameState.ts`): «единый радиус; для
+ *  Sector Zero — свой по цифрам» (решение владельца 2026-09-24). Нет раздела ⇒ общие
+ *  числа ядра `DEFAULT_SIGHT`. */
+const ModeSightSchema = z
+  .object({
+    world: z.number().nonnegative(),
+    fleet: z.number().nonnegative(),
+    radarScale: z.number().positive(),
+  })
+  .strict();
+
 /**
  * A game mode — the named preset of rules a match runs under (docs/game-modes-roadmap.md
  * GM-0.1). A mode is DATA: "3v3 against the Swarm" is a JSON entry plus an optional
@@ -1274,6 +1285,8 @@ export const GameModeDefSchema = z.object({
   modules: z.array(z.string()).default([]),
   /** Present ⇒ PvE mode (a common NPC enemy attacking in waves). */
   pve: ModePveSchema.optional(),
+  /** Свои радиусы зрения режима; нет ⇒ общие числа ядра. */
+  sight: ModeSightSchema.optional(),
 });
 
 /** Session-market rules that belong to CONTENT, not to the mechanic (CONV-9).

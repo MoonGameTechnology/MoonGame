@@ -46,13 +46,29 @@ function refreshMemory(h: HandlerContext): void {
   }
 }
 
+/** Радиусы зрения режима — один раз, на первом шаге часов, как `pve` заводит свою волну:
+ *  дальше матч живёт со своими числами, и правка баланса не переписывает идущий матч. У
+ *  режима без раздела `sight` поле не появляется — действуют общие числа ядра. Матч,
+ *  сохранённый до этого поля, получает числа своего режима на первом же шаге после загрузки. */
+function pinSight(h: HandlerContext): void {
+  if (h.state.sight !== undefined) return;
+  const modeId = h.ctx.config?.modeId;
+  const sight = modeId === undefined ? undefined : h.ctx.data.modes[modeId]?.sight;
+  if (sight) h.state.sight = { ...sight };
+}
+
 export const visibilityModule: GameModule = {
   id: 'visibility',
-  version: '1.0.0',
+  // 2.0.0 — зрение кругами вместо соседства по линиям (решение владельца 2026-09-24):
+  // память тумана старых реплеев пишется иначе.
+  version: '2.0.0',
   setup(api) {
     // Continuous time advances refresh memory; captures and arrivals refresh it
     // immediately so a just-scouted world is remembered at once.
-    api.on('time.advanced', (_event, h) => refreshMemory(h));
+    api.on('time.advanced', (_event, h) => {
+      pinSight(h);
+      refreshMemory(h);
+    });
     api.on('planet.captured', (_event, h) => refreshMemory(h));
     api.on('fleet.arrived', (_event, h) => refreshMemory(h));
   },

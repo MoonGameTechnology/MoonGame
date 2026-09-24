@@ -25,15 +25,16 @@ function planet(id: string, owner: string | null, links: string[], extra: Partia
   return { id, owner, position: { x: 0, y: 0 }, links, resources: {}, buildings: [], garrison: [], traits: [], ...extra };
 }
 
-/** A(p1) — B(p2, garrisoned) — C(p2, unlinked-from-A, never seen). */
+/** A(p1) · B(p2, garrisoned, 100 away — inside A's sight circle) · C(p2, far, never
+ *  seen). Зрение — круги (решение владельца 2026-09-24): линии на него не влияют. */
 function baseState(): GameState {
   return {
     ...createInitialState({ seed: 'fog', version: { data: '0.1.0', manifest: '1' } }),
     players: { p1: player('p1'), p2: player('p2') },
     planets: {
       A: planet('A', 'p1', ['B']),
-      B: planet('B', 'p2', ['A'], { garrison: [{ unit: 'cruiser', count: 3 }], planetType: 'terran' }),
-      C: planet('C', 'p2', [], { garrison: [{ unit: 'cruiser', count: 9 }] }),
+      B: planet('B', 'p2', ['A'], { garrison: [{ unit: 'cruiser', count: 3 }], planetType: 'terran', position: { x: 100, y: 0 } }),
+      C: planet('C', 'p2', [], { garrison: [{ unit: 'cruiser', count: 9 }], position: { x: 1000, y: 0 } }),
     },
   };
 }
@@ -45,10 +46,10 @@ describe('visibilityModule (fog-of-war memory, variant B)', () => {
     if (!r.ok) throw new Error(r.code);
 
     const memP1 = r.state.fog?.p1 ?? {};
-    expect(Object.keys(memP1).sort()).toEqual(['A', 'B']); // A owned, B is 1 jump away
+    expect(Object.keys(memP1).sort()).toEqual(['A', 'B']); // A owned, B inside its sight circle
     expect(memP1.B?.owner).toBe('p2');
     expect(memP1.B?.garrison).toEqual([{ unit: 'cruiser', count: 3 }]);
-    expect(memP1.C).toBeUndefined(); // never identified (unlinked)
+    expect(memP1.C).toBeUndefined(); // never identified (far outside every circle)
   });
 
   it('feeds visibleState a greyed last-known world once sight lifts', () => {
@@ -70,6 +71,39 @@ describe('visibilityModule (fog-of-war memory, variant B)', () => {
     const view = visibleState(baseState(), 'p1', data); // no fog populated
     expect(view.remembered).toEqual([]);
     expect(view.planets.C?.owner).toBeNull(); // unseen, no memory → stripped
+  });
+});
+
+describe('радиусы зрения режима (решение владельца 2026-09-24)', () => {
+  const sight = { world: 330, fleet: 90, radarScale: 2.5 };
+  const mdata: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: { cruiser: { faction: 'x', stats: { attack: 4, defense: 4, speed: 6, hp: 20 } } },
+    factions: {},
+    buildings: {},
+    events: {},
+    modes: { run: { name: 'Run', sight }, plain: { name: 'Plain' } },
+  });
+  const at = (modeId: string, now: number): Context => ({ now, data: mdata, config: { timeScale: 1, modeId } });
+
+  it('режим со своими числами закрепляет их в матче на первом шаге часов', () => {
+    const kernel = createKernel([visibilityModule]);
+    const r = kernel.advanceTo(baseState(), at('run', HOUR));
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.sight).toEqual(sight);
+    // Закреплённые числа не переписываются: идущий матч живёт со своими.
+    const pinned = { ...r.state, sight: { world: 1, fleet: 1, radarScale: 1 } };
+    const again = kernel.advanceTo(pinned, at('run', 2 * HOUR));
+    if (!again.ok) throw new Error(again.code);
+    expect(again.state.sight).toEqual({ world: 1, fleet: 1, radarScale: 1 });
+  });
+
+  it('режим без раздела — поля нет, действуют общие числа ядра', () => {
+    const kernel = createKernel([visibilityModule]);
+    const r = kernel.advanceTo(baseState(), at('plain', HOUR));
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.sight).toBeUndefined();
   });
 });
 
