@@ -49,8 +49,13 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.29'); // picket_frigate: radar module moves to a dedicated support hull (owner, 2026-09-23)
+    expect(data.version).toBe('0.1.30'); // PERK-3.1: новый фрагмент `veteran.json` — боевая надбавка за пережитые бои
     expect(data.resources).toContain('microelectronics');
+    // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
+    // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
+    // может отвалиться МОЛЧА: пропавший или обнулённый фрагмент выключает механику
+    // целиком, и заметить это было бы некому (шапка `data/bundle.ts`, AUD-1).
+    expect(data.veteran.damagePerBattle).toBeGreaterThan(0);
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
     // огня с дистанции в игре не существует — радиус не читает никто.

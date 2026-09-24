@@ -522,6 +522,7 @@ export { seatClaimModule } from './modules/seatClaim';
 export { technologyModule, technologyLock, conditionMet } from './modules/technology';
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
+export { veteranModule } from './modules/veteran';
 export { armyModule } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { autoRallyModule } from './modules/autoRally';
