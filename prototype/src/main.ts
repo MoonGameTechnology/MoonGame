@@ -258,8 +258,9 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
-import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
-import { chapterMapView } from '../../decisions/chapterMap';
+import { shownObjectives } from '../../decisions/missionObjectives';
+import { missionBriefs, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
+import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
 import {
   adoptMark,
@@ -1562,6 +1563,7 @@ devlineEl.addEventListener('click', (event) => {
   }
   if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
   if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
+  if ((event.target as Element).closest('[data-missions]')) { toggleMissionPanel(); return; }
   if (!(event.target as Element).closest('[data-swarm-intel]')) return;
   swarmDossierWin.classList.add('show');
   renderSwarmDossier();
@@ -6004,6 +6006,7 @@ function render(now: number) {
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
+  drawMissionTargets();
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
@@ -13566,6 +13569,122 @@ function chapterShown(mission: number) {
   return shownObjectives(chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? [], chapter.slots);
 }
 
+/** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
+function runMissionRows(): MissionRow[] {
+  const chapter = pveChapter(sectorMission);
+  return missionRows(chapterShown(sectorMission), s, ME, chapter.slots?.base);
+}
+/** Награда задачи обеими валютами — теми же знаками, что в кошельке шапки. */
+const missionRewardHtml = (r: MissionReward): string =>
+  `<span class="mp-reward"><i class="tw-data">◇ +${r.research}</i><i class="tw-warrants">⌖ +${r.warrants}</i></span>`;
+
+// --- панель задач забега (заказ владельца 2026-09-24) ---------------------------------
+// Что сделать, сколько сделано, сколько придёт на итогах; задача с целью на карте — кнопка:
+// нажатие ведёт камеру к цели, повторное — к следующей.
+let missionPanelOpen = false;
+let lastMissionPanelHtml = '';
+const missionFocus = new Map<string, number>();
+const missionPanel = $('missionpanel');
+function toggleMissionPanel(open = !missionPanelOpen): void {
+  missionPanelOpen = open;
+  missionPanel.hidden = !open;
+  lastClockText = '';
+  lastMissionPanelHtml = '';
+  // На широком экране панель встаёт прямо под чипом: справа её место занято досье Роя.
+  // Узкий экран — во всю ширину (CSS), позицию не трогаем.
+  const chip = document.querySelector('#devline .dl-missions');
+  if (open && chip && window.innerWidth > 700) {
+    const r = chip.getBoundingClientRect();
+    const width = Math.min(360, window.innerWidth - 24);
+    missionPanel.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - width - 12))}px`;
+    missionPanel.style.right = 'auto';
+    missionPanel.style.top = `${r.bottom + 8}px`;
+  }
+}
+function renderMissionPanel(rows: MissionRow[]): void {
+  if (!missionPanelOpen) return;
+  if (rows.length === 0) {
+    toggleMissionPanel(false);
+    return;
+  }
+  const html =
+    `<div class="mp-head"><b>${t('hud.missions.title')}</b><button type="button" class="mp-close" data-missions-close="1" aria-label="${t('hud.close')}">✕</button></div>` +
+    `<p class="mp-hint">${t('hud.missions.hint')}</p>` +
+    rows
+      .map(r => {
+        const body =
+          `<i class="mp-mark" aria-hidden="true">${r.complete ? '✓' : '⚑'}</i>` +
+          `<span class="mp-name">${esc(t(r.id, { n: r.total }))}</span>` +
+          `<b class="mp-prog">${r.done}/${r.total}</b>` +
+          missionRewardHtml(r.reward) +
+          (r.targets.length ? `<span class="mp-go">${t('hud.missions.show')}</span>` : '');
+        return r.targets.length
+          ? `<button type="button" class="mp-row" data-mission-go="${esc(r.id)}">${body}</button>`
+          : `<div class="mp-row${r.complete ? ' done' : ''}">${body}</div>`;
+      })
+      .join('');
+  if (html === lastMissionPanelHtml) return;
+  lastMissionPanelHtml = html;
+  missionPanel.innerHTML = html;
+}
+missionPanel.addEventListener('click', event => {
+  const el = event.target as Element;
+  if (el.closest('[data-missions-close]')) {
+    toggleMissionPanel(false);
+    return;
+  }
+  const go = el.closest<HTMLElement>('[data-mission-go]')?.dataset.missionGo;
+  if (!go) return;
+  const row = runMissionRows().find(r => r.id === go);
+  if (!row || row.targets.length === 0) return;
+  const i = (missionFocus.get(go) ?? -1) + 1;
+  missionFocus.set(go, i);
+  // Панель закрывается: иначе она сама закрыла бы цель, к которой ведёт камера.
+  toggleMissionPanel(false);
+  jumpTo(row.targets[i % row.targets.length]!, 'goto');
+});
+
+/** Метки целей задач на карте: дышащее мятное кольцо и флажок над миром. Выполненная
+ *  задача меток не держит (`missionView.ts`, правило 3). */
+function drawMissionTargets(): void {
+  if (!sectorRunActive) return;
+  const ids = new Set(runMissionRows().flatMap(r => r.targets));
+  if (ids.size === 0) return;
+  // `hologramTime` — визуальные часы карты: стоят на паузе и при отключённой анимации.
+  const breath = 0.5 + 0.5 * Math.sin(hologramTime / 520);
+  cx.save();
+  for (const id of ids) {
+    const p = s.planets[id];
+    if (!p) continue;
+    const c = world(p.position);
+    if (!visible(c, 40)) continue;
+    cx.strokeStyle = `rgba(143,245,200,${0.55 + 0.35 * breath})`;
+    cx.lineWidth = 1.8;
+    cx.setLineDash([6, 5]);
+    cx.shadowColor = '#8ff5c8';
+    cx.shadowBlur = fxBlur(6 + 6 * breath);
+    cx.beginPath();
+    cx.arc(c.x, c.y, 24, 0, TAU);
+    cx.stroke();
+    cx.setLineDash([]);
+    // флажок над миром: древко и полотнище
+    const x = c.x + 17;
+    const y = c.y - 34;
+    cx.strokeStyle = 'rgba(4,10,12,.9)';
+    cx.fillStyle = '#8ff5c8';
+    cx.lineWidth = 1.4;
+    cx.beginPath();
+    cx.moveTo(x, y + 20);
+    cx.lineTo(x, y);
+    cx.lineTo(x + 15, y + 5);
+    cx.lineTo(x, y + 10);
+    cx.closePath();
+    cx.fill();
+    cx.stroke();
+  }
+  cx.restore();
+}
+
 function saveSectorProgress(next: SectorZeroProgress): void {
   // Победа в главе приводит её героя (решение владельца 2026-09-23) — на любом пути засчёта.
   const granted = grantChapterHeroes(next, sectorChapterIds(), data);
@@ -13861,15 +13980,27 @@ const sectorZeroMenu = initSectorZeroMenu({
     pool: pveChapter(index).objectives.length,
     cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
     ...heroReward(index),
+    briefs: missionBriefs(chapterShown(index), pveChapter(index).slots?.base),
   }),
   // Карта главы: мир на старте главы + память тумана прошлых забегов из профиля.
   chapterMap: index => {
     const chapter = pveChapter(index);
+    const start = pveState(data, index);
+    const scouted = sectorProgress.chapterScouted[chapter.id] ?? [];
+    // Цели задач: активные — видимые в следующем забеге, «позже» — остаток запаса главы;
+    // выполненные закрыты навсегда и на карту не зовут (`chapterTargets`).
+    const done = new Set(sectorProgress.objectivesDone[chapter.id] ?? []);
+    const known = new Set([...scouted, ...Object.values(start.planets).filter(p => p.owner === 'p1').map(p => p.id)]);
     return chapterMapView(
-      pveState(data, index),
-      sectorProgress.chapterScouted[chapter.id] ?? [],
+      start,
+      scouted,
       'p1',
-      chapter.objectives.flatMap(o => (o.kind === 'control' ? o.targets : [])),
+      chapterTargets(
+        start,
+        chapter.objectives.filter(o => !done.has(o.id)),
+        new Set(chapterShown(index).map(o => o.id)),
+        known,
+      ),
     );
   },
   setMission: value => {
@@ -14230,24 +14361,23 @@ function frame(nowReal: number) {
   // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
   // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
   // Видимы только задачи ЭТОГО забега — запас главы минус закрытое навсегда (PVR-5.3).
-  const missions = sectorRunActive ? missionProgress(chapterShown(sectorMission), s, ME) : [];
+  // Чип — кнопка панели задач (заказ владельца 2026-09-24): список прятался в подсказке
+  // при наведении, и на телефоне его не было видно вовсе.
+  const missions = sectorRunActive ? runMissionRows() : [];
   const missionsDone = missions.filter(m => m.complete).length;
   const missionHtml =
     missions.length === 0
       ? ''
-      : `<span class="dl-wave" title="${esc(
-          missions
-            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${objectiveNominal(m.reward, missions.length)})`)
-            .join('\n'),
-        )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
+      : `<button type="button" class="dl-missions" data-missions="1" aria-expanded="${missionPanelOpen}" title="${t('hud.missions.title')}"><i aria-hidden="true">⚑</i><span>${t('hud.missions.label')}</span><b>${missionsDone}/${missions.length}</b></button>`;
+  renderMissionPanel(missions);
   const clockHtml = `<span id="clock">${clockHM(s.time)}</span>`;
   if (clockHtml !== lastClockHead) {
     devlineHead.innerHTML = clockHtml;
     lastClockHead = clockHtml;
   }
   const statusHtml =
-    waveHtml +
     missionHtml +
+    waveHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +

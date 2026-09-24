@@ -280,6 +280,35 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
    Красный (--red) в этой палитре занят опасностью и с золотом не путается.
    Без пульсации: строка висит весь матч, мигающая угроза на полчаса утомляет и перестаёт
    читаться как сигнал вообще. */
+/* Задачи забега — мятный чип-кнопка панели (заказ владельца 2026-09-24). Мята, а не
+   красный волны и не золото Суверенов: задача — то, что игрок делает сам, и цвет её
+   меток на карте тот же. Стоит ПЕРЕД волной, чтобы на узком экране не уехать за край. */
+#devline .dl-missions{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:2px 10px;
+  border-radius:11px;cursor:pointer;color:#8ff5c8;font:700 12px/1.4 inherit;letter-spacing:.3px;white-space:nowrap;
+  font-variant-numeric:tabular-nums;background:rgba(143,245,200,.1);border:1px solid rgba(143,245,200,.5);}
+#devline .dl-missions[aria-expanded="true"]{background:rgba(143,245,200,.22);border-color:#8ff5c8;}
+#devline .dl-missions i{font-style:normal;}
+#missionpanel{position:fixed;top:calc(var(--tbh) + 34px);right:18px;z-index:44;width:min(360px,calc(100vw - 24px));
+  max-height:min(60vh,420px);overflow:auto;padding:10px 12px;border-radius:12px;color:var(--ink);
+  background:rgba(4,16,18,.94);border:1px solid rgba(143,245,200,.55);box-shadow:0 8px 28px rgba(0,0,0,.55),0 0 16px rgba(143,245,200,.12);}
+#missionpanel[hidden]{display:none;}
+#missionpanel .mp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#8ff5c8;
+  font-size:13px;letter-spacing:.6px;text-transform:uppercase;}
+#missionpanel .mp-close{min-width:32px;min-height:32px;border:0;background:none;color:var(--ink);font-size:16px;cursor:pointer;}
+#missionpanel .mp-hint{margin:2px 0 8px;color:var(--dim);font-size:11px;}
+#missionpanel .mp-row{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:2px 8px;width:100%;
+  margin:0 0 6px;padding:8px 10px;border-radius:9px;text-align:left;font:inherit;font-size:12px;color:var(--ink);
+  background:rgba(143,245,200,.05);border:1px solid rgba(143,245,200,.22);}
+#missionpanel button.mp-row{cursor:pointer;}
+#missionpanel button.mp-row:hover{background:rgba(143,245,200,.12);border-color:rgba(143,245,200,.5);}
+#missionpanel .mp-row.done{opacity:.7;}
+#missionpanel .mp-mark{grid-row:1/3;font-style:normal;color:#8ff5c8;}
+#missionpanel .mp-prog{color:#8ff5c8;font-variant-numeric:tabular-nums;}
+#missionpanel .mp-reward{grid-column:2;display:flex;gap:10px;font-size:11px;font-variant-numeric:tabular-nums;}
+#missionpanel .mp-reward i{font-style:normal;}
+#missionpanel .mp-reward .tw-data{color:var(--cur-data);}
+#missionpanel .mp-reward .tw-warrants{color:var(--cur-warrants);}
+#missionpanel .mp-go{grid-column:3;font-size:11px;color:#8ff5c8;text-decoration:underline;text-underline-offset:2px;}
 #devline .dl-wave{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
   color:#ffb3aa;font-weight:700;font-size:12px;line-height:1;letter-spacing:.3px;
   font-variant-numeric:tabular-nums;white-space:nowrap;
@@ -1677,10 +1706,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
 #scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
 /* Досье Роя открывается СПРАВА (заказ владельца 2026-09-23): на телефоне — выдвижная
-   панель во всю высоту у правого края, на ПК — приколото в правом столбце (ниже). */
+   панель во всю высоту у правого края, на ПК — приколото в правом столбце (ниже).
+   Без затемнения (жалоба владельца 2026-09-24: «экран чернеет, будто поверх открывается
+   всё»): досье — справка к карте, а не модальное окно. Подложка прозрачна и пропускает
+   нажатия, карта слева видна и живёт; нажатия ловит только сама панель. */
 #swarm-dossier{position:fixed;inset:0;z-index:60;display:none;align-items:stretch;justify-content:flex-end;padding:0;
-  background:rgba(1,5,9,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+  background:transparent;pointer-events:none;}
 #swarm-dossier.show{display:flex;}
+#swarm-dossier .twbox{pointer-events:auto;}
+/* без затемнения под панелью карта просвечивала бы сквозь стекло — панель плотнее */
+#swarm-dossier:not(.pinned) .twbox{background:rgba(4,14,18,.97);}
 #swarm-dossier .twbox{display:flex;flex-direction:column;width:min(420px,88vw);height:100%;overflow:hidden;
   padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box;
   background:var(--glass);border:1px solid var(--cyan);border-right:0;border-radius:14px 0 0 14px;
@@ -2019,6 +2054,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .res b{font-size:12px;}
   #devline .dl-donate{font-size:12px;height:24px;gap:5px;padding:0 2px 0 5px;}
   #devline .dl-wave{font-size:11px;padding:2px 8px;margin-left:8px;}
+  #devline .dl-missions{font-size:11px;padding:2px 8px;margin-left:8px;}
+  #devline .dl-missions span{display:none;}
+  #missionpanel{right:12px;left:12px;width:auto;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
      identify the window, so the «ДИПЛОМАТИЯ» caption yields its room to them */
@@ -3206,6 +3244,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </header>
 <nav class="holo-nav" data-i18n-aria="hud.map"><span aria-current="page" data-i18n="hud.map"></span><button id="holo-tech" type="button" data-i18n="win.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
 <div id="devline"><span id="devline-head"></span><span id="devline-status"></span></div>
+<!-- панель задач забега: открывается чипом «Задачи» на строке статуса (missionView.ts) -->
+<div id="missionpanel" role="dialog" data-i18n-aria="hud.missions.title" hidden></div>
 <!-- slim left rail: only the wired tools (each opens its window). More icons land here as
      features get wired. -->
 <div id="solo-replace" role="dialog" aria-modal="true" aria-labelledby="solo-replace-title">
@@ -3479,7 +3519,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <legend data-i18n="sector-zero.mission"></legend>
             <div id="sz-route" class="sz-route"></div>
             <div class="sz-route-ends" aria-hidden="true"><span data-i18n="sector-zero.route.edge"></span><span data-i18n="sector-zero.route.core"></span></div>
-            <div class="sz-chapter" role="status" aria-live="polite"><b id="sz-chapter-name"></b><p id="sz-chapter-brief"></p><p id="sz-chapter-stats"></p><p id="sz-chapter-hero" class="sz-chapter-hero" hidden></p></div>
+            <div class="sz-chapter" role="status" aria-live="polite"><b id="sz-chapter-name"></b><p id="sz-chapter-brief"></p><p id="sz-chapter-stats"></p><ul id="sz-chapter-tasks" class="sz-chapter-tasks" hidden></ul><p id="sz-chapter-hero" class="sz-chapter-hero" hidden></p></div>
           </fieldset>
           <fieldset class="sz-difficulty">
             <legend data-i18n="sector-zero.difficulty"></legend>

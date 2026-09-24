@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { pveChapter, pveState, PVE_MISSION_COUNT } from '../packages/client/src/gameData';
-import { chapterMapView } from './chapterMap';
+import { chapterMapView, chapterTargets } from './chapterMap';
 
 const data = shippedGameData();
 
@@ -25,7 +25,7 @@ describe('карта главы в меню — что игрок уже зна�
     expect(view.known).toBe(home.length);
     for (const c of view.cells) {
       if (home.includes(c.id)) expect(c).toMatchObject({ known: true, side: 'you' });
-      else expect(c).toMatchObject({ known: false, kind: null, side: null, objective: false });
+      else expect(c).toMatchObject({ known: false, kind: null, side: null, objective: null });
     }
     // Проходов из тумана не видно: с одной известной провинцией линий нет.
     expect(view.lanes).toEqual([]);
@@ -37,13 +37,13 @@ describe('карта главы в меню — что игрок уже зна�
     const targets = pveChapter(1).objectives.flatMap((o) =>
       o.kind === 'control' ? o.targets : [],
     );
-    const view = chapterMapView(s, all, 'p1', targets);
+    const view = chapterMapView(s, all, 'p1', { active: targets, later: [] });
     expect(view.known).toBe(all.length);
     expect(view.lanes.length).toBeGreaterThan(0);
     expect(view.cells.some((c) => c.side === 'hostile')).toBe(true);
     expect(
       view.cells
-        .filter((c) => c.objective)
+        .filter((c) => c.objective === 'active')
         .map((c) => c.id)
         .sort(),
     ).toEqual([...targets].sort());
@@ -53,5 +53,45 @@ describe('карта главы в меню — что игрок уже зна�
   it('мусор в памяти разведки не ломает панель', () => {
     const view = chapterMapView(pveState(data, 0), ['no_such_sector', 'no_such_sector']);
     expect(view.known).toBe(1);
+  });
+});
+
+describe('цели задач на карте главы (заказ владельца 2026-09-24)', () => {
+  const s = pveState(data, 1);
+  const pool = pveChapter(1).objectives;
+  const control = pool.find((o) => o.kind === 'control')!;
+  const raze = pool.find((o) => o.kind === 'raze')!;
+  const razeWorlds = Object.values(s.planets)
+    .filter((p) => p.buildings.some((b) => raze.targets.includes(b.type)))
+    .map((p) => p.id);
+
+  it('активная задача и «позже» различаются; одна клетка — одна метка', () => {
+    const t = chapterTargets(s, pool, new Set([control.id]), new Set(Object.keys(s.planets)));
+    expect([...t.active].sort()).toEqual([...control.targets].sort());
+    expect(t.later).toEqual(expect.arrayContaining(razeWorlds));
+    for (const id of t.active) expect(t.later).not.toContain(id);
+  });
+
+  it('захват метится и в тумане — задача сама называет место', () => {
+    const t = chapterTargets(s, [control], new Set([control.id]), new Set());
+    const view = chapterMapView(s, [], 'p1', t);
+    const cell = view.cells.find((c) => c.id === control.targets[0])!;
+    expect(cell.known).toBe(false);
+    expect(cell.objective).toBe('active');
+    expect(cell.side).toBeNull();
+  });
+
+  it('зачистка метится только по разведанному — метка не выдаёт разведку', () => {
+    expect(razeWorlds.length).toBeGreaterThan(0);
+    expect(chapterTargets(s, [raze], new Set([raze.id]), new Set()).active).toEqual([]);
+    expect(chapterTargets(s, [raze], new Set([raze.id]), new Set(razeWorlds)).active).toEqual(
+      [...razeWorlds].sort(),
+    );
+  });
+
+  it('разведка, волны и форты одной точки не имеют', () => {
+    const rest = pool.filter((o) => ['scout', 'wave', 'build'].includes(o.kind));
+    const t = chapterTargets(s, rest, new Set(rest.map((o) => o.id)), new Set(Object.keys(s.planets)));
+    expect(t).toEqual({ active: [], later: [] });
   });
 });
