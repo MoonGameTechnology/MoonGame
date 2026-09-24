@@ -1206,10 +1206,10 @@
 | YAG-1.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | Язык от площадки |
 | YAG-1.4 | 🔶 | proto | `docs/yandex-games-roadmap.md` | Гость и повышение до аккаунта площадки 2026-09-23 |
 | YAG-2.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | PortableMetaSave: компактный дескриптор забега 2026-09-23 |
-| YAG-2.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | PlatformSave в адаптере Яндекса |
+| YAG-2.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | PlatformSave в адаптере Яндекса 2026-09-24 |
 | YAG-3.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | PlatformAds в адаптере Яндекса |
 | YAG-3.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
-| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
+| YAG-4.1 | ⏳ | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
 | YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию |

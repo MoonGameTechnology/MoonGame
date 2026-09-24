@@ -258,6 +258,13 @@ import { waveReadout } from '../../decisions/waveReadout';
 import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
 import { chapterMapView } from '../../decisions/chapterMap';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
+import {
+  parseCloudProfile,
+  parseSyncMark,
+  planCloudSync,
+  profileHasProgress,
+  serializeCloudProfile,
+} from '../../decisions/cloudSync';
 import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
@@ -13496,7 +13503,111 @@ function saveSectorProgress(next: SectorZeroProgress): void {
   sectorProgress = next;
   const blob = JSON.stringify(next);
   progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
+  bumpCloudRev();
 }
+
+// --- облачный сейв профиля (YAG-2.2) ------------------------------------------
+// Облако есть только у ВОШЕДШЕГО игрока; гость живёт локально (`YAG-1.4`). Источник
+// прогресса — по-прежнему локальное хранилище, облако — его копия, которая переезжает
+// между устройствами. Что делать на старте, решает `decisions/cloudSync.ts`; здесь только
+// проводка: сверка на старте, номер правки на каждое сохранение, запись по событию.
+const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
+/** Сколько ждать облако на старте. Не ответило — в этой сессии облака нет: писать поверх
+ *  того, чего мы не видели, нельзя, а держать меню дольше незачем. */
+const CLOUD_LOAD_TIMEOUT_MS = 4000;
+let syncMark = parseSyncMark(readRaw(CLOUD_MARK_KEY));
+/** `off` — гость или облака нет; `on` — сверено, пишем; `held` — прогресс разошёлся с
+ *  облачным, и до выбора игрока облако не трогаем (экран выбора — `YAG-1.4`). */
+let cloudState: 'off' | 'on' | 'held' = 'off';
+let cloudWrite: Promise<void> = Promise.resolve();
+let lastCloudEnvelope = '';
+let lastCloudFlushed = '';
+let lastPortableRaw: string | null = null;
+
+function writeSyncMark(): void {
+  writeRaw(CLOUD_MARK_KEY, JSON.stringify(syncMark));
+}
+/** Профиль или дескриптор забега изменился — новая правка, и облако её получит. */
+function bumpCloudRev(): void {
+  syncMark = { ...syncMark, rev: syncMark.rev + 1 };
+  writeSyncMark();
+  pushCloud();
+}
+/** Отправить текущий профиль в облако. Частоту держит адаптер (квота), здесь — только
+ *  «есть ли что отправлять». `flush` — страница уходит: сразу, а не в окно квоты. */
+function pushCloud(flush = false): void {
+  cloudWrite = cloudWrite.then(async () => {
+    if (cloudState !== 'on') return;
+    await progressWrite;
+    await runWrite;
+    const run = await portableRunStore.load();
+    const envelope = serializeCloudProfile({
+      v: 1,
+      seed: sectorProgress.seed,
+      rev: syncMark.rev,
+      progress: JSON.stringify(sectorProgress),
+      ...(run ? { run } : {}),
+    });
+    if (envelope === (flush ? lastCloudFlushed : lastCloudEnvelope)) return;
+    lastCloudEnvelope = envelope;
+    if (flush) lastCloudFlushed = envelope;
+    // Отмечаем сверку сразу: не дойди запись — облако окажется ПОЗАДИ отметки, и
+    // следующий старт отправит профиль снова (`planCloudSync`, «наша запись не дошла»).
+    syncMark = { ...syncMark, syncedRev: syncMark.rev };
+    writeSyncMark();
+    void getPlatform().save.save(envelope, { flush });
+  });
+}
+/** Сверка на старте. Цепляется к записи профиля — меню ждёт её и сразу показывает
+ *  правильный прогресс. Любой сбой — «облака в этой сессии нет», а не сломанное меню. */
+async function syncCloud(): Promise<void> {
+  const host = getPlatform();
+  if (!host.capabilities.cloudSave) return;
+  if (!(await host.auth.player()).authenticated) return;
+  const raw = await Promise.race([
+    host.save.load(),
+    new Promise<undefined>((resolve) => setTimeout(resolve, CLOUD_LOAD_TIMEOUT_MS)),
+  ]);
+  if (raw === undefined) return;
+  const cloud = parseCloudProfile(raw);
+  const cloudProgress = cloud ? parseSectorZeroProgress(cloud.progress, data, cloud.seed) : null;
+  const plan = planCloudSync(
+    {
+      seed: sectorProgress.seed,
+      rev: syncMark.rev,
+      syncedRev: syncMark.syncedRev,
+      hasProgress: profileHasProgress(sectorProgress),
+    },
+    cloud,
+    cloudProgress ? profileHasProgress(cloudProgress) : false,
+  );
+  if (plan === 'choose') {
+    cloudState = 'held';
+    return;
+  }
+  if (plan === 'adopt' && cloud && cloudProgress) {
+    await runWrite;
+    sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data).progress;
+    await sectorProgressStore.save(JSON.stringify(sectorProgress));
+    // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному
+    // дескриптору (или его нет вовсе).
+    await runSaveStore.clear();
+    if (cloud.run) await portableRunStore.save(cloud.run);
+    else await portableRunStore.clear();
+    savedRun = null;
+    savedPortable = null;
+    syncMark = { rev: cloud.rev, syncedRev: cloud.rev };
+    writeSyncMark();
+    cloudState = 'on';
+    note(t('sector-zero.cloud.adopted'));
+    return;
+  }
+  cloudState = 'on';
+  if (plan === 'upload') pushCloud();
+}
+progressWrite = progressWrite.then(syncCloud).catch((error: unknown) => {
+  console.error('E_CLOUD_SYNC', error);
+});
 
 // Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
 // (`bootstrap.ts`): здесь площадка уже готова, и игра про её имя ничего не знает. В
@@ -13693,6 +13804,11 @@ function saveRun(): void {
     }),
   );
   runWrite = runWrite.then(() => runSaveStore.save(blob)).then(() => portableRunStore.save(portable));
+  // Дескриптор — часть облачного профиля: сменился (волна, усиление) — новая правка.
+  if (portable !== lastPortableRaw) {
+    lastPortableRaw = portable;
+    bumpCloudRev();
+  }
 }
 
 function awardSectorRun(): number {
@@ -15156,6 +15272,12 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') runPauseEvent('hidden');
 });
 host.onPlatformPause?.((paused) => runPauseEvent(paused ? 'platform-pause' : 'platform-resume'));
+// YAG-2.2: уходя, страница отправляет облачную копию СРАЗУ — таймер окна квоты после
+// выгрузки не сработает. Порядок важен: сначала снимок забега (он же двигает правку).
+addEventListener('pagehide', () => pushCloud(true));
+addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') pushCloud(true);
+});
 // Only the explicit standalone page opens Sector Zero at boot. The shared entry
 // must keep its login screen even when a run exists (or its stored data is invalid).
 // The hub button loads that save on demand, without losing or resuming it here.
