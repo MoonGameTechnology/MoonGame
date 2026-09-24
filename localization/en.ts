@@ -49,6 +49,7 @@ export const en: Record<string, string> = {
 
   'hud.missions': 'Missions: {n}/{m}',
   'mission.claim-colony': 'Second colony: take the neighbouring world',
+  'mission.destroy-hive': 'Destroy the hive: take it by assault',
   'mission.fortify': 'Fortify: build forts ({n})',
   'mission.hold-out': 'Hold out: survive to wave {n}',
   'mission.raze-biomass': 'Raze production: destroy the Swarm biomass pits',
@@ -425,6 +426,7 @@ export const en: Record<string, string> = {
   'swarm.intel.close': 'Close',
   'hud.wave': 'Wave {n}/{m}',
   'hud.wave.done': 'no more waves',
+  'hud.wave.hold': 'hold out {in} more',
   'hud.wave.next': 'next in {in}',
   'pve.pirates.title': 'First battle · Pirates',
   'pve.pirates.approach': 'A nearby pirate base holds two frigates. Select your starting fleet, choose Course and target the base. Your fleet is strong enough for this first fight. This objective is optional: Swarm waves keep coming.',

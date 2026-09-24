@@ -51,6 +51,12 @@ const data: GameData = parseGameData({
         boons: ['boon_a', 'boon_b'],
       },
     },
+    // Тот же штурм, но забег засчитывается УДЕРЖАНИЕМ после последней волны (PVR-2.5).
+    held: {
+      name: 'Held',
+      modules: ['pve'],
+      pve: { waves: 2, npcFaction: 'swarm', waveIntervalHours: 6, holdHours: 5 },
+    },
     plain: { name: 'Plain' },
   },
 });
@@ -366,3 +372,72 @@ describe('pveModule — усиление между волнами (PVR-1.4)', (
     expect(r).toMatchObject({ ok: false, code: 'E_NOT_PVE' });
   });
 });
+
+describe('pveModule — удержание после последней волны (PVR-2.5)', () => {
+  // Решение владельца 2026-09-23: «победа — выстоять». Модуль ставит СРОК, а вердикт
+  // выносит `victoryModule`; здесь — только срок и отметка на таймлайне.
+  const HOUR = MS_PER_HOUR;
+  const seededHeld = (from: GameState = world()): GameState => ok(advance(HOUR, 'held', from));
+  const holds = (s: GameState): Array<[string, number]> =>
+    s.scheduled.filter((e) => e.type === 'pve.hold').map((e) => [e.type, e.at]);
+
+  it('последняя волна ставит срок удержания и отметку ровно на этот срок', () => {
+    // Волны на 6-м и 12-м часу, удержание 5 часов: срок — 17-й час.
+    const state = ok(advance(13 * HOUR, 'held', seededHeld()));
+    expect(state.pve?.waveNumber).toBe(2);
+    expect(state.pve?.holdUntil).toBe(17 * HOUR);
+    expect(holds(state)).toEqual([['pve.hold', 17 * HOUR]]);
+  });
+
+  it('пока волны идут, срока нет', () => {
+    const state = ok(advance(7 * HOUR, 'held', seededHeld()));
+    expect(state.pve?.waveNumber).toBe(1);
+    expect(state.pve?.holdUntil).toBeUndefined();
+    expect(holds(state)).toEqual([]);
+  });
+
+  it('режим без holdHours срока не ставит — прежнее правило, «нет данных → база»', () => {
+    const state = ok(advance(20 * HOUR, 'waves', seeded()));
+    expect(state.pve?.waveNumber).toBe(2);
+    expect(state.pve?.holdUntil).toBeUndefined();
+    expect(holds(state)).toEqual([]);
+  });
+
+  it('срок ставится, даже когда последней волне негде высадиться', () => {
+    // Ранняя зачистка улья лишает волны места спавна, но счётчик доходит до конца —
+    // и забег обязан получить свой срок, а не зависнуть без него.
+    const noHive: GameState = { ...world(), planets: { home: planet('home', 'human') } };
+    const state = ok(advance(13 * HOUR, 'held', seededHeld(noHive)));
+    expect(Object.keys(state.fleets)).toEqual([]);
+    expect(state.pve?.holdUntil).toBe(17 * HOUR);
+  });
+
+  it('детерминизм: членение advance не меняет срок', () => {
+    const oneJump = ok(advance(20 * HOUR, 'held', seededHeld()));
+    let stepwise = seededHeld();
+    for (const hrs of [7, 12, 13, 16, 20]) stepwise = ok(advance(hrs * HOUR, 'held', stepwise));
+    expect(JSON.stringify(stepwise.pve)).toBe(JSON.stringify(oneJump.pve));
+    expect(JSON.stringify(stepwise.scheduled)).toBe(JSON.stringify(oneJump.scheduled));
+  });
+
+  it('мир, восстановленный ПОСЛЕ последней волны, получает срок на первой же отметке', () => {
+    // Так восстанавливает забег переносимый сейв (YAG-2.1): свежий засеянный мир, счётчик
+    // выставлен руками, срока в сейве нет. Без этой отметки забег после восстановления
+    // нельзя было бы выиграть удержанием вовсе — только зачисткой.
+    const fresh = seededHeld();
+    const restored: GameState = { ...fresh, pve: { ...fresh.pve!, waveNumber: 2 } };
+    delete restored.pve!.nextWaveAt;
+    const state = ok(advance(7 * HOUR, 'held', restored));
+    expect(state.pve?.waveNumber).toBe(2); // лишней волны не пришло
+    expect(Object.keys(state.fleets)).toEqual([]);
+    expect(state.pve?.holdUntil).toBe(11 * HOUR); // отметка на 6-м часу + 5 часов
+    expect(holds(state)).toEqual([['pve.hold', 11 * HOUR]]);
+  });
+
+  it('уже взведённый срок повторная отметка не переносит', () => {
+    const state = ok(advance(13 * HOUR, 'held', seededHeld()));
+    const again = ok(advance(30 * HOUR, 'held', state));
+    expect(again.pve?.holdUntil).toBe(17 * HOUR);
+  });
+});
+

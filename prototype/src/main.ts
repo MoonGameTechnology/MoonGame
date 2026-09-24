@@ -13894,8 +13894,14 @@ function frame(nowReal: number) {
   const waveHtml =
     wave.kind === 'none'
       ? ''
-      : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'cleared' ? wave.total : wave.wave, m: wave.total })}` +
-        ` · ${wave.kind === 'cleared' ? t('hud.wave.done') : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>`;
+      : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'waves' ? wave.wave : wave.total, m: wave.total })}` +
+        ` · ${
+          wave.kind === 'cleared'
+            ? t('hud.wave.done')
+            : wave.kind === 'hold'
+              ? t('hud.wave.hold', { in: countdownHMS(wave.holdInMs) })
+              : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })
+        }</span>`;
   // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
   // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
   // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.

@@ -40,4 +40,14 @@ describe('waveReadout — что показать игроку про волны
     const pve = { waveNumber: 4, totalWaves: 10, npcPlayerId: 'p3' };
     expect(waveReadout(pve, HOUR)).toEqual({ kind: 'cleared', total: 10 });
   });
+
+  it('волны кончились, но режим объявил удержание — отсчёт до победы (PVR-2.5)', () => {
+    const pve = { waveNumber: 10, totalWaves: 10, npcPlayerId: 'p3', holdUntil: 72 * HOUR };
+    expect(waveReadout(pve, 65 * HOUR)).toEqual({ kind: 'hold', total: 10, holdInMs: 7 * HOUR });
+  });
+
+  it('срок удержания наступил, а вердикт ещё не вынесен — ноль, а не минус', () => {
+    const pve = { waveNumber: 10, totalWaves: 10, npcPlayerId: 'p3', holdUntil: 72 * HOUR };
+    expect(waveReadout(pve, 73 * HOUR)).toEqual({ kind: 'hold', total: 10, holdInMs: 0 });
+  });
 });

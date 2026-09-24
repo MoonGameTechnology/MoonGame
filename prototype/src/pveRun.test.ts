@@ -8,6 +8,9 @@ import {
   moveFleet,
   orbitFleet,
   assaultFleet,
+  mergeFleet,
+  buildBuilding,
+  buildUnit,
 } from './game';
 import { data } from './gameData';
 import { initSoloDrivers } from './soloDrivers';
@@ -16,7 +19,9 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { sensorCoverage, playablePlayerIds } from '../../packages/shared-core/src/index';
-import { RUN_SPINE_HOURS, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
+import { RUN_SPINE_HOURS, RUN_TAIL_HOURS, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
+import { freshSectorZeroProgress, prepareSectorZeroRun } from '../../decisions/sectorZeroProgress';
+import type { RunDifficulty } from '../../decisions/runDifficulty';
 
 /**
  * PVR-1.6 — сквозной прогон ЗАБЕГА на шипнутой карте `pve-1`, через настоящие функции
@@ -238,3 +243,72 @@ describe('pirates teach the first fight on the actual PvE map', () => {
   });
 
 });
+
+/**
+ * PVR-2.5 — «победа — выстоять» (решение владельца 2026-09-23). Главный сторож кирпича:
+ * первую главу МОЖНО пройти, и проходит её не зачистка, а оборона.
+ *
+ * До кирпича её не проходила ни одна из 16 стратегий: вердикт требовал взять ВСЕ миры
+ * Роя после десятой волны, а волны бесплатные, растут ×N и рождаются в улье — к 60-му часу
+ * там стояли ~55 маток и ~100 фрегатов. Теперь забег засчитан, если игрок держит мир
+ * `holdHours` после последней волны.
+ *
+ * Игрок здесь — НОВИЧОК на настоящем старте забега (`prepareSectorZeroRun` со свежим
+ * профилем: флагман с героем, прокачки нет) и с самой простой обороной, какую можно
+ * придумать: все флоты в один у дома, казарма и непрерывный найм пехоты. Если такой
+ * игрок перестанет проходить главу — это сдвиг баланса, который обязан заметить человек.
+ */
+describe('первую главу проходит оборона (PVR-2.5)', () => {
+  afterEach(disarmRun);
+
+  function defend(difficulty: RunDifficulty): { state: GameState; endedAtHour?: number } {
+    armRun();
+    let s: GameState = prepareSectorZeroRun(pveState(data), freshSectorZeroProgress(data), data);
+    const home = 'home_a';
+    const apply = (a: Action): void => {
+      const out = order(s, a, s.time);
+      if (!out.error) s = out.state;
+    };
+    const drivers = initSoloDrivers({
+      state: () => s,
+      me: () => 'p1',
+      aiSeats: () => runAiSeats(s, 'p1', difficulty),
+      applyLocal: apply,
+      playerOrder: apply,
+      autoAssault: () => false,
+      patrols: () => new Map(),
+      known: () => true,
+    });
+    for (const f of Object.values(s.fleets)) {
+      if (f.owner === 'p1' && f.id !== 'sector-zero:flagship') apply(mergeFleet('p1', f.id, 'sector-zero:flagship'));
+    }
+    apply(buildBuilding('p1', home, 'barracks'));
+    for (let hour = 1; hour <= 200; hour++) {
+      s = advance(s, hour * HOUR).state;
+      if (s.match.status === 'ended') return { state: s, endedAtHour: hour };
+      const r = s.players.p1!.resources;
+      if ((r.metal ?? 0) >= 55 && (r.credits ?? 0) >= 15) apply(buildUnit('p1', home, 'heavy_infantry', 1));
+      else if ((r.metal ?? 0) >= 15) apply(buildUnit('p1', home, 'militia', 1));
+      drivers.runAI();
+      drivers.autoEngage();
+      drivers.checkFleetClashes();
+    }
+    return { state: s };
+  }
+
+  for (const difficulty of ['weak', 'strong'] as const) {
+    it(`против ${difficulty === 'weak' ? 'обычного' : 'сильного'} Роя: забег засчитан удержанием, улей стоит`, () => {
+      const { state, endedAtHour } = defend(difficulty);
+      expect({ reason: state.match.reason, winner: state.match.winner }).toEqual({
+        reason: 'pve-cleared',
+        winner: 'p1',
+      });
+      // Вердикт ровно в срок: хребет волн плюс удержание — ни раньше, ни позже.
+      expect(state.match.endedAt).toBe((RUN_SPINE_HOURS + RUN_TAIL_HOURS) * HOUR);
+      expect(endedAtHour).toBe(RUN_SPINE_HOURS + RUN_TAIL_HOURS);
+      // Прошла именно ОБОРОНА: улей так и остался за Роем.
+      expect(state.planets.hive?.owner).toBe('p3');
+    });
+  }
+});
+

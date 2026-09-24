@@ -204,6 +204,14 @@
       "kind": "scout",
       "count": 6,
       "reward": 2
+    },
+    {
+      "id": "mission.destroy-hive",
+      "kind": "control",
+      "targets": [
+        "hive"
+      ],
+      "reward": 5
     }
   ],
   "players": {
