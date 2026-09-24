@@ -2915,7 +2915,7 @@ _Дополнение 2026-09-23 (заказ владельца):_ выбор г
 - **Надеваемая пассивка — новая механика ядра:** `HeroPassiveDef.slotted`. Владение — из
   `Hero.passives`, ношение — `hero.equip`, как у способности, и бюджет слотов общий; действует
   она только надетой (`passiveBonus`), постоянная пассивка в слот не идёт (`E_NO_ABILITY`).
-  Модуль `hero` 4.1.0. Sector Zero: пул слотов — `sectorHeroSlotItems`, подпись —
+  Модуль `hero` 4.2.0. Sector Zero: пул слотов — `sectorHeroSlotItems`, подпись —
   `sectorSlotItem` (Академия, экипировка, чтение профиля); панель героя в забеге кладёт её в
   слоты и в запас, а в список бонусов — только надетой.
 - **Выдача:** `CHAPTER_HEROES = ['scientist', 'vanguard', 'warden']` (`decisions/heroRecruits.ts`).
