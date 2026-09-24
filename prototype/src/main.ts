@@ -196,7 +196,8 @@ import {
   blitSphere as hdBlitSphere,
   clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
-import { drawTerritory } from '../../packages/client/src/territory';
+import { classifyBorders, drawTerritory, type ClassifiedBorders } from '../../packages/client/src/territory';
+import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
@@ -4633,6 +4634,9 @@ let bgContent = ''; // viewport + ownership signature (camera-independent)
 let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
 let presentedCam: { x: number; y: number; scale: number } | null = null;
 let provincePolygons = new Map<string, ProvincePolygon>();
+/** M2.11: границы провинций с последней выпечки — рисуются КАЖДЫЙ кадр живыми, а не
+ *  запекаются. `null` — плоская карта: там граница стоит в статичном слое, как и рамка. */
+let provinceBorders: ClassifiedBorders | null = null;
 let terrainFields: TerrainField[] = [];
 let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 let paintedSelection: string | null = null;
@@ -4835,8 +4839,12 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     hideOwnedInner: holographicMapOn(),
     provinceDetail: lod.provinceDetail,
     sealed: sealedBorder,
+    // M2.11: на голографической карте граница живёт, как рамка, — её рисует кадр, а не
+    // выпечка. Запеки её и здесь — линия легла бы дважды, одна из них застывшей.
+    strokeBorders: !holographicMapOn(),
   }, territoryGeometry.project(seeds, clip, cam.scale, provinceWave()));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
+  provinceBorders = holographicMapOn() ? classifyBorders(cells, seeds, sealedBorder) : null;
   terrainFields = [];
   if (holographicMapOn() && lod.art > 0) {
     g.save();
@@ -5125,6 +5133,16 @@ function render(now: number) {
   if (holographicMapOn()) {
     cx.save();
     clipGlassSurface(cx, holographicFrame);
+    // M2.11: границы провинций — живые, как рамка карты, и на тех же часах голограммы
+    // (под reduced motion стоят — линия замирает видимой). Сразу над заливкой, чтобы
+    // порядок слоёв остался прежним, когда граница жила в выпечке.
+    if (provinceBorders) {
+      drawLivingBorders(cx, provinceBorders, {
+        ownerColor,
+        hideOwnedInner: true,
+        provinceDetail: lod.provinceDetail,
+      }, holographicFrame, hologramTime, { width: VW, height: VH });
+    }
     if (detail > 0) {
       cx.save(); cx.globalAlpha *= detail;
       for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
