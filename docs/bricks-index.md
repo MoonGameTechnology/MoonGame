@@ -632,6 +632,7 @@
 | UI-14 | ✅ | proto | `docs/backlog.md` | Осмотр чужого флота должен быть находимым. |
 | CMB-5 | ✅ | core | `docs/backlog.md` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| ATK-2 | ✅ | proto | `docs/backlog.md` | «Атака» видна: цели в красных уголках, путь красным пунктиром. |
 | SHIPART-1 | ✅ | proto cli | `docs/backlog.md` | Реалистичные портреты в постройке и описаниях, |
 | SHIPART-2 | ✅ | cli proto | `docs/backlog.md` | Десантный корабль — в десантной семье |
 | HEROART-1 | ✅ | proto cli | `docs/backlog.md` | Портреты, досье и читаемый счёт флота |
