@@ -428,13 +428,17 @@ export const technologyModule: GameModule = {
       return bonus !== 0 ? speed * (1 + bonus) : speed;
     });
 
-    api.hook<number>('combat.damage', (damage, args, h) => {
+    // PERK-1.2: боевые техи — МАССОВЫЙ класс, поэтому очки, а не множитель. Их восемь
+    // исследуемых, и лидер берёт все: перемножаясь, они давали ×1.73, а сложившись — ×1.57.
+    // Каждый следующий тех теперь обесценивает сам себя, и это ровно то, ради чего
+    // параллельная группа заведена (PERK-0.1 / PERK-1.1, `util/combat.ts`).
+    api.hook<number>('combat.damage.parallel', (points, args, h) => {
       const attacker = (args as DamageArgs).attacker;
       const bonus =
         typeof attacker === 'string'
           ? effectsSum(h.state.players[attacker], h.ctx.data, 'combatDamageBonus')
           : 0;
-      return bonus !== 0 ? damage * (1 + bonus) : damage;
+      return points + bonus;
     });
   },
 };
