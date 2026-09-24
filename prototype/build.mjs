@@ -315,9 +315,9 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .spd .spddiv{width:1px;height:18px;background:var(--line-hi);margin:0 2px;}
 .spd .spdmini{min-width:26px;font-size:10px;opacity:.9;}
 .spd .sep{width:1px;height:18px;background:var(--line-hi);margin:0 4px;flex:0 0 auto;}
-/* забег Sector Zero (matchExits.ts, правило 6): только его темп — ▶ и ▶▶, на ПК и на
-   телефоне. Множители сбили бы темп забега, пауза забега живёт в строке статуса. */
-.spd.spd-run #spd-pause,.spd.spd-run .spddiv,.spd.spd-run .spd-mult-legacy,.spd.spd-run .spd-mult-pc{display:none;}
+/* забег Sector Zero (matchExits.ts, правило 6): только пауза и его темп — ‖ ▶ ▶▶, на ПК и
+   на телефоне (в дев-забеге ещё ▶▶▶). Множители сбили бы темп забега. */
+.spd.spd-run .spddiv,.spd.spd-run .spd-mult-legacy,.spd.spd-run .spd-mult-pc{display:none;}
 .spd.spd-run #spd-fast{display:inline-block;}
 /* speed-multiplier sets: mobile keeps the legacy chips, PC swaps in 1/30/60/120. The
    wrappers are display:contents so their buttons flow in the speedbar flex row. */
@@ -1588,10 +1588,6 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 /* YAG-6.2: пауза забега. Идёт мир — неброская «‖» рядом с часами; стоит — янтарная
    «▶ Продолжить»: после ухода со страницы мир ждёт именно её, и её должно быть видно. */
 #devline-head,#devline-status{display:contents;}
-#devline .dl-pause[hidden]{display:none;}
-#devline .dl-pause{flex:0 0 auto;min-width:32px;min-height:24px;margin-left:8px;border:1px solid var(--cyan-dim);
-  border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;font-weight:700;padding:2px 9px;cursor:pointer;}
-#devline .dl-pause.dl-paused{color:#ffd27a;border-color:rgba(255,190,90,.7);background:rgba(255,170,60,.12);}
 /* Досье Роя (заказ владельца 2026-09-23): сводка → адаптации → силы → «О Рое».
    Порядок — вопросами игрока, а не разработки; см. шапку prototype/src/swarmDossier.ts. */
 .sd-summary{margin:0 0 12px;padding:8px 10px;border:1px solid var(--cyan-dim);border-radius:8px;
@@ -3155,7 +3151,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div id="purse"></div>
 </header>
 <nav class="holo-nav" data-i18n-aria="hud.map"><span aria-current="page" data-i18n="hud.map"></span><button id="holo-tech" type="button" data-i18n="win.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
-<div id="devline"><span id="devline-head"></span><button id="runpause" class="dl-pause" type="button" data-run-pause="1" hidden></button><span id="devline-status"></span></div>
+<div id="devline"><span id="devline-head"></span><span id="devline-status"></span></div>
 <!-- slim left rail: only the wired tools (each opens its window). More icons land here as
      features get wired. -->
 <div id="solo-replace" role="dialog" aria-modal="true" aria-labelledby="solo-replace-title">
@@ -3209,7 +3205,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
        bar hidden otherwise); ⌂/▶▶ are PC-hidden (exit lives in the rail). Mobile is
        frozen: keeps ⌂/▶▶ and the legacy ×1/×10/×50/×100 chips; PC swaps in 1/30/60/120
        (data-mult = real wall-clock multiplier: 1800=½h·s, 3600=1h·s, 7200=2h·s). -->
-  <span id="spd-ctl"><button id="spd-pause" data-speed="0">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">1×</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">30×</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">60×</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">120×</button></span><span class="sep"></span></span>
+  <span id="spd-ctl"><button id="spd-pause" data-speed="0" data-i18n-title="hud.run.pause" data-i18n-aria="hud.run.pause">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><!--dev-only--><button id="spd-dev" type="button" data-speed="0" hidden>▶▶▶</button><!--/dev-only--><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">1×</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">30×</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">60×</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">120×</button></span><span class="sep"></span></span>
   <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" data-i18n-title="speed.restart" style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" data-i18n-title="speed.exit">⌂</button>
 </div>
 <div id="cmdbar"></div>

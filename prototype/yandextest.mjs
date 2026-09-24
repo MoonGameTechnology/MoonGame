@@ -19,15 +19,16 @@
  * 4. ролик за Суверены: досмотренный кладёт порцию в кошелёк;
  * 5. двери по ссылке закрыты: `?join=…` и `?reset=…` открывают тот же Sector Zero;
  * 6. игра не просит ничего, кроме файлов архива и SDK, — ни нашего сервера, ни чужого;
- * 7. пауза забега (`YAG-6.2`): кнопка и уход со страницы замораживают мир, на возврате он
- *    ждёт кнопки, а площадка слышит «геймплей встал / пошёл» — в том числе в меню;
+ * 7. пауза забега (`YAG-6.2`, «‖» полосы скорости): кнопка и уход со страницы
+ *    замораживают мир, на возврате он ждёт кнопки, а площадка слышит «геймплей встал /
+ *    пошёл» — в том числе в меню;
  * 8. облако вошедшего игрока (`YAG-2.2`): пустое получает профиль, а облачный прогресс на
  *    пустом устройстве берётся молча; гость входит кнопкой «Войти», и если прогресс есть
  *    и здесь, и в облаке, профиль выбирает игрок — любой из двух (`YAG-1.4`).
  * 9. язык (`YAG-1.1d`): игрок скачивает файл только своего языка, и разметка подписана
  *    текстом, а не ключами, — и для русского, и для англоязычного игрока;
- * 10. темп забега (`matchExits.ts`, правило 6): полоса скорости несёт ▶ и ▶▶ — и на ПК, и на
- *    телефоне, — а множителей ×1…×100 в забеге нет.
+ * 10. темп забега (`matchExits.ts`, правило 6): полоса скорости несёт ‖ ▶ ▶▶ — и на ПК, и
+ *    на телефоне, — а множителей ×1…×100 в забеге нет.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
  *   node prototype/yandextest.mjs --no-build # проверить уже собранный архив
@@ -154,7 +155,8 @@ async function onSectorZeroMenu(label) {
 /** Текст ключа в собранном файле языка — им и должна быть подписана кнопка. */
 const builtText = (id, key) =>
   JSON.parse(readFileSync(join(ROOT, `assets/locale-${id}.json`), 'utf8'))[key];
-/** Полоса скорости в забеге: только его темп — ▶ и ▶▶, без множителей и без своей паузы. */
+/** Полоса скорости в забеге: пауза и его темп — ‖ ▶ ▶▶, без множителей; ▶▶▶ — только в
+ *  дев-забеге, а архив — игроцкая сборка, где её нет вовсе. */
 async function runTempoOnly(p, label) {
   await p.locator('#spd-fast').waitFor({ state: 'visible' });
   assert.ok(await p.locator('#spd-play').isVisible(), `${label}: ▶ на месте`);
@@ -163,11 +165,9 @@ async function runTempoOnly(p, label) {
     0,
     `${label}: множителей нет`,
   );
-  assert.equal(
-    await p.locator('#spd-pause').isVisible(),
-    false,
-    `${label}: пауза — в строке статуса`,
-  );
+  assert.ok(await p.locator('#spd-pause').isVisible(), `${label}: пауза — в полосе скорости`);
+  assert.equal(await p.locator('#spd-dev').count(), 0, `${label}: ▶▶▶ в архиве нет`);
+  assert.equal(await p.locator('#runpause').count(), 0, `${label}: второй паузы нет`);
 }
 const wave = () => page.locator('.dl-wave').first();
 const log = () => page.evaluate(() => window.__ya.log);
@@ -201,8 +201,9 @@ try {
     assert.ok(await page.locator('#spd-fast.on').isVisible(), 'ПК: ▶▶ включает ускорение');
     await page.locator('#spd-play').click();
 
-    // 2а. Пауза забега (YAG-6.2): кнопка замораживает отсчёт волны, уход со страницы — тоже,
-    // и на возврате мир ждёт кнопки; площадка слышит «геймплей встал / пошёл».
+    // 2а. Пауза забега (YAG-6.2; «‖» полосы скорости с 2026-09-24): кнопка замораживает
+    // отсчёт волны, уход со страницы — тоже, и на возврате мир ждёт кнопки; площадка
+    // слышит «геймплей встал / пошёл».
     const countdown = async () => (await wave().textContent()) ?? '';
     const frozenFor = async (ms) => {
       const before = await countdown();
@@ -211,10 +212,10 @@ try {
     };
     const lastMark = async () => (await log()).filter((c) => c === 'start' || c === 'stop').at(-1);
     assert.equal(await frozenFor(1200), false, 'мир идёт');
-    await page.locator('#runpause').click();
+    await page.locator('#spd-pause').click();
     assert.equal(await frozenFor(1200), true, 'пауза кнопкой замораживает мир');
     assert.equal(await lastMark(), 'stop', 'на паузе площадке сообщено «геймплей встал»');
-    await page.locator('#runpause').click();
+    await page.locator('#spd-pause').click();
     assert.equal(await frozenFor(1200), false, 'кнопка продолжает мир');
     assert.equal(await lastMark(), 'start', 'после паузы — «геймплей пошёл»');
     const setVisibility = (state) =>
@@ -225,7 +226,7 @@ try {
     await setVisibility('hidden');
     await setVisibility('visible');
     assert.equal(await frozenFor(1200), true, 'после ухода со страницы мир ждёт игрока');
-    await page.locator('#runpause').click();
+    await page.locator('#spd-pause').click();
     assert.equal(await frozenFor(1200), false, 'и продолжает по кнопке');
 
     // 3. Выход в меню путём игрока, перезагрузка, «Продолжить».

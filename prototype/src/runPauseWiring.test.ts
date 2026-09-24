@@ -7,17 +7,15 @@
  *    мир снова тикает без игрока, и ни один тест правил этого не видит.
  * 2. **Возобновление нагоняет паузу.** Забыт сброс отметки реального времени — первый кадр
  *    после «продолжить» отыграет всё время паузы разом.
- * 3. **Кнопку снова рисуют строкой.** Строка статуса перерисовывается каждый кадр, и
- *    пересозданная кнопка теряет нажатие (так и было в первой редакции).
- * 4. **Кнопка на ПК глуха.** Строка статуса там не принимает нажатий, и кнопке нужно
- *    отдельное разрешение.
+ * 3. **Кнопка паузы в полосе скорости идёт мимо правила.** С 2026-09-24 пауза забега живёт
+ *    в полосе рядом с ▶ и ▶▶ (решение владельца), и общий обработчик полосы ставит темп
+ *    напрямую — а правило помнит, с каким темпом продолжать, и слышит уход со страницы.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
-const HOLO = readFileSync(new URL('../holographic.css', import.meta.url), 'utf8');
 const body = (name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
 
@@ -45,18 +43,19 @@ describe('YAG-6.2 — каждый повод паузы доходит до п�
   });
 });
 
-describe('YAG-6.2 — кнопка переживает перерисовку строки статуса', () => {
-  it('кнопка — постоянный узел разметки между двумя перерисовываемыми частями', () => {
-    expect(BUILD).toMatch(
-      /<div id="devline"><span id="devline-head"><\/span><button id="runpause"[^>]*data-run-pause="1"[^>]*hidden><\/button><span id="devline-status"><\/span><\/div>/,
+describe('пауза забега — в полосе скорости (решение владельца 2026-09-24)', () => {
+  it('«‖» полосы в забеге идёт через правило паузы, а не ставит темп напрямую', () => {
+    expect(SRC).toMatch(
+      /if \(b\.id === 'spd-pause' && runPauseShown\(\)\) \{\s+runPauseEvent\('toggle'\);\s+return;/,
     );
   });
 
-  it('в перерисовываемую строку кнопку больше не пишут', () => {
-    expect(SRC.match(/data-run-pause="/g) ?? []).toHaveLength(0);
+  it('второй кнопки паузы в строке статуса больше нет', () => {
+    expect(BUILD).toContain('<div id="devline"><span id="devline-head"></span><span id="devline-status"></span></div>');
+    expect(SRC).not.toContain('data-run-pause');
   });
 
-  it('на ПК строка статуса глуха к нажатиям — кнопке паузы нажатия разрешены', () => {
-    expect(HOLO).toContain('body.holo-ui #devline .dl-pause{pointer-events:auto;}');
+  it('у «‖» есть подпись для мыши и скринридера', () => {
+    expect(BUILD).toMatch(/<button id="spd-pause"[^>]*data-i18n-title="hud\.run\.pause"[^>]*data-i18n-aria="hud\.run\.pause"/);
   });
 });

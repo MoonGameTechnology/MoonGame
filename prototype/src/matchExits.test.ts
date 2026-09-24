@@ -105,9 +105,9 @@ describe('rule 6 in the markup', () => {
   const css = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
   const hidden = /\.spd\.spd-run ([^{]+)\{display:none;\}/.exec(css)?.[1] ?? '';
 
-  it("hides the pace multipliers of both sets and the bar's own pause", () => {
-    for (const part of ['.spd-mult-legacy', '.spd-mult-pc', '#spd-pause', '.spddiv'])
-      expect(hidden).toContain(part);
+  it('hides the pace multipliers of both sets, but keeps the pause — it lives here now', () => {
+    for (const part of ['.spd-mult-legacy', '.spd-mult-pc', '.spddiv']) expect(hidden).toContain(part);
+    expect(hidden).not.toContain('#spd-pause');
   });
 
   it('shows ▶▶ in a run even where the PC layout drops it', () => {
@@ -127,6 +127,12 @@ describe('rule 6 in the frame', () => {
       'timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__, run)',
     );
     expect(main).toContain('speedbarShown(pcUi(), devSpeedControl, run)');
+  });
+
+  it('▶▶▶ — только в дев-забеге, и в игроцкой сборке её нет вовсе', () => {
+    expect(main).toContain('if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);');
+    const markup = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+    expect(markup).toMatch(/<!--dev-only--><button id="spd-dev"[^>]*hidden>▶▶▶<\/button><!--\/dev-only-->/);
   });
 });
 
