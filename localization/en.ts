@@ -424,6 +424,8 @@ export const en: Record<string, string> = {
   'swarm.intel.fold': 'Collapse dossier',
   'swarm.intel.unfold': 'Expand dossier',
   'swarm.intel.close': 'Close',
+  'hud.run.pause': 'Pause',
+  'hud.run.resume': '▶ Resume',
   'hud.wave': 'Wave {n}/{m}',
   'hud.wave.done': 'no more waves',
   'hud.wave.hold': 'hold out {in} more',

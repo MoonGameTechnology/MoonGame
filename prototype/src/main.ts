@@ -289,6 +289,7 @@ import {
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
+import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
 import {
   authOutcome,
   shouldRegister,
@@ -1371,6 +1372,7 @@ let lastCmdHtml = '';
 let lastSplitHtml = '';
 let lastHudHtml = '';
 let lastClockText = '';
+let lastClockHead = '';
 let lastTopText = ''; // row-1 dirty check (nick / standing / score / day / countdown)
 let lastObjDescHtml = '';
 let lastLogHtml = '';
@@ -1514,7 +1516,38 @@ function renderSwarmDossier(now = performance.now()): void {
   }
 }
 const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
+// Строка статуса перерисовывается целиком, стоит измениться хоть символу, — а часы и отсчёт
+// волны меняются каждый кадр. Кнопка, пересозданная между нажатием и отпусканием, нажатия
+// не получает (поймал живой прогон: 20 секунд попыток попасть по паузе). Поэтому пауза
+// забега (`YAG-6.2`) — ПОСТОЯННЫЙ узел разметки между двумя перерисовываемыми частями;
+// обе части — `display: contents`, так что раскладка и селекторы `#devline …` разреза не
+// заметили (`build.mjs`).
+const devlineHead = $('devline-head');
+const devlineTail = $('devline-status');
+const runPauseBtn = $('runpause') as HTMLButtonElement;
+/** Кнопка паузы по состоянию мира. Трогает узел, только когда ответ сменился. */
+let runPauseView = '';
+function syncRunPauseButton(): void {
+  const view = !runPauseShown() ? 'none' : speed > 0 ? 'running' : 'paused';
+  if (view === runPauseView) return;
+  runPauseView = view;
+  runPauseBtn.hidden = view === 'none';
+  runPauseBtn.classList.toggle('dl-paused', view === 'paused');
+  // Идёт мир — неброская «‖» с подписью для мыши и скринридера; стоит — «▶ Продолжить».
+  runPauseBtn.textContent = view === 'paused' ? t('hud.run.resume') : '‖';
+  if (view === 'paused') {
+    runPauseBtn.removeAttribute('title');
+    runPauseBtn.removeAttribute('aria-label');
+  } else {
+    runPauseBtn.title = t('hud.run.pause');
+    runPauseBtn.setAttribute('aria-label', t('hud.run.pause'));
+  }
+}
 devlineEl.addEventListener('click', (event) => {
+  if ((event.target as Element).closest('[data-run-pause]')) {
+    runPauseEvent('toggle');
+    return;
+  }
   if ((event.target as Element).closest('[data-solo-play]')) {
     if (soloSaveActive && !NET) {
       speed = Number($('spd-play').dataset.speed);
@@ -13381,8 +13414,25 @@ function setRunActive(on: boolean): void {
   sectorRunActive = on;
   setMatchTravelSpeed(on ? RUN_TRAVEL_SPEED : 1);
   syncSectorZeroTools();
+  markGameplay();
+}
+
+/**
+ * Разметка геймплея для площадки — одна дверь на все её поводы (`YAG-1.2a`, `YAG-6.2`).
+ * «Геймплей идёт» = забег идёт И мир не стоит: пауза игрока, уход со страницы и выход в
+ * меню забега останавливают его так же, как конец забега. Раньше разметку знал только
+ * флаг забега, и после выхода в меню индикатор площадки оставался зелёным.
+ *
+ * Зовётся из сеттера забега и из кадра — при смене ответа: темп мира меняют больше десятка
+ * мест (полоса скорости, кнопка паузы, запуск и восстановление), и поставить вызов в
+ * каждое — значит однажды забыть одно. Повторы гасит адаптер (`decisions/platformLifecycle`).
+ */
+let gameplayMarked: boolean | null = null;
+function markGameplay(): void {
+  const playing = sectorRunActive && speed > 0;
+  gameplayMarked = playing;
   const api = getPlatform() as Partial<PlatformHost>;
-  if (on) api.gameplayStart?.();
+  if (playing) api.gameplayStart?.();
   else api.gameplayStop?.();
 }
 
@@ -13888,6 +13938,7 @@ function frame(nowReal: number) {
   // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
   tickSoloSave(nowReal);
+  if (gameplayMarked !== (sectorRunActive && speed > 0)) markGameplay();
   renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   const wave = waveReadout(s.pve, s.time);
@@ -13916,8 +13967,13 @@ function frame(nowReal: number) {
             .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${objectiveNominal(m.reward, missions.length)})`)
             .join('\n'),
         )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
+  const clockHtml = `<span id="clock">${clockHM(s.time)}</span>`;
+  if (clockHtml !== lastClockHead) {
+    devlineHead.innerHTML = clockHtml;
+    lastClockHead = clockHtml;
+  }
+  syncRunPauseButton();
   const statusHtml =
-    `<span id="clock">${clockHM(s.time)}</span>` +
     waveHtml +
     missionHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
@@ -13928,7 +13984,7 @@ function frame(nowReal: number) {
     // Нажатие поведёт в магазин Суверенов; пока магазина нет — честная подсказка.
     `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.aria', { n: kfmt(SOVEREIGNS) })}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em aria-hidden="true">+</em></button>`;
   if (statusHtml !== lastClockText) {
-    devlineEl.innerHTML = statusHtml;
+    devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;
   }
   // Top-bar row 1: nick + live standing («N-е из M» — the end-screen ranking formula
@@ -15063,6 +15119,43 @@ document.addEventListener('visibilitychange', () => {
 addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') saveRun();
 });
+
+// --- пауза забега (YAG-6.2) ---------------------------------------------------
+// Резолюция владельца 2026-09-24: мир забега ЗАМИРАЕТ, пока игрока нет, и у игрока есть
+// кнопка паузы на любом устройстве. Правила — `decisions/runPause.ts`; здесь только
+// проводка: кнопка в строке забега, уход со страницы и пауза площадки.
+/** С каким темпом продолжить после паузы — обычным или ускоренным, как шли до неё. */
+let runResumeSpeed = 0;
+/** Паузу поставила площадка — её «продолжить» и снимет. */
+let runPlatformHeld = false;
+/** Кнопка паузы есть, пока идёт забег Sector Zero, — не сетевой и не законченный. */
+function runPauseShown(): boolean {
+  return sectorRunActive && !NET && s.match.status !== 'ended';
+}
+function runPauseEvent(event: RunPauseEvent): void {
+  if (!runPauseShown()) return;
+  const next = runPauseStep(
+    {
+      speed,
+      resumeSpeed: runResumeSpeed || Number($('spd-play').dataset.speed),
+      platformHeld: runPlatformHeld,
+    },
+    event,
+  );
+  // Возобновление не нагоняет время паузы — как у соло-сохранения.
+  if (speed <= 0 && next.speed > 0) lastReal = performance.now();
+  speed = next.speed;
+  runResumeSpeed = next.resumeSpeed;
+  runPlatformHeld = next.platformHeld;
+  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
+  markGameplay();
+}
+addEventListener('pagehide', () => runPauseEvent('hidden'));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') runPauseEvent('hidden');
+});
+host.onPlatformPause?.((paused) => runPauseEvent(paused ? 'platform-pause' : 'platform-resume'));
 // Only the explicit standalone page opens Sector Zero at boot. The shared entry
 // must keep its login screen even when a run exists (or its stored data is invalid).
 // The hub button loads that save on demand, without losing or resuming it here.
