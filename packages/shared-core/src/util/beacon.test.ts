@@ -69,13 +69,25 @@ describe('ответ Роя на маяк', () => {
 });
 
 describe('дозорный на маяке', () => {
-  it('флот Роя, стоящий на маяке, — дозорный; в пути и в чужих руках — нет', () => {
+  const sentinel = { traits: ['sentinel'] };
+
+  it('дозорный — помеченный флот Роя, стоящий на маяке; в пути и в чужих руках — нет', () => {
     const s = world([
-      fleet('scout', 'swarm', 'beacon'),
-      fleet('passing', 'swarm', null, { movement: { from: 'near', to: 'beacon', departedAt: 0, arrivesAt: 1 } }),
-      fleet('elsewhere', 'swarm', 'near'),
-      fleet('you', 'p1', 'beacon'),
+      fleet('scout', 'swarm', 'beacon', sentinel),
+      fleet('passing', 'swarm', null, {
+        ...sentinel,
+        movement: { from: 'near', to: 'beacon', departedAt: 0, arrivesAt: 1 },
+      }),
+      fleet('elsewhere', 'swarm', 'near', sentinel),
+      fleet('you', 'p1', 'beacon', sentinel),
     ]);
+    expect([...beaconSentinels(s, 'swarm')]).toEqual(['scout']);
+  });
+
+  it('флот Роя без признака, зашедший на маяк, дозорным не становится', () => {
+    // Прогон MC-01: главный флот Роя заходил на маяк, сливался с дозорным и замирал там
+    // навсегда — правило «любой флот на маяке» выключало из войны половину Роя.
+    const s = world([fleet('scout', 'swarm', 'beacon', sentinel), fleet('main', 'swarm', 'beacon')]);
     expect([...beaconSentinels(s, 'swarm')]).toEqual(['scout']);
   });
 });
@@ -89,7 +101,7 @@ describe('тревогу поднимает только игрок', () => {
 
 describe('дозорный — только на маяке, которого игрок не взял', () => {
   it('маяк в руках игрока: пришедший отряд Роя штурмует, а не дежурит', () => {
-    const s = world([fleet('answer', 'swarm', 'beacon')], 'p1');
+    const s = world([fleet('answer', 'swarm', 'beacon', { traits: ['sentinel'] })], 'p1');
     expect([...beaconSentinels(s, 'swarm')]).toEqual([]);
   });
 });
