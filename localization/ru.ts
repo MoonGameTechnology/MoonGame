@@ -428,7 +428,6 @@ export const ru: Record<string, string> = {
   'swarm.intel.unfold': 'Развернуть досье',
   'swarm.intel.close': 'Закрыть',
   'hud.run.pause': 'Пауза',
-  'hud.run.resume': '▶ Продолжить',
   'hud.wave': 'Волна {n}/{m}',
   'hud.wave.done': 'волны кончились',
   'hud.wave.hold': 'выстоять ещё {in}',

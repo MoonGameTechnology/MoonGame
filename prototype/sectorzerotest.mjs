@@ -58,6 +58,8 @@ async function check(label, run) {
   // Флаг забега ставится после установки матча — ждём его, а не читаем наперегонки.
   await page.waitForFunction((want) => window.__szTest.run() === want, run);
   await page.locator('#maploading').waitFor({ state: 'hidden' });
+  // ▶▶▶ — только дев-забега: ни в обычном забеге, ни в схватке её нет.
+  assert.equal(await page.locator('#spd-dev').isVisible(), false, `${label}: ▶▶▶ нет`);
 
   await page.locator('#railtoggle').click();
   for (const id of ABSENT)
@@ -211,11 +213,20 @@ try {
       (await page.locator('#sz-map-body polygon.known').count()) > scoutedBefore,
       'разведка забега попала на карту главы',
     );
+
+    // 5. Дев-забег (заказ владельца 2026-09-24): в полосе скорости есть ▶▶▶, и она включается.
+    await page.locator('#sz-map-close').click();
+    await page.locator('#sz-dev').click();
+    await page.waitForFunction(() => window.__szTest.run() === true);
+    await page.locator('#maploading').waitFor({ state: 'hidden' });
+    await page.locator('#spd-dev').click();
+    assert(await page.locator('#spd-dev.on').isVisible(), 'дев-забег: ▶▶▶ включает свой темп');
+    assert(await page.locator('#spd-pause').isVisible(), 'пауза — в полосе скорости');
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
-      ' карта главы показывает накопленную разведку\n',
+      ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶\n',
   );
 } finally {
   await browser.close();

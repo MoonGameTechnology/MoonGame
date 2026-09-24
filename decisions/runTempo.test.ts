@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import { shippedGameData } from '../data/bundle';
 import {
+  RUN_SPEED_DEV,
   RUN_SPEED_FAST,
   RUN_SPEED_NORMAL,
   RUN_SPINE_HOURS,
@@ -53,5 +54,15 @@ describe('темп забега (PVR-2.2)', () => {
     // раз дальше верхней границы владельца (35 минут). Порог — от самой полосы, а не
     // голым числом: хвост с тех пор уже сжимался (PVR-2.5), а смысл сторожа — нет.
     expect(runMinutes(LONGEST, 10)).toBeGreaterThan(10 * 35);
+  });
+});
+
+describe('дев-темп забега ▶▶▶ (заказ владельца 2026-09-24)', () => {
+  it('проводит весь забег за считанные минуты — чтобы проверять волны, а не ждать их', () => {
+    expect(runMinutes(RUN_SPINE_HOURS + RUN_TAIL_HOURS, RUN_SPEED_DEV)).toBeLessThanOrEqual(3);
+  });
+
+  it('быстрее игроцкого ускорения — иначе третья кнопка ничего не даёт', () => {
+    expect(RUN_SPEED_DEV).toBeGreaterThan(RUN_SPEED_FAST);
   });
 });
