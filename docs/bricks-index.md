@@ -232,9 +232,9 @@
 | BAL-1 | ✅ | proto | `docs/backlog.md` | Стартовые позиции больше не решают матч — карта-«колесо». |
 | BAL-2 | ✅ | proto data | `docs/backlog.md` | Фракции: перекос есть, но ВДВОЕ МЕНЬШЕ и в другую сторону. |
 | BAL-3 | 🔶 | proto data | `docs/backlog.md` | Кредиты, энергия и еда — декорации, а не ресурсы. |
-| BAL-4 | ✅ | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
+| BAL-4 | 🗑 | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
 | BAL-5 | ✅ | proto core | `docs/backlog.md` | Снежный ком: 71–75%, камбэк есть у каждого четвёртого. |
-| BAL-10 | ✅ | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |
+| BAL-10 | 🔶 | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |
 | BAL-11 | ✅ | proto data | `docs/backlog.md` | Скорость флота — сильнейший пассив, а «сбалансированный» |
 | BAL-6 | 🔶 | proto data | `docs/backlog.md` | Дерево технологий не даёт выбора — но причина НЕ цена. |
 | BAL-7 | ⏳ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
@@ -1061,6 +1061,7 @@
 | PVR-4.3 | 🔶 | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
 | PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md` | Структуры первого набора |
 | PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Журнал адаптаций |
+| PVR-4.6 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Органы Роя у захватчика: не работают, гарнизон их зачищает |
 | PVR-5.1 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Карта второй главы и дверь к ней |
 | PVR-5.2 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Задачи на карте и награда за них |
 | PVR-5.3 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Рост числа задач по главам |
@@ -1227,7 +1228,7 @@
 | YAG-4.1 | ⏳ | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
-| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию |
+| YAG-5.2 | 🔶 | docs proto | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию 2026-09-24 |
 | YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
 | YAG-6.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир 2026-09-24 |
 | YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
