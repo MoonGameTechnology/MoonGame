@@ -58,6 +58,8 @@ interface RunOut {
   groundBattleAtHome?: number;
   /** Кем кончились наземные бои у дома, по порядку (`null` — боем без победителя). */
   groundOutcomes: Array<string | null>;
+  /** Сколько раундов шёл каждый наземный бой у дома, по порядку. */
+  groundRounds: number[];
 }
 
 function runIdlePlayer(maxHours: number): RunOut {
@@ -65,12 +67,14 @@ function runIdlePlayer(maxHours: number): RunOut {
   let s: GameState = pveState(data);
   let groundBattleAtHome: number | undefined;
   const groundOutcomes: Array<string | null> = [];
+  const groundRounds: number[] = [];
   let hour = 0;
   const scan = (events: readonly { type: string; payload: unknown }[]): void => {
     for (const e of events) {
-      const p = e.payload as { location?: string; phase?: string; winner?: string | null };
+      const p = e.payload as { location?: string; phase?: string; winner?: string | null; rounds?: number };
       if (e.type === 'battle.resolved' && p.location === 'home_a' && p.phase === 'ground') {
         groundOutcomes.push(p.winner ?? null);
+        groundRounds.push(p.rounds ?? 0);
       }
     }
   };
@@ -108,13 +112,13 @@ function runIdlePlayer(maxHours: number): RunOut {
     s = step.state;
     scan(step.events);
     if (s.match.status === 'ended') {
-      return { state: s, endedAtHour: hour, groundBattleAtHome, groundOutcomes };
+      return { state: s, endedAtHour: hour, groundBattleAtHome, groundOutcomes, groundRounds };
     }
     drivers.runAI();
     drivers.autoEngage();
     drivers.checkFleetClashes();
   }
-  return { state: s, groundBattleAtHome, groundOutcomes };
+  return { state: s, groundBattleAtHome, groundOutcomes, groundRounds };
 }
 
 describe('забег на карте pve-1 доходит до вердикта (PVR-1.6)', () => {
@@ -133,14 +137,19 @@ describe('забег на карте pve-1 доходит до вердикта 
     expect(endedAtHour).toBeLessThan(300);
   });
 
-  it('крепкий старт держит дом на первом штурме — падает он не с первого раза (PVR-2.4)', () => {
-    // После ×5 дом пассивного игрока падал на ПЕРВОМ же наземном штурме (30-й час).
+  it('крепкий старт держит дом: первый штурм — не один раунд, пассивный держится дольше (PVR-2.4)', () => {
+    // После ×5 дом пассивного игрока брали ПЕРВЫМ же десантом за один раунд (30-й час).
     // Владелец выбрал рычаг «крепче старт игрока»: форт, тяжёлая пехота и стража дома.
-    // Замер на кирпиче: первый штурм кончается без победителя (33-й час), дом падает на
-    // втором (35-й) — и пассивный всё равно проигрывает, это держит тест выше.
-    const { groundOutcomes } = runIdlePlayer(400);
-    expect(groundOutcomes.length).toBeGreaterThanOrEqual(2);
-    expect(groundOutcomes[0]).not.toBe('p3');
+    //
+    // Замер на кирпиче показывал «первый штурм отбит, дом падает на втором (35-й час)», но
+    // «отбит» был артефактом бага (плейтест 2026-09-24): флот, вступивший в идущий
+    // наземный бой, не помечался «в бою», ИИ уводил его, и сторона считалась погибшей —
+    // бой обрывался. С честным боем первый штурм — СОВМЕСТНЫЙ, волн 2, 3 и 5; дом держит
+    // его четыре раунда и падает на 34-м часу. Держит тест именно то, что даёт рычаг: бой
+    // за дом длится больше раунда, и пассивный держится дольше прежних 30 часов.
+    const { groundRounds, endedAtHour } = runIdlePlayer(400);
+    expect(groundRounds[0]).toBeGreaterThanOrEqual(2);
+    expect(endedAtHour).toBeGreaterThanOrEqual(33);
   });
 
   it('штурм доходит до дома игрока и высаживается — а не стоит на орбите', () => {

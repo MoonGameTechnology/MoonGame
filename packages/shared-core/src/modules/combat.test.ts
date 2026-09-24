@@ -943,6 +943,41 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
     expect(ground.sides.filter((x) => x.ref.kind === 'landing')).toHaveLength(2);
   });
 
+  // Плейтест 2026-09-24: Рой «бесконечно высаживал десант». Вступивший флот оставался без
+  // `battleId` — для правил он был свободен, и драйвер авто-штурма каждый кадр отдавал ему
+  // новый штурм, а ядро каждый раз вписывало в бой ЕЩЁ ОДНУ копию того же десанта: копии
+  // стреляли каждая за себя, флот мог улететь посреди боя, оставив десант драться.
+  it('the joining fleet is IN the battle: a repeated assault is refused, no duplicate side', () => {
+    const a1 = fleet('A1', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
+    const a2 = fleet('A2', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
+    a1.orbit = 'near';
+    a2.orbit = 'near';
+    const st = baseState([a1, a2], [planet('P', 'p2', 0, 0, [['militia', 5]])]);
+    const first = okApply(kernel.applyAction(st, assault('A1'), ctx(0)));
+    const second = okApply(kernel.applyAction(first.state, assault('A2'), ctx(0)));
+    const ground = Object.values(second.state.battles)[0]!;
+    expect(second.state.fleets.A2?.battleId).toBe(ground.id);
+    expect(rej(kernel.applyAction(second.state, assault('A2'), ctx(0)))).toBe('E_FLEET_BUSY');
+    expect(ground.sides.filter((x) => x.ref.kind === 'landing')).toHaveLength(2);
+  });
+
+  it('the joining fleet is released when the ground battle ends', () => {
+    const a1 = fleet('A1', 'p1', 'P', [['fighter', 1]], [['marine', 3]]);
+    const a2 = fleet('A2', 'p1', 'P', [['fighter', 1]], [['marine', 3]]);
+    a1.orbit = 'near';
+    a2.orbit = 'near';
+    const st = baseState([a1, a2], [planet('P', 'p2', 0, 0, [['militia', 1]])]);
+    const first = okApply(kernel.applyAction(st, assault('A1'), ctx(0)));
+    const second = okApply(kernel.applyAction(first.state, assault('A2'), ctx(0)));
+    const done = kernel.advanceTo(second.state, ctx(200 * 3_600_000));
+    if (!done.ok) throw new Error(done.code);
+    expect(Object.keys(done.state.battles)).toHaveLength(0);
+    for (const id of ['A1', 'A2']) {
+      const f = done.state.fleets[id];
+      if (f) expect(f.battleId ?? null).toBeNull();
+    }
+  });
+
   it('no early landing while the orbital fight is undecided (GDD §7.4, two SEQUENTIAL phases)', () => {
     const f2 = fleet('F2', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
     f2.orbit = 'near';
