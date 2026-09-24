@@ -2182,6 +2182,7 @@ export const en: Record<string, string> = {
   'sector-zero.confirm': 'Start over',
   'sector-zero.confirm.body': 'Your current run will be replaced. You will no longer be able to resume it.',
   'sector-zero.confirm.title': 'Start a new run?',
+  'sector-zero.cloud.adopted': 'Progress loaded from the cloud',
   'sector-zero.continue': 'Continue',
   'sector-zero.difficulty': 'New run difficulty',
   'sector-zero.difficulty.hint': 'Your saved run keeps its original difficulty.',

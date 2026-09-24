@@ -2190,6 +2190,7 @@ export const ru: Record<string, string> = {
   'sector-zero.confirm': 'Начать заново',
   'sector-zero.confirm.body': 'Текущий забег будет заменён. Продолжить с этого места уже не получится.',
   'sector-zero.confirm.title': 'Начать новый забег?',
+  'sector-zero.cloud.adopted': 'Прогресс загружен из облака',
   'sector-zero.continue': 'Продолжить',
   'sector-zero.difficulty': 'Сложность нового забега',
   'sector-zero.difficulty.hint': 'Сложность сохранённого забега остаётся прежней.',
