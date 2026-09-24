@@ -22,7 +22,7 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { DAY, HOUR } from './time';
-import { esc, cost, displayUnit, fmtEta } from './format';
+import { esc, cost, displayUnit, fmtDur, fmtEta } from './format';
 import { researchTech } from '../../decisions/actions';
 import { isGrantOnlyTech } from './techCoverage';
 
@@ -254,7 +254,7 @@ export function techTreeHtml(
       `<div class="tt-ih"><b>${esc(tData(td.name))}</b>${right}</div>` +
       (techFx(td) ? `<div class="tt-ifx">${techFx(td)}</div>` : '') +
       `<div class="tt-ifoot"><span>${techCost(td.cost, res)}</span>` +
-      `<span class="tt-idur">${t('fmt.hours', { n: td.researchTimeHours })}</span></div>` +
+      `<span class="tt-idur">${fmtDur(td.researchTimeHours)}</span></div>` +
       (st.st === 'res'
         ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
         : '') +
@@ -326,7 +326,7 @@ export function techTreeHtml(
       `<div class="tt-mtags">${tag}</div></div></div>` +
       (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
       `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost, res)} · ${t('fmt.hours', { n: td.researchTimeHours })}</b></span>` +
+      `<span>💰 <b>${techCost(td.cost, res)} · ${fmtDur(td.researchTimeHours)}</b></span>` +
       (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
       (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
       (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +

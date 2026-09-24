@@ -27,7 +27,8 @@
  *    честная строка лучше пустой рамки.
  */
 import { t } from '../../localization/runtime';
-import { esc, displayUnit } from './format';
+import { esc, displayUnit, runClockShown } from './format';
+import { runRealSeconds } from '../../decisions/runClock';
 import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
 import { veteranBadge } from '../../decisions/veteranBadge';
 import type { GameState, PlayerId } from '../../packages/shared-core/src/index';
@@ -183,7 +184,8 @@ export function battleWindowHtml(
           })
           .join('')}</div><p class="hint">${esc(t('side.battle.retreat.hint'))}</p>`
       : '') +
-    `<p class="bw-rule">${esc(t('battle.win.rule'))}</p>`
+    // Раунд — игровой час (`combat.ts`); в забеге он называется реальными секундами.
+    `<p class="bw-rule">${esc(runClockShown() ? t('battle.win.rule.run', { n: runRealSeconds(3_600_000) }) : t('battle.win.rule'))}</p>`
   );
 }
 
