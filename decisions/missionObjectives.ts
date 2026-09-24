@@ -80,7 +80,10 @@ export function objectiveProgress(
     }
     // Всего — сколько их объявлено в каталоге карты, знать неоткуда, поэтому «всего»
     // это то, что ОСТАЛОСЬ плюс ноль: шкала здесь двоичная, и честнее показать её так.
-    return { ...base, done: left === 0 ? 1 : 0, total: 1, complete: left === 0 };
+    // Без названных целей сносить нечего — такая задача не выполняется сама собой с первой
+    // секунды (схема карты допускает пустой `targets`). Тот же предохранитель, что у `control`.
+    const complete = kinds.size > 0 && left === 0;
+    return { ...base, done: complete ? 1 : 0, total: 1, complete };
   }
   const need = Math.max(1, Math.trunc(objective.count ?? 1));
   if (objective.kind === 'wave') {
