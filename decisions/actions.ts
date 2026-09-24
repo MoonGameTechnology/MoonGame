@@ -302,6 +302,9 @@ export const designateCapital = (playerId: string, planetId: string) =>
 /** Забрать усиление, предложенное забегом между волнами (PVR-1.4). Что предложить —
  *  `decisions/waveBoons.ts`; кому и сколько должно — `pveModule`, он же и проверяет. */
 export const takeBoon = (playerId: string, tech: string) => act(playerId, 'pve.boon', { tech });
+/** Пакет снабжения забега — хостовое действие: хост зовёт его, только если профиль может
+ *  заплатить Сувернами (`run-supply` в `decisions/sectorZeroProgress.ts`). */
+export const buySupply = (playerId: string) => act(playerId, 'pve.supply', {});
 
 // --- hero engine (core heroModule, HERO-3..9): the data-driven hero actions ---
 // `castHeroAbility` moved to `actions.ts` (REFP-24) — imported/re-exported in the

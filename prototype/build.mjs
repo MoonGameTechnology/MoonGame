@@ -773,6 +773,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .rc-market{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
   background:rgba(53,214,230,.12);color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;}
 .rc-market:active{background:rgba(53,214,230,.22);}
+/* Пакет снабжения за Суверены (решение владельца 2026-09-24): золото — цвет валюты. */
+.rc-supply{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:6px 0;font-size:13px;}
+.rc-buy{margin-top:8px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cur-sovereigns);
+  background:color-mix(in srgb,var(--cur-sovereigns) 14%,transparent);color:var(--cur-sovereigns);font:600 13px/1.3 system-ui,sans-serif;}
+.rc-buy:disabled{cursor:default;opacity:.45;}
+.rc-note{margin-top:6px;text-align:center;font-size:12px;color:var(--dim);}
 .rc-market.disabled{opacity:.4;cursor:default;border-color:var(--line-hi);color:var(--dim);background:transparent;}
 .rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
   background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}

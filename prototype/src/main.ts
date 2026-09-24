@@ -88,6 +88,7 @@ import {
   FORCED_MARCH_MULT,
   instantRepairFleet,
   premiumRepairFleet,
+  buySupply,
   instantRepairCost,
   repairFleet,
   dockRepairCost,
@@ -10078,6 +10079,36 @@ const resourceCard = initResourceCard({
   icons: RES_SVG,
   onOpenMarket: (res) => market?.open(res),
   marketShown: () => toolShown('market', sectorZeroToolsHidden()),
+  // Пакет снабжения за Суверены (решение владельца 2026-09-24): состав и лимит — правило
+  // мира (режим), цена — магазин профиля.
+  supply: () => {
+    if (!isSectorZeroRun()) return null;
+    const cfg = data.modes[matchMode() ?? '']?.pve?.supply;
+    const { price } = data.sectorZeroShop.runSupply;
+    if (!cfg || cfg.perRun <= 0 || price <= 0) return null;
+    const bought = s.pve?.supplies?.[ME] ?? 0;
+    return {
+      pack: cfg.pack,
+      price,
+      perRun: cfg.perRun,
+      left: Math.max(0, cfg.perRun - bought),
+      affordable: sectorProgress.sovereigns >= price,
+    };
+  },
+  // Как ремонт за Суверены: сперва профиль может ли заплатить, потом ядро выдаёт пакет, и
+  // только потом списание — отказ ядра (лимит, конец забега) не стоит игроку валюты.
+  onBuySupply: () => {
+    if (!isSectorZeroRun()) return;
+    const paid = changeSectorZeroProgress(sectorProgress, { kind: 'run-supply' }, data);
+    if (!paid) {
+      toast(t('rescard.supply.poor', { price: data.sectorZeroShop.runSupply.price }));
+      return;
+    }
+    if (playerOrder(buySupply(ME))) {
+      saveSectorProgress(paid);
+      note(t('rescard.supply.done'));
+    }
+  },
 });
 
 
