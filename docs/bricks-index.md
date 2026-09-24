@@ -1066,6 +1066,7 @@
 | PVR-6.8 | ✅ | proto | `docs/sector-zero-roadmap.md` | Живое главное меню |
 | PVR-6.9 | ✅ | proto | `docs/sector-zero-roadmap.md` | Выбор главы — маршрут от края сектора к эпицентру |
 | PVR-6.10 | ✅ | proto | `docs/sector-zero-roadmap.md` | Досье Роя — справа, сворачивается, читается вопросами |
+| PVR-6.11 | ✅ | proto | `docs/sector-zero-roadmap.md` | Портреты героев в Академии |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

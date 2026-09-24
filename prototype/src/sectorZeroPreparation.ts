@@ -34,6 +34,7 @@ import {
 import { featuredOffer } from '../../decisions/shopFeatured';
 import { esc, displayUnit } from './format';
 import { catalogPortraitHtml } from './shipArt';
+import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { splitSupport } from '../../decisions/supportShips';
 import { heroChapter } from '../../decisions/heroRecruits';
 import { romanChapter } from '../../decisions/chapterRoute';
@@ -364,9 +365,20 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     seen.add(id);
     return 1 + Math.max(...node.requires.map((r) => skillTier(r, seen)));
   };
-  /** Герб героя — первая буква имени в ромбе: арта героев нет, а пустая рамка хуже. */
+  /** Герб героя — первая буква имени в ромбе: запас для героя без портрета. */
   const crest = (name: string): string =>
     `<span class="sz-crest" aria-hidden="true"><em>${esc(name.charAt(0).toUpperCase())}</em></span>`;
+  /**
+   * Лицо героя — портрет из общего атласа (`heroPortraits.ts`), того же, что на карте и в
+   * штабе. Герою без портрета достаётся герб: пустая рамка хуже буквы. Закрытый герой —
+   * приглушённым лицом: кто уже в строю, ростер говорит ещё до подписи под карточкой.
+   */
+  const face = (id: string, name: string, locked: boolean): string => {
+    const portrait = heroPortraitHtml(id);
+    return portrait
+      ? `<span class="sz-face${locked ? ' sz-face-locked' : ''}">${portrait}</span>`
+      : crest(name);
+  };
 
   /**
    * Академия (PVR-6.6, была «Герои и навыки»): ростер — карточки с гербом и состоянием
@@ -386,14 +398,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
           : p.selectedHero === id
             ? t('sector-zero.prep.hero-selected')
             : t('sector-zero.academy.rank', { n: hero.level });
-        return button('hero', id, `${crest(tData(def.name))}<span><b>${esc(tData(def.name))}</b><small>${state}</small></span>`, false, heroId === id);
+        return button('hero', id, `${face(id, tData(def.name), !hero)}<span><b>${esc(tData(def.name))}</b><small>${state}</small></span>`, false, heroId === id);
       })
       .join('');
     const def = data.heroes[heroId];
     if (!def) return `<div class="sz-roster">${roster}</div>`;
     const hero = p.heroes[heroId];
     const name = esc(tData(def.name));
-    let body = `<div class="sz-hero">${crest(tData(def.name))}<div><h2>${name}</h2><p class="sz-sub">${esc(t(def.description ?? ''))}</p>`;
+    let body = `<div class="sz-hero">${face(heroId, tData(def.name), !hero)}<div><h2>${name}</h2><p class="sz-sub">${esc(t(def.description ?? ''))}</p>`;
     const byChapter = heroChapter(heroId);
     if (!hero)
       return `<div class="sz-roster">${roster}</div>${body}${
