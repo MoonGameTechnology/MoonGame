@@ -110,7 +110,7 @@ describe('кошелёк: ролик только по раскрытой кно
   });
 
   it('не досмотрел или адаптер сломан — ничего не начислено', async () => {
-    const skipped = harness(Promise.resolve('skipped'));
+    const skipped = harness(Promise.resolve('cancelled'));
     skipped.press('watch');
     const broken = harness(Promise.reject(new Error('sdk')));
     broken.press('watch');
