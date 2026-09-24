@@ -3513,6 +3513,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <button id="sz-new" class="sz-action sz-primary" type="button" disabled data-i18n="sector-zero.new"></button>
             <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
+            <button id="sz-codex" class="sz-action" type="button" data-i18n="sector-zero.codex.open"></button>
           </div>
           <p id="sz-signin-row" class="sz-signin" hidden><button id="sz-signin" type="button" data-i18n="sector-zero.signin"></button><span data-i18n="sector-zero.signin.why"></span></p>
           <fieldset class="sz-difficulty sz-route-box">
@@ -3567,6 +3568,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.map.title"></span><b id="sz-map-title"></b><button id="sz-map-close" type="button" data-i18n-aria="sector-zero.map.close" data-i18n-title="sector-zero.map.close">×</button></div>
         <div id="sz-map-body" class="sz-map-body"></div>
         <div id="sz-map-foot" class="sz-map-foot"></div>
+      </aside>
+      <!-- Досье Роя: всё, что игрок узнал о Рое за прошлые забеги (swarmCodex.ts) -->
+      <aside id="sz-codex-panel" class="sz-map-panel sz-codex-panel" hidden aria-labelledby="sz-codex-title">
+        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.codex.eyebrow"></span><b id="sz-codex-title" data-i18n="sector-zero.codex.open"></b><button id="sz-codex-close" type="button" data-i18n-aria="sector-zero.codex.close" data-i18n-title="sector-zero.codex.close">×</button></div>
+        <div id="sz-codex-body" class="sz-codex-body"></div>
       </aside>
     </div>
     <div id="sz-workshop" hidden></div>
