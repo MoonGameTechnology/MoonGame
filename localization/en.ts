@@ -894,6 +894,7 @@ export const en: Record<string, string> = {
   'data.pve-waves': 'Swarm Waves',
   'data.psi-veil': 'Psi Veil',
   'data.radar-array': 'Radar Array',
+  'data.compact-radar': 'Compact Radar',
   'data.radar-module': 'Radar Module',
   'data.rally-beacon': 'Rally Beacon',
   'data.rally': 'Rally',
@@ -1073,7 +1074,7 @@ export const en: Record<string, string> = {
     'A picket frigate: the eyes of the fleet. Its own antenna reaches {r}, and the radar module (+{m}) fits this hull only. It barely fights ({a} attack, {d} defense, {hp} hull) and keeps to the rear line. Module bays: {n}.',
   'dossier.unit.picket-frigate.name': 'Picket Frigate',
   'dossier.unit.scout.desc':
-    'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
+    'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go. It carries its own compact radar (+{m}).',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
     'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
