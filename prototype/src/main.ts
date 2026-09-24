@@ -221,6 +221,10 @@ import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
+import { shipCardModel } from '../../decisions/shipCard';
+import { shipCardHtml } from './shipCard';
+import { moduleIcon } from './moduleIcons';
+import { catalogPortraitHtml } from './shipArt';
 import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 // SHU-3.1 — ангар глазами игрока: состав, вместимость, топливо, перегрузка.
 import {
@@ -6327,11 +6331,12 @@ function taskGroupPanelHtml(group: Fleet[]): string {
 }
 
 /** Тайлы состава флота Bytro-стиля: силуэт-архетип в цвете стороны (наземные —
- *  прежние текст-глифы), счётчик и мини-бар корпуса стека; тап — досье юнита. */
+ *  прежние текст-глифы), счётчик и мини-бар корпуса стека. Тап по кораблю — карточка
+ *  стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному — досье юнита. */
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
   const tiles = stacks
-    .filter((u) => u.count > 0)
-    .map((u) => {
+    .map((u, index) => {
+      if (u.count <= 0) return '';
       const def = data.units[u.unit];
       if (!def) return '';
       const name = unitTitle(u.unit);
@@ -6341,17 +6346,19 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
           : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: s.players[f.owner]?.faction, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
-      // Show installed modules as small tags under the count (RULES-2.1 / SM-0.3):
-      // two cruisers with different modules are separate stacks — the tags make
-      // the difference visible at a glance, without opening the codex.
+      // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
+      // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
+      // подписи не читались; имя модуля — в подсказке, полная картина — в карточке.
       const modTags = u.modules && u.modules.length > 0
         ? `<span class="pt-mods">${u.modules.map((m) => {
             const mdef = data.modules[m];
             const mname = mdef ? tData(mdef.name) : m;
-            return `<span class="pt-mod" title="${esc(mname)}">${esc(mname)}</span>`;
+            return `<span class="pt-mod" title="${esc(mname)}" aria-label="${esc(mname)}">${moduleIcon(m)}</span>`;
           }).join('')}</span>`
         : '';
-      return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
+      const open =
+        def.domain === 'space' ? `data-shipcard="${esc(f.id)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
+      return `<button class="ptile" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
@@ -7676,6 +7683,34 @@ function incomeOf(type: string, level: number): string {
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
+/** Карточка корабля (`shipCard.ts`) в окне справочника: отсеки стека с тем, что надето,
+ *  и характеристики одного корабля. Стек адресуется местом во флоте — тем же, что у
+ *  плитки; флот исчез или стек сдвинулся — карточки нет, а не чужой корабль. */
+function openShipCard(fleetId: string, index: number): void {
+  const el = document.getElementById('codex');
+  const f = s.fleets[fleetId];
+  const stack = f?.units[index];
+  if (!el || !f || !stack) return;
+  const model = shipCardModel(stack, data);
+  if (!model) return;
+  const faction = s.players[f.owner]?.faction;
+  const html = shipCardHtml(
+    model,
+    {
+      portrait: (u) => catalogPortraitHtml('u', u, data),
+      icon: (u) => unitIconHtml(u, data, ownerColor(f.owner), 40, faction),
+      unitName: (u) => unitTitle(u),
+      moduleName: (m) => {
+        const mdef = data.modules[m];
+        return mdef ? tData(mdef.name) : m;
+      },
+    },
+    { hpPct: stackHullPct(stack, data), fleetName: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»` },
+  );
+  el.innerHTML = `<div class="cxbox sc-box">${html}<button class="cx-close">${t('codex.close')}</button></div>`;
+  el.classList.add('show');
+}
+
 function openCodex(key: string): void {
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
@@ -8629,8 +8664,14 @@ side.addEventListener('click', (ev) => {
     }
     return;
   }
+  if (bEl.dataset.shipcard) {
+    // Карточка корабля: отсеки и надетые модули стека (заказ владельца 2026-09-24).
+    const at = bEl.dataset.shipcard.lastIndexOf('|');
+    openShipCard(bEl.dataset.shipcard.slice(0, at), Number(bEl.dataset.shipcard.slice(at + 1)));
+    return;
+  }
   if (bEl.dataset.codex) {
-    openCodex(bEl.dataset.codex); // a build/ship tile → full specs (+ Build here)
+    openCodex(bEl.dataset.codex); // a build/ground tile → full specs (+ Build here)
     return;
   }
   const act = bEl.dataset.act;
@@ -14754,6 +14795,12 @@ if (codexEl) {
       lastPanelHtml = '';
       renderPanel();
       openCodex(`b:${upg}`);
+      return;
+    }
+    // Карточка корабля ведёт в справочник своего корпуса — той же дорогой, что плитка.
+    const deep = (tg.closest('.sc-codex') as HTMLElement | null)?.dataset.codex;
+    if (deep) {
+      openCodex(deep);
       return;
     }
     if (tg.id === 'codex' || tg.classList.contains('cx-close')) codexEl.classList.remove('show');

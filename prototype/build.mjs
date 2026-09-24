@@ -501,7 +501,7 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .ptile .pt-ic{font-size:18px;line-height:1;}
 .ptile .pt-c{font-size:9px;color:var(--dim);letter-spacing:.3px;white-space:nowrap;}
 .pt-mods{display:flex;flex-wrap:wrap;gap:1px;justify-content:center;max-width:70px;}
-.pt-mod{font-size:7px;line-height:1.1;padding:0 2px;border-radius:2px;background:rgba(53,214,230,.12);color:var(--cyan);white-space:nowrap;}
+.pt-mod{font-size:10px;line-height:1.1;padding:0 1px;border-radius:2px;white-space:nowrap;}
 /* подпись построенного здания: имя обязано читаться, поэтому плитка растягивается под
    него и переносит длинное имя в две строки, а не режет многоточием — обрезанное
    «Salvage Metal…» отвечает на вопрос «что это» не лучше голой иконки */
@@ -1877,6 +1877,24 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cn-note{margin-top:11px;font-size:10.5px;color:var(--dim);line-height:1.5;}
 .cn-note b{color:var(--cyan);}
 /* live stat preview bars (right column) */
+/* Карточка корабля (заказ владельца 2026-09-24): отсеки стека и надетые модули — языком
+   конструктора (.cn-bay, .cn-stat), только без действий: тут ничего не снимают. */
+#codex .sc .cn-hull{margin-bottom:8px;}
+#codex .sc-n{color:var(--cyan);font-size:13px;}
+#codex .sc-hp{display:flex;align-items:center;gap:8px;margin:0 0 4px;font-size:11px;color:var(--dim);}
+#codex .sc-hp b{color:var(--ink);font-variant-numeric:tabular-nums;}
+#codex .sc-hpbar{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
+#codex .sc-hpbar i{display:block;height:100%;background:var(--grn);}
+#codex .sc-hpbar.low i{background:var(--red);}
+#codex .sc-sec{margin:14px 0 8px;font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);}
+#codex .cn-bay.sc-bay{cursor:default;}
+#codex .cn-bay.sc-bay:hover{border-color:var(--line-hi);}
+#codex .cn-bay.sc-extra,#codex .cn-bay.sc-extra:hover{border-color:#e6b777;}
+#codex .sc-stars{color:#ffd166;letter-spacing:1px;}
+#codex .sc-rar{margin-left:4px;padding:1px 5px;border:1px solid var(--line-hi);border-radius:6px;font:600 9px ui-monospace,monospace;color:var(--dim);}
+#codex .sc-codex{margin-top:12px;width:100%;min-height:36px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
+  color:var(--cyan);font:600 12px ui-monospace,monospace;cursor:pointer;}
+#codex .sc-codex:hover{border-color:var(--cyan);}
 .cn-stat{margin-bottom:11px;}
 .cn-srow{display:flex;align-items:baseline;gap:8px;margin-bottom:5px;}
 .cn-snm{font:700 12px ui-monospace,monospace;color:#eafffb;}
