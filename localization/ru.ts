@@ -2396,7 +2396,7 @@ export const ru: Record<string, string> = {
   'settings.sweep': 'Радарная развёртка',
   'settings.sweep.hint': 'вращающийся луч на карте — только вид, не влияет на обнаружение',
   'settings.sweep.opacity': 'Прозрачность радарной развёртки',
-  'settings.tab.general': 'Общие',
+  'settings.tab.map': 'Карта',
   'settings.tag': 'интерфейс',
   'settings.title': 'НАСТРОЙКИ',
 

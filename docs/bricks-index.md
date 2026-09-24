@@ -675,6 +675,7 @@
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
 | UX-SEL-1 | 🗑 | proto | `docs/backlog.md` | На ПК выделять рамкой обычным ЛКМ — снято решением |
 | UX-KEYS-1 | ✅ | proto | `docs/backlog.md` | Раздел «Управление» в настройках: какие клавиши и жесты есть. |
+| UX-SET-1 | ✅ | proto | `docs/backlog.md` | Окно настроек — вкладками: Звук · Графика · Карта · Управление. |
 | ROS-SUP-1 | ✅ | proto data | `docs/backlog.md` | Корабли поддержки — своей вкладкой. |
 | SIEGE-1 | ✅ | data proto | `docs/backlog.md` | Юнита siege в игре нет, урон по постройкам — модулем. |
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
