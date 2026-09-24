@@ -25,3 +25,19 @@ export type SessionTool = keyof typeof SECTOR_ZERO_ABSENT_TOOLS;
 export function toolShown(_tool: SessionTool, sectorZeroRun: boolean): boolean {
   return !sectorZeroRun;
 }
+
+/**
+ * Поля шапки основной игры, которых в забеге Sector Zero тоже НЕТ (решение владельца
+ * 2026-09-24): эмблема с названием и местом под ним («Лазурный пакт · 2-е из 3»), очки
+ * победы («✦ 82/1100») и игровой день с отсчётом до следующего. Победа в забеге — выстоять
+ * волны (PVR-2.5), а не набрать счёт; место среди ИИ-соседей ничего не значит; ритм забега
+ * задают волны, а не сутки мира. Эмблема открывала досье сессии — счёт, фракцию и карьеру
+ * основной игры, — и в забеге ему показывать нечего.
+ *
+ * Значение — id узла шапки (`prototype/build.mjs`); сторож в тесте сверяет их с разметкой.
+ */
+export const SECTOR_ZERO_ABSENT_HUD = {
+  crest: 'tbcrest',
+  score: 'tbscore',
+  day: 'daycard',
+} as const;

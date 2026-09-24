@@ -23,7 +23,7 @@ import {
   waitForApp,
   withDiagnostics,
 } from './harnessKit.mjs';
-import { SECTOR_ZERO_ABSENT_TOOLS } from '../decisions/sectorZeroTools.ts';
+import { SECTOR_ZERO_ABSENT_HUD, SECTOR_ZERO_ABSENT_TOOLS } from '../decisions/sectorZeroTools.ts';
 
 const hooks = `window.__szTest = {
   run: () => isSectorZeroRun(),
@@ -37,6 +37,8 @@ const hooks = `window.__szTest = {
 };`;
 
 const ABSENT = Object.values(SECTOR_ZERO_ABSENT_TOOLS);
+/** Поля шапки, которых в забеге нет: эмблема с названием и местом, очки победы, день. */
+const ABSENT_HUD = Object.values(SECTOR_ZERO_ABSENT_HUD);
 const KEPT = ['rail-diplo', 'rail-tech', 'rail-help'];
 
 // Страница Sector Zero — со своим бандлом и симуляцией рекламы, как настоящая дев-сборка:
@@ -63,6 +65,9 @@ async function check(label, run) {
   for (const id of KEPT)
     assert(await page.locator('#' + id).isVisible(), `${label}: #${id} на месте`);
   await page.locator('#railtoggle').click();
+  for (const id of ABSENT_HUD)
+    assert.equal(await page.locator('#' + id).isVisible(), !run, `${label}: шапка #${id}`);
+  assert.equal(await page.locator('#tbwallet').isVisible(), run, `${label}: кошелёк профиля в шапке`);
 
   const home = await page.evaluate(() => window.__szTest.home());
   assert(home, `${label}: у игрока есть домашний мир`);
