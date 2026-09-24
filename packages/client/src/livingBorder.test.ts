@@ -77,7 +77,6 @@ describe('M2.11 — живая граница провинций', () => {
       ]),
       ownedInner: new Map(),
       neutralEdge: [],
-      sealedEdge: [],
     };
     const { g, log } = recorder();
     drawLivingBorders(g, borders, palette, frame, 3100, { width: 1000, height: 800 });
@@ -99,7 +98,6 @@ describe('M2.11 — живая граница провинций', () => {
         [10, 10, 40, 40],
         [5000, 10, 5100, 40],
       ],
-      sealedEdge: [],
     };
     const { g, log } = recorder();
     drawLivingBorders(g, borders, palette, frame, 0, { width: 1000, height: 800 });
@@ -111,7 +109,6 @@ describe('M2.11 — живая граница провинций', () => {
       ownedFront: new Map([['p1', [[300, 200, 360, 260]]]]),
       ownedInner: new Map(),
       neutralEdge: [[10, 10, 40, 40]],
-      sealedEdge: [[100, 100, 140, 120]],
     };
     const styleOf = (log: string[]): string[] =>
       log.filter((l) => /^(strokeStyle|lineWidth)=|^setLineDash\(|^stroke\(/.test(l));
