@@ -95,6 +95,10 @@ import { canAfford, payCost } from '../util/treasury';
  * Applied as ×(1 + Σ bonuses) on top of the lane bonus / base +5% aura; a dead hero
  * or an unknown passive id contributes nothing (graceful degradation).
  *
+ * PVR-6.16 — a passive may be SLOTTED (`HeroPassiveDef.slotted`): owned in `passives`, worn
+ * through `hero.equip` like an ability, sharing the slot budget, and counting only while
+ * worn. An always-on passive is not a slot item (`E_NO_ABILITY`).
+ *
  * State lives in `GameState.heroes` / `tempLanes` (JSON, deterministic); durations go
  * through `schedule`; the speed bonus through the `fleet.speed` hook. No kernel change.
  */
@@ -262,9 +266,12 @@ function passiveBonus(
     // DEPLOYED heroes only — a reserve hero (alive undefined) must not radiate
     // passives from the bench (bughunt BF-24).
     if (hero.owner !== owner || hero.alive !== true) continue;
+    const worn = equippedOf(hero);
     for (const id of hero.passives ?? []) {
       const def = h.ctx.data.heroPassives[id];
       if (!def || def.hook !== hook) continue;
+      // A slotted passive (PVR-6.16) is owned from the pool but counts only while worn.
+      if (def.slotted && !worn.includes(id)) continue;
       if (passiveApplies(h.state, h.ctx.data, hero, def, args)) total += def.params.bonus;
     }
   }
@@ -583,7 +590,9 @@ export const heroModule: GameModule = {
   // 4.0.0 — AUD-18: сняты наследные `hero.move` и `planet.annihilate` (контракт действий
   // сузился, отсюда мажор). 3.1.0 — CORE-DMG-3: пассивы и +5% носителю героя во всех
   // каналах, где стреляет флот.
-  version: '4.1.0', // AUD-22: узел, чья награда у архетипа со старта, считается изученным
+  // 4.1.0 AUD-22: узел, чья награда у архетипа со старта, считается изученным.
+  // 4.2.0 PVR-6.16: пассивка может надеваться в слот (slotted).
+  version: '4.2.0',
   setup(api) {
 
     // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
@@ -958,14 +967,20 @@ export const heroModule: GameModule = {
       if (hero.alive === false) return h.reject('E_HERO_DEAD');
       // Wearing what you don't own is the one thing this action must never allow —
       // otherwise the whole collection axis (drops, auction, ownership) is bypassed.
-      if (!(hero.abilities ?? []).includes(abilityId)) return h.reject('E_NOT_OWNED');
+      // A slotted passive (PVR-6.16) is owned from `passives` and worn like an ability.
+      const owned =
+        (hero.abilities ?? []).includes(abilityId) || (hero.passives ?? []).includes(abilityId);
+      if (!owned) return h.reject('E_NOT_OWNED');
       const equipped = equippedOf(hero);
       const slots = heroSkillSlots(hero, h.ctx.data);
       // Same generic slots+items gate as ship modules (SHIP-4),
       // expressed as a single-category budget — one mechanism, one failure order.
+      // An always-on passive is no slot item: it already works, so it reads as unknown.
       const gate = canInstall(
         {
-          item: (id) => h.ctx.data.heroAbilities[id],
+          item: (id) =>
+            h.ctx.data.heroAbilities[id] ??
+            (h.ctx.data.heroPassives[id]?.slotted ? h.ctx.data.heroPassives[id] : undefined),
           category: () => 'skill',
           capacity: () => slots,
         },

@@ -16,3 +16,13 @@ The same natural-color cutouts serve dossier cards and map markers. The interfac
 adds frames and grade glyphs separately. There is no baked-in text or level.
 `heroPortraits.ts` loads the atlas once; the prototype embeds it as a data URL.
 Names and biographies live in the RU/EN locale files, keyed by `decisions/heroIdentity.ts`.
+
+## Outside the atlas
+
+`scientist.svg` — a vector draft of the fifth hero, the Scientist (owner's decision
+2026-09-24), until real art replaces it. Same framing as an atlas cell: a square bust on
+a transparent background, no text. It shows no implant and no glow on the skin — that is
+a spoiler of the Sector Zero finale (`docs/sector-zero-roadmap.md` §3.1.4).
+`heroPortraits.ts` maps it by archetype (`LOOSE_ART`); a hero whose identity has no atlas
+`cell` takes its portrait from there. When the final art arrives, either replace this file
+or give the hero an atlas cell and drop the entry.
