@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import {
+  adoptMark,
+  bumpMark,
+  compareLineage,
   keepLocalMark,
   parseCloudProfile,
   parseSyncMark,
@@ -10,6 +13,7 @@ import {
   serializeCloudProfile,
   type CloudProfile,
   type LocalSync,
+  type SyncMark,
 } from './cloudSync';
 import { freshSectorZeroProgress } from './sectorZeroProgress';
 
@@ -118,26 +122,133 @@ describe('YAG-1.4 — развилка: «Оставить этот»', () => {
   it('облако уходит ВПЕРЁД последней сверки Б — Б берёт выбор игрока, а не пишет поверх', () => {
     // Здесь правок меньше, чем в облаке: своим номером запись оказалась бы ПОЗАДИ облака,
     // и Б прочло бы её как «наша запись не дошла» и молча отправило свой профиль.
-    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, 8);
+    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, { rev: 8 });
     expect(kept.rev).toBeGreaterThan(8);
     expect(planCloudSync(deviceB, cloud({ rev: kept.rev }), true)).toBe('adopt');
   });
 
   it('здесь правок больше, чем в облаке, — номер всё равно растёт', () => {
-    expect(keepLocalMark({ rev: 20, syncedRev: 5 }, 8).rev).toBe(21);
+    expect(keepLocalMark({ rev: 20, syncedRev: 5 }, { rev: 8 }).rev).toBe(21);
   });
 
   it('отметка сверки — облако, которое игрок видел: не дойдёт запись — старт отправит снова', () => {
-    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, 8);
+    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, { rev: 8 });
     expect(kept.syncedRev).toBe(8);
     // Запись не дошла: в облаке по-прежнему правка 8, а своя правка впереди.
     expect(planCloudSync({ ...local(), ...kept }, cloud({ rev: 8 }), true)).toBe('upload');
   });
 
   it('после выбора развилки нет: то же устройство на следующем старте видит «совпадает»', () => {
-    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, 8);
+    const kept = keepLocalMark({ rev: 7, syncedRev: 5 }, { rev: 8 });
     const pushed = { ...local(), rev: kept.rev, syncedRev: kept.rev };
     expect(planCloudSync(pushed, cloud({ rev: kept.rev }), true)).toBe('same');
+  });
+});
+
+describe('родословная: номера разных устройств — не одна история (ревью Sector Zero)', () => {
+  // А и Б — один профиль (один сид) на двух устройствах. Отметка записи ставится ДО того,
+  // как запись дошла: промис записи об успехе не сообщает.
+  const markA = { rev: 10, syncedRev: 10, device: 'A', lineage: { A: 10 } };
+  const markB = adoptMark({ rev: 3, syncedRev: 3, device: 'B' }, { rev: 10, lineage: { A: 10 } });
+  const sync = (mark: SyncMark): LocalSync => ({ ...local(), ...mark });
+  const envelope = (mark: { rev: number; lineage?: Record<string, number> }) =>
+    cloud({ rev: mark.rev, ...(mark.lineage ? { lineage: mark.lineage } : {}) });
+
+  it('воспроизведение: по голым номерам А молча «совпадает» и затирает правку Б', () => {
+    // Прежнее правило, которое остаётся только для записей без родословной: так оно и
+    // ошибалось, пока было единственным.
+    expect(planCloudSync(local({ rev: 11, syncedRev: 11 }), cloud({ rev: 11 }), true)).toBe('same');
+    expect(planCloudSync(local({ rev: 11, syncedRev: 11 }), cloud({ rev: 13 }), true)).toBe(
+      'adopt',
+    );
+  });
+
+  it('запись А пропала, Б записало ту же 11 — развилка, а не «совпадает»', () => {
+    const a = { ...bumpMark(markA), syncedRev: 11 }; // отметил 11, запись не дошла
+    const b = bumpMark(markB); // Б записал поверх облачной 10
+    expect(b.rev).toBe(11);
+    expect(planCloudSync(sync(a), envelope(b), true)).toBe('choose');
+  });
+
+  it('запись А пропала, Б записало трижды — развилка, а не молчаливое «взять облако»', () => {
+    const a = { ...bumpMark(markA), syncedRev: 11 };
+    const b = bumpMark(bumpMark(bumpMark(markB)));
+    expect(planCloudSync(sync(a), envelope(b), true)).toBe('choose');
+  });
+
+  it('запись А дошла, Б взял её и продолжил — облако впереди, берём молча', () => {
+    const a = bumpMark(markA);
+    const b = bumpMark(adoptMark(markB, envelope(a)));
+    expect(planCloudSync(sync(a), envelope(b), true)).toBe('adopt');
+  });
+
+  it('облако — наша же запись: та же — «совпадает», отставшая — отправляем снова', () => {
+    const a = bumpMark(markA);
+    expect(planCloudSync(sync(a), envelope(a), true)).toBe('same');
+    expect(planCloudSync(sync(bumpMark(a)), envelope(a), true)).toBe('upload');
+  });
+
+  it('на развилке здесь терять нечего — берём облачный молча', () => {
+    const a = { ...bumpMark(markA), syncedRev: 11 };
+    const b = bumpMark(markB);
+    expect(planCloudSync({ ...sync(a), hasProgress: false }, envelope(b), true)).toBe('adopt');
+  });
+
+  it('«Оставить этот» впереди ОБЕИХ веток: другое устройство берёт выбор, а не спрашивает', () => {
+    const a = { ...bumpMark(markA), syncedRev: 11 };
+    const b = bumpMark(markB);
+    const kept = keepLocalMark(a, envelope(b));
+    expect(compareLineage(kept.lineage!, b.lineage!)).toBe('ahead');
+    expect(compareLineage(kept.lineage!, a.lineage!)).toBe('ahead');
+    expect(planCloudSync(sync(b), envelope(kept), true)).toBe('adopt');
+    expect(planCloudSync(sync(kept), envelope(kept), true)).toBe('same');
+  });
+
+  it('взятое облако не откатывает свой номер правки назад', () => {
+    const adopted = adoptMark(
+      { rev: 30, syncedRev: 30, device: 'B', lineage: { B: 30 } },
+      {
+        rev: 4,
+        lineage: { A: 4 },
+      },
+    );
+    expect(adopted.lineage).toEqual({ A: 4 });
+    expect(bumpMark(adopted).lineage).toEqual({ A: 4, B: 31 });
+  });
+
+  it('облако без родословной — прежнее правило, а взятое оставляет устройство без неё', () => {
+    const adopted = adoptMark({ rev: 2, syncedRev: 2, device: 'B', lineage: { B: 2 } }, { rev: 9 });
+    expect(adopted).not.toHaveProperty('lineage');
+    expect(planCloudSync(sync({ ...markA, lineage: { A: 10 } }), cloud({ rev: 12 }), true)).toBe(
+      'adopt',
+    );
+  });
+
+  it('сравнение родословных — четыре исхода', () => {
+    expect(compareLineage({ A: 1 }, { A: 1 })).toBe('equal');
+    expect(compareLineage({ A: 2 }, { A: 1 })).toBe('ahead');
+    expect(compareLineage({ A: 1 }, { A: 1, B: 1 })).toBe('behind');
+    expect(compareLineage({ A: 2 }, { A: 1, B: 1 })).toBe('forked');
+  });
+
+  it('родословная переживает запись и разбор; испорченная — как её нет', () => {
+    const p = cloud({ lineage: { A: 3, B: 7 } });
+    expect(parseCloudProfile(serializeCloudProfile(p))).toEqual(p);
+    for (const junk of [[1], { A: -1 }, { A: 1.5 }, { A: '3' }, 'x'])
+      expect(parseCloudProfile(JSON.stringify({ ...cloud(), lineage: junk }))).not.toHaveProperty(
+        'lineage',
+      );
+  });
+
+  it('отметка хранит имя устройства и родословную; без имени родословной нет', () => {
+    const raw = JSON.stringify({ rev: 4, syncedRev: 4, device: 'A', lineage: { A: 4 } });
+    expect(parseSyncMark(raw)).toEqual({ rev: 4, syncedRev: 4, device: 'A', lineage: { A: 4 } });
+    expect(parseSyncMark(JSON.stringify({ rev: 4, lineage: { A: 4 } }))).toEqual({
+      rev: 4,
+      syncedRev: 0,
+    });
+    // Без имени устройства правка родословную не заводит: сверка идёт прежним правилом.
+    expect(bumpMark({ rev: 1, syncedRev: 1 })).toEqual({ rev: 2, syncedRev: 1 });
   });
 });
 

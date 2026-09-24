@@ -251,6 +251,10 @@ export const forceMarchFleet = (playerId: string, fleetId: string, on: boolean) 
 /** Платный мгновенный ремонт корпуса всего флота (цена — `instantRepairCost`). */
 export const instantRepairFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.instantRepair', { fleetId });
+/** Тот же ремонт, оплаченный Суверенами со счёта (забег Sector Zero). Выпускает ХОСТ после
+ *  списания; гейт его от клиента не принимает — схемы у типа нет намеренно. */
+export const premiumRepairFleet = (playerId: string, fleetId: string) =>
+  act(playerId, 'fleet.premiumRepair', { fleetId });
 /** ECON-3а: экспресс-ремонт за metal у своего дока (цена — `dockRepairCost`). */
 export const repairFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.repair', { fleetId });

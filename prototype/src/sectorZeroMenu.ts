@@ -11,6 +11,7 @@ import type { RunPreview } from '../../decisions/sectorZeroMenu';
 import { CHAPTER_KEYS, chapterRoute, romanChapter } from '../../decisions/chapterRoute';
 import type { ChapterMapView } from '../../decisions/chapterMap';
 import type { ProfileNumbers } from '../../decisions/cloudSync';
+import type { MissionBrief } from '../../decisions/missionView';
 import { detach } from './detach';
 
 /** Вход площадки и облако профиля (`YAG-1.4`). Нет — площадка без облака: ни кнопки
@@ -44,6 +45,8 @@ export interface SectorZeroMenuHooks {
     cleared: boolean;
     /** Герой-награда главы (`heroRecruits.ts`): имя и пришёл ли он уже. Нет — у главы награды-героя нет. */
     hero?: { name: string; joined: boolean };
+    /** Задачи следующего забега с наградой (`missionView.ts`) — названиями, а не числом. */
+    briefs: MissionBrief[];
   };
   /** Карта главы с тем, что игрок о ней знает (панель справа при выборе главы). */
   chapterMap(index: number): ChapterMapView | null;
@@ -86,14 +89,30 @@ export function chapterMapSvg(view: ChapterMapView): string {
     .map((c) =>
       c.side === 'you'
         ? `<rect class="home" x="${Math.round(c.x - r)}" y="${Math.round(c.y - r)}" width="${Math.round(r * 2)}" height="${Math.round(r * 2)}" transform="rotate(45 ${Math.round(c.x)} ${Math.round(c.y)})"/>`
-        : `<circle class="dot side-${c.side}" cx="${Math.round(c.x)}" cy="${Math.round(c.y)}" r="${Math.round(r * 0.55)}"/>` +
-          (c.objective ? `<circle class="target" cx="${Math.round(c.x)}" cy="${Math.round(c.y)}" r="${Math.round(r * 1.8)}"/>` : ''),
+        : `<circle class="dot side-${c.side}" cx="${Math.round(c.x)}" cy="${Math.round(c.y)}" r="${Math.round(r * 0.55)}"/>`,
     )
+    .join('');
+  // Цели задач — поверх, и в тумане тоже: задача сама называет место. Активная (следующий
+  // забег) — мятное кольцо с флажком, как метка в забеге; «позже» — приглушённый пунктир.
+  const targets = view.cells
+    .filter((c) => c.objective !== null)
+    .map((c) => {
+      const cx = Math.round(c.x);
+      const cy = Math.round(c.y);
+      const ring = `<circle class="target ${c.objective}" cx="${cx}" cy="${cy}" r="${Math.round(r * 1.8)}"/>`;
+      if (c.objective !== 'active') return ring;
+      const fx = Math.round(c.x + r * 1.3);
+      const fy = Math.round(c.y - r * 2.6);
+      return (
+        ring +
+        `<path class="flag" d="M${fx} ${fy + Math.round(r * 2)}V${fy}l${Math.round(r * 1.4)} ${Math.round(r * 0.5)}l${-Math.round(r * 1.4)} ${Math.round(r * 0.5)}"/>`
+      );
+    })
     .join('');
   return (
     `<svg viewBox="${Math.round(x)} ${Math.round(y)} ${Math.round(w)} ${Math.round(h)}" preserveAspectRatio="xMidYMid meet" role="img">` +
     `<defs><pattern id="sz-fog" width="${Math.round(r * 1.6)}" height="${Math.round(r * 1.6)}" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><rect width="100%" height="100%" class="fog-bg"/><line x1="0" y1="0" x2="0" y2="${Math.round(r * 1.6)}" class="fog-hatch"/></pattern></defs>` +
-    `<g class="cells">${cells}</g><g class="lanes">${lanes}</g><g class="marks">${marks}</g></svg>`
+    `<g class="cells">${cells}</g><g class="lanes">${lanes}</g><g class="marks">${marks}${targets}</g></svg>`
   );
 }
 
@@ -148,6 +167,17 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
           ...(info.cleared ? [t('sector-zero.chapter.cleared')] : []),
         ].join(' · ')
       : '';
+    // Задачи следующего забега — названиями и с наградой (заказ владельца 2026-09-24):
+    // «доп. задач: 3 из 5» не говорило, ЧТО делать и сколько за это придёт.
+    const tasks = el('sz-chapter-tasks');
+    const briefs = info?.briefs ?? [];
+    tasks.hidden = briefs.length === 0;
+    tasks.innerHTML = briefs
+      .map(
+        (b) =>
+          `<li><span>⚑ ${esc(t(b.id, { n: b.n }))}</span><em><i class="tw-data">◇ +${b.reward.research}</i> <i class="tw-warrants">⌖ +${b.reward.warrants}</i></em></li>`,
+      )
+      .join('');
     // Награда-герой: силуэт, пока он не пришёл, — цель видна до забега.
     const heroLine = el('sz-chapter-hero');
     heroLine.hidden = !info?.hero;
@@ -173,7 +203,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     el('sz-map-foot').innerHTML = view
       ? `<b>${t('sector-zero.map.scouted', { n: view.known, m: view.total })}</b>` +
         `<span class="lg you">${t('sector-zero.map.you')}</span><span class="lg hostile">${t('sector-zero.map.hostile')}</span>` +
-        `<span class="lg target">${t('sector-zero.map.target')}</span><span class="lg fog">${t('sector-zero.map.fog')}</span>`
+        `<span class="lg target">${t('sector-zero.map.target')}</span><span class="lg target-later">${t('sector-zero.map.target.later')}</span><span class="lg fog">${t('sector-zero.map.fog')}</span>`
       : '';
   }
   function openMap(): void {

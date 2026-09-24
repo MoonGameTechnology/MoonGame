@@ -13,10 +13,21 @@
  * **Как понять, где потерять нечего.** Два признака:
  * - `seed` — сид профиля, рождается один раз (`SectorZeroProgress.seed`). Один сид — одна
  *   родословная: тот же профиль на другом устройстве. Разные — это два разных профиля.
- * - номер правки `rev` растёт с каждым сохранением профиля, а устройство помнит
- *   `syncedRev` — номер облака, с которым оно сверялось в последний раз. Ушло вперёд
- *   только облако — его и берём; только устройство — отправляем; оба — развилка, и её
- *   решает игрок.
+ * - **родословная** `lineage` — для каждого устройства последний ЕГО номер правки, который
+ *   вошёл в этот профиль (вектор версий). Номер правки у каждого устройства свой, поэтому
+ *   сравниваются родословные, а не голые номера: в одной есть всё из другой — вперёд ушла
+ *   она; у каждой есть своё — развилка, и её решает игрок.
+ *
+ * **Почему не один номер на всех.** Раньше номер правки `rev` сравнивался с отметкой
+ * `syncedRev` как ОДНА история, хотя номера пишут разные устройства, а отметка ставится
+ * до того, как запись дошла (промис записи об успехе не сообщает). Устройство А отметило
+ * правку 11, запись пропала; Б взяло облачную 10 и записало свою 11. На старте А видело
+ * «облако 11 = моя сверка 11» и молча отвечало «совпадает», а следующее сохранение
+ * затирало прогресс Б. Запиши Б трижды — А так же молча брало облако и теряло свою
+ * правку. Родословная `{А:11}` против `{А:10, Б:11}` — развилка в обоих случаях.
+ *
+ * Запись без родословной (сохранена до неё) сверяется прежним правилом по номерам: такое
+ * бывает один раз, до первого сохранения после обновления.
  */
 
 import type { SectorZeroProgress } from './sectorZeroProgress';
@@ -50,6 +61,9 @@ export const profileNumbers = (
   sovereigns: p.sovereigns,
 });
 
+/** Родословная профиля: устройство → последний его номер правки, вошедший в профиль. */
+export type Lineage = Record<string, number>;
+
 /** Что лежит в облаке. Профиль и дескриптор забега — строками в своём формате: их
  *  разбирают свои парсеры (`parseSectorZeroProgress`, `parsePortableRun`). */
 export interface CloudProfile {
@@ -58,6 +72,8 @@ export interface CloudProfile {
   rev: number;
   progress: string;
   run?: string;
+  /** Нет — запись сделана до родословных. */
+  lineage?: Lineage;
 }
 
 /** Что устройство знает о себе. */
@@ -68,6 +84,8 @@ export interface LocalSync {
   syncedRev: number;
   /** Есть ли в локальном профиле что терять (`profileHasProgress`). */
   hasProgress: boolean;
+  /** Родословная локального профиля; нет — ещё не сохранялся после обновления. */
+  lineage?: Lineage;
 }
 
 export type CloudPlan =
@@ -83,6 +101,33 @@ export type CloudPlan =
 const count = (value: unknown): number | null =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
 
+/** Разбор родословной. Испорченная — как её отсутствие: сверка уйдёт в прежнее правило,
+ *  а не примет мусор за историю. */
+function parseLineage(value: unknown): Lineage | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out: Lineage = {};
+  for (const [device, rev] of Object.entries(value as Record<string, unknown>)) {
+    const n = count(rev);
+    if (!device || n === null) return undefined;
+    out[device] = n;
+  }
+  return out;
+}
+
+/** Как родословная `a` относится к `b`: та же, впереди (есть всё из `b` и больше),
+ *  позади или развилка (у каждой есть своё). */
+export function compareLineage(a: Lineage, b: Lineage): 'equal' | 'ahead' | 'behind' | 'forked' {
+  let ahead = false;
+  let behind = false;
+  for (const device of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const x = a[device] ?? 0;
+    const y = b[device] ?? 0;
+    if (x > y) ahead = true;
+    if (x < y) behind = true;
+  }
+  return ahead ? (behind ? 'forked' : 'ahead') : behind ? 'behind' : 'equal';
+}
+
 /** Разбор облачной записи. Чужая или испорченная запись — `null`, как «облака нет». */
 export function parseCloudProfile(raw: string | null): CloudProfile | null {
   if (!raw) return null;
@@ -97,12 +142,14 @@ export function parseCloudProfile(raw: string | null): CloudProfile | null {
   const rev = count(o.rev);
   if (o.v !== 1 || typeof o.seed !== 'string' || rev === null) return null;
   if (typeof o.progress !== 'string' || o.progress.length === 0) return null;
+  const lineage = parseLineage(o.lineage);
   return {
     v: 1,
     seed: o.seed,
     rev,
     progress: o.progress,
     ...(typeof o.run === 'string' && o.run ? { run: o.run } : {}),
+    ...(lineage ? { lineage } : {}),
   };
 }
 
@@ -119,15 +166,27 @@ export function planCloudSync(
 ): CloudPlan {
   if (!cloud || !cloudHasProgress) return 'upload';
   if (cloud.seed !== local.seed) return local.hasProgress ? 'choose' : 'adopt';
+  if (cloud.lineage && local.lineage) {
+    const order = compareLineage(local.lineage, cloud.lineage);
+    if (order === 'equal') return 'same';
+    if (order === 'ahead') return 'upload';
+    if (order === 'behind') return 'adopt';
+    return local.hasProgress ? 'choose' : 'adopt';
+  }
+  // Прежнее правило — для записи без родословной (см. шапку).
   if (cloud.rev > local.syncedRev) return local.rev > local.syncedRev ? 'choose' : 'adopt';
   // Облако не дальше последней сверки: либо совпадает, либо наша запись до него не дошла.
   return local.rev > cloud.rev ? 'upload' : 'same';
 }
 
-/** Локальная отметка сверки: номер своей правки и номер облака на последней сверке. */
+/** Локальная отметка сверки: номер своей правки, номер облака на последней сверке, имя
+ *  устройства и родословная локального профиля. Имя выдаёт хост (случайное, один раз):
+ *  здесь случайности нет. */
 export interface SyncMark {
   rev: number;
   syncedRev: number;
+  device?: string;
+  lineage?: Lineage;
 }
 
 /** Разбор отметки. Мусор — «не сверялось», а не падение. */
@@ -136,10 +195,36 @@ export function parseSyncMark(raw: string | null): SyncMark {
     const o = JSON.parse(raw ?? 'null') as Record<string, unknown> | null;
     const rev = count(o?.rev) ?? 0;
     const syncedRev = Math.min(count(o?.syncedRev) ?? 0, rev);
-    return { rev, syncedRev };
+    const device = typeof o?.device === 'string' && o.device ? o.device : undefined;
+    const lineage = device ? parseLineage(o?.lineage) : undefined;
+    return { rev, syncedRev, ...(device ? { device } : {}), ...(lineage ? { lineage } : {}) };
   } catch {
     return { rev: 0, syncedRev: 0 };
   }
+}
+
+/** Родословная с новой правкой этого устройства. Без имени устройства — как была. */
+const withOwn = (mark: SyncMark, rev: number, base?: Lineage): Lineage | undefined =>
+  mark.device ? { ...base, [mark.device]: rev } : base;
+
+/** Профиль сохранён — новая правка этого устройства. */
+export function bumpMark(mark: SyncMark): SyncMark {
+  const rev = mark.rev + 1;
+  const lineage = withOwn(mark, rev, mark.lineage);
+  return { ...mark, rev, ...(lineage ? { lineage } : {}) };
+}
+
+/**
+ * Облачный профиль взят: родословная — ровно облачная. Свой номер правки не откатывается
+ * назад — иначе следующая правка этого устройства повторила бы номер, который уже мог
+ * попасть в чью-то родословную.
+ */
+export function adoptMark(mark: SyncMark, cloud: Pick<CloudProfile, 'rev' | 'lineage'>): SyncMark {
+  const rev = Math.max(mark.rev, cloud.rev);
+  const next: SyncMark = { ...mark, rev, syncedRev: rev };
+  if (cloud.lineage) next.lineage = { ...cloud.lineage };
+  else delete next.lineage;
+  return next;
 }
 
 /**
@@ -151,7 +236,23 @@ export function parseSyncMark(raw: string | null): SyncMark {
  * `planCloudSync` прочтёт это как «наша запись не дошла»: то устройство молча отправит
  * свой профиль поверх выбора игрока. Отметка сверки — облако, которое игрок видел: не
  * дойдёт запись — следующий старт отправит профиль снова.
+ *
+ * Родословная — обе ветки развилки и новая правка сверху: выбор игрока «впереди» и
+ * облачной ветки, и своей, поэтому другое устройство его возьмёт, а не спросит снова.
  */
-export function keepLocalMark(mark: SyncMark, cloudRev: number): SyncMark {
-  return { rev: Math.max(mark.rev, cloudRev) + 1, syncedRev: cloudRev };
+export function keepLocalMark(
+  mark: SyncMark,
+  cloud: Pick<CloudProfile, 'rev' | 'lineage'>,
+): SyncMark {
+  const rev = Math.max(mark.rev, cloud.rev) + 1;
+  const merged: Lineage = { ...cloud.lineage };
+  for (const [device, n] of Object.entries(mark.lineage ?? {}))
+    merged[device] = Math.max(merged[device] ?? 0, n);
+  const lineage = withOwn(mark, rev, merged);
+  return {
+    ...mark,
+    rev,
+    syncedRev: cloud.rev,
+    ...(lineage && Object.keys(lineage).length ? { lineage } : {}),
+  };
 }

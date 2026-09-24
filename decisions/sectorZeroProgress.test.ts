@@ -13,6 +13,7 @@ import {
   sectorHullIds,
   sectorModuleIds,
   sectorSkillOpenTo,
+  sovereignRepairCost,
   WARRANTS_PER_REWARD,
   type SectorZeroProgress,
   type SectorProgressAction,
@@ -639,5 +640,24 @@ describe('SZE-5.3 — итог забега приносит дубли и че�
     expect(reread.moduleCopies).toEqual(after.moduleCopies);
     const { loot: _drop, ...oldRun } = after.lastRun!;
     expect(parseSectorZeroProgress(JSON.stringify({ ...after, lastRun: oldRun }), data).lastRun?.loot).toBeUndefined();
+  });
+});
+
+describe('ремонт в забеге за Суверены (заказ владельца 2026-09-24)', () => {
+  it('цена: 0 — чинить нечего; иначе не меньше одного, дальше по 25 HP', () => {
+    expect(sovereignRepairCost(0)).toBe(0);
+    expect(sovereignRepairCost(Number.NaN)).toBe(0);
+    expect(sovereignRepairCost(1)).toBe(1);
+    expect(sovereignRepairCost(25)).toBe(1);
+    expect(sovereignRepairCost(26)).toBe(2);
+    expect(sovereignRepairCost(300)).toBe(12);
+  });
+
+  it('списывает цену; не хватает или нечего чинить — отказ, кошелёк цел', () => {
+    const p = { ...fresh(), sovereigns: 12 };
+    expect(change(p, { kind: 'premium-repair', hull: 300 }).sovereigns).toBe(0);
+    expect(changeSectorZeroProgress(p, { kind: 'premium-repair', hull: 301 }, data)).toBeNull();
+    expect(changeSectorZeroProgress(p, { kind: 'premium-repair', hull: 0 }, data)).toBeNull();
+    expect(p.sovereigns).toBe(12);
   });
 });
