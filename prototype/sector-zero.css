@@ -51,6 +51,8 @@
 .sz-options button { flex: 1; min-height: 42px; padding: 8px; border: 1px solid #294550; color: var(--sz-muted); background: #07151f; font-size: 12px !important; }
 .sz-options button[aria-pressed="true"] { border-color: #8bbec2; color: #d7eeee; background: #16313d; }
 #sz-difficulty-hint { margin: 9px 0 0; color: var(--sz-muted); font-size: 11px; line-height: 1.5; }
+/* Чем уровни отличаются (заказ владельца 2026-09-23): пояснение выбранного — под кнопками. */
+#sz-difficulty-about { margin: 10px 0 0; color: #b0c7ce; font-size: 12px; line-height: 1.55; }
 /* Маршрут глав (PVR-6.9): от края сектора (слева) к эпицентру (справа). Линия пути
    «заражается» к центру — бирюза края переходит в фиолетовый и красный эпицентра. */
 .sz-route { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }

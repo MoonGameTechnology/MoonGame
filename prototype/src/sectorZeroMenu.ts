@@ -4,6 +4,7 @@ import { t } from '../../localization/runtime';
 import { esc } from './format';
 import {
   parseRunDifficulty,
+  runDifficultyAboutKey,
   runDifficultyKey,
   type RunDifficulty,
 } from '../../decisions/runDifficulty';
@@ -294,6 +295,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
           })
         : t('sector-zero.no-save');
     el('sz-difficulty-hint').hidden = !preview;
+    el('sz-difficulty-what').textContent = t(runDifficultyAboutKey(h.difficulty()));
     for (const button of difficulties) {
       const active = button.dataset.difficulty === h.difficulty();
       button.setAttribute('aria-pressed', String(active));
