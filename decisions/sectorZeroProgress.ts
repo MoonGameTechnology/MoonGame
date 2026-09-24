@@ -3,6 +3,7 @@
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
 import { forgeOutcome } from './sectorZeroForge';
+import { dailyOffers } from './sectorZeroShop';
 import {
   addLoot,
   moduleLadder,
@@ -265,7 +266,7 @@ export function sectorSkillLegal(
   const node = data.heroSkillTrees[id];
   if (!hero || !node) return false;
   return (
-    nodeOpenTo(node, progress.selectedHero, data) &&
+    sectorSkillOpenTo(node, progress.selectedHero, data) &&
     !hero.skills.includes(id) &&
     node.requires.every((r) => hero.skills.includes(r))
   );
@@ -286,7 +287,7 @@ export function sectorSkillLegal(
  * ядерному СЕЙЧАС, а не «когда понадобится»: иначе распарковка вернула бы вместе с
  * ветками и эту дыру, и искать её пришлось бы заново.
  */
-function nodeOpenTo(
+export function sectorSkillOpenTo(
   node: { branch?: string },
   archetype: string | undefined,
   data: GameData,
@@ -437,6 +438,11 @@ export function changeSectorZeroProgress(
       // Выдача и списание живут ВМЕСТЕ: разведи их — и однажды товар выдастся без оплаты.
       const offer = data.sectorZeroShop.offers[action.id];
       if (!offer || next.shopSold.includes(action.id)) return null;
+      // Продаётся только то, что СЕГОДНЯ на витрине (сутки и раунд профиля). Иначе ротация
+      // держалась бы одним интерфейсом, и вчерашний или никогда не выставлявшийся лот
+      // покупался бы в обход неё (ревью Sector Zero).
+      if (!dailyOffers(next.seed, next.day, data, next.shopRound).some((o) => o.id === action.id))
+        return null;
       const price = offer.prices[action.pay];
       if (price === undefined) return null; // этим способом товар не продаётся
       if (action.pay === 'warrants') {
@@ -513,7 +519,7 @@ export function changeSectorZeroProgress(
       if (
         !hero ||
         !node ||
-        !nodeOpenTo(node, action.hero, data) ||
+        !sectorSkillOpenTo(node, action.hero, data) ||
         hero.skills.includes(action.id) ||
         !node.requires.every((id) => hero.skills.includes(id)) ||
         !pay(sectorSkillCost(action.id, data))
@@ -686,8 +692,9 @@ export function parseSectorZeroProgress(
       const star = Math.min(data.sectorZeroStars.cap, value);
       if (star > 0) fresh.stars[id] = star;
     }
+    const hulls = sectorHullIds(data);
     for (const [hull, ids] of Object.entries(p.loadouts ?? {})) {
-      if (!sectorHullIds(data).includes(hull)) continue;
+      if (!hulls.includes(hull)) continue;
       const equipped: string[] = [];
       for (const id of strings(ids))
         if (fresh.modules.includes(id) && canEquip(hull, data.units[hull]!, equipped, id, data).ok)
@@ -708,7 +715,7 @@ export function parseSectorZeroProgress(
           const node = data.heroSkillTrees[skill];
           if (
             node &&
-            nodeOpenTo(node, id, data) &&
+            sectorSkillOpenTo(node, id, data) &&
             !hero.skills.includes(skill) &&
             node.requires.every((r) => hero.skills.includes(r))
           )
@@ -791,10 +798,7 @@ export function settleSectorZeroRun(
       chapter.id && tasks.done.length > done.length
         ? { ...progress.objectivesDone, [chapter.id]: tasks.done }
         : progress.objectivesDone,
-    chaptersWon:
-      won && chapter.id && !progress.chaptersWon.includes(chapter.id)
-        ? [...progress.chaptersWon, chapter.id]
-        : progress.chaptersWon,
+    chaptersWon: firstWin ? [...progress.chaptersWon, chapter.id] : progress.chaptersWon,
     chapterScouted: chapter.id
       ? {
           ...progress.chapterScouted,

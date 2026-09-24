@@ -57,14 +57,22 @@ describe('sectorZeroShop — витрина знает, чем можно пла
     const p = profile({ warrants: 9999, modules: ['cargo_bay', 'ion_engine', 'radar_module'] });
     expect(row(p, ALL, 'radar_module').owned).toBe(true);
     expect(priceOf(p, ALL, 'radar_module', 'warrants').can).toBe(true);
-    const bought = changeSectorZeroProgress(p, { kind: 'buy', id: 'radar_module', pay: 'warrants' }, data)!;
+    const bought = changeSectorZeroProgress(
+      dayWith(p, 'radar_module'),
+      { kind: 'buy', id: 'radar_module', pay: 'warrants' },
+      data,
+    )!;
     expect(bought.modules.filter((id) => id === 'radar_module')).toHaveLength(1);
     expect(bought.moduleCopies.radar_module).toBe(1);
   });
 
   it('лот чертежа кладёт чертёж своей ступени', () => {
     const p = profile({ sovereigns: 999 });
-    const bought = changeSectorZeroProgress(p, { kind: 'buy', id: 'blueprint_mythic', pay: 'sovereigns' }, data)!;
+    const bought = changeSectorZeroProgress(
+      dayWith(p, 'blueprint_mythic'),
+      { kind: 'buy', id: 'blueprint_mythic', pay: 'sovereigns' },
+      data,
+    )!;
     expect(bought.blueprints).toEqual({ mythic: 1 });
     expect(bought.sovereigns).toBe(999 - data.sectorZeroShop.offers.blueprint_mythic!.prices.sovereigns!);
   });
@@ -84,7 +92,11 @@ describe('sectorZeroShop — покупка доходит до профиля �
   const rich = () => profile({ warrants: 9999, sovereigns: 9999 });
 
   it('за Варранты: модуль открыт, кошелёк списан', () => {
-    const p = changeSectorZeroProgress(rich(), { kind: 'buy', id: 'targeting_array', pay: 'warrants' }, data)!;
+    const p = changeSectorZeroProgress(
+      dayWith(rich(), 'targeting_array'),
+      { kind: 'buy', id: 'targeting_array', pay: 'warrants' },
+      data,
+    )!;
     expect(p).not.toBeNull();
     expect(p.modules).toContain('targeting_array');
     expect(p.warrants).toBe(9999 - data.sectorZeroShop.offers.targeting_array!.prices.warrants!);
@@ -92,14 +104,22 @@ describe('sectorZeroShop — покупка доходит до профиля �
 
   it('за Суверены: ресурс начислен, списаны Суверены, а не Варранты', () => {
     const before = rich();
-    const p = changeSectorZeroProgress(before, { kind: 'buy', id: 'warrants_pack', pay: 'sovereigns' }, data)!;
+    const p = changeSectorZeroProgress(
+      dayWith(before, 'warrants_pack'),
+      { kind: 'buy', id: 'warrants_pack', pay: 'sovereigns' },
+      data,
+    )!;
     expect(p.warrants).toBe(before.warrants + data.sectorZeroShop.offers.warrants_pack!.amount);
     expect(p.sovereigns).toBeLessThan(before.sovereigns);
   });
 
   it('за рекламу: товар выдан, НИ ОДНА валюта не списана', () => {
     const before = profile({ warrants: 0, sovereigns: 0 });
-    const p = changeSectorZeroProgress(before, { kind: 'buy', id: 'data_small', pay: 'ad' }, data)!;
+    const p = changeSectorZeroProgress(
+      dayWith(before, 'data_small'),
+      { kind: 'buy', id: 'data_small', pay: 'ad' },
+      data,
+    )!;
     expect(p.research).toBe(before.research + data.sectorZeroShop.offers.data_small!.amount);
     expect([p.warrants, p.sovereigns]).toEqual([0, 0]);
   });
@@ -107,8 +127,13 @@ describe('sectorZeroShop — покупка доходит до профиля �
   it('отказ от рекламы ничего не ломает и не отнимает', () => {
     // Отказ = хозяин просто не зовёт действие. Профиль обязан остаться тем же объектом.
     const before = profile({ warrants: 500 });
-    expect(changeSectorZeroProgress(before, { kind: 'buy', id: 'data_small', pay: 'ad' }, data))
-      .not.toBe(before); // купил — новый профиль
+    expect(
+      changeSectorZeroProgress(
+        dayWith(before, 'data_small'),
+        { kind: 'buy', id: 'data_small', pay: 'ad' },
+        data,
+      ),
+    ).not.toBe(before); // купил — новый профиль
     expect(before.research).toBe(0); // а прежний не тронут
   });
 
@@ -120,12 +145,28 @@ describe('sectorZeroShop — покупка доходит до профиля �
 
   it('без денег, дважды и за несуществующий товар — отказ', () => {
     expect(
-      changeSectorZeroProgress(profile({ warrants: 1 }), { kind: 'buy', id: 'targeting_array', pay: 'warrants' }, data),
+      changeSectorZeroProgress(
+        dayWith(profile({ warrants: 1 }), 'targeting_array'),
+        { kind: 'buy', id: 'targeting_array', pay: 'warrants' },
+        data,
+      ),
     ).toBeNull();
     // Дважды за сутки — нет: купленный лот ушёл с прилавка (второй экземпляр — завтра, дублем).
-    const owned = changeSectorZeroProgress(rich(), { kind: 'buy', id: 'targeting_array', pay: 'warrants' }, data)!;
-    expect(changeSectorZeroProgress(owned, { kind: 'buy', id: 'targeting_array', pay: 'warrants' }, data)).toBeNull();
-    expect(changeSectorZeroProgress(rich(), { kind: 'buy', id: 'ghost', pay: 'warrants' }, data)).toBeNull();
+    const owned = changeSectorZeroProgress(
+      dayWith(rich(), 'targeting_array'),
+      { kind: 'buy', id: 'targeting_array', pay: 'warrants' },
+      data,
+    )!;
+    expect(
+      changeSectorZeroProgress(
+        owned,
+        { kind: 'buy', id: 'targeting_array', pay: 'warrants' },
+        data,
+      ),
+    ).toBeNull();
+    expect(
+      changeSectorZeroProgress(rich(), { kind: 'buy', id: 'ghost', pay: 'warrants' }, data),
+    ).toBeNull();
   });
 });
 
@@ -140,10 +181,44 @@ describe('sectorZeroShop — «площадка не умеет» и «тебе 
     expect(priceOf(p, NONE, 'void_attunement', 'warrants').available).toBe(true);
   });
 
+  it('«уже есть» у навыка — про ВЫБРАННОГО героя: знание другого героя покупку не закрывает', () => {
+    // Ревью Sector Zero: раньше хватало навыка у любого героя, и лот гас с «уже есть»,
+    // хотя покупка идёт выбранному (`buy` → selectedHero) и была бы законной.
+    const base = profile({ warrants: 9999 });
+    const other = Object.keys(data.heroes).find((id) => id !== base.selectedHero)!;
+    const p = {
+      ...base,
+      heroes: { ...base.heroes, [other]: { level: 1, skills: ['neural_lace'], equipped: [] } },
+    };
+    expect(row(p, ALL, 'neural_lace').owned).toBe(false);
+    const mine = {
+      ...base,
+      heroes: {
+        ...base.heroes,
+        [base.selectedHero]: { ...base.heroes[base.selectedHero]!, skills: ['neural_lace'] },
+      },
+    };
+    expect(priceOf(mine, ALL, 'neural_lace', 'warrants').reason).toBe('E_SHOP_OWNED');
+  });
+
   it('доступность способа не зависит от товара', () => {
     const p = profile({ warrants: 9999 });
     for (const id of ['data_small', 'radar_module'])
       expect([id, priceOf(p, ALL, id, 'ad')?.available]).toEqual([id, true]);
+  });
+});
+
+describe('sectorZeroShop — продаётся только сегодняшняя витрина (ревью Sector Zero)', () => {
+  it('лот, которого нет на витрине этих суток, не покупается', () => {
+    const p = profile({ warrants: 9999, sovereigns: 9999 });
+    const shelf = new Set(shopRows(p, data, ALL).map((r) => r.id));
+    const off = Object.keys(data.sectorZeroShop.offers).find((id) => !shelf.has(id))!;
+    const offer = data.sectorZeroShop.offers[off]!;
+    const pay = (['warrants', 'sovereigns'] as const).find((k) => offer.prices[k] !== undefined)!;
+    expect(changeSectorZeroProgress(p, { kind: 'buy', id: off, pay }, data)).toBeNull();
+    expect(
+      changeSectorZeroProgress(dayWith(p, off), { kind: 'buy', id: off, pay }, data),
+    ).not.toBeNull();
   });
 });
 
