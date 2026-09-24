@@ -13555,7 +13555,7 @@ function pushCloud(flush = false): void {
     // следующий старт отправит профиль снова (`planCloudSync`, «наша запись не дошла»).
     syncMark = { ...syncMark, syncedRev: syncMark.rev };
     writeSyncMark();
-    void getPlatform().save.save(envelope, { flush });
+    detach('облако: запись профиля', getPlatform().save.save(envelope, { flush }));
   });
 }
 /** Сверка на старте. Цепляется к записи профиля — меню ждёт её и сразу показывает
