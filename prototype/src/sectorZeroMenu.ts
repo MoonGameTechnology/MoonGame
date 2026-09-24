@@ -10,6 +10,20 @@ import {
 import type { RunPreview } from '../../decisions/sectorZeroMenu';
 import { CHAPTER_KEYS, chapterRoute, romanChapter } from '../../decisions/chapterRoute';
 import type { ChapterMapView } from '../../decisions/chapterMap';
+import type { ProfileNumbers } from '../../decisions/cloudSync';
+import { detach } from './detach';
+
+/** Вход площадки и облако профиля (`YAG-1.4`). Нет — площадка без облака: ни кнопки
+ *  входа, ни развилки. */
+export interface SectorZeroAccount {
+  /** Показать «Войти»: у площадки есть облако и вход, а игрок — гость. */
+  canSignIn(): boolean;
+  /** Окно входа площадки и сверка с облаком после него. */
+  signIn(): Promise<void>;
+  /** Развилка профилей — числа обоих; `null` — выбирать нечего. */
+  fork(): { here: ProfileNumbers; cloud: ProfileNumbers } | null;
+  choose(pick: 'here' | 'cloud'): Promise<void>;
+}
 
 export interface SectorZeroMenuHooks {
   root: HTMLElement;
@@ -40,7 +54,10 @@ export interface SectorZeroMenuHooks {
   back(): void;
   standalone: boolean;
   preparation: { open(): void; close(): void; isOpen(): boolean };
+  account?: SectorZeroAccount;
 }
+
+const numbersText = (n: ProfileNumbers): string => t('sector-zero.cloud.numbers', { ...n });
 
 /** Класс из id данных: только `[a-z0-9_-]`, чтобы вид сектора не нёс в разметку ничего чужого. */
 const cls = (id: string): string => id.toLowerCase().replace(/[^a-z0-9_-]/g, '');
@@ -87,6 +104,12 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   const newButton = el<HTMLButtonElement>('sz-new');
   const confirmation = el('sz-confirm');
   const actions = el('sz-actions');
+  const cloudChoice = el('sz-cloud-choice');
+  const signInRow = el('sz-signin-row');
+  const signInButton = el<HTMLButtonElement>('sz-signin');
+  const choiceButtons = ['sz-keep-here', 'sz-take-cloud'].map((id) => el<HTMLButtonElement>(id));
+  /** Окно входа открыто или выбор профиля применяется — второй тап ничего не начинает. */
+  let busy = false;
   const difficulties = ['weak', 'strong'].map((id) => el<HTMLButtonElement>(`sz-${id}`));
   // Маршрут глав (PVR-6.9): узел на главу от края сектора к эпицентру. Закрытые главы —
   // безымянным «сигнал потерян»: нажать можно (карточка скажет, что там), выбрать нельзя.
@@ -202,6 +225,19 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     }
     renderChapter();
     el('sz-back').hidden = h.standalone;
+    signInRow.hidden = loading || !h.account?.canSignIn();
+    signInButton.disabled = busy;
+    // Развилка заменяет кнопки меню: играть до выбора — значит играть профилем, который
+    // выбор может заменить.
+    const fork = loading ? null : (h.account?.fork() ?? null);
+    cloudChoice.hidden = !fork;
+    if (fork) {
+      actions.hidden = true;
+      confirmation.hidden = true;
+      el('sz-cloud-here').textContent = numbersText(fork.here);
+      el('sz-cloud-cloud').textContent = numbersText(fork.cloud);
+      for (const button of choiceButtons) button.disabled = busy;
+    }
   }
 
   function cancel(): void {
@@ -249,6 +285,32 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     h.startDev();
   });
   el('sz-cancel').addEventListener('click', cancel);
+  /** Действие с облаком, после которого профиль мог смениться: меню читается заново. */
+  function accountStep(what: string, step: () => Promise<void>): void {
+    if (loading || busy) return;
+    busy = true;
+    render();
+    detach(
+      what,
+      step().finally(() => {
+        busy = false;
+        return open();
+      }),
+    );
+  }
+  signInButton.addEventListener('click', () => {
+    const account = h.account;
+    if (account) accountStep('Sector Zero: вход площадки', () => account.signIn());
+  });
+  for (const [button, pick] of [
+    [choiceButtons[0]!, 'here'],
+    [choiceButtons[1]!, 'cloud'],
+  ] as const)
+    button.addEventListener('click', () => {
+      const account = h.account;
+      if (account && !cloudChoice.hidden)
+        accountStep('Sector Zero: выбор профиля', () => account.choose(pick));
+    });
   el('sz-replace').addEventListener('click', () => {
     if (loading || confirmation.hidden) return;
     hide();

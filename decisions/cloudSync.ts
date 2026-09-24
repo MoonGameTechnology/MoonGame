@@ -27,6 +27,29 @@ export const profileHasProgress = (
   p: Pick<SectorZeroProgress, 'nextAttempt' | 'research' | 'warrants' | 'sovereigns'>,
 ): boolean => p.nextAttempt > 1 || p.research > 0 || p.warrants > 0 || p.sovereigns > 0;
 
+/** Числа профиля для экрана выбора (`YAG-1.4`): по ним игрок и решает, какой оставить. */
+export interface ProfileNumbers {
+  /** Начатые забеги: счётчик попыток растёт на старте забега. */
+  runs: number;
+  chapters: number;
+  research: number;
+  warrants: number;
+  sovereigns: number;
+}
+
+export const profileNumbers = (
+  p: Pick<
+    SectorZeroProgress,
+    'nextAttempt' | 'chaptersWon' | 'research' | 'warrants' | 'sovereigns'
+  >,
+): ProfileNumbers => ({
+  runs: p.nextAttempt - 1,
+  chapters: p.chaptersWon.length,
+  research: p.research,
+  warrants: p.warrants,
+  sovereigns: p.sovereigns,
+});
+
 /** Что лежит в облаке. Профиль и дескриптор забега — строками в своём формате: их
  *  разбирают свои парсеры (`parseSectorZeroProgress`, `parsePortableRun`). */
 export interface CloudProfile {
@@ -117,4 +140,18 @@ export function parseSyncMark(raw: string | null): SyncMark {
   } catch {
     return { rev: 0, syncedRev: 0 };
   }
+}
+
+/**
+ * «Оставить этот» на развилке (`YAG-1.4`): отметка, с которой локальный профиль заменит
+ * облачный. «Взять из облака» отдельного правила не требует — это `adopt`.
+ *
+ * Номер правки — ВПЕРЕДИ облачного, а не свой. Другое устройство последний раз сверялось
+ * с `cloudRev`; запиши мы свой номер, а он меньше, — облако окажется ПОЗАДИ его сверки, и
+ * `planCloudSync` прочтёт это как «наша запись не дошла»: то устройство молча отправит
+ * свой профиль поверх выбора игрока. Отметка сверки — облако, которое игрок видел: не
+ * дойдёт запись — следующий старт отправит профиль снова.
+ */
+export function keepLocalMark(mark: SyncMark, cloudRev: number): SyncMark {
+  return { rev: Math.max(mark.rev, cloudRev) + 1, syncedRev: cloudRev };
 }

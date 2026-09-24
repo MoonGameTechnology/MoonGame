@@ -3414,6 +3414,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
           </div>
+          <p id="sz-signin-row" class="sz-signin" hidden><button id="sz-signin" type="button" data-i18n="sector-zero.signin"></button><span data-i18n="sector-zero.signin.why"></span></p>
           <fieldset class="sz-difficulty sz-route-box">
             <legend data-i18n="sector-zero.mission"></legend>
             <div id="sz-route" class="sz-route"></div>
@@ -3434,6 +3435,12 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <p data-i18n="sector-zero.confirm.body"></p>
           <button id="sz-cancel" class="sz-action" type="button" data-i18n="sector-zero.cancel"></button>
           <button id="sz-replace" class="sz-action sz-primary" type="button" data-i18n="sector-zero.confirm"></button>
+        </div>
+        <div id="sz-cloud-choice" hidden role="group" aria-labelledby="sz-cloud-title">
+          <h2 id="sz-cloud-title" data-i18n="sector-zero.cloud.choice.title"></h2>
+          <p data-i18n="sector-zero.cloud.choice.body"></p>
+          <div class="sz-cloud-side"><b data-i18n="sector-zero.cloud.here"></b><p id="sz-cloud-here"></p><button id="sz-keep-here" class="sz-action" type="button" data-i18n="sector-zero.cloud.keep-here"></button></div>
+          <div class="sz-cloud-side"><b data-i18n="sector-zero.cloud.cloud"></b><p id="sz-cloud-cloud"></p><button id="sz-take-cloud" class="sz-action" type="button" data-i18n="sector-zero.cloud.take-cloud"></button></div>
         </div>
         <div class="sz-tools"><button id="sz-settings" type="button" data-i18n="hub.tile.settings"></button><button id="sz-back" type="button" data-i18n="sector-zero.back"></button></div>
       </div>
