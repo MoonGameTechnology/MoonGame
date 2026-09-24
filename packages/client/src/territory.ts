@@ -61,6 +61,10 @@ export interface TerritoryPalette {
    *  barrier: a caller without link data must not invent one, and a caller that has it
    *  must also respect fog — an unscouted approach is «unknown», not «closed». */
   sealed?: (a: number, b: number) => boolean;
+  /** `false` paints the cells only and leaves the borders to the caller — the living
+   *  border (M2.11) strokes them every frame from {@link classifyBorders}, so baking them
+   *  here as well would draw each line twice, once frozen. Default: stroke them. */
+  strokeBorders?: boolean;
 }
 
 /** Sentinel edge-tag: this province edge sits on the map boundary, not a neighbour. */
@@ -195,11 +199,48 @@ export function drawTerritory(
   }
 
   // Pass 2 — classify every cell edge (pure, see classifyBorders), then stroke.
-  const { ownedFront, ownedInner, neutralEdge, sealedEdge } = classifyBorders(
-    cells,
-    seeds,
-    palette.sealed,
-  );
+  if (palette.strokeBorders !== false)
+    strokeBorders(g, classifyBorders(cells, seeds, palette.sealed), palette);
+  return cells;
+}
+
+/** Where a border point lands on the canvas. The baked map leaves points where they are;
+ *  the living border (M2.11) shifts them with the clock. It must be a function of the
+ *  POINT alone: two cells hand their shared border in with the same coordinates and must
+ *  get the same answer back, or the line splits into two. */
+export type BorderProjection = (x: number, y: number) => readonly [number, number];
+
+/** Stroke classified borders: same-owner inner hairlines, neutral divisions, glowing owner
+ *  frontiers and shut borders. The political STYLES live here and only here, so the baked
+ *  map and the living border cannot drift apart in colour or weight.
+ *
+ *  `at` moves every point (omit — they stay put), `keep` drops a segment before it costs
+ *  anything (omit — all are drawn). Each class is prepared once and stroked from that,
+ *  so the frontier's two passes do not project the same points twice. */
+export function strokeBorders(
+  g: CanvasRenderingContext2D,
+  borders: ClassifiedBorders,
+  palette: Pick<TerritoryPalette, 'ownerColor' | 'hideOwnedInner' | 'provinceDetail'>,
+  at?: BorderProjection,
+  keep?: (seg: BorderSegment) => boolean,
+): void {
+  const detail = palette.provinceDetail ?? 1;
+  const { ownedFront, ownedInner, neutralEdge, sealedEdge } = borders;
+  const prepare = (segs: BorderSegment[]): BorderSegment[] => {
+    if (!at && !keep) return segs;
+    const out: BorderSegment[] = [];
+    for (const sg of segs) {
+      if (keep && !keep(sg)) continue;
+      if (!at) {
+        out.push(sg);
+        continue;
+      }
+      const [x0, y0] = at(sg[0], sg[1]);
+      const [x1, y1] = at(sg[2], sg[3]);
+      out.push([x0, y0, x1, y1]);
+    }
+    return out;
+  };
   const strokeSegs = (segs: BorderSegment[], style: string, width: number): void => {
     if (segs.length === 0) return;
     g.strokeStyle = style;
@@ -216,12 +257,13 @@ export function drawTerritory(
   g.lineCap = 'round';
   if (!palette.hideOwnedInner && detail > 0) {
     for (const [owner, segs] of ownedInner)
-      strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3 * detail), 0.65); // inner hairlines
+      strokeSegs(prepare(segs), rgba(palette.ownerColor(owner), 0.3 * detail), 0.65); // inner hairlines
   }
-  if (detail > 0) strokeSegs(neutralEdge, rgba('#5fb0c5', 0.55 * detail), 0.75);
-  for (const [owner, segs] of ownedFront)
+  if (detail > 0) strokeSegs(prepare(neutralEdge), rgba('#5fb0c5', 0.55 * detail), 0.75);
+  const fronts = [...ownedFront].map(([owner, segs]) => [owner, prepare(segs)] as const);
+  for (const [owner, segs] of fronts)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
-  for (const [owner, segs] of ownedFront)
+  for (const [owner, segs] of fronts)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.85), 1.15); // frontier crisp
   // A border with no lane across it, drawn LAST so it reads over whatever political
   // border it shares the line with. Dashed and off-palette on purpose: everything else
@@ -229,11 +271,10 @@ export function drawTerritory(
   // «whose». Same violet the rift kind carries in the catalogue.
   if (sealedEdge.length > 0 && detail > 0) {
     g.setLineDash([5, 4]);
-    strokeSegs(sealedEdge, rgba('#9268b0', 0.85 * detail), 1.6);
+    strokeSegs(prepare(sealedEdge), rgba('#9268b0', 0.85 * detail), 1.6);
     g.setLineDash([]);
   }
   g.restore();
-  return cells;
 }
 
 /** A cell edge as a stroke segment: [x0, y0, x1, y1]. */
