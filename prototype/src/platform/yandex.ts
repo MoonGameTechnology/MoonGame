@@ -388,6 +388,7 @@ export function createYandexPlatform(
           return null;
         }
       },
+      fits: (snapshot) => cloudBytes(snapshot) <= CLOUD_LIMIT_BYTES,
       save(snapshot, saveOptions) {
         // Сверх лимита площадка запись отвергнет — не тратим на неё квоту. Локальная копия
         // остаётся источником, а сбой уходит в журнал разработчика.
