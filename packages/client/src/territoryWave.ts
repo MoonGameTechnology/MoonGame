@@ -25,8 +25,15 @@
  *
  * Дробление грани идёт по ДЛИНЕ, а не фиксированным числом: одну и ту же грань обе ячейки
  * разбивают одинаково, и точки совпадают.
+ *
+ * 4. **Край карты не волнуется** (замечание владельца 2026-09-24: «у провинций у края
+ *    карты не должно быть своих волнистых краёв»). Край рисует сама карта — рамка
+ *    голограммы или контур доски, — и провинция доходит до него ровно. Неподвижны точки
+ *    грани края и обе её вершины; вершину, где граница двух провинций упирается в край,
+ *    обе ячейки видят концом своей грани края и оставляют на месте одинаково — правило 1
+ *    не нарушается.
  */
-import type { TerritoryCell } from './territory';
+import { BOUNDARY, type TerritoryCell } from './territory';
 
 /** Настройка волны. Единицы — те же, в которых пришли ячейки (локальные координаты
  *  мозаики), поэтому вызывающий переводит их из мировых сам. */
@@ -67,7 +74,7 @@ export function edgeSteps(len: number, segment: number): number {
  * Та же мозаика, но грани — живые линии. Возвращает НОВЫЕ ячейки: полигон раздроблен и
  * смещён, а `tags` растянуты параллельно, чтобы каждый кусочек грани знал того же соседа,
  * что и грань целиком. Это важно не для красоты, а для правильности: по `tags` границы
- * классифицируются (своя / чужая / закрытая), и разъехавшийся массив покрасил бы куски
+ * классифицируются (своя / чужая / край карты), и разъехавшийся массив покрасил бы куски
  * одной границы в разные цвета.
  *
  * Заливка и обводка потом идут по ОДНОМУ и тому же полигону — иначе закрашенная
@@ -81,10 +88,11 @@ export function waveCells(cells: readonly TerritoryCell[], cfg: WaveConfig): Ter
     if (n < 3) return cell;
     const poly: Array<[number, number]> = [];
     const tags: number[] = [];
+    const edge = (k: number): boolean => (cell.tags[(k + n) % n] ?? BOUNDARY) === BOUNDARY;
     for (let k = 0; k < n; k++) {
       const p = cell.poly[k]!;
       const q = cell.poly[(k + 1) % n]!;
-      const tag = cell.tags[k] ?? -1;
+      const tag = cell.tags[k] ?? BOUNDARY;
       const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
       const steps = edgeSteps(len, cfg.segment);
       // Конец грани НЕ добавляется: он же — начало следующей, и дубль замкнул бы
@@ -93,7 +101,9 @@ export function waveCells(cells: readonly TerritoryCell[], cfg: WaveConfig): Ter
         const t = i / steps;
         const x = p[0] + (q[0] - p[0]) * t;
         const y = p[1] + (q[1] - p[1]) * t;
-        const [dx, dy] = waveOffset(x, y, cfg);
+        // Правило 4: грань края и её вершины (вершина k — конец грани k−1) стоят.
+        const still = edge(k) || (i === 0 && edge(k - 1));
+        const [dx, dy] = still ? [0, 0] : waveOffset(x, y, cfg);
         poly.push([x + dx, y + dy]);
         tags.push(tag);
       }

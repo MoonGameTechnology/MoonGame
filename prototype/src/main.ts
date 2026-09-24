@@ -26,7 +26,6 @@ import {
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
-  isImpassableKind,
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
   DAY,
@@ -263,7 +262,6 @@ import {
   type RunDifficulty,
 } from '../../decisions/runDifficulty';
 import { medalBadges } from '../../decisions/unitMedals';
-import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
@@ -4873,24 +4871,6 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
   // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
   // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
-  // MAP-SEAL: граница, через которую нет пути, молча обещает переход. С M4.3 клиенту
-  // больше не нужно об этом ДОГАДЫВАТЬСЯ: соседство выводится из мозаики, и ядро
-  // публикует `Planet.sealed` — границы, закрытые местностью. Само правило (что считать
-  // барьером и когда о нём молчать) — чистое решение, общее обоим клиентам:
-  // `decisions/sealedBorder.ts`.
-  const sealedBorder = (a: number, b: number): boolean => {
-    const ia = provinceIds[a];
-    const ib = provinceIds[b];
-    if (ia === undefined || ib === undefined) return false;
-    const seen = (id: string): boolean => known(id) || memory.has(id);
-    const side = (id: string): SealSide => ({
-      id,
-      ...(s.planets[id]?.sealed ? { sealed: s.planets[id]!.sealed } : {}),
-      impassable: isImpassableKind(s.planets[id]?.kind),
-      seen: seen(id),
-    });
-    return isSealedBorder(side(ia), side(ib));
-  };
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
@@ -4898,13 +4878,12 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
       : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographicMapOn(),
     provinceDetail: lod.provinceDetail,
-    sealed: sealedBorder,
     // M2.11: на голографической карте граница живёт, как рамка, — её рисует кадр, а не
     // выпечка. Запеки её и здесь — линия легла бы дважды, одна из них застывшей.
     strokeBorders: !holographicMapOn(),
   }, territoryGeometry.project(seeds, clip, cam.scale, provinceWave()));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
-  provinceBorders = holographicMapOn() ? classifyBorders(cells, seeds, sealedBorder) : null;
+  provinceBorders = holographicMapOn() ? classifyBorders(cells, seeds) : null;
   terrainFields = [];
   if (holographicMapOn() && lod.art > 0) {
     g.save();
@@ -4978,23 +4957,24 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   if (holographicMapOn()) g.restore();
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  if (!holographicMapOn()) {
-    // На картах Фронтира территория обрезается выпуклым контуром галактики
-    // (`provinceClip`), а рамка рисовалась прежним прямоугольником — между ними
-    // оставалась широкая пустая полоса, и рамка переставала обозначать край доски.
-    // Рисуем то же, чем обрезаем; прочие карты сохраняют прямоугольник.
-    if (galaxyOutline.length) {
-      g.beginPath();
-      galaxyOutline.forEach((pt, i) => {
-        const v = world(pt);
-        if (i === 0) g.moveTo(v.x, v.y);
-        else g.lineTo(v.x, v.y);
-      });
-      g.closePath();
-      g.stroke();
-    } else {
-      g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
-    }
+  // На картах Фронтира территория обрезается выпуклым контуром галактики
+  // (`provinceClip`), а рамка рисовалась прежним прямоугольником — между ними
+  // оставалась широкая пустая полоса, и рамка переставала обозначать край доски.
+  // Рисуем то же, чем обрезаем; прочие карты сохраняют прямоугольник.
+  // Край доски — линия КАРТЫ, а не провинций (владелец 2026-09-24): `classifyBorders`
+  // больше не обводит грани края. Прямоугольник на голограмме — это рамка стекла,
+  // контур галактики там рисует только эта линия, поэтому он идёт в обоих режимах.
+  if (galaxyOutline.length) {
+    g.beginPath();
+    galaxyOutline.forEach((pt, i) => {
+      const v = world(pt);
+      if (i === 0) g.moveTo(v.x, v.y);
+      else g.lineTo(v.x, v.y);
+    });
+    g.closePath();
+    g.stroke();
+  } else if (!holographicMapOn()) {
+    g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }
   if (g === bgx && !bgx.isContextLost?.()) {
     bgContent = terrainRaster.pending ? '' : content;
