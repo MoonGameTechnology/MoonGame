@@ -272,6 +272,7 @@ import { missionBriefs, missionLabelN, missionRows, type MissionReward, type Mis
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
 import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
+import { grantTokenHeroes } from '../../decisions/heroTokens';
 import {
   adoptMark,
   bumpMark,
@@ -13918,8 +13919,11 @@ function drawMissionTargets(): void {
 function saveSectorProgress(next: SectorZeroProgress): void {
   // Победа в главе приводит её героя (решение владельца 2026-09-23) — на любом пути засчёта.
   const granted = grantChapterHeroes(next, sectorChapterIds(), data);
-  next = granted.progress;
-  for (const id of granted.joined)
+  // Герой, для которого набралось 10 жетонов (`heroTokens.ts`), — тоже на любом пути:
+  // жетоны приходят и с итогов забега, и из магазина.
+  const byTokens = grantTokenHeroes(granted.progress, data);
+  next = byTokens.progress;
+  for (const id of [...granted.joined, ...byTokens.joined])
     note(t('sector-zero.hero.joined', { name: tData(data.heroes[id]?.name ?? id) }));
   // Что открыла эта запись (`YAG-5.1`). Облако и загрузка кладут профиль мимо этой функции,
   // поэтому принесённое с другого устройства за открытие здесь не считается.

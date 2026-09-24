@@ -994,12 +994,13 @@ export const SectorZeroPriceSchema = z.object({
 });
 
 /** Один лот витрины. `grants` трактуется по `kind`: id модуля, id узла навыка, имя
- *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount` — либо ступень
- *  редкости чертежа (`blueprint`, SZE-5.3: `unique` / `mythic` / `legendary`). */
+ *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount` — ступень
+ *  редкости чертежа (`blueprint`, SZE-5.3: `unique` / `mythic` / `legendary`) либо id
+ *  героя, чьи жетоны продаются (`hero-tokens`, тоже с `amount`). */
 export const SectorZeroOfferSchema = z.object({
-  kind: z.enum(['module', 'skill', 'resource', 'blueprint']),
+  kind: z.enum(['module', 'skill', 'resource', 'blueprint', 'hero-tokens']),
   grants: z.string(),
-  /** Сколько выдать. Значим только для `kind: 'resource'`. */
+  /** Сколько выдать. Значим для `kind: 'resource'` и `'hero-tokens'`. */
   amount: z.number().int().positive().default(1),
   prices: SectorZeroPriceSchema.prefault({}),
   /** Вес в суточной ротации (`SZE-3.2`): чем больше, тем чаще лот попадает на витрину.
