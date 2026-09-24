@@ -531,9 +531,9 @@ export {
 } from './modules/technology';
 export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
-export { stationModule, STATION_COST } from './modules/station';
+export { stationModule, STATION_COST, STATION_CORE } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';
-export { technologyModule, technologyLock, conditionMet } from './modules/technology';
+export { technologyModule, technologyLock, conditionMet, technologiesUnlocking } from './modules/technology';
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { veteranModule } from './modules/veteran';
