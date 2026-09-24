@@ -298,9 +298,15 @@ import {
 } from '../../decisions/sectorZeroTools';
 import { initSectorZeroMenu, type SectorZeroAccount } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
-import { runWalletHtml } from './runWallet';
+import { initRunWallet } from './runWallet';
 import { getPlatform, type PlatformHost } from './platform/host';
-import { advanceShopDay, doubleReward, localShopDay, shopCapabilities } from '../../decisions/sectorZeroShop';
+import {
+  adSovereigns,
+  advanceShopDay,
+  doubleReward,
+  localShopDay,
+  shopCapabilities,
+} from '../../decisions/sectorZeroShop';
 import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
@@ -1590,8 +1596,6 @@ const topEl = $('top');
 const tbName = $('tbname');
 const tbPlace = $('tbplace');
 const tbScore = $('tbscore');
-const tbWallet = $('tbwallet');
-let lastWalletHtml = '';
 const tbDay = $('tbday');
 const tbEta = $('tbeta');
 const bannerEl = $('banner');
@@ -13779,6 +13783,22 @@ function changeSectorProgress(action: SectorProgressAction): boolean {
   saveSectorProgress(next);
   return true;
 }
+
+// Кошелёк профиля в шапке забега и «+» у Суверенов (`run.sovereigns`, решение владельца
+// 2026-09-24): тот же кран, что кнопка магазина — одна порция, один дневной лимит. Сутки
+// сверяются до предложения, иначе вчерашний исчерпанный лимит прятал бы «+» до выхода в меню.
+const runWallet = initRunWallet({
+  root: $('tbwallet'),
+  wallet: () => (sectorZeroToolsHidden() ? sectorProgress : null),
+  offer: () => {
+    syncShopDay();
+    const ad = adSovereigns(sectorProgress, data, shopCapabilities(platform.capabilities));
+    return ad.state === 'ready' ? { amount: ad.amount, left: ad.left } : null;
+  },
+  watchAd,
+  apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),
+  note,
+});
 const sectorZeroMenu = initSectorZeroMenu({
   root: $('sector-zero'),
   standalone: document.body.dataset.entry === 'sector-zero',
@@ -14247,12 +14267,7 @@ function frame(nowReal: number) {
   const eta = countdownHMS(DAY - (s.time % DAY));
   // Шапка забега (решение владельца 2026-09-24): вместо эмблемы, очков и дня — кошелёк
   // профиля, живой: награда или ролик посреди забега видны сразу.
-  const walletHtml = sectorZeroToolsHidden() ? runWalletHtml(sectorProgress) : '';
-  if (walletHtml !== lastWalletHtml) {
-    tbWallet.innerHTML = walletHtml;
-    tbWallet.hidden = !walletHtml;
-    lastWalletHtml = walletHtml;
-  }
+  runWallet.render();
   const topText = topSignature(nick, myPlace, seats, score, d, eta);
   if (topText !== lastTopText) {
     tbName.textContent = nick;

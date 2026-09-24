@@ -175,6 +175,13 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #tbwallet .tw-data{color:var(--cur-data);}
 #tbwallet .tw-warrants{color:var(--cur-warrants);}
 #tbwallet .tw-sovereigns{color:var(--cur-sovereigns);}
+/* «+» у Суверенов раскрывает кнопку ролика под кошельком (run.sovereigns) */
+#tbwallet{position:relative;}
+#tbwallet .tw-plus{min-width:26px;height:24px;margin-left:-4px;border-radius:999px;border:1px solid var(--cur-sovereigns);
+  background:color-mix(in srgb,var(--cur-sovereigns) 22%,transparent);color:var(--cur-sovereigns);font:700 14px/1 ui-monospace,monospace;cursor:pointer;}
+#tbwallet .tw-ad{position:absolute;top:calc(100% + 6px);right:0;z-index:40;white-space:nowrap;padding:8px 14px;border-radius:10px;
+  border:1px solid var(--cur-sovereigns);background:rgba(20,16,4,.96);color:var(--cur-sovereigns);font:600 13px/1.3 system-ui,sans-serif;cursor:pointer;
+  box-shadow:0 6px 20px rgba(0,0,0,.5);}
 /* day card: current game day over a countdown to the next one. Mock palette: neutral
    outline, teal day, grey countdown. */
 #daycard{flex:0 0 auto;margin-left:10px;padding:5px 12px;border-radius:10px;text-align:center;
