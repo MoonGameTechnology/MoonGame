@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { setLocale } from '../../localization/runtime';
-import { runWalletHtml } from './runWallet';
+import { initRunWallet, runWalletHtml, type RunWalletHost } from './runWallet';
+import type { AdOutcome } from '../../decisions/adPlacements';
 
 beforeAll(() => setLocale('ru'));
 
@@ -27,6 +28,106 @@ describe('кошелёк профиля в шапке забега (решени
   });
 });
 
+describe('Суверены за ролик прямо в забеге (решение владельца 2026-09-24)', () => {
+  const w = { research: 1, warrants: 2, sovereigns: 7 };
+
+  it('«+» у Суверенов есть, только пока ролик доступен', () => {
+    expect(runWalletHtml(w, { amount: 2, left: 3, open: false })).toContain('data-wallet="more"');
+    expect(runWalletHtml(w, null)).not.toContain('data-wallet');
+  });
+
+  it('ролик запускает только раскрытая кнопка, и на ней сказано, что будет ролик и что придёт', () => {
+    // Требование площадки 4.5.1: голый «+» не говорит ни того, ни другого.
+    expect(runWalletHtml(w, { amount: 2, left: 3, open: false })).not.toContain(
+      'data-wallet="watch"',
+    );
+    const open = runWalletHtml(w, { amount: 2, left: 3, open: true });
+    expect(open).toMatch(/data-wallet="watch"[^>]*>\+2 ◆ за рекламу · осталось 3</);
+  });
+});
+
+describe('кошелёк: ролик только по раскрытой кнопке', () => {
+  /** Корень без DOM: vitest здесь без jsdom, а кошельку нужны лишь разметка и клик. */
+  function harness(outcome: Promise<AdOutcome>, inRun = true) {
+    let click: (ev: { target: unknown }) => void = () => {};
+    const root = {
+      innerHTML: '',
+      hidden: true,
+      addEventListener: (_: string, fn: typeof click) => (click = fn),
+    };
+    const calls = { ads: [] as string[], applied: 0, notes: [] as string[] };
+    let sovereigns = 7;
+    let left = 3;
+    const host: RunWalletHost = {
+      root: root as unknown as HTMLElement,
+      wallet: () => (inRun ? { research: 1, warrants: 2, sovereigns } : null),
+      offer: () => (left > 0 ? { amount: 2, left } : null),
+      watchAd: (placement) => (calls.ads.push(placement), outcome),
+      apply: () => {
+        calls.applied++;
+        sovereigns += 2;
+        left--;
+        return true;
+      },
+      note: (msg) => calls.notes.push(msg),
+    };
+    const wallet = initRunWallet(host);
+    const press = (which: string) =>
+      click({ target: { closest: () => ({ dataset: { wallet: which } }) } });
+    return { root, calls, wallet, press };
+  }
+
+  it('кадр рисует кошелёк с «+», но без кнопки ролика — ролика нет', () => {
+    const { root, calls, wallet } = harness(Promise.resolve('ok'));
+    wallet.render();
+    expect(root.hidden).toBe(false);
+    expect(root.innerHTML).toContain('data-wallet="more"');
+    expect(root.innerHTML).not.toContain('data-wallet="watch"');
+    expect(calls.ads).toEqual([]);
+  });
+
+  it('«+» раскрывает кнопку, повторный «+» прячет — и ни разу не зовёт ролик', () => {
+    const { root, calls, wallet, press } = harness(Promise.resolve('ok'));
+    wallet.render();
+    press('more');
+    expect(root.innerHTML).toContain('data-wallet="watch"');
+    press('more');
+    expect(root.innerHTML).not.toContain('data-wallet="watch"');
+    expect(calls.ads).toEqual([]);
+  });
+
+  it('досмотренный ролик — `run.sovereigns`, начисление и строка в ленте', async () => {
+    const { root, calls, wallet, press } = harness(Promise.resolve('ok'));
+    wallet.render();
+    press('more');
+    press('watch');
+    press('watch'); // второе нажатие, пока ролик идёт, второго ролика не зовёт
+    await Promise.resolve();
+    expect(calls.ads).toEqual(['run.sovereigns']);
+    expect(calls.applied).toBe(1);
+    expect(calls.notes).toEqual(['Получено: +2 ◆.']);
+    expect(root.innerHTML).toMatch(/tw-sovereigns[^>]*>.*◆.*9<\/span>/);
+  });
+
+  it('не досмотрел или адаптер сломан — ничего не начислено', async () => {
+    const skipped = harness(Promise.resolve('cancelled'));
+    skipped.press('watch');
+    const broken = harness(Promise.reject(new Error('sdk')));
+    broken.press('watch');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(skipped.calls.applied + broken.calls.applied).toBe(0);
+    expect(skipped.calls.notes).toHaveLength(1);
+    expect(broken.calls.notes).toHaveLength(1);
+  });
+
+  it('вне забега кошелька нет', () => {
+    const { root, wallet } = harness(Promise.resolve('ok'), false);
+    wallet.render();
+    expect(root.innerHTML).toBe('');
+    expect(root.hidden).toBe(true);
+  });
+});
+
 describe('шапка забега — проводка в кадре', () => {
   // Кадр — единственное место, где признак забега доходит до шапки.
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
@@ -37,11 +138,16 @@ describe('шапка забега — проводка в кадре', () => {
     );
   });
 
-  it('кошелёк — только в забеге, из профиля', () => {
-    expect(main).toContain(
-      "const walletHtml = sectorZeroToolsHidden() ? runWalletHtml(sectorProgress) : '';",
+  it('кошелёк — только в забеге, из профиля, и кадр перерисовывает его', () => {
+    expect(main).toContain('wallet: () => (sectorZeroToolsHidden() ? sectorProgress : null),');
+    expect(main).toMatch(/\n {2}runWallet\.render\(\);/);
+  });
+
+  it('ролик в кошельке — те же порция и дневной лимит, что у магазина, по сегодняшним суткам', () => {
+    expect(main).toMatch(
+      /offer: \(\) => \{\s*syncShopDay\(\);\s*const ad = adSovereigns\(sectorProgress, data, shopCapabilities\(platform\.capabilities\)\);/,
     );
-    expect(main).toContain('tbWallet.hidden = !walletHtml;');
+    expect(main).toContain("apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),");
   });
 
   it('плашка-заглушка Суверенов в строке статуса в забеге не рисуется', () => {

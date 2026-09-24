@@ -167,6 +167,19 @@ try {
     if (await page.locator('#sz-replace').isVisible()) await page.locator('#sz-replace').click();
     await page.waitForFunction(() => window.__szTest.run() === true);
     await page.locator('#maploading').waitFor({ state: 'hidden' });
+    // «+» у Суверенов в шапке забега (`run.sovereigns`, решение владельца 2026-09-24): сам
+    // «+» ролик не зовёт, он раскрывает кнопку, на которой сказано, что будет реклама и что
+    // придёт; ролик — по ней. Дев-сборка симулирует рекламу, порция приходит сразу.
+    const progress = () => page.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1')));
+    const beforeAd = await progress();
+    await page.locator('#tbwallet [data-wallet="more"]').click();
+    assert.equal((await progress()).sovereigns, beforeAd.sovereigns, '«+» сам ролик не зовёт');
+    await page.locator('#tbwallet [data-wallet="watch"]').click();
+    await page.waitForFunction(
+      (before) => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).sovereigns === before.sovereigns + 2,
+      beforeAd,
+    );
+    await page.locator('#tbwallet .tw-sovereigns', { hasText: String(beforeAd.sovereigns + 2) }).waitFor();
     await page.evaluate(() => window.__szTest.end());
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#endscreen .es-run li.task').count(), 3, 'три задачи главы II');
@@ -212,7 +225,7 @@ try {
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
+      ' «+» у Суверенов даёт ролик прямо в забеге; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶\n',
   );
 } finally {
