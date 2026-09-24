@@ -31,6 +31,7 @@ import {
   previewLossCount,
   stewardUnlocked,
   veteranFactor,
+  veteranHull,
 } from '@void/shared-core';
 import type {
   Battle,
@@ -41,6 +42,7 @@ import type {
   FleetId,
   GameData,
   GameState,
+  MatchConfig,
   PlanetId,
   PlayerId,
   ResourceId,
@@ -777,6 +779,10 @@ export interface BattleSideView {
    *  бывает несколько сторон, множитель у них пулится, и показать сторонам разные числа
    *  значило бы соврать. Поэтому у всех сторон одного владельца оно одинаковое. */
   veteran?: number;
+  /** VET-6: очки пула снижения урона за пережитые бои — «корпус» ветерана: сторона
+   *  держит в `1 + veteranHull` раз больше. Отсутствует на тех же условиях, что
+   *  `veteran`, и так же принадлежит владельцу, а не строке. */
+  veteranHull?: number;
 }
 
 /** Render-ready description of an active battle — the "combat zone" panel. */
@@ -814,6 +820,7 @@ function sideView(
   side: { ref: CombatantRef; owner: PlayerId | null; role: 'attacker' | 'defender' },
   viewerId: PlayerId,
   data?: Pick<GameData, 'units' | 'veteran'>,
+  config?: Pick<MatchConfig, 'veteranPower'>,
 ): BattleSideView {
   const ref = side.ref;
   const stacks: UnitStack[] =
@@ -851,9 +858,14 @@ function sideView(
     // (так устроены и фикстуры тестов). Обещание этого файла — панель БЕЗ части данных
     // деградирует, а не падает; без проверки урезанный каталог ронял бы всё окно боя
     // целиком, и поймано это было именно так.
+    //
+    // VET-6: сила ветерана — правило ХОСТА, поэтому проекция спрашивает тот же конфиг,
+    // что и редьюсер. Без него — сетевые правила: надбавки нет, и значка нет.
     if (owner != null && data.veteran) {
-      const factor = veteranFactor(state, battle, owner, data);
+      const factor = veteranFactor(state, battle, owner, data, config);
       if (factor !== 1) view.veteran = factor;
+      const hull = veteranHull(state, battle, owner, data, config);
+      if (hull > 0) view.veteranHull = hull;
     }
   }
   return view;
@@ -861,12 +873,15 @@ function sideView(
 
 /** Project the combat panel for `battleId`, as seen by `viewerId`. Fail-secure: a
  *  battle absent from `state.battles` (resolved, or fogged) yields `E_NO_BATTLE`.
- *  Fog-safe by construction — the battle is only present when its world is visible. */
+ *  Fog-safe by construction — the battle is only present when its world is visible.
+ *  `config` is the match config the reducer runs on: without it the panel assumes the
+ *  online rules, where veterans get no combat bonus (VET-6). */
 export function createBattleModel(
   state: GameState,
   battleId: BattleId,
   viewerId: PlayerId,
   data?: Pick<GameData, 'units' | 'veteran'>,
+  config?: Pick<MatchConfig, 'veteranPower'>,
 ): BattleResult {
   const battle = state.battles[battleId];
   if (!battle) {
@@ -879,9 +894,9 @@ export function createBattleModel(
   if (!attackerSide || !defenderSide) {
     return { ok: false, code: 'E_NO_BATTLE' };
   }
-  const sides = battle.sides.map((side) => sideView(state, battle, side, viewerId, data));
-  const attacker = sideView(state, battle, attackerSide, viewerId, data);
-  const defender = sideView(state, battle, defenderSide, viewerId, data);
+  const sides = battle.sides.map((side) => sideView(state, battle, side, viewerId, data, config));
+  const attacker = sideView(state, battle, attackerSide, viewerId, data, config);
+  const defender = sideView(state, battle, defenderSide, viewerId, data, config);
 
   const model: BattleModel = {
     kind: 'battle',

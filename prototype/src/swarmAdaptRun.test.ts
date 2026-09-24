@@ -1,6 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { advance, order, setMatchMode, setMatchTravelSpeed, strikeShuttle } from './game';
+import {
+  advance,
+  order,
+  setMatchMode,
+  setMatchTravelSpeed,
+  setMatchVeteranPower,
+  strikeShuttle,
+} from './game';
 import { data } from './gameData';
 import { initSoloDrivers } from './soloDrivers';
 import { pveState, pveModeId } from '../../packages/client/src/gameData';
@@ -36,13 +43,17 @@ const VEIL = 'swarm_intercept_veil';
  *  проверить надо ещё и удар ПОСЛЕ него — забегу даётся запас волн (рука теста, как дом). */
 const RUN_WAVES = 16;
 
+/** Правила ЗАБЕГА — те же, что ставит хост (`installMatch` + `setRunActive`): режим карты,
+ *  темп перемещения ×5 и сила ветерана (VET-6). */
 function armRun(): void {
   setMatchMode(pveModeId());
   setMatchTravelSpeed(RUN_TRAVEL_SPEED);
+  setMatchVeteranPower(true);
 }
 function disarmRun(): void {
   setMatchMode(undefined);
   setMatchTravelSpeed(1);
+  setMatchVeteranPower(false);
 }
 
 interface Mc01 {

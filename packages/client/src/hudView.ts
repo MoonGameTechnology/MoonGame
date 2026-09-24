@@ -368,7 +368,7 @@ function sideHtml(side: BattleSideView): string {
   // PERK-3.3: надбавка за пережитые бои. Решение — общее (`/decisions/veteranBadge.ts`),
   // то же самое, что зовёт прототип: разойдись они, игрок, перешедший с прототипа на
   // клиент, увидел бы другую игру — ровно ради этого решение и вынесено из вёрстки.
-  const vet = veteranBadge(side.veteran);
+  const vet = veteranBadge(side.veteran, side.veteranHull);
   return (
     `<div class="side${side.mine ? ' mine' : ''} ${side.role}">` +
     `<p class="owner">${esc(side.ownerName)}<i>${esc(t(SIDE_KIND[side.kind]))}</i>` +

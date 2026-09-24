@@ -50,6 +50,7 @@ export {
   setMatchMode,
   matchMode,
   setMatchTravelSpeed,
+  setMatchVeteranPower,
   advance,
   order,
   canOrder,

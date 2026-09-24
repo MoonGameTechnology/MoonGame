@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import type { GameState } from '../../packages/shared-core/src/index';
 import { newGame } from './game';
-import { EMPTY_STATS, metaLevel, type MetaState } from './meta';
+import { EMPTY_STATS, matchXp, metaLevel, type MetaState } from './meta';
 import {
   awardKeyFor,
   awardOnce,
@@ -264,6 +264,20 @@ describe('конец матча — витрина', () => {
     w.api.check();
     expect(w.meta().stats.placeSum).toBe(3);
     expect(w.meta().stats.placed).toBe(1);
+  });
+
+  it('опыт берётся из таблицы наград ядра — с выплатой за медали ветеранов (VET-8)', () => {
+    // Ядро считает XP вместе с медалями сохранённых ветеранов (VET-4). Своя формула
+    // прототипа была копией БЕЗ медалей, и песочница их молча не платила. 300 очков и
+    // победа дают по формуле 40 + 30 + 160 = 230; ядро прибавило 45 за медали.
+    const w = wired({}, ended({ rewards: { p1: { place: 1, xp: 275 } } }));
+    expect(w.api.check()!.xp).toBe(275);
+    expect(w.meta().xp).toBe(275);
+  });
+
+  it('без таблицы ядра (дев-хук) — запасная формула', () => {
+    const w = wired({}, ended({ rewards: {} }));
+    expect(w.api.check()!.xp).toBe(matchXp({ won: true, score: 300 }));
   });
 
   it('матч без места (дев-хук) считается, но среднее не портит', () => {

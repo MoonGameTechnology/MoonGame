@@ -1,4 +1,5 @@
 import type { GameData } from '../data/schemas';
+import type { MatchConfig } from '../action/types';
 import type { Battle, GameState, PlayerId } from './gameState';
 import { sideUnits } from '../util/combat';
 
@@ -14,6 +15,13 @@ import { sideUnits } from '../util/combat';
  *
  * Именно этим окно боя отличается от карточки стека: стек показывает СВОЮ выслугу, а
  * множитель принадлежит СТОРОНЕ целиком и зависит от всего её состава.
+ *
+ * СИЛА ВЕТЕРАНА — ПРАВИЛО ХОСТА (VET-6, резолюция владельца 2026-09-24): «в сетевой
+ * только награда, а в Sector Zero — урон, корпус и выплата». Поэтому обе функции ниже
+ * спрашивают конфиг матча (`MatchConfig.veteranPower`) и без него отвечают «надбавки
+ * нет». Конфиг — ОБЯЗАТЕЛЬНЫЙ аргумент, хотя и может прийти пустым: забыть его передать
+ * значило бы молча решить за хоста, и окно боя показало бы надбавку там, где ядро её не
+ * применяет.
  */
 
 /**
@@ -54,18 +62,46 @@ export function servedPerUnit(state: GameState, battle: Battle, owner: PlayerId)
 /**
  * Во сколько раз силы `owner` бьют сильнее за выслугу: `1 + ставка × средняя выслуга`.
  *
- * `1` значит «надбавки нет» — и у необстрелянных сил, и когда механика выключена данными
- * (`damagePerBattle: 0`). Для показа игроку это одно и то же: показывать «×1.00» не нужно
- * ни в том, ни в другом случае.
+ * `1` значит «надбавки нет» — у необстрелянных сил, когда механика выключена данными
+ * (`damagePerBattle: 0`) и когда хост силы ветерану не дал (сетевая партия, VET-6). Для
+ * показа игроку это одно и то же: показывать «×1.00» не нужно ни в одном из случаев.
  */
 export function veteranFactor(
   state: GameState,
   battle: Battle,
   owner: PlayerId,
   data: Pick<GameData, 'veteran'>,
+  config: Pick<MatchConfig, 'veteranPower'> | undefined,
 ): number {
+  if (config?.veteranPower !== true) return 1;
   const rate = data.veteran.damagePerBattle;
   if (rate <= 0) return 1;
   const served = servedPerUnit(state, battle, owner);
   return served > 0 ? 1 + rate * served : 1;
+}
+
+/**
+ * КОРПУС ВЕТЕРАНА (VET-6): сколько очков пула снижения урона (`combat.mitigation`) дают
+ * силам `owner` пережитые бои — `ставка × средняя выслуга`. Сторона с пулом R принимает
+ * `1 / (1 + R)` входящего урона, то есть держит в `1 + R` раз больше: при той же ставке,
+ * что у урона, ветеран бьёт на 16% сильнее и держит на 16% больше.
+ *
+ * Пул, а не новое поле прочности у стека. Прочность корпуса читают урон, починка, трюм
+ * госпиталя и полоса в окне боя; надбавка, вшитая в каждого из них, была бы пятью копиями
+ * одного правила. Пул же — готовый шов защиты (PERK-2.1): он общий у всех каналов огня
+ * ближнего боя, и выслуге остаётся только положить в него свои очки.
+ *
+ * `0` значит «надбавки нет» — по тем же трём причинам, что у {@link veteranFactor}.
+ */
+export function veteranHull(
+  state: GameState,
+  battle: Battle,
+  owner: PlayerId,
+  data: Pick<GameData, 'veteran'>,
+  config: Pick<MatchConfig, 'veteranPower'> | undefined,
+): number {
+  if (config?.veteranPower !== true) return 0;
+  const rate = data.veteran.hullPerBattle;
+  if (rate <= 0) return 0;
+  return rate * servedPerUnit(state, battle, owner);
 }

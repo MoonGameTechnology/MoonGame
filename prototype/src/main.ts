@@ -23,6 +23,7 @@ import {
   setMatchMode,
   matchMode,
   setMatchTravelSpeed,
+  setMatchVeteranPower,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
@@ -10139,7 +10140,9 @@ const battleWindow = initBattleWindow({
   state: () => s,
   me: () => ME,
   model: (id) => {
-    const m = createBattleModel(s, id, ME, data);
+    // VET-6: тот же конфиг матча, на котором считает редьюсер, — иначе окно показало бы
+    // надбавку ветерана там, где хост её не дал.
+    const m = createBattleModel(s, id, ME, data, ctx(s.time, s).config);
     return m.ok ? m : null;
   },
   // Отступление из окна боя — тот же приказ, что и кнопкой боковой панели.
@@ -13660,11 +13663,14 @@ let sectorRunActive = false;
  * где живёт одно правило.
  *
  * Та же дверь включает и выключает темп перемещения забега (PVR-2.3): ×5 ко всем скоростям
- * карты живёт ровно столько, сколько живёт забег, во всех тех же точках.
+ * карты живёт ровно столько, сколько живёт забег, во всех тех же точках. И силу ветерана
+ * (VET-6): урон и корпус за пережитые бои есть только в забеге, сетевая партия и песочница
+ * платят ветерану одной наградой.
  */
 function setRunActive(on: boolean): void {
   sectorRunActive = on;
   setMatchTravelSpeed(on ? RUN_TRAVEL_SPEED : 1);
+  setMatchVeteranPower(on);
   syncSectorZeroTools();
   markGameplay();
 }

@@ -58,6 +58,12 @@ export interface MatchConfig {
    *  Zero runs at ×5 (docs/sector-zero-roadmap.md PVR-2.3), while an online match on the
    *  same `pve_waves` mode keeps ×1. Absent ⇒ ×1 — every match created before it. */
   travelSpeedFactor?: number;
+  /** Whether surviving battles makes a force stronger in combat — more damage and a
+   *  tougher hull (VET-6, `state/veterancy.ts`). Set by the host, never by a mode, for
+   *  the same reason as `travelSpeedFactor`: the owner's resolution of 2026-09-24 gives
+   *  veterans combat power in Sector Zero only, while an online match — `pve_waves`
+   *  included — pays for veterans solely with the end-of-match reward. Absent ⇒ off. */
+  veteranPower?: boolean;
 }
 
 /**
