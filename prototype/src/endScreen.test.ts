@@ -12,6 +12,7 @@ import {
   type EndAction,
   type EndScreenHost,
 } from './endScreen';
+import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 
 // REFM-20: locale pinned RU (see format.test.ts — Node has no browser language, so the
 // runtime would fall back to EN and the label assertions would drift).
@@ -327,5 +328,148 @@ describe('итог забега Sector Zero — по частям (PVR-5.4)', ()
     const bare = endScreenHtml(scored(), 'p1', endOf({ runReward: 17 }), { net: false, worldsFallback: 0, fmtStamp: () => '' });
     expect(bare).not.toContain('es-run');
     expect(bare).not.toContain('data-es="replay"');
+  });
+});
+
+describe('×2 к награде забега на экране итогов (YAG-3.2, место run.double)', () => {
+  const runSummary = {
+    attempt: 3,
+    chapter: 'pve-1',
+    won: false,
+    waves: 6,
+    totalWaves: 10,
+    base: 7,
+    objectives: [],
+    bonus: 0,
+    total: 7,
+    warrants: 35,
+    unlocked: 0,
+  };
+  const ranEnd = (): MatchEnd => endOf({ runReward: 7, runSummary });
+  const offer = { research: 7, warrants: 35 };
+
+  /** Хост удвоения: ролик отвечает, когда тест скажет, — видно, что делает экран, пока он идёт. */
+  function doubleHost() {
+    let available: typeof offer | null = offer;
+    let answer: ((o: AdOutcome) => void) | null = null;
+    const watched: AdPlacement[] = [];
+    let applied = 0;
+    const host: NonNullable<EndScreenHost['double']> = {
+      offer: () => available,
+      watchAd: (placement) => {
+        watched.push(placement);
+        return new Promise((resolve) => (answer = resolve));
+      },
+      apply: () => {
+        applied++;
+        available = null; // удвоение одно на забег
+        return true;
+      },
+    };
+    return {
+      host,
+      watched,
+      applied: () => applied,
+      answer: async (o: AdOutcome) => {
+        answer?.(o);
+        await Promise.resolve();
+        await Promise.resolve();
+      },
+    };
+  }
+
+  it('кнопка стоит под наградой и называет и ролик, и сколько придёт', () => {
+    const html = endScreenHtml(scored(), 'p1', ranEnd(), { ...view, double: offer });
+    expect(html).toContain('data-es="double"');
+    expect(html).toContain('Удвоить за рекламу: +7 данных · +35 ⌖');
+    const at = html.indexOf('data-es="double"');
+    expect(at).toBeGreaterThan(html.indexOf('es-total'));
+    expect(at).toBeLessThan(html.indexOf('es-acts'));
+  });
+
+  it('без разбивки забега кнопки нет — удвоилась бы награда прошлого забега', () => {
+    const html = endScreenHtml(scored(), 'p1', endOf({ runReward: 7 }), { ...view, double: offer });
+    expect(html).not.toContain('data-es="double"');
+  });
+
+  it('нет предложения (ни рекламы, ни неудвоенной награды) — нет и кнопки', () => {
+    expect(endScreenHtml(scored(), 'p1', ranEnd(), view)).not.toContain('data-es="double"');
+  });
+
+  it('ролик — только по нажатию: отрисовка его не зовёт', () => {
+    const d = doubleHost();
+    const w = wired({ double: d.host });
+    w.setEnd(ranEnd());
+    for (let i = 0; i < 5; i++) w.api.render();
+    expect(w.ov.html()).toContain('data-es="double"');
+    expect(d.watched).toEqual([]);
+  });
+
+  it('досмотрел — удвоение начислено один раз, кнопка ушла, сказано, сколько пришло', async () => {
+    const d = doubleHost();
+    const w = wired({ double: d.host });
+    w.setEnd(ranEnd());
+    w.api.render();
+    w.ov.click('double');
+    expect(d.watched).toEqual(['run.double']);
+    await d.answer('ok');
+    w.api.render();
+    expect(d.applied()).toBe(1);
+    expect(w.ov.html()).not.toContain('data-es="double"');
+    expect(w.ov.html()).toContain('Награда удвоена: +7 данных · +35 ⌖.');
+  });
+
+  it('закрыл раньше или рекламы нет — ничего не начислено, причина названа', async () => {
+    for (const [outcome, text] of [
+      ['cancelled', 'Ролик не досмотрен'],
+      ['unavailable', 'Реклама сейчас недоступна'],
+    ] as const) {
+      const d = doubleHost();
+      const w = wired({ double: d.host });
+      w.setEnd(ranEnd());
+      w.api.render();
+      w.ov.click('double');
+      await d.answer(outcome);
+      w.api.render();
+      expect(d.applied()).toBe(0);
+      expect(w.ov.html()).toContain(text);
+      expect(w.ov.html()).toContain('data-es="double"'); // можно попробовать снова
+    }
+  });
+
+  it('второй тап, пока ролик идёт, второго ролика не зовёт', () => {
+    const d = doubleHost();
+    const w = wired({ double: d.host });
+    w.setEnd(ranEnd());
+    w.api.render();
+    w.ov.click('double');
+    w.ov.click('double');
+    expect(d.watched).toHaveLength(1);
+  });
+
+  it('итог нажатия уходит вместе с панелью — на следующем забеге его нет', async () => {
+    const d = doubleHost();
+    const w = wired({ double: d.host });
+    w.setEnd(ranEnd());
+    w.api.render();
+    w.ov.click('double');
+    await d.answer('cancelled');
+    w.api.render();
+    expect(w.ov.html()).toContain('Ролик не досмотрен');
+    w.ov.click('menu');
+    w.api.render(); // итога нет — панель спрятана
+    w.setEnd(ranEnd());
+    w.api.render();
+    expect(w.ov.html()).not.toContain('Ролик не досмотрен');
+  });
+
+  it('нажатие ×2 — не уход: итог остаётся, хозяину уход не отдан', () => {
+    const d = doubleHost();
+    const w = wired({ double: d.host });
+    w.setEnd(ranEnd());
+    w.api.render();
+    w.ov.click('double');
+    expect(w.left).toEqual([]);
+    expect(w.getEnd()).not.toBeNull();
   });
 });

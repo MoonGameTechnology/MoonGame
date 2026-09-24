@@ -20,6 +20,7 @@ import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc } from './format';
 import type { RunSummary } from '../../decisions/sectorZeroProgress';
+import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
 
 /** Что игрок выбрал на панели: сыграть ещё или уйти в меню. */
 /** `replay` — новая попытка той же главы Sector Zero, мимо меню (итоги забега). */
@@ -74,6 +75,10 @@ export function endScreenHtml(
     /** Провинции, если счёт их не несёт (старый матч без снимка). */
     worldsFallback: number;
     fmtStamp: (at: number, opts?: { day?: boolean; time?: boolean }) => string;
+    /** ×2 к награде забега за ролик: сколько придёт сверху (`EndScreenDouble.offer`). */
+    double?: { research: number; warrants: number } | null;
+    /** Итог нажатия ×2 — удвоено или почему нет. */
+    note?: string;
   },
 ): string {
   const sc = state.match?.scores ?? {};
@@ -99,6 +104,14 @@ export function endScreenHtml(
             : '') +
           `</div>`
         : '';
+  // ×2 (`run.double`) — сразу под наградой, которую удваивает, и только под разбивкой
+  // ЭТОГО забега: без неё удвоилась бы награда прошлого. Кнопка называет и ролик, и сколько
+  // придёт (п. 4.5.1).
+  const double =
+    end.runSummary && view.double
+      ? `<button class="es-btn ad" data-es="double">${t('sector-zero.prep.double', { n: view.double.research, m: view.double.warrants })}</button>`
+      : '';
+  const note = view.note ? `<p class="es-note" role="status">${esc(view.note)}</p>` : '';
   // Формулировка «ещё раз» честна по режиму: соло перезапускает схватку, сеть — открывает
   // браузер матчей (пересадить тот же стол клиент не может).
   const againLabel = end.runReward !== undefined ? t('sector-zero.end.prepare') : view.net ? t('end.new-match') : t('end.play-again');
@@ -114,6 +127,8 @@ export function endScreenHtml(
     cell(t('end.duration'), dur) +
     `</div>` +
     xpLine +
+    double +
+    note +
     `<div class="es-acts">` +
     // Повтор главы — только у засчитанного забега Sector Zero: у dev-забега разбивки нет.
     (end.runSummary ? `<button class="es-btn primary wide" data-es="replay">↻ ${t('sector-zero.end.replay')}</button>` : '') +
@@ -168,6 +183,19 @@ export function runSummaryHtml(r: RunSummary): string {
   );
 }
 
+/**
+ * ×2 к награде забега за ролик (`YAG-3.2`, место `run.double`) — то же предложение, что на
+ * экране подготовки: удвоение одно на забег, поэтому две кнопки не дают двух выплат.
+ */
+export interface EndScreenDouble {
+  /** Сколько придёт сверху; `null` — предложения нет (площадка без рекламы, уже удвоено). */
+  offer(): { research: number; warrants: number } | null;
+  /** Ролик площадки — дверь хоста, та же, что у экрана подготовки. */
+  watchAd(placement: AdPlacement): Promise<AdOutcome>;
+  /** Начислить удвоение; `false` — удваивать уже нечего. */
+  apply(): boolean;
+}
+
 /** Что панель берёт у экрана матча. */
 export interface EndScreenHost {
   /** Оверлей (`#endscreen`). */
@@ -189,17 +217,24 @@ export interface EndScreenHost {
   fmtStamp(at: number, opts?: { day?: boolean; time?: boolean }): string;
   /** Уход из матча — сеть, туры и хаб принадлежат хосту. */
   onLeave(which: EndAction, wasNet: boolean): void;
+  /** ×2 к награде забега; нет — кнопки нет. */
+  double?: EndScreenDouble;
 }
 
 /** Собрать панель. `render()` зовётся каждым кадром — она сама решает, показываться ли. */
 export function initEndScreen(host: EndScreenHost): { render: () => void } {
   let lastHtml = ''; // кадр за кадром одна и та же разметка — не трогаем DOM зря
+  /** Итог нажатия ×2 — живёт, пока панель на экране. */
+  let note = '';
+  /** Ролик ×2 идёт — второй тап второго ролика не зовёт. */
+  let watching = false;
 
   const hide = (): void => {
     const root = host.root();
     if (root.style.display !== 'none') {
       root.style.display = 'none';
       lastHtml = '';
+      note = '';
     }
   };
 
@@ -213,6 +248,8 @@ export function initEndScreen(host: EndScreenHost): { render: () => void } {
       net: host.net(),
       worldsFallback: host.worldsFallback(),
       fmtStamp: host.fmtStamp,
+      double: host.double?.offer() ?? null,
+      note,
     });
     const root = host.root();
     if (html !== lastHtml) {
@@ -228,6 +265,25 @@ export function initEndScreen(host: EndScreenHost): { render: () => void } {
     const which = act.dataset.es;
     if (which === 'board') {
       host.dismiss(); // спрятать панель, оставить замерший стол
+      return;
+    }
+    // ×2 — не уход: итог остаётся на экране. Ролик зовётся ТОЛЬКО отсюда, по нажатию.
+    if (which === 'double') {
+      const double = host.double;
+      const offer = double?.offer();
+      if (!double || !offer || watching) return;
+      watching = true;
+      note = '';
+      const settle = (status: AdOutcome): void => {
+        watching = false;
+        note =
+          status !== 'ok'
+            ? t(adRefusalKey(status))
+            : double.apply()
+              ? t('sector-zero.prep.doubled', { n: offer.research, m: offer.warrants })
+              : t('sector-zero.prep.unavailable');
+      };
+      void double.watchAd('run.double').then(settle, () => settle('unavailable'));
       return;
     }
     const wasNet = host.net();

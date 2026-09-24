@@ -294,11 +294,12 @@ import { SECTOR_ZERO_ABSENT_TOOLS, toolShown, type SessionTool } from '../../dec
 import { initSectorZeroMenu, type SectorZeroAccount } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
 import { getPlatform, type PlatformHost } from './platform/host';
-import { advanceShopDay, localShopDay, shopCapabilities } from '../../decisions/sectorZeroShop';
+import { advanceShopDay, doubleReward, localShopDay, shopCapabilities } from '../../decisions/sectorZeroShop';
+import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
-  type SectorZeroProgress,
+  type SectorZeroProgress, type SectorProgressAction,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
@@ -9821,6 +9822,17 @@ const endScreenPanel = initEndScreen({
   net: () => NET,
   worldsFallback: () => worldsOf(ME),
   fmtStamp,
+  // ×2 к награде забега (`run.double`) — та же дверь к ролику и то же удвоение, что на
+  // экране подготовки; удвоение одно на забег, так что две кнопки не дают двух выплат.
+  double: {
+    offer: () => {
+      if (!isSectorZeroRun()) return null;
+      const twice = doubleReward(sectorProgress, shopCapabilities(getPlatform().capabilities));
+      return twice.state === 'ready' ? { research: twice.research, warrants: twice.warrants } : null;
+    },
+    watchAd,
+    apply: () => changeSectorProgress({ kind: 'double-reward' }),
+  },
   onLeave: (which, wasNet) => {
     // Уход из сетевого матча — намеренный дисконнект (без авто-реконнекта).
     if (wasNet) {
@@ -13722,20 +13734,28 @@ const sectorPreparation = initSectorZeroPreparation({
   // Суверены тратятся там, где у них есть кран — покупка ИЛИ ролик (`SZE-3.5`).
   platform: shopCapabilities(platform.capabilities),
   sync: syncShopDay,
-  watchAd: async (placement, props) => {
-    platform.analytics.emit('rewarded_ad_offered', { placement, ...props });
-    const shown = await platform.ads.showRewardedAd({ placement });
-    if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement, ...props });
-    return shown.status;
-  },
+  watchAd,
   progress: () => sectorProgress,
-  change: action => {
-    const next = changeSectorZeroProgress(sectorProgress, action, data);
-    if (!next) return false;
-    saveSectorProgress(next);
-    return true;
-  },
+  change: changeSectorProgress,
 });
+
+/** Дверь к ролику площадки (`YAG-3.2`) — единственный вызов `showRewardedAd` в игре. Её
+ *  получают оба экрана с рекламой — подготовка и итоги забега, — и оба зовут её только
+ *  по нажатию (`platform/adPlacementGuard.test.ts`). */
+async function watchAd(placement: AdPlacement, props?: Record<string, string>): Promise<AdOutcome> {
+  platform.analytics.emit('rewarded_ad_offered', { placement, ...props });
+  const shown = await platform.ads.showRewardedAd({ placement });
+  if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement, ...props });
+  return shown.status;
+}
+
+/** Действие игрока над профилем Sector Zero; `false` — действие не прошло правила. */
+function changeSectorProgress(action: SectorProgressAction): boolean {
+  const next = changeSectorZeroProgress(sectorProgress, action, data);
+  if (!next) return false;
+  saveSectorProgress(next);
+  return true;
+}
 const sectorZeroMenu = initSectorZeroMenu({
   root: $('sector-zero'),
   standalone: document.body.dataset.entry === 'sector-zero',

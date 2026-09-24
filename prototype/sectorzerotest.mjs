@@ -39,9 +39,13 @@ const hooks = `window.__szTest = {
 const ABSENT = Object.values(SECTOR_ZERO_ABSENT_TOOLS);
 const KEPT = ['rail-diplo', 'rail-tech', 'rail-help'];
 
+// Страница Sector Zero — со своим бандлом и симуляцией рекламы, как настоящая дев-сборка:
+// без неё ×2 на итогах не появился бы вовсе.
+const sz = await instrumentedGame(hooks, { page: 'sector-zero-dev.html', simulate: true });
 const site = await serve({
   ...(await instrumentedGame(hooks)),
-  '/sz': (await instrumentedGame(hooks, { page: 'sector-zero-dev.html' }))['/'],
+  '/sz': sz['/'].replace('<script src="/app.js">', '<script src="/sz-app.js">'),
+  '/sz-app.js': sz['/app.js'],
 });
 const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -159,6 +163,16 @@ try {
     await page.evaluate(() => window.__szTest.end());
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#endscreen .es-run li.task').count(), 3, 'три задачи главы II');
+    // ×2 к награде за ролик — прямо на итогах (YAG-3.2, решение владельца 2026-09-24).
+    // Дев-сборка симулирует рекламу: ролик «досмотрен», удвоение приходит сразу.
+    const beforeDouble = await page.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1')));
+    await page.locator('#endscreen [data-es="double"]').click();
+    await page.locator('#endscreen .es-note').waitFor({ state: 'visible' });
+    await page.waitForFunction(
+      (before) => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).research === before.research + before.lastReward,
+      beforeDouble,
+    );
+    assert.equal(await page.locator('#endscreen [data-es="double"]').count(), 0, 'удвоение одно на забег — кнопка ушла');
     // «Сыграть главу снова» запускает новую попытку ТОЙ ЖЕ главы — её родной мир `landing`.
     const attempt = await page.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).nextAttempt);
     await page.locator('#endscreen [data-es="replay"]').click();
@@ -182,7 +196,7 @@ try {
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' итог забега — по частям, глава повторяется с итогов и отмечена пройденной;' +
+      ' итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' карта главы показывает накопленную разведку\n',
   );
 } finally {
