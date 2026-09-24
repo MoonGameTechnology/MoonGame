@@ -6,7 +6,7 @@
  * Maps stay local: they are the client's own screens, not shared content.
  */
 import { parseMatchMap, buildStateFromMap } from '@void/shared-core';
-import type { GameData, GameState, MapObjective } from '@void/shared-core';
+import type { GameData, GameState, MapObjective, MatchMap } from '@void/shared-core';
 
 import { FRAGMENTS, shippedGameData } from '../../../data/bundle';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
@@ -51,6 +51,21 @@ function missionMap(mission: number): unknown {
   return (ok ? PVE_MISSIONS[i] : PVE_MISSIONS[0]) ?? pveMap;
 }
 
+/** Разобранная карта главы — один раз на карту. Карты глав — неизменные данные поставки, а
+ *  панель задач и метки целей спрашивают главу КАЖДЫЙ кадр: полный разбор zod на кадр был
+ *  заметной долей кадра на телефоне (замер 2026-09-24). Мир из карты (`pveState`) по-прежнему
+ *  строится из свежего разбора — отдавать общий объект в изменяемый мир нельзя. */
+const parsedMissions = new WeakMap<object, MatchMap>();
+function parsedMission(mission: number): MatchMap {
+  const raw = missionMap(mission) as object;
+  let map = parsedMissions.get(raw);
+  if (!map) {
+    map = parseMatchMap(raw);
+    parsedMissions.set(raw, map);
+  }
+  return map;
+}
+
 /** A ready-to-render PvE `GameState` built from the shipped map of that mission. */
 export function pveState(data: GameData, mission = 0): GameState {
   const map = parseMatchMap(missionMap(mission));
@@ -62,7 +77,7 @@ export function pveState(data: GameData, mission = 0): GameState {
 /** Глава по id её карты — обратное к {@link pveState}. `null` — такой главы в поставке
  *  нет (карту переименовали или убрали): восстанавливать нечего, угадывать нельзя. */
 export function pveMissionOfMap(mapId: string | undefined): number | null {
-  const at = PVE_MISSIONS.findIndex((map) => parseMatchMap(map).id === mapId);
+  const at = PVE_MISSIONS.findIndex((_, i) => parsedMission(i).id === mapId);
   return mapId === undefined || at < 0 ? null : at;
 }
 
@@ -70,7 +85,7 @@ export function pveMissionOfMap(mapId: string | undefined): number | null {
  *  (`decisions/missionObjectives.ts`). Карта без задач отдаёт пустой список, и это
  *  нормальный случай: задачи ДОПОЛНИТЕЛЬНЫЕ. */
 export function pveObjectives(mission = 0): MapObjective[] {
-  return parseMatchMap(missionMap(mission)).objectives;
+  return parsedMission(mission).objectives;
 }
 
 /** Глава забега одной структурой (PVR-5.3): id карты — ключ счёта выполненных задач в
@@ -80,7 +95,7 @@ export function pveChapter(mission = 0): {
   objectives: MapObjective[];
   slots?: { base: number; cap: number };
 } {
-  const map = parseMatchMap(missionMap(mission));
+  const map = parsedMission(mission);
   return {
     id: map.id,
     objectives: map.objectives,
@@ -92,5 +107,5 @@ export function pveChapter(mission = 0): {
  *  to arm the match with. The map carries it so the binding is DATA: the map and the mode
  *  both existed for a long time and nothing said they belonged together. */
 export function pveModeId(mission = 0): string | undefined {
-  return parseMatchMap(missionMap(mission)).mode;
+  return parsedMission(mission).mode;
 }
