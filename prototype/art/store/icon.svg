@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Черновик иконки Sector Zero для Яндекс Игр (YAG-5.2). Не скриншот (п. 5.6), без текста,
+       без рамок и скруглений (п. 8.3.3/8.3.4). Палитра — меню Sector Zero (sector-zero.css),
+       Рой — красный второй стороны (sideColors.ts). PNG: node prototype/storeshots.mjs -->
+  <defs>
+    <radialGradient id="bg" cx="0.6" cy="0.36" r="0.9">
+      <stop offset="0" stop-color="#15404f"/>
+      <stop offset="0.42" stop-color="#071a24"/>
+      <stop offset="1" stop-color="#02070c"/>
+    </radialGradient>
+    <radialGradient id="flesh" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0" stop-color="#ff8a6e"/>
+      <stop offset="0.35" stop-color="#ff5a4d"/>
+      <stop offset="0.75" stop-color="#a51f3c"/>
+      <stop offset="1" stop-color="#4c0a26"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#79dfdf" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#79dfdf" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="goo" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur"/>
+      <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -10" result="goo"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7" result="noise"/>
+      <feDisplacementMap in="goo" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="redglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="#cee7ec">
+    <circle cx="65.2" cy="235.3" r="0.79" opacity="0.58"/>
+    <circle cx="13.2" cy="177.5" r="0.60" opacity="0.38"/>
+    <circle cx="164.7" cy="11.3" r="0.75" opacity="0.55"/>
+    <circle cx="214.5" cy="219.4" r="0.60" opacity="0.35"/>
+    <circle cx="445.7" cy="446.3" r="0.60" opacity="0.37"/>
+    <circle cx="196.8" cy="219.5" r="1.19" opacity="0.75"/>
+    <circle cx="421.6" cy="449.2" r="0.64" opacity="0.45"/>
+    <circle cx="299.9" cy="71.7" r="1.13" opacity="0.73"/>
+    <circle cx="243.0" cy="491.6" r="0.83" opacity="0.60"/>
+    <circle cx="280.7" cy="59.5" r="1.65" opacity="0.89"/>
+    <circle cx="260.8" cy="471.5" r="0.78" opacity="0.57"/>
+    <circle cx="320.8" cy="4.9" r="1.00" opacity="0.68"/>
+    <circle cx="93.2" cy="332.4" r="0.90" opacity="0.64"/>
+    <circle cx="201.7" cy="407.9" r="1.40" opacity="0.82"/>
+    <circle cx="305.9" cy="363.1" r="1.43" opacity="0.83"/>
+    <circle cx="344.6" cy="49.1" r="0.61" opacity="0.40"/>
+    <circle cx="38.7" cy="440.0" r="1.09" opacity="0.72"/>
+    <circle cx="60.6" cy="334.8" r="0.60" opacity="0.37"/>
+    <circle cx="127.0" cy="46.3" r="1.58" opacity="0.87"/>
+    <circle cx="260.5" cy="494.2" r="1.01" opacity="0.69"/>
+    <circle cx="432.4" cy="311.4" r="1.15" opacity="0.74"/>
+    <circle cx="63.7" cy="394.3" r="1.68" opacity="0.90"/>
+    <circle cx="490.0" cy="127.9" r="1.65" opacity="0.89"/>
+    <circle cx="56.3" cy="368.3" r="0.92" opacity="0.65"/>
+    <circle cx="400.1" cy="227.6" r="0.62" opacity="0.42"/>
+    <circle cx="500.5" cy="348.7" r="0.81" opacity="0.59"/>
+    <circle cx="165.1" cy="213.7" r="1.13" opacity="0.73"/>
+    <circle cx="363.8" cy="443.2" r="1.10" opacity="0.72"/>
+    <circle cx="86.7" cy="127.6" r="0.80" opacity="0.59"/>
+    <circle cx="363.4" cy="19.1" r="1.83" opacity="0.93"/>
+    <circle cx="45.7" cy="8.6" r="0.61" opacity="0.41"/>
+    <circle cx="213.6" cy="222.7" r="1.59" opacity="0.87"/>
+    <circle cx="364.8" cy="476.7" r="1.01" opacity="0.69"/>
+    <circle cx="130.9" cy="271.2" r="0.63" opacity="0.44"/>
+    <circle cx="451.3" cy="277.7" r="0.82" opacity="0.60"/>
+    <circle cx="466.1" cy="129.4" r="0.71" opacity="0.52"/>
+    <circle cx="86.6" cy="25.9" r="0.76" opacity="0.56"/>
+    <circle cx="153.5" cy="376.5" r="0.79" opacity="0.58"/>
+    <circle cx="268.3" cy="480.6" r="1.29" opacity="0.79"/>
+    <circle cx="133.0" cy="396.0" r="1.62" opacity="0.88"/>
+    <circle cx="430.6" cy="462.8" r="0.64" opacity="0.45"/>
+    <circle cx="162.8" cy="19.4" r="0.62" opacity="0.42"/>
+    <circle cx="186.4" cy="393.9" r="0.60" opacity="0.38"/>
+    <circle cx="197.9" cy="193.6" r="1.00" opacity="0.68"/>
+    <circle cx="39.4" cy="48.9" r="0.95" opacity="0.66"/>
+    <circle cx="47.9" cy="144.8" r="1.40" opacity="0.82"/>
+  </g>
+  <circle cx="256" cy="256" r="190" fill="url(#halo)"/>
+  <!-- Сектор: шестигранник, как клетка карты главы. -->
+  <polygon points="256,78 410,167 410,345 256,434 102,345 102,167" fill="#0a2430" fill-opacity="0.55"
+    stroke="#79dfdf" stroke-width="9" stroke-linejoin="round" filter="url(#glow)"/>
+  <polygon points="256,112 380,184 380,328 256,400 132,328 132,184" fill="none"
+    stroke="#79dfdf" stroke-opacity="0.35" stroke-width="2"/>
+  <!-- Рой вползает в сектор снизу справа: метаболы с органическим краем. -->
+  <g filter="url(#redglow)" fill="#ff5a4d" opacity="0.45">
+    <circle cx="452" cy="452" r="92"/>
+    <circle cx="392" cy="392" r="48"/>
+    <circle cx="350" cy="420" r="30"/>
+    <circle cx="420" cy="338" r="34"/>
+    <circle cx="330" cy="360" r="20"/>
+    <circle cx="300" cy="392" r="14"/>
+    <circle cx="372" cy="310" r="16"/>
+    <path d="M430 430 C 380 380, 330 330, 292 318" stroke="#ff5a4d" stroke-width="18" stroke-linecap="round" fill="none"/>
+    <path d="M470 400 C 440 330, 420 280, 402 250" stroke="#ff5a4d" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <path d="M410 480 C 350 470, 300 452, 262 446" stroke="#ff5a4d" stroke-width="12" stroke-linecap="round" fill="none"/>
+  </g>
+  <g filter="url(#goo)" fill="url(#flesh)">
+    <circle cx="452" cy="452" r="92"/>
+    <circle cx="392" cy="392" r="48"/>
+    <circle cx="350" cy="420" r="30"/>
+    <circle cx="420" cy="338" r="34"/>
+    <circle cx="330" cy="360" r="20"/>
+    <circle cx="300" cy="392" r="14"/>
+    <circle cx="372" cy="310" r="16"/>
+    <path d="M430 430 C 380 380, 330 330, 292 318" stroke="url(#flesh)" stroke-width="18" stroke-linecap="round" fill="none"/>
+    <path d="M470 400 C 440 330, 420 280, 402 250" stroke="url(#flesh)" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <path d="M410 480 C 350 470, 300 452, 262 446" stroke="url(#flesh)" stroke-width="12" stroke-linecap="round" fill="none"/>
+  </g>
+  <!-- Глубина массы: тёмные ядра и прожилки поверх, мягкое свечение под ней. -->
+  <g filter="url(#goo)" fill="#5e0b26" opacity="0.55">
+    <circle cx="470" cy="470" r="60"/><circle cx="410" cy="410" r="26"/><circle cx="432" cy="350" r="14"/>
+  </g>
+  <g fill="none" stroke="#3d0718" stroke-opacity="0.55" stroke-linecap="round">
+    <path d="M462 456 C 430 420, 400 404, 372 398" stroke-width="4"/>
+    <path d="M478 430 C 460 390, 440 364, 424 350" stroke-width="3"/>
+    <path d="M444 478 C 410 470, 380 452, 350 432" stroke-width="3"/>
+  </g>
+  <g fill="#ffd2c4" opacity="0.35">
+    <circle cx="376" cy="372" r="9"/><circle cx="410" cy="324" r="6"/><circle cx="332" cy="350" r="5"/>
+  </g>
+  <g fill="#ffb3a0" opacity="0.8">
+    <circle cx="398" cy="396" r="5"/><circle cx="436" cy="440" r="7"/><circle cx="420" cy="346" r="4"/>
+    <circle cx="352" cy="418" r="3.5"/><circle cx="462" cy="470" r="5"/><circle cx="300" cy="320" r="3"/>
+  </g>
+  <!-- «Ноль» сектора: кольцо с янтарной чертой. -->
+  <g filter="url(#glow)">
+    <ellipse cx="248" cy="250" rx="58" ry="80" fill="none" stroke="#e1f4f4" stroke-width="17"/>
+    <line x1="206" y1="322" x2="290" y2="178" stroke="#e6b777" stroke-width="11" stroke-linecap="round"/>
+  </g>
+  <!-- Флот экспедиции: три шеврона идут навстречу Рою. -->
+  <g fill="#79dfdf" filter="url(#glow)">
+    <path d="M150 190 l26 10 -26 10 6 -10 z" transform="rotate(38 160 200)"/>
+    <path d="M176 164 l22 8 -22 8 5 -8 z" transform="rotate(38 184 172)"/>
+    <path d="M128 222 l22 8 -22 8 5 -8 z" transform="rotate(38 136 230)"/>
+  </g>
+</svg>

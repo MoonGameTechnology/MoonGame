@@ -158,6 +158,21 @@ try {
     const reward = page.locator('#sz-chapter-hero');
     assert.equal(await reward.isVisible(), true, 'у главы II есть герой-награда');
     assert.equal(await reward.locator('.sz-hero-sil').textContent(), '?', 'герой ещё не пришёл');
+    // Меню без повторов (замечание владельца 2026-09-24): «Одиночная игра» — один раз, в
+    // надзаголовке; подписи сохранения без сохранённого забега нет.
+    // Считается ТЕКСТ, который видит игрок, а не ключи разметки: подпись могла бы
+    // получить те же слова и из кода.
+    const singlePlayer = () =>
+      page.evaluate(
+        () =>
+          [...document.querySelectorAll('#sector-zero *')].filter(
+            (e) =>
+              e.children.length === 0 &&
+              e.getClientRects().length > 0 &&
+              /^(Одиночная игра|Single player)$/i.test((e.textContent ?? '').trim()),
+          ).length,
+      );
+    assert.equal(await singlePlayer(), 1, '«Одиночная игра» в меню — один раз');
     await page.locator('#sz-mission-0').click();
     // Комикс главы (решение владельца 2026-09-24): перед первым забегом главы, один раз.
     // Вторая панель — битая картинка: подписи остаются на тёмном фоне, игра не встаёт.
@@ -199,8 +214,12 @@ try {
     // снимка), и флаг забега там ставится в своём месте: его тоже надо поймать.
     await page.locator('#hub-sector-zero').click();
     await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
+    assert.equal(await page.locator('#sz-save-label').isVisible(), true, 'сохранённый забег подписан');
+    assert.equal(await singlePlayer(), 1, '«Одиночная игра» — один раз и при сохранённом забеге');
     await page.locator('#sz-continue').click();
     await check('Sector Zero из хаба (продолжение)', true);
+    // Вкладка полосы навигации — подписью кнопки, а не заголовком окна заглавными.
+    assert.match((await page.locator('#holo-tech').textContent())?.trim() ?? '', /^(Технологии|Technologies)$/);
     await leave(); // выход из забега ведёт в меню Sector Zero, оттуда — в хаб
     await page.locator('#sz-back').click();
     await enterSkirmish(page, { fromWelcome: false });

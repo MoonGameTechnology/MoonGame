@@ -23,6 +23,7 @@ import {
   inhabitedWorldCount,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
+import { feedsOnBiomass, isInfected } from '../../packages/shared-core/src/util/infestation';
 import { HOUR } from './time';
 
 /** ECON-6: почасовой экономический срез для пайплайна наблюдений хоста — казна /
@@ -250,9 +251,11 @@ export function incomeBreakdown(
       if (res === 'credits') credits += v;
       else { cell(res).production += v; }
     }
+    // Органы Роя у не-Роя не работают — то же правило, что у ядра (`util/infestation.ts`).
+    const eatsBiomass = feedsOnBiomass(state, playerId, data);
     for (const b of p.buildings) {
       const def = data.buildings[b.type];
-      if (!def) continue;
+      if (!def || (!eatsBiomass && isInfected(def))) continue;
       const level = buildingLevel(def, b.level);
       const starved =
         arrears.length > 0 &&

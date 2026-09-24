@@ -63,6 +63,10 @@ export const UnitStatsSchema = z
      *  not be expressed at all — a siege platform could only wreck a world by
      *  also being a strong warship. It does NOT feed fleet-vs-fleet combat. */
     siegeDamage: z.number().nonnegative().default(0),
+    /** Урон в час, которым НАЗЕМНЫЙ юнит гарнизона зачищает органы Роя (`infected`) на
+     *  захваченном мире (решение владельца 2026-09-24: «постройки имеют хп, а наземные
+     *  юниты — урон по зданиям»). 0 = не зачищает. Бой флотов и штурм не трогает. */
+    buildingDamage: z.number().nonnegative().default(0),
     /** Damage this hull deals to an enemy SHUTTLE STRIKE when it scrambles against
      *  it (SHU-1.3). 0 = not an interceptor: the hull stays in the hangar and lets
      *  the strike through.

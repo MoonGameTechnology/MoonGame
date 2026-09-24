@@ -129,7 +129,8 @@
       "attack": 4,
       "defense": 8,
       "speed": 44,
-      "hp": 14
+      "hp": 14,
+      "buildingDamage": 1
     },
     "traits": [
       "ground"
@@ -152,7 +153,8 @@
       "defense": 8,
       "speed": 0,
       "hp": 22,
-      "cargoSize": 1
+      "cargoSize": 1,
+      "buildingDamage": 2
     },
     "line": "front",
     "traits": [],
@@ -175,7 +177,8 @@
       "attack": 22,
       "defense": 14,
       "speed": 40,
-      "hp": 46
+      "hp": 46,
+      "buildingDamage": 3
     },
     "traits": [
       "ground"
@@ -199,7 +202,8 @@
       "attack": 8,
       "defense": 20,
       "speed": 40,
-      "hp": 34
+      "hp": 34,
+      "buildingDamage": 2
     },
     "traits": [
       "ground"
@@ -222,7 +226,8 @@
       "attack": 18,
       "defense": 12,
       "speed": 52,
-      "hp": 26
+      "hp": 26,
+      "buildingDamage": 3
     },
     "traits": [
       "ground"

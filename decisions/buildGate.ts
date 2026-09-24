@@ -22,20 +22,31 @@
 // Лежит в `/decisions`, а не в `prototype/src`: кнопку стройки рисуют оба клиента.
 import { allowedBuildings, isBuildable } from '../packages/shared-core/src/index';
 import type { GameData, Planet } from '../packages/shared-core/src/index';
+import { isInfected } from '../packages/shared-core/src/util/infestation';
 
 /** Узел, о котором спрашивают: нужен только его вид (`kind`). */
 export type BuildNode = Pick<Planet, 'kind'>;
 
 /**
  * Пускает ли вид узла ЭТО здание — тот же вопрос и в том же порядке, что у ворот
- * `building.construct` (все три отказа там дают `E_WRONG_SECTOR`).
+ * `building.construct` (три отказа вида там дают `E_WRONG_SECTOR`).
+ *
+ * `eatsBiomass` — ест ли строитель биомассу (Рой): органы Роя (`infected`) строит только
+ * он, иначе редьюсер отказывает `E_SWARM_ONLY` (решение владельца 2026-09-24). Параметр
+ * обязательный, чтобы клиент не забыл спросить, КТО строит.
  *
  * Неизвестный каталогу id — `false`: строить нечего. Редьюсер на нём тоже отказывает,
  * просто другим кодом (`E_UNKNOWN_BUILDING`).
  */
-export function canBuildHere(node: BuildNode, building: string, data: GameData): boolean {
+export function canBuildHere(
+  node: BuildNode,
+  building: string,
+  data: GameData,
+  eatsBiomass: boolean,
+): boolean {
   const def = data.buildings[building];
   if (!def) return false;
+  if (!eatsBiomass && isInfected(def)) return false;
   if (!isBuildable(data, node)) return false;
   const roster = allowedBuildings(data, node);
   if (roster !== undefined && !roster.includes(building)) return false;
@@ -50,6 +61,8 @@ export function canBuildHere(node: BuildNode, building: string, data: GameData):
  * отвечает не на тот вопрос. Перебор к тому же учитывает `onlyOn` — вид, которому
  * каталог не предлагает ничего, честно окажется пустым.
  */
-export function buildsAnything(node: BuildNode, data: GameData): boolean {
-  return Object.keys(data.buildings).some((building) => canBuildHere(node, building, data));
+export function buildsAnything(node: BuildNode, data: GameData, eatsBiomass: boolean): boolean {
+  return Object.keys(data.buildings).some((building) =>
+    canBuildHere(node, building, data, eatsBiomass),
+  );
 }
