@@ -188,7 +188,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveMissionOfMap, pveChapter, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -13697,9 +13697,9 @@ let savedRun: RunSave | null = null;
 let savedPortable: PortableRunSave | null = null;
 let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
 /** Выбранная ГЛАВА забега (0 — первая). Живёт рядом со сложностью и хранится так же:
- *  это тот же род настройки запуска. Клампит `pveState` — испорченное хранилище открывает
- *  первую главу, а не роняет вход. */
-let nextSectorMission = Number(readRaw('void.pveMission') ?? 0) || 0;
+ *  это тот же род настройки запуска. Номер приводит `pveMissionIndex` — тем же правилом,
+ *  что карта (AUD-32): испорченное хранилище открывает первую главу, а не роняет вход. */
+let nextSectorMission = pveMissionIndex(Number(readRaw('void.pveMission') ?? 0));
 let runWrite = Promise.resolve();
 let progressWrite = sectorProgressStore.load().then(raw => {
   sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
@@ -13712,7 +13712,10 @@ let progressWrite = sectorProgressStore.load().then(raw => {
 
 /** Глава для засчёта забега: карта и задачи плюс гарантированный чертёж за первую
  *  победу (SZE-5.3, `chapterBlueprint`) — ступень растёт к эпицентру. */
-function chapterForSettle(index: number) {
+function chapterForSettle(mission: number) {
+  // Номер из журнала или хранилища приводится ОДИН раз (AUD-32): карта и награда главы
+  // считаются по одной и той же главе.
+  const index = pveMissionIndex(mission);
   return { ...pveChapter(index), blueprint: chapterBlueprint(index) };
 }
 
@@ -14439,7 +14442,7 @@ function restoreRun(): boolean {
   pveDifficulty = parseRunDifficulty(save.difficulty);
   setRunActive(true);
   sectorAttempt = save.sectorZeroAttempt ?? sectorProgress.nextAttempt;
-  sectorMission = save.sectorZeroMission ?? sectorMission;
+  sectorMission = pveMissionIndex(save.sectorZeroMission ?? sectorMission);
   if (sectorProgress.nextAttempt <= sectorAttempt) {
     saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   }
