@@ -429,6 +429,8 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #cmdbar button .cl{font-size:8px;letter-spacing:.6px;opacity:.82;text-transform:uppercase;}
 #cmdbar button:hover:not(:disabled){background:rgba(53,214,230,.14);box-shadow:0 0 10px rgba(53,214,230,.35);}
 #cmdbar button:disabled{opacity:.3;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+/* Серая кнопка с причиной (cmdBtn, why): выглядит погашенной, но нажатие объясняет запрет. */
+#cmdbar button[aria-disabled="true"]{opacity:.3;cursor:help;color:var(--dim);border-color:var(--line);}
 #cmdbar button.on{background:rgba(53,214,230,.18);border-color:var(--cyan);}
 #cmdbar button.danger{color:var(--red);border-color:#7a2a22;}
 #cmdbar button.danger:hover:not(:disabled){background:rgba(255,90,77,.12);box-shadow:0 0 10px rgba(255,90,77,.3);}
@@ -1291,6 +1293,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #splitdlg .scur{min-width:26px;text-align:center;color:#eafffb;font-variant-numeric:tabular-nums;}
 #splitdlg .snew{min-width:42px;text-align:right;color:var(--grn);font-weight:700;font-variant-numeric:tabular-nums;}
 #splitdlg .sbtns{display:flex;gap:4px;}
+/* Флагман героя не отделяется (ядро: E_HERO_UNIT) — строка без кнопок, с пометкой. */
+#splitdlg .sstays{justify-self:center;padding:0 8px;color:var(--dim);font-size:11px;letter-spacing:.5px;}
+#splitdlg .ssub.shero{margin-top:-6px;color:#e6c77a;}
 #splitdlg .sbtns button{min-width:34px;height:30px;padding:0 7px;cursor:pointer;border-radius:2px;
   font:700 11px ui-monospace,monospace;background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);}
 #splitdlg .sbtns button:hover:not(:disabled){background:rgba(53,214,230,.14);}

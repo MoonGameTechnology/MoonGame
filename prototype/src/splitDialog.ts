@@ -31,10 +31,14 @@
  *    корпус, поэтому увести транспорты, бросив на них войска, — такой же перегруз, как
  *    забрать войска без транспортов. Обе половины показаны, и подтверждение гаснет ДО
  *    отказа сервера.
+ * 9. **Флагман героя — строка без кнопок (`splitPlan.ts`, правило 8).** Ядро его не
+ *    отделяет, поэтому окно не предлагает то, что вернётся отказом, а говорит, как
+ *    добиться своего: увести остальных — и герой останется один.
+ * 10. **В заголовке — имя флота, а не его id.** `p1_2` игроку ничего не говорит.
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import { canConfirmSplit, clampTake, shipTotals, type CargoSplit, type SplitSlot } from '../../decisions/splitPlan';
+import { canConfirmSplit, clampTake, shipTotals, takeable, type CargoSplit, type SplitSlot } from '../../decisions/splitPlan';
 
 /** Что нужно знать, чтобы решить судьбу окна (правила 1–4). */
 export interface SplitLifeInput {
@@ -67,6 +71,8 @@ export interface SplitRow {
   have: number;
   take: number;
   stay: number;
+  /** Не отделяется — флагман героя (правило 9). */
+  fixed?: true;
 }
 
 /** Строки окна по живым слотам флота (правила 5–6). */
@@ -75,7 +81,7 @@ export function splitRows(
   take: Readonly<Record<string, number>> = {},
 ): SplitRow[] {
   return slots.map((slot) => {
-    const tk = clampTake(take[slot.key] ?? 0, slot.have);
+    const tk = clampTake(take[slot.key] ?? 0, takeable(slot));
     return {
       key: slot.key,
       unit: slot.unit,
@@ -84,6 +90,7 @@ export function splitRows(
       have: slot.have,
       take: tk,
       stay: slot.have - tk,
+      ...(slot.fixed ? { fixed: true as const } : {}),
     };
   });
 }
@@ -99,6 +106,8 @@ export interface SplitDialogHooks {
 /** Модель окна целиком. */
 export interface SplitDialogModel {
   fleetId: string;
+  /** Имя флота для заголовка (правило 10); нет — стоит id. */
+  fleetName?: string;
   rows: readonly SplitRow[];
   /** Трюм обеих половин (правило 8). */
   cargo: CargoSplit;
@@ -111,6 +120,14 @@ function rowHtml(r: SplitRow, hooks: SplitDialogHooks): string {
           .map((m) => `<span class="smod">${esc(hooks.moduleName(m))}</span>`)
           .join('')}</span>`
       : '';
+  if (r.fixed) {
+    return `<div class="srow sfixed">
+      <span class="sname"><span class="bicon">${hooks.icon(r.unit)}</span>${esc(hooks.name(r.unit))}${mods}</span>
+      <b class="scur">${r.stay}</b>
+      <span class="sstays">${t('split.fixed')}</span>
+      <b class="snew">→ 0</b>
+    </div>`;
+  }
   return `<div class="srow">
       <span class="sname"><span class="bicon">${hooks.icon(r.unit)}</span>${esc(hooks.name(r.unit))}${mods}</span>
       <b class="scur">${r.stay}</b>
@@ -134,6 +151,7 @@ export function splitDialogHtml(m: SplitDialogModel, hooks: SplitDialogHooks): s
     ...(r.modules ? { modules: [...r.modules] } : {}),
     have: r.have,
     kind: r.kind,
+    ...(r.fixed ? { fixed: true as const } : {}),
   }));
   const take: Record<string, number> = {};
   for (const r of m.rows) take[r.key] = r.take;
@@ -148,8 +166,10 @@ export function splitDialogHtml(m: SplitDialogModel, hooks: SplitDialogHooks): s
     })}${c.fits ? '' : ` — ${t('split.hold.over')}`}</div>`
     : '';
   return `<div class="sbox">
-    <div class="shead">${t('split.title')} <b>${esc(m.fleetId)}</b></div>
-    <div class="ssub">${t('split.note')}</div>
+    <div class="shead">${t('split.title')} <b>${esc(m.fleetName ?? m.fleetId)}</b></div>
+    <div class="ssub">${t('split.note')}</div>${
+      ships.some((r) => r.fixed) ? `<div class="ssub shero">${t('split.hero')}</div>` : ''
+    }
     <div class="srows">${ships.map((r) => rowHtml(r, hooks)).join('')}${hold}</div>
     <div class="sfoot">${t('split.preview', { a: `<b>${takeTotal}</b>`, b: `<b>${total - takeTotal}</b>` })}</div>
     <div class="sactions">

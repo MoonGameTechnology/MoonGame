@@ -21,6 +21,12 @@
  *    вместимость даёт корпус, поэтому увести транспорты, бросив на них войска, — такой
  *    же перегруз, как забрать войска без транспортов. Обе половины считаются здесь,
  *    чтобы кнопка гасла ДО отказа сервера.
+ * 8. **Флагман героя остаётся (`fixed`).** Ядро не отделяет корабль героя (`E_HERO_UNIT`:
+ *    сущность героя привязана к флоту), а окно предлагало его наравне с остальными —
+ *    и подтверждение возвращалось отказом (сообщение владельца 2026-09-24: «кнопка
+ *    деления флотов не работает»). Такой стек в отбор не попадает, но в остатке
+ *    считается: увести всех остальных можно — герой полетит один, ровно то, чего игрок
+ *    и добивался.
  */
 
 /** Стопка кораблей одного типа в составе флота. */
@@ -95,6 +101,8 @@ export interface SplitSlot {
   modules?: string[];
   have: number;
   kind: 'ship' | 'landing';
+  /** Стек не отделяется от исходного флота — флагман героя (правило 8). */
+  fixed?: true;
 }
 
 /** Стопка с лоадаутом — то, из чего состоит живой флот. */
@@ -108,6 +116,7 @@ export interface LoadoutStackLike extends UnitStackLike {
 export function splitSlots(
   units: readonly LoadoutStackLike[],
   landing: readonly UnitStackLike[] = [],
+  fixed: (unit: string) => boolean = () => false,
 ): SplitSlot[] {
   const out: SplitSlot[] = [];
   const at = new Map<string, SplitSlot>();
@@ -120,6 +129,7 @@ export function splitSlots(
     }
     const slot: SplitSlot = { key, unit, have: count, kind };
     if (modules && modules.length > 0) slot.modules = [...modules];
+    if (kind === 'ship' && fixed(unit)) slot.fixed = true;
     at.set(key, slot);
     out.push(slot);
   };
@@ -134,8 +144,13 @@ export function normalizeSlotTake(
   slots: readonly SplitSlot[],
 ): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const slot of slots) out[slot.key] = clampTake(take[slot.key] ?? 0, slot.have);
+  for (const slot of slots) out[slot.key] = clampTake(take[slot.key] ?? 0, takeable(slot));
   return out;
+}
+
+/** Сколько из стека можно увести: у неподвижного — ничего (правило 8). */
+export function takeable(slot: SplitSlot): number {
+  return slot.fixed ? 0 : slot.have;
 }
 
 /** Итоги по КОРАБЛЯМ — правила «не ноль и не всё» касаются только их: флот без единого
@@ -149,7 +164,7 @@ export function shipTotals(
   for (const slot of slots) {
     if (slot.kind !== 'ship') continue;
     total += slot.have;
-    takeTotal += clampTake(take[slot.key] ?? 0, slot.have);
+    takeTotal += clampTake(take[slot.key] ?? 0, takeable(slot));
   }
   return { takeTotal, total, left: total - takeTotal };
 }
@@ -178,7 +193,7 @@ export function cargoSplit(
   let takenUsed = 0;
   let keptUsed = 0;
   for (const slot of slots) {
-    const tk = clampTake(take[slot.key] ?? 0, slot.have);
+    const tk = clampTake(take[slot.key] ?? 0, takeable(slot));
     const stay = slot.have - tk;
     if (slot.kind === 'ship') {
       takenCapacity += tk * capacity(slot.unit, slot.modules);

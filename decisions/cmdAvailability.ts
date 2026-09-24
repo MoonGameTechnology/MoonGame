@@ -42,8 +42,24 @@ export interface LoneFleet {
 
 /** Деление: только один стоящий флот с 2+ кораблями (правила 1, 3). */
 export function canSplit(lone: LoneFleet | null): boolean {
-  if (!lone) return false;
-  return !!lone.location && !lone.movement && !lone.battleId && lone.ships >= 2;
+  return splitBlock(lone) === null;
+}
+
+/**
+ * ПОЧЕМУ делить нельзя — ключ подсказки, или `null`, когда можно (правила 1, 3).
+ *
+ * Серая кнопка без объяснения читается как сломанная (сообщение владельца 2026-09-24:
+ * «кнопка деления флотов не работает»): флот в пути или в бою — а в Sector Zero это
+ * большая часть забега, — и кнопка просто молчит. На ПК причина жила только в подсказке
+ * мыши, на телефоне её не было вовсе. Порядок проверок — от того, что игрок исправит
+ * быстрее: выбрать один флот, дождаться прибытия, дождаться конца боя.
+ */
+export function splitBlock(lone: LoneFleet | null): string | null {
+  if (!lone) return 'cmd.split.why.one';
+  if (lone.movement || !lone.location) return 'cmd.split.why.moving';
+  if (lone.battleId) return 'cmd.split.why.battle';
+  if (lone.ships < 2) return 'cmd.split.why.single';
+  return null;
 }
 
 /** Мир глазами штурма с орбиты. */

@@ -724,7 +724,7 @@ import {
   canAssaultAim,
   canAssaultFromOrbit,
   canMerge,
-  canSplit,
+  splitBlock,
 } from '../../decisions/cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
 import {
@@ -8048,7 +8048,15 @@ function cmdBtn(
   cls: string,
   disabled: boolean,
   desc?: string,
+  why?: string | null,
 ): string {
+  // Серая кнопка с причиной (`why`) остаётся нажимаемой: нажатие говорит, ПОЧЕМУ нельзя
+  // (сообщение владельца 2026-09-24 про «Делить»). `disabled` проглотил бы нажатие, а на
+  // телефоне подсказки мыши нет — кнопка выглядела бы просто сломанной.
+  if (disabled && why) {
+    const reason = t(why);
+    return `<button data-cmd="${cmd}" class="${cls}" title="${esc(`${label} — ${reason}`)}" aria-label="${esc(`${label} — ${reason}`)}" aria-disabled="true" data-why="${esc(why)}"><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+  }
   const tip = desc ? `${label} — ${desc}` : label;
   return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
 }
@@ -8300,7 +8308,7 @@ function renderCmdBar() {
   const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
-  const splitOk = canSplit(
+  const splitWhy = splitBlock(
     lone
       ? {
           location: lone.location,
@@ -8310,6 +8318,7 @@ function renderCmdBar() {
         }
       : null,
   );
+  const splitOk = splitWhy === null;
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
@@ -8378,7 +8387,7 @@ function renderCmdBar() {
       !mergeOk,
       t('cmd.merge.hint'),
     ) +
-    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint')) +
+    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint'), splitWhy) +
     cmdBtn(
       'troops',
       '⇅',
@@ -8490,7 +8499,9 @@ function renderCmdBar() {
  *  thing: the same hull flies fitted and bare, and the loadout is part of the stack's
  *  identity (SM-0.3), so "two cruisers" says nothing until it says WHICH two. */
 function fleetSplitSlots(f: Fleet): SplitSlot[] {
-  return splitSlots(f.units, f.landing ?? []); // арифметика деления — `splitPlan.ts` (REFM-76)
+  // арифметика деления — `splitPlan.ts` (REFM-76); флагман героя ядро не отделяет
+  // (`E_HERO_UNIT`), и окно держит его строку неподвижной (правило 8 там же)
+  return splitSlots(f.units, f.landing ?? [], (u) => !!data.units[u]?.traits.includes('hero'));
 }
 
 /** Hold capacity of one ship stack with its loadout installed (a cargo module is
@@ -8531,7 +8542,7 @@ function renderSplitDialog() {
     data.units[u]?.stats.cargoSize ?? 1,
   );
   const html = splitDialogHtml(
-    { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
+    { fleetId: plan.fleetId, fleetName: `«${fleetCallsign(plan.fleetId)}»`, rows: splitRows(slots, plan.take), cargo },
     {
       icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
       name: displayUnit,
@@ -8989,6 +9000,11 @@ document.addEventListener?.('click', (ev) => {
 cmdbar.addEventListener('click', (ev) => {
   const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
   if (!bEl || bEl.disabled) return;
+  // Серая кнопка с причиной (`cmdBtn`, `why`): приказа нет — есть объяснение.
+  if (bEl.getAttribute('aria-disabled') === 'true') {
+    if (bEl.dataset.why) note(t(bEl.dataset.why));
+    return;
+  }
   const cmd = bEl.dataset.cmd;
   const ids = selectedFleetIds();
   if (MOBILE && (cmd === 'mobile-send' || cmd === 'mobile-cancel')) {

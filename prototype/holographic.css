@@ -143,7 +143,7 @@ body.holo-ui #cmdbar button.holo-command-close{width:26px;height:26px;min-height
 body.holo-ui #cmdbar [data-cmd=move]{grid-column:1/-1;min-height:40px;color:var(--holo-reflection);
   background:rgba(26,115,130,.2);border-color:var(--cyan-dim);}
 body.holo-ui #cmdbar [data-cmd=move].on{background:rgba(26,145,157,.36);border-color:var(--cyan);}
-body.holo-ui #cmdbar button:disabled{opacity:.56;border-color:var(--line);}
+body.holo-ui #cmdbar button:disabled,body.holo-ui #cmdbar button[aria-disabled="true"]{opacity:.56;border-color:var(--line);}
 body.holo-ui #cmdbar .holo-command-details{margin:0 12px 10px;border:0;border-top:1px solid var(--line);
   padding:10px 0 0;min-height:32px;font-size:12px;color:var(--cyan-dim);}
 body.holo-ui #cmdbar .cmdpop{position:static;grid-column:1/-1;min-width:0;max-width:none;width:100%;margin-top:5px;

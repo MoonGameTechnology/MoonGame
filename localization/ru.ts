@@ -561,6 +561,10 @@ export const ru: Record<string, string> = {
   'cmd.selection.one': 'ФЛОТ',
   'cmd.split': 'Делить',
   'cmd.split.hint': 'отделить часть кораблей пришвартованного флота в новый',
+  'cmd.split.why.battle': 'Флот в бою — разделить можно после боя.',
+  'cmd.split.why.moving': 'Флот в пути — разделить можно, когда он встанет.',
+  'cmd.split.why.one': 'Делится один флот — выберите его одного.',
+  'cmd.split.why.single': 'Во флоте один корабль — делить нечего.',
   'cmd.stop': 'Стоп',
   'cmd.troops': 'Десант',
   'cmd.troops.hint':
@@ -1318,6 +1322,8 @@ export const ru: Record<string, string> = {
   // --- split — Разделение флота: диалог и предпросмотр.
   'split.all': 'Все',
   'split.confirm': 'Подтвердить',
+  'split.fixed': 'остаётся',
+  'split.hero': 'Флагман героя остаётся в этом флоте. Чтобы герой полетел один, отделите остальные корабли.',
   'split.hold': 'трюм — новый флот: {a} · исходный: {b}',
   'split.hold.over': 'десант не влезает',
   'split.note':
