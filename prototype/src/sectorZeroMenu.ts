@@ -122,7 +122,8 @@ const pts = (poly: ReadonlyArray<[number, number]>): string =>
 /**
  * Карта главы в стиле игровой: мозаика провинций, линии проходов, туман над неопознанным.
  * Опознанное красится стороной (вы / противник / ничьё) и видом сектора, цели задач —
- * кольцом. Толщины линий не зависят от масштаба (`non-scaling-stroke`).
+ * кольцом. Толщины линий не зависят от масштаба (`non-scaling-stroke`). Размера у SVG нет —
+ * только `viewBox`: высоту панель берёт из его пропорций, и карта не обрастает полосами.
  */
 export function chapterMapSvg(view: ChapterMapView): string {
   const { x, y, w, h } = view.frame;
@@ -163,7 +164,9 @@ export function chapterMapSvg(view: ChapterMapView): string {
     .join('');
   return (
     `<svg viewBox="${Math.round(x)} ${Math.round(y)} ${Math.round(w)} ${Math.round(h)}" preserveAspectRatio="xMidYMid meet" role="img">` +
-    `<defs><pattern id="sz-fog" width="${Math.round(r * 1.6)}" height="${Math.round(r * 1.6)}" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><rect width="100%" height="100%" class="fog-bg"/><line x1="0" y1="0" x2="0" y2="${Math.round(r * 1.6)}" class="fog-hatch"/></pattern></defs>` +
+    // Туман — свой мягкий свет в каждой плитке (градиент по рамке клетки): форма главы
+    // читается, а вид и хозяин неразведанного — нет. Цвета остановок живут в CSS.
+    `<defs><radialGradient id="sz-fog" cx="50%" cy="42%" r="70%"><stop offset="0" class="fog-in"/><stop offset="1" class="fog-out"/></radialGradient></defs>` +
     `<g class="cells">${cells}</g><g class="lanes">${lanes}</g><g class="marks">${marks}${targets}</g></svg>`
   );
 }
