@@ -3560,6 +3560,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
               <button id="sz-weak" type="button" data-difficulty="weak" aria-pressed="true" data-i18n="setup.pve.difficulty.weak"></button>
               <button id="sz-strong" type="button" data-difficulty="strong" aria-pressed="false" data-i18n="setup.pve.difficulty.strong"></button>
             </div>
+            <p id="sz-difficulty-about" aria-live="polite"><span id="sz-difficulty-what"></span> <span data-i18n="sector-zero.difficulty.same"></span></p>
             <p id="sz-difficulty-hint" hidden data-i18n="sector-zero.difficulty.hint"></p>
           </fieldset>
         </div>

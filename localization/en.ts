@@ -2232,7 +2232,12 @@ export const en: Record<string, string> = {
   'sector-zero.codex.empty': 'Nothing yet. Identify Swarm forces in a run — the dossier keeps them after the results.',
   'sector-zero.continue': 'Continue',
   'sector-zero.difficulty': 'New run difficulty',
+  'sector-zero.difficulty.about.strong':
+    'The veteran Swarm thinks: it researches technologies, retreats from lost battles, splits its fleet between two targets, lands troops on defended worlds, launches shuttles and trains its heroes.',
+  'sector-zero.difficulty.about.weak':
+    'The standard Swarm wins by numbers: its fleets go for the nearest target and fight to the end; it researches nothing and never lands troops on defended worlds.',
   'sector-zero.difficulty.hint': 'Your saved run keeps its original difficulty.',
+  'sector-zero.difficulty.same': 'Scheduled waves and rewards are the same on both levels.',
   'sector-zero.end.prepare': 'Upgrade and prepare',
   'sector-zero.end.replay': 'Play this chapter again',
   'sector-zero.end.reward': '+{n} expedition data',
