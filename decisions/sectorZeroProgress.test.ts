@@ -20,6 +20,7 @@ import {
 } from './sectorZeroProgress';
 import { parseRunSave, serializeRunSave, RUN_SAVE_VERSION } from './runSave';
 import { runLoot } from './moduleRarity';
+import { workshopRows } from './sectorZeroWorkshop';
 
 const data = shippedGameData();
 const fresh = () => freshSectorZeroProgress(data);
@@ -707,5 +708,82 @@ describe('ремонт в забеге за Суверены (заказ вла�
     expect(changeSectorZeroProgress(p, { kind: 'premium-repair', hull: 301 }, data)).toBeNull();
     expect(changeSectorZeroProgress(p, { kind: 'premium-repair', hull: 0 }, data)).toBeNull();
     expect(p.sovereigns).toBe(12);
+  });
+});
+
+describe('AUD-30 — служебные имена JavaScript в профиле', () => {
+  // `data.modules['constructor']` находит не запись каталога, а наследство
+  // `Object.prototype`: без проверки собственного ключа такие «модули» и «герои» проходили
+  // разбор, а действие с id `__proto__` писало прямо в `Object.prototype`.
+  const SPECIAL = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'];
+  // `Object.fromEntries` кладёт `__proto__` СОБСТВЕННЫМ ключом — так его и приносит JSON
+  // из хранилища.
+  const raw = (patch: Record<string, unknown>): string => JSON.stringify({ v: 1, research: 7, ...patch });
+  const prototypeClean = (): void => {
+    const probe: Record<string, unknown> = {};
+    for (const key of ['level', 'skills', 'equipped', 'research', 'warrants'])
+      expect(key in probe, key).toBe(false);
+  };
+
+  it('модули, звёзды и герои со служебными именами до профиля не доезжают', () => {
+    const p = parseSectorZeroProgress(
+      raw({
+        modules: [...SPECIAL, 'cargo_bay'],
+        stars: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
+        forgeTries: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
+        moduleCopies: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
+        heroes: Object.fromEntries(SPECIAL.map((id) => [id, { level: 2 }])),
+        selectedHero: 'constructor',
+      }),
+      data,
+    );
+    for (const id of SPECIAL) {
+      expect(p.modules).not.toContain(id);
+      expect(Object.prototype.hasOwnProperty.call(p.heroes, id), id).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(p.stars, id), id).toBe(false);
+    }
+    expect(p.selectedHero).toBe(fresh().selectedHero);
+    expect(p.research).toBe(7);
+  });
+
+  it('один битый id навыка не обнуляет профиль целиком', () => {
+    const p = parseSectorZeroProgress(
+      raw({ heroes: { commander: { level: 2, skills: ['constructor', 'toString'] } } }),
+      data,
+    );
+    expect(p.research).toBe(7);
+    expect(p.heroes.commander?.level).toBe(2);
+    expect(p.heroes.commander?.skills).toEqual([]);
+  });
+
+  it('«Новый забег» и Мастерская работают на профиле, принёсшем служебные имена', () => {
+    const p = parseSectorZeroProgress(
+      raw({ modules: ['constructor', 'cargo_bay'], selectedHero: 'constructor' }),
+      data,
+    );
+    expect(() => prepareSectorZeroRun(pveState(data), p, data)).not.toThrow();
+    expect(() => workshopRows(p, data)).not.toThrow();
+  });
+
+  it('действие со служебным id — отказ, и Object.prototype не тронут', () => {
+    const p = { ...fresh(), research: 500, warrants: 500, sovereigns: 500 };
+    for (const id of SPECIAL) {
+      const actions: SectorProgressAction[] = [
+        { kind: 'unlock-module', id },
+        { kind: 'forge', id },
+        { kind: 'raise-rarity', id },
+        { kind: 'buy', id, pay: 'warrants' },
+        { kind: 'fit', hull: sectorHullIds(data)[0]!, id },
+        { kind: 'unlock-hero', id },
+        { kind: 'select-hero', id },
+        { kind: 'upgrade-hero', id },
+        { kind: 'skill', hero: 'commander', id },
+        { kind: 'skill', hero: id, id: Object.keys(data.heroSkillTrees)[0]! },
+        { kind: 'ability', hero: id, id: 'x' },
+      ];
+      for (const action of actions)
+        expect(changeSectorZeroProgress(p, action, data), `${action.kind} ${id}`).toBeNull();
+    }
+    prototypeClean();
   });
 });

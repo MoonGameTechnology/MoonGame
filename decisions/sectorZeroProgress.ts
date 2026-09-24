@@ -286,7 +286,7 @@ export function sectorSkillLegal(
   id: string,
   data: GameData,
 ): boolean {
-  const hero = progress.heroes[progress.selectedHero];
+  const hero = own(progress.heroes, progress.selectedHero);
   return hero !== undefined && skillLearnable(progress.selectedHero, hero.skills, id, data);
 }
 
@@ -316,7 +316,7 @@ function skillLearnable(
   id: string,
   data: GameData,
 ): boolean {
-  const node = data.heroSkillTrees[id];
+  const node = own(data.heroSkillTrees, id);
   if (!node || !sectorSkillOpenTo(node, heroId, data)) return false;
   const known = knownSkillNodes(skills, heroId, data);
   return !known.has(id) && node.requires.every((r) => known.has(r));
@@ -422,7 +422,7 @@ export function changeSectorZeroProgress(
   };
   switch (action.kind) {
     case 'unlock-module':
-      if (!data.modules[action.id] || next.modules.includes(action.id) || !pay(MODULE_UNLOCK_COST))
+      if (!own(data.modules, action.id) || next.modules.includes(action.id) || !pay(MODULE_UNLOCK_COST))
         return null;
       next.modules.push(action.id);
       break;
@@ -430,7 +430,7 @@ export function changeSectorZeroProgress(
       // Попытка улучшения — один движок на Мастерскую и Академию (§0.3 роадмапа
       // экономики): заводить вторую лестницу запрещено. Здесь только предмет и кошелёк,
       // правило исхода целиком в `sectorZeroForge.ts`.
-      if (!data.modules[action.id] || !next.modules.includes(action.id)) return null;
+      if (!own(data.modules, action.id) || !next.modules.includes(action.id)) return null;
       const tries = next.forgeTries[action.id] ?? 0;
       const shards = next.forgeShards[action.id] ?? 0;
       const out = forgeOutcome(
@@ -456,6 +456,7 @@ export function changeSectorZeroProgress(
     }
     case 'raise-rarity': {
       // Чертёж той ступени, НА которую поднимают, и 3 дубля того же модуля (SZE-5.2).
+      if (!own(data.modules, action.id)) return null;
       const check = raiseCheck(next, action.id, data);
       if (!check.can || !check.to) return null;
       next.blueprints[check.to] = check.blueprints - 1;
@@ -504,7 +505,7 @@ export function changeSectorZeroProgress(
     }
     case 'buy': {
       // Выдача и списание живут ВМЕСТЕ: разведи их — и однажды товар выдастся без оплаты.
-      const offer = data.sectorZeroShop.offers[action.id];
+      const offer = own(data.sectorZeroShop.offers, action.id);
       if (!offer || next.shopSold.includes(action.id)) return null;
       // Продаётся только то, что СЕГОДНЯ на витрине (сутки и раунд профиля). Иначе ротация
       // держалась бы одним интерфейсом, и вчерашний или никогда не выставлявшийся лот
@@ -566,23 +567,23 @@ export function changeSectorZeroProgress(
       break;
     }
     case 'unlock-hero': {
-      const def = data.heroes[action.id];
-      if (!def || next.heroes[action.id] || !pay(HERO_UNLOCK_COST)) return null;
+      if (!own(data.heroes, action.id) || own(next.heroes, action.id) || !pay(HERO_UNLOCK_COST))
+        return null;
       next.heroes[action.id] = newSectorHero(action.id, data);
       break;
     }
     case 'select-hero':
-      if (!next.heroes[action.id]) return null;
+      if (!own(next.heroes, action.id)) return null;
       next.selectedHero = action.id;
       break;
     case 'upgrade-hero': {
-      const hero = next.heroes[action.id];
+      const hero = own(next.heroes, action.id);
       if (!hero || hero.level >= GRADES.length || !pay(sectorHeroUpgradeCost(hero))) return null;
       hero.level++;
       break;
     }
     case 'skill': {
-      const hero = next.heroes[action.hero];
+      const hero = own(next.heroes, action.hero);
       if (
         !hero ||
         !skillLearnable(action.hero, hero.skills, action.id, data) ||
@@ -593,7 +594,7 @@ export function changeSectorZeroProgress(
       break;
     }
     case 'ability': {
-      const hero = next.heroes[action.hero];
+      const hero = own(next.heroes, action.hero);
       if (
         !hero ||
         !sectorHeroAbilities(action.hero, hero, data).includes(action.id) ||
@@ -610,6 +611,20 @@ export function changeSectorZeroProgress(
     }
   }
   return next;
+}
+
+/**
+ * Запись таблицы по id — только СОБСТВЕННЫЙ ключ (AUD-30). `data.modules['constructor']`
+ * находит не запись каталога, а наследство `Object.prototype`, и профиль из `localStorage`
+ * или облака принимал такие «модули» и «героев»: «Новый забег» падал на
+ * `selectedHero: "constructor"`, Мастерская — на модуле `constructor`, а действие с id
+ * `__proto__` дописывало поле прямо в `Object.prototype` — все объекты игры получали
+ * `level: NaN`. `hasOwnProperty.call`, а не `Object.hasOwn`: клиент идёт и в старые WebView.
+ */
+function own<T>(table: Readonly<Record<string, T>>, id: unknown): T | undefined {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(table, id)
+    ? table[id]
+    : undefined;
 }
 
 const counter = (n: unknown, fallback = 0): number =>
@@ -699,13 +714,13 @@ export function parseSectorZeroProgress(
     // нет в запасе карты, значит они ничего не закрывают и не открывают.
     for (const [chapter, ids] of Object.entries(p.objectivesDone ?? {})) {
       const list = strings(ids);
-      if (list.length > 0) fresh.objectivesDone[chapter] = list;
+      if (list.length > 0 && chapter !== '__proto__') fresh.objectivesDone[chapter] = list;
     }
     fresh.chaptersWon = strings(p.chaptersWon);
     fresh.comicsSeen = strings(p.comicsSeen).filter((id) => COMIC_ID.test(id));
     for (const [chapter, ids] of Object.entries(p.chapterScouted ?? {})) {
       const list = strings(ids);
-      if (list.length > 0) fresh.chapterScouted[chapter] = list;
+      if (list.length > 0 && chapter !== '__proto__') fresh.chapterScouted[chapter] = list;
     }
     fresh.lastRun = parseRunSummary(p.lastRun);
     fresh.warrants = counter(p.warrants);
@@ -718,10 +733,10 @@ export function parseSectorZeroProgress(
       counter(p.adSovereignsToday),
       data.sectorZeroShop.adSovereigns.perDay,
     );
-    fresh.shopSold = [...new Set(strings(p.shopSold).filter((id) => data.sectorZeroShop.offers[id]))];
+    fresh.shopSold = [...new Set(strings(p.shopSold).filter((id) => own(data.sectorZeroShop.offers, id)))];
     if (typeof p.seed === 'string') fresh.seed = p.seed;
     fresh.modules = [
-      ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => data.modules[id])]),
+      ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => own(data.modules, id))]),
     ];
     // Профиль лежит в localStorage — то есть правится игроком. Звезда сверх потолка,
     // дробная, отрицательная и звезда несуществующего модуля не доезжают: срезаем здесь,
@@ -729,22 +744,23 @@ export function parseSectorZeroProgress(
     // Счётчик попыток живёт по тем же правилам, что и звёзды: профиль лежит в
     // localStorage, так что дробное, отрицательное и чужое до механики не доезжает.
     for (const [id, value] of Object.entries(p.forgeTries ?? {})) {
-      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       if (value > 0) fresh.forgeTries[id] = value;
     }
     for (const [id, value] of Object.entries(p.forgeShards ?? {})) {
-      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       if (value > 0) fresh.forgeShards[id] = value;
     }
     // Редкость, дубли и чертежи (SZE-5.2): профиль лежит в localStorage и правится
     // игроком, поэтому чужая ступень, мусорный счётчик или неизвестный модуль — мимо.
     for (const [id, value] of Object.entries(p.moduleRarity ?? {})) {
-      if (!data.modules[id] || typeof value !== 'string') continue;
-      const base = RARITIES.indexOf(data.modules[id]!.rarity ?? 'simple');
+      const def = own(data.modules, id);
+      if (!def || typeof value !== 'string') continue;
+      const base = RARITIES.indexOf(def.rarity ?? 'simple');
       if (RARITIES.indexOf(value as (typeof RARITIES)[number]) > base) fresh.moduleRarity[id] = value;
     }
     for (const [id, value] of Object.entries(p.moduleCopies ?? {})) {
-      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       if (value > 0) fresh.moduleCopies[id] = value;
     }
     for (const [r, value] of Object.entries(p.blueprints ?? {})) {
@@ -753,7 +769,7 @@ export function parseSectorZeroProgress(
       if (value > 0) fresh.blueprints[r] = value;
     }
     for (const [id, value] of Object.entries(p.stars ?? {})) {
-      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       const star = Math.min(data.sectorZeroStars.cap, value);
       if (star > 0) fresh.stars[id] = star;
     }
@@ -767,7 +783,7 @@ export function parseSectorZeroProgress(
       fresh.loadouts[hull] = equipped;
     }
     for (const [id, value] of Object.entries(p.heroes ?? {})) {
-      if (!data.heroes[id] || !value || typeof value !== 'object') continue;
+      if (!own(data.heroes, id) || !value || typeof value !== 'object') continue;
       const hero: SectorHero = {
         level: Math.max(1, Math.min(3, counter(value.level, 1))),
         skills: [],
@@ -784,7 +800,7 @@ export function parseSectorZeroProgress(
         .slice(0, sectorHeroSlots(hero, data));
       fresh.heroes[id] = hero;
     }
-    if (p.selectedHero && fresh.heroes[p.selectedHero]) fresh.selectedHero = p.selectedHero;
+    if (own(fresh.heroes, p.selectedHero)) fresh.selectedHero = p.selectedHero!;
     fresh.swarmCodex = parseSwarmCodex(p.swarmCodex, data);
     return fresh;
   } catch {
@@ -927,8 +943,8 @@ export function prepareSectorZeroRun(
         else delete stack.moduleRarity;
       }
     }
-  const selected = progress.heroes[progress.selectedHero];
-  const def = data.heroes[progress.selectedHero];
+  const selected = own(progress.heroes, progress.selectedHero);
+  const def = own(data.heroes, progress.selectedHero);
   const home = Object.values(next.planets).find((p) => p.owner === 'p1' && p.kind === 'planet');
   if (!selected || !def || !home) return next;
   const id = 'sector-zero:hero';
