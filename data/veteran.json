@@ -1,3 +1,4 @@
 {
-  "damagePerBattle": 0.04
+  "damagePerBattle": 0.04,
+  "hullPerBattle": 0.04
 }

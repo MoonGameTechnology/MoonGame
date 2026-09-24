@@ -36,6 +36,38 @@ describe('значок надбавки ветерана (PERK-3.3)', () => {
     // игроку разница между «ничего» и «+1%» на такой границе не видна в принципе.
   });
 
+  it('корпус (VET-6): при равных ставках — одно число, подпись называет обе половины', () => {
+    // Урон ×1.16 и корпус 0.16 — одна и та же выслуга при одной ставке.
+    const b = veteranBadge(1.16, 0.16);
+    expect(b?.text).toBe('+16%');
+    expect(b?.percent).toBe(16);
+    expect(b?.hullPercent).toBe(16);
+    expect(b?.title).toBe(t('battle.win.veteran-both', { n: 16, h: 16 }));
+    expect(b?.title).not.toContain('{h}');
+  });
+
+  it('корпус (VET-6): разошедшиеся ставки видны обоими числами', () => {
+    const b = veteranBadge(1.16, 0.08);
+    expect(b?.text).toBe('+16%/+8%');
+    expect(b?.title).toBe(t('battle.win.veteran-both', { n: 16, h: 8 }));
+  });
+
+  it('корпус (VET-6): каждая половина показывается и одна', () => {
+    // Ставка урона обнулена данными — значок остаётся ради корпуса, со своей подписью.
+    const hullOnly = veteranBadge(1, 0.12);
+    expect(hullOnly?.text).toBe('+12%');
+    expect(hullOnly?.percent).toBe(0);
+    expect(hullOnly?.title).toBe(t('battle.win.veteran-hull', { h: 12 }));
+    // Обнулён корпус — прежняя подпись PERK-3.3 без слова о прочности.
+    const damageOnly = veteranBadge(1.12, 0);
+    expect(damageOnly?.text).toBe('+12%');
+    expect(damageOnly?.hullPercent).toBe(0);
+    expect(damageOnly?.title).toBe(t('battle.win.veteran', { n: 12 }));
+    // И обе в ноль — молчание, как и без выслуги.
+    expect(veteranBadge(1.004, 0.004)).toBeNull();
+    expect(veteranBadge(undefined, undefined)).toBeNull();
+  });
+
   it('глиф ТОТ ЖЕ, что у медали «Выслуга» в строке состава', () => {
     // Одна механика, показанная в двух местах. Разойдись глифы — игрок не связал бы
     // вымпел на корабле с процентами в окне боя, а связывать это его работа не должна.

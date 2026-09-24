@@ -9,7 +9,7 @@ import {
   type UnitStack,
 } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
-import type { Action, Context } from '../action/types';
+import type { Action, Context, MatchConfig } from '../action/types';
 import { hookedDamage } from '../util/combat';
 import { veteranModule } from './veteran';
 
@@ -24,7 +24,11 @@ import { veteranModule } from './veteran';
 
 const RATE = 0.04;
 
-function dataWith(rate: number): GameData {
+/** Хост дал ветерану силу — так идёт забег Sector Zero (VET-6). Сетевая партия этого
+ *  флага не ставит, и надбавки в ней нет: это держит отдельный блок ниже. */
+const POWER: MatchConfig = { timeScale: 1, veteranPower: true };
+
+function dataWith(rate: number, hull = 0): GameData {
   return parseGameData({
     version: '0.1.0',
     resources: ['metal'],
@@ -32,8 +36,19 @@ function dataWith(rate: number): GameData {
     factions: {},
     buildings: {},
     events: {},
-    veteran: { damagePerBattle: rate },
+    veteran: { damagePerBattle: rate, hullPerBattle: hull },
   });
+}
+
+/** Кладёт очки в пул снижения урона — как укрепления мира (PERK-2.1). */
+function mitigation(id: string, points: number): GameModule {
+  return {
+    id,
+    version: '1.0.0',
+    setup(api) {
+      api.hook<number>('combat.mitigation', (pool) => pool + points);
+    },
+  };
 }
 
 /** Кладёт очки в ПАРАЛЛЕЛЬНУЮ группу — они сложатся с чужими, а не умножатся. */
@@ -86,6 +101,9 @@ function fire(
   mods: GameModule[] = [],
   args: Record<string, unknown> = {},
   rate = RATE,
+  /** `null` — конфига нет вовсе (`undefined` подставил бы значение по умолчанию). */
+  config: MatchConfig | null = POWER,
+  hull = 0,
 ): number {
   const probe: GameModule = {
     id: 'vet-probe',
@@ -107,7 +125,7 @@ function fire(
   };
   const kernel = createKernel([probe, veteranModule, ...mods]);
   const action: Action = { id: 's:p1:1', type: 'fire', playerId: 'p1', payload: {}, issuedAt: 0 };
-  const ctx: Context = { now: 0, data: dataWith(rate) };
+  const ctx: Context = { now: 0, data: dataWith(rate, hull), ...(config ? { config } : {}) };
   const r = kernel.applyAction(state, action, ctx);
   if (!r.ok) throw new Error(`apply failed: ${r.code}`);
   return (r.events.find((e) => e.type === 'probe.dealt')?.payload as { dealt: number }).dealt;
@@ -214,5 +232,79 @@ describe('надбавка ветерана — деградация без па
     const before = JSON.stringify(state);
     fire(state, [parallelBonus('p', 0.5)]);
     expect(JSON.stringify(state)).toBe(before);
+  });
+});
+
+describe('сила ветерана — правило хоста (VET-6)', () => {
+  // Резолюция владельца 2026-09-24: «в сетевой только награда, а в Sector Zero — урон,
+  // корпус и выплата». Хост забега ставит флаг, сетевая партия — нет.
+
+  it('без флага хоста — сетевые правила: ни урона, ни корпуса', () => {
+    const attacker = stateWith([stack(10, 4)]);
+    expect(fire(attacker, [], {}, RATE, null)).toBe(100);
+    expect(fire(attacker, [], {}, RATE, { timeScale: 1 })).toBe(100);
+    // Тот же ответ и у обороняющегося ветерана: корпус тоже выключен.
+    const defender = stateWith([stack(10)]);
+    defender.fleets.f2!.units = [stack(10, 4)];
+    expect(fire(defender, [], {}, 0, null, RATE)).toBe(100);
+  });
+
+  it('флаг хоста включает надбавку, которую данные уже задали', () => {
+    expect(fire(stateWith([stack(10, 4)]), [], {}, RATE, POWER)).toBeCloseTo(116, 9);
+  });
+});
+
+describe('корпус ветерана — пул снижения урона (VET-6)', () => {
+  const HULL = 0.05;
+  /** Бой, где ветераны — ОБОРОНЯЮЩАЯСЯ сторона (по ним и стреляют). */
+  function veteranDefender(units: UnitStack[]): GameState {
+    const state = stateWith([stack(10)]);
+    state.fleets.f2!.units = units;
+    return state;
+  }
+
+  it('обороняющийся ветеран держит в 1 + ставка × выслуга раз больше', () => {
+    for (const battles of [1, 2, 4]) {
+      expect(fire(veteranDefender([stack(10, battles)]), [], {}, 0, POWER, HULL), `${battles}`).toBeCloseTo(
+        100 / (1 + HULL * battles),
+        9,
+      );
+    }
+  });
+
+  it('считается среднее на юнит — долив свежих разбавляет корпус, как и урон', () => {
+    // 10 ветеранов по 4 боя + 30 новобранцев = 1 бой на юнит.
+    expect(fire(veteranDefender([stack(10, 4), stack(30, 0)]), [], {}, 0, POWER, HULL)).toBeCloseTo(
+      100 / (1 + HULL * 1),
+      9,
+    );
+  });
+
+  it('корпус — у того, ПО КОМУ стреляют: выслуга нападающего его не даёт', () => {
+    // Нападающий с выслугой, обороняющийся — новобранцы: урон не снижается ничем.
+    expect(fire(stateWith([stack(10, 4)]), [], {}, 0, POWER, HULL)).toBe(100);
+  });
+
+  it('очки складываются в ОБЩИЙ пул с укреплениями и тратятся один раз', () => {
+    // Пул PERK-2.1: 1 / (1 + 0.5 + 0.2), а не 1 / ((1 + 0.5) × (1 + 0.2)).
+    const dealt = fire(veteranDefender([stack(10, 4)]), [mitigation('fort', 0.5)], {}, 0, POWER, HULL);
+    expect(dealt).toBeCloseTo(100 / (1 + 0.5 + HULL * 4), 9);
+    expect(dealt).not.toBeCloseTo(100 / (1.5 * (1 + HULL * 4)), 6);
+  });
+
+  it('канал без боя корпуса не даёт — тот же, что у урона', () => {
+    // Обстрел с орбиты, ПВО и вылеты боями не считаются: выслугу за них не начисляют.
+    expect(
+      fire(veteranDefender([stack(10, 4)]), [], { battleId: undefined, phase: 'bombard' }, 0, POWER, HULL),
+    ).toBe(100);
+    expect(fire(veteranDefender([stack(10, 4)]), [], { defender: null }, 0, POWER, HULL)).toBe(100);
+  });
+
+  it('ставка корпуса в данных: ноль выключает только корпус', () => {
+    // Урон при этом на месте — две половины выключаются порознь.
+    const state = stateWith([stack(10, 4)]);
+    state.fleets.f2!.units = [stack(10, 4)];
+    expect(fire(state, [], {}, RATE, POWER, 0)).toBeCloseTo(116, 9);
+    expect(fire(state, [], {}, RATE, POWER, HULL)).toBeCloseTo(116 / (1 + HULL * 4), 9);
   });
 });

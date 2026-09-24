@@ -101,10 +101,14 @@ export function awardOnce(
   prior: AwardMarker | null,
   endStamp: string,
   meta: MetaState,
-  result: { won: boolean; score: number; place?: number },
+  /** `xp` — опыт из таблицы наград ЯДРА (`match.rewards`), вместе с выплатой за медали
+   *  сохранённых ветеранов (VET-4). Своя формула `matchXp` — только запасной путь для
+   *  дев-хука завершения, у которого таблицы нет: её копия без медалей была единственным
+   *  источником, и песочница медали молча не платила (VET-8). */
+  result: { won: boolean; score: number; place?: number; xp?: number },
 ): Award {
   if (prior?.at === endStamp) return { xp: prior.xp, levelUp: null, meta: null, marker: null };
-  const xp = matchXp({ won: result.won, score: result.score });
+  const xp = result.xp ?? matchXp({ won: result.won, score: result.score });
   const before = metaLevel(meta.xp);
   // Место приходит из таблицы наград ЯДРА (модуль победы считает стандартное
   // соревновательное ранжирование) — клиент таблицу не переранжирует. У дев-хука
@@ -168,12 +172,12 @@ export function initMatchEnd(host: MatchEndHost): MatchEndWatch {
     }
     const key = awardKeyFor(host.nick());
     const stamp = endStampOf(s.match);
+    const reward = s.match.rewards?.[host.me()];
     const award = awardOnce(parseAwardMarker(host.readMarker(key)), stamp, host.loadMeta(), {
       won,
       score: s.match.scores?.[host.me()]?.total ?? 0,
-      ...(s.match.rewards?.[host.me()]?.place !== undefined
-        ? { place: s.match.rewards[host.me()]!.place }
-        : {}),
+      ...(reward?.place !== undefined ? { place: reward.place } : {}),
+      ...(reward?.xp !== undefined ? { xp: reward.xp } : {}),
     });
     if (award.meta) host.saveMeta(award.meta);
     if (award.marker) host.writeMarker(key, JSON.stringify(award.marker));

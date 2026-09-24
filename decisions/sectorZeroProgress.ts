@@ -30,6 +30,7 @@ import {
   starsOf,
   rarityOf,
   RARITIES,
+  veteranXp,
   type GameData,
   type Rarity,
   type GameState,
@@ -192,7 +193,10 @@ export interface RunSummary {
   objectives: ObjectiveResult[];
   /** Сумма за задачи. */
   bonus: number;
-  /** Всего данных экспедиций (`base + bonus`) и Варрантов за них. */
+  /** Плата за медали сохранённых ветеранов (VET-7, {@link veteranReward}). Нет — итог
+   *  засчитан до VET-7 или платить было не за что. */
+  veterans?: number;
+  /** Всего данных экспедиций (`base + bonus + veterans`) и Варрантов за них. */
   total: number;
   warrants: number;
   /** Сколько новых задач главы откроется к следующему заходу. */
@@ -219,6 +223,28 @@ export function forgeLadderOf(data: GameData): RarityLadder {
  *  половина награды). **v0**: забег с четырьмя волнами и победой даёт 40 ⌖, первая звезда
  *  стоит 20, полная лестница одного модуля — 695. Числа калибруются телеметрией. */
 export const WARRANTS_PER_REWARD = 5;
+
+/**
+ * Курс медалей в награду забега (VET-7, резолюция владельца 2026-09-24: «в Sector Zero —
+ * урон, корпус и выплата»): сколько очков выплаты ядра за медали сохранённых ветеранов
+ * (`veteranXp`) стоят одно очко награды забега.
+ *
+ * Выплата та же, что в сетевой партии, — одни медали, одни степени и одна шкала «чем выше
+ * степень, тем дороже» (решение владельца 6). Своей шкалы у забега нет намеренно: две
+ * лестницы ценности одной медали разошлись бы при первой же правке. Курс нужен потому,
+ * что награды забега мелкие (1 + волны + 3 за победу), а шкала медалей — 5–100 за юнит.
+ *
+ * **Число — по замеру** (2026-09-24, стенд глав, игрок-оборонец): победный забег приносит
+ * 1620–1980 очков медалей, то есть +4…+5 к награде при базе 14 — полторы надбавки за
+ * победу. В проигранных забегах выживших ветеранов у игрока к концу не остаётся вовсе, и
+ * медали не платят ничего.
+ */
+export const MEDAL_XP_PER_REWARD = 400;
+
+/** Сколько очков награды забега стоят медали на ЖИВЫХ юнитах `owner` к концу забега. */
+export function veteranReward(state: GameState, owner: string, data: GameData): number {
+  return Math.round(veteranXp(state, owner, data) / MEDAL_XP_PER_REWARD);
+}
 
 /** Сколько корпуса чинит один Суверен (заказ владельца 2026-09-24: платный ремонт в
  *  забеге — за донат-валюту). Корпуса забега — десятки HP: флот из десятка фрегатов
@@ -731,6 +757,7 @@ function parseRunSummary(v: unknown): RunSummary | null {
     return out;
   };
   const rawLoot = r.loot as Record<string, unknown> | undefined;
+  const veterans = n(r.veterans);
   return {
     attempt: attempt!,
     chapter: r.chapter,
@@ -740,6 +767,7 @@ function parseRunSummary(v: unknown): RunSummary | null {
     base: base!,
     objectives,
     bonus: bonus!,
+    ...(veterans ? { veterans } : {}),
     total: total!,
     warrants: warrants!,
     unlocked: unlocked!,
@@ -922,7 +950,10 @@ export function settleSectorZeroRun(
     'p1',
     chapter.slots ?? DEFAULT_OBJECTIVE_SLOTS,
   );
-  const reward = base + tasks.bonus;
+  // VET-7: медали сохранённых ветеранов — третья часть награды, рядом с волнами и
+  // задачами. Каталог нужен для порогов медалей; без него платить не за что.
+  const veterans = data ? veteranReward(state, 'p1', data) : 0;
+  const reward = base + tasks.bonus + veterans;
   const warrants = reward * WARRANTS_PER_REWARD;
   const firstWin = !!won && !!chapter.id && !progress.chaptersWon.includes(chapter.id);
   // Дубли и чертежи (SZE-5.3): бросок от сида профиля, номера попытки и отпечатка итогового
@@ -972,6 +1003,7 @@ export function settleSectorZeroRun(
       base,
       objectives: tasks.results,
       bonus: tasks.bonus,
+      ...(veterans > 0 ? { veterans } : {}),
       total: reward,
       warrants,
       unlocked: tasks.unlocked,

@@ -5,6 +5,7 @@ import {
   order,
   setMatchMode,
   setMatchTravelSpeed,
+  setMatchVeteranPower,
   moveFleet,
   orbitFleet,
   assaultFleet,
@@ -41,15 +42,18 @@ import type { RunDifficulty } from '../../decisions/runDifficulty';
 
 const HOUR = 3_600_000;
 
-/** Правила ЗАБЕГА — те же, что ставит хост (`installMatch` + `setRunActive`): режим карты и
- *  темп перемещения ×5 (PVR-2.3). Без второго прогон мерил бы не ту игру, в которую играют. */
+/** Правила ЗАБЕГА — те же, что ставит хост (`installMatch` + `setRunActive`): режим карты,
+ *  темп перемещения ×5 (PVR-2.3) и сила ветерана (VET-6). Без них прогон мерил бы не ту
+ *  игру, в которую играют. */
 function armRun(): void {
   setMatchMode(pveModeId());
   setMatchTravelSpeed(RUN_TRAVEL_SPEED);
+  setMatchVeteranPower(true);
 }
 function disarmRun(): void {
   setMatchMode(undefined);
   setMatchTravelSpeed(1);
+  setMatchVeteranPower(false);
 }
 
 interface RunOut {

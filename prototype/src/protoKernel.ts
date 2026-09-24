@@ -205,12 +205,26 @@ export function setMatchTravelSpeed(factor: number): void {
   matchTravelSpeed = factor;
 }
 
+/**
+ * Сила ветерана в ТЕКУЩЕМ матче (VET-6): пережитые бои дают урон и корпус. Та же посадка,
+ * что у темпа: правило ставит ХОСТ забега, а не режим — резолюция владельца 2026-09-24
+ * «в сетевой только награда, а в Sector Zero — урон, корпус и выплата». Песочница и
+ * обучение идут без неё, как сетевая партия.
+ */
+let matchVeteranPower = false;
+
+/** Дать ли ветерану силу в бою в этом матче. Зовётся там же, где темп забега. */
+export function setMatchVeteranPower(on: boolean): void {
+  matchVeteranPower = on;
+}
+
 export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
   const config: MatchConfig = {
     timeScale: 1,
     victory: { scoreLimit: scoreLimitFor(state ?? {}) },
     ...(matchModeId !== undefined ? { modeId: matchModeId } : {}),
     ...(matchTravelSpeed !== 1 ? { travelSpeedFactor: matchTravelSpeed } : {}),
+    ...(matchVeteranPower ? { veteranPower: true } : {}),
   };
   // Единственный дом правила «режим → правила»: пресет победы режима подстилается ПОД
   // победу матча, свою копию слоения здесь не заводим. Отказать он может только на

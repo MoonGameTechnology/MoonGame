@@ -1235,6 +1235,9 @@
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md` | Грейды и пороги |
 | VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md` | Выплата, растущая со степенью |
 | VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md` | Медали в карточке юнита |
+| VET-6 | ✅ | core data proto cli | `docs/unit-medals-roadmap.md` | Сила ветерана — правило хоста, и у неё есть корпус |
+| VET-7 | ✅ | proto | `docs/unit-medals-roadmap.md` | Выплата за медали в итог забега |
+| VET-8 | ✅ | proto | `docs/unit-medals-roadmap.md` | Песочница прототипа платит за медали |
 | YAG-0.1 | ✅ | docs | `docs/yandex-games-roadmap.md` | Сверить требования с первоисточником 2026-09-22 |
 | YAG-0.2 | ✅ | docs | `docs/yandex-games-roadmap.md` | Сверить страницы SDK с первоисточником 2026-09-22 |
 | YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md` | Контракты GamePlatform и WebPlatformAdapter |
