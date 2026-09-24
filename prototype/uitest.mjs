@@ -249,7 +249,7 @@ const res = await build({
   platform: 'node',
   format: 'cjs',
   target: 'es2020',
-  loader: { '.webp': 'dataurl' },
+  loader: { '.webp': 'dataurl', '.svg': 'dataurl' },
   write: false,
   // The build profile is a REQUIRED define (see main.ts) — the smoke test drives
   // the full dev client, same as dist/void-dominion.html.
@@ -523,11 +523,11 @@ assert.deepEqual(JSON.parse(storage.get('sector-zero.progress.v1')).loadouts.cru
 await prep('tab', 'heroes');
 assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="upgrade-hero"'));
 assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="skill"'));
-// Академия показывает лица из общего атласа, а не буквы: четыре карточки ростера и
-// открытый герой. Закрытые (награды глав) — приглушены, открытый командир — нет.
+// Академия показывает лица, а не буквы: пять карточек ростера (четыре из общего атласа и
+// векторный черновик Учёного) и открытый герой. Закрытые — приглушены, открытый командир — нет.
 const academy = getEl('sz-workshop').innerHTML;
-assert.equal(academy.match(/class="hero-portrait"/g)?.length, 5, 'every hero shows a portrait');
-assert.equal(academy.match(/sz-face sz-face-locked/g)?.length, 3, 'locked heroes are dimmed');
+assert.equal(academy.match(/class="hero-portrait"/g)?.length, 6, 'every hero shows a portrait');
+assert.equal(academy.match(/sz-face sz-face-locked/g)?.length, 4, 'locked heroes are dimmed');
 assert.ok(!academy.includes('sz-crest'), 'the letter crest is only a fallback for heroes without art');
 await prep('back');
 await click('sz-strong');

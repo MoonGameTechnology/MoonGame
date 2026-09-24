@@ -79,7 +79,7 @@ export function heroDisplayName(hero: HeroInst): string {
   const fallback = hero.name ?? hero.id;
   if (hero.grade === 'main') return houseDisplayName(fallback);
   const identity = heroIdentity(hero.archetype);
-  if (identity) return t(identity.name);
+  if (identity?.name) return t(identity.name);
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   // Две РАЗНЫЕ формы, и один вызов на обе не годится (CONV-12b). Имя архетипа приходит
   // из каталога и теперь английское (`Ravager`) — его переводит `tData()` по слагу

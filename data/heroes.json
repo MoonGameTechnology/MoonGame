@@ -60,5 +60,20 @@
       "bulwark"
     ],
     "startPassives": []
+  },
+  "scientist": {
+    "name": "Scientist",
+    "description": "hero.unit.scientist.desc",
+    "ship": {
+      "unit": "hero"
+    },
+    "slots": 2,
+    "startAbilities": [
+      "scan",
+      "decoy_signal"
+    ],
+    "startPassives": [
+      "field_lab"
+    ]
   }
 }

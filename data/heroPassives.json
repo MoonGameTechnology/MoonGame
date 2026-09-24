@@ -94,5 +94,15 @@
     "params": {
       "bonus": 0.2
     }
+  },
+  "field_lab": {
+    "name": "Field Lab",
+    "description": "hero.passive.field-lab.desc",
+    "hook": "salvage",
+    "scope": "ownFleetsNear",
+    "params": {
+      "bonus": 0.05,
+      "radius": 0
+    }
   }
 }

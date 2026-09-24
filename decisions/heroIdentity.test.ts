@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { createInitialState, type GameState } from '../packages/shared-core/src/index';
+import { shippedGameData } from '../data/bundle';
 
 function newGame(): GameState {
   const s = createInitialState({ seed: 1, version: { data: '0.1.0', manifest: 'test' } });
@@ -94,5 +95,20 @@ describe('hero map privacy and targeting', () => {
     expect(heroAtPoint(hits, 49, 128)).toBeNull();
     expect(heroAtPoint([], 49, 60)).toBeNull();
     expect(heroIdentity('unknown')).toBeUndefined();
+  });
+});
+
+describe('личность героя — у каждого героя каталога', () => {
+  it('у каждого героя каталога есть личность, а значит и портрет', () => {
+    for (const id of Object.keys(shippedGameData().heroes))
+      expect([id, heroIdentity(id) !== undefined]).toEqual([id, true]);
+  });
+
+  it('Учёный: портрет — черновик вне атласа, имя не согласовано (sector-zero-roadmap §3.1.8)', () => {
+    const scientist = heroIdentity('scientist')!;
+    expect(scientist.cell).toBeUndefined();
+    // Без личного имени панель героя показывает имя архетипа — выдумывать канон нельзя.
+    expect(scientist.name).toBeUndefined();
+    expect(scientist.bio).toBe('hero.person.scientist.bio');
   });
 });

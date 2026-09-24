@@ -922,6 +922,7 @@ export const en: Record<string, string> = {
   'data.salvage-metal-rig': 'Salvage Metal Rig',
   'data.saturation-barrage': 'Saturation Barrage',
   'data.scan': 'Scan',
+  'data.scientist': 'Scientist',
   'data.field-hospital': 'Field Hospital',
   'data.vehicle-factory': 'Vehicle Factory',
   'data.scout': 'scout',
@@ -1604,6 +1605,8 @@ export const en: Record<string, string> = {
   'hero.passive.reclaimed-barrels.desc': "A further +2% damage — 7% in total.",
   'hero.passive.scavenged-guns.desc': "+5% damage for the ship the hero commands.",
   'hero.passive.wreck-optics.desc': "+3% salvage share in battles this hero fought.",
+  'data.field-lab': 'Field Lab',
+  'hero.passive.field-lab.desc': '+5% salvage share in battles this hero fought.',
   'hero.tree.field-foundry.desc': "Salvaged metal is melted down in the hold and fed to the barrels.",
   'hero.tree.hull-shears.desc': "Powered shears open plating faster than it can cool.",
   'hero.tree.salvage-rig.desc': "Grapples and cutters on external mounts: the hero starts stripping more off a battlefield than anyone else.",
@@ -1619,6 +1622,7 @@ export const en: Record<string, string> = {
   "hero.person.vanguard.bio": "He began as an escort commander on dangerous trade routes. After a severe injury, he returned to the bridge with communications and tactical-processing implants. He tests uncertain routes first and leads reinforcements in person. Direct and quick to decide, he values initiative in his crew.",
   "hero.person.warden.name": "Elena Mor",
   "hero.person.warden.bio": "For years she escorted evacuation convoys at the edge of settled space. She developed her psionic discipline to protect people, not to stand above them. Calm under fire, she remembers the cost of every order. Her ship leaves last, once the others have reached a safe course.",
+  "hero.person.scientist.bio": "Author of the program the Swarm grew from. He was evacuated from the complex in the first hours of the quarantine — injured, but able to work. Command does not fully trust him, yet it has tasked him with stopping the Swarm: only he knows the system's founding principles. To him this is not an order but a debt to those who could not be saved.",
   "hero.person.main.bio": "You command this flagship. Its callsign follows your name in the match. Your history is shaped by your decisions: whom to protect, where to take a risk, and when to withdraw. This card shows your abilities, learned skills, and ship equipment.",
   "hero.person.dossier": "Personal dossier",
   "hero.person.archetype": "Specialization",
@@ -1700,6 +1704,8 @@ export const en: Record<string, string> = {
   'hero.unit.commander.desc':
     'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
   'hero.unit.ravager.desc': 'A psionic destroyer: annihilates worlds and tears open the fog.',
+  'hero.unit.scientist.desc':
+    "An analyst: lifts the fog and plants false signals. Innate — Field Lab: +5% salvage share in the hero's battles.",
   'hero.unit.vanguard.desc':
     'A transhuman manoeuvrist: corridors and a war cry for the leading fleets.',
   'hero.unit.warden.desc': 'A psionic defender: holds the line behind a bastion shield.',

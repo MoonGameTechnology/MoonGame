@@ -11,6 +11,7 @@ import {
   ownHeroes,
   normalizeHeroView,
   initHeroStaff,
+  heroDisplayName,
   HERO_CASTABLE,
   heroCdKey,
   nodeDepth,
@@ -656,5 +657,19 @@ describe('штаб героев — корабль: модули в той же 
     const html = shipPane({ state: () => s }); // главный герой развёрнут
     expect(html).toContain(t('hero.ship.refit-docked'));
     expect(html).not.toContain('data-hinstall');
+  });
+});
+
+describe('штаб героев — Учёный', () => {
+  it('имя Учёного не согласовано — панель показывает имя архетипа, а не ключ', () => {
+    const name = heroDisplayName({
+      id: 'h',
+      owner: 'p1',
+      location: 'A',
+      cooldowns: {},
+      archetype: 'scientist',
+    });
+    expect(name).toBe(tData(data.heroes.scientist!.name));
+    expect(name).not.toContain('hero.person');
   });
 });
