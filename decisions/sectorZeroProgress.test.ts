@@ -787,3 +787,75 @@ describe('AUD-30 — служебные имена JavaScript в профиле'
     prototypeClean();
   });
 });
+
+describe('AUD-31 — откат версии не стирает купленное', () => {
+  // Профиль новой версии, разобранный старой: её каталог ещё не знает модуля, героя и
+  // навыка. Раньше разбор выбрасывал их, следующая запись закрепляла потерю, а облако
+  // разносило её по устройствам — потраченные данные и Варранты не возвращались.
+  const hero = Object.keys(data.heroes).find((h) => h !== 'commander')!;
+  function bought(): SectorZeroProgress {
+    let p: SectorZeroProgress = { ...fresh(), research: 200, warrants: 5000 };
+    const acts: SectorProgressAction[] = [
+      { kind: 'unlock-module', id: 'shield_booster' },
+      { kind: 'forge', id: 'shield_booster' },
+      { kind: 'forge', id: 'shield_booster' },
+      { kind: 'forge', id: 'shield_booster' },
+      { kind: 'unlock-hero', id: hero },
+      { kind: 'upgrade-hero', id: hero },
+      { kind: 'skill', hero: 'commander', id: 'command_relay' },
+      { kind: 'skill', hero: 'commander', id: 'command_grid' },
+    ];
+    for (const a of acts) p = change(p, a);
+    return { ...p, moduleCopies: { shield_booster: 2 }, moduleRarity: { shield_booster: 'mythic' } };
+  }
+  function olderCatalog(): typeof data {
+    const old = structuredClone(data);
+    delete (old.modules as Record<string, unknown>).shield_booster;
+    delete (old.heroes as Record<string, unknown>)[hero];
+    delete (old.heroSkillTrees as Record<string, unknown>).command_relay;
+    return old;
+  }
+
+  it('старая версия откладывает незнакомое на полку, а не выбрасывает', () => {
+    const p = bought();
+    const back = parseSectorZeroProgress(JSON.stringify(p), olderCatalog());
+    expect(back.modules).not.toContain('shield_booster');
+    expect(back.heroes[hero]).toBeUndefined();
+    expect(back.heroes.commander?.skills).toEqual([]);
+    expect(back.shelf?.modules).toEqual(['shield_booster']);
+    expect(back.shelf?.heroes?.[hero]?.level).toBe(2);
+    expect(back.shelf?.skills?.commander).toEqual(['command_relay', 'command_grid']);
+  });
+
+  it('новая версия возвращает с полки всё, за что заплачено', () => {
+    const p = bought();
+    const back = parseSectorZeroProgress(JSON.stringify(p), olderCatalog());
+    // Старая версия успела пожить с профилем: действие, засчёт — полка едет дальше.
+    const lived = change(back, { kind: 'select-hero', id: 'commander' });
+    const again = parseSectorZeroProgress(JSON.stringify(lived), data);
+    expect(again.modules).toEqual(expect.arrayContaining(['shield_booster']));
+    expect(again.stars).toEqual(p.stars);
+    expect(again.forgeTries).toEqual(p.forgeTries);
+    expect(again.moduleCopies).toEqual(p.moduleCopies);
+    expect(again.moduleRarity).toEqual(p.moduleRarity);
+    expect(again.heroes[hero]).toEqual(p.heroes[hero]);
+    expect(again.heroes.commander?.skills).toEqual(p.heroes.commander?.skills);
+    expect(again.shelf).toBeUndefined();
+  });
+
+  it('врождённый узел (AUD-22) — не незнакомое: из профиля уходит, на полку не едет', () => {
+    const legacy = parseSectorZeroProgress(
+      JSON.stringify({ v: 1, heroes: { commander: { level: 1, skills: ['void_attunement', 'psi_veil'] } } }),
+      data,
+    );
+    expect(legacy.heroes.commander?.skills).toEqual([]);
+    expect(legacy.shelf).toBeUndefined();
+  });
+
+  it('обычный профиль полки не носит, и разбор остаётся идемпотентным', () => {
+    const p = bought();
+    expect(parseSectorZeroProgress(JSON.stringify(p), data).shelf).toBeUndefined();
+    const back = parseSectorZeroProgress(JSON.stringify(p), olderCatalog());
+    expect(parseSectorZeroProgress(JSON.stringify(back), olderCatalog())).toEqual(back);
+  });
+});

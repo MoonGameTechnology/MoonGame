@@ -139,7 +139,36 @@ export interface SectorZeroProgress {
   /** Что игрок знает о Рое за все забеги (`swarmCodex.ts`, досье в меню — заказ владельца
    *  2026-09-24). Пополняется на закрытии забега, только растёт. */
   swarmCodex: SwarmCodex;
+  /** Купленное, которого нет в каталоге ЭТОЙ версии игры (AUD-31). Нет поля — полка пуста. */
+  shelf?: ProfileShelf;
 }
+
+/**
+ * Полка профиля (AUD-31) — содержимое, которое разбор НЕ узнал по каталогу своей версии.
+ *
+ * Раньше разбор выбрасывал незнакомое как мусор, и это молча стирало купленное при откате
+ * версии игры: профиль новой версии, разобранный старой (откат релиза), терял модуль, его
+ * звёзды и героя, а следующая запись и облако закрепляли потерю на всех устройствах —
+ * потраченные данные и Варранты не возвращались. Теперь незнакомое едет рядом с профилем
+ * и возвращается в него, как только каталог его снова знает. Мусор с формой хуже
+ * (дробное, отрицательное, не строка) на полку не попадает — его по-прежнему отбрасывают.
+ *
+ * Снаряжение кораблей и экипировку героя полка не держит: их переставляют бесплатно.
+ */
+export interface ProfileShelf {
+  modules?: string[];
+  stars?: Record<string, number>;
+  forgeTries?: Record<string, number>;
+  forgeShards?: Record<string, number>;
+  moduleRarity?: Record<string, string>;
+  moduleCopies?: Record<string, number>;
+  blueprints?: Record<string, number>;
+  heroes?: Record<string, SectorHero>;
+  /** Навыки ЗНАКОМЫХ героев, которые каталог не принял: узел другой версии или его
+   *  предпосылка. `герой → id узлов`. */
+  skills?: Record<string, string[]>;
+}
+type ShelfRecordField = Exclude<keyof ProfileShelf, 'modules'>;
 /** Глава забега: id карты, её запас задач и правило показа (PVR-5.3). */
 export interface SectorChapter {
   id: string;
@@ -627,6 +656,10 @@ function own<T>(table: Readonly<Record<string, T>>, id: unknown): T | undefined 
     : undefined;
 }
 
+/** Объект-словарь из хранилища или пустой: массив и примитив словарём не считаются. */
+const record = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+
 const counter = (n: unknown, fallback = 0): number =>
   typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : fallback;
 const strings = (v: unknown): string[] =>
@@ -735,43 +768,48 @@ export function parseSectorZeroProgress(
     );
     fresh.shopSold = [...new Set(strings(p.shopSold).filter((id) => own(data.sectorZeroShop.offers, id)))];
     if (typeof p.seed === 'string') fresh.seed = p.seed;
-    fresh.modules = [
-      ...new Set([...fresh.modules, ...strings(p.modules).filter((id) => own(data.modules, id))]),
-    ];
+    // Полка (AUD-31): то, что прошлая запись отложила как незнакомое своему каталогу,
+    // разбирается ВМЕСТЕ с основными полями — знакомое этому каталогу возвращается в
+    // профиль, незнакомое снова уходит на полку. Основное поле важнее полочного.
+    const shelved = (p.shelf && typeof p.shelf === 'object' ? p.shelf : {}) as Record<string, unknown>;
+    const shelf: ProfileShelf = {};
+    const merged = (field: string): [string, unknown][] =>
+      Object.entries({ ...record(shelved[field]), ...record((p as Record<string, unknown>)[field]) });
+    const shelve = (field: ShelfRecordField, id: string, value: unknown): void => {
+      if (id !== '__proto__') ((shelf[field] ??= {}) as Record<string, unknown>)[id] = value;
+    };
+    const rawModules = [...new Set([...strings(p.modules), ...strings(shelved.modules)])];
+    fresh.modules = [...new Set([...fresh.modules, ...rawModules.filter((id) => own(data.modules, id))])];
+    const unknownModules = rawModules.filter((id) => !own(data.modules, id));
+    if (unknownModules.length > 0) shelf.modules = unknownModules;
     // Профиль лежит в localStorage — то есть правится игроком. Звезда сверх потолка,
     // дробная, отрицательная и звезда несуществующего модуля не доезжают: срезаем здесь,
     // один раз, а не в каждом месте, которое потом звезду прочтёт.
     // Счётчик попыток живёт по тем же правилам, что и звёзды: профиль лежит в
     // localStorage, так что дробное, отрицательное и чужое до механики не доезжает.
-    for (const [id, value] of Object.entries(p.forgeTries ?? {})) {
-      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
-      if (value > 0) fresh.forgeTries[id] = value;
-    }
-    for (const [id, value] of Object.entries(p.forgeShards ?? {})) {
-      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
-      if (value > 0) fresh.forgeShards[id] = value;
-    }
+    // Модуль, которого нет в ЭТОМ каталоге, — не мусор, а, может быть, контент другой
+    // версии игры: его счётчики едут на полку (AUD-31).
+    for (const field of ['forgeTries', 'forgeShards', 'moduleCopies', 'stars'] as const)
+      for (const [id, value] of merged(field)) {
+        if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) continue;
+        if (!own(data.modules, id)) shelve(field, id, value);
+        else if (field !== 'stars') fresh[field][id] = value;
+        else fresh.stars[id] = Math.min(data.sectorZeroStars.cap, value);
+      }
     // Редкость, дубли и чертежи (SZE-5.2): профиль лежит в localStorage и правится
-    // игроком, поэтому чужая ступень, мусорный счётчик или неизвестный модуль — мимо.
-    for (const [id, value] of Object.entries(p.moduleRarity ?? {})) {
+    // игроком, поэтому мусорный счётчик — мимо; незнакомые модуль или ступень — на полку.
+    for (const [id, value] of merged('moduleRarity')) {
+      if (typeof value !== 'string') continue;
       const def = own(data.modules, id);
-      if (!def || typeof value !== 'string') continue;
-      const base = RARITIES.indexOf(def.rarity ?? 'simple');
-      if (RARITIES.indexOf(value as (typeof RARITIES)[number]) > base) fresh.moduleRarity[id] = value;
+      const tier = RARITIES.indexOf(value as (typeof RARITIES)[number]);
+      if (!def || tier < 0) shelve('moduleRarity', id, value);
+      else if (tier > RARITIES.indexOf(def.rarity ?? 'simple')) fresh.moduleRarity[id] = value;
     }
-    for (const [id, value] of Object.entries(p.moduleCopies ?? {})) {
-      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
-      if (value > 0) fresh.moduleCopies[id] = value;
-    }
-    for (const [r, value] of Object.entries(p.blueprints ?? {})) {
-      if (!RARITIES.includes(r as (typeof RARITIES)[number]) || r === 'simple') continue;
-      if (typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
-      if (value > 0) fresh.blueprints[r] = value;
-    }
-    for (const [id, value] of Object.entries(p.stars ?? {})) {
-      if (!own(data.modules, id) || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
-      const star = Math.min(data.sectorZeroStars.cap, value);
-      if (star > 0) fresh.stars[id] = star;
+    for (const [r, value] of merged('blueprints')) {
+      if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0 || r === 'simple')
+        continue;
+      if (RARITIES.includes(r as (typeof RARITIES)[number])) fresh.blueprints[r] = value;
+      else shelve('blueprints', r, value);
     }
     const hulls = sectorHullIds(data);
     for (const [hull, ids] of Object.entries(p.loadouts ?? {})) {
@@ -782,24 +820,34 @@ export function parseSectorZeroProgress(
           equipped.push(id);
       fresh.loadouts[hull] = equipped;
     }
-    for (const [id, value] of Object.entries(p.heroes ?? {})) {
-      if (!own(data.heroes, id) || !value || typeof value !== 'object') continue;
-      const hero: SectorHero = {
-        level: Math.max(1, Math.min(3, counter(value.level, 1))),
-        skills: [],
-        equipped: [],
-      };
-      const candidates = strings(value.skills);
+    const shelvedSkills = record(shelved.skills);
+    for (const [id, raw] of merged('heroes')) {
+      if (!raw || typeof raw !== 'object') continue;
+      const value = raw as Partial<Record<keyof SectorHero, unknown>>;
+      const level = Math.max(1, Math.min(3, counter(value.level, 1)));
+      const candidates = [...new Set([...strings(value.skills), ...strings(own(shelvedSkills, id))])];
+      if (!own(data.heroes, id)) {
+        shelve('heroes', id, { level, skills: candidates, equipped: strings(value.equipped) });
+        continue;
+      }
+      const hero: SectorHero = { level, skills: [], equipped: [] };
       // Repeat in catalog-independent order so valid prerequisites survive JSON key order.
       for (let pass = 0; pass < candidates.length; pass++)
         for (const skill of candidates)
           if (skillLearnable(id, hero.skills, skill, data)) hero.skills.push(skill);
+      // Не принятые навыки — на полку (AUD-31): узел другой версии, его предпосылка или
+      // ветка, которой у героя сейчас нет. Кроме тех, что герой и так знает — врождённых
+      // (AUD-22): их не покупают, и полка их не держит.
+      const known = knownSkillNodes(hero.skills, id, data);
+      const left = candidates.filter((skill) => !known.has(skill));
+      if (left.length > 0) shelve('skills', id, left);
       const owned = sectorHeroAbilities(id, hero, data);
       hero.equipped = strings(value.equipped)
         .filter((a) => owned.includes(a) && !data.heroAbilities[a]?.type.startsWith('spawn_'))
         .slice(0, sectorHeroSlots(hero, data));
       fresh.heroes[id] = hero;
     }
+    if (Object.keys(shelf).length > 0) fresh.shelf = shelf;
     if (own(fresh.heroes, p.selectedHero)) fresh.selectedHero = p.selectedHero!;
     fresh.swarmCodex = parseSwarmCodex(p.swarmCodex, data);
     return fresh;
