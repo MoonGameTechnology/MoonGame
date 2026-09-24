@@ -1214,6 +1214,6 @@
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
 | YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию |
 | YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
-| YAG-6.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир |
+| YAG-6.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир 2026-09-24 |
 | YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
 | YAG-6.4 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход |
