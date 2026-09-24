@@ -607,13 +607,15 @@
 | AUD-17 | ✅ | proto | `docs/backlog.md` | Корабельное ПВО стало видно. |
 | AUD-18 | ✅ | core | `docs/backlog.md` | Сняты наследные hero.move и planet.annihilate — второй |
 | AUD-19 | ✅ | docs | `docs/backlog.md` | Сводка решений ГДД (п. 8) описывала артиллерию, |
-| AUD-20 | ⏳ | srv proto | `docs/backlog.md` | Адаптация Роя (AD-01) не подключена ни к одному живому |
+| AUD-20 | ✅ | srv proto | `docs/backlog.md` | Адаптация Роя (AD-01) не подключена ни к одному живому |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | AUD-22 | ✅ | core proto | `docs/backlog.md` | Пустые покупки в дереве навыков. |
 | AUD-23 | ✅ | proto cli | `docs/backlog.md` | Разрыв кадра выигрывал главу без боя. |
 | AUD-24 | ✅ | proto cli | `docs/backlog.md` | «Продолжить» на втором устройстве стирало |
 | AUD-25 | ✅ | proto | `docs/backlog.md` | Двойной тап на экране подготовки — два ролика. |
 | AUD-26 | ✅ | cli | `docs/backlog.md` | Лут забега выбирался прокруткой попыток. |
+| AUD-27 | ⏳ | core | `docs/backlog.md` | Перезарядка шаттлов стоит, пока рядом идут бои. |
+| AUD-28 | ⏳ | core data | `docs/backlog.md` | Карта молча теряет модули стартовых флотов. |
 | AUD-27 | ✅ | proto | `docs/backlog.md` | Меню и старт ждали SDK и сохранение вечно. |
 | AUD-28 | ✅ | proto cli | `docs/backlog.md` | Реклама и облако зависали на молчащем SDK. |
 | AUD-29 | ✅ | proto cli | `docs/backlog.md` | Две вкладки затирали прогресс друг друга. |
@@ -1075,7 +1077,7 @@
 | PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Награда за забег |
 | PVR-4.1 | ✅ | docs | `docs/sector-zero-roadmap.md` | Резолюция: что из §3 входит в первую версию |
 | PVR-4.2 | ✅ | core | `docs/sector-zero-roadmap.md` | Память Роя как состояние |
-| PVR-4.3 | 🔶 | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.3 | ✅ | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
 | PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md` | Структуры первого набора |
 | PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Журнал адаптаций |
 | PVR-4.6 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Органы Роя у захватчика: не работают, гарнизон их зачищает |

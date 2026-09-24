@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { swarmMemoryModule } from './swarmMemory';
-import { swarmAdaptModule, swarmModuleLevel, MIN_SIGNAL } from './swarmAdapt';
+import {
+  swarmAdaptModule,
+  swarmAdaptDue,
+  swarmKnownLevel,
+  swarmModuleLevel,
+  MIN_SIGNAL,
+  SWARM_MEMORY_WINDOW,
+} from './swarmAdapt';
 import type { GameModule } from '../kernel/module';
 import { createInitialState, type Fleet, type GameState, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
@@ -224,13 +231,42 @@ describe('PVR-4.3 — проект доходит до уровня в бою', 
     expect(early.swarmAdapt).toBeDefined();
   });
 
-  it('уровень получают только стеки, несущие ЭТОТ модуль', () => {
-    let s = seen(MIN_SIGNAL);
-    s.fleets.other = fleet('other', 'swarm', ['chamber']); // камера есть, покрова нет
+  it('покров ВЫРАСТАЕТ на матках, где гнездо свободно (AUD-20)', () => {
+    // Решение владельца 2026-09-24: до адаптации покрова нет ни на одной матке — Рой
+    // шаттлы не перехватывает. Готовый проект растит его там, куда его можно поставить.
+    let s = seen(MIN_SIGNAL, { modules: ['chamber'] });
+    s.fleets.other = fleet('other', 'swarm', ['chamber']);
     s = apply(s, adapt(), 10);
     const done = ok(kernel.advanceTo(s, ctx(10 + 7 * MS_PER_HOUR)));
-    expect(done.fleets.hostF?.units[0]?.moduleStars).toEqual({ veil: 1 });
-    expect(done.fleets.other?.units[0]?.moduleStars).toBeUndefined();
+    for (const id of ['hostF', 'other']) {
+      expect(done.fleets[id]?.units[0]?.modules).toEqual(['chamber', 'veil']);
+      expect(done.fleets[id]?.units[0]?.moduleStars).toEqual({ veil: 1 });
+    }
+  });
+
+  it('корпус, который покров не допускает, его не получает', () => {
+    let s = seen(MIN_SIGNAL);
+    s.fleets.escort = {
+      ...fleet('escort', 'swarm', []),
+      units: [{ unit: 'cruiser', count: 2 }],
+    };
+    s = apply(s, adapt(), 10);
+    const done = ok(kernel.advanceTo(s, ctx(10 + 7 * MS_PER_HOUR)));
+    expect(done.fleets.escort?.units[0]?.modules).toBeUndefined();
+    expect(done.fleets.escort?.units[0]?.moduleStars).toBeUndefined();
+  });
+
+  it('готовый проект пишется в рецепт — знание переживает гибель маток', () => {
+    let s = apply(seen(MIN_SIGNAL), adapt(), 10);
+    s = ok(kernel.advanceTo(s, ctx(10 + 7 * MS_PER_HOUR)));
+    expect(s.swarmRecipes).toEqual({ veil: 1 });
+    // Все матки с покровом погибли, но следующий проект продолжает лестницу, а не
+    // начинает её заново: новая камера растит уже второй уровень.
+    s = apply(s, act('test.kill', 'swarm', { fleetId: 'hostF' }), s.time + 1);
+    s.fleets.fresh = fleet('fresh', 'swarm', ['chamber']);
+    expect(swarmKnownLevel(s, 'swarm', 'veil')).toBe(1);
+    s = apply(s, adapt({ fleetId: 'fresh' }), s.time + 1);
+    expect(s.swarmAdapt).toMatchObject({ level: 2, fleetId: 'fresh' });
   });
 
   it('второй шаг лестницы поднимает уровень до 2, третьего шага нет', () => {
@@ -240,6 +276,34 @@ describe('PVR-4.3 — проект доходит до уровня в бою', 
     s = ok(kernel.advanceTo(s, ctx(s.time + 10 * MS_PER_HOUR)));
     expect(swarmModuleLevel(s, 'swarm', 'veil')).toBe(2);
     expect(code(s, adapt(), s.time + 1)).toBe('E_ADAPT_MAXED');
+  });
+});
+
+describe('AUD-20 — проект едет вместе с органом, влитым в другой флот', () => {
+  const merger: GameModule = {
+    id: 'test-merge',
+    version: '1.0.0',
+    setup(api) {
+      api.onAction('test.merge', (action, h) => {
+        const p = action.payload as { from: string; into: string };
+        const from = h.state.fleets[p.from]!;
+        h.state.fleets[p.into]!.units.push(...from.units);
+        delete h.state.fleets[p.from];
+        h.emit('fleet.merged', { from: p.from, into: p.into, owner: 'swarm', at: 'hive' });
+      });
+    },
+  };
+  const k = createKernel([swarmMemoryModule, swarmAdaptModule, striker, merger]);
+
+  it('слияние не хоронит оплаченный проект: уровень вырастает в новом флоте', () => {
+    const s = apply(seen(MIN_SIGNAL), adapt(), 10);
+    s.fleets.wave = fleet('wave', 'swarm', []);
+    const r = k.applyAction(s, act('test.merge', 'swarm', { from: 'hostF', into: 'wave' }), ctx(11));
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.swarmAdapt?.fleetId).toBe('wave');
+    const done = ok(k.advanceTo(r.state, ctx(10 + 7 * MS_PER_HOUR)));
+    expect(done.swarmRecipes).toEqual({ veil: 1 });
+    expect(swarmModuleLevel(done, 'swarm', 'veil')).toBe(1);
   });
 });
 
@@ -264,5 +328,72 @@ describe('PVR-4.3 — потеря органа прекращает незав�
     s = apply(s, act('test.kill', 'swarm', { fleetId: 'hostF' }), 11);
     expect(s.players.swarm?.resources.biomass).toBe(paid);
     expect(paid).toBe(RICH.biomass - 30);
+  });
+});
+
+describe('AUD-20 — новые формы рождаются по рецепту', () => {
+  const waveBell: GameModule = {
+    id: 'test-wave',
+    version: '1.0.0',
+    setup(api) {
+      api.onAction('test.wave', (action, h) => {
+        const p = action.payload as { fleetId: string };
+        h.state.fleets[p.fleetId] = fleet(p.fleetId, 'swarm', ['chamber']);
+        h.emit('pve.wave.spawned', { owner: 'swarm', fleetId: p.fleetId, location: 'hive', wave: 1 });
+      });
+    },
+  };
+  const k = createKernel([swarmMemoryModule, swarmAdaptModule, striker, waveBell]);
+  const run = (s: GameState, a: Action, at: number): GameState => {
+    const r = k.applyAction(s, a, ctx(at));
+    if (!r.ok) throw new Error(r.code);
+    return r.state;
+  };
+
+  it('волна после адаптации выходит уже с покровом нужного уровня', () => {
+    let s = apply(seen(MIN_SIGNAL), adapt(), 10);
+    s = ok(kernel.advanceTo(s, ctx(10 + 7 * MS_PER_HOUR)));
+    s = run(s, act('test.wave', 'swarm', { fleetId: 'w1' }), s.time + 1);
+    expect(s.fleets.w1?.units[0]?.modules).toEqual(['chamber', 'veil']);
+    expect(s.fleets.w1?.units[0]?.moduleStars).toEqual({ veil: 1 });
+  });
+
+  it('волна до адаптации выходит без покрова', () => {
+    const s = run(seen(MIN_SIGNAL), act('test.wave', 'swarm', { fleetId: 'w1' }), 10);
+    expect(s.fleets.w1?.units[0]?.modules).toEqual(['chamber']);
+  });
+});
+
+describe('AUD-20 — «пора ли» решает одно правило на оба хоста', () => {
+  it('окно сложности: слабый Рой помнит 4 боя, сильный — весь забег', () => {
+    expect(SWARM_MEMORY_WINDOW).toEqual({ weak: 4, strong: null });
+  });
+
+  it('пол взят — заказ проекта на органе; пол не взят — ничего', () => {
+    expect(swarmAdaptDue(seen(MIN_SIGNAL - 1), data, 'swarm', null)).toBeNull();
+    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', null)).toEqual({
+      moduleId: 'veil',
+      fleetId: 'hostF',
+    });
+  });
+
+  it('узкое окно ждёт свежих боёв: старые наблюдения из него выпали', () => {
+    // Окно считается в столкновениях: окно уже пола не вмещает нужного числа
+    // наблюдений, сколько бы их ни было за весь забег.
+    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', MIN_SIGNAL - 1)).toBeNull();
+    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', MIN_SIGNAL)).not.toBeNull();
+  });
+
+  it('идёт проект, нет органа или не на что — не заказывает', () => {
+    expect(swarmAdaptDue(apply(seen(MIN_SIGNAL), adapt(), 10), data, 'swarm', null)).toBeNull();
+    expect(swarmAdaptDue(seen(MIN_SIGNAL, { modules: ['veil'] }), data, 'swarm', null)).toBeNull();
+    const poor = seen(MIN_SIGNAL, { resources: { biomass: 5, metal: 5, microelectronics: 1 } });
+    expect(swarmAdaptDue(poor, data, 'swarm', null)).toBeNull();
+  });
+
+  it('заказ, который выдаёт правило, ядро принимает', () => {
+    const s = seen(MIN_SIGNAL);
+    const due = swarmAdaptDue(s, data, 'swarm', SWARM_MEMORY_WINDOW.weak)!;
+    expect(code(s, adapt({ moduleId: due.moduleId, fleetId: due.fleetId }))).toBeUndefined();
   });
 });

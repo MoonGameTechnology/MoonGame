@@ -271,6 +271,12 @@ export const chainStamp = (
     waitUntil === undefined ? { fleetId, steps } : { fleetId, steps, waitUntil },
   );
 
+/** AUD-20: проект адаптации Роя. Приказ ДРАЙВЕРА Роя (бот забега, серверный оркестратор),
+ *  а не игрока: гейт его от клиента не принимает — схемы у типа нет намеренно, а ядро
+ *  отклоняет его от любого места, кроме Роя (`E_NOT_SWARM`). */
+export const swarmAdapt = (playerId: string, moduleId: string, fleetId: string) =>
+  act(playerId, 'swarm.adapt', { moduleId, fleetId });
+
 // Market listing, pulled ahead of the REFP-22 remainder for the same reason as the
 // standing-order toggles above: `aiOrders` (ai.ts, REFP-26) places lots and must not
 // import the facade back. Leaf builder — only the `MarketSide` type rides along.

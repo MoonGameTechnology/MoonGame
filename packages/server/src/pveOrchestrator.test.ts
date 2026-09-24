@@ -209,3 +209,80 @@ describe('pveOrchestrator — ответ на маяк (задача владе�
     ]);
   });
 });
+
+describe('pveOrchestrator — адаптация Роя (AUD-20)', () => {
+  // Свой мир: матка с камерой вывода, модуль-ответ с лестницей и память ударов.
+  const adaptData: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['biomass'],
+    units: {
+      mother: {
+        faction: 'swarm',
+        traits: ['brood_host'],
+        slots: { defense: 1, utility: 1 },
+        stats: { attack: 3, defense: 1, speed: 10 },
+      },
+      lander: { faction: 'swarm', domain: 'ground', stats: { attack: 1, defense: 1, speed: 1 } },
+    },
+    modules: {
+      veil: {
+        name: 'Veil',
+        slot: 'defense',
+        tag: 'vertical',
+        effects: { stats: { pointDefense: 6 } },
+        allowed: { domain: 'space', traits: ['brood_host'] },
+        adaptation: { signal: 'strike', levels: [{ cost: { biomass: 30 }, hours: 6 }] },
+      },
+      chamber: {
+        name: 'Chamber',
+        slot: 'utility',
+        tag: 'horizontal',
+        effects: { stats: {} },
+        allowed: { domain: 'space', traits: ['brood_host'] },
+        brood: { unit: 'lander', intervalHours: 3 },
+      },
+    },
+    factions: { swarm: { name: 'Swarm' }, vanguard: { name: 'Vanguard' } },
+    buildings: {},
+    events: {},
+  });
+  const struck = (n: number): GameState['swarmMemory'] => ({
+    engagements: n,
+    observations: Array.from({ length: n }, (_, i) => ({
+      ordinal: i + 1,
+      kind: 'strike',
+      engagement: `strike:s${i + 1}`,
+    })),
+  });
+  const adaptWorld = (strikes: number): GameState =>
+    world({
+      players: {
+        human: player('human', 'vanguard'),
+        swarm: { ...player('swarm', 'swarm'), resources: { biomass: 100 } },
+      },
+      fleets: {
+        organ: fleet('organ', 'swarm', 'hive', {
+          units: [{ unit: 'mother', count: 1, modules: ['chamber'] }],
+        }),
+      },
+      swarmMemory: struck(strikes),
+    });
+  const adaptOrders = (s: GameState, memoryWindow?: number | null): Action[] =>
+    pveOrders(s, adaptData, { session: 'm1', seq: 0, memoryWindow }).filter(
+      (a) => a.type === 'swarm.adapt',
+    );
+
+  it('пол наблюдений взят — драйвер заказывает проект на органе', () => {
+    expect(adaptOrders(adaptWorld(3), 4)).toEqual([
+      expect.objectContaining({ playerId: 'swarm', payload: { moduleId: 'veil', fleetId: 'organ' } }),
+    ]);
+  });
+
+  it('пол не взят — заказа нет', () => {
+    expect(adaptOrders(adaptWorld(2), 4)).toEqual([]);
+  });
+
+  it('без окна памяти Рой не адаптируется: молча «помнить всё» было бы тихой сложностью', () => {
+    expect(adaptOrders(adaptWorld(3))).toEqual([]);
+  });
+});

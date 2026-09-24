@@ -345,7 +345,8 @@
           "unit": "scout_drone",
           "count": 1
         }
-      ]
+      ],
+      "traits": ["sentinel"]
     }
   }
 }
