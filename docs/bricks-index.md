@@ -627,6 +627,7 @@
 | CMB-5 | ✅ | core | `docs/backlog.md` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
 | SHIPART-1 | ✅ | proto cli | `docs/backlog.md` | Реалистичные портреты в постройке и описаниях, |
+| SHIPART-2 | ✅ | cli proto | `docs/backlog.md` | Десантный корабль — в десантной семье |
 | HEROART-1 | ✅ | proto cli | `docs/backlog.md` | Портреты, досье и читаемый счёт флота |
 | YARD-1 | ✅ | data proto srv | `docs/backlog.md` | Корабли строит ВЕРФЬ, челноки — |
 | YARD-2 | ✅ | data | `docs/backlog.md` | У верфи два яруса: дешёвый строит, дорогой |

@@ -11,6 +11,9 @@ describe('realistic build portraits', () => {
     }
     expect(catalogPortraitHtml('u', 'frigate', data)).toContain('data-ship-art="frigate"');
     expect(catalogPortraitHtml('u', 'landing_shuttle', data)).toContain('data-ship-art="dropship"');
+    // Owner decision 2026-09-24: the landing ship and the carrier no longer share a picture.
+    expect(catalogPortraitHtml('u', 'strike_carrier', data)).toContain('data-ship-art="dropship"');
+    expect(catalogPortraitHtml('u', 'shuttle_carrier', data)).toContain('data-ship-art="transport"');
     expect(catalogPortraitHtml('b', 'starfort', data)).toContain('data-ship-art="station"');
     expect(catalogPortraitHtml('b', 'metal_station', data)).toContain('data-ship-art="station"');
   });

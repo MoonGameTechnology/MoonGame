@@ -12,12 +12,14 @@
 | frigate.webp | frigate | 57819bfc-efbc-492c-b8a1-e2aa552c5281 |
 | cruiser.webp | cruiser | a7b515a9-4d12-44c3-81f6-8f0e12c09ca0 |
 | dreadnought.webp | siege, siege_lance, hero | 07beebbd-997f-46de-8b0a-901e691ef16b |
-| transport.webp | strike_carrier, shuttle_carrier | de184b15-ab06-42a1-8711-c48c030796da |
-| dropship.webp | landing_shuttle | ee5b6c0f-638b-491b-96b8-d04ebc7993d5 |
+| transport.webp | shuttle_carrier | de184b15-ab06-42a1-8711-c48c030796da |
+| dropship.webp | strike_carrier, landing_shuttle | ee5b6c0f-638b-491b-96b8-d04ebc7993d5 |
 | station.webp | здания starfort, metal_station | 35d9c5c5-27aa-4928-b202-6d2e0be2ea56 |
 
 Это соответствие визуальных семейств существующему ростеру, без добавления классов
-или изменения механик. Карта использует отдельные настоящие векторы из
+или изменения механик. Десантный корабль (`strike_carrier`) до 2026-09-24 делил грузовик
+с авианосцем, и экран подготовки показывал два разных класса одной картинкой; по решению
+владельца он перешёл в десантную семью к десантному шаттлу, грузовик остался авианосцу. Карта использует отдельные настоящие векторы из
 `packages/client/src/shipShapes.ts`, а не растровые изображения голограмм.
 
 Общий промпт редактирования, по одному вызову на каждое имя из таблицы:
