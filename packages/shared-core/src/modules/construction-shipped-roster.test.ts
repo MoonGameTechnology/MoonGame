@@ -97,7 +97,7 @@ const SELF_RESTRICTED = [
  * владельца 2026-09-24, `util/infestation.ts`). Строитель этой таблицы — не Рой, поэтому
  * на планете их нет. Вписаны поимённо по той же причине, что {@link SELF_RESTRICTED}.
  */
-const SWARM_ONLY = ['biomass_pit', 'swarm_synapse', 'swarm_hive'];
+const SWARM_ONLY = ['biomass_pit', 'swarm_synapse', 'swarm_hive', 'swarm_datacenter'];
 
 /** Every shipped province type, and what it hosts. `null` = roster-less: anything in the
  *  catalogue that does not restrict itself (see {@link SELF_RESTRICTED}). */

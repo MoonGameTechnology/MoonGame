@@ -3,6 +3,8 @@ import {
   beaconSentinels,
   isCapturable,
   swarmAdaptDue,
+  swarmNetPlan,
+  musterPlan,
   type Action,
   type GameData,
   type GameState,
@@ -115,14 +117,14 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   // Правило «пора» одно на оба хоста (`swarmAdaptDue`, AUD-20): бот одиночного забега
   // зовёт ту же функцию, иначе Рой адаптировался бы по-разному офлайн и на сервере.
   const due =
-    opts.memoryWindow === undefined ? null : swarmAdaptDue(state, data, npc, opts.memoryWindow);
-  if (due) {
+    opts.memoryWindow === undefined ? [] : swarmAdaptDue(state, data, npc, opts.memoryWindow);
+  for (const order of due) {
     out.push({
       id: `${opts.session}:${npc}:${seq++}`,
       issuedAt: state.time,
       type: 'swarm.adapt',
       playerId: npc,
-      payload: { moduleId: due.moduleId, fleetId: due.fleetId },
+      payload: { moduleId: order.moduleId, fleetId: order.fleetId },
     });
   }
   // Sorted by id: the order of `Object.values` is insertion order, and two hosts that
@@ -132,8 +134,42 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   // Маяк задачи (2026-09-24): флот игрока на маяке — разведчик Роя зовёт ударный отряд.
   // Правило общее с ботом прототипа (`beaconCallouts`), чтобы Рой отвечал одинаково в
   // одиночном забеге и на сервере; ответивший флот в общий выбор цели не попадает.
+  // Сеть Роя: посты-ретрансляторы ведёт сеть, а не выбор цели (`swarmNetPlan`, то же
+  // правило у бота забега). Их приказы — ниже, общий цикл их не трогает.
+  const net = swarmNetPlan(state, data, npc);
+  // Построенное Роем ждёт в улье и уходит с волной (`musterPlan`, то же у бота забега).
+  const muster = musterPlan(state, data, npc);
   const answering = beaconSentinels(state, npc); // дозорный на маяке не уходит
-  for (const call of beaconCallouts(state, npc)) {
+  for (const id of [...net.held, ...muster.held]) answering.add(id);
+  for (const move of [...muster.moves, ...net.moves]) {
+    out.push({
+      id: `${opts.session}:${npc}:${seq++}`,
+      type: 'fleet.move',
+      playerId: npc,
+      payload: { fleetId: move.fleetId, to: move.to },
+      issuedAt: state.time,
+    });
+  }
+  for (const split of net.splits) {
+    out.push({
+      id: `${opts.session}:${npc}:${seq++}`,
+      type: 'fleet.split',
+      playerId: npc,
+      payload: { fleetId: split.fleetId, take: split.take },
+      issuedAt: state.time,
+    });
+  }
+  for (const build of net.builds) {
+    out.push({
+      id: `${opts.session}:${npc}:${seq++}`,
+      issuedAt: state.time,
+      playerId: npc,
+      ...(build.unit
+        ? { type: 'unit.build', payload: { planetId: build.planetId, unit: build.unit, count: 1 } }
+        : { type: 'building.construct', payload: { planetId: build.planetId, building: build.building } }),
+    });
+  }
+  for (const call of beaconCallouts(state, npc, net.held)) {
     answering.add(call.fleetId);
     out.push({
       id: `${opts.session}:${npc}:${seq++}`,

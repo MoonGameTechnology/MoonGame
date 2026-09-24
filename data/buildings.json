@@ -761,7 +761,8 @@
     },
     "buildTimeHours": 6,
     "produces": {
-      "microelectronics": 4
+      "microelectronics": 4,
+      "energy": 5
     },
     "upkeep": {
       "metal": 8,
@@ -786,6 +787,24 @@
     "enablesInfantryConstruction": true,
     "hp": 25,
     "scoreValue": 10,
+    "traits": [
+      "infected"
+    ]
+  },
+  "swarm_datacenter": {
+    "name": "Swarm Data Center",
+    "cost": {
+      "biomass": 80,
+      "metal": 60,
+      "microelectronics": 30
+    },
+    "buildTimeHours": 8,
+    "upkeep": {
+      "energy": 24
+    },
+    "hp": 30,
+    "relayRange": 200,
+    "scoreValue": 8,
     "traits": [
       "infected"
     ]

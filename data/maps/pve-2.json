@@ -276,6 +276,9 @@
         },
         {
           "type": "fort"
+        },
+        {
+          "type": "swarm_datacenter"
         }
       ],
       "garrison": [
@@ -339,6 +342,12 @@
         },
         {
           "type": "orbital_aa"
+        },
+        {
+          "type": "swarm_datacenter"
+        },
+        {
+          "type": "swarm_synapse"
         }
       ],
       "garrison": [
@@ -447,7 +456,8 @@
         "credits": 800,
         "metal": 800,
         "biomass": 300,
-        "microelectronics": 80
+        "microelectronics": 80,
+        "energy": 150
       }
     }
   },
@@ -525,6 +535,48 @@
         {
           "unit": "swarm_lander",
           "count": 3
+        }
+      ]
+    },
+    "swarm_relay_1": {
+      "owner": "swarm",
+      "location": "relay",
+      "units": [
+        {
+          "unit": "swarm_relay",
+          "count": 1
+        },
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    },
+    "swarm_relay_2": {
+      "owner": "swarm",
+      "location": "camp",
+      "units": [
+        {
+          "unit": "swarm_relay",
+          "count": 1
+        },
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    },
+    "swarm_relay_3": {
+      "owner": "swarm",
+      "location": "spore_cloud",
+      "units": [
+        {
+          "unit": "swarm_relay",
+          "count": 1
+        },
+        {
+          "unit": "frigate",
+          "count": 2
         }
       ]
     }

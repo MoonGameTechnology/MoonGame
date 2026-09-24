@@ -63,9 +63,11 @@ const SWARM = 'swarm';
 export function swarmCatalog(data: GameData, chapters: readonly GameState[]): SwarmCatalog {
   const units: string[] = [...(data.factions[SWARM]?.uniqueUnits ?? [])];
   for (const mode of Object.values(data.modes)) {
-    const pve = mode.pve as { waveFleet?: unknown; waveLanding?: unknown } | undefined;
+    const pve = mode.pve as
+      | { waveFleet?: unknown; waveLanding?: unknown; waveFixed?: unknown }
+      | undefined;
     if (!pve) continue;
-    JSON.stringify([pve.waveFleet, pve.waveLanding], (key, value: unknown) => {
+    JSON.stringify([pve.waveFleet, pve.waveLanding, pve.waveFixed], (key, value: unknown) => {
       if (key === 'unit' && typeof value === 'string') units.push(value);
       return value;
     });

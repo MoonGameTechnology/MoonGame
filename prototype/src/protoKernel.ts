@@ -49,6 +49,7 @@ import {
   fleetBroodModule,
   pveModule,
   swarmMemoryModule,
+  swarmNetModule,
   swarmAdaptModule,
   swarmJournalModule,
   missionFactsModule,
@@ -115,6 +116,7 @@ export const MODULES: GameModule[] = [
   pveModule, // PVE-3: волны NPC, вооружается секцией `pve` режима матча (в PvP инертен)
   fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
   swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
+  swarmNetModule, // сеть Роя: знание течёт только по связи ретрансляторов и центров данных
   swarmAdaptModule, // PVR-4.3: проект развития модуля Роя; читает память, платит, растит
   swarmJournalModule, // PVR-4.5: что игрок ВИДЕЛ про ответы Роя; зеркало swarmMemory
   missionFactsModule, // факты для задач забега: удержание, потери, эвакуация

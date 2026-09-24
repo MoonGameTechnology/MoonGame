@@ -15,7 +15,8 @@ const HOUR = 3_600_000;
 const infected = (st: GameState, id: string) =>
   st.planets[id]!.buildings.filter((b) => data.buildings[b.type]?.traits.includes('infected'));
 
-/** Гнездо главы II (улей 25 + яма 15) — у игрока, в гарнизоне 4 ополченца (урон 4 в час). */
+/** Гнездо главы II (улей 25 + яма 15 + центр данных 30 + синапс 20 — узел сети Роя) — у
+ *  игрока, в гарнизоне 4 ополченца (урон 4 в час). */
 function takenNest(): GameState {
   setMatchMode(undefined); // без волн: проверяется зачистка, а не штурм Роя
   const st = pveState(data, 1);
@@ -25,12 +26,12 @@ function takenNest(): GameState {
 }
 
 describe('мир Роя у человека: органы не работают и вычищаются гарнизоном', () => {
-  it('на старте в гнезде два органа — улей и яма', () => {
+  it('на старте в гнезде четыре органа — улей, яма, центр данных и синапс', () => {
     expect(
       infected(takenNest(), 'nest')
         .map((b) => b.type)
         .sort(),
-    ).toEqual(['biomass_pit', 'swarm_hive']);
+    ).toEqual(['biomass_pit', 'swarm_datacenter', 'swarm_hive', 'swarm_synapse']);
   });
 
   it('биомассы игрок не получает ни в казне, ни в строке дохода', () => {
@@ -41,11 +42,11 @@ describe('мир Роя у человека: органы не работают 
     expect(incomeBreakdown(after, 'p1').biomass?.production ?? 0).toBe(0);
   });
 
-  it('за 10 часов 4 ополченца (4 в час) вычищают 40 прочности — оба органа снесены', () => {
+  it('за 22,5 часа 4 ополченца (4 в час) вычищают 90 прочности — все органы снесены', () => {
     const st = takenNest();
     const half = advance(st, st.time + 5 * HOUR).state;
-    expect(infected(half, 'nest').reduce((sum, b) => sum + b.hp, 0)).toBeCloseTo(20);
-    const done = advance(half, half.time + 5 * HOUR + 1).state;
+    expect(infected(half, 'nest').reduce((sum, b) => sum + b.hp, 0)).toBeCloseTo(70);
+    const done = advance(half, half.time + 17.5 * HOUR + 1).state;
     expect(infected(done, 'nest')).toEqual([]);
   });
 });

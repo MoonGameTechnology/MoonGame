@@ -36,6 +36,7 @@ export const BUILD_ICON: Record<string, string> = {
   shipyard: '⊟', // верфь: без неё корабль на мире не заложить (YARD-1)
   swarm_hive: '⬢', // PVR-4.4: наземный орган выращивания
   swarm_synapse: '▣',
+  swarm_datacenter: '⊛', // центр данных Роя: узел сети, хранит знание своей части
   biomass_pit: '❀', // биомасса бандла
   mine_t1: '❒', // те же шахты бандла, что и `mine` прототипа
   mine_t2: '❒',
@@ -45,6 +46,8 @@ export const BUILD_ICON: Record<string, string> = {
  *  silhouette family (space-only) does not cover. */
 export const UNIT_ICON: Record<string, string> = {
   swarm_lander: '♆',
+  swarm_relay: '⊕', // большой ретранслятор Роя — пост сети
+  swarm_relay_small: '⊙', // малый ретранслятор — идёт с волной
   cruiser: '▲',
   scout: '◌',
   siege: '✦',

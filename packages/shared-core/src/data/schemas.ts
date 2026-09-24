@@ -180,6 +180,10 @@ export const UnitDefSchema = z.object({
   hullClass: z.enum(['light', 'medium', 'heavy']).optional(),
   /** Radar reach (Euclidean distance, map units) the unit projects as a radar-ship (0 = none). */
   radarRange: z.number().nonnegative().default(0),
+  /** Радиус СВЯЗИ Роя (map units): флот с таким юнитом — узел сети ретрансляторов
+   *  (`docs/swarm-behavior.md`). Два узла связаны, когда их круги пересекаются. Связь —
+   *  не радар: в радиусе ничего не разведывается, по ней передаётся опыт боёв. 0 — не узел. */
+  relayRange: z.number().nonnegative().default(0),
   /** Typed module slots this hull exposes (ship-modules-roadmap.md). A player
    *  fills them BEFORE building; the built ship is locked (no refit). Omitted →
    *  all-zero → carries no modules (a partial object defaults the rest to 0). */
@@ -256,6 +260,8 @@ export const BuildingLevelSchema = z.object({
   /** Radar reach (Euclidean distance, map units) at this level — lets a radar array widen its
    *  detection radius as it is upgraded. */
   radarRange: z.number().nonnegative().default(0),
+  /** Радиус связи Роя на этом уровне (см. `UnitDef.relayRange`): здание — узел сети. */
+  relayRange: z.number().nonnegative().default(0),
   /** Fraction of a garrison stack's max-HP pool restored per game hour (0.1 = 10%/h).
    *  Stacks heal continuously while the planet is owned; destroyed buildings don't heal. */
   healRate: z.number().nonnegative().default(0),
@@ -386,6 +392,9 @@ export const BuildingDefSchema = z.object({
   /** Radar reach (Euclidean distance, map units) the building projects from the world it sits on
    *  (0 = none). Drives signature detection in `visibleState`. */
   radarRange: z.number().nonnegative().default(0),
+  /** Радиус связи Роя (map units): здание — узел сети ретрансляторов, как центр данных
+   *  (`docs/swarm-behavior.md`). 0 — не узел. */
+  relayRange: z.number().nonnegative().default(0),
   /** Fraction of garrison max-HP restored per game hour (see BuildingLevelSchema). */
   healRate: z.number().nonnegative().default(0),
   /** Fraction of a docked friendly fleet's HULL restored per game hour — a
@@ -1249,6 +1258,10 @@ export const ModePveSchema = z
      *  `pve-failed` could not be reached (PVR-1.6). Scaling with the wave keeps the
      *  landing party proportional to the hulls carrying it. */
     waveLanding: z.array(StartingStackSchema).min(1).optional(),
+    /** Корабли, которые каждая волна несёт в ОДНОМ и том же числе, без умножения на номер
+     *  волны: малый ретранслятор Роя идёт с волной по одному (решение владельца
+     *  2026-09-24), десятая волна не везёт десять. Нет — волна как была. */
+    waveFixed: z.array(StartingStackSchema).min(1).optional(),
     /** Boons the run offers between waves (PVR-1.4) — ids from `data.technologies`.
      *
      *  Reuses the seam `metaGrant` proved: a hidden session technology handed out as
@@ -1472,8 +1485,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

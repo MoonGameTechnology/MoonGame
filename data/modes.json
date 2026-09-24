@@ -25,6 +25,9 @@
       "waveLanding": [
         { "unit": "swarm_lander", "count": 2 }
       ],
+      "waveFixed": [
+        { "unit": "swarm_relay_small", "count": 1 }
+      ],
       "holdHours": 12,
       "supply": {
         "perRun": 3,

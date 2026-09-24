@@ -23,7 +23,8 @@ import type { RunDifficulty } from '../../decisions/runDifficulty';
  * Подготовка мира — единственная рука теста: дом игрока с портом, эскадрой
  * бомбардировщиков и тремя авианосцами (ещё три запаса вылетов), крепче обычного —
  * пассивный игрок забега падает раньше, чем Рой успевает дорастить форму, а мерить здесь
- * надо адаптацию, а не оборону, — и запас волн. Всё остальное — волны, их курс, бои у дома, решение Роя —
+ * надо адаптацию, а не оборону, — и цепочка постов-ретрансляторов Роя до фронта: опыт
+ * боя течёт только по сети (`docs/swarm-behavior.md`). Всё остальное — волны, их курс, бои у дома, решение Роя —
  * делает забег. Игрок бьёт, пока Рой не набрал сигнал, потом бережёт вылет до
  * проявления рецепта — ровно так, как проверял бы его живой игрок.
  */
@@ -49,15 +50,44 @@ interface Mc01 {
   state: GameState;
   /** Часы, в которые удар попал по Рою, и сколько ответки он встретил. */
   hits: Array<{ hour: number; target: string }>;
-  repelled: Array<{ hour: number; target: string; damage: number; downed: number }>;
+  repelled: Array<{
+    hour: number;
+    target: string;
+    damage: number;
+    downed: number;
+  }>;
   started?: { hour: number; moduleId: string };
   done?: { hour: number; touched: number };
+  /** Час, когда ИИ Роя сам поставил пост-ретранслятор на `drift` — последнее звено сети до
+   *  дома игрока. Не поставил — поля нет. */
+  chainAt?: number;
+  /** Сколько наблюдений знал улей до этого часа. */
+  hiveBeforeChain: number;
 }
 
 /** Дом игрока с портом, эскадрой и авианосцами: стартовый флот без шаттлов, бить Рой
  *  ему нечем. Несколько баз — потому что у каждой свой запас вылетов. */
-function armedHome(): GameState {
+function armedHome(chain: boolean): GameState {
   const s = pveState(data);
+  // Сеть Роя дотянута до фронта: к посту на `ridge` из данных карты — посты на `shoal` и
+  // `drift`. Малый ретранслятор волны у дома игрока тогда достаёт до сети, и опыт боя
+  // доходит до улья. Без цепочки он гибнет вместе с волной (`docs/swarm-behavior.md`).
+  if (chain) {
+    for (const at of ['shoal', 'drift']) {
+      s.fleets[`post_${at}`] = {
+        id: `post_${at}`,
+        owner: 'p3',
+        location: at,
+        movement: null,
+        units: [
+          { unit: 'swarm_relay', count: 1 },
+          { unit: 'frigate', count: 2 },
+        ],
+        traits: [],
+        orbit: 'near',
+      };
+    }
+  }
   const home = s.planets.home_a!;
   home.buildings = [...home.buildings, { type: 'spaceport', level: 1, hp: 25 }];
   home.hangar = [{ id: SQUAD, units: [{ unit: 'bomber', count: 3 }] }];
@@ -80,11 +110,11 @@ function armedHome(): GameState {
   return s;
 }
 
-function runMc01(difficulty: RunDifficulty, maxHours: number): Mc01 {
+function runMc01(difficulty: RunDifficulty, maxHours: number, chain = true): Mc01 {
   armRun();
-  let s = armedHome();
+  let s = armedHome(chain);
   let hour = 0;
-  const out: Mc01 = { state: s, hits: [], repelled: [] };
+  const out: Mc01 = { state: s, hits: [], repelled: [], hiveBeforeChain: 0 };
   const scan = (events: readonly { type: string; payload: unknown }[]): void => {
     for (const e of events) {
       const p = e.payload as Record<string, unknown>;
@@ -128,6 +158,16 @@ function runMc01(difficulty: RunDifficulty, maxHours: number): Mc01 {
     if (s.pve && s.pve.totalWaves < RUN_WAVES)
       s = { ...s, pve: { ...s.pve, totalWaves: RUN_WAVES } };
     if (s.match.status === 'ended') break;
+    const posted = Object.values(s.fleets).some(
+      (f) =>
+        f.owner === 'p3' &&
+        f.location === 'drift' &&
+        f.movement === null &&
+        f.units.some((u) => u.unit === 'swarm_relay' && u.count > 0),
+    );
+    if (posted) out.chainAt ??= hour;
+    if (out.chainAt === undefined)
+      out.hiveBeforeChain = s.swarmNet?.holders['planet:hive']?.known.length ?? 0;
     drivers.runAI();
     drivers.autoEngage();
     drivers.checkFleetClashes();
@@ -144,7 +184,9 @@ function runMc01(difficulty: RunDifficulty, maxHours: number): Mc01 {
     if (target && (signal < 3 || grown)) {
       // Первая база, у которой есть вылет: порт, потом авианосцы по порядку.
       const bases = [
-        strikeShuttle('p1', { planetId: 'home_a' }, SQUAD, { targetFleetId: target.id }),
+        strikeShuttle('p1', { planetId: 'home_a' }, SQUAD, {
+          targetFleetId: target.id,
+        }),
         ...[1, 2, 3].map((n) =>
           strikeShuttle('p1', { fleetId: `cv${n}` }, `${CV_SQUAD}${n}`, {
             targetFleetId: target.id,
@@ -163,6 +205,21 @@ function runMc01(difficulty: RunDifficulty, maxHours: number): Mc01 {
 }
 
 describe('MC-01 на pve-1: удары шаттлов доводят Рой до перехвата (AUD-20)', () => {
+  it('без цепочки ретрансляторов опыт боёв у дома игрока до улья не доходит', () => {
+    // Волна у дома игрока бьётся вне сети: её малый ретранслятор до поста на `ridge` не
+    // достаёт. Пока ИИ Роя сам не дотянул посты до `drift`, опыт остаётся на волнах — улей
+    // не знает ничего. Дотянул — и опыт пошёл: сеть и есть канал обучения.
+    const run = runMc01('weak', 120, false);
+    const early = run.hits.filter((h) => run.chainAt === undefined || h.hour < run.chainAt);
+    expect(early.length).toBeGreaterThan(0);
+    expect(run.hiveBeforeChain).toBe(0);
+    if (run.chainAt === undefined) {
+      expect(run.state.swarmNet?.holders['planet:hive']?.known ?? []).toEqual([]);
+      expect(run.started).toBeUndefined();
+    } else {
+      expect(run.started === undefined || run.started.hour >= run.chainAt).toBe(true);
+    }
+  });
   afterEach(disarmRun);
 
   it('бот забега сам открывает проект покрова, и он дорастает', () => {

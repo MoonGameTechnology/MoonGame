@@ -98,7 +98,13 @@ describe('faction data (B1 / CR-1.1)', () => {
     expect(v.passives.combatDamageBonus).toBeGreaterThan(0);
     expect(s.passives.productionBonus).toBeGreaterThan(0);
     expect(v.uniqueUnits).toEqual([]);
-    expect(s.uniqueUnits).toEqual(['swarm_brood_mother', 'swarm_lander']);
+    // Ретрансляторы — органы сети Роя (`docs/swarm-behavior.md`): их строит только Рой.
+    expect(s.uniqueUnits).toEqual([
+      'swarm_brood_mother',
+      'swarm_lander',
+      'swarm_relay',
+      'swarm_relay_small',
+    ]);
   });
 
   it('human factions retain their symmetric roster', () => {
