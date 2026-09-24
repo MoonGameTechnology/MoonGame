@@ -229,9 +229,11 @@
 .sz-odds { width: 100%; margin-bottom: 14px; }
 .sz-odds p { margin-bottom: 6px !important; }
 .sz-bar { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--rar, #79dfdf) var(--p), #17313b var(--p)); }
-/* Академия (PVR-6.6): ростер карточками с гербом, деления подготовки, навыки ступенями. */
+/* Академия (PVR-6.6): ростер карточками с портретом, деления подготовки, навыки ступенями.
+   Карточка вертикальная: лицо сверху, имя под ним во всю ширину карточки. Рядом с гербом
+   имени на телефоне оставалось ~80px, и «Разрушитель» ломался по буквам. */
 .sz-roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 10px; margin: 8px 0 24px; }
-#sz-workshop .sz-roster button { display: flex; align-items: center; gap: 14px; padding: 12px 14px; text-align: left; }
+#sz-workshop .sz-roster button { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 10px 12px; text-align: center; }
 .sz-roster b { display: block; color: #e1f4f4; font-size: 15px; font-weight: 600; }
 .sz-roster small { color: #8fb3bb; font-size: 12px; }
 .sz-roster button > span { min-width: 0; overflow-wrap: anywhere; }
@@ -241,6 +243,13 @@
 .sz-roster .sz-crest { width: 34px; height: 34px; font-size: 15px; margin: 4px; }
 .sz-hero { display: flex; gap: 26px; align-items: flex-start; margin-bottom: 18px; }
 .sz-hero > .sz-crest { width: 64px; height: 64px; font-size: 26px; margin: 14px 10px; }
+/* Портрет — вырезка из общего атласа (`heroPortraits.ts`): черта снизу, как в штабе героев;
+   закрытый герой — серым лицом и тусклой чертой. */
+.sz-face { flex: none; display: block; width: 88px; border-bottom: 1px solid #79dfdf; }
+.sz-face .hero-portrait { width: 100%; vertical-align: top; }
+.sz-face-locked { border-bottom-color: #1d3a44; }
+.sz-face-locked img { filter: grayscale(1) brightness(.6); }
+.sz-hero > .sz-face { width: 136px; }
 .sz-hero > div { flex: 1; min-width: 0; }
 .sz-hero h2 { margin: 0 0 6px; color: #e1f4f4; }
 .sz-pips { display: inline-flex; gap: 4px; margin-right: 10px; vertical-align: middle; }
@@ -260,7 +269,9 @@
 .sz-glyph-warrants { color: var(--cur-warrants); }
 .sz-glyph-skill { color: #79dfdf; }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }
-.sz-hero-head span { font-size: 13px; color: #aad3d1; margin-right: auto; }
+/* Только прямой потомок: вложенным делениям `.sz-pips` правило затирало отступ, и они
+   прилипали к тексту («▬▬▬Подготовка 1»). */
+.sz-hero-head > span { font-size: 13px; color: #aad3d1; margin-right: auto; }
 #sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }
 #sz-confirm h2 { color: #efd1a1; font-size: 19px; font-weight: 500; margin: 0 0 10px; }
 #sz-confirm p { color: #bacdd3; font-size: 13px; line-height: 1.65; margin: 0 0 22px; }
@@ -290,6 +301,8 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   .sz-roster b { font-size: 14px; }
   .sz-hero { gap: 18px; }
   .sz-hero > .sz-crest { width: 44px; height: 44px; font-size: 18px; margin: 8px 6px; }
+  .sz-roster .sz-face { width: 72px; }
+  .sz-hero > .sz-face { width: 96px; }
 }
 @media (max-height: 660px) and (min-width: 761px) {
   .sz-main { padding: 26px 0; gap: 40px; }
