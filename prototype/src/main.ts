@@ -261,6 +261,7 @@ import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
 import { missionBriefs, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
+import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
 import {
   adoptMark,
@@ -13955,6 +13956,7 @@ const sectorZeroMenu = initSectorZeroMenu({
         savedRun.sectorZeroAttempt ?? 0,
         savedRun.state as GameState,
         chapterForSettle(savedRun.sectorZeroMission ?? sectorMission),
+        data,
       );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
@@ -14006,6 +14008,38 @@ const sectorZeroMenu = initSectorZeroMenu({
         known,
       ),
     );
+  },
+  // Досье Роя (заказ владельца 2026-09-24): память профиля против каталога игры.
+  swarmCodex: () => {
+    const view = swarmCodexView(
+      sectorProgress.swarmCodex,
+      swarmCatalog(data, sectorChapterIds().map((_, i) => pveState(data, i))),
+      data,
+    );
+    return {
+      known: view.known,
+      total: view.total,
+      units: view.units.map(u => {
+        const def = data.units[u.id]!;
+        return {
+          name: displayUnit(u.id),
+          known: u.known,
+          max: u.max,
+          runs: u.runs,
+          stats: {
+            attack: def.stats.attack ?? 0,
+            defense: def.stats.defense ?? 0,
+            hp: def.stats.hp ?? 0,
+            speed: def.stats.speed ?? 0,
+          },
+        };
+      }),
+      modules: view.modules.map(m => {
+        const def = data.modules[m.id]!;
+        return { name: tData(def.name), desc: def.description ? t(def.description) : '', known: m.known, evidence: m.evidence, n: m.n };
+      }),
+      buildings: view.buildings.map(b => ({ name: tData(data.buildings[b.id]?.name ?? b.id), known: b.known })),
+    };
   },
   setMission: value => {
     nextSectorMission = value;
@@ -14111,7 +14145,7 @@ function awardSectorRun(): number {
   if (sectorDevActive) return 0;
   // Задачи главы платят и здесь, в обычном конце забега (раньше их платил только засчёт
   // после перезагрузки — PVR-5.3 нашёл это при переходе на запас задач).
-  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission));
+  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission), data);
   if (next !== sectorProgress) {
     // Journal the terminal run before its award. If the page closes between the
     // two writes, opening the menu settles the same serial exactly once.

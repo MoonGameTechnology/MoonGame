@@ -4,6 +4,7 @@
  * are the first playable tuning, not the final campaign economy. */
 import { forgeOutcome } from './sectorZeroForge';
 import { dailyOffers } from './sectorZeroShop';
+import { emptySwarmCodex, learnSwarm, parseSwarmCodex, type SwarmCodex } from './swarmCodex';
 import {
   addLoot,
   moduleLadder,
@@ -128,6 +129,9 @@ export interface SectorZeroProgress {
   loadouts: Record<string, string[]>;
   heroes: Record<string, SectorHero>;
   selectedHero: string;
+  /** Что игрок знает о Рое за все забеги (`swarmCodex.ts`, досье в меню — заказ владельца
+   *  2026-09-24). Пополняется на закрытии забега, только растёт. */
+  swarmCodex: SwarmCodex;
 }
 /** Глава забега: id карты, её запас задач и правило показа (PVR-5.3). */
 export interface SectorChapter {
@@ -221,6 +225,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     loadouts: {},
     heroes: first ? { [first]: newSectorHero(first, data) } : {},
     selectedHero: first,
+    swarmCodex: emptySwarmCodex(),
   };
 }
 
@@ -748,6 +753,7 @@ export function parseSectorZeroProgress(
       fresh.heroes[id] = hero;
     }
     if (p.selectedHero && fresh.heroes[p.selectedHero]) fresh.selectedHero = p.selectedHero;
+    fresh.swarmCodex = parseSwarmCodex(p.swarmCodex, data);
     return fresh;
   } catch {
     return fresh;
@@ -763,6 +769,9 @@ export function settleSectorZeroRun(
   /** Глава забега: её запас задач (решение владельца 2026-09-22) и правило показа
    *  (PVR-5.3). Без запаса забег платит ровно как раньше: задачи ДОПОЛНИТЕЛЬНЫЕ. */
   chapter: SectorChapter = NO_CHAPTER,
+  /** Каталог игры — с ним закрытие забега пополняет досье Роя (`learnSwarm`). Без него
+   *  досье не трогается: выплата от него не зависит. */
+  data?: GameData,
 ): SectorZeroProgress {
   if (
     !Number.isSafeInteger(attempt) ||
@@ -819,6 +828,7 @@ export function settleSectorZeroRun(
         ? { ...progress.objectivesDone, [chapter.id]: tasks.done }
         : progress.objectivesDone,
     chaptersWon: firstWin ? [...progress.chaptersWon, chapter.id] : progress.chaptersWon,
+    swarmCodex: data ? learnSwarm(progress.swarmCodex, state, 'p1', data) : progress.swarmCodex,
     chapterScouted: chapter.id
       ? {
           ...progress.chapterScouted,

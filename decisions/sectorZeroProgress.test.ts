@@ -189,6 +189,23 @@ describe('Sector Zero persistent preparation', () => {
     });
   });
 
+  it('досье Роя пополняется на итогах забега и переживает сохранение (заказ владельца 2026-09-24)', () => {
+    const p = { ...fresh(), nextAttempt: 2 };
+    const s = pveState(data);
+    s.pve = { waveNumber: 4, totalWaves: 10, npcPlayerId: 'p3' };
+    s.match.status = 'ended';
+    s.match.winner = 'p3';
+    s.swarmIntel = {
+      p1: { a: { owner: 'swarm', location: 'x', at: 1, units: [{ unit: 'swarm_brood_mother', count: 1 }] } },
+    };
+    // Без каталога игры досье не трогается — выплата от него не зависит.
+    expect(settleSectorZeroRun(p, 1, s).swarmCodex).toEqual(p.swarmCodex);
+    const settled = settleSectorZeroRun(p, 1, s, undefined, data);
+    expect(settled.swarmCodex.units.swarm_brood_mother).toEqual({ max: 1, runs: 1 });
+    const loaded = parseSectorZeroProgress(JSON.stringify(settled), data);
+    expect(loaded.swarmCodex).toEqual(settled.swarmCodex);
+  });
+
   it('rewards a terminal loss once, survives reload, and does not reward a menu exit', () => {
     const p = { ...fresh(), nextAttempt: 2 };
     const s = pveState(data);

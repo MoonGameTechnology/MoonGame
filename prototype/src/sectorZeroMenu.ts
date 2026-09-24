@@ -12,6 +12,56 @@ import { CHAPTER_KEYS, chapterRoute, romanChapter } from '../../decisions/chapte
 import type { ChapterMapView } from '../../decisions/chapterMap';
 import type { ProfileNumbers } from '../../decisions/cloudSync';
 import type { MissionBrief } from '../../decisions/missionView';
+
+/** Досье Роя для меню: каталог с отметкой «известно», имена уже переведены хостом. */
+export interface SwarmCodexRows {
+  known: number;
+  total: number;
+  units: Array<{
+    name: string;
+    known: boolean;
+    max: number;
+    runs: number;
+    stats: { attack: number; defense: number; hp: number; speed: number };
+  }>;
+  modules: Array<{ name: string; desc: string; known: boolean; evidence: 'intercept' | 'brood' | null; n: number }>;
+  buildings: Array<{ name: string; known: boolean }>;
+}
+
+/** Разметка досье Роя: известное — карточками, неизвестное — «?». */
+export function swarmCodexHtml(c: SwarmCodexRows): string {
+  const unknown = `<article class="sz-codex-card unknown"><b aria-hidden="true">?</b><small>${esc(t('sector-zero.codex.unknown'))}</small></article>`;
+  const units = c.units
+    .map((u) =>
+      u.known
+        ? `<article class="sz-codex-card"><b>${esc(u.name)}</b><p class="stats"><span>⚔ ${u.stats.attack}</span><span>🛡 ${u.stats.defense}</span><span title="${esc(t('stat.hp'))}">♥ ${u.stats.hp}</span><span title="${esc(t('stat.speed'))}">➤ ${u.stats.speed}</span></p><small>${esc(t('sector-zero.codex.unit.seen', { n: u.max, r: u.runs }))}</small></article>`
+        : unknown,
+    )
+    .join('');
+  const modules = c.modules
+    .map((m) =>
+      m.known
+        ? `<article class="sz-codex-card"><b>${esc(m.name)}</b>${m.desc ? `<p>${esc(m.desc)}</p>` : ''}<small>${esc(m.evidence === 'intercept' ? t('sector-zero.codex.veil.seen', { n: m.n }) : t('sector-zero.codex.brood.seen'))}</small></article>`
+        : unknown,
+    )
+    .join('');
+  const buildings = c.buildings
+    .map((b) =>
+      b.known
+        ? `<article class="sz-codex-card"><b>${esc(b.name)}</b><small>${esc(t('sector-zero.codex.building.seen'))}</small></article>`
+        : unknown,
+    )
+    .join('');
+  const section = (key: string, cards: string): string =>
+    cards ? `<h4>${esc(t(key))}</h4><div class="sz-codex-grid">${cards}</div>` : '';
+  return (
+    `<p class="sz-codex-sum">${t('sector-zero.codex.progress', { n: `<b>${c.known}</b>`, m: c.total })}</p>` +
+    (c.known === 0 ? `<p class="sz-codex-empty">${esc(t('sector-zero.codex.empty'))}</p>` : '') +
+    section('sector-zero.codex.units', units) +
+    section('sector-zero.codex.modules', modules) +
+    section('sector-zero.codex.buildings', buildings)
+  );
+}
 import { detach } from './detach';
 
 /** Вход площадки и облако профиля (`YAG-1.4`). Нет — площадка без облака: ни кнопки
@@ -50,6 +100,8 @@ export interface SectorZeroMenuHooks {
   };
   /** Карта главы с тем, что игрок о ней знает (панель справа при выборе главы). */
   chapterMap(index: number): ChapterMapView | null;
+  /** Досье Роя из профиля (`swarmCodex.ts`) — строки уже с именами из данных. */
+  swarmCodex(): SwarmCodexRows;
   start(): void;
   startDev?: () => void;
   resume(): boolean;
@@ -207,6 +259,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
       : '';
   }
   function openMap(): void {
+    el('sz-codex-panel').hidden = true;
     mapPanel.hidden = false;
     h.root.classList.add('sz-map-open');
     renderChapter();
@@ -375,6 +428,22 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   el('sz-settings').addEventListener('click', h.settings);
   el('sz-prep').addEventListener('click', () => {
     if (!loading) h.preparation.open();
+  });
+  // Досье Роя встаёт на место карты главы: две панели в одном столбце не открываются разом.
+  const codexPanel = el('sz-codex-panel');
+  el('sz-codex').addEventListener('click', () => {
+    if (!codexPanel.hidden) {
+      codexPanel.hidden = true;
+      return;
+    }
+    mapPanel.hidden = true;
+    el('sz-codex-body').innerHTML = swarmCodexHtml(h.swarmCodex());
+    codexPanel.hidden = false;
+    if (window.matchMedia?.('(max-width: 900px)').matches)
+      codexPanel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+  el('sz-codex-close').addEventListener('click', () => {
+    codexPanel.hidden = true;
   });
   el('sz-back').addEventListener('click', () => {
     hide();

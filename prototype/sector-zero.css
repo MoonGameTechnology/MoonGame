@@ -347,3 +347,20 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   #sz-title { font-size: 60px; }
   .sz-intro { margin: 16px 0 20px; }
 }
+
+/* Досье Роя в меню (заказ владельца 2026-09-24): известное — карточками с характеристиками,
+   неизвестное — «?»-силуэтом. Красный акцент Роя, как у его стороны на карте главы. */
+.sz-codex-body { display: grid; gap: 10px; max-height: min(70vh, 640px); overflow: auto; }
+.sz-codex-sum { margin: 0; color: #b0c7ce; font-size: 12px; }
+.sz-codex-sum b { color: #ff9a8f; }
+.sz-codex-body h4 { margin: 4px 0 0; color: #ff9a8f; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; }
+.sz-codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.sz-codex-card { display: grid; gap: 4px; padding: 10px; border: 1px solid #5a2a2e; border-radius: 9px; background: #1a0c10cc; }
+.sz-codex-card b { display: block; color: #ffd9d4; font-size: 13px; }
+.sz-codex-card b::first-letter { text-transform: uppercase; }
+.sz-codex-card p { margin: 0; color: #d6b8b4; font-size: 11px; line-height: 1.45; }
+.sz-codex-card small { color: #9fb6bc; font-size: 11px; }
+.sz-codex-card .stats { display: flex; flex-wrap: wrap; gap: 4px 10px; font-variant-numeric: tabular-nums; color: #ffb3aa; }
+.sz-codex-card.unknown { border-style: dashed; border-color: #3a2a2e; background: #0c0a0ecc; }
+.sz-codex-card.unknown b { color: #6f5a5e; font-size: 18px; }
+.sz-codex-empty { margin: 0; padding: 10px; border: 1px dashed #3a4a52; border-radius: 9px; color: #9fb6bc; font-size: 12px; }
