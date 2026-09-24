@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { shippedGameData } from '../../../data/bundle';
 import { pveState } from './gameData';
 import { dominantUnit, unitGlyphSvg, unitShape } from './shipGlyphs';
-import { drawShipShape, SHIP_SHAPES, shipPaths } from './shipShapes';
+import { drawShipShape, SHIP_SHAPES, shipPaths, UNIT_SHAPE } from './shipShapes';
 
 const data = shippedGameData();
 afterEach(() => vi.unstubAllGlobals());
@@ -69,6 +69,15 @@ describe('approved ship hulls', () => {
     expect(unitGlyphSvg(data.units.frigate!, { unitId: 'frigate', color: '#ff5a4d' })).toContain(
       SHIP_SHAPES.frigate.hull,
     );
+  });
+
+  it('never draws the landing ship and the carrier with one picture (owner, 2026-09-24)', () => {
+    // Both used the freighter, so the prep screen showed two different classes as one.
+    // The landing ship now shares the landing family with the landing shuttle instead.
+    expect(unitShape(data.units.strike_carrier!, 'strike_carrier')).toBe('dropship');
+    expect(unitShape(data.units.shuttle_carrier!, 'shuttle_carrier')).toBe('transport');
+    expect(UNIT_SHAPE.strike_carrier).toBe(UNIT_SHAPE.landing_shuttle);
+    expect(UNIT_SHAPE.strike_carrier).not.toBe(UNIT_SHAPE.shuttle_carrier);
   });
 
   it('keeps fleet identity stable when cargo or stack order changes', () => {
