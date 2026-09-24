@@ -66,6 +66,30 @@ describe('окно боя', () => {
     expect(other).not.toContain('mine');
   });
 
+  it('надбавка за пережитые бои названа числом и подписью (PERK-3.3)', () => {
+    // До этого кирпича множитель менял урон и не был показан НИГДЕ: игрок читал его как
+    // разброс. Строка обязана назвать величину, а подпись — откуда она взялась.
+    const sd = side('p1', 'attacker', true);
+    sd.veteran = 1.16;
+    const html = sideRowHtml(sd);
+    expect(html).toContain('bw-vet');
+    expect(html).toContain('+16%');
+    expect(html).toContain(t('battle.win.veteran', { n: 16 }));
+    // Подпись доступна не только мышью: у значка есть и `aria-label`.
+    expect(html).toContain('aria-label="' + t('battle.win.veteran', { n: 16 }));
+  });
+
+  it('у необстрелянной стороны строка не меняется НИ НА СИМВОЛ', () => {
+    // Тот же уговор, что у медалей в составе (VET-5): «надбавки нет» отдельным
+    // сообщением не пишется — это верно для большинства сторон, и место оно отбирало бы
+    // у самого расклада.
+    const plain = side('p2', 'defender');
+    const zero = { ...side('p2', 'defender'), veteran: 1 };
+    const rounded = { ...side('p2', 'defender'), veteran: 1.004 };
+    expect(sideRowHtml(zero)).toBe(sideRowHtml(plain));
+    expect(sideRowHtml(rounded)).toBe(sideRowHtml(plain));
+  });
+
   it('силы стороны видны: состав и корпус', () => {
     const s = side('p1', 'defender');
     s.hull = { current: 120, max: 200 };

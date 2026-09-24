@@ -1,6 +1,5 @@
 import type { GameModule } from '../kernel/module';
-import type { Battle, GameState, PlayerId } from '../state/gameState';
-import { sideUnits } from '../util/combat';
+import { veteranFactor } from '../state/veterancy';
 
 /**
  * БОЕВАЯ НАДБАВКА ВЕТЕРАНА (PERK-3.1): чем больше сражений сторона пережила, тем
@@ -24,53 +23,17 @@ import { sideUnits } from '../util/combat';
  * осознанно: надбавка редкая (её имеет четверть доживших стеков) и не обязана
  * разбавляться массовыми процентами технологий — ровно тот класс, под который
  * последовательная группа и заведена (PERK-0.1, `util/combat.ts`).
+ *
+ * САМО ПРАВИЛО ЗДЕСЬ НЕ ЖИВЁТ — оно в `state/veterancy.ts`, потому что читателя два:
+ * этот хук и окно боя, которое показывает игроку получаемую надбавку (PERK-3.3). Две
+ * копии разошлись бы молча: каждая половина верна сама по себе, и ни один тест этого
+ * не поймал бы.
  */
-
-/**
- * Средняя выслуга НА ЮНИТ у стороны `owner` в этом бою.
- *
- * Развеска — ПО ГОЛОВАМ, а не по доле в залпе, и это не небрежность. `creditBattle`
- * (VET-2) начисляет бой ПЛОСКО: +1 каждому живому стеку стороны, независимо от того,
- * стрелял он или вёз десант. Раз заслуга зарабатывается плоско, платить за неё по
- * калибру значило бы развести две половины одной механики — начисление говорило бы одно,
- * выплата другое, и разошлось бы это молча. (Линия «Доблесть» зарабатывается как раз по
- * доле в залпе — у неё и выплата была бы другой, но её этот кирпич не трогает.)
- *
- * Следствие, которое принимается, а не обходится: долив свежих кораблей в заслуженный
- * флот надбавку разбавляет. Это ТА ЖЕ цена удобства, что уже записана в правиле слияния
- * стеков VET-2 («долив свежих разводит честь подразделения по новым»).
- *
- * Одного владельца в бою может представлять НЕСКОЛЬКО сторон (совместный штурм, MSB-4),
- * поэтому обходятся все его стороны, а не первая найденная. Порядок обхода — порядок
- * массива `sides` (порядок входа в бой), то есть детерминированный.
- */
-function servedPerUnit(state: GameState, battle: Battle, owner: PlayerId): number {
-  let units = 0;
-  let served = 0;
-  for (const side of battle.sides) {
-    if (side.owner !== owner) continue;
-    const stacks = sideUnits(state, side.ref);
-    if (!stacks) continue;
-    for (const stack of stacks) {
-      // Отдельной проверки «выбитый стек не в счёт» тут НЕТ, и это проверено порчей:
-      // взвешивание по `count` И ЕСТЬ это правило — стек из нуля голов не добавляет ни к
-      // числителю, ни к знаменателю. Написанная сначала проверка `count <= 0` порчу не
-      // уронила ни одним тестом, потому что ронять было нечего (тот же мёртвый сторож,
-      // что уже снимали в VET-4).
-      units += stack.count;
-      served += stack.count * (stack.battles ?? 0);
-    }
-  }
-  return units > 0 ? served / units : 0;
-}
-
 export const veteranModule: GameModule = {
   id: 'veteran',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.hook<number>('combat.damage', (damage, args, h) => {
-      const rate = h.ctx.data.veteran.damagePerBattle;
-      if (rate <= 0) return damage; // надбавка выключена данными — механики нет вовсе
       const { battleId, attacker } = args as { battleId?: string; attacker?: string | null };
       // Надбавка живёт РОВНО в том канале, который её и выдаёт: `battleId` несёт только
       // `combatModule`, и только он зовёт `creditBattle`. Обстрел с орбиты, перехват на
@@ -79,8 +42,8 @@ export const veteranModule: GameModule = {
       if (battleId === undefined || attacker === undefined || attacker === null) return damage;
       const battle = h.state.battles[battleId];
       if (!battle) return damage;
-      const served = servedPerUnit(h.state, battle, attacker);
-      return served > 0 ? damage * (1 + rate * served) : damage;
+      const factor = veteranFactor(h.state, battle, attacker, h.ctx.data);
+      return factor !== 1 ? damage * factor : damage;
     });
   },
 };
