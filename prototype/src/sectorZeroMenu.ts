@@ -283,7 +283,11 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     if (devButton) { devButton.disabled = loading; devButton.hidden = !h.startDev; }
     el<HTMLButtonElement>('sz-prep').disabled = loading;
     newButton.classList.toggle('sz-primary', !preview);
-    el('sz-save-label').textContent = t(preview ? 'sector-zero.saved' : 'sector-zero.offline');
+    // Подпись есть, только когда есть сохранённый забег: без него «Одиночная игра» здесь
+    // повторяла надзаголовок меню (третий раз на одном экране).
+    const saveLabel = el('sz-save-label');
+    saveLabel.hidden = !preview;
+    saveLabel.textContent = preview ? t('sector-zero.saved') : '';
     el('sz-summary').textContent = loading
       ? t('sector-zero.loading')
       : preview
