@@ -806,7 +806,7 @@ import {
   flowSign,
   stockBleeds,
 } from './resourceChip';
-import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
+import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
