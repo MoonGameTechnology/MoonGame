@@ -265,6 +265,7 @@ import {
 import { medalBadges } from '../../decisions/unitMedals';
 import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
+import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -1067,6 +1068,7 @@ const setupPreset = () => mapPreset(setupMapId);
 const setupSeatCount = () => setupPreset().starts.length;
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
+const HOSTILE = '#ff5a4d'; // «Атака»: цели и путь к ним — красным (заказ владельца 2026-09-24)
 // RANGE-UX: три вида оружия — три РАЗНЫХ цвета, чтобы круги не сливались в кашу, когда
 // в выделении и артиллерия, и носитель. Линия огня — того же цвета, что круг стрелка.
 const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
@@ -4098,13 +4100,13 @@ function poly(x: number, y: number, r: number, sides: number, rot = 0) {
 }
 
 /** Stable corner brackets keep the picked object's position unambiguous. */
-function targetBrackets(x: number, y: number, r: number, t: number) {
+function targetBrackets(x: number, y: number, r: number, t: number, color = LOCK) {
   cx.save();
   cx.translate(x, y);
   cx.globalAlpha = fxBreath(t, { period: 1800, base: 0.9, amp: 0.1, phase: 0 });
-  cx.strokeStyle = LOCK;
+  cx.strokeStyle = color;
   cx.lineWidth = 1.6;
-  cx.shadowColor = LOCK;
+  cx.shadowColor = color;
   cx.shadowBlur = fxBlur(3);
   // Четыре уголка «захваченной цели» — их геометрию считает `mapShapes.ts`.
   for (const b of bracketStrokes(r, 6)) {
@@ -4312,6 +4314,27 @@ function drawStrikeTrails(): void {
     }
   }
   cx.restore();
+}
+
+/** Кого может ударить «Атака»: видимые флоты противника с кораблями — один список на
+ *  прицел, превью и нажатие (`engageAim.ts`). */
+function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
+  const out: Array<EngageCandidate & { fleet: Fleet }> = [];
+  for (const g of Object.values(s.fleets)) {
+    if (g.owner === ME || sumUnits(g.units) <= 0) continue;
+    if (!fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner))) continue;
+    const at = fleetAnchor(g);
+    if (!at) continue;
+    out.push({ id: g.id, location: g.location ?? null, x: at.x, y: at.y, ships: sumUnits(g.units), fleet: g });
+  }
+  return out;
+}
+
+/** «Атака» взведена: каждая цель — в красных уголках, чтобы было видно, КОГО можно
+ *  ударить (раньше прицел не рисовал ничего, и кнопка читалась как сломанная). */
+function drawEngageTargets(now: number) {
+  if (!engageAim) return;
+  for (const c of engageCandidates()) targetBrackets(c.x, c.y, 14, now, HOSTILE);
 }
 
 /** While ШТУРМ is armed (PC): ring every valid target — someone else's capturable
@@ -4525,12 +4548,23 @@ function drawAimPreview() {
   const pointer = MOBILE ? mobileDraftPoint() : aimPointer;
   if (!pointer) return;
   if (MOBILE && mobileDraft && (engageAim || merging)) {
-    targetBrackets(pointer.x, pointer.y, 22, lastReal);
+    targetBrackets(pointer.x, pointer.y, 22, lastReal, engageAim ? HOSTILE : LOCK);
     return;
   }
-  if (!(aiming || assaultAim)) return;
+  if (!(aiming || assaultAim || engageAim)) return;
   const ids = selectedFleetIds();
   if (!ids.length) return;
+  // «Атака»: путь — к флоту противника под указателем (или на мире под ним), красным
+  // пунктиром; нет цели — пути нет, уголки на целях показывают, куда вести.
+  const foeAim = engageAim
+    ? engageFoeAt(
+        engageCandidates(),
+        pointer,
+        tapRadius('fleet', tapByTouch),
+        nearestHit(MAP, (n) => world(n), pointer.x, pointer.y, tapRadius('node', tapByTouch))?.id ?? null,
+      )
+    : null;
+  if (engageAim && !foeAim) return;
   // Prefer a node target; if none is near, aim at the closest point ON a lane —
   // the army will route to that road and park there (Bytro continuous order).
   // Радиус захвата узла — `tapPriority.ts` (REFM-125, правило 5), поиск ближайшего —
@@ -4539,25 +4573,30 @@ function drawAimPreview() {
   // превью рисовало бы путь, которого отпускание не отправит, причём молча.
   const rAim = tapRadius('node', tapByTouch);
   const staged = mobileDraft?.target;
-  const hit = MOBILE
-    ? (staged?.kind === 'planet' ? MAP.find((n) => n.id === staged.id) : null)
-    : nearestHit(MAP, (n) => world(n), pointer.x, pointer.y, rAim);
-  let target: { x: number; y: number } | null = hit ? world(hit) : null;
+  const hit = foeAim
+    ? (foeAim.location ? MAP.find((n) => n.id === foeAim.location) ?? null : null)
+    : MOBILE
+      ? (staged?.kind === 'planet' ? MAP.find((n) => n.id === staged.id) : null)
+      : nearestHit(MAP, (n) => world(n), pointer.x, pointer.y, rAim);
+  let target: { x: number; y: number } | null = foeAim ? { x: foeAim.x, y: foeAim.y } : hit ? world(hit) : null;
   const targetId: string | null = hit?.id ?? null;
   // Из чего складывается линия и что она обещает — `aimPreview.ts` (REFM-196): мир важнее
   // дороги (дорога ищется, только если узла рядом НЕТ), остриё падает на сам палец, путь
   // идёт по МАРШРУТУ через центры провинций, а не прямой, и без маршрута всё равно
   // дотягивается до острия — иначе не рисуется ничего, и игрок читает это как «не взведено».
-  const laneTarget = MOBILE
-    ? (mobileDraft?.target.kind === 'lane' ? { ...mobileDraft.target, ...pointer } : null)
-    : laneSought(targetId) ? nearestLanePoint(pointer.x, pointer.y) : null;
+  const laneTarget = foeAim
+    ? null
+    : MOBILE
+      ? (mobileDraft?.target.kind === 'lane' ? { ...mobileDraft.target, ...pointer } : null)
+      : laneSought(targetId) ? nearestLanePoint(pointer.x, pointer.y) : null;
   if (laneTarget) target = { x: laneTarget.x, y: laneTarget.y };
-  const tip = aimTip(target, pointer);
+  const tip = foeAim ? { x: foeAim.x, y: foeAim.y } : aimTip(target, pointer);
+  const ink = foeAim ? HOSTILE : LOCK;
   cx.save();
-  cx.strokeStyle = rgba(LOCK, 0.6);
-  cx.lineWidth = 1.4;
-  cx.setLineDash([3, 5]);
-  cx.shadowColor = LOCK;
+  cx.strokeStyle = rgba(ink, foeAim ? 0.85 : 0.6);
+  cx.lineWidth = foeAim ? 1.8 : 1.4;
+  cx.setLineDash(foeAim ? [6, 5] : [3, 5]);
+  cx.shadowColor = ink;
   cx.shadowBlur = fxBlur(6);
   for (const id of ids) {
     const f = s.fleets[id];
@@ -4624,7 +4663,7 @@ function drawAimPreview() {
     if (etaShown(hrs)) {
       cx.font = '11px ui-monospace,Menlo,monospace';
       cx.textAlign = 'center';
-      cx.fillStyle = rgba(LOCK, 0.95);
+      cx.fillStyle = rgba(ink, 0.95);
       cx.fillText(etaText(hrs!), tip.x, tip.y - 22);
     }
   }
@@ -6023,6 +6062,7 @@ function render(now: number) {
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
+  drawEngageTargets(lastReal);
   drawMissionTargets();
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
@@ -7087,12 +7127,31 @@ function planetPanelHtml(p: Planet): string {
     // самое, каким решает редьюсер (сверено тестом по всем раскладам): здесь только
     // отрисовка. Стоит РЯДОМ с «Постройками», а не вместо: на астероидах и мёртвом мире
     // осмысленно и то и другое — добывающая станция ИЛИ крепость со своим ростером.
-    const fortress = fortressRaise(p, ME, s.players[ME]?.resources ?? {}, data);
+    const fortress = fortressRaise(
+      p,
+      ME,
+      s.players[ME]?.resources ?? {},
+      data,
+      s.players[ME]?.technologies?.completed ?? [],
+    );
     if (fortress.show) {
       const off = fortress.enabled ? '' : ' disabled';
+      // Цена — фишками `resLine` (это РАЗМЕТКА со значками). Экранировать её нельзя: игрок
+      // видел сырой `<span class="rcost">…<svg…>` вместо цены (сообщение владельца
+      // 2026-09-24: «непонятный текст там»).
       blds +=
         `<button class="bw-open" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
-        ` <span class="dim">${esc(resLine(fortress.cost) ?? '')}</span></button>`;
+        ` <span class="dim">${resLine(fortress.cost)}</span></button>`;
+      // Не изучена — говорим, ЧТО изучить, и ведём туда: кнопка раньше горела, а ядро
+      // отвечало безымянным «нужна технология».
+      if (fortress.blocked === 'tech') {
+        const names = fortress.needs
+          .map((id) => `«${tData(data.technologies[id]?.name ?? id)}»`)
+          .join(t('side.fortress.or'));
+        blds +=
+          `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
+          `<button class="bw-open" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+      }
     }
     cols.push(blds);
   }
@@ -8396,6 +8455,12 @@ function renderCmdBar() {
     // штурмовать некем, и кнопки не бывает вовсе. Пригодность ЦЕЛИ её по-прежнему гасит.
     troops: canAssaultAim(fleets.map((f) => sumUnits(f.landing ?? []))),
     assaultArmed: assaultAim,
+    // «Слить» и «Десант» — по составу (правило 3б): нет напарника или некого грузить —
+    // нет и кнопки.
+    mergeable: mergeOk,
+    merging,
+    troopsMenu: !!troopsIn,
+    troopsOpen: !!troopsPlan,
     more: cmdMore,
     picking: pickMode,
   });
@@ -8420,23 +8485,27 @@ function renderCmdBar() {
     (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
-    cmdBtn(
-      'merge',
-      '⛬',
-      ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
-      merging ? 'on' : '',
-      !mergeOk,
-      t('cmd.merge.hint'),
-    ) +
+    (shown.merge
+      ? cmdBtn(
+          'merge',
+          '⛬',
+          ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
+          merging ? 'on' : '',
+          !mergeOk,
+          t('cmd.merge.hint'),
+        )
+      : '') +
     cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint'), splitWhy) +
-    cmdBtn(
-      'troops',
-      '⇅',
-      t('cmd.troops'),
-      troopsPlan ? 'on' : '',
-      !troopsIn,
-      t('cmd.troops.hint'),
-    ) +
+    (shown.troops
+      ? cmdBtn(
+          'troops',
+          '⇅',
+          t('cmd.troops'),
+          troopsPlan ? 'on' : '',
+          !troopsIn,
+          t('cmd.troops.hint'),
+        )
+      : '') +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
@@ -8710,6 +8779,8 @@ side.addEventListener('click', (ev) => {
       buildWin.open(selPlanet, arg);
   } else if (act === 'fortress') {
     playerOrder(deployStation(ME, selPlanet!));
+  } else if (act === 'opentech') {
+    techTree.open();
   } else if (act === 'build') {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {
@@ -9418,19 +9489,13 @@ function selectAt(mx: number, my: number) {
    * точка флота, и «не попал» почти всегда значит «передумал».
    */
   if (owner === 'engage') {
-    const foe = nearestHit(
-      Object.values(s.fleets)
-        .filter(
-          (g) =>
-            g.owner !== ME &&
-            fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner)) &&
-            sumUnits(g.units) > 0,
-        )
-        .map((g) => ({ id: g.id, anchor: fleetAnchor(g) })),
-      (g) => g.anchor,
-      mx,
-      my,
+    // Та же цель, что рисует превью (`engageAim.ts`): флот рядом или флот противника на
+    // мире под пальцем — тап по базе пиратов бьёт по пиратам, а не снимает прицел.
+    const foe = engageFoeAt(
+      engageCandidates(),
+      { x: mx, y: my },
       rFleet,
+      nearestHit(MAP, (n) => world(n), mx, my, rNode)?.id ?? null,
     );
     if (MOBILE) {
       stageMobileTarget('engage', foe ? { kind: 'fleet', id: foe.id } : null);

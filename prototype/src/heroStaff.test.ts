@@ -370,6 +370,36 @@ describe('штаб героев — разметка панели', () => {
   });
 });
 
+describe('штаб героев — врождённый узел (AUD-22)', () => {
+  // Решение владельца 2026-09-24: узел, чья награда у героя со старта, уже изучен. Ядро
+  // отбивает его покупку `E_ALREADY_UNLOCKED`, и экран обязан говорить то же самое, а не
+  // вешать цену и кнопку, которая всегда кончится отказом.
+  const treeName = (id: string): string => tData(data.heroSkillTrees[id]!.name);
+  /** Начало разметки узла — от его `<div class="hx-node…">` до имени. */
+  const nodeHead = (html: string, id: string): string => {
+    const at = html.indexOf(treeName(id));
+    return html.slice(html.lastIndexOf('<div class="hx-node', at), at);
+  };
+
+  it('у Командира «Сонастройка» и «Пси-вуаль» изучены, а узел за ними открыт', () => {
+    const html = initHeroStaff(hostOf()).paneHtml(); // главный герой места — Командир
+    for (const id of ['void_attunement', 'psi_veil']) {
+      expect(nodeHead(html, id), id).toContain('hx-node owned');
+      expect(nodeHead(html, id), id).not.toContain('data-hnode');
+    }
+    expect(nodeHead(html, 'psi_weak_points')).toContain('hx-node avail');
+  });
+
+  it('в досье врождённого узла нет кнопки покупки, а у его ребёнка требование выполнено', () => {
+    const staff = initHeroStaff(hostOf());
+    staff.click(click('[data-hnode]', { hnode: 'void_attunement' }));
+    expect(staff.paneHtml()).toContain('hx-dossier');
+    expect(staff.paneHtml()).not.toContain('data-hskill=');
+    staff.click(click('[data-hnode]', { hnode: 'psi_weak_points' }));
+    expect(staff.paneHtml()).toContain(`<span class="hx-ok">✓ ${treeName('psi_veil')}</span>`);
+  });
+});
+
 describe('штаб героев — имена узлов в списке требований (HERO-REQ-T)', () => {
   /** Имя узла — это имя игровых ДАННЫХ (`data/heroSkillTrees.json` держит их
    *  по-английски), значит спрашивать его надо через `tData()`: слаг `data.neural-lace`

@@ -142,7 +142,7 @@ export {
   journeyEtaMs,
 } from './state/route';
 export { isBombarded, bombardedPlanets, isActivelyBombarding } from './state/orbit';
-export { sidesOf, attackerOf, defenderOf } from './state/battle';
+export { sidesOf, attackerOf, defenderOf, shipsEngaged, landingBattleOf } from './state/battle';
 // MSB-2: правило деления залпа между врагами — одно на живой бой и на прогноз.
 export { volleyShare, splitVolley, type VolleyShare, type VolleyTarget } from './util/volley';
 export { fleetPositionAt, fleetNodeAt, legT } from './state/fleetPosition';
@@ -491,6 +491,7 @@ export {
 } from './util/fitting';
 export { requireOwnedIdleFleet, nextFleetSeq, type IdleFleet, type FleetSeqState } from './util/fleet';
 export { buildProgress, thresholdRamp } from './util/construction';
+export { knownSkillNodes, nodeInnateTo } from './util/heroSkills';
 export {
   buildRecap,
   isHighEvent,
@@ -529,12 +530,13 @@ export {
 } from './modules/technology';
 export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
-export { stationModule, STATION_COST } from './modules/station';
+export { stationModule, STATION_COST, STATION_CORE } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';
 export {
   technologyModule,
   technologyLock,
   conditionMet,
+  technologiesUnlocking,
   techRulesOf,
   techInMatch,
   DEFAULT_TECH_RULES,

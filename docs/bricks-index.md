@@ -609,7 +609,7 @@
 | AUD-19 | ✅ | docs | `docs/backlog.md` | Сводка решений ГДД (п. 8) описывала артиллерию, |
 | AUD-20 | ⏳ | srv proto | `docs/backlog.md` | Адаптация Роя (AD-01) не подключена ни к одному живому |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
-| AUD-22 | ⏳ | data | `docs/backlog.md` | Пустые покупки в дереве навыков. |
+| AUD-22 | ✅ | core proto | `docs/backlog.md` | Пустые покупки в дереве навыков. |
 | AUD-23 | ✅ | proto cli | `docs/backlog.md` | Разрыв кадра выигрывал главу без боя. |
 | AUD-24 | ✅ | proto cli | `docs/backlog.md` | «Продолжить» на втором устройстве стирало |
 | AUD-25 | ✅ | proto | `docs/backlog.md` | Двойной тап на экране подготовки — два ролика. |
@@ -632,6 +632,7 @@
 | UI-14 | ✅ | proto | `docs/backlog.md` | Осмотр чужого флота должен быть находимым. |
 | CMB-5 | ✅ | core | `docs/backlog.md` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| ATK-2 | ✅ | proto | `docs/backlog.md` | «Атака» видна: цели в красных уголках, путь красным пунктиром. |
 | SHIPART-1 | ✅ | proto cli | `docs/backlog.md` | Реалистичные портреты в постройке и описаниях, |
 | SHIPART-2 | ✅ | cli proto | `docs/backlog.md` | Десантный корабль — в десантной семье |
 | HEROART-1 | ✅ | proto cli | `docs/backlog.md` | Портреты, досье и читаемый счёт флота |
@@ -664,6 +665,7 @@
 | OBJP-2 | ✅ | proto | `docs/backlog.md` | Подробности объекта встают РЯДОМ с карточкой, а не |
 | OBJP-3 | ✅ | proto | `docs/backlog.md` | Каталог юнитов уехал в окно производства — туда же, |
 | CMD-VIS-2 | ✅ | proto | `docs/backlog.md` | Кнопка штурма появляется только когда есть кем |
+| CMD-VIS-3 | ✅ | proto | `docs/backlog.md` | «Слить» и «Десант» появляются, только когда есть |
 | EVT-1 | ✅ | core data proto | `docs/backlog.md` | Тёмные события наконец видны игроку, |
 | EVT-2 | ✅ | core data proto | `docs/backlog.md` | Трофеи за бой: победитель |
 | EVT-3 | ✅ | core data | `docs/backlog.md` | Пассивка героя «мародёр»: лестница из пяти |
@@ -807,6 +809,7 @@
 | FORT-5.10 | ✅ | core data | `docs/fortress-roadmap.md` | Щиты крепости |
 | FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md` | Технологии открывают постройки крепости |
 | FORT-5.13 | ✅ | core | `docs/fortress-roadmap.md` | Сбитая крепость уничтожается |
+| FORT-5.14 | ✅ | proto | `docs/fortress-roadmap.md` | Кнопка крепости: знает о технологии и не показывает разметку |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md` | Туман как граница (анти-maphack) (в основном) |
@@ -935,6 +938,7 @@
 | MSB-5 | ✅ | core | `docs/multiside-combat-roadmap.md` | Что делает бой при смене владельца стороны |
 | MSB-6 | ✅ | proto cli | `docs/multiside-combat-roadmap.md` | Панель боя на N сторон |
 | MSB-7 | ✅ | core | `docs/multiside-combat-roadmap.md` | Зенитки и обстрел при N сторонах |
+| MSB-8 | ✅ | core | `docs/multiside-combat-roadmap.md` | Штурм не стоит, подмога не ждёт |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (скриптовая соло-песочница) ★ |

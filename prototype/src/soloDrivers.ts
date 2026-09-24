@@ -17,7 +17,7 @@
  * хозяин отдаёт оба, и драйверы проверяются на настоящем состоянии без DOM.
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
-import { autoRetreatDue } from '../../packages/shared-core/src/index';
+import { autoRetreatDue, shipsEngaged } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
 import type { StewardPosture } from './stewardScreen';
 import { StaggeredAi } from './aiScheduler';
@@ -187,17 +187,18 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
   /**
    * Страховка на случай, когда оба флота были в пути и обработчик прибытия боевого
    * модуля не нашёл противника: два простаивающих врага в одном секторе без боя —
-   * свести их принудительно.
+   * свести их принудительно. Флот, чей десант дерётся на земле, для орбиты свободен
+   * (MSB-8, `shipsEngaged`) — как и в ядре.
    */
   function checkFleetClashes(): void {
     const s = host.state();
     const me = host.me();
     const fleets = Object.values(s.fleets);
     for (const f of fleets) {
-      if (!f.location || f.movement || f.battleId) continue;
+      if (!f.location || f.movement || shipsEngaged(s, f)) continue;
       for (const g of fleets) {
         if (g.id <= f.id) continue; // пара обрабатывается один раз
-        if (!g.location || g.movement || g.battleId) continue;
+        if (!g.location || g.movement || shipsEngaged(s, g)) continue;
         if (f.owner === g.owner || f.location !== g.location) continue;
         // Бой начинается со стороны игрока, если он в паре есть.
         const myFleet = f.owner === me ? f : g.owner === me ? g : f;
