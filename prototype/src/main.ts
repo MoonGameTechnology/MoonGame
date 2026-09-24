@@ -221,6 +221,10 @@ import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
+import { shipCardModel } from '../../decisions/shipCard';
+import { shipCardHtml } from './shipCard';
+import { moduleIcon } from './moduleIcons';
+import { catalogPortraitHtml } from './shipArt';
 import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 // SHU-3.1 — ангар глазами игрока: состав, вместимость, топливо, перегрузка.
 import {
@@ -261,6 +265,7 @@ import {
 import { medalBadges } from '../../decisions/unitMedals';
 import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
+import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -725,7 +730,7 @@ import {
   canAssaultAim,
   canAssaultFromOrbit,
   canMerge,
-  canSplit,
+  splitBlock,
 } from '../../decisions/cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
 import {
@@ -1063,6 +1068,7 @@ const setupPreset = () => mapPreset(setupMapId);
 const setupSeatCount = () => setupPreset().starts.length;
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
+const HOSTILE = '#ff5a4d'; // «Атака»: цели и путь к ним — красным (заказ владельца 2026-09-24)
 // RANGE-UX: три вида оружия — три РАЗНЫХ цвета, чтобы круги не сливались в кашу, когда
 // в выделении и артиллерия, и носитель. Линия огня — того же цвета, что круг стрелка.
 const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
@@ -4094,13 +4100,13 @@ function poly(x: number, y: number, r: number, sides: number, rot = 0) {
 }
 
 /** Stable corner brackets keep the picked object's position unambiguous. */
-function targetBrackets(x: number, y: number, r: number, t: number) {
+function targetBrackets(x: number, y: number, r: number, t: number, color = LOCK) {
   cx.save();
   cx.translate(x, y);
   cx.globalAlpha = fxBreath(t, { period: 1800, base: 0.9, amp: 0.1, phase: 0 });
-  cx.strokeStyle = LOCK;
+  cx.strokeStyle = color;
   cx.lineWidth = 1.6;
-  cx.shadowColor = LOCK;
+  cx.shadowColor = color;
   cx.shadowBlur = fxBlur(3);
   // Четыре уголка «захваченной цели» — их геометрию считает `mapShapes.ts`.
   for (const b of bracketStrokes(r, 6)) {
@@ -4308,6 +4314,27 @@ function drawStrikeTrails(): void {
     }
   }
   cx.restore();
+}
+
+/** Кого может ударить «Атака»: видимые флоты противника с кораблями — один список на
+ *  прицел, превью и нажатие (`engageAim.ts`). */
+function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
+  const out: Array<EngageCandidate & { fleet: Fleet }> = [];
+  for (const g of Object.values(s.fleets)) {
+    if (g.owner === ME || sumUnits(g.units) <= 0) continue;
+    if (!fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner))) continue;
+    const at = fleetAnchor(g);
+    if (!at) continue;
+    out.push({ id: g.id, location: g.location ?? null, x: at.x, y: at.y, ships: sumUnits(g.units), fleet: g });
+  }
+  return out;
+}
+
+/** «Атака» взведена: каждая цель — в красных уголках, чтобы было видно, КОГО можно
+ *  ударить (раньше прицел не рисовал ничего, и кнопка читалась как сломанная). */
+function drawEngageTargets(now: number) {
+  if (!engageAim) return;
+  for (const c of engageCandidates()) targetBrackets(c.x, c.y, 14, now, HOSTILE);
 }
 
 /** While ШТУРМ is armed (PC): ring every valid target — someone else's capturable
@@ -4521,12 +4548,23 @@ function drawAimPreview() {
   const pointer = MOBILE ? mobileDraftPoint() : aimPointer;
   if (!pointer) return;
   if (MOBILE && mobileDraft && (engageAim || merging)) {
-    targetBrackets(pointer.x, pointer.y, 22, lastReal);
+    targetBrackets(pointer.x, pointer.y, 22, lastReal, engageAim ? HOSTILE : LOCK);
     return;
   }
-  if (!(aiming || assaultAim)) return;
+  if (!(aiming || assaultAim || engageAim)) return;
   const ids = selectedFleetIds();
   if (!ids.length) return;
+  // «Атака»: путь — к флоту противника под указателем (или на мире под ним), красным
+  // пунктиром; нет цели — пути нет, уголки на целях показывают, куда вести.
+  const foeAim = engageAim
+    ? engageFoeAt(
+        engageCandidates(),
+        pointer,
+        tapRadius('fleet', tapByTouch),
+        nearestHit(MAP, (n) => world(n), pointer.x, pointer.y, tapRadius('node', tapByTouch))?.id ?? null,
+      )
+    : null;
+  if (engageAim && !foeAim) return;
   // Prefer a node target; if none is near, aim at the closest point ON a lane —
   // the army will route to that road and park there (Bytro continuous order).
   // Радиус захвата узла — `tapPriority.ts` (REFM-125, правило 5), поиск ближайшего —
@@ -4535,25 +4573,30 @@ function drawAimPreview() {
   // превью рисовало бы путь, которого отпускание не отправит, причём молча.
   const rAim = tapRadius('node', tapByTouch);
   const staged = mobileDraft?.target;
-  const hit = MOBILE
-    ? (staged?.kind === 'planet' ? MAP.find((n) => n.id === staged.id) : null)
-    : nearestHit(MAP, (n) => world(n), pointer.x, pointer.y, rAim);
-  let target: { x: number; y: number } | null = hit ? world(hit) : null;
+  const hit = foeAim
+    ? (foeAim.location ? MAP.find((n) => n.id === foeAim.location) ?? null : null)
+    : MOBILE
+      ? (staged?.kind === 'planet' ? MAP.find((n) => n.id === staged.id) : null)
+      : nearestHit(MAP, (n) => world(n), pointer.x, pointer.y, rAim);
+  let target: { x: number; y: number } | null = foeAim ? { x: foeAim.x, y: foeAim.y } : hit ? world(hit) : null;
   const targetId: string | null = hit?.id ?? null;
   // Из чего складывается линия и что она обещает — `aimPreview.ts` (REFM-196): мир важнее
   // дороги (дорога ищется, только если узла рядом НЕТ), остриё падает на сам палец, путь
   // идёт по МАРШРУТУ через центры провинций, а не прямой, и без маршрута всё равно
   // дотягивается до острия — иначе не рисуется ничего, и игрок читает это как «не взведено».
-  const laneTarget = MOBILE
-    ? (mobileDraft?.target.kind === 'lane' ? { ...mobileDraft.target, ...pointer } : null)
-    : laneSought(targetId) ? nearestLanePoint(pointer.x, pointer.y) : null;
+  const laneTarget = foeAim
+    ? null
+    : MOBILE
+      ? (mobileDraft?.target.kind === 'lane' ? { ...mobileDraft.target, ...pointer } : null)
+      : laneSought(targetId) ? nearestLanePoint(pointer.x, pointer.y) : null;
   if (laneTarget) target = { x: laneTarget.x, y: laneTarget.y };
-  const tip = aimTip(target, pointer);
+  const tip = foeAim ? { x: foeAim.x, y: foeAim.y } : aimTip(target, pointer);
+  const ink = foeAim ? HOSTILE : LOCK;
   cx.save();
-  cx.strokeStyle = rgba(LOCK, 0.6);
-  cx.lineWidth = 1.4;
-  cx.setLineDash([3, 5]);
-  cx.shadowColor = LOCK;
+  cx.strokeStyle = rgba(ink, foeAim ? 0.85 : 0.6);
+  cx.lineWidth = foeAim ? 1.8 : 1.4;
+  cx.setLineDash(foeAim ? [6, 5] : [3, 5]);
+  cx.shadowColor = ink;
   cx.shadowBlur = fxBlur(6);
   for (const id of ids) {
     const f = s.fleets[id];
@@ -4620,7 +4663,7 @@ function drawAimPreview() {
     if (etaShown(hrs)) {
       cx.font = '11px ui-monospace,Menlo,monospace';
       cx.textAlign = 'center';
-      cx.fillStyle = rgba(LOCK, 0.95);
+      cx.fillStyle = rgba(ink, 0.95);
       cx.fillText(etaText(hrs!), tip.x, tip.y - 22);
     }
   }
@@ -6019,6 +6062,7 @@ function render(now: number) {
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
+  drawEngageTargets(lastReal);
   drawMissionTargets();
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
@@ -6328,11 +6372,12 @@ function taskGroupPanelHtml(group: Fleet[]): string {
 }
 
 /** Тайлы состава флота Bytro-стиля: силуэт-архетип в цвете стороны (наземные —
- *  прежние текст-глифы), счётчик и мини-бар корпуса стека; тап — досье юнита. */
+ *  прежние текст-глифы), счётчик и мини-бар корпуса стека. Тап по кораблю — карточка
+ *  стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному — досье юнита. */
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
   const tiles = stacks
-    .filter((u) => u.count > 0)
-    .map((u) => {
+    .map((u, index) => {
+      if (u.count <= 0) return '';
       const def = data.units[u.unit];
       if (!def) return '';
       const name = unitTitle(u.unit);
@@ -6342,17 +6387,19 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
           : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: s.players[f.owner]?.faction, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
-      // Show installed modules as small tags under the count (RULES-2.1 / SM-0.3):
-      // two cruisers with different modules are separate stacks — the tags make
-      // the difference visible at a glance, without opening the codex.
+      // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
+      // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
+      // подписи не читались; имя модуля — в подсказке, полная картина — в карточке.
       const modTags = u.modules && u.modules.length > 0
         ? `<span class="pt-mods">${u.modules.map((m) => {
             const mdef = data.modules[m];
             const mname = mdef ? tData(mdef.name) : m;
-            return `<span class="pt-mod" title="${esc(mname)}">${esc(mname)}</span>`;
+            return `<span class="pt-mod" title="${esc(mname)}" aria-label="${esc(mname)}">${moduleIcon(m)}</span>`;
           }).join('')}</span>`
         : '';
-      return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
+      const open =
+        def.domain === 'space' ? `data-shipcard="${esc(f.id)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
+      return `<button class="ptile" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
@@ -7677,6 +7724,34 @@ function incomeOf(type: string, level: number): string {
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
+/** Карточка корабля (`shipCard.ts`) в окне справочника: отсеки стека с тем, что надето,
+ *  и характеристики одного корабля. Стек адресуется местом во флоте — тем же, что у
+ *  плитки; флот исчез или стек сдвинулся — карточки нет, а не чужой корабль. */
+function openShipCard(fleetId: string, index: number): void {
+  const el = document.getElementById('codex');
+  const f = s.fleets[fleetId];
+  const stack = f?.units[index];
+  if (!el || !f || !stack) return;
+  const model = shipCardModel(stack, data);
+  if (!model) return;
+  const faction = s.players[f.owner]?.faction;
+  const html = shipCardHtml(
+    model,
+    {
+      portrait: (u) => catalogPortraitHtml('u', u, data),
+      icon: (u) => unitIconHtml(u, data, ownerColor(f.owner), 40, faction),
+      unitName: (u) => unitTitle(u),
+      moduleName: (m) => {
+        const mdef = data.modules[m];
+        return mdef ? tData(mdef.name) : m;
+      },
+    },
+    { hpPct: stackHullPct(stack, data), fleetName: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»` },
+  );
+  el.innerHTML = `<div class="cxbox sc-box">${html}<button class="cx-close">${t('codex.close')}</button></div>`;
+  el.classList.add('show');
+}
+
 function openCodex(key: string): void {
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
@@ -8054,7 +8129,15 @@ function cmdBtn(
   cls: string,
   disabled: boolean,
   desc?: string,
+  why?: string | null,
 ): string {
+  // Серая кнопка с причиной (`why`) остаётся нажимаемой: нажатие говорит, ПОЧЕМУ нельзя
+  // (сообщение владельца 2026-09-24 про «Делить»). `disabled` проглотил бы нажатие, а на
+  // телефоне подсказки мыши нет — кнопка выглядела бы просто сломанной.
+  if (disabled && why) {
+    const reason = t(why);
+    return `<button data-cmd="${cmd}" class="${cls}" title="${esc(`${label} — ${reason}`)}" aria-label="${esc(`${label} — ${reason}`)}" aria-disabled="true" data-why="${esc(why)}"><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+  }
   const tip = desc ? `${label} — ${desc}` : label;
   return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
 }
@@ -8306,7 +8389,7 @@ function renderCmdBar() {
   const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
-  const splitOk = canSplit(
+  const splitWhy = splitBlock(
     lone
       ? {
           location: lone.location,
@@ -8316,6 +8399,7 @@ function renderCmdBar() {
         }
       : null,
   );
+  const splitOk = splitWhy === null;
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
@@ -8384,7 +8468,7 @@ function renderCmdBar() {
       !mergeOk,
       t('cmd.merge.hint'),
     ) +
-    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint')) +
+    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint'), splitWhy) +
     cmdBtn(
       'troops',
       '⇅',
@@ -8496,7 +8580,9 @@ function renderCmdBar() {
  *  thing: the same hull flies fitted and bare, and the loadout is part of the stack's
  *  identity (SM-0.3), so "two cruisers" says nothing until it says WHICH two. */
 function fleetSplitSlots(f: Fleet): SplitSlot[] {
-  return splitSlots(f.units, f.landing ?? []); // арифметика деления — `splitPlan.ts` (REFM-76)
+  // арифметика деления — `splitPlan.ts` (REFM-76); флагман героя ядро не отделяет
+  // (`E_HERO_UNIT`), и окно держит его строку неподвижной (правило 8 там же)
+  return splitSlots(f.units, f.landing ?? [], (u) => !!data.units[u]?.traits.includes('hero'));
 }
 
 /** Hold capacity of one ship stack with its loadout installed (a cargo module is
@@ -8537,7 +8623,7 @@ function renderSplitDialog() {
     data.units[u]?.stats.cargoSize ?? 1,
   );
   const html = splitDialogHtml(
-    { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
+    { fleetId: plan.fleetId, fleetName: `«${fleetCallsign(plan.fleetId)}»`, rows: splitRows(slots, plan.take), cargo },
     {
       icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
       name: displayUnit,
@@ -8632,8 +8718,14 @@ side.addEventListener('click', (ev) => {
     }
     return;
   }
+  if (bEl.dataset.shipcard) {
+    // Карточка корабля: отсеки и надетые модули стека (заказ владельца 2026-09-24).
+    const at = bEl.dataset.shipcard.lastIndexOf('|');
+    openShipCard(bEl.dataset.shipcard.slice(0, at), Number(bEl.dataset.shipcard.slice(at + 1)));
+    return;
+  }
   if (bEl.dataset.codex) {
-    openCodex(bEl.dataset.codex); // a build/ship tile → full specs (+ Build here)
+    openCodex(bEl.dataset.codex); // a build/ground tile → full specs (+ Build here)
     return;
   }
   const act = bEl.dataset.act;
@@ -8995,6 +9087,11 @@ document.addEventListener?.('click', (ev) => {
 cmdbar.addEventListener('click', (ev) => {
   const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
   if (!bEl || bEl.disabled) return;
+  // Серая кнопка с причиной (`cmdBtn`, `why`): приказа нет — есть объяснение.
+  if (bEl.getAttribute('aria-disabled') === 'true') {
+    if (bEl.dataset.why) note(t(bEl.dataset.why));
+    return;
+  }
   const cmd = bEl.dataset.cmd;
   const ids = selectedFleetIds();
   if (MOBILE && (cmd === 'mobile-send' || cmd === 'mobile-cancel')) {
@@ -9361,19 +9458,13 @@ function selectAt(mx: number, my: number) {
    * точка флота, и «не попал» почти всегда значит «передумал».
    */
   if (owner === 'engage') {
-    const foe = nearestHit(
-      Object.values(s.fleets)
-        .filter(
-          (g) =>
-            g.owner !== ME &&
-            fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner)) &&
-            sumUnits(g.units) > 0,
-        )
-        .map((g) => ({ id: g.id, anchor: fleetAnchor(g) })),
-      (g) => g.anchor,
-      mx,
-      my,
+    // Та же цель, что рисует превью (`engageAim.ts`): флот рядом или флот противника на
+    // мире под пальцем — тап по базе пиратов бьёт по пиратам, а не снимает прицел.
+    const foe = engageFoeAt(
+      engageCandidates(),
+      { x: mx, y: my },
       rFleet,
+      nearestHit(MAP, (n) => world(n), mx, my, rNode)?.id ?? null,
     );
     if (MOBILE) {
       stageMobileTarget('engage', foe ? { kind: 'fleet', id: foe.id } : null);
@@ -14819,6 +14910,12 @@ if (codexEl) {
       lastPanelHtml = '';
       renderPanel();
       openCodex(`b:${upg}`);
+      return;
+    }
+    // Карточка корабля ведёт в справочник своего корпуса — той же дорогой, что плитка.
+    const deep = (tg.closest('.sc-codex') as HTMLElement | null)?.dataset.codex;
+    if (deep) {
+      openCodex(deep);
       return;
     }
     if (tg.id === 'codex' || tg.classList.contains('cx-close')) codexEl.classList.remove('show');

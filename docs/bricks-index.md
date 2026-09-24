@@ -609,13 +609,14 @@
 | AUD-19 | ✅ | docs | `docs/backlog.md` | Сводка решений ГДД (п. 8) описывала артиллерию, |
 | AUD-20 | ⏳ | srv proto | `docs/backlog.md` | Адаптация Роя (AD-01) не подключена ни к одному живому |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
-| AUD-22 | ⏳ | data | `docs/backlog.md` | Пустые покупки в дереве навыков. |
+| AUD-22 | ✅ | core proto | `docs/backlog.md` | Пустые покупки в дереве навыков. |
 | AUD-23 | ✅ | proto cli | `docs/backlog.md` | Разрыв кадра выигрывал главу без боя. |
 | AUD-24 | ✅ | proto cli | `docs/backlog.md` | «Продолжить» на втором устройстве стирало |
 | AUD-25 | ✅ | proto | `docs/backlog.md` | Двойной тап на экране подготовки — два ролика. |
 | AUD-26 | ✅ | cli | `docs/backlog.md` | Лут забега выбирался прокруткой попыток. |
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md` | Десант делится вместе с кораблями, по трюму обеих половин. |
+| FSPLIT-3 | ✅ | proto | `docs/backlog.md` | «Делить» не молчит: герой остаётся, серая кнопка объясняет. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md` | Строка места переключается «выкл → слабый → сильный». |
 | RESIL-1 | ✅ | proto | `docs/backlog.md` | Фоновые промисы браузерного клиента. |
 | RESIL-2 | ✅ | proto | `docs/backlog.md` | Цикл подсветки обучающего тура. |
@@ -631,6 +632,7 @@
 | UI-14 | ✅ | proto | `docs/backlog.md` | Осмотр чужого флота должен быть находимым. |
 | CMB-5 | ✅ | core | `docs/backlog.md` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| ATK-2 | ✅ | proto | `docs/backlog.md` | «Атака» видна: цели в красных уголках, путь красным пунктиром. |
 | SHIPART-1 | ✅ | proto cli | `docs/backlog.md` | Реалистичные портреты в постройке и описаниях, |
 | SHIPART-2 | ✅ | cli proto | `docs/backlog.md` | Десантный корабль — в десантной семье |
 | HEROART-1 | ✅ | proto cli | `docs/backlog.md` | Портреты, досье и читаемый счёт флота |
@@ -1084,6 +1086,7 @@
 | PVR-6.12 | ✅ | proto | `docs/sector-zero-roadmap.md` | Шапка забега: кошелёк профиля вместо счёта, места и дня |
 | PVR-6.13 | ✅ | proto | `docs/sector-zero-roadmap.md` | Часы забега — реальные минуты вместо игровых часов |
 | PVR-6.14 | ✅ | proto | `docs/sector-zero-roadmap.md` | Комиксы глав — основа под арт владельца |
+| PVR-6.15 | ✅ | proto | `docs/sector-zero-roadmap.md` | Карта главы — красивее, крестик ровный |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |
@@ -1165,6 +1168,7 @@
 | SM-0.5 | 🔒 | core | `docs/ship-modules-roadmap.md` | Маршрутизация cargoCapacity через эффективный лукап |
 | SM-0.6 | 🔒 | core | `docs/ship-modules-roadmap.md` | Действие loadout.equip / loadout.unequip |
 | SM-0.7 | 🔒 | cli | `docs/ship-modules-roadmap.md` | CLI лоадаута |
+| SM-0.8 | ✅ | proto | `docs/ship-modules-roadmap.md` | Карточка корабля в матче: отсеки и надетые модули |
 | SM-1.1 | 🔒 | data | `docs/ship-modules-roadmap.md` | Модуль +N cargoCapacity (плоский, тиры) |
 | SM-1.2 | 🔒 | data srv | `docs/ship-modules-roadmap.md` | Фейрнес расширителя (F2P + soulbound) |
 | SM-2.1 | 🔒 | data | `docs/ship-modules-roadmap.md` | Семейство «дройды» (новый контент) |

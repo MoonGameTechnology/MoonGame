@@ -72,15 +72,12 @@ describe('Sector Zero persistent preparation', () => {
     ).toBeNull();
     // Раньше здесь же проверялась ЧУЖАЯ ветка: `void_attunement` (psionic) на
     // `commander` (transhuman) не покупался. Ветки припаркованы (HERO-11) — чужих узлов
-    // в каталоге больше нет, и этот узел законен. Проверяем именно это, а не оставляем
-    // утверждение, которое молча перестало что-либо ловить: корень без `requires`
-    // покупается, а всё, что ниже по лестнице, по-прежнему закрыто родителями (выше).
+    // в каталоге больше нет. Проверяем, что корень без `requires` покупается, а всё, что
+    // ниже по лестнице, по-прежнему закрыто родителями (выше). Корень — `wreck_rig`:
+    // `void_attunement` Командиру не продаётся вовсе, его «Маяк сбора» у героя со старта
+    // (AUD-22, `sectorZeroSkillNodes.test.ts`).
     expect(
-      changeSectorZeroProgress(
-        p,
-        { kind: 'skill', hero: 'commander', id: 'void_attunement' },
-        data,
-      ),
+      changeSectorZeroProgress(p, { kind: 'skill', hero: 'commander', id: 'wreck_rig' }, data),
     ).not.toBeNull();
     p = change(p, { kind: 'upgrade-hero', id: 'commander' });
     p = change(p, { kind: 'skill', hero: 'commander', id: 'neural_lace' });

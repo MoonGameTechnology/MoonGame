@@ -25,6 +25,7 @@ import {
 import {
   canEquip,
   hashState,
+  knownSkillNodes,
   moduleAllowed,
   starsOf,
   rarityOf,
@@ -286,13 +287,39 @@ export function sectorSkillLegal(
   data: GameData,
 ): boolean {
   const hero = progress.heroes[progress.selectedHero];
+  return hero !== undefined && skillLearnable(progress.selectedHero, hero.skills, id, data);
+}
+
+/** Карточка узла в Академии: изучен ли (куплен или врождён, AUD-22) и каких предпосылок
+ *  не хватает. Та же правда, что у покупки, — иначе экран повесил бы цену на узел, который
+ *  у героя уже есть, или замок на тот, что покупается. */
+export function sectorSkillCard(
+  heroId: string,
+  hero: SectorHero,
+  id: string,
+  data: GameData,
+): { owned: boolean; missing: string[] } {
+  const known = knownSkillNodes(hero.skills, heroId, data);
+  const requires = data.heroSkillTrees[id]?.requires ?? [];
+  return { owned: known.has(id), missing: requires.filter((r) => !known.has(r)) };
+}
+
+/**
+ * Одно правило «можно изучить» для Академии, магазина и чтения профиля. Изученным
+ * считается и купленный узел, и ВРОЖДЁННЫЙ — тот, чья награда у архетипа со старта
+ * (AUD-22, решение владельца 2026-09-24): его не продают, а узлы за ним открыты. Набор
+ * известных узлов считает ядро (`knownSkillNodes`), тот же, что в `hero.skill.unlock`.
+ */
+function skillLearnable(
+  heroId: string,
+  skills: readonly string[],
+  id: string,
+  data: GameData,
+): boolean {
   const node = data.heroSkillTrees[id];
-  if (!hero || !node) return false;
-  return (
-    sectorSkillOpenTo(node, progress.selectedHero, data) &&
-    !hero.skills.includes(id) &&
-    node.requires.every((r) => hero.skills.includes(r))
-  );
+  if (!node || !sectorSkillOpenTo(node, heroId, data)) return false;
+  const known = knownSkillNodes(skills, heroId, data);
+  return !known.has(id) && node.requires.every((r) => known.has(r));
 }
 
 /**
@@ -556,13 +583,9 @@ export function changeSectorZeroProgress(
     }
     case 'skill': {
       const hero = next.heroes[action.hero];
-      const node = data.heroSkillTrees[action.id];
       if (
         !hero ||
-        !node ||
-        !sectorSkillOpenTo(node, action.hero, data) ||
-        hero.skills.includes(action.id) ||
-        !node.requires.every((id) => hero.skills.includes(id)) ||
+        !skillLearnable(action.hero, hero.skills, action.id, data) ||
         !pay(sectorSkillCost(action.id, data))
       )
         return null;
@@ -755,16 +778,8 @@ export function parseSectorZeroProgress(
       const candidates = strings(value.skills);
       // Repeat in catalog-independent order so valid prerequisites survive JSON key order.
       for (let pass = 0; pass < candidates.length; pass++)
-        for (const skill of candidates) {
-          const node = data.heroSkillTrees[skill];
-          if (
-            node &&
-            sectorSkillOpenTo(node, id, data) &&
-            !hero.skills.includes(skill) &&
-            node.requires.every((r) => hero.skills.includes(r))
-          )
-            hero.skills.push(skill);
-        }
+        for (const skill of candidates)
+          if (skillLearnable(id, hero.skills, skill, data)) hero.skills.push(skill);
       const owned = sectorHeroAbilities(id, hero, data);
       hero.equipped = strings(value.equipped)
         .filter((a) => owned.includes(a) && !data.heroAbilities[a]?.type.startsWith('spawn_'))
@@ -936,7 +951,16 @@ export function prepareSectorZeroRun(
     passives: [
       ...new Set([
         ...def.startPassives,
-        ...selected.skills.flatMap((skill) => data.heroSkillTrees[skill]?.grants.passive ?? []),
+        // Узел даёт пассивку одиночной (`passive`) или списком (`passives`, «Мастерство
+        // обломков» — две сразу). Список здесь раньше не читался, и такой узел в забег не
+        // привозил ничего (AUD-22).
+        ...selected.skills.flatMap((skill) => {
+          const grants = data.heroSkillTrees[skill]?.grants;
+          return [
+            ...(grants?.passive !== undefined ? [grants.passive] : []),
+            ...(grants?.passives ?? []),
+          ];
+        }),
       ]),
     ],
   };

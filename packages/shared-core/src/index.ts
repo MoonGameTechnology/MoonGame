@@ -490,6 +490,7 @@ export {
 } from './util/fitting';
 export { requireOwnedIdleFleet, nextFleetSeq, type IdleFleet, type FleetSeqState } from './util/fleet';
 export { buildProgress, thresholdRamp } from './util/construction';
+export { knownSkillNodes, nodeInnateTo } from './util/heroSkills';
 export {
   buildRecap,
   isHighEvent,
