@@ -315,3 +315,5 @@ body.holo-ui #holo-selection-window.details-open #cmdbar .holo-command-body{max-
   #side .object-detail{border-left:0;border-top:1px solid var(--line-hi);padding:12px 0 0;margin-top:12px;}
 }
 #battlewin .bw-ret button{padding:8px 12px;border:1px solid var(--line-hi);background:#102632;color:var(--cyan);cursor:pointer;}
+/* Карточка корабля — карточка, а не справочник на всю ширину: отсеки читаются столбцом. */
+body.holo-ui #codex .cxbox.sc-box{width:min(560px,84vw);}

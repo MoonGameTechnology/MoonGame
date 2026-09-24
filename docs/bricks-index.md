@@ -1167,6 +1167,7 @@
 | SM-0.5 | 🔒 | core | `docs/ship-modules-roadmap.md` | Маршрутизация cargoCapacity через эффективный лукап |
 | SM-0.6 | 🔒 | core | `docs/ship-modules-roadmap.md` | Действие loadout.equip / loadout.unequip |
 | SM-0.7 | 🔒 | cli | `docs/ship-modules-roadmap.md` | CLI лоадаута |
+| SM-0.8 | ✅ | proto | `docs/ship-modules-roadmap.md` | Карточка корабля в матче: отсеки и надетые модули |
 | SM-1.1 | 🔒 | data | `docs/ship-modules-roadmap.md` | Модуль +N cargoCapacity (плоский, тиры) |
 | SM-1.2 | 🔒 | data srv | `docs/ship-modules-roadmap.md` | Фейрнес расширителя (F2P + soulbound) |
 | SM-2.1 | 🔒 | data | `docs/ship-modules-roadmap.md` | Семейство «дройды» (новый контент) |
