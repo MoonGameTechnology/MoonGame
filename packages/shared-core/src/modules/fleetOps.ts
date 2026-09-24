@@ -31,6 +31,7 @@ import type { Battle, Fleet, UnitStack } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
 import { heroByFleet } from '../state/heroes';
+import { shipsEngaged } from '../state/battle';
 import { isHostile, ownFleet } from '../util/combat';
 import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
@@ -439,7 +440,9 @@ export const fleetOpsModule: GameModule = {
       if (!f.units.some((s) => s.count > 0) || !target.units.some((s) => s.count > 0)) {
         return h.reject('E_NO_FLEET'); // ghosts can't fight — no empty-side battles
       }
-      if (f.battleId || target.battleId) {
+      // ASSAULT-1: флот, чей десант дерётся на земле, для орбитального боя свободен —
+      // то же правило, что у автосцепки на прибытии (`shipsEngaged`).
+      if (shipsEngaged(h.state, f) || shipsEngaged(h.state, target)) {
         return h.reject('E_IN_BATTLE');
       }
       if (!f.location || f.movement || target.movement || f.location !== target.location) {
