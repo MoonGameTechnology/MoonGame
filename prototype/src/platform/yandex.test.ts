@@ -607,3 +607,71 @@ describe('граница площадки (platform-adapters.md)', () => {
     expect(read('../main.ts')).not.toMatch(/['"]yandex['"]/i);
   });
 });
+
+describe('YAG-6.4 — «назад» и выход площадки', () => {
+  /** SDK с `onEvent`: помнит подписчиков и умеет прислать событие. */
+  function withEvents() {
+    const listeners: Record<string, (() => void)[]> = {};
+    const base = fakeSdk({
+      onEvent: (name, listener) => {
+        (listeners[name] ??= []).push(listener);
+        return () => {
+          listeners[name] = (listeners[name] ?? []).filter((l) => l !== listener);
+        };
+      },
+    });
+    const send = (name: string): void => {
+      for (const l of listeners[name] ?? []) l();
+    };
+    return { ...base, listeners, send };
+  }
+
+  it('«назад» площадки доходит до игры, отписка его снимает', () => {
+    const { sdk, send } = withEvents();
+    const platform = createYandexPlatform(sdk);
+    const seen: string[] = [];
+    const off = platform.onHistoryBack(() => seen.push('back'));
+    send('HISTORY_BACK');
+    off();
+    send('HISTORY_BACK');
+    expect(seen).toEqual(['back']);
+  });
+
+  it('выход площадки доходит до игры отдельным событием', () => {
+    const { sdk, send } = withEvents();
+    const platform = createYandexPlatform(sdk);
+    const seen: string[] = [];
+    platform.onHistoryBack(() => seen.push('back'));
+    platform.onExit(() => seen.push('exit'));
+    send('EXIT');
+    expect(seen).toEqual(['exit']);
+  });
+
+  it('`dispose` снимает и эти подписки', () => {
+    const { sdk, send, listeners } = withEvents();
+    const platform = createYandexPlatform(sdk);
+    platform.onHistoryBack(() => {});
+    platform.onExit(() => {});
+    platform.dispose();
+    send('HISTORY_BACK');
+    expect((listeners.HISTORY_BACK ?? []).length + (listeners.EXIT ?? []).length).toBe(0);
+  });
+
+  it('SDK без `onEvent` — подписка пустая, а не падение', () => {
+    const { sdk } = fakeSdk();
+    const platform = createYandexPlatform(sdk);
+    expect(() => platform.onHistoryBack(() => {})()).not.toThrow();
+  });
+
+  it('сбой `onEvent` уходит в журнал сбоев, игра продолжает', () => {
+    const errors: string[] = [];
+    const { sdk } = fakeSdk({
+      onEvent: () => {
+        throw new Error('sdk');
+      },
+    });
+    const platform = createYandexPlatform(sdk, { onSdkError: (where) => errors.push(where) });
+    expect(() => platform.onExit(() => {})()).not.toThrow();
+    expect(errors).toEqual(['onEvent']);
+  });
+});

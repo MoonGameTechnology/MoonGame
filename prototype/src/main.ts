@@ -13281,12 +13281,17 @@ function closeTopLayer(): boolean {
 // вслепую, и матч не должен теряться от одного случайного касания), второе в пределах
 // окна выходит по-настоящему, а вне матча ступень истории не ставится вовсе — там
 // следующий Back и обязан закрыть приложение.
-window.addEventListener('popstate', () => {
-  backArmed = false;
+/**
+ * Один шаг «назад» — общий для аппаратной кнопки браузера (`popstate`) и кнопки площадки
+ * (`HISTORY_BACK`, `YAG-6.4`): закрыть верхний слой, а в матче сперва подсказать и только
+ * вторым нажатием выйти. `rearm` — только для браузера: его «назад» съедает запись
+ * истории, и её надо положить обратно; у площадки истории нет.
+ */
+function stepBack(rearm: boolean): void {
   const act = backAction(closeTopLayer(), inMatch(), performance.now(), backHintAt);
   if (act === 'closed') {
     snd.play('close'); // обратный блип: слой закрылся аппаратным Back
-    if (rearmAfterClose(topLayerOpen(), inMatch())) armBack();
+    if (rearm && rearmAfterClose(topLayerOpen(), inMatch())) armBack();
     return;
   }
   if (act === 'exit') {
@@ -13295,7 +13300,11 @@ window.addEventListener('popstate', () => {
   }
   if (act === 'hint') backHintAt = performance.now();
   note(t(act === 'hint' ? 'back.confirm.match' : 'back.confirm'));
-  if (rearmAfterHint(act)) armBack();
+  if (rearm && rearmAfterHint(act)) armBack();
+}
+window.addEventListener('popstate', () => {
+  backArmed = false;
+  stepBack(true);
 });
 function armBack(): void {
   if (backArmed) return;
@@ -15382,6 +15391,15 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') runPauseEvent('hidden');
 });
 host.onPlatformPause?.((paused) => runPauseEvent(paused ? 'platform-pause' : 'platform-resume'));
+// YAG-6.4: «назад» площадки (на телефоне — системная кнопка) идёт по той же лестнице слоёв,
+// что и браузерный; без обработчика она выкинула бы игрока из игры посреди забега. Выход
+// площадки сохраняет всё сразу — тем же путём, что уход со страницы.
+host.onHistoryBack?.(() => stepBack(false));
+host.onExit?.(() => {
+  runPauseEvent('hidden');
+  saveRun();
+  pushCloud(true);
+});
 // YAG-2.2: уходя, страница отправляет облачную копию СРАЗУ — таймер окна квоты после
 // выгрузки не сработает. Порядок важен: сначала снимок забега (он же двигает правку).
 addEventListener('pagehide', () => pushCloud(true));
