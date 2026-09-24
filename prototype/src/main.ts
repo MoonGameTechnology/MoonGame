@@ -2831,7 +2831,7 @@ function playerOrder(action: Action): boolean {
     if (plan.tour === 'on-accept') activeTour?.notifyAction(action.type);
     // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
     // `introTrigger.ts` (REFM-100).
-    const intro = introFor(action.type, !!activeTour?.active);
+    const intro = introFor(action.type, !!activeTour?.active, NET);
     if (intro) maybeIntro(intro);
   }
   return true;
