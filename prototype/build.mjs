@@ -789,8 +789,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
   background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
 
-/* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs */
-#settings{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
+/* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs.
+   UX-SET-1: окно прибито к верху, а не к центру. Вкладки разной высоты («Звук» — две
+   строки, «Карта» — семь), и по центру ряд вкладок прыгал бы под курсором при каждом
+   переключении. */
+#settings{position:fixed;inset:0;z-index:59;display:none;align-items:flex-start;justify-content:center;padding:max(18px,8vh) 18px 18px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #settings.show{display:flex;}
 #settings .setbox{width:min(380px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
@@ -802,8 +805,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink);}
 .set-lbl .set-sub{font-size:10px;color:var(--dim);letter-spacing:.2px;}
 /* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
+/* UX-SET-1: четыре вкладки (Звук · Графика · Карта · Управление). Ширина — по подписи, а не
+   поровну: «Управление» вдвое длиннее «Звука», и равные доли резали бы её на телефоне. */
 .set-tabs{display:flex;gap:6px;margin:0 0 12px;}
-.set-tabs button{flex:1;min-height:36px;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;}
+.set-tabs button{flex:1 1 auto;min-height:36px;padding:0 8px;white-space:nowrap;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;}
+@media (max-width:360px){.set-tabs{gap:4px;}.set-tabs button{padding:0 5px;font-size:11px;letter-spacing:0;}}
+.set-tabs button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 .set-tabs button.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
 .set-keys{display:grid;gap:6px;margin:0 0 12px;}
 .set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
