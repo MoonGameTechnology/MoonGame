@@ -19,6 +19,11 @@
  *    засчитал бы облачному профилю чужой забег.
  * 5. **«Оставить этот» своим номером правки.** Облако оказалось бы позади сверки другого
  *    устройства, и то молча записало бы свой профиль поверх выбора игрока.
+ *
+ * Аудит Sector Zero (`AUD-24`) добавил шестой:
+ *
+ * 6. **Облако без мира забега.** Везёт один дескриптор — другое устройство пересобирает
+ *    мир с карты главы, и «Продолжить» там стирает поражение.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -34,8 +39,23 @@ describe('YAG-2.2 — каждое изменение профиля — нов�
 
   it('смена дескриптора забега двигает правку, повтор того же — нет', () => {
     const save = body('saveRun');
-    expect(save).toContain('if (portable !== lastPortableRaw) {');
+    expect(save).toContain('if (portable !== lastPortableRaw || worldDue) {');
     expect(save).toContain('bumpCloudRev();');
+  });
+
+  it('AUD-24: мир забега тоже двигает правку — только изменившийся и не чаще окна', () => {
+    // Повтор того же мира (пауза) облако не пишет, а изменившийся — не чаще
+    // `CLOUD_RUN_EVERY_MS`: снимок главы — до 36 КБ, и каждая запись — трафик игрока.
+    expect(body('saveRun')).toContain(
+      'const worldDue = blob !== lastCloudRunBlob && now - cloudRunAt >= CLOUD_RUN_EVERY_MS;',
+    );
+  });
+
+  it('AUD-24: облако везёт точный мир, принятое облако кладёт его в локальный снимок', () => {
+    const push = body('pushCloud');
+    expect(push).toContain('const state = await runSaveStore.load();');
+    expect(push).toContain('cloudEnvelope(');
+    expect(body('adoptCloud')).toContain('if (cloud.state) await runSaveStore.save(cloud.state);');
   });
 
   it('правка отправляется в облако, а отправка отмечает сверку', () => {

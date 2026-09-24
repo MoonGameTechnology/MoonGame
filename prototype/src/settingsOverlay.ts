@@ -78,9 +78,26 @@ function rangeRow(id: string, label: string, hint: string, value: number, aria =
   );
 }
 
-/** Вкладки окна: настройки отдельно, справка по управлению отдельно — таблица клавиш
- *  длинная и в общем списке прятала под собой кнопку «Готово». */
-export type SettingsTab = 'general' | 'controls';
+/** Вкладки окна (UX-SET-1, заказ владельца 2026-09-23: «разнеси по вкладкам звук,
+ *  графику и т. д.»). Справка по управлению жила отдельно и раньше — таблица клавиш
+ *  длинная и в общем списке прятала под собой кнопку «Готово» (UX-KEYS-1). */
+export type SettingsTab = 'sound' | 'graphics' | 'map' | 'controls';
+
+/** Вкладки по порядку кнопок; первая — та, на которой окно открывается. Каждая настройка
+ *  живёт ровно в одной вкладке (сторож в тесте), иначе её было бы две правды на экране. */
+export const SETTINGS_TABS: ReadonlyArray<{ id: SettingsTab; key: string }> = [
+  { id: 'sound', key: 'settings.snd.title' },
+  { id: 'graphics', key: 'settings.gfx.title' },
+  { id: 'map', key: 'settings.tab.map' },
+  { id: 'controls', key: 'settings.controls.title' },
+];
+
+const DEFAULT_TAB: SettingsTab = SETTINGS_TABS[0]!.id;
+
+/** Вкладка по её id из разметки; чужое значение — вкладка по умолчанию. */
+function tabOf(id: string | undefined): SettingsTab {
+  return SETTINGS_TABS.find((x) => x.id === id)?.id ?? DEFAULT_TAB;
+}
 
 /** «Управление» (UX-KEYS-1): что нажать → что будет. Таблица и её сторож —
  *  `decisions/controls.ts`. */
@@ -94,36 +111,54 @@ function controlsHtml(view: SettingsView): string {
 export function settingsBoxHtml(
   view: SettingsView,
   renderingReportAvailable = false,
-  tab: SettingsTab = 'general',
+  tab: SettingsTab = DEFAULT_TAB,
 ): string {
+  // Кнопки вкладок — по образцу WAI-ARIA «tabs»: в Tab-обходе только выбранная
+  // (остальные — стрелками), панель подписана своей вкладкой.
+  const tabs = SETTINGS_TABS.map(
+    ({ id, key }) =>
+      `<button type="button" role="tab" id="set-tab-${id}" data-settab="${id}" aria-controls="set-panel"` +
+      ` aria-selected="${tab === id}" tabindex="${tab === id ? 0 : -1}"${tab === id ? ' class="on"' : ''}>${t(key)}</button>`,
+  ).join('');
+  return (
+    `<div class="setbox">` +
+    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
+    `<div class="set-tabs" role="tablist" aria-label="${t('settings.title')}">${tabs}</div>` +
+    `<div class="set-panel" id="set-panel" role="tabpanel" aria-labelledby="set-tab-${tab}">${tabHtml(view, tab, renderingReportAvailable)}</div>` +
+    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
+    `</div>`
+  );
+}
+
+function tabHtml(view: SettingsView, tab: SettingsTab, renderingReportAvailable: boolean): string {
+  switch (tab) {
+    case 'sound':
+      return soundHtml(view);
+    case 'graphics':
+      return graphicsHtml(view, renderingReportAvailable);
+    case 'map':
+      return mapHtml(view);
+    case 'controls':
+      return controlsHtml(view);
+  }
+}
+
+/** «Звук» (SND-1): тумблер синтезированных откликов и громкость. */
+function soundHtml(view: SettingsView): string {
+  return (
+    switchRow('snd', t('settings.snd.ui'), t('settings.snd.ui.hint'), view.soundOn) +
+    rangeRow('snd-vol', t('settings.snd.vol'), '', view.volume)
+  );
+}
+
+/** «Карта»: развёртка радара, свои метки и цвета сторон — всё, чем окрашена карта. */
+function mapHtml(view: SettingsView): string {
   const palettes =
     PALETTES.map(
       (p) =>
         `<button type="button" class="set-pal${view.palette === p.id ? ' on' : ''}" data-pal="${p.id}">${t(p.key)}</button>`,
     ).join('') +
     `<button type="button" class="set-pal" id="set-colreset" title="${t('settings.colors.reset')}">⟲</button>`;
-  return (
-    `<div class="setbox">` +
-    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
-    `<div class="set-tabs" role="tablist">${(
-      [
-        ['general', 'settings.tab.general'],
-        ['controls', 'settings.controls.title'],
-      ] as const
-    )
-      .map(
-        ([id, key]) =>
-          `<button type="button" role="tab" data-settab="${id}" aria-selected="${tab === id}"${tab === id ? ' class="on"' : ''}>${t(key)}</button>`,
-      )
-      .join('')}</div>` +
-    (tab === 'controls' ? controlsHtml(view) : generalHtml(view, palettes, renderingReportAvailable)) +
-    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
-    `</div>`
-  );
-}
-
-/** Вкладка «Общие»: развёртка, метки, цвета, графика, звук. */
-function generalHtml(view: SettingsView, palettes: string, renderingReportAvailable: boolean): string {
   return (
     rangeRow(
       'sweep',
@@ -145,8 +180,13 @@ function generalHtml(view: SettingsView, palettes: string, renderingReportAvaila
     `<div class="set-row">` +
     `<div class="set-lbl">${t('settings.colors.palette')}<span class="set-sub">${t('settings.colors.palette.hint')}</span></div>` +
     `<div class="set-ctl set-pals">${palettes}</div>` +
-    `</div>` +
-    `<div class="pc-sec">${t('settings.gfx.title')}</div>` +
+    `</div>`
+  );
+}
+
+/** «Графика»: свечение, звёзды, движение, счётчик кадров, совместимость отрисовки. */
+function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): string {
+  return (
     switchRow('glow', t('settings.gfx.glow'), t('settings.gfx.glow.hint'), view.glow) +
     switchRow(
       'starfield',
@@ -169,11 +209,7 @@ function generalHtml(view: SettingsView, palettes: string, renderingReportAvaila
       ? `<div class="set-row"><button type="button" class="set-pal" id="set-render-report" aria-expanded="false" aria-controls="set-render-report-panel">${t('settings.gfx.render-report')}</button>` +
         `<div id="set-render-report-panel" hidden><div class="set-lbl"><span class="set-sub">${t('settings.gfx.render-report.hint')}</span></div>` +
         `<textarea id="set-render-report-text" class="set-render-report-text" readonly spellcheck="false" rows="8" aria-label="${t('settings.gfx.render-report')}"></textarea></div></div>`
-      : '') +
-    // SND-1: секция «Звук» — тумблер синтезированных откликов + громкость.
-    `<div class="pc-sec">${t('settings.snd.title')}</div>` +
-    switchRow('snd', t('settings.snd.ui'), t('settings.snd.ui.hint'), view.soundOn) +
-    rangeRow('snd-vol', t('settings.snd.vol'), '', view.volume)
+      : '')
   );
 }
 
@@ -212,16 +248,33 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     if (el) el.textContent = text;
   };
 
-  let tab: SettingsTab = 'general';
+  let tab: SettingsTab = DEFAULT_TAB;
+
+  /** Открыть вкладку и вернуть фокус на её кнопку: перерисовка снесла прежнюю. */
+  const select = (next: SettingsTab): void => {
+    tab = next;
+    render();
+    host.root().querySelector<HTMLElement>(`[data-settab="${tab}"]`)?.focus();
+  };
 
   function render(): void {
     const v = host.view();
     host.root().innerHTML = settingsBoxHtml(v, typeof host.renderingReport === 'function', tab);
     for (const b of Array.from(host.root().querySelectorAll<HTMLElement>('[data-settab]'))) {
-      b.addEventListener('click', () => {
-        tab = b.dataset.settab === 'controls' ? 'controls' : 'general';
-        render();
-        host.root().querySelector<HTMLElement>(`[data-settab="${tab}"]`)?.focus();
+      b.addEventListener('click', () => select(tabOf(b.dataset.settab)));
+      // Стрелки ходят по кругу, Home/End — к краям (образец WAI-ARIA «tabs»).
+      b.addEventListener('keydown', (e: KeyboardEvent) => {
+        const at = SETTINGS_TABS.findIndex((x) => x.id === tab);
+        const n = SETTINGS_TABS.length;
+        const to =
+          e.key === 'ArrowRight' ? (at + 1) % n
+          : e.key === 'ArrowLeft' ? (at + n - 1) % n
+          : e.key === 'Home' ? 0
+          : e.key === 'End' ? n - 1
+          : -1;
+        if (to < 0) return;
+        e.preventDefault();
+        select(SETTINGS_TABS[to]!.id);
       });
     }
 
@@ -312,7 +365,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
 
   return {
     open: () => {
-      tab = 'general'; // окно открывается на настройках, а не на справке
+      tab = DEFAULT_TAB; // окно открывается на первой вкладке, а не там, где его закрыли
       render();
       host.root().classList.add('show');
     },

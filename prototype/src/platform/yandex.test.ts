@@ -409,6 +409,18 @@ describe('облачный сейв (YAG-2.2)', () => {
     expect(errors).toEqual(['setData:E_CLOUD_SAVE_TOO_BIG']);
   });
 
+  it('AUD-24: «влезет ли» — тем же подсчётом, каким запись потом режется', () => {
+    // Хост спрашивает это ДО записи, чтобы отправить конверт без мира забега, а не
+    // потерять запись целиком. Два разных правила подсчёта здесь разошлись бы на
+    // экранировании кавычек: снимок едет строкой внутри JSON.
+    const platform = createYandexPlatform(fakeSdk({}).sdk);
+    const overhead = JSON.stringify({ [CLOUD_KEY]: '' }).length;
+    expect(platform.save.fits?.('x'.repeat(CLOUD_LIMIT_BYTES - overhead))).toBe(true);
+    expect(platform.save.fits?.('x'.repeat(CLOUD_LIMIT_BYTES - overhead + 1))).toBe(false);
+    // Кавычки удваиваются экранированием — их считает тот же подсчёт, а не длина строки.
+    expect(platform.save.fits?.('"'.repeat(CLOUD_LIMIT_BYTES / 2))).toBe(false);
+  });
+
   it('сбой чтения — «сохранения нет», сбой записи — промис не отклоняется', async () => {
     const errors: string[] = [];
     const broken = {

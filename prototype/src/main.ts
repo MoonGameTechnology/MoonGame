@@ -221,6 +221,10 @@ import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
+import { shipCardModel } from '../../decisions/shipCard';
+import { shipCardHtml } from './shipCard';
+import { moduleIcon } from './moduleIcons';
+import { catalogPortraitHtml } from './shipArt';
 import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 // SHU-3.1 — ангар глазами игрока: состав, вместимость, топливо, перегрузка.
 import {
@@ -277,7 +281,7 @@ import {
   planCloudSync,
   profileNumbers,
   profileHasProgress,
-  serializeCloudProfile,
+  cloudEnvelope,
   type CloudProfile,
 } from '../../decisions/cloudSync';
 import { chapterBlueprint } from '../../decisions/moduleRarity';
@@ -725,7 +729,7 @@ import {
   canAssaultAim,
   canAssaultFromOrbit,
   canMerge,
-  canSplit,
+  splitBlock,
 } from '../../decisions/cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
 import {
@@ -806,7 +810,7 @@ import {
   flowSign,
   stockBleeds,
 } from './resourceChip';
-import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
+import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
@@ -2836,7 +2840,7 @@ function playerOrder(action: Action): boolean {
     if (plan.tour === 'on-accept') activeTour?.notifyAction(action.type);
     // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
     // `introTrigger.ts` (REFM-100).
-    const intro = introFor(action.type, !!activeTour?.active);
+    const intro = introFor(action.type, !!activeTour?.active, NET);
     if (intro) maybeIntro(intro);
   }
   return true;
@@ -6328,11 +6332,12 @@ function taskGroupPanelHtml(group: Fleet[]): string {
 }
 
 /** Тайлы состава флота Bytro-стиля: силуэт-архетип в цвете стороны (наземные —
- *  прежние текст-глифы), счётчик и мини-бар корпуса стека; тап — досье юнита. */
+ *  прежние текст-глифы), счётчик и мини-бар корпуса стека. Тап по кораблю — карточка
+ *  стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному — досье юнита. */
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
   const tiles = stacks
-    .filter((u) => u.count > 0)
-    .map((u) => {
+    .map((u, index) => {
+      if (u.count <= 0) return '';
       const def = data.units[u.unit];
       if (!def) return '';
       const name = unitTitle(u.unit);
@@ -6342,17 +6347,19 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
           : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: s.players[f.owner]?.faction, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
-      // Show installed modules as small tags under the count (RULES-2.1 / SM-0.3):
-      // two cruisers with different modules are separate stacks — the tags make
-      // the difference visible at a glance, without opening the codex.
+      // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
+      // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
+      // подписи не читались; имя модуля — в подсказке, полная картина — в карточке.
       const modTags = u.modules && u.modules.length > 0
         ? `<span class="pt-mods">${u.modules.map((m) => {
             const mdef = data.modules[m];
             const mname = mdef ? tData(mdef.name) : m;
-            return `<span class="pt-mod" title="${esc(mname)}">${esc(mname)}</span>`;
+            return `<span class="pt-mod" title="${esc(mname)}" aria-label="${esc(mname)}">${moduleIcon(m)}</span>`;
           }).join('')}</span>`
         : '';
-      return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
+      const open =
+        def.domain === 'space' ? `data-shipcard="${esc(f.id)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
+      return `<button class="ptile" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
@@ -7696,6 +7703,34 @@ function incomeOf(type: string, level: number): string {
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
+/** Карточка корабля (`shipCard.ts`) в окне справочника: отсеки стека с тем, что надето,
+ *  и характеристики одного корабля. Стек адресуется местом во флоте — тем же, что у
+ *  плитки; флот исчез или стек сдвинулся — карточки нет, а не чужой корабль. */
+function openShipCard(fleetId: string, index: number): void {
+  const el = document.getElementById('codex');
+  const f = s.fleets[fleetId];
+  const stack = f?.units[index];
+  if (!el || !f || !stack) return;
+  const model = shipCardModel(stack, data);
+  if (!model) return;
+  const faction = s.players[f.owner]?.faction;
+  const html = shipCardHtml(
+    model,
+    {
+      portrait: (u) => catalogPortraitHtml('u', u, data),
+      icon: (u) => unitIconHtml(u, data, ownerColor(f.owner), 40, faction),
+      unitName: (u) => unitTitle(u),
+      moduleName: (m) => {
+        const mdef = data.modules[m];
+        return mdef ? tData(mdef.name) : m;
+      },
+    },
+    { hpPct: stackHullPct(stack, data), fleetName: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»` },
+  );
+  el.innerHTML = `<div class="cxbox sc-box">${html}<button class="cx-close">${t('codex.close')}</button></div>`;
+  el.classList.add('show');
+}
+
 function openCodex(key: string): void {
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
@@ -7895,8 +7930,10 @@ document.getElementById('recap')?.addEventListener('click', (ev) => {
 });
 // The «🛰» button in the log window → the whole-session briefing on demand.
 document.getElementById('lw-recap')?.addEventListener('click', () => openRecap(0));
-// Auto-briefing: mark where we left when the tab hides; on return (after the sim has
-// caught up the elapsed time) summarise what happened — only for a real absence.
+// Auto-briefing: mark where we left when the tab hides; on return summarise what happened —
+// only for a real absence. In the network the server kept the world running; the solo sim does
+// NOT catch the absence up (AUD-23: a frame gap advances at most one plausible frame), so a solo
+// brief is usually empty and `worthShowing` skips it.
 let awayAtRealMs = 0;
 document.addEventListener?.('visibilitychange', () => {
   if (document.hidden) {
@@ -8071,7 +8108,15 @@ function cmdBtn(
   cls: string,
   disabled: boolean,
   desc?: string,
+  why?: string | null,
 ): string {
+  // Серая кнопка с причиной (`why`) остаётся нажимаемой: нажатие говорит, ПОЧЕМУ нельзя
+  // (сообщение владельца 2026-09-24 про «Делить»). `disabled` проглотил бы нажатие, а на
+  // телефоне подсказки мыши нет — кнопка выглядела бы просто сломанной.
+  if (disabled && why) {
+    const reason = t(why);
+    return `<button data-cmd="${cmd}" class="${cls}" title="${esc(`${label} — ${reason}`)}" aria-label="${esc(`${label} — ${reason}`)}" aria-disabled="true" data-why="${esc(why)}"><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+  }
   const tip = desc ? `${label} — ${desc}` : label;
   return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
 }
@@ -8323,7 +8368,7 @@ function renderCmdBar() {
   const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
-  const splitOk = canSplit(
+  const splitWhy = splitBlock(
     lone
       ? {
           location: lone.location,
@@ -8333,6 +8378,7 @@ function renderCmdBar() {
         }
       : null,
   );
+  const splitOk = splitWhy === null;
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
@@ -8401,7 +8447,7 @@ function renderCmdBar() {
       !mergeOk,
       t('cmd.merge.hint'),
     ) +
-    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint')) +
+    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint'), splitWhy) +
     cmdBtn(
       'troops',
       '⇅',
@@ -8513,7 +8559,9 @@ function renderCmdBar() {
  *  thing: the same hull flies fitted and bare, and the loadout is part of the stack's
  *  identity (SM-0.3), so "two cruisers" says nothing until it says WHICH two. */
 function fleetSplitSlots(f: Fleet): SplitSlot[] {
-  return splitSlots(f.units, f.landing ?? []); // арифметика деления — `splitPlan.ts` (REFM-76)
+  // арифметика деления — `splitPlan.ts` (REFM-76); флагман героя ядро не отделяет
+  // (`E_HERO_UNIT`), и окно держит его строку неподвижной (правило 8 там же)
+  return splitSlots(f.units, f.landing ?? [], (u) => !!data.units[u]?.traits.includes('hero'));
 }
 
 /** Hold capacity of one ship stack with its loadout installed (a cargo module is
@@ -8554,7 +8602,7 @@ function renderSplitDialog() {
     data.units[u]?.stats.cargoSize ?? 1,
   );
   const html = splitDialogHtml(
-    { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
+    { fleetId: plan.fleetId, fleetName: `«${fleetCallsign(plan.fleetId)}»`, rows: splitRows(slots, plan.take), cargo },
     {
       icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
       name: displayUnit,
@@ -8649,8 +8697,14 @@ side.addEventListener('click', (ev) => {
     }
     return;
   }
+  if (bEl.dataset.shipcard) {
+    // Карточка корабля: отсеки и надетые модули стека (заказ владельца 2026-09-24).
+    const at = bEl.dataset.shipcard.lastIndexOf('|');
+    openShipCard(bEl.dataset.shipcard.slice(0, at), Number(bEl.dataset.shipcard.slice(at + 1)));
+    return;
+  }
   if (bEl.dataset.codex) {
-    openCodex(bEl.dataset.codex); // a build/ship tile → full specs (+ Build here)
+    openCodex(bEl.dataset.codex); // a build/ground tile → full specs (+ Build here)
     return;
   }
   const act = bEl.dataset.act;
@@ -9014,6 +9068,11 @@ document.addEventListener?.('click', (ev) => {
 cmdbar.addEventListener('click', (ev) => {
   const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
   if (!bEl || bEl.disabled) return;
+  // Серая кнопка с причиной (`cmdBtn`, `why`): приказа нет — есть объяснение.
+  if (bEl.getAttribute('aria-disabled') === 'true') {
+    if (bEl.dataset.why) note(t(bEl.dataset.why));
+    return;
+  }
   const cmd = bEl.dataset.cmd;
   const ids = selectedFleetIds();
   if (MOBILE && (cmd === 'mobile-send' || cmd === 'mobile-cancel')) {
@@ -13817,6 +13876,17 @@ let cloudWrite: Promise<void> = Promise.resolve();
 let lastCloudEnvelope = '';
 let lastCloudFlushed = '';
 let lastPortableRaw: string | null = null;
+/** Мир забега, последним поставленный в облако, и когда (AUD-24). */
+let lastCloudRunBlob: string | null = null;
+let cloudRunAt = 0;
+/**
+ * Как часто мир идущего забега уходит в облако (AUD-24). Реже локального автосейва: снимок
+ * главы — до 36 КБ, и в окно писателя (раз в 6 с) это ~12 МБ трафика за главу на телефоне,
+ * а раз в 30 с — ~2 МБ. Цена — другое устройство может получить мир давностью до 30 секунд
+ * реального времени: откат на полминуты, а не пересборка главы с карты. Уход со страницы
+ * и выход площадки отправляют последний мир сразу (`pushCloud(true)`).
+ */
+const CLOUD_RUN_EVERY_MS = 30_000;
 
 function writeSyncMark(): void {
   writeRaw(CLOUD_MARK_KEY, JSON.stringify(syncMark));
@@ -13835,14 +13905,23 @@ function pushCloud(flush = false): void {
     await progressWrite;
     await runWrite;
     const run = await portableRunStore.load();
-    const envelope = serializeCloudProfile({
-      v: 1,
-      seed: sectorProgress.seed,
-      rev: syncMark.rev,
-      progress: JSON.stringify(sectorProgress),
-      ...(run ? { run } : {}),
-      ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
-    });
+    // AUD-24: вместе с дескриптором едет ТОЧНЫЙ мир забега. Без него другое устройство
+    // пересобирало мир с карты главы, и «Продолжить» там стирало поражение. Не влез в
+    // лимит площадки — уходит без мира, профиль всё равно доезжает (`cloudEnvelope`).
+    const state = await runSaveStore.load();
+    const platform = getPlatform();
+    const envelope = cloudEnvelope(
+      {
+        v: 1,
+        seed: sectorProgress.seed,
+        rev: syncMark.rev,
+        progress: JSON.stringify(sectorProgress),
+        ...(run ? { run } : {}),
+        ...(state ? { state } : {}),
+        ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
+      },
+      (candidate) => platform.save.fits?.(candidate) ?? true,
+    );
     if (envelope === (flush ? lastCloudFlushed : lastCloudEnvelope)) return;
     lastCloudEnvelope = envelope;
     if (flush) lastCloudFlushed = envelope;
@@ -13902,9 +13981,12 @@ async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress
   if (runInProgress()) setRunActive(false);
   sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data).progress;
   await sectorProgressStore.save(JSON.stringify(sectorProgress));
-  // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному
-  // дескриптору (или его нет вовсе).
+  // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному: ТОЧНЫМ
+  // миром, если облако его привезло (AUD-24), иначе по дескриптору (или его нет вовсе).
+  // Именно мир, а не дескриптор: пересборка по дескриптору начинает мир с карты главы, и
+  // вход с другого устройства превращался в бесплатную перемотку поражения.
   await runSaveStore.clear();
+  if (cloud.state) await runSaveStore.save(cloud.state);
   if (cloud.run) await portableRunStore.save(cloud.run);
   else await portableRunStore.clear();
   savedRun = null;
@@ -14250,9 +14332,15 @@ function saveRun(): void {
     }),
   );
   runWrite = runWrite.then(() => runSaveStore.save(blob)).then(() => portableRunStore.save(portable));
-  // Дескриптор — часть облачного профиля: сменился (волна, усиление) — новая правка.
-  if (portable !== lastPortableRaw) {
+  // Дескриптор — часть облачного профиля: сменился (волна, усиление) — новая правка. Мир
+  // забега (AUD-24) — тоже, но не чаще `CLOUD_RUN_EVERY_MS` и только изменившийся: на паузе
+  // облако не пишется.
+  const now = performance.now();
+  const worldDue = blob !== lastCloudRunBlob && now - cloudRunAt >= CLOUD_RUN_EVERY_MS;
+  if (portable !== lastPortableRaw || worldDue) {
     lastPortableRaw = portable;
+    lastCloudRunBlob = blob;
+    cloudRunAt = now;
     bumpCloudRev();
   }
 }
@@ -14361,10 +14449,15 @@ function restoreRun(): boolean {
  *
  * Мир собирается так же, как у нового запуска той же главы (карта, снаряжение, сложность),
  * засевается модулем PvE и только потом получает волну и усиления из дескриптора —
- * чистой функцией `resumePortableRun`. ⚠️ Восстановление НЕ побайтовое, и это принято
- * осознанно (§2.1(а) роадмапа площадки): флоты, бои и ресурсы начинаются заново, и игрок
- * это видит в журнале, а не догадывается. Номер попытки берётся из дескриптора — награда
- * за этот забег не выдастся дважды.
+ * чистой функцией `resumePortableRun`. ⚠️ Восстановление НЕ побайтовое: флоты, бои и
+ * ресурсы начинаются заново, и игрок это видит в журнале, а не догадывается. Номер попытки
+ * берётся из дескриптора — награда за этот забег не выдастся дважды.
+ *
+ * ⚠️ Это ЗАПАСНОЙ путь, и держать его таким обязательно (AUD-24). Новый мир с карты главы
+ * выгоднее проигрываемого — дом цел, наступление Роя стёрто, — поэтому путь, на который
+ * игрок может встать по желанию, был перемоткой поражения. Облако теперь везёт точный мир,
+ * и сюда приходят только когда его нет: игру обновили и снимок не стал миром, или мир не
+ * влез в лимит площадки.
  */
 function restorePortable(): boolean {
   const save = savedPortable;
@@ -14797,6 +14890,12 @@ if (codexEl) {
       lastPanelHtml = '';
       renderPanel();
       openCodex(`b:${upg}`);
+      return;
+    }
+    // Карточка корабля ведёт в справочник своего корпуса — той же дорогой, что плитка.
+    const deep = (tg.closest('.sc-codex') as HTMLElement | null)?.dataset.codex;
+    if (deep) {
+      openCodex(deep);
       return;
     }
     if (tg.id === 'codex' || tg.classList.contains('cx-close')) codexEl.classList.remove('show');

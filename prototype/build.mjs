@@ -429,6 +429,8 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #cmdbar button .cl{font-size:8px;letter-spacing:.6px;opacity:.82;text-transform:uppercase;}
 #cmdbar button:hover:not(:disabled){background:rgba(53,214,230,.14);box-shadow:0 0 10px rgba(53,214,230,.35);}
 #cmdbar button:disabled{opacity:.3;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+/* Серая кнопка с причиной (cmdBtn, why): выглядит погашенной, но нажатие объясняет запрет. */
+#cmdbar button[aria-disabled="true"]{opacity:.3;cursor:help;color:var(--dim);border-color:var(--line);}
 #cmdbar button.on{background:rgba(53,214,230,.18);border-color:var(--cyan);}
 #cmdbar button.danger{color:var(--red);border-color:#7a2a22;}
 #cmdbar button.danger:hover:not(:disabled){background:rgba(255,90,77,.12);box-shadow:0 0 10px rgba(255,90,77,.3);}
@@ -501,7 +503,7 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .ptile .pt-ic{font-size:18px;line-height:1;}
 .ptile .pt-c{font-size:9px;color:var(--dim);letter-spacing:.3px;white-space:nowrap;}
 .pt-mods{display:flex;flex-wrap:wrap;gap:1px;justify-content:center;max-width:70px;}
-.pt-mod{font-size:7px;line-height:1.1;padding:0 2px;border-radius:2px;background:rgba(53,214,230,.12);color:var(--cyan);white-space:nowrap;}
+.pt-mod{font-size:10px;line-height:1.1;padding:0 1px;border-radius:2px;white-space:nowrap;}
 /* подпись построенного здания: имя обязано читаться, поэтому плитка растягивается под
    него и переносит длинное имя в две строки, а не режет многоточием — обрезанное
    «Salvage Metal…» отвечает на вопрос «что это» не лучше голой иконки */
@@ -789,8 +791,11 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
   background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
 
-/* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs */
-#settings{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
+/* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs.
+   UX-SET-1: окно прибито к верху, а не к центру. Вкладки разной высоты («Звук» — две
+   строки, «Карта» — семь), и по центру ряд вкладок прыгал бы под курсором при каждом
+   переключении. */
+#settings{position:fixed;inset:0;z-index:59;display:none;align-items:flex-start;justify-content:center;padding:max(18px,8vh) 18px 18px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #settings.show{display:flex;}
 #settings .setbox{width:min(380px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
@@ -802,8 +807,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink);}
 .set-lbl .set-sub{font-size:10px;color:var(--dim);letter-spacing:.2px;}
 /* «Управление» (UX-KEYS-1): что нажать — слева моноширинной «клавишей», что будет — справа. */
+/* UX-SET-1: четыре вкладки (Звук · Графика · Карта · Управление). Ширина — по подписи, а не
+   поровну: «Управление» вдвое длиннее «Звука», и равные доли резали бы её на телефоне. */
 .set-tabs{display:flex;gap:6px;margin:0 0 12px;}
-.set-tabs button{flex:1;min-height:36px;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;}
+.set-tabs button{flex:1 1 auto;min-height:36px;padding:0 8px;white-space:nowrap;border:1px solid var(--line-hi);border-radius:6px;background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;}
+@media (max-width:360px){.set-tabs{gap:4px;}.set-tabs button{padding:0 5px;font-size:11px;letter-spacing:0;}}
+.set-tabs button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 .set-tabs button.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
 .set-keys{display:grid;gap:6px;margin:0 0 12px;}
 .set-keys>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);}
@@ -1291,6 +1300,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #splitdlg .scur{min-width:26px;text-align:center;color:#eafffb;font-variant-numeric:tabular-nums;}
 #splitdlg .snew{min-width:42px;text-align:right;color:var(--grn);font-weight:700;font-variant-numeric:tabular-nums;}
 #splitdlg .sbtns{display:flex;gap:4px;}
+/* Флагман героя не отделяется (ядро: E_HERO_UNIT) — строка без кнопок, с пометкой. */
+#splitdlg .sstays{justify-self:center;padding:0 8px;color:var(--dim);font-size:11px;letter-spacing:.5px;}
+#splitdlg .ssub.shero{margin-top:-6px;color:#e6c77a;}
 #splitdlg .sbtns button{min-width:34px;height:30px;padding:0 7px;cursor:pointer;border-radius:2px;
   font:700 11px ui-monospace,monospace;background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);}
 #splitdlg .sbtns button:hover:not(:disabled){background:rgba(53,214,230,.14);}
@@ -1884,6 +1896,24 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cn-note{margin-top:11px;font-size:10.5px;color:var(--dim);line-height:1.5;}
 .cn-note b{color:var(--cyan);}
 /* live stat preview bars (right column) */
+/* Карточка корабля (заказ владельца 2026-09-24): отсеки стека и надетые модули — языком
+   конструктора (.cn-bay, .cn-stat), только без действий: тут ничего не снимают. */
+#codex .sc .cn-hull{margin-bottom:8px;}
+#codex .sc-n{color:var(--cyan);font-size:13px;}
+#codex .sc-hp{display:flex;align-items:center;gap:8px;margin:0 0 4px;font-size:11px;color:var(--dim);}
+#codex .sc-hp b{color:var(--ink);font-variant-numeric:tabular-nums;}
+#codex .sc-hpbar{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
+#codex .sc-hpbar i{display:block;height:100%;background:var(--grn);}
+#codex .sc-hpbar.low i{background:var(--red);}
+#codex .sc-sec{margin:14px 0 8px;font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);}
+#codex .cn-bay.sc-bay{cursor:default;}
+#codex .cn-bay.sc-bay:hover{border-color:var(--line-hi);}
+#codex .cn-bay.sc-extra,#codex .cn-bay.sc-extra:hover{border-color:#e6b777;}
+#codex .sc-stars{color:#ffd166;letter-spacing:1px;}
+#codex .sc-rar{margin-left:4px;padding:1px 5px;border:1px solid var(--line-hi);border-radius:6px;font:600 9px ui-monospace,monospace;color:var(--dim);}
+#codex .sc-codex{margin-top:12px;width:100%;min-height:36px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
+  color:var(--cyan);font:600 12px ui-monospace,monospace;cursor:pointer;}
+#codex .sc-codex:hover{border-color:var(--cyan);}
 .cn-stat{margin-bottom:11px;}
 .cn-srow{display:flex;align-items:baseline;gap:8px;margin-bottom:5px;}
 .cn-snm{font:700 12px ui-monospace,monospace;color:#eafffb;}
@@ -3555,6 +3585,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
               <button id="sz-weak" type="button" data-difficulty="weak" aria-pressed="true" data-i18n="setup.pve.difficulty.weak"></button>
               <button id="sz-strong" type="button" data-difficulty="strong" aria-pressed="false" data-i18n="setup.pve.difficulty.strong"></button>
             </div>
+            <p id="sz-difficulty-about" aria-live="polite"><span id="sz-difficulty-what"></span> <span data-i18n="sector-zero.difficulty.same"></span></p>
             <p id="sz-difficulty-hint" hidden data-i18n="sector-zero.difficulty.hint"></p>
           </fieldset>
         </div>
@@ -3592,13 +3623,13 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         </svg>
       </div>
       <aside id="sz-map-panel" class="sz-map-panel" hidden aria-labelledby="sz-map-title">
-        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.map.title"></span><b id="sz-map-title"></b><button id="sz-map-close" type="button" data-i18n-aria="sector-zero.map.close" data-i18n-title="sector-zero.map.close">×</button></div>
+        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.map.title"></span><b id="sz-map-title"></b><button id="sz-map-close" class="sz-panel-x" type="button" data-i18n-aria="sector-zero.map.close" data-i18n-title="sector-zero.map.close"><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button></div>
         <div id="sz-map-body" class="sz-map-body"></div>
         <div id="sz-map-foot" class="sz-map-foot"></div>
       </aside>
       <!-- Досье Роя: всё, что игрок узнал о Рое за прошлые забеги (swarmCodex.ts) -->
       <aside id="sz-codex-panel" class="sz-map-panel sz-codex-panel" hidden aria-labelledby="sz-codex-title">
-        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.codex.eyebrow"></span><b id="sz-codex-title" data-i18n="sector-zero.codex.open"></b><button id="sz-codex-close" type="button" data-i18n-aria="sector-zero.codex.close" data-i18n-title="sector-zero.codex.close">×</button></div>
+        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.codex.eyebrow"></span><b id="sz-codex-title" data-i18n="sector-zero.codex.open"></b><button id="sz-codex-close" class="sz-panel-x" type="button" data-i18n-aria="sector-zero.codex.close" data-i18n-title="sector-zero.codex.close"><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button></div>
         <div id="sz-codex-body" class="sz-codex-body"></div>
       </aside>
     </div>

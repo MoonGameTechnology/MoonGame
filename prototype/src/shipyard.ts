@@ -27,6 +27,7 @@
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
 import { splitSupport } from '../../decisions/supportShips';
+import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import {
   unitBuildSiteBlocker,
   type Action,
@@ -106,22 +107,6 @@ export function hullsOfTab(tab: YardTab): string[] {
 /** How many hulls one order may queue at once (the ± stepper's range). */
 const MAX_COUNT = 20;
 
-const SLOT_KEY: Record<string, string> = {
-  weapon: 'yard.slot.weapon',
-  defense: 'yard.slot.defense',
-  utility: 'yard.slot.utility',
-};
-const SLOT_ICON: Record<string, string> = { weapon: '🎯', defense: '🛡', utility: '⊞' };
-const MODULE_ICON: Record<string, string> = {
-  targeting_array: '🎯',
-  shield_booster: '🛡',
-  ablative_plating: '🧱',
-  ion_engine: '🚀',
-  radar_module: '📡',
-  compact_radar: '📡',
-  cargo_bay: '📦',
-  siege_platform: '💥',
-};
 const RES_KEY: Record<string, string> = {
   metal: 'res.of.metal',
   credits: 'res.of.credits',
@@ -275,7 +260,7 @@ export function loadoutPaneHtml(
               .join(' ') + (md.description ? `<p>${esc(t(md.description))}</p>` : '')
           : '';
         return (
-          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +
+          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
           `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
         );
       }
@@ -292,7 +277,7 @@ export function loadoutPaneHtml(
         .join(' ');
       if (o.installable) {
         return (
-          `<button class="cn-mod" data-cnmod="${o.id}"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
+          `<button class="cn-mod" data-cnmod="${o.id}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
           `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span><span class="cn-me">${eff}</span><span class="cn-mc">${bagText(o.cost)}</span></button>`
         );
       }
@@ -304,7 +289,7 @@ export function loadoutPaneHtml(
           ? t('yard.module.not-allowed')
           : t('yard.slot.named', { s: t(SLOT_KEY[o.slot] ?? o.slot) });
       return (
-        `<div class="cn-mod locked"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
+        `<div class="cn-mod locked"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
         `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
       );
     })

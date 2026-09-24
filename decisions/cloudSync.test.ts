@@ -3,6 +3,7 @@ import { shippedGameData } from '../data/bundle';
 import {
   adoptMark,
   bumpMark,
+  cloudEnvelope,
   compareLineage,
   keepLocalMark,
   parseCloudProfile,
@@ -99,6 +100,35 @@ describe('YAG-2.2 — облачная запись: разбор', () => {
 
   it('пустой дескриптор забега не превращается в поле', () => {
     expect(parseCloudProfile(serializeCloudProfile(cloud({ run: '' })))).not.toHaveProperty('run');
+  });
+});
+
+describe('AUD-24 — облако везёт ТОЧНЫЙ мир забега, а не только номер волны', () => {
+  const world = '{"v":1,"mode":"pve_waves","state":{"time":123}}';
+
+  it('снимок мира переживает облако туда и обратно рядом с дескриптором', () => {
+    const p = cloud({ run: '{"v":1,"wave":9}', state: world });
+    expect(parseCloudProfile(serializeCloudProfile(p))).toEqual(p);
+  });
+
+  it('пустой или не-строковый снимок — не поле: мусор не выдаётся за мир', () => {
+    expect(parseCloudProfile(serializeCloudProfile(cloud({ state: '' })))).not.toHaveProperty('state');
+    const raw = JSON.stringify({ ...cloud(), state: { time: 1 } });
+    expect(parseCloudProfile(raw)).not.toHaveProperty('state');
+  });
+
+  it('влезает — конверт целиком, с миром', () => {
+    const p = cloud({ run: '{"v":1,"wave":9}', state: world });
+    expect(cloudEnvelope(p, () => true)).toBe(serializeCloudProfile(p));
+    expect(cloudEnvelope(p)).toBe(serializeCloudProfile(p));
+  });
+
+  it('НЕ влезает в лимит площадки — уходит без мира, но профиль и дескриптор едут', () => {
+    // Иначе площадка отвергла бы запись целиком, и на другом устройстве игрок нашёл бы
+    // вчерашний профиль. Мир — копия того, что лежит локально; прогресс — нет.
+    const p = cloud({ run: '{"v":1,"wave":9}', state: world });
+    const sent = parseCloudProfile(cloudEnvelope(p, (e) => !e.includes('"state"')));
+    expect(sent).toEqual(cloud({ run: '{"v":1,"wave":9}' }));
   });
 });
 

@@ -5,6 +5,7 @@ import {
   RUN_DIFFICULTIES,
   nextRunDifficulty,
   parseRunDifficulty,
+  runDifficultyAboutKey,
   runDifficultyKey,
   type RunDifficulty,
 } from './runDifficulty';
@@ -37,5 +38,12 @@ describe('сложность забега (PVR-2.1)', () => {
     for (const value of RUN_DIFFICULTIES) {
       expect(parseRunDifficulty(value as RunDifficulty)).toBe(value);
     }
+  });
+});
+
+describe('пояснение уровня (заказ владельца 2026-09-23)', () => {
+  it('у каждого уровня своё пояснение', () => {
+    const keys = RUN_DIFFICULTIES.map(runDifficultyAboutKey);
+    expect(keys).toEqual(['sector-zero.difficulty.about.weak', 'sector-zero.difficulty.about.strong']);
   });
 });

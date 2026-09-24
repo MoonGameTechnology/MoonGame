@@ -26,6 +26,8 @@
  * 8. облако вошедшего игрока (`YAG-2.2`): пустое получает профиль, а облачный прогресс на
  *    пустом устройстве берётся молча; гость входит кнопкой «Войти», и если прогресс есть
  *    и здесь, и в облаке, профиль выбирает игрок — любой из двух (`YAG-1.4`).
+ *    Забег на другом устройстве продолжается ТЕМ ЖЕ миром из облака, а не пересобранным
+ *    с карты главы (`AUD-24`): иначе вход со второго устройства стирал поражение.
  * 9. язык (`YAG-1.1d`): игрок скачивает файл только своего языка, и разметка подписана
  *    текстом, а не ключами, — и для русского, и для англоязычного игрока;
  * 10. темп забега (`matchExits.ts`, правило 6): полоса скорости несёт ‖ ▶ ▶▶ — и на ПК, и
@@ -279,12 +281,21 @@ try {
     await page.locator('#sz-prep').click();
     await page.locator('[data-prep="tab"][data-id="shop"]').click();
     const before = (await progress())?.sovereigns ?? 0;
-    await page.locator('[data-prep="ad-sovereigns"]:not([disabled])').click();
+    const shown = async () => (await log()).filter((c) => c === 'rewarded').length;
+    const shownBefore = await shown();
+    await page.locator('[data-prep="ad-sovereigns"]:not([disabled])').waitFor();
+    // Двойной тап в одном такте (AUD-25): пока ролик идёт, второе нажатие не зовёт второй.
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-prep="ad-sovereigns"]:not([disabled])');
+      button.click();
+      button.click();
+    });
     await page.waitForFunction(
       (n) => (JSON.parse(localStorage.getItem('sector-zero.progress.v1')).sovereigns ?? 0) > n,
       before,
     );
-    assert.ok((await log()).includes('rewarded'), 'ролик показан силами площадки');
+    await page.waitForTimeout(300);
+    assert.equal((await shown()) - shownBefore, 1, 'двойной тап — один ролик');
 
     // 5. Двери по ссылке ведут в тот же Sector Zero.
     for (const tail of ['/?join=abc123', '/?reset=token123']) {
@@ -390,6 +401,39 @@ try {
   assert.equal(adopted.nextAttempt, 4, 'и счёт попыток с ним');
   await other.close();
 
+  // 8б. Забег на другом устройстве (AUD-24): облако везёт ТОЧНЫЙ мир, а не только номер
+  // волны. Раньше в облако уезжал один дескриптор, второе устройство пересобирало мир с
+  // карты главы — и «Продолжить» там было перемоткой поражения: дом цел, наступление Роя
+  // стёрто. Признак пересборки — часы мира: новый мир начинается с начала карты.
+  const envelope = await page
+    .waitForFunction(() => {
+      const metas = window.__ya.writes.map((w) => w.data.meta).filter(Boolean);
+      const last = metas.at(-1);
+      return last && JSON.parse(last).state ? last : null;
+    })
+    .then((handle) => handle.jsonValue());
+  const cloudRun = JSON.parse(JSON.parse(envelope).state);
+  assert.ok(cloudRun.state.time > 0, 'в облаке — мир забега, который уже шёл');
+  const second = await browser.newContext({ locale: 'ru-RU' });
+  const secondPage = await second.newPage();
+  secondPage.setDefaultTimeout(20000);
+  secondPage.on('pageerror', (error) => errors.push(`pageerror (2-е устройство): ${error.message}`));
+  await secondPage.addInitScript((meta) => {
+    window.__cloudInit = { meta };
+  }, envelope);
+  await secondPage.goto(origin + '/');
+  await waitForApp(secondPage);
+  await secondPage.waitForFunction(() => !document.getElementById('sz-continue').disabled);
+  await secondPage.locator('#sz-continue').click();
+  await secondPage.locator('.dl-wave').first().waitFor({ state: 'visible' });
+  const resumed = await secondPage.evaluate(() => JSON.parse(localStorage.getItem('void.run.v1')));
+  assert.ok(
+    resumed.state.time >= cloudRun.state.time,
+    `2-е устройство продолжает тот же мир (${resumed.state.time} ≥ ${cloudRun.state.time}), а не новый`,
+  );
+  assert.equal(resumed.sectorZeroAttempt, cloudRun.sectorZeroAttempt, 'та же попытка');
+  await second.close();
+
   // 9. Площадка говорит `en`, а браузер — по-русски: язык берётся у площадки (требование
   // 2.14), и скачан только английский файл. Браузер нарочно другой: совпади они, проверка
   // прошла бы и с игрой, которая площадку не слушает.
@@ -434,7 +478,7 @@ try {
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, вход и выбор профиля, один язык, темп забега — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, тот же забег на другом устройстве, вход и выбор профиля, один язык, темп забега — без ошибок\n',
   );
 } finally {
   await browser.close();

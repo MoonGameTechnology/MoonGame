@@ -64,14 +64,23 @@ export const profileNumbers = (
 /** Родословная профиля: устройство → последний его номер правки, вошедший в профиль. */
 export type Lineage = Record<string, number>;
 
-/** Что лежит в облаке. Профиль и дескриптор забега — строками в своём формате: их
- *  разбирают свои парсеры (`parseSectorZeroProgress`, `parsePortableRun`). */
+/** Что лежит в облаке. Профиль, дескриптор и снимок забега — строками в своём формате:
+ *  их разбирают свои парсеры (`parseSectorZeroProgress`, `parsePortableRun`,
+ *  `parseRunSave`). */
 export interface CloudProfile {
   v: 1;
   seed: string;
   rev: number;
   progress: string;
   run?: string;
+  /**
+   * Точный мир идущего забега — тот же блоб, что лежит локально (`runSave.ts`). AUD-24:
+   * без него другое устройство продолжало забег по дескриптору, то есть пересобирало мир
+   * с карты главы, — и «Продолжить» там было перемоткой поражения: дом цел, наступление
+   * Роя стёрто. Нет поля — запись сделана раньше или мир не влез в лимит площадки
+   * ({@link cloudEnvelope}); тогда остаётся дескриптор.
+   */
+  state?: string;
   /** Нет — запись сделана до родословных. */
   lineage?: Lineage;
 }
@@ -149,11 +158,30 @@ export function parseCloudProfile(raw: string | null): CloudProfile | null {
     rev,
     progress: o.progress,
     ...(typeof o.run === 'string' && o.run ? { run: o.run } : {}),
+    ...(typeof o.state === 'string' && o.state ? { state: o.state } : {}),
     ...(lineage ? { lineage } : {}),
   };
 }
 
 export const serializeCloudProfile = (profile: CloudProfile): string => JSON.stringify(profile);
+
+/**
+ * Конверт для облака с оглядкой на лимит площадки (AUD-24). Мир забега — самая тяжёлая
+ * часть конверта (замер: до 36 КБ в главе II при лимите `setData` 200 КБ), и если он всё
+ * же не влез, конверт уходит БЕЗ него, а не отвергается целиком: площадка иначе не
+ * получила бы и профиль, и другое устройство нашло бы вчерашний прогресс. Мир — копия
+ * того, что лежит локально; профиль — нет. `fits` отвечает площадка (`PlatformSave`):
+ * своего правила подсчёта байт здесь нет.
+ */
+export function cloudEnvelope(
+  profile: CloudProfile,
+  fits: (envelope: string) => boolean = () => true,
+): string {
+  const full = serializeCloudProfile(profile);
+  if (profile.state === undefined || fits(full)) return full;
+  const { state: _dropped, ...rest } = profile;
+  return serializeCloudProfile(rest);
+}
 
 /**
  * Что делать на старте. `cloudHasProgress` считает вызывающий тем же правилом, что и

@@ -4,6 +4,7 @@ import {
   settingsBoxHtml,
   initSettings,
   PALETTES,
+  SETTINGS_TABS,
   type SettingsView,
   type SettingsHost,
 } from './settingsOverlay';
@@ -90,6 +91,18 @@ function fakeWin() {
       return nodes.get(id) as never;
     },
     querySelectorAll: (sel: string) => {
+      // Кнопки вкладок — из разметки, как в живом окне: вкладки, которой нет, нет и тут.
+      if (sel.includes('data-settab')) {
+        return [...el.innerHTML.matchAll(/data-settab="([a-z]+)"/g)].map(([, id]) => {
+          const key = `tab:${id}`;
+          if (!nodes.has(key)) {
+            const n = make() as never as { dataset: Record<string, string> };
+            n.dataset.settab = id!;
+            nodes.set(key, n as never);
+          }
+          return nodes.get(key) as never;
+        });
+      }
       if (!sel.includes('data-pal')) return [];
       return PALETTES.map((p) => {
         const key = `pal:${p.id}`;
@@ -110,6 +123,19 @@ function fakeWin() {
     node: (id: string) => nodes.get(id),
     fire: (id: string, type = 'change') => nodes.get(id)?.on[type]?.(),
     firePalette: (pal: string) => nodes.get(`pal:${pal}`)?.on.click?.(),
+    /** Нажать вкладку. Узлы строятся при отрисовке — тут их только находим. */
+    tab: (id: string) => nodes.get(`tab:${id}`)?.on.click?.(),
+    /** Клавиша на кнопке вкладки. */
+    tabKey: (id: string, key: string) => {
+      let prevented = false;
+      const handler = nodes.get(`tab:${id}`)?.on.keydown as unknown as
+        | ((e: { key: string; preventDefault(): void }) => void)
+        | undefined;
+      handler?.({ key, preventDefault: () => (prevented = true) });
+      return prevented;
+    },
+    /** Какая вкладка выбрана по разметке. */
+    selected: () => /data-settab="([a-z]+)" aria-controls="set-panel" aria-selected="true"/.exec(el.innerHTML)?.[1],
     backdrop: () => handler?.({ target: el }),
   };
 }
@@ -141,42 +167,63 @@ describe('настройки — разметка', () => {
   it('«Управление»: на ПК — клавиши и жесты, на телефоне — только жесты (UX-KEYS-1)', () => {
     const pc = settingsBoxHtml(viewOf(), false, 'controls');
     const phone = settingsBoxHtml(viewOf({ touchOnly: true }), false, 'controls');
-    // Отдельная вкладка: на «Общих» таблицы нет, настроек на «Управлении» — тоже.
+    // Отдельная вкладка: на первой таблицы нет, настроек на «Управлении» — тоже.
     expect(settingsBoxHtml(viewOf())).not.toContain('class="set-keys"');
     expect(pc).not.toContain('id="set-sweep"');
-    expect(pc).toContain('data-settab="controls" aria-selected="true"');
+    expect(pc).toContain('data-settab="controls" aria-controls="set-panel" aria-selected="true"');
     expect(pc).toContain('class="set-keys"');
     expect(pc).toContain(t('controls.box.keys'));
     expect(phone).not.toContain(t('controls.box.keys'));
     expect(phone).toContain(t('controls.long-press.keys'));
   });
 
-  it('окно несёт все секции и кнопку закрытия', () => {
+  // UX-SET-1 (заказ владельца 2026-09-23): звук, графика, карта и управление — вкладками,
+  // и первой открывается «Звук».
+  it('вкладки: Звук · Графика · Карта · Управление, первой — «Звук»', () => {
+    expect(SETTINGS_TABS.map((x) => x.id)).toEqual(['sound', 'graphics', 'map', 'controls']);
     const html = settingsBoxHtml(viewOf());
-    for (const id of [
-      'set-sweep',
-      'set-ownpings',
-      'set-glow',
-      'set-starfield',
-      'set-fps',
-      'set-snd',
-      'set-snd-vol',
-      'set-close',
-    ]) {
-      expect(html).toContain(`id="${id}"`);
+    expect(html).toContain('data-settab="sound" aria-controls="set-panel" aria-selected="true"');
+    for (const { key } of SETTINGS_TABS) expect(html).toContain(`>${t(key)}</button>`);
+  });
+
+  const HOME: Record<string, readonly string[]> = {
+    sound: ['set-snd', 'set-snd-vol'],
+    graphics: ['set-glow', 'set-starfield', 'set-motion', 'set-fps'],
+    map: ['set-sweep', 'set-ownpings', 'set-colyou', 'set-colneutral', 'set-colreset'],
+    controls: [],
+  };
+
+  it('каждая настройка живёт ровно в одной вкладке, «Готово» — во всех', () => {
+    const view = viewOf({ renderCompatibilitySupported: true });
+    const all = Object.values(HOME).flat();
+    for (const { id: tab } of SETTINGS_TABS) {
+      const html = settingsBoxHtml(view, false, tab);
+      expect(html).toContain('id="set-close"');
+      for (const id of all) expect(html.includes(`id="${id}"`)).toBe(HOME[tab]!.includes(id));
     }
+    // Совместимость отрисовки — графика, палитры — карта.
+    expect(settingsBoxHtml(view, false, 'graphics')).toContain('id="set-render-compat"');
+    expect(settingsBoxHtml(view, false, 'map')).toContain('data-pal="classic"');
+    expect(settingsBoxHtml(view, false, 'sound')).not.toContain('data-pal=');
+  });
+
+  it('панель подписана выбранной вкладкой, в Tab-обходе — только она', () => {
+    const html = settingsBoxHtml(viewOf(), false, 'map');
+    expect(html).toContain('role="tabpanel" aria-labelledby="set-tab-map"');
+    expect(html).toContain('id="set-tab-map" data-settab="map" aria-controls="set-panel" aria-selected="true" tabindex="0"');
+    expect(html).toContain('id="set-tab-sound" data-settab="sound" aria-controls="set-panel" aria-selected="false" tabindex="-1"');
   });
 
   it('состояние тумблера отражено и в галочке, и в подписи', () => {
-    const on = settingsBoxHtml(viewOf({ glow: true }));
-    const off = settingsBoxHtml(viewOf({ glow: false }));
+    const on = settingsBoxHtml(viewOf({ glow: true }), false, 'graphics');
+    const off = settingsBoxHtml(viewOf({ glow: false }), false, 'graphics');
     expect(on).toMatch(/id="set-glow" type="checkbox" checked/);
     expect(off).not.toMatch(/id="set-glow" type="checkbox" checked/);
     expect(on).not.toBe(off);
   });
 
   it('проценты показываются целыми — и в значении ползунка, и в подписи', () => {
-    const html = settingsBoxHtml(viewOf({ sweepOpacity: 0.37 }));
+    const html = settingsBoxHtml(viewOf({ sweepOpacity: 0.37 }), false, 'map');
     expect(html).toContain('value="37"');
     expect(html).toContain('37%');
   });
@@ -184,19 +231,19 @@ describe('настройки — разметка', () => {
   // Тумблера компактного режима тут больше нет: плотная подача стала единственной,
   // поэтому окно настроек не должно снова обзавестись строкой-призраком.
   it('строки компактного режима в окне нет вовсе', () => {
-    expect(settingsBoxHtml(viewOf())).not.toContain('set-compact');
+    for (const { id } of SETTINGS_TABS) expect(settingsBoxHtml(viewOf(), true, id)).not.toContain('set-compact');
   });
 
   it('устаревший интерфейс нельзя вернуть через настройки', () => {
-    expect(settingsBoxHtml(viewOf())).not.toContain('set-holography');
+    for (const { id } of SETTINGS_TABS) expect(settingsBoxHtml(viewOf(), true, id)).not.toContain('set-holography');
   });
 
   it('совместимость отрисовки предлагается только при поддержке', () => {
-    expect(settingsBoxHtml(viewOf())).not.toContain('id="set-render-compat"');
+    expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-render-compat"');
     expect(
-      settingsBoxHtml(viewOf({ renderCompatibilitySupported: false, renderCompatibility: true })),
+      settingsBoxHtml(viewOf({ renderCompatibilitySupported: false, renderCompatibility: true }), false, 'graphics'),
     ).not.toContain('id="set-render-compat"');
-    const html = settingsBoxHtml(viewOf({ renderCompatibilitySupported: true }));
+    const html = settingsBoxHtml(viewOf({ renderCompatibilitySupported: true }), false, 'graphics');
     expect(html).toContain('id="set-render-compat" type="checkbox"');
     expect(html).toContain(t('settings.gfx.render-compat'));
     expect(html).toContain(t('settings.gfx.render-compat.hint'));
@@ -214,14 +261,16 @@ describe('настройки — разметка', () => {
         renderCompatibility: requested,
         renderCompatibilityActive: active,
       }),
+      false,
+      'graphics',
     );
     expect(html.includes('id="set-render-compat" type="checkbox" checked')).toBe(requested);
     expect(html.includes(t('settings.gfx.render-compat.pending'))).toBe(pending);
   });
 
   it('технический отчёт необязателен и свёрнут до нажатия кнопки', () => {
-    expect(settingsBoxHtml(viewOf())).not.toContain('id="set-render-report"');
-    const html = settingsBoxHtml(viewOf(), true);
+    expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-render-report"');
+    const html = settingsBoxHtml(viewOf(), true, 'graphics');
     expect(html).toContain('id="set-render-report"');
     expect(html).toContain('aria-expanded="false" aria-controls="set-render-report-panel"');
     expect(html).toContain('id="set-render-report-panel" hidden');
@@ -229,13 +278,13 @@ describe('настройки — разметка', () => {
   });
 
   it('выбранная палитра подсвечена, остальные — нет', () => {
-    const html = settingsBoxHtml(viewOf({ palette: 'warm' }));
+    const html = settingsBoxHtml(viewOf({ palette: 'warm' }), false, 'map');
     expect(html).toContain('class="set-pal on" data-pal="warm"');
     expect(html).toContain('class="set-pal" data-pal="classic"');
   });
 
   it('цвета сторон приходят в поля выбора цвета', () => {
-    const html = settingsBoxHtml(viewOf({ youColor: '#123456', neutralColor: '#abcdef' }));
+    const html = settingsBoxHtml(viewOf({ youColor: '#123456', neutralColor: '#abcdef' }), false, 'map');
     expect(html).toContain('value="#123456"');
     expect(html).toContain('value="#abcdef"');
   });
@@ -257,6 +306,7 @@ describe('настройки — окно и обработчики', () => {
   it('тумблер пишет настройку и тут же обновляет свою подпись', () => {
     const w = wired();
     w.api.open();
+    w.win.tab('graphics');
     const node = w.win.node('set-glow')!;
     node.checked = false;
     w.win.fire('set-glow');
@@ -267,7 +317,8 @@ describe('настройки — окно и обработчики', () => {
   it('каждый тумблер зовёт СВОЙ сеттер', () => {
     const w = wired();
     w.api.open();
-    for (const id of ['ownpings', 'glow', 'starfield', 'fps']) {
+    for (const [tab, id] of [['map', 'ownpings'], ['graphics', 'glow'], ['graphics', 'starfield'], ['graphics', 'fps']]) {
+      w.win.tab(tab!);
       const n = w.win.node(`set-${id}`)!;
       n.checked = true;
       w.win.fire(`set-${id}`);
@@ -278,6 +329,7 @@ describe('настройки — окно и обработчики', () => {
   it('движение можно отключить без переключения на старый интерфейс', () => {
     const w = wired();
     w.api.open();
+    w.win.tab('graphics');
     expect(w.win.node('set-holography')).toBeUndefined();
     w.win.node('set-motion')!.checked = false;
     w.win.fire('set-motion');
@@ -301,9 +353,10 @@ describe('настройки — окно и обработчики', () => {
       view,
     );
     w.api.open();
+    w.win.tab('graphics');
     const renders = w.win.renderCount();
-    const volume = w.win.node('set-snd-vol')!;
-    volume.value = '65';
+    const fps = w.win.node('set-fps')!;
+    fps.checked = true;
     const toggle = w.win.node('set-render-compat')!;
     toggle.checked = true;
     w.win.fire('set-render-compat');
@@ -319,8 +372,8 @@ describe('настройки — окно и обработчики', () => {
     expect(w.win.node('set-render-compat-val')?.textContent).toBe(t('settings.off'));
     expect(w.win.node('set-render-compat-pending')?.textContent).toBe('');
     expect(w.win.renderCount()).toBe(renders);
-    expect(w.win.node('set-snd-vol')).toBe(volume);
-    expect(volume.value).toBe('65');
+    expect(w.win.node('set-fps')).toBe(fps);
+    expect(fps.checked).toBe(true);
   });
 
   it('не обещает изменение совместимости, если хозяин не смог сохранить настройку', () => {
@@ -329,6 +382,7 @@ describe('настройки — окно и обработчики', () => {
       viewOf({ renderCompatibilitySupported: true, renderCompatibility: false }),
     );
     w.api.open();
+    w.win.tab('graphics');
     w.win.node('set-render-compat')!.checked = true;
     w.win.fire('set-render-compat');
     expect(w.win.node('set-render-compat')?.checked).toBe(false);
@@ -346,6 +400,7 @@ describe('настройки — окно и обработчики', () => {
       },
     });
     w.api.open();
+    w.win.tab('graphics');
     const renders = w.win.renderCount();
     expect(reads).toBe(0);
     expect(w.win.node('set-render-report-panel')?.hidden).toBe(true);
@@ -378,6 +433,7 @@ describe('настройки — окно и обработчики', () => {
   it('ползунок развёртки отдаёт долю, а не проценты', () => {
     const w = wired();
     w.api.open();
+    w.win.tab('map');
     const n = w.win.node('set-sweep')!;
     n.value = '40';
     w.win.fire('set-sweep', 'input');
@@ -397,6 +453,7 @@ describe('настройки — окно и обработчики', () => {
   it('выбор палитры сохраняет уже выбранные цвета', () => {
     const w = wired({}, viewOf({ youColor: '#111111', neutralColor: '#222222' }));
     w.api.open();
+    w.win.tab('map');
     w.win.firePalette('warm');
     expect(w.calls).toContainEqual(['colors', ['#111111', '#222222', 'warm']]);
   });
@@ -404,9 +461,40 @@ describe('настройки — окно и обработчики', () => {
   it('сброс цветов — отдельное намерение', () => {
     const w = wired();
     w.api.open();
+    w.win.tab('map');
     w.win.node('set-colreset');
     w.win.fire('set-colreset', 'click');
     expect(w.calls).toContainEqual(['reset', true]);
+  });
+
+  it('нажатая вкладка открывается, окно снова открывается на «Звуке»', () => {
+    const w = wired();
+    w.api.open();
+    expect(w.win.selected()).toBe('sound');
+    w.win.tab('controls');
+    expect(w.win.selected()).toBe('controls');
+    expect(w.win.html()).toContain('class="set-keys"');
+    w.win.fire('set-close', 'click');
+    w.api.open();
+    expect(w.win.selected()).toBe('sound');
+  });
+
+  it('стрелки ходят по вкладкам по кругу, Home/End — к краям, прочие клавиши не трогают', () => {
+    const w = wired();
+    w.api.open();
+    expect(w.win.tabKey('sound', 'ArrowRight')).toBe(true);
+    expect(w.win.selected()).toBe('graphics');
+    w.win.tabKey('graphics', 'End');
+    expect(w.win.selected()).toBe('controls');
+    w.win.tabKey('controls', 'ArrowRight');
+    expect(w.win.selected()).toBe('sound');
+    w.win.tabKey('sound', 'ArrowLeft');
+    expect(w.win.selected()).toBe('controls');
+    w.win.tabKey('controls', 'Home');
+    expect(w.win.selected()).toBe('sound');
+    const renders = w.win.renderCount();
+    expect(w.win.tabKey('sound', 'Enter')).toBe(false);
+    expect(w.win.renderCount()).toBe(renders);
   });
 
   it('тап по фону закрывает окно', () => {
