@@ -9,6 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { fortressRaise } from './fortressRaise';
 import { createKernel, parseGameData, STATION_COST } from '../packages/shared-core/src/index';
 import { stationModule } from '../packages/shared-core/src/modules/station';
+import { technologyModule } from '../packages/shared-core/src/modules/technology';
+import { shippedGameData } from '../data/bundle';
 import { createInitialState } from '../packages/shared-core/src/state/gameState';
 import type { GameData, GameState, Planet } from '../packages/shared-core/src/index';
 
@@ -104,6 +106,63 @@ describe('FORT-0.2 — кнопка и редьюсер решают ОДИНА�
         { now: 0, data },
       );
       expect(decision.enabled, `${kind}/${owner}/${metal}: кнопка и ядро разошлись`).toBe(r.ok);
+    }
+  });
+});
+
+describe('FORT-5.1 — крепость надо изучить (сообщение владельца 2026-09-24)', () => {
+  // Настоящие данные: ядро `starfort` открывает «Укрепления Пустоты». Кнопка горела на
+  // неизученной крепости, ядро отвечало `E_TECH_LOCKED`, игрок видел «нужна технология».
+  const real = shippedGameData();
+  const withTech = createKernel([stationModule, technologyModule]);
+  const locks = fortressRaise({ kind: 'asteroid', owner: 'p1' }, 'p1', rich, real).needs;
+
+  it('в данных крепость заперта технологией — кнопка её называет', () => {
+    expect(locks.length).toBeGreaterThan(0);
+    const d = fortressRaise({ kind: 'asteroid', owner: 'p1' }, 'p1', rich, real);
+    expect(d).toMatchObject({ show: true, enabled: false, blocked: 'tech' });
+    expect(fortressRaise({ kind: 'asteroid', owner: 'p1' }, 'p1', rich, real, [locks[0]!]).enabled).toBe(true);
+  });
+
+  it('без технологии и без денег — сперва технология: деньги её не заменят', () => {
+    expect(fortressRaise({ kind: 'asteroid', owner: 'p1' }, 'p1', { metal: 0 }, real).blocked).toBe('tech');
+  });
+
+  it('кнопка и ядро С ТЕХНОЛОГИЯМИ решают одинаково во всех раскладах', () => {
+    const kinds = Object.keys(real.sectorKinds ?? {});
+    expect(kinds.length).toBeGreaterThan(0);
+    for (const kind of kinds) {
+      for (const owner of ['p1', 'p2', null]) {
+        for (const metal of [5000, 10]) {
+          for (const completed of [[], [locks[0]!]]) {
+            const base = createInitialState({ seed: 'f', version: { data: real.version, manifest: '1' } });
+            const st: GameState = {
+              ...base,
+              players: {
+                p1: {
+                  id: 'p1',
+                  name: 'p1',
+                  faction: Object.keys(real.factions)[0]!,
+                  status: 'active',
+                  resources: { metal, credits: 5000 },
+                  technologies: { completed: [...completed], active: [] },
+                } as GameState['players'][string],
+              },
+              planets: {
+                N: { id: 'N', owner, position: { x: 0, y: 0 }, resources: {}, buildings: [], garrison: [], traits: [], kind },
+              },
+            };
+            const decision = fortressRaise(st.planets.N!, 'p1', st.players.p1!.resources, real, completed);
+            const r = withTech.applyAction(
+              st,
+              { id: 's:p1:1', type: 'station.deploy', playerId: 'p1', payload: { planetId: 'N' }, issuedAt: 0 },
+              { now: 0, data: real },
+            );
+            const tag = `${kind}/${owner}/${metal}/${completed.join(',') || 'нет техн.'}`;
+            expect(decision.enabled, `${tag}: кнопка и ядро разошлись`).toBe(r.ok);
+          }
+        }
+      }
     }
   });
 });
