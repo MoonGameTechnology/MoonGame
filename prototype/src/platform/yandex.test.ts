@@ -4,7 +4,13 @@
 import { globSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { CLOUD_KEY, CLOUD_LIMIT_BYTES, createYandexPlatform, type YandexSdk } from './yandex';
+import {
+  AD_START_TIMEOUT_MS,
+  CLOUD_KEY,
+  CLOUD_LIMIT_BYTES,
+  createYandexPlatform,
+  type YandexSdk,
+} from './yandex';
 
 /** Поддельный `ysdk`: записывает вызовы и умеет отдавать события паузы. */
 function fakeSdk(over: Partial<YandexSdk> = {}) {
@@ -560,6 +566,59 @@ describe('rewarded-реклама (YAG-3.1)', () => {
       status: 'cancelled',
     });
     expect(paused).toEqual([true, false]);
+  });
+
+  it('SDK не прислал ни одного колбэка — `unavailable` по сроку, а не вечное ожидание (AUD-28)', async () => {
+    vi.useFakeTimers();
+    try {
+      const platform = createYandexPlatform(adSdk([]).sdk);
+      const shown = platform.ads.showRewardedAd({ placement: 'shop.lot' });
+      await vi.advanceTimersByTimeAsync(AD_START_TIMEOUT_MS);
+      expect(await shown).toEqual({ status: 'unavailable' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('открытый ролик срок не обрывает: игрок досматривает и получает награду', async () => {
+    vi.useFakeTimers();
+    try {
+      let cb: Callbacks = {};
+      const { sdk } = fakeSdk({
+        adv: { showRewardedVideo: ({ callbacks }: { callbacks?: Callbacks } = {}) => void (cb = callbacks ?? {}) },
+      });
+      const shown = createYandexPlatform(sdk).ads.showRewardedAd({ placement: 'shop.lot' });
+      cb.onOpen?.();
+      await vi.advanceTimersByTimeAsync(AD_START_TIMEOUT_MS * 3);
+      cb.onRewarded?.();
+      cb.onClose?.();
+      expect(await shown).toEqual({ status: 'ok' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ролик, открывшийся после срока, всё равно глушит игру и возвращает её (п. 4.7)', async () => {
+    vi.useFakeTimers();
+    try {
+      let cb: Callbacks = {};
+      const { sdk } = fakeSdk({
+        adv: { showRewardedVideo: ({ callbacks }: { callbacks?: Callbacks } = {}) => void (cb = callbacks ?? {}) },
+      });
+      const platform = createYandexPlatform(sdk);
+      const paused: boolean[] = [];
+      platform.onPlatformPause((p) => paused.push(p));
+      const shown = platform.ads.showRewardedAd({ placement: 'shop.lot' });
+      await vi.advanceTimersByTimeAsync(AD_START_TIMEOUT_MS);
+      expect(await shown).toEqual({ status: 'unavailable' });
+      cb.onOpen?.();
+      cb.onRewarded?.();
+      cb.onClose?.();
+      // Исход уже был, и награды он не даёт, — но звук на время ролика заглушён.
+      expect(paused).toEqual([true, false]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('интерстишл честно `unavailable`, даже если SDK его умеет', async () => {

@@ -138,6 +138,13 @@ export interface YandexPlatform extends GamePlatform {
 
 const UNAVAILABLE: PlatformPurchase = { status: 'unavailable' };
 
+/**
+ * Сколько ждать, пока ролик откроется (AUD-28). Щедро: медленная сеть грузит ролик
+ * секундами, а ролик, открывшийся ПОСЛЕ срока, награды уже не даст. Цена молчания SDK без
+ * срока выше: флаг «ролик идёт» не снимался никогда, и кнопки рекламы молчали до конца сессии.
+ */
+export const AD_START_TIMEOUT_MS = 30_000;
+
 /** Ключ облачных данных игры. Одно поле: формат снимка — наш (`PlatformSave`). */
 export const CLOUD_KEY = 'meta';
 /** Лимит `setData` — 200 КБ на игрока (§1.1). Считаем в байтах UTF-8 ЦЕЛОГО объекта, как
@@ -280,21 +287,31 @@ export function createYandexPlatform(
    * магазине. На время ролика звук глушится и геймплей встаёт (п. 4.7) — сами, а не в
    * расчёте на `game_api_pause`: требование проверяет модерация, и держать его должна
    * игра. Двойная пауза безопасна — переходы жизненного цикла идемпотентны.
+   *
+   * Пауза следует за роликом НА ЭКРАНЕ, а не за исходом (AUD-28): ролик, открывшийся после
+   * срока {@link AD_START_TIMEOUT_MS}, исхода уже не меняет, но звук на его время глушится
+   * и возвращается на закрытии — ровно как у вовремя открытого.
    */
   const showRewardedAd = (): Promise<RewardedAdResult> =>
     new Promise((resolve) => {
       const show = sdk.adv?.showRewardedVideo;
       if (typeof show !== 'function') return resolve({ status: 'unavailable' });
       let ad = initialRewarded;
+      let onScreen = false;
       const on = (event: RewardedEvent): void => {
-        const wasOpen = ad.opened;
+        if (event === 'open' && !onScreen) {
+          onScreen = true;
+          onPause();
+        } else if ((event === 'close' || event === 'error') && onScreen) {
+          onScreen = false;
+          onResume();
+        }
         const settled = ad.outcome !== null;
         ad = rewardedStep(ad, event);
-        if (!wasOpen && ad.opened) onPause();
-        if (settled || !ad.outcome) return;
-        if (ad.opened) onResume();
-        resolve({ status: ad.outcome });
+        if (ad.opened || ad.outcome) clearTimeout(deadline);
+        if (!settled && ad.outcome) resolve({ status: ad.outcome });
       };
+      const deadline = setTimeout(() => on('timeout'), AD_START_TIMEOUT_MS);
       try {
         show.call(sdk.adv, {
           callbacks: {

@@ -46,6 +46,17 @@ describe('YAG-3.1 — исход rewarded-ролика по колбэкам п�
     expect(run('error').opened).toBe(false);
   });
 
+  it('СРОК ДО ОТКРЫТИЯ ВЫШЕЛ — `unavailable` (AUD-28): ролик, который так и не начался', () => {
+    // Без срока SDK, не приславший ни одного колбэка, держал кнопки рекламы мёртвыми
+    // до конца сессии: флаг «ролик идёт» не снимался никогда.
+    expect(run('timeout').outcome).toBe('unavailable');
+  });
+
+  it('ролик уже на экране — срок не действует: исход даст закрытие', () => {
+    expect(run('open', 'timeout').outcome).toBeNull();
+    expect(run('open', 'timeout', 'rewarded', 'close').outcome).toBe('ok');
+  });
+
   it('шаг чистый: вход не мутируется', () => {
     const before = run('open');
     const snapshot = JSON.stringify(before);

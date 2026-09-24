@@ -15,10 +15,14 @@
  *    игрок не отказывался. Заработанное же не отнимается сбоем, случившимся после.
  * 4. **Исход один.** Колбэки после него не меняют ничего: второй исход означал бы вторую
  *    выдачу или отзыв уже выданного.
+ * 5. **Ролик, который так и не начался, — `unavailable`** (AUD-28). Срок до открытия
+ *    отсчитывает хост; вышел он раньше `onOpen` — рекламы нет. Без срока SDK, не приславший
+ *    ни одного колбэка, держал флаг «ролик идёт» вечно, и кнопки рекламы молчали до конца
+ *    сессии. Открытый ролик срок не обрывает: игрок его смотрит, исход даст закрытие.
  */
 
-/** Колбэки площадки в наших терминах. */
-export type RewardedEvent = 'open' | 'rewarded' | 'close' | 'error';
+/** Колбэки площадки в наших терминах плюс срок до открытия, который ставит хост. */
+export type RewardedEvent = 'open' | 'rewarded' | 'close' | 'error' | 'timeout';
 
 /** Исход в терминах контракта площадки. Свой тип: `decisions/` прототип не импортирует. */
 export type RewardedOutcome = 'ok' | 'cancelled' | 'unavailable';
@@ -45,5 +49,7 @@ export function rewardedStep(s: RewardedAdState, event: RewardedEvent): Rewarded
       return { ...s, outcome: s.rewarded ? 'ok' : 'cancelled' };
     case 'error':
       return { ...s, outcome: s.rewarded ? 'ok' : 'unavailable' };
+    case 'timeout':
+      return s.opened ? s : { ...s, outcome: s.rewarded ? 'ok' : 'unavailable' };
   }
 }
