@@ -1252,6 +1252,28 @@ export const MarketDefSchema = z
   })
   .strict();
 
+/**
+ * Боевая надбавка ветерана (PERK-3.1) — ПОСЛЕДОВАТЕЛЬНЫЙ множитель, растущий с числом
+ * пережитых сражений (`UnitStack.battles`, VET-2).
+ *
+ * ⚠️ Это НЕ медаль, и живёт оно отдельно от `medals` намеренно. Решение владельца 2
+ * (`docs/unit-medals-roadmap.md` §0.0) — «медаль не даёт силы в бою, только награда» —
+ * владелец сузил 2026-09-23: выплата за медаль силы по-прежнему не даёт, а СЧЁТЧИК боёв
+ * теперь ещё и питает боевой множитель. Держать ставку рядом с порогами медалей значило
+ * бы снова склеить эти две вещи в одну, и сужение перестало бы читаться из данных.
+ *
+ * Ноль ВЫКЛЮЧАЕТ механику целиком, без флага в коде — та же посадка, что у `medals`.
+ */
+export const VeteranDefSchema = z
+  .object({
+    /** Прибавка к множителю урона за КАЖДЫЙ пережитый бой в среднем на юнит стороны.
+     *  Потолок ставит сама механика, а не это число: по замеру (`docs/unit-medals-roadmap.md`
+     *  §0.5) на юнит приходится максимум 4 боя, и удлинение матча вдвое распределения не
+     *  двигает — много дерущийся стек погибает раньше, чем накопит больше. */
+    damagePerBattle: z.number().min(0).default(0),
+  })
+  .strict();
+
 export const GameDataSchema = z.object({
   version: z.string(),
   resources: z.array(z.string()).min(1),
@@ -1282,10 +1304,13 @@ export const GameDataSchema = z.object({
    *  механика выключается снятием данных, без единого флага в коде. */
   medals: z.record(z.string(), MedalLineDefSchema).prefault({}),
   researchBoost: ResearchBoostDefSchema.prefault({}),
+  /** Боевая надбавка ветерана (PERK-3.1). Ноль = надбавки в этой партии нет вовсе. */
+  veteran: VeteranDefSchema.prefault({}),
   market: MarketDefSchema.prefault({}),
 });
 
 export type MarketDef = z.infer<typeof MarketDefSchema>;
+export type VeteranDef = z.infer<typeof VeteranDefSchema>;
 export type ResourceBag = z.infer<typeof ResourceBagSchema>;
 export type UnitStats = z.infer<typeof UnitStatsSchema>;
 export type UnitDef = z.infer<typeof UnitDefSchema>;
