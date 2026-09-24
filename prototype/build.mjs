@@ -1936,6 +1936,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-run li.task.done b{color:#5fd07a;}
 #endscreen .es-total{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin-top:8px;padding-top:7px;border-top:1px solid var(--line-hi);font-size:13px;color:var(--amber);font-weight:700;}
 #endscreen .es-next{margin:7px 0 0;font-size:11px;color:var(--cyan);}
+#endscreen .es-loot{margin:6px 0 0;font-size:12px;color:#e6d8a8;}
+#endscreen .es-blueprint{color:#ffcf6b;font-weight:600;}
 #endscreen .es-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px;}
 #endscreen .es-btn{flex:1 1 45%;min-width:120px;padding:12px;border-radius:8px;cursor:pointer;
   font:700 13px ui-monospace,monospace;letter-spacing:.5px;border:1px solid var(--line-hi);

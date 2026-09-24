@@ -18,12 +18,39 @@ const ids = (seed: string, day: number, round?: number) =>
   dailyOffers(seed, day, data, round).map((o) => o.id);
 const refresh = (p: SectorZeroProgress) =>
   changeSectorZeroProgress(p, { kind: 'refresh-shop' }, data);
+/** Лоты каталога на момент съёмки эталона раунда 0. */
+const GOLDEN_IDS = [
+  'shield_booster',
+  'point_defense_array',
+  'targeting_array',
+  'ablative_plating',
+  'radar_module',
+  'void_attunement',
+  'neural_lace',
+  'data_small',
+  'data_large',
+  'warrants_pack',
+];
 
 describe('SZE-3.4 — раунд витрины: сверх суточной ротации одно обновление за ролик', () => {
   it('РАУНД 0 — ТА ЖЕ витрина, что до кирпича: существующие профили не сдвинулись', () => {
     // Эталон снят с `main` ДО появления раунда. Раунд 0 обязан хешироваться прежней
     // строкой `сид ∥ день ∥ id` — иначе у каждого игрока в день выхода обновления
     // витрина молча сменилась бы, и купленное вчера «на завтра» исчезло бы.
+    //
+    // Каталог — в том составе, с которым эталон снимался: новые лоты (чертежи SZE-5.3)
+    // законно меняют выборку дня, а сторожит тест не ассортимент, а строку хеша.
+    const catalog = {
+      ...data,
+      sectorZeroShop: {
+        ...data.sectorZeroShop,
+        offers: Object.fromEntries(
+          Object.entries(data.sectorZeroShop.offers).filter(([id]) => GOLDEN_IDS.includes(id)),
+        ),
+      },
+    };
+    const ids = (seed: string, day: number, round?: number) =>
+      dailyOffers(seed, day, catalog, round).map((o) => o.id);
     expect(ids('golden', 20_000, 0)).toEqual([
       'warrants_pack',
       'shield_booster',

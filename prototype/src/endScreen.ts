@@ -16,7 +16,8 @@
  * матча — дело хоста (сеть, туры, хаб), модуль только сообщает, что выбрал игрок.
  */
 import type { GameState } from '../../packages/shared-core/src/index';
-import { t } from '../../localization/runtime';
+import { t, tData } from '../../localization/runtime';
+import { data } from './gameData';
 import { esc } from './format';
 import type { RunSummary } from '../../decisions/sectorZeroProgress';
 
@@ -148,10 +149,22 @@ export function runSummaryHtml(r: RunSummary): string {
     r.unlocked > 0
       ? `<p class="es-next">${t('sector-zero.end.unlocked', { n: r.unlocked })}</p>`
       : '';
+  // Добыча для редкости модулей (SZE-5.3): дубли поимённо и чертежи по ступеням.
+  const copies = Object.entries(r.loot?.copies ?? {})
+    .map(([id, n]) => `${esc(tData(data.modules[id]?.name ?? id))} ×${n}`)
+    .join(', ');
+  const loot =
+    (copies ? `<p class="es-loot">${t('sector-zero.end.copies', { list: copies })}</p>` : '') +
+    Object.entries(r.loot?.blueprints ?? {})
+      .map(
+        ([tier, n]) =>
+          `<p class="es-loot es-blueprint r-${esc(tier)}">📐 ${t('sector-zero.end.blueprint', { r: t(`rarity.${tier}`) })}${n > 1 ? ` ×${n}` : ''}</p>`,
+      )
+      .join('');
   return (
     `<div class="es-run"><ul>${rows}</ul>` +
     `<div class="es-total"><span>${t('sector-zero.end.total')}</span><b>${t('sector-zero.end.reward', { n: r.total })} · +${r.warrants} ⌖</b></div>` +
-    `${next}</div>`
+    `${loot}${next}</div>`
   );
 }
 

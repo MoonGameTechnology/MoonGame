@@ -71,7 +71,7 @@ export interface ShopPrice {
 /** Строка витрины. */
 export interface ShopRow {
   id: string;
-  kind: 'module' | 'skill' | 'resource';
+  kind: 'module' | 'skill' | 'resource' | 'blueprint';
   grants: string;
   /** Сколько выдаётся (значимо для ресурса). */
   amount: number;
@@ -81,7 +81,8 @@ export interface ShopRow {
   prices: ShopPrice[];
 }
 
-/** Уже есть ли у игрока то, что даёт товар. Ресурс выдаётся всегда — он расходуемый. */
+/** Уже есть ли у игрока то, что даёт товар. Ресурс и чертёж выдаются всегда — они
+ *  расходуемые. Открытый модуль «свой», но с SZE-5.3 продаётся ДУБЛЕМ (см. `shopRows`). */
 export function offerOwned(
   row: Pick<ShopRow, 'kind' | 'grants'>,
   progress: SectorZeroProgress,
@@ -124,9 +125,11 @@ export function shopRows(
       const available = kind === 'ad' ? caps.ads : kind === 'sovereigns' ? caps.sovereigns : true;
       // Возможность площадки идёт ПЕРВОЙ: способа, которого у площадки нет, для игрока
       // не существует вовсе, и объяснять про него что-то ещё бессмысленно.
+      // Открытый модуль не отказывает: он продаётся дублем для повышения редкости
+      // (SZE-5.3, решение владельца 2026-09-24). «Уже есть» остаётся только у навыка.
       const reason: ShopRefusal | null = !available
         ? 'E_SHOP_UNAVAILABLE'
-        : owned
+        : owned && offer.kind === 'skill'
           ? 'E_SHOP_OWNED'
           : locked
             ? 'E_SHOP_LOCKED'

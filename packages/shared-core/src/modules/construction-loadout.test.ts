@@ -147,3 +147,27 @@ describe('SZE-1.1 — верфь ставит модули той звёздно
     expect(done.state.planets.A?.garrison[0]?.moduleStars).toEqual({ targeting: 2 });
   });
 });
+
+describe('SZE-5.1 — верфь ставит модули той редкости, что в снимке арсенала', () => {
+  // Та же причина, что у звёзд: стартовый флот и построенное за забег обязаны нести
+  // один модуль с одними числами.
+  const raised = (s: GameState, rarity: Record<string, string>): GameState => ({
+    ...s,
+    players: {
+      ...s.players,
+      p1: { ...s.players.p1!, arsenal: { hulls: ['cruiser'], modules: ['targeting', 'cargo'], rarity } },
+    },
+  });
+
+  it('свежий корабль встаёт с поднятой редкостью надетых модулей', () => {
+    const ordered = ok(
+      kernel.applyAction(
+        raised(world(1000), { targeting: 'mythic', cargo: 'unique' }),
+        build(['targeting']),
+        ctx(0),
+      ),
+    );
+    const done = okAdv(kernel.advanceTo(ordered.state, ctx(0)));
+    expect(done.state.planets.A?.garrison[0]?.moduleRarity).toEqual({ targeting: 'mythic' });
+  });
+});

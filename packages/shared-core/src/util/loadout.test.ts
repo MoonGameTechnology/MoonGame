@@ -12,6 +12,7 @@ import {
   loadoutCost,
   moduleAllowed,
   hullSlotTypes,
+  moduleRarityBonus,
 } from './loadout';
 import { sumUnitStat, addUnits } from './stacks';
 import type { UnitStack } from '../state/gameState';
@@ -270,5 +271,85 @@ describe('SZE-1.1 — звёздность модуля усиливает ег�
     expect(
       effectiveStats(cruiser, { modules: ['targeting'], moduleStars: { targeting: 5 } }, data).attack,
     ).toBe(14);
+  });
+});
+
+describe('SZE-5.1 — редкость модуля даёт новый параметр, звезда его усиливает', () => {
+  // Решение владельца 2026-09-24: «редкость даёт дополнительный параметр, звёздность
+  // усиливает параметры». Прибавки ступеней складываются и множатся той же звездой.
+  const rare: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: { cruiser: { faction: 'x', stats: { attack: 10, defense: 0, speed: 5, hp: 10 }, slots: { utility: 1 } } },
+    factions: {},
+    buildings: {},
+    events: {},
+    modules: {
+      radar: {
+        name: 'R',
+        slot: 'utility',
+        tag: 'horizontal',
+        rarity: 'simple',
+        rarityBonus: { unique: { speed: 2 }, mythic: { defense: 4 }, legendary: { hp: 10 } },
+        effects: { stats: { radarRange: 100 } },
+        cost: {},
+      },
+    },
+    sectorZeroStars: { cap: 1, guaranteed: 1, steps: [{ chance: 1, warrants: 10, bonus: 0.5 }] },
+  });
+  const hull = rare.units.cruiser!;
+  const radar = rare.modules.radar!;
+
+  it('без поднятой редкости — прежние числа байт-в-байт', () => {
+    const s = effectiveStats(hull, { modules: ['radar'] }, rare);
+    expect([s.speed, s.defense, s.radarRange]).toEqual([5, 0, 100]);
+  });
+
+  it('прибавки ступеней складываются: мифический несёт и уникальную', () => {
+    expect(moduleRarityBonus(radar, 'unique')).toEqual({ speed: 2 });
+    expect(moduleRarityBonus(radar, 'mythic')).toEqual({ speed: 2, defense: 4 });
+    const s = effectiveStats(hull, { modules: ['radar'], moduleRarity: { radar: 'mythic' } }, rare);
+    expect([s.speed, s.defense, s.hp]).toEqual([7, 4, 10]);
+  });
+
+  it('звезда множит и базовый параметр, и параметры редкости', () => {
+    const s = effectiveStats(
+      hull,
+      { modules: ['radar'], moduleStars: { radar: 1 }, moduleRarity: { radar: 'unique' } },
+      rare,
+    );
+    expect(s.radarRange).toBe(150); // 100 × 1.5
+    expect(s.speed).toBe(8); // 5 + 2 × 1.5
+  });
+
+  it('ступень не выше базовой, чужая ступень и снятый модуль прибавки не дают', () => {
+    expect(moduleRarityBonus(radar, 'simple')).toEqual({});
+    expect(moduleRarityBonus(radar, 'cosmic')).toEqual({});
+    expect(effectiveStats(hull, { modules: [], moduleRarity: { radar: 'legendary' } }, rare).hp).toBe(10);
+  });
+
+  it('поднятая редкость доезжает до стека вместе с лоадаутом и не заводится зря', () => {
+    const stacks: UnitStack[] = [];
+    addUnits(stacks, 'cruiser', 2, ['radar'], undefined, { radar: 'mythic', other: 'legendary' });
+    expect(stacks[0]!.moduleRarity).toEqual({ radar: 'mythic' });
+    const bare: UnitStack[] = [];
+    addUnits(bare, 'cruiser', 1, [], undefined, { radar: 'mythic' });
+    expect(bare[0]!.moduleRarity).toBeUndefined();
+  });
+
+  it('схема отклоняет прибавку на ступени не выше базовой и правку слотов', () => {
+    const mod = (extra: Record<string, unknown>) =>
+      parseGameData({
+        version: '0.1.0',
+        resources: ['metal'],
+        units: {},
+        factions: {},
+        buildings: {},
+        events: {},
+        modules: { m: { name: 'M', slot: 'utility', tag: 'horizontal', cost: {}, ...extra } },
+      });
+    expect(() => mod({ rarity: 'unique', rarityBonus: { unique: { hp: 1 } } })).toThrow();
+    expect(() => mod({ rarityBonus: { unique: { utilitySlots: 1 } } })).toThrow();
+    expect(() => mod({ rarityBonus: { unique: { hp: 1 } } })).not.toThrow();
   });
 });

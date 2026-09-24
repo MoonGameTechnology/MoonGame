@@ -2,6 +2,17 @@
   "cargo_bay": {
     "name": "Cargo Bay",
     "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "hp": 6
+      },
+      "mythic": {
+        "speed": 1
+      },
+      "legendary": {
+        "cargoCapacity": 3
+      }
+    },
     "slot": "utility",
     "tag": "horizontal",
     "effects": {
@@ -19,6 +30,17 @@
   "radar_module": {
     "name": "Radar Module",
     "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "speed": 2
+      },
+      "mythic": {
+        "defense": 2
+      },
+      "legendary": {
+        "radarRange": 60
+      }
+    },
     "slot": "utility",
     "tag": "horizontal",
     "effects": {
@@ -39,6 +61,17 @@
   "compact_radar": {
     "name": "Compact Radar",
     "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "speed": 2
+      },
+      "mythic": {
+        "defense": 1
+      },
+      "legendary": {
+        "radarRange": 30
+      }
+    },
     "slot": "utility",
     "tag": "horizontal",
     "effects": {
@@ -59,6 +92,17 @@
   "ion_engine": {
     "name": "Ion Engine",
     "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "defense": 1
+      },
+      "mythic": {
+        "hp": 8
+      },
+      "legendary": {
+        "speed": 1
+      }
+    },
     "slot": "utility",
     "tag": "vertical",
     "effects": {
@@ -76,6 +120,14 @@
   "targeting_array": {
     "name": "Targeting Array",
     "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "hp": 10
+      },
+      "legendary": {
+        "defense": 3
+      }
+    },
     "slot": "weapon",
     "tag": "vertical",
     "effects": {
@@ -93,6 +145,17 @@
   "ablative_plating": {
     "name": "Ablative Plating",
     "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "defense": 2
+      },
+      "mythic": {
+        "shield": 5
+      },
+      "legendary": {
+        "hp": 8
+      }
+    },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -110,6 +173,14 @@
   "shield_booster": {
     "name": "Shield Booster",
     "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "shieldRegen": 0.01
+      },
+      "legendary": {
+        "defense": 3
+      }
+    },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -127,6 +198,17 @@
   "point_defense_array": {
     "name": "Area Defense Array",
     "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "defense": 1
+      },
+      "mythic": {
+        "hp": 8
+      },
+      "legendary": {
+        "pointDefense": 4
+      }
+    },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -144,6 +226,14 @@
   "void_shield_i": {
     "name": "Void Shield I",
     "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "hp": 10
+      },
+      "legendary": {
+        "defense": 3
+      }
+    },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -161,6 +251,11 @@
   "void_shield_ii": {
     "name": "Void Shield II",
     "rarity": "mythic",
+    "rarityBonus": {
+      "legendary": {
+        "hp": 15
+      }
+    },
     "slot": "defense",
     "tag": "vertical",
     "effects": {
@@ -262,6 +357,14 @@
   "siege_platform": {
     "name": "Siege Platform",
     "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "hp": 10
+      },
+      "legendary": {
+        "attack": 3
+      }
+    },
     "slot": "weapon",
     "tag": "vertical",
     "effects": {

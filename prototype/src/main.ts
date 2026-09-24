@@ -269,6 +269,7 @@ import {
   serializeCloudProfile,
   type CloudProfile,
 } from '../../decisions/cloudSync';
+import { chapterBlueprint } from '../../decisions/moduleRarity';
 import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
@@ -13502,6 +13503,12 @@ let progressWrite = sectorProgressStore.load().then(raw => {
   return sectorProgressStore.save(JSON.stringify(granted.progress));
 });
 
+/** Глава для засчёта забега: карта и задачи плюс гарантированный чертёж за первую
+ *  победу (SZE-5.3, `chapterBlueprint`) — ступень растёт к эпицентру. */
+function chapterForSettle(index: number) {
+  return { ...pveChapter(index), blueprint: chapterBlueprint(index) };
+}
+
 /** Id глав по номерам — для правила «герой за главу» (`heroRecruits.ts`). */
 function sectorChapterIds(): string[] {
   return Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveChapter(i).id);
@@ -13745,7 +13752,7 @@ const sectorZeroMenu = initSectorZeroMenu({
         sectorProgress,
         savedRun.sectorZeroAttempt ?? 0,
         savedRun.state as GameState,
-        pveChapter(savedRun.sectorZeroMission ?? sectorMission),
+        chapterForSettle(savedRun.sectorZeroMission ?? sectorMission),
       );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
@@ -13886,7 +13893,7 @@ function awardSectorRun(): number {
   if (sectorDevActive) return 0;
   // Задачи главы платят и здесь, в обычном конце забега (раньше их платил только засчёт
   // после перезагрузки — PVR-5.3 нашёл это при переходе на запас задач).
-  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, pveChapter(sectorMission));
+  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission));
   if (next !== sectorProgress) {
     // Journal the terminal run before its award. If the page closes between the
     // two writes, opening the menu settles the same serial exactly once.

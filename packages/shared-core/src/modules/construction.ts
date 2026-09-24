@@ -1259,8 +1259,10 @@ export const constructionModule: GameModule = {
         const built = h.ctx.data.units[p.unit];
         // Звёздность модулей (SZE-1.1) берётся из СНИМКА арсенала места, а не из меты:
         // ядро во время матча мету не читает. Нет снимка (обычный матч) → ★0 у всех.
-        const stars =
-          typeof p.playerId === 'string' ? h.state.players[p.playerId]?.arsenal?.stars : undefined;
+        const arsenal =
+          typeof p.playerId === 'string' ? h.state.players[p.playerId]?.arsenal : undefined;
+        const stars = arsenal?.stars;
+        const rarity = arsenal?.rarity; // SZE-5.1 — тем же снимком, что звёзды
         if (built?.traits.includes('shuttle')) {
           // Готовая машина встаёт в ЭСКАДРУ (SHU-4.2), а не россыпью. Правило живёт в
           // `state/shuttle.ts` — там же, где вся арифметика ангара: своя копия здесь
@@ -1275,9 +1277,10 @@ export const constructionModule: GameModule = {
             `sq:${p.playerId}:${seq}`,
             p.modules,
             stars,
+            rarity,
           );
         } else {
-          addUnits(planet.garrison, p.unit, p.count, p.modules, stars);
+          addUnits(planet.garrison, p.unit, p.count, p.modules, stars, rarity);
         }
         h.emit('unit.built', {
           planetId: planet.id,

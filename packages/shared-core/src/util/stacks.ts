@@ -44,6 +44,21 @@ export function starsOf(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/** Поднятая редкость надетых модулей в виде поля стека (SZE-5.1) — зеркало
+ *  {@link starsOf}: только НАДЕТЫХ и только записанных. Пусто → поле не заводится. */
+export function rarityOf(
+  modules: readonly string[] | undefined,
+  rarity: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!modules || !rarity) return undefined;
+  const out: Record<string, string> = {};
+  for (const id of modules) {
+    const r = rarity[id];
+    if (r !== undefined) out[id] = r;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Adds `count` units to a stack array, merging into an existing healthy stack of
  *  the same type AND loadout when one exists, else appending a fresh stack (which
  *  carries `modules` — and the звёздность `stars` of those modules — when given).
@@ -57,6 +72,7 @@ export function addUnits(
   count: number,
   modules?: readonly string[],
   stars?: Record<string, number>,
+  rarity?: Record<string, string>,
 ): void {
   const stack = findHealthyStack(stacks, unit, modules);
   if (stack) {
@@ -70,6 +86,8 @@ export function addUnits(
     if (modules && modules.length > 0) fresh.modules = [...modules];
     const own = starsOf(fresh.modules, stars);
     if (own) fresh.moduleStars = own;
+    const raised = rarityOf(fresh.modules, rarity);
+    if (raised) fresh.moduleRarity = raised;
     stacks.push(fresh);
   }
 }
@@ -130,6 +148,7 @@ export function takeFromStacks(
     // несёт те же звёзды. Поля тут перечисляются поимённо, поэтому забытое теряется
     // МОЛЧА — ровно так растворилась бы половина заточки при любом делении флота.
     if (st.moduleStars) t.moduleStars = { ...st.moduleStars };
+    if (st.moduleRarity) t.moduleRarity = { ...st.moduleRarity }; // SZE-5.1 — то же правило
     // Заслуга ветерана (VET-2) КОПИРУЕТСЯ, а не делится: она уже «на юнит», и от того,
     // сколько кораблей отделили, величина на юнит не зависит. Делить её здесь, как
     // делится пул `hp`, значило бы наказывать за разделение флота.
@@ -152,6 +171,7 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
     ...st,
     ...(st.modules ? { modules: [...st.modules] } : {}),
     ...(st.moduleStars ? { moduleStars: { ...st.moduleStars } } : {}),
+    ...(st.moduleRarity ? { moduleRarity: { ...st.moduleRarity } } : {}),
   });
   const out = base.map(clone);
   for (const st of add) {

@@ -52,10 +52,21 @@ describe('sectorZeroShop — витрина знает, чем можно пла
     expect([cost.amount > 0, cost.can, cost.reason]).toEqual([true, false, 'E_SHOP_NOT_ENOUGH']);
   });
 
-  it('уже открытое не продаётся повторно', () => {
+  it('открытый модуль продаётся ДУБЛЕМ — материалом для редкости (SZE-5.3)', () => {
+    // Решение владельца 2026-09-24: раньше открытое гасло «уже есть».
     const p = profile({ warrants: 9999, modules: ['cargo_bay', 'ion_engine', 'radar_module'] });
     expect(row(p, ALL, 'radar_module').owned).toBe(true);
-    expect(priceOf(p, ALL, 'radar_module', 'warrants').reason).toBe('E_SHOP_OWNED');
+    expect(priceOf(p, ALL, 'radar_module', 'warrants').can).toBe(true);
+    const bought = changeSectorZeroProgress(p, { kind: 'buy', id: 'radar_module', pay: 'warrants' }, data)!;
+    expect(bought.modules.filter((id) => id === 'radar_module')).toHaveLength(1);
+    expect(bought.moduleCopies.radar_module).toBe(1);
+  });
+
+  it('лот чертежа кладёт чертёж своей ступени', () => {
+    const p = profile({ sovereigns: 999 });
+    const bought = changeSectorZeroProgress(p, { kind: 'buy', id: 'blueprint_mythic', pay: 'sovereigns' }, data)!;
+    expect(bought.blueprints).toEqual({ mythic: 1 });
+    expect(bought.sovereigns).toBe(999 - data.sectorZeroShop.offers.blueprint_mythic!.prices.sovereigns!);
   });
 
   it('пустая витрина выключает магазин данными', () => {
@@ -111,6 +122,7 @@ describe('sectorZeroShop — покупка доходит до профиля �
     expect(
       changeSectorZeroProgress(profile({ warrants: 1 }), { kind: 'buy', id: 'targeting_array', pay: 'warrants' }, data),
     ).toBeNull();
+    // Дважды за сутки — нет: купленный лот ушёл с прилавка (второй экземпляр — завтра, дублем).
     const owned = changeSectorZeroProgress(rich(), { kind: 'buy', id: 'targeting_array', pay: 'warrants' }, data)!;
     expect(changeSectorZeroProgress(owned, { kind: 'buy', id: 'targeting_array', pay: 'warrants' }, data)).toBeNull();
     expect(changeSectorZeroProgress(rich(), { kind: 'buy', id: 'ghost', pay: 'warrants' }, data)).toBeNull();

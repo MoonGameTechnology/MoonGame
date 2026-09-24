@@ -764,6 +764,20 @@ export const ModuleDefSchema = z
     /** PVR-6.4: ступень редкости; нет поля — «простой». */
     rarity: RaritySchema.optional(),
     /**
+     * SZE-5.1: НОВЫЙ параметр, который модуль получает на каждой ступени редкости выше
+     * своей базовой (решение владельца 2026-09-24: «редкость даёт дополнительный
+     * параметр, звёздность усиливает»). Прибавки ступеней складываются: мифический
+     * модуль несёт и прибавку уникальной ступени. Ступень не выше базовой прибавки не
+     * имеет — refine ниже.
+     */
+    rarityBonus: z
+      .object({
+        unique: z.record(z.string(), z.number()).optional(),
+        mythic: z.record(z.string(), z.number()).optional(),
+        legendary: z.record(z.string(), z.number()).optional(),
+      })
+      .optional(),
+    /**
      * PVR-4.3: модуль — ОТВЕТ Роя на класс оружия. Лестница живёт рядом с модулем
      * (`SZE-4.1`), а не отдельной таблицей: уровень осмыслен только вместе с тем,
      * что он усиливает, и разнесённые данные разъехались бы молча.
@@ -795,6 +809,21 @@ export const ModuleDefSchema = z
   .refine((m) => !Object.keys(m.effects.stats).some((k) => /slot/i.test(k)), {
     message: 'a module may not modify slot capacity (anti self-expansion)',
   })
+  .refine(
+    (m) =>
+      !Object.values(m.rarityBonus ?? {}).some((bag) =>
+        Object.keys(bag ?? {}).some((k) => /slot/i.test(k)),
+      ),
+    { message: 'SZE-5.1: a rarity bonus may not modify slot capacity (anti self-expansion)' },
+  )
+  .refine(
+    (m) =>
+      Object.keys(m.rarityBonus ?? {}).every(
+        (r) =>
+          RARITIES.indexOf(r as Rarity) > RARITIES.indexOf(m.rarity ?? 'simple'),
+      ),
+    { message: 'SZE-5.1: a rarity bonus is declared only for steps ABOVE the base rarity' },
+  )
   .refine(
     (m) =>
       !m.adaptation ||
@@ -930,6 +959,16 @@ export const SectorZeroStarsSchema = z.object({
   guaranteed: z.number().int().nonnegative().default(0),
   /** Ступени по порядку: `steps[0]` — попытка получить первую звезду. */
   steps: z.array(SectorZeroStarStepSchema).default([]),
+  /** SZE-5.1: потолок звёзд по редкости модуля (решение владельца 2026-09-24). Нет
+   *  ступени в таблице — действует общий {@link cap}. Больше `cap` не бывает. */
+  capByRarity: z
+    .object({
+      simple: z.number().int().nonnegative().optional(),
+      unique: z.number().int().nonnegative().optional(),
+      mythic: z.number().int().nonnegative().optional(),
+      legendary: z.number().int().nonnegative().optional(),
+    })
+    .default({}),
 });
 
 /** Цена товара магазина Sector Zero по способам оплаты (§0.4 `sector-zero-economy-roadmap`).
@@ -941,10 +980,11 @@ export const SectorZeroPriceSchema = z.object({
   ad: z.number().int().positive().optional(),
 });
 
-/** Один лот витрины. `grants` трактуется по `kind`: id модуля, id узла навыка либо имя
- *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount`. */
+/** Один лот витрины. `grants` трактуется по `kind`: id модуля, id узла навыка, имя
+ *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount` — либо ступень
+ *  редкости чертежа (`blueprint`, SZE-5.3: `unique` / `mythic` / `legendary`). */
 export const SectorZeroOfferSchema = z.object({
-  kind: z.enum(['module', 'skill', 'resource']),
+  kind: z.enum(['module', 'skill', 'resource', 'blueprint']),
   grants: z.string(),
   /** Сколько выдать. Значим только для `kind: 'resource'`. */
   amount: z.number().int().positive().default(1),
