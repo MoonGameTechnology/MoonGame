@@ -264,6 +264,29 @@ export function sectorHeroAbilities(id: string, hero: SectorHero, data: GameData
   }
   return [...new Set(ids)].filter((key) => data.heroAbilities[key]);
 }
+/** Что можно надеть в слоты героя (PVR-6.16): его способности и НАДЕВАЕМЫЕ пассивки —
+ *  стартовые и из узлов дерева. Постоянная пассивка сюда не входит: она работает всегда. */
+export function sectorHeroSlotItems(id: string, hero: SectorHero, data: GameData): string[] {
+  const passives = [
+    ...(data.heroes[id]?.startPassives ?? []),
+    ...hero.skills.flatMap((skill) => {
+      const grants = data.heroSkillTrees[skill]?.grants;
+      return [
+        ...(grants?.passive !== undefined ? [grants.passive] : []),
+        ...(grants?.passives ?? []),
+      ];
+    }),
+  ].filter((p) => data.heroPassives[p]?.slotted);
+  return [...new Set([...sectorHeroAbilities(id, hero, data), ...passives])];
+}
+/** Имя и описание предмета слота — способности или надеваемой пассивки. */
+export function sectorSlotItem(
+  id: string,
+  data: GameData,
+): { name: string; description?: string } | undefined {
+  const passive = data.heroPassives[id];
+  return data.heroAbilities[id] ?? (passive?.slotted ? passive : undefined);
+}
 export function sectorHeroUpgradeCost(hero: SectorHero): number {
   return hero.level * 4;
 }
@@ -596,7 +619,7 @@ export function changeSectorZeroProgress(
       const hero = next.heroes[action.hero];
       if (
         !hero ||
-        !sectorHeroAbilities(action.hero, hero, data).includes(action.id) ||
+        !sectorHeroSlotItems(action.hero, hero, data).includes(action.id) ||
         data.heroAbilities[action.id]?.type.startsWith('spawn_')
       )
         return null;
@@ -778,7 +801,7 @@ export function parseSectorZeroProgress(
       for (let pass = 0; pass < candidates.length; pass++)
         for (const skill of candidates)
           if (skillLearnable(id, hero.skills, skill, data)) hero.skills.push(skill);
-      const owned = sectorHeroAbilities(id, hero, data);
+      const owned = sectorHeroSlotItems(id, hero, data);
       hero.equipped = strings(value.equipped)
         .filter((a) => owned.includes(a) && !data.heroAbilities[a]?.type.startsWith('spawn_'))
         .slice(0, sectorHeroSlots(hero, data));

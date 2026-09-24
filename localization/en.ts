@@ -1606,7 +1606,9 @@ export const en: Record<string, string> = {
   'hero.passive.scavenged-guns.desc': "+5% damage for the ship the hero commands.",
   'hero.passive.wreck-optics.desc': "+3% salvage share in battles this hero fought.",
   'data.field-lab': 'Field Lab',
-  'hero.passive.field-lab.desc': '+5% salvage share in battles this hero fought.',
+  'data.ballistic-model': 'Ballistic Model',
+  'hero.passive.ballistic-model.desc': "In a slot: +10% damage for the hero's fleet.",
+  'hero.passive.field-lab.desc': '+10% salvage share in battles this hero fought.',
   'hero.tree.field-foundry.desc': "Salvaged metal is melted down in the hold and fed to the barrels.",
   'hero.tree.hull-shears.desc': "Powered shears open plating faster than it can cool.",
   'hero.tree.salvage-rig.desc': "Grapples and cutters on external mounts: the hero starts stripping more off a battlefield than anyone else.",
@@ -1705,7 +1707,7 @@ export const en: Record<string, string> = {
     'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
   'hero.unit.ravager.desc': 'A psionic destroyer: annihilates worlds and tears open the fog.',
   'hero.unit.scientist.desc':
-    "An analyst: lifts the fog and plants false signals. Innate — Field Lab: +5% salvage share in the hero's battles.",
+    "An analyst: lifts the fog with reconnaissance. Innate — Field Lab: +10% salvage share in the hero's battles.",
   'hero.unit.vanguard.desc':
     'A transhuman manoeuvrist: corridors and a war cry for the leading fleets.',
   'hero.unit.warden.desc': 'A psionic defender: holds the line behind a bastion shield.',

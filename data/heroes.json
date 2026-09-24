@@ -69,11 +69,11 @@
     },
     "slots": 2,
     "startAbilities": [
-      "scan",
-      "decoy_signal"
+      "scan"
     ],
     "startPassives": [
-      "field_lab"
+      "field_lab",
+      "ballistic_model"
     ]
   }
 }

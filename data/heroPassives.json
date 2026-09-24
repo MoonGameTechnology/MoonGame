@@ -101,8 +101,18 @@
     "hook": "salvage",
     "scope": "ownFleetsNear",
     "params": {
-      "bonus": 0.05,
+      "bonus": 0.1,
       "radius": 0
+    }
+  },
+  "ballistic_model": {
+    "name": "Ballistic Model",
+    "description": "hero.passive.ballistic-model.desc",
+    "hook": "combat.damage",
+    "scope": "heroFleet",
+    "slotted": true,
+    "params": {
+      "bonus": 0.1
     }
   }
 }
