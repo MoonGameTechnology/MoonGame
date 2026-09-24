@@ -49,13 +49,16 @@ function tryCapture(h: HandlerContext, payload: unknown): void {
     (g) => g.owner !== fleet.owner && g.location === at && g.units.some((u) => u.count > 0),
   );
   if (contested) return;
+  const from = planet.owner;
   planet.owner = fleet.owner;
-  h.emit('planet.captured', { planetId: at, owner: fleet.owner, via: 'arrival' });
+  // `from` — как у захвата в бою: память фактов (`missionFacts`) по нему знает, что мир
+  // был потерян прежним владельцем, а не просто занят с нуля.
+  h.emit('planet.captured', { planetId: at, owner: fleet.owner, from, via: 'arrival' });
 }
 
 export const captureOnArrivalModule: GameModule = {
   id: 'capture-on-arrival',
-  version: '0.1.0',
+  version: '0.2.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => tryCapture(h, event.payload));
     api.on('fleet.transit', (event, h) => tryCapture(h, event.payload));

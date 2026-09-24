@@ -16,6 +16,8 @@ import {
   conditionMet,
   clampResearchSlots,
   scientistSlotBonus,
+  techInMatch,
+  techRulesOf,
   BASE_RESEARCH_SLOTS,
 } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
@@ -149,9 +151,17 @@ export function techTreeHtml(
   // shows only the real nodes. The rule itself lives in `techCoverage.ts` (BAL-12): the
   // self-play report needs the same split for its denominator, and a second hand-written
   // prefix check is exactly how the two would drift apart.
+  // PVR-6.17: и только узлы ЭТОГО матча — режим может убрать узел целиком (в забеге нет
+  // «Хранителя»). Правило в ядре (`techInMatch`), редьюсер отвечает на него же.
   const techs = Object.fromEntries(
-    Object.entries(data.technologies).filter(([id, def]) => !isGrantOnlyTech(id, def)),
+    Object.entries(data.technologies).filter(
+      ([id, def]) => !isGrantOnlyTech(id, def) && techInMatch(state, id),
+    ),
   );
+  // Ворота дней режим может снять целиком (забег до третьего дня не доживает) — тогда нет
+  // ни замка «нужен день N», ни счётчика дней в шапке: считать их незачем.
+  const dayGates = techRulesOf(state).dayGates;
+  const gateOf = (td: { dayGate?: number }): number => (dayGates ? (td.dayGate ?? 0) : 0);
   const done = new Set(seat?.technologies?.completed ?? []);
   // Research runs in CONCURRENT slots (core: technologies.active is a list).
   const activeRaw = seat?.technologies?.active;
@@ -179,7 +189,7 @@ export function techTreeHtml(
       };
     }
     if ((td.prerequisites ?? []).some((p) => !done.has(p))) return { st: 'chain', prog: 0, eta: 0 };
-    if ((td.dayGate ?? 0) > 0 && state.time - started < (td.dayGate ?? 0) * DAY)
+    if (gateOf(td) > 0 && state.time - started < gateOf(td) * DAY)
       return { st: 'gate', prog: 0, eta: 0 };
     if ((td.conditions ?? []).some((c) => !techCondOk(state, me, c))) return { st: 'cond', prog: 0, eta: 0 };
     return { st: 'avail', prog: 0, eta: 0 };
@@ -201,6 +211,13 @@ export function techTreeHtml(
   const leadHtml = lead
     ? `🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b>`
     : `🔭 ${t('tech.curator.none')}`;
+  // PVR-6.17: предупреждение «без лидера ветки узлы с условием „учёный“ закрыты» — только
+  // когда оно про что-то. Совета учёных у забега нет, и единственный такой узел («Хранитель»)
+  // режим убрал: строка обещала замок, которого в дереве нет.
+  const scientistGated = Object.values(techs).some((td) =>
+    (td.conditions ?? []).some((c) => c.type === 'has_scientist'),
+  );
+  const showLead = !!lead || scientistGated;
   // СПИСОК вместо сетки (TT-4, макет владельца): узлы ветки идут ярусами, каждый —
   // полноразмерной строкой, где ЭФФЕКТ, ЦЕНА и СРОК видны без тапа. Сетка 52-пиксельных
   // иконок помещала на экран больше узлов, но про каждый молчала: чтобы узнать, что даёт
@@ -214,7 +231,7 @@ export function techTreeHtml(
     .sort(
       (x, y) =>
         techs[x]!.tier - techs[y]!.tier ||
-        (techs[x]!.dayGate ?? 0) - (techs[y]!.dayGate ?? 0) ||
+        gateOf(techs[x]!) - gateOf(techs[y]!) ||
         (x < y ? -1 : 1),
     );
   /** Почему узел заперт — словами и с ЛЕКАРСТВОМ, а не просто «закрыто». */
@@ -224,7 +241,7 @@ export function techTreeHtml(
       const missing = (td.prerequisites ?? []).find((p) => !done.has(p));
       return t('tech.lock.needs', { x: esc(tData(techs[missing ?? '']?.name ?? (missing ?? ''))) });
     }
-    if (st === 'gate') return t('tech.lock.day', { n: (td.dayGate ?? 0) + 1 });
+    if (st === 'gate') return t('tech.lock.day', { n: gateOf(td) + 1 });
     const unmet = (td.conditions ?? []).find((c) => !techCondOk(state, me, c));
     return unmet ? esc(techCondText(unmet)) : t('tech.action.unmet');
   };
@@ -290,7 +307,7 @@ export function techTreeHtml(
     const id = modalId;
     const td = techs[id]!;
     const st = nodeState(id);
-    const gate = td.dayGate ?? 0;
+    const gate = gateOf(td);
     const prereqNames = (td.prerequisites ?? [])
       .map((p) => esc(tData(techs[p]?.name ?? p)))
       .join(', ');
@@ -334,11 +351,11 @@ export function techTreeHtml(
       `</div>${btn}</div></div>`;
   }
   const html =
-    `<div class="tt-top"><span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` +
+    `<div class="tt-top">${dayGates ? `<span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` : ''}` +
     `<span class="tt-slots">⚛ ${t('tech.slots', { a: activeList.length, b: slots })}</span></div>` +
     activeHtml +
     `<div class="tt-tabs">${tabs}</div>` +
-    `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` +
+    (showLead ? `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` : '') +
     `<div class="tt-scroll"><div class="tt-list">${listHtml}</div></div>` +
     modal;
   return html;

@@ -37,6 +37,7 @@ import {
   swarmMemoryModule,
   swarmAdaptModule,
   swarmJournalModule,
+  missionFactsModule,
   scientistModule,
   sectorModule,
   standingOrdersModule,
@@ -173,6 +174,7 @@ export const DEV_MODULES: GameModule[] = [
   swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
   swarmAdaptModule, // PVR-4.3: проект развития модуля Роя; читает память, платит, растит
   swarmJournalModule, // PVR-4.5: что игрок ВИДЕЛ про ответы Роя; зеркало swarmMemory
+  missionFactsModule, // факты для задач забега: удержание, потери, эвакуация
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
   // H4's `divisionModule` used to sit here, at the END. It is GONE (H4-REVERT): the
@@ -200,7 +202,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '32'; // PERK-3.2: добавлен promotionModule —
+export const MODULE_MANIFEST_VERSION = '33'; // Задачи забега владельца 2026-09-24:
+// добавлен missionFactsModule (память фактов: удержание провинций, потерянные миры,
+// доставленные беженцы) и `capture-on-arrival` 0.2.0 передаёт прежнего владельца. Изменилось
+// ЧЛЕНСТВО графа и форма состояния (`state.missionFacts`): партия на 32 не несёт фактов, и
+// задача «держать маяк подряд» считала бы серию с начала матча, а не с захвата.
+// export const MODULE_MANIFEST_VERSION = '32'; // PERK-3.2: добавлен promotionModule —
 // случайный промоушен. Изменилось ЧЛЕНСТВО графа, и порядок значим: модуль стоит ПЕРЕД
 // `autoRally`, потому что оба слушают `unit.built`, а авто-сбор уносит свежие корабли из
 // гарнизона во флот. Партия, поднятая под графом с лишним модулем, молча получила бы

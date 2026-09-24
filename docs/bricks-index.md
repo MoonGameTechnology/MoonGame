@@ -660,6 +660,7 @@
 | TEST-4 | ✅ | srv | `docs/backlog.md` | topXp падал на живой базе разработчика. |
 | PHONE-STRATEGY | ✅ |  | `docs/backlog.md` | Технологии, постройки, производство, рынок и дипломатия |
 | MAP-PERF | ✅ |  | `docs/backlog.md` | Ускорение движения раскрытой голографической карты и подготовка |
+| BOOT-1 | ✅ | proto | `docs/backlog.md` | Первый кадр сразу в новом виде — без вспышки старого |
 | PERK-0.1 | ✅ | docs | `docs/backlog.md` | Резолюция владельца: два класса бонусов + третья группа |
 | PERK-1.1 | ✅ | core | `docs/backlog.md` | Три группы вместо одной цепочки. |
 | PERK-1.2 | ✅ | core | `docs/backlog.md` | Массовые перки переехали в параллельную корзину — |
@@ -904,11 +905,12 @@
 | M2.4 | ✅ | core data | `docs/map-roadmap.md` | Связность — свойство местности, а не координат — |
 | M2.5 | ✅ | core data | `docs/map-roadmap.md` | Параллельные пути через провинцию — |
 | M2.6 | ✅ | core data | `docs/map-roadmap.md` | Непроходимость перестала быть декоративной — |
-| M2.7 | ✅ | cli proto | `docs/map-roadmap.md` | Граница, через которую нет пути, видна как барьер — |
+| M2.7 | 🗑 | cli proto | `docs/map-roadmap.md` | Граница, через которую нет пути, видна как барьер — 2026-09-24 |
 | M2.8 | ✅ | core data | `docs/map-roadmap.md` | Сродство к семейству местности — 2026-09-22 |
 | M2.9 | ✅ | cli proto data | `docs/map-roadmap.md` | Космос без прямых углов: волнистые границы и неровные области — 2026-09-22 |
 | M2.10 | ✅ | data | `docs/map-roadmap.md` | Развилка — не провинция: обе карты Сектора Зеро переложены — 2026-09-22 |
 | M2.11 | ✅ | cli proto | `docs/map-roadmap.md` | Живая граница провинций — 2026-09-24 |
+| M2.12 | ✅ | cli proto | `docs/map-roadmap.md` | Край карты — линия карты, а не провинций; пунктир барьера снят — 2026-09-24 |
 | M3.1 | 🔒 |  | `docs/map-roadmap.md` | Редактор карты [tools] |
 | M3.2 | ⏳ |  | `docs/map-roadmap.md` | Процедурный пресет → формат карты [tools] |
 | M4.1 | ✅ | cli | `docs/map-roadmap.md` | Рендер из данных сектора — /🚧 |
@@ -1097,6 +1099,7 @@
 | PVR-6.14 | ✅ | proto | `docs/sector-zero-roadmap.md` | Комиксы глав — основа под арт владельца |
 | PVR-6.15 | ✅ | proto | `docs/sector-zero-roadmap.md` | Карта главы — красивее, крестик ровный |
 | PVR-6.16 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Пятый герой — Учёный, награда главы I |
+| PVR-6.17 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Дерево технологий забега — без дней, «Хранителя» и совета учёных |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

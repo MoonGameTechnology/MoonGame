@@ -56,11 +56,6 @@ export interface TerritoryPalette {
   hideOwnedInner?: boolean;
   /** Zoom detail in [0,1]; outer political frontiers remain legible at zero. */
   provinceDetail?: number;
-  /** Is the border between these two SEED INDICES shut — they touch on the mosaic but
-   *  no lane joins them? See {@link classifyBorders}. Omit and nothing is drawn as a
-   *  barrier: a caller without link data must not invent one, and a caller that has it
-   *  must also respect fog — an unscouted approach is «unknown», not «closed». */
-  sealed?: (a: number, b: number) => boolean;
   /** `false` paints the cells only and leaves the borders to the caller — the living
    *  border (M2.11) strokes them every frame from {@link classifyBorders}, so baking them
    *  here as well would draw each line twice, once frozen. Default: stroke them. */
@@ -200,7 +195,7 @@ export function drawTerritory(
 
   // Pass 2 — classify every cell edge (pure, see classifyBorders), then stroke.
   if (palette.strokeBorders !== false)
-    strokeBorders(g, classifyBorders(cells, seeds, palette.sealed), palette);
+    strokeBorders(g, classifyBorders(cells, seeds), palette);
   return cells;
 }
 
@@ -210,8 +205,8 @@ export function drawTerritory(
  *  get the same answer back, or the line splits into two. */
 export type BorderProjection = (x: number, y: number) => readonly [number, number];
 
-/** Stroke classified borders: same-owner inner hairlines, neutral divisions, glowing owner
- *  frontiers and shut borders. The political STYLES live here and only here, so the baked
+/** Stroke classified borders: same-owner inner hairlines, neutral divisions and glowing
+ *  owner frontiers. The political STYLES live here and only here, so the baked
  *  map and the living border cannot drift apart in colour or weight.
  *
  *  `at` moves every point (omit — they stay put), `keep` drops a segment before it costs
@@ -225,7 +220,7 @@ export function strokeBorders(
   keep?: (seg: BorderSegment) => boolean,
 ): void {
   const detail = palette.provinceDetail ?? 1;
-  const { ownedFront, ownedInner, neutralEdge, sealedEdge } = borders;
+  const { ownedFront, ownedInner, neutralEdge } = borders;
   const prepare = (segs: BorderSegment[]): BorderSegment[] => {
     if (!at && !keep) return segs;
     const out: BorderSegment[] = [];
@@ -265,15 +260,6 @@ export function strokeBorders(
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
   for (const [owner, segs] of fronts)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.85), 1.15); // frontier crisp
-  // A border with no lane across it, drawn LAST so it reads over whatever political
-  // border it shares the line with. Dashed and off-palette on purpose: everything else
-  // on this map is the cyan family, so «shut» must not be mistaken for a shade of
-  // «whose». Same violet the rift kind carries in the catalogue.
-  if (sealedEdge.length > 0 && detail > 0) {
-    g.setLineDash([5, 4]);
-    strokeSegs(prepare(sealedEdge), rgba('#9268b0', 0.85 * detail), 1.6);
-    g.setLineDash([]);
-  }
   g.restore();
 }
 
@@ -286,35 +272,27 @@ export interface ClassifiedBorders {
   /** Same-owner province divisions, per owner — faint inner hairlines, deduped
    *  (`idx < t` keeps one of the two coincident edges). */
   ownedInner: Map<string, BorderSegment[]>;
-  /** Neutral-vs-neutral divisions and neutral map-boundary edges, deduped. */
+  /** Neutral-vs-neutral divisions, deduped. */
   neutralEdge: BorderSegment[];
-  /** Borders that cannot be crossed: the two provinces touch on the mosaic but no lane
-   *  joins them. Deduped (`idx < t`), and ADDITIVE — the edge is still classified by
-   *  ownership above, so a sealed frontier reads as both «whose» and «shut». In a
-   *  province mosaic adjacency IS the shared border, so without this a border silently
-   *  promises a crossing the map does not have. */
-  sealedEdge: BorderSegment[];
 }
 
 /** Classify every cell edge by what lies across it — the political-border logic
  *  behind {@link drawTerritory}, pure so the dedup and owner-comparison rules are
  *  unit-testable without a canvas. Same-owner borders are thin INNER hairlines
  *  (an empire stays one colour field with subtle province divisions); an
- *  owner-vs-(other owner / neutral / void) border is that owner's FRONTIER. */
+ *  owner-vs-(other owner / neutral) border is that owner's FRONTIER.
+ *
+ *  The map edge is NOT a province border (owner, 2026-09-24: «provinces at the map edge
+ *  must not have wavy edges of their own»). There is no province across it, and the map
+ *  draws its own edge — the glass rim on the holographic map, the faint frame on the flat
+ *  one — so a province stroke there would be a second, separately moving line. */
 export function classifyBorders(
   cells: readonly TerritoryCell[],
   seeds: readonly TerritorySeed[],
-  /** Is the border between these two SEED INDICES shut — they touch, but no lane joins
-   *  them? Must be symmetric; asked once per edge pair. Omit and nothing is sealed,
-   *  which is what every caller did before and what a caller without link data should
-   *  keep doing: an unknown crossing is drawn as an ordinary border, never as a barrier
-   *  the player has not earned the right to see. */
-  sealed?: (a: number, b: number) => boolean,
 ): ClassifiedBorders {
   const ownedFront = new Map<string, BorderSegment[]>();
   const ownedInner = new Map<string, BorderSegment[]>();
   const neutralEdge: BorderSegment[] = [];
-  const sealedEdge: BorderSegment[] = [];
   const bucket = (m: Map<string, BorderSegment[]>, key: string): BorderSegment[] => {
     let arr = m.get(key);
     if (!arr) m.set(key, (arr = []));
@@ -325,22 +303,18 @@ export function classifyBorders(
     const m = poly.length;
     for (let k = 0; k < m; k++) {
       const t = tags[k]!;
+      if (t === BOUNDARY) continue; // the map's own edge, see above
       const p0 = poly[k]!;
       const p1 = poly[(k + 1) % m]!;
       const seg: BorderSegment = [p0[0], p0[1], p1[0], p1[1]];
-      const neigh = t >= 0 ? seeds[t]!.owner : undefined; // undefined ⇒ map boundary
-      // A shut border is additive: classified by ownership below AS WELL, so the player
-      // still reads whose land it is. Never on the map boundary — there is no province
-      // across it to be cut off from.
-      if (t >= 0 && idx < t && sealed?.(idx, t) === true) sealedEdge.push(seg);
-      if (t >= 0 && owner !== null && neigh === owner) {
+      if (owner !== null && seeds[t]!.owner === owner) {
         if (idx < t) bucket(ownedInner, owner).push(seg); // same empire, draw once
       } else if (owner !== null) {
         bucket(ownedFront, owner).push(seg); // empire frontier (each side glows)
-      } else if (t === BOUNDARY || idx < t) {
+      } else if (idx < t) {
         neutralEdge.push(seg); // neutral province division (faint, drawn once)
       }
     }
   }
-  return { ownedFront, ownedInner, neutralEdge, sealedEdge };
+  return { ownedFront, ownedInner, neutralEdge };
 }

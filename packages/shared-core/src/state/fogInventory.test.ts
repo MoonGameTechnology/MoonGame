@@ -61,6 +61,9 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // Радиусы зрения матча — правила стола, одинаковые для всех (приходят из режима), а не
   // чья-то разведка: клиент рисует по ним свою границу обзора.
   sight: 'public',
+  // PVR-6.17: дерево технологий матча — тоже правила стола из режима; окно технологий
+  // каждого игрока рисует по ним, какие узлы есть и заперты ли дни.
+  techRules: 'public',
   time: 'public',
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
@@ -68,6 +71,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   swarmMemory: 'stripped', // PVR-4.2: вывод Роя игрок читает журналом, не состоянием
   swarmAdapt: 'stripped', // PVR-4.3: идущий проект — не разведан, пока не проявился
   swarmJournal: 'filtered', // PVR-4.5: свой журнал видно, чужой — нет
+  missionFacts: 'filtered', // факты задач: свои удержания/потери/беженцы — да, чужие — нет
   players: 'filtered', // см. PLAYER_EXPOSURE ниже
   planets: 'filtered', // топология публична, содержимое неопознанного мира — нет
   fleets: 'filtered', // чужой флот виден только опознанным (иначе — засветка)
@@ -188,6 +192,7 @@ function maximalState(): GameState {
     mapId: 'frontier-100',
     modeId: 'pve_waves',
     sight: { world: 330, fleet: 90, radarScale: 2.5 },
+    techRules: { dayGates: false, exclude: ['ai_stewardship'] },
     startedAt: 0,
     match: {
       status: 'ongoing',
@@ -387,6 +392,12 @@ function maximalState(): GameState {
     swarmMemory: { engagements: 1, observations: [{ ordinal: 1, kind: 'strike', engagement: 'strike:s1' }] },
     swarmAdapt: { moduleId: 'swarm_intercept_veil', level: 1, fleetId: 'CANARY_fleet', dueAt: 9 },
     swarmJournal: { mine: { firstAt: 1, lastAt: 5, sorties: 2, firstDamage: 3, lastDamage: 9 }, CANARY_player: { firstAt: 1, lastAt: 1, sorties: 1, firstDamage: 1, lastDamage: 1 } },
+    missionFacts: {
+      held: { a: { owner: 'mine', since: 1 }, CANARY_held: { owner: 'CANARY_player', since: 2 } },
+      longest: { a: { mine: 5, CANARY_player: 7 } },
+      fallen: { mine: ['a'], CANARY_player: ['CANARY_fallen'] },
+      evacuated: { mine: 2, CANARY_player: 9 },
+    },
   };
 }
 

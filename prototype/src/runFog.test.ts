@@ -27,12 +27,17 @@ function runStart(chapter: number): GameState {
   return st;
 }
 
+/** Расстояние — до БЛИЖАЙШЕГО своего мира: у игрока бывает не один стартовый мир (во
+ *  второй главе — колония с беженцами и осаждённый гарнизон, задачи владельца 2026-09-24),
+ *  и круг зрения стоит вокруг каждого. */
 function byDistance(st: GameState) {
-  const home = Object.values(st.planets).find((p) => p.owner === 'p1' && p.kind === 'planet')!;
+  const own = Object.values(st.planets).filter((p) => p.owner === 'p1');
   const { identify, radar } = sensorCoverage(st, 'p1', data);
   return Object.values(st.planets).map((p) => ({
     id: p.id,
-    d: Math.hypot(p.position.x - home.position.x, p.position.y - home.position.y),
+    d: Math.min(
+      ...own.map((o) => Math.hypot(p.position.x - o.position.x, p.position.y - o.position.y)),
+    ),
     identified: identify.has(p.id),
     radar: radar.has(p.id),
   }));
@@ -58,8 +63,8 @@ describe('туман забега — круги на картах глав', ()
 
   for (const chapter of [0, 1])
     it(`глава ${chapter + 1}: зрение монотонно — опознанный мир не дальше неопознанного`, () => {
-      // На старте все глаза игрока — дом и флоты у дома, поэтому картина обязана быть
-      // кругом: самый дальний опознанный ближе самого близкого неопознанного.
+      // На старте глаза игрока — его миры и флоты у них, поэтому картина обязана быть
+      // кругами: самый дальний опознанный ближе самого близкого неопознанного.
       const rows = byDistance(runStart(chapter));
       const farthestSeen = Math.max(...rows.filter((r) => r.identified).map((r) => r.d));
       const nearestHidden = Math.min(...rows.filter((r) => !r.identified).map((r) => r.d));

@@ -23,6 +23,8 @@ import {
   hangarUsed,
   fleetShuttleBay,
   squadronSize,
+  beaconCallouts,
+  beaconSentinels,
   type GameState,
   type Action,
   type Battle,
@@ -354,6 +356,28 @@ export function aiOrders(
   ai: string,
   posture: StewardPosture | 'expand' = 'expand',
   profile: AiProfile = 'weak',
+): Action[] {
+  const out = baseAiOrders(state, ai, posture, profile);
+  // Маяк задачи (заказ владельца 2026-09-24): флот игрока на маяке — разведчик Роя зовёт
+  // силы. Правило одно на оба хоста (`beaconCallouts`, общее с серверным оркестратором);
+  // флот, ушедший отвечать на маяк, в этот тик других приказов от бота не получает, а
+  // дозорный на самом маяке не получает их вовсе (`beaconSentinels`).
+  if (state.pve?.npcPlayerId !== ai) return out;
+  const callouts = beaconCallouts(state, ai);
+  const held = beaconSentinels(state, ai);
+  for (const c of callouts) held.add(c.fleetId);
+  if (held.size === 0) return out;
+  return [
+    ...out.filter((a) => !held.has((a.payload as { fleetId?: string } | undefined)?.fleetId ?? '')),
+    ...callouts.map((c) => moveFleet(ai, c.fleetId, c.to)),
+  ];
+}
+
+function baseAiOrders(
+  state: GameState,
+  ai: string,
+  posture: StewardPosture | 'expand',
+  profile: AiProfile,
 ): Action[] {
   const out: Action[] = [];
   if (!state.players[ai] || state.players[ai]!.status === 'defeated') return out; // seat not in play / eliminated
@@ -999,7 +1023,7 @@ export function aiOrders(
           const def = data.technologies[id];
           if (!def) return false;
           if (doneTech.includes(id) || activeTech.some((a) => a.technology === id)) return false;
-          if (technologyLock(def, state, ai, data) !== null) return false;
+          if (technologyLock(def, state, ai, data, id) !== null) return false;
           return affordableTech(def.cost ?? {});
         })
         // Дешёвое и быстрое вперёд — это не «оптимальный порядок», а ДЕТЕРМИНИРОВАННЫЙ:

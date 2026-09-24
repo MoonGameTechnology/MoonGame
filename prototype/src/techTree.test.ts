@@ -607,3 +607,52 @@ describe('гейты технологий по учёному достижимы
     );
   });
 });
+
+/**
+ * PVR-6.17 — окно в забеге Sector Zero (заказ владельца 2026-09-24: «технологии из
+ * сетевой игры надо переделать под Sector Zero — там дневные ограничения, Хранитель,
+ * которого нет, и т. д.»). Правила — `state.techRules` из режима, окно их только читает.
+ */
+describe('techTreeHtml — дерево забега (PVR-6.17)', () => {
+  const run = (): GameState => {
+    const st = newGame();
+    st.techRules = { dayGates: false, exclude: ['ai_stewardship'] };
+    delete st.players.p1!.scientists; // совета учёных у забега нет
+    return st;
+  };
+  const allTabs = (st: GameState): string =>
+    TECH_BRANCHES.map((b) => techTreeHtml(st, 'p1', b.key, null)).join('');
+
+  it('«Хранителя» нет ни в ветке, ни в счётчике вкладки', () => {
+    const html = techTreeHtml(run(), 'p1', 'command', null);
+    expect(html).not.toContain('data-tech="ai_stewardship"');
+    const commandIds = Object.keys(TECHS).filter(
+      (id) => TECHS[id]!.branch === 'command' && id !== 'ai_stewardship',
+    );
+    expect(html).toContain(`<i class="tt-cnt">0/${commandIds.length}</i></button>`);
+    // В сетевом матче узел на месте.
+    expect(techTreeHtml(newGame(), 'p1', 'command', null)).toContain('data-tech="ai_stewardship"');
+  });
+
+  it('ни замка «нужен день N», ни счётчика дней', () => {
+    const html = allTabs(run());
+    expect(html).not.toContain('tt-day');
+    expect(html).not.toContain('st-gate');
+    // Досье узла с воротами дня: ни «открывается с дня», ни строки «📅 с дня».
+    const gated = Object.keys(TECHS).find(
+      (id) => (TECHS[id]!.dayGate ?? 0) > 0 && !TECHS[id]!.prerequisites?.length && id !== 'ai_stewardship',
+    )!;
+    const dossier = techTreeHtml(run(), 'p1', TECHS[gated]!.branch ?? 'space', gated);
+    expect(dossier).toContain(`data-go="${gated}"`);
+    expect(dossier).not.toContain('📅');
+    // Сетевой матч держит и то и другое.
+    expect(allTabs(newGame())).toContain('tt-day');
+    expect(allTabs(newGame())).toContain('st-gate');
+  });
+
+  it('строки про лидера ветки нет, когда замков «учёный» в дереве не осталось', () => {
+    expect(allTabs(run())).not.toContain('tt-lead');
+    expect(allTabs(newGame())).toContain('tt-lead');
+  });
+});
+

@@ -49,20 +49,34 @@ export interface ChapterMapView {
 }
 
 /**
- * Цели задач главы на её карте. `control` называет провинции — метятся всегда: задача сама
- * говорит, куда идти, и клетка на карте есть и в тумане (без вида и хозяина). `raze`
- * метит провинции со стоящей постройкой названного вида — только ОПОЗНАННЫЕ: иначе метка
- * выдала бы разведку, которой не было. У `build`, `scout` и `wave` одной точки нет.
+ * Цели задач главы на её карте. `control`, `rescue`, `beacon` и `build` с местом называют
+ * провинции — метятся всегда: задача сама говорит, куда идти, и клетка на карте есть и в
+ * тумане (без вида и хозяина). `raze` метит провинции со стоящей постройкой названного
+ * вида, `evac` — убежища, — только ОПОЗНАННЫЕ: иначе метка выдала бы разведку, которой не
+ * было. У `scout`, `wave` и `build` без места одной точки нет.
  * Выполненные задачи в `pool` уже не входят — закрытое не зовёт на карту.
  */
 export function chapterTargets(
   state: GameState,
-  pool: ReadonlyArray<{ id: string; kind: string; targets?: readonly string[] }>,
+  pool: ReadonlyArray<{
+    id: string;
+    kind: string;
+    targets?: readonly string[];
+    at?: readonly string[];
+  }>,
   active: ReadonlySet<string>,
   known: ReadonlySet<string>,
 ): ChapterTargets {
   const where = (o: (typeof pool)[number]): string[] => {
-    if (o.kind === 'control') return (o.targets ?? []).filter((id) => state.planets[id]);
+    // Названное место метится всегда: задача сама говорит, куда идти.
+    if (o.kind === 'control' || o.kind === 'rescue' || o.kind === 'beacon')
+      return (o.targets ?? []).filter((id) => state.planets[id]);
+    if (o.kind === 'build') return (o.at ?? []).filter((id) => state.planets[id]);
+    if (o.kind === 'evac')
+      return Object.values(state.planets)
+        .filter((p) => p.traits.includes('haven') && known.has(p.id))
+        .map((p) => p.id)
+        .sort();
     if (o.kind === 'raze') {
       const kinds = new Set(o.targets ?? []);
       return Object.values(state.planets)

@@ -15,6 +15,7 @@
  * Форма REFM: разметка и подсчёт места чистые (`endScreenHtml`, `placementOf`), уход из
  * матча — дело хоста (сеть, туры, хаб), модуль только сообщает, что выбрал игрок.
  */
+import { missionLabelN } from '../../decisions/missionView';
 import type { GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
@@ -159,7 +160,7 @@ export function runSummaryHtml(r: RunSummary): string {
     ...r.objectives.map((o) =>
       row(
         o.complete ? 'task done' : 'task',
-        `${o.complete ? '✓' : '✗'} ${esc(t(o.id, { n: o.total }))}`,
+        `${o.complete ? '✓' : '✗'} ${esc(t(o.id, { n: missionLabelN(o) }))}`,
         o.complete ? `+${o.paid}` : '—',
       ),
     ),

@@ -113,6 +113,11 @@ body{margin:0;overflow:hidden;color:var(--ink);
 body.app-starting *,body.app-starting *::before,body.app-starting *::after{
   animation:none!important;transition:none!important;}
 body.app-starting #map{visibility:hidden;}
+/* BOOT-1: до первого шага скрипта — только фон. Разметка большая, и браузер успевал
+   нарисовать её раньше, чем выполнится скрипт: вход в СТАРОМ виде (без класса консоли
+   \`holo-ui\`) и без подписей, а через полсекунды — новый. Покров снимает \`bootstrap.ts\`,
+   уже поставив классы консоли и подписи. */
+body.app-booting > *{visibility:hidden!important;}
 body.app-startup-failed > :not(#startup-error){display:none!important;}
 /* AUD-29: the tab that lost Sector Zero to another tab looks like a stopped start, too. */
 #startup-error,#tab-taken{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
@@ -297,7 +302,7 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #devline .dl-missions i{font-style:normal;}
 #missionpanel{position:fixed;top:calc(var(--tbh) + 34px);right:18px;z-index:44;width:min(360px,calc(100vw - 24px));
   max-height:min(60vh,420px);overflow:auto;padding:10px 12px;border-radius:12px;color:var(--ink);
-  background:rgba(4,16,18,.94);border:1px solid rgba(143,245,200,.55);box-shadow:0 8px 28px rgba(0,0,0,.55),0 0 16px rgba(143,245,200,.12);}
+  background:rgba(4,16,18,.98);border:1px solid rgba(143,245,200,.55);box-shadow:0 8px 28px rgba(0,0,0,.55),0 0 16px rgba(143,245,200,.12);}
 #missionpanel[hidden]{display:none;}
 #missionpanel .mp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#8ff5c8;
   font-size:13px;letter-spacing:.6px;text-transform:uppercase;}
@@ -309,6 +314,8 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #missionpanel button.mp-row{cursor:pointer;}
 #missionpanel button.mp-row:hover{background:rgba(143,245,200,.12);border-color:rgba(143,245,200,.5);}
 #missionpanel .mp-row.done{opacity:.7;}
+#missionpanel .mp-row.failed{opacity:.6;border-color:rgba(255,90,77,.35);}
+#missionpanel .mp-row.failed .mp-mark,#missionpanel .mp-row.failed .mp-prog{color:#ff8f86;}
 #missionpanel .mp-mark{grid-row:1/3;font-style:normal;color:#8ff5c8;}
 #missionpanel .mp-prog{color:#8ff5c8;font-variant-numeric:tabular-nums;}
 #missionpanel .mp-reward{grid-column:2;display:flex;gap:10px;font-size:11px;font-variant-numeric:tabular-nums;}
@@ -1557,7 +1564,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #techbody{padding:0;overflow:hidden;display:flex;flex-direction:column;}
 .tt-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 0;flex:none;}
 .tt-day{font-size:11px;color:var(--grn);border:1px solid var(--grn-dim);border-radius:12px;padding:3px 10px;background:rgba(95,240,192,.06);}
-.tt-slots{font-size:11px;color:var(--cyan);}
+.tt-slots{font-size:11px;color:var(--cyan);margin-left:auto;}
 /* Ветки — СЕТКА 3×2, а не лента с прокруткой: пять веток влезают целиком, и «сколько
    ещё осталось» видно по всем сразу, не досвайпывая до края. */
 .tt-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:9px 12px 8px;flex:none;}
@@ -3256,10 +3263,11 @@ const SDK_LOADER = `<!-- Yandex Games SDK -->
 
 const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
+<style>html{background:#02080e}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
 <title>${entry === 'sector-zero' ? 'Sector Zero' : 'Void Dominion — Sector Command'}</title>${external ? `${SDK_LOADER}\n<link rel="stylesheet" href="assets/app.css">` : `<style>${allCss()}</style>`}</head>
-<body data-entry="${entry}">
+<body data-entry="${entry}" class="app-booting">
 <section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
   <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
   <p data-i18n="startup.failed.body"></p>

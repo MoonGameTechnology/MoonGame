@@ -761,6 +761,10 @@ export interface GameState {
    *  на первом шаге часов и дальше не меняются — как `pve`: правка баланса не переписывает
    *  идущий матч. Нет поля ⇒ общие числа ядра (`DEFAULT_SIGHT`, `state/visibility.ts`). */
   sight?: SightRules;
+  /** Дерево технологий этого матча (PVR-6.17): свои правила режима
+   *  (`data.modes[id].technology`), закреплённые на первом шаге часов — как `sight`. Нет
+   *  поля ⇒ дерево сетевого матча (`DEFAULT_TECH_RULES`, `modules/technology.ts`). */
+  techRules?: TechRules;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
@@ -915,6 +919,25 @@ export interface GameState {
    *  же швом, что `swarmIntel`. Память самого Роя лежит отдельно и клиенту не уходит
    *  вовсе: журнал — это знание игрока, а не подсмотренная правда. */
   swarmJournal?: Record<PlayerId, SwarmRepelRecord>;
+  /** Факты для задач забега (`missionFactsModule`): кто и с какого момента держит
+   *  провинцию, какие миры игрок терял, сколько беженцев доставил. Задачи — чистые
+   *  предикаты над состоянием, а «N часов подряд» и «гарнизон уже пал» из одного кадра
+   *  не прочесть: нужна память. Здесь только ФАКТЫ, без знания о конкретных задачах. */
+  missionFacts?: MissionFacts;
+}
+
+/** Память фактов для задач забега (`missionFactsModule`). */
+export interface MissionFacts {
+  /** Провинция → кто её держит и с какого момента (ставится на каждом захвате). Нет
+   *  записи — провинция не переходила из рук в руки с начала матча. */
+  held?: Record<PlanetId, { owner: PlayerId; since: number }>;
+  /** Провинция → игрок → самая длинная ЗАВЕРШЁННАЯ серия удержания (мс). «Держал N
+   *  часов подряд» не отменяется потерей после: серия уже состоялась. */
+  longest?: Record<PlanetId, Record<PlayerId, number>>;
+  /** Игрок → провинции, которые он терял (захват у него). Только растёт. */
+  fallen?: Record<PlayerId, PlanetId[]>;
+  /** Игрок → сколько беженцев (юниты с признаком `evacuee`) доставлено в убежище. */
+  evacuated?: Record<PlayerId, number>;
 }
 
 /**
@@ -1289,6 +1312,14 @@ export interface SightRules {
   fleet: number;
   /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */
   radarScale: number;
+}
+
+/** Правила дерева технологий матча (PVR-6.17). */
+export interface TechRules {
+  /** Действуют ли ворота дней (`dayGate`) — в забеге нет. */
+  dayGates: boolean;
+  /** Узлы, которых в этом матче нет вовсе. */
+  exclude: string[];
 }
 
 /** Creates an empty, deterministically-seeded initial state. */
