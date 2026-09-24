@@ -6,6 +6,10 @@ const пусто: CmdSelection = {
   castHero: false,
   troops: false,
   assaultArmed: false,
+  mergeable: false,
+  merging: false,
+  troopsMenu: false,
+  troopsOpen: false,
   more: false,
   picking: false,
 };
@@ -33,6 +37,35 @@ describe('cmdPresence — что показывается отсутствием
   // и кнопка унесла бы с собой единственную подпись о том, что он ещё взведён.
   it('ВЗВЕДЁННЫЙ штурм остаётся в ряду, даже когда штурмовать уже некем', () => {
     expect(cmdShown(с({ assaultArmed: true })).assault).toBe(true);
+  });
+});
+
+// Правило 3б (заказ владельца 2026-09-24): «Если сливать нечего, то и кнопки "слить" не
+// должно отображаться», «то же самое с кнопкой десант».
+describe('cmdPresence — слияние и десант по составу (правило 3б)', () => {
+  it('«Слить» нет, когда сливаться не с кем', () => {
+    expect(cmdShown(пусто).merge).toBe(false);
+    expect(cmdShown(с({ mergeable: true })).merge).toBe(true);
+  });
+
+  it('взведённый выбор напарника остаётся в ряду, даже когда напарник пропал', () => {
+    expect(cmdShown(с({ merging: true })).merge).toBe(true);
+  });
+
+  it('«Десант» нет, когда грузить и высаживать нечего', () => {
+    expect(cmdShown(пусто).troops).toBe(false);
+    expect(cmdShown(с({ troopsMenu: true })).troops).toBe(true);
+  });
+
+  it('открытое меню десанта кнопку не теряет', () => {
+    expect(cmdShown(с({ troopsOpen: true })).troops).toBe(true);
+  });
+
+  it('десант на борту для штурма и меню десанта — разные вопросы', () => {
+    // Трюм полон, но флот в пути: штурмовать есть кем, грузить сейчас нечего.
+    const inTransit = cmdShown(с({ troops: true }));
+    expect(inTransit.assault).toBe(true);
+    expect(inTransit.troops).toBe(false);
   });
 });
 

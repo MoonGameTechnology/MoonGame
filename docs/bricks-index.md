@@ -664,6 +664,7 @@
 | OBJP-2 | ✅ | proto | `docs/backlog.md` | Подробности объекта встают РЯДОМ с карточкой, а не |
 | OBJP-3 | ✅ | proto | `docs/backlog.md` | Каталог юнитов уехал в окно производства — туда же, |
 | CMD-VIS-2 | ✅ | proto | `docs/backlog.md` | Кнопка штурма появляется только когда есть кем |
+| CMD-VIS-3 | ✅ | proto | `docs/backlog.md` | «Слить» и «Десант» появляются, только когда есть |
 | EVT-1 | ✅ | core data proto | `docs/backlog.md` | Тёмные события наконец видны игроку, |
 | EVT-2 | ✅ | core data proto | `docs/backlog.md` | Трофеи за бой: победитель |
 | EVT-3 | ✅ | core data | `docs/backlog.md` | Пассивка героя «мародёр»: лестница из пяти |

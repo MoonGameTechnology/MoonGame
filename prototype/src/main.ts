@@ -8396,6 +8396,12 @@ function renderCmdBar() {
     // штурмовать некем, и кнопки не бывает вовсе. Пригодность ЦЕЛИ её по-прежнему гасит.
     troops: canAssaultAim(fleets.map((f) => sumUnits(f.landing ?? []))),
     assaultArmed: assaultAim,
+    // «Слить» и «Десант» — по составу (правило 3б): нет напарника или некого грузить —
+    // нет и кнопки.
+    mergeable: mergeOk,
+    merging,
+    troopsMenu: !!troopsIn,
+    troopsOpen: !!troopsPlan,
     more: cmdMore,
     picking: pickMode,
   });
@@ -8420,23 +8426,27 @@ function renderCmdBar() {
     (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
-    cmdBtn(
-      'merge',
-      '⛬',
-      ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
-      merging ? 'on' : '',
-      !mergeOk,
-      t('cmd.merge.hint'),
-    ) +
+    (shown.merge
+      ? cmdBtn(
+          'merge',
+          '⛬',
+          ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
+          merging ? 'on' : '',
+          !mergeOk,
+          t('cmd.merge.hint'),
+        )
+      : '') +
     cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint'), splitWhy) +
-    cmdBtn(
-      'troops',
-      '⇅',
-      t('cmd.troops'),
-      troopsPlan ? 'on' : '',
-      !troopsIn,
-      t('cmd.troops.hint'),
-    ) +
+    (shown.troops
+      ? cmdBtn(
+          'troops',
+          '⇅',
+          t('cmd.troops'),
+          troopsPlan ? 'on' : '',
+          !troopsIn,
+          t('cmd.troops.hint'),
+        )
+      : '') +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
