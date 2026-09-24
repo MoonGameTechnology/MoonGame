@@ -11,6 +11,7 @@ import {
   splitSlots,
   splitTotals,
   stepTake,
+  takeable,
 } from './splitPlan';
 
 describe('деление флота — состав', () => {
@@ -197,5 +198,33 @@ describe('трюм при делении', () => {
   it('честное деление с трюмом подтверждается', () => {
     const take = { [ships]: 1, [troops]: 2 };
     expect(canConfirmSplit(slots, take, cargoSplit(slots, take, capacity, size))).toBe(true);
+  });
+});
+
+describe('флагман героя остаётся (правило 8, сообщение владельца 2026-09-24)', () => {
+  const hero = (u: string) => u === 'hero';
+  const slots = () => splitSlots([{ unit: 'cruiser', count: 2 }, { unit: 'hero', count: 1 }], [], hero);
+
+  it('стек героя помечен неподвижным, прочие — нет', () => {
+    const s = slots();
+    expect(s.find((x) => x.unit === 'hero')?.fixed).toBe(true);
+    expect(s.find((x) => x.unit === 'cruiser')?.fixed).toBeUndefined();
+    expect(takeable(s.find((x) => x.unit === 'hero')!)).toBe(0);
+  });
+
+  it('отбор героя обнуляется пересчётом — приказ не уйдёт в отказ E_HERO_UNIT', () => {
+    const take = normalizeSlotTake({ 'ship:hero|': 1, 'ship:cruiser|': 1 }, slots());
+    expect(take).toEqual({ 'ship:cruiser|': 1, 'ship:hero|': 0 });
+  });
+
+  it('увести всех остальных можно: герой остаётся один — ровно то, чего хотел игрок', () => {
+    const s = slots();
+    const take = { 'ship:cruiser|': 2 };
+    expect(shipTotals(s, take)).toEqual({ takeTotal: 2, total: 3, left: 1 });
+    expect(canConfirmSplit(s, take, cargoSplit(s, take, () => 0, () => 1))).toBe(true);
+  });
+
+  it('без предиката ничто не неподвижно — прежние вызовы не меняются', () => {
+    expect(splitSlots([{ unit: 'hero', count: 1 }]).some((x) => x.fixed)).toBe(false);
   });
 });

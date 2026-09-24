@@ -555,6 +555,10 @@ export const en: Record<string, string> = {
   'cmd.selection.one': 'FLEET',
   'cmd.split': 'Split',
   'cmd.split.hint': 'peel some ships off a docked fleet into a new one',
+  'cmd.split.why.battle': 'The fleet is in battle — split it after the fight.',
+  'cmd.split.why.moving': 'The fleet is under way — split it once it stops.',
+  'cmd.split.why.one': 'Only a single fleet can be split — select just that one.',
+  'cmd.split.why.single': 'The fleet has a single ship — nothing to split.',
   'cmd.stop': 'Stop',
   'cmd.troops': 'Troops',
   'cmd.troops.hint':
@@ -1313,6 +1317,8 @@ export const en: Record<string, string> = {
   // --- split — Разделение флота: диалог и предпросмотр.
   'split.all': 'All',
   'split.confirm': 'Confirm',
+  'split.fixed': 'stays',
+  'split.hero': "The hero's flagship stays in this fleet. To send the hero off alone, split off the other ships.",
   'split.hold': 'hold — new fleet: {a} · original: {b}',
   'split.hold.over': 'the troops do not fit',
   'split.note':

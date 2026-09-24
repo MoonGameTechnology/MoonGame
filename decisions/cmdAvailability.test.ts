@@ -4,6 +4,7 @@ import {
   canAssaultFromOrbit,
   canMerge,
   canSplit,
+  splitBlock,
   uniformMode,
   type AssaultSpot,
   type LoneFleet,
@@ -120,5 +121,30 @@ describe('командная полоса — общий режим огня', (
 
   it('показывать нечего — тоже null', () => {
     expect(uniformMode([])).toBeNull();
+  });
+});
+
+describe('почему делить нельзя (сообщение владельца 2026-09-24)', () => {
+  const флот = (over: Partial<Parameters<typeof splitBlock>[0] & object> = {}) => ({
+    location: 'W1',
+    ships: 3,
+    ...over,
+  });
+
+  it('можно — причины нет, и это то же, что canSplit', () => {
+    expect(splitBlock(флот())).toBeNull();
+    expect(canSplit(флот())).toBe(true);
+  });
+
+  it('каждому запрету — своя причина', () => {
+    expect(splitBlock(null)).toBe('cmd.split.why.one');
+    expect(splitBlock(флот({ movement: { to: 'W2' } }))).toBe('cmd.split.why.moving');
+    expect(splitBlock(флот({ location: null }))).toBe('cmd.split.why.moving');
+    expect(splitBlock(флот({ battleId: 'b1' }))).toBe('cmd.split.why.battle');
+    expect(splitBlock(флот({ ships: 1 }))).toBe('cmd.split.why.single');
+  });
+
+  it('в пути и в бою разом — сперва «в пути»: это то, что пройдёт раньше', () => {
+    expect(splitBlock(флот({ movement: { to: 'W2' }, battleId: 'b1' }))).toBe('cmd.split.why.moving');
   });
 });

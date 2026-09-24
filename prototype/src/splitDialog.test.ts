@@ -168,3 +168,28 @@ describe('окно деления — разметка', () => {
     expect(html).not.toContain('<u>');
   });
 });
+
+describe('окно деления — флагман героя и имя флота (правила 9–10)', () => {
+  const hooks = { icon: () => '', name: (u: string) => u, moduleName: (m: string) => m };
+  const slots = splitSlots([{ unit: 'cruiser', count: 2 }, { unit: 'hero', count: 1 }], [], (u) => u === 'hero');
+
+  it('строка героя без кнопок, с пометкой «остаётся», и пояснение, как отпустить героя', () => {
+    const html = splitDialogHtml({ fleetId: 'p1_2', rows: splitRows(slots, { 'ship:hero|': 1 }), cargo: пусто }, hooks);
+    expect(html).not.toContain('data-key="ship:hero|"');
+    expect(html).toContain('data-key="ship:cruiser|"');
+    expect(html).toContain('<div class="srow sfixed">');
+    expect(html).toContain('class="ssub shero"');
+  });
+
+  it('без героя пояснения нет', () => {
+    const html = splitDialogHtml(модель('f1', [{ unit: 'cruiser', count: 2 }]), hooks);
+    expect(html).not.toContain('shero');
+  });
+
+  it('в заголовке — имя флота, id — только запасной', () => {
+    const named = splitDialogHtml({ ...модель('p1_2', [{ unit: 'cruiser', count: 2 }]), fleetName: '«IRONSIDE 5»' }, hooks);
+    expect(named).toContain('<b>«IRONSIDE 5»</b>');
+    expect(named).not.toContain('<b>p1_2</b>');
+    expect(splitDialogHtml(модель('p1_2', [{ unit: 'cruiser', count: 2 }]), hooks)).toContain('<b>p1_2</b>');
+  });
+});
