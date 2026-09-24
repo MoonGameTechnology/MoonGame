@@ -281,12 +281,21 @@ try {
     await page.locator('#sz-prep').click();
     await page.locator('[data-prep="tab"][data-id="shop"]').click();
     const before = (await progress())?.sovereigns ?? 0;
-    await page.locator('[data-prep="ad-sovereigns"]:not([disabled])').click();
+    const shown = async () => (await log()).filter((c) => c === 'rewarded').length;
+    const shownBefore = await shown();
+    await page.locator('[data-prep="ad-sovereigns"]:not([disabled])').waitFor();
+    // Двойной тап в одном такте (AUD-25): пока ролик идёт, второе нажатие не зовёт второй.
+    await page.evaluate(() => {
+      const button = document.querySelector('[data-prep="ad-sovereigns"]:not([disabled])');
+      button.click();
+      button.click();
+    });
     await page.waitForFunction(
       (n) => (JSON.parse(localStorage.getItem('sector-zero.progress.v1')).sovereigns ?? 0) > n,
       before,
     );
-    assert.ok((await log()).includes('rewarded'), 'ролик показан силами площадки');
+    await page.waitForTimeout(300);
+    assert.equal((await shown()) - shownBefore, 1, 'двойной тап — один ролик');
 
     // 5. Двери по ссылке ведут в тот же Sector Zero.
     for (const tail of ['/?join=abc123', '/?reset=token123']) {
