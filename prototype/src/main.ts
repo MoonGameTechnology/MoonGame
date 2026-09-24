@@ -260,11 +260,14 @@ import { missionProgress, objectiveNominal, shownObjectives } from '../../decisi
 import { chapterMapView } from '../../decisions/chapterMap';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
 import {
+  keepLocalMark,
   parseCloudProfile,
   parseSyncMark,
   planCloudSync,
+  profileNumbers,
   profileHasProgress,
   serializeCloudProfile,
+  type CloudProfile,
 } from '../../decisions/cloudSync';
 import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
@@ -287,7 +290,7 @@ import {
   type PortableRunSave,
 } from '../../decisions/portableRun';
 import { SECTOR_ZERO_ABSENT_TOOLS, toolShown, type SessionTool } from '../../decisions/sectorZeroTools';
-import { initSectorZeroMenu } from './sectorZeroMenu';
+import { initSectorZeroMenu, type SectorZeroAccount } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
 import { getPlatform, type PlatformHost } from './platform/host';
 import { advanceShopDay, localShopDay, shopCapabilities } from '../../decisions/sectorZeroShop';
@@ -13534,9 +13537,12 @@ const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
  *  того, чего мы не видели, нельзя, а держать меню дольше незачем. */
 const CLOUD_LOAD_TIMEOUT_MS = 4000;
 let syncMark = parseSyncMark(readRaw(CLOUD_MARK_KEY));
-/** `off` — гость или облака нет; `on` — сверено, пишем; `held` — прогресс разошёлся с
- *  облачным, и до выбора игрока облако не трогаем (экран выбора — `YAG-1.4`). */
-let cloudState: 'off' | 'on' | 'held' = 'off';
+/** `off` — облака нет; `guest` — облако у площадки есть, а игрок не вошёл (кнопка «Войти»);
+ *  `on` — сверено, пишем; `held` — прогресс разошёлся с облачным, и до выбора игрока
+ *  облако не трогаем (экран выбора в меню, `YAG-1.4`). */
+let cloudState: 'off' | 'guest' | 'on' | 'held' = 'off';
+/** Облачный профиль на развилке — ждёт выбора игрока (`held`). */
+let cloudFork: { cloud: CloudProfile; progress: SectorZeroProgress } | null = null;
 let cloudWrite: Promise<void> = Promise.resolve();
 let lastCloudEnvelope = '';
 let lastCloudFlushed = '';
@@ -13581,7 +13587,10 @@ function pushCloud(flush = false): void {
 async function syncCloud(): Promise<void> {
   const host = getPlatform();
   if (!host.capabilities.cloudSave) return;
-  if (!(await host.auth.player()).authenticated) return;
+  if (!(await host.auth.player()).authenticated) {
+    cloudState = 'guest';
+    return;
+  }
   const raw = await Promise.race([
     host.save.load(),
     new Promise<undefined>((resolve) => setTimeout(resolve, CLOUD_LOAD_TIMEOUT_MS)),
@@ -13599,33 +13608,76 @@ async function syncCloud(): Promise<void> {
     cloud,
     cloudProgress ? profileHasProgress(cloudProgress) : false,
   );
-  if (plan === 'choose') {
+  if (plan === 'choose' && cloud && cloudProgress) {
     cloudState = 'held';
+    cloudFork = { cloud, progress: cloudProgress };
     return;
   }
   if (plan === 'adopt' && cloud && cloudProgress) {
-    await runWrite;
-    sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data).progress;
-    await sectorProgressStore.save(JSON.stringify(sectorProgress));
-    // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному
-    // дескриптору (или его нет вовсе).
-    await runSaveStore.clear();
-    if (cloud.run) await portableRunStore.save(cloud.run);
-    else await portableRunStore.clear();
-    savedRun = null;
-    savedPortable = null;
-    syncMark = { rev: cloud.rev, syncedRev: cloud.rev };
-    writeSyncMark();
-    cloudState = 'on';
+    await adoptCloud(cloud, cloudProgress);
     note(t('sector-zero.cloud.adopted'));
     return;
   }
   cloudState = 'on';
   if (plan === 'upload') pushCloud();
 }
-progressWrite = progressWrite.then(syncCloud).catch((error: unknown) => {
+/** Облачный профиль становится единственным: молча на старте или выбором на развилке. */
+async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress): Promise<void> {
+  await runWrite;
+  // Забег, стоящий на паузе в этой вкладке, принадлежит прежнему профилю — выбор на
+  // развилке делается и после него. Меню иначе предложило бы «Продолжить» его и засчитало
+  // бы облачному профилю чужой забег.
+  if (runInProgress()) setRunActive(false);
+  sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data).progress;
+  await sectorProgressStore.save(JSON.stringify(sectorProgress));
+  // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному
+  // дескриптору (или его нет вовсе).
+  await runSaveStore.clear();
+  if (cloud.run) await portableRunStore.save(cloud.run);
+  else await portableRunStore.clear();
+  savedRun = null;
+  savedPortable = null;
+  syncMark = { rev: cloud.rev, syncedRev: cloud.rev };
+  writeSyncMark();
+  cloudFork = null;
+  cloudState = 'on';
+}
+const cloudSyncFailed = (error: unknown): void => {
   console.error('E_CLOUD_SYNC', error);
-});
+};
+progressWrite = progressWrite.then(syncCloud).catch(cloudSyncFailed);
+
+/** Меню: вход площадки и развилка профилей (`YAG-1.4`). Вход — только по нажатию игрока
+ *  (требование 1.2.1), и польза названа рядом с кнопкой ДО окна. */
+const sectorZeroAccount: SectorZeroAccount = {
+  canSignIn: () => cloudState === 'guest' && getPlatform().auth.canSignIn,
+  async signIn() {
+    // Отказ — не ошибка: кнопка остаётся, игрок продолжает гостем.
+    if ((await getPlatform().auth.signIn()).status !== 'ok') return;
+    progressWrite = progressWrite.then(syncCloud).catch(cloudSyncFailed);
+    await progressWrite;
+  },
+  fork: () =>
+    cloudFork ? { here: profileNumbers(sectorProgress), cloud: profileNumbers(cloudFork.progress) } : null,
+  async choose(pick) {
+    const fork = cloudFork;
+    if (!fork) return;
+    if (pick === 'cloud') {
+      progressWrite = progressWrite
+        .then(() => adoptCloud(fork.cloud, fork.progress))
+        .catch(cloudSyncFailed);
+      await progressWrite;
+      return;
+    }
+    // «Оставить этот»: облако получит локальный профиль с номером ВПЕРЕДИ облачного
+    // (`keepLocalMark` — почему именно так).
+    syncMark = keepLocalMark(syncMark, fork.cloud.rev);
+    writeSyncMark();
+    cloudFork = null;
+    cloudState = 'on';
+    pushCloud();
+  },
+};
 
 // Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
 // (`bootstrap.ts`): здесь площадка уже готова, и игра про её имя ничего не знает. В
@@ -13681,6 +13733,7 @@ const sectorZeroMenu = initSectorZeroMenu({
   root: $('sector-zero'),
   standalone: document.body.dataset.entry === 'sector-zero',
   preparation: sectorPreparation,
+  account: sectorZeroAccount,
   load: async () => {
     await progressWrite;
     await runWrite;
