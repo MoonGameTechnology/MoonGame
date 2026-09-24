@@ -28,6 +28,7 @@ export {
   type Fleet,
   type FleetMovement,
   type FleetEdge,
+  type FleetResume,
   type PlanetRoads,
   type RoadPoint,
   type RoadTrail,
