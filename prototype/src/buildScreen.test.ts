@@ -97,6 +97,13 @@ describe('окно построек — состояние строки от п�
     expect(buildRowState(s, 'p1', home(s), 'mine', () => 'E_FORBIDDEN', noQueue).st).toBe('hidden');
   });
 
+  it('органы Роя у не-Роя прячутся: строить их может только Рой (E_SWARM_ONLY)', () => {
+    const s = newGame();
+    for (const organ of ['biomass_pit', 'swarm_synapse', 'swarm_hive'])
+      expect(buildRowState(s, 'p1', home(s), organ, probe(s), noQueue).st).toBe('hidden');
+    expect(html(s, home(s))).not.toContain('data-bw="biomass_pit"');
+  });
+
   it('локальная соло-очередь читается как «строится» — ядро о ней не знает', () => {
     const s = newGame();
     expect(buildRowState(s, 'p1', home(s), 'mine', probe(s), () => true).st).toBe('queued');

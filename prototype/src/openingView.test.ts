@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { HOME_ZOOM, openingView, pickHome, type WorldLike } from './openingView';
+import { readFileSync } from 'node:fs';
+import {
+  HOME_ZOOM,
+  RUN_HOME_ZOOM,
+  openingView,
+  openingZoom,
+  pickHome,
+  type WorldLike,
+} from './openingView';
 
 const world = (owner: string | null, buildings: number, x = 0): WorldLike => ({
   owner,
@@ -57,7 +65,43 @@ describe('стартовый вид — куда встаёт камера', () 
     expect(openingView(false, null)).toEqual({ kind: 'whole-map' });
   });
 
+  it('ЗАБЕГ на широком экране — у дома, но ближе к обзору, чем консоль', () => {
+    // ×3 показывало на карте главы один дом, вся карта целиком — почти сплошной туман.
+    expect(openingZoom({ phone: false, console: true, run: true })).toBe(RUN_HOME_ZOOM);
+    expect(openingZoom({ phone: false, console: false, run: true })).toBe(RUN_HOME_ZOOM);
+    expect(RUN_HOME_ZOOM).toBeGreaterThan(1);
+    expect(RUN_HOME_ZOOM).toBeLessThan(HOME_ZOOM);
+  });
+
+  it('консоль флагмана вне забега — у дома по-прежнему; простой ПК — обзор', () => {
+    expect(openingZoom({ phone: false, console: true, run: false })).toBe(HOME_ZOOM);
+    expect(openingZoom({ phone: false, console: false, run: false })).toBeNull();
+  });
+
+  it('телефон открывается у дома по правилу 3 — и в забеге тоже', () => {
+    expect(openingZoom({ phone: true, console: false, run: true })).toBe(HOME_ZOOM);
+    expect(openingZoom({ phone: true, console: true, run: false })).toBe(HOME_ZOOM);
+  });
+
+  it('приближение доезжает до вида: дом с тем множителем, что выбрало правило', () => {
+    expect(openingView(true, world('me', 1, 7), RUN_HOME_ZOOM)).toEqual({
+      kind: 'home',
+      at: { x: 7, y: 0 },
+      scale: RUN_HOME_ZOOM,
+    });
+  });
+
   it('приближение задано множителем к вписыванию, а не в пикселях', () => {
     expect(HOME_ZOOM).toBeGreaterThan(1);
+  });
+});
+
+describe('проводка стартового вида', () => {
+  it('defaultView спрашивает openingZoom с признаком забега из режима матча', () => {
+    // `s.pve` ядро заводит только на первом ходе часов, а стартовый вид ставится раньше:
+    // забег узнаётся по режиму. Литерал вместо признака typecheck пропустил бы.
+    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    expect(src).toContain("const run = data.modes[matchMode() ?? '']?.pve !== undefined;");
+    expect(src).toContain('openingZoom({ phone: MOBILE, console: holographic.active(), run })');
   });
 });
