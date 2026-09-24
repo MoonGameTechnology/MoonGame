@@ -41,6 +41,10 @@ export interface PlatformHost {
   gameplayStart(): void;
   gameplayStop(): void;
   onPlatformPause(listener: (paused: boolean) => void): () => void;
+  /** Кнопка «назад» площадки (`YAG-6.4`). */
+  onHistoryBack(listener: () => void): () => void;
+  /** Игрок выходит из игры (`YAG-6.4`). */
+  onExit(listener: () => void): () => void;
 }
 
 /** Глобальный объект, который кладёт тег лоадера. Своё описание, а не зависимость. */
