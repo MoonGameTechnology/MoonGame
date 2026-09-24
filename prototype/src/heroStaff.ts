@@ -22,6 +22,7 @@ import {
   slotUsage,
   type Action,
   type GameState,
+  type HeroPassiveDef,
   type ShipSlotType,
   type SlotCounts,
 } from '../../packages/shared-core/src/index';
@@ -79,7 +80,7 @@ export function heroDisplayName(hero: HeroInst): string {
   const fallback = hero.name ?? hero.id;
   if (hero.grade === 'main') return houseDisplayName(fallback);
   const identity = heroIdentity(hero.archetype);
-  if (identity) return t(identity.name);
+  if (identity?.name) return t(identity.name);
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   // Две РАЗНЫЕ формы, и один вызов на обе не годится (CONV-12b). Имя архетипа приходит
   // из каталога и теперь английское (`Ravager`) — его переводит `tData()` по слагу
@@ -200,7 +201,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     : fleet
       ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
       : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
-  const bonuses = (hero.passives ?? [])
+  const bonuses = activePassivesOf(hero)
     .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
     .join('');
   const bays = heroBaysOf(hero);
@@ -393,6 +394,19 @@ function heroBaysOf(hero: HeroInst): SlotCounts {
   };
 }
 
+/** A passive that is worn in a skill slot (PVR-6.16), or undefined for an always-on one. */
+function slottedPassive(id: string): HeroPassiveDef | undefined {
+  const def = data.heroPassives[id];
+  return def?.slotted ? def : undefined;
+}
+
+/** Passives that act right now: always-on ones, and slotted ones only while worn — the
+ *  same rule the core's `passiveBonus` applies, so the panel never lists a dead bonus. */
+function activePassivesOf(hero: HeroInst): string[] {
+  const worn = wornOf(hero);
+  return (hero.passives ?? []).filter((p) => !slottedPassive(p) || worn.includes(p));
+}
+
 /** What the hero WEARS. Mirrors the core's `equippedOf`, including its legacy fallback:
  *  no `equipped` field ⇒ an old loadout where owning and wearing were one thing. */
 function wornOf(hero: HeroInst): string[] {
@@ -419,17 +433,31 @@ function wornOf(hero: HeroInst): string[] {
  */
 function heroAbilitiesHtml(hero: HeroInst, now: number): string {
   const dead = hero.alive === false;
-  const owned = (hero.abilities ?? []).filter(
-    (a): a is string => a !== null && !!data.heroAbilities[a],
-  );
+  // Slots hold abilities AND slotted passives (PVR-6.16): one list, one budget.
+  const owned = [
+    ...(hero.abilities ?? []).filter((a): a is string => a !== null && !!data.heroAbilities[a]),
+    ...(hero.passives ?? []).filter((p) => !!slottedPassive(p)),
+  ];
   if (!owned.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
-  const worn = wornOf(hero).filter((a) => !!data.heroAbilities[a]);
+  const worn = wornOf(hero).filter((a) => !!data.heroAbilities[a] || !!slottedPassive(a));
   const slots = skillSlotsOf(hero);
   const free = Math.max(0, slots - worn.length);
 
   // --- слоты: занятые отсеки + пустые приглашения ---------------------------
   const bays: string[] = [];
   for (const ab of worn) {
+    const pd = slottedPassive(ab);
+    if (pd) {
+      // A worn passive has nothing to cast: it simply acts while it sits here.
+      bays.push(
+        `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(pd.name))}</span>` +
+          `<div class="hx-note">${esc(t(pd.description ?? ''))}</div></div>` +
+          `<div class="hx-bayact"><span class="hx-badge on">${t('hero.stat.active')}</span>` +
+          `<button class="hx-btn ghost" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+          `</div></div>`,
+      );
+      continue;
+    }
     const ad = data.heroAbilities[ab]!;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - now);
     const cast =
@@ -454,6 +482,18 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
   const pool = owned.filter((ab) => !worn.includes(ab));
   let poolHtml = '';
   for (const ab of pool) {
+    const pd = slottedPassive(ab);
+    if (pd) {
+      const action =
+        free > 0
+          ? `<button class="hx-btn" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
+          : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
+      poolHtml +=
+        `<div class="hx-row${free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
+        `<span class="hx-an">${esc(tData(pd.name))}</span>` +
+        `<div class="hx-note">${esc(t(pd.description ?? ''))}</div></div>${action}</div>`;
+      continue;
+    }
     const ad = data.heroAbilities[ab]!;
     const perk = ad.type.startsWith('spawn_');
     // Перк слот не занимает — он всегда «при герое», и кнопки надевания у него нет.
@@ -594,7 +634,7 @@ function heroOverviewHtml(hero: HeroInst, now: number, fleet?: GameState['fleets
       return b.weapon + b.defense + b.utility;
     })()}</b><span>${t('hero.stat.modules')}</span></div>` +
     `</div>`;
-  const bonuses = (hero.passives ?? [])
+  const bonuses = activePassivesOf(hero)
     .map(
       (p) =>
         `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('hero.stat.active')}</span></div>`,

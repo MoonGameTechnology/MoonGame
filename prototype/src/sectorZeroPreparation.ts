@@ -10,7 +10,7 @@ import {
 import {
   HERO_UNLOCK_COST,
   MODULE_UNLOCK_COST,
-  sectorHeroAbilities,
+  sectorHeroSlotItems,
   sectorHeroSlots,
   sectorHeroUpgradeCost,
   forgeLadderOf,
@@ -18,6 +18,7 @@ import {
   sectorModuleIds,
   sectorSkillCard,
   sectorSkillCost,
+  sectorSlotItem,
   sectorSkillOpenTo,
   WARRANTS_PER_REWARD,
   type SectorProgressAction,
@@ -457,11 +458,12 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const pips = [1, 2, 3].map((n) => `<i class="${n <= hero.level ? 'lit' : ''}"></i>`).join('');
     body += `<div class="sz-hero-head"><span><span class="sz-pips" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}${button('upgrade-hero', heroId, hero.level >= 3 ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { n: sectorHeroUpgradeCost(hero) }), hero.level >= 3 || p.research < sectorHeroUpgradeCost(hero))}</div></div></div>`;
     body += `<h3>${t('sector-zero.prep.abilities')} · ${hero.equipped.length}/${slots}</h3><div class="sz-cards">`;
-    for (const id of sectorHeroAbilities(heroId, hero, data)) {
-      const ability = data.heroAbilities[id]!;
-      if (ability.type.startsWith('spawn_')) continue;
+    // В слоты идут способности и надеваемые пассивки (PVR-6.16) — один список, один бюджет.
+    for (const id of sectorHeroSlotItems(heroId, hero, data)) {
+      if (data.heroAbilities[id]?.type.startsWith('spawn_')) continue;
+      const item = sectorSlotItem(id, data)!;
       const equipped = hero.equipped.includes(id);
-      body += `<article class="sz-card${equipped ? ' selected' : ''}"><h3>${esc(tData(ability.name))}</h3><p>${esc(t(ability.description ?? ''))}</p>${button('ability', id, t(equipped ? 'hero.slot.remove' : 'hero.slot.equip'), !equipped && hero.equipped.length >= slots, equipped)}</article>`;
+      body += `<article class="sz-card${equipped ? ' selected' : ''}"><h3>${esc(tData(item.name))}</h3><p>${esc(t(item.description ?? ''))}</p>${button('ability', id, t(equipped ? 'hero.slot.remove' : 'hero.slot.equip'), !equipped && hero.equipped.length >= slots, equipped)}</article>`;
     }
     body += `</div><h3>${t('sector-zero.prep.skills')}</h3><p class="sz-sub">${t('sector-zero.prep.skill-hint')}</p>`;
     const tiers = new Map<number, string[]>();

@@ -1,5 +1,6 @@
 /** One transparent atlas shared by the offline client and the PWA. No per-frame decoding. */
 import atlasUrl from './art/heroes/portraits.webp';
+import scientistUrl from './art/heroes/scientist.svg';
 import {
   heroGradeGlyph,
   heroIdentity,
@@ -7,21 +8,50 @@ import {
 } from '../../../decisions/heroIdentity';
 import type { Hero } from '../../shared-core/src/index';
 
-let atlas: HTMLImageElement | undefined;
-function portraitImage(): HTMLImageElement | undefined {
-  if (!atlas && typeof Image !== 'undefined') {
-    atlas = new Image();
-    atlas.src = atlasUrl;
+/** Portraits outside the atlas — one square file per archetype. Today it is the vector
+ *  draft of the fifth hero (owner's decision 2026-09-24) until real art replaces it. */
+const LOOSE_ART: Readonly<Record<string, string>> = { scientist: scientistUrl };
+
+const images = new Map<string, HTMLImageElement>();
+function portraitImage(url: string): HTMLImageElement | undefined {
+  let img = images.get(url);
+  if (!img && typeof Image !== 'undefined') {
+    img = new Image();
+    img.src = url;
+    images.set(url, img);
   }
-  return atlas?.complete && atlas.naturalWidth > 0 ? atlas : undefined;
+  return img?.complete && img.naturalWidth > 0 ? img : undefined;
+}
+
+/** Where the hero's face lives: an atlas cell, or a whole loose file. */
+function portraitSource(
+  archetype: string | undefined,
+): { url: string; cell?: number } | undefined {
+  const identity = heroIdentity(archetype);
+  if (!identity) return undefined;
+  if (identity.cell !== undefined) return { url: atlasUrl, cell: identity.cell };
+  const loose = archetype !== undefined ? LOOSE_ART[archetype] : undefined;
+  return loose !== undefined ? { url: loose } : undefined;
 }
 
 export function heroPortraitHtml(archetype: string | undefined): string {
-  const identity = heroIdentity(archetype);
-  if (!identity) return '';
-  const col = identity.cell % 2,
-    row = Math.floor(identity.cell / 2);
-  return `<span class="hero-portrait" aria-hidden="true" style="display:inline-block;overflow:hidden;position:relative;aspect-ratio:1"><img src="${atlasUrl}" alt="" draggable="false" decoding="async" style="position:absolute;width:200%;max-width:none;height:200%;left:-${col * 100}%;top:-${row * 100}%"></span>`;
+  const src = portraitSource(archetype);
+  return src ? portraitMarkup(src.url, src.cell) : '';
+}
+
+/**
+ * The portrait's markup for a source URL: an atlas cell (a quarter of the sheet) or a
+ * whole loose file. The URL is escaped for the attribute: the one-file builds inline an
+ * SVG as a `data:` URL that keeps its double quotes, and a raw `"` would end `src` early —
+ * the image arrives broken while every string check still passes.
+ */
+export function portraitMarkup(url: string, cell?: number): string {
+  const frame =
+    cell === undefined
+      ? 'width:100%;max-width:none;height:100%;left:0;top:0'
+      : `width:200%;max-width:none;height:200%;left:-${(cell % 2) * 100}%;top:-${Math.floor(cell / 2) * 100}%`;
+  const src = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  return `<span class="hero-portrait" aria-hidden="true" style="display:inline-block;overflow:hidden;position:relative;aspect-ratio:1"><img src="${src}" alt="" draggable="false" decoding="async" style="position:absolute;${frame}"></span>`;
 }
 
 /** Returns exactly the screen-space box used for clicks. Portraits stay upright. */
@@ -32,9 +62,9 @@ export function drawHeroPortrait(
   color: string,
   occupied: readonly PortraitHit[] = [],
 ): PortraitHit | null {
-  const identity = heroIdentity(hero.archetype);
-  const img = portraitImage();
-  if (!identity || !img) return null;
+  const src = portraitSource(hero.archetype);
+  const img = src ? portraitImage(src.url) : undefined;
+  if (!src || !img) return null;
   const width = 58,
     height = 68;
   const box: PortraitHit = {
@@ -64,12 +94,15 @@ export function drawHeroPortrait(
   cx.moveTo(anchor.x, anchor.y - 14);
   cx.lineTo(box.x + width / 2, box.y + height);
   cx.stroke();
-  const sw = img.naturalWidth / 2,
-    sh = img.naturalHeight / 2;
+  // An atlas cell is a quarter of the sheet; a loose portrait is the whole image.
+  const cells = src.cell === undefined ? 1 : 2;
+  const cell = src.cell ?? 0;
+  const sw = img.naturalWidth / cells,
+    sh = img.naturalHeight / cells;
   cx.drawImage(
     img,
-    (identity.cell % 2) * sw,
-    Math.floor(identity.cell / 2) * sh,
+    (cell % cells) * sw,
+    Math.floor(cell / cells) * sh,
     sw,
     sh,
     box.x,

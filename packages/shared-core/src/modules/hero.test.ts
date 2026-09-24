@@ -125,6 +125,14 @@ const data: GameData = parseGameData({
   // HERO-5 catalog: one passive per scope for each wired hook.
   heroPassives: {
     swift: { name: 'Swift', hook: 'fleet.speed', scope: 'heroFleet', params: { bonus: 0.1 } },
+    // PVR-6.16: a SLOTTED passive — works only while worn in a skill slot.
+    rush: {
+      name: 'Rush',
+      hook: 'fleet.speed',
+      scope: 'heroFleet',
+      slotted: true,
+      params: { bonus: 0.1 },
+    },
     herald: {
       name: 'Herald',
       hook: 'fleet.speed',
@@ -1541,6 +1549,55 @@ describe('hero — железо корабля: модули на герое (HP
     const hero = spawned.state.heroes!['hero:p1']!;
     const stack = spawned.state.fleets[hero.fleetId!]!.units[0]!;
     expect('modules' in stack).toBe(false);
+  });
+});
+
+describe('hero — надеваемая пассивка (PVR-6.16)', () => {
+  // Решение владельца 2026-09-24: пассивка может надеваться в слот, как способность.
+  // Такая действует, только пока надета, и делит бюджет слотов со способностями.
+  const kernel = createKernel([heroModule, movementModule]);
+  const equip = (abilityId: string, seq = 1): Action =>
+    act('hero.equip', 'p1', { heroId: 'hero:p1', abilityId }, seq);
+  function moving(over: Partial<Hero>): GameState {
+    const st = world();
+    st.fleets = { F1: fleet('F1', 'p1', 'A') };
+    Object.assign(st.heroes!['hero:p1']!, { fleetId: 'F1', grade: 'rare', ...over });
+    return st;
+  }
+  const eta = (st: GameState): number =>
+    okApply(kernel.applyAction(st, act('fleet.move', 'p1', { fleetId: 'F1', to: 'B' }, 9), ctx(0)))
+      .state.fleets.F1!.movement!.arrivesAt;
+
+  const boosted = (30 / 11) * HOUR;
+  const tryEquip = (over: Partial<Hero>, id: string) =>
+    kernel.applyAction(moving(over), equip(id), ctx(0));
+
+  it('действует только надетой: в пуле — ноль, в слоте — +10%', () => {
+    expect(eta(moving({ passives: ['rush'], equipped: [] }))).toBeCloseTo(3 * HOUR, 0);
+    expect(eta(moving({ passives: ['rush'], equipped: ['rush'] }))).toBeCloseTo(boosted, 0);
+    // Постоянная пассивка по-прежнему работает без всякого слота.
+    expect(eta(moving({ passives: ['swift'], equipped: [] }))).toBeCloseTo(boosted, 0);
+  });
+
+  it('надевается своя надеваемая пассивка; чужая и постоянная — нет', () => {
+    const worn = okApply(tryEquip({ passives: ['rush'], equipped: [] }, 'rush'));
+    expect(worn.state.heroes!['hero:p1']!.equipped).toEqual(['rush']);
+    expect(eta(worn.state)).toBeCloseTo(boosted, 0);
+    expect(errCode(tryEquip({ passives: [], equipped: [] }, 'rush'))).toBe('E_NOT_OWNED');
+    // Постоянная пассивка — не предмет для слота: она и так работает всегда.
+    expect(errCode(tryEquip({ passives: ['swift'], equipped: [] }, 'swift'))).toBe('E_NO_ABILITY');
+  });
+
+  it('делит бюджет слотов со способностями и снимается как они', () => {
+    const two = ['corridor', 'annihilate'];
+    expect(errCode(tryEquip({ abilities: two, passives: ['rush'], equipped: two }, 'rush'))).toBe(
+      'E_NO_SLOTS',
+    );
+    const on = moving({ passives: ['rush'], equipped: ['rush'] });
+    const unequip = act('hero.unequip', 'p1', { heroId: 'hero:p1', abilityId: 'rush' });
+    const off = okApply(kernel.applyAction(on, unequip, ctx(0)));
+    expect(off.state.heroes!['hero:p1']!.equipped).toEqual([]);
+    expect(eta(off.state)).toBeCloseTo(3 * HOUR, 0);
   });
 });
 

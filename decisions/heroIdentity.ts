@@ -1,16 +1,28 @@
 /** Presentation identities, separate from the simulated archetypes and their balance. */
 import type { GameState, Hero } from '../packages/shared-core/src/index';
 
-export const HERO_IDENTITIES = {
+export interface HeroIdentity {
+  /** Клетка атласа `portraits.webp` (2×2). Нет — портрет лежит отдельным файлом
+   *  (`packages/client/src/heroPortraits.ts`). */
+  readonly cell?: number;
+  /** Ключ личного имени. Нет — имя не согласовано, и показывается имя архетипа. */
+  readonly name?: string;
+  readonly bio: string;
+}
+
+export const HERO_IDENTITIES: Readonly<Record<string, HeroIdentity>> = {
   commander: { cell: 0, name: 'hero.person.commander.name', bio: 'hero.person.commander.bio' },
   ravager: { cell: 1, name: 'hero.person.ravager.name', bio: 'hero.person.ravager.bio' },
   vanguard: { cell: 2, name: 'hero.person.vanguard.name', bio: 'hero.person.vanguard.bio' },
   warden: { cell: 3, name: 'hero.person.warden.name', bio: 'hero.person.warden.bio' },
-} as const;
+  // Пятый герой (решение владельца 2026-09-24). В атласе клетки нет — портрет пока векторный
+  // черновик. Имя не выдумываем: сюжет требует согласовать его (sector-zero-roadmap §3.1.8).
+  scientist: { bio: 'hero.person.scientist.bio' },
+};
 
-export function heroIdentity(archetype: string | undefined) {
+export function heroIdentity(archetype: string | undefined): HeroIdentity | undefined {
   return archetype && Object.hasOwn(HERO_IDENTITIES, archetype)
-    ? HERO_IDENTITIES[archetype as keyof typeof HERO_IDENTITIES]
+    ? HERO_IDENTITIES[archetype]
     : undefined;
 }
 

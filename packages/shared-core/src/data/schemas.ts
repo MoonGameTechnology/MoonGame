@@ -1052,6 +1052,10 @@ export const HeroPassiveDefSchema = z.object({
    *  the province being ENTERED, because that is where `sectorModule` takes its toll.
    *  Unresolvable terrain contributes nothing rather than defaulting to "applies". */
   terrainFamily: z.string().optional(),
+  /** Worn in a skill slot (PVR-6.16, owner's decision 2026-09-24): the passive counts only
+   *  while it sits in `Hero.equipped`, and it shares the slot budget with abilities. Absent
+   *  = always on, which is how every passive behaved before. */
+  slotted: z.boolean().default(false),
   params: z
     .object({
       /** Multiplier contribution, e.g. 0.1 = +10% — applied as ×(1 + Σ bonuses). */
