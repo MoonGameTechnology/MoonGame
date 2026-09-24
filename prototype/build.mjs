@@ -315,6 +315,10 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .spd .spddiv{width:1px;height:18px;background:var(--line-hi);margin:0 2px;}
 .spd .spdmini{min-width:26px;font-size:10px;opacity:.9;}
 .spd .sep{width:1px;height:18px;background:var(--line-hi);margin:0 4px;flex:0 0 auto;}
+/* забег Sector Zero (matchExits.ts, правило 6): только его темп — ▶ и ▶▶, на ПК и на
+   телефоне. Множители сбили бы темп забега, пауза забега живёт в строке статуса. */
+.spd.spd-run #spd-pause,.spd.spd-run .spddiv,.spd.spd-run .spd-mult-legacy,.spd.spd-run .spd-mult-pc{display:none;}
+.spd.spd-run #spd-fast{display:inline-block;}
 /* speed-multiplier sets: mobile keeps the legacy chips, PC swaps in 1/30/60/120. The
    wrappers are display:contents so their buttons flow in the speedbar flex row. */
 .spd .spd-mult-legacy{display:contents;}
@@ -3007,6 +3011,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .spd .spd-pc-hide{display:none;}
   .spd .spd-mult-legacy{display:none;}
   .spd .spd-mult-pc{display:contents;}
+  /* забег (правило 6): ⌂ на ПК спрятан, и черте перед ним разделять нечего */
+  .spd.spd-run .sep{display:none;}
   /* base (portrait) bottom-sheet panel + the bars it lifts (замер --sheeth, 22.5vh —
      фолбэк: третья копия той же догадки, из-за которой дыра между рядом и листом
      вылезала «иногда» — на конкретной раскладке) */
