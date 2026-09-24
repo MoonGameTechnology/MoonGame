@@ -196,7 +196,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '30'; // PERK-3.1: добавлен veteranModule —
+export const MODULE_MANIFEST_VERSION = '31'; // PERK-1.2: массовые перки — в параллельную
+// корзину. Состав и порядок модулей те же; сменились ПРАВИЛА УРОНА: техи, пассив фракции и
+// аура героя больше не перемножаются друг с другом, а складываются очками. У лидера с полным
+// древом это ×2.10 → ×1.77. Подняв старую партию под новым кодом, мы молча сменили бы ей
+// боевую математику посреди игры — тот же случай, что CORE-DMG-3 ниже.
+// export const MODULE_MANIFEST_VERSION = '30'; // PERK-3.1: добавлен veteranModule —
 // надбавка за пережитые бои. Тут изменилось ЧЛЕНСТВО графа, а не только правила, так что
 // бамп обязателен по самому правилу выше. Номер новый, а не повторно 29: 29 уже лежит в
 // `main`, партии на нём создаются, и поднять такую партию под графом с лишним модулем

@@ -68,14 +68,16 @@ export const factionModule: GameModule = {
       return cap + passive(h.state.players[owner], h.ctx.data, 'fortGarrisonBonus');
     });
 
-    // Outgoing combat damage ×(1 + combatDamageBonus).
-    api.hook<number>('combat.damage', (damage, args, h) => {
+    // Outgoing combat damage: POINTS into the mass bucket (PERK-1.2), not a factor.
+    // Фракционный процент всегда включён и есть у каждого, то есть он ровно тот фон, на
+    // котором чужие проценты и должны разбавляться, а не множиться поверх.
+    api.hook<number>('combat.damage.parallel', (points, args, h) => {
       const attacker = (args as { attacker?: string | null }).attacker;
       const bonus =
         typeof attacker === 'string'
           ? passive(h.state.players[attacker], h.ctx.data, 'combatDamageBonus')
           : 0;
-      return bonus !== 0 ? damage * (1 + bonus) : damage;
+      return points + bonus;
     });
   },
 };

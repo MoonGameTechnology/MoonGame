@@ -272,16 +272,19 @@ export const heroEffectsModule: GameModule = {
     // и раньше считал ПОЗИЦИОННО — «герой жив, аура не истекла, узел в радиусе», — но
     // добраться до него можно было только через бой, и радиус кончался там же, где
     // свалка. Клетка у выстрела есть в каждом канале, и аура теперь доходит до всех.
-    api.hook<number>('combat.damage', (base, args, h) => {
+    //
+    // PERK-1.2: аура кладёт ОЧКИ в массовую корзину, а не множит. Она складывается сама с
+    // собой (несколько героев, несколько аур — `auraBonus` уже суммирует), значит и с
+    // чужими процентами ей складываться, а не компаундиться поверх них.
+    api.hook<number>('combat.damage.parallel', (points, args, h) => {
       const { attacker, attackerFleet, location } = (args ?? {}) as {
         attacker?: string;
         attackerFleet?: string;
         location?: string;
       };
-      if (typeof attacker !== 'string' || typeof attackerFleet !== 'string') return base;
-      if (typeof location !== 'string' || location === '') return base;
-      const bonus = auraBonus(h, attacker, location);
-      return bonus !== 0 ? base * (1 + bonus) : base;
+      if (typeof attacker !== 'string' || typeof attackerFleet !== 'string') return points;
+      if (typeof location !== 'string' || location === '') return points;
+      return points + auraBonus(h, attacker, location);
     });
 
     // PSI-LADDER → `combat.damage`, keyed off the side TAKING the hit (`args.defender`)
