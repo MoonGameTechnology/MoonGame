@@ -23,7 +23,7 @@
  * за рекламу не показывается», и отсутствие рекламы — нормальное состояние, а не поломка
  * игрового цикла. Включение способа — смена флага, а не переписывание витрины.
  */
-import type { GameData } from '../packages/shared-core/src/index';
+import { knownSkillNodes, type GameData } from '../packages/shared-core/src/index';
 import { hashUnit } from './sectorZeroForge';
 import {
   sectorSkillLegal,
@@ -86,12 +86,19 @@ export interface ShopRow {
 export function offerOwned(
   row: Pick<ShopRow, 'kind' | 'grants'>,
   progress: SectorZeroProgress,
+  data: GameData,
 ): boolean {
   if (row.kind === 'module') return progress.modules.includes(row.grants);
   // Навык покупается ВЫБРАННОМУ герою (`buy` → `selectedHero`), поэтому и «уже есть»
-  // спрашивается у него: знание навыка другим героем покупку не закрывает.
-  if (row.kind === 'skill')
-    return progress.heroes[progress.selectedHero]?.skills.includes(row.grants) ?? false;
+  // спрашивается у него: знание навыка другим героем покупку не закрывает. Врождённый
+  // узел (награда у архетипа со старта, AUD-22) тоже «уже есть».
+  if (row.kind === 'skill') {
+    const hero = progress.heroes[progress.selectedHero];
+    return (
+      hero !== undefined &&
+      knownSkillNodes(hero.skills, progress.selectedHero, data).has(row.grants)
+    );
+  }
   return false;
 }
 
@@ -114,7 +121,7 @@ export function shopRows(
     const offer = data.sectorZeroShop.offers[id];
     // Купленный сегодня лот ушёл с прилавка (`shopSold`) — до смены суток его нет.
     if (!offer || progress.shopSold.includes(id)) continue;
-    const owned = offerOwned(offer, progress);
+    const owned = offerOwned(offer, progress, data);
     // Узел навыка продаётся, только если его ВООБЩЕ можно изучить выбранному герою:
     // ветка и предпосылки — правила каталога, и деньги их не отменяют.
     const locked =

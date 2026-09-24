@@ -146,6 +146,21 @@ describe('AI-BAL-8 — дерево навыков (`hero.skill.unlock`)', () =>
     expect(only(orders(staged), 'hero.skill.unlock')).toHaveLength(0);
   });
 
+  it('врождённый узел бот не заказывает — ядро отбило бы его каждый тик (AUD-22)', () => {
+    // Командиру «Сонастройка» и «Пси-вуаль» даны от рождения («Маяк сбора», «Скан»): ядро
+    // засчитывает их изученными и покупку отбивает `E_ALREADY_UNLOCKED`. Бот, считающий
+    // только купленное, видел бы их свободными и заказывал бы вечно.
+    const s = rich(game2());
+    const hero = mainHero(s, 'p2'); // commander
+    const all = Object.keys(data.heroSkillTrees);
+    const innate = ['void_attunement', 'psi_veil'];
+    let staged = withHero(s, hero.id, { skills: all.filter((id) => !innate.includes(id)) });
+    for (const x of heroesOf(staged, 'p2')) {
+      if (x.id !== hero.id) staged = withHero(staged, x.id, { skills: all });
+    }
+    expect(only(orders(staged), 'hero.skill.unlock')).toHaveLength(0);
+  });
+
   it('узел без выполненных `requires` не берётся', () => {
     // `overclocked_helm` требует `neural_lace`: первым всегда идёт корень.
     const s = rich(game2());

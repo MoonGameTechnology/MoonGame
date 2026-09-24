@@ -94,13 +94,17 @@ describe('hero actions — the core engine over the prototype catalogs', () => {
     expect(h1.passives).toContain('vanguard_impulse'); // the node's grant landed
     // Раньше здесь мерилась ветка: `void_attunement` (psionic) на трансгуманисте падал
     // `E_WRONG_BRANCH`. Ветки припаркованы (HERO-11) — в каталоге их нет, дерево одно
-    // общее, и этот корень законен любому герою. Утверждение переписано под то, что
-    // действительно происходит; сам гейт цел и проверен на фикстурном каталоге в
-    // `packages/shared-core/src/modules/hero.test.ts`.
-    expect(order(s, unlockHeroSkill('p1', main.id, 'void_attunement'), s.time).error).toBeUndefined();
+    // общее; сам гейт ветки цел и проверен на фикстурном каталоге в
+    // `packages/shared-core/src/modules/hero.test.ts`. Командиру этот корень всё равно
+    // не продаётся: его «Маяк сбора» у героя со старта, и узел засчитан изученным (AUD-22).
+    expect(order(s, unlockHeroSkill('p1', main.id, 'void_attunement'), s.time).error).toBe(
+      'E_ALREADY_UNLOCKED',
+    );
     // Fail-secure никуда не делся — его держат РОДИТЕЛИ: узел ниже по лестнице закрыт,
     // пока не взят его `requires`.
-    expect(order(s, unlockHeroSkill('p1', main.id, 'psi_veil'), s.time).error).toBe('E_REQUIRES');
+    expect(order(s, unlockHeroSkill('p1', main.id, 'wreck_battery'), s.time).error).toBe(
+      'E_REQUIRES',
+    );
   });
 
   it('лестница коридора доходит до игрока: узлы дерева поднимают ступень каста', () => {

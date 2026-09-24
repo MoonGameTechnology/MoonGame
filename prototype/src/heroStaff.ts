@@ -17,6 +17,7 @@
  */
 import {
   effectiveStats,
+  knownSkillNodes,
   moduleAllowed,
   slotUsage,
   type Action,
@@ -275,7 +276,8 @@ export function nodeDepth(
  *  roots-first with a prereq connector; tap an own, un-owned node → dossier. */
 function heroTreeHtml(hero: HeroInst, res: Bag): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const skills = hero.skills ?? [];
+  // Изученное — купленное И врождённое (AUD-22): тот же набор, по которому судит ядро.
+  const known = knownSkillNodes(hero.skills ?? [], hero.archetype, data);
   const entries = Object.entries(data.heroSkillTrees);
   const ownBranch = def?.branch;
   // The hero's rail carries own-branch AND branch-less common nodes (both unlockable),
@@ -322,8 +324,8 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
       (rail.own ? '' : `<span class="hx-ftag">${t('hero.tree.not-your-branch')}</span>`) +
       `</div>`;
     for (const [nid, nd] of rn) {
-      const owned = skills.includes(nid);
-      const reqMet = nd.requires.every((r) => skills.includes(r));
+      const owned = known.has(nid);
+      const reqMet = nd.requires.every((r) => known.has(r));
       let cls = 'hx-node';
       let crest: string;
       let foot: string;
@@ -566,10 +568,13 @@ function heroShipHtml(hero: HeroInst): string {
  *  and the hero's live passive bonuses. */
 function heroOverviewHtml(hero: HeroInst, now: number, fleet?: GameState['fleets'][string]): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const learned = (hero.skills ?? []).length;
-  const treeTotal = Object.values(data.heroSkillTrees).filter(
-    (n) => n.branch === undefined || n.branch === def?.branch,
-  ).length;
+  const known = knownSkillNodes(hero.skills ?? [], hero.archetype, data);
+  const open = Object.entries(data.heroSkillTrees).filter(
+    ([, n]) => n.branch === undefined || n.branch === def?.branch,
+  );
+  const treeTotal = open.length;
+  // Счётчик сходится с галочками дерева: врождённый узел тоже изучен (AUD-22).
+  const learned = open.filter(([id]) => known.has(id)).length;
   const abil = (hero.abilities ?? []).filter((a) => a !== null).length;
   const identity = heroIdentity(hero.archetype);
   const bio = hero.grade === 'main' ? t('hero.person.main.bio') : identity ? t(identity.bio) : '';
@@ -631,7 +636,7 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
   if (kind === 'node') {
     const nd = data.heroSkillTrees[id];
     if (!nd) return '';
-    const skills = hero.skills ?? [];
+    const known = knownSkillNodes(hero.skills ?? [], hero.archetype, data);
     const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
     const give = gAb
       ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(tData(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
@@ -639,12 +644,12 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
         ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
         : '';
     const branchOk = nd.branch === undefined || nd.branch === def?.branch;
-    const reqMet = nd.requires.every((r) => skills.includes(r));
-    const owned = skills.includes(id);
+    const reqMet = nd.requires.every((r) => known.has(r));
+    const owned = known.has(id);
     const reqHtml = nd.requires
       .map(
         (r) =>
-          `<span class="${skills.includes(r) ? 'hx-ok' : 'hx-no'}">${skills.includes(r) ? '✓' : '✗'} ${esc(tData(data.heroSkillTrees[r]?.name ?? r))}</span>`,
+          `<span class="${known.has(r) ? 'hx-ok' : 'hx-no'}">${known.has(r) ? '✓' : '✗'} ${esc(tData(data.heroSkillTrees[r]?.name ?? r))}</span>`,
       )
       .join(' ');
     const canBuy = branchOk && reqMet && !owned && affordable(res, nd.cost) && !dead;
