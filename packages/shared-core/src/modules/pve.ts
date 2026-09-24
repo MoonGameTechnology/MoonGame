@@ -42,6 +42,12 @@ import { setStance } from '../state/diplomacy';
  *  action gate treats it as non-submittable — a player cannot call a wave down. */
 const WAVE_EVENT = 'pve.wave';
 
+/** The beat at the end of the hold-out (PVR-2.5). It carries no rule of its own: it only
+ *  splits the timeline AT the deadline, so `victoryModule` (subscribed to it by name —
+ *  modules meet on the bus, never by import) judges the run at that instant rather than
+ *  wherever the host's next advance happens to end. Internal, like the wave event. */
+const HOLD_EVENT = 'pve.hold';
+
 /** The PvE section of the match's mode, or undefined if this match isn't PvE. */
 function pveOf(h: HandlerContext): ModePve | undefined {
   const modeId = h.ctx.config?.modeId;
@@ -101,6 +107,22 @@ function armNextWave(
 }
 
 /**
+ * Start the hold-out that clears the run (PVR-2.5, «победа — выстоять»): the humans must
+ * still hold a world `holdHours` from now. Once per match — a deadline already set is
+ * never pushed back — and only under a mode that declares one. The beat at the deadline
+ * splits the timeline there, so `victoryModule` judges the run AT that instant.
+ */
+function startHoldOut(
+  h: HandlerContext,
+  pve: NonNullable<GameState['pve']>,
+  cfg: ModePve,
+): void {
+  if (cfg.holdHours === undefined || pve.holdUntil !== undefined) return;
+  pve.holdUntil = h.ctx.now + hoursToMs(h.ctx, cfg.holdHours);
+  h.schedule(pve.holdUntil, HOLD_EVENT, {});
+}
+
+/**
  * Declare the NPC at war with every other seat (PVR-1.5).
  *
  * Without this the mechanic was inert in the only way that matters: waves spawned on
@@ -155,7 +177,7 @@ function oweBoons(h: HandlerContext, pve: NonNullable<GameState['pve']>, cfg: Mo
 
 export const pveModule: GameModule = {
   id: 'pve',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     // Seeding rides on `time.advanced` rather than a match-start event: the kernel
     // emits it for the first continuous span of every match, so a PvE match arms its
@@ -182,7 +204,15 @@ export const pveModule: GameModule = {
       const cfg = pveOf(h);
       const pve = h.state.pve;
       if (!cfg || !pve) return;
-      if (pve.waveNumber >= pve.totalWaves) return; // the assault already finished
+      if (pve.waveNumber >= pve.totalWaves) {
+        // The assault already finished — yet a beat is still due. That is a world restored
+        // PAST its last wave: a portable save (YAG-2.1) rebuilds a freshly seeded match and
+        // sets the counter, so the fresh schedule's beat outlives it while the save carries
+        // no deadline. This beat is where the hold-out starts; for a live match it is a
+        // no-op, the deadline having been set when the last wave actually landed.
+        startHoldOut(h, pve, cfg);
+        return;
+      }
       pve.waveNumber += 1;
 
       const at = npcStagingWorld(h.state, pve.npcPlayerId);
@@ -221,6 +251,10 @@ export const pveModule: GameModule = {
         });
       }
       oweBoons(h, pve, cfg);
+      // The last wave has landed: start the hold-out (PVR-2.5). Keyed on the COUNTER,
+      // not on a spawn — a wave skipped for want of a staging world still ends the
+      // assault, so a run that wiped the hive early gets its deadline all the same.
+      if (pve.waveNumber >= pve.totalWaves) startHoldOut(h, pve, cfg);
       armNextWave(h, pve, cfg, h.ctx.now);
     });
 

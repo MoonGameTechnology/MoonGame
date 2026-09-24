@@ -896,6 +896,41 @@ describe('victory — PvE-исход (PVE-4)', () => {
     expect(r.state.match.status).toBe('ongoing');
   });
 
+  // PVR-2.5 — решение владельца 2026-09-23: «победа — выстоять». Срок ставит
+  // `pveModule` на последней волне; здесь он посажен руками, как и весь `state.pve`.
+  it('выстоял до срока → победа всех выживших, даже если у Роя остались миры', () => {
+    const state = pveWorld({
+      pve: { waveNumber: 3, totalWaves: 3, npcPlayerId: 'swarm', holdUntil: HOUR },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({ status: 'ended', reason: 'pve-cleared', winner: null });
+    expect(r.state.match.winners).toEqual(['p1', 'p2']);
+  });
+
+  it('срок ещё не настал → забег идёт, хотя у Роя миры', () => {
+    const state = pveWorld({
+      pve: { waveNumber: 3, totalWaves: 3, npcPlayerId: 'swarm', holdUntil: 2 * HOUR },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match.status).toBe('ongoing');
+  });
+
+  it('пал до срока → поражение: срок не спасает того, кто не выстоял', () => {
+    const state = pveWorld({
+      pve: { waveNumber: 3, totalWaves: 3, npcPlayerId: 'swarm', holdUntil: HOUR },
+      planets: { A: planet('A', 'swarm'), B: planet('B', 'swarm'), H: planet('H', 'swarm') },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({ status: 'ended', reason: 'pve-failed', winner: 'swarm' });
+  });
+
+  it('без срока — прежнее правило: волны кончились, но Рой держит мир → забег идёт', () => {
+    // Режим без `holdHours` срока не получает никогда, и тогда кончить забег можно только
+    // зачисткой. Регресс ровно этого правила — чтобы онлайн-PvE без поля не сменил смысл.
+    const r = okAdvance(kernel.advanceTo(pveWorld(), ctx(HOUR)));
+    expect(r.state.match.status).toBe('ongoing');
+  });
+
   it('но предел длины сессии забег всё-таки заканчивает — зависнуть он не может', () => {
     const state = pveWorld({
       pve: { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' },

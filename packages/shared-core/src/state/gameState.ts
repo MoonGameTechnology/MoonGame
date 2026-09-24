@@ -971,6 +971,11 @@ export interface PveState {
    *  co-op PvE seats each survive for themselves — a shared number would let one
    *  player spend the other's pick. Absent/0 = nothing owed. */
   boons?: Record<PlayerId, number>;
+  /** World time the match counts as CLEARED if a human seat still holds a world — set
+   *  when the last wave lands, the mode's `holdHours` later (PVR-2.5). Absent until then,
+   *  and absent for good under a mode without `holdHours`: there the only clear is taking
+   *  every NPC world. Echoed here for the HUD's «hold out» countdown as well. */
+  holdUntil?: number;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */

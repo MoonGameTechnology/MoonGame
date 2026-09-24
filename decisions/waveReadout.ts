@@ -24,6 +24,11 @@ import type { PveState } from '../packages/shared-core/src/index';
  *    Такого состояния модуль не создаёт, но оно может приехать из сейва другой сборки.
  *    Ответ «показывать нечего» здесь был бы худшим из вариантов: HUD молча погас бы
  *    посреди PvE-матча.
+ * 6. **После последней волны идёт отсчёт удержания, если режим его объявил (PVR-2.5).**
+ *    Победа в забеге — выстоять (решение владельца 2026-09-23): срок `holdUntil` ядро
+ *    ставит на последней волне, и это единственное, что игроку теперь нужно знать.
+ *    «Волны кончились» без срока значило бы, что ждать нечего, — а ждать как раз есть
+ *    чего. Режим без срока отвечает по-прежнему, правилом 4.
  */
 
 /** Ответ: что рисовать. Текста здесь нет — он живёт в `/localization` по ключу. */
@@ -33,12 +38,18 @@ export type WaveReadout =
   /** Штурм идёт: `wave` уже пришло из `total`, следующая через `nextInMs` (правила 2–3). */
   | { kind: 'waves'; wave: number; total: number; nextInMs: number }
   /** Волны кончились — новых не будет (правила 4–5). */
-  | { kind: 'cleared'; total: number };
+  | { kind: 'cleared'; total: number }
+  /** Волны кончились, до победы — удержание ещё `holdInMs` (правило 6). */
+  | { kind: 'hold'; total: number; holdInMs: number };
 
 /** `pve` — секция состояния матча (её нет в обычной партии), `now` — время МИРА. */
 export function waveReadout(pve: PveState | undefined, now: number): WaveReadout {
   if (!pve) return { kind: 'none' };
-  if (pve.nextWaveAt === undefined) return { kind: 'cleared', total: pve.totalWaves };
+  if (pve.nextWaveAt === undefined) {
+    return pve.holdUntil === undefined
+      ? { kind: 'cleared', total: pve.totalWaves }
+      : { kind: 'hold', total: pve.totalWaves, holdInMs: Math.max(0, pve.holdUntil - now) };
+  }
   return {
     kind: 'waves',
     wave: pve.waveNumber,

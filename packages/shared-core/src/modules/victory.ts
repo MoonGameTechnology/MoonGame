@@ -307,11 +307,21 @@ function evaluateVictory(h: HandlerContext): void {
       endMatch(h, npcPlayerId, 'pve-failed');
       return;
     }
-    // Cleared: every wave has landed AND the enemy holds nothing. Order matters —
-    // wiping the hive early does not end the match, it only starves later waves
-    // (`pveModule` skips a spawn with nowhere to stage), so the counter still runs
-    // to its end and the match cannot deadlock on an early clear.
-    if (waveNumber >= totalWaves && !holding(npcPlayerId)) {
+    // Cleared: every wave has landed AND either the enemy holds nothing or the humans
+    // held out to the deadline. Order matters — wiping the hive early does not end the
+    // match, it only starves later waves (`pveModule` skips a spawn with nowhere to
+    // stage), so the counter still runs to its end and the match cannot deadlock on an
+    // early clear.
+    //
+    // The hold-out is the owner's resolution for PvE (PVR-2.5, 2026-09-23: «победа —
+    // выстоять»). Waves are free, fielded ×N and staged inside the NPC's own world, so
+    // the wipe alone asked the player to beat the whole accumulated assault — no run
+    // measured on the shipped chapters ever reached it. The wipe stays the early finish.
+    // Reaching this line already means a human seat still holds ground: the failure
+    // verdict above is judged first.
+    const { holdUntil } = h.state.pve;
+    const heldOut = holdUntil !== undefined && h.ctx.now >= holdUntil;
+    if (waveNumber >= totalWaves && (!holding(npcPlayerId) || heldOut)) {
       // A coalition win with no single champion: the survivors won together, so
       // `winner` is the top scorer among them and every one of them is in `winners`.
       endMatch(h, highestScore(scores, humansAlive), 'pve-cleared', humansAlive);
@@ -430,12 +440,16 @@ function evaluateVictory(h: HandlerContext): void {
  */
 export const victoryModule: GameModule = {
   id: 'victory',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));
     api.on('fleet.destroyed', (_event, h) => evaluateVictory(h));
     api.on('battle.resolved', (_event, h) => evaluateVictory(h));
     api.on('unit.built', (_event, h) => evaluateVictory(h));
+    // The end of a PvE hold-out (PVR-2.5): `pveModule` schedules this beat AT the
+    // deadline, so the run is judged at that instant. Matched by name — the bus, not an
+    // import — and inert everywhere else: no PvE, no beat.
+    api.on('pve.hold', (_event, h) => evaluateVictory(h));
   },
 };

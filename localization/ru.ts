@@ -52,6 +52,7 @@ export const ru: Record<string, string> = {
 
   'hud.missions': 'Задачи: {n}/{m}',
   'mission.claim-colony': 'Вторая колония: взять соседний мир',
+  'mission.destroy-hive': 'Уничтожить улей: взять его штурмом',
   'mission.fortify': 'Укрепления: построить форты ({n})',
   'mission.hold-out': 'Удержаться: дожить до волны {n}',
   'mission.raze-biomass': 'Зачистка производства: снести биореакторы Роя',
@@ -427,6 +428,7 @@ export const ru: Record<string, string> = {
   'swarm.intel.close': 'Закрыть',
   'hud.wave': 'Волна {n}/{m}',
   'hud.wave.done': 'волны кончились',
+  'hud.wave.hold': 'выстоять ещё {in}',
   'hud.wave.next': 'следующая через {in}',
   'pve.pirates.title': 'Первый бой · Пираты',
   'pve.pirates.approach': 'Рядом база пиратов с двумя фрегатами. Выберите стартовый флот, нажмите «Курс» и укажите базу. Ваших сил достаточно для первого боя. Это необязательная цель: волны Роя продолжают идти.',

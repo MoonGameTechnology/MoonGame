@@ -1201,6 +1201,17 @@ export const ModePveSchema = z
      *  per boon, and a new one is a JSON entry. Absent ⇒ the run offers nothing, which
      *  is the pre-existing behaviour. */
     boons: z.array(z.string()).min(1).optional(),
+    /** How long the human seats must still hold a world after the LAST wave lands for
+     *  the mode to count as cleared (PVR-2.5, owner's resolution 2026-09-23: «победа —
+     *  выстоять»). Game-hours, timeScale-scaled like every other duration here.
+     *
+     *  Without it the only clear is the older one — every wave landed AND the NPC holds
+     *  nothing — and on the shipped chapters that one alone was out of reach: waves are
+     *  free, fielded ×N and staged INSIDE the NPC's own world, so "take everything after
+     *  the last wave" meant beating the whole accumulated assault (55× the declared force
+     *  by wave ten). The wipe stays as the early finish. Absent ⇒ the pre-existing rule
+     *  only (invariant #3: absent data → base default). */
+    holdHours: z.number().positive().optional(),
   })
   .strict();
 

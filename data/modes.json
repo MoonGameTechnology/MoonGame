@@ -24,7 +24,8 @@
       ],
       "waveLanding": [
         { "unit": "swarm_lander", "count": 2 }
-      ]
+      ],
+      "holdHours": 12
     }
   },
   "duel": {

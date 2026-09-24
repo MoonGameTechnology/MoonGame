@@ -1042,6 +1042,7 @@
 | PVR-2.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | У забега свой темп и ускорение |
 | PVR-2.3 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Корабли забега впятеро быстрее |
 | PVR-2.4 | ✅ | data | `docs/sector-zero-roadmap.md` | Крепкий старт игрока в главах |
+| PVR-2.5 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Победа в главе — выстоять |
 | PVR-3.1 | ✅ | docs | `docs/sector-zero-roadmap.md` | Резолюция: чем PvE-прокачка НЕ является |
 | PVR-3.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | Хранилище PvE-прогресса |
 | PVR-3.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Награда за забег |
