@@ -980,10 +980,11 @@ export const SectorZeroPriceSchema = z.object({
   ad: z.number().int().positive().optional(),
 });
 
-/** Один лот витрины. `grants` трактуется по `kind`: id модуля, id узла навыка либо имя
- *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount`. */
+/** Один лот витрины. `grants` трактуется по `kind`: id модуля, id узла навыка, имя
+ *  ресурса профиля (`research` / `warrants`) — тогда значим ещё и `amount` — либо ступень
+ *  редкости чертежа (`blueprint`, SZE-5.3: `unique` / `mythic` / `legendary`). */
 export const SectorZeroOfferSchema = z.object({
-  kind: z.enum(['module', 'skill', 'resource']),
+  kind: z.enum(['module', 'skill', 'resource', 'blueprint']),
   grants: z.string(),
   /** Сколько выдать. Значим только для `kind: 'resource'`. */
   amount: z.number().int().positive().default(1),

@@ -17,6 +17,7 @@ import {
   type SectorProgressAction,
 } from './sectorZeroProgress';
 import { parseRunSave, serializeRunSave, RUN_SAVE_VERSION } from './runSave';
+import { runLoot } from './moduleRarity';
 
 const data = shippedGameData();
 const fresh = () => freshSectorZeroProgress(data);
@@ -591,5 +592,46 @@ describe('SZE-5.2 — повышение редкости модуля', () => {
     const hpOf = (st: typeof cruiser): number => effectiveStats(data.units.cruiser!, st, data).hp!;
     // Мифический ионный двигатель несёт параметры уникальной и мифической ступеней.
     expect(hpOf(cruiser) - hpOf(plainCruiser)).toBe(data.modules.ion_engine!.rarityBonus!.mythic!.hp);
+  });
+});
+
+describe('SZE-5.3 — итог забега приносит дубли и чертежи', () => {
+  it('засчёт кладёт добычу в профиль и в итог, первая победа — с чертежом главы', () => {
+    const s = pveState(data);
+    s.pve = { waveNumber: 4, totalWaves: 10, npcPlayerId: 'p3' };
+    s.match.status = 'ended';
+    s.match.winner = 'p1';
+    const before = { ...fresh(), nextAttempt: 2 };
+    const chapter = { id: 'ch-1', objectives: [], blueprint: 'unique' as const };
+    const after = settleSectorZeroRun(before, 1, s, chapter);
+    const copies = Object.values(after.moduleCopies).reduce((a, b) => a + b, 0);
+    expect(copies).toBe(2); // забег + победа
+    expect(after.blueprints.unique ?? 0).toBeGreaterThanOrEqual(1);
+    expect(after.lastRun?.loot?.copies).toEqual(after.moduleCopies);
+    // Повторная победа той же главы гарантированного чертежа уже не даёт: добыча ровно
+    // та, что у забега без него.
+    const again = settleSectorZeroRun({ ...after, nextAttempt: 3 }, 2, s, chapter);
+    expect(again.lastRun!.loot).toEqual(
+      runLoot({
+        seed: after.seed,
+        attempt: 2,
+        modules: after.modules,
+        won: true,
+        newTasks: 0,
+        firstWinBlueprint: null,
+      }),
+    );
+  });
+
+  it('итог с добычей переживает сохранение; старый итог без неё тоже читается', () => {
+    const s = pveState(data);
+    s.pve = { waveNumber: 2, totalWaves: 10, npcPlayerId: 'p3' };
+    s.match.status = 'ended';
+    const after = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s);
+    const reread = parseSectorZeroProgress(JSON.stringify(after), data);
+    expect(reread.lastRun?.loot).toEqual(after.lastRun?.loot);
+    expect(reread.moduleCopies).toEqual(after.moduleCopies);
+    const { loot: _drop, ...oldRun } = after.lastRun!;
+    expect(parseSectorZeroProgress(JSON.stringify({ ...after, lastRun: oldRun }), data).lastRun?.loot).toBeUndefined();
   });
 });

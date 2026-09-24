@@ -19,9 +19,9 @@ import {
   type SectorProgressAction,
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
-import { workshopRows } from '../../decisions/sectorZeroWorkshop';
+import { contribution, workshopRows } from '../../decisions/sectorZeroWorkshop';
 import { starRow } from '../../decisions/itemRarity';
-import { moduleLadder, profileRarity } from '../../decisions/moduleRarity';
+import { moduleLadder, profileRarity, raiseCheck, RARITY_COPIES } from '../../decisions/moduleRarity';
 import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
 import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
 import {
@@ -254,13 +254,36 @@ export function initSectorZeroPreparation(h: PreparationHost) {
           ? `${oddsHtml(row.chance, row.warrants)}${deltaHtml(statDeltas(row.now, row.next, STAT_ORDER))}${shards}`
           : `<p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)}</p>`;
         const head = itemHead(row.id, p);
-        return `<article class="sz-card${head.cls}">${head.html}${offer}${button('forge', row.id, label, !row.can)}</article>`;
+        return `<article class="sz-card${head.cls}">${head.html}${offer}${button('forge', row.id, label, !row.can)}${rarityHtml(row, p)}</article>`;
       })
       .join('');
     // Правило «при неудаче Варранты сгорают» одно на всю кузню — оно стоит один раз над
     // карточками, а не повторяется в каждой (PVR-6.6).
-    return `<p class="sz-sub">${t('sector-zero.forge.hint')} ${t('sector-zero.forge.burn')}</p><div class="sz-cards">${cards}</div>`;
+    const bp = (['unique', 'mythic', 'legendary'] as const)
+      .map((r) => `<span class="r-${r}">${t(`rarity.${r}`)} ${p.blueprints[r] ?? 0}</span>`)
+      .join('');
+    return `<p class="sz-sub">${t('sector-zero.forge.hint')} ${t('sector-zero.forge.burn')} ${t('sector-zero.rarity.hint', { n: RARITY_COPIES })}</p><p class="sz-blueprints"><b>${t('sector-zero.rarity.blueprints')}</b>${bp}</p><div class="sz-cards">${cards}</div>`;
   }
+
+  /**
+   * Блок редкости в карточке Мастерской (SZE-5.4): до какой ступени поднять, какой
+   * параметр она даст (числом, с учётом звёзд) и чего не хватает — «чертёж 0/1 · дубли
+   * 2/3». Вершина лестницы говорит об этом одной строкой, а не пустой кнопкой.
+   */
+  const rarityHtml = (row: { id: string; star: number; now: Record<string, number> }, p: SectorZeroProgress): string => {
+    const check = raiseCheck(p, row.id, h.data);
+    if (!check.to) return `<p class="sz-rarity-top">${t('sector-zero.rarity.top')}</p>`;
+    const gain = deltaHtml(statDeltas(row.now, contribution(row.id, row.star, h.data, check.to), STAT_ORDER));
+    const need = t('sector-zero.rarity.need', {
+      b: Math.min(check.blueprints, 1),
+      c: Math.min(check.copies, RARITY_COPIES),
+      m: RARITY_COPIES,
+    });
+    return (
+      `<div class="sz-rarity-up r-${check.to}"><p><b>${t('sector-zero.rarity.to', { r: t(`rarity.${check.to}`) })}</b></p>${gain}` +
+      `<p class="sz-need">${need}</p>${button('raise-rarity', row.id, t('sector-zero.rarity.raise'), !check.can)}</div>`
+    );
+  };
 
   const PAY_LABEL: Record<PayKind, string> = {
     warrants: 'sector-zero.shop.pay.warrants',
@@ -282,14 +305,20 @@ export function initSectorZeroPreparation(h: PreparationHost) {
             ? esc(tData(h.data.modules[row.grants]?.name ?? row.grants))
             : row.kind === 'skill'
               ? esc(tData(h.data.heroSkillTrees[row.grants]?.name ?? row.grants))
-              : t(`sector-zero.shop.grants.${row.grants}`, { n: row.amount });
+              : row.kind === 'blueprint'
+                ? t('sector-zero.shop.blueprint', { r: t(`rarity.${row.grants}`) })
+                : t(`sector-zero.shop.grants.${row.grants}`, { n: row.amount });
         const what =
           row.kind === 'resource' ? '' : `<div class="sz-card-type">${t(`sector-zero.shop.grants.${row.kind}`)}</div>`;
         // Что товар ДАЁТ — одной строкой (PVR-6.7): у модуля — его статы, у узла навыка —
         // его описание. Ресурс говорит за себя заголовком «+12 данных».
         const gives =
           row.kind === 'module'
-            ? effectText(h.data.modules[row.grants]?.effects.stats ?? {})
+            ? effectText(h.data.modules[row.grants]?.effects.stats ?? {}) +
+              // Открытый модуль приходит дублем — материалом для редкости (SZE-5.3).
+              (row.owned ? ` · ${t('sector-zero.shop.duplicate')}` : '')
+            : row.kind === 'blueprint'
+              ? t('sector-zero.shop.blueprint.gives', { n: RARITY_COPIES })
             : row.kind === 'skill'
               ? esc(t(h.data.heroSkillTrees[row.grants]?.description ?? ''))
               : '';
@@ -297,7 +326,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         const glyph =
           row.kind === 'module'
             ? ''
-            : `<span class="sz-glyph sz-glyph-${row.kind === 'skill' ? 'skill' : esc(row.grants)}" aria-hidden="true">${row.kind === 'skill' ? '✦' : row.grants === 'warrants' ? '⌖' : '◇'}</span>`;
+            : `<span class="sz-glyph sz-glyph-${row.kind === 'skill' ? 'skill' : row.kind === 'blueprint' ? `blueprint r-${esc(row.grants)}` : esc(row.grants)}" aria-hidden="true">${row.kind === 'skill' ? '✦' : row.kind === 'blueprint' ? '📐' : row.grants === 'warrants' ? '⌖' : '◇'}</span>`;
         // Способ, которого НЕТ У ПЛОЩАДКИ, не рисуется вовсе — это прямое требование
         // `platform-adapters.md` («если `rewardedAds === false`, кнопка не показывается»),
         // а не экономия места. Погашенная кнопка «за рекламу» там, где рекламы не бывает,
@@ -589,6 +618,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               ? t('sector-zero.forge.won', { n: after })
               : t('sector-zero.forge.lost');
         } else message = t('sector-zero.prep.unavailable');
+        render();
+        return;
+      }
+      if (kind === 'raise-rarity') {
+        const ok = h.change({ kind, id });
+        message = ok
+          ? t('sector-zero.rarity.raised', { r: t(`rarity.${profileRarity(h.progress(), id, h.data)}`) })
+          : t('sector-zero.prep.unavailable');
         render();
         return;
       }

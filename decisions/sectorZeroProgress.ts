@@ -2,13 +2,16 @@
  * XP and the commander's PvP tree. Catalog abilities, skill requirements, module
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
-import { forgeOutcome, type ForgeLadder } from './sectorZeroForge';
+import { forgeOutcome } from './sectorZeroForge';
 import {
+  addLoot,
   moduleLadder,
   profileRarity,
   raiseCheck,
+  runLoot,
   RARITY_COPIES,
   type RarityLadder,
+  type RunLoot,
 } from './moduleRarity';
 import {
   DEFAULT_OBJECTIVE_SLOTS,
@@ -23,6 +26,7 @@ import {
   rarityOf,
   RARITIES,
   type GameData,
+  type Rarity,
   type GameState,
   type Hero,
   type MapObjective,
@@ -129,6 +133,8 @@ export interface SectorChapter {
   id: string;
   objectives: readonly MapObjective[];
   slots?: ObjectiveSlots;
+  /** Чертёж за ПЕРВУЮ победу в главе (SZE-5.3, `chapterBlueprint`). Нет — не положен. */
+  blueprint?: Rarity | null;
 }
 const NO_CHAPTER: SectorChapter = { id: '', objectives: [] };
 
@@ -150,6 +156,8 @@ export interface RunSummary {
   warrants: number;
   /** Сколько новых задач главы откроется к следующему заходу. */
   unlocked: number;
+  /** Дубли и чертежи, выпавшие за этот забег (SZE-5.3). Нет — старый итог до редкости. */
+  loot?: RunLoot;
 }
 
 export const SECTOR_ZERO_PROGRESS_KEY = 'sector-zero.progress.v1';
@@ -443,9 +451,19 @@ export function changeSectorZeroProgress(
       // (`platform-adapters.md`), поэтому сюда действие доходит уже оплаченным.
       switch (offer.kind) {
         case 'module':
-          if (!data.modules[offer.grants] || next.modules.includes(offer.grants)) return null;
-          next.modules.push(offer.grants);
+          if (!data.modules[offer.grants]) return null;
+          // Уже открытый модуль приходит ДУБЛЕМ — материалом для повышения редкости (SZE-5.3).
+          if (next.modules.includes(offer.grants))
+            next.moduleCopies[offer.grants] = (next.moduleCopies[offer.grants] ?? 0) + 1;
+          else next.modules.push(offer.grants);
           break;
+        case 'blueprint': {
+          // Чертёж ступени редкости (SZE-5.3). Простой ступени не бывает: на неё не поднимают.
+          const tier = offer.grants as Rarity;
+          if (tier === 'simple' || !RARITIES.includes(tier)) return null;
+          next.blueprints[tier] = (next.blueprints[tier] ?? 0) + 1;
+          break;
+        }
         case 'skill': {
           if (!sectorSkillLegal(next, offer.grants, data)) return null;
           next.heroes[next.selectedHero]!.skills.push(offer.grants);
@@ -560,6 +578,16 @@ function parseRunSummary(v: unknown): RunSummary | null {
     });
   }
   const [attempt, waves, totalWaves, base, bonus, total, warrants, unlocked] = nums as number[];
+  const bag = (v: unknown): Record<string, number> => {
+    const out: Record<string, number> = {};
+    if (v && typeof v === 'object')
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+        const c = n(x);
+        if (c) out[k] = c;
+      }
+    return out;
+  };
+  const rawLoot = r.loot as Record<string, unknown> | undefined;
   return {
     attempt: attempt!,
     chapter: r.chapter,
@@ -572,6 +600,9 @@ function parseRunSummary(v: unknown): RunSummary | null {
     total: total!,
     warrants: warrants!,
     unlocked: unlocked!,
+    ...(rawLoot && typeof rawLoot === 'object'
+      ? { loot: { copies: bag(rawLoot.copies), blueprints: bag(rawLoot.blueprints) } }
+      : {}),
   };
 }
 
@@ -736,9 +767,21 @@ export function settleSectorZeroRun(
   );
   const reward = base + tasks.bonus;
   const warrants = reward * WARRANTS_PER_REWARD;
+  const firstWin = !!won && !!chapter.id && !progress.chaptersWon.includes(chapter.id);
+  // Дубли и чертежи (SZE-5.3): бросок от сида профиля и номера попытки — повторный засчёт
+  // того же забега невозможен (проверка выше), перезагрузка итог не перекатывает.
+  const loot = runLoot({
+    seed: progress.seed,
+    attempt,
+    modules: progress.modules,
+    won: !!won,
+    newTasks: Math.max(0, tasks.done.length - done.length),
+    firstWinBlueprint: firstWin ? (chapter.blueprint ?? null) : null,
+  });
   return {
     ...progress,
     research: progress.research + reward,
+    ...addLoot(progress, loot),
     // Забег — кран ОБЕИХ валют (§2 роадмапа экономики): данные открывают горизонталь,
     // Варранты обслуживают вертикаль. Без второго крана Мастерская недостижима.
     warrants: progress.warrants + warrants,
@@ -775,6 +818,7 @@ export function settleSectorZeroRun(
       total: reward,
       warrants,
       unlocked: tasks.unlocked,
+      loot,
     },
   };
 }

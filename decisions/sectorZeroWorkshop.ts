@@ -25,7 +25,7 @@ import {
   type Rarity,
 } from '../packages/shared-core/src/index';
 import { moduleLadder, profileRarity } from './moduleRarity';
-import { forgeOutcome, type ForgeLadder, type ForgeRefusal } from './sectorZeroForge';
+import { forgeOutcome, type ForgeRefusal } from './sectorZeroForge';
 import { forgeLadderOf, type SectorZeroProgress } from './sectorZeroProgress';
 
 export { forgeLadderOf as forgeLadder };

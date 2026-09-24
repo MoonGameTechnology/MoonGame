@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { shippedGameData } from '../data/bundle';
-import { moduleLadder, nextRarity, profileRarity, raiseCheck, RARITY_COPIES } from './moduleRarity';
+import {
+  addLoot,
+  BLUEPRINT_CHANCE,
+  chapterBlueprint,
+  moduleLadder,
+  nextRarity,
+  profileRarity,
+  raiseCheck,
+  RARITY_COPIES,
+  runLoot,
+} from './moduleRarity';
 import { forgeLadderOf } from './sectorZeroProgress';
 
 const data = shippedGameData();
@@ -72,5 +82,67 @@ describe('редкость модуля в профиле (SZE-5.2)', () => {
     expect(moduleLadder(ladder, 'legendary').cap).toBe(ladder.cap);
     expect(moduleLadder({ ...ladder, capByRarity: { simple: 99 } }, 'simple').cap).toBe(ladder.cap);
     expect(moduleLadder({ ...ladder, capByRarity: {} }, 'simple').cap).toBe(ladder.cap);
+  });
+});
+
+describe('добыча забега: дубли и чертежи (SZE-5.3)', () => {
+  const base = {
+    seed: 's',
+    attempt: 1,
+    modules: ['cargo_bay', 'ion_engine'],
+    won: false,
+    newTasks: 0,
+    firstWinBlueprint: null,
+  };
+  const total = (r: Record<string, number>): number => Object.values(r).reduce((a, b) => a + b, 0);
+
+  it('дубли: 1 за забег, +1 за победу, +1 за каждую новую задачу — и только открытых модулей', () => {
+    expect(total(runLoot(base).copies)).toBe(1);
+    expect(total(runLoot({ ...base, won: true, newTasks: 2 }).copies)).toBe(4);
+    for (const id of Object.keys(runLoot({ ...base, won: true, newTasks: 5 }).copies))
+      expect(base.modules).toContain(id);
+    expect(runLoot({ ...base, modules: [] }).copies).toEqual({});
+  });
+
+  it('бросок детерминирован: тот же забег — та же добыча, другой — своя', () => {
+    expect(runLoot(base)).toEqual(runLoot(base));
+    const tries = Array.from({ length: 40 }, (_, i) =>
+      JSON.stringify(runLoot({ ...base, attempt: i + 1 })),
+    );
+    expect(new Set(tries).size).toBeGreaterThan(1);
+  });
+
+  it('первая победа в главе даёт чертёж ГАРАНТИРОВАННО, ступень растёт к эпицентру', () => {
+    expect([chapterBlueprint(0), chapterBlueprint(1), chapterBlueprint(4)]).toEqual([
+      'unique',
+      'mythic',
+      'legendary',
+    ]);
+    expect(chapterBlueprint(-1)).toBeNull();
+    const loot = runLoot({ ...base, won: true, firstWinBlueprint: 'mythic' });
+    expect(loot.blueprints.mythic ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  it('случайный чертёж — редкость: за победу чаще, чем за поражение', () => {
+    const rate = (won: boolean): number =>
+      Array.from({ length: 2000 }, (_, i) => runLoot({ ...base, won, attempt: i + 1 })).filter(
+        (l) => total(l.blueprints) > 0,
+      ).length / 2000;
+    expect(rate(true)).toBeGreaterThan(rate(false));
+    expect(Math.abs(rate(true) - BLUEPRINT_CHANCE.won)).toBeLessThan(0.05);
+    expect(Math.abs(rate(false) - BLUEPRINT_CHANCE.lost)).toBeLessThan(0.04);
+  });
+
+  it('добыча складывается в счётчики, входы не меняются', () => {
+    const p = { moduleCopies: { cargo_bay: 1 }, blueprints: { unique: 1 } };
+    const out = addLoot(p, {
+      copies: { cargo_bay: 2, ion_engine: 1 },
+      blueprints: { unique: 1, mythic: 1 },
+    });
+    expect(out).toEqual({
+      moduleCopies: { cargo_bay: 3, ion_engine: 1 },
+      blueprints: { unique: 2, mythic: 1 },
+    });
+    expect(p).toEqual({ moduleCopies: { cargo_bay: 1 }, blueprints: { unique: 1 } });
   });
 });

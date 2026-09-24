@@ -268,6 +268,18 @@
 .sz-glyph-research { color: var(--cur-data); }
 .sz-glyph-warrants { color: var(--cur-warrants); }
 .sz-glyph-skill { color: #79dfdf; }
+/* SZE-5.4: редкость модуля — лот чертежа, блок «повысить до…» в Мастерской и строка чертежей. */
+.sz-glyph-blueprint { color: var(--rar); }
+.sz-glyph-blueprint.r-unique, .sz-rarity-up.r-unique, .sz-blueprints .r-unique { --rar: var(--rar-unique); }
+.sz-glyph-blueprint.r-mythic, .sz-rarity-up.r-mythic, .sz-blueprints .r-mythic { --rar: var(--rar-mythic); }
+.sz-glyph-blueprint.r-legendary, .sz-rarity-up.r-legendary, .sz-blueprints .r-legendary { --rar: var(--rar-legendary); }
+.sz-rarity-up { align-self: stretch; margin-top: 10px; padding: 9px 10px; border: 1px solid var(--rar); border-radius: 8px; background: color-mix(in srgb, var(--rar) 9%, transparent); }
+.sz-rarity-up p { margin: 0 0 4px; }
+.sz-rarity-up b { color: var(--rar); }
+.sz-rarity-up .sz-need { font-size: 12px; color: #b0c7ce; font-family: ui-monospace, monospace; }
+.sz-rarity-top { margin: 10px 0 0; font-size: 12px; color: var(--rar-legendary); }
+.sz-blueprints { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 12px; font-size: 13px; }
+.sz-blueprints span { color: var(--rar); font-weight: 600; }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }
 /* Только прямой потомок: вложенным делениям `.sz-pips` правило затирало отступ, и они
    прилипали к тексту («▬▬▬Подготовка 1»). */

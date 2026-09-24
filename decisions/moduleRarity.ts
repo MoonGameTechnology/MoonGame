@@ -1,5 +1,5 @@
 import { RARITIES, type GameData, type Rarity } from '../packages/shared-core/src/index';
-import type { ForgeLadder } from './sectorZeroForge';
+import { hashUnit, type ForgeLadder } from './sectorZeroForge';
 
 /**
  * Редкость модуля в профиле Sector Zero (SZE-5.2, решение владельца 2026-09-24).
@@ -78,4 +78,82 @@ export type RarityLadder = ForgeLadder & { capByRarity?: Partial<Record<Rarity, 
 export function moduleLadder(ladder: RarityLadder, rarity: Rarity): ForgeLadder {
   const own = ladder.capByRarity?.[rarity];
   return own === undefined ? ladder : { ...ladder, cap: Math.min(ladder.cap, own) };
+}
+
+/* ── Откуда дубли и чертежи (SZE-5.3) ─────────────────────────────────────────────── */
+
+/**
+ * Добыча итогов забега. Числа — **v0** для плейтеста.
+ *
+ * 4. **Дубли — за сам забег и за задачи.** 1 дубль за любой засчитанный забег, ещё 1 за
+ *    победу и по 1 за каждую задачу главы, закрытую ВПЕРВЫЕ. Какой модуль продублирован —
+ *    бросок из открытых игроком: дубль того, чего у игрока нет, поднимать было бы нечем.
+ * 5. **Чертёж — редкий.** Шанс 25% за победу и 8% за поражение; ступень чаще уникальная,
+ *    реже мифическая, совсем редко легендарная. Первая победа в главе даёт чертёж
+ *    ГАРАНТИРОВАННО — ступень растёт к эпицентру.
+ * 6. **Бросок детерминирован**: ключ — сид профиля и номер попытки, тот же хеш, что у
+ *    заточки. Перезагрузка страницы итог не перекатывает.
+ */
+export const RUN_COPIES = { run: 1, win: 1, perTask: 1 } as const;
+export const BLUEPRINT_CHANCE = { won: 0.25, lost: 0.08 } as const;
+export const BLUEPRINT_TIERS: readonly (readonly [Rarity, number])[] = [
+  ['unique', 0.7],
+  ['mythic', 0.25],
+  ['legendary', 0.05],
+];
+
+/** Добыча одного забега: дубли по модулям и чертежи по ступеням. */
+export interface RunLoot {
+  copies: Record<string, number>;
+  blueprints: Record<string, number>;
+}
+
+/** Гарантированный чертёж за первую победу в главе `index`: к эпицентру — ступень выше. */
+export function chapterBlueprint(index: number): Rarity | null {
+  if (!Number.isInteger(index) || index < 0) return null;
+  return index === 0 ? 'unique' : index === 1 ? 'mythic' : 'legendary';
+}
+
+export function runLoot(input: {
+  seed: string;
+  attempt: number;
+  modules: readonly string[];
+  won: boolean;
+  newTasks: number;
+  firstWinBlueprint: Rarity | null;
+}): RunLoot {
+  const key = `${input.seed}\u0000${input.attempt}\u0000`;
+  const copies: Record<string, number> = {};
+  const count =
+    RUN_COPIES.run +
+    (input.won ? RUN_COPIES.win : 0) +
+    Math.max(0, input.newTasks) * RUN_COPIES.perTask;
+  if (input.modules.length > 0)
+    for (let i = 0; i < count; i++) {
+      const id =
+        input.modules[Math.floor(hashUnit(`${key}copy\u0000${i}`) * input.modules.length)]!;
+      copies[id] = (copies[id] ?? 0) + 1;
+    }
+  const blueprints: Record<string, number> = {};
+  const add = (r: Rarity): void => {
+    blueprints[r] = (blueprints[r] ?? 0) + 1;
+  };
+  if (input.firstWinBlueprint) add(input.firstWinBlueprint);
+  if (hashUnit(`${key}blueprint`) < (input.won ? BLUEPRINT_CHANCE.won : BLUEPRINT_CHANCE.lost)) {
+    let roll = hashUnit(`${key}tier`);
+    const tier = BLUEPRINT_TIERS.find(([, w]) => (roll -= w) < 0)?.[0] ?? 'unique';
+    add(tier);
+  }
+  return { copies, blueprints };
+}
+
+/** Сложить добычу в счётчики профиля (новые объекты, входы не трогаются). */
+export function addLoot<
+  T extends { moduleCopies: Record<string, number>; blueprints: Record<string, number> },
+>(p: T, loot: RunLoot): Pick<T, 'moduleCopies' | 'blueprints'> {
+  const moduleCopies = { ...p.moduleCopies };
+  for (const [id, n] of Object.entries(loot.copies)) moduleCopies[id] = (moduleCopies[id] ?? 0) + n;
+  const blueprints = { ...p.blueprints };
+  for (const [r, n] of Object.entries(loot.blueprints)) blueprints[r] = (blueprints[r] ?? 0) + n;
+  return { moduleCopies, blueprints };
 }

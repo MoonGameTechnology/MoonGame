@@ -1029,10 +1029,10 @@
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md` | Уровень у модуля Роя |
 | SZE-4.2 | ✅ | core | `docs/sector-zero-economy-roadmap.md` | Контригра против уровня |
-| SZE-5.1 | ⏳ | data core | `docs/sector-zero-economy-roadmap.md` | Редкость в данных и в бою |
-| SZE-5.2 | ⏳ | proto | `docs/sector-zero-economy-roadmap.md` | Повышение редкости в профиле |
-| SZE-5.3 | 🔒 | proto data | `docs/sector-zero-economy-roadmap.md` | Откуда дубли и чертежи |
-| SZE-5.4 | 🔒 | proto | `docs/sector-zero-economy-roadmap.md` | Экран редкости в Мастерской |
+| SZE-5.1 | ✅ | data core | `docs/sector-zero-economy-roadmap.md` | Редкость в данных и в бою |
+| SZE-5.2 | ✅ | proto | `docs/sector-zero-economy-roadmap.md` | Повышение редкости в профиле |
+| SZE-5.3 | ✅ | proto data | `docs/sector-zero-economy-roadmap.md` | Откуда дубли и чертежи |
+| SZE-5.4 | ✅ | proto | `docs/sector-zero-economy-roadmap.md` | Экран редкости в Мастерской |
 | PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md` | Карта pve-1 снова строится |
 | PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | pveModule в ядре прототипа |
 | PVR-0.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Сохранение: сперва мета, потом забег |

@@ -94,6 +94,22 @@
         "sovereigns": 20
       },
       "weight": 2
+    },
+    "blueprint_unique": {
+      "kind": "blueprint",
+      "grants": "unique",
+      "prices": {
+        "sovereigns": 30
+      },
+      "weight": 2
+    },
+    "blueprint_mythic": {
+      "kind": "blueprint",
+      "grants": "mythic",
+      "prices": {
+        "sovereigns": 80
+      },
+      "weight": 1
     }
   }
 }
