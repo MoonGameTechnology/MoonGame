@@ -118,6 +118,7 @@ const MODULE_ICON: Record<string, string> = {
   ablative_plating: '🧱',
   ion_engine: '🚀',
   radar_module: '📡',
+  compact_radar: '📡',
   cargo_bay: '📦',
   siege_platform: '💥',
 };

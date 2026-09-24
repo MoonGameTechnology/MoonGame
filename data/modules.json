@@ -36,6 +36,26 @@
       ]
     }
   },
+  "compact_radar": {
+    "name": "Compact Radar",
+    "rarity": "simple",
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {
+        "radarRange": 70
+      }
+    },
+    "cost": {
+      "metal": 20
+    },
+    "allowed": {
+      "domain": "space",
+      "units": [
+        "scout"
+      ]
+    }
+  },
   "ion_engine": {
     "name": "Ion Engine",
     "rarity": "simple",
