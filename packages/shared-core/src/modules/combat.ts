@@ -401,6 +401,13 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
       owner: fleet.owner,
       role: 'attacker',
     });
+    // Вступивший флот — В БОЮ, как у `startBattle`. Без отметки он оставался «свободным»:
+    // повторный штурм проходил и вписывал в бой ещё одну копию того же десанта (копии
+    // стреляли каждая за себя), драйвер авто-штурма отдавал такой штурм каждый кадр —
+    // «Рой бесконечно высаживает десант» (плейтест 2026-09-24), — а флот мог улететь,
+    // бросив свой десант на земле. Освобождает его конец боя, как всех сторон.
+    fleet.battleId = joined.id;
+    fleet.movement = null;
     h.emit('battle.joined', { battleId: joined.id, location: at, fleetId: fleet.id, owner: fleet.owner });
     return null;
   }
