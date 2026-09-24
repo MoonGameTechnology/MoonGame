@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global window, document, localStorage -- эти имена живут внутри page.evaluate */
+/* global window, document, localStorage, Event -- эти имена живут внутри page.evaluate */
 /**
  * YAG-1.1c — робот играет в СОБРАННЫЙ архив площадки (`prototype/dist/yandex/`).
  *
@@ -18,7 +18,9 @@
  * 3. выход в меню и перезагрузка — «Продолжить» возвращает тот же забег;
  * 4. ролик за Суверены: досмотренный кладёт порцию в кошелёк;
  * 5. двери по ссылке закрыты: `?join=…` и `?reset=…` открывают тот же Sector Zero;
- * 6. игра не просит ничего, кроме файлов архива и SDK, — ни нашего сервера, ни чужого.
+ * 6. игра не просит ничего, кроме файлов архива и SDK, — ни нашего сервера, ни чужого;
+ * 7. пауза забега (`YAG-6.2`): кнопка и уход со страницы замораживают мир, на возврате он
+ *    ждёт кнопки, а площадка слышит «геймплей встал / пошёл» — в том числе в меню.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
  *   node prototype/yandextest.mjs --no-build # проверить уже собранный архив
@@ -139,10 +141,41 @@ try {
     await page.locator('#maploading').waitFor({ state: 'hidden' });
     assert.ok((await log()).includes('start'), 'площадке сообщено начало геймплея');
 
+    // 2а. Пауза забега (YAG-6.2): кнопка замораживает отсчёт волны, уход со страницы — тоже,
+    // и на возврате мир ждёт кнопки; площадка слышит «геймплей встал / пошёл».
+    const countdown = async () => (await wave().textContent()) ?? '';
+    const frozenFor = async (ms) => {
+      const before = await countdown();
+      await page.waitForTimeout(ms);
+      return before === (await countdown());
+    };
+    const lastMark = async () => (await log()).filter((c) => c === 'start' || c === 'stop').at(-1);
+    assert.equal(await frozenFor(1200), false, 'мир идёт');
+    await page.locator('#runpause').click();
+    assert.equal(await frozenFor(1200), true, 'пауза кнопкой замораживает мир');
+    assert.equal(await lastMark(), 'stop', 'на паузе площадке сообщено «геймплей встал»');
+    await page.locator('#runpause').click();
+    assert.equal(await frozenFor(1200), false, 'кнопка продолжает мир');
+    assert.equal(await lastMark(), 'start', 'после паузы — «геймплей пошёл»');
+    const setVisibility = (state) =>
+      page.evaluate((value) => {
+        Object.defineProperty(document, 'visibilityState', { value, configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, state);
+    await setVisibility('hidden');
+    await setVisibility('visible');
+    assert.equal(await frozenFor(1200), true, 'после ухода со страницы мир ждёт игрока');
+    await page.locator('#runpause').click();
+    assert.equal(await frozenFor(1200), false, 'и продолжает по кнопке');
+
     // 3. Выход в меню путём игрока, перезагрузка, «Продолжить».
     await page.locator('#railtoggle').click();
     await page.locator('#rail-exit').click();
     await onSectorZeroMenu('выход из забега');
+    // В меню геймплея нет — индикатор площадки не должен остаться зелёным (YAG-6.2).
+    await page.waitForFunction(
+      () => window.__ya.log.filter((c) => c === 'start' || c === 'stop').at(-1) === 'stop',
+    );
     await page.reload();
     await onSectorZeroMenu('перезагрузка');
     await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
@@ -174,7 +207,7 @@ try {
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, «Продолжить», ролик, закрытые двери — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери — без ошибок\n',
   );
 } finally {
   await browser.close();

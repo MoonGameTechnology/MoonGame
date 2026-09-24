@@ -304,7 +304,7 @@ if (soloBootCheck) {
     assert.equal(mod.exports.solo().speed, 0, 'reload resumes paused');
     for (let i = 0; i < 5 && rafCbs.length; i++) await rafCbs.shift()(performance.now());
     assert.equal(JSON.parse(mod.exports.state()).time, expected.state.time, 'no offline advancement');
-    assert.ok(getEl('devline').innerHTML.includes('data-solo-play'), 'resume is visible even when the PC speed bar is hidden');
+    assert.ok(getEl('devline-status').innerHTML.includes('data-solo-play'), 'resume is visible even when the PC speed bar is hidden');
   } else assert.equal(storage.get('void.solo.v1'), savedAtBoot, 'bad saves are not silently deleted');
   assert.equal(frameErrors.length, 0);
   console.log('Solo boot regression OK');
@@ -530,7 +530,7 @@ assert.equal(getEl('sector-zero').style.display, 'none');
 assert.equal(getEl('setup').style.display, 'none');
 assert.equal(getEl('scipick').classList.contains('show'), false);
 for (let i = 0; i < 12 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
-assert.ok(getEl('devline').innerHTML.includes('data-swarm-intel'));
+assert.ok(getEl('devline-status').innerHTML.includes('data-swarm-intel'));
 for (const handle of (listeners.get(getEl('devline')) ?? {}).click ?? [])
   handle({ target: { closest: selector => selector === '[data-swarm-intel]' ? ({ dataset: { swarmIntel: '1' } }) : null } });
 assert.equal(getEl('swarm-dossier').classList.contains('show'), true);

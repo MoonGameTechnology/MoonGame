@@ -25,13 +25,34 @@ const SRC = readFileSync(new URL('../main.ts', import.meta.url), 'utf8');
 /** Строки файла без пустых — номера сохраняются для внятного сообщения об ошибке. */
 const lines = SRC.split('\n');
 
+/** Тело функции `main.ts` по имени — пусто, если её нет (проверки ниже тогда падают). */
+const fnBody = (name: string): string =>
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+
 describe('YAG-1.2a — разметка геймплея не может разойтись с состоянием забега', () => {
-  it('сеттер существует и зовёт ОБА конца разметки', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1];
+  it('сеттер существует и зовёт дверь разметки, а дверь — ОБА её конца', () => {
+    const body = fnBody('setRunActive');
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain('sectorRunActive = on');
-    expect(body).toContain('gameplayStart');
-    expect(body).toContain('gameplayStop');
+    expect(body).toContain('markGameplay()');
+    const mark = fnBody('markGameplay');
+    expect(mark).toContain('gameplayStart');
+    expect(mark).toContain('gameplayStop');
+  });
+
+  it('YAG-6.2: «геймплей идёт» = забег идёт И мир не стоит — и это видит каждый кадр', () => {
+    // Темп мира меняют больше десятка мест; дверь зовётся из кадра при смене ответа, иначе
+    // пауза или выход в меню оставили бы индикатор площадки зелёным.
+    expect(fnBody('markGameplay')).toContain('const playing = sectorRunActive && speed > 0;');
+    expect(SRC).toContain('if (gameplayMarked !== (sectorRunActive && speed > 0)) markGameplay();');
+    expect(fnBody('runPauseEvent')).toContain('markGameplay()');
+  });
+
+  it('звать площадку напрямую, мимо двери, нельзя', () => {
+    const direct = SRC.match(/\.gameplay(Start|Stop)\?\.\(\)/g) ?? [];
+    expect(direct).toHaveLength(2);
+    const mark = fnBody('markGameplay');
+    expect(mark.match(/\.gameplay(Start|Stop)\?\.\(\)/g)).toHaveLength(2);
   });
 
   it('`sectorRunActive` присваивают только внутри сеттера', () => {
@@ -62,7 +83,7 @@ describe('YAG-1.2a — разметка геймплея не может раз�
   });
 
   it('площадка берётся через `getPlatform()`, а не через константу выше по файлу', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1] ?? '';
+    const body = fnBody('markGameplay');
     // Присваивания стоят ВЫШЕ объявления `const platform`, и обращение к нему из функции,
     // вызванной раньше инициализации, упало бы на временной мёртвой зоне.
     expect(body).toContain('getPlatform()');
