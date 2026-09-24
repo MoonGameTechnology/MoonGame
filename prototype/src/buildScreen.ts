@@ -117,8 +117,10 @@ export function buildRowState(
       count: mine.length,
     };
   }
-  // Ростер сектора / не тот мир: приказа не существует — нет и строки (CMD-VIS).
-  if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return { st: 'hidden' };
+  // Ростер сектора / не тот мир / орган Роя у не-Роя: приказа не существует — нет и
+  // строки (CMD-VIS).
+  if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET' || code === 'E_SWARM_ONLY')
+    return { st: 'hidden' };
   return { st: 'lock', code }; // незнакомый отказ показываем причиной, не прячем
 }
 

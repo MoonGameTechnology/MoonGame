@@ -8,6 +8,7 @@ import type { Context } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
 import { buildProgress, thresholdRamp } from '../util/construction';
 import { MS_PER_HOUR, MS_PER_DAY } from '../util/time';
+import { feedsOnBiomass, isInfected } from '../util/infestation';
 
 /** Narrow read of a `construction.complete` event's payload — economy never imports
  *  the construction module (modules never import each other), so it re-declares just
@@ -26,12 +27,19 @@ export const BROWNOUT = 0.5;
 
 /** Base hourly production of a planet = the sum of its buildings' `produces`, each at
  *  its current level. A building whose upkeep names a resource the OWNER failed to pay
- *  last settlement (`Player.arrears`) runs at `BROWNOUT` of its output. */
-function baseProduction(planet: Planet, data: GameData, arrears?: readonly string[]): ResourceBag {
+ *  last settlement (`Player.arrears`) runs at `BROWNOUT` of its output. A Swarm organ
+ *  (`infected`) produces nothing for an owner that does not feed on biomass
+ *  (`util/infestation.ts`, решение владельца 2026-09-24). */
+function baseProduction(
+  planet: Planet,
+  data: GameData,
+  arrears: readonly string[] | undefined,
+  eatsBiomass: boolean,
+): ResourceBag {
   const out: Record<string, number> = {};
   for (const building of planet.buildings) {
     const def = data.buildings[building.type];
-    if (!def) {
+    if (!def || (!eatsBiomass && isInfected(def))) {
       continue;
     }
     const level = buildingLevel(def, building.level);
@@ -215,10 +223,12 @@ function upkeepByOwner(state: GameState, data: GameData): Map<string, ResourceBa
     }
     addStacks(planet.owner, planet.garrison);
     // Standing buildings bill their owner daily too (destroyed ones are gone from
-    // the array, so nothing dead is ever billed).
+    // the array, so nothing dead is ever billed). A Swarm organ bills only the Swarm:
+    // to anyone else it is dead tissue awaiting clearance (`util/infestation.ts`).
+    const eatsBiomass = feedsOnBiomass(state, planet.owner, data);
     for (const building of planet.buildings) {
       const def = data.buildings[building.type];
-      if (!def) {
+      if (!def || (!eatsBiomass && isInfected(def))) {
         continue;
       }
       const upkeep = buildingLevel(def, building.level).upkeep;
@@ -292,7 +302,7 @@ export const economyModule: GameModule = {
           // and a PAUSED one keeps its frozen share (only further construction halts).
           mergeBags(
             mergeBags(
-              baseProduction(planet, data, player.arrears),
+              baseProduction(planet, data, player.arrears, feedsOnBiomass(h.state, planet.owner, data)),
               pendingProduction(h.state.scheduled, planet, data, h.ctx, from, to, hours),
             ),
             pausedProduction(planet, data),

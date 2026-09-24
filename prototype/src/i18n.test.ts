@@ -159,6 +159,17 @@ function shippedNames(): Array<[string, string]> {
       if (typeof name === 'string') out.push([`${table}.${id}`, name]);
     }
   }
+  // Имена игроков в картах (`data/maps/*.json` → `players[].name`): их показывает
+  // `houseDisplayName` через тот же `tData()`. Гейт их не видел, и у Роя и пиратов глав
+  // Sector Zero ключей не было: игрок читал «Swarm Collective» на любой локали.
+  const maps = path.join(repoRoot, 'data/maps');
+  for (const file of readdirSync(maps).filter((f) => f.endsWith('.json'))) {
+    const map = JSON.parse(readFileSync(path.join(maps, file), 'utf8')) as {
+      players?: Record<string, { name?: unknown }>;
+    };
+    for (const [id, player] of Object.entries(map.players ?? {}))
+      if (typeof player?.name === 'string') out.push([`maps/${file}.players.${id}`, player.name]);
+  }
   return out;
 }
 

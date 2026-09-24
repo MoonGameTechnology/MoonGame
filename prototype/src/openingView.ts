@@ -14,6 +14,10 @@
  *    широком экране обзор читается сразу.
  * 4. **Приближение задано ОТНОСИТЕЛЬНО вписывания в экран**, а не в пикселях, поэтому
  *    один и тот же вид получается и на маленьком телефоне, и на планшете.
+ * 5. **Забег на широком экране открывается у дома, но ближе к обзору.** Консольное ×3
+ *    показывало на карте главы один дом, да ещё под подсказкой первого боя, а вся карта
+ *    целиком — почти сплошной туман. {@link RUN_HOME_ZOOM} даёт дом с соседями и первой
+ *    целью. Телефон и в забеге открывается по правилу 3.
  */
 
 /** Мир в том виде, в каком стартовый вид его различает. */
@@ -25,6 +29,9 @@ export interface WorldLike {
 
 /** Во сколько раз стартовый вид на телефоне ближе вписывания карты в экран. */
 export const HOME_ZOOM = 3;
+
+/** Во сколько раз стартовый вид забега на широком экране ближе вписывания (правило 5). */
+export const RUN_HOME_ZOOM = 2;
 
 /**
  * Найти дом: свой застроенный мир, иначе любой свой, иначе `null` (правила 1–2).
@@ -42,10 +49,24 @@ export function pickHome<T extends WorldLike>(worlds: readonly T[], me: string):
 export type OpeningView =
   { kind: 'home'; at: { x: number; y: number }; scale: number } | { kind: 'whole-map' };
 
+/** Приближение стартового вида к дому, `null` — обзор всей карты (правила 3 и 5).
+ *  `console` — голографическая консоль флагмана, `run` — забег Sector Zero. */
+export function openingZoom(view: {
+  phone: boolean;
+  console: boolean;
+  run: boolean;
+}): number | null {
+  if (view.phone) return HOME_ZOOM;
+  if (view.run) return RUN_HOME_ZOOM;
+  return view.console ? HOME_ZOOM : null;
+}
+
 /** Решить стартовый вид. `phone` — узкая раскладка, `home` — результат `pickHome`. */
-export function openingView(phone: boolean, home: WorldLike | null): OpeningView {
+export function openingView(
+  phone: boolean,
+  home: WorldLike | null,
+  zoom: number = HOME_ZOOM,
+): OpeningView {
   // Правило 3: приближение к дому — только на телефоне и только если дом есть.
-  return phone && home
-    ? { kind: 'home', at: home.position, scale: HOME_ZOOM }
-    : { kind: 'whole-map' };
+  return phone && home ? { kind: 'home', at: home.position, scale: zoom } : { kind: 'whole-map' };
 }

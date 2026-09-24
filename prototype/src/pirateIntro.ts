@@ -10,6 +10,8 @@ export function initPirateIntro(host: {
   close: HTMLElement;
   focus(sector: string): void;
   openBattle(id: string): void;
+  /** Подсказка перешла на новый этап — шаг воронки обучения (`YAG-5.1`). */
+  onStage?(stage: PirateEncounter['stage']): void;
 }): { update(model: PirateEncounter | null): void; reset(): void } {
   let dismissed = false;
   let model: PirateEncounter | null = null;
@@ -36,6 +38,7 @@ export function initPirateIntro(host: {
         host.openBattle(next.battleId);
       }
       if (model?.stage !== next?.stage && next) {
+        host.onStage?.(next.stage);
         const messages = {
           approach: t('pve.pirates.approach'),
           travel: t('pve.pirates.travel'),

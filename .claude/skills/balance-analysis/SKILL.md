@@ -11,28 +11,20 @@ seed воспроизводит матч байт-в-байт, а сотня м�
 
 ## 0. Сначала — какой контент ты меряешь
 
-В репозитории **два** набора контента, и это первое, что надо развести:
+Каталог контента ОДИН — **`data/*.json`** (`data/manifest.json` + фрагменты). Прежний
+рукописный каталог прототипа `prototypeData.ts` удалён (CONV-12b): прототип читает тот же
+бандл через `prototype/src/gameData.ts` → `data/bundle.ts`, сервер — с диска через
+`packages/shared-core/src/data/loadGameData.ts`. Поэтому **все харнесы** (`selfplay.mjs`,
+`econplaytest.mjs`, `netserver.ts`) и играбельный клиент видят правку `data/*.json` сразу.
+Новый фрагмент обязан попасть в ОБА сборщика (`loadGameData.ts` и `data/bundle.ts`) — это
+держит `bundle.test.ts`.
 
-- **`prototype/src/prototypeData.ts`** — каталог прототипа, `parseGameData({ ... })`.
-  Секции: `technologies`, `units`, `modules`, `factions`, `buildings`, `sectors`,
-  `sectorKinds`, `planetTypes`, `heroes` — ищи по имени (`rg '^  units: \{'`), номера
-  строк здесь намеренно не приводятся: файл растёт с каждым контентным PR, и любое
-  записанное число протухает за неделю. (Исторически каталог лежал инлайном в
-  `game.ts`; после REFP вынесен в отдельный файл — `game.ts` его только re-export'ит.)
-  **Именно его гоняют все харнесы** (`selfplay.mjs`, `econplaytest.mjs`,
-  `netserver.ts`) и играбельный клиент `prototype/dist/void-dominion.html` (артефакт
-  сборки — в git его нет, собирается `pnpm run prototype`). Дома здесь —
-  `azure/crimson/amber/violet` с чистыми пассивками.
-- **`data/*.json`** — shipped-бандл (`data/manifest.json` + фрагменты, собираются
-  `packages/shared-core/src/data/loadGameData.ts`). Его читают `packages/server/src/scenario.ts`,
-  `packages/client/src/gameData.ts` и тесты `shared-core`. Фракций здесь ШЕСТЬ: те же
-  четыре дома плюс легаси-пара `vanguard` / `swarm` (закреплено списком в
-  `factions.test.ts`), поэтому наборы не «разные», а вложенные — прототип гоняет
-  четыре, бандл несёт шесть.
+Фракций в бандле ШЕСТЬ: четыре дома `azure/crimson/amber/violet` плюс легаси-пара
+`vanguard` / `swarm`; за стол (и в замер) садятся только четыре дома —
+`PLAYABLE_FACTIONS` в `prototype/src/matchSetup.ts`.
 
-Правь то, что меряешь. Цифра, покрученная в `data/units.json`, **не изменит вывод
-`pnpm run selfplay`** — харнес её просто не видит. Если вывод обязан измениться, а не
-изменился, ты почти наверняка правишь не тот файл.
+Если вывод `selfplay` обязан был измениться, а не изменился, — ищи, читает ли поле хоть
+кто-то (модуль ядра или `ai.ts`), а не «тот ли файл».
 
 ## 1. Прогон батча self-play
 
@@ -117,7 +109,7 @@ desync'и и латентности. Это про поведение живых
 Выброс полезен только тогда, когда доведён до конкретного поля:
 
 - перекос **по фракции** → `factions.*.passives` (`productionBonus`, `combatDamageBonus`,
-  `fleetSpeedBonus`) в `prototype/src/prototypeData.ts` (~545) / `data/factions.json`;
+  `fleetSpeedBonus`) в `data/factions.json`;
 - **юнит доминирует** → `units.*.stats` (attack/defense/hp/shield/speed), `cost`, `upkeep`;
   смотри отношение боевой ценности к цене, а не абсолютные числа;
 - **постройка мертва или обязательна** → `buildings.*`: `cost`, `buildTimeHours`, `produces`,
@@ -152,7 +144,7 @@ desync'и и латентности. Это про поведение живых
 ## 7. Зона, гейт, оформление
 
 Балансная правка — это изменение контента, зона **`[data]`** по словарю `docs/backlog.md`
-(`data/*.json`; правка инлайнового каталога прототипа — зона `[proto]`). Контентные зоны почти
+(`data/*.json`; правка бота `prototype/src/ai.ts` — зона `[proto]`). Контентные зоны почти
 не пересекаются с кодом, поэтому такой PR редко конфликтует с чужой работой — но зона всё равно
 одна на кирпичик.
 
