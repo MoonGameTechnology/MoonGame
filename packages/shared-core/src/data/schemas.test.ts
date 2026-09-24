@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.34'); // задачи владельца 2026-09-24: транспорт с беженцами, маяк, спасение, крепость
+    expect(data.version).toBe('0.1.35'); // задачи владельца 2026-09-24 (транспорт с беженцами, маяк, спасение) поверх 0.1.34 — Учёного PVR-6.16
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что

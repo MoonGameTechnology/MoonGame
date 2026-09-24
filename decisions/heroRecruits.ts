@@ -15,8 +15,10 @@ import { newSectorHero, type SectorZeroProgress } from './sectorZeroProgress';
  *    первом же чтении профиля. Повторная победа второго героя не даёт — герой уже в отряде.
  */
 
-/** Герой за первую победу в главе с этим номером (0 — первая глава). */
-export const CHAPTER_HEROES: readonly string[] = ['ravager', 'vanguard', 'warden'];
+/** Герой за первую победу в главе с этим номером (0 — первая глава). Решение владельца
+ *  2026-09-24: глава I приводит Учёного — по сюжету его спасают в самом начале
+ *  (sector-zero-roadmap §3.1.3), — II Авангарда, III Стража; Разрушитель — только покупка. */
+export const CHAPTER_HEROES: readonly string[] = ['scientist', 'vanguard', 'warden'];
 
 /** Кто придёт за главу `index`, либо null — у главы героя-награды нет. */
 export function chapterHero(index: number): string | null {

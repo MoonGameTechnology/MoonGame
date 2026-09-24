@@ -11,6 +11,7 @@ import {
   ownHeroes,
   normalizeHeroView,
   initHeroStaff,
+  heroDisplayName,
   HERO_CASTABLE,
   heroCdKey,
   nodeDepth,
@@ -612,6 +613,50 @@ describe('штаб героев — слоты под скиллы (HPR-1.2)', (
   });
 });
 
+describe('штаб героев — надеваемая пассивка в слотах (PVR-6.16)', () => {
+  function pane(over: Partial<NonNullable<GameState['heroes']>[string]>): string {
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    Object.assign(hero, {
+      grade: 'rare',
+      abilities: ['scan'],
+      passives: ['ballistic_model'],
+      ...over,
+    });
+    const staff = initHeroStaff(hostOf({ state: () => s }));
+    staff.click(click('[data-htab]', { htab: 'abilities' }));
+    return staff.paneHtml();
+  }
+  it('лежит в запасе с кнопкой «Надеть», а счёт слотов её учитывает', () => {
+    const html = pane({ equipped: ['scan'] });
+    expect(html).toContain(tData(data.heroPassives.ballistic_model!.name));
+    expect(html).toMatch(/data-hequip="[^"]*" data-ab="ballistic_model"/);
+    expect(html).toContain(t('hero.slot.head', { u: 1, n: 2 }));
+  });
+
+  it('надетая занимает слот: снять можно, применить нечего', () => {
+    const html = pane({ equipped: ['scan', 'ballistic_model'] });
+    expect(html).toContain(t('hero.slot.head', { u: 2, n: 2 }));
+    expect(html).toMatch(/data-hunequip="[^"]*" data-ab="ballistic_model"/);
+    expect(html).not.toMatch(/data-hcast="[^"]*" data-ab="ballistic_model"/);
+    expect(html).not.toContain(t('hero.slot.empty'));
+  });
+
+  it('в бонусах героя — только когда надета', () => {
+    const line = `+10% ${t('hero.hook.combat-damage')}`;
+    const overview = (equipped: string[]): string => {
+      const s = staffed();
+      const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+      Object.assign(hero, { abilities: ['scan'], passives: ['ballistic_model'], equipped });
+      const staff = initHeroStaff(hostOf({ state: () => s }));
+      staff.click(click('[data-htab]', { htab: 'overview' }));
+      return staff.paneHtml();
+    };
+    expect(overview(['scan'])).not.toContain(line);
+    expect(overview(['ballistic_model'])).toContain(line);
+  });
+});
+
 describe('штаб героев — корабль: модули в той же идиоме отсеков (HPR-1.5.4)', () => {
   function shipPane(over: Partial<HeroStaffHost> = {}): string {
     const staff = initHeroStaff(hostOf(over));
@@ -656,5 +701,19 @@ describe('штаб героев — корабль: модули в той же 
     const html = shipPane({ state: () => s }); // главный герой развёрнут
     expect(html).toContain(t('hero.ship.refit-docked'));
     expect(html).not.toContain('data-hinstall');
+  });
+});
+
+describe('штаб героев — Учёный', () => {
+  it('имя Учёного не согласовано — панель показывает имя архетипа, а не ключ', () => {
+    const name = heroDisplayName({
+      id: 'h',
+      owner: 'p1',
+      location: 'A',
+      cooldowns: {},
+      archetype: 'scientist',
+    });
+    expect(name).toBe(tData(data.heroes.scientist!.name));
+    expect(name).not.toContain('hero.person');
   });
 });

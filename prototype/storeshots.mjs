@@ -53,6 +53,7 @@ const TYPES = {
   '.js': 'text/javascript',
   '.css': 'text/css',
   '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
   '.json': 'application/json',
 };
 const server = createServer((req, res) => {

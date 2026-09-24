@@ -44,7 +44,7 @@ export const platformBuildOptions = {
   platform: 'browser',
   target: 'es2020',
   // Не `dataurl`: бинарники едут отдельными файлами в assets/ (см. шапку).
-  loader: { '.webp': 'file' },
+  loader: { '.webp': 'file', '.svg': 'file' },
   assetNames: 'assets/[name]-[hash]',
   entryNames: 'assets/app',
   outdir: here('./dist/yandex'),

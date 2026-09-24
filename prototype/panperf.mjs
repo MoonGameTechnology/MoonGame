@@ -75,7 +75,7 @@ const bundle = await build({
   write: false,
   format: 'iife',
   platform: 'browser',
-  loader: { '.webp': 'dataurl' },
+  loader: { '.webp': 'dataurl', '.svg': 'dataurl' },
   define: { __PLAYER_BUILD__: 'false', __SECTOR_ZERO_ONLY__: 'false' },
 });
 const built = readFileSync('prototype/dist/void-dominion.html', 'utf8');
