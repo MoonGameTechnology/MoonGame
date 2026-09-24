@@ -12,6 +12,7 @@ import {
   sectorHeroSlots,
   sectorHullIds,
   sectorModuleIds,
+  sectorSkillOpenTo,
   WARRANTS_PER_REWARD,
   type SectorZeroProgress,
   type SectorProgressAction,
@@ -135,6 +136,11 @@ describe('Sector Zero persistent preparation', () => {
         unparked,
       ),
     ).toBeNull();
+    // Академия раскладывает дерево тем же правилом (ревью Sector Zero): общий узел виден
+    // любому герою, чужой — нет. Иначе купить можно было бы то, чего на экране нет.
+    const trees = unparked.heroSkillTrees;
+    expect(sectorSkillOpenTo(trees.command_relay!, 'commander', unparked)).toBe(true);
+    expect(sectorSkillOpenTo(trees.void_attunement!, 'commander', unparked)).toBe(false);
   });
 
   it('chooses another acquired hero and carries their own skills into the real map', () => {

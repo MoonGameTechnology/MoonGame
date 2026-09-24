@@ -3,6 +3,8 @@ import {
   canEquip,
   effectiveStats,
   moduleAllowed,
+  rarityOf,
+  starsOf,
   type GameData,
 } from '../../packages/shared-core/src/index';
 import {
@@ -15,6 +17,7 @@ import {
   sectorHullIds,
   sectorModuleIds,
   sectorSkillCost,
+  sectorSkillOpenTo,
   WARRANTS_PER_REWARD,
   type SectorProgressAction,
   type SectorZeroProgress,
@@ -135,7 +138,19 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const def = data.units[hull];
     if (!def) return '';
     const selected = p.loadouts[hull] ?? [];
-    const statsNow = effectiveStats(def, { modules: selected }, data);
+    // Сравнение — с теми же звёздами и редкостью, что поедут в забег (`prepareSectorZeroRun`):
+    // без них карточка показывала бы голый модуль, а в бою он сильнее.
+    const statsWith = (mods: string[]) =>
+      effectiveStats(
+        def,
+        {
+          modules: mods,
+          moduleStars: starsOf(mods, p.stars),
+          moduleRarity: rarityOf(mods, p.moduleRarity),
+        },
+        data,
+      );
+    const statsNow = statsWith(selected);
     // Корпус выбирают по картинке, а не по слову (PVR-6.6): тот же арт, что в
     // конструкторе основной игры. Нет арта у корпуса — остаётся имя, без пустой рамки.
     const hullTile = (id: string): string =>
@@ -184,11 +199,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
             ? deltaHtml(
                 statDeltas(
                   statsNow,
-                  effectiveStats(
-                    def,
-                    { modules: fitted ? selected.filter((m) => m !== id) : [...selected, id] },
-                    data,
-                  ),
+                  statsWith(fitted ? selected.filter((m) => m !== id) : [...selected, id]),
                   STAT_ORDER,
                 ),
               )
@@ -390,12 +401,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
 
   /** Глубина узла в дереве навыков: без предпосылок — 1, иначе на один глубже самой
    *  глубокой. Ступени делают дерево читаемым: что открыть сначала, что потом. */
-  const skillTier = (id: string, seen: Set<string> = new Set()): number => {
-    const node = h.data.heroSkillTrees[id];
-    if (!node || seen.has(id) || node.requires.length === 0) return 1;
-    seen.add(id);
-    return 1 + Math.max(...node.requires.map((r) => skillTier(r, seen)));
-  };
+  const skillTier = (id: string): number => Math.max(1, sectorSkillCost(id, h.data) / 2);
   /** Герб героя — первая буква имени в ромбе: запас для героя без портрета. */
   const crest = (name: string): string =>
     `<span class="sz-crest" aria-hidden="true"><em>${esc(name.charAt(0).toUpperCase())}</em></span>`;
@@ -459,7 +465,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     body += `</div><h3>${t('sector-zero.prep.skills')}</h3><p class="sz-sub">${t('sector-zero.prep.skill-hint')}</p>`;
     const tiers = new Map<number, string[]>();
     for (const [id, node] of Object.entries(data.heroSkillTrees)) {
-      if (node.branch !== def.branch) continue;
+      if (!sectorSkillOpenTo(node, heroId, data)) continue;
       const tier = skillTier(id);
       tiers.set(tier, [...(tiers.get(tier) ?? []), id]);
     }

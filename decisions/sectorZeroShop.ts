@@ -88,8 +88,10 @@ export function offerOwned(
   progress: SectorZeroProgress,
 ): boolean {
   if (row.kind === 'module') return progress.modules.includes(row.grants);
+  // Навык покупается ВЫБРАННОМУ герою (`buy` → `selectedHero`), поэтому и «уже есть»
+  // спрашивается у него: знание навыка другим героем покупку не закрывает.
   if (row.kind === 'skill')
-    return Object.values(progress.heroes).some((h) => h.skills.includes(row.grants));
+    return progress.heroes[progress.selectedHero]?.skills.includes(row.grants) ?? false;
   return false;
 }
 
