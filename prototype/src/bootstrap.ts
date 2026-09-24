@@ -19,6 +19,7 @@ import {
 } from './platform/host';
 import { sdkLoaderPresent } from './platform/sdkWait';
 import { loadLocaleAsset } from './platform/localeAsset';
+import { measureViewport } from './viewport';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
@@ -42,6 +43,28 @@ async function loadActiveLocale(): Promise<void> {
 
 document.body.classList.add('app-starting');
 if (!__SECTOR_ZERO_ONLY__) labelStaticDom();
+
+/**
+ * BOOT-1 — первый кадр сразу в новом виде (заказ владельца: «убрать вспышку старого
+ * интерфейса при заходе на сайт»).
+ *
+ * Вид консоли включает класс `holo-ui`, а ставит его кадровый цикл игры
+ * (`holographicUi.sync`) — то есть после загрузки всей игры. До того браузер успевал
+ * нарисовать разметку в прежнем виде: замер, 1440×900 — старый вход с 157 до 360 мс, потом
+ * новый. Поэтому страница рождается под покровом (`app-booting` в разметке), а здесь, в
+ * первом же синхронном шаге скрипта, получает классы консоли по ТОМУ ЖЕ правилу, что у
+ * цикла (`supportsHolography` = не телефонный вьюпорт), и только потом открывается.
+ * Цикл дальше ведёт эти классы сам, при повороте и ресайзе.
+ */
+function revealBoot(): void {
+  const holo = !measureViewport().mobile;
+  document.body.classList.toggle('holo-available', holo);
+  document.body.classList.toggle('holo-ui', holo);
+  document.body.classList.remove('app-booting');
+}
+// Архиву площадки нечем подписать разметку, пока не скачан язык, — там покров снимается
+// после загрузки текстов (ниже), чтобы не показать кнопки без подписей.
+if (!__SECTOR_ZERO_ONLY__) revealBoot();
 
 /**
  * Площадка поднимается ДО игры (`YAG-1.1b`).
@@ -96,7 +119,7 @@ loaderReady()
       if (locale) suggestLocale(locale);
     } else if (locale && suggestLocale(locale)) labelStaticDom();
   })
-  .then(() => (__SECTOR_ZERO_ONLY__ ? loadActiveLocale() : undefined))
+  .then(() => (__SECTOR_ZERO_ONLY__ ? loadActiveLocale().then(revealBoot) : undefined))
   .then(() => import('./main'))
   .then(
     () => {
@@ -111,6 +134,9 @@ loaderReady()
       // Raw errors belong in developer logs, not in the player's UI: a message or
       // stack may contain a URL or stored data. The screen reports only safe codes.
       console.error('E_CLIENT_STARTUP', error);
+      // Сбой до снятия покрова (архив площадки: не скачался язык) — экран ошибки обязан
+      // быть виден, покров его не прячет.
+      document.body.classList.remove('app-booting');
       document.body.classList.add('app-startup-failed');
       const panel = document.getElementById('startup-error');
       if (panel) panel.hidden = false;
