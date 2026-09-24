@@ -1226,7 +1226,7 @@
 | YAG-4.1 | ⏳ | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
-| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию |
+| YAG-5.2 | 🔶 | docs proto | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию 2026-09-24 |
 | YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
 | YAG-6.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир 2026-09-24 |
 | YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
