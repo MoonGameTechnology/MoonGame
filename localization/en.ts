@@ -600,16 +600,16 @@ export const en: Record<string, string> = {
   'codex.tag.module': 'module',
   'codex.tag.ship': 'ship',
   'codex.term.async.body':
-    'The world runs in real time and keeps going 24/7 — even after you leave. Orders take real hours: set a course, close the game, come back to the result. This is not turn-based — drop in, issue orders, drop out.',
+    'The world runs in real time and keeps going 24/7 — even after you leave. Orders take real hours: set a course, close the game, come back to the result.',
   'codex.term.async.title': 'Asynchronous world',
   'codex.term.capture.body':
-    'Capturing a world is two-phase. First enter orbit and beat the defenders in space; if the world holds a garrison, land troops (a ground division from the hold). Sky first, then ground.',
+    'Capturing a world is two-phase. First enter orbit and beat the defenders in space; if the world holds a garrison, land troops (a ground division from the hold).',
   'codex.term.capture.title': 'Orbit and landing',
   'codex.term.coalition.body':
     'Diplomacy lets you sign pacts and alliances, but a coalition is capped by combined strength — you cannot gang everyone up on one player. The cap keeps the balance of power and stops a snowball from crushing the game.',
   'codex.term.coalition.title': 'Coalition cap',
   'codex.term.fog.body':
-    'You see only what is near your forces and radars; the rest is hidden by fog or shown from memory (the last thing you saw there). Scouts and radar widen your view — keep your eyes open.',
+    'You see only what is near your forces and radars; the rest is hidden by fog or shown from memory (the last thing you saw there). Scouts and radar widen your view.',
   'codex.term.fog.title': 'Fog of war',
   'codex.term.lanes.body':
     'Fleets travel not in straight lines but along star lanes between worlds — the route is built automatically. Lane nodes can be intercepted: an enemy met on the way is a battle.',
@@ -618,7 +618,7 @@ export const en: Record<string, string> = {
     'Points accrue from what you hold: a world — 50, any other sector — 10, buildings add per level. Reach the score threshold to win. Other paths to victory: eliminating rivals or domination.',
   'codex.term.score.title': 'Victory points',
   'codex.term.upkeep.body':
-    'Fleets and buildings cost a daily fee. Mine income minus upkeep = your net balance; go negative and the treasury drains. Build economy before army.',
+    'Fleets and buildings cost a daily fee. Mine income minus upkeep = your net balance; go negative and the treasury drains.',
   'codex.term.upkeep.title': 'Upkeep',
   'codex.value.hours': '{n} h',
   'codex.value.levels-upgradable': '{n} (upgradeable)',
