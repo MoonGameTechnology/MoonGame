@@ -7,7 +7,7 @@
 //     markup (fenced with <!--dev-only--> … <!--/dev-only--> below) is stripped.
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
-import { platformBuildOptions } from './platformBuild.mjs';
+import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
 
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
@@ -3711,6 +3711,11 @@ for (const file of platformFiles) {
   mkdirSync(out.slice(0, out.lastIndexOf('/')), { recursive: true });
   writeFileSync(out, file.contents);
   platformBytes += file.contents.byteLength;
+}
+// YAG-1.1d: тексты — по файлу на язык; игрок скачивает только свой.
+for (const locale of await platformLocaleFiles()) {
+  writeFileSync(`prototype/dist/yandex/${locale.path}`, locale.contents);
+  platformBytes += Buffer.byteLength(locale.contents);
 }
 const platformCss = allCss();
 writeFileSync('prototype/dist/yandex/assets/app.css', platformCss);

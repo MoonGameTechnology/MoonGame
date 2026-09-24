@@ -5,6 +5,9 @@
 //
 // PWA-клиент импортирует НЕ отсюда, а из `core.ts`, и подключает ровно одну локаль
 // (`packages/client/src/locale.ts`): иначе игрок скачивал бы все языки — LOC-6.
+// Архив площадки (`prototype/dist/yandex/`) этот файл тоже НЕ получает: его сборка
+// подменяет импорт на `core.ts`, а язык игрока догружает файлом (`YAG-1.1d`,
+// `prototype/platformBuild.mjs`).
 import { LOCALE_SOURCES } from './bundles';
 import { LOCALE_IDS } from './index';
 import { registerMessages } from './core';

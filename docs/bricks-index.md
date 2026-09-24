@@ -1201,6 +1201,7 @@
 | YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md` | Контракты GamePlatform и WebPlatformAdapter |
 | YAG-1.1b | ✅ | proto | `docs/yandex-games-roadmap.md` | Платформенная цель сборки и раскладка архива 2026-09-22 |
 | YAG-1.1c | ✅ | proto | `docs/yandex-games-roadmap.md` | В архиве площадки — только Sector Zero 2026-09-23 |
+| YAG-1.1d | ✅ | proto | `docs/yandex-games-roadmap.md` | В архиве — тексты одного языка 2026-09-24 |
 | YAG-1.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | YandexGamesAdapter: инициализация и жизненный цикл 2026-09-22 |
 | YAG-1.2a | ✅ | proto | `docs/yandex-games-roadmap.md` | Разметка геймплея на забеге 2026-09-22 |
 | YAG-1.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | Язык от площадки |

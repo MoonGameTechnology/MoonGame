@@ -1,7 +1,13 @@
 // Entry labels must not depend on game/map initialization reaching the welcome
 // handlers. esbuild keeps this dynamic import inside the self-contained bundle;
 // no network request is needed to start the game, including in the APK.
-import { localizeStaticDom, LOCALE, LOCALE_LABEL, suggestLocale } from '../../localization/runtime';
+import {
+  localizeStaticDom,
+  LOCALE,
+  LOCALE_LABEL,
+  registerMessages,
+  suggestLocale,
+} from '../../localization/runtime';
 import { platformLocale } from '../../decisions/platformLocale';
 import { currentBuild } from './updater';
 import {
@@ -12,9 +18,13 @@ import {
   type YaGamesGlobal,
 } from './platform/host';
 import { sdkLoaderPresent } from './platform/sdkWait';
+import { loadLocaleAsset } from './platform/localeAsset';
 
 /** Сборка игрока (esbuild define). Дев-сборке нужна симуляция рекламы и покупок. */
 declare const __PLAYER_BUILD__: boolean;
+/** Архив площадки (esbuild define, см. `main.ts`). Здесь он решает одно: тексты едут
+ *  файлом одного языка (`YAG-1.1d`), а не лежат в бандле. */
+declare const __SECTOR_ZERO_ONLY__: boolean;
 
 /** Статическая разметка и подпись переключателя — на текущем языке рантайма. */
 function labelStaticDom(): void {
@@ -23,8 +33,15 @@ function labelStaticDom(): void {
   if (language) language.textContent = LOCALE_LABEL[LOCALE] + ' ▾';
 }
 
+/** Архив площадки: скачать тексты языка, на котором игра запустится, и подписать ими
+ *  разметку. До этого текстов нет вовсе — подпись раньше показала бы игроку ключи. */
+async function loadActiveLocale(): Promise<void> {
+  registerMessages(LOCALE, await loadLocaleAsset(LOCALE));
+  labelStaticDom();
+}
+
 document.body.classList.add('app-starting');
-labelStaticDom();
+if (!__SECTOR_ZERO_ONLY__) labelStaticDom();
 
 /**
  * Площадка поднимается ДО игры (`YAG-1.1b`).
@@ -73,8 +90,13 @@ loaderReady()
     // вообще перезагружает страницу. Статика выше уже отрисована на языке браузера —
     // сменился язык, перерисовываем её. Явный выбор игрока подсказка не перебивает.
     const locale = platformLocale(platform.language);
-    if (locale && suggestLocale(locale)) labelStaticDom();
+    // YAG-1.1d: в архиве тексты ещё не скачаны — подписывать нечем; язык качается
+    // следующим шагом, уже ПОСЛЕ подсказки площадки: ровно тот, на котором игра запустится.
+    if (__SECTOR_ZERO_ONLY__) {
+      if (locale) suggestLocale(locale);
+    } else if (locale && suggestLocale(locale)) labelStaticDom();
   })
+  .then(() => (__SECTOR_ZERO_ONLY__ ? loadActiveLocale() : undefined))
   .then(() => import('./main'))
   .then(
     () => {
