@@ -16,7 +16,7 @@
  * 2. **Метка — только там, куда игроку идти.** `control` метит названные миры, которые
  *    ещё не взяты; `raze` — миры, где игрок ПОМНИТ стоящую постройку названного вида
  *    (память тумана, а не правда состояния: метка не выдаёт разведку, которой не было);
- *    `rescue` и `beacon` — свою провинцию; `build` с `at` — названные места без нужной
+ *    `rescue` и `beacon` — свою провинцию; `isolate` — мир Роя, который надо отрезать; `build` с `at` — названные места без нужной
  *    постройки; `evac` — свои убежища. У `scout`, `wave` и `build` без места одной
  *    точки нет — меток нет.
  * 3. **Выполненная и проваленная задача меток не держит**: на карту зовёт только то, что
@@ -82,8 +82,8 @@ export function missionTargets(
     return (objective.targets ?? []).filter(
       (id) => state.planets[id] !== undefined && state.planets[id]!.owner !== player,
     );
-  // Спасение и маяк называют провинцию — метка стоит, пока задача не решена.
-  if (objective.kind === 'rescue' || objective.kind === 'beacon')
+  // Спасение, маяк и разрыв сети называют провинцию — метка стоит, пока задача не решена.
+  if (objective.kind === 'rescue' || objective.kind === 'beacon' || objective.kind === 'isolate')
     return (objective.targets ?? []).filter((id) => state.planets[id] !== undefined);
   // Крепость в провинции: названные места, где нужной постройки ещё нет.
   if (objective.kind === 'build' && objective.at && objective.at.length > 0) {

@@ -179,3 +179,14 @@ describe('новые задачи владельца 2026-09-24: крепост�
     expect(objectiveProgress(beacon, broken, 'p1').complete).toBe(false);
   });
 });
+
+describe('разрыв сети Роя (2026-09-24)', () => {
+  const cutNest: MissionObjective = { id: 'm.cut', kind: 'isolate', targets: ['nest'], reward: 3 };
+  it('засчитан, когда ядро записало разрыв названного мира', () => {
+    const s = (cut?: string[]) =>
+      ({ planets: {}, fleets: {}, ...(cut ? { swarmNet: { holders: {}, cut } } : {}) }) as unknown as GameState;
+    expect(objectiveProgress(cutNest, s(), 'p1').complete).toBe(false);
+    expect(objectiveProgress(cutNest, s(['other']), 'p1').complete).toBe(false);
+    expect(objectiveProgress(cutNest, s(['nest']), 'p1').complete).toBe(true);
+  });
+});

@@ -62,6 +62,7 @@ export const en: Record<string, string> = {
   'mission.beacon': 'Beacon: hold the beacon for {n} straight — the Swarm will respond in force',
   'mission.starfort': 'Fortress: build a space fortress on the second colony',
   'mission.rescue': 'Rescue: break the siege before the garrison falls',
+  'mission.cut-network': 'Cut the network: sever the Swarm nest from the hive — kill a relay on the route',
   'mission.evac': 'Evacuation: bring {n} refugee transports to your base',
   'production.units': 'Build units',
   'battle.win.at': 'Battle at {w}',
@@ -2697,6 +2698,8 @@ export const en: Record<string, string> = {
   'swarm.journal.tier.unknown': 'Unknown',
   'swarm.journal.intercept': 'The Swarm intercepts strike craft — sorties repelled: {n}',
   'swarm.journal.stronger': 'interception looks reinforced — point defence rose from {from} to {to}',
+  'swarm.journal.stale': 'Swarm groups without the usual intercept: {n} — likely cut off from the network, fighting on old memory',
+  'swarm.intel.network': 'The Swarm passes combat experience only over its links: data centers and relays. A severed part fights on old memory until the link returns.',
   'swarm.journal.unknown': 'the Swarm growth organ has not been scouted',
 
   // --- tech — Дерево технологий: названия веток.

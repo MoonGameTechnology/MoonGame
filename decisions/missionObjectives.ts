@@ -162,6 +162,14 @@ export function objectiveProgress(
       needMs,
     };
   }
+  if (objective.kind === 'isolate') {
+    // «Разорвать сеть Роя» (2026-09-24): названный мир Роя отрезан от улья после того, как
+    // был с ним на связи. Разрыв — событие ядра (`swarmNet.cut`), починка его не отменяет.
+    const targets = objective.targets ?? [];
+    const cut = state.swarmNet?.cut ?? [];
+    const done = targets.filter((id) => cut.includes(id)).length;
+    return { ...base, done, total: targets.length, complete: targets.length > 0 && done === targets.length };
+  }
   const done = Math.min(identified(state, player), need);
   return { ...base, done, total: need, complete: done >= need };
 }

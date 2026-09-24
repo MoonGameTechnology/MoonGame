@@ -19,9 +19,13 @@
 import type { GameModule } from '../kernel/module';
 import type { SwarmRepelRecord } from '../state/gameState';
 
+/** Во сколько раз перехват должен вырасти (и во сколько раз быть слабее сильнейшего),
+ *  чтобы разница читалась как другая память, а не как другой размер отряда. */
+const STALE_RATIO = 4;
+
 export const swarmJournalModule: GameModule = {
   id: 'swarmJournal',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.on('shuttle.repelled', (event, h) => {
       const p = event.payload as {
@@ -49,9 +53,17 @@ export const swarmJournalModule: GameModule = {
           lastDamage: damage,
         } satisfies SwarmRepelRecord;
       } else {
+        // Старая память (сеть Роя, 2026-09-24): игрок уже видел перехват, выросший в разы
+        // против первого, а этот отряд отвечает в разы слабее сильнейшего — он, похоже,
+        // отрезан от сети. Вывод из собственных замеров игрока, а не из состояния Роя.
+        const top = seen.maxDamage ?? Math.max(seen.firstDamage, seen.lastDamage);
+        if (top >= STALE_RATIO * seen.firstDamage && damage * STALE_RATIO <= top) {
+          seen.stale = (seen.stale ?? 0) + 1;
+        }
         seen.lastAt = h.ctx.now;
         seen.sorties += 1;
         seen.lastDamage = damage;
+        seen.maxDamage = Math.max(top, damage);
       }
       h.emit('swarm.journal.entry', { owner: p.owner, damage });
     });
