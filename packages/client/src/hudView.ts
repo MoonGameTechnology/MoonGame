@@ -19,6 +19,7 @@
 import type { GameData, ShipSlotType } from '@void/shared-core';
 import { t, tData } from '../../../localization/core';
 import { buildingName, displayUnit } from '../../../decisions/dataNames';
+import { veteranBadge } from '../../../decisions/veteranBadge';
 import type {
   BattleModel,
   MergeCandidate,
@@ -364,10 +365,18 @@ const SIDE_KIND: Record<BattleSideView['kind'], string> = {
 };
 
 function sideHtml(side: BattleSideView): string {
+  // PERK-3.3: надбавка за пережитые бои. Решение — общее (`/decisions/veteranBadge.ts`),
+  // то же самое, что зовёт прототип: разойдись они, игрок, перешедший с прототипа на
+  // клиент, увидел бы другую игру — ровно ради этого решение и вынесено из вёрстки.
+  const vet = veteranBadge(side.veteran);
   return (
     `<div class="side${side.mine ? ' mine' : ''} ${side.role}">` +
     `<p class="owner">${esc(side.ownerName)}<i>${esc(t(SIDE_KIND[side.kind]))}</i>` +
-    `<em>${esc(t(side.role === 'attacker' ? 'hud.side.attacking' : 'hud.side.defending'))}</em></p>` +
+    `<em>${esc(t(side.role === 'attacker' ? 'hud.side.attacking' : 'hud.side.defending'))}</em>` +
+    (vet
+      ? `<b class="vet" title="${esc(vet.title)}" aria-label="${esc(vet.title)}">${vet.glyph}${esc(vet.text)}</b>`
+      : '') +
+    `</p>` +
     (side.hull ? barHtml('hull', side.hull) : '') +
     (side.shield ? barHtml('shield', side.shield) : '') +
     stacksHtml(side.units) +

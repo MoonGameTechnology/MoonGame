@@ -30,8 +30,10 @@ import {
   previewBattle,
   previewLossCount,
   stewardUnlocked,
+  veteranFactor,
 } from '@void/shared-core';
 import type {
+  Battle,
   BattleId,
   BattlePreviewSide,
   CombatantRef,
@@ -767,6 +769,14 @@ export interface BattleSideView {
    *  `defense`. Роль принадлежит СТОРОНЕ (MSB-1), поэтому её нельзя вывести из места в
    *  списке: атакующих может быть сразу несколько. */
   role: 'attacker' | 'defender';
+  /** PERK-3.3: во сколько раз эта сторона бьёт сильнее за пережитые бои (PERK-3.1).
+   *  Отсутствует, когда надбавки нет — у необстрелянных сил или когда механика выключена
+   *  данными. Панель тогда не рисует строки вовсе: «×1.00» это шум, а не сведения.
+   *
+   *  Число принадлежит ВЛАДЕЛЬЦУ, а не строке: в совместном штурме (MSB-4) у игрока
+   *  бывает несколько сторон, множитель у них пулится, и показать сторонам разные числа
+   *  значило бы соврать. Поэтому у всех сторон одного владельца оно одинаковое. */
+  veteran?: number;
 }
 
 /** Render-ready description of an active battle — the "combat zone" panel. */
@@ -800,9 +810,10 @@ export type BattleResult = ({ ok: true } & BattleModel) | { ok: false; code: str
 
 function sideView(
   state: GameState,
+  battle: Battle,
   side: { ref: CombatantRef; owner: PlayerId | null; role: 'attacker' | 'defender' },
   viewerId: PlayerId,
-  data?: Pick<GameData, 'units'>,
+  data?: Pick<GameData, 'units' | 'veteran'>,
 ): BattleSideView {
   const ref = side.ref;
   const stacks: UnitStack[] =
@@ -831,6 +842,19 @@ function sideView(
     view.hull = hullOf(stacks, data);
     const shield = shieldOf(stacks, data);
     if (shield) view.shield = shield;
+    // PERK-3.3: надбавку СЧИТАЕТ ЯДРО (`veteranFactor`), а не эта проекция. Повтори
+    // формулу здесь — и панель однажды покажет одно, а редьюсер применит другое; каждая
+    // половина будет верна сама по себе, и ни один тест этого не поймает.
+    //
+    // Проверка `data.veteran` по типу избыточна и стоит здесь НАМЕРЕННО: `data` сюда
+    // приходит срезом каталога, и зовущие подсовывают неполные объекты через приведение
+    // (так устроены и фикстуры тестов). Обещание этого файла — панель БЕЗ части данных
+    // деградирует, а не падает; без проверки урезанный каталог ронял бы всё окно боя
+    // целиком, и поймано это было именно так.
+    if (owner != null && data.veteran) {
+      const factor = veteranFactor(state, battle, owner, data);
+      if (factor !== 1) view.veteran = factor;
+    }
   }
   return view;
 }
@@ -842,7 +866,7 @@ export function createBattleModel(
   state: GameState,
   battleId: BattleId,
   viewerId: PlayerId,
-  data?: Pick<GameData, 'units'>,
+  data?: Pick<GameData, 'units' | 'veteran'>,
 ): BattleResult {
   const battle = state.battles[battleId];
   if (!battle) {
@@ -855,9 +879,9 @@ export function createBattleModel(
   if (!attackerSide || !defenderSide) {
     return { ok: false, code: 'E_NO_BATTLE' };
   }
-  const sides = battle.sides.map((side) => sideView(state, side, viewerId, data));
-  const attacker = sideView(state, attackerSide, viewerId, data);
-  const defender = sideView(state, defenderSide, viewerId, data);
+  const sides = battle.sides.map((side) => sideView(state, battle, side, viewerId, data));
+  const attacker = sideView(state, battle, attackerSide, viewerId, data);
+  const defender = sideView(state, battle, defenderSide, viewerId, data);
 
   const model: BattleModel = {
     kind: 'battle',

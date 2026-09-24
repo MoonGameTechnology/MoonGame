@@ -29,6 +29,7 @@
 import { t } from '../../localization/runtime';
 import { esc, displayUnit } from './format';
 import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
+import { veteranBadge } from '../../decisions/veteranBadge';
 import type { GameState, PlayerId } from '../../packages/shared-core/src/index';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
@@ -105,11 +106,18 @@ export function sideRowHtml(side: Side, view: BattleView = {}): string {
     side.units
       .map((u) => `<span class="bw-unit"><b>${u.count}×</b> ${esc(displayUnit(u.unit))}</span>`)
       .join('') || '<span class="bw-unit">—</span>';
+  // PERK-3.3: надбавка за пережитые бои. Решение «что показать и когда молчать» —
+  // в `/decisions/veteranBadge.ts`, здесь только подстановка. Значка нет у сил без
+  // выслуги, поэтому у необстрелянной стороны строка не меняется ни на символ.
+  const vet = veteranBadge(side.veteran);
+  const vetHtml = vet
+    ? `<span class="bw-vet" title="${esc(vet.title)}" aria-label="${esc(vet.title)}">${vet.glyph}${esc(vet.text)}</span>`
+    : '';
   return (
     `<div class="bw-side${side.mine ? ' mine' : ''} ${side.role}" style="--own:${esc(col)}">` +
     `<p class="bw-who"><b>${esc(side.ownerName)}</b>` +
     (side.mine ? `<em class="bw-you">${esc(t('battle.win.you'))}</em>` : '') +
-    `<span class="bw-role">${esc(role)}</span><span class="bw-kind">${esc(kind)}</span></p>` +
+    `<span class="bw-role">${esc(role)}</span><span class="bw-kind">${esc(kind)}</span>${vetHtml}</p>` +
     meter(side.hull, `hull tone-${tone}`, t('battle.win.hull'), t(TONE_KEY[tone])) +
     meter(side.shield, 'shield', t('battle.win.shield')) +
     `<div class="bw-units">${units}</div>` +

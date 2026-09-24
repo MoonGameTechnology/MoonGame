@@ -66,6 +66,7 @@ export const ru: Record<string, string> = {
   'battle.win.role.attacker': '⚔ нападает',
   'battle.win.role.defender': '🛡 обороняется',
   'battle.win.rule': 'Раунд — раз в час: стороны обмениваются залпами. Сторона выбывает, когда у неё не осталось сил или она отступила; предел — 240 раундов.',
+  'battle.win.veteran': 'Выслуга: +{n}% урона за пережитые бои',
   'battle.win.tone.hurt': 'потрёпан',
   'battle.win.tone.low': 'на грани',
   'battle.win.tone.ok': 'цел',

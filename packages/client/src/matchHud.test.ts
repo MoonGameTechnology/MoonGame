@@ -612,6 +612,49 @@ describe('createBattleModel', () => {
     const res = createBattleModel(orbitalScene(), 'b1', 'p1', DATA);
     expect(JSON.parse(JSON.stringify(res))).toEqual(res);
   });
+
+  // PERK-3.3: надбавка за пережитые бои приезжает в панель ЧИСЛОМ ИЗ ЯДРА.
+  const VET_DATA = { ...DATA, veteran: { damagePerBattle: 0.04 } } as unknown as GameData;
+
+  it('сторона с выслугой несёт множитель, необстрелянная — не несёт поля вовсе', () => {
+    const s = orbitalScene();
+    s.fleets.f1!.units = [{ unit: 'aegis', count: 3, battles: 4 }];
+    const res = createBattleModel(s, 'b1', 'p1', VET_DATA);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.attacker.veteran).toBeCloseTo(1.16, 9);
+    // Отсутствие поля, а не единица: «надбавки нет» панель не должна рисовать вообще.
+    expect(res.defender.veteran).toBeUndefined();
+  });
+
+  it('число принадлежит ВЛАДЕЛЬЦУ, а не строке: у двух сторон одного игрока оно общее', () => {
+    // Совместный штурм (MSB-4): множитель в ядре пулится по всем силам владельца, и
+    // показать сторонам разные числа значило бы соврать про то, что реально применится.
+    const s = threeSided();
+    s.fleets.f1!.units = [{ unit: 'aegis', count: 2, battles: 4 }];
+    s.fleets.f3!.owner = 'p1';
+    s.battles.b1!.sides[2]!.owner = 'p1';
+    s.fleets.f3!.units = [{ unit: 'frigate', count: 2, battles: 0 }];
+    const res = createBattleModel(s, 'b1', 'p1', VET_DATA);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const mine = res.sides.filter((sd) => sd.owner === 'p1').map((sd) => sd.veteran);
+    expect(mine).toHaveLength(2);
+    // 2 юнита по 4 боя + 2 юнита по 0 = 2 боя на юнит → ×1.08 у ОБЕИХ строк.
+    expect(mine[0]).toBeCloseTo(1.08, 9);
+    expect(mine[1]).toBeCloseTo(1.08, 9);
+  });
+
+  it('урезанный каталог без секции `veteran` не роняет окно боя', () => {
+    // Панель обязана деградировать, а не падать (шапка файла). `DATA` намеренно
+    // неполон — ровно на нём краш и был пойман.
+    const s = orbitalScene();
+    s.fleets.f1!.units = [{ unit: 'aegis', count: 3, battles: 4 }];
+    const res = createBattleModel(s, 'b1', 'p1', DATA);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.attacker.veteran).toBeUndefined();
+  });
 });
 
 describe('createBattlePreviewModel', () => {
