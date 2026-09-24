@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-import { SECTOR_ZERO_ABSENT_TOOLS, toolShown, type SessionTool } from './sectorZeroTools';
+import {
+  SECTOR_ZERO_ABSENT_HUD,
+  SECTOR_ZERO_ABSENT_TOOLS,
+  toolShown,
+  type SessionTool,
+} from './sectorZeroTools';
 
 const MARKUP = readFileSync(new URL('../prototype/build.mjs', import.meta.url), 'utf8');
 const TOOLS = Object.keys(SECTOR_ZERO_ABSENT_TOOLS) as SessionTool[];
@@ -22,5 +27,21 @@ describe('PVR-6.1 — инструменты мультиплеера не ед�
       expect(toolShown(tool, true)).toBe(false);
       expect(toolShown(tool, false)).toBe(true);
     }
+  });
+});
+
+describe('поля шапки, которых нет в забеге (решение владельца 2026-09-24)', () => {
+  it('эмблема с названием и местом, очки победы и день — ровно решение владельца', () => {
+    expect(Object.keys(SECTOR_ZERO_ABSENT_HUD).sort()).toEqual(['crest', 'day', 'score']);
+  });
+
+  it('место живёт внутри блока эмблемы — уходит вместе с ним', () => {
+    const crest = /<div class="crest" id="tbcrest">[\s\S]*?\n {4}<\/div>/.exec(MARKUP)?.[0] ?? '';
+    for (const id of ['crestmark', 'tbname', 'tbplace']) expect(crest).toContain(`id="${id}"`);
+  });
+
+  it('каждое поле существует в разметке шапки', () => {
+    for (const id of Object.values(SECTOR_ZERO_ABSENT_HUD))
+      expect(MARKUP, `id="${id}" в build.mjs`).toContain(`id="${id}"`);
   });
 });

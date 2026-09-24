@@ -167,6 +167,14 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   border:1px solid var(--line);background:rgba(3,14,18,.55);}
 #tbscore.win{color:var(--up);border-color:rgba(95,240,168,.5);font-weight:700;}
 #tbscore:empty{display:none;}
+/* кошелёк профиля в шапке забега (runWallet.ts) — вместо эмблемы, очков и дня */
+#tbwallet{display:flex;align-items:center;gap:8px;margin-left:auto;}
+#tbwallet[hidden]{display:none;}
+#tbwallet .tw-cur{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid currentColor;border-radius:999px;
+  background:color-mix(in srgb,currentColor 12%,transparent);font:600 12px/1.4 ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+#tbwallet .tw-data{color:var(--cur-data);}
+#tbwallet .tw-warrants{color:var(--cur-warrants);}
+#tbwallet .tw-sovereigns{color:var(--cur-sovereigns);}
 /* day card: current game day over a countdown to the next one. Mock palette: neutral
    outline, teal day, grey countdown. */
 #daycard{flex:0 0 auto;margin-left:10px;padding:5px 12px;border-radius:10px;text-align:center;
@@ -3145,11 +3153,12 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <header id="top">
   <div class="tbar">
     <button id="topback" data-i18n-title="hud.back.title" type="button">‹</button>
-    <div class="crest">
+    <div class="crest" id="tbcrest">
       <button id="crestmark" data-i18n-title="hud.crest.title" type="button">◆</button>
       <div class="who"><b id="tbname"></b><span id="tbplace"></span></div>
     </div>
     <span id="tbscore" class="dstat"></span>
+    <div id="tbwallet" class="tbwallet" hidden></div>
     <div id="daycard"><b id="tbday"></b><span id="tbeta"></span><span id="tbetacap" data-i18n="hud.next-day.cap"></span></div>
   </div>
   <div id="purse"></div>

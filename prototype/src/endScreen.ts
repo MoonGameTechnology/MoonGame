@@ -120,7 +120,11 @@ export function endScreenHtml(
     `<div class="es-head ${cls}">${head}</div>` +
     `<div class="es-why">${esc(end.why)}</div>` +
     `<div class="es-grid">` +
-    `<div class="es-cell wide"><span class="es-k">${t('end.score')}</span><span class="es-v">✦ ${total} <small>· ${t('end.place', { p: place, n: of })}</small></span></div>` +
+    // Счёт и место — не про забег Sector Zero (решение владельца 2026-09-24): победа в нём —
+    // выстоять волны, а место среди ИИ-соседей ничего не значит.
+    (end.runReward !== undefined
+      ? ''
+      : `<div class="es-cell wide"><span class="es-k">${t('end.score')}</span><span class="es-v">✦ ${total} <small>· ${t('end.place', { p: place, n: of })}</small></span></div>`) +
     cell(t('end.provinces'), `⬣ ${provinces}`) +
     cell(t('end.fleets'), `⛴ ${fleets}`) +
     cell(t('end.units'), `⚔ ${units}`) +
