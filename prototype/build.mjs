@@ -1401,6 +1401,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #battlewinbody .attacker .bw-role{color:#ff7a6b;border-color:rgba(255,122,107,.5);}
 #battlewinbody .defender .bw-role{color:#7fc8ff;border-color:rgba(127,200,255,.5);}
 #battlewinbody .bw-kind{font-size:11px;color:var(--dim);margin-left:auto;}
+/* PERK-3.3: надбавка за пережитые бои. Янтарь — цвет семьи ветерана (ср. .umedal.g3),
+   чтобы значок в окне боя читался как продолжение вымпела в строке состава. */
+#battlewinbody .bw-vet{font-size:11px;font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:8px;color:var(--amb);border:1px solid rgba(255,190,90,.45);}
 #battlewinbody .bw-meter{position:relative;height:18px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:4px;}
 #battlewinbody .bw-meter i{position:absolute;inset:0 auto 0 0;border-radius:5px;transition:width .6s ease;}
 #battlewinbody .bw-meter span{position:relative;display:block;padding:0 7px;font-size:11px;line-height:18px;color:#f2fbff;text-shadow:0 1px 2px #000;}

@@ -652,6 +652,7 @@
 | PERK-1.2 | ⏳ | data proto | `docs/backlog.md` | Перевести массовые перки в параллельную |
 | PERK-2.1 | ✅ | core | `docs/backlog.md` | Снижение урона: один пул, одна форма, один кап. |
 | PERK-3.1 | ✅ | core data | `docs/backlog.md` | Последовательный множитель выдаётся за |
+| PERK-3.3 | ✅ | core cli proto | `docs/backlog.md` | Надбавка ветерана стала видимой: |
 | PERK-3.2 | ⏳ | core | `docs/backlog.md` | Случайный промоушен: параллельный бонус становится |
 | OBJP-1 | ✅ | proto | `docs/backlog.md` | Значок боя наконец открывает окно, а окно даёт |
 | OBJP-2 | ✅ | proto | `docs/backlog.md` | Подробности объекта встают РЯДОМ с карточкой, а не |

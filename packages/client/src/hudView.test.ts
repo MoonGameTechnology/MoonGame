@@ -153,6 +153,21 @@ describe('панель боя', () => {
     expect(battleHtml(battle, 0)).not.toContain('data-act="retreat"');
   });
 
+  it('надбавка за пережитые бои показана и здесь, тем же решением (PERK-3.3)', () => {
+    // Паритет клиентов: медали VET-5 остались в прототипе и до клиента не доехали —
+    // повторять этот долг не надо. Решение одно (`/decisions/veteranBadge.ts`), значит
+    // и число, и подпись у обоих клиентов совпадают по построению.
+    const vet: BattleModel = {
+      ...battle,
+      sides: [{ ...side(true, 'attacker'), veteran: 1.16 }, side(false, 'defender')],
+    };
+    const html = battleHtml(vet, 0);
+    expect(html).toContain('+16%');
+    expect(html).toContain(t('battle.win.veteran', { n: 16 }));
+    // У стороны без выслуги — ни символа лишнего.
+    expect(battleHtml(battle, 0)).not.toContain('class="vet"');
+  });
+
   it('кнопка появляется ровно тогда, когда модель назвала флот', () => {
     expect(battleHtml({ ...battle, retreatFleetId: 'f1' }, 0)).toContain('data-act="retreat"');
   });

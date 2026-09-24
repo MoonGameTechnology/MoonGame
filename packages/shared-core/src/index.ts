@@ -198,6 +198,8 @@ export {
   type MedalAward,
   type MedalLine,
 } from './state/medals';
+// PERK-3.3: правило надбавки ветерана — ОДНО на редьюсер и на окно боя (см. шапку файла).
+export { servedPerUnit, veteranFactor } from './state/veterancy';
 export {
   previewBattle,
   previewSides,
