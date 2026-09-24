@@ -1563,7 +1563,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #techbody{padding:0;overflow:hidden;display:flex;flex-direction:column;}
 .tt-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 0;flex:none;}
 .tt-day{font-size:11px;color:var(--grn);border:1px solid var(--grn-dim);border-radius:12px;padding:3px 10px;background:rgba(95,240,192,.06);}
-.tt-slots{font-size:11px;color:var(--cyan);}
+.tt-slots{font-size:11px;color:var(--cyan);margin-left:auto;}
 /* Ветки — СЕТКА 3×2, а не лента с прокруткой: пять веток влезают целиком, и «сколько
    ещё осталось» видно по всем сразу, не досвайпывая до края. */
 .tt-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:9px 12px 8px;flex:none;}

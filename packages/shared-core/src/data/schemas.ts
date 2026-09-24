@@ -1292,6 +1292,20 @@ const ModeSightSchema = z
   })
   .strict();
 
+/** PVR-6.17. Дерево технологий режима (заказ владельца 2026-09-24: «технологии из
+ *  сетевой игры надо переделать под Sector Zero — там дневные ограничения, Хранитель,
+ *  которого нет, и т. д.»). Сетевой матч идёт неделями, и узлы в нём открываются по
+ *  дням; забег проходится за часы и до третьего дня не доживает. Нет раздела ⇒ дерево
+ *  как в сетевом матче.
+ *  - `dayGates: false` — ворота дней снимаются целиком: остаются предки, условия и цена;
+ *  - `exclude` — узлы, которых в режиме нет вовсе: их не исследовать и не показывать. */
+const ModeTechnologySchema = z
+  .object({
+    dayGates: z.boolean().default(true),
+    exclude: z.array(z.string()).default([]),
+  })
+  .strict();
+
 /**
  * A game mode — the named preset of rules a match runs under (docs/game-modes-roadmap.md
  * GM-0.1). A mode is DATA: "3v3 against the Swarm" is a JSON entry plus an optional
@@ -1313,6 +1327,8 @@ export const GameModeDefSchema = z.object({
   pve: ModePveSchema.optional(),
   /** Свои радиусы зрения режима; нет ⇒ общие числа ядра. */
   sight: ModeSightSchema.optional(),
+  /** Своё дерево технологий режима (PVR-6.17); нет ⇒ как в сетевом матче. */
+  technology: ModeTechnologySchema.optional(),
 });
 
 /** Session-market rules that belong to CONTENT, not to the mechanic (CONV-9).

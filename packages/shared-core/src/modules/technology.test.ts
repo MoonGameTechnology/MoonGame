@@ -14,7 +14,7 @@ import {
 import { constructionModule } from './construction';
 import { economyModule } from './economy';
 import { movementModule } from './movement';
-import { technologyLock, technologyModule } from './technology';
+import { techInMatch, techRulesOf, technologyLock, technologyModule } from './technology';
 
 const HOUR = 3_600_000;
 
@@ -724,5 +724,72 @@ describe('technology.boost — the premium research sink (SES-3, GDD §4.3)', ()
       initialPercent: 0.25,
       decay: 0.5,
     });
+  });
+});
+
+/**
+ * PVR-6.17 — дерево режима (заказ владельца 2026-09-24: «технологии из сетевой игры надо
+ * переделать под Sector Zero — там дневные ограничения, Хранитель, которого нет, и т. д.»).
+ */
+describe('technology module — дерево режима (PVR-6.17)', () => {
+  const runMode = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: {},
+    factions: {},
+    buildings: {},
+    events: {},
+    modes: { run: { name: 'Run', technology: { dayGates: false, exclude: ['siege'] } } },
+  }).modes.run!;
+  const runData: GameData = { ...data, modes: { ...data.modes, run: runMode } };
+  const runCtx = (now: number): Context => ({ now, data: runData, config: { timeScale: 1, modeId: 'run' } });
+  const kernel = createKernel([technologyModule]);
+  const fresh = () => stateWith({ players: [player('p1', { metal: 99, credits: 99 })] });
+
+  it('правила режима закрепляются в состоянии на первом шаге часов и дальше не меняются', () => {
+    const st = fresh();
+    expect(st.techRules).toBeUndefined();
+    const on = okAdvance(kernel.advanceTo(st, runCtx(1)));
+    expect(on.state.techRules).toEqual({ dayGates: false, exclude: ['siege'] });
+    // Правка данных посреди матча его не переписывает.
+    const edited: GameData = {
+      ...runData,
+      modes: { run: { ...runMode, technology: { dayGates: true, exclude: [] } } },
+    };
+    const later = okAdvance(
+      kernel.advanceTo(on.state, { now: 2, data: edited, config: { timeScale: 1, modeId: 'run' } }),
+    );
+    expect(later.state.techRules).toEqual({ dayGates: false, exclude: ['siege'] });
+  });
+
+  it('режим без раздела — дерево сетевого матча, поле не появляется', () => {
+    const on = okAdvance(kernel.advanceTo(fresh(), ctx(1)));
+    expect(on.state.techRules).toBeUndefined();
+    expect(techRulesOf(on.state)).toEqual({ dayGates: true, exclude: [] });
+  });
+
+  it('без ворот дней узел «с третьего дня» берётся с первой минуты', () => {
+    const r = okApply(kernel.applyAction(fresh(), research('blockade'), runCtx(0)));
+    expect(r.state.players.p1?.technologies?.active?.[0]?.technology).toBe('blockade');
+    // В сетевом матче тот же приказ в ту же минуту — по-прежнему рано.
+    expect(errCode(kernel.applyAction(fresh(), research('blockade'), ctx(0)))).toBe('E_TOO_EARLY');
+  });
+
+  it('узла, убранного режимом, нет: ни приказа, ни ворот «можно взять»', () => {
+    const logistics = okApply(kernel.applyAction(fresh(), research('logistics'), runCtx(0)));
+    const done = okAdvance(kernel.advanceTo(logistics.state, runCtx(3 * HOUR)));
+    expect(done.state.players.p1?.technologies?.completed).toContain('logistics');
+    // Предок изучен — в сетевом матче `siege` доступен, в забеге его нет вовсе.
+    expect(errCode(kernel.applyAction(done.state, research('siege'), runCtx(3 * HOUR)))).toBe(
+      'E_NOT_IN_MATCH',
+    );
+    expect(techInMatch(done.state, 'siege')).toBe(false);
+    expect(technologyLock(data.technologies.siege!, done.state, 'p1', runData, 'siege')).toBe(
+      'E_NOT_IN_MATCH',
+    );
+    // Сетевой матч (правила не закреплены): узел на месте, заперт лишь предком.
+    expect(technologyLock(data.technologies.siege!, fresh(), 'p1', data, 'siege')).toBe(
+      'E_PREREQUISITE',
+    );
   });
 });
