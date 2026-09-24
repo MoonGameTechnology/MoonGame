@@ -2424,6 +2424,8 @@ export const en: Record<string, string> = {
   'side.fleet.on-lane': '⟜ holding on the {lane} lane · {p}% across',
   'side.fleet.repair.dock.title': 'Express repair at your own dock for metal',
   'side.fleet.repair.instant.title': 'Instant full-hull repair for credits',
+  'side.fleet.repair.premium.title': 'Instant full-hull repair for Sovereigns',
+  'side.fleet.repair.premium.short': 'Not enough Sovereigns: {n} needed',
   'side.fleet.ships': 'Ships — tap for specs',
   'side.fleet.signature': 'radar contact: ~{n} ships',
   'side.fleet.sub': '{s} ships · {tr} troops',

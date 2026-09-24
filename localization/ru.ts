@@ -2430,6 +2430,8 @@ export const ru: Record<string, string> = {
   'side.fleet.on-lane': '⟜ стоит на трассе {lane} · {p}% пути',
   'side.fleet.repair.dock.title': 'Экспресс-ремонт у своего дока за металл',
   'side.fleet.repair.instant.title': 'Мгновенный ремонт всего корпуса за кредиты',
+  'side.fleet.repair.premium.title': 'Мгновенный ремонт всего корпуса за Суверены',
+  'side.fleet.repair.premium.short': 'Не хватает Суверенов: нужно {n}',
   'side.fleet.ships': 'Корабли — тап для характеристик',
   'side.fleet.signature': 'радарный контакт: ~{n} кораблей',
   'side.fleet.sub': '{s} кораблей · {tr} десанта',

@@ -180,6 +180,17 @@ export function forgeLadderOf(data: GameData): RarityLadder {
  *  стоит 20, полная лестница одного модуля — 695. Числа калибруются телеметрией. */
 export const WARRANTS_PER_REWARD = 5;
 
+/** Сколько корпуса чинит один Суверен (заказ владельца 2026-09-24: платный ремонт в
+ *  забеге — за донат-валюту). Корпуса забега — десятки HP: флот из десятка фрегатов
+ *  (300 HP) встаёт в 12 Суверенов, дешевле любого лота витрины (15–80). */
+export const REPAIR_HP_PER_SOVEREIGN = 25;
+
+/** Цена ремонта в Суверенах: 0 — чинить нечего, иначе не меньше одного. */
+export function sovereignRepairCost(missingHull: number): number {
+  if (!(missingHull > 0) || !Number.isFinite(missingHull)) return 0;
+  return Math.max(1, Math.ceil(missingHull / REPAIR_HP_PER_SOVEREIGN));
+}
+
 export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroProgress {
   const first = data.heroes.commander ? 'commander' : (Object.keys(data.heroes)[0] ?? '');
   return {
@@ -341,6 +352,9 @@ export type SectorProgressAction =
   | { kind: 'refresh-shop' }
   | { kind: 'ad-sovereigns' }
   | { kind: 'double-reward' }
+  /** Ремонт флота в забеге: списать цену за `hull` недостающего корпуса. Сам ремонт
+   *  делает ядро (`fleet.premiumRepair`) — хост зовёт его, только если списание прошло. */
+  | { kind: 'premium-repair'; hull: number }
   | { kind: 'forge'; id: string }
   | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
@@ -424,6 +438,12 @@ export function changeSectorZeroProgress(
       next.warrants += next.lastReward * WARRANTS_PER_REWARD;
       next.doubledThrough = next.settledThrough;
       break;
+    case 'premium-repair': {
+      const price = sovereignRepairCost(action.hull);
+      if (price <= 0 || next.sovereigns < price) return null;
+      next.sovereigns -= price;
+      break;
+    }
     case 'ad-sovereigns': {
       // Порция и лимит — в данных (§0.6б: числа — предмет плейтеста). Ноль в любом из
       // двух выключает кран. Как и у обновления витрины, платой служит просмотр,

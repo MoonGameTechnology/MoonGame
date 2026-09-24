@@ -206,6 +206,7 @@ export {
   orderChain,
   forceMarchFleet,
   instantRepairFleet,
+  premiumRepairFleet,
   repairFleet,
   chainStamp,
   marketList,

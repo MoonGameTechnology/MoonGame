@@ -174,14 +174,28 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   background:color-mix(in srgb,currentColor 12%,transparent);font:600 12px/1.4 ui-monospace,monospace;font-variant-numeric:tabular-nums;}
 #tbwallet .tw-data{color:var(--cur-data);}
 #tbwallet .tw-warrants{color:var(--cur-warrants);}
-#tbwallet .tw-sovereigns{color:var(--cur-sovereigns);}
+/* Суверены в кошельке — та же золотая стеклянная плашка, что фишка на карте (.dl-donate,
+   заказ владельца 2026-09-24 «сделай красивой»): тёмное стекло, золотая кромка, светящийся
+   самоцвет, число золотым градиентом; «+» — золотая клавиша, приставленная к плашке. */
+#tbwallet .tw-sovereigns{color:#ffd978;font-weight:800;border-color:rgba(255,207,98,.75);
+  background:linear-gradient(180deg,rgba(66,46,8,.94) 0%,rgba(26,18,4,.96) 100%);
+  box-shadow:0 0 10px rgba(255,186,52,.28),inset 0 1px 0 rgba(255,238,176,.28);}
+#tbwallet .tw-sovereigns i{color:#fff1bf;text-shadow:0 0 6px rgba(255,196,70,.95),0 0 2px #fff;}
 /* «+» у Суверенов раскрывает кнопку ролика под кошельком (run.sovereigns) */
 #tbwallet{position:relative;}
-#tbwallet .tw-plus{min-width:26px;height:24px;margin-left:-4px;border-radius:999px;border:1px solid var(--cur-sovereigns);
-  background:color-mix(in srgb,var(--cur-sovereigns) 22%,transparent);color:var(--cur-sovereigns);font:700 14px/1 ui-monospace,monospace;cursor:pointer;}
+#tbwallet .tw-plus{min-width:24px;height:24px;margin-left:-5px;border-radius:7px;border:1px solid #fff0b8;cursor:pointer;
+  font:900 15px/1 system-ui,sans-serif;color:#3b2500;
+  background:linear-gradient(180deg,#ffec9e 0%,#ffc93f 55%,#e59a17 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -1px 0 rgba(120,70,0,.5),0 0 8px rgba(255,190,60,.55);
+  transition:transform .12s,filter .2s;}
+#tbwallet .tw-plus:hover{filter:brightness(1.1);transform:translateY(-1px);}
+#tbwallet .tw-plus:active{transform:translateY(1px);}
+#tbwallet .tw-plus:focus-visible{outline:2px solid #ffe28a;outline-offset:2px;}
 #tbwallet .tw-ad{position:absolute;top:calc(100% + 6px);right:0;z-index:40;white-space:nowrap;padding:8px 14px;border-radius:10px;
-  border:1px solid var(--cur-sovereigns);background:rgba(20,16,4,.96);color:var(--cur-sovereigns);font:600 13px/1.3 system-ui,sans-serif;cursor:pointer;
-  box-shadow:0 6px 20px rgba(0,0,0,.5);}
+  border:1px solid rgba(255,207,98,.8);color:#ffd978;font:700 13px/1.3 system-ui,sans-serif;cursor:pointer;
+  background:linear-gradient(180deg,rgba(66,46,8,.97) 0%,rgba(26,18,4,.98) 100%);
+  box-shadow:0 6px 20px rgba(0,0,0,.5),0 0 14px rgba(255,186,52,.3),inset 0 1px 0 rgba(255,238,176,.28);}
+#tbwallet .tw-ad:hover{filter:brightness(1.12);}
 /* day card: current game day over a countdown to the next one. Mock palette: neutral
    outline, teal day, grey countdown. */
 #daycard{flex:0 0 auto;margin-left:10px;padding:5px 12px;border-radius:10px;text-align:center;
@@ -272,39 +286,63 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   background:rgba(255,90,77,.08);border:1px solid rgba(255,90,77,.42);}
 /* donate currency (Суверены ◆, gold) sits UNDER the resource bar on the status line,
    pushed to the right end — so the resource chips get the full top-bar width for numbers.
-   Заказ владельца 2026-09-23: фишка — ПРИМАНКА. Золотая заливка, самоцвет с искрой, блик
-   раз в несколько секунд и кнопка «+» — привычный жест «пополнить» из F2P-игр. */
-#devline .dl-donate{position:relative;overflow:hidden;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:6px;
-  padding:3px 4px 3px 9px;border-radius:14px;color:#2a1a00;font:800 12px/1 inherit;cursor:pointer;
-  letter-spacing:.3px;font-variant-numeric:tabular-nums;white-space:nowrap;
-  background:linear-gradient(180deg,#ffe9a3 0%,#ffc94d 45%,#e89a1c 100%);border:1px solid #fff0b8;
-  box-shadow:0 0 12px rgba(255,198,72,.55),0 2px 0 #9a5a00,inset 0 1px 0 rgba(255,255,255,.7);
-  animation:donatePulse 2.4s ease-in-out infinite;transition:transform .12s;}
-#devline .dl-donate:hover{transform:translateY(-1px) scale(1.04);}
-#devline .dl-donate:active{transform:translateY(1px);box-shadow:0 0 8px rgba(255,198,72,.5),0 0 0 #9a5a00;}
-#devline .dl-donate b{font-weight:900;}
-/* блик: светлая полоса пробегает по фишке */
-#devline .dl-donate::after{content:"";position:absolute;top:-50%;left:-60%;width:40%;height:200%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:rotate(20deg);
-  animation:donateShine 3.6s ease-in-out infinite;pointer-events:none;}
-/* faceted gem (SOV_SVG) — крупнее, с тёмным контуром на золоте и искрой */
-#devline .dl-donate i{position:relative;color:#fff7d6;font-style:normal;font-size:15px;}
-#devline .dl-donate i svg{display:block;width:16px;height:16px;
-  filter:drop-shadow(0 0 1px #7a4400) drop-shadow(0 0 4px rgba(255,255,255,.8));}
-#devline .dl-donate i::after{content:"✦";position:absolute;top:-6px;right:-6px;font-size:8px;color:#fff;
-  text-shadow:0 0 4px #fff;animation:donateSpark 2.4s ease-in-out infinite;}
-/* «+» — пополнить */
-#devline .dl-donate em{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;
-  font-style:normal;font-weight:900;font-size:14px;color:#fff;background:#2fb35a;
-  box-shadow:0 0 6px rgba(47,179,90,.8),inset 0 1px 0 rgba(255,255,255,.5);}
-@keyframes donatePulse{
-  0%,100%{box-shadow:0 0 10px rgba(255,198,72,.45),0 2px 0 #9a5a00,inset 0 1px 0 rgba(255,255,255,.7);}
-  50%{box-shadow:0 0 20px rgba(255,205,90,.9),0 2px 0 #9a5a00,inset 0 1px 0 rgba(255,255,255,.7);}}
-@keyframes donateShine{0%,60%{left:-60%;}100%{left:130%;}}
-@keyframes donateSpark{0%,100%{opacity:0;transform:scale(.4);}50%{opacity:1;transform:scale(1);}}
+   Заказ владельца 2026-09-23: фишка — ПРИМАНКА; 2026-09-24: «сделай красивой» — прежняя
+   сплошная жёлтая таблетка спорила с голографическим HUD. Теперь это та же стеклянная
+   плашка, что у HUD, но в золоте: тёмное стекло с золотой кромкой, светящийся гранёный
+   самоцвет, число золотым градиентом и золотая кнопка «+» — пополнить. Живость — мягкое
+   дыхание кромки и редкий блик, а не мигание всей кнопки. */
+/* Строка статуса прокручивается вбок; когда она шире экрана (телефон, сохранение соло,
+   досье Роя), фишка уезжала за край. sticky держит её у правого края всегда. */
+/* …а хвост соседнего чипа, уехавший в правый отступ строки (14px), прячет маска: сама
+   фишка стоит левее отступа и маской не задета. */
+#devline{-webkit-mask-image:linear-gradient(to left,transparent 14px,#000 14px);
+  mask-image:linear-gradient(to left,transparent 14px,#000 14px);}
+#devline .dl-donate{position:sticky;right:0;z-index:1;overflow:hidden;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;
+  gap:7px;height:26px;padding:0 3px 0 6px;border-radius:8px;cursor:pointer;
+  font:800 13px/1 inherit;letter-spacing:.4px;font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:linear-gradient(180deg,rgba(66,46,8,.94) 0%,rgba(26,18,4,.96) 100%);
+  border:1px solid rgba(255,207,98,.75);
+  box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 12px rgba(255,186,52,.3),inset 0 1px 0 rgba(255,238,176,.28),
+    inset 0 -6px 12px rgba(0,0,0,.35);
+  animation:donateBreath 3.2s ease-in-out infinite;transition:transform .12s,filter .2s;}
+#devline .dl-donate:hover{transform:translateY(-1px);filter:brightness(1.15);}
+#devline .dl-donate:active{transform:translateY(1px);filter:brightness(.95);}
+#devline .dl-donate:focus-visible{outline:2px solid #ffe28a;outline-offset:2px;}
+/* самоцвет: заливка гранями + свечение — читается даже крошечным на телефоне */
+#devline .dl-donate i{display:grid;place-items:center;width:18px;height:18px;color:#fff1bf;
+  filter:drop-shadow(0 0 4px rgba(255,196,70,.9));}
+#devline .dl-donate i svg{display:block;width:18px;height:18px;fill:rgba(255,190,56,.55);stroke-width:1.2;}
+#devline .dl-donate b{font-weight:900;color:#ffd978;
+  background:linear-gradient(180deg,#fff6d2 0%,#ffd466 55%,#e9a326 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 0 10px rgba(255,190,60,.25);}
+/* «+» — пополнить: золотая клавиша внутри плашки */
+#devline .dl-donate em{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;
+  font-style:normal;font-weight:900;font-size:15px;line-height:1;color:#3b2500;
+  background:linear-gradient(180deg,#ffec9e 0%,#ffc93f 55%,#e59a17 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -1px 0 rgba(120,70,0,.5),0 0 8px rgba(255,190,60,.5);}
+/* блик: узкая светлая полоса раз в несколько секунд */
+#devline .dl-donate::after{content:"";position:absolute;top:-40%;left:-40%;width:22%;height:180%;
+  background:linear-gradient(90deg,transparent,rgba(255,244,200,.45),transparent);transform:rotate(18deg);
+  animation:donateShine 5s ease-in-out infinite;pointer-events:none;}
+@keyframes donateBreath{
+  0%,100%{border-color:rgba(255,207,98,.6);
+    box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 8px rgba(255,186,52,.22),inset 0 1px 0 rgba(255,238,176,.28),inset 0 -6px 12px rgba(0,0,0,.35);}
+  50%{border-color:rgba(255,226,140,.95);
+    box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 16px rgba(255,196,70,.5),inset 0 1px 0 rgba(255,238,176,.28),inset 0 -6px 12px rgba(0,0,0,.35);}}
+@keyframes donateShine{0%,70%{left:-40%;}100%{left:130%;}}
 @media (prefers-reduced-motion:reduce){
-  #devline .dl-donate,#devline .dl-donate::after,#devline .dl-donate i::after{animation:none;}
+  #devline .dl-donate,#devline .dl-donate::after{animation:none;}
   #devline .dl-donate::after{display:none;}}
+/* ремонт за Суверены в карточке флота (забег Sector Zero): та же золотая плашка в малом */
+.chip-sov{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font-size:10px;cursor:pointer;
+  color:#ffd978;border:1px solid rgba(255,207,98,.7);border-radius:6px;
+  background:linear-gradient(180deg,rgba(66,46,8,.9),rgba(26,18,4,.92));
+  box-shadow:0 0 8px rgba(255,186,52,.22),inset 0 1px 0 rgba(255,238,176,.25);}
+.chip-sov:hover{filter:brightness(1.15);box-shadow:0 0 12px rgba(255,196,70,.4),inset 0 1px 0 rgba(255,238,176,.25);}
+.chip-sov i{display:grid;place-items:center;width:12px;height:12px;color:#fff1bf;filter:drop-shadow(0 0 3px rgba(255,196,70,.8));}
+.chip-sov i svg{display:block;width:12px;height:12px;fill:rgba(255,190,56,.55);}
+.chip-sov b{font-weight:900;}
 #toasts{position:fixed;left:50%;top:calc(var(--tbh) + 50px);transform:translateX(-50%);z-index:40;display:flex;
   flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(92vw,520px);}
 #toasts .toast{pointer-events:auto;cursor:pointer;background:rgba(3,14,18,.88);border:1px solid var(--line-hi);
@@ -1983,7 +2021,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .res i{font-size:13px;}
   .res i svg{width:14px;height:14px;}
   .res b{font-size:12px;}
-  #devline .dl-donate{font-size:11px;padding:2px 3px 2px 8px;}
+  #devline .dl-donate{font-size:12px;height:24px;gap:5px;padding:0 2px 0 5px;}
   #devline .dl-wave{font-size:11px;padding:2px 8px;margin-left:8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone

@@ -87,6 +87,7 @@ import {
   forceMarchFleet,
   FORCED_MARCH_MULT,
   instantRepairFleet,
+  premiumRepairFleet,
   instantRepairCost,
   repairFleet,
   dockRepairCost,
@@ -174,6 +175,7 @@ import {
   type StrikeBase,
   type PausedConstructionSite,
   type QueuedConstruction,
+  missingHull,
 } from '../../packages/shared-core/src/index';
 import {
   MultiplayerClient,
@@ -312,7 +314,7 @@ import {
 import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
-  changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
+  changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun, sovereignRepairCost,
   type SectorZeroProgress, type SectorProgressAction,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
@@ -6485,6 +6487,9 @@ function fleetPanelHtml(f: Fleet): string {
   // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
   const repairCost = instantRepairCost(f, data);
   const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
+  // В забеге Sector Zero платный ремонт — за Суверены со счёта профиля (заказ владельца
+  // 2026-09-24), в остальной игре — за кредиты матча, как было.
+  const premiumCost = isSectorZeroRun() ? sovereignRepairCost(missingHull(f, data)) : 0;
   // FORT-5.8: док открыт своему И СОЮЗНОМУ флоту. Союзность кнопка резолвит стойкой —
   // capability `diplomacy` живёт в ядре и требует `HandlerContext`, которого у рендера
   // нет; база самой capability — та же стойка, поэтому ответы сходятся. Правило «что
@@ -6499,9 +6504,11 @@ function fleetPanelHtml(f: Fleet): string {
         ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
         : ''
     }${
-      repairable
-        ? `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
-        : ''
+      !repairable
+        ? ''
+        : premiumCost > 0
+          ? `<button class="chip-sov" data-act="premiumrepair" data-arg="${f.id}" title="${t('side.fleet.repair.premium.title')}">🔧 <i>${SOV_SVG}</i><b>${premiumCost}</b></button>`
+          : `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
     }</div>`;
     if (sm.shield.max > 0)
       h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
@@ -8767,6 +8774,18 @@ side.addEventListener('click', (ev) => {
     // Платный мгновенный ремонт: цена и отказы — на сервере; панель перерисуется
     // по факту (полный бар = получилось), нотификаций-обещаний не даём.
     playerOrder(instantRepairFleet(ME, arg || selFleet!));
+  } else if (act === 'premiumrepair') {
+    // Ремонт за Суверены: сначала ядро чинит, потом профиль платит — отвергнутый ремонт
+    // (бой начался между кадром и нажатием) не должен стоить игроку валюты.
+    const f = s.fleets[arg || selFleet!];
+    if (!f || !isSectorZeroRun()) return;
+    const hull = missingHull(f, data);
+    const paid = changeSectorZeroProgress(sectorProgress, { kind: 'premium-repair', hull }, data);
+    if (!paid) {
+      toast(t('side.fleet.repair.premium.short', { n: sovereignRepairCost(hull) }));
+      return;
+    }
+    if (playerOrder(premiumRepairFleet(ME, f.id))) saveSectorProgress(paid);
   } else if (act === 'dockrepair') {
     // ECON-3а: экспресс-ремонт за metal — кнопка видна только у своего дока.
     playerOrder(repairFleet(ME, arg || selFleet!));
