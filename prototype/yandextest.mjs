@@ -15,7 +15,8 @@
  *
  * 1. запуск без единой ошибки страницы и консоли; сразу Sector Zero, без хаба и входа;
  * 2. забег стартует, площадке сообщается начало геймплея;
- * 3. выход в меню и перезагрузка — «Продолжить» возвращает тот же забег;
+ * 3. выход в меню (вторым «назад» площадки, `YAG-6.4`; первое — подсказка) и перезагрузка —
+ *    «Продолжить» возвращает тот же забег; выход площадки ставит мир на паузу;
  * 4. ролик за Суверены: досмотренный кладёт порцию в кошелёк;
  * 5. двери по ссылке закрыты: `?join=…` и `?reset=…` открывают тот же Sector Zero;
  * 6. игра не просит ничего, кроме файлов архива и SDK, — ни нашего сервера, ни чужого;
@@ -61,6 +62,9 @@ if (!existsSync(join(ROOT, 'index.html'))) {
 
 /** Поддельный SDK: ровно то, что зовёт адаптер, и журнал вызовов для проверок. */
 const FAKE_SDK = `window.__ya = { log: [], writes: [] };
+// «Назад» и выход площадки (YAG-6.4): тест шлёт их сам — \`__yaFire('HISTORY_BACK')\`.
+const events = {};
+window.__yaFire = (name) => (events[name] || []).forEach((listener) => listener());
 // Облако вошедшего игрока (YAG-2.2): стартовое содержимое задаёт тест (\`__cloudInit\`).
 const cloud = Object.assign({}, window.__cloudInit || {});
 window.YaGames = {
@@ -88,6 +92,12 @@ window.YaGames = {
         for (const [i, name] of ['onOpen', 'onRewarded', 'onClose'].entries())
           setTimeout(() => callbacks[name] && callbacks[name](), 30 * (i + 1));
       },
+    },
+    onEvent: (name, listener) => {
+      (events[name] = events[name] || []).push(listener);
+      return () => {
+        events[name] = (events[name] || []).filter((l) => l !== listener);
+      };
     },
     // Вход (YAG-1.4): гость (\`__guest\`) после окна становится вошедшим.
     auth: {
@@ -240,9 +250,15 @@ try {
     );
     assert.equal(await page.locator('#devline .dl-donate').count(), 0, 'Суверены не дублируются');
 
-    // 3. Выход в меню путём игрока, перезагрузка, «Продолжить».
-    await page.locator('#railtoggle').click();
-    await page.locator('#rail-exit').click();
+    // 2б. Выход площадки (YAG-6.4) ставит мир на паузу — сохранение идёт тем же путём, что
+    // уход со страницы. «Назад» площадки: первое — подсказка, второе — выход в меню.
+    await page.evaluate(() => window.__yaFire('EXIT'));
+    assert.equal(await frozenFor(1200), true, 'выход площадки ставит мир на паузу');
+    await page.evaluate(() => window.__yaFire('HISTORY_BACK'));
+    assert.equal(await page.locator('#sz-new').isVisible(), false, 'первое «назад» — подсказка');
+    await page.evaluate(() => window.__yaFire('HISTORY_BACK'));
+
+    // 3. Выход в меню (вторым «назад» площадки), перезагрузка, «Продолжить».
     await onSectorZeroMenu('выход из забега');
     // В меню геймплея нет — индикатор площадки не должен остаться зелёным (YAG-6.2).
     await page.waitForFunction(

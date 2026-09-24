@@ -76,6 +76,8 @@ export interface YandexSdk {
   };
   on?: (event: 'game_api_pause' | 'game_api_resume', observer: () => void) => (() => void) | void;
   off?: (event: 'game_api_pause' | 'game_api_resume', observer: () => void) => void;
+  /** «Назад» и выход площадки (`YAG-6.4`); возвращает отписку. */
+  onEvent?: (event: 'HISTORY_BACK' | 'EXIT', listener: () => void) => () => void;
   getPlayer?: (opts?: { signed?: boolean }) => Promise<YandexPlayer>;
   /** Окно входа Яндекс ID. Отказ игрока ОТКЛОНЯЕТ промис (страница «Авторизация»). */
   auth?: { openAuthDialog?: () => Promise<unknown> };
@@ -122,6 +124,10 @@ export interface YandexPlatform extends GamePlatform {
   gameplayStop(): void;
   /** Подписка на паузу ПЛОЩАДКИ: мир обязан встать, а по `resume` — вернуться как был. */
   onPlatformPause(listener: (paused: boolean) => void): () => void;
+  /** Кнопка «назад» площадки (`YAG-6.4`) — на телефоне это системная кнопка. */
+  onHistoryBack(listener: () => void): () => void;
+  /** Площадка сообщает, что игрок выходит из игры (`YAG-6.4`): сохранить всё сейчас. */
+  onExit(listener: () => void): () => void;
   /** Снять подписки на события SDK. */
   dispose(): void;
   /** Что адаптер уже отправил площадке — для тестов и debug-обзора. */
@@ -197,6 +203,25 @@ export function createYandexPlatform(
   };
   // `on` в декларациях возвращает отписку, но не у всех сборок SDK — поэтому держим и
   // запасной путь через `off`, а не доверяем одному способу.
+  /** Отписки от `onEvent` — `dispose` снимает их все. */
+  const eventOffs = new Set<() => void>();
+  /** Подписка на событие площадки. Нет `onEvent` или он упал — пустая отписка: без
+   *  «назад» площадки игра не ломается, у неё остаётся свой (`popstate`). */
+  const subscribe = (event: 'HISTORY_BACK' | 'EXIT', listener: () => void): (() => void) => {
+    let off: (() => void) | undefined;
+    try {
+      const got = sdk.onEvent?.(event, listener);
+      if (typeof got === 'function') off = got;
+    } catch (error) {
+      options.onSdkError?.('onEvent', error);
+    }
+    const drop = (): void => {
+      eventOffs.delete(drop);
+      off?.();
+    };
+    eventOffs.add(drop);
+    return drop;
+  };
   const offPause = sdk.on?.('game_api_pause', onPause);
   const offResume = sdk.on?.('game_api_resume', onResume);
 
@@ -331,8 +356,11 @@ export function createYandexPlatform(
       pauseListeners.add(listener);
       return () => pauseListeners.delete(listener);
     },
+    onHistoryBack: (listener) => subscribe('HISTORY_BACK', listener),
+    onExit: (listener) => subscribe('EXIT', listener),
     dispose() {
       pauseListeners.clear();
+      for (const off of [...eventOffs]) off();
       if (typeof offPause === 'function') offPause();
       else sdk.off?.('game_api_pause', onPause);
       if (typeof offResume === 'function') offResume();

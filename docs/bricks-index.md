@@ -1226,4 +1226,4 @@
 | YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
 | YAG-6.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир 2026-09-24 |
 | YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
-| YAG-6.4 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход |
+| YAG-6.4 | ✅ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход 2026-09-24 |
