@@ -277,5 +277,26 @@ export const pveModule: GameModule = {
       pve.boons![action.playerId] = (pve.boons![action.playerId] ?? 0) - 1;
       h.emit('pve.boon.taken', { owner: action.playerId, tech });
     });
+
+    // Пакет снабжения (решение владельца 2026-09-24). Платят за него Сувернами — валютой
+    // АККАУНТА, которой в матче нет: хост сперва проверяет, что профиль может заплатить,
+    // потом зовёт это действие и списывает, только если оно прошло. Действие хостовое по
+    // построению, как `fleet.premiumRepair`: в `actionPayloadSchemas` его нет, и гейт
+    // действий не примет его от клиента — бесплатного снабжения в онлайне не бывает.
+    api.onAction('pve.supply', (action, h) => {
+      const cfg = pveOf(h);
+      const pve = h.state.pve;
+      if (!cfg || !pve) return h.reject('E_NOT_PVE');
+      const supply = cfg.supply;
+      if (!supply || supply.perRun <= 0) return h.reject('E_NO_SUPPLY');
+      const player = h.state.players[action.playerId];
+      if (!player) return h.reject('E_FORBIDDEN');
+      const bought = pve.supplies?.[action.playerId] ?? 0;
+      if (bought >= supply.perRun) return h.reject('E_SUPPLY_EXHAUSTED');
+      for (const [res, n] of Object.entries(supply.pack))
+        player.resources[res] = (player.resources[res] ?? 0) + n;
+      pve.supplies = { ...pve.supplies, [action.playerId]: bought + 1 };
+      h.emit('pve.supply.delivered', { owner: action.playerId, pack: { ...supply.pack } });
+    });
   },
 };

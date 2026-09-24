@@ -87,6 +87,12 @@ body{margin:0;overflow:hidden;color:var(--ink);
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
 #sector-zero{position:fixed;inset:0;z-index:58;display:none;}
 
+/* Комикс главы (decisions/chapterComics.ts): поверх всего, кроме баннера обновления.
+   Остальные правила — в sector-zero.css. */
+#comic{position:fixed;inset:0;z-index:90;display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+  background:#01040a;}
+
 /* Map entry: a calm projection surface, actual work progress, original lore. */
 #maploading{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
   padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));
@@ -775,6 +781,12 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .rc-market{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
   background:rgba(53,214,230,.12);color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;}
 .rc-market:active{background:rgba(53,214,230,.22);}
+/* Пакет снабжения за Суверены (решение владельца 2026-09-24): золото — цвет валюты. */
+.rc-supply{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:6px 0;font-size:13px;}
+.rc-buy{margin-top:8px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cur-sovereigns);
+  background:color-mix(in srgb,var(--cur-sovereigns) 14%,transparent);color:var(--cur-sovereigns);font:600 13px/1.3 system-ui,sans-serif;}
+.rc-buy:disabled{cursor:default;opacity:.45;}
+.rc-note{margin-top:6px;text-align:center;font-size:12px;color:var(--dim);}
 .rc-market.disabled{opacity:.4;cursor:default;border-color:var(--line-hi);color:var(--dim);background:transparent;}
 .rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
   background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
@@ -3219,6 +3231,14 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <button id="startup-retry" type="button" data-i18n="startup.retry"></button>
 </section>
 <canvas id="map" tabindex="-1"></canvas>
+<section id="comic" role="dialog" aria-modal="true" data-i18n-aria="sector-zero.comic.title">
+  <button id="comic-skip" type="button" data-i18n="sector-zero.comic.skip"></button>
+  <figure class="comic-panel">
+    <img id="comic-img" alt="" decoding="async">
+    <figcaption id="comic-caption" aria-live="polite"></figcaption>
+  </figure>
+  <div class="comic-foot"><span id="comic-count" aria-hidden="true"></span><button id="comic-next" type="button"></button></div>
+</section>
 <section id="maploading" role="dialog" aria-modal="true" aria-labelledby="maploading-title">
   <div class="ml-content">
     <h1 id="maploading-title" data-i18n="map-loading.title"></h1>

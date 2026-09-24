@@ -207,6 +207,7 @@ export {
   forceMarchFleet,
   instantRepairFleet,
   premiumRepairFleet,
+  buySupply,
   repairFleet,
   chainStamp,
   marketList,

@@ -1,6 +1,7 @@
 {
   "slots": 5,
   "adSovereigns": { "amount": 2, "perDay": 3 },
+  "runSupply": { "price": 5 },
   "offers": {
     "shield_booster": {
       "kind": "module",

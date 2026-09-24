@@ -34,7 +34,21 @@ const hooks = `window.__szTest = {
   selected: () => selPlanet,
   // Конец забега победой — как его ставит модуль победы ядра.
   end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
+  // Комиксы глав: арт владельца ещё не приехал — робот подкладывает свой реестр.
+  comics: registry => { comicArt.registry = registry; },
+  comicsSeen: () => sectorProgress.comicsSeen,
+  // Суверены на профиле и казна матча — для покупки пакета снабжения.
+  sov: n => saveSectorProgress({ ...sectorProgress, sovereigns: n }),
+  res: r => s.players[ME]?.resources?.[r] ?? 0,
 };`;
+
+/** Панель тестового комикса и заведомо битая картинка (панель без арта). */
+const PANEL =
+  'data:image/svg+xml,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200"><rect width="1600" height="1200" fill="#0b1d27"/><circle cx="800" cy="600" r="320" fill="#1c6f78"/></svg>',
+  );
+const BROKEN = 'data:image/webp;base64,AAAA';
 
 const ABSENT = Object.values(SECTOR_ZERO_ABSENT_TOOLS);
 /** Поля шапки, которых в забеге нет: эмблема с названием и местом, очки победы, день. */
@@ -145,7 +159,33 @@ try {
     assert.equal(await reward.isVisible(), true, 'у главы II есть герой-награда');
     assert.equal(await reward.locator('.sz-hero-sil').textContent(), '?', 'герой ещё не пришёл');
     await page.locator('#sz-mission-0').click();
+    // Комикс главы (решение владельца 2026-09-24): перед первым забегом главы, один раз.
+    // Вторая панель — битая картинка: подписи остаются на тёмном фоне, игра не встаёт.
+    await page.evaluate(
+      (r) => window.__szTest.comics(r),
+      {
+        'pve-1': {
+          intro: [
+            { image: PANEL, captions: ['pve.pirates.approach'] },
+            { image: BROKEN, captions: ['pve.pirates.travel'] },
+            { image: PANEL },
+          ],
+        },
+      },
+    );
     await page.locator('#sz-new').click();
+    await page.locator('#comic').waitFor({ state: 'visible' });
+    assert.equal(await page.evaluate(() => window.__szTest.run()), false, 'комикс идёт ДО забега');
+    assert.equal(await page.locator('#comic-count').textContent(), '1 / 3');
+    assert.notEqual((await page.locator('#comic-caption').textContent()).trim(), '', 'подпись — текст локали');
+    await page.locator('#comic-next').click();
+    await page.waitForFunction(() => document.getElementById('comic').classList.contains('no-art'));
+    assert.notEqual((await page.locator('#comic-caption').textContent()).trim(), '', 'без арта подпись на месте');
+    await page.locator('#comic-next').click();
+    assert.match(await page.locator('#comic-next').textContent(), /В бой|To battle/, 'последняя панель ведёт в бой');
+    await page.locator('#comic-next').click();
+    await page.locator('#comic').waitFor({ state: 'hidden' });
+    assert.deepEqual(await page.evaluate(() => window.__szTest.comicsSeen()), ['pve-1:intro']);
     await check('Sector Zero', true);
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.
@@ -172,8 +212,16 @@ try {
     await waitForApp(page);
     await page.waitForFunction(() => !document.getElementById('sz-new').disabled);
     await page.locator('#sz-mission-1').click();
+    await page.evaluate(
+      (r) => window.__szTest.comics(r),
+      { 'pve-2': { intro: [{ image: PANEL }], outro: [{ image: PANEL, captions: ['pve.pirates.won'] }, { image: PANEL }] } },
+    );
     await page.locator('#sz-new').click();
     if (await page.locator('#sz-replace').isVisible()) await page.locator('#sz-replace').click();
+    // «назад» и Escape закрывают комикс, как «Пропустить», — и забег стартует.
+    await page.locator('#comic').waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await page.locator('#comic').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => window.__szTest.run() === true);
     await page.locator('#maploading').waitFor({ state: 'hidden' });
     // «+» у Суверенов в шапке забега (`run.sovereigns`, решение владельца 2026-09-24): сам
@@ -189,8 +237,24 @@ try {
       beforeAd,
     );
     await page.locator('#tbwallet .tw-sovereigns', { hasText: String(beforeAd.sovereigns + 2) }).waitFor();
+    // Пакет снабжения за 5 ◆ (решение владельца 2026-09-24) — из карточки ресурса: пакет
+    // приходит в казну матча, цена списывается с профиля, остаток покупок убывает.
+    await page.evaluate(() => window.__szTest.sov(10));
+    const metalBefore = await page.evaluate(() => window.__szTest.res('metal'));
+    await page.locator('#purse [data-res="metal"]').click();
+    await page.locator('#rescard [data-rc-supply]').click();
+    await page.waitForFunction((b) => window.__szTest.res('metal') >= b + 150, metalBefore);
+    assert.equal((await progress()).sovereigns, 5, 'пакет стоит 5 ◆');
+    assert.match(await page.locator('#rescard .rc-note').textContent(), /2/, 'осталось 2 из 3');
+    await page.locator('#rescard .rc-close').click();
     await page.evaluate(() => window.__szTest.end());
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
+    // Победа — комикс главы поверх итогов, в первый раз; «Пропустить» открывает итоги.
+    await page.locator('#comic').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#comic-next').textContent(), /Дальше|Next/);
+    await page.locator('#comic-skip').click();
+    await page.locator('#comic').waitFor({ state: 'hidden' });
+    assert.deepEqual(await page.evaluate(() => window.__szTest.comicsSeen()), ['pve-1:intro', 'pve-2:intro', 'pve-2:outro']);
     assert.equal(await page.locator('#endscreen .es-run li.task').count(), 3, 'три задачи главы II');
     // ×2 к награде за ролик — прямо на итогах (YAG-3.2, решение владельца 2026-09-24).
     // Дев-сборка симулирует рекламу: ролик «досмотрен», удвоение приходит сразу.
@@ -213,6 +277,7 @@ try {
       attempt,
     );
     await page.locator('#maploading').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('#comic').isVisible(), false, 'комикс главы — один раз на профиль');
     await leave();
     await page.waitForFunction(() => document.getElementById('sz-mission-1').classList.contains('sz-passed'));
     // Засчитанный забег добавил разведку главы: на её карте опознанного стало больше.
@@ -234,7 +299,8 @@ try {
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' «+» у Суверенов даёт ролик прямо в забеге; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
+      ' комиксы глав — до первого забега и после победы, один раз, с пропуском;' +
+      ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты\n',
   );
 } finally {

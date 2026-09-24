@@ -2,6 +2,7 @@
  * XP and the commander's PvP tree. Catalog abilities, skill requirements, module
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
+import { COMIC_ID } from './chapterComics';
 import { forgeOutcome } from './sectorZeroForge';
 import { dailyOffers } from './sectorZeroShop';
 import { emptySwarmCodex, learnSwarm, parseSwarmCodex, type SwarmCodex } from './swarmCodex';
@@ -105,6 +106,10 @@ export interface SectorZeroProgress {
   objectivesDone: Record<string, string[]>;
   /** Главы, выигранные хоть раз (id карты): отметка «пройдена» на маршруте глав. */
   chaptersWon: string[];
+  /** Комиксы глав, уже показанные этому профилю (`pve-1:intro`, `pve-1:outro`) — каждый
+   *  один раз (`decisions/chapterComics.ts`). В профиле, а не в браузере: отметка едет с
+   *  профилем через облако, и на новом устройстве комикс второй раз не всплывёт. */
+  comicsSeen: string[];
   /** Разведка главы, накопленная за все засчитанные забеги: `id главы → id провинций`,
    *  опознанных игроком (его память тумана). Панель карты главы в меню показывает по ней,
    *  что уже известно, а что лежит в тумане. */
@@ -215,6 +220,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     doubledThrough: 0,
     objectivesDone: {},
     chaptersWon: [],
+    comicsSeen: [],
     chapterScouted: {},
     lastRun: null,
     modules: STARTER_MODULES.filter((id) => data.modules[id]),
@@ -360,6 +366,9 @@ export type SectorProgressAction =
   /** Ремонт флота в забеге: списать цену за `hull` недостающего корпуса. Сам ремонт
    *  делает ядро (`fleet.premiumRepair`) — хост зовёт его, только если списание прошло. */
   | { kind: 'premium-repair'; hull: number }
+  /** Пакет снабжения забега: списать его цену. Сам пакет выдаёт ядро (`pve.supply`) —
+   *  хост зовёт его, только если списание прошло (решение владельца 2026-09-24). */
+  | { kind: 'run-supply' }
   | { kind: 'forge'; id: string }
   | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
@@ -445,6 +454,12 @@ export function changeSectorZeroProgress(
       break;
     case 'premium-repair': {
       const price = sovereignRepairCost(action.hull);
+      if (price <= 0 || next.sovereigns < price) return null;
+      next.sovereigns -= price;
+      break;
+    }
+    case 'run-supply': {
+      const { price } = data.sectorZeroShop.runSupply;
       if (price <= 0 || next.sovereigns < price) return null;
       next.sovereigns -= price;
       break;
@@ -665,6 +680,7 @@ export function parseSectorZeroProgress(
       if (list.length > 0) fresh.objectivesDone[chapter] = list;
     }
     fresh.chaptersWon = strings(p.chaptersWon);
+    fresh.comicsSeen = strings(p.comicsSeen).filter((id) => COMIC_ID.test(id));
     for (const [chapter, ids] of Object.entries(p.chapterScouted ?? {})) {
       const list = strings(ids);
       if (list.length > 0) fresh.chapterScouted[chapter] = list;

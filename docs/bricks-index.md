@@ -1028,6 +1028,7 @@
 | SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Ассортимент |
 | SZE-3.4 | ✅ | proto | `docs/sector-zero-economy-roadmap.md` | Обновление витрины за рекламу |
 | SZE-3.5 | ✅ | proto data | `docs/sector-zero-economy-roadmap.md` | Суверены за рекламу |
+| SZE-3.6 | ✅ | core proto data | `docs/sector-zero-economy-roadmap.md` | Пакет снабжения забега за Суверены |
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md` | Уровень у модуля Роя |
 | SZE-4.2 | ✅ | core | `docs/sector-zero-economy-roadmap.md` | Контригра против уровня |
@@ -1076,6 +1077,7 @@
 | PVR-6.11 | ✅ | proto | `docs/sector-zero-roadmap.md` | Портреты героев в Академии |
 | PVR-6.12 | ✅ | proto | `docs/sector-zero-roadmap.md` | Шапка забега: кошелёк профиля вместо счёта, места и дня |
 | PVR-6.13 | ✅ | proto | `docs/sector-zero-roadmap.md` | Часы забега — реальные минуты вместо игровых часов |
+| PVR-6.14 | ✅ | proto | `docs/sector-zero-roadmap.md` | Комиксы глав — основа под арт владельца |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |
