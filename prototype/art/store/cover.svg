@@ -1,0 +1,209 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="470" viewBox="0 0 800 470">
+  <!-- Черновик обложки Sector Zero для Яндекс Игр (YAG-5.2). Не скриншот (п. 5.6), без рамок
+       и элементов UI (п. 8.3.3/8.3.4); надпись — только название, одинаковое на всех языках.
+       PNG: node prototype/storeshots.mjs -->
+  <defs>
+    <radialGradient id="bg" cx="0.72" cy="0.45" r="0.85">
+      <stop offset="0" stop-color="#123846"/>
+      <stop offset="0.4" stop-color="#071720"/>
+      <stop offset="1" stop-color="#02060b"/>
+    </radialGradient>
+    <radialGradient id="world" cx="0.32" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#3f8d9a"/>
+      <stop offset="0.45" stop-color="#15495a"/>
+      <stop offset="0.85" stop-color="#062029"/>
+      <stop offset="1" stop-color="#03111a"/>
+    </radialGradient>
+    <radialGradient id="atmo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.82" stop-color="#79dfdf" stop-opacity="0"/>
+      <stop offset="0.93" stop-color="#79dfdf" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#79dfdf" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flesh" cx="0.4" cy="0.35" r="0.9">
+      <stop offset="0" stop-color="#ff8a6e"/>
+      <stop offset="0.35" stop-color="#ff5a4d"/>
+      <stop offset="0.75" stop-color="#a51f3c"/>
+      <stop offset="1" stop-color="#4c0a26"/>
+    </radialGradient>
+    <linearGradient id="trail" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="#79dfdf" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#79dfdf" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="worldClip"><circle cx="612" cy="262" r="178"/></clipPath>
+    <filter id="goo" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -9" result="goo"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" result="noise"/>
+      <feDisplacementMap in="goo" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="redglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect width="800" height="470" fill="url(#bg)"/>
+  <g fill="#cee7ec">
+    <circle cx="630.4" cy="156.3" r="0.60" opacity="0.38"/>
+    <circle cx="667.4" cy="298.4" r="1.76" opacity="0.92"/>
+    <circle cx="688.6" cy="290.1" r="0.88" opacity="0.63"/>
+    <circle cx="4.7" cy="50.2" r="1.07" opacity="0.71"/>
+    <circle cx="445.9" cy="356.9" r="1.11" opacity="0.72"/>
+    <circle cx="110.4" cy="48.4" r="1.07" opacity="0.71"/>
+    <circle cx="446.5" cy="146.6" r="1.08" opacity="0.71"/>
+    <circle cx="120.0" cy="196.8" r="1.44" opacity="0.83"/>
+    <circle cx="157.8" cy="89.4" r="0.85" opacity="0.61"/>
+    <circle cx="496.0" cy="248.3" r="1.48" opacity="0.84"/>
+    <circle cx="571.1" cy="351.2" r="0.95" opacity="0.66"/>
+    <circle cx="525.5" cy="40.8" r="0.77" opacity="0.57"/>
+    <circle cx="512.1" cy="203.0" r="0.68" opacity="0.50"/>
+    <circle cx="529.6" cy="441.4" r="1.50" opacity="0.85"/>
+    <circle cx="39.5" cy="431.6" r="1.05" opacity="0.70"/>
+    <circle cx="742.7" cy="186.1" r="1.55" opacity="0.86"/>
+    <circle cx="73.0" cy="6.0" r="1.57" opacity="0.87"/>
+    <circle cx="750.5" cy="448.3" r="0.67" opacity="0.49"/>
+    <circle cx="265.0" cy="311.2" r="1.77" opacity="0.92"/>
+    <circle cx="667.5" cy="331.6" r="0.86" opacity="0.62"/>
+    <circle cx="616.7" cy="157.2" r="0.64" opacity="0.45"/>
+    <circle cx="189.0" cy="118.3" r="0.99" opacity="0.68"/>
+    <circle cx="736.5" cy="159.9" r="1.60" opacity="0.88"/>
+    <circle cx="570.4" cy="422.9" r="1.28" opacity="0.78"/>
+    <circle cx="650.0" cy="302.6" r="0.83" opacity="0.60"/>
+    <circle cx="166.1" cy="78.7" r="0.65" opacity="0.46"/>
+    <circle cx="195.7" cy="372.5" r="1.24" opacity="0.77"/>
+    <circle cx="701.5" cy="458.9" r="1.06" opacity="0.71"/>
+    <circle cx="575.2" cy="48.0" r="0.77" opacity="0.57"/>
+    <circle cx="459.5" cy="148.4" r="1.13" opacity="0.73"/>
+    <circle cx="273.5" cy="279.6" r="1.39" opacity="0.82"/>
+    <circle cx="724.6" cy="203.2" r="1.73" opacity="0.91"/>
+    <circle cx="230.7" cy="346.4" r="0.72" opacity="0.54"/>
+    <circle cx="662.9" cy="305.0" r="0.61" opacity="0.41"/>
+    <circle cx="113.7" cy="70.2" r="0.73" opacity="0.54"/>
+    <circle cx="406.2" cy="281.0" r="1.44" opacity="0.83"/>
+    <circle cx="328.5" cy="261.4" r="0.60" opacity="0.35"/>
+    <circle cx="761.1" cy="403.7" r="0.76" opacity="0.56"/>
+    <circle cx="506.8" cy="301.4" r="1.02" opacity="0.69"/>
+    <circle cx="185.2" cy="273.1" r="1.76" opacity="0.92"/>
+    <circle cx="515.6" cy="283.6" r="0.65" opacity="0.47"/>
+    <circle cx="148.8" cy="247.5" r="0.67" opacity="0.49"/>
+    <circle cx="459.9" cy="183.6" r="0.63" opacity="0.44"/>
+    <circle cx="645.4" cy="457.5" r="0.90" opacity="0.64"/>
+    <circle cx="784.1" cy="113.1" r="1.41" opacity="0.82"/>
+    <circle cx="315.4" cy="434.3" r="0.75" opacity="0.55"/>
+    <circle cx="728.2" cy="297.8" r="0.63" opacity="0.44"/>
+    <circle cx="319.4" cy="459.0" r="0.84" opacity="0.61"/>
+    <circle cx="554.2" cy="204.2" r="0.98" opacity="0.67"/>
+    <circle cx="22.6" cy="413.3" r="0.86" opacity="0.62"/>
+    <circle cx="431.3" cy="123.1" r="0.93" opacity="0.65"/>
+    <circle cx="446.4" cy="49.7" r="1.77" opacity="0.92"/>
+    <circle cx="556.3" cy="155.8" r="0.62" opacity="0.43"/>
+    <circle cx="199.0" cy="285.4" r="0.64" opacity="0.46"/>
+    <circle cx="481.4" cy="259.3" r="1.09" opacity="0.72"/>
+    <circle cx="109.6" cy="58.4" r="1.89" opacity="0.95"/>
+    <circle cx="235.7" cy="422.8" r="1.18" opacity="0.75"/>
+    <circle cx="177.0" cy="428.7" r="0.83" opacity="0.60"/>
+    <circle cx="746.8" cy="194.8" r="1.01" opacity="0.69"/>
+    <circle cx="778.6" cy="172.6" r="0.72" opacity="0.53"/>
+    <circle cx="606.9" cy="433.3" r="0.68" opacity="0.50"/>
+    <circle cx="96.6" cy="315.8" r="0.64" opacity="0.46"/>
+    <circle cx="676.9" cy="95.2" r="1.22" opacity="0.77"/>
+    <circle cx="481.3" cy="52.3" r="0.68" opacity="0.50"/>
+    <circle cx="479.9" cy="55.7" r="1.54" opacity="0.86"/>
+    <circle cx="702.0" cy="2.8" r="0.62" opacity="0.43"/>
+    <circle cx="712.6" cy="279.6" r="0.74" opacity="0.55"/>
+    <circle cx="630.7" cy="67.3" r="1.20" opacity="0.76"/>
+    <circle cx="786.1" cy="321.0" r="0.62" opacity="0.42"/>
+    <circle cx="154.3" cy="17.0" r="1.16" opacity="0.74"/>
+    <circle cx="608.0" cy="282.7" r="0.60" opacity="0.36"/>
+    <circle cx="131.3" cy="88.7" r="0.65" opacity="0.47"/>
+    <circle cx="127.2" cy="4.5" r="0.64" opacity="0.46"/>
+    <circle cx="687.8" cy="303.0" r="1.35" opacity="0.81"/>
+    <circle cx="787.9" cy="99.8" r="0.73" opacity="0.54"/>
+    <circle cx="589.8" cy="165.7" r="1.65" opacity="0.89"/>
+    <circle cx="272.7" cy="422.0" r="0.72" opacity="0.53"/>
+    <circle cx="732.3" cy="64.4" r="0.87" opacity="0.62"/>
+    <circle cx="466.3" cy="340.7" r="0.75" opacity="0.55"/>
+    <circle cx="456.1" cy="107.7" r="0.63" opacity="0.43"/>
+    <circle cx="730.1" cy="5.4" r="0.74" opacity="0.55"/>
+    <circle cx="528.2" cy="101.2" r="0.60" opacity="0.37"/>
+    <circle cx="250.8" cy="131.7" r="0.64" opacity="0.46"/>
+    <circle cx="318.8" cy="395.3" r="0.84" opacity="0.61"/>
+    <circle cx="315.0" cy="410.5" r="1.23" opacity="0.77"/>
+    <circle cx="58.6" cy="79.0" r="1.87" opacity="0.94"/>
+    <circle cx="557.6" cy="300.5" r="0.94" opacity="0.66"/>
+    <circle cx="379.9" cy="27.0" r="1.40" opacity="0.82"/>
+    <circle cx="43.0" cy="85.4" r="0.65" opacity="0.47"/>
+    <circle cx="523.4" cy="321.3" r="1.49" opacity="0.85"/>
+  </g>
+  <!-- Мир, который поглощает Рой. -->
+  <circle cx="612" cy="262" r="200" fill="url(#atmo)"/>
+  <circle cx="612" cy="262" r="178" fill="url(#world)"/>
+  <g clip-path="url(#worldClip)" opacity="0.35" fill="none" stroke="#79dfdf" stroke-width="1.2">
+    <ellipse cx="612" cy="262" rx="178" ry="60"/>
+    <ellipse cx="612" cy="262" rx="178" ry="120"/>
+    <ellipse cx="612" cy="262" rx="70" ry="178"/>
+  </g>
+  <g filter="url(#redglow)" fill="#ff5a4d" opacity="0.45">
+    <circle cx="700" cy="380" r="86"/>
+    <circle cx="640" cy="360" r="46"/>
+    <circle cx="742" cy="300" r="44"/>
+    <circle cx="592" cy="392" r="30"/>
+    <circle cx="690" cy="262" r="22"/>
+    <circle cx="560" cy="350" r="16"/>
+    <circle cx="780" cy="430" r="70"/>
+    <path d="M700 380 C 640 320, 600 300, 548 300" stroke="#ff5a4d" stroke-width="16" stroke-linecap="round" fill="none"/>
+    <path d="M742 330 C 720 250, 700 210, 668 184" stroke="#ff5a4d" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <path d="M620 420 C 560 440, 520 450, 470 452" stroke="#ff5a4d" stroke-width="12" stroke-linecap="round" fill="none"/>
+  </g>
+  <g filter="url(#goo)" fill="url(#flesh)">
+    <circle cx="700" cy="380" r="86"/>
+    <circle cx="640" cy="360" r="46"/>
+    <circle cx="742" cy="300" r="44"/>
+    <circle cx="592" cy="392" r="30"/>
+    <circle cx="690" cy="262" r="22"/>
+    <circle cx="560" cy="350" r="16"/>
+    <circle cx="780" cy="430" r="70"/>
+    <path d="M700 380 C 640 320, 600 300, 548 300" stroke="url(#flesh)" stroke-width="16" stroke-linecap="round" fill="none"/>
+    <path d="M742 330 C 720 250, 700 210, 668 184" stroke="url(#flesh)" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <path d="M620 420 C 560 440, 520 450, 470 452" stroke="url(#flesh)" stroke-width="12" stroke-linecap="round" fill="none"/>
+  </g>
+  <!-- Глубина массы: тёмные ядра и прожилки поверх, мягкое свечение под ней. -->
+  <g filter="url(#goo)" fill="#5e0b26" opacity="0.55">
+    <circle cx="730" cy="410" r="58"/><circle cx="670" cy="380" r="24"/><circle cx="760" cy="320" r="18"/>
+  </g>
+  <g fill="none" stroke="#3d0718" stroke-opacity="0.55" stroke-linecap="round">
+    <path d="M720 400 C 690 370, 660 360, 620 360" stroke-width="4"/>
+    <path d="M760 360 C 750 330, 740 310, 720 296" stroke-width="3"/>
+    <path d="M700 430 C 660 440, 630 420, 600 400" stroke-width="3"/>
+  </g>
+  <g fill="#ffd2c4" opacity="0.35">
+    <circle cx="624" cy="346" r="8"/><circle cx="728" cy="286" r="6"/><circle cx="584" cy="382" r="5"/>
+  </g>
+  <g fill="#ffb3a0" opacity="0.8">
+    <circle cx="690" cy="372" r="6"/><circle cx="740" cy="306" r="4"/><circle cx="640" cy="360" r="4.5"/>
+    <circle cx="596" cy="392" r="3.5"/><circle cx="770" cy="420" r="6"/><circle cx="552" cy="302" r="3"/>
+  </g>
+  <!-- Флот экспедиции идёт к миру. -->
+  <g>
+    <rect x="300" y="248" width="110" height="3" fill="url(#trail)"/>
+    <rect x="262" y="284" width="92" height="3" fill="url(#trail)"/>
+    <rect x="330" y="306" width="84" height="3" fill="url(#trail)"/>
+    <rect x="290" y="222" width="70" height="2" fill="url(#trail)"/>
+  </g>
+  <g fill="#79dfdf" filter="url(#glow)">
+    <path d="M410 238 l34 12 -34 12 8 -12 z"/>
+    <path d="M354 274 l28 11 -28 11 7 -11 z"/>
+    <path d="M414 296 l26 10 -26 10 6 -10 z"/>
+    <path d="M360 214 l20 8 -20 8 5 -8 z"/>
+  </g>
+  <!-- Название. -->
+  <g font-family="Liberation Sans, Arial, Helvetica, sans-serif">
+    <path d="M52 150 l6 -6 6 6 -6 6 z" fill="none" stroke="#e6b777" stroke-width="1.5"/>
+    <line x1="76" y1="150" x2="176" y2="150" stroke="#e6b777" stroke-width="1.5"/>
+    <text x="48" y="214" font-size="58" letter-spacing="7" fill="#e1f4f4">SECTOR</text>
+    <text x="48" y="280" font-size="58" letter-spacing="7" fill="#e1f4f4">ZERO</text>
+    <line x1="50" y1="304" x2="250" y2="304" stroke="#79dfdf" stroke-opacity="0.6" stroke-width="1.5"/>
+  </g>
+</svg>
