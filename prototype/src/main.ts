@@ -7876,8 +7876,10 @@ document.getElementById('recap')?.addEventListener('click', (ev) => {
 });
 // The «🛰» button in the log window → the whole-session briefing on demand.
 document.getElementById('lw-recap')?.addEventListener('click', () => openRecap(0));
-// Auto-briefing: mark where we left when the tab hides; on return (after the sim has
-// caught up the elapsed time) summarise what happened — only for a real absence.
+// Auto-briefing: mark where we left when the tab hides; on return summarise what happened —
+// only for a real absence. In the network the server kept the world running; the solo sim does
+// NOT catch the absence up (AUD-23: a frame gap advances at most one plausible frame), so a solo
+// brief is usually empty and `worthShowing` skips it.
 let awayAtRealMs = 0;
 document.addEventListener?.('visibilitychange', () => {
   if (document.hidden) {
