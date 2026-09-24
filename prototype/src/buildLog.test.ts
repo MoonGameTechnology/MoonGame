@@ -27,16 +27,23 @@ describe('правило 1 — три события, три текста, и «
     expect(buildLogLine('destroyed').needsLevel).toBe(false);
   });
   it('ключи попарно различны', () => {
-    const ключи = (['constructed', 'upgraded', 'destroyed'] as BuildLogKind[]).map(
+    const ключи = (['constructed', 'upgraded', 'destroyed', 'cleared'] as BuildLogKind[]).map(
       (k) => buildLogLine(k).key,
     );
-    expect(new Set(ключи).size).toBe(3);
+    expect(new Set(ключи).size).toBe(4);
   });
 });
 
 describe('правило 2 — якорь несёт только разрушение', () => {
   it('разрушение прыгает камерой', () => {
     expect(buildLogLine('destroyed').anchored).toBe(true);
+  });
+  it('зачистка органа Роя — своя строка и тоже с якорем', () => {
+    expect(buildLogLine('cleared')).toEqual({
+      key: 'log.build.cleared',
+      needsLevel: false,
+      anchored: true,
+    });
   });
   it.each(['constructed', 'upgraded'] as BuildLogKind[])('%s — без якоря', (k) => {
     expect(buildLogLine(k).anchored).toBe(false);

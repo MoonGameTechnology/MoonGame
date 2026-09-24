@@ -22,6 +22,7 @@ import { isAllied } from '../util/combat';
 import { addUnits } from '../util/stacks';
 import { basedMachine, hangarUsed, shuttleBayAt } from '../state/shuttle';
 import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
+import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
 
 /** Share of the ground assault's round damage that also wears down the planet's
  *  structures (the rest is spent on the defending garrison). Tunable. */
@@ -667,6 +668,26 @@ function damageBuildings(
   syncIssuedGarrison(h, planet);
 }
 
+/** Снять `amount` прочности с заражённых построек мира — по очереди, в порядке массива,
+ *  с переносом остатка; обычные постройки не трогаются. Снесённые убираются и объявляются
+ *  `building.destroyed` с пометкой `cleared` — это зачистка, а не штурм. */
+function clearInfected(h: HandlerContext, planet: Planet, amount: number): void {
+  let remaining = amount;
+  const survivors: BuildingInstance[] = [];
+  for (const b of planet.buildings) {
+    if (remaining <= 0 || !isInfected(h.ctx.data.buildings[b.type])) {
+      survivors.push(b);
+      continue;
+    }
+    const absorbed = Math.min(remaining, b.hp);
+    b.hp -= absorbed;
+    remaining -= absorbed;
+    if (b.hp > 0) survivors.push(b);
+    else h.emit('building.destroyed', { planetId: planet.id, building: b.type, owner: planet.owner, cleared: true });
+  }
+  planet.buildings = survivors;
+}
+
 /**
  * Buildings — a base module (docs/modulesystem.md). It owns everything about
  * planet structures:
@@ -701,6 +722,11 @@ export const constructionModule: GameModule = {
       const def = h.ctx.data.buildings[payload.building];
       if (!def) {
         return h.reject('E_UNKNOWN_BUILDING');
+      }
+      // 0. Органы Роя (`infected`) растит только Рой (решение владельца 2026-09-24):
+      //    у остальных они не работают, и яма биомассы у людей была источником биомассы.
+      if (!worksFor(h.state, action.playerId, def, h.ctx.data)) {
+        return h.reject('E_SWARM_ONLY');
       }
       // Province type decides construction in TWO steps, and both are gates here.
       //
@@ -805,6 +831,10 @@ export const constructionModule: GameModule = {
       const def = h.ctx.data.buildings[instance.type];
       if (!def) {
         return h.reject('E_UNKNOWN_BUILDING');
+      }
+      // Захваченный орган Роя не растят — его зачищают (решение владельца 2026-09-24).
+      if (!worksFor(h.state, action.playerId, def, h.ctx.data)) {
+        return h.reject('E_SWARM_ONLY');
       }
       const nextLevel = instance.level + 1;
       if (nextLevel > buildingMaxLevel(def)) {
@@ -1422,6 +1452,21 @@ export const constructionModule: GameModule = {
         if (totalHealRate <= 0) continue;
         for (const stack of planet.garrison) mend(stack, totalHealRate);
         for (const stack of landings) mend(stack, totalHealRate);
+      }
+
+      // Зачистка органов Роя (решение владельца 2026-09-24: «при захвате не-роем наземные
+      // юниты сражаются с постройками»): на мире не-Роя наземный гарнизон непрерывно
+      // снимает с заражённых построек прочность своим уроном по зданиям
+      // (`stats.buildingDamage` в час). Пока идёт бой на узле — войска заняты боем, и
+      // зачистки нет. У Роя его органы, понятно, никто не трогает.
+      for (const planet of Object.values(h.state.planets)) {
+        if (planet.owner === null || fighting.has(planet.id)) continue;
+        if (!planet.buildings.some((b) => isInfected(data.buildings[b.type]))) continue;
+        if (feedsOnBiomass(h.state, planet.owner, data)) continue;
+        let rate = 0;
+        for (const stack of planet.garrison)
+          rate += stack.count * (data.units[stack.unit]?.stats.buildingDamage ?? 0);
+        if (rate > 0) clearInfected(h, planet, rate * hours);
       }
 
       // Ship regen/repair — the two pools mend differently (shields-roadmap §1):

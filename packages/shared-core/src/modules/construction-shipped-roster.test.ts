@@ -92,6 +92,13 @@ const SELF_RESTRICTED = [
   'void_shield',
 ];
 
+/**
+ * Органы Роя (`infected`): их строит только фракция, которая ест биомассу (решение
+ * владельца 2026-09-24, `util/infestation.ts`). Строитель этой таблицы — не Рой, поэтому
+ * на планете их нет. Вписаны поимённо по той же причине, что {@link SELF_RESTRICTED}.
+ */
+const SWARM_ONLY = ['biomass_pit', 'swarm_synapse', 'swarm_hive'];
+
 /** Every shipped province type, and what it hosts. `null` = roster-less: anything in the
  *  catalogue that does not restrict itself (see {@link SELF_RESTRICTED}). */
 const EXPECTED: Record<string, string[] | null> = {
@@ -143,7 +150,9 @@ describe('shipped province types: what each one hosts (ORB-4 golden table)', () 
     it(`${kind} hosts ${expected === null ? 'everything that will have it' : expected.length + ' building(s)'}`, () => {
       const actual = hosts(kind);
       if (expected === null) {
-        const anything = Object.keys(data.buildings).filter((b) => !SELF_RESTRICTED.includes(b));
+        const anything = Object.keys(data.buildings).filter(
+          (b) => !SELF_RESTRICTED.includes(b) && !SWARM_ONLY.includes(b),
+        );
         expect(actual.sort()).toEqual(anything.sort());
       } else {
         expect(actual.sort()).toEqual([...expected].sort());
