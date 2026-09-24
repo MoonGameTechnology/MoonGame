@@ -2401,7 +2401,7 @@ export const en: Record<string, string> = {
   'settings.sweep': 'Radar sweep',
   'settings.sweep.hint': 'the rotating beam on the map — visual only, does not affect detection',
   'settings.sweep.opacity': 'Radar sweep opacity',
-  'settings.tab.general': 'General',
+  'settings.tab.map': 'Map',
   'settings.tag': 'interface',
   'settings.title': 'SETTINGS',
 

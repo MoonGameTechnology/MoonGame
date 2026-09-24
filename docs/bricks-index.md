@@ -610,6 +610,10 @@
 | AUD-20 | ⏳ | srv proto | `docs/backlog.md` | Адаптация Роя (AD-01) не подключена ни к одному живому |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | AUD-22 | ⏳ | data | `docs/backlog.md` | Пустые покупки в дереве навыков. |
+| AUD-23 | ✅ | proto cli | `docs/backlog.md` | Разрыв кадра выигрывал главу без боя. |
+| AUD-24 | ✅ | proto cli | `docs/backlog.md` | «Продолжить» на втором устройстве стирало |
+| AUD-25 | ✅ | proto | `docs/backlog.md` | Двойной тап на экране подготовки — два ролика. |
+| AUD-26 | ✅ | cli | `docs/backlog.md` | Лут забега выбирался прокруткой попыток. |
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md` | Строка места переключается «выкл → слабый → сильный». |
@@ -675,6 +679,7 @@
 | TXT-7 | 🔒 | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
 | UX-SEL-1 | 🗑 | proto | `docs/backlog.md` | На ПК выделять рамкой обычным ЛКМ — снято решением |
 | UX-KEYS-1 | ✅ | proto | `docs/backlog.md` | Раздел «Управление» в настройках: какие клавиши и жесты есть. |
+| UX-SET-1 | ✅ | proto | `docs/backlog.md` | Окно настроек — вкладками: Звук · Графика · Карта · Управление. |
 | ROS-SUP-1 | ✅ | proto data | `docs/backlog.md` | Корабли поддержки — своей вкладкой. |
 | SIEGE-1 | ✅ | data proto | `docs/backlog.md` | Юнита siege в игре нет, урон по постройкам — модулем. |
 | BRWH-1 | ✅ | proto docs | `docs/backlog.md` | Три рабочих харнеса получили команды, каталог |
@@ -1226,6 +1231,7 @@
 | YAG-3.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
 | YAG-4.1 | ⏳ | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
+| YAG-4.3 | ⏳ | srv proto | `docs/yandex-games-roadmap.md` | Где живёт кошелёк Суверенов — решение до покупок |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
 | YAG-5.2 | 🔶 | docs proto | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию 2026-09-24 |
 | YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |

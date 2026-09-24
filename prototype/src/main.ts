@@ -277,7 +277,7 @@ import {
   planCloudSync,
   profileNumbers,
   profileHasProgress,
-  serializeCloudProfile,
+  cloudEnvelope,
   type CloudProfile,
 } from '../../decisions/cloudSync';
 import { chapterBlueprint } from '../../decisions/moduleRarity';
@@ -806,7 +806,7 @@ import {
   flowSign,
   stockBleeds,
 } from './resourceChip';
-import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
+import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
@@ -2836,7 +2836,7 @@ function playerOrder(action: Action): boolean {
     if (plan.tour === 'on-accept') activeTour?.notifyAction(action.type);
     // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
     // `introTrigger.ts` (REFM-100).
-    const intro = introFor(action.type, !!activeTour?.active);
+    const intro = introFor(action.type, !!activeTour?.active, NET);
     if (intro) maybeIntro(intro);
   }
   return true;
@@ -7876,8 +7876,10 @@ document.getElementById('recap')?.addEventListener('click', (ev) => {
 });
 // The «🛰» button in the log window → the whole-session briefing on demand.
 document.getElementById('lw-recap')?.addEventListener('click', () => openRecap(0));
-// Auto-briefing: mark where we left when the tab hides; on return (after the sim has
-// caught up the elapsed time) summarise what happened — only for a real absence.
+// Auto-briefing: mark where we left when the tab hides; on return summarise what happened —
+// only for a real absence. In the network the server kept the world running; the solo sim does
+// NOT catch the absence up (AUD-23: a frame gap advances at most one plausible frame), so a solo
+// brief is usually empty and `worthShowing` skips it.
 let awayAtRealMs = 0;
 document.addEventListener?.('visibilitychange', () => {
   if (document.hidden) {
@@ -13803,6 +13805,17 @@ let cloudWrite: Promise<void> = Promise.resolve();
 let lastCloudEnvelope = '';
 let lastCloudFlushed = '';
 let lastPortableRaw: string | null = null;
+/** Мир забега, последним поставленный в облако, и когда (AUD-24). */
+let lastCloudRunBlob: string | null = null;
+let cloudRunAt = 0;
+/**
+ * Как часто мир идущего забега уходит в облако (AUD-24). Реже локального автосейва: снимок
+ * главы — до 36 КБ, и в окно писателя (раз в 6 с) это ~12 МБ трафика за главу на телефоне,
+ * а раз в 30 с — ~2 МБ. Цена — другое устройство может получить мир давностью до 30 секунд
+ * реального времени: откат на полминуты, а не пересборка главы с карты. Уход со страницы
+ * и выход площадки отправляют последний мир сразу (`pushCloud(true)`).
+ */
+const CLOUD_RUN_EVERY_MS = 30_000;
 
 function writeSyncMark(): void {
   writeRaw(CLOUD_MARK_KEY, JSON.stringify(syncMark));
@@ -13821,14 +13834,23 @@ function pushCloud(flush = false): void {
     await progressWrite;
     await runWrite;
     const run = await portableRunStore.load();
-    const envelope = serializeCloudProfile({
-      v: 1,
-      seed: sectorProgress.seed,
-      rev: syncMark.rev,
-      progress: JSON.stringify(sectorProgress),
-      ...(run ? { run } : {}),
-      ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
-    });
+    // AUD-24: вместе с дескриптором едет ТОЧНЫЙ мир забега. Без него другое устройство
+    // пересобирало мир с карты главы, и «Продолжить» там стирало поражение. Не влез в
+    // лимит площадки — уходит без мира, профиль всё равно доезжает (`cloudEnvelope`).
+    const state = await runSaveStore.load();
+    const platform = getPlatform();
+    const envelope = cloudEnvelope(
+      {
+        v: 1,
+        seed: sectorProgress.seed,
+        rev: syncMark.rev,
+        progress: JSON.stringify(sectorProgress),
+        ...(run ? { run } : {}),
+        ...(state ? { state } : {}),
+        ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
+      },
+      (candidate) => platform.save.fits?.(candidate) ?? true,
+    );
     if (envelope === (flush ? lastCloudFlushed : lastCloudEnvelope)) return;
     lastCloudEnvelope = envelope;
     if (flush) lastCloudFlushed = envelope;
@@ -13888,9 +13910,12 @@ async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress
   if (runInProgress()) setRunActive(false);
   sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data).progress;
   await sectorProgressStore.save(JSON.stringify(sectorProgress));
-  // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному
-  // дескриптору (или его нет вовсе).
+  // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному: ТОЧНЫМ
+  // миром, если облако его привезло (AUD-24), иначе по дескриптору (или его нет вовсе).
+  // Именно мир, а не дескриптор: пересборка по дескриптору начинает мир с карты главы, и
+  // вход с другого устройства превращался в бесплатную перемотку поражения.
   await runSaveStore.clear();
+  if (cloud.state) await runSaveStore.save(cloud.state);
   if (cloud.run) await portableRunStore.save(cloud.run);
   else await portableRunStore.clear();
   savedRun = null;
@@ -14236,9 +14261,15 @@ function saveRun(): void {
     }),
   );
   runWrite = runWrite.then(() => runSaveStore.save(blob)).then(() => portableRunStore.save(portable));
-  // Дескриптор — часть облачного профиля: сменился (волна, усиление) — новая правка.
-  if (portable !== lastPortableRaw) {
+  // Дескриптор — часть облачного профиля: сменился (волна, усиление) — новая правка. Мир
+  // забега (AUD-24) — тоже, но не чаще `CLOUD_RUN_EVERY_MS` и только изменившийся: на паузе
+  // облако не пишется.
+  const now = performance.now();
+  const worldDue = blob !== lastCloudRunBlob && now - cloudRunAt >= CLOUD_RUN_EVERY_MS;
+  if (portable !== lastPortableRaw || worldDue) {
     lastPortableRaw = portable;
+    lastCloudRunBlob = blob;
+    cloudRunAt = now;
     bumpCloudRev();
   }
 }
@@ -14347,10 +14378,15 @@ function restoreRun(): boolean {
  *
  * Мир собирается так же, как у нового запуска той же главы (карта, снаряжение, сложность),
  * засевается модулем PvE и только потом получает волну и усиления из дескриптора —
- * чистой функцией `resumePortableRun`. ⚠️ Восстановление НЕ побайтовое, и это принято
- * осознанно (§2.1(а) роадмапа площадки): флоты, бои и ресурсы начинаются заново, и игрок
- * это видит в журнале, а не догадывается. Номер попытки берётся из дескриптора — награда
- * за этот забег не выдастся дважды.
+ * чистой функцией `resumePortableRun`. ⚠️ Восстановление НЕ побайтовое: флоты, бои и
+ * ресурсы начинаются заново, и игрок это видит в журнале, а не догадывается. Номер попытки
+ * берётся из дескриптора — награда за этот забег не выдастся дважды.
+ *
+ * ⚠️ Это ЗАПАСНОЙ путь, и держать его таким обязательно (AUD-24). Новый мир с карты главы
+ * выгоднее проигрываемого — дом цел, наступление Роя стёрто, — поэтому путь, на который
+ * игрок может встать по желанию, был перемоткой поражения. Облако теперь везёт точный мир,
+ * и сюда приходят только когда его нет: игру обновили и снимок не стал миром, или мир не
+ * влез в лимит площадки.
  */
 function restorePortable(): boolean {
   const save = savedPortable;

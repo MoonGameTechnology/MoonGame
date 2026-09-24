@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { pveState, pveModeId } from '../packages/client/src/gameData';
-import { effectiveStats } from '../packages/shared-core/src/index';
+import { effectiveStats, hashState } from '../packages/shared-core/src/index';
 import type { GameState } from '../packages/shared-core/src/index';
 import {
   changeSectorZeroProgress,
@@ -643,8 +643,42 @@ describe('SZE-5.3 — итог забега приносит дубли и че�
         won: true,
         newTasks: 0,
         firstWinBlueprint: null,
+        outcome: hashState(s),
       }),
     );
+  });
+
+  it('AUD-26: бросок — от ИТОГОВОГО мира, а не от одного номера попытки', () => {
+    const at = (time: number): GameState => {
+      const s = pveState(data);
+      s.pve = { waveNumber: 10, totalWaves: 10, npcPlayerId: 'p3' };
+      s.match.status = 'ended';
+      s.match.winner = 'p1';
+      s.time = time;
+      return s;
+    };
+    const base = { ...fresh(), nextAttempt: 2 };
+    const loots = new Set(
+      Array.from({ length: 40 }, (_, i) =>
+        JSON.stringify(settleSectorZeroRun(base, 1, at(1000 + i)).lastRun?.loot),
+      ),
+    );
+    expect(loots.size).toBeGreaterThan(1);
+  });
+
+  it('AUD-26: живой мир и его снимок из хранилища дают ОДНУ добычу — путей засчёта два', () => {
+    // Конец забега засчитывается либо сразу (живой мир), либо из журнала при следующем
+    // открытии меню (JSON-снимок). Отпечаток мира обязан совпасть, иначе игрок, закрывший
+    // вкладку между записями, увидел бы другую добычу, чем на экране итогов.
+    const s = pveState(data);
+    s.pve = { waveNumber: 10, totalWaves: 10, npcPlayerId: 'p3' };
+    s.match.status = 'ended';
+    s.match.winner = 'p1';
+    (s as unknown as Record<string, unknown>).probe = undefined;
+    const base = { ...fresh(), nextAttempt: 2 };
+    const live = settleSectorZeroRun(base, 1, s).lastRun?.loot;
+    const journaled = settleSectorZeroRun(base, 1, JSON.parse(JSON.stringify(s)) as GameState).lastRun?.loot;
+    expect(journaled).toEqual(live);
   });
 
   it('итог с добычей переживает сохранение; старый итог без неё тоже читается', () => {

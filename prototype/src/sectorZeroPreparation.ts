@@ -530,12 +530,18 @@ export function initSectorZeroPreparation(h: PreparationHost) {
    * Сломавшийся адаптер (отклонённый промис) читается как «рекламы нет» — fail-secure:
    * исключение в SDK площадки не должно превращаться в бесплатную награду.
    */
+  /** Ролик уже идёт (AUD-25): второе нажатие до его исхода — не второй ролик. Кнопки
+   *  кошелька и итогов держат то же правило своим флагом. */
+  let watching = false;
   const viaAd = (
     placement: AdPlacement,
     onWatched: () => string,
     props?: Record<string, string>,
   ): void => {
+    if (watching) return;
+    watching = true;
     const settle = (status: AdOutcome): void => {
+      watching = false;
       message = status === 'ok' ? onWatched() : t(adRefusalKey(status));
       render();
     };
