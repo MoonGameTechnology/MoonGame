@@ -93,6 +93,7 @@ describe('добыча забега: дубли и чертежи (SZE-5.3)', ()
     won: false,
     newTasks: 0,
     firstWinBlueprint: null,
+    outcome: 'world',
   };
   const total = (r: Record<string, number>): number => Object.values(r).reduce((a, b) => a + b, 0);
 
@@ -110,6 +111,18 @@ describe('добыча забега: дубли и чертежи (SZE-5.3)', ()
       JSON.stringify(runLoot({ ...base, attempt: i + 1 })),
     );
     expect(new Set(tries).size).toBeGreaterThan(1);
+  });
+
+  it('НОМЕР ПОПЫТКИ БРОСОК НЕ ВЫБИРАЕТ (AUD-26): при том же номере решает исход забега', () => {
+    // Сид лежит в профиле открытым текстом, хеш — в бандле. Ключуйся бросок только номером
+    // попытки, игрок посчитал бы удачный номер заранее и промотал бы до него попытки через
+    // «Новый забег → Заменить». Исход забега до его конца не знает никто.
+    const rolls = new Set(
+      Array.from({ length: 60 }, (_, i) =>
+        JSON.stringify(runLoot({ ...base, won: true, outcome: `world-${i}` })),
+      ),
+    );
+    expect(rolls.size).toBeGreaterThan(1);
   });
 
   it('первая победа в главе даёт чертёж ГАРАНТИРОВАННО, ступень растёт к эпицентру', () => {
