@@ -313,7 +313,7 @@ import {
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
   type SectorZeroProgress, type SectorProgressAction,
 } from '../../decisions/sectorZeroProgress';
-import { RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
+import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
 import {
   authOutcome,
@@ -1541,38 +1541,12 @@ function renderSwarmDossier(now = performance.now()): void {
   }
 }
 const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
-// Строка статуса перерисовывается целиком, стоит измениться хоть символу, — а часы и отсчёт
-// волны меняются каждый кадр. Кнопка, пересозданная между нажатием и отпусканием, нажатия
-// не получает (поймал живой прогон: 20 секунд попыток попасть по паузе). Поэтому пауза
-// забега (`YAG-6.2`) — ПОСТОЯННЫЙ узел разметки между двумя перерисовываемыми частями;
-// обе части — `display: contents`, так что раскладка и селекторы `#devline …` разреза не
-// заметили (`build.mjs`).
+// Строка статуса рисуется двумя частями — часы и остальное (`build.mjs`, обе части
+// `display: contents`). Между ними стояла пауза забега (`YAG-6.2`); по решению владельца
+// 2026-09-24 она живёт в полосе скорости рядом с ▶ и ▶▶ — «там ей логичнее находиться».
 const devlineHead = $('devline-head');
 const devlineTail = $('devline-status');
-const runPauseBtn = $('runpause') as HTMLButtonElement;
-/** Кнопка паузы по состоянию мира. Трогает узел, только когда ответ сменился. */
-let runPauseView = '';
-function syncRunPauseButton(): void {
-  const view = !runPauseShown() ? 'none' : speed > 0 ? 'running' : 'paused';
-  if (view === runPauseView) return;
-  runPauseView = view;
-  runPauseBtn.hidden = view === 'none';
-  runPauseBtn.classList.toggle('dl-paused', view === 'paused');
-  // Идёт мир — неброская «‖» с подписью для мыши и скринридера; стоит — «▶ Продолжить».
-  runPauseBtn.textContent = view === 'paused' ? t('hud.run.resume') : '‖';
-  if (view === 'paused') {
-    runPauseBtn.removeAttribute('title');
-    runPauseBtn.removeAttribute('aria-label');
-  } else {
-    runPauseBtn.title = t('hud.run.pause');
-    runPauseBtn.setAttribute('aria-label', t('hud.run.pause'));
-  }
-}
 devlineEl.addEventListener('click', (event) => {
-  if ((event.target as Element).closest('[data-run-pause]')) {
-    runPauseEvent('toggle');
-    return;
-  }
   if ((event.target as Element).closest('[data-solo-play]')) {
     if (soloSaveActive && !NET) {
       speed = Number($('spd-play').dataset.speed);
@@ -9766,6 +9740,12 @@ canvas.addEventListener('pointermove', (ev) => {
 
 for (const b of Array.from(document.querySelectorAll('[data-speed]'))) {
   b.addEventListener('click', () => {
+    // Пауза забега — через его правило (`YAG-6.2`): оно помнит темп для продолжения, а уход
+    // со страницы и пауза площадки говорят с тем же правилом. «‖» на паузе продолжает.
+    if (b.id === 'spd-pause' && runPauseShown()) {
+      runPauseEvent('toggle');
+      return;
+    }
     speed = Number((b as HTMLElement).dataset.speed);
     for (const x of Array.from(document.querySelectorAll('[data-speed]')))
       x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === speed);
@@ -9801,6 +9781,10 @@ function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void {
   for (const x of Array.from(document.querySelectorAll('[data-mult]')))
     x.classList.toggle('on', Number((x as HTMLElement).dataset.mult) === mult);
 }
+// ▶▶▶ дев-забега (заказ владельца 2026-09-24) — свой постоянный темп: пара «играть /
+// ускорить» его не трогает. В игроцкой сборке кнопки нет вовсе (`<!--dev-only-->`).
+const devFastBtn = document.getElementById('spd-dev');
+if (devFastBtn) devFastBtn.dataset.speed = String(PLAY_BASE * RUN_SPEED_DEV);
 
 // Restart → back to the skirmish setup (bot selection). The speedbar button serves the
 // no-bots sandbox; the end-banner button (delegated) serves a finished bot match.
@@ -14229,7 +14213,6 @@ function frame(nowReal: number) {
     devlineHead.innerHTML = clockHtml;
     lastClockHead = clockHtml;
   }
-  syncRunPauseButton();
   const statusHtml =
     waveHtml +
     missionHtml +
@@ -14394,6 +14377,7 @@ function frame(nowReal: number) {
   // Правило 6 (`matchExits.ts`): в забеге полоса несёт только его темп — ▶ и ▶▶.
   const run = sectorZeroToolsHidden();
   speedbarEl.classList.toggle('spd-run', run);
+  if (devFastBtn) devFastBtn.hidden = !(run && sectorDevActive);
   const showSpdCtl = displayOf(timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__, run));
   if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
   const showBar = displayOf(holographic.active() || speedbarShown(pcUi(), devSpeedControl, run));
