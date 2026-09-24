@@ -45,6 +45,7 @@ import {
   seatClaimModule,
   taxModule,
   technologyModule,
+  promotionModule,
   veteranModule,
   victoryModule,
   visibilityModule,
@@ -157,6 +158,9 @@ export const DEV_MODULES: GameModule[] = [
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
+  // PERK-3.2: бросок промоушена. СТРОГО ПЕРЕД `autoRally` — оба слушают `unit.built`,
+  // и авто-сбор уносит свежие корабли из гарнизона во флот; отметить надо до переезда.
+  promotionModule,
   autoRallyModule, // CONV-10: построенный корабль сам уходит на орбиту в RALLY-флот (BF-29)
   shuttleModule, // SQ: free-space movement for shuttles (strike/return off the lane graph)
   capitalModule, // capital.designate: re-point the hero respawn anchor
@@ -196,7 +200,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '31'; // PERK-1.2: массовые перки — в параллельную
+export const MODULE_MANIFEST_VERSION = '32'; // PERK-3.2: добавлен promotionModule —
+// случайный промоушен. Изменилось ЧЛЕНСТВО графа, и порядок значим: модуль стоит ПЕРЕД
+// `autoRally`, потому что оба слушают `unit.built`, а авто-сбор уносит свежие корабли из
+// гарнизона во флот. Партия, поднятая под графом с лишним модулем, молча получила бы
+// другие боевые числа и другой поток RNG посреди игры.
+// export const MODULE_MANIFEST_VERSION = '31'; // PERK-1.2: массовые перки — в параллельную
 // корзину. Состав и порядок модулей те же; сменились ПРАВИЛА УРОНА: техи, пассив фракции и
 // аура героя больше не перемножаются друг с другом, а складываются очками. У лидера с полным
 // древом это ×2.10 → ×1.77. Подняв старую партию под новым кодом, мы молча сменили бы ей

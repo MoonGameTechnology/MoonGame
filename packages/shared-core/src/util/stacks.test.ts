@@ -253,3 +253,38 @@ describe('SZE-1.1 — звёздность модуля едет ВМЕСТЕ с
     expect(withStars).toBe(18); // 10 + 4 × (1 + 0.5 + 0.5)
   });
 });
+
+describe('addUnits — заслуга при доливе и переезде (VET-2 / PERK-3.2)', () => {
+  it('долив НЕотмеченных разбавляет отметку по весу', () => {
+    // 2 отмеченных + 6 новых = четверть. Это та же цена удобства, что у медалей:
+    // большой стек удобен, но честь подразделения он разводит по новичкам.
+    const stacks: UnitStack[] = [{ unit: 'gun', count: 2, promoted: 1 }];
+    addUnits(stacks, 'gun', 6);
+    expect(stacks[0]?.count).toBe(8);
+    expect(stacks[0]?.promoted).toBeCloseTo(0.25, 9);
+  });
+
+  it('ПЕРЕЕЗД юнитов приносит их заслугу с собой — сплит копирует', () => {
+    // Авто-сбор построенного уносит корабли из гарнизона во флот и зовёт `addUnits`.
+    // Без переноса отмеченный корабль терял бы отметку ровно в момент подъёма с верфи.
+    const source: UnitStack = { unit: 'gun', count: 3, promoted: 1, battles: 2 };
+    const dest: UnitStack[] = [];
+    addUnits(dest, 'gun', 3, undefined, undefined, undefined, source);
+    expect(dest[0]?.count).toBe(3); // размер партии, а не остаток источника
+    expect(dest[0]?.promoted).toBe(1);
+    expect(dest[0]?.battles).toBe(2);
+  });
+
+  it('переезд в НЕПУСТОЙ стек усредняет, а не затирает', () => {
+    const dest: UnitStack[] = [{ unit: 'gun', count: 1 }];
+    addUnits(dest, 'gun', 3, undefined, undefined, undefined, { promoted: 1 });
+    expect(dest[0]?.count).toBe(4);
+    expect(dest[0]?.promoted).toBeCloseTo(0.75, 9);
+  });
+
+  it('без заслуги поле не заводится вовсе', () => {
+    const dest: UnitStack[] = [];
+    addUnits(dest, 'gun', 2);
+    expect(dest[0]).toEqual({ unit: 'gun', count: 2 });
+  });
+});

@@ -49,13 +49,18 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.32'); // SZE-5.1: module rarity bonuses + star cap by rarity (owner, 2026-09-24)
+    expect(data.version).toBe('0.1.33'); // PERK-3.2: новый фрагмент `promotion.json` — случайный промоушен
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
     // может отвалиться МОЛЧА: пропавший или обнулённый фрагмент выключает механику
     // целиком, и заметить это было бы некому (шапка `data/bundle.ts`, AUD-1).
     expect(data.veteran.damagePerBattle).toBeGreaterThan(0);
+    // PERK-3.2: промоушен в шипнутом каталоге включён. Числами не прибиваем (их на то и
+    // держат в данных), сторожим ровно то, что может отвалиться МОЛЧА — пропавший или
+    // обнулённый фрагмент выключает механику, и заметить это было бы некому.
+    expect(data.promotion.chance).toBeGreaterThan(0);
+    expect(data.promotion.damageBonus).toBeGreaterThan(0);
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
     // огня с дистанции в игре не существует — радиус не читает никто.

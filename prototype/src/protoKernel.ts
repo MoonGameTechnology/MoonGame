@@ -28,6 +28,7 @@ import {
   arsenalSyncModule,
   stationModule,
   armyModule,
+  promotionModule,
   veteranModule,
   victoryModule,
   technologyModule,
@@ -117,6 +118,9 @@ export const MODULES: GameModule[] = [
   swarmJournalModule, // PVR-4.5: что игрок ВИДЕЛ про ответы Роя; зеркало swarmMemory
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
   fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
+  // PERK-3.2: бросок промоушена. СТРОГО ПЕРЕД `autoRally` — оба слушают `unit.built`,
+  // и авто-сбор уносит свежие корабли из гарнизона во флот; отметить надо до переезда.
+  promotionModule,
   // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя
   // механика, которую прототип держал один; канон её теперь тоже грузит.
   autoRallyModule,
