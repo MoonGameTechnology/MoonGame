@@ -14,7 +14,7 @@ import { MS_PER_HOUR } from '../util/time';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
 import { isCapturable } from '../state/sectorKind';
-import { attackerOf, defenderOf } from '../state/battle';
+import { attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
 import { splitVolley } from '../util/volley';
 import {
@@ -127,7 +127,8 @@ function findEnemyFleetAt(
   let best: Fleet | null = null;
   for (const id of Object.keys(h.state.fleets)) {
     const f = h.state.fleets[id];
-    if (!f || f.id === excludeId || except?.has(f.id) || f.location !== at || f.battleId) {
+    // Флот, чей десант дерётся на земле, для орбиты свободен (ASSAULT-1, `shipsEngaged`).
+    if (!f || f.id === excludeId || except?.has(f.id) || f.location !== at || shipsEngaged(h.state, f)) {
       continue;
     }
     if (!f.units.some((s) => s.count > 0) || !isHostile(h, owner, f.owner)) {
@@ -166,6 +167,21 @@ function ceasefired(h: HandlerContext, battle: Battle): boolean {
   // означало бы «неизвестно ⇒ мир» и разводило бы бой с ничейным гарнизоном — ровно то,
   // что запрещает правило «любая неопределённость → отказ, а не тихий проход».
   return comparable > 0;
+}
+
+/**
+ * ASSAULT-1. Враждебны ли две стороны боя — для залпа.
+ *
+ * Ничейный гарнизон (`owner === null`) — враг всякому, кто пришёл его брать: стойки у
+ * него нет, и мира с ним не бывает (см. `ceasefired`). Залп спрашивал только стойку
+ * пары и ничейную сторону отбрасывал целиком — десант и гарнизон ничейного мира не
+ * стреляли друг в друга вовсе, и штурм стоял до предохранителя `MAX_COMBAT_ROUNDS`
+ * (240 раундов — полтора часа забега) с запертым над миром флотом. Двое ничейных друг
+ * другу не враги: такого боя модель не заводит.
+ */
+function sidesHostile(h: HandlerContext, a: string | null, b: string | null): boolean {
+  if (a === null || b === null) return a !== b;
+  return isHostile(h, a, b);
 }
 
 /** Pulls a fleet out of transit and pins it at a node (it now fights/holds). */
@@ -288,7 +304,7 @@ function pullInBystanders(h: HandlerContext, at: string): void {
     // порядка создания флотов (инвариант детерминизма #6).
     for (const id of Object.keys(h.state.fleets).sort()) {
       const f = h.state.fleets[id];
-      if (!f || f.battleId || f.location !== at) continue;
+      if (!f || shipsEngaged(h.state, f) || f.location !== at) continue;
       if (!f.units.some((st) => st.count > 0)) continue;
       const battle = runningBattleFor(h, at, f.owner);
       if (!battle) continue;
@@ -306,7 +322,7 @@ function engageFleets(
   except?: ReadonlySet<string> | null,
 ): void {
   const fleet = h.state.fleets[fleetId];
-  if (!fleet || fleet.battleId) {
+  if (!fleet || shipsEngaged(h.state, fleet)) {
     return;
   }
   // MSB-3: идущий бой имеет ПРИОРИТЕТ над новой дуэлью. Иначе пятеро прибывших дали бы
@@ -503,12 +519,26 @@ function capturePlanetByBeachhead(
   });
 }
 
-function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef): void {
+function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef, battleId: string): void {
   if (ref.kind === 'garrison' || ref.kind === 'beachhead') {
     return; // стороны без флота — освобождать и уничтожать нечего
   }
   const fleet = h.state.fleets[ref.fleetId];
   if (!fleet) {
+    return;
+  }
+  // ASSAULT-1. Флот сейчас держит ДРУГОЙ живой бой: десант дрался на земле, а корабли
+  // тем временем сцепились на орбите. Отпускать или хоронить его — дело того боя.
+  if (fleet.battleId && fleet.battleId !== battleId && h.state.battles[fleet.battleId]) {
+    return;
+  }
+  // ASSAULT-1. Кончился бой кораблей, а десант этого флота ещё дерётся на земле: флот
+  // возвращается под замок наземного боя — улететь, бросив десант, нельзя. Жив он и
+  // без единого корабля: его войска на земле, и захват после победы кладёт их в
+  // гарнизон через этот флот.
+  const ground = landingBattleOf(h.state, fleet.id, battleId);
+  if (ground) {
+    fleet.battleId = ground.id;
     return;
   }
   if (fleet.units.length === 0) {
@@ -638,7 +668,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // `defender` покрывали список целиком; с втягиванием третьего этот же код оставлял
   // ему `battleId`, указывающий на удалённый бой, — а такой флот заперт навсегда: он не
   // ходит, не стреляет и не освобождается, потому что освобождать его больше некому.
-  for (const side of battle.sides) releaseOrDestroyFleet(h, side.ref);
+  for (const side of battle.sides) releaseOrDestroyFleet(h, side.ref, battle.id);
   delete h.state.battles[battle.id];
   // Штурм продолжают уцелевшие берега (MSB-4): теперь, когда прежний бой удалён,
   // обработчик заведёт новый и подтянет в него остальные плацдармы.
@@ -801,7 +831,7 @@ export const combatModule: GameModule = {
       for (const id of Object.keys(h.state.fleets).sort()) {
         const f = h.state.fleets[id];
         if (!f || (f.owner !== a && f.owner !== b)) continue;
-        if (!f.location || f.movement || f.battleId) continue;
+        if (!f.location || f.movement || shipsEngaged(h.state, f)) continue;
         engageFleets(h, id, f.location);
       }
     });
@@ -927,7 +957,7 @@ export const combatModule: GameModule = {
         // Сторона уходит вместе с игроком, а флот, если он ещё цел, освобождается —
         // иначе он остался бы с `battleId` на бой, в котором его больше нет.
         for (const side of battle.sides) {
-          if (side.owner === playerId) releaseOrDestroyFleet(h, side.ref);
+          if (side.owner === playerId) releaseOrDestroyFleet(h, side.ref, battle.id);
         }
         battle.sides = left;
         // Драться стало некому — бой закрывается как перемирие: победителя в нём нет
@@ -1024,6 +1054,12 @@ export const combatModule: GameModule = {
       if (!battle.sides.some((side) => isThisFleet(side.ref))) {
         return h.reject('E_CANNOT_RETREAT'); // the landing force, not the orbital fleet
       }
+      // ASSAULT-1. Корабли сцепились на орбите, а десант этого флота дерётся внизу: уйти
+      // значило бы бросить войска на земле. Тот же отказ, что у самого десанта, — и та же
+      // причина; отступить можно, когда наземный бой кончится.
+      if (landingBattleOf(h.state, fleetId, battleId)) {
+        return h.reject('E_CANNOT_RETREAT');
+      }
 
       applyRetreatToll(fleet, h.ctx.data);
       fleet.battleId = null;
@@ -1033,7 +1069,7 @@ export const combatModule: GameModule = {
       // Отпускаем ВСЕ остальные стороны: на двух это прежний «противник», на N — каждый,
       // кто остался в распускаемом бою.
       for (const side of battle.sides) {
-        if (!isThisFleet(side.ref)) releaseOrDestroyFleet(h, side.ref);
+        if (!isThisFleet(side.ref)) releaseOrDestroyFleet(h, side.ref, battleId);
       }
       delete h.state.battles[battleId];
 
@@ -1117,13 +1153,7 @@ export const combatModule: GameModule = {
       for (const side of live) {
         // Враги — только ВРАЖДЕБНЫЕ живые стороны. Спрятаться за спину союзника нельзя
         // (ради этого выбор и сделан), но и бить союзника залп не имеет права.
-        const enemies = live.filter(
-          (other) =>
-            other !== side &&
-            side.owner !== null &&
-            other.owner !== null &&
-            isHostile(h, side.owner, other.owner),
-        );
+        const enemies = live.filter((other) => other !== side && sidesHostile(h, side.owner, other.owner));
         // Разбивка, а не только сумма (VET-1): те же числа, но видно, какой стек что
         // положил в залп — из этого VET-2 пишет заслугу ветерана.
         const shot = sideDamageBreakdown(

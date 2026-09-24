@@ -1019,7 +1019,10 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
     expect(later.state.fleets.B?.battleId).toBeNull();
   });
 
-  it('after a won ground assault the attacker chain-engages a relief fleet at the node', () => {
+  // ASSAULT-1 (плейтест 2026-09-24, «Рой прилетел и не вступил в бой с моим флотом»):
+  // подмога больше не ждёт конца штурма. Корабли штурмующего висят на орбите, и прилетевший
+  // враг бьётся с ними СРАЗУ; десант тем временем дерётся внизу.
+  it('a relief fleet arriving mid-assault engages the assault fleet at once; the landing fights on', () => {
     const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 3]]);
     a.orbit = 'near';
     const st = baseState(
@@ -1030,28 +1033,23 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
       [planet('P', 'p2', 0, 0, [['militia', 1]])],
     );
     const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
-    expect(started.state.fleets.A?.battleId).not.toBeNull();
-    // The relief fleet arrives mid-assault — it can't engage (A is battleId-locked).
+    const groundId = started.state.fleets.A?.battleId;
+    expect(started.state.battles[groundId!]?.phase).toBe('ground');
     const mid = structuredClone(started.state);
     mid.fleets.R!.location = 'P';
     const relief = okApply(kernel.applyAction(mid, arrive('R', 'p2'), ctx(0)));
-    expect(relief.state.fleets.R?.battleId ?? null).toBeNull();
-    // Ground battle resolves at its first tick (militia falls in one round, ~1h) →
-    // the attacker must chain-engage the relief fleet instead of coexisting with it
-    // at the node forever. С CMB-4 всё это происходит НА МЕСТЕ: наземный раунд бьёт в
-    // миг штурма, ополчение падает, захват совершается, и сцепка с подмогой начинается
-    // тут же — своим событием на том же мгновении (`advanceTo` берёт его следующей
-    // итерацией, не рекурсией). Смотрим туда же: захват сделан, сцепленный бой живой.
+    const orbital = Object.values(relief.state.battles).find((b) => b.phase === 'orbital');
+    expect(orbital).toBeDefined();
+    expect(relief.state.fleets.R?.battleId).toBe(orbital?.id);
+    expect(relief.state.fleets.A?.battleId).toBe(orbital?.id);
+    expect(relief.state.battles[groundId!]).toBeDefined(); // the ground battle goes on
+    // The militia falls to the landing in the first ground round; the orbital fight goes
+    // on — A stays in it, not released by the ground battle's end.
     const r = okAdvance(kernel.advanceTo(relief.state, ctx(0)));
     expect(r.state.planets.P?.owner).toBe('p1');
-    expect(types(r.events)).toEqual(
-      expect.arrayContaining(['planet.captured', 'battle.resolved', 'battle.started']),
-    );
-    const battles = Object.values(r.state.battles);
-    expect(battles).toHaveLength(1);
-    expect(battles[0]?.phase).toBe('orbital');
-    expect(r.state.fleets.A?.battleId).toBe(battles[0]?.id);
-    expect(r.state.fleets.R?.battleId).toBe(battles[0]?.id);
+    expect(r.state.battles[groundId!]).toBeUndefined();
+    expect(r.state.fleets.A?.battleId).toBe(orbital?.id);
+    expect(r.state.fleets.R?.battleId).toBe(orbital?.id);
   });
 
   it('a bombarding fleet pinned in a melee stops shelling until released', () => {
@@ -1319,6 +1317,135 @@ describe('combat — перемирие останавливает бой (CMB-7
     // Бой продолжается (или уже решён исходом) — но НЕ расцеплен перемирием.
     const resolved = on.events.find((e) => e.type === 'battle.resolved');
     expect((resolved?.payload as { end?: unknown })?.end).not.toBe('ceasefire');
+  });
+});
+
+
+/**
+ * ASSAULT-1 — штурм, плейтест 2026-09-24: «штурмую планету и ничего не происходит. Бой
+ * зависает. Так ещё и утаскивает туда флот. Рой прилетел и не вступил в бой с моим флотом».
+ *
+ * Две поломки. Первая: залп спрашивал стойку пары и ничейную сторону (`owner === null`)
+ * отбрасывал целиком, так что десант и гарнизон ничейного мира не стреляли друг в друга —
+ * бой стоял до предохранителя, а флот над миром был заперт. Вторая: флот, чей десант
+ * дерётся на земле, держал `battleId` наземного боя, и прилетевший враг его не видел.
+ */
+describe('combat — штурм: ничейный гарнизон и бой на орбите во время штурма (ASSAULT-1)', () => {
+  const kernel = createKernel([...combatFamily, arrivalModule]);
+  const HOLD = 'p2';
+
+  it('десант и НИЧЕЙНЫЙ гарнизон бьют друг друга с первого раунда', () => {
+    const a = fleet('A', 'p1', 'X', [['fighter', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    // guardian: 100 hp, отвечает `defense` 20 — десантник (20 hp) падает в первом раунде.
+    const st = baseState([a], [planet('X', null, 0, 0, [['guardian', 1]])]);
+    const stormed = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(stormed.state, ctx(0)));
+    const round = r.events.find((e) => e.type === 'combat.round');
+    const sides = (round?.payload as { sides: Array<{ owner: string | null; damage: number }> })
+      .sides;
+    expect(sides.find((x) => x.owner === 'p1')?.damage).toBeGreaterThan(0);
+    expect(sides.find((x) => x.owner === null)?.damage).toBeGreaterThan(0);
+    expect(types(r.events)).toContain('battle.resolved');
+    expect(r.state.battles).toEqual({});
+    expect(r.state.fleets.A?.battleId ?? null).toBeNull(); // флот свободен, не заперт
+  });
+
+  it('ничейный мир берётся штурмом, а не стоит до предохранителя', () => {
+    const a = fleet('A', 'p1', 'X', [['fighter', 1]], [['marine', 2]]);
+    a.orbit = 'near';
+    const st = baseState([a], [planet('X', null, 0, 0, [['militia', 3]])]);
+    const stormed = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    // militia: 10 hp, два десантника кладут по 20 за раунд — три раунда, не 240.
+    const r = okAdvance(kernel.advanceTo(stormed.state, ctx(3 * HOUR)));
+    expect(r.state.planets.X?.owner).toBe('p1');
+    expect(r.state.battles).toEqual({});
+  });
+
+  it('враг, прилетевший к миру посреди штурма, сразу бьётся с кораблями на орбите', () => {
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    // militia 5 при защите 0: наземный бой идёт пять раундов, десант не теряет никого.
+    const st = baseState(
+      [a, fleet('R', HOLD, 'Q', [['fighter', 1]])],
+      [planet('P', HOLD, 0, 0, [['militia', 5]])],
+    );
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const groundId = started.state.fleets.A!.battleId!;
+    const mid = structuredClone(started.state);
+    mid.fleets.R!.location = 'P';
+    const r = okApply(kernel.applyAction(mid, arrive('R', HOLD), ctx(0)));
+    const orbital = Object.values(r.state.battles).find((b) => b.phase === 'orbital');
+    expect(orbital?.sides.map((x) => x.ref)).toEqual([
+      { kind: 'fleet', fleetId: 'R' },
+      { kind: 'fleet', fleetId: 'A' },
+    ]);
+    expect(r.state.fleets.A?.battleId).toBe(orbital?.id);
+    const ground = r.state.battles[groundId];
+    expect(ground?.sides.some((x) => x.ref.kind === 'landing' && x.ref.fleetId === 'A')).toBe(true);
+  });
+
+  it('выигранный бой на орбите возвращает флот под замок наземного боя', () => {
+    // guardian отвечает 20 — истребитель подмоги (20 hp) падает в первом раунде.
+    const a = fleet('A', 'p1', 'P', [['guardian', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    const st = baseState(
+      [a, fleet('R', HOLD, 'Q', [['fighter', 1]])],
+      [planet('P', HOLD, 0, 0, [['militia', 5]])],
+    );
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const groundId = started.state.fleets.A!.battleId!;
+    const mid = structuredClone(started.state);
+    mid.fleets.R!.location = 'P';
+    const arrived = okApply(kernel.applyAction(mid, arrive('R', HOLD), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(arrived.state, ctx(0)));
+    expect(r.state.fleets.R).toBeUndefined();
+    expect(Object.keys(r.state.battles)).toEqual([groundId]);
+    // Под замком: улететь, бросив десант, нельзя.
+    expect(r.state.fleets.A?.battleId).toBe(groundId);
+    const done = okAdvance(kernel.advanceTo(r.state, ctx(6 * HOUR)));
+    expect(done.state.planets.P?.owner).toBe('p1');
+    expect(done.state.fleets.A?.battleId ?? null).toBeNull();
+  });
+
+  it('потеряв корабли на орбите, десант дерётся дальше и берёт мир', () => {
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    // aggressor бьёт 30 — единственный истребитель A (20 hp) гибнет в первом раунде.
+    const st = baseState(
+      [a, fleet('R', HOLD, 'Q', [['aggressor', 1]])],
+      [planet('P', HOLD, 0, 0, [['militia', 3]])],
+    );
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const groundId = started.state.fleets.A!.battleId!;
+    const mid = structuredClone(started.state);
+    mid.fleets.R!.location = 'P';
+    const arrived = okApply(kernel.applyAction(mid, arrive('R', HOLD), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(arrived.state, ctx(0)));
+    expect(r.state.fleets.A?.units.some((x) => x.count > 0) ?? false).toBe(false);
+    expect(r.state.fleets.A?.battleId).toBe(groundId); // флот жив: его войска на земле
+    const done = okAdvance(kernel.advanceTo(r.state, ctx(4 * HOUR)));
+    expect(done.state.planets.P?.owner).toBe('p1');
+    expect(done.state.planets.P?.garrison.some((x) => x.unit === 'marine')).toBe(true);
+    expect(done.state.fleets.A).toBeUndefined(); // кораблей нет — флот расформирован
+  });
+
+  it('с орбиты не уйти, пока десант дерётся внизу', () => {
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    const st = baseState(
+      [a, fleet('R', HOLD, 'Q', [['fighter', 1]])],
+      [planet('P', HOLD, 0, 0, [['militia', 5]])],
+    );
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const mid = structuredClone(started.state);
+    mid.fleets.R!.location = 'P';
+    const arrived = okApply(kernel.applyAction(mid, arrive('R', HOLD), ctx(0)));
+    expect(rej(kernel.applyAction(arrived.state, retreat('A'), ctx(0)))).toBe('E_CANNOT_RETREAT');
+    // Враг уйти может — и тогда флот A снова под замком наземного боя, а не свободен.
+    const fled = okApply(kernel.applyAction(arrived.state, retreat('R', HOLD), ctx(0)));
+    const groundId = started.state.fleets.A!.battleId!;
+    expect(fled.state.fleets.A?.battleId).toBe(groundId);
   });
 });
 

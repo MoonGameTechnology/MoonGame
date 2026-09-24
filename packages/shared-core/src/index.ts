@@ -141,7 +141,7 @@ export {
   journeyEtaMs,
 } from './state/route';
 export { isBombarded, bombardedPlanets, isActivelyBombarding } from './state/orbit';
-export { sidesOf, attackerOf, defenderOf } from './state/battle';
+export { sidesOf, attackerOf, defenderOf, shipsEngaged, landingBattleOf } from './state/battle';
 // MSB-2: правило деления залпа между врагами — одно на живой бой и на прогноз.
 export { volleyShare, splitVolley, type VolleyShare, type VolleyTarget } from './util/volley';
 export { fleetPositionAt, fleetNodeAt, legT } from './state/fleetPosition';

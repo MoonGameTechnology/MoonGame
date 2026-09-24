@@ -933,6 +933,7 @@
 | MSB-5 | ✅ | core | `docs/multiside-combat-roadmap.md` | Что делает бой при смене владельца стороны |
 | MSB-6 | ✅ | proto cli | `docs/multiside-combat-roadmap.md` | Панель боя на N сторон |
 | MSB-7 | ✅ | core | `docs/multiside-combat-roadmap.md` | Зенитки и обстрел при N сторонах |
+| MSB-8 | ✅ | core | `docs/multiside-combat-roadmap.md` | Штурм не стоит, подмога не ждёт |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (скриптовая соло-песочница) ★ |

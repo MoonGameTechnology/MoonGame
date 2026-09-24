@@ -819,6 +819,37 @@ describe('fleetOps — fleet.engage (deliberate attack on a co-located hostile f
     expect(errCode(kernel.applyAction(busy, engage('A', 'D'), ctx))).toBe('E_IN_BATTLE');
   });
 
+  // ASSAULT-1: у штурмующего корабли на орбите, а десант внизу. Наземный бой запирает
+  // флот, но по его кораблям стрелять можно — как и на автосцепке при прибытии.
+  it('a fleet whose landing fights on the ground can be attacked in orbit', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1'), player('p2')],
+      fleets: [
+        fleet('A', 'p1', 'X', [['cruiser', 2]]),
+        { ...fleet('D', 'p2', 'X', [['cruiser', 2]]), battleId: 'g1' },
+      ],
+      battles: {
+        g1: {
+          id: 'g1',
+          location: 'X',
+          phase: 'ground',
+          sides: [
+            { ref: { kind: 'landing', fleetId: 'D' }, owner: 'p2', role: 'attacker' },
+            { ref: { kind: 'garrison', planetId: 'X' }, owner: 'p1', role: 'defender' },
+          ],
+          round: 1,
+        },
+      },
+    });
+    const r = okApply(kernel.applyAction(s, engage('A', 'D'), ctx));
+    const orbital = r.state.fleets.A?.battleId;
+    expect(orbital).toBeTruthy();
+    expect(r.state.battles[orbital!]?.phase).toBe('orbital');
+    expect(r.state.fleets.D?.battleId).toBe(orbital);
+    expect(r.state.battles.g1).toBeDefined(); // десант дерётся дальше
+  });
+
   it('rejects engaging a ghost fleet (no live ships on either side)', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
