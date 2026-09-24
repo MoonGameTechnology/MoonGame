@@ -214,12 +214,19 @@ describe('SZE-1.1 — звёздность модуля усиливает ег�
   const starred: GameData = parseGameData({
     version: '0.1.0',
     resources: ['metal'],
-    units: { cruiser: { faction: 'x', stats: { attack: 10, defense: 0, speed: 1, hp: 10 }, slots: { weapon: 1 } } },
+    units: {
+      cruiser: {
+        faction: 'x',
+        stats: { attack: 10, defense: 0, speed: 1, hp: 10, cargoCapacity: 2 },
+        slots: { weapon: 1, utility: 1 },
+      },
+    },
     factions: {},
     buildings: {},
     events: {},
     modules: {
       targeting: { name: 'T', slot: 'weapon', tag: 'vertical', effects: { stats: { attack: 4 } }, cost: {} },
+      cargo: { name: 'C', slot: 'utility', tag: 'horizontal', effects: { stats: { cargoCapacity: 6 } }, cost: {} },
     },
     sectorZeroStars: {
       cap: 3,
@@ -250,6 +257,18 @@ describe('SZE-1.1 — звёздность модуля усиливает ег�
     expect(
       effectiveStats(hull, { modules: ['targeting'], moduleStars: { targeting: 3 } }, starred).attack,
     ).toBe(21);
+  });
+
+  it('трюм — целые места на ЛЮБОЙ звезде: округляется итог корпуса (владелец 2026-09-24)', () => {
+    // 2 + 6 × 1,25 = 9,5 → 10; ★2: 2 + 6 × 1,75 = 12,5 → 13; ★3: 2 + 6 × 2,75 = 18,5 → 19.
+    const hold = (star: number): number | undefined =>
+      effectiveStats(hull, { modules: ['cargo'], moduleStars: { cargo: star } }, starred).cargoCapacity;
+    expect([0, 1, 2, 3].map(hold)).toEqual([8, 10, 13, 19]);
+    for (const star of [0, 1, 2, 3]) expect(Number.isInteger(hold(star))).toBe(true);
+    // Урон — не места: он остаётся дробным, как был.
+    expect(
+      effectiveStats(hull, { modules: ['targeting'], moduleStars: { targeting: 1 } }, starred).attack,
+    ).toBe(15);
   });
 
   it('звёзды выше лестницы не растут дальше последней ступени', () => {

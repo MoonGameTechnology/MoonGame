@@ -310,7 +310,7 @@ describe('итог забега Sector Zero — по частям (PVR-5.4)', ()
 
   it('забег, победа и каждая задача — отдельными строками, сумма и открытое — внизу', () => {
     const html = runSummaryHtml(summary);
-    expect(html).toContain('Забег: волн 10 из 10');
+    expect(html).toContain('Экспедиция: волн 10 из 10');
     expect(html).toContain('+11'); // забег без победы: 1 + 10 волн
     expect(html).toContain('Победа');
     expect(html).toContain('✓ Сбор материалов');

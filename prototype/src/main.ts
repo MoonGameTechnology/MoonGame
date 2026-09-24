@@ -335,6 +335,7 @@ import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun, sovereignRepairCost,
+  REPAIR_HP_PER_SOVEREIGN, WARRANTS_PER_REWARD,
   type SectorZeroProgress, type SectorProgressAction,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
@@ -1467,11 +1468,25 @@ let lastSwarmDossierRefresh = -Infinity;
 let lastSwarmDossierContactKey = '';
 let swarmDossierScanUntil = 0;
 const SWARM_DOSSIER_REFRESH_MS = 500;
+/** Чем досье открыли — язычком или пунктом гамбургера: туда и вернуть фокус при закрытии. */
+let swarmDossierOpener: HTMLElement | null = null;
+function openSwarmDossier(opener: HTMLElement): void {
+  swarmDossierOpener = opener;
+  swarmDossierWin.classList.add('show');
+  renderSwarmDossier();
+  $('swarm-dossier-close').focus({ preventScroll: true });
+}
 function closeSwarmDossier(): void {
   if (swarmDossierPinned) return;
   swarmDossierWin.classList.remove('show');
-  document.querySelector<HTMLButtonElement>('[data-swarm-intel]')?.focus({ preventScroll: true });
+  swarmDossierOpener?.focus({ preventScroll: true });
 }
+// Входы в досье на телефоне (заказ владельца 2026-09-24): пункт гамбургера и язычок у
+// правого края. Кнопка в строке статуса снята — на телефоне её обрезало на «Досье Р…».
+const railDossier = $('rail-dossier');
+const swarmTab = $('swarm-tab');
+railDossier.addEventListener('click', () => openSwarmDossier(railDossier));
+swarmTab.addEventListener('click', () => openSwarmDossier(swarmTab));
 $('swarm-dossier-close').addEventListener('click', closeSwarmDossier);
 // Досье сворачивается до шапки со сводкой (заказ владельца 2026-09-23). Свёрнутость —
 // удобство ЗРИТЕЛЯ, а не состояние партии: хранится в localStorage и переживает перезагрузку;
@@ -1586,10 +1601,6 @@ devlineEl.addEventListener('click', (event) => {
   if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
   if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
   if ((event.target as Element).closest('[data-missions]')) { toggleMissionPanel(); return; }
-  if (!(event.target as Element).closest('[data-swarm-intel]')) return;
-  swarmDossierWin.classList.add('show');
-  renderSwarmDossier();
-  $('swarm-dossier-close').focus({ preventScroll: true });
 });
 
 const purse = $('purse');
@@ -14156,6 +14167,14 @@ const runWallet = initRunWallet({
     const ad = adSovereigns(sectorProgress, data, shopCapabilities(platform.capabilities));
     return ad.state === 'ready' ? { amount: ad.amount, left: ad.left } : null;
   },
+  // Числа описаний валют — из тех же правил, по которым профиль платит и списывает.
+  rules: () => ({
+    warrantsPerReward: WARRANTS_PER_REWARD,
+    repairHp: REPAIR_HP_PER_SOVEREIGN,
+    supplyPrice: data.sectorZeroShop.runSupply.price,
+    adAmount: data.sectorZeroShop.adSovereigns.amount,
+    adPerDay: data.sectorZeroShop.adSovereigns.perDay,
+  }),
   watchAd,
   apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),
   note,
@@ -14742,7 +14761,6 @@ function frame(nowReal: number) {
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
-    (s.pve && !swarmDossierPinned ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
     // Суверены — приманка (заказ владельца 2026-09-23): кнопка с «+», золотом и бликом.
     // Нажатие поведёт в магазин Суверенов; пока магазина нет — честная подсказка. В забеге
     // Sector Zero Суверены живут в шапке — настоящим балансом профиля (`runWallet.ts`).
@@ -14753,6 +14771,13 @@ function frame(nowReal: number) {
     devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;
   }
+  // Входы в досье Роя — пока оно не приколото справа (ПК держит его открытым всегда).
+  // Язычок прячется и под открытой панелью: ручка того, что уже выдвинуто, не нужна.
+  const dossierEntry = Boolean(s.pve) && !swarmDossierPinned;
+  const railDossierShown = dossierEntry ? '' : 'none';
+  if (railDossier.style.display !== railDossierShown) railDossier.style.display = railDossierShown;
+  const tabHidden = !dossierEntry || swarmDossierWin.classList.contains('show');
+  if (swarmTab.hidden !== tabHidden) swarmTab.hidden = tabHidden;
   // Top-bar row 1: nick + live standing («N-е из M» — the end-screen ranking formula
   // over the LIVE scores), the ✦ victory chip in the middle gap, and the day card
   // with a countdown to the next game day. Fixed nodes are patched by textContent

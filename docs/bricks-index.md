@@ -1102,6 +1102,7 @@
 | PVR-6.15 | ✅ | proto | `docs/sector-zero-roadmap.md` | Карта главы — красивее, крестик ровный |
 | PVR-6.16 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Пятый герой — Учёный, награда главы I |
 | PVR-6.17 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Дерево технологий забега — без дней, «Хранителя» и совета учёных |
+| PVR-6.18 | ✅ | proto | `docs/sector-zero-roadmap.md` | Экспедиция на телефоне — слово, полоса скорости, кошелёк, досье |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |
