@@ -24,6 +24,7 @@ import {
 } from './missionObjectives';
 import {
   canEquip,
+  hashState,
   moduleAllowed,
   starsOf,
   rarityOf,
@@ -820,8 +821,9 @@ export function settleSectorZeroRun(
   const reward = base + tasks.bonus;
   const warrants = reward * WARRANTS_PER_REWARD;
   const firstWin = !!won && !!chapter.id && !progress.chaptersWon.includes(chapter.id);
-  // Дубли и чертежи (SZE-5.3): бросок от сида профиля и номера попытки — повторный засчёт
-  // того же забега невозможен (проверка выше), перезагрузка итог не перекатывает.
+  // Дубли и чертежи (SZE-5.3): бросок от сида профиля, номера попытки и отпечатка итогового
+  // мира (AUD-26) — повторный засчёт того же забега невозможен (проверка выше), перезагрузка
+  // итог не перекатывает, а номер попытки удачу не выбирает.
   const loot = runLoot({
     seed: progress.seed,
     attempt,
@@ -829,6 +831,7 @@ export function settleSectorZeroRun(
     won: !!won,
     newTasks: Math.max(0, tasks.done.length - done.length),
     firstWinBlueprint: firstWin ? (chapter.blueprint ?? null) : null,
+    outcome: hashState(state),
   });
   return {
     ...progress,

@@ -114,6 +114,17 @@ export function chapterBlueprint(index: number): Rarity | null {
   return index === 0 ? 'unique' : index === 1 ? 'mythic' : 'legendary';
 }
 
+/**
+ * Добыча забега — чистый бросок от ключа.
+ *
+ * ⚠️ В ключе обязателен `outcome` — отпечаток итогового мира забега (AUD-26). Сид профиля
+ * лежит у игрока открытым текстом, хеш — в бандле, а номер попытки проматывается даром:
+ * «Новый забег → Заменить» бросает попытку незасчитанной. Ключ «сид + номер» позволял
+ * посчитать заранее, какой номер принесёт легендарный чертёж, и промотать до него. Итог
+ * мира до конца забега не знает никто, а после конца забег засчитывается ровно один раз
+ * (`settleSectorZeroRun`), поэтому перебрать броски нельзя ни так, ни перезагрузкой. Тот же
+ * класс, что закрыт поимёнными счётчиками у Мастерской (`SectorZeroProgress.forgeTries`).
+ */
 export function runLoot(input: {
   seed: string;
   attempt: number;
@@ -121,8 +132,10 @@ export function runLoot(input: {
   won: boolean;
   newTasks: number;
   firstWinBlueprint: Rarity | null;
+  /** Отпечаток итогового мира (`hashState`): один и тот же у живого мира и у его снимка. */
+  outcome: string;
 }): RunLoot {
-  const key = `${input.seed}\u0000${input.attempt}\u0000`;
+  const key = `${input.seed}\u0000${input.attempt}\u0000${input.outcome}\u0000`;
   const copies: Record<string, number> = {};
   const count =
     RUN_COPIES.run +
