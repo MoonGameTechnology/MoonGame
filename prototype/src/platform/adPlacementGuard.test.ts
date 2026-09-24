@@ -11,10 +11,11 @@
  *
  * Поэтому путь к ролику сужен до одной двери и проверяется по ней:
  * `platform.ads.showRewardedAd` зовёт только хост (`watchAd` в `main.ts`), сам хост
- * `watchAd` не зовёт, а отдаёт двум экранам. На экране подготовки её зовёт только помощник
+ * `watchAd` не зовёт, а отдаёт трём местам. На экране подготовки её зовёт только помощник
  * `viaAd`, а `viaAd` — только обработчик нажатия. На экране итогов забега — только
  * обработчик нажатия, и только ради удвоения (`run.double`, решение владельца 2026-09-24:
- * ×2 и в конце попытки).
+ * ×2 и в конце попытки). В кошельке шапки забега — только обработчик нажатия, и только
+ * ради Суверенов (`run.sovereigns`, решение владельца 2026-09-24).
  */
 import { describe, expect, it } from 'vitest';
 import { globSync, readFileSync } from 'node:fs';
@@ -29,6 +30,7 @@ const gameFiles = globSync('**/*.ts', { cwd: ROOT }).filter(
 );
 const PREP = read('sectorZeroPreparation.ts');
 const END = read('endScreen.ts');
+const WALLET = read('runWallet.ts');
 const MAIN = read('main.ts');
 
 /** Тело обработчика нажатия на панели подготовки — от подписки до возврата API экрана. */
@@ -45,6 +47,13 @@ const endClickHandler = (() => {
   return from >= 0 && to > from ? END.slice(from, to) : '';
 })();
 
+/** Обработчик нажатия на кошельке шапки — от подписки до возврата API кошелька. */
+const walletClickHandler = (() => {
+  const from = WALLET.indexOf("h.root.addEventListener('click'");
+  const to = WALLET.indexOf('\n  return { render };', from);
+  return from >= 0 && to > from ? WALLET.slice(from, to) : '';
+})();
+
 /** Вызовы `viaAd(` — без её собственного объявления. */
 const viaAdCalls = (src: string): number => (src.match(/(?<!const )\bviaAd\(/g) ?? []).length;
 
@@ -55,6 +64,7 @@ describe('YAG-3.2 — реклама показывается только по 
 
   it('обработчики нажатия найдены — иначе проверки ниже смотрели бы в пустоту', () => {
     expect(endClickHandler.length).toBeGreaterThan(300);
+    expect(walletClickHandler.length).toBeGreaterThan(300);
   });
 
   it('ролик площадки зовёт ровно одно место игры — хост `watchAd`', () => {
@@ -65,15 +75,15 @@ describe('YAG-3.2 — реклама показывается только по 
     expect(door).toContain('.showRewardedAd(');
   });
 
-  it('хост сам `watchAd` не зовёт — только отдаёт двум экранам', () => {
+  it('хост сам `watchAd` не зовёт — только отдаёт трём местам', () => {
     expect(MAIN.match(/\bwatchAd\(/g)).toEqual(['watchAd(']); // одно объявление
     expect(MAIN).toContain('async function watchAd(');
-    expect(MAIN.match(/^ +watchAd,$/gm)).toHaveLength(2);
+    expect(MAIN.match(/^ +watchAd,$/gm)).toHaveLength(3);
   });
 
-  it('`watchAd` зовут два экрана: подготовка — только из помощника `viaAd`', () => {
+  it('`watchAd` зовут три места: подготовка — только из помощника `viaAd`', () => {
     const callers = gameFiles.filter((f) => /\.watchAd\(/.test(read(f)));
-    expect(callers).toEqual(['endScreen.ts', 'sectorZeroPreparation.ts']);
+    expect(callers).toEqual(['endScreen.ts', 'runWallet.ts', 'sectorZeroPreparation.ts']);
     expect(PREP.match(/\bh\.watchAd\(/g)).toHaveLength(1);
     const helper = /const viaAd = \([\s\S]*?\n {2}\};/.exec(PREP)?.[0] ?? '';
     expect(helper).toContain('h.watchAd(');
@@ -84,13 +94,19 @@ describe('YAG-3.2 — реклама показывается только по 
     expect(endClickHandler).toContain(".watchAd('run.double')");
   });
 
+  it('кошелёк зовёт ролик один раз, из обработчика нажатия, и только ради Суверенов', () => {
+    expect(WALLET.match(/\.watchAd\(/g)).toHaveLength(1);
+    expect(walletClickHandler).toContain(".watchAd('run.sovereigns')");
+  });
+
   it('`viaAd` зовут ТОЛЬКО из обработчика нажатия — ни из отрисовки, ни из таймера', () => {
     expect(viaAdCalls(PREP)).toBeGreaterThan(0);
     expect(viaAdCalls(clickHandler)).toBe(viaAdCalls(PREP));
   });
 
-  it('каждое из четырёх мест подключено к своей кнопке ровно один раз', () => {
-    for (const placement of AD_PLACEMENTS) {
+  it('каждое место подготовки подключено к своей кнопке ровно один раз', () => {
+    // `run.sovereigns` живёт в кошельке шапки забега — его держит проверка кошелька выше.
+    for (const placement of AD_PLACEMENTS.filter((p) => p !== 'run.sovereigns')) {
       // Перенос строки после скобки — дело форматирования, а не смысла.
       const id = placement.replace('.', '\\.');
       const uses = clickHandler.match(new RegExp(`\\bviaAd\\(\\s*'${id}'`, 'g'))?.length ?? 0;
