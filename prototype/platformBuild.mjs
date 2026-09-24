@@ -14,9 +14,28 @@
  * и кириллицу в именах файлов и папок архива; сторож в `buildTarget.test.ts` проверяет это
  * на готовом артефакте, а не на обещании.
  */
+import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 
 const here = (rel) => fileURLToPath(new URL(rel, import.meta.url));
+
+/**
+ * `YAG-1.1d`: в архиве ОДИН язык на игрока, а не все сразу.
+ *
+ * Прототип импортирует `localization/runtime.ts`, который подключает тексты всех языков
+ * (так нужно однофайловым сборкам: их открывают с диска, без сервера). Для архива площадки
+ * этот импорт подменяется на `core.ts` — тот же рантайм без единого текста, — а нужный
+ * язык `bootstrap.ts` догружает файлом `assets/locale-<id>.json` (`platformLocaleFiles`).
+ * Сторож описи (`productCut.test.ts`) держит, что `ru.ts`/`en.ts` в `app.js` не попали.
+ */
+const oneLocale = {
+  name: 'one-locale',
+  setup(b) {
+    b.onResolve({ filter: /\/localization\/runtime(\.ts)?$/ }, () => ({
+      path: here('../localization/core.ts'),
+    }));
+  },
+};
 
 export const platformBuildOptions = {
   entryPoints: [here('./src/bootstrap.ts')],
@@ -38,4 +57,38 @@ export const platformBuildOptions = {
   // `YAG-1.1c`: в архиве площадки только Sector Zero. Код основной игры стоит за этим
   // флагом и выпадает из бандла (как это устроено — у объявления флага в `main.ts`).
   define: { __PLAYER_BUILD__: 'true', __SECTOR_ZERO_ONLY__: 'true' },
+  plugins: [oneLocale],
 };
+
+/** Путь файла языка в архиве — его же запрашивает `bootstrap.ts` (`localeAssetPath`). */
+export const localeAssetPath = (id) => `assets/locale-${id}.json`;
+
+/**
+ * Файлы языков для архива: по одному на язык, каждый — `bakedLocale(id)`, то есть язык
+ * поверх русского источника. Фолбэк запечён, поэтому игроку хватает ОДНОГО файла.
+ *
+ * Тексты лежат в TypeScript, а сборка — обычный Node-скрипт: модуль локалей сначала
+ * собирается esbuild'ом в ESM и уже потом импортируется. JSON, а не JS: это данные,
+ * их не исполняют, и кириллица в них остаётся UTF-8, а не `\uXXXX` (в бандле каждая
+ * русская буква весит 6 байт вместо двух).
+ */
+export async function platformLocaleFiles() {
+  const res = await build({
+    stdin: {
+      contents: "export { bakedLocale } from './bundles';\nexport { LOCALE_IDS } from './index';\n",
+      resolveDir: here('../localization'),
+      loader: 'ts',
+    },
+    bundle: true,
+    format: 'esm',
+    platform: 'neutral',
+    write: false,
+  });
+  const code = Buffer.from(res.outputFiles[0].text).toString('base64');
+  const { bakedLocale, LOCALE_IDS } = await import(`data:text/javascript;base64,${code}`);
+  return LOCALE_IDS.map((id) => ({
+    id,
+    path: localeAssetPath(id),
+    contents: JSON.stringify(bakedLocale(id)),
+  }));
+}

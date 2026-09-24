@@ -22,6 +22,7 @@ import { build, type Metafile } from 'esbuild';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { platformBuildOptions } from '../../platformBuild.mjs';
+import { LOCALE_IDS } from '../../../localization/index';
 
 /**
  * От модуля, чей код вырезан, в бандле может остаться ЗАГЛУШКА: `main.ts` грузится
@@ -56,15 +57,23 @@ const FORBIDDEN = {
 };
 /** Большие карты фронтира: Sector Zero играет только на картах глав. */
 const FRONTIER = ['data/frontier-50.json', 'data/frontier-100.json'];
+/** Тексты языков (`YAG-1.1d`): в архиве они едут отдельными файлами, по одному на язык.
+ *  Список — из `LOCALE_IDS`: новый язык попадает под сторожа сам. */
+const LOCALES = LOCALE_IDS.map((id) => `localization/${id}.ts`);
 
-/** Сколько байт каждый исходник внёс в `app.js` — ключ по пути от корня репозитория. */
-async function inventory(sectorZeroOnly: boolean): Promise<Map<string, number>> {
+/**
+ * Сколько байт каждый исходник внёс в `app.js` — ключ по пути от корня репозитория.
+ * `archive` — ровно настройки архива; «полная» сборка — те же настройки без обоих вырезов
+ * архива (флага продукта и подмены рантайма языков), то есть обычная игровая сборка.
+ */
+async function inventory(archiveCut: boolean): Promise<Map<string, number>> {
   const res = await build({
     ...platformBuildOptions,
     // Пути описи — от корня репозитория, откуда бы ни запустили тесты.
     absWorkingDir: fileURLToPath(new URL('../../../', import.meta.url)),
     metafile: true,
-    define: { ...platformBuildOptions.define, __SECTOR_ZERO_ONLY__: String(sectorZeroOnly) },
+    define: { ...platformBuildOptions.define, __SECTOR_ZERO_ONLY__: String(archiveCut) },
+    plugins: archiveCut ? platformBuildOptions.plugins : [],
   });
   const meta: Metafile = res.metafile!;
   const [, app] = Object.entries(meta.outputs).find(([file]) => file.endsWith('/app.js'))!;
@@ -82,7 +91,7 @@ describe('YAG-1.1c — в архиве площадки только Sector Zero
 
   it('каждый запрещённый модуль ЕСТЬ в полной сборке — иначе список устарел', () => {
     // Переименованный или удалённый экран иначе «проходил» бы проверку ниже вечно.
-    for (const file of [...Object.values(FORBIDDEN).flat(), ...FRONTIER]) {
+    for (const file of [...Object.values(FORBIDDEN).flat(), ...FRONTIER, ...LOCALES]) {
       expect([file, bytes(full, file) > STUB_BYTES]).toEqual([file, true]);
     }
   });
@@ -95,6 +104,10 @@ describe('YAG-1.1c — в архиве площадки только Sector Zero
 
   it('карт фронтира в архиве нет вовсе', () => {
     for (const file of FRONTIER) expect([file, bytes(archive, file)]).toEqual([file, 0]);
+  });
+
+  it('текстов языков в бандле нет вовсе — игрок скачивает файл только своего (YAG-1.1d)', () => {
+    for (const file of LOCALES) expect([file, bytes(archive, file)]).toEqual([file, 0]);
   });
 
   it('двери по ссылке закрыты флагом: ни сброса пароля, ни входа в партию', () => {
@@ -131,7 +144,9 @@ describe('YAG-1.1c — флаг объявлен каждому сборщику
 
   it('`build.mjs` собирает архив ТЕМИ ЖЕ настройками, что проверяет сторож', () => {
     const src = readFileSync(new URL('build.mjs', dir), 'utf8');
-    expect(src).toContain("import { platformBuildOptions } from './platformBuild.mjs';");
+    expect(src).toMatch(
+      /import \{[^}]*\bplatformBuildOptions\b[^}]*\} from '\.\/platformBuild\.mjs';/,
+    );
     expect(src).toContain('build(platformBuildOptions)');
   });
 });
