@@ -165,3 +165,41 @@ describe('instantRepair — fleet.instantRepair', () => {
     expect(errCode(kernel.applyAction(s, act('__proto__'), ctx))).toBe('E_NO_FLEET');
   });
 });
+
+describe('instantRepair — fleet.premiumRepair (оплата Суверенами вне матча)', () => {
+  const premium = (fleetId: string, playerId = 'p1'): Action => ({
+    ...act(fleetId, playerId),
+    type: 'fleet.premiumRepair',
+  });
+
+  it('чинит корпус и десант, не трогая ресурсы матча', () => {
+    // Суверены списывает хост со счёта ДО действия; кредиты матча — не цена этой кнопки.
+    const kernel = createKernel([instantRepairModule]);
+    const s = stateWith({
+      players: [player('p1', 0)],
+      fleets: [
+        fleet('f1', 'p1', [['cruiser', 2, 40]], { landing: [{ unit: 'militia', count: 2, hp: 5 }] }),
+      ],
+    });
+    const r = okApply(kernel.applyAction(s, premium('f1'), ctx));
+    expect(r.state.fleets.f1?.units[0]?.hp).toBeUndefined();
+    expect(r.state.fleets.f1?.landing?.[0]?.hp).toBeUndefined();
+    expect(r.state.players.p1?.resources.credits).toBe(0);
+  });
+
+  it('те же отказы: нечего чинить, чужой флот, в бою', () => {
+    const kernel = createKernel([instantRepairModule]);
+    const full = stateWith({ players: [player('p1')], fleets: [fleet('f1', 'p1', [['cruiser', 2]])] });
+    expect(errCode(kernel.applyAction(full, premium('f1'), ctx))).toBe('E_NOTHING_TO_REPAIR');
+    const foreign = stateWith({
+      players: [player('p1'), player('p2')],
+      fleets: [fleet('f2', 'p2', [['cruiser', 2, 40]])],
+    });
+    expect(errCode(kernel.applyAction(foreign, premium('f2', 'p1'), ctx))).toBe('E_NO_FLEET');
+    const busy = stateWith({
+      players: [player('p1')],
+      fleets: [{ ...fleet('f1', 'p1', [['cruiser', 2, 40]]), battleId: 'b1' }],
+    });
+    expect(errCode(kernel.applyAction(busy, premium('f1'), ctx))).toBe('E_IN_BATTLE');
+  });
+});

@@ -207,6 +207,9 @@ describe('SV-1.2 · action payload schemas', () => {
     expect(isValidActionPayload('arrive', { fleetId: 'f1', at: 'p1' })).toBe(false);
     expect(isValidActionPayload('fleet.arrival', { fleetId: 'f1' })).toBe(false);
     expect(isValidActionPayload('nonsense.type', {})).toBe(false);
+    // Ремонт за Суверены: валюта — на счёте, вне матча; действие выпускает ХОСТ после
+    // списания. Прими его гейт от клиента — корпус чинился бы бесплатно.
+    expect(isValidActionPayload('fleet.premiumRepair', { fleetId: 'f1' })).toBe(false);
   });
 
   // Серверные действия места (`seatClaim.ts`, правила 6–8). Схемы у них нет НАМЕРЕННО:

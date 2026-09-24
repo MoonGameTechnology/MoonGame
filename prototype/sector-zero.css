@@ -72,6 +72,15 @@
 .sz-chapter b { color: #e1f4f4; font-size: 14px; font-weight: 600; }
 .sz-chapter p { margin: 4px 0 0; color: #b0c7ce; font-size: 12px; line-height: 1.5; }
 .sz-chapter p:empty { display: none; }
+/* Задачи следующего забега с наградой (заказ владельца 2026-09-24) — мятные, как чип и
+   метки задач в забеге; награда — цветами валют. */
+.sz-chapter-tasks { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.sz-chapter-tasks[hidden] { display: none; }
+.sz-chapter-tasks li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; color: #c9f7e3; }
+.sz-chapter-tasks em { font-style: normal; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sz-chapter-tasks i { font-style: normal; }
+.sz-chapter-tasks .tw-data { color: var(--cur-data, #35d6e6); }
+.sz-chapter-tasks .tw-warrants { color: var(--cur-warrants, #b48cff); }
 #sz-chapter-stats { color: #8ccbcc; font-family: ui-monospace, monospace; }
 /* Герой-награда главы: силуэт «?» до первой победы, звезда — когда пришёл (решение владельца 2026-09-23). */
 .sz-chapter p.sz-chapter-hero { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #ffd27a; }
@@ -114,14 +123,19 @@
 .sz-map-body .home { fill: #90e2dd; filter: drop-shadow(0 0 6px #90e2dd); }
 .sz-map-body .dot { fill: #9fc6cc; }
 .sz-map-body .dot.side-hostile { fill: #ff6f63; }
-.sz-map-body .target { fill: none; stroke: #f2c14e; vector-effect: non-scaling-stroke; stroke-width: 1.6; stroke-dasharray: 3 3; }
+/* Цели задач главы: активная (следующий забег) — мятная, как метка в забеге; «позже» —
+   приглушённый пунктир. Мята, а не золото: золото занято Суверенами. */
+.sz-map-body .target { fill: none; stroke: #8ff5c8; vector-effect: non-scaling-stroke; stroke-width: 1.8; stroke-dasharray: 4 3; }
+.sz-map-body .target.later { stroke: rgba(143, 245, 200, 0.45); stroke-width: 1.2; stroke-dasharray: 2 3; }
+.sz-map-body .flag { fill: #8ff5c8; stroke: #04120e; vector-effect: non-scaling-stroke; stroke-width: 1; }
 .sz-map-lost { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: #b99ad8; font: 12px/1.6 ui-monospace, monospace; letter-spacing: .08em; background: repeating-linear-gradient(0deg, #ffffff05 0 2px, transparent 2px 4px); }
 .sz-map-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: #9fbcc4; font-size: 11px; }
 .sz-map-foot b { color: #e1f4f4; font-weight: 600; margin-right: auto; }
 .sz-map-foot .lg::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border: 1px solid; }
 .sz-map-foot .lg.you::before { background: #104048; border-color: #90e2dd; }
 .sz-map-foot .lg.hostile::before { background: #3a1418; border-color: #ff6f63; }
-.sz-map-foot .lg.target::before { border: 1px dashed #f2c14e; border-radius: 50%; }
+.sz-map-foot .lg.target::before { border: 1.5px dashed #8ff5c8; border-radius: 50%; }
+.sz-map-foot .lg.target-later::before { border: 1px dotted rgba(143, 245, 200, 0.55); border-radius: 50%; }
 .sz-map-foot .lg.fog::before { background: repeating-linear-gradient(35deg, #16303a 0 2px, #050d14 2px 5px); border-color: #1a2c35; }
 .sz-tools { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; }
 .sz-tools button { min-height: 44px; border: 0; padding: 8px 0; background: transparent; color: #b1cbd1; font-size: 13px !important; }
@@ -333,6 +347,23 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   #sz-title { font-size: 60px; }
   .sz-intro { margin: 16px 0 20px; }
 }
+
+/* Досье Роя в меню (заказ владельца 2026-09-24): известное — карточками с характеристиками,
+   неизвестное — «?»-силуэтом. Красный акцент Роя, как у его стороны на карте главы. */
+.sz-codex-body { display: grid; gap: 10px; max-height: min(70vh, 640px); overflow: auto; }
+.sz-codex-sum { margin: 0; color: #b0c7ce; font-size: 12px; }
+.sz-codex-sum b { color: #ff9a8f; }
+.sz-codex-body h4 { margin: 4px 0 0; color: #ff9a8f; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; }
+.sz-codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.sz-codex-card { display: grid; gap: 4px; padding: 10px; border: 1px solid #5a2a2e; border-radius: 9px; background: #1a0c10cc; }
+.sz-codex-card b { display: block; color: #ffd9d4; font-size: 13px; }
+.sz-codex-card b::first-letter { text-transform: uppercase; }
+.sz-codex-card p { margin: 0; color: #d6b8b4; font-size: 11px; line-height: 1.45; }
+.sz-codex-card small { color: #9fb6bc; font-size: 11px; }
+.sz-codex-card .stats { display: flex; flex-wrap: wrap; gap: 4px 10px; font-variant-numeric: tabular-nums; color: #ffb3aa; }
+.sz-codex-card.unknown { border-style: dashed; border-color: #3a2a2e; background: #0c0a0ecc; }
+.sz-codex-card.unknown b { color: #6f5a5e; font-size: 18px; }
+.sz-codex-empty { margin: 0; padding: 10px; border: 1px dashed #3a4a52; border-radius: 9px; color: #9fb6bc; font-size: 12px; }
 
 /* Комикс главы (prototype/src/comicPlayer.ts): панель за панелью. Панель вписывается в
    экран целиком (contain), подпись — текст локали под ней. Движение — наезд и проявление,

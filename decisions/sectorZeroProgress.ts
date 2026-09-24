@@ -5,6 +5,7 @@
 import { COMIC_ID } from './chapterComics';
 import { forgeOutcome } from './sectorZeroForge';
 import { dailyOffers } from './sectorZeroShop';
+import { emptySwarmCodex, learnSwarm, parseSwarmCodex, type SwarmCodex } from './swarmCodex';
 import {
   addLoot,
   moduleLadder,
@@ -133,6 +134,9 @@ export interface SectorZeroProgress {
   loadouts: Record<string, string[]>;
   heroes: Record<string, SectorHero>;
   selectedHero: string;
+  /** Что игрок знает о Рое за все забеги (`swarmCodex.ts`, досье в меню — заказ владельца
+   *  2026-09-24). Пополняется на закрытии забега, только растёт. */
+  swarmCodex: SwarmCodex;
 }
 /** Глава забега: id карты, её запас задач и правило показа (PVR-5.3). */
 export interface SectorChapter {
@@ -185,6 +189,17 @@ export function forgeLadderOf(data: GameData): RarityLadder {
  *  стоит 20, полная лестница одного модуля — 695. Числа калибруются телеметрией. */
 export const WARRANTS_PER_REWARD = 5;
 
+/** Сколько корпуса чинит один Суверен (заказ владельца 2026-09-24: платный ремонт в
+ *  забеге — за донат-валюту). Корпуса забега — десятки HP: флот из десятка фрегатов
+ *  (300 HP) встаёт в 12 Суверенов, дешевле любого лота витрины (15–80). */
+export const REPAIR_HP_PER_SOVEREIGN = 25;
+
+/** Цена ремонта в Суверенах: 0 — чинить нечего, иначе не меньше одного. */
+export function sovereignRepairCost(missingHull: number): number {
+  if (!(missingHull > 0) || !Number.isFinite(missingHull)) return 0;
+  return Math.max(1, Math.ceil(missingHull / REPAIR_HP_PER_SOVEREIGN));
+}
+
 export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroProgress {
   const first = data.heroes.commander ? 'commander' : (Object.keys(data.heroes)[0] ?? '');
   return {
@@ -216,6 +231,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     loadouts: {},
     heroes: first ? { [first]: newSectorHero(first, data) } : {},
     selectedHero: first,
+    swarmCodex: emptySwarmCodex(),
   };
 }
 
@@ -347,6 +363,9 @@ export type SectorProgressAction =
   | { kind: 'refresh-shop' }
   | { kind: 'ad-sovereigns' }
   | { kind: 'double-reward' }
+  /** Ремонт флота в забеге: списать цену за `hull` недостающего корпуса. Сам ремонт
+   *  делает ядро (`fleet.premiumRepair`) — хост зовёт его, только если списание прошло. */
+  | { kind: 'premium-repair'; hull: number }
   | { kind: 'forge'; id: string }
   | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
@@ -430,6 +449,12 @@ export function changeSectorZeroProgress(
       next.warrants += next.lastReward * WARRANTS_PER_REWARD;
       next.doubledThrough = next.settledThrough;
       break;
+    case 'premium-repair': {
+      const price = sovereignRepairCost(action.hull);
+      if (price <= 0 || next.sovereigns < price) return null;
+      next.sovereigns -= price;
+      break;
+    }
     case 'ad-sovereigns': {
       // Порция и лимит — в данных (§0.6б: числа — предмет плейтеста). Ноль в любом из
       // двух выключает кран. Как и у обновления витрины, платой служит просмотр,
@@ -735,6 +760,7 @@ export function parseSectorZeroProgress(
       fresh.heroes[id] = hero;
     }
     if (p.selectedHero && fresh.heroes[p.selectedHero]) fresh.selectedHero = p.selectedHero;
+    fresh.swarmCodex = parseSwarmCodex(p.swarmCodex, data);
     return fresh;
   } catch {
     return fresh;
@@ -750,6 +776,9 @@ export function settleSectorZeroRun(
   /** Глава забега: её запас задач (решение владельца 2026-09-22) и правило показа
    *  (PVR-5.3). Без запаса забег платит ровно как раньше: задачи ДОПОЛНИТЕЛЬНЫЕ. */
   chapter: SectorChapter = NO_CHAPTER,
+  /** Каталог игры — с ним закрытие забега пополняет досье Роя (`learnSwarm`). Без него
+   *  досье не трогается: выплата от него не зависит. */
+  data?: GameData,
 ): SectorZeroProgress {
   if (
     !Number.isSafeInteger(attempt) ||
@@ -806,6 +835,7 @@ export function settleSectorZeroRun(
         ? { ...progress.objectivesDone, [chapter.id]: tasks.done }
         : progress.objectivesDone,
     chaptersWon: firstWin ? [...progress.chaptersWon, chapter.id] : progress.chaptersWon,
+    swarmCodex: data ? learnSwarm(progress.swarmCodex, state, 'p1', data) : progress.swarmCodex,
     chapterScouted: chapter.id
       ? {
           ...progress.chapterScouted,

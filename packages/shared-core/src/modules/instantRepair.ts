@@ -13,7 +13,7 @@ import { ownFleet } from '../util/combat';
 
 export const instantRepairModule: GameModule = {
   id: 'instant-repair',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.onAction('fleet.instantRepair', (action, h) => {
       const p = action.payload as { fleetId?: unknown };
@@ -31,6 +31,23 @@ export const instantRepairModule: GameModule = {
       payCost(player.resources, { credits });
       for (const stack of [...f.units, ...(f.landing ?? [])]) delete stack.hp;
       h.emit('fleet.instantRepaired', { fleetId: f.id, owner: f.owner, credits, hull });
+    });
+
+    // The same repair paid in the ACCOUNT's premium currency (Суверены), which lives
+    // outside the match: the host charges the account first, then issues this action.
+    // It is host-only by construction — `actionPayloadSchemas` has no entry for it, so
+    // the action-layer gate never accepts it from a client (the `seat.confirm` lock).
+    // Same checks as the credits path; no in-match resource is touched.
+    api.onAction('fleet.premiumRepair', (action, h) => {
+      const p = action.payload as { fleetId?: unknown };
+      if (typeof p?.fleetId !== 'string') return h.reject('E_BAD_PAYLOAD');
+      const f = ownFleet(h.state, p.fleetId);
+      if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
+      if (f.battleId) return h.reject('E_IN_BATTLE');
+      const hull = missingHull(f, h.ctx.data);
+      if (hull <= 0) return h.reject('E_NOTHING_TO_REPAIR');
+      for (const stack of [...f.units, ...(f.landing ?? [])]) delete stack.hp;
+      h.emit('fleet.instantRepaired', { fleetId: f.id, owner: f.owner, credits: 0, hull });
     });
   },
 };

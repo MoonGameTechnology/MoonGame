@@ -19,6 +19,7 @@ import {
   forceMarchFleet,
   installHeroModule,
   instantRepairFleet,
+  premiumRepairFleet,
   launchFleet,
   loadArmy,
   loadShuttle,
@@ -156,6 +157,15 @@ describe('строители приказов против схем гейта',
     // него однажды появится, этот тест упадёт — и это правильный повод остановиться.
     expect(CLIENT_ACTION_TYPES).not.toContain('chain.stamp');
     expect(isValidActionPayload('chain.stamp', chainStamp(P, 'f1', []).payload)).toBe(false);
+  });
+
+  it('`fleet.premiumRepair` гейтом НЕ признан — Суверены списывает хост, не клиент', () => {
+    // Валюта живёт на счёте, вне матча. Прими гейт этот тип от клиента — корпус чинился
+    // бы бесплатно: списание осталось бы на стороне, которую сервер не видит.
+    expect(CLIENT_ACTION_TYPES).not.toContain('fleet.premiumRepair');
+    expect(isValidActionPayload('fleet.premiumRepair', premiumRepairFleet(P, 'f1').payload)).toBe(
+      false,
+    );
   });
 
   it('три приказа каталога не строит НИКТО — у игрока нет способа их отдать', () => {

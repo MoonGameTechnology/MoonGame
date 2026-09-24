@@ -26,8 +26,16 @@ export interface ChapterMapCell {
   /** Только у опознанной: вид сектора и сторона. У неопознанной — `null`. */
   kind: string | null;
   side: ChapterCellSide | null;
-  /** Опознанная провинция — цель задачи главы «взять». */
-  objective: boolean;
+  /** Цель задачи главы (заказ владельца 2026-09-24: «на карте главы рисовать доступные и
+   *  активные задания»): `active` — задача следующего забега, `later` — откроется позже
+   *  из запаса главы, `null` — не цель или задача уже выполнена. */
+  objective: 'active' | 'later' | null;
+}
+
+/** Провинции-цели задач главы: активные (видны в следующем забеге) и те, что позже. */
+export interface ChapterTargets {
+  active: readonly string[];
+  later: readonly string[];
 }
 
 export interface ChapterMapView {
@@ -41,14 +49,48 @@ export interface ChapterMapView {
 }
 
 /**
+ * Цели задач главы на её карте. `control` называет провинции — метятся всегда: задача сама
+ * говорит, куда идти, и клетка на карте есть и в тумане (без вида и хозяина). `raze`
+ * метит провинции со стоящей постройкой названного вида — только ОПОЗНАННЫЕ: иначе метка
+ * выдала бы разведку, которой не было. У `build`, `scout` и `wave` одной точки нет.
+ * Выполненные задачи в `pool` уже не входят — закрытое не зовёт на карту.
+ */
+export function chapterTargets(
+  state: GameState,
+  pool: ReadonlyArray<{ id: string; kind: string; targets?: readonly string[] }>,
+  active: ReadonlySet<string>,
+  known: ReadonlySet<string>,
+): ChapterTargets {
+  const where = (o: (typeof pool)[number]): string[] => {
+    if (o.kind === 'control') return (o.targets ?? []).filter((id) => state.planets[id]);
+    if (o.kind === 'raze') {
+      const kinds = new Set(o.targets ?? []);
+      return Object.values(state.planets)
+        .filter((p) => known.has(p.id) && p.buildings.some((b) => kinds.has(b.type) && b.hp > 0))
+        .map((p) => p.id)
+        .sort();
+    }
+    return [];
+  };
+  const now = pool.filter((o) => active.has(o.id)).flatMap(where);
+  const nowSet = new Set(now);
+  return {
+    active: [...new Set(now)],
+    later: [...new Set(pool.filter((o) => !active.has(o.id)).flatMap(where))].filter(
+      (id) => !nowSet.has(id),
+    ),
+  };
+}
+
+/**
  * Модель панели. `state` — стартовое состояние главы (`pveState`), `scouted` — память
- * тумана из профиля, `targets` — провинции-цели задач главы.
+ * тумана из профиля, `targets` — провинции-цели задач главы (`chapterTargets`).
  */
 export function chapterMapView(
   state: GameState,
   scouted: readonly string[],
   player = 'p1',
-  targets: readonly string[] = [],
+  targets: ChapterTargets = { active: [], later: [] },
 ): ChapterMapView {
   const planets = Object.values(state.planets).sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
@@ -84,7 +126,11 @@ export function chapterMapView(
       known,
       kind: known ? (p.kind ?? 'planet') : null,
       side: !known ? null : p.owner === player ? 'you' : p.owner ? 'hostile' : 'neutral',
-      objective: known && targets.includes(p.id),
+      objective: targets.active.includes(p.id)
+        ? 'active'
+        : targets.later.includes(p.id)
+          ? 'later'
+          : null,
     };
   });
   const lanes: ChapterMapView['lanes'] = [];

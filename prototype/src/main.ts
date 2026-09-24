@@ -87,6 +87,7 @@ import {
   forceMarchFleet,
   FORCED_MARCH_MULT,
   instantRepairFleet,
+  premiumRepairFleet,
   instantRepairCost,
   repairFleet,
   dockRepairCost,
@@ -174,6 +175,7 @@ import {
   type StrikeBase,
   type PausedConstructionSite,
   type QueuedConstruction,
+  missingHull,
 } from '../../packages/shared-core/src/index';
 import {
   MultiplayerClient,
@@ -256,10 +258,14 @@ import { isSealedBorder, type SealSide } from '../../decisions/sealedBorder';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
-import { missionProgress, objectiveNominal, shownObjectives } from '../../decisions/missionObjectives';
-import { chapterMapView } from '../../decisions/chapterMap';
+import { shownObjectives } from '../../decisions/missionObjectives';
+import { missionBriefs, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
+import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
+import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
 import {
+  adoptMark,
+  bumpMark,
   keepLocalMark,
   parseCloudProfile,
   parseSyncMark,
@@ -319,7 +325,7 @@ import {
 import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
-  changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun,
+  changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun, sovereignRepairCost,
   type SectorZeroProgress, type SectorProgressAction,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
@@ -1571,6 +1577,7 @@ devlineEl.addEventListener('click', (event) => {
   }
   if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
   if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
+  if ((event.target as Element).closest('[data-missions]')) { toggleMissionPanel(); return; }
   if (!(event.target as Element).closest('[data-swarm-intel]')) return;
   swarmDossierWin.classList.add('show');
   renderSwarmDossier();
@@ -6013,6 +6020,7 @@ function render(now: number) {
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
+  drawMissionTargets();
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
@@ -6470,6 +6478,9 @@ function fleetPanelHtml(f: Fleet): string {
   // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
   const repairCost = instantRepairCost(f, data);
   const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
+  // В забеге Sector Zero платный ремонт — за Суверены со счёта профиля (заказ владельца
+  // 2026-09-24), в остальной игре — за кредиты матча, как было.
+  const premiumCost = isSectorZeroRun() ? sovereignRepairCost(missingHull(f, data)) : 0;
   // FORT-5.8: док открыт своему И СОЮЗНОМУ флоту. Союзность кнопка резолвит стойкой —
   // capability `diplomacy` живёт в ядре и требует `HandlerContext`, которого у рендера
   // нет; база самой capability — та же стойка, поэтому ответы сходятся. Правило «что
@@ -6484,9 +6495,11 @@ function fleetPanelHtml(f: Fleet): string {
         ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
         : ''
     }${
-      repairable
-        ? `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
-        : ''
+      !repairable
+        ? ''
+        : premiumCost > 0
+          ? `<button class="chip-sov" data-act="premiumrepair" data-arg="${f.id}" title="${t('side.fleet.repair.premium.title')}">🔧 <i>${SOV_SVG}</i><b>${premiumCost}</b></button>`
+          : `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
     }</div>`;
     if (sm.shield.max > 0)
       h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
@@ -8752,6 +8765,18 @@ side.addEventListener('click', (ev) => {
     // Платный мгновенный ремонт: цена и отказы — на сервере; панель перерисуется
     // по факту (полный бар = получилось), нотификаций-обещаний не даём.
     playerOrder(instantRepairFleet(ME, arg || selFleet!));
+  } else if (act === 'premiumrepair') {
+    // Ремонт за Суверены: сначала ядро чинит, потом профиль платит — отвергнутый ремонт
+    // (бой начался между кадром и нажатием) не должен стоить игроку валюты.
+    const f = s.fleets[arg || selFleet!];
+    if (!f || !isSectorZeroRun()) return;
+    const hull = missingHull(f, data);
+    const paid = changeSectorZeroProgress(sectorProgress, { kind: 'premium-repair', hull }, data);
+    if (!paid) {
+      toast(t('side.fleet.repair.premium.short', { n: sovereignRepairCost(hull) }));
+      return;
+    }
+    if (playerOrder(premiumRepairFleet(ME, f.id))) saveSectorProgress(paid);
   } else if (act === 'dockrepair') {
     // ECON-3а: экспресс-ремонт за metal — кнопка видна только у своего дока.
     playerOrder(repairFleet(ME, arg || selFleet!));
@@ -13570,6 +13595,122 @@ function chapterShown(mission: number) {
   return shownObjectives(chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? [], chapter.slots);
 }
 
+/** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
+function runMissionRows(): MissionRow[] {
+  const chapter = pveChapter(sectorMission);
+  return missionRows(chapterShown(sectorMission), s, ME, chapter.slots?.base);
+}
+/** Награда задачи обеими валютами — теми же знаками, что в кошельке шапки. */
+const missionRewardHtml = (r: MissionReward): string =>
+  `<span class="mp-reward"><i class="tw-data">◇ +${r.research}</i><i class="tw-warrants">⌖ +${r.warrants}</i></span>`;
+
+// --- панель задач забега (заказ владельца 2026-09-24) ---------------------------------
+// Что сделать, сколько сделано, сколько придёт на итогах; задача с целью на карте — кнопка:
+// нажатие ведёт камеру к цели, повторное — к следующей.
+let missionPanelOpen = false;
+let lastMissionPanelHtml = '';
+const missionFocus = new Map<string, number>();
+const missionPanel = $('missionpanel');
+function toggleMissionPanel(open = !missionPanelOpen): void {
+  missionPanelOpen = open;
+  missionPanel.hidden = !open;
+  lastClockText = '';
+  lastMissionPanelHtml = '';
+  // На широком экране панель встаёт прямо под чипом: справа её место занято досье Роя.
+  // Узкий экран — во всю ширину (CSS), позицию не трогаем.
+  const chip = document.querySelector('#devline .dl-missions');
+  if (open && chip && window.innerWidth > 700) {
+    const r = chip.getBoundingClientRect();
+    const width = Math.min(360, window.innerWidth - 24);
+    missionPanel.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - width - 12))}px`;
+    missionPanel.style.right = 'auto';
+    missionPanel.style.top = `${r.bottom + 8}px`;
+  }
+}
+function renderMissionPanel(rows: MissionRow[]): void {
+  if (!missionPanelOpen) return;
+  if (rows.length === 0) {
+    toggleMissionPanel(false);
+    return;
+  }
+  const html =
+    `<div class="mp-head"><b>${t('hud.missions.title')}</b><button type="button" class="mp-close" data-missions-close="1" aria-label="${t('hud.close')}">✕</button></div>` +
+    `<p class="mp-hint">${t('hud.missions.hint')}</p>` +
+    rows
+      .map(r => {
+        const body =
+          `<i class="mp-mark" aria-hidden="true">${r.complete ? '✓' : '⚑'}</i>` +
+          `<span class="mp-name">${esc(t(r.id, { n: r.total }))}</span>` +
+          `<b class="mp-prog">${r.done}/${r.total}</b>` +
+          missionRewardHtml(r.reward) +
+          (r.targets.length ? `<span class="mp-go">${t('hud.missions.show')}</span>` : '');
+        return r.targets.length
+          ? `<button type="button" class="mp-row" data-mission-go="${esc(r.id)}">${body}</button>`
+          : `<div class="mp-row${r.complete ? ' done' : ''}">${body}</div>`;
+      })
+      .join('');
+  if (html === lastMissionPanelHtml) return;
+  lastMissionPanelHtml = html;
+  missionPanel.innerHTML = html;
+}
+missionPanel.addEventListener('click', event => {
+  const el = event.target as Element;
+  if (el.closest('[data-missions-close]')) {
+    toggleMissionPanel(false);
+    return;
+  }
+  const go = el.closest<HTMLElement>('[data-mission-go]')?.dataset.missionGo;
+  if (!go) return;
+  const row = runMissionRows().find(r => r.id === go);
+  if (!row || row.targets.length === 0) return;
+  const i = (missionFocus.get(go) ?? -1) + 1;
+  missionFocus.set(go, i);
+  // Панель закрывается: иначе она сама закрыла бы цель, к которой ведёт камера.
+  toggleMissionPanel(false);
+  jumpTo(row.targets[i % row.targets.length]!, 'goto');
+});
+
+/** Метки целей задач на карте: дышащее мятное кольцо и флажок над миром. Выполненная
+ *  задача меток не держит (`missionView.ts`, правило 3). */
+function drawMissionTargets(): void {
+  if (!sectorRunActive) return;
+  const ids = new Set(runMissionRows().flatMap(r => r.targets));
+  if (ids.size === 0) return;
+  // `hologramTime` — визуальные часы карты: стоят на паузе и при отключённой анимации.
+  const breath = 0.5 + 0.5 * Math.sin(hologramTime / 520);
+  cx.save();
+  for (const id of ids) {
+    const p = s.planets[id];
+    if (!p) continue;
+    const c = world(p.position);
+    if (!visible(c, 40)) continue;
+    cx.strokeStyle = `rgba(143,245,200,${0.55 + 0.35 * breath})`;
+    cx.lineWidth = 1.8;
+    cx.setLineDash([6, 5]);
+    cx.shadowColor = '#8ff5c8';
+    cx.shadowBlur = fxBlur(6 + 6 * breath);
+    cx.beginPath();
+    cx.arc(c.x, c.y, 24, 0, TAU);
+    cx.stroke();
+    cx.setLineDash([]);
+    // флажок над миром: древко и полотнище
+    const x = c.x + 17;
+    const y = c.y - 34;
+    cx.strokeStyle = 'rgba(4,10,12,.9)';
+    cx.fillStyle = '#8ff5c8';
+    cx.lineWidth = 1.4;
+    cx.beginPath();
+    cx.moveTo(x, y + 20);
+    cx.lineTo(x, y);
+    cx.lineTo(x + 15, y + 5);
+    cx.lineTo(x, y + 10);
+    cx.closePath();
+    cx.fill();
+    cx.stroke();
+  }
+  cx.restore();
+}
+
 function saveSectorProgress(next: SectorZeroProgress): void {
   // Победа в главе приводит её героя (решение владельца 2026-09-23) — на любом пути засчёта.
   const granted = grantChapterHeroes(next, sectorChapterIds(), data);
@@ -13592,6 +13733,15 @@ const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
  *  того, чего мы не видели, нельзя, а держать меню дольше незачем. */
 const CLOUD_LOAD_TIMEOUT_MS = 4000;
 let syncMark = parseSyncMark(readRaw(CLOUD_MARK_KEY));
+// Имя устройства для родословной профиля (`cloudSync.ts`): случайное, выдаётся один раз и
+// живёт в отметке. Решения случайности не держат — её даёт хост.
+if (!syncMark.device)
+  syncMark = {
+    ...syncMark,
+    device:
+      globalThis.crypto?.randomUUID?.() ??
+      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  };
 /** `off` — облака нет; `guest` — облако у площадки есть, а игрок не вошёл (кнопка «Войти»);
  *  `on` — сверено, пишем; `held` — прогресс разошёлся с облачным, и до выбора игрока
  *  облако не трогаем (экран выбора в меню, `YAG-1.4`). */
@@ -13608,7 +13758,7 @@ function writeSyncMark(): void {
 }
 /** Профиль или дескриптор забега изменился — новая правка, и облако её получит. */
 function bumpCloudRev(): void {
-  syncMark = { ...syncMark, rev: syncMark.rev + 1 };
+  syncMark = bumpMark(syncMark);
   writeSyncMark();
   pushCloud();
 }
@@ -13626,6 +13776,7 @@ function pushCloud(flush = false): void {
       rev: syncMark.rev,
       progress: JSON.stringify(sectorProgress),
       ...(run ? { run } : {}),
+      ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
     });
     if (envelope === (flush ? lastCloudFlushed : lastCloudEnvelope)) return;
     lastCloudEnvelope = envelope;
@@ -13659,6 +13810,7 @@ async function syncCloud(): Promise<void> {
       rev: syncMark.rev,
       syncedRev: syncMark.syncedRev,
       hasProgress: profileHasProgress(sectorProgress),
+      ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
     },
     cloud,
     cloudProgress ? profileHasProgress(cloudProgress) : false,
@@ -13692,7 +13844,7 @@ async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress
   else await portableRunStore.clear();
   savedRun = null;
   savedPortable = null;
-  syncMark = { rev: cloud.rev, syncedRev: cloud.rev };
+  syncMark = adoptMark(syncMark, cloud);
   writeSyncMark();
   cloudFork = null;
   cloudState = 'on';
@@ -13726,7 +13878,7 @@ const sectorZeroAccount: SectorZeroAccount = {
     }
     // «Оставить этот»: облако получит локальный профиль с номером ВПЕРЕДИ облачного
     // (`keepLocalMark` — почему именно так).
-    syncMark = keepLocalMark(syncMark, fork.cloud.rev);
+    syncMark = keepLocalMark(syncMark, fork.cloud);
     writeSyncMark();
     cloudFork = null;
     cloudState = 'on';
@@ -13825,6 +13977,7 @@ const sectorZeroMenu = initSectorZeroMenu({
         savedRun.sectorZeroAttempt ?? 0,
         savedRun.state as GameState,
         chapterForSettle(savedRun.sectorZeroMission ?? sectorMission),
+        data,
       );
       if (next !== sectorProgress) saveSectorProgress(next);
       await progressWrite;
@@ -13854,16 +14007,60 @@ const sectorZeroMenu = initSectorZeroMenu({
     pool: pveChapter(index).objectives.length,
     cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
     ...heroReward(index),
+    briefs: missionBriefs(chapterShown(index), pveChapter(index).slots?.base),
   }),
   // Карта главы: мир на старте главы + память тумана прошлых забегов из профиля.
   chapterMap: index => {
     const chapter = pveChapter(index);
+    const start = pveState(data, index);
+    const scouted = sectorProgress.chapterScouted[chapter.id] ?? [];
+    // Цели задач: активные — видимые в следующем забеге, «позже» — остаток запаса главы;
+    // выполненные закрыты навсегда и на карту не зовут (`chapterTargets`).
+    const done = new Set(sectorProgress.objectivesDone[chapter.id] ?? []);
+    const known = new Set([...scouted, ...Object.values(start.planets).filter(p => p.owner === 'p1').map(p => p.id)]);
     return chapterMapView(
-      pveState(data, index),
-      sectorProgress.chapterScouted[chapter.id] ?? [],
+      start,
+      scouted,
       'p1',
-      chapter.objectives.flatMap(o => (o.kind === 'control' ? o.targets : [])),
+      chapterTargets(
+        start,
+        chapter.objectives.filter(o => !done.has(o.id)),
+        new Set(chapterShown(index).map(o => o.id)),
+        known,
+      ),
     );
+  },
+  // Досье Роя (заказ владельца 2026-09-24): память профиля против каталога игры.
+  swarmCodex: () => {
+    const view = swarmCodexView(
+      sectorProgress.swarmCodex,
+      swarmCatalog(data, sectorChapterIds().map((_, i) => pveState(data, i))),
+      data,
+    );
+    return {
+      known: view.known,
+      total: view.total,
+      units: view.units.map(u => {
+        const def = data.units[u.id]!;
+        return {
+          name: displayUnit(u.id),
+          known: u.known,
+          max: u.max,
+          runs: u.runs,
+          stats: {
+            attack: def.stats.attack ?? 0,
+            defense: def.stats.defense ?? 0,
+            hp: def.stats.hp ?? 0,
+            speed: def.stats.speed ?? 0,
+          },
+        };
+      }),
+      modules: view.modules.map(m => {
+        const def = data.modules[m.id]!;
+        return { name: tData(def.name), desc: def.description ? t(def.description) : '', known: m.known, evidence: m.evidence, n: m.n };
+      }),
+      buildings: view.buildings.map(b => ({ name: tData(data.buildings[b.id]?.name ?? b.id), known: b.known })),
+    };
   },
   setMission: value => {
     nextSectorMission = value;
@@ -13996,7 +14193,7 @@ function awardSectorRun(): number {
   if (sectorDevActive) return 0;
   // Задачи главы платят и здесь, в обычном конце забега (раньше их платил только засчёт
   // после перезагрузки — PVR-5.3 нашёл это при переходе на запас задач).
-  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission));
+  const next = settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission), data);
   if (next !== sectorProgress) {
     // Journal the terminal run before its award. If the page closes between the
     // two writes, opening the menu settles the same serial exactly once.
@@ -14257,16 +14454,15 @@ function frame(nowReal: number) {
   // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
   // события: тот же `missionProgress`, что платит в конце, отвечает и здесь, каждый кадр.
   // Видимы только задачи ЭТОГО забега — запас главы минус закрытое навсегда (PVR-5.3).
-  const missions = sectorRunActive ? missionProgress(chapterShown(sectorMission), s, ME) : [];
+  // Чип — кнопка панели задач (заказ владельца 2026-09-24): список прятался в подсказке
+  // при наведении, и на телефоне его не было видно вовсе.
+  const missions = sectorRunActive ? runMissionRows() : [];
   const missionsDone = missions.filter(m => m.complete).length;
   const missionHtml =
     missions.length === 0
       ? ''
-      : `<span class="dl-wave" title="${esc(
-          missions
-            .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${objectiveNominal(m.reward, missions.length)})`)
-            .join('\n'),
-        )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
+      : `<button type="button" class="dl-missions" data-missions="1" aria-expanded="${missionPanelOpen}" title="${t('hud.missions.title')}"><i aria-hidden="true">⚑</i><span>${t('hud.missions.label')}</span><b>${missionsDone}/${missions.length}</b></button>`;
+  renderMissionPanel(missions);
   // В забеге время суток ничего не значит (дня в шапке нет) — часы показывают, сколько
   // забег идёт, в тех же реальных минутах, что и все его таймеры.
   const clockHtml = `<span id="clock">${isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)}</span>`;
@@ -14275,8 +14471,8 @@ function frame(nowReal: number) {
     lastClockHead = clockHtml;
   }
   const statusHtml =
-    waveHtml +
     missionHtml +
+    waveHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
