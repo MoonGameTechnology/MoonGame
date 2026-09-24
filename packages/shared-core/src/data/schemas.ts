@@ -1314,6 +1314,28 @@ export const VeteranDefSchema = z
   })
   .strict();
 
+/**
+ * СЛУЧАЙНЫЙ ПРОМОУШЕН (PERK-3.2): изредка построенная партия выходит «отмеченной», и её
+ * прибавка идёт ПОСЛЕДОВАТЕЛЬНЫМ множителем — то есть не тонет в сумме массовых
+ * процентов, а множится поверх неё.
+ *
+ * ⚠️ Кирпич предупреждает: это не маленький бафф. Те же проценты, сложенные с десятком
+ * чужих, стоят копейки, а вынесенные в отдельный множитель дают почти всю свою величину.
+ * Отсюда и форма чисел: величина заметная, но вероятность НИЗКАЯ.
+ *
+ * Ноль в любом из полей выключает механику целиком, без флага в коде.
+ */
+export const PromotionDefSchema = z
+  .object({
+    /** Вероятность отметить ОДИН выполненный заказ постройки. Бросок один на заказ, а не
+     *  на корабль: «прочный видимый момент» из кирпича — это событие постройки. */
+    chance: z.number().min(0).max(1).default(0),
+    /** Прибавка урона у полностью отмеченного стека. Сторона получает её долей: средняя
+     *  отметка на юнит × эта величина. */
+    damageBonus: z.number().min(0).default(0),
+  })
+  .strict();
+
 export const GameDataSchema = z.object({
   version: z.string(),
   resources: z.array(z.string()).min(1),
@@ -1346,11 +1368,14 @@ export const GameDataSchema = z.object({
   researchBoost: ResearchBoostDefSchema.prefault({}),
   /** Боевая надбавка ветерана (PERK-3.1). Ноль = надбавки в этой партии нет вовсе. */
   veteran: VeteranDefSchema.prefault({}),
+  /** Случайный промоушен (PERK-3.2). Ноль в любом поле = механики нет вовсе. */
+  promotion: PromotionDefSchema.prefault({}),
   market: MarketDefSchema.prefault({}),
 });
 
 export type MarketDef = z.infer<typeof MarketDefSchema>;
 export type VeteranDef = z.infer<typeof VeteranDefSchema>;
+export type PromotionDef = z.infer<typeof PromotionDefSchema>;
 export type ResourceBag = z.infer<typeof ResourceBagSchema>;
 export type UnitStats = z.infer<typeof UnitStatsSchema>;
 export type UnitDef = z.infer<typeof UnitDefSchema>;

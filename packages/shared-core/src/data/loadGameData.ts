@@ -44,6 +44,7 @@ export function composeGameDataBundle(readJson: JsonReader): Record<string, unkn
     rewards: readJson('rewards.json'),
     medals: readJson('medalGrades.json'),
     veteran: readJson('veteran.json'),
+    promotion: readJson('promotion.json'),
     market: readJson('market.json'),
   };
 }

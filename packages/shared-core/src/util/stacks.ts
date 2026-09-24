@@ -73,16 +73,31 @@ export function addUnits(
   modules?: readonly string[],
   stars?: Record<string, number>,
   rarity?: Record<string, string>,
+  /** Заслуга НА ЮНИТ, которую приносят с собой доливаемые юниты (PERK-3.2). Нужна там,
+   *  где `addUnits` выражает ПЕРЕЕЗД уже существующих юнитов, а не рождение новых:
+   *  авто-сбор построенного уносит корабли из гарнизона во флот, и по правилу VET-2
+   *  («сплит КОПИРУЕТ») их заслуга обязана ехать с ними. Без этого отмеченный корабль
+   *  терял отметку в ту же секунду, как его поднимали с верфи. Не передано — юниты
+   *  считаются новорождёнными, как и было. */
+  merit?: Pick<UnitStack, 'damageDealt' | 'battles' | 'promoted'>,
 ): void {
+  // ТОЛЬКО три величины заслуги, по одной поимённо. Спред `...merit` здесь стоял и был
+  // багом: зовущий передаёт исходный СТЕК целиком, и спред утаскивал заодно `count`,
+  // затирая размер доливаемой партии (TypeScript это пропускает — лишние поля,
+  // пришедшие переменной, структурная типизация разрешает).
+  const carried: Partial<UnitStack> = {};
+  if (merit?.damageDealt !== undefined) carried.damageDealt = merit.damageDealt;
+  if (merit?.battles !== undefined) carried.battles = merit.battles;
+  if (merit?.promoted !== undefined) carried.promoted = merit.promoted;
   const stack = findHealthyStack(stacks, unit, modules);
   if (stack) {
     // Свежая постройка, влитая в заслуженный стек, РАЗБАВЛЯЕТ его заслугу (VET-2) —
     // тем же правилом, что и слияние флотов. Без этого сюда открывалась дыра: долить
     // сотню корпусов в стек с медалью и получить медаль на всю сотню даром.
-    mergeMerit(stack, { unit, count });
+    mergeMerit(stack, { unit, count, ...carried });
     stack.count += count;
   } else {
-    const fresh: UnitStack = { unit, count };
+    const fresh: UnitStack = { unit, count, ...carried };
     if (modules && modules.length > 0) fresh.modules = [...modules];
     const own = starsOf(fresh.modules, stars);
     if (own) fresh.moduleStars = own;
@@ -206,7 +221,7 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
 function mergeMerit(base: UnitStack, add: UnitStack): void {
   const total = base.count + add.count;
   if (total <= 0) return;
-  for (const field of ['damageDealt', 'battles'] as const) {
+  for (const field of ['damageDealt', 'battles', 'promoted'] as const) {
     const a = base[field];
     const b = add[field];
     if (a === undefined && b === undefined) continue;
