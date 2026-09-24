@@ -7128,12 +7128,31 @@ function planetPanelHtml(p: Planet): string {
     // самое, каким решает редьюсер (сверено тестом по всем раскладам): здесь только
     // отрисовка. Стоит РЯДОМ с «Постройками», а не вместо: на астероидах и мёртвом мире
     // осмысленно и то и другое — добывающая станция ИЛИ крепость со своим ростером.
-    const fortress = fortressRaise(p, ME, s.players[ME]?.resources ?? {}, data);
+    const fortress = fortressRaise(
+      p,
+      ME,
+      s.players[ME]?.resources ?? {},
+      data,
+      s.players[ME]?.technologies?.completed ?? [],
+    );
     if (fortress.show) {
       const off = fortress.enabled ? '' : ' disabled';
+      // Цена — фишками `resLine` (это РАЗМЕТКА со значками). Экранировать её нельзя: игрок
+      // видел сырой `<span class="rcost">…<svg…>` вместо цены (сообщение владельца
+      // 2026-09-24: «непонятный текст там»).
       blds +=
         `<button class="bw-open" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
-        ` <span class="dim">${esc(resLine(fortress.cost) ?? '')}</span></button>`;
+        ` <span class="dim">${resLine(fortress.cost)}</span></button>`;
+      // Не изучена — говорим, ЧТО изучить, и ведём туда: кнопка раньше горела, а ядро
+      // отвечало безымянным «нужна технология».
+      if (fortress.blocked === 'tech') {
+        const names = fortress.needs
+          .map((id) => `«${tData(data.technologies[id]?.name ?? id)}»`)
+          .join(t('side.fortress.or'));
+        blds +=
+          `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
+          `<button class="bw-open" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+      }
     }
     cols.push(blds);
   }
@@ -8437,6 +8456,12 @@ function renderCmdBar() {
     // штурмовать некем, и кнопки не бывает вовсе. Пригодность ЦЕЛИ её по-прежнему гасит.
     troops: canAssaultAim(fleets.map((f) => sumUnits(f.landing ?? []))),
     assaultArmed: assaultAim,
+    // «Слить» и «Десант» — по составу (правило 3б): нет напарника или некого грузить —
+    // нет и кнопки.
+    mergeable: mergeOk,
+    merging,
+    troopsMenu: !!troopsIn,
+    troopsOpen: !!troopsPlan,
     more: cmdMore,
     picking: pickMode,
   });
@@ -8461,23 +8486,27 @@ function renderCmdBar() {
     (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
-    cmdBtn(
-      'merge',
-      '⛬',
-      ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
-      merging ? 'on' : '',
-      !mergeOk,
-      t('cmd.merge.hint'),
-    ) +
+    (shown.merge
+      ? cmdBtn(
+          'merge',
+          '⛬',
+          ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
+          merging ? 'on' : '',
+          !mergeOk,
+          t('cmd.merge.hint'),
+        )
+      : '') +
     cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint'), splitWhy) +
-    cmdBtn(
-      'troops',
-      '⇅',
-      t('cmd.troops'),
-      troopsPlan ? 'on' : '',
-      !troopsIn,
-      t('cmd.troops.hint'),
-    ) +
+    (shown.troops
+      ? cmdBtn(
+          'troops',
+          '⇅',
+          t('cmd.troops'),
+          troopsPlan ? 'on' : '',
+          !troopsIn,
+          t('cmd.troops.hint'),
+        )
+      : '') +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
@@ -8751,6 +8780,8 @@ side.addEventListener('click', (ev) => {
       buildWin.open(selPlanet, arg);
   } else if (act === 'fortress') {
     playerOrder(deployStation(ME, selPlanet!));
+  } else if (act === 'opentech') {
+    techTree.open();
   } else if (act === 'build') {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {

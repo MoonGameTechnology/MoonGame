@@ -671,6 +671,7 @@
 | OBJP-2 | ✅ | proto | `docs/backlog.md` | Подробности объекта встают РЯДОМ с карточкой, а не |
 | OBJP-3 | ✅ | proto | `docs/backlog.md` | Каталог юнитов уехал в окно производства — туда же, |
 | CMD-VIS-2 | ✅ | proto | `docs/backlog.md` | Кнопка штурма появляется только когда есть кем |
+| CMD-VIS-3 | ✅ | proto | `docs/backlog.md` | «Слить» и «Десант» появляются, только когда есть |
 | EVT-1 | ✅ | core data proto | `docs/backlog.md` | Тёмные события наконец видны игроку, |
 | EVT-2 | ✅ | core data proto | `docs/backlog.md` | Трофеи за бой: победитель |
 | EVT-3 | ✅ | core data | `docs/backlog.md` | Пассивка героя «мародёр»: лестница из пяти |
@@ -814,6 +815,7 @@
 | FORT-5.10 | ✅ | core data | `docs/fortress-roadmap.md` | Щиты крепости |
 | FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md` | Технологии открывают постройки крепости |
 | FORT-5.13 | ✅ | core | `docs/fortress-roadmap.md` | Сбитая крепость уничтожается |
+| FORT-5.14 | ✅ | proto | `docs/fortress-roadmap.md` | Кнопка крепости: знает о технологии и не показывает разметку |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md` | Туман как граница (анти-maphack) (в основном) |

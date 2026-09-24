@@ -94,7 +94,10 @@ function effectsSum(
   return bonus;
 }
 
-function technologiesUnlocking(data: GameData, kind: 'unit' | 'building', id: string): string[] {
+/** Технологии, любая из которых открывает юнита или здание (пусто — не заперто). Тот же
+ *  список, по которому хук `construction.requirement` решает, пускать ли стройку, —
+ *  экспортирован, чтобы клиент называл игроку ИМЕННО эту технологию, а не гадал. */
+export function technologiesUnlocking(data: GameData, kind: 'unit' | 'building', id: string): string[] {
   const out: string[] = [];
   for (const technology of Object.keys(data.technologies).sort()) {
     const def = data.technologies[technology];

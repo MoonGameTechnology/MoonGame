@@ -1686,6 +1686,13 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .bw-open{margin-top:8px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--grn);cursor:pointer;
   font:800 11px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;
   color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
+/* Крепость не изучена — причина под серой кнопкой и путь к технологиям (сообщение владельца
+   2026-09-24: кнопка горела, а ядро отвечало безымянным «нужна технология»). */
+.fort-why{margin-top:6px;font-size:11px;line-height:1.45;color:#e6c77a;}
+/* Серая кнопка панели должна БЫТЬ серой: погашенная «Возвести крепость» светилась так же, как
+   живая, и нажатие «ничего не делало». Цена внутри — цветом кнопки, а не бледным .dim. */
+.bw-open:disabled{cursor:not-allowed;background:transparent;color:var(--dim);border-color:var(--line-hi);}
+.bw-open .dim{color:inherit;opacity:.85;}
 /* Листалка уровней в карточке кодекса (BUILD-1) */
 .cx-lvls{display:flex;gap:6px;margin:10px 0 0;}
 .cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;

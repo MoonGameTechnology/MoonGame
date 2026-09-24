@@ -103,3 +103,18 @@ describe('CMD-VIS — штурм спрашивает десант, а не ко
     expect(src).not.toMatch(/canAssault =[\s\S]{0,120}sumUnits\(f\.units\)/);
   });
 });
+
+// CMD-VIS-3 (заказ владельца 2026-09-24): «Если сливать нечего, то и кнопки "слить" не
+// должно отображаться», «то же самое с кнопкой десант».
+describe('CMD-VIS-3 — «Слить» и «Десант» по составу', () => {
+  it('main.ts прячет «Слить» без напарника и «Десант» без меню, а не гасит их', () => {
+    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    expect(src).toContain('mergeable: mergeOk,');
+    expect(src).toContain('troopsMenu: !!troopsIn,');
+    expect(src).toMatch(/\(shown\.merge\s*\?\s*cmdBtn\(\s*'merge'/);
+    expect(src).toMatch(/\(shown\.troops\s*\?\s*cmdBtn\(\s*'troops'/);
+    // Кнопки без условия показа больше нет — ни у одной из двух.
+    expect(src).not.toMatch(/\+\s*cmdBtn\(\s*'merge'/);
+    expect(src).not.toMatch(/\+\s*cmdBtn\(\s*'troops'/);
+  });
+});
