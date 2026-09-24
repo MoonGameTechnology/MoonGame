@@ -996,6 +996,9 @@ export interface PveState {
    *  co-op PvE seats each survive for themselves — a shared number would let one
    *  player spend the other's pick. Absent/0 = nothing owed. */
   boons?: Record<PlayerId, number>;
+  /** Сколько пакетов снабжения каждое место уже купило в этом забеге (`pve.supply`, решение
+   *  владельца 2026-09-24): лимит — на забег, поэтому счёт живёт в матче, а не в профиле. */
+  supplies?: Record<PlayerId, number>;
   /** World time the match counts as CLEARED if a human seat still holds a world — set
    *  when the last wave lands, the mode's `holdHours` later (PVR-2.5). Absent until then,
    *  and absent for good under a mode without `holdHours`: there the only clear is taking

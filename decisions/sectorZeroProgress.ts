@@ -360,6 +360,9 @@ export type SectorProgressAction =
   /** Ремонт флота в забеге: списать цену за `hull` недостающего корпуса. Сам ремонт
    *  делает ядро (`fleet.premiumRepair`) — хост зовёт его, только если списание прошло. */
   | { kind: 'premium-repair'; hull: number }
+  /** Пакет снабжения забега: списать его цену. Сам пакет выдаёт ядро (`pve.supply`) —
+   *  хост зовёт его, только если списание прошло (решение владельца 2026-09-24). */
+  | { kind: 'run-supply' }
   | { kind: 'forge'; id: string }
   | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
@@ -445,6 +448,12 @@ export function changeSectorZeroProgress(
       break;
     case 'premium-repair': {
       const price = sovereignRepairCost(action.hull);
+      if (price <= 0 || next.sovereigns < price) return null;
+      next.sovereigns -= price;
+      break;
+    }
+    case 'run-supply': {
+      const { price } = data.sectorZeroShop.runSupply;
       if (price <= 0 || next.sovereigns < price) return null;
       next.sovereigns -= price;
       break;

@@ -1009,6 +1009,13 @@ export const SectorZeroShopSchema = z.object({
       perDay: z.number().int().nonnegative().default(0),
     })
     .prefault({}),
+  /** Цена пакета снабжения забега в Суверенах (решение владельца 2026-09-24). Что в пакете
+   *  и сколько раз за забег — правило МИРА, оно в режиме (`pve.supply`). Ноль — покупки нет. */
+  runSupply: z
+    .object({
+      price: z.number().int().nonnegative().default(0),
+    })
+    .prefault({}),
 });
 
 export const HeroGradeDefSchema = z.object({
@@ -1252,6 +1259,17 @@ export const ModePveSchema = z
      *  by wave ten). The wipe stays as the early finish. Absent ⇒ the pre-existing rule
      *  only (invariant #3: absent data → base default). */
     holdHours: z.number().positive().optional(),
+    /** Пакет снабжения за Суверены (решение владельца 2026-09-24): что приходит в казну
+     *  за одну покупку и сколько покупок на забег. Цену в Суверенах знает магазин профиля
+     *  (`sectorZeroShop.runSupply`) — у матча этой валюты нет. Нет раздела ⇒ `pve.supply`
+     *  отказывает (`E_NO_SUPPLY`). */
+    supply: z
+      .object({
+        perRun: z.number().int().nonnegative(),
+        pack: z.record(z.string(), z.number().int().positive()),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

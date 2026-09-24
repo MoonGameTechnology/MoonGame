@@ -34,6 +34,9 @@ const hooks = `window.__szTest = {
   selected: () => selPlanet,
   // Конец забега победой — как его ставит модуль победы ядра.
   end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
+  // Суверены на профиле и казна матча — для покупки пакета снабжения.
+  sov: n => saveSectorProgress({ ...sectorProgress, sovereigns: n }),
+  res: r => s.players[ME]?.resources?.[r] ?? 0,
 };`;
 
 const ABSENT = Object.values(SECTOR_ZERO_ABSENT_TOOLS);
@@ -189,6 +192,16 @@ try {
       beforeAd,
     );
     await page.locator('#tbwallet .tw-sovereigns', { hasText: String(beforeAd.sovereigns + 2) }).waitFor();
+    // Пакет снабжения за 5 ◆ (решение владельца 2026-09-24) — из карточки ресурса: пакет
+    // приходит в казну матча, цена списывается с профиля, остаток покупок убывает.
+    await page.evaluate(() => window.__szTest.sov(10));
+    const metalBefore = await page.evaluate(() => window.__szTest.res('metal'));
+    await page.locator('#purse [data-res="metal"]').click();
+    await page.locator('#rescard [data-rc-supply]').click();
+    await page.waitForFunction((b) => window.__szTest.res('metal') >= b + 150, metalBefore);
+    assert.equal((await progress()).sovereigns, 5, 'пакет стоит 5 ◆');
+    assert.match(await page.locator('#rescard .rc-note').textContent(), /2/, 'осталось 2 из 3');
+    await page.locator('#rescard .rc-close').click();
     await page.evaluate(() => window.__szTest.end());
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#endscreen .es-run li.task').count(), 3, 'три задачи главы II');
@@ -234,7 +247,7 @@ try {
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' «+» у Суверенов даёт ролик прямо в забеге; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
+      ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты\n',
   );
 } finally {
