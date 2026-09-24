@@ -8,7 +8,6 @@ import {
   computePowerCells,
   computePowerCell,
   type TerritorySeed,
-  type TerritoryCell,
 } from './territory';
 
 // The unit square, CCW — the reusable clip fixture for the half-plane primitives.
@@ -172,14 +171,14 @@ describe('territory — classifyBorders (political border logic, no canvas)', ()
     // The p1↔p1 edge appears ONCE (idx < t dedup), keyed by owner.
     expect(ownedInner.get('p1')).toHaveLength(1);
     expect(ownedInner.has('p2')).toBe(false);
-    // The p1↔p2 border glows from BOTH sides (one frontier segment per owner),
-    // and each owner's map-boundary edges are frontiers too.
-    expect(ownedFront.get('p1')!.length).toBeGreaterThan(0);
-    expect(ownedFront.get('p2')!.length).toBeGreaterThan(0);
+    // The p1↔p2 border glows from BOTH sides — one frontier segment per owner, and ONLY
+    // that one: the map edge is the map's line, not a frontier (owner, 2026-09-24).
+    expect(ownedFront.get('p1')).toHaveLength(1);
+    expect(ownedFront.get('p2')).toHaveLength(1);
     expect(neutralEdge).toHaveLength(0); // nothing neutral on this map
   });
 
-  it('neutral-vs-neutral divisions are deduped; neutral boundary edges are kept', () => {
+  it('neutral-vs-neutral divisions are deduped; the map edge is not a division', () => {
     const seeds: TerritorySeed[] = [
       { x: -50, y: 0, w: 0, owner: null, kind: 'planet' },
       { x: 50, y: 0, w: 0, owner: null, kind: 'planet' },
@@ -188,61 +187,49 @@ describe('territory — classifyBorders (political border logic, no canvas)', ()
     const { ownedFront, ownedInner, neutralEdge } = classifyBorders(cells, seeds);
     expect(ownedFront.size).toBe(0);
     expect(ownedInner.size).toBe(0);
-    // 1 shared division (deduped by idx < t) + 3 boundary edges per cell.
-    const boundaryEdges = cells.flatMap((c) => c.tags).filter((t) => t < 0).length;
-    expect(neutralEdge).toHaveLength(1 + boundaryEdges);
+    // The one shared division (deduped by idx < t); each cell's 3 map-edge sides are not.
+    expect(cells.flatMap((c) => c.tags).filter((t) => t === BOUNDARY)).toHaveLength(6);
+    expect(neutralEdge).toHaveLength(1);
   });
 });
 
-describe('classifyBorders — граница без пути (MAP-SEAL)', () => {
-  // Две провинции бок о бок: в мозаике у них ОБЩАЯ ГРАНИЦА, и игрок читает соседство
-  // именно по ней. Если пути между ними нет, граница молча обещает переход.
-  const pair = (owners: Array<string | null>): { cells: TerritoryCell[]; seeds: TerritorySeed[] } => {
+describe('classifyBorders — край карты не граница провинции (владелец 2026-09-24)', () => {
+  // «У провинций у края карты не должно быть своих волнистых краёв»: край рисует сама
+  // карта — рамка голограммы или контур доски, — и обводка провинции по нему легла бы
+  // второй линией, которая движется отдельно от рамки.
+  const clip: Array<[number, number]> = [
+    [-200, -200],
+    [200, -200],
+    [200, 200],
+    [-200, 200],
+  ];
+  const onClip = (x: number, y: number): boolean =>
+    Math.abs(Math.abs(x) - 200) < 1e-9 || Math.abs(Math.abs(y) - 200) < 1e-9;
+
+  it('провинция на всю карту — ни одной обводки: весь её край и есть край карты', () => {
+    const seeds: TerritorySeed[] = [{ x: 0, y: 0, w: 0, owner: 'p1', kind: 'planet' }];
+    const { ownedFront, ownedInner, neutralEdge } = classifyBorders(computePowerCells(seeds, clip), seeds);
+    expect(ownedFront.size).toBe(0);
+    expect(ownedInner.size).toBe(0);
+    expect(neutralEdge).toHaveLength(0);
+  });
+
+  it('ни одна обводка не лежит на краю — ни фронтир, ни граница своих, ни нейтральная', () => {
     const seeds: TerritorySeed[] = [
-      { x: -50, y: 0, w: 1, owner: owners[0]!, kind: 'planet' },
-      { x: 50, y: 0, w: 1, owner: owners[1]!, kind: 'planet' },
+      { x: -100, y: -100, w: 0, owner: 'p1', kind: 'planet' },
+      { x: 100, y: -100, w: 0, owner: 'p1', kind: 'planet' },
+      { x: -100, y: 100, w: 0, owner: 'p2', kind: 'planet' },
+      { x: 100, y: 100, w: 0, owner: null, kind: 'planet' },
     ];
-    const clip: Array<[number, number]> = [
-      [-200, -200],
-      [200, -200],
-      [200, 200],
-      [-200, 200],
-    ];
-    return { cells: computePowerCells(seeds, clip), seeds };
-  };
-
-  it('без предиката ничего не запечатано — как у всех прежних вызовов', () => {
-    const { cells, seeds } = pair([null, null]);
-    expect(classifyBorders(cells, seeds).sealedEdge).toEqual([]);
-  });
-
-  it('предикат помечает общую границу как закрытую', () => {
-    const { cells, seeds } = pair([null, null]);
-    const sealed = classifyBorders(cells, seeds, () => true).sealedEdge;
-    expect(sealed.length).toBeGreaterThan(0);
-  });
-
-  it('закрытая граница АДДИТИВНА: политическая классификация не теряется', () => {
-    // Иначе барьер стирал бы информацию о том, чья это земля.
-    const { cells, seeds } = pair(['p1', 'p2']);
-    const open = classifyBorders(cells, seeds);
-    const shut = classifyBorders(cells, seeds, () => true);
-    expect(shut.ownedFront.get('p1')?.length).toEqual(open.ownedFront.get('p1')?.length);
-    expect(shut.ownedFront.get('p2')?.length).toEqual(open.ownedFront.get('p2')?.length);
-    expect(shut.sealedEdge.length).toBeGreaterThan(0);
-  });
-
-  it('каждое ребро считается один раз, а не дважды с обеих сторон', () => {
-    // У пары соседей общая граница РОВНО одна, хотя обе клетки несут её у себя.
-    const { cells, seeds } = pair([null, null]);
-    expect(classifyBorders(cells, seeds, () => true).sealedEdge).toHaveLength(1);
-  });
-
-  it('край карты не запечатывается: за ним нет провинции, от которой отрезать', () => {
-    const { cells, seeds } = pair([null, null]);
-    const shut = classifyBorders(cells, seeds, () => true).sealedEdge;
-    // у каждой клетки рёбер больше, чем одно общее: остальные лежат на границе карты
-    const totalEdges = cells.reduce((n, c) => n + c.poly.length, 0);
-    expect(shut.length).toBeLessThan(totalEdges);
+    const { ownedFront, ownedInner, neutralEdge } = classifyBorders(computePowerCells(seeds, clip), seeds);
+    const all = [...[...ownedFront.values()].flat(), ...[...ownedInner.values()].flat(), ...neutralEdge];
+    expect(all.length).toBeGreaterThan(0); // внутренние границы на месте
+    for (const [x0, y0, x1, y1] of all) {
+      // отрезок, у которого ОБА конца на одной стороне рамки, лёг бы вдоль края
+      const alongX = Math.abs(x0 - x1) < 1e-9 && Math.abs(Math.abs(x0) - 200) < 1e-9;
+      const alongY = Math.abs(y0 - y1) < 1e-9 && Math.abs(Math.abs(y0) - 200) < 1e-9;
+      expect(alongX || alongY).toBe(false);
+      expect(onClip((x0 + x1) / 2, (y0 + y1) / 2)).toBe(false);
+    }
   });
 });

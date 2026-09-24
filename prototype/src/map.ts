@@ -12,7 +12,6 @@ import {
   hasOrbit,
   isBuildable,
   isCapturable,
-  sectorKindDef,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
 
@@ -71,15 +70,6 @@ const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
   // отличать от ландшафта с одного взгляда, а не вчитываясь в подпись.
   void_station: { name: 'Void Fortress', core: 'empty_space', color: '#ffb347' },
 };
-
-/** Непроходимый вид (MAP-BARRIER): сквозь него нет прохода и в него нет трассы.
- *  Выводится из данных тем же способом, что capturable/buildable/orbit выше, — чтобы
- *  прототип не разъехался с тем, что на самом деле держит ядро. Виды, которых нет в
- *  `SECTOR_TYPE_UI` (например `rift`), через `SECTOR_TYPES` не видны, поэтому спрашивать
- *  надо каталог, а не UI-таблицу. */
-export function isImpassableKind(kind: string | undefined): boolean {
-  return sectorKindDef(data, { kind }).traversable === false;
-}
 
 /** SECTOR_TYPES = UI delta + gameplay flags DERIVED from `data.sectorKinds` via the
  *  core's own resolution (permissive default for kinds the data doesn't list) — one
