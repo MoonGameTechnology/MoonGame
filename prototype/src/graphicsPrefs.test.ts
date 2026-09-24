@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
+  defaultGlowFx,
   fxBlur,
   glowOn,
   setGlowFx,
@@ -25,6 +26,13 @@ function around<T>(read: () => boolean, write: (v: boolean) => void, body: () =>
     write(before);
   }
 }
+
+describe('графика — свечение по умолчанию', () => {
+  it('на сенсорном устройстве выключено, с мышью — включено', () => {
+    expect(defaultGlowFx(true)).toBe(false);
+    expect(defaultGlowFx(false)).toBe(true);
+  });
+});
 
 describe('графика — кран размытия', () => {
   it('свечение включено — размытие проходит как есть', () => {

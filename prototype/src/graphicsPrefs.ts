@@ -17,8 +17,27 @@
 import { readBool, writeBool } from './prefs';
 import { breath, type Breath } from './pulseFx';
 
-/** Свечение и ореолы: мягкие диски вокруг миров, флотов и границ. По умолчанию ВКЛ. */
-let glowFx = readBool('void.glowFx', true);
+/**
+ * Свечение и ореолы: мягкие диски вокруг миров, флотов и границ, широкие полосы рамки и
+ * волны голограммы. По умолчанию — ПО УСТРОЙСТВУ: на сенсорном (телефон, планшет) выкл,
+ * с мышью вкл. Замер 2026-09-24 (жалоба владельца «сильно подтормаживает на телефоне»):
+ * на телефоне голографическая карта включена всегда, и свечение её рамки и волны — это
+ * 15 широких обводок с градиентом в режиме `screen` на кадр; без них кадр возвращается к
+ * 60 даже без замедления процессора, с ними — ~50, а на слабом процессоре кадр тянется
+ * к 100 мс. Явный тумблер игрока перекрывает умолчание в обе стороны — как у движения.
+ */
+export function defaultGlowFx(coarsePointer: boolean): boolean {
+  return !coarsePointer;
+}
+function systemCoarsePointer(): boolean {
+  // matchMedia нет в node (тесты, харнессы) — там честный ответ «устройство с мышью».
+  try {
+    return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+let glowFx = readBool('void.glowFx', defaultGlowFx(systemCoarsePointer()));
 export const glowOn = (): boolean => glowFx;
 export function setGlowFx(v: boolean): void {
   glowFx = v;
