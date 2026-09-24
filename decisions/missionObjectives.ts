@@ -42,7 +42,13 @@ export interface ObjectiveProgress {
   done: number;
   total: number;
   complete: boolean;
+  /** Задача провалена в этом забеге и выполниться уже не может (`rescue`: гарнизон пал). */
+  failed?: boolean;
   reward: number;
+  /** `beacon`: сколько мс маяк уже удерживается подряд (лучшая серия) и сколько нужно —
+   *  панель показывает это реальным временем забега, а не игровыми часами. */
+  holdMs?: number;
+  needMs?: number;
 }
 
 /** Сколько провинций игрок опознал: ключи его памяти тумана. Нет памяти — ноль, а не
@@ -93,15 +99,68 @@ export function objectiveProgress(
   }
   if (objective.kind === 'build') {
     // «Держать N построек вида X» (PVR-5.3): стоящие, своих миров. Снесённая не в счёт —
-    // задача про то, что стоит сейчас, как и `raze`.
+    // задача про то, что стоит сейчас, как и `raze`. С `at` — только в названных
+    // провинциях («построить космическую крепость в провинции X», 2026-09-24).
     const kinds = new Set(objective.targets ?? []);
+    const where = objective.at && objective.at.length > 0 ? new Set(objective.at) : null;
     let have = 0;
     for (const planet of Object.values(state.planets)) {
-      if (planet.owner !== player) continue;
+      if (planet.owner !== player || (where && !where.has(planet.id))) continue;
       for (const b of planet.buildings) if (kinds.has(b.type) && b.hp > 0) have += 1;
     }
     const done = Math.min(have, need);
     return { ...base, done, total: need, complete: done >= need };
+  }
+  if (objective.kind === 'evac') {
+    // «Довести N беженцев до убежища»: счёт доставленных ведёт память фактов ядра
+    // (`missionFacts.evacuated`) — высаженные беженцы из состояния уходят, считать их
+    // по флотам уже нельзя.
+    const done = Math.min(state.missionFacts?.evacuated?.[player] ?? 0, need);
+    return { ...base, done, total: need, complete: done >= need };
+  }
+  if (objective.kind === 'rescue') {
+    // «Снять осаду, пока гарнизон держится» (решение владельца 2026-09-24: пал —
+    // провал внутри забега). Выполнено: мир твой, не терялся, и у него нет врага.
+    const targets = objective.targets ?? [];
+    const lost = state.missionFacts?.fallen?.[player] ?? [];
+    const failed = targets.some((id) => lost.includes(id));
+    const relieved =
+      targets.length > 0 &&
+      targets.every(
+        (id) =>
+          state.planets[id]?.owner === player &&
+          !Object.values(state.fleets).some(
+            (f) => f.owner !== player && f.location === id && f.units.some((u) => u.count > 0),
+          ),
+      );
+    const complete = !failed && relieved;
+    return { ...base, done: complete ? 1 : 0, total: 1, complete, failed };
+  }
+  if (objective.kind === 'beacon') {
+    // «Удерживать маяк N часов подряд» (2026-09-24): текущая серия — от захвата
+    // (`missionFacts.held`), либо лучшая уже закончившаяся (`longest`) — выполненное
+    // потерей после не отменяется. Мир свой с начала матча — серия с начала.
+    const HOUR_MS = 3_600_000;
+    const needMs = need * HOUR_MS;
+    let best = 0;
+    for (const id of objective.targets ?? []) {
+      const planet = state.planets[id];
+      const held = state.missionFacts?.held?.[id];
+      let current = 0;
+      if (planet?.owner === player)
+        current = state.time - (held && held.owner === player ? held.since : 0);
+      const past = state.missionFacts?.longest?.[id]?.[player] ?? 0;
+      best = Math.max(best, current, past);
+    }
+    const complete = (objective.targets ?? []).length > 0 && best >= needMs;
+    return {
+      ...base,
+      done: Math.min(Math.floor(best / HOUR_MS), need),
+      total: need,
+      complete,
+      holdMs: Math.min(best, needMs),
+      needMs,
+    };
   }
   const done = Math.min(identified(state, player), need);
   return { ...base, done, total: need, complete: done >= need };
@@ -179,6 +238,8 @@ export interface ObjectiveResult {
   id: string;
   /** Для подписи: `total` подставляется в текст задачи. */
   total: number;
+  /** `beacon`: срок удержания в мс — подпись показывает его временем забега. */
+  needMs?: number;
   complete: boolean;
   /** Сколько заплатила: номинал выполненной, 0 — невыполненной. */
   paid: number;
@@ -201,6 +262,7 @@ export function settleObjectives(
     return {
       id: o.id,
       total: p.total,
+      ...(p.needMs !== undefined ? { needMs: p.needMs } : {}),
       complete: p.complete,
       paid: p.complete ? objectiveNominal(o.reward, shown.length, base) : 0,
     };

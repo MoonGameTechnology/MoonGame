@@ -49,7 +49,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  перемножаются; список перезакреплён без единой правки.
  *  32 — PERK-3.2: снова ЧЛЕНСТВО — добавлен `promotion`, случайный промоушен. Его место
  *  в списке значимо: строго перед `auto-rally`, оба слушают `unit.built`.) */
-const PINNED_FOR_VERSION = '32';
+const PINNED_FOR_VERSION = '33';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -101,6 +101,7 @@ const PINNED_MODULE_IDS = [
   'swarmMemory',
   'swarmAdapt',
   'swarmJournal',
+  'missionFacts', // задачи забега 2026-09-24: удержание, потери, беженцы
   'victory',
   'visibility',
   // 'division' СНЯТ ОСОЗНАННО (H4-REVERT, 2026-07-31), не потерян при правке.

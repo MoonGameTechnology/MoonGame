@@ -188,3 +188,24 @@ describe('pveOrchestrator — тактика волн (PVE-5.1)', () => {
     expect(JSON.stringify(state)).toBe(before);
   });
 });
+
+describe('pveOrchestrator — ответ на маяк (задача владельца 2026-09-24)', () => {
+  it('флот игрока на маяке — Рой шлёт туда отряд вместо обычной цели', () => {
+    const beacon = { ...planet('beacon', null, 60), traits: ['beacon'] };
+    const state = world({
+      planets: {
+        hive: planet('hive', 'swarm', 0),
+        beacon,
+        near: planet('near', 'human', 100),
+      },
+      fleets: {
+        'pve:wave:1': fleet('pve:wave:1', 'swarm', 'hive'),
+        you: fleet('you', 'human', 'beacon'),
+      },
+    });
+    const out = orders(state);
+    expect(out.filter((a) => (a.payload as { fleetId: string }).fleetId === 'pve:wave:1')).toEqual([
+      expect.objectContaining({ type: 'fleet.move', payload: { fleetId: 'pve:wave:1', to: 'beacon' } }),
+    ]);
+  });
+});

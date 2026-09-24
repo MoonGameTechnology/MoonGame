@@ -121,7 +121,10 @@
         "y": 150
       },
       "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "terrain": "asteroid_field",
+      "traits": [
+        "beacon"
+      ]
     },
     "shear": {
       "position": {
@@ -194,6 +197,15 @@
       "reward": 3
     },
     {
+      "id": "mission.beacon",
+      "kind": "beacon",
+      "targets": [
+        "shoal"
+      ],
+      "count": 8,
+      "reward": 3
+    },
+    {
       "id": "mission.hold-out",
       "kind": "wave",
       "count": 5,
@@ -204,6 +216,18 @@
       "kind": "scout",
       "count": 6,
       "reward": 2
+    },
+    {
+      "id": "mission.starfort",
+      "kind": "build",
+      "targets": [
+        "starfort"
+      ],
+      "at": [
+        "home_b"
+      ],
+      "count": 1,
+      "reward": 3
     },
     {
       "id": "mission.destroy-hive",
@@ -310,6 +334,16 @@
         {
           "unit": "cruiser",
           "count": 2
+        }
+      ]
+    },
+    "p3_scout": {
+      "owner": "p3",
+      "location": "shoal",
+      "units": [
+        {
+          "unit": "scout_drone",
+          "count": 1
         }
       ]
     }

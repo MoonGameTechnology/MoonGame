@@ -51,6 +51,7 @@ import {
   swarmMemoryModule,
   swarmAdaptModule,
   swarmJournalModule,
+  missionFactsModule,
   resolveMatchConfig,
   type GameModule,
   type GameState,
@@ -116,6 +117,7 @@ export const MODULES: GameModule[] = [
   swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
   swarmAdaptModule, // PVR-4.3: проект развития модуля Роя; читает память, платит, растит
   swarmJournalModule, // PVR-4.5: что игрок ВИДЕЛ про ответы Роя; зеркало swarmMemory
+  missionFactsModule, // факты для задач забега: удержание, потери, эвакуация
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
   fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
   // PERK-3.2: бросок промоушена. СТРОГО ПЕРЕД `autoRally` — оба слушают `unit.built`,

@@ -663,9 +663,11 @@ function parseRunSummary(v: unknown): RunSummary | null {
   for (const o of r.objectives as unknown[]) {
     const x = o as Record<string, unknown> | null;
     if (!x || typeof x.id !== 'string' || n(x.total) === null || n(x.paid) === null) return null;
+    const needMs = n(x.needMs);
     objectives.push({
       id: x.id,
       total: x.total as number,
+      ...(needMs ? { needMs } : {}),
       complete: x.complete === true,
       paid: x.paid as number,
     });
