@@ -4,7 +4,16 @@ import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
-import type { Fleet, GameState, PlanetId, PlayerId, ScheduledEvent, UnitStack } from './gameState';
+import type {
+  Fleet,
+  GameState,
+  Planet,
+  PlanetId,
+  PlayerId,
+  ScheduledEvent,
+  SightRules,
+  UnitStack,
+} from './gameState';
 
 /** A scheduled event belongs to a player when it clearly references their own planet,
  *  fleet, or is owner-tagged for them. Used to keep a player's OWN pending construction /
@@ -33,15 +42,29 @@ function scheduledOwnedBy(event: ScheduledEvent, viewerId: PlayerId, state: Game
  * memory of last-seen state (variant B) layers on top in a follow-up.
  */
 
-/** Identify (full-detail) range, in jumps, from an owned WORLD — local awareness
- *  around your own territory. */
-const IDENTIFY_HOPS = 1;
+/**
+ * Общие радиусы зрения ядра — у матча без своих чисел в режиме (решение владельца
+ * 2026-09-24: «круги везде», «единый радиус»). Подобраны по основной карте (nexus:
+ * ближайший сосед ~80, линия ~119): мир видит ближнее кольцо соседей, флот — узел, в
+ * котором стоит, и почти ничего в пути. Разведка дальше — радаром: массив в мире
+ * (240/330/420), радарный корабль или модуль, разведдрон.
+ *
+ * До этого свой мир раскрывал соседей ПО ЛИНИЯМ на любом расстоянии, а флот — ближайший
+ * к нему узел, хоть на середине длинной линии. Граница обзора при этом рисовалась
+ * кругами радара, и мир за ней светился, а мир рядом без линии — нет.
+ */
+export const DEFAULT_SIGHT: Readonly<SightRules> = { world: 120, fleet: 40, radarScale: 1 };
 
-/** Identify range from a FLEET, in jumps. Ships are near-blind on their own: they
- *  see only the node they occupy (`0` hops). Real reconnaissance comes from RADAR —
- *  a `radar` building/outpost, or a unit/hero carrying a radar module (`radarRange`,
- *  resolved via `fleetRadarRange`). A radarless fleet is a blind kitten by design. */
-const FLEET_IDENTIFY_HOPS = 0;
+/** Радиусы зрения матча: его собственные (`state.sight`, из режима) или общие. Сломанные
+ *  числа (не конечные, отрицательные, нулевой масштаб) читаются как общие целиком — карта
+ *  не должна ослепнуть или прозреть от опечатки в данных. */
+export function sightRulesOf(state: Pick<GameState, 'sight'>): Readonly<SightRules> {
+  const s = state.sight;
+  const ok = (n: unknown): boolean => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+  return s && ok(s.world) && ok(s.fleet) && ok(s.radarScale) && s.radarScale > 0
+    ? s
+    : DEFAULT_SIGHT;
+}
 
 /** A radar projects TWO concentric ranges: it catches coarse signatures out to its
  *  full reach, and fully identifies contacts within the inner half of that reach
@@ -109,53 +132,6 @@ export function fleetRadarRange(fleet: Pick<Fleet, 'units'>, data: GameData): nu
     if (def && stack.count > 0) reach = Math.max(reach, stackRadarRange(def, stack, data));
   }
   return reach;
-}
-
-/** Flood `hops` jumps out from `start` over the lane graph, into `out`. */
-function flood(state: GameState, start: PlanetId, hops: number, out: Set<PlanetId>): void {
-  out.add(start);
-  let frontier: PlanetId[] = [start];
-  for (let d = 0; d < hops; d++) {
-    const next: PlanetId[] = [];
-    for (const id of frontier) {
-      const links = state.planets[id]?.links;
-      if (!links) continue;
-      for (const link of links) {
-        if (!out.has(link)) {
-          out.add(link);
-          next.push(link);
-        }
-      }
-    }
-    frontier = next;
-  }
-}
-
-/** Add every node within Euclidean `radius` of `originId`'s position. Radar is a
- *  physical signal, not graph hops: a node that is close in space still shows up
- *  even if it is many jumps away (or unreachable) by the lane graph. Uses squared
- *  distance — exact and deterministic, no sqrt. */
-function withinRadiusAt(
-  state: GameState,
-  origin: { x: number; y: number },
-  radius: number,
-  out: Set<PlanetId>,
-): void {
-  const r2 = radius * radius;
-  for (const planet of Object.values(state.planets)) {
-    const dx = planet.position.x - origin.x;
-    const dy = planet.position.y - origin.y;
-    if (dx * dx + dy * dy <= r2) out.add(planet.id);
-  }
-}
-function withinRadius(
-  state: GameState,
-  originId: PlanetId,
-  radius: number,
-  out: Set<PlanetId>,
-): void {
-  const origin = state.planets[originId]?.position;
-  if (origin) withinRadiusAt(state, origin, radius, out);
 }
 
 /** A fleet's CONTINUOUS map position right now — the shared interpolation
@@ -228,80 +204,130 @@ function visionBloc(state: GameState, viewerId: PlayerId): PlayerId[] {
   return bloc;
 }
 
-/** What ONE player's own assets sense, accumulated into the shared sets: worlds
- *  (identify hops + radar buildings), fleets (own node + ship radar) and live hero
- *  reveals. Each member is measured with their OWN `radarMultiplier`, so an ally's
- *  radar tech extends the ally's sensors — and an ally in energy `arrears` contributes
- *  a dimmed picture (ECON-2), exactly as it would on their own screen. */
-function accumulateCoverage(
+/** Дальность радара мира без множителей: лучший из его массивов по уровню. */
+function worldRadarRaw(planet: Pick<Planet, 'buildings'>, data: GameData): number {
+  let reach = 0;
+  for (const b of planet.buildings) {
+    const def = data.buildings[b.type];
+    if (def) reach = Math.max(reach, buildingLevel(def, b.level).radarRange);
+  }
+  return reach;
+}
+
+/** Дальность засечки радара мира — с масштабом режима и множителем ВЛАДЕЛЬЦА (технологии,
+ *  фракция, блэкаут). Экспорт — чтобы клиент рисовал тот же круг, что считает туман. */
+export function worldRadarReach(state: GameState, planet: Planet, data: GameData): number {
+  if (planet.owner === null) return 0;
+  const scale = sightRulesOf(state).radarScale;
+  return worldRadarRaw(planet, data) * scale * radarMultiplier(state, planet.owner, data);
+}
+
+/** То же для флота: его самый «слышащий» корабль, масштаб режима, множитель владельца. */
+export function fleetRadarReach(state: GameState, fleet: Fleet, data: GameData): number {
+  const scale = sightRulesOf(state).radarScale;
+  return fleetRadarRange(fleet, data) * scale * radarMultiplier(state, fleet.owner, data);
+}
+
+/**
+ * Один круг зрения: где он стоит, чей он и какие у него два радиуса. Внутренний —
+ * полный обзор (опознание), внешний — засечка сигнатур; внешний не меньше внутреннего.
+ * Туман считается ТОЛЬКО по этим кругам, и граница обзора на карте рисуется из них же:
+ * видно ровно то, что внутри нарисованной границы.
+ */
+export interface SightCircle {
+  owner: PlayerId;
+  /** Чей это круг: свой мир, флот или скан героя — клиент выделяет круг выбранного. */
+  source: { kind: 'world' | 'fleet' | 'reveal'; id: string };
+  x: number;
+  y: number;
+  identify: number;
+  signature: number;
+}
+
+/** Круги одного игрока — его собственные глаза и радары. Множитель радара у каждого свой:
+ *  технологии союзника расширяют его радары, а союзник в блэкауте даёт тусклую картинку
+ *  (ECON-2) — ровно как на его собственном экране. Базовые круги мира и флота — «глаза»,
+ *  а не радар: множители радара (и блэкаут) их не трогают. */
+function playerCircles(
   state: GameState,
   ownerId: PlayerId,
   data: GameData,
-  identify: Set<PlanetId>,
-  radar: Set<PlanetId>,
+  rules: Readonly<SightRules>,
+  out: SightCircle[],
 ): void {
-  const mult = radarMultiplier(state, ownerId, data);
+  const mult = radarMultiplier(state, ownerId, data) * rules.radarScale;
+  const circle = (
+    source: SightCircle['source'],
+    at: { x: number; y: number },
+    base: number,
+    radar: number,
+  ): void => {
+    out.push({
+      owner: ownerId,
+      source,
+      x: at.x,
+      y: at.y,
+      identify: Math.max(base, radar * IDENTIFY_REACH_FRACTION),
+      signature: Math.max(base, radar),
+    });
+  };
   for (const planet of Object.values(state.planets)) {
     if (planet.owner !== ownerId) continue;
-    flood(state, planet.id, IDENTIFY_HOPS, identify);
-    let reach = 0;
-    for (const b of planet.buildings) {
-      const def = data.buildings[b.type];
-      if (def) reach = Math.max(reach, buildingLevel(def, b.level).radarRange);
-    }
-    reach *= mult;
-    if (reach > 0) {
-      withinRadius(state, planet.id, reach, radar); // signatures (outer)
-      withinRadius(state, planet.id, reach * IDENTIFY_REACH_FRACTION, identify); // full reveal (inner)
-    }
+    const radar = worldRadarRaw(planet, data) * mult;
+    circle({ kind: 'world', id: planet.id }, planet.position, rules.world, radar);
   }
   for (const fleet of Object.values(state.fleets)) {
     if (fleet.owner !== ownerId) continue;
-    const node = fleetNode(state, fleet);
-    if (node === null) continue;
-    flood(state, node, FLEET_IDENTIFY_HOPS, identify); // own node only — ships are near-blind
-    const reach = fleetRadarRange(fleet, data) * mult;
-    if (reach > 0) {
-      // Radar is a physical signal from the SHIP — centre it on the fleet's actual
-      // continuous position, not the node it is heading to.
-      const pos = fleetPosition(state, fleet);
-      if (pos) {
-        withinRadiusAt(state, pos, reach, radar); // signatures (outer)
-        withinRadiusAt(state, pos, reach * IDENTIFY_REACH_FRACTION, identify); // full reveal (inner)
-      }
-    }
+    // Круг стоит там, где КОРАБЛЬ, а не в узле назначения и не в ближайшем узле.
+    const pos = fleetPosition(state, fleet);
+    if (pos) circle({ kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
   }
-  // HERO-FX3 `reveal` (scan): the viewer's OWN living heroes' active time-boxed reveals
-  // light a full-identify zone around their target node until it expires. Read per-viewer
-  // (this coverage is scoped to one `ownerId`), so a scan never leaks to a rival.
-  const heroes = state.heroes;
-  if (heroes) {
-    for (const hero of Object.values(heroes)) {
-      if (hero.owner !== ownerId || hero.alive !== true) continue; // deployed only (BF-24)
-      const reveals = hero.activeReveals;
-      if (reveals === undefined) continue;
-      for (const r of reveals) {
-        if (r.until > state.time) withinRadius(state, r.center, r.radius, identify);
-      }
+  // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
+  // light a full-identify zone around their target node until it expires.
+  for (const hero of Object.values(state.heroes ?? {})) {
+    if (hero.owner !== ownerId || hero.alive !== true) continue; // deployed only (BF-24)
+    for (const r of hero.activeReveals ?? []) {
+      const at = state.planets[r.center]?.position;
+      if (r.until > state.time && at) circle({ kind: 'reveal', id: hero.id }, at, r.radius, 0);
     }
   }
 }
 
+/** Все круги, которыми видит `viewerId`: его собственные и его блока зрения (союз, обмен
+ *  картами). Порядок фиксирован — зритель, затем `state.players` (инвариант №1). */
+export function sightCircles(state: GameState, viewerId: PlayerId, data: GameData): SightCircle[] {
+  const rules = sightRulesOf(state);
+  const out: SightCircle[] = [];
+  for (const memberId of visionBloc(state, viewerId)) playerCircles(state, memberId, data, rules, out);
+  return out;
+}
+
 /** What `viewerId` can sense this instant: an identify range (full detail) and a
- *  wider radar range (signatures only), driven by world/fleet radar reach — UNIONED
- *  over the viewer's vision bloc, so allies pool their reconnaissance.
+ *  wider radar range (signatures only) — the worlds inside the viewer's sight circles
+ *  (`sightCircles`), UNIONED over the vision bloc, so allies pool their reconnaissance.
  *
  *  This is the single point the whole fog boundary reads: the per-player projection
  *  (`project`), the remembered-fog writer (`visibilityModule`), the broadcast event
  *  filter (`matchRoom`) and threat scanning all route through here, so shared vision
- *  stays consistent across every surface instead of being re-derived per caller. */
+ *  stays consistent across every surface instead of being re-derived per caller.
+ *  Squared distances — exact and deterministic, no sqrt. */
 export function sensorCoverage(state: GameState, viewerId: PlayerId, data: GameData): Coverage {
   const identify = new Set<PlanetId>();
   const radar = new Set<PlanetId>();
-  for (const memberId of visionBloc(state, viewerId)) {
-    accumulateCoverage(state, memberId, data, identify, radar);
+  const circles = sightCircles(state, viewerId, data);
+  for (const planet of Object.values(state.planets)) {
+    for (const c of circles) {
+      const dx = planet.position.x - c.x;
+      const dy = planet.position.y - c.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > c.signature * c.signature) continue;
+      radar.add(planet.id); // identify implies radar: identify ≤ signature by construction
+      if (d2 <= c.identify * c.identify) {
+        identify.add(planet.id);
+        break;
+      }
+    }
   }
-  for (const id of identify) radar.add(id); // identify implies radar
   return { identify, radar };
 }
 

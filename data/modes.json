@@ -26,7 +26,8 @@
         { "unit": "swarm_lander", "count": 2 }
       ],
       "holdHours": 12
-    }
+    },
+    "sight": { "world": 330, "fleet": 90, "radarScale": 2.5 }
   },
   "duel": {
     "name": "Duel",

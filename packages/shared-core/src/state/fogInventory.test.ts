@@ -58,6 +58,9 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // (`MatchSummary.modeId`), — снимать его в проекции значило бы скрыть от игрока за
   // столом то, что он видел, пока выбирал стол.
   modeId: 'public',
+  // Радиусы зрения матча — правила стола, одинаковые для всех (приходят из режима), а не
+  // чья-то разведка: клиент рисует по ним свою границу обзора.
+  sight: 'public',
   time: 'public',
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
@@ -184,6 +187,7 @@ function maximalState(): GameState {
     ...base,
     mapId: 'frontier-100',
     modeId: 'pve_waves',
+    sight: { world: 330, fleet: 90, radarScale: 2.5 },
     startedAt: 0,
     match: {
       status: 'ongoing',
