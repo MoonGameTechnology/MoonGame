@@ -181,8 +181,18 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 /* кошелёк профиля в шапке забега (runWallet.ts) — вместо эмблемы, очков и дня */
 #tbwallet{display:flex;align-items:center;gap:8px;margin-left:auto;}
 #tbwallet[hidden]{display:none;}
-#tbwallet .tw-cur{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid currentColor;border-radius:999px;
-  background:color-mix(in srgb,currentColor 12%,transparent);font:600 12px/1.4 ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+/* Валюта — кнопка: тап раскрывает её описание (.tw-info). Значок крупный, шапке забега места
+   хватает (заказ владельца 2026-09-24: «увеличить иконки, а то вон сколько места»). */
+#tbwallet .tw-cur{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 9px;border:1px solid currentColor;border-radius:999px;
+  background:color-mix(in srgb,currentColor 12%,transparent);font:600 13px/1.4 ui-monospace,monospace;font-variant-numeric:tabular-nums;
+  cursor:pointer;}
+#tbwallet .tw-cur i{font-style:normal;font-size:19px;line-height:1;}
+#tbwallet .tw-cur[aria-expanded="true"]{box-shadow:0 0 0 2px color-mix(in srgb,currentColor 45%,transparent);}
+#tbwallet .tw-cur:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+#tbwallet .tw-info{position:absolute;top:calc(100% + 6px);right:0;z-index:40;margin:0;width:max-content;
+  max-width:min(320px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;border:1px solid currentColor;
+  background:rgba(4,14,18,.97);box-shadow:0 6px 20px rgba(0,0,0,.5);font:500 13px/1.45 system-ui,sans-serif;white-space:normal;}
+#tbwallet .tw-info.tw-sovereigns{color:#ffd978;border-color:rgba(255,207,98,.8);}
 #tbwallet .tw-data{color:var(--cur-data);}
 #tbwallet .tw-warrants{color:var(--cur-warrants);}
 /* Суверены в кошельке — та же золотая стеклянная плашка, что фишка на карте (.dl-donate,
@@ -1704,7 +1714,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
   color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
 .cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
-#devline [data-solo-play],#devline [data-solo-save],#devline [data-swarm-intel]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
+#devline [data-solo-play],#devline [data-solo-save]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
 /* YAG-6.2: пауза забега. Идёт мир — неброская «‖» рядом с часами; стоит — янтарная
    «▶ Продолжить»: после ухода со страницы мир ждёт именно её, и её должно быть видно. */
 #devline-head,#devline-status{display:contents;}
@@ -1748,6 +1758,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
    Без затемнения (жалоба владельца 2026-09-24: «экран чернеет, будто поверх открывается
    всё»): досье — справка к карте, а не модальное окно. Подложка прозрачна и пропускает
    нажатия, карта слева видна и живёт; нажатия ловит только сама панель. */
+/* Язычок досье Роя у правого края (заказ владельца 2026-09-24): вход в досье там, где оно
+   выезжает, — вместо кнопки в строке статуса, которой на телефоне не хватало места. */
+#swarm-tab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:23;display:flex;flex-direction:column;
+  align-items:center;gap:8px;padding:12px 8px;border:1px solid var(--line-hi);border-right:0;border-radius:12px 0 0 12px;
+  background:rgba(3,12,16,.86);color:var(--cyan);box-shadow:0 0 14px rgba(40,200,210,.12);cursor:pointer;
+  font:700 12px/1 system-ui,sans-serif;letter-spacing:.08em;}
+#swarm-tab[hidden]{display:none;}
+#swarm-tab i{font-style:normal;font-size:18px;line-height:1;}
+#swarm-tab span{writing-mode:vertical-rl;}
+#swarm-tab:focus-visible{outline:2px solid var(--cyan);outline-offset:-3px;}
 #swarm-dossier{position:fixed;inset:0;z-index:60;display:none;align-items:stretch;justify-content:flex-end;padding:0;
   background:transparent;pointer-events:none;}
 #swarm-dossier.show{display:flex;}
@@ -3321,6 +3341,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div>
 <nav id="rail">
   <div id="railtools">
+    <!-- Досье Роя — там, где на телефоне у панели нет места в строке статуса (заказ владельца
+         2026-09-24); показывается в PvE-партии, пока досье не приколото справа -->
+    <button id="rail-dossier" type="button" data-i18n-title="swarm.intel.title" style="display:none">☣<span class="rlbl" data-i18n="swarm.intel.title"></span></button>
     <button id="rail-diplo" data-i18n-title="rail.diplo.title">⬡<span class="rlbl" data-i18n="rail.diplo.label"></span></button>
     <button id="rail-msgs" data-i18n-title="rail.msgs.title">✉<span class="rlbl" data-i18n="rail.msgs.label"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
     <button id="rail-pings" data-i18n-title="rail.pings.title">📍<span class="rlbl" data-i18n="rail.pings.label"></span></button>
@@ -3351,6 +3374,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
+<!-- язычок досье Роя у правого края: панель выезжает справа, язычок — её ручка (заказ владельца 2026-09-24) -->
+<button id="swarm-tab" type="button" data-i18n-title="swarm.intel.title" data-i18n-aria="swarm.intel.title" hidden><i aria-hidden="true">☣</i><span data-i18n="swarm.intel.tab"></span></button>
 <div id="swarm-dossier" role="dialog" aria-modal="true" aria-labelledby="swarm-dossier-title"><div class="twbox"><div class="lw-head"><button id="swarm-dossier-fold" class="sd-fold" type="button" aria-expanded="true" aria-controls="swarm-dossier-body"><b id="swarm-dossier-title" data-i18n="swarm.intel.title"></b><span id="swarm-dossier-badge" class="sd-badge"></span><span class="sd-chev" aria-hidden="true"></span></button><span class="swarm-sync" aria-hidden="true" data-i18n="swarm.intel.updated"></span><button id="swarm-dossier-close" class="sp-cancel" type="button" data-i18n="swarm.intel.close"></button></div><div id="swarm-dossier-body"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
@@ -3635,13 +3660,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         <div id="sz-map-body" class="sz-map-body"></div>
         <div id="sz-map-foot" class="sz-map-foot"></div>
       </aside>
-      <!-- Досье Роя: всё, что игрок узнал о Рое за прошлые забеги (swarmCodex.ts) -->
-      <aside id="sz-codex-panel" class="sz-map-panel sz-codex-panel" hidden aria-labelledby="sz-codex-title">
-        <div class="sz-map-head"><span class="sz-map-eyebrow" data-i18n="sector-zero.codex.eyebrow"></span><b id="sz-codex-title" data-i18n="sector-zero.codex.open"></b><button id="sz-codex-close" class="sz-panel-x" type="button" data-i18n-aria="sector-zero.codex.close" data-i18n-title="sector-zero.codex.close"><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button></div>
-        <div id="sz-codex-body" class="sz-codex-body"></div>
-      </aside>
     </div>
     <div id="sz-workshop" hidden></div>
+    <!-- Досье Роя — своё окно, как «Подготовка» (заказ владельца 2026-09-24): всё, что игрок
+         узнал о Рое за прошлые экспедиции (swarmCodex.ts) -->
+    <div id="sz-codex-screen" hidden></div>
     <div class="sz-bottomline"><span data-i18n="sector-zero.title"></span><span aria-hidden="true">00 / ∞</span></div>
   </div>
 </section>

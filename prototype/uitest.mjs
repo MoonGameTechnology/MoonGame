@@ -530,23 +530,47 @@ assert.equal(academy.match(/class="hero-portrait"/g)?.length, 6, 'every hero sho
 assert.equal(academy.match(/sz-face sz-face-locked/g)?.length, 4, 'locked heroes are dimmed');
 assert.ok(!academy.includes('sz-crest'), 'the letter crest is only a fallback for heroes without art');
 await prep('back');
+// Досье Роя — своё окно, как «Подготовка» (заказ владельца 2026-09-24): меню уступает ему
+// место, а «В главное меню» возвращает меню на экран.
+await click('sz-codex');
+assert.equal(getEl('sz-codex-screen').hidden, false, 'the dossier opens its own screen');
+assert.equal(getEl('sz-home').hidden, true, 'the menu steps aside, as for preparation');
+assert.ok(getEl('sz-codex-screen').innerHTML.includes('data-codex="back"'));
+assert.ok(getEl('sz-codex-screen').innerHTML.includes('sz-codex-sum'), 'the dossier content is on the screen');
+for (const handle of (listeners.get(getEl('sz-codex-screen')) ?? {}).click ?? [])
+  handle({ target: { closest: (sel) => (sel === '[data-codex="back"]' ? {} : null) } });
+assert.equal(getEl('sz-codex-screen').hidden, true);
+assert.equal(getEl('sz-home').hidden, false, 'back returns to the menu');
 await click('sz-strong');
 await click('sz-new');
 assert.equal(getEl('sector-zero').style.display, 'none');
 assert.equal(getEl('setup').style.display, 'none');
 assert.equal(getEl('scipick').classList.contains('show'), false);
 for (let i = 0; i < 12 && rafCbs.length; i++) { await rafCbs.shift()(performance.now()); frames++; }
-assert.ok(getEl('devline-status').innerHTML.includes('data-swarm-intel'));
-for (const handle of (listeners.get(getEl('devline')) ?? {}).click ?? [])
-  handle({ target: { closest: selector => selector === '[data-swarm-intel]' ? ({ dataset: { swarmIntel: '1' } }) : null } });
+// Досье Роя на телефоне (заказ владельца 2026-09-24): в строке статуса кнопки больше нет —
+// её обрезало; входы — пункт гамбургера и язычок у правого края, и оба открывают досье.
+const frames3 = async () => { for (let i = 0; i < 3 && rafCbs.length; i++) await rafCbs.shift()(performance.now()); };
+assert.ok(!getEl('devline-status').innerHTML.includes('data-swarm-intel'), 'no dossier button in the status row');
+assert.equal(getEl('swarm-tab').hidden, false, 'the right-edge tab offers the dossier');
+await click('swarm-tab');
 assert.equal(getEl('swarm-dossier').classList.contains('show'), true);
 assert.ok(getEl('swarm-dossier-body').innerHTML.length > 0);
+await frames3();
+assert.equal(getEl('swarm-tab').hidden, true, 'the tab steps aside while the panel is out');
 await click('swarm-dossier-close');
 assert.equal(getEl('swarm-dossier').classList.contains('show'), false);
+await frames3();
+assert.equal(getEl('swarm-tab').hidden, false, 'the tab is back once the panel closes');
+await click('rail-dossier');
+assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'the hamburger item opens the dossier too');
+await click('swarm-dossier-close');
 dossierMedia.matches = true;
 const dossierNow = performance.now();
 mod.exports.repaintDossier(dossierNow);
 assert.equal(getEl('swarm-dossier').classList.contains('pinned'), true);
+await frames3();
+assert.equal(getEl('rail-dossier').style.display, 'none', 'a docked dossier needs no hamburger entry');
+assert.equal(getEl('swarm-tab').hidden, true, 'a docked dossier needs no tab');
 assert.equal(getEl('swarm-dossier').classList.contains('show'), true, 'PC dossier opens automatically');
 assert.equal(getEl('swarm-dossier').role, 'complementary');
 assert.equal(getEl('swarm-dossier')['aria-modal'], undefined);
@@ -569,6 +593,9 @@ dossierMedia.matches = false;
 mod.exports.repaintDossier();
 assert.equal(getEl('swarm-dossier').classList.contains('show'), false, 'resize restores the compact modal');
 assert.equal(getEl('swarm-dossier').role, 'dialog');
+await frames3();
+assert.equal(getEl('rail-dossier').style.display, '', 'the compact dossier is back in the hamburger');
+assert.equal(getEl('swarm-tab').hidden, false, 'and at the right edge');
 await click('tomenu');
 assert.equal(getEl('sz-continue').hidden, false, 'a live run is offered after returning to menu');
 let saved = JSON.parse(storage.get('void.run.v1'));

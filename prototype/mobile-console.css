@@ -379,10 +379,13 @@ body.mobile-ui.aim-mode #toasts .toast:not(.jump) {
 body.mobile-ui #railtoggle {
   border-radius: 14px;
 }
+/* The bar hugs its buttons from the right edge instead of stretching from the rail: an
+   expedition shows only ‖ ▶ ▶▶ ⌂, and a stretched bar left an empty band to the left of the
+   pause (owner, 2026-09-24). The cap keeps the 76px rail strip clear, as `left: 76px` did,
+   so a full match's longer row still wraps before it reaches the rail. */
 body.mobile-ui #speedbar {
-  left: 76px;
   right: max(8px, env(safe-area-inset-right));
-  max-width: none;
+  max-width: calc(100vw - 76px - max(8px, env(safe-area-inset-right)));
   border-radius: 14px;
   gap: 5px;
 }
