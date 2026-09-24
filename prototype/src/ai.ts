@@ -12,6 +12,7 @@ import {
   abilityRange,
   getStance,
   heroCooldownKey,
+  knownSkillNodes,
   MARKET_COMMISSION,
   moduleAllowed,
   previewBattle,
@@ -1523,16 +1524,17 @@ export function aiOrders(
     // 2. ДЕРЕВО НАВЫКОВ — один узел за тик, как одна стройка за тик в экономике.
     //    Ветку узла против ветки архетипа и цепочку `requires` судит ядро; здесь их
     //    ЗЕРКАЛО ровно в той мере, чтобы не отдавать заведомо отбиваемый приказ.
+    //    Изученное — купленное И врождённое (AUD-22): набор считает то же `knownSkillNodes`.
     for (const x of roster) {
       if (x.alive === false) continue;
       const branch = x.archetype !== undefined ? data.heroes[x.archetype]?.branch : undefined;
-      const taken = x.skills ?? [];
+      const taken = knownSkillNodes(x.skills ?? [], x.archetype, data);
       const node = Object.keys(data.heroSkillTrees)
         .filter((id) => {
           const def = data.heroSkillTrees[id];
-          if (!def || taken.includes(id)) return false;
+          if (!def || taken.has(id)) return false;
           if (def.branch !== undefined && def.branch !== branch) return false;
-          if (!(def.requires ?? []).every((parent) => taken.includes(parent))) return false;
+          if (!(def.requires ?? []).every((parent) => taken.has(parent))) return false;
           return affordableCost(def.cost);
         })
         .sort(byPrice((id) => data.heroSkillTrees[id]?.cost))[0];

@@ -26,6 +26,7 @@ import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
 import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
+import { knownSkillNodes } from '../util/heroSkills';
 import { moduleAllowed, type SlotCounts } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
 
@@ -582,7 +583,7 @@ export const heroModule: GameModule = {
   // 4.0.0 — AUD-18: сняты наследные `hero.move` и `planet.annihilate` (контракт действий
   // сузился, отсюда мажор). 3.1.0 — CORE-DMG-3: пассивы и +5% носителю героя во всех
   // каналах, где стреляет флот.
-  version: '4.0.0',
+  version: '4.1.0', // AUD-22: узел, чья награда у архетипа со старта, считается изученным
   setup(api) {
 
     // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
@@ -917,7 +918,10 @@ export const heroModule: GameModule = {
       const def = h.ctx.data.heroSkillTrees[node];
       if (!def) return h.reject('E_NO_NODE');
       const skills = hero.skills ?? [];
-      if (skills.includes(node)) return h.reject('E_ALREADY_UNLOCKED');
+      // AUD-22: a node whose every grant the archetype carries from birth counts as
+      // learned — buying it would buy nothing, and the nodes that require it are open.
+      const known = knownSkillNodes(skills, hero.archetype, h.ctx.data);
+      if (known.has(node)) return h.reject('E_ALREADY_UNLOCKED');
       // A branch node is exclusive to heroes of that branch (via the archetype); a
       // branchless "common" node is open to everyone, incl. archetype-less heroes.
       if (def.branch !== undefined) {
@@ -925,7 +929,7 @@ export const heroModule: GameModule = {
           hero.archetype !== undefined ? h.ctx.data.heroes[hero.archetype]?.branch : undefined;
         if (branch !== def.branch) return h.reject('E_WRONG_BRANCH');
       }
-      if (!def.requires.every((parent) => skills.includes(parent))) {
+      if (!def.requires.every((parent) => known.has(parent))) {
         return h.reject('E_REQUIRES');
       }
       chargeOrReject(h, action.playerId, def.cost);

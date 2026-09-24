@@ -16,6 +16,7 @@ import {
   forgeLadderOf,
   sectorHullIds,
   sectorModuleIds,
+  sectorSkillCard,
   sectorSkillCost,
   sectorSkillOpenTo,
   WARRANTS_PER_REWARD,
@@ -473,8 +474,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       body += `<p class="sz-tier">${t('sector-zero.academy.tier', { n: tier })}</p><div class="sz-cards">`;
       for (const id of tiers.get(tier)!) {
         const node = data.heroSkillTrees[id]!;
-        const owned = hero.skills.includes(id);
-        const missing = node.requires.filter((r) => !hero.skills.includes(r));
+        const { owned, missing } = sectorSkillCard(heroId, hero, id, data);
         const cost = sectorSkillCost(id, data);
         // Предпосылки называются только когда их НЕ хватает: у открытого узла это шум.
         const prereq = missing.length

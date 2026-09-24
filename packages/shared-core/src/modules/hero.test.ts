@@ -1147,6 +1147,24 @@ describe('hero — skill tree (HERO-7)', () => {
     expect(both.state.heroes![HERO_ID]!.skills).toContain('synthesis');
   });
 
+  it('AUD-22: узел, чья награда у архетипа со старта, уже изучен — и открывает детей', () => {
+    // Решение владельца 2026-09-24: платить за то, что у героя уже есть, нельзя.
+    const kitData: GameData = {
+      ...data,
+      heroes: { ...data.heroes, raider: { ...data.heroes.raider!, startPassives: ['swift'] } },
+    };
+    const kctx = (now: number): Context => ({ now, data: kitData });
+    const st = skillWorld();
+    expect(errCode(kernel.applyAction(st, unlock('neural_lace'), kctx(0)))).toBe(
+      'E_ALREADY_UNLOCKED',
+    );
+    expect(st.players.p1?.resources.metal).toBe(50); // отказ ничего не стоит
+    // Узел, который требует врождённого, открыт: родитель засчитан как изученный.
+    const child = okApply(kernel.applyAction(st, unlock('overclock'), kctx(0)));
+    expect(child.state.heroes![HERO_ID]!.skills).toEqual(['overclock']);
+    expect(child.state.players.p1?.resources.metal).toBe(10);
+  });
+
   it('a branchless hero takes only common nodes; an archetype-less hero is branchless', () => {
     // No archetype ⇒ no branch ⇒ branch nodes are closed…
     const st = world();
