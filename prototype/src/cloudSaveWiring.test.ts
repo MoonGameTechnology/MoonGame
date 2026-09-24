@@ -80,7 +80,7 @@ describe('YAG-2.2 — сверка на старте', () => {
     expect(sync).toMatch(
       /if \(plan === 'choose'[^)]*\) \{\s+cloudState = 'held';\s+cloudFork = [^;]+;\s+return;/,
     );
-    expect(body('pushCloud')).toContain("if (cloudState !== 'on') return;");
+    expect(body('pushCloud')).toContain("if (cloudState !== 'on' || !ownsSectorZero()) return;");
   });
 
   it('облако не ответило вовремя — в этой сессии его нет, а не зависшее меню', () => {

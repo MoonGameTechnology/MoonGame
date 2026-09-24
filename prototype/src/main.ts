@@ -306,7 +306,8 @@ import {
   type RunSave,
   type RunSaveStore,
 } from '../../decisions/runSave';
-import { localRunSaveStore, PORTABLE_RUN_KEY } from './runSaveLocal';
+import { localRunSaveStore, PORTABLE_RUN_KEY, RUN_SAVE_KEY } from './runSaveLocal';
+import { TAB_OWNER_KEY, tabSuperseded } from '../../decisions/tabLock';
 import { portableRunPreview, sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import {
   describeRun,
@@ -13605,11 +13606,23 @@ function restoreSolo(): void {
  * `RunSaveStore`. В релизной сборке площадки сюда встанет облачное хранилище, и код
  * ниже не изменится — в этом и была цена асинхронного интерфейса.
  */
-const runSaveStore: RunSaveStore = localRunSaveStore();
+/**
+ * Одна вкладка — один писатель Sector Zero (`AUD-29`, `decisions/tabLock.ts`). Две вкладки
+ * одной игры держали по копии профиля в памяти и молча затирали записи друг друга, а
+ * облако этого не видело: имя устройства и номера правок у них общие. Хозяйка — вкладка,
+ * последней открывшая Sector Zero (`claimSectorZero`); профиль, журнал забега, отметку и
+ * облако пишет только она, и спрашивает об этом хранилище в момент записи.
+ */
+const TAB_ID =
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+function ownsSectorZero(): boolean {
+  return !tabSuperseded(TAB_ID, readRaw(TAB_OWNER_KEY));
+}
+const runSaveStore: RunSaveStore = localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero);
 // Дескриптор забега (`YAG-2.1`) — рядом с полным снимком. Снимок точнее, дескриптор живучее:
 // шесть полей переживают смену формы мира после обновления игры, блоб — нет.
-const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY);
-const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY);
+const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero);
+const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero);
 // Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
 // Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
 // он один раз — у сохранённого профиля свой сид, и разбор его сохраняет.
@@ -13907,7 +13920,7 @@ let cloudRunAt = 0;
 const CLOUD_RUN_EVERY_MS = 30_000;
 
 function writeSyncMark(): void {
-  writeRaw(CLOUD_MARK_KEY, JSON.stringify(syncMark));
+  if (ownsSectorZero()) writeRaw(CLOUD_MARK_KEY, JSON.stringify(syncMark));
 }
 /** Профиль или дескриптор забега изменился — новая правка, и облако её получит. */
 function bumpCloudRev(): void {
@@ -13919,7 +13932,8 @@ function bumpCloudRev(): void {
  *  «есть ли что отправлять». `flush` — страница уходит: сразу, а не в окно квоты. */
 function pushCloud(flush = false): void {
   cloudWrite = cloudWrite.then(async () => {
-    if (cloudState !== 'on') return;
+    // Облако пишет та же вкладка, что и хранилище (AUD-29): копия вытесненной отстаёт.
+    if (cloudState !== 'on' || !ownsSectorZero()) return;
     await progressWrite;
     await runWrite;
     const run = await portableRunStore.load();
@@ -14278,10 +14292,62 @@ function launchSectorRun(): void {
   playChapterComic(pveChapter(nextSectorMission).id, 'intro', () => startPvEMatch());
 }
 
+/**
+ * Эта вкладка становится хозяйкой Sector Zero (AUD-29). Хозяйкой до неё была другая —
+ * значит, память этой могла отстать от хранилища (вкладка хаба грузила профиль давно,
+ * а другая с тех пор играла): профиль и отметка облака перечитываются, а забег в памяти
+ * снимается — меню возьмёт его журнал из хранилища, где лежит самый свежий.
+ */
+function claimSectorZero(): void {
+  const previous = readRaw(TAB_OWNER_KEY);
+  writeRaw(TAB_OWNER_KEY, TAB_ID);
+  if (!tabSuperseded(TAB_ID, previous)) return;
+  if (runInProgress()) setRunActive(false);
+  savedRun = null;
+  savedPortable = null;
+  const mark = readRaw(CLOUD_MARK_KEY);
+  if (mark !== null) syncMark = parseSyncMark(mark);
+  progressWrite = progressWrite
+    .then(() => sectorProgressStore.load())
+    .then((raw) => {
+      if (raw) sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
+    });
+}
+
+/** Sector Zero перехватила другая вкладка, а эта его показывает: мир встаёт, экран
+ *  закрывается заставкой. «Играть здесь» перезагружает вкладку — та перехватит его обратно
+ *  и прочтёт свежее хранилище, а не свою отставшую память. */
+let tabTaken: HTMLElement | null = null;
+function checkTabOwner(): void {
+  if (ownsSectorZero() || !(sectorZeroMenu.isOpen() || (sectorRunActive && !NET))) return;
+  runPauseEvent('hidden');
+  if (tabTaken) return;
+  tabTaken = document.createElement('div');
+  tabTaken.id = 'tab-taken';
+  tabTaken.setAttribute('role', 'alertdialog');
+  const title = document.createElement('h1');
+  title.textContent = t('sector-zero.tab-taken.title');
+  const text = document.createElement('p');
+  text.textContent = t('sector-zero.tab-taken.text');
+  const here = document.createElement('button');
+  here.type = 'button';
+  here.textContent = t('sector-zero.tab-taken.here');
+  here.addEventListener('click', () => location.reload());
+  tabTaken.append(title, text, here);
+  document.body.append(tabTaken);
+  here.focus({ preventScroll: true });
+}
+addEventListener('storage', (event) => {
+  if (event.key === TAB_OWNER_KEY) checkTabOwner();
+});
+// Вкладка из кэша «назад/вперёд» событий `storage` не слышала — сверяется на возврате.
+addEventListener('pageshow', checkTabOwner);
+
 /** `replay` — сразу новая попытка той же главы (кнопка итогов «Сыграть главу снова»). Идёт
  *  через открытие меню: оно засчитывает и стирает закончившийся забег, и только потом
  *  стартует новый — тем же путём, что кнопка «Новый забег». */
 function openSectorZero(preparation = false, replay = false): void {
+  claimSectorZero();
   saveSolo();
   speed = 0;
   userClosed = true;

@@ -60,3 +60,23 @@ describe('локальный бэкенд сохранения забега (PVR
     await expect(s.clear()).resolves.toBeUndefined();
   });
 });
+
+describe('AUD-29 — пишет только вкладка-хозяйка', () => {
+  it('вытесненная вкладка не пишет и не стирает, а читать может', async () => {
+    const cell = new Map<string, string>([[RUN_SAVE_KEY, 'чужой забег']]);
+    withStorage({
+      getItem: (k) => cell.get(k) ?? null,
+      setItem: (k, v) => void cell.set(k, v),
+      removeItem: (k) => void cell.delete(k),
+    });
+    let owner = false;
+    const s = localRunSaveStore(RUN_SAVE_KEY, () => owner);
+    await s.save(blob);
+    await s.clear();
+    expect(cell.get(RUN_SAVE_KEY)).toBe('чужой забег');
+    expect(await s.load()).toBe('чужой забег');
+    owner = true; // спрашивается в момент записи, а не при создании
+    await s.save(blob);
+    expect(cell.get(RUN_SAVE_KEY)).toBe(blob);
+  });
+});
