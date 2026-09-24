@@ -420,4 +420,19 @@ describe('удар челноков — попадание и возврат (п
     s = advance(s, 4); // вернулись + отстояли перезарядку (rearmRounds 2 часа)
     expect(code(s, strike({ targetFleetId: 'E1' }))).toBeNull();
   });
+
+  it('ПЕРЕЗАРЯДКА НЕ ЗАВИСИТ ОТ НАРЕЗКИ ВРЕМЕНИ: десять минут шестью шагами — тот же час (AUD-27)', () => {
+    // Ядро режет время на отрезки у каждого запланированного события, и во время боёв
+    // они короче часа. Считай база часы отрезка по отдельности — перезарядка стояла бы.
+    let s = world({ hangar: 4 });
+    s = apply(s, split([{ unit: 'interceptor', count: 2 }]));
+    const second = (s.planets.A?.hangar ?? []).find((q) => q.id !== 'sq:interceptor')!.id;
+    s = apply(s, strike({ targetFleetId: 'E1' }));
+    s = apply(s, strike({ targetFleetId: 'E1' }, second));
+    const whole = advance(s, 4);
+    let sliced = s;
+    for (let i = 0; i < 24; i++) sliced = advance(sliced, 1 / 6);
+    expect(sliced.planets.A?.sortie).toEqual(whole.planets.A?.sortie);
+    expect(code(sliced, strike({ targetFleetId: 'E1' }))).toBeNull();
+  });
 });

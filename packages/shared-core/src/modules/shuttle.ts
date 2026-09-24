@@ -59,6 +59,7 @@ import {
   squadronReach,
   tickRearm,
   trimHangar,
+  type SortieState,
 } from '../state/shuttle';
 import {
   applyDamageToSide,
@@ -183,8 +184,8 @@ interface BaseView {
   disabled: boolean;
   hangar: Squadron[];
   setHangar: (next: Squadron[]) => void;
-  sortie: { fuel: number; rearming: number } | undefined;
-  setSortie: (next: { fuel: number; rearming: number }) => void;
+  sortie: SortieState | undefined;
+  setSortie: (next: SortieState) => void;
 }
 
 function planetBase(planet: Planet, data: GameData): BaseView {
@@ -906,7 +907,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
 
 export const shuttleModule: GameModule = {
   id: 'shuttle',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -1575,11 +1576,16 @@ export const shuttleModule: GameModule = {
 
     /** Перезарядка идёт ДОМА: час мира — раунд перезарядки (SHU-1.2). «Дом» — любая
      *  база: и космопорт, и носитель (SHU-2.1), поэтому счётчик тикает у обоих одним
-     *  правилом, а не двумя копиями, которые разъедутся. */
+     *  правилом, а не двумя копиями, которые разъедутся.
+     *
+     *  Часы считаются от НАКОПЛЕННОГО времени, а не от отрезка (AUD-27): остаток сверх
+     *  целых часов переходит в следующий отрезок (`SortieState.carry`). Иначе итог зависел
+     *  бы от нарезки времени — от частоты событий и вызовов `advanceTo`. */
     api.on('time.advanced', (event, h: HandlerContext) => {
       const { from, to } = event.payload as { from: number; to: number };
-      const hours = Math.floor((to - from) / hourMs(h));
-      if (hours <= 0) return;
+      const span = to - from;
+      if (!(span > 0)) return;
+      const hour = hourMs(h);
       const bases: BaseView[] = [
         ...Object.values(h.state.planets).map((planet) => planetBase(planet, h.ctx.data)),
         ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
@@ -1588,9 +1594,12 @@ export const shuttleModule: GameModule = {
         const sortie = base.sortie;
         if (!sortie || sortie.rearming <= 0) continue;
         const spec = baseSortieSpec(base, h.state, h.ctx.data);
-        let next = sortie;
+        const total = (sortie.carry ?? 0) + span;
+        const hours = Math.floor(total / hour);
+        let next: SortieState = { fuel: sortie.fuel, rearming: sortie.rearming };
         for (let i = 0; i < hours && next.rearming > 0; i++) next = tickRearm(next, spec.maxFuel);
-        base.setSortie(next);
+        const carry = total - hours * hour;
+        base.setSortie(next.rearming > 0 && carry > 0 ? { ...next, carry } : next);
       }
     });
 

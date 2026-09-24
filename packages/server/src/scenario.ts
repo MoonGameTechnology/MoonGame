@@ -204,7 +204,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '37'; // Сеть Роя (`docs/swarm-behavior.md`): добавлен
+export const MODULE_MANIFEST_VERSION = '38'; // AUD-27: членство и порядок не тронуты;
+// `shuttle` 1.2.0 считает перезарядку баз от накопленного времени (`SortieState.carry`), а не
+// от каждого отрезка отдельно. Партия на 37 во время боёв стояла без перезарядки: подняв её
+// под новым кодом, мы молча сменили бы ей темп вылетов посреди игры.
+// export const MODULE_MANIFEST_VERSION = '37'; // Сеть Роя (`docs/swarm-behavior.md`): добавлен
 // swarmNetModule — знание Роя течёт только по связи ретрансляторов и центров данных. Изменилось
 // ЧЛЕНСТВО графа, и порядок значим: сеть стоит между памятью (она рождает наблюдение) и
 // адаптацией (она читает знание части). `swarmAdapt` 2.0.0 — проекты по одному на часть сети
