@@ -88,6 +88,7 @@ import {
   FORCED_MARCH_MULT,
   instantRepairFleet,
   premiumRepairFleet,
+  buySupply,
   instantRepairCost,
   repairFleet,
   dockRepairCost,
@@ -168,7 +169,10 @@ import {
   scanNodeThreats,
   identifiedNodes,
   sensorCoverage,
-  fleetRadarRange,
+  sightCircles,
+  sightRulesOf,
+  worldRadarReach,
+  fleetRadarReach,
   abilityRange,
   hangarMachines,
   type Squadron,
@@ -355,10 +359,7 @@ import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { frontierOutline } from './frontierOutline';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
 import {
-  hasCoverage,
-  identifyRadius,
   mergeArms,
-  radarSources,
   rangeRings,
   sweepChromeShown,
 } from './radarSources';
@@ -2542,15 +2543,20 @@ function fleetSignature(f: Fleet): number {
   return coreFleetSignature(f.units, (u) => data.units[u]);
 }
 /** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
- *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarRange` — не своя копия правила: когда копия
+ *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarReach` — не своя копия правила: когда копия
  *  тут читала только `data.units[u].radarRange`, установленный радар-модуль на карте
- *  не считался, хотя игрок за него платил. */
+ *  не считался, хотя игрок за него платил. С масштабом режима и множителем владельца —
+ *  тот же радиус, что считает туман. */
 function fleetRadar(f: Fleet): number {
-  return fleetRadarRange(f, data);
+  return fleetRadarReach(s, f, data);
 }
-/** Слух мира: лучший из его массивов и по УРОВНЮ — правила 5–6 в `sensorScale.ts`. */
+/** Слух мира: лучший из его массивов и по УРОВНЮ — правила 5–6 в `sensorScale.ts`. Своему
+ *  миру — ровно то, что считает туман (масштаб режима, технологии, блэкаут); чужому —
+ *  только масштаб режима: его технологии — не наша разведка. */
 function planetRadar(p: Planet): number {
-  return corePlanetRadar(p.buildings, (t) => data.buildings[t]);
+  return p.owner === ME
+    ? worldRadarReach(s, p, data)
+    : corePlanetRadar(p.buildings, (t) => data.buildings[t]) * sightRulesOf(s).radarScale;
 }
 interface Vision {
   identify: Set<string>;
@@ -4153,30 +4159,14 @@ function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier
 }
 
 function drawRadarCoverage() {
-  // My radar sources (planet arrays + radar-ships), tagged so a SELECTED entity can
-  // also show its own precise range on top of the merged frontier.
-  // Отбор источников — `radarSources.ts` (REFM-63): только свои, только с
-  // положительным радиусом, кольцо флота — в его ФАКТИЧЕСКОМ месте, а не в узле
-  // назначения (иначе покрытие прыгает вперёд флота).
+  // Граница обзора — из ТЕХ ЖЕ кругов, по которым ядро считает туман (`sightCircles`,
+  // решение владельца 2026-09-24: «круги везде»): видно ровно то, что внутри неё. Круги
+  // свои и союзные (блок зрения); у мира и флота есть базовый круг обзора и без радара.
+  // Раньше граница собиралась из радаров одного игрока без множителя технологий, а туман
+  // считался иначе — мир светился за нарисованной границей.
+  const circles = sightCircles(s, ME, data);
+  if (circles.length === 0) return;
   const selFleetSet = new Set(selectedFleetIds());
-  const sources = radarSources([
-    ...Object.values(s.planets).map((p) => ({
-      mine: p.owner === ME,
-      radius: planetRadar(p),
-      at: p.position,
-      selected: selPlanet === p.id,
-    })),
-    ...Object.values(s.fleets).map((f) => {
-      const r = f.owner === ME ? fleetRadar(f) : 0;
-      return {
-        mine: f.owner === ME,
-        radius: r,
-        at: r > 0 ? fleetPos(f) : null,
-        selected: selFleetSet.has(f.id),
-      };
-    }),
-  ]);
-  if (!hasCoverage(sources)) return;
   // Project map circles to screen circles (uniform projection ⇒ true circles) — радиус
   // считает `worldDist`, а не проекция смещённой точки: это тот же множитель окольным
   // путём (`mapRadius.ts`, правило 3).
@@ -4184,16 +4174,20 @@ function drawRadarCoverage() {
     const c = world({ x, y });
     return { x: c.x, y: c.y, r: worldDist(rr) };
   };
-  const outer = sources.map((v) => screen(v.x, v.y, v.r));
-  const inner = sources.map((v) => screen(v.x, v.y, identifyRadius(v.r, IDENTIFY_REACH_FRACTION)));
+  const outer = circles.map((v) => screen(v.x, v.y, v.signature));
+  const inner = circles.map((v) => screen(v.x, v.y, v.identify));
   cx.save();
   // The unified visibility frontier: outer (signatures) then inner (full reveal).
   drawUnionTier(outer, 'signature');
   drawUnionTier(inner, 'reveal');
   // A selected planet/fleet additionally shows ITS OWN two rings — crisp + dashed —
   // so you can read one entity's exact reach out of the merged whole.
-  for (const v of sources) {
-    if (!v.selected) continue;
+  for (const v of circles) {
+    const selected =
+      v.owner === ME &&
+      ((v.source.kind === 'world' && v.source.id === selPlanet) ||
+        (v.source.kind === 'fleet' && selFleetSet.has(v.source.id)));
+    if (!selected) continue;
     const c = world({ x: v.x, y: v.y });
     // Пунктир внешнего и сплошная внутреннего — `sightFrontier.ts` (REFM-120, правило 6).
     const ring = (rr: number, tier: SightTier): void => {
@@ -4207,8 +4201,8 @@ function drawRadarCoverage() {
       cx.strokeStyle = rgba(LOCK, look.alpha);
       cx.stroke();
     };
-    ring(v.r, 'signature'); // outer — signatures
-    ring(identifyRadius(v.r, IDENTIFY_REACH_FRACTION), 'reveal'); // inner — full reveal
+    ring(v.signature, 'signature'); // outer — signatures
+    ring(v.identify, 'reveal'); // inner — full reveal
   }
   cx.setLineDash([]);
   cx.restore();
@@ -10105,6 +10099,36 @@ const resourceCard = initResourceCard({
   icons: RES_SVG,
   onOpenMarket: (res) => market?.open(res),
   marketShown: () => toolShown('market', sectorZeroToolsHidden()),
+  // Пакет снабжения за Суверены (решение владельца 2026-09-24): состав и лимит — правило
+  // мира (режим), цена — магазин профиля.
+  supply: () => {
+    if (!isSectorZeroRun()) return null;
+    const cfg = data.modes[matchMode() ?? '']?.pve?.supply;
+    const { price } = data.sectorZeroShop.runSupply;
+    if (!cfg || cfg.perRun <= 0 || price <= 0) return null;
+    const bought = s.pve?.supplies?.[ME] ?? 0;
+    return {
+      pack: cfg.pack,
+      price,
+      perRun: cfg.perRun,
+      left: Math.max(0, cfg.perRun - bought),
+      affordable: sectorProgress.sovereigns >= price,
+    };
+  },
+  // Как ремонт за Суверены: сперва профиль может ли заплатить, потом ядро выдаёт пакет, и
+  // только потом списание — отказ ядра (лимит, конец забега) не стоит игроку валюты.
+  onBuySupply: () => {
+    if (!isSectorZeroRun()) return;
+    const paid = changeSectorZeroProgress(sectorProgress, { kind: 'run-supply' }, data);
+    if (!paid) {
+      toast(t('rescard.supply.poor', { price: data.sectorZeroShop.runSupply.price }));
+      return;
+    }
+    if (playerOrder(buySupply(ME))) {
+      saveSectorProgress(paid);
+      note(t('rescard.supply.done'));
+    }
+  },
 });
 
 

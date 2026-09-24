@@ -1009,6 +1009,13 @@ export const SectorZeroShopSchema = z.object({
       perDay: z.number().int().nonnegative().default(0),
     })
     .prefault({}),
+  /** Цена пакета снабжения забега в Суверенах (решение владельца 2026-09-24). Что в пакете
+   *  и сколько раз за забег — правило МИРА, оно в режиме (`pve.supply`). Ноль — покупки нет. */
+  runSupply: z
+    .object({
+      price: z.number().int().nonnegative().default(0),
+    })
+    .prefault({}),
 });
 
 export const HeroGradeDefSchema = z.object({
@@ -1252,6 +1259,28 @@ export const ModePveSchema = z
      *  by wave ten). The wipe stays as the early finish. Absent ⇒ the pre-existing rule
      *  only (invariant #3: absent data → base default). */
     holdHours: z.number().positive().optional(),
+    /** Пакет снабжения за Суверены (решение владельца 2026-09-24): что приходит в казну
+     *  за одну покупку и сколько покупок на забег. Цену в Суверенах знает магазин профиля
+     *  (`sectorZeroShop.runSupply`) — у матча этой валюты нет. Нет раздела ⇒ `pve.supply`
+     *  отказывает (`E_NO_SUPPLY`). */
+    supply: z
+      .object({
+        perRun: z.number().int().nonnegative(),
+        pack: z.record(z.string(), z.number().int().positive()),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+/** Радиусы зрения режима (`SightRules`, `state/gameState.ts`): «единый радиус; для
+ *  Sector Zero — свой по цифрам» (решение владельца 2026-09-24). Нет раздела ⇒ общие
+ *  числа ядра `DEFAULT_SIGHT`. */
+const ModeSightSchema = z
+  .object({
+    world: z.number().nonnegative(),
+    fleet: z.number().nonnegative(),
+    radarScale: z.number().positive(),
   })
   .strict();
 
@@ -1274,6 +1303,8 @@ export const GameModeDefSchema = z.object({
   modules: z.array(z.string()).default([]),
   /** Present ⇒ PvE mode (a common NPC enemy attacking in waves). */
   pve: ModePveSchema.optional(),
+  /** Свои радиусы зрения режима; нет ⇒ общие числа ядра. */
+  sight: ModeSightSchema.optional(),
 });
 
 /** Session-market rules that belong to CONTENT, not to the mechanic (CONV-9).

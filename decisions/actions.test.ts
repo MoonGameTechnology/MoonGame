@@ -20,6 +20,7 @@ import {
   installHeroModule,
   instantRepairFleet,
   premiumRepairFleet,
+  buySupply,
   launchFleet,
   loadArmy,
   loadShuttle,
@@ -166,6 +167,11 @@ describe('строители приказов против схем гейта',
     expect(isValidActionPayload('fleet.premiumRepair', premiumRepairFleet(P, 'f1').payload)).toBe(
       false,
     );
+  });
+
+  it('`pve.supply` гейтом НЕ признан — Суверены за снабжение списывает хост', () => {
+    expect(CLIENT_ACTION_TYPES).not.toContain('pve.supply');
+    expect(isValidActionPayload('pve.supply', buySupply(P).payload)).toBe(false);
   });
 
   it('три приказа каталога не строит НИКТО — у игрока нет способа их отдать', () => {

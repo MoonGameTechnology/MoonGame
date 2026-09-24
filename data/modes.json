@@ -25,8 +25,13 @@
       "waveLanding": [
         { "unit": "swarm_lander", "count": 2 }
       ],
-      "holdHours": 12
-    }
+      "holdHours": 12,
+      "supply": {
+        "perRun": 3,
+        "pack": { "credits": 150, "metal": 150, "food": 100, "energy": 50 }
+      }
+    },
+    "sight": { "world": 330, "fleet": 90, "radarScale": 2.5 }
   },
   "duel": {
     "name": "Duel",

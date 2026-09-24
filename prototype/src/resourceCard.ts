@@ -8,7 +8,7 @@
  */
 import type { GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
-import { esc, flowPer, flowRate } from './format';
+import { esc, flowPer, flowRate, resLine } from './format';
 import { incomeBreakdown } from './economy';
 
 /** Resources that can be traded on the in-game market (credits are the currency). */
@@ -22,13 +22,38 @@ export interface ResourceCardHost {
   onOpenMarket: (resource: string) => void;
   /** Есть ли рынок у игрока сейчас; в забеге Sector Zero его нет (PVR-6.1). */
   marketShown?: () => boolean;
+  /** Пакет снабжения за Суверены (решение владельца 2026-09-24); `null` — купить нельзя
+   *  вовсе (не забег, режим без снабжения), и блока нет. */
+  supply?: () => CardSupply | null;
+  /** Купить пакет: хост платит профилем и зовёт ядро — карточка только сообщает о нажатии. */
+  onBuySupply?: () => void;
+}
+
+/** Что карточка знает о пакете снабжения. */
+export interface CardSupply {
+  pack: Record<string, number>;
+  price: number;
+  /** Покупок осталось в этом забеге. */
+  left: number;
+  perRun: number;
+  /** Хватает ли Суверенов на профиле. */
+  affordable: boolean;
 }
 
 export function initResourceCard(host: ResourceCardHost): { open: (resource: string) => void } {
+  let current = '';
   function paint(resource: string): void {
     const root = host.root();
     if (!root) return;
-    root.innerHTML = resourceCardHtml(host.state(), host.me(), resource, host.icons, host.marketShown?.() ?? true);
+    current = resource;
+    root.innerHTML = resourceCardHtml(
+      host.state(),
+      host.me(),
+      resource,
+      host.icons,
+      host.marketShown?.() ?? true,
+      host.supply?.() ?? null,
+    );
   }
 
   function open(resource: string): void {
@@ -44,6 +69,12 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
       host.root()?.classList.remove('show');
       return;
     }
+    const supplyBtn = tg.closest('[data-rc-supply]') as HTMLButtonElement | null;
+    if (supplyBtn) {
+      if (!supplyBtn.disabled) host.onBuySupply?.();
+      paint(current); // казна и остаток покупок — уже новые
+      return;
+    }
     const marketBtn = tg.closest('[data-rc-market]') as HTMLElement | null;
     if (marketBtn) {
       const res = marketBtn.dataset.rcMarket!;
@@ -57,7 +88,14 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
 }
 
 /** Pure HTML for the resource card. Exported so tests can assert on structure. */
-export function resourceCardHtml(state: GameState, me: string, resource: string, icons: Record<string, string>, market = true): string {
+export function resourceCardHtml(
+  state: GameState,
+  me: string,
+  resource: string,
+  icons: Record<string, string>,
+  market = true,
+  supply: CardSupply | null = null,
+): string {
   const player = state.players[me];
   const stock = Math.round(player?.resources?.[resource] ?? 0);
   const bd = incomeBreakdown(state, me)[resource] ?? { production: 0, buildingUpkeep: 0, unitUpkeep: 0, net: 0 };
@@ -88,9 +126,25 @@ export function resourceCardHtml(state: GameState, me: string, resource: string,
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.army'))}</span><span class="rc-v neg">−${fmt(bd.unitUpkeep)}</span></div>
     <div class="rc-sec">${esc(t('rescard.net'))}</div>
     <div class="rc-flow ${netCls}">${netStr}${esc(flowPer())}</div>
+    ${supply ? supplyHtml(supply) : ''}
     ${market ? `<button class="rc-market ${canTrade ? '' : 'disabled'}" data-rc-market="${esc(resource)}">
       ${canTrade ? esc(t('rescard.market')) : esc(t('rescard.no-trade'))}
     </button>` : ''}
     <button class="rc-close">${esc(t('rescard.close'))}</button>
   </div>`;
+}
+/** Блок «Снабжение»: что в пакете, цена и сколько покупок осталось на забег. Кнопка гаснет,
+ *  когда покупать нечем или больше нельзя, но цену и состав показывает всегда: игрок видит,
+ *  за что копить (`EC-2.3` — стоимость видна до возможности платить). */
+function supplyHtml(supply: CardSupply): string {
+  const out = supply.left <= 0;
+  const hint = out
+    ? t('rescard.supply.none')
+    : !supply.affordable
+      ? t('rescard.supply.poor', { price: supply.price })
+      : t('rescard.supply.left', { n: supply.left, m: supply.perRun });
+  return `<div class="rc-sec">${esc(t('rescard.supply'))}</div>
+    <div class="rc-supply">${resLine(supply.pack, { sign: true })}</div>
+    <button class="rc-buy" data-rc-supply${out || !supply.affordable ? ' disabled' : ''}>${esc(t('rescard.supply.buy', { price: supply.price }))}</button>
+    <div class="rc-note">${esc(hint)}</div>`;
 }

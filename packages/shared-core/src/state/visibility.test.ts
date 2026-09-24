@@ -10,9 +10,13 @@ import {
   type Player,
 } from './gameState';
 import {
+  DEFAULT_SIGHT,
   fleetRadarRange,
   identifiedNodes,
   isVisibleTo,
+  sensorCoverage,
+  sightCircles,
+  sightRulesOf,
   stackRadarRange,
   visibleState,
   visibleView,
@@ -698,6 +702,9 @@ describe('radar — two concentric ranges (inner full-reveal, outer signatures)'
   function radarState(): GameState {
     return {
       ...createInitialState({ seed: 'r', version: { data: '0.1.0', manifest: '1' } }),
+      // Только радар: базовые круги мира и флота обнулены, иначе они накрыли бы кольца,
+      // которые здесь и проверяются.
+      sight: { world: 0, fleet: 0, radarScale: 1 },
       players: { p1: player('p1'), p2: player('p2') },
       planets: {
         H: planet('H', 'p1', [], {
@@ -732,8 +739,9 @@ describe('radar — two concentric ranges (inner full-reveal, outer signatures)'
 
 describe('shared vision — allies pool their reconnaissance (союз / коалиция)', () => {
   /** Three separate neighbourhoods, far enough apart that nobody's radar bleeds into
-   *  another's (no radar buildings at all here — coverage is pure identify-by-jumps,
-   *  so each assertion isolates the sharing rule itself).
+   *  another's (no radar buildings at all here — coverage is pure base sight circles:
+   *  X and Y sit 50 from their homes, inside the default world circle, so each assertion
+   *  isolates the sharing rule itself).
    *
    *    p1 home H1 (alone)   ·   p3 home H3 —— X (unowned, garrisoned)
    *                             p2 home Z  —— Y (unowned, garrisoned)
@@ -909,6 +917,7 @@ describe('decoy — a phantom contact lives in the projection, never in the worl
     return {
       ...createInitialState({ seed: 'd', version: { data: '0.1.0', manifest: '1' } }),
       time: 0,
+      sight: { world: 0, fleet: 0, radarScale: 1 }, // только радар — как в фикстуре колец
       players: { p1: player('p1'), p2: player('p2') },
       planets: {
         H: planet('H', 'p1', [], {
@@ -969,5 +978,83 @@ describe('decoy — a phantom contact lives in the projection, never in the worl
     expect(visibleState(decoyState(at('MID', 20)), 'p1', ddata).signatures).toEqual([
       { location: 'MID', size: 'L' },
     ]);
+  });
+});
+
+describe('зрение — только круги (решение владельца 2026-09-24: «круги везде»)', () => {
+  const at = (x: number, y = 0): Partial<Planet> => ({ position: { x, y } });
+  function circlesState(extra: Partial<GameState> = {}): GameState {
+    return {
+      ...createInitialState({ seed: 'circles', version: { data: '0.1.0', manifest: '1' } }),
+      players: { p1: player('p1'), p2: player('p2') },
+      planets: {
+        HOME: planet('HOME', 'p1', ['FAR_LINKED'], at(0)),
+        // Связан линией, но далеко: раньше его раскрывало соседство по линии.
+        FAR_LINKED: planet('FAR_LINKED', null, ['HOME'], at(781)),
+        // Без линии, но рядом: раньше он оставался в темноте.
+        NEAR_UNLINKED: planet('NEAR_UNLINKED', null, [], at(100)),
+        // Кольцо засечки при масштабе радара 2.5 (радар 300 → 750).
+        RADAR_ONLY: planet('RADAR_ONLY', null, [], at(500)),
+      },
+      ...extra,
+    };
+  }
+
+  it('линия зрения не даёт, расстояние даёт: видно то, что внутри круга', () => {
+    const seen = identifiedNodes(circlesState(), 'p1', data);
+    expect(seen.has('NEAR_UNLINKED')).toBe(true);
+    expect(seen.has('FAR_LINKED')).toBe(false);
+  });
+
+  it('флот видит круг вокруг себя — узел, где стоит, и ближнее, но не дальше круга', () => {
+    const fleet: Fleet = {
+      id: 'f',
+      owner: 'p1',
+      location: 'POST',
+      movement: null,
+      units: [{ unit: 'cruiser', count: 1 }],
+      traits: [],
+    };
+    const st = circlesState({ fleets: { f: fleet } });
+    st.planets.POST = planet('POST', null, [], at(2000));
+    st.planets.BY = planet('BY', null, [], at(2000 + DEFAULT_SIGHT.fleet - 1));
+    st.planets.BEYOND = planet('BEYOND', null, ['POST'], at(2000 + DEFAULT_SIGHT.fleet + 50));
+    const seen = identifiedNodes(st, 'p1', data);
+    expect([seen.has('POST'), seen.has('BY'), seen.has('BEYOND')]).toEqual([true, true, false]);
+  });
+
+  it('числа режима: масштаб радара растягивает оба кольца', () => {
+    const st = circlesState({ sight: { world: 0, fleet: 0, radarScale: 2.5 } });
+    st.planets.HOME!.buildings = [{ type: 'radar', level: 1, hp: 0 }];
+    const home = sightCircles(st, 'p1', data).find((c) => c.source.id === 'HOME')!;
+    expect([home.identify, home.signature]).toEqual([375, 750]); // 300 × 2.5, внутреннее — половина
+    const { identify, radar } = sensorCoverage(st, 'p1', data);
+    expect(identify.has('NEAR_UNLINKED')).toBe(true); // 100 ≤ 375
+    // 375 < 500 ≤ 750: только засечка.
+    expect([identify.has('RADAR_ONLY'), radar.has('RADAR_ONLY')]).toEqual([false, true]);
+  });
+
+  it('туман и граница на карте — одни круги: опознан ровно тот, кто внутри внутреннего', () => {
+    const st = circlesState({ sight: { world: 150, fleet: 40, radarScale: 1 } });
+    st.planets.HOME!.buildings = [{ type: 'radar', level: 2, hp: 0 }];
+    for (let i = 0; i < 40; i++) st.planets[`P${i}`] = planet(`P${i}`, null, [], at(i * 23, (i % 7) * 31));
+    const circles = sightCircles(st, 'p1', data);
+    const { identify } = sensorCoverage(st, 'p1', data);
+    for (const p of Object.values(st.planets)) {
+      const inside = circles.some(
+        (c) => (p.position.x - c.x) ** 2 + (p.position.y - c.y) ** 2 <= c.identify ** 2,
+      );
+      expect([p.id, identify.has(p.id)]).toEqual([p.id, inside]);
+    }
+  });
+
+  it('сломанные числа читаются как общие целиком — карта не слепнет от опечатки', () => {
+    for (const sight of [
+      { world: -1, fleet: 40, radarScale: 1 },
+      { world: 100, fleet: Number.NaN, radarScale: 1 },
+      { world: 100, fleet: 40, radarScale: 0 },
+    ])
+      expect(sightRulesOf({ sight })).toBe(DEFAULT_SIGHT);
+    expect(sightRulesOf({})).toBe(DEFAULT_SIGHT);
   });
 });

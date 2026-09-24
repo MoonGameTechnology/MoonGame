@@ -23,6 +23,7 @@
 | A3 | ✅ |  | `docs/backlog.md` | Разведка флотом: транзитный флот опознаёт ближайший узел по ходу (fleetNode), |
 | A4 | ✅ |  | `docs/backlog.md` | Хелпер isVisibleTo(state, viewer, {planetId/fleetId}, data) — «видим ли объект |
 | A5 | ✅ |  | `docs/backlog.md` | Общая видимость союза/коалиции: coverageFor объединяет покрытие по «блоку |
+| A6 | ✅ |  | `docs/backlog.md` | Зрение — только круги (решение владельца 2026-09-24 после плейтеста: «вижу |
 | B1 | ✅ |  | `docs/backlog.md` | Расширить FactionDef: стартовый лоадаут (startingLoadout: ресурсы/флот/ |
 | B2 | ✅ |  | `docs/backlog.md` | factionModule: пассивы фракции через хуки economy.production/fleet.speed/ |
 | B3 | ✅ |  | `docs/backlog.md` | factionStart(data, faction) — чистая детерминированная сборка старта из |
@@ -1027,6 +1028,7 @@
 | SZE-3.2 | ✅ | data proto | `docs/sector-zero-economy-roadmap.md` | Ассортимент |
 | SZE-3.4 | ✅ | proto | `docs/sector-zero-economy-roadmap.md` | Обновление витрины за рекламу |
 | SZE-3.5 | ✅ | proto data | `docs/sector-zero-economy-roadmap.md` | Суверены за рекламу |
+| SZE-3.6 | ✅ | core proto data | `docs/sector-zero-economy-roadmap.md` | Пакет снабжения забега за Суверены |
 | SZE-3.3 | ⏳ | docs sec | `docs/sector-zero-economy-roadmap.md` | Покупки в Sector Zero и площадка |
 | SZE-4.1 | ✅ | data | `docs/sector-zero-economy-roadmap.md` | Уровень у модуля Роя |
 | SZE-4.2 | ✅ | core | `docs/sector-zero-economy-roadmap.md` | Контригра против уровня |

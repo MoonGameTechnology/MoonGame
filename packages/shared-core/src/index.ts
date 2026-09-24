@@ -19,6 +19,7 @@ export {
   type Planet,
   type PlanetSnapshot,
   type FogMemory,
+  type SightRules,
   type Hero,
   type TempLane,
   type MarketOrder,
@@ -176,9 +177,15 @@ export {
   fleetRadarRange,
   stackRadarRange,
   BLACKOUT_MULT,
+  DEFAULT_SIGHT,
+  sightRulesOf,
+  sightCircles,
+  worldRadarReach,
+  fleetRadarReach,
 } from './state/visibility';
 export type {
   Coverage,
+  SightCircle,
   VisibleState,
   VisibleView,
   SignatureContact,

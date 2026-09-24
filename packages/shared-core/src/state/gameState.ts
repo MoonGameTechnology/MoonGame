@@ -756,6 +756,11 @@ export interface GameState {
    *  match browser's `modeId` — so there is one source, not two. Absent on matches
    *  created before modes existed, and on any match deliberately run without one. */
   modeId?: string;
+  /** Радиусы зрения этого матча (решение владельца 2026-09-24: «круги везде», «единый
+   *  радиус; для Sector Zero — свой по цифрам»). Приходят из режима (`data.modes[id].sight`)
+   *  на первом шаге часов и дальше не меняются — как `pve`: правка баланса не переписывает
+   *  идущий матч. Нет поля ⇒ общие числа ядра (`DEFAULT_SIGHT`, `state/visibility.ts`). */
+  sight?: SightRules;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
@@ -991,6 +996,9 @@ export interface PveState {
    *  co-op PvE seats each survive for themselves — a shared number would let one
    *  player spend the other's pick. Absent/0 = nothing owed. */
   boons?: Record<PlayerId, number>;
+  /** Сколько пакетов снабжения каждое место уже купило в этом забеге (`pve.supply`, решение
+   *  владельца 2026-09-24): лимит — на забег, поэтому счёт живёт в матче, а не в профиле. */
+  supplies?: Record<PlayerId, number>;
   /** World time the match counts as CLEARED if a human seat still holds a world — set
    *  when the last wave lands, the mode's `holdHours` later (PVR-2.5). Absent until then,
    *  and absent for good under a mode without `holdHours`: there the only clear is taking
@@ -1266,6 +1274,22 @@ export interface PlanetSnapshot {
 }
 /** One player's memory: last-known snapshot per world they have ever identified. */
 export type FogMemory = Record<PlanetId, PlanetSnapshot>;
+
+/**
+ * Зрение — ТОЛЬКО КРУГИ (решение владельца 2026-09-24). Каждый свой мир и флот видит
+ * вокруг себя круг полного обзора; радары (постройки, корабли, модули) расширяют его
+ * вторым, внешним кругом засечки. Связи между мирами на зрение не влияют: раньше свой
+ * мир раскрывал соседей ПО ЛИНИЯМ на любом расстоянии, и игрок видел мир в 781 единице,
+ * но не видел мир в 521 без линии. Расстояния — в единицах карты.
+ */
+export interface SightRules {
+  /** Радиус полного обзора вокруг каждого своего мира. */
+  world: number;
+  /** Радиус полного обзора вокруг каждого своего флота — в его фактическом месте. */
+  fleet: number;
+  /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */
+  radarScale: number;
+}
 
 /** Creates an empty, deterministically-seeded initial state. */
 export function createInitialState(params: {

@@ -57,6 +57,17 @@ const data: GameData = parseGameData({
       modules: ['pve'],
       pve: { waves: 2, npcFaction: 'swarm', waveIntervalHours: 6, holdHours: 5 },
     },
+    // Пакет снабжения за Суверены (решение владельца 2026-09-24): два на забег.
+    supplied: {
+      name: 'Supplied',
+      modules: ['pve'],
+      pve: {
+        waves: 2,
+        npcFaction: 'swarm',
+        waveIntervalHours: 6,
+        supply: { perRun: 2, pack: { metal: 150, credits: 40 } },
+      },
+    },
     plain: { name: 'Plain' },
   },
 });
@@ -441,3 +452,37 @@ describe('pveModule — удержание после последней вол�
   });
 });
 
+
+describe('pveModule — пакет снабжения (решение владельца 2026-09-24)', () => {
+  const suppliedSeed = (): GameState => ok(advance(MS_PER_HOUR, 'supplied'));
+  const buy = (from: GameState, modeId = 'supplied', who = 'human') =>
+    kernel.applyAction(
+      from,
+      { id: 'a1', type: 'pve.supply', playerId: who, payload: {}, issuedAt: 0 },
+      ctx(from.time, modeId),
+    );
+
+  it('пакет приходит в казну целиком, и покупка засчитывается месту', () => {
+    const r = buy(suppliedSeed());
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.players.human?.resources).toEqual({ metal: 150, credits: 40 });
+    expect(r.state.pve?.supplies).toEqual({ human: 1 });
+  });
+
+  it('лимит — на забег: сверх него отказ со стабильным кодом, казна не тронута', () => {
+    let state = suppliedSeed();
+    for (let i = 0; i < 2; i++) {
+      const r = buy(state);
+      if (!r.ok) throw new Error(r.code);
+      state = r.state;
+    }
+    const third = buy(state);
+    expect(third).toMatchObject({ ok: false, code: 'E_SUPPLY_EXHAUSTED' });
+    expect(state.players.human?.resources.metal).toBe(300);
+  });
+
+  it('режим без снабжения и не-PvE матч — отказ, а не бесплатная выдача', () => {
+    expect(buy(ok(advance(MS_PER_HOUR, 'waves')), 'waves')).toMatchObject({ ok: false, code: 'E_NO_SUPPLY' });
+    expect(buy(world(), 'plain')).toMatchObject({ ok: false, code: 'E_NOT_PVE' });
+  });
+});
