@@ -649,7 +649,7 @@
 | MAP-PERF | ✅ |  | `docs/backlog.md` | Ускорение движения раскрытой голографической карты и подготовка |
 | PERK-0.1 | ✅ | docs | `docs/backlog.md` | Резолюция владельца: два класса бонусов + третья группа |
 | PERK-1.1 | ✅ | core | `docs/backlog.md` | Три группы вместо одной цепочки. |
-| PERK-1.2 | ⏳ | data proto | `docs/backlog.md` | Перевести массовые перки в параллельную |
+| PERK-1.2 | ✅ | core | `docs/backlog.md` | Массовые перки переехали в параллельную корзину — |
 | PERK-2.1 | ✅ | core | `docs/backlog.md` | Снижение урона: один пул, одна форма, один кап. |
 | PERK-3.1 | ✅ | core data | `docs/backlog.md` | Последовательный множитель выдаётся за |
 | PERK-3.3 | ✅ | core cli proto | `docs/backlog.md` | Надбавка ветерана стала видимой: |
@@ -1073,6 +1073,7 @@
 | PVR-6.9 | ✅ | proto | `docs/sector-zero-roadmap.md` | Выбор главы — маршрут от края сектора к эпицентру |
 | PVR-6.10 | ✅ | proto | `docs/sector-zero-roadmap.md` | Досье Роя — справа, сворачивается, читается вопросами |
 | PVR-6.11 | ✅ | proto | `docs/sector-zero-roadmap.md` | Портреты героев в Академии |
+| PVR-6.12 | ✅ | proto | `docs/sector-zero-roadmap.md` | Шапка забега: кошелёк профиля вместо счёта, места и дня |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

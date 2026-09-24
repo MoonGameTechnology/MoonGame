@@ -279,6 +279,17 @@ describe('итоги матча — уход', () => {
   });
 });
 
+describe('итог забега Sector Zero — без счёта и места (решение владельца 2026-09-24)', () => {
+  it('у забега нет строки «Итоговый счёт» с местом — у обычной партии она есть', () => {
+    const run = endScreenHtml(scored(), 'p1', endOf({ runReward: 7 }), view);
+    expect(run).not.toContain('Итоговый счёт');
+    expect(run).not.toContain('-е место из');
+    const match = endScreenHtml(scored(), 'p1', endOf(), view);
+    expect(match).toContain('Итоговый счёт');
+    expect(match).toContain('2-е место из 3');
+  });
+});
+
 describe('итог забега Sector Zero — по частям (PVR-5.4)', () => {
   const summary = {
     attempt: 3,

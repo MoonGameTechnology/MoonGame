@@ -228,6 +228,18 @@ try {
     assert.equal(await frozenFor(1200), true, 'после ухода со страницы мир ждёт игрока');
     await page.locator('#spd-pause').click();
     assert.equal(await frozenFor(1200), false, 'и продолжает по кнопке');
+    // Шапка забега: ни эмблемы с названием и местом, ни очков победы, ни дня (решение
+    // владельца 2026-09-24) — в забеге они ничего не значат.
+    for (const id of ['tbcrest', 'tbscore', 'daycard'])
+      assert.equal(await page.locator('#' + id).isVisible(), false, `шапка забега: #${id}`);
+    // Вместо них — кошелёк профиля настоящим балансом, а плашки-заглушки в строке статуса нет.
+    const sov = (await progress())?.sovereigns ?? 0;
+    assert.equal(
+      (await page.locator('#tbwallet .tw-sovereigns').textContent())?.replace(/\D/g, ''),
+      String(sov),
+      'шапка забега: Суверены — баланс профиля',
+    );
+    assert.equal(await page.locator('#devline .dl-donate').count(), 0, 'Суверены не дублируются');
 
     // 3. Выход в меню путём игрока, перезагрузка, «Продолжить».
     await page.locator('#railtoggle').click();

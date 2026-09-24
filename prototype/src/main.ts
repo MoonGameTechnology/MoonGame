@@ -290,9 +290,15 @@ import {
   serializePortableRun,
   type PortableRunSave,
 } from '../../decisions/portableRun';
-import { SECTOR_ZERO_ABSENT_TOOLS, toolShown, type SessionTool } from '../../decisions/sectorZeroTools';
+import {
+  SECTOR_ZERO_ABSENT_HUD,
+  SECTOR_ZERO_ABSENT_TOOLS,
+  toolShown,
+  type SessionTool,
+} from '../../decisions/sectorZeroTools';
 import { initSectorZeroMenu, type SectorZeroAccount } from './sectorZeroMenu';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
+import { runWalletHtml } from './runWallet';
 import { getPlatform, type PlatformHost } from './platform/host';
 import { advanceShopDay, doubleReward, localShopDay, shopCapabilities } from '../../decisions/sectorZeroShop';
 import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
@@ -1558,6 +1564,8 @@ const topEl = $('top');
 const tbName = $('tbname');
 const tbPlace = $('tbplace');
 const tbScore = $('tbscore');
+const tbWallet = $('tbwallet');
+let lastWalletHtml = '';
 const tbDay = $('tbday');
 const tbEta = $('tbeta');
 const bannerEl = $('banner');
@@ -13477,6 +13485,12 @@ function syncSectorZeroTools(): void {
     const el = document.getElementById(id);
     if (el) el.style.display = toolShown(tool as SessionTool, run) ? '' : 'none';
   }
+  // Эмблема с названием и местом, очки победы и день шапки — тоже не про забег
+  // (решение владельца 2026-09-24).
+  for (const id of Object.values(SECTOR_ZERO_ABSENT_HUD)) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = run ? 'none' : '';
+  }
 }
 
 let sectorDevActive = false;
@@ -14178,8 +14192,11 @@ function frame(nowReal: number) {
     (soloSaveActive && !NET ? `<button type="button" data-solo-save="1">${t('solo.save.action')}</button>` : '') +
     (s.pve && !swarmDossierPinned ? `<button type="button" data-swarm-intel="1">${t('swarm.intel.title')}</button>` : '') +
     // Суверены — приманка (заказ владельца 2026-09-23): кнопка с «+», золотом и бликом.
-    // Нажатие поведёт в магазин Суверенов; пока магазина нет — честная подсказка.
-    `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.aria', { n: kfmt(SOVEREIGNS) })}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em aria-hidden="true">+</em></button>`;
+    // Нажатие поведёт в магазин Суверенов; пока магазина нет — честная подсказка. В забеге
+    // Sector Zero Суверены живут в шапке — настоящим балансом профиля (`runWallet.ts`).
+    (sectorZeroToolsHidden()
+      ? ''
+      : `<button type="button" class="dl-donate" data-donate="1" title="${t('hub.sovereigns')}" aria-label="${t('donate.aria', { n: kfmt(SOVEREIGNS) })}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em aria-hidden="true">+</em></button>`);
   if (statusHtml !== lastClockText) {
     devlineTail.innerHTML = statusHtml;
     lastClockText = statusHtml;
@@ -14202,6 +14219,14 @@ function frame(nowReal: number) {
   } = liveStanding(s.match?.scores ?? {}, ME, SCORE_LIMIT);
   const nick = callsign(nickInput.value, NAME[ME]);
   const eta = countdownHMS(DAY - (s.time % DAY));
+  // Шапка забега (решение владельца 2026-09-24): вместо эмблемы, очков и дня — кошелёк
+  // профиля, живой: награда или ролик посреди забега видны сразу.
+  const walletHtml = sectorZeroToolsHidden() ? runWalletHtml(sectorProgress) : '';
+  if (walletHtml !== lastWalletHtml) {
+    tbWallet.innerHTML = walletHtml;
+    tbWallet.hidden = !walletHtml;
+    lastWalletHtml = walletHtml;
+  }
   const topText = topSignature(nick, myPlace, seats, score, d, eta);
   if (topText !== lastTopText) {
     tbName.textContent = nick;
