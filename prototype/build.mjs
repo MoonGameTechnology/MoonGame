@@ -1578,6 +1578,13 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
 .cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
 #devline [data-solo-play],#devline [data-solo-save],#devline [data-swarm-intel]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
+/* YAG-6.2: пауза забега. Идёт мир — неброская «‖» рядом с часами; стоит — янтарная
+   «▶ Продолжить»: после ухода со страницы мир ждёт именно её, и её должно быть видно. */
+#devline-head,#devline-status{display:contents;}
+#devline .dl-pause[hidden]{display:none;}
+#devline .dl-pause{flex:0 0 auto;min-width:32px;min-height:24px;margin-left:8px;border:1px solid var(--cyan-dim);
+  border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;font-weight:700;padding:2px 9px;cursor:pointer;}
+#devline .dl-pause.dl-paused{color:#ffd27a;border-color:rgba(255,190,90,.7);background:rgba(255,170,60,.12);}
 /* Досье Роя (заказ владельца 2026-09-23): сводка → адаптации → силы → «О Рое».
    Порядок — вопросами игрока, а не разработки; см. шапку prototype/src/swarmDossier.ts. */
 .sd-summary{margin:0 0 12px;padding:8px 10px;border:1px solid var(--cyan-dim);border-radius:8px;
@@ -3133,7 +3140,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div id="purse"></div>
 </header>
 <nav class="holo-nav" data-i18n-aria="hud.map"><span aria-current="page" data-i18n="hud.map"></span><button id="holo-tech" type="button" data-i18n="win.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
-<div id="devline"></div>
+<div id="devline"><span id="devline-head"></span><button id="runpause" class="dl-pause" type="button" data-run-pause="1" hidden></button><span id="devline-status"></span></div>
 <!-- slim left rail: only the wired tools (each opens its window). More icons land here as
      features get wired. -->
 <div id="solo-replace" role="dialog" aria-modal="true" aria-labelledby="solo-replace-title">
