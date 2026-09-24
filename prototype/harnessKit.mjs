@@ -58,11 +58,19 @@ export function builtPage(name = 'void-dominion.html') {
  * бандла собранной страницы. Так тест читает состояние, не заводя ради него экспортов в
  * проде. Возвращает маршруты для {@link serve}: страницу и её `/app.js`.
  */
-export async function instrumentedGame(hooks, { page = 'void-dominion.html' } = {}) {
+export async function instrumentedGame(hooks, { page = 'void-dominion.html', simulate = false } = {}) {
   const { build } = await import('esbuild');
+  // Площадку дев-сборки ставит `bootstrap.ts` — до импорта игры, с симуляцией рекламы и
+  // покупок. Бандл здесь собран из `main.ts` без него, поэтому `simulate` ставит ту же
+  // симуляцию сам: тело модуля начинается с неё, а `main.ts` берёт площадку ниже.
+  const platform = simulate
+    ? "import { setPlatform as __setPlatform } from './platform/host';\n" +
+      "import { createWebPlatform as __webPlatform } from './platform/web';\n" +
+      '__setPlatform(__webPlatform({ simulate: true }));\n'
+    : '';
   const bundle = await build({
     stdin: {
-      contents: readFileSync('prototype/src/main.ts', 'utf8') + hooks,
+      contents: platform + readFileSync('prototype/src/main.ts', 'utf8') + hooks,
       resolveDir: process.cwd() + '/prototype/src',
       loader: 'ts',
     },
