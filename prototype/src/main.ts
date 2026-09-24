@@ -260,6 +260,8 @@ import { missionProgress, objectiveNominal, shownObjectives } from '../../decisi
 import { chapterMapView } from '../../decisions/chapterMap';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
 import {
+  adoptMark,
+  bumpMark,
   keepLocalMark,
   parseCloudProfile,
   parseSyncMark,
@@ -13583,6 +13585,15 @@ const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
  *  того, чего мы не видели, нельзя, а держать меню дольше незачем. */
 const CLOUD_LOAD_TIMEOUT_MS = 4000;
 let syncMark = parseSyncMark(readRaw(CLOUD_MARK_KEY));
+// Имя устройства для родословной профиля (`cloudSync.ts`): случайное, выдаётся один раз и
+// живёт в отметке. Решения случайности не держат — её даёт хост.
+if (!syncMark.device)
+  syncMark = {
+    ...syncMark,
+    device:
+      globalThis.crypto?.randomUUID?.() ??
+      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+  };
 /** `off` — облака нет; `guest` — облако у площадки есть, а игрок не вошёл (кнопка «Войти»);
  *  `on` — сверено, пишем; `held` — прогресс разошёлся с облачным, и до выбора игрока
  *  облако не трогаем (экран выбора в меню, `YAG-1.4`). */
@@ -13599,7 +13610,7 @@ function writeSyncMark(): void {
 }
 /** Профиль или дескриптор забега изменился — новая правка, и облако её получит. */
 function bumpCloudRev(): void {
-  syncMark = { ...syncMark, rev: syncMark.rev + 1 };
+  syncMark = bumpMark(syncMark);
   writeSyncMark();
   pushCloud();
 }
@@ -13617,6 +13628,7 @@ function pushCloud(flush = false): void {
       rev: syncMark.rev,
       progress: JSON.stringify(sectorProgress),
       ...(run ? { run } : {}),
+      ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
     });
     if (envelope === (flush ? lastCloudFlushed : lastCloudEnvelope)) return;
     lastCloudEnvelope = envelope;
@@ -13650,6 +13662,7 @@ async function syncCloud(): Promise<void> {
       rev: syncMark.rev,
       syncedRev: syncMark.syncedRev,
       hasProgress: profileHasProgress(sectorProgress),
+      ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
     },
     cloud,
     cloudProgress ? profileHasProgress(cloudProgress) : false,
@@ -13683,7 +13696,7 @@ async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress
   else await portableRunStore.clear();
   savedRun = null;
   savedPortable = null;
-  syncMark = { rev: cloud.rev, syncedRev: cloud.rev };
+  syncMark = adoptMark(syncMark, cloud);
   writeSyncMark();
   cloudFork = null;
   cloudState = 'on';
@@ -13717,7 +13730,7 @@ const sectorZeroAccount: SectorZeroAccount = {
     }
     // «Оставить этот»: облако получит локальный профиль с номером ВПЕРЕДИ облачного
     // (`keepLocalMark` — почему именно так).
-    syncMark = keepLocalMark(syncMark, fork.cloud.rev);
+    syncMark = keepLocalMark(syncMark, fork.cloud);
     writeSyncMark();
     cloudFork = null;
     cloudState = 'on';

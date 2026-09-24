@@ -96,7 +96,16 @@ describe('YAG-1.4 — вход и развилка', () => {
 
   it('«Оставить этот» — номер правки по общему правилу, и облако получает профиль', () => {
     expect(account).toMatch(
-      /syncMark = keepLocalMark\(syncMark, fork\.cloud\.rev\);[\s\S]*cloudState = 'on';\s+pushCloud\(\);/,
+      /syncMark = keepLocalMark\(syncMark, fork\.cloud\);[\s\S]*cloudState = 'on';\s+pushCloud\(\);/,
     );
+  });
+
+  it('родословная проведена насквозь: правка, запись, сверка, взятие облака', () => {
+    // Без неё сверка откатывается к номерам разных устройств как одной истории — и молча
+    // теряет прогресс, если оптимистичная отметка записи не дошла (ревью Sector Zero).
+    expect(body('bumpCloudRev')).toContain('syncMark = bumpMark(syncMark);');
+    expect(body('pushCloud')).toContain('lineage: syncMark.lineage');
+    expect(body('syncCloud')).toContain('lineage: syncMark.lineage');
+    expect(body('adoptCloud')).toContain('syncMark = adoptMark(syncMark, cloud);');
   });
 });
