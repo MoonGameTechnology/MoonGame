@@ -1,4 +1,4 @@
-import type { Battle, BattleSide, GameState, PlanetId } from './gameState';
+import type { Battle, BattleSide, Fleet, GameState, PlanetId } from './gameState';
 
 /**
  * MSB-1 — ОДИН доступ к сторонам боя на все поверхности.
@@ -37,6 +37,39 @@ export function attackerOf(battle: Battle): BattleSide | undefined {
 /** Обороняющаяся сторона дуэли — зеркало {@link attackerOf}. */
 export function defenderOf(battle: Battle): BattleSide | undefined {
   return sideByRole(battle, 'defender');
+}
+
+/**
+ * ASSAULT-1 — заняты ли боем КОРАБЛИ флота.
+ *
+ * `battleId` у флота один, а мест боя у штурмующего два: десант дерётся на земле
+ * (наземный бой держит его стороной `landing`), корабли висят над ней на орбите.
+ * Наземный бой запирает флот — улететь, бросив десант, нельзя, — но корабли в нём не
+ * стреляют. Поэтому для ОРБИТАЛЬНОЙ сцепки такой флот свободен: прилетевший враг бьётся
+ * с ним сразу, а не ждёт конца штурма (плейтест 2026-09-24: «Рой прилетел и не вступил
+ * в бой с моим флотом»).
+ *
+ * Бой, которого уже нет в состоянии, считается занятостью: неизвестно — не трогаем.
+ */
+export function shipsEngaged(state: GameState, fleet: Fleet): boolean {
+  if (!fleet.battleId) return false;
+  return state.battles[fleet.battleId]?.phase !== 'ground';
+}
+
+/** ASSAULT-1. Наземный бой, в котором дерётся десант флота `fleetId`, кроме `except`. */
+export function landingBattleOf(
+  state: GameState,
+  fleetId: string,
+  except?: string,
+): Battle | null {
+  for (const id of Object.keys(state.battles).sort()) {
+    const b = state.battles[id];
+    if (!b || b.id === except || b.phase !== 'ground') continue;
+    if (b.sides.some((side) => side.ref.kind === 'landing' && side.ref.fleetId === fleetId)) {
+      return b;
+    }
+  }
+  return null;
 }
 
 
