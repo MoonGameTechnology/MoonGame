@@ -42,7 +42,7 @@ describe('sectorZeroWorkshop — что видно ДО подтверждени
   });
 
   it('пустая лестница выключает мастерскую целиком, без флага в коде', () => {
-    const bare = { ...data, sectorZeroStars: { cap: 0, guaranteed: 0, steps: [] } };
+    const bare = { ...data, sectorZeroStars: { cap: 0, guaranteed: 0, steps: [], capByRarity: {} } };
     expect(workshopRows(profile({ warrants: 9999 }), bare)).toEqual([]);
   });
 });
@@ -50,10 +50,13 @@ describe('sectorZeroWorkshop — что видно ДО подтверждени
 describe('sectorZeroWorkshop — поток осколков виден', () => {
   const ladder = forgeLadder(data);
   const top = ladder.cap - 1;
+  // Верхняя ступень общей лестницы есть только у легендарного модуля (SZE-5.2).
+  const legend = (over: Partial<SectorZeroProgress> = {}): SectorZeroProgress =>
+    profile({ moduleRarity: { cargo_bay: 'legendary' }, ...over });
 
   it('строка несёт осколки и порог гарантии', () => {
     const rows = workshopRows(
-      profile({ warrants: 9999, stars: { cargo_bay: top }, forgeShards: { cargo_bay: 2 } }),
+      legend({ warrants: 9999, stars: { cargo_bay: top }, forgeShards: { cargo_bay: 2 } }),
       data,
     );
     const row = rows.find((r) => r.id === 'cargo_bay')!;
@@ -64,7 +67,7 @@ describe('sectorZeroWorkshop — поток осколков виден', () => 
     // Иначе экран обещал бы бросок там, где его уже не будет (`EC-2.3`).
     const pity = ladder.steps[top]!.pity ?? 0;
     const rows = workshopRows(
-      profile({ warrants: 9999, stars: { cargo_bay: top }, forgeShards: { cargo_bay: pity - 1 } }),
+      legend({ warrants: 9999, stars: { cargo_bay: top }, forgeShards: { cargo_bay: pity - 1 } }),
       data,
     );
     expect(rows.find((r) => r.id === 'cargo_bay')!.chance).toBe(1);
@@ -73,5 +76,26 @@ describe('sectorZeroWorkshop — поток осколков виден', () => 
   it('на ступени без гарантии порог нулевой — рисовать нечего', () => {
     const rows = workshopRows(profile({ warrants: 9999 }), data);
     expect([rows[0]!.shards, rows[0]!.pity]).toEqual([0, 0]);
+  });
+});
+
+describe('sectorZeroWorkshop — редкость решает потолок и добавляет параметр (SZE-5.2)', () => {
+  it('простой модуль упирается в ★3, поднятый — идёт выше', () => {
+    const simple = workshopRows(profile({ warrants: 9999, stars: { cargo_bay: 3 } }), data).find(
+      (r) => r.id === 'cargo_bay',
+    )!;
+    expect([simple.rarity, simple.cap, simple.reason]).toEqual(['simple', 3, 'E_FORGE_AT_CAP']);
+    const raised = workshopRows(
+      profile({ warrants: 9999, stars: { cargo_bay: 3 }, moduleRarity: { cargo_bay: 'unique' } }),
+      data,
+    ).find((r) => r.id === 'cargo_bay')!;
+    expect([raised.rarity, raised.cap, raised.can]).toEqual(['unique', 4, true]);
+  });
+
+  it('вклад модуля показывает и параметр редкости', () => {
+    const row = workshopRows(profile({ moduleRarity: { cargo_bay: 'unique' } }), data).find(
+      (r) => r.id === 'cargo_bay',
+    )!;
+    expect(row.now.hp).toBe(data.modules.cargo_bay!.rarityBonus!.unique!.hp);
   });
 });

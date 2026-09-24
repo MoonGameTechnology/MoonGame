@@ -18,7 +18,13 @@
  * отказа. Отказ не прячет числа — при нехватке Варрантов цена и шанс всё равно видны,
  * иначе игрок не узнает, на что копить.
  */
-import { moduleStarMultiplier, type GameData } from '../packages/shared-core/src/index';
+import {
+  moduleRarityBonus,
+  moduleStarMultiplier,
+  type GameData,
+  type Rarity,
+} from '../packages/shared-core/src/index';
+import { moduleLadder, profileRarity } from './moduleRarity';
 import { forgeOutcome, type ForgeLadder, type ForgeRefusal } from './sectorZeroForge';
 import { forgeLadderOf, type SectorZeroProgress } from './sectorZeroProgress';
 
@@ -30,8 +36,10 @@ export interface WorkshopRow {
   id: string;
   /** Текущая звёздность: 0 = ни одной звезды. */
   star: number;
-  /** Потолок из данных — сколько делений рисовать. */
+  /** Потолок звёзд ЭТОГО модуля — от его редкости (SZE-5.2): сколько делений рисовать. */
   cap: number;
+  /** Текущая редкость модуля: базовая из каталога или поднятая в профиле. */
+  rarity: Rarity;
   /** Объявленный шанс следующей попытки, доля [0, 1]. На потолке — 0. */
   chance: number;
   /** Цена следующей попытки в Варрантах. Сгорает и при неудаче. */
@@ -51,12 +59,21 @@ export interface WorkshopRow {
   pity: number;
 }
 
-/** Вклад модуля на звезде `star` — базовые дельты, помноженные на множитель ступени. */
-function contribution(id: string, star: number, data: GameData): Record<string, number> {
+/** Вклад модуля на звезде `star` и ступени `rarity` — базовые дельты и параметры
+ *  редкости (SZE-5.1), помноженные на множитель звезды: тот же счёт, что в `effectiveStats`. */
+export function contribution(
+  id: string,
+  star: number,
+  data: GameData,
+  rarity?: Rarity,
+): Record<string, number> {
   const mult = moduleStarMultiplier(star, data);
+  const def = data.modules[id];
   const out: Record<string, number> = {};
-  for (const [key, value] of Object.entries(data.modules[id]?.effects.stats ?? {}))
-    out[key] = value * mult;
+  for (const [key, value] of Object.entries(def?.effects.stats ?? {})) out[key] = value * mult;
+  if (def && rarity)
+    for (const [key, value] of Object.entries(moduleRarityBonus(def, rarity)))
+      out[key] = (out[key] ?? 0) + value * mult;
   return out;
 }
 
@@ -70,30 +87,33 @@ export function workshopRows(
   progress: SectorZeroProgress,
   data: GameData,
 ): WorkshopRow[] {
-  const ladder: ForgeLadder = forgeLadderOf(data);
+  const ladder = forgeLadderOf(data);
   if (ladder.cap <= 0 || ladder.steps.length === 0) return [];
   const rows: WorkshopRow[] = [];
   for (const id of progress.modules) {
     if (!data.modules[id]) continue;
     const star = progress.stars[id] ?? 0;
     const shards = progress.forgeShards[id] ?? 0;
+    const rarity = profileRarity(progress, id, data);
+    const own = moduleLadder(ladder, rarity);
     const out = forgeOutcome(
       { seed: progress.seed, attempt: progress.forgeTries[id] ?? 0, target: id, star, shards },
-      ladder,
+      own,
       progress.warrants,
     );
     rows.push({
       id,
       star,
-      cap: ladder.cap,
+      cap: own.cap,
+      rarity,
       chance: out.chance,
       warrants: out.warrants,
       can: out.allowed,
       reason: out.reason,
       shards,
       pity: ladder.steps[star]?.pity ?? 0,
-      now: contribution(id, star, data),
-      next: out.reason === 'E_FORGE_AT_CAP' ? null : contribution(id, star + 1, data),
+      now: contribution(id, star, data, rarity),
+      next: out.reason === 'E_FORGE_AT_CAP' ? null : contribution(id, star + 1, data, rarity),
     });
   }
   return rows;

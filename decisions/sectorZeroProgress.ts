@@ -4,6 +4,13 @@
  * are the first playable tuning, not the final campaign economy. */
 import { forgeOutcome, type ForgeLadder } from './sectorZeroForge';
 import {
+  moduleLadder,
+  profileRarity,
+  raiseCheck,
+  RARITY_COPIES,
+  type RarityLadder,
+} from './moduleRarity';
+import {
   DEFAULT_OBJECTIVE_SLOTS,
   settleObjectives,
   type ObjectiveResult,
@@ -13,6 +20,8 @@ import {
   canEquip,
   moduleAllowed,
   starsOf,
+  rarityOf,
+  RARITIES,
   type GameData,
   type GameState,
   type Hero,
@@ -102,6 +111,15 @@ export interface SectorZeroProgress {
    *  валюты, §0.1 роадмапа экономики, поэтому звезда живёт здесь, а не в `modules`.
    *  Потолок — `data.sectorZeroStars.cap`; отсутствие записи = ★0. */
   stars: Record<string, number>;
+  /** Поднятая редкость модулей (SZE-5.2), `id → ступень` — только выше базовой из
+   *  каталога. Вторая ось прокачки рядом со звёздами: редкость даёт новый параметр и
+   *  поднимает потолок звёзд (`moduleRarity.ts`). */
+  moduleRarity: Record<string, string>;
+  /** Дубли модулей (SZE-5.2), `id → сколько`: 3 дубля + чертёж поднимают редкость. */
+  moduleCopies: Record<string, number>;
+  /** Чертежи по ступеням (SZE-5.2), `ступень → сколько`: чертёж той ступени, НА которую
+   *  поднимают. */
+  blueprints: Record<string, number>;
   loadouts: Record<string, string[]>;
   heroes: Record<string, SectorHero>;
   selectedHero: string;
@@ -144,7 +162,7 @@ const STARTER_MODULES = ['cargo_bay', 'ion_engine'];
 
 /** Лестница звёздности из каталога. Пустая (`cap` 0 / нет ступеней) = Мастерской и
  *  Академии в этой сборке нет — механика выключается ДАННЫМИ, без флага в коде. */
-export function forgeLadderOf(data: GameData): ForgeLadder {
+export function forgeLadderOf(data: GameData): RarityLadder {
   return data.sectorZeroStars;
 }
 
@@ -177,6 +195,9 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     lastRun: null,
     modules: STARTER_MODULES.filter((id) => data.modules[id]),
     stars: {},
+    moduleRarity: {},
+    moduleCopies: {},
+    blueprints: {},
     loadouts: {},
     heroes: first ? { [first]: newSectorHero(first, data) } : {},
     selectedHero: first,
@@ -312,6 +333,7 @@ export type SectorProgressAction =
   | { kind: 'ad-sovereigns' }
   | { kind: 'double-reward' }
   | { kind: 'forge'; id: string }
+  | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
   | { kind: 'unlock-hero'; id: string }
@@ -354,7 +376,8 @@ export function changeSectorZeroProgress(
           star: next.stars[action.id] ?? 0,
           shards,
         },
-        forgeLadderOf(data),
+        // Потолок звёзд — от редкости модуля (SZE-5.2): у простого их меньше, чем у легендарного.
+        moduleLadder(forgeLadderOf(data), profileRarity(next, action.id, data)),
         next.warrants,
       );
       if (!out.allowed) return null;
@@ -364,6 +387,17 @@ export function changeSectorZeroProgress(
         next.stars[action.id] = out.star;
         delete next.forgeShards[action.id]; // ступень пройдена — гарантия начинается заново
       } else next.forgeShards[action.id] = shards + 1;
+      break;
+    }
+    case 'raise-rarity': {
+      // Чертёж той ступени, НА которую поднимают, и 3 дубля того же модуля (SZE-5.2).
+      const check = raiseCheck(next, action.id, data);
+      if (!check.can || !check.to) return null;
+      next.blueprints[check.to] = check.blueprints - 1;
+      if (next.blueprints[check.to] === 0) delete next.blueprints[check.to];
+      next.moduleCopies[action.id] = check.copies - RARITY_COPIES;
+      if (next.moduleCopies[action.id] === 0) delete next.moduleCopies[action.id];
+      next.moduleRarity[action.id] = check.to;
       break;
     }
     case 'refresh-shop':
@@ -600,6 +634,22 @@ export function parseSectorZeroProgress(
       if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       if (value > 0) fresh.forgeShards[id] = value;
     }
+    // Редкость, дубли и чертежи (SZE-5.2): профиль лежит в localStorage и правится
+    // игроком, поэтому чужая ступень, мусорный счётчик или неизвестный модуль — мимо.
+    for (const [id, value] of Object.entries(p.moduleRarity ?? {})) {
+      if (!data.modules[id] || typeof value !== 'string') continue;
+      const base = RARITIES.indexOf(data.modules[id]!.rarity ?? 'simple');
+      if (RARITIES.indexOf(value as (typeof RARITIES)[number]) > base) fresh.moduleRarity[id] = value;
+    }
+    for (const [id, value] of Object.entries(p.moduleCopies ?? {})) {
+      if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (value > 0) fresh.moduleCopies[id] = value;
+    }
+    for (const [r, value] of Object.entries(p.blueprints ?? {})) {
+      if (!RARITIES.includes(r as (typeof RARITIES)[number]) || r === 'simple') continue;
+      if (typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
+      if (value > 0) fresh.blueprints[r] = value;
+    }
     for (const [id, value] of Object.entries(p.stars ?? {})) {
       if (!data.modules[id] || typeof value !== 'number' || !Number.isSafeInteger(value)) continue;
       const star = Math.min(data.sectorZeroStars.cap, value);
@@ -743,12 +793,15 @@ export function prepareSectorZeroRun(
   // мету ядро читает ровно один раз, на старте. Поэтому заточка во время идущего забега
   // на него не влияет, а реплей уже сыгранного остаётся воспроизводимым.
   const stars = { ...progress.stars };
+  // Поднятая редкость едет тем же снимком (SZE-5.2): верфь забега штампует её на всё построенное.
+  const rarity = { ...progress.moduleRarity };
   player.arsenal = {
     hulls: Object.keys(data.units)
       .filter((id) => data.units[id]?.domain === 'space')
       .sort(),
     modules: [...progress.modules].sort(),
     ...(Object.keys(stars).length > 0 ? { stars } : {}),
+    ...(Object.keys(rarity).length > 0 ? { rarity } : {}),
   };
   for (const fleet of Object.values(next.fleets))
     if (fleet.owner === 'p1') {
@@ -757,6 +810,9 @@ export function prepareSectorZeroRun(
         const own = starsOf(stack.modules, stars);
         if (own) stack.moduleStars = own;
         else delete stack.moduleStars;
+        const raised = rarityOf(stack.modules, rarity);
+        if (raised) stack.moduleRarity = raised;
+        else delete stack.moduleRarity;
       }
     }
   const selected = progress.heroes[progress.selectedHero];

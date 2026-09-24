@@ -337,9 +337,12 @@ describe('SZE-1.1 — звёздность модуля: профиль, пот�
 
 describe('SZE-1.2 — Мастерская: кошелёк, попытка, инвариант провала', () => {
   const ladder = data.sectorZeroStars;
+  // Здесь проверяется ЛЕСТНИЦА целиком, поэтому модуль поднят до легендарного: с
+  // SZE-5.2 потолок звёзд зависит от редкости, и только у легендарного он равен общему.
   const seeded = (over: Partial<SectorZeroProgress> = {}): SectorZeroProgress => ({
     ...freshSectorZeroProgress(data, 'profile-7'),
     warrants: 9999,
+    moduleRarity: { cargo_bay: 'legendary' },
     ...over,
   });
 
@@ -432,9 +435,11 @@ describe('SZE-1.2 — Мастерская: кошелёк, попытка, ин
 describe('SZE-1.3 — осколки: серия неудач упирается в гарантию', () => {
   const ladder = data.sectorZeroStars;
   const top = ladder.cap - 1; // верхняя ступень: самый длинный хвост неудач
+  // Легендарные — чтобы потолок редкости (SZE-5.2) совпал с общим и верхняя ступень была доступна.
   const seeded = (over: Partial<SectorZeroProgress> = {}): SectorZeroProgress => ({
     ...freshSectorZeroProgress(data, 'profile-7'),
     warrants: 999999,
+    moduleRarity: { cargo_bay: 'legendary', ion_engine: 'legendary' },
     ...over,
   });
 
@@ -518,3 +523,73 @@ describe('PVR-6.5 — в подготовке только модули, кот�
   });
 });
 
+
+describe('SZE-5.2 — повышение редкости модуля', () => {
+  const ready = (): SectorZeroProgress => ({
+    ...fresh(),
+    blueprints: { unique: 1, mythic: 1 },
+    moduleCopies: { cargo_bay: 7 },
+  });
+
+  it('списывает чертёж следующей ступени и 3 дубля, модуль становится уникальным', () => {
+    const next = change(ready(), { kind: 'raise-rarity', id: 'cargo_bay' });
+    expect(next.moduleRarity.cargo_bay).toBe('unique');
+    expect(next.blueprints).toEqual({ mythic: 1 }); // пустой счётчик не хранится
+    expect(next.moduleCopies.cargo_bay).toBe(4);
+    // Следующая ступень — уже мифическим чертежом.
+    const again = change(next, { kind: 'raise-rarity', id: 'cargo_bay' });
+    expect(again.moduleRarity.cargo_bay).toBe('mythic');
+    expect(again.blueprints).toEqual({});
+    expect(again.moduleCopies.cargo_bay).toBe(1);
+  });
+
+  it('без чертежа, без дублей и у закрытого модуля — отказ, профиль не тронут', () => {
+    expect(
+      changeSectorZeroProgress({ ...ready(), blueprints: {} }, { kind: 'raise-rarity', id: 'cargo_bay' }, data),
+    ).toBeNull();
+    expect(
+      changeSectorZeroProgress({ ...ready(), moduleCopies: { cargo_bay: 2 } }, { kind: 'raise-rarity', id: 'cargo_bay' }, data),
+    ).toBeNull();
+    expect(
+      changeSectorZeroProgress(ready(), { kind: 'raise-rarity', id: 'targeting_array' }, data),
+    ).toBeNull();
+  });
+
+  it('поднятая редкость поднимает и потолок звёзд', () => {
+    const atSimpleCap = { ...ready(), warrants: 9999, stars: { cargo_bay: 3 } };
+    expect(changeSectorZeroProgress(atSimpleCap, { kind: 'forge', id: 'cargo_bay' }, data)).toBeNull();
+    const raised = change(atSimpleCap, { kind: 'raise-rarity', id: 'cargo_bay' });
+    expect(change(raised, { kind: 'forge', id: 'cargo_bay' }).forgeTries.cargo_bay).toBe(1);
+  });
+
+  it('редкость, дубли и чертежи переживают сохранение, мусор отсекается', () => {
+    const raw = JSON.stringify({
+      ...fresh(),
+      moduleRarity: { cargo_bay: 'mythic', targeting_array: 'simple', ghost: 'legendary', ion_engine: 'cosmic' },
+      moduleCopies: { cargo_bay: 3, ion_engine: -1, ghost: 5, radar_module: 1.5 },
+      blueprints: { unique: 2, simple: 4, cosmic: 1, mythic: -1 },
+    });
+    const p = parseSectorZeroProgress(raw, data);
+    expect(p.moduleRarity).toEqual({ cargo_bay: 'mythic' });
+    expect(p.moduleCopies).toEqual({ cargo_bay: 3 });
+    expect(p.blueprints).toEqual({ unique: 2 });
+    const { moduleRarity: _r, moduleCopies: _c, blueprints: _b, ...legacy } = fresh();
+    const old = parseSectorZeroProgress(JSON.stringify(legacy), data);
+    expect([old.moduleRarity, old.moduleCopies, old.blueprints]).toEqual([{}, {}, {}]);
+  });
+
+  it('редкость едет в забег снимком — и в числа корабля', () => {
+    const p = change(fresh(), { kind: 'fit', hull: 'cruiser', id: 'ion_engine' });
+    const raised = { ...p, moduleRarity: { ion_engine: 'mythic' } };
+    const s = prepareSectorZeroRun(pveState(data), raised, data);
+    const cruiser = s.fleets.p1_1!.units.find((u) => u.unit === 'cruiser')!;
+    expect(cruiser.moduleRarity).toEqual({ ion_engine: 'mythic' });
+    expect(s.players.p1?.arsenal?.rarity).toEqual({ ion_engine: 'mythic' });
+    const plain = prepareSectorZeroRun(pveState(data), p, data);
+    const plainCruiser = plain.fleets.p1_1!.units.find((u) => u.unit === 'cruiser')!;
+    expect(plainCruiser.moduleRarity).toBeUndefined();
+    const hpOf = (st: typeof cruiser): number => effectiveStats(data.units.cruiser!, st, data).hp!;
+    // Мифический ионный двигатель несёт параметры уникальной и мифической ступеней.
+    expect(hpOf(cruiser) - hpOf(plainCruiser)).toBe(data.modules.ion_engine!.rarityBonus!.mythic!.hp);
+  });
+});

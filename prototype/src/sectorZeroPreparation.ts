@@ -20,7 +20,8 @@ import {
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
 import { workshopRows } from '../../decisions/sectorZeroWorkshop';
-import { moduleRarity, starRow } from '../../decisions/itemRarity';
+import { starRow } from '../../decisions/itemRarity';
+import { moduleLadder, profileRarity } from '../../decisions/moduleRarity';
 import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
 import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
 import {
@@ -216,8 +217,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
    */
   const itemHead = (id: string, p: SectorZeroProgress): { cls: string; html: string } => {
     const module = h.data.modules[id]!;
-    const rarity = moduleRarity(module);
-    const cap = forgeLadderOf(h.data).cap;
+    // Ступень — из профиля (поднятая за чертёж и дубли, SZE-5.2), потолок звёзд — от неё.
+    const rarity = profileRarity(p, id, h.data);
+    const cap = moduleLadder(forgeLadderOf(h.data), rarity).cap;
     const { lit, empty } = starRow(p.stars[id] ?? 0, cap);
     const stars =
       cap > 0
