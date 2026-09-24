@@ -351,12 +351,24 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     actions.hidden = false;
     loading = true;
     render();
+    // AUD-27: сбой чтения сохранения — это «сохранения нет», а не меню навсегда в
+    // «Проверяем сохранение…». Без ловушки исключение оставляло `loading` поднятым, все
+    // кнопки погашенными, а меню — единственной дверью в игру: битый журнал забега запирал
+    // её и после перезагрузки. «Новый забег» при этом перезапишет сам журнал.
+    let loaded: RunPreview | null = null;
+    let failed = false;
+    try {
+      loaded = await h.load();
+    } catch (error) {
+      console.error('E_SECTOR_ZERO_LOAD', error);
+      failed = true;
+    }
     // A late storage response cannot reopen a menu the player has already left.
-    const loaded = await h.load();
     if (generation !== ownGeneration) return;
     preview = loaded;
     loading = false;
     render();
+    if (failed) el('sz-summary').textContent = t('sector-zero.restore-failed');
     (preview ? continueButton : newButton).focus({ preventScroll: true });
   }
 

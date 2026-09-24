@@ -24,6 +24,11 @@
  *
  * 6. **Облако без мира забега.** Везёт один дескриптор — другое устройство пересобирает
  *    мир с карты главы, и «Продолжить» там стирает поражение.
+ *
+ * `AUD-27` — седьмой:
+ *
+ * 7. **Сверка без общего срока.** Срок на чтении облака есть, а вопрос «кто играет» перед
+ *    ним ждёт SDK вечно — меню, которое сверку дожидается, не открывается никогда.
  */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -80,8 +85,16 @@ describe('YAG-2.2 — сверка на старте', () => {
 
   it('облако не ответило вовремя — в этой сессии его нет, а не зависшее меню', () => {
     const sync = body('syncCloud');
-    expect(sync).toContain('Promise.race([');
+    expect(sync).toContain('Promise.race([host.save.load(), late])');
     expect(sync).toContain('if (raw === undefined) return;');
+  });
+
+  it('AUD-27: вопрос «кто играет» — под тем же сроком: молчащий getPlayer не запирает меню', () => {
+    // Срок стоял только на чтении облака, а `auth.player()` перед ним ждал SDK без
+    // потолка — меню висело на «Проверяем сохранение…» навсегда (прогон архива).
+    const sync = body('syncCloud');
+    expect(sync).toContain('const player = await Promise.race([host.auth.player(), late]);');
+    expect(sync).toMatch(/if \(!player\) return;/);
   });
 });
 

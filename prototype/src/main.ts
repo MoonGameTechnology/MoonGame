@@ -13869,8 +13869,10 @@ function saveSectorProgress(next: SectorZeroProgress): void {
 // между устройствами. Что делать на старте, решает `decisions/cloudSync.ts`; здесь только
 // проводка: сверка на старте, номер правки на каждое сохранение, запись по событию.
 const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
-/** Сколько ждать облако на старте. Не ответило — в этой сессии облака нет: писать поверх
- *  того, чего мы не видели, нельзя, а держать меню дольше незачем. */
+/** Сколько ждать сверку с облаком на старте — ВСЮ: и вопрос «кто играет», и чтение облака
+ *  (AUD-27; раньше срок стоял только на чтении, и молчащий `getPlayer` запирал меню
+ *  навсегда). Не ответило — в этой сессии облака нет: писать поверх того, чего мы не
+ *  видели, нельзя, а держать меню дольше незачем. */
 const CLOUD_LOAD_TIMEOUT_MS = 4000;
 let syncMark = parseSyncMark(readRaw(CLOUD_MARK_KEY));
 // Имя устройства для родословной профиля (`cloudSync.ts`): случайное, выдаётся один раз и
@@ -13953,14 +13955,14 @@ function pushCloud(flush = false): void {
 async function syncCloud(): Promise<void> {
   const host = getPlatform();
   if (!host.capabilities.cloudSave) return;
-  if (!(await host.auth.player()).authenticated) {
+  const late = new Promise<undefined>((resolve) => setTimeout(resolve, CLOUD_LOAD_TIMEOUT_MS));
+  const player = await Promise.race([host.auth.player(), late]);
+  if (!player) return;
+  if (!player.authenticated) {
     cloudState = 'guest';
     return;
   }
-  const raw = await Promise.race([
-    host.save.load(),
-    new Promise<undefined>((resolve) => setTimeout(resolve, CLOUD_LOAD_TIMEOUT_MS)),
-  ]);
+  const raw = await Promise.race([host.save.load(), late]);
   if (raw === undefined) return;
   const cloud = parseCloudProfile(raw);
   const cloudProgress = cloud ? parseSectorZeroProgress(cloud.progress, data, cloud.seed) : null;
