@@ -20,6 +20,7 @@ export {
   type PlanetSnapshot,
   type FogMemory,
   type SightRules,
+  type TechRules,
   type Hero,
   type TempLane,
   type MarketOrder,
@@ -530,7 +531,14 @@ export { constructionModule, unitBuildSiteBlocker } from './modules/construction
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule, STATION_COST } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';
-export { technologyModule, technologyLock, conditionMet } from './modules/technology';
+export {
+  technologyModule,
+  technologyLock,
+  conditionMet,
+  techRulesOf,
+  techInMatch,
+  DEFAULT_TECH_RULES,
+} from './modules/technology';
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { veteranModule } from './modules/veteran';

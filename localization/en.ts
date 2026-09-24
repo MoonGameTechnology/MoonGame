@@ -2052,7 +2052,7 @@ export const en: Record<string, string> = {
     'Away for a while? Hand your defence to the Steward — it holds your worlds by your rules while you are gone. The world runs 24/7, but a baseline defence stays up even when you are offline.',
   'onb.intro.steward.title': 'Steward — AI on sleep',
   'onb.intro.tech.body':
-    'Here you unlock technologies — permanent upgrades to your fleet, economy and defence. A node costs resources and time; once researched, the bonus lasts the rest of the match. Plan the branch to fit your playstyle.',
+    'Here you unlock technologies — permanent upgrades to your fleet, economy and defence. A node costs resources and time; once researched, the bonus lasts the rest of the game. Plan the branch to fit your playstyle.',
   'onb.intro.tech.title': 'Technology tree',
   'onb.recap.attention': 'Needs attention · {n}',
   'onb.recap.close': 'CLOSE',

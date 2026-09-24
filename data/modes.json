@@ -31,7 +31,8 @@
         "pack": { "credits": 150, "metal": 150, "food": 100, "energy": 50 }
       }
     },
-    "sight": { "world": 330, "fleet": 90, "radarScale": 2.5 }
+    "sight": { "world": 330, "fleet": 90, "radarScale": 2.5 },
+    "technology": { "dayGates": false, "exclude": ["ai_stewardship"] }
   },
   "duel": {
     "name": "Duel",

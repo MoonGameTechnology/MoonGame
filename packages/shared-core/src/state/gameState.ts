@@ -761,6 +761,10 @@ export interface GameState {
    *  на первом шаге часов и дальше не меняются — как `pve`: правка баланса не переписывает
    *  идущий матч. Нет поля ⇒ общие числа ядра (`DEFAULT_SIGHT`, `state/visibility.ts`). */
   sight?: SightRules;
+  /** Дерево технологий этого матча (PVR-6.17): свои правила режима
+   *  (`data.modes[id].technology`), закреплённые на первом шаге часов — как `sight`. Нет
+   *  поля ⇒ дерево сетевого матча (`DEFAULT_TECH_RULES`, `modules/technology.ts`). */
+  techRules?: TechRules;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
@@ -1289,6 +1293,14 @@ export interface SightRules {
   fleet: number;
   /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */
   radarScale: number;
+}
+
+/** Правила дерева технологий матча (PVR-6.17). */
+export interface TechRules {
+  /** Действуют ли ворота дней (`dayGate`) — в забеге нет. */
+  dayGates: boolean;
+  /** Узлы, которых в этом матче нет вовсе. */
+  exclude: string[];
 }
 
 /** Creates an empty, deterministically-seeded initial state. */

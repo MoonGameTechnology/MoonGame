@@ -1086,6 +1086,7 @@
 | PVR-6.13 | ✅ | proto | `docs/sector-zero-roadmap.md` | Часы забега — реальные минуты вместо игровых часов |
 | PVR-6.14 | ✅ | proto | `docs/sector-zero-roadmap.md` | Комиксы глав — основа под арт владельца |
 | PVR-6.15 | ✅ | proto | `docs/sector-zero-roadmap.md` | Карта главы — красивее, крестик ровный |
+| PVR-6.17 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Дерево технологий забега — без дней, «Хранителя» и совета учёных |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

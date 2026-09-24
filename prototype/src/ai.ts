@@ -998,7 +998,7 @@ export function aiOrders(
           const def = data.technologies[id];
           if (!def) return false;
           if (doneTech.includes(id) || activeTech.some((a) => a.technology === id)) return false;
-          if (technologyLock(def, state, ai, data) !== null) return false;
+          if (technologyLock(def, state, ai, data, id) !== null) return false;
           return affordableTech(def.cost ?? {});
         })
         // Дешёвое и быстрое вперёд — это не «оптимальный порядок», а ДЕТЕРМИНИРОВАННЫЙ:

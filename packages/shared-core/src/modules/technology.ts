@@ -9,6 +9,7 @@ import type {
   Planet,
   Player,
   PlayerTechnologyState,
+  TechRules,
   UnitStack,
 } from '../state/gameState';
 import { scientistsOf } from '../state/gameState';
@@ -195,8 +196,32 @@ export function conditionMet(
   }
 }
 
+/** Дерево сетевого матча: ворота дней действуют, исключённых узлов нет (PVR-6.17). */
+export const DEFAULT_TECH_RULES: Readonly<TechRules> = { dayGates: true, exclude: [] };
+
+/** Правила дерева этого матча: закреплённые из режима (`state.techRules`) или сетевые. */
+export function techRulesOf(state: Pick<GameState, 'techRules'>): Readonly<TechRules> {
+  return state.techRules ?? DEFAULT_TECH_RULES;
+}
+
+/** Есть ли узел `id` в дереве этого матча (PVR-6.17): режим может убрать узел целиком —
+ *  в забеге нет «Хранителя». Окно, бот и редьюсер спрашивают одно и то же. */
+export function techInMatch(state: Pick<GameState, 'techRules'>, id: string): boolean {
+  return !techRulesOf(state).exclude.includes(id);
+}
+
+/** Правила дерева режима — один раз, на первом шаге часов, как `sight` у зрения: дальше
+ *  матч живёт со своими правилами, и правка данных не переписывает идущий матч. У режима
+ *  без раздела `technology` поле не появляется — действует дерево сетевого матча. */
+function pinTechRules(h: HandlerContext): void {
+  if (h.state.techRules !== undefined) return;
+  const modeId = h.ctx.config?.modeId;
+  const rules = modeId === undefined ? undefined : h.ctx.data.modes[modeId]?.technology;
+  if (rules) h.state.techRules = { dayGates: rules.dayGates, exclude: [...rules.exclude] };
+}
+
 /** The data-driven availability gate of a tech, independent of cost / research-slot
- *  state: grant-only → prerequisites → day-gate → conditions. Returns the first unmet
+ *  state: grant-only → not in this match → prerequisites → day-gate → conditions. Returns the first unmet
  *  gate's stable reject code, or null when the node is researchable. Pure — used by the
  *  reducer and reusable for a read-only "what can I research (and why not)" query. */
 export function technologyLock(
@@ -204,6 +229,7 @@ export function technologyLock(
   state: GameState,
   playerId: string,
   data: GameData,
+  id?: string,
 ): string | null {
   // A grant-only node is never researchable BY ANYONE — it is handed out (commander
   // meta-progression, a run boon), not worked for. The rule belongs here and not only in
@@ -214,6 +240,9 @@ export function technologyLock(
   // these are free — asked for one every step, got E_GRANT_ONLY, and never reached the
   // real tree: research was dead in every match (BAL-15).
   if (def.grantOnly) return 'E_GRANT_ONLY';
+  // PVR-6.17: узла нет в дереве этого матча (режим его убрал). `id` необязателен лишь
+  // ради старых вызовов по одному определению; все читатели в игре его передают.
+  if (id !== undefined && !techInMatch(state, id)) return 'E_NOT_IN_MATCH';
   const completed = state.players[playerId]?.technologies?.completed ?? [];
   for (const prerequisite of def.prerequisites) {
     if (!completed.includes(prerequisite)) return 'E_PREREQUISITE';
@@ -222,7 +251,12 @@ export function technologyLock(
   // shows it (matchRegistry: floor((state.time − startedAt) / MS_PER_DAY)), so the lock
   // lines up with the displayed day. timeScale already lives in state.time (the room
   // runs the world clock fast); startedAt defaults to 0 for the 0-based clock.
-  if ((def.dayGate ?? 0) > 0 && state.time - (state.startedAt ?? 0) < def.dayGate * MS_PER_DAY) {
+  // PVR-6.17: режим может снять ворота дней целиком — забег до третьего дня не доживает.
+  if (
+    techRulesOf(state).dayGates &&
+    (def.dayGate ?? 0) > 0 &&
+    state.time - (state.startedAt ?? 0) < def.dayGate * MS_PER_DAY
+  ) {
     return 'E_TOO_EARLY';
   }
   for (const condition of def.conditions ?? []) {
@@ -270,7 +304,9 @@ function startResearch(action: Action, h: HandlerContext): void {
   if (active.length >= slots) {
     return h.reject('E_RESEARCH_SLOTS_FULL'); // every research slot is occupied
   }
-  const lock = technologyLock(def, h.state, action.playerId, h.ctx.data);
+  // Приказ может прийти раньше первого шага часов — правила режима закрепляются здесь же.
+  pinTechRules(h);
+  const lock = technologyLock(def, h.state, action.playerId, h.ctx.data, payload.technology);
   if (lock) {
     return h.reject(lock);
   }
@@ -351,6 +387,7 @@ export const technologyModule: GameModule = {
   setup(api) {
     api.onAction('technology.research', startResearch);
     api.onAction('technology.boost', boostResearch);
+    api.on('time.advanced', (_event, h) => pinTechRules(h));
 
     api.on('technology.complete', (event, h) => {
       const payload = event.payload as CompletePayload;
