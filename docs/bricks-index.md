@@ -1075,6 +1075,7 @@
 | PVR-6.11 | ✅ | proto | `docs/sector-zero-roadmap.md` | Портреты героев в Академии |
 | PVR-6.12 | ✅ | proto | `docs/sector-zero-roadmap.md` | Шапка забега: кошелёк профиля вместо счёта, места и дня |
 | PVR-6.13 | ✅ | proto | `docs/sector-zero-roadmap.md` | Часы забега — реальные минуты вместо игровых часов |
+| PVR-6.14 | ✅ | proto | `docs/sector-zero-roadmap.md` | Комиксы глав — основа под арт владельца |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

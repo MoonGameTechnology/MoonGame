@@ -333,3 +333,26 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   #sz-title { font-size: 60px; }
   .sz-intro { margin: 16px 0 20px; }
 }
+
+/* Комикс главы (prototype/src/comicPlayer.ts): панель за панелью. Панель вписывается в
+   экран целиком (contain), подпись — текст локали под ней. Движение — наезд и проявление,
+   только CSS; при reduced motion его нет. */
+#comic { font-family: system-ui, sans-serif; color: #e1f4f4; gap: 14px; }
+#comic .comic-panel { margin: 0; flex: 1; min-height: 0; width: min(1200px, 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; overflow: hidden; }
+#comic-img { flex: 1 1 0; min-height: 0; width: 100%; object-fit: contain; }
+#comic.no-art #comic-img { display: none; }
+#comic-caption { max-width: 760px; margin: 0; text-align: center; font-size: clamp(15px, 2.2vw, 19px); line-height: 1.5; color: #d5e9e9; }
+#comic-caption p { margin: 0 0 6px; }
+#comic-caption[hidden] { display: none; }
+#comic .comic-foot { width: min(1200px, 100%); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+#comic-count { color: #91aeb9; font: 12px/1.5 ui-monospace, monospace; letter-spacing: .14em; }
+#comic button { font: inherit; cursor: pointer; touch-action: manipulation; min-height: 44px; padding: 10px 18px; background: #0b1d27; border: 1px solid #34535d; color: #c2d9de; }
+#comic-next { color: #b3f1e9; border-color: #75b6b6; }
+#comic-skip { position: absolute; z-index: 1; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
+#comic button:focus-visible { outline: 2px solid #e6b777; outline-offset: 4px; }
+#comic.comic-in #comic-img { animation: comic-fade .35s ease-out both, comic-drift 9s ease-out both; }
+@keyframes comic-fade { from { opacity: 0; } }
+@keyframes comic-drift { from { transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) {
+  #comic.comic-in #comic-img { animation: none; }
+}
