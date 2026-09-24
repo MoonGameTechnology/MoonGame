@@ -511,10 +511,24 @@ export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
 export { pveModule } from './modules/pve';
 export { swarmMemoryModule, recalled, STRIKE_KIND } from './modules/swarmMemory';
-export { swarmAdaptModule, swarmModuleLevel, MIN_SIGNAL } from './modules/swarmAdapt';
+export {
+  swarmAdaptModule,
+  swarmAdaptDue,
+  swarmKnownLevel,
+  swarmModuleLevel,
+  MIN_SIGNAL,
+  SWARM_MEMORY_WINDOW,
+  type SwarmAdaptOrder,
+} from './modules/swarmAdapt';
 export { swarmJournalModule } from './modules/swarmJournal';
 export { missionFactsModule, HAVEN_TRAIT, EVACUEE_TRAIT } from './modules/missionFacts';
-export { beaconCallouts, beaconSentinels, BEACON_TRAIT, type BeaconCallout } from './util/beacon';
+export {
+  beaconCallouts,
+  beaconSentinels,
+  BEACON_TRAIT,
+  SENTINEL_TRAIT,
+  type BeaconCallout,
+} from './util/beacon';
 export { fleetBroodModule } from './modules/fleetBrood';
 export {
   taxModule,

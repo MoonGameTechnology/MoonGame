@@ -2,9 +2,7 @@ import {
   beaconCallouts,
   beaconSentinels,
   isCapturable,
-  recalled,
-  swarmModuleLevel,
-  MIN_SIGNAL,
+  swarmAdaptDue,
   type Action,
   type GameData,
   type GameState,
@@ -114,28 +112,18 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   // считается по ОКНУ сложности, а `swarmAdaptModule` независимо проверяет, что класс
   // вообще наблюдался за забег. Поэтому сложность двигает МОМЕНТ адаптации, а не её
   // законность, и жульничающий драйвер ничего себе не выторгует.
-  if (opts.memoryWindow !== undefined && !state.swarmAdapt) {
-    const host = fleetsOf(state, npc).find((f) =>
-      f.units.some((st) => st.modules?.some((id) => data.modules[id]?.brood !== undefined)),
-    );
-    if (host) {
-      // Модули перебираются по отсортированным id: два хоста обязаны выбрать один и
-      // тот же ответ на одну и ту же память.
-      for (const moduleId of Object.keys(data.modules).sort()) {
-        const ladder = data.modules[moduleId]?.adaptation;
-        if (!ladder) continue;
-        if (swarmModuleLevel(state, npc, moduleId) >= ladder.levels.length) continue;
-        if (recalled(state.swarmMemory, ladder.signal, opts.memoryWindow) < MIN_SIGNAL) continue;
-        out.push({
-          id: `${opts.session}:${npc}:${seq++}`,
-          issuedAt: state.time,
-          type: 'swarm.adapt',
-          playerId: npc,
-          payload: { moduleId, fleetId: host.id },
-        });
-        break; // проект одновременно один — второй приказ ядро отклонит `E_ADAPT_BUSY`
-      }
-    }
+  // Правило «пора» одно на оба хоста (`swarmAdaptDue`, AUD-20): бот одиночного забега
+  // зовёт ту же функцию, иначе Рой адаптировался бы по-разному офлайн и на сервере.
+  const due =
+    opts.memoryWindow === undefined ? null : swarmAdaptDue(state, data, npc, opts.memoryWindow);
+  if (due) {
+    out.push({
+      id: `${opts.session}:${npc}:${seq++}`,
+      issuedAt: state.time,
+      type: 'swarm.adapt',
+      playerId: npc,
+      payload: { moduleId: due.moduleId, fleetId: due.fleetId },
+    });
   }
   // Sorted by id: the order of `Object.values` is insertion order, and two hosts that
   // built the same world differently would otherwise mint orders in a different order.

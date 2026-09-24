@@ -81,6 +81,8 @@ const MapFleetSchema = z.object({
   location: z.string(),
   units: z.array(MapUnitStackSchema).default([]),
   landing: z.array(MapUnitStackSchema).default([]),
+  /** Признаки флота (`Fleet.traits`), например `sentinel` — дозорный маяка задачи. */
+  traits: z.array(z.string()).default([]),
 });
 
 /** How a slot's home is placed at session creation (read by the server

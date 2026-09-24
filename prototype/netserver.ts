@@ -92,7 +92,7 @@ import {
 import { ActionGate } from '../packages/action-layer/src/index';
 import { isValidActionPayload } from '../packages/shared-core/src/actions/payloadSchemas';
 import type { PlayerId } from '../packages/shared-core/src/index';
-import { MS_PER_DAY } from '../packages/shared-core/src/index';
+import { MS_PER_DAY, SWARM_MEMORY_WINDOW } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
 import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
 import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
@@ -496,7 +496,11 @@ async function createHostedMatch(
     // PVE-5.2: тактика Роя. Для PvP-сессии `pveOrders` возвращает пустой список
     // (нет `state.pve`), поэтому провод безусловный — режим решают ДАННЫЕ, а не
     // условие здесь. Без этой строки волны спавнились бы у логова и стояли.
-    serverOrders: (state, seq) => pveOrders(state, data, { session: id, seq }),
+    // AUD-20: окно памяти Роя. Без него драйвер не адаптирует Рой вовсе (так было до
+    // аудита). Сетевой матч сложность у клиента не спрашивает — её решает сервер, и
+    // сервер ставит обычный Рой (сторож `aiProfile.test.ts`).
+    serverOrders: (state, seq) =>
+      pveOrders(state, data, { session: id, seq, memoryWindow: SWARM_MEMORY_WINDOW.weak }),
     // The kernel context config must match what the local sim (and the HUD) promise:
     // without it victory falls back to its 600 default while the HUD counts to 450.
     config: {
