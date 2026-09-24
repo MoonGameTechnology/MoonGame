@@ -202,7 +202,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '34'; // AUD-20: адаптация Роя ожила. Членство и
+export const MODULE_MANIFEST_VERSION = '35'; // VET-6: сила ветерана — правило хоста
+// (резолюция владельца 2026-09-24 «в сетевой только награда, в Sector Zero — урон, корпус и
+// выплата»). Состав и порядок модулей те же; сменились ПРАВИЛА УРОНА сетевой партии:
+// надбавка за пережитые бои (PERK-3.1) в ней больше не действует. Поднятая под новым кодом
+// партия на 34 молча потеряла бы её посреди игры.
+// export const MODULE_MANIFEST_VERSION = '34'; // AUD-20: адаптация Роя ожила. Членство и
 // порядок не тронуты; сменились ПРАВИЛА `swarmAdapt` 1.1.0 и форма состояния: готовый
 // проект пишется в рецепт (`state.swarmRecipes`), покров вырастает на матках, где его не
 // было, волна рождается по рецепту, а проект едет вместе с органом, влитым в другой флот.

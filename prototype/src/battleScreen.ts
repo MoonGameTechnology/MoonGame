@@ -110,7 +110,7 @@ export function sideRowHtml(side: Side, view: BattleView = {}): string {
   // PERK-3.3: надбавка за пережитые бои. Решение «что показать и когда молчать» —
   // в `/decisions/veteranBadge.ts`, здесь только подстановка. Значка нет у сил без
   // выслуги, поэтому у необстрелянной стороны строка не меняется ни на символ.
-  const vet = veteranBadge(side.veteran);
+  const vet = veteranBadge(side.veteran, side.veteranHull);
   const vetHtml = vet
     ? `<span class="bw-vet" title="${esc(vet.title)}" aria-label="${esc(vet.title)}">${vet.glyph}${esc(vet.text)}</span>`
     : '';

@@ -1,5 +1,5 @@
 import type { GameModule } from '../kernel/module';
-import { veteranFactor } from '../state/veterancy';
+import { veteranFactor, veteranHull } from '../state/veterancy';
 
 /**
  * БОЕВАЯ НАДБАВКА ВЕТЕРАНА (PERK-3.1): чем больше сражений сторона пережила, тем
@@ -28,10 +28,21 @@ import { veteranFactor } from '../state/veterancy';
  * этот хук и окно боя, которое показывает игроку получаемую надбавку (PERK-3.3). Две
  * копии разошлись бы молча: каждая половина верна сама по себе, и ни один тест этого
  * не поймал бы.
+ *
+ * СИЛА ВЕТЕРАНА — ТОЛЬКО ТАМ, ГДЕ ЕЁ ДАЛ ХОСТ (VET-6, резолюция владельца 2026-09-24):
+ * «в сетевой только награда, а в Sector Zero — урон, корпус и выплата». Модуль стоит в
+ * графе везде, а решает конфиг матча (`MatchConfig.veteranPower`): сетевая партия его
+ * не ставит, и оба хука возвращают вход нетронутым. Модуль, а не его отсутствие в
+ * списке: списков модулей два на все хосты (сервер и прототип), а забег от песочницы
+ * прототип отличает именно конфигом — так же, как ×5 к скорости.
+ *
+ * КОРПУС (VET-6) — очки в пул снижения урона (`combat.mitigation`), а не новое поле
+ * прочности: см. `veteranHull`. Канал тот же, что у урона, — ближний бой (`battleId`),
+ * и по той же причине: только его пережитым боем и засчитывают.
  */
 export const veteranModule: GameModule = {
   id: 'veteran',
-  version: '1.1.0',
+  version: '2.0.0',
   setup(api) {
     api.hook<number>('combat.damage', (damage, args, h) => {
       const { battleId, attacker } = args as { battleId?: string; attacker?: string | null };
@@ -42,8 +53,20 @@ export const veteranModule: GameModule = {
       if (battleId === undefined || attacker === undefined || attacker === null) return damage;
       const battle = h.state.battles[battleId];
       if (!battle) return damage;
-      const factor = veteranFactor(h.state, battle, attacker, h.ctx.data);
+      const factor = veteranFactor(h.state, battle, attacker, h.ctx.data, h.ctx.config);
       return factor !== 1 ? damage * factor : damage;
+    });
+
+    // Корпус ветерана (VET-6): очки обороняющейся стороны в пул снижения урона. Пул
+    // складывается с укреплениями мира (PERK-2.1) и тратится один раз, поэтому порядок
+    // подписчиков на число не влияет.
+    api.hook<number>('combat.mitigation', (pool, args, h) => {
+      const { battleId, defender } = args as { battleId?: string; defender?: string | null };
+      if (battleId === undefined || defender === undefined || defender === null) return pool;
+      const battle = h.state.battles[battleId];
+      if (!battle) return pool;
+      const hull = veteranHull(h.state, battle, defender, h.ctx.data, h.ctx.config);
+      return hull > 0 ? pool + hull : pool;
     });
   },
 };
