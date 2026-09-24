@@ -615,7 +615,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       units: fl.units.map((u) => ({ unit: u.unit, count: u.count })),
       landing: fl.landing.map((u) => ({ unit: u.unit, count: u.count })),
       orbit: 'near',
-      traits: [],
+      traits: [...fl.traits],
     };
   }
 

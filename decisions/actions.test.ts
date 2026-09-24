@@ -50,6 +50,7 @@ import {
   spyOn,
   stopFleet,
   strikeShuttle,
+  swarmAdapt,
   unequipHeroAbility,
   uninstallHeroModule,
   unloadArmy,
@@ -172,6 +173,14 @@ describe('строители приказов против схем гейта',
   it('`pve.supply` гейтом НЕ признан — Суверены за снабжение списывает хост', () => {
     expect(CLIENT_ACTION_TYPES).not.toContain('pve.supply');
     expect(isValidActionPayload('pve.supply', buySupply(P).payload)).toBe(false);
+  });
+
+  it('`swarm.adapt` гейтом НЕ признан — проект Роя заказывает драйвер, не клиент', () => {
+    // Сетевой клиент играет человеческой фракцией; принял бы гейт этот тип — игрок мог бы
+    // хотя бы щупать ядро чужими приказами. Ядро и так откажет (`E_NOT_SWARM`), но первым
+    // замком стоит шлюз.
+    expect(CLIENT_ACTION_TYPES).not.toContain('swarm.adapt');
+    expect(isValidActionPayload('swarm.adapt', swarmAdapt(P, 'veil', 'f1').payload)).toBe(false);
   });
 
   it('три приказа каталога не строит НИКТО — у игрока нет способа их отдать', () => {

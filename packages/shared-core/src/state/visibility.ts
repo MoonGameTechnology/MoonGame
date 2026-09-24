@@ -646,6 +646,9 @@ function project(
   // из состояния. Видимый счётчик «до перехватчика осталось 4 часа» — это разведка,
   // которой не было.
   delete (view as Partial<GameState>).swarmAdapt;
+  // AUD-20: рецепт Роя — то же знание о проекте, только законченном. Игрок видит ответ
+  // в бою (журнал), а не читает уровень из состояния.
+  delete (view as Partial<GameState>).swarmRecipes;
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.

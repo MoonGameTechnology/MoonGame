@@ -70,6 +70,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   rng: 'stripped', // кости мира: держащий поток предсказывает будущие броски
   swarmMemory: 'stripped', // PVR-4.2: вывод Роя игрок читает журналом, не состоянием
   swarmAdapt: 'stripped', // PVR-4.3: идущий проект — не разведан, пока не проявился
+  swarmRecipes: 'stripped', // AUD-20: законченный проект — тоже не разведан, игрок видит его в бою
   swarmJournal: 'filtered', // PVR-4.5: свой журнал видно, чужой — нет
   missionFacts: 'filtered', // факты задач: свои удержания/потери/беженцы — да, чужие — нет
   players: 'filtered', // см. PLAYER_EXPOSURE ниже
@@ -391,6 +392,7 @@ function maximalState(): GameState {
     pve: { waveNumber: 3, totalWaves: 10, npcPlayerId: 'swarm', nextWaveAt: 7 },
     swarmMemory: { engagements: 1, observations: [{ ordinal: 1, kind: 'strike', engagement: 'strike:s1' }] },
     swarmAdapt: { moduleId: 'swarm_intercept_veil', level: 1, fleetId: 'CANARY_fleet', dueAt: 9 },
+    swarmRecipes: { CANARY_recipe: 2 },
     swarmJournal: { mine: { firstAt: 1, lastAt: 5, sorties: 2, firstDamage: 3, lastDamage: 9 }, CANARY_player: { firstAt: 1, lastAt: 1, sorties: 1, firstDamage: 1, lastDamage: 1 } },
     missionFacts: {
       held: { a: { owner: 'mine', since: 1 }, CANARY_held: { owner: 'CANARY_player', since: 2 } },
