@@ -25,7 +25,9 @@
  *    пустом устройстве берётся молча; гость входит кнопкой «Войти», и если прогресс есть
  *    и здесь, и в облаке, профиль выбирает игрок — любой из двух (`YAG-1.4`).
  * 9. язык (`YAG-1.1d`): игрок скачивает файл только своего языка, и разметка подписана
- *    текстом, а не ключами, — и для русского, и для англоязычного игрока.
+ *    текстом, а не ключами, — и для русского, и для англоязычного игрока;
+ * 10. темп забега (`matchExits.ts`, правило 6): полоса скорости несёт ▶ и ▶▶ — и на ПК, и на
+ *    телефоне, — а множителей ×1…×100 в забеге нет.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
  *   node prototype/yandextest.mjs --no-build # проверить уже собранный архив
@@ -152,6 +154,21 @@ async function onSectorZeroMenu(label) {
 /** Текст ключа в собранном файле языка — им и должна быть подписана кнопка. */
 const builtText = (id, key) =>
   JSON.parse(readFileSync(join(ROOT, `assets/locale-${id}.json`), 'utf8'))[key];
+/** Полоса скорости в забеге: только его темп — ▶ и ▶▶, без множителей и без своей паузы. */
+async function runTempoOnly(p, label) {
+  await p.locator('#spd-fast').waitFor({ state: 'visible' });
+  assert.ok(await p.locator('#spd-play').isVisible(), `${label}: ▶ на месте`);
+  assert.equal(
+    await p.locator('#speedbar [data-mult]:visible').count(),
+    0,
+    `${label}: множителей нет`,
+  );
+  assert.equal(
+    await p.locator('#spd-pause').isVisible(),
+    false,
+    `${label}: пауза — в строке статуса`,
+  );
+}
 const wave = () => page.locator('.dl-wave').first();
 const log = () => page.evaluate(() => window.__ya.log);
 const progress = () =>
@@ -179,6 +196,10 @@ try {
     await wave().waitFor({ state: 'visible' });
     await page.locator('#maploading').waitFor({ state: 'hidden' });
     assert.ok((await log()).includes('start'), 'площадке сообщено начало геймплея');
+    await runTempoOnly(page, 'ПК');
+    await page.locator('#spd-fast').click();
+    assert.ok(await page.locator('#spd-fast.on').isVisible(), 'ПК: ▶▶ включает ускорение');
+    await page.locator('#spd-play').click();
 
     // 2а. Пауза забега (YAG-6.2): кнопка замораживает отсчёт волны, уход со страницы — тоже,
     // и на возврате мир ждёт кнопки; площадка слышит «геймплей встал / пошёл».
@@ -374,11 +395,29 @@ try {
   );
   await english.close();
 
+  // 10. Телефон: та же полоса в забеге — ▶ и ▶▶, выход ⌂ на месте, множителей нет.
+  const phone = await browser.newContext({
+    locale: 'ru-RU',
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const phonePage = await phone.newPage();
+  phonePage.on('pageerror', (error) => errors.push(`pageerror (телефон): ${error.message}`));
+  await phonePage.goto(origin + '/');
+  await waitForApp(phonePage);
+  await phonePage.waitForFunction(() => !document.getElementById('sz-new').disabled);
+  await phonePage.locator('#sz-new').tap();
+  await phonePage.locator('.dl-wave').first().waitFor({ state: 'visible' });
+  await runTempoOnly(phonePage, 'телефон');
+  assert.ok(await phonePage.locator('#tomenu').isVisible(), 'телефон: выход ⌂ на полосе');
+  await phone.close();
+
   // 6. Ни ошибок, ни запросов мимо архива.
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, вход и выбор профиля, один язык — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, вход и выбор профиля, один язык, темп забега — без ошибок\n',
   );
 } finally {
   await browser.close();

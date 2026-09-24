@@ -21,6 +21,13 @@
  * 5. **Управление временем на телефоне следует правилу режима, а не дев-выключателю.**
  *    В сети временем распоряжается сервер, поэтому ускорять его игроку нечем; в соло и в
  *    любой не-игроцкой сборке — можно.
+ * 6. **В забеге Sector Zero полоса несёт ТЕМП забега — на ПК и на телефоне.** У забега
+ *    своя пара «▶ обычный / ▶▶ ускоренный» (PVR-2.2, `decisions/runTempo.ts`), и ускорение —
+ *    часть продукта: время прохождения владелец назвал и с ним. Поэтому на ПК полоса видна
+ *    и без дев-выключателя. Остальное в забеге спрятано (класс `spd-run`, CSS): множители
+ *    перенастраивают пару на темп песочницы — ×1 растянул бы забег на 60–72 реальных часа,
+ *    а своя пауза полосы стала бы второй кнопкой рядом с паузой забега в строке статуса
+ *    (`YAG-6.2`) — две правды об одном действии.
  */
 
 /** Забытый кэш баннера: пустая разметка и есть «на экране ничего нет» (правило 2). */
@@ -36,19 +43,22 @@ export function speedbarRestartShown(net: boolean, aiSeats: number): boolean {
   return !net && aiSeats === 0;
 }
 
-/** Правило 4: на телефоне полоса несёт выход, поэтому живёт всегда. */
-export function speedbarShown(pcUi: boolean, devSpeedControl: boolean): boolean {
-  return pcUi ? devSpeedControl : true;
+/** Правило 4: на телефоне полоса несёт выход, поэтому живёт всегда; правило 6 — в забеге
+ *  она несёт его темп, поэтому живёт и на ПК. */
+export function speedbarShown(pcUi: boolean, devSpeedControl: boolean, run: boolean): boolean {
+  return run || (pcUi ? devSpeedControl : true);
 }
 
-/** Правило 5: управление временем — дев-выключатель на ПК, режим на телефоне. */
+/** Правило 5: управление временем — дев-выключатель на ПК, режим на телефоне; правило 6 —
+ *  в забеге оно есть всегда. */
 export function timeControlsShown(
   pcUi: boolean,
   devSpeedControl: boolean,
   net: boolean,
   playerBuild: boolean,
+  run: boolean,
 ): boolean {
-  return pcUi ? devSpeedControl : !net || !playerBuild;
+  return run || (pcUi ? devSpeedControl : !net || !playerBuild);
 }
 
 /** Значение `style.display` для узла, который либо показан, либо убран. */

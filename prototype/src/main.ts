@@ -14367,9 +14367,12 @@ function frame(nowReal: number) {
     restartBtn.style.display = restart;
     restartSep.style.display = restart;
   }
-  const showSpdCtl = displayOf(timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__));
+  // Правило 6 (`matchExits.ts`): в забеге полоса несёт только его темп — ▶ и ▶▶.
+  const run = sectorZeroToolsHidden();
+  speedbarEl.classList.toggle('spd-run', run);
+  const showSpdCtl = displayOf(timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__, run));
   if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
-  const showBar = displayOf(holographic.active() || speedbarShown(pcUi(), devSpeedControl));
+  const showBar = displayOf(holographic.active() || speedbarShown(pcUi(), devSpeedControl, run));
   if (speedbarEl && speedbarEl.style.display !== showBar) speedbarEl.style.display = showBar;
   // Как часто живёт открытое окно — `liveWindows.ts` (REFM-194): дроссель считает РЕАЛЬНОЕ
   // время (по игровому он на разгоне ×7200 пробивался бы каждым кадром, а на паузе — никогда),
