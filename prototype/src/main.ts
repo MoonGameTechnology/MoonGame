@@ -400,7 +400,7 @@ import {
   ringRadius,
   ringWidth,
 } from './pingPulse';
-import { openingView, pickHome } from './openingView';
+import { openingView, openingZoom, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
   fmtJoinWindow,
@@ -2094,7 +2094,10 @@ function centerOn(p: { x: number; y: number }, scale: number): void {
  *  the simple desktop view keeps its whole-map fit. Zoom is relative to the screen-fit. */
 function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
-  const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
+  // Забег узнаётся по режиму матча: `s.pve` ядро заводит только на первом ходе часов.
+  const run = data.modes[matchMode() ?? '']?.pve !== undefined;
+  const zoom = openingZoom({ phone: MOBILE, console: holographic.active(), run });
+  const view = openingView(zoom !== null, pickHome(Object.values(s.planets), ME), zoom ?? undefined);
   if (view.kind === 'home') {
     centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
     return;
