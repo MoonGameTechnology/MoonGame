@@ -28,7 +28,7 @@ describe('карточка ресурса — пакет снабжения (р�
   it('можно купить — кнопка с ценой, состав пакета и остаток на забег', () => {
     const html = card(supply({ left: 2 }));
     expect(html).toMatch(/<button class="rc-buy" data-rc-supply>Купить за 5 ◆<\/button>/);
-    expect(html).toContain('Осталось 2 из 3 на забег');
+    expect(html).toContain('Осталось 2 из 3 на экспедицию');
     expect(html).toContain('rc-credits');
     expect(html).toContain('+150');
   });
@@ -42,7 +42,7 @@ describe('карточка ресурса — пакет снабжения (р�
   it('лимит забега исчерпан — кнопка погашена', () => {
     const html = card(supply({ left: 0 }));
     expect(html).toContain('data-rc-supply disabled');
-    expect(html).toContain('Снабжение на этот забег исчерпано');
+    expect(html).toContain('Снабжение на эту экспедицию исчерпано');
   });
 });
 

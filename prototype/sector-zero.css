@@ -360,7 +360,13 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
 
 /* Досье Роя в меню (заказ владельца 2026-09-24): известное — карточками с характеристиками,
    неизвестное — «?»-силуэтом. Красный акцент Роя, как у его стороны на карте главы. */
-.sz-codex-body { display: grid; gap: 10px; max-height: min(70vh, 640px); overflow: auto; }
+/* Досье Роя — отдельный экран, как «Подготовка» (#sz-workshop): меню уступает ему место, и
+   на телефоне его не надо искать прокруткой под картой главы. */
+#sz-codex-screen { padding: 28px 0 40px; flex: 1; }
+#sz-codex-screen h1 { font-size: clamp(22px, 4vw, 32px); color: #e1f4f4; font-weight: 450; margin: 24px 0 8px; }
+#sz-codex-screen .sz-workhead button { min-height: 44px; padding: 10px 14px; background: #0b1d27; border: 1px solid #34535d; color: #c2d9de; font-size: 12px; cursor: pointer; }
+#sz-codex-screen .sz-workhead button:hover { border-color: #8bc8c8; }
+.sz-codex-body { display: grid; gap: 10px; margin-top: 18px; }
 .sz-codex-sum { margin: 0; color: #b0c7ce; font-size: 12px; }
 .sz-codex-sum b { color: #ff9a8f; }
 .sz-codex-body h4 { margin: 4px 0 0; color: #ff9a8f; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; }

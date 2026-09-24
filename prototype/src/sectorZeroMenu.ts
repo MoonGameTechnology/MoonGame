@@ -263,7 +263,6 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
       : '';
   }
   function openMap(): void {
-    el('sz-codex-panel').hidden = true;
     mapPanel.hidden = false;
     h.root.classList.add('sz-map-open');
     renderChapter();
@@ -346,6 +345,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     const ownGeneration = ++generation;
     h.root.style.display = 'flex';
     h.preparation.close();
+    if (codexOpen()) closeCodex();
     document.body.classList.add('sector-zero-home');
     confirmation.hidden = true;
     actions.hidden = false;
@@ -438,21 +438,31 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   el('sz-prep').addEventListener('click', () => {
     if (!loading) h.preparation.open();
   });
-  // Досье Роя встаёт на место карты главы: две панели в одном столбце не открываются разом.
-  const codexPanel = el('sz-codex-panel');
-  el('sz-codex').addEventListener('click', () => {
-    if (!codexPanel.hidden) {
-      codexPanel.hidden = true;
-      return;
-    }
-    mapPanel.hidden = true;
-    el('sz-codex-body').innerHTML = swarmCodexHtml(h.swarmCodex());
-    codexPanel.hidden = false;
-    if (window.matchMedia?.('(max-width: 900px)').matches)
-      codexPanel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  });
-  el('sz-codex-close').addEventListener('click', () => {
-    codexPanel.hidden = true;
+  // Досье Роя — своё окно, как «Подготовка» (заказ владельца 2026-09-24): меню уступает ему
+  // место целиком. Раньше досье вставало на место карты главы, и на телефоне, где карта
+  // стоит ниже меню, его приходилось искать прокруткой.
+  const home = el('sz-home');
+  const codexScreen = el('sz-codex-screen');
+  function codexOpen(): boolean {
+    return !codexScreen.hidden;
+  }
+  function openCodex(): void {
+    codexScreen.innerHTML =
+      `<div class="sz-workhead"><button type="button" data-codex="back">${esc(t('sector-zero.prep.back'))}</button></div>` +
+      `<h1>${esc(t('sector-zero.codex.open'))}</h1><p class="sz-sub">${esc(t('sector-zero.codex.eyebrow'))}</p>` +
+      `<div class="sz-codex-body">${swarmCodexHtml(h.swarmCodex())}</div>`;
+    home.hidden = true;
+    codexScreen.hidden = false;
+    codexScreen.querySelector<HTMLButtonElement>('[data-codex="back"]')?.focus({ preventScroll: true });
+  }
+  function closeCodex(): void {
+    codexScreen.hidden = true;
+    home.hidden = false;
+    el('sz-codex').focus({ preventScroll: true });
+  }
+  el('sz-codex').addEventListener('click', openCodex);
+  codexScreen.addEventListener('click', (event) => {
+    if ((event.target as Element).closest('[data-codex="back"]')) closeCodex();
   });
   el('sz-back').addEventListener('click', () => {
     hide();
@@ -470,9 +480,10 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     // then returns to the shared hub only when this menu was opened from there.
     canGoBack: (): boolean =>
       h.root.style.display === 'flex' &&
-      (h.preparation.isOpen() || !confirmation.hidden || !h.standalone),
+      (h.preparation.isOpen() || codexOpen() || !confirmation.hidden || !h.standalone),
     back: (): void => {
       if (h.preparation.isOpen()) h.preparation.close();
+      else if (codexOpen()) closeCodex();
       else if (!confirmation.hidden) cancel();
       else if (!h.standalone) {
         hide();

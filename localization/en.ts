@@ -430,6 +430,7 @@ export const en: Record<string, string> = {
   "swarm.intel.economy": "The Swarm consumes organic matter for living tissue, metal for structural supports and armour, and microelectronics to grow conductive neural nodes. Industrial worlds feed its expansion: biomass alone is insufficient.",
   "swarm.intel.brood": "A Brood Mother carries a brood chamber, an organ that grows ground Landers from biomass, metal and microelectronics. They occupy landing capacity and take the surface through a normal assault. The carrier does not infect a world merely by being there.",
   'swarm.intel.updated': 'New intel',
+  'swarm.intel.tab': 'Dossier',
   'swarm.intel.title': 'Swarm dossier',
   'swarm.intel.lore': 'Each contact lets us study the Swarm’s composition and changes. These are observed formations, not the entire Swarm army.',
   'swarm.intel.empty': 'No identified formations yet. Radar blips do not reveal composition.',
@@ -2244,7 +2245,6 @@ export const en: Record<string, string> = {
   'sector-zero.signin.why': 'Cloud save and play on other devices.',
   'sector-zero.codex.open': 'Swarm dossier',
   'sector-zero.codex.eyebrow': 'Intel from past runs',
-  'sector-zero.codex.close': 'Close the dossier',
   'sector-zero.codex.progress': 'Studied: {n} of {m}',
   'sector-zero.codex.units': 'Forms',
   'sector-zero.codex.modules': 'Organs',
@@ -2384,6 +2384,9 @@ export const en: Record<string, string> = {
   'sector-zero.shop.sovereigns': 'Sovereigns: {n} ◆',
   'sector-zero.summary': 'Waves: {wave} / {total} · {difficulty}',
   'sector-zero.title': 'SECTOR ZERO',
+  'sector-zero.wallet.data': 'Expedition data ◇ unlocks modules, heroes and skills. Every finished expedition pays it — win or lose.',
+  'sector-zero.wallet.sovereigns': 'Sovereigns ◆: instant repair ({hp} hull per 1 ◆), a supply pack ({supply} ◆) and shop items. An ad gives +{ad} ◆, up to {day} times a day.',
+  'sector-zero.wallet.warrants': 'Warrants ⌖ buy module stars in the Workshop and shop items; a failed forge attempt burns them. An expedition pays {n} ⌖ per reward point.',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.
   'settings.colors.neutral': 'Neutrals',
