@@ -1060,6 +1060,7 @@
 | PVR-4.3 | 🔶 | core data | `docs/sector-zero-roadmap.md` | Одна читаемая адаптация от сигнала до формы |
 | PVR-4.4 | ✅ | data | `docs/sector-zero-roadmap.md` | Структуры первого набора |
 | PVR-4.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Журнал адаптаций |
+| PVR-4.6 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Органы Роя у захватчика: не работают, гарнизон их зачищает |
 | PVR-5.1 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Карта второй главы и дверь к ней |
 | PVR-5.2 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Задачи на карте и награда за них |
 | PVR-5.3 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Рост числа задач по главам |

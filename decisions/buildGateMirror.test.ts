@@ -42,12 +42,13 @@ const data: GameData = parseGameData(
 const kernel = createKernel([constructionModule]);
 const CATALOGUE = Object.keys(data.buildings);
 
-function world(kind?: string): GameState {
+/** Строитель — не Рой (`x`) или Рой (`swarm`): органы Роя строит только второй. */
+function world(kind?: string, faction = 'x'): GameState {
   const base = createInitialState({ seed: 'mig10', version: { data: '0.1.0', manifest: '1' } });
   const player: Player = {
     id: 'p1',
     name: 'p1',
-    faction: 'x',
+    faction,
     status: 'active',
     resources: Object.fromEntries(data.resources.map((r) => [r, 1_000_000])),
   };
@@ -65,8 +66,8 @@ function world(kind?: string): GameState {
 }
 
 /** Что РЕДЬЮСЕР пускает на узел этого вида. */
-function reducerHosts(kind?: string): string[] {
-  const state = world(kind);
+function reducerHosts(kind?: string, faction = 'x'): string[] {
+  const state = world(kind, faction);
   return CATALOGUE.filter((building) => {
     const action: Action = {
       id: `a:${kind ?? '-'}:${building}`,
@@ -80,8 +81,8 @@ function reducerHosts(kind?: string): string[] {
 }
 
 /** Что пускает РЕШЕНИЕ. */
-function decisionHosts(kind?: string): string[] {
-  return CATALOGUE.filter((building) => canBuildHere({ kind }, building, data));
+function decisionHosts(kind?: string, eatsBiomass = false): string[] {
+  return CATALOGUE.filter((building) => canBuildHere({ kind }, building, data, eatsBiomass));
 }
 
 describe('buildGate — ответ решения и ответ building.construct совпадают (MIG-10)', () => {
@@ -93,6 +94,10 @@ describe('buildGate — ответ решения и ответ building.constru
   for (const kind of Object.keys(data.sectorKinds)) {
     it(`${kind}: те же здания, что у редьюсера`, () => {
       expect(decisionHosts(kind)).toEqual(reducerHosts(kind));
+    });
+    // Органы Роя (решение владельца 2026-09-24): у Роя ответ свой, и он тоже обязан сойтись.
+    it(`${kind}: у Роя — те же здания, что у редьюсера`, () => {
+      expect(decisionHosts(kind, true)).toEqual(reducerHosts(kind, 'swarm'));
     });
   }
 
@@ -109,7 +114,7 @@ describe('buildGate — ответ решения и ответ building.constru
 
   it('«есть ли тут вообще стройка» — тот же перебор, что у редьюсера', () => {
     for (const kind of [...Object.keys(data.sectorKinds), undefined, 'no_such_kind']) {
-      expect(buildsAnything({ kind }, data), `вид ${kind ?? '(нет)'}`).toBe(
+      expect(buildsAnything({ kind }, data, false), `вид ${kind ?? '(нет)'}`).toBe(
         reducerHosts(kind).length > 0,
       );
     }

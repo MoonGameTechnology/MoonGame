@@ -112,6 +112,7 @@ import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName } from './planetName';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
+import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
@@ -3792,7 +3793,7 @@ function handleEvents(events: DomainEvent[]) {
       // не раскрытие.
       case 'building.destroyed':
         if (!admits('building.destroyed', p)) break;
-        tellBuild('destroyed', p);
+        tellBuild(p.cleared === true ? 'cleared' : 'destroyed', p);
         break;
       case 'unit.built':
         if (!admits('unit.built', p)) break;
@@ -7068,7 +7069,7 @@ function planetPanelHtml(p: Planet): string {
     // Каталог непостроенного больше не живёт плитками в панели — его показывает
     // полноэкранное окно построек. Кнопка есть только там, где строить можно
     // (свой мир И каталог что-то здесь предлагает — CMD-VIS: нет приказа — нет кнопки).
-    if (mine && buildsAnything(p, data)) {
+    if (mine && buildsAnything(p, data, feedsOnBiomass(s, ME, data))) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
     // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
@@ -7706,7 +7707,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
       const c = def ? buildingLevel(def, inst.level + 1).cost : undefined;
       return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
     }
-    const buildable = canBuildHere(p, id, data);
+    const buildable = canBuildHere(p, id, data, feedsOnBiomass(s, ME, data));
     // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
@@ -8875,7 +8876,7 @@ side.addEventListener('contextmenu', (ev) => {
   const order = quickBuildOrder(tile.dataset.buildorder, {
     worldOwner: p?.owner ?? null,
     me: ME,
-    sectorAllows: !!p && !!anchorId && canBuildHere(p, anchorId, data),
+    sectorAllows: !!p && !!anchorId && canBuildHere(p, anchorId, data, feedsOnBiomass(s, ME, data)),
     locked: !!p && !!anchorId && !!buildingLocked(p.id, anchorId),
   });
   if (!order || !selPlanet) return;
