@@ -87,3 +87,23 @@ describe('карточка главы в меню — задачи следую�
     ]);
   });
 });
+
+describe('метки новых задач (2026-09-24)', () => {
+  it('крепость — названные места без нужной постройки', () => {
+    const fort: MissionObjective = { id: 'm.fort', kind: 'build', targets: ['starfort'], at: ['gate', 'far'], count: 1, reward: 3 };
+    const s = { ...world([planet('gate', 'p1', [['starfort', 0]]), planet('far', null)]), fleets: {} } as GameState;
+    expect(missionTargets(fort, s, 'p1')).toEqual(['gate', 'far']);
+  });
+
+  it('эвакуация — свои убежища; спасение и маяк — своя провинция', () => {
+    const haven = { ...planet('safe', 'p1'), traits: ['haven'] };
+    const s = { ...world([haven, planet('keep', 'p1'), planet('b', null)]), fleets: {} } as GameState;
+    expect(missionTargets({ id: 'e', kind: 'evac', targets: [], count: 2, reward: 1 }, s, 'p1')).toEqual(['safe']);
+    expect(missionTargets({ id: 'b', kind: 'beacon', targets: ['b'], count: 2, reward: 1 }, s, 'p1')).toEqual(['b']);
+  });
+
+  it('проваленное спасение меток не держит', () => {
+    const s = { ...world([planet('keep', 'p1')]), fleets: {}, missionFacts: { fallen: { p1: ['keep'] } } } as unknown as GameState;
+    expect(missionTargets({ id: 'r', kind: 'rescue', targets: ['keep'], reward: 1 }, s, 'p1')).toEqual([]);
+  });
+});

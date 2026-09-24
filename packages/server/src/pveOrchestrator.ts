@@ -1,4 +1,6 @@
 import {
+  beaconCallouts,
+  beaconSentinels,
   isCapturable,
   recalled,
   swarmModuleLevel,
@@ -139,7 +141,23 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   // built the same world differently would otherwise mint orders in a different order.
   const fleets = fleetsOf(state, npc);
 
+  // Маяк задачи (2026-09-24): флот игрока на маяке — разведчик Роя зовёт ударный отряд.
+  // Правило общее с ботом прототипа (`beaconCallouts`), чтобы Рой отвечал одинаково в
+  // одиночном забеге и на сервере; ответивший флот в общий выбор цели не попадает.
+  const answering = beaconSentinels(state, npc); // дозорный на маяке не уходит
+  for (const call of beaconCallouts(state, npc)) {
+    answering.add(call.fleetId);
+    out.push({
+      id: `${opts.session}:${npc}:${seq++}`,
+      type: 'fleet.move',
+      playerId: npc,
+      payload: { fleetId: call.fleetId, to: call.to },
+      issuedAt: state.time,
+    });
+  }
+
   for (const fleet of fleets) {
+    if (answering.has(fleet.id)) continue;
     // Busy fleets are left alone: one already under way is committed to its leg, and
     // one locked in a battle cannot take a move order anyway (the reducer would reject
     // it — better not to spend an action id on a certain refusal).

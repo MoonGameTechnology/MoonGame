@@ -41,6 +41,9 @@
           "unit": "garrison",
           "count": 2
         }
+      ],
+      "traits": [
+        "haven"
       ]
     },
     "rim_veil": {
@@ -57,7 +60,18 @@
         "y": -145
       },
       "kind": "asteroid",
-      "terrain": "asteroid_field"
+      "terrain": "asteroid_field",
+      "owner": "p1",
+      "garrison": [
+        {
+          "unit": "heavy_infantry",
+          "count": 2
+        },
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
     },
     "dig_site": {
       "position": {
@@ -227,7 +241,14 @@
         "y": 3
       },
       "kind": "dead_world",
-      "terrain": "deep_void"
+      "terrain": "deep_void",
+      "owner": "p1",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 1
+        }
+      ]
     },
     "veil_deep": {
       "position": {
@@ -354,6 +375,21 @@
   },
   "objectives": [
     {
+      "id": "mission.rescue",
+      "kind": "rescue",
+      "targets": [
+        "cold_shoal"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.evac",
+      "kind": "evac",
+      "targets": [],
+      "count": 3,
+      "reward": 3
+    },
+    {
       "id": "mission.salvage",
       "kind": "control",
       "targets": [
@@ -463,6 +499,32 @@
         {
           "unit": "swarm_brood_mother",
           "count": 1
+        }
+      ]
+    },
+    "p1_evac": {
+      "owner": "p1",
+      "location": "deep_drift",
+      "units": [
+        {
+          "unit": "evac_transport",
+          "count": 4
+        }
+      ]
+    },
+    "swarm_siege": {
+      "owner": "swarm",
+      "location": "cold_shoal",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1
+        }
+      ],
+      "landing": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
         }
       ]
     }

@@ -15,11 +15,14 @@
  *    то, что придёт на итогах.
  * 2. **Метка — только там, куда игроку идти.** `control` метит названные миры, которые
  *    ещё не взяты; `raze` — миры, где игрок ПОМНИТ стоящую постройку названного вида
- *    (память тумана, а не правда состояния: метка не выдаёт разведку, которой не было).
- *    У `build`, `scout` и `wave` одной точки нет — меток нет.
- * 3. **Выполненная задача меток не держит**: сделанное не зовёт на карту.
+ *    (память тумана, а не правда состояния: метка не выдаёт разведку, которой не было);
+ *    `rescue` и `beacon` — свою провинцию; `build` с `at` — названные места без нужной
+ *    постройки; `evac` — свои убежища. У `scout`, `wave` и `build` без места одной
+ *    точки нет — меток нет.
+ * 3. **Выполненная и проваленная задача меток не держит**: на карту зовёт только то, что
+ *    ещё можно сделать.
  */
-import type { GameState, PlayerId } from '../packages/shared-core/src/index';
+import { HAVEN_TRAIT, type GameState, type PlayerId } from '../packages/shared-core/src/index';
 import {
   DEFAULT_OBJECTIVE_SLOTS,
   objectiveNominal,
@@ -28,6 +31,7 @@ import {
   type ObjectiveKind,
 } from './missionObjectives';
 import { WARRANTS_PER_REWARD } from './sectorZeroProgress';
+import { runClockText } from './runClock';
 
 /** Награда задачи в валютах профиля. */
 export interface MissionReward {
@@ -51,6 +55,19 @@ export interface MissionRow {
   reward: MissionReward;
   /** Миры для меток и для «показать на карте», в порядке объявления. */
   targets: string[];
+  /** Провалена в этом забеге (`rescue`: гарнизон пал) — сделать уже нельзя. */
+  failed: boolean;
+  /** `beacon`: лучшая серия удержания и срок, мс. */
+  holdMs?: number;
+  needMs?: number;
+}
+
+/**
+ * Что подставить в `{n}` подписи задачи: у маяка — срок удержания РЕАЛЬНЫМ временем
+ * забега («4:48»), как все его таймеры (PVR-6.13), у остальных — сколько нужно.
+ */
+export function missionLabelN(p: { total: number; needMs?: number }): number | string {
+  return p.needMs !== undefined ? runClockText(p.needMs) : p.total;
 }
 
 /** Миры, которые стоит пометить для задачи (правила 2–3). */
@@ -59,11 +76,29 @@ export function missionTargets(
   state: GameState,
   player: PlayerId,
 ): string[] {
-  if (objectiveProgress(objective, state, player).complete) return [];
+  const progress = objectiveProgress(objective, state, player);
+  if (progress.complete || progress.failed) return [];
   if (objective.kind === 'control')
     return (objective.targets ?? []).filter(
       (id) => state.planets[id] !== undefined && state.planets[id]!.owner !== player,
     );
+  // Спасение и маяк называют провинцию — метка стоит, пока задача не решена.
+  if (objective.kind === 'rescue' || objective.kind === 'beacon')
+    return (objective.targets ?? []).filter((id) => state.planets[id] !== undefined);
+  // Крепость в провинции: названные места, где нужной постройки ещё нет.
+  if (objective.kind === 'build' && objective.at && objective.at.length > 0) {
+    const kinds = new Set(objective.targets ?? []);
+    return objective.at.filter((id) => {
+      const p = state.planets[id];
+      return !!p && !(p.owner === player && p.buildings.some((b) => kinds.has(b.type) && b.hp > 0));
+    });
+  }
+  // Эвакуация: куда вести — свои убежища.
+  if (objective.kind === 'evac')
+    return Object.values(state.planets)
+      .filter((p) => p.owner === player && p.traits.includes(HAVEN_TRAIT))
+      .map((p) => p.id)
+      .sort();
   if (objective.kind === 'raze') {
     const kinds = new Set(objective.targets ?? []);
     const memory = state.fog?.[player] ?? {};
@@ -95,6 +130,8 @@ export function missionRows(
       complete: p.complete,
       reward: missionReward(objectiveNominal(o.reward, shown.length, base)),
       targets: missionTargets(o, state, player),
+      failed: p.failed ?? false,
+      ...(p.holdMs !== undefined ? { holdMs: p.holdMs, needMs: p.needMs } : {}),
     };
   });
 }
@@ -103,6 +140,8 @@ export function missionRows(
  *  придёт. Состояния забега ещё нет — только объявление и номинал. */
 export interface MissionBrief {
   id: string;
+  /** `beacon`: срок удержания, мс — для подписи временем забега (`missionLabelN`). */
+  needMs?: number;
   /** Подстановка `{n}` в подпись задачи: сколько нужно (провинций, волн, фортов, миров). */
   n: number;
   reward: MissionReward;
@@ -114,6 +153,7 @@ export function missionBriefs(
 ): MissionBrief[] {
   return shown.map((o) => ({
     id: o.id,
+    ...(o.kind === 'beacon' ? { needMs: (o.count ?? 1) * 3_600_000 } : {}),
     n: o.count ?? (o.targets ?? []).length,
     reward: missionReward(objectiveNominal(o.reward, shown.length, base)),
   }));

@@ -130,3 +130,52 @@ describe('награда', () => {
     expect(objectiveBonus([salvage], s, 'p1')).toBe(shown[0]!.reward);
   });
 });
+
+describe('новые задачи владельца 2026-09-24: крепость, эвакуация, спасение, маяк', () => {
+  const HOUR = 3_600_000;
+  const withFacts = (s: GameState, facts: GameState['missionFacts'], time = 0): GameState =>
+    ({ ...s, missionFacts: facts, time, fleets: {} }) as GameState;
+
+  it('крепость в провинции — считается только в названном месте', () => {
+    const fort: MissionObjective = { id: 'm.fort', kind: 'build', targets: ['starfort'], at: ['gate'], count: 1, reward: 3 };
+    const elsewhere = world([planet('home', 'p1', [['starfort', 50]]), planet('gate', 'p1')]);
+    expect(objectiveProgress(fort, elsewhere, 'p1').complete).toBe(false);
+    const there = world([planet('home', 'p1'), planet('gate', 'p1', [['starfort', 50]])]);
+    expect(objectiveProgress(fort, there, 'p1').complete).toBe(true);
+  });
+
+  it('эвакуация — счёт доставленных из памяти фактов', () => {
+    const evac: MissionObjective = { id: 'm.evac', kind: 'evac', targets: [], count: 4, reward: 3 };
+    const s = withFacts(world([]), { evacuated: { p1: 3 } });
+    expect(objectiveProgress(evac, s, 'p1')).toMatchObject({ done: 3, total: 4, complete: false });
+    expect(objectiveProgress(evac, withFacts(world([]), { evacuated: { p1: 5 } }), 'p1').complete).toBe(true);
+  });
+
+  it('спасение — выполнено, когда мир твой и врага у него нет; пал — провал до конца забега', () => {
+    const rescue: MissionObjective = { id: 'm.rescue', kind: 'rescue', targets: ['keep'], reward: 3 };
+    const besieged = {
+      ...world([planet('keep', 'p1')]),
+      fleets: { s: { id: 's', owner: 'swarm', location: 'keep', movement: null, units: [{ unit: 'x', count: 2 }], traits: [] } },
+    } as unknown as GameState;
+    expect(objectiveProgress(rescue, besieged, 'p1')).toMatchObject({ complete: false, failed: false });
+    const relieved = { ...world([planet('keep', 'p1')]), fleets: {} } as unknown as GameState;
+    expect(objectiveProgress(rescue, relieved, 'p1').complete).toBe(true);
+    // Гарнизон пал и мир отбит назад — задача всё равно провалена (решение владельца).
+    const retaken = withFacts(world([planet('keep', 'p1')]), { fallen: { p1: ['keep'] } });
+    expect(objectiveProgress(rescue, retaken, 'p1')).toMatchObject({ complete: false, failed: true });
+  });
+
+  it('маяк — N часов подряд; выполненная серия не отменяется потерей после', () => {
+    const beacon: MissionObjective = { id: 'm.beacon', kind: 'beacon', targets: ['b'], count: 6, reward: 3 };
+    const holding = withFacts(world([planet('b', 'p1')]), { held: { b: { owner: 'p1', since: 2 * HOUR } } }, 5 * HOUR);
+    expect(objectiveProgress(beacon, holding, 'p1')).toMatchObject({ done: 3, total: 6, complete: false, holdMs: 3 * HOUR, needMs: 6 * HOUR });
+    const done = withFacts(world([planet('b', 'p1')]), { held: { b: { owner: 'p1', since: 0 } } }, 6 * HOUR);
+    expect(objectiveProgress(beacon, done, 'p1').complete).toBe(true);
+    // Серия 7 ч состоялась, потом маяк отбит Роем — задача выполнена.
+    const lostAfter = withFacts(world([planet('b', 'swarm')]), { held: { b: { owner: 'swarm', since: 9 * HOUR } }, longest: { b: { p1: 7 * HOUR } } }, 10 * HOUR);
+    expect(objectiveProgress(beacon, lostAfter, 'p1').complete).toBe(true);
+    // Две серии по 4 ч — не «подряд».
+    const broken = withFacts(world([planet('b', 'p1')]), { held: { b: { owner: 'p1', since: 10 * HOUR } }, longest: { b: { p1: 4 * HOUR } } }, 14 * HOUR);
+    expect(objectiveProgress(beacon, broken, 'p1').complete).toBe(false);
+  });
+});

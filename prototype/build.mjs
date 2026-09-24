@@ -290,7 +290,7 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #devline .dl-missions i{font-style:normal;}
 #missionpanel{position:fixed;top:calc(var(--tbh) + 34px);right:18px;z-index:44;width:min(360px,calc(100vw - 24px));
   max-height:min(60vh,420px);overflow:auto;padding:10px 12px;border-radius:12px;color:var(--ink);
-  background:rgba(4,16,18,.94);border:1px solid rgba(143,245,200,.55);box-shadow:0 8px 28px rgba(0,0,0,.55),0 0 16px rgba(143,245,200,.12);}
+  background:rgba(4,16,18,.98);border:1px solid rgba(143,245,200,.55);box-shadow:0 8px 28px rgba(0,0,0,.55),0 0 16px rgba(143,245,200,.12);}
 #missionpanel[hidden]{display:none;}
 #missionpanel .mp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#8ff5c8;
   font-size:13px;letter-spacing:.6px;text-transform:uppercase;}
@@ -302,6 +302,8 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #missionpanel button.mp-row{cursor:pointer;}
 #missionpanel button.mp-row:hover{background:rgba(143,245,200,.12);border-color:rgba(143,245,200,.5);}
 #missionpanel .mp-row.done{opacity:.7;}
+#missionpanel .mp-row.failed{opacity:.6;border-color:rgba(255,90,77,.35);}
+#missionpanel .mp-row.failed .mp-mark,#missionpanel .mp-row.failed .mp-prog{color:#ff8f86;}
 #missionpanel .mp-mark{grid-row:1/3;font-style:normal;color:#8ff5c8;}
 #missionpanel .mp-prog{color:#8ff5c8;font-variant-numeric:tabular-nums;}
 #missionpanel .mp-reward{grid-column:2;display:flex;gap:10px;font-size:11px;font-variant-numeric:tabular-nums;}

@@ -425,6 +425,29 @@ function project(
   if (journal) view.swarmJournal = { [viewerId]: journal };
   else delete view.swarmJournal;
 
+  // Факты задач забега (`missionFacts`) — фильтруются по зрителю: свои удержания, свои
+  // потери, свои доставленные беженцы. Чужой `held` рассказал бы, кто и когда взял мир в
+  // тумане, а чужой `fallen` — что сосед потерял.
+  const mf = view.missionFacts;
+  if (mf) {
+    const held = Object.fromEntries(
+      Object.entries(mf.held ?? {}).filter(([, v]) => v.owner === viewerId),
+    );
+    const longest = Object.fromEntries(
+      Object.entries(mf.longest ?? {}).flatMap(([id, by]) =>
+        by[viewerId] !== undefined ? [[id, { [viewerId]: by[viewerId]! }]] : [],
+      ),
+    );
+    const mine: NonNullable<GameState['missionFacts']> = {};
+    if (Object.keys(held).length) mine.held = held;
+    if (Object.keys(longest).length) mine.longest = longest;
+    if (mf.fallen?.[viewerId]) mine.fallen = { [viewerId]: [...mf.fallen[viewerId]!] };
+    if (mf.evacuated?.[viewerId] !== undefined)
+      mine.evacuated = { [viewerId]: mf.evacuated[viewerId]! };
+    if (Object.keys(mine).length) view.missionFacts = mine;
+    else delete view.missionFacts;
+  }
+
   // Stolen intel windows (espionage): the viewer's LIVE grants open narrow holes in
   // the fog below. Expired grants open nothing — expiry is enforced HERE, at the
   // security boundary, not only by the module's housekeeping.

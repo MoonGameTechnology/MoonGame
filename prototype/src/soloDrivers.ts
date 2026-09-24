@@ -17,7 +17,7 @@
  * хозяин отдаёт оба, и драйверы проверяются на настоящем состоянии без DOM.
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
-import { autoRetreatDue } from '../../packages/shared-core/src/index';
+import { autoRetreatDue, beaconSentinels } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
 import type { StewardPosture } from './stewardScreen';
 import { StaggeredAi } from './aiScheduler';
@@ -152,8 +152,12 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
 
   function autoEngage(): void {
     const s = host.state();
+    // Дозорный Роя на маяке задачи (`beaconSentinels`) не захватывает провинцию: иначе
+    // маяк становился бы миром Роя, и волны рождались бы у маяка, а не в улье.
+    const sentinels = s.pve ? beaconSentinels(s, s.pve.npcPlayerId) : new Set<string>();
     for (const f of Object.values(s.fleets)) {
       if (f.location == null || f.movement || f.battleId) continue;
+      if (sentinels.has(f.id)) continue;
       const mine = f.owner === host.me();
       // Чужие всегда давят цикл захвата; свой флот — только если игрок сам включил
       // авто-штурм (CC-2), иначе штурмами он распоряжается руками.

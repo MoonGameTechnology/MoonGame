@@ -27,8 +27,12 @@ describe('карта главы в меню — что игрок уже зна�
       if (home.includes(c.id)) expect(c).toMatchObject({ known: true, side: 'you' });
       else expect(c).toMatchObject({ known: false, kind: null, side: null, objective: null });
     }
-    // Проходов из тумана не видно: с одной известной провинцией линий нет.
-    expect(view.lanes).toEqual([]);
+    // Проходы видны только между двумя ИЗВЕСТНЫМИ провинциями: в туман линия не ведёт.
+    const pos = new Map(home.map((id) => [`${s.planets[id]!.position.x},${s.planets[id]!.position.y}`, id]));
+    for (const [x1, y1, x2, y2] of view.lanes) {
+      expect(pos.has(`${x1},${y1}`)).toBe(true);
+      expect(pos.has(`${x2},${y2}`)).toBe(true);
+    }
   });
 
   it('разведанное показывает вид, сторону, проходы и цели задач', () => {

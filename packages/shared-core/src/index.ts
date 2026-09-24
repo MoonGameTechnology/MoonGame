@@ -511,6 +511,8 @@ export { pveModule } from './modules/pve';
 export { swarmMemoryModule, recalled, STRIKE_KIND } from './modules/swarmMemory';
 export { swarmAdaptModule, swarmModuleLevel, MIN_SIGNAL } from './modules/swarmAdapt';
 export { swarmJournalModule } from './modules/swarmJournal';
+export { missionFactsModule, HAVEN_TRAIT, EVACUEE_TRAIT } from './modules/missionFacts';
+export { beaconCallouts, beaconSentinels, BEACON_TRAIT, type BeaconCallout } from './util/beacon';
 export { fleetBroodModule } from './modules/fleetBrood';
 export {
   taxModule,
@@ -587,4 +589,4 @@ export {
 export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 
-export type { SwarmRepelRecord } from './state/gameState';
+export type { SwarmRepelRecord, MissionFacts } from './state/gameState';

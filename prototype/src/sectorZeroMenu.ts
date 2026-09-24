@@ -11,7 +11,7 @@ import type { RunPreview } from '../../decisions/sectorZeroMenu';
 import { CHAPTER_KEYS, chapterRoute, romanChapter } from '../../decisions/chapterRoute';
 import type { ChapterMapView } from '../../decisions/chapterMap';
 import type { ProfileNumbers } from '../../decisions/cloudSync';
-import type { MissionBrief } from '../../decisions/missionView';
+import { missionLabelN, type MissionBrief } from '../../decisions/missionView';
 
 /** Досье Роя для меню: каталог с отметкой «известно», имена уже переведены хостом. */
 export interface SwarmCodexRows {
@@ -227,7 +227,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     tasks.innerHTML = briefs
       .map(
         (b) =>
-          `<li><span>⚑ ${esc(t(b.id, { n: b.n }))}</span><em><i class="tw-data">◇ +${b.reward.research}</i> <i class="tw-warrants">⌖ +${b.reward.warrants}</i></em></li>`,
+          `<li><span>⚑ ${esc(t(b.id, { n: missionLabelN({ total: b.n, needMs: b.needMs }) }))}</span><em><i class="tw-data">◇ +${b.reward.research}</i> <i class="tw-warrants">⌖ +${b.reward.warrants}</i></em></li>`,
       )
       .join('');
     // Награда-герой: силуэт, пока он не пришёл, — цель видна до забега.

@@ -21,7 +21,7 @@ import {
   type MatchMap,
 } from '../packages/shared-core/src/index';
 import { pveState, pveModeId, pveObjectives, PVE_MISSION_COUNT } from '../packages/client/src/gameData';
-import { objectiveProgress } from '../decisions/missionObjectives';
+import { DEFAULT_OBJECTIVE_SLOTS, objectiveNominal, objectiveProgress } from '../decisions/missionObjectives';
 import { shippedGameData } from './bundle';
 import mapJson from './maps/pve-2.json';
 
@@ -126,14 +126,17 @@ describe('карта второй главы — «Кладбище экспед
 describe('дополнительные задачи карты (PVR-5.2)', () => {
   const objectives = map.objectives;
 
-  it('запас ПЯТЬ, и все с разными глаголами (PVR-5.3: запас растёт с номером главы)', () => {
+  it('запас СЕМЬ, и все с разными глаголами (PVR-5.3: запас растёт с номером главы)', () => {
     // Задачи одного рода слились бы в одну: смысл «дополнительных миссий» в том, что они
-    // требуют РАЗНОГО, а не одного и того же много раз.
-    expect(objectives).toHaveLength(5);
+    // требуют РАЗНОГО, а не одного и того же много раз. Эвакуация и спасение — задачи
+    // владельца 2026-09-24.
+    expect(objectives).toHaveLength(7);
     expect([...new Set(objectives.map((o) => o.kind))].sort()).toEqual([
       'build',
       'control',
+      'evac',
       'raze',
+      'rescue',
       'scout',
       'wave',
     ]);
@@ -193,18 +196,27 @@ describe('дополнительные задачи карты (PVR-5.2)', () =>
 
   it('у каждой задачи есть награда, и она не перевешивает сам забег', () => {
     // Выплата за забег — `1 + номер волны + 3 за победу`, то есть до 14 на десяти волнах.
-    // Сумма надбавок должна быть заметной, но не превращать задачи в основной источник.
-    const sum = objectives.reduce((n, o) => n + o.reward, 0);
+    // Надбавки должны быть заметными, но не превращать задачи в основной источник.
+    // Сравнивается МАКСИМУМ ОДНОГО забега, а не весь запас: запас больше, чем видно за
+    // заход (не больше потолка задач), и номинал видимых урезается (`objectiveNominal`).
     for (const o of objectives) expect([o.id, o.reward > 0]).toEqual([o.id, true]);
-    expect(sum).toBeLessThan(14);
+    const cap = DEFAULT_OBJECTIVE_SLOTS.cap;
+    const shown = Math.min(cap, objectives.length);
+    const best = objectives
+      .map((o) => objectiveNominal(o.reward, shown))
+      .sort((a, b) => b - a)
+      .slice(0, shown)
+      .reduce((n, r) => n + r, 0);
+    expect(best).toBeLessThan(14);
   });
 
-  it('запас первой главы — четыре, второй — пять (PVR-5.3, PVR-2.5)', () => {
+  it('запас первой главы — шесть, второй — семь (PVR-5.3, PVR-2.5)', () => {
     // Четвёртая задача первой главы — «уничтожить улей» (решение владельца 2026-09-24):
-    // зачистка перестала быть условием победы и стала задачей с наградой. Правило PVR-5.3
-    // «запас растёт с номером главы» держится — 4 → 5.
-    expect(pveObjectives(0)).toHaveLength(4);
-    expect(pveObjectives(1)).toHaveLength(5);
+    // зачистка перестала быть условием победы и стала задачей с наградой. Крепость и маяк
+    // в первой, эвакуация и спасение во второй — задачи владельца 2026-09-24. Правило
+    // PVR-5.3 «запас растёт с номером главы» держится — 6 → 7.
+    expect(pveObjectives(0)).toHaveLength(6);
+    expect(pveObjectives(1)).toHaveLength(7);
   });
 });
 

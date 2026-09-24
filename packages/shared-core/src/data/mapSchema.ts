@@ -45,6 +45,9 @@ export const MapSectorSchema = z.object({
   owner: z.string().nullable().default(null),
   buildings: z.array(MapBuildingSchema).default([]),
   garrison: z.array(MapUnitStackSchema).default([]),
+  /** Признаки провинции (`Planet.traits`) — например `haven` (убежище для беженцев) или
+   *  `beacon` (маяк задачи, на который Рой отвечает силами). Заказ владельца 2026-09-24. */
+  traits: z.array(z.string()).default([]),
   /** Which pairs of neighbours connect THROUGH this sector (MAP-TRANSIT). Absent =
    *  the sector is a full interchange: arriving by any lane you may leave by any other,
    *  which is how every sector behaved before and how most still do. Present = these
@@ -113,11 +116,16 @@ export const MapSlotSchema = z.object({
 export const MapObjectiveSchema = z.object({
   /** Ключ локализации заголовка: в коде и в данных живёт КЛЮЧ, не текст. */
   id: z.string(),
-  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build']),
-  /** `control` — id провинций; `raze` и `build` — виды построек; `scout`/`wave` не читают. */
+  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build', 'evac', 'rescue', 'beacon']),
+  /** `control`, `rescue`, `beacon` — id провинций; `raze` и `build` — виды построек;
+   *  `scout`/`wave`/`evac` не читают. */
   targets: z.array(z.string()).default([]),
+  /** `build` — ГДЕ строить (id провинций; нет — где угодно). Заказ владельца 2026-09-24:
+   *  «построить космическую крепость в провинции X». */
+  at: z.array(z.string()).optional(),
   /** `scout` — сколько провинций опознать; `wave` — до какой волны дожить; `build` —
-   *  сколько построек названных видов держать (PVR-5.3). */
+   *  сколько построек названных видов держать (PVR-5.3); `evac` — сколько беженцев
+   *  довести до убежища; `beacon` — сколько игровых часов удерживать подряд. */
   count: z.number().int().positive().optional(),
   /** Надбавка к награде за забег; складывается с выплатой за волны, а не заменяет её. */
   reward: z.number().nonnegative().default(0),

@@ -262,7 +262,7 @@ import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
-import { missionBriefs, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
+import { missionBriefs, missionLabelN, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
 import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
@@ -13610,15 +13610,22 @@ function renderMissionPanel(rows: MissionRow[]): void {
     `<p class="mp-hint">${t('hud.missions.hint')}</p>` +
     rows
       .map(r => {
+        // Маяк считает время удержания — реальным временем забега, как его таймеры;
+        // проваленная задача (гарнизон пал) говорит об этом, а не висит «0/1».
+        const progress = r.failed
+          ? t('hud.missions.failed')
+          : r.needMs !== undefined
+            ? `${runClockText(r.holdMs ?? 0)}/${runClockText(r.needMs)}`
+            : `${r.done}/${r.total}`;
         const body =
-          `<i class="mp-mark" aria-hidden="true">${r.complete ? '✓' : '⚑'}</i>` +
-          `<span class="mp-name">${esc(t(r.id, { n: r.total }))}</span>` +
-          `<b class="mp-prog">${r.done}/${r.total}</b>` +
+          `<i class="mp-mark" aria-hidden="true">${r.complete ? '✓' : r.failed ? '✗' : '⚑'}</i>` +
+          `<span class="mp-name">${esc(t(r.id, { n: missionLabelN(r) }))}</span>` +
+          `<b class="mp-prog">${progress}</b>` +
           missionRewardHtml(r.reward) +
           (r.targets.length ? `<span class="mp-go">${t('hud.missions.show')}</span>` : '');
         return r.targets.length
           ? `<button type="button" class="mp-row" data-mission-go="${esc(r.id)}">${body}</button>`
-          : `<div class="mp-row${r.complete ? ' done' : ''}">${body}</div>`;
+          : `<div class="mp-row${r.complete ? ' done' : r.failed ? ' failed' : ''}">${body}</div>`;
       })
       .join('');
   if (html === lastMissionPanelHtml) return;

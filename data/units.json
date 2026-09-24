@@ -51,6 +51,27 @@
       "support"
     ]
   },
+  "evac_transport": {
+    "faction": "vanguard",
+    "stats": {
+      "attack": 0,
+      "defense": 2,
+      "speed": 40,
+      "hp": 24,
+      "cargoCapacity": 0
+    },
+    "line": "rear",
+    "cost": {
+      "metal": 40
+    },
+    "buildTimeHours": 1,
+    "upkeep": {},
+    "hullClass": "light",
+    "traits": [
+      "evacuee",
+      "issued"
+    ]
+  },
   "cruiser": {
     "faction": "vanguard",
     "stats": {

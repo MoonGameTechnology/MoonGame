@@ -520,7 +520,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
         hp: buildingLevel(data.buildings[b.type]!, b.level).hp,
       })),
       garrison: sec.garrison.map((g) => ({ unit: g.unit, count: g.count })),
-      traits: [],
+      traits: [...sec.traits],
     };
     if (sec.terrain) planet.terrain = sec.terrain;
     if (sec.planetType) planet.planetType = sec.planetType;
