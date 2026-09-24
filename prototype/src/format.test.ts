@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import {
   TECH_CUR,
@@ -12,12 +12,17 @@ import {
   dayHour,
   displayUnit,
   esc,
+  fmtDur,
   fmtEta,
+  fmtHrs,
+  flowPer,
+  flowRate,
   gameDay,
   hl,
   kfmt,
   nfmt,
   resChip,
+  setRunClock,
   resLine,
   round1,
 } from './format';
@@ -269,5 +274,39 @@ describe('игровое время на экране', () => {
     expect(countdownHMS(2 * ЧАС + 5 * 60_000 + 30_000)).toBe('2:05:30');
     expect(countdownHMS(0)).toBe('0:00:00');
     expect(countdownHMS(-5)).toBe('0:00:00'); // отрицательного остатка не показываем
+  });
+});
+
+describe('часы забега Sector Zero (решение владельца 2026-09-24)', () => {
+  const H = 3_600_000;
+  afterEach(() => setRunClock(() => false));
+
+  it('в забеге отсчёты и сроки — реальные минуты и секунды при обычном темпе', () => {
+    setRunClock(() => true);
+    expect(countdownHMS(6 * H)).toBe('2:24'); // волна через шесть игровых часов
+    expect(fmtEta(6)).toBe('2:24');
+    expect(fmtHrs(1)).toBe('0:24');
+    expect(fmtDur(3)).toBe('1:12'); // срок стройки
+  });
+
+  it('в забеге приток — в минуту: и число, и подпись', () => {
+    setRunClock(() => true);
+    expect(flowRate(12)).toBe(30);
+    expect(flowPer()).toBe('/мин');
+    const chip = resChip('metal', 12, { sign: true, per: 'h' });
+    expect(chip).toContain('+30');
+    expect(chip).toContain('/мин');
+    // Суточный суффикс — не скорость мира, его часы забега не трогают.
+    expect(resChip('metal', 12, { per: 'd' })).toContain('12');
+  });
+
+  it('вне забега — игровые часы, как было', () => {
+    setRunClock(() => false);
+    expect(countdownHMS(6 * H)).toBe('6:00:00');
+    expect(fmtEta(2.5)).toContain('2.5');
+    expect(fmtDur(3)).toBe('3ч');
+    expect(flowRate(12)).toBe(12);
+    expect(flowPer()).toBe('/ч');
+    expect(resChip('metal', 12, { sign: true, per: 'h' })).toContain('+12');
   });
 });

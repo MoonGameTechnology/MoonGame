@@ -8,7 +8,7 @@
  */
 import type { GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
-import { esc } from './format';
+import { esc, flowPer, flowRate } from './format';
 import { incomeBreakdown } from './economy';
 
 /** Resources that can be traded on the in-game market (credits are the currency). */
@@ -66,7 +66,11 @@ export function resourceCardHtml(state: GameState, me: string, resource: string,
   const canTrade = TRADEABLE.has(resource);
   const inDeficit = (player?.arrears ?? []).includes(resource);
 
-  const fmt = (v: number) => (Math.abs(v) >= 1 ? String(Math.round(v)) : String(Math.round(v * 10) / 10));
+  // Все строки карточки — скорости мира: в забеге они в минуту (часы забега, `format.ts`).
+  const fmt = (perHour: number) => {
+    const v = flowRate(perHour);
+    return Math.abs(v) >= 1 ? String(Math.round(v)) : String(Math.round(v * 10) / 10);
+  };
   const netStr = (bd.net >= 0 ? '+' : '') + fmt(bd.net);
   const netCls = bd.net >= 0 ? 'pos' : 'neg';
 
@@ -83,7 +87,7 @@ export function resourceCardHtml(state: GameState, me: string, resource: string,
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.upkeep'))}</span><span class="rc-v neg">−${fmt(bd.buildingUpkeep)}</span></div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.army'))}</span><span class="rc-v neg">−${fmt(bd.unitUpkeep)}</span></div>
     <div class="rc-sec">${esc(t('rescard.net'))}</div>
-    <div class="rc-flow ${netCls}">${netStr}/ч</div>
+    <div class="rc-flow ${netCls}">${netStr}${esc(flowPer())}</div>
     ${market ? `<button class="rc-market ${canTrade ? '' : 'disabled'}" data-rc-market="${esc(resource)}">
       ${canTrade ? esc(t('rescard.market')) : esc(t('rescard.no-trade'))}
     </button>` : ''}

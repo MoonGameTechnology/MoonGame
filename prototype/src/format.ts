@@ -7,11 +7,29 @@
  * docs/backlog.md — `main.ts` has no export surface, so screen modules take their
  * host dependencies explicitly; these are the ones that never need to be passed).
  *
- * Locale-aware but state-free: `t`/`tData` read the chosen locale, nothing else.
+ * Locale-aware and clock-aware, otherwise state-free: `t`/`tData` read the chosen locale,
+ * and the time helpers ask {@link setRunClock} whether a Sector Zero run is on screen.
  */
 import { t, tData } from '../../localization/runtime';
+import { runClockText, runPerMinute } from '../../decisions/runClock';
 import { RES_SVG } from './icons';
 import { DAY, HOUR } from './time';
+
+/**
+ * ЧАСЫ ЗАБЕГА (решение владельца 2026-09-24). В забеге Sector Zero игровой час на обычном
+ * темпе длится 24 секунды, и «6 ч до волны» врёт о том, сколько ждать. Поэтому, пока
+ * забег на экране, отсчёты и сроки читаются реальными минутами и секундами, а приток —
+ * в минуту (`decisions/runClock.ts`). Хост отдаёт сюда ВОПРОС, а не флаг: флаг пришлось
+ * бы снимать на каждом выходе из забега, и забытый выход оставил бы секунды в схватке.
+ */
+let runClockOn: () => boolean = () => false;
+export function setRunClock(on: () => boolean): void {
+  runClockOn = on;
+}
+/** Идут ли сейчас часы забега — для текста, который называет единицу словами. */
+export function runClockShown(): boolean {
+  return runClockOn();
+}
 
 /** HTML-escape for text AND attribute values (CWE-79). Covers both quote styles: the
  *  file uses double-quoted attributes today, escaping `'` too keeps this complete if a
@@ -101,6 +119,9 @@ export function resChip(
   n: number | string,
   opts: { sign?: boolean; per?: 'h' | 'd' } = {},
 ): string {
+  // Скорость мира в забеге — в минуту (часы забега), суточный суффикс — не скорость мира.
+  const perMin = opts.per === 'h' && typeof n === 'number' && runClockOn();
+  if (perMin && typeof n === 'number') n = runPerMinute(n);
   const num = typeof n === 'number' ? n : Number(n);
   // Минус — типографский «−» (U+2212), тот же знак, что у дефицита в ценнике:
   // дефисный «-» в моноширинном шрифте читается как перенос, а не как «минус».
@@ -109,7 +130,7 @@ export function resChip(
       ? `${opts.sign && num > 0 ? '+' : ''}${String(round1(num)).replace('-', '−')}`
       : String(n);
   const per = opts.per
-    ? `<i class="rc-per">${t(opts.per === 'd' ? 'res.per.day' : 'res.per.hour')}</i>`
+    ? `<i class="rc-per">${opts.per === 'd' ? t('res.per.day') : perMin ? t('res.per.minute') : t('res.per.hour')}</i>`
     : '';
   return `<span class="rcost rc-${res}">${curIc(res)}${shown}${per}</span>`;
 }
@@ -139,8 +160,24 @@ export function costText(bag: Record<string, number> | undefined): string {
 // продолжали импортировать отсюда.
 export { displayUnit, buildingName } from '../../decisions/dataNames';
 
-/** «2.5 ч» / «40 мин» — an ETA in the wording the HUD uses. */
+/** Приток за час мира — в той единице, в которой его читает игрок: в забеге за минуту. */
+export function flowRate(perHour: number): number {
+  return runClockOn() ? runPerMinute(perHour) : perHour;
+}
+
+/** Подпись к {@link flowRate}: «/ч», в забеге «/мин». */
+export function flowPer(): string {
+  return t(runClockOn() ? 'res.per.minute' : 'res.per.hour');
+}
+
+/** Срок в часах мира (стройка, исследование): «3ч», в забеге «1:12». */
+export function fmtDur(h: number): string {
+  return runClockOn() ? runClockText(h * HOUR) : t('fmt.hours', { n: h });
+}
+
+/** «2.5 ч» / «40 мин» — an ETA in the wording the HUD uses; «m:ss» in a run. */
 export function fmtEta(totalH: number): string {
+  if (runClockOn()) return runClockText(totalH * HOUR);
   return totalH >= 1
     ? t('fmt.hours', { n: totalH.toFixed(1) })
     : t('fmt.minutes', { n: Math.ceil(totalH * 60) });
@@ -148,6 +185,7 @@ export function fmtEta(totalH: number): string {
 
 /** «≈14ч» / «≈2д 3ч» — plan durations are game-hours, like every duration in the UI. */
 export function fmtHrs(h: number): string {
+  if (runClockOn()) return runClockText(h * HOUR);
   const r = Math.max(0, Math.round(h));
   return r >= 48
     ? t('browser.left.days', { d: Math.floor(r / 24), h: r % 24 })
@@ -189,8 +227,10 @@ export function clockHM(at: number): string {
   return `${p2(dayHour(at))}:${p2(Math.floor((at % HOUR) / 60000))}`;
 }
 
-/** Обратный отсчёт «Ч:ММ:СС» — остаток, а не показание часов (правило 5). */
+/** Обратный отсчёт «Ч:ММ:СС» — остаток, а не показание часов (правило 5). В забеге —
+ *  реальный «м:сс» (часы забега). */
 export function countdownHMS(ms: number): string {
+  if (runClockOn()) return runClockText(ms);
   const left = Math.max(0, ms);
   const p2 = (n: number) => String(n).padStart(2, '0');
   return `${Math.floor(left / HOUR)}:${p2(Math.floor((left % HOUR) / 60000))}:${p2(Math.floor((left % 60000) / 1000))}`;

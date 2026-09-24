@@ -22,7 +22,7 @@ import { buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
-import { buildingName, cost, esc, resLine, displayUnit } from './format';
+import { buildingName, cost, esc, fmtDur, resLine, displayUnit } from './format';
 import { BUILD_ICON, unitIcon } from './icons';
 import { buildBuilding, buildUnit } from '../../decisions/actions';
 import { planetName } from './planetName';
@@ -184,7 +184,7 @@ export function buildScreenHtml(
     const lv = nextLvl <= maxLvl ? buildingLevel(def, nextLvl) : null;
     const foot = lv
       ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${roman(nextLvl)}</i> ` : ''}${cost(lv.cost, res)}</span>` +
-        `<span class="bw-dur">${t('fmt.hours', { n: lv.buildTimeHours })}</span></div>`
+        `<span class="bw-dur">${fmtDur(lv.buildTimeHours)}</span></div>`
       : '';
     const row =
       `<div class="bw-item st-${st.st}" data-bw="${id}">` +
@@ -248,7 +248,7 @@ export function unitScreenHtml(
       return (
         `<div class="bw-item st-${locked ? 'lock' : 'ready'}" data-unit-info="${esc(id)}"><div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
-        `<div class="bw-foot"><span>${cost(def.cost, res)}</span><span class="bw-dur">${t('fmt.hours', { n: def.buildTimeHours })}</span></div></div>`
+        `<div class="bw-foot"><span>${cost(def.cost, res)}</span><span class="bw-dur">${fmtDur(def.buildTimeHours)}</span></div></div>`
       );
     })
     .join('');

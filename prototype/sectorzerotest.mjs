@@ -70,6 +70,15 @@ async function check(label, run) {
   for (const id of ABSENT_HUD)
     assert.equal(await page.locator('#' + id).isVisible(), !run, `${label}: шапка #${id}`);
   assert.equal(await page.locator('#tbwallet').isVisible(), run, `${label}: кошелёк профиля в шапке`);
+  // Часы забега (решение владельца 2026-09-24): приток — в минуту, отсчёт волны — «м:сс»
+  // реального времени; в схватке — прежние игровые часы.
+  const flow = await page.locator('#purse [data-res="metal"] em').first().textContent();
+  assert.match(flow, run ? /\/(мин|min)$/ : /\/(ч|h)$/, `${label}: единица притока`);
+  if (run) {
+    const wave = await page.locator('.dl-wave').first().textContent();
+    assert.match(wave, /\d:\d\d/, `${label}: отсчёт волны есть`);
+    assert.doesNotMatch(wave, /\d:\d\d:\d\d/, `${label}: отсчёт волны — минуты, а не часы мира`);
+  }
 
   const home = await page.evaluate(() => window.__szTest.home());
   assert(home, `${label}: у игрока есть домашний мир`);
@@ -226,7 +235,7 @@ try {
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
-      ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶\n',
+      ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты\n',
   );
 } finally {
   await browser.close();

@@ -500,12 +500,16 @@ import {
   buildingName,
   fmtEta,
   fmtHrs,
+  flowPer,
+  flowRate,
   gameDay,
   dayHour,
   clockHM,
   countdownHMS,
   costText,
+  setRunClock,
 } from './format';
+import { runClockText } from '../../decisions/runClock';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
   BUILD_ICON,
@@ -13906,6 +13910,10 @@ function runInProgress(): boolean {
 function isSectorZeroRun(): boolean {
   return sectorRunActive && !NET && s.pve !== undefined;
 }
+// Часы забега (решение владельца 2026-09-24): пока забег на экране, отсчёты и сроки —
+// реальные минуты и секунды на обычном темпе, приток — в минуту (`format.ts`). Форматтеры
+// спрашивают сами, поэтому выход из забега не надо не забыть «выключить».
+setRunClock(isSectorZeroRun);
 
 /** Записать снимок (или забыть его, если забег кончился). Провал записи молчалив —
  *  бэкенд обещает не ронять игру, а не обещает сохранить. */
@@ -14208,7 +14216,9 @@ function frame(nowReal: number) {
             .map(m => `${t(m.id, { n: m.total })} — ${m.done}/${m.total} (+${objectiveNominal(m.reward, missions.length)})`)
             .join('\n'),
         )}">${t('hud.missions', { n: missionsDone, m: missions.length })}</span>`;
-  const clockHtml = `<span id="clock">${clockHM(s.time)}</span>`;
+  // В забеге время суток ничего не значит (дня в шапке нет) — часы показывают, сколько
+  // забег идёт, в тех же реальных минутах, что и все его таймеры.
+  const clockHtml = `<span id="clock">${isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)}</span>`;
   if (clockHtml !== lastClockHead) {
     devlineHead.innerHTML = clockHtml;
     lastClockHead = clockHtml;
@@ -14296,9 +14306,10 @@ function frame(nowReal: number) {
   // считает производство, которое уже не доходит), а телефон уносит скорость в цвет.
   const chip = (icon: string, key: string) => {
     const stock = r[key] ?? 0;
-    const flow = flowRounded(inc[key] ?? 0);
+    // Часы забега: в забеге приток — за минуту (решение владельца 2026-09-24).
+    const flow = flowRounded(flowRate(inc[key] ?? 0));
     const flowTxt = flowShown(MOBILE, flow)
-      ? `<em class="${flowSign(flow)}">${flowPrefix(flow)}${flowDigits(flow, kfmt)}/ч</em>`
+      ? `<em class="${flowSign(flow)}">${flowPrefix(flow)}${flowDigits(flow, kfmt)}${flowPer()}</em>`
       : '';
     const dead = chipDead(stock, flow) ? ' dead' : '';
     const short = chipShort(myArrears, key) ? ' short' : '';
