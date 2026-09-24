@@ -400,7 +400,7 @@ import {
   ringRadius,
   ringWidth,
 } from './pingPulse';
-import { openingView, pickHome } from './openingView';
+import { openingView, openingZoom, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
   fmtJoinWindow,
@@ -527,6 +527,7 @@ import {
   setRunClock,
 } from './format';
 import { runClockText } from '../../decisions/runClock';
+import { metaUnlocks, pveOutcomeEvent } from '../../decisions/runAnalytics';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
   BUILD_ICON,
@@ -2094,7 +2095,10 @@ function centerOn(p: { x: number; y: number }, scale: number): void {
  *  the simple desktop view keeps its whole-map fit. Zoom is relative to the screen-fit. */
 function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
-  const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
+  // Забег узнаётся по режиму матча: `s.pve` ядро заводит только на первом ходе часов.
+  const run = data.modes[matchMode() ?? '']?.pve !== undefined;
+  const zoom = openingZoom({ phone: MOBILE, console: holographic.active(), run });
+  const view = openingView(zoom !== null, pickHome(Object.values(s.planets), ME), zoom ?? undefined);
   if (view.kind === 'home') {
     centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
     return;
@@ -10056,6 +10060,11 @@ const pirateIntro = initPirateIntro({
   close: $('pirate-close'),
   focus: focusWorld,
   openBattle: (id) => battleWindow.open(id),
+  // Воронка обучения (`YAG-5.1`): первый бой с пиратами — это и есть обучение забега.
+  onStage: (step) => {
+    if (isSectorZeroRun())
+      getPlatform().analytics.emit('onboarding_step', { guide: 'pirates', step, attempt: sectorAttempt });
+  },
 });
 // Комиксы глав (решение владельца 2026-09-24): арт рисует владелец, реестр — `comicArt.ts`.
 // Реестр читается через держатель, чтобы робот мог подложить свой комикс.
@@ -11604,6 +11613,13 @@ function startPvEMatch(dev = false): void {
   if (!testing) saveSectorProgress({ ...sectorProgress, nextAttempt: sectorAttempt + 1 });
   runShipLoadouts = JSON.parse(JSON.stringify(sectorProgress.loadouts));
   sectorMission = nextSectorMission;
+  // Новая попытка (`YAG-5.1`); «Продолжить» — та же попытка, её исход придёт своим событием.
+  if (!testing)
+    getPlatform().analytics.emit('pve_started', {
+      chapter: pveChapter(sectorMission).id,
+      difficulty: pveDifficulty,
+      attempt: sectorAttempt,
+    });
   const st = prepareSectorZeroRun(pveState(data, sectorMission), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
   const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
@@ -13758,6 +13774,9 @@ function saveSectorProgress(next: SectorZeroProgress): void {
   next = granted.progress;
   for (const id of granted.joined)
     note(t('sector-zero.hero.joined', { name: tData(data.heroes[id]?.name ?? id) }));
+  // Что открыла эта запись (`YAG-5.1`). Облако и загрузка кладут профиль мимо этой функции,
+  // поэтому принесённое с другого устройства за открытие здесь не считается.
+  for (const unlock of metaUnlocks(sectorProgress, next)) getPlatform().analytics.emit('meta_unlock', unlock);
   sectorProgress = next;
   const blob = JSON.stringify(next);
   progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
@@ -13935,6 +13954,9 @@ const sectorZeroAccount: SectorZeroAccount = {
 // проходился целиком, а не только в юнит-тесте. Пускать симуляцию к игроку нельзя: это
 // ровно «обещать механику, которой у него не будет».
 const platform = getPlatform();
+
+// Начало сессии (`YAG-5.1`): точка входа — страница Sector Zero или основная игра.
+platform.analytics.emit('session_started', { entry: document.body.dataset.entry ?? 'main' });
 
 // Разметка жизненного цикла для площадки (`YAG-1.2`). Хост отдаёт её, только если под
 // нами правда площадка; в браузере методов нет, и вызывать нечего — поэтому `host?.`, а
@@ -14253,6 +14275,9 @@ function tickRunSave(nowReal: number): void {
   if (isSectorZeroRun() && s.match.status === 'ended') {
     if (sectorAttempt > 0 && clearedAttempt !== sectorAttempt) {
       const won = s.match.winner === ME || (s.match.winners ?? []).includes(ME);
+      // Исход попытки (`YAG-5.1`) — один раз, там же, где засчитывается её награда.
+      const outcome = pveOutcomeEvent(s, ME, { chapter: pveChapter(sectorMission).id, attempt: sectorAttempt });
+      if (outcome) getPlatform().analytics.emit(outcome.event, outcome.props);
       awardSectorRun();
       clearedAttempt = sectorAttempt;
       // Победа — комикс главы поверх итогов (в первый раз); итоги под ним уже нарисованы.

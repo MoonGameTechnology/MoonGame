@@ -943,6 +943,9 @@ export const en: Record<string, string> = {
   'data.hive': 'Hive',
   'data.intercept-veil': 'Intercept Veil',
   'data.the-swarm': 'The Swarm',
+  // Имена игроков в картах (`data/maps/*.json`): Рой глав и дом схватки.
+  'data.swarm-collective': 'The Swarm',
+  'data.vanguard-compact': 'Vanguard Compact',
   'data.vanguard-coalition': 'Vanguard Coalition',
   'data.vanguard-impulse': 'Vanguard Impulse',
   'data.vanguard': 'Vanguard',
@@ -1878,7 +1881,7 @@ export const en: Record<string, string> = {
   'hud.crest.title': 'Your profile',
   'hud.deficit': '⚠ SHORTAGE — consuming buildings run at 50%',
   'hud.goal': 'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
-  'hud.goal.pve': 'Goal: survive {n} waves and take all Swarm territory. The pirate base is an optional first battle.',
+  'hud.goal.pve': 'Goal: survive {n} waves and hold your world until the chapter ends.',
   'hud.next-day.cap': 'to next day',
   'hud.place': '#{p} of {n}',
   'hud.resource.credits': 'Credits',

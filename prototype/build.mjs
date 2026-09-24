@@ -3267,7 +3267,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   </div>
   <div id="purse"></div>
 </header>
-<nav class="holo-nav" data-i18n-aria="hud.map"><span aria-current="page" data-i18n="hud.map"></span><button id="holo-tech" type="button" data-i18n="win.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
+<nav class="holo-nav" data-i18n-aria="hud.map"><span aria-current="page" data-i18n="hud.map"></span><button id="holo-tech" type="button" data-i18n="rail.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
 <div id="devline"><span id="devline-head"></span><span id="devline-status"></span></div>
 <!-- панель задач забега: открывается чипом «Задачи» на строке статуса (missionView.ts) -->
 <div id="missionpanel" role="dialog" data-i18n-aria="hud.missions.title" hidden></div>
@@ -3525,13 +3525,13 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div>
 <section id="sector-zero" aria-labelledby="sz-title"${entry === 'sector-zero' ? ' style="display:flex"' : ''}>
   <div class="sz-shell">
-    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span><span data-i18n="sector-zero.offline"></span></div>
+    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span></div>
     <div class="sz-main" id="sz-home">
       <div class="sz-content">
         <p class="sz-eyebrow" data-i18n="sector-zero.offline"></p>
         <h1 id="sz-title" data-i18n="sector-zero.title"></h1>
         <p class="sz-intro" data-i18n="sector-zero.intro"></p>
-        <div class="sz-run"><div id="sz-save-label" data-i18n="sector-zero.offline"></div><p id="sz-summary" role="status" aria-live="polite" data-i18n="sector-zero.loading"></p></div>
+        <div class="sz-run"><div id="sz-save-label" data-i18n="sector-zero.saved" hidden></div><p id="sz-summary" role="status" aria-live="polite" data-i18n="sector-zero.loading"></p></div>
         <div id="sz-actions">
           <div class="sz-actions">
             <button id="sz-continue" class="sz-action sz-primary" type="button" hidden disabled data-i18n="sector-zero.continue"></button>

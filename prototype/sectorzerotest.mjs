@@ -40,6 +40,8 @@ const hooks = `window.__szTest = {
   // Суверены на профиле и казна матча — для покупки пакета снабжения.
   sov: n => saveSectorProgress({ ...sectorProgress, sovereigns: n }),
   res: r => s.players[ME]?.resources?.[r] ?? 0,
+  // Журнал аналитики веб-площадки (YAG-5.1): что игра отдала бы приёмнику.
+  events: () => platform.events ?? [],
 };`;
 
 /** Панель тестового комикса и заведомо битая картинка (панель без арта). */
@@ -158,6 +160,21 @@ try {
     const reward = page.locator('#sz-chapter-hero');
     assert.equal(await reward.isVisible(), true, 'у главы II есть герой-награда');
     assert.equal(await reward.locator('.sz-hero-sil').textContent(), '?', 'герой ещё не пришёл');
+    // Меню без повторов (замечание владельца 2026-09-24): «Одиночная игра» — один раз, в
+    // надзаголовке; подписи сохранения без сохранённого забега нет.
+    // Считается ТЕКСТ, который видит игрок, а не ключи разметки: подпись могла бы
+    // получить те же слова и из кода.
+    const singlePlayer = () =>
+      page.evaluate(
+        () =>
+          [...document.querySelectorAll('#sector-zero *')].filter(
+            (e) =>
+              e.children.length === 0 &&
+              e.getClientRects().length > 0 &&
+              /^(Одиночная игра|Single player)$/i.test((e.textContent ?? '').trim()),
+          ).length,
+      );
+    assert.equal(await singlePlayer(), 1, '«Одиночная игра» в меню — один раз');
     await page.locator('#sz-mission-0').click();
     // Комикс главы (решение владельца 2026-09-24): перед первым забегом главы, один раз.
     // Вторая панель — битая картинка: подписи остаются на тёмном фоне, игра не встаёт.
@@ -187,6 +204,10 @@ try {
     await page.locator('#comic').waitFor({ state: 'hidden' });
     assert.deepEqual(await page.evaluate(() => window.__szTest.comicsSeen()), ['pve-1:intro']);
     await check('Sector Zero', true);
+    // Воронка обучения (YAG-5.1): бой с пиратами главы I — первый шаг уходит на старте.
+    await page.waitForFunction(() =>
+      window.__szTest.events().some((e) => e.event === 'onboarding_step' && e.props.step === 'approach'),
+    );
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.
     await page.goto(site.url + '/');
@@ -199,8 +220,12 @@ try {
     // снимка), и флаг забега там ставится в своём месте: его тоже надо поймать.
     await page.locator('#hub-sector-zero').click();
     await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
+    assert.equal(await page.locator('#sz-save-label').isVisible(), true, 'сохранённый забег подписан');
+    assert.equal(await singlePlayer(), 1, '«Одиночная игра» — один раз и при сохранённом забеге');
     await page.locator('#sz-continue').click();
     await check('Sector Zero из хаба (продолжение)', true);
+    // Вкладка полосы навигации — подписью кнопки, а не заголовком окна заглавными.
+    assert.match((await page.locator('#holo-tech').textContent())?.trim() ?? '', /^(Технологии|Technologies)$/);
     await leave(); // выход из забега ведёт в меню Sector Zero, оттуда — в хаб
     await page.locator('#sz-back').click();
     await enterSkirmish(page, { fromWelcome: false });
@@ -278,6 +303,21 @@ try {
     );
     await page.locator('#maploading').waitFor({ state: 'hidden' });
     assert.equal(await page.locator('#comic').isVisible(), false, 'комикс главы — один раз на профиль');
+    // Аналитика забега (YAG-5.1) на этой загрузке страницы: одна сессия, по старту на
+    // попытку, исход ровно один (конец забега tickRunSave видит каждый кадр), открытие
+    // главы, реклама из шапки и с итогов — через одну дверь.
+    const events = await page.evaluate(() => window.__szTest.events());
+    const named = (name) => events.filter((e) => e.event === name);
+    assert.deepEqual(named('session_started').map((e) => e.props), [{ entry: 'sector-zero' }]);
+    assert.deepEqual(named('pve_started').map((e) => e.props.chapter), ['pve-2', 'pve-2'], 'новый забег и повтор');
+    assert.equal(named('pve_completed').length, 1, 'исход попытки — один раз');
+    assert.equal(named('pve_completed')[0].props.chapter, 'pve-2');
+    assert.equal(named('pve_failed').length, 0);
+    assert(named('meta_unlock').some((e) => e.props.kind === 'chapter' && e.props.id === 'pve-2'), 'глава открыта');
+    assert.deepEqual(
+      named('rewarded_ad_completed').map((e) => e.props.placement),
+      ['run.sovereigns', 'run.double'],
+    );
     await leave();
     await page.waitForFunction(() => document.getElementById('sz-mission-1').classList.contains('sz-passed'));
     // Засчитанный забег добавил разведку главы: на её карте опознанного стало больше.
@@ -296,10 +336,14 @@ try {
     await page.locator('#spd-dev').click();
     assert(await page.locator('#spd-dev.on').isVisible(), 'дев-забег: ▶▶▶ включает свой темп');
     assert(await page.locator('#spd-pause').isVisible(), 'пауза — в полосе скорости');
+    // Дев-забег не пишет профиль — и попыткой для аналитики он тоже не считается.
+    const devEvents = await page.evaluate(() => window.__szTest.events());
+    assert.equal(devEvents.filter((e) => e.event === 'pve_started').length, 2, 'дев-забег — не попытка');
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
       ' комиксы глав — до первого забега и после победы, один раз, с пропуском;' +
+      ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты\n',
   );
