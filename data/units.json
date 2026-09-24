@@ -12,6 +12,7 @@
     "abilities": [
       "long_range_scan"
     ],
+    "radarRange": 150,
     "signature": 1,
     "cost": {
       "metal": 40

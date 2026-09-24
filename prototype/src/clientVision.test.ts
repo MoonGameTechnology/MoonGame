@@ -129,11 +129,31 @@ describe('RULES-5 — карта спрашивает ядро, а не выво
   });
 });
 
+describe('круги везде — граница обзора на карте из тех же кругов (2026-09-24)', () => {
+  it('drawRadarCoverage рисует `sightCircles` ядра, а не собирает радары сам', () => {
+    // Граница собиралась из своих радаров без множителя технологий и без базового обзора
+    // мира, а туман считался иначе — мир светился за нарисованной границей.
+    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    const body = src.slice(src.indexOf('function drawRadarCoverage('));
+    const fn = body.slice(0, body.indexOf('\n}\n') + 3);
+    expect(fn).toContain('sightCircles(s, ME, data)');
+    for (const reDerived of ['planetRadar(', 'fleetRadar(', 'IDENTIFY_REACH_FRACTION']) {
+      expect(fn).not.toContain(reDerived);
+    }
+  });
+});
+
 describe('RULES-5 — блэкаут пережил переезд', () => {
   it('неоплаченная энергия сужает опознание', () => {
-    const paid = base(withRadar);
-    const unpaid = base((st) => {
+    // Блэкаут гасит РАДАР, а не глаза: базовый круг мира энергии не требует. Здесь он
+    // обнулён, иначе накрыл бы внутреннее кольцо радара, сужение которого и проверяется.
+    const radarOnly = (st: GameState): void => {
+      st.sight = { world: 0, fleet: 0, radarScale: 1 };
       withRadar(st);
+    };
+    const paid = base(radarOnly);
+    const unpaid = base((st) => {
+      radarOnly(st);
       st.players.p1 = player('p1', { arrears: ['energy'] } as Partial<Player>);
     });
     expect(see(unpaid).size).toBeLessThan(see(paid).size);

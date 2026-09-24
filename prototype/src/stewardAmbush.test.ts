@@ -66,6 +66,9 @@ function roadsState(posture: 'defend' | 'active_defend'): GameState {
   const state: GameState = {
     ...s,
     time: NOW,
+    // Засада — про дороги, а не про зрение: круг мира B накрывает соседей A и C (по 250),
+    // иначе «Хранитель» просто не увидел бы, кого ловить (зрение кругами, 2026-09-24).
+    sight: { world: 260, fleet: 40, radarScale: 1 },
     planets: {
       A,
       B,
