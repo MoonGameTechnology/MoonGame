@@ -284,6 +284,15 @@ import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
+import { initComicPlayer } from './comicPlayer';
+import { CHAPTER_COMICS } from './comicArt';
+import {
+  comicDue,
+  comicId,
+  markComicSeen,
+  type ComicMoment,
+  type ComicRegistry,
+} from '../../decisions/chapterComics';
 import {
   RUN_SAVE_VERSION,
   parseRunSave,
@@ -10031,6 +10040,17 @@ const pirateIntro = initPirateIntro({
   focus: focusWorld,
   openBattle: (id) => battleWindow.open(id),
 });
+// Комиксы глав (решение владельца 2026-09-24): арт рисует владелец, реестр — `comicArt.ts`.
+// Реестр читается через держатель, чтобы робот мог подложить свой комикс.
+const comicPlayer = initComicPlayer({
+  root: $('comic'),
+  img: $('comic-img') as HTMLImageElement,
+  caption: $('comic-caption'),
+  count: $('comic-count'),
+  next: $('comic-next') as HTMLButtonElement,
+  skip: $('comic-skip') as HTMLButtonElement,
+});
+const comicArt: { registry: ComicRegistry } = { registry: CHAPTER_COMICS };
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
 let stewSnapshot: StewardMetrics | null = null;
 
@@ -13194,6 +13214,7 @@ const hide = (id: string): void => document.getElementById(id)?.classList.remove
 const flexed = (id: string): boolean => document.getElementById(id)?.style.display === 'flex';
 
 const BACK_LAYERS: BackLayer[] = [
+  { id: 'comic', isOpen: () => comicPlayer.isOpen(), close: () => comicPlayer.skip() }, // z90
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   // --- модалки поверх всего (z60…z57) ---
   { id: 'solo-replace', isOpen: () => flexed('solo-replace'), close: closeSoloReplace }, // z60
@@ -14069,7 +14090,7 @@ const sectorZeroMenu = initSectorZeroMenu({
     nextSectorMission = value;
     writeRaw('void.pveMission', String(value));
   },
-  start: () => startPvEMatch(),
+  start: () => launchSectorRun(),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
   resume: restoreRun,
   settings: () => settings.open(),
@@ -14084,6 +14105,33 @@ function heroReward(index: number): { hero?: { name: string; joined: boolean } }
   const id = chapterHero(index);
   const def = id ? data.heroes[id] : undefined;
   return id && def ? { hero: { name: tData(def.name), joined: !!sectorProgress.heroes[id] } } : {};
+}
+
+/**
+ * Комикс главы, если он положен (`decisions/chapterComics.ts`), и затем `then`. Показ —
+ * один раз на профиль; отметка пишется, когда игрок комикс закрыл (досмотрел или
+ * пропустил), поэтому вкладка, закрытая посреди комикса, покажет его снова, а не потеряет.
+ */
+function playChapterComic(chapter: string, moment: ComicMoment, then: () => void): void {
+  const panels = comicDue(sectorProgress, comicArt.registry, chapter, moment);
+  if (!panels) {
+    then();
+    return;
+  }
+  const shown = comicPlayer.play(panels, moment === 'intro' ? 'battle' : 'results');
+  detach(
+    'Sector Zero: комикс главы',
+    shown.then(() => {
+      saveSectorProgress(markComicSeen(sectorProgress, comicId(chapter, moment)));
+      then();
+    }),
+  );
+}
+
+/** Новая попытка главы — и меню, и «Сыграть главу снова»: сперва комикс главы (в первый
+ *  раз), потом забег. Дев-забег комикс не показывает: он не пишет профиль. */
+function launchSectorRun(): void {
+  playChapterComic(pveChapter(nextSectorMission).id, 'intro', () => startPvEMatch());
 }
 
 /** `replay` — сразу новая попытка той же главы (кнопка итогов «Сыграть главу снова»). Идёт
@@ -14115,7 +14163,7 @@ function openSectorZero(preparation = false, replay = false): void {
       nextSectorMission = chapter;
       writeRaw('void.pveMission', String(chapter));
       sectorZeroMenu.hide();
-      startPvEMatch();
+      launchSectorRun();
     }
   }));
 }
@@ -14187,8 +14235,11 @@ function tickRunSave(nowReal: number): void {
   if (sectorDevActive) return;
   if (isSectorZeroRun() && s.match.status === 'ended') {
     if (sectorAttempt > 0 && clearedAttempt !== sectorAttempt) {
+      const won = s.match.winner === ME || (s.match.winners ?? []).includes(ME);
       awardSectorRun();
       clearedAttempt = sectorAttempt;
+      // Победа — комикс главы поверх итогов (в первый раз); итоги под ним уже нарисованы.
+      if (won) playChapterComic(pveChapter(sectorMission).id, 'outro', () => {});
       const awardWrite = progressWrite;
       runWrite = runWrite
         .then(() => awardWrite)
