@@ -300,6 +300,22 @@ describe('метки — композер', () => {
     expect(w.pushed[0]![1].length).toBe(PING_DESC_MAX);
   });
 
+  it('Escape закрывает композер и дальше не уходит — иначе закрылось бы и окно под ним', () => {
+    // Поле композера получает фокус пустым, а пустое поле Escape уже пропускает к лестнице
+    // «назад» (`backGesture.ts`, правило 7): без остановки одно нажатие закрывало и композер,
+    // и карточку провинции под ним.
+    const w = wired();
+    w.api.openMenu();
+    let stopped = false;
+    w.menu.fire('keydown', {
+      key: 'Escape',
+      target: { id: 'pm-text' },
+      stopPropagation: () => (stopped = true),
+    });
+    expect(w.api.menuOpen()).toBe(false);
+    expect(stopped).toBe(true);
+  });
+
   it('тап по фону закрывает композер', () => {
     const w = wired();
     w.api.openMenu();
