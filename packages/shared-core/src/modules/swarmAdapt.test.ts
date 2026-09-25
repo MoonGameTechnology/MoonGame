@@ -168,7 +168,7 @@ describe('PVR-4.3 — право на адаптацию проверяет яд
 
   it('пол взят — проект открывается и ОПЛАЧИВАЕТСЯ', () => {
     const s = apply(seen(MIN_SIGNAL), adapt(), 10);
-    expect(s.swarmAdapt).toMatchObject({ moduleId: 'veil', level: 1, fleetId: 'hostF' });
+    expect(s.swarmAdapts).toEqual([expect.objectContaining({ moduleId: 'veil', level: 1, fleetId: 'hostF' })]);
     expect(s.players.swarm?.resources).toMatchObject({
       biomass: RICH.biomass - 30,
       metal: RICH.metal - 20,
@@ -221,14 +221,14 @@ describe('PVR-4.3 — проект доходит до уровня в бою', 
     expect(swarmModuleLevel(s, 'swarm', 'veil')).toBe(0); // ещё растёт
     const done = ok(kernel.advanceTo(s, ctx(10 + 7 * MS_PER_HOUR)));
     expect(swarmModuleLevel(done, 'swarm', 'veil')).toBe(1);
-    expect(done.swarmAdapt).toBeUndefined();
+    expect(done.swarmAdapts).toBeUndefined();
   });
 
   it('до срока уровня нет — время и есть цена адаптации', () => {
     const s = apply(seen(MIN_SIGNAL), adapt(), 10);
     const early = ok(kernel.advanceTo(s, ctx(10 + 5 * MS_PER_HOUR)));
     expect(swarmModuleLevel(early, 'swarm', 'veil')).toBe(0);
-    expect(early.swarmAdapt).toBeDefined();
+    expect(early.swarmAdapts).toHaveLength(1);
   });
 
   it('покров ВЫРАСТАЕТ на матках, где гнездо свободно (AUD-20)', () => {
@@ -266,7 +266,7 @@ describe('PVR-4.3 — проект доходит до уровня в бою', 
     s.fleets.fresh = fleet('fresh', 'swarm', ['chamber']);
     expect(swarmKnownLevel(s, 'swarm', 'veil')).toBe(1);
     s = apply(s, adapt({ fleetId: 'fresh' }), s.time + 1);
-    expect(s.swarmAdapt).toMatchObject({ level: 2, fleetId: 'fresh' });
+    expect(s.swarmAdapts).toEqual([expect.objectContaining({ level: 2, fleetId: 'fresh' })]);
   });
 
   it('второй шаг лестницы поднимает уровень до 2, третьего шага нет', () => {
@@ -300,7 +300,7 @@ describe('AUD-20 — проект едет вместе с органом, вл�
     s.fleets.wave = fleet('wave', 'swarm', []);
     const r = k.applyAction(s, act('test.merge', 'swarm', { from: 'hostF', into: 'wave' }), ctx(11));
     if (!r.ok) throw new Error(r.code);
-    expect(r.state.swarmAdapt?.fleetId).toBe('wave');
+    expect(r.state.swarmAdapts?.[0]?.fleetId).toBe('wave');
     const done = ok(k.advanceTo(r.state, ctx(10 + 7 * MS_PER_HOUR)));
     expect(done.swarmRecipes).toEqual({ veil: 1 });
     expect(swarmModuleLevel(done, 'swarm', 'veil')).toBe(1);
@@ -310,9 +310,9 @@ describe('AUD-20 — проект едет вместе с органом, вл�
 describe('PVR-4.3 — потеря органа прекращает незавершённый проект', () => {
   it('гибель носителя снимает проект сразу', () => {
     let s = apply(seen(MIN_SIGNAL), adapt(), 10);
-    expect(s.swarmAdapt).toBeDefined();
+    expect(s.swarmAdapts).toHaveLength(1);
     s = apply(s, act('test.kill', 'swarm', { fleetId: 'hostF' }), 11);
-    expect(s.swarmAdapt).toBeUndefined();
+    expect(s.swarmAdapts).toBeUndefined();
   });
 
   it('и уровень из отложенного события уже не выпускается', () => {
@@ -370,30 +370,29 @@ describe('AUD-20 — «пора ли» решает одно правило на
   });
 
   it('пол взят — заказ проекта на органе; пол не взят — ничего', () => {
-    expect(swarmAdaptDue(seen(MIN_SIGNAL - 1), data, 'swarm', null)).toBeNull();
-    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', null)).toEqual({
-      moduleId: 'veil',
-      fleetId: 'hostF',
-    });
+    expect(swarmAdaptDue(seen(MIN_SIGNAL - 1), data, 'swarm', null)).toEqual([]);
+    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', null)).toEqual([
+      { moduleId: 'veil', fleetId: 'hostF' },
+    ]);
   });
 
   it('узкое окно ждёт свежих боёв: старые наблюдения из него выпали', () => {
     // Окно считается в столкновениях: окно уже пола не вмещает нужного числа
     // наблюдений, сколько бы их ни было за весь забег.
-    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', MIN_SIGNAL - 1)).toBeNull();
-    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', MIN_SIGNAL)).not.toBeNull();
+    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', MIN_SIGNAL - 1)).toEqual([]);
+    expect(swarmAdaptDue(seen(MIN_SIGNAL), data, 'swarm', MIN_SIGNAL)).toHaveLength(1);
   });
 
   it('идёт проект, нет органа или не на что — не заказывает', () => {
-    expect(swarmAdaptDue(apply(seen(MIN_SIGNAL), adapt(), 10), data, 'swarm', null)).toBeNull();
-    expect(swarmAdaptDue(seen(MIN_SIGNAL, { modules: ['veil'] }), data, 'swarm', null)).toBeNull();
+    expect(swarmAdaptDue(apply(seen(MIN_SIGNAL), adapt(), 10), data, 'swarm', null)).toEqual([]);
+    expect(swarmAdaptDue(seen(MIN_SIGNAL, { modules: ['veil'] }), data, 'swarm', null)).toEqual([]);
     const poor = seen(MIN_SIGNAL, { resources: { biomass: 5, metal: 5, microelectronics: 1 } });
-    expect(swarmAdaptDue(poor, data, 'swarm', null)).toBeNull();
+    expect(swarmAdaptDue(poor, data, 'swarm', null)).toEqual([]);
   });
 
   it('заказ, который выдаёт правило, ядро принимает', () => {
     const s = seen(MIN_SIGNAL);
-    const due = swarmAdaptDue(s, data, 'swarm', SWARM_MEMORY_WINDOW.weak)!;
-    expect(code(s, adapt({ moduleId: due.moduleId, fleetId: due.fleetId }))).toBeUndefined();
+    const [due] = swarmAdaptDue(s, data, 'swarm', SWARM_MEMORY_WINDOW.weak);
+    expect(code(s, adapt({ moduleId: due!.moduleId, fleetId: due!.fleetId }))).toBeUndefined();
   });
 });

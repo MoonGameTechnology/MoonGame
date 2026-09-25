@@ -40,8 +40,13 @@ export interface BeaconCallout {
   to: PlanetId;
 }
 
-/** Кого Рой (`npc`) шлёт к каким маякам прямо сейчас. Детерминированно: id сравниваются. */
-export function beaconCallouts(state: GameState, npc: PlayerId): BeaconCallout[] {
+/** Кого Рой (`npc`) шлёт к каким маякам прямо сейчас. Детерминированно: id сравниваются.
+ *  `skip` — флоты, которые отвечать не могут (посты сети Роя стоят на своих местах). */
+export function beaconCallouts(
+  state: GameState,
+  npc: PlayerId,
+  skip: ReadonlySet<FleetId> = new Set(),
+): BeaconCallout[] {
   const out: BeaconCallout[] = [];
   const busy = new Set<FleetId>();
   const beacons = Object.values(state.planets)
@@ -68,7 +73,7 @@ export function beaconCallouts(state: GameState, npc: PlayerId): BeaconCallout[]
     if (answering) continue;
     let best: { id: FleetId; d: number } | null = null;
     for (const f of fleets) {
-      if (f.owner !== npc || busy.has(f.id)) continue;
+      if (f.owner !== npc || busy.has(f.id) || skip.has(f.id)) continue;
       if (f.movement || f.battleId || f.location == null || f.location === beacon.id) continue;
       if (!f.units.some((u) => u.count > 0)) continue;
       const at = state.planets[f.location];

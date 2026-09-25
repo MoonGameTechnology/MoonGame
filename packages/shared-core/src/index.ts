@@ -522,6 +522,22 @@ export {
   type SwarmAdaptOrder,
 } from './modules/swarmAdapt';
 export { swarmJournalModule } from './modules/swarmJournal';
+export { swarmNetModule } from './modules/swarmNet';
+export {
+  swarmNet,
+  swarmNodes,
+  poweredNodes,
+  partsOf,
+  linked,
+  knowledgeOf,
+  planetHolder,
+  fleetHolder,
+  NET_ENERGY,
+  type HolderId,
+  type NetNode,
+  type SwarmNetView,
+  type SwarmKnown,
+} from './util/swarmNet';
 export { missionFactsModule, HAVEN_TRAIT, EVACUEE_TRAIT } from './modules/missionFacts';
 export {
   beaconCallouts,
@@ -615,3 +631,12 @@ export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 
 export type { SwarmRepelRecord, MissionFacts } from './state/gameState';
+export { swarmNetPlan, RELAY_POST_TRAIT, type SwarmNetPlan } from './util/swarmNetTactics';
+export {
+  waveStagingWorld,
+  producedForcesAt,
+  isProducedForce,
+  musterPlan,
+  RALLY_TRAIT,
+  type MusterPlan,
+} from './util/pveStaging';

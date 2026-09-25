@@ -309,19 +309,26 @@ describe('первую главу проходит оборона (PVR-2.5)', ()
     return { state: s };
   }
 
-  for (const difficulty of ['weak', 'strong'] as const) {
-    it(`против ${difficulty === 'weak' ? 'обычного' : 'сильного'} Роя: забег засчитан удержанием, улей стоит`, () => {
-      const { state, endedAtHour } = defend(difficulty);
-      expect({ reason: state.match.reason, winner: state.match.winner }).toEqual({
-        reason: 'pve-cleared',
-        winner: 'p1',
-      });
-      // Вердикт ровно в срок: хребет волн плюс удержание — ни раньше, ни позже.
-      expect(state.match.endedAt).toBe((RUN_SPINE_HOURS + RUN_TAIL_HOURS) * HOUR);
-      expect(endedAtHour).toBe(RUN_SPINE_HOURS + RUN_TAIL_HOURS);
-      // Прошла именно ОБОРОНА: улей так и остался за Роем.
-      expect(state.planets.hive?.owner).toBe('p3');
+  it('против обычного Роя: забег засчитан удержанием, улей стоит', () => {
+    const { state, endedAtHour } = defend('weak');
+    expect({ reason: state.match.reason, winner: state.match.winner }).toEqual({
+      reason: 'pve-cleared',
+      winner: 'p1',
     });
-  }
+    // Вердикт ровно в срок: хребет волн плюс удержание — ни раньше, ни позже.
+    expect(state.match.endedAt).toBe((RUN_SPINE_HOURS + RUN_TAIL_HOURS) * HOUR);
+    expect(endedAtHour).toBe(RUN_SPINE_HOURS + RUN_TAIL_HOURS);
+    // Прошла именно ОБОРОНА: улей так и остался за Роем.
+    expect(state.planets.hive?.owner).toBe('p3');
+  });
+
+  it('против сильного Роя забег доходит до вердикта — простой обороне он не обещан', () => {
+    // Решение владельца 2026-09-24: с тех пор как построенное Роем уходит с волной,
+    // сильный Рой вправе сломать простую оборону — против него нужна активная игра.
+    // Обещание «простая оборона проходит главу I» держит только обычный Рой (выше).
+    const { state, endedAtHour } = defend('strong');
+    expect(['pve-cleared', 'pve-failed']).toContain(state.match.reason);
+    expect(endedAtHour).toBeLessThanOrEqual(RUN_SPINE_HOURS + RUN_TAIL_HOURS);
+  });
 });
 

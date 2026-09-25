@@ -195,13 +195,16 @@
     "abilities": [],
     "uniqueUnits": [
       "swarm_brood_mother",
-      "swarm_lander"
+      "swarm_lander",
+      "swarm_relay",
+      "swarm_relay_small"
     ],
     "startingLoadout": {
       "resources": {
         "biomass": 200,
         "metal": 200,
-        "microelectronics": 60
+        "microelectronics": 60,
+        "energy": 100
       },
       "fleet": [
         {

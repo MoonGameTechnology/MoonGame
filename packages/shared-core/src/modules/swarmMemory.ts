@@ -71,12 +71,12 @@ function swarmSeat(state: GameState, cfg: ModePve): PlayerId | undefined {
  * в одном бою, обязаны попасть в одно окно памяти, иначе «последние 4 столкновения»
  * означало бы разное для разного оружия.
  */
-function observe(memory: SwarmMemory, kind: string, engagement: string): boolean {
-  if (memory.observations.some((o) => o.kind === kind && o.engagement === engagement)) return false;
+function observe(memory: SwarmMemory, kind: string, engagement: string): number | null {
+  if (memory.observations.some((o) => o.kind === kind && o.engagement === engagement)) return null;
   const known = memory.observations.find((o) => o.engagement === engagement);
   const ordinal = known?.ordinal ?? ++memory.engagements;
   memory.observations.push({ ordinal, kind, engagement } satisfies SwarmObservation);
-  return true;
+  return ordinal;
 }
 
 /**
@@ -92,15 +92,25 @@ export function recalled(
   memory: SwarmMemory | undefined,
   kind: string,
   window: number | null,
+  known: ReadonlySet<number> | null = null,
 ): number {
   if (!memory) return 0;
-  const from = window === null ? 0 : memory.engagements - window;
-  return memory.observations.filter((o) => o.kind === kind && o.ordinal > from).length;
+  if (known === null) {
+    const from = window === null ? 0 : memory.engagements - window;
+    return memory.observations.filter((o) => o.kind === kind && o.ordinal > from).length;
+  }
+  // Сеть Роя (`docs/swarm-behavior.md`): часть помнит только то, что до неё ДОШЛО, и
+  // окно считается по её собственным столкновениям — последние `window` из известных
+  // ей, а не из всего журнала забега.
+  const mine = [...known].sort((a, b) => a - b);
+  const from = window === null || mine.length <= window ? -Infinity : mine[mine.length - window - 1]!;
+  return memory.observations.filter((o) => o.kind === kind && known.has(o.ordinal) && o.ordinal > from)
+    .length;
 }
 
 export const swarmMemoryModule: GameModule = {
   id: 'swarmMemory',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     // Единственный вход: попадание ударной машины. Не `battle.resolved` — там уже
     // нет состава сторон (флоты освобождены строкой выше emit'а), и класс оружия из
@@ -109,7 +119,12 @@ export const swarmMemoryModule: GameModule = {
     api.on('shuttle.hit', (event, h) => {
       const cfg = pveOf(h);
       if (!cfg) return; // не PvE — модуль инертен, как `pveModule`
-      const p = event.payload as { strikeId?: unknown; targetOwner?: unknown; damage?: unknown };
+      const p = event.payload as {
+        strikeId?: unknown;
+        targetId?: unknown;
+        targetOwner?: unknown;
+        damage?: unknown;
+      };
       const damage = typeof p.damage === 'number' ? p.damage : 0;
       if (damage <= 0) return; // применение без эффекта наблюдением не является
       const swarm = swarmSeat(h.state, cfg);
@@ -117,12 +132,17 @@ export const swarmMemoryModule: GameModule = {
       const strikeId = typeof p.strikeId === 'string' ? p.strikeId : String(p.strikeId ?? '');
       if (strikeId === '') return; // без идентификатора не отличить повтор от нового боя
       const memory: SwarmMemory = h.state.swarmMemory ?? { engagements: 0, observations: [] };
-      if (!observe(memory, STRIKE_KIND, `strike:${strikeId}`)) return; // та же телеметрия
+      const ordinal = observe(memory, STRIKE_KIND, `strike:${strikeId}`);
+      if (ordinal === null) return; // та же телеметрия
       h.state.swarmMemory = memory;
+      // `ordinal` и `witness` — для сети Роя: наблюдение рождается у СВИДЕТЕЛЯ (флот или
+      // мир, по которому пришёлся удар) и дальше течёт только по связи.
       h.emit('swarm.observed', {
         owner: swarm,
         kind: STRIKE_KIND,
         engagements: memory.engagements,
+        ordinal,
+        ...(typeof p.targetId === 'string' ? { witness: p.targetId } : {}),
       });
     });
   },

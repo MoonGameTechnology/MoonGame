@@ -35,6 +35,7 @@ import {
   fleetBroodModule,
   pveModule,
   swarmMemoryModule,
+  swarmNetModule,
   swarmAdaptModule,
   swarmJournalModule,
   missionFactsModule,
@@ -172,6 +173,7 @@ export const DEV_MODULES: GameModule[] = [
   pveModule, // PVE-3: NPC wave assault, armed by the mode's `pve` section (inert in PvP)
   fleetBroodModule, // paid onboard growth of ground organisms; after wave creation
   swarmMemoryModule, // PVR-4.2: наблюдения завершённых столкновений; только пишет факты
+  swarmNetModule, // сеть Роя: знание течёт только по связи ретрансляторов и центров данных
   swarmAdaptModule, // PVR-4.3: проект развития модуля Роя; читает память, платит, растит
   swarmJournalModule, // PVR-4.5: что игрок ВИДЕЛ про ответы Роя; зеркало swarmMemory
   missionFactsModule, // факты для задач забега: удержание, потери, эвакуация
@@ -202,7 +204,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '36'; // ROADS-8: победитель боя на дороге продолжает
+export const MODULE_MANIFEST_VERSION = '37'; // Сеть Роя (`docs/swarm-behavior.md`): добавлен
+// swarmNetModule — знание Роя течёт только по связи ретрансляторов и центров данных. Изменилось
+// ЧЛЕНСТВО графа, и порядок значим: сеть стоит между памятью (она рождает наблюдение) и
+// адаптацией (она читает знание части). `swarmAdapt` 2.0.0 — проекты по одному на часть сети
+// (`state.swarmAdapts`), `swarmMemory` 1.1.0 называет свидетеля, `pve` 1.2.0 несёт `waveFixed`.
+// export const MODULE_MANIFEST_VERSION = '36'; // ROADS-8: победитель боя на дороге продолжает
 // марш. Состав и порядок модулей те же; сменились ПРАВИЛА боя на дороге (`combat` 2.2.0,
 // `movement` 1.4.0) и форма состояния: перехваченный в пути флот помнит цель в
 // `Fleet.resume` и после боя летит дальше, а не стоит посреди дороги. Партия на 35 молча
