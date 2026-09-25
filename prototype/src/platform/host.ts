@@ -18,10 +18,12 @@
  *
  * ## Любой сбой чужого SDK = веб-адаптер, а не сломанная загрузка
  *
- * `init()` может отклониться, бросить синхронно, вернуть мусор или вовсе отсутствовать.
- * Ни один из этих случаев не должен стоить игроку запуска игры: во всех мы отдаём
- * `createWebPlatform`, у которого реклама и покупки честно `unavailable`. Это тот же
- * fail-secure, что в ядре: ошибка → отказ в возможности, никогда не молчаливый проход.
+ * `init()` может отклониться, бросить синхронно, вернуть мусор, вовсе отсутствовать — или
+ * НЕ ОТВЕТИТЬ (AUD-33: без срока игра так и стояла на экране загрузки, `ready()` площадке
+ * не уходил никогда). Ни один из этих случаев не должен стоить игроку запуска игры: во
+ * всех мы отдаём `createWebPlatform`, у которого реклама и покупки честно `unavailable`.
+ * Это тот же fail-secure, что в ядре: ошибка → отказ в возможности, никогда не молчаливый
+ * проход.
  */
 import { createWebPlatform } from './web';
 import { createYandexPlatform, type YandexSdk } from './yandex';
@@ -62,6 +64,13 @@ export interface PlatformHostOptions {
 }
 
 /**
+ * Сколько ждать `YaGames.init()` после того, как лоадер уже поднялся (AUD-33). Щедро: у
+ * живого SDK это доли секунды, а поздний ответ после срока уже не нужен — игра запущена
+ * веб-адаптером и живёт без рекламы и облака до перезагрузки.
+ */
+export const SDK_INIT_TIMEOUT_MS = 10_000;
+
+/**
  * Поднять площадку. Всегда резолвится — отказ площадки это тоже рабочий исход.
  */
 export async function createPlatform(options: PlatformHostOptions): Promise<GamePlatform> {
@@ -70,13 +79,23 @@ export async function createPlatform(options: PlatformHostOptions): Promise<Game
   // Нет тега, старый лоадер без `init`, чужая страница — всё это не ошибка, а просто
   // «мы не на площадке». Сообщать хозяину не о чем, поэтому и не сообщаем.
   if (typeof loader?.init !== 'function') return fallback();
+  let stop: ReturnType<typeof setTimeout> | undefined;
   try {
-    const sdk = (await loader.init()) as YandexSdk | null;
+    const late = new Promise<'late'>((resolve) => {
+      stop = setTimeout(() => resolve('late'), SDK_INIT_TIMEOUT_MS);
+    });
+    const sdk = (await Promise.race([loader.init(), late])) as YandexSdk | null | 'late';
+    if (sdk === 'late') {
+      options.onSdkError?.('init', new Error('E_SDK_INIT_TIMEOUT'));
+      return fallback();
+    }
     if (!sdk || typeof sdk !== 'object') return fallback();
     return createYandexPlatform(sdk, { onSdkError: options.onSdkError });
   } catch (error) {
     options.onSdkError?.('init', error);
     return fallback();
+  } finally {
+    clearTimeout(stop);
   }
 }
 

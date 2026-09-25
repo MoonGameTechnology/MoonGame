@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { sumUnitStat, planRoute, playablePlayerIds, type Planet } from '@void/shared-core';
 
 import { shippedGameData } from '../../../data/bundle';
-import { pveState, pveModeId, pveMissionOfMap, skirmishState } from './gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, PVE_MISSION_COUNT, skirmishState } from './gameData';
 
 /**
  * The client's doors into a playable state. Both were uncovered, and the PvE one was
@@ -215,5 +215,22 @@ describe('YAG-2.1 — мир забега знает свою главу', () =>
   it('незнакомая карта или её отсутствие — null, а не первая глава', () => {
     expect(pveMissionOfMap('pve-99')).toBeNull();
     expect(pveMissionOfMap(undefined)).toBeNull();
+  });
+});
+
+describe('AUD-32 — номер главы из хранилища один на карту и награду', () => {
+  // Карта клампила чужой номер к первой главе, а чертёж за первую победу считался по
+  // сырому номеру: «5» из правленого хранилища играло главу I, а платило легендарным
+  // чертежом вместо уникального. Теперь номер приводится один раз и одним правилом.
+  it('номер в диапазоне — он сам', () => {
+    for (let i = 0; i < PVE_MISSION_COUNT; i++) expect(pveMissionIndex(i)).toBe(i);
+  });
+
+  it('вне диапазона, дробный и мусорный — первая глава, ровно как у карты', () => {
+    for (const bad of [-1, PVE_MISSION_COUNT, 1e9, Number.NaN, Infinity]) {
+      expect(pveMissionIndex(bad)).toBe(0);
+      expect(pveState(data, bad).mapId).toBe(pveState(data, pveMissionIndex(bad)).mapId);
+    }
+    expect(pveMissionIndex(1.7)).toBe(Math.min(1, PVE_MISSION_COUNT - 1));
   });
 });

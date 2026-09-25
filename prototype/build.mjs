@@ -122,15 +122,16 @@ body.app-starting #map{visibility:hidden;}
    уже поставив классы консоли и подписи. */
 body.app-booting > *{visibility:hidden!important;}
 body.app-startup-failed > :not(#startup-error){display:none!important;}
-#startup-error{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
+/* AUD-29: the tab that lost Sector Zero to another tab looks like a stopped start, too. */
+#startup-error,#tab-taken{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:18px;padding:24px;
   padding-bottom:max(24px,env(safe-area-inset-bottom));background:#041016;
   color:var(--ink);text-align:center;overflow:auto;touch-action:pan-y;}
 #startup-error[hidden]{display:none;}
-#startup-error h1{font-size:22px;line-height:1.3;margin:0;}
-#startup-error p{max-width:440px;margin:0;font-size:15px;line-height:1.5;}
+#startup-error h1,#tab-taken h1{font-size:22px;line-height:1.3;margin:0;}
+#startup-error p,#tab-taken p{max-width:440px;margin:0;font-size:15px;line-height:1.5;}
 #startup-code{max-width:100%;overflow-wrap:anywhere;user-select:text;font-size:12px;color:#9bb4c1;}
-#startup-retry{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;
+#startup-retry,#tab-taken button{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;
   color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
 #startup-retry:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
 

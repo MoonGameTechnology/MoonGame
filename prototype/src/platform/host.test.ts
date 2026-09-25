@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createPlatform, getPlatform, setPlatform } from './host';
+import { createPlatform, getPlatform, setPlatform, SDK_INIT_TIMEOUT_MS } from './host';
 import { createWebPlatform } from './web';
 
 /** Минимальный `ysdk`, которого хватает адаптеру, чтобы объявить `auth`. */
@@ -62,6 +62,24 @@ describe('YAG-1.1b — хост выбирает площадку, а не иг�
     expect(platform.capabilities.auth).toBe(false);
     // Отсутствие метода — не сбой SDK: сообщать хозяину не о чем.
     expect(onSdkError).not.toHaveBeenCalled();
+  });
+
+  it('`init()` не ответил — по сроку веб-адаптер, а не вечный экран загрузки (AUD-33)', async () => {
+    vi.useFakeTimers();
+    try {
+      const onSdkError = vi.fn();
+      const created = createPlatform({
+        simulate: false,
+        yaGames: { init: () => new Promise(() => {}) },
+        onSdkError,
+      });
+      await vi.advanceTimersByTimeAsync(SDK_INIT_TIMEOUT_MS);
+      const platform = await created;
+      expect(platform.capabilities.auth).toBe(false);
+      expect(onSdkError).toHaveBeenCalledWith('init', new Error('E_SDK_INIT_TIMEOUT'));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('`init()` вернул не объект — фолбэк, а не адаптер поверх мусора', async () => {

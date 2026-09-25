@@ -31,8 +31,17 @@ function store(): Storage | null {
   }
 }
 
-/** Бэкенд поверх `localStorage`. Хранилища нет — забег просто не сохраняется. */
-export function localRunSaveStore(key: string = RUN_SAVE_KEY): RunSaveStore {
+/**
+ * Бэкенд поверх `localStorage`. Хранилища нет — забег просто не сохраняется.
+ *
+ * `canWrite` — пишет ли эта вкладка (`AUD-29`, `decisions/tabLock.ts`). Спрашивается в
+ * момент каждой записи: вытесненная вкладка не пишет и не стирает, даже если перехват
+ * случился между её решением записать и самой записью. Читать может любая.
+ */
+export function localRunSaveStore(
+  key: string = RUN_SAVE_KEY,
+  canWrite: () => boolean = () => true,
+): RunSaveStore {
   return {
     load: () => {
       try {
@@ -42,6 +51,7 @@ export function localRunSaveStore(key: string = RUN_SAVE_KEY): RunSaveStore {
       }
     },
     save: (blob) => {
+      if (!canWrite()) return Promise.resolve();
       try {
         store()?.setItem(key, blob);
       } catch {
@@ -50,6 +60,7 @@ export function localRunSaveStore(key: string = RUN_SAVE_KEY): RunSaveStore {
       return Promise.resolve();
     },
     clear: () => {
+      if (!canWrite()) return Promise.resolve();
       try {
         store()?.removeItem(key);
       } catch {
