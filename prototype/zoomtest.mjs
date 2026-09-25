@@ -10,6 +10,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { resolveChromium } from '../scripts/chromium.mjs';
+import { LIFT_BOOT_VEIL } from './harnessKit.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json'))(
@@ -32,7 +33,7 @@ for (const player of [false, true]) {
   const name = player ? 'player' : 'alpha';
   const bundle = await build({
     stdin: {
-      contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
+      contents: LIFT_BOOT_VEIL + readFileSync('prototype/src/main.ts', 'utf8') + bridge,
       resolveDir: process.cwd() + '/prototype/src',
       loader: 'ts',
     },
@@ -96,6 +97,9 @@ try {
       await page.locator('#maploading').waitFor({ state: 'hidden' });
       // Changing the stored preference must not replace the live canvas/context or game.
       await page.evaluate(() => window.__zoomTest.settings());
+      // The renderer switch and report live on the Graphics tab (UX-SET-1); the window
+      // opens on the first tab.
+      await page.locator('#set-tab-graphics').click();
       const originalReport = JSON.parse(await page.evaluate(() => window.__zoomTest.report()));
       assert.equal(originalReport.compatibility.active, compatibility);
       await page.locator('#set-render-compat').setChecked(!compatibility);
