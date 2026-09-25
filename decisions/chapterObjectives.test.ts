@@ -221,14 +221,17 @@ describe('засчёт забега', () => {
   });
 });
 
-describe('главы кампании — запас растёт с номером главы', () => {
-  it('у каждой главы запас не меньше базы, и он растёт от главы к главе', () => {
+describe('главы кампании — запас не убывает с номером главы', () => {
+  it('у каждой главы запас не меньше базы и не меньше, чем у предыдущей главы', () => {
+    // PVR-5.3: запас растёт с номером главы. Резолюция владельца 2026-09-25 (задача на
+    // пиратское логово сравняла главу I со второй): равный запас соседних глав допустим,
+    // убывать ему нельзя.
     const pools = Array.from(
       { length: PVE_MISSION_COUNT },
       (_, i) => pveChapter(i).objectives.length,
     );
     expect(pools[0]).toBeGreaterThanOrEqual(3);
-    for (let i = 1; i < pools.length; i++) expect(pools[i]).toBeGreaterThan(pools[i - 1]!);
+    for (let i = 1; i < pools.length; i++) expect(pools[i]).toBeGreaterThanOrEqual(pools[i - 1]!);
   });
 
   it('id глав различны — иначе счёт выполненного у них был бы общий', () => {

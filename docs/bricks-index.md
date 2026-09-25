@@ -1089,6 +1089,7 @@
 | PVR-5.3 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Рост числа задач по главам |
 | PVR-5.4 | ✅ | proto cli | `docs/sector-zero-roadmap.md` | Экран итогов забега |
 | PVR-5.5 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Карта третьей главы и дверь к ней |
+| PVR-5.6 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Глава I: две новые провинции, логово дальше, задача на логово |
 | PVR-6.1 | ✅ | proto | `docs/sector-zero-roadmap.md` | Инструменты мультиплеера не едут в забег |
 | PVR-6.2 | ✅ | proto | `docs/sector-zero-roadmap.md` | Список корпусов — только то, что игрок строит |
 | PVR-6.3 | ✅ | proto | `docs/sector-zero-roadmap.md` | Валюты: цвет и «фишка» |
