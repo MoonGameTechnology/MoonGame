@@ -18,6 +18,7 @@ import { esc } from './format';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import type { ShipCardModel, ShipCardStat } from '../../decisions/shipCard';
 import { unitDamageHtml } from './unitDamageView';
+import { chevronsSvg } from './veteranChevrons';
 
 /** Чем карточка рисует корпус и модуль. */
 export interface ShipCardHooks {
@@ -71,7 +72,12 @@ function statRow(s: ShipCardStat, max: number): string {
 export function shipCardHtml(
   m: ShipCardModel,
   hooks: ShipCardHooks,
-  opts: { hpPct: number; fleetName?: string },
+  opts: {
+    hpPct: number;
+    fleetName?: string;
+    /** Выслуга стека (`decisions/veteranMark.ts`); нет — стек не ветеран, строки нет. */
+    veteran?: { grade: number; title: string } | null;
+  },
 ): string {
   const portrait = hooks.portrait(m.unit);
   const hp = Math.max(0, Math.min(100, Math.round(opts.hpPct)));
@@ -80,7 +86,8 @@ export function shipCardHtml(
     `<div class="cn-hic">${hooks.icon(m.unit)}</div><div><div class="cn-hn">${esc(hooks.unitName(m.unit))} <span class="sc-n">×${m.count}</span></div>` +
     (opts.fleetName ? `<div class="cn-hm">${esc(opts.fleetName)}</div>` : '') +
     `</div></div></div>` +
-    `<div class="sc-hp"><span>${t('loadout.stat.hp')}</span><span class="sc-hpbar${hp < 30 ? ' low' : ''}"><i style="width:${hp}%"></i></span><b>${hp}%</b></div>`;
+    `<div class="sc-hp"><span>${t('loadout.stat.hp')}</span><span class="sc-hpbar${hp < 30 ? ' low' : ''}"><i style="width:${hp}%"></i></span><b>${hp}%</b></div>` +
+    (opts.veteran ? `<div class="sc-vet">${chevronsSvg(opts.veteran.grade)}<span>${esc(opts.veteran.title)}</span></div>` : '');
   const filled = m.bays.filter((b) => b.module).length;
   const bays = m.bays
     .map((b) => {

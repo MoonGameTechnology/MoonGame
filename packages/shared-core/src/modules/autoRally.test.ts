@@ -159,18 +159,25 @@ describe('autoRally module', () => {
     // нет. С отметкой промоушена, которая ставится ИМЕННО при постройке, дыра стала
     // видимой — корабль терял её в ту же секунду, как его поднимали с верфи.
     const seeded = stateWith();
-    seeded.planets.A!.garrison = [{ unit: 'cruiser', count: 2, promoted: 1, battles: 3 }];
+    seeded.planets.A!.garrison = [{ unit: 'cruiser', count: 2, promoted: 1 }];
     const s = built(seeded, 'cruiser', 2);
     const rally = rallyFleets(s);
     expect(rally).toHaveLength(1);
     // Уносится РОВНО построенное количество, а не весь стек, — остальные остаются.
     const moved = rally[0]?.units[0];
     expect(moved?.count).toBe(2);
-    // Постройка сперва разбавила стек (2 отмеченных ветерана + 2 новобранца), и уехавшие
-    // юниты несут уже разбавленную величину на юнит — а не ноль, как было до правки.
+    // Постройка сперва разбавила стек (2 отмеченных + 2 новобранца той же выслуги), и
+    // уехавшие юниты несут уже разбавленную величину на юнит — а не ноль, как было до правки.
     expect(moved?.promoted).toBeCloseTo(0.5, 9);
-    expect(moved?.battles).toBeCloseTo(1.5, 9);
     expect(s.planets.A?.garrison[0]?.promoted).toBeCloseTo(0.5, 9); // у оставшихся то же
+  });
+
+  it('новостройка к ВЕТЕРАНАМ не доливается и уезжает одна (решение владельца 2026-09-25)', () => {
+    const seeded = stateWith();
+    seeded.planets.A!.garrison = [{ unit: 'cruiser', count: 2, battles: 3 }];
+    const s = built(seeded, 'cruiser', 2);
+    expect(rallyFleets(s)[0]?.units).toEqual([{ unit: 'cruiser', count: 2 }]);
+    expect(s.planets.A?.garrison).toEqual([{ unit: 'cruiser', count: 2, battles: 3 }]);
   });
 
   it('leaves the ship in the garrison when the module is absent (the gap it closes)', () => {

@@ -98,7 +98,9 @@ export const promotionModule: GameModule = {
         : undefined;
       // Тот же поиск по лоадауту, что у `addUnits`: заказ с другим фиттингом лежит в
       // своём стеке, и отметить надо именно построенный.
-      const stack = findHealthyStack(planet.garrison, p.unit, mods);
+      // Выслуга 0 — по той же причине, что у `addUnits`: новостройка лежит в стеке
+      // новичков, ветераны того же корпуса стоят отдельно.
+      const stack = findHealthyStack(planet.garrison, p.unit, mods, 0);
       if (!stack || stack.count <= 0) return;
       // Бросок ПОСЛЕ всех отказов выше: иначе поток RNG зависел бы от того, нашёлся ли
       // стек, и реплей разошёлся бы на ровном месте.

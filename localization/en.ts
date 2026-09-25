@@ -617,6 +617,8 @@ export const en: Record<string, string> = {
   'medal.service.2': 'Silver Keel',
   'medal.service.3': 'Iron Pennant',
   'medal.service.4': 'Unbroken Line',
+  'veteran.mark': 'Veteran: battles survived — {n}',
+  'veteran.mark.power': '+{d}% damage, +{h}% hull in battle',
   'codex.dmg.title': 'Damage per unit',
   'codex.dmg.ships': 'vs ships',
   'codex.dmg.buildings': 'vs buildings',

@@ -17,15 +17,36 @@ export function findHealthyStack(
   stacks: UnitStack[],
   unit: string,
   modules?: readonly string[],
+  /** Искать стек ТОЙ ЖЕ выслуги (см. {@link serviceKey}) — для слияния: ветераны и новички
+   *  одного корпуса не сливаются. Не передано — любая выслуга (поиск источника). */
+  battles?: number,
 ): UnitStack | undefined {
   const key = loadoutKey(modules);
+  const service = battles === undefined ? null : serviceKey(battles);
   return stacks.find(
     (s) =>
       s.unit === unit &&
       s.hp === undefined &&
       s.shieldHp === undefined &&
-      loadoutKey(s.modules) === key,
+      loadoutKey(s.modules) === key &&
+      (service === null || serviceKey(s.battles) === service),
   );
+}
+
+/** Высшая степень «Выслуги», до которой выслуга делит стеки. Пороги линии в данных —
+ *  1/2/3/4 пережитых боя (`data/medalGrades.json`), то есть степень и есть число полных
+ *  боёв; тест `stacks.test.ts` сверяет это с данными, чтобы пороги не разъехались молча. */
+export const SERVICE_MERGE_CAP = 4;
+
+/**
+ * Ключ выслуги для СЛИЯНИЯ стеков (решение владельца 2026-09-25): ветеран — отдельная
+ * плитка в составе, а не растворённая в новичках доля. До этого слияние усредняло выслугу
+ * по весу (VET-2), и два ветерана, влитые в двух новичков, становились «четырьмя по
+ * полбоя» — кто был ветераном, узнать было уже нельзя. Теперь сливаются только стеки
+ * одной степени: не больше `SERVICE_MERGE_CAP + 1` плиток на корпус.
+ */
+export function serviceKey(battles: number | undefined): number {
+  return Math.min(SERVICE_MERGE_CAP, Math.floor(battles ?? 0));
 }
 
 /** Звёздность надетых модулей в виде поля стека (SZE-1.1): только НЕнулевые звёзды
@@ -89,11 +110,12 @@ export function addUnits(
   if (merit?.damageDealt !== undefined) carried.damageDealt = merit.damageDealt;
   if (merit?.battles !== undefined) carried.battles = merit.battles;
   if (merit?.promoted !== undefined) carried.promoted = merit.promoted;
-  const stack = findHealthyStack(stacks, unit, modules);
+  const stack = findHealthyStack(stacks, unit, modules, carried.battles ?? 0);
   if (stack) {
-    // Свежая постройка, влитая в заслуженный стек, РАЗБАВЛЯЕТ его заслугу (VET-2) —
-    // тем же правилом, что и слияние флотов. Без этого сюда открывалась дыра: долить
-    // сотню корпусов в стек с медалью и получить медаль на всю сотню даром.
+    // Сливается только стек той же выслуги (`serviceKey`): свежая постройка к ветеранам
+    // не доливается, а встаёт отдельно. Усреднение ниже осталось для урона и отметки
+    // (PERK-3.2) внутри одной степени — медаль «Доблести» на всю сотню даром по-прежнему
+    // не выйдет: долитые новички разбавляют её, как раньше.
     mergeMerit(stack, { unit, count, ...carried });
     stack.count += count;
   } else {
@@ -176,7 +198,7 @@ export function takeFromStacks(
 }
 
 /** Fold one stack list into another. Two stacks coalesce only when they share unit,
- *  loadout AND are both full-health (no `hp`/`shieldHp` pool) — the same rule
+ *  loadout, service grade ({@link serviceKey}) AND are both full-health (no `hp`/`shieldHp` pool) — the same rule
  *  `findHealthyStack` uses. Merging on `hp` equality alone would fuse two damaged
  *  stacks into ONE pool (halving hull) and smear a fitted stack's modules over bare
  *  hulls; damaged/differently-fitted stacks stay separate (combat handles multiple
@@ -197,7 +219,8 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
             o.unit === st.unit &&
             o.hp === undefined &&
             o.shieldHp === undefined &&
-            loadoutKey(o.modules) === loadoutKey(st.modules),
+            loadoutKey(o.modules) === loadoutKey(st.modules) &&
+            serviceKey(o.battles) === serviceKey(st.battles),
         )
       : undefined;
     if (match) {

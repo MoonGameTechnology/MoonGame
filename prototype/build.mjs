@@ -523,6 +523,10 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .ptiles{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;}
 .ptile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:54px;min-height:50px;
   padding:6px 7px;cursor:pointer;background:rgba(53,214,230,.05);border:1px solid var(--line-hi);border-radius:5px;color:var(--cyan);}
+.ptile{position:relative;}
+.ptile.vet{border-color:rgba(240,196,106,.55);}
+.ptile .pt-vet{position:absolute;top:3px;left:4px;line-height:0;}
+.sc-vet{display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:11px;color:#f0c46a;}
 .ptile:hover{border-color:var(--cyan);background:rgba(53,214,230,.14);box-shadow:0 0 8px rgba(53,214,230,.25);}
 .ptile:active{background:rgba(53,214,230,.24);}
 /* committed one-per-planet building — dimmed, non-ordering (still hover-describes) */

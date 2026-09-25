@@ -209,6 +209,15 @@ export function creditVolley(
   }
 }
 
+/** Растут ли у сил `owner` ветераны: фракция может запретить их данными
+ *  (`FactionDef.veterans: false` — Рой). Игрок без фракции или с неизвестной — растут,
+ *  как и было до флага. Проверяют ВСЕ места начисления заслуги, иначе у запрещённой
+ *  фракции копилась бы одна из двух линий медалей. */
+export function earnsMerit(state: GameState, owner: string | null | undefined, data: Pick<GameData, 'factions'>): boolean {
+  const faction = owner ? state.players[owner]?.faction : undefined;
+  return faction === undefined || data.factions[faction]?.veterans !== false;
+}
+
 /** Отметить пережитое сражение (VET-2): +1 каждому ЖИВОМУ стеку стороны. Зовётся один
  *  раз на закрытие боя, поэтому «пережил» здесь значит именно то, что написано — стек
  *  дожил до конца, а не «участвовал в раунде». */

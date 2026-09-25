@@ -626,6 +626,8 @@ export const ru: Record<string, string> = {
   'medal.service.2': 'Серебряный киль',
   'medal.service.3': 'Железный вымпел',
   'medal.service.4': 'Немеркнущий строй',
+  'veteran.mark': 'Ветеран: пережито боёв — {n}',
+  'veteran.mark.power': '+{d}% урона, +{h}% прочности в бою',
   'codex.dmg.title': 'Урон одного юнита',
   'codex.dmg.ships': 'по кораблям',
   'codex.dmg.buildings': 'по зданиям',

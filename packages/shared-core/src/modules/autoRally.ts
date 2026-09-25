@@ -62,7 +62,9 @@ export const autoRallyModule: GameModule = {
       const mods = Array.isArray(p.modules)
         ? p.modules.filter((m): m is string => typeof m === 'string')
         : undefined;
-      const stack = findHealthyStack(planet.garrison, p.unit, mods);
+      // Выслуга 0: новостройка легла в стек НОВИЧКОВ — ветераны того же корпуса стоят
+      // отдельно (`serviceKey`), и увести надо построенное, а не их.
+      const stack = findHealthyStack(planet.garrison, p.unit, mods, 0);
       if (!stack) return;
       const take = Math.min(want, stack.count);
       if (take <= 0) return;

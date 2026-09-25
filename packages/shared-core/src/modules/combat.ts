@@ -41,6 +41,7 @@ import {
   sideAlive,
   creditBattle,
   creditVolley,
+  earnsMerit,
   sideDamageBreakdown,
   sideUnits,
   trunkOccupancies,
@@ -641,7 +642,8 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // потому что получать её уже некому. Здесь же, а не в раунде: «пережил» должно значить
   // «дожил до конца», иначе счётчик считал бы раунды и длинная драка давала бы выслугу
   // за один бой.
-  for (const side of aliveSides) creditBattle(h.state, side.ref);
+  for (const side of aliveSides)
+    if (earnsMerit(h.state, side.owner, h.ctx.data)) creditBattle(h.state, side.ref);
 
   // The battle is over. GROUND survivors (a planet garrison or a fleet's landing
   // troops) return "at rest": clear their transient combat HP pool (a UnitStack with
@@ -895,7 +897,8 @@ function groundVolleys(
       creditTotal += part;
     }
   }
-  creditVolley(h.state, side.ref, { total: creditTotal, rows: [...credit.values()] }, landed);
+  if (earnsMerit(h.state, side.owner, data))
+    creditVolley(h.state, side.ref, { total: creditTotal, rows: [...credit.values()] }, landed);
 }
 
 export const combatModule: GameModule = {
@@ -1338,7 +1341,7 @@ export const combatModule: GameModule = {
         }
         // Пишется ДО применения урона — по тому же ПРЕДРАУНДОВОМУ снимку, из которого
         // считался залп. Иначе развеска шла бы по составу, уже подбитому этим раундом.
-        creditVolley(h.state, side.ref, shot, landed);
+        if (earnsMerit(h.state, side.owner, h.ctx.data)) creditVolley(h.state, side.ref, shot, landed);
       }
       for (const [side, dmg] of incoming) {
         if (!(dmg > 0)) continue;

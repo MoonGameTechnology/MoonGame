@@ -168,12 +168,19 @@ describe('VET-2 — арифметика носителя', () => {
     expect(src[0]?.damageDealt).toBe(60); // у остатка тоже прежняя
   });
 
-  it('СЛИЯНИЕ со свежими РАЗБАВЛЯЕТ заслугу по весу — это и есть цена долива', () => {
+  it('ветераны и новички НЕ сливаются — у ветерана своя плитка (решение владельца 2026-09-25)', () => {
     const merged = mergeStacks(veteran(), [{ unit: 'lance', count: 5 }]);
+    expect(merged).toHaveLength(2);
+    expect(merged[0]).toMatchObject({ count: 5, damageDealt: 60, battles: 3 });
+    expect(merged[1]).toEqual({ unit: 'lance', count: 5 });
+  });
+
+  it('СЛИЯНИЕ одной выслуги усредняет урон по весу — «Доблесть» доливом не размножить', () => {
+    const merged = mergeStacks(veteran(), [{ unit: 'lance', count: 5, battles: 3 }]);
     expect(merged).toHaveLength(1);
     expect(merged[0]?.count).toBe(10);
     expect(merged[0]?.damageDealt).toBe(30); // (5×60 + 5×0) / 10
-    expect(merged[0]?.battles).toBe(1.5); // (5×3 + 5×0) / 10
+    expect(merged[0]?.battles).toBe(3);
   });
 
   it('ГИБЕЛЬ товарища заслугу выживших НЕ повышает — та самая дыра итогов', () => {
@@ -209,5 +216,31 @@ describe('VET-2 — арифметика носителя', () => {
     // запись равнялась бы верхней границе. Замер: 370.45 при границах [350.00, 381.82].
     expect(recorded).toBeGreaterThan(dealtByA / 12);
     expect(recorded).toBeLessThan(dealtByA / stack!.count);
+  });
+});
+
+describe('фракция без ветеранов (решение владельца 2026-09-25: «у Роя ветеранов нет»)', () => {
+  const hiveData: GameData = parseGameData({
+    ...JSON.parse(JSON.stringify({ version: '0.1.0', resources: ['metal'], units: data.units, buildings: {}, events: {} })),
+    factions: { hive: { name: 'Hive', veterans: false } },
+  });
+
+  it('силы фракции с `veterans: false` не копят ни боёв, ни урона; противник копит как раньше', () => {
+    const s = duel([{ unit: 'lance', count: 3 }], [{ unit: 'lance', count: 3 }]);
+    s.players.p2!.faction = 'hive';
+    const started = kernel.applyAction(s, arrive('A'), { now: 0, data: hiveData });
+    if (!started.ok) throw new Error(`arrive failed: ${started.code}`);
+    let cur = started.state;
+    for (let i = 1; i <= 2; i++) {
+      const r = kernel.advanceTo(cur, { now: i * HOUR, data: hiveData });
+      if (!r.ok) throw new Error(`advance failed: ${r.code}`);
+      cur = r.state;
+    }
+    // Хотя бы один залп прошёл — иначе тест был бы зелёным при любой модели.
+    expect(cur.fleets.A?.units[0]?.damageDealt ?? 0).toBeGreaterThan(0);
+    for (const st of cur.fleets.B?.units ?? []) {
+      expect(st.damageDealt).toBeUndefined();
+      expect(st.battles).toBeUndefined();
+    }
   });
 });

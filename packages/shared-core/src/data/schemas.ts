@@ -250,6 +250,10 @@ export const FactionDefSchema = z.object({
   startingLoadout: FactionLoadoutSchema.prefault({}),
   /** Always-on faction bonuses, applied by the faction module via hooks. */
   passives: FactionPassivesSchema.prefault({}),
+  /** Растут ли у сил фракции ВЕТЕРАНЫ — счётчик пережитых боёв и нанесённого урона, а с
+   *  ними медали, надбавка выслуги и шевроны. `false` — у фракции ветеранов нет вовсе
+   *  (Рой: решение владельца 2026-09-25 «у Роя ветеранов нет»). */
+  veterans: z.boolean().default(true),
 });
 
 /** Per-level stats of a building (level 2..N). Level 1 uses the base fields. */
