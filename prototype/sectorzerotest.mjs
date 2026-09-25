@@ -83,6 +83,10 @@ const hooks = `window.__szTest = {
   // Меню каста флагмана и что герой носит — меню обязано быть из надетого.
   casts: () => chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
   worn: () => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)?.equipped ?? null,
+  // Бой с пиратами до конца — промоткой часов, как их двигает игра (apply(advance)).
+  pirateFight: () => playerOrder(moveFleet(ME, 'p1_1', 'pirate_den')),
+  skip: (min) => { apply(advance(s, s.time + min * 60000)); },
+  battles: () => Object.keys(s.battles).length,
   // Карточка корабля флота Роя: портрет — форма Роя с листа владельца, а не корпус людей.
   swarmCard: (unit) => {
     const f = JSON.parse(JSON.stringify(Object.values(s.fleets).find((x) => x.owner === ME)));
@@ -387,6 +391,18 @@ try {
     assert.equal(hunter.art, 'swarmHunter', 'карточка корабля Роя — форма Роя');
     assert.ok(await page.evaluate(() => document.querySelector('#codex .ship-art img').naturalWidth > 0), 'портрет Роя загружен');
     await page.locator('#codex .cx-close').click();
+
+    // Окно боя держит итог до закрытия (решение владельца 2026-09-25): бой у планеты при
+    // осаде длится раунд-два, и окно пустело сразу после открытия.
+    await page.evaluate(() => window.__szTest.pirateFight());
+    for (let i = 0; i < 200 && !(await page.evaluate(() => window.__szTest.battles())); i++)
+      await page.evaluate(() => window.__szTest.skip(5));
+    await page.locator('#battlewin').waitFor({ state: 'visible' });
+    for (let i = 0; i < 200 && (await page.evaluate(() => window.__szTest.battles())); i++)
+      await page.evaluate(() => window.__szTest.skip(5));
+    await page.locator('#battlewinbody .bw-ended').waitFor({ state: 'visible' });
+    assert.ok(await page.locator('#battlewinbody .bw-who').count() > 0, 'после боя окно держит снимок сторон');
+    await page.locator('#battlewin .tw-close').click();
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.
     await page.goto(site.url + '/');

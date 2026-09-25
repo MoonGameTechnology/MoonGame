@@ -3687,21 +3687,21 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'battle.resolved': {
         const loc = p.location as string;
-        if (seenTail(myBattleLocs.has(loc), known(loc))) {
-          // Потери сводятся ПО ИГРОКУ и приписываются, только если они есть (правила
-          // 3–5 в `battleLog.ts`): пустой хвост «· потери:» — строка ни о чём.
-          const tally = lossTally(battleLosses.get(loc), (who) => NAME[who] ?? who);
-          const out = battleOutcome(p.winner as string | undefined);
-          note(
-            t('log.battle.end', {
-              at: placeName(loc),
-              res: out.named
-                ? t(out.key, { who: NAME[p.winner as string] ?? (p.winner as string) })
-                : t(out.key),
-            }) + (tally ? t('log.battle.losses', { tally }) : ''),
-            loc,
-          );
-        }
+        // Потери сводятся ПО ИГРОКУ и приписываются, только если они есть (правила
+        // 3–5 в `battleLog.ts`): пустой хвост «· потери:» — строка ни о чём.
+        const tally = lossTally(battleLosses.get(loc), (who) => NAME[who] ?? who);
+        const out = battleOutcome(p.winner as string | undefined);
+        const endText =
+          t('log.battle.end', {
+            at: placeName(loc),
+            res: out.named
+              ? t(out.key, { who: NAME[p.winner as string] ?? (p.winner as string) })
+              : t(out.key),
+          }) + (tally ? t('log.battle.losses', { tally }) : '');
+        if (seenTail(myBattleLocs.has(loc), known(loc))) note(endText, loc);
+        // Окно на этом бою держит итог до закрытия (решение владельца 2026-09-25): бой у
+        // планеты при осаде длится раунд-два, и окно пустело сразу после открытия.
+        if (typeof p.battleId === 'string') battleWindow.ended(p.battleId, endText);
         battleLosses.delete(loc);
         myBattleLocs.delete(loc);
         break;

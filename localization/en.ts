@@ -89,6 +89,7 @@ export const en: Record<string, string> = {
   'battle.win.yours': 'Your fleets in this battle',
   'battle.win.beachhead': 'beachhead',
   'battle.win.empty': 'nothing is known about this battle',
+  'battle.win.ended': 'Battle over',
   'battle.win.head': '⚔ Battle',
   'battle.win.hull': 'hull',
   'battle.win.next': 'next round in',
