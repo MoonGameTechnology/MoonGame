@@ -81,8 +81,11 @@ const css = `
 html,body{height:100%;}
 body{margin:0;overflow:hidden;color:var(--ink);
   font:12px/1.45 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;letter-spacing:.2px;
-  user-select:none;overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  overscroll-behavior:none;touch-action:none;
   background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
+/* Тело не выделяется (п. 1.6.1.8), а поле ввода обязано: иначе в Safari не вставить текст. */
+input,textarea{user-select:text;-webkit-user-select:text;}
 /* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
 #sector-zero{position:fixed;inset:0;z-index:58;display:none;}
@@ -1168,6 +1171,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
   overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;}
 #railtools::-webkit-scrollbar{display:none;}
 #rail.open #railtools{display:flex;}
+/* п. 1.10.1: открытое меню — над всплывающими сообщениями (#toasts, z 40), иначе они лежат
+   поверх пунктов и ловят нажатие; окна, которые меню открывает, — выше (44+). */
+#rail.open{z-index:41;}
 #railtools .rlbl{display:none;font:8px ui-monospace,monospace;letter-spacing:.4px;color:var(--cyan-dim);line-height:1;}
 #railtools button{position:relative;width:38px;height:38px;background:transparent;border:0;cursor:pointer;
   font-size:18px;color:var(--cyan-dim);border-radius:8px;font-variant-emoji:text;display:grid;place-items:center;}
@@ -2093,6 +2099,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-head.draw{color:var(--amber);text-shadow:0 0 18px rgba(232,178,74,.4);}
 #endscreen .es-why{margin-top:7px;font-size:12px;color:var(--dim);letter-spacing:.4px;}
 #endscreen .es-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:18px 0 6px;}
+/* С боевым счётом PvE (PVR-6.20) клеток шесть: на широком экране — три колонки, иначе лишняя
+   строка уводила кнопки итогов под край окна. На телефоне три не помещаются по ширине — там две,
+   но плотнее, и панель итогов, как и раньше, встаёт на экран целиком. */
+#endscreen .es-grid.tri{grid-template-columns:repeat(3,1fr);}
+@media (max-width:600px){
+  #endscreen .es-grid.tri{grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 4px;}
+  #endscreen .es-grid.tri .es-cell{padding:6px 10px;gap:1px;}
+}
 #endscreen .es-cell{border:1px solid var(--line-hi);border-radius:8px;padding:9px 10px;background:rgba(6,18,22,.6);
   display:flex;flex-direction:column;gap:3px;}
 #endscreen .es-cell.wide{grid-column:1 / -1;}

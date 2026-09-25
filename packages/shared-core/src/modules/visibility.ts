@@ -54,14 +54,16 @@ function pinSight(h: HandlerContext): void {
   if (h.state.sight !== undefined) return;
   const modeId = h.ctx.config?.modeId;
   const sight = modeId === undefined ? undefined : h.ctx.data.modes[modeId]?.sight;
-  if (sight) h.state.sight = { ...sight };
+  // Таблица по видам копируется отдельно: состояние не делит объекты с данными.
+  if (sight) h.state.sight = { ...sight, ...(sight.byKind ? { byKind: { ...sight.byKind } } : {}) };
 }
 
 export const visibilityModule: GameModule = {
   id: 'visibility',
   // 2.0.0 — зрение кругами вместо соседства по линиям (решение владельца 2026-09-24):
-  // память тумана старых реплеев пишется иначе.
-  version: '2.0.0',
+  // память тумана старых реплеев пишется иначе. 2.1.0 — обзор мира по виду провинции
+  // (`sight.byKind`, решение владельца 2026-09-25).
+  version: '2.1.0',
   setup(api) {
     // Continuous time advances refresh memory; captures and arrivals refresh it
     // immediately so a just-scouted world is remembered at once.

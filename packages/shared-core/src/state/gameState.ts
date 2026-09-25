@@ -1080,6 +1080,19 @@ export interface PveState {
    *  and absent for good under a mode without `holdHours`: there the only clear is taking
    *  every NPC world. Echoed here for the HUD's «hold out» countdown as well. */
   holdUntil?: number;
+  /** Боевой счёт каждого места за забег (PVR-6.20, окно итогов экспедиции): сколько СВОИХ
+   *  юнитов и машин оно потеряло и сколько чужих уничтожило. Павшие засчитываются тому,
+   *  чей огонь их добил (`unit.died.killedBy`, стрелок сбитых машин). Только места игроков:
+   *  Рой, пираты и нейтралы счёта не ведут. Нет записи — ноль. */
+  tally?: Record<PlayerId, PveTally>;
+}
+
+/** Строка боевого счёта одного места (см. {@link PveState.tally}). */
+export interface PveTally {
+  /** Своих юнитов и машин погибло. */
+  lost: number;
+  /** Чужих юнитов и машин уничтожено его огнём. */
+  destroyed: number;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */
@@ -1359,8 +1372,13 @@ export type FogMemory = Record<PlanetId, PlanetSnapshot>;
  * но не видел мир в 521 без линии. Расстояния — в единицах карты.
  */
 export interface SightRules {
-  /** Радиус полного обзора вокруг каждого своего мира. */
+  /** Радиус полного обзора вокруг каждого своего мира — у вида провинции без своего числа в
+   *  `byKind`. */
   world: number;
+  /** Свой радиус обзора по виду провинции (`Planet.kind`) вместо `world`. Решение владельца
+   *  2026-09-25 для забега: вокруг себя видят только колонии и космические крепости, по 100;
+   *  захваченное поле, туманность или мёртвый мир — только себя, дальше — радар. */
+  byKind?: Record<string, number>;
   /** Радиус полного обзора вокруг каждого своего флота — в его фактическом месте. */
   fleet: number;
   /** Множитель дальности всех радаров, мировых и корабельных: карты Sector Zero крупнее. */

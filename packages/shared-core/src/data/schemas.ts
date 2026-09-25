@@ -1309,6 +1309,8 @@ export const ModePveSchema = z
 const ModeSightSchema = z
   .object({
     world: z.number().nonnegative(),
+    /** Свой обзор по виду провинции вместо `world` (решение владельца 2026-09-25). */
+    byKind: z.record(z.string(), z.number().nonnegative()).optional(),
     fleet: z.number().nonnegative(),
     radarScale: z.number().positive(),
   })

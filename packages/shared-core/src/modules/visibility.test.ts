@@ -99,6 +99,25 @@ describe('радиусы зрения режима (решение владел�
     expect(again.state.sight).toEqual({ world: 1, fleet: 1, radarScale: 1 });
   });
 
+  it('таблица по видам провинции закрепляется копией, а не ссылкой на данные', () => {
+    const byKind = { planet: 100, void_station: 100 };
+    const kdata: GameData = parseGameData({
+      version: '0.1.0',
+      resources: ['metal'],
+      units: { cruiser: { faction: 'x', stats: { attack: 4, defense: 4, speed: 6, hp: 20 } } },
+      factions: {},
+      buildings: {},
+      events: {},
+      modes: { run: { name: 'Run', sight: { world: 0, byKind, fleet: 90, radarScale: 2.5 } } },
+    });
+    const kernel = createKernel([visibilityModule]);
+    const ctx: Context = { now: HOUR, data: kdata, config: { timeScale: 1, modeId: 'run' } };
+    const r = kernel.advanceTo(baseState(), ctx);
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.sight).toEqual({ world: 0, byKind, fleet: 90, radarScale: 2.5 });
+    expect(r.state.sight?.byKind).not.toBe(kdata.modes.run!.sight!.byKind);
+  });
+
   it('режим без раздела — поля нет, действуют общие числа ядра', () => {
     const kernel = createKernel([visibilityModule]);
     const r = kernel.advanceTo(baseState(), at('plain', HOUR));

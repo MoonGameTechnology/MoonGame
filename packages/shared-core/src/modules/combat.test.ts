@@ -236,6 +236,23 @@ describe('combat — resolution over real hours', () => {
     expect(Object.keys(r.state.battles)).toHaveLength(0);
   });
 
+  it('each death names whose fire killed it — `killedBy` (PVR-6.20)', () => {
+    // The expedition's combat tally credits kills by this field: a melee death belongs to
+    // the side that landed the most damage on it — here, the only enemy.
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    const st = baseState(
+      [fleet('A', 'p1', 'P', [['fighter', 3]]), fleet('D', 'p2', 'P', [['fighter', 1]])],
+      [planet('P', null)],
+    );
+    const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(2 * HOUR)));
+    const deaths = r.events
+      .filter((e) => e.type === 'unit.died')
+      .map((e) => e.payload as { owner?: string; killedBy?: string });
+    expect(deaths.some((d) => d.owner === 'p2')).toBe(true);
+    for (const d of deaths) expect(d.killedBy).toBe(d.owner === 'p2' ? 'p1' : 'p2');
+  });
+
   it('timeScale compresses the round interval', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);
     const st = baseState(

@@ -1106,6 +1106,9 @@
 | PVR-6.16 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Пятый герой — Учёный, награда главы I |
 | PVR-6.17 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Дерево технологий забега — без дней, «Хранителя» и совета учёных |
 | PVR-6.18 | ✅ | proto | `docs/sector-zero-roadmap.md` | Экспедиция на телефоне — слово, полоса скорости, кошелёк, досье |
+| PVR-6.19 | ✅ | proto | `docs/sector-zero-roadmap.md` | Имена провинций, кольцо радара, ▶▶ вдвое |
+| PVR-6.20 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Итоги экспедиции: сколько потеряно и уничтожено |
+| PVR-6.21 | ✅ | core data | `docs/sector-zero-roadmap.md` | Обзор провинции: вокруг себя видят только колонии и крепости |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |
@@ -1264,3 +1267,6 @@
 | YAG-6.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир 2026-09-24 |
 | YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
 | YAG-6.4 | ✅ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход 2026-09-24 |
+| YAG-7.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | Долгий тап, меню под сообщениями, единицы в угрозах 2026-09-25 |
+| YAG-7.2 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Карточка обучения закрывает стартовый флот на 1024×576 |
+| YAG-7.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | На старте забега — служебная строка дипломатии |

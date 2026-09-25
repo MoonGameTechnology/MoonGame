@@ -221,6 +221,21 @@ try {
     await page.locator('#spd-fast').click();
     assert.ok(await page.locator('#spd-fast.on').isVisible(), 'ПК: ▶▶ включает ускорение');
     await page.locator('#spd-play').click();
+    // п. 1.10.1: стартовые сообщения забега лежат там же, где открывается меню «Ещё», и
+    // раньше закрывали его пункты и ловили нажатия. Открытое меню — поверх них.
+    assert.ok((await page.locator('#toasts .toast').count()) > 0, 'ПК: на старте есть сообщения');
+    await page.locator('#railtoggle').click();
+    const covered = await page.evaluate(() =>
+      [...document.querySelectorAll('#railtools button')]
+        .filter((b) => b.getClientRects().length > 0)
+        .filter((b) => {
+          const r = b.getBoundingClientRect();
+          return !b.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+        })
+        .map((b) => b.id),
+    );
+    assert.deepEqual(covered, [], 'ПК: пункты открытого меню ничем не перекрыты');
+    await page.locator('#railtoggle').click();
 
     // 2а. Пауза забега (YAG-6.2; «‖» полосы скорости с 2026-09-24): кнопка замораживает
     // отсчёт волны, уход со страницы — тоже, и на возврате мир ждёт кнопки; площадка
@@ -483,6 +498,15 @@ try {
   await phonePage.locator('.dl-wave').first().waitFor({ state: 'visible' });
   await runTempoOnly(phonePage, 'телефон');
   assert.ok(await phonePage.locator('#tomenu').isVisible(), 'телефон: выход ⌂ на полосе');
+  // п. 1.6.1.8: долгий тап не открывает системное меню — ни на карте, ни на картинке.
+  const menuBlocked = await phonePage.evaluate(() =>
+    ['map', 'comic-img'].map((id) => {
+      const ev = new window.MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      document.getElementById(id).dispatchEvent(ev);
+      return ev.defaultPrevented;
+    }),
+  );
+  assert.deepEqual(menuBlocked, [true, true], 'телефон: долгий тап без системного меню');
   await phone.close();
 
   // 11. Две вкладки (AUD-29). Раньше каждая писала свою копию профиля целиком, и правка
@@ -593,7 +617,7 @@ try {
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, тот же забег на другом устройстве, вход и выбор профиля, один язык, темп забега, две вкладки, битый журнал, молчащий SDK — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, тот же забег на другом устройстве, вход и выбор профиля, один язык, темп забега, меню поверх сообщений, долгий тап без системного меню, две вкладки, битый журнал, молчащий SDK — без ошибок\n',
   );
 } finally {
   await browser.close();
