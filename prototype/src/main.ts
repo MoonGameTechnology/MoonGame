@@ -302,6 +302,7 @@ import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
+import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
 import { CHAPTER_COMICS } from './comicArt';
@@ -11893,7 +11894,7 @@ function startPvEMatch(dev = false): void {
       difficulty: pveDifficulty,
       attempt: sectorAttempt,
     });
-  const st = prepareSectorZeroRun(pveState(data, sectorMission), sectorProgress, data);
+  const st = prepareSectorZeroRun(chapterWorld(sectorMission), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
   const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
@@ -13981,6 +13982,13 @@ function chapterShown(mission: number) {
   return shownObjectives(chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? [], chapter.slots);
 }
 
+/** Мир главы на старт забега: карта минус встречи, чьи задачи уже закрыты в профиле
+ *  (`retiredEncounters.ts`) — взятое логово пиратов не встаёт заново. */
+function chapterWorld(mission: number): GameState {
+  const chapter = pveChapter(mission);
+  return retireDoneEncounters(pveState(data, mission), chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? []);
+}
+
 /** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
 function runMissionRows(): MissionRow[] {
   const chapter = pveChapter(sectorMission);
@@ -14834,7 +14842,7 @@ function restorePortable(): boolean {
   const priorMission = sectorMission;
   try {
     sectorMission = mission;
-    const world = prepareSectorZeroRun(pveState(data, mission), sectorProgress, data);
+    const world = prepareSectorZeroRun(chapterWorld(mission), sectorProgress, data);
     installMatch(world, runAiSeats(world, 'p1', parseRunDifficulty(save.difficulty)), save.mode);
     apply(advance(s, s.time + 1)); // засеять PvE: волна 0, следующая назначена
     const resumed = resumePortableRun(s, save, ME, pve.boons ?? []);
