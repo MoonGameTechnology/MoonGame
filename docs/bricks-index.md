@@ -1271,7 +1271,10 @@
 | YAG-3.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Четыре добровольных placement'а |
 | YAG-4.1 | ⏳ | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
-| YAG-4.3 | ⏳ | srv proto | `docs/yandex-games-roadmap.md` | Где живёт кошелёк Суверенов — решение до покупок |
+| YAG-4.3 | ✅ | srv proto | `docs/yandex-games-roadmap.md` | Где живёт кошелёк Суверенов — решение до покупок 2026-09-25 |
+| YAG-4.4 | ⏳ | proto cli | `docs/yandex-games-roadmap.md` | Печать профиля: правка руками не приживается |
+| YAG-4.5 | ⏳ | cli | `docs/yandex-games-roadmap.md` | Журнал кошелька Суверенов |
+| YAG-4.6 | 🔒 | srv | `docs/yandex-games-roadmap.md` | Кошелёк на сервере |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |
 | YAG-5.2 | 🔶 | docs proto | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию 2026-09-24 |
 | YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
