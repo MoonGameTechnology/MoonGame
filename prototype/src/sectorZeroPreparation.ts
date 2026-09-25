@@ -2,7 +2,6 @@ import { t, tData } from '../../localization/runtime';
 import {
   canEquip,
   effectiveStats,
-  moduleAllowed,
   rarityOf,
   starsOf,
   type GameData,
@@ -14,7 +13,7 @@ import {
   sectorHeroSlots,
   forgeLadderOf,
   sectorHullIds,
-  sectorModuleIds,
+  sectorModulesFor,
   sectorSkillCard,
   sectorSkillCost,
   sectorSlotItem,
@@ -179,27 +178,26 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return `<div class="sz-bay"><b>${esc(t(`yard.slot.${slot}`))} · ${modules.length}/${n}</b><span>${modules.map((id) => esc(tData(data.modules[id]!.name))).join(', ') || t('hero.slot.empty')}</span></div>`;
       })
       .join('');
-    const modules = sectorModuleIds(data)
+    // Только то, что встаёт на ЭТОТ корпус (решение владельца 2026-09-25): карточка
+    // «не подходит» занимала место и звала открыть то, что сюда не встанет никогда.
+    const modules = sectorModulesFor(hull, selected, data)
       .map((id) => [id, data.modules[id]!] as const)
       .map(([id, module]) => {
         const owned = p.modules.includes(id);
         const fitted = selected.includes(id);
         const fits = canEquip(hull, def, selected, id, data).ok;
-        const allowed = moduleAllowed(hull, def, module);
         const label = !owned
           ? t('sector-zero.prep.unlock', { n: MODULE_UNLOCK_COST })
           : fitted
             ? t('sector-zero.prep.equipped')
-            : !allowed
-              ? t('sector-zero.prep.incompatible')
-              : !fits
-                ? t('sector-zero.prep.full')
-                : t('sector-zero.prep.equip');
+            : !fits
+              ? t('sector-zero.prep.full')
+              : t('sector-zero.prep.equip');
         const head = itemHead(id, p);
         // Что станет с ЭТИМ корпусом: надетый — если снять, ненадетый — если надеть.
-        // Не влезает или не подходит — сравнивать не с чем, строки нет.
+        // Слот занят — сравнивать не с чем, строки нет.
         const compare =
-          allowed && (fitted || fits)
+          fitted || fits
             ? deltaHtml(
                 statDeltas(
                   statsNow,
@@ -208,17 +206,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
                 ),
               )
             : '';
-        // Не встаёт на ЭТОТ корпус — сказать, на какие встаёт, ДО того как игрок заплатит
-        // данные за открытие: «Открыть» на радаре у крейсера обещало то, чего не будет.
-        const fitsOnly = allowed
-          ? ''
-          : `<p class="sz-prereq">${t('sector-zero.prep.fits-only', {
-              list: sectorHullIds(data)
-                .filter((other) => moduleAllowed(other, data.units[other]!, module))
-                .map((other) => esc(displayUnit(other)))
-                .join(', '),
-            })}</p>`;
-        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${fitsOnly}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
+        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
       })
       .join('');
     return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(data.units[hull]!, statsNow))}<div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;

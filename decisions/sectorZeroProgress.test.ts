@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { pveState, pveModeId } from '../packages/client/src/gameData';
-import { effectiveStats, hashState } from '../packages/shared-core/src/index';
+import { effectiveStats, hashState, moduleAllowed } from '../packages/shared-core/src/index';
 import type { GameState } from '../packages/shared-core/src/index';
 import {
   changeSectorZeroProgress,
@@ -12,6 +12,7 @@ import {
   sectorHeroSlots,
   sectorHullIds,
   sectorModuleIds,
+  sectorModulesFor,
   sectorSkillOpenTo,
   sovereignRepairCost,
   WARRANTS_PER_REWARD,
@@ -547,6 +548,38 @@ describe('PVR-6.5 — в подготовке только модули, кот�
     // Радар встаёт только на разведчика: это не повод его прятать, разведчик у игрока есть.
     for (const id of ['cargo_bay', 'ion_engine', 'targeting_array', 'shield_booster', 'radar_module'])
       expect(modules, id).toContain(id);
+  });
+});
+
+describe('модули выбранного корпуса — только те, что на него встают (решение владельца 2026-09-25)', () => {
+  it('на крейсере нет радаров разведчика и дозорного фрегата', () => {
+    // «Если нельзя надеть модуль, то его не должно показывать»: карточка «Только для: …»
+    // занимала место и звала открыть то, что на этот корпус не встанет никогда.
+    const cruiser = sectorModulesFor('cruiser', [], data);
+    expect(cruiser).not.toContain('radar_module');
+    expect(cruiser).not.toContain('compact_radar');
+    for (const id of ['cargo_bay', 'ion_engine', 'targeting_array', 'siege_platform'])
+      expect(cruiser, id).toContain(id);
+  });
+
+  it('узкий модуль виден на своём корпусе', () => {
+    expect(sectorModulesFor('scout', [], data)).toContain('compact_radar');
+    expect(sectorModulesFor('picket_frigate', [], data)).toContain('radar_module');
+  });
+
+  it('каждый показанный модуль встаёт на корпус, а весь список — подмножество модулей подготовки', () => {
+    const all = sectorModuleIds(data);
+    for (const hull of sectorHullIds(data))
+      for (const id of sectorModulesFor(hull, [], data)) {
+        expect(all, `${hull}: ${id}`).toContain(id);
+        expect(moduleAllowed(hull, data.units[hull]!, data.modules[id]!), `${hull}: ${id}`).toBe(true);
+      }
+  });
+
+  it('уже надетый модуль не пропадает, даже если перестал подходить: его должно быть можно снять', () => {
+    // Сохранение из старой версии данных может держать на корпусе то, что туда больше не
+    // встаёт. Спрятать его — значит оставить игрока без кнопки «Снять».
+    expect(sectorModulesFor('cruiser', ['radar_module'], data)).toContain('radar_module');
   });
 });
 

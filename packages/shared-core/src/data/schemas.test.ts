@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.40'); // обзор забега по виду провинции: колония и крепость — 100 (поверх урона по роду войск 0.1.39)
+    expect(data.version).toBe('0.1.41'); // фрегат ушёл из поддержки в «Корабли» (решение владельца 2026-09-25)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
