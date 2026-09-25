@@ -29,7 +29,7 @@ import { HERO_MAX_STARS, heroTokenUse } from './heroTokens';
 import {
   sectorSkillLegal,
   SHOP_AD_REFRESHES_PER_DAY,
-  WARRANTS_PER_REWARD,
+  lastRunWarrants,
   type SectorZeroProgress,
 } from './sectorZeroProgress';
 
@@ -262,7 +262,7 @@ export function doubleReward(
   caps: ShopCapabilities,
 ): { state: 'hidden' | 'ready'; research: number; warrants: number } {
   const research = progress.lastReward;
-  const warrants = research * WARRANTS_PER_REWARD;
+  const warrants = lastRunWarrants(progress);
   const open = research > 0 && progress.doubledThrough < progress.settledThrough;
   return { state: caps.ads && open ? 'ready' : 'hidden', research, warrants };
 }

@@ -2345,6 +2345,7 @@ export const en: Record<string, string> = {
     'The standard Swarm wins by numbers: its fleets go for the nearest target and fight to the end; it researches nothing and never lands troops on defended worlds.',
   'sector-zero.difficulty.hint': 'Your saved run keeps its original difficulty.',
   'sector-zero.difficulty.same': 'Scheduled waves and rewards are the same on both levels.',
+  'sector-zero.end.kills': 'Enemies destroyed: {n}',
   'sector-zero.end.prepare': 'Upgrade and prepare',
   'sector-zero.end.replay': 'Play this chapter again',
   'sector-zero.end.reward': '+{n} expedition data',

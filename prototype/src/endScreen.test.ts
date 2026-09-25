@@ -367,6 +367,14 @@ describe('итог забега Sector Zero — по частям (PVR-5.4)', ()
     expect(runSummaryHtml(summary)).not.toContain(t('sector-zero.end.veterans'));
   });
 
+  it('уничтоженные враги — своей строкой в Варрантах, и при поражении тоже (2026-09-25)', () => {
+    const html = runSummaryHtml({ ...summary, won: false, base: 1, kills: 23, killWarrants: 23, warrants: 28 });
+    expect(html).toContain(`<span>${t('sector-zero.end.kills', { n: 23 })}</span><b>+23 ⌖</b>`);
+    expect(html).toContain('+28 ⌖'); // в сумме Варрантов — вместе с ними
+    // Ноль уничтоженных — строки нет, как у медалей: «+0» ничего не сообщает.
+    expect(runSummaryHtml({ ...summary, kills: 0, killWarrants: 0 })).not.toContain(t('sector-zero.end.kills', { n: 0 }));
+  });
+
   it('панель берёт разбивку вместо одной суммы, когда она есть', () => {
     const html = endScreenHtml(scored(), 'p1', endOf({ runReward: 17, runSummary: summary }), {
       net: false,
