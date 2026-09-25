@@ -40,6 +40,8 @@ import {
 import { featuredOffer } from '../../decisions/shopFeatured';
 import { esc, displayUnit } from './format';
 import { catalogPortraitHtml } from './shipArt';
+import { unitDamageHtml } from './unitDamageView';
+import { unitDamageProfile } from '../../decisions/unitDamage';
 import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { splitSupport } from '../../decisions/supportShips';
 import { heroChapter } from '../../decisions/heroRecruits';
@@ -219,7 +221,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${fitsOnly}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
       })
       .join('');
-    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div><div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
+    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(data.units[hull]!, statsNow))}<div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
   }
 
   /**

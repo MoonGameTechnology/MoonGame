@@ -505,7 +505,7 @@ export {
 export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
-export { orbitalModule } from './modules/orbital';
+export { orbitalModule, BOMBARD_FRACTION } from './modules/orbital';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
