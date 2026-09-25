@@ -1120,6 +1120,7 @@
 | PVR-6.23 | ✅ | proto | `docs/sector-zero-roadmap.md` | Мастерская — внутри «Кораблей» |
 | PVR-6.24 | ⏳ | proto data | `docs/sector-zero-roadmap.md` | Корабль героя: модули и слоты за звёзды |
 | PVR-6.25 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Академия: страница героя вкладками, навыки деревом |
+| PVR-6.26 | ✅ | proto | `docs/sector-zero-roadmap.md` | Варрант за каждого уничтоженного врага |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

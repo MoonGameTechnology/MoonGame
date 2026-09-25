@@ -201,7 +201,12 @@ export interface RunSummary {
   /** Плата за медали сохранённых ветеранов (VET-7, {@link veteranReward}). Нет — итог
    *  засчитан до VET-7 или платить было не за что. */
   veterans?: number;
-  /** Всего данных экспедиций (`base + bonus + veterans`) и Варрантов за них. */
+  /** Уничтожено врагов и Варранты за них ({@link WARRANTS_PER_KILL}). Нет — итог засчитан
+   *  до этой строки. */
+  kills?: number;
+  killWarrants?: number;
+  /** Всего данных экспедиций (`base + bonus + veterans`) и Варрантов — за них и за
+   *  уничтоженных. */
   total: number;
   warrants: number;
   /** Сколько новых задач главы откроется к следующему заходу. */
@@ -228,6 +233,22 @@ export function forgeLadderOf(data: GameData): RarityLadder {
  *  половина награды). **v0**: забег с четырьмя волнами и победой даёт 40 ⌖, первая звезда
  *  стоит 20, полная лестница одного модуля — 695. Числа калибруются телеметрией. */
 export const WARRANTS_PER_REWARD = 5;
+/** Варранты за каждого уничтоженного врага (решение владельца 2026-09-25: «проигрывать —
+ *  нормально, каждая экспедиция должна что-то приносить»). Платит и поражение: счёт
+ *  уничтоженных ведёт ядро (`PveState.tally`, PVR-6.20). **v0** — калибруется телеметрией. */
+export const WARRANTS_PER_KILL = 1;
+/** Сколько чужих юнитов уничтожил `player` в этом забеге. Мусор в счёте — ноль. */
+function runKills(state: GameState, player: string): number {
+  const destroyed = state.pve?.tally?.[player]?.destroyed;
+  return typeof destroyed === 'number' && Number.isSafeInteger(destroyed) && destroyed > 0 ? destroyed : 0;
+}
+/** Варранты последнего засчитанного забега — вся сумма, с уничтоженными. Итог без разбивки
+ *  (засчитан до неё) — по старому правилу, от данных. */
+export function lastRunWarrants(progress: SectorZeroProgress): number {
+  return progress.lastRun?.attempt === progress.settledThrough
+    ? progress.lastRun.warrants
+    : progress.lastReward * WARRANTS_PER_REWARD;
+}
 
 /**
  * Курс медалей в награду забега (VET-7, резолюция владельца 2026-09-24: «в Sector Zero —
@@ -573,7 +594,8 @@ export function changeSectorZeroProgress(
       // доходит только после подтверждения адаптера.
       if (next.lastReward <= 0 || next.doubledThrough >= next.settledThrough) return null;
       next.research += next.lastReward;
-      next.warrants += next.lastReward * WARRANTS_PER_REWARD;
+      // Все Варранты забега, с уничтоженными врагами: удваивается награда целиком.
+      next.warrants += lastRunWarrants(next);
       next.doubledThrough = next.settledThrough;
       break;
     case 'premium-repair': {
@@ -787,6 +809,8 @@ function parseRunSummary(v: unknown): RunSummary | null {
   };
   const rawLoot = r.loot as Record<string, unknown> | undefined;
   const veterans = n(r.veterans);
+  const kills = n(r.kills);
+  const killWarrants = n(r.killWarrants);
   return {
     attempt: attempt!,
     chapter: r.chapter,
@@ -797,6 +821,7 @@ function parseRunSummary(v: unknown): RunSummary | null {
     objectives,
     bonus: bonus!,
     ...(veterans ? { veterans } : {}),
+    ...(kills !== null && killWarrants !== null ? { kills, killWarrants } : {}),
     total: total!,
     warrants: warrants!,
     unlocked: unlocked!,
@@ -996,7 +1021,9 @@ export function settleSectorZeroRun(
   // задачами. Каталог нужен для порогов медалей; без него платить не за что.
   const veterans = data ? veteranReward(state, 'p1', data) : 0;
   const reward = base + tasks.bonus + veterans;
-  const warrants = reward * WARRANTS_PER_REWARD;
+  const kills = runKills(state, 'p1');
+  const killWarrants = kills * WARRANTS_PER_KILL;
+  const warrants = reward * WARRANTS_PER_REWARD + killWarrants;
   const firstWin = !!won && !!chapter.id && !progress.chaptersWon.includes(chapter.id);
   // Дубли и чертежи (SZE-5.3): бросок от сида профиля, номера попытки и отпечатка итогового
   // мира (AUD-26) — повторный засчёт того же забега невозможен (проверка выше), перезагрузка
@@ -1058,6 +1085,8 @@ export function settleSectorZeroRun(
       objectives: tasks.results,
       bonus: tasks.bonus,
       ...(veterans > 0 ? { veterans } : {}),
+      kills,
+      killWarrants,
       total: reward,
       warrants,
       unlocked: tasks.unlocked,

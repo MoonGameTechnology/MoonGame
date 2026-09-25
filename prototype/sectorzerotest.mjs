@@ -75,6 +75,8 @@ const hooks = `window.__szTest = {
   },
   // Конец забега победой — как его ставит модуль победы ядра.
   end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
+  // Счёт уничтоженных игроком (PveState.tally, PVR-6.20) — чтобы итоги показали их плату.
+  kills: (n) => { s.pve.tally = { ...(s.pve.tally ?? {}), p1: { lost: s.pve.tally?.p1?.lost ?? 0, destroyed: n } }; },
   // Комиксы глав: арт владельца ещё не приехал — робот подкладывает свой реестр.
   comics: registry => { comicArt.registry = registry; },
   comicsSeen: () => sectorProgress.comicsSeen,
@@ -391,6 +393,7 @@ try {
     assert.equal((await progress()).sovereigns, 5, 'пакет стоит 5 ◆');
     assert.match(await page.locator('#rescard .rc-note').textContent(), /2/, 'осталось 2 из 3');
     await page.locator('#rescard .rc-close').click();
+    await page.evaluate(() => window.__szTest.kills(7));
     await page.evaluate(() => window.__szTest.end());
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
     // Победа — комикс главы поверх итогов, в первый раз; «Пропустить» открывает итоги.
@@ -400,6 +403,8 @@ try {
     await page.locator('#comic').waitFor({ state: 'hidden' });
     assert.deepEqual(await page.evaluate(() => window.__szTest.comicsSeen()), ['pve-1:intro', 'pve-2:intro', 'pve-2:outro']);
     assert.equal(await page.locator('#endscreen .es-run li.task').count(), 3, 'три задачи главы II');
+    // Каждый уничтоженный враг — Варрант (решение владельца 2026-09-25), своей строкой.
+    assert.match(await page.locator('#endscreen .es-run li.kills').textContent(), /7.*\+7 ⌖/, 'уничтоженные — строкой итогов');
     // ×2 к награде за ролик — прямо на итогах (YAG-3.2, решение владельца 2026-09-24).
     // Дев-сборка симулирует рекламу: ролик «досмотрен», удвоение приходит сразу.
     const beforeDouble = await page.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1')));
@@ -408,6 +413,12 @@ try {
     await page.waitForFunction(
       (before) => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).research === before.research + before.lastReward,
       beforeDouble,
+    );
+    // ×2 удваивает и Варранты за уничтоженных: приходит вся сумма Варрантов забега.
+    assert.equal(
+      (await page.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1')))).warrants,
+      beforeDouble.warrants + beforeDouble.lastRun.warrants,
+      '×2 — все Варранты забега, с уничтоженными',
     );
     assert.equal(await page.locator('#endscreen [data-es="double"]').count(), 0, 'удвоение одно на забег — кнопка ушла');
     // «Сыграть главу снова» запускает новую попытку ТОЙ ЖЕ главы — её родной мир `landing`.

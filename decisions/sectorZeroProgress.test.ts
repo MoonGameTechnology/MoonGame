@@ -15,6 +15,7 @@ import {
   sectorModulesFor,
   sectorSkillOpenTo,
   sovereignRepairCost,
+  WARRANTS_PER_KILL,
   WARRANTS_PER_REWARD,
   type SectorZeroProgress,
   type SectorProgressAction,
@@ -222,6 +223,45 @@ describe('Sector Zero persistent preparation', () => {
     expect(settleSectorZeroRun(loaded, 1, s)).toBe(loaded);
     s.match.winner = 'p1';
     expect(settleSectorZeroRun(p, 1, s).research).toBeGreaterThan(settled.research);
+  });
+
+  it('каждый уничтоженный враг — Варранты, и при поражении тоже (решение владельца 2026-09-25)', () => {
+    // «Проиграл матч и ничего не получил. Проигрывать — нормально. Каждая экспедиция должна
+    // что-то приносить». Счёт уничтоженных ведёт ядро (`PveState.tally`, PVR-6.20).
+    const s = pveState(data);
+    s.pve = { waveNumber: 0, totalWaves: 10, npcPlayerId: 'p3', tally: { p1: { lost: 12, destroyed: 17 } } };
+    s.match.status = 'ended';
+    s.match.winner = 'p3';
+    const p = { ...fresh(), nextAttempt: 2 };
+    const bare = settleSectorZeroRun(p, 1, { ...s, pve: { ...s.pve, tally: {} } });
+    const settled = settleSectorZeroRun(p, 1, s);
+    expect(settled.warrants - bare.warrants).toBe(17 * WARRANTS_PER_KILL);
+    expect(settled.research).toBe(bare.research); // данные — за волны и задачи, как прежде
+    // Итог по частям: сколько уничтожено и сколько за это пришло; сумма Варрантов — с ними.
+    expect(settled.lastRun).toMatchObject({ kills: 17, killWarrants: 17 * WARRANTS_PER_KILL });
+    expect(settled.lastRun!.warrants).toBe(bare.lastRun!.warrants + 17 * WARRANTS_PER_KILL);
+    // Разбор сохранения держит строку.
+    expect(parseSectorZeroProgress(JSON.stringify(settled), data).lastRun).toMatchObject({ kills: 17 });
+  });
+
+  it('×2 за ролик удваивает и Варранты за уничтоженных', () => {
+    const s = pveState(data);
+    s.pve = { waveNumber: 2, totalWaves: 10, npcPlayerId: 'p3', tally: { p1: { lost: 0, destroyed: 9 } } };
+    s.match.status = 'ended';
+    s.match.winner = 'p3';
+    const settled = settleSectorZeroRun({ ...fresh(), nextAttempt: 2 }, 1, s);
+    const doubled = change(settled, { kind: 'double-reward' });
+    expect(doubled.warrants - settled.warrants).toBe(settled.lastRun!.warrants);
+    expect(doubled.research - settled.research).toBe(settled.lastReward);
+  });
+
+  it('мусорный счёт в состоянии не платит: отрицательное и дробное — ноль', () => {
+    const s = pveState(data);
+    s.pve = { waveNumber: 0, totalWaves: 10, npcPlayerId: 'p3', tally: { p1: { lost: 0, destroyed: -5.5 } } };
+    s.match.status = 'ended';
+    s.match.winner = 'p3';
+    const p = { ...fresh(), nextAttempt: 2 };
+    expect(settleSectorZeroRun(p, 1, s).lastRun).toMatchObject({ kills: 0, killWarrants: 0 });
   });
 
   it('ЗАДАЧИ КАРТЫ добавляют к выплате, а не заменяют её (PVR-5.2)', () => {

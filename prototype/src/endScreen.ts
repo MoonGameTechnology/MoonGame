@@ -174,6 +174,8 @@ export function runSummaryHtml(r: RunSummary): string {
     // VET-7: медали сохранённых ветеранов. Строки нет, когда платить не за что, — как у
     // победы: «+0» за пустое место игроку ничего не сообщает.
     ...(r.veterans ? [row('run', t('sector-zero.end.veterans'), `+${r.veterans}`)] : []),
+    // Уничтоженные враги платят Варрантами и при поражении (решение владельца 2026-09-25).
+    ...(r.kills ? [row('run kills', t('sector-zero.end.kills', { n: r.kills }), `+${r.killWarrants ?? 0} ⌖`)] : []),
   ].join('');
   const next =
     r.unlocked > 0

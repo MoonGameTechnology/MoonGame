@@ -18,7 +18,7 @@ import {
   sectorSkillCost,
   sectorSlotItem,
   sectorSkillOpenTo,
-  WARRANTS_PER_REWARD,
+  lastRunWarrants,
   type SectorProgressAction,
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
@@ -524,7 +524,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       button('tab', id, `<i aria-hidden="true">${icon}</i><span>${t(key)}</span>`, false, tab === id);
     // Шапка: назад + кошелёк одной строкой, одна строка подсказки (PVR-6.6: меньше
     // абзацев), вкладки с иконкой — на телефоне в ряд, без переполнения (Мастерская — в «Кораблях»).
-    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
+    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: lastRunWarrants(p) })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)
