@@ -26,6 +26,7 @@ export interface PanelRect {
 
 /** Насколько камере разрешено перелезть за край карты. Пустой — панели нет. */
 export interface Slack {
+  left?: number;
   right?: number;
   bottom?: number;
 }
@@ -42,4 +43,34 @@ export function panelSlackFor(rect: PanelRect | null, vw: number, vh: number): S
   // Правило 1: широкая панель — нижний лист, узкая — правая колонка.
   if (rect.width >= vw * SHEET_WIDTH_RATIO) return { bottom: Math.max(0, vh - rect.top) };
   return { right: Math.max(0, vw - rect.left) }; // правило 3 — обрезка по нулю
+}
+
+/** Карточка у левого края — та, что стоит в пределах этой доли ширины от края. */
+export const LEFT_EDGE_RATIO = 0.1;
+
+/**
+ * Припуск под карточкой, стоящей колонкой у ЛЕВОГО края (YAG-7.2): подсказка первого боя
+ * на ПК. Закрыта полоса слева до правой кромки карточки. Карточка не у края или шире
+ * листа ({@link SHEET_WIDTH_RATIO}) — это не колонка, и припуска нет: на телефоне та же
+ * подсказка лежит плашкой снизу.
+ */
+export function leftCardSlackFor(rect: PanelRect | null, vw: number): Slack {
+  if (!rect || rect.width <= 0 || rect.height <= 0) return {};
+  if (rect.left > vw * LEFT_EDGE_RATIO || rect.width >= vw * SHEET_WIDTH_RATIO) return {};
+  return { left: Math.max(0, rect.left + rect.width) };
+}
+
+/** Закрывает ли карточка точку экрана — с запасом `margin` вокруг (значки флотов у мира). */
+export function cardCovers(
+  rect: PanelRect | null,
+  at: { x: number; y: number },
+  margin: number,
+): boolean {
+  if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+  return (
+    at.x >= rect.left - margin &&
+    at.x <= rect.left + rect.width + margin &&
+    at.y >= rect.top - margin &&
+    at.y <= rect.top + rect.height + margin
+  );
 }

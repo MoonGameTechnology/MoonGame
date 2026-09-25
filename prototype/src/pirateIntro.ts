@@ -12,8 +12,12 @@ export function initPirateIntro(host: {
   openBattle(id: string): void;
   /** Подсказка перешла на новый этап — шаг воронки обучения (`YAG-5.1`). */
   onStage?(stage: PirateEncounter['stage']): void;
+  /** Подсказка впервые за забег стала видна (YAG-7.2): она появляется после первого хода
+   *  часов, когда стартовый вид уже выбран, и хост может пересчитать его под неё. */
+  onFirstShow?(): void;
 }): { update(model: PirateEncounter | null): void; reset(): void } {
   let dismissed = false;
+  let shown = false;
   let model: PirateEncounter | null = null;
   let openedBattle: string | undefined;
   const { copy, action } = host;
@@ -30,9 +34,11 @@ export function initPirateIntro(host: {
     else host.focus(model.sector);
   });
   return {
-    reset() { dismissed = false; model = null; openedBattle = undefined; host.root.hidden = true; },
+    reset() { dismissed = false; shown = false; model = null; openedBattle = undefined; host.root.hidden = true; },
     update(next) {
       host.root.hidden = dismissed || !next;
+      const firstShow = !host.root.hidden && !shown;
+      if (firstShow) shown = true;
       if (!dismissed && next?.battleId && openedBattle !== next.battleId) {
         openedBattle = next.battleId;
         host.openBattle(next.battleId);
@@ -54,6 +60,8 @@ export function initPirateIntro(host: {
           : t('pve.pirates.show');
       }
       model = next;
+      // Хост меряет карточку уже с текстом этапа — поэтому зов в конце, а не при показе.
+      if (firstShow) host.onFirstShow?.();
     },
   };
 }
