@@ -101,12 +101,3 @@ export interface PortraitHit {
   width: number;
   height: number;
 }
-
-export function heroAtPoint(hits: readonly PortraitHit[], x: number, y: number): string | null {
-  return (
-    [...hits]
-      .reverse()
-      .find((h) => x >= h.x && x <= h.x + h.width && y >= h.y && y <= h.y + h.height)?.heroId ??
-    null
-  );
-}

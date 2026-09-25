@@ -121,7 +121,7 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 import { initShipyard } from './shipyard';
 import { initHeroStaff, HERO_CASTABLE, heroCdKey, heroDisplayName } from './heroStaff';
 import { drawHeroPortrait } from '../../packages/client/src/heroPortraits';
-import { heroAtPoint, mapHeroes, type PortraitHit } from '../../decisions/heroIdentity';
+import { mapHeroes, type PortraitHit } from '../../decisions/heroIdentity';
 import {
   initConversations,
   COALITION,
@@ -322,6 +322,7 @@ import {
 import {
   SECTOR_ZERO_ABSENT_HUD,
   SECTOR_ZERO_ABSENT_TOOLS,
+  espionageShown,
   toolShown,
   type SessionTool,
 } from '../../decisions/sectorZeroTools';
@@ -7019,7 +7020,8 @@ function planetPanelHtml(p: Planet): string {
 
   // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
   // window lives its countdown replaces the button — the node stays identified.
-  {
+  // В забеге Sector Zero шпионажа нет (`espionageShown`, заказ владельца 2026-09-25).
+  if (espionageShown(sectorZeroToolsHidden())) {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
     // Кому и что предлагаем — `spyOffer.ts` (REFM-92): свой и ничейный мир не шпионят,
     // живое окно показывает отсчёт вместо кнопки, а нехватка кредитов кнопку гасит, но
@@ -7599,8 +7601,10 @@ function seatDiploActionsHtml(id: string): string {
       return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${stanceCol(sk)}"${offerDisabled(aff, barred) ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
     }).join('') +
     mapShareBtnHtml(id) +
-    `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
-    `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>` +
+    (espionageShown(sectorZeroToolsHidden())
+      ? `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
+        `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>`
+      : '') +
     `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
     intelRowHtml(id)
   );
@@ -7717,6 +7721,9 @@ function intelTabHtml(): string {
 function renderDiplo(): void {
   const el = document.getElementById('diplo');
   if (!el) return;
+  // Вкладки «Шпионаж» в забеге Sector Zero нет: открытая до забега не переживает вход в него.
+  const spyTab = espionageShown(sectorZeroToolsHidden());
+  if (!spyTab && diploTab === 'intel') diploTab = 'diplo';
   const tabBtn = (k: 'diplo' | 'msgs' | 'intel', label: string) =>
     `<button class="dp-tab${diploTab === k ? ' on' : ''}" data-tab="${k}">${label}</button>`;
   const sortBtn = (k: typeof diploSort, label: string) =>
@@ -7744,7 +7751,7 @@ function renderDiplo(): void {
         : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
-    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${tabBtn('intel', t('diplo.tab.espionage'))}<button class="dp-close">✕</button></div>` +
+    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${spyTab ? tabBtn('intel', t('diplo.tab.espionage')) : ''}<button class="dp-close">✕</button></div>` +
     body +
     `</div>`;
   if (diploTab === 'msgs') scrollFeedToEnd();
@@ -9579,13 +9586,6 @@ function selectAt(mx: number, my: number) {
     const tm = nearestHit(chainHits, (h) => h, mx, my, rPing);
     if (tm) {
       enterChainMode(tm.fleetIds);
-      return;
-    }
-  }
-  if (!aiming) {
-    const heroId = heroAtPoint(heroPortraitHits, mx, my);
-    if (heroId && heroStaff.focus(heroId)) {
-      shipyard.open('heroes');
       return;
     }
   }
