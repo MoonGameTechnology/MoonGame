@@ -3,6 +3,8 @@ import { data } from './gameData';
 import { catalogPortraitHtml } from './shipArt';
 import { catalogRowHtml, catalogTileHtml } from './catalogTile';
 import { YARD_HULLS, YARD_SQUAD_HULLS } from './shipyard';
+import { SWARM_UNIT_SHAPE } from '../../packages/client/src/shipShapes';
+import { SWARM_SHAPES } from '../../packages/client/src/swarmShapes';
 
 describe('realistic build portraits', () => {
   it('covers every buildable ship and wing, including the frigate and dropship', () => {
@@ -43,5 +45,28 @@ describe('realistic build portraits', () => {
       expect(locked).not.toContain('data-codex');
       expect(locked).toContain('data-desc="u:frigate"');
     }
+  });
+
+  // Лист владельца «Рой» (2026-09-25): восемь форм 01–08 — те же, что у векторов карты.
+  it('a Swarm-owned hull shows its Swarm form, and all eight forms have a portrait', () => {
+    const shown = new Set<string>();
+    for (const [unit, shape] of Object.entries(SWARM_UNIT_SHAPE)) {
+      if (data.units[unit]?.domain === 'ground' || !data.units[unit]) continue;
+      const html = catalogPortraitHtml('u', unit, data, 'portrait', 'swarm');
+      expect(html, unit).toContain(`data-ship-art="${shape}"`);
+      expect(html, unit).toContain('<img');
+      shown.add(shape);
+    }
+    expect([...shown].sort()).toEqual(Object.keys(SWARM_SHAPES).sort());
+  });
+
+  it('the owner picks the family: the same hull stays human without the Swarm', () => {
+    expect(catalogPortraitHtml('u', 'cruiser', data)).toContain('data-ship-art="cruiser"');
+    expect(catalogPortraitHtml('u', 'cruiser', data, 'portrait', 'vanguard')).toContain('data-ship-art="cruiser"');
+    expect(catalogPortraitHtml('u', 'cruiser', data, 'thumb', 'swarm')).toContain('data-ship-art="swarmHunter"');
+    // Юнит самого Роя в кодексе — без владельца, по `def.faction`.
+    expect(catalogPortraitHtml('u', 'swarm_brood_mother', data)).toContain('data-ship-art="swarmMatriarch"');
+    // Наземный десант Роя остаётся со своей иконкой.
+    expect(catalogPortraitHtml('u', 'swarm_lander', data, 'portrait', 'swarm')).toBe('');
   });
 });

@@ -643,6 +643,7 @@
 | ATK-2 | ✅ | proto | `docs/backlog.md` | «Атака» видна: цели в красных уголках, путь красным пунктиром. |
 | SHIPART-1 | ✅ | proto cli | `docs/backlog.md` | Реалистичные портреты в постройке и описаниях, |
 | SHIPART-2 | ✅ | cli proto | `docs/backlog.md` | Десантный корабль — в десантной семье |
+| SHIPART-3 | ✅ | proto | `docs/backlog.md` | Портреты Роя — в карточках кораблей |
 | HEROART-1 | ✅ | proto cli | `docs/backlog.md` | Портреты, досье и читаемый счёт флота |
 | YARD-1 | ✅ | data proto srv | `docs/backlog.md` | Корабли строит ВЕРФЬ, челноки — |
 | YARD-2 | ✅ | data | `docs/backlog.md` | У верфи два яруса: дешёвый строит, дорогой |
