@@ -46,7 +46,10 @@ describe('YAG-2.1 — дескриптор живёт и умирает вмес
   it('восстановление по дескриптору собирает мир ТОЙ главы, что в нём записана', () => {
     const portable = body('restorePortable');
     expect(portable).toContain('pveMissionOfMap(save?.map)');
-    expect(portable).toContain('pveState(data, mission)');
+    // Мир главы — через `chapterWorld` (PVR-6.27: минус встречи, чьи задачи закрыты), и он
+    // строится с карты ТОЙ ЖЕ главы.
+    expect(portable).toContain('chapterWorld(mission)');
+    expect(/function chapterWorld\(mission: number\)[^{]*\{[^}]*pveState\(data, mission\)/.test(SRC)).toBe(true);
     expect(portable).toContain('resumePortableRun(');
   });
 });
