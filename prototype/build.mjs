@@ -341,6 +341,9 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #missionpanel .mp-reward .tw-data{color:var(--cur-data);}
 #missionpanel .mp-reward .tw-warrants{color:var(--cur-warrants);}
 #missionpanel .mp-go{grid-column:3;font-size:11px;color:#8ff5c8;text-decoration:underline;text-underline-offset:2px;}
+#devline .dl-wave .dl-short{display:none;}
+body.mobile-ui #devline .dl-wave .dl-full{display:none;}
+body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
 #devline .dl-wave{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
   color:#ffb3aa;font-weight:700;font-size:12px;line-height:1;letter-spacing:.3px;
   font-variant-numeric:tabular-nums;white-space:nowrap;
