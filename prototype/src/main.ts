@@ -7699,7 +7699,7 @@ function intelTabHtml(): string {
     .map((e) => {
       const d = gameDay(e.at);
       const h = dayHour(e.at);
-      return `<div class="in-log">D${d} ${String(h).padStart(2, '0')}ч · ${esc(e.text)}</div>`;
+      return `<div class="in-log">D${d} ${t('fmt.hours', { n: String(h).padStart(2, '0') })} · ${esc(e.text)}</div>`;
     })
     .join('');
   return (
@@ -9036,11 +9036,11 @@ side.addEventListener('pointerleave', () => {
   }
 });
 
-// PC: the browser context menu is suppressed across the whole game surface (the
-// map, the HUD, every overlay) — right-click is a game input now. Text fields keep
-// their native menu (paste!).
+// The browser context menu is suppressed across the whole game surface (the map, the
+// HUD, every overlay) on EVERY device: on PC right-click is a game input, on a phone a
+// long press would open the system menu («save image» on ship art and portraits) —
+// Yandex Games requirement 1.6.1.8. Text fields keep their native menu (paste!).
 document.addEventListener('contextmenu', (ev) => {
-  if (!pcUi()) return;
   if ((ev.target as HTMLElement).closest('input,textarea')) return;
   ev.preventDefault();
 });

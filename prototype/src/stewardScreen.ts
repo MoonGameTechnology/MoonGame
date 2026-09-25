@@ -19,6 +19,8 @@ import { t } from '../../localization/runtime';
 // other REFM screens, so this module never leans on the façade.
 import { delegateSteward, recallSteward } from '../../decisions/actions';
 import { DAY, HOUR } from './time';
+import { runClockShown } from './format';
+import { runClockText } from '../../decisions/runClock';
 
 /** Game-hours a single delegation can run — the three offered buttons. */
 const STEW_DURATIONS = [4, 8, 12];
@@ -43,11 +45,15 @@ export function stewMetrics(state: GameState, me: string): StewardMetrics {
 }
 
 /** A duration in the wording the watch uses («2ч 30м» / «45м»). Shared with the threat
- *  alert, which counts down the same way. */
+ *  alert, which counts down the same way. Units come from the locale (`fmt.hours` /
+ *  `fmt.minutes`); inside a Sector Zero run it reads the run clock — real «m:ss», like
+ *  every other countdown there (a game hour is seconds long on the run's tempo). */
 export function stewFmtDur(ms: number): string {
+  if (runClockShown()) return runClockText(Math.max(0, ms));
   const mins = Math.max(0, Math.round(ms / 60000));
   const h = Math.floor(mins / 60);
-  return h > 0 ? `${h}ч ${mins % 60}м` : `${mins}м`;
+  const m = t('fmt.minutes', { n: h > 0 ? mins % 60 : mins });
+  return h > 0 ? `${t('fmt.hours', { n: h })} ${m}` : m;
 }
 
 /** Is the Steward unlocked? Researched in the «Командование» branch (day 15, scientist
