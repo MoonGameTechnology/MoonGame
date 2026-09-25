@@ -9,6 +9,7 @@ import { ru } from '../localization/ru';
 import { en } from '../localization/en';
 import { shippedGameData } from '../data/bundle';
 import { PVE_MISSION_COUNT, pveState } from '../packages/client/src/gameData';
+import testbed from '../data/maps/duel-testbed.json';
 
 const data = shippedGameData();
 /** Карты глав — ровно те, что открывает дверь Sector Zero, а не список рядом. */
@@ -54,9 +55,12 @@ describe('имена карт глав', () => {
   it('в локалях нет имён несуществующих провинций', () => {
     // Префикс `province.` разбор ключей пропускает как собранный в рантайме, поэтому
     // имя переименованного узла осталось бы в локали навсегда. Держим здесь.
-    const real = new Set(
-      chapters.flatMap((s) => Object.keys(s.planets).map((id) => provinceKey(s.mapId!, id))),
-    );
+    // Имена есть у карт глав и у тестовой дуэли (M2.14); полноту её имён держит
+    // `data/duelTestbed.test.ts`.
+    const real = new Set([
+      ...chapters.flatMap((s) => Object.keys(s.planets).map((id) => provinceKey(s.mapId!, id))),
+      ...Object.keys(testbed.sectors).map((id) => provinceKey(testbed.id, id)),
+    ]);
     const stale = Object.keys(ru).filter((k) => k.startsWith('province.') && !real.has(k));
     expect(stale).toEqual([]);
   });

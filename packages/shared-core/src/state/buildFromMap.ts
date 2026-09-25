@@ -260,13 +260,20 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   // undirected graph and cannot see transit, so a lane-crossing spec could leave a
   // sector reachable on the map yet unreachable to any fleet. Checked the way a fleet
   // actually travels: over (sector, lane it arrived by) states, from every start.
-  if (ids.length > 1 && Object.values(map.sectors).some((sec) => sec.transit)) {
+  // Barriers are exempt here exactly as in the plain connectivity check below: a rift or a
+  // black hole is a hole in the map, not a destination, so a map carrying both a transit
+  // and a barrier must not fail for "failing" to reach the barrier.
+  const traversable = ids.filter((id) => {
+    const kind = map.sectors[id]?.kind;
+    return !(data && kind !== undefined && data.sectorKinds[kind]?.traversable === false);
+  });
+  if (traversable.length > 1 && Object.values(map.sectors).some((sec) => sec.transit)) {
     const passable = (node: string, from: string | null, to: string): boolean => {
       const pairs = map.sectors[node]?.transit;
       if (!pairs || pairs.length === 0 || from === null) return true;
       return pairs.some(([a, b]) => (a === from && b === to) || (b === from && a === to));
     };
-    for (const start of ids) {
+    for (const start of traversable) {
       const seenNodes = new Set<string>([start]);
       const queue: Array<[string, string | null]> = [[start, null]];
       const seenStates = new Set<string>([`${start}\u0000`]);
@@ -281,7 +288,7 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
           queue.push([next, cur]);
         }
       }
-      for (const target of ids) {
+      for (const target of traversable) {
         if (target !== start && !seenNodes.has(target)) {
           issues.push(`E_TRANSIT_UNREACHABLE:${start}->${target}`);
         }
@@ -309,10 +316,7 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   // demanding a route to it would force the author to either drill a lane into the
   // barrier or switch the check off — and both defeat the barrier. What must stay
   // connected is everything a fleet can actually reach.
-  const reachRequired = ids.filter((id) => {
-    const kind = map.sectors[id]?.kind;
-    return !(data && kind !== undefined && data.sectorKinds[kind]?.traversable === false);
-  });
+  const reachRequired = traversable;
   if (reachRequired.length > 1) {
     const adj = new Map<string, string[]>(ids.map((id) => [id, []]));
     for (const [a, b] of edges.paths) {
