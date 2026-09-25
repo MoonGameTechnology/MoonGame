@@ -693,6 +693,9 @@ export function changeSectorZeroProgress(
       if (!own(data.heroes, action.id) || own(next.heroes, action.id) || !pay(HERO_UNLOCK_COST))
         return null;
       next.heroes[action.id] = newSectorHero(action.id, data);
+      // Купленный герой сразу идёт в следующий забег (замечание владельца 2026-09-25: «купил
+      // Учёного — он не заспаунился»): выбор отдельной кнопкой после покупки пропускали.
+      next.selectedHero = action.id;
       break;
     }
     case 'select-hero':
