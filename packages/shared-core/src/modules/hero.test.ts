@@ -1538,6 +1538,30 @@ describe('hero — железо корабля: модули на герое (HP
     expect(sumUnitStat(fleet.units, data, 'attack')).toBe(4);
   });
 
+  it('корабль героя выходит со звёздами и редкостью модулей из снимка арсенала (PVR-6.24)', () => {
+    // Верфь забега штампует звёзды из `PlayerArsenal` на всё построенное; корабль героя
+    // после гибели минтится заново, и без того же снимка он возвращался бы с голыми ★0.
+    const st = docked({ alive: false, modules: ['gun'] });
+    st.players.p1!.arsenal = { hulls: ['hero'], modules: ['gun'], stars: { gun: 2, bay: 1 }, rarity: { gun: 'unique' } };
+    const spawned = okApply(
+      kernel.applyAction(st, act('hero.spawn', 'p1', { heroId: 'hero:p1', at: 'A' }), ctx(0)),
+    );
+    const hero = spawned.state.heroes!['hero:p1']!;
+    const stack = spawned.state.fleets[hero.fleetId!]!.units[0]!;
+    expect(stack.moduleStars).toEqual({ gun: 2 }); // только надетого
+    expect(stack.moduleRarity).toEqual({ gun: 'unique' });
+    // Без снимка (обычный матч) полей нет — стек байт-в-байт прежний.
+    const plain = okApply(
+      kernel.applyAction(
+        docked({ alive: false, modules: ['gun'] }),
+        act('hero.spawn', 'p1', { heroId: 'hero:p1', at: 'A' }),
+        ctx(0),
+      ),
+    );
+    const bare = plain.state.fleets[plain.state.heroes!['hero:p1']!.fleetId!]!.units[0]!;
+    expect('moduleStars' in bare || 'moduleRarity' in bare).toBe(false);
+  });
+
   it('герой без модулей минтит стек БЕЗ ключа `modules` — идентичность старых стеков цела', () => {
     const spawned = okApply(
       kernel.applyAction(
