@@ -286,6 +286,15 @@ import {
   cloudEnvelope,
   type CloudProfile,
 } from '../../decisions/cloudSync';
+import {
+  LOCAL_SEAL,
+  SECTOR_ZERO_SHADOW_KEY,
+  cloudSeal,
+  pickLocalProfile,
+  sealProgress,
+  wholeCloud,
+  type LocalProfile,
+} from '../../decisions/profileSeal';
 import { chapterBlueprint } from '../../decisions/moduleRarity';
 import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
@@ -13808,6 +13817,9 @@ const runSaveStore: RunSaveStore = localRunSaveStore(RUN_SAVE_KEY, ownsSectorZer
 // шесть полей переживают смену формы мира после обновления игры, блоб — нет.
 const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero);
 const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero);
+// Теневая копия профиля (`YAG-4.4`) — последний целый профиль: правленый руками основной
+// игра не берёт, а берёт её.
+const sectorShadowStore = localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero);
 // Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
 // Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
 // он один раз — у сохранённого профиля свой сид, и разбор его сохраняет.
@@ -13902,13 +13914,44 @@ let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
  *  что карта (AUD-32): испорченное хранилище открывает первую главу, а не роняет вход. */
 let nextSectorMission = pveMissionIndex(Number(readRaw('void.pveMission') ?? 0));
 let runWrite = Promise.resolve();
-let progressWrite = sectorProgressStore.load().then(raw => {
-  sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
+
+/**
+ * Профиль из хранилища по правилу печати (`YAG-4.4`, `pickLocalProfile`): целый основной,
+ * иначе теневая копия, иначе профиль старой версии — один раз. Флаг «уже запечатывало»
+ * лежит в отметке сверки, а она объявлена ниже по файлу: читается он после ожидания
+ * хранилища, когда модуль уже исполнен.
+ */
+async function loadSectorProfile(): Promise<LocalProfile> {
+  const main = await sectorProgressStore.load();
+  const shadow = await sectorShadowStore.load();
+  const pick = pickLocalProfile(main, shadow, syncMark.sealed === true);
+  // Правка руками не прощается молча: причина — в журнал, а игроку ничего (наказаний нет).
+  if (pick.from === 'shadow' || (pick.from === 'none' && main)) console.warn('E_PROFILE_SEAL', pick.from);
+  return pick;
+}
+
+/**
+ * Запечатанный профиль (`sealProgress`) — в основную копию и сразу в теневую. Флаг «уже
+ * запечатывало» встаёт, только когда запись правда легла. Иначе переполненное хранилище
+ * оставило бы рядом с флагом старый профиль без печати, и следующий старт принял бы
+ * честный профиль за правленый.
+ */
+async function writeSectorProgress(blob: string): Promise<void> {
+  await sectorProgressStore.save(blob);
+  await sectorShadowStore.save(blob);
+  if (syncMark.sealed || (await sectorProgressStore.load()) !== blob) return;
+  syncMark = { ...syncMark, sealed: true };
+  writeSyncMark();
+}
+
+let progressWrite = loadSectorProfile().then(pick => {
+  sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
   // Профиль с главами, выигранными до наград-героев, догоняет их при чтении (heroRecruits §3).
   const granted = grantChapterHeroes(sectorProgress, sectorChapterIds(), data);
-  if (granted.progress === sectorProgress) return;
+  // Запись и тогда, когда печать велит: подделка стирается, старый профиль запечатывается.
+  if (granted.progress === sectorProgress && !pick.rewrite) return;
   sectorProgress = granted.progress;
-  return sectorProgressStore.save(JSON.stringify(granted.progress));
+  return writeSectorProgress(sealProgress(granted.progress, LOCAL_SEAL));
 });
 
 /** Глава для засчёта забега: карта и задачи плюс гарантированный чертёж за первую
@@ -14083,8 +14126,8 @@ function saveSectorProgress(next: SectorZeroProgress): void {
   // поэтому принесённое с другого устройства за открытие здесь не считается.
   for (const unlock of metaUnlocks(sectorProgress, next)) getPlatform().analytics.emit('meta_unlock', unlock);
   sectorProgress = next;
-  const blob = JSON.stringify(next);
-  progressWrite = progressWrite.then(() => sectorProgressStore.save(blob));
+  const blob = sealProgress(next, LOCAL_SEAL);
+  progressWrite = progressWrite.then(() => writeSectorProgress(blob));
   bumpCloudRev();
 }
 
@@ -14113,6 +14156,9 @@ if (!syncMark.device)
  *  `on` — сверено, пишем; `held` — прогресс разошёлся с облачным, и до выбора игрока
  *  облако не трогаем (экран выбора в меню, `YAG-1.4`). */
 let cloudState: 'off' | 'guest' | 'on' | 'held' = 'off';
+/** Id вошедшего игрока площадки — привязка печати облачной копии (`YAG-4.4`, `cloudSeal`).
+ *  Ставит сверка до того, как облако станет `on`, — раньше в облако никто не пишет. */
+let cloudPlayer = '';
 /** Облачный профиль на развилке — ждёт выбора игрока (`held`). */
 let cloudFork: { cloud: CloudProfile; progress: SectorZeroProgress } | null = null;
 let cloudWrite: Promise<void> = Promise.resolve();
@@ -14159,7 +14205,8 @@ function pushCloud(flush = false): void {
         v: 1,
         seed: sectorProgress.seed,
         rev: syncMark.rev,
-        progress: JSON.stringify(sectorProgress),
+        // Облачная копия запечатана для этого игрока (`YAG-4.4`): чужое облако её не примет.
+        progress: sealProgress(sectorProgress, cloudSeal(cloudPlayer)),
         ...(run ? { run } : {}),
         ...(state ? { state } : {}),
         ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
@@ -14188,9 +14235,14 @@ async function syncCloud(): Promise<void> {
     cloudState = 'guest';
     return;
   }
+  cloudPlayer = player.id;
   const raw = await Promise.race([host.save.load(), late]);
   if (raw === undefined) return;
-  const cloud = parseCloudProfile(raw);
+  // Замок 3 (`YAG-4.4`): облачная копия без целой печати ЭТОГО игрока — как «облака нет»,
+  // и сверка отправит туда целый локальный профиль.
+  const found = parseCloudProfile(raw);
+  const cloud = wholeCloud(found, player.id);
+  if (found && !cloud) console.warn('E_PROFILE_SEAL', 'cloud');
   const cloudProgress = cloud ? parseSectorZeroProgress(cloud.progress, data, cloud.seed) : null;
   const plan = planCloudSync(
     {
@@ -14224,7 +14276,7 @@ async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress
   // бы облачному профилю чужой забег.
   if (runInProgress()) setRunActive(false);
   sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data).progress;
-  await sectorProgressStore.save(JSON.stringify(sectorProgress));
+  await writeSectorProgress(sealProgress(sectorProgress, LOCAL_SEAL));
   // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному: ТОЧНЫМ
   // миром, если облако его привезло (AUD-24), иначе по дескриптору (или его нет вовсе).
   // Именно мир, а не дескриптор: пересборка по дескриптору начинает мир с карты главы, и
@@ -14527,11 +14579,13 @@ function claimSectorZero(): void {
   savedPortable = null;
   const mark = readRaw(CLOUD_MARK_KEY);
   if (mark !== null) syncMark = parseSyncMark(mark);
-  progressWrite = progressWrite
-    .then(() => sectorProgressStore.load())
-    .then((raw) => {
-      if (raw) sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);
-    });
+  // Перечитывается тем же правилом печати, что и на старте (`YAG-4.4`): правленый за это
+  // время профиль не берётся, а стирается целой копией.
+  progressWrite = progressWrite.then(loadSectorProfile).then(async (pick) => {
+    if (!pick.raw) return;
+    sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
+    if (pick.rewrite) await writeSectorProgress(sealProgress(sectorProgress, LOCAL_SEAL));
+  });
 }
 
 /** Sector Zero перехватила другая вкладка, а эта его показывает: мир встаёт, экран

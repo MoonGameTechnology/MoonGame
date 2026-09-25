@@ -143,6 +143,18 @@ describe('YAG-2.2 — отметка сверки на устройстве', ()
   it('сверка не может быть впереди своей правки — срезается до неё', () => {
     expect(parseSyncMark('{"rev":3,"syncedRev":9}')).toEqual({ rev: 3, syncedRev: 3 });
   });
+
+  it('YAG-4.4: флаг «уже запечатывало» живёт в отметке и переживает любую правку', () => {
+    const mark = parseSyncMark('{"rev":3,"syncedRev":3,"device":"A","sealed":true}');
+    expect(mark).toEqual({ rev: 3, syncedRev: 3, device: 'A', sealed: true });
+    for (const junk of ['1', '"true"', 'false', 'null'])
+      expect(parseSyncMark(`{"rev":3,"syncedRev":3,"sealed":${junk}}`)).not.toHaveProperty(
+        'sealed',
+      );
+    expect(bumpMark(mark).sealed).toBe(true);
+    expect(adoptMark(mark, { rev: 9 }).sealed).toBe(true);
+    expect(keepLocalMark(mark, { rev: 9 }).sealed).toBe(true);
+  });
 });
 
 describe('YAG-1.4 — развилка: «Оставить этот»', () => {

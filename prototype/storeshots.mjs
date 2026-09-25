@@ -19,9 +19,11 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { launchBrowser, waitForApp } from './harnessKit.mjs';
+import { launchBrowser, profileSeal, waitForApp } from './harnessKit.mjs';
 
 const ROOT = fileURLToPath(new URL('./dist/yandex/', import.meta.url));
+/** Печать профиля — та же, что у игры: кошелёк кадров кладётся запечатанным. */
+const seal = await profileSeal();
 const ART = fileURLToPath(new URL('./art/store/', import.meta.url));
 const OUT = fileURLToPath(new URL('./dist/store/', import.meta.url));
 
@@ -133,14 +135,15 @@ try {
       // Дальше меняются только числа валют; остальное игра нормализует сама при чтении.
       await page.locator('#sz-prep').click();
       await page.locator('[data-prep="back"]').click();
-      await page.evaluate(() => {
-        const key = 'sector-zero.progress.v1';
-        const p = JSON.parse(localStorage.getItem(key) ?? '{"v":1}');
-        localStorage.setItem(
-          key,
-          JSON.stringify({ ...p, research: 640, warrants: 24, sovereigns: 35 }),
-        );
-      });
+      // Кошелёк ложится запечатанным (`YAG-4.4`): правленый без печати игра не возьмёт и
+      // вернёт теневую копию.
+      const key = 'sector-zero.progress.v1';
+      const current = await page.evaluate((k) => localStorage.getItem(k) ?? '{"v":1}', key);
+      const wallet = seal.sealProgress(
+        { ...JSON.parse(current), research: 640, warrants: 24, sovereigns: 35 },
+        seal.LOCAL_SEAL,
+      );
+      await page.evaluate(([k, raw]) => localStorage.setItem(k, raw), [key, wallet]);
       await page.reload();
       await waitForApp(page);
       await page.locator('#sz-new').waitFor({ state: 'visible' });

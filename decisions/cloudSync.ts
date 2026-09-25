@@ -215,6 +215,10 @@ export interface SyncMark {
   syncedRev: number;
   device?: string;
   lineage?: Lineage;
+  /** Устройство уже запечатывало профиль (`profileSeal.ts`): профиль без печати здесь —
+   *  снятая печать, а не старая версия. Сборка без печати этот флаг не хранит и снимает
+   *  его первой же записью отметки — вместе с печатью профиля. */
+  sealed?: true;
 }
 
 /** Разбор отметки. Мусор — «не сверялось», а не падение. */
@@ -225,7 +229,13 @@ export function parseSyncMark(raw: string | null): SyncMark {
     const syncedRev = Math.min(count(o?.syncedRev) ?? 0, rev);
     const device = typeof o?.device === 'string' && o.device ? o.device : undefined;
     const lineage = device ? parseLineage(o?.lineage) : undefined;
-    return { rev, syncedRev, ...(device ? { device } : {}), ...(lineage ? { lineage } : {}) };
+    return {
+      rev,
+      syncedRev,
+      ...(device ? { device } : {}),
+      ...(lineage ? { lineage } : {}),
+      ...(o?.sealed === true ? { sealed: true as const } : {}),
+    };
   } catch {
     return { rev: 0, syncedRev: 0 };
   }
