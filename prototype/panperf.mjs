@@ -11,6 +11,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { resolveChromium } from '../scripts/chromium.mjs';
+import { LIFT_BOOT_VEIL } from './harnessKit.mjs';
 import { checkMapLoading } from './mapLoadingTest.mjs';
 
 const require = createRequire(import.meta.url);
@@ -67,7 +68,7 @@ window.__panBenchmark = {
 };`;
 const bundle = await build({
   stdin: {
-    contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
+    contents: LIFT_BOOT_VEIL + readFileSync('prototype/src/main.ts', 'utf8') + bridge,
     resolveDir: process.cwd() + '/prototype/src',
     loader: 'ts',
   },
