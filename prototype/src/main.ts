@@ -3797,7 +3797,11 @@ function handleEvents(events: DomainEvent[]) {
             true,
             thread.from,
           );
-          note(`${na} → ${nb}: ${stanceRu(st)}`);
+          // YAG-7.3 (решение владельца 2026-09-25): в забеге Sector Zero строки ленты нет.
+          // Противник там один — Рой, и его объявление войны на старте штурма повторяло
+          // «Экспедиция начата — Рой уже идёт» служебной строкой с именем фракции игрока.
+          // Реплика в треде дипломатии выше остаётся.
+          if (!sectorRunActive) note(`${na} → ${nb}: ${stanceRu(st)}`);
         }
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;

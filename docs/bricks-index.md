@@ -1269,4 +1269,4 @@
 | YAG-6.4 | ✅ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход 2026-09-24 |
 | YAG-7.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | Долгий тап, меню под сообщениями, единицы в угрозах 2026-09-25 |
 | YAG-7.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Карточка обучения закрывает стартовый флот на 1024×576 2026-09-25 |
-| YAG-7.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | На старте забега — служебная строка дипломатии |
+| YAG-7.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | На старте забега — служебная строка дипломатии 2026-09-25 |
