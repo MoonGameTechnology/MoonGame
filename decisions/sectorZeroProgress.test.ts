@@ -148,6 +148,19 @@ describe('Sector Zero persistent preparation', () => {
     expect(sectorSkillOpenTo(trees.void_attunement!, 'commander', unparked)).toBe(false);
   });
 
+  it('купленный герой сразу идёт в забег (замечание владельца 2026-09-25)', () => {
+    // «Купил Учёного — он не заспаунился»: покупка клала героя в отряд, а в бой по-прежнему
+    // шёл прежний — выбор был отдельной кнопкой, и её не нажимали.
+    const bought = change({ ...fresh(), research: 30 }, { kind: 'unlock-hero', id: 'scientist' });
+    expect(bought.selectedHero).toBe('scientist');
+    const s = prepareSectorZeroRun(pveState(data), bought, data);
+    expect(Object.values(s.heroes ?? {}).filter((h) => h.owner === 'p1').map((h) => h.archetype)).toEqual([
+      'scientist',
+    ]);
+    // Выбор остаётся за игроком: вернуть прежнего — та же кнопка.
+    expect(change(bought, { kind: 'select-hero', id: 'commander' }).selectedHero).toBe('commander');
+  });
+
   it('chooses another acquired hero and carries their own skills into the real map', () => {
     let p = { ...fresh(), research: 30 };
     p = change(p, { kind: 'unlock-hero', id: 'warden' });
