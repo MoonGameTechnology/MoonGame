@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chapterMapSvg } from './sectorZeroMenu';
 import type { ChapterMapView } from '../../decisions/chapterMap';
+import { WAVE_MS, WAVE_OFFSETS } from '../../decisions/missionRing';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(path.join(here, '../sector-zero.css'), 'utf8');
@@ -51,6 +52,20 @@ describe('карта главы — разметка (PVR-6.15)', () => {
     expect(rules.length).toBeGreaterThan(0);
     for (const body of rules) expect(body).not.toMatch(/(^|;)\s*height\s*:/);
     expect(css).toMatch(/\.sz-map-body svg\s*\{[^}]*height:\s*auto/);
+  });
+});
+
+describe('активная цель на карте главы — как метка в забеге (PVR-6.22)', () => {
+  // Кольцо в меню рисует CSS, а в забеге — `decisions/missionRing.ts`. Сторож держит их в
+  // одном ритме: пара волн, вторая со сдвигом в полпериода, период — тот же.
+  it('две волны пунктира у активной цели, ритм — из missionRing', () => {
+    const svg = chapterMapSvg(view);
+    expect(svg.match(/class="target-ping"/g)).toHaveLength(1);
+    expect(svg.match(/class="target-ping late"/g)).toHaveLength(1);
+    const period = /\.target-ping\s*\{[^}]*animation:\s*sz-target-ping\s+([\d.]+)s\s+linear/.exec(css);
+    const delay = /\.target-ping\.late\s*\{[^}]*animation-delay:\s*-([\d.]+)s/.exec(css);
+    expect(Number(period?.[1]) * 1000).toBe(WAVE_MS);
+    expect(Number(delay?.[1]) * 1000).toBe(WAVE_MS * WAVE_OFFSETS[1]!);
   });
 });
 
