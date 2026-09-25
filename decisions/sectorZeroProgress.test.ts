@@ -62,7 +62,8 @@ describe('Sector Zero persistent preparation', () => {
   });
 
   it('persists a hero upgrade and skill chain, rejecting missing prerequisites', () => {
-    let p = { ...fresh(), research: 40 };
+    // Звезда героя стоит его жетоны (`heroTokens.ts`): 10 за ★2.
+    let p: SectorZeroProgress = { ...fresh(), research: 40, heroTokens: { commander: 12 } };
     expect(
       changeSectorZeroProgress(
         p,
@@ -79,7 +80,10 @@ describe('Sector Zero persistent preparation', () => {
     expect(
       changeSectorZeroProgress(p, { kind: 'skill', hero: 'commander', id: 'wreck_rig' }, data),
     ).not.toBeNull();
+    const research = p.research;
     p = change(p, { kind: 'upgrade-hero', id: 'commander' });
+    expect(p.heroTokens).toEqual({ commander: 2 });
+    expect(p.research).toBe(research);
     p = change(p, { kind: 'skill', hero: 'commander', id: 'neural_lace' });
     p = change(p, { kind: 'skill', hero: 'commander', id: 'overclocked_helm' });
     p = change(p, { kind: 'skill', hero: 'commander', id: 'corridor_sustained' });

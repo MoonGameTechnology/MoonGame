@@ -102,10 +102,12 @@ export const BLUEPRINT_TIERS: readonly (readonly [Rarity, number])[] = [
   ['legendary', 0.05],
 ];
 
-/** Добыча одного забега: дубли по модулям и чертежи по ступеням. */
+/** Добыча одного забега: дубли по модулям, чертежи по ступеням и жетоны героя
+ *  (`heroTokens.ts`; нет — итог до жетонов). */
 export interface RunLoot {
   copies: Record<string, number>;
   blueprints: Record<string, number>;
+  heroTokens?: Record<string, number>;
 }
 
 /** Гарантированный чертёж за первую победу в главе `index`: к эпицентру — ступень выше. */
