@@ -16,7 +16,17 @@ import { effectiveStats } from '../util/loadout';
 import { isCapturable } from '../state/sectorKind';
 import { attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
-import { splitVolley } from '../util/volley';
+import { splitVolley, volleyShare } from '../util/volley';
+import {
+  addPools,
+  hasGroundTargets,
+  poolsTotal,
+  splitDealt,
+  targetedVolley,
+  type ClassPools,
+  type FireRole,
+} from '../util/groundTargets';
+import type { StackContribution } from '../util/stacks';
 import {
   addHooked,
   applyDamageToSide,
@@ -836,9 +846,60 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  * (AA / bombardment) lives in `orbital`, and the
  * lane-crossing detector in `intercept` — each degrades gracefully on its own.
  */
+/**
+ * ЗАЛП ПО НАЗЕМНЫМ ВОЙСКАМ (решение владельца 2026-09-25, `util/groundTargets.ts`). Та же
+ * одновременность и тот же делёж, что у раунда флотов (MSB-2), с одним отличием: залп
+ * зависит от ЦЕЛИ. Против каждого врага он считается под его состав — доля пехоты бьётся
+ * уроном по пехоте, доля техники уроном по технике, — и ложится на врага раздельно по родам.
+ *
+ * Хук зовётся по-прежнему ОДИН раз на пару: разложение по родам идёт после него, в той же
+ * пропорции (`splitDealt`), так что технологии, укрепления и ауры усиливают залп целиком,
+ * а не одну его часть. Заслуга ветерана (VET-2) пишется по тем же строкам, из которых
+ * сложен залп, — сумма залпов по всем врагам делится на их число, ровно как делится урон.
+ */
+function groundVolleys(
+  h: HandlerContext,
+  battle: Battle,
+  side: BattleSide,
+  enemies: readonly BattleSide[],
+  role: FireRole,
+  incoming: Map<BattleSide, HookedDamage>,
+  byClass: Map<BattleSide, ClassPools>,
+): void {
+  const data = h.ctx.data;
+  const shooters = sideUnits(h.state, side.ref) ?? [];
+  const credit = new Map<number, StackContribution>();
+  let creditTotal = 0;
+  let landed = 0;
+  for (const target of enemies) {
+    const shot = targetedVolley(shooters, sideUnits(h.state, target.ref) ?? [], data, role);
+    const dealt = hookedDamage(h, volleyShare(shot.total, enemies.length), {
+      battleId: battle.id,
+      phase: battle.phase,
+      location: battle.location,
+      attacker: side.owner,
+      defender: target.owner,
+      ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
+    });
+    const running = incoming.get(target);
+    incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
+    const pools = splitDealt(shot.pools, shot.total, dealt);
+    const had = byClass.get(target);
+    byClass.set(target, had === undefined ? pools : addPools(had, pools));
+    landed += dealt;
+    for (const row of shot.rows) {
+      const part = row.damage / enemies.length;
+      const prev = credit.get(row.index);
+      credit.set(row.index, prev ? { ...prev, damage: prev.damage + part } : { ...row, damage: part });
+      creditTotal += part;
+    }
+  }
+  creditVolley(h.state, side.ref, { total: creditTotal, rows: [...credit.values()] }, landed);
+}
+
 export const combatModule: GameModule = {
   id: 'combat',
-  version: '2.2.0',
+  version: '2.3.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -1216,18 +1277,23 @@ export const combatModule: GameModule = {
       // несколько, и «атакующий ↔ обороняющийся» перестаёт описывать бой целиком.
       const live = battle.sides.filter((side) => sideAlive(h.state, side.ref));
       const incoming = new Map<BattleSide, HookedDamage>();
+      // Урон по роду войск (решение владельца 2026-09-25): против наземных войск залп
+      // считается под СОСТАВ цели и ложится по родам — пехоте своё, технике своё. Разложение
+      // живёт рядом с суммой: сумма идёт в `combat.round`, разложение — в `applyDamageToSide`.
+      const byClass = new Map<BattleSide, ClassPools>();
       for (const side of live) {
         // Враги — только ВРАЖДЕБНЫЕ живые стороны. Спрятаться за спину союзника нельзя
         // (ради этого выбор и сделан), но и бить союзника залп не имеет права.
         const enemies = live.filter((other) => other !== side && sidesHostile(h, side.owner, other.owner));
         // Разбивка, а не только сумма (VET-1): те же числа, но видно, какой стек что
         // положил в залп — из этого VET-2 пишет заслугу ветерана.
-        const shot = sideDamageBreakdown(
-          h.state,
-          side.ref,
-          data,
-          side.role === 'attacker' ? 'attack' : 'defense',
-        );
+        const role = side.role === 'attacker' ? 'attack' : 'defense';
+        const ground = enemies.some((e) => hasGroundTargets(sideUnits(h.state, e.ref) ?? [], data));
+        if (ground) {
+          groundVolleys(h, battle, side, enemies, role, incoming, byClass);
+          continue;
+        }
+        const shot = sideDamageBreakdown(h.state, side.ref, data, role);
         const volley = shot.total;
         let landed = 0; // сколько РЕАЛЬНО легло на врагов после хука — это и есть заслуга
         for (const [i, share] of splitVolley(volley, enemies).entries()) {
@@ -1256,7 +1322,15 @@ export const combatModule: GameModule = {
         creditVolley(h.state, side.ref, shot, landed);
       }
       for (const [side, dmg] of incoming) {
-        if (dmg > 0) applyDamageToSide(h, side.ref, dmg, data, battle.location, battle.id);
+        if (!(dmg > 0)) continue;
+        // Сторону могли бить и по составу (наземный залп), и одним телом (залп флота по
+        // флоту в том же бою). Разложение покрывает только первое; всё, что сверх него,
+        // ложится как всегда — родом `other`, то есть на весь состав без разбора.
+        const pools = byClass.get(side);
+        const split = pools
+          ? { ...pools, other: pools.other + Math.max(0, dmg - poolsTotal(pools)) }
+          : undefined;
+        applyDamageToSide(h, side.ref, dmg, data, battle.location, battle.id, split);
       }
 
       // Полезная нагрузка события — единственная двойственность боя, которая уезжает ПО

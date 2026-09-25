@@ -52,15 +52,40 @@ describe('урон юнита по целям', () => {
     expect(row?.value).toBe(def.stats.attack);
   });
 
-  it('наземный: ПВО по кораблям, урон по зданиям, атака одинаково по технике и пехоте', () => {
+  it('наземный: ПВО по кораблям, урон по зданиям, по технике и пехоте — свои атака и оборона', () => {
     const tank = data.units.tank!.stats;
-    expect(profile('tank')).toEqual({
-      ships: tank.aaDamage ?? 0,
-      buildings: tank.buildingDamage,
-      air: 0,
-      vehicles: tank.attack,
-      infantry: tank.attack,
+    const rows = unitDamageProfile(data.units.tank!, tank);
+    const by = Object.fromEntries(rows.map((r) => [r.target, r]));
+    expect(by.ships!.value).toBe(tank.aaDamage ?? 0);
+    expect(by.buildings!.value).toBe(tank.buildingDamage);
+    expect(by.air!.value).toBe(0);
+    expect(by.vehicles).toEqual({
+      target: 'vehicles',
+      value: tank.attackVsVehicle,
+      defense: tank.defenseVsVehicle,
     });
+    expect(by.infantry).toEqual({
+      target: 'infantry',
+      value: tank.attackVsInfantry,
+      defense: tank.defenseVsInfantry,
+    });
+    // Танк давит пехоту и слабее по броне (решение владельца 2026-09-25).
+    expect(by.infantry!.value).toBeGreaterThan(by.vehicles!.value);
+  });
+
+  it('наземный без объявленного рода войск бьёт оба рода своей атакой и обороной', () => {
+    const def = data.units.tank!;
+    const bare = {
+      ...def.stats,
+      attackVsInfantry: undefined,
+      attackVsVehicle: undefined,
+      defenseVsInfantry: undefined,
+      defenseVsVehicle: undefined,
+    };
+    const rows = unitDamageProfile(def, bare);
+    const veh = rows.find((r) => r.target === 'vehicles')!;
+    expect(veh.value).toBe(def.stats.attack);
+    expect(veh.defense).toBe(def.stats.defense);
   });
 
   it('оснащение доходит до профиля: модуль ПРО виден в уроне по авиации', () => {

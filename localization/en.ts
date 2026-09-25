@@ -616,6 +616,7 @@ export const en: Record<string, string> = {
   'codex.dmg.ships': 'vs ships',
   'codex.dmg.buildings': 'vs buildings',
   'codex.dmg.air': 'vs aircraft',
+  'codex.dmg.atk-def': 'attack / defense',
   'codex.dmg.vehicles': 'vs vehicles',
   'codex.dmg.infantry': 'vs infantry',
   'codex.row.atk-def': 'Attack / Defense',
