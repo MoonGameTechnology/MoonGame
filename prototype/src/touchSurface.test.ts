@@ -23,9 +23,11 @@ const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 /** Тело CSS-правила ровно с этим селектором — с начала строки, а не хвостом чужого
  *  (`body{` сидит и внутри `html,body{`). */
 function rule(selector: string): string {
-  const escaped = selector.replace(/[.#[\]()]/g, '\\$&');
-  const m = new RegExp(`(?:^|\\n)${escaped}\\{([^}]*)\\}`).exec(GAME_CSS);
-  return m?.[1] ?? '';
+  const head = `\n${selector}{`;
+  const at = GAME_CSS.indexOf(head);
+  if (at < 0) return '';
+  const start = at + head.length;
+  return GAME_CSS.slice(start, GAME_CSS.indexOf('}', start));
 }
 const zIndex = (selector: string): number => Number(/z-index:(\d+)/.exec(rule(selector))?.[1]);
 
