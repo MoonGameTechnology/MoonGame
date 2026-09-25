@@ -14,6 +14,9 @@ import {
   forgeLadderOf,
   sectorHullIds,
   sectorModulesFor,
+  sectorHeroShipSlots,
+  sectorHeroShipUnit,
+  HERO_SHIP_STAR_SLOTS,
   sectorSkillCard,
   sectorSkillCost,
   sectorSlotItem,
@@ -127,6 +130,8 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     ? 'cruiser'
     : (sectorHullIds(h.data)[0] ?? '');
   let heroId = h.progress().selectedHero;
+  /** Во вкладке «Корабли» открыт корабль героя, а не корпус флота (PVR-6.24). */
+  let heroShip = false;
   let message = '';
   const button = (
     action: string,
@@ -139,9 +144,16 @@ export function initSectorZeroPreparation(h: PreparationHost) {
 
   function ships(p: SectorZeroProgress): string {
     const data = h.data;
-    const def = data.units[hull];
-    if (!def) return '';
-    const selected = p.loadouts[hull] ?? [];
+    // Корабль героя (PVR-6.24, решение владельца 2026-09-25) — такой же корпус со своим
+    // набором, только набор у каждого героя свой, а слотов прибавляют его звёзды. В забег
+    // едет корабль ВЫБРАННОГО героя, поэтому и показывается он.
+    const captain = p.heroes[p.selectedHero];
+    const onHero = heroShip && captain !== undefined;
+    const unit = onHero ? sectorHeroShipUnit(p.selectedHero, data) : hull;
+    const base = data.units[unit];
+    if (!base) return '';
+    const def = onHero ? { ...base, slots: sectorHeroShipSlots(p.selectedHero, captain, data) } : base;
+    const selected = onHero ? (captain.ship ?? []) : (p.loadouts[hull] ?? []);
     // Сравнение — с теми же звёздами и редкостью, что поедут в забег (`prepareSectorZeroRun`):
     // без них карточка показывала бы голый модуль, а в бою он сильнее.
     const statsWith = (mods: string[]) =>
@@ -158,7 +170,16 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // Корпус выбирают по картинке, а не по слову (PVR-6.6): тот же арт, что в
     // конструкторе основной игры. Нет арта у корпуса — остаётся имя, без пустой рамки.
     const hullTile = (id: string): string =>
-      button('hull', id, `${catalogPortraitHtml('u', id, data, 'thumb')}<span>${esc(displayUnit(id))}</span>`, false, hull === id);
+      button('hull', id, `${catalogPortraitHtml('u', id, data, 'thumb')}<span>${esc(displayUnit(id))}</span>`, false, !onHero && hull === id);
+    const heroTile = captain
+      ? button(
+          'hero-ship',
+          p.selectedHero,
+          `${catalogPortraitHtml('u', sectorHeroShipUnit(p.selectedHero, data), data, 'thumb')}<span>${t('sector-zero.prep.hero-ship')}</span>`,
+          false,
+          onHero,
+        )
+      : '';
     // Корабли линии, поддержка и челноки — рядами, как вкладки Производства (ROS-SUP-1);
     // признаки из данных.
     const groups = splitSupport(sectorHullIds(data), data);
@@ -170,7 +191,10 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       ] as const
     )
       .filter(([, ids]) => ids.length > 0)
-      .map(([key, ids]) => `<p class="sz-tier">${t(key)}</p><div class="sz-picker sz-hulls">${ids.map(hullTile).join('')}</div>`)
+      .map(
+        ([key, ids]) =>
+          `<p class="sz-tier">${t(key)}</p><div class="sz-picker sz-hulls">${key === 'yard.tab.ships' ? heroTile : ''}${ids.map(hullTile).join('')}</div>`,
+      )
       .join('');
     const bays = Object.entries(def.slots)
       .filter(([, n]) => n > 0)
@@ -184,12 +208,12 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const forge = new Map(workshopRows(p, data).map((row) => [row.id, row] as const));
     // Только то, что встаёт на ЭТОТ корпус (решение владельца 2026-09-25): карточка
     // «не подходит» занимала место и звала открыть то, что сюда не встанет никогда.
-    const modules = sectorModulesFor(hull, selected, data)
+    const modules = sectorModulesFor(unit, selected, data)
       .map((id) => [id, data.modules[id]!] as const)
       .map(([id, module]) => {
         const owned = p.modules.includes(id);
         const fitted = selected.includes(id);
-        const fits = canEquip(hull, def, selected, id, data).ok;
+        const fits = canEquip(unit, def, selected, id, data).ok;
         const label = !owned
           ? t('sector-zero.prep.unlock', { n: MODULE_UNLOCK_COST })
           : fitted
@@ -211,7 +235,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               )
             : '';
         const row = owned ? forge.get(id) : undefined;
-        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}${row ? upgradeHtml(row, p) : ''}</article>`;
+        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? (onHero ? 'fit-hero' : 'fit') : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}${row ? upgradeHtml(row, p) : ''}</article>`;
       })
       .join('');
     // Правило кузни одно на все карточки — строкой над ними (PVR-6.6), чертежи — только когда
@@ -225,7 +249,15 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               : ''
           }`
         : '';
-    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(data.units[hull]!, statsNow))}<div class="sz-bays">${bays}</div></div></div>${forgeNote}<div class="sz-cards">${modules}</div>`;
+    // Что даст следующая звезда героя кораблю — прямо под заголовком, где видны слоты.
+    const nextSlot = onHero ? HERO_SHIP_STAR_SLOTS[captain.level + 1] : undefined;
+    const title = onHero
+      ? `${t('sector-zero.prep.hero-ship')} · ${esc(tData(data.heroes[p.selectedHero]!.name))}`
+      : esc(displayUnit(hull));
+    const hint = onHero
+      ? `${t('sector-zero.prep.hero-ship.hint')}${nextSlot ? ` ${t('sector-zero.prep.hero-ship.next', { n: captain.level + 1, slot: t(`yard.slot.${nextSlot}`).toLocaleLowerCase() })}` : ''}`
+      : t('sector-zero.prep.ship-hint');
+    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', unit, data)}<div><h2>${title}</h2><p class="sz-sub">${hint}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(base, statsNow))}<div class="sz-bays">${bays}</div></div></div>${forgeNote}<div class="sz-cards">${modules}</div>`;
   }
 
   /**
@@ -579,7 +611,10 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     }
     if (kind === 'tab')
       tab = id === 'heroes' ? 'heroes' : id === 'shop' ? 'shop' : 'ships';
-    else if (kind === 'hull') hull = id;
+    else if (kind === 'hull') {
+      hull = id;
+      heroShip = false;
+    } else if (kind === 'hero-ship') heroShip = true;
     else if (kind === 'hero') heroId = id;
     else {
       let action: SectorProgressAction | null = null;
@@ -660,6 +695,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return;
       }
       if (kind === 'fit') action = { kind, hull, id };
+      else if (kind === 'fit-hero') action = { kind, hero: h.progress().selectedHero, id };
       else if (kind === 'skill' || kind === 'ability') action = { kind, hero: heroId, id };
       else if (
         kind === 'unlock-module' ||

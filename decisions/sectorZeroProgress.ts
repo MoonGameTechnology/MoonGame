@@ -37,12 +37,16 @@ import {
   type GameState,
   type Hero,
   type MapObjective,
+  type SlotCounts,
 } from '../packages/shared-core/src/index';
 
 export interface SectorHero {
   level: number;
   skills: string[];
   equipped: string[];
+  /** Модули КОРАБЛЯ героя (PVR-6.24, решение владельца 2026-09-25): свой набор у каждого
+   *  героя, в забег едет набор выбранного. Нет поля — корабль голый, как до PVR-6.24. */
+  ship?: string[];
 }
 export interface SectorZeroProgress {
   v: 1;
@@ -338,6 +342,42 @@ export function sectorHeroGrade(hero: SectorHero): string {
 export function sectorHeroSlots(hero: SectorHero, data: GameData): number {
   return data.heroGrades[sectorHeroGrade(hero)]?.skillSlots ?? 1;
 }
+
+/**
+ * Лишний слот корабля героя за звезду (PVR-6.24, решение владельца 2026-09-25: «звезда героя
+ * добавляет слот модуля»). Числа **v0**: 2★ — защита, 3★ — оружие. Порядок нарочно такой:
+ * вторая звезда делает корабль живучее, третья — опаснее.
+ */
+export const HERO_SHIP_STAR_SLOTS: Readonly<Record<number, keyof SlotCounts>> = {
+  2: 'defense',
+  3: 'weapon',
+};
+/** Корпус корабля героя — из каталога героя (`ship.unit`), по умолчанию `hero`. */
+export function sectorHeroShipUnit(id: string, data: GameData): string {
+  return data.heroes[id]?.ship.unit ?? 'hero';
+}
+/** Слоты корабля героя: слоты корпуса плюс слоты за его звёзды. */
+export function sectorHeroShipSlots(id: string, hero: SectorHero, data: GameData): SlotCounts {
+  const hull = data.units[sectorHeroShipUnit(id, data)]?.slots;
+  const out: SlotCounts = {
+    weapon: hull?.weapon ?? 0,
+    defense: hull?.defense ?? 0,
+    utility: hull?.utility ?? 0,
+  };
+  for (let star = 2; star <= hero.level; star++) {
+    const slot = HERO_SHIP_STAR_SLOTS[star];
+    if (slot) out[slot]++;
+  }
+  return out;
+}
+/** Встаёт ли `module` на корабль героя поверх `fitted` — те же правила, что у корпусов
+ *  (`canEquip`), только со слотами за звёзды. */
+function heroShipFits(id: string, hero: SectorHero, fitted: readonly string[], module: string, data: GameData): boolean {
+  const unit = sectorHeroShipUnit(id, data);
+  const def = data.units[unit];
+  if (!def) return false;
+  return canEquip(unit, { ...def, slots: sectorHeroShipSlots(id, hero, data) }, [...fitted], module, data).ok;
+}
 export function sectorHeroAbilities(id: string, hero: SectorHero, data: GameData): string[] {
   const ids = [...(data.heroes[id]?.startAbilities ?? [])];
   for (const skill of hero.skills) {
@@ -517,6 +557,8 @@ export type SectorProgressAction =
   | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
+  /** Модуль на корабль героя `hero` — или снять, если уже стоит (PVR-6.24). */
+  | { kind: 'fit-hero'; hero: string; id: string }
   | { kind: 'unlock-hero'; id: string }
   | { kind: 'select-hero'; id: string }
   | { kind: 'upgrade-hero'; id: string }
@@ -686,6 +728,17 @@ export function changeSectorZeroProgress(
         if (!canEquip(action.hull, data.units[action.hull]!, equipped, action.id, data).ok)
           return null;
         next.loadouts[action.hull] = [...equipped, action.id];
+      }
+      break;
+    }
+    case 'fit-hero': {
+      const hero = own(next.heroes, action.hero);
+      if (!hero || !next.modules.includes(action.id)) return null;
+      const ship = hero.ship ?? [];
+      if (ship.includes(action.id)) hero.ship = ship.filter((id) => id !== action.id);
+      else {
+        if (!heroShipFits(action.hero, hero, ship, action.id, data)) return null;
+        hero.ship = [...ship, action.id];
       }
       break;
     }
@@ -943,7 +996,12 @@ export function parseSectorZeroProgress(
       const level = Math.max(1, Math.min(3, counter(value.level, 1)));
       const candidates = [...new Set([...strings(value.skills), ...strings(own(shelvedSkills, id))])];
       if (!own(data.heroes, id)) {
-        shelve('heroes', id, { level, skills: candidates, equipped: strings(value.equipped) });
+        shelve('heroes', id, {
+          level,
+          skills: candidates,
+          equipped: strings(value.equipped),
+          ...(value.ship !== undefined ? { ship: strings(value.ship) } : {}),
+        });
         continue;
       }
       const hero: SectorHero = { level, skills: [], equipped: [] };
@@ -961,6 +1019,14 @@ export function parseSectorZeroProgress(
       hero.equipped = strings(value.equipped)
         .filter((a) => owned.includes(a) && !data.heroAbilities[a]?.type.startsWith('spawn_'))
         .slice(0, sectorHeroSlots(hero, data));
+      // Набор корабля (PVR-6.24): профиль правится игроком, поэтому каждый модуль заново
+      // проходит те же ворота, что при установке, — открыт и встаёт в слоты этих звёзд.
+      if (value.ship !== undefined) {
+        const ship: string[] = [];
+        for (const module of strings(value.ship))
+          if (fresh.modules.includes(module) && heroShipFits(id, hero, ship, module, data)) ship.push(module);
+        hero.ship = ship;
+      }
       fresh.heroes[id] = hero;
     }
     // Жетоны героев (`heroTokens.ts`) покупаются, поэтому жетоны героя, которого нет в ЭТОМ
@@ -1098,6 +1164,24 @@ export function settleSectorZeroRun(
   };
 }
 
+
+/** Флагман экспедиции со своим набором (PVR-6.24): звёзды и редкость модулей — тем же
+ *  снимком, что у стартового флота. Пустой набор — поле стека не заводится вовсе. */
+function flagshipStack(
+  unit: string,
+  modules: readonly string[],
+  stars: Record<string, number>,
+  rarity: Record<string, string>,
+): GameState['fleets'][string]['units'][number] {
+  const stack: GameState['fleets'][string]['units'][number] = { unit, count: 1 };
+  if (modules.length === 0) return stack;
+  stack.modules = [...modules];
+  const own = starsOf(stack.modules, stars);
+  if (own) stack.moduleStars = own;
+  const raised = rarityOf(stack.modules, rarity);
+  if (raised) stack.moduleRarity = raised;
+  return stack;
+}
 /** Snapshot preparation onto a NEW run only. Restoring a save must never call this:
  * the old hero and fleets keep the equipment and skills they began with. */
 export function prepareSectorZeroRun(
@@ -1153,6 +1237,8 @@ export function prepareSectorZeroRun(
     skills: [...selected.skills],
     abilities: sectorHeroAbilities(progress.selectedHero, selected, data),
     equipped: [...selected.equipped],
+    // Набор корабля героя (PVR-6.24): с ним корабль и ВОЗРОДИТСЯ после гибели (`heroShipStack`).
+    ...(selected.ship?.length ? { modules: [...selected.ship] } : {}),
     passives: [
       ...new Set([
         ...def.startPassives,
@@ -1179,7 +1265,7 @@ export function prepareSectorZeroRun(
     owner: 'p1',
     location: home.id,
     movement: null,
-    units: [{ unit: def.ship.unit ?? 'hero', count: 1 }],
+    units: [flagshipStack(def.ship.unit ?? 'hero', selected.ship ?? [], stars, rarity)],
     traits: [],
     orbit: 'near',
   };

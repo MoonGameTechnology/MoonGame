@@ -9,6 +9,7 @@ import {
   parseSectorZeroProgress,
   prepareSectorZeroRun,
   settleSectorZeroRun,
+  sectorHeroShipSlots,
   sectorHeroSlots,
   sectorHullIds,
   sectorModuleIds,
@@ -601,6 +602,81 @@ describe('PVR-6.5 — в подготовке только модули, кот�
     // Радар встаёт только на разведчика: это не повод его прятать, разведчик у игрока есть.
     for (const id of ['cargo_bay', 'ion_engine', 'targeting_array', 'shield_booster', 'radar_module'])
       expect(modules, id).toContain(id);
+  });
+});
+
+describe('PVR-6.24 — корабль героя: модули и слоты за звёзды (решение владельца 2026-09-25)', () => {
+  /** Профиль, где у командира открыты защитные модули, а звёзд — `level`. */
+  const armed = (level = 1): SectorZeroProgress => {
+    const p = fresh();
+    p.modules = [...new Set([...p.modules, 'ablative_plating', 'shield_booster', 'targeting_array'])];
+    p.heroes.commander = { ...p.heroes.commander!, level };
+    return p;
+  };
+
+  it('на 1★ слоты корабля — корпуса героя; 2★ добавляет защиту, 3★ — оружие', () => {
+    const base = data.units[data.heroes.commander!.ship.unit ?? 'hero']!.slots;
+    const at = (level: number) => sectorHeroShipSlots('commander', { ...armed(level).heroes.commander! }, data);
+    expect(at(1)).toEqual({ weapon: base.weapon ?? 0, defense: base.defense ?? 0, utility: base.utility ?? 0 });
+    expect(at(2).defense).toBe(at(1).defense + 1);
+    expect(at(3).weapon).toBe(at(2).weapon + 1);
+    expect(at(3).defense).toBe(at(2).defense);
+  });
+
+  it('модуль встаёт на корабль героя и снимается тем же нажатием', () => {
+    const on = change(armed(), { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    expect(on.heroes.commander!.ship).toEqual(['ablative_plating']);
+    const off = change(on, { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    expect(off.heroes.commander!.ship).toEqual([]);
+  });
+
+  it('второй модуль защиты встаёт только со второй звездой', () => {
+    const one = change(armed(1), { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    expect(changeSectorZeroProgress(one, { kind: 'fit-hero', hero: 'commander', id: 'shield_booster' }, data)).toBeNull();
+    const two = change(armed(2), { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    expect(change(two, { kind: 'fit-hero', hero: 'commander', id: 'shield_booster' }).heroes.commander!.ship).toEqual([
+      'ablative_plating',
+      'shield_booster',
+    ]);
+  });
+
+  it('чужое не встаёт: неоткрытый модуль, закрытый герой, модуль не для этого корпуса', () => {
+    const p = armed();
+    expect(changeSectorZeroProgress(p, { kind: 'fit-hero', hero: 'commander', id: 'point_defense_array' }, data)).toBeNull();
+    expect(changeSectorZeroProgress(p, { kind: 'fit-hero', hero: 'ravager', id: 'ablative_plating' }, data)).toBeNull();
+    p.modules.push('siege_platform'); // только для крейсера
+    expect(changeSectorZeroProgress(p, { kind: 'fit-hero', hero: 'commander', id: 'siege_platform' }, data)).toBeNull();
+  });
+
+  it('разбор сохранения держит набор корабля и выбрасывает то, что не встаёт', () => {
+    const p = change(armed(2), { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    const back = parseSectorZeroProgress(JSON.stringify(p), data);
+    expect(back.heroes.commander!.ship).toEqual(['ablative_plating']);
+    const junk = JSON.parse(JSON.stringify(p)) as SectorZeroProgress;
+    junk.heroes.commander!.ship = ['ablative_plating', 'shield_booster', 'point_defense_array', 'nope'];
+    junk.heroes.commander!.level = 1;
+    // 1★: один слот защиты; неоткрытое и незнакомое — мимо.
+    expect(parseSectorZeroProgress(JSON.stringify(junk), data).heroes.commander!.ship).toEqual(['ablative_plating']);
+  });
+
+  it('набор корабля героя едет в забег: на флагман и в `Hero.modules`, со звёздами модулей', () => {
+    const p = change(armed(2), { kind: 'fit-hero', hero: 'commander', id: 'ablative_plating' });
+    p.stars = { ablative_plating: 2 };
+    const s = prepareSectorZeroRun(pveState(data), p, data);
+    const flagship = s.fleets['sector-zero:flagship']!.units[0]!;
+    expect(flagship.modules).toEqual(['ablative_plating']);
+    expect(flagship.moduleStars).toEqual({ ablative_plating: 2 });
+    // Hero.modules — то, с чем корабль героя ВОЗРОДИТСЯ после гибели.
+    expect(s.heroes!['sector-zero:hero']!.modules).toEqual(['ablative_plating']);
+    const hp = (st: typeof s) => effectiveStats(data.units.hero!, st.fleets['sector-zero:flagship']!.units[0]!, data).hp!;
+    expect(hp(s)).toBeGreaterThan(hp(prepareSectorZeroRun(pveState(data), armed(2), data)));
+  });
+
+  it('без набора флагман выходит голым, как раньше, — поле стека не заводится', () => {
+    const s = prepareSectorZeroRun(pveState(data), armed(), data);
+    const flagship = s.fleets['sector-zero:flagship']!.units[0]!;
+    expect(flagship.modules).toBeUndefined();
+    expect(s.heroes!['sector-zero:hero']!.modules).toBeUndefined();
   });
 });
 

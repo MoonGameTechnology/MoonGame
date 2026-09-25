@@ -99,6 +99,8 @@ const hooks = `window.__szTest = {
     const img = document.querySelector('#codex .ship-art img');
     return { art: document.querySelector('#codex .ship-art')?.getAttribute('data-ship-art') ?? null, loaded: !!img && img.complete && img.naturalWidth > 0 };
   },
+  // PVR-6.24: набор корабля героя на флагмане экспедиции.
+  flagship: () => s.fleets['sector-zero:flagship']?.units?.[0]?.modules ?? null,
   // YAG-7.3: с кем я в войне, строки ленты о смене стойки с ними и реплики от них в треде.
   atWar: () => Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war'),
   warLines: () => {
@@ -324,6 +326,10 @@ try {
     // модуля в карточке своя кнопка улучшения.
     assert.equal(await page.locator('[data-prep="tab"][data-id="workshop"]').count(), 0, 'вкладки «Мастерская» нет');
     assert.equal(await page.locator('#sz-workshop .sz-cards .sz-upgrade [data-prep="forge"][data-id="cargo_bay"]').count(), 1, 'улучшение — в карточке открытого модуля');
+    // Корабль героя (PVR-6.24): своя плитка в ряду «Корабли», модуль встаёт на него.
+    await page.locator('[data-prep="hero-ship"]').click();
+    await page.locator('[data-prep="fit-hero"][data-id="cargo_bay"]').click();
+    assert.equal(await page.locator('[data-prep="fit-hero"][data-id="cargo_bay"].selected').count(), 1, 'модуль встал на корабль героя');
     await page.locator('[data-prep="tab"][data-id="heroes"]').click();
     const faces = '#sz-workshop .hero-portrait img';
     await page.waitForFunction((sel) => [...document.querySelectorAll(sel)].every((i) => i.complete), faces);
@@ -406,6 +412,7 @@ try {
     assert.equal(hunter.art, 'swarmHunter', 'карточка корабля Роя — форма Роя');
     assert.ok(await page.evaluate(() => document.querySelector('#codex .ship-art img').naturalWidth > 0), 'портрет Роя загружен');
     await page.locator('#codex .cx-close').click();
+    assert.deepEqual(await page.evaluate(() => window.__szTest.flagship()), ['cargo_bay'], 'PVR-6.24: флагман вышел с набором корабля героя');
 
     // Окно боя держит итог до закрытия (решение владельца 2026-09-25): бой у планеты при
     // осаде длится раунд-два, и окно пустело сразу после открытия.
