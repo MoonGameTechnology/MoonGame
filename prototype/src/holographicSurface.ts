@@ -437,20 +437,72 @@ export function drawTerrainField(
   g.restore();
 }
 
+/** The rim's rounded outline, measured once per draw: corner radius, the eight runs
+ * (four sides, four quarter arcs, clockwise from the top-left) and their total. */
+interface RimShape {
+  width: number;
+  height: number;
+  radius: number;
+  lengths: number[];
+  perimeter: number;
+}
+function rimShape(frame: HoloRect): RimShape {
+  const scale = Math.min(frame.width, frame.height);
+  const radius = scale * 0.026;
+  const arc = Math.PI * radius / 2;
+  const horizontal = frame.width - radius * 2;
+  const vertical = frame.height - radius * 2;
+  return {
+    width: frame.width,
+    height: frame.height,
+    radius,
+    lengths: [horizontal, arc, vertical, arc, horizontal, arc, vertical, arc],
+    perimeter: (horizontal + vertical + arc * 2) * 2,
+  };
+}
+/** Point (relative to the frame's corner) and outward normal at `fraction` of the rim's
+ * length. Writes into one reused object: the rim asks for it 321 times a frame. */
+const RIM_POINT = { x: 0, y: 0, nx: 0, ny: 0 };
+function rimPoint(shape: RimShape, fraction: number): typeof RIM_POINT {
+  const { radius, lengths } = shape;
+  let distance = fraction * shape.perimeter;
+  let segment = 0;
+  while (segment < 7 && distance > lengths[segment]!) distance -= lengths[segment++]!;
+  const out = RIM_POINT;
+  if (segment % 2 === 1) {
+    const corner = (segment - 1) / 2;
+    const angle = -Math.PI / 2 + corner * Math.PI / 2 + distance / radius;
+    out.nx = Math.cos(angle); out.ny = Math.sin(angle);
+    out.x = (corner < 2 ? shape.width - radius : radius) + out.nx * radius;
+    out.y = (corner === 0 || corner === 3 ? radius : shape.height - radius) + out.ny * radius;
+  } else {
+    const edge = segment / 2;
+    out.nx = edge === 1 ? 1 : edge === 3 ? -1 : 0;
+    out.ny = edge === 0 ? -1 : edge === 2 ? 1 : 0;
+    out.x = edge === 0 ? radius + distance : edge === 1 ? shape.width : edge === 2 ? shape.width - radius - distance : 0;
+    out.y = edge === 0 ? 0 : edge === 1 ? radius + distance : edge === 2 ? shape.height : shape.height - radius - distance;
+  }
+  return out;
+}
+
 /** The edge itself shimmers: one continuous filament with a small outward halo.
- * Rounded corners and every displacement scale with the same world plane. */
+ * Rounded corners and every displacement scale with the same world plane.
+ *
+ * The halo has two weights. With glow on — five soft passes. With glow off (the phone's
+ * default since the frame-time fix of 2026-09-24) the rim used to lose its halo entirely
+ * and fade to a hairline; the owner asked for it back (2026-09-25), so it now keeps a
+ * light two-pass halo: under a third of the old stroke area, still one path.
+ *
+ * Over the halo the rim smoulders — «небольшое слабое горение», owner 2026-09-25: see
+ * {@link rimHeat}. Same hologram clock as the rest of the rim, so pause and reduced
+ * motion freeze it in place like the boil. */
 export function drawGlassRim(
   g: CanvasRenderingContext2D, frame: HoloRect, clock: number, glow = true,
 ): void {
   if (frame.width <= 0 || frame.height <= 0) return;
   const time = Math.max(0, clock) / 1000;
   const scale = Math.min(frame.width, frame.height);
-  const radius = scale * 0.026;
-  const arc = Math.PI * radius / 2;
-  const horizontal = frame.width - radius * 2;
-  const vertical = frame.height - radius * 2;
-  const perimeter = (horizontal + vertical + arc * 2) * 2;
-  const lengths = [horizontal, arc, vertical, arc, horizontal, arc, vertical, arc];
+  const shape = rimShape(frame);
   g.save();
   g.globalCompositeOperation = 'screen';
   g.lineCap = 'round';
@@ -465,44 +517,93 @@ export function drawGlassRim(
   for (let i = 0; i <= 320; i++) {
     // The final point exactly meets the first, without an animated seam.
     const fraction = (i % 320) / 320;
-    let distance = fraction * perimeter;
-    let segment = 0;
-    while (segment < 7 && distance > lengths[segment]!) distance -= lengths[segment++]!;
-    let x: number, y: number, nx: number, ny: number;
-    if (segment % 2 === 1) {
-      const corner = (segment - 1) / 2;
-      const angle = -Math.PI / 2 + corner * Math.PI / 2 + distance / radius;
-      nx = Math.cos(angle); ny = Math.sin(angle);
-      x = (corner < 2 ? frame.width - radius : radius) + nx * radius;
-      y = (corner === 0 || corner === 3 ? radius : frame.height - radius) + ny * radius;
-    } else {
-      const edge = segment / 2;
-      nx = edge === 1 ? 1 : edge === 3 ? -1 : 0;
-      ny = edge === 0 ? -1 : edge === 2 ? 1 : 0;
-      x = edge === 0 ? radius + distance : edge === 1 ? frame.width : edge === 2 ? frame.width - radius - distance : 0;
-      y = edge === 0 ? 0 : edge === 1 ? radius + distance : edge === 2 ? frame.height : frame.height - radius - distance;
-    }
+    const { nx, ny } = rimPoint(shape, fraction);
+    let { x, y } = RIM_POINT;
     const phase = fraction * Math.PI * 2;
     const charge = 0.55 + 0.45 * Math.sin(phase * 7 - time * 0.72);
     const boil = Math.sin(phase * 53 + time * 1.6) * Math.sin(phase * 19 - time * 1.1);
     const normal = scale * (0.00035 * Math.sin(phase * 11 + time * 0.8) + 0.0017 * charge * boil);
     x += frame.x + nx * normal; y += frame.y + ny * normal;
+    RIM_XY[i * 2] = x; RIM_XY[i * 2 + 1] = y;
     if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
   }
   g.closePath();
-  if (glow) {
-    // Reuse the path for a soft falloff on BOTH sides of the edge; no clipping at
-    // the map boundary, no per-frame shadow filters, no particles beside the line.
-    for (const [width, alpha] of [[0.028, 0.012], [0.020, 0.018], [0.013, 0.027], [0.008, 0.042], [0.004, 0.085]]) {
-      g.lineWidth = scale * width!;
-      g.globalAlpha = alpha! * (0.9 + 0.1 * Math.sin(time * 0.73));
-      g.stroke();
-    }
+  // Reuse the path for a soft falloff on BOTH sides of the edge; no clipping at the map
+  // boundary, no per-frame shadow filters. Glow off keeps the two inner passes only.
+  const halo = glow ? RIM_HALO : RIM_HALO_LITE;
+  for (const [width, alpha] of halo) {
+    g.lineWidth = scale * width;
+    g.globalAlpha = alpha * (0.9 + 0.1 * Math.sin(time * 0.73));
+    g.stroke();
   }
-  g.globalAlpha = (glow ? 0.64 : 0.15) * (0.88 + 0.12 * Math.sin(time * 0.61));
+  g.globalAlpha = (glow ? 0.64 : 0.5) * (0.88 + 0.12 * Math.sin(time * 0.61));
   g.lineWidth = scale * 0.00115;
   g.stroke();
+  drawRimBurn(g, frame, scale, time);
   g.restore();
+}
+
+/** Halo passes as [width, alpha], widths relative to the frame's short side. */
+const RIM_HALO: readonly (readonly [number, number])[] = [
+  [0.028, 0.012], [0.020, 0.018], [0.013, 0.027], [0.008, 0.042], [0.004, 0.085],
+];
+const RIM_HALO_LITE: readonly (readonly [number, number])[] = [[0.012, 0.03], [0.0045, 0.075]];
+
+/** The rim's traced points of this frame, `[x0, y0, x1, y1, …]`: the burn re-strokes the
+ * hot stretches of the same line instead of tracing it a second time. */
+const RIM_XY = new Float64Array(321 * 2);
+/** Stops of the burn's conic gradient round the frame: enough that the heat reads as
+ * smooth patches, not facets. */
+const BURN_STOPS = 48;
+/** Brightness of the burn at full heat — weak on purpose: the rim glows, it does not flare. */
+export const BURN_ALPHA = 0.22;
+
+/**
+ * Heat of the rim at `fraction` of a turn round the frame's centre (0..1): where it
+ * smoulders and how it flickers. Two slow waves decide WHERE — three to five patches
+ * drifting round the frame — and a quicker ripple makes a patch waver like a low flame.
+ * Cold stretches are 0, so the burn is patches, never an even band. Periodic in
+ * `fraction`, so the turn closes without a seam.
+ */
+export function rimHeat(fraction: number, time: number): number {
+  const p = fraction * Math.PI * 2;
+  const drift = 0.55 * Math.sin(p * 3 + time * 0.35) + 0.45 * Math.sin(p * 7 - time * 0.6);
+  const flicker = 0.78 + 0.22 * Math.sin(p * 11 + time * 3.1) * Math.sin(p * 5 - time * 1.9);
+  return Math.min(1, Math.max(0, drift) * flicker);
+}
+
+/** Colour of the burn at `heat`: the rim's pale cyan, whitening toward a hot core. */
+function burnColor(heat: number): string {
+  const r = Math.round(127 + (230 - 127) * heat);
+  const gr = Math.round(215 + (247 - 215) * heat);
+  return `rgba(${r},${gr},255,${(BURN_ALPHA * heat).toFixed(3)})`;
+}
+
+/** Paint the smoulder: the hot stretches of the rim's own line stroked once more with a
+ * conic gradient whose alpha follows the heat round the frame. The gradient, not the
+ * stretches, carries the brightness, so patches melt into each other without steps; cold
+ * stretches are left out of the path entirely, so the burn costs only where it burns. A
+ * browser without conic gradients simply keeps the plain rim. */
+function drawRimBurn(g: CanvasRenderingContext2D, frame: HoloRect, scale: number, time: number): void {
+  if (typeof g.createConicGradient !== 'function') return;
+  const cx = frame.x + frame.width / 2;
+  const cy = frame.y + frame.height / 2;
+  const turn = (i: number): number =>
+    (Math.atan2(RIM_XY[i * 2 + 1]! - cy, RIM_XY[i * 2]! - cx) / (Math.PI * 2) + 1) % 1;
+  g.beginPath();
+  let open = false;
+  for (let i = 0; i <= 320; i++) {
+    const hot = rimHeat(turn(i), time) > 0.01;
+    if (hot && !open) g.moveTo(RIM_XY[i * 2]!, RIM_XY[i * 2 + 1]!);
+    else if (hot || open) g.lineTo(RIM_XY[i * 2]!, RIM_XY[i * 2 + 1]!);
+    open = hot;
+  }
+  const burn = g.createConicGradient(0, cx, cy);
+  for (let k = 0; k <= BURN_STOPS; k++) burn.addColorStop(k / BURN_STOPS, burnColor(rimHeat(k / BURN_STOPS, time)));
+  g.strokeStyle = burn;
+  g.globalAlpha = 1;
+  g.lineWidth = scale * 0.007;
+  g.stroke();
 }
 
 /** Subtle interference on the world plane. Every point and stroke width is world-
