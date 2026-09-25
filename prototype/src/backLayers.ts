@@ -70,7 +70,10 @@ export type LayerVerdict =
  *     (рельса инструментов: `#rail.open`).
  * Заводишь такой слой — впиши сюда, иначе сторож сочтёт его лишней ступенью лестницы.
  */
-export const EXTRA_LAYERS: readonly string[] = ['chain', 'aim', 'rail', 'mobile-picker'];
+// `missions` — панель задач забега (`#missionpanel`): раскрытость у неё атрибут `hidden`, а не
+// класс, и опись CSS её не видит. Без ветки в лестнице Escape её не закрывал (нашёл прогон
+// «потыкать все кнопки», 2026-09-25).
+export const EXTRA_LAYERS: readonly string[] = ['chain', 'aim', 'rail', 'mobile-picker', 'missions'];
 
 /**
  * ОПИСЬ ВСЕХ ОВЕРЛЕЕВ. Ключ — id из CSS (`prototype/build.mjs`), значение — вердикт.

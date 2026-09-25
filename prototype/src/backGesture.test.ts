@@ -118,6 +118,11 @@ describe('Escape (правило 7)', () => {
     expect(escapeConsultsLadder('Escape', true)).toBe(false);
   });
 
+  it('пустое поле терять нечего — Escape закрывает окно (поиск «Справочника», строка чата)', () => {
+    expect(escapeConsultsLadder('Escape', true, true)).toBe(true);
+    expect(escapeConsultsLadder('Escape', true, false)).toBe(false);
+  });
+
   it('набором считается поле ввода, textarea и любой редактируемый узел', () => {
     expect(typingTarget('INPUT', false)).toBe(true);
     expect(typingTarget('TEXTAREA', false)).toBe(true);

@@ -176,5 +176,23 @@ export function initRunWallet(h: RunWalletHost): { render(): void } {
     render();
   });
 
+  // Раскрытое (кнопка ролика или описание валюты) закрывается тапом мимо и Escape: на
+  // планшете кнопка ролика висела поверх ресурсов шапки и закрывалась только повторным «+»
+  // (нашёл прогон «потыкать все кнопки», 2026-09-25).
+  const collapse = (): void => {
+    if (!open && info === null) return;
+    open = false;
+    info = null;
+    render();
+  };
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointerdown', (ev) => {
+      if (!h.root.contains(ev.target as Node)) collapse();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') collapse();
+    });
+  }
+
   return { render };
 }

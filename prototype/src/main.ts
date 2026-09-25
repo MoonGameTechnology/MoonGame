@@ -1432,6 +1432,33 @@ let lastPanelHtml = '';
 let lastCmdHtml = '';
 let lastSplitHtml = '';
 let lastHudHtml = '';
+/** Плашки ресурсов обновляются НА МЕСТЕ. Числа на быстрой скорости меняются каждый кадр, и
+ *  замена `innerHTML` всей шапки пересоздавала узел плашки между нажатием и отпусканием —
+ *  клик по ресурсу терялся (нашёл прогон «потыкать все кнопки», 2026-09-25). Узел `.res`
+ *  живёт, пока набор ресурсов тот же; меняются его класс, подпись и содержимое, а
+ *  содержимое прозрачно для указателя (CSS), так что целью клика всегда остаётся плашка. */
+const purseTpl = document.createElement('template');
+function patchPurse(html: string): void {
+  purseTpl.innerHTML = html;
+  // Без настоящего DOM (упрощённые харнесы) — прежняя замена целиком.
+  if (!purseTpl.content?.children || !purse.children) {
+    purse.innerHTML = html;
+    return;
+  }
+  const fresh = [...purseTpl.content.children] as HTMLElement[];
+  const cur = [...purse.children] as HTMLElement[];
+  const same = fresh.length === cur.length && fresh.every((el, i) => el.dataset.res === cur[i]!.dataset.res);
+  if (!same) {
+    purse.replaceChildren(...fresh);
+    return;
+  }
+  fresh.forEach((el, i) => {
+    const old = cur[i]!;
+    if (old.className !== el.className) old.className = el.className;
+    if (old.title !== el.title) old.title = el.title;
+    if (old.innerHTML !== el.innerHTML) old.innerHTML = el.innerHTML;
+  });
+}
 let lastClockText = '';
 let lastClockHead = '';
 let lastTopText = ''; // row-1 dirty check (nick / standing / score / day / countdown)
@@ -13546,6 +13573,8 @@ const BACK_LAYERS: BackLayer[] = [
   // Раскрытая панель инструментов рельсы: на телефоне она занимает пол-экрана, а CSS-опись
   // её не видит — узел живёт всегда, раскрытость это класс `.open` (см. EXTRA_LAYERS).
   { id: 'rail', isOpen: () => railEl.classList.contains('open'), close: () => setRailOpen(false) }, // z26
+  // Панель задач забега: открыта чипом «Задачи», закрывается и Escape/Back (см. EXTRA_LAYERS).
+  { id: 'missions', isOpen: () => missionPanelOpen, close: () => toggleMissionPanel(false) }, // z44
   { id: 'side', isOpen: () => panelFleet() !== null || selPlanet !== null || selFleets.size > 0, close: () => {
     if (mobileHud.expanded()) mobileHud.collapse();
     else clearSelection();
@@ -13617,7 +13646,8 @@ function armBack(): void {
 window.addEventListener('keydown', (e) => {
   const el = e.target as HTMLElement | null;
   const typing = !!el && typingTarget(el.tagName, el.isContentEditable);
-  if (!escapeConsultsLadder(e.key, typing)) return;
+  const empty = !!el && 'value' in el && (el as HTMLInputElement).value === '';
+  if (!escapeConsultsLadder(e.key, typing, empty)) return;
   if (closeTopLayer()) {
     snd.play('close');
     e.preventDefault();
@@ -14970,7 +15000,7 @@ function frame(nowReal: number) {
     chip(RES_SVG['microelectronics']!, 'microelectronics') +
     ((r.biomass ?? 0) > 0 || (inc.biomass ?? 0) !== 0 ? chip(RES_SVG['biomass']!, 'biomass') : '');
   if (hudHtml !== lastHudHtml) {
-    purse.innerHTML = hudHtml;
+    patchPurse(hudHtml);
     lastHudHtml = hudHtml;
   }
   // Кого зовут значки внимания и куда ложится цифра — `attentionBadges.ts` (REFM-189):
