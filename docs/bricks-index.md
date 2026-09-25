@@ -1126,6 +1126,7 @@
 | PVR-6.25 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Академия: страница героя вкладками, навыки деревом |
 | PVR-6.26 | ✅ | proto | `docs/sector-zero-roadmap.md` | Варрант за каждого уничтоженного врага |
 | PVR-6.27 | ✅ | proto | `docs/sector-zero-roadmap.md` | Взятое логово пиратов не встаёт заново |
+| PVR-6.30 | ✅ | proto | `docs/sector-zero-roadmap.md` | Окно боя показывает итог |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

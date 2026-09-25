@@ -92,6 +92,7 @@ export const ru: Record<string, string> = {
   'battle.win.yours': 'Ваши флоты в этом бою',
   'battle.win.beachhead': 'плацдарм',
   'battle.win.empty': 'об этом бое ничего не известно',
+  'battle.win.ended': 'Бой окончен',
   'battle.win.head': '⚔ Бой',
   'battle.win.hull': 'корпус',
   'battle.win.next': 'следующий раунд через',

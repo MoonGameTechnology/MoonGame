@@ -1532,6 +1532,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 /* Окно боя «для взрослых детей» (заказ владельца 2026-09-23): шапка «где и когда
    следующий залп», полоса остатка сил цветами владельцев, карточки сторон со шкалами
    корпуса/щита светофором и чипами кораблей, свои флоты — с кнопкой отхода. */
+#battlewinbody .bw-ended{margin-bottom:10px;padding:10px 12px;border:1px solid #ffd27a88;border-radius:8px;background:rgba(255,210,122,.08);}
+#battlewinbody .bw-ended b{display:block;color:#ffd27a;font-size:14px;}
+#battlewinbody .bw-ended p{margin:4px 0 0;font-size:12px;color:var(--txt,#e8f6fa);}
 #battlewinbody .bw-top{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--line-hi);
   border-radius:10px;background:linear-gradient(120deg,rgba(255,90,77,.14),rgba(53,214,230,.08));}
 #battlewinbody .bw-top.ground{background:linear-gradient(120deg,rgba(255,180,77,.16),rgba(53,214,230,.06));}

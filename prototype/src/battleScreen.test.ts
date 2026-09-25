@@ -6,7 +6,7 @@
  * REFM-экранов.
  */
 import { describe, it, expect } from 'vitest';
-import { battleWindowHtml, sideRowHtml, battleRetreats } from './battleScreen';
+import { battleEndedHtml, battleWindowHtml, sideRowHtml, battleRetreats } from './battleScreen';
 import { t } from '../../localization/runtime';
 import { displayUnit } from './format';
 import type { BattleModel } from '../../packages/client/src/matchHud';
@@ -167,6 +167,25 @@ describe('окно боя', () => {
   it('БОЙ ИСЧЕЗ, пока палец летел к экрану — честная строка, а не пустая рамка', () => {
     const html = battleWindowHtml(null);
     expect(html).toContain('bw-empty');
+    expect(html).not.toContain('bw-side');
+  });
+  // Решение владельца 2026-09-25: бой у планеты при осаде длится раунд-два, и окно тут же
+  // пустело — «открылось и сразу закрылось». Теперь оно держит итог до закрытия.
+  it('БОЙ КОНЧИЛСЯ при открытом окне — итог и последний снимок сторон, без отсчёта и отхода', () => {
+    const last = battle([side('p1', 'attacker', true), side('p2', 'defender')]);
+    const html = battleEndedHtml(last, '⚔ бой завершён · Застава — отбились · потери: 2');
+    expect(html).toContain('bw-ended');
+    expect(html).toContain(t('battle.win.ended'));
+    expect(html).toContain('отбились');
+    expect(html.match(/class="bw-who"/g) ?? []).toHaveLength(2); // стороны на месте
+    expect(html).not.toContain('pn-timer'); // раундов больше не будет
+    expect(html).not.toContain('data-battle-retreat'); // отходить не из чего
+    expect(html).not.toContain('bw-empty');
+  });
+
+  it('итог есть, снимка нет (окно открыли на последнем раунде) — одна строка итога', () => {
+    const html = battleEndedHtml(null, 'отбились');
+    expect(html).toContain('bw-ended');
     expect(html).not.toContain('bw-side');
   });
 });

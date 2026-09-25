@@ -190,6 +190,22 @@ export function battleWindowHtml(
 }
 
 /** Current membership, never the unrelated fleet selected behind the window. */
+/**
+ * Бой кончился, пока окно открыто (решение владельца 2026-09-25): итог строкой журнала и
+ * последний снимок сторон под ним — до закрытия, а не «об этом бое ничего не известно».
+ * Отсчёта раунда и кнопок отхода нет: раундов больше не будет, отходить не из чего.
+ */
+export function battleEndedHtml(
+  last: BattleModel | null,
+  summary: string,
+  view: BattleView = {},
+): string {
+  const banner = `<div class="bw-ended"><b>${esc(t('battle.win.ended'))}</b><p>${esc(summary)}</p></div>`;
+  if (!last) return banner;
+  const { nextRoundAt: _gone, ...still } = last;
+  return banner + battleWindowHtml(still, [], view);
+}
+
 export function battleRetreats(state: GameState, id: string, me: PlayerId): string[] {
   return (state.battles[id]?.sides ?? []).flatMap((side) =>
     side.ref.kind === 'fleet' &&
@@ -203,20 +219,29 @@ export function battleRetreats(state: GameState, id: string, me: PlayerId): stri
 
 export function initBattleWindow(host: BattleWindowHost): {
   open: (battleId: string) => void;
+  /** Бой кончился (`battle.resolved`): окно на нём держит итог до закрытия. */
+  ended: (battleId: string, summary: string) => void;
   repaint: () => void;
   isOpen: () => boolean;
 } {
   let shown: string | null = null;
+  /** Последний снимок показанного боя и его итог, если бой уже кончился. */
+  let lastModel: BattleModel | null = null;
+  let summary: string | null = null;
   const isOpen = (): boolean => host.root().classList.contains('show');
   let lastHtml = '';
   const repaint = (): void => {
     if (!isOpen() || shown === null) return;
     const model = host.model(shown);
-    const html = battleWindowHtml(
-      model,
-      model ? battleRetreats(host.state(), shown, host.me()) : [],
-      host.view,
-    );
+    if (model) lastModel = model;
+    const html =
+      !model && summary !== null
+        ? battleEndedHtml(lastModel, summary, host.view)
+        : battleWindowHtml(
+            model,
+            model ? battleRetreats(host.state(), shown, host.me()) : [],
+            host.view,
+          );
     if (html !== lastHtml) {
       const scroll = host.body().scrollTop;
       host.body().innerHTML = html;
@@ -251,9 +276,18 @@ export function initBattleWindow(host: BattleWindowHost): {
   });
   return {
     open: (battleId: string): void => {
+      if (battleId !== shown) {
+        lastModel = null;
+        summary = null;
+      }
       shown = battleId;
       lastHtml = '';
       host.root().classList.add('show');
+      repaint();
+    },
+    ended: (battleId: string, text: string): void => {
+      if (battleId !== shown) return;
+      summary = text;
       repaint();
     },
     repaint,
