@@ -153,6 +153,17 @@ describe('наземный бой: урон по роду войск', () => {
     expect(firstRound([['tank', 2]], [['hulk', 1]]).round.dmgToDefender).toBe(4);
   });
 
+  it('павшие наземного боя засчитываются стрелку — `killedBy` (PVR-6.20)', () => {
+    // Наземный залп идёт своим путём (`groundVolleys`), и учёт стрелка обязан видеть его:
+    // иначе боевой счёт экспедиции терял бы всех павших в штурмах.
+    const { r } = firstRound([['tank', 2]], [['rifle', 2]]); // 40 по пехоте ≥ 2 × 10
+    const deaths = r.events
+      .filter((e) => e.type === 'unit.died')
+      .map((e) => e.payload as { owner?: string; killedBy?: string });
+    expect(deaths.some((d) => d.owner === 'p2')).toBe(true);
+    for (const d of deaths) expect(d.killedBy).toBe(d.owner === 'p2' ? 'p1' : 'p2');
+  });
+
   it('ответный огонь обороны — тоже по роду войск атакующего', () => {
     // Два стрелка отвечают танкам обороной по технике (12), а не общей обороной (4).
     expect(firstRound([['tank', 1]], [['rifle', 2]]).round.dmgToAttacker).toBe(24);

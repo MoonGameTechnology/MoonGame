@@ -1286,6 +1286,15 @@ export const combatModule: GameModule = {
       // боевой счёт экспедиции засчитывает павших ему). Равный вклад решает меньший id,
       // а не порядок сторон: иначе засчитанная победа зависела бы от того, кто вошёл первым.
       const topShooter = new Map<BattleSide, { owner: PlayerId; dealt: number }>();
+      const noteShooter = (target: BattleSide, side: BattleSide, dealt: number): void => {
+        const top = topShooter.get(target);
+        if (
+          side.owner !== null &&
+          dealt > 0 &&
+          (!top || dealt > top.dealt || (dealt === top.dealt && side.owner < top.owner))
+        )
+          topShooter.set(target, { owner: side.owner, dealt });
+      };
       for (const side of live) {
         // Враги — только ВРАЖДЕБНЫЕ живые стороны. Спрятаться за спину союзника нельзя
         // (ради этого выбор и сделан), но и бить союзника залп не имеет права.
@@ -1295,7 +1304,11 @@ export const combatModule: GameModule = {
         const role = side.role === 'attacker' ? 'attack' : 'defense';
         const ground = enemies.some((e) => hasGroundTargets(sideUnits(h.state, e.ref) ?? [], data));
         if (ground) {
+          // Наземный залп пишет в `incoming` сам; вклад этой стороны в каждую цель — прирост.
+          const before = new Map(enemies.map((e) => [e, incoming.get(e) ?? 0]));
           groundVolleys(h, battle, side, enemies, role, incoming, byClass);
+          for (const target of enemies)
+            noteShooter(target, side, (incoming.get(target) ?? 0) - before.get(target)!);
           continue;
         }
         const shot = sideDamageBreakdown(h.state, side.ref, data, role);
@@ -1321,12 +1334,7 @@ export const combatModule: GameModule = {
           const running = incoming.get(target);
           incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
           landed += dealt;
-          const top = topShooter.get(target);
-          if (
-            side.owner !== null &&
-            (!top || dealt > top.dealt || (dealt === top.dealt && side.owner < top.owner))
-          )
-            topShooter.set(target, { owner: side.owner, dealt });
+          noteShooter(target, side, dealt);
         }
         // Пишется ДО применения урона — по тому же ПРЕДРАУНДОВОМУ снимку, из которого
         // считался залп. Иначе развеска шла бы по составу, уже подбитому этим раундом.
