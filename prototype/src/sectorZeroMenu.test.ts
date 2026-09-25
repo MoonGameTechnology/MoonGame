@@ -20,9 +20,9 @@ const square = (x: number, y: number): Array<[number, number]> => [
 const view: ChapterMapView = {
   frame: { x: 0, y: 0, w: 30, h: 10 },
   cells: [
-    { id: 'home', poly: square(0, 0), x: 5, y: 5, known: true, kind: 'planet', side: 'you', objective: null },
-    { id: 'rift', poly: square(10, 0), x: 15, y: 5, known: false, kind: null, side: null, objective: 'active' },
-    { id: 'nest', poly: square(20, 0), x: 25, y: 5, known: true, kind: 'pirate_base', side: 'hostile', objective: 'later' },
+    { id: 'home', poly: square(0, 0), x: 5, y: 5, known: true, kind: 'planet', side: 'you', objective: null, tasks: [] },
+    { id: 'rift', poly: square(10, 0), x: 15, y: 5, known: false, kind: null, side: null, objective: 'active', tasks: ['mission.rift'] },
+    { id: 'nest', poly: square(20, 0), x: 25, y: 5, known: true, kind: 'pirate_base', side: 'hostile', objective: 'later', tasks: ['mission.nest'] },
   ],
   lanes: [[5, 5, 25, 5]],
   known: 2,
@@ -52,6 +52,19 @@ describe('карта главы — разметка (PVR-6.15)', () => {
     expect(rules.length).toBeGreaterThan(0);
     for (const body of rules) expect(body).not.toMatch(/(^|;)\s*height\s*:/);
     expect(css).toMatch(/\.sz-map-body svg\s*\{[^}]*height:\s*auto/);
+  });
+});
+
+describe('кольцо задачи нажимается (заказ владельца 2026-09-25)', () => {
+  it('у каждой метки — зона нажатия с адресом клетки; у клетки без задачи её нет', () => {
+    const svg = chapterMapSvg(view);
+    expect(svg.match(/class="target-hit" data-cell="[^"]+"/g)).toEqual([
+      'class="target-hit" data-cell="rift"',
+      'class="target-hit" data-cell="nest"',
+    ]);
+    expect(svg).not.toContain('data-cell="home"');
+    // Нажимается и с клавиатуры.
+    expect(svg).toMatch(/class="target-hit"[^>]*tabindex="0" role="button"/);
   });
 });
 

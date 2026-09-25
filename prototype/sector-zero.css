@@ -136,6 +136,16 @@
 .sz-map-body polygon.known.kind-dead_world, .sz-map-body polygon.known.kind-graveyard { fill: #1c1c22; }
 .sz-map-body polygon.known.kind-solar_flare { fill: #33230f; }
 .sz-map-body polygon.known.kind-pirate_base { fill: #33200f; }
+.sz-map-body .target-hit { fill: transparent; stroke: none; pointer-events: all; cursor: pointer; outline: none; }
+.sz-map-body .target-hit.picked, .sz-map-body .target-hit:focus-visible { stroke: #ffd27a; stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-dasharray: 3 3; }
+.sz-map-task { display: grid; gap: 6px; min-height: 18px; }
+.sz-map-task-hint { margin: 0; color: #7fa3ad; font-size: 12px; }
+.sz-map-task-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; padding: 8px 10px; border: 1px solid #2c5663; border-radius: 6px; background: #0a1c24; font-size: 13px; color: #d7f5f1; }
+.sz-map-task-row b { font-weight: 600; }
+.sz-map-task-row em { font-style: normal; display: inline-flex; gap: 8px; }
+.sz-map-task-row small { flex-basis: 100%; color: #90e2dd; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.sz-map-task-row.later { border-style: dashed; color: #a9c1c9; }
+.sz-map-task-row.later small { color: #7fa3ad; }
 .sz-map-body .lanes line { vector-effect: non-scaling-stroke; stroke: #79dfdf; stroke-width: 1.2; stroke-dasharray: 4 4; opacity: .7; }
 .sz-map-body .home { fill: #90e2dd; filter: drop-shadow(0 0 6px #90e2dd); }
 .sz-map-body .dot { fill: #9fc6cc; }
