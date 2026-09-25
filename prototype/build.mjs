@@ -3384,7 +3384,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   </div>
   <div id="purse"></div>
 </header>
-<nav class="holo-nav" data-i18n-aria="hud.map"><span aria-current="page" data-i18n="hud.map"></span><button id="holo-tech" type="button" data-i18n="rail.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
+<nav class="holo-nav" data-i18n-aria="hud.map"><button id="holo-tech" type="button" data-i18n="rail.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
 <div id="devline"><span id="devline-head"></span><span id="devline-status"></span></div>
 <!-- панель задач забега: открывается чипом «Задачи» на строке статуса (missionView.ts) -->
 <div id="missionpanel" role="dialog" data-i18n-aria="hud.missions.title" hidden></div>

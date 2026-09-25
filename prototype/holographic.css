@@ -63,11 +63,9 @@ body.holo-ui .holo-back{position:fixed;display:grid;place-items:center;left:18px
 body.holo-ui .holo-back:hover{color:var(--cyan);border-color:var(--cyan-dim);}
 body.holo-ui .holo-back:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(185,245,255,.15);}
 body.holo-ui .holo-nav{position:fixed;display:flex;gap:8px;left:18px;top:calc(var(--tbh) + 30px);z-index:27;}
-body.holo-ui .holo-nav :is(button,span){display:flex;align-items:center;justify-content:center;min-width:86px;min-height:36px;
+body.holo-ui .holo-nav button{display:flex;align-items:center;justify-content:center;min-width:86px;min-height:36px;
   padding:7px 14px;border:1px solid var(--line);border-radius:4px;background:var(--glass);color:var(--ink);font-size:12px;}
 body.holo-ui .holo-nav button{cursor:pointer;}
-body.holo-ui .holo-nav [aria-current=page]{color:var(--holo-reflection);border-color:var(--cyan-dim);
-  background:rgba(8,39,51,.94);box-shadow:inset 0 -2px 0 rgba(140,233,242,.6);}
 body.holo-ui .holo-nav button:hover{border-color:var(--cyan-dim);}
 /* Инструменты — постоянная колонка иконок у левого края под вкладками (заказ владельца
    2026-09-25: кнопку «☰ Ещё», прятавшую их, убрать). Подпись — всплывающая подсказка. */
@@ -240,7 +238,7 @@ body.holo-ui #endscreen .es-box{width:min(620px,86vw);max-height:86dvh;}
   body.holo-ui #cmdbar button.holo-command-close{height:44px;width:44px;min-height:44px;min-width:44px;}
   body.holo-ui #side :is(.pclose,.ptab,button.b){min-height:44px;min-width:44px;}
   body.holo-ui #side .pclose{height:44px;width:44px;}
-  body.holo-ui .holo-nav :is(button,span),body.holo-ui #railtoggle,
+  body.holo-ui .holo-nav button,body.holo-ui #railtoggle,
   body.holo-ui #railtools button{min-height:44px;}
   body.holo-ui :is(.tw-close,.lw-close,.cn-close,.mk-close,.cw-btn,.cw-send){min-width:44px;min-height:44px;}
   body.holo-ui .cw-head{gap:4px;padding:7px;}
