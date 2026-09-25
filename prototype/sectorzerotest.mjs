@@ -63,6 +63,9 @@ const hooks = `window.__szTest = {
   layerOpen: () => topLayerOpen(),
   // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
   prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+  // Меню каста флагмана и что герой носит — меню обязано быть из надетого.
+  casts: () => chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
+  worn: () => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)?.equipped ?? null,
   // YAG-7.3: с кем я в войне, строки ленты о смене стойки с ними и реплики от них в треде.
   atWar: () => Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war'),
   warLines: () => {
@@ -329,6 +332,12 @@ try {
     await page.waitForFunction(() => window.__szTest.atWar().length > 0);
     assert.deepEqual(await page.evaluate(() => window.__szTest.warLines()), [], 'YAG-7.3: строки войны в ленте нет');
     assert.ok((await page.evaluate(() => window.__szTest.warReplies())) > 0, 'YAG-7.3: реплика в треде на месте');
+    // Меню приказов предлагает только надетые навыки героя (замечание владельца 2026-09-25):
+    // у командира открыто четыре способности, надета одна.
+    const casts = await page.evaluate(() => window.__szTest.casts());
+    const worn = await page.evaluate(() => window.__szTest.worn());
+    assert.ok(worn && worn.length > 0 && casts.every((id) => worn.includes(id)), `в меню каста только надетое: ${casts} ⊆ ${worn}`);
+    assert.ok(casts.length < 4, 'ненадетых способностей в меню нет');
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.
     await page.goto(site.url + '/');

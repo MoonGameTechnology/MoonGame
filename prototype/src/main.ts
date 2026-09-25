@@ -391,7 +391,7 @@ import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderDraft, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
-import { castOptions, heroAboard, type CastOption } from './heroCasts';
+import { castOptions, heroAboard, wornAbilities, type CastOption } from './heroCasts';
 import { fromScreen, stickToPoint, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
 import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
@@ -15474,9 +15474,10 @@ function chainAbilitiesFor(fleetIds: string[]): ChainAbility[] {
  *  Одна точка разрешения на все три места, которые спрашивают «что можно применить»:
  *  кнопка ✨ командной полосы, её поповер и меню точки режима «Приказ». */
 function castOptionsOf(hero: Hero): CastOption[] {
-  const specs = (hero.abilities ?? []).map((ab) => {
-    const ad = ab !== null ? data.heroAbilities[ab] : undefined;
-    if (!ab || !ad) return null;
+  // Только надетое (правило 6 `heroCasts.ts`): ненадетую ядро не применит.
+  const specs = wornAbilities(hero).map((ab) => {
+    const ad = data.heroAbilities[ab];
+    if (!ad) return null;
     return {
       id: ab,
       type: ad.type,

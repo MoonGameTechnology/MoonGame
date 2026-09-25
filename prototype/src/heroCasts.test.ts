@@ -6,6 +6,7 @@ import {
   heroAlive,
   isCastable,
   isRanged,
+  wornAbilities,
   type AbilitySpec,
   type HeroAboard,
 } from './heroCasts';
@@ -97,5 +98,24 @@ describe('каст героя — кулдаун и прицел', () => {
   it('пункт меню несёт и кулдаун, и признак прицела', () => {
     const [opt] = castOptions([умение({ range: 90, readyAt: 8 * ЧАС })], КАСТУЕМЫЕ, 2 * ЧАС, ЧАС);
     expect(opt).toEqual({ id: 'a1', cdH: 6, ranged: true });
+  });
+});
+
+describe('каст героя — только надетое (замечание владельца 2026-09-25)', () => {
+  // «Почему-то вообще показываются в окне приказов скиллы, которые не надеты»: меню строилось
+  // из ВСЕХ открытых способностей, а ядро применяет только надетые (`E_NOT_EQUIPPED`) —
+  // пункт вёл в отказ.
+  it('в меню идёт то, что герой носит, а не всё открытое', () => {
+    expect(
+      wornAbilities(герой({ abilities: ['rally', 'scan', 'bulwark'], equipped: ['scan'] })),
+    ).toEqual(['scan']);
+  });
+
+  it('пустой набор надетого — пустое меню, а не всё открытое', () => {
+    expect(wornAbilities(герой({ abilities: ['rally', 'scan'], equipped: [] }))).toEqual([]);
+  });
+
+  it('старый набор без поля `equipped` — открытое и есть надетое, как в ядре; пустой слот — мимо', () => {
+    expect(wornAbilities(герой({ abilities: ['rally', null, 'scan'] }))).toEqual(['rally', 'scan']);
   });
 });
