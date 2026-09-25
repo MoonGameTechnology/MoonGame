@@ -53,6 +53,21 @@ import { launchBrowser, waitForApp, withDiagnostics } from './harnessKit.mjs';
 
 /** «☰ Ещё» есть только на телефоне: на ПК и планшете инструменты — постоянная колонка
  *  иконок слева (заказ владельца 2026-09-25), открывать нечего. */
+/** Выход из партии путём игрока: на телефоне — «Выход» в «☰», на ПК и планшете — «‹» в углу
+ *  (дубль «Выхода» из колонки инструментов убран, заказ владельца 2026-09-25). «‹» сначала
+ *  закрывает открытое окно, поэтому жмём, пока партия не закроется. */
+async function exitMatch() {
+  const exit = page.locator('#rail-exit');
+  if (await exit.isVisible()) return exit.click();
+  const back = page.locator('#holo-back');
+  // «‹» есть и вне партии — жмём, пока не открылся хаб или меню Sector Zero.
+  const out = async () => (await page.locator('#hub').isVisible()) || (await page.locator('#sector-zero').isVisible());
+  for (let i = 0; i < 6 && !(await out()); i++) {
+    await back.click();
+    await page.waitForTimeout(150);
+  }
+}
+
 async function toggleTools() {
   const toggle = page.locator('#railtoggle');
   if (await toggle.isVisible()) await toggle.click();
@@ -304,7 +319,7 @@ try {
     await page.locator('#sz-continue').click();
     await wave().waitFor({ state: 'visible' });
     await toggleTools();
-    await page.locator('#rail-exit').click();
+    await exitMatch();
     await onSectorZeroMenu('второй выход');
 
     // 4. Ролик за Суверены из магазина.

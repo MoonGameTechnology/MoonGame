@@ -80,7 +80,10 @@ body.holo-ui #railtools::before,body.holo-ui #railtools::after{display:none;}
 body.holo-ui #railtools button{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:44px;height:44px;
   padding:0;font-size:18px;color:var(--cyan);border-radius:6px;}
 body.holo-ui #railtools .rlbl{display:none;}
-body.holo-ui #railtools #rail-settings,body.holo-ui #railtools #rail-exit{display:flex;}
+body.holo-ui #railtools #rail-settings{display:flex;}
+/* Дубли убраны (заказ владельца 2026-09-25): «Технологии» и «Производство» — вкладки сверху,
+   выход в меню — «‹» в углу. Узлы остаются: вкладки нажимают их программно, телефон — пальцем. */
+body.holo-ui #railtools :is(#rail-tech,#rail-constructor,#rail-exit){display:none!important;}
 body.holo-ui #devline{top:calc(var(--tbh) + 31px);left:auto;right:18px;width:auto;gap:16px;
   background:transparent;border:0;font-size:11px;pointer-events:none;}
 /* Суверены — приманка и на ПК (заказ владельца 2026-09-23): голографическое гашение фишки снято. */

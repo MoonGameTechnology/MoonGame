@@ -237,6 +237,9 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
    overflowing. Each capsule = a bare line-glyph + tabular amount + flow, in the mock's
    MUTED palette: neutral grey outline, grey icon, near-white number (no cyan glow). */
 #purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;gap:0;padding:0 8px 4px;}
+/* Содержимое плашки прозрачно для указателя: цель клика — сама плашка .res, которая
+   переживает обновление чисел (patchPurse в main.ts), а не её цифры, пересоздаваемые кадром. */
+#purse .res *{pointer-events:none;}
 .res{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;height:100%;flex:1 1 0;min-width:0;
   position:relative;overflow:hidden;border:1px solid transparent;border-right-color:var(--line);border-radius:0;background:transparent;}
 .res:last-child{border-right-color:transparent;}

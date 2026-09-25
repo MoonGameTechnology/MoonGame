@@ -28,6 +28,21 @@ import { SECTOR_ZERO_ABSENT_HUD, SECTOR_ZERO_ABSENT_TOOLS } from '../decisions/s
 
 /** «☰ Ещё» есть только на телефоне: на ПК и планшете инструменты — постоянная колонка
  *  иконок слева (заказ владельца 2026-09-25), открывать нечего. */
+/** Выход из партии путём игрока: на телефоне — «Выход» в «☰», на ПК и планшете — «‹» в углу
+ *  (дубль «Выхода» из колонки инструментов убран, заказ владельца 2026-09-25). «‹» сначала
+ *  закрывает открытое окно, поэтому жмём, пока партия не закроется. */
+async function exitMatch() {
+  const exit = page.locator('#rail-exit');
+  if (await exit.isVisible()) return exit.click();
+  const back = page.locator('#holo-back');
+  // «‹» есть и вне партии — жмём, пока не открылся хаб или меню Sector Zero.
+  const out = async () => (await page.locator('#hub').isVisible()) || (await page.locator('#sector-zero').isVisible());
+  for (let i = 0; i < 6 && !(await out()); i++) {
+    await back.click();
+    await page.waitForTimeout(150);
+  }
+}
+
 async function toggleTools() {
   const toggle = page.locator('#railtoggle');
   if (await toggle.isVisible()) await toggle.click();
@@ -46,6 +61,8 @@ const hooks = `window.__szTest = {
   selected: () => selPlanet,
   // Открыт ли слой, который закроет Escape/Back.
   layerOpen: () => topLayerOpen(),
+  // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
+  prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
   // Конец забега победой — как его ставит модуль победы ядра.
   end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
   // Комиксы глав: арт владельца ещё не приехал — робот подкладывает свой реестр.
@@ -69,7 +86,8 @@ const BROKEN = 'data:image/webp;base64,AAAA';
 const ABSENT = Object.values(SECTOR_ZERO_ABSENT_TOOLS);
 /** Поля шапки, которых в забеге нет: эмблема с названием и местом, очки победы, день. */
 const ABSENT_HUD = Object.values(SECTOR_ZERO_ABSENT_HUD);
-const KEPT = ['rail-diplo', 'rail-tech', 'rail-help'];
+// Технологии на ПК — вкладка сверху (`holo-tech`), дубль в колонке убран.
+const KEPT = ['rail-diplo', 'holo-tech', 'rail-help'];
 
 // Страница Sector Zero — со своим бандлом и симуляцией рекламы, как настоящая дев-сборка:
 // без неё ×2 на итогах не появился бы вовсе.
@@ -87,6 +105,9 @@ page.setDefaultTimeout(15000);
 async function check(label, run) {
   // Флаг забега ставится после установки матча — ждём его, а не читаем наперегонки.
   await page.waitForFunction((want) => window.__szTest.run() === want, run);
+  // Экран подготовки появляется кадром ПОЗЖЕ входа: «#maploading скрыт» бывает правдой ещё до
+  // него, и Escape из проверки ниже попадал в «уйти, пока карта готовится».
+  await page.waitForFunction(() => window.__szTest.prepared());
   await page.locator('#maploading').waitFor({ state: 'hidden' });
   // ▶▶▶ — только дев-забега: ни в обычном забеге, ни в схватке её нет.
   assert.equal(await page.locator('#spd-dev').isVisible(), false, `${label}: ▶▶▶ нет`);
@@ -150,7 +171,7 @@ async function check(label, run) {
 /** Выход в меню путём игрока на десктопе: «Выход» в колонке инструментов. */
 async function leave() {
   await toggleTools();
-  await page.locator('#rail-exit').click();
+  await exitMatch();
 }
 
 try {
