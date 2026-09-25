@@ -35,6 +35,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingInstance } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { refundCost } from '../util/treasury';
+import { receivesResource } from '../util/infestation';
 
 /** Base fraction of the battlefield's value the winner claims (owner's decision:
  *  5%, to be re-checked by self-play — this rule feeds the snowball). */
@@ -71,6 +72,9 @@ function payOut(h: HandlerContext, pool: Pool, winners: readonly string[], locat
     if (!(share > 0)) continue;
     const bag: Record<string, number> = {};
     for (const [resource, total] of Object.entries(pool)) {
+      // Биомассу получает только Рой (`util/infestation.ts`): формы Роя стоят биомассу,
+      // и без этой строки победитель-человек уносил её с поля боя.
+      if (!receivesResource(h.state, playerId, resource, h.ctx.data)) continue;
       // Floor keeps the treasury in whole units and can only ever pay LESS than the
       // rule promises — never more, which is the safe direction for a snowball rule.
       const amount = Math.floor((total * share) / winners.length);
@@ -90,7 +94,8 @@ function entryAt(h: HandlerContext, location: string): { pool: Pool; winners?: s
 
 export const salvageModule: GameModule = {
   id: 'salvage',
-  version: '1.0.0',
+  // 1.1.0: биомассу из трофеев получает только Рой (решение владельца 2026-09-25).
+  version: '1.1.0',
   setup(api) {
     api.on('unit.died', (event, h) => {
       const p = event.payload as Record<string, unknown>;

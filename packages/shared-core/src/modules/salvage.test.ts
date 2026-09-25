@@ -373,3 +373,45 @@ describe('salvage — лестница «мародёра» (EVT-3)', () => {
     }
   });
 });
+
+describe('salvage — биомассу берёт только тот, кто ею питается (решение владельца 2026-09-25)', () => {
+  // Жалоба владельца после плейтеста: «И опять ресурс биомасса у меня». Экономика и стройка
+  // уже не дают человеку биомассы (`util/infestation.ts`), но трофеи платили долю стоимости
+  // погибших, а формы Роя стоят биомассу, — и победитель-человек её получал.
+  const swarmy: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal', 'credits', 'biomass'],
+    units: {
+      drone: {
+        faction: 'swarm',
+        stats: { attack: 0, defense: 0, speed: 5, hp: 10 },
+        line: 'front',
+        cost: { metal: 100, biomass: 200 },
+      },
+    },
+    factions: {
+      vanguard: { name: 'Vanguard' },
+      swarm: { name: 'Swarm', traits: ['consume_biomass'] },
+    },
+    buildings: {},
+    events: {},
+  });
+  const who = (id: string, faction: string): Player => ({ ...player(id), faction });
+  const runSwarmy = (winner: Player, loser: Player) => {
+    const kernel = createKernel([salvageModule, emitter]);
+    const state = baseState([winner, loser]);
+    const events = [died('drone', 2, 'N', loser.id, 'b1'), resolved('N', [winner.id])];
+    return okApply(kernel.applyAction(state, emitAll(events), { now: 0, data: swarmy })).state;
+  };
+
+  it('человек-победитель получает металл, но не биомассу', () => {
+    const after = runSwarmy(who('p1', 'vanguard'), who('p3', 'swarm'));
+    expect(after.players['p1']!.resources['metal']).toBe(Math.floor(200 * SALVAGE_SHARE)); // 10
+    expect(after.players['p1']!.resources['biomass']).toBeUndefined();
+  });
+
+  it('Рой-победитель биомассу получает, как прежде', () => {
+    const after = runSwarmy(who('p3', 'swarm'), who('p1', 'vanguard'));
+    expect(after.players['p3']!.resources['biomass']).toBe(Math.floor(400 * SALVAGE_SHARE)); // 20
+  });
+});

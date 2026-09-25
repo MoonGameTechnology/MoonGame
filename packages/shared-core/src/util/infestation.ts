@@ -36,6 +36,21 @@ export function feedsOnBiomass(
   );
 }
 
+/** Ресурс Роя: его добывают, тратят и получают только те, кто ест биомассу. */
+export const BIOMASS = 'biomass';
+
+/** Может ли `owner` получить этот ресурс. Биомасса — только Рою: трофеи с поля боя, где
+ *  погибли формы Роя, не должны класть её человеку (решение владельца 2026-09-25, «опять
+ *  ресурс биомасса у меня»). Прочие ресурсы — всем. */
+export function receivesResource(
+  state: Pick<GameState, 'players'>,
+  owner: PlayerId | null,
+  resource: string,
+  data: GameData,
+): boolean {
+  return resource !== BIOMASS || feedsOnBiomass(state, owner, data);
+}
+
 /** Работает ли постройка у этого владельца: обычная — у всех, заражённая — только у Роя. */
 export function worksFor(
   state: Pick<GameState, 'players'>,
