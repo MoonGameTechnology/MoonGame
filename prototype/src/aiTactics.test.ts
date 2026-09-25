@@ -327,8 +327,8 @@ describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
   });
 
   it('порядок приказов: сперва раскол, потом курс', () => {
-    // `fleet.split` требует стоящий флот (`E_IN_TRANSIT`), так что после курса он был бы
-    // отбит ядром.
+    // Раскол после курса увёл бы обе половины: в пути отделённая часть летит тем же
+    // курсом, что исходный флот (`fleet.split` в пути, 2026-09-25).
     const orders = aiOrders(fistState(game2(), 8), 'p2', 'expand', 'strong');
     const split = orders.findIndex((a) => a.type === 'fleet.split');
     expect(split).toBeGreaterThanOrEqual(0);

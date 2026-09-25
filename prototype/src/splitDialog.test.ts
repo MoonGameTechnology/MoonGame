@@ -17,7 +17,6 @@ const живое = (
   planFleetId: 'f1',
   selectedFleetId: 'f1',
   fleetExists: true,
-  moving: false,
   inBattle: false,
   ...over,
 });
@@ -40,9 +39,6 @@ describe('окно деления — когда оно живо', () => {
     expect(splitDialogLives(живое({ fleetExists: false }))).toBe(false);
   });
 
-  it('ПОЛЕТЕЛ — ОКНО ГАСНЕТ: ядро делит только состыкованный, окно обещало бы отказ', () => {
-    expect(splitDialogLives(живое({ moving: true }))).toBe(false);
-  });
 
   it('ДЕРЁТСЯ — ТО ЖЕ САМОЕ: в бою состав меняется под пальцем', () => {
     expect(splitDialogLives(живое({ inBattle: true }))).toBe(false);
