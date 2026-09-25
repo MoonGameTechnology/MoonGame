@@ -106,6 +106,8 @@ export interface SectorZeroMenuHooks {
   /** Досье Роя из профиля (`swarmCodex.ts`) — строки уже с именами из данных. */
   swarmCodex(): SwarmCodexRows;
   start(): void;
+  /** Учебный полигон «Протокол допуска» (§14) — не глава и не забег: свой мир, без профиля. */
+  startTraining(): void;
   startDev?: () => void;
   resume(): boolean;
   settings(): void;
@@ -336,6 +338,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     const devButton = el<HTMLButtonElement>('sz-dev');
     if (devButton) { devButton.disabled = loading; devButton.hidden = !h.startDev; }
     el<HTMLButtonElement>('sz-prep').disabled = loading;
+    el<HTMLButtonElement>('sz-training').disabled = loading;
     newButton.classList.toggle('sz-primary', !preview);
     // Подпись есть, только когда есть сохранённый забег: без него «Одиночная игра» здесь
     // повторяла надзаголовок меню (третий раз на одном экране).
@@ -433,6 +436,12 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     actions.hidden = true;
     confirmation.hidden = false;
     el('sz-cancel').focus({ preventScroll: true });
+  });
+  // Полигон не трогает сохранённый забег: он ляжет рядом и дождётся «Продолжить».
+  el('sz-training').addEventListener('click', () => {
+    if (loading) return;
+    hide();
+    h.startTraining();
   });
   el('sz-dev')?.addEventListener('click', () => {
     if (loading || !h.startDev) return;

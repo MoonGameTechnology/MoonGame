@@ -144,6 +144,15 @@ describe('конец матча — награда выдаётся один р�
     expect(w.meta()).toEqual(meta());
   });
 
+  it('учебный полигон (§14.7): ни карьерного опыта, ни метки, ни выплаты профиля', () => {
+    const w = wired({ training: () => true });
+    expect(w.api.check()).toMatchObject({ training: true, xp: 0, levelUp: null });
+    expect(w.api.check()).toBeNull();
+    expect(w.saves).toEqual([]);
+    expect(w.marks.size).toBe(0);
+    expect(w.meta()).toEqual(meta());
+  });
+
   it('Sector Zero отдаёт экрану разбивку засчёта (PVR-5.4)', () => {
     const summary = { attempt: 1, chapter: 'pve-1', won: false, waves: 4, totalWaves: 10, base: 5, objectives: [], bonus: 0, total: 5, warrants: 25, unlocked: 0 };
     const w = wired({ runAward: () => 5, runSummary: () => summary });

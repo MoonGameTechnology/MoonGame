@@ -290,6 +290,15 @@ describe('итог забега Sector Zero — без счёта и места 
   });
 });
 
+describe('итог учебного полигона (§14)', () => {
+  it('без счёта, места и опыта; «ещё раз» — повтор обучения', () => {
+    const html = endScreenHtml(scored(), 'p1', endOf({ training: true }), view);
+    expect(html).not.toContain('Итоговый счёт');
+    expect(html).toContain('опыт и награды профиля не начисляются');
+    expect(html).toContain('Повторить обучение');
+  });
+});
+
 describe('боевой счёт в итогах (PVR-6.20)', () => {
   it('PvE-матч: потеряно и уничтожено — из счёта ядра, по своему месту', () => {
     const s = scored();

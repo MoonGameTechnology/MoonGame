@@ -707,6 +707,12 @@
 | AUDM-4 | ⏳ | proto | `docs/backlog.md` | Погрузка десанта отменяется молча. |
 | AUDM-5 | ⏳ | docs | `docs/backlog.md` | Карта механик устарела. |
 | AUDM-6 | ✅ | core data proto | `docs/backlog.md` | Ветерана видно, и он не растворяется. |
+| TRN-1 | ✅ | data proto | `docs/backlog.md` | Каркас полигона: карта, режим, кнопка, задачи. |
+| TRN-2 | ⏳ | proto | `docs/backlog.md` | Этапы §14.4 с подсказками «что, зачем, где». |
+| TRN-3 | ⏳ | proto data | `docs/backlog.md` | Учебные соединения и объявленная контратака (§14.2, §14.9). |
+| TRN-4 | ⏳ | proto | `docs/backlog.md` | Стартовый пакет и бонусы задач (§14.7). |
+| TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |
+| TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md` | Уровень/опыт аккаунта |
