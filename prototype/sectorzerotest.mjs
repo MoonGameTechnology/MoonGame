@@ -261,6 +261,10 @@ try {
     assert.equal(await page.locator(radars).count(), 0, 'у крейсера нет радаров разведчика и дозорного фрегата');
     await page.locator('[data-prep="hull"][data-id="scout"]').click();
     assert.equal(await page.locator('#sz-workshop .sz-cards [data-id="compact_radar"]').count(), 1, 'у разведчика его радар на месте');
+    // Мастерская живёт в «Кораблях» (решение владельца 2026-09-25): вкладки нет, а у открытого
+    // модуля в карточке своя кнопка улучшения.
+    assert.equal(await page.locator('[data-prep="tab"][data-id="workshop"]').count(), 0, 'вкладки «Мастерская» нет');
+    assert.equal(await page.locator('#sz-workshop .sz-cards .sz-upgrade [data-prep="forge"][data-id="cargo_bay"]').count(), 1, 'улучшение — в карточке открытого модуля');
     await page.locator('[data-prep="tab"][data-id="heroes"]').click();
     const faces = '#sz-workshop .hero-portrait img';
     await page.waitForFunction((sel) => [...document.querySelectorAll(sel)].every((i) => i.complete), faces);
