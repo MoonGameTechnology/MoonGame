@@ -1275,7 +1275,7 @@
 | YAG-4.1 | ⏳ | srv | `docs/yandex-games-roadmap.md` | Эндпойнт проверки подписи |
 | YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md` | PlatformIAP в адаптере Яндекса |
 | YAG-4.3 | ✅ | srv proto | `docs/yandex-games-roadmap.md` | Где живёт кошелёк Суверенов — решение до покупок 2026-09-25 |
-| YAG-4.4 | ⏳ | proto cli | `docs/yandex-games-roadmap.md` | Печать профиля: правка руками не приживается |
+| YAG-4.4 | ✅ | proto cli | `docs/yandex-games-roadmap.md` | Печать профиля: правка руками не приживается 2026-09-25 |
 | YAG-4.5 | ⏳ | cli | `docs/yandex-games-roadmap.md` | Журнал кошелька Суверенов |
 | YAG-4.6 | 🔒 | srv | `docs/yandex-games-roadmap.md` | Кошелёк на сервере |
 | YAG-5.1 | 🔶 | proto | `docs/yandex-games-roadmap.md` | PlatformAnalytics: словарь событий |

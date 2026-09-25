@@ -38,6 +38,10 @@
  *    (`AUD-30`) не ломает «Новый забег»;
  * 13–14. молчащий SDK (`AUD-33`): `getPlayer` без ответа не держит меню, `init()` без ответа
  *    не держит запуск — игра стартует веб-адаптером.
+ * 15. печать профиля (`YAG-4.4`): честный профиль старой версии открывается без потерь и
+ *    запечатывается, а правка Суверенов руками — в хранилище и в облачной копии — после
+ *    перезагрузки исчезает. Облачный профиль в шагах 8 и 8а робот печатает для игрока `u-1`
+ *    той же функцией, что и игра: другое устройство пишет облако уже запечатанным.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
  *   node prototype/yandextest.mjs --no-build # проверить уже собранный архив
@@ -49,7 +53,7 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { launchBrowser, waitForApp, withDiagnostics } from './harnessKit.mjs';
+import { launchBrowser, profileSeal, waitForApp, withDiagnostics } from './harnessKit.mjs';
 
 /** «☰ Ещё» есть только на телефоне: на ПК и планшете инструменты — постоянная колонка
  *  иконок слева (заказ владельца 2026-09-25), открывать нечего. */
@@ -349,28 +353,33 @@ try {
       await onSectorZeroMenu(tail);
     }
   });
+  // Облако пишет другое устройство, и копия в нём запечатана для игрока (`YAG-4.4`). Робот
+  // печатает её той же функцией, что и игра: без печати облако копию не примет (шаг 15).
+  const seal = await profileSeal();
+  const accountCloud = JSON.stringify({
+    v: 1,
+    seed: 'account',
+    rev: 12,
+    progress: seal.sealProgress(
+      { v: 1, seed: 'account', research: 50, nextAttempt: 41 },
+      seal.cloudSeal('u-1'),
+    ),
+  });
   // 8а. Развилка (YAG-1.4): гость с прогрессом входит, а в облаке — другой профиль.
   // Игрок видит числа обоих и выбирает; выбранный становится единственным.
   for (const pick of ['take-cloud', 'keep-here']) {
     const fork = await browser.newContext({ locale: 'ru-RU' });
     const forkPage = await fork.newPage();
     forkPage.on('pageerror', (error) => errors.push(`pageerror (${pick}): ${error.message}`));
-    await forkPage.addInitScript(() => {
+    await forkPage.addInitScript((meta) => {
       window.__guest = true;
-      window.__cloudInit = {
-        meta: JSON.stringify({
-          v: 1,
-          seed: 'account',
-          rev: 12,
-          progress: JSON.stringify({ v: 1, seed: 'account', research: 50, nextAttempt: 41 }),
-        }),
-      };
+      window.__cloudInit = { meta };
       if (!localStorage.getItem('sector-zero.progress.v1'))
         localStorage.setItem(
           'sector-zero.progress.v1',
           JSON.stringify({ v: 1, seed: 'device', research: 9, nextAttempt: 13 }),
         );
-    });
+    }, accountCloud);
     await forkPage.goto(origin + '/');
     await waitForApp(forkPage);
     // Гость: облака нет, пока он не войдёт, — и вход только по кнопке.
@@ -430,11 +439,14 @@ try {
     nextAttempt: 4,
     settledThrough: 3,
   };
-  await otherPage.addInitScript((progress) => {
-    window.__cloudInit = {
-      meta: JSON.stringify({ v: 1, seed: 'account', rev: 12, progress: JSON.stringify(progress) }),
-    };
-  }, cloudProfile);
+  await otherPage.addInitScript(
+    (progress) => {
+      window.__cloudInit = {
+        meta: JSON.stringify({ v: 1, seed: 'account', rev: 12, progress }),
+      };
+    },
+    seal.sealProgress(cloudProfile, seal.cloudSeal('u-1')),
+  );
   await otherPage.goto(origin + '/');
   await waitForApp(otherPage);
   await otherPage.waitForFunction(
@@ -637,11 +649,123 @@ try {
     await silent.close();
   }
 
+  // 15. Печать профиля (YAG-4.4). Профиль старой версии, записанный сборкой без печати,
+  // открывается без потерь и запечатывается. Правка Суверенов руками после перезагрузки
+  // исчезает: и в хранилище (с печатью и без неё), и в облачной копии.
+  const sealed = await browser.newContext({ locale: 'ru-RU' });
+  const sealPage = await sealed.newPage();
+  sealPage.setDefaultTimeout(20000);
+  sealPage.on('pageerror', (error) => errors.push(`pageerror (печать): ${error.message}`));
+  const legacy = {
+    v: 1,
+    seed: 'old',
+    research: 50,
+    warrants: 30,
+    sovereigns: 7,
+    nextAttempt: 4,
+    settledThrough: 3,
+  };
+  await sealPage.addInitScript((raw) => {
+    if (localStorage.getItem('robot.planted')) return;
+    localStorage.setItem('robot.planted', '1');
+    localStorage.setItem('sector-zero.progress.v1', raw);
+  }, JSON.stringify(legacy));
+  const stored = () =>
+    sealPage.evaluate(() => ({
+      main: localStorage.getItem('sector-zero.progress.v1'),
+      shadow: localStorage.getItem('sector-zero.progress.shadow.v1'),
+      mark: JSON.parse(localStorage.getItem('sector-zero.cloud.v1') ?? '{}'),
+    }));
+  const reopen = async () => {
+    await sealPage.reload();
+    await waitForApp(sealPage);
+    await ready(sealPage);
+  };
+  await sealPage.goto(origin + '/');
+  await waitForApp(sealPage);
+  await ready(sealPage);
+  await sealPage.waitForFunction(() =>
+    Boolean(JSON.parse(localStorage.getItem('sector-zero.progress.v1')).seal),
+  );
+  const first = await stored();
+  assert.equal(seal.checkSeal(first.main, seal.LOCAL_SEAL), 'sealed', 'старый профиль запечатан');
+  assert.equal(first.shadow, first.main, 'рядом — теневая копия');
+  assert.equal(first.mark.sealed, true, 'устройство помнит, что уже запечатывало');
+  const honest = JSON.parse(first.main);
+  for (const key of ['seed', 'research', 'warrants', 'sovereigns', 'nextAttempt'])
+    assert.equal(honest[key], legacy[key], `старый профиль открылся без потерь: ${key}`);
+  // Правка руками — с печатью на месте и со снятой печатью: обе после перезагрузки исчезают.
+  const { seal: _stripped, ...bare } = honest;
+  for (const [label, forged] of [
+    ['правка', { ...honest, sovereigns: 99999 }],
+    ['снятая печать', { ...bare, sovereigns: 99999 }],
+  ]) {
+    await sealPage.evaluate(
+      (raw) => localStorage.setItem('sector-zero.progress.v1', raw),
+      JSON.stringify(forged),
+    );
+    await reopen();
+    await sealPage.waitForFunction(
+      () => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).sovereigns !== 99999,
+    );
+    const after = await stored();
+    assert.equal(
+      JSON.parse(after.main).sovereigns,
+      legacy.sovereigns,
+      `${label}: Суверены прежние`,
+    );
+    assert.equal(after.main, first.main, `${label}: в хранилище — целая копия`);
+  }
+  await sealed.close();
+  // Облачная копия, правленая через консоль SDK: печать для игрока цела, число — нет.
+  const forgedCloud = JSON.parse(
+    seal.sealProgress({ ...legacy, seed: 'account' }, seal.cloudSeal('u-1')),
+  );
+  forgedCloud.sovereigns = 99999;
+  const cloudForge = await browser.newContext({ locale: 'ru-RU' });
+  const forgePage = await cloudForge.newPage();
+  forgePage.setDefaultTimeout(20000);
+  forgePage.on('pageerror', (error) => errors.push(`pageerror (облако): ${error.message}`));
+  await forgePage.addInitScript(
+    (meta) => {
+      window.__cloudInit = { meta };
+    },
+    JSON.stringify({ v: 1, seed: 'account', rev: 12, progress: JSON.stringify(forgedCloud) }),
+  );
+  await forgePage.goto(origin + '/');
+  await waitForApp(forgePage);
+  await ready(forgePage);
+  const rewritten = await forgePage
+    .waitForFunction(() => {
+      const last = window.__ya.writes
+        .map((w) => w.data.meta)
+        .filter(Boolean)
+        .at(-1);
+      return last && JSON.parse(last);
+    })
+    .then((handle) => handle.jsonValue());
+  assert.equal(
+    seal.checkSeal(rewritten.progress, seal.cloudSeal('u-1')),
+    'sealed',
+    'облако: подделку заменила целая копия',
+  );
+  assert.notEqual(
+    JSON.parse(rewritten.progress).sovereigns,
+    99999,
+    'облако: подделка не вернулась',
+  );
+  const local = await forgePage.evaluate(() =>
+    JSON.parse(localStorage.getItem('sector-zero.progress.v1') ?? '{}'),
+  );
+  assert.notEqual(local.sovereigns, 99999, 'облако: подделка не взята на устройство');
+  assert.notEqual(local.seed, 'account', 'облако: правленая копия не принята вовсе');
+  await cloudForge.close();
+
   // 6. Ни ошибок, ни запросов мимо архива.
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, тот же забег на другом устройстве, вход и выбор профиля, один язык, темп забега, меню поверх сообщений, долгий тап без системного меню, две вкладки, битый журнал, молчащий SDK — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, тот же забег на другом устройстве, вход и выбор профиля, один язык, темп забега, меню поверх сообщений, долгий тап без системного меню, две вкладки, битый журнал, молчащий SDK, печать профиля — без ошибок\n',
   );
 } finally {
   await browser.close();

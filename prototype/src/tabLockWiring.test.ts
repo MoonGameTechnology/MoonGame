@@ -19,12 +19,14 @@ const body = (name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
 
 describe('AUD-29 — пишет только вкладка-хозяйка', () => {
-  it('все три хранилища Sector Zero спрашивают замок', () => {
+  it('все четыре хранилища Sector Zero спрашивают замок', () => {
     expect(SRC).toContain('localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero)');
     expect(SRC).toContain('localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero)');
     expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero)');
+    // Теневая копия профиля (`YAG-4.4`) — тоже: вытесненная вкладка затёрла бы ею целую.
+    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero)');
     // Ни одного хранилища Sector Zero мимо замка.
-    expect(SRC.match(/localRunSaveStore\(/g)).toHaveLength(3);
+    expect(SRC.match(/localRunSaveStore\(/g)).toHaveLength(4);
   });
 
   it('отметка облака и само облако — тоже', () => {
@@ -41,7 +43,11 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
     expect(claim).toContain('if (!tabSuperseded(TAB_ID, previous)) return;');
     expect(claim).toContain('if (runInProgress()) setRunActive(false);');
     expect(claim).toContain('syncMark = parseSyncMark(mark);');
-    expect(claim).toContain('sectorProgress = parseSectorZeroProgress(raw, data, sectorSeed);');
+    // Перечитывает тем же правилом печати, что и старт (`YAG-4.4`).
+    expect(claim).toContain('progressWrite = progressWrite.then(loadSectorProfile)');
+    expect(claim).toContain(
+      'sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);',
+    );
   });
 
   it('вытесненная вкладка слышит перехват и встаёт', () => {

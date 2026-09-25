@@ -101,6 +101,25 @@ export async function instrumentedGame(hooks, { page = 'void-dominion.html', sim
 }
 
 /**
+ * Печать профиля Sector Zero (`YAG-4.4`) — ТА ЖЕ функция, что у игры
+ * (`decisions/profileSeal.ts`): копия в роботе разошлась бы с игрой молча. Робот печатает
+ * ею профиль, который кладёт в хранилище или облако как «честный». Модуль тянет ядро
+ * импортами без расширений, и Node сам его не прочтёт — поэтому собираем esbuild'ом.
+ */
+export async function profileSeal() {
+  const { build } = await import('esbuild');
+  const bundle = await build({
+    entryPoints: ['decisions/profileSeal.ts'],
+    bundle: true,
+    write: false,
+    format: 'esm',
+    platform: 'neutral',
+  });
+  const code = Buffer.from(bundle.outputFiles[0].text).toString('base64');
+  return import(`data:text/javascript;base64,${code}`);
+}
+
+/**
  * Локальный сервер для страниц игры. `routes` — путь → тело (строка/Buffer) или
  * `{ type, body }`; неизвестный путь отдаёт `fallback` (по умолчанию первый маршрут).
  * `/auth/status` всегда отвечает «аккаунтов нет»: без этого стартовый экран ждёт пробы
