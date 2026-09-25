@@ -11,9 +11,12 @@
  *    на месте, без зума и без «попади мимо».
  * 3. **Тап по новому месту начинается с верхнего.** Если текущий выбор не из этой
  *    стопки, перебор стартует с нуля — иначе новый тап отдавал бы случайный номер.
- * 4. **Один кандидат — он и остаётся.** Перебор по кругу из одного не должен ничего
+ * 4. **Один флот — он и остаётся.** Перебор по кругу из одного не должен ничего
  *    «сбрасывать»: тап по своему единственному флоту не снимает его выделение.
  * 5. **Пусто — значит снять выделение.** Тап по пустому космосу это осознанное «ничего».
+ * 6. **Повторный тап по выбранному миру снимает выделение** (заказ владельца 2026-09-25).
+ *    Мир — последний в стопке, поэтому круг на ПК — «флоты → мир → ничего → флоты», а
+ *    палец и планшет снимают выбор тем же вторым тапом по провинции.
  *
  * На телефоне несколько кандидатов открывают явный список выбора, без перебора.
  * Планшет сохраняет прежний `touchPick`: ближайший видимый флот, иначе мир.
@@ -44,16 +47,31 @@ export function tapCandidates(fleetIds: readonly string[], worldId: string | nul
 /**
  * Следующий кандидат: от текущего выбора на шаг вперёд по кругу (правило 2), а если
  * текущего в стопке нет — с верхнего (правило 3). Пустая стопка → `null` (правило 5).
+ * Выбранный мир из этой стопки → `null`: второй тап по провинции снимает выбор (правило 6).
  */
 export function nextPick(cands: readonly TapPick[], current: TapPick | null): TapPick | null {
   if (cands.length === 0) return null;
   const at = cands.findIndex((c) => samePick(c, current));
+  if (at >= 0 && current?.kind === 'planet') return null;
   return cands[(at + 1) % cands.length] ?? null;
 }
 
-/** Тап пальцем: ближайший свой флот, иначе мир, иначе ничего. Перебора нет. */
-export function touchPick(fleetId: string | null, worldId: string | null): TapPick | null {
+/** Тап пришёлся на мир, который уже выбран, — второй тап по провинции (правило 6). */
+export function retapsSelectedWorld(worldId: string | null, current: TapPick | null): boolean {
+  return worldId !== null && samePick({ kind: 'planet', id: worldId }, current);
+}
+
+/**
+ * Тап пальцем: ближайший свой флот, иначе мир, иначе ничего. Перебора нет. Тап по уже
+ * выбранному миру снимает выбор (правило 6); флот под пальцем важнее мира, как и был.
+ */
+export function touchPick(
+  fleetId: string | null,
+  worldId: string | null,
+  current: TapPick | null = null,
+): TapPick | null {
   if (fleetId) return { kind: 'fleet', id: fleetId };
-  if (worldId) return { kind: 'planet', id: worldId };
+  if (worldId)
+    return retapsSelectedWorld(worldId, current) ? null : { kind: 'planet', id: worldId };
   return null;
 }

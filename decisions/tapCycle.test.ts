@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { nextPick, samePick, tapCandidates, touchPick, type TapPick } from './tapCycle';
+import {
+  nextPick,
+  retapsSelectedWorld,
+  samePick,
+  tapCandidates,
+  touchPick,
+  type TapPick,
+} from './tapCycle';
 
 const флот = (id: string): TapPick => ({ kind: 'fleet', id });
 const мир = (id: string): TapPick => ({ kind: 'planet', id });
@@ -35,8 +42,12 @@ describe('тап по карте — перебор стопки', () => {
     expect(nextPick(стопка, флот('f2'))).toEqual(мир('p1'));
   });
 
-  it('перебор идёт по кругу: с последнего снова на верхнего', () => {
-    expect(nextPick(стопка, мир('p1'))).toEqual(флот('f1'));
+  it('ПОВТОРНЫЙ ТАП ПО ВЫБРАННОМУ МИРУ СНИМАЕТ ВЫДЕЛЕНИЕ, а следующий начинает с верхнего', () => {
+    // Заказ владельца 2026-09-25: «повторно топаешь по провинции — выделение спадает».
+    // Мир — последний в стопке, так что круг теперь «флоты → мир → ничего → флоты».
+    expect(nextPick(стопка, мир('p1'))).toBeNull();
+    expect(nextPick(стопка, null)).toEqual(флот('f1'));
+    expect(nextPick([мир('p1')], мир('p1'))).toBeNull();
   });
 
   it('ОДИН КАНДИДАТ ОСТАЁТСЯ ВЫБРАННЫМ: тап по своему флоту не снимает выделение', () => {
@@ -65,5 +76,26 @@ describe('тап пальцем — без перебора', () => {
 
   it('пустой космос — ничего', () => {
     expect(touchPick(null, null)).toBeNull();
+  });
+
+  it('ПОВТОРНЫЙ ТАП ПО ВЫБРАННОМУ МИРУ СНИМАЕТ ВЫДЕЛЕНИЕ', () => {
+    expect(touchPick(null, 'p1', мир('p1'))).toBeNull();
+    // Другой мир или выбранный флот — обычный выбор мира.
+    expect(touchPick(null, 'p1', мир('p2'))).toEqual(мир('p1'));
+    expect(touchPick(null, 'p1', флот('f1'))).toEqual(мир('p1'));
+    // Флот на орбите по-прежнему важнее мира, и повторный тап по флоту его не снимает.
+    expect(touchPick('f1', 'p1', мир('p1'))).toEqual(флот('f1'));
+    expect(touchPick('f1', null, флот('f1'))).toEqual(флот('f1'));
+  });
+});
+
+describe('телефон — второй тап по выбранной провинции', () => {
+  it('снимает выбор и тогда, когда на орбите флоты: список «флот или мир» не открывается', () => {
+    expect(retapsSelectedWorld('p1', мир('p1'))).toBe(true);
+    // Другая провинция, выбранный флот или пустой космос — обычный тап.
+    expect(retapsSelectedWorld('p2', мир('p1'))).toBe(false);
+    expect(retapsSelectedWorld('p1', флот('p1'))).toBe(false);
+    expect(retapsSelectedWorld(null, мир('p1'))).toBe(false);
+    expect(retapsSelectedWorld('p1', null)).toBe(false);
   });
 });

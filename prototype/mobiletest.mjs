@@ -60,11 +60,29 @@ async function chooseFleet(f) {
     provinceIndex >= 0 && choices.some((x) => x.kind === 'fleet'),
     'stack picker offers the fleet and its province',
   );
-  await p.locator(`[data-mobile="choose"][data-index="${provinceIndex}"]`).tap();
+  const province = p.locator(`[data-mobile="choose"][data-index="${provinceIndex}"]`);
+  const row = (await province.locator('b').textContent()).trim();
+  assert.notEqual(
+    row,
+    choices[provinceIndex].id,
+    'the chooser names the province, not its node id',
+  );
+  await province.tap();
   await pause();
   assert.equal((await ui()).planet, choices[provinceIndex].id);
-  await p.locator('[data-mobile="close"]').tap();
+  assert.equal(
+    await p
+      .locator('#side .ptitle > :first-child')
+      .textContent()
+      .then((x) => x.replace(/ ▸$/, '').trim()),
+    row,
+    'the card that opens carries the same name as the chooser row',
+  );
+  // Второй тап по выбранной провинции снимает выбор, а не открывает список заново.
+  await p.touchscreen.tap(f.p.x, f.p.y);
   await pause();
+  assert.equal((await ui()).planet, null, 're-tap on the selected province clears the selection');
+  assert.equal((await ui()).choices.length, 0, 're-tap does not reopen the chooser');
   const current = (await p.evaluate(() => window.__mobileTest.fleets())).find((x) => x.id === f.id);
   await p.touchscreen.tap(current.p.x, current.p.y);
   await pause();
