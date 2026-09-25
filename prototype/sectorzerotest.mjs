@@ -275,6 +275,12 @@ try {
     // (черновик Учёного, PVR-6.16) однофайловая сборка встраивает data-URL'ом с кавычками
     // SVG, и неэкранированная кавычка обрывала `src` — строковые проверки этого не видят.
     await page.locator('#sz-prep').click();
+    // Кошелёк прилипает к верху вместе с вкладками (замечание владельца 2026-09-25): внизу
+    // длинного списка запас валют виден рядом с ценой.
+    await page.evaluate(() => { const el = document.getElementById('sector-zero'); el.scrollTop = el.scrollHeight; });
+    const purse = await page.locator('#sz-workshop .sz-purse').boundingBox();
+    assert.ok(purse && purse.y >= 0 && purse.y + purse.height <= 800, `кошелёк на экране после прокрутки (y=${purse?.y})`);
+    await page.evaluate(() => { document.getElementById('sector-zero').scrollTop = 0; });
     // Корабли (решения владельца 2026-09-25): фрегат — в первом ряду «Корабли», а у
     // выбранного корпуса нет карточек модулей, которые на него не встают.
     const firstRow = page.locator('#sz-workshop .sz-hulls').first();
