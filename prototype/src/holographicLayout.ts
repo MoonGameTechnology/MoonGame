@@ -62,9 +62,11 @@ export function selectionWindowPosition(
   const right = anchor.x + gap;
   const left = anchor.x - size.width - gap;
   const x = right + size.width <= viewport.width - 12 ? right : left;
+  // The chrome wins over the bottom edge: a window too tall for the room below the chrome
+  // opens at the chrome and scrolls, rather than being pushed up underneath it.
   return {
     x: Math.max(12, Math.min(x, viewport.width - size.width - 12)),
-    y: Math.max(12, Math.min(Math.max(chromeBottom, anchor.y - 48), viewport.height - size.height - 12)),
+    y: Math.max(chromeBottom, Math.min(anchor.y - 48, viewport.height - size.height - 12)),
   };
 }
 

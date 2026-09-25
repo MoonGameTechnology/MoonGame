@@ -264,9 +264,11 @@ body.holo-no-glow.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.
 #holo-selection-thread .holo-thread-glow{stroke-width:3.5;opacity:.1;}
 body.holo-no-glow #holo-selection-thread .holo-thread-glow{display:none;}
 body.holo-ui #holo-selection-window{
-  position:fixed;left:50%;top:40%;width:min(340px,calc(100vw - 36px));
+  position:fixed;left:50%;top:40%;width:min(372px,calc(100vw - 36px));
   --holo-window-max-height:min(620px,74dvh);
-  max-height:var(--holo-window-max-height);z-index:26;flex-direction:column;overflow:hidden;
+  /* z 40 — наравне с тостами и позже них в DOM, то есть над ними: тост поверх окна накрывал
+     «Курс» и ✕ (заказ владельца 2026-09-25). Открытое меню (41) и его окна (44+) — выше. */
+  max-height:var(--holo-window-max-height);z-index:40;flex-direction:column;overflow:hidden;
   border-color:rgba(140,233,242,.65);
 }
 body.holo-ui #holo-selection-window :is(#side,#cmdbar){
@@ -288,6 +290,17 @@ body.holo-ui #holo-selection-window #cmdbar .holo-command-head{position:sticky;t
 body.holo-ui #holo-selection-window.has-commands #side .phead{display:none;}
 body.holo-ui #holo-selection-window.has-commands #side .pscroll{padding-top:10px;}
 body.holo-ui.chain-mode #holo-selection-window #cmdbar{width:100%;padding:12px;}
+/* Доводка окна выбора (заказ владельца 2026-09-25: «концепция интересная, но не доработанная»):
+   подзаголовок мира — не больше двух строк, а не три с обрывом; вкладки — одним рядом,
+   а не «Здания» отдельной строкой; одинокая последняя команда — на всю ширину. */
+body.holo-ui #holo-selection-window #side .ptitle span{display:-webkit-box;-webkit-box-orient:vertical;
+  -webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal;}
+body.holo-ui #holo-selection-window #side .ptabs{flex-wrap:nowrap;gap:5px;}
+body.holo-ui #holo-selection-window #side .ptab{flex:1 1 0;min-width:0;padding:7px 4px;justify-content:center;
+  text-align:center;font-size:11px;letter-spacing:.4px;white-space:nowrap;}
+body.holo-ui #holo-selection-window #side .ptab b{margin-left:5px;}
+body.holo-ui #holo-selection-window .holo-command-body:has(> [data-cmd=move]) > button:last-of-type:nth-of-type(even){
+  grid-column:1/-1;}
 /* Titles stay graspable; content and controls retain their own pointer/scroll gestures. */
 body.holo-ui .holo-floating-window{
   position:fixed!important;right:auto!important;bottom:auto!important;margin:0!important;transform:none!important;

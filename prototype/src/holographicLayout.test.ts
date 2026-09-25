@@ -57,6 +57,9 @@ it('opens beside the selection on the side with room and below the top chrome', 
   expect(selectionWindowPosition({ x: 1250, y: 300 }, size, view, 104)).toEqual({ x: 880, y: 252 });
   expect(selectionWindowPosition({ x: 500, y: 40 }, size, view, 104).y).toBe(104);
   expect(selectionWindowPosition({ x: 500, y: 940 }, size, view, 104).y).toBe(398);
+  // A tall window on a short screen (tablet): the chrome wins over the bottom edge — the
+  // window used to be pushed up under the resource bar (owner, 2026-09-25).
+  expect(selectionWindowPosition({ x: 500, y: 300 }, size, { width: 1024, height: 600 }, 176).y).toBe(176);
 });
 
 it('connects each object to the nearest window side without crossing its rounded corners', () => {

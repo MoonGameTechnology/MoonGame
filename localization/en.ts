@@ -1966,6 +1966,7 @@ export const en: Record<string, string> = {
   'hub.tile.meta': 'Progression',
   'hub.tile.notifications': 'Notifications',
   'hub.tile.settings': 'Settings',
+  'locale.pick.aria': 'Language',
   'hub.tile.support': 'Support',
   'hub.tile.tutorial': 'Tutorial',
   'hub.tile.updates': 'Updates',

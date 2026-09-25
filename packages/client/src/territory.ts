@@ -254,7 +254,9 @@ export function strokeBorders(
     for (const [owner, segs] of ownedInner)
       strokeSegs(prepare(segs), rgba(palette.ownerColor(owner), 0.3 * detail), 0.65); // inner hairlines
   }
-  if (detail > 0) strokeSegs(prepare(neutralEdge), rgba('#5fb0c5', 0.55 * detail), 0.75);
+  // Ничейные границы приглушены (заказ владельца 2026-09-25, «прослеживается топология»):
+  // сетка ячеек не должна читаться сильнее самого космоса. Границы держав — прежние.
+  if (detail > 0) strokeSegs(prepare(neutralEdge), rgba('#5fb0c5', 0.3 * detail), 0.7);
   const fronts = [...ownedFront].map(([owner, segs]) => [owner, prepare(segs)] as const);
   for (const [owner, segs] of fronts)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
