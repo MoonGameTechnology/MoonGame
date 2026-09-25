@@ -7088,7 +7088,7 @@ function planetPanelHtml(p: Planet): string {
       );
     }
     if (!pcUi()) {
-      cols.push(`<div class="hint">${t('side.ground.hint')}</div>`);
+      cols.push(`<div class="hint">${t('dossier.tab.ground.desc')}</div>`);
     }
   } else if (planetTab === 'ships') {
     // Built ships now auto-rally to orbit (see fleetLaunchModule), so the garrison
@@ -7115,8 +7115,9 @@ function planetPanelHtml(p: Planet): string {
       );
     }
     if (!pcUi()) {
-      // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships')
-      cols.push(`<div class="hint">${t('side.shipyard.hint')}</div>`);
+      // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships') — TXT-3 свёл
+      // обе поверхности на ОДИН ключ, до него текст жил двумя разошедшимися копиями.
+      cols.push(`<div class="hint">${t('dossier.tab.ships.desc')}</div>`);
     }
   } else if (planetTab === 'shuttle') {
     // SHU-3.1 — АНГАР ПОРТА, а не гарнизон. Раньше здесь стоял `wing` — гарнизон,

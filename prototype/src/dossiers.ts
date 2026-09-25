@@ -434,10 +434,14 @@ export function createDossiers(host: DossierHost): {
       };
     }
     if (key.startsWith('stat:')) {
+      // TXT-3: тело есть только у характеристики, которая несёт СВОЁ правило (лимит
+      // залпа, бесплатная регенерация щита, починка корпуса, «в гарнизоне, не на
+      // орбите», скорость по самому медленному). Остальные пересказывали подпись, и
+      // их тела сняты — как у `res:` выше, остаётся одно имя.
       const STAT_DOSSIER: Record<string, [string, string]> = {
-        atk: [t('dossier.stat.atk.name'), t('dossier.stat.atk.desc')],
-        def: [t('dossier.stat.def.name'), t('dossier.stat.def.desc')],
-        hp: [t('dossier.stat.hp.name'), t('dossier.stat.hp.desc')],
+        atk: [t('dossier.stat.atk.name'), ''],
+        def: [t('dossier.stat.def.name'), ''],
+        hp: [t('dossier.stat.hp.name'), ''],
         cap: [
           t('dossier.stat.cap.name'),
           t('dossier.stat.cap.desc', {
@@ -447,13 +451,13 @@ export function createDossiers(host: DossierHost): {
         hull: [t('dossier.stat.hull.name'), t('dossier.stat.hull.desc')],
         shield: [t('dossier.stat.shield.name'), t('dossier.stat.shield.desc')],
         spd: [t('dossier.stat.spd.name'), t('dossier.stat.spd.desc')],
-        garrison: [t('dossier.stat.garrison.name'), t('dossier.stat.garrison.desc')],
-        ground: [t('dossier.stat.ground.name'), t('dossier.stat.ground.desc')],
+        garrison: [t('dossier.stat.garrison.name'), ''],
+        ground: [t('dossier.stat.ground.name'), ''],
         gships: [t('dossier.stat.gships.name'), t('dossier.stat.gships.desc')],
-        pbuild: [t('dossier.stat.pbuild.name'), t('dossier.stat.pbuild.desc')],
-        datk: [t('dossier.stat.datk.name'), t('dossier.stat.datk.desc')],
-        ddef: [t('dossier.stat.ddef.name'), t('dossier.stat.ddef.desc')],
-        dhp: [t('dossier.stat.dhp.name'), t('dossier.stat.dhp.desc')],
+        pbuild: [t('dossier.stat.pbuild.name'), ''],
+        datk: [t('dossier.stat.datk.name'), ''],
+        ddef: [t('dossier.stat.ddef.name'), ''],
+        dhp: [t('dossier.stat.dhp.name'), ''],
       };
       const d = STAT_DOSSIER[key.slice(5)];
       return d ? { name: d[0], body: d[1] } : null;

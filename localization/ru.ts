@@ -1061,46 +1061,34 @@ export const ru: Record<string, string> = {
     'Мобильное оперативное соединение кораблей. Выберите его, чтобы отдавать приказы на манёвр, орбиту и удар по врагу.',
   'dossier.fleet.name': 'Флот',
   'dossier.hint': 'Наведите на объект слева — здесь появится его досье.',
-  'dossier.stat.atk.desc': 'Суммарная атака кораблей флота.',
   'dossier.stat.atk.name': 'Атака',
   'dossier.stat.cap.desc':
     'В залпе бьют максимум {n} юнитов — сильнейшие первыми; все сверх капа только впитывают урон.',
   'dossier.stat.cap.name': 'Линия огня',
-  'dossier.stat.datk.desc': 'Суммарная атака дивизии.',
   'dossier.stat.datk.name': 'Атака',
-  'dossier.stat.ddef.desc': 'Суммарная защита дивизии.',
   'dossier.stat.ddef.name': 'Защита',
-  'dossier.stat.def.desc': 'Суммарная защита кораблей флота.',
   'dossier.stat.def.name': 'Защита',
-  'dossier.stat.dhp.desc': 'Суммарные очки здоровья дивизии.',
   'dossier.stat.dhp.name': 'ОЗ',
-  'dossier.stat.garrison.desc': 'Численность наземных войск, обороняющих мир.',
   'dossier.stat.garrison.name': 'Гарнизон',
-  'dossier.stat.ground.desc': 'Пехота и техника на поверхности мира.',
   'dossier.stat.ground.name': 'Наземные части',
   'dossier.stat.gships.desc': 'Корабли, стоящие в гарнизоне мира (не на орбите).',
   'dossier.stat.gships.name': 'Корабли в гарнизоне',
-  'dossier.stat.hp.desc': 'Суммарная прочность кораблей флота.',
   'dossier.stat.hp.name': 'Очки здоровья',
   'dossier.stat.hull.desc':
     'Текущая/полная прочность армии. Чинится у своего мира с верфью — или мгновенно за кредиты.',
   'dossier.stat.hull.name': 'Корпус',
-  'dossier.stat.pbuild.desc': 'Число построек на мире.',
   'dossier.stat.pbuild.name': 'Постройки',
   'dossier.stat.shield.desc':
     'Аблятивный щит: принимает урон первым и бесплатно восстанавливается вне боя.',
   'dossier.stat.shield.name': 'Щит',
-  'dossier.stat.spd.desc':
-    'Скорость перелёта — флот движется со скоростью самого медленного корабля.',
+  'dossier.stat.spd.desc': 'Флот движется со скоростью самого медленного корабля.',
   'dossier.stat.spd.name': 'Скорость',
   'dossier.tab.buildings.desc':
     'Постройки мира и строительный конвейер: состояние, уровни и улучшения.',
   'dossier.tab.buildings.name': 'Здания',
-  'dossier.tab.ground.desc':
-    'Наземные части обороняют ваши миры. Их можно погрузить на флот для захвата вражеских миров.',
+  'dossier.tab.ground.desc': 'Грузятся на флот для захвата вражеских миров.',
   'dossier.tab.ground.name': 'Земля',
-  'dossier.tab.ships.desc':
-    'Флот — ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.',
+  'dossier.tab.ships.desc': 'Корабли гарнизона, флоты на орбите и очередь заказа.',
   'dossier.tab.ships.name': 'Флот',
   'dossier.tab.shuttle.desc':
     'Эскадра космопорта: машины (△) стоят в ангаре мира, на карте их нет. Кнопка удара поднимает вылет, цель выбирается тапом по карте. Авианосец (◈) возит эскадру с собой — его трюм показан в панели флота.',
@@ -2618,8 +2606,6 @@ export const ru: Record<string, string> = {
   'side.garrison.wing': 'Эскадра в порту',
   'side.ground.conveyor': 'Наземный конвейер',
   'side.ground.empty': 'наземной армии здесь нет',
-  'side.ground.hint':
-    'Наземные части обороняют ваши миры. Их можно погрузить на флот для захвата вражеских миров.',
   'side.ground.legend': 'гарнизон ▸ трюм',
   'side.ground.load': '▲ Погрузить {u}',
   'side.ground.loading': '⏳ грузится: {n}',
@@ -2647,8 +2633,6 @@ export const ru: Record<string, string> = {
   'side.scan.stale': 'Вне сенсорного охвата — последний скан (мог устареть).',
   'side.scan.title': 'ПОСЛЕДНИЕ ДАННЫЕ ✦',
   'side.shipyard.conveyor': 'Конвейер кораблей',
-  'side.shipyard.hint':
-    'Флот — ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.',
   'side.stat.atk': 'АТК',
   'side.stat.def': 'ЗАЩ',
   'side.stat.spd': 'СКР',
