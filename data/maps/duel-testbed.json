@@ -1,0 +1,655 @@
+{
+  "id": "duel-testbed",
+  "seed": "duel-testbed",
+  "time": 0,
+  "sectors": {
+    "home_a": {
+      "position": {
+        "x": -1300,
+        "y": 250
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_a",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "belt_n": {
+      "position": {
+        "x": -1357,
+        "y": -75
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "gap_ne": {
+      "position": {
+        "x": -1047,
+        "y": 38
+      },
+      "kind": "asteroid",
+      "terrain": "deep_void"
+    },
+    "belt_e": {
+      "position": {
+        "x": -990,
+        "y": 363
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "crystal": {
+      "position": {
+        "x": -1243,
+        "y": 575
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "belt_sw": {
+      "position": {
+        "x": -1553,
+        "y": 462
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "gap_w": {
+      "position": {
+        "x": -1610,
+        "y": 137
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "twin_a": {
+      "position": {
+        "x": -1700,
+        "y": -200
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic"
+    },
+    "outer_belt": {
+      "position": {
+        "x": -1720,
+        "y": 700
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "giant": {
+      "position": {
+        "x": -699,
+        "y": 469
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "gas_giant"
+    },
+    "io_moon": {
+      "position": {
+        "x": -559,
+        "y": 669
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "trojan_l4": {
+      "position": {
+        "x": -810,
+        "y": -161
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "trojan_l5": {
+      "position": {
+        "x": -1189,
+        "y": 880
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "wreck_1": {
+      "position": {
+        "x": -700,
+        "y": -620
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard"
+    },
+    "wreck_2": {
+      "position": {
+        "x": -400,
+        "y": -840
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard"
+    },
+    "debris_1": {
+      "position": {
+        "x": -1000,
+        "y": -470
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "debris_2": {
+      "position": {
+        "x": -300,
+        "y": -560
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "last_camp": {
+      "position": {
+        "x": -760,
+        "y": -1000
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "fortress_world"
+    },
+    "survey_1": {
+      "position": {
+        "x": -1150,
+        "y": -820
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "singularity": {
+      "position": {
+        "x": 150,
+        "y": -150
+      },
+      "kind": "black_hole",
+      "terrain": "deep_void"
+    },
+    "relic": {
+      "position": {
+        "x": -130,
+        "y": -170
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "relic_world"
+    },
+    "ring": {
+      "position": {
+        "x": 390,
+        "y": -400
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "ringworld"
+    },
+    "station": {
+      "position": {
+        "x": 200,
+        "y": 170
+      },
+      "kind": "void_station",
+      "terrain": "deep_void"
+    },
+    "observatory": {
+      "position": {
+        "x": 450,
+        "y": -50
+      },
+      "kind": "neutral_base",
+      "terrain": "deep_void",
+      "owner": "neutrals",
+      "buildings": [
+        {
+          "type": "shipyard"
+        },
+        {
+          "type": "radar"
+        },
+        {
+          "type": "power_plant"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "survey_2": {
+      "position": {
+        "x": -110,
+        "y": 110
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "scorched": {
+      "position": {
+        "x": 720,
+        "y": -300
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "irradiated"
+    },
+    "scar_nw": {
+      "position": {
+        "x": -150,
+        "y": -440
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "scar_s": {
+      "position": {
+        "x": -220,
+        "y": 520
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "scar_e": {
+      "position": {
+        "x": 650,
+        "y": 90
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "core_1": {
+      "position": {
+        "x": 900,
+        "y": -760
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "core_2": {
+      "position": {
+        "x": 1160,
+        "y": -560
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "veil_w": {
+      "position": {
+        "x": 620,
+        "y": -700
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "veil_n": {
+      "position": {
+        "x": 1150,
+        "y": -950
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "veil_e": {
+      "position": {
+        "x": 1430,
+        "y": -720
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "veil_s": {
+      "position": {
+        "x": 900,
+        "y": -490
+      },
+      "kind": "nebula",
+      "terrain": "nebula",
+      "transit": [
+        [
+          "core_1",
+          "core_2"
+        ],
+        [
+          "reach_e",
+          "scorched"
+        ]
+      ]
+    },
+    "globule": {
+      "position": {
+        "x": 1500,
+        "y": -1000
+      },
+      "kind": "pirate_base",
+      "terrain": "dense_nebula",
+      "owner": "pirates",
+      "buildings": [
+        {
+          "type": "shipyard"
+        },
+        {
+          "type": "radar"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "home_b": {
+      "position": {
+        "x": 1360,
+        "y": -330
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "slot_b",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "shore_b": {
+      "position": {
+        "x": 1640,
+        "y": -60
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic"
+    },
+    "wisp": {
+      "position": {
+        "x": 1120,
+        "y": -130
+      },
+      "kind": "nebula",
+      "terrain": "nebula",
+      "transit": [
+        [
+          "home_b",
+          "flare_1"
+        ],
+        [
+          "reach_e",
+          "shore_b"
+        ]
+      ]
+    },
+    "storm_1": {
+      "position": {
+        "x": 880,
+        "y": 150
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "flare_1": {
+      "position": {
+        "x": 1130,
+        "y": 220
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "storm_2": {
+      "position": {
+        "x": 1475,
+        "y": 213
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "flare_2": {
+      "position": {
+        "x": 1620,
+        "y": 420
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "storm_3": {
+      "position": {
+        "x": 1000,
+        "y": 440
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "hot_world": {
+      "position": {
+        "x": 1270,
+        "y": 620
+      },
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
+    },
+    "scoured": {
+      "position": {
+        "x": 980,
+        "y": 900
+      },
+      "kind": "dead_world",
+      "terrain": "solar_flare_zone"
+    },
+    "blaze": {
+      "position": {
+        "x": 1560,
+        "y": 760
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "spent": {
+      "position": {
+        "x": -300,
+        "y": 700
+      },
+      "kind": "planet",
+      "terrain": "depleted_system",
+      "planetType": "barren"
+    },
+    "husk": {
+      "position": {
+        "x": -30,
+        "y": 850
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "planetType": "dead_world"
+    },
+    "tailings": {
+      "position": {
+        "x": -560,
+        "y": 930
+      },
+      "kind": "asteroid",
+      "terrain": "depleted_system"
+    },
+    "cinder": {
+      "position": {
+        "x": 422,
+        "y": 382
+      },
+      "kind": "dead_world",
+      "terrain": "solar_flare_zone",
+      "transit": [
+        [
+          "husk",
+          "scoured"
+        ],
+        [
+          "station",
+          "reach_se"
+        ]
+      ]
+    },
+    "old_colony": {
+      "position": {
+        "x": -560,
+        "y": 470
+      },
+      "kind": "planet",
+      "terrain": "depleted_system",
+      "planetType": "terran"
+    },
+    "reach_w": {
+      "position": {
+        "x": -560,
+        "y": 110
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "reach_nw": {
+      "position": {
+        "x": -440,
+        "y": -300
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "barren"
+    },
+    "reach_se": {
+      "position": {
+        "x": 511,
+        "y": 271
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "reach_n": {
+      "position": {
+        "x": 100,
+        "y": -700
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "gas_giant"
+    },
+    "reach_sw": {
+      "position": {
+        "x": -900,
+        "y": 820
+      },
+      "kind": "asteroid",
+      "terrain": "empty_space"
+    },
+    "reach_e": {
+      "position": {
+        "x": 930,
+        "y": -200
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    }
+  },
+  "players": {
+    "pirates": {
+      "name": "Pirate Base",
+      "faction": "vanguard",
+      "npc": "pirate",
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
+    },
+    "neutrals": {
+      "name": "Neutral AI Base",
+      "faction": "vanguard",
+      "npc": "neutral",
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
+    }
+  },
+  "slots": {
+    "slot_a": {
+      "team": "A",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "slot_b": {
+      "team": "B",
+      "spawn": "fixed",
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    }
+  },
+  "fleets": {
+    "fleet_a": {
+      "owner": "slot_a",
+      "location": "home_a",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "fleet_b": {
+      "owner": "slot_b",
+      "location": "home_b",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "pirate_patrol": {
+      "owner": "pirates",
+      "location": "globule",
+      "units": [
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    }
+  }
+}

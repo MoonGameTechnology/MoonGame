@@ -112,9 +112,11 @@ describe('shipped maps resolve against the shipped catalogue', () => {
   it('the maps exercise the terrain catalogue, not just nebula and asteroid', () => {
     const kinds = new Set<string>();
     const terrains = new Set<string>();
+    const emptyOn = new Set<string>();
     for (const file of files) {
       for (const sec of Object.values(parseMatchMap(readMap(file)).sectors)) {
         kinds.add(sec.kind);
+        if (sec.kind === 'empty') emptyOn.add(file);
         if (sec.terrain !== undefined) terrains.add(sec.terrain);
       }
     }
@@ -138,22 +140,23 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       'nebula',
       'solar_flare_zone',
     ]);
-    // `empty` на шипнутых картах НЕ стоит — и это решение владельца (22 сентября):
-    // «развилки не создают отдельную провинцию, и перекрёстки тоже не обязательно
-    // должны создавать провинцию». На `pve-2` было семь клеток `empty` — перекрёстки
-    // решётки, которые нельзя присвоить и которые существовали только чтобы через них
-    // летали. Их убрали вместе с решёткой: каждая провинция теперь МЕСТО, а развилка
-    // получается сама — там, где сходятся границы соседей. Вернуть `empty` на карту —
-    // значит вернуть узел-дорогу, от которого владелец отказался; поэтому его отсутствие
-    // закреплено здесь, а не забыто.
+    // Тестовая дуэльная карта (`duel-testbed`, заказ владельца 2026-09-25) выкладывает
+    // каталог ЦЕЛИКОМ, поэтому набор видов на шипнутых картах теперь равен каталогу.
+    // Впервые с неё пришли пять: `black_hole`, `debris_field`, `empty`, `neutral_base`,
+    // `void_station`.
     expect([...kinds].sort()).toEqual([
       'asteroid',
       'asteroid_cluster',
+      'black_hole',
       'dead_world',
+      'debris_field',
       'dense_nebula',
+      // Только «точки съёмки» тестовой карты — см. проверку ниже.
+      'empty',
       'graveyard',
       'ion_storm',
       'nebula',
+      'neutral_base',
       'pirate_base',
       'planet',
       // Третья глава (`pve-3`, «Карантинный рубеж»): пространственные разломы держат стену
@@ -164,6 +167,17 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       // экспедиции и астероидным полем. Быстрая, но по живучести штрафная: пролететь
       // можно, драться там дорого.
       'solar_flare',
+      'void_station',
     ]);
+    // `empty` на БОЕВЫХ картах НЕ стоит — решение владельца (22 сентября): «развилки не
+    // создают отдельную провинцию, и перекрёстки тоже не обязательно должны создавать
+    // провинцию». На `pve-2` было семь клеток `empty` — перекрёстки решётки, которые нельзя
+    // присвоить и которые существовали только чтобы через них летали. Развилка получается
+    // сама, там, где расходятся дороги (ROADS), а перекрёсток — это мир, где их сходится
+    // пять и больше. Единственное исключение — тестовая карта (резолюция владельца
+    // 2026-09-25): две «точки съёмки», чтобы на ней можно было развернуть станцию
+    // (`station.deploy` требует клетку `empty`). Любая другая карта с `empty` — возврат
+    // узла-дороги, от которого владелец отказался.
+    expect([...emptyOn]).toEqual(['duel-testbed.json']);
   });
 });

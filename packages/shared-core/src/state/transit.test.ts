@@ -105,4 +105,18 @@ describe('MAP-TRANSIT — the map may not lie about its lanes', () => {
     const issues = withTransit([['north', 'west'], ['north', 'east']]);
     expect(issues.some((c) => c.startsWith('E_TRANSIT_UNREACHABLE:'))).toBe(true);
   });
+
+  it('a barrier on the same map is not demanded as a destination', () => {
+    // A rift is a hole in the map: plain connectivity already exempts it, and the
+    // fleet-walk check must too — otherwise ANY map with both a transit and a rift or
+    // black hole fails validation, which is how the testbed duel map found this.
+    const map = parseMatchMap({
+      ...crossing(LANES),
+      sectors: {
+        ...crossing(LANES).sectors,
+        hole: { position: { x: 600, y: 600 }, kind: 'rift', terrain: 'empty_space' },
+      },
+    });
+    expect(validateMatchMap(map, data)).toEqual([]);
+  });
 });
