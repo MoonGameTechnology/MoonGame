@@ -81,8 +81,11 @@ const css = `
 html,body{height:100%;}
 body{margin:0;overflow:hidden;color:var(--ink);
   font:12px/1.45 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;letter-spacing:.2px;
-  user-select:none;overscroll-behavior:none;touch-action:none;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  overscroll-behavior:none;touch-action:none;
   background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
+/* Тело не выделяется (п. 1.6.1.8), а поле ввода обязано: иначе в Safari не вставить текст. */
+input,textarea{user-select:text;-webkit-user-select:text;}
 /* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
 #sector-zero{position:fixed;inset:0;z-index:58;display:none;}
@@ -1167,6 +1170,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
   overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;}
 #railtools::-webkit-scrollbar{display:none;}
 #rail.open #railtools{display:flex;}
+/* п. 1.10.1: открытое меню — над всплывающими сообщениями (#toasts, z 40), иначе они лежат
+   поверх пунктов и ловят нажатие; окна, которые меню открывает, — выше (44+). */
+#rail.open{z-index:41;}
 #railtools .rlbl{display:none;font:8px ui-monospace,monospace;letter-spacing:.4px;color:var(--cyan-dim);line-height:1;}
 #railtools button{position:relative;width:38px;height:38px;background:transparent;border:0;cursor:pointer;
   font-size:18px;color:var(--cyan-dim);border-radius:8px;font-variant-emoji:text;display:grid;place-items:center;}

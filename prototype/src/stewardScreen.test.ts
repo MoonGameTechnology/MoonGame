@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
+import { setRunClock } from './format';
+import { runClockText } from '../../decisions/runClock';
 import { newGame, HOUR, DAY } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
@@ -79,6 +81,29 @@ describe('хранитель — счётчики и формат', () => {
     expect(stewFmtDur(90 * 60_000)).toBe('1ч 30м');
     expect(stewFmtDur(2 * 60 * 60_000)).toBe('2ч 0м');
     expect(stewFmtDur(-5)).toBe('0м'); // просроченный дедлайн не уходит в минус
+  });
+
+  it('единицы длительности — из локали: английский игрок не видит «ч» и «м»', () => {
+    // Строка уходит в предупреждение «враг на подходе» — в забеге Sector Zero тоже.
+    setLocale('en');
+    try {
+      expect(stewFmtDur(45 * 60_000)).toBe('45m');
+      expect(stewFmtDur(90 * 60_000)).toBe('1h 30m');
+    } finally {
+      setLocale('ru');
+    }
+  });
+
+  it('в забеге Sector Zero — реальные «м:сс», как у отсчёта волны', () => {
+    // Игровой час на темпе забега длится секунды: «прибытие через 2ч 0м» врало бы о том,
+    // сколько ждать (решение владельца 2026-09-24 — отсчёты забега в реальном времени).
+    setRunClock(() => true);
+    try {
+      expect(stewFmtDur(2 * HOUR)).toBe(runClockText(2 * HOUR));
+      expect(stewFmtDur(-5)).toBe(runClockText(0));
+    } finally {
+      setRunClock(() => false);
+    }
   });
 
   it('технология читается с МОЕГО места, отсутствие ветки — не краш', () => {
