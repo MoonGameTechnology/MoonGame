@@ -625,6 +625,7 @@ export const ru: Record<string, string> = {
   'codex.dmg.ships': 'по кораблям',
   'codex.dmg.buildings': 'по зданиям',
   'codex.dmg.air': 'по авиации',
+  'codex.dmg.atk-def': 'атака / оборона',
   'codex.dmg.vehicles': 'по технике',
   'codex.dmg.infantry': 'по пехоте',
   'codex.row.atk-def': 'Атака / Оборона',

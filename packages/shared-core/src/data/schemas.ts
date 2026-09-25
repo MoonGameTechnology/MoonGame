@@ -84,6 +84,14 @@ export const UnitStatsSchema = z
     /** Range (Euclidean, map units) at which point-defense engages enemy
      *  shuttles/missiles. 0 = use the default PD_RANGE (120). */
     pointDefenseRange: z.number().nonnegative().default(0),
+    /** Урон по роду войск (решение владельца 2026-09-25, `util/groundTargets.ts`): атака и
+     *  оборона отдельно по ПЕХОТЕ и по ТЕХНИКЕ. Бьют только наземные войска — корабли по земле
+     *  не стреляют. Не объявлено — юнит бьёт этот род своей `attack`/`defense`; живой
+     *  наземный каталог объявляет все четыре явно (сторож в `schemas.test.ts`). */
+    attackVsInfantry: z.number().nonnegative().optional(),
+    attackVsVehicle: z.number().nonnegative().optional(),
+    defenseVsInfantry: z.number().nonnegative().optional(),
+    defenseVsVehicle: z.number().nonnegative().optional(),
     /** Shuttle reach (shuttles-roadmap SQ-3.1): the Euclidean distance in MAP
      *  UNITS a launched `shuttle` may strike from its carrier. 0 = no reach. */
     strikeRange: z.number().nonnegative().default(0),

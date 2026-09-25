@@ -461,6 +461,17 @@ export {
   type Tier,
 } from './util/combat';
 export {
+  targetClassOf,
+  statVs,
+  classShares,
+  targetedVolley,
+  hasGroundTargets,
+  TARGET_CLASSES,
+  type TargetClass,
+  type ClassPools,
+  type FireRole,
+} from './util/groundTargets';
+export {
   findHealthyStack,
   addUnits,
   sumUnitStat,
