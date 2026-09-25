@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 import {
+  espionageShown,
   SECTOR_ZERO_ABSENT_HUD,
   SECTOR_ZERO_ABSENT_TOOLS,
   toolShown,
@@ -43,5 +44,12 @@ describe('поля шапки, которых нет в забеге (решен
   it('каждое поле существует в разметке шапки', () => {
     for (const id of Object.values(SECTOR_ZERO_ABSENT_HUD))
       expect(MARKUP, `id="${id}" в build.mjs`).toContain(`id="${id}"`);
+  });
+});
+
+describe('шпионаж — не в забеге (заказ владельца 2026-09-25)', () => {
+  it('в забеге Sector Zero шпионажа нет, в остальной игре — есть', () => {
+    expect(espionageShown(true)).toBe(false);
+    expect(espionageShown(false)).toBe(true);
   });
 });

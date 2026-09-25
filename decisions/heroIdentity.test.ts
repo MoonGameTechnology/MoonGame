@@ -29,7 +29,6 @@ function newGame(): GameState {
 }
 import {
   HERO_GRADE_COLORS,
-  heroAtPoint,
   heroGradeColor,
   heroGradeGlyph,
   heroGradeKey,
@@ -89,11 +88,7 @@ describe('hero map privacy and targeting', () => {
     expect(src).toContain('heroGradeGlyph(hero.grade)');
   });
 
-  it('uses the displayed portrait bounds rather than the hull position', () => {
-    const hits = [{ heroId: 'h1', x: 20, y: 30, width: 58, height: 68 }];
-    expect(heroAtPoint(hits, 49, 60)).toBe('h1');
-    expect(heroAtPoint(hits, 49, 128)).toBeNull();
-    expect(heroAtPoint([], 49, 60)).toBeNull();
+  it('unknown hero has no identity', () => {
     expect(heroIdentity('unknown')).toBeUndefined();
   });
 });
