@@ -63,6 +63,23 @@ const hooks = `window.__szTest = {
   layerOpen: () => topLayerOpen(),
   // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
   prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+  // Захват Роем провинции игрока — тем же путём событий, что в игре (handleEvents).
+  farthestWorld: () => {
+    const home = Object.values(s.planets).find((p) => p.owner === ME && p.kind === 'planet');
+    const far = Object.values(s.planets)
+      .filter((p) => p.kind === 'planet' && p.id !== home?.id)
+      .sort((a, b) => Math.hypot(b.position.x - home.position.x, b.position.y - home.position.y) - Math.hypot(a.position.x - home.position.x, a.position.y - home.position.y))[0];
+    return far?.id ?? null;
+  },
+  give: (id) => { s.planets[id].owner = ME; },
+  capture: (id) => {
+    const owner = s.pve.npcPlayerId;
+    s.planets[id].owner = owner;
+    handleEvents([{ type: 'planet.captured', payload: { planetId: id, owner } }]);
+    return owner;
+  },
+  knownOwner: (id) => knownOwner(id),
+  identified: (id) => known(id),
   // Меню каста флагмана и что герой носит — меню обязано быть из надетого.
   casts: () => chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
   worn: () => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)?.equipped ?? null,
@@ -332,6 +349,14 @@ try {
     await page.waitForFunction(() => window.__szTest.atWar().length > 0);
     assert.deepEqual(await page.evaluate(() => window.__szTest.warLines()), [], 'YAG-7.3: строки войны в ленте нет');
     assert.ok((await page.evaluate(() => window.__szTest.warReplies())) > 0, 'YAG-7.3: реплика в треде на месте');
+    // Захват Роем провинции игрока (замечание владельца 2026-09-25): после вспышки мир
+    // уходит в туман, и карта обязана помнить НОВОГО владельца, а не прежнего.
+    const far = await page.evaluate(() => window.__szTest.farthestWorld());
+    await page.evaluate((id) => window.__szTest.give(id), far);
+    await page.waitForFunction((id) => window.__szTest.identified(id) && window.__szTest.knownOwner(id) === 'p1', far);
+    const taker = await page.evaluate((id) => window.__szTest.capture(id), far);
+    await page.waitForFunction((id) => !window.__szTest.identified(id), far);
+    assert.equal(await page.evaluate((id) => window.__szTest.knownOwner(id), far), taker, 'захваченная Роем провинция — цвета Роя, а не игрока');
     // Меню приказов предлагает только надетые навыки героя (замечание владельца 2026-09-25):
     // у командира открыто четыре способности, надета одна.
     const casts = await page.evaluate(() => window.__szTest.casts());
