@@ -484,6 +484,8 @@ export {
   rarityOf,
   takeFromStacks,
   mergeStacks,
+  serviceKey,
+  SERVICE_MERGE_CAP,
 } from './util/stacks';
 export {
   effectiveStats,

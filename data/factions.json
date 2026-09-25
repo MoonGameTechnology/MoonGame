@@ -231,6 +231,7 @@
     "passives": {
       "productionBonus": 0.15,
       "fortGarrisonBonus": -1
-    }
+    },
+    "veterans": false
   }
 }

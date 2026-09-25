@@ -136,6 +136,8 @@ import {
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
 import { fleetHolds } from '../../decisions/fleetHolds';
 import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
+import { veteranMark, fleetVeteranGrade } from '../../decisions/veteranMark';
+import { veteranTag } from './veteranChevrons';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -6070,7 +6072,7 @@ function render(now: number) {
       cx.restore();
     }
     if (detail === 0) {
-      drawFleetHoldBadge(cx, A, null, ships, [], false, col);
+      drawFleetHoldBadge(cx, A, null, ships, [], false, col, fleetVeteranGrade(f.units, data));
       // selection still reads on the schematic view; the rest of the kit is gone
       if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 12, now);
       continue;
@@ -6141,6 +6143,7 @@ function render(now: number) {
       f.owner === ME ? fleetHolds(f, data, s.time) : [],
       selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
       col,
+      fleetVeteranGrade(f.units, data),
     );
 
     cx.globalAlpha = 1; // end of the per-fleet LOD cross-fade
@@ -6488,6 +6491,10 @@ function taskGroupPanelHtml(group: Fleet[]): string {
 /** Тайлы состава флота Bytro-стиля: силуэт-архетип в цвете стороны (наземные —
  *  прежние текст-глифы), счётчик и мини-бар корпуса стека. Тап по кораблю — карточка
  *  стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному — досье юнита. */
+/** Даёт ли выслуга силу в этом матче — тот же конфиг, на котором считает ядро (VET-6). */
+function veteranPowerOn(): boolean {
+  return ctx(s.time, s).config?.veteranPower === true;
+}
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
   const tiles = stacks
     .map((u, index) => {
@@ -6513,7 +6520,9 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
         : '';
       const open =
         def.domain === 'space' ? `data-shipcard="${esc(f.id)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
-      return `<button class="ptile" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
+      // Ветеран — своя плитка (стеки разной выслуги не сливаются) с шевронами степени.
+      const vet = veteranMark(u, data, veteranPowerOn());
+      return `<button class="ptile${vet ? ' vet' : ''}" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}${vet ? veteranTag(vet, 'pt-vet') : ''}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
@@ -7890,7 +7899,11 @@ function openShipCard(fleetId: string, index: number): void {
         return mdef ? tData(mdef.name) : m;
       },
     },
-    { hpPct: stackHullPct(stack, data), fleetName: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»` },
+    {
+      hpPct: stackHullPct(stack, data),
+      fleetName: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`,
+      veteran: veteranMark(stack, data, veteranPowerOn()),
+    },
   );
   el.innerHTML = `<div class="cxbox sc-box">${html}<button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');

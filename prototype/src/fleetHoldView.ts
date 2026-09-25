@@ -3,6 +3,7 @@ import { holdBadgePosition, type FleetHold } from '../../decisions/fleetHolds';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { fleetCountWidth } from '../../packages/client/src/fleetCountBadge';
+import { drawChevron } from './veteranChevrons';
 
 const number = (n: number): string => String(Math.round(n * 10) / 10);
 const color = (m: FleetHold): string => (m.kind === 'hangar' ? '#7bdce8' : '#e6bc7b');
@@ -47,13 +48,15 @@ export function drawFleetHoldBadge(
   meters: readonly FleetHold[],
   detailed: boolean,
   ownerColor: string,
+  /** Высшая степень «Выслуги» во флоте (`fleetVeteranGrade`); >0 — у числа кораблей шеврон. */
+  veteran = 0,
 ): void {
   cx.save();
   cx.font = '700 16px ui-monospace,Menlo,monospace';
   cx.textBaseline = 'middle';
   cx.textAlign = 'left';
 
-  const countWidth = fleetCountWidth(cx, ships);
+  const countWidth = fleetCountWidth(cx, ships) + (veteran > 0 ? 10 : 0);
   const figures = meters.map((m) => `${number(m.used)}/${number(m.capacity)}`);
   const textWidth = detailed ? Math.max(0, ...figures.map((s) => cx.measureText(s).width)) : 0;
   const meterWidth = meters.length ? 44 + (detailed ? textWidth + 5 : 0) : 0;
@@ -79,6 +82,8 @@ export function drawFleetHoldBadge(
   cx.font = '700 16px ui-monospace,Menlo,monospace';
   cx.fillStyle = '#f4f8fc';
   cx.fillText(String(ships), box.x + 20, centerY);
+  // Ветераны во флоте (решение владельца 2026-09-25): шеврон сразу за числом кораблей.
+  if (veteran > 0) drawChevron(cx, box.x + 26 + cx.measureText(String(ships)).width, centerY);
 
   if (meters.length) {
     const dividerX = box.x + countWidth + 0.5;
