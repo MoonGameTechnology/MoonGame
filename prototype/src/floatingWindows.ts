@@ -27,14 +27,19 @@ const WINDOWS = [
   ['pingmenu', '.pm-box', '.pm-head'],
 ] as const;
 
-/** Keep the complete window reachable; oversized content scrolls inside its frame. */
+/** Keep the complete window reachable; oversized content scrolls inside its frame.
+ *  `top` is where the HUD chrome ends (resources, tabs, objectives): a window whose title
+ *  slid under it could be neither dragged back nor used — owner's report 2026-09-25, the
+ *  order window hid under the resource bar. A window taller than the room below the
+ *  chrome stays at `top` and scrolls, instead of being pushed up under it. */
 export function fitWindowPosition(
   p: HoloPoint, size: { width: number; height: number }, viewport: { width: number; height: number },
+  top = 12,
 ): HoloPoint {
-  const clamp = (n: number, max: number): number => Math.max(12, Math.min(n, Math.max(12, max)));
+  const clamp = (n: number, min: number, max: number): number => Math.max(min, Math.min(n, Math.max(min, max)));
   return {
-    x: clamp(p.x, viewport.width - size.width - 12),
-    y: clamp(p.y, viewport.height - size.height - 12),
+    x: clamp(p.x, 12, viewport.width - size.width - 12),
+    y: clamp(p.y, top, viewport.height - size.height - 12),
   };
 }
 
@@ -60,6 +65,7 @@ export function initFloatingWindows() {
   const previous = new WeakMap<HTMLElement, { left: string; top: string; leftPriority: string; topPriority: string }>();
   let enabled = false;
   let viewport = { width: 1280, height: 720 };
+  let topInset = 12;
   let drag: { entry: WindowEntry; id: number; start: HoloPoint; origin: HoloPoint } | null = null;
   let releasedRoot: HTMLElement | null = null;
   const observer = typeof ResizeObserver !== 'undefined'
@@ -93,7 +99,7 @@ export function initFloatingWindows() {
   };
   const apply = (entry: WindowEntry): void => {
     if (!entry.node || !entry.point || !entry.size) return;
-    const point = fitWindowPosition(entry.point, entry.size, viewport);
+    const point = fitWindowPosition(entry.point, entry.size, viewport, topInset);
     entry.point = point;
     entry.node.style.setProperty('left', `${Math.round(point.x)}px`, 'important');
     entry.node.style.setProperty('top', `${Math.round(point.y)}px`, 'important');
@@ -175,6 +181,13 @@ export function initFloatingWindows() {
       return entry?.visible && entry.point && entry.size ? {
         x: Math.round(entry.point.x), y: Math.round(entry.point.y), ...entry.size,
       } : null;
+    },
+    /** Where the HUD chrome ends. Visible windows are re-fitted when it moves: a window
+     *  already standing under a taller chrome must come out from under it. */
+    setTopInset(px: number): void {
+      if (px === topInset) return;
+      topInset = px;
+      for (const entry of entries) if (entry.visible) apply(entry);
     },
     /** A newly selected object suggests an opening position; a user's placement wins. */
     openAt(id: string, point: HoloPoint): void {

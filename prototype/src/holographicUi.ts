@@ -75,10 +75,20 @@ export function initHolographicUi(host: HolographicHost) {
   let width = 1280;
   let height = 720;
   let selected = '';
+  /** Where the HUD chrome ends: the resource bar, the tab row and the objectives/wave
+   *  line on the right. Windows must not open or be dragged above it. */
+  let chromeBottom = 12;
   const measureChrome = (): void => {
     const nav = navigation?.getBoundingClientRect();
     if (nav && nav.width > 0)
       document.body.style.setProperty('--holo-nav-end', `${Math.ceil(nav.right + 8)}px`);
+    let bottom = 12;
+    for (const el of [host.top, navigation, document.getElementById('devline'), document.getElementById('railtoggle')]) {
+      const r = el?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) bottom = Math.max(bottom, Math.ceil(r.bottom + 10));
+    }
+    chromeBottom = bottom;
+    windows.setTopInset(enabled && inGame ? chromeBottom : 12);
   };
   if (typeof ResizeObserver !== 'undefined') {
     new ResizeObserver(measureChrome).observe(host.top);
@@ -148,9 +158,9 @@ export function initHolographicUi(host: HolographicHost) {
           const anchor = host.selectionAnchor();
           if (anchor) {
             const box = selection.getBoundingClientRect();
-            const top = host.top.getBoundingClientRect().bottom + 24;
+            measureChrome();
             windows.openAt('holo-selection-window', selectionWindowPosition(anchor,
-              { width: box.width, height: box.height }, { width, height }, top));
+              { width: box.width, height: box.height }, { width, height }, chromeBottom));
           }
           selected = key;
         }
