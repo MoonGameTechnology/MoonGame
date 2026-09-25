@@ -110,6 +110,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['playercard', 'layer'], // карточка игрока, z50
   ['diplo', 'layer'], // окно дипломатии, z49
   ['warprompt', 'layer'], // подтверждение объявления войны, z48
+  ['abandon', 'layer'], // «Флот потерян» / «Завершить экспедицию?» (PVR-6.29), z48
   ['pingmenu', 'layer'], // композер пинга провинции, z47
   ['tech', 'layer'], // дерево технологий, z47
   ['buildwin', 'layer'], // окно построек мира (BUILD-1), z45 — ниже кодекса

@@ -311,6 +311,9 @@ export const takeBoon = (playerId: string, tech: string) => act(playerId, 'pve.b
 /** Пакет снабжения забега — хостовое действие: хост зовёт его, только если профиль может
  *  заплатить Сувернами (`run-supply` в `decisions/sectorZeroProgress.ts`). */
 export const buySupply = (playerId: string) => act(playerId, 'pve.supply', {});
+/** «Завершить экспедицию» (PVR-6.29) — хостовое действие одиночного забега: сдавшийся
+ *  проигрывает сразу, засчёт тот же, что у проигранного забега. Гейт его не принимает. */
+export const abandonRun = (playerId: string) => act(playerId, 'pve.abandon', {});
 
 // --- hero engine (core heroModule, HERO-3..9): the data-driven hero actions ---
 // `castHeroAbility` moved to `actions.ts` (REFP-24) — imported/re-exported in the

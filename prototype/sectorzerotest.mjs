@@ -118,6 +118,9 @@ const hooks = `window.__szTest = {
   res: r => s.players[ME]?.resources?.[r] ?? 0,
   // Журнал аналитики веб-площадки (YAG-5.1): что игра отдала бы приёмнику.
   events: () => platform.events ?? [],
+  // Весь флот игрока погиб — флоты уходят из мира, как после проигранного боя.
+  sink: () => { for (const f of Object.values(s.fleets)) if (f.owner === ME) delete s.fleets[f.id]; selFleet = null; selFleets = new Set(); },
+  ended: () => s.match.status === 'ended',
 };`;
 
 /** Панель тестового комикса и заведомо битая картинка (панель без арта). */
@@ -522,7 +525,24 @@ try {
       named('rewarded_ad_completed').map((e) => e.props.placement),
       ['run.sovereigns', 'run.double'],
     );
-    await leave();
+    // PVR-6.29 (решение владельца 2026-09-25): кораблей не осталось — карточка «Флот потерян»
+    // вместо минут у экрана, где Рой штурмует планету. «Отстроиться» оставляет забег; та же
+    // карточка — кнопкой колонки в любой момент, и «Завершить» сразу ставит поражение с итогами.
+    await page.evaluate(() => window.__szTest.sink());
+    await page.locator('#abandon').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#abandon-title').textContent(), /Флот потерян|Fleet lost/);
+    assert.match(await page.locator('#abandon-stay').textContent(), /Отстроиться|Rebuild/);
+    await page.locator('#abandon-stay').click();
+    await page.locator('#abandon').waitFor({ state: 'hidden' });
+    assert.equal(await page.evaluate(() => window.__szTest.ended()), false, '«Отстроиться» — забег идёт');
+    await toggleTools();
+    await page.locator('#rail-abandon').click();
+    assert.match(await page.locator('#abandon-title').textContent(), /Завершить экспедицию\?|End the expedition\?/);
+    await page.locator('#abandon-go').click();
+    await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
+    const failed = (await page.evaluate(() => window.__szTest.events())).filter((e) => e.event === 'pve_failed');
+    assert.equal(failed.length, 1, 'сдача — проигранная попытка');
+    await page.locator('#endscreen [data-es="menu"]').click();
     await page.waitForFunction(() => document.getElementById('sz-mission-1').classList.contains('sz-passed'));
     // Засчитанный забег добавил разведку главы: на её карте опознанного стало больше.
     await page.locator('#sz-mission-1').click();
@@ -549,7 +569,7 @@ try {
       ' комиксы глав — до первого забега и после победы, один раз, с пропуском; портреты Академии загружены;' +
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
-      ' карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты\n',
+      ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты\n',
   );
 } finally {
   await browser.close();

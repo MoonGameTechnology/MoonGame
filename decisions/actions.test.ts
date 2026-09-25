@@ -21,6 +21,7 @@ import {
   instantRepairFleet,
   premiumRepairFleet,
   buySupply,
+  abandonRun,
   launchFleet,
   loadArmy,
   loadShuttle,
@@ -173,6 +174,14 @@ describe('строители приказов против схем гейта',
   it('`pve.supply` гейтом НЕ признан — Суверены за снабжение списывает хост', () => {
     expect(CLIENT_ACTION_TYPES).not.toContain('pve.supply');
     expect(isValidActionPayload('pve.supply', buySupply(P).payload)).toBe(false);
+  });
+
+  it('`pve.abandon` гейтом НЕ признан — сдача есть только у одиночного забега', () => {
+    // Сетевого PvE нет; принял бы гейт этот тип, у онлайн-матча появилась бы дверь, которой
+    // там не должно быть.
+    expect(abandonRun(P)).toMatchObject({ type: 'pve.abandon', playerId: P, payload: {} });
+    expect(CLIENT_ACTION_TYPES).not.toContain('pve.abandon');
+    expect(isValidActionPayload('pve.abandon', abandonRun(P).payload)).toBe(false);
   });
 
   it('`swarm.adapt` гейтом НЕ признан — проект Роя заказывает драйвер, не клиент', () => {
