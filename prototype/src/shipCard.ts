@@ -17,6 +17,7 @@ import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import type { ShipCardModel, ShipCardStat } from '../../decisions/shipCard';
+import { unitDamageHtml } from './unitDamageView';
 
 /** Чем карточка рисует корпус и модуль. */
 export interface ShipCardHooks {
@@ -106,7 +107,7 @@ export function shipCardHtml(
   const max = Math.max(1, ...m.stats.map((s) => Math.max(s.base, s.effective)));
   const stats = `<div class="sc-sec">${t('shipcard.stats')}</div>${m.stats.map((s) => statRow(s, max)).join('')}`;
   return (
-    `<div class="sc">${head}${loadout}${stats}` +
+    `<div class="sc">${head}${loadout}${stats}${unitDamageHtml(m.damage)}` +
     `<button type="button" class="sc-codex" data-codex="u:${esc(m.unit)}">${t('shipcard.codex')}</button></div>`
   );
 }

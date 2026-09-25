@@ -29,6 +29,7 @@
 import { splitSupport } from '../../decisions/supportShips';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import {
+  effectiveStats,
   unitBuildSiteBlocker,
   type Action,
   type ArsenalItem,
@@ -43,6 +44,8 @@ import { SECTOR_TYPES } from './map';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
 import { buildShip } from '../../decisions/actions';
+import { unitDamageProfile } from '../../decisions/unitDamage';
+import { unitDamageHtml } from './unitDamageView';
 import {
   createLoadoutEditor,
   applyLoadoutAction,
@@ -310,6 +313,14 @@ export function loadoutPaneHtml(
   // right: live preview + cost + build
   const maxStat = Math.max(1, ...m.preview.map((p) => p.effective));
   const bars = m.preview.map((p) => statBarHtml(p, maxStat)).join('');
+  // Урон по целям — с тем же оснащением, что и полосы над ним: надел осадный модуль —
+  // выросла ячейка «по зданиям».
+  const hullDef = data.units[m.unit];
+  const damage = hullDef
+    ? unitDamageHtml(
+        unitDamageProfile(hullDef, effectiveStats(hullDef, { modules: m.modules }, data)),
+      )
+    : '';
   const worlds = buildSites(state, me, draft.hull);
   const planOpts = worlds
     .map(
@@ -326,7 +337,7 @@ export function loadoutPaneHtml(
     `<div class="cn-crow total"><span class="cn-cl">${t('yard.cost.total')}</span><span class="cn-cv">${bagText(m.totalCost)}</span></div></div>`;
   const canBuild = m.affordable && draft.planet !== '';
   const right =
-    `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${cost}` +
+    `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${damage}${cost}` +
     `<div class="cn-row2"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
     // Нет годного мира — вместо селектора ПРЯМАЯ надпись (заказ владельца): пустой
     // выпадающий список игрок читает как «сейчас загрузится», а не как отказ, и жмёт

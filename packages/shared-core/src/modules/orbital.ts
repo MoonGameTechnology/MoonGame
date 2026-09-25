@@ -13,7 +13,7 @@ import { applyDamageToSide, hookedDamage, isHostile, removeIfWiped } from '../ut
 import { splitVolley } from '../util/volley';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
-const BOMBARD_FRACTION = 0.5;
+export const BOMBARD_FRACTION = 0.5;
 
 /** One game-hour of world time — the AA volley grid (same value the melee module
  *  uses for its round interval). */
