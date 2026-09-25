@@ -1,0 +1,12 @@
+// Cloudflare Worker `moongame`: the web client as static assets — no Worker code.
+// Workers Builds deploys it on every push to `main`: build command `pnpm run site`,
+// deploy command `npx wrangler deploy` (the default). Only the client lives here; the
+// match server (Node + Postgres + WebSocket) is deployed from `deploy/`.
+{
+  "name": "moongame",
+  "compatibility_date": "2026-09-25",
+  "assets": {
+    // Staged by `scripts/stage-site.mjs`: only the player-facing pages of prototype/dist.
+    "directory": "./prototype/dist/site",
+  },
+}
