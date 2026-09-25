@@ -182,6 +182,7 @@ export {
   BLACKOUT_MULT,
   DEFAULT_SIGHT,
   sightRulesOf,
+  worldSightOf,
   sightCircles,
   worldRadarReach,
   fleetRadarReach,

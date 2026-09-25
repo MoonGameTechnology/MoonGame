@@ -61,9 +61,21 @@ export const DEFAULT_SIGHT: Readonly<SightRules> = { world: 120, fleet: 40, rada
 export function sightRulesOf(state: Pick<GameState, 'sight'>): Readonly<SightRules> {
   const s = state.sight;
   const ok = (n: unknown): boolean => typeof n === 'number' && Number.isFinite(n) && n >= 0;
-  return s && ok(s.world) && ok(s.fleet) && ok(s.radarScale) && s.radarScale > 0
+  const kindsOk = (k: unknown): boolean =>
+    k === undefined || (!!k && typeof k === 'object' && Object.values(k).every(ok));
+  return s && ok(s.world) && ok(s.fleet) && ok(s.radarScale) && s.radarScale > 0 && kindsOk(s.byKind)
     ? s
     : DEFAULT_SIGHT;
+}
+
+/** Базовый обзор своего мира: число его вида провинции (`byKind`) или общее `world`. Вид
+ *  ищется только среди СОБСТВЕННЫХ ключей таблицы: `__proto__` или `constructor` в данных
+ *  не должен прочитаться как обзор. */
+export function worldSightOf(rules: Readonly<SightRules>, kind: string | undefined): number {
+  const own = rules.byKind;
+  return kind !== undefined && own && Object.prototype.hasOwnProperty.call(own, kind)
+    ? own[kind]!
+    : rules.world;
 }
 
 /** A radar projects TWO concentric ranges: it catches coarse signatures out to its
@@ -274,7 +286,7 @@ function playerCircles(
   for (const planet of Object.values(state.planets)) {
     if (planet.owner !== ownerId) continue;
     const radar = worldRadarRaw(planet, data) * mult;
-    circle({ kind: 'world', id: planet.id }, planet.position, rules.world, radar);
+    circle({ kind: 'world', id: planet.id }, planet.position, worldSightOf(rules, planet.kind), radar);
   }
   for (const fleet of Object.values(state.fleets)) {
     if (fleet.owner !== ownerId) continue;
