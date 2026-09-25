@@ -202,8 +202,20 @@ function tallyLoss(h: HandlerContext, loser: unknown, killer: unknown, n: unknow
 
 export const pveModule: GameModule = {
   id: 'pve',
-  version: '1.4.0',
+  version: '1.5.0',
   setup(api) {
+    // Флоты NPC-стороны идут со множителем режима (`npcSpeedFactor`, решение владельца
+    // 2026-09-25). Сторона — засеянная (`state.pve`), до засева — та же, что засеет модуль.
+    api.hook<number>('fleet.speed', (speed, args, h) => {
+      const cfg = pveOf(h);
+      const factor = cfg?.npcSpeedFactor;
+      if (!cfg || factor === undefined || factor === 1) return speed;
+      const fleetId = (args as { fleetId?: string }).fleetId;
+      const owner = fleetId ? h.state.fleets[fleetId]?.owner : undefined;
+      const npc = h.state.pve?.npcPlayerId ?? npcSeat(h.state, cfg.npcFaction);
+      return owner !== undefined && owner === npc ? speed * factor : speed;
+    });
+
     // Seeding rides on `time.advanced` rather than a match-start event: the kernel
     // emits it for the first continuous span of every match, so a PvE match arms its
     // opening wave the first time its world clock moves — including a match restored

@@ -1126,6 +1126,7 @@
 | PVR-6.25 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Академия: страница героя вкладками, навыки деревом |
 | PVR-6.26 | ✅ | proto | `docs/sector-zero-roadmap.md` | Варрант за каждого уничтоженного врага |
 | PVR-6.27 | ✅ | proto | `docs/sector-zero-roadmap.md` | Взятое логово пиратов не встаёт заново |
+| PVR-6.28 | ✅ | core data | `docs/sector-zero-roadmap.md` | Рой в экспедиции на четверть медленнее |
 | PVR-6.30 | ✅ | proto | `docs/sector-zero-roadmap.md` | Окно боя показывает итог |
 | PVR-6.29 | ✅ | core proto | `docs/sector-zero-roadmap.md` | «Флот потерян» и «Завершить экспедицию» |
 | PVR-6.31 | ✅ | proto | `docs/sector-zero-roadmap.md` | Гарнизон и наземные части — плитками с полоской и числами |

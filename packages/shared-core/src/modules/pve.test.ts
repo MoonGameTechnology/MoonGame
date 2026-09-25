@@ -6,6 +6,7 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { AdvanceResult, Context, MatchConfig } from '../action/types';
 import { deepFreeze } from '../util/clone';
 import { MS_PER_HOUR } from '../util/time';
+import { movementModule } from './movement';
 
 // pveModule — общий NPC-враг, приходящий волнами по расписанию (PVE-3). Мир собран
 // из одного модуля: это и есть доказательство изоляции (модуль ни от кого не зависит).
@@ -79,6 +80,13 @@ const data: GameData = parseGameData({
         waveIntervalHours: 6,
         supply: { perRun: 2, pack: { metal: 150, credits: 40 } },
       },
+    },
+    // Рой медленнее в экспедиции (решение владельца 2026-09-25): вдвое — чтобы разница
+    // читалась в тесте без округлений.
+    slowed: {
+      name: 'Slowed',
+      modules: ['pve'],
+      pve: { waves: 2, npcFaction: 'swarm', waveIntervalHours: 6, npcSpeedFactor: 0.5 },
     },
     plain: { name: 'Plain' },
   },
@@ -550,5 +558,43 @@ describe('pveModule — пакет снабжения (решение владе
   it('режим без снабжения и не-PvE матч — отказ, а не бесплатная выдача', () => {
     expect(buy(ok(advance(MS_PER_HOUR, 'waves')), 'waves')).toMatchObject({ ok: false, code: 'E_NO_SUPPLY' });
     expect(buy(world(), 'plain')).toMatchObject({ ok: false, code: 'E_NOT_PVE' });
+  });
+});
+
+describe('pveModule — скорость NPC-стороны (решение владельца 2026-09-25)', () => {
+  // «Какая-то слишком большая скорость у кораблей Роя». Надбавок у Роя не было: волна шла
+  // быстрее крейсеров игрока собственными фрегатами. Режим задаёт множитель скорости
+  // флотов NPC-стороны — только в забеге, основная игра Роем не замедляется.
+  const moving = createKernel([pveModule, movementModule]);
+  function race(modeId: string): { npc: number; human: number } {
+    const base = ok(advance(MS_PER_HOUR, modeId));
+    const st: GameState = JSON.parse(JSON.stringify(base));
+    st.planets.far = { ...planet('far', null), position: { x: 100, y: 0 } };
+    for (const id of ['home', 'hive']) st.planets[id]!.links = ['far'];
+    st.planets.far.links = ['home', 'hive'];
+    const fleet = (id: string, owner: string, at: string) => ({
+      id, owner, location: at, movement: null, traits: [], units: [{ unit: 'hunter', count: 1 }],
+    });
+    st.fleets = { n: fleet('n', 'swarm', 'hive'), h: fleet('h', 'human', 'home') };
+    const go = (s: GameState, fleetId: string, playerId: string): GameState => {
+      const r = moving.applyAction(
+        s,
+        { id: `mv:${fleetId}`, type: 'fleet.move', playerId, payload: { fleetId, to: 'far' }, issuedAt: MS_PER_HOUR },
+        ctx(MS_PER_HOUR, modeId),
+      );
+      if (!r.ok) throw new Error('move failed: ' + r.code);
+      return r.state;
+    };
+    const after = go(go(st, 'n', 'swarm'), 'h', 'human');
+    const leg = (id: string) => after.fleets[id]!.movement!.arrivesAt - MS_PER_HOUR;
+    return { npc: leg('n'), human: leg('h') };
+  }
+
+  it('флот NPC в режиме со множителем идёт медленнее ровно на множитель, игрок — как был', () => {
+    const plain = race('waves');
+    const slow = race('slowed');
+    expect(plain.npc).toBe(plain.human); // без множителя стороны равны
+    expect(slow.human).toBe(plain.human);
+    expect(slow.npc).toBeCloseTo(plain.npc / 0.5, 5);
   });
 });
