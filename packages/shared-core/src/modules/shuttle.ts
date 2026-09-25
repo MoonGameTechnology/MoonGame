@@ -841,7 +841,16 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
               targetOwner: target.owner,
               damage: dealt,
             });
-            applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, dealt, h.ctx.data, '');
+            applyDamageToSide(
+              h,
+              { kind: 'fleet', fleetId: target.id },
+              dealt,
+              h.ctx.data,
+              '',
+              undefined,
+              undefined,
+              strike.owner,
+            );
             removeIfWiped(h, target.id);
           }
           repelStrike(h, strike, answer, {

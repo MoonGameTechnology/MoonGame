@@ -20,6 +20,7 @@ import {
   stackRadarRange,
   visibleState,
   visibleView,
+  worldSightOf,
 } from './visibility';
 import type { VisibleState } from './visibility';
 
@@ -1056,5 +1057,66 @@ describe('зрение — только круги (решение владел�
     ])
       expect(sightRulesOf({ sight })).toBe(DEFAULT_SIGHT);
     expect(sightRulesOf({})).toBe(DEFAULT_SIGHT);
+  });
+});
+
+describe('обзор мира по виду провинции (решение владельца 2026-09-25)', () => {
+  // «Захватил провинцию, а она радар почему-то давала»: в забеге вокруг себя видят только
+  // колонии и космические крепости, по 100; поле, туманность, мёртвый мир — только себя.
+  const RULES = { world: 0, byKind: { planet: 100, void_station: 100 }, fleet: 0, radarScale: 1 };
+  const at = (x: number): Partial<Planet> => ({ position: { x, y: 0 } });
+  function kindState(kind: string, radarLevel?: number): GameState {
+    const home = planet('HOME', 'p1', [], { ...at(0), kind });
+    if (radarLevel !== undefined) home.buildings = [{ type: 'radar', level: radarLevel, hp: 0 }];
+    return {
+      ...createInitialState({ seed: 'kinds', version: { data: '0.1.0', manifest: '1' } }),
+      players: { p1: player('p1') },
+      planets: {
+        HOME: home,
+        NEAR: planet('NEAR', null, [], at(90)),
+        MID: planet('MID', null, [], at(140)),
+      },
+      sight: RULES,
+    };
+  }
+  const seen = (st: GameState): boolean[] => {
+    const ids = identifiedNodes(st, 'p1', data);
+    return ['HOME', 'NEAR', 'MID'].map((id) => ids.has(id));
+  };
+
+  it('колония и крепость без радара видят 100: ближний мир — да, дальше — нет', () => {
+    expect(seen(kindState('planet'))).toEqual([true, true, false]);
+    expect(seen(kindState('void_station'))).toEqual([true, true, false]);
+  });
+
+  it('поле, туманность и мёртвый мир без радара видят только себя', () => {
+    for (const kind of ['asteroid', 'nebula', 'dead_world'])
+      expect([kind, ...seen(kindState(kind))]).toEqual([kind, true, false, false]);
+  });
+
+  it('радар видит, как прежде, на провинции любого вида', () => {
+    // Радар 1-го уровня — 300: опознание на половину, 150, накрывает и ближний, и средний мир.
+    expect(seen(kindState('asteroid', 1))).toEqual([true, true, true]);
+  });
+
+  it('вид без числа — общее `world`; без таблицы — как было', () => {
+    const rules = { world: 5, byKind: { planet: 7 }, fleet: 0, radarScale: 1 };
+    expect(worldSightOf(rules, 'nebula')).toBe(5);
+    expect(worldSightOf(DEFAULT_SIGHT, 'planet')).toBe(DEFAULT_SIGHT.world);
+    expect(worldSightOf(RULES, undefined)).toBe(0);
+  });
+
+  it('ключ прототипа не читается как обзор', () => {
+    const rules = { world: 3, byKind: {}, fleet: 0, radarScale: 1 };
+    for (const kind of ['__proto__', 'constructor', 'toString'])
+      expect(worldSightOf(rules, kind)).toBe(3);
+  });
+
+  it('сломанная таблица — общие числа целиком, как и прочие сломанные числа', () => {
+    for (const byKind of [{ planet: -1 }, { planet: Number.NaN }, null]) {
+      const sight = { world: 0, fleet: 0, radarScale: 1, byKind } as never;
+      expect(sightRulesOf({ sight })).toBe(DEFAULT_SIGHT);
+    }
+    expect(sightRulesOf({ sight: RULES })).toBe(RULES);
   });
 });

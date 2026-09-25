@@ -290,6 +290,42 @@ describe('итог забега Sector Zero — без счёта и места 
   });
 });
 
+describe('боевой счёт в итогах (PVR-6.20)', () => {
+  it('PvE-матч: потеряно и уничтожено — из счёта ядра, по своему месту', () => {
+    const s = scored();
+    s.pve = {
+      waveNumber: 10,
+      totalWaves: 10,
+      npcPlayerId: 'p3',
+      tally: { p1: { lost: 12, destroyed: 87 }, p2: { lost: 1, destroyed: 2 } },
+    };
+    const html = endScreenHtml(s, 'p1', endOf({ runReward: 7 }), view);
+    expect(html).toContain(`<span class="es-k">${t('end.lost')}</span><span class="es-v">☠ 12</span>`);
+    expect(html).toContain(`<span class="es-k">${t('end.destroyed')}</span><span class="es-v">✹ 87</span>`);
+  });
+
+  it('счёта ещё нет — нули, а не пустое место', () => {
+    const s = scored();
+    s.pve = { waveNumber: 1, totalWaves: 10, npcPlayerId: 'p3' };
+    const html = endScreenHtml(s, 'p1', endOf({ runReward: 7 }), view);
+    expect(html).toContain('☠ 0');
+    expect(html).toContain('✹ 0');
+  });
+
+  it('не PvE — строк счёта нет', () => {
+    const html = endScreenHtml(scored(), 'p1', endOf(), view);
+    expect(html).not.toContain(t('end.lost'));
+    expect(html).not.toContain(t('end.destroyed'));
+    expect(html).toContain('<div class="es-grid">');
+  });
+
+  it('шесть клеток — сетка в три колонки, чтобы кнопки итогов не ушли под край', () => {
+    const s = scored();
+    s.pve = { waveNumber: 1, totalWaves: 10, npcPlayerId: 'p3' };
+    expect(endScreenHtml(s, 'p1', endOf({ runReward: 7 }), view)).toContain('<div class="es-grid tri">');
+  });
+});
+
 describe('итог забега Sector Zero — по частям (PVR-5.4)', () => {
   const summary = {
     attempt: 3,

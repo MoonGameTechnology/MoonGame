@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   identifyRadius,
   mergeArms,
+  radarShown,
   rangeRings,
   sweepChromeShown,
   type RangeSight,
@@ -50,6 +52,35 @@ describe('дальномер выбранного мира — когда сло
       for (const reach of [100, 0])
         if (rangeRings({ detailed, reach }, 0.5).do === 'draw') seen.push(`${detailed}/${reach}`);
     expect(seen).toEqual(['true/100']);
+  });
+});
+
+describe('кольцо у узла карты — только у мира с радаром (PVR-6.19)', () => {
+  it('ИСЧЕРПЫВАЮЩЕ: знак радара виден ровно у видимого мира с радаром', () => {
+    const seen: string[] = [];
+    for (const detailed of [true, false])
+      for (const reach of [100, 0, -3, Number.NaN])
+        if (radarShown({ detailed, reach })) seen.push(`${detailed}/${reach}`);
+    expect(seen).toEqual(['true/100']);
+  });
+
+  it('кольцо и дальномер спрашивают ОДНО условие — разойтись не могут', () => {
+    for (const detailed of [true, false])
+      for (const reach of [100, 0])
+        expect(radarShown({ detailed, reach })).toBe(
+          rangeRings({ detailed, reach }, 0.5).do === 'draw',
+        );
+  });
+
+  it('карта рисует кольцо только через это условие', () => {
+    // `main.ts` в vitest не поднять — стык держит статическая проверка. Без условия
+    // кольцо снова встало бы у каждой провинции («баг, что у каждой провинции есть радар»).
+    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    const gate = /\/\/ sensor-range ring[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*if \(([^\n]*)\) \{/.exec(
+      src,
+    );
+    expect(gate, 'кольцо не найдено — сторож проверял бы пустоту').toBeTruthy();
+    expect(gate![1]).toContain('radarShown(');
   });
 });
 

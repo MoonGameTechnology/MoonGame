@@ -310,6 +310,17 @@ describe('orbital — anti-air (orbital AA)', () => {
     expect(r.events.map((e) => e.type)).toContain('fleet.destroyed');
   });
 
+  it('an AA kill names the world owner as the killer — `killedBy` (PVR-6.20)', () => {
+    const kernel = createKernel([...combatFamily]);
+    const st = stateWith({
+      planets: [planet('P', 'p1', { garrison: [['aa', 2]] })],
+      fleets: [fleet('E', 'p2', 'P', [['cruiser', 1]], { orbit: 'near' })],
+    });
+    const r = okAdvance(kernel.advanceTo(st, at(2 * HOUR)));
+    const deaths = r.events.filter((e) => e.type === 'unit.died').map((e) => e.payload);
+    expect(deaths).toEqual([expect.objectContaining({ owner: 'p2', killedBy: 'p1' })]);
+  });
+
   it('ECON-2 blackout: unpaid energy halves BOTH flak tiers until the bill clears', () => {
     const kernel = createKernel([orbitalModule]);
     const scene = (arrears?: string[]) =>

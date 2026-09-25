@@ -204,7 +204,15 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '40'; // Урон по роду войск (решение владельца
+export const MODULE_MANIFEST_VERSION = '42'; // PVR-6.21: обзор мира по виду провинции.
+// Состав и порядок модулей те же; сменились ПРАВИЛА зрения и форма `GameState.sight` —
+// таблица `byKind` (`visibility` 2.1.0): в забеге вокруг себя видят только колонии и
+// космические крепости. Партия на 41 закрепила числа без таблицы и видела бы по-старому.
+// export const MODULE_MANIFEST_VERSION = '41'; // PVR-6.20: боевой счёт экспедиции. Состав и
+// порядок модулей те же; сменилась ФОРМА состояния — `PveState.tally` (сколько место потеряло
+// и уничтожило, `pve` 1.3.0), а `unit.died` несёт `killedBy`, чей огонь добил юнит. Партия на
+// 40 поднялась бы с пустым счётом посреди забега и показала бы в итогах не свои числа.
+// export const MODULE_MANIFEST_VERSION = '40'; // Урон по роду войск (решение владельца
 // 2026-09-25): членство и порядок не тронуты; `combat` 2.3.0 считает залп по наземным войскам
 // под состав цели — у юнита атака и оборона отдельно по пехоте и по технике, и урон ложится
 // по родам раздельно. Партия на 39 молча сменила бы исход каждого штурма посреди игры.

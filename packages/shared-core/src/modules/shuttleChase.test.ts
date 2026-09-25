@@ -219,3 +219,14 @@ describe('SHU-4.4 — удар по движущейся цели', () => {
     expect((s.strikes ?? [])[0]?.at).toBeUndefined();
   });
 });
+
+describe('PVR-6.20 — павший от удара челноков засчитывается хозяину вылета', () => {
+  it('`unit.died` несёт `killedBy` владельца эскадры', () => {
+    const s = apply(world(40), order);
+    s.fleets.E1!.units = [{ unit: 'cruiser', count: 2, hp: 101 }]; // второй корпус — на 1 hp
+    const r = kernel.advanceTo(s, { now: s.time + 6 * MS_PER_HOUR, data });
+    if (!r.ok) throw new Error('advance failed');
+    const deaths = r.events.filter((e) => e.type === 'unit.died').map((e) => e.payload);
+    expect(deaths).toEqual([expect.objectContaining({ owner: 'p2', killedBy: 'p1' })]);
+  });
+});

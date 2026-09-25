@@ -566,6 +566,12 @@ export function applyDamageToSide(
    *  пехоте ложится только на пехоту, по технике — только на технику. Не передан — весь
    *  урон одним телом, как всегда. */
   byClass?: ClassPools,
+  /** Whose fire killed these units — stamped onto `unit.died` as `killedBy` (PVR-6.20:
+   *  the expedition's combat tally credits kills to the seat that made them). The
+   *  melee round names the side that landed the most damage on this one; an orbital AA
+   *  burst names the world's owner; a shuttle strike names the strike's owner. Omitted
+   *  when nobody owns the fire (a neutral garrison). */
+  killedBy?: PlayerId | null,
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -577,6 +583,7 @@ export function applyDamageToSide(
     ? { at: location, planetId: ref.planetId }
     : { at: location, fleetId: ref.fleetId };
   if (battleId !== undefined) source.battleId = battleId;
+  if (killedBy != null) source.killedBy = killedBy;
   // Tag the casualty's owner NOW: a wiped fleet is deleted before the `unit.died`
   // event drains, so listeners (heroes / score) can't re-find it. У плацдарма
   // владелец СВОЙ — он не хозяин мира, он на него высадился.
