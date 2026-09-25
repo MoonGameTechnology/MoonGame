@@ -551,6 +551,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .ptile .pt-hp{width:36px;height:3px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;}
 .ptile .pt-hp i{display:block;height:100%;background:#3ad17a;}
 .ptile .pt-hp.low i{background:#ff5a4d;}
+/* числа корпуса стека под полоской: «осталось/всего» (заказ владельца 2026-09-25) */
+.ptile .pt-hpn{font-size:9px;line-height:1;color:var(--dim);letter-spacing:.2px;white-space:nowrap;font-variant-numeric:tabular-nums;}
 /* шапочный ХП-бар армии + ненавязчивый золотой чип платного ремонта */
 .hullrow{display:flex;align-items:center;gap:7px;}
 .hullrow .hico{opacity:.8;flex:0 0 auto;}

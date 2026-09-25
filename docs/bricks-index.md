@@ -1128,6 +1128,7 @@
 | PVR-6.27 | ✅ | proto | `docs/sector-zero-roadmap.md` | Взятое логово пиратов не встаёт заново |
 | PVR-6.30 | ✅ | proto | `docs/sector-zero-roadmap.md` | Окно боя показывает итог |
 | PVR-6.29 | ✅ | core proto | `docs/sector-zero-roadmap.md` | «Флот потерян» и «Завершить экспедицию» |
+| PVR-6.31 | ✅ | proto | `docs/sector-zero-roadmap.md` | Гарнизон и наземные части — плитками с полоской и числами |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |
