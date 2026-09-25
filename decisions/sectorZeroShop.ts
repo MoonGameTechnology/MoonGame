@@ -25,6 +25,7 @@
  */
 import { knownSkillNodes, type GameData } from '../packages/shared-core/src/index';
 import { hashUnit } from './sectorZeroForge';
+import { HERO_MAX_STARS, heroTokenUse } from './heroTokens';
 import {
   sectorSkillLegal,
   SHOP_AD_REFRESHES_PER_DAY,
@@ -71,7 +72,7 @@ export interface ShopPrice {
 /** Строка витрины. */
 export interface ShopRow {
   id: string;
-  kind: 'module' | 'skill' | 'resource' | 'blueprint';
+  kind: 'module' | 'skill' | 'resource' | 'blueprint' | 'hero-tokens';
   grants: string;
   /** Сколько выдаётся (значимо для ресурса). */
   amount: number;
@@ -99,6 +100,9 @@ export function offerOwned(
       knownSkillNodes(hero.skills, progress.selectedHero, data).has(row.grants)
     );
   }
+  // Жетоны «свои», когда герою они больше не нужны: звёзды на потолке.
+  if (row.kind === 'hero-tokens')
+    return (progress.heroes[row.grants]?.level ?? 0) >= HERO_MAX_STARS;
   return false;
 }
 
@@ -124,8 +128,10 @@ export function shopRows(
     const owned = offerOwned(offer, progress, data);
     // Узел навыка продаётся, только если его ВООБЩЕ можно изучить выбранному герою:
     // ветка и предпосылки — правила каталога, и деньги их не отменяют.
+    // Жетоны героя непройденной главы тоже закрыты: герой придёт наградой за главу.
     const locked =
-      offer.kind === 'skill' && !owned && !sectorSkillLegal(progress, offer.grants, data);
+      (offer.kind === 'skill' && !owned && !sectorSkillLegal(progress, offer.grants, data)) ||
+      (offer.kind === 'hero-tokens' && !owned && heroTokenUse(progress, offer.grants, data) === null);
     const prices: ShopPrice[] = [];
     for (const kind of PAY_KINDS) {
       const amount = offer.prices[kind];
@@ -135,10 +141,10 @@ export function shopRows(
       // Возможность площадки идёт ПЕРВОЙ: способа, которого у площадки нет, для игрока
       // не существует вовсе, и объяснять про него что-то ещё бессмысленно.
       // Открытый модуль не отказывает: он продаётся дублем для повышения редкости
-      // (SZE-5.3, решение владельца 2026-09-24). «Уже есть» остаётся только у навыка.
+      // (SZE-5.3, решение владельца 2026-09-24). «Уже есть» — у навыка и у жетонов героя на потолке звёзд.
       const reason: ShopRefusal | null = !available
         ? 'E_SHOP_UNAVAILABLE'
-        : owned && offer.kind === 'skill'
+        : owned && (offer.kind === 'skill' || offer.kind === 'hero-tokens')
           ? 'E_SHOP_OWNED'
           : locked
             ? 'E_SHOP_LOCKED'

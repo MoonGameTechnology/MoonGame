@@ -1,5 +1,5 @@
 /**
- * Сторож меню Sector Zero (`AUD-27`) — статический: меню живёт на DOM, а DOM-окружения у
+ * Сторож меню Sector Zero (`AUD-33`) — статический: меню живёт на DOM, а DOM-окружения у
  * гейта нет. Поведение на собранном архиве проверяет робот `yandextest.mjs` (битый журнал
  * забега → меню доступно).
  *
@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 const SRC = readFileSync(new URL('./sectorZeroMenu.ts', import.meta.url), 'utf8');
 const open = /async function open\(\)[\s\S]*?\n {2}\}/.exec(SRC)?.[0] ?? '';
 
-describe('AUD-27 — сбой чтения сохранения не запирает меню', () => {
+describe('AUD-33 — сбой чтения сохранения не запирает меню', () => {
   it('чтение обёрнуто: исключение — «сохранения нет», а не вечная загрузка', () => {
     expect(open).toMatch(/try \{\s+loaded = await h\.load\(\);\s+\} catch \(error\) \{/);
     // Флаг загрузки снимается ПОСЛЕ ловушки — на любом исходе чтения.

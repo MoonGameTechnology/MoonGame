@@ -12,7 +12,6 @@ import {
   MODULE_UNLOCK_COST,
   sectorHeroSlotItems,
   sectorHeroSlots,
-  sectorHeroUpgradeCost,
   forgeLadderOf,
   sectorHullIds,
   sectorModuleIds,
@@ -38,8 +37,11 @@ import {
   type ShopCapabilities,
 } from '../../decisions/sectorZeroShop';
 import { featuredOffer } from '../../decisions/shopFeatured';
+import { HERO_MAX_STARS, heroStarCost, heroTokenGoal, heroTokenUse } from '../../decisions/heroTokens';
 import { esc, displayUnit } from './format';
 import { catalogPortraitHtml } from './shipArt';
+import { unitDamageHtml } from './unitDamageView';
+import { unitDamageProfile } from '../../decisions/unitDamage';
 import { heroPortraitHtml } from '../../packages/client/src/heroPortraits';
 import { splitSupport } from '../../decisions/supportShips';
 import { heroChapter } from '../../decisions/heroRecruits';
@@ -219,7 +221,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${fitsOnly}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
       })
       .join('');
-    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div><div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
+    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(data.units[hull]!, statsNow))}<div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
   }
 
   /**
@@ -320,7 +322,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               ? esc(tData(h.data.heroSkillTrees[row.grants]?.name ?? row.grants))
               : row.kind === 'blueprint'
                 ? t('sector-zero.shop.blueprint', { r: t(`rarity.${row.grants}`) })
-                : t(`sector-zero.shop.grants.${row.grants}`, { n: row.amount });
+                : row.kind === 'hero-tokens'
+                  ? t('sector-zero.shop.tokens', { name: esc(tData(h.data.heroes[row.grants]?.name ?? row.grants)), n: row.amount })
+                  : t(`sector-zero.shop.grants.${row.grants}`, { n: row.amount });
         const what =
           row.kind === 'resource' ? '' : `<div class="sz-card-type">${t(`sector-zero.shop.grants.${row.kind}`)}</div>`;
         // Что товар ДАЁТ — одной строкой (PVR-6.7): у модуля — его статы, у узла навыка —
@@ -334,12 +338,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
               ? t('sector-zero.shop.blueprint.gives', { n: RARITY_COPIES })
             : row.kind === 'skill'
               ? esc(t(h.data.heroSkillTrees[row.grants]?.description ?? ''))
-              : '';
+              : row.kind === 'hero-tokens' && heroTokenGoal(p, row.grants, h.data) !== null
+                ? t('sector-zero.academy.tokens', { n: p.heroTokens[row.grants] ?? 0, goal: heroTokenGoal(p, row.grants, h.data)! })
+                : '';
         // Значок у товаров без арта: ресурс — фишкой своей валюты, узел навыка — звездой Академии.
         const glyph =
           row.kind === 'module'
             ? ''
-            : `<span class="sz-glyph sz-glyph-${row.kind === 'skill' ? 'skill' : row.kind === 'blueprint' ? `blueprint r-${esc(row.grants)}` : esc(row.grants)}" aria-hidden="true">${row.kind === 'skill' ? '✦' : row.kind === 'blueprint' ? '📐' : row.grants === 'warrants' ? '⌖' : '◇'}</span>`;
+            : `<span class="sz-glyph sz-glyph-${row.kind === 'skill' ? 'skill' : row.kind === 'blueprint' ? `blueprint r-${esc(row.grants)}` : row.kind === 'hero-tokens' ? 'tokens' : esc(row.grants)}" aria-hidden="true">${row.kind === 'skill' ? '✦' : row.kind === 'blueprint' ? '📐' : row.kind === 'hero-tokens' ? '★' : row.grants === 'warrants' ? '⌖' : '◇'}</span>`;
         // Способ, которого НЕТ У ПЛОЩАДКИ, не рисуется вовсе — это прямое требование
         // `platform-adapters.md` («если `rewardedAds === false`, кнопка не показывается»),
         // а не экономия места. Погашенная кнопка «за рекламу» там, где рекламы не бывает,
@@ -357,9 +363,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         // Подпись — только когда купить нельзя НИЧЕМ из показанного: иначе она висела бы
         // над живой кнопкой и объясняла не то, на что игрок смотрит.
         const blocked = offered.every((price) => !price.can) ? offered[0]!.reason : null;
+        const tokensLot = row.kind === 'hero-tokens';
         const note =
           blocked === 'E_SHOP_OWNED' || blocked === 'E_SHOP_LOCKED'
-            ? `<p class="sz-sub">${t(blocked === 'E_SHOP_OWNED' ? 'sector-zero.shop.owned' : 'sector-zero.shop.locked')}</p>`
+            ? `<p class="sz-sub">${t(
+                blocked === 'E_SHOP_OWNED'
+                  ? tokensLot ? 'sector-zero.shop.tokens.max' : 'sector-zero.shop.owned'
+                  : tokensLot ? 'sector-zero.shop.tokens.locked' : 'sector-zero.shop.locked',
+              )}</p>`
             : '';
         // Модуль в витрине — та же карточка предмета, что в подготовке и Мастерской (PVR-6.4).
         const head =
@@ -433,7 +444,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         const state = !hero
           ? chapter !== null
             ? t('sector-zero.academy.by-chapter', { n: romanChapter(chapter) })
-            : t('sector-zero.academy.locked')
+            : heroTokenUse(p, id, data) === 'join'
+              ? t('sector-zero.academy.tokens', { n: p.heroTokens[id] ?? 0, goal: heroTokenGoal(p, id, data) ?? 0 })
+              : t('sector-zero.academy.locked')
           : p.selectedHero === id
             ? t('sector-zero.prep.hero-selected')
             : t('sector-zero.academy.rank', { n: hero.level });
@@ -446,17 +459,25 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const name = esc(tData(def.name));
     let body = `<div class="sz-hero">${face(heroId, tData(def.name), !hero)}<div><h2>${name}</h2><p class="sz-sub">${esc(t(def.description ?? ''))}</p>`;
     const byChapter = heroChapter(heroId);
+    // Жетоны героя (`heroTokens.ts`): до прихода — счёт до 10, после — до следующей звезды.
+    const tokens = p.heroTokens[heroId] ?? 0;
+    const goal = heroTokenGoal(p, heroId, data);
     if (!hero)
       return `<div class="sz-roster">${roster}</div>${body}${
         byChapter !== null
           ? `<p class="sz-hero-reward">${t('sector-zero.academy.by-chapter.hint', { n: romanChapter(byChapter) })}</p>`
-          : ''
+          : goal !== null
+            ? `<p class="sz-hero-reward">${t('sector-zero.academy.tokens.join', { n: tokens, goal })}</p>`
+            : ''
       }${button('unlock-hero', heroId, t('sector-zero.prep.unlock', { n: HERO_UNLOCK_COST }), p.research < HERO_UNLOCK_COST)}</div></div>`;
     const selected = p.selectedHero === heroId;
     const slots = sectorHeroSlots(hero, data);
-    // Ступень подготовки — делениями: 3 ступени видны сразу, а не угадываются из текста.
-    const pips = [1, 2, 3].map((n) => `<i class="${n <= hero.level ? 'lit' : ''}"></i>`).join('');
-    body += `<div class="sz-hero-head"><span><span class="sz-pips" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}${button('upgrade-hero', heroId, hero.level >= 3 ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { n: sectorHeroUpgradeCost(hero) }), hero.level >= 3 || p.research < sectorHeroUpgradeCost(hero))}</div></div></div>`;
+    // Звёздность героя — делениями: все звёзды видны сразу, а не угадываются из текста.
+    // Звезда стоит жетоны этого героя и открывает слот навыка (`heroTokens.ts`).
+    const pips = Array.from({ length: HERO_MAX_STARS }, (_, i) => `<i class="${i < hero.level ? 'lit' : ''}">★</i>`).join('');
+    const cost = heroStarCost(hero.level);
+    const tokenLine = goal !== null ? `<small class="sz-tokens">${t('sector-zero.academy.tokens', { n: tokens, goal })}</small>` : '';
+    body += `<div class="sz-hero-head"><span><span class="sz-pips sz-stars" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}${tokenLine}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}${button('upgrade-hero', heroId, cost === null ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { star: hero.level + 1, n: cost }), cost === null || tokens < cost)}</div></div></div>`;
     body += `<h3>${t('sector-zero.prep.abilities')} · ${hero.equipped.length}/${slots}</h3><div class="sz-cards">`;
     // В слоты идут способности и надеваемые пассивки (PVR-6.16) — один список, один бюджет.
     for (const id of sectorHeroSlotItems(heroId, hero, data)) {

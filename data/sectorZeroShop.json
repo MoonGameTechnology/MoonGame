@@ -111,6 +111,56 @@
         "sovereigns": 80
       },
       "weight": 1
+    },
+    "tokens_commander": {
+      "kind": "hero-tokens",
+      "grants": "commander",
+      "amount": 5,
+      "prices": {
+        "warrants": 300,
+        "sovereigns": 25
+      },
+      "weight": 1
+    },
+    "tokens_ravager": {
+      "kind": "hero-tokens",
+      "grants": "ravager",
+      "amount": 5,
+      "prices": {
+        "warrants": 300,
+        "sovereigns": 25
+      },
+      "weight": 1
+    },
+    "tokens_vanguard": {
+      "kind": "hero-tokens",
+      "grants": "vanguard",
+      "amount": 5,
+      "prices": {
+        "warrants": 300,
+        "sovereigns": 25
+      },
+      "weight": 1
+    },
+    "tokens_warden": {
+      "kind": "hero-tokens",
+      "grants": "warden",
+      "amount": 5,
+      "prices": {
+        "warrants": 300,
+        "sovereigns": 25
+      },
+      "weight": 1
+    },
+    "tokens_scientist": {
+      "kind": "hero-tokens",
+      "grants": "scientist",
+      "amount": 5,
+      "prices": {
+        "warrants": 300,
+        "sovereigns": 25
+      },
+      "weight": 1
     }
   }
 }

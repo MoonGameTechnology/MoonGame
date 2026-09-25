@@ -37,6 +37,8 @@ import type { Fleet, GameState, PlayerId, UnitStack } from '../state/gameState';
 import type { ModePve } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { setStance } from '../state/diplomacy';
+import { mergeStacks } from '../util/stacks';
+import { producedForcesAt, waveStagingWorld } from '../util/pveStaging';
 
 /** The scheduled event a due wave fires. Internal: it has no payload schema, so the
  *  action gate treats it as non-submittable — a player cannot call a wave down. */
@@ -65,9 +67,10 @@ function npcSeat(state: GameState, npcFaction: string): PlayerId | undefined {
   return found;
 }
 
-/** Where a wave materialises: a world the NPC holds. Lowest id wins — a stable choice
- *  that survives replay. No world ⇒ nowhere to spawn, and the wave is skipped rather
- *  than dropped into the void. */
+/** Where a wave materialises when the hive is lost: a world the NPC holds. Lowest id
+ *  wins — a stable choice that survives replay. No world ⇒ nowhere to spawn, and the
+ *  wave is skipped rather than dropped into the void. The hive itself (`PveState.home`)
+ *  is picked by this same rule at seeding. */
 function npcStagingWorld(state: GameState, npcId: PlayerId): string | undefined {
   let found: string | undefined;
   for (const [id, planet] of Object.entries(state.planets)) {
@@ -177,7 +180,7 @@ function oweBoons(h: HandlerContext, pve: NonNullable<GameState['pve']>, cfg: Mo
 
 export const pveModule: GameModule = {
   id: 'pve',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     // Seeding rides on `time.advanced` rather than a match-start event: the kernel
     // emits it for the first continuous span of every match, so a PvE match arms its
@@ -189,7 +192,13 @@ export const pveModule: GameModule = {
       if (h.state.pve) return; // already seeded; waves ride the schedule from now on
       const npcPlayerId = npcSeat(h.state, cfg.npcFaction);
       if (npcPlayerId === undefined) return; // no seat plays the enemy — stay inert
-      const pve = { waveNumber: 0, totalWaves: cfg.waves, npcPlayerId };
+      const home = npcStagingWorld(h.state, npcPlayerId);
+      const pve = {
+        waveNumber: 0,
+        totalWaves: cfg.waves,
+        npcPlayerId,
+        ...(home !== undefined ? { home } : {}),
+      };
       h.state.pve = pve;
       declareWarOnEveryone(h, npcPlayerId);
       const { from } = event.payload as { from: number };
@@ -215,7 +224,9 @@ export const pveModule: GameModule = {
       }
       pve.waveNumber += 1;
 
-      const at = npcStagingWorld(h.state, pve.npcPlayerId);
+      // Волна рождается в улье, пока он в руках NPC; пал — в самом дальнем от игроков мире
+      // (решение владельца 2026-09-24, `util/pveStaging.ts`).
+      const at = waveStagingWorld(h.state);
       const loadout = cfg.waveFleet ?? h.ctx.data.factions[cfg.npcFaction]?.startingLoadout.fleet;
       if (at !== undefined && loadout && loadout.length > 0) {
         const fleetId = `pve:wave:${pve.waveNumber}`;
@@ -230,12 +241,18 @@ export const pveModule: GameModule = {
             ...(stack.modules?.length ? { modules: [...stack.modules] } : {}),
           }));
         const landing = scaled(cfg.waveLanding ?? []);
+        // Несомое по одному — без роста с номером волны (малый ретранслятор Роя).
+        const fixed: UnitStack[] = (cfg.waveFixed ?? []).map((stack) => ({
+          unit: stack.unit,
+          count: stack.count,
+          ...(stack.modules?.length ? { modules: [...stack.modules] } : {}),
+        }));
         const fleet: Fleet = {
           id: fleetId,
           owner: pve.npcPlayerId,
           location: at,
           movement: null,
-          units: scaled(loadout),
+          units: [...scaled(loadout), ...fixed],
           traits: [],
           orbit: 'near',
           // Omitted rather than empty when the mode declares no landing party: a mode
@@ -243,6 +260,16 @@ export const pveModule: GameModule = {
           ...(landing.length > 0 ? { landing } : {}),
         };
         h.state.fleets[fleetId] = fleet;
+        // Построенное Роем уходит с волной (решение владельца 2026-09-24): флоты сбора,
+        // ждущие в улье, вливаются в неё вместе с трюмом. Стартовые флоты карты — нет.
+        for (const produced of producedForcesAt(h.state, h.ctx.data, pve.npcPlayerId, at)) {
+          const from = h.state.fleets[produced]!;
+          fleet.units = mergeStacks(fleet.units, from.units);
+          const hold = mergeStacks(fleet.landing ?? [], from.landing ?? []);
+          if (hold.length > 0) fleet.landing = hold;
+          delete h.state.fleets[produced];
+          h.emit('fleet.merged', { from: produced, into: fleetId, owner: pve.npcPlayerId, at });
+        }
         h.emit('pve.wave.spawned', {
           owner: pve.npcPlayerId,
           fleetId,

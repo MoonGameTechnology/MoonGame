@@ -280,6 +280,10 @@
 .sz-pips { display: inline-flex; gap: 4px; margin-right: 10px; vertical-align: middle; }
 .sz-pips i { width: 16px; height: 6px; background: #1d3a44; }
 .sz-pips i.lit { background: #79dfdf; }
+/* Звёздность героя (жетоны, `heroTokens.ts`): звёзды вместо делений и счёт жетонов под ними. */
+.sz-stars i { width: auto; height: auto; background: none; color: #1d3a44; font-style: normal; font-size: 15px; line-height: 1; }
+.sz-stars i.lit { background: none; color: #f0c96a; text-shadow: 0 0 6px #f0c96a66; }
+.sz-tokens { display: block; margin-top: 4px; color: #9fc6cc; font-size: 11px; letter-spacing: .04em; }
 .sz-tier { margin: 18px 0 8px; color: #79dfdf; font: 11px/1.5 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
 .sz-card.sz-locked { opacity: .62; }
 /* Магазин-витрина (PVR-6.7): главное предложение шире остальных и с лентой; у товаров
@@ -293,6 +297,7 @@
 .sz-glyph-research { color: var(--cur-data); }
 .sz-glyph-warrants { color: var(--cur-warrants); }
 .sz-glyph-skill { color: #79dfdf; }
+.sz-glyph-tokens { color: #f0c96a; }
 /* SZE-5.4: редкость модуля — лот чертежа, блок «повысить до…» в Мастерской и строка чертежей. */
 .sz-glyph-blueprint { color: var(--rar); }
 .sz-glyph-blueprint.r-unique, .sz-rarity-up.r-unique, .sz-blueprints .r-unique { --rar: var(--rar-unique); }

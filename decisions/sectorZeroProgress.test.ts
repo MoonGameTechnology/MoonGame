@@ -63,7 +63,8 @@ describe('Sector Zero persistent preparation', () => {
   });
 
   it('persists a hero upgrade and skill chain, rejecting missing prerequisites', () => {
-    let p = { ...fresh(), research: 40 };
+    // Звезда героя стоит его жетоны (`heroTokens.ts`): 10 за ★2.
+    let p: SectorZeroProgress = { ...fresh(), research: 40, heroTokens: { commander: 12 } };
     expect(
       changeSectorZeroProgress(
         p,
@@ -80,7 +81,10 @@ describe('Sector Zero persistent preparation', () => {
     expect(
       changeSectorZeroProgress(p, { kind: 'skill', hero: 'commander', id: 'wreck_rig' }, data),
     ).not.toBeNull();
+    const research = p.research;
     p = change(p, { kind: 'upgrade-hero', id: 'commander' });
+    expect(p.heroTokens).toEqual({ commander: 2 });
+    expect(p.research).toBe(research);
     p = change(p, { kind: 'skill', hero: 'commander', id: 'neural_lace' });
     p = change(p, { kind: 'skill', hero: 'commander', id: 'overclocked_helm' });
     p = change(p, { kind: 'skill', hero: 'commander', id: 'corridor_sustained' });
@@ -733,6 +737,7 @@ describe('AUD-30 — служебные имена JavaScript в профиле'
         forgeTries: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
         moduleCopies: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
         heroes: Object.fromEntries(SPECIAL.map((id) => [id, { level: 2 }])),
+        heroTokens: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
         selectedHero: 'constructor',
       }),
       data,
@@ -741,6 +746,7 @@ describe('AUD-30 — служебные имена JavaScript в профиле'
       expect(p.modules).not.toContain(id);
       expect(Object.prototype.hasOwnProperty.call(p.heroes, id), id).toBe(false);
       expect(Object.prototype.hasOwnProperty.call(p.stars, id), id).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(p.heroTokens, id), id).toBe(false);
     }
     expect(p.selectedHero).toBe(fresh().selectedHero);
     expect(p.research).toBe(7);
@@ -794,7 +800,13 @@ describe('AUD-31 — откат версии не стирает купленн�
   // разносило её по устройствам — потраченные данные и Варранты не возвращались.
   const hero = Object.keys(data.heroes).find((h) => h !== 'commander')!;
   function bought(): SectorZeroProgress {
-    let p: SectorZeroProgress = { ...fresh(), research: 200, warrants: 5000 };
+    // Звезда героя стоит его жетоны (`heroTokens.ts`): 10 за ★2, и 3 остаются в запасе.
+    let p: SectorZeroProgress = {
+      ...fresh(),
+      research: 200,
+      warrants: 5000,
+      heroTokens: { [hero]: 13 },
+    };
     const acts: SectorProgressAction[] = [
       { kind: 'unlock-module', id: 'shield_booster' },
       { kind: 'forge', id: 'shield_booster' },
@@ -825,6 +837,9 @@ describe('AUD-31 — откат версии не стирает купленн�
     expect(back.shelf?.modules).toEqual(['shield_booster']);
     expect(back.shelf?.heroes?.[hero]?.level).toBe(2);
     expect(back.shelf?.skills?.commander).toEqual(['command_relay', 'command_grid']);
+    // Жетоны героя куплены за Варранты — они едут на полку вместе с героем.
+    expect(back.heroTokens[hero]).toBeUndefined();
+    expect(back.shelf?.heroTokens).toEqual({ [hero]: 3 });
   });
 
   it('новая версия возвращает с полки всё, за что заплачено', () => {
@@ -839,6 +854,7 @@ describe('AUD-31 — откат версии не стирает купленн�
     expect(again.moduleCopies).toEqual(p.moduleCopies);
     expect(again.moduleRarity).toEqual(p.moduleRarity);
     expect(again.heroes[hero]).toEqual(p.heroes[hero]);
+    expect(again.heroTokens).toEqual({ [hero]: 3 });
     expect(again.heroes.commander?.skills).toEqual(p.heroes.commander?.skills);
     expect(again.shelf).toBeUndefined();
   });

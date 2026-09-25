@@ -430,7 +430,7 @@ export interface Planet {
    *  своей личности (они сливаются по юниту и лоадауту), и завести топливо на стек
    *  значило бы запретить им сливаться вовсе. Игроку это ещё и понятнее: у порта одно
    *  читаемое состояние «готов / перезаряжается», а не N счётчиков. */
-  sortie?: { fuel: number; rearming: number };
+  sortie?: { fuel: number; rearming: number; carry?: number };
   /** ЭСКАДРЫ, базирующиеся в космопорте мира (SHU-1.1, форма — SHU-4.2). НЕ флот и НЕ
    *  часть гарнизона: челнок стоит внутри порта, на орбите не появляется и в наземной
    *  обороне мира не участвует. Вместимость — `shuttleBay` портов; потерян порт
@@ -566,6 +566,10 @@ export interface FleetEdge {
   t: number;
 }
 
+/** The target of an interrupted march (`Fleet.resume`, ROADS-8) — the same two shapes a
+ *  `fleet.move` aims at: a node, or a point on a lane. */
+export type FleetResume = { to: PlanetId } | { toEdge: FleetEdge };
+
 /** One ground lift in progress — see `Fleet.loading` (CARGO-1). A CLAIM, not custody:
  *  the units stay in the garrison until the hour is up, so nothing is ever in limbo. */
 export interface LoadingClaim {
@@ -615,7 +619,7 @@ export interface Fleet {
   /** Sortie budget of the shuttles based aboard (fuel + rearm countdown) — the
    *  fleet-side twin of `Planet.sortie`, and for the same reason: the counter belongs
    *  to the BASE, not to the machine, so stacks in the hangar stay mergeable. */
-  sortie?: { fuel: number; rearming: number };
+  sortie?: { fuel: number; rearming: number; carry?: number };
   /** Set (`'near'`) while the fleet is stationed in orbit at a planet; undefined while
    *  in transit. There is a SINGLE orbit (GDD §7.4): a stationed fleet can bombard /
    *  land and is exposed to the planet's orbital AA — no separate "far" safe standoff.
@@ -634,6 +638,12 @@ export interface Fleet {
    *  `fleet.retreat` — the disengaging fleet flees faster while `now < it`. Absent =
    *  no boost. Read by the `fleet.speed` hook. */
   retreatHasteUntil?: number;
+  /** Where a fleet a ROAD battle pulled off its march was heading (ROADS-8): the rest of
+   *  its order, kept while it fights and resumed once the fight is over and the fleet is
+   *  free. Set only while the fleet is in that battle — every way out of it consumes the
+   *  field. Absent = the fleet stood still when the fight found it (an ambush, a parked
+   *  fleet) or it was not a road battle. */
+  resume?: FleetResume;
   // ЗДЕСЬ БЫЛИ `freePosition`/`freeMovement`/`homeBase` — свободный полёт «крыла как
   // флота» (SQ-1.1). Сняты в SHU-2.2 вместе с остальной старой машинерией: с SHU-1.1
   // челнок живёт в `Planet.hangar`/`Fleet.hangar` и в `Fleet.units` не попадает ниоткуда
@@ -910,15 +920,20 @@ export interface GameState {
    *  Здесь лежат только ФАКТЫ симуляции — реплеируемые и сериализуемые; насколько
    *  далеко Рой смотрит назад, решает не состояние, а драйвер (см. `swarmMemory.ts`). */
   swarmMemory?: SwarmMemory;
-  /** PVR-4.3: идущий проект развития модуля Роя. Одновременно он ровно один (§3.4:
-   *  один запас нельзя потратить дважды), поэтому поле, а не список. Отсутствует,
-   *  пока Рой ничего не растит. Форма описана в `modules/swarmAdapt.ts`. */
-  swarmAdapt?: SwarmAdaptProject;
+  /** PVR-4.3: идущие проекты развития модулей Роя. По одному на часть сети (решение
+   *  владельца 2026-09-24: отрезанная часть учится сама); без сети — один на весь Рой
+   *  (§3.4: один запас нельзя потратить дважды). Отсутствует, пока Рой ничего не растит.
+   *  Форма описана в `modules/swarmAdapt.ts`. */
+  swarmAdapts?: SwarmAdaptProject[];
   /** AUD-20: рецепты Роя — до какого уровня он умеет растить модуль-ответ. Пишется по
    *  завершении проекта и штампуется на новые формы (волны). Живёт отдельно от стеков:
    *  погибли все матки с покровом — знание «как его растить» остаётся. Снимается с
    *  клиентской проекции вместе с проектом: рецепт — разведка, которой не было. */
   swarmRecipes?: Record<string, number>;
+  /** Сеть Роя (`swarmNetModule`, `docs/swarm-behavior.md`): что знает каждый держатель —
+   *  центр данных, флот, мир. Знание течёт только по связи, разрыв сети не стирает
+   *  полученного. Снимается с клиентской проекции: это память Роя, а не разведка игрока. */
+  swarmNet?: SwarmNetState;
   /** PVR-4.5: журнал адаптаций — что об ответах Роя знает КАЖДЫЙ ИГРОК. Пишется из
    *  того, что игрок наблюдал лично (его удар отражён), и фильтруется по зрителю тем
    *  же швом, что `swarmIntel`. Память самого Роя лежит отдельно и клиенту не уходит
@@ -985,17 +1000,35 @@ export interface SwarmObservation {
 /**
  * Идущий проект развития модуля Роя (`swarmAdaptModule`, PVR-4.3).
  *
- * Одновременно он ровно один: §3.4 запрещает потратить один запас дважды, поэтому в
- * `GameState` это поле, а не список. Срок дублирует запланированное событие и нужен
- * журналу — источник правды о времени по-прежнему `scheduled`, как у волн.
+ * По одному на часть сети Роя (без сети — один на весь Рой). Срок дублирует
+ * запланированное событие и нужен журналу — источник правды о времени по-прежнему
+ * `scheduled`, как у волн.
  */
 export interface SwarmAdaptProject {
+  /** Стабильный id проекта: по нему отложенный срок находит СВОЙ проект, когда их
+   *  несколько (по одному на часть сети). */
+  id: string;
   moduleId: string;
   /** Уровень, который проект ДАСТ (1 — первый шаг лестницы модуля). */
   level: number;
   /** Флот-носитель с камерой вывода: его гибель проект прекращает. */
   fleetId: string;
   dueAt: number;
+}
+
+/** Сеть Роя (`swarmNetModule`): знание держателей. Ключ — `planet:<id>` / `fleet:<id>`. */
+export interface SwarmNetState {
+  holders: Record<string, SwarmKnowledge>;
+}
+
+/** Что знает один держатель сети Роя. */
+export interface SwarmKnowledge {
+  /** Номера столкновений (`SwarmObservation.ordinal`), о которых держатель знает, по
+   *  возрастанию. Номер, а не id столкновения: знание копируется каждому держателю части,
+   *  и число вместо строки держит снапшот коротким. */
+  known: number[];
+  /** Рецепты: модуль → уровень, который держатель умеет растить. */
+  recipes?: Record<string, number>;
 }
 
 /** Память Роя внутри одного забега (`swarmMemoryModule`, PVR-4.2). */
@@ -1016,6 +1049,11 @@ export interface PveState {
   totalWaves: number;
   /** The seat the NPC enemy plays (resolved once, by the mode's `npcFaction`). */
   npcPlayerId: PlayerId;
+  /** Улей: мир, где волна рождалась на посеве. Волны рождаются здесь, пока мир в руках
+   *  NPC; потерян — по прежнему правилу (наименьший id). Без этого Рой, занявший пустой
+   *  мир с меньшим id, переносил роды волн к нему — у главы I это был мир в двух шагах от
+   *  дома игрока. Отсутствует у матчей, посеянных до поля: там прежнее правило. */
+  home?: PlanetId;
   /** World time the next wave is due — an echo of the scheduled event, for the HUD.
    *  Absent once the last wave has landed. */
   nextWaveAt?: number;

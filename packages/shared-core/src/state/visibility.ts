@@ -645,10 +645,13 @@ function project(
   // §3.9: игрок узнаёт об уровне ПОСЛЕ того, как тот проявился в завершённом бою, а не
   // из состояния. Видимый счётчик «до перехватчика осталось 4 часа» — это разведка,
   // которой не было.
-  delete (view as Partial<GameState>).swarmAdapt;
+  delete (view as Partial<GameState>).swarmAdapts;
   // AUD-20: рецепт Роя — то же знание о проекте, только законченном. Игрок видит ответ
   // в бою (журнал), а не читает уровень из состояния.
   delete (view as Partial<GameState>).swarmRecipes;
+  // Сеть Роя: что знает каждая его часть — это его память, а не разведка игрока. Сами
+  // узлы (ретрансляторы во флотах, центры на мирах) видны обычным туманом.
+  delete (view as Partial<GameState>).swarmNet;
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.

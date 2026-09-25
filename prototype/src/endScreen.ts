@@ -177,7 +177,15 @@ export function runSummaryHtml(r: RunSummary): string {
   const copies = Object.entries(r.loot?.copies ?? {})
     .map(([id, n]) => `${esc(tData(data.modules[id]?.name ?? id))} ×${n}`)
     .join(', ');
+  // Жетоны героя (`heroTokens.ts`): одному герою за забег — одной строкой.
+  const tokens = Object.entries(r.loot?.heroTokens ?? {})
+    .map(
+      ([id, n]) =>
+        `<p class="es-loot es-tokens">★ ${t('sector-zero.end.tokens', { name: esc(tData(data.heroes[id]?.name ?? id)), n })}</p>`,
+    )
+    .join('');
   const loot =
+    tokens +
     (copies ? `<p class="es-loot">${t('sector-zero.end.copies', { list: copies })}</p>` : '') +
     Object.entries(r.loot?.blueprints ?? {})
       .map(

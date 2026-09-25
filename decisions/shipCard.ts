@@ -17,6 +17,8 @@
  *    модулем» минус «голый корпус».
  * 4. **Строка характеристики — только живая.** Атака, защита, корпус и скорость — всегда;
  *    прочие — если они есть у корпуса или оснащение их меняет.
+ * 5. **Урон по целям — с оснащением.** Модуль, добавивший осадный урон или ПРО, виден и
+ *    в ряду «корабли · здания · авиация · техника · пехота».
  */
 import {
   effectiveStats,
@@ -24,6 +26,7 @@ import {
   type ShipSlotType,
   type UnitStack,
 } from '../packages/shared-core/src/index';
+import { unitDamageProfile, type UnitDamageRow } from './unitDamage';
 
 /** Один отсек корпуса и то, что в нём стоит. */
 export interface ShipCardBay {
@@ -53,6 +56,8 @@ export interface ShipCardModel {
   count: number;
   bays: ShipCardBay[];
   stats: ShipCardStat[];
+  /** Урон одного корабля по целям — с оснащением (`decisions/unitDamage.ts`). */
+  damage: UnitDamageRow[];
 }
 
 /** Порядок отсеков — как в конструкторе: оружие, защита, системы. */
@@ -134,5 +139,5 @@ export function shipCardModel(stack: CardStack, data: GameData): ShipCardModel |
       stats.push({ stat, base: b, effective: e, delta: e - b });
     }
   }
-  return { unit: stack.unit, count: stack.count, bays, stats };
+  return { unit: stack.unit, count: stack.count, bays, stats, damage: unitDamageProfile(def, eff) };
 }

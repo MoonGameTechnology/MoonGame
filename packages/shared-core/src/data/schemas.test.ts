@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.36'); // VET-6: корпус ветерана (`veteran.hullPerBattle`) поверх 0.1.35 — задач владельца 2026-09-24
+    expect(data.version).toBe('0.1.38'); // жетоны героев: лоты «5 жетонов» на витрине Sector Zero (поверх сети Роя 0.1.37)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что

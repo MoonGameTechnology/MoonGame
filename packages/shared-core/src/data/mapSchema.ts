@@ -19,6 +19,10 @@ const PositionSchema = z.object({ x: z.number(), y: z.number() });
 const MapUnitStackSchema = z.object({
   unit: z.string(),
   count: z.number().int().positive(),
+  /** Снаряжение стека (`UnitStack.modules`), как задумал автор карты: матки Роя с
+   *  выводковой камерой и т.п. Раньше схема его не знала и zod молча срезал (AUD-28).
+   *  Проверяется `validateMatchMap` тем же `validateLoadout`, что и верфь. */
+  modules: z.array(z.string()).optional(),
 });
 
 const MapBuildingSchema = z.object({

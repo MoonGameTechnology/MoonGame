@@ -569,5 +569,56 @@
     "traits": [
       "swarm_ground"
     ]
+  },
+  "swarm_relay": {
+    "faction": "swarm",
+    "stats": {
+      "attack": 0,
+      "defense": 10,
+      "speed": 30,
+      "hp": 70
+    },
+    "line": "rear",
+    "signature": 3,
+    "traits": [
+      "relay",
+      "relay_post"
+    ],
+    "cost": {
+      "biomass": 60,
+      "metal": 40,
+      "microelectronics": 16
+    },
+    "buildTimeHours": 4,
+    "upkeep": {
+      "energy": 20
+    },
+    "relayRange": 240,
+    "hullClass": "medium"
+  },
+  "swarm_relay_small": {
+    "faction": "swarm",
+    "stats": {
+      "attack": 0,
+      "defense": 3,
+      "speed": 40,
+      "hp": 18
+    },
+    "line": "rear",
+    "signature": 1,
+    "traits": [
+      "relay"
+    ],
+    "cost": {
+      "biomass": 15,
+      "metal": 10,
+      "microelectronics": 6
+    },
+    "buildTimeHours": 2,
+    "upkeep": {
+      "energy": 6
+    },
+    "relayRange": 100,
+    "hullClass": "light"
   }
 }

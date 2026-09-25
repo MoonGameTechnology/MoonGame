@@ -568,7 +568,7 @@ describe('rewarded-реклама (YAG-3.1)', () => {
     expect(paused).toEqual([true, false]);
   });
 
-  it('SDK не прислал ни одного колбэка — `unavailable` по сроку, а не вечное ожидание (AUD-28)', async () => {
+  it('SDK не прислал ни одного колбэка — `unavailable` по сроку, а не вечное ожидание (AUD-34)', async () => {
     vi.useFakeTimers();
     try {
       const platform = createYandexPlatform(adSdk([]).sdk);

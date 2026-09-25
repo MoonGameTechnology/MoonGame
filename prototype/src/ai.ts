@@ -26,6 +26,8 @@ import {
   beaconCallouts,
   beaconSentinels,
   swarmAdaptDue,
+  swarmNetPlan,
+  musterPlan,
   SWARM_MEMORY_WINDOW,
   type GameState,
   type Action,
@@ -360,24 +362,40 @@ export function aiOrders(
   posture: StewardPosture | 'expand' = 'expand',
   profile: AiProfile = 'weak',
 ): Action[] {
-  const out = baseAiOrders(state, ai, posture, profile);
-  if (state.pve?.npcPlayerId !== ai) return out;
+  if (state.pve?.npcPlayerId !== ai) return baseAiOrders(state, ai, posture, profile, new Set());
+  // Сеть Роя (`docs/swarm-behavior.md`): посты-ретрансляторы стоят там, куда их ставит
+  // сеть, — общий бот их не двигает и не сливает (`swarmNetPlan`, то же правило на сервере).
+  const net = swarmNetPlan(state, data, ai);
+  // Построенное Роем ждёт в улье и уходит с волной (решение владельца 2026-09-24):
+  // общий бот флоты сбора не уводит, а построенные на другой верфи ведёт в улей.
+  const muster = musterPlan(state, data, ai);
+  const pinned = new Set([...beaconSentinels(state, ai), ...net.held, ...muster.held]);
+  const out = baseAiOrders(state, ai, posture, profile, pinned);
   // AUD-20: адаптация Роя. Правило «пора» одно на оба хоста (`swarmAdaptDue`, то же зовёт
   // серверный оркестратор), а окно памяти — это сложность забега (§3.9): слабый Рой
   // помнит 4 боя, сильный — весь забег. До аудита бот забега `swarm.adapt` не отправлял
   // вовсе, и Рой в одиночной игре не учился.
   // Проект идёт отдельно от приказов флоту: орган, ушедший отвечать на маяк, растить
   // форму не перестаёт, поэтому фильтр маяка ниже этот приказ не трогает.
-  const due = swarmAdaptDue(state, data, ai, SWARM_MEMORY_WINDOW[profile]);
-  const adapt = due ? [swarmAdapt(ai, due.moduleId, due.fleetId)] : [];
+  const adapt = swarmAdaptDue(state, data, ai, SWARM_MEMORY_WINDOW[profile]).map((due) =>
+    swarmAdapt(ai, due.moduleId, due.fleetId),
+  );
   // Маяк задачи (заказ владельца 2026-09-24): флот игрока на маяке — разведчик Роя зовёт
   // силы. Правило одно на оба хоста (`beaconCallouts`, общее с серверным оркестратором);
   // флот, ушедший отвечать на маяк, в этот тик других приказов от бота не получает, а
   // дозорный на самом маяке не получает их вовсе (`beaconSentinels`).
-  const callouts = beaconCallouts(state, ai);
-  const held = beaconSentinels(state, ai);
+  const callouts = beaconCallouts(state, ai, net.held);
+  const held = new Set(pinned);
   for (const c of callouts) held.add(c.fleetId);
-  if (held.size === 0) return [...out, ...adapt];
+  const netOrders = [
+    ...muster.moves.map((m) => moveFleet(ai, m.fleetId, m.to)),
+    ...net.moves.map((m) => moveFleet(ai, m.fleetId, m.to)),
+    ...net.splits.map((sp) => splitFleet(ai, sp.fleetId, sp.take)),
+    ...net.builds.map((b) =>
+      b.unit ? buildUnit(ai, b.planetId, b.unit, 1) : buildBuilding(ai, b.planetId, b.building!),
+    ),
+  ];
+  if (held.size === 0) return [...out, ...netOrders, ...adapt];
   // Приказ касается флота, если называет его хоть в одном поле: слияние несёт `from` и
   // `into`, а не `fleetId`. Пропусти фильтр слияния — и главный флот Роя, проходя через
   // маяк, вбирал бы дозорного в себя (или сливался в него) и замирал там навсегда.
@@ -388,6 +406,7 @@ export function aiOrders(
   return [
     ...out.filter((a) => !touchesHeld(a)),
     ...callouts.map((c) => moveFleet(ai, c.fleetId, c.to)),
+    ...netOrders,
     ...adapt,
   ];
 }
@@ -397,6 +416,8 @@ function baseAiOrders(
   ai: string,
   posture: StewardPosture | 'expand',
   profile: AiProfile,
+  /** Флоты, которые общий бот не сливает (дозорный маяка, посты сети Роя). */
+  pinned: ReadonlySet<string>,
 ): Action[] {
   const out: Action[] = [];
   if (!state.players[ai] || state.players[ai]!.status === 'defeated') return out; // seat not in play / eliminated
@@ -482,13 +503,12 @@ function baseAiOrders(
   // enemy AA one hull at a time). The merged fleet sorties on the next tick.
   const skipMove = new Set<string>();
   {
-    // Дозорный маяка задачи стоит особняком: слей бот его с проходящим флотом — и якорь
-    // ждал бы слияния, которое обёртка `aiOrders` не пропустит, то есть стоял бы вечно.
-    const sentinels = state.pve?.npcPlayerId === ai ? beaconSentinels(state, ai) : null;
+    // Дозорный маяка и посты сети стоят особняком: слей бот такой флот с проходящим — и
+    // якорь ждал бы слияния, которое обёртка `aiOrders` не пропустит, то есть стоял бы вечно.
     const byLoc = new Map<string, Fleet[]>();
     for (const f of expandFleets) {
       if (f.owner !== ai || f.location == null || f.movement || f.battleId) continue;
-      if (sentinels?.has(f.id)) continue;
+      if (pinned.has(f.id)) continue;
       const group = byLoc.get(f.location);
       if (group) group.push(f);
       else byLoc.set(f.location, [f]);

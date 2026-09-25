@@ -47,6 +47,24 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     ]);
   });
 
+  it('модули стартового флота доезжают из карты в стек (AUD-28)', () => {
+    // Матки Роя на `pve-1` объявлены с выводковой камерой — и в игре они с ней.
+    const map = parseMatchMap(readJson('data/maps/pve-1.json'));
+    const state = buildStateFromMap(map, data);
+    const brood = state.fleets.p3_1!.units.find((u) => u.unit === 'swarm_brood_mother');
+    expect(brood?.modules).toEqual(['swarm_brood_chamber']);
+    // Стек без модулей поля не получает — как и раньше.
+    expect(state.fleets.p3_1!.units.find((u) => u.unit === 'scout_drone')).not.toHaveProperty('modules');
+  });
+
+  it('модуль, который корпусу не встать, карта не пропускает (AUD-28)', () => {
+    const map = exampleMap();
+    map.fleets.green_1!.units = [{ unit: 'cruiser', count: 2, modules: ['swarm_brood_chamber'] }];
+    expect(validateMatchMap(map, data).some((i) => i.startsWith('E_MAP_LOADOUT:green_1:cruiser'))).toBe(true);
+    map.fleets.green_1!.units = [{ unit: 'cruiser', count: 2, modules: ['no_such_module'] }];
+    expect(validateMatchMap(map, data).some((i) => i.startsWith('E_MAP_LOADOUT:green_1:cruiser'))).toBe(true);
+  });
+
   it('carries a map player ai flag onto the seated player', () => {
     const map = exampleMap();
     map.players.red!.ai = true;

@@ -28,6 +28,7 @@ export {
   type Fleet,
   type FleetMovement,
   type FleetEdge,
+  type FleetResume,
   type PlanetRoads,
   type RoadPoint,
   type RoadTrail,
@@ -504,7 +505,7 @@ export {
 export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
-export { orbitalModule } from './modules/orbital';
+export { orbitalModule, BOMBARD_FRACTION } from './modules/orbital';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
@@ -521,6 +522,22 @@ export {
   type SwarmAdaptOrder,
 } from './modules/swarmAdapt';
 export { swarmJournalModule } from './modules/swarmJournal';
+export { swarmNetModule } from './modules/swarmNet';
+export {
+  swarmNet,
+  swarmNodes,
+  poweredNodes,
+  partsOf,
+  linked,
+  knowledgeOf,
+  planetHolder,
+  fleetHolder,
+  NET_ENERGY,
+  type HolderId,
+  type NetNode,
+  type SwarmNetView,
+  type SwarmKnown,
+} from './util/swarmNet';
 export { missionFactsModule, HAVEN_TRAIT, EVACUEE_TRAIT } from './modules/missionFacts';
 export {
   beaconCallouts,
@@ -614,3 +631,12 @@ export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 
 export type { SwarmRepelRecord, MissionFacts } from './state/gameState';
+export { swarmNetPlan, RELAY_POST_TRAIT, type SwarmNetPlan } from './util/swarmNetTactics';
+export {
+  waveStagingWorld,
+  producedForcesAt,
+  isProducedForce,
+  musterPlan,
+  RALLY_TRAIT,
+  type MusterPlan,
+} from './util/pveStaging';

@@ -1,5 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, FleetEdge, GameState, PlayerId, PlanetId } from '../state/gameState';
+import type { Fleet, FleetEdge, FleetResume, GameState, PlayerId, PlanetId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
 import { fleetTravelSpeed, planRoute, routeDistance } from '../state/route';
@@ -12,9 +12,13 @@ import { getStance } from '../state/diplomacy';
  * Предоставляет модуль движения, потребляет модуль боя — так отступление уводит флот,
  * не заводя второй маршрутизатор. Возвращает код отказа строкой или `null` при успехе;
  * владение флотом проверяется внутри, потому что вызывающий приходит со своей дверью.
+ *
+ * ROADS-8: цель — те же две формы, что у `fleet.move` (`FleetResume`): узел или точка на
+ * дороге. Вторую зовёт бой, возвращая флоту прерванный марш, — приказ «встать на дороге»
+ * после выигранной встречи должен довести флот до той же точки, а не до узла рядом.
  */
 export type FleetCourse = (
-  args: { fleetId: string; to: PlanetId; playerId: PlayerId },
+  args: { fleetId: string; playerId: PlayerId } & FleetResume,
   h: HandlerContext,
 ) => string | null;
 
@@ -359,7 +363,7 @@ function planJourney(
  */
 export const movementModule: GameModule = {
   id: 'movement',
-  version: '1.3.0',
+  version: '1.4.0',
   setup(api) {
     // Closure-scoped cache, shared across actions; keyed by `state.topology` so a
     // hero temp lane mutating `links` invalidates stale routes (see RouteCache).
@@ -476,10 +480,13 @@ export const movementModule: GameModule = {
      * Нет модуля движения — возможности нет, и отступление просто расцепляет бой:
      * деградация к базовому поведению, а не падение.
      */
-    api.provideCapability<FleetCourse>('fleet.course', ({ fleetId, to, playerId }, h) => {
+    api.provideCapability<FleetCourse>('fleet.course', (args, h) => {
+      const { fleetId, playerId } = args;
       const fleet = h.state.fleets[fleetId];
       if (!fleet || fleet.owner !== playerId) return 'E_NO_FLEET';
-      return setCourse(h, fleet, { fleetId, to }, playerId);
+      const target: MovePayload =
+        'toEdge' in args ? { fleetId, toEdge: args.toEdge } : { fleetId, to: args.to };
+      return setCourse(h, fleet, target, playerId);
     });
 
     api.onAction('fleet.move', (action, h) => {

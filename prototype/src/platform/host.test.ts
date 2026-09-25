@@ -64,7 +64,7 @@ describe('YAG-1.1b — хост выбирает площадку, а не иг�
     expect(onSdkError).not.toHaveBeenCalled();
   });
 
-  it('`init()` не ответил — по сроку веб-адаптер, а не вечный экран загрузки (AUD-27)', async () => {
+  it('`init()` не ответил — по сроку веб-адаптер, а не вечный экран загрузки (AUD-33)', async () => {
     vi.useFakeTimers();
     try {
       const onSdkError = vi.fn();

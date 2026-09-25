@@ -34,9 +34,9 @@
  *    на телефоне, — а множителей ×1…×100 в забеге нет.
  * 11. две вкладки (`AUD-29`): открывшая Sector Zero последней становится хозяйкой, прежняя
  *    встаёт под заставкой и больше не пишет, — правки обеих доживают до хранилища;
- * 12. битый журнал забега (`AUD-27`) не запирает меню, а герой `constructor` в профиле
+ * 12. битый журнал забега (`AUD-33`) не запирает меню, а герой `constructor` в профиле
  *    (`AUD-30`) не ломает «Новый забег»;
- * 13–14. молчащий SDK (`AUD-27`): `getPlayer` без ответа не держит меню, `init()` без ответа
+ * 13–14. молчащий SDK (`AUD-33`): `getPlayer` без ответа не держит меню, `init()` без ответа
  *    не держит запуск — игра стартует веб-адаптером.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
@@ -71,7 +71,7 @@ if (!existsSync(join(ROOT, 'index.html'))) {
 
 /** Поддельный SDK: ровно то, что зовёт адаптер, и журнал вызовов для проверок. */
 const FAKE_SDK = `window.__ya = { log: [], writes: [] };
-// Молчащий SDK (AUD-27): \`__initHang\` — \`init()\` без ответа, \`__playerHang\` — \`getPlayer\`.
+// Молчащий SDK (AUD-33): \`__initHang\` — \`init()\` без ответа, \`__playerHang\` — \`getPlayer\`.
 const never = () => new Promise(() => {});
 // «Назад» и выход площадки (YAG-6.4): тест шлёт их сам — \`__yaFire('HISTORY_BACK')\`.
 const events = {};
@@ -528,7 +528,7 @@ try {
   assert.equal(await tabA.locator('#tab-taken').count(), 0, 'A снова хозяйка');
   await tabs.close();
 
-  // 12. Битый журнал забега (AUD-27) и герой `constructor` в профиле (AUD-30). Раньше
+  // 12. Битый журнал забега (AUD-33) и герой `constructor` в профиле (AUD-30). Раньше
   // исключение при засчёте журнала оставляло меню в «Проверяем сохранение…» навсегда, а
   // «Новый забег» на таком профиле давал пустой экран.
   const broken = await browser.newContext({ locale: 'ru-RU' });
@@ -569,7 +569,7 @@ try {
   await brokenPage.locator('.dl-wave').first().waitFor({ state: 'visible' });
   await broken.close();
 
-  // 13. `getPlayer` не отвечает (AUD-27): сверка облака — под общим сроком, меню живое.
+  // 13. `getPlayer` не отвечает (AUD-33): сверка облака — под общим сроком, меню живое.
   // 14. `init()` не отвечает: запуск по сроку идёт веб-адаптером, а не стоит на загрузке.
   for (const [flag, label] of [
     ['__playerHang', 'getPlayer молчит'],

@@ -614,14 +614,14 @@
 | AUD-24 | ✅ | proto cli | `docs/backlog.md` | «Продолжить» на втором устройстве стирало |
 | AUD-25 | ✅ | proto | `docs/backlog.md` | Двойной тап на экране подготовки — два ролика. |
 | AUD-26 | ✅ | cli | `docs/backlog.md` | Лут забега выбирался прокруткой попыток. |
-| AUD-27 | ⏳ | core | `docs/backlog.md` | Перезарядка шаттлов стоит, пока рядом идут бои. |
-| AUD-28 | ⏳ | core data | `docs/backlog.md` | Карта молча теряет модули стартовых флотов. |
-| AUD-27 | ✅ | proto | `docs/backlog.md` | Меню и старт ждали SDK и сохранение вечно. |
-| AUD-28 | ✅ | proto cli | `docs/backlog.md` | Реклама и облако зависали на молчащем SDK. |
+| AUD-27 | ✅ | core | `docs/backlog.md` | Перезарядка шаттлов стоит, пока рядом идут бои. |
+| AUD-28 | ✅ | core data | `docs/backlog.md` | Карта молча теряет модули стартовых флотов. |
 | AUD-29 | ✅ | proto cli | `docs/backlog.md` | Две вкладки затирали прогресс друг друга. |
 | AUD-30 | ✅ | cli | `docs/backlog.md` | Служебные имена JavaScript в профиле. |
 | AUD-31 | ✅ | cli | `docs/backlog.md` | Откат версии стирал купленное. |
 | AUD-32 | ✅ | cli proto | `docs/backlog.md` | Номер главы вне диапазона. |
+| AUD-33 | ✅ | proto | `docs/backlog.md` | Меню и старт ждали SDK и сохранение вечно. |
+| AUD-34 | ✅ | proto cli | `docs/backlog.md` | Реклама и облако зависали на молчащем SDK. |
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | FSPLIT-3 | ✅ | proto | `docs/backlog.md` | «Делить» не молчит: герой остаётся, серая кнопка объясняет. |
@@ -1025,6 +1025,7 @@
 | ROADS-5 | ✅ | proto data | `docs/roads-roadmap.md` | Прогоны глав по дорогам — 2026-09-23 |
 | ROADS-6 | ✅ | proto | `docs/roads-roadmap.md` | ИИ сторожит развилки — 2026-09-23 |
 | ROADS-7 | ✅ | proto core | `docs/roads-roadmap.md` | Дороги на соло-картах прототипа — 2026-09-23 |
+| ROADS-8 | ✅ | core | `docs/roads-roadmap.md` | Победитель боя на дороге продолжает марш — 2026-09-24 |
 | ROS-0.1 | ✅ | data proto core | `docs/roster-roadmap.md` | ПКО и зональное ПВО: имя насквозь 2026-09-09 |
 | ROS-0.2 | ✅ | proto | `docs/roster-roadmap.md` | «Верфь» → «Производство» 2026-09-09 |
 | ROS-1.1 | ✅ | core data proto | `docs/roster-roadmap.md` | Пехота и техника: два рода наземных войск 2026-09-09 |

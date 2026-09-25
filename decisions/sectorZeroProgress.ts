@@ -5,6 +5,7 @@
 import { COMIC_ID } from './chapterComics';
 import { forgeOutcome } from './sectorZeroForge';
 import { dailyOffers } from './sectorZeroShop';
+import { addHeroTokens, heroStarCost, heroTokenUse, rollHeroTokens } from './heroTokens';
 import { emptySwarmCodex, learnSwarm, parseSwarmCodex, type SwarmCodex } from './swarmCodex';
 import {
   addLoot,
@@ -136,6 +137,9 @@ export interface SectorZeroProgress {
   blueprints: Record<string, number>;
   loadouts: Record<string, string[]>;
   heroes: Record<string, SectorHero>;
+  /** Жетоны героев (`heroTokens.ts`), `id → сколько`: у каждого героя свой счёт. Звезда
+   *  героя стоит его жетоны, 10 жетонов приводят героя, которого приводят только жетоны. */
+  heroTokens: Record<string, number>;
   selectedHero: string;
   /** Что игрок знает о Рое за все забеги (`swarmCodex.ts`, досье в меню — заказ владельца
    *  2026-09-24). Пополняется на закрытии забега, только растёт. */
@@ -165,6 +169,7 @@ export interface ProfileShelf {
   moduleCopies?: Record<string, number>;
   blueprints?: Record<string, number>;
   heroes?: Record<string, SectorHero>;
+  heroTokens?: Record<string, number>;
   /** Навыки ЗНАКОМЫХ героев, которые каталог не принял: узел другой версии или его
    *  предпосылка. `герой → id узлов`. */
   skills?: Record<string, string[]>;
@@ -287,6 +292,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     blueprints: {},
     loadouts: {},
     heroes: first ? { [first]: newSectorHero(first, data) } : {},
+    heroTokens: {},
     selectedHero: first,
     swarmCodex: emptySwarmCodex(),
   };
@@ -341,9 +347,6 @@ export function sectorSlotItem(
 ): { name: string; description?: string } | undefined {
   const passive = data.heroPassives[id];
   return data.heroAbilities[id] ?? (passive?.slotted ? passive : undefined);
-}
-export function sectorHeroUpgradeCost(hero: SectorHero): number {
-  return hero.level * 4;
 }
 export function sectorSkillCost(id: string, data: GameData): number {
   // Branch roots cost two; every prerequisite step adds two. Catalog trees are DAGs.
@@ -622,6 +625,12 @@ export function changeSectorZeroProgress(
           next.heroes[next.selectedHero]!.skills.push(offer.grants);
           break;
         }
+        case 'hero-tokens':
+          // Жетоны покупаются тому, кому они нужны (`heroTokenUse`): герою на потолке звёзд
+          // и герою непройденной главы лот не продаётся.
+          if (heroTokenUse(next, offer.grants, data) === null) return null;
+          next.heroTokens[offer.grants] = (next.heroTokens[offer.grants] ?? 0) + offer.amount;
+          break;
         case 'resource':
           if (offer.grants === 'research') next.research += offer.amount;
           else if (offer.grants === 'warrants') next.warrants += offer.amount;
@@ -655,8 +664,14 @@ export function changeSectorZeroProgress(
       next.selectedHero = action.id;
       break;
     case 'upgrade-hero': {
+      // Звезда героя стоит ЕГО жетоны (`heroTokens.ts`, решение владельца 2026-09-24), а не
+      // данные экспедиций: данные открывают новое, жетоны растят звёздность.
       const hero = own(next.heroes, action.id);
-      if (!hero || hero.level >= GRADES.length || !pay(sectorHeroUpgradeCost(hero))) return null;
+      const cost = hero && hero.level < GRADES.length ? heroStarCost(hero.level) : null;
+      const have = next.heroTokens[action.id] ?? 0;
+      if (!hero || cost === null || have < cost) return null;
+      next.heroTokens[action.id] = have - cost;
+      if (next.heroTokens[action.id] === 0) delete next.heroTokens[action.id];
       hero.level++;
       break;
     }
@@ -772,7 +787,13 @@ function parseRunSummary(v: unknown): RunSummary | null {
     warrants: warrants!,
     unlocked: unlocked!,
     ...(rawLoot && typeof rawLoot === 'object'
-      ? { loot: { copies: bag(rawLoot.copies), blueprints: bag(rawLoot.blueprints) } }
+      ? {
+          loot: {
+            copies: bag(rawLoot.copies),
+            blueprints: bag(rawLoot.blueprints),
+            ...(rawLoot.heroTokens ? { heroTokens: bag(rawLoot.heroTokens) } : {}),
+          },
+        }
       : {}),
   };
 }
@@ -900,6 +921,13 @@ export function parseSectorZeroProgress(
         .slice(0, sectorHeroSlots(hero, data));
       fresh.heroes[id] = hero;
     }
+    // Жетоны героев (`heroTokens.ts`) покупаются, поэтому жетоны героя, которого нет в ЭТОМ
+    // каталоге, не стираются, а едут на полку вместе с самим героем (AUD-31).
+    for (const [id, value] of merged('heroTokens')) {
+      if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) continue;
+      if (own(data.heroes, id)) fresh.heroTokens[id] = value;
+      else shelve('heroTokens', id, value);
+    }
     if (Object.keys(shelf).length > 0) fresh.shelf = shelf;
     if (own(fresh.heroes, p.selectedHero)) fresh.selectedHero = p.selectedHero!;
     fresh.swarmCodex = parseSwarmCodex(p.swarmCodex, data);
@@ -959,19 +987,31 @@ export function settleSectorZeroRun(
   // Дубли и чертежи (SZE-5.3): бросок от сида профиля, номера попытки и отпечатка итогового
   // мира (AUD-26) — повторный засчёт того же забега невозможен (проверка выше), перезагрузка
   // итог не перекатывает, а номер попытки удачу не выбирает.
-  const loot = runLoot({
-    seed: progress.seed,
-    attempt,
-    modules: progress.modules,
-    won: !!won,
-    newTasks: Math.max(0, tasks.done.length - done.length),
-    firstWinBlueprint: firstWin ? (chapter.blueprint ?? null) : null,
-    outcome: hashState(state),
-  });
+  const newTasks = Math.max(0, tasks.done.length - done.length);
+  const outcome = hashState(state);
+  const loot: RunLoot = {
+    ...runLoot({
+      seed: progress.seed,
+      attempt,
+      modules: progress.modules,
+      won: !!won,
+      newTasks,
+      firstWinBlueprint: firstWin ? (chapter.blueprint ?? null) : null,
+      outcome,
+    }),
+    // Жетоны героя (`heroTokens.ts`): тем же ключом, что дубли. Без каталога неизвестно,
+    // кому они нужны, — тогда не падают.
+    ...(data
+      ? {
+          heroTokens: rollHeroTokens({ seed: progress.seed, attempt, outcome, progress, data, won: !!won, newTasks }),
+        }
+      : {}),
+  };
   return {
     ...progress,
     research: progress.research + reward,
     ...addLoot(progress, loot),
+    heroTokens: addHeroTokens(progress.heroTokens, loot.heroTokens ?? {}),
     // Забег — кран ОБЕИХ валют (§2 роадмапа экономики): данные открывают горизонталь,
     // Варранты обслуживают вертикаль. Без второго крана Мастерская недостижима.
     warrants: progress.warrants + warrants,

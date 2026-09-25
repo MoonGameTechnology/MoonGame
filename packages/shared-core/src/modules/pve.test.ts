@@ -51,6 +51,18 @@ const data: GameData = parseGameData({
         boons: ['boon_a', 'boon_b'],
       },
     },
+    // Тот же состав плюс несомое по одному — малый ретранслятор Роя (2026-09-24).
+    relayed: {
+      name: 'Relayed',
+      modules: ['pve'],
+      pve: {
+        waves: 2,
+        npcFaction: 'swarm',
+        waveIntervalHours: 6,
+        waveFleet: [{ unit: 'hunter', count: 2 }],
+        waveFixed: [{ unit: 'drone', count: 1 }],
+      },
+    },
     // Тот же штурм, но забег засчитывается УДЕРЖАНИЕМ после последней волны (PVR-2.5).
     held: {
       name: 'Held',
@@ -142,9 +154,48 @@ describe('pveModule — волны (PVE-3)', () => {
       waveNumber: 0,
       totalWaves: 2,
       npcPlayerId: 'swarm',
+      home: 'hive',
       nextWaveAt: 6 * MS_PER_HOUR,
     });
     expect(state.scheduled.map((s) => s.type)).toEqual(['pve.wave']);
+  });
+
+  it('волна рождается в улье, даже когда Рой занял мир с меньшим id', () => {
+    // Раньше роды шли на мире NPC с наименьшим id, и в главе I Рой, заняв пустой мир у
+    // дома игрока, переносил туда рождение волн. Улей закреплён на посеве.
+    const seeded = ok(advance(MS_PER_HOUR, 'waves'));
+    seeded.planets.aaa = { ...seeded.planets.hive!, id: 'aaa', owner: 'swarm' };
+    const state = ok(advance(7 * MS_PER_HOUR, 'waves', seeded));
+    expect(state.fleets['pve:wave:1']?.location).toBe('hive');
+  });
+
+  it('построенное Роем ждёт в улье и уходит с волной; стартовый флот — нет', () => {
+    // Решение владельца 2026-09-24: к волне прибавляется то, что произвёл сам Рой.
+    const seeded = ok(advance(MS_PER_HOUR, 'waves'));
+    const ship = (id: string, traits: string[]) => ({
+      id,
+      owner: 'swarm',
+      location: 'hive',
+      movement: null,
+      units: [{ unit: 'drone', count: 3 }],
+      landing: [{ unit: 'spore', count: 1 }],
+      traits,
+    });
+    seeded.fleets.built = ship('built', ['rally']);
+    seeded.fleets.start = ship('start', []);
+    const state = ok(advance(7 * MS_PER_HOUR, 'waves', seeded));
+    expect(state.fleets.built).toBeUndefined();
+    expect(state.fleets['pve:wave:1']?.units).toEqual([{ unit: 'drone', count: 5 }]);
+    expect(state.fleets['pve:wave:1']?.landing).toEqual([{ unit: 'spore', count: 1 }]);
+    expect(state.fleets.start).toBeDefined();
+  });
+
+  it('улей потерян — волна рождается в мире Роя, самом дальнем от игроков', () => {
+    const seeded = ok(advance(MS_PER_HOUR, 'waves'));
+    seeded.planets.aaa = { ...seeded.planets.hive!, id: 'aaa', owner: 'swarm' };
+    seeded.planets.hive!.owner = 'human';
+    const state = ok(advance(7 * MS_PER_HOUR, 'waves', seeded));
+    expect(state.fleets['pve:wave:1']?.location).toBe('aaa');
   });
 
   it('нет места под фракцию Роя — модуль остаётся инертным, а не выдумывает врага', () => {
@@ -281,6 +332,21 @@ describe('pveModule — волна везёт десант (PVR-1.6)', () => {
     const state = ok(advance(20 * MS_PER_HOUR, 'fielded', fieldedSeed()));
     expect(state.fleets['pve:wave:1']?.landing).toEqual([{ unit: 'spore', count: 3 }]);
     expect(state.fleets['pve:wave:2']?.landing).toEqual([{ unit: 'spore', count: 6 }]);
+  });
+
+  it('несомое по одному (waveFixed) не растёт с номером волны', () => {
+    // Малый ретранслятор Роя идёт с волной ОДИН (решение владельца 2026-09-24): десятая
+    // волна не везёт десять, иначе связь волны росла бы вместе с её силой.
+    const seed = ok(advance(MS_PER_HOUR, 'relayed'));
+    const state = ok(advance(20 * MS_PER_HOUR, 'relayed', seed));
+    expect(state.fleets['pve:wave:1']?.units).toEqual([
+      { unit: 'hunter', count: 2 },
+      { unit: 'drone', count: 1 },
+    ]);
+    expect(state.fleets['pve:wave:2']?.units).toEqual([
+      { unit: 'hunter', count: 4 },
+      { unit: 'drone', count: 1 },
+    ]);
   });
 
   it('режим без waveLanding даёт флот БЕЗ поля landing, а не с пустым', () => {

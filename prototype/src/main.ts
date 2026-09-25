@@ -272,6 +272,7 @@ import { missionBriefs, missionLabelN, missionRows, type MissionReward, type Mis
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
 import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
+import { grantTokenHeroes } from '../../decisions/heroTokens';
 import {
   adoptMark,
   bumpMark,
@@ -287,6 +288,7 @@ import {
 import { chapterBlueprint } from '../../decisions/moduleRarity';
 import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
+import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
@@ -4180,6 +4182,39 @@ function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier
   drawSightFrontier(cx, circles, tier, LOCK, VW, VH);
 }
 
+/**
+ * Сеть Роя на карте (`docs/swarm-behavior.md`): круги связи центров данных и
+ * ретрансляторов, которые игрок видит, и линии между сошедшимися кругами. Что и как
+ * показывать — `decisions/swarmNetMarks.ts`: только разведанное, без питания и знания.
+ */
+function drawSwarmNet(): void {
+  const npc = s.pve?.npcPlayerId;
+  if (!npc) return;
+  const marks = swarmNetMarks(s, data, known);
+  if (marks.nodes.length === 0) return;
+  const col = ownerColor(npc);
+  const at = marks.nodes.map((n) => world({ x: n.x, y: n.y }));
+  cx.save();
+  cx.setLineDash([2, 6]);
+  cx.lineWidth = 1;
+  cx.strokeStyle = rgba(col, 0.28);
+  for (const [a, b] of marks.links) {
+    cx.beginPath();
+    cx.moveTo(at[a]!.x, at[a]!.y);
+    cx.lineTo(at[b]!.x, at[b]!.y);
+    cx.stroke();
+  }
+  cx.setLineDash([6, 8]);
+  marks.nodes.forEach((n, i) => {
+    cx.strokeStyle = rgba(col, n.kind === 'center' ? 0.5 : 0.35);
+    cx.lineWidth = n.kind === 'center' ? 1.4 : 1;
+    cx.beginPath();
+    cx.arc(at[i]!.x, at[i]!.y, worldDist(n.r), 0, TAU);
+    cx.stroke();
+  });
+  cx.restore();
+}
+
 function drawRadarCoverage() {
   // Граница обзора — из ТЕХ ЖЕ кругов, по которым ядро считает туман (`sightCircles`,
   // решение владельца 2026-09-24: «круги везде»): видно ровно то, что внутри неё. Круги
@@ -5218,6 +5253,7 @@ function render(now: number) {
   updateRadarContacts(now); // the arm paints enemy signatures as it crosses them
   updateThreatAlerts(); // «враг у ваших рубежей» — once per game step
   drawRadarCoverage(); // my sensor reach (radar arrays + ships)
+  drawSwarmNet(); // сеть Роя: круги связи разведанных узлов
 
   drawFleetRoutes();
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
@@ -13899,8 +13935,11 @@ function drawMissionTargets(): void {
 function saveSectorProgress(next: SectorZeroProgress): void {
   // Победа в главе приводит её героя (решение владельца 2026-09-23) — на любом пути засчёта.
   const granted = grantChapterHeroes(next, sectorChapterIds(), data);
-  next = granted.progress;
-  for (const id of granted.joined)
+  // Герой, для которого набралось 10 жетонов (`heroTokens.ts`), — тоже на любом пути:
+  // жетоны приходят и с итогов забега, и из магазина.
+  const byTokens = grantTokenHeroes(granted.progress, data);
+  next = byTokens.progress;
+  for (const id of [...granted.joined, ...byTokens.joined])
     note(t('sector-zero.hero.joined', { name: tData(data.heroes[id]?.name ?? id) }));
   // Что открыла эта запись (`YAG-5.1`). Облако и загрузка кладут профиль мимо этой функции,
   // поэтому принесённое с другого устройства за открытие здесь не считается.
@@ -13918,7 +13957,7 @@ function saveSectorProgress(next: SectorZeroProgress): void {
 // проводка: сверка на старте, номер правки на каждое сохранение, запись по событию.
 const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
 /** Сколько ждать сверку с облаком на старте — ВСЮ: и вопрос «кто играет», и чтение облака
- *  (AUD-27; раньше срок стоял только на чтении, и молчащий `getPlayer` запирал меню
+ *  (AUD-33; раньше срок стоял только на чтении, и молчащий `getPlayer` запирал меню
  *  навсегда). Не ответило — в этой сессии облака нет: писать поверх того, чего мы не
  *  видели, нельзя, а держать меню дольше незачем. */
 const CLOUD_LOAD_TIMEOUT_MS = 4000;
