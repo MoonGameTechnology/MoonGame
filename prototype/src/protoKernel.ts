@@ -220,6 +220,18 @@ export function setMatchVeteranPower(on: boolean): void {
   matchVeteranPower = on;
 }
 
+/**
+ * Босс штурма в ТЕКУЩЕМ матче (PVR-4.7): Левиафан приходит с последней волной. Правило
+ * снова ставит ХОСТ, а не режим — резолюция владельца 2026-09-24: босс только у матёрого
+ * (сильного) Роя Sector Zero, а у сетевой партии на том же `pve_waves` сложности нет вовсе.
+ */
+let matchPveBoss = false;
+
+/** Звать ли босса в этот матч. Зовётся там же, где темп забега. */
+export function setMatchPveBoss(on: boolean): void {
+  matchPveBoss = on;
+}
+
 export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
   const config: MatchConfig = {
     timeScale: 1,
@@ -227,6 +239,7 @@ export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
     ...(matchModeId !== undefined ? { modeId: matchModeId } : {}),
     ...(matchTravelSpeed !== 1 ? { travelSpeedFactor: matchTravelSpeed } : {}),
     ...(matchVeteranPower ? { veteranPower: true } : {}),
+    ...(matchPveBoss ? { pveBoss: true } : {}),
   };
   // Единственный дом правила «режим → правила»: пресет победы режима подстилается ПОД
   // победу матча, свою копию слоения здесь не заводим. Отказать он может только на

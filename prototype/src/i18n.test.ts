@@ -231,6 +231,14 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       'provinceKey() в /decisions/provinceName.ts — из id карты и узла (PVR-6.19); ' +
       'полноту и отсутствие сирот держит decisions/provinceName.test.ts',
   },
+  {
+    prefix: 'boss.',
+    built_by:
+      'задача, журнал, осада и итоги забега строят ' +
+      '`boss.<архетип>.<task|spawned|slain|siege|siege-broken|devoured>` из ' +
+      'архетипа босса (`data.modes[].pve.boss.hero`, PVR-4.7): у имени босса свой падеж ' +
+      'в каждой фразе, подстановкой его не собрать; наличие держит `runBoss.test.ts`',
+  },
 ];
 const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.prefix));
 

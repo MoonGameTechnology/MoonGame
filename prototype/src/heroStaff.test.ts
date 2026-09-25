@@ -127,8 +127,9 @@ describe('штаб героев — словарь способностей', ()
     expect(HERO_CASTABLE.has('нет-такого-типа')).toBe(false);
   });
 
-  // Два встроенных эффекта heroModule; остальные приходят провайдерами capability.
-  const BUILT_IN = ['temp_lane', 'annihilate'];
+  // Три встроенных эффекта heroModule (осада `devour` — PVR-4.7); остальные приходят
+  // провайдерами capability.
+  const BUILT_IN = ['temp_lane', 'annihilate', 'devour'];
   /** Типы, которые `heroEffectsModule` объявляет как `hero.effect.<тип>`. Читаем ИСХОДНИК:
    *  реестр capability у ядра приватный, а знать надо именно объявленное, а не то, что
    *  кто-то не забыл продублировать здесь. */

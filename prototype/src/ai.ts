@@ -40,7 +40,7 @@ import {
   type Fleet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
-import { heroByFleet, heroNode } from '../../packages/shared-core/src/state/heroes';
+import { bossFallen, heroByFleet, heroNode } from '../../packages/shared-core/src/state/heroes';
 // Опознанные узлы считаются ОДИН раз на тик и передаются в `knownGarrison`: покрытие
 // сенсоров — проход по всему флоту, а спрашивают про него десятки миров подряд.
 import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
@@ -369,7 +369,17 @@ export function aiOrders(
   // Построенное Роем ждёт в улье и уходит с волной (решение владельца 2026-09-24):
   // общий бот флоты сбора не уводит, а построенные на другой верфи ведёт в улей.
   const muster = musterPlan(state, data, ai);
-  const pinned = new Set([...beaconSentinels(state, ai), ...net.held, ...muster.held]);
+  // PVR-4.7: флот героя, ведущего осаду «Поглощения мира», стоит над миром до её конца:
+  // уход, слияние или прекращение огня сорвали бы осаду самому Рою.
+  const besieging = Object.values(state.heroes ?? {}).flatMap((x) =>
+    x.owner === ai && x.siege && x.fleetId !== undefined ? [x.fleetId] : [],
+  );
+  const pinned = new Set([
+    ...beaconSentinels(state, ai),
+    ...net.held,
+    ...muster.held,
+    ...besieging,
+  ]);
   const out = baseAiOrders(state, ai, posture, profile, pinned);
   // AUD-20: адаптация Роя. Правило «пора» одно на оба хоста (`swarmAdaptDue`, то же зовёт
   // серверный оркестратор), а окно памяти — это сложность забега (§3.9): слабый Рой
@@ -1553,8 +1563,10 @@ function baseAiOrders(
     // Порядок обхода — по id инстанса, а не по раскладке объекта: `hero:{место}:{n}`
     // сеет `matchSetup`, так что сортировка стабильна и один сид разыгрывается
     // одинаково (инвариант #1).
+    // Павший босс (PVR-4.7) не возвращается: ядро отбивает о нём любой приказ
+    // (`E_HERO_FALLEN`), и бот слал бы его каждый тик — подъём, оснащение, навыки.
     const roster = Object.values(state.heroes ?? {})
-      .filter((x) => x.owner === ai)
+      .filter((x) => x.owner === ai && !bossFallen(x, data))
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     // «Развёрнут» ровно в том смысле, в каком это считает ядро (`activeHeroCount`):
     // жив И командует ЖИВЫМ кораблём. Протухший `fleetId` не считается — иначе бот
@@ -1594,6 +1606,10 @@ function baseAiOrders(
     //    Изученное — купленное И врождённое (AUD-22): набор считает то же `knownSkillNodes`.
     for (const x of roster) {
       if (x.alive === false) continue;
+      // Босс штурма (PVR-4.7) навыков ростера не учит: набор у него свой, объявленный
+      // владельцем. Общий узел дерева (без ветки) ядро приняло бы, и бот за казну Роя
+      // учил бы Левиафана чужим навыкам.
+      if (x.archetype !== undefined && data.heroes[x.archetype]?.boss === true) continue;
       const branch = x.archetype !== undefined ? data.heroes[x.archetype]?.branch : undefined;
       const taken = knownSkillNodes(x.skills ?? [], x.archetype, data);
       const node = Object.keys(data.heroSkillTrees)
@@ -1668,6 +1684,9 @@ function baseAiOrders(
         //  · `annihilate` — по миру, который бот ОСАЖДАЕТ и всё равно не может взять
         //    (AI-BAL-7): размен «мир противника на мёртвый мир, богатый металлом» —
         //    единственный способ, которым в матче вообще появляется `dead_world`;
+        //  · `devour` (PVR-4.7, «Поглощение мира» Левиафана) — осада чужого мира, который
+        //    флот героя уже бомбардирует; идущую осаду заново не начинают, а флот
+        //    осаждающего держит на месте обёртка Роя (`besieging`);
         //  · `temp_lane` — дорога туда, куда дороги нет: коридор к захватываемой цели
         //    в радиусе, не связанной с узлом героя ребром графа;
         //  · `recall` (домой) и маркеры `spawn_*` — НЕ кастуются. Отзыв выдёргивает
@@ -1680,6 +1699,10 @@ function baseAiOrders(
           target = reach > 0 ? node.id : undefined;
         } else if (def.type === 'annihilate') {
           if (!fleet.bombarding || node.owner === null || node.owner === ai) continue;
+          target = node.id;
+        } else if (def.type === 'devour') {
+          if (x.siege || fighting || !fleet.bombarding || node.owner === null || node.owner === ai)
+            continue;
           target = node.id;
         } else if (def.type === 'temp_lane') {
           const linked = new Set(node.links ?? []);

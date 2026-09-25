@@ -348,6 +348,11 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
   color:#ffb3aa;font-weight:700;font-size:12px;line-height:1;letter-spacing:.3px;
   font-variant-numeric:tabular-nums;white-space:nowrap;
   background:rgba(255,90,77,.08);border:1px solid rgba(255,90,77,.42);}
+/* PVR-4.7: осада «Поглощения мира» над своим миром — тревога ярче волны. */
+#devline .dl-siege{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
+  color:#fff;font-weight:700;font-size:12px;line-height:1;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:rgba(255,90,77,.5);border:1px solid #ff5a4d;}
 /* donate currency (Суверены ◆, gold) sits UNDER the resource bar on the status line,
    pushed to the right end — so the resource chips get the full top-bar width for numbers.
    Заказ владельца 2026-09-23: фишка — ПРИМАНКА; 2026-09-24: «сделай красивой» — прежняя
@@ -2175,6 +2180,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .res b{font-size:12px;}
   #devline .dl-donate{font-size:12px;height:24px;gap:5px;padding:0 2px 0 5px;}
   #devline .dl-wave{font-size:11px;padding:2px 8px;margin-left:8px;}
+  #devline .dl-siege{font-size:11px;padding:2px 8px;margin-left:8px;}
+  #devline .dl-siege span{display:none;}
   #devline .dl-missions{font-size:11px;padding:2px 8px;margin-left:8px;}
   #devline .dl-missions span{display:none;}
   #missionpanel{right:12px;left:12px;width:auto;}

@@ -3,6 +3,7 @@
  * compatibility and combat effects remain the shared game's rules. Prices below
  * are the first playable tuning, not the final campaign economy. */
 import { COMIC_ID } from './chapterComics';
+import { bossBounty, bossTask } from './runBoss';
 import { forgeOutcome } from './sectorZeroForge';
 import { dailyOffers } from './sectorZeroShop';
 import { addHeroTokens, heroStarCost, heroTokenUse, rollHeroTokens } from './heroTokens';
@@ -209,7 +210,10 @@ export interface RunSummary {
    *  до этой строки. */
   kills?: number;
   killWarrants?: number;
-  /** Всего данных экспедиций (`base + bonus + veterans`) и Варрантов — за них и за
+  /** Убитый босс и награда за него (PVR-4.7, `runBoss.ts`): архетип нужен подписи — у
+   *  каждого босса своё имя и свой падеж. Нет — босс не приходил или выжил. */
+  boss?: { hero: string; reward: number };
+  /** Всего данных экспедиций (`base + bonus + veterans + boss`) и Варрантов — за них и за
    *  уничтоженных. */
   total: number;
   warrants: number;
@@ -743,8 +747,9 @@ export function changeSectorZeroProgress(
       break;
     }
     case 'unlock-hero': {
-      if (!own(data.heroes, action.id) || own(next.heroes, action.id) || !pay(HERO_UNLOCK_COST))
-        return null;
+      const def = own(data.heroes, action.id);
+      // Босс Роя (PVR-4.7) — не герой игрока: его не открывают ни за какие данные.
+      if (!def || def.boss || own(next.heroes, action.id) || !pay(HERO_UNLOCK_COST)) return null;
       next.heroes[action.id] = newSectorHero(action.id, data);
       // Купленный герой сразу идёт в следующий забег (замечание владельца 2026-09-25: «купил
       // Учёного — он не заспаунился»): выбор отдельной кнопкой после покупки пропускали.
@@ -867,6 +872,10 @@ function parseRunSummary(v: unknown): RunSummary | null {
   const veterans = n(r.veterans);
   const kills = n(r.kills);
   const killWarrants = n(r.killWarrants);
+  const rawBoss = r.boss as { hero?: unknown; reward?: unknown } | undefined;
+  const bossReward = rawBoss && typeof rawBoss === 'object' ? n(rawBoss.reward) : 0;
+  const boss =
+    bossReward && typeof rawBoss!.hero === 'string' ? { hero: rawBoss!.hero, reward: bossReward } : null;
   return {
     attempt: attempt!,
     chapter: r.chapter,
@@ -878,6 +887,7 @@ function parseRunSummary(v: unknown): RunSummary | null {
     bonus: bonus!,
     ...(veterans ? { veterans } : {}),
     ...(kills !== null && killWarrants !== null ? { kills, killWarrants } : {}),
+    ...(boss ? { boss } : {}),
     total: total!,
     warrants: warrants!,
     unlocked: unlocked!,
@@ -1004,6 +1014,8 @@ export function parseSectorZeroProgress(
         });
         continue;
       }
+      // Босса в профиле быть не может (PVR-4.7): такая запись — подмена, и она отбрасывается.
+      if (data.heroes[id]!.boss) continue;
       const hero: SectorHero = { level, skills: [], equipped: [] };
       // Repeat in catalog-independent order so valid prerequisites survive JSON key order.
       for (let pass = 0; pass < candidates.length; pass++)
@@ -1089,7 +1101,10 @@ export function settleSectorZeroRun(
   // VET-7: медали сохранённых ветеранов — третья часть награды, рядом с волнами и
   // задачами. Каталог нужен для порогов медалей; без него платить не за что.
   const veterans = data ? veteranReward(state, 'p1', data) : 0;
-  const reward = base + tasks.bonus + veterans;
+  // PVR-4.7: убитый босс — четвёртая часть награды; его цену матч записал при появлении.
+  const boss = bossBounty(state);
+  const bossHero = bossTask(state)?.hero;
+  const reward = base + tasks.bonus + veterans + boss;
   const kills = runKills(state, 'p1');
   const killWarrants = kills * WARRANTS_PER_KILL;
   const warrants = reward * WARRANTS_PER_REWARD + killWarrants;
@@ -1156,6 +1171,7 @@ export function settleSectorZeroRun(
       ...(veterans > 0 ? { veterans } : {}),
       kills,
       killWarrants,
+      ...(boss > 0 && bossHero !== undefined ? { boss: { hero: bossHero, reward: boss } } : {}),
       total: reward,
       warrants,
       unlocked: tasks.unlocked,

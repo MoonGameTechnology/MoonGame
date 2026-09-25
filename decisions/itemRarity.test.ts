@@ -12,10 +12,15 @@ describe('PVR-6.4 — редкость и звёзды на карточке п�
   });
 
   it('у каждого модуля игрока редкость задана ЯВНО', () => {
-    // Модули Роя (`brood_host`) игроку не показываются, им разметка не нужна. Остальным —
-    // обязательна: иначе новый модуль тихо стал бы «простым», хотя его никто так не решал.
+    // Модули Роя игроку не показываются, им разметка не нужна: выводковые камеры
+    // (`brood_host`) и снаряжение, разрешённое только корпусам Роя (выводок Левиафана,
+    // PVR-4.7). Остальным — обязательна: иначе новый модуль тихо стал бы «простым», хотя
+    // его никто так не решал.
+    const swarmOnly = (units: readonly string[] | undefined): boolean =>
+      !!units?.length && units.every((u) => data.units[u]?.faction === 'swarm');
     const unmarked = Object.entries(data.modules)
       .filter(([, def]) => !def.allowed?.traits?.includes('brood_host'))
+      .filter(([, def]) => !swarmOnly(def.allowed?.units))
       .filter(([, def]) => def.rarity === undefined)
       .map(([id]) => id);
     expect(unmarked).toEqual([]);

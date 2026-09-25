@@ -463,7 +463,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
    */
   function heroes(p: SectorZeroProgress): string {
     const data = h.data;
+    // Босс Роя (PVR-4.7) — не герой игрока: его не нанимают и не открывают.
     const roster = Object.entries(data.heroes)
+      .filter(([, def]) => !def.boss)
       .map(([id, def]) => {
         const hero = p.heroes[id];
         const chapter = heroChapter(id);

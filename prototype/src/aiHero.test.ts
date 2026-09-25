@@ -355,6 +355,45 @@ describe('AI-BAL-8 — способности (`hero.ability`)', () => {
   });
 });
 
+describe('PVR-4.7 — павший босс', () => {
+  it('бот не поднимает, не оснащает и не учит босса, чья смерть окончательна', () => {
+    // Босса выставляет штурм, а не ростер; погибнув, он не возвращается, и ядро отбивает
+    // о нём любой приказ (`E_HERO_FALLEN`). Бот обязан это знать, иначе слал бы подъём
+    // каждый тик до конца забега.
+    const bossId = 'hero:p2:boss';
+    const fallen: Hero = {
+      id: bossId,
+      owner: 'p2',
+      location: homeOf(game2(), 'p2'),
+      cooldowns: {},
+      archetype: 'leviathan',
+      abilities: [...data.heroes.leviathan!.startAbilities],
+      passives: [...data.heroes.leviathan!.startPassives],
+      alive: false,
+    };
+    // Спящих героев ростера убираем: иначе подъём упёрся бы в кэп раньше, чем дошёл до
+    // босса, и сторож ниже проверял бы кэп, а не правило.
+    const g = rich(game2());
+    const main = mainHero(g, 'p2');
+    const s0: GameState = {
+      ...g,
+      heroes: Object.fromEntries(
+        Object.entries(g.heroes ?? {}).filter(([, x]) => x.owner !== 'p2' || x.id === main.id),
+      ),
+    };
+    const s: GameState = { ...s0, heroes: { ...s0.heroes, [bossId]: fallen } };
+    const aboutBoss = orders(s).filter(
+      (a) => a.type.startsWith('hero.') && (a.payload as { heroId?: string }).heroId === bossId,
+    );
+    expect(aboutBoss).toEqual([]);
+    // Сторож самой проверки: тот же босс ЖИВЫМ и без корабля — обычный кандидат на подъём.
+    const sleeping: GameState = { ...s0, heroes: { ...s0.heroes, [bossId]: { ...fallen, alive: undefined } } };
+    expect(
+      payloads<{ heroId: string }>(orders(sleeping), 'hero.spawn').some((p) => p.heroId === bossId),
+    ).toBe(true);
+  });
+});
+
 describe('AI-BAL-8 — инвариант #1 цел', () => {
   it('решение — чистая функция состояния: повтор даёт тот же набор приказов', () => {
     const s = rich(game2());

@@ -176,6 +176,8 @@ export function runSummaryHtml(r: RunSummary): string {
     ...(r.veterans ? [row('run', t('sector-zero.end.veterans'), `+${r.veterans}`)] : []),
     // Уничтоженные враги платят Варрантами и при поражении (решение владельца 2026-09-25).
     ...(r.kills ? [row('run kills', t('sector-zero.end.kills', { n: r.kills }), `+${r.killWarrants ?? 0} ⌖`)] : []),
+    // PVR-4.7: убитый босс — своей строкой, его именем (ключ по архетипу: у имени свой падеж).
+    ...(r.boss ? [row('run', t(`boss.${r.boss.hero}.slain`), `+${r.boss.reward}`)] : []),
   ].join('');
   const next =
     r.unlocked > 0

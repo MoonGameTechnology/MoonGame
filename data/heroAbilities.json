@@ -130,5 +130,27 @@
       "signature": 8,
       "durationHours": 4
     }
+  },
+  "hive_call": {
+    "name": "Hive Call",
+    "description": "hero.ability.hive-call.desc",
+    "type": "aura",
+    "cooldownHours": 6,
+    "range": 0,
+    "params": {
+      "combatBonus": 0.15,
+      "durationHours": 2,
+      "radius": 220
+    }
+  },
+  "devour": {
+    "name": "Devour World",
+    "description": "hero.ability.devour.desc",
+    "type": "devour",
+    "cooldownHours": 1,
+    "range": 0,
+    "params": {
+      "siegeHours": 4
+    }
   }
 }

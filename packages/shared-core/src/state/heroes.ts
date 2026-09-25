@@ -1,4 +1,5 @@
 import type { Battle, BattleSide, GameState, Hero, PlanetId } from './gameState';
+import type { GameData } from '../data/schemas';
 
 /**
  * Shared pure hero/battle reads for the hero-family modules (`hero`,
@@ -25,6 +26,18 @@ import type { Battle, BattleSide, GameState, Hero, PlanetId } from './gameState'
 export function heroByFleet(state: GameState, fleetId: string): Hero | undefined {
   if (state.heroes === undefined) return undefined;
   return Object.values(state.heroes).find((hero) => hero.fleetId === fleetId);
+}
+
+/** Пал ли БОСС насовсем (PVR-4.7): архетип `boss` и корабль потерян. Смерть босса
+ *  окончательна — возрождения нет ни по таймеру, ни приказом, — поэтому такого героя не
+ *  поднимают, не оснащают и не учат. Читателей двое: модуль героев (гейт `hero.spawn`)
+ *  и бот, который иначе слал бы заведомо отбиваемые приказы. */
+export function bossFallen(hero: Hero, data: Pick<GameData, 'heroes'>): boolean {
+  return (
+    hero.alive === false &&
+    hero.archetype !== undefined &&
+    data.heroes[hero.archetype]?.boss === true
+  );
 }
 
 export function heroNode(state: GameState, hero: Hero): PlanetId {

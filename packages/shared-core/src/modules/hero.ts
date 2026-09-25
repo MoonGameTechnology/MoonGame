@@ -20,7 +20,7 @@ import type {
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
 import { getStance, stanceToRelation } from '../state/diplomacy';
-import { heroByFleet, heroNode } from '../state/heroes';
+import { bossFallen, heroByFleet, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
@@ -114,6 +114,8 @@ const PATH_SPEED_BONUS = 0.5; // +50% for the owner's fleets along the lane
 const PATH_DURATION_HOURS = 6;
 const PATH_RANGE = 300; // max Euclidean span the hero can bridge (−50% from 600)
 const ANNIHILATE_RANGE = 500;
+/** Game-hours a «Devour World» siege must hold before the world dies (PVR-4.7). */
+const DEVOUR_SIEGE_HOURS = 4;
 const DEAD_KIND = 'dead_world';
 const DEAD_PLANET_TYPE = 'dead_world';
 // Projection hero — the player's first hero: a ship that rides in a fleet, granting
@@ -438,15 +440,38 @@ function applyGrants(
 
 /** Put a living hero into the dead/respawning state — the single death path shared by
  *  both death signals (`unit.died` for the hero stack, `fleet.destroyed` for the whole
- *  ship). Caller has checked the hero is alive. */
+ *  ship). Caller has checked the hero is alive. A BOSS dies for good (PVR-4.7): no
+ *  respawn timer, and `hero.spawn` refuses it (`bossFallen`). */
 function killHero(h: HandlerContext, hero: Hero): void {
   hero.alive = false;
   delete hero.fleetId; // its ship is gone
-  const respawnAt = after(h, HERO_RESPAWN_HOURS);
-  hero.cooldowns = hero.cooldowns ?? {};
-  hero.cooldowns.respawn = respawnAt;
-  h.schedule(respawnAt, 'hero.respawn', { heroId: hero.id });
+  const boss = hero.archetype !== undefined && h.ctx.data.heroes[hero.archetype]?.boss === true;
+  if (!boss) {
+    const respawnAt = after(h, HERO_RESPAWN_HOURS);
+    hero.cooldowns = hero.cooldowns ?? {};
+    hero.cooldowns.respawn = respawnAt;
+    h.schedule(respawnAt, 'hero.respawn', { heroId: hero.id });
+  }
+  breakSiege(h, hero, 'died');
   h.emit('hero.died', { owner: hero.owner, heroId: hero.id, at: h.ctx.now });
+}
+
+/** Why a «Devour World» siege ended without the world dying (`hero.siege.broken`). */
+type SiegeBreak = 'died' | 'battle' | 'departed' | 'ceased' | 'captured' | 'lapsed';
+
+/** End a hero's siege early, if it has one (PVR-4.7): drop the record and tell the bus.
+ *  The scheduled `hero.siege.due` stays on the timeline and finds nothing to finish. */
+function breakSiege(h: HandlerContext, hero: Hero, reason: SiegeBreak): void {
+  const siege = hero.siege;
+  if (!siege) return;
+  delete hero.siege;
+  h.emit('hero.siege.broken', {
+    heroId: hero.id,
+    owner: hero.owner,
+    target: siege.target,
+    victim: siege.victim,
+    reason,
+  });
 }
 
 /** A numeric knob out of an ability's free-form `params`, with an engine fallback. */
@@ -596,6 +621,38 @@ function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetI
   h.emit('planet.destroyed', { planetId, by: playerId, from: previousOwner });
 }
 
+/** «Devour World» (`devour`, PVR-4.7; owner's resolution 2026-09-25: «Поглощение после
+ *  4 ч осады») — the Leviathan's annihilation as a siege rather than a snap. The hero
+ *  stands over a hostile world with its fleet bombarding it; `siegeHours` later the world
+ *  becomes a dead world, unless something interrupted the bombardment first (see
+ *  {@link HeroSiege}). The player gets the hours to strike the fleet or kill the hero.
+ *  The instant `annihilate` stays as it is for every other hero. */
+function castDevour(
+  h: HandlerContext,
+  hero: Hero,
+  target: unknown,
+  params: Record<string, unknown>,
+): void {
+  if (typeof target !== 'string') return h.reject('E_BAD_PAYLOAD');
+  const planet = requireDestructible(h, target);
+  if (planet.owner === null || planet.owner === hero.owner) return h.reject('E_NOT_HOSTILE');
+  const fleet = hero.fleetId !== undefined ? h.state.fleets[hero.fleetId] : undefined;
+  if (!fleet || fleet.movement || fleet.location !== target) return h.reject('E_OUT_OF_RANGE');
+  if (fleet.battleId) return h.reject('E_IN_BATTLE');
+  if (fleet.bombarding !== true) return h.reject('E_NOT_BOMBARDING');
+  if (hero.siege) return h.reject('E_FLEET_BUSY');
+  const until = after(h, numParam(params, 'siegeHours', DEVOUR_SIEGE_HOURS));
+  hero.siege = { target, victim: planet.owner, since: h.ctx.now, until };
+  h.schedule(until, 'hero.siege.due', { heroId: hero.id, until });
+  h.emit('hero.siege.started', {
+    heroId: hero.id,
+    owner: hero.owner,
+    target,
+    victim: planet.owner,
+    until,
+  });
+}
+
 export const heroModule: GameModule = {
   id: 'hero',
   // 4.0.0 — AUD-18: сняты наследные `hero.move` и `planet.annihilate` (контракт действий
@@ -604,7 +661,9 @@ export const heroModule: GameModule = {
   // 4.1.0 AUD-22: узел, чья награда у архетипа со старта, считается изученным.
   // 4.2.0 PVR-6.16: пассивка может надеваться в слот (slotted).
   // 4.2.1 PVR-6.24: корабль героя выходит со звёздами и редкостью модулей из арсенала места.
-  version: '4.2.1',
+  // 4.3.0 PVR-4.7: босс умирает насовсем; смерть героя узнаётся по корпусу его архетипа;
+  // «Поглощение мира» (`devour`) — осада мира вместо мгновенной аннигиляции.
+  version: '4.3.0',
   setup(api) {
 
     // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
@@ -620,6 +679,71 @@ export const heroModule: GameModule = {
         if (hero?.fleetId !== fleetId) continue;
         closeTempLane(h, lane.id);
       }
+    });
+
+    // PVR-4.7: «Devour World». Anything that interrupts the bombardment breaks the
+    // siege at once — a battle involving the hero's fleet, the fleet leaving or ceasing
+    // fire, the world changing hands; the hero's death breaks it in `killHero`.
+    const besieger = (h: HandlerContext, fleetId: unknown): Hero | undefined => {
+      if (typeof fleetId !== 'string') return undefined;
+      const hero = heroByFleet(h.state, fleetId);
+      return hero?.siege ? hero : undefined;
+    };
+    api.on('fleet.departed', (event, h) => {
+      const hero = besieger(h, (event.payload as { fleetId?: unknown })?.fleetId);
+      if (hero) breakSiege(h, hero, 'departed');
+    });
+    api.on('fleet.bombard', (event, h) => {
+      const { fleetId, on } = (event.payload ?? {}) as { fleetId?: unknown; on?: unknown };
+      const hero = on === false ? besieger(h, fleetId) : undefined;
+      if (hero) breakSiege(h, hero, 'ceased');
+    });
+    api.on('battle.started', (event, h) => {
+      const battleId = (event.payload as { battleId?: unknown })?.battleId;
+      if (typeof battleId !== 'string') return;
+      for (const hero of Object.values(h.state.heroes ?? {})) {
+        const fleet = hero.siege && hero.fleetId !== undefined ? h.state.fleets[hero.fleetId] : undefined;
+        if (hero.siege && fleet?.battleId === battleId) breakSiege(h, hero, 'battle');
+      }
+    });
+    api.on('planet.captured', (event, h) => {
+      const planetId = (event.payload as { planetId?: unknown })?.planetId;
+      if (typeof planetId !== 'string') return;
+      for (const hero of Object.values(h.state.heroes ?? {}))
+        if (hero.siege?.target === planetId) breakSiege(h, hero, 'captured');
+    });
+    // The siege clock ran out. The listeners above drop the record the moment the
+    // bombardment stops, so a record with THIS `until` still on the hero means the hours
+    // of uninterrupted fire were served. The checks here are the last line: a world that
+    // can no longer die, or a fleet that is no longer over it, devours nothing.
+    api.on('hero.siege.due', (event, h) => {
+      const { heroId, until } = (event.payload ?? {}) as { heroId?: unknown; until?: unknown };
+      if (typeof heroId !== 'string') return;
+      const hero = h.state.heroes?.[heroId];
+      const siege = hero?.siege;
+      if (!hero || !siege || siege.until !== until) return; // broken, or a newer siege
+      const planet = h.state.planets[siege.target];
+      const fleet = hero.fleetId !== undefined ? h.state.fleets[hero.fleetId] : undefined;
+      const holds =
+        hero.alive !== false &&
+        planet !== undefined &&
+        planet.owner === siege.victim &&
+        isCapturable(h.ctx.data, planet) &&
+        planet.kind !== DEAD_KIND &&
+        fleet !== undefined &&
+        fleet.location === siege.target &&
+        !fleet.movement &&
+        !fleet.battleId &&
+        fleet.bombarding === true;
+      if (!holds) return breakSiege(h, hero, 'lapsed');
+      delete hero.siege;
+      castAnnihilate(h, hero.owner, siege.target);
+      h.emit('hero.siege.done', {
+        heroId,
+        owner: hero.owner,
+        target: siege.target,
+        victim: siege.victim,
+      });
     });
 
     api.on('hero.path.expire', (event, h) => {
@@ -677,6 +801,8 @@ export const heroModule: GameModule = {
       } else if (def.type === 'annihilate') {
         if (typeof target !== 'string') return h.reject('E_BAD_PAYLOAD');
         castAnnihilate(h, action.playerId, target);
+      } else if (def.type === 'devour') {
+        castDevour(h, hero, target, abilityParams(def, hero));
       } else {
         const impl = h.capability<HeroEffect>(`hero.effect.${def.type}`);
         if (!impl) return h.reject('E_NO_EFFECT'); // typed in data, absent in the engine
@@ -809,10 +935,18 @@ export const heroModule: GameModule = {
         fleetId?: string;
         owner?: string;
       };
-      if (unit !== HERO_UNIT) return;
+      if (typeof unit !== 'string') return;
+      // The dead stack is the hero's ship when it is the hull of the hero commanding
+      // THAT fleet — `hero` for every roster archetype, its own hull for a boss (PVR-4.7).
+      // A boss that took a wave aboard loses its ship while the fleet lives on, so the
+      // whole-fleet signal below would never fire for it.
+      const commander = typeof fleetId === 'string' ? heroByFleet(h.state, fleetId) : undefined;
       const hero =
-        (typeof fleetId === 'string' ? heroByFleet(h.state, fleetId) : undefined) ??
-        (typeof owner === 'string' ? heroOf(h.state, owner) : undefined);
+        commander && unit === heroShipUnit(h, commander)
+          ? commander
+          : unit === HERO_UNIT
+            ? (commander ?? (typeof owner === 'string' ? heroOf(h.state, owner) : undefined))
+            : undefined;
       if (!hero || hero.alive === false) return; // no hero entity, or already respawning
       killHero(h, hero);
     });
@@ -876,6 +1010,7 @@ export const heroModule: GameModule = {
       const hero = h.state.heroes?.[heroId];
       if (!hero) return h.reject('E_NO_HERO');
       if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      if (bossFallen(hero, h.ctx.data)) return h.reject('E_HERO_FALLEN'); // PVR-4.7
       // Already commanding a live ship. `alive` is stamped by deploy and cleared ONLY
       // by death (unit.died / fleet.destroyed) — check the flag, not just a live
       // fleetId: a host may delete/rename the carrier without a death (fleet.merge),

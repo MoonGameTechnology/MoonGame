@@ -67,12 +67,14 @@ function seed(h: HandlerContext): void {
   }
 }
 
-/** Data-driven growth organs. A completed cycle consumes the real treasury;
- * empty resources, combat or a full hold yield no organisms and no charge.
- * The next cycle takes its full duration, so splitting/merging cannot speed growth. */
+/** Data-driven growth organs: `brood.count` organisms per fitted hull and cycle (one for
+ * the Brood Mother's chamber, a litter for the Leviathan's brood — PVR-4.7). A completed
+ * cycle consumes the real treasury; empty resources, combat or a full hold yield no
+ * organisms and no charge. The next cycle takes its full duration, so splitting/merging
+ * cannot speed growth. */
 export const fleetBroodModule: GameModule = {
   id: 'fleetBrood',
-  version: '1.0.0',
+  version: '1.1.0', // PVR-4.7: `brood.count` — organisms per hull and cycle
   setup(api) {
     api.on('time.advanced', (_event, h) => seed(h));
     api.on('pve.wave.spawned', (_event, h) => seed(h));
@@ -97,7 +99,7 @@ export const fleetBroodModule: GameModule = {
           reserved;
         let count = Math.max(
           0,
-          Math.min(hulls, Math.floor(free / Math.max(1, unit.stats.cargoSize ?? 1))),
+          Math.min(hulls * brood.count, Math.floor(free / Math.max(1, unit.stats.cargoSize ?? 1))),
         );
         for (const [resource, amount] of Object.entries(unit.cost)) {
           if (amount < 0 || !Number.isFinite(amount)) {
