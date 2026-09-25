@@ -38,6 +38,8 @@ const hooks = `window.__szTest = {
   home: () => Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null,
   // Id всех узлов карты — для проверки, что игрок их не видит (SZ-map-ids).
   places: () => Object.keys(s.planets),
+  // Дом на экране и подсказка первого боя (YAG-7.2): закрывает ли одно другое.
+  homeOnScreen: () => { const h = pickHome(Object.values(s.planets), ME); return h ? world(h.position) : null; },
   // Выбор мира так же, как его делает \`jumpTo\` (переход по ссылке): сама карточка —
   // предмет проверки, а не попадание мышью по карте, где камера у Sector Zero близко к дому.
   select: id => { selPlanet = id; selFleet = null; selFleets = new Set(); lastPanelHtml = ''; renderPanel(); },
@@ -248,6 +250,8 @@ try {
         },
       },
     );
+    // YAG-7.2: первый забег открывается на 1024×576 — это 16:9 минус 20 %, методика п. 1.10.
+    await page.setViewportSize({ width: 1024, height: 576 });
     await page.locator('#sz-new').click();
     await page.locator('#comic').waitFor({ state: 'visible' });
     assert.equal(await page.evaluate(() => window.__szTest.run()), false, 'комикс идёт ДО забега');
@@ -261,11 +265,20 @@ try {
     await page.locator('#comic-next').click();
     await page.locator('#comic').waitFor({ state: 'hidden' });
     assert.deepEqual(await page.evaluate(() => window.__szTest.comicsSeen()), ['pve-1:intro']);
-    await check('Sector Zero', true);
     // Воронка обучения (YAG-5.1): бой с пиратами главы I — первый шаг уходит на старте.
     await page.waitForFunction(() =>
       window.__szTest.events().some((e) => e.event === 'onboarding_step' && e.props.step === 'approach'),
     );
+    // Подсказка первого боя встала слева; дом и значки его флотов — не под ней.
+    await page.locator('#pirate-intro').waitFor({ state: 'visible' });
+    const intro = await page.locator('#pirate-intro').boundingBox();
+    const home = await page.evaluate(() => window.__szTest.homeOnScreen());
+    assert.ok(
+      home.x > intro.x + intro.width + 60 || home.y > intro.y + intro.height + 60,
+      `YAG-7.2: дом (${Math.round(home.x)},${Math.round(home.y)}) не под подсказкой первого боя`,
+    );
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await check('Sector Zero', true);
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.
     await page.goto(site.url + '/');

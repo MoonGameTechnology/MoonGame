@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { SHEET_WIDTH_RATIO, panelSlackFor, type PanelRect } from './panelSlack';
+import {
+  SHEET_WIDTH_RATIO,
+  cardCovers,
+  leftCardSlackFor,
+  panelSlackFor,
+  type PanelRect,
+} from './panelSlack';
 
 const VW = 1000;
 const VH = 800;
@@ -74,5 +80,32 @@ describe('припуск камеры — сколько именно', () => {
     expect(sheet.right).toBeUndefined();
     const column = panelSlackFor(rect({ width: 280, height: VH, left: 720 }), VW, VH);
     expect(column.bottom).toBeUndefined();
+  });
+});
+
+describe('YAG-7.2 — карточка у левого края экрана', () => {
+  // Карточка обучения «Первый бой» на ПК стоит слева колонкой. Дом главы I лежит в углу
+  // карты, и без припуска слева камера не могла вывести его из-под карточки: на 1024×576
+  // (методика п. 1.10) карточка закрывала часть стартового флота.
+  const PC = 1024;
+  const card = { left: 18, top: 187, width: 280, height: 190 };
+
+  it('колонка у левого края даёт припуск на свою правую кромку', () => {
+    expect(leftCardSlackFor(card, PC)).toEqual({ left: 298 });
+  });
+
+  it('нет карточки, схлопнутая или не у края — припуска нет', () => {
+    expect(leftCardSlackFor(null, PC)).toEqual({});
+    expect(leftCardSlackFor({ ...card, width: 0 }, PC)).toEqual({});
+    expect(leftCardSlackFor({ ...card, left: 400 }, PC)).toEqual({});
+    // Телефон: та же карточка — широкая плашка снизу, а не колонка у края.
+    expect(leftCardSlackFor({ left: 12, top: 520, width: 366, height: 210 }, 390)).toEqual({});
+  });
+
+  it('закрывает ли карточка точку на экране — с запасом под значки флотов', () => {
+    expect(cardCovers(card, { x: 250, y: 250 }, 0)).toBe(true);
+    expect(cardCovers(card, { x: 330, y: 260 }, 0)).toBe(false);
+    expect(cardCovers(card, { x: 330, y: 260 }, 40)).toBe(true);
+    expect(cardCovers(null, { x: 250, y: 250 }, 40)).toBe(false);
   });
 });

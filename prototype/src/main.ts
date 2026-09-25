@@ -363,7 +363,7 @@ import {
 } from '../../decisions/joinRules';
 import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
-import { panelSlackFor } from './panelSlack';
+import { cardCovers, leftCardSlackFor, panelSlackFor, type Slack } from './panelSlack';
 import { longPressAction, pressIntent } from '../../decisions/pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
@@ -2088,12 +2088,21 @@ function visible(c: { x: number; y: number }, pad = 80): boolean {
  *  open panel can be dragged into the clear part of the screen. The panel is a
  *  full-width bottom sheet on phones (→ slack below) and a right-hand column on wide
  *  screens (→ slack on the right); measure its live rect so both layouts just work. */
-function panelSlack(): { right?: number; bottom?: number } {
+function panelSlack(): Slack {
   const el = typeof document !== 'undefined' ? document.getElementById(MOBILE ? 'mobile-sheet' : 'side') : null;
   const open = el && getComputedStyle(el).display !== 'none';
   // The arithmetic (which side is covered, and by how much) is `panelSlack.ts`
-  // (REFM-54); measuring the live element stays here.
-  return panelSlackFor(open ? el.getBoundingClientRect() : null, VW, VH);
+  // (REFM-54); measuring the live element stays here. YAG-7.2: the first-fight hint is a
+  // left column on PC — the camera may pull the home corner out from under it too.
+  return {
+    ...panelSlackFor(open ? el.getBoundingClientRect() : null, VW, VH),
+    ...leftCardSlackFor(pirateIntroRect(), VW),
+  };
+}
+/** Прямоугольник подсказки первого боя, пока она видна (YAG-7.2), иначе `null`. */
+function pirateIntroRect(): DOMRect | null {
+  const el = typeof document !== 'undefined' ? document.getElementById('pirate-intro') : null;
+  return el && !el.hidden ? el.getBoundingClientRect() : null;
 }
 
 function zoomAt(fx: number, fy: number, factor: number) {
@@ -10220,6 +10229,8 @@ const battleWindow = initBattleWindow({
     timeLeft,
   },
 });
+/** Сколько экрана вокруг дома занимают его значки — стек флотов, гарнизон, подписи (YAG-7.2). */
+const HOME_CLEARANCE_PX = 80;
 const pirateIntro = initPirateIntro({
   root: $('pirate-intro'),
   copy: $('pirate-copy'),
@@ -10231,6 +10242,12 @@ const pirateIntro = initPirateIntro({
   onStage: (step) => {
     if (isSectorZeroRun())
       getPlatform().analytics.emit('onboarding_step', { guide: 'pirates', step, attempt: sectorAttempt });
+  },
+  // YAG-7.2: подсказка встаёт после первого хода часов, когда стартовый вид уже выбран. Если
+  // она легла на дом (и его флоты рядом), вид пересчитывается — теперь с припуском под ней.
+  onFirstShow: () => {
+    const home = pickHome(Object.values(s.planets), ME);
+    if (home && cardCovers(pirateIntroRect(), world(home.position), HOME_CLEARANCE_PX)) defaultView();
   },
 });
 // Комиксы глав (решение владельца 2026-09-24): арт рисует владелец, реестр — `comicArt.ts`.
