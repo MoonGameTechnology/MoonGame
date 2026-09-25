@@ -386,7 +386,7 @@ import { drawSightFrontier } from './drawSightFrontier';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
 import { tapOwner, tapRadius } from '../../decisions/tapPriority';
-import { nextPick, tapCandidates, touchPick, type TapPick } from '../../decisions/tapCycle';
+import { nextPick, retapsSelectedWorld, tapCandidates, touchPick, type TapPick } from '../../decisions/tapCycle';
 import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderDraft, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
@@ -8353,7 +8353,7 @@ function updateMobileHud(): void {
       if (!f || !fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner))) continue;
       choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
     } else if (s.planets[pick.id]) {
-      choices.push({ ...pick, title: pick.id, sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
+      choices.push({ ...pick, title: worldTitle(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
     }
   }
   mobileChoices = choices.map(({ kind, id }) => ({ kind, id }));
@@ -9739,11 +9739,18 @@ function selectAt(mx: number, my: number) {
       return;
     }
     if (MOBILE) {
+      // Второй тап по выбранной провинции снимает выбор и тогда, когда на её орбите флоты:
+      // иначе он снова открывал бы список «флот или мир» (`tapCycle.ts`, правило 6).
+      if (retapsSelectedWorld(n?.id ?? null, selPlanet ? { kind: 'planet', id: selPlanet } : null)) {
+        applyPick(null);
+        return;
+      }
       const choices = tapCandidates(fleetIds, n?.id ?? null);
       mobileChoices = choices.length > 1 ? choices : [];
       if (mobileChoices.length) return;
     }
-    applyPick(touchPick(hit, n?.id ?? null));
+    // Второй тап по выбранной провинции снимает выбор (`tapCycle.ts`, правило 6).
+    applyPick(touchPick(hit, n?.id ?? null, selPlanet ? { kind: 'planet', id: selPlanet } : null));
     return;
   }
   // PC — RimWorld-style cycling: gather EVERY selectable object under the tap — your
