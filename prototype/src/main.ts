@@ -513,7 +513,6 @@ import {
   t,
   tData,
   LOCALE,
-  LOCALE_LABEL,
   setLocale,
   localizeStaticDom,
 } from '../../localization/runtime';
@@ -824,6 +823,7 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
+import { mountLocaleMenu } from './localeMenu';
 import { artScale, calloutAlpha, chevronAlpha, sphereBloom } from './semanticZoom';
 import { mapLod, mapSpacing, drawSchematicNode, type MapLod } from '../../packages/client/src/mapLod';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
@@ -10823,13 +10823,17 @@ $('cback').addEventListener('click', () => {
   statusEl.textContent = '';
   openHub(); // back from the browser → the hub
 });
-// Language picker: RU ⇄ EN. The choice persists; a reload rebuilds every renderer
-// in the new language (the picker lives on the welcome screen — no match to lose).
-$('clang').textContent = LOCALE_LABEL[LOCALE] + ' ▾';
-$('clang').addEventListener('click', () => {
-  setLocale(LOCALE === 'ru' ? 'en' : 'ru');
-  if (typeof location !== 'undefined' && location.reload) location.reload();
-});
+// Выбор языка — кнопка со списком (`localeMenu.ts`, заказ владельца 2026-09-25): на экране
+// входа, в хабе и в меню Sector Zero. Выбор сохраняется, перезагрузка перестраивает все
+// рендеры на новом языке (кнопки живут только вне партии — терять нечего).
+for (const id of ['clang', 'hub-lang', 'sz-lang'])
+  mountLocaleMenu($(id), {
+    current: () => LOCALE,
+    pick: (locale) => {
+      setLocale(locale);
+      if (typeof location !== 'undefined' && location.reload) location.reload();
+    },
+  });
 localizeStaticDom(); // static markup is canonical-Russian; translate it in place
 for (const a of Array.from(document.querySelectorAll('.cfoot a'))) {
   a.addEventListener('click', () => {
@@ -11150,6 +11154,7 @@ const settings = initSettings({
   resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
 });
 $('hub-settings').addEventListener('click', () => settings.open());
+$('hub-gear').addEventListener('click', () => settings.open());
 // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
 document.getElementById('rail-settings')?.addEventListener('click', () => settings.open());
 

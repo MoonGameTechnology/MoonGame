@@ -26,6 +26,14 @@
 .sz-topline, .sz-bottomline { display: flex; align-items: center; justify-content: space-between; gap: 24px; color: var(--sz-muted); font: 11px/1.5 ui-monospace, monospace; letter-spacing: .16em; }
 .sz-topline { border-bottom: 1px solid #24404b; padding-bottom: 20px; }
 .sz-mark { color: #79dfdf; display: flex; align-items: center; gap: 12px; }
+.sz-topactions { display: flex; align-items: center; gap: 10px; }
+.sz-lang, .sz-gear { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 3px; cursor: pointer; font: 600 12px/1 ui-monospace, monospace; letter-spacing: .12em; }
+.sz-lang { border: 1px solid #2b4a55; background: rgba(8, 24, 31, .75); color: #b9d3d8; }
+.sz-lang .lm-car { font-size: 9px; opacity: .7; }
+/* Настройки — заметно (заказ владельца 2026-09-25): раньше текстовая ссылка под меню. */
+.sz-gear { border: 1px solid #5fd6d0; background: rgba(95, 214, 208, .1); color: #a9f5ee; box-shadow: 0 0 14px rgba(95, 214, 208, .12); }
+.sz-gear-ic { font-size: 17px; }
+.sz-lang:hover, .sz-gear:hover { border-color: #a9f5ee; color: #fff; background: rgba(95, 214, 208, .18); }
 .sz-mark::before { content: ""; width: 9px; height: 9px; border: 1px solid currentColor; transform: rotate(45deg); }
 .sz-main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; flex: 1; gap: 64px; padding: 54px 0 44px; }
 .sz-content { position: relative; z-index: 1; max-width: 440px; }

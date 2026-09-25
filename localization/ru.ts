@@ -1976,6 +1976,7 @@ export const ru: Record<string, string> = {
   'hub.tile.meta': 'Прокачка',
   'hub.tile.notifications': 'Уведомления',
   'hub.tile.settings': 'Настройки',
+  'locale.pick.aria': 'Язык',
   'hub.tile.support': 'Поддержка',
   'hub.tile.tutorial': 'Обучение',
   'hub.tile.updates': 'Обновления',

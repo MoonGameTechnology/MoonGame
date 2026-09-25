@@ -2371,7 +2371,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   padding:7px 13px;background:rgba(3,12,16,.72);border:1px solid var(--line-hi);border-radius:7px;
   color:var(--dim);font:11px ui-monospace,monospace;letter-spacing:2px;cursor:pointer;}
 #connect .clang:hover{border-color:var(--cyan-dim);color:var(--ink);}
-#connect .clang .car{font-size:7px;opacity:.7;}
+#connect .clang .lm-car{font-size:8px;opacity:.7;}
+/* Список языков (localeMenu.ts): висит над всем, под кнопкой, что его открыла. */
+.locmenu{position:fixed;z-index:200;display:flex;flex-direction:column;padding:5px;border-radius:9px;
+  background:rgba(4,14,20,.97);border:1px solid var(--line-hi,#2c5866);box-shadow:0 10px 28px rgba(0,0,0,.55),0 0 0 1px rgba(53,214,230,.06);}
+.locmenu .lm-item{display:flex;align-items:center;gap:9px;min-height:40px;padding:8px 14px 8px 10px;border:0;border-radius:6px;
+  background:transparent;color:#cfe7ec;font:600 12px ui-monospace,monospace;letter-spacing:2px;text-align:left;cursor:pointer;}
+.locmenu .lm-item:hover,.locmenu .lm-item:focus-visible{background:rgba(53,214,230,.12);color:#fff;outline:none;}
+.locmenu .lm-item.on{color:var(--cyan,#35d6e6);}
+.locmenu .lm-tick{width:12px;text-align:center;}
+.lm-globe{font-size:13px;letter-spacing:0;}
 #connect .ccrest{display:flex;flex-direction:column;align-items:center;gap:9px;margin:4px 0 24px;}
 #connect .ccrest .ring{position:relative;width:62px;height:62px;display:grid;place-items:center;}
 #connect .ccrest .ring .dia{width:32px;height:32px;transform:rotate(45deg);border:2px solid var(--cyan);
@@ -2766,6 +2775,18 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #hub .hub-st{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan-dim);margin-top:3px;}
 #hub .hub-st::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#3ad17a;
   box-shadow:0 0 6px #3ad17a;margin-right:6px;vertical-align:middle;}
+/* Язык и настройки — на виду в шапке хаба (заказ владельца 2026-09-25), а не только в «Ещё». */
+#hub .hub-lang,#hub .hub-gear{height:42px;display:flex;align-items:center;gap:7px;padding:0 13px;border-radius:10px;
+  border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:#d6eef2;cursor:pointer;flex:0 0 auto;
+  font:600 11px ui-monospace,monospace;letter-spacing:1.5px;}
+#hub .hub-lang .lm-car{font-size:8px;opacity:.7;}
+#hub .hub-gear{border-color:var(--cyan-dim);color:var(--cyan);font-size:12px;letter-spacing:.5px;
+  box-shadow:inset 0 0 10px rgba(53,214,230,.08);}
+#hub .hub-gear .hg-ic{font-size:17px;line-height:1;}
+#hub .hub-lang:hover,#hub .hub-gear:hover{border-color:var(--cyan);color:#fff;box-shadow:0 0 12px rgba(53,214,230,.22);}
+/* На телефоне подписи вытесняли имя командира — остаются значки 🌐 и ⚙. */
+@media (max-width:560px){#hub .hub-lang .lm-cur,#hub .hub-gear .hg-lbl{display:none;}
+  #hub .hub-lang,#hub .hub-gear{padding:0 11px;}}
 #hub .hub-msg{position:relative;width:42px;height:42px;border-radius:10px;border:1px solid var(--line-hi);
   background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;flex:0 0 auto;}
 #hub .hub-msg .badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;padding:0 4px;
@@ -3444,7 +3465,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="endscreen"></div>
 <div id="connect">
   <div class="cwrap">
-    <button id="clang" class="clang" type="button">РУССКИЙ <span class="car">▼</span></button>
+    <button id="clang" class="clang" type="button" data-i18n-aria="locale.pick.aria"></button>
     <div class="cbox">
       <div id="cwelcome">
         <div class="ccrest">
@@ -3613,7 +3634,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div>
 <section id="sector-zero" aria-labelledby="sz-title"${entry === 'sector-zero' ? ' style="display:flex"' : ''}>
   <div class="sz-shell">
-    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span></div>
+    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span><div class="sz-topactions"><button id="sz-lang" class="sz-lang" type="button" data-i18n-aria="locale.pick.aria"></button><button id="sz-settings" class="sz-gear" type="button"><span class="sz-gear-ic" aria-hidden="true">⚙</span><span data-i18n="hub.tile.settings"></span></button></div></div>
     <div class="sz-main" id="sz-home">
       <div class="sz-content">
         <p class="sz-eyebrow" data-i18n="sector-zero.offline"></p>
@@ -3657,7 +3678,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <div class="sz-cloud-side"><b data-i18n="sector-zero.cloud.here"></b><p id="sz-cloud-here"></p><button id="sz-keep-here" class="sz-action" type="button" data-i18n="sector-zero.cloud.keep-here"></button></div>
           <div class="sz-cloud-side"><b data-i18n="sector-zero.cloud.cloud"></b><p id="sz-cloud-cloud"></p><button id="sz-take-cloud" class="sz-action" type="button" data-i18n="sector-zero.cloud.take-cloud"></button></div>
         </div>
-        <div class="sz-tools"><button id="sz-settings" type="button" data-i18n="hub.tile.settings"></button><button id="sz-back" type="button" data-i18n="sector-zero.back"></button></div>
+        <div class="sz-tools"><button id="sz-back" type="button" data-i18n="sector-zero.back"></button></div>
       </div>
       <div class="sz-projection" aria-hidden="true">
         <svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -3702,6 +3723,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-name" id="hub-name">Командир</div>
       <div class="hub-st" data-i18n="hub.status.online"></div>
     </div>
+    <button class="hub-lang" id="hub-lang" type="button" data-i18n-aria="locale.pick.aria"></button>
+    <button class="hub-gear" id="hub-gear" type="button" data-i18n-aria="hub.tile.settings"><span class="hg-ic" aria-hidden="true">⚙</span><span class="hg-lbl" data-i18n="hub.tile.settings"></span></button>
     <button class="hub-msg" id="hub-msg" type="button" data-i18n-aria="hub.msgs.aria">✉</button>
   </div>
   <div class="hub-body">
