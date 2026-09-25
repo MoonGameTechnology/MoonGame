@@ -32,6 +32,7 @@
 export type TapOwner =
   | 'chain-plan' // режим «Приказ»
   | 'merge' // слияние флотов
+  | 'retreat' // точка отхода флота из боя
   | 'cast' // применение способности героя
   | 'deploy' // высадка героя
   | 'assault' // штурм с ПК
@@ -45,6 +46,9 @@ export type TapOwner =
 export interface TapModes {
   chainMode: boolean;
   merging: boolean;
+  /** Взведено «Отступить»: следующий тап — точка отхода (RETR-1 `to`). Необязательно:
+   *  без поля режима нет. */
+  retreatAim?: boolean;
   heroAim: boolean;
   heroSpawnAim: boolean;
   assaultAim: boolean;
@@ -62,6 +66,9 @@ export interface TapModes {
 export function tapOwner(m: TapModes): TapOwner {
   if (m.chainMode) return 'chain-plan'; // правило 1
   if (m.merging) return 'merge';
+  // Отход — сразу за слиянием: его взводят из боя, где флот теряет корпус каждый раунд,
+  // и тап обязан уйти в точку отхода, а не в выделение.
+  if (m.retreatAim) return 'retreat';
   if (m.heroAim) return 'cast';
   if (m.heroSpawnAim) return 'deploy';
   if (m.assaultAim) return 'assault';

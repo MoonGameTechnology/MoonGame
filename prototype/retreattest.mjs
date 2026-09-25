@@ -30,6 +30,21 @@ const hooks = `window.__retreatTest = {
   me: () => ME,
   ids: () => selectedFleetIds(),
   fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
+  // Ручной отход: бой собирается прямо в мире — свой флот и чужой на соседнем узле, война,
+  // «Атака». Ждать встречи на живой карте значило бы проверять ИИ, а не кнопку.
+  stageBattle: () => {
+    const mine = Object.values(s.fleets).find(f => f.owner === ME && f.location);
+    const foe = Object.values(s.fleets).find(f => f.owner !== ME && f.units.length > 0);
+    const home = mine.location;
+    const away = (s.planets[home].links ?? [])[0];
+    mine.location = away; mine.movement = null;
+    foe.location = away; foe.movement = null; foe.battleId = null;
+    s.diplomacy = { ...(s.diplomacy ?? {}), [[ME, foe.owner].sort().join('|')]: 'war' };
+    playerOrder(engageFleet(ME, mine.id, foe.id));
+    return { mine: mine.id, home, away, battle: s.fleets[mine.id]?.battleId ?? null };
+  },
+  openBattle: (id) => battleWindow.open(id),
+  screen: (id) => world(s.planets[id].position),
 };`;
 
 const site = await serve(await instrumentedGame(hooks));
@@ -133,10 +148,37 @@ try {
       await page.screenshot({ path: process.env.RETREAT_SHOT });
     }
 
+    // РУЧНОЙ ОТХОД (аудит механик 2026-09-25, решение владельца): «Отступить» в окне боя
+    // взводит прицел, окно уступает карту, тап по миру — точка отхода. До этого кнопка
+    // слала приказ без точки, и флот оставался под огнём на том же узле.
+    const staged = await page.evaluate(() => window.__retreatTest.stageBattle());
+    assert(staged.battle, `бой собран (${JSON.stringify(staged)})`);
+    await page.evaluate((id) => window.__retreatTest.openBattle(id), staged.battle);
+    const retreatBtn = page.locator(`#battlewin [data-battle-retreat="${staged.mine}"]`);
+    await retreatBtn.waitFor({ state: 'visible' });
+    await retreatBtn.click();
+    assert.equal(
+      await page.evaluate(() => document.getElementById('battlewin').classList.contains('show')),
+      false,
+      'окно боя уступает карту прицелу',
+    );
+    const fleetNow = () =>
+      page.evaluate((id) => {
+        const f = window.__retreatTest.state().fleets[id];
+        return f ? { battle: f.battleId ?? null, to: f.movement?.destination ?? f.movement?.to ?? null } : null;
+      }, staged.mine);
+    assert.equal((await fleetNow()).battle, staged.battle, 'пока точка не выбрана, флот в бою');
+    const home = await page.evaluate((id) => window.__retreatTest.screen(id), staged.home);
+    await page.mouse.click(home.x, home.y);
+    const after = await fleetNow();
+    assert(after, 'флот пережил отход');
+    assert.equal(after.battle, null, 'флот вышел из боя');
+    assert.equal(after.to, staged.home, 'флот идёт в выбранную точку');
+
     assert.deepEqual(errors, [], 'страница не выбросила исключений');
   });
   console.log(
-    '\n✓ retreat smoke: кнопка авто-отхода открывает окошко 20/30/40/50/Выкл, выбор ставит и снимает приказ\n',
+    '\n✓ retreat smoke: авто-отход — окошко 20/30/40/50/Выкл ставит и снимает приказ; «Отступить» в бою — выбор точки на карте уводит флот\n',
   );
 } finally {
   await browser.close();

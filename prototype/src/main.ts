@@ -1195,6 +1195,10 @@ let squadTroops: { id: string; plan: Record<string, number> } | null = null;
 // Hero window armed modes: a cast waits for its target world; a deploy waits for the
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
 let heroAim: { heroId: string; abilityId: string } | null = null;
+/** «Отступить» взведено: следующий тап по карте — точка, куда уйдёт этот флот (RETR-1
+ *  `to`). Без точки отход только расцеплял бой и оставлял флот под огнём на том же узле —
+ *  аудит механик 2026-09-25; решение владельца: точку выбирает игрок. */
+let retreatAim: string | null = null;
 let heroSpawnAim: string | null = null;
 // Shuttle free-space strike armed → next tap on an enemy fleet sends shuttle.strike
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
@@ -8163,7 +8167,7 @@ function renderPanel() {
   // и режимом «Приказ». Раньше движение было исключением: игрок жал ⤳ и тапал в лист,
   // который закрывал пол-карты (заказ владельца — убирать нижний хаб и на движении).
   const dock: DockState = {
-    aiming: aiming || (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim)),
+    aiming: aiming || (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim || !!retreatAim)),
     merging,
     picking: pickMode,
     chaining: chainMode !== null,
@@ -8988,7 +8992,7 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'openbattle') {
     if (arg) battleWindow.open(arg);
   } else if (act === 'retreat') {
-    playerOrder(retreatFleet(ME, selFleet!));
+    armRetreat(selFleet!);
   } else if (act === 'instantrepair') {
     // Платный мгновенный ремонт: цена и отказы — на сервере; панель перерисуется
     // по факту (полный бар = получилось), нотификаций-обещаний не даём.
@@ -9255,6 +9259,7 @@ cmdbar.addEventListener('click', (ev) => {
   if (disarms('pick', cmd)) pickMode = false;
   // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
   heroAim = null;
+  retreatAim = null;
   heroSpawnAim = null;
   strikeAim = null;
   if (cmd === 'engage') {
@@ -9462,6 +9467,7 @@ function selectAt(mx: number, my: number) {
     merging,
     heroAim: !!heroAim,
     heroSpawnAim: !!heroSpawnAim,
+    retreatAim: !!retreatAim,
     assaultAim,
     engageAim,
     strikeAim: !!strikeAim,
@@ -9512,6 +9518,18 @@ function selectAt(mx: number, my: number) {
     } else {
       note(t('hint.wing-cancelled'));
     }
+    lastPanelHtml = '';
+    return;
+  }
+  // «Отступить» взведено: тап по миру — точка отхода. Дорогу, право прохода и то, что флот
+  // всё ещё в бою, проверяет ЯДРО: недостижимая точка оставляет флот в бою и приходит
+  // отказом (`errText`), а не молчаливым расцеплением. Промах мимо мира снимает прицел.
+  if (owner === 'retreat' && retreatAim) {
+    const fleetId = retreatAim;
+    retreatAim = null;
+    const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+    if (n) playerOrder(retreatFleet(ME, fleetId, n.id));
+    else note(t('hint.retreat-cancelled'));
     lastPanelHtml = '';
     return;
   }
@@ -10246,6 +10264,19 @@ document.getElementById('rail-steward')?.addEventListener('click', () => steward
 // До этого расклад можно было увидеть единственным путём — выделив свой флот в этом
 // бою, — то есть про чужую схватку рядом узнать было нечем.
 const battleWin = $('battlewin');
+/** Взвести «Отступить» для флота: остальные прицелы гаснут, окно боя уступает карту. */
+function armRetreat(fleetId: string): void {
+  retreatAim = fleetId;
+  aiming = false;
+  assaultAim = false;
+  engageAim = false;
+  merging = false;
+  heroAim = null;
+  strikeAim = null;
+  battleWin.classList.remove('show');
+  note(t('hint.pick-retreat'));
+  lastPanelHtml = '';
+}
 const battleWindow = initBattleWindow({
   root: () => battleWin,
   body: () => $('battlewinbody'),
@@ -10257,8 +10288,8 @@ const battleWindow = initBattleWindow({
     const m = createBattleModel(s, id, ME, data, ctx(s.time, s).config);
     return m.ok ? m : null;
   },
-  // Отступление из окна боя — тот же приказ, что и кнопкой боковой панели.
-  retreat: (fleetId) => playerOrder(retreatFleet(ME, fleetId)),
+  // Отступление из окна боя — тот же прицел, что и кнопкой боковой панели.
+  retreat: (fleetId) => armRetreat(fleetId),
   view: {
     color: ownerColor,
     fleetName: fleetCallsign,
@@ -11771,6 +11802,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   selFleets = new Set();
   aiming = false;
   assaultAim = false;
+  retreatAim = null;
   merging = false;
   additive = false;
   splitState = null;
@@ -13572,11 +13604,12 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'chain', isOpen: () => chainMode !== null, close: () => exitChainMode() },
   {
     id: 'aim',
-    isOpen: () => aiming || assaultAim || merging || (MOBILE && (engageAim || pickMode)),
+    isOpen: () => aiming || assaultAim || merging || !!retreatAim || (MOBILE && (engageAim || pickMode)),
     close: () => {
       if (MOBILE) cancelMobileOrder();
       aiming = false;
       assaultAim = false;
+      retreatAim = null;
       merging = false;
       lastPanelHtml = '';
     },
