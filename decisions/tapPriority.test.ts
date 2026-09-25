@@ -38,6 +38,9 @@ describe('тап по карте — кто его забирает', () => {
 
   it('каждый вооружённый приказ забирает тап себе', () => {
     expect(tapOwner(modes({ merging: true }))).toBe('merge');
+    // Отход взводят из боя: тап обязан уйти в точку отхода, даже если вооружён ход.
+    expect(tapOwner(modes({ retreatAim: true, aiming: true, heroAim: true }))).toBe('retreat');
+    expect(tapOwner(modes({ merging: true, retreatAim: true }))).toBe('merge');
     expect(tapOwner(modes({ heroAim: true }))).toBe('cast');
     expect(tapOwner(modes({ heroSpawnAim: true }))).toBe('deploy');
     expect(tapOwner(modes({ assaultAim: true }))).toBe('assault');

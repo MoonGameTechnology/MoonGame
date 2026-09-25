@@ -204,8 +204,10 @@ module.exports = {
     clearSelection();
     const badge = battleBadgePoint(world(battleAnchor(s.battles['ui-battle'])));
     selectAt(badge.x, badge.y);
-    return { own: own.id, foe: foe.id, restore: () => { s = before; vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
+    return { own: own.id, foe: foe.id, loc, restore: () => { s = before; vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
   },
+  links: (id) => [...(s.planets[id].links ?? [])],
+  tapWorld: (id) => { const p = world(s.planets[id].position); selectAt(p.x, p.y); },
   cards: () => ({
     planet: Object.values(s.planets).find(p => p.owner === ME).id,
     fleet: Object.values(s.fleets).find(f => f.owner === ME).id,
@@ -399,8 +401,15 @@ assert.ok(!getEl('battlewinbody').innerHTML.includes('data-battle-retreat="' + b
 for (const handle of (listeners.get(getEl('battlewin')) ?? {}).click ?? [])
   handle({ target: { classList: { contains: () => false }, closest: selector =>
     selector === '[data-battle-retreat]' ? { dataset: { battleRetreat: battleScene.own } } : null } });
-assert.equal(JSON.parse(mod.exports.state()).fleets[battleScene.own].battleId, null);
-assert.ok(getEl('battlewinbody').innerHTML.includes('bw-empty'), 'resolved battle does not retain stale controls');
+// «Отступить» взводит прицел (аудит механик 2026-09-25): окно уступает карту, флот ещё в бою,
+// и только тап по миру уводит его — с точкой отхода, а не на месте боя.
+assert.ok(!getEl('battlewin').classList.contains('show'), 'retreat hands the map to the aim');
+assert.equal(JSON.parse(mod.exports.state()).fleets[battleScene.own].battleId, 'ui-battle', 'no retreat before the point is picked');
+const retreatTo = mod.exports.links(battleScene.loc)[0];
+mod.exports.tapWorld(retreatTo);
+const retreated = JSON.parse(mod.exports.state()).fleets[battleScene.own];
+assert.equal(retreated.battleId, null, 'the picked point pulls the fleet out of battle');
+assert.equal(retreated.movement?.destination ?? retreated.movement?.to, retreatTo, 'the fleet heads for the picked point');
 battleScene.restore();
 console.log('Battle badge and targeted retreat OK');
 console.log('Card navigation OK — planet, own fleet and inspected foreign fleet');

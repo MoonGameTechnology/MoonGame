@@ -1153,6 +1153,8 @@ export const en: Record<string, string> = {
   'hint.forced-march': '⚡ forced march: +50% speed, −5% hull per hour underway',
   'hint.multiselect': '⊕ tap your fleets — build the group, then give a common order',
   'hint.pick-assault': "⚔ pick someone else's world to storm",
+  'hint.pick-retreat': '⤺ pick where to fall back on the map',
+  'hint.retreat-cancelled': '✖ retreat cancelled',
   'hint.pick-engage': 'tap an enemy fleet or the world it holds — we attack',
   'hint.engage-enemy-only': 'no enemy fleet here — targets are in red brackets',
   'hint.engage-in-flight': 'the target is under way — no course to it; wait until it stops',
@@ -2144,7 +2146,7 @@ export const en: Record<string, string> = {
   'onb.intro.market.title': 'Session market',
   'onb.intro.ok': 'Got it',
   'onb.intro.retreat.body':
-    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely.",
+    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely. After tapping, pick where to fall back on the map.",
   'onb.intro.retreat.title': 'Retreat is not free',
   'onb.intro.steward.body':
     'Away for a while? Hand your defence to the Steward — it holds your worlds by your rules while you are gone. The world runs 24/7, but a baseline defence stays up even when you are offline.',
@@ -2547,7 +2549,7 @@ export const en: Record<string, string> = {
   'side.arch.transport': 'transports',
   'side.battle.retreat': '⤺ Retreat',
   'side.battle.retreat.hint':
-    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely.",
+    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely. After tapping, pick where to fall back on the map.",
   'side.battle.side.fleet': 'fleet',
   'side.battle.side.garrison': 'garrison',
   'side.battle.side.landing': 'landing',
