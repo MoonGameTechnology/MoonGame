@@ -8,6 +8,8 @@
  * мифо-астрономический колорит, номер даёт уникальность при редкой коллизии хэша.
  */
 
+import { provinceName } from '../../decisions/provinceName';
+
 /** Мифо-астрономические собственные имена миров (латиница — нейтральны к локали). */
 export const PLANET_NAMES = [
   'HELIOS',
@@ -64,4 +66,10 @@ export function planetName(id: string): string {
   const name = PLANET_NAMES[h % PLANET_NAMES.length]!;
   const num = (Math.floor(h / PLANET_NAMES.length) % 9) + 1;
   return `${name}-${num}`;
+}
+
+/** Имя мира в карточке, окне боя, стройке и метках: у провинции главы — её имя
+ *  (PVR-6.19, `decisions/provinceName.ts`), у карт без имён — авто-имя, как было. */
+export function worldName(mapId: string | undefined, id: string): string {
+  return provinceName(mapId, id) ?? planetName(id);
 }

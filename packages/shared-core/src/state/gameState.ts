@@ -1080,6 +1080,19 @@ export interface PveState {
    *  and absent for good under a mode without `holdHours`: there the only clear is taking
    *  every NPC world. Echoed here for the HUD's «hold out» countdown as well. */
   holdUntil?: number;
+  /** Боевой счёт каждого места за забег (PVR-6.20, окно итогов экспедиции): сколько СВОИХ
+   *  юнитов и машин оно потеряло и сколько чужих уничтожило. Павшие засчитываются тому,
+   *  чей огонь их добил (`unit.died.killedBy`, стрелок сбитых машин). Только места игроков:
+   *  Рой, пираты и нейтралы счёта не ведут. Нет записи — ноль. */
+  tally?: Record<PlayerId, PveTally>;
+}
+
+/** Строка боевого счёта одного места (см. {@link PveState.tally}). */
+export interface PveTally {
+  /** Своих юнитов и машин погибло. */
+  lost: number;
+  /** Чужих юнитов и машин уничтожено его огнём. */
+  destroyed: number;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */

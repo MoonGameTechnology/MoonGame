@@ -47,12 +47,12 @@ function journalHtml(rows: JournalRow[]): string {
   );
 }
 
-function contactHtml(c: Contact): string {
+function contactHtml(c: Contact, placeName: (id: string) => string): string {
   const status = c.live ? t('swarm.intel.live') : t('swarm.intel.stale.short');
   return (
     `<article class="sd-contact${c.live ? ' live' : ''}">` +
     `<header><button type="button" class="sd-loc" data-jump="${esc(c.location)}" ` +
-    `title="${esc(t('swarm.intel.jump'))}">${esc(c.location)}</button>` +
+    `title="${esc(t('swarm.intel.jump'))}">${esc(placeName(c.location))}</button>` +
     `<span class="sd-chip">${esc(status)}</span></header>` +
     `<ul class="sd-units">${c.units
       .map((u) => `<li><span>${esc(tData(u.unit.replace(/_/g, ' ')))}</span><b>×${u.count}</b></li>`)
@@ -62,12 +62,14 @@ function contactHtml(c: Contact): string {
   );
 }
 
+/** `placeName` — имя провинции контакта (PVR-6.19); без него — id узла, как было. */
 export function swarmDossierHtml(
   contacts: ReturnType<typeof swarmDossier>,
   journal: JournalRow[] = [],
   /** Раздел «О Рое»: в первой главе забега его нет — природу Роя расскажет учёный после
    *  неё (`decisions/swarmLore.ts`). */
   lore = true,
+  placeName: (id: string) => string = (id) => id,
 ): string {
   const ordered = orderContacts(contacts);
   return (
@@ -75,7 +77,7 @@ export function swarmDossierHtml(
     (journal.length ? journalHtml(journal) : '') +
     `<section class="sd-sec sd-forces"><h3>${esc(t('swarm.intel.forces'))}</h3>` +
     (ordered.length
-      ? ordered.map(contactHtml).join('')
+      ? ordered.map((c) => contactHtml(c, placeName)).join('')
       : `<p class="sd-empty">${esc(t('swarm.intel.empty'))}</p>`) +
     `</section>` +
     (lore

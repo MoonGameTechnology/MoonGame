@@ -42,6 +42,12 @@ describe('досье Роя — пересборка 2026-09-23 (справа, �
     expect(html).not.toContain('b-old'); // id флота игроку ничего не говорит
   });
 
+  it('подпись мира — имя провинции, а ссылка — по-прежнему id узла (PVR-6.19)', () => {
+    const html = swarmDossierHtml(contacts, [], true, (id) => `Мир ${id}`);
+    expect(html).toContain('data-jump="A"');
+    expect(html).toContain('>Мир A</button>');
+  });
+
   it('часов наблюдения нет — «цифры подсчёта времени не нужны»', () => {
     const html = swarmDossierHtml(contacts);
     expect(html).not.toMatch(/\d{1,2}:\d{2}/);

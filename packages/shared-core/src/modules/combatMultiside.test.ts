@@ -171,3 +171,28 @@ describe('MSB-2 — урон дробится на всех врагов', () =>
     expect(hull(after, 'f002')).toBeCloseTo(4000 - 4, 6);
   });
 });
+
+describe('PVR-6.20 — павших стороны засчитывают тому, кто положил в неё больше всех', () => {
+  /** Три стороны; у обороняющегося `f000` корпус на один залп. */
+  function killers(counts: [number, number, number]): Array<string | undefined> {
+    const s = melee(3);
+    counts.forEach((n, i) => {
+      const f = s.fleets[`f00${i}`]!;
+      f.units = [{ unit: 'fighter', count: n, ...(i === 0 ? { hp: 5 } : {}) }];
+    });
+    const r = kernel.advanceTo(s, ctx(0));
+    if (!r.ok) throw new Error('advance failed');
+    return r.events
+      .filter((e) => e.type === 'unit.died' && (e.payload as { owner?: string }).owner === 'p000')
+      .map((e) => (e.payload as { killedBy?: string }).killedBy);
+  }
+
+  it('больший вклад: второй атакующий вдвое сильнее — павшие его', () => {
+    // f001 бьёт 12 пополам (6 в оборону), f002 — 24 пополам (12 в оборону).
+    expect(killers([1, 1, 2])).toEqual(['p002']);
+  });
+
+  it('равный вклад решает меньший id, а не порядок сторон', () => {
+    expect(killers([1, 1, 1])).toEqual(['p001']);
+  });
+});

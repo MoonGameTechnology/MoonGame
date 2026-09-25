@@ -2092,6 +2092,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-head.draw{color:var(--amber);text-shadow:0 0 18px rgba(232,178,74,.4);}
 #endscreen .es-why{margin-top:7px;font-size:12px;color:var(--dim);letter-spacing:.4px;}
 #endscreen .es-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:18px 0 6px;}
+/* С боевым счётом PvE (PVR-6.20) клеток шесть: на широком экране — три колонки, иначе лишняя
+   строка уводила кнопки итогов под край окна. На телефоне три не помещаются по ширине — там две,
+   но плотнее, и панель итогов, как и раньше, встаёт на экран целиком. */
+#endscreen .es-grid.tri{grid-template-columns:repeat(3,1fr);}
+@media (max-width:600px){
+  #endscreen .es-grid.tri{grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 4px;}
+  #endscreen .es-grid.tri .es-cell{padding:6px 10px;gap:1px;}
+}
 #endscreen .es-cell{border:1px solid var(--line-hi);border-radius:8px;padding:9px 10px;background:rgba(6,18,22,.6);
   display:flex;flex-direction:column;gap:3px;}
 #endscreen .es-cell.wide{grid-column:1 / -1;}

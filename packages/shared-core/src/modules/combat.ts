@@ -6,6 +6,7 @@ import type {
   Fleet,
   Planet,
   PlanetId,
+  PlayerId,
   UnitStack,
 } from '../state/gameState';
 import type { GameData } from '../data/schemas';
@@ -1281,6 +1282,10 @@ export const combatModule: GameModule = {
       // считается под СОСТАВ цели и ложится по родам — пехоте своё, технике своё. Разложение
       // живёт рядом с суммой: сумма идёт в `combat.round`, разложение — в `applyDamageToSide`.
       const byClass = new Map<BattleSide, ClassPools>();
+      // Чей огонь добил сторону: кто положил в неё больше всех за раунд (PVR-6.20 —
+      // боевой счёт экспедиции засчитывает павших ему). Равный вклад решает меньший id,
+      // а не порядок сторон: иначе засчитанная победа зависела бы от того, кто вошёл первым.
+      const topShooter = new Map<BattleSide, { owner: PlayerId; dealt: number }>();
       for (const side of live) {
         // Враги — только ВРАЖДЕБНЫЕ живые стороны. Спрятаться за спину союзника нельзя
         // (ради этого выбор и сделан), но и бить союзника залп не имеет права.
@@ -1316,6 +1321,12 @@ export const combatModule: GameModule = {
           const running = incoming.get(target);
           incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
           landed += dealt;
+          const top = topShooter.get(target);
+          if (
+            side.owner !== null &&
+            (!top || dealt > top.dealt || (dealt === top.dealt && side.owner < top.owner))
+          )
+            topShooter.set(target, { owner: side.owner, dealt });
         }
         // Пишется ДО применения урона — по тому же ПРЕДРАУНДОВОМУ снимку, из которого
         // считался залп. Иначе развеска шла бы по составу, уже подбитому этим раундом.
@@ -1330,7 +1341,16 @@ export const combatModule: GameModule = {
         const split = pools
           ? { ...pools, other: pools.other + Math.max(0, dmg - poolsTotal(pools)) }
           : undefined;
-        applyDamageToSide(h, side.ref, dmg, data, battle.location, battle.id, split);
+        applyDamageToSide(
+          h,
+          side.ref,
+          dmg,
+          data,
+          battle.location,
+          battle.id,
+          split,
+          topShooter.get(side)?.owner,
+        );
       }
 
       // Полезная нагрузка события — единственная двойственность боя, которая уезжает ПО

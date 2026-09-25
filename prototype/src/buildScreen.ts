@@ -25,7 +25,7 @@ import { data } from './gameData';
 import { buildingName, cost, esc, fmtDur, resLine, displayUnit } from './format';
 import { BUILD_ICON, unitIcon } from './icons';
 import { buildBuilding, buildUnit } from '../../decisions/actions';
-import { planetName } from './planetName';
+import { worldName } from './planetName';
 
 type BuildingDef = (typeof data.buildings)[string];
 
@@ -154,7 +154,7 @@ export function buildScreenHtml(
   }
   // Честный счётчик вместо выдуманных «слотов»: сколько зданий уже стоит.
   const head =
-    `<div class="bw-top"><div class="bw-world"><b>${esc(planetName(p.id))}</b>` +
+    `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state.mapId, p.id))}</b>` +
     (sub.length ? `<span>${sub.join(' · ')}</span>` : '') +
     `</div><span class="bw-cnt">⛭ ${t('build.head.built', { n: p.buildings.length })}</span></div>`;
 
@@ -255,7 +255,7 @@ export function unitScreenHtml(
     })
     .join('');
   return (
-    `<div class="bw-top"><div class="bw-world"><b>${esc(planetName(planetId))}</b><span>${t('production.units')}</span></div></div>` +
+    `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state.mapId, planetId))}</b><span>${t('production.units')}</span></div></div>` +
     `<div class="bw-scroll"><div class="bw-list">${rows}</div></div>`
   );
 }

@@ -191,7 +191,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
               damage: dealt,
               tier,
             });
-            applyDamageToSide(h, share.to, dealt, data, planetId);
+            applyDamageToSide(h, share.to, dealt, data, planetId, undefined, undefined, planet.owner);
             removeIfWiped(h, target.id);
           }
           return true;

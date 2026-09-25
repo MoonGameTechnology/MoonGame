@@ -37,16 +37,16 @@ describe('темп забега (PVR-2.2)', () => {
     expect(runMinutes(LONGEST, RUN_SPEED_NORMAL)).toBeLessThanOrEqual(35);
   });
 
-  it('с ускорением — в 15–25 минут', () => {
-    expect(runMinutes(SHORTEST, RUN_SPEED_FAST)).toBeGreaterThanOrEqual(15);
-    expect(runMinutes(LONGEST, RUN_SPEED_FAST)).toBeLessThanOrEqual(25);
+  it('с ускорением — в 12–15 минут', () => {
+    expect(runMinutes(SHORTEST, RUN_SPEED_FAST)).toBeGreaterThanOrEqual(12);
+    expect(runMinutes(LONGEST, RUN_SPEED_FAST)).toBeLessThanOrEqual(15);
   });
 
-  it('ускорение именно УСКОРЯЕТ, и ровно в полтора раза', () => {
-    // Полоса «25–35» против «15–25» — это ×1.5 по серединам. Больше — и ускорение
-    // проскакивает нижнюю границу, меньше — его не почувствовать.
+  it('ускорение именно УСКОРЯЕТ, и ровно вдвое (решение владельца 2026-09-25)', () => {
+    // Прежние ×1,5 на экране почти не отличались от ▶ — владелец: «на второй стрелочке
+    // не сильно быстрее». Вдвое — различимо и всё ещё играбельно.
     expect(RUN_SPEED_FAST).toBeGreaterThan(RUN_SPEED_NORMAL);
-    expect(RUN_SPEED_FAST / RUN_SPEED_NORMAL).toBeCloseTo(1.5, 5);
+    expect(RUN_SPEED_FAST / RUN_SPEED_NORMAL).toBe(2);
   });
 
   it('дефолт песочницы (×10) для забега негоден — ради этого кирпич и заведён', () => {

@@ -178,9 +178,31 @@ function oweBoons(h: HandlerContext, pve: NonNullable<GameState['pve']>, cfg: Mo
   }
 }
 
+/**
+ * Боевой счёт экспедиции (PVR-6.20, заказ владельца 2026-09-25: «в окно наград вывести,
+ * сколько было потеряно и уничтожено»). Считает ядро, а не окно итогов: павших видит
+ * только шина, а окно берёт готовое число из состояния — как и остальные свои цифры.
+ *
+ * `loser` теряет, `killer` уничтожает, каждый — только если это МЕСТО игрока: Рой,
+ * пираты и нейтралы счёта не ведут (их потери — это и есть чужое «уничтожено»).
+ */
+function tallyLoss(h: HandlerContext, loser: unknown, killer: unknown, n: unknown): void {
+  const pve = h.state.pve;
+  if (!pve || typeof n !== 'number' || !(n > 0)) return;
+  const seat = (id: unknown): id is PlayerId =>
+    typeof id === 'string' && id !== pve.npcPlayerId && !!h.state.players[id] && !h.state.players[id]!.npc;
+  const add = (id: PlayerId, field: 'lost' | 'destroyed'): void => {
+    const row = { lost: 0, destroyed: 0, ...pve.tally?.[id] };
+    row[field] += n;
+    pve.tally = { ...pve.tally, [id]: row };
+  };
+  if (seat(loser)) add(loser, 'lost');
+  if (seat(killer) && killer !== loser) add(killer, 'destroyed');
+}
+
 export const pveModule: GameModule = {
   id: 'pve',
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
     // Seeding rides on `time.advanced` rather than a match-start event: the kernel
     // emits it for the first continuous span of every match, so a PvE match arms its
@@ -303,6 +325,27 @@ export const pveModule: GameModule = {
       player.technologies = { ...player.technologies, completed: [...completed, tech] };
       pve.boons![action.playerId] = (pve.boons![action.playerId] ?? 0) - 1;
       h.emit('pve.boon.taken', { owner: action.playerId, tech });
+    });
+
+    // Боевой счёт (PVR-6.20). Павшие корабли, войска и гарнизоны — `unit.died` (кого добил
+    // чей огонь, пишет место урона); сбитые машины челноков — три события перехвата со
+    // стрелком и `shuttle.lost` без стрелка (порт потерян, ангар переполнен).
+    api.on('unit.died', (event, h) => {
+      const p = event.payload as { owner?: unknown; killedBy?: unknown; count?: unknown };
+      tallyLoss(h, p.owner, p.killedBy, p.count);
+    });
+    api.on('shuttle.repelled', (event, h) => {
+      const p = event.payload as { owner?: unknown; targetOwner?: unknown; downed?: unknown };
+      tallyLoss(h, p.owner, p.targetOwner, p.downed);
+    });
+    for (const shot of ['pd.fired', 'shuttle.intercepted'])
+      api.on(shot, (event, h) => {
+        const p = event.payload as { owner?: unknown; targetOwner?: unknown; downed?: unknown };
+        tallyLoss(h, p.targetOwner, p.owner, p.downed);
+      });
+    api.on('shuttle.lost', (event, h) => {
+      const p = event.payload as { owner?: unknown; count?: unknown };
+      tallyLoss(h, p.owner, undefined, p.count);
     });
 
     // Пакет снабжения (решение владельца 2026-09-24). Платят за него Сувернами — валютой

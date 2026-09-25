@@ -63,6 +63,7 @@ export {
   type MatchEndReason,
   type MatchScore,
   type PveState,
+  type PveTally,
   type MatchState,
   type PlayerArsenal,
   type PlayerReward,

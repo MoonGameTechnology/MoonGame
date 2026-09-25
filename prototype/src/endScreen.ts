@@ -94,6 +94,9 @@ export function endScreenHtml(
   const head = outcomeTitle(end, state.match?.winners);
   const cell = (k: string, v: string): string =>
     `<div class="es-cell"><span class="es-k">${k}</span><span class="es-v">${v}</span></div>`;
+  // Боевой счёт PvE-матча (PVR-6.20): сколько своих погибло и сколько чужих уничтожено.
+  // Считает ядро (`state.pve.tally`), панель только показывает; нет записи — нули.
+  const tally = state.pve ? (state.pve.tally?.[me] ?? { lost: 0, destroyed: 0 }) : null;
   const xpLine = end.runSummary
     ? runSummaryHtml(end.runSummary)
     : end.runReward !== undefined
@@ -120,7 +123,7 @@ export function endScreenHtml(
     `<div class="es-box">` +
     `<div class="es-head ${cls}">${head}</div>` +
     `<div class="es-why">${esc(end.why)}</div>` +
-    `<div class="es-grid">` +
+    `<div class="es-grid${tally ? ' tri' : ''}">` +
     // Счёт и место — не про забег Sector Zero (решение владельца 2026-09-24): победа в нём —
     // выстоять волны, а место среди ИИ-соседей ничего не значит.
     (end.runReward !== undefined
@@ -130,6 +133,9 @@ export function endScreenHtml(
     cell(t('end.fleets'), `⛴ ${fleets}`) +
     cell(t('end.units'), `⚔ ${units}`) +
     cell(t('end.duration'), dur) +
+    (tally
+      ? cell(t('end.lost'), `☠ ${tally.lost}`) + cell(t('end.destroyed'), `✹ ${tally.destroyed}`)
+      : '') +
     `</div>` +
     xpLine +
     double +
