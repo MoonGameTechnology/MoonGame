@@ -221,8 +221,8 @@ describe('дополнительные задачи карты (PVR-5.2)', () =>
 });
 
 describe('дверь второй главы', () => {
-  it('глав ДВЕ, и они открывают РАЗНЫЕ карты', () => {
-    expect(PVE_MISSION_COUNT).toBe(2);
+  it('вторая глава есть, и она открывает ДРУГУЮ карту, чем первая', () => {
+    expect(PVE_MISSION_COUNT).toBeGreaterThanOrEqual(2);
     const first = pveState(data, 0);
     const second = pveState(data, 1);
     expect(Object.keys(second.planets).length).toBeGreaterThan(
