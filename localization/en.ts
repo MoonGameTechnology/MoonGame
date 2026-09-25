@@ -2394,6 +2394,8 @@ export const en: Record<string, string> = {
   'sector-zero.map.scouted': 'Scouted: {n} of {m}',
   'sector-zero.map.target': 'Run objective',
   'sector-zero.map.target.later': 'Later objective',
+  'sector-zero.map.task.hint': 'Tap a task ring to read the task',
+  'sector-zero.map.task.open': 'Show the task',
   'sector-zero.map.title': 'Chapter map',
   'sector-zero.map.you': 'Your worlds',
   'sector-zero.new': 'New run',

@@ -96,6 +96,19 @@ describe('цели задач на карте главы (заказ владе�
   it('разведка, волны и форты одной точки не имеют', () => {
     const rest = pool.filter((o) => ['scout', 'wave', 'build'].includes(o.kind));
     const t = chapterTargets(s, rest, new Set(rest.map((o) => o.id)), new Set(Object.keys(s.planets)));
-    expect(t).toEqual({ active: [], later: [] });
+    expect(t).toEqual({ active: [], later: [], tasks: {} });
+  });
+
+  it('клетка знает свои задачи — тап по метке показывает, какая это задача (2026-09-25)', () => {
+    // Заказ владельца: «на карте главы, если нажать на кружок задания, можно прочитать, что
+    // за задание». Метка знала только «активна/позже», а не саму задачу.
+    const t = chapterTargets(s, pool, new Set([control.id]), new Set(Object.keys(s.planets)));
+    const view = chapterMapView(s, [], 'p1', t);
+    const cell = (id: string) => view.cells.find((c) => c.id === id)!;
+    expect(cell(control.targets[0]!).tasks[0]).toBe(control.id); // активная — первой
+    for (const id of razeWorlds) expect(cell(id).tasks).toContain(raze.id);
+    expect(view.cells.filter((c) => c.objective === null).every((c) => c.tasks.length === 0)).toBe(true);
+    // Без целей (старый вызов) у клеток просто нет задач.
+    expect(chapterMapView(s, []).cells.every((c) => c.tasks.length === 0)).toBe(true);
   });
 });

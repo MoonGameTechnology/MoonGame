@@ -259,6 +259,9 @@ try {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     assert.deepEqual(await ringMotion(), ['none', 'none'], 'reduced motion — цель в покое');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    // Кольцо задачи нажимается (заказ владельца 2026-09-25): под картой — сама задача.
+    await page.locator('#sz-map-body .target-hit').first().click({ force: true });
+    assert.ok((await page.locator('#sz-map-task .sz-map-task-row').count()) > 0, 'тап по кольцу показывает задачу');
     const scoutedBefore = await page.locator('#sz-map-body polygon.known').count();
     assert.match(await page.locator('#sz-chapter-stats').textContent(), /3/, 'задачи главы II');
     // Герой-награда главы виден ДО забега: силуэт «?» и имя того, кто придёт за победу.

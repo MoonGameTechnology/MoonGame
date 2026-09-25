@@ -98,6 +98,8 @@ export interface SectorZeroMenuHooks {
     hero?: { name: string; joined: boolean };
     /** Задачи следующего забега с наградой (`missionView.ts`) — названиями, а не числом. */
     briefs: MissionBrief[];
+    /** Остаток запаса главы — задачи, что откроются позже (для подписи метки на карте). */
+    laterBriefs?: MissionBrief[];
   };
   /** Карта главы с тем, что игрок о ней знает (панель справа при выборе главы). */
   chapterMap(index: number): ChapterMapView | null;
@@ -153,7 +155,10 @@ export function chapterMapSvg(view: ChapterMapView): string {
     .map((c) => {
       const cx = Math.round(c.x);
       const cy = Math.round(c.y);
-      const ring = `<circle class="target ${c.objective}" cx="${cx}" cy="${cy}" r="${Math.round(r * 1.8)}"/>`;
+      // Кольцо нажимается (2026-09-25): под ним прозрачный круг пошире — пальцу есть куда
+      // попасть, — и по нему панель показывает задачу этой клетки.
+      const hit = `<circle class="target-hit" data-cell="${cls(c.id)}" cx="${cx}" cy="${cy}" r="${Math.round(r * 2.8)}" tabindex="0" role="button" aria-label="${esc(t('sector-zero.map.task.open'))}"/>`;
+      const ring = `<circle class="target ${c.objective}" cx="${cx}" cy="${cy}" r="${Math.round(r * 1.8)}"/>` + hit;
       if (c.objective !== 'active') return ring;
       // Активная цель живёт, как метка в забеге (`decisions/missionRing.ts`): от кольца
       // парой уходят волны пунктира, пунктир бежит по кругу. Движение — в CSS, чтобы его
@@ -257,12 +262,51 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
 
   // Панель карты главы: открывается выбором главы на маршруте и закрывается крестиком.
   const mapPanel = el('sz-map-panel');
+  /** Карта, что сейчас нарисована, и её глава — тап по кольцу ищет задачу здесь. */
+  let shownMap: { view: ChapterMapView; index: number } | null = null;
+  const taskBox = el('sz-map-task');
+  /** Задачи клетки под кольцом: название, награда активной, «позже» — у остальных. */
+  function showTasks(cellId: string | null): void {
+    const cell = cellId && shownMap ? shownMap.view.cells.find((c) => cls(c.id) === cellId) : undefined;
+    for (const ring of el('sz-map-body').querySelectorAll('.target-hit'))
+      ring.classList.toggle('picked', !!cell && ring.getAttribute('data-cell') === cellId);
+    if (!cell || !shownMap || cell.tasks.length === 0) {
+      const any = !!shownMap?.view.cells.some((c) => c.tasks.length > 0);
+      taskBox.innerHTML = any ? `<p class="sz-map-task-hint">${t('sector-zero.map.task.hint')}</p>` : '';
+      return;
+    }
+    const info = h.chapterInfo(shownMap.index);
+    const label = (b: MissionBrief): string => esc(t(b.id, { n: missionLabelN({ total: b.n, needMs: b.needMs }) }));
+    taskBox.innerHTML = cell.tasks
+      .map((id) => {
+        const now = info.briefs.find((b) => b.id === id);
+        const later = now ? undefined : info.laterBriefs?.find((b) => b.id === id);
+        const b = now ?? later;
+        if (!b) return '';
+        return now
+          ? `<p class="sz-map-task-row"><b>⚑ ${label(b)}</b><em><i class="tw-data">◇ +${b.reward.research}</i> <i class="tw-warrants">⌖ +${b.reward.warrants}</i></em><small>${t('sector-zero.map.target')}</small></p>`
+          : `<p class="sz-map-task-row later"><b>⚑ ${label(b)}</b><small>${t('sector-zero.map.target.later')}</small></p>`;
+      })
+      .join('');
+  }
+  el('sz-map-body').addEventListener('click', (e) => {
+    const ring = (e.target as Element).closest('[data-cell]');
+    showTasks(ring?.getAttribute('data-cell') ?? null);
+  });
+  el('sz-map-body').addEventListener('keydown', (e) => {
+    const ring = (e.target as Element).closest('[data-cell]');
+    if (!ring || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    showTasks(ring.getAttribute('data-cell'));
+  });
   function renderMap(index: number, lost: boolean): void {
     const view = lost ? null : h.chapterMap(index);
+    shownMap = view ? { view, index } : null;
     el('sz-map-title').textContent = lost ? t('sector-zero.mission.lost') : t(CHAPTER_KEYS[index]!.name);
     el('sz-map-body').innerHTML = view
       ? chapterMapSvg(view)
       : `<div class="sz-map-lost"><span>${t('sector-zero.map.lost')}</span></div>`;
+    showTasks(null);
     el('sz-map-foot').innerHTML = view
       ? `<b>${t('sector-zero.map.scouted', { n: view.known, m: view.total })}</b>` +
         `<span class="lg you">${t('sector-zero.map.you')}</span><span class="lg hostile">${t('sector-zero.map.hostile')}</span>` +

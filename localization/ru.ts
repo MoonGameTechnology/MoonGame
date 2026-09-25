@@ -2401,6 +2401,8 @@ export const ru: Record<string, string> = {
   'sector-zero.map.scouted': 'Разведано: {n} из {m}',
   'sector-zero.map.target': 'Задача экспедиции',
   'sector-zero.map.target.later': 'Задача позже',
+  'sector-zero.map.task.hint': 'Нажмите на кольцо задачи, чтобы прочитать её',
+  'sector-zero.map.task.open': 'Показать задачу',
   'sector-zero.map.title': 'Карта главы',
   'sector-zero.map.you': 'Ваши миры',
   'sector-zero.new': 'Новая экспедиция',

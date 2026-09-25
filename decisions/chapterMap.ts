@@ -30,12 +30,17 @@ export interface ChapterMapCell {
    *  активные задания»): `active` — задача следующего забега, `later` — откроется позже
    *  из запаса главы, `null` — не цель или задача уже выполнена. */
   objective: 'active' | 'later' | null;
+  /** Задачи, чья цель — эта клетка, активные первыми (заказ владельца 2026-09-25: «нажать на
+   *  кружок задания — прочитать, что за задание»). Пусто у клетки без метки. */
+  tasks: string[];
 }
 
 /** Провинции-цели задач главы: активные (видны в следующем забеге) и те, что позже. */
 export interface ChapterTargets {
   active: readonly string[];
   later: readonly string[];
+  /** Провинция → задачи, которые на неё указывают; активные первыми. */
+  tasks?: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface ChapterMapView {
@@ -88,11 +93,18 @@ export function chapterTargets(
   };
   const now = pool.filter((o) => active.has(o.id)).flatMap(where);
   const nowSet = new Set(now);
+  const tasks: Record<string, string[]> = {};
+  const ordered = [
+    ...pool.filter((o) => active.has(o.id)),
+    ...pool.filter((o) => !active.has(o.id)),
+  ];
+  for (const o of ordered) for (const id of new Set(where(o))) (tasks[id] ??= []).push(o.id);
   return {
     active: [...new Set(now)],
     later: [...new Set(pool.filter((o) => !active.has(o.id)).flatMap(where))].filter(
       (id) => !nowSet.has(id),
     ),
+    tasks,
   };
 }
 
@@ -145,6 +157,7 @@ export function chapterMapView(
         : targets.later.includes(p.id)
           ? 'later'
           : null,
+      tasks: [...(targets.tasks?.[p.id] ?? [])],
     };
   });
   const lanes: ChapterMapView['lanes'] = [];

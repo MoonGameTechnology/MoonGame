@@ -13991,6 +13991,14 @@ function chapterWorld(mission: number): GameState {
   return retireDoneEncounters(pveState(data, mission), chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? []);
 }
 
+/** Задачи главы, что откроются позже: запас минус видимые и выполненные. */
+function chapterLater(mission: number) {
+  const chapter = pveChapter(mission);
+  const shown = new Set(chapterShown(mission).map((o) => o.id));
+  const done = new Set(sectorProgress.objectivesDone[chapter.id] ?? []);
+  return chapter.objectives.filter((o) => !shown.has(o.id) && !done.has(o.id));
+}
+
 /** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
 function runMissionRows(): MissionRow[] {
   const chapter = pveChapter(sectorMission);
@@ -14477,6 +14485,9 @@ const sectorZeroMenu = initSectorZeroMenu({
     cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
     ...heroReward(index),
     briefs: missionBriefs(chapterShown(index), pveChapter(index).slots?.base),
+    // Остаток запаса — подписи меток «позже» на карте главы (их награду не показываем:
+    // номинал считается от набора, который будет виден, когда задача откроется).
+    laterBriefs: missionBriefs(chapterLater(index), pveChapter(index).slots?.base),
   }),
   // Карта главы: мир на старте главы + память тумана прошлых забегов из профиля.
   chapterMap: index => {
