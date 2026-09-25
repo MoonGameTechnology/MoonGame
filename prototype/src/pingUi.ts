@@ -357,6 +357,10 @@ export function initPingUi(host: PingHost): PingUi {
       createTo(COALITION); // Enter в поле — метка коалиции, самый частый адресат
     } else if (ke.key === 'Escape') {
       closeMenu();
+      // Нажатие отработано здесь. Поле получает фокус пустым, а пустое поле Escape
+      // пропускает к лестнице «назад» (`backGesture.ts`, правило 7) — та закрыла бы
+      // следующий слой, карточку провинции, тем же нажатием.
+      e.stopPropagation();
     }
   });
 
