@@ -212,7 +212,7 @@
 .sz-reward { color: #d5ba87; }
 /* Вкладки (PVR-6.6): иконка над словом, четыре в ряд на любой ширине; прилипают к верху
    при прокрутке длинного списка — перейти можно, не листая обратно. */
-.sz-tabs { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 20px 0 12px; padding: 8px 0; background: #051019e6; backdrop-filter: blur(6px); }
+.sz-tabs { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 20px 0 12px; padding: 8px 0; background: #051019e6; backdrop-filter: blur(6px); }
 #sz-workshop .sz-tabs button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; font-size: 13px; white-space: nowrap; }
 .sz-tabs i { font-style: normal; font-size: 20px; line-height: 1; color: #79dfdf; }
 .sz-tabs button.selected { box-shadow: inset 0 -3px 0 #79dfdf; }
@@ -270,6 +270,12 @@
 .sz-delta em.down { color: var(--red); }
 /* Шанс кузни полосой (PVR-6.6). */
 .sz-odds { width: 100%; margin-bottom: 14px; }
+/* Улучшение в карточке модуля (Мастерская живёт в «Кораблях», решение владельца 2026-09-25):
+   отдельный блок под кнопкой «Установить», чтобы две разные операции не слиплись. */
+.sz-upgrade { align-self: stretch; margin-top: 14px; padding-top: 12px; border-top: 1px dashed #28444e; }
+.sz-card .sz-upgrade p.sz-upgrade-title { margin: 0 0 8px; color: #d8f6f2; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.sz-upgrade .sz-delta { margin: 0 0 10px; }
+.sz-upgrade button { margin-top: 4px; }
 .sz-odds p { margin-bottom: 6px !important; }
 .sz-bar { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--rar, #79dfdf) var(--p), #17313b var(--p)); }
 /* Академия (PVR-6.6): ростер карточками с портретом, деления подготовки, навыки ступенями.
@@ -325,7 +331,6 @@
 .sz-rarity-up p { margin: 0 0 4px; }
 .sz-rarity-up b { color: var(--rar); }
 .sz-rarity-up .sz-need { font-size: 12px; color: #b0c7ce; font-family: ui-monospace, monospace; }
-.sz-rarity-top { margin: 10px 0 0; font-size: 12px; color: var(--rar-legendary); }
 .sz-blueprints { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 12px; font-size: 13px; }
 .sz-blueprints span { color: var(--rar); font-weight: 600; }
 .sz-hero-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 20px 0 30px; }

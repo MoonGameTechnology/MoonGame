@@ -71,6 +71,17 @@ export function raiseCheck(p: RarityProfile, id: string, data: GameData): RaiseC
   return { from, to, blueprints, copies, can: reason === null, reason };
 }
 
+/**
+ * Предлагать ли в карточке модуля подъём редкости (решение владельца 2026-09-25: Мастерская
+ * переехала в «Корабли»). Только когда на руках чертёж СЛЕДУЮЩЕЙ ступени: без него блок
+ * звал бы к тому, на что пути нет, и висел бы в каждой карточке. Дублей может не хватать —
+ * счёт «дубли 1/3» и показывает, что копить.
+ */
+export function rarityOffered(p: RarityProfile, id: string, data: GameData): boolean {
+  const check = raiseCheck(p, id, data);
+  return check.reason !== 'E_RARITY_LOCKED' && check.to !== null && check.blueprints >= 1;
+}
+
 /** Общая лестница заточки вместе с потолками по редкости (`data.sectorZeroStars`). */
 export type RarityLadder = ForgeLadder & { capByRarity?: Partial<Record<Rarity, number>> };
 

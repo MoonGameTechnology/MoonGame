@@ -22,9 +22,9 @@ import {
   type SectorProgressAction,
   type SectorZeroProgress,
 } from '../../decisions/sectorZeroProgress';
-import { contribution, workshopRows } from '../../decisions/sectorZeroWorkshop';
+import { contribution, workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
 import { starRow } from '../../decisions/itemRarity';
-import { moduleLadder, profileRarity, raiseCheck, RARITY_COPIES } from '../../decisions/moduleRarity';
+import { moduleLadder, profileRarity, raiseCheck, rarityOffered, RARITY_COPIES } from '../../decisions/moduleRarity';
 import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
 import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
 import {
@@ -97,17 +97,18 @@ const effectText = (values: Record<string, number>): string =>
 /** Порядок строк сравнения — тот же, что у полосы статов корабля. */
 const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'cargoCapacity', 'radarRange', 'pointDefense', 'siegeDamage'];
 /**
- * «Было → станет» списком (PVR-6.5): одна разметка на подготовку и Мастерскую. Прибавка
+ * «Было → станет» списком (PVR-6.5): одна разметка на корабль и на улучшение модуля. Прибавка
  * зелёная, потеря красная — цвет несёт смысл, а число рядом дублирует его для тех, кто
- * цвет не различает.
+ * цвет не различает. `signed` — для вклада самого модуля («+6 → +6.6», как строка «Трюм +6»
+ * над ним), чтобы он не путался со статом корабля («5 → 11») в той же карточке.
  */
-const deltaHtml = (rows: readonly StatDelta[]): string =>
+const deltaHtml = (rows: readonly StatDelta[], signed = false): string =>
   rows.length === 0
     ? ''
     : `<ul class="sz-delta">${rows
         .map(
           (r) =>
-            `<li><span>${esc(t(stats[r.key] ?? r.key))}</span><b>${statValue(r.key, r.before)} → ${statValue(r.key, r.after)}</b><em class="${r.diff > 0 ? 'up' : 'down'}">${statValue(r.key, r.diff, true)}</em></li>`,
+            `<li><span>${esc(t(stats[r.key] ?? r.key))}</span><b>${statValue(r.key, r.before, signed)} → ${statValue(r.key, r.after, signed)}</b><em class="${r.diff > 0 ? 'up' : 'down'}">${statValue(r.key, r.diff, true)}</em></li>`,
         )
         .join('')}</ul>`;
 
@@ -121,7 +122,7 @@ const oddsHtml = (chance: number, warrants: number): string => {
 export function initSectorZeroPreparation(h: PreparationHost) {
   const panel = document.getElementById('sz-workshop')!;
   const home = document.getElementById('sz-home')!;
-  let tab: 'ships' | 'heroes' | 'workshop' | 'shop' = 'ships';
+  let tab: 'ships' | 'heroes' | 'shop' = 'ships';
   let hull = sectorHullIds(h.data).includes('cruiser')
     ? 'cruiser'
     : (sectorHullIds(h.data)[0] ?? '');
@@ -178,6 +179,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return `<div class="sz-bay"><b>${esc(t(`yard.slot.${slot}`))} · ${modules.length}/${n}</b><span>${modules.map((id) => esc(tData(data.modules[id]!.name))).join(', ') || t('hero.slot.empty')}</span></div>`;
       })
       .join('');
+    // Улучшение живёт в карточке модуля (решение владельца 2026-09-25): надел и тут же
+    // прокачал — отдельной вкладки «Мастерская» больше нет.
+    const forge = new Map(workshopRows(p, data).map((row) => [row.id, row] as const));
     // Только то, что встаёт на ЭТОТ корпус (решение владельца 2026-09-25): карточка
     // «не подходит» занимала место и звала открыть то, что сюда не встанет никогда.
     const modules = sectorModulesFor(hull, selected, data)
@@ -206,10 +210,22 @@ export function initSectorZeroPreparation(h: PreparationHost) {
                 ),
               )
             : '';
-        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}</article>`;
+        const row = owned ? forge.get(id) : undefined;
+        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? 'fit' : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}${row ? upgradeHtml(row, p) : ''}</article>`;
       })
       .join('');
-    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(data.units[hull]!, statsNow))}<div class="sz-bays">${bays}</div></div></div><div class="sz-cards">${modules}</div>`;
+    // Правило кузни одно на все карточки — строкой над ними (PVR-6.6), чертежи — только когда
+    // они есть: без чертежа путь к редкости закрыт, и счёт «0 · 0 · 0» был бы шумом.
+    const blueprints = (['unique', 'mythic', 'legendary'] as const).filter((r) => (p.blueprints[r] ?? 0) > 0);
+    const forgeNote =
+      forge.size > 0
+        ? `<p class="sz-sub sz-forge-rule">${t('sector-zero.forge.burn')}</p>${
+            blueprints.length
+              ? `<p class="sz-blueprints"><b>${t('sector-zero.rarity.blueprints')}</b>${blueprints.map((r) => `<span class="r-${r}">${t(`rarity.${r}`)} ${p.blueprints[r]}</span>`).join('')}</p><p class="sz-sub">${t('sector-zero.rarity.hint', { n: RARITY_COPIES })}</p>`
+              : ''
+          }`
+        : '';
+    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', hull, data)}<div><h2>${esc(displayUnit(hull))}</h2><p class="sz-sub">${t('sector-zero.prep.ship-hint')}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(data.units[hull]!, statsNow))}<div class="sz-bays">${bays}</div></div></div>${forgeNote}<div class="sz-cards">${modules}</div>`;
   }
 
   /**
@@ -234,49 +250,39 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     };
   };
 
-  function workshop(p: SectorZeroProgress): string {
-    const rows = workshopRows(p, h.data);
-    if (rows.length === 0)
-      return `<p class="sz-sub">${t('sector-zero.forge.empty')}</p>`;
-    const cards = rows
-      .map((row) => {
-        const label = row.can
-          ? t('sector-zero.forge.price', { n: row.warrants })
-          : row.reason === 'E_FORGE_NOT_ENOUGH'
-            ? t('sector-zero.forge.poor')
-            : t('sector-zero.forge.cap');
-        // Шанс и цена стоят в карточке ВСЕГДА, даже когда нажать нельзя: `EC-2.3`
-        // требует, чтобы игрок понимал стоимость до того, как сможет заплатить.
-        // Поток осколков виден только там, где у ступени ЕСТЬ потолок попыток: на
-        // гарантированных ступенях копить нечего, и счётчик 0/0 был бы шумом.
-        const shards =
-          row.next && row.pity > 0
-            ? `<p class="sz-forge-shards">${t('sector-zero.forge.shards', { n: row.shards, cap: row.pity })}${row.shards >= row.pity - 1 ? ` · ${t('sector-zero.forge.sure')}` : ''}</p>`
-            : '';
-        const offer = row.next
-          ? `${oddsHtml(row.chance, row.warrants)}${deltaHtml(statDeltas(row.now, row.next, STAT_ORDER))}${shards}`
-          : `<p class="sz-forge-gain">${t('sector-zero.forge.has')}: ${effectText(row.now)}</p>`;
-        const head = itemHead(row.id, p);
-        return `<article class="sz-card${head.cls}">${head.html}${offer}${button('forge', row.id, label, !row.can)}${rarityHtml(row, p)}</article>`;
-      })
-      .join('');
-    // Правило «при неудаче Варранты сгорают» одно на всю кузню — оно стоит один раз над
-    // карточками, а не повторяется в каждой (PVR-6.6).
-    const bp = (['unique', 'mythic', 'legendary'] as const)
-      .map((r) => `<span class="r-${r}">${t(`rarity.${r}`)} ${p.blueprints[r] ?? 0}</span>`)
-      .join('');
-    return `<p class="sz-sub">${t('sector-zero.forge.hint')} ${t('sector-zero.forge.burn')} ${t('sector-zero.rarity.hint', { n: RARITY_COPIES })}</p><p class="sz-blueprints"><b>${t('sector-zero.rarity.blueprints')}</b>${bp}</p><div class="sz-cards">${cards}</div>`;
-  }
+  /**
+   * Блок «Улучшение ★» в карточке ОТКРЫТОГО модуля (решение владельца 2026-09-25: Мастерская
+   * живёт в «Кораблях»). Шанс и цена стоят ВСЕГДА, даже когда нажать нельзя: `EC-2.3`
+   * требует, чтобы игрок понимал стоимость до того, как сможет заплатить. Поток осколков —
+   * только там, где у ступени ЕСТЬ потолок попыток: на гарантированной копить нечего.
+   * Редкость — только с чертежом следующей ступени (`rarityOffered`).
+   */
+  const upgradeHtml = (row: WorkshopRow, p: SectorZeroProgress): string => {
+    const label = row.can
+      ? t('sector-zero.forge.price', { n: row.warrants })
+      : row.reason === 'E_FORGE_NOT_ENOUGH'
+        ? t('sector-zero.forge.poor')
+        : t('sector-zero.forge.cap');
+    const shards =
+      row.next && row.pity > 0
+        ? `<p class="sz-forge-shards">${t('sector-zero.forge.shards', { n: row.shards, cap: row.pity })}${row.shards >= row.pity - 1 ? ` · ${t('sector-zero.forge.sure')}` : ''}</p>`
+        : '';
+    const star = row.next
+      ? `${oddsHtml(row.chance, row.warrants)}${deltaHtml(statDeltas(row.now, row.next, STAT_ORDER), true)}${shards}${button('forge', row.id, label, !row.can)}`
+      : `<p class="sz-forge-gain">${t('sector-zero.forge.cap')}</p>`;
+    const rarity = rarityOffered(p, row.id, h.data) ? rarityHtml(row, p) : '';
+    return `<div class="sz-upgrade"><p class="sz-upgrade-title">${t('sector-zero.forge.title')}</p>${star}${rarity}</div>`;
+  };
 
   /**
-   * Блок редкости в карточке Мастерской (SZE-5.4): до какой ступени поднять, какой
-   * параметр она даст (числом, с учётом звёзд) и чего не хватает — «чертёж 0/1 · дубли
-   * 2/3». Вершина лестницы говорит об этом одной строкой, а не пустой кнопкой.
+   * Блок редкости в карточке модуля (SZE-5.4): до какой ступени поднять, какой
+   * параметр она даст (числом, с учётом звёзд) и чего не хватает — «чертёж 1/1 · дубли
+   * 2/3». Встаёт только с чертежом на руках (`rarityOffered`).
    */
   const rarityHtml = (row: { id: string; star: number; now: Record<string, number> }, p: SectorZeroProgress): string => {
     const check = raiseCheck(p, row.id, h.data);
-    if (!check.to) return `<p class="sz-rarity-top">${t('sector-zero.rarity.top')}</p>`;
-    const gain = deltaHtml(statDeltas(row.now, contribution(row.id, row.star, h.data, check.to), STAT_ORDER));
+    if (!check.to) return '';
+    const gain = deltaHtml(statDeltas(row.now, contribution(row.id, row.star, h.data, check.to), STAT_ORDER), true);
     const need = t('sector-zero.rarity.need', {
       b: Math.min(check.blueprints, 1),
       c: Math.min(check.copies, RARITY_COPIES),
@@ -517,8 +523,8 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const tabButton = (id: typeof tab, icon: string, key: string): string =>
       button('tab', id, `<i aria-hidden="true">${icon}</i><span>${t(key)}</span>`, false, tab === id);
     // Шапка: назад + кошелёк одной строкой, одна строка подсказки (PVR-6.6: меньше
-    // абзацев), вкладки с иконкой — на телефоне четыре в ряд, без переполнения.
-    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('workshop', '⚒\uFE0E', 'sector-zero.prep.workshop')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'workshop' ? workshop(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
+    // абзацев), вкладки с иконкой — на телефоне в ряд, без переполнения (Мастерская — в «Кораблях»).
+    panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}<div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div></div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: p.lastReward * WARRANTS_PER_REWARD })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)
@@ -570,8 +576,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       return;
     }
     if (kind === 'tab')
-      tab =
-        id === 'heroes' ? 'heroes' : id === 'workshop' ? 'workshop' : id === 'shop' ? 'shop' : 'ships';
+      tab = id === 'heroes' ? 'heroes' : id === 'shop' ? 'shop' : 'ships';
     else if (kind === 'hull') hull = id;
     else if (kind === 'hero') heroId = id;
     else {

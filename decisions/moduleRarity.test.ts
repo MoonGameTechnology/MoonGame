@@ -8,6 +8,7 @@ import {
   nextRarity,
   profileRarity,
   raiseCheck,
+  rarityOffered,
   RARITY_COPIES,
   runLoot,
 } from './moduleRarity';
@@ -20,6 +21,35 @@ const profile = (over: Record<string, unknown> = {}) => ({
   moduleCopies: {},
   blueprints: {},
   ...over,
+});
+
+describe('когда карточка модуля предлагает поднять редкость (решение владельца 2026-09-25)', () => {
+  // Мастерская переехала в «Корабли»: блок редкости встаёт только тогда, когда для неё есть
+  // чертёж следующей ступени, — иначе в каждой карточке висело бы «Чертёж 0/1» без пути.
+  it('без чертежа следующей ступени — не предлагает', () => {
+    expect(rarityOffered(profile(), 'cargo_bay', data)).toBe(false);
+    expect(rarityOffered(profile({ blueprints: { mythic: 1 } }), 'cargo_bay', data)).toBe(false);
+  });
+
+  it('с чертежом — предлагает, даже если дублей пока не хватает: видно, что копить', () => {
+    expect(rarityOffered(profile({ blueprints: { unique: 1 } }), 'cargo_bay', data)).toBe(true);
+  });
+
+  it('закрытый модуль и вершина лестницы — не предлагает', () => {
+    expect(
+      rarityOffered(profile({ modules: [], blueprints: { unique: 1 } }), 'cargo_bay', data),
+    ).toBe(false);
+    expect(
+      rarityOffered(
+        profile({
+          moduleRarity: { cargo_bay: 'legendary' },
+          blueprints: { unique: 1, mythic: 1, legendary: 1 },
+        }),
+        'cargo_bay',
+        data,
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('редкость модуля в профиле (SZE-5.2)', () => {
