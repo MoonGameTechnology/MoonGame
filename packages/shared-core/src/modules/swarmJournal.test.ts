@@ -102,3 +102,19 @@ describe('PVR-4.5 — журнал записывает только прояв�
     expect(JSON.parse(JSON.stringify(s)).swarmJournal).toEqual(s.swarmJournal);
   });
 });
+
+describe('старая память — отряд, отрезанный от сети Роя (2026-09-24)', () => {
+  it('после выросшего в разы перехвата слабый ответ записывается как «старая память»', () => {
+    let s = apply(world(), repelled({ damage: 2 }), 10);
+    s = apply(s, repelled({ strikeId: 's2', damage: 50 }), 20); // покров вырос
+    s = apply(s, repelled({ strikeId: 's3', damage: 3 }), 30); // этот отряд его не знает
+    expect(s.swarmJournal?.p1).toMatchObject({ maxDamage: 50, stale: 1 });
+  });
+
+  it('без выросшего перехвата разброс ответа старой памятью не считается', () => {
+    let s = apply(world(), repelled({ damage: 2 }), 10);
+    s = apply(s, repelled({ strikeId: 's2', damage: 6 }), 20);
+    s = apply(s, repelled({ strikeId: 's3', damage: 1 }), 30);
+    expect(s.swarmJournal?.p1?.stale).toBeUndefined();
+  });
+});

@@ -65,6 +65,9 @@ function contactHtml(c: Contact): string {
 export function swarmDossierHtml(
   contacts: ReturnType<typeof swarmDossier>,
   journal: JournalRow[] = [],
+  /** Раздел «О Рое»: в первой главе забега его нет — природу Роя расскажет учёный после
+   *  неё (`decisions/swarmLore.ts`). */
+  lore = true,
 ): string {
   const ordered = orderContacts(contacts);
   return (
@@ -75,10 +78,13 @@ export function swarmDossierHtml(
       ? ordered.map(contactHtml).join('')
       : `<p class="sd-empty">${esc(t('swarm.intel.empty'))}</p>`) +
     `</section>` +
-    `<details class="sd-sec swarm-biology"><summary>${esc(t('swarm.intel.about'))}</summary>` +
-    `<p>${esc(t('swarm.intel.lore'))}</p>` +
-    `<h4>${esc(t('data.brood-chamber'))}</h4>` +
-    `<p>${esc(t('swarm.intel.economy'))}</p><p>${esc(t('swarm.intel.brood'))}</p>` +
-    `<p>${esc(t('swarm.brood.desc'))}</p></details>`
+    (lore
+      ? `<details class="sd-sec swarm-biology"><summary>${esc(t('swarm.intel.about'))}</summary>` +
+        `<p>${esc(t('swarm.intel.lore'))}</p>` +
+        `<p>${esc(t('swarm.intel.network'))}</p>` +
+        `<h4>${esc(t('data.brood-chamber'))}</h4>` +
+        `<p>${esc(t('swarm.intel.economy'))}</p><p>${esc(t('swarm.intel.brood'))}</p>` +
+        `<p>${esc(t('swarm.brood.desc'))}</p></details>`
+      : '')
   );
 }

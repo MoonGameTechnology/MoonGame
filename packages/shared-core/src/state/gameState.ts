@@ -976,6 +976,11 @@ export interface SwarmRepelRecord {
   /** Урон ПВО в первом и последнем отражении — основа гипотезы об усилении. */
   firstDamage: number;
   lastDamage: number;
+  /** Сильнейшее отражение, которое игрок видел. */
+  maxDamage?: number;
+  /** Сколько раз, уже увидев сильный перехват, игрок встречал отряд Роя, отвечающий в разы
+   *  слабее, — отряд, похоже, отрезан от сети и воюет по старой памяти. */
+  stale?: number;
 }
 
 /**
@@ -1019,6 +1024,11 @@ export interface SwarmAdaptProject {
 /** Сеть Роя (`swarmNetModule`): знание держателей. Ключ — `planet:<id>` / `fleet:<id>`. */
 export interface SwarmNetState {
   holders: Record<string, SwarmKnowledge>;
+  /** Миры NPC, которые хоть раз были на связи с ульем (`PveState.home`). */
+  linked?: PlanetId[];
+  /** Миры NPC, отрезанные от улья ПОСЛЕ того, как были с ним на связи: разрыв сети — это
+   *  событие, починка его не отменяет. Отсюда задача «Разорвать сеть». */
+  cut?: PlanetId[];
 }
 
 /** Что знает один держатель сети Роя. */

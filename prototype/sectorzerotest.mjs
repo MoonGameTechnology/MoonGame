@@ -8,7 +8,8 @@
  * ссылка на рынок из карточки ресурса. Каждая проверка идёт ПАРОЙ: в обычной схватке то же
  * самое обязано быть видно — иначе «кнопки нет» прошло бы и тогда, когда селектор просто
  * устарел. Третий прогон — выход из забега в обычную партию на той же странице: кнопки
- * обязаны вернуться. Попутно — PVR-6.8: меню анимировано, а при reduced motion замирает;
+ * обязаны вернуться. Попутно — PVR-6.8: меню и кольцо цели на карте главы анимированы, а при
+ * reduced motion замирают;
  * PVR-6.9: маршрут глав выбирает главу, а закрытый узел — нет.
  *
  *   node prototype/sectorzerotest.mjs      # или pnpm run smoke:sector-zero
@@ -154,6 +155,21 @@ try {
     // до первого забега известен только старт.
     await page.locator('#sz-map-panel').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#sz-map-body polygon').count(), 24, 'мозаика главы II');
+    // Активная цель задачи живёт (волна-сонар и бегущий пунктир) и замирает при reduced motion.
+    const ringMotion = () =>
+      page.evaluate(() =>
+        ['.target.active', '.target-ping'].map(
+          (sel) => getComputedStyle(document.querySelector(`#sz-map-body ${sel}`)).animationName,
+        ),
+      );
+    assert.deepEqual(
+      await ringMotion(),
+      ['sz-target-run, sz-target-pulse', 'sz-target-ping'],
+      'цель задачи анимирована',
+    );
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.deepEqual(await ringMotion(), ['none', 'none'], 'reduced motion — цель в покое');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     const scoutedBefore = await page.locator('#sz-map-body polygon.known').count();
     assert.match(await page.locator('#sz-chapter-stats').textContent(), /3/, 'задачи главы II');
     // Герой-награда главы виден ДО забега: силуэт «?» и имя того, кто придёт за победу.

@@ -336,3 +336,25 @@ describe('адаптация по частям сети', () => {
     expect(s.swarmAdapts).toHaveLength(2);
   });
 });
+
+describe('разрыв сети — событие (задача «Разорвать сеть»)', () => {
+  it('мир, бывший на связи с ульем и отрезанный, помнится; починка не отменяет', () => {
+    const start = world([fleet('r', 'B', [['relay', 1]])]);
+    start.pve = { ...start.pve!, home: 'A' };
+    let s = run(start, 'test.start');
+    expect(s.swarmNet?.linked).toEqual(['A', 'B', 'C']);
+    s = run(s, 'test.kill', { fleetId: 'r' });
+    expect(s.swarmNet?.cut).toEqual(['B', 'C']);
+    s.fleets.r2 = fleet('r2', 'D', [['relay', 1]]);
+    s = run(s, 'test.move', { fleetId: 'r2', to: 'B' }); // Рой починил связь
+    expect(s.swarmNet?.cut).toEqual(['B', 'C']);
+  });
+
+  it('мир, не бывавший на связи, отрезанным не считается', () => {
+    const start = world([]);
+    start.pve = { ...start.pve!, home: 'A' };
+    const s = run(start, 'test.start');
+    expect(s.swarmNet?.cut).toBeUndefined();
+    expect(s.swarmNet?.linked).toEqual(['A']);
+  });
+});

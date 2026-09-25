@@ -49,5 +49,10 @@ export function swarmJournal(seen: SwarmRepelRecord | undefined): JournalRow[] {
       vars: { from: seen.firstDamage, to: seen.lastDamage },
     });
   }
+  // Сеть Роя: отряд, отвечающий в разы слабее уже виденного перехвата, похоже, отрезан
+  // от сети и воюет по старой памяти — тоже гипотеза из замеров игрока.
+  if ((seen.stale ?? 0) > 0) {
+    rows.push({ tier: 'hypothesis', key: 'swarm.journal.stale', vars: { n: seen.stale! } });
+  }
   return rows;
 }

@@ -122,7 +122,7 @@ export const MapSlotSchema = z.object({
 export const MapObjectiveSchema = z.object({
   /** Ключ локализации заголовка: в коде и в данных живёт КЛЮЧ, не текст. */
   id: z.string(),
-  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build', 'evac', 'rescue', 'beacon']),
+  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build', 'evac', 'rescue', 'beacon', 'isolate']),
   /** `control`, `rescue`, `beacon` — id провинций; `raze` и `build` — виды построек;
    *  `scout`/`wave`/`evac` не читают. */
   targets: z.array(z.string()).default([]),
