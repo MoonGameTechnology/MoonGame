@@ -99,3 +99,33 @@ describe('PvE: удержание после последней волны ко�
     expect(state.match).toMatchObject({ status: 'ended', reason: 'pve-failed', winner: 'swarm' });
   });
 });
+
+describe('PVR-6.29 — «Завершить экспедицию» (решение владельца 2026-09-25)', () => {
+  // Флот потерян, а Рой штурмует дом минут десять — игрок вправе закончить забег сам. Сдача
+  // — действие `pveModule`; вердикт выносит `victoryModule` на том же правиле, что и гибель
+  // последнего мира: живых людей нет → `pve-failed`, тем же засчётом.
+  const abandon = (state: GameState, playerId = 'human') =>
+    kernel.applyAction(
+      state,
+      { id: `ab:${playerId}`, type: 'pve.abandon', playerId, payload: {}, issuedAt: HOUR },
+      ctx(HOUR),
+    );
+
+  it('сдача кончает забег поражением сразу, не дожидаясь хода часов', () => {
+    const r = abandon(seeded());
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.human!.status).toBe('defeated');
+    expect(r.state.match).toMatchObject({ status: 'ended', reason: 'pve-failed', winner: 'swarm' });
+    expect(r.events.map((e) => e.type)).toContain('pve.abandoned');
+  });
+
+  it('сдаться может только человек и только в идущем забеге', () => {
+    expect(abandon(seeded(), 'swarm')).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    expect(abandon(seeded(), 'ghost')).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
+    expect(abandon(world())).toMatchObject({ ok: false, code: 'E_NOT_PVE' }); // забег не засеян
+    const done = abandon(seeded());
+    if (!done.ok) throw new Error('abandon failed');
+    expect(abandon(done.state)).toMatchObject({ ok: false, code: 'E_MATCH_ENDED' });
+  });
+});

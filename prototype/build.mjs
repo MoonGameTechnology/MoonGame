@@ -879,10 +879,10 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .set-switch input:focus-visible ~ .sw-track{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.35);}
 
 /* war prompt — confirm before a move declares war on a player you're at peace with */
-#warprompt{position:fixed;inset:0;z-index:48;display:none;align-items:center;justify-content:center;padding:18px;
+#warprompt,#abandon{position:fixed;inset:0;z-index:48;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(20,2,1,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
-#warprompt.show{display:flex;}
-#warprompt .wpbox{width:min(360px,92vw);background:var(--glass);border:1px solid var(--red);
+#warprompt.show,#abandon.show{display:flex;}
+#warprompt .wpbox,#abandon .wpbox{width:min(360px,92vw);background:var(--glass);border:1px solid var(--red);
   border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 44px rgba(255,90,77,.22),inset 0 0 0 1px rgba(255,90,77,.06);}
 .wp-head{font-size:15px;letter-spacing:2px;color:var(--red);text-shadow:0 0 10px rgba(255,90,77,.5);
   padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid #5a201a;}
@@ -2729,7 +2729,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 /* --- short viewports (landscape phones, split-screen): overlays scroll instead of
    clipping off-screen (#connect already does, see its base rule) --- */
 @media (max-height:680px){
-  #setup,#codex,#playercard,#settings,#warprompt,#diplo,#splitdlg,#pingmenu,#constructor,#market{
+  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market{
     align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 }
 /* --- the welcome card is the tallest overlay we have: the roomy version needs ~930px
@@ -3138,7 +3138,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
     --vph:calc(100dvh / var(--pcz));}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#swarm-dossier,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#pirate-intro,#playercard,
-  #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
+  #settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
   /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
      весь остальной интерфейс шёл в 1.5× — игрок видел мелкий чужой шрифт ровно в
@@ -3420,6 +3420,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-log" data-i18n-title="rail.log.title">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
     <button id="rail-help" data-i18n-title="rail.help.title">?<span class="rlbl" data-i18n="rail.help.label"></span></button>
     <button id="rail-settings" data-i18n-title="rail.settings.title">⚙<span class="rlbl" data-i18n="rail.settings.label"></span></button>
+    <!-- «Завершить экспедицию» (PVR-6.29): только пока идёт забег, видимость — кадр main.ts -->
+    <button id="rail-abandon" type="button" data-i18n-title="rail.abandon.title" style="display:none">⚑<span class="rlbl" data-i18n="rail.abandon.label"></span></button>
     <button id="rail-exit" data-i18n-title="rail.exit.title">⌂<span class="rlbl" data-i18n="rail.exit.label"></span></button>
   </div>
   <button id="railtoggle" data-i18n-title="rail.toggle.title" type="button" aria-expanded="false"><span id="railglyph">☰</span><span class="holo-more" data-i18n="hud.tools"></span><span class="badge" id="railalert" style="display:none">0</span></button>
@@ -3473,6 +3475,13 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="profile"></div>
 <div id="settings"></div>
 <div id="warprompt"></div>
+<!-- «Флот потерян» / «Завершить экспедицию?» (PVR-6.29): заголовок, текст и левая кнопка
+     зависят от повода и ставятся из main.ts; правая всегда сдаёт забег -->
+<div id="abandon" role="dialog" aria-modal="true" aria-labelledby="abandon-title"><div class="wpbox">
+  <div class="wp-head" id="abandon-title"></div>
+  <div class="wp-body" id="abandon-text"></div>
+  <div class="wp-actions"><button type="button" id="abandon-stay" class="wp-no"></button><button type="button" id="abandon-go" class="wp-yes" data-i18n="run.abandon.go"></button></div>
+</div></div>
 <div id="diplo"></div>
 <div id="pingpop"></div>
   <div id="pingpanel"></div>

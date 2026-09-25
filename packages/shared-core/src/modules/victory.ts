@@ -440,7 +440,7 @@ function evaluateVictory(h: HandlerContext): void {
  */
 export const victoryModule: GameModule = {
   id: 'victory',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));
@@ -451,5 +451,7 @@ export const victoryModule: GameModule = {
     // deadline, so the run is judged at that instant. Matched by name — the bus, not an
     // import — and inert everywhere else: no PvE, no beat.
     api.on('pve.hold', (_event, h) => evaluateVictory(h));
+    // Сдача в забеге (PVR-6.29): вердикт сразу, а не на следующем ходе часов.
+    api.on('pve.abandoned', (_event, h) => evaluateVictory(h));
   },
 };

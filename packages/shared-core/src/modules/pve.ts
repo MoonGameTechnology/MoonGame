@@ -202,7 +202,7 @@ function tallyLoss(h: HandlerContext, loser: unknown, killer: unknown, n: unknow
 
 export const pveModule: GameModule = {
   id: 'pve',
-  version: '1.3.0',
+  version: '1.4.0',
   setup(api) {
     // Seeding rides on `time.advanced` rather than a match-start event: the kernel
     // emits it for the first continuous span of every match, so a PvE match arms its
@@ -346,6 +346,20 @@ export const pveModule: GameModule = {
     api.on('shuttle.lost', (event, h) => {
       const p = event.payload as { owner?: unknown; count?: unknown };
       tallyLoss(h, p.owner, undefined, p.count);
+    });
+
+    // «Завершить экспедицию» (PVR-6.29, решение владельца 2026-09-25): флот потерян, а Рой
+    // минутами штурмует дом — игрок заканчивает забег сам. Сдавшийся — побеждённый; вердикт
+    // выносит `victoryModule` по событию, тем же правилом, что гибель последнего мира
+    // (живых людей нет → `pve-failed`). Хостовое, как `pve.supply`: гейт его не принимает.
+    api.onAction('pve.abandon', (action, h) => {
+      const pve = h.state.pve;
+      if (!pveOf(h) || !pve) return h.reject('E_NOT_PVE');
+      const player = h.state.players[action.playerId];
+      if (!player || player.npc || action.playerId === pve.npcPlayerId || player.status !== 'active')
+        return h.reject('E_FORBIDDEN');
+      player.status = 'defeated';
+      h.emit('pve.abandoned', { owner: action.playerId });
     });
 
     // Пакет снабжения (решение владельца 2026-09-24). Платят за него Сувернами — валютой

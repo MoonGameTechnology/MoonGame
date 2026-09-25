@@ -89,6 +89,7 @@ import {
   instantRepairFleet,
   premiumRepairFleet,
   buySupply,
+  abandonRun,
   instantRepairCost,
   repairFleet,
   dockRepairCost,
@@ -304,6 +305,7 @@ import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
+import { fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
@@ -1577,6 +1579,47 @@ $('swarm-dossier-body').addEventListener('click', (e) => {
   jumpToPing(node);
   if (!swarmDossierPinned) closeSwarmDossier();
 });
+// «Флот потерян» / «Завершить экспедицию» (PVR-6.29, решение владельца 2026-09-25): без флота
+// игрок минутами смотрел, как Рой штурмует его планету. Карточка встаёт в кадре, когда кораблей
+// стало ноль (`decisions/fleetLost.ts`), и та же открывается кнопкой рельса в любой момент
+// забега. «Завершить» — хостовое `pve.abandon`: поражение ставит ядро, итоги и награду считает
+// обычный конец забега (`tickRunSave`). Фокус — на «остаться»: сдача необратима.
+const abandonCard = $('abandon');
+const railAbandon = $('rail-abandon');
+let abandonOpener: HTMLElement | null = null;
+/** Счёт кораблей прошлого кадра забега; `null` — вне забега, чтобы вход не поднял карточку. */
+let lastRunShips: number | null = null;
+function openAbandon(reason: 'lost' | 'ask', opener: HTMLElement | null = null): void {
+  const lost = reason === 'lost';
+  $('abandon-title').textContent = t(lost ? 'run.abandon.lost.title' : 'run.abandon.ask.title');
+  $('abandon-text').textContent = t(lost ? 'run.abandon.lost.text' : 'run.abandon.ask.text');
+  $('abandon-stay').textContent = t(lost ? 'run.abandon.rebuild' : 'run.abandon.back');
+  abandonOpener = opener;
+  abandonCard.classList.add('show');
+  $('abandon-stay').focus({ preventScroll: true });
+}
+function closeAbandon(): void {
+  abandonCard.classList.remove('show');
+  abandonOpener?.focus({ preventScroll: true });
+  abandonOpener = null;
+}
+railAbandon.addEventListener('click', () => openAbandon('ask', railAbandon));
+$('abandon-stay').addEventListener('click', closeAbandon);
+$('abandon-go').addEventListener('click', () => {
+  closeAbandon();
+  if (runInProgress()) playerOrder(abandonRun(ME));
+});
+/** Кадровый такт карточки: кнопка рельса живёт, пока идёт забег; карточка встаёт на переходе
+ *  к нулю кораблей и уходит сама, если забег кончился иначе. */
+function tickAbandon(): void {
+  const live = inMatch() && runInProgress();
+  const ships = live ? shipCount(s, ME) : null;
+  if (ships !== null && fleetLostPrompt(lastRunShips, ships)) openAbandon('lost');
+  lastRunShips = ships;
+  const shown = live ? '' : 'none';
+  if (railAbandon.style.display !== shown) railAbandon.style.display = shown;
+  if (!live && abandonCard.classList.contains('show')) closeAbandon();
+}
 function renderSwarmDossier(now = performance.now()): void {
   const pinned = Boolean(inMatch() && s.pve && swarmDossierDesktop?.matches);
   if (pinned !== swarmDossierPinned) {
@@ -13588,6 +13631,8 @@ const BACK_LAYERS: BackLayer[] = [
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
   { id: 'warprompt', isOpen: () => warPrompt !== null, close: () => cancelWarPrompt() }, // z48
+  // «Завершить экспедицию?» — та же ступень и то же правило: Back ведёт в «остаться».
+  { id: 'abandon', isOpen: () => abandonCard.classList.contains('show'), close: () => closeAbandon() }, // z48
   { id: 'pingmenu', isOpen: () => pings?.menuOpen() ?? false, close: () => pings?.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
@@ -14999,6 +15044,7 @@ function frame(nowReal: number) {
   if (gameplayMarked !== (sectorRunActive && speed > 0)) markGameplay();
   renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
+  tickAbandon();
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
     wave.kind === 'none'

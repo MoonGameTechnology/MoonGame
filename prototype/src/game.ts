@@ -209,6 +209,7 @@ export {
   instantRepairFleet,
   premiumRepairFleet,
   buySupply,
+  abandonRun,
   repairFleet,
   chainStamp,
   marketList,
