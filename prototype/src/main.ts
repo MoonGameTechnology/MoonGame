@@ -110,6 +110,7 @@ import {
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName } from './planetName';
+import { placeLabel, placeName } from '../../decisions/placeLabel';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -1886,8 +1887,8 @@ function updateThreatAlerts(): void {
   for (const a of threatAlerts(sightings, s.time, threatMemory)) {
     note(
       a.left === null
-        ? t('threat.here', { node: a.node })
-        : t('threat.incoming', { node: a.node, dur: stewFmtDur(a.left) }),
+        ? t('threat.here', { node: placeLabel(a.node) })
+        : t('threat.incoming', { node: placeLabel(a.node), dur: stewFmtDur(a.left) }),
       a.node,
     );
   }
@@ -1923,7 +1924,7 @@ function updateRadarContacts(now: number): void {
       if (paintedThisFrame(sweepArms, pos, sweepPrevAng, sweepAng)) {
         hit = true;
         if (!radarMemory.has(c.key))
-          note(t('threat.contact', { size: c.size, at: c.node }), c.node);
+          note(t('threat.contact', { size: c.size, at: placeLabel(c.node) }), c.node);
         radarMemory.set(c.key, { node: c.node, size: c.size, at: now });
       }
     }
@@ -2245,7 +2246,7 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
   // следующий снимок её поправит. Раньше тост был только в соло — в сети локальной
   // очереди не было вовсе, и тап не отвечал игроку ничем.
   if (activeConstruction(planetId, laneOf(order.kind))) {
-    note(t('queue.added', { what: queuedLabel(order), at: planetId }));
+    note(t('queue.added', { what: queuedLabel(order), at: placeLabel(planetId) }));
   }
   playerOrder(queuedAction(planetId, order));
 }
@@ -2732,7 +2733,7 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
     cx.textAlign = 'left';
     cx.fillStyle = rgba(col, 0.5);
     cx.font = '700 11px ui-monospace,Menlo,monospace';
-    cx.fillText(id, c.x + 13, c.y - 1);
+    cx.fillText(placeLabel(id), c.x + 13, c.y - 1);
     cx.fillStyle = 'rgba(120,140,150,0.45)';
     cx.font = '9px ui-monospace,Menlo,monospace';
     const icons = mem.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
@@ -3574,7 +3575,7 @@ function tellHero(news: HeroNews | null): void {
       ? t(news.key, { who, h: fmtHrs(news.leftMs / HOUR) })
       : news.key === 'log.hero.died.bare'
         ? t(news.key, { who })
-        : t(news.key, { who, at: news.at ?? '' });
+        : t(news.key, { who, at: news.at === undefined ? '' : placeLabel(news.at) });
   note(text, news.at);
 }
 
@@ -3584,8 +3585,8 @@ function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
   const b = buildingName(data.buildings[p.building as string]?.name, p.building as string);
   const at = p.planetId as string;
   const text = line.needsLevel
-    ? t(line.key, { b, lvl: String(p.level), at })
-    : t(line.key, { b, at });
+    ? t(line.key, { b, lvl: String(p.level), at: placeLabel(at) })
+    : t(line.key, { b, at: placeLabel(at) });
   if (line.anchored) note(text, at);
   else note(text);
 }
@@ -3607,7 +3608,7 @@ function handleEvents(events: DomainEvent[]) {
           // потому что орбита и десант — разные бои с разными войсками.
           note(
             t('log.battle.start', {
-              at: p.location as string,
+              at: placeLabel(p.location as string),
               phase: t(battlePhaseKey(p.phase as string | undefined)),
             }),
             p.location as string,
@@ -3626,7 +3627,7 @@ function handleEvents(events: DomainEvent[]) {
           const out = battleOutcome(p.winner as string | undefined);
           note(
             t('log.battle.end', {
-              at: loc,
+              at: placeLabel(loc),
               res: out.named
                 ? t(out.key, { who: NAME[p.winner as string] ?? (p.winner as string) })
                 : t(out.key),
@@ -3711,7 +3712,7 @@ function handleEvents(events: DomainEvent[]) {
           note(
             t('log.capture', {
               who: NAME[p.owner as string] ?? (p.owner as string),
-              at: p.planetId as string,
+              at: placeLabel(p.planetId as string),
             }),
             p.planetId as string,
           );
@@ -3825,7 +3826,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'unit.built':
         if (!admits('unit.built', p)) break;
-        note(`🛠️ ${p.count}× ${displayUnit(p.unit as string)} · ${p.planetId}`);
+        note(`🛠️ ${p.count}× ${displayUnit(p.unit as string)} · ${placeLabel(p.planetId as string)}`);
         break;
       case 'fleet.launched':
         // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
@@ -3834,7 +3835,7 @@ function handleEvents(events: DomainEvent[]) {
         note(
           t('log.fleet.launched', {
             who: NAME[p.owner as string] ?? (p.owner as string),
-            at: p.planetId as string,
+            at: placeLabel(p.planetId as string),
           }),
         );
         break;
@@ -3908,7 +3909,7 @@ function handleEvents(events: DomainEvent[]) {
         note(
           t(mine ? 'log.shuttle.repelled.mine' : 'log.shuttle.repelled.theirs', {
             n: p.downed as number,
-            at: p.targetId as string,
+            at: placeLabel(p.targetId as string),
           }),
         );
         break;
@@ -3927,12 +3928,12 @@ function handleEvents(events: DomainEvent[]) {
           );
         break;
       case 'fleet.merged':
-        if (reorgHeard(p.owner, ME)) note(t(reorgKey('merged'), { at: p.at as string }));
+        if (reorgHeard(p.owner, ME)) note(t(reorgKey('merged'), { at: placeLabel(p.at as string) }));
         break;
       case 'fleet.split':
         // Чужую реорганизацию наблюдать нечем — на карте виден значок, а не то, что
         // два соединения свели в одно (`fleetNews.ts`, правило 2).
-        if (reorgHeard(p.owner, ME)) note(t(reorgKey('split'), { at: p.at as string }));
+        if (reorgHeard(p.owner, ME)) note(t(reorgKey('split'), { at: placeLabel(p.at as string) }));
         break;
       // AUD-16: герой больше не гибнет молча. Только свой — в сети геройские события и
       // так строго адресны владельцу, соло повторяет тот же фильтр (`heroNews.ts`).
@@ -5404,7 +5405,7 @@ function render(now: number) {
       if (p.owner === ME && known(n.id) && n.sector === 'planet') {
         cx.fillStyle = ownerColor(ME);
         cx.font = '700 12px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + lod.markerRadius + 6, c.y - 1);
+        cx.fillText(placeLabel(n.id), c.x + lod.markerRadius + 6, c.y - 1);
       }
     }
     cx.restore();
@@ -5562,10 +5563,10 @@ function render(now: number) {
       // An asteroid field is a minor sector — de-emphasised (dim, smaller).
       cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
       cx.font = '600 10px ui-monospace,Menlo,monospace';
-      cx.fillText(n.id, c.x + 16, c.y - 1);
+      cx.fillText(placeLabel(n.id), c.x + 16, c.y - 1);
       cx.fillStyle = 'rgba(150,210,205,0.38)';
       cx.font = '9px ui-monospace,Menlo,monospace';
-      cx.fillText('asteroid field', c.x + 16, c.y + 11);
+      cx.fillText(tData(sectorTypeOf(n.id)?.name ?? 'Asteroid field'), c.x + 16, c.y + 11);
       cx.restore();
       continue;
     }
@@ -5857,7 +5858,7 @@ function render(now: number) {
       cx.fillStyle = ink === 'owner' ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
       cx.font = '600 10px ui-monospace,Menlo,monospace';
     }
-    cx.fillText(n.id, c.x + R + 12, c.y - 1);
+    cx.fillText(placeLabel(n.id), c.x + R + 12, c.y - 1);
     if (line.do === 'stats') {
       const icons = p.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
       cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
@@ -6705,15 +6706,15 @@ function fleetPanelHtml(f: Fleet): string {
     const rawRestH =
       dest !== f.movement.to ? estimateTravelHours(s, ctx(s.time), f.movement.to, dest, f) : 0;
     const restH = restRouteHours(rawRestH, boosted, FORCED_MARCH_MULT);
-    h += `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(dest)}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
+    h += `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(placeLabel(dest))}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
   } else if (f.edge) {
     // ROADS-4: стоит ровно на развилке — засада, и строка говорит, что она сторожит.
     const ambush = ambushOf(s, f);
     if (ambush) {
-      h += `<div class="row">${t('side.fleet.ambush', { planet: `<b>${esc(ambush.province)}</b>`, exits: ambush.exits.map(esc).join(', ') })}</div>`;
+      h += `<div class="row">${t('side.fleet.ambush', { planet: `<b>${esc(placeLabel(ambush.province))}</b>`, exits: ambush.exits.map((x) => esc(placeLabel(x))).join(', ') })}</div>`;
     } else {
       const pct = Math.round(f.edge.t * 100);
-      h += `<div class="row">${t('side.fleet.on-lane', { lane: `<b>${esc(f.edge.from)}–${esc(f.edge.to)}</b>`, p: pct })}</div>`;
+      h += `<div class="row">${t('side.fleet.on-lane', { lane: `<b>${esc(placeLabel(f.edge.from))}–${esc(placeLabel(f.edge.to))}</b>`, p: pct })}</div>`;
     }
   }
 
@@ -6869,7 +6870,7 @@ function planetSummaryHtml(p: Planet): string {
   const ptName = tData(pt?.name ?? p.planetType ?? '—');
   const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
   const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
-  rows.push(`<div class="row">${t('side.world.designation')}: <b>${esc(p.id)}</b></div>`);
+  rows.push(`<div class="row">${t('side.world.designation')}: <b>${esc(placeLabel(p.id))}</b></div>`);
   rows.push(
     `<div class="row">${t('side.world.owner')}: <b style="color:${ownerColor(p.owner)}">${p.owner ? esc(NAME[p.owner] ?? p.owner) : t('side.neutral')}</b></div>`,
   );
@@ -6939,11 +6940,13 @@ function planetPanelHtml(p: Planet): string {
   const here = Object.values(s.fleets).filter((f) => f.location === p.id);
   const counts = tabCounts(p, data, here);
   // Bytro-стиль: у мира авто-имя (тап → карточка статистики); координата (grid id)
-  // остаётся отдельным обозначением в подзаголовке.
+  // остаётся отдельным обозначением в подзаголовке. У места с именем в локали (карты из
+  // `data/maps/`, SZ-map-ids) заголовок — это имя, а сырой id в подзаголовок не идёт.
+  const named = placeName(p.id);
   const header = cardHeader(
     ownerColor(p.owner),
-    planetName(p.id),
-    `${esc(p.id)} · ${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
+    named ?? planetName(p.id),
+    `${named === null ? `${esc(p.id)} · ` : ''}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
     'planetinfo',
   );
   // Тап по имени открыл сводку мира — она встаёт РЯДОМ с панелью (`objectPanelHtml`).
@@ -7517,7 +7520,7 @@ function intelRowHtml(target: string): string {
     } else if (g.kind === 'fleets' && g.target === target) {
       bits.push(t('comms.intel.fleets', { left }));
     } else if (g.kind === 'planet' && s.planets[g.target]?.owner === target) {
-      bits.push(t('comms.intel.world', { id: esc(g.target), left }));
+      bits.push(t('comms.intel.world', { id: esc(placeLabel(g.target)), left }));
     }
   }
   if (!bits.length) return '';
@@ -7652,7 +7655,7 @@ function intelTabHtml(): string {
       ? t('log.spy.what.treasury', { who: NAME[g.target] ?? g.target })
       : g.kind === 'fleets'
         ? t('log.spy.what.fleets', { who: NAME[g.target] ?? g.target })
-        : t('log.spy.what.world', { at: g.target });
+        : t('log.spy.what.world', { at: placeLabel(g.target) });
   const rows = myIntel()
     .sort((a, b) => a.until - b.until)
     .map((g) => {
@@ -8230,7 +8233,7 @@ function mobileDraftPoint(): { x: number; y: number } | null {
 }
 
 function mobileTargetLabel(target: MobileOrderTarget): string {
-  if (target.kind === 'planet') return target.id;
+  if (target.kind === 'planet') return placeLabel(target.id);
   if (target.kind === 'fleet') return `${t(FLEET_KIND_KEY)} «${fleetCallsign(target.id)}»`;
   return t('hud.mobile.lane', target);
 }
@@ -9351,7 +9354,7 @@ cmdbar.addEventListener('click', (ev) => {
       if (to === null) note(t('hint.auto-retreat.nowhere'));
       else {
         for (const id of ids) playerOrder(orderRetreat(ME, id, true, at, to));
-        note(t('hint.auto-retreat', { n: Math.round(at * 100), at: to }));
+        note(t('hint.auto-retreat', { n: Math.round(at * 100), at: placeLabel(to) }));
       }
     }
     retreatMenu = false;
@@ -12099,7 +12102,7 @@ function netClientFor(seat: string): MultiplayerClient {
           at: ping.createdAt,
           from: ping.owner,
           to: COALITION,
-          text: ping.label ?? t('chat.ping.mark', { node }),
+          text: ping.label ?? t('chat.ping.mark', { node: placeLabel(node) }),
           sys: false,
           ping: node,
           pingId: ping.id,
@@ -15177,7 +15180,7 @@ function pingSelected(): void {
     // `ping.added` back to us + allies — that echo is what adds it (see onPingAdded).
     sendProvincePing(selPlanet, desc);
   } else {
-    pushMsg(COALITION, desc || t('chat.ping.mark', { node: selPlanet }), false, ME, selPlanet);
+    pushMsg(COALITION, desc || t('chat.ping.mark', { node: placeLabel(selPlanet) }), false, ME, selPlanet);
   }
   if (input) {
     input.value = '';

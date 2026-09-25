@@ -225,6 +225,12 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       'свиток журнала в main.ts строит `event.<id правила>` из `effect.applied` — ' +
       'id приезжает из data/events.json, kebab-case вместо подчёркиваний',
   },
+  {
+    prefix: 'place.',
+    built_by:
+      'placeLabel() в /decisions строит `place.<id сектора>` из id карты data/maps/*.json, ' +
+      'kebab-case вместо подчёркиваний (SZ-map-ids); сторож — decisions/placeLabel.test.ts',
+  },
 ];
 const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.prefix));
 

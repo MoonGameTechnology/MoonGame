@@ -3,6 +3,7 @@ import type { swarmDossier } from '../../decisions/swarmDossier';
 import { orderContacts, swarmDossierSummary } from '../../decisions/swarmDossier';
 import type { JournalRow } from '../../decisions/swarmJournal';
 import { esc } from './format';
+import { placeLabel } from '../../decisions/placeLabel';
 
 /**
  * Досье Роя — что игрок знает о противнике (PVR-4.5; пересобрано по заказу владельца
@@ -52,7 +53,7 @@ function contactHtml(c: Contact): string {
   return (
     `<article class="sd-contact${c.live ? ' live' : ''}">` +
     `<header><button type="button" class="sd-loc" data-jump="${esc(c.location)}" ` +
-    `title="${esc(t('swarm.intel.jump'))}">${esc(c.location)}</button>` +
+    `title="${esc(t('swarm.intel.jump'))}">${esc(placeLabel(c.location))}</button>` +
     `<span class="sd-chip">${esc(status)}</span></header>` +
     `<ul class="sd-units">${c.units
       .map((u) => `<li><span>${esc(tData(u.unit.replace(/_/g, ' ')))}</span><b>×${u.count}</b></li>`)

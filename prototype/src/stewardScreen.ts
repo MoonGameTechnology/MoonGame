@@ -18,6 +18,7 @@ import { t } from '../../localization/runtime';
 // Straight from the source modules, not through the `game.ts` barrel — same as the
 // other REFM screens, so this module never leans on the façade.
 import { delegateSteward, recallSteward } from '../../decisions/actions';
+import { placeLabel } from '../../decisions/placeLabel';
 import { DAY, HOUR } from './time';
 
 /** Game-hours a single delegation can run — the three offered buttons. */
@@ -71,10 +72,10 @@ export interface StewardLogEntry {
  *  than vanishing — a watch that did something must never read as a watch that slept. */
 export function stewLogLine(e: StewardLogEntry): string {
   const pct = e.fraction !== undefined ? String(Math.round(e.fraction * 100)) : '?';
-  const node = e.node ?? '?';
+  const node = e.node === undefined ? '?' : placeLabel(e.node);
   switch (e.kind) {
     case 'evac':
-      return t('steward.log.evac', { node, to: e.to ?? '?', pct, n: String(e.count ?? 0) });
+      return t('steward.log.evac', { node, to: e.to === undefined ? '?' : placeLabel(e.to), pct, n: String(e.count ?? 0) });
     case 'ferry':
       return t('steward.log.ferry', { node });
     case 'stranded':

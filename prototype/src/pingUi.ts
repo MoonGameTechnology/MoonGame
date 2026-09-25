@@ -16,6 +16,7 @@
 import { t } from '../../localization/runtime';
 import { COALITION, type SessionMsg } from './conversations';
 import { esc } from './format';
+import { placeLabel } from '../../decisions/placeLabel';
 import { canEditPing, canRemovePing, pingRows, toggleHidden, type PingRow } from './pingPanel';
 import { stickToPoint } from './screenAnchor';
 
@@ -51,7 +52,7 @@ export function pingMenuHtml(loc: string, coalitionSize: number, dms: readonly P
   );
   return (
     `<div class="pm-box">` +
-    `<div class="pm-head">📍 ${t('ping.title')} · <b>${esc(loc)}</b></div>` +
+    `<div class="pm-head">📍 ${t('ping.title')} · <b>${esc(placeLabel(loc))}</b></div>` +
     `<div class="pm-sub">${t('ping.note')}</div>` +
     `<input id="pm-text" class="pm-text" maxlength="${PING_DESC_MAX}" placeholder="${t('ping.desc.ph')}" autocomplete="off">` +
     `<div class="pm-lbl">${t('ping.to.coalition')}</div>${coal}` +
@@ -116,7 +117,7 @@ export function pingPopHtml(
   mine: boolean,
 ): string {
   return (
-    `<div class="pp-top"><b style="color:${color}">📍 ${esc(who)}</b><span>${esc(loc)}</span></div>` +
+    `<div class="pp-top"><b style="color:${color}">📍 ${esc(who)}</b><span>${esc(placeLabel(loc))}</span></div>` +
     `<div class="pp-desc">${text ? esc(text) : `<i>${t('ping.no-desc')}</i>`}</div>` +
     `<div class="pp-act"><button class="pp-jump" data-loc="${esc(loc)}">${t('chat.jump')}</button>` +
     (mine ? `<button class="pp-del" data-loc="${esc(loc)}">${t('ping.remove')}</button>` : '') +
@@ -256,7 +257,7 @@ export function initPingUi(host: PingHost): PingUi {
       return;
     }
     const desc = draftText();
-    const fallback = t('ping.mark', { loc });
+    const fallback = t('ping.mark', { loc: placeLabel(loc) });
     if (dest === COALITION) {
       const net = host.net();
       if (net) net.placePing({ kind: 'mark', target: { node: loc }, label: desc });
@@ -387,7 +388,7 @@ export function initPingUi(host: PingHost): PingUi {
       remove(id);
       const net = host.net();
       if (net) net.placePing({ kind: 'mark', target: { node: id }, label: text });
-      else host.push(COALITION, text || t('ping.mark', { loc: id }), id);
+      else host.push(COALITION, text || t('ping.mark', { loc: placeLabel(id) }), id);
       renderPanel();
       return;
     }
