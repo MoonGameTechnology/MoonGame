@@ -824,6 +824,7 @@ import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { mountLocaleMenu } from './localeMenu';
+import { chaosScene, drawChaosUnder, drawChaosVeil, type ChaosScene, type ChaosView } from './spaceChaos';
 import { artScale, calloutAlpha, chevronAlpha, sphereBloom } from './semanticZoom';
 import { mapLod, mapSpacing, drawSchematicNode, type MapLod } from '../../packages/client/src/mapLod';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
@@ -4831,6 +4832,18 @@ function provinceClip(): Array<[number, number]> {
  *  а статик-слой чередует `bgx` (устоявшийся кадр) и `cx` (кадр в движении). */
 const territoryGeometry = new TerritoryGeometryCache();
 
+/** Сцена хаоса на текущую карту: ключ — карта и её рамка, иначе сцена не меняется. */
+let chaosCache: { key: string; scene: ChaosScene } | null = null;
+function chaosNow(): ChaosScene {
+  const b = mapBounds();
+  const key = `${s.mapId ?? ''}|${b.minX}|${b.minY}|${b.maxX}|${b.maxY}`;
+  if (chaosCache?.key !== key) chaosCache = { key, scene: chaosScene(key, b) };
+  return chaosCache.scene;
+}
+function chaosView(): ChaosView {
+  return { toScreen: world, toPx: worldDist, width: VW, height: VH };
+}
+
 function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
   const lod = currentMapLod();
   // Always cover newly exposed edges at the current camera. Only the stationary
@@ -4891,6 +4904,12 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
       g.fillStyle = rgba('#bfeee6', st.b * 0.45);
       g.fillRect(st.x * VW, st.y * VH, 0.7, 0.7);
     }
+  // «Космический хаос» (`spaceChaos.ts`, заказ владельца 2026-09-25): туманности, пылевые
+  // рукава и звёзды, прибитые к МИРУ, — между линиями карты больше не пусто. Выключается
+  // вместе со звёздным фоном в настройках графики.
+  // На голограмме слой ложится ВНУТРЬ стекла (ниже): под ним стекло гасило его почти в ноль.
+  const chaos = starfieldOn() ? chaosNow() : null;
+  if (chaos && !holographicMapOn()) drawChaosUnder(g, chaos, chaosView());
 
   // PROVINCES — political map (Bytro-style). Every sector is a filled CELL of a
   // weighted Voronoi (power diagram) over the sector centres: the cells tile the
@@ -4924,6 +4943,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     drawGlassScreen(g, holographicFrame);
     g.save();
     clipGlassSurface(g, holographicFrame);
+    if (chaos) drawChaosUnder(g, chaos, chaosView());
   }
   // Weighted-Voronoi political fill + classified borders — the shared @void/client
   // territory renderer clamps the weights (so no cell is swallowed), tessellates the
@@ -5020,6 +5040,8 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
       drawForkMark(g, c.x, c.y);
     }
   }
+  // Вуаль тех же туманностей поверх границ и дорог: идеальные линии тонут в дымке.
+  if (chaos) drawChaosVeil(g, chaos, chaosView(), 0.55);
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
   if (holographicMapOn()) g.restore();
