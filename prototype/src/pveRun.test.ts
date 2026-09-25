@@ -15,10 +15,11 @@ import {
 } from './game';
 import { data } from './gameData';
 import { initSoloDrivers } from './soloDrivers';
-import { pveState, pveModeId } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveObjectives } from '../../packages/client/src/gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
+import { objectiveProgress, shownObjectives } from '../../decisions/missionObjectives';
 import { sensorCoverage, playablePlayerIds } from '../../packages/shared-core/src/index';
 import { RUN_SPINE_HOURS, RUN_TAIL_HOURS, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import { freshSectorZeroProgress, prepareSectorZeroRun } from '../../decisions/sectorZeroProgress';
@@ -187,12 +188,30 @@ describe('pirates teach the first fight on the actual PvE map', () => {
     expect(sensorCoverage(state, 'p1', data).identify.has('pirate_den')).toBe(true);
     expect(state.planets.pirate_den!.links).toEqual(['home_a']);
     expect(playablePlayerIds(state).sort()).toEqual(['p1', 'p3']);
+    // Логово — отдельное место, а не пристройка к дому (заказ владельца 2026-09-25: «чуть
+    // дальше расположи базу пиратов»; было 45 от дома). Видно оно со старта всё равно:
+    // проверка опознания выше держит его в круге обзора дома.
+    const home = state.planets.home_a!.position;
+    const den = state.planets.pirate_den!.position;
+    expect(Math.hypot(den.x - home.x, den.y - home.y)).toBeGreaterThan(100);
+  });
+
+  it('destroying the den is a chapter objective, shown from the first run', () => {
+    // Заказ владельца 2026-09-25. Тот же глагол, что у «Уничтожить улей»: логово
+    // уничтожено, когда оно взято штурмом, — `control` мира пиратов.
+    const pool = pveObjectives();
+    const task = pool.find((o) => o.id === 'mission.pirate-den');
+    expect(task).toMatchObject({ kind: 'control', targets: ['pirate_den'] });
+    expect(task!.reward).toBeGreaterThan(0);
+    expect(shownObjectives(pool, []).map((o) => o.id)).toContain('mission.pirate-den');
   });
 
   it('the opening fleet wins a real multi-round battle and the run continues', () => {
     armRun();
     let state = advance(pveState(data), 1).state;
     expect(pirateEncounter(state, 'p1')?.stage).toBe('approach');
+    const task = pveObjectives().find((o) => o.id === 'mission.pirate-den')!;
+    expect(objectiveProgress(task, state, 'p1').complete).toBe(false);
     const moved = order(state, moveFleet('p1', 'p1_1', 'pirate_den'), state.time);
     expect(moved.error).toBeUndefined();
     state = moved.state;
@@ -232,6 +251,8 @@ describe('pirates teach the first fight on the actual PvE map', () => {
     expect(rounds).toBeGreaterThanOrEqual(2);
     expect(victor).toBe('p1');
     expect(pirateEncounter(state, 'p1')?.stage).toBe('won');
+    // Взятое логово закрывает задачу главы — ровно этим штурмом, без отдельного счёта.
+    expect(objectiveProgress(task, state, 'p1').complete).toBe(true);
     expect(state.fleets.p1_1?.units.some((u) => u.count > 0)).toBe(true);
     expect(state.fleets.p1_1?.units.find((u) => u.unit === 'cruiser')?.count).toBe(2);
     expect(Object.values(state.fleets).some((f) => f.owner === 'pirates')).toBe(false);

@@ -6,8 +6,8 @@
   "sectors": {
     "pirate_den": {
       "position": {
-        "x": -394,
-        "y": -563
+        "x": -465,
+        "y": -540
       },
       "kind": "pirate_base",
       "terrain": "empty_space",
@@ -95,7 +95,7 @@
         ],
         [
           "home_a",
-          "veil"
+          "ford"
         ]
       ]
     },
@@ -188,9 +188,33 @@
           "count": 3
         }
       ]
+    },
+    "ford": {
+      "position": {
+        "x": 60,
+        "y": -380
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "cove": {
+      "position": {
+        "x": 400,
+        "y": 440
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
     }
   },
   "objectives": [
+    {
+      "id": "mission.pirate-den",
+      "kind": "control",
+      "targets": [
+        "pirate_den"
+      ],
+      "reward": 2
+    },
     {
       "id": "mission.claim-colony",
       "kind": "control",
