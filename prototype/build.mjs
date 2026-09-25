@@ -657,6 +657,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .udmg-c b{font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums;}
 .udmg-c span{font-size:9.5px;color:var(--dim);line-height:1.15;overflow-wrap:anywhere;}
 .udmg-c.off{opacity:.4;}
+.udmg-c b i{font-style:normal;font-size:12px;color:var(--dim);font-weight:600;}
+.udmg-h em{font-style:normal;letter-spacing:.5px;text-transform:none;color:var(--dim);}
 .cx-desc{font-size:12px;line-height:1.6;color:#9fc9c4;}
 .cx-build{margin-top:12px;width:100%;padding:12px;cursor:pointer;border-radius:6px;border:1px solid var(--grn-dim);
   background:rgba(95,240,168,.12);color:var(--grn);font:700 13px ui-monospace,monospace;letter-spacing:1px;}

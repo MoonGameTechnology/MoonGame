@@ -135,9 +135,17 @@
 /* Цели задач главы: активная (следующий забег) — мятная, как метка в забеге; «позже» —
    приглушённый пунктир. Мята, а не золото: золото занято Суверенами. */
 .sz-map-body .target { fill: none; stroke: #8ff5c8; vector-effect: non-scaling-stroke; stroke-width: 1.8; stroke-dasharray: 4 3; }
-@media (prefers-reduced-motion: no-preference) { .sz-map-body .target:not(.later) { animation: sz-target-pulse 2.4s ease-in-out infinite; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sz-map-body .target:not(.later) { animation: sz-target-pulse 2.4s ease-in-out infinite; }
+  /* Активная цель ещё и бежит пунктиром (`decisions/missionRing.ts`), пульс яркости остаётся. */
+  .sz-map-body .target.active { animation: sz-target-run 1.1s linear infinite, sz-target-pulse 2.4s ease-in-out infinite; }
+}
 @keyframes sz-target-pulse { 50% { stroke-opacity: .4; } }
 .sz-map-body .target.later { stroke: rgba(143, 245, 200, 0.45); stroke-width: 1.2; stroke-dasharray: 2 3; }
+/* Волна-сонар от активной цели: та же, что у метки в забеге (`decisions/missionRing.ts`). */
+.sz-map-body .target-ping { fill: none; stroke: #8ff5c8; vector-effect: non-scaling-stroke; stroke-width: 1.4; opacity: 0; transform-box: fill-box; transform-origin: center; animation: sz-target-ping 2.4s ease-out infinite; }
+@keyframes sz-target-run { to { stroke-dashoffset: -14; } }
+@keyframes sz-target-ping { from { transform: scale(1); opacity: .6; } to { transform: scale(2.1); opacity: 0; } }
 .sz-map-body .flag { fill: #8ff5c8; stroke: #04120e; vector-effect: non-scaling-stroke; stroke-width: 1; }
 .sz-map-lost { position: relative; min-height: min(40vh, 320px); display: grid; place-items: center; padding: 20px; text-align: center; color: #b99ad8; font: 12px/1.6 ui-monospace, monospace; letter-spacing: .08em; background: repeating-linear-gradient(0deg, #ffffff05 0 2px, transparent 2px 4px); }
 .sz-map-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: #9fbcc4; font-size: 11px; }
@@ -165,7 +173,7 @@
 @keyframes sz-breathe { 50% { opacity: .35; } }
 @keyframes sz-ping { from { transform: scale(.6); opacity: .8; } to { transform: scale(2.2); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .sz-spin, .sz-core, .sz-ping, .sz-node.sz-core-node::after, .sz-map-panel { animation: none; }
+  .sz-spin, .sz-core, .sz-ping, .sz-node.sz-core-node::after, .sz-map-panel, .sz-map-body .target.active, .sz-map-body .target-ping { animation: none; }
 }
 .sz-bottomline { border-top: 1px solid #24404b; padding-top: 18px; font-size: 10px; }
 #sz-workshop { padding: 28px 0 40px; flex: 1; }

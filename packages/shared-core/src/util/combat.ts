@@ -2,6 +2,7 @@ import type { HandlerContext } from '../kernel/module';
 import type { CombatantRef, Fleet, GameState, PlanetId, PlayerId, UnitStack } from '../state/gameState';
 import type { GameData, UnitDef } from '../data/schemas';
 import { cappedUnitBreakdown, type StackContribution } from './stacks';
+import { TARGET_CLASSES, targetClassOf, type ClassPools } from './groundTargets';
 import { effectiveStats } from './loadout';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 import { laneTrunks, T_EPS, type TrunkSpan } from '../state/roads';
@@ -408,6 +409,24 @@ export function damageUnits(
   return { survivors: units.filter((s) => s.count > 0), deaths };
 }
 
+/** Урон, разложенный по роду войск (`util/groundTargets.ts`), ложится каждый на свой род:
+ *  урон по пехоте — только на пехоту, по технике — только на технику. Внутри рода — тем же
+ *  {@link damageUnits}. Мутирует стеки так же; выжившие — в исходном порядке. */
+export function damageByClass(
+  units: UnitStack[],
+  pools: ClassPools,
+  data: GameData,
+): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
+  const deaths: { unit: string; count: number }[] = [];
+  for (const cls of TARGET_CLASSES) {
+    if (!(pools[cls] > 0)) continue;
+    const subset = units.filter((s) => targetClassOf(data.units[s.unit]) === cls);
+    if (subset.length === 0) continue;
+    deaths.push(...damageUnits(subset, pools[cls], data).deaths);
+  }
+  return { survivors: units.filter((s) => s.count > 0), deaths };
+}
+
 /** The bus-facing wrapper over {@link damageUnits}: each loss is announced via
  *  `unit.died` (tagged with `source`), and the surviving stacks are returned. */
 export function applyDamage(
@@ -543,6 +562,10 @@ export function applyDamageToSide(
    *  a bombardment or a shuttle strike — those kill units outside any battle (EVT-2:
    *  only a battlefield is salvageable). Omitted by exactly those callers. */
   battleId?: string,
+  /** Тот же `dmg`, разложенный по роду войск цели (`util/groundTargets.ts`): тогда урон по
+   *  пехоте ложится только на пехоту, по технике — только на технику. Не передан — весь
+   *  урон одним телом, как всегда. */
+  byClass?: ClassPools,
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -574,7 +597,13 @@ export function applyDamageToSide(
       f.lastDamagedAt = h.ctx.now;
     }
   }
-  setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
+  if (!byClass) {
+    setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
+    return;
+  }
+  const { survivors, deaths } = damageByClass(units, byClass, data);
+  for (const d of deaths) h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
+  setSideUnits(h.state, ref, survivors);
 }
 
 /** Delete a fleet whose LAST ship just died outside a battle (orbital AA or

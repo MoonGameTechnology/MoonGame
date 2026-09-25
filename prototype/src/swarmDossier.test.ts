@@ -55,4 +55,14 @@ describe('досье Роя — пересборка 2026-09-23 (справа, �
     expect(html).toMatch(/<details class="sd-sec swarm-biology"><summary>/);
     expect(html.indexOf('swarm-biology')).toBeGreaterThan(html.indexOf('sd-forces'));
   });
+
+  it('в первой главе забега раздела «О Рое» нет — его расскажет учёный', () => {
+    const contacts = swarmDossier(
+      createInitialState({ seed: 'lore', version: { data: '1', manifest: '1' } }),
+      'p1',
+      new Set(),
+    );
+    expect(swarmDossierHtml(contacts, [], false)).not.toContain('swarm-biology');
+    expect(swarmDossierHtml(contacts, [], true)).toContain('swarm-biology');
+  });
 });

@@ -179,3 +179,25 @@ jobs:
             exit 1
           fi
         continue-on-error: true
+
+      # SZ-ci-robot: главный робот продукта. Робот архива выше проверяет обвязку площадки,
+      # а этот — сам Sector Zero: меню и маршрут глав, подготовку, забег, итоги, комиксы,
+      # снабжение, аналитику. Он собирает `main.ts` сам и кладёт бандл в готовую страницу
+      # `sector-zero-dev.html` — сборку берёт из шагов выше (`smoke:yandex` собирает всегда),
+      # а без неё собирает сам. Раньше его гоняли только руками, и между BOOT-1 и BOOT-1.1
+      # он падал незамеченным. Поза та же — не блокирует, сбой всплывает аннотацией.
+      - name: Sector Zero smoke (non-blocking)
+        run: |
+          if ! pnpm run smoke:browser:install; then
+            echo "::warning title=Sector Zero smoke::смоук не смог установиться (Chromium недоступен) — забег НЕ проверялся"
+            exit 1
+          fi
+          if [ ! -f prototype/dist/sector-zero-dev.html ] && ! pnpm run prototype; then
+            echo "::error title=Sector Zero smoke::сборка прототипа упала — смотри лог шага"
+            exit 1
+          fi
+          if ! pnpm run smoke:sector-zero; then
+            echo "::error title=Sector Zero smoke::робот нашёл ошибку в забеге Sector Zero — смотри лог шага"
+            exit 1
+          fi
+        continue-on-error: true

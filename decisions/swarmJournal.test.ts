@@ -58,4 +58,9 @@ describe('журнал адаптаций', () => {
     expect(flat).not.toContain('level');
     expect(flat).not.toContain('star');
   });
+
+  it('отряды без прежнего перехвата — гипотеза «отрезан от сети»', () => {
+    const rows = swarmJournal({ firstAt: 0, lastAt: 9, sorties: 3, firstDamage: 2, lastDamage: 3, stale: 2 });
+    expect(rows.at(-1)).toEqual({ tier: 'hypothesis', key: 'swarm.journal.stale', vars: { n: 2 } });
+  });
 });

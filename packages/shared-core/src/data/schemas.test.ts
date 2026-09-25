@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.38'); // жетоны героев: лоты «5 жетонов» на витрине Sector Zero (поверх сети Роя 0.1.37)
+    expect(data.version).toBe('0.1.39'); // урон по роду войск: четыре числа у наземных юнитов (атака/оборона по пехоте и по технике)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -280,6 +280,24 @@ describe('game data schema (docs/architecture.md §2)', () => {
       .map(([id]) => id)
       .sort();
     expect(silent, 'нет поля kind в data/units.json — род войск взят дефолтом').toEqual([]);
+  });
+
+  // Урон по роду войск (решение владельца 2026-09-25, `util/groundTargets.ts`): схема
+  // разрешает не объявлять `…Vs…` — юнит тогда бьёт род своей `attack`/`defense`, и это
+  // нужно модам и кораблям. В живом наземном каталоге такое молчание — забытое число:
+  // танк без `attackVsVehicle` бил бы броню всей атакой, и контры не было бы вовсе.
+  it('каждый наземный юнит каталога объявляет четыре числа урона по роду войск', () => {
+    const data = parseGameData(loadShippedBundle());
+    const need = ['attackVsInfantry', 'attackVsVehicle', 'defenseVsInfantry', 'defenseVsVehicle'];
+    const missing = Object.entries(data.units)
+      .filter(([, def]) => def.domain === 'ground')
+      .flatMap(([id, def]) =>
+        need
+          .filter((k) => (def.stats as Record<string, unknown>)[k] === undefined)
+          .map((k) => `${id}.${k}`),
+      )
+      .sort();
+    expect(missing).toEqual([]);
   });
 
   // Второй половиной той же пары идут ЗДАНИЯ: род войск бесполезен, если его негде

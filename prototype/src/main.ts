@@ -289,6 +289,8 @@ import { chapterBlueprint } from '../../decisions/moduleRarity';
 import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { swarmNetMarks } from '../../decisions/swarmNetMarks';
+import { swarmLoreKnown } from '../../decisions/swarmLore';
+import { missionRingFrame, RING_R } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
@@ -1573,7 +1575,11 @@ function renderSwarmDossier(now = performance.now()): void {
     $('swarm-dossier-badge').textContent = badge;
     lastSwarmDossierBadge = badge;
   }
-  const html = swarmDossierHtml(contacts, swarmJournal(s.swarmJournal?.[ME]));
+  const html = swarmDossierHtml(
+    contacts,
+    swarmJournal(s.swarmJournal?.[ME]),
+    swarmLoreKnown(sectorProgress, sectorRunActive),
+  );
   if (html !== lastSwarmDossierHtml) {
     const body = $('swarm-dossier-body');
     const scroll = body.scrollTop;
@@ -13898,22 +13904,33 @@ function drawMissionTargets(): void {
   const ids = new Set(runMissionRows().flatMap(r => r.targets));
   if (ids.size === 0) return;
   // `hologramTime` — визуальные часы карты: стоят на паузе и при отключённой анимации.
-  const breath = 0.5 + 0.5 * Math.sin(hologramTime / 520);
+  // Ритм кольца (бегущий пунктир, волна-сонар, дыхание) — `decisions/missionRing.ts`.
+  const { breath, dashOffset, ripple } = missionRingFrame(hologramTime, motionOn());
   cx.save();
   for (const id of ids) {
     const p = s.planets[id];
     if (!p) continue;
     const c = world(p.position);
-    if (!visible(c, 40)) continue;
+    if (!visible(c, 60)) continue;
+    cx.shadowColor = '#8ff5c8';
+    if (ripple) {
+      cx.strokeStyle = `rgba(143,245,200,${ripple.alpha})`;
+      cx.lineWidth = 1.4;
+      cx.shadowBlur = fxBlur(4);
+      cx.beginPath();
+      cx.arc(c.x, c.y, ripple.r, 0, TAU);
+      cx.stroke();
+    }
     cx.strokeStyle = `rgba(143,245,200,${0.55 + 0.35 * breath})`;
     cx.lineWidth = 1.8;
     cx.setLineDash([6, 5]);
-    cx.shadowColor = '#8ff5c8';
+    cx.lineDashOffset = dashOffset;
     cx.shadowBlur = fxBlur(6 + 6 * breath);
     cx.beginPath();
-    cx.arc(c.x, c.y, 24, 0, TAU);
+    cx.arc(c.x, c.y, RING_R, 0, TAU);
     cx.stroke();
     cx.setLineDash([]);
+    cx.lineDashOffset = 0;
     // флажок над миром: древко и полотнище
     const x = c.x + 17;
     const y = c.y - 34;

@@ -12,6 +12,7 @@ import { FRAGMENTS, shippedGameData } from '../../../data/bundle';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
 import pveMap from '../../../data/maps/pve-1.json';
 import pveMap2 from '../../../data/maps/pve-2.json';
+import pveMap3 from '../../../data/maps/pve-3.json';
 
 export { FRAGMENTS, shippedGameData };
 
@@ -32,7 +33,7 @@ export function skirmishState(data: GameData): GameState {
  * испорченное хранилище или старая ссылка не должны ронять вход в игру — они открывают
  * первую главу, а не падают.
  */
-const PVE_MISSIONS = [pveMap, pveMap2];
+const PVE_MISSIONS = [pveMap, pveMap2, pveMap3];
 
 /** Сколько глав у Сектора Зеро сегодня — чтобы интерфейс не держал своего числа. */
 export const PVE_MISSION_COUNT = PVE_MISSIONS.length;

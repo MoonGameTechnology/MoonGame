@@ -19,6 +19,8 @@
  *    связанные центры знание уже сохранили).
  * 4. **Рецепт — тоже знание.** Готовая адаптация (`swarm.adapt.done`) пишется органу и
  *    дальше течёт по связи, давая новые формы другим частям.
+ * 5. **Разрыв — событие.** Мир, бывший на связи с ульем и отрезанный от него, помнится
+ *    (`cut`) — задача «Разорвать сеть» засчитывается, даже если Рой связь потом починил.
  *
  * Синхронизация идёт на событиях, а не на тиках времени: частота вызова `advanceTo` у
  * хостов разная, и знание, текущее «по часам», разошлось бы между одиночным забегом и
@@ -81,6 +83,7 @@ function sync(h: HandlerContext): void {
   if (!net || owner === undefined) return;
   const view = swarmNet(h.state, h.ctx.data, owner, h.ctx.now);
   for (const id of Object.keys(net.holders)) if (!view.partOf.has(id)) delete net.holders[id];
+  recordCuts(h, net, view);
   const centers = new Set(view.nodes.filter((n) => n.kind === 'center').map((n) => n.id));
   for (const holders of partsOf(view).values()) {
     if (holders.length < 2) continue; // отрезанному не с кем делиться
@@ -106,6 +109,29 @@ function sync(h: HandlerContext): void {
   }
 }
 
+/**
+ * Правило 5: разрыв сети — событие. Мир, бывший на связи с ульем, а теперь отрезанный от
+ * его части, попадает в `cut` навсегда: игрок перерезал связь, и починка Роем этого не
+ * отменяет (задача «Разорвать сеть»). Миры, которые с ульем не связывались никогда, —
+ * не «отрезаны», они просто вне сети.
+ */
+function recordCuts(h: HandlerContext, net: SwarmNetState, view: ReturnType<typeof swarmNet>): void {
+  const home = h.state.pve?.home;
+  const npc = h.state.pve?.npcPlayerId;
+  if (home === undefined || npc === undefined || h.state.planets[home]?.owner !== npc) return;
+  const homePart = view.partOf.get(planetHolder(home));
+  for (const id of Object.keys(h.state.planets).sort()) {
+    if (h.state.planets[id]?.owner !== npc) continue;
+    const together = view.partOf.get(planetHolder(id)) === homePart;
+    if (together) {
+      if (!(net.linked ?? []).includes(id)) net.linked = [...(net.linked ?? []), id];
+    } else if ((net.linked ?? []).includes(id) && !(net.cut ?? []).includes(id)) {
+      net.cut = [...(net.cut ?? []), id];
+      h.emit('swarm.net.cut', { owner: npc, planetId: id });
+    }
+  }
+}
+
 /** События, после которых связность или знание могли измениться. */
 const RESYNC = [
   'pve.wave.spawned',
@@ -120,7 +146,7 @@ const RESYNC = [
 
 export const swarmNetModule: GameModule = {
   id: 'swarmNet',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.on('pve.started', (_event, h) => {
       if (ensureNet(h)) sync(h);

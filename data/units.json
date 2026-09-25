@@ -128,6 +128,10 @@
     "stats": {
       "attack": 4,
       "defense": 8,
+      "attackVsInfantry": 4,
+      "attackVsVehicle": 1,
+      "defenseVsInfantry": 8,
+      "defenseVsVehicle": 4,
       "speed": 44,
       "hp": 14,
       "buildingDamage": 1
@@ -151,6 +155,10 @@
     "stats": {
       "attack": 16,
       "defense": 8,
+      "attackVsInfantry": 16,
+      "attackVsVehicle": 8,
+      "defenseVsInfantry": 8,
+      "defenseVsVehicle": 5,
       "speed": 0,
       "hp": 22,
       "cargoSize": 1,
@@ -176,6 +184,10 @@
     "stats": {
       "attack": 22,
       "defense": 14,
+      "attackVsInfantry": 22,
+      "attackVsVehicle": 13,
+      "defenseVsInfantry": 14,
+      "defenseVsVehicle": 9,
       "speed": 40,
       "hp": 46,
       "buildingDamage": 3
@@ -201,6 +213,10 @@
     "stats": {
       "attack": 8,
       "defense": 20,
+      "attackVsInfantry": 8,
+      "attackVsVehicle": 4,
+      "defenseVsInfantry": 20,
+      "defenseVsVehicle": 14,
       "speed": 40,
       "hp": 34,
       "buildingDamage": 2
@@ -225,6 +241,10 @@
     "stats": {
       "attack": 18,
       "defense": 12,
+      "attackVsInfantry": 18,
+      "attackVsVehicle": 18,
+      "defenseVsInfantry": 12,
+      "defenseVsVehicle": 9,
       "speed": 52,
       "hp": 26,
       "buildingDamage": 3
@@ -504,6 +524,10 @@
     "stats": {
       "attack": 3,
       "defense": 9,
+      "attackVsInfantry": 3,
+      "attackVsVehicle": 1,
+      "defenseVsInfantry": 9,
+      "defenseVsVehicle": 5,
       "speed": 0,
       "hp": 26,
       "cargoSize": 1
@@ -552,6 +576,10 @@
     "stats": {
       "attack": 8,
       "defense": 5,
+      "attackVsInfantry": 8,
+      "attackVsVehicle": 4,
+      "defenseVsInfantry": 5,
+      "defenseVsVehicle": 3,
       "hp": 16,
       "speed": 1,
       "cargoSize": 1

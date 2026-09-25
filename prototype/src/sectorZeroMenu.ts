@@ -155,9 +155,14 @@ export function chapterMapSvg(view: ChapterMapView): string {
       const cy = Math.round(c.y);
       const ring = `<circle class="target ${c.objective}" cx="${cx}" cy="${cy}" r="${Math.round(r * 1.8)}"/>`;
       if (c.objective !== 'active') return ring;
+      // Активная цель живёт, как метка в забеге (`decisions/missionRing.ts`): от кольца
+      // расходится волна, пунктир бежит по кругу. Движение — в CSS, чтобы его гасил
+      // `prefers-reduced-motion` вместе с прочей анимацией меню.
+      const ping = `<circle class="target-ping" cx="${cx}" cy="${cy}" r="${Math.round(r * 1.8)}"/>`;
       const fx = Math.round(c.x + r * 1.3);
       const fy = Math.round(c.y - r * 2.6);
       return (
+        ping +
         ring +
         `<path class="flag" d="M${fx} ${fy + Math.round(r * 2)}V${fy}l${Math.round(r * 1.4)} ${Math.round(r * 0.5)}l${-Math.round(r * 1.4)} ${Math.round(r * 0.5)}"/>`
       );

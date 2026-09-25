@@ -1,6 +1,14 @@
 import type { UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
-import { damageUnits, MAX_COMBAT_ROUNDS, stackHull } from '../util/combat';
+import { damageByClass, damageUnits, MAX_COMBAT_ROUNDS, stackHull } from '../util/combat';
+import {
+  addPools,
+  hasGroundTargets,
+  poolsTotal,
+  splitDealt,
+  targetedVolley,
+  type ClassPools,
+} from '../util/groundTargets';
 import { cappedUnitStat } from '../util/stacks';
 import { volleyShare } from '../util/volley';
 import { effectiveStats } from '../util/loadout';
@@ -140,17 +148,27 @@ export function previewSides(
       break;
     }
     const incoming = new Array<number>(input.length).fill(0);
+    // Урон по роду войск — то же правило, что в живом раунде (`util/groundTargets.ts`):
+    // против наземных войск залп считается под состав цели и ложится по родам.
+    const byClass = new Array<ClassPools | undefined>(input.length).fill(undefined);
     let anyFired = false;
     for (let i = 0; i < input.length; i++) {
       if (!alive(live[i]!)) continue;
       const foes = enemies(i);
       if (foes.length === 0) continue;
       anyFired = true;
-      const volley = cappedUnitStat(
-        live[i]!,
-        data,
-        input[i]!.role === 'attacker' ? 'attack' : 'defense',
-      );
+      const role = input[i]!.role === 'attacker' ? 'attack' : 'defense';
+      if (foes.some((j) => hasGroundTargets(live[j]!, data))) {
+        for (const j of foes) {
+          const shot = targetedVolley(live[i]!, live[j]!, data, role);
+          const share = volleyShare(shot.total, foes.length);
+          incoming[j]! += share;
+          const pools = splitDealt(shot.pools, shot.total, share);
+          byClass[j] = byClass[j] ? addPools(byClass[j]!, pools) : pools;
+        }
+        continue;
+      }
+      const volley = cappedUnitStat(live[i]!, data, role);
       const share = volleyShare(volley, foes.length);
       for (const j of foes) incoming[j]! += share;
     }
@@ -162,7 +180,15 @@ export function previewSides(
       break;
     }
     for (let i = 0; i < input.length; i++) {
-      if (incoming[i]! > 0) live[i] = damageUnits(live[i]!, incoming[i]!, data).survivors;
+      if (!(incoming[i]! > 0)) continue;
+      const pools = byClass[i];
+      live[i] = pools
+        ? damageByClass(
+            live[i]!,
+            { ...pools, other: pools.other + Math.max(0, incoming[i]! - poolsTotal(pools)) },
+            data,
+          ).survivors
+        : damageUnits(live[i]!, incoming[i]!, data).survivors;
     }
   }
   const survivorCount = live.filter((u) => alive(u)).length;

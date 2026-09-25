@@ -16,6 +16,7 @@ export const ROUTE_LENGTH = 6;
 export const CHAPTER_KEYS: readonly { name: string; brief: string }[] = [
   { name: 'sector-zero.mission.1', brief: 'sector-zero.mission.1.brief' },
   { name: 'sector-zero.mission.2', brief: 'sector-zero.mission.2.brief' },
+  { name: 'sector-zero.mission.3', brief: 'sector-zero.mission.3.brief' },
 ];
 
 export interface RouteNode {

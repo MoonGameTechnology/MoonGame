@@ -23,7 +23,17 @@ import { cappedUnitStat, deepClone } from '../packages/shared-core/src/index';
 // Глубокий импорт: и предохранитель раундов, и развеска урона живут в `util/combat`, а
 // наружу `index` отдаёт из него не всё. Брать их оттуда, где они объявлены, честнее,
 // чем заводить копию ради красивого импорта.
-import { damageUnits, MAX_COMBAT_ROUNDS } from '../packages/shared-core/src/util/combat';
+import {
+  damageByClass,
+  damageUnits,
+  MAX_COMBAT_ROUNDS,
+} from '../packages/shared-core/src/util/combat';
+import {
+  hasGroundTargets,
+  splitDealt,
+  targetedVolley,
+  type FireRole,
+} from '../packages/shared-core/src/util/groundTargets';
 import type { GameData, UnitStack } from '../packages/shared-core/src/index';
 
 /**
@@ -50,6 +60,32 @@ const alive = (units: readonly UnitStack[]): number =>
 export interface ForecastOptions {
   /** Во сколько раз усилить залп ОБОРОНЫ. `1` — честный прогноз. */
   defenderEdge?: number;
+}
+
+/** Залп стороны по цели: против наземных войск — под состав цели (разложен по родам),
+ *  иначе прежний плоский `attack`/`defense`. */
+function volleyAt(
+  shooters: UnitStack[],
+  targets: UnitStack[],
+  data: GameData,
+  role: FireRole,
+  edge: number,
+): { total: number; pools?: ReturnType<typeof splitDealt> } {
+  if (!hasGroundTargets(targets, data))
+    return { total: cappedUnitStat(shooters, data, role) * edge };
+  const shot = targetedVolley(shooters, targets, data, role);
+  const total = shot.total * edge;
+  return { total, pools: splitDealt(shot.pools, shot.total, total) };
+}
+
+function hit(
+  units: UnitStack[],
+  volley: { total: number; pools?: ReturnType<typeof splitDealt> },
+  data: GameData,
+): UnitStack[] {
+  return volley.pools
+    ? damageByClass(units, volley.pools, data).survivors
+    : damageUnits(units, volley.total, data).survivors;
 }
 
 /**
@@ -80,10 +116,12 @@ export function forecastGround(
   let rounds = 0;
   while (rounds < MAX_COMBAT_ROUNDS) {
     rounds += 1;
-    const aVolley = cappedUnitStat(att, data, 'attack');
-    const dVolley = cappedUnitStat(def, data, 'defense') * edge;
-    att = damageUnits(att, dVolley, data).survivors;
-    def = damageUnits(def, aVolley, data).survivors;
+    // Тем же правилом рода войск, что и живой раунд (`util/groundTargets.ts`): залп считается
+    // под состав цели и ложится по родам. Фора обороны множит залп целиком.
+    const aVolley = volleyAt(att, def, data, 'attack', 1);
+    const dVolley = volleyAt(def, att, data, 'defense', edge);
+    att = hit(att, dVolley, data);
+    def = hit(def, aVolley, data);
     const aLeft = alive(att);
     const dLeft = alive(def);
     if (aLeft <= 0 || dLeft <= 0) {
@@ -95,7 +133,7 @@ export function forecastGround(
       };
     }
     // Обе стороны целы и ни одна не может убить другую — дальше крутить нечего.
-    if (aVolley <= 0 && dVolley <= 0) break;
+    if (aVolley.total <= 0 && dVolley.total <= 0) break;
   }
   return {
     winner: 'draw',
