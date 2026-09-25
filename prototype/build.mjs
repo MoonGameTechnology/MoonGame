@@ -657,10 +657,14 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .cx-head .cx-ic{font-size:22px;color:var(--cyan);}
 .cx-head b{font-size:16px;letter-spacing:1.5px;color:#eafffb;flex:1;}
 .cx-head .cx-tag{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan-dim);border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
-.cx-stats{display:flex;flex-direction:column;gap:3px;margin-bottom:12px;}
-.cx-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(14,59,64,.4);}
-.cx-row .cx-k{color:var(--dim);}
-.cx-row .cx-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+/* Число рядом с подписью (замечание владельца 2026-09-25): две колонки вместо строки по краям
+   окна — на ПК окно шириной 800px, и «60» стояло в 700px от «Корпус». Колонка подписей — по
+   самой длинной, но не шире 60%: на узком телефоне длинная подпись переносится. */
+.cx-stats{display:grid;grid-template-columns:fit-content(60%) 1fr;margin-bottom:12px;font-size:12px;}
+.cx-stats>.cx-row{display:contents;}
+.cx-stats>.cx-row>span{padding:5px 0;border-bottom:1px solid rgba(14,59,64,.4);}
+.cx-stats>.cx-row>.cx-k{color:var(--dim);padding-right:20px;}
+.cx-stats>.cx-row>.cx-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:left;}
 .udmg{margin:2px 0 12px;}
 .udmg-h{font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin-bottom:6px;}
 .udmg-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;}
