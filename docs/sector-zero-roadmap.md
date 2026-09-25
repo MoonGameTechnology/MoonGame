@@ -417,9 +417,11 @@ Sector Zero дорастает до неё добавлением полей
   Закрыты: `SZ-roadmap-stale` (#1218), `SZ-menu-text` и `SZ-run-camera` (#1222),
   `SZ-empty-skill` (AUD-22), `SZ-adapt-offline` (AUD-20), `SZ-ci-robot` (2026-09-25:
   `smoke:sector-zero` — не блокирующий шаг `ci.yml` рядом с `smoke:yandex`; до того между
-  BOOT-1 и BOOT-1.1 робот падал незамеченным). `SZ-platforms` решён владельцем 2026-09-24:
-  подаём как есть. Открыты: `SZ-map-ids`, `SZ-ch2-balance` (#1213 влит, замер ждёт
-  разрешения владельца), `SZ-analytics-sink` (нужен номер счётчика Метрики).
+  BOOT-1 и BOOT-1.1 робот падал незамеченным), `SZ-map-ids` (`PVR-6.19` — имена провинций;
+  сторожа — `placeLabels.test.ts` для холста и робот `smoke:sector-zero`, который ищет id
+  узлов на экране забега). `SZ-platforms` решён владельцем 2026-09-24: подаём как есть.
+  Открыты: `SZ-ch2-balance` (#1213 влит, замер ждёт разрешения владельца),
+  `SZ-analytics-sink` (нужен номер счётчика Метрики).
 
 ---
 

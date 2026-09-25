@@ -29,6 +29,8 @@ import { SECTOR_ZERO_ABSENT_HUD, SECTOR_ZERO_ABSENT_TOOLS } from '../decisions/s
 const hooks = `window.__szTest = {
   run: () => isSectorZeroRun(),
   home: () => Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null,
+  // Id всех узлов карты — для проверки, что игрок их не видит (SZ-map-ids).
+  places: () => Object.keys(s.planets),
   // Выбор мира так же, как его делает \`jumpTo\` (переход по ссылке): сама карточка —
   // предмет проверки, а не попадание мышью по карте, где камера у Sector Zero близко к дому.
   select: id => { selPlanet = id; selFleet = null; selFleets = new Set(); lastPanelHtml = ''; renderPanel(); },
@@ -109,6 +111,17 @@ async function check(label, run) {
     run ? 0 : 1,
     `${label}: «Пинг»`,
   );
+  if (run) {
+    // SZ-map-ids: карточка мира, её сводка (тап по имени), журнал и панели называют места
+    // именами провинций. Id узлов глав — английские слова (`home_a`, `drift`): на русском
+    // экране забега их быть не должно.
+    await page.locator('#side [data-act="planetinfo"]').first().click();
+    const raw = await page.evaluate(() => {
+      const words = new Set(document.body.innerText.split(/[^\w-]+/));
+      return window.__szTest.places().filter((id) => words.has(id));
+    });
+    assert.deepEqual(raw, [], `${label}: сырые id мест на экране`);
+  }
   await page.keyboard.press('Escape');
 
   await page.locator('#purse [data-res="metal"]').click();
