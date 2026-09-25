@@ -414,11 +414,11 @@ Sector Zero дорастает до неё добавлением полей
   [`reviews/2026-09-24-sector-zero-readiness.md`](reviews/2026-09-24-sector-zero-readiness.md) §3.
   Обзор — датированный снимок и не правится, поэтому живой статус его находок ведётся здесь.
   Закрыты: `SZ-roadmap-stale` (#1218), `SZ-menu-text` и `SZ-run-camera` (#1222),
-  `SZ-empty-skill` (AUD-22), `SZ-adapt-offline` (AUD-20). `SZ-platforms` решён владельцем
-  2026-09-24: подаём как есть. Открыты: `SZ-map-ids`, `SZ-ch2-balance` (#1213 влит, замер
-  ждёт разрешения владельца), `SZ-analytics-sink` (нужен номер счётчика Метрики),
-  `SZ-ci-robot` (робот не в CI; между BOOT-1 и BOOT-1.1 он падал на покрове незамеченным,
-  починен BOOT-1.1).
+  `SZ-empty-skill` (AUD-22), `SZ-adapt-offline` (AUD-20), `SZ-ci-robot` (2026-09-25:
+  `smoke:sector-zero` — не блокирующий шаг `ci.yml` рядом с `smoke:yandex`; до того между
+  BOOT-1 и BOOT-1.1 робот падал незамеченным). `SZ-platforms` решён владельцем 2026-09-24:
+  подаём как есть. Открыты: `SZ-map-ids`, `SZ-ch2-balance` (#1213 влит, замер ждёт
+  разрешения владельца), `SZ-analytics-sink` (нужен номер счётчика Метрики).
 
 ---
 
