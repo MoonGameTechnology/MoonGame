@@ -69,17 +69,17 @@ body.holo-ui .holo-nav button{cursor:pointer;}
 body.holo-ui .holo-nav [aria-current=page]{color:var(--holo-reflection);border-color:var(--cyan-dim);
   background:rgba(8,39,51,.94);box-shadow:inset 0 -2px 0 rgba(140,233,242,.6);}
 body.holo-ui .holo-nav button:hover{border-color:var(--cyan-dim);}
-body.holo-ui #rail{left:var(--holo-nav-end,370px);top:calc(var(--tbh) + 30px);bottom:auto;gap:8px;flex-direction:column-reverse;align-items:flex-start;}
-body.holo-ui #railtoggle{display:flex;align-items:center;justify-content:center;gap:8px;width:92px;height:36px;
-  border:1px solid var(--line);border-radius:4px;font-size:14px;background:var(--glass);box-shadow:none;}
+/* Инструменты — постоянная колонка иконок у левого края под вкладками (заказ владельца
+   2026-09-25: кнопку «☰ Ещё», прятавшую их, убрать). Подпись — всплывающая подсказка. */
+body.holo-ui #rail{left:18px;top:calc(var(--tbh) + 84px);bottom:auto;gap:0;flex-direction:column;align-items:flex-start;}
+body.holo-ui #railtoggle{display:none!important;}
 body.holo-ui .holo-more{display:inline;font-size:12px;}
-body.holo-ui #railtools{width:264px;max-height:calc(100dvh - var(--tbh) - 136px);overflow-y:auto;
-  padding:10px;grid-template-columns:1fr 1fr;gap:5px;}
-body.holo-ui #rail.open #railtools{display:grid;}
+body.holo-ui #railtools,body.holo-ui #rail.open #railtools{display:flex;flex-direction:column;width:auto;
+  max-height:calc(100dvh - var(--tbh) - 132px);overflow-y:auto;padding:6px;gap:6px;}
 body.holo-ui #railtools::before,body.holo-ui #railtools::after{display:none;}
-body.holo-ui #railtools button{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:auto;height:40px;
-  padding:7px 9px;font-size:16px;color:var(--cyan);border-radius:4px;}
-body.holo-ui #railtools .rlbl{display:inline;font-size:12px;line-height:1.3;letter-spacing:0;color:var(--ink);}
+body.holo-ui #railtools button{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:44px;height:44px;
+  padding:0;font-size:18px;color:var(--cyan);border-radius:6px;}
+body.holo-ui #railtools .rlbl{display:none;}
 body.holo-ui #railtools #rail-settings,body.holo-ui #railtools #rail-exit{display:flex;}
 body.holo-ui #devline{top:calc(var(--tbh) + 31px);left:auto;right:18px;width:auto;gap:16px;
   background:transparent;border:0;font-size:11px;pointer-events:none;}
@@ -91,7 +91,7 @@ body.holo-ui #missionpanel{top:calc(var(--tbh) + 64px);}
 /* YAG-6.2: пауза забега на ПК — строка статуса глуха к нажатиям, кнопка паузы — нет. */
 body.holo-ui #fps{top:calc(var(--tbh) + 70px);right:18px;font-size:10px;}
 body.holo-ui #toasts{top:calc(var(--tbh) + 76px);max-width:min(560px,70vw);}
-body.holo-ui #goals{top:calc(var(--tbh) + 82px);left:18px;right:auto;max-width:240px;font-size:12px;}
+body.holo-ui #goals{top:calc(var(--tbh) + 82px);left:84px;right:auto;max-width:240px;font-size:12px;}
 /* The selection card remains the game's own full dossier, with all its live actions. */
 /* Досье Роя — в том же правом столбце, что и карточка выбранного (заказ владельца
    2026-09-23): те же край и верх, чтобы столбец не прыгал, когда одно сменяет другое. */

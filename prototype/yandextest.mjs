@@ -51,6 +51,13 @@ import { fileURLToPath } from 'node:url';
 
 import { launchBrowser, waitForApp, withDiagnostics } from './harnessKit.mjs';
 
+/** «☰ Ещё» есть только на телефоне: на ПК и планшете инструменты — постоянная колонка
+ *  иконок слева (заказ владельца 2026-09-25), открывать нечего. */
+async function toggleTools() {
+  const toggle = page.locator('#railtoggle');
+  if (await toggle.isVisible()) await toggle.click();
+}
+
 const ROOT = fileURLToPath(new URL('./dist/yandex/', import.meta.url));
 
 if (!process.argv.includes('--no-build')) {
@@ -224,7 +231,7 @@ try {
     // п. 1.10.1: стартовые сообщения забега лежат там же, где открывается меню «Ещё», и
     // раньше закрывали его пункты и ловили нажатия. Открытое меню — поверх них.
     assert.ok((await page.locator('#toasts .toast').count()) > 0, 'ПК: на старте есть сообщения');
-    await page.locator('#railtoggle').click();
+    await toggleTools();
     const covered = await page.evaluate(() =>
       [...document.querySelectorAll('#railtools button')]
         .filter((b) => b.getClientRects().length > 0)
@@ -235,7 +242,7 @@ try {
         .map((b) => b.id),
     );
     assert.deepEqual(covered, [], 'ПК: пункты открытого меню ничем не перекрыты');
-    await page.locator('#railtoggle').click();
+    await toggleTools();
 
     // 2а. Пауза забега (YAG-6.2; «‖» полосы скорости с 2026-09-24): кнопка замораживает
     // отсчёт волны, уход со страницы — тоже, и на возврате мир ждёт кнопки; площадка
@@ -296,7 +303,7 @@ try {
     await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
     await page.locator('#sz-continue').click();
     await wave().waitFor({ state: 'visible' });
-    await page.locator('#railtoggle').click();
+    await toggleTools();
     await page.locator('#rail-exit').click();
     await onSectorZeroMenu('второй выход');
 

@@ -205,7 +205,9 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #tbwallet .tw-sovereigns{color:#ffd978;font-weight:800;border-color:rgba(255,207,98,.75);
   background:linear-gradient(180deg,rgba(66,46,8,.94) 0%,rgba(26,18,4,.96) 100%);
   box-shadow:0 0 10px rgba(255,186,52,.28),inset 0 1px 0 rgba(255,238,176,.28);}
-#tbwallet .tw-sovereigns i{color:#fff1bf;text-shadow:0 0 6px rgba(255,196,70,.95),0 0 2px #fff;}
+#tbwallet .tw-sovereigns i{display:grid;place-items:center;width:18px;height:18px;color:#fff1bf;
+  filter:drop-shadow(0 0 4px rgba(255,196,70,.9));}
+#tbwallet .tw-sovereigns i svg{display:block;width:18px;height:18px;fill:rgba(255,190,56,.55);stroke-width:1.2;}
 /* «+» у Суверенов раскрывает кнопку ролика под кошельком (run.sovereigns) */
 #tbwallet{position:relative;}
 #tbwallet .tw-plus{min-width:24px;height:24px;margin-left:-5px;border-radius:7px;border:1px solid #fff0b8;cursor:pointer;
@@ -741,7 +743,7 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
   border:0;background:transparent;color:var(--ink);cursor:pointer;}
 #pirate-intro .pe-action{min-height:40px;width:100%;border:1px solid #a95e48;border-radius:5px;
   background:#302128;color:var(--ink);font:inherit;cursor:pointer;}
-body.holo-ui #pirate-intro{left:18px;}
+body.holo-ui #pirate-intro{left:84px;} /* правее колонки инструментов слева */
 @media(max-width:640px){#pirate-intro,body.holo-ui #pirate-intro{top:auto;left:auto;right:12px;
   bottom:calc(112px + env(safe-area-inset-bottom,0px));}}
 body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirate-intro{display:none;}

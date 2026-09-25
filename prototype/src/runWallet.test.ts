@@ -13,7 +13,7 @@ describe('кошелёк профиля в шапке забега (решени
     const html = runWalletHtml({ research: 12, warrants: 35, sovereigns: 7 });
     expect(html).toMatch(/tw-data[^>]*>.*◇.*12<\/button>/);
     expect(html).toMatch(/tw-warrants[^>]*>.*⌖.*35<\/button>/);
-    expect(html).toMatch(/tw-sovereigns[^>]*>.*◆.*7<\/button>/);
+    expect(html).toMatch(/tw-sovereigns[^>]*><i aria-hidden="true"><svg.*<\/svg><\/i>7<\/button>/);
   });
 
   it('полное имя валюты — в подписи для мыши и скринридера', () => {
@@ -109,7 +109,7 @@ describe('кошелёк: ролик только по раскрытой кно
     expect(calls.ads).toEqual(['run.sovereigns']);
     expect(calls.applied).toBe(1);
     expect(calls.notes).toEqual(['Получено: +2 ◆.']);
-    expect(root.innerHTML).toMatch(/tw-sovereigns[^>]*>.*◆.*9<\/button>/);
+    expect(root.innerHTML).toMatch(/tw-sovereigns[^>]*><i aria-hidden="true"><svg.*<\/svg><\/i>9<\/button>/);
   });
 
   it('не досмотрел или адаптер сломан — ничего не начислено', async () => {
