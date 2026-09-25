@@ -148,14 +148,21 @@ export function parseSwarmCodex(raw: unknown, data: GameData): SwarmCodex {
   const o = raw as Record<string, unknown>;
   if (o.units && typeof o.units === 'object')
     for (const [id, v] of Object.entries(o.units as Record<string, unknown>)) {
-      if (!data.units[id] || !v || typeof v !== 'object') continue;
+      // Собственный ключ каталога (AUD-30): `data.units['__proto__']` — это `Object.prototype`.
+      if (!Object.prototype.hasOwnProperty.call(data.units, id) || !v || typeof v !== 'object')
+        continue;
       const e = v as Record<string, unknown>;
       const max = count(e.max);
       if (max > 0) out.units[id] = { max, runs: Math.max(1, count(e.runs)) };
     }
   if (Array.isArray(o.buildings))
     out.buildings = [
-      ...new Set(o.buildings.filter((b): b is string => typeof b === 'string' && !!data.buildings[b])),
+      ...new Set(
+        o.buildings.filter(
+          (b): b is string =>
+            typeof b === 'string' && Object.prototype.hasOwnProperty.call(data.buildings, b),
+        ),
+      ),
     ].sort();
   out.repels = count(o.repels);
   out.veilDamage = count(o.veilDamage);

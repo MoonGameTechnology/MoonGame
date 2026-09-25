@@ -39,17 +39,26 @@ const PVE_MISSIONS = [pveMap, pveMap2, pveMap3];
 export const PVE_MISSION_COUNT = PVE_MISSIONS.length;
 
 /**
- * Карта главы по её номеру (0 — первая). Любой номер вне диапазона → ПЕРВАЯ глава.
+ * Номер главы из хранилища или ссылки → номер, который реально сыграется (0 — первая).
+ * Любой номер вне диапазона → ПЕРВАЯ глава.
+ *
+ * Хост приводит номер ЭТОЙ функцией, а не только карта внутри себя (AUD-32): иначе карта
+ * клампила чужой номер к первой главе, а награда главы (чертёж за первую победу) считалась
+ * по сырому номеру — «5» из правленого хранилища играло главу I, а платило легендарным
+ * чертежом вместо уникального.
  *
  * Именно первая, а не ближайшая: сюда номер приходит из хранилища браузера и из ссылки,
  * то есть испорченное значение — обычный случай, а не авария. Подтянуть его к последней
  * главе значило бы молча ПРОПУСТИТЬ игроку содержимое кампании; открыть первую —
  * поведение, которое он точно поймёт.
  */
-function missionMap(mission: number): unknown {
+export function pveMissionIndex(mission: number): number {
   const i = Number.isInteger(mission) ? mission : Math.trunc(Number(mission));
-  const ok = Number.isFinite(i) && i >= 0 && i < PVE_MISSIONS.length;
-  return (ok ? PVE_MISSIONS[i] : PVE_MISSIONS[0]) ?? pveMap;
+  return Number.isFinite(i) && i >= 0 && i < PVE_MISSIONS.length ? i : 0;
+}
+
+function missionMap(mission: number): unknown {
+  return PVE_MISSIONS[pveMissionIndex(mission)] ?? pveMap;
 }
 
 /** Разобранная карта главы — один раз на карту. Карты глав — неизменные данные поставки, а

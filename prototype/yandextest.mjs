@@ -32,6 +32,12 @@
  *    текстом, а не ключами, — и для русского, и для англоязычного игрока;
  * 10. темп забега (`matchExits.ts`, правило 6): полоса скорости несёт ‖ ▶ ▶▶ — и на ПК, и
  *    на телефоне, — а множителей ×1…×100 в забеге нет.
+ * 11. две вкладки (`AUD-29`): открывшая Sector Zero последней становится хозяйкой, прежняя
+ *    встаёт под заставкой и больше не пишет, — правки обеих доживают до хранилища;
+ * 12. битый журнал забега (`AUD-33`) не запирает меню, а герой `constructor` в профиле
+ *    (`AUD-30`) не ломает «Новый забег»;
+ * 13–14. молчащий SDK (`AUD-33`): `getPlayer` без ответа не держит меню, `init()` без ответа
+ *    не держит запуск — игра стартует веб-адаптером.
  *
  *   node prototype/yandextest.mjs            # или pnpm run smoke:yandex (собирает сам)
  *   node prototype/yandextest.mjs --no-build # проверить уже собранный архив
@@ -65,14 +71,16 @@ if (!existsSync(join(ROOT, 'index.html'))) {
 
 /** Поддельный SDK: ровно то, что зовёт адаптер, и журнал вызовов для проверок. */
 const FAKE_SDK = `window.__ya = { log: [], writes: [] };
+// Молчащий SDK (AUD-33): \`__initHang\` — \`init()\` без ответа, \`__playerHang\` — \`getPlayer\`.
+const never = () => new Promise(() => {});
 // «Назад» и выход площадки (YAG-6.4): тест шлёт их сам — \`__yaFire('HISTORY_BACK')\`.
 const events = {};
 window.__yaFire = (name) => (events[name] || []).forEach((listener) => listener());
 // Облако вошедшего игрока (YAG-2.2): стартовое содержимое задаёт тест (\`__cloudInit\`).
 const cloud = Object.assign({}, window.__cloudInit || {});
 window.YaGames = {
-  init: () => Promise.resolve({
-    getPlayer: async () => ({
+  init: () => window.__initHang ? never() : Promise.resolve({
+    getPlayer: async () => window.__playerHang ? never() : ({
       getUniqueID: () => 'u-1',
       isAuthorized: () => !window.__guest,
       setData: async (data, flush) => {
@@ -433,7 +441,9 @@ try {
   const second = await browser.newContext({ locale: 'ru-RU' });
   const secondPage = await second.newPage();
   secondPage.setDefaultTimeout(20000);
-  secondPage.on('pageerror', (error) => errors.push(`pageerror (2-е устройство): ${error.message}`));
+  secondPage.on('pageerror', (error) =>
+    errors.push(`pageerror (2-е устройство): ${error.message}`),
+  );
   await secondPage.addInitScript((meta) => {
     window.__cloudInit = { meta };
   }, envelope);
@@ -499,11 +509,115 @@ try {
   assert.deepEqual(menuBlocked, [true, true], 'телефон: долгий тап без системного меню');
   await phone.close();
 
+  // 11. Две вкладки (AUD-29). Раньше каждая писала свою копию профиля целиком, и правка
+  // одной пропадала после любой записи другой. Теперь пишет хозяйка — открывшая последней.
+  const tabs = await browser.newContext({ locale: 'ru-RU' });
+  const tabA = await tabs.newPage();
+  const tabB = await tabs.newPage();
+  for (const [label, p] of [
+    ['вкладка A', tabA],
+    ['вкладка B', tabB],
+  ])
+    p.on('pageerror', (error) => errors.push(`pageerror (${label}): ${error.message}`));
+  const loadouts = (p) =>
+    p.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1')).loadouts);
+  const ready = (p) => p.waitForFunction(() => !document.getElementById('sz-new').disabled);
+  await tabA.goto(origin + '/');
+  await waitForApp(tabA);
+  await ready(tabA);
+  await tabA.locator('#sz-prep').click();
+  await tabA.locator('[data-prep="fit"][data-id="ion_engine"]').first().click();
+  await tabB.goto(origin + '/');
+  await waitForApp(tabB);
+  await ready(tabB);
+  await tabA.locator('#tab-taken').waitFor({ state: 'visible' });
+  assert.equal(
+    (await tabA.locator('#tab-taken button').textContent())?.trim(),
+    builtText('ru', 'sector-zero.tab-taken.here'),
+    'вытесненная вкладка: заставка подписана текстом',
+  );
+  await tabB.locator('#sz-prep').click();
+  await tabB.locator('[data-prep="hull"]').nth(1).click();
+  await tabB.locator('[data-prep="fit"][data-id="cargo_bay"]').first().click();
+  // Вытесненная вкладка уходит со страницы — раньше здесь она писала свою копию поверх.
+  await tabA.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  const both = Object.values(await loadouts(tabB)).flat();
+  assert.ok(both.includes('ion_engine'), 'правка вкладки A дожила: B прочла её при перехвате');
+  assert.ok(both.includes('cargo_bay'), 'правка вкладки B не затёрта уходом A');
+  // «Играть здесь»: A перезагружается и перехватывает Sector Zero обратно.
+  await tabA.locator('#tab-taken button').click();
+  await waitForApp(tabA);
+  await ready(tabA);
+  await tabB.locator('#tab-taken').waitFor({ state: 'visible' });
+  assert.equal(await tabA.locator('#tab-taken').count(), 0, 'A снова хозяйка');
+  await tabs.close();
+
+  // 12. Битый журнал забега (AUD-33) и герой `constructor` в профиле (AUD-30). Раньше
+  // исключение при засчёте журнала оставляло меню в «Проверяем сохранение…» навсегда, а
+  // «Новый забег» на таком профиле давал пустой экран.
+  const broken = await browser.newContext({ locale: 'ru-RU' });
+  const brokenPage = await broken.newPage();
+  brokenPage.on('pageerror', (error) => errors.push(`pageerror (битый журнал): ${error.message}`));
+  await brokenPage.addInitScript(() => {
+    if (localStorage.getItem('robot.planted')) return;
+    localStorage.setItem('robot.planted', '1');
+    localStorage.setItem(
+      'sector-zero.progress.v1',
+      JSON.stringify({ v: 1, nextAttempt: 3, settledThrough: 1, selectedHero: 'constructor' }),
+    );
+    localStorage.setItem(
+      'void.run.v1',
+      JSON.stringify({
+        v: 1,
+        mode: 'pve_waves',
+        difficulty: 'normal',
+        state: {
+          match: { status: 'ended', winner: 'p1' },
+          pve: { waveNumber: 2, totalWaves: 10 },
+          planets: null,
+        },
+        sectorZeroAttempt: 2,
+        sectorZeroMission: 0,
+      }),
+    );
+  });
+  await brokenPage.goto(origin + '/');
+  await waitForApp(brokenPage);
+  await ready(brokenPage);
+  assert.equal(
+    (await brokenPage.locator('#sz-summary').textContent())?.trim(),
+    builtText('ru', 'sector-zero.restore-failed'),
+    'битый журнал: меню говорит, что сохранение не открылось, и пускает дальше',
+  );
+  await brokenPage.locator('#sz-new').click();
+  await brokenPage.locator('.dl-wave').first().waitFor({ state: 'visible' });
+  await broken.close();
+
+  // 13. `getPlayer` не отвечает (AUD-33): сверка облака — под общим сроком, меню живое.
+  // 14. `init()` не отвечает: запуск по сроку идёт веб-адаптером, а не стоит на загрузке.
+  for (const [flag, label] of [
+    ['__playerHang', 'getPlayer молчит'],
+    ['__initHang', 'init() молчит'],
+  ]) {
+    const silent = await browser.newContext({ locale: 'ru-RU' });
+    const silentPage = await silent.newPage();
+    silentPage.on('pageerror', (error) => errors.push(`pageerror (${label}): ${error.message}`));
+    await silentPage.addInitScript((name) => {
+      window[name] = true;
+    }, flag);
+    await silentPage.goto(origin + '/');
+    await waitForApp(silentPage, { timeout: 20000 });
+    await silentPage.waitForFunction(() => !document.getElementById('sz-new').disabled, undefined, {
+      timeout: 15000,
+    });
+    await silent.close();
+  }
+
   // 6. Ни ошибок, ни запросов мимо архива.
   assert.deepEqual(errors, [], 'ошибки страницы и консоли');
   assert.deepEqual(stray, [], 'запросы мимо файлов архива и SDK');
   console.log(
-    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, тот же забег на другом устройстве, вход и выбор профиля, один язык, темп забега, меню поверх сообщений, долгий тап без системного меню — без ошибок\n',
+    '\n✓ архив площадки: запуск, забег, пауза, «Продолжить», ролик, закрытые двери, облако, тот же забег на другом устройстве, вход и выбор профиля, один язык, темп забега, меню поверх сообщений, долгий тап без системного меню, две вкладки, битый журнал, молчащий SDK — без ошибок\n',
   );
 } finally {
   await browser.close();

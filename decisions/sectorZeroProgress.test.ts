@@ -20,6 +20,7 @@ import {
 } from './sectorZeroProgress';
 import { parseRunSave, serializeRunSave, RUN_SAVE_VERSION } from './runSave';
 import { runLoot } from './moduleRarity';
+import { workshopRows } from './sectorZeroWorkshop';
 
 const data = shippedGameData();
 const fresh = () => freshSectorZeroProgress(data);
@@ -711,5 +712,166 @@ describe('ремонт в забеге за Суверены (заказ вла�
     expect(changeSectorZeroProgress(p, { kind: 'premium-repair', hull: 301 }, data)).toBeNull();
     expect(changeSectorZeroProgress(p, { kind: 'premium-repair', hull: 0 }, data)).toBeNull();
     expect(p.sovereigns).toBe(12);
+  });
+});
+
+describe('AUD-30 — служебные имена JavaScript в профиле', () => {
+  // `data.modules['constructor']` находит не запись каталога, а наследство
+  // `Object.prototype`: без проверки собственного ключа такие «модули» и «герои» проходили
+  // разбор, а действие с id `__proto__` писало прямо в `Object.prototype`.
+  const SPECIAL = ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'];
+  // `Object.fromEntries` кладёт `__proto__` СОБСТВЕННЫМ ключом — так его и приносит JSON
+  // из хранилища.
+  const raw = (patch: Record<string, unknown>): string => JSON.stringify({ v: 1, research: 7, ...patch });
+  const prototypeClean = (): void => {
+    const probe: Record<string, unknown> = {};
+    for (const key of ['level', 'skills', 'equipped', 'research', 'warrants'])
+      expect(key in probe, key).toBe(false);
+  };
+
+  it('модули, звёзды и герои со служебными именами до профиля не доезжают', () => {
+    const p = parseSectorZeroProgress(
+      raw({
+        modules: [...SPECIAL, 'cargo_bay'],
+        stars: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
+        forgeTries: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
+        moduleCopies: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
+        heroes: Object.fromEntries(SPECIAL.map((id) => [id, { level: 2 }])),
+        heroTokens: Object.fromEntries(SPECIAL.map((id) => [id, 2])),
+        selectedHero: 'constructor',
+      }),
+      data,
+    );
+    for (const id of SPECIAL) {
+      expect(p.modules).not.toContain(id);
+      expect(Object.prototype.hasOwnProperty.call(p.heroes, id), id).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(p.stars, id), id).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(p.heroTokens, id), id).toBe(false);
+    }
+    expect(p.selectedHero).toBe(fresh().selectedHero);
+    expect(p.research).toBe(7);
+  });
+
+  it('один битый id навыка не обнуляет профиль целиком', () => {
+    const p = parseSectorZeroProgress(
+      raw({ heroes: { commander: { level: 2, skills: ['constructor', 'toString'] } } }),
+      data,
+    );
+    expect(p.research).toBe(7);
+    expect(p.heroes.commander?.level).toBe(2);
+    expect(p.heroes.commander?.skills).toEqual([]);
+  });
+
+  it('«Новый забег» и Мастерская работают на профиле, принёсшем служебные имена', () => {
+    const p = parseSectorZeroProgress(
+      raw({ modules: ['constructor', 'cargo_bay'], selectedHero: 'constructor' }),
+      data,
+    );
+    expect(() => prepareSectorZeroRun(pveState(data), p, data)).not.toThrow();
+    expect(() => workshopRows(p, data)).not.toThrow();
+  });
+
+  it('действие со служебным id — отказ, и Object.prototype не тронут', () => {
+    const p = { ...fresh(), research: 500, warrants: 500, sovereigns: 500 };
+    for (const id of SPECIAL) {
+      const actions: SectorProgressAction[] = [
+        { kind: 'unlock-module', id },
+        { kind: 'forge', id },
+        { kind: 'raise-rarity', id },
+        { kind: 'buy', id, pay: 'warrants' },
+        { kind: 'fit', hull: sectorHullIds(data)[0]!, id },
+        { kind: 'unlock-hero', id },
+        { kind: 'select-hero', id },
+        { kind: 'upgrade-hero', id },
+        { kind: 'skill', hero: 'commander', id },
+        { kind: 'skill', hero: id, id: Object.keys(data.heroSkillTrees)[0]! },
+        { kind: 'ability', hero: id, id: 'x' },
+      ];
+      for (const action of actions)
+        expect(changeSectorZeroProgress(p, action, data), `${action.kind} ${id}`).toBeNull();
+    }
+    prototypeClean();
+  });
+});
+
+describe('AUD-31 — откат версии не стирает купленное', () => {
+  // Профиль новой версии, разобранный старой: её каталог ещё не знает модуля, героя и
+  // навыка. Раньше разбор выбрасывал их, следующая запись закрепляла потерю, а облако
+  // разносило её по устройствам — потраченные данные и Варранты не возвращались.
+  const hero = Object.keys(data.heroes).find((h) => h !== 'commander')!;
+  function bought(): SectorZeroProgress {
+    // Звезда героя стоит его жетоны (`heroTokens.ts`): 10 за ★2, и 3 остаются в запасе.
+    let p: SectorZeroProgress = {
+      ...fresh(),
+      research: 200,
+      warrants: 5000,
+      heroTokens: { [hero]: 13 },
+    };
+    const acts: SectorProgressAction[] = [
+      { kind: 'unlock-module', id: 'shield_booster' },
+      { kind: 'forge', id: 'shield_booster' },
+      { kind: 'forge', id: 'shield_booster' },
+      { kind: 'forge', id: 'shield_booster' },
+      { kind: 'unlock-hero', id: hero },
+      { kind: 'upgrade-hero', id: hero },
+      { kind: 'skill', hero: 'commander', id: 'command_relay' },
+      { kind: 'skill', hero: 'commander', id: 'command_grid' },
+    ];
+    for (const a of acts) p = change(p, a);
+    return { ...p, moduleCopies: { shield_booster: 2 }, moduleRarity: { shield_booster: 'mythic' } };
+  }
+  function olderCatalog(): typeof data {
+    const old = structuredClone(data);
+    delete (old.modules as Record<string, unknown>).shield_booster;
+    delete (old.heroes as Record<string, unknown>)[hero];
+    delete (old.heroSkillTrees as Record<string, unknown>).command_relay;
+    return old;
+  }
+
+  it('старая версия откладывает незнакомое на полку, а не выбрасывает', () => {
+    const p = bought();
+    const back = parseSectorZeroProgress(JSON.stringify(p), olderCatalog());
+    expect(back.modules).not.toContain('shield_booster');
+    expect(back.heroes[hero]).toBeUndefined();
+    expect(back.heroes.commander?.skills).toEqual([]);
+    expect(back.shelf?.modules).toEqual(['shield_booster']);
+    expect(back.shelf?.heroes?.[hero]?.level).toBe(2);
+    expect(back.shelf?.skills?.commander).toEqual(['command_relay', 'command_grid']);
+    // Жетоны героя куплены за Варранты — они едут на полку вместе с героем.
+    expect(back.heroTokens[hero]).toBeUndefined();
+    expect(back.shelf?.heroTokens).toEqual({ [hero]: 3 });
+  });
+
+  it('новая версия возвращает с полки всё, за что заплачено', () => {
+    const p = bought();
+    const back = parseSectorZeroProgress(JSON.stringify(p), olderCatalog());
+    // Старая версия успела пожить с профилем: действие, засчёт — полка едет дальше.
+    const lived = change(back, { kind: 'select-hero', id: 'commander' });
+    const again = parseSectorZeroProgress(JSON.stringify(lived), data);
+    expect(again.modules).toEqual(expect.arrayContaining(['shield_booster']));
+    expect(again.stars).toEqual(p.stars);
+    expect(again.forgeTries).toEqual(p.forgeTries);
+    expect(again.moduleCopies).toEqual(p.moduleCopies);
+    expect(again.moduleRarity).toEqual(p.moduleRarity);
+    expect(again.heroes[hero]).toEqual(p.heroes[hero]);
+    expect(again.heroTokens).toEqual({ [hero]: 3 });
+    expect(again.heroes.commander?.skills).toEqual(p.heroes.commander?.skills);
+    expect(again.shelf).toBeUndefined();
+  });
+
+  it('врождённый узел (AUD-22) — не незнакомое: из профиля уходит, на полку не едет', () => {
+    const legacy = parseSectorZeroProgress(
+      JSON.stringify({ v: 1, heroes: { commander: { level: 1, skills: ['void_attunement', 'psi_veil'] } } }),
+      data,
+    );
+    expect(legacy.heroes.commander?.skills).toEqual([]);
+    expect(legacy.shelf).toBeUndefined();
+  });
+
+  it('обычный профиль полки не носит, и разбор остаётся идемпотентным', () => {
+    const p = bought();
+    expect(parseSectorZeroProgress(JSON.stringify(p), data).shelf).toBeUndefined();
+    const back = parseSectorZeroProgress(JSON.stringify(p), olderCatalog());
+    expect(parseSectorZeroProgress(JSON.stringify(back), olderCatalog())).toEqual(back);
   });
 });

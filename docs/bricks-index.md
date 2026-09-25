@@ -616,6 +616,12 @@
 | AUD-26 | ✅ | cli | `docs/backlog.md` | Лут забега выбирался прокруткой попыток. |
 | AUD-27 | ✅ | core | `docs/backlog.md` | Перезарядка шаттлов стоит, пока рядом идут бои. |
 | AUD-28 | ✅ | core data | `docs/backlog.md` | Карта молча теряет модули стартовых флотов. |
+| AUD-29 | ✅ | proto cli | `docs/backlog.md` | Две вкладки затирали прогресс друг друга. |
+| AUD-30 | ✅ | cli | `docs/backlog.md` | Служебные имена JavaScript в профиле. |
+| AUD-31 | ✅ | cli | `docs/backlog.md` | Откат версии стирал купленное. |
+| AUD-32 | ✅ | cli proto | `docs/backlog.md` | Номер главы вне диапазона. |
+| AUD-33 | ✅ | proto | `docs/backlog.md` | Меню и старт ждали SDK и сохранение вечно. |
+| AUD-34 | ✅ | proto cli | `docs/backlog.md` | Реклама и облако зависали на молчащем SDK. |
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | FSPLIT-3 | ✅ | proto | `docs/backlog.md` | «Делить» не молчит: герой остаётся, серая кнопка объясняет. |

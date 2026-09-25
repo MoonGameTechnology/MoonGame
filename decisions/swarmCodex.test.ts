@@ -90,6 +90,16 @@ describe('разбор и вид досье', () => {
     expect(p).toEqual({ units: { frigate: { max: 3, runs: 2 } }, buildings: ['swarm_hive'], repels: 0, veilDamage: 0, broodSeen: false });
   });
 
+  it('служебные имена JavaScript за юнит и постройку каталога не выдать (AUD-30)', () => {
+    const raw = JSON.parse(
+      '{"units":{"__proto__":{"max":3},"constructor":{"max":3},"frigate":{"max":1}},"buildings":["constructor","toString","swarm_hive"]}',
+    );
+    const p = parseSwarmCodex(raw, data);
+    expect(Object.keys(p.units)).toEqual(['frigate']);
+    expect(Object.getPrototypeOf(p.units)).toBe(Object.prototype);
+    expect(p.buildings).toEqual(['swarm_hive']);
+  });
+
   it('пустая память — весь каталог «?»; органы открываются по действию', () => {
     const blank = swarmCodexView(emptySwarmCodex(), catalog, data);
     expect(blank.known).toBe(0);
