@@ -17,6 +17,9 @@
  *    без клампа меню показало бы «через −3 ч» на давно готовой способности.
  * 5. **Дальнобойность — это `range > 0`.** По ней решается, нужен ли прицел по карте
  *    (дальняя) или каст бьёт по себе (ближняя).
+ * 6. **В меню — только НАДЕТОЕ** (замечание владельца 2026-09-25). Ядро применяет лишь
+ *    надетую способность (`E_NOT_EQUIPPED`), и пункт с ненадетой вёл в отказ. Правило то же,
+ *    что у ядра (`equippedOf`): без поля `equipped` старый набор — открытое и есть надетое.
  */
 
 /** Герой глазами меню: жив ли и на каком он флоте. */
@@ -25,6 +28,8 @@ export interface HeroAboard {
   alive?: boolean;
   fleetId?: string;
   abilities?: readonly (string | null)[];
+  /** Что надето. Нет поля — старый набор, где открытое и надетое совпадали (правило 6). */
+  equipped?: readonly string[];
 }
 
 /** Способность, уже разрешённая вызывающим по игровым данным. */
@@ -62,6 +67,12 @@ export function heroAboard<H extends HeroAboard>(
     heroes.find((h) => heroAlive(h) && h.fleetId !== undefined && fleetIds.includes(h.fleetId)) ??
     null
   );
+}
+
+/** Что герой носит (правило 6) — зеркало ядра `equippedOf`. */
+export function wornAbilities(hero: Pick<HeroAboard, 'abilities' | 'equipped'>): string[] {
+  if (hero.equipped !== undefined) return [...hero.equipped];
+  return (hero.abilities ?? []).filter((a): a is string => a !== null);
 }
 
 /** Попадает ли способность в меню (правило 3). */
