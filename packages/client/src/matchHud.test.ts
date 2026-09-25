@@ -614,17 +614,39 @@ describe('createBattleModel', () => {
   });
 
   // PERK-3.3: надбавка за пережитые бои приезжает в панель ЧИСЛОМ ИЗ ЯДРА.
-  const VET_DATA = { ...DATA, veteran: { damagePerBattle: 0.04 } } as unknown as GameData;
+  const VET_DATA = {
+    ...DATA,
+    veteran: { damagePerBattle: 0.04, hullPerBattle: 0.05 },
+  } as unknown as GameData;
+  // VET-6: сила ветерана — правило хоста. Так панель видит забег Sector Zero.
+  const RUN = { veteranPower: true };
 
   it('сторона с выслугой несёт множитель, необстрелянная — не несёт поля вовсе', () => {
     const s = orbitalScene();
     s.fleets.f1!.units = [{ unit: 'aegis', count: 3, battles: 4 }];
-    const res = createBattleModel(s, 'b1', 'p1', VET_DATA);
+    const res = createBattleModel(s, 'b1', 'p1', VET_DATA, RUN);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.attacker.veteran).toBeCloseTo(1.16, 9);
+    // VET-6: корпус приезжает рядом, тем же числом из ядра (`veteranHull`).
+    expect(res.attacker.veteranHull).toBeCloseTo(0.2, 9);
     // Отсутствие поля, а не единица: «надбавки нет» панель не должна рисовать вообще.
     expect(res.defender.veteran).toBeUndefined();
+    expect(res.defender.veteranHull).toBeUndefined();
+  });
+
+  it('без конфига хоста — сетевые правила: у ветерана нет ни урона, ни корпуса', () => {
+    // Резолюция владельца 2026-09-24: «в сетевой только награда». Клиент сетевой партии
+    // зовёт проекцию без конфига, и значок выслуги у него молчит — как молчит и ядро.
+    const s = orbitalScene();
+    s.fleets.f1!.units = [{ unit: 'aegis', count: 3, battles: 4 }];
+    for (const config of [undefined, { veteranPower: false }]) {
+      const res = createBattleModel(s, 'b1', 'p1', VET_DATA, config);
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      expect(res.attacker.veteran).toBeUndefined();
+      expect(res.attacker.veteranHull).toBeUndefined();
+    }
   });
 
   it('число принадлежит ВЛАДЕЛЬЦУ, а не строке: у двух сторон одного игрока оно общее', () => {
@@ -635,7 +657,7 @@ describe('createBattleModel', () => {
     s.fleets.f3!.owner = 'p1';
     s.battles.b1!.sides[2]!.owner = 'p1';
     s.fleets.f3!.units = [{ unit: 'frigate', count: 2, battles: 0 }];
-    const res = createBattleModel(s, 'b1', 'p1', VET_DATA);
+    const res = createBattleModel(s, 'b1', 'p1', VET_DATA, RUN);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     const mine = res.sides.filter((sd) => sd.owner === 'p1').map((sd) => sd.veteran);
@@ -650,7 +672,7 @@ describe('createBattleModel', () => {
     // неполон — ровно на нём краш и был пойман.
     const s = orbitalScene();
     s.fleets.f1!.units = [{ unit: 'aegis', count: 3, battles: 4 }];
-    const res = createBattleModel(s, 'b1', 'p1', DATA);
+    const res = createBattleModel(s, 'b1', 'p1', DATA, RUN);
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.attacker.veteran).toBeUndefined();

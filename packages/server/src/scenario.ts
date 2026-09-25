@@ -204,11 +204,21 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '35'; // Сеть Роя (`docs/swarm-behavior.md`): добавлен
+export const MODULE_MANIFEST_VERSION = '37'; // Сеть Роя (`docs/swarm-behavior.md`): добавлен
 // swarmNetModule — знание Роя течёт только по связи ретрансляторов и центров данных. Изменилось
 // ЧЛЕНСТВО графа, и порядок значим: сеть стоит между памятью (она рождает наблюдение) и
 // адаптацией (она читает знание части). `swarmAdapt` 2.0.0 — проекты по одному на часть сети
 // (`state.swarmAdapts`), `swarmMemory` 1.1.0 называет свидетеля, `pve` 1.2.0 несёт `waveFixed`.
+// export const MODULE_MANIFEST_VERSION = '36'; // ROADS-8: победитель боя на дороге продолжает
+// марш. Состав и порядок модулей те же; сменились ПРАВИЛА боя на дороге (`combat` 2.2.0,
+// `movement` 1.4.0) и форма состояния: перехваченный в пути флот помнит цель в
+// `Fleet.resume` и после боя летит дальше, а не стоит посреди дороги. Партия на 35 молча
+// сменила бы исход дорожных встреч посреди игры.
+// export const MODULE_MANIFEST_VERSION = '35'; // VET-6: сила ветерана — правило хоста
+// (резолюция владельца 2026-09-24 «в сетевой только награда, в Sector Zero — урон, корпус и
+// выплата»). Состав и порядок модулей те же; сменились ПРАВИЛА УРОНА сетевой партии:
+// надбавка за пережитые бои (PERK-3.1) в ней больше не действует. Поднятая под новым кодом
+// партия на 34 молча потеряла бы её посреди игры.
 // export const MODULE_MANIFEST_VERSION = '34'; // AUD-20: адаптация Роя ожила. Членство и
 // порядок не тронуты; сменились ПРАВИЛА `swarmAdapt` 1.1.0 и форма состояния: готовый
 // проект пишется в рецепт (`state.swarmRecipes`), покров вырастает на матках, где его не

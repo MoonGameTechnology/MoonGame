@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, t } from '../../localization/runtime';
 import { newGame } from './game';
 import type { GameState } from '../../packages/shared-core/src/index';
 import {
@@ -323,6 +323,12 @@ describe('итог забега Sector Zero — по частям (PVR-5.4)', ()
     const html = runSummaryHtml({ ...summary, won: false, base: 11, unlocked: 0 });
     expect(html).not.toContain('Победа');
     expect(html).not.toContain('откроется');
+  });
+
+  it('медали сохранённых ветеранов — своей строкой, и только когда они платят (VET-7)', () => {
+    const html = runSummaryHtml({ ...summary, veterans: 5, total: 22, warrants: 110 });
+    expect(html).toContain(`<span>${t('sector-zero.end.veterans')}</span><b>+5</b>`);
+    expect(runSummaryHtml(summary)).not.toContain(t('sector-zero.end.veterans'));
   });
 
   it('панель берёт разбивку вместо одной суммы, когда она есть', () => {

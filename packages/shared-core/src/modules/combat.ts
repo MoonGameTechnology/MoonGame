@@ -197,6 +197,49 @@ function pinToEdge(fleet: Fleet, from: PlanetId, to: PlanetId, t: number): void 
   fleet.edge = { from, to, t };
 }
 
+/**
+ * ROADS-8. Remember where a MOVING fleet was going before a road battle pins it: the
+ * journey's final node, or the point on a lane its order parks at (`parkT` on the last
+ * leg). A fleet standing still — an ambush at a fork, a fleet parked on a lane — has no
+ * march to resume, and stays where it fought.
+ *
+ * Only road battles do this. A battle AT A WORLD still ends the march there: the fleet
+ * has reached an orbit, where there is something to do — hold it, bombard, land. A fleet
+ * stopped halfway down a road has nothing to do there, and a winner left standing on the
+ * road reads as a bug (found in the Sector Zero playtest, PVR-2.4).
+ */
+function rememberMarch(fleet: Fleet): void {
+  const mv = fleet.movement;
+  if (!mv) return;
+  const hops = [mv.from, mv.to, ...(mv.path ?? [])];
+  const destination = hops[hops.length - 1]!;
+  const lastFrom = hops[hops.length - 2]!;
+  fleet.resume =
+    mv.parkT !== undefined && mv.parkT < 1
+      ? { toEdge: { from: lastFrom, to: destination, t: mv.parkT } }
+      : { to: destination };
+}
+
+/**
+ * ROADS-8. A fight that pulled `fleetId` off its march is over: consume the remembered
+ * march, and — when `carryOn` — put the fleet back on course through the movement module
+ * (`fleet.course`, the same seam the retreat uses; a second router here would drift from
+ * the first). A refused course (the destination is now peace-locked, a corridor closed)
+ * leaves the fleet where it fought, which is exactly the behaviour before this rule.
+ *
+ * A fleet that is fighting again (it was dragged into a new battle) keeps its march for
+ * that battle's end. No movement module — no capability — and the fleet stays: invariant
+ * #3's graceful degradation.
+ */
+function settleMarch(h: HandlerContext, fleetId: string, carryOn: boolean): void {
+  const fleet = h.state.fleets[fleetId];
+  if (!fleet?.resume || fleet.battleId) return;
+  const target = fleet.resume;
+  delete fleet.resume;
+  if (!carryOn || fleet.movement) return;
+  h.capability<FleetCourse>('fleet.course')?.({ fleetId, playerId: fleet.owner, ...target }, h);
+}
+
 function startBattle(h: HandlerContext, battle: Battle): void {
   h.state.battles[battle.id] = battle;
   for (const side of battle.sides) {
@@ -762,6 +805,14 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
       engageFleets(h, f.id, battle.location);
     }
   }
+
+  // ROADS-8: whoever a road battle pulled off its march carries on — after a decided
+  // fight and after a ceasefire alike. Not after a STALEMATE: both sides are alive on
+  // the same point of the road, and marching on would re-meet them at once, restarting
+  // the very fight the `MAX_COMBAT_ROUNDS` valve just closed (the CMB-6 livelock).
+  for (const side of battle.sides) {
+    if (side.ref.kind === 'fleet') settleMarch(h, side.ref.fleetId, end !== 'stalemate');
+  }
 }
 
 /**
@@ -787,7 +838,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  */
 export const combatModule: GameModule = {
   id: 'combat',
-  version: '2.1.0',
+  version: '2.2.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -864,6 +915,8 @@ export const combatModule: GameModule = {
         return; // not actually meeting now — stale
       }
       const t = Math.min(1 - EDGE_EPS, Math.max(EDGE_EPS, (sa + sb) / 2));
+      rememberMarch(fa);
+      rememberMarch(fb);
       pinToEdge(fa, oa.lo, oa.hi, t);
       pinToEdge(fb, oa.lo, oa.hi, t);
       startBattle(h, {
@@ -900,6 +953,7 @@ export const combatModule: GameModule = {
         const mv = f.movement;
         if (!mv) continue; // parked: already where the fight is
         const t = Math.min(1 - EDGE_EPS, Math.max(EDGE_EPS, legT(mv, h.ctx.now)));
+        rememberMarch(f);
         pinToEdge(f, mv.from, mv.to, t);
       }
       startBattle(h, {
@@ -957,7 +1011,9 @@ export const combatModule: GameModule = {
         // Сторона уходит вместе с игроком, а флот, если он ещё цел, освобождается —
         // иначе он остался бы с `battleId` на бой, в котором его больше нет.
         for (const side of battle.sides) {
-          if (side.owner === playerId) releaseOrDestroyFleet(h, side.ref, battle.id);
+          if (side.owner !== playerId) continue;
+          releaseOrDestroyFleet(h, side.ref, battle.id);
+          if (side.ref.kind === 'fleet') settleMarch(h, side.ref.fleetId, false);
         }
         battle.sides = left;
         // Драться стало некому — бой закрывается как перемирие: победителя в нём нет
@@ -1063,6 +1119,9 @@ export const combatModule: GameModule = {
 
       applyRetreatToll(fleet, h.ctx.data);
       fleet.battleId = null;
+      // ROADS-8: отступление — СВОЙ приказ игрока, и прерванный боем марш он отменяет:
+      // отходящий идёт туда, куда велели отойти, или стоит.
+      delete fleet.resume;
 
       // Free the opponent's side (a fleet can pursue; a garrison ref is a no-op),
       // then dissolve the now-one-sided battle.
@@ -1072,6 +1131,13 @@ export const combatModule: GameModule = {
         if (!isThisFleet(side.ref)) releaseOrDestroyFleet(h, side.ref, battleId);
       }
       delete h.state.battles[battleId];
+      // ROADS-8: противник остался на дороге один — бой для него кончен, и прерванный
+      // им марш продолжается, как после выигранного боя.
+      for (const side of battle.sides) {
+        if (!isThisFleet(side.ref) && side.ref.kind === 'fleet') {
+          settleMarch(h, side.ref.fleetId, true);
+        }
+      }
 
       if (fleet.units.length === 0) {
         // The withdrawal finished off an already-crippled fleet — no escape.

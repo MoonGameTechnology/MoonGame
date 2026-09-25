@@ -1019,6 +1019,7 @@
 | ROADS-5 | ✅ | proto data | `docs/roads-roadmap.md` | Прогоны глав по дорогам — 2026-09-23 |
 | ROADS-6 | ✅ | proto | `docs/roads-roadmap.md` | ИИ сторожит развилки — 2026-09-23 |
 | ROADS-7 | ✅ | proto core | `docs/roads-roadmap.md` | Дороги на соло-картах прототипа — 2026-09-23 |
+| ROADS-8 | ✅ | core | `docs/roads-roadmap.md` | Победитель боя на дороге продолжает марш — 2026-09-24 |
 | ROS-0.1 | ✅ | data proto core | `docs/roster-roadmap.md` | ПКО и зональное ПВО: имя насквозь 2026-09-09 |
 | ROS-0.2 | ✅ | proto | `docs/roster-roadmap.md` | «Верфь» → «Производство» 2026-09-09 |
 | ROS-1.1 | ✅ | core data proto | `docs/roster-roadmap.md` | Пехота и техника: два рода наземных войск 2026-09-09 |
@@ -1229,6 +1230,9 @@
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md` | Грейды и пороги |
 | VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md` | Выплата, растущая со степенью |
 | VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md` | Медали в карточке юнита |
+| VET-6 | ✅ | core data proto cli | `docs/unit-medals-roadmap.md` | Сила ветерана — правило хоста, и у неё есть корпус |
+| VET-7 | ✅ | proto | `docs/unit-medals-roadmap.md` | Выплата за медали в итог забега |
+| VET-8 | ✅ | proto | `docs/unit-medals-roadmap.md` | Песочница прототипа платит за медали |
 | YAG-0.1 | ✅ | docs | `docs/yandex-games-roadmap.md` | Сверить требования с первоисточником 2026-09-22 |
 | YAG-0.2 | ✅ | docs | `docs/yandex-games-roadmap.md` | Сверить страницы SDK с первоисточником 2026-09-22 |
 | YAG-1.1a | ✅ | proto | `docs/yandex-games-roadmap.md` | Контракты GamePlatform и WebPlatformAdapter |

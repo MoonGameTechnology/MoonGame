@@ -166,6 +166,13 @@ describe('панель боя', () => {
     expect(html).toContain(t('battle.win.veteran', { n: 16 }));
     // У стороны без выслуги — ни символа лишнего.
     expect(battleHtml(battle, 0)).not.toContain('class="vet"');
+    // VET-6: корпус едет в тот же значок. Сетевая партия его не получает (проекция без
+    // конфига хоста молчит), но вёрстка у клиентов одна — и подпись тоже.
+    const hull: BattleModel = {
+      ...battle,
+      sides: [{ ...side(true, 'attacker'), veteran: 1.16, veteranHull: 0.16 }, side(false, 'defender')],
+    };
+    expect(battleHtml(hull, 0)).toContain(t('battle.win.veteran-both', { n: 16, h: 16 }));
   });
 
   it('кнопка появляется ровно тогда, когда модель назвала флот', () => {

@@ -566,6 +566,10 @@ export interface FleetEdge {
   t: number;
 }
 
+/** The target of an interrupted march (`Fleet.resume`, ROADS-8) — the same two shapes a
+ *  `fleet.move` aims at: a node, or a point on a lane. */
+export type FleetResume = { to: PlanetId } | { toEdge: FleetEdge };
+
 /** One ground lift in progress — see `Fleet.loading` (CARGO-1). A CLAIM, not custody:
  *  the units stay in the garrison until the hour is up, so nothing is ever in limbo. */
 export interface LoadingClaim {
@@ -634,6 +638,12 @@ export interface Fleet {
    *  `fleet.retreat` — the disengaging fleet flees faster while `now < it`. Absent =
    *  no boost. Read by the `fleet.speed` hook. */
   retreatHasteUntil?: number;
+  /** Where a fleet a ROAD battle pulled off its march was heading (ROADS-8): the rest of
+   *  its order, kept while it fights and resumed once the fight is over and the fleet is
+   *  free. Set only while the fleet is in that battle — every way out of it consumes the
+   *  field. Absent = the fleet stood still when the fight found it (an ambush, a parked
+   *  fleet) or it was not a road battle. */
+  resume?: FleetResume;
   // ЗДЕСЬ БЫЛИ `freePosition`/`freeMovement`/`homeBase` — свободный полёт «крыла как
   // флота» (SQ-1.1). Сняты в SHU-2.2 вместе с остальной старой машинерией: с SHU-1.1
   // челнок живёт в `Planet.hangar`/`Fleet.hangar` и в `Fleet.units` не попадает ниоткуда

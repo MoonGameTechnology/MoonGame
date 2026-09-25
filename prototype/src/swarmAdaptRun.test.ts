@@ -1,6 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 
-import { advance, order, setMatchMode, setMatchTravelSpeed, strikeShuttle } from './game';
+import {
+  advance,
+  order,
+  setMatchMode,
+  setMatchTravelSpeed,
+  setMatchVeteranPower,
+  strikeShuttle,
+} from './game';
 import { data } from './gameData';
 import { initSoloDrivers } from './soloDrivers';
 import { pveState, pveModeId } from '../../packages/client/src/gameData';
@@ -37,18 +44,23 @@ const VEIL = 'swarm_intercept_veil';
  *  проверить надо ещё и удар ПОСЛЕ него — забегу даётся запас волн (рука теста, как дом). */
 const RUN_WAVES = 16;
 
+/** Правила ЗАБЕГА — те же, что ставит хост (`installMatch` + `setRunActive`): режим карты,
+ *  темп перемещения ×5 и сила ветерана (VET-6). */
 function armRun(): void {
   setMatchMode(pveModeId());
   setMatchTravelSpeed(RUN_TRAVEL_SPEED);
+  setMatchVeteranPower(true);
 }
 function disarmRun(): void {
   setMatchMode(undefined);
   setMatchTravelSpeed(1);
+  setMatchVeteranPower(false);
 }
 
 interface Mc01 {
   state: GameState;
-  /** Часы, в которые удар попал по Рою, и сколько ответки он встретил. */
+  /** Часы, в которые удар попал по Рою, и сколько ответки он встретил — у цели или на
+   *  подлёте. */
   hits: Array<{ hour: number; target: string }>;
   repelled: Array<{
     hour: number;
@@ -89,7 +101,10 @@ function armedHome(chain: boolean): GameState {
     }
   }
   const home = s.planets.home_a!;
-  home.buildings = [...home.buildings, { type: 'spaceport', level: 1, hp: 25 }];
+  // Порт с запасом прочности (рука теста): после ROADS-8 волны доходят до дома плотнее,
+  // и штатные 25 HP сносятся раньше, чем Рой дорастит покров, — удар ПОСЛЕ проявления,
+  // предмет теста, вылетать было бы неоткуда.
+  home.buildings = [...home.buildings, { type: 'spaceport', level: 1, hp: 400 }];
   home.hangar = [{ id: SQUAD, units: [{ unit: 'bomber', count: 3 }] }];
   home.garrison = [...home.garrison, { unit: 'heavy_infantry', count: 24 }];
   s.fleets.p1_2!.units = [{ unit: 'cruiser', count: 24 }];
@@ -120,6 +135,16 @@ function runMc01(difficulty: RunDifficulty, maxHours: number, chain = true): Mc0
       const p = e.payload as Record<string, unknown>;
       if (e.type === 'shuttle.hit' && p.targetOwner === 'p3')
         out.hits.push({ hour, target: String(p.targetId) });
+      // Перехват бывает двух видов: ответка у цели (`shuttle.repelled`) и зональное ПВО
+      // флота Роя, сбивающее вылет ещё на подлёте (`pd.fired`). После ROADS-8 волна
+      // продолжает марш, удар гонится за ней — и покров встречает его в погоне.
+      if (e.type === 'pd.fired' && p.owner === 'p3' && p.targetOwner === 'p1')
+        out.repelled.push({
+          hour,
+          target: String(p.fleetId),
+          damage: Number(p.damage),
+          downed: Number(p.downed ?? 0),
+        });
       if (e.type === 'shuttle.repelled' && p.targetOwner === 'p3')
         out.repelled.push({
           hour,

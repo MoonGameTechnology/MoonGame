@@ -28,6 +28,7 @@ export {
   type Fleet,
   type FleetMovement,
   type FleetEdge,
+  type FleetResume,
   type PlanetRoads,
   type RoadPoint,
   type RoadTrail,
@@ -207,7 +208,7 @@ export {
   type MedalLine,
 } from './state/medals';
 // PERK-3.3: правило надбавки ветерана — ОДНО на редьюсер и на окно боя (см. шапку файла).
-export { servedPerUnit, veteranFactor } from './state/veterancy';
+export { servedPerUnit, veteranFactor, veteranHull } from './state/veterancy';
 export {
   previewBattle,
   previewSides,
