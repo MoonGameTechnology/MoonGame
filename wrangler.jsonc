@@ -9,4 +9,8 @@
     // Staged by `scripts/stage-site.mjs`: only the player-facing pages of prototype/dist.
     "directory": "./prototype/dist/site",
   },
+  // Pushes to any other branch build a Preview (`npx wrangler preview`), and that command
+  // requires this block. Empty: previews do not inherit production settings, and the site
+  // has no bindings or vars that a preview would need in their place.
+  "previews": {},
 }

@@ -66,7 +66,10 @@ TIME_SCALE=200 HOST=0.0.0.0 PORT=8788 pnpm host
   команда сборки `pnpm run site` (сборка прототипа + `scripts/stage-site.mjs`), деплой —
   `npx wrangler deploy`. На сайте три страницы: `/` — тот же `void-dominion.html`, что и у
   Pages, `/sector-zero.html`, `/player.html`; админка и архив площадки не публикуются.
-  Сервер партий сюда не едет — только клиент.
+  Сервер партий сюда не едет — только клиент. Пуш в любую другую ветку собирает превью
+  (`npx wrangler preview`), для него в `wrangler.jsonc` обязателен блок `previews`. В PR
+  это проверка «Workers Builds: moongame»: мерж её не ждёт, а лог сборки виден только в
+  дашборде Cloudflare.
 - **Android APK** — workflow `android.yml`: артефакт на каждом ране + rolling-релиз
   `alpha` со стабильной ссылкой (сборки с `main`); в APK встроен автоапдейтер,
   сверяющий versionCode с релизом. В приложении игрок вводит адрес сервера на
