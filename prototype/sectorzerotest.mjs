@@ -63,6 +63,16 @@ const hooks = `window.__szTest = {
   layerOpen: () => topLayerOpen(),
   // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
   prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
+  // YAG-7.3: с кем я в войне, строки ленты о смене стойки с ними и реплики от них в треде.
+  atWar: () => Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war'),
+  warLines: () => {
+    const foes = Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war');
+    return eventLog.map((e) => e.text).filter((text) => foes.some((id) => text.startsWith(\`\${NAME[id]} → \`)));
+  },
+  warReplies: () => {
+    const foes = Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war');
+    return sessionMessages.filter((m) => m.sys && foes.includes(m.from)).length;
+  },
   // Конец забега победой — как его ставит модуль победы ядра.
   end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
   // Комиксы глав: арт владельца ещё не приехал — робот подкладывает свой реестр.
@@ -300,6 +310,11 @@ try {
     );
     await page.setViewportSize({ width: 1280, height: 800 });
     await check('Sector Zero', true);
+    // YAG-7.3: Рой объявляет войну на старте штурма, а в ленте забега об этом строки нет —
+    // «Экспедиция начата — Рой уже идёт» говорит то же. Реплика в треде дипломатии остаётся.
+    await page.waitForFunction(() => window.__szTest.atWar().length > 0);
+    assert.deepEqual(await page.evaluate(() => window.__szTest.warLines()), [], 'YAG-7.3: строки войны в ленте нет');
+    assert.ok((await page.evaluate(() => window.__szTest.warReplies())) > 0, 'YAG-7.3: реплика в треде на месте');
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.
     await page.goto(site.url + '/');
