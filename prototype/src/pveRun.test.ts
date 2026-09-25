@@ -271,7 +271,7 @@ describe('pirates teach the first fight on the actual PvE map', () => {
  * придумать: все флоты в один у дома, казарма и непрерывный найм пехоты. Если такой
  * игрок перестанет проходить главу — это сдвиг баланса, который обязан заметить человек.
  */
-describe('первую главу проходит оборона (PVR-2.5)', () => {
+describe('глава I: простая оборона доходит до вердикта (PVR-2.5)', () => {
   afterEach(disarmRun);
 
   function defend(difficulty: RunDifficulty): { state: GameState; endedAtHour?: number } {
@@ -309,16 +309,14 @@ describe('первую главу проходит оборона (PVR-2.5)', ()
     return { state: s };
   }
 
-  it('против обычного Роя: забег засчитан удержанием, улей стоит', () => {
+  it('против обычного Роя забег доходит до вердикта — простой обороне он больше не обещан', () => {
+    // Решение владельца 2026-09-24 (AUD-28): матки главы I выходят с выводковой камерой,
+    // как их объявила карта, и с десантом камер обычный Рой вправе сломать простую
+    // оборону — глава I стала сложнее. Держится только срок: вердикт не позже хребта
+    // волн с удержанием, а улей простая оборона не берёт.
     const { state, endedAtHour } = defend('weak');
-    expect({ reason: state.match.reason, winner: state.match.winner }).toEqual({
-      reason: 'pve-cleared',
-      winner: 'p1',
-    });
-    // Вердикт ровно в срок: хребет волн плюс удержание — ни раньше, ни позже.
-    expect(state.match.endedAt).toBe((RUN_SPINE_HOURS + RUN_TAIL_HOURS) * HOUR);
-    expect(endedAtHour).toBe(RUN_SPINE_HOURS + RUN_TAIL_HOURS);
-    // Прошла именно ОБОРОНА: улей так и остался за Роем.
+    expect(['pve-cleared', 'pve-failed']).toContain(state.match.reason);
+    expect(endedAtHour).toBeLessThanOrEqual(RUN_SPINE_HOURS + RUN_TAIL_HOURS);
     expect(state.planets.hive?.owner).toBe('p3');
   });
 

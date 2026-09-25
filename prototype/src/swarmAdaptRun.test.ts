@@ -204,7 +204,9 @@ function runMc01(difficulty: RunDifficulty, maxHours: number, chain = true): Mc0
         (f) => f.owner === 'p3' && f.location === 'home_a' && f.units.some((u) => u.count > 0),
       )
       .sort((a, b) => (a.id < b.id ? -1 : 1))[0];
-    const signal = s.swarmMemory?.observations.length ?? 0;
+    // Сигнал считается там, где он нужен, — у улья: наблюдение, погибшее вместе со
+    // свидетелем вне сети, до проекта не доходит, и такой удар игрок повторяет.
+    const signal = s.swarmNet?.holders['planet:hive']?.known.length ?? 0;
     const grown = (s.swarmRecipes?.[VEIL] ?? 0) > 0;
     if (target && (signal < 3 || grown)) {
       // Первая база, у которой есть вылет: порт, потом авианосцы по порядку.

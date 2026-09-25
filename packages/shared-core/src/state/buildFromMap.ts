@@ -16,6 +16,12 @@ import { pairKey } from './diplomacy';
 import { distance } from './route';
 import { mosaicBorderSegments, mosaicBorders, sealPlan, type MosaicSeed } from './mosaic';
 import { deriveRoads, shareRoadNetwork } from './roads';
+import { validateLoadout } from '../util/loadout';
+import type { UnitStack } from './gameState';
+
+/** Стек из карты: снаряжение переносится, только если автор его объявил (AUD-28). */
+const mapStack = (u: { unit: string; count: number; modules?: string[] }): UnitStack =>
+  u.modules?.length ? { unit: u.unit, count: u.count, modules: [...u.modules] } : { unit: u.unit, count: u.count };
 
 /**
  * Map-as-content loader (map-roadmap.md M1.2 / M1.3). Turns a validated `MatchMap`
@@ -287,6 +293,15 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   for (const [id, fl] of Object.entries(map.fleets)) {
     if (!has(fl.location)) issues.push(`E_FLEET_UNKNOWN_SECTOR:${id}`);
     if (!isOwnerRef(fl.owner)) issues.push(`E_FLEET_UNKNOWN_OWNER:${id}`);
+    // Снаряжение стартовых стеков — те же правила, что у верфи (AUD-28): модуль, который
+    // корпусу не встать, или неизвестный id — ошибка карты, а не молча срезанное поле.
+    if (data)
+      for (const st of [...fl.units, ...fl.landing]) {
+        if (!st.modules?.length) continue;
+        const def = data.units[st.unit];
+        const check = def ? validateLoadout(st.unit, def, st.modules, data) : { ok: false as const, code: 'E_UNKNOWN_UNIT' };
+        if (!check.ok) issues.push(`E_MAP_LOADOUT:${id}:${st.unit}:${check.code}`);
+      }
   }
 
   // graph connectivity (BFS over the valid undirected edges). Impassable sectors are
@@ -612,8 +627,8 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       owner: resolveOwner(fl.owner),
       location: fl.location,
       movement: null,
-      units: fl.units.map((u) => ({ unit: u.unit, count: u.count })),
-      landing: fl.landing.map((u) => ({ unit: u.unit, count: u.count })),
+      units: fl.units.map(mapStack),
+      landing: fl.landing.map(mapStack),
       orbit: 'near',
       traits: [...fl.traits],
     };

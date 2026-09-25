@@ -430,7 +430,7 @@ export interface Planet {
    *  своей личности (они сливаются по юниту и лоадауту), и завести топливо на стек
    *  значило бы запретить им сливаться вовсе. Игроку это ещё и понятнее: у порта одно
    *  читаемое состояние «готов / перезаряжается», а не N счётчиков. */
-  sortie?: { fuel: number; rearming: number };
+  sortie?: { fuel: number; rearming: number; carry?: number };
   /** ЭСКАДРЫ, базирующиеся в космопорте мира (SHU-1.1, форма — SHU-4.2). НЕ флот и НЕ
    *  часть гарнизона: челнок стоит внутри порта, на орбите не появляется и в наземной
    *  обороне мира не участвует. Вместимость — `shuttleBay` портов; потерян порт
@@ -619,7 +619,7 @@ export interface Fleet {
   /** Sortie budget of the shuttles based aboard (fuel + rearm countdown) — the
    *  fleet-side twin of `Planet.sortie`, and for the same reason: the counter belongs
    *  to the BASE, not to the machine, so stacks in the hangar stay mergeable. */
-  sortie?: { fuel: number; rearming: number };
+  sortie?: { fuel: number; rearming: number; carry?: number };
   /** Set (`'near'`) while the fleet is stationed in orbit at a planet; undefined while
    *  in transit. There is a SINGLE orbit (GDD §7.4): a stationed fleet can bombard /
    *  land and is exposed to the planet's orbital AA — no separate "far" safe standoff.
