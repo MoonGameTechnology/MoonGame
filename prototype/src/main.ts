@@ -224,7 +224,7 @@ import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
-import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
+import { LIMP_PCT, fleetSummary, hullPct, stackHullPct, stackPools } from './fleetSummary';
 import { shipCardModel } from '../../decisions/shipCard';
 import { shipCardHtml } from './shipCard';
 import { moduleIcon } from './moduleIcons';
@@ -307,6 +307,7 @@ import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisi
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import { retireDoneEncounters } from '../../decisions/retiredEncounters';
+import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
 import { CHAPTER_COMICS } from './comicArt';
@@ -6531,44 +6532,60 @@ function taskGroupPanelHtml(group: Fleet[]): string {
   return h;
 }
 
-/** Тайлы состава флота Bytro-стиля: силуэт-архетип в цвете стороны (наземные —
- *  прежние текст-глифы), счётчик и мини-бар корпуса стека. Тап по кораблю — карточка
- *  стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному — досье юнита. */
+/** Тайлы состава Bytro-стиля: силуэт-архетип в цвете стороны (наземные — прежние
+ *  текст-глифы с подписью имени), счётчик, мини-бар корпуса стека и его числа
+ *  «осталось/всего» (`decisions/unitTile.ts`, заказ владельца 2026-09-25). Тап по кораблю
+ *  флота — карточка стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному и
+ *  по гарнизону мира — досье юнита. */
 /** Даёт ли выслуга силу в этом матче — тот же конфиг, на котором считает ядро (VET-6). */
 function veteranPowerOn(): boolean {
   return ctx(s.time, s).config?.veteranPower === true;
 }
+function unitTileHtml(u: UnitStack, owner: string | null, open: string): string {
+  if (u.count <= 0) return '';
+  const def = data.units[u.unit];
+  if (!def) return '';
+  const name = unitTitle(u.unit);
+  const eff = effectiveStats(def, u, data);
+  const hp = tileHp(stackPools(u, data).hull); // тот же зажим остатка, что в сводке (REFM-37)
+  const ground = def.domain === 'ground';
+  const icon = ground
+    ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
+    : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color: ownerColor(owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
+  // Глиф наземного — не силуэт: без подписи его приходилось угадывать (поэтому «Землю»
+  // когда-то и перевели в список строк). Корабль узнаётся по силуэту, имя — в подсказке.
+  const caption = ground ? `<span class="pt-n">${esc(name)}</span>` : '';
+  // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
+  // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
+  // подписи не читались; имя модуля — в подсказке, полная картина — в карточке.
+  const modTags = u.modules && u.modules.length > 0
+    ? `<span class="pt-mods">${u.modules.map((m) => {
+        const mdef = data.modules[m];
+        const mname = mdef ? tData(mdef.name) : m;
+        return `<span class="pt-mod" title="${esc(mname)}" aria-label="${esc(mname)}">${moduleIcon(m)}</span>`;
+      }).join('')}</span>`
+    : '';
+  // Ветеран — своя плитка (стеки разной выслуги не сливаются) с шевронами степени.
+  const vet = veteranMark(u, data, veteranPowerOn());
+  return `<button class="ptile${vet ? ' vet' : ''}" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}${vet ? veteranTag(vet, 'pt-vet') : ''}${caption}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${hp.low ? ' low' : ''}"><i style="width:${hp.pct}%"></i></span><span class="pt-hpn">${kfmt(hp.cur)}/${kfmt(hp.max)}</span></button>`;
+}
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
   const tiles = stacks
     .map((u, index) => {
-      if (u.count <= 0) return '';
       const def = data.units[u.unit];
       if (!def) return '';
-      const name = unitTitle(u.unit);
-      const eff = effectiveStats(def, u, data);
-      const pct = stackHullPct(u, data); // тот же зажим остатка, что в сводке (REFM-37)
-      const icon =
-        def.domain === 'ground'
-          ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-          : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: s.players[f.owner]?.faction, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
-      // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
-      // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
-      // подписи не читались; имя модуля — в подсказке, полная картина — в карточке.
-      const modTags = u.modules && u.modules.length > 0
-        ? `<span class="pt-mods">${u.modules.map((m) => {
-            const mdef = data.modules[m];
-            const mname = mdef ? tData(mdef.name) : m;
-            return `<span class="pt-mod" title="${esc(mname)}" aria-label="${esc(mname)}">${moduleIcon(m)}</span>`;
-          }).join('')}</span>`
-        : '';
       const open =
         def.domain === 'space' ? `data-shipcard="${esc(f.id)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
-      // Ветеран — своя плитка (стеки разной выслуги не сливаются) с шевронами степени.
-      const vet = veteranMark(u, data, veteranPowerOn());
-      return `<button class="ptile${vet ? ' vet' : ''}" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}${vet ? veteranTag(vet, 'pt-vet') : ''}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
+      return unitTileHtml(u, f.owner, open);
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
+}
+/** Гарнизон мира — теми же плитками, что состав флота (заказ владельца 2026-09-25): тап —
+ *  досье юнита, как у прежней строки. Пустой гарнизон называется словами, а не пропадает. */
+function garrisonTilesHtml(owner: string | null, stacks: UnitStack[]): string {
+  const tiles = stacks.map((u) => unitTileHtml(u, owner, `data-codex="u:${esc(u.unit)}"`)).join('');
+  return tiles ? `<div class="ptiles">${tiles}</div>` : `<div class="row dim">${esc(t('side.none'))}</div>`;
 }
 
 /** Сводка армии (тап по имени в шапке карточки): состав по архетипам, боевой вес
@@ -7158,9 +7175,9 @@ function planetPanelHtml(p: Planet): string {
   // side-by-side columns (filling the wide panel), on phones they stack vertically.
   const cols: string[] = [];
   if (planetTab === 'ground') {
-    // Состав ЗЕМЛИ показывается списком на ВСЕХ раскладках — тем же столбиком строк, что
-    // и здания. Плитки на ПК давали только иконку и число: имя приходилось угадывать, и
-    // одна и та же группа читалась на телефоне и на ПК по-разному.
+    // Состав ЗЕМЛИ — плитками на ВСЕХ раскладках, как состав флота (заказ владельца
+    // 2026-09-25): полоска и числа корпуса видны сразу. Прежние плитки ПК давали только
+    // иконку и число, и имя приходилось угадывать — теперь у наземной плитки есть подпись.
     // ECON-1: голодный гарнизон — владелец мира в food-arrears теряет 25% на земле.
     const starving = showsStarving(p.owner === ME, ground.length, s.players[ME]?.arrears)
       ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
@@ -7168,7 +7185,7 @@ function planetPanelHtml(p: Planet): string {
     cols.push(
       `<div class="sec">${t('side.ground.units')}</div>` +
         starving +
-        unitRows(ground),
+        garrisonTilesHtml(p.owner, ground),
     );
     if (mine) {
       cols.push(
@@ -7185,8 +7202,8 @@ function planetPanelHtml(p: Planet): string {
     // normally holds no spacecraft — only surface the section if some linger.
     // Состав показывается ВСЕГДА, даже пустой, — как у земли и зданий. Скрытая секция
     // читается как поломка панели: игрок не понимает, пуст гарнизон или вкладка не
-    // прогрузилась. Пустой список говорит об этом словами (`unitRows`).
-    cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + unitRows(ships));
+    // прогрузилась. Пустой гарнизон говорит об этом словами (`garrisonTilesHtml`).
+    cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + garrisonTilesHtml(p.owner, ships));
     if (here.length) {
       let orbit = `<div class="sec">${t('side.world.fleets')}</div>`;
       for (const f of here) {
