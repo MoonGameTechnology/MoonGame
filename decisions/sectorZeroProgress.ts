@@ -467,6 +467,20 @@ export function sectorModuleIds(data: GameData): string[] {
   );
 }
 
+/**
+ * Модули в подготовке выбранного корпуса: только те, что на него встают (решение владельца
+ * 2026-09-25 «если нельзя надеть модуль, то его не должно показывать»). Уже надетый остаётся
+ * при любом раскладе: сохранение из старой версии данных может держать на корпусе то, что
+ * туда больше не встаёт, и без карточки его было бы не снять. Неизвестный корпус — пусто.
+ */
+export function sectorModulesFor(hull: string, fitted: readonly string[], data: GameData): string[] {
+  const def = data.units[hull];
+  if (!def) return [];
+  return sectorModuleIds(data).filter(
+    (id) => fitted.includes(id) || moduleAllowed(hull, def, data.modules[id]!),
+  );
+}
+
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
   | { kind: 'refresh-shop' }

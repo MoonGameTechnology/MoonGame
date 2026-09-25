@@ -5,13 +5,14 @@ import { isSupportHull, splitSupport } from './supportShips';
 const data = shippedGameData();
 
 describe('supportShips — вкладка «Поддержка» по признаку из данных', () => {
-  it('разведчик, фрегат и шаттл-носитель — поддержка; крейсер — линия', () => {
+  it('разведчик и шаттл-носитель — поддержка; крейсер и фрегат — линия', () => {
+    // Фрегат переехал в «Корабли» решением владельца 2026-09-25 («Фрегат в корабли»).
     const { line, support } = splitSupport(
       ['cruiser', 'scout', 'frigate', 'shuttle_carrier'],
       data,
     );
-    expect(support).toEqual(['scout', 'frigate', 'shuttle_carrier']);
-    expect(line).toEqual(['cruiser']);
+    expect(support).toEqual(['scout', 'shuttle_carrier']);
+    expect(line).toEqual(['cruiser', 'frigate']);
   });
 
   it('поддержка — только космические корпуса без боевого оружия', () => {

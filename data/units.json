@@ -46,10 +46,7 @@
       "defense": 1,
       "utility": 3
     },
-    "hullClass": "light",
-    "traits": [
-      "support"
-    ]
+    "hullClass": "light"
   },
   "evac_transport": {
     "faction": "vanguard",

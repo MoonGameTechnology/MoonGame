@@ -253,6 +253,14 @@ try {
     // (черновик Учёного, PVR-6.16) однофайловая сборка встраивает data-URL'ом с кавычками
     // SVG, и неэкранированная кавычка обрывала `src` — строковые проверки этого не видят.
     await page.locator('#sz-prep').click();
+    // Корабли (решения владельца 2026-09-25): фрегат — в первом ряду «Корабли», а у
+    // выбранного корпуса нет карточек модулей, которые на него не встают.
+    const firstRow = page.locator('#sz-workshop .sz-hulls').first();
+    assert.equal(await firstRow.locator('[data-prep="hull"][data-id="frigate"]').count(), 1, 'фрегат в ряду «Корабли»');
+    const radars = '#sz-workshop .sz-cards [data-id="radar_module"], #sz-workshop .sz-cards [data-id="compact_radar"]';
+    assert.equal(await page.locator(radars).count(), 0, 'у крейсера нет радаров разведчика и дозорного фрегата');
+    await page.locator('[data-prep="hull"][data-id="scout"]').click();
+    assert.equal(await page.locator('#sz-workshop .sz-cards [data-id="compact_radar"]').count(), 1, 'у разведчика его радар на месте');
     await page.locator('[data-prep="tab"][data-id="heroes"]').click();
     const faces = '#sz-workshop .hero-portrait img';
     await page.waitForFunction((sel) => [...document.querySelectorAll(sel)].every((i) => i.complete), faces);
