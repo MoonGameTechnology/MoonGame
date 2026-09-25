@@ -12,6 +12,12 @@
 обход через туманность. Визуально рубеж задают станции и колонии, а разлом — просто
 отсутствие пути (§5.3: «не сплошная декоративная стена»).
 
+ОБЛАСТИ (заказ владельца 2026-09-25: «карта стерильная, прослеживается топология»). Первый
+эскиз стоял зеркалом и рядами — ровная сетка читалась сквозь карту. Теперь провинции собраны
+в области `docs/map-terrain-regions-concept.md` §5.5: открытый простор, астероидный массив,
+туманное облако на севере; риф, кладбище экспедиции и штормовой фронт на юге. Зеркала нет,
+общего шага по рядам нет.
+
 ЧТО ПРОВЕРЯЕТСЯ ЧИСЛАМИ — `data/pveThirdMission.test.ts`: переходов ровно три, путь с
 севера на юг идёт только через них, по обе стороны есть поперечные связи, у каждой колонии
 свой подход, переходы разнесены так, что ни одна крепость не накрывает двух, и т. д.
@@ -24,65 +30,74 @@ import json, collections
 
 # Провинции: id → (x, y, вид, местность, владелец, гарнизон, постройки).
 P = collections.OrderedDict([
-    # СЕВЕР — сторона игрока: основная база, две вынесенные колонии, место для развития.
+    # СЕВЕР — сторона игрока. Три области, а не ряды: открытый простор в центре, астероидный
+    # массив на северо-западе, туманное облако на северо-востоке (§5.5 концепции областей).
+    #
+    # ОТКРЫТЫЙ ПРОСТОР — база и глубокий дрейф за ней, выработанный двор перед воротами.
     # Дом — тот же крепкий старт, что во всех главах (PVR-2.4, `data/runStartDefense.test.ts`):
     # форт второго уровня с выданным гарнизоном, четыре тяжёлых пехотинца, `haven`.
-    ('bastion',     (0, -500, 'planet', 'empty_space', 'p1',
+    ('bastion',     (40, -470, 'planet', 'empty_space', 'p1',
                      [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 4},
                       {'unit': 'garrison', 'count': 2}],
                      [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
                       {'type': 'fort', 'level': 2}])),
+    ('north_reach', (-230, -600, 'dead_world', 'deep_void', None, [], [])),
+    ('gate_yard',   (-70, -280, 'dead_world', 'depleted_system', None, [], [])),
+    ('north_gate',  (60, -150, 'planet', 'empty_space', None, [], [])),
+
+    # АСТЕРОИДНЫЙ МАССИВ (северо-запад): колония на краю, в глубине — богатый тупик
+    # (`asteroid_cluster`, один подход), к переходу массив редеет в обычное поле.
     # Колонии — обжитые миры: верфь у них есть (сторож стартовых миров,
     # `construction-yard-port.test.ts`), первого уровня — лёгкие корпуса строятся на месте.
-    ('west_colony', (-540, -330, 'planet', 'empty_space', 'p1',
+    ('west_colony', (-600, -300, 'planet', 'empty_space', 'p1',
                      [{'unit': 'militia', 'count': 2}],
                      [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 1}])),
-    ('east_colony', (540, -330, 'planet', 'empty_space', 'p1',
+    ('ore_shelf',   (-470, -500, 'asteroid_cluster', 'asteroid_cluster', None, [], [])),
+    ('watch_post',  (-560, -130, 'asteroid', 'asteroid_field', None, [], [])),
+    ('front_w',     (-300, -190, 'asteroid', 'asteroid_field', None, [], [])),
+
+    # ТУМАННОЕ ОБЛАКО (северо-восток): плотное ядро за колонией, обычная туманность по
+    # краю; восточный переход — обход сквозь плотную часть облака.
+    ('east_colony', (420, -390, 'planet', 'empty_space', 'p1',
                      [{'unit': 'militia', 'count': 2}],
                      [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 1}])),
-    ('north_reach', (-270, -390, 'asteroid', 'asteroid_field', None, [], [])),
-    ('gate_yard',   (0, -300, 'dead_world', 'deep_void', None, [], [])),
-    ('ore_shelf',   (270, -390, 'asteroid', 'asteroid_field', None, [], [])),
-    ('hinter_veil', (-560, -600, 'nebula', 'nebula', None, [], [])),
+    ('hinter_veil', (600, -580, 'dense_nebula', 'dense_nebula', None, [], [])),
+    ('east_haze',   (560, -150, 'nebula', 'nebula', None, [], [])),
+    ('front_e',     (390, -120, 'nebula', 'nebula', None, [], [])),
 
-    # ПОДХОДЫ К ПЕРЕХОДАМ с севера. Наблюдательный пост — вынесенная точка на западе.
-    ('watch_post',  (-520, -170, 'asteroid', 'asteroid_field', None, [], [])),
-    ('north_gate',  (0, -165, 'planet', 'empty_space', None, [], [])),
-    ('east_haze',   (520, -170, 'nebula', 'nebula', None, [], [])),
-    # Поперечные связи ПЕРЕДНЕЙ линии: резерв перебрасывается между переходами, не
-    # откатываясь к базе (§5.3).
-    ('front_w',     (-260, -195, 'nebula', 'nebula', None, [], [])),
-    ('front_e',     (260, -195, 'asteroid', 'asteroid_field', None, [], [])),
-
-    # РУБЕЖ: три перехода между разломами.
-    ('rift_far_w',  (-790, 0, 'rift', 'empty_space', None, [], [])),
-    ('west_pass',   (-520, 0, 'asteroid', 'asteroid_field', None, [], [])),
-    ('rift_w',      (-260, 0, 'rift', 'empty_space', None, [], [])),
+    # РУБЕЖ: три перехода между разломами. Разломы — непроходимые клетки (`rift`) между
+    # переходами и по краям; переход — место, а не дыра.
+    ('rift_far_w',  (-820, 40, 'rift', 'empty_space', None, [], [])),
+    ('west_pass',   (-500, 20, 'asteroid', 'asteroid_field', None, [], [])),
+    ('rift_w',      (-230, -10, 'rift', 'empty_space', None, [], [])),
     # Станция карантина потеряна: её держит десант Роя, построек у неё не осталось.
-    ('quarantine',  (0, 0, 'planet', 'empty_space', 'swarm',
+    ('quarantine',  (50, 15, 'planet', 'empty_space', 'swarm',
                      [{'unit': 'swarm_lander', 'count': 3}], [])),
-    ('rift_e',      (260, 0, 'rift', 'empty_space', None, [], [])),
-    ('east_pass',   (520, 0, 'dense_nebula', 'dense_nebula', None, [], [])),
-    ('rift_far_e',  (790, 0, 'rift', 'empty_space', None, [], [])),
+    ('rift_e',      (340, 10, 'rift', 'empty_space', None, [], [])),
+    ('east_pass',   (620, 30, 'dense_nebula', 'dense_nebula', None, [], [])),
+    ('rift_far_e',  (860, -20, 'rift', 'empty_space', None, [], [])),
 
-    # ЮГ — сторона Роя: передовой плацдарм, производство, основной очаг.
-    ('south_west',  (-520, 175, 'asteroid', 'asteroid_field', 'swarm', [], [])),
-    ('beachhead',   (0, 175, 'planet', 'empty_space', 'swarm',
-                     [{'unit': 'swarm_lander', 'count': 3}],
-                     [{'type': 'shipyard', 'level': 2}])),
-    ('spore_reach', (520, 175, 'nebula', 'nebula', 'swarm', [], [])),
-    # Боковые пути есть и у Роя (§5.3): удар может сменить переход.
-    ('wreck_w',     (-260, 195, 'graveyard', 'derelict_graveyard', 'swarm', [], [])),
-    ('storm_e',     (260, 195, 'ion_storm', 'ion_storm', None, [], [])),
-    ('biofarm_w',   (-360, 380, 'planet', 'empty_space', 'swarm',
+    # ЮГ — сторона Роя, тоже областями.
+    # АСТЕРОИДНЫЙ РИФ (юго-запад) с выносным маяком в глубине.
+    ('south_west',  (-520, 190, 'asteroid', 'asteroid_field', 'swarm', [], [])),
+    ('biofarm_w',   (-330, 420, 'planet', 'empty_space', 'swarm',
                      [{'unit': 'swarm_lander', 'count': 3}],
                      [{'type': 'biomass_pit'}, {'type': 'shipyard', 'level': 2}])),
-    ('biofarm_e',   (360, 380, 'planet', 'empty_space', 'swarm',
+    ('beacon_rock', (-700, 480, 'asteroid', 'asteroid_field', None, [], [])),
+    # КЛАДБИЩЕ ЭКСПЕДИЦИИ у плацдарма: обломки прикрывают подход к центральному переходу.
+    ('wreck_w',     (-190, 210, 'graveyard', 'derelict_graveyard', 'swarm', [], [])),
+    ('beachhead',   (90, 190, 'planet', 'empty_space', 'swarm',
+                     [{'unit': 'swarm_lander', 'count': 3}],
+                     [{'type': 'shipyard', 'level': 2}])),
+    # ШТОРМОВОЙ ФРОНТ (юго-восток): ионная полоса и хвост облака за разломом.
+    ('storm_e',     (360, 240, 'ion_storm', 'ion_storm', None, [], [])),
+    ('spore_reach', (630, 210, 'nebula', 'nebula', 'swarm', [], [])),
+    ('biofarm_e',   (440, 460, 'planet', 'empty_space', 'swarm',
                      [{'unit': 'swarm_lander', 'count': 3}],
                      [{'type': 'biomass_pit'}, {'type': 'swarm_synapse'},
                       {'type': 'shipyard', 'level': 2}])),
-    ('beacon_rock', (-640, 470, 'asteroid', 'asteroid_field', None, [], [])),
-    ('hive',        (0, 720, 'planet', 'empty_space', 'swarm',
+    # Очаг — вдали и не на оси карты.
+    ('hive',        (120, 740, 'planet', 'empty_space', 'swarm',
                      [{'unit': 'swarm_lander', 'count': 6}],
                      [{'type': 'swarm_hive'}, {'type': 'swarm_datacenter'},
                       {'type': 'shipyard', 'level': 2}, {'type': 'barracks'},
