@@ -1293,6 +1293,10 @@ export const ModePveSchema = z
      *  by wave ten). The wipe stays as the early finish. Absent ⇒ the pre-existing rule
      *  only (invariant #3: absent data → base default). */
     holdHours: z.number().positive().optional(),
+    /** Множитель скорости флотов NPC-стороны в этом режиме (решение владельца 2026-09-25:
+     *  «слишком большая скорость у кораблей Роя»). Только режим: Рой основной игры и
+     *  сыгранный игроком — прежней скорости. Нет поля ⇒ ×1 (инвариант №3). */
+    npcSpeedFactor: z.number().positive().max(1).optional(),
     /** Пакет снабжения за Суверены (решение владельца 2026-09-24): что приходит в казну
      *  за одну покупку и сколько покупок на забег. Цену в Суверенах знает магазин профиля
      *  (`sectorZeroShop.runSupply`) — у матча этой валюты нет. Нет раздела ⇒ `pve.supply`

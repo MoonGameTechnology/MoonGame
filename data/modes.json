@@ -29,6 +29,7 @@
         { "unit": "swarm_relay_small", "count": 1 }
       ],
       "holdHours": 12,
+      "npcSpeedFactor": 0.75,
       "supply": {
         "perRun": 3,
         "pack": { "credits": 150, "metal": 150, "food": 100, "energy": 50 }

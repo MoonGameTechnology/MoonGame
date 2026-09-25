@@ -46,7 +46,9 @@ describe('PVR-2.5 — удержание после последней волн�
       const rules = { data, config: { timeScale: 1, modeId, travelSpeedFactor: RUN_TRAVEL_SPEED } };
       const approach = estimateTravelHours(s, rules, staging, home.id, wave);
       expect(approach).not.toBeNull();
-      expect(pve.holdHours!).toBeGreaterThanOrEqual(approach!);
+      // Прикидка идёт без хуков скорости, а волна Роя в забеге медленнее на множитель
+      // режима (`npcSpeedFactor`, 2026-09-25) — настоящий подлёт длиннее во столько же раз.
+      expect(pve.holdHours!).toBeGreaterThanOrEqual(approach! / (pve.npcSpeedFactor ?? 1));
     });
   }
 
