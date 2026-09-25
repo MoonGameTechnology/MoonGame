@@ -53,6 +53,13 @@ export function builtPage(name = 'void-dominion.html') {
 }
 
 /**
+ * Начало любого бандла, который собран из `main.ts` без `bootstrap.ts` и положен в готовую
+ * страницу. Покров BOOT-1 (`body.app-booting` в разметке) снимает `bootstrap.ts`; без этой
+ * строки под `body` не видно ни одной кнопки, и робот падает на первом же нажатии.
+ */
+export const LIFT_BOOT_VEIL = "document.body.classList.remove('app-booting');\n";
+
+/**
  * Игра с харнесовыми хуками: `main.ts` собирается заново с дописанным `hooks` (код в
  * области видимости игры — видит `s`, выделение, камеру) и встаёт в слот инлайнового
  * бандла собранной страницы. Так тест читает состояние, не заводя ради него экспортов в
@@ -70,7 +77,7 @@ export async function instrumentedGame(hooks, { page = 'void-dominion.html', sim
     : '';
   const bundle = await build({
     stdin: {
-      contents: platform + readFileSync('prototype/src/main.ts', 'utf8') + hooks,
+      contents: LIFT_BOOT_VEIL + platform + readFileSync('prototype/src/main.ts', 'utf8') + hooks,
       resolveDir: process.cwd() + '/prototype/src',
       loader: 'ts',
     },

@@ -11,6 +11,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { resolveChromium } from '../scripts/chromium.mjs';
+import { LIFT_BOOT_VEIL } from './harnessKit.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json'))(
@@ -30,7 +31,7 @@ for (const player of [false, true]) {
   const name = player ? 'player' : 'alpha';
   const bundle = await build({
     stdin: {
-      contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
+      contents: LIFT_BOOT_VEIL + readFileSync('prototype/src/main.ts', 'utf8') + bridge,
       resolveDir: process.cwd() + '/prototype/src',
       loader: 'ts',
     },

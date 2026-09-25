@@ -5,11 +5,13 @@
 // новый. Причина: браузер рисовал разметку раньше, чем выполнялся скрипт, а вид консоли
 // (`holo-ui`) ставил только кадровый цикл игры. Сторож держит три звена правки: покров в
 // разметке, его CSS и порядок в `bootstrap.ts` — сперва классы вида, потом снятие покрова.
-import { readFileSync } from 'node:fs';
+// Четвёртое звено — харнесовые сборки без `bootstrap.ts`: покров они снимают сами.
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const build = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 const boot = readFileSync(new URL('./bootstrap.ts', import.meta.url), 'utf8');
+const kit = readFileSync(new URL('../harnessKit.mjs', import.meta.url), 'utf8');
 
 describe('BOOT-1 — покров до первого шага скрипта', () => {
   it('страница рождается под покровом, и покров прячет всё, кроме фона', () => {
@@ -49,5 +51,27 @@ describe('BOOT-1 — покров до первого шага скрипта', 
     const fail = boot.slice(boot.indexOf("console.error('E_CLIENT_STARTUP'"));
     expect(fail.indexOf("remove('app-booting')")).toBeGreaterThan(-1);
     expect(fail.indexOf("remove('app-booting')")).toBeLessThan(fail.indexOf("add('app-startup-failed')"));
+  });
+
+  it('каждая сборка `main.ts` поверх готовой страницы снимает покров сама', () => {
+    // Харнесы собирают `main.ts` заново, с мостом к состоянию игры, и кладут бандл в слот
+    // готовой страницы. Покров там есть, а `bootstrap.ts`, который его снимает, — нет. Такие
+    // роботы в CI не ходят, и после BOOT-1 шесть из них молча перестали видеть хоть одну
+    // кнопку. Снятие живёт в одном месте — `LIFT_BOOT_VEIL` в `harnessKit.mjs`.
+    expect(kit).toContain(
+      `export const LIFT_BOOT_VEIL = "document.body.classList.remove('app-booting');\\n";`,
+    );
+    const dir = new URL('../', import.meta.url);
+    const slotted = readdirSync(dir)
+      .filter((name) => name.endsWith('.mjs'))
+      .map((name) => ({ name, text: readFileSync(new URL(name, dir), 'utf8') }))
+      .filter(
+        ({ text }) =>
+          text.includes("readFileSync('prototype/src/main.ts'") &&
+          text.includes("lastIndexOf('<script>')"),
+      );
+    expect(slotted.map(({ name }) => name)).toContain('harnessKit.mjs');
+    for (const { name, text } of slotted)
+      expect(text, name).toMatch(/contents: LIFT_BOOT_VEIL \+ /);
   });
 });
