@@ -14883,7 +14883,10 @@ function frame(nowReal: number) {
             ? t('hud.wave.done')
             : wave.kind === 'hold'
               ? t('hud.wave.hold', { in: countdownHMS(wave.holdInMs) })
-              : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })
+              : // На телефоне строка статуса уже экрана: слова «следующая через» уходят, остаётся
+                // отсчёт (прогон кнопок на телефоне, 2026-09-25 — хвост обрезался маской).
+                `<span class="dl-full">${t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>` +
+                `<span class="dl-short">${countdownHMS(wave.nextInMs)}</span>`
         }</span>`;
   // ЗАДАЧИ ЗАБЕГА (решение владельца 2026-09-22). Прогресс считается ЧИСТЫМ предикатом по
   // текущему состоянию, поэтому живая строка не стоит ни нового поля в состоянии, ни
