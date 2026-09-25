@@ -184,6 +184,29 @@ describe('dossiers — маршрутизация objDossier', () => {
     expect(objDossier('res:metal')).toEqual({ name: 'металл', body: '' });
   });
 
+  // TXT-3. Досье характеристики, которое лишь пересказывало свою подпись («Атака» /
+  // «Суммарная атака кораблей флота»), тела больше не имеет: подпись и число уже сказали
+  // всё. Тело осталось только там, где оно несёт НЕОЧЕВИДНОЕ правило.
+  it('характеристика без своего правила отдаёт только подпись', () => {
+    for (const k of ['atk', 'def', 'hp', 'datk', 'ddef', 'dhp', 'garrison', 'ground', 'pbuild']) {
+      const d = objDossier(`stat:${k}`);
+      expect(d?.name, k).toBeTruthy();
+      expect(d?.body, k).toBe('');
+    }
+  });
+
+  it('характеристика со своим правилом тело сохраняет', () => {
+    for (const k of ['cap', 'shield', 'hull', 'gships', 'spd']) {
+      expect(objDossier(`stat:${k}`)?.body, k).toBeTruthy();
+    }
+  });
+
+  it('скорость объясняет правило самого медленного, а не пересказывает подпись', () => {
+    const d = objDossier('stat:spd');
+    expect(d?.body).toContain('медленного');
+    expect(d?.body).not.toContain(d!.name); // «Скорость» в теле больше нет
+  });
+
   it('b:/u: уходят в свои досье, голый и незнакомый ключ → null', () => {
     expect(objDossier('b:mine:2')).toEqual(buildingDossier('mine', 2));
     const scout = objDossier('u:scout');
