@@ -3,8 +3,8 @@
  *
  * В забеге шапка основной игры теряет эмблему с названием и местом, очки победы и день —
  * они про соревнование и сутки мира, а не про забег. Освободившийся ряд занимают три
- * валюты ПРОФИЛЯ: данные экспедиций ◇, Варранты ⌖ и Суверены ◆. Значки — те же, что на
- * экране подготовки, цвета — общие `--cur-*`.
+ * валюты ПРОФИЛЯ: данные экспедиций ◇, Варранты ⌖ и Суверены (самоцвет `SOV_SVG` основной
+ * игры). Цвета — общие `--cur-*`.
  *
  * Числа живые: кадр перерисовывает кошелёк из профиля, поэтому награда или ролик посреди
  * забега видны сразу, а не после выхода в меню.
@@ -20,6 +20,7 @@
 import { t } from '../../localization/runtime';
 import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
 import { kfmt } from './format';
+import { SOV_SVG } from './icons';
 
 export interface RunWallet {
   research: number;
@@ -91,7 +92,9 @@ export function runWalletHtml(
   return (
     cur('data', '◇', w.research, t('sector-zero.prep.research', { n: w.research })) +
     cur('warrants', '⌖', w.warrants, t('sector-zero.forge.warrants', { n: w.warrants })) +
-    cur('sovereigns', '◆', w.sovereigns, t('sector-zero.shop.sovereigns', { n: w.sovereigns })) +
+    // Суверены — самоцвет основной игры (`SOV_SVG`, как фишка «500 +»), а не текстовый ◆
+    // (заказ владельца 2026-09-25: «иконку золотой валюты — как в основной игре»).
+    cur('sovereigns', SOV_SVG, w.sovereigns, t('sector-zero.shop.sovereigns', { n: w.sovereigns })) +
     plus +
     note
   );

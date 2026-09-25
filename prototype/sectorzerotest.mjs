@@ -26,6 +26,13 @@ import {
 } from './harnessKit.mjs';
 import { SECTOR_ZERO_ABSENT_HUD, SECTOR_ZERO_ABSENT_TOOLS } from '../decisions/sectorZeroTools.ts';
 
+/** «☰ Ещё» есть только на телефоне: на ПК и планшете инструменты — постоянная колонка
+ *  иконок слева (заказ владельца 2026-09-25), открывать нечего. */
+async function toggleTools() {
+  const toggle = page.locator('#railtoggle');
+  if (await toggle.isVisible()) await toggle.click();
+}
+
 const hooks = `window.__szTest = {
   run: () => isSectorZeroRun(),
   home: () => Object.values(s.planets).find(p => p.owner === ME && p.kind === 'planet')?.id ?? null,
@@ -35,6 +42,8 @@ const hooks = `window.__szTest = {
   // предмет проверки, а не попадание мышью по карте, где камера у Sector Zero близко к дому.
   select: id => { selPlanet = id; selFleet = null; selFleets = new Set(); lastPanelHtml = ''; renderPanel(); },
   selected: () => selPlanet,
+  // Открыт ли слой, который закроет Escape/Back.
+  layerOpen: () => topLayerOpen(),
   // Конец забега победой — как его ставит модуль победы ядра.
   end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
   // Комиксы глав: арт владельца ещё не приехал — робот подкладывает свой реестр.
@@ -80,12 +89,12 @@ async function check(label, run) {
   // ▶▶▶ — только дев-забега: ни в обычном забеге, ни в схватке её нет.
   assert.equal(await page.locator('#spd-dev').isVisible(), false, `${label}: ▶▶▶ нет`);
 
-  await page.locator('#railtoggle').click();
+  await toggleTools();
   for (const id of ABSENT)
     assert.equal(await page.locator('#' + id).isVisible(), !run, `${label}: #${id}`);
   for (const id of KEPT)
     assert(await page.locator('#' + id).isVisible(), `${label}: #${id} на месте`);
-  await page.locator('#railtoggle').click();
+  await toggleTools();
   for (const id of ABSENT_HUD)
     assert.equal(await page.locator('#' + id).isVisible(), !run, `${label}: шапка #${id}`);
   assert.equal(await page.locator('#tbwallet').isVisible(), run, `${label}: кошелёк профиля в шапке`);
@@ -122,7 +131,10 @@ async function check(label, run) {
     });
     assert.deepEqual(raw, [], `${label}: сырые id мест на экране`);
   }
-  await page.keyboard.press('Escape');
+  // Escape закрывает открытое — а если открытого нет, выводит из партии. На старте схватки
+  // выбор успевает сброситься установкой матча; прежде это маскировали клики по «☰ Ещё»,
+  // которого на ПК больше нет (заказ владельца 2026-09-25), — жмём, только если есть что закрыть.
+  if (await page.evaluate(() => window.__szTest.layerOpen())) await page.keyboard.press('Escape');
 
   await page.locator('#purse [data-res="metal"]').click();
   assert.equal(
@@ -133,9 +145,9 @@ async function check(label, run) {
   await page.locator('.rc-close').click();
 }
 
-/** Выход в меню путём игрока на десктопе: «☰ Ещё» → «Выход». */
+/** Выход в меню путём игрока на десктопе: «Выход» в колонке инструментов. */
 async function leave() {
-  await page.locator('#railtoggle').click();
+  await toggleTools();
   await page.locator('#rail-exit').click();
 }
 
