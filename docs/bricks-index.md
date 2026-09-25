@@ -1109,6 +1109,7 @@
 | PVR-6.19 | ✅ | proto | `docs/sector-zero-roadmap.md` | Имена провинций, кольцо радара, ▶▶ вдвое |
 | PVR-6.20 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Итоги экспедиции: сколько потеряно и уничтожено |
 | PVR-6.21 | ✅ | core data | `docs/sector-zero-roadmap.md` | Обзор провинции: вокруг себя видят только колонии и крепости |
+| PVR-6.22 | ✅ | proto | `docs/sector-zero-roadmap.md` | Кольцо цели задачи живёт, как метка-пинг |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

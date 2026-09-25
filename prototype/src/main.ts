@@ -291,7 +291,7 @@ import { battleStance } from '../../decisions/battleStance';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
-import { missionRingFrame, RING_R } from '../../decisions/missionRing';
+import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
@@ -13988,26 +13988,29 @@ function drawMissionTargets(): void {
   if (!sectorRunActive) return;
   const ids = new Set(runMissionRows().flatMap(r => r.targets));
   if (ids.size === 0) return;
-  // `hologramTime` — визуальные часы карты: стоят на паузе и при отключённой анимации.
-  // Ритм кольца (бегущий пунктир, волна-сонар, дыхание) — `decisions/missionRing.ts`.
-  const { breath, dashOffset, ripple } = missionRingFrame(hologramTime, motionOn());
   cx.save();
   for (const id of ids) {
     const p = s.planets[id];
     if (!p) continue;
     const c = world(p.position);
     if (!visible(c, 60)) continue;
+    // `hologramTime` — визуальные часы карты: стоят на паузе и при отключённой анимации.
+    // Ритм кольца (пунктир уходит волнами, как сонар метки, бежит и дышит) и своя фаза
+    // цели — `decisions/missionRing.ts`.
+    const { breath, dashOffset, waves } = missionRingFrame(hologramTime, motionOn(), missionRingPhase(p.position));
     cx.shadowColor = '#8ff5c8';
-    if (ripple) {
-      cx.strokeStyle = `rgba(143,245,200,${ripple.alpha})`;
-      cx.lineWidth = 1.4;
-      cx.shadowBlur = fxBlur(4);
+    cx.shadowBlur = fxBlur(4);
+    for (const w of waves) {
+      cx.strokeStyle = `rgba(143,245,200,${w.alpha})`;
+      cx.lineWidth = w.width;
+      cx.setLineDash([6 * w.scale, 5 * w.scale]);
+      cx.lineDashOffset = dashOffset * w.scale;
       cx.beginPath();
-      cx.arc(c.x, c.y, ripple.r, 0, TAU);
+      cx.arc(c.x, c.y, w.r, 0, TAU);
       cx.stroke();
     }
     cx.strokeStyle = `rgba(143,245,200,${0.55 + 0.35 * breath})`;
-    cx.lineWidth = 1.8;
+    cx.lineWidth = RING_W;
     cx.setLineDash([6, 5]);
     cx.lineDashOffset = dashOffset;
     cx.shadowBlur = fxBlur(6 + 6 * breath);
