@@ -83,6 +83,15 @@ const hooks = `window.__szTest = {
   // Меню каста флагмана и что герой носит — меню обязано быть из надетого.
   casts: () => chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
   worn: () => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)?.equipped ?? null,
+  // Карточка корабля флота Роя: портрет — форма Роя с листа владельца, а не корпус людей.
+  swarmCard: (unit) => {
+    const f = JSON.parse(JSON.stringify(Object.values(s.fleets).find((x) => x.owner === ME)));
+    s.fleets.__swarm = { ...f, id: '__swarm', owner: s.pve.npcPlayerId, units: [{ unit, count: 1 }], movement: null };
+    openShipCard('__swarm', 0);
+    delete s.fleets.__swarm;
+    const img = document.querySelector('#codex .ship-art img');
+    return { art: document.querySelector('#codex .ship-art')?.getAttribute('data-ship-art') ?? null, loaded: !!img && img.complete && img.naturalWidth > 0 };
+  },
   // YAG-7.3: с кем я в войне, строки ленты о смене стойки с ними и реплики от них в треде.
   atWar: () => Object.keys(s.players).filter((id) => id !== ME && getStance(s, ME, id) === 'war'),
   warLines: () => {
@@ -363,6 +372,12 @@ try {
     const worn = await page.evaluate(() => window.__szTest.worn());
     assert.ok(worn && worn.length > 0 && casts.every((id) => worn.includes(id)), `в меню каста только надетое: ${casts} ⊆ ${worn}`);
     assert.ok(casts.length < 4, 'ненадетых способностей в меню нет');
+    // Лист «Рой» владельца (2026-09-25): крейсер Роя в карточке — Охотник, картинка грузится.
+    const hunter = await page.evaluate(() => window.__szTest.swarmCard('cruiser'));
+    await page.waitForFunction(() => document.querySelector('#codex .ship-art img')?.complete);
+    assert.equal(hunter.art, 'swarmHunter', 'карточка корабля Роя — форма Роя');
+    assert.ok(await page.evaluate(() => document.querySelector('#codex .ship-art img').naturalWidth > 0), 'портрет Роя загружен');
+    await page.locator('#codex .cx-close').click();
 
     // 2. Обычная схватка на основной странице — те же кнопки на месте.
     await page.goto(site.url + '/');

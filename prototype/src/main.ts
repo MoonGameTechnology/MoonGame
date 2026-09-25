@@ -7871,7 +7871,8 @@ function openShipCard(fleetId: string, index: number): void {
   const html = shipCardHtml(
     model,
     {
-      portrait: (u) => catalogPortraitHtml('u', u, data),
+      // Портрет — семья владельца, как силуэт на карте: крейсер Роя — Охотник.
+      portrait: (u) => catalogPortraitHtml('u', u, data, 'portrait', faction),
       icon: (u) => unitIconHtml(u, data, ownerColor(f.owner), 40, faction),
       unitName: (u) => unitTitle(u),
       moduleName: (m) => {
