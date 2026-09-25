@@ -625,6 +625,7 @@
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | FSPLIT-3 | ✅ | proto | `docs/backlog.md` | «Делить» не молчит: герой остаётся, серая кнопка объясняет. |
+| FSPLIT-4 | ✅ | core proto | `docs/backlog.md` | Флот делится и в пути. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md` | Строка места переключается «выкл → слабый → сильный». |
 | RESIL-1 | ✅ | proto | `docs/backlog.md` | Фоновые промисы браузерного клиента. |
 | RESIL-2 | ✅ | proto | `docs/backlog.md` | Цикл подсветки обучающего тура. |

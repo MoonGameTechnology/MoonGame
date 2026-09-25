@@ -742,7 +742,7 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     ).toBe('E_HERO_UNIT');
   });
 
-  it('rejects splitting a busy fleet (in battle or in transit)', () => {
+  it('rejects splitting a fleet in battle', () => {
     const kernel = createKernel([fleetOpsModule]);
     const inBattle = stateWith({
       players: [player('p1')],
@@ -751,13 +751,67 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     expect(
       errCode(kernel.applyAction(inBattle, split('F1', [{ unit: 'cruiser', count: 1 }]), ctx)),
     ).toBe('E_IN_BATTLE');
-    const transit = stateWith({
+  });
+});
+
+describe('fleetOps — fleet.split в пути (замечание владельца 2026-09-25)', () => {
+  // «Флот делить можно в любой момент. А то мне пишет, что он в пути, и я не могу». Бой —
+  // по-прежнему нет: стороны боя адресуют флот по id, и половина ушла бы из-под огня.
+  const kernel = createKernel([movementModule, fleetOpsModule]);
+  const move: Action = {
+    id: 'a:p1:mv',
+    type: 'fleet.move',
+    playerId: 'p1',
+    payload: { fleetId: 'F1', to: 'A' },
+    issuedAt: 0,
+  };
+  /** F1 (три крейсера) летит с B на A и прошёл половину пути. */
+  const midway = (): { state: GameState; now: number } => {
+    const st = stateWith({
       players: [player('p1')],
-      fleets: [fleet('F1', 'p1', null, [['cruiser', 2]])],
+      planets: [planet('A', 'p1'), planet('B', 'p1')],
+      fleets: [fleet('F1', 'p1', 'B', [['cruiser', 3]])],
     });
-    expect(
-      errCode(kernel.applyAction(transit, split('F1', [{ unit: 'cruiser', count: 1 }]), ctx)),
-    ).toBe('E_IN_TRANSIT');
+    st.planets.B!.position = { x: 10, y: 0 };
+    st.planets.A!.links = ['B'];
+    st.planets.B!.links = ['A'];
+    const flying = okApply(kernel.applyAction(st, move, ctx)).state;
+    const now = flying.fleets.F1!.movement!.arrivesAt / 2;
+    const adv = kernel.advanceTo(flying, { now, data });
+    if (!adv.ok) throw new Error(`advance failed: ${adv.code}`);
+    return { state: adv.state, now };
+  };
+
+  it('отделённая часть летит тем же курсом и прибывает вместе с исходной', () => {
+    const { state, now } = midway();
+    const r = okApply(
+      kernel.applyAction(state, split('F1', [{ unit: 'cruiser', count: 1 }]), { now, data }),
+    );
+    const out = Object.values(r.state.fleets).find((f) => f.id !== 'F1')!;
+    expect(out.units).toEqual([{ unit: 'cruiser', count: 1 }]);
+    expect(out.location).toBeNull();
+    expect(out.movement).toEqual(r.state.fleets.F1!.movement);
+    expect(r.events.map((e) => e.type)).toContain('fleet.split');
+    const adv = kernel.advanceTo(r.state, { now: 4 * HOUR, data });
+    if (!adv.ok) throw new Error(`advance failed: ${adv.code}`);
+    for (const id of ['F1', out.id]) {
+      expect(adv.state.fleets[id]?.location, id).toBe('A');
+      expect(adv.state.fleets[id]?.movement, id).toBeNull();
+    }
+    expect(adv.state.fleets.F1!.units).toEqual([{ unit: 'cruiser', count: 2 }]);
+  });
+
+  it('флот, стоящий на линии, делится на той же точке линии', () => {
+    const st = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1'), planet('B', 'p1')],
+      fleets: [{ ...fleet('F1', 'p1', null, [['cruiser', 2]]), edge: { from: 'A', to: 'B', t: 0.5 } }],
+    });
+    const r = okApply(kernel.applyAction(st, split('F1', [{ unit: 'cruiser', count: 1 }]), ctx));
+    const out = Object.values(r.state.fleets).find((f) => f.id !== 'F1')!;
+    expect(out.edge).toEqual({ from: 'A', to: 'B', t: 0.5 });
+    expect(out.location).toBeNull();
+    expect(out.movement).toBeNull();
   });
 });
 

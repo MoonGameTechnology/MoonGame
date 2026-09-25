@@ -38,7 +38,7 @@ import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/st
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -239,8 +239,9 @@ export const fleetOpsModule: GameModule = {
       }
     });
 
-    // Peel a chosen set of ships off a docked, idle fleet into a fresh fleet in
-    // the same sector (same orbit). Must keep ≥1 ship behind and move ≥1 out.
+    // Peel a chosen set of ships off a fleet that is not in battle into a fresh fleet
+    // at the same place: the same sector (same orbit), the same point of a lane, or the
+    // same leg of a journey. Must keep ≥1 ship behind and move ≥1 out.
     //
     // FSPLIT-1/2 (заказ владельца): раскол адресует СТЕК, а не тип, и делит трюм.
     //   · `take[i].modules` сужает отбор до одного лоадаута — без него «два крейсера»
@@ -273,9 +274,8 @@ export const fleetOpsModule: GameModule = {
       if (fleet.battleId) {
         return h.reject('E_IN_BATTLE');
       }
-      if (fleet.movement || !fleet.location) {
-        return h.reject('E_IN_TRANSIT');
-      }
+      // В пути и на линии делить МОЖНО (замечание владельца 2026-09-25: «флот делить можно
+      // в любой момент»): отделённая часть продолжает тот же участок курса — ниже.
       // Ключ отбора — «юнит + лоадаут»: два стека одного корпуса с разной начинкой
       // адресуются по отдельности, а запись без `modules` берёт по-старому, любой.
       const want = new Map<string, { unit: string; modules?: string[]; count: number }>();
@@ -398,17 +398,37 @@ export const fleetOpsModule: GameModule = {
       // SHU-1.1 челнок живёт в ангаре и в `Fleet.units` не попадает ниоткуда (правило 5
       // в `shuttleHangar.test.ts`), поэтому отделять было нечего — ветка не срабатывала
       // ни разу. Отделение обычных кораблей она не касалась и не касается.
+      // В пути отделённая часть получает копию ТЕКУЩЕГО участка (те же вылет и прибытие —
+      // половины не разъезжаются посреди линии) и своё прибытие. Следующие участки
+      // `beginLeg` считает уже по её собственной скорости. Стоявший на линии флот делится
+      // на той же точке линии.
+      const movement = fleet.movement
+        ? {
+            ...fleet.movement,
+            ...(fleet.movement.path ? { path: [...fleet.movement.path] } : {}),
+          }
+        : null;
       h.state.fleets[id] = {
         id,
         owner: action.playerId,
         location: fleet.location,
-        movement: null,
+        movement,
         units: taken,
         landing: takenLanding,
         traits: [],
         battleId: null,
+        ...(fleet.edge ? { edge: { ...fleet.edge } } : {}),
         ...(fleet.orbit ? { orbit: fleet.orbit } : {}),
       };
+      if (movement) {
+        h.schedule(movement.arrivesAt, 'fleet.arrival', {
+          fleetId: id,
+          departedAt: movement.departedAt,
+          arrivesAt: movement.arrivesAt,
+        });
+        // Тот же сигнал, что у начала участка: модули перехвата на линиях узнают о новом флоте.
+        h.emit('fleet.leg', { fleetId: id });
+      }
       h.emit('fleet.split', {
         from: payload.fleetId,
         to: id,

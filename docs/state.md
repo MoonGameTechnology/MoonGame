@@ -1619,8 +1619,14 @@ E_IMMOBILE, E_FLEET_BUSY, E_FORBIDDEN, E_NO_PLANET, E_UNKNOWN_UNIT, E_BAD_PAYLOA
 - **`fleet.split {fleetId, take[], takeLanding?}`** — отделяет выбранные корабли в новый
   флот на том же месте (`takeFromStacks` — апорционирует пул `hp`/`shieldHp`
   пропорционально, не дублирует корпус); héro-юнит нельзя отделить отдельно от сущности
-  героя. Коды: `E_NO_FLEET, E_FORBIDDEN, E_IN_BATTLE, E_IN_TRANSIT, E_HERO_UNIT,
-  E_NOT_ENOUGH, E_NO_ARMY, E_NO_CAPACITY, E_SPLIT_EMPTY, E_SPLIT_ALL, E_BAD_PAYLOAD`.
+  героя. **Делить можно и в пути, и на линии** (fleetOps 1.2.0, замечание владельца
+  2026-09-25 «флот делить можно в любой момент»): отделённая часть получает копию текущего
+  участка курса (те же вылет и прибытие) и своё `fleet.arrival` плюс `fleet.leg` для
+  перехвата; следующие участки считаются по её собственной скорости. Флот на линии
+  делится на той же точке (`edge`). Кнопка «Разделить» и окно деления в пути не гаснут
+  (`splitBlock`, `splitDialogLives`); новость в пути — «флот разделён в пути». Коды:
+  `E_NO_FLEET, E_FORBIDDEN, E_IN_BATTLE, E_HERO_UNIT, E_NOT_ENOUGH, E_NO_ARMY,
+  E_NO_CAPACITY, E_SPLIT_EMPTY, E_SPLIT_ALL, E_BAD_PAYLOAD`.
   **Адрес отбора — СТЕК, а не тип корабля (FSPLIT-1):** `take[i].modules` называет
   лоадаут, потому что он часть личности стека (SM-0.3) и один корпус летает и с
   начинкой, и голым — без этого «увести два крейсера» выбирал не игрок, а порядок

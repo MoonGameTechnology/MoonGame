@@ -40,9 +40,9 @@ describe('командная полоса — слияние', () => {
 });
 
 describe('командная полоса — деление', () => {
-  it('ДЕЛИТЬ МОЖНО ТОЛЬКО СТОЯЩИЙ ФЛОТ: на ходу состав не режут', () => {
+  it('ДЕЛИТЬ МОЖНО И НА ХОДУ (замечание владельца 2026-09-25)', () => {
     expect(canSplit(флот())).toBe(true);
-    expect(canSplit(флот({ movement: { to: 'W2' } }))).toBe(false);
+    expect(canSplit(флот({ movement: { to: 'W2' } }))).toBe(true);
   });
 
   it('в бою тоже нельзя', () => {
@@ -54,8 +54,8 @@ describe('командная полоса — деление', () => {
     expect(canSplit(флот({ ships: 2 }))).toBe(true);
   });
 
-  it('флот вне узла (в коридоре) делить нельзя', () => {
-    expect(canSplit(флот({ location: null }))).toBe(false);
+  it('флот вне узла (в коридоре) делить тоже можно', () => {
+    expect(canSplit(флот({ location: null }))).toBe(true);
   });
 
   it('КОМАНДА СТРОГО ОДНОФЛОТОВАЯ: без одиночки её нет вовсе', () => {
@@ -138,13 +138,14 @@ describe('почему делить нельзя (сообщение владе�
 
   it('каждому запрету — своя причина', () => {
     expect(splitBlock(null)).toBe('cmd.split.why.one');
-    expect(splitBlock(флот({ movement: { to: 'W2' } }))).toBe('cmd.split.why.moving');
-    expect(splitBlock(флот({ location: null }))).toBe('cmd.split.why.moving');
     expect(splitBlock(флот({ battleId: 'b1' }))).toBe('cmd.split.why.battle');
     expect(splitBlock(флот({ ships: 1 }))).toBe('cmd.split.why.single');
   });
 
-  it('в пути и в бою разом — сперва «в пути»: это то, что пройдёт раньше', () => {
-    expect(splitBlock(флот({ movement: { to: 'W2' }, battleId: 'b1' }))).toBe('cmd.split.why.moving');
+  it('в пути и на линии делить можно (замечание владельца 2026-09-25)', () => {
+    expect(splitBlock(флот({ movement: { to: 'W2' }, location: null }))).toBeNull();
+    expect(splitBlock(флот({ location: null }))).toBeNull();
+    // Бой запрещает и в пути: стороны боя адресуют флот по id.
+    expect(splitBlock(флот({ movement: { to: 'W2' }, battleId: 'b1' }))).toBe('cmd.split.why.battle');
   });
 });

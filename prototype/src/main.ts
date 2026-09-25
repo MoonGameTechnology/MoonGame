@@ -4006,8 +4006,9 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'fleet.split':
         // Чужую реорганизацию наблюдать нечем — на карте виден значок, а не то, что
-        // два соединения свели в одно (`fleetNews.ts`, правило 2).
-        if (reorgHeard(p.owner, ME)) note(t(reorgKey('split'), { at: placeName(p.at as string) }));
+        // два соединения свели в одно (`fleetNews.ts`, правило 2). В пути места нет.
+        if (reorgHeard(p.owner, ME))
+          note(typeof p.at === 'string' ? t(reorgKey('split'), { at: placeName(p.at) }) : t('log.fleet.split-transit'));
         break;
       // AUD-16: герой больше не гибнет молча. Только свой — в сети геройские события и
       // так строго адресны владельцу, соло повторяет тот же фильтр (`heroNews.ts`).
@@ -8747,8 +8748,9 @@ function stackCargoCapacity(unit: string, modules?: readonly string[]): number {
 }
 
 /** The "Split fleet" modal: per ship type, +1 / +10 / All (and −1) move ships into
- *  a new fleet; Confirm peels them off into the same sector. Closes itself if the
- *  fleet is deselected, vanishes, or starts moving. */
+ *  a new fleet; Confirm peels them off into the same place (a sector, a point of a lane
+ *  or the same leg of a journey). Closes itself if the fleet is deselected, vanishes
+ *  or enters a battle. */
 function renderSplitDialog() {
   // Жизнь окна и его разметка — `splitDialog.ts` (REFM-159): план привязан к ОДНОМУ
   // флоту, а мир под окном идёт дальше — флот летит, гибнет, дерётся, выделение уходит.
@@ -8758,7 +8760,6 @@ function renderSplitDialog() {
     planFleetId: plan?.fleetId ?? null,
     selectedFleetId: selFleet,
     fleetExists: !!f,
-    moving: !!f?.movement,
     inBattle: !!f?.battleId,
   });
   // `|| !plan || !f` — это не второе правило, а хвост для компилятора: их наличие уже
