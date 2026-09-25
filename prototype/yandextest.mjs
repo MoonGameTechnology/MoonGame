@@ -222,7 +222,7 @@ try {
         .filter((b) => b.getClientRects().length > 0)
         .filter((b) => {
           const r = b.getBoundingClientRect();
-          return !document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest(`#${b.id}`);
+          return !b.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
         })
         .map((b) => b.id),
     );
