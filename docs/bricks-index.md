@@ -1171,6 +1171,8 @@
 | PVR-6.31 | ✅ | proto | `docs/sector-zero-roadmap.md` | Гарнизон и наземные части — плитками с полоской и числами |
 | PVR-6.32 | ✅ | data core proto | `docs/sector-zero-roadmap.md` | Старт главы I на обычном Рое: гарнизон 6, +3 крейсера |
 | PVR-6.33 | ✅ | data | `docs/sector-zero-roadmap.md` | Радары забега меньше: множитель ×2,5 → ×1,5 |
+| PVR-6.35 | ✅ | proto | `docs/sector-zero-roadmap.md` | ⌂ в экспедиции спрашивает и называет награду |
+| PVR-6.36 | ✅ | proto | `docs/sector-zero-roadmap.md` | Вкладка «Флот» — орбита, без наземных частей |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

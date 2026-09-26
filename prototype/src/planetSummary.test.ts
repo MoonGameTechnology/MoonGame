@@ -56,6 +56,24 @@ describe('сводка мира — домены гарнизона', () => {
     expect(isShipUnit('tank', data)).toBe(false);
   });
 
+  // Владелец 2026-09-26: «гарнизон — только наземный юнит». Гарнизон крепости, десант и
+  // десантник Роя трейта `ground` не носят, и прежний признак «не корабль» по трейту
+  // выводил их во вкладку «Флот» кораблями, хотя они уже стояли на «Земле».
+  it('наземный без трейта `ground` — не корабль: гарнизон крепости, десант, десантник Роя', () => {
+    for (const id of ['garrison', 'drop_infantry', 'swarm_lander']) {
+      expect(data.units[id]?.domain, id).toBe('ground');
+      expect(isGroundUnit(id, data), id).toBe(true);
+      expect(isShipUnit(id, data), id).toBe(false);
+    }
+  });
+
+  it('каждый юнит каталога — ровно в ОДНОЙ из трёх вкладок', () => {
+    const twice = Object.keys(data.units).filter(
+      (id) => [isGroundUnit(id, data), isShipUnit(id, data), isWingUnit(id, data)].filter(Boolean).length !== 1,
+    );
+    expect(twice).toEqual([]);
+  });
+
   it('КАЖДЫЙ стек попадает ровно в одну корзину — сумма сходится', () => {
     const split = garrisonSplit(
       [

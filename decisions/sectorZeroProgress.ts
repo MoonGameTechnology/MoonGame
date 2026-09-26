@@ -1137,6 +1137,59 @@ export function parseSectorZeroProgress(
   }
 }
 
+/** Выплата забега по его миру — ОДНА формула на засчёт ({@link settleSectorZeroRun}) и на
+ *  превью перед сдачей ({@link abandonRunReward}), чтобы обещанное не разошлось с выплаченным. */
+function runPayout(
+  progress: SectorZeroProgress,
+  state: GameState,
+  pve: NonNullable<GameState['pve']>,
+  chapter: SectorChapter,
+  data: GameData | undefined,
+  won: boolean,
+) {
+  // Надбавка за ВЫПОЛНЕННЫЕ задачи складывается с выплатой за волны, а не заменяет её:
+  // иначе игрок, сделавший задачи и проигравший рано, получал бы больше того, кто дошёл
+  // до конца, — и «дополнительная» задача перестала бы быть дополнительной.
+  // Платят только задачи, ПОКАЗАННЫЕ в этом забеге: закрытые раньше в показ не входят и
+  // второй раз не платят (PVR-5.3).
+  const base = 1 + Math.max(0, pve.waveNumber) + (won ? 3 : 0);
+  const done = progress.objectivesDone[chapter.id] ?? [];
+  const tasks = settleObjectives(
+    chapter.objectives,
+    done,
+    state,
+    'p1',
+    chapter.slots ?? DEFAULT_OBJECTIVE_SLOTS,
+  );
+  // VET-7: медали сохранённых ветеранов — третья часть награды, рядом с волнами и
+  // задачами. Каталог нужен для порогов медалей; без него платить не за что.
+  const veterans = data ? veteranReward(state, 'p1', data) : 0;
+  // PVR-4.7: убитый босс — четвёртая часть награды; его цену матч записал при появлении.
+  const boss = bossBounty(state);
+  const reward = base + tasks.bonus + veterans + boss;
+  const kills = runKills(state, 'p1');
+  const killWarrants = kills * WARRANTS_PER_KILL;
+  const warrants = reward * WARRANTS_PER_REWARD + killWarrants;
+  return { base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants };
+}
+
+/** Сколько экспедиция заплатит, если завершить её СЕЙЧАС (решение владельца 2026-09-26: выход
+ *  «показывает, сколько награды заберёшь сейчас»). Сдача — поражение: надбавки за победу нет,
+ *  остальное — та же формула, что засчёт, а сдача не трогает ни флоты, ни счёт волн и убитых.
+ *  Трофеи (дубли, чертежи, жетоны) бросаются только при засчёте и сюда не входят. Не забег или
+ *  битый счёт волн — ноль. */
+export function abandonRunReward(
+  progress: SectorZeroProgress,
+  state: GameState,
+  chapter: SectorChapter = NO_CHAPTER,
+  data?: GameData,
+): { research: number; warrants: number } {
+  const pve = state.pve;
+  if (!pve || !Number.isSafeInteger(pve.waveNumber) || pve.waveNumber < 0) return { research: 0, warrants: 0 };
+  const pay = runPayout(progress, state, pve, chapter, data, false);
+  return { research: pay.reward, warrants: pay.warrants };
+}
+
 /** An attempt's serial belongs to this profile, not to wall time. No reward for
  * leaving the map. A terminal run is settled once, including after page reload. */
 export function settleSectorZeroRun(
@@ -1164,30 +1217,15 @@ export function settleSectorZeroRun(
   )
     return progress;
   const won = state.match.winner === 'p1' || state.match.winners?.includes('p1');
-  // Надбавка за ВЫПОЛНЕННЫЕ задачи складывается с выплатой за волны, а не заменяет её:
-  // иначе игрок, сделавший задачи и проигравший рано, получал бы больше того, кто дошёл
-  // до конца, — и «дополнительная» задача перестала бы быть дополнительной.
-  // Платят только задачи, ПОКАЗАННЫЕ в этом забеге: закрытые раньше в показ не входят и
-  // второй раз не платят (PVR-5.3).
-  const base = 1 + Math.max(0, state.pve.waveNumber) + (won ? 3 : 0);
-  const done = progress.objectivesDone[chapter.id] ?? [];
-  const tasks = settleObjectives(
-    chapter.objectives,
-    done,
+  const { base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants } = runPayout(
+    progress,
     state,
-    'p1',
-    chapter.slots ?? DEFAULT_OBJECTIVE_SLOTS,
+    state.pve,
+    chapter,
+    data,
+    !!won,
   );
-  // VET-7: медали сохранённых ветеранов — третья часть награды, рядом с волнами и
-  // задачами. Каталог нужен для порогов медалей; без него платить не за что.
-  const veterans = data ? veteranReward(state, 'p1', data) : 0;
-  // PVR-4.7: убитый босс — четвёртая часть награды; его цену матч записал при появлении.
-  const boss = bossBounty(state);
   const bossHero = bossTask(state)?.hero;
-  const reward = base + tasks.bonus + veterans + boss;
-  const kills = runKills(state, 'p1');
-  const killWarrants = kills * WARRANTS_PER_KILL;
-  const warrants = reward * WARRANTS_PER_REWARD + killWarrants;
   const firstWin = !!won && !!chapter.id && !progress.chaptersWon.includes(chapter.id);
   // Дубли и чертежи (SZE-5.3): бросок от сида профиля, номера попытки и отпечатка итогового
   // мира (AUD-26) — повторный засчёт того же забега невозможен (проверка выше), перезагрузка

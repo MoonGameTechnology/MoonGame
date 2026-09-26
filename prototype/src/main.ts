@@ -358,7 +358,7 @@ import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import {
   SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun, sovereignRepairCost,
-  REPAIR_HP_PER_SOVEREIGN, WARRANTS_PER_REWARD,
+  REPAIR_HP_PER_SOVEREIGN, WARRANTS_PER_REWARD, abandonRunReward,
   type SectorZeroProgress, type SectorProgressAction,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
@@ -1593,11 +1593,34 @@ const railAbandon = $('rail-abandon');
 let abandonOpener: HTMLElement | null = null;
 /** Счёт кораблей прошлого кадра забега; `null` — вне забега, чтобы вход не поднял карточку. */
 let lastRunShips: number | null = null;
-function openAbandon(reason: 'lost' | 'ask', opener: HTMLElement | null = null): void {
-  const lost = reason === 'lost';
-  $('abandon-title').textContent = t(lost ? 'run.abandon.lost.title' : 'run.abandon.ask.title');
-  $('abandon-text').textContent = t(lost ? 'run.abandon.lost.text' : 'run.abandon.ask.text');
-  $('abandon-stay').textContent = t(lost ? 'run.abandon.rebuild' : 'run.abandon.back');
+/** Повод карточки: флот потерян, ⚑ «Завершить» или ⌂ «Выйти» (решение владельца 2026-09-26:
+ *  ⌂ в экспедиции спрашивает — в меню с сохранением или завершить и забрать награду). */
+type AbandonReason = 'lost' | 'ask' | 'exit';
+const ABANDON_TEXT: Record<AbandonReason, { title: string; text: string; stay: string; go: string }> = {
+  lost: { title: 'run.abandon.lost.title', text: 'run.abandon.lost.text', stay: 'run.abandon.rebuild', go: 'run.abandon.go' },
+  ask: { title: 'run.abandon.ask.title', text: 'run.abandon.ask.text', stay: 'run.abandon.back', go: 'run.abandon.go' },
+  exit: { title: 'run.exit.title', text: 'run.exit.text', stay: 'run.abandon.back', go: 'run.exit.go' },
+};
+function openAbandon(reason: AbandonReason, opener: HTMLElement | null = null): void {
+  const txt = ABANDON_TEXT[reason];
+  const exit = reason === 'exit';
+  $('abandon-title').textContent = t(txt.title);
+  // ×2 за ролик живёт на экране итогов (`run.double`); здесь о нём только говорят — и лишь
+  // там, где у площадки есть реклама: обещать удвоение без ролика значило бы соврать.
+  const double = exit && shopCapabilities(getPlatform().capabilities).ads;
+  $('abandon-text').textContent = double ? `${t(txt.text)} ${t('run.exit.double')}` : t(txt.text);
+  // Сколько заберёт «Завершить» (решение владельца 2026-09-26) — та же формула, что засчёт
+  // после сдачи. Стенд разработчика не платит (`awardSectorRun`), и обещать там нечего.
+  const reward = $('abandon-reward');
+  reward.hidden = sectorDevActive;
+  if (!sectorDevActive) {
+    const r = abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data);
+    reward.textContent = t('run.exit.reward', { n: r.research, w: r.warrants });
+  }
+  $('abandon-stay').textContent = t(txt.stay);
+  $('abandon-go').textContent = t(txt.go);
+  $('abandon-menu').hidden = !exit;
+  abandonCard.classList.toggle('exit', exit);
   abandonOpener = opener;
   abandonCard.classList.add('show');
   $('abandon-stay').focus({ preventScroll: true });
@@ -1609,6 +1632,12 @@ function closeAbandon(): void {
 }
 railAbandon.addEventListener('click', () => openAbandon('ask', railAbandon));
 $('abandon-stay').addEventListener('click', closeAbandon);
+// «В меню» — тот же выход, что ⌂ вне экспедиции: забег сохраняется, продолжить можно позже.
+// Программный `.click()` не доверенный, поэтому ⌂ не спросит второй раз.
+$('abandon-menu').addEventListener('click', () => {
+  closeAbandon();
+  $('tomenu').click();
+});
 $('abandon-go').addEventListener('click', () => {
   closeAbandon();
   if (runInProgress()) playerOrder(abandonRun(ME));
@@ -7105,6 +7134,10 @@ function planetPanelHtml(p: Planet): string {
   const { ground, ships } = garrisonByTab(p.garrison, data);
   const gcount = sumUnits(p.garrison);
   const here = Object.values(s.fleets).filter((f) => f.location === p.id);
+  // «N кораблей» в шапке — корабли ВЛАДЕЛЬЦА у этого мира: на орбите и на самой планете.
+  // Одни гарнизонные корабли давали здесь вечный ноль — построенное уходит на орбиту само.
+  const shipsHere =
+    sumUnits(ships) + here.filter((f) => f.owner === p.owner).reduce((n, f) => n + sumUnits(f.units), 0);
   const counts = tabCounts(p, data, here);
   // Bytro-стиль: у мира авто-имя (тап → карточка статистики); координата (grid id)
   // остаётся отдельным обозначением в подзаголовке. У провинции главы — её имя, а id
@@ -7120,7 +7153,7 @@ function planetPanelHtml(p: Planet): string {
   const detail = planetInfoFor === p.id ? planetSummaryHtml(p) : '';
   let h =
     header +
-    `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
+    `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${shipsHere} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
   // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПКО этого владельца вдвое.
   // Блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
   if (showsBlackout(mine, s.players[ME]?.arrears)) {
@@ -7216,21 +7249,22 @@ function planetPanelHtml(p: Planet): string {
       cols.push(`<div class="hint">${t('dossier.tab.ground.desc')}</div>`);
     }
   } else if (planetTab === 'ships') {
-    // Built ships now auto-rally to orbit (see fleetLaunchModule), so the garrison
-    // normally holds no spacecraft — only surface the section if some linger.
-    // Состав показывается ВСЕГДА, даже пустой, — как у земли и зданий. Скрытая секция
-    // читается как поломка панели: игрок не понимает, пуст гарнизон или вкладка не
-    // прогрузилась. Пустой гарнизон говорит об этом словами (`garrisonTilesHtml`).
-    cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + garrisonTilesHtml(p.owner, ships));
-    if (here.length) {
-      let orbit = `<div class="sec">${t('side.world.fleets')}</div>`;
-      for (const f of here) {
-        const fShips = sumUnits(f.units);
-        const tr = sumUnits(f.landing ?? []);
-        const sel = f.owner === ME ? btn('selfleet', f.id, t('side.garrison.select'), true) : '';
-        orbit += `<div class="asset-row" data-desc="fleet" style="color:${ownerColor(f.owner)}"><span class="bicon">▲</span><b>${t('side.world.fleet-ships', { n: fShips })}${tr ? ' ' + t('side.garrison.plus-troops', { n: tr }) : ''}</b>${sel}</div>`;
-      }
-      cols.push(orbit);
+    // Вкладка флота — это ОРБИТА (владелец 2026-09-26: «гарнизон — только наземный юнит»).
+    // Построенный корабль сам уходит в сборный флот (`autoRally`), поэтому кораблей на
+    // самой планете обычно нет, и строка о них появляется, только когда они есть. Орбита
+    // показывается ВСЕГДА, даже пустая, — как состав земли и здания: скрытая секция
+    // читается как поломка панели, и пустота говорит о себе словами.
+    let orbit = `<div class="sec">${t('side.world.fleets')}</div>`;
+    if (!here.length) orbit += `<div class="row dim">${esc(t('side.none'))}</div>`;
+    for (const f of here) {
+      const fShips = sumUnits(f.units);
+      const tr = sumUnits(f.landing ?? []);
+      const sel = f.owner === ME ? btn('selfleet', f.id, t('side.garrison.select'), true) : '';
+      orbit += `<div class="asset-row" data-desc="fleet" style="color:${ownerColor(f.owner)}"><span class="bicon">▲</span><b>${t('side.world.fleet-ships', { n: fShips })}${tr ? ' ' + t('side.garrison.plus-troops', { n: tr }) : ''}</b>${sel}</div>`;
+    }
+    cols.push(orbit);
+    if (ships.length) {
+      cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + garrisonTilesHtml(p.owner, ships));
     }
     if (mine) {
       cols.push(
@@ -10243,7 +10277,14 @@ const renderEndScreen = (): void => endScreenPanel.render();
 // loses, elimination fires, and "Victory!" paints over the hub. In net the server is
 // authoritative (it keeps ticking regardless), but the end-screen overlay is suppressed
 // while the hub is visible (see renderEndScreen guard).
-$('tomenu').addEventListener('click', () => {
+$('tomenu').addEventListener('click', (ev) => {
+  // ⌂ в идущей экспедиции спрашивает (решение владельца 2026-09-26): в меню с сохранением
+  // или завершить и забрать награду. Спрашивает только живой тап — программные выходы
+  // (аппаратный Back, отмена загрузки карты, «В меню» самой карточки) уходят сразу.
+  if (ev.isTrusted && runInProgress()) {
+    openAbandon('exit', $('tomenu'));
+    return;
+  }
   const wasRun = isSectorZeroRun();
   const toSectorZero = leavesToSectorZero();
   if (wasRun) saveRun();
@@ -10267,8 +10308,12 @@ $('tomenu').addEventListener('click', () => {
   if (toSectorZero) openSectorZero();
   else openHub();
 });
-// Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too.
-document.getElementById('rail-exit')?.addEventListener('click', () => $('tomenu').click());
+// Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too. На ПК ⌂
+// в полосе скорости спрятан и выход живёт здесь, поэтому в экспедиции спрашивает и он.
+document.getElementById('rail-exit')?.addEventListener('click', (ev) => {
+  if (runInProgress()) openAbandon('exit', ev.currentTarget as HTMLElement);
+  else $('tomenu').click();
+});
 
 // Event-log window: the rail's ≡ opens it; ✕ or the backdrop closes it. The feed
 // (#log) updates in place each frame whether the window is open or not.
@@ -15516,8 +15561,11 @@ $('topback').addEventListener('click', () => {
     if (rearmAfterClose(topLayerOpen(), inMatch())) armBack();
     return;
   }
-  // no layers + in match → straight to the hub; на хабе/входе — системный Back
-  if (act === 'exit') $('tomenu').click();
+  // no layers + in match → straight to the hub; на хабе/входе — системный Back. В идущей
+  // экспедиции шеврон спрашивает, как ⌂ (решение владельца 2026-09-26): на ПК ⌂ спрятан,
+  // и шеврон — это и есть видимый выход.
+  if (act === 'exit' && runInProgress()) openAbandon('exit', $('topback'));
+  else if (act === 'exit') $('tomenu').click();
   else history.back();
 });
 

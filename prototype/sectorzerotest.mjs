@@ -40,6 +40,8 @@ async function exitMatch() {
   for (let i = 0; i < 6 && !(await out()); i++) {
     await back.click();
     await page.waitForTimeout(150);
+    // В идущей экспедиции «‹» спрашивает (решение владельца 2026-09-26) — выход «В меню».
+    if (await page.locator('#abandon-menu').isVisible()) await page.locator('#abandon-menu').click();
   }
 }
 
@@ -62,6 +64,7 @@ const hooks = `window.__szTest = {
   // Вкладка карточки мира — как тап по ней; живые наземные части гарнизона мира.
   tab: (x) => { planetTab = x; lastPanelHtml = ''; renderPanel(); },
   ground: (id) => s.planets[id].garrison.filter((st) => st.count > 0 && data.units[st.unit]?.domain === 'ground').length,
+  garrisonUnits: (id) => s.planets[id].garrison.filter((st) => st.count > 0).map((st) => st.unit),
   // Открыт ли слой, который закроет Escape/Back.
   layerOpen: () => topLayerOpen(),
   // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
@@ -231,6 +234,13 @@ async function check(label, run) {
     assert.equal(hp.length, ground, `${label}: плитка с числами на каждую наземную часть`);
     for (const x of hp) assert.match(x, /^[\d.]+k?\/[\d.]+k?$/, `${label}: числа корпуса на плитке`);
     assert.equal(await page.locator('#side .ptile .pt-n').count(), ground, `${label}: подпись наземной плитки`);
+    // Гарнизон — только наземный (владелец 2026-09-26): гарнизон крепости не носит трейта
+    // `ground`, и вкладка «Флот» показывала его «кораблями в гарнизоне». Её плитки — орбита.
+    assert((await page.evaluate((id) => window.__szTest.garrisonUnits(id), home)).includes('garrison'), `${label}: у дома гарнизон крепости`);
+    await page.evaluate(() => window.__szTest.tab('ships'));
+    assert.equal(await page.locator('#side .ptile').count(), 0, `${label}: во «Флоте» нет наземных плиток`);
+    assert.equal(await page.locator('#side .sec', { hasText: /Флоты на орбите|Fleets in orbit/ }).count(), 1, `${label}: во «Флоте» — орбита`);
+    await page.evaluate(() => window.__szTest.tab('ground'));
     // SZ-map-ids: карточка мира, её сводка (тап по имени), журнал и панели называют места
     // именами провинций. Id узлов глав — английские слова (`home_a`, `drift`): на русском
     // экране забега их быть не должно.
@@ -597,6 +607,29 @@ try {
       named('rewarded_ad_completed').map((e) => e.props.placement),
       ['run.sovereigns', 'run.double'],
     );
+    // ⌂ в экспедиции спрашивает (решение владельца 2026-09-26): «Продолжить» оставляет забег,
+    // «В меню» уводит с сохранением, «Завершить и забрать награду» — та же сдача с итогами.
+    // На ПК ⌂ в полосе скорости спрятан — видимый выход там шеврон «‹».
+    await page.locator('#holo-back').click();
+    await page.locator('#abandon').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#abandon-title').textContent(), /Выйти из экспедиции\?|Leave the expedition\?/);
+    assert(await page.locator('#abandon-menu').isVisible(), '⌂: есть «В меню»');
+    assert.match(await page.locator('#abandon-go').textContent(), /Завершить и забрать награду|End and collect the reward/);
+    assert.match(await page.locator('#abandon-text').textContent(), /удвоить за ролик|doubled for an ad/, 'дев-сборка с рекламой: ×2 названо');
+    assert.match(
+      await page.locator('#abandon-reward').textContent(),
+      /^(Заберёте сейчас: \+\d+ данных, \+\d+ ⌖|You take now: \+\d+ data, \+\d+ ⌖)$/,
+      '⌂: названо, сколько заберёт «Завершить»',
+    );
+    await page.locator('#abandon-stay').click();
+    await page.locator('#abandon').waitFor({ state: 'hidden' });
+    assert.equal(await page.evaluate(() => window.__szTest.ended()), false, '«Продолжить» — забег идёт');
+    await page.locator('#holo-back').click();
+    await page.locator('#abandon-menu').click();
+    await page.waitForFunction(() => !document.getElementById('sz-continue').disabled);
+    await page.locator('#sz-continue').click();
+    await page.waitForFunction(() => window.__szTest.run() === true);
+    await page.locator('#maploading').waitFor({ state: 'hidden' });
     // PVR-6.29 (решение владельца 2026-09-25): кораблей не осталось — карточка «Флот потерян»
     // вместо минут у экрана, где Рой штурмует планету. «Отстроиться» оставляет забег; та же
     // карточка — кнопкой колонки в любой момент, и «Завершить» сразу ставит поражение с итогами.
@@ -610,6 +643,7 @@ try {
     await toggleTools();
     await page.locator('#rail-abandon').click();
     assert.match(await page.locator('#abandon-title').textContent(), /Завершить экспедицию\?|End the expedition\?/);
+    assert.equal(await page.locator('#abandon-menu').isVisible(), false, '⚑: «В меню» — только у ⌂');
     await page.locator('#abandon-go').click();
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
     const failed = (await page.evaluate(() => window.__szTest.events())).filter((e) => e.event === 'pve_failed');

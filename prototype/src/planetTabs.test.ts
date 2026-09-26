@@ -21,6 +21,21 @@ const ROSTER = [
   'tank',
 ];
 
+describe('вкладка «Флот» не показывает гарнизон крепости кораблями (владелец 2026-09-26)', () => {
+  it('гарнизон крепости и десант — на «Земле», во «Флоте» их нет', () => {
+    const g = garrisonByTab(
+      [
+        { unit: 'garrison', count: 3 },
+        { unit: 'drop_infantry', count: 2 },
+      ],
+      data,
+    );
+    expect(g.ground.map((st) => st.unit)).toEqual(['garrison', 'drop_infantry']);
+    expect(g.ships).toEqual([]);
+    expect(tabCounts(planet([{ unit: 'garrison', count: 3 }]), data, []).ships).toBe(0);
+  });
+});
+
 describe('вкладки мира — разбор гарнизона', () => {
   const garrison: UnitStack[] = [
     { unit: 'tank', count: 2 },
