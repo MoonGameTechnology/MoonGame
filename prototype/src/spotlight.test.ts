@@ -356,3 +356,76 @@ describe('spotlightDom overlay CSS — passthrough must cover the ROOT, not just
     expect(src).toMatch(/#spotlight \.sl-bubble\{[^}]*pointer-events:auto/);
   });
 });
+
+describe('SpotlightTour — этапы учебного полигона (TRN-2)', () => {
+  // Шаги несут `stage`: несколько подсказок составляют один этап §14.4. Пропуск этапа
+  // уводит к первому шагу СЛЕДУЮЩЕГО этапа, а не завершает всё обучение, как
+  // «Пропустить обучение».
+  const staged: SpotlightStep[] = [
+    { id: 'a1', target: null, copy: 'A1', advance: { on: 'tap' }, stage: 'a' },
+    { id: 'a2', target: null, copy: 'A2', advance: { on: 'action', type: 'x' }, stage: 'a' },
+    { id: 'b1', target: null, copy: 'B1', advance: { on: 'action', type: 'y' }, stage: 'b' },
+    { id: 'c1', target: null, copy: 'C1', advance: { on: 'tap' }, stage: 'c' },
+  ];
+
+  it('вид шага знает свой этап: номер и сколько их всего', () => {
+    const h = fakeHost();
+    const tour = new SpotlightTour(staged, h.host);
+    tour.start();
+    expect(h.last()?.stage).toEqual({ id: 'a', index: 0, count: 3 });
+    tour.tap();
+    expect(h.last()?.stage).toEqual({ id: 'a', index: 0, count: 3 });
+    tour.notifyAction('x');
+    expect(h.last()?.stage).toEqual({ id: 'b', index: 1, count: 3 });
+  });
+
+  it('пропуск этапа ведёт к первому шагу следующего, обучение продолжается', () => {
+    const h = fakeHost();
+    const e = ender();
+    const tour = new SpotlightTour(staged, h.host, e.onEnd);
+    tour.start();
+    tour.skipStage();
+    expect(h.last()?.step.id).toBe('b1');
+    expect(e.get()).toBeNull();
+  });
+
+  it('пропуск последнего этапа — конец обучения как пройденного до конца', () => {
+    const e = ender();
+    const tour = new SpotlightTour(staged, fakeHost().host, e.onEnd);
+    tour.start();
+    tour.skipStage();
+    tour.skipStage();
+    tour.skipStage();
+    expect(e.get()).toEqual({ completed: true, skipped: false, stopped: false, reachedStep: 3 });
+  });
+
+  it('свёрнутая подсказка не рисуется, но этап засчитывается по делу', () => {
+    const h = fakeHost();
+    const tour = new SpotlightTour(staged, h.host);
+    tour.start();
+    tour.tap();
+    tour.collapse();
+    expect(h.last()?.collapsed).toBe(true);
+    tour.notifyAction('x'); // игрок сделал дело, пока подсказка свёрнута
+    expect(h.last()?.step.id).toBe('b1');
+    expect(h.last()?.collapsed).toBe(true); // свёрнутой она и остаётся
+    tour.reopen();
+    expect(h.last()?.collapsed).toBe(false);
+  });
+
+  it('свёрнутый tap-шаг не пролистывается нажатием «Далее»', () => {
+    const h = fakeHost();
+    const tour = new SpotlightTour(staged, h.host);
+    tour.start();
+    tour.collapse();
+    tour.tap();
+    expect(h.last()?.step.id).toBe('a1');
+  });
+
+  it('шаги без этапа — прежнее обучение: этапа в виде нет', () => {
+    const h = fakeHost();
+    const tour = new SpotlightTour([{ id: 'x', target: null, copy: 'X', advance: { on: 'tap' } }], h.host);
+    tour.start();
+    expect(h.last()?.stage).toBeUndefined();
+  });
+});

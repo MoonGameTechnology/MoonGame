@@ -729,6 +729,8 @@ import type { TourResult } from './spotlight';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 // ONB-2 — the guided first match (a data chain over this same engine).
 import { buildFirstMatchTour } from './firstMatchTour';
+import { buildTrainingTour } from './trainingTour';
+import { trainingBaseline } from '../../decisions/trainingStages';
 // ONB-4 — searchable codex/help index (pure) over the existing article corpus.
 import {
   buildCodexIndex,
@@ -12048,6 +12050,20 @@ function startTraining(): void {
   // Учебный противник сам не ходит (§14.2: соединения вводятся по этапам) — ИИ-мест нет.
   // Герой, арсенал и оснащение — те же, что поедут в главу I (`prepareSectorZeroRun`):
   // полигон учит тем кораблям, с которыми игрок пойдёт дальше.
+  // TRN-2: двенадцать этапов §14.4 — по одной подсказке, этап засчитывает дело, а не
+  // «Далее». Отметка роста снимается, когда HUD уже живой, — от неё этапы и считаются.
+  pendingGuide = () => {
+    const baseline = trainingBaseline(s, ME, data);
+    launchTour(
+      buildTrainingTour({
+        world: () => s,
+        me: ME,
+        data,
+        baseline,
+        fleetSelected: () => selFleet !== null && s.fleets[selFleet]?.owner === ME,
+      }),
+    );
+  };
   installMatch(prepareSectorZeroRun(trainingState(data), sectorProgress, data), new Map(), trainingModeId());
   setRunActive(true);
   trainingActive = true;

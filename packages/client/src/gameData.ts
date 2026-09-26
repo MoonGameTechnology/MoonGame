@@ -145,8 +145,21 @@ export function trainingState(data: GameData): GameState {
   const seats = Object.values(world.players).filter((p) => !p.npc).map((p) => p.id);
   const diplomacy = { ...world.diplomacy };
   for (const a of seats) for (const b of seats) if (a < b) diplomacy[pairKey(a, b)] = 'war';
-  return { ...world, mapId: map.id, diplomacy };
+  // Учебный комплект носителя (§14.4, этап «Носитель и челноки»): эскадра перехватчиков
+  // уже в ангаре авианосца. Ангар схема карты не описывает, поэтому комплект кладёт сам
+  // полигон — как и войну выше.
+  const fleets = { ...world.fleets };
+  const carrier = fleets[TRAINING_CARRIER];
+  if (carrier)
+    fleets[TRAINING_CARRIER] = {
+      ...carrier,
+      hangar: [{ id: 'sq:training', units: [{ unit: 'interceptor', count: 4 }] }],
+    };
+  return { ...world, mapId: map.id, diplomacy, fleets };
 }
+
+/** Флот учебного авианосца на карте полигона. */
+export const TRAINING_CARRIER = 'p1_carrier';
 
 /** Задачи полигона (§14.5): маяк и разведка — дополнительные, победу не определяют. */
 export function trainingObjectives(): MapObjective[] {

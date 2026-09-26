@@ -239,6 +239,18 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       'архетипа босса (`data.modes[].pve.boss.hero`, PVR-4.7): у имени босса свой падеж ' +
       'в каждой фразе, подстановкой его не собрать; наличие держит `runBoss.test.ts`',
   },
+  {
+    prefix: 'training.stage.',
+    built_by:
+      'счётчик этапов подсказки (spotlightDom.ts) — `training.stage.<этап>` из поля `stage` шага ' +
+      '(TRN-2); полноту держит prototype/src/trainingTour.test.ts',
+  },
+  {
+    prefix: 'training.tour.',
+    built_by:
+      'buildTrainingTour() — `training.tour.<этап>.<шаг>` из id шага (TRN-2); ' +
+      'полноту держит prototype/src/trainingTour.test.ts',
+  },
 ];
 const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.prefix));
 

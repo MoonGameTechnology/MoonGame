@@ -595,6 +595,16 @@ try {
     await page.locator('#maploading').waitFor({ state: 'hidden' });
     assert(await page.evaluate(() => window.__szTest.heroAlive()), 'полигон: герой экспедиции выведен');
     assert.deepEqual(await page.evaluate(() => window.__szTest.atWar()), ['p2'], 'полигон: противник — враг сразу');
+    // TRN-2: подсказка этапов — «Этап 1 из 12», сворачивается в кнопку и открывается снова,
+    // «Пропустить этап» ведёт к следующему.
+    await page.locator('#spotlight .sl-count').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#spotlight .sl-count').innerText(), /1 .* 12/, 'полигон: счётчик этапов');
+    await page.locator('#spotlight .sl-fold').click();
+    await page.locator('#spotlight-chip').waitFor({ state: 'visible' });
+    assert(!(await page.locator('#spotlight .sl-count').isVisible()), 'полигон: свёрнутая подсказка не рисуется');
+    await page.locator('#spotlight-chip').click();
+    await page.locator('#spotlight .sl-skip-stage').click();
+    assert.match(await page.locator('#spotlight .sl-count').innerText(), /2 .* 12/, 'полигон: этап пропущен');
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
@@ -602,7 +612,7 @@ try {
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — плитками с подписью, полоской и числами корпуса; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +
-      ' «Обучение» открывает полигон с героем и объявленным противником\n',
+      ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап\n',
   );
 } finally {
   await browser.close();
