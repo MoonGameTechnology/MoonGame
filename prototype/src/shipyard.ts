@@ -27,10 +27,12 @@
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
 import { splitSupport } from '../../decisions/supportShips';
+import { moduleGroups } from '../../decisions/moduleGroups';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import { isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
 import {
   effectiveStats,
+  moduleAllowed,
   unitBuildSiteBlocker,
   type Action,
   type ArsenalItem,
@@ -287,29 +289,40 @@ export function loadoutPaneHtml(
       );
     })
     .join('');
-  const palette = m.palette
-    .map((o) => {
-      const eff = Object.entries(o.effect)
-        .map(([k, v]) => effectChip(k, v))
-        .join(' ');
-      if (o.installable) {
-        return (
-          `<button class="cn-mod" data-cnmod="${o.id}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-          `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span><span class="cn-me">${eff}</span><span class="cn-mc">${bagText(o.cost)}</span></button>`
-        );
-      }
-      // Причина берётся из КОДА отказа ядра, а не гадается: «нет слота» и «не для
-      // этого корпуса» — разные вещи, и подпись «нужен слот: утилита» на корпусе, у
-      // которого утилита свободна, читалась бы как враньё.
-      const why =
-        o.code === 'E_NOT_ALLOWED'
-          ? t('yard.module.not-allowed')
-          : t('yard.slot.named', { s: t(SLOT_KEY[o.slot] ?? o.slot) });
+  const paletteCard = (o: LoadoutModel['palette'][number]): string => {
+    const eff = Object.entries(o.effect)
+      .map(([k, v]) => effectChip(k, v))
+      .join(' ');
+    if (o.installable) {
       return (
-        `<div class="cn-mod locked"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
+        `<button class="cn-mod" data-cnmod="${o.id}"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
+        `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span><span class="cn-me">${eff}</span><span class="cn-mc">${bagText(o.cost)}</span></button>`
       );
-    })
+    }
+    // Причина берётся из КОДА отказа ядра, а не гадается: «нет слота» и «не для
+    // этого корпуса» — разные вещи, и подпись «нужен слот: утилита» на корпусе, у
+    // которого утилита свободна, читалась бы как враньё.
+    const why =
+      o.code === 'E_NOT_ALLOWED'
+        ? t('yard.module.not-allowed')
+        : t('yard.slot.named', { s: t(SLOT_KEY[o.slot] ?? o.slot) });
+    return (
+      `<div class="cn-mod locked"><span class="cn-mic">${moduleIcon(o.id)}</span>` +
+      `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
+    );
+  };
+  // Модули группами по типу отсека (заказ владельца 2026-09-26, `moduleGroups.ts`): в том же
+  // порядке, что отсеки выше; внутри группы сначала то, что встаёт на этот корпус, по редкости.
+  const option = new Map(m.palette.map((o) => [o.id, o] as const));
+  const fitDef = data.units[m.unit];
+  const palette = moduleGroups([...option.keys()], data, {
+    fits: (id) => fitDef !== undefined && moduleAllowed(m.unit, fitDef, data.modules[id]!),
+  })
+    .map(
+      ({ slot, ids }) =>
+        `<div class="cn-pg"><span aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</span> ${t(SLOT_KEY[slot] ?? slot)}</div>` +
+        ids.map((id) => paletteCard(option.get(id)!)).join(''),
+    )
     .join('');
   const palHead = freeTypes.length
     ? t('yard.modules.for-slot', {

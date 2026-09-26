@@ -54,6 +54,8 @@ import { splitSupport } from '../../decisions/supportShips';
 import { heroChapter } from '../../decisions/heroRecruits';
 import { romanChapter } from '../../decisions/chapterRoute';
 import { SLOT_ICON } from './moduleIcons';
+import { moduleGroups } from '../../decisions/moduleGroups';
+import { upgradeFx, type UpgradeFx } from '../../decisions/upgradeFx';
 
 interface PreparationHost {
   data: GameData;
@@ -121,6 +123,10 @@ const deltaHtml = (rows: readonly StatDelta[], signed = false): string =>
         )
         .join('')}</ul>`;
 
+/** `n` звёзд подряд; `fresh` — последняя только что получена и вспыхивает (`upgradeFx.ts`). */
+const litStars = (n: number, fresh: boolean): string =>
+  fresh && n > 0 ? `${'★'.repeat(n - 1)}<em class="sz-new">★</em>` : '★'.repeat(n);
+
 /** Шанс кузни полосой: доля читается глазом раньше, чем цифра (PVR-6.6). Цена стоит
  *  рядом всегда — `EC-2.3`: стоимость видна до того, как хватит Варрантов. */
 const oddsHtml = (chance: number, warrants: number): string => {
@@ -140,6 +146,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
    *  каждого героя свой корабль со своим набором — полка «Корабли героев». */
   let shipHero: string | null = null;
   let message = '';
+  /** Отклик на улучшение (`upgradeFx.ts`): живёт ровно одну перерисовку — следующая
+   *  (вкладка, другой корпус) не проигрывает вспышку заново. */
+  let fx: UpgradeFx | null = null;
   const button = (
     action: string,
     id: string,
@@ -216,6 +225,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // Слоты — плитками (решение владельца 2026-09-26): по плитке на слот, в ней модуль или
     // пустое место. Слоты, открытые звёздами корабля, помечены звездой.
     const hullStarred = onHero ? [] : (p.hullStars[hull] ?? []);
+    // Слот, только что открытый звездой корабля: плитки за звёзды стоят последними в своём
+    // типе, значит новая — последняя плитка этого типа.
+    const newSlot = fx?.kind === 'slot' && !onHero && fx.hull === hull ? fx.slot : null;
     const bays = SHIP_SLOTS.flatMap((slot) => {
       const n = def.slots[slot] ?? 0;
       const fitted = selected.filter((id) => data.modules[id]?.slot === slot);
@@ -223,7 +235,8 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       return Array.from({ length: n }, (_, i) => {
         const id = fitted[i];
         const star = i >= n - starred ? ' star' : '';
-        return `<div class="sz-slot${id ? ' full' : ''}${star}" title="${esc(t(`yard.slot.${slot}`))}"><i aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</i><b>${id ? esc(tData(data.modules[id]!.name)) : t('hero.slot.empty')}</b><span>${t(`yard.slot.${slot}`)}</span></div>`;
+        const fresh = slot === newSlot && i === n - 1 ? ' sz-fx-new' : '';
+        return `<div class="sz-slot${id ? ' full' : ''}${star}${fresh}" title="${esc(t(`yard.slot.${slot}`))}"><i aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</i><b>${id ? esc(tData(data.modules[id]!.name)) : t('hero.slot.empty')}</b><span>${t(`yard.slot.${slot}`)}</span></div>`;
       });
     }).join('');
     // Звезда корабля: плитка «+ слот» с выбором типа и ценой (решение владельца 2026-09-26:
@@ -243,36 +256,50 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // Улучшение живёт в карточке модуля (решение владельца 2026-09-25): надел и тут же
     // прокачал — отдельной вкладки «Мастерская» больше нет.
     const forge = new Map(workshopRows(p, data).map((row) => [row.id, row] as const));
+    const card = (id: string): string => {
+      const module = data.modules[id]!;
+      const owned = p.modules.includes(id);
+      const fitted = selected.includes(id);
+      const fits = canEquip(unit, def, selected, id, data).ok;
+      const label = !owned
+        ? t('sector-zero.prep.unlock', { n: MODULE_UNLOCK_COST })
+        : fitted
+          ? t('sector-zero.prep.equipped')
+          : !fits
+            ? t('sector-zero.prep.full')
+            : t('sector-zero.prep.equip');
+      const head = itemHead(id, p, fx?.kind === 'star' && fx.id === id);
+      // Что станет с ЭТИМ корпусом: надетый — если снять, ненадетый — если надеть.
+      // Слот занят — сравнивать не с чем, строки нет.
+      const compare =
+        fitted || fits
+          ? deltaHtml(
+              statDeltas(
+                statsNow,
+                statsWith(fitted ? selected.filter((m) => m !== id) : [...selected, id]),
+                STAT_ORDER,
+              ),
+            )
+          : '';
+      const row = owned ? forge.get(id) : undefined;
+      // Отклик на улучшение ЭТОГО модуля: звезда, промах кузни или новая редкость.
+      const hit =
+        (fx?.kind === 'star' || fx?.kind === 'miss' || fx?.kind === 'rarity') && fx.id === id
+          ? ` sz-fx-${fx.kind}`
+          : '';
+      return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}${hit}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? (onHero ? 'fit-hero' : 'fit') : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}${row ? upgradeHtml(row, p) : ''}</article>`;
+    };
     // Только то, что встаёт на ЭТОТ корпус (решение владельца 2026-09-25): карточка
     // «не подходит» занимала место и звала открыть то, что сюда не встанет никогда.
-    const modules = sectorModulesFor(unit, selected, data)
-      .map((id) => [id, data.modules[id]!] as const)
-      .map(([id, module]) => {
-        const owned = p.modules.includes(id);
-        const fitted = selected.includes(id);
-        const fits = canEquip(unit, def, selected, id, data).ok;
-        const label = !owned
-          ? t('sector-zero.prep.unlock', { n: MODULE_UNLOCK_COST })
-          : fitted
-            ? t('sector-zero.prep.equipped')
-            : !fits
-              ? t('sector-zero.prep.full')
-              : t('sector-zero.prep.equip');
-        const head = itemHead(id, p);
-        // Что станет с ЭТИМ корпусом: надетый — если снять, ненадетый — если надеть.
-        // Слот занят — сравнивать не с чем, строки нет.
-        const compare =
-          fitted || fits
-            ? deltaHtml(
-                statDeltas(
-                  statsNow,
-                  statsWith(fitted ? selected.filter((m) => m !== id) : [...selected, id]),
-                  STAT_ORDER,
-                ),
-              )
-            : '';
-        const row = owned ? forge.get(id) : undefined;
-        return `<article class="sz-card${head.cls}${fitted ? ' selected' : ''}">${head.html}<p>${effectText(module.effects.stats)}</p>${compare}${button(owned ? (onHero ? 'fit-hero' : 'fit') : 'unlock-module', id, label, owned ? !fits && !fitted : p.research < MODULE_UNLOCK_COST, fitted)}${row ? upgradeHtml(row, p) : ''}</article>`;
+    // Группами по типу слота (заказ владельца 2026-09-26, `moduleGroups.ts`): оружие, защита,
+    // система — в порядке плиток слотов; в заголовке — сколько слотов этого типа занято.
+    // `--n` — число карточек: на ПК группы встают в ряд шириной по своим карточкам.
+    const modules = moduleGroups(sectorModulesFor(unit, selected, data), data, {
+      rarity: (id) => profileRarity(p, id, data),
+    })
+      .map(({ slot, ids }) => {
+        const used = selected.filter((id) => data.modules[id]?.slot === slot).length;
+        return `<section class="sz-modgroup" style="--n:${ids.length}"><p class="sz-tier"><i aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</i>${t(`yard.slot.${slot}`)}<span>${used}/${def.slots[slot] ?? 0}</span></p><div class="sz-cards sz-mods">${ids.map(card).join('')}</div></section>`;
       })
       .join('');
     // Правило кузни одно на все карточки — строкой над ними (PVR-6.6), чертежи — только когда
@@ -290,13 +317,13 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const nextSlot = onHero ? HERO_SHIP_STAR_SLOTS[captain.level + 1] : undefined;
     const title = onHero
       ? `${t('sector-zero.prep.hero-ship')} · ${esc(tData(data.heroes[captainId]!.name))}`
-      : `${esc(displayUnit(hull))}${hullStarred.length ? ` <span class="sz-hull-stars">${'★'.repeat(hullStarred.length)}</span>` : ''}`;
+      : `${esc(displayUnit(hull))}${hullStarred.length ? ` <span class="sz-hull-stars">${litStars(hullStarred.length, newSlot !== null)}</span>` : ''}`;
     // В забег едет корабль ВЫБРАННОГО героя: у чужого корабля об этом сказано прямо.
     const offRun = onHero && captainId !== p.selectedHero ? ` ${t('sector-zero.prep.hero-ship.off-run')}` : '';
     const hint = onHero
       ? `${t('sector-zero.prep.hero-ship.hint')}${nextSlot ? ` ${t('sector-zero.prep.hero-ship.next', { n: captain.level + 1, slot: t(`yard.slot.${nextSlot}`).toLocaleLowerCase() })}` : ''}${offRun}`
       : t('sector-zero.prep.ship-hint');
-    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', unit, data)}<div><h2>${title}</h2><p class="sz-sub">${hint}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(base, statsNow))}<div class="sz-slots">${bays}${addSlot}</div></div></div>${forgeNote}<div class="sz-cards sz-mods">${modules}</div>`;
+    return `${hulls}<div class="sz-hull">${catalogPortraitHtml('u', unit, data)}<div><h2>${title}</h2><p class="sz-sub">${hint}</p><div class="sz-stats">${['attack', 'defense', 'hp', 'shield', 'speed'].map((key) => `<span>${esc(t(stats[key]!))}<b>${num(statsNow[key] ?? 0)}</b></span>`).join('')}</div>${unitDamageHtml(unitDamageProfile(base, statsNow))}<div class="sz-slots">${bays}${addSlot}</div></div></div>${forgeNote}<div class="sz-modgroups">${modules}</div>`;
   }
 
   /**
@@ -304,8 +331,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
    * ступень редкости и звёзды. Цвет рамки карточки задаёт класс `r-<редкость>`, звёзды —
    * символами, а не картинкой: самодостаточному HTML лишний ассет ни к чему. Число звёзд
    * дублируется для экранного диктора, иначе ряд значков он прочитал бы как мусор.
+   * `fresh` — последняя звезда только что выкована и вспыхивает (`upgradeFx.ts`).
    */
-  const itemHead = (id: string, p: SectorZeroProgress): { cls: string; html: string } => {
+  const itemHead = (id: string, p: SectorZeroProgress, fresh = false): { cls: string; html: string } => {
     const module = h.data.modules[id]!;
     // Ступень — из профиля (поднятая за чертёж и дубли, SZE-5.2), потолок звёзд — от неё.
     const rarity = profileRarity(p, id, h.data);
@@ -313,7 +341,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const { lit, empty } = starRow(p.stars[id] ?? 0, cap);
     const stars =
       cap > 0
-        ? `<div class="sz-stars" role="img" aria-label="${esc(t('sector-zero.forge.stars', { n: lit, cap }))}"><span class="lit">${'★'.repeat(lit)}</span>${'★'.repeat(empty)}</div>`
+        ? `<div class="sz-stars" role="img" aria-label="${esc(t('sector-zero.forge.stars', { n: lit, cap }))}"><span class="lit">${litStars(lit, fresh)}</span>${'★'.repeat(empty)}</div>`
         : '';
     return {
       cls: ` sz-item r-${rarity}`,
@@ -540,8 +568,10 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     const selected = p.selectedHero === heroId;
     const slots = sectorHeroSlots(hero, data);
     // Звёздность героя — делениями: все звёзды видны сразу, а не угадываются из текста.
-    // Звезда стоит жетоны этого героя и открывает слот навыка (`heroTokens.ts`).
-    const pips = Array.from({ length: HERO_MAX_STARS }, (_, i) => `<i class="${i < hero.level ? 'lit' : ''}">★</i>`).join('');
+    // Звезда стоит жетоны этого героя и открывает слот навыка (`heroTokens.ts`). Только что
+    // полученная вспыхивает (`upgradeFx.ts`).
+    const freshPip = fx?.kind === 'hero-star' && fx.id === heroId ? fx.star - 1 : -1;
+    const pips = Array.from({ length: HERO_MAX_STARS }, (_, i) => `<i class="${i < hero.level ? 'lit' : ''}${i === freshPip ? ' sz-new' : ''}">★</i>`).join('');
     const cost = heroStarCost(hero.level);
     const tokenLine = goal !== null ? `<small class="sz-tokens">${t('sector-zero.academy.tokens', { n: tokens, goal })}</small>` : '';
     body += `<div class="sz-hero-head"><span><span class="sz-pips sz-stars" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}${tokenLine}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}${button('upgrade-hero', heroId, cost === null ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { star: hero.level + 1, n: cost }), cost === null || tokens < cost)}</div></div></div>`;
@@ -600,6 +630,7 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // верху ВМЕСТЕ с вкладками (замечание владельца 2026-09-25: «прокрутил вниз и не вижу,
     // сколько у меня ресурсов для прокачки»): цена стоит у кнопки внизу, а запас — всегда на виду.
     panel.innerHTML = `<div class="sz-workhead">${button('back', '', t('sector-zero.prep.back'))}</div><h1>${t('sector-zero.prep')}</h1><p class="sz-sub">${t('sector-zero.prep.hint')} <span class="sz-reward">${p.lastReward ? `${t('sector-zero.prep.reward', { n: p.lastReward })} · ${t('sector-zero.prep.warrants', { n: lastRunWarrants(p) })}` : t('sector-zero.prep.earn')}</span></p>${doubleButton}<div class="sz-stick"><div class="sz-purse"><b class="sz-cur sz-cur-data">${t('sector-zero.prep.research', { n: p.research })}</b><b class="sz-cur sz-cur-warrants">${t('sector-zero.forge.warrants', { n: p.warrants })}</b>${h.platform.sovereigns ? `<b class="sz-cur sz-cur-sovereigns">${t('sector-zero.shop.sovereigns', { n: p.sovereigns })}</b>` : ''}</div><div class="sz-tabs">${tabButton('ships', '⬡', 'sector-zero.prep.modules')}${tabButton('shop', '◈', 'sector-zero.prep.shop')}${tabButton('heroes', '✦', 'sector-zero.prep.heroes')}</div></div><div id="sz-prep-status" role="status" aria-live="polite">${esc(message)}</div>${tab === 'ships' ? ships(p) : tab === 'shop' ? shop(p) : heroes(p)}`;
+    fx = null; // отклик отыгран — следующая перерисовка его не повторит
     // Preserve keyboard position after a purchase or fit without interpolating an id
     // from external storage into a selector.
     if (focusAction)
@@ -713,22 +744,24 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         return;
       }
       if (kind === 'forge') {
-        // Исход читаем по ЗВЁЗДНОСТИ, а не по «удалось ли изменить профиль»: неудачная
-        // попытка тоже меняет профиль (сгорели Варранты, вырос счётчик), и по успеху
-        // вызова их было бы не отличить. Никакой «почти удачи» — ровно два сообщения.
-        const before = h.progress().stars[id] ?? 0;
+        // Исход читаем по ПРОФИЛЮ (`upgradeFx.ts`), а не по «удалось ли изменить профиль»:
+        // неудачная попытка тоже меняет профиль (сгорели Варранты, вырос счётчик), и по
+        // успеху вызова их было бы не отличить. Никакой «почти удачи» — ровно два сообщения.
+        const before = h.progress();
         if (h.change({ kind, id })) {
-          const after = h.progress().stars[id] ?? 0;
+          fx = upgradeFx({ kind, id }, before, h.progress(), h.data);
           message =
-            after > before
-              ? t('sector-zero.forge.won', { n: after })
+            fx?.kind === 'star'
+              ? t('sector-zero.forge.won', { n: fx.star })
               : t('sector-zero.forge.lost');
         } else message = t('sector-zero.prep.unavailable');
         render();
         return;
       }
       if (kind === 'raise-rarity') {
+        const before = h.progress();
         const ok = h.change({ kind, id });
+        if (ok) fx = upgradeFx({ kind, id }, before, h.progress(), h.data);
         message = ok
           ? t('sector-zero.rarity.raised', { r: t(`rarity.${profileRarity(h.progress(), id, h.data)}`) })
           : t('sector-zero.prep.unavailable');
@@ -747,8 +780,14 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         kind === 'upgrade-hero'
       )
         action = { kind, id };
-      if (action)
-        message = t(h.change(action) ? 'sector-zero.prep.saved' : 'sector-zero.prep.unavailable');
+      if (action) {
+        // Звезда корабля и звезда героя — тоже улучшения: отклик решает `upgradeFx`, для
+        // «надеть» и «открыть» он пуст.
+        const before = h.progress();
+        const ok = h.change(action);
+        if (ok) fx = upgradeFx(action, before, h.progress(), h.data);
+        message = t(ok ? 'sector-zero.prep.saved' : 'sector-zero.prep.unavailable');
+      }
     }
     render();
   });

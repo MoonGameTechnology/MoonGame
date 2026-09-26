@@ -1967,6 +1967,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cn-ph{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);margin:14px 0 8px;}
 .cn-ph em{color:var(--dim);font-style:normal;text-transform:none;letter-spacing:0;}
 .cn-pal{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+/* модули группами по типу отсека (moduleGroups.ts): подпись группы — во всю строку сетки */
+.cn-pg{grid-column:1/-1;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:6px;}
+.cn-pg:first-child{margin-top:0;}
 .cn-mod{text-align:left;padding:11px 11px;border:1px solid var(--line-hi);border-radius:10px;background:rgba(53,214,230,.04);
   cursor:pointer;color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:3px;}
 .cn-mod:hover:not(.locked){border-color:var(--cyan);box-shadow:0 0 12px rgba(53,214,230,.18);}
