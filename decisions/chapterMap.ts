@@ -74,7 +74,7 @@ export function chapterTargets(
 ): ChapterTargets {
   const where = (o: (typeof pool)[number]): string[] => {
     // Названное место метится всегда: задача сама говорит, куда идти.
-    if (o.kind === 'control' || o.kind === 'rescue' || o.kind === 'beacon' || o.kind === 'isolate')
+    if (o.kind === 'control' || o.kind === 'rescue' || o.kind === 'beacon' || o.kind === 'isolate' || o.kind === 'recruit')
       return (o.targets ?? []).filter((id) => state.planets[id]);
     if (o.kind === 'build') return (o.at ?? []).filter((id) => state.planets[id]);
     if (o.kind === 'evac')

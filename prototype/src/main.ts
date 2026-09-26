@@ -14246,6 +14246,7 @@ function renderMissionPanel(rows: MissionRow[]): void {
           `<i class="mp-mark" aria-hidden="true">${r.complete ? '✓' : r.failed ? '✗' : '⚑'}</i>` +
           `<span class="mp-name">${esc(t(r.id, { n: missionLabelN(r) }))}</span>` +
           `<b class="mp-prog">${progress}</b>` +
+          (r.kind === 'recruit' ? `<span class="mp-reward">${t('hud.missions.recruit-reward')}</span>` : '') +
           (isTraining() ? '' : missionRewardHtml(r.reward)) +
           (r.targets.length ? `<span class="mp-go">${t('hud.missions.show')}</span>` : '');
         return r.targets.length

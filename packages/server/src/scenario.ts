@@ -204,7 +204,8 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '43'; // PVR-4.7: Левиафан — босс штурма. Состав и
+export const MODULE_MANIFEST_VERSION = '44'; // Rescue heroes on fleet arrival; persisted recruitment facts.
+// export const MODULE_MANIFEST_VERSION = '43'; // PVR-4.7: Левиафан — босс штурма. Состав и
 // порядок модулей те же; сменились правила `pve` 1.6.0 (босс с последней волной по флагу
 // хоста), `hero` 4.3.0 (босс умирает насовсем, смерть узнаётся по корпусу архетипа) и
 // `fleetBrood` 1.1.0 (выводок по `count` на корпус), а у состояния появилась запись

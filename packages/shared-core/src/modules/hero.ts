@@ -333,6 +333,41 @@ function formHeroShip(h: HandlerContext, hero: Hero, at: PlanetId): string {
   return fleetId;
 }
 
+/** Map-authored rescue: a real ship must arrive, and the reward is consumed atomically. */
+function recruitOnArrival(h: HandlerContext, fleetId: string, at: string): void {
+  const fleet = h.state.fleets[fleetId];
+  const planet = h.state.planets[at];
+  const archetype = planet?.recruitHero;
+  const def = archetype ? h.ctx.data.heroes[archetype] : undefined;
+  if (!fleet || !planet || !archetype || !def || def.boss) return;
+  const player = h.state.players[fleet.owner];
+  if (!player || player.ai || player.npc || fleet.location !== at || fleet.movement) return;
+  if (!fleet.units.some((u) => u.count > 0 && (u.hp ?? 1) > 0 && h.ctx.data.units[u.unit]?.domain === 'space')) return;
+  const facts = (h.state.missionFacts ??= {});
+  if (Object.values(facts.recruited ?? {}).some((places) => places.includes(at))) return;
+  // An already deployed/owned archetype must not turn into a second copy of that hero.
+  let hero = Object.values(h.state.heroes ?? {}).find((x) => x.owner === fleet.owner && x.archetype === archetype);
+  if (!hero) {
+    if (activeHeroCount(h.state, fleet.owner) >= HERO_ACTIVE_CAP) return;
+    const id = `recruit:${fleet.owner}:${at}`;
+    hero = {
+      id, owner: fleet.owner, archetype, grade: 'common', location: at,
+      home: h.state.capital?.[fleet.owner] ?? at, cooldowns: {}, skills: [],
+      abilities: [...def.startAbilities], passives: [...def.startPassives],
+      equipped: [
+        ...def.startAbilities,
+        ...def.startPassives.filter((id) => h.ctx.data.heroPassives[id]?.slotted),
+      ].slice(0, def.slots),
+    };
+    (h.state.heroes ??= {})[id] = hero;
+    formHeroShip(h, hero, at);
+    h.emit('hero.spawned', { owner: hero.owner, heroId: id, fleetId: hero.fleetId, at });
+  }
+  ((facts.recruited ??= {})[fleet.owner] ??= []).push(at);
+  delete planet.recruitHero;
+  h.emit('hero.recruited', { owner: hero.owner, heroId: hero.id, at });
+}
+
 /** Charge `cost` to the player's treasury or reject — the shared terminal gate of every
  *  priced hero action (`hero.ability` / `hero.skill.unlock`). Charges the
  *  DRAFT, so a later reject in the same handler still discards the payment. */
@@ -663,8 +698,14 @@ export const heroModule: GameModule = {
   // 4.2.1 PVR-6.24: корабль героя выходит со звёздами и редкостью модулей из арсенала места.
   // 4.3.0 PVR-4.7: босс умирает насовсем; смерть героя узнаётся по корпусу его архетипа;
   // «Поглощение мира» (`devour`) — осада мира вместо мгновенной аннигиляции.
-  version: '4.3.0',
+  // 4.4.0: map-authored hero rescue on arrival, with one-time persisted recruitment facts.
+  version: '4.4.0',
   setup(api) {
+    api.on('fleet.arrived', (event, h) => {
+      const p = event.payload as { fleetId?: unknown; at?: unknown };
+      if (typeof p.fleetId === 'string' && typeof p.at === 'string')
+        recruitOnArrival(h, p.fleetId, p.at);
+    });
 
     // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
     // ПРИБЫЛА — не когда вышла: иначе она летела бы по уже закрытому коридору, а

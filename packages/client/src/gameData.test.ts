@@ -25,12 +25,13 @@ describe('pveState — the PvE door', () => {
       'home_a',
       'home_b',
       'pirate_den',
+      'research_station',
       'ridge',
       'shear',
       'shoal',
       'veil',
     ]);
-    // Двенадцать провинций и НИ ОДНОГО пустого путевого узла: соседство выводится из
+    // Тринадцать провинций и НИ ОДНОГО пустого путевого узла: соседство выводится из
     // мозаики (M4.3), а точке схода линий в мозаике места нет — клетки у неё быть
     // не может, значит и границы тоже (§0 роадмапа карты).
     expect(state.planets.home_a!.owner).toBe('p1'); // the human seat
@@ -54,7 +55,7 @@ describe('pveState — the PvE door', () => {
 
   it('terrain, not coordinates, decides how many lanes a sector carries', () => {
     // MAP-LINK, теперь поверх мозаики (M4.3). Геометрия ПРЕДЛАГАЕТ каждую общую
-    // границу, местность ЗАКРЫВАЕТ лишние: больше половины карты сидит ровно на своём
+    // границу, местность ЗАКРЫВАЕТ лишние: шесть провинций сидят ровно на своём
     // бюджете, и «эта провинция — тупик» остаётся фактом мира, а не следствием того,
     // куда автор поставил точки.
     const state = pveState(data);
@@ -73,11 +74,11 @@ describe('pveState — the PvE door', () => {
     for (const id of Object.keys(state.planets)) {
       expect([id, degree(id) <= budget(id)]).toEqual([id, true]);
     }
-    // Seven sectors are AT their budget — the constraint is real, not decorative.
+    // Six sectors are AT their budget — the constraint is real, not decorative.
     const atBudget = Object.keys(state.planets)
       .filter((id) => degree(id) === budget(id))
       .sort();
-    expect(atBudget).toEqual(['cluster', 'drift', 'ford', 'ridge', 'shear', 'shoal', 'veil']);
+    expect(atBudget).toEqual(['cluster', 'drift', 'ford', 'ridge', 'shear', 'shoal']);
   });
 
   it('a border with no lane is SEALED, not absent — the mosaic never lies', () => {
@@ -97,11 +98,8 @@ describe('pveState — the PvE door', () => {
     // И то, что закрыто, НЕ проходимо: печать — это не украшение поверх открытого пути.
     for (const [id, p] of Object.entries(state.planets))
       for (const other of p.sealed ?? []) expect([id, p.links ?? []]).toEqual([id, expect.not.arrayContaining([other])]);
-    // Местность закрыла восемь границ этой карты, и каждая объяснима: скопление
-    // впускает один подход, ионные штормы не смыкаются друг с другом и несут по два пути,
-    // гнездо не режет напрямик в астероидную отмель; к пиратам ведёт только домашний
-    // подход; туманный брод в центре ведёт к обоим домам, дрейфу и пелене, а к штормам
-    // и отмели на юге прохода нет.
+    // Центральная научная станция делит прежние границы. Местность закрывает десять
+    // границ; астероидный коридор и подход к пиратам остаются прежними.
     const seals = Object.entries(state.planets)
       .flatMap(([id, p]) => (p.sealed ?? []).map((o) => (id < o ? `${id}|${o}` : `${o}|${id}`)))
       .filter((k, i, all) => all.indexOf(k) === i)
@@ -110,11 +108,13 @@ describe('pveState — the PvE door', () => {
       'cluster|drift',
       'cove|ridge',
       'drift|pirate_den',
-      'ford|ridge',
-      'ford|shear',
-      'ford|shoal',
+      'drift|research_station',
+      'ford|veil',
       'hive|shoal',
-      'ridge|shear',
+      'research_station|ridge',
+      'research_station|shoal',
+      'research_station|veil',
+      'shear|veil',
     ]);
   });
 
@@ -153,10 +153,10 @@ describe('pveState — the PvE door', () => {
     // а не указывает в пустоту.
     expect(state.planets.drift!.links).toEqual(['ford', 'home_a', 'shoal']);
     // Поперечный срез действительно исчез, а не стал длиннее на шаг:
-    expect(planRoute(state, 'shoal', 'veil')).toEqual(['drift', 'home_a', 'ford', 'veil']);
+    expect(planRoute(state, 'shoal', 'veil')).toEqual(['drift', 'home_a', 'ford', 'home_b', 'veil']);
     // …и у Роя два разных подхода к двум домам — восточный через заводь и западный
     // через отмель, вместо одной общей спины через перекрёсток.
-    expect(planRoute(state, 'hive', 'home_b')).toEqual(['cove', 'shear', 'veil', 'home_b']);
+    expect(planRoute(state, 'hive', 'home_b')).toEqual(['cove', 'research_station', 'ford', 'home_b']);
     expect(planRoute(state, 'hive', 'home_a')).toEqual(['ridge', 'shoal', 'drift', 'home_a']);
   });
 });
