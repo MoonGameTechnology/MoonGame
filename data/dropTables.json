@@ -9,6 +9,7 @@
     { "kind": "hull", "defId": "siege_lance", "weight": 2 },
     { "kind": "hull", "defId": "interceptor", "weight": 2 },
     { "kind": "hull", "defId": "bomber", "weight": 2 },
+    { "kind": "hull", "defId": "heavy_striker", "weight": 1 },
     { "kind": "hull", "defId": "strike_carrier", "weight": 1 },
     { "kind": "hull", "defId": "shuttle_carrier", "weight": 1 },
     { "kind": "module", "defId": "targeting_array", "weight": 3 },

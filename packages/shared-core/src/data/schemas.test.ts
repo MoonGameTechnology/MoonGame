@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.44'); // PVR-4.7: Левиафан — босс матёрого Роя (юнит, архетип, способность, пассивка, выводок, `pve.boss`) поверх 0.1.43 (у Роя ветеранов нет)
+    expect(data.version).toBe('0.1.45'); // тяжёлый ударный страйкер (`heavy_striker`, shuttles-roadmap §0.5) поверх 0.1.44 (Левиафан)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -329,6 +329,10 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // BAL он не отбирает ничего, а ветка крепости получает вторую ступень глубины рядом
     // с ангаром: крепость → её постройки.
     //
+    // Тяжёлый ударный страйкер (2026-09-26, `shuttles-roadmap.md` §0.5) — дальний удар
+    // шаттлов (радиус 260) отбирает доступное с первой минуты намеренно: его место —
+    // второй ярус ветки шаттлов, после того как игрок освоил ударного страйкера.
+    //
     // FORT-5.11 (2026-09-16) — ШЕСТАЯ строка, и тоже из дешёвых: ангар крепости заведён
     // в тот же день (FORT-5.7), стоит только на крепости и с первой минуты недоступен по
     // определению — до него надо сперва изучить саму крепость. Отбирать у замеров BAL
@@ -363,6 +367,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
       'industrial_automation → building:mine_t2',
       'orbital_defense_grid → building:orbital_aa',
       'siege_doctrine → unit:siege_lance',
+      'strike_vectors → unit:heavy_striker',
       'void_fortification → building:starfort',
       'void_shielding → building:void_shield',
       'void_shipworks → building:void_hangar',

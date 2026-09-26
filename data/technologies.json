@@ -230,6 +230,11 @@
     "prerequisites": [
       "flight_decks"
     ],
+    "unlocks": {
+      "units": [
+        "heavy_striker"
+      ]
+    },
     "effects": {
       "combatDamageBonus": 0.08
     }

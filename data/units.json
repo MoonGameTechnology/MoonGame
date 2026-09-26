@@ -352,6 +352,38 @@
       "weapon": 1
     }
   },
+  "heavy_striker": {
+    "faction": "blue",
+    "stats": {
+      "attack": 34,
+      "defense": 6,
+      "speed": 44,
+      "hp": 30,
+      "strikeRange": 260,
+      "chaseRadius": 10,
+      "fuel": 2,
+      "rearmRounds": 4,
+      "siegeDamage": 30,
+      "shuttleDamage": 3
+    },
+    "line": "front",
+    "traits": [
+      "shuttle"
+    ],
+    "signature": 3,
+    "cost": {
+      "metal": 200,
+      "credits": 100,
+      "microelectronics": 24
+    },
+    "buildTimeHours": 5,
+    "upkeep": {
+      "credits": 64
+    },
+    "slots": {
+      "weapon": 1
+    }
+  },
   "landing_shuttle": {
     "faction": "blue",
     "stats": {
