@@ -748,6 +748,80 @@ describe('combat — lane intercept (crossing ON a lane, GDD §7.4)', () => {
   });
 });
 
+describe('combat — бой на дороге втягивает проходящего (MSB-3 на дороге)', () => {
+  // A(0,0) — B(60,0); скорость 5 ⇒ 12h от края до края, середина — 6h. Стороны — двадцать
+  // щитов (hp 50) и один истребитель (10 урона за раунд): бой тянется десятки раундов, и
+  // проходящему есть во что вступать.
+  function lane(): Planet[] {
+    const a = planet('A', null, 0, 0);
+    const b = planet('B', null, 60, 0);
+    a.links = ['B'];
+    b.links = ['A'];
+    return [a, b];
+  }
+  const parked = (): Fleet => ({
+    id: 'P',
+    owner: 'p1',
+    location: null,
+    movement: null,
+    edge: { from: 'A', to: 'B', t: 0.5 },
+    units: stacks([['shield', 20], ['fighter', 1]]),
+    traits: [],
+  });
+
+  it('враг, выехавший на дорогу ПОСЛЕ начала боя, вступает в него, а не проходит насквозь', () => {
+    const kernel = createKernel([...combatFamily, movementModule]);
+    const st = baseState(
+      [parked(), fleet('E', 'p2', 'A', [['shield', 20], ['fighter', 1]]), fleet('E2', 'p2', 'A', [['guardian', 1]])],
+      lane(),
+    );
+    const m = okApply(kernel.applyAction(st, move('E', 'B', 'p2'), ctx(0)));
+    const fight = okAdvance(kernel.advanceTo(m.state, ctx(6 * HOUR)));
+    const battleId = fight.state.fleets.P?.battleId;
+    expect(battleId).toBeDefined();
+    const m2 = okApply(kernel.applyAction(fight.state, move('E2', 'B', 'p2'), ctx(6 * HOUR)));
+    const r = okAdvance(kernel.advanceTo(m2.state, ctx(13 * HOUR)));
+    const e2 = r.state.fleets.E2;
+    expect(e2?.location).not.toBe('B'); // не проехал сквозь бой
+    expect(e2?.battleId).toBe(battleId);
+    expect(e2?.edge).toEqual({ from: 'A', to: 'B', t: 0.5 });
+    expect(r.state.battles[battleId!]?.sides.map((x) => x.ref.kind === 'fleet' && x.ref.fleetId)).toContain('E2');
+    expect(types(r.events)).toContain('battle.joined');
+  });
+
+  it('враг, уже ехавший по дороге, когда там завязался бой, тоже вступает', () => {
+    const kernel = createKernel([...combatFamily, movementModule]);
+    const st = baseState(
+      [parked(), fleet('E', 'p2', 'A', [['shield', 20], ['fighter', 1]]), fleet('E2', 'p2', 'A', [['guardian', 1]])],
+      lane(),
+    );
+    const m1 = okApply(kernel.applyAction(st, move('E', 'B', 'p2'), ctx(0)));
+    const at1 = okAdvance(kernel.advanceTo(m1.state, ctx(1 * HOUR)));
+    const m2 = okApply(kernel.applyAction(at1.state, move('E2', 'B', 'p2'), ctx(1 * HOUR)));
+    const r = okAdvance(kernel.advanceTo(m2.state, ctx(8 * HOUR)));
+    const battleId = r.state.fleets.P?.battleId;
+    expect(battleId).toBeDefined();
+    expect(r.state.fleets.E2?.location).not.toBe('B');
+    expect(r.state.fleets.E2?.battleId).toBe(battleId);
+    expect(r.state.fleets.E2?.edge).toEqual({ from: 'A', to: 'B', t: 0.5 });
+  });
+
+  it('свой флот, проезжающий мимо боя своего флота, вступает на его стороне', () => {
+    const kernel = createKernel([...combatFamily, movementModule]);
+    const st = baseState(
+      [parked(), fleet('E', 'p2', 'A', [['shield', 20], ['fighter', 1]]), fleet('P2', 'p1', 'B', [['guardian', 1]])],
+      lane(),
+    );
+    const m = okApply(kernel.applyAction(st, move('E', 'B', 'p2'), ctx(0)));
+    const fight = okAdvance(kernel.advanceTo(m.state, ctx(6 * HOUR)));
+    const battleId = fight.state.fleets.P?.battleId;
+    const m2 = okApply(kernel.applyAction(fight.state, move('P2', 'A', 'p1'), ctx(6 * HOUR)));
+    const r = okAdvance(kernel.advanceTo(m2.state, ctx(13 * HOUR)));
+    expect(r.state.fleets.P2?.location).not.toBe('A');
+    expect(r.state.fleets.P2?.battleId).toBe(battleId);
+  });
+});
+
 describe('combat — ships keep hull damage; ground rests at full (persistent hull)', () => {
   it('leaves a surviving fleet at its battle-end hull, so damage carries forward', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);

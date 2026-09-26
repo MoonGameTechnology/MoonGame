@@ -327,6 +327,11 @@ function runningBattleFor(h: HandlerContext, at: string, owner: string): Battle 
  */
 function joinBattle(h: HandlerContext, fleet: Fleet, battle: Battle, at: string): void {
   pinToNode(fleet, at);
+  enlist(h, fleet, battle);
+}
+
+/** Записать флот стороной в идущий бой — общее у вступления на узле и на дороге. */
+function enlist(h: HandlerContext, fleet: Fleet, battle: Battle): void {
   fleet.battleId = battle.id;
   battle.sides.push({
     ref: { kind: 'fleet', fleetId: fleet.id },
@@ -335,10 +340,36 @@ function joinBattle(h: HandlerContext, fleet: Fleet, battle: Battle, at: string)
   });
   h.emit('battle.joined', {
     battleId: battle.id,
-    location: at,
+    location: battle.location,
     fleetId: fleet.id,
     owner: fleet.owner,
   });
+}
+
+/**
+ * ВСТУПЛЕНИЕ В БОЙ НА ДОРОГЕ — MSB-3 для боя посреди дороги (найдено в плейтесте Sector
+ * Zero 2026-09-26: второй флот Роя проехал СКВОЗЬ бой на дороге). Встречу на дороге
+ * назначает `intercept`, и он теперь видит и флот, уже сцепившийся в бою на дороге: для
+ * проходящего это такая же стоящая на дороге точка. Когда встреча наступает и один из пары
+ * уже дерётся, второй не открывает новую дуэль, а вступает в ТОТ ЖЕ бой — атакующим, как
+ * и на узле («кто вступает, тот атакующий»), и встаёт в точку боя, а не едет дальше.
+ *
+ * Возвращает, состоялось ли вступление. Не состоялось — встреча протухла: бой уже кончился
+ * или ушёл в наземную фазу, флот сошёл с дороги или больше не враг никому в бою.
+ */
+function joinRoadBattle(h: HandlerContext, fighter: Fleet, mover: Fleet): boolean {
+  const battle = fighter.battleId ? h.state.battles[fighter.battleId] : undefined;
+  const at = fighter.edge;
+  if (!battle || battle.phase !== 'orbital' || !at || fighter.movement) return false;
+  if (!mover.units.some((s) => s.count > 0)) return false;
+  const hostile = battle.sides.some(
+    (side) => side.owner !== null && isHostile(h, mover.owner, side.owner) && sideAlive(h.state, side.ref),
+  );
+  if (!hostile) return false;
+  rememberMarch(mover);
+  pinToEdge(mover, at.from, at.to, at.t);
+  enlist(h, mover, battle);
+  return true;
 }
 
 /**
@@ -903,7 +934,7 @@ function groundVolleys(
 
 export const combatModule: GameModule = {
   id: 'combat',
-  version: '2.3.0',
+  version: '2.4.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -960,7 +991,7 @@ export const combatModule: GameModule = {
       const { a, b } = event.payload as { a: string; b: string };
       const fa = h.state.fleets[a];
       const fb = h.state.fleets[b];
-      if (!fa || !fb || fa.battleId || fb.battleId) {
+      if (!fa || !fb || (fa.battleId && fb.battleId)) {
         return;
       }
       if (!isHostile(h, fa.owner, fb.owner)) {
@@ -978,6 +1009,11 @@ export const combatModule: GameModule = {
       const sb = posAt(ob, h.ctx.now);
       if (Math.abs(sa - sb) > INTERCEPT_TOL) {
         return; // not actually meeting now — stale
+      }
+      // Один уже дерётся на этой точке дороги — второй вступает в его бой.
+      if (fa.battleId || fb.battleId) {
+        joinRoadBattle(h, fa.battleId ? fa : fb, fa.battleId ? fb : fa);
+        return;
       }
       const t = Math.min(1 - EDGE_EPS, Math.max(EDGE_EPS, (sa + sb) / 2));
       rememberMarch(fa);
@@ -1007,13 +1043,18 @@ export const combatModule: GameModule = {
       const { a, b, trunk } = event.payload as { a: string; b: string; trunk: string };
       const fa = h.state.fleets[a];
       const fb = h.state.fleets[b];
-      if (!fa || !fb || fa.battleId || fb.battleId) return;
+      if (!fa || !fb || (fa.battleId && fb.battleId)) return;
       if (!isHostile(h, fa.owner, fb.owner)) return;
       if (!fa.units.some((s) => s.count > 0) || !fb.units.some((s) => s.count > 0)) return;
       const oa = trunkOccupancies(h.state, fa).find((o) => o.key === trunk);
       const ob = trunkOccupancies(h.state, fb).find((o) => o.key === trunk);
       if (!oa || !ob) return; // one left the trunk (re-routed / arrived) — stale
       if (Math.abs(trunkPosAt(oa, h.ctx.now) - trunkPosAt(ob, h.ctx.now)) > INTERCEPT_TOL) return;
+      // Бой уже идёт на этом стволе — проходящий вступает в него (как на полосе).
+      if (fa.battleId || fb.battleId) {
+        joinRoadBattle(h, fa.battleId ? fa : fb, fa.battleId ? fb : fa);
+        return;
+      }
       for (const f of [fa, fb]) {
         const mv = f.movement;
         if (!mv) continue; // parked: already where the fight is
