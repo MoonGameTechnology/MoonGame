@@ -27,6 +27,7 @@ export const MODULE_ICON: Record<string, string> = {
   radar_module: '📡',
   compact_radar: '📡',
   cargo_bay: '📦',
+  repair_bay: '🔧',
   siege_platform: '💥',
   swarm_brood_chamber: '🧬',
 };

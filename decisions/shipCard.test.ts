@@ -62,4 +62,12 @@ describe('карточка корабля — характеристики (пр
     expect(shield).toMatchObject({ base: 0, effective: 15, delta: 15 });
     expect(fitted.stats.some((s) => s.stat === 'radarRange')).toBe(true);
   });
+
+  it('ремонтный ангар виден строкой ремонта корпуса и вкладом отсека (SHU-5.5)', () => {
+    const bare = shipCardModel({ unit: 'cruiser', count: 1 }, data)!;
+    expect(bare.stats.map((s) => s.stat)).not.toContain('hullRepair');
+    const m = shipCardModel({ unit: 'cruiser', count: 1, modules: ['repair_bay'] }, data)!;
+    expect(m.stats.find((s) => s.stat === 'hullRepair')).toMatchObject({ base: 0, effective: 0.05 });
+    expect(m.bays.find((b) => b.module === 'repair_bay')!.effect).toEqual({ hullRepair: 0.05 });
+  });
 });

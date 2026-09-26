@@ -134,7 +134,7 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
-import { fleetHolds } from '../../decisions/fleetHolds';
+import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
 import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
 import { veteranMark, fleetVeteranGrade } from '../../decisions/veteranMark';
 import { veteranTag } from './veteranChevrons';
@@ -6221,7 +6221,7 @@ function render(now: number) {
     const dock = !f.movement && f.location ? s.planets[f.location] : null;
     drawFleetHoldBadge(
       cx, A, heroesByFleet.has(f.id) ? null : dock ? world(dock.position) : null, ships,
-      f.owner === ME ? fleetHolds(f, data, s.time) : [],
+      f.owner === ME ? fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)) : [],
       selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
       col,
       fleetVeteranGrade(f.units, data),
@@ -6318,6 +6318,9 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
       : t('side.wing.hangar', { used: view.used, bay: view.bay });
   const head =
     `<div class="sec">${title}</div>` +
+    // Места улетевших держатся за бортом (SHU-5.1): без этой строки «2 из 4» при пустом
+    // трюме читалось бы как «два места свободны», а погрузку на них ядро отобьёт.
+    (view.aloft > 0 ? `<div class="row dim">${esc(t('side.wing.aloft', { n: view.aloft }))}</div>` : '') +
     (view.sortie
       ? `<div class="row dim">${
           view.sortie.rearming > 0
@@ -6373,7 +6376,13 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
 function squadronCardHtml(card: SquadronCard, view: HangarView): string {
   const title = `${t(SQUADRON_KIND_KEY)} «${card.name}»`;
   const cargo = card.cargo.reduce((n, st) => n + st.count, 0);
-  const sub = cargo > 0 ? ` <span class="dim">· ${esc(t('side.wing.cargo', { n: cargo }))}</span>` : '';
+  // Места звена в трюме (SHU-5.1), десант (SHU-5.2) и корпус подбитого борта (SHU-5.3).
+  const notes = [
+    t('side.wing.places', { n: card.places }),
+    ...(cargo > 0 ? [t('side.wing.cargo', { n: cargo })] : []),
+    ...(card.hull !== null ? [t('side.wing.hull', { p: card.hull })] : []),
+  ];
+  const sub = ` <span class="dim">· ${esc(notes.join(' · '))}</span>`;
   const head = `<div class="row"><b>${esc(title)}</b>${sub}</div>`;
   const rows = unitRows(card.stacks);
   if (!card.canStrike && !card.canSplit && !card.canMerge) return head + rows;
@@ -6617,7 +6626,7 @@ function fleetSummaryHtml(f: Fleet): string {
   rows.push(
     `<div class="row">⚡ ${t('side.summary.speed')}: <b>${sm.speed > 0 ? Math.round(sm.speed) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('side.summary.speed.note')}</span></div>`,
   );
-  if (f.owner === ME) rows.push(fleetHoldsHtml(fleetHolds(f, data, s.time)));
+  if (f.owner === ME) rows.push(fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data))));
   else if (sm.cargo)
     rows.push(
       `<div class="row">📦 ${t('side.summary.cargo')}: <b>${sm.cargo.used}/${sm.cargo.cap}</b></div>`,
@@ -6726,7 +6735,7 @@ function fleetPanelHtml(f: Fleet): string {
     if (sm.shield.max > 0)
       h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
-  if (f.owner === ME) h += fleetHoldsHtml(fleetHolds(f, data, s.time));
+  if (f.owner === ME) h += fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)));
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
   // корпусам, лимп <30% учтён), с меткой форс-марша. The hero aura (+5%, noted
@@ -6805,7 +6814,7 @@ function fleetPanelHtml(f: Fleet): string {
   // летает во флоте, он стоит в космопорте и бьёт оттуда (SHU-1.2). Но «Шаттл» —
   // вторая база челноков, она ездит вместе с флотом, и её трюм показывать больше
   // негде: до этого кирпича шесть машин на борту не были видны игроку вообще.
-  const hold = f.owner === ME && enemyKnown ? fleetHangar(f, data) : null;
+  const hold = f.owner === ME && enemyKnown ? fleetHangar(f, data, s) : null;
   if (hasHangar(hold)) {
     h += hangarSectionHtml(hold, f.id, true);
     // Перегрузка предлагается, только когда пройдёт: носитель стоит у СВОЕГО мира и
@@ -7232,7 +7241,7 @@ function planetPanelHtml(p: Planet): string {
       // флота-носителя, тогда как челноки он видит и строит здесь. Приказ тот же
       // (`wingload`/`wingunload` адресуют ФЛОТ), поэтому обработчик не тронут.
       const ship = mine ? dockedCarrier(Object.values(s.fleets), p.id, ME, data) : null;
-      const offer = transferOffer(port, ship ? fleetHangar(ship, data) : null, {
+      const offer = transferOffer(port, ship ? fleetHangar(ship, data, s) : null, {
         docked: true, // `dockedCarrier` уже спросил про стоянку, бой и чужой флот
         mine: true,
       });
@@ -9033,7 +9042,7 @@ side.addEventListener('click', (ev) => {
     const f = s.fleets[arg];
     const at = f?.location ? s.planets[f.location] : undefined;
     const portView = at ? planetHangar(at, data) : null;
-    const holdView = f ? fleetHangar(f, data) : null;
+    const holdView = f ? fleetHangar(f, data, s) : null;
     const up = act === 'wingload';
     const pick = transferPick(up ? portView : holdView, up ? holdView : portView);
     if (pick) {

@@ -70,6 +70,7 @@ export const SHIP_CARD_STATS = [
   'hp',
   'shield',
   'shieldRegen',
+  'hullRepair',
   'speed',
   'radarRange',
   'cargoCapacity',

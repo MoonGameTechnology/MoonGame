@@ -3,11 +3,13 @@
  * hold minus what the other share already occupies, so both read the same free space. Loading reserves its whole volume until the snapshot
  * moves it aboard; animation progress never changes custody or free space. */
 import {
+  fleetHoldFree,
   fleetShuttleBay,
   hangarSize,
   sumUnitStat,
   type Fleet,
   type GameData,
+  type GameState,
 } from '../packages/shared-core/src/index';
 
 export interface FleetHold {
@@ -46,7 +48,19 @@ function hold(
   };
 }
 
-export function fleetHolds(fleet: Fleet, data: GameData, now: number): FleetHold[] {
+/** Places held by the fleet's squadrons that are OUT on a sortie (SHU-5.1): the hull
+ * keeps them for the return, so they are neither aboard nor free. Derived from the
+ * core's own `fleetHoldFree`, the number both load orders are measured against. */
+export function fleetAloftPlaces(state: GameState, fleet: Fleet, data: GameData): number {
+  return Math.max(
+    0,
+    fleetShuttleBay(fleet, data) - hangarSize(fleet, data) - fleetHoldFree(state, fleet, data),
+  );
+}
+
+/** `aloft` — places of squadrons out on a sortie (`fleetAloftPlaces`): they count as
+ * shuttle places, so the troops meter never offers space the core would refuse. */
+export function fleetHolds(fleet: Fleet, data: GameData, now: number, aloft = 0): FleetHold[] {
   const capacity = sumUnitStat(fleet.units, data, 'cargoCapacity');
   const used = sumUnitStat(fleet.landing ?? [], data, 'cargoSize');
   let reserved = 0;
@@ -59,7 +73,7 @@ export function fleetHolds(fleet: Fleet, data: GameData, now: number): FleetHold
     reserved += volume;
     progressed += volume * progress;
   }
-  const machines = hangarSize(fleet, data);
+  const machines = hangarSize(fleet, data) + aloft;
   const meters: FleetHold[] = [];
   if (capacity > 0 || used > 0 || reserved > 0)
     meters.push(

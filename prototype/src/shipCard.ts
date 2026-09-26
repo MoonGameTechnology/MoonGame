@@ -17,6 +17,7 @@ import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
 import type { ShipCardModel, ShipCardStat } from '../../decisions/shipCard';
+import { isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
 import { unitDamageHtml } from './unitDamageView';
 import { chevronsSvg } from './veteranChevrons';
 
@@ -37,6 +38,7 @@ const STAT_LABEL: Record<string, string> = {
   hp: 'loadout.stat.hp',
   shield: 'loadout.stat.shield',
   shieldRegen: 'loadout.stat.shield-regen',
+  hullRepair: 'loadout.stat.hull-repair',
   speed: 'loadout.stat.speed',
   radarRange: 'loadout.stat.radar',
   cargoCapacity: 'loadout.stat.cargo',
@@ -44,9 +46,9 @@ const STAT_LABEL: Record<string, string> = {
   siegeDamage: 'loadout.stat.siege',
 };
 
-/** Значение для глаза: доля восстановления щита — процентом в час, прочее — до десятых. */
+/** Значение для глаза: доли в час (щит, ремонт корпуса) — процентом в час, прочее — до десятых. */
 function value(stat: string, v: number): string {
-  if (stat === 'shieldRegen') return t('loadout.stat.share-per-hour', { n: Math.round(v * 1000) / 10 });
+  if (isPerHourShare(stat)) return t('loadout.stat.share-per-hour', { n: perHourPercent(v) });
   return String(Math.round(v * 10) / 10);
 }
 

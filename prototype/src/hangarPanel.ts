@@ -40,7 +40,7 @@
  *    порт, стоя на идущем «Шаттле». Признак живёт в данных, а не в разметке, потому что
  *    разметка его не выведет — по составу порт от трюма не отличить.
  */
-import type { GameData, Fleet, Planet, Squadron, UnitStack } from '../../packages/shared-core/src/index';
+import type { GameData, GameState, Fleet, Planet, Squadron, UnitStack } from '../../packages/shared-core/src/index';
 import {
   canSortie,
   fleetShuttleBay,
@@ -51,6 +51,7 @@ import {
   sortieSpec,
   type SortieState,
 } from '../../packages/shared-core/src/index';
+import { fleetAloftPlaces } from '../../decisions/fleetHolds';
 
 /** Почему вылет невозможен прямо сейчас — или `null`, если возможен (правило 3). */
 export type HangarBlock = 'empty' | 'busy' | 'rearming' | 'no-fuel' | null;
@@ -75,6 +76,9 @@ export interface HangarView {
   used: number;
   /** Вместимость в местах; у стоящего порта — `Infinity` (порт без предела). */
   bay: number;
+  /** Места эскадр, УЛЕТЕВШИХ в вылет (SHU-5.1): борт держит их до возврата, поэтому
+   *  они не свободны, хотя машин в трюме нет. У порта — 0 (он без предела). */
+  aloft: number;
   free: number;
   /** Топливо места (правило 2). `undefined` — счётчика нет (пустой носитель). */
   sortie?: { fuel: number; maxFuel: number; rearming: number };
@@ -95,6 +99,7 @@ function view(
   sortie: SortieState | undefined,
   maxFuel: number,
   busy = false,
+  aloft = 0,
 ): HangarView | null {
   if (bay <= 0) return null;
   const squadrons = (host.hangar ?? []).filter((sq) => sq.units.some((st) => st.count > 0));
@@ -120,7 +125,8 @@ function view(
     stacks,
     used,
     bay,
-    free: Math.max(0, bay - used),
+    aloft,
+    free: Math.max(0, bay - used - aloft),
     ...(maxFuel > 0 ? { sortie: { fuel: live.fuel, maxFuel, rearming: live.rearming } } : {}),
     blocked,
   };
@@ -152,17 +158,24 @@ export function planetHangar(planet: Planet, data: GameData): HangarView | null 
  * панель зеркалила все три условия; решением владельца движение перестало быть помехой,
  * и «Удар» на ходу больше не гаснет. Условие здесь по-прежнему ЗЕРКАЛО ядра, а не своя
  * копия: кнопка не должна обещать приказ, который отобьют после прицеливания.
+ *
+ * `state` — чтобы увидеть места улетевших эскадр (`aloft`, SHU-5.1): их считает
+ * `fleetAloftPlaces` от той же `fleetHoldFree`, что меряет погрузку в ядре. Без состояния улетевших
+ * не видно, и `aloft` = 0.
  */
-export function fleetHangar(fleet: Fleet, data: GameData): HangarView | null {
+export function fleetHangar(fleet: Fleet, data: GameData, state?: GameState): HangarView | null {
   const busy = !!fleet.battleId;
+  const bay = fleetShuttleBay(fleet, data);
+  const aloft = state ? fleetAloftPlaces(state, fleet, data) : 0;
   return view(
     data,
     'hold',
     fleet,
-    fleetShuttleBay(fleet, data),
+    bay,
     fleet.sortie,
     sortieSpec(fleet, data).maxFuel,
     busy,
+    aloft,
   );
 }
 
