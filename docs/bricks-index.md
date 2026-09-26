@@ -1229,6 +1229,11 @@
 | SM-2.4 | 🔒 | core | `docs/ship-modules-roadmap.md` | Завершение + бой-фриз + ОГРАНИЧЕННЫЙ re-defer |
 | SM-2.5 | 🔒 | cli | `docs/ship-modules-roadmap.md` | Рендер фабрики |
 | SM-2.6 | 🔒 | data srv | `docs/ship-modules-roadmap.md` | Фейрнес/P2W-гард фабрики |
+| SM-3.1 | ⏳ | core data | `docs/ship-modules-roadmap.md` | Тяговый луч: отступать от него дороже |
+| SM-3.2 | ⏳ | core data | `docs/ship-modules-roadmap.md` | Сборщик обломков: больше трофеев с боя |
+| SM-3.3 | ⏳ | core data | `docs/ship-modules-roadmap.md` | Ремонтный тендер: чинит соседей по флоту |
+| SM-3.4 | ⏳ | core data | `docs/ship-modules-roadmap.md` | Минный заградитель: минное поле на узле |
+| SM-3.5 | 🔒 | proto | `docs/ship-modules-roadmap.md` | Мины на карте прототипа |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |
