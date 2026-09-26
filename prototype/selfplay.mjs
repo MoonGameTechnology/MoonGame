@@ -203,11 +203,23 @@ function runMatch(i) {
   let strikeDamage = 0;
   let shuttlesDowned = 0;
   let dropsLanded = 0;
+  // SHU-5.6 — ЧЕТЫРЕ ДЕЙСТВИЯ ФАЗЫ 5 у сильного бота: шаттл погружен в трюм корабля
+  // (и сколько вылетов поднято С КОРАБЛЯ, а не с порта — «возит» доказывает вылет),
+  // десантный челнок построен с бойцом, тяжёлый страйкер построен, корабль сошёл со
+  // стапеля с ремонтным ангаром. Ноль в любой из четырёх = действие вне игры бота.
+  let holdLoads = 0;
+  let fleetSorties = 0;
+  let landersBuilt = 0;
+  let repairBaysBuilt = 0;
   const consume = (events, now) => {
     for (const e of events) {
       if (e.type === 'unit.built') {
         const p = e.payload ?? {};
         usage.set(p.unit, (usage.get(p.unit) ?? 0) + (p.count ?? 1));
+        if (typeof p.troop === 'string') landersBuilt += p.count ?? 1;
+        if ((p.modules ?? []).includes('repair_bay')) repairBaysBuilt += p.count ?? 1;
+      } else if (e.type === 'shuttle.loaded') {
+        holdLoads++;
       } else if (e.type === 'building.constructed') {
         const p = e.payload ?? {};
         usage.set(p.building, (usage.get(p.building) ?? 0) + 1);
@@ -249,6 +261,7 @@ function runMatch(i) {
         bombardSpans++;
       } else if (e.type === 'shuttle.launched') {
         sorties++;
+        if ((e.payload ?? {}).fromKind === 'fleet') fleetSorties++;
       } else if (e.type === 'shuttle.hit') {
         strikeHits++;
         strikeDamage += (e.payload ?? {}).damage ?? 0;
@@ -370,6 +383,11 @@ function runMatch(i) {
     strikeDamage,
     shuttlesDowned,
     dropsLanded,
+    holdLoads,
+    fleetSorties,
+    landersBuilt,
+    heavyStrikersBuilt: usage.get('heavy_striker') ?? 0,
+    repairBaysBuilt,
     heroSpawns,
     heroSkills,
     heroFits,
@@ -432,6 +450,11 @@ let strikeHitsTotal = 0;
 let strikeDamageTotal = 0;
 let shuttlesDownedTotal = 0;
 let dropsLandedTotal = 0;
+let holdLoadsTotal = 0;
+let fleetSortiesTotal = 0;
+let landersBuiltTotal = 0;
+let heavyStrikersTotal = 0;
+let repairBaysTotal = 0;
 let heroSpawnsTotal = 0;
 let heroSkillsTotal = 0;
 let heroFitsTotal = 0;
@@ -479,6 +502,11 @@ for (let i = 0; i < N; i++) {
   strikeDamageTotal += r.strikeDamage;
   shuttlesDownedTotal += r.shuttlesDowned;
   dropsLandedTotal += r.dropsLanded;
+  holdLoadsTotal += r.holdLoads;
+  fleetSortiesTotal += r.fleetSorties;
+  landersBuiltTotal += r.landersBuilt;
+  heavyStrikersTotal += r.heavyStrikersBuilt;
+  repairBaysTotal += r.repairBaysBuilt;
   heroSpawnsTotal += r.heroSpawns;
   heroSkillsTotal += r.heroSkills;
   heroFitsTotal += r.heroFits;
@@ -698,6 +726,7 @@ console.log(
     `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
     `  рынок      : сделок ${tradesTotal} на ${tradeCreditsTotal.toFixed(0)} credits (сгорело комиссией ${tradeFeesTotal.toFixed(0)})  ← AI-BAL-9; лоты выставлялись и раньше, доказывают только СДЕЛКИ`,
     `  челноки    : вылетов ${sortiesTotal} · попаданий ${strikeHitsTotal} на ${strikeDamageTotal.toFixed(0)} урона · сбито машин ${shuttlesDownedTotal} · высадок ${dropsLandedTotal}  ← SHU-3.2; «построено» в мёртвом контенте НЕ доказывает механику: машина может пролежать весь матч в порту. Ноль вылетов при ненулевой постройке — ровно этот случай`,
+    `  фаза 5     : в трюм погружено эскадр ${holdLoadsTotal} (вылетов с корабля ${fleetSortiesTotal}) · челноков с бойцом ${landersBuiltTotal} · тяжёлых страйкеров ${heavyStrikersTotal} · кораблей с ремонтным ангаром ${repairBaysTotal}  ← SHU-5.6; 0 = действие вне игры бота`,
     `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
       [...heroCastsTotal.entries()]
         .sort()
@@ -834,6 +863,11 @@ console.log(
         strikeDamage: strikeDamageTotal,
         shuttlesDowned: shuttlesDownedTotal,
         dropsLanded: dropsLandedTotal,
+        holdLoads: holdLoadsTotal,
+        fleetSorties: fleetSortiesTotal,
+        landersBuilt: landersBuiltTotal,
+        heavyStrikersBuilt: heavyStrikersTotal,
+        repairBaysBuilt: repairBaysTotal,
         heroSpawns: heroSpawnsTotal,
         heroSkills: heroSkillsTotal,
         heroFits: heroFitsTotal,

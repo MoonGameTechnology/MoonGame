@@ -1248,7 +1248,7 @@
 | SHU-5.3 | ✅ | core | `docs/shuttles-roadmap.md` | Урон шаттлов между вылетами |
 | SHU-5.4 | ✅ | core data | `docs/shuttles-roadmap.md` | Ремонтный ангар |
 | SHU-5.5 | ✅ | proto | `docs/shuttles-roadmap.md` | Интерфейс фазы 5 |
-| SHU-5.6 | ⏳ | proto | `docs/shuttles-roadmap.md` | Бот и фаза 5 |
+| SHU-5.6 | ✅ | proto | `docs/shuttles-roadmap.md` | Бот и фаза 5 |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md` | Поза «Активная оборона» — контрудар при приемлемых потерях |
