@@ -35,6 +35,7 @@ import { shipsEngaged } from '../state/battle';
 import { isHostile, ownFleet } from '../util/combat';
 import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
+import { hangarSize, strikesReserved } from '../state/shuttle';
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
@@ -116,6 +117,9 @@ export const fleetOpsModule: GameModule = {
       if (!from || !into) return;
       into.units = mergeStacks(into.units, from.units);
       into.landing = mergeStacks(into.landing ?? [], from.landing ?? []);
+      // Шаттлы в трюме едут вместе с кораблями (SHU-5.1): без этой строки эскадры
+      // сплавленного флота исчезали бы молча вместе с его записью.
+      if (from.hangar?.length) into.hangar = [...(into.hangar ?? []), ...from.hangar];
       // Heroes are bound by fleetId: the hero UNIT rides into the merged fleet, so
       // the hero ENTITY must follow — a stale fleetId would orphan it (and
       // hero.spawn could then mint a duplicate free flagship).
@@ -375,7 +379,11 @@ export const fleetOpsModule: GameModule = {
       if (cargoOf(takenLandingPreview) > capacityOf(takenShipsPreview)) {
         return h.reject('E_NO_CAPACITY');
       }
-      if (cargoOf(keptLandingPreview) > capacityOf(keptShipsPreview)) {
+      // Шаттлы едут в том же трюме (SHU-5.1) и остаются с флотом, который сохраняет
+      // имя, — вместе с местами эскадр, ушедших в вылет: садиться они будут сюда же.
+      const keptShuttles =
+        hangarSize(fleet, h.ctx.data) + strikesReserved(h.state, fleet.id, h.ctx.data);
+      if (cargoOf(keptLandingPreview) + keptShuttles > capacityOf(keptShipsPreview)) {
         return h.reject('E_NO_CAPACITY');
       }
 

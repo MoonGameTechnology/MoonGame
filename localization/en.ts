@@ -362,8 +362,8 @@ export const en: Record<string, string> = {
   'side.wing.merge': '⛬ Merge',
   'side.wing.merge.into': '⛬ into this',
   'side.wing.merge.pick': 'pick the squadron to merge into',
-  'side.wing.hangar': 'Port hangar — {used} of {bay}',
-  'side.wing.hold': 'Carrier hold — {used} of {bay}',
+  'side.wing.hangar': 'Port hangar — {used}',
+  'side.wing.hold': 'Hold — {used} of {bay}',
   'side.wing.load': '↑ Aboard',
   'side.wing.no-port': 'no spaceport — no shuttles are based here',
   'side.wing.split': '⊟ Detach one',
@@ -1139,7 +1139,7 @@ export const en: Record<string, string> = {
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go. It carries its own compact radar (+{m}).',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
-    'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
+    'A spaceport under way: a {bay}-berth hold for shuttles and troops; shuttles launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hold lives exactly as long as its hulls do: lose the carrier and you lose everything aboard.',
   'dossier.unit.shuttle-carrier.name': 'Carrier',
   'dossier.unit.strike-carrier.desc':
     "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. It carries no shuttles: only the Carrier has a hangar.",
@@ -1189,7 +1189,6 @@ export const en: Record<string, string> = {
 
   // --- loadout — Ship loadout editor (packages/client): stat-preview labels.
   'loadout.stat.attack': 'Attack damage',
-  'loadout.stat.bay': 'Hangar',
   'loadout.stat.cargo': 'Cargo',
   'loadout.stat.defense': 'Defense damage',
   'loadout.stat.hp': 'Hull',

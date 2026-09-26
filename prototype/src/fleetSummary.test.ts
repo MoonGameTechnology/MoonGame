@@ -135,7 +135,7 @@ describe('сводка армии — трюм, радар, содержание
     const f = fleet([{ unit: 'strike_carrier', count: 1 }], {
       landing: [{ unit: 'tank', count: 2 }],
     });
-    expect(fleetSummary(f, data, 0).cargo).toEqual({ used: 2, cap: 16 });
+    expect(fleetSummary(f, data, 0).cargo).toEqual({ used: 4, cap: 16 }); // танк — 2 места (SHU-5.1)
     expect(fleetSummary(f, heavy, 0).cargo).toEqual({ used: 6, cap: 16 });
   });
 

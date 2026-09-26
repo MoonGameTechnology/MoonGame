@@ -86,11 +86,13 @@ describe('SHU-3.1 — трюм НОСИТЕЛЯ виден той же форм�
   it('«Шаттл» несёт ангар, и его состав читается так же, как у порта', () => {
     const v = fleetHangar(carrier({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }] }), data)!;
     expect(v.used).toBe(2);
-    expect(v.bay).toBe(data.units.shuttle_carrier!.stats.shuttleBay);
+    expect(v.bay).toBe(data.units.shuttle_carrier!.stats.cargoCapacity);
   });
 
-  it('обычный корабль ангара не несёт — блока нет', () => {
-    expect(fleetHangar(carrier({ units: [{ unit: 'cruiser', count: 3 }] }), data)).toBeNull();
+  // SHU-5.1: шаттлы едут в общем трюме любого корабля — «не носитель» теперь только
+  // корпус без трюма вовсе.
+  it('корабль без трюма шаттлов не несёт — блока нет', () => {
+    expect(fleetHangar(carrier({ units: [{ unit: 'scout_drone', count: 3 }] }), data)).toBeNull();
   });
 });
 
@@ -99,7 +101,7 @@ describe('SHU-3.1 — перегрузка порт ⇄ носитель пре�
   const empty = planetHangar(port(), data);
   const hold = fleetHangar(carrier(), data);
   const heldFull = fleetHangar(
-    carrier({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: data.units.shuttle_carrier!.stats.shuttleBay! }] }] }),
+    carrier({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: data.units.shuttle_carrier!.stats.cargoCapacity! }] }] }),
     data,
   );
 
@@ -127,8 +129,8 @@ describe('SHU-3.1 — перегрузка порт ⇄ носитель пре�
     });
   });
 
-  it('корабль без ангара перегрузку не предлагает', () => {
-    const plain = fleetHangar(carrier({ units: [{ unit: 'cruiser', count: 1 }] }), data);
+  it('корабль без трюма перегрузку не предлагает', () => {
+    const plain = fleetHangar(carrier({ units: [{ unit: 'scout_drone', count: 1 }] }), data);
     expect(transferOffer(full, plain, { docked: true, mine: true })).toEqual({
       load: false,
       unload: false,
@@ -156,8 +158,8 @@ describe('перегрузка предлагается и со стороны �
     expect(dockedCarrier([flying], 'A', 'p1', data)).toBeNull();
   });
 
-  it('КОРАБЛЬ БЕЗ АНГАРА НЕ НОСИТЕЛЬ: обычный флот у мира кнопок не даёт', () => {
-    const plain = carrier({ units: [{ unit: 'cruiser', count: 1 }] });
+  it('КОРАБЛЬ БЕЗ ТРЮМА НЕ НОСИТЕЛЬ: такой флот у мира кнопок не даёт', () => {
+    const plain = carrier({ units: [{ unit: 'scout_drone', count: 1 }] });
     expect(dockedCarrier([plain], 'A', 'p1', data)).toBeNull();
   });
 

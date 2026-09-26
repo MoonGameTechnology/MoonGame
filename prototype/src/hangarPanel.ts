@@ -45,8 +45,9 @@ import {
   canSortie,
   fleetShuttleBay,
   hangarMachines,
-  hangarUsed,
+  hangarSize,
   shuttleBayAt,
+  stacksSize,
   sortieSpec,
   type SortieState,
 } from '../../packages/shared-core/src/index';
@@ -65,9 +66,14 @@ export interface HangarView {
   /** ЭСКАДРЫ места (SHU-4.2) — то, чем адресуются приказы: вылет, перегрузка, делёж.
    *  Панель со списком соединений придёт в SHU-4.3; пока отсюда берётся id. */
   squadrons: Squadron[];
+  /** Сколько мест трюма занимает каждая эскадра `squadrons` (тот же порядок): место
+   *  меряется `cargoSize` машины (SHU-5.1), тяжёлый страйкер занимает два. */
+  sizes: number[];
   /** Машины места одним списком — состав, без деления на соединения. */
   stacks: UnitStack[];
+  /** Занято МЕСТ (не машин, SHU-5.1). */
   used: number;
+  /** Вместимость в местах; у стоящего порта — `Infinity` (порт без предела). */
   bay: number;
   free: number;
   /** Топливо места (правило 2). `undefined` — счётчика нет (пустой носитель). */
@@ -82,6 +88,7 @@ export function hasHangar(view: HangarView | null): view is HangarView {
 }
 
 function view(
+  data: GameData,
   kind: HangarView['kind'],
   host: { hangar?: Squadron[] },
   bay: number,
@@ -92,7 +99,7 @@ function view(
   if (bay <= 0) return null;
   const squadrons = (host.hangar ?? []).filter((sq) => sq.units.some((st) => st.count > 0));
   const stacks = hangarMachines(host).filter((st) => st.count > 0);
-  const used = hangarUsed(host);
+  const used = hangarSize(host, data);
   const live: SortieState = sortie ?? { fuel: maxFuel, rearming: 0 };
   // `busy` идёт СРАЗУ за «пусто»: у порта его не бывает вовсе, а у носителя он значит
   // БОЙ и перебивает топливо с перезарядкой — ждать их бессмысленно, пока идут раунды.
@@ -109,6 +116,7 @@ function view(
   return {
     kind,
     squadrons,
+    sizes: squadrons.map((sq) => stacksSize(sq.units, data)),
     stacks,
     used,
     bay,
@@ -126,9 +134,11 @@ export function planetHangar(planet: Planet, data: GameData): HangarView | null 
   // Пустой порт показывает состав без топлива: выводить «0 из 0 вылетов» там, где
   // лететь некому, значит пугать числом ни о чём.
   return view(
+    data,
     'port',
     planet,
-    shuttleBayAt(planet, data),
+    // Порт — только ворота: стоит — держит сколько угодно (SHU-5.1).
+    shuttleBayAt(planet, data) > 0 ? Infinity : 0,
     planet.sortie,
     sortieSpec(planet, data).maxFuel,
   );
@@ -146,6 +156,7 @@ export function planetHangar(planet: Planet, data: GameData): HangarView | null 
 export function fleetHangar(fleet: Fleet, data: GameData): HangarView | null {
   const busy = !!fleet.battleId;
   return view(
+    data,
     'hold',
     fleet,
     fleetShuttleBay(fleet, data),
@@ -219,5 +230,6 @@ export function transferPick(
   const sq = from.squadrons[0];
   if (!sq) return null;
   const count = sq.units.reduce((n, st) => n + st.count, 0);
-  return count > 0 && count <= to.free ? { squadronId: sq.id, count } : null;
+  // Влезает ли — по МЕСТАМ (SHU-5.1), а не по штукам: ядро меряет трюм `cargoSize`.
+  return count > 0 && (from.sizes[0] ?? count) <= to.free ? { squadronId: sq.id, count } : null;
 }

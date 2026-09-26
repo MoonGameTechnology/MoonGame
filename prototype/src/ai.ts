@@ -20,8 +20,9 @@ import {
   technologyLock,
   hangarMachines,
   fleetPositionAt,
-  hangarUsed,
+  fleetHoldFree,
   fleetShuttleBay,
+  stacksSize,
   squadronSize,
   beaconCallouts,
   beaconSentinels,
@@ -1381,17 +1382,29 @@ function baseAiOrders(
             f.location !== null &&
             fleetShuttleBay(f, data) > 0,
         )
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+        // С SHU-5.1 трюм есть у любого транспорта, поэтому сначала берётся флот с
+        // АВИАНОСЦЕМ (трейт `carrier`), дальше — с самым свободным трюмом, равенство — по
+        // id (детерминированно): иначе бот грузил бы эскадру в первый попавшийся
+        // крейсер, мимо стоящего рядом авианосца.
+        .map((f) => ({
+          f,
+          cv: f.units.some((st) => st.count > 0 && data.units[st.unit]?.traits.includes('carrier')) ? 1 : 0,
+          room: fleetHoldFree(state, f, data),
+        }))
+        .sort(
+          (a, b) =>
+            b.cv - a.cv || b.room - a.room || (a.f.id < b.f.id ? -1 : a.f.id > b.f.id ? 1 : 0),
+        )[0]?.f;
       if (myCarrier) {
         const dock = state.planets[myCarrier.location!];
-        const free = fleetShuttleBay(myCarrier, data) - hangarUsed(myCarrier);
+        const free = fleetHoldFree(state, myCarrier, data);
         // Берётся ПЕРВАЯ ударная эскадра порта, влезающая целиком, — тем же правилом,
         // что и кнопка перегрузки у игрока (`transferPick`): половину ядро отобьёт.
         const liftable = (dock?.hangar ?? []).find(
           (sq) =>
             sq.units.some((st) => STRIKE_SHUTTLES.includes(st.unit as never) && st.count > 0) &&
             squadronSize(sq) > 0 &&
-            squadronSize(sq) <= free,
+            stacksSize(sq.units, data) <= free,
         );
         if (dock && dock.owner === ai && liftable) {
           out.push(loadShuttle(ai, myCarrier.id, liftable.id));

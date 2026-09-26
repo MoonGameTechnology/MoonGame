@@ -26,6 +26,7 @@ const sq = (id: string, units: Array<[string, number]>, cargo?: Array<[string, n
 const view = (squadrons: Squadron[], over: Partial<HangarView> = {}): HangarView => ({
   kind: 'port',
   squadrons,
+  sizes: squadrons.map((q) => q.units.reduce((m, st) => m + st.count, 0)),
   stacks: squadrons.flatMap((q) => q.units),
   used: squadrons.reduce((n, q) => n + q.units.reduce((m, st) => m + st.count, 0), 0),
   bay: 6,

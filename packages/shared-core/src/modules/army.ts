@@ -3,25 +3,16 @@ import type { Fleet, GameState, LoadingClaim } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
-import { findHealthyStack, addUnits, sumUnitStat } from '../util/stacks';
+import { findHealthyStack, addUnits } from '../util/stacks';
 import { garrisonUnderAssault, requireOwnedIdleFleet } from '../util/fleet';
 import { isAllied } from '../util/combat';
 import { hasMapShare } from '../state/diplomacy';
+import { fleetHoldFree } from '../state/shuttle';
 
 interface TransferPayload {
   fleetId: string;
   unit: string;
   count?: number;
-}
-
-/** Total ground-army a fleet's ships can carry (Σ count × cargoCapacity). */
-function fleetCapacity(fleet: Fleet, data: GameData): number {
-  return sumUnitStat(fleet.units, data, 'cargoCapacity');
-}
-
-/** Transport space currently occupied by the fleet's carried ground army. */
-function cargoUsed(fleet: Fleet, data: GameData): number {
-  return sumUnitStat(fleet.landing ?? [], data, 'cargoSize');
 }
 
 /**
@@ -138,10 +129,9 @@ export const armyModule: GameModule = {
       if (!avail || avail.count - claimedAt(h.state, planet.id, unit) < count) {
         return h.reject('E_NO_ARMY'); // not that many in the garrison
       }
-      const free =
-        fleetCapacity(fleet, h.ctx.data) -
-        cargoUsed(fleet, h.ctx.data) -
-        claimedCargo(fleet, h.ctx.data);
+      // Трюм общий с шаттлами (SHU-5.1): места эскадр на борту и улетевших в вылет
+      // заняты так же, как места десанта.
+      const free = fleetHoldFree(h.state, fleet, h.ctx.data);
       if (count * def.stats.cargoSize > free) {
         return h.reject('E_NO_CAPACITY'); // not enough transport space aboard
       }
@@ -194,7 +184,10 @@ export const armyModule: GameModule = {
         // Берём, сколько ЕСТЬ и сколько влезает: за час гарнизон мог поредеть в бою,
         // а трюм — заполниться соседней заявкой. Частичная погрузка честнее отказа:
         // приказ был «подними столько», и он поднимает столько, сколько осталось.
-        const room = fleetCapacity(fleet, h.ctx.data) - cargoUsed(fleet, h.ctx.data);
+        // Заявки здесь не вычитаются (как и до SHU-5.1: `loading` переписывается после
+        // цикла, и созревшие вычли бы сами себя), а шаттлы в ангаре и в полёте — да:
+        // трюм у них с десантом общий.
+        const room = fleetHoldFree(h.state, fleet, h.ctx.data) + claimedCargo(fleet, h.ctx.data);
         const size = def.stats.cargoSize;
         const take = Math.min(claim.count, stack.count, size > 0 ? Math.floor(room / size) : claim.count);
         if (take <= 0) continue;

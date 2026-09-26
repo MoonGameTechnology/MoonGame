@@ -40,7 +40,6 @@ const STAT_LABEL: Record<string, string> = {
   speed: 'loadout.stat.speed',
   radarRange: 'loadout.stat.radar',
   cargoCapacity: 'loadout.stat.cargo',
-  shuttleBay: 'loadout.stat.bay',
   pointDefense: 'shipcard.stat.pd',
   siegeDamage: 'loadout.stat.siege',
 };

@@ -20,7 +20,7 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
 import { buildProgress } from '../util/construction';
 import { isAllied } from '../util/combat';
 import { addUnits } from '../util/stacks';
-import { basedMachine, hangarUsed, shuttleBayAt } from '../state/shuttle';
+import { basedMachine, shuttleBayAt } from '../state/shuttle';
 import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
 import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
 
@@ -496,24 +496,6 @@ function yardLevelAt(planet: Planet, data: GameData): number {
   return best;
 }
 
-/** Сколько ЕЩЁ челноков примет мир (SHU-1.1): вместимость стоящих портов минус уже
- *  базирующиеся минус уже заказанные и не достроенные.
- *
- *  Очередь считается вместе с ангаром намеренно. Иначе десять заказов по одному прошли
- *  бы там, где один заказ на десять честно отбивается: каждый по отдельности видел бы
- *  пустой ангар, а на выходе порт получил бы вдесятеро больше, чем вмещает. */
-function hangarFree(h: HandlerContext, planet: Planet): number {
-  const data = h.ctx.data;
-  let queued = 0;
-  for (const e of h.state.scheduled) {
-    if (e.type !== 'construction.complete') continue;
-    const p = e.payload as CompletePayload;
-    if (p.kind !== 'unit' || p.planetId !== planet.id || typeof p.unit !== 'string') continue;
-    if (data.units[p.unit]?.traits.includes('shuttle')) queued += p.count ?? 0;
-  }
-  return shuttleBayAt(planet, data) - hangarUsed(planet) - queued;
-}
-
 /** Здание, без которого наземный юнит не заложить: КАЗАРМЫ для пехоты, ЗАВОД для
  *  техники (ROS-1.1). Род войск живёт в данных (`UnitDef.kind`), поэтому новый род
  *  вводится юнитом и зданием, а не правкой этой функции. */
@@ -535,9 +517,8 @@ function hasGroundFacility(planet: Planet, data: GameData, kind: UnitDef['kind']
  * правил разъехалась бы на первой же правке — игрок выбирал бы мир, на котором ядро
  * отвечает отказом. Спрашивать надо ту функцию, по которой ядро и решает.
  *
- * Считается только ПОСТОЯННАЯ половина гейта — здания. Очередь (`E_HANGAR_FULL`) сюда не
- * входит: она зависит от уже поставленных заказов, то есть от расписания, которого у
- * чистой функции нет, и остаётся ответом ядра в момент приказа.
+ * С SHU-5.1 гейт весь постоянный: космопорт держит сколько угодно челноков, и предела
+ * «ангар полон», зависевшего бы от очереди заказов, больше нет.
  */
 export function unitBuildSiteBlocker(
   planet: Planet,
@@ -910,17 +891,12 @@ export const constructionModule: GameModule = {
         return h.reject('E_NOT_BUILDABLE');
       }
       requireUnlocked(h, action.playerId, 'unit', payload.unit);
-      // Челнок строится В КОСМОПОРТЕ и остаётся в нём: порт — и гейт, и предел
-      // (SHU-1.1). Ноль вместимости читается как «порта нет» — отдельного флага
-      // «умеет ангар» больше нет, чтобы две правды не разъезжались.
+      // Челнок строится В КОСМОПОРТЕ и остаётся в нём. Порт — только ворота (SHU-1.1):
+      // ноль вместимости читается как «порта нет», а предела нет вовсе — космопорт
+      // держит сколько угодно машин (SHU-5.1, резолюция владельца 2026-09-26).
       const isShuttle = def.traits.includes('shuttle');
-      if (isShuttle) {
-        if (shuttleBayAt(planet, h.ctx.data) <= 0) {
-          return h.reject('E_NO_PORT');
-        }
-        if (hangarFree(h, planet) < count) {
-          return h.reject('E_HANGAR_FULL');
-        }
+      if (isShuttle && shuttleBayAt(planet, h.ctx.data) <= 0) {
+        return h.reject('E_NO_PORT');
       }
       if (!isShuttle && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');

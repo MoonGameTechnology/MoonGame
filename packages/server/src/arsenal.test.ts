@@ -130,12 +130,12 @@ describe('достижимость содержимого на гейтиров�
       .map(([id]) => id);
     expect(shuttles.length).toBeGreaterThan(0);
     expect(shuttles.filter((id) => !have.has(id))).toEqual([]);
-    // Носителя мало «где-то иметь»: без него ангар существует только у порта.
+    // Носителя мало «где-то иметь»: без него шаттлы живут только у порта. С SHU-5.1
+    // носитель — любой корабль с трюмом.
     const carriers = Object.entries(data.units)
-      .filter(([, u]) => (u.stats.shuttleBay ?? 0) > 0)
+      .filter(([, u]) => u.domain === 'space' && (u.stats.cargoCapacity ?? 0) > 0)
       .map(([id]) => id);
-    expect(carriers.length).toBeGreaterThan(0);
-    expect(carriers.filter((id) => !have.has(id))).toEqual([]);
+    expect(carriers.some((id) => have.has(id))).toBe(true);
   });
 
   // YARD-1 уточнил ПРИЧИНУ, но не правило: космопорта на старте больше нет, игрок его

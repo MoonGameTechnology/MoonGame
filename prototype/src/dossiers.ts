@@ -208,7 +208,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
       return {
         name: t('dossier.unit.shuttle-carrier.name'),
         body: t('dossier.unit.shuttle-carrier.desc', {
-          bay: hl(st.shuttleBay ?? 0),
+          bay: hl(st.cargoCapacity ?? 0),
           d: hl(st.defense),
           hp: hl(st.hp),
           a: hl(st.attack),

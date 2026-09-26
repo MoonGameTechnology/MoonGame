@@ -1,9 +1,10 @@
-/** Cargo occupancy, shared by map badges and fleet cards. Ground cargo and aircraft
- * use different capacities. Loading reserves its whole volume until the snapshot
+/** Cargo occupancy, shared by map badges and fleet cards. Ground cargo and shuttles
+ * share ONE hold (SHU-5.1): each meter shows its own share, and its capacity is the
+ * hold minus what the other share already occupies, so both read the same free space. Loading reserves its whole volume until the snapshot
  * moves it aboard; animation progress never changes custody or free space. */
 import {
   fleetShuttleBay,
-  hangarUsed,
+  hangarSize,
   sumUnitStat,
   type Fleet,
   type GameData,
@@ -58,12 +59,19 @@ export function fleetHolds(fleet: Fleet, data: GameData, now: number): FleetHold
     reserved += volume;
     progressed += volume * progress;
   }
+  const machines = hangarSize(fleet, data);
   const meters: FleetHold[] = [];
   if (capacity > 0 || used > 0 || reserved > 0)
-    meters.push(hold('troops', used, capacity, reserved, reserved > 0 ? progressed / reserved : 0));
-  const bay = fleetShuttleBay(fleet, data);
-  const machines = hangarUsed(fleet);
-  if (bay > 0 || machines > 0) meters.push(hold('hangar', machines, bay));
+    meters.push(
+      hold(
+        'troops',
+        used,
+        Math.max(0, capacity - machines),
+        reserved,
+        reserved > 0 ? progressed / reserved : 0,
+      ),
+    );
+  if (machines > 0) meters.push(hold('hangar', machines, fleetShuttleBay(fleet, data)));
   return meters;
 }
 

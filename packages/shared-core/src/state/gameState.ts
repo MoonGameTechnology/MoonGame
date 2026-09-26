@@ -609,11 +609,11 @@ export interface Fleet {
    *  the fuse happens on arrival even if nobody is watching. Cleared when it
    *  resolves — or when it cannot (target gone / moved on / not co-located). */
   mergeInto?: FleetId | null;
-  /** ЭСКАДРЫ, базирующиеся на носителях этого флота (SHU-2.1) — подвижный близнец
-   *  `Planet.hangar`, и форма у них ОДНА (SHU-4.2). НЕ часть `units`: базирующийся
-   *  челнок не корабль линии, он не стреляет в раунде боя и не принимает на себя залп,
-   *  он только летает в вылеты. Вместимость — Σ `shuttleBay` корпусов флота; погибли
-   *  носители — погибло и то, что на них стояло, ровно как при потере порта.
+  /** ЭСКАДРЫ в трюме этого флота (SHU-2.1) — подвижный близнец `Planet.hangar`, и форма
+   *  у них ОДНА (SHU-4.2). НЕ часть `units`: базирующийся челнок не корабль линии, он не
+   *  стреляет в раунде боя и не принимает на себя залп, он только летает в вылеты. Трюм
+   *  ОБЩИЙ с `landing` (SHU-5.1): Σ `cargoCapacity` корпусов, машина занимает свой
+   *  `cargoSize`; погибли корпуса — погибло и то, что не влезает, ровно как при потере порта.
    *  Undefined/пусто = на борту ничего не базируется. */
   hangar?: Squadron[];
   /** Sortie budget of the shuttles based aboard (fuel + rearm countdown) — the
