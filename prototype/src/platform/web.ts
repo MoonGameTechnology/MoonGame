@@ -130,5 +130,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): WebPlatform
         options.sink?.(event, props);
       },
     },
+    // Удалённого конфига у обычного браузера нет: игра идёт на числах поставки.
+    config: { flags: () => Promise.resolve({}) },
   };
 }

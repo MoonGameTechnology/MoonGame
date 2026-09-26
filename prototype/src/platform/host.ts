@@ -117,3 +117,17 @@ export function setPlatform(platform: GamePlatform): void {
 export function getPlatform(): GamePlatform {
   return current;
 }
+
+/**
+ * Флаги площадки (`YAG-6.3`), прочитанные до импорта игры. Каталог (`gameData.ts`)
+ * собирается один раз при импорте и берёт их отсюда. По умолчанию пусто — числа поставки.
+ */
+let remoteFlags: Record<string, string> = {};
+
+export function setRemoteFlags(flags: Record<string, string>): void {
+  remoteFlags = flags;
+}
+
+export function getRemoteFlags(): Record<string, string> {
+  return remoteFlags;
+}
