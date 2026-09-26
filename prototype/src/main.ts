@@ -1123,6 +1123,7 @@ const RAIL = 50; // left-rail width
 // `wingBuilds` фильтруют этот же список), так что достаточно их сюда вписать.
 const BUILD_UNITS = [
   'cruiser',
+  'heavy_cruiser',
   'scout',
   'picket_frigate',
   'shuttle_carrier',

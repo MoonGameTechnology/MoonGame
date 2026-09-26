@@ -2824,13 +2824,15 @@ speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage, siegeDamage, build
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
   (армия очков не даёт — см. victory). Есть: `scout_drone, scout, frigate,
 picket_frigate(«Дозорный фрегат», поддержка: антенна 120, единственный носитель радар-модуля),
-cruiser, siege_lance, bomber(челнок против корпусов:
+cruiser, heavy_cruiser(«Усиленный крейсер», решение владельца 2026-09-26: тяжёлый корпус
+линии — атака 24, защита 21, корпус 90, ход 34, верфь 3-го уровня, в стартовом арсенале;
+осадную платформу ставит, как крейсер), siege_lance, bomber(челнок против корпусов:
 attack 20, siegeDamage 18), interceptor(охотник за челноками: shuttleDamage 22 при
 attack 4),
 landing_shuttle(«десантный челнок», ROS-1.5 + SHU-5.2: attack 0, трейт `lander` — строится с
 одним наземным бойцом внутри и садится им; cargoSize 2), shuttle_carrier(«Носитель», cargoCapacity 16, hp 140 — с SHU-5.1 обычный
 трюм; авианосец и десантный корабль слиты в него решением владельца 2026-09-26), militia, drop_infantry, tank(cargoSize 2), heavy_infantry,
-special_forces, hero, interceptor` (всего в `data/units.json` 25 юнитов: 12 `vanguard`,
+special_forces, hero, interceptor` (всего в `data/units.json` 26 юнитов: 13 `vanguard`,
 6 `blue`, 5 `swarm`, 2 `neutral`; `orbital_aa` — защитное здание, не юнит;
 `infected_cruiser` в контенте нет). **Осадной платформы как юнита нет** (SIEGE-1, резолюция
 владельца 2026-09-23): её роль — модуль `siege_platform` («Осадная платформа», слот оружия,

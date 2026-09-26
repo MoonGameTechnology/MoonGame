@@ -2,6 +2,7 @@
   { "kind": "hull", "defId": "scout_drone" },
   { "kind": "hull", "defId": "scout" },
   { "kind": "hull", "defId": "cruiser" },
+  { "kind": "hull", "defId": "heavy_cruiser" },
   { "kind": "hull", "defId": "frigate" },
   { "kind": "hull", "defId": "picket_frigate" },
   { "kind": "hull", "defId": "shuttle_carrier" },

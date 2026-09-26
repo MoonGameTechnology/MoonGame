@@ -172,6 +172,17 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           c: hl(st.cargoCapacity ?? 0),
         }),
       };
+    case 'heavy_cruiser':
+      return {
+        name: t('dossier.unit.heavy-cruiser.name'),
+        body: t('dossier.unit.heavy-cruiser.desc', {
+          a: hl(st.attack),
+          d: hl(st.defense),
+          hp: hl(st.hp),
+          sp: hl(st.speed),
+          c: hl(st.cargoCapacity ?? 0),
+        }),
+      };
     case 'frigate':
       return {
         name: t('dossier.unit.frigate.name'),

@@ -49,6 +49,7 @@ export const UNIT_ICON: Record<string, string> = {
   swarm_relay: '⊕', // большой ретранслятор Роя — пост сети
   swarm_relay_small: '⊙', // малый ретранслятор — идёт с волной
   cruiser: '▲',
+  heavy_cruiser: '⏶', // усиленный крейсер — тот же клин линии, только тяжелее
   scout: '◌',
   siege: '✦',
   shuttle_carrier: '⬢', // плавучий космопорт — сплошной корпус, весь объём под ангар
