@@ -865,6 +865,7 @@ export const ru: Record<string, string> = {
   'data.bomber': 'ударный страйкер',
   'data.bulwark': 'Бастион',
   'data.cargo-bay': 'Грузовой отсек',
+  'data.repair-bay': 'Ремонтный ангар',
   'data.carrier': 'авианосец',
   'data.combined-arms': 'Общевойсковой бой',
   'data.commander': 'Командир',

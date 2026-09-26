@@ -1518,8 +1518,8 @@ export const constructionModule: GameModule = {
         // сам в драку не втянут. Прежде такой флот спокойно чинился посреди сражения.
         if (fleet.location !== null && fighting.has(fleet.location)) continue;
 
-        // Корпус чинится только у ДРУЖЕСТВЕННОГО мира с верфью или космопортом
-        // (`shipRepair`, shields-roadmap SH-2.1) — нет дока, нет починки. «Дружественный»
+        // Корпус чинится у ДРУЖЕСТВЕННОГО мира с верфью или космопортом
+        // (`shipRepair`, shields-roadmap SH-2.1); без дока — только свой `repair_bay` (SHU-5.4). «Дружественный»
         // с FORT-5.8 значит свой ИЛИ союзный: правило одно на все три пути ремонта, и
         // живёт оно в `fleetAtOwnDock`. Частичный эффект здесь был бы необъяснимым —
         // ровно так разъезжались два хука наземной защиты форта.
@@ -1541,12 +1541,15 @@ export const constructionModule: GameModule = {
           const unitDef = data.units[stack.unit];
           if (!unitDef) continue;
 
-          // Hull (`hp`): friendly-port repair only, never a free regen.
+          // Hull (`hp`): friendly-port repair, plus the stack's own `repair_bay`
+          // (`hullRepair`, SHU-5.4) anywhere out of combat — never a free regen.
           if (stack.hp !== undefined) {
-            const fullHp = stack.count * (effectiveStats(unitDef, stack, data).hp ?? 0);
+            const eff = effectiveStats(unitDef, stack, data);
+            const fullHp = stack.count * (eff.hp ?? 0);
+            const rate = hullRate + (eff.hullRepair ?? 0);
             if (fullHp <= 0 || stack.hp >= fullHp) stack.hp = undefined;
-            else if (hullRate > 0) {
-              const cur = Math.min(fullHp, stack.hp + hullRate * hours * fullHp);
+            else if (rate > 0) {
+              const cur = Math.min(fullHp, stack.hp + rate * hours * fullHp);
               stack.hp = cur >= fullHp ? undefined : cur;
             }
           }
