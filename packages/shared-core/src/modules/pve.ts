@@ -33,7 +33,7 @@
  * a JSON edit, never a code change.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, GameState, PlayerId, UnitStack } from '../state/gameState';
+import type { Fleet, GameState, Hero, PlayerId, UnitStack } from '../state/gameState';
 import type { ModePve } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { setStance } from '../state/diplomacy';
@@ -200,9 +200,71 @@ function tallyLoss(h: HandlerContext, loser: unknown, killer: unknown, n: unknow
   if (seat(killer) && killer !== loser) add(killer, 'destroyed');
 }
 
+/**
+ * Field the assault's boss with the last wave (PVR-4.7, owner's resolution 2026-09-24:
+ * «Левиафан — босс матёрого Роя … приходит с 10-й волной каждой главы»).
+ *
+ * Two keys, and the split is the point: the MODE says who the boss is (`cfg.boss`), the
+ * HOST says whether this match meets it (`MatchConfig.pveBoss` — Sector Zero sets it for
+ * the strong Swarm only). Either missing ⇒ no boss, which is every match before this brick.
+ *
+ * The boss is a hero of the NPC seat, so everything a hero is comes for free: its
+ * abilities cast through `hero.ability`, its passives ride the hero hooks, and its ship
+ * is an ordinary fleet the seat's AI moves. It is minted here rather than by `hero.spawn`
+ * because nothing about it is a player's intent — the wave schedule brings it, the same
+ * way it brings the wave. Its death is final (`boss` archetype, `hero.ts`); `pve.boss`
+ * keeps the record the run's bounty is paid from.
+ *
+ * Once per match: a boss already fielded — alive or slain — is never fielded again.
+ */
+function fieldBoss(
+  h: HandlerContext,
+  pve: NonNullable<GameState['pve']>,
+  cfg: ModePve,
+  at: string,
+): void {
+  const boss = cfg.boss;
+  if (!boss || h.ctx.config?.pveBoss !== true || pve.boss !== undefined) return;
+  const def = h.ctx.data.heroes[boss.hero];
+  const hull = def?.ship.unit;
+  // Only a `boss` archetype: an ordinary hero fielded here would respawn at the hive
+  // forever, and the bounty would be paid for a kill that does not stick.
+  if (!def || def.boss !== true || hull === undefined || !h.ctx.data.units[hull]) return;
+  const owner = pve.npcPlayerId;
+  const heroId = `hero:${owner}:boss`;
+  const fleetId = 'pve:boss';
+  const modules = boss.modules.filter((id) => h.ctx.data.modules[id] !== undefined);
+  h.state.fleets[fleetId] = {
+    id: fleetId,
+    owner,
+    location: at,
+    movement: null,
+    units: [{ unit: hull, count: 1, ...(modules.length > 0 ? { modules } : {}) }],
+    traits: [],
+    orbit: 'near',
+  };
+  const hero: Hero = {
+    id: heroId,
+    owner,
+    location: at,
+    home: at,
+    cooldowns: {},
+    archetype: boss.hero,
+    abilities: [...def.startAbilities],
+    passives: [...def.startPassives],
+    ...(modules.length > 0 ? { modules } : {}),
+    alive: true,
+    fleetId,
+  };
+  h.state.heroes = { ...h.state.heroes, [heroId]: hero };
+  pve.boss = { heroId, hero: boss.hero, spawnedAt: h.ctx.now, reward: boss.reward };
+  h.emit('pve.boss.spawned', { owner, heroId, fleetId, location: at, hero: boss.hero });
+}
+
 export const pveModule: GameModule = {
   id: 'pve',
-  version: '1.5.0',
+  // 1.6.0 — PVR-4.7: the boss joins the last wave when the host asks for it.
+  version: '1.6.0',
   setup(api) {
     // Флоты NPC-стороны идут со множителем режима (`npcSpeedFactor`, решение владельца
     // 2026-09-25). Сторона — засеянная (`state.pve`), до засева — та же, что засеет модуль.
@@ -311,12 +373,25 @@ export const pveModule: GameModule = {
           wave: pve.waveNumber,
         });
       }
+      // The boss rides with the LAST wave, from the same staging world (PVR-4.7).
+      if (at !== undefined && pve.waveNumber >= pve.totalWaves) fieldBoss(h, pve, cfg, at);
       oweBoons(h, pve, cfg);
       // The last wave has landed: start the hold-out (PVR-2.5). Keyed on the COUNTER,
       // not on a spawn — a wave skipped for want of a staging world still ends the
       // assault, so a run that wiped the hive early gets its deadline all the same.
       if (pve.waveNumber >= pve.totalWaves) startHoldOut(h, pve, cfg);
       armNextWave(h, pve, cfg, h.ctx.now);
+    });
+
+    // The boss fell (PVR-4.7): its death is final, so the record is written once and the
+    // bounty can be paid from it. Keyed on the hero id the boss was fielded under — a
+    // roster hero of the same seat dying is none of this module's business.
+    api.on('hero.died', (event, h) => {
+      const boss = h.state.pve?.boss;
+      const { heroId } = (event.payload ?? {}) as { heroId?: string };
+      if (!boss || boss.slainAt !== undefined || heroId !== boss.heroId) return;
+      boss.slainAt = h.ctx.now;
+      h.emit('pve.boss.slain', { owner: h.state.pve!.npcPlayerId, heroId, hero: boss.hero });
     });
 
     // Забрать усиление. ИНТЕНТ игрока, а не событие: выбор делает человек, и сервер

@@ -64,6 +64,11 @@ export interface MatchConfig {
    *  veterans combat power in Sector Zero only, while an online match — `pve_waves`
    *  included — pays for veterans solely with the end-of-match reward. Absent ⇒ off. */
   veteranPower?: boolean;
+  /** Whether the PvE assault ends with its boss (`data.modes[].pve.boss`, PVR-4.7). Set by
+   *  the host, never by a mode: the owner's resolution of 2026-09-24 sends the Leviathan
+   *  to the strong Swarm of Sector Zero only, and an online `pve_waves` match has no
+   *  difficulty to pick it by. Absent ⇒ no boss. */
+  pveBoss?: boolean;
 }
 
 /**

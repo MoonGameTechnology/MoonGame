@@ -1085,6 +1085,11 @@ export interface PveState {
    *  чей огонь их добил (`unit.died.killedBy`, стрелок сбитых машин). Только места игроков:
    *  Рой, пираты и нейтралы счёта не ведут. Нет записи — ноль. */
   tally?: Record<PlayerId, PveTally>;
+  /** The assault's boss once it is on the field (PVR-4.7): its hero, the bounty the mode
+   *  declared for it — stamped at spawn, like every other number a match keeps once it
+   *  started — and when it fell. Absent until the boss spawns, and for good in a match the
+   *  host sent no boss to. */
+  boss?: PveBoss;
 }
 
 /** Строка боевого счёта одного места (см. {@link PveState.tally}). */
@@ -1093,6 +1098,20 @@ export interface PveTally {
   lost: number;
   /** Чужих юнитов и машин уничтожено его огнём. */
   destroyed: number;
+}
+
+/** The PvE boss on the field (`PveState.boss`). Its ship is found through its hero
+ *  (`heroes[heroId].fleetId`), never stored here: the seat's AI merges the wave into the
+ *  boss's fleet or the boss into the wave's, and a copied fleet id would go stale. */
+export interface PveBoss {
+  heroId: string;
+  /** The mode's `boss.hero` archetype. */
+  hero: string;
+  spawnedAt: number;
+  /** Bounty for slaying it (`data.modes[].pve.boss.reward`); the host decides what it pays in. */
+  reward: number;
+  /** World time it fell; absent while it lives. */
+  slainAt?: number;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */
@@ -1225,6 +1244,23 @@ export interface Hero {
    *  the reader buckets it into S/M/L with the identical rule and nothing new is
    *  invented for fakes. Filtered by `until` at read time; pruned on cast. */
   activeDecoys?: { at: PlanetId; signature: number; until: number }[];
+  /** A running «Devour World» siege (`devour`, PVR-4.7). Absent ⇒ no siege. See
+   *  {@link HeroSiege} for what ends it early. */
+  siege?: HeroSiege;
+}
+
+/** A world under a hero's «Devour World» siege (PVR-4.7; owner's resolution 2026-09-25:
+ *  «Поглощение после 4 ч осады»). The world dies at `until` only if the hero's fleet has
+ *  bombarded it the whole time. Anything that interrupts the bombardment ends the siege
+ *  early: a battle involving the hero's fleet, the fleet leaving orbit or ceasing fire,
+ *  the hero's death, or the world changing hands. */
+export interface HeroSiege {
+  target: PlanetId;
+  /** Owner of `target` when the siege began: a world that has since changed hands is no
+   *  longer the world under siege. */
+  victim: PlayerId;
+  since: number;
+  until: number;
 }
 
 /** A temporary lane a hero opened: a real, routable graph edge between two nodes for

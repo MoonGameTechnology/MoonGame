@@ -18,3 +18,9 @@ describe('AUD-22 — Академия читает изученное из ре�
     expect(PREP).not.toMatch(/hero\.skills\.includes\(/);
   });
 });
+
+describe('PVR-4.7 — босс Роя не герой Академии', () => {
+  it('ростер Академии отбрасывает архетип-босса: его не нанимают и не открывают', () => {
+    expect(PREP).toMatch(/Object\.entries\(data\.heroes\)\s*\.filter\(\(\[, def\]\) => !def\.boss\)/);
+  });
+});

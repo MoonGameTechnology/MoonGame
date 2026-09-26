@@ -311,6 +311,27 @@
       "intervalHours": 3
     }
   },
+  "leviathan_brood": {
+    "name": "Leviathan Brood",
+    "description": "swarm.leviathan-brood.desc",
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {}
+    },
+    "cost": {},
+    "allowed": {
+      "domain": "space",
+      "units": [
+        "swarm_leviathan"
+      ]
+    },
+    "brood": {
+      "unit": "swarm_lander",
+      "intervalHours": 3,
+      "count": 6
+    }
+  },
   "swarm_intercept_veil": {
     "name": "Intercept Veil",
     "description": "swarm.veil.desc",

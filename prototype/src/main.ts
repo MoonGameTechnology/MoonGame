@@ -24,6 +24,7 @@ import {
   matchMode,
   setMatchTravelSpeed,
   setMatchVeteranPower,
+  setMatchPveBoss,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
@@ -272,7 +273,9 @@ import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
-import { missionBriefs, missionLabelN, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
+import { bossMissionRow, missionBriefs, missionLabelN, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
+import { bossTask } from '../../decisions/runBoss';
+import { devourSieges } from '../../decisions/devourSiege';
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
 import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
 import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
@@ -4066,6 +4069,26 @@ function handleEvents(events: DomainEvent[]) {
       case 'hero.respawned':
         tellHero(heroRespawnedNews(p, ME, (id) => !!s.planets[id]));
         break;
+      // PVR-4.7: босс — часть штурма, и забег объявляет его, как объявляет волны. Имя —
+      // ключом по архетипу: у каждой фразы свой падеж, подстановкой его не собрать.
+      case 'pve.boss.spawned':
+      case 'pve.boss.slain':
+        note(t(`boss.${p.hero as string}.${e.type === 'pve.boss.spawned' ? 'spawned' : 'slain'}`));
+        break;
+      // PVR-4.7: осада «Поглощения мира» над СВОИМ миром — начало, срыв и гибель мира. Фраза —
+      // по архетипу героя, как у появления босса; отсчёт — тем же часам, что у волн.
+      case 'hero.siege.started':
+      case 'hero.siege.broken':
+      case 'hero.siege.done': {
+        if (p.victim !== ME) break;
+        const arch = s.heroes?.[p.heroId as string]?.archetype;
+        if (!arch) break;
+        const phrase =
+          e.type === 'hero.siege.started' ? 'siege' : e.type === 'hero.siege.done' ? 'devoured' : 'siege-broken';
+        const world = placeName(p.target as string);
+        note(t(`boss.${arch}.${phrase}`, { world, in: countdownHMS((p.until as number) - s.time) }));
+        break;
+      }
       case 'fleet.destroyed':
         // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
         // разобрано в шапке `fleetNews.ts`: в сети событие едет без места, и сервер
@@ -6225,6 +6248,7 @@ function render(now: number) {
   drawAssaultTargets();
   drawEngageTargets(lastReal);
   drawMissionTargets();
+  drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
@@ -13939,6 +13963,8 @@ function setRunActive(on: boolean): void {
   sectorRunActive = on;
   setMatchTravelSpeed(on ? RUN_TRAVEL_SPEED : 1);
   setMatchVeteranPower(on);
+  // Левиафан — босс МАТЁРОГО Роя (PVR-4.7): сложность забега к этой двери уже выбрана.
+  setMatchPveBoss(on && pveDifficulty === 'strong');
   syncSectorZeroTools();
   markGameplay();
 }
@@ -14077,7 +14103,10 @@ function chapterLater(mission: number) {
 /** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
 function runMissionRows(): MissionRow[] {
   const chapter = pveChapter(sectorMission);
-  return missionRows(chapterShown(sectorMission), s, ME, chapter.slots?.base);
+  const rows = missionRows(chapterShown(sectorMission), s, ME, chapter.slots?.base);
+  // Босс — своя задача, пока он на поле или пал в этом забеге (PVR-4.7, `runBoss.ts`).
+  const boss = bossTask(s);
+  return boss ? [...rows, bossMissionRow(boss)] : rows;
 }
 /** Награда задачи обеими валютами — теми же знаками, что в кошельке шапки. */
 const missionRewardHtml = (r: MissionReward): string =>
@@ -14207,6 +14236,51 @@ function drawMissionTargets(): void {
     cx.closePath();
     cx.fill();
     cx.stroke();
+  }
+  cx.restore();
+}
+
+/** Осада «Поглощения мира» над своим миром (PVR-4.7): красное кольцо-часы — дуга тает к
+ *  гибели мира — и отсчёт над ним в тех же часах, что у волн (`decisions/devourSiege.ts`).
+ *  Текста нет: знак и время, поэтому и локали не нужно. */
+function drawDevourSieges(): void {
+  const marks = devourSieges(s, ME);
+  if (marks.length === 0) return;
+  const R = 31;
+  cx.save();
+  cx.textAlign = 'center';
+  cx.textBaseline = 'top';
+  cx.font = '700 12px ui-monospace, monospace';
+  for (const m of marks) {
+    const p = s.planets[m.target];
+    if (!p) continue;
+    const c = world(p.position);
+    if (!visible(c, 60)) continue;
+    cx.lineWidth = 4;
+    cx.strokeStyle = 'rgba(255,90,77,.22)';
+    cx.beginPath();
+    cx.arc(c.x, c.y, R, 0, TAU);
+    cx.stroke();
+    cx.strokeStyle = HOSTILE;
+    cx.shadowColor = HOSTILE;
+    cx.shadowBlur = fxBlur(8);
+    cx.beginPath();
+    cx.arc(c.x, c.y, R, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - m.progress));
+    cx.stroke();
+    cx.shadowBlur = 0;
+    // Отсчёт — на тёмной плашке: у дома тесно (плашки флотов, портрет героя), и голый
+    // текст тонул бы в них. Плашку не заслоняет ничего — слой рисуется поверх флотов.
+    const label = `☠ ${countdownHMS(m.leftMs)}`;
+    const w = Math.ceil(cx.measureText(label).width) + 12;
+    const top = Math.round(c.y + R + 5);
+    const left = Math.round(c.x - w / 2);
+    cx.fillStyle = 'rgba(4,10,12,.9)';
+    cx.fillRect(left, top, w, 17);
+    cx.lineWidth = 1;
+    cx.strokeStyle = HOSTILE;
+    cx.strokeRect(left + 0.5, top + 0.5, w - 1, 16);
+    cx.fillStyle = HOSTILE;
+    cx.fillText(label, c.x, top + 3);
   }
   cx.restore();
 }
@@ -15083,6 +15157,16 @@ function frame(nowReal: number) {
   // Видимы только задачи ЭТОГО забега — запас главы минус закрытое навсегда (PVR-5.3).
   // Чип — кнопка панели задач (заказ владельца 2026-09-24): список прятался в подсказке
   // при наведении, и на телефоне его не было видно вовсе.
+  // PVR-4.7: осада «Поглощения мира» над своим миром — и в строке статуса: на карте отсчёт
+  // может заслонить флот, здесь он читается всегда. На телефоне — только знак и время.
+  const siegeHtml = devourSieges(s, ME)
+    .map((m) => {
+      const place = placeName(m.target);
+      const left = countdownHMS(m.leftMs);
+      const tip = m.archetype ? ` title="${esc(t(`boss.${m.archetype}.siege`, { world: place, in: left }))}"` : '';
+      return `<span class="dl-siege"${tip}>☠ <span>${esc(place)} </span>${left}</span>`;
+    })
+    .join('');
   const missions = sectorRunActive ? runMissionRows() : [];
   const missionsDone = missions.filter(m => m.complete).length;
   const missionHtml =
@@ -15099,6 +15183,7 @@ function frame(nowReal: number) {
   }
   const statusHtml =
     missionHtml +
+    siegeHtml +
     waveHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +
     (soloSaveActive && !NET && speed === 0 ? `<button type="button" data-solo-play="1">${t('solo.save.play')}</button>` : '') +

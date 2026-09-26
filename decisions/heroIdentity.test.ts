@@ -95,8 +95,12 @@ describe('hero map privacy and targeting', () => {
 
 describe('личность героя — у каждого героя каталога', () => {
   it('у каждого героя каталога есть личность, а значит и портрет', () => {
-    for (const id of Object.keys(shippedGameData().heroes))
+    // Босс Роя (PVR-4.7) — не герой игрока: к игроку он не приходит (Академия, жетоны,
+    // профиль — `runBoss.test.ts`), а на карте чужого героя рисует корабль, не портрет.
+    for (const [id, def] of Object.entries(shippedGameData().heroes)) {
+      if (def.boss === true) continue;
       expect([id, heroIdentity(id) !== undefined]).toEqual([id, true]);
+    }
   });
 
   it('Учёный: портрет — черновик вне атласа, имя не согласовано (sector-zero-roadmap §3.1.8)', () => {

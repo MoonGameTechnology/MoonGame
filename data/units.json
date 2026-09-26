@@ -645,5 +645,35 @@
     },
     "relayRange": 100,
     "hullClass": "light"
+  },
+  "swarm_leviathan": {
+    "faction": "swarm",
+    "stats": {
+      "attack": 40,
+      "defense": 36,
+      "speed": 32,
+      "hp": 900,
+      "shield": 240,
+      "shieldRegen": 0.19,
+      "cargoCapacity": 24
+    },
+    "line": "front",
+    "traits": [
+      "hero",
+      "issued",
+      "brood_host"
+    ],
+    "signature": 12,
+    "cost": {
+      "metal": 0
+    },
+    "buildTimeHours": 0,
+    "upkeep": {},
+    "slots": {
+      "weapon": 0,
+      "defense": 0,
+      "utility": 1
+    },
+    "hullClass": "heavy"
   }
 }

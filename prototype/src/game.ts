@@ -51,6 +51,7 @@ export {
   matchMode,
   setMatchTravelSpeed,
   setMatchVeteranPower,
+  setMatchPveBoss,
   advance,
   order,
   canOrder,

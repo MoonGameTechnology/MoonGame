@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.43'); // у Роя ветеранов нет: `factions.swarm.veterans: false` (решение владельца 2026-09-25)
+    expect(data.version).toBe('0.1.44'); // PVR-4.7: Левиафан — босс матёрого Роя (юнит, архетип, способность, пассивка, выводок, `pve.boss`) поверх 0.1.43 (у Роя ветеранов нет)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что

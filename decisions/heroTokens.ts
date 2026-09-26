@@ -40,15 +40,16 @@ export function heroStarCost(stars: number): number | null {
 export type TokenUse = 'star' | 'join' | null;
 
 /**
- * Нужны ли жетоны этому герою. `null` — не нужны: героя нет в каталоге, звёзды на
- * потолке или это герой главы, которую ещё не прошли (правило 4).
+ * Нужны ли жетоны этому герою. `null` — не нужны: героя нет в каталоге, это босс Роя
+ * (PVR-4.7: босс не приходит к игроку ни жетонами, ни наградой), звёзды на потолке или это
+ * герой главы, которую ещё не прошли (правило 4).
  */
 export function heroTokenUse(
   progress: Pick<SectorZeroProgress, 'heroes'>,
   id: string,
   data: GameData,
 ): TokenUse {
-  if (!data.heroes[id]) return null;
+  if (!data.heroes[id] || data.heroes[id].boss === true) return null;
   const hero = progress.heroes[id];
   if (hero) return hero.level < HERO_MAX_STARS ? 'star' : null;
   return heroChapter(id) === null ? 'join' : null;

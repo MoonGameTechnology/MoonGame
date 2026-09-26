@@ -123,8 +123,9 @@ const HERO_GRADE_KEY: Record<string, string> = {
  *  because the map's command menu shows the same cooldown on the same ability. */
 export const heroCdKey = (type: string): string =>
   type === 'temp_lane' ? 'path' : type === 'annihilate' ? 'annihilate' : `fx:${type}`;
-// Ability types the prototype kernel can actually resolve: the two heroModule
-// built-ins + every `hero.effect.<type>` the kernel's MODULES provide (heroEffects →
+// Ability types the prototype kernel can actually resolve: the three heroModule
+// built-ins (`temp_lane`, `annihilate` and the boss's siege `devour`, PVR-4.7) + every
+// `hero.effect.<type>` the kernel's MODULES provide (heroEffects →
 // recall/aura/reveal/jump/decoy). Types not here have no engine effect yet → the «скоро»
 // badge. Keeping this list in step with `heroEffectsModule` is the whole job of the
 // parity test in `heroStaff.test.ts`: a provider added there and forgotten here gives a
@@ -132,6 +133,7 @@ export const heroCdKey = (type: string): string =>
 export const HERO_CASTABLE = new Set([
   'temp_lane',
   'annihilate',
+  'devour',
   'recall',
   'aura',
   'reveal',

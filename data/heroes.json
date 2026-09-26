@@ -75,5 +75,21 @@
       "field_lab",
       "ballistic_model"
     ]
+  },
+  "leviathan": {
+    "name": "Leviathan",
+    "description": "hero.unit.leviathan.desc",
+    "ship": {
+      "unit": "swarm_leviathan"
+    },
+    "slots": 0,
+    "startAbilities": [
+      "hive_call",
+      "devour"
+    ],
+    "startPassives": [
+      "swarm_instinct"
+    ],
+    "boss": true
   }
 }

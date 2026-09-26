@@ -32,6 +32,7 @@ import {
 } from './missionObjectives';
 import { WARRANTS_PER_REWARD } from './sectorZeroProgress';
 import { runClockText } from './runClock';
+import type { BossTask } from './runBoss';
 
 /** Награда задачи в валютах профиля. */
 export interface MissionReward {
@@ -48,7 +49,8 @@ export function missionReward(nominal: number): MissionReward {
 /** Строка панели задач. */
 export interface MissionRow {
   id: string;
-  kind: ObjectiveKind;
+  /** Вид задачи главы либо `boss` — задача босса забега (PVR-4.7). */
+  kind: ObjectiveKind | 'boss';
   done: number;
   total: number;
   complete: boolean;
@@ -134,6 +136,25 @@ export function missionRows(
       ...(p.holdMs !== undefined ? { holdMs: p.holdMs, needMs: p.needMs } : {}),
     };
   });
+}
+
+/**
+ * Строка босса (PVR-4.7): «Убить Левиафана», 0/1 до гибели и 1/1 после. Награда — та, что
+ * объявил режим, без деления на число задач (`objectiveNominal`): босс не задача главы и
+ * места в её запасе не занимает. Меток нет — где босс, игрок узнаёт разведкой, а не
+ * панелью (правило 2: метка не выдаёт разведку, которой не было).
+ */
+export function bossMissionRow(task: BossTask): MissionRow {
+  return {
+    id: `boss.${task.hero}.task`,
+    kind: 'boss',
+    done: task.slain ? 1 : 0,
+    total: 1,
+    complete: task.slain,
+    reward: missionReward(task.reward),
+    targets: [],
+    failed: false,
+  };
 }
 
 /** Строка карточки главы в меню: что будет задачей следующего забега и сколько за неё

@@ -440,6 +440,14 @@ export const en: Record<string, string> = {
   "data.swarm-data-center": "Swarm Data Center",
   "data.brood-chamber": "Brood Chamber",
   "swarm.brood.desc": "A living growth organ carried by a Brood Mother. Every 3 game hours each carrier grows one Lander for 20 biomass, 8 metal and 2 microelectronics. Growth stops in combat, without feedstock, or when the landing hold is full.",
+  'data.swarm-leviathan': 'Leviathan',
+  'data.leviathan': 'Leviathan',
+  'data.leviathan-brood': 'Leviathan Brood',
+  'swarm.leviathan-brood.desc':
+    'The Leviathan’s brood womb. Every 3 game hours it grows 6 Landers for 20 biomass, 8 metal and 2 microelectronics each. Growth stops in combat, without feedstock, or when the landing hold is full.',
+  'data.hive-call': 'Hive Call',
+  'data.devour-world': 'Devour World',
+  'data.swarm-instinct': 'Swarm Instinct',
   "swarm.intel.economy": "The Swarm consumes organic matter for living tissue, metal for structural supports and armour, and microelectronics to grow conductive neural nodes. Industrial worlds feed its expansion: biomass alone is insufficient.",
   "swarm.intel.brood": "A Brood Mother carries a brood chamber, an organ that grows ground Landers from biomass, metal and microelectronics. They occupy landing capacity and take the surface through a normal assault. The carrier does not infect a world merely by being there.",
   'swarm.intel.updated': 'New intel',
@@ -1618,6 +1626,7 @@ export const en: Record<string, string> = {
   'err.hero-cap': 'deployed-hero limit reached',
   'err.hero-dead': 'the hero is dead — wait for the respawn',
   'err.hero-deployed': 'the hero is already deployed — command them through their fleet',
+  'err.hero-fallen': 'the boss has fallen for good',
   'err.hero-not-deployed': 'the hero is not deployed — raise a ship first',
   'err.hero-unit': 'a hero ship cannot be split off its fleet',
   'err.host-in-transit': 'the fleet is in transit — a hero ship launches at a stop',
@@ -1691,6 +1700,7 @@ export const en: Record<string, string> = {
   'err.not-enough': 'not that many',
   'err.not-equipped': 'the hero does not have that ability',
   'err.not-ground': 'only ground troops load into the hold',
+  'err.not-bombarding': 'the fleet is not bombarding',
   'err.not-hostile': 'they are not an enemy',
   'err.not-in-battle': 'the fleet is not in battle',
   'err.not-inhabited': 'an uninhabited world cannot be the capital',
@@ -1762,6 +1772,7 @@ export const en: Record<string, string> = {
   'hero.passive.master-scavenger.desc': "A further +5% salvage share — 10% in total.",
   'hero.passive.reclaimed-barrels.desc': "A further +2% damage — 7% in total.",
   'hero.passive.scavenged-guns.desc': "+5% damage for the ship the hero commands.",
+  'hero.passive.swarm-instinct.desc': 'Swarm fleets within 42 of the Leviathan fly 10% faster.',
   'hero.passive.wreck-optics.desc': "+3% salvage share in battles this hero fought.",
   'data.field-lab': 'Field Lab',
   'data.ballistic-model': 'Ballistic Model',
@@ -1804,6 +1815,10 @@ export const en: Record<string, string> = {
     'Fakes a radar contact: a node in range starts reading as occupied on rival radar. The phantom only shows where their radar reaches, and it falls apart the moment they get close enough to identify the node.',
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
+  'hero.ability.hive-call.desc':
+    '+15% damage for Swarm fleets within 220 of the Leviathan, for 2 hours.',
+  'hero.ability.devour.desc':
+    'A world under the Leviathan\'s bombardment becomes a dead world after 4 hours. A battle with its fleet or leaving orbit breaks the siege.',
   'hero.ability.rally.desc':
     'A battle cry: +10% damage for your fleets within 42 of the hero, for 2 hours. The command net widens it to 220, then 334.',
   'hero.ability.rally.name': 'Rally',
@@ -1863,6 +1878,8 @@ export const en: Record<string, string> = {
     'The top of the corridor branch: the hero stops laying a path and simply vanishes at one node to appear at another.',
   'hero.unit.commander.desc':
     'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
+  'hero.unit.leviathan.desc':
+    'Boss of the veteran Swarm: a living flagship with 900 hull and 240 chitin that regrows between battles. Arrives with the last wave; its death is final.',
   'hero.unit.ravager.desc': 'A psionic destroyer: annihilates worlds and tears open the fog.',
   'hero.unit.scientist.desc':
     "An analyst: lifts the fog with reconnaissance. Innate — Field Lab: +10% salvage share in the hero's battles.",
@@ -2410,11 +2427,11 @@ export const en: Record<string, string> = {
   'sector-zero.continue': 'Continue',
   'sector-zero.difficulty': 'New run difficulty',
   'sector-zero.difficulty.about.strong':
-    'The veteran Swarm thinks: it researches technologies, retreats from lost battles, splits its fleet between two targets, lands troops on defended worlds, launches shuttles and trains its heroes.',
+    'The veteran Swarm thinks: it researches technologies, retreats from lost battles, splits its fleet between two targets, lands troops on defended worlds, launches shuttles and trains its heroes. The Leviathan, the Swarm’s boss, arrives with the last wave.',
   'sector-zero.difficulty.about.weak':
     'The standard Swarm wins by numbers: its fleets go for the nearest target and fight to the end; it researches nothing and never lands troops on defended worlds.',
   'sector-zero.difficulty.hint': 'Your saved run keeps its original difficulty.',
-  'sector-zero.difficulty.same': 'Scheduled waves and rewards are the same on both levels.',
+  'sector-zero.difficulty.same': 'Scheduled waves are the same on both levels.',
   'sector-zero.end.kills': 'Enemies destroyed: {n}',
   'sector-zero.end.prepare': 'Upgrade and prepare',
   'sector-zero.end.replay': 'Play this chapter again',
@@ -2439,6 +2456,12 @@ export const en: Record<string, string> = {
   'sector-zero.shop.tokens.locked': 'This hero comes as a chapter reward',
   'sector-zero.end.unlocked': 'New objectives next run: {n}',
   'sector-zero.end.veterans': 'Medals of surviving veterans',
+  'boss.leviathan.slain': 'The Leviathan is slain',
+  'boss.leviathan.spawned': 'The Leviathan, the Swarm’s boss, has left the hive',
+  'boss.leviathan.task': 'Kill the Leviathan',
+  'boss.leviathan.siege': '⚠ {world}: the Leviathan is devouring the world — it dies in {in}',
+  'boss.leviathan.siege-broken': '{world}: the Leviathan’s siege is broken',
+  'boss.leviathan.devoured': '☠ {world}: devoured by the Leviathan',
   'sector-zero.end.victory': 'Victory',
   'sector-zero.end.waves': 'Run: waves {n} of {m}',
   'sector-zero.enter': 'Sector Zero',

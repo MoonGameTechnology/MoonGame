@@ -114,5 +114,15 @@
     "params": {
       "bonus": 0.1
     }
+  },
+  "swarm_instinct": {
+    "name": "Swarm Instinct",
+    "description": "hero.passive.swarm-instinct.desc",
+    "hook": "fleet.speed",
+    "scope": "ownFleetsNear",
+    "params": {
+      "bonus": 0.1,
+      "radius": 42
+    }
   }
 }

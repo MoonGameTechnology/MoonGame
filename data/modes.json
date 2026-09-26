@@ -33,7 +33,8 @@
       "supply": {
         "perRun": 3,
         "pack": { "credits": 150, "metal": 150, "food": 100, "energy": 50 }
-      }
+      },
+      "boss": { "hero": "leviathan", "modules": ["leviathan_brood"], "reward": 5 }
     },
     "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100 }, "fleet": 90, "radarScale": 2.5 },
     "technology": { "dayGates": false, "exclude": ["ai_stewardship"] }

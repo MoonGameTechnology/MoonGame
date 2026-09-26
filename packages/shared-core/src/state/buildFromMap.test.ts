@@ -317,6 +317,8 @@ describe('slot-based maps — team-aware start slots (corporation-wars.md §4)',
     expect(seat(['nobody'])).toThrow(/E_UNKNOWN_HERO/);
     expect(seat(['warden', 'warden'])).toThrow(/E_DUPLICATE_HERO/);
     expect(seat(['commander', 'ravager', 'vanguard', 'warden'])).toThrow(/E_TOO_MANY_HEROES/);
+    // PVR-4.7: босса штурма выставляет режим, в ростер места его не взять.
+    expect(seat(['leviathan'])).toThrow(/E_BOSS_HERO/);
   });
 
   it('grants pre-match technology picks as completed research (C3)', () => {

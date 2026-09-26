@@ -460,6 +460,8 @@ function resolveHeroes(a: SlotAssignment, data: GameData): string[] {
   const seen = new Set<string>();
   for (const id of raw) {
     if (!data.heroes[id]) throw new Error(`E_UNKNOWN_HERO: ${id}`);
+    // A boss is fielded by its PvE mode, never picked into a seat's roster (PVR-4.7).
+    if (data.heroes[id]!.boss) throw new Error(`E_BOSS_HERO: ${id}`);
     if (seen.has(id)) throw new Error(`E_DUPLICATE_HERO: ${id}`);
     seen.add(id);
   }

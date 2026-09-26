@@ -819,12 +819,15 @@ export const ModuleDefSchema = z
           .min(1),
       })
       .optional(),
-    /** Automatic onboard growth: one ground organism per fitted hull and cycle.
+    /** Automatic onboard growth: `count` ground organisms per fitted hull and cycle.
      * Costs come from the organism's unit definition, never from the client. */
     brood: z
       .object({
         unit: z.string(),
         intervalHours: z.number().positive(),
+        /** Organisms each fitted hull grows per cycle. Default 1 — every organ before the
+         *  Leviathan's brood (PVR-4.7) grew exactly one, and a missing field must keep it so. */
+        count: z.number().int().positive().default(1),
       })
       .optional(),
     /** Bound to the owning player (anti-RMT). A `vertical` module must never be
@@ -1145,6 +1148,10 @@ export const HeroArchetypeDefSchema = z.object({
   startAbilities: z.array(z.string()).default([]),
   /** Passive ids active from spawn (→ `data.heroPassives`, HERO-5). Ids only here. */
   startPassives: z.array(z.string()).default([]),
+  /** A BOSS (PVR-4.7): fielded only by the game — a PvE mode's `boss` — never recruited,
+   *  picked or bought by a player, and its death is final: no respawn timer and no manual
+   *  `hero.spawn`. Absent ⇒ an ordinary hero. */
+  boss: z.boolean().default(false),
 });
 
 /** Session-end reward scale (SES-2 first slice, GDD §3.4) — the data knob for the
@@ -1305,6 +1312,19 @@ export const ModePveSchema = z
       .object({
         perRun: z.number().int().nonnegative(),
         pack: z.record(z.string(), z.number().int().positive()),
+      })
+      .strict()
+      .optional(),
+    /** The assault's boss (PVR-4.7, owner's resolution 2026-09-24): a `boss` hero archetype
+     *  (→ `data.heroes`) that joins the LAST wave at the NPC's staging world, carrying
+     *  `modules` on its ship, and the bounty the host pays for slaying it. The mode says WHO
+     *  the boss is; the HOST says whether this match meets it (`MatchConfig.pveBoss`) —
+     *  Sector Zero sends it to the strong Swarm only. Absent ⇒ no boss. */
+    boss: z
+      .object({
+        hero: z.string(),
+        modules: z.array(z.string()).default([]),
+        reward: z.number().int().nonnegative().default(0),
       })
       .strict()
       .optional(),

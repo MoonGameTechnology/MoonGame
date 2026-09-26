@@ -56,9 +56,10 @@ export interface SwarmCatalog {
 const SWARM = 'swarm';
 
 /**
- * Каталог по данным и стартовым состояниям глав. Формы — уникальные юниты фракции Роя и
- * всё, что приходит волнами PvE; органы — модули, которые встают на эти формы; постройки
- * — стоящие на мирах Роя в главах. Порядок стабилен: как объявлено, без повторов.
+ * Каталог по данным и стартовым состояниям глав. Формы — уникальные юниты фракции Роя,
+ * всё, что приходит волнами PvE, и корабль босса штурма (PVR-4.7); органы — модули,
+ * которые встают на эти формы; постройки — стоящие на мирах Роя в главах. Порядок
+ * стабилен: как объявлено, без повторов.
  */
 export function swarmCatalog(data: GameData, chapters: readonly GameState[]): SwarmCatalog {
   const units: string[] = [...(data.factions[SWARM]?.uniqueUnits ?? [])];
@@ -71,6 +72,9 @@ export function swarmCatalog(data: GameData, chapters: readonly GameState[]): Sw
       if (key === 'unit' && typeof value === 'string') units.push(value);
       return value;
     });
+    const boss = mode.pve?.boss?.hero;
+    const hull = boss !== undefined ? data.heroes[boss]?.ship.unit : undefined;
+    if (hull !== undefined) units.push(hull);
   }
   const known = [...new Set(units)].filter((id) => data.units[id]);
   // Органы — модули, которые данные ЯВНО отдают носителю выводка (`allowed.traits`), а не
