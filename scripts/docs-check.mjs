@@ -30,7 +30,7 @@
 //     им позволено ссылаться на имена, актуальные на их дату (в т.ч. на
 //     предложенные и отклонённые доки).
 //   - ALLOW: точечные forward-ссылки на ещё не созданные файлы.
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname, normalize, basename, sep } from 'node:path';
 
 const ROOT = normalize(join(import.meta.dirname, '..'));
@@ -126,7 +126,12 @@ for (const file of mdFiles) {
 }
 
 // 3. словарь зон backlog'а
-const backlog = readFileSync(join(ROOT, 'docs/backlog.md'), 'utf8');
+// Бэклог — два файла: живые кирпичи в `backlog.md`, закрытые — в `backlog-archive.md`
+// (выносит `scripts/archive-done-bricks.mjs`). Проверки ниже читают их как один бэклог:
+// блокировка `🔒(ID)` на уехавший в архив кирпич должна оставаться видимой как мёртвая.
+const BACKLOG_FILES = ['docs/backlog.md', 'docs/backlog-archive.md'].filter((f) => existsSync(join(ROOT, f)));
+const backlogTexts = BACKLOG_FILES.map((f) => ({ file: f, text: readFileSync(join(ROOT, f), 'utf8') }));
+const backlog = backlogTexts.map((b) => b.text).join('\n');
 for (const m of backlog.matchAll(/`\[([a-z/+-]+)\]`/g)) {
   for (const part of m[1].split('/')) {
     if (!ZONES.has(part)) {
@@ -210,8 +215,10 @@ const checkLocks = (where, id, deps) => {
   }
 };
 
-for (const m of backlog.matchAll(/^- \*\*([A-Za-z0-9.-]+)\*\*[ \t]*🔒\(([^)]*)\)/gm)) {
-  checkLocks('docs/backlog.md', m[1], m[2]);
+for (const { file, text } of backlogTexts) {
+  for (const m of text.matchAll(/^- \*\*([A-Za-z0-9.-]+)\*\*[ \t]*🔒\(([^)]*)\)/gm)) {
+    checkLocks(file, m[1], m[2]);
+  }
 }
 for (const [file, heads] of roadmapHeads) {
   for (const { id, head } of heads) {
@@ -343,18 +350,20 @@ const slash = (f) => f.split(sep).join('/');
 
 const indexRows = [];
 {
-  const lines = backlog.split('\n');
   const RE = /^- \*\*([A-Za-z][A-Za-z0-9]*(?:[-.][A-Za-z0-9]+)*(?:\.\.[A-Za-z0-9]+)?)\*\*[ \t]*(✅|⏳|🔶|🔒|🗑)/;
-  for (let i = 0; i < lines.length; i++) {
-    const m = RE.exec(lines[i]);
-    if (!m) continue;
-    indexRows.push({
-      id: m[1],
-      mark: m[2],
-      zones: zonesOf(lines[i]),
-      where: 'docs/backlog.md',
-      title: brickTitle(lines[i].slice(m[0].length)),
-    });
+  for (const { file, text } of backlogTexts) {
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const m = RE.exec(lines[i]);
+      if (!m) continue;
+      indexRows.push({
+        id: m[1],
+        mark: m[2],
+        zones: zonesOf(lines[i]),
+        where: file,
+        title: brickTitle(lines[i].slice(m[0].length)),
+      });
+    }
   }
 }
 for (const file of [...roadmaps].sort()) {
