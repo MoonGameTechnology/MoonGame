@@ -87,6 +87,8 @@ export interface YandexSdk {
     showFullscreenAdv?: (opts?: { callbacks?: Record<string, unknown> }) => void;
   };
   environment?: { i18n?: { lang?: string; tld?: string } };
+  /** Удалённые флаги из консоли (`YAG-6.3`): имя → строка. */
+  getFlags?: (params?: { defaultFlags?: Record<string, string> }) => Promise<Record<string, unknown>>;
   deviceInfo?: { isMobile?: () => boolean; isDesktop?: () => boolean; isTV?: () => boolean };
 }
 
@@ -144,6 +146,13 @@ const UNAVAILABLE: PlatformPurchase = { status: 'unavailable' };
  * срока выше: флаг «ролик идёт» не снимался никогда, и кнопки рекламы молчали до конца сессии.
  */
 export const AD_START_TIMEOUT_MS = 30_000;
+
+/**
+ * Сколько ждать флаги площадки (`YAG-6.3`). Их ждёт СТАРТ игры: каталог собирается с ними
+ * один раз. Поэтому срок короткий — не ответили вовремя, игра идёт на числах поставки, а
+ * поздний ответ уже ничего не меняет.
+ */
+export const FLAGS_TIMEOUT_MS = 2_000;
 
 /** Ключ облачных данных игры. Одно поле: формат снимка — наш (`PlatformSave`). */
 export const CLOUD_KEY = 'meta';
@@ -361,6 +370,34 @@ export function createYandexPlatform(
 
   const lang = sdk.environment?.i18n?.lang;
 
+  /** Флаги площадки строками. Любой сбой — пустой набор, а не ошибка запуска. */
+  const readFlags = async (): Promise<Record<string, string>> => {
+    if (typeof sdk.getFlags !== 'function') return {};
+    let stop: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const late = new Promise<'late'>((resolve) => {
+        stop = setTimeout(() => resolve('late'), FLAGS_TIMEOUT_MS);
+      });
+      const got = await Promise.race([sdk.getFlags({ defaultFlags: {} }), late]);
+      if (got === 'late') {
+        options.onSdkError?.('getFlags', new Error('E_FLAGS_TIMEOUT'));
+        return {};
+      }
+      const flags: Record<string, string> = {};
+      if (got && typeof got === 'object') {
+        for (const [name, value] of Object.entries(got)) {
+          if (typeof value === 'string') flags[name] = value;
+        }
+      }
+      return flags;
+    } catch (error) {
+      options.onSdkError?.('getFlags', error);
+      return {};
+    } finally {
+      clearTimeout(stop);
+    }
+  };
+
   return {
     capabilities: capabilitiesOf(sdk),
     ...(typeof lang === 'string' ? { language: lang } : {}),
@@ -434,5 +471,6 @@ export function createYandexPlatform(
         else events.push(props ? { event, props } : { event });
       },
     },
+    config: { flags: readFlags },
   };
 }

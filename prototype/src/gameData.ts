@@ -13,7 +13,13 @@
  */
 import { shippedGameData } from '../../data/bundle';
 import type { GameData } from '../../packages/shared-core/src/index';
+import { applyBalanceFlags, parseBalanceFlags } from '../../decisions/remoteBalance';
+import { getRemoteFlags } from './platform/host';
 
 /** Валидированный каталог игры. Собирается один раз на загрузку модуля — как и прежний
- *  литерал, который `parseGameData` проверял на том же месте. */
-export const data: GameData = shippedGameData();
+ *  литерал, который `parseGameData` проверял на том же месте. Числа баланса поверх него —
+ *  из флагов площадки (`YAG-6.3`), которые `bootstrap.ts` прочитал до импорта игры. */
+export const data: GameData = applyBalanceFlags(
+  shippedGameData(),
+  parseBalanceFlags(getRemoteFlags()),
+);

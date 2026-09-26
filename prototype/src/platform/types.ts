@@ -117,6 +117,16 @@ export interface PlatformAnalytics {
   emit(event: PlatformEvent, props?: Record<string, string | number | boolean>): void;
 }
 
+/**
+ * Удалённые флаги площадки (`YAG-6.3`) — сырые строки, как их задали в консоли. Что из них
+ * можно применить, решает `decisions/remoteBalance.ts`, а не адаптер. Промис не
+ * отклоняется: нет флагов, SDK упал или молчит — пустой объект, и игра идёт на числах
+ * поставки.
+ */
+export interface PlatformConfig {
+  flags(): Promise<Record<string, string>>;
+}
+
 /** Площадка целиком. */
 export interface GamePlatform {
   capabilities: PlatformCapabilities;
@@ -129,4 +139,5 @@ export interface GamePlatform {
   ads: PlatformAds;
   iap: PlatformIAP;
   analytics: PlatformAnalytics;
+  config: PlatformConfig;
 }

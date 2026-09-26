@@ -1304,7 +1304,7 @@
 | YAG-5.2 | 🔶 | docs proto | `docs/yandex-games-roadmap.md` | Карточка игры и подача в модерацию 2026-09-24 |
 | YAG-6.1 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Серверное время для суток витрины и дневных лимитов |
 | YAG-6.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Пауза площадки: что делает мир 2026-09-24 |
-| YAG-6.3 | ⏳ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса |
+| YAG-6.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | Удалённый конфиг баланса 2026-09-26 |
 | YAG-6.4 | ✅ | proto | `docs/yandex-games-roadmap.md` | Кнопка «назад» и выход 2026-09-24 |
 | YAG-7.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | Долгий тап, меню под сообщениями, единицы в угрозах 2026-09-25 |
 | YAG-7.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Карточка обучения закрывает стартовый флот на 1024×576 2026-09-25 |

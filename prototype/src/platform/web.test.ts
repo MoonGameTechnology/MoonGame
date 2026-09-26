@@ -101,4 +101,8 @@ describe('WebPlatformAdapter — площадка по умолчанию', () =
       delete g.localStorage;
     }
   });
+
+  it('удалённого конфига нет: флаги пустые, игра на числах поставки (YAG-6.3)', async () => {
+    expect(await createWebPlatform().config.flags()).toEqual({});
+  });
 });

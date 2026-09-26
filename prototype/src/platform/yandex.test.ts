@@ -9,6 +9,7 @@ import {
   CLOUD_KEY,
   CLOUD_LIMIT_BYTES,
   createYandexPlatform,
+  FLAGS_TIMEOUT_MS,
   type YandexSdk,
 } from './yandex';
 
@@ -744,5 +745,50 @@ describe('YAG-6.4 — «назад» и выход площадки', () => {
     const platform = createYandexPlatform(sdk, { onSdkError: (where) => errors.push(where) });
     expect(() => platform.onExit(() => {})()).not.toThrow();
     expect(errors).toEqual(['onEvent']);
+  });
+});
+
+describe('YAG-6.3 — удалённые флаги площадки', () => {
+  it('отдаёт флаги консоли строками и отбрасывает не-строки', async () => {
+    let asked: unknown;
+    const { sdk } = fakeSdk({
+      getFlags: async (params) => {
+        asked = params;
+        return { pve_waves: '8', broken: 3, empty: null };
+      },
+    });
+    expect(await createYandexPlatform(sdk).config.flags()).toEqual({ pve_waves: '8' });
+    expect(asked).toEqual({ defaultFlags: {} });
+  });
+
+  it('нет метода, сбой или отказ SDK — пустой набор, а не ошибка запуска', async () => {
+    const errors: string[] = [];
+    const onSdkError = (where: string) => errors.push(where);
+    expect(await createYandexPlatform(fakeSdk().sdk).config.flags()).toEqual({});
+    const rejects = fakeSdk({ getFlags: () => Promise.reject(new Error('boom')) }).sdk;
+    expect(await createYandexPlatform(rejects, { onSdkError }).config.flags()).toEqual({});
+    const throws = fakeSdk({
+      getFlags: () => {
+        throw new Error('boom');
+      },
+    }).sdk;
+    expect(await createYandexPlatform(throws, { onSdkError }).config.flags()).toEqual({});
+    expect(errors).toEqual(['getFlags', 'getFlags']);
+  });
+
+  it('молчащий SDK не держит старт игры дольше срока', async () => {
+    vi.useFakeTimers();
+    try {
+      const errors: string[] = [];
+      const silent = fakeSdk({ getFlags: () => new Promise(() => {}) }).sdk;
+      const flags = createYandexPlatform(silent, {
+        onSdkError: (where) => errors.push(where),
+      }).config.flags();
+      await vi.advanceTimersByTimeAsync(FLAGS_TIMEOUT_MS);
+      expect(await flags).toEqual({});
+      expect(errors).toEqual(['getFlags']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

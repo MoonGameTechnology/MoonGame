@@ -14,6 +14,7 @@ import {
   createPlatform,
   getPlatform,
   setPlatform,
+  setRemoteFlags,
   type PlatformHost,
   type YaGamesGlobal,
 } from './platform/host';
@@ -119,7 +120,14 @@ loaderReady()
       if (locale) suggestLocale(locale);
     } else if (locale && suggestLocale(locale)) labelStaticDom();
   })
-  .then(() => (__SECTOR_ZERO_ONLY__ ? loadActiveLocale().then(revealBoot) : undefined))
+  .then(() =>
+    Promise.all([
+      __SECTOR_ZERO_ONLY__ ? loadActiveLocale().then(revealBoot) : undefined,
+      // Удалённый конфиг баланса (`YAG-6.3`) — тоже ДО импорта игры: каталог собирается
+      // один раз при импорте. Промис не отклоняется: нет флагов — числа поставки.
+      getPlatform().config.flags().then(setRemoteFlags),
+    ]),
+  )
   .then(() => import('./main'))
   .then(
     () => {
