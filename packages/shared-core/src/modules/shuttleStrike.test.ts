@@ -275,7 +275,9 @@ describe('перехват — свои челноки поднимаются н
     const s = apply(defended({ attackers: 3 }), strike({ targetPlanetId: 'B' }));
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
-    expect(mine?.hp).toBe(19); // долетел ОДИН челнок: 1 × siegeDamage 1
+    // Долетел ОДИН челнок, и он подбит: 4 недобитых урона из корпуса 10 — бьёт на 60%
+    // (SHU-5.7), 1 × siegeDamage 1 × 0.6.
+    expect(mine?.hp).toBeCloseTo(19.4);
   });
 
   it('удар, потерявший ВСЕ машины, до цели не доходит вовсе', () => {
@@ -313,7 +315,8 @@ describe('перехват — свои челноки поднимаются н
       },
     };
     const s = apply(own, strike({ targetFleetId: 'E1' }));
-    const after = advance(s, 2);
+    // Три часа: ответка цели подбивает эскадру, и домой она идёт медленнее (SHU-5.7).
+    const after = advance(s, 3);
     expect(after.strikes ?? []).toHaveLength(0); // долетел и вернулся, никто не мешал
     expect(hullOf(after, 'E1')).toBeLessThan(100);
   });
