@@ -1131,7 +1131,7 @@
 | PVR-6.22 | ✅ | proto | `docs/sector-zero-roadmap.md` | Кольцо цели задачи живёт, как метка-пинг |
 | PVR-6.23 | ✅ | proto | `docs/sector-zero-roadmap.md` | Мастерская — внутри «Кораблей» |
 | PVR-6.24 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Корабль героя: модули и слоты за звёзды |
-| PVR-6.25 | ⏳ | proto | `docs/sector-zero-roadmap.md` | Академия: страница героя вкладками, навыки деревом |
+| PVR-6.25 | ✅ | proto | `docs/sector-zero-roadmap.md` | Академия: страница героя вкладками, навыки деревом |
 | PVR-6.26 | ✅ | proto | `docs/sector-zero-roadmap.md` | Варрант за каждого уничтоженного врага |
 | PVR-6.27 | ✅ | proto | `docs/sector-zero-roadmap.md` | Взятое логово пиратов не встаёт заново |
 | PVR-6.28 | ✅ | core data | `docs/sector-zero-roadmap.md` | Рой в экспедиции на четверть медленнее |

@@ -375,6 +375,20 @@ try {
     );
     assert.deepEqual(broken, [], 'портреты героев в Академии загрузились');
     assert.ok((await page.locator(faces).count()) >= 5, 'пять героев в ростере');
+    // Страница героя вкладками, навыки деревом (PVR-6.25): связи — линиями, состояние узла
+    // видно по классу, карточка закрытого узла называет, чего не хватает.
+    assert.equal(await page.locator('[data-prep="hero-tab"]').count(), 3, 'три вкладки героя');
+    assert.ok((await page.locator('#sz-workshop [data-prep="ability"]').count()) > 0, '«В бой» — навыки в слотах');
+    await page.locator('[data-prep="hero-tab"][data-id="tree"]').click();
+    assert.ok((await page.locator('.sz-tree line').count()) > 0, 'связи дерева — линиями');
+    for (const state of ['owned', 'open', 'locked'])
+      assert.ok((await page.locator(`.sz-tree-node.${state}`).count()) > 0, `в дереве есть узел «${state}»`);
+    await page.locator('.sz-tree-node.locked').first().click();
+    assert.equal(await page.locator('.sz-tree-card .sz-prereq').count(), 1, 'карточка закрытого узла называет предпосылку');
+    await page.locator('[data-prep="hero-tab"][data-id="stars"]').click();
+    assert.equal(await page.locator('.sz-star-ladder li').count(), 3, 'лестница звёзд');
+    assert.equal(await page.locator('#sz-workshop [data-prep="upgrade-hero"]').count(), 1, 'звезда покупается на своей вкладке');
+    await page.locator('[data-prep="hero-tab"][data-id="battle"]').click();
     await page.locator('[data-prep="back"]').click();
     await page.locator('#sz-mission-0').click();
     // Комикс главы (решение владельца 2026-09-24): перед первым забегом главы, один раз.
@@ -644,7 +658,7 @@ try {
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' комиксы глав — до первого забега и после победы, один раз, с пропуском; портреты Академии загружены;' +
+      ' комиксы глав — до первого забега и после победы, один раз, с пропуском; портреты Академии загружены; страница героя вкладками, навыки деревом с линиями;' +
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — плитками с подписью, полоской и числами корпуса; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +

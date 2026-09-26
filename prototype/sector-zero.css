@@ -430,6 +430,37 @@
 /* Только прямой потомок: вложенным делениям `.sz-pips` правило затирало отступ, и они
    прилипали к тексту («▬▬▬Подготовка 1»). */
 .sz-hero-head > span { font-size: 13px; color: #aad3d1; margin-right: auto; }
+/* Страница героя вкладками (PVR-6.25): «В бой», «Развитие», «Звёзды» — ряд под шапкой. */
+.sz-subtabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: -14px 0 18px; }
+#sz-workshop .sz-subtabs button { padding: 8px 4px; font-size: 13px; }
+/* Дерево навыков: клетка — глубина × порядок (`skillTreeLayout`), шаг клетки — здесь.
+   Линии — SVG в клетках под узлами; центр кружка — на 0.4 высоты клетки (`TREE_NODE_Y`). */
+.sz-tree-wrap { overflow-x: auto; margin: 4px 0 16px; scrollbar-width: thin; }
+.sz-tree { position: relative; --px: 124px; --py: 88px; width: calc(var(--cols) * var(--px)); height: calc(var(--rows) * var(--py)); }
+.sz-tree svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.sz-tree line { stroke: #2b4a54; stroke-width: 2; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.sz-tree line.lit { stroke: #58d6cf; stroke-dasharray: none; }
+#sz-workshop .sz-tree-node { position: absolute; left: calc(var(--c) * var(--px)); top: calc(var(--r) * var(--py)); width: var(--px); height: var(--py); min-height: 0; padding: calc(var(--py) * .4 - 20px) 4px 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; color: #b9d4d8; }
+.sz-tree-node i { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 16px/1 system-ui, sans-serif; border: 2px solid #3b5a63; background: #081821; }
+.sz-tree-node span { font-size: 11px; line-height: 1.2; text-align: center; max-width: 100%; overflow: hidden; overflow-wrap: anywhere; hyphens: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.sz-tree-node.owned i { background: #185257; border-color: #6fe3d6; color: #e2fbf7; }
+.sz-tree-node.open i { border-color: var(--cur-data); color: var(--cur-data); box-shadow: 0 0 10px color-mix(in srgb, var(--cur-data) 35%, transparent); }
+.sz-tree-node.locked i { border-style: dashed; font-size: 13px; filter: grayscale(1); opacity: .55; }
+.sz-tree-node.locked span { color: #6c8790; }
+.sz-tree-node.selected i { outline: 2px solid #e1f4f4; outline-offset: 3px; }
+#sz-workshop .sz-tree-node:hover i { border-color: #8bc8c8; }
+/* Выбор узла — рамкой у кружка, а не заливкой клетки общего `button.selected`. */
+#sz-workshop .sz-tree-node.selected { background: none; }
+/* Карточка выбранного узла: на широком экране — справа от дерева, рядом с тем, что выбрали. */
+@media (min-width: 761px) {
+  .sz-tree-page { display: grid; grid-template-columns: max-content minmax(260px, 440px); gap: 28px; align-items: start; }
+  .sz-tree-page .sz-tree-wrap { margin: 0; }
+}
+/* «Звёзды»: лестница — взятые горят, следующая выделена рамкой. */
+.sz-star-ladder { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
+.sz-star-ladder li { padding: 10px 12px; border: 1px solid #22404a; color: #7f9ca3; font-size: 13px; }
+.sz-star-ladder li.lit { color: #f0c96a; border-color: #5d4f2b; }
+.sz-star-ladder li.next { color: #d5e9e9; border-color: var(--cur-data); }
 #sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }
 #sz-confirm h2 { color: #efd1a1; font-size: 19px; font-weight: 500; margin: 0 0 10px; }
 #sz-confirm p { color: #bacdd3; font-size: 13px; line-height: 1.65; margin: 0 0 22px; }
@@ -481,6 +512,11 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   .sz-hero > .sz-crest { width: 44px; height: 44px; font-size: 18px; margin: 8px 6px; }
   .sz-roster .sz-face { width: 72px; }
   .sz-hero > .sz-face { width: 96px; }
+  /* Пять колонок дерева в ширину телефона; не влезло — лента прокручивается, как корпуса. */
+  .sz-tree-wrap { margin-inline: -22px; padding-inline: 22px; }
+  .sz-tree { --px: 68px; --py: 84px; }
+  #sz-workshop .sz-tree-node { padding-inline: 0; }
+  .sz-tree-node span { font-size: 9px; letter-spacing: -.03em; }
 }
 @media (max-height: 660px) and (min-width: 761px) {
   .sz-main { padding: 26px 0; gap: 40px; }
