@@ -12,6 +12,10 @@ import dreadnought from '../art/ships/dreadnought.webp';
 import transport from '../art/ships/transport.webp';
 import dropship from '../art/ships/dropship.webp';
 import station from '../art/ships/station.webp';
+import scout from '../art/ships/scout.webp';
+import heavyStriker from '../art/ships/heavy-striker.webp';
+import picketFrigate from '../art/ships/picket-frigate.webp';
+import heavyCruiser from '../art/ships/heavy-cruiser.webp';
 import swarmScout from '../art/ships/swarm-scout.webp';
 import swarmFlock from '../art/ships/swarm-flock.webp';
 import swarmHunter from '../art/ships/swarm-hunter.webp';
@@ -30,6 +34,10 @@ const PORTRAITS: Partial<Record<ShipShapeId, string>> = {
   transport,
   dropship,
   station,
+  scout,
+  heavyStriker,
+  picketFrigate,
+  heavyCruiser,
   swarmScout,
   swarmFlock,
   swarmHunter,

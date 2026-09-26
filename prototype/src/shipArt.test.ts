@@ -8,8 +8,14 @@ import { SWARM_SHAPES } from '../../packages/client/src/swarmShapes';
 
 describe('realistic build portraits', () => {
   it('covers every buildable ship and wing, including the frigate and the landing shuttle', () => {
+    const portraits = new Set<string>();
     for (const id of [...YARD_HULLS, ...YARD_SQUAD_HULLS, 'hero']) {
-      expect(catalogPortraitHtml('u', id, data), id).toContain('<img');
+      const html = catalogPortraitHtml('u', id, data);
+      expect(html, id).toContain('<img');
+      const src = html.match(/src="([^"]+)"/)?.[1];
+      expect(src, id).toBeTruthy();
+      expect(portraits.has(src!), `${id} must not borrow another buildable hull's portrait`).toBe(false);
+      portraits.add(src!);
     }
     expect(catalogPortraitHtml('u', 'frigate', data)).toContain('data-ship-art="frigate"');
     expect(catalogPortraitHtml('u', 'landing_shuttle', data)).toContain('data-ship-art="dropship"');
