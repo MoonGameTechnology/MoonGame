@@ -212,7 +212,7 @@ describe('dossiers — маршрутизация objDossier', () => {
     const scout = objDossier('u:scout');
     expect(scout?.name).toBe(unitDossier('scout', true)?.name);
     expect(scout?.body).toContain(unitDossier('scout', true)!.body);
-    expect(scout?.body).toContain('data-ship-art="fighter"');
+    expect(scout?.body).toContain('data-ship-art="scout"');
     expect(objDossier('b')).toBeNull();
     expect(objDossier('что-то')).toBeNull();
   });
