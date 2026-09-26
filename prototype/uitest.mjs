@@ -530,8 +530,14 @@ const prep = async (kind, id = '') => {
 await prep('fit', 'ion_engine');
 assert.deepEqual(JSON.parse(storage.get('sector-zero.progress.v1')).loadouts.cruiser, ['ion_engine']);
 await prep('tab', 'heroes');
+// Страница героя — вкладками (PVR-6.25). «В бой» — по умолчанию: навыки в слотах.
+assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="ability"'));
+assert.ok(!getEl('sz-workshop').innerHTML.includes('data-prep="upgrade-hero"'), 'звезда — на своей вкладке');
+await prep('hero-tab', 'stars');
 assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="upgrade-hero"'));
+await prep('hero-tab', 'tree');
 assert.ok(getEl('sz-workshop').innerHTML.includes('data-prep="skill"'));
+assert.ok(getEl('sz-workshop').innerHTML.includes('<line '), 'связи дерева — линиями');
 // Академия показывает лица, а не буквы: пять карточек ростера (четыре из общего атласа и
 // векторный черновик Учёного) и открытый герой. Закрытые — приглушены, открытый командир — нет.
 const academy = getEl('sz-workshop').innerHTML;

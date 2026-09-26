@@ -27,6 +27,7 @@ import {
   sectorSlotItem,
   sectorSkillOpenTo,
   lastRunWarrants,
+  type SectorHero,
   type SectorProgressAction,
   type SectorZeroProgress,
   type ShipSlot,
@@ -58,6 +59,17 @@ import { romanChapter } from '../../decisions/chapterRoute';
 import { SLOT_ICON } from './moduleIcons';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import { upgradeFx, type UpgradeFx } from '../../decisions/upgradeFx';
+import { skillNodeState, skillTreeLayout } from '../../decisions/skillTreeLayout';
+import { skillTreeHtml, type SkillNodeView } from './academyTree';
+
+/** Вкладки страницы героя в Академии (PVR-6.25). */
+type HeroTab = 'battle' | 'tree' | 'stars';
+/** Состояние узла дерева словом — для экранного диктора (глиф в кружке ему не виден). */
+const NODE_STATE_KEY = {
+  owned: 'sector-zero.academy.node.owned',
+  open: 'sector-zero.academy.node.open',
+  locked: 'sector-zero.academy.node.locked',
+} as const;
 
 interface PreparationHost {
   data: GameData;
@@ -144,6 +156,11 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     ? 'cruiser'
     : (sectorHullIds(h.data)[0] ?? '');
   let heroId = h.progress().selectedHero;
+  /** Вкладка страницы героя (PVR-6.25). Переживает смену героя: сравнивая героев, игрок
+   *  остаётся в том же разделе. */
+  let heroTab: HeroTab = 'battle';
+  /** Узел дерева, чья карточка открыта; у каждого героя своё дерево — сбрасывается при смене. */
+  let skillSel: string | null = null;
   /** Во вкладке «Корабли» открыт корабль ЭТОГО героя, а не корпус флота (PVR-6.24). У
    *  каждого героя свой корабль со своим набором — полка «Корабли героев». */
   let shipHero: string | null = null;
@@ -511,9 +528,6 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     return `<p class="sz-sub">${t('sector-zero.shop.hint')}</p>${refreshButton || tapButton ? `<div class="sz-shopbar">${refreshButton}${tapButton}</div>` : ''}${rows.length ? `<div class="sz-cards sz-shelf">${cards}</div>` : `<p class="sz-sub">${t('sector-zero.shop.sold-out')}</p>`}`;
   }
 
-  /** Глубина узла в дереве навыков: без предпосылок — 1, иначе на один глубже самой
-   *  глубокой. Ступени делают дерево читаемым: что открыть сначала, что потом. */
-  const skillTier = (id: string): number => Math.max(1, sectorSkillCost(id, h.data) / 2);
   /** Герб героя — первая буква имени в ромбе: запас для героя без портрета. */
   const crest = (name: string): string =>
     `<span class="sz-crest" aria-hidden="true"><em>${esc(name.charAt(0).toUpperCase())}</em></span>`;
@@ -531,8 +545,9 @@ export function initSectorZeroPreparation(h: PreparationHost) {
 
   /**
    * Академия (PVR-6.6, была «Герои и навыки»): ростер — карточки с гербом и состоянием
-   * («в забеге», «закрыт», ступень подготовки); навыки героя — ступенями, закрытое
-   * приглушено и говорит, чего ему не хватает.
+   * («в забеге», «закрыт», ступень подготовки). Страница открытого героя — вкладками
+   * (PVR-6.25): «В бой» — навыки в слотах, «Развитие» — дерево навыков, «Звёзды» — жетоны
+   * и что даёт каждая звезда.
    */
   function heroes(p: SectorZeroProgress): string {
     const data = h.data;
@@ -578,39 +593,89 @@ export function initSectorZeroPreparation(h: PreparationHost) {
     // полученная вспыхивает (`upgradeFx.ts`).
     const freshPip = fx?.kind === 'hero-star' && fx.id === heroId ? fx.star - 1 : -1;
     const pips = Array.from({ length: HERO_MAX_STARS }, (_, i) => `<i class="${i < hero.level ? 'lit' : ''}${i === freshPip ? ' sz-new' : ''}">★</i>`).join('');
-    const cost = heroStarCost(hero.level);
-    const tokenLine = goal !== null ? `<small class="sz-tokens">${t('sector-zero.academy.tokens', { n: tokens, goal })}</small>` : '';
-    body += `<div class="sz-hero-head"><span><span class="sz-pips sz-stars" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}${tokenLine}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}${button('upgrade-hero', heroId, cost === null ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { star: hero.level + 1, n: cost }), cost === null || tokens < cost)}</div></div></div>`;
-    body += `<h3>${t('sector-zero.prep.abilities')} · ${hero.equipped.length}/${slots}</h3><div class="sz-cards">`;
+    body += `<div class="sz-hero-head"><span><span class="sz-pips sz-stars" aria-hidden="true">${pips}</span>${t('sector-zero.prep.hero-level', { n: hero.level, slots })}</span>${button('select-hero', heroId, t(selected ? 'sector-zero.prep.hero-selected' : 'sector-zero.prep.hero-select'), selected, selected)}</div></div></div>`;
+    const heroTabButton = (id: HeroTab, key: string): string =>
+      button('hero-tab', id, t(key), false, heroTab === id);
+    body += `<div class="sz-subtabs">${heroTabButton('battle', 'sector-zero.academy.tab.battle')}${heroTabButton('tree', 'sector-zero.academy.tab.tree')}${heroTabButton('stars', 'sector-zero.academy.tab.stars')}</div>`;
+    const page =
+      heroTab === 'tree'
+        ? skillTree(p, hero)
+        : heroTab === 'stars'
+          ? starsPage(hero, tokens, goal)
+          : battlePage(hero, slots);
+    return `<div class="sz-roster">${roster}</div>${body}${page}`;
+  }
+
+  /** «В бой»: что герой возьмёт в экспедицию — навыки и пассивки в слотах. */
+  function battlePage(hero: SectorHero, slots: number): string {
+    const data = h.data;
+    let out = `<h3>${t('sector-zero.prep.abilities')} · ${hero.equipped.length}/${slots}</h3><div class="sz-cards">`;
     // В слоты идут способности и надеваемые пассивки (PVR-6.16) — один список, один бюджет.
     for (const id of sectorHeroSlotItems(heroId, hero, data)) {
       if (data.heroAbilities[id]?.type.startsWith('spawn_')) continue;
       const item = sectorSlotItem(id, data)!;
       const equipped = hero.equipped.includes(id);
-      body += `<article class="sz-card${equipped ? ' selected' : ''}"><h3>${esc(tData(item.name))}</h3><p>${esc(t(item.description ?? ''))}</p>${button('ability', id, t(equipped ? 'hero.slot.remove' : 'hero.slot.equip'), !equipped && hero.equipped.length >= slots, equipped)}</article>`;
+      out += `<article class="sz-card${equipped ? ' selected' : ''}"><h3>${esc(tData(item.name))}</h3><p>${esc(t(item.description ?? ''))}</p>${button('ability', id, t(equipped ? 'hero.slot.remove' : 'hero.slot.equip'), !equipped && hero.equipped.length >= slots, equipped)}</article>`;
     }
-    body += `</div><h3>${t('sector-zero.prep.skills')}</h3><p class="sz-sub">${t('sector-zero.prep.skill-hint')}</p>`;
-    const tiers = new Map<number, string[]>();
-    for (const [id, node] of Object.entries(data.heroSkillTrees)) {
-      if (!sectorSkillOpenTo(node, heroId, data)) continue;
-      const tier = skillTier(id);
-      tiers.set(tier, [...(tiers.get(tier) ?? []), id]);
+    return `${out}</div>`;
+  }
+
+  /**
+   * «Развитие»: дерево навыков линиями (`skillTreeLayout` + `academyTree.ts`) и карточка
+   * выбранного узла с покупкой. Изученное, доступное и закрытое различимы без текста; что
+   * именно не хватает закрытому, называет карточка.
+   */
+  function skillTree(p: SectorZeroProgress, hero: SectorHero): string {
+    const data = h.data;
+    const ids = Object.keys(data.heroSkillTrees).filter((id) => sectorSkillOpenTo(data.heroSkillTrees[id]!, heroId, data));
+    const layout = skillTreeLayout(ids, (id) => data.heroSkillTrees[id]?.requires ?? []);
+    const cards: Record<string, { owned: boolean; missing: string[] }> = {};
+    const views: Record<string, SkillNodeView> = {};
+    for (const id of ids) {
+      const card = sectorSkillCard(heroId, hero, id, data);
+      const state = skillNodeState(card);
+      cards[id] = card;
+      views[id] = { name: tData(data.heroSkillTrees[id]!.name), state, stateLabel: t(NODE_STATE_KEY[state]) };
     }
-    for (const tier of [...tiers.keys()].sort((x, y) => x - y)) {
-      body += `<p class="sz-tier">${t('sector-zero.academy.tier', { n: tier })}</p><div class="sz-cards">`;
-      for (const id of tiers.get(tier)!) {
-        const node = data.heroSkillTrees[id]!;
-        const { owned, missing } = sectorSkillCard(heroId, hero, id, data);
-        const cost = sectorSkillCost(id, data);
-        // Предпосылки называются только когда их НЕ хватает: у открытого узла это шум.
-        const prereq = missing.length
-          ? `<p class="sz-prereq">${t('hero.tree.requires')}: ${missing.map((r) => esc(tData(data.heroSkillTrees[r]!.name))).join(', ')}</p>`
-          : '';
-        body += `<article class="sz-card${owned ? ' selected' : missing.length ? ' sz-locked' : ''}"><h3>${esc(tData(node.name))}</h3><p>${esc(t(node.description ?? ''))}</p>${prereq}${button('skill', id, owned ? t('sector-zero.prep.owned') : t('sector-zero.prep.skill-buy', { n: cost }), owned || missing.length > 0 || p.research < cost, owned)}</article>`;
-      }
-      body += '</div>';
-    }
-    return `<div class="sz-roster">${roster}</div>${body}`;
+    // Без выбора карточка показывает первый доступный узел — то, что можно изучить сейчас.
+    const reading = Object.entries(layout.nodes).sort(([, a], [, b]) => a.row - b.row || a.col - b.col);
+    const sel =
+      skillSel !== null && views[skillSel]
+        ? skillSel
+        : (reading.find(([id]) => views[id]!.state === 'open') ?? reading[0])?.[0];
+    const tree = skillTreeHtml(layout, views, sel ?? null);
+    const hint = `<p class="sz-sub">${t('sector-zero.prep.skill-hint')}</p>`;
+    if (sel === undefined) return `${hint}${tree}`;
+    const node = data.heroSkillTrees[sel]!;
+    const { owned, missing } = cards[sel]!;
+    const cost = sectorSkillCost(sel, data);
+    // Предпосылки называются только когда их НЕ хватает: у открытого узла это шум.
+    const prereq = missing.length
+      ? `<p class="sz-prereq">${t('hero.tree.requires')}: ${missing.map((r) => esc(tData(data.heroSkillTrees[r]!.name))).join(', ')}</p>`
+      : '';
+    const card = `<article class="sz-card sz-tree-card${owned ? ' selected' : missing.length ? ' sz-locked' : ''}"><h3>${esc(tData(node.name))}</h3><p>${esc(t(node.description ?? ''))}</p>${prereq}${button('skill', sel, owned ? t('sector-zero.prep.owned') : t('sector-zero.prep.skill-buy', { n: cost }), owned || missing.length > 0 || p.research < cost, owned)}</article>`;
+    // На широком экране карточка стоит справа от дерева, на телефоне — под ним.
+    return `${hint}<div class="sz-tree-page">${tree}${card}</div>`;
+  }
+
+  /**
+   * «Звёзды»: жетоны героя и лестница звёзд — что даёт каждая (слоты навыков и слот
+   * корабля, `HERO_SHIP_STAR_SLOTS`). Взятые звёзды горят, следующая выделена, у неё — цена.
+   */
+  function starsPage(hero: SectorHero, tokens: number, goal: number | null): string {
+    const data = h.data;
+    const ladder = Array.from({ length: HERO_MAX_STARS }, (_, i) => {
+      const star = i + 1;
+      const ship = HERO_SHIP_STAR_SLOTS[star];
+      const text =
+        t('sector-zero.academy.star.row', { star, slots: sectorHeroSlots({ ...hero, level: star }, data) }) +
+        (ship ? ` · ${t('sector-zero.academy.star.ship', { slot: t(`yard.slot.${ship}`) })}` : '');
+      const cls = star <= hero.level ? ' class="lit"' : star === hero.level + 1 ? ' class="next"' : '';
+      return `<li${cls}>${esc(text)}</li>`;
+    }).join('');
+    const cost = heroStarCost(hero.level);
+    const tokenLine = goal !== null ? `<p class="sz-tokens">${t('sector-zero.academy.tokens', { n: tokens, goal })}</p>` : '';
+    return `<ol class="sz-star-ladder">${ladder}</ol>${tokenLine}${button('upgrade-hero', heroId, cost === null ? t('sector-zero.prep.hero-max') : t('sector-zero.prep.hero-upgrade', { star: hero.level + 1, n: cost }), cost === null || tokens < cost)}`;
   }
 
   function render(): void {
@@ -693,7 +758,11 @@ export function initSectorZeroPreparation(h: PreparationHost) {
       hull = id;
       shipHero = null;
     } else if (kind === 'hero-ship') shipHero = id;
-    else if (kind === 'hero') heroId = id;
+    else if (kind === 'hero') {
+      heroId = id;
+      skillSel = null;
+    } else if (kind === 'hero-tab') heroTab = id === 'tree' ? 'tree' : id === 'stars' ? 'stars' : 'battle';
+    else if (kind === 'skill-node') skillSel = id;
     else {
       let action: SectorProgressAction | null = null;
       if (kind === 'double-reward') {
