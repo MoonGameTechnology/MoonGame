@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.45'); // тяжёлый ударный страйкер (`heavy_striker`, shuttles-roadmap §0.5) поверх 0.1.44 (Левиафан)
+    expect(data.version).toBe('0.1.46'); // общий трюм (SHU-5.1: `cargoSize` шаттлов и техники, авианосец на `cargoCapacity`) поверх 0.1.45 (тяжёлый ударный страйкер)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -79,33 +79,32 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // её роль стала модулем `siege_platform` на крейсере.
     expect(data.units.siege).toBeUndefined();
     expect(data.modules.siege_platform?.effects.stats.siegeDamage).toBeGreaterThan(0);
-    // Carriers are mobile spaceports (SHU-2.1): `shuttleBay` on the HULL is what bases
-    // shuttles aboard, so a hull with 0 simply cannot base any.
-    // «Шаттл» — ЕДИНСТВЕННЫЙ носитель челноков после того, как десантный корабль
-    // отдал ангар (заказ владельца 2026-09-09).
-    expect(data.units.shuttle_carrier?.stats.shuttleBay).toBe(6);
+    // SHU-5.1 (резолюция владельца 2026-09-26): шаттлы едут в ОБЩЕМ трюме любого
+    // корабля, отдельного ангара у корпуса нет. Авианосец — обычный трюм на 6 мест.
+    expect(data.units.shuttle_carrier?.stats.cargoCapacity).toBe(6);
     expect(data.units.shuttle_carrier?.line).toBe('rear');
     expect(
       Object.entries(data.units)
         .filter(([, u]) => (u.stats.shuttleBay ?? 0) > 0)
         .map(([id]) => id),
-    ).toEqual(['shuttle_carrier']);
+    ).toEqual([]);
     expect(data.units.cruiser?.upkeep.credits).toBe(32); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
     expect(data.units.tank?.domain).toBe('ground');
-    // H4-REVERT: «один юнит занимает один трюм» — правило игрока, а не таблица весов.
-    // Танк вёз 3 слота, пока трюм мерили тоннажем; теперь вместимость считается
-    // ШТУКАМИ, и все наземные стоят по 1. Это data-driven шов: ядро (`armyModule`)
-    // по-прежнему складывает cargoSize, просто слагаемые стали единицами.
-    for (const id of ['militia', 'drop_infantry', 'tank']) {
+    // Места трюма (SHU-5.1, резолюция владельца 2026-09-26; заменила H4-REVERT «все по
+    // 1»): пехота и лёгкие шаттлы — 1 место, техника, тяжёлый страйкер и десантный
+    // челнок — 2. Ядро складывает `cargoSize`, так что это правка данных, а не кода.
+    for (const id of ['militia', 'drop_infantry', 'heavy_infantry', 'special_forces', 'interceptor', 'bomber']) {
       expect(data.units[id]?.stats.cargoSize).toBe(1);
+    }
+    for (const id of ['tank', 'heavy_striker', 'landing_shuttle']) {
+      expect(data.units[id]?.stats.cargoSize).toBe(2);
     }
     // Десантный корабль — единственный выделенный транспорт: самый большой трюм в
     // ростере. `dropship` снят (заказ владельца), его роль забрал этот корпус.
     expect(data.units.dropship).toBeUndefined();
     expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(16);
-    expect(data.units.strike_carrier?.stats.shuttleBay ?? 0).toBe(0); // челноков не несёт
     expect(data.units.strike_carrier?.traits).toEqual([]);
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building

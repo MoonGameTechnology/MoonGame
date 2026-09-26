@@ -12,7 +12,7 @@ const data = parseGameData({
     carrier: {
       faction: 'x',
       domain: 'space',
-      stats: { attack: 0, defense: 0, speed: 1, hp: 100, cargoCapacity: 10, shuttleBay: 6 },
+      stats: { attack: 0, defense: 0, speed: 1, hp: 100, cargoCapacity: 10 },
     },
     scout: { faction: 'x', domain: 'space', stats: { attack: 0, defense: 0, speed: 1, hp: 10 } },
     tank: {
@@ -69,7 +69,7 @@ const fleet = (over: Partial<Fleet> = {}): Fleet => ({
 const claim = { unit: 'tank', count: 2, from: 'home', startAt: 0, doneAt: 100 };
 
 describe('fleet hold occupancy', () => {
-  it('counts ground volume and hangar machines independently', () => {
+  it('splits ONE hold between ground volume and shuttle places (SHU-5.1)', () => {
     const meters = fleetHolds(
       fleet({
         landing: [{ unit: 'tank', count: 2 }],
@@ -82,15 +82,16 @@ describe('fleet hold occupancy', () => {
       0,
     );
     expect(meters).toMatchObject([
-      { kind: 'troops', used: 6, capacity: 10, free: 4, reserved: 0 },
-      { kind: 'hangar', used: 4, capacity: 6, free: 2 },
+      { kind: 'troops', used: 6, capacity: 6, free: 0, reserved: 0 },
+      { kind: 'hangar', used: 4, capacity: 4, free: 0 },
     ]);
   });
 
   it('shows an empty hold but omits a fleet with no transport space', () => {
+    // No shuttles aboard → no shuttle meter: the hold is one, and its free space is
+    // already on the troops meter.
     expect(fleetHolds(fleet(), data, 0)).toMatchObject([
       { kind: 'troops', used: 0, capacity: 10, free: 10 },
-      { kind: 'hangar', used: 0, capacity: 6, free: 6 },
     ]);
     expect(fleetHolds(fleet({ units: [{ unit: 'scout', count: 1 }] }), data, 0)).toEqual([]);
   });

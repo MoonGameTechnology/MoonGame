@@ -12,7 +12,7 @@
  * riskier pass. `patrolTarget`/`scrambleOrder` (the auto-scramble driver, CC-4)
  * live in the prototype's `game.ts`, not `shuttle.ts` — out of scope here.
  */
-import type { Fleet, Planet, Squadron, UnitStack } from './gameState';
+import type { Fleet, GameState, Planet, Squadron, UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
 import { addUnits, sumUnitStat } from '../util/stacks';
@@ -144,11 +144,10 @@ export function shuttleReaches(
 
 // --- Ангар космопорта (SHU-1.1) ------------------------------------------------------
 //
-// Челнок не флот и не гарнизон: он стоит ВНУТРИ порта. Поэтому вместимость порта — сразу
-// и гейт («можно ли здесь вообще держать челноки»), и предел («сколько»). Отдельного
-// флага «умеет ангар» нет намеренно: порт, вмещающий ноль, ничем не отличается от
-// отсутствующего, а два способа сказать одно и то же расходятся на первой же правке
-// данных.
+// Челнок не флот и не гарнизон: он стоит ВНУТРИ порта. `shuttleBay` порта — ворота:
+// ноль значит «здесь челноки не держат», больше нуля — держат СКОЛЬКО УГОДНО (резолюция
+// владельца 2026-09-26, SHU-5.1: космопорт без предела). Отдельного флага «умеет ангар»
+// нет намеренно: два способа сказать одно и то же расходятся на первой же правке данных.
 
 /** Сколько челноков вмещают СТОЯЩИЕ порты мира: Σ `shuttleBay` их текущих уровней.
  *  Разрушенное здание (`hp <= 0`) вместимости не даёт — его уже нет. */
@@ -162,13 +161,63 @@ export function shuttleBayAt(planet: Planet, data: GameData): number {
   return bay;
 }
 
-/** Сколько челноков базируется на флоте: Σ `shuttleBay` его ЖИВЫХ корпусов (SHU-2.1).
- *  Носитель — мобильный космопорт, поэтому вместимость считается тем же способом, что у
- *  мира, только слагаемые берутся у кораблей. Порога повреждения у носителя нет и не
- *  нужно: подбитый носитель гибнет целыми корпусами, вместимость падает сама, и лишние
- *  челноки снимает та же `trimHangar`, что у порта. */
+/** Сколько МЕСТ занимает одна машина или один боец: `cargoSize` юнита (SHU-5.1). Трюм
+ *  общий, и у шаттла, и у наземки место меряется одним числом — иначе два трюма в одном
+ *  корпусе разошлись бы на первой правке данных. */
+export function machineSize(unit: string, data: GameData): number {
+  return data.units[unit]?.stats.cargoSize ?? 1;
+}
+
+/** Сколько мест занимают стеки: Σ count × `cargoSize`. */
+export function stacksSize(stacks: readonly UnitStack[] | undefined, data: GameData): number {
+  let n = 0;
+  for (const st of stacks ?? []) if (st.count > 0) n += st.count * machineSize(st.unit, data);
+  return n;
+}
+
+/** Сколько мест трюма занимает ангар базы: машины по своему `cargoSize` (SHU-5.1). */
+export function hangarSize(host: { hangar?: Squadron[] }, data: GameData): number {
+  let n = 0;
+  for (const sq of host.hangar ?? []) n += stacksSize(sq.units, data);
+  return n;
+}
+
+/** Места, которые держат за собой эскадры флота, УЛЕТЕВШИЕ в вылет (SHU-5.1): борт,
+ *  выпустивший страйкера, обязан его принять, поэтому место не освобождается на время
+ *  полёта. `except` — вылет, который как раз садится и своё место занимает сам. */
+export function strikesReserved(
+  state: GameState,
+  fleetId: string,
+  data: GameData,
+  except?: string,
+): number {
+  let n = 0;
+  for (const s of state.strikes ?? []) {
+    if (s.base.kind !== 'fleet' || s.base.id !== fleetId || s.id === except) continue;
+    n += stacksSize(s.units, data);
+  }
+  return n;
+}
+
+/** Сколько мест трюма флот может отдать шаттлам (SHU-5.1): общий трюм Σ `cargoCapacity`
+ *  живых корпусов минус наземка на борту и минус обещанная погрузка. Отдельного ангара у
+ *  корабля больше нет — шаттл едет в том же трюме, что и десант, и на одном месте они не
+ *  помещаются вдвоём. Подбитый флот гибнет целыми корпусами, трюм падает сам, и лишних
+ *  снимает та же `trimHangar`, что у порта. */
 export function fleetShuttleBay(fleet: Fleet, data: GameData): number {
-  return sumUnitStat(fleet.units, data, 'shuttleBay');
+  let claimed = 0;
+  for (const c of fleet.loading ?? []) claimed += c.count * machineSize(c.unit, data);
+  return Math.max(
+    0,
+    sumUnitStat(fleet.units, data, 'cargoCapacity') - stacksSize(fleet.landing, data) - claimed,
+  );
+}
+
+/** Свободные места трюма флота прямо сейчас: всё, что не занято наземкой, заявками на
+ *  погрузку, эскадрами в ангаре и эскадрами в полёте (SHU-5.1). Этим числом меряют и
+ *  погрузку десанта, и погрузку шаттлов — одно число на один трюм. */
+export function fleetHoldFree(state: GameState, fleet: Fleet, data: GameData): number {
+  return fleetShuttleBay(fleet, data) - hangarSize(fleet, data) - strikesReserved(state, fleet.id, data);
 }
 
 /** Все МАШИНЫ базы одним списком — ангар без деления на эскадры (SHU-4.2).
@@ -257,17 +306,30 @@ export function basedMachine(
  *  эскадры, и только когда она опустела — предыдущей. Опустевшая эскадра исчезает
  *  вместе с последней машиной: соединение без бортов — не соединение, а имя. ТРЮМ
  *  гибнет вместе со своей эскадрой — войска стояли на её бортах. */
-export function trimHangar(hangar: readonly Squadron[], bay: number): Squadron[] {
-  let left = Math.max(0, Math.floor(bay));
+export function trimHangar(
+  hangar: readonly Squadron[],
+  bay: number,
+  data: GameData,
+): Squadron[] {
+  // Места, а не штуки (SHU-5.1): тяжёлый страйкер занимает два. Машина, которой не
+  // хватает мест целиком, гибнет целиком — половины борта не бывает.
+  let left = bay === Infinity ? Infinity : Math.max(0, Math.floor(bay));
   const out: Squadron[] = [];
   for (const sq of hangar) {
     if (left <= 0) break;
     const units: UnitStack[] = [];
     for (const st of sq.units) {
       if (left <= 0) break;
-      const keep = Math.min(st.count, left);
-      left -= keep;
-      units.push({ ...st, count: keep, ...(st.modules ? { modules: [...st.modules] } : {}) });
+      const size = machineSize(st.unit, data);
+      const keep = size > 0 ? Math.min(st.count, Math.floor(left / size)) : st.count;
+      left -= keep * size;
+      if (keep > 0) {
+        units.push({ ...st, count: keep, ...(st.modules ? { modules: [...st.modules] } : {}) });
+      }
+      // Хвост сквозной: не влезла машина — не влезает и всё, что стоит за ней, даже
+      // если там борт поменьше. Иначе порядок гибели зависел бы от размеров, а не от
+      // очереди постройки.
+      if (keep < st.count) left = 0;
     }
     if (units.length === 0) continue;
     out.push({ ...sq, units, ...(sq.cargo ? { cargo: sq.cargo.map((c) => ({ ...c })) } : {}) });

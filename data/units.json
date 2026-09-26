@@ -187,7 +187,8 @@
       "defenseVsVehicle": 9,
       "speed": 40,
       "hp": 46,
-      "buildingDamage": 3
+      "buildingDamage": 3,
+      "cargoSize": 2
     },
     "traits": [
       "ground"
@@ -300,7 +301,8 @@
       "fuel": 3,
       "rearmRounds": 2,
       "siegeDamage": 1,
-      "shuttleDamage": 22
+      "shuttleDamage": 22,
+      "cargoSize": 1
     },
     "line": "front",
     "traits": [
@@ -332,7 +334,8 @@
       "fuel": 2,
       "rearmRounds": 3,
       "siegeDamage": 18,
-      "shuttleDamage": 2
+      "shuttleDamage": 2,
+      "cargoSize": 1
     },
     "line": "front",
     "traits": [
@@ -364,7 +367,8 @@
       "fuel": 2,
       "rearmRounds": 4,
       "siegeDamage": 30,
-      "shuttleDamage": 3
+      "shuttleDamage": 3,
+      "cargoSize": 2
     },
     "line": "front",
     "traits": [
@@ -394,7 +398,8 @@
       "strikeRange": 120,
       "fuel": 2,
       "rearmRounds": 2,
-      "cargoCapacity": 3
+      "cargoCapacity": 3,
+      "cargoSize": 2
     },
     "line": "front",
     "traits": [
@@ -496,7 +501,7 @@
       "defense": 18,
       "speed": 34,
       "hp": 90,
-      "shuttleBay": 6
+      "cargoCapacity": 6
     },
     "line": "rear",
     "traits": [

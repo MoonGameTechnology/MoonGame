@@ -254,6 +254,10 @@ export {
   shuttleBayAt,
   fleetShuttleBay,
   hangarUsed,
+  // SHU-5.1: трюм общий с десантом, место меряется `cargoSize`, а не штуками.
+  hangarSize,
+  stacksSize,
+  fleetHoldFree,
   // SHU-4.2: ангар — список ЭСКАДР, и «просто машины» из него достаёт одна функция на
   // всех читателей; своя развёртка у каждого разъехалась бы с этой.
   hangarMachines,

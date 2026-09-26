@@ -506,7 +506,9 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
       owner: 'p2',
       location: perch.id,
       movement: null,
-      units: [{ unit: 'shuttle_carrier', count: 1 }],
+      // Четыре корпуса: трюм общий (SHU-5.1), и три челнока (по 2 места) с девятью
+      // танками (по 2) обязаны в него поместиться — 24 места.
+      units: [{ unit: 'shuttle_carrier', count: 4 }],
       hangar: [{ id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] }],
       landing: [{ unit: 'tank', count: 9 }],
       traits: [],

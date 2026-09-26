@@ -47,6 +47,7 @@ import { hasMapShare } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
 import {
   canSortie,
+  fleetHoldFree,
   fleetShuttleBay,
   hangarMachines,
   hangarUsed,
@@ -57,6 +58,8 @@ import {
   squadronCargoUsed,
   squadronSize,
   squadronReach,
+  stacksSize,
+  strikesReserved,
   tickRearm,
   trimHangar,
   type SortieState,
@@ -176,8 +179,9 @@ interface BaseView {
   ref: StrikeBase;
   owner: string | null;
   position: { x: number; y: number } | null;
-  /** Вместимость. 0 читается как «базы нет»: порт, вмещающий ноль, ничем не отличается
-   *  от отсутствующего (SHU-1.1), и у носителя ровно так же. */
+  /** Вместимость в МЕСТАХ (`cargoSize` машин). 0 читается как «базы нет». У порта она
+   *  бесконечна, если порт стоит (SHU-5.1: космопорт без предела); у флота это его
+   *  трюм за вычетом десанта (`fleetShuttleBay`). */
   bay: number;
   /** Не выпускает из-за повреждений. Есть только у порта: у носителя вместимость
    *  падает вместе с погибшими корпусами, отдельного порога не нужно. */
@@ -193,7 +197,7 @@ function planetBase(planet: Planet, data: GameData): BaseView {
     ref: { kind: 'planet', id: planet.id },
     owner: planet.owner,
     position: planet.position,
-    bay: shuttleBayAt(planet, data),
+    bay: shuttleBayAt(planet, data) > 0 ? Infinity : 0,
     disabled: portDisabled(planet, data),
     hangar: planet.hangar ?? [],
     setHangar: (next) => {
@@ -1218,7 +1222,7 @@ export const shuttleModule: GameModule = {
     ): Squadron => {
       const squad = (from.hangar ?? []).find((q) => q.id === squadronId);
       if (!squad) return h.reject('E_NO_SQUADRON');
-      if (squadronSize(squad) > freeSpace) return h.reject('E_NO_CAPACITY');
+      if (stacksSize(squad.units, h.ctx.data) > freeSpace) return h.reject('E_NO_CAPACITY');
       from.hangar = (from.hangar ?? []).filter((q) => q.id !== squadronId);
       to.hangar = [...(to.hangar ?? []), squad];
       return squad;
@@ -1231,7 +1235,7 @@ export const shuttleModule: GameModule = {
         planet,
         fleet,
         squadronId,
-        fleetShuttleBay(fleet, h.ctx.data) - hangarUsed(fleet),
+        fleetHoldFree(h.state, fleet, h.ctx.data),
       );
       h.emit('shuttle.loaded', {
         fleetId: fleet.id,
@@ -1249,7 +1253,7 @@ export const shuttleModule: GameModule = {
         fleet,
         planet,
         squadronId,
-        shuttleBayAt(planet, h.ctx.data) - hangarUsed(planet),
+        shuttleBayAt(planet, h.ctx.data) > 0 ? Infinity : 0,
       );
       h.emit('shuttle.unloaded', {
         fleetId: fleet.id,
@@ -1284,7 +1288,14 @@ export const shuttleModule: GameModule = {
       // носитель, захваченный мир), — тогда садиться некуда.
       h.state.strikes = strikes.filter((s) => s.id !== strikeId);
       const base = baseOf(strike.base, h.state, h.ctx.data, h.ctx.now);
-      const bay = base && base.owner === strike.owner ? base.bay : 0;
+      // У флота места считаются БЕЗ этого вылета (он уже снят со списка выше), но с
+      // остальными, ещё летящими: их места заняты до их собственной посадки.
+      const bay =
+        base && base.owner === strike.owner
+          ? base.ref.kind === 'fleet'
+            ? base.bay - strikesReserved(h.state, base.ref.id, h.ctx.data)
+            : base.bay
+          : 0;
       if (!base || bay <= 0) {
         h.emit('shuttle.lost', {
           baseId: strike.base.id,
@@ -1303,7 +1314,7 @@ export const shuttleModule: GameModule = {
         id: taken ? nextSquadronId(h, strike.owner) : strike.squadronId,
         units: strike.units.map((st) => ({ ...st })),
       };
-      base.setHangar(trimHangar([...base.hangar, home], bay));
+      base.setHangar(trimHangar([...base.hangar, home], bay, h.ctx.data));
       h.emit('shuttle.landed', {
         baseId: base.ref.id,
         baseKind: base.ref.kind,
@@ -1417,13 +1428,13 @@ export const shuttleModule: GameModule = {
         ...Object.values(h.state.planets).map((planet) => ({
           ...planetBase(planet, h.ctx.data),
           // Ничей мир не держит ангар: вместимость нейтрального мира читается как 0.
-          bay: planet.owner === null ? 0 : shuttleBayAt(planet, h.ctx.data),
+          bay: planet.owner === null ? 0 : planetBase(planet, h.ctx.data).bay,
         })),
         ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
       ];
       for (const base of bases) {
         if (base.hangar.length === 0) continue;
-        const kept = trimHangar(base.hangar, base.bay);
+        const kept = trimHangar(base.hangar, base.bay, h.ctx.data);
         const lost = hangarUsed({ hangar: base.hangar }) - hangarUsed({ hangar: kept });
         if (lost <= 0) continue;
         base.setHangar(kept);

@@ -18,11 +18,11 @@ const data: GameData = parseGameData({
       cost: { metal: 220 },
       slots: { weapon: 1, defense: 1, utility: 1 },
     },
-    // The one hull in this fixture that carries a hangar — the preview has to tell it
-    // apart from `cruiser` without anyone naming it in the UI.
+    // A carrier: since SHU-5.1 shuttles ride in the common hold, so the hull's one
+    // capacity number is `cargoCapacity`, shared by shuttles and troops.
     carrier: {
       faction: 'x',
-      stats: { attack: 3, defense: 18, speed: 3, hp: 90, shuttleBay: 6 },
+      stats: { attack: 3, defense: 18, speed: 3, hp: 90, cargoCapacity: 6 },
       cost: { metal: 260 },
       slots: { defense: 1 },
     },
@@ -80,24 +80,22 @@ describe('loadout editor — model', () => {
     });
   });
 
-  // In the yard every hull is a row of the same stat bars, so a hull that carries
-  // SHUTTLES looked exactly like one that does not — the single thing that separates
-  // the carrier from every other ship was the one number the preview never listed.
-  // The rule stays the general one (a line shows only where the stat is live), so
-  // nothing here names a hull by id.
-  it('previews the shuttle bay — and only on a hull that has one', () => {
-    const bay = ok(createLoadoutEditor('carrier', data, rich)).preview.find(
-      (p) => p.stat === 'shuttleBay',
+  // SHU-5.1: there is no separate hangar stat any more — shuttles ride in the common
+  // hold, so the carrier's capacity previews as the same cargo line as any transport.
+  it('previews a carrier hold as cargo — one hold for shuttles and troops', () => {
+    const hold = ok(createLoadoutEditor('carrier', data, rich)).preview.find(
+      (p) => p.stat === 'cargoCapacity',
     );
-    expect(bay).toEqual({
-      stat: 'shuttleBay',
-      label: t('loadout.stat.bay'),
+    expect(hold).toEqual({
+      stat: 'cargoCapacity',
+      label: t('loadout.stat.cargo'),
       base: 6,
       effective: 6,
       delta: 0,
     });
-    const plain = ok(createLoadoutEditor('cruiser', data, rich));
-    expect(plain.preview.find((p) => p.stat === 'shuttleBay')).toBeUndefined();
+    expect(
+      ok(createLoadoutEditor('carrier', data, rich)).preview.find((p) => p.stat === 'shuttleBay'),
+    ).toBeUndefined();
   });
 
   it('rejects an unknown hull, fail-secure', () => {

@@ -54,7 +54,7 @@ const data: GameData = parseGameData({
     // Носитель: и ангар под челноки, и своё ПВО — одна сцена на два канала.
     carrier: {
       faction: 'x',
-      stats: { attack: 0, defense: 0, speed: 4, hp: 900, shuttleBay: 4 },
+      stats: { attack: 0, defense: 0, speed: 4, hp: 900, cargoCapacity: 4 },
       line: 'rear',
     },
     // Машина челнока: топливо и дальность — на вылет, `attack` — чтобы по кораблям было чем бить

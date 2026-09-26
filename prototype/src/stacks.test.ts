@@ -165,9 +165,8 @@ describe('BF-27/BF-28 — fleet.launch: assault lock + cargo cap', () => {
   it('lifts ground troops only up to the ships’ cargo capacity; the rest stays', () => {
     const s = newGame();
     const home = Object.values(s.planets).find((p) => p.owner === 'p1')!;
-    // H4-REVERT, «один юнит = один трюм»: вместимость теперь считается ШТУКАМИ.
-    // Крейсер везёт 5, в гарнизоне 7 танков → 5 уедут, 2 останутся. До правила
-    // танк весил 3 слота, и тот же крейсер поднимал ровно одного.
+    // Места трюма (SHU-5.1): техника занимает 2. Крейсер везёт 5 мест, в гарнизоне
+    // 7 танков → 2 уедут (4 места), 5 останутся — пятое место танку мало.
     home.garrison = [
       { unit: 'cruiser', count: 1 },
       { unit: 'tank', count: 7 },
@@ -176,9 +175,9 @@ describe('BF-27/BF-28 — fleet.launch: assault lock + cargo cap', () => {
     const out = order(s, launchFleet('p1', home.id), s.time);
     expect(out.error).toBeUndefined();
     const fleet = Object.values(out.state.fleets).find((f) => !before.has(f.id))!;
-    expect(fleet.landing?.find((u) => u.unit === 'tank')?.count).toBe(5);
+    expect(fleet.landing?.find((u) => u.unit === 'tank')?.count).toBe(2);
     const left = out.state.planets[home.id]!.garrison.find((u) => u.unit === 'tank');
-    expect(left?.count).toBe(2); // over-cap troops stay planetside, nothing vanished
+    expect(left?.count).toBe(5); // over-cap troops stay planetside, nothing vanished
   });
 });
 

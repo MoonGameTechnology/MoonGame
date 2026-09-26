@@ -73,7 +73,6 @@ export const SHIP_CARD_STATS = [
   'speed',
   'radarRange',
   'cargoCapacity',
-  'shuttleBay',
   'pointDefense',
   'siegeDamage',
 ] as const;
