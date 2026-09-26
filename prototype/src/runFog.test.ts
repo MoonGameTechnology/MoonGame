@@ -51,8 +51,24 @@ describe('туман забега — круги на картах глав', ()
       world: 0,
       byKind: { planet: 100, void_station: 100 },
       fleet: 90,
-      radarScale: 2.5,
+      radarScale: 1.5,
     });
+    // Полигон учит той же экспедиции — и видит ровно так же, как главы.
+    expect(data.modes.training?.sight).toEqual(data.modes.pve_waves?.sight);
+  });
+
+  // PVR-6.33 (заказ владельца 2026-09-26): «я бы у разведчика уменьшил радар. Слишком
+  // большой. Да все бы радары начальные порезал радиус». Множитель радаров забега ×2,5 → ×1,5:
+  // радар постройки 1-го уровня засекал на 600 (5 из 12 провинций главы I), разведдрон — на
+  // 375; опознают оба на половине засечки.
+  it('начальные радары главы I: радар дома — 360, разведдрон — 225', () => {
+    const circles = sightCircles(runStart(0), 'p1', data);
+    const home = circles.find((c) => c.source.kind === 'world' && c.source.id === 'home_a')!;
+    const scout = circles.find(
+      (c) => c.source.kind === 'fleet' && c.source.id === 'p1_1', // стартовый флот с разведдроном
+    )!;
+    expect([home.identify, home.signature]).toEqual([180, 360]);
+    expect([scout.identify, scout.signature]).toEqual([112.5, 225]);
   });
 
   it('каждый вид в таблице обзора — настоящий вид провинции', () => {
@@ -63,13 +79,14 @@ describe('туман забега — круги на картах глав', ()
     expect(unknown).toEqual([]);
   });
 
-  it('глава I: видно пиратов у дома; дрейф — только засечка радара; дальний мир — нет', () => {
+  it('глава I: видно пиратов у дома; дрейф — только засечка радара; дальше — туман', () => {
     const rows = byDistance(runStart(0));
     const seen = (id: string) => rows.find((r) => r.id === id)!;
     expect(['home_a', 'pirate_den'].map((id) => seen(id).identified)).toEqual([true, true]);
-    // Опознаёт дом своим радаром (половина засечки); дрейф и скопление — только засечка.
+    // Опознаёт дом своим радаром (половина засечки); дрейф (317) — только засечка.
     expect([seen('drift').identified, seen('drift').radar]).toEqual([false, true]);
-    expect([seen('cluster').identified, seen('cluster').radar]).toEqual([false, true]);
+    // Скопление (521) засекал радар ×2,5; с ×1,5 (PVR-6.33) оно в тумане, как и дальний мир.
+    expect([seen('cluster').identified, seen('cluster').radar]).toEqual([false, false]);
     expect([seen('home_b').identified, seen('home_b').radar]).toEqual([false, false]);
   });
 
@@ -78,10 +95,11 @@ describe('туман забега — круги на картах глав', ()
     const world = (id: string) =>
       sightCircles(st, 'p1', data).find((c) => c.source.kind === 'world' && c.source.id === id)!;
     expect([world('cold_shoal').identify, world('deep_drift').identify]).toEqual([0, 0]);
-    // «Споровое облако» в 171 от отмели: раньше его открывал круг поля, теперь — лишь засечка
-    // радара Плацдарма.
+    // «Споровое облако» в 171 от отмели: раньше его открывал круг поля (PVR-6.21), потом —
+    // засечка радара Плацдарма; с радарами ×1,5 (PVR-6.33) не достаёт и она — облако надо
+    // разведать.
     const { identify, radar } = sensorCoverage(st, 'p1', data);
-    expect([identify.has('spore_cloud'), radar.has('spore_cloud')]).toEqual([false, true]);
+    expect([identify.has('spore_cloud'), radar.has('spore_cloud')]).toEqual([false, false]);
     expect([identify.has('cold_shoal'), identify.has('deep_drift')]).toEqual([true, true]);
   });
 

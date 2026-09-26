@@ -36,14 +36,14 @@
       },
       "boss": { "hero": "leviathan", "modules": ["leviathan_brood"], "reward": 5 }
     },
-    "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100 }, "fleet": 90, "radarScale": 2.5 },
+    "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100 }, "fleet": 90, "radarScale": 1.5 },
     "technology": { "dayGates": false, "exclude": ["ai_stewardship"] }
   },
   "training": {
     "name": "Training Range",
     "teamFormat": "ffa",
     "victory": { "dominationPercent": 1, "scoreLimit": 1000000 },
-    "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100 }, "fleet": 90, "radarScale": 2.5 },
+    "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100 }, "fleet": 90, "radarScale": 1.5 },
     "technology": { "dayGates": false, "exclude": ["ai_stewardship"] }
   },
   "duel": {
