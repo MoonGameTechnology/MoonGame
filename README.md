@@ -173,7 +173,8 @@ pnpm run check          # lint + typecheck + test + docs-check — гонять 
 шапке [`docs/state.md`](./docs/state.md) (правило «изменчивый факт имеет один дом»);
 здесь он не дублируется, чтобы не протухать.
 
-**CI** зеркалит гейт на каждый пуш: [`ci.yml`](./.github/workflows/ci.yml) гоняет
+**CI** зеркалит гейт на каждый пуш в рабочую ветку, PR и прогон очереди мержа (push в сам
+`main` не перепроверяется — очередь уже прогнала ровно это дерево): [`ci.yml`](./.github/workflows/ci.yml) гоняет
 `pnpm run check` против сервисного Postgres (так что durable-тесты тоже бегут) + SCA через
 **OSV-Scanner** (`pnpm audit` снят — npm закрыл audit-эндпоинты, 2026-07). Рядом:
 security-пайплайн ([`security.yml`](./.github/workflows/security.yml): Semgrep, CodeQL,

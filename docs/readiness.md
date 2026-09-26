@@ -34,7 +34,7 @@ kernel + `advanceTo` · movement (Дейкстра по лейнам) · **comba
 
 ## Инфраструктура
 
-- CI `ci.yml`: гейт (`pnpm run check`) + SCA (OSV-Scanner) на каждый пуш, против сервисного
+- CI `ci.yml`: гейт (`pnpm run check`) + SCA (OSV-Scanner) на каждый пуш в рабочую ветку, PR и очередь, против сервисного
   Postgres (durable-тесты бегут в CI) — **блокирующий** (main защищён, required check `check`).
 - CI `security.yml`: сканеры (Semgrep/CodeQL/Trivy/OSV/Gitleaks/TruffleHog/zizmor + SBOM) —
   оттриаженные (Semgrep/Gitleaks/OSV/Trivy fs+image) — **блокирующие** (SEC-1 ✅,

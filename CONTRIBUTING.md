@@ -341,10 +341,9 @@ pnpm run ui:shot -- --screen match --phone --locale en --out /tmp/match.png
    выполняются) плюс блокирующие сканеры SEC-1 — `SAST patterns (Semgrep)`,
    `Secrets — tree (Gitleaks)`, `SCA — osv.dev (OSV-Scanner)`,
    `Vuln + IaC — files (Trivy fs)`, `Vuln — built image base OS (Trivy image)`.
-   - **Не бери `lint + typecheck + test + audit`** (через ПЛЮСЫ — job из
-     `security.yml`): у шага стоит `continue-on-error: true`, а результат лишь
-     пишется в JSON для сводного отчёта, так что джоба зелёная и при красном
-     `pnpm run check`. Единственным обязательным чеком она защищает `main` на вид.
+   - Джобы `lint + typecheck + test + audit` (через ПЛЮСЫ, из `security.yml`) больше
+     нет — дубль гейта снят 2026-09-26. Если она осталась в списке required-чеков
+     ruleset'а, убери её оттуда: иначе очередь будет ждать чек, который никто не пришлёт.
    - **Не бери `Vuln — third-party prod images (Trivy image)`** — он помечен
      `report — informational`, там CVE сторонних образов прода: репозиторий запрётся
      до апстрим-обновления caddy/postgres, которое от нас не зависит.
