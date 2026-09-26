@@ -474,7 +474,8 @@ Sector Zero: `decisions/sectorZeroMenu.ts`, `decisions/sectorZeroProgress.ts` (�
 полосой во всю ширину — без прокрутки и не закрывая середину карты, решение владельца
 2026-09-26; подсказка наведения `#objtip` лежит выше окон; в окне стройки нет строк зданий,
 которых вид мира не пускает, — ни замком, ни причиной (`canBuildHere`), а в дереве
-технологий нет изученных узлов — сколько изучено, говорит счётчик вкладки), `prototype/src/holographicSurface.ts` (материалы провинций
+технологий нет изученных узлов — сколько изучено, говорит счётчик вкладки; узлы дерева —
+плитками в сетке, ярус — заголовком во всю её ширину, на телефоне две плитки в ряд), `prototype/src/holographicSurface.ts` (материалы провинций
 и край экрана), `prototype/src/holographicEffects.ts` (визуальные боевые контакты и пинги),
 `prototype/src/holographicIcons.ts` (официальные Phosphor SVG, закреплённый источник и MIT-лицензия в `prototype/src/art/phosphor/`). Токены дополнительной темы — `packages/client/src/theme.ts`.
 Подготовка карты и ускорение камеры: `prototype/src/mapPreparation.ts` (порции работы,

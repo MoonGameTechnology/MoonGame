@@ -73,12 +73,17 @@ body.mobile-ui #tech .tt-tab {
 body.mobile-ui #tech .tt-tab > span {
   white-space: normal;
 }
+/* Телефон: плитки узлов — по две в ряд. */
+body.mobile-ui #tech .tt-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* Шапка плитки — столбец: перенос в ней выносил кнопку в соседний столбец, за край плитки. */
 body.mobile-ui #tech .tt-ih {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
 }
 body.mobile-ui #tech .tt-ih > b {
-  flex: 1 0 100%;
+  flex: none;
   font-size: 13px;
 }
 body.mobile-ui #tech :is(.tt-ifx, .tt-lead) {
