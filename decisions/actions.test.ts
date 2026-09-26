@@ -25,7 +25,6 @@ import {
   launchFleet,
   loadArmy,
   loadShuttle,
-  loadSquadronTroops,
   marketCancel,
   marketList,
   marketTake,
@@ -56,7 +55,6 @@ import {
   uninstallHeroModule,
   unloadArmy,
   unloadShuttle,
-  unloadSquadronTroops,
   unlockHeroSkill,
   upgradeBuilding,
 } from './actions';
@@ -90,9 +88,6 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['unloadShuttle', unloadShuttle(P, 'f1', 'sq1')],
   ['splitSquadron', splitSquadron(P, { planetId: 'alpha' }, 'sq1', [{ unit: 'u', count: 2 }])],
   ['mergeSquadron', mergeSquadron(P, { fleetId: 'f1' }, 'sq1', 'sq2')],
-  ['loadSquadronTroops', loadSquadronTroops(P, { planetId: 'alpha' }, 'sq1', [{ unit: 'u', count: 1 }])],
-  ['unloadSquadronTroops', unloadSquadronTroops(P, { planetId: 'alpha' }, 'sq1', [{ unit: 'u', count: 1 }])],
-  ['unloadSquadronTroops (весь трюм)', unloadSquadronTroops(P, { planetId: 'alpha' }, 'sq1')],
   ['loadArmy', loadArmy(P, 'f1', 'infantry', 2)],
   ['unloadArmy', unloadArmy(P, 'f1', 'infantry')],
   ['launchFleet', launchFleet(P, 'alpha')],
@@ -102,7 +97,9 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['buildBuilding', buildBuilding(P, 'alpha', 'metal_mine')],
   ['upgradeBuilding', upgradeBuilding(P, 'alpha', 'metal_mine')],
   ['buildUnit', buildUnit(P, 'alpha', 'cruiser', 2)],
+  ['buildUnit (десантный челнок с бойцом)', buildUnit(P, 'alpha', 'landing_shuttle', 1, 'infantry')],
   ['buildShip', buildShip(P, 'alpha', 'cruiser', 1, ['railgun'])],
+  ['buildShip (десантный челнок с бойцом)', buildShip(P, 'alpha', 'landing_shuttle', 1, [], 'tank')],
   ['cancelConstruction', cancelConstruction(P, 'alpha', 7)],
   ['resumeConstruction', resumeConstruction(P, 'alpha', 7)],
   ['engageFleet', engageFleet(P, 'f1', 'f2')],
@@ -222,14 +219,14 @@ describe('конверт приказа', () => {
 
 describe('необязательное поле ОТСУТСТВУЕТ, а не равно undefined', () => {
   // У каждого из этих полей «нет значения» — самостоятельный смысл, а не пропуск:
-  // весь трюм вместо части, весь лот вместо доли, приказ без цели. Ключ со значением
+  // заказ без бойца, весь лот вместо доли, приказ без цели. Ключ со значением
   // `undefined` переживает JSON-сериализацию как ОТСУТСТВИЕ и читался бы так же — но
   // до сериализации он есть, и рукописная проверка `'troops' in payload` (а такие в
   // обработчиках встречаются) увидела бы его и прочла наоборот.
   const keys = (a: Action): string[] => Object.keys(a.payload as object);
 
-  it('выгрузка без списка не несёт troops', () => {
-    expect(keys(unloadSquadronTroops(P, { planetId: 'alpha' }, 'sq1'))).not.toContain('troops');
+  it('заказ юнита без бойца не несёт troop — ядро отбивает его у всех, кроме десантного челнока', () => {
+    expect(keys(buildUnit(P, 'alpha', 'cruiser', 2))).not.toContain('troop');
   });
   it('заполнение лота без доли не несёт amount', () => {
     expect(keys(marketTake(P, 'lot1'))).not.toContain('amount');

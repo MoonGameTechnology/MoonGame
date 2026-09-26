@@ -398,12 +398,12 @@
       "strikeRange": 120,
       "fuel": 2,
       "rearmRounds": 2,
-      "cargoCapacity": 3,
       "cargoSize": 2
     },
     "line": "front",
     "traits": [
-      "shuttle"
+      "shuttle",
+      "lander"
     ],
     "signature": 2,
     "cost": {

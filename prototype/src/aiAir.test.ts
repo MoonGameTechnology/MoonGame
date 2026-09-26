@@ -140,8 +140,44 @@ describe('SHU-3.2 — бот СТРОИТ новый ростер челноко
     expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand', 'strong'))).toContain('bomber');
   });
 
+  /** Порт и КАЗАРМЫ: десантный челнок строится с бойцом внутри (SHU-5.2), и боец
+   *  требует своего цеха на этом мире — без него ядро челнок не примет. */
+  function withBarracks(s: GameState): GameState {
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    home.buildings = [...home.buildings, { type: 'barracks', level: 1, hp: data.buildings.barracks!.hp }];
+    return s;
+  }
+
   it('строит десантный челнок — высадка без флота (ROS-1.5)', () => {
-    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand', 'strong'))).toContain('landing_shuttle');
+    expect(unitsBuilt(aiOrders(withBarracks(withPort(rich(game2()))), 'p2', 'expand', 'strong'))).toContain(
+      'landing_shuttle',
+    );
+  });
+
+  it('БОЙЦА НЕГДЕ ВЗЯТЬ — десантного челнока нет, а не отказ ядра каждый тик (SHU-5.2)', () => {
+    // На старте у дома нет ни казарм, ни завода: посадить в челнок некого.
+    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand', 'strong'))).not.toContain(
+      'landing_shuttle',
+    );
+  });
+
+  it('ДЕСАНТНЫЙ ЧЕЛНОК ЗАКАЗЫВАЕТСЯ С САМЫМ УДАРНЫМ БОЙЦОМ, которого ядро примет (SHU-5.2)', () => {
+    const s = withBarracks(withPort(rich(game2())));
+    const order = only(aiOrders(s, 'p2', 'expand', 'strong'), 'unit.build').find(
+      (a) => (a.payload as { unit: string }).unit === 'landing_shuttle',
+    )!;
+    const troop = (order.payload as { troop?: string }).troop;
+    expect(troop).toBeTruthy();
+    // Никого ударнее, кого ядро приняло бы на этом мире, бот не пропустил.
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    const atk = (u: string): number => data.units[u]?.stats.attack ?? 0;
+    for (const [id, u] of Object.entries(data.units)) {
+      if (u.domain !== 'ground' || atk(id) <= atk(troop!)) continue;
+      const alt = { ...order, payload: { planetId: home.id, unit: 'landing_shuttle', count: 1, troop: id } };
+      expect(kernel.applyAction(s, alt, ctx(s.time)).ok, id).toBe(false);
+    }
+    const r = kernel.applyAction(s, order, ctx(s.time));
+    expect(r.ok, r.ok ? '' : r.code).toBe(true);
   });
 
   it('в мирное время ударные челноки не строит — бить некого', () => {
@@ -167,7 +203,7 @@ describe('SHU-3.2 — бот СТРОИТ новый ростер челноко
     home.hangar = [
       { id: 'sq:i', units: [{ unit: 'interceptor', count: 3 }] },
       { id: 'sq:b', units: [{ unit: 'bomber', count: 3 }] },
-      { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] },
+      { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }], cargo: [{ unit: 'militia', count: 3 }] },
     ];
     const built = unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'));
     expect(built).not.toContain('interceptor');
@@ -246,42 +282,25 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
     expect(strikes(armed({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: 6 }] }] })).length).toBe(1);
   });
 
-  it('ДЕСАНТНЫЙ ВЫЛЕТ ИДЁТ С ГРУЗОМ — без него он долетит и просто погибнет', () => {
-    const s = armed({ hangar: [{ id: 'sq:1', units: [{ unit: 'landing_shuttle', count: 2 }] }] });
-    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
-    home.garrison = [{ unit: 'militia', count: 8 }]; // сверх домашней стражи есть что везти
-    // SHU-4.2: груз кладут в трюм ОТДЕЛЬНЫМ приказом, и он обязан идти ПЕРЕД ударом —
-    // иначе эскадра взлетит порожней. Проверяем оба и их порядок.
+  it('ДЕСАНТНЫЙ ВЫЛЕТ ИДЁТ С ТЕМ, ЧТО УЖЕ В ТРЮМЕ — одним приказом удара', () => {
+    // SHU-5.2: челнок строится с бойцом внутри, поэтому погрузки перед вылетом нет —
+    // бот отдаёт только `shuttle.strike`, и эскадра взлетает со своим десантом.
+    const s = armed({
+      hangar: [{ id: 'sq:1', units: [{ unit: 'landing_shuttle', count: 2 }], cargo: [{ unit: 'tank', count: 2 }] }],
+    });
     const orders = aiOrders(s, 'p2', 'expand', 'strong');
     const out = only(orders, 'shuttle.strike');
-    const loads = only(orders, 'shuttle.loadTroops');
     expect(out).toHaveLength(1);
-    expect(loads).toHaveLength(1);
-    expect(orders.indexOf(loads[0]!)).toBeLessThan(orders.indexOf(out[0]!));
     const p = out[0]!.payload as { squadronId: string; targetPlanetId?: string };
-    const lp = loads[0]!.payload as {
-      squadronId: string;
-      troops: Array<{ unit: string; count: number }>;
-    };
-    const home2 = Object.values(s.planets).find((w) => w.owner === 'p2')!;
-    expect((home2.hangar ?? []).find((q) => q.id === p.squadronId)?.units[0]?.unit).toBe(
-      'landing_shuttle',
-    );
+    expect(p.squadronId).toBe('sq:1');
     expect(p.targetPlanetId).toBeTruthy(); // десант летит по МИРУ, а не по кораблю
-    expect(lp.squadronId).toBe(p.squadronId);
-    expect(lp.troops.reduce((n, t) => n + t.count, 0)).toBeGreaterThan(0);
-    // Обе заявки проходят ЯДРО, а не только выглядят правильными.
-    const loaded = kernel.applyAction(s, loads[0]!, ctx(s.time));
-    expect(loaded.ok).toBe(true);
-    if (loaded.ok) expect(kernel.applyAction(loaded.state, out[0]!, ctx(s.time)).ok).toBe(true);
+    // Заявка проходит ЯДРО, а не только выглядит правильной.
+    const r = kernel.applyAction(s, out[0]!, ctx(s.time));
+    expect(r.ok, r.ok ? '' : r.code).toBe(true);
   });
 
-  it('ДОМ ПУСТЫМ НЕ ОСТАВЛЯЕТ: везти нечего — вылета нет вовсе', () => {
-    // Тот же порог домашней стражи, что и у погрузки на корабль: гарнизон из трёх
-    // бойцов целиком уходит в оборону дома, и десантному челноку грузить нечего.
+  it('ПУСТОЙ ДЕСАНТНЫЙ ЧЕЛНОК НЕ ЛЕТИТ: без бойца он долетит и просто погибнет', () => {
     const s = armed({ hangar: [{ id: 'sq:1', units: [{ unit: 'landing_shuttle', count: 2 }] }] });
-    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
-    home.garrison = [{ unit: 'militia', count: 3 }];
     expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 
@@ -506,11 +525,12 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
       owner: 'p2',
       location: perch.id,
       movement: null,
-      // Четыре корпуса: трюм общий (SHU-5.1), и три челнока (по 2 места) с девятью
-      // танками (по 2) обязаны в него поместиться — 24 места.
+      // Четыре корпуса: трюм общий (SHU-5.1). Три десантных челнока несут по танку —
+      // так их строит ядро (SHU-5.2).
       units: [{ unit: 'shuttle_carrier', count: 4 }],
-      hangar: [{ id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] }],
-      landing: [{ unit: 'tank', count: 9 }],
+      hangar: [
+        { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }], cargo: [{ unit: 'tank', count: 3 }] },
+      ],
       traits: [],
       battleId: null,
     } as GameState['fleets'][string];
@@ -530,24 +550,20 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
 
   it('ПРАВИЛО №1 — БЕЗ РАЗВЕДДАННЫХ ВЫСАДКИ НЕТ, даже когда всё на борту', () => {
     const { s } = staged();
-    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 
   it('РАЗВЕДДАННЫЕ ЕСТЬ И СИЛ ХВАТАЕТ — высадка уходит и проходит ЯДРО', () => {
     const { s, foe } = staged();
     withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
     const orders = aiOrders(s, 'p2', 'expand', 'strong');
-    const load = only(orders, 'shuttle.loadTroops');
     const strike = only(orders, 'shuttle.strike');
-    expect(load).toHaveLength(1);
     expect(strike).toHaveLength(1);
-    // Оба приказа адресуют НОСИТЕЛЬ, а не дом: груз едет вместе с ним.
-    expect((load[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_cv');
+    // Приказ адресует НОСИТЕЛЬ, а не дом: десант уже в трюме его эскадры (SHU-5.2).
+    expect((strike[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_cv');
     expect((strike[0]!.payload as { targetPlanetId?: string }).targetPlanetId).toBe(foe.id);
-    // Погрузка идёт ПЕРВОЙ, и ядро принимает обе подряд.
-    const loaded = kernel.applyAction(s, load[0]!, ctx(s.time));
-    expect(loaded.ok).toBe(true);
-    if (loaded.ok) expect(kernel.applyAction(loaded.state, strike[0]!, ctx(s.time)).ok).toBe(true);
+    const r = kernel.applyAction(s, strike[0]!, ctx(s.time));
+    expect(r.ok, r.ok ? '' : r.code).toBe(true);
   });
 
   it('ПРОТУХШИЕ РАЗВЕДДАННЫЕ знанием не считаются', () => {
@@ -562,14 +578,14 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
         },
       },
     };
-    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 
   it('ГАРНИЗОН НЕ ПО ЗУБАМ — высадки нет: челноки целы, десант жив', () => {
     const { s, foe } = staged();
     foe.garrison = [{ unit: 'heavy_infantry', count: 12 }];
     withIntel(s, foe.id, [{ unit: 'heavy_infantry', count: 12 }]);
-    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 
   it('ПРАВИЛО №3 — под ВРАЖЕСКИМ ФЛОТОМ высадка не идёт', () => {
@@ -584,7 +600,7 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
       traits: [],
       battleId: null,
     } as GameState['fleets'][string];
-    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 
   it('ПРАВИЛО №2 — над миром уже стоит СВОЙ флот: берём штурмом, челноки не тратим', () => {
@@ -602,7 +618,7 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
       battleId: null,
     } as GameState['fleets'][string];
     const orders = aiOrders(s, 'p2', 'expand', 'strong');
-    expect(only(orders, 'shuttle.loadTroops')).toEqual([]);
+    expect(only(orders, 'shuttle.strike')).toEqual([]);
     expect(only(orders, 'fleet.assault')).toHaveLength(1);
   });
 
@@ -611,7 +627,7 @@ describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с но�
     // Разведданных нет ⇒ высадки не будет. Раньше на этом приказ терялся ВОВСЕ: машина
     // выбиралась одна на общем ростере, и ею оказывался десантный челнок.
     s.fleets.p2_cv!.hangar = [
-      { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] },
+      { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }], cargo: [{ unit: 'tank', count: 3 }] },
       { id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] },
     ];
     const strikes = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');

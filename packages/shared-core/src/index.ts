@@ -262,7 +262,7 @@ export {
   // всех читателей; своя развёртка у каждого разъехалась бы с этой.
   hangarMachines,
   squadronSize,
-  squadronCargoCapacity,
+  trimCargo,
   squadronCargoUsed,
   // Остаток SHU-3.1: круг взведённого прицела рисуется ТОЙ ЖЕ дальностью, по которой
   // ядро отбивает `E_OUT_OF_RANGE`.

@@ -44,6 +44,7 @@ import { SECTOR_TYPES } from './map';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
 import { buildShip } from '../../decisions/actions';
+import { isLander, landerTroopCandidates, orderableTroops } from '../../decisions/landerTroops';
 import { unitDamageProfile } from '../../decisions/unitDamage';
 import { unitDamageHtml } from './unitDamageView';
 import {
@@ -135,6 +136,8 @@ export interface YardDraft {
   modules: string[];
   count: number;
   planet: string;
+  /** Боец десантного челнока (SHU-5.2) — по одному на каждую машину заказа. */
+  troop?: string;
 }
 
 /** A price as text: «120 металл · 40 кредиты», or «бесплатно» when nothing is due. */
@@ -228,7 +231,12 @@ export function loadoutPaneHtml(
   me: string,
   draft: YardDraft,
   hullList: string[],
-  view: { youColor: string; arsenalItems: readonly ArsenalItem[] },
+  view: {
+    youColor: string;
+    arsenalItems: readonly ArsenalItem[];
+    /** Кого ядро примет бойцом десантного челнока на мире черновика (SHU-5.2). */
+    troops?: readonly string[];
+  },
 ): string {
   const snap = state.players[me]?.arsenal;
   const ownedHulls = ownedHullsOf(state, me, hullList);
@@ -328,14 +336,40 @@ export function loadoutPaneHtml(
         `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(p.id)}</option>`,
     )
     .join('');
+  // ДЕСАНТНЫЙ ЧЕЛНОК (SHU-5.2) строится с бойцом внутри: выбор бойца и его цена — в
+  // том же блоке цены, итог — челнок с модулями ПЛЮС бойцы. Список бойцов считает
+  // хозяин пробой ядра (`orderableTroops`), здесь — только разметка.
+  const lander = isLander(hullDef);
+  const troop =
+    lander && draft.troop && (view.troops ?? []).includes(draft.troop) ? draft.troop : undefined;
+  const troopCost: Record<string, number> = {};
+  for (const [r, n] of Object.entries((troop && data.units[troop]?.cost) || {}))
+    troopCost[r] = n * m.count;
+  const total: Record<string, number> = { ...m.totalCost };
+  for (const [r, n] of Object.entries(troopCost)) total[r] = (total[r] ?? 0) + n;
+  const troopRow = !lander
+    ? ''
+    : (view.troops ?? []).length
+      ? `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.troop', { n: String(m.count) })}</span>` +
+        `<select class="cn-plan" id="cn-troop">${(view.troops ?? [])
+          .map(
+            (g) =>
+              `<option value="${esc(g)}"${g === troop ? ' selected' : ''}>${esc(displayUnit(g))}</option>`,
+          )
+          .join('')}</select><span class="cn-cv">${bagText(troopCost)}</span></div>`
+      : `<div class="cn-noplace">${t('yard.troop.none')}</div>`;
   const cost =
     `<div class="cn-cost">` +
     `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.hull', { n: String(m.count) })}</span><span class="cn-cv">${bagText(m.hullCost)}</span></div>` +
     (draft.modules.length
       ? `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.modules', { n: String(m.count) })}</span><span class="cn-cv">${bagText(m.modulesCost)}</span></div>`
       : '') +
-    `<div class="cn-crow total"><span class="cn-cl">${t('yard.cost.total')}</span><span class="cn-cv">${bagText(m.totalCost)}</span></div></div>`;
-  const canBuild = m.affordable && draft.planet !== '';
+    troopRow +
+    `<div class="cn-crow total"><span class="cn-cl">${t('yard.cost.total')}</span><span class="cn-cv">${bagText(total)}</span></div></div>`;
+  const affordable = lander
+    ? Object.entries(total).every(([r, n]) => (res[r] ?? 0) >= n)
+    : m.affordable;
+  const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
   const right =
     `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${damage}${cost}` +
     `<div class="cn-row2"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
@@ -373,6 +407,9 @@ export interface YardHost {
   youColor(): string;
   /** Submit a player order through the host's usual path (gate, net, replay). */
   order(action: Action): void;
+  /** Проба ядра (`canOrder`): кого можно посадить в десантный челнок (SHU-5.2). Без
+   *  неё список бойцов — все кандидаты, и отказ, если он будет, скажет ядро. */
+  probe?(action: Action): string | null;
   /** Toast line (build confirmations, refused fits). */
   note(msg: string): void;
   /** Localized text of a reducer error code — the host owns that vocabulary. */
@@ -407,6 +444,15 @@ export function initShipyard(host: YardHost): {
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
 
   const hullsOf = (): string[] => hullsOfTab(tab);
+  /** Бойцы десантного челнока для черновика (SHU-5.2); `undefined` — корпус не десантный. */
+  const troopsFor = (d: YardDraft): string[] | undefined => {
+    if (!isLander(data.units[d.hull])) return undefined;
+    const candidates = landerTroopCandidates(data);
+    if (!host.probe || !d.planet) return d.planet ? candidates : [];
+    return orderableTroops(candidates, (g) =>
+      host.probe!(buildShip(host.me(), d.planet, d.hull, 1, d.modules, g)),
+    );
+  };
   const close = (): void => host.root().classList.remove('show');
 
   function paint(): void {
@@ -416,9 +462,15 @@ export function initShipyard(host: YardHost): {
       renderedHeroBody = body;
     } else {
       draft = normalizeDraft(host.state(), host.me(), draft, hullsOf());
+      const troops = troopsFor(draft);
+      // Боец, которого на этом мире больше нельзя посадить, сменяется первым годным —
+      // тем же правилом, каким `normalizeDraft` возвращает на землю мир и корпус.
+      if (troops && !(draft.troop && troops.includes(draft.troop)))
+        draft = { ...draft, troop: troops[0] };
       body = loadoutPaneHtml(host.state(), host.me(), draft, hullsOf(), {
         youColor: host.youColor(),
         arsenalItems: host.arsenalItems(),
+        ...(troops ? { troops } : {}),
       });
     }
     host.root().innerHTML = yardBoxHtml(tab, body);
@@ -507,7 +559,10 @@ export function initShipyard(host: YardHost): {
     }
     if (tg.closest('[data-cnbuild]')) {
       if (draft.planet) {
-        host.order(buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules));
+        const troop = isLander(data.units[draft.hull]) ? draft.troop : undefined;
+        host.order(
+          buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, troop),
+        );
         host.note(t('yard.ordered', { n: String(draft.count), hull: displayUnit(draft.hull) }));
       }
     }
@@ -515,7 +570,16 @@ export function initShipyard(host: YardHost): {
 
   host.root().addEventListener('change', (e) => {
     const sel = e.target as HTMLSelectElement;
-    if (sel.id === 'cn-planet') draft = { ...draft, planet: sel.value };
+    if (sel.id === 'cn-planet') {
+      draft = { ...draft, planet: sel.value };
+      // У десантного челнока от мира зависит и список бойцов (казармы/завод здесь).
+      if (isLander(data.units[draft.hull])) paint();
+    }
+    // Выбор бойца меняет цену — перерисовка сразу, а не на следующем тике.
+    if (sel.id === 'cn-troop') {
+      draft = { ...draft, troop: sel.value };
+      paint();
+    }
   });
 
   return {

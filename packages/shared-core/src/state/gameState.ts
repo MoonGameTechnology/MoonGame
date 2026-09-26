@@ -122,6 +122,8 @@ export interface PausedConstructionSite {
   unit?: UnitId;
   count?: number;
   modules?: ModuleId[];
+  /** Наземный юнит внутри десантного челнока (SHU-5.2). */
+  troop?: UnitId;
   /** RULES-2.1: instance uid for upgrade resume (when maxPerPlanet > 1). */
   uid?: string;
   /** Fraction (0..1) already complete at the moment of the pause. */
@@ -504,6 +506,8 @@ export interface QueuedConstruction {
   unit?: string;
   count?: number;
   modules?: string[];
+  /** Наземный юнит внутри десантного челнока (SHU-5.2). */
+  troop?: string;
 }
 
 export interface FleetMovement {

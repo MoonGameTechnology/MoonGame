@@ -20,7 +20,7 @@ import { canAfford, payCost, refundCost } from '../util/treasury';
 import { buildProgress } from '../util/construction';
 import { isAllied } from '../util/combat';
 import { addUnits } from '../util/stacks';
-import { basedMachine, shuttleBayAt } from '../state/shuttle';
+import { basedLander, basedMachine, shuttleBayAt } from '../state/shuttle';
 import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
 import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
 
@@ -40,6 +40,9 @@ interface BuildUnitPayload {
    *  hull's slots at order time, paid for up-front, then LOCKED onto the stack —
    *  there is no refit action. Absent/empty = a bare hull. */
   modules?: string[];
+  /** Десантный челнок (трейт `lander`, SHU-5.2): какой наземный юнит он несёт. Цена и
+   *  срок заказа — челнок плюс этот юнит, условия его постройки проверяются здесь же. */
+  troop?: string;
 }
 /** Payload of the internal `construction.complete` schedule (we author it, so
  *  it is well-formed; the handler still guards types and is fail-secure). */
@@ -52,6 +55,8 @@ interface CompletePayload {
   count?: number;
   level?: number;
   modules?: string[];
+  /** Наземный юнит десантного челнока (SHU-5.2). */
+  troop?: string;
   /** RULES-2.1: instance uid for upgrade completion (when maxPerPlanet > 1). */
   uid?: string;
   /** Scheduled event seq (for uid generation). */
@@ -112,11 +117,16 @@ function orderSpec(
   if (p.kind === 'unit' && typeof p.unit === 'string' && typeof p.count === 'number') {
     const def = data.units[p.unit];
     if (!def) return null;
-    const perShip =
+    const hull =
       p.modules && p.modules.length > 0
         ? sumBags(def.cost, loadoutCost(p.modules, data))
         : def.cost;
-    return { hours: def.buildTimeHours, cost: scaleCost(perShip, p.count) };
+    // Десантный челнок: цена — челнок ПЛЮС его боец, срок — дольший из двух (SHU-5.2).
+    const troop = typeof p.troop === 'string' ? data.units[p.troop] : undefined;
+    if (p.troop !== undefined && !troop) return null;
+    const perShip = troop ? sumBags(hull, troop.cost) : hull;
+    const hours = troop ? Math.max(def.buildTimeHours, troop.buildTimeHours) : def.buildTimeHours;
+    return { hours, cost: scaleCost(perShip, p.count) };
   }
   return null;
 }
@@ -421,6 +431,7 @@ function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): vo
       unit: head.unit,
       count: head.count,
       modules: head.modules,
+      troop: head.troop,
     });
     h.emit('construction.started', {
       kind: head.kind,
@@ -917,6 +928,30 @@ export const constructionModule: GameModule = {
       if (def.domain === 'ground' && !hasGroundFacility(planet, h.ctx.data, def.kind)) {
         return h.reject(GROUND_FACILITY[def.kind].code);
       }
+      // ДЕСАНТНЫЙ ЧЕЛНОК строится сразу с бойцом внутри (SHU-5.2, резолюция владельца
+      // 2026-09-26): игрок выбирает наземный юнит, платит за челнок и за него, и условия
+      // постройки бойца — открытие технологией и его здание на ЭТОМ мире — те же, что у
+      // заказа самого бойца. Иначе челнок стал бы обходным путём к танку без завода.
+      const lander = def.traits.includes('lander');
+      const troopId = payload.troop;
+      if (
+        lander !== (troopId !== undefined) ||
+        (troopId !== undefined && typeof troopId !== 'string')
+      ) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const troopDef = troopId !== undefined ? h.ctx.data.units[troopId] : undefined;
+      if (troopId !== undefined) {
+        if (!troopDef) return h.reject('E_UNKNOWN_UNIT');
+        if (troopDef.domain !== 'ground') return h.reject('E_NOT_GROUND');
+        if (troopDef.traits.includes('issued') || troopDef.traits.includes('immobile')) {
+          return h.reject('E_NOT_BUILDABLE');
+        }
+        requireUnlocked(h, action.playerId, 'unit', troopId);
+        if (!hasGroundFacility(planet, h.ctx.data, troopDef.kind)) {
+          return h.reject(GROUND_FACILITY[troopDef.kind].code);
+        }
+      }
       // ARS-3 ownership gate: a seat with an arsenal SNAPSHOT builds only what it
       // owns — the hull and every module must be listed (fail-secure E_NOT_OWNED).
       // No snapshot on the player ⇒ no restriction (regular/dev matches unchanged).
@@ -951,26 +986,34 @@ export const constructionModule: GameModule = {
           unit: payload.unit,
           count,
           ...(modules && modules.length > 0 ? { modules } : {}),
+          ...(troopId !== undefined ? { troop: troopId } : {}),
         });
         return code ? h.reject(code) : undefined;
       }
       // The loadout is paid up-front with the hull and locked onto the built stack.
-      const perShip =
-        modules && modules.length > 0
-          ? sumBags(def.cost, loadoutCost(modules, h.ctx.data))
-          : def.cost;
-      const cost = scaleCost(perShip, count);
+      // Десантный челнок — вместе со своим бойцом (SHU-5.2); цена и срок — `orderSpec`,
+      // та же функция, что считает возврат при отмене.
+      const spec = orderSpec(h.ctx.data, {
+        kind: 'unit',
+        unit: payload.unit,
+        count,
+        ...(modules && modules.length > 0 ? { modules } : {}),
+        ...(troopId !== undefined ? { troop: troopId } : {}),
+      });
+      if (!spec) return h.reject('E_UNKNOWN_UNIT');
+      const cost = spec.cost;
       if (!canAfford(player.resources, cost)) {
         return h.reject('E_INSUFFICIENT');
       }
       payCost(player.resources, cost);
-      scheduleCompletion(h, def.buildTimeHours, {
+      scheduleCompletion(h, spec.hours, {
         kind: 'unit',
         planetId: planet.id,
         playerId: action.playerId,
         unit: payload.unit,
         count,
         ...(modules && modules.length > 0 ? { modules } : {}),
+        ...(troopId !== undefined ? { troop: troopId } : {}),
       });
       h.emit('construction.started', {
         kind: 'unit',
@@ -1042,6 +1085,7 @@ export const constructionModule: GameModule = {
         unit: p.unit,
         count: p.count,
         modules: p.modules,
+        troop: p.troop,
         progress,
         remainingHours: spec.hours * (1 - progress),
         remainingCost: refund,
@@ -1120,6 +1164,7 @@ export const constructionModule: GameModule = {
         unit: site.unit,
         count: site.count,
         modules: site.modules,
+        troop: site.troop,
       });
       h.emit('construction.resumed', {
         planetId: planet.id,
@@ -1276,15 +1321,27 @@ export const constructionModule: GameModule = {
           // модуля челноков нельзя вовсе — модули общаются только через шину.
           const seq = (h.state.squadronSeq ?? 0) + 1;
           h.state.squadronSeq = seq;
-          planet.hangar = basedMachine(
-            planet.hangar ?? [],
-            p.unit,
-            p.count,
-            `sq:${p.playerId}:${seq}`,
-            p.modules,
-            stars,
-            rarity,
-          );
+          // Десантный челнок встаёт В СВОЮ эскадру вместе с бойцом (SHU-5.2): челнок без
+          // бойца — это не челнок, а корпус без смысла, поэтому заказ без `troop` сюда
+          // не доходит (отбит на приказе).
+          if (built.traits.includes('lander') && typeof p.troop === 'string') {
+            planet.hangar = basedLander(
+              planet.hangar ?? [],
+              p.unit,
+              p.count,
+              p.troop,
+              `sq:${p.playerId}:${seq}`,
+            );
+          } else
+            planet.hangar = basedMachine(
+              planet.hangar ?? [],
+              p.unit,
+              p.count,
+              `sq:${p.playerId}:${seq}`,
+              p.modules,
+              stars,
+              rarity,
+            );
         } else {
           addUnits(planet.garrison, p.unit, p.count, p.modules, stars, rarity);
         }
@@ -1294,6 +1351,7 @@ export const constructionModule: GameModule = {
           count: p.count,
           owner: p.playerId,
           ...(p.modules && p.modules.length > 0 ? { modules: p.modules } : {}),
+          ...(typeof p.troop === 'string' ? { troop: p.troop } : {}),
         });
       }
     }

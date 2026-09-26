@@ -183,8 +183,6 @@ export {
   strikeShuttle,
   splitSquadron,
   mergeSquadron,
-  loadSquadronTroops,
-  unloadSquadronTroops,
   buildBuilding,
   upgradeBuilding,
   buildUnit,

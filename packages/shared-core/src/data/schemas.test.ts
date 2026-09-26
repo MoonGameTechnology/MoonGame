@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.46'); // общий трюм (SHU-5.1: `cargoSize` шаттлов и техники, авианосец на `cargoCapacity`) поверх 0.1.45 (тяжёлый ударный страйкер)
+    expect(data.version).toBe('0.1.47'); // десантный челнок с бойцом внутри (SHU-5.2: трейт `lander`, без своего трюма) поверх 0.1.46 (общий трюм)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что

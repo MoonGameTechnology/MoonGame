@@ -12,7 +12,6 @@ import {
   splitOne,
   squadronCards,
   squadronCallsignOf,
-  troopsInputForSquadron,
 } from './squadronPanel';
 import type { HangarView } from './hangarPanel';
 import type { Squadron } from '../../packages/shared-core/src/index';
@@ -56,7 +55,6 @@ describe('SHU-4.3 — карточка эскадры', () => {
     const cards = squadronCards(view([sq('sq:p2:1', [['interceptor', 3]])]), { mine: false, data });
     expect(cards[0]?.canStrike).toBe(false);
     expect(cards[0]?.canSplit).toBe(false);
-    expect(cards[0]?.canLoad).toBe(false);
   });
 
   it('ПУСТЫЕ ЗВЕНЬЯ НЕ ПОКАЗЫВАЮТСЯ: соединение без бортов — не соединение', () => {
@@ -73,8 +71,15 @@ describe('SHU-4.3 — делёж одной кнопкой', () => {
     expect(splitOne(sq('sq:p1:1', [['interceptor', 1]]))).toBeNull();
   });
 
-  it('ГРУЖЁНУЮ НЕ ДЕЛИМ: то же правило, что в ядре (`E_HAS_CARGO`), и кнопки тут нет', () => {
-    expect(splitOne(sq('sq:p1:1', [['lander', 3]], [['militia', 2]]))).toBeNull();
+  it('СО СМЕШАННЫМ ДЕСАНТОМ НЕ ДЕЛИМ: то же правило, что в ядре (`E_HAS_CARGO`), и кнопки тут нет', () => {
+    expect(splitOne(sq('sq:p1:1', [['landing_shuttle', 3]], [['militia', 2], ['tank', 1]]))).toBeNull();
+  });
+
+  it('ОДНОРОДНЫЙ ДЕСАНТ ДЕЛИТСЯ: отделённый борт уносит своего бойца (SHU-5.2)', () => {
+    expect(splitOne(sq('sq:p1:1', [['landing_shuttle', 3]], [['militia', 3]]))).toEqual({
+      unit: 'landing_shuttle',
+      count: 1,
+    });
   });
 
   it('в смешанном звене отделяется ПЕРВЫЙ тип — выбор детерминирован, а не «какой-нибудь»', () => {
@@ -98,37 +103,12 @@ describe('SHU-4.3 — слияние двумя тапами', () => {
   });
 });
 
-describe('SHU-4.3 — десант грузится в КОНКРЕТНУЮ эскадру', () => {
-  const ground = [{ unit: 'militia', count: 6 }];
-
-  it('ТРЮМ И ВМЕСТИМОСТЬ БЕРУТСЯ У ЭСКАДРЫ, а не у мира: грузят в звено, а не в порт', () => {
-    const inp = troopsInputForSquadron(sq('sq:p1:1', [['landing_shuttle', 2]]), ground, data);
-    const cap = (data.units.landing_shuttle?.stats.cargoCapacity ?? 0) * 2;
-    expect(inp.capacity).toBe(cap);
-    expect(inp.used).toBe(0);
-    expect(inp.units.find((u) => u.unit === 'militia')?.garrison).toBe(6);
-  });
-
-  it('УЖЕ ПОГРУЖЕННОЕ ВИДНО КАК ТРЮМ — иначе игрок не поймёт, что можно ссадить', () => {
-    const inp = troopsInputForSquadron(
-      sq('sq:p1:1', [['landing_shuttle', 2]], [['militia', 4]]),
-      ground,
+describe('SHU-5.2 — десант в трюме только показывается', () => {
+  it('КАРТОЧКА НЕСЁТ ТРЮМ ЗВЕНА: челнок строится с бойцом внутри, игрок видит, кого везёт', () => {
+    const cards = squadronCards(view([sq('sq:p1:1', [['landing_shuttle', 2]], [['militia', 2]])]), {
+      mine: true,
       data,
-    );
-    expect(inp.used).toBe(4);
-    expect(inp.units.find((u) => u.unit === 'militia')?.hold).toBe(4);
-  });
-
-  it('ЗВЕНО БЕЗ ТРЮМА НЕ ГРУЗЯТ, А ДЕСАНТНОЕ — ГРУЗЯТ: признак в вместимости, не в имени', () => {
-    const bare = view([sq('sq:p1:1', [['interceptor', 2]])]);
-    expect(squadronCards(bare, { mine: true, data })[0]?.canLoad).toBe(false);
-    const lander = view([sq('sq:p1:2', [['landing_shuttle', 1]])]);
-    expect(squadronCards(lander, { mine: true, data })[0]?.canLoad).toBe(true);
-  });
-
-  it('ОЧЕРЕДЕЙ И РЕЗЕРВОВ У ЭСКАДРЫ НЕТ: погрузка в трюм мгновенна (ядро, SHU-4.2)', () => {
-    const inp = troopsInputForSquadron(sq('sq:p1:1', [['landing_shuttle', 1]]), ground, data);
-    expect(inp.reservedCargo).toBe(0);
-    expect(inp.units.every((u) => u.queued === 0 && u.reserved === 0)).toBe(true);
+    });
+    expect(cards[0]?.cargo).toEqual([{ unit: 'militia', count: 2 }]);
   });
 });

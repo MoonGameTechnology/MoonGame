@@ -11,6 +11,7 @@ import {
   buildRowState,
   buildScreenHtml,
   initBuildScreen,
+  unitScreenHtml,
   type BuildHost,
 } from './buildScreen';
 
@@ -333,5 +334,53 @@ describe('окно построек — подключение к main.ts', () =
     expect(src).toMatch(
       /build: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'building', id, count: 1 \}\)/,
     );
+  });
+});
+
+describe('окно юнитов — десантный челнок строится с бойцом (SHU-5.2)', () => {
+  /** Мой мир с портом, казармами (если просят) и полной казной. */
+  function staged(barracks: boolean): { s: GameState; pid: string } {
+    const s = newGame();
+    const pid = home(s);
+    const p = s.planets[pid]!;
+    p.buildings = [
+      ...p.buildings.filter((b) => b.type !== 'spaceport' && b.type !== 'barracks'),
+      { type: 'spaceport', level: 1, hp: data.buildings.spaceport!.hp },
+      ...(barracks ? [{ type: 'barracks', level: 1, hp: data.buildings.barracks!.hp }] : []),
+    ];
+    s.players.p1!.resources = {
+      metal: 9000,
+      credits: 9000,
+      energy: 9000,
+      food: 9000,
+      microelectronics: 9000,
+    };
+    return { s, pid };
+  }
+
+  it('ВМЕСТО ОДНОЙ КНОПКИ — по кнопке на бойца, которого ядро примет на этом мире', () => {
+    const { s, pid } = staged(true);
+    const out = unitScreenHtml(s, 'p1', pid, ['landing_shuttle'], probe(s), lockText);
+    expect(out).toContain('data-unit-troop="militia"');
+    // Танку нужен завод, а его на мире нет — такого бойца не предлагают.
+    expect(out).not.toContain('data-unit-troop="tank"');
+    // Каждая предложенная кнопка — приказ, который ядро и правда примет.
+    for (const m of out.matchAll(/data-unit-troop="([^"]+)"/g)) {
+      const a = {
+        id: 'x',
+        type: 'unit.build',
+        playerId: 'p1',
+        issuedAt: 0,
+        payload: { planetId: pid, unit: 'landing_shuttle', count: 1, troop: m[1] },
+      };
+      expect(canOrder(s, a), m[1]).toBeNull();
+    }
+  });
+
+  it('НЕКОГО ПОСАДИТЬ — строка заперта кодом отказа ядра, кнопок нет', () => {
+    const { s, pid } = staged(false);
+    const out = unitScreenHtml(s, 'p1', pid, ['landing_shuttle'], probe(s), lockText);
+    expect(out).toContain('bw-st lock');
+    expect(out).not.toContain('data-unit-troop=');
   });
 });
