@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale, tData } from '../../localization/runtime';
+import { setLocale, t, tData } from '../../localization/runtime';
 import { newGame, data, DAY, HOUR, order, researchTech } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
@@ -339,13 +339,24 @@ describe('дерево технологий — разметка', () => {
     expect(html).not.toContain(`data-go="${locked}"`);
   });
 
-  it('исследованный узел помечен галочкой, а не кнопкой', () => {
+  it('исследованный узел уходит из списка (решение владельца 2026-09-26), досье его помнит', () => {
     const st = newGame();
     const id = firstOf('space');
     st.players.p1!.technologies = { completed: [id], active: [], points: 0 } as never;
+    const list = techTreeHtml(st, 'p1', 'space', null);
+    expect(list).not.toContain(`data-tech="${id}"`);
+    expect(list).not.toContain('st-done');
+    // Досье, открытое по ссылке (например, из «Хранителя»), честно пишет «изучено».
     const html = techTreeHtml(st, 'p1', 'space', id);
-    expect(html).toContain('st-done');
     expect(html).not.toContain(`data-go="${id}"`);
+    expect(html).toContain('tt-mbtn wait');
+  });
+
+  it('ветка, изученная целиком, говорит об этом строкой, а не пустым списком', () => {
+    const st = newGame();
+    const all = Object.keys(TECHS).filter((id) => (TECHS[id]!.branch ?? 'space') === 'space');
+    st.players.p1!.technologies = { completed: all, active: [], points: 0 } as never;
+    expect(techTreeHtml(st, 'p1', 'space', null)).toContain(t('tech.branch.done'));
   });
 
   it('кнопка исследования гаснет, когда не хватает ресурсов', () => {

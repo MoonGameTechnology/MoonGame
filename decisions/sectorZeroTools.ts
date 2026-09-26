@@ -40,7 +40,17 @@ export const SECTOR_ZERO_ABSENT_HUD = {
   crest: 'tbcrest',
   score: 'tbscore',
   day: 'daycard',
+  // «Производство» — конструктор кораблей (решение владельца 2026-09-26: «кнопка
+  // производство тоже не нужна»): корпуса забега собираются в Мастерской до вылета, а
+  // строятся с вкладки «Корабли» мира. На ПК это вкладка над картой.
+  production: 'holo-constructor',
 } as const;
+
+/** Дубли полей шапки в других местах интерфейса: уходят вместе со своим полем. Кнопка
+ *  конструктора в рельсе — та же «Производство» на телефоне и узком экране. */
+export const SECTOR_ZERO_ABSENT_TWINS: Partial<Record<keyof typeof SECTOR_ZERO_ABSENT_HUD, string>> = {
+  production: 'rail-constructor',
+};
 
 /**
  * Шпионажа в забеге Sector Zero тоже НЕТ (заказ владельца 2026-09-25). Кража окна разведки
