@@ -61,6 +61,7 @@ import {
   tickRearm,
   trimCargo,
   trimHangar,
+  hullShare,
   type SortieState,
 } from '../state/shuttle';
 import {
@@ -473,13 +474,17 @@ function strikePower(
   data: GameData,
   target: ShuttleStrike['target']['kind'],
 ): number {
+  // Подбитые машины бьют слабее — в доле живого корпуса (SHU-5.7).
+  const share = hullShare(strike.units, strike.damage, data);
   if (target === 'fleet') {
-    return cappedUnitStat(strike.units, data, 'attack');
+    return cappedUnitStat(strike.units, data, 'attack') * share;
   }
-  return cappedUnitStat(strike.units, data, (stats) => {
-    const siege = stats.siegeDamage ?? 0;
-    return siege > 0 ? siege : (stats.attack ?? 0);
-  });
+  return (
+    cappedUnitStat(strike.units, data, (stats) => {
+      const siege = stats.siegeDamage ?? 0;
+      return siege > 0 ? siege : (stats.attack ?? 0);
+    }) * share
+  );
 }
 
 /** Носитель, пустивший этот вылет, для `DamageHookArgs.attackerFleet` (CORE-DMG-3).
@@ -553,8 +558,23 @@ function trimCargoToSurvivors(strike: ShuttleStrike): void {
  *    вместе с машинами. Это не молчаливая потеря: о ней говорит `shuttle.landed`
  *    с `landed: 0`.
  */
+/**
+ * Поставить высаженных бойцов в список стеков (SHU-5.7). Побитый челнок отдаёт бойцу свою
+ * долю живого корпуса: 50% корпуса челнока — 50% здоровья бойца (резолюция владельца
+ * 2026-09-26). Раненый стек встаёт ОТДЕЛЬНО — с целыми он не сливается, как и любой
+ * раненый стек (`findHealthyStack`); целые сливаются как прежде.
+ */
+function landStacks(into: UnitStack[], cargo: readonly UnitStack[], share: number, data: GameData): void {
+  for (const st of cargo) {
+    const per = data.units[st.unit]?.stats.hp ?? 0;
+    if (share >= 1 || per <= 0) addUnits(into, st.unit, st.count);
+    else into.push({ unit: st.unit, count: st.count, hp: st.count * per * share });
+  }
+}
+
 function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): void {
   const cargo = (strike.cargo ?? []).filter((st) => st.count > 0);
+  const share = hullShare(strike.units, strike.damage, h.ctx.data);
   const owner = strike.owner;
   const friendly =
     planet.owner === owner ||
@@ -571,13 +591,13 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
   if (cargo.length === 0) {
     mode = 'lost';
   } else if (friendly) {
-    for (const st of cargo) addUnits(planet.garrison, st.unit, st.count);
+    landStacks(planet.garrison, cargo, share, h.ctx.data);
     mode = 'reinforce';
   } else if (own) {
     // Свой плацдарм уже на земле — подкрепление в идущий бой. Ссылка стороны адресует
     // ПАРУ (мир, владелец), а не снимок стеков, поэтому подошедшие войска считаются со
     // следующего раунда.
-    for (const st of cargo) addUnits(own.units, st.unit, st.count);
+    landStacks(own.units, cargo, share, h.ctx.data);
     mode = 'beachhead';
   } else if (!isCapturable(h.ctx.data, planet)) {
     landed = []; // пустое пространство не занимают пехотой
@@ -591,7 +611,8 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
     // спорный, — тогда ниже заводится свой берег, а не захват без боя.
     const previous = planet.owner;
     planet.owner = owner;
-    planet.garrison = cargo.map((st) => ({ ...st }));
+    planet.garrison = [];
+    landStacks(planet.garrison, cargo, share, h.ctx.data);
     h.emit('planet.captured', {
       planetId: planet.id,
       owner,
@@ -605,7 +626,9 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
     // стоял отказ «за мир дерётся другой — садиться некуда»: плацдарм был один, и второй
     // десант просто терял груз. Push в конец — порядок списка это порядок ВЫСАДКИ, по
     // которому §0.0 №4 решает, чей мир.
-    (planet.beachheads ??= []).push({ owner, units: cargo.map((st) => ({ ...st })) });
+    const units: UnitStack[] = [];
+    landStacks(units, cargo, share, h.ctx.data);
+    (planet.beachheads ??= []).push({ owner, units });
     // Бой начинает МОДУЛЬ БОЯ, услышав событие: модули не зовут друг друга напрямую
     // (инвариант «только через шину»), и `startBattle` живёт там же, где все остальные
     // правила боя. Нет модуля боя — плацдарм просто стоит, а не падает.
@@ -674,9 +697,10 @@ function slowestSpeed(units: readonly UnitStack[], ctx: Context): number {
   return Number.isFinite(slowest) ? slowest * travelSpeedFactorOf(ctx) : 0;
 }
 
-/** Скорость вылета — самая медленная машина в нём. */
+/** Скорость вылета — самая медленная машина в нём, урезанная в доле живого корпуса
+ *  (SHU-5.7): подбитое соединение летит медленнее. */
 function strikeSpeed(strike: ShuttleStrike, ctx: Context): number {
-  return slowestSpeed(strike.units, ctx);
+  return slowestSpeed(strike.units, ctx) * hullShare(strike.units, strike.damage, ctx.data);
 }
 
 /**
@@ -905,7 +929,7 @@ export const shuttleModule: GameModule = {
       if (range <= 0) return h.reject('E_NO_RANGE');
       if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
 
-      const speed = slowestSpeed(squad.units, h.ctx);
+      const speed = slowestSpeed(squad.units, h.ctx) * hullShare(squad.units, squad.damage, h.ctx.data);
       if (speed <= 0) return h.reject('E_NO_SPEED');
       const flightMs = Math.max(1, Math.round((distance(from, to) / speed) * hourMs(h)));
 

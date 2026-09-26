@@ -244,6 +244,18 @@ export function hangarUsed(host: { hangar?: Squadron[] }): number {
   return (host.hangar ?? []).reduce((n, sq) => n + squadronSize(sq), 0);
 }
 
+/**
+ * Доля живого корпуса эскадры или вылета (SHU-5.7): `1 − damage / Σ корпусов`. Подбитые
+ * машины летят медленнее и бьют слабее ровно в этой доле, а побитый десантный челнок
+ * высаживает бойца с тем же процентом здоровья (резолюция владельца 2026-09-26). Урон —
+ * общий пул соединения, поэтому и доля одна на всё соединение. Нет урона — 1.
+ */
+export function hullShare(units: readonly UnitStack[], damage: number | undefined, data: GameData): number {
+  if (!damage || damage <= 0) return 1;
+  const full = sumUnitStat(units, data, 'hp');
+  return full > 0 ? Math.max(0, 1 - damage / full) : 1;
+}
+
 /** Оставить в трюме не больше `n` бойцов, срезая с ХВОСТА (SHU-5.2): десантный челнок
  *  несёт ровно одного, поэтому погибший борт уносит своего бойца. Порядок фиксирован,
  *  как у самих машин (`trimHangar`), — «кого потеряли» не зависит от обхода объекта. */

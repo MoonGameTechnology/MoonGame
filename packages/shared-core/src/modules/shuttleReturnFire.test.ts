@@ -129,7 +129,8 @@ const strike = (target: { targetFleetId: string } | { targetPlanetId: string }):
   issuedAt: 0,
 });
 
-/** Прогон удара: приказ на вылет, затем два часа — долёт (час) и возврат. */
+/** Прогон удара: приказ на вылет, затем три часа — долёт (час) и возврат, с запасом на
+ *  подбитых: они летят медленнее в доле живого корпуса (SHU-5.7). */
 function run(
   state: GameState,
   action: Action,
@@ -138,7 +139,7 @@ function run(
   const kernel = createKernel([constructionModule, shuttleModule, ...modules]);
   const applied = kernel.applyAction(state, action, at(state));
   if (!applied.ok) throw new Error(applied.code);
-  const advanced = kernel.advanceTo(applied.state, { now: applied.state.time + 2 * HOUR, data });
+  const advanced = kernel.advanceTo(applied.state, { now: applied.state.time + 3 * HOUR, data });
   if (!advanced.ok) throw new Error(advanced.code);
   return { state: advanced.state, events: [...applied.events, ...advanced.events] };
 }

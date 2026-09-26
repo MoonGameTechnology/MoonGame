@@ -131,8 +131,8 @@ function advance(state: GameState, hours: number): GameState {
   if (!r.ok) throw new Error(r.code);
   return r.state;
 }
-/** Вылет туда и обратно: час до цели, час домой. */
-const sortie = (s: GameState): GameState => advance(apply(s, strike()), 2);
+/** Вылет туда и обратно: час до цели и два домой — полкорпуса летит вполскорости (SHU-5.7). */
+const sortie = (s: GameState): GameState => advance(apply(s, strike()), 3);
 const squad = (s: GameState, id = 'sq:1') => (s.planets.A?.hangar ?? []).find((q) => q.id === id);
 
 describe('SHU-5.3 — урон шаттлов между вылетами', () => {
