@@ -1651,15 +1651,22 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-nowdot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--amber);animation:ttpulse 1.6s ease-in-out infinite;}
 @keyframes ttpulse{0%,100%{opacity:.35;}50%{opacity:1;}}
 .tt-nowt{flex:none;font:700 11px ui-monospace,monospace;color:var(--amber);font-variant-numeric:tabular-nums;}
-.tt-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;}
+/* Узлы — ПЛИТКАМИ (решение владельца 2026-09-26): сетка вместо столбца строк, ярус —
+   заголовком во всю ширину сетки. Эффект, цена и срок видны на плитке, как и в строке. */
+.tt-list{padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:7px;align-items:stretch;}
 /* Ярус вместо рельсы дней: day-гейт не пропал, он стал ПРИЧИНОЙ замка в самой строке */
-.tt-tierh{margin:9px 0 1px;font:800 9px ui-monospace,monospace;letter-spacing:1.4px;color:var(--cyan-dim);}
+.tt-tierh{grid-column:1/-1;margin:9px 0 1px;font:800 9px ui-monospace,monospace;letter-spacing:1.4px;color:var(--cyan-dim);}
+.tt-list > .hint{grid-column:1/-1;}
 .tt-tierh:first-child{margin-top:2px;}
 .tt-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
   background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
 .tt-item:active{transform:scale(.995);}
-.tt-ih{display:flex;align-items:center;gap:8px;}
-.tt-ih b{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#eafffb;}
+.tt-item{display:flex;flex-direction:column;}
+/* На плитке имя — сверху, состояние или кнопка — под ним во всю ширину. */
+.tt-ih{display:flex;flex-direction:column;align-items:stretch;gap:6px;}
+.tt-ih b{flex:none;min-width:0;font-size:12.5px;font-weight:700;color:#eafffb;}
+.tt-ih .tt-st{max-width:none;text-align:left;}
+.tt-ifoot{margin-top:auto !important;padding-top:6px;}
 .tt-ifx{margin-top:4px;font-size:10px;line-height:1.45;color:var(--cyan-dim);}
 .tt-ifoot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--dim);}
 .tt-idur{flex:none;font-variant-numeric:tabular-nums;}

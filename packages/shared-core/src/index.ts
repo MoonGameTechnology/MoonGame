@@ -501,6 +501,7 @@ export {
   moduleAllowed,
   canEquip,
   validateLoadout,
+  withBonusSlots,
   loadoutCost,
   hullSlotTypes,
   type SlotCounts,

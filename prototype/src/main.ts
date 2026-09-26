@@ -728,6 +728,7 @@ import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 // ONB-2 — the guided first match (a data chain over this same engine).
 import { buildFirstMatchTour } from './firstMatchTour';
 import { buildTrainingTour } from './trainingTour';
+import { startFleetMerges } from '../../decisions/startFleets';
 import { trainingBaseline } from '../../decisions/trainingStages';
 // ONB-4 — searchable codex/help index (pure) over the existing article corpus.
 import {
@@ -11974,6 +11975,12 @@ function startPvEMatch(dev = false): void {
   // Seed the PvE section through the kernel before the first save. A page can
   // close before its first animation frame; that must not lose a fresh attempt.
   apply(advance(s, s.time + 1));
+  // Стартовые флоты главы — одним флотом вокруг корабля героя (решение владельца
+  // 2026-09-26, `decisions/startFleets.ts`). Сливает ядро, приказом: его правила в силе.
+  for (const m of startFleetMerges(s, ME)) {
+    const merged = order(s, mergeFleet(ME, m.from, m.into), s.time);
+    if (!merged.error) apply(merged);
+  }
   // У забега СВОЙ темп, а не дефолт песочницы: на ×10 полное прохождение занимало бы
   // около четырнадцати часов (PVR-2.2, решение владельца §0.3).
   applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);

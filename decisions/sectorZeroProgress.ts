@@ -39,6 +39,7 @@ import {
   type Hero,
   type MapObjective,
   type SlotCounts,
+  withBonusSlots,
 } from '../packages/shared-core/src/index';
 
 export interface SectorHero {
@@ -141,6 +142,10 @@ export interface SectorZeroProgress {
    *  поднимают. */
   blueprints: Record<string, number>;
   loadouts: Record<string, string[]>;
+  /** Звёзды КОРАБЛЕЙ (решение владельца 2026-09-26), `корпус → слоты по порядку звёзд`:
+   *  каждая звезда открыла один слот того типа, который выбрал игрок. Звёзд — сколько
+   *  записей. Цены и потолок — `data.sectorZeroStars.hulls`. */
+  hullStars: Record<string, ShipSlot[]>;
   heroes: Record<string, SectorHero>;
   /** Жетоны героев (`heroTokens.ts`), `id → сколько`: у каждого героя свой счёт. Звезда
    *  героя стоит его жетоны, 10 жетонов приводят героя, которого приводят только жетоны. */
@@ -175,6 +180,8 @@ export interface ProfileShelf {
   blueprints?: Record<string, number>;
   heroes?: Record<string, SectorHero>;
   heroTokens?: Record<string, number>;
+  /** Звёзды кораблей, чьих корпусов нет в каталоге этой версии: за них заплачено. */
+  hullStars?: Record<string, ShipSlot[]>;
   /** Навыки ЗНАКОМЫХ героев, которые каталог не принял: узел другой версии или его
    *  предпосылка. `герой → id узлов`. */
   skills?: Record<string, string[]>;
@@ -320,6 +327,7 @@ export function freshSectorZeroProgress(data: GameData, seed = ''): SectorZeroPr
     moduleCopies: {},
     blueprints: {},
     loadouts: {},
+    hullStars: {},
     heroes: first ? { [first]: newSectorHero(first, data) } : {},
     heroTokens: {},
     selectedHero: first,
@@ -546,6 +554,43 @@ export function sectorModulesFor(hull: string, fitted: readonly string[], data: 
   );
 }
 
+/** Тип слота под модуль. */
+export type ShipSlot = keyof SlotCounts;
+export const SHIP_SLOTS: readonly ShipSlot[] = ['weapon', 'defense', 'utility'];
+
+/** Лишние слоты корпуса, открытые его звёздами. Нет звёзд — `undefined`. */
+export function sectorHullBonus(hull: string, progress: SectorZeroProgress): Partial<SlotCounts> | undefined {
+  const picked = progress.hullStars[hull];
+  if (!picked?.length) return undefined;
+  const bonus: Partial<SlotCounts> = {};
+  for (const slot of picked) bonus[slot] = (bonus[slot] ?? 0) + 1;
+  return bonus;
+}
+/** Слоты корпуса в Sector Zero: каталог плюс звёзды корабля. */
+export function sectorHullSlots(hull: string, progress: SectorZeroProgress, data: GameData): SlotCounts {
+  const base = data.units[hull]?.slots;
+  const bonus = sectorHullBonus(hull, progress);
+  return {
+    weapon: (base?.weapon ?? 0) + (bonus?.weapon ?? 0),
+    defense: (base?.defense ?? 0) + (bonus?.defense ?? 0),
+    utility: (base?.utility ?? 0) + (bonus?.utility ?? 0),
+  };
+}
+const slotTotal = (slots: SlotCounts): number => slots.weapon + slots.defense + slots.utility;
+/**
+ * Цена СЛЕДУЮЩЕЙ звезды корабля в Варрантах, или `null`, если звёзд больше нет: у корпуса
+ * уже `maxSlots` слотов (решение владельца: «максимум 6» — слотов, а не звёзд) или лестница
+ * цен кончилась. Поэтому разведчику с одним слотом доступно пять звёзд, фрегату с
+ * четырьмя — две.
+ */
+export function hullStarCost(hull: string, progress: SectorZeroProgress, data: GameData): number | null {
+  const rule = data.sectorZeroStars.hulls;
+  if (!data.units[hull]) return null;
+  const stars = progress.hullStars[hull]?.length ?? 0;
+  if (slotTotal(sectorHullSlots(hull, progress, data)) >= rule.maxSlots) return null;
+  return rule.warrants[stars] ?? null;
+}
+
 export type SectorProgressAction =
   | { kind: 'unlock-module'; id: string }
   | { kind: 'refresh-shop' }
@@ -561,6 +606,8 @@ export type SectorProgressAction =
   | { kind: 'raise-rarity'; id: string }
   | { kind: 'buy'; id: string; pay: 'warrants' | 'sovereigns' | 'ad' }
   | { kind: 'fit'; hull: string; id: string }
+  /** Звезда корабля: открыть корпусу ещё один слот выбранного типа за Варранты. */
+  | { kind: 'hull-star'; hull: string; slot: ShipSlot }
   /** Модуль на корабль героя `hero` — или снять, если уже стоит (PVR-6.24). */
   | { kind: 'fit-hero'; hero: string; id: string }
   | { kind: 'unlock-hero'; id: string }
@@ -729,10 +776,19 @@ export function changeSectorZeroProgress(
       if (equipped.includes(action.id))
         next.loadouts[action.hull] = equipped.filter((id) => id !== action.id);
       else {
-        if (!canEquip(action.hull, data.units[action.hull]!, equipped, action.id, data).ok)
-          return null;
+        const hull = withBonusSlots(data.units[action.hull]!, sectorHullBonus(action.hull, next));
+        if (!canEquip(action.hull, hull, equipped, action.id, data).ok) return null;
         next.loadouts[action.hull] = [...equipped, action.id];
       }
+      break;
+    }
+    case 'hull-star': {
+      // Звезда без броска (решение владельца 2026-09-26): заплатил — слот твой.
+      if (!sectorHullIds(data).includes(action.hull) || !SHIP_SLOTS.includes(action.slot)) return null;
+      const cost = hullStarCost(action.hull, next, data);
+      if (cost === null || cost > next.warrants) return null;
+      next.warrants -= cost;
+      next.hullStars[action.hull] = [...(next.hullStars[action.hull] ?? []), action.slot];
       break;
     }
     case 'fit-hero': {
@@ -991,11 +1047,28 @@ export function parseSectorZeroProgress(
       else shelve('blueprints', r, value);
     }
     const hulls = sectorHullIds(data);
+    // Звёзды кораблей: чужой корпус — на полку (за звёзды заплачено), лишняя звезда сверх
+    // потолка слотов и мусор вместо типа слота не доезжают.
+    for (const [hull, raw] of merged('hullStars')) {
+      // Не `strings()`: тот убирает повторы, а две звезды «оружие» подряд — законный набор.
+      const picked = (Array.isArray(raw) ? raw : []).filter(
+        (x): x is ShipSlot => typeof x === 'string' && SHIP_SLOTS.includes(x as ShipSlot),
+      );
+      if (!hulls.includes(hull)) {
+        if (picked.length > 0) shelve('hullStars', hull, picked);
+        continue;
+      }
+      for (const slot of picked) {
+        if (hullStarCost(hull, fresh, data) === null) break;
+        fresh.hullStars[hull] = [...(fresh.hullStars[hull] ?? []), slot];
+      }
+    }
     for (const [hull, ids] of Object.entries(p.loadouts ?? {})) {
       if (!hulls.includes(hull)) continue;
+      const def = withBonusSlots(data.units[hull]!, sectorHullBonus(hull, fresh));
       const equipped: string[] = [];
       for (const id of strings(ids))
-        if (fresh.modules.includes(id) && canEquip(hull, data.units[hull]!, equipped, id, data).ok)
+        if (fresh.modules.includes(id) && canEquip(hull, def, equipped, id, data).ok)
           equipped.push(id);
       fresh.loadouts[hull] = equipped;
     }
@@ -1222,6 +1295,14 @@ export function prepareSectorZeroRun(
     ...(Object.keys(stars).length > 0 ? { stars } : {}),
     ...(Object.keys(rarity).length > 0 ? { rarity } : {}),
   };
+  // Слоты за звёзды кораблей едут тем же снимком: верфь забега проверяет набор модулей
+  // против них, иначе снаряжение из подготовки на корабль, построенный в забеге, не встало бы.
+  const slots: Record<string, Partial<SlotCounts>> = {};
+  for (const hull of Object.keys(progress.hullStars)) {
+    const bonus = sectorHullBonus(hull, progress);
+    if (bonus) slots[hull] = bonus;
+  }
+  if (Object.keys(slots).length > 0) player.arsenal.slots = slots;
   for (const fleet of Object.values(next.fleets))
     if (fleet.owner === 'p1') {
       for (const stack of fleet.units) {

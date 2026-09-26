@@ -244,6 +244,28 @@
 .sz-hull .ship-art--portrait { margin: 0; }
 .sz-hull h2 { margin: 0 0 4px; color: #e1f4f4; }
 .sz-hull h2::first-letter { text-transform: uppercase; }
+/* Полки корпусов по две в ряд (решение владельца 2026-09-26): корабли | корабли героев,
+   поддержка | шаттлы. На узком экране — столбцом. */
+.sz-shelves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; margin-bottom: 8px; }
+.sz-shelf { min-width: 0; }
+.sz-shelf .sz-picker { margin-bottom: 12px; }
+/* Слоты — плитками: по плитке на слот; слот за звезду корабля помечен ★ в углу. */
+.sz-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 18px 0; align-items: start; }
+.sz-slot { position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; min-height: 92px;
+  padding: 10px 8px; border: 1px dashed #2f5560; background: #081822; text-align: center; }
+.sz-slot i { font-style: normal; font-size: 20px; line-height: 1; opacity: .55; }
+.sz-slot b { color: #9dbdc4; font-size: 12px; font-weight: 500; line-height: 1.3; }
+.sz-slot span { color: #6f9199; font: 10px/1.4 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+.sz-slot.full { border-style: solid; border-color: #4f8b8f; background: #0b2330; }
+.sz-slot.full i { opacity: 1; }
+.sz-slot.full b { color: #e1f4f4; }
+.sz-slot.star::after { content: '★'; position: absolute; top: 4px; right: 6px; color: #f0c86b; font-size: 11px; }
+.sz-slot-add { border-color: #6b5a2c; background: #14140c; }
+.sz-slot-add b { color: #f0c86b; }
+.sz-slot-add.done { opacity: .7; }
+.sz-slot-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; width: 100%; margin-top: 2px; }
+#sz-workshop .sz-slot-pick button { padding: 4px 0; font-size: 15px; line-height: 1.2; }
+.sz-hull-stars { color: #f0c86b; font-size: .7em; letter-spacing: .1em; vertical-align: middle; }
 .sz-bays { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 18px 0; }
 .sz-bay { border-left: 2px solid #5d9094; padding: 12px 16px; background: #0a1c26; display: grid; gap: 8px; }
 .sz-bay b { color: #aad6d6; font-size: 12px; font-weight: 500; }
@@ -290,6 +312,19 @@
 .sz-upgrade .sz-delta { margin: 0 0 10px; }
 .sz-upgrade button { margin-top: 4px; }
 .sz-odds p { margin-bottom: 6px !important; }
+/* Плитки модулей компактнее (решение владельца 2026-09-26): те же сведения — слот,
+   редкость, звёзды, эффект, сравнение, цена улучшения, — но плотнее и уже. */
+.sz-mods { grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: 8px; }
+.sz-mods .sz-card { padding: 11px 12px; }
+.sz-mods .sz-card h3 { margin: 4px 0 4px; font-size: 14px; }
+.sz-mods .sz-card p { margin: 0 0 8px; line-height: 1.45; }
+.sz-mods .sz-stars { font-size: 11px; margin-bottom: 4px; }
+.sz-mods .sz-delta { margin: 0 0 8px; padding: 6px 8px; gap: 3px; }
+.sz-mods .sz-delta li { font-size: 11px; gap: 6px; }
+.sz-mods .sz-upgrade { margin-top: 8px; padding-top: 8px; }
+.sz-mods .sz-card .sz-upgrade p.sz-upgrade-title { margin-bottom: 4px; font-size: 11px; }
+.sz-mods .sz-odds { margin-bottom: 8px; }
+#sz-workshop .sz-mods .sz-card button { padding: 6px 8px; font-size: 12px; }
 .sz-bar { display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--rar, #79dfdf) var(--p), #17313b var(--p)); }
 /* Академия (PVR-6.6): ростер карточками с портретом, деления подготовки, навыки ступенями.
    Карточка вертикальная: лицо сверху, имя под ним во всю ширину карточки. Рядом с гербом
@@ -380,6 +415,12 @@ body.sector-zero-home #top, body.sector-zero-home #speedbar, body.sector-zero-ho
   .sz-tabs { gap: 6px; }
   #sz-workshop .sz-tabs button { font-size: 11px; padding: 8px 2px; }
   .sz-hull { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sz-shelves { grid-template-columns: minmax(0, 1fr); }
+  .sz-slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sz-mods { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Две плитки в ряд — строка сравнения переносится, а не вылезает за край. */
+  .sz-mods .sz-delta li { display: flex; flex-wrap: wrap; gap: 0 6px; }
+  .sz-mods .sz-delta li span { flex-basis: 100%; }
   /* Телефон: карта — блоком под выбором главы, во всю ширину. */
   .sz-map-panel { grid-column: 1; grid-row: auto; width: 100%; max-width: 440px; margin: 18px auto 0; }
   /* Корпуса — лентой с прокруткой: семь плиток в три ряда съедали весь экран. */

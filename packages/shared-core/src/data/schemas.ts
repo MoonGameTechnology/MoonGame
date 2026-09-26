@@ -996,6 +996,16 @@ export const SectorZeroStarsSchema = z.object({
       legendary: z.number().int().nonnegative().optional(),
     })
     .default({}),
+  /** Звёзды КОРАБЛЕЙ (решение владельца 2026-09-26): каждая звезда корпуса открывает ещё
+   *  один слот под модуль — оружие, защиту или утилиту на выбор игрока. Покупка без броска,
+   *  Варрантами; `warrants[n]` — цена звезды n+1. Звёзды кончаются, когда у корпуса
+   *  `maxSlots` слотов, или когда кончилась лестница цен. Числа — **v0**. */
+  hulls: z
+    .object({
+      maxSlots: z.number().int().nonnegative().default(0),
+      warrants: z.array(z.number().int().positive()).default([]),
+    })
+    .default({ maxSlots: 0, warrants: [] }),
 });
 
 /** Цена товара магазина Sector Zero по способам оплаты (§0.4 `sector-zero-economy-roadmap`).

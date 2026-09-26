@@ -239,6 +239,10 @@ export interface PlayerArsenal {
    *  {@link PlayerArsenal.stars}: иначе стартовый флот и построенное за забег несли бы
    *  один модуль с разными числами. Отсутствует = базовая редкость у всех. */
   rarity?: Record<string, string>;
+  /** Лишние слоты корпусов этого места, `корпус → { weapon, defense, utility }` —
+   *  снимок звёзд кораблей Sector Zero (решение владельца 2026-09-26). Верфь проверяет
+   *  набор модулей против слотов корпуса С ЭТОЙ прибавкой. Отсутствует = слоты каталога. */
+  slots?: Record<string, { weapon?: number; defense?: number; utility?: number }>;
 }
 
 /** A live Steward delegation on a player (see `Player.steward`). */
