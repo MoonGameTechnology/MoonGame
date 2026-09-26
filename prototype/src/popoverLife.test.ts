@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { barStays, popoverLife, type OpenPopovers, type PopoverBases } from './popoverLife';
 
@@ -71,5 +72,15 @@ describe('поповеры — пустое выделение', () => {
       cast: false,
       troops: true,
     });
+  });
+});
+
+describe('✕ окна выбора на ПК (плейтест 2026-09-26)', () => {
+  const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  it('закрывает окно целиком — и набор группы, который держит ряд на нуле выбранных', () => {
+    // barStays(0, picking=true) держит ряд живым: если ✕ не снимает набор, окно остаётся
+    // пустым «0 флотов» и не закрывается.
+    expect(barStays(0, true)).toBe(true);
+    expect(main).toMatch(/dismiss: \(\) => \{\s*pickMode = false;[\s\S]*?clearSelection\(\);\s*renderCmdBar\(\);/);
   });
 });

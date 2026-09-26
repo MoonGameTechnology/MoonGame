@@ -1733,7 +1733,17 @@ const holographic = initHolographicUi({
   top: topEl,
   side,
   exit: () => $('topback').click(),
-  dismiss: () => clearSelection(),
+  // ✕ окна выбора закрывает его ЦЕЛИКОМ: набор группы и прицелы тоже. Иначе режим набора
+  // держал пустое окно «0 флотов», и крестик его не закрывал (плейтест 2026-09-26).
+  dismiss: () => {
+    pickMode = false;
+    aiming = false;
+    assaultAim = false;
+    engageAim = false;
+    cmdMore = false;
+    clearSelection();
+    renderCmdBar();
+  },
   details: () => {
     side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click();
   },
@@ -8768,7 +8778,12 @@ function renderCmdBar() {
         })
       : '');
   if (holographic.active()) {
-    const title = lone ? fleetCallsign(lone.id) : t('cmd.selection.many', { n: ids.length });
+    // Пустой набор группы — это режим, а не «0 флотов».
+    const title = lone
+      ? fleetCallsign(lone.id)
+      : ids.length === 0 && pickMode
+        ? t('cmd.multiselect')
+        : t('cmd.selection.many', { n: ids.length });
     const sub = lone ? [fleetNode(lone), t('side.fleet.sub.pc', { s: sumUnits(lone.units), tr: sumUnits(lone.landing ?? []) })].filter(Boolean).join(' · ') : '';
     html = commandWindowHtml(html, title, sub, !!lone && !aiming && !merging && !pickMode);
   }
