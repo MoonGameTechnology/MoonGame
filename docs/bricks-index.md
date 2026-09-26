@@ -950,7 +950,7 @@
 | M4 | ✅ | core | `docs/metrics-roadmap.md` | Балансная аналитика + self-play [tools] — реализовано |
 | M5 | 🔒 |  | `docs/metrics-roadmap.md` | Ops-дашборды и алерты [server] |
 | M6 | ⏳ |  | `docs/metrics-roadmap.md` | Продуктовая аналитика (категория H) [server][tools] |
-| MS-0.1 | 🔒 | data core | `docs/missiles-roadmap.md` | Тип missile + пусковой модуль |
+| MS-0.1 | ⏳ | data core | `docs/missiles-roadmap.md` | Тип missile + пусковой модуль |
 | MS-1.1 | 🔒 | core | `docs/missiles-roadmap.md` | launchMissile(targetNode) |
 | MS-1.2 | 🔒 | core | `docs/missiles-roadmap.md` | Полёт (неуправляемый) + детект |
 | MS-2.1 | 🔒 | core | `docs/missiles-roadmap.md` | Перехват ближним ПВО (pointDefense) |
@@ -1213,17 +1213,17 @@
 | SH-2.1 | ✅ | core data | `docs/shields-roadmap.md` | Ремонт в порту |
 | SH-2.2 | 🔒 | core | `docs/shields-roadmap.md` | Ремонтные дроны — единственный in-combat ремонт |
 | SH-2.3 | 🔒 | core data | `docs/shields-roadmap.md` | Ремонтный модуль |
-| SM-0.1 | 🔒 | data | `docs/ship-modules-roadmap.md` | Схема ModuleDef + каталог data/modules.json |
-| SM-0.2 | 🔒 | data core | `docs/ship-modules-roadmap.md` | Стат moduleSlots + поле UnitStack.modules |
-| SM-0.3 | 🔒 | core | `docs/ship-modules-roadmap.md` | Лоадаут-aware идентичность стека |
-| SM-0.4 | 🔒 | core | `docs/ship-modules-roadmap.md` | Хелпер effectiveStats(def, stack, data) |
-| SM-0.5 | 🔒 | core | `docs/ship-modules-roadmap.md` | Маршрутизация cargoCapacity через эффективный лукап |
-| SM-0.6 | 🔒 | core | `docs/ship-modules-roadmap.md` | Действие loadout.equip / loadout.unequip |
-| SM-0.7 | 🔒 | cli | `docs/ship-modules-roadmap.md` | CLI лоадаута |
+| SM-0.1 | ✅ | data | `docs/ship-modules-roadmap.md` | Схема ModuleDef + каталог data/modules.json |
+| SM-0.2 | ✅ | data core | `docs/ship-modules-roadmap.md` | Стат moduleSlots + поле UnitStack.modules |
+| SM-0.3 | ✅ | core | `docs/ship-modules-roadmap.md` | Лоадаут-aware идентичность стека |
+| SM-0.4 | ✅ | core | `docs/ship-modules-roadmap.md` | Хелпер effectiveStats(def, stack, data) |
+| SM-0.5 | ✅ | core | `docs/ship-modules-roadmap.md` | Маршрутизация cargoCapacity через эффективный лукап |
+| SM-0.6 | 🗑 | core | `docs/ship-modules-roadmap.md` | Действие loadout.equip / loadout.unequip |
+| SM-0.7 | 🗑 | cli | `docs/ship-modules-roadmap.md` | CLI лоадаута |
 | SM-0.8 | ✅ | proto | `docs/ship-modules-roadmap.md` | Карточка корабля в матче: отсеки и надетые модули |
-| SM-1.1 | 🔒 | data | `docs/ship-modules-roadmap.md` | Модуль +N cargoCapacity (плоский, тиры) |
+| SM-1.1 | 🔶 | data | `docs/ship-modules-roadmap.md` | Модуль +N cargoCapacity (плоский, тиры) |
 | SM-1.2 | 🔒 | data srv | `docs/ship-modules-roadmap.md` | Фейрнес расширителя (F2P + soulbound) |
-| SM-2.1 | 🔒 | data | `docs/ship-modules-roadmap.md` | Семейство «дройды» (новый контент) |
+| SM-2.1 | ⏳ | data | `docs/ship-modules-roadmap.md` | Семейство «дройды» (новый контент) |
 | SM-2.2 | 🔒 | data | `docs/ship-modules-roadmap.md` | Трейт transport + модуль-фабрика |
 | SM-2.3 | 🔒 | core | `docs/ship-modules-roadmap.md` | fleet.assembleDroids — fleet-scoped производство |
 | SM-2.4 | 🔒 | core | `docs/ship-modules-roadmap.md` | Завершение + бой-фриз + ОГРАНИЧЕННЫЙ re-defer |
@@ -1264,15 +1264,15 @@
 | ST-2.5 | ⏳ | srv | `docs/steward-roadmap.md` | Мета-гейт тиров (free / paid) |
 | TT-0.1 | ✅ | data core | `docs/tech-tree-roadmap.md` | Ветки branch |
 | TT-0.2 | ✅ | data core | `docs/tech-tree-roadmap.md` | День-гейт dayGate |
-| TT-0.3 | 🔒 | data core | `docs/tech-tree-roadmap.md` | Условия conditions[] |
-| TT-1.1 | 🔒 | core | `docs/tech-tree-roadmap.md` | Правило доступности |
-| TT-1.2 | 🔒 | core | `docs/tech-tree-roadmap.md` | Исследование → завершение (reuse) |
-| TT-1.3 | 🔒 | core | `docs/tech-tree-roadmap.md` | Слоты исследований (РЕШЕНО: 2 → до 3) |
+| TT-0.3 | ✅ | data core | `docs/tech-tree-roadmap.md` | Условия conditions[] |
+| TT-1.1 | ✅ | core | `docs/tech-tree-roadmap.md` | Правило доступности |
+| TT-1.2 | ✅ | core | `docs/tech-tree-roadmap.md` | Исследование → завершение (reuse) |
+| TT-1.3 | ✅ | core | `docs/tech-tree-roadmap.md` | Слоты исследований (РЕШЕНО: 2 → до 3) |
 | TT-2.1 | 🔒 | srv core | `docs/tech-tree-roadmap.md` | Анлок узлов уровнем аккаунта |
 | TT-3.1 | ✅ | cli | `docs/tech-tree-roadmap.md` | Вкладки веток + состояния узлов |
-| TT-4.1 | ⏳ | data core | `docs/tech-tree-roadmap.md` | Слот учёного + выбор на старте |
+| TT-4.1 | 🔶 | data core | `docs/tech-tree-roadmap.md` | Слот учёного + выбор на старте |
 | TT-4.2 | 🔒 | data core | `docs/tech-tree-roadmap.md` | Капстоун: супер-юнит / особое здание (лейт-гейм) |
-| TT-4.3 | 🔒 | data core | `docs/tech-tree-roadmap.md` | Учёный «+слот» |
+| TT-4.3 | ✅ | data core | `docs/tech-tree-roadmap.md` | Учёный «+слот» |
 | VET-1 | ✅ | core | `docs/unit-medals-roadmap.md` | Вклад стека в залп перестаёт выбрасываться |
 | VET-2 | ✅ | core | `docs/unit-medals-roadmap.md` | Счётчики ветерана на стеке |
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md` | Грейды и пороги |
