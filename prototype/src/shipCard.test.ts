@@ -44,6 +44,14 @@ describe('карточка корабля — разметка (заказ вл�
     expect(html).toContain(t('shipcard.loadout', { n: 0, m: 3 }));
   });
 
+  it('универсальный отсек подписан своим типом — модуль любого типа стоит в нём', () => {
+    const html = card({ unit: 'heavy_cruiser', count: 1, modules: ['shield_booster'] });
+    expect(html.match(/class="cn-bay empty"/g)?.length).toBe(3);
+    expect(html).toContain(t('yard.slot.universal'));
+    expect(html).toContain(t('shipcard.loadout', { n: 1, m: 4 }));
+    expect(html).not.toContain('sc-extra');
+  });
+
   it('модуль сверх ёмкости помечен', () => {
     const html = card({ unit: 'cruiser', count: 1, modules: ['shield_booster', 'ablative_plating'] });
     expect(html).toContain('sc-extra');

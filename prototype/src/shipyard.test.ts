@@ -310,6 +310,19 @@ describe('верфь — панель конструктора', () => {
     expect((html.match(/class="cn-bay/g) ?? []).length).toBe(4);
   });
 
+  // Решение владельца 2026-09-26: «усиленный крейсер, 4 слота под модули любые».
+  // Отсеки универсальные — подпись это говорит, и модули разных типов встают рядом.
+  it('усиленный крейсер есть в списке верфи: четыре универсальных отсека под любые модули', () => {
+    expect(YARD_HULLS).toContain('heavy_cruiser');
+    const mods = ['targeting_array', 'shield_booster', 'ablative_plating'];
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'heavy_cruiser', modules: mods }), YARD_HULLS);
+    expect(d.modules).toEqual(mods);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    expect((html.match(/class="cn-bay/g) ?? []).length).toBe(4);
+    expect((html.match(new RegExp(t('yard.slot.universal'), 'g')) ?? []).length).toBeGreaterThanOrEqual(4);
+    for (const id of mods) expect(html).toContain(`data-cnun="${id}"`);
+  });
+
   it('пустая казна гасит кнопку заказа, а не позволяет отправить отказ', () => {
     const broke = rich();
     broke.players.p1!.resources = { metal: 0, credits: 0, energy: 0, food: 0, microelectronics: 0 };

@@ -38,6 +38,7 @@ import {
   type GameState,
   type Hero,
   type MapObjective,
+  type ShipSlots,
   type SlotCounts,
   withBonusSlots,
 } from '../packages/shared-core/src/index';
@@ -568,17 +569,21 @@ export function sectorHullBonus(hull: string, progress: SectorZeroProgress): Par
   for (const slot of picked) bonus[slot] = (bonus[slot] ?? 0) + 1;
   return bonus;
 }
-/** Слоты корпуса в Sector Zero: каталог плюс звёзды корабля. */
-export function sectorHullSlots(hull: string, progress: SectorZeroProgress, data: GameData): SlotCounts {
+/** Слоты корпуса в Sector Zero: каталог плюс звёзды корабля. Универсальные слоты корпуса
+ *  (усиленный крейсер) едут как есть — звёзды их не прибавляют. */
+export function sectorHullSlots(hull: string, progress: SectorZeroProgress, data: GameData): ShipSlots {
   const base = data.units[hull]?.slots;
   const bonus = sectorHullBonus(hull, progress);
   return {
     weapon: (base?.weapon ?? 0) + (bonus?.weapon ?? 0),
     defense: (base?.defense ?? 0) + (bonus?.defense ?? 0),
     utility: (base?.utility ?? 0) + (bonus?.utility ?? 0),
+    ...(base?.universal ? { universal: base.universal } : {}),
   };
 }
-const slotTotal = (slots: SlotCounts): number => slots.weapon + slots.defense + slots.utility;
+/** Все слоты корпуса, универсальные тоже: потолок «максимум 6» — про слоты вообще. */
+const slotTotal = (slots: ShipSlots): number =>
+  slots.weapon + slots.defense + slots.utility + (slots.universal ?? 0);
 /**
  * Цена СЛЕДУЮЩЕЙ звезды корабля в Варрантах, или `null`, если звёзд больше нет: у корпуса
  * уже `maxSlots` слотов (решение владельца: «максимум 6» — слотов, а не звёзд) или лестница

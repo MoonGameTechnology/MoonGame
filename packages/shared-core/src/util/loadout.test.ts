@@ -11,8 +11,9 @@ import {
   validateLoadout,
   loadoutCost,
   moduleAllowed,
-  hullSlotTypes,
+  loadoutBays,
   moduleRarityBonus,
+  withBonusSlots,
 } from './loadout';
 import { sumUnitStat, addUnits } from './stacks';
 import type { UnitStack } from '../state/gameState';
@@ -27,6 +28,10 @@ const data: GameData = parseGameData({
       slots: { weapon: 1, defense: 1, utility: 1 },
     },
     tank: { faction: 'x', domain: 'ground', stats: { attack: 20, defense: 16, speed: 0, hp: 50 } },
+    // Universal bays: `reinforced` takes any two modules; `hybrid` has a typed weapon
+    // bay and one universal bay on top.
+    reinforced: { faction: 'x', stats: { attack: 20, defense: 18, speed: 5, hp: 90 }, slots: { universal: 2 } },
+    hybrid: { faction: 'x', stats: { attack: 10, defense: 8, speed: 6, hp: 40 }, slots: { weapon: 1, universal: 1 } },
   },
   factions: {},
   buildings: {},
@@ -70,9 +75,9 @@ describe('slot usage, allow rules, and canEquip', () => {
     expect(slotUsage(['targeting', 'cargo'], data)).toEqual({ weapon: 1, defense: 0, utility: 1 });
   });
 
-  it('hullSlotTypes lists only categories the hull offers', () => {
-    expect(hullSlotTypes(cruiser)).toEqual(['weapon', 'defense', 'utility']);
-    expect(hullSlotTypes(tank)).toEqual([]); // no slots
+  it('loadoutBays lists one empty bay per slot the hull offers', () => {
+    expect(loadoutBays(cruiser.slots, [], data).map((b) => b.type)).toEqual(['weapon', 'defense', 'utility']);
+    expect(loadoutBays(tank.slots, [], data)).toEqual([]); // no slots
   });
 
   it('moduleAllowed honours the domain predicate', () => {
@@ -123,6 +128,83 @@ describe('validateLoadout — the whole-loadout gate the build action uses', () 
   });
 });
 
+// Универсальные отсеки (решение владельца 2026-09-26, усиленный крейсер: «4 слота под
+// модули любые»): модуль любого типа, но только когда отсеки его типа заняты. Гейт
+// верфи и раскладка экранов считают одинаково — иначе экран нарисовал бы одно, а ядро
+// приняло бы другое.
+describe('universal bays — any module type, typed bays first', () => {
+  const reinforced = data.units.reinforced!;
+  const hybrid = data.units.hybrid!;
+
+  it('a universal bay takes a module of any type; the budget is bounded', () => {
+    expect(validateLoadout('reinforced', reinforced, ['targeting', 'plating'], data)).toEqual({ ok: true });
+    expect(validateLoadout('reinforced', reinforced, ['plating', 'cargo'], data)).toEqual({ ok: true });
+    expect(validateLoadout('reinforced', reinforced, ['targeting', 'targeting2'], data)).toEqual({ ok: true });
+    expect(canEquip('reinforced', reinforced, ['targeting', 'plating'], 'cargo', data)).toEqual({
+      ok: false,
+      code: 'E_NO_SLOT',
+    });
+  });
+
+  it('a module fills its typed bay first, so the universal bay is left for an overflow', () => {
+    // targeting → the weapon bay whichever order it comes in; plating → the universal one.
+    expect(validateLoadout('hybrid', hybrid, ['targeting', 'plating'], data)).toEqual({ ok: true });
+    expect(validateLoadout('hybrid', hybrid, ['plating', 'targeting'], data)).toEqual({ ok: true });
+    expect(canEquip('hybrid', hybrid, ['plating', 'targeting'], 'targeting2', data)).toEqual({
+      ok: false,
+      code: 'E_NO_SLOT',
+    });
+    expect(validateLoadout('hybrid', hybrid, ['targeting', 'targeting2'], data)).toEqual({ ok: true });
+  });
+
+  it('the module’s own allow rule still decides in a universal bay', () => {
+    const ground = { ...tank, slots: { weapon: 0, defense: 0, utility: 0, universal: 2 } };
+    expect(canEquip('tank', ground, [], 'cargo', data)).toEqual({ ok: false, code: 'E_NOT_ALLOWED' });
+  });
+
+  it('loadoutBays: typed bays, then universal ones holding the overflow', () => {
+    expect(loadoutBays(hybrid.slots, ['plating', 'targeting'], data)).toEqual([
+      { type: 'weapon', module: 'targeting' },
+      { type: 'universal', module: 'plating' },
+    ]);
+    expect(loadoutBays(reinforced.slots, ['plating'], data)).toEqual([
+      { type: 'universal', module: 'plating' },
+      { type: 'universal', module: null },
+    ]);
+  });
+
+  it('loadoutBays does not depend on the install order', () => {
+    const a = loadoutBays(reinforced.slots, ['plating', 'targeting'], data);
+    const b = loadoutBays(reinforced.slots, ['targeting', 'plating'], data);
+    expect(a).toEqual(b);
+    expect(a.map((bay) => bay.module)).toEqual(['targeting', 'plating']); // weapon, then defense
+  });
+
+  it('loadoutBays keeps a module over capacity as an extra bay, never drops it', () => {
+    expect(loadoutBays(hybrid.slots, ['targeting', 'targeting2', 'plating'], data)).toEqual([
+      { type: 'weapon', module: 'targeting' },
+      { type: 'universal', module: 'targeting2' },
+      { type: 'defense', module: 'plating', extra: true },
+    ]);
+    expect(loadoutBays(cruiser.slots, ['ghost'], data).every((bay) => bay.module === null)).toBe(true);
+  });
+
+  it('a ship star adds a typed slot and keeps the universal ones (withBonusSlots)', () => {
+    const starred = withBonusSlots(reinforced, { weapon: 1 });
+    expect(starred.slots).toEqual({ weapon: 1, defense: 0, utility: 0, universal: 2 });
+    // targeting → the star's weapon slot; targeting2 and plating → the two universal bays.
+    expect(validateLoadout('reinforced', starred, ['targeting', 'targeting2', 'plating'], data)).toEqual({ ok: true });
+  });
+
+  it('a hull without the field has no universal bays — old hulls answer as before', () => {
+    expect(cruiser.slots.universal).toBeUndefined();
+    expect(canEquip('cruiser', cruiser, ['targeting'], 'targeting2', data)).toEqual({
+      ok: false,
+      code: 'E_NO_SLOT',
+    });
+  });
+});
+
 describe('sumUnitStat reflects installed modules (MOD-4 routing)', () => {
   it('adds module deltas ×count; bare stacks are unchanged', () => {
     expect(sumUnitStat([{ unit: 'cruiser', count: 2 }], data, 'cargoCapacity')).toBe(4); // 2 × base 2
@@ -169,7 +251,7 @@ describe('HPR-1.5.1 — the shipped hero hull takes ordinary ship modules', () =
 
   it('offers one bay of each category', () => {
     expect(heroDef.slots).toEqual({ weapon: 1, defense: 1, utility: 1 });
-    expect(hullSlotTypes(heroDef)).toEqual(['weapon', 'defense', 'utility']);
+    expect(loadoutBays(heroDef.slots, [], shipped).map((b) => b.type)).toEqual(['weapon', 'defense', 'utility']);
   });
 
   it('accepts a space module into each bay', () => {

@@ -74,3 +74,44 @@ describe('validateInstalled — left-to-right replay of a whole list', () => {
     expect(validateInstalled(typedSpec(), [])).toEqual({ ok: true });
   });
 });
+
+// Universal slots (owner's decision 2026-09-26 — the reinforced cruiser's «4 slots for
+// any modules»): a wildcard budget that takes an item of ANY category, but only once the
+// item's own category is full.
+describe('canInstall — universal slots (wildcard)', () => {
+  /** weapon 1 / defense 1 / utility 2, plus `wild` universal slots. */
+  const wildSpec = (wild: number): FittingSpec<Item> => ({ ...typedSpec(), wildcard: wild });
+
+  it('takes an item whose own category is full, of any category', () => {
+    expect(canInstall(wildSpec(1), ['gun'], 'laser')).toEqual({ ok: true });
+    expect(canInstall(wildSpec(0), ['gun'], 'laser')).toEqual({ ok: false, reason: 'no_slot' });
+    // An all-universal budget: no typed slots at all, any category goes in.
+    const bare: FittingSpec<Item> = { item: (id) => CATALOG[id], category: (m) => m.cat, capacity: () => 0, wildcard: 2 };
+    expect(validateInstalled(bare, ['gun', 'plate'])).toEqual({ ok: true });
+    expect(canInstall(bare, ['gun', 'plate'], 'crate')).toEqual({ ok: false, reason: 'no_slot' });
+  });
+
+  it('a typed slot is spent first — the universal one stays free for an overflow', () => {
+    // defense 1 + one universal slot: plate takes the typed slot whichever order it
+    // comes in, so the universal slot is still there for the gun (weapon capacity 0).
+    const caps: Record<string, number> = { defense: 1 };
+    const spec: FittingSpec<Item> = { item: (id) => CATALOG[id], category: (m) => m.cat, capacity: (c) => caps[c] ?? 0, wildcard: 1 };
+    expect(validateInstalled(spec, ['plate', 'gun'])).toEqual({ ok: true });
+    expect(validateInstalled(spec, ['gun', 'plate'])).toEqual({ ok: true });
+    // A second overflow finds the only universal slot taken.
+    expect(canInstall(spec, ['plate', 'gun'], 'laser')).toEqual({ ok: false, reason: 'no_slot' });
+    expect(canInstall(wildSpec(1), ['gun', 'laser'], 'plate')).toEqual({ ok: true });
+  });
+
+  it('legality depends on the set, not on the order it was assembled in', () => {
+    const items = ['gun', 'laser', 'plate', 'crate'];
+    const orders = [items, [...items].reverse(), ['laser', 'crate', 'gun', 'plate'], ['plate', 'laser', 'crate', 'gun']];
+    for (const order of orders) expect(validateInstalled(wildSpec(1), order), order.join()).toEqual({ ok: true });
+    for (const order of orders) expect(validateInstalled(wildSpec(0), order).ok, order.join()).toBe(false);
+  });
+
+  it('the check order holds: a barred item is `not_allowed`, not squeezed into a universal slot', () => {
+    expect(canInstall(wildSpec(3), [], 'anchor')).toEqual({ ok: false, reason: 'not_allowed' });
+    expect(canInstall(wildSpec(3), ['gun'], 'gun')).toEqual({ ok: false, reason: 'duplicate' });
+  });
+});

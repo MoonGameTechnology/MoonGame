@@ -597,6 +597,23 @@ describe('PVR-6.2 — в подготовке только корпуса, ко�
   });
 });
 
+describe('усиленный крейсер в подготовке (решение владельца 2026-09-26)', () => {
+  it('корпус из одних универсальных отсеков — в списке подготовки', () => {
+    expect(sectorHullIds(data)).toContain('heavy_cruiser');
+  });
+
+  it('в его набор встают модули разных типов — до четырёх', () => {
+    // Два системных модуля стартового набора и два защитных: крейсеру такое не собрать.
+    const four = ['cargo_bay', 'ion_engine', 'ablative_plating', 'shield_booster'];
+    let p: SectorZeroProgress = { ...fresh(), modules: [...new Set([...fresh().modules, ...four, 'targeting_array'])] };
+    for (const id of four) p = change(p, { kind: 'fit', hull: 'heavy_cruiser', id });
+    expect(p.loadouts.heavy_cruiser).toEqual(four);
+    expect(
+      changeSectorZeroProgress(p, { kind: 'fit', hull: 'heavy_cruiser', id: 'targeting_array' }, data),
+    ).toBeNull();
+  });
+});
+
 describe('PVR-6.5 — в подготовке только модули, которые есть куда поставить', () => {
   const modules = sectorModuleIds(data);
 
@@ -1098,6 +1115,23 @@ describe('звёзды кораблей (решение владельца 2026-
     );
     expect(tampered.hullStars.frigate).toEqual(['weapon', 'weapon']);
     expect(tampered.shelf?.hullStars).toEqual({ gone_hull: ['defense'] });
+  });
+
+  it('усиленный крейсер: потолок шести считает и универсальные слоты, звезда их не отнимает', () => {
+    let p = rich();
+    let stars = 0;
+    while (hullStarCost('heavy_cruiser', p, data) !== null && stars < 10) {
+      p = change(p, { kind: 'hull-star', hull: 'heavy_cruiser', slot: 'weapon' });
+      stars++;
+    }
+    expect(stars).toBe(2); // четыре универсальных + две звезды = шесть
+    expect(sectorHullSlots('heavy_cruiser', p, data)).toEqual({ weapon: 2, defense: 0, utility: 0, universal: 4 });
+    const six = ['targeting_array', 'siege_platform', 'shield_booster', 'ablative_plating', 'cargo_bay', 'ion_engine'];
+    p = { ...p, modules: [...new Set([...p.modules, ...six])] };
+    for (const id of six) p = change(p, { kind: 'fit', hull: 'heavy_cruiser', id });
+    expect(p.loadouts.heavy_cruiser).toEqual(six);
+    // Сохранение перепроверяет набор теми же слотами: универсальные не теряются и там.
+    expect(parseSectorZeroProgress(JSON.stringify(p), data).loadouts.heavy_cruiser).toEqual(six);
   });
 
   it('слоты едут в забег снимком арсенала — верфь забега строит корабль с этим набором', () => {

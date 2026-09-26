@@ -504,7 +504,9 @@ export {
   validateLoadout,
   withBonusSlots,
   loadoutCost,
-  hullSlotTypes,
+  loadoutBays,
+  type LoadoutBay,
+  type ShipBayType,
   type SlotCounts,
 } from './util/loadout';
 export {

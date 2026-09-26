@@ -16,7 +16,7 @@
  * Every function returns a string, which is what keeps this testable at all: the tests
  * assert the markup directly, with no DOM and no renderer harness.
  */
-import type { GameData, ShipSlotType } from '@void/shared-core';
+import type { GameData, ShipBayType } from '@void/shared-core';
 import { t, tData } from '../../../localization/core';
 import { buildingName, displayUnit } from '../../../decisions/dataNames';
 import { veteranBadge } from '../../../decisions/veteranBadge';
@@ -432,11 +432,12 @@ export function unitPickerHtml(unitIds: readonly string[], at: string): string {
 /* ────────────────────────── Ship loadout editor ──────────────────────────── */
 
 /** Те же соображения, что у `BAR_LABEL`: ключ слота — литерал, иначе сканер сирот
- *  посчитает три перевода мёртвыми. */
-const SLOT_LABEL: Record<ShipSlotType, string> = {
+ *  посчитает эти переводы мёртвыми. */
+const SLOT_LABEL: Record<ShipBayType, string> = {
   weapon: 'hud.slot.weapon',
   defense: 'hud.slot.defense',
   utility: 'hud.slot.utility',
+  universal: 'hud.slot.universal',
 };
 
 function bagHtml(bag: Record<string, number>): string {

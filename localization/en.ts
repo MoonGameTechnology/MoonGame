@@ -518,6 +518,7 @@ export const en: Record<string, string> = {
   'hud.side.garrison': 'garrison',
   'hud.side.landing': 'landing',
   'hud.slot.defense': 'defense',
+  'hud.slot.universal': 'universal',
   'hud.slot.utility': 'utility',
   'hud.slot.weapon': 'weapon',
   'hud.stationed': 'stationed: {at}',
@@ -1120,7 +1121,7 @@ export const en: Record<string, string> = {
     "The battle line's workhorse: {a} attack, {hp} hull and a {c}-place hold for troops and shuttles. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
   'dossier.unit.heavy-cruiser.desc':
-    'A heavy line hull: {a} attack, {d} defense, {hp} hull, speed {sp}, a {c}-place hold.',
+    'A heavy line hull: {a} attack, {d} defense, {hp} hull, speed {sp}, a {c}-place hold. Universal bays: {n}, each takes a module of any type.',
   'dossier.unit.heavy-cruiser.name': 'Heavy Cruiser',
   'dossier.unit.default': 'A combat unit.',
   'dossier.unit.bomber.desc':
@@ -1574,11 +1575,12 @@ export const en: Record<string, string> = {
   'rarity.unique': 'Unique',
   'rarity.mythic': 'Mythic',
   'rarity.legendary': 'Legendary',
+  'yard.slot.universal': 'Universal',
   'yard.slot.utility': 'System',
   'yard.slot.weapon': 'Weapon',
   'yard.slots.count': '{n} module slots (by hull size)',
   'yard.slots.note':
-    'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
+    'A module fits a slot of its own type, or a universal one when that is full. <b>Greyed</b> — not for a free slot, or already installed.',
   'yard.tab.heroes': 'Heroes',
   'yard.tab.infantry': 'Infantry',
   'yard.tab.ships': 'Ships',
