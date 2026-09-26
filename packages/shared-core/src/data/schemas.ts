@@ -269,6 +269,15 @@ export const FactionDefSchema = z.object({
   veterans: z.boolean().default(true),
 });
 
+/**
+ * Доля снижения урона по миру, которую даёт ОБЫЧНАЯ постройка (решение владельца
+ * 2026-09-26: «Крепость на планетах даёт снижение получаемого урона. Как и каждое
+ * здание»). Дефолт поля `defenseBonus`: здание, не объявившее своей доли, прикрывает мир
+ * на 5%. Крепость объявляет свою (15/30/45% по уровню); сумма по миру упирается в потолок
+ * пула (`MITIGATION_CAP`, 90%). Считает её `worldDamageReduction` (`construction.ts`).
+ */
+export const BASE_BUILDING_DEFENSE = 0.05;
+
 /** Per-level stats of a building (level 2..N). Level 1 uses the base fields. */
 export const BuildingLevelSchema = z.object({
   cost: ResourceBagSchema.default({}),
@@ -280,8 +289,9 @@ export const BuildingLevelSchema = z.object({
   upkeep: ResourceBagSchema.default({}),
   /** Structural HP at this level. */
   hp: z.number().nonnegative().default(0),
-  /** Ground-defense bonus this level grants the garrison (0.01 = +1%). */
-  defenseBonus: z.number().default(0.01),
+  /** Доля, на которую постройка этого уровня снижает урон по своему миру при штурме и
+   *  обстреле с орбиты (0.05 = 5%). Доли всех стоящих построек мира складываются. */
+  defenseBonus: z.number().default(BASE_BUILDING_DEFENSE),
   /** Radar reach (Euclidean distance, map units) at this level — lets a radar array widen its
    *  detection radius as it is upgraded. */
   radarRange: z.number().nonnegative().default(0),
@@ -390,9 +400,9 @@ export const BuildingDefSchema = z.object({
    * жить в данных рядом с остальными свойствами уровня, а не лестницей в коде.
    */
   issuesGarrison: z.number().nonnegative().default(0),
-  /** Ground-defense bonus the building grants the garrison (0.01 = +1%); a
-   *  fortress grants much more, and it grows with level. */
-  defenseBonus: z.number().default(0.01),
+  /** Доля снижения урона по миру (см. {@link BASE_BUILDING_DEFENSE}): обычная постройка —
+   *  5%, крепость объявляет свою и растит её уровнями. */
+  defenseBonus: z.number().default(BASE_BUILDING_DEFENSE),
   /** Overrides for levels 2..N (index 0 = level 2). maxLevel = 1 + length. */
   upgrades: z.array(BuildingLevelSchema).default([]),
   /**

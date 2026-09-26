@@ -18,7 +18,7 @@ import { hoursToMs, timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 import { buildProgress } from '../util/construction';
-import { isAllied } from '../util/combat';
+import { MITIGATION_CAP, isAllied } from '../util/combat';
 import { addUnits } from '../util/stacks';
 import { basedLander, basedMachine, shuttleBayAt } from '../state/shuttle';
 import {
@@ -597,10 +597,9 @@ function ownedPlanet(
  * Прикрывают ли постройки мира того, кто сейчас получает урон (решение владельца 5,
  * fortress-roadmap §0.6): владельца — да, его СОЮЗНИКА — тоже, остальных — нет.
  *
- * Предикат ОДИН на оба хука наземной защиты (`defenseBonus` и скидка за число зданий).
- * Держать его в двух местах значило бы дать им разойтись: ровно это и случилось при
- * первой правке — союзник начал получать бонус форта, но не однопроцентную скидку, и
- * игрок увидел бы необъяснимо частичное прикрытие.
+ * Предикат один на всю защиту построек (`worldDamageReduction`): при первой правке, когда
+ * правил было два (бонус форта и скидка за число зданий), союзник начал получать бонус
+ * форта, но не скидку, и игрок увидел бы необъяснимо частичное прикрытие.
  *
  * Проверка именно «владелец ИЛИ союзник», а не «не враг»: снять её целиком значило бы
  * прикрыть и ШТУРМУЮЩЕГО, стоящего на вашей же земле, то есть заставить форт работать на
@@ -619,16 +618,25 @@ function fortificationCovers(
   return null;
 }
 
-/** Total ground-defense bonus a planet's standing buildings grant its garrison. */
-function totalDefenseBonus(planet: Planet, data: GameData): number {
-  let bonus = 0;
+/**
+ * На какую долю постройки мира снижают урон по нему (решение владельца 2026-09-26):
+ * «Крепость на планетах даёт снижение получаемого урона. Как и каждое здание. Максимум
+ * 90%… при разрушении здания бонус начинает уменьшаться».
+ *
+ * Каждая СТОЯЩАЯ постройка даёт свою долю `defenseBonus`: обычная — 5%
+ * (`BASE_BUILDING_DEFENSE`, дефолт схемы), крепость — 15/30/45% по уровню. Доли складываются, сумма
+ * упирается в потолок пула {@link MITIGATION_CAP}: форт III и девять других построек — уже
+ * 90%. Разрушенная (hp 0) не прикрывает, поэтому обстрел, сносящий постройки, снимает защиту
+ * по одной доле.
+ */
+export function worldDamageReduction(planet: Pick<Planet, 'buildings'>, data: GameData): number {
+  let share = 0;
   for (const b of planet.buildings) {
+    if (!(b.hp > 0)) continue;
     const def = data.buildings[b.type];
-    if (def) {
-      bonus += buildingLevel(def, b.level).defenseBonus;
-    }
+    if (def) share += buildingLevel(def, b.level).defenseBonus;
   }
-  return bonus;
+  return Math.min(MITIGATION_CAP, Math.max(0, share));
 }
 
 /** Wears `amount` of structural damage across a planet's buildings (array order,
@@ -705,7 +713,8 @@ function clearInfected(h: HandlerContext, planet: Planet, amount: number): void 
  */
 export const constructionModule: GameModule = {
   id: 'construction',
-  version: '1.0.0',
+  // 1.1.0: защита построек мира — доля каждой постройки, потолок 90%, штурм и обстрел (FORT-5.15).
+  version: '1.1.0',
   setup(api) {
     api.onAction('building.construct', (action, h) => {
       const payload = action.payload as Partial<ConstructBuildingPayload>;
@@ -1364,8 +1373,11 @@ export const constructionModule: GameModule = {
       }
     }
 
-    // Standing buildings toughen the ground defence: they reduce the damage taken in
-    // the ground phase by the planet's total defense bonus.
+    // Постройки мира снижают урон по нему — при штурме (наземная фаза) и при обстреле с
+    // орбиты (решение владельца 2026-09-26: «и на штурм, и на бомбардировку»). Доля
+    // (`worldDamageReduction`) уходит в пул очками `r / (1 − r)`: одна лишь защита мира даёт
+    // ровно r (1 / (1 + очки) = 1 − r), а с другими источниками пула (корпус ветерана, тип
+    // планеты) складывается по правилу пула под его единым потолком.
     //
     // Кого именно прикрывают — `fortificationCovers` (решение владельца 5): владельца и
     // его союзника. Раньше здесь стояло `planet.owner !== a.defender` → выход, то есть
@@ -1374,25 +1386,11 @@ export const constructionModule: GameModule = {
     // одном мире может быть несколько.
     api.hook<number>('combat.mitigation', (pool, args, h) => {
       const a = args as { phase?: string; location?: string; defender?: string };
-      if (a.phase !== 'ground') return pool;
+      if (a.phase !== 'ground' && a.phase !== 'bombard') return pool;
       const planet = fortificationCovers(h, a.location, a.defender);
       if (!planet) return pool;
-      return pool + totalDefenseBonus(planet, h.ctx.data);
-    });
-
-    // Each standing building on the planet adds 1% worth of mitigation POINTS. This is
-    // a SEPARATE parameter from `defenseBonus` (a per-building stat); this one counts
-    // ALL buildings: 10 buildings = 0.1 points. PERK-2.1 removed the local 90% ceiling
-    // this rule used to carry — the cap now belongs to the POOL (`MITIGATION_CAP`), so
-    // four sources can no longer stack four separate ceilings.
-    const GROUND_DAMAGE_REDUCTION_PER_BUILDING = 0.01;
-    api.hook<number>('combat.mitigation', (pool, args, h) => {
-      const a = args as { phase?: string; location?: string; defender?: string };
-      if (a.phase !== 'ground') return pool;
-      const planet = fortificationCovers(h, a.location, a.defender);
-      if (!planet) return pool;
-      const standing = planet.buildings.filter((b) => b.hp > 0).length;
-      return pool + standing * GROUND_DAMAGE_REDUCTION_PER_BUILDING;
+      const r = worldDamageReduction(planet, h.ctx.data);
+      return r > 0 ? pool + r / (1 - r) : pool;
     });
 
     // The ground assault wears down the contested planet's structures each round

@@ -204,9 +204,22 @@ describe('dossiers — маршрутизация objDossier', () => {
   });
 
   it('характеристика со своим правилом тело сохраняет', () => {
-    for (const k of ['cap', 'shield', 'hull', 'gships', 'spd']) {
+    for (const k of ['cap', 'shield', 'hull', 'gships', 'spd', 'mitigation']) {
       expect(objDossier(`stat:${k}`)?.body, k).toBeTruthy();
     }
+  });
+
+  // Защита построек (решение владельца 2026-09-26): числа правила — из данных, а не из
+  // текста, иначе правка лестницы форта оставила бы досье врать.
+  it('защита построек называет лестницу форта, долю постройки и потолок — из данных', () => {
+    const d = objDossier('stat:mitigation');
+    expect(d?.body).toContain('15/30/45%');
+    expect(d?.body).toContain('5%');
+    expect(d?.body).toContain('90%');
+    const fort3 = buildingDossier('fort', 3)!.body;
+    expect(fort3).toContain('45%');
+    expect(fort3).toContain('90%');
+    expect(fort3).not.toContain('+45%'); // «меньше на 45%», а не «+45% к обороне»
   });
 
   it('скорость объясняет правило самого медленного, а не пересказывает подпись', () => {

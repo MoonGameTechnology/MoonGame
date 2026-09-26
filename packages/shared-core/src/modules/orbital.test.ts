@@ -47,7 +47,10 @@ const dataLiteral = {
   factions: {},
   buildings: {
     mine: { name: 'Mine', cost: { metal: 50 }, buildTimeHours: 0, produces: { metal: 10 }, hp: 20 },
-    depot: { name: 'Depot', cost: { metal: 40 }, buildTimeHours: 2, hp: 30 },
+    // Склад мира не прикрывает (доля 0): тесты осадной формулы меряют её в чистом виде.
+    depot: { name: 'Depot', cost: { metal: 40 }, buildTimeHours: 2, hp: 30, defenseBonus: 0 },
+    // Бастион срезает половину урона по миру — для теста защиты построек под обстрелом.
+    bastion: { name: 'Bastion', cost: { metal: 40 }, buildTimeHours: 2, hp: 30, defenseBonus: 0.5 },
     flak: { name: 'Orbital AA', cost: { metal: 60 }, buildTimeHours: 0, hp: 25, aaDamage: 28 },
   },
   events: {},
@@ -216,6 +219,20 @@ describe('orbital — bombardment effects (GDD §7.4)', () => {
     const r = okAdvance(kernel.advanceTo(st, at(HOUR)));
     const depot = r.state.planets.P?.buildings.find((b) => b.type === 'depot');
     expect(depot?.hp).toBe(25); // 10 attack × 0.5 × 1ч = 5
+  });
+
+  // Решение владельца 2026-09-26: защита построек срезает и обстрел с орбиты, а не только
+  // штурм. Урон уходит в постройки уже срезанным.
+  it('обстрел срезается защитой построек мира', () => {
+    const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
+    const st = stateWith({
+      players: [player('p2', { metal: 0 })],
+      planets: [planet('P', 'p2', { buildings: [['bastion', 1]] })], // hp 30, доля 0.5
+      fleets: [fleet('F', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
+    });
+    const r = okAdvance(kernel.advanceTo(st, at(HOUR)));
+    const bastion = r.state.planets.P?.buildings.find((b) => b.type === 'bastion');
+    expect(bastion?.hp).toBeCloseTo(30 - 10 * 0.5 * (1 - 0.5), 5); // 5 в час, половина срезана
   });
 
   it('смешанный флот складывает обе формулы в одном залпе', () => {

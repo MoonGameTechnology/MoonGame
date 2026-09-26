@@ -63,7 +63,14 @@ describe('окно построек — строка эффекта', () => {
   it('производство и содержание читаются с одного взгляда', () => {
     expect(buildFx(data.buildings.mine!, 1)).toContain('+12');
     expect(buildFx(data.buildings.refinery!, 1)).toContain('−40'); // upkeep — со знаком минус (BAL-3)
-    expect(buildFx(data.buildings.fort!, 1)).toContain('к обороне');
+    // Доля защиты мира (решение владельца 2026-09-26): у форта своя, по уровню.
+    expect(buildFx(data.buildings.fort!, 1)).toContain('−15% урона по миру');
+    expect(buildFx(data.buildings.fort!, 3)).toContain('−45% урона по миру');
+    // 5% есть у каждого здания — это дефолт, а не эффект: строкой не пишется, в «оборону»
+    // обычное здание не уводит.
+    expect(buildFx(data.buildings.mine!, 1)).not.toContain('урона по миру');
+    expect(buildCategory(data.buildings.mine!)).toBe('economy');
+    expect(buildCategory(data.buildings.barracks!)).toBe('infra');
     // YARD-1: «строит корабли» — примета ВЕРФИ, а у порта своя строка про ангар. До
     // разделения обе висели на одном здании, и про челноки экран не говорил ничего.
     expect(buildFx(data.buildings.shipyard!, 1)).toContain('кораблей');
