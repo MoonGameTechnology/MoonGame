@@ -74,7 +74,8 @@
 
 ## Фаза 0 · Лоадаут-фундамент `[data][core]`
 
-### SM-0.1 · Схема `ModuleDef` + каталог `data/modules.json` `[data]` 🔒(—) — M
+### SM-0.1 · Схема `ModuleDef` + каталог `data/modules.json` `[data]` ✅ — M
+**✅ в коде** (сверено 2026-09-26): `ModuleDefSchema` и `data/modules.json` — см. «Сделано» выше.
 **Подзадачи:** `ModuleDefSchema` (zod, по образцу `UnitDefSchema` schemas.ts:39): `id`,
 `slotCost: z.number().int().positive()`, `allowed?: { domain?, traits?: string[], units?: string[] }`
 (модуль ставится, если корабль удовлетворяет ВСЕМ заданным полям), `effects: { stats?:
@@ -87,7 +88,8 @@ Record<string,number>, enables?: string[] }`, `tag: z.enum(['horizontal','vertic
 **Готово, когда:** модуль добавляется данными; `parseGameData` валидирует; кривой (slotCost≤0,
 `moduleSlots` в `effects.stats`, `vertical`+`soulbound`) — отвергается; тест композиции.
 
-### SM-0.2 · Стат `moduleSlots` + поле `UnitStack.modules` `[data][core]` 🔒(SM-0.1) — S
+### SM-0.2 · Стат `moduleSlots` + поле `UnitStack.modules` `[data][core]` ✅ — S
+**✅ в коде** (сверено 2026-09-26): слоты типизированы (`UnitDef.slots`), а не скаляр `moduleSlots` — см. «Сделано» выше.
 **Подзадачи:** `moduleSlots: z.number().nonnegative().default(0)` в `UnitStatsSchema`
 (schemas.ts:17-37). `UnitStack.modules?: ModuleId[]` (gameState.ts:27-33), опционально.
 **Свободные слоты считаются от БАЗОВОГО `def.stats.moduleSlots`** (не эффективного — анти
@@ -95,7 +97,8 @@ Record<string,number>, enables?: string[] }`, `tag: z.enum(['horizontal','vertic
 **Готово, когда:** `moduleSlots` парсится (default 0 не ломает существующее); `UnitStack` с
 `modules:[...]` сериализуется/`deepClone`-ится без потерь; round-trip JSON-тест.
 
-### SM-0.3 · Лоадаут-aware идентичность стека `[core]` 🔒(SM-0.2) — M
+### SM-0.3 · Лоадаут-aware идентичность стека `[core]` ✅ — M
+**✅ в коде** (сверено 2026-09-26): `loadoutKey` в `util/stacks.ts`, `findHealthyStack` сливает только одинаковый лоадаут.
 **Подзадачи:** `findHealthyStack`/`addUnits` (stacks.ts:5-18) сейчас мёржат healthy-стеки
 по `unit`+`hp===undefined`, **игнорируя `modules`** → два стека одного корпуса с разным
 лоадаутом молча сольются (потеря/подмена модулей при `army.load`/выходе в `landing`).
@@ -103,7 +106,8 @@ Record<string,number>, enables?: string[] }`, `tag: z.enum(['horizontal','vertic
 **Готово, когда:** load/unload двух одинаковых корпусов с РАЗНЫМ лоадаутом их не сливает;
 переживает JSON round-trip; регресс-тест на анти-мердж.
 
-### SM-0.4 · Хелпер `effectiveStats(def, stack, data)` `[core]` 🔒(SM-0.2) — M
+### SM-0.4 · Хелпер `effectiveStats(def, stack, data)` `[core]` ✅ — M
+**✅ в коде** (сверено 2026-09-26): `effectiveStats` в `util/loadout.ts`.
 **Подзадачи:** кернел-модуль `shipModules`. Чистая функция: база `def.stats`, для каждого
 `m ∈ stack.modules` прибавляет `data.modules[m]?.effects.stats` (неизвестный модуль —
 graceful-пропуск, как `sumUnitStat` пропускает unknown unit). Нет модулей → ровно
@@ -113,7 +117,8 @@ graceful-пропуск, как `sumUnitStat` пропускает unknown unit)
 **Готово, когда:** без модулей `=== def.stats`; модуль `+2 cargoCapacity` даёт `+2`;
 неизвестный — игнор; чисто/детерминированно; unit-тест.
 
-### SM-0.5 · Маршрутизация `cargoCapacity` через эффективный лукап `[core]` 🔒(SM-0.4) — M
+### SM-0.5 · Маршрутизация `cargoCapacity` через эффективный лукап `[core]` ✅ — M
+**✅ в коде** (сверено 2026-09-26): `sumUnitStat` читает `effectiveStats` — и для всех статов, не только `cargoCapacity`.
 **Подзадачи:** `sumUnitStat` (stacks.ts:22-31) читает `effectiveStats(def, s, data)[stat] ?? 0`
 вместо `def.stats[stat] ?? 0` — он уже per-stack. Это даёт эффект `fleetCapacity`
 (army.ts:14-16) и контр-проверке `free` (army.ts:76). **Скоуп фундамента —
@@ -124,7 +129,8 @@ combat/route/army-значения (формулировка «бит-в-бит�
 **Готово, когда:** надетый расширитель поднимает эфф-`cargoCapacity` и `fleetCapacity` его
 видит; пустой лоадаут не меняет golden; combat/route не затронуты; тест.
 
-### SM-0.6 · Действие `loadout.equip` / `loadout.unequip` `[core]` 🔒(SM-0.5) — M
+### SM-0.6 · Действие `loadout.equip` / `loadout.unequip` `[core]` 🗑 — M
+**🗑 Снят решением владельца:** лоадаут выбирается при постройке (`unit.build{modules}`) и залочен, экшена переоснастки нет — см. «Сделано» выше.
 **Подзадачи:** имя `loadout.*` (не `module.*` — не путать с кернел-модулями). Зеркало
 `army.load` (army.ts:67-95): флот **idle + пристыкован к СВОЕЙ планете-порту**; цель —
 конкретный `UnitStack`; гейты: `slotCost ≤ свободные базовые слоты`, `allowed`-предикат,
@@ -136,7 +142,8 @@ combat/route/army-значения (формулировка «бит-в-бит�
 **Готово, когда:** equip в порту на корабль с местом проходит; нет слота/не-в-порту/в-бою/чужой
 soulbound/перегруз — стабильный отказ; снаряжённый корабль несёт эффект; тест.
 
-### SM-0.7 · CLI лоадаута `[cli]` 🔒(SM-0.6) — S
+### SM-0.7 · CLI лоадаута `[cli]` 🗑 — S
+**🗑 Снят вместе с SM-0.6:** переоснастки нет; просмотр лоадаута — меню `loadoutEditor` (клиент) и карточка корабля SM-0.8.
 **Подзадачи:** equip/unequip в порту; просмотр слотов (занято/свободно) и **эффективных vs
 базовых статов** стека; пометка `tag`/`soulbound`.
 **Готово, когда:** видно лоадаут, свободные слоты и как модуль меняет статы.
@@ -175,7 +182,8 @@ soulbound/перегруз — стабильный отказ; снаряжён
 
 ## Фаза 1 · Грузовой расширитель `[data]`
 
-### SM-1.1 · Модуль `+N cargoCapacity` (плоский, тиры) `[data]` 🔒(SM-0.5) — M
+### SM-1.1 · Модуль `+N cargoCapacity` (плоский, тиры) `[data]` 🔶 — M
+**🔶 Сделано** (сверено 2026-09-26): плоский `cargo_bay` (+6 `cargoCapacity`) в `data/modules.json`. **Осталось:** тиры T1/T2/T3 (сейчас рост идёт через редкость, `rarityBonus`); отказ `E_OVER_CAPACITY` отпал вместе с SM-0.6.
 **Подзадачи:** `ModuleDef` грузового расширителя, **тиры отдельными записями** (T1/T2/T3 =
 `effects.stats.cargoCapacity` `+2/+3/+4` — рабочая гипотеза, число/шаг — баланс), `tag:
 horizontal`, `allowed` — корабль с трюмом/слотом. **Один экземпляр на тип на стек** (тиры
@@ -199,13 +207,13 @@ soulbound; нет безграничного платного фаст-трек�
 > во время сборки (полётная фаза), **вступление в бой замораживает** сборку, модуль — **только
 > в транспорт**. Зафиксированные решения пользователя.
 
-### SM-2.1 · Семейство «дройды» (новый контент) `[data]` 🔒(—) — S
+### SM-2.1 · Семейство «дройды» (новый контент) `[data]` ⏳ — S
 **Подзадачи:** 2-3 роли наземных юнитов `domain:ground`, дёшево/расходно (`cost`/`hp`/
 `cargoSize`/`upkeep` относительно `drop_infantry` — баланс). Это **готовый блок** (§7.5):
 фабрика собирает **только дройдов**, не «любой юнит» (иначе мобильная верфь под всё).
 **Готово, когда:** дройды парсятся; грузятся/десантируются как обычная наземка; кривые отвергаются.
 
-### SM-2.2 · Трейт `transport` + модуль-фабрика `[data]` 🔒(SM-0.1, SM-2.1) — S
+### SM-2.2 · Трейт `transport` + модуль-фабрика `[data]` 🔒(SM-2.1) — S
 **Подзадачи:** в `data/units.json` **нет трейта `transport`** (есть artillery/immobile/…;
 транспортность сейчас = `cargoCapacity>0`). Пометить транспортные `UnitDef` трейтом
 `transport` (новый контент) — якорь для `allowed`. `ModuleDef` фабрики: `allowed:{ traits:
