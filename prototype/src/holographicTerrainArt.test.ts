@@ -96,6 +96,10 @@ describe("terrain art respects province geometry", () => {
       "debris_field",
       "dead_world",
       "asteroid",
+      "asteroid_cluster",
+      "rift",
+      "dust_lane",
+      "depleted_system",
     ]) {
       const r = recorder();
       expect(
@@ -122,12 +126,13 @@ describe("terrain art respects province geometry", () => {
       expect(r.strokes.every((s) => s.alpha > 0 && s.alpha <= 0.53)).toBe(true);
     }
   });
-  it("keeps terrain geometry anchored through camera translation and zoom", () => {
+  it.each(["nebula", "asteroid_cluster", "rift", "dust_lane", "depleted_system"])("keeps %s anchored through camera translation and zoom", (kind) => {
     const before = recorder();
     const after = recorder();
-    drawTerrainArt(before.context, field);
+    drawTerrainArt(before.context, { ...field, kind });
     drawTerrainArt(after.context, {
       ...field,
+      kind,
       poly: poly.map(([x, y]) => [x * 3 + 41, y * 3 - 19] as const),
       box: { x: 41, y: -19, width: 300, height: 300 },
     });
@@ -155,6 +160,20 @@ describe("terrain art respects province geometry", () => {
     const still = recorder();
     drawTerrainArt(still.context, { ...field, kind: "asteroid" }, 8000, true);
     expect(still.strokes).toEqual([]);
+  });
+  it("animates only four fixed rift glints and leaves new mineral terrain static", () => {
+    const before = recorder();
+    const after = recorder();
+    drawTerrainArt(before.context, { ...field, kind: 'rift' }, 0, true);
+    drawTerrainArt(after.context, { ...field, kind: 'rift' }, 8000, true);
+    expect(before.strokes).toHaveLength(4);
+    expect(after.strokes.map(s => s.points)).toEqual(before.strokes.map(s => s.points));
+    expect(after.strokes.map(s => s.alpha)).not.toEqual(before.strokes.map(s => s.alpha));
+    for (const kind of ['asteroid_cluster', 'dust_lane', 'depleted_system']) {
+      const r = recorder();
+      drawTerrainArt(r.context, { ...field, kind }, 8000, true);
+      expect(r.strokes).toEqual([]);
+    }
   });
   it("does not regenerate the full terrain for live glints after a fractional pan", () => {
     const original = { ...field, id: 'fractional-marker', marker: { x: 31.21, y: 47.13 } };

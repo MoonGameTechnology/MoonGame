@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { heroPortraitHtml, portraitMarkup } from './heroPortraits';
 
 describe('портреты героев', () => {
-  it('герой из атласа — вырез клетки атласа, Учёный — свой векторный черновик', () => {
+  it('герой из атласа — вырез клетки атласа, Учёный — отдельный портрет', () => {
     expect(heroPortraitHtml('commander')).toContain('portraits');
     const scientist = heroPortraitHtml('scientist');
     expect(scientist).toContain('scientist');
     expect(scientist).not.toContain('portraits');
-    // Черновик — квадрат целиком, а не четверть атласа.
+    // Отдельный портрет — квадрат целиком, а не четверть атласа.
     expect(scientist).toContain('width:100%');
     expect(heroPortraitHtml('nobody')).toBe('');
   });

@@ -1,6 +1,6 @@
 /** One transparent atlas shared by the offline client and the PWA. No per-frame decoding. */
 import atlasUrl from './art/heroes/portraits.webp';
-import scientistUrl from './art/heroes/scientist.svg';
+import scientistUrl from './art/heroes/scientist.webp';
 import {
   heroGradeGlyph,
   heroIdentity,
@@ -8,8 +8,7 @@ import {
 } from '../../../decisions/heroIdentity';
 import type { Hero } from '../../shared-core/src/index';
 
-/** Portraits outside the atlas — one square file per archetype. Today it is the vector
- *  draft of the fifth hero (owner's decision 2026-09-24) until real art replaces it. */
+/** Portraits outside the atlas — one transparent square file per archetype. */
 const LOOSE_ART: Readonly<Record<string, string>> = { scientist: scientistUrl };
 
 const images = new Map<string, HTMLImageElement>();

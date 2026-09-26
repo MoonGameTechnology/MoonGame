@@ -53,6 +53,8 @@ const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
   planet: { name: 'Planet', core: 'empty_space', color: '#5fd0ff' },
   nebula: { name: 'Nebula', core: 'nebula', color: '#8f6dff' },
   asteroid: { name: 'Asteroid Field', core: 'asteroid_field', color: '#d6a645' },
+  asteroid_cluster: { name: 'Dense Asteroid Cluster', core: 'asteroid_cluster', color: '#c98a3a' },
+  rift: { name: 'Spatial Rift', core: 'empty_space', color: '#7a4a8f' },
   empty: { name: 'Empty Space', core: 'empty_space', color: '#46606e' },
   // new terrains — each maps to a core `data.sectors` entry for its speed/HP bonus
   ion_storm: { name: 'Ion Storm', core: 'ion_storm', color: '#6fe3ff' },

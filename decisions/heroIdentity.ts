@@ -15,8 +15,8 @@ export const HERO_IDENTITIES: Readonly<Record<string, HeroIdentity>> = {
   ravager: { cell: 1, name: 'hero.person.ravager.name', bio: 'hero.person.ravager.bio' },
   vanguard: { cell: 2, name: 'hero.person.vanguard.name', bio: 'hero.person.vanguard.bio' },
   warden: { cell: 3, name: 'hero.person.warden.name', bio: 'hero.person.warden.bio' },
-  // Пятый герой (решение владельца 2026-09-24). В атласе клетки нет — портрет пока векторный
-  // черновик. Имя не выдумываем: сюжет требует согласовать его (sector-zero-roadmap §3.1.8).
+  // Пятый герой (решение владельца 2026-09-24). Портрет — отдельный файл вне атласа.
+  // Имя не выдумываем: сюжет требует согласовать его (sector-zero-roadmap §3.1.8).
   scientist: { bio: 'hero.person.scientist.bio' },
 };
 
