@@ -250,6 +250,9 @@ export function techTreeHtml(
   for (const id of branchIds) {
     const td = techs[id]!;
     const st = nodeState(id);
+    // Изученное из списка уходит (решение владельца 2026-09-26): строка «✓ Изучено» только
+    // отодвигала то, что ещё можно взять. Сколько изучено — видно по счётчику вкладки.
+    if (st.st === 'done') continue;
     if (td.tier !== lastTier) {
       lastTier = td.tier;
       listHtml += `<div class="tt-tierh">${t('tech.tier', { n: roman(td.tier) })}</div>`;
@@ -277,6 +280,7 @@ export function techTreeHtml(
         : '') +
       `</div>`;
   }
+  if (!listHtml && branchIds.length) listHtml = `<div class="hint">${t('tech.branch.done')}</div>`;
   // Закреплённая шапка: что исследуется ПРЯМО СЕЙЧАС, со сроком и полосой. Раньше это
   // приходилось искать глазами по сетке — а это единственное, ради чего экран открывают
   // повторно.

@@ -2987,6 +2987,7 @@ export const ru: Record<string, string> = {
   'tech.action.unmet': 'Условие не выполнено',
   'tech.curator': 'Ветку курирует',
   'tech.curator.none': 'Без лидера ветки — узлы с условием «учёный» закрыты',
+  'tech.branch.done': 'Ветка изучена полностью.',
   'tech.day': 'День {n}',
   'tech.from-day': 'с дня {n}',
   'tech.grants': 'открывает: {x}',

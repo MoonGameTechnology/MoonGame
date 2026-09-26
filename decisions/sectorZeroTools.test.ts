@@ -5,6 +5,7 @@ import {
   espionageShown,
   SECTOR_ZERO_ABSENT_HUD,
   SECTOR_ZERO_ABSENT_TOOLS,
+  SECTOR_ZERO_ABSENT_TWINS,
   toolShown,
   type SessionTool,
 } from './sectorZeroTools';
@@ -33,7 +34,9 @@ describe('PVR-6.1 — инструменты мультиплеера не ед�
 
 describe('поля шапки, которых нет в забеге (решение владельца 2026-09-24)', () => {
   it('эмблема с названием и местом, очки победы и день — ровно решение владельца', () => {
-    expect(Object.keys(SECTOR_ZERO_ABSENT_HUD).sort()).toEqual(['crest', 'day', 'score']);
+    expect(Object.keys(SECTOR_ZERO_ABSENT_HUD).sort()).toEqual(['crest', 'day', 'production', 'score']);
+    for (const id of [...Object.values(SECTOR_ZERO_ABSENT_HUD), ...Object.values(SECTOR_ZERO_ABSENT_TWINS)])
+      expect(MARKUP, `id="${id}" в build.mjs`).toContain(`id="${id}"`);
   });
 
   it('место живёт внутри блока эмблемы — уходит вместе с ним', () => {

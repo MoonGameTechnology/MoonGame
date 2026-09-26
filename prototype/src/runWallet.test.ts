@@ -136,8 +136,10 @@ describe('шапка забега — проводка в кадре', () => {
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 
   it('поля основной игры прячутся в забеге и возвращаются вне его', () => {
+    // Каждое поле — вместе со своим дублем в другом месте интерфейса (кнопка «Производство»
+    // в рельсе, решение владельца 2026-09-26).
     expect(main).toMatch(
-      /for \(const id of Object\.values\(SECTOR_ZERO_ABSENT_HUD\)\) \{[\s\S]*?el\.style\.display = run \? 'none' : '';/,
+      /for \(const \[field, id\] of Object\.entries\(SECTOR_ZERO_ABSENT_HUD\)\) \{[\s\S]*?SECTOR_ZERO_ABSENT_TWINS\[[\s\S]*?el\.style\.display = run \? 'none' : '';/,
     );
   });
 

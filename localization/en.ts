@@ -2983,6 +2983,7 @@ export const en: Record<string, string> = {
   'tech.action.unmet': 'Condition not met',
   'tech.curator': 'Branch curated by',
   'tech.curator.none': 'No branch leader — “scientist”-gated nodes stay locked',
+  'tech.branch.done': 'Branch fully researched.',
   'tech.day': 'Day {n}',
   'tech.from-day': 'from day {n}',
   'tech.grants': 'unlocks: {x}',

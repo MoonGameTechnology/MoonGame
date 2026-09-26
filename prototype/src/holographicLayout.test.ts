@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reframePresentation, supportsHolography, selectionWindowPosition, selectionThread } from './holographicLayout';
+import { DOCK_BOTTOM, reframePresentation, supportsHolography, selectionWindowPosition, selectionThread } from './holographicLayout';
 import { worldToScreen } from '../../packages/client/src/camera';
 import { isMobileViewport } from './viewport';
 
@@ -60,6 +60,16 @@ it('opens beside the selection on the side with room and below the top chrome', 
   // A tall window on a short screen (tablet): the chrome wins over the bottom edge — the
   // window used to be pushed up under the resource bar (owner, 2026-09-25).
   expect(selectionWindowPosition({ x: 500, y: 300 }, size, { width: 1024, height: 600 }, 176).y).toBe(176);
+});
+
+it('a wide horizontal window docks at the bottom instead of covering the map centre', () => {
+  const view = { width: 1280, height: 800 };
+  const wide = { width: 1040, height: 380 };
+  // Где бы ни стоял объект — окно у нижнего края, над полосой скорости, по центру.
+  for (const anchor of [{ x: 640, y: 390 }, { x: 100, y: 700 }, { x: 1200, y: 150 }])
+    expect(selectionWindowPosition(anchor, wide, view, 104)).toEqual({ x: 120, y: 800 - 380 - DOCK_BOTTOM });
+  // Низкий экран: шапка важнее низа — окно не залезает под неё.
+  expect(selectionWindowPosition({ x: 500, y: 300 }, wide, { width: 1280, height: 520 }, 104).y).toBe(104);
 });
 
 it('connects each object to the nearest window side without crossing its rounded corners', () => {
