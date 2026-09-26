@@ -30,7 +30,7 @@ import { data } from './gameData';
 import { HOUR } from './time';
 import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
-import { esc, hl, round1, cost, displayUnit, fmtEta, resChip, resLine } from './format';
+import { esc, hl, round1, cost, displayUnit, fmtEta, fmtHrs, resChip, resLine } from './format';
 import { BUILD_ICON, unitIcon, unitIconHtml } from './icons';
 import { catalogPortraitHtml } from './shipArt';
 import { unitDamageHtml } from './unitDamageView';
@@ -347,6 +347,21 @@ export function cxRow(k: string, v: string): string {
   return `<div class="cx-row"><span class="cx-k">${k}</span><span class="cx-v">${v}</span></div>`;
 }
 
+/**
+ * Навык героя (заказ владельца 2026-09-25: «долгое нажатие на навык в меню приказов —
+ * описание навыка»). Имя и описание — из каталога, перезарядка и дальность — те же числа,
+ * по которым навык применяет ядро. Незнакомый id — `null`.
+ */
+export function abilityDossier(id: string): Dossier | null {
+  const def = data.heroAbilities[id];
+  if (!def) return null;
+  // Срок — тем же форматтером, что остаток перезарядки в меню: в забеге это реальные минуты.
+  const rows = [cxRow(t('codex.row.cooldown'), fmtHrs(def.cooldownHours))];
+  if ((def.range ?? 0) > 0) rows.push(cxRow(t('codex.row.range'), String(def.range)));
+  const desc = def.description ? `<p>${esc(t(def.description))}</p>` : '';
+  return { name: tData(def.name), body: `${desc}<div class="cx-stats">${rows.join('')}</div>` };
+}
+
 /** Wire the live-state renderers to the match screen. The pure exports above need no
  *  host and are imported directly. */
 export function createDossiers(host: DossierHost): {
@@ -486,6 +501,7 @@ export function createDossiers(host: DossierHost): {
     if (key.startsWith('c:')) return constructionDossier(key);
     const [kind, id, lvl] = key.split(':');
     if (id === undefined) return null; // bare "b"/"u" key with no id — nothing to show
+    if (kind === 'ab') return abilityDossier(id);
     if (kind === 'b' || kind === 'u') {
       const dos = kind === 'b' ? buildingDossier(id, Number(lvl) || 1) : unitDos(id);
       return dos ? { ...dos, body: catalogPortraitHtml(kind, id, data) + dos.body } : null;

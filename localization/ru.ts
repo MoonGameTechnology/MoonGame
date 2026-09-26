@@ -668,6 +668,7 @@ export const ru: Record<string, string> = {
   'codex.row.produces': 'Производит',
   'codex.row.radar': 'Радиус радара',
   'codex.row.range': 'Дальность',
+  'codex.row.cooldown': 'Перезарядка',
   'codex.row.score': 'Очки победы',
   'codex.row.signature': 'Радарная сигнатура',
   'codex.row.slot': 'Слот',
