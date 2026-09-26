@@ -51,7 +51,6 @@ export const UNIT_ICON: Record<string, string> = {
   cruiser: '▲',
   scout: '◌',
   siege: '✦',
-  strike_carrier: '⊟', // десантный корабль — сплошной трюм, ни одного орудийного отсека
   shuttle_carrier: '⬢', // плавучий космопорт — сплошной корпус, весь объём под ангар
   interceptor: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
   bomber: '⧨', // челнок с бомбовой нагрузкой — тот же треугольник, но «полный»

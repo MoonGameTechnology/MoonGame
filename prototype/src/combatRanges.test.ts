@@ -32,7 +32,7 @@ describe('RANGE-UX — радиусы приходят из ядра, а не и
   it('круг эскадрильи равен shuttleStrikeRange ядра', () => {
     const { s, fleet } = withFleet([
       { unit: 'interceptor', count: 2 },
-      { unit: 'strike_carrier', count: 1 },
+      { unit: 'shuttle_carrier', count: 1 },
     ]);
     const core = shuttleStrikeRange(fleet, data);
     const ring = combatRanges(s, data, [fleet.id], ME, locate, seen).rings.find(

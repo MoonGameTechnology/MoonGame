@@ -2828,10 +2828,10 @@ cruiser, siege_lance, bomber(челнок против корпусов:
 attack 20, siegeDamage 18), interceptor(охотник за челноками: shuttleDamage 22 при
 attack 4),
 landing_shuttle(«десантный челнок», ROS-1.5 + SHU-5.2: attack 0, трейт `lander` — строится с
-одним наземным бойцом внутри и садится им; cargoSize 2), strike_carrier(«десантный корабль», cargoCapacity 16), shuttle_carrier(«Авианосец»,
-cargoCapacity 6 — с SHU-5.1 обычный трюм), militia, drop_infantry, tank(cargoSize 2), heavy_infantry,
-special_forces, hero, interceptor` (всего в `data/units.json` 21 юнит: 12 `vanguard`,
-5 `blue`, по 2 `neutral` и `swarm`; `orbital_aa` — защитное здание, не юнит;
+одним наземным бойцом внутри и садится им; cargoSize 2), shuttle_carrier(«Носитель», cargoCapacity 16, hp 140 — с SHU-5.1 обычный
+трюм; авианосец и десантный корабль слиты в него решением владельца 2026-09-26), militia, drop_infantry, tank(cargoSize 2), heavy_infantry,
+special_forces, hero, interceptor` (всего в `data/units.json` 25 юнитов: 12 `vanguard`,
+6 `blue`, 5 `swarm`, 2 `neutral`; `orbital_aa` — защитное здание, не юнит;
 `infected_cruiser` в контенте нет). **Осадной платформы как юнита нет** (SIEGE-1, резолюция
 владельца 2026-09-23): её роль — модуль `siege_platform` («Осадная платформа», слот оружия,
 `+60 siegeDamage`, ставится только на крейсер); бомбардировка читает эффективный стат корпуса,
@@ -2839,12 +2839,12 @@ special_forces, hero, interceptor` (всего в `data/units.json` 21 юнит:
 боя несут трейт `support` (ROS-SUP-1: `scout`, `picket_frigate`, `shuttle_carrier`; `frigate`
 снят решением владельца 2026-09-25 «Фрегат в корабли») — по нему
 Производство и подготовка Sector Zero выносят их во вкладку/ряд «Поддержка»
-(`decisions/supportShips.ts`). `dropship` СНЯТ (заказ владельца 2026-09-09):
-десантный корабль в игре один, и это переделанный `strike_carrier` — трюм 16, hp 140,
-attack 1, челноков не несёт. Внутреннее имя корпуса историческое (был «ударный
-носитель»); игроку оно не видно, имя приходит из локали `data.strike-carrier`.
+(`decisions/supportShips.ts`). Выделенный транспорт в игре один — «Носитель»
+(`shuttle_carrier`, трейты `carrier` + `support`): `dropship` снят 2026-09-09, а
+`strike_carrier` (десантный корабль) — 2026-09-26, когда владелец слил его с авианосцем
+(«вместо авианосца и десантного корабля — просто носитель», «носитель в поддержке»).
   **Линии получения урона — свойство кораблей** (GDD §7.2, раздача — в §5,
-  `combat.tick`). Линий ТРИ (ROS-2.1): front — `cruiser, strike_carrier, interceptor,
+  `combat.tick`). Линий ТРИ (ROS-2.1): front — `cruiser, interceptor,
   bomber, hero`; mid — `scout, scout_drone, frigate`; rear — `siege_lance,
   shuttle_carrier`. Прежняя четвёртая, артиллерийская, снята вместе со всей подсистемой
   огня с дистанции: линию называет только поле `line`, исключений нет ни у кого.
@@ -5114,7 +5114,7 @@ instantRepair, fleetRepair, effects, seatClaim, visibility])` (40 модулей
   `time.advanced`, что у порта; погибший целиком флот уносит ангар с собой (осиротеть
   нечему — ангар лежит НА флоте), а вылет с исчезнувшей базой ловится на посадке
   (`shuttle.lost`). Тесты: 16 в `shuttleCarrier.test.ts`.
-  `shuttle_carrier` («Авианосец», трюм 6) — с SHU-5.1 не единственный носитель, а корпус с
+  `shuttle_carrier` («Носитель», трюм 16) — с SHU-5.1 не единственный носитель, а корпус с
   трейтом `carrier`, которому бот отдаёт эскадры первым, за ним — флоту с ремонтным ангаром
   (`decisions/holdPick.ts`, SHU-5.6); возить шаттлы может любой корабль с трюмом.
   **YARD-1 (заказ владельца 2026-09-14): ВЕРФЬ и КОСМОПОРТ — разные производства.** До
@@ -5256,8 +5256,8 @@ instantRepair, fleetRepair, effects, seatClaim, visibility])` (40 модулей
   в карточке корабля флота Роя крейсер показан Охотником. Названия и числа
   остаются локализованными элементами интерфейса. Станция привязана к `starfort` и
   `metal_station`, нового мобильного юнита нет; наземные войска сохраняют свои иконки.
-  Десантный корабль (`strike_carrier`) — в десантной семье вместе с шаттлом (`dropship`),
-  грузовик — только у авианосца (SHIPART-2, решение владельца 2026-09-24).
+  Картинка `dropship` — только у десантного челнока, грузовик — у Носителя (SHIPART-2,
+  решения владельца 2026-09-24 и 2026-09-26).
   Карточка флота (`fleetPanelHtml`): ХП-бар армии (корабли+десант, effectiveStats;
   отдельная полоса щита), чипы АТК/ЗАЩ считаются как в ядре (`cappedUnitStat`,
   кап-индикатор `N/10`), СКР = `fleetBaseSpeed` с меткой ⚡ форс-марша; время в

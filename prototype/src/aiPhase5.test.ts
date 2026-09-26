@@ -87,7 +87,7 @@ describe('SHU-5.6 — шаттлы в трюме корабля', () => {
   it('из двух транспортов выбирается флот с РЕМОНТНЫМ АНГАРОМ, а не просторный трюм', () => {
     const { s, home } = staged();
     home.hangar = [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }];
-    fleetAt(s, 'p2_a', home.id, [{ unit: 'strike_carrier', count: 1 }]); // трюм 16
+    fleetAt(s, 'p2_a', home.id, [{ unit: 'cruiser', count: 2 }]); // трюм 10
     fleetAt(s, 'p2_b', home.id, [{ unit: 'cruiser', count: 1, modules: ['repair_bay'] }]);
     const loads = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load');
     expect((loads[0]?.payload as { fleetId: string }).fleetId).toBe('p2_b');
@@ -100,7 +100,7 @@ describe('SHU-5.6 — шаттлы в трюме корабля', () => {
     // Ремонтный крейсер впереди по рангу, но его 5 мест заняты десантом.
     fleetAt(s, 'p2_full', home.id, [{ unit: 'cruiser', count: 1, modules: ['repair_bay'] }]);
     s.fleets.p2_full!.landing = [{ unit: 'militia', count: 4 }];
-    fleetAt(s, 'p2_roomy', home.id, [{ unit: 'strike_carrier', count: 1 }]);
+    fleetAt(s, 'p2_roomy', home.id, [{ unit: 'shuttle_carrier', count: 1 }]);
     const loads = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load');
     expect((loads[0]?.payload as { fleetId: string }).fleetId).toBe('p2_roomy');
     passes(s, loads[0]!);

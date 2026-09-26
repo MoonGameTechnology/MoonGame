@@ -573,7 +573,7 @@ try {
   await tabB.locator('#sz-prep').click();
   // Другой корпус, чем у вкладки A (там ионный двигатель занял слот системы крейсера). По
   // id, а не по месту в ряду: ряды меняются вместе с данными (фрегат переехал в «Корабли»).
-  await tabB.locator('[data-prep="hull"][data-id="strike_carrier"]').click();
+  await tabB.locator('[data-prep="hull"][data-id="shuttle_carrier"]').click();
   await tabB.locator('[data-prep="fit"][data-id="cargo_bay"]').first().click();
   // Вытесненная вкладка уходит со страницы — раньше здесь она писала свою копию поверх.
   await tabA.evaluate(() => window.dispatchEvent(new Event('pagehide')));

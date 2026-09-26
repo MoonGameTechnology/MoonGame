@@ -32,7 +32,7 @@ export const SHIP_HULLS: Record<string, ShipHull> = {
   cruiser: { name: 'ship.hull.cruiser', icon: '▲', slots: 3, base: 'cruiser' },
   siege_lance: { name: 'ship.hull.siege_lance', icon: '✦', slots: 2, base: 'siege_lance' },
   scout_drone: { name: 'ship.hull.scout_drone', icon: '◌', slots: 1, base: 'scout' },
-  dropship: { name: 'ship.hull.dropship', icon: '⊟', slots: 2, base: 'strike_carrier' },
+  carrier: { name: 'ship.hull.carrier', icon: '⬢', slots: 2, base: 'shuttle_carrier' },
 };
 
 export const SHIP_HULL_IDS: string[] = Object.keys(SHIP_HULLS);
@@ -124,5 +124,5 @@ export const DEFAULT_SHIP_LOADOUTS: ShipLoadout[] = [
   { hull: 'cruiser', modules: ['battery', 'plating', 'shield'] },
   { hull: 'siege_lance', modules: ['battery', 'targeting'] },
   { hull: 'scout_drone', modules: ['thruster'] },
-  { hull: 'dropship', modules: ['plating', 'plating'] },
+  { hull: 'carrier', modules: ['plating', 'plating'] },
 ];

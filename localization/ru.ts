@@ -869,7 +869,7 @@ export const ru: Record<string, string> = {
   'data.bulwark': 'Бастион',
   'data.cargo-bay': 'Грузовой отсек',
   'data.repair-bay': 'Ремонтный ангар',
-  'data.carrier': 'авианосец',
+  'data.carrier': 'носитель',
   'data.combined-arms': 'Общевойсковой бой',
   'data.commander': 'Командир',
   'data.commander-drill-gunnery': 'Слаженные экипажи',
@@ -991,7 +991,7 @@ export const ru: Record<string, string> = {
   'data.shield-booster': 'Тяжёлый щит',
   'data.area-defense-array': 'Зональное ПВО',
   'data.siege-doctrine': 'Осадная доктрина',
-  'data.shuttle-carrier': 'Авианосец',
+  'data.shuttle-carrier': 'Носитель',
   'data.siege-platform': 'Осадная платформа',
   'data.signal-corps': 'Войска связи',
   'data.solar-flare-zone': 'Зона солнечных вспышек',
@@ -1003,7 +1003,6 @@ export const ru: Record<string, string> = {
   'data.steward-protocol': 'Протокол «Хранитель»',
   'data.sustained-corridor': 'Устойчивый коридор',
   'data.shared-corridor': 'Общий коридор',
-  'data.strike-carrier': 'десантный корабль',
   'data.strike-vectors': 'Ударные векторы',
   'data.tank': 'танк',
   'data.targeting-array': 'Система наведения',
@@ -1150,11 +1149,8 @@ export const ru: Record<string, string> = {
     'Лёгкий разведывательный корпус. Быстрый (ход {sp}) и почти неслышный (сигнатура {sig}) — чертит карту пустоты там, куда боится соваться линейный флот. Носит свой компактный радар (+{m}).',
   'dossier.unit.scout.name': 'Разведчик',
   'dossier.unit.shuttle-carrier.desc':
-    'Плавучий космопорт: трюм на {bay} мест под шаттлы и десант, {d} защиты, {hp} корпуса, {a} атаки. Стоит в задней линии. Шаттлы вылетают с борта на ходу и садятся обратно; погибнет корпус — погибнет всё на борту.',
-  'dossier.unit.shuttle-carrier.name': 'Авианосец',
-  'dossier.unit.strike-carrier.desc':
-    'Десантный корабль: самый большой трюм во флоте ({c} мест) на самом толстом корпусе ({hp}). Он не воюет — {a} атаки это ничто, — он довозит армию к чужому миру и держит удар, пока она высаживается. Шаттлы везёт в том же трюме.',
-  'dossier.unit.strike-carrier.name': 'Десантный корабль',
+    'Плавучий космопорт: трюм на {bay} мест под шаттлы и десант, {d} защиты, {hp} корпуса, {a} атаки. Везёт и армию для высадки, и шаттлы. Стоит в линии поддержки. Шаттлы вылетают с борта на ходу и садятся обратно; погибнет корпус — погибнет всё на борту.',
+  'dossier.unit.shuttle-carrier.name': 'Носитель',
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'Кочевой конкорд логистов: флоты идут по лейнам на +15% быстрее.',
@@ -2551,7 +2547,7 @@ export const ru: Record<string, string> = {
   'training.stage.fleet': 'Управление флотом',
   'training.stage.battle': 'Бой и герой',
   'training.stage.retreat': 'Отход и ремонт',
-  'training.stage.carrier': 'Авианосец',
+  'training.stage.carrier': 'Носитель',
   'training.stage.assault': 'Штурм',
   'training.stage.fortify': 'Закрепление',
   'training.stage.finale': 'Финал',
@@ -2567,7 +2563,7 @@ export const ru: Record<string, string> = {
   'training.tour.battle.hero': 'Примените способность героя. После применения — перезарядка.',
   'training.tour.retreat.retreat': 'Двиньте флот к планете-цели и в бою нажмите «Отступить». Отход стоит 40% текущего корпуса и щита.',
   'training.tour.retreat.repair': 'Верните флот на базу и почините у своего дока.',
-  'training.tour.carrier.strike': 'Поставьте авианосец на дороге к посту и отправьте эскадру: «Удар». Радиус удара — 180.',
+  'training.tour.carrier.strike': 'Поставьте носитель на дороге к посту и отправьте эскадру: «Удар». Радиус удара — 180.',
   'training.tour.carrier.home': 'Дождитесь, пока эскадра вернётся в ангар.',
   'training.tour.assault.load': 'Погрузите войска на флот у базы. Погрузка — 1 ч; улетите раньше — она отменится.',
   'training.tour.assault.outpost': 'Очистите орбиту поста и нажмите «Штурм». Десант должен перевесить гарнизон и форт.',
@@ -2695,7 +2691,7 @@ export const ru: Record<string, string> = {
 
   // --- ship — Корабли: корпуса и модули (имя + описание).
   'ship.hull.cruiser': 'Крейсер',
-  'ship.hull.dropship': 'Десантный корабль',
+  'ship.hull.carrier': 'Носитель',
   'ship.hull.scout_drone': 'Скаут-дрон',
   'ship.hull.siege_lance': 'Осадная ланса',
   'ship.module.battery.desc': '+30% к атаке.',

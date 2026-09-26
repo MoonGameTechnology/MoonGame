@@ -195,15 +195,6 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           n: hl((def.slots?.weapon ?? 0) + (def.slots?.defense ?? 0) + (def.slots?.utility ?? 0)),
         }),
       };
-    case 'strike_carrier':
-      return {
-        name: t('dossier.unit.strike-carrier.name'),
-        body: t('dossier.unit.strike-carrier.desc', {
-          hp: hl(st.hp),
-          c: hl(st.cargoCapacity ?? 0),
-          a: hl(st.attack),
-        }),
-      };
     case 'shuttle_carrier':
       return {
         name: t('dossier.unit.shuttle-carrier.name'),

@@ -995,7 +995,6 @@ export const en: Record<string, string> = {
   'data.steward-protocol': 'Steward Protocol',
   'data.sustained-corridor': 'Sustained Corridor',
   'data.shared-corridor': 'Shared Corridor',
-  'data.strike-carrier': 'landing ship',
   'data.strike-vectors': 'Strike Vectors',
   'data.tank': 'tank',
   'data.targeting-array': 'Targeting Array',
@@ -1142,11 +1141,8 @@ export const en: Record<string, string> = {
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go. It carries its own compact radar (+{m}).',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
-    'A spaceport under way: a {bay}-place hold for shuttles and troops, {d} defense, {hp} hull, {a} attack. Stands in the rear line. Shuttles launch from it on the move and land back; lose the hull and you lose everything aboard.',
+    'A spaceport under way: a {bay}-place hold for shuttles and troops, {d} defense, {hp} hull, {a} attack. Carries both the landing army and the shuttles. Stands in the support line. Shuttles launch from it on the move and land back; lose the hull and you lose everything aboard.',
   'dossier.unit.shuttle-carrier.name': 'Carrier',
-  'dossier.unit.strike-carrier.desc':
-    "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. Shuttles ride in the same hold.",
-  'dossier.unit.strike-carrier.name': 'Landing Ship',
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'A nomad concord of hauliers: fleets run the lanes 15% faster.',
@@ -2691,7 +2687,7 @@ export const en: Record<string, string> = {
 
   // --- ship — Корабли: корпуса и модули (имя + описание).
   'ship.hull.cruiser': 'Cruiser',
-  'ship.hull.dropship': 'Landing Ship',
+  'ship.hull.carrier': 'Carrier',
   'ship.hull.scout_drone': 'Scout Drone',
   'ship.hull.siege_lance': 'Siege Lance',
   'ship.module.battery.desc': '+30% to attack.',

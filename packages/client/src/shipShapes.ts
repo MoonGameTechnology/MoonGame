@@ -68,10 +68,9 @@ export const UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
   siege: 'dreadnought',
   siege_lance: 'dreadnought',
   hero: 'dreadnought',
-  // Owner decision 2026-09-24: the landing ship joins the landing family next to the
-  // landing shuttle; the freighter stays with the carrier, so two different classes
-  // never share one picture again.
-  strike_carrier: 'dropship',
+  // Owner decision 2026-09-26: the carrier and the landing ship are one hull, the
+  // Carrier; the freighter is its picture and the dropship art belongs to the landing
+  // shuttle alone.
   shuttle_carrier: 'transport',
   landing_shuttle: 'dropship',
 };
@@ -89,10 +88,9 @@ export const SWARM_UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
   picket_frigate: 'swarmFlock',
   cruiser: 'swarmHunter',
   landing_shuttle: 'swarmDevourer',
-  strike_carrier: 'swarmSporeCarrier',
   siege: 'swarmDestroyer',
   siege_lance: 'swarmDestroyer',
-  shuttle_carrier: 'swarmMatriarch',
+  shuttle_carrier: 'swarmSporeCarrier',
   swarm_brood_mother: 'swarmMatriarch',
   hero: 'swarmLeviathan',
 };
