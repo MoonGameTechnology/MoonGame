@@ -25,12 +25,17 @@ const COLORS: Readonly<Record<string, string>> = {
   debris_field: "#689caf",
   graveyard: "#8ab6c1",
   dead_world: "#929ac0",
+  asteroid_cluster: "#b7c4a1",
+  rift: "#c7a0ed",
+  dust_lane: "#baa7cc",
+  depleted_system: "#7f99ab",
 };
 const ANIMATED = new Set([
   "nebula",
   "dense_nebula",
   "ion_storm",
   "solar_flare",
+  "rift",
 ]);
 
 /** Smooth interior coverage, including concave boundaries. Outside is transparent. */
@@ -143,7 +148,81 @@ function geometry(field: TerrainArtField): Geometry {
     return seed / 4294967296;
   };
 
-  if (field.kind === "asteroid") {
+  if (field.kind === "asteroid_cluster") {
+    // Dense mineral core, scattered surrounding rocks, open outer edge.
+    // Generated once in local space; the existing asteroid field stays untouched.
+    for (let i = 0; i < 58; i++) {
+      const a = random() * Math.PI * 2;
+      const reach = Math.sqrt(random()) * (i < 42 ? 0.25 : 0.43);
+      const x = 0.5 + Math.cos(a) * reach;
+      const y = 0.5 + Math.sin(a) * reach * 0.82;
+      if (Math.hypot(x - marker[0], y - marker[1]) < 0.105) continue;
+      const radius = 0.014 + random() * (i < 42 ? 0.036 : 0.018);
+      const points = Array.from({ length: 6 }, (_, j): Point => {
+        const angle = a + (j * Math.PI * 2) / 6;
+        const r = radius * (0.65 + random() * 0.35);
+        return [x + Math.cos(angle) * r, y + Math.sin(angle) * r];
+      });
+      path([...points, points[0]!], i < 42 ? 0.49 : 0.27);
+      line(points[0]!, points[3]!, 0.18);
+      if (i < 42) line([x, y], points[1]!, 0.23);
+    }
+  } else if (field.kind === "rift") {
+    // A split seam and warped contour planes, not a storm or a filled portal.
+    for (const side of [-1, 1]) {
+      for (let band = 0; band < 4; band++) {
+        path(Array.from({ length: 33 }, (_, j): Point => {
+          const t = j / 32;
+          const bend = Math.sin(t * Math.PI) * (0.025 + band * 0.058);
+          const seam = Math.sin(t * 18 + phase) * 0.017 + (t - 0.5) * 0.13;
+          return [0.5 + seam + side * (0.018 + bend), 0.08 + t * 0.84];
+        }), band === 0 ? 0.5 : 0.25 - band * 0.04);
+      }
+      for (let i = 0; i < 7; i++) {
+        const y = 0.18 + i * 0.105;
+        const x = 0.5 + (y - 0.5) * 0.13;
+        path([[x + side * 0.05, y], [x + side * 0.13, y - 0.025],
+          [x + side * 0.23, y - 0.075]], 0.15);
+      }
+    }
+  } else if (field.kind === "dust_lane") {
+    // Fine sediment follows one oblique ribbon, with a dense middle and soft edges.
+    for (let band = -4; band <= 4; band++) {
+      path(Array.from({ length: 35 }, (_, j): Point => {
+        const x = j / 34;
+        return [x, 0.69 - x * 0.38 + Math.sin(x * 5 + phase) * 0.045 + band * 0.022];
+      }), 0.08 + (4 - Math.abs(band)) * 0.038);
+    }
+    for (let i = 0; i < 70; i++) {
+      const x = random();
+      const y = 0.69 - x * 0.38 + Math.sin(x * 5 + phase) * 0.045
+        + (random() - 0.5) * 0.21;
+      const length = 0.004 + random() * 0.013;
+      line([x, y], [x + length, y - length * 0.4], 0.18 + random() * 0.18);
+    }
+  } else if (field.kind === "depleted_system") {
+    // Sparse broken survey orbits and a handful of exhausted extraction frames.
+    // The planet/dead-world node is still drawn separately by its original renderer.
+    for (let ring = 0; ring < 3; ring++) {
+      for (let arc = 0; arc < 3; arc++) {
+        const start = phase + arc * 2.1 + ring * 0.4;
+        path(Array.from({ length: 16 }, (_, j): Point => {
+          const a = start + (j / 15) * 0.98;
+          const r = 0.2 + ring * 0.09;
+          return [marker[0] + Math.cos(a) * r, marker[1] + Math.sin(a) * r * 0.66];
+        }), 0.19 - ring * 0.035);
+      }
+    }
+    for (let i = 0; i < 7; i++) {
+      const a = phase + i * 2.4;
+      const r = 0.22 + random() * 0.13;
+      const x = marker[0] + Math.cos(a) * r;
+      const y = marker[1] + Math.sin(a) * r * 0.66;
+      path([[x - 0.013, y - 0.008], [x + 0.013, y - 0.008],
+        [x + 0.013, y + 0.008]], 0.29);
+      line([x - 0.02, y + 0.013], [x - 0.008, y + 0.013], 0.16);
+    }
+  } else if (field.kind === "asteroid") {
     for (const [i, rock] of (field.asteroids ?? []).entries()) {
       const center = local([rock.x, rock.y]);
       const points =

@@ -72,6 +72,8 @@ export const KIND_ICON: Record<string, string> = {
   planet: '◉',
   dead_world: '⊗',
   asteroid: '⬡',
+  asteroid_cluster: '⬢',
+  rift: '⋈',
   nebula: '≋',
   dense_nebula: '❋',
   graveyard: '⊘',

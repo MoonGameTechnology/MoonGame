@@ -35,6 +35,10 @@ const TERRAIN_KINDS = new Set([
   'graveyard',
   'dead_world',
   'debris_field',
+  'asteroid_cluster',
+  'rift',
+  'dust_lane',
+  'depleted_system',
 ]);
 
 /** Only these decorative terrain families replace their old standalone glyph. */

@@ -11,6 +11,10 @@ describe('terrain presentation respects discovered geometry', () => {
   it('never replaces unexplored fog with terrain details', () => {
     expect(makeTerrainField('C2R3', 'ion_storm', '#ffaa00', poly, false)).toBeNull();
     expect(makeTerrainField('C2R3', 'asteroid', '#aaaaaa', poly, false)).toBeNull();
+    for (const kind of ['asteroid_cluster', 'rift', 'dust_lane', 'depleted_system']) {
+      expect(makeTerrainField('C2R3', kind, '#aaaaaa', poly, false)).toBeNull();
+      expect(makeTerrainField('C2R3', kind, '#aaaaaa', poly, true)?.kind).toBe(kind);
+    }
   });
   it('keeps the exact province polygon without moving a border or node', () => {
     const before = structuredClone(poly);

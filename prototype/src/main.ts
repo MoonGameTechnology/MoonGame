@@ -555,6 +555,7 @@ import {
   setRunClock,
 } from './format';
 import { runClockText } from '../../decisions/runClock';
+import { terrainArtKind } from '../../decisions/terrainArt';
 import { metaUnlocks, pveOutcomeEvent } from '../../decisions/runAnalytics';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
@@ -5107,7 +5108,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
       // Cull using the cheap polygon bounds BEFORE constructing rock geometry.
       if (poly.every(([x]) => x < 0) || poly.every(([x]) => x > VW) ||
         poly.every(([, y]) => y < 0) || poly.every(([, y]) => y > VH)) continue;
-      const field = terrainGeometry.project(n.id, n.sector, sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
+      const field = terrainGeometry.project(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain), sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
         known(n.id) || memory.has(n.id), world(n));
       if (!field || field.box.x > VW || field.box.y > VH ||
         field.box.x + field.box.width < 0 || field.box.y + field.box.height < 0) continue;
@@ -5288,7 +5289,7 @@ function prepareEnteringMap(): boolean {
         // Prepare known geometry beyond the first screen, in cooperative loading
         // slices. Unexplored provinces never enter either terrain cache.
         const poly = provincePolygons.get(n.id);
-        if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, n.sector,
+        if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain),
           sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly, known(n.id) || memory.has(n.id), world(n));
         const field = terrainFields.find(f => f.id === n.id);
         if (field) terrainRaster.prepare(field, DPR);
@@ -5679,7 +5680,7 @@ function render(now: number) {
     // fat hub where the lanes meet, no orbits. Captured by simply arriving. Raising a
     // fortress here stops making it an asteroid field at all: `station.deploy` turns the
     // node into `void_station`, which draws (with its hull bar) in its own branch below.
-    if (n.sector === 'asteroid' && !holographicMapOn()) {
+    if ((n.sector === 'asteroid' || n.sector === 'asteroid_cluster') && !holographicMapOn()) {
       blitGlow(col, c.x, c.y, 30, p.owner ? 0.16 : 0.06); // cached glow disc
       cx.save();
       cx.strokeStyle = 'rgba(186,170,140,0.7)';
@@ -5810,6 +5811,20 @@ function render(now: number) {
         cx.lineTo(c.x + dx * (R + 5), c.y + dy * (R + 5));
       }
       cx.stroke();
+    } else if (n.sector === 'rift') {
+      // Classic mode retains a compact split-seam marker for the new obstacle.
+      cx.save();
+      cx.strokeStyle = '#c7a0ed';
+      cx.lineWidth = 1.3;
+      for (const side of [-1, 1]) {
+        cx.beginPath();
+        cx.moveTo(c.x - R * .3 + side * 2, c.y - R);
+        cx.lineTo(c.x + R * .18 + side * 4, c.y - R * .25);
+        cx.lineTo(c.x - R * .18 + side * 4, c.y + R * .25);
+        cx.lineTo(c.x + R * .3 + side * 2, c.y + R);
+        cx.stroke();
+      }
+      cx.restore();
     } else if (n.sector === 'nebula' || n.sector === 'dense_nebula') {
       // Nebula: soft diamond (rotated square) with diffuse glow
       const kc = sectorTypeOf(n.id)?.color ?? col;
