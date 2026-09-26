@@ -42,6 +42,7 @@ import {
   type UnitStack,
 } from '../../packages/shared-core/src/index';
 import { bossFallen, heroByFleet, heroNode } from '../../packages/shared-core/src/state/heroes';
+import { fleetHangarRepairRate } from '../../packages/shared-core/src/util/repair';
 // Опознанные узлы считаются ОДИН раз на тик и передаются в `knownGarrison`: покрытие
 // сенсоров — проход по всему флоту, а спрашивают про него десятки миров подряд.
 import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
@@ -86,6 +87,7 @@ import {
 } from '../../decisions/garrisonPolicy';
 import { freshIntel, knownGarrison } from '../../decisions/garrisonIntel';
 import { planDrop } from '../../decisions/dropPlan';
+import { pickHoldFleet } from '../../decisions/holdPick';
 import { isLander, landerTroopCandidates } from '../../decisions/landerTroops';
 import { botEmbargoes } from './botFavour';
 import { netIncome } from './economy';
@@ -164,6 +166,11 @@ const DROPSHIP_CAP = 2;
  *  отдельный корпус). Столько же держал бот и платформ, пока они были юнитом. */
 const SIEGE_CAP = 2;
 const SIEGE_MODULE = 'siege_platform';
+/** Крейсеров с ремонтным ангаром (SHU-5.6) — два, как осадных: по одному на ударную
+ *  группу. Флот чинит эскадры в трюме ЛУЧШИМ модулем среди своих кораблей
+ *  (`fleetHangarRepairRate`), второй ангар в том же флоте ничего не добавляет. */
+const REPAIR_BAY_CAP = 2;
+const REPAIR_MODULE = 'repair_bay';
 /** Предел челноков КАЖДОГО рода — картонные, дорогие по микроэлектронике, конкурируют
  *  с крейсерами за тот же дефицитный ресурс. Считается по АНГАРУ порта, а не по флотам:
  *  челнок с SHU-1.1 живёт в `planet.hangar` и во флот не попадает никогда. */
@@ -182,8 +189,16 @@ const CARRIER_CAP = 1;
  * вылеты, и она идёт БЕЗ приказа (база поднимает звено сама, SHU-1.3). Строит его бот
  * отдельным правилом ниже; послать его бить корпуса значило бы измерить не ту роль —
  * у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
+ *
+ * Тяжёлый страйкер (SHU-5.6) стоит ПЕРВЫМ: заказы идут по порядку списка, и дефицитная
+ * микроэлектроника достаётся сперва ему — его `strikeRange` 260 против 150 у ударного
+ * достаёт соседнюю провинцию (§0.5). Пока «Ударные векторы» не изучены, ядро его заказ
+ * отбивает, проба `canOrder` это видит, и очередь просто переходит к ударному.
  */
-const STRIKE_SHUTTLES = ['bomber', 'landing_shuttle'] as const;
+const STRIKE_SHUTTLES = ['heavy_striker', 'bomber', 'landing_shuttle'] as const;
+/** Ударные машины вылета «по корпусам и мирам» — в порядке дальности: тяжёлый достаёт
+ *  дальше, поэтому поднимается первым; нечем или некого — очередь ударного. */
+const STRIKERS = ['heavy_striker', 'bomber'] as const;
 /** Кандидаты в бойцы десантного челнока (SHU-5.2), от самого ударного — общее правило
  *  `/decisions/landerTroops.ts`. Строить ли их на ЭТОМ мире — спрашивается у ядра
  *  (`canOrder`) в момент заказа. */
@@ -1157,11 +1172,11 @@ function baseAiOrders(
           const q = e.payload as { kind?: string; planetId?: string; unit?: string };
           return q.kind === 'unit' && q.planetId === planetId && q.unit === unit;
         });
-      const pendingSiege = (planetId: string): boolean =>
+      const pendingSiege = (planetId: string, mod: string = SIEGE_MODULE): boolean =>
         state.scheduled.some((e) => {
           if (e.type !== 'construction.complete') return false;
           const q = e.payload as { kind?: string; planetId?: string; modules?: string[] };
-          return q.kind === 'unit' && q.planetId === planetId && !!q.modules?.includes(SIEGE_MODULE);
+          return q.kind === 'unit' && q.planetId === planetId && !!q.modules?.includes(mod);
         });
       // `troop` — боец десантного челнока (SHU-5.2): платится вместе с машиной.
       const affordableUnit = (unit: string, count: number, troop?: string): boolean => {
@@ -1327,6 +1342,27 @@ function baseAiOrders(
       ) {
         out.push(buildShip(ai, base.id, 'cruiser', 1, [SIEGE_MODULE]));
       }
+      // РЕМОНТНЫЙ АНГАР (SHU-5.4 → SHU-5.6). Крейсер — тот корпус, что у бота возит
+      // шаттлы в трюме (5 мест; авианосец строится редко), и вспомогательный слот у него
+      // свободен: осадный модуль — оружейный. Ангар чинит корпус в походе и эскадры на
+      // борту, поэтому нужен ровно там, где идут вылеты: на войне, пара на империю.
+      // Погрузка предпочитает флот с ангаром (`pickHoldFleet`). Проба `canOrder` — на
+      // случай арсенала без модуля: тогда заказа нет, а не отказ ядра каждый тик.
+      const repairCost = data.modules[REPAIR_MODULE]?.cost ?? {};
+      if (
+        warFooting &&
+        data.modules[REPAIR_MODULE] &&
+        shipsOwned('cruiser', REPAIR_MODULE) < REPAIR_BAY_CAP &&
+        !pendingSiege(base.id, REPAIR_MODULE) &&
+        Object.keys({ ...(data.units.cruiser?.cost ?? {}), ...repairCost }).every(
+          (r) =>
+            (pl.resources[r] ?? 0) >=
+            (data.units.cruiser?.cost[r] ?? 0) + (repairCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+        ) &&
+        canOrder(state, buildShip(ai, base.id, 'cruiser', 1, [REPAIR_MODULE])) === null
+      ) {
+        out.push(buildShip(ai, base.id, 'cruiser', 1, [REPAIR_MODULE]));
+      }
       // ═══ ЧЕЛНОКИ (SHU-1.1 + SHU-3.2) ═══
       // Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём, поэтому цепочка
       // короткая — порт у бота и так есть под корабли.
@@ -1394,43 +1430,41 @@ function baseAiOrders(
       // Носитель без эскадр — просто дорогой корпус с плохими пушками. Грузим, пока он
       // СТОИТ у своего мира с портом: ядро возит соединение целиком и только со стоянки.
       // Один приказ за тик той же формы, что и остальные правила бота.
-      const myCarrier = Object.values(state.fleets)
-        .filter(
-          (f) =>
-            f.owner === ai &&
-            !f.movement &&
-            !f.battleId &&
-            f.location !== null &&
-            fleetShuttleBay(f, data) > 0,
-        )
-        // С SHU-5.1 трюм есть у любого транспорта, поэтому сначала берётся флот с
-        // АВИАНОСЦЕМ (трейт `carrier`), дальше — с самым свободным трюмом, равенство — по
-        // id (детерминированно): иначе бот грузил бы эскадру в первый попавшийся
-        // крейсер, мимо стоящего рядом авианосца.
-        .map((f) => ({
-          f,
-          cv: f.units.some((st) => st.count > 0 && data.units[st.unit]?.traits.includes('carrier')) ? 1 : 0,
-          room: fleetHoldFree(state, f, data),
-        }))
-        .sort(
-          (a, b) =>
-            b.cv - a.cv || b.room - a.room || (a.f.id < b.f.id ? -1 : a.f.id > b.f.id ? 1 : 0),
-        )[0]?.f;
-      if (myCarrier) {
-        const dock = state.planets[myCarrier.location!];
-        const free = fleetHoldFree(state, myCarrier, data);
-        // Берётся ПЕРВАЯ ударная эскадра порта, влезающая целиком, — тем же правилом,
-        // что и кнопка перегрузки у игрока (`transferPick`): половину ядро отобьёт.
-        const liftable = (dock?.hangar ?? []).find(
-          (sq) =>
-            sq.units.some((st) => STRIKE_SHUTTLES.includes(st.unit as never) && st.count > 0) &&
-            squadronSize(sq) > 0 &&
-            stacksSize(sq.units, data) <= free,
-        );
-        if (dock && dock.owner === ai && liftable) {
-          out.push(loadShuttle(ai, myCarrier.id, liftable.id));
-        }
-      }
+      // Кандидат — флот, СТОЯЩИЙ у своего мира, в порту которого есть ударная эскадра,
+      // влезающая в его трюм целиком. Берётся ПЕРВАЯ такая эскадра порта — тем же
+      // правилом, что и кнопка перегрузки у игрока (`transferPick`): половину ядро отобьёт.
+      // Кого из кандидатов грузить — `pickHoldFleet` (SHU-5.6): авианосец, потом флот с
+      // ремонтным ангаром (эскадры на его борту чинятся в походе), потом свободный трюм.
+      // Раньше лучший флот выбирался ДО порта и трюма, и полный или стоящий не у порта
+      // лидер останавливал погрузку совсем.
+      const holdPick = pickHoldFleet(
+        Object.values(state.fleets).flatMap((f) => {
+          if (f.owner !== ai || f.movement || f.battleId || f.location === null) return [];
+          if (fleetShuttleBay(f, data) <= 0) return [];
+          const dock = state.planets[f.location];
+          if (!dock || dock.owner !== ai) return [];
+          const room = fleetHoldFree(state, f, data);
+          const liftable = (dock.hangar ?? []).find(
+            (sq) =>
+              sq.units.some((st) => STRIKE_SHUTTLES.includes(st.unit as never) && st.count > 0) &&
+              squadronSize(sq) > 0 &&
+              stacksSize(sq.units, data) <= room,
+          );
+          if (!liftable) return [];
+          return [
+            {
+              id: f.id,
+              carrier: f.units.some(
+                (st) => st.count > 0 && data.units[st.unit]?.traits.includes('carrier'),
+              ),
+              repair: fleetHangarRepairRate(f, data),
+              room,
+              squadronId: liftable.id,
+            },
+          ];
+        }),
+      );
+      if (holdPick) out.push(loadShuttle(ai, holdPick.id, holdPick.squadronId));
       // ═══ ОТКУДА ПОДНИМАТЬ ═══
       // БАЗ У ВЫЛЕТА ДВЕ, а не одна. Пока бот умел только домашний порт, удар не доезжал
       // до войны вовсе: радиус челнока 120–150, а чужие миры так близко к дому не стоят —
@@ -1528,16 +1562,18 @@ function baseAiOrders(
         }
       }
 
-      // ═══ УДАР БОМБАРДИРОВЩИКОМ ═══
+      // ═══ УДАР СТРАЙКЕРОМ ═══
       // Один вылет за тик: топливо у базы общее, вторым приказом его не растянуть.
       // Цель — чужой ФЛОТ (бомбардировщик бьёт корпуса) либо чужой МИР, ближайшая в
       // радиусе, тай-брейк по id: иначе выбор зависел бы от порядка ключей объекта.
-      const bombPad = !sortied
-        ? launchpads.find((lp) => squadsWith(lp.hangar, 'bomber').length > 0)
-        : undefined;
-      if (bombPad) {
-        const squad = squadsWith(bombPad.hangar, 'bomber')[0]!;
-        const reach = reachOf('bomber');
+      // SHU-5.6: машин две — тяжёлый и ударный страйкер (`STRIKERS`), и пробуются они
+      // по порядку: первая, у которой есть и эскадра на базе, и цель в СВОЁМ радиусе,
+      // поднимается, остальные ждут следующего тика.
+      for (const unit of sortied ? [] : STRIKERS) {
+        const bombPad = launchpads.find((lp) => squadsWith(lp.hangar, unit).length > 0);
+        if (!bombPad) continue;
+        const squad = squadsWith(bombPad.hangar, unit)[0]!;
+        const reach = reachOf(unit);
         const inReach = (at: { x: number; y: number }): boolean => d(bombPad.at, at) <= reach;
         const foeFleet = nearestBy(
           Object.values(state.fleets).filter(
@@ -1564,8 +1600,11 @@ function baseAiOrders(
         );
         if (foeFleet) {
           out.push(strikeShuttle(ai, bombPad.base, squad.id, { targetFleetId: foeFleet.id }));
-        } else if (foeWorld) {
+          break;
+        }
+        if (foeWorld) {
           out.push(strikeShuttle(ai, bombPad.base, squad.id, { targetPlanetId: foeWorld.id }));
+          break;
         }
       }
     }
