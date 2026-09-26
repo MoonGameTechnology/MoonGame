@@ -117,6 +117,23 @@ describe('меню точки — «в зависимости от того, ч�
     expect(ab.label).toContain('Скан');
   });
 
+  // Заказ владельца 2026-09-25: долгое нажатие на навык в меню приказов — описание навыка.
+  it('пункт навыка несёт ключ сводки ab: и подсказку-описание', () => {
+    const items = chainMenuItems(emptyDraft(), own, 'S', {
+      ...opts,
+      abilities: [{ id: 'scan', name: 'Скан', cdH: 0, ranged: true, desc: 'Открывает туман' }],
+    });
+    const html = chainMenuHtml('ПРИКАЗ', 'B · 0/8', items);
+    expect(html).toContain('data-chab="scan" data-desc="ab:scan"');
+    expect(html).toContain('title="Открывает туман"');
+    // Причина серости важнее описания: серый пункт объясняет, почему он серый.
+    const grey = chainMenuItems(emptyDraft(), own, 'S', {
+      ...opts,
+      abilities: [{ id: 'scan', name: 'Скан', cdH: 3, ranged: true, desc: 'Открывает туман' }],
+    }).map((i) => (i.act === 'ability' ? { ...i, why: 'кулдаун' } : i));
+    expect(chainMenuHtml('ПРИКАЗ', '', grey)).toContain('title="кулдаун"');
+  });
+
   it('пункты наращивания часов помечены keep — меню не закрывается', () => {
     const items = chainMenuItems(emptyDraft(), enemy, 'S', opts);
     expect(items.find((i) => i.act === 'wait')!.keep).toBe(true);

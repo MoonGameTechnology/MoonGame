@@ -8763,7 +8763,10 @@ function renderCmdBar() {
                 : opt.ranged
                   ? t('cmd.cast.needs-target')
                   : t('cmd.cast.self');
-            return `<button data-cmd="castdo" data-ab="${opt.id}" data-hero="${castHero.id}"${opt.cdH > 0 ? ' disabled' : ''}><b>${esc(tData(ad.name))}</b><span>${sub}</span></button>`;
+            // Описание навыка: удержание на телефоне открывает сводку `ab:` (как у плиток и
+            // строк), наведение на ПК — подсказку (заказ владельца 2026-09-25).
+            const hint = ad.description ? ` title="${esc(t(ad.description))}"` : '';
+            return `<button data-cmd="castdo" data-ab="${opt.id}" data-hero="${castHero.id}" data-desc="ab:${opt.id}"${hint}${opt.cdH > 0 ? ' disabled' : ''}><b>${esc(tData(ad.name))}</b><span>${sub}</span></button>`;
           })
           .join('') +
         `</div>`
@@ -9204,7 +9207,11 @@ side.addEventListener('contextmenu', (ev) => {
 /** Что принимает удержание. Один селектор на оба слушателя: взводит удержание и
  *  съедает хвостовой клик ровно один и тот же набор кнопок — разъедься они, и на
  *  «забытой» кнопке удержание срабатывало бы, а её тап проходил бы следом. */
-const HOLD_TARGETS = '.ptile, .ptab, .asset-row';
+// Навык героя в меню приказов (✨ командной полосы и меню точки «Приказа») — тоже цель
+// удержания: его сводка `ab:` — описание, перезарядка и дальность (заказ владельца
+// 2026-09-25). Короткий тап по-прежнему применяет навык: съедается только хвостовой клик
+// созревшего удержания.
+const HOLD_TARGETS = '.ptile, .ptab, .asset-row, [data-desc^="ab:"]';
 let holdTipEl: HTMLElement | null = null;
 let holdTimer: number | null = null;
 // Жизненный цикл удержания (взвод → созревание → съеденный клик) — `holdPress.ts` (REFM-80).
@@ -15734,12 +15741,16 @@ function nearestOwnWorld(fromId: string): string | null {
 function chainAbilitiesFor(fleetIds: string[]): ChainAbility[] {
   const hero = heroAboard(Object.values(s.heroes ?? {}), fleetIds);
   if (!hero) return [];
-  return castOptionsOf(hero).map((opt) => ({
-    id: opt.id,
-    name: tData(data.heroAbilities[opt.id]!.name),
-    cdH: opt.cdH,
-    ranged: opt.ranged,
-  }));
+  return castOptionsOf(hero).map((opt) => {
+    const ad = data.heroAbilities[opt.id]!;
+    return {
+      id: opt.id,
+      name: tData(ad.name),
+      cdH: opt.cdH,
+      ranged: opt.ranged,
+      ...(ad.description ? { desc: t(ad.description) } : {}),
+    };
+  });
 }
 /** Слоты героя, разрешённые по игровым данным → пункты каста (`heroCasts.ts`, REFM-68).
  *  Одна точка разрешения на все три места, которые спрашивают «что можно применить»:

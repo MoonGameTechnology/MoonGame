@@ -659,6 +659,7 @@ export const en: Record<string, string> = {
   'codex.row.produces': 'Produces',
   'codex.row.radar': 'Radar reach',
   'codex.row.range': 'Range',
+  'codex.row.cooldown': 'Cooldown',
   'codex.row.score': 'Victory points',
   'codex.row.signature': 'Radar signature',
   'codex.row.slot': 'Slot',

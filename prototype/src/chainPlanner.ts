@@ -68,6 +68,8 @@ export interface ChainAbility {
   /** Остаток кулдауна в игро-часах (0 — готова). */
   cdH: number;
   ranged: boolean;
+  /** Уже локализованное описание — подсказка пункта наведением на ПК. */
+  desc?: string;
 }
 
 export interface ChainMenuOpts {
@@ -87,6 +89,8 @@ export interface ChainMenuItem {
   /** Выбор НЕ закрывает меню — наращивание часов повторными тапами. */
   keep?: boolean;
   ability?: string;
+  /** Подсказка наведением (title), если пункт не серый по причине `why`. */
+  hint?: string;
 }
 
 /** Применить пункт меню к черновику. `null` — применить нельзя (пункт серый). */
@@ -188,6 +192,7 @@ export function chainMenuItems(
         ability: ab.id,
         label: `★ ${ab.name}${ab.cdH > 0 ? ` ${t('hero.abil.cooldown', { h: fmtCd(ab.cdH) })}` : ''}`,
         disabled: !ok,
+        ...(ab.desc ? { hint: ab.desc } : {}),
       });
     }
   }
@@ -307,7 +312,7 @@ export function chainMenuHtml(title: string, sub: string, items: ChainMenuItem[]
   const rows = items
     .map(
       (it) =>
-        `<button data-ch="${it.act}"${it.ability ? ` data-chab="${esc(it.ability)}"` : ''}${it.keep ? ' data-keep="1"' : ''}${it.why ? ` title="${esc(it.why)}"` : ''} ${it.disabled ? 'disabled' : ''}>${esc(it.label)}</button>`,
+        `<button data-ch="${it.act}"${it.ability ? ` data-chab="${esc(it.ability)}" data-desc="ab:${esc(it.ability)}"` : ''}${it.keep ? ' data-keep="1"' : ''}${it.why || it.hint ? ` title="${esc(it.why ?? it.hint ?? '')}"` : ''} ${it.disabled ? 'disabled' : ''}>${esc(it.label)}</button>`,
     )
     .join('');
   return (

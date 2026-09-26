@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame, data } from './game';
 import { buildingLevel, type GameState } from '../../packages/shared-core/src/index';
@@ -8,9 +8,12 @@ import {
   taskDossier,
   cxRow,
   createDossiers,
+  abilityDossier,
   type DossierHost,
 } from './dossiers';
 import type { ActiveBuild } from './buildQueue';
+import { setRunClock } from './format';
+import { runClockText } from '../../decisions/runClock';
 
 // REFM-4: first tests over the dossier/codex corpus. Locale pinned RU for the same
 // reason as format.test.ts — under Node there is no browser language, so the runtime
@@ -205,6 +208,38 @@ describe('dossiers — маршрутизация objDossier', () => {
     const d = objDossier('stat:spd');
     expect(d?.body).toContain('медленного');
     expect(d?.body).not.toContain(d!.name); // «Скорость» в теле больше нет
+  });
+
+  // Заказ владельца 2026-09-25: долгое нажатие на навык в меню приказов — описание навыка.
+  it('ab: — сводка навыка героя: имя, описание, перезарядка и дальность из каталога', () => {
+    const def = data.heroAbilities.corridor!;
+    const d = objDossier('ab:corridor');
+    expect(d).toEqual(abilityDossier('corridor'));
+    expect(d?.name).toBeTruthy();
+    expect(d?.body).toContain('Перезарядка');
+    expect(d?.body).toContain(`${def.cooldownHours}ч`); // fmtHrs вне забега
+    expect(d?.body).toContain('Дальность');
+    expect(d?.body).toContain(String(def.range));
+    // Описание — настоящий текст локали, а не ключ.
+    expect(d?.body).not.toContain('hero.ability.corridor.desc');
+    expect(objDossier('ab:такого-нет')).toBeNull();
+  });
+
+  describe('в забеге', () => {
+    afterEach(() => setRunClock(() => false));
+    it('перезарядка — реальным временем, как остаток перезарядки в меню', () => {
+      setRunClock(() => true);
+      const def = data.heroAbilities.corridor!;
+      const body = abilityDossier('corridor')!.body;
+      expect(body).toContain(runClockText(def.cooldownHours * 3_600_000));
+      expect(body).not.toContain(`${def.cooldownHours}ч`);
+    });
+  });
+
+  it('навык без дальности строки «Дальность» не получает', () => {
+    const selfCast = Object.entries(data.heroAbilities).find(([, a]) => !(a.range > 0))?.[0];
+    expect(selfCast).toBeDefined();
+    expect(abilityDossier(selfCast!)?.body).not.toContain('Дальность');
   });
 
   it('b:/u: уходят в свои досье, голый и незнакомый ключ → null', () => {
