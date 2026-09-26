@@ -277,6 +277,25 @@ describe('верфь — панель конструктора', () => {
     expect(cruiser.slice(at, at + 400)).toContain('не для этого корпуса'); // …и сказано почему
   });
 
+  // Заказ владельца 2026-09-26: модули группами по типу отсека, а не вперемешку каталогом.
+  it('модули верфи — группами по отсекам, запертые для корпуса в конце своей группы', () => {
+    const html = loadoutPaneHtml(
+      s,
+      'p1',
+      normalizeDraft(s, 'p1', draftOf({ hull: 'cruiser' }), YARD_HULLS),
+      YARD_HULLS,
+      view,
+    );
+    const pal = html.slice(html.indexOf('class="cn-pal"'));
+    const heads = [...pal.matchAll(/class="cn-pg"><span aria-hidden="true">[^<]*<\/span> ([^<]+)</g)].map((x) => x[1]);
+    expect(heads).toEqual(['Оружие', 'Защита', 'Система']);
+    // Щиты пустоты — только для пушек крепости: легендарный щит не заслоняет броню крейсера.
+    expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeGreaterThan(0);
+    expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeLessThan(pal.indexOf('🔰'));
+    // Каждый модуль — в группе своего отсека: система после заголовка «Система».
+    expect(pal.indexOf('data-cnmod="cargo_bay"')).toBeGreaterThan(pal.indexOf('> Система<'));
+  });
+
   // ROS-1.2: фрегат — корабль ПОДДЕРЖКИ, и его ценность в навеске. Панель обязана
   // показать все четыре отсека: один защитный и три под системы.
   it('фрегат есть в списке верфи и несёт САМУЮ ШИРОКУЮ навеску — четыре отсека', () => {

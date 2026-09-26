@@ -340,6 +340,14 @@ try {
     // модуля в карточке своя кнопка улучшения.
     assert.equal(await page.locator('[data-prep="tab"][data-id="workshop"]').count(), 0, 'вкладки «Мастерская» нет');
     assert.equal(await page.locator('#sz-workshop .sz-cards .sz-upgrade [data-prep="forge"][data-id="cargo_bay"]').count(), 1, 'улучшение — в карточке открытого модуля');
+    // Модули группами по типу слота (заказ владельца 2026-09-26): в группе — модули одного слота.
+    const groupSlots = await page.evaluate(() =>
+      [...document.querySelectorAll('#sz-workshop .sz-modgroup')].map((g) =>
+        [...new Set([...g.querySelectorAll('.sz-card-type > span:first-child')].map((x) => x.textContent))],
+      ),
+    );
+    assert.ok(groupSlots.length >= 2, 'модули разложены по группам');
+    for (const slots of groupSlots) assert.equal(slots.length, 1, `в группе модули одного слота: ${slots}`);
     // Корабль героя (PVR-6.24): своя плитка в ряду «Корабли», модуль встаёт на него.
     await page.locator('[data-prep="hero-ship"]').click();
     await page.locator('[data-prep="fit-hero"][data-id="cargo_bay"]').click();
