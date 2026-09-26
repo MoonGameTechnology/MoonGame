@@ -117,9 +117,7 @@
       "credits": 56
     },
     "slots": {
-      "weapon": 1,
-      "defense": 1,
-      "utility": 1
+      "universal": 4
     },
     "hullClass": "heavy"
   },

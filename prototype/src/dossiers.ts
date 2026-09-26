@@ -181,6 +181,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           hp: hl(st.hp),
           sp: hl(st.speed),
           c: hl(st.cargoCapacity ?? 0),
+          n: hl(def.slots.universal ?? 0),
         }),
       };
     case 'frigate':

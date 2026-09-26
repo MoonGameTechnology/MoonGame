@@ -10,13 +10,14 @@
  * a stable code only, never a throw. All stat maths route through the core's
  * `effectiveStats` so the preview matches what the built ship will actually carry.
  */
-import type { GameData, ResourceBag, ShipSlotType, UnitDef } from '@void/shared-core';
-import { canEquip, effectiveStats, hullSlotTypes, loadoutCost } from '@void/shared-core';
+import type { GameData, ResourceBag, ShipBayType, ShipSlotType, UnitDef } from '@void/shared-core';
+import { canEquip, effectiveStats, loadoutBays, loadoutCost } from '@void/shared-core';
 import { t } from '../../../localization/core';
 
-/** One capacity slot on the hull — its category and the module in it (if any). */
+/** One capacity slot on the hull — its category and the module in it (if any).
+ *  `universal` is a bay that takes a module of any type once its own type is full. */
 export interface LoadoutSlotView {
-  type: ShipSlotType;
+  type: ShipBayType;
   moduleId?: string;
   moduleName?: string;
 }
@@ -139,20 +140,14 @@ function buildModel(
   const def: UnitDef | undefined = data.units[unit];
   if (!def) return null;
 
-  // One slot view per capacity, filled from the installed modules of that type.
-  const byType: Record<ShipSlotType, string[]> = { weapon: [], defense: [], utility: [] };
-  for (const id of modules) {
-    const m = data.modules[id];
-    if (m) byType[m.slot].push(id);
-  }
+  // One slot view per capacity, laid out by the core's `loadoutBays` — the same count the
+  // build gate makes: a module fills a bay of its own type, and a universal bay takes the
+  // overflow. The editor can't assemble anything over capacity, so extras never show here.
   const slots: LoadoutSlotView[] = [];
-  for (const type of hullSlotTypes(def)) {
-    const filled = byType[type];
-    for (let i = 0; i < def.slots[type]; i++) {
-      const id = filled[i];
-      const m = id ? data.modules[id] : undefined;
-      slots.push(id && m ? { type, moduleId: id, moduleName: m.name } : { type });
-    }
+  for (const bay of loadoutBays(def.slots, modules, data)) {
+    if (bay.extra) continue;
+    const m = bay.module ? data.modules[bay.module] : undefined;
+    slots.push(bay.module && m ? { type: bay.type, moduleId: bay.module, moduleName: m.name } : { type: bay.type });
   }
 
   const palette: LoadoutOption[] = Object.entries(data.modules)

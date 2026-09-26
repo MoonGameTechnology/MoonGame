@@ -142,6 +142,16 @@ export const ShipSlotsSchema = z.object({
   weapon: z.number().int().nonnegative().default(0),
   defense: z.number().int().nonnegative().default(0),
   utility: z.number().int().nonnegative().default(0),
+  /** УНИВЕРСАЛЬНЫЕ отсеки (решение владельца 2026-09-26, усиленный крейсер: «4 слота под
+   *  модули любые»): берут модуль ЛЮБОГО типа, но только когда отсеки его собственного
+   *  типа заняты — типизированный отсек тратится первым. Собственное правило модуля
+   *  (`allowed`) действует и здесь. Нет поля — универсальных отсеков нет, и все прежние
+   *  корпуса остаются байт-в-байт прежними.
+   *
+   *  Читает поле только верфь (`util/loadout.ts`). Отсеки корабля ГЕРОЯ считают свои
+   *  экраны и гейт `hero.install` по типам, поэтому ни корпус героя, ни ступень героя
+   *  (`moduleSlots`) универсальных отсеков не объявляют — это держит сторож данных. */
+  universal: z.number().int().nonnegative().optional(),
 });
 
 export const UnitDefSchema = z.object({
@@ -191,9 +201,10 @@ export const UnitDefSchema = z.object({
    *  (`docs/swarm-behavior.md`). Два узла связаны, когда их круги пересекаются. Связь —
    *  не радар: в радиусе ничего не разведывается, по ней передаётся опыт боёв. 0 — не узел. */
   relayRange: z.number().nonnegative().default(0),
-  /** Typed module slots this hull exposes (ship-modules-roadmap.md). A player
-   *  fills them BEFORE building; the built ship is locked (no refit). Omitted →
-   *  all-zero → carries no modules (a partial object defaults the rest to 0). */
+  /** Typed module slots this hull exposes (ship-modules-roadmap.md), plus optional
+   *  universal ones (`ShipSlotsSchema.universal`). A player fills them BEFORE
+   *  building; the built ship is locked (no refit). Omitted → all-zero → carries no
+   *  modules (a partial object defaults the rest to 0). */
   slots: ShipSlotsSchema.default({ weapon: 0, defense: 0, utility: 0 }),
 });
 

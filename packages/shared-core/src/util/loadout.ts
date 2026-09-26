@@ -1,7 +1,9 @@
 import {
   RARITIES,
+  SHIP_SLOT_TYPES,
   type GameData,
   type ModuleDef,
+  type ShipSlots,
   type ShipSlotType,
   type UnitDef,
   type ResourceBag,
@@ -31,13 +33,16 @@ export interface SlotCounts {
 /**
  * Корпус со слотами, открытыми звёздами корабля (Sector Zero, решение владельца
  * 2026-09-26): к слотам корпуса из каталога прибавляются лишние слоты этого места
- * (`PlayerArsenal.slots`). Нет прибавки — тот же объект каталога.
+ * (`PlayerArsenal.slots`). Нет прибавки — тот же объект каталога. Звёзды открывают
+ * только типизированные слоты, а универсальные корпуса остаются при нём: без них
+ * усиленный крейсер со звездой потерял бы все четыре отсека.
  */
 export function withBonusSlots(def: UnitDef, bonus: Partial<SlotCounts> | undefined): UnitDef {
   if (!bonus) return def;
   return {
     ...def,
     slots: {
+      ...def.slots,
       weapon: (def.slots.weapon ?? 0) + (bonus.weapon ?? 0),
       defense: (def.slots.defense ?? 0) + (bonus.defense ?? 0),
       utility: (def.slots.utility ?? 0) + (bonus.utility ?? 0),
@@ -122,7 +127,8 @@ export function moduleRarityBonus(m: ModuleDef, rarity: string): Record<string, 
 }
 
 /** How many slots of each category a loadout occupies (one module = one slot of
- *  its own category). Unknown module ids are skipped. */
+ *  its own category). Unknown module ids are skipped. Counts by module TYPE: on a hull
+ *  with universal bays a module may sit in one of those — {@link loadoutBays} says where. */
 export function slotUsage(modules: readonly string[], data: GameData): SlotCounts {
   const use: SlotCounts = { weapon: 0, defense: 0, utility: 0 };
   for (const id of modules) {
@@ -145,12 +151,14 @@ export function moduleAllowed(unit: string, def: UnitDef, m: ModuleDef): boolean
 
 /** The ship-module fitting system expressed on the generic gate (`util/fitting.ts`):
  *  catalog = `data.modules`, category = the module's typed slot, capacity = the
- *  hull's BASE `slots` (a module can't expand its own capacity), `allowed` predicate. */
+ *  hull's BASE `slots` (a module can't expand its own capacity), the hull's universal
+ *  bays as the gate's wildcard, `allowed` predicate. */
 function shipSpec(unit: string, def: UnitDef, data: GameData): FittingSpec<ModuleDef> {
   return {
     item: (id) => data.modules[id],
     category: (m) => m.slot,
     capacity: (category) => def.slots[category as ShipSlotType],
+    wildcard: def.slots.universal ?? 0,
     allowed: (m) => moduleAllowed(unit, def, m),
   };
 }
@@ -204,11 +212,44 @@ export function loadoutCost(modules: readonly string[], data: GameData): Resourc
   return bag;
 }
 
-/** Slot categories a hull actually offers (count > 0), in a fixed order. */
-export function hullSlotTypes(def: UnitDef): ShipSlotType[] {
-  const types: ShipSlotType[] = [];
-  if (def.slots.weapon > 0) types.push('weapon');
-  if (def.slots.defense > 0) types.push('defense');
-  if (def.slots.utility > 0) types.push('utility');
-  return types;
+/** A hull bay's kind: one of the typed module slots, or `universal` — a bay that takes
+ *  a module of any type (`ShipSlots.universal`). */
+export type ShipBayType = ShipSlotType | 'universal';
+
+/** One bay of a hull and what sits in it. */
+export interface LoadoutBay {
+  type: ShipBayType;
+  /** The installed module; `null` — the bay is empty. */
+  module: string | null;
+  /** A module beyond the hull's capacity: the stack was built under an older rule and
+   *  still carries it, so a screen shows it rather than hide a module that works. */
+  extra?: true;
+}
+
+/** Which bay each installed module sits in — the layout twin of the fitting gate, so a
+ *  screen never draws a loadout differently from how the core counted it: a module takes
+ *  a bay of its own type first and spills into a universal bay only when its type is
+ *  full. Order: weapon, defense, utility bays, then the universal ones, then anything
+ *  over capacity. Within a type the loadout's own order decides; the universal bays take
+ *  the spill in bay-type order, so the layout does not depend on the order the modules
+ *  were installed in. Unknown module ids are skipped. */
+export function loadoutBays(slots: ShipSlots, modules: readonly string[], data: GameData): LoadoutBay[] {
+  const byType: Record<ShipSlotType, string[]> = { weapon: [], defense: [], utility: [] };
+  for (const id of modules) {
+    const m = data.modules[id];
+    if (m) byType[m.slot].push(id);
+  }
+  const bays: LoadoutBay[] = [];
+  const spill: string[] = [];
+  for (const type of SHIP_SLOT_TYPES) {
+    const fitted = byType[type];
+    for (let i = 0; i < slots[type]; i++) bays.push({ type, module: fitted[i] ?? null });
+    spill.push(...fitted.slice(slots[type]));
+  }
+  const universal = slots.universal ?? 0;
+  for (let i = 0; i < universal; i++) bays.push({ type: 'universal', module: spill[i] ?? null });
+  for (const id of spill.slice(universal)) {
+    bays.push({ type: data.modules[id]!.slot, module: id, extra: true });
+  }
+  return bays;
 }

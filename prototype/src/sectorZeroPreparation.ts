@@ -2,9 +2,11 @@ import { t, tData } from '../../localization/runtime';
 import {
   canEquip,
   effectiveStats,
+  loadoutBays,
   rarityOf,
   starsOf,
   type GameData,
+  type ShipSlots,
 } from '../../packages/shared-core/src/index';
 import {
   HERO_UNLOCK_COST,
@@ -223,22 +225,26 @@ export function initSectorZeroPreparation(h: PreparationHost) {
         .join('') +
       `</div>`;
     // Слоты — плитками (решение владельца 2026-09-26): по плитке на слот, в ней модуль или
-    // пустое место. Слоты, открытые звёздами корабля, помечены звездой.
+    // пустое место. Раскладка — та же, что считает гейт верфи (`loadoutBays`): модуль, которому
+    // не хватило слота своего типа, стоит в универсальном. Слоты, открытые звёздами корабля, —
+    // последние слоты своего типа, они помечены звездой.
     const hullStarred = onHero ? [] : (p.hullStars[hull] ?? []);
     // Слот, только что открытый звездой корабля: плитки за звёзды стоят последними в своём
     // типе, значит новая — последняя плитка этого типа.
     const newSlot = fx?.kind === 'slot' && !onHero && fx.hull === hull ? fx.slot : null;
-    const bays = SHIP_SLOTS.flatMap((slot) => {
-      const n = def.slots[slot] ?? 0;
-      const fitted = selected.filter((id) => data.modules[id]?.slot === slot);
-      const starred = hullStarred.filter((x) => x === slot).length;
-      return Array.from({ length: n }, (_, i) => {
-        const id = fitted[i];
+    const slots: ShipSlots = def.slots;
+    const nth: Partial<Record<string, number>> = {};
+    const bays = loadoutBays(slots, selected, data)
+      .filter((bay) => !bay.extra)
+      .map(({ type, module: id }) => {
+        const i = (nth[type] = (nth[type] ?? -1) + 1);
+        const n = slots[type] ?? 0;
+        const starred = hullStarred.filter((x) => x === type).length;
         const star = i >= n - starred ? ' star' : '';
-        const fresh = slot === newSlot && i === n - 1 ? ' sz-fx-new' : '';
-        return `<div class="sz-slot${id ? ' full' : ''}${star}${fresh}" title="${esc(t(`yard.slot.${slot}`))}"><i aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</i><b>${id ? esc(tData(data.modules[id]!.name)) : t('hero.slot.empty')}</b><span>${t(`yard.slot.${slot}`)}</span></div>`;
-      });
-    }).join('');
+        const fresh = type === newSlot && i === n - 1 ? ' sz-fx-new' : '';
+        return `<div class="sz-slot${id ? ' full' : ''}${star}${fresh}" title="${esc(t(`yard.slot.${type}`))}"><i aria-hidden="true">${SLOT_ICON[type] ?? '＋'}</i><b>${id ? esc(tData(data.modules[id]!.name)) : t('hero.slot.empty')}</b><span>${t(`yard.slot.${type}`)}</span></div>`;
+      })
+      .join('');
     // Звезда корабля: плитка «+ слот» с выбором типа и ценой (решение владельца 2026-09-26:
     // Варранты, без броска, тип выбирает игрок). Цена видна всегда — `EC-2.3`.
     const starCost = onHero ? null : hullStarCost(hull, p, data);

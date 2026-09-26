@@ -4,15 +4,16 @@
  * и там, где его потом видно на корабле.
  */
 
-/** Подпись типа отсека. */
+/** Подпись типа отсека. Универсальный отсек (усиленный крейсер) берёт модуль любого типа. */
 export const SLOT_KEY: Record<string, string> = {
   weapon: 'yard.slot.weapon',
   defense: 'yard.slot.defense',
   utility: 'yard.slot.utility',
+  universal: 'yard.slot.universal',
 };
 
 /** Значок пустого отсека по типу. */
-export const SLOT_ICON: Record<string, string> = { weapon: '🎯', defense: '🛡', utility: '⊞' };
+export const SLOT_ICON: Record<string, string> = { weapon: '🎯', defense: '🛡', utility: '⊞', universal: '⧉' };
 
 /** Значок модуля. Нет своего — нейтральный квадрат, а не пустота. */
 export const MODULE_ICON: Record<string, string> = {

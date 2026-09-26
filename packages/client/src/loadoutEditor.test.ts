@@ -26,6 +26,13 @@ const data: GameData = parseGameData({
       cost: { metal: 260 },
       slots: { defense: 1 },
     },
+    // Universal bays only (the reinforced cruiser's shape): any module type goes in.
+    reinforced: {
+      faction: 'x',
+      stats: { attack: 15, defense: 12, speed: 5, hp: 60 },
+      cost: { metal: 330 },
+      slots: { universal: 2 },
+    },
   },
   factions: {},
   buildings: {},
@@ -199,5 +206,30 @@ describe('loadout editor — arsenal ownership filter (ARS-5)', () => {
   it('equipping an unowned module is rejected even off-palette (defense in depth; the server gate is authoritative)', () => {
     const m0 = ok(createLoadoutEditor('cruiser', data, rich, { ownedModules: new Set(['targeting']) }));
     expect(err(applyLoadoutAction({ kind: 'equip', moduleId: 'shield' }, m0, data, rich))).toBe('E_NOT_OWNED');
+  });
+});
+
+describe('loadout editor — universal bays (reinforced cruiser)', () => {
+  it('lays universal bays out empty, and a module of any type goes in', () => {
+    const m0 = ok(createLoadoutEditor('reinforced', data, rich));
+    expect(m0.hasSlots).toBe(true);
+    expect(m0.slots).toEqual([{ type: 'universal' }, { type: 'universal' }]);
+    expect(m0.palette.every((p) => p.installable)).toBe(true);
+    const m1 = ok(applyLoadoutAction({ kind: 'equip', moduleId: 'shield' }, m0, data, rich));
+    const m2 = ok(applyLoadoutAction({ kind: 'equip', moduleId: 'targeting' }, m1, data, rich));
+    // The core's layout: the weapon overflow first, then the defense one — install order
+    // does not move a module between bays.
+    expect(m2.slots).toEqual([
+      { type: 'universal', moduleId: 'targeting', moduleName: 'Наведение' },
+      { type: 'universal', moduleId: 'shield', moduleName: 'Щит' },
+    ]);
+  });
+
+  it('both bays taken: nothing else installs, and the palette says why', () => {
+    const m = ok(createLoadoutEditor('reinforced', data, rich, { modules: ['targeting', 'shield'] }));
+    expect(m.palette.find((p) => p.id === 'cargo')).toMatchObject({ installable: false, code: 'E_NO_SLOT' });
+    expect(err(applyLoadoutAction({ kind: 'equip', moduleId: 'cargo' }, m, data, rich))).toBe('E_NO_SLOT');
+    const freed = ok(applyLoadoutAction({ kind: 'unequip', moduleId: 'targeting' }, m, data, rich));
+    expect(freed.palette.find((p) => p.id === 'cargo')?.installable).toBe(true);
   });
 });

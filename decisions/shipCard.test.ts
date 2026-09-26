@@ -50,6 +50,27 @@ describe('карточка корабля — отсеки (заказ влад�
   });
 });
 
+describe('карточка корабля — универсальные отсеки (усиленный крейсер)', () => {
+  it('четыре универсальных отсека, модули любых типов — в них', () => {
+    const m = shipCardModel(
+      { unit: 'heavy_cruiser', count: 1, modules: ['shield_booster', 'targeting_array', 'ablative_plating'] },
+      data,
+    )!;
+    expect(m.bays.map((b) => [b.type, b.module])).toEqual([
+      ['universal', 'targeting_array'],
+      ['universal', 'shield_booster'],
+      ['universal', 'ablative_plating'],
+      ['universal', null],
+    ]);
+    expect(m.bays.some((b) => b.extra)).toBe(false);
+  });
+
+  it('вклад модуля в универсальном отсеке считается так же, как в своём', () => {
+    const m = shipCardModel({ unit: 'heavy_cruiser', count: 1, modules: ['targeting_array'] }, data)!;
+    expect(m.bays[0]!.effect).toEqual({ attack: 4 });
+  });
+});
+
 describe('карточка корабля — характеристики (правило 4)', () => {
   it('атака, защита, корпус и скорость — всегда; прочие — только живые', () => {
     const bare = shipCardModel({ unit: 'cruiser', count: 1 }, data)!;

@@ -520,6 +520,7 @@ export const ru: Record<string, string> = {
   'hud.side.garrison': 'гарнизон',
   'hud.side.landing': 'десант',
   'hud.slot.defense': 'защита',
+  'hud.slot.universal': 'универсальный',
   'hud.slot.utility': 'снаряжение',
   'hud.slot.weapon': 'оружие',
   'hud.stationed': 'стоит: {at}',
@@ -1128,7 +1129,7 @@ export const ru: Record<string, string> = {
     'Рабочая лошадь линейного флота: {a} атаки, {hp} корпуса и трюм на {c} мест под десант и шаттлы. Универсальный боевой корабль, одинаково уверенный в обороне и в наступлении.',
   'dossier.unit.cruiser.name': 'Крейсер',
   'dossier.unit.heavy-cruiser.desc':
-    'Тяжёлый корпус линии: {a} атаки, {d} защиты, {hp} корпуса, ход {sp}, трюм на {c} мест.',
+    'Тяжёлый корпус линии: {a} атаки, {d} защиты, {hp} корпуса, ход {sp}, трюм на {c} мест. Универсальных отсеков: {n} — в каждый встаёт модуль любого типа.',
   'dossier.unit.heavy-cruiser.name': 'Усиленный крейсер',
   'dossier.unit.default': 'Боевая единица.',
   'dossier.unit.bomber.desc':
@@ -1581,11 +1582,12 @@ export const ru: Record<string, string> = {
   'rarity.unique': 'Уникальный',
   'rarity.mythic': 'Мифический',
   'rarity.legendary': 'Легендарный',
+  'yard.slot.universal': 'Универсальный',
   'yard.slot.utility': 'Система',
   'yard.slot.weapon': 'Оружие',
   'yard.slots.count': '{n} слота под модули (по размеру корпуса)',
   'yard.slots.note':
-    'Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.',
+    'Модуль встаёт в слот своего типа, а когда тот занят — в универсальный. <b>Серые</b> — не для свободного слота или уже стоят.',
   'yard.tab.heroes': 'Герои',
   'yard.tab.infantry': 'Пехота',
   'yard.tab.ships': 'Корабли',

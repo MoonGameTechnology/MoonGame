@@ -20,6 +20,7 @@
     "default": 1,
     "perUnit": {
       "cruiser": 2,
+      "heavy_cruiser": 3,
       "siege_lance": 3,
       "tank": 2,
       "shuttle_carrier": 4

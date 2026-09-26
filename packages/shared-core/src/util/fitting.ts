@@ -5,9 +5,10 @@
  *
  * The shared rule set: the item must exist in its catalog, must not already be
  * installed (one instance per id), must pass the consumer's `allowed` predicate,
- * and must find a free slot in its category's bounded budget. An untyped budget
- * (heroes) is just a single-category spec. Checks run in that fixed order, so
- * every consumer reports the same failure for the same situation.
+ * and must find a free slot in its category's bounded budget — or, with that budget
+ * full, a free universal slot (`wildcard`). An untyped budget (heroes) is just a
+ * single-category spec. Checks run in that fixed order, so every consumer reports
+ * the same failure for the same situation.
  *
  * The gate returns a GENERIC reason; each consumer maps reasons onto its own
  * stable `E_*` codes (fail-secure, A10) — unifying the mechanism must not change
@@ -29,6 +30,11 @@ export interface FittingSpec<Item> {
   /** Capacity of a category. Counted against the BASE budget — an installed item
    *  can never expand the budget it occupies. */
   capacity: (category: string) => number;
+  /** Universal slots: they take an item of ANY category, but only once that
+   *  category's own capacity is full — a typed slot is always spent first, so a
+   *  universal one never goes to an item that had a typed home. Absent ⇒ none, and
+   *  the gate answers exactly as it did before universal slots existed. */
+  wildcard?: number;
   /** Optional per-item predicate (e.g. ship `allowed` domain/traits/units).
    *  Absent ⇒ every catalog item is eligible. */
   allowed?: (item: Item) => boolean;
@@ -48,13 +54,22 @@ export function canInstall<Item>(
     return { ok: false, reason: 'not_allowed' };
   }
   const category = spec.category(item);
-  let used = 0;
+  const used = new Map<string, number>();
   for (const cur of current) {
     const it = spec.item(cur);
-    if (it !== undefined && spec.category(it) === category) used += 1;
+    if (it === undefined) continue;
+    const c = spec.category(it);
+    used.set(c, (used.get(c) ?? 0) + 1);
   }
-  if (used >= spec.capacity(category)) return { ok: false, reason: 'no_slot' };
-  return { ok: true };
+  if ((used.get(category) ?? 0) < spec.capacity(category)) return { ok: true };
+  // Its own category is full — a universal slot takes it if one is left. Universal
+  // slots hold the overflow of EVERY category, so what they already hold is the sum of
+  // all overflows. That sum depends on the installed SET, not on the order the items
+  // went in, so a loadout's legality does not depend on the order it was assembled in.
+  let overflow = 0;
+  for (const [c, n] of used) overflow += Math.max(0, n - spec.capacity(c));
+  if (overflow < (spec.wildcard ?? 0)) return { ok: true };
+  return { ok: false, reason: 'no_slot' };
 }
 
 /** Validate a whole installed list: every item installs legally on top of the
