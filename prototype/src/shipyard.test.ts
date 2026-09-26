@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
-import { newGame } from './game';
+import { newGame, canOrder } from './game';
 import { data } from './gameData';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import {
@@ -644,5 +644,54 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     win.fire(click('.cn-tab', { ctab: 'infantry' }));
     win.fire(click('[data-cnbuild]'));
     expect(sent).toEqual([]);
+  });
+});
+
+describe('верфь — десантный челнок с бойцом (SHU-5.2)', () => {
+  /** Мой мир с портом и казармами: боец требует своего цеха. */
+  function withYards(): GameState {
+    const s = rich();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1' && p.buildings.length > 0)!;
+    home.buildings = [
+      ...home.buildings.filter((b) => b.type !== 'spaceport' && b.type !== 'barracks'),
+      { type: 'spaceport', level: 1, hp: data.buildings.spaceport!.hp },
+      { type: 'barracks', level: 1, hp: data.buildings.barracks!.hp },
+    ];
+    return s;
+  }
+
+  it('ЦЕНА — челнок ПЛЮС боец, и выбор бойца стоит в блоке цены', () => {
+    const s = withYards();
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'landing_shuttle', troop: 'militia' }), YARD_SQUAD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_SQUAD_HULLS, { ...view, troops: ['militia'] });
+    expect(html).toContain('id="cn-troop"');
+    const total = { ...data.units.landing_shuttle!.cost };
+    for (const [r, n] of Object.entries(data.units.militia!.cost)) total[r] = (total[r] ?? 0) + n;
+    expect(html).toContain(bagText(total));
+    expect(html).not.toMatch(/data-cnbuild disabled/);
+  });
+
+  it('НЕКОГО ПОСАДИТЬ — заказать нельзя, и это сказано словами', () => {
+    const s = withYards();
+    const d = normalizeDraft(s, 'p1', draftOf({ hull: 'landing_shuttle' }), YARD_SQUAD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_SQUAD_HULLS, { ...view, troops: [] });
+    expect(html).toContain(t('yard.troop.none'));
+    expect(html).toMatch(/data-cnbuild disabled/);
+  });
+
+  it('заказ уходит с бойцом, которого приняло ядро, и проходит его', () => {
+    const s = withYards();
+    const orders: Action[] = [];
+    const win = fakeWin();
+    const yard = initShipyard(
+      hostOf({ root: () => win, state: () => s, order: (a) => orders.push(a), probe: (a) => canOrder(s, a) }),
+    );
+    yard.open('squads');
+    win.fire(click('.cn-hbtn', { cnhull: 'landing_shuttle' }));
+    win.fire(click('[data-cnbuild]'));
+    expect(orders).toHaveLength(1);
+    const troop = (orders[0]!.payload as { troop?: string }).troop;
+    expect(troop).toBeTruthy();
+    expect(canOrder(s, orders[0]!)).toBeNull();
   });
 });

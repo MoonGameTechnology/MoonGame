@@ -49,8 +49,6 @@ import {
   strikeShuttle,
   splitSquadron,
   mergeSquadron,
-  loadSquadronTroops,
-  unloadSquadronTroops,
   mergeFleet,
   splitFleet,
   buildBuilding,
@@ -248,7 +246,6 @@ import {
   squadronCallsignOf,
   squadronCards,
   SQUADRON_KIND_KEY,
-  troopsInputForSquadron,
   type SquadronCard,
 } from './squadronPanel';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
@@ -1211,9 +1208,6 @@ let strikeAim: { from: { planetId: string } | { fleetId: string }; squadronId: s
  *  приёмника. Два тапа, а не выпадающий список: приёмник это такая же карточка на
  *  экране, и выбирать его удобнее там же, где на него смотрят. */
 let squadMerge: { from: string } | null = null;
-/** Открытый блок погрузки десанта в звено (SHU-4.3): чей и с каким планом. План —
- *  знаковая дельта на тип, ровно как у корабельного десанта (`troopsMenu.ts`). */
-let squadTroops: { id: string; plan: Record<string, number> } | null = null;
 // Hero window armed modes: a cast waits for its target world; a deploy waits for the
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
 let heroAim: { heroId: string; abilityId: string } | null = null;
@@ -2281,7 +2275,12 @@ function coreQueue(planetId: string, lane: BuildLane): QueuedConstruction[] {
 function buildCost(planetId: string, q: QueuedConstruction): Record<string, number> | undefined {
   const id = q.building ?? q.unit;
   if (id === undefined) return undefined;
-  return queuedCost(s, data, planetId, { kind: q.kind, id, count: q.count ?? 1 });
+  return queuedCost(s, data, planetId, {
+    kind: q.kind,
+    id,
+    count: q.count ?? 1,
+    ...(q.troop !== undefined ? { troop: q.troop } : {}),
+  });
 }
 /** Приказ, которым голова очереди уедет в ядро. */
 function queuedAction(planetId: string, q: QueuedBuild): Action {
@@ -6367,7 +6366,7 @@ function squadronCardHtml(card: SquadronCard, view: HangarView): string {
   const sub = cargo > 0 ? ` <span class="dim">· ${esc(t('side.wing.cargo', { n: cargo }))}</span>` : '';
   const head = `<div class="row"><b>${esc(title)}</b>${sub}</div>`;
   const rows = unitRows(card.stacks);
-  if (!card.canStrike && !card.canSplit && !card.canMerge && !card.canLoad) return head + rows;
+  if (!card.canStrike && !card.canSplit && !card.canMerge) return head + rows;
 
   // Слияние — ДВА ТАПА: первый взводит источник, второй выбирает приёмника. Пока
   // источник взведён, у остальных карточек кнопка меняет смысл на «сюда», а у самого
@@ -6385,41 +6384,9 @@ function squadronCardHtml(card: SquadronCard, view: HangarView): string {
     btn('wingstrike', card.id, t('side.wing.strike'), card.canStrike) +
     (card.canSplit ? btn('wingsplit', card.id, t('side.wing.split'), true) : '') +
     merge +
-    (card.canLoad ? btn('wingtroops', card.id, t('side.wing.troops'), true) : '') +
     `</div>` +
     (isSource ? `<div class="row dim">${esc(t('side.wing.merge.pick'))}</div>` : '');
-  const troops = squadTroops?.id === card.id ? squadronTroopsHtml(card.id) : '';
-  return head + rows + buttons + troops;
-}
-
-/** Блок погрузки десанта в ОДНО звено (SHU-4.3). Арифметику «сколько влезет» считает
- *  общая модель `troopsMenu.ts` — та же, что у корабельного десанта; здесь только
- *  строки со счётчиками и подтверждение. */
-function squadronTroopsHtml(squadronId: string): string {
-  const inp = squadTroopsInput(squadronId);
-  if (!inp) return '';
-  const m = troopsModel({ ...inp, plan: squadTroops?.plan ?? {} });
-  const rows = m.rows
-    .map((r) => {
-      const nm = displayUnit(r.unit);
-      const sign = r.delta > 0 ? '+' : '';
-      return (
-        `<div class="row">` +
-        `<span class="bicon">${unitIconHtml(r.unit, data, youColor, 18, s.players[ME]?.faction)}</span>${esc(nm)} ` +
-        `<span class="dim">${r.garrison} ▸ ${r.hold}</span> ` +
-        `<button class="b" data-act="wingtstep" data-arg="${esc(squadronId)}" data-unit="${esc(r.unit)}" data-n="-1"${r.delta <= -r.maxUnload ? ' disabled' : ''}>−</button>` +
-        `<b>${sign}${r.delta}</b>` +
-        `<button class="b" data-act="wingtstep" data-arg="${esc(squadronId)}" data-unit="${esc(r.unit)}" data-n="1"${r.delta >= r.maxLoad ? ' disabled' : ''}>+</button>` +
-        `</div>`
-      );
-    })
-    .join('');
-  const hold = t('troops.hold', { a: m.capacity - m.freeCargo, b: m.capacity });
-  return (
-    `<div class="row dim">${esc(hold)}</div>` +
-    rows +
-    `<div class="row">${btn('wingtok', squadronId, t('side.wing.troops.done'), m.valid)}</div>`
-  );
+  return head + rows + buttons;
 }
 
 /** Где стоит эта эскадра — мир или носитель. Адрес ВЫВОДИТСЯ из состояния, а не
@@ -6442,19 +6409,6 @@ function squadronAt(id: string): { sq: Squadron; base: { planetId: string } | { 
   const host = 'planetId' in base ? s.planets[base.planetId] : s.fleets[base.fleetId];
   const sq = (host?.hangar ?? []).find((q) => q.id === id);
   return sq ? { sq, base } : null;
-}
-
-/** Вход модели десанта для звена: гарнизон мира или десант носителя против трюма.
- *  База берётся ОТ САМОГО ЗВЕНА (`squadronAt`), а не приходит параметром: источник
- *  войск обязан быть тем же местом, где стоит эскадра. */
-function squadTroopsInput(squadronId: string): TroopsInput | null {
-  const found = squadronAt(squadronId);
-  if (!found) return null;
-  const source =
-    'planetId' in found.base
-      ? (s.planets[found.base.planetId]?.garrison ?? [])
-      : (s.fleets[found.base.fleetId]?.landing ?? []);
-  return troopsInputForSquadron(found.sq, source, data);
 }
 
 function unitRows(stacks: Array<UnitStack>): string {
@@ -9057,32 +9011,6 @@ side.addEventListener('click', (ev) => {
     const found = from ? squadronAt(from) : null;
     if (from && found) playerOrder(mergeSquadron(ME, found.base, from, arg));
     squadMerge = null;
-  } else if (act === 'wingtroops') {
-    squadTroops = squadTroops?.id === arg ? null : { id: arg, plan: {} }; // toggle
-  } else if (act === 'wingtstep') {
-    // Шаг счётчика КЛАМПИТСЯ моделью, а не блокируется — как в ⇅-меню корабельного
-    // десанта: «+5» при трёх свободных местах даст +3, а не откажет.
-    const inp = squadTroops ? squadTroopsInput(squadTroops.id) : null;
-    if (squadTroops && inp) {
-      const unit = bEl.dataset.unit ?? '';
-      squadTroops.plan = stepPlan(
-        { ...inp, plan: squadTroops.plan },
-        unit,
-        Number(bEl.dataset.n),
-      );
-    }
-  } else if (act === 'wingtok') {
-    const st = squadTroops;
-    const found = st ? squadronAt(st.id) : null;
-    const inp = st ? squadTroopsInput(st.id) : null;
-    if (st && found && inp) {
-      const { load, unload } = planOrders(troopsModel({ ...inp, plan: st.plan }));
-      // Выгрузка идёт ПЕРВОЙ: она освобождает трюм, на который модель уже посчитала
-      // погрузку. Обратный порядок отбился бы `E_NO_CAPACITY` на ровном месте.
-      if (unload.length) playerOrder(unloadSquadronTroops(ME, found.base, st.id, unload));
-      if (load.length) playerOrder(loadSquadronTroops(ME, found.base, st.id, load));
-    }
-    squadTroops = null;
   } else if (act === 'wingload' || act === 'wingunload') {
     // Что именно перегружать — `hangarPanel.ts` (`transferPick`): первый живой стек
     // источника, столько, сколько влезет в приёмник. Кнопки нет, если брать нечего,
@@ -10354,7 +10282,8 @@ const buildWin = initBuildScreen({
   // панель, — ростер по вкладке, заказ через ту же очередь, карточка через тот же кодекс.
   // Новой логики здесь нет и быть не должно: окно переехало, правила остались.
   unitIds: (tab) => buildRoster(tab, BUILD_UNITS, data),
-  buildUnit: (pid, id) => enqueueBuild(pid, { kind: 'unit', id, count: 1 }),
+  buildUnit: (pid, id, troop) =>
+    enqueueBuild(pid, { kind: 'unit', id, count: 1, ...(troop !== undefined ? { troop } : {}) }),
   openUnitInfo: (id) => openCodex(`u:${id}`),
   openInfo: (id) => openCodex(`b:${id}`),
   lockText: errText,
@@ -10550,6 +10479,7 @@ const shipyard = initShipyard({
   me: () => ME,
   youColor: () => youColor,
   order: playerOrder,
+  probe: (a) => canOrder(s, a),
   note: (msg) => note(msg),
   errText,
   arsenalItems: () => arsenal?.items() ?? [],

@@ -25,6 +25,12 @@ import { data } from './gameData';
 import { buildingName, cost, esc, fmtDur, resLine, displayUnit } from './format';
 import { BUILD_ICON, unitIcon } from './icons';
 import { buildBuilding, buildUnit } from '../../decisions/actions';
+import {
+  isLander,
+  landerCost,
+  landerTroopCandidates,
+  orderableTroops,
+} from '../../decisions/landerTroops';
 import { canBuildHere } from '../../decisions/buildGate';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { worldName } from './planetName';
@@ -256,6 +262,7 @@ export function unitScreenHtml(
     .map((id) => {
       const def = data.units[id];
       if (!def) return '';
+      if (isLander(def)) return landerRowHtml(me, planetId, id, res, probe, lockText);
       const code = probe(buildUnit(me, planetId, id, 1));
       if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
       const locked = code !== null && code !== 'E_INSUFFICIENT';
@@ -275,6 +282,49 @@ export function unitScreenHtml(
   );
 }
 
+/**
+ * Строка ДЕСАНТНОГО ЧЕЛНОКА (SHU-5.2): он строится сразу с бойцом внутри, поэтому
+ * вместо одной кнопки «Строить» — по кнопке на каждого бойца, которого ядро примет на
+ * этом мире, с ценой «челнок + боец». Кого можно посадить, решает ядро пробой приказа
+ * (`orderableTroops`); некого — строка заперта кодом отказа первого кандидата.
+ */
+function landerRowHtml(
+  me: string,
+  planetId: string,
+  id: string,
+  res: Record<string, number>,
+  probe: (a: Action) => string | null,
+  lockText: (code: string) => string,
+): string {
+  const def = data.units[id]!;
+  const candidates = landerTroopCandidates(data);
+  const order = (g: string): Action => buildUnit(me, planetId, id, 1, g);
+  const troops = orderableTroops(candidates, (g) => probe(order(g)));
+  const first = candidates[0];
+  const code = troops.length === 0 ? (first ? probe(order(first)) : 'E_NOT_BUILDABLE') : null;
+  if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
+  const head =
+    `<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>` +
+    (code ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>` : '') +
+    `</div>`;
+  const fx = `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>`;
+  const pick = troops
+    .map((g) => {
+      const short = probe(order(g)) !== null; // E_INSUFFICIENT: цена видна, кнопка серая
+      const hours = Math.max(def.buildTimeHours, data.units[g]?.buildTimeHours ?? 0);
+      return (
+        `<div class="bw-foot"><button class="bw-take" data-unit-go="${esc(id)}" data-unit-troop="${esc(g)}"${short ? ' disabled' : ''}>▷ ${unitIcon(g, data)} ${esc(displayUnit(g))}</button>` +
+        `<span>${cost(landerCost(data, id, g), res)}</span><span class="bw-dur">${fmtDur(hours)}</span></div>`
+      );
+    })
+    .join('');
+  return (
+    `<div class="bw-item st-${code ? 'lock' : 'ready'}" data-unit-info="${esc(id)}">${head}${fx}` +
+    (pick ? `<div class="bw-fx">${t('build.lander.troop')}</div>${pick}` : '') +
+    `</div>`
+  );
+}
+
 /** Что окну нужно от матч-экрана. */
 export interface BuildHost {
   /** Само окно (`#buildwin`) — показ/скрытие классом .show и делегат кликов. */
@@ -290,7 +340,8 @@ export interface BuildHost {
   /** Заказ стройки хостовым путём (enqueueBuild: сеть → приказ, соло → очередь). */
   build(planetId: string, id: string): void;
   unitIds(tab: UnitCatalogTab): string[];
-  buildUnit(planetId: string, id: string): void;
+  /** `troop` — боец десантного челнока (SHU-5.2); у остальных юнитов его нет. */
+  buildUnit(planetId: string, id: string, troop?: string): void;
   openUnitInfo(id: string): void;
   /** Тап по строке → полная карточка здания (кодекс с листалкой уровней). */
   openInfo(id: string): void;
@@ -349,9 +400,10 @@ export function initBuildScreen(host: BuildHost): {
       host.root().classList.remove('show');
       return;
     }
-    const unitGo = tg.closest<HTMLElement>('[data-unit-go]')?.dataset.unitGo;
+    const goEl = tg.closest<HTMLElement>('[data-unit-go]');
+    const unitGo = goEl?.dataset.unitGo;
     if (unitGo && planetId && units && host.unitIds(units).includes(unitGo)) {
-      host.buildUnit(planetId, unitGo);
+      host.buildUnit(planetId, unitGo, goEl?.dataset.unitTroop);
       repaint();
       return;
     }

@@ -67,7 +67,6 @@ import {
   splitFleet,
   strikeShuttle,
   loadShuttle,
-  loadSquadronTroops,
   spawnHero,
   unlockHeroSkill,
   installHeroModule,
@@ -87,6 +86,7 @@ import {
 } from '../../decisions/garrisonPolicy';
 import { freshIntel, knownGarrison } from '../../decisions/garrisonIntel';
 import { planDrop } from '../../decisions/dropPlan';
+import { isLander, landerTroopCandidates } from '../../decisions/landerTroops';
 import { botEmbargoes } from './botFavour';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
@@ -184,6 +184,10 @@ const CARRIER_CAP = 1;
  * у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
  */
 const STRIKE_SHUTTLES = ['bomber', 'landing_shuttle'] as const;
+/** Кандидаты в бойцы десантного челнока (SHU-5.2), от самого ударного — общее правило
+ *  `/decisions/landerTroops.ts`. Строить ли их на ЭТОМ мире — спрашивается у ядра
+ *  (`canOrder`) в момент заказа. */
+const GROUND_BY_ATTACK: readonly string[] = landerTroopCandidates(data);
 
 /** Есть ли у мира ангар: признак — ПОЛЕ ДАННЫХ, а не имя здания, поэтому новый порт
  *  подхватится сам. `shuttleBayAt` ядра сюда не годится: он считает ВМЕСТИМОСТЬ с учётом
@@ -1159,10 +1163,14 @@ function baseAiOrders(
           const q = e.payload as { kind?: string; planetId?: string; modules?: string[] };
           return q.kind === 'unit' && q.planetId === planetId && !!q.modules?.includes(SIEGE_MODULE);
         });
-      const affordableUnit = (unit: string, count: number): boolean => {
-        const cost = data.units[unit]?.cost ?? {};
-        return Object.keys(cost).every(
-          (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) * count + (ORDER_RESERVE[r] ?? 0),
+      // `troop` — боец десантного челнока (SHU-5.2): платится вместе с машиной.
+      const affordableUnit = (unit: string, count: number, troop?: string): boolean => {
+        const hull = data.units[unit]?.cost ?? {};
+        const extra = troop !== undefined ? (data.units[troop]?.cost ?? {}) : {};
+        return Object.keys({ ...hull, ...extra }).every(
+          (r) =>
+            (pl.resources[r] ?? 0) >=
+            ((hull[r] ?? 0) + (extra[r] ?? 0)) * count + (ORDER_RESERVE[r] ?? 0),
         );
       };
       // 1. Дома — оба цеха: КАЗАРМЫ открывают пехоту, ЗАВОД — технику (ROS-1.1).
@@ -1346,6 +1354,19 @@ function baseAiOrders(
         // несёт верфь, а порт бот строит сам (цепочка выше). Заказ без порта ядро
         // отбивает `E_NO_PORT`, и без этой пробы бот платил бы за него отказом каждый
         // тик — ровно тем же способом, каким когда-то упирался в `E_HANGAR_FULL`.
+        // ДЕСАНТНЫЙ ЧЕЛНОК строится сразу с бойцом внутри (SHU-5.2), и боец выбирается
+        // здесь: самый УДАРНЫЙ (`attack` вниз, тай-брейк по id), которого ядро примет на
+        // этом мире — правило владельца №3 «максимум силы наземных юнитов» решается на
+        // заказе, грузить трюм перед вылетом больше нечем. Некого строить — челнока нет.
+        if (isLander(data.units[unit])) {
+          const troop = GROUND_BY_ATTACK.find(
+            (g) =>
+              affordableUnit(unit, 1, g) &&
+              canOrder(state, buildUnit(ai, base.id, unit, 1, g)) === null,
+          );
+          if (troop !== undefined) out.push(buildUnit(ai, base.id, unit, 1, troop));
+          return;
+        }
         if (canOrder(state, buildUnit(ai, base.id, unit, 1)) !== null) return;
         out.push(buildUnit(ai, base.id, unit, 1));
       };
@@ -1464,7 +1485,8 @@ function baseAiOrders(
       // №2 — мир, над которым УЖЕ стоит свой флот, челноками не берут: там дешевле
       //      штурм с кораблей, и он в этом же тике выше по коду.
       // №3 — цель без вражеского флота на орбите; наряд — самая маленькая эскадра,
-      //      которой хватит, с трюмом, набитым лучшими ударными (`planDrop`).
+      //      чей десант в трюме уверенно берёт мир (`planDrop`); самых ударных бойцов
+      //      челнок получает ещё на заказе (SHU-5.2).
       const identified = identifiedNodes(state, ai, data);
       const ownNearOrbit = new Set<string>();
       for (const fl of Object.values(state.fleets)) {
@@ -1480,13 +1502,8 @@ function baseAiOrders(
       const dropPad = launchpads.find((lp) => squadsWith(lp.hangar, 'landing_shuttle').length > 0);
       if (dropPad) {
         const from = dropPad.base;
-        // Откуда берётся десант: у мира — ИЗЛИШЕК сверх пола (правило №6), у носителя —
-        // то, что уже едет с ним. Второго источника у носителя нет и не нужно: войска
-        // сажают дома, под операцию (правило №5).
-        const source =
-          'planetId' in from
-            ? spareGround(state.planets[from.planetId] ?? { buildings: [], garrison: [] }, data)
-            : (state.fleets[from.fleetId]?.landing ?? []);
+        // Десант уже в трюме: челнок строится с бойцом внутри (SHU-5.2), поэтому источника
+        // войск у вылета больше нет — гарнизон базы под операцию не трогается.
         const reach = reachOf('landing_shuttle');
         const target = nearestBy(
           Object.values(state.planets).filter((p) => {
@@ -1503,12 +1520,9 @@ function baseAiOrders(
         );
         const intel = target ? knownGarrison(state, ai, target.id, data, identified) : null;
         const plan = target && intel
-          ? planDrop(squadsWith(dropPad.hangar, 'landing_shuttle'), source, intel.units, data)
+          ? planDrop(squadsWith(dropPad.hangar, 'landing_shuttle'), intel.units, data)
           : null;
         if (target && plan) {
-          // Груз кладут ОТДЕЛЬНЫМ приказом, и он идёт ПЕРЕД вылетом: два приказа одного
-          // тика применяются по порядку, поэтому эскадра взлетает уже гружёной.
-          out.push(loadSquadronTroops(ai, from, plan.squadronId, plan.troops));
           out.push(strikeShuttle(ai, from, plan.squadronId, { targetPlanetId: target.id }));
           sortied = true;
         }

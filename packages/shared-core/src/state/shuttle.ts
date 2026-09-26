@@ -244,9 +244,19 @@ export function hangarUsed(host: { hangar?: Squadron[] }): number {
   return (host.hangar ?? []).reduce((n, sq) => n + squadronSize(sq), 0);
 }
 
-/** Сколько наземных войск поднимет эскадра: Σ `cargoCapacity` её машин (ROS-1.5). */
-export function squadronCargoCapacity(sq: Squadron, data: GameData): number {
-  return sumUnitStat(sq.units, data, 'cargoCapacity');
+/** Оставить в трюме не больше `n` бойцов, срезая с ХВОСТА (SHU-5.2): десантный челнок
+ *  несёт ровно одного, поэтому погибший борт уносит своего бойца. Порядок фиксирован,
+ *  как у самих машин (`trimHangar`), — «кого потеряли» не зависит от обхода объекта. */
+export function trimCargo(cargo: readonly UnitStack[], n: number): UnitStack[] {
+  let left = Math.max(0, Math.floor(n));
+  const out: UnitStack[] = [];
+  for (const st of cargo) {
+    if (left <= 0) break;
+    const keep = Math.min(st.count, left);
+    left -= keep;
+    if (keep > 0) out.push({ ...st, count: keep });
+  }
+  return out;
 }
 
 /** Сколько мест трюма занято сейчас. */
@@ -297,6 +307,39 @@ export function basedMachine(
   return out;
 }
 
+/** Десантный челнок встаёт в ангар ВМЕСТЕ со своим бойцом (SHU-5.2): челнок строится
+ *  уже с наземным юнитом внутри, по одному на машину, и боец лежит в трюме эскадры.
+ *  Встаёт он в первую эскадру, где ТОЛЬКО такие челноки и ТОЛЬКО такие бойцы, иначе
+ *  заводит свою: смешанная эскадра не делится (`shuttle.split` не знает, чей боец
+ *  на каком борту), а однородную можно делить поштучно. */
+export function basedLander(
+  hangar: readonly Squadron[],
+  unit: string,
+  count: number,
+  troop: string,
+  freshId: string,
+): Squadron[] {
+  const out = hangar.map((q) => ({
+    ...q,
+    units: q.units.map((st) => ({ ...st })),
+    ...(q.cargo ? { cargo: q.cargo.map((c) => ({ ...c })) } : {}),
+  }));
+  const home = out.find(
+    (q) =>
+      q.units.length > 0 &&
+      q.units.every((st) => st.unit === unit) &&
+      (q.cargo ?? []).length > 0 &&
+      (q.cargo ?? []).every((c) => c.unit === troop),
+  );
+  if (home) {
+    addUnits(home.units, unit, count);
+    addUnits((home.cargo ??= []), troop, count);
+    return out;
+  }
+  out.push({ id: freshId, units: [{ unit, count }], cargo: [{ unit: troop, count }] });
+  return out;
+}
+
 /** Обрезать ангар до вместимости `bay`, начиная с ХВОСТА: раньше построенное переживает
  *  потерю порта, позже построенное гибнет первым. Порядок здесь — не вкус, а инвариант
  *  детерминизма: «лишние гибнут» обязано давать один и тот же результат на сервере и в
@@ -305,12 +348,8 @@ export function basedMachine(
  *  С эскадрами хвост считается СКВОЗНЫМ (SHU-4.2): сначала гибнут машины последней
  *  эскадры, и только когда она опустела — предыдущей. Опустевшая эскадра исчезает
  *  вместе с последней машиной: соединение без бортов — не соединение, а имя. ТРЮМ
- *  гибнет вместе со своей эскадрой — войска стояли на её бортах. */
-export function trimHangar(
-  hangar: readonly Squadron[],
-  bay: number,
-  data: GameData,
-): Squadron[] {
+ *  гибнет вместе с бортами — по бойцу на погибший борт (SHU-5.2). */
+export function trimHangar(hangar: readonly Squadron[], bay: number, data: GameData): Squadron[] {
   // Места, а не штуки (SHU-5.1): тяжёлый страйкер занимает два. Машина, которой не
   // хватает мест целиком, гибнет целиком — половины борта не бывает.
   let left = bay === Infinity ? Infinity : Math.max(0, Math.floor(bay));
@@ -332,7 +371,10 @@ export function trimHangar(
       if (keep < st.count) left = 0;
     }
     if (units.length === 0) continue;
-    out.push({ ...sq, units, ...(sq.cargo ? { cargo: sq.cargo.map((c) => ({ ...c })) } : {}) });
+    // Боец едет на своём борту (SHU-5.2): сколько бортов осталось, столько и бойцов.
+    const cargo = sq.cargo ? trimCargo(sq.cargo, squadronSize({ id: sq.id, units })) : [];
+    const { cargo: _old, ...bare } = sq;
+    out.push({ ...bare, units, ...(cargo.length > 0 ? { cargo } : {}) });
   }
   return out;
 }

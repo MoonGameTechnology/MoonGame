@@ -1,21 +1,22 @@
 /**
- * ДЕСАНТНЫЙ ЧЕЛНОК (ROS-1.5, заказ владельца 2026-09-09, п. 10).
+ * ДЕСАНТНЫЙ ЧЕЛНОК (ROS-1.5, заказ владельца 2026-09-09, п. 10; с SHU-5.2 — челнок с
+ * бойцом внутри, резолюция владельца 2026-09-26).
  *
- * Безоружная машина с маленьким трюмом: по кораблям не бьёт вовсе, а при ударе по миру
- * ГИБНЕТ и высаживает то, что везла. Отсюда правила:
+ * Безоружная машина, которая несёт ровно ОДНОГО наземного бойца: по кораблям не бьёт
+ * вовсе, а при ударе по миру становится этим бойцом. Отсюда правила:
  *
  * 1. **Корабль ей не цель.** Вылет, которому нечем бить по корпусам, отбивается
  *    `E_INVALID_TARGET` — не «долетел и ничего не сделал», а отказ на приказе.
- * 2. **Груз берётся с базы при вылете**, а не хранится в ангаре: у машин в ангаре нет
- *    своей личности (стеки сливаются), и трюм на стеке запретил бы им сливаться.
- *    Ограничен `cargoCapacity` вылета; чего нет в гарнизоне — не взлетит.
+ * 2. **Боец выбирается при постройке** (`unit.build { troop }`): цена — челнок плюс
+ *    боец, условия постройки бойца (его здание на этом мире) проверяются тем же
+ *    правилом, что у заказа самого бойца. Грузить в челнок нечего и нечем.
  * 3. **Одноразовость.** Домой машины не возвращаются: они высадились вместе с грузом.
  * 4. **Пустой чужой мир берётся сразу**, десант становится его гарнизоном.
  * 5. **Обороняемый чужой мир — ПЛАЦДАРМ** (решение владельца 2026-09-09): десант встаёт
  *    на землю четвёртой стороной боя и сам начинает наземный бой, без единого корабля
  *    рядом. Выиграл — стал гарнизоном и взял мир; проиграл — исчез вместе с боем.
  * 6. **Свой и союзный мир — подкрепление:** груз уходит в гарнизон, боя нет.
- * 7. **Зональное ПВО режет груз.** Сбитая машина уносит свою долю трюма: высаживается
+ * 7. **Зональное ПВО режет груз.** Сбитая машина уносит своего бойца: высаживается
  *    ровно то, что довезли уцелевшие.
  */
 import { describe, expect, it } from 'vitest';
@@ -39,11 +40,13 @@ const data: GameData = parseGameData({
   resources: ['metal'],
   units: {
     cruiser: { faction: 'x', domain: 'space', stats: { attack: 20, defense: 5, speed: 6, hp: 200 } },
-    // Десантный челнок: ноль урона, трюм на три единицы (§0.2).
+    // Десантный челнок: ноль урона, один боец внутри (SHU-5.2).
     landing_shuttle: {
       faction: 'x',
       domain: 'space',
-      traits: ['shuttle'],
+      traits: ['shuttle', 'lander'],
+      cost: { metal: 70 },
+      buildTimeHours: 2,
       stats: {
         attack: 0,
         defense: 2,
@@ -52,7 +55,6 @@ const data: GameData = parseGameData({
         strikeRange: 180,
         fuel: 4,
         rearmRounds: 2,
-        cargoCapacity: 3,
       },
     },
     // Вооружённый челнок — сторож на то, что запрет бить корабли идёт от ОРУЖИЯ.
@@ -62,12 +64,29 @@ const data: GameData = parseGameData({
       traits: ['shuttle'],
       stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180, fuel: 4, rearmRounds: 2 },
     },
-    militia: { faction: 'x', domain: 'ground', stats: { attack: 4, defense: 4, speed: 4, hp: 20, cargoSize: 1 } },
+    militia: {
+      faction: 'x',
+      domain: 'ground',
+      kind: 'infantry',
+      cost: { metal: 30 },
+      buildTimeHours: 1,
+      stats: { attack: 4, defense: 4, speed: 4, hp: 20, cargoSize: 1 },
+    },
     guard: { faction: 'x', domain: 'ground', stats: { attack: 30, defense: 30, speed: 4, hp: 200, cargoSize: 1 } },
+    tank: {
+      faction: 'x',
+      domain: 'ground',
+      kind: 'vehicle',
+      cost: { metal: 120 },
+      buildTimeHours: 4,
+      stats: { attack: 20, defense: 12, speed: 4, hp: 46, cargoSize: 2 },
+    },
   },
   factions: {},
   buildings: {
     spaceport: { name: 'Spaceport', cost: {}, buildTimeHours: 0, hp: 30, shuttleBay: 12 },
+    barracks: { name: 'Barracks', cost: {}, buildTimeHours: 0, hp: 20, enablesInfantryConstruction: true },
+    factory: { name: 'Factory', cost: {}, buildTimeHours: 0, hp: 20, enablesVehicleConstruction: true },
     zonal_aa: { name: 'Area Defense Battery', cost: {}, buildTimeHours: 0, hp: 22, pointDefense: 20 },
   },
   events: {},
@@ -94,12 +113,14 @@ function planet(
     traits: [],
     // SHU-4.2: ангар — эскадры. Держим ДВА звена по половине, чтобы тесты могли послать
     // и часть машин (одно звено), и все (слияние + вылет), не гадая о выданных id.
+    // SHU-5.2: у каждого челнока внутри свой боец — ополченец.
     ...(over.hangar === undefined
       ? {}
       : {
           hangar: ['sq:a', 'sq:b'].map((id) => ({
             id,
             units: [{ unit: 'landing_shuttle', count: Math.floor(over.hangar! / 2) }],
+            cargo: [{ unit: 'militia', count: Math.floor(over.hangar! / 2) }],
           })),
         }),
   };
@@ -152,29 +173,20 @@ const order = (type: string, payload: Record<string, unknown>): Action => ({
 });
 
 /**
- * Десантный вылет ПОСЛЕДОВАТЕЛЬНОСТЬЮ (SHU-4.2): груз теперь кладут в трюм ЗАРАНЕЕ, а
- * не заявляют в приказе на удар. Хелпер собирает её целиком — (слияние) → погрузка →
- * удар, — чтобы тесты говорили про исход высадки, а не про механику трёх приказов.
+ * Десантный вылет: бойцы уже внутри челноков (SHU-5.2), поэтому это (слияние) → удар.
  * `count: 4` значит «всеми машинами», то есть сперва свести оба звена в одно.
  */
 const drop = (
   over: {
     squadronId?: string;
     count?: number;
-    troops?: Array<{ unit: string; count: number }>;
     targetPlanetId?: string;
     targetFleetId?: string;
   } = {},
 ): Action[] => {
-  const {
-    squadronId = 'sq:a',
-    count = 2,
-    troops = [{ unit: 'militia', count: 4 }],
-    ...target
-  } = over;
+  const { squadronId = 'sq:a', count = 2, ...target } = over;
   const out: Action[] = [];
   if (count === 4) out.push(order('shuttle.merge', { planetId: 'A', squadronId: 'sq:b', intoId: squadronId }));
-  if (troops.length > 0) out.push(order('shuttle.loadTroops', { planetId: 'A', squadronId, troops }));
   out.push(
     order('shuttle.strike', {
       planetId: 'A',
@@ -215,7 +227,7 @@ const count = (stacks: readonly { unit: string; count: number }[] | undefined, u
 describe('ROS-1.5 — приказ: кого и с чем можно послать (правила 1–2)', () => {
   it('ПО КОРАБЛЯМ ДЕСАНТНЫЙ ЧЕЛНОК НЕ БЬЁТ ВОВСЕ — отказ на приказе, а не пустой полёт', () => {
     const s = { ...world(), fleets: { E1: fleetOf('E1', 'p2', 'B') } };
-    expect(code(s, drop({ targetFleetId: 'E1', troops: [] }))).toBe('E_INVALID_TARGET');
+    expect(code(s, drop({ targetFleetId: 'E1' }))).toBe('E_INVALID_TARGET');
   });
 
   it('запрет идёт от ОРУЖИЯ, а не от имени юнита: вооружённый челнок по кораблю бьёт', () => {
@@ -228,27 +240,7 @@ describe('ROS-1.5 — приказ: кого и с чем можно посла�
       },
       fleets: { E1: fleetOf('E1', 'p2', 'B') },
     };
-    expect(code(s, drop({ troops: [], targetFleetId: 'E1' }))).toBeNull();
-  });
-
-  it('трюм не резиновый: больше `cargoCapacity` вылета не увезти', () => {
-    // Две машины по 3 = 6 мест; седьмая единица не влезает.
-    expect(code(world(), drop({ troops: [{ unit: 'militia', count: 7 }] }))).toBe('E_NO_CAPACITY');
-    expect(code(world(), drop({ troops: [{ unit: 'militia', count: 6 }] }))).toBeNull();
-  });
-
-  it('чего нет в гарнизоне — не взлетит, и КОРАБЛЬ грузом не бывает', () => {
-    expect(code(world(), drop({ troops: [{ unit: 'guard', count: 1 }] }))).toBe('E_NO_ARMY');
-    expect(code(world(), drop({ troops: [{ unit: 'cruiser', count: 1 }] }))).toBe('E_NOT_GROUND');
-  });
-
-  it('груз уходит из гарнизона СРАЗУ на вылете — вторая посылка тем же взводом не пройдёт', () => {
-    const s = apply(world(), drop({ troops: [{ unit: 'militia', count: 4 }] }));
-    expect(count(s.planets.A?.garrison, 'militia')).toBe(4);
-    // Второе звено ещё в порту — но взвода на него уже не хватит: первый улетел с грузом.
-    expect(code(s, drop({ squadronId: 'sq:b', troops: [{ unit: 'militia', count: 5 }] }))).toBe(
-      'E_NO_ARMY',
-    );
+    expect(code(s, drop({ targetFleetId: 'E1' }))).toBeNull();
   });
 });
 
@@ -256,7 +248,7 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
   it('ПУСТОЙ ЧУЖОЙ МИР БЕРЁТСЯ СРАЗУ: десант становится гарнизоном, боя нет', () => {
     const { state, events } = advance(apply(world(), drop()), 2);
     expect(state.planets.B?.owner).toBe('p1');
-    expect(count(state.planets.B?.garrison, 'militia')).toBe(4);
+    expect(count(state.planets.B?.garrison, 'militia')).toBe(2); // два челнока — два бойца
     expect(Object.keys(state.battles)).toEqual([]);
     expect(events.some((e) => e.type === 'planet.captured')).toBe(true);
   });
@@ -273,7 +265,7 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
     const s = world({ target: { garrison: [['militia', 2]] } });
     const { state } = advance(apply(s, drop()), 2);
     expect(state.planets.B?.beachheads?.map((b) => b.owner)).toEqual(['p1']);
-    expect(count(state.planets.B?.beachheads?.[0]?.units, 'militia')).toBe(4);
+    expect(count(state.planets.B?.beachheads?.[0]?.units, 'militia')).toBe(2);
     const battle = Object.values(state.battles)[0];
     expect(battle?.phase).toBe('ground');
     expect(battle && attackerOf(battle)?.ref).toEqual({
@@ -304,7 +296,7 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
   it('СВОЙ МИР — ПОДКРЕПЛЕНИЕ: груз уходит в гарнизон, боя и плацдарма нет', () => {
     const s = world({ target: { owner: 'p1', garrison: [['militia', 1]] } });
     const { state } = advance(apply(s, drop()), 2);
-    expect(count(state.planets.B?.garrison, 'militia')).toBe(5);
+    expect(count(state.planets.B?.garrison, 'militia')).toBe(3);
     expect(state.planets.B?.beachheads).toBeUndefined();
     expect(Object.keys(state.battles)).toEqual([]);
   });
@@ -319,15 +311,98 @@ describe('ROS-1.5 — зональное ПВО режет груз (прави�
     expect(state.planets.B?.beachheads).toBeUndefined();
   });
 
-  it('уцелевшая половина довозит свою половину груза', () => {
-    // Четыре машины (трюм 12) везут 6 бойцов; батарея сбивает двух → остаётся 6 мест,
-    // и все шестеро доезжают. Сбей она больше — доехало бы по вместимости.
+  it('уцелевшая половина довозит своих бойцов — по одному на борт', () => {
+    // Четыре машины везут четырёх бойцов; батарея сбивает двух → доезжают двое.
     const s = world({ target: { buildings: ['zonal_aa'] } });
-    const { state } = advance(
-      apply(s, drop({ count: 4, troops: [{ unit: 'militia', count: 6 }] })),
-      2,
-    );
+    const { state } = advance(apply(s, drop({ count: 4 })), 2);
     expect(state.planets.B?.owner).toBe('p1');
-    expect(count(state.planets.B?.garrison, 'militia')).toBe(6);
+    expect(count(state.planets.B?.garrison, 'militia')).toBe(2);
+  });
+});
+
+describe('SHU-5.2 — челнок строится с бойцом внутри', () => {
+  const build = (troop: string | undefined, count = 1): Action =>
+    order('unit.build', {
+      planetId: 'A',
+      unit: 'landing_shuttle',
+      count,
+      ...(troop !== undefined ? { troop } : {}),
+    });
+  /** Свой порт с казармами и без завода; денег с запасом. */
+  const yard = (buildings: string[] = ['spaceport', 'barracks']): GameState => {
+    const s = world();
+    s.planets.A = { ...s.planets.A!, hangar: [], buildings: buildings.map((type) => ({ type, level: 1, hp: data.buildings[type]!.hp })) };
+    s.players.p1 = { ...s.players.p1!, resources: { metal: 10_000 } };
+    return s;
+  };
+  const hangarOf = (s: GameState) => s.planets.A?.hangar ?? [];
+
+  it('ГОТОВНОСТЬ: челнок с танком без завода не заказывается — условие постройки танка', () => {
+    expect(code(yard(), build('tank'))).toBe('E_NO_FACTORY');
+    expect(code(yard(['spaceport', 'factory']), build('tank'))).toBeNull();
+  });
+
+  it('боец обязателен и только наземный; у обычного шаттла бойца нет', () => {
+    expect(code(yard(), build(undefined))).toBe('E_BAD_PAYLOAD');
+    expect(code(yard(), build('cruiser'))).toBe('E_NOT_GROUND');
+    expect(code(yard(), build('ghost'))).toBe('E_UNKNOWN_UNIT');
+    expect(
+      code(yard(), order('unit.build', { planetId: 'A', unit: 'bomber', troop: 'militia' })),
+    ).toBe('E_BAD_PAYLOAD');
+  });
+
+  it('цена — челнок плюс боец, срок — дольший из двух; готовый встаёт в ангар с бойцом', () => {
+    const s = apply(yard(['spaceport', 'factory']), build('tank', 2));
+    expect(s.players.p1?.resources.metal).toBe(10_000 - 2 * (70 + 120));
+    expect(advance(s, 3).state.planets.A?.hangar ?? []).toEqual([]); // танк строится 4 ч
+    const done = advance(s, 4).state;
+    expect(hangarOf(done)).toEqual([
+      expect.objectContaining({
+        units: [{ unit: 'landing_shuttle', count: 2 }],
+        cargo: [{ unit: 'tank', count: 2 }],
+      }),
+    ]);
+  });
+
+  it('челноки с разными бойцами встают в разные эскадры, с одинаковыми — в одну', () => {
+    let s = apply(yard(['spaceport', 'barracks', 'factory']), build('tank'));
+    s = apply(s, build('militia'));
+    s = apply(s, build('tank'));
+    s = advance(s, 20).state;
+    expect(hangarOf(s).map((q) => q.cargo)).toEqual([
+      [{ unit: 'tank', count: 2 }],
+      [{ unit: 'militia', count: 1 }],
+    ]);
+  });
+
+  it('ГОТОВНОСТЬ: дошедший до пустого чужого мира челнок становится танком-гарнизоном', () => {
+    let s = advance(apply(yard(['spaceport', 'factory']), build('tank')), 4).state;
+    const id = hangarOf(s)[0]!.id;
+    s = apply(s, order('shuttle.strike', { planetId: 'A', squadronId: id, targetPlanetId: 'B' }));
+    const { state } = advance(s, 2);
+    expect(state.planets.B?.owner).toBe('p1');
+    expect(state.planets.B?.garrison).toEqual([{ unit: 'tank', count: 1 }]);
+  });
+
+  it('ГОТОВНОСТЬ: на своём мире челнок становится танком в гарнизоне', () => {
+    let s = advance(apply(yard(['spaceport', 'factory']), build('tank')), 4).state;
+    s.planets.B = { ...s.planets.B!, owner: 'p1', garrison: [{ unit: 'militia', count: 1 }] };
+    const id = hangarOf(s)[0]!.id;
+    s = apply(s, order('shuttle.strike', { planetId: 'A', squadronId: id, targetPlanetId: 'B' }));
+    const { state } = advance(s, 2);
+    expect(count(state.planets.B?.garrison, 'tank')).toBe(1);
+    expect(state.planets.B?.beachheads).toBeUndefined();
+  });
+
+  it('однородная эскадра делится — бойцы расходятся по бортам', () => {
+    const s = apply(
+      world(),
+      order('shuttle.split', { planetId: 'A', squadronId: 'sq:a', units: [{ unit: 'landing_shuttle', count: 1 }] }),
+    );
+    expect((s.planets.A?.hangar ?? []).map((q) => q.cargo)).toEqual([
+      [{ unit: 'militia', count: 1 }],
+      [{ unit: 'militia', count: 1 }],
+      [{ unit: 'militia', count: 2 }],
+    ]);
   });
 });

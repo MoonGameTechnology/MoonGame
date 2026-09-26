@@ -22,6 +22,8 @@ export interface QueuedBuild {
   kind: BuildKind;
   id: string;
   count: number;
+  /** Боец десантного челнока (SHU-5.2): он едет в заказ и в цену вместе с машиной. */
+  troop?: string;
 }
 
 /** The payload of a scheduled `construction.complete` event, as the UI reads it —

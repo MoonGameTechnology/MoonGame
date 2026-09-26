@@ -249,7 +249,6 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
       return {
         name: t('dossier.unit.landing-shuttle.name'),
         body: t('dossier.unit.landing-shuttle.desc', {
-          c: hl(st.cargoCapacity ?? 0),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
         }),

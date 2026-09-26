@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
 import {
-  loadSquadronTroops,
   moveFleet,
   retreatFleet,
   splitFleet,
+  splitSquadron,
   strikeShuttle,
 } from '../../decisions/actions';
 import { aiOrderSlices } from './aiOrderSlices';
@@ -32,10 +32,10 @@ it('разные флоты и места не образуют зависиму
   expect(slices.flat()).toEqual(actions);
 });
 
-it('погрузка десанта и вылет одной эскадры не разделяются (ai.ts:1188)', () => {
+it('приказ эскадре и её вылет не разделяются — эскадра тоже адрес', () => {
   const base = { planetId: 'p1' };
   const actions = [
-    loadSquadronTroops('a', base, 'sq1', [{ unit: 'militia', count: 2 }]),
+    splitSquadron('a', base, 'sq1', [{ unit: 'bomber', count: 1 }]),
     strikeShuttle('a', base, 'sq1', { targetPlanetId: 'foe' }),
     strikeShuttle('a', base, 'sq2', { targetPlanetId: 'foe' }),
   ];
@@ -57,7 +57,7 @@ it('деление флота и его вылет не разделяются (
 it('чужая сущность между зависимыми приказами разрывает пару, порядок сохраняется', () => {
   const base = { planetId: 'p1' };
   const actions = [
-    loadSquadronTroops('a', base, 'sq1', [{ unit: 'militia', count: 2 }]),
+    splitSquadron('a', base, 'sq1', [{ unit: 'bomber', count: 1 }]),
     moveFleet('a', 'f9', 'home'), // другая сущность вклинилась — склеивать нечего
     strikeShuttle('a', base, 'sq1', { targetPlanetId: 'foe' }),
   ];

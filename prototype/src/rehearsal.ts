@@ -167,12 +167,6 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
     units: [{ unit: 'interceptor', count: 1 }],
   },
   'shuttle.merge': { planetId: 'C0R1', squadronId: 'missing-squadron', intoId: 'other' },
-  'shuttle.loadTroops': {
-    planetId: 'C0R1',
-    squadronId: 'missing-squadron',
-    troops: [{ unit: 'militia', count: 1 }],
-  },
-  'shuttle.unloadTroops': { planetId: 'C0R1', squadronId: 'missing-squadron' },
   'capital.designate': { planetId: 'home_p1' },
   // Усиление забега (PVR-1.4). В этом прогоне матч не PvE, поэтому приказ законно
   // отобьётся `E_NOT_PVE` — каталог проверяет ФОРМУ конверта, а не исполнимость.

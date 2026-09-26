@@ -67,6 +67,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     // The ship loadout chosen in the «Верфь» constructor — validated/priced/stamped by
     // the reducer (validateLoadout); the schema only bounds well-formedness.
     modules: z.array(id).max(32).optional(),
+    // Десантный челнок (трейт `lander`) строится сразу с наземным юнитом внутри
+    // (SHU-5.2): здесь — какой именно. Проверяет и ценит его редьюсер.
+    troop: id.optional(),
   }),
   // construction.ts — cancel an ACTIVE order (refund the unbuilt share, pause it) by
   // the `scheduled` event's `seq`; resume a paused one (pay the remainder, continue
@@ -143,7 +146,7 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     planetId: id.optional(),
     fleetId: id.optional(),
     // ЭСКАДРА (SHU-4.2): летит соединение целиком, поэтому «юнит и сколько» тут больше
-    // нет. Груза тоже нет — он уже в трюме, его кладут заранее (`shuttle.loadTroops`).
+    // нет. Груза тоже нет — десантный челнок строится с бойцом внутри (SHU-5.2).
     squadronId: id,
     targetFleetId: id.optional(),
     targetPlanetId: id.optional(),
@@ -164,20 +167,6 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     fleetId: id.optional(),
     squadronId: id,
     intoId: id,
-  }),
-  'shuttle.loadTroops': z.object({
-    planetId: id.optional(),
-    fleetId: id.optional(),
-    squadronId: id,
-    troops: z.array(z.object({ unit: id, count })).min(1),
-  }),
-  'shuttle.unloadTroops': z.object({
-    planetId: id.optional(),
-    fleetId: id.optional(),
-    squadronId: id,
-    // Необязателен: без списка ссаживается весь трюм (SHU-4.2), со списком — часть
-    // (SHU-4.3: интерфейс считает погрузку и выгрузку одним знаковым планом).
-    troops: z.array(z.object({ unit: id, count })).min(1).optional(),
   }),
   // capital (hero respawn / re-fit anchor)
   'capital.designate': z.object({ planetId: id }),

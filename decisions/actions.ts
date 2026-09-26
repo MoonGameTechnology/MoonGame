@@ -71,7 +71,8 @@ export const orderRetreat = (
 export const bombardFleet = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'fleet.bombard', { fleetId, on });
 /** Поднять ЭСКАДРУ из порта мира по цели (SHU-1.2, адресация — SHU-4.2). Груз десанта
- *  здесь не передаётся: он уже в трюме, его кладут туда заранее (`loadSquadronTroops`). */
+ *  здесь не передаётся: десантный челнок строится с бойцом внутри (SHU-5.2, `buildUnit`
+ *  с `troop`). */
 export const strikeShuttle = (
   playerId: string,
   // БАЗА вылета — мир с портом ИЛИ носитель (SHU-2.1), ровно одна из двух: ядро ищет
@@ -101,27 +102,6 @@ export const mergeSquadron = (
   squadronId: string,
   intoId: string,
 ) => act(playerId, 'shuttle.merge', { ...base, squadronId, intoId });
-/** Погрузка десанта в трюм ЗАРАНЕЕ и выгрузка обратно (SHU-4.2). */
-export const loadSquadronTroops = (
-  playerId: string,
-  base: { planetId: string } | { fleetId: string },
-  squadronId: string,
-  troops: Array<{ unit: string; count: number }>,
-) => act(playerId, 'shuttle.loadTroops', { ...base, squadronId, troops });
-/** `troops` НЕОБЯЗАТЕЛЕН: без него ссаживается весь трюм, со списком — часть. Панель
- *  (SHU-4.3) считает погрузку и выгрузку одним знаковым планом, и «всё или ничего»
- *  ей не выразить. */
-export const unloadSquadronTroops = (
-  playerId: string,
-  base: { planetId: string } | { fleetId: string },
-  squadronId: string,
-  troops?: Array<{ unit: string; count: number }>,
-) =>
-  act(playerId, 'shuttle.unloadTroops', {
-    ...base,
-    squadronId,
-    ...(troops && troops.length > 0 ? { troops } : {}),
-  });
 export const loadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
   act(playerId, 'army.load', { fleetId, unit, count });
 export const unloadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
@@ -145,18 +125,36 @@ export const buildBuilding = (playerId: string, planetId: string, building: stri
   act(playerId, 'building.construct', { planetId, building });
 export const upgradeBuilding = (playerId: string, planetId: string, building: string) =>
   act(playerId, 'building.upgrade', { planetId, building });
-export const buildUnit = (playerId: string, planetId: string, unit: string, count = 1) =>
-  act(playerId, 'unit.build', { planetId, unit, count });
+/** `troop` — наземный юнит внутри десантного челнока (трейт `lander`, SHU-5.2): ядро
+ *  требует его у такого челнока и отбивает у любого другого юнита, поэтому в payload
+ *  он попадает только переданным. */
+export const buildUnit = (
+  playerId: string,
+  planetId: string,
+  unit: string,
+  count = 1,
+  troop?: string,
+) =>
+  act(playerId, 'unit.build', { planetId, unit, count, ...(troop !== undefined ? { troop } : {}) });
 /** Build a hull with a chosen module loadout (the «Оснащение корабля» constructor).
  *  The modules ride in the `unit.build` payload; the core stamps them onto the built
- *  stack (validated + priced by `loadout.ts`), locked for good — no refit. */
+ *  stack (validated + priced by `loadout.ts`), locked for good — no refit. `troop` —
+ *  боец десантного челнока (SHU-5.2), как у `buildUnit`. */
 export const buildShip = (
   playerId: string,
   planetId: string,
   unit: string,
   count: number,
   modules: string[],
-) => act(playerId, 'unit.build', { planetId, unit, count, modules });
+  troop?: string,
+) =>
+  act(playerId, 'unit.build', {
+    planetId,
+    unit,
+    count,
+    modules,
+    ...(troop !== undefined ? { troop } : {}),
+  });
 /** Cancel an ACTIVE (already paid) building/upgrade/unit order: refunds the unbuilt
  *  share of its cost and parks it as a resumable paused site — `seq` is the order's
  *  `construction.complete` scheduled-event seq (already read off `s.scheduled`, e.g.

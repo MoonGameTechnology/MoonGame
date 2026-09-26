@@ -54,13 +54,12 @@ import {
   freshSortie,
   shuttleBayAt,
   spendSortie,
-  squadronCargoCapacity,
-  squadronCargoUsed,
   squadronSize,
   squadronReach,
   stacksSize,
   strikesReserved,
   tickRearm,
+  trimCargo,
   trimHangar,
   type SortieState,
 } from '../state/shuttle';
@@ -73,7 +72,7 @@ import {
   type HookedDamage,
 } from '../util/combat';
 import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
-import { addUnits, cappedUnitStat, findHealthyStack, sumUnitStat } from '../util/stacks';
+import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -456,14 +455,6 @@ function parseStacks(h: HandlerContext, raw: unknown): Array<{ unit: string; cou
   return out;
 }
 
-/** Записать в ангар изменённую эскадру; опустевшая ИСЧЕЗАЕТ — соединение без бортов
- *  это не соединение, а имя. */
-function putSquadron(base: BaseView, next: Squadron): void {
-  base.setHangar(
-    base.hangar.flatMap((q) => (q.id !== next.id ? [q] : squadronSize(next) > 0 ? [next] : [])),
-  );
-}
-
 /** Сила вылета против ЦЕЛИ ЭТОГО РОДА, ограниченная линией боя, ровно как у
  *  артиллерии: количество бьёт, но не бесконечно.
  *
@@ -530,31 +521,17 @@ function repelStrike(
 }
 
 /**
- * Урезать груз до того, что довезли УЦЕЛЕВШИЕ машины (ROS-1.5).
+ * Урезать груз до того, что довезли УЦЕЛЕВШИЕ машины (ROS-1.5, SHU-5.2).
  *
- * Сбитая машина уносит свою долю трюма — иначе зональное ПВО выбивало бы конвой, а на
- * землю всё равно сходил бы полный десант, и оборона против высадки ничего не решала бы.
- * Режем с хвоста тем же порядком, что и сами машины (`shootDownStrike`): порядок
- * детерминирован, а «кого именно потеряли» игрок всё равно видит числом, а не списком.
+ * Десантный челнок несёт ровно одного бойца, поэтому сбитый борт уносит своего: иначе
+ * зональное ПВО выбивало бы конвой, а на землю всё равно сходил бы полный десант, и
+ * оборона против высадки ничего не решала бы. Режем с хвоста (`trimCargo`) тем же
+ * порядком, что и сами машины: порядок детерминирован.
  */
-function trimCargoToSurvivors(strike: ShuttleStrike, data: GameData): void {
+function trimCargoToSurvivors(strike: ShuttleStrike): void {
   const cargo = strike.cargo ?? [];
   if (cargo.length === 0) return;
-  let room = 0;
-  for (const st of strike.units) {
-    room += (data.units[st.unit]?.stats.cargoCapacity ?? 0) * st.count;
-  }
-  let used = 0;
-  for (const st of cargo) used += (data.units[st.unit]?.stats.cargoSize ?? 0) * st.count;
-  for (let i = cargo.length - 1; i >= 0 && used > room; i--) {
-    const st = cargo[i]!;
-    const size = data.units[st.unit]?.stats.cargoSize ?? 0;
-    if (size <= 0) continue;
-    const drop = Math.min(st.count, Math.ceil((used - room) / size));
-    st.count -= drop;
-    used -= drop * size;
-  }
-  strike.cargo = cargo.filter((st) => st.count > 0);
+  strike.cargo = trimCargo(cargo, strike.units.reduce((n, st) => n + Math.max(0, st.count), 0));
 }
 
 /**
@@ -651,76 +628,6 @@ function groundBattleAt(h: HandlerContext, planetId: string): boolean {
     if (b && b.phase === 'ground' && b.location === planetId) return true;
   }
   return false;
-}
-
-/** Откуда десантный вылет берёт груз: у мира это гарнизон, у носителя — его десант.
- *  Обе стороны уже существуют в модели (`army.load` возит войска ровно между ними), и
- *  третьего хранилища кирпич не заводит. */
-function troopSource(state: GameState, base: BaseView): UnitStack[] | null {
-  if (base.ref.kind === 'planet') return state.planets[base.ref.id]?.garrison ?? null;
-  const fleet = state.fleets[base.ref.id];
-  return fleet ? (fleet.landing ?? []) : null;
-}
-
-function setTroopSource(state: GameState, base: BaseView, units: UnitStack[]): void {
-  if (base.ref.kind === 'planet') {
-    const planet = state.planets[base.ref.id];
-    if (planet) planet.garrison = units;
-    return;
-  }
-  const fleet = state.fleets[base.ref.id];
-  if (fleet) fleet.landing = units;
-}
-
-/**
- * Проверить заявленный груз и собрать его стеки (ROS-1.5). Ничего не меняет — только
- * отвечает «можно» или кодом отказа, потому что fail-secure требует отбить приказ до
- * первой правки состояния.
- *
- * Три границы, и все три — существующие правила, а не новые: грузом бывает ТОЛЬКО
- * наземный юнит (как у `army.load`), его должно хватать в источнике, и он обязан
- * влезть в `cargoCapacity` вылета — тот же стат, которым меряется трюм корабля.
- */
-function loadTroops(
-  h: HandlerContext,
-  base: BaseView,
-  troops: ReadonlyArray<{ unit: string; count: number }>,
-  capacity: number,
-): { units: UnitStack[] } | { code: string } {
-  if (troops.length === 0) return { units: [] };
-  const source = troopSource(h.state, base);
-  if (!source) return { code: 'E_NO_ARMY' };
-  const units: UnitStack[] = [];
-  let used = 0;
-  for (const want of troops) {
-    const def = h.ctx.data.units[want.unit];
-    if (!def) return { code: 'E_UNKNOWN_UNIT' };
-    if (def.domain !== 'ground') return { code: 'E_NOT_GROUND' };
-    const stack = findHealthyStack(source, want.unit);
-    if (!stack || stack.count < want.count) return { code: 'E_NO_ARMY' };
-    used += want.count * def.stats.cargoSize;
-    addUnits(units, want.unit, want.count);
-  }
-  if (used > capacity) return { code: 'E_NO_CAPACITY' };
-  return { units };
-}
-
-/** Снять погруженное с базы. Отдельным шагом после всех проверок: до этой строки
- *  состояние не тронуто, и любой отказ выше не оставляет за собой полугрузки. */
-function takeCargoFromBase(h: HandlerContext, base: BaseView, cargo: readonly UnitStack[]): void {
-  if (cargo.length === 0) return;
-  const source = troopSource(h.state, base);
-  if (!source) return;
-  const left = source.map((st) => ({ ...st }));
-  for (const st of cargo) {
-    const from = findHealthyStack(left, st.unit);
-    if (from) from.count -= st.count;
-  }
-  setTroopSource(
-    h.state,
-    base,
-    left.filter((st) => st.count > 0),
-  );
 }
 
 /** База из payload: ровно одна из двух — свой мир с портом ИЛИ свой носитель. Общая
@@ -909,7 +816,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
       if (strike.cargo !== undefined) {
         const target = h.state.planets[strike.target.id];
         if (target) {
-          trimCargoToSurvivors(strike, h.ctx.data);
+          trimCargoToSurvivors(strike);
           landCargo(h, strike, target);
         }
         h.state.strikes = (h.state.strikes ?? []).filter((st) => st.id !== strike.id);
@@ -1046,15 +953,18 @@ export const shuttleModule: GameModule = {
      * десятки — имя у восьмёрки, отделил восьмёрку — имя ушло с ней. Иначе имя
      * следовало бы за тем, на что игрок случайно нажал. Ничья — у исходной.
      *
-     * **Эскадру с грузом делить нельзя.** Делёж трюма — правило, которого в модели нет
-     * и которое пришлось бы выдумывать (кому достаётся взвод, если бортов поровну?).
-     * Выгрузи, раздели, погрузи заново — три понятных шага вместо одного гадания.
+     * **Груз делится, только если он однороден** (SHU-5.2): десантный челнок несёт
+     * ровно одного бойца, и у эскадры, где все бойцы одного рода, ответ «кто уходит»
+     * однозначен — по бойцу на уходящий борт. Смешанный трюм (после `shuttle.merge`
+     * разных десантов) делить нельзя: кому достаётся танк, а кому пехотинец, модель не
+     * знает.
      */
     api.onAction('shuttle.split', (action, h: HandlerContext) => {
       const p = (action.payload ?? {}) as { squadronId?: unknown; units?: unknown };
       const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
       const squad = requireSquadron(h, base, p.squadronId);
-      if (squadronCargoUsed(squad) > 0) return h.reject('E_HAS_CARGO');
+      const hold = (squad.cargo ?? []).filter((st) => st.count > 0);
+      if (hold.length > 1) return h.reject('E_HAS_CARGO');
 
       const want = parseStacks(h, p.units);
       let left: UnitStack[] = squad.units.map((st) => ({ ...st }));
@@ -1071,9 +981,15 @@ export const shuttleModule: GameModule = {
 
       const goes = moved.reduce((n, st) => n + st.count, 0);
       const freshId = nextSquadronId(h, action.playerId);
-      const keepsName = goes > stay ? moved : left;
-      const named: Squadron = { id: squad.id, units: keepsName };
-      const other: Squadron = { id: freshId, units: keepsName === moved ? left : moved };
+      // Бойцы расходятся по бортам: уходящим — по одному на борт, остальные остаются.
+      const troop = hold[0];
+      const goesN = troop ? Math.min(troop.count, goes) : 0;
+      const part = (units: UnitStack[], n: number): Omit<Squadron, 'id'> =>
+        troop && n > 0 ? { units, cargo: [{ unit: troop.unit, count: n }] } : { units };
+      const movedPart = part(moved, goesN);
+      const leftPart = part(left, troop ? troop.count - goesN : 0);
+      const named: Squadron = { id: squad.id, ...(goes > stay ? movedPart : leftPart) };
+      const other: Squadron = { id: freshId, ...(goes > stay ? leftPart : movedPart) };
       base.setHangar(base.hangar.flatMap((q) => (q.id === squad.id ? [named, other] : [q])));
       h.emit('squadron.split', {
         baseId: base.ref.id,
@@ -1108,78 +1024,6 @@ export const shuttleModule: GameModule = {
         owner: action.playerId,
         squadronId: into.id,
         absorbed: from.id,
-      });
-    });
-
-    /**
-     * `shuttle.loadTroops { planetId | fleetId, squadronId, troops: [{unit,count}] }` —
-     * погрузить наземные войска в трюм ЗАРАНЕЕ (SHU-4.2, заказ владельца).
-     *
-     * До этого кирпича груз брали с базы в момент вылета, и до вылета трюма не
-     * существовало вовсе: собрать десант и подержать его наготове было нельзя. Теперь
-     * войска ПОКИДАЮТ ГАРНИЗОН СРАЗУ — иначе тот же взвод числился бы и в обороне мира,
-     * и в трюме, и два приказа послали бы его дважды.
-     */
-    api.onAction('shuttle.loadTroops', (action, h: HandlerContext) => {
-      const p = (action.payload ?? {}) as { squadronId?: unknown; troops?: unknown };
-      const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
-      const squad = requireSquadron(h, base, p.squadronId);
-      const want = parseStacks(h, p.troops);
-      const free = squadronCargoCapacity(squad, h.ctx.data) - squadronCargoUsed(squad);
-      const loaded = loadTroops(h, base, want, free);
-      if ('code' in loaded) return h.reject(loaded.code);
-
-      const cargo = (squad.cargo ?? []).map((st) => ({ ...st }));
-      for (const st of loaded.units) addUnits(cargo, st.unit, st.count);
-      putSquadron(base, { ...squad, cargo });
-      takeCargoFromBase(h, base, loaded.units);
-      h.emit('squadron.loaded', {
-        baseId: base.ref.id,
-        baseKind: base.ref.kind,
-        owner: action.playerId,
-        squadronId: squad.id,
-      });
-    });
-
-    /**
-     * `shuttle.unloadTroops { planetId | fleetId, squadronId, troops? }` — ссадить трюм
-     * обратно. Приказ без обратного хода запер бы войска в трюме до вылета, а вылет
-     * десантный одноразовый — то есть навсегда.
-     *
-     * `troops` НЕОБЯЗАТЕЛЕН, и это не удобство: интерфейс (SHU-4.3) считает погрузку и
-     * выгрузку ОДНИМ знаковым планом на строку («+2 взять, −1 ссадить»), и «всё или
-     * ничего» им не выразить — кнопка обещала бы игроку то, чего ядро не умеет. Без
-     * списка ссаживается весь трюм: это и есть «выгрузить всё» одним тапом.
-     */
-    api.onAction('shuttle.unloadTroops', (action, h: HandlerContext) => {
-      const p = (action.payload ?? {}) as { squadronId?: unknown; troops?: unknown };
-      const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
-      const squad = requireSquadron(h, base, p.squadronId);
-      const aboard = (squad.cargo ?? []).filter((st) => st.count > 0);
-      if (aboard.length === 0) return h.reject('E_NO_ARMY');
-      // Заявка проверяется ЦЕЛИКОМ до первой правки состояния (fail-secure): половина
-      // ссаженного взвода при отказе второй половины — это молча испорченный трюм.
-      const cargo = p.troops === undefined ? aboard : parseStacks(h, p.troops);
-      let left: UnitStack[] = aboard.map((st) => ({ ...st }));
-      for (const want of cargo) {
-        const next = takeMachines(left, want.unit, want.count);
-        if (!next) return h.reject('E_NO_ARMY');
-        left = next;
-      }
-      const source = troopSource(h.state, base);
-      if (!source) return h.reject('E_NO_ARMY');
-      const back = source.map((st) => ({ ...st }));
-      for (const st of cargo) addUnits(back, st.unit, st.count);
-      setTroopSource(h.state, base, back);
-      // Пустой трюм — ОТСУТСТВИЕ поля, а не ключ со значением `undefined`: состояние
-      // хранится как JSONB, и «пустой ключ» пережил бы только один рейс до базы.
-      const { cargo: _gone, ...bare } = squad;
-      putSquadron(base, left.length > 0 ? { ...bare, cargo: left } : bare);
-      h.emit('squadron.unloaded', {
-        baseId: base.ref.id,
-        baseKind: base.ref.kind,
-        owner: action.playerId,
-        squadronId: squad.id,
       });
     });
 

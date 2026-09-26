@@ -22,6 +22,7 @@
 import type { Action, GameData, GameState } from '../../packages/shared-core/src/index';
 import { buildBuilding, buildUnit, upgradeBuilding } from './game';
 import type { BuildKind, BuildLane, QueuedBuild } from './buildQueue';
+import { landerCost } from '../../decisions/landerTroops';
 
 /** Полоса очереди, в которую попадает заказ: юниты отдельно, здания и апгрейды вместе. */
 export function laneOf(kind: BuildKind): BuildLane {
@@ -50,7 +51,9 @@ export function queuedCost(
   q: QueuedBuild,
 ): Record<string, number> | undefined {
   if (q.kind === 'unit') {
-    const per = data.units[q.id]?.cost;
+    // Десантный челнок стоит вместе со своим бойцом (SHU-5.2).
+    const per =
+      data.units[q.id] && q.troop ? landerCost(data, q.id, q.troop) : data.units[q.id]?.cost;
     if (!per) return undefined;
     const n = q.count ?? 1;
     return n === 1 ? per : Object.fromEntries(Object.entries(per).map(([r, v]) => [r, v * n]));
@@ -67,7 +70,7 @@ export function queuedCost(
  */
 export function queuedAction(me: string, planetId: string, q: QueuedBuild): Action {
   return q.kind === 'unit'
-    ? buildUnit(me, planetId, q.id, q.count)
+    ? buildUnit(me, planetId, q.id, q.count, q.troop)
     : q.kind === 'upgrade'
       ? upgradeBuilding(me, planetId, q.id)
       : buildBuilding(me, planetId, q.id);
