@@ -81,7 +81,9 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  (минный заградитель); порядок остальных не тронут.) */
 // 51: порядок тот же; combat 3.0.0 сохраняет личные циклы атаки на BattleSide.
 // 52: порядок тот же; construction 1.1.0 — защита построек мира (FORT-5.15), правило урона.
-const PINNED_FOR_VERSION = '53';
+// 53: порядок тот же; missionFacts 1.1.0 — беженцы по прибытии, поле Planet.awaitingFleets.
+// 54: порядок тот же; combat 3.1.0 и army 1.1.0 — высадка по таймеру, у флота новые поля (MSB-9).
+const PINNED_FOR_VERSION = '54';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

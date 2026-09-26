@@ -77,6 +77,11 @@ function runIdlePlayer(maxHours: number): RunOut {
   const scan = (events: readonly { type: string; payload: unknown }[]): void => {
     for (const e of events) {
       const p = e.payload as { location?: string; phase?: string; winner?: string | null; rounds?: number };
+      // Высадка идёт по таймеру (решение владельца 2026-09-26): наземный бой начинается в ходе
+      // часов, когда десант ступил на землю, а не в событиях самого приказа штурма.
+      if (e.type === 'battle.started' && p.location === 'home_a' && p.phase === 'ground') {
+        groundBattleAtHome ??= hour;
+      }
       if (e.type === 'battle.resolved' && p.location === 'home_a' && p.phase === 'ground') {
         groundOutcomes.push(p.winner ?? null);
         groundRounds.push(p.rounds ?? 0);

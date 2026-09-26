@@ -226,7 +226,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '53'; // Беженцы по прибытии (заказ владельца 2026-09-29):
+export const MODULE_MANIFEST_VERSION = '54'; // MSB-9: штурм — высадка по таймеру, потом
+// плацдарм; выгрузка на свой мир — час, как погрузка. Членство и порядок не тронуты; `combat`
+// 3.1.0 и `army` 1.1.0, у флота новые поля `assaultLanding` и `unloading`. Партия на 53 не
+// знает этих полей и держала бы флот в наземном бою до конца.
+// export const MODULE_MANIFEST_VERSION = '53'; // Беженцы по прибытии (заказ владельца 2026-09-29):
 // членство и порядок не тронуты; `missionFacts` 1.1.0 выпускает в игру флоты карты с
 // `joinsOnArrival`, когда к ним прибыл флот владельца. У провинции новое поле
 // `Planet.awaitingFleets`. Партия на 52 держит транспорты в игре с первой секунды.
