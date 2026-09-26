@@ -7,7 +7,7 @@
  * `econScrews.ts` (`dockRepairCost`/`fleetAtOwnDock`, REFP-18); since CONV-1/CONV-2
  * those files are gone and this is the only copy of the math.
  */
-import type { Fleet, GameState } from '../state/gameState';
+import type { Fleet, GameState, Planet } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { effectiveStats } from './loadout';
 import { buildingLevel } from '../data/schemas';
@@ -96,4 +96,19 @@ export function fleetAtOwnDock(
     const def = data.buildings[b.type];
     return !!def && buildingLevel(def, b.level).shipRepair > 0;
   });
+}
+
+/**
+ * Темп ремонта корпусов у дока мира — доля полного корпуса в час: сумма `shipRepair`
+ * живых построек (SHU-5.3, та же сумма, что чинит корабли в `construction`). Своё ли это
+ * место и не идёт ли там бой, решает вызывающий.
+ */
+export function dockHullRate(planet: Planet, data: GameData): number {
+  let rate = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue;
+    const def = data.buildings[b.type];
+    if (def) rate += buildingLevel(def, b.level).shipRepair;
+  }
+  return rate;
 }
