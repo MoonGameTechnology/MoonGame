@@ -31,6 +31,8 @@ import {
   landerTroopCandidates,
   orderableTroops,
 } from '../../decisions/landerTroops';
+import { canBuildHere } from '../../decisions/buildGate';
+import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
 import { worldName } from './planetName';
 
 type BuildingDef = (typeof data.buildings)[string];
@@ -110,6 +112,19 @@ export function buildRowState(
   localQueued: (planetId: string, id: string) => boolean,
 ): BuildRowSt {
   if (localQueued(planetId, id)) return { st: 'queued' };
+  // Вид провинции этого здания не пускает — строки нет вовсе, а не замок с причиной
+  // (решение владельца 2026-09-26: «если в провинции по её типу нельзя что-то строить,
+  // этого просто нет в выборе»). Спрашиваем воротами вида, а не кодом отказа: ядро
+  // проверяет технологию раньше вида, и запертое ЕЩЁ И технологией показалось бы замком.
+  // Уже стоящее здание остаётся строкой всегда — его улучшают, а вид мира мог смениться
+  // после постройки (`station.deploy`).
+  const node = state.planets[planetId];
+  if (
+    node &&
+    !node.buildings.some((b) => b.type === id) &&
+    !canBuildHere(node, id, data, feedsOnBiomass(state, me, data))
+  )
+    return { st: 'hidden' };
   const code = probe(buildBuilding(me, planetId, id));
   if (code === null) return { st: 'avail', affordable: true };
   if (code === 'E_INSUFFICIENT') return { st: 'avail', affordable: false };

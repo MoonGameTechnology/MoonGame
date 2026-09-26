@@ -302,6 +302,26 @@ body.holo-ui #holo-selection-window #side .ptab{flex:1 1 0;min-width:0;padding:7
 body.holo-ui #holo-selection-window #side .ptab b{margin-left:5px;}
 body.holo-ui #holo-selection-window .holo-command-body:has(> [data-cmd=move]) > button:last-of-type:nth-of-type(even){
   grid-column:1/-1;}
+/* ГОРИЗОНТАЛЬНОЕ окно выбора (решение владельца 2026-09-26: «панель приказов горизонтальной,
+   чтоб там не было скролов; то же с выделением провинций»). Узкое высокое окно упиралось в
+   край экрана и прятало низ под прокрутку. Теперь окно широкое и низкое: приказы — столбцом
+   слева, сведения справа текут колонками газетой, а не вниз. */
+body.holo-ui #holo-selection-window.has-info{
+  width:min(1040px,calc(100vw - 150px));--holo-window-max-height:min(420px,calc(100dvh - 140px));
+  flex-direction:row;
+}
+body.holo-ui #holo-selection-window.has-info.has-commands #cmdbar{
+  flex:0 0 320px;max-height:none;overflow:hidden;border-bottom:0;border-right:1px solid var(--line-hi);}
+body.holo-ui #holo-selection-window.has-info #side{min-width:0;}
+body.holo-ui #holo-selection-window.has-info #side .pscroll{
+  column-width:230px;column-gap:18px;column-rule:1px solid var(--line);column-fill:balance;
+  overflow:hidden;height:100%;}
+body.holo-ui #holo-selection-window.has-info #side .pscroll > *{break-inside:avoid;}
+body.holo-ui #holo-selection-window.has-info #side .phead{position:static;column-span:all;}
+/* Вкладки мира — полосой во всю ширину: сведения над ними, список под ними, оба — колонками. */
+body.holo-ui #holo-selection-window.has-info #side .ptabs{column-span:all;margin:8px 0 10px;}
+body.holo-ui #holo-selection-window.has-info #side .pcols{columns:auto;column-rule:none;}
+body.holo-ui #holo-selection-window.details-open{width:min(1180px,calc(100vw - 120px));}
 /* Titles stay graspable; content and controls retain their own pointer/scroll gestures. */
 body.holo-ui .holo-floating-window{
   position:fixed!important;right:auto!important;bottom:auto!important;margin:0!important;transform:none!important;

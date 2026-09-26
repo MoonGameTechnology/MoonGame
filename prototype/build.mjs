@@ -3271,7 +3271,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      is deliberately NOT in the zoom list (JS places it at pointer coords, and zoom
      would double them) — its type is therefore sized at 1.5× directly. */
   #side .pdesc{display:none;}
-  #objtip{position:fixed;left:0;top:0;z-index:29;display:none;pointer-events:none;opacity:.8;
+  /* Подсказка наведения выше плавающих окон (40) и оверлеев панелей (60): иначе плитка в окне
+     флота открывала её ПОД самим окном (плейтест 2026-09-26). */
+  #objtip{position:fixed;left:0;top:0;z-index:61;display:none;pointer-events:none;opacity:.8;
     width:max-content;max-width:min(460px,32vw);padding:12px 15px;
     background:rgba(3,14,18,.95);border:1px solid var(--line-hi);border-radius:9px;
     box-shadow:0 6px 24px rgba(0,0,0,.55),inset 0 0 0 1px rgba(53,214,230,.06);}

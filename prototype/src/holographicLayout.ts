@@ -53,11 +53,24 @@ export function selectionThread(anchor: HoloPoint, box: HoloRect): { from: HoloP
     y: anchor.y + (to.y - anchor.y) * 10 / length }, to };
 }
 
-/** Place the compact command window beside the object once, without covering its marker. */
+/** Сколько места снизу оставляет пристыкованная панель: под ней полоса скорости. */
+export const DOCK_BOTTOM = 72;
+
+/** Place the compact command window beside the object once, without covering its marker.
+ *
+ *  Горизонтальное окно (шире половины экрана, решение владельца 2026-09-26) рядом с объектом
+ *  не встаёт — оно закрыло бы середину карты вместе с самим объектом и местом, куда целиться.
+ *  Оно пристыковано к низу, как консоль: над полосой скорости, по центру. */
 export function selectionWindowPosition(
   anchor: HoloPoint, size: { width: number; height: number },
   viewport: { width: number; height: number }, chromeBottom: number,
 ): HoloPoint {
+  if (size.width > viewport.width / 2) {
+    return {
+      x: Math.max(12, Math.round((viewport.width - size.width) / 2)),
+      y: Math.max(chromeBottom, viewport.height - size.height - DOCK_BOTTOM),
+    };
+  }
   const gap = 30;
   const right = anchor.x + gap;
   const left = anchor.x - size.width - gap;

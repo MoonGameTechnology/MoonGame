@@ -338,6 +338,7 @@ import {
 import {
   SECTOR_ZERO_ABSENT_HUD,
   SECTOR_ZERO_ABSENT_TOOLS,
+  SECTOR_ZERO_ABSENT_TWINS,
   espionageShown,
   toolShown,
   type SessionTool,
@@ -13987,11 +13988,12 @@ function syncSectorZeroTools(): void {
     const el = document.getElementById(id);
     if (el) el.style.display = toolShown(tool as SessionTool, run) ? '' : 'none';
   }
-  // Эмблема с названием и местом, очки победы и день шапки — тоже не про забег
-  // (решение владельца 2026-09-24).
-  for (const id of Object.values(SECTOR_ZERO_ABSENT_HUD)) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = run ? 'none' : '';
+  // Эмблема с названием и местом, очки победы, день шапки и «Производство» — тоже не про
+  // забег (решения владельца 2026-09-24 и 2026-09-26).
+  for (const [field, id] of Object.entries(SECTOR_ZERO_ABSENT_HUD)) {
+    const twin = SECTOR_ZERO_ABSENT_TWINS[field as keyof typeof SECTOR_ZERO_ABSENT_HUD];
+    for (const el of [id, twin].map((x) => (x ? document.getElementById(x) : null)))
+      if (el) el.style.display = run ? 'none' : '';
   }
 }
 

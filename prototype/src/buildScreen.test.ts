@@ -105,6 +105,24 @@ describe('окно построек — состояние строки от п�
     expect(html(s, home(s))).not.toContain('data-bw="biomass_pit"');
   });
 
+  it('вид провинции не пускает здание — строки нет, а не замок (решение владельца 2026-09-26)', () => {
+    const s = newGame();
+    const pid = home(s);
+    // Астероид строит только добывающую станцию: верфь и форт на нём не предлагаются,
+    // даже если ядро отказало бы им раньше по другой причине.
+    s.planets[pid]!.kind = 'asteroid';
+    const standing = new Set(s.planets[pid]!.buildings.map((b) => b.type));
+    const barred = ['shipyard', 'fort', 'radar', 'refinery', 'power_plant'].filter((id) => !standing.has(id));
+    expect(barred.length).toBeGreaterThan(0);
+    for (const id of barred)
+      expect(buildRowState(s, 'p1', pid, id, () => 'E_TECH_LOCKED', noQueue).st).toBe('hidden');
+    expect(buildRowState(s, 'p1', pid, 'metal_station', () => 'E_TECH_LOCKED', noQueue).st).toBe('lock');
+    expect(html(s, pid)).not.toContain(`data-bw="${barred[0]}"`);
+    // Уже стоящее остаётся: его улучшают, даже если вид мира сменился после постройки.
+    const built = s.planets[pid]!.buildings[0]!.type;
+    expect(html(s, pid)).toContain(`data-bw="${built}"`);
+  });
+
   it('локальная соло-очередь читается как «строится» — ядро о ней не знает', () => {
     const s = newGame();
     expect(buildRowState(s, 'p1', home(s), 'mine', probe(s), () => true).st).toBe('queued');
