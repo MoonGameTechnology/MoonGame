@@ -62,14 +62,15 @@ TIME_SCALE=200 HOST=0.0.0.0 PORT=8788 pnpm host
   (`/Nygame/` — такого репозитория нет; адрес проектных Pages — это имя репозитория).
   Пока клиента из веба нет — но он и не обязателен: сервер раздаёт игру сам на `/`.
 - **Клиент из веба (Cloudflare)** — воркер `moongame` раздаёт статику без своего кода
-  (`wrangler.jsonc` в корне). Workers Builds собирает его на каждый push в `main`:
-  команда сборки `pnpm run site` (сборка прототипа + `scripts/stage-site.mjs`), деплой —
-  `npx wrangler deploy`. На сайте три страницы: `/` — тот же `void-dominion.html`, что и у
-  Pages, `/sector-zero.html`, `/player.html`; админка и архив площадки не публикуются.
-  Сервер партий сюда не едет — только клиент. Пуш в любую другую ветку собирает превью
-  (`npx wrangler preview`), для него в `wrangler.jsonc` обязателен блок `previews`. В PR
-  это проверка «Workers Builds: moongame»: мерж её не ждёт, а лог сборки виден только в
-  дашборде Cloudflare.
+  (`wrangler.jsonc` в корне). Workers Builds выкладывает его на каждый push в `main`
+  командой `npx wrangler deploy`, а пуш в любую другую ветку — превью командой
+  `npx wrangler preview`. Сайт обе команды собирают сами: `build.command` в
+  `wrangler.jsonc` — `pnpm run site` (сборка прототипа + `scripts/stage-site.mjs`), так
+  что команда сборки в дашборде не нужна; превью, кроме того, требует блок `previews`. На
+  сайте три страницы: `/` — тот же `void-dominion.html`, что и у Pages,
+  `/sector-zero.html`, `/player.html`; админка и архив площадки не публикуются. Сервер
+  партий сюда не едет — только клиент. В PR превью — это проверка «Workers Builds:
+  moongame»: мерж её не ждёт, а лог сборки виден только в дашборде Cloudflare.
 - **Android APK** — workflow `android.yml`: артефакт на каждом ране + rolling-релиз
   `alpha` со стабильной ссылкой (сборки с `main`); в APK встроен автоапдейтер,
   сверяющий versionCode с релизом. В приложении игрок вводит адрес сервера на
