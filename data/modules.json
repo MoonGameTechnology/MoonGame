@@ -27,6 +27,34 @@
       "domain": "space"
     }
   },
+  "repair_bay": {
+    "name": "Repair Bay",
+    "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "hp": 6
+      },
+      "mythic": {
+        "speed": 1
+      },
+      "legendary": {
+        "hullRepair": 0.02
+      }
+    },
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {
+        "hullRepair": 0.05
+      }
+    },
+    "cost": {
+      "metal": 60
+    },
+    "allowed": {
+      "domain": "space"
+    }
+  },
   "radar_module": {
     "name": "Radar Module",
     "rarity": "simple",

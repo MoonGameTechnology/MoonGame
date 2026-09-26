@@ -112,3 +112,18 @@ export function dockHullRate(planet: Planet, data: GameData): number {
   }
   return rate;
 }
+
+/**
+ * Темп, которым ФЛОТ чинит эскадры в своём ангаре сам, без дока (SHU-5.4): лучший
+ * `hullRepair` среди его кораблей. Лучший, а не сумма — ремонтный ангар один на борт
+ * шаттлов, и второй такой модуль ангар не ускоряет. Нет модуля — 0.
+ */
+export function fleetHangarRepairRate(f: Fleet, data: GameData): number {
+  let best = 0;
+  for (const st of f.units) {
+    const def = data.units[st.unit];
+    if (!def || st.count <= 0) continue;
+    best = Math.max(best, effectiveStats(def, st, data).hullRepair ?? 0);
+  }
+  return best;
+}

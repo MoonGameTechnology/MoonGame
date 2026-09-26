@@ -42,6 +42,11 @@ export const UnitStatsSchema = z
      *  способ, которым дефолт схемы тихо переписывает баланс (прецедент: `defenseBonus`
      *  в уровнях зданий). */
     shieldRegen: z.number().nonnegative().default(0),
+    /** Самопочинка корпуса (SHU-5.4, модуль `repair_bay`) — доля полного корпуса стека
+     *  в игровой час, ВЕЗДЕ вне боя, у дока — сверх темпа дока. Корабль с ней чинит и
+     *  эскадры в своём ангаре. Добавка, как и `shieldRegen`: без поля корпус, как прежде,
+     *  чинится только у дока (shields-roadmap SH-2.1). */
+    hullRepair: z.number().nonnegative().default(0),
     /** Legacy standoff firing radius in MAP UNITS. Nothing reads it since the
      *  standoff-fire subsystem was removed; kept so shipped content that still
      *  states it keeps parsing. Shuttle reach is `strikeRange`, not this. */

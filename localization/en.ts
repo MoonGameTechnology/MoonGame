@@ -857,6 +857,7 @@ export const en: Record<string, string> = {
   'data.bomber': 'striker',
   'data.bulwark': 'Bulwark',
   'data.cargo-bay': 'Cargo Bay',
+  'data.repair-bay': 'Repair Bay',
   'data.carrier': 'carrier',
   'data.combined-arms': 'Combined Arms',
   'data.commander': 'Commander',

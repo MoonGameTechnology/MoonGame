@@ -76,7 +76,7 @@ import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
-import { dockHullRate, fleetAtOwnDock } from '../util/repair';
+import { dockHullRate, fleetAtOwnDock, fleetHangarRepairRate } from '../util/repair';
 import { battleLocations } from '../state/battle';
 
 /** Total point-defense (anti-shuttle/anti-missile) firepower of a fleet —
@@ -1312,8 +1312,9 @@ export const shuttleModule: GameModule = {
      * РЕМОНТ ЭСКАДР (SHU-5.3). Урон, привезённый с вылета, чинится у ДОКА тем же темпом,
      * что корпус корабля (`shipRepair` живых построек, доля полного корпуса в час): в
      * порту своего мира и на борту флота, стоящего у своего или союзного дока
-     * (`fleetAtOwnDock` — правило одно на все пути ремонта). Пока на узле бой, док не
-     * чинит — как и корабли (решение владельца 17).
+     * (`fleetAtOwnDock` — правило одно на все пути ремонта). Флот с ремонтным ангаром
+     * (`repair_bay`, SHU-5.4) чинит свои эскадры и в походе. Пока на узле бой, ремонта
+     * нет — как и у кораблей (решение владельца 17).
      */
     api.on('time.advanced', (event, h: HandlerContext) => {
       const { from, to } = event.payload as { from: number; to: number };
@@ -1334,11 +1335,15 @@ export const shuttleModule: GameModule = {
         if (!planet.hangar?.length || planet.owner === null || fighting.has(planet.id)) continue;
         mend(planet.hangar, dockHullRate(planet, data));
       }
+      // Флот чинит свой ангар ремонтным модулем ВЕЗДЕ вне боя (SHU-5.4), у дока — сверх
+      // темпа дока.
       for (const fleet of Object.values(h.state.fleets)) {
-        if (!fleet.hangar?.length || fleet.battleId || !fleet.location) continue;
-        if (fighting.has(fleet.location)) continue;
-        if (!fleetAtOwnDock(fleet, h.state, data, (a, b) => isAllied(h, a, b))) continue;
-        mend(fleet.hangar, dockHullRate(h.state.planets[fleet.location]!, data));
+        if (!fleet.hangar?.length || fleet.battleId) continue;
+        if (fleet.location !== null && fighting.has(fleet.location)) continue;
+        const docked =
+          fleet.location !== null && fleetAtOwnDock(fleet, h.state, data, (a, b) => isAllied(h, a, b));
+        const dock = docked ? dockHullRate(h.state.planets[fleet.location!]!, data) : 0;
+        mend(fleet.hangar, dock + fleetHangarRepairRate(fleet, data));
       }
     });
 
