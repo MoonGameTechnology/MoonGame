@@ -911,6 +911,10 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .wp-no{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.1);color:var(--cyan);}
 .wp-yes{border:1px solid #7a221c;background:rgba(255,90,77,.16);color:var(--red);}
 .wp-yes:active{background:rgba(255,90,77,.3);}
+/* ⌂ в экспедиции: три действия столбцом — «Завершить и забрать награду» в треть ряда не влезает */
+#abandon.exit .wp-actions{flex-direction:column;}
+/* сколько заберёт «Завершить» — цветом данных экспедиций, как кошелёк подготовки */
+.wp-reward{font:700 13px ui-monospace,monospace;letter-spacing:.5px;color:var(--cur-data);margin:-4px 0 14px;}
 
 /* session menu — diplomacy roster + message log (rail: Diplomacy / Dispatches) */
 #diplo{position:fixed;inset:0;z-index:49;display:none;align-items:center;justify-content:center;padding:16px;
@@ -3507,12 +3511,14 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="profile"></div>
 <div id="settings"></div>
 <div id="warprompt"></div>
-<!-- «Флот потерян» / «Завершить экспедицию?» (PVR-6.29): заголовок, текст и левая кнопка
-     зависят от повода и ставятся из main.ts; правая всегда сдаёт забег -->
+<!-- «Флот потерян» / «Завершить экспедицию?» (PVR-6.29) / «Выйти из экспедиции?» (⌂): заголовок,
+     текст и подписи зависят от повода и ставятся из main.ts; правая всегда сдаёт забег, средняя
+     («В меню») видна только у ⌂ -->
 <div id="abandon" role="dialog" aria-modal="true" aria-labelledby="abandon-title"><div class="wpbox">
   <div class="wp-head" id="abandon-title"></div>
   <div class="wp-body" id="abandon-text"></div>
-  <div class="wp-actions"><button type="button" id="abandon-stay" class="wp-no"></button><button type="button" id="abandon-go" class="wp-yes" data-i18n="run.abandon.go"></button></div>
+  <div class="wp-reward" id="abandon-reward" hidden></div>
+  <div class="wp-actions"><button type="button" id="abandon-stay" class="wp-no"></button><button type="button" id="abandon-menu" class="wp-no" data-i18n="run.exit.menu" hidden></button><button type="button" id="abandon-go" class="wp-yes" data-i18n="run.abandon.go"></button></div>
 </div></div>
 <div id="diplo"></div>
 <div id="pingpop"></div>
