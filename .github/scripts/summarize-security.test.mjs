@@ -73,3 +73,76 @@ describe('отчёт безопасности: реестр доверия и ne
     expect(reportNeeds().length).toBeGreaterThan(10);
   });
 });
+
+/**
+ * БАЗОВАЯ ЛИНИЯ С `main`. Одни и те же CVE стороннего образа (postgres, gosu) висели
+ * в топе sticky-отчёта на КАЖДОМ PR, и новая находка тонула под ними. Отчёт сверяет
+ * находки с последним отчётом `main` и в таблицу кладёт только новые; известные
+ * называет числом. Номер строки в ключ не входит: правка выше по файлу сдвигает его.
+ */
+describe('отчёт безопасности: новые находки против базовой линии main', () => {
+  const sarif = (results) =>
+    JSON.stringify({
+      runs: [
+        {
+          tool: { driver: { name: 'Trivy' } },
+          results: results.map(([ruleId, uri, line]) => ({
+            ruleId,
+            level: 'error',
+            message: { text: `finding ${ruleId}` },
+            locations: [
+              { physicalLocation: { artifactLocation: { uri }, region: { startLine: line } } },
+            ],
+          })),
+        },
+      ],
+    });
+
+  const run = async (current, baseline) => {
+    const { mkdtempSync, writeFileSync: write, mkdirSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { execFileSync } = await import('node:child_process');
+    const dir = mkdtempSync(join(tmpdir(), 'sec-report-'));
+    mkdirSync(join(dir, 'cur'));
+    write(join(dir, 'cur', 'trivy.sarif'), sarif(current));
+    const args = [
+      join(root, '.github/scripts/summarize-security.mjs'),
+      join(dir, 'cur'),
+      join(dir, 'out.md'),
+    ];
+    if (baseline) {
+      mkdirSync(join(dir, 'base'));
+      write(join(dir, 'base', 'trivy.sarif'), sarif(baseline));
+      args.push(join(dir, 'base'));
+    }
+    execFileSync(process.execPath, args, { env: { ...process.env, GITHUB_REF_NAME: 'feat/x' } });
+    return readFileSync(join(dir, 'out.md'), 'utf8');
+  };
+
+  it('в таблице только новое, известное — числом; сдвиг строки не делает находку новой', async () => {
+    const md = await run(
+      [
+        ['CVE-OLD', 'library/postgres', 12],
+        ['CVE-NEW', 'library/postgres', 3],
+      ],
+      [['CVE-OLD', 'library/postgres', 1]],
+    );
+    expect(md).toContain('**Уже есть на `main`:** 1');
+    expect(md).toContain('### Новые находки (топ 1 из 1)');
+    expect(md).toContain('CVE-NEW');
+    expect(md).not.toContain('`CVE-OLD`');
+  });
+
+  it('кратность считается: третья такая же находка при двух на main — новая', async () => {
+    const same = ['CVE-X', 'a', 1];
+    const md = await run([same, same, same], [same, same]);
+    expect(md).toContain('**Уже есть на `main`:** 2');
+    expect(md).toContain('### Новые находки (топ 1 из 1)');
+  });
+
+  it('без базовой линии показано всё и сказано почему', async () => {
+    const md = await run([['CVE-OLD', 'library/postgres', 1]]);
+    expect(md).toContain('Базовая линия с `main` недоступна');
+    expect(md).toContain('### Находки (топ 1 из 1)');
+  });
+});

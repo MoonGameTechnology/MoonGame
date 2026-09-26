@@ -2,7 +2,14 @@
 // Aggregates every scanner's output (SARIF + TruffleHog NDJSON + per-tool
 // status sentinels) from a directory tree into one Markdown report.
 // Pure Node (no external deps — avoids the unpinned-install supply-chain vector).
-//   node .github/scripts/summarize-security.mjs <inputDir> <outFile>
+//   node .github/scripts/summarize-security.mjs <inputDir> <outFile> [baselineDir]
+//
+// BASELINE: `baselineDir` (optional) holds the report artifact of the last successful
+// run on `main`. Findings present there too are "already on main": they are counted,
+// but the findings table shows only the NEW ones — otherwise the same upstream CVEs
+// (postgres, gosu) sat on top of every PR and a genuinely new finding drowned under
+// them. Display only: no gate reads this report, so a missing baseline just means
+// "show everything", as before.
 //
 // TRUST: the report LEADS with a scan-confirmation table built from per-job status
 // sentinels (`status-<key>.json`, written AFTER each scan with the real exit/outcome).
@@ -13,6 +20,7 @@ import { join, basename } from 'node:path';
 
 const inputDir = process.argv[2] ?? 'reports';
 const outFile = process.argv[3] ?? 'security-report.md';
+const baselineDir = process.argv[4] ?? '';
 const sha = (process.env.GITHUB_SHA ?? '').slice(0, 7);
 const ref = process.env.GITHUB_REF_NAME ?? '';
 const runUrl =
@@ -104,118 +112,148 @@ for (const f of files.filter(
 }
 
 // --- SARIF findings ---
-const perTool = new Map();
-const totals = { error: 0, warning: 0, note: 0, none: 0 };
-const findings = [];
-/** Сколько результатов сканеры пометили как подавленные (см. фильтр ниже). */
-let suppressedCount = 0;
-const sarifTools = new Set();
-const toolOf = (name) => {
-  if (!perTool.has(name)) perTool.set(name, { error: 0, warning: 0, note: 0, none: 0 });
-  return perTool.get(name);
-};
-for (const f of files.filter((f) => f.endsWith('.sarif') || f.endsWith('.sarif.json'))) {
-  const data = readJson(f);
-  if (!data) continue;
-  for (const run of data.runs ?? []) {
-    const name = run.tool?.driver?.name ?? 'Unknown';
-    sarifTools.add(name);
-    for (const r of run.results ?? []) {
-      // Непустой `suppressions` — находка, ПОДАВЛЕННАЯ самим сканером (инлайн
-      // `nosemgrep`, dismissal в UI и т.п.). Semgrep оставляет её в SARIF с этой
-      // пометкой, но выходит с кодом 0 — для гейта её нет. Считать её наравне с живыми
-      // значит показывать как проблему то, что уже разобрано и обосновано: именно так
-      // «подавленная» находка в `wsServer.tls.test.ts` месяцами висела в отчёте, создавая
-      // впечатление, что подавление не работает. Счётчик остаётся — молча прятать тоже
-      // нельзя, число подавлений само по себе показатель.
-      if (Array.isArray(r.suppressions) && r.suppressions.length > 0) {
-        suppressedCount++;
+/** Разбор одного дерева отчётов: тем же кодом читаются и текущий прогон, и базовая
+ *  линия с `main`, так что «та же находка» определяется одинаково для обоих. */
+function collect(files) {
+  const perTool = new Map();
+  const totals = { error: 0, warning: 0, note: 0, none: 0 };
+  const findings = [];
+  /** Сколько результатов сканеры пометили как подавленные (см. фильтр ниже). */
+  let suppressedCount = 0;
+  const sarifTools = new Set();
+  const toolOf = (name) => {
+    if (!perTool.has(name)) perTool.set(name, { error: 0, warning: 0, note: 0, none: 0 });
+    return perTool.get(name);
+  };
+  for (const f of files.filter((f) => f.endsWith('.sarif') || f.endsWith('.sarif.json'))) {
+    const data = readJson(f);
+    if (!data) continue;
+    for (const run of data.runs ?? []) {
+      const name = run.tool?.driver?.name ?? 'Unknown';
+      sarifTools.add(name);
+      for (const r of run.results ?? []) {
+        // Непустой `suppressions` — находка, ПОДАВЛЕННАЯ самим сканером (инлайн
+        // `nosemgrep`, dismissal в UI и т.п.). Semgrep оставляет её в SARIF с этой
+        // пометкой, но выходит с кодом 0 — для гейта её нет. Считать её наравне с живыми
+        // значит показывать как проблему то, что уже разобрано и обосновано: именно так
+        // «подавленная» находка в `wsServer.tls.test.ts` месяцами висела в отчёте, создавая
+        // впечатление, что подавление не работает. Счётчик остаётся — молча прятать тоже
+        // нельзя, число подавлений само по себе показатель.
+        if (Array.isArray(r.suppressions) && r.suppressions.length > 0) {
+          suppressedCount++;
+          continue;
+        }
+        const level = norm(r.level);
+        toolOf(name)[level]++;
+        totals[level]++;
+        const loc = r.locations?.[0]?.physicalLocation;
+        findings.push({
+          tool: name,
+          level,
+          rule: r.ruleId ?? '',
+          path: loc?.artifactLocation?.uri ?? '',
+          line: loc?.region?.startLine ?? '',
+          msg: (r.message?.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 140),
+        });
+      }
+    }
+  }
+
+  // --- TruffleHog NDJSON (one finding per line; .Verified marks a live credential) ---
+  const thFile = files.find((f) => /(^|\/)trufflehog\.json$/.test(f));
+  if (thFile) {
+    let verified = 0;
+    let unverified = 0;
+    for (const line of readFileSync(thFile, 'utf8').split('\n')) {
+      const t = line.trim();
+      if (!t || t[0] !== '{') continue;
+      let o;
+      try {
+        o = JSON.parse(t);
+      } catch {
         continue;
       }
-      const level = norm(r.level);
-      toolOf(name)[level]++;
-      totals[level]++;
-      const loc = r.locations?.[0]?.physicalLocation;
-      findings.push({
-        tool: name,
-        level,
-        rule: r.ruleId ?? '',
-        path: loc?.artifactLocation?.uri ?? '',
-        line: loc?.region?.startLine ?? '',
-        msg: (r.message?.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 140),
-      });
-    }
-  }
-}
-
-// --- TruffleHog NDJSON (one finding per line; .Verified marks a live credential) ---
-const thFile = files.find((f) => /(^|\/)trufflehog\.json$/.test(f));
-if (thFile) {
-  let verified = 0;
-  let unverified = 0;
-  for (const line of readFileSync(thFile, 'utf8').split('\n')) {
-    const t = line.trim();
-    if (!t || t[0] !== '{') continue;
-    let o;
-    try {
-      o = JSON.parse(t);
-    } catch {
-      continue;
-    }
-    if (o.DetectorName === undefined && o.SourceMetadata === undefined) continue;
-    const isV = o.Verified === true;
-    if (isV) verified++;
-    else unverified++;
-    const level = isV ? 'error' : 'note';
-    toolOf('TruffleHog')[level]++;
-    totals[level]++;
-    findings.push({
-      tool: 'TruffleHog',
-      level,
-      rule: String(o.DetectorName ?? 'secret') + (isV ? ' (VERIFIED)' : ''),
-      path: '',
-      line: '',
-      msg: isV ? 'Verified live credential' : 'Unverified potential secret',
-    });
-  }
-  if (verified || unverified) sarifTools.add('TruffleHog');
-}
-
-// --- OWASP ZAP baseline (собственный JSON: SARIF эта утилита не умеет) ---
-// ЗАЧЕМ ОТДЕЛЬНЫЙ РАЗБОР. Выше читаются только `*.sarif` и NDJSON TruffleHog, а `zap`
-// кладёт свой `zap-report.json` — он лежал в артефакте НЕПРОЧИТАННЫМ. Из-за этого
-// алерты DAST не попадали ни в таблицу «По инструментам», ни в список находок, ни в
-// счётчики: при живых находках отчёт мог напечатать «Сканеры не вернули находок», и
-// единственным следом оставалась `::warning::`-аннотация в логе джобы. Строка
-// «✅ просканировано» при этом была формально верной — сентинел не врал, врала полнота.
-const zapFile = files.find((f) => /(^|\/)zap-report\.json$/.test(f));
-if (zapFile) {
-  const data = readJson(zapFile);
-  // riskcode: 3=High, 2=Medium, 1=Low, 0=Informational. Раскладка по тем же вёдрам,
-  // что у SARIF, чтобы находка DAST весила столько же, сколько равная ей из SAST.
-  const LEVEL = { 3: 'error', 2: 'warning', 1: 'note', 0: 'none' };
-  let seen = 0;
-  for (const site of data?.site ?? []) {
-    for (const a of site.alerts ?? []) {
-      const level = LEVEL[Number(a.riskcode)] ?? 'note';
-      seen++;
-      toolOf('ZAP')[level]++;
+      if (o.DetectorName === undefined && o.SourceMetadata === undefined) continue;
+      const isV = o.Verified === true;
+      if (isV) verified++;
+      else unverified++;
+      const level = isV ? 'error' : 'note';
+      toolOf('TruffleHog')[level]++;
       totals[level]++;
       findings.push({
-        tool: 'ZAP',
+        tool: 'TruffleHog',
         level,
-        rule: String(a.pluginid ?? a.alertRef ?? ''),
-        // У DAST «где» — это URL, а не файл: берём первый инстанс, их число в msg.
-        path: a.instances?.[0]?.uri ?? site['@name'] ?? '',
+        rule: String(o.DetectorName ?? 'secret') + (isV ? ' (VERIFIED)' : ''),
+        path: '',
         line: '',
-        msg: `${String(a.alert ?? a.name ?? '').replace(/\s+/g, ' ').trim()}${
-          Number(a.count) > 1 ? ` (×${a.count})` : ''
-        }`.slice(0, 140),
+        msg: isV ? 'Verified live credential' : 'Unverified potential secret',
       });
     }
+    if (verified || unverified) sarifTools.add('TruffleHog');
   }
-  if (seen) sarifTools.add('ZAP');
+
+  // --- OWASP ZAP baseline (собственный JSON: SARIF эта утилита не умеет) ---
+  // ЗАЧЕМ ОТДЕЛЬНЫЙ РАЗБОР. Выше читаются только `*.sarif` и NDJSON TruffleHog, а `zap`
+  // кладёт свой `zap-report.json` — он лежал в артефакте НЕПРОЧИТАННЫМ. Из-за этого
+  // алерты DAST не попадали ни в таблицу «По инструментам», ни в список находок, ни в
+  // счётчики: при живых находках отчёт мог напечатать «Сканеры не вернули находок», и
+  // единственным следом оставалась `::warning::`-аннотация в логе джобы. Строка
+  // «✅ просканировано» при этом была формально верной — сентинел не врал, врала полнота.
+  const zapFile = files.find((f) => /(^|\/)zap-report\.json$/.test(f));
+  if (zapFile) {
+    const data = readJson(zapFile);
+    // riskcode: 3=High, 2=Medium, 1=Low, 0=Informational. Раскладка по тем же вёдрам,
+    // что у SARIF, чтобы находка DAST весила столько же, сколько равная ей из SAST.
+    const LEVEL = { 3: 'error', 2: 'warning', 1: 'note', 0: 'none' };
+    let seen = 0;
+    for (const site of data?.site ?? []) {
+      for (const a of site.alerts ?? []) {
+        const level = LEVEL[Number(a.riskcode)] ?? 'note';
+        seen++;
+        toolOf('ZAP')[level]++;
+        totals[level]++;
+        findings.push({
+          tool: 'ZAP',
+          level,
+          rule: String(a.pluginid ?? a.alertRef ?? ''),
+          // У DAST «где» — это URL, а не файл: берём первый инстанс, их число в msg.
+          path: a.instances?.[0]?.uri ?? site['@name'] ?? '',
+          line: '',
+          msg: `${String(a.alert ?? a.name ?? '')
+            .replace(/\s+/g, ' ')
+            .trim()}${Number(a.count) > 1 ? ` (×${a.count})` : ''}`.slice(0, 140),
+        });
+      }
+    }
+    if (seen) sarifTools.add('ZAP');
+  }
+  return { perTool, totals, findings, suppressedCount, sarifTools };
 }
+
+const { perTool, totals, findings, suppressedCount } = collect(files);
+
+// --- baseline: what is already on `main` ---
+// Ключ находки — инструмент, правило, файл и текст, БЕЗ номера строки: правка выше по
+// файлу сдвигает строку, и старая находка читалась бы как новая. Счёт кратностей, а не
+// множество: если на main правило сработало в файле дважды, а в PR — трижды, третья
+// находка новая.
+const fp = (f) => [f.tool, f.rule, f.path, f.msg].join('\u0000');
+const baselineFiles = baselineDir ? walk(baselineDir) : [];
+const hasBaseline = baselineFiles.some((f) => f.endsWith('.sarif') || f.endsWith('.sarif.json'));
+const known = new Map();
+if (hasBaseline)
+  for (const f of collect(baselineFiles).findings) known.set(fp(f), (known.get(fp(f)) ?? 0) + 1);
+const fresh = [];
+let knownCount = 0;
+for (const f of findings) {
+  const left = known.get(fp(f)) ?? 0;
+  if (left > 0) {
+    known.set(fp(f), left - 1);
+    knownCount++;
+  } else fresh.push(f);
+}
+const freshTotals = { error: 0, warning: 0, note: 0, none: 0 };
+for (const f of fresh) freshTotals[f.level]++;
 
 const sboms = files.filter((f) => /\.cdx\.json$/i.test(f)).map((f) => basename(f));
 
@@ -256,7 +294,9 @@ const okCount = confirm.filter((c) => c.state === 'ok').length;
 const skipped = confirm.filter((c) => c.state === 'skipped');
 const bad = confirm.filter((c) => c.state === 'bad');
 
-findings.sort((a, b) => RANK[b.level] - RANK[a.level] || a.tool.localeCompare(b.tool));
+const bySeverity = (a, b) => RANK[b.level] - RANK[a.level] || a.tool.localeCompare(b.tool);
+findings.sort(bySeverity);
+fresh.sort(bySeverity);
 const CAP = 30;
 
 const L = [];
@@ -292,9 +332,15 @@ for (const c of confirm)
   );
 L.push('');
 
-L.push('| Серьёзность | Σ |');
-L.push('| --- | --: |');
-for (const l of LEVELS) L.push(`| ${ICON[l]} ${l} | ${totals[l]} |`);
+if (hasBaseline) {
+  L.push('| Серьёзность | Σ | новые (нет на `main`) |');
+  L.push('| --- | --: | --: |');
+  for (const l of LEVELS) L.push(`| ${ICON[l]} ${l} | ${totals[l]} | ${freshTotals[l]} |`);
+} else {
+  L.push('| Серьёзность | Σ |');
+  L.push('| --- | --: |');
+  for (const l of LEVELS) L.push(`| ${ICON[l]} ${l} | ${totals[l]} |`);
+}
 L.push('');
 if (suppressedCount)
   L.push(
@@ -312,18 +358,33 @@ if (perTool.size) {
   L.push('');
 }
 
-if (findings.length) {
-  L.push(`### Находки (топ ${Math.min(CAP, findings.length)} из ${findings.length})`);
+// С базовой линией таблица показывает только НОВЫЕ находки; уже известные на `main`
+// названы числом и лежат в полном списке в логе.
+const listed = hasBaseline ? fresh : findings;
+if (hasBaseline && knownCount)
+  L.push(
+    `**Уже есть на \`main\`:** ${knownCount} — в таблицу ниже не входят (полный список — в логе прогона).  `,
+  );
+else if (!hasBaseline && !isMain)
+  L.push('_Базовая линия с `main` недоступна — показаны все находки._  ');
+if (hasBaseline && !fresh.length && findings.length) {
+  L.push('');
+  L.push('_Новых находок нет: всё найденное уже есть на `main`._');
+  L.push('');
+} else if (listed.length) {
+  L.push(
+    `### ${hasBaseline ? 'Новые находки' : 'Находки'} (топ ${Math.min(CAP, listed.length)} из ${listed.length})`,
+  );
   L.push('| | Инструмент | Правило | Где | Сообщение |');
   L.push('| --- | --- | --- | --- | --- |');
-  for (const f of findings.slice(0, CAP)) {
+  for (const f of listed.slice(0, CAP)) {
     const where = f.path ? `\`${f.path}${f.line ? ':' + f.line : ''}\`` : '—';
     L.push(
       `| ${ICON[f.level]} | ${f.tool} | \`${f.rule}\` | ${where} | ${f.msg.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')} |`,
     );
   }
-  if (findings.length > CAP)
-    L.push(`\n_…и ещё ${findings.length - CAP}. Полные SARIF — в артефактах прогона._`);
+  if (listed.length > CAP)
+    L.push(`\n_…и ещё ${listed.length - CAP}. Полные SARIF — в артефактах прогона._`);
   L.push('');
 } else {
   L.push(
