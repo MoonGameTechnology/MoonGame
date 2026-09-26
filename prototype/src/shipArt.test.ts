@@ -7,14 +7,13 @@ import { SWARM_UNIT_SHAPE } from '../../packages/client/src/shipShapes';
 import { SWARM_SHAPES } from '../../packages/client/src/swarmShapes';
 
 describe('realistic build portraits', () => {
-  it('covers every buildable ship and wing, including the frigate and dropship', () => {
+  it('covers every buildable ship and wing, including the frigate and the landing shuttle', () => {
     for (const id of [...YARD_HULLS, ...YARD_SQUAD_HULLS, 'hero']) {
       expect(catalogPortraitHtml('u', id, data), id).toContain('<img');
     }
     expect(catalogPortraitHtml('u', 'frigate', data)).toContain('data-ship-art="frigate"');
     expect(catalogPortraitHtml('u', 'landing_shuttle', data)).toContain('data-ship-art="dropship"');
-    // Owner decision 2026-09-24: the landing ship and the carrier no longer share a picture.
-    expect(catalogPortraitHtml('u', 'strike_carrier', data)).toContain('data-ship-art="dropship"');
+    // Owner decision 2026-09-26: the Carrier is one hull (carrier + landing ship) on the freighter.
     expect(catalogPortraitHtml('u', 'shuttle_carrier', data)).toContain('data-ship-art="transport"');
     expect(catalogPortraitHtml('b', 'starfort', data)).toContain('data-ship-art="station"');
     expect(catalogPortraitHtml('b', 'metal_station', data)).toContain('data-ship-art="station"');

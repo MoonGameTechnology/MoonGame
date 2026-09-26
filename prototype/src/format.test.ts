@@ -176,8 +176,8 @@ describe('format — ресурсы', () => {
 describe('format — имена и время', () => {
   it('displayUnit разбирает id в имя ДАННЫХ (подчёркивания → пробелы)', () => {
     // ключ строится из имени, поэтому подчёркивание обязано стать пробелом:
-    // 'strike_carrier' → 'strike carrier' → data.strike-carrier
-    expect(displayUnit('strike_carrier')).toBe('десантный корабль');
+    // 'shuttle_carrier' → 'shuttle carrier' → data.shuttle-carrier
+    expect(displayUnit('shuttle_carrier')).toBe('Носитель');
     expect(displayUnit('cruiser')).toBe('крейсер');
   });
 

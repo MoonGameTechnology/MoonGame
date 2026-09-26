@@ -516,7 +516,9 @@ export function sectorHullIds(data: GameData): string[] {
     return (
       def.domain === 'space' &&
       id !== 'hero' &&
-      Object.values(def.slots).some((n) => n > 0) &&
+      // Челнок без слотов модулей — тоже корпус забега: десантный челнок модулей не несёт,
+      // и без этой оговорки подготовка его прятала (замечание владельца 2026-09-26).
+      (Object.values(def.slots).some((n) => n > 0) || def.traits.includes('shuttle')) &&
       !def.traits.includes('issued') &&
       !factionOnly.has(id)
     );

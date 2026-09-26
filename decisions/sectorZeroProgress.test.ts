@@ -580,8 +580,13 @@ describe('PVR-6.2 — в подготовке только корпуса, ко�
   });
 
   it('обычные корабли игрока на месте', () => {
-    for (const id of ['frigate', 'cruiser', 'scout', 'strike_carrier', 'shuttle_carrier'])
+    for (const id of ['frigate', 'cruiser', 'scout', 'shuttle_carrier'])
       expect(hulls, id).toContain(id);
+  });
+
+  it('десантный челнок на месте, хоть слотов модулей у него и нет (владелец 2026-09-26)', () => {
+    expect(data.units.landing_shuttle?.slots).toEqual({ weapon: 0, defense: 0, utility: 0 });
+    expect(hulls).toContain('landing_shuttle');
   });
 
   it('фильтр держится на данных: новый уникальный юнит фракции сюда не попадёт', () => {

@@ -1125,7 +1125,6 @@ const BUILD_UNITS = [
   'cruiser',
   'scout',
   'picket_frigate',
-  'strike_carrier',
   'shuttle_carrier',
   'interceptor',
   'bomber',

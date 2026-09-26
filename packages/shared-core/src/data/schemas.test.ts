@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.49'); // радары забега и полигона ×1,5 вместо ×2,5 (PVR-6.33) поверх 0.1.48 (ремонтный ангар, SHU-5.4)
+    expect(data.version).toBe('0.1.50'); // авианосец и десантный корабль слиты в «Носитель» поверх 0.1.49: радары забега и полигона ×1,5 вместо ×2,5 (PVR-6.33) поверх 0.1.48 (ремонтный ангар, SHU-5.4)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -80,8 +80,8 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.siege).toBeUndefined();
     expect(data.modules.siege_platform?.effects.stats.siegeDamage).toBeGreaterThan(0);
     // SHU-5.1 (резолюция владельца 2026-09-26): шаттлы едут в ОБЩЕМ трюме любого
-    // корабля, отдельного ангара у корпуса нет. Авианосец — обычный трюм на 6 мест.
-    expect(data.units.shuttle_carrier?.stats.cargoCapacity).toBe(6);
+    // корабля, отдельного ангара у корпуса нет. Носитель — обычный трюм, самый большой.
+    expect(data.units.shuttle_carrier?.stats.cargoCapacity).toBe(16);
     expect(data.units.shuttle_carrier?.line).toBe('rear');
     expect(
       Object.entries(data.units)
@@ -101,11 +101,11 @@ describe('game data schema (docs/architecture.md §2)', () => {
     for (const id of ['tank', 'heavy_striker', 'landing_shuttle']) {
       expect(data.units[id]?.stats.cargoSize).toBe(2);
     }
-    // Десантный корабль — единственный выделенный транспорт: самый большой трюм в
-    // ростере. `dropship` снят (заказ владельца), его роль забрал этот корпус.
+    // Носитель — единственный выделенный транспорт (решение владельца 2026-09-26:
+    // авианосец и десантный корабль — один корабль в линии поддержки).
     expect(data.units.dropship).toBeUndefined();
-    expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(16);
-    expect(data.units.strike_carrier?.traits).toEqual([]);
+    expect(data.units.strike_carrier).toBeUndefined();
+    expect(data.units.shuttle_carrier?.traits).toContain('support');
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
     // Planets and station-class bases have an orbital layer. Frontier adds

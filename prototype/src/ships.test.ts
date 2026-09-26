@@ -16,11 +16,11 @@ const BASE: Record<ShipStat, number> = { attack: 10, defense: 8, speed: 6, hp: 4
 const load = (hull: string, modules: (string | null)[]): ShipLoadout => ({ hull, modules });
 
 describe('ship hulls — slot count grows with the hull role', () => {
-  it('maps cruiser 3 · siege 2 · scout 1 · dropship 2', () => {
+  it('maps cruiser 3 · siege 2 · scout 1 · carrier 2', () => {
     expect(hullSlots('cruiser')).toBe(3);
     expect(hullSlots('siege_lance')).toBe(2);
     expect(hullSlots('scout_drone')).toBe(1);
-    expect(hullSlots('dropship')).toBe(2);
+    expect(hullSlots('carrier')).toBe(2);
     expect(hullSlots('nope')).toBe(0); // unknown hull → graceful 0
   });
 });
@@ -32,8 +32,8 @@ describe('ship modules — fractional stat mods applied to the hull base (same s
   });
 
   it('stacks identical modules (two plating = +50% hp)', () => {
-    // dropship has 2 slots; plating +25% hp each → 40 × 1.5 = 60
-    expect(shipStats(BASE, load('dropship', ['plating', 'plating'])).hp).toBe(60);
+    // carrier has 2 slots; plating +25% hp each → 40 × 1.5 = 60
+    expect(shipStats(BASE, load('carrier', ['plating', 'plating'])).hp).toBe(60);
   });
 
   it('sums a multi-stat module with others, per stat', () => {

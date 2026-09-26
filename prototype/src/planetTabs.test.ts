@@ -15,7 +15,6 @@ const ROSTER = [
   'cruiser',
   'scout',
   'siege',
-  'strike_carrier',
   'shuttle_carrier',
   'interceptor',
   'militia',
@@ -105,7 +104,6 @@ describe('вкладки мира — ростер стройки', () => {
       'cruiser',
       'scout',
       'siege',
-      'strike_carrier',
       'shuttle_carrier', // ROS-3.2: носитель заказывается среди кораблей
     ]);
     expect(buildRoster('shuttle', ROSTER, data)).toEqual(['interceptor']);

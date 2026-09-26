@@ -4,7 +4,7 @@
   { "kind": "hull", "defId": "cruiser" },
   { "kind": "hull", "defId": "frigate" },
   { "kind": "hull", "defId": "picket_frigate" },
-  { "kind": "hull", "defId": "strike_carrier" },
+  { "kind": "hull", "defId": "shuttle_carrier" },
   { "kind": "hull", "defId": "interceptor" },
   { "kind": "hull", "defId": "landing_shuttle" },
   { "kind": "module", "defId": "cargo_bay" },

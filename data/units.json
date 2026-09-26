@@ -415,32 +415,6 @@
       "credits": 24
     }
   },
-  "strike_carrier": {
-    "faction": "vanguard",
-    "stats": {
-      "attack": 1,
-      "defense": 12,
-      "speed": 34,
-      "hp": 140,
-      "cargoCapacity": 16
-    },
-    "line": "front",
-    "traits": [],
-    "signature": 6,
-    "cost": {
-      "metal": 150,
-      "credits": 60
-    },
-    "buildTimeHours": 5,
-    "upkeep": {
-      "credits": 48
-    },
-    "slots": {
-      "defense": 1,
-      "utility": 2
-    },
-    "hullClass": "heavy"
-  },
   "scout": {
     "faction": "blue",
     "stats": {
@@ -500,8 +474,8 @@
       "attack": 3,
       "defense": 18,
       "speed": 34,
-      "hp": 90,
-      "cargoCapacity": 6
+      "hp": 140,
+      "cargoCapacity": 16
     },
     "line": "rear",
     "traits": [

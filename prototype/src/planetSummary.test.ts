@@ -34,9 +34,6 @@ describe('сводка мира — домены гарнизона', () => {
       expect(isWingUnit(wing, data), wing).toBe(true);
       expect(isShipUnit(wing, data), wing).toBe(false);
     }
-    // Десантный корабль трейт отдал вместе с ангаром ещё раньше и остаётся кораблём.
-    expect(isShipUnit('strike_carrier', data)).toBe(true);
-    expect(isWingUnit('strike_carrier', data)).toBe(false);
   });
 
   it('КРЫЛО = ТРЕЙТ `shuttle`, и никакой второй признак его не расширяет', () => {

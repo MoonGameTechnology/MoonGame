@@ -60,9 +60,4 @@ describe('трюм авианосца — общий', () => {
     const r = kernel.applyAction(s, load(), { now: 0, data });
     expect(r.ok ? 'ПОГРУЗИЛ' : r.code).toBe('E_NO_CAPACITY');
   });
-
-  it('ДЕСАНТНЫЙ КОРАБЛЬ пехоту берёт', () => {
-    const r = kernel.applyAction(world('strike_carrier'), load(), { now: 0, data });
-    expect(r.ok).toBe(true);
-  });
 });

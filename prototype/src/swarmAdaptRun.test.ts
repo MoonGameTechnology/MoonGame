@@ -108,7 +108,7 @@ function armedHome(chain: boolean): GameState {
   home.hangar = [{ id: SQUAD, units: [{ unit: 'bomber', count: 3 }] }];
   home.garrison = [...home.garrison, { unit: 'heavy_infantry', count: 24 }];
   s.fleets.p1_2!.units = [{ unit: 'cruiser', count: 24 }];
-  // Три авианосца — три запаса вылетов: перезарядка у баз медленная (AUD-27), а сигнал
+  // Три носителя — три запаса вылетов: перезарядка у баз медленная (AUD-27), а сигнал
   // Рою нужно дать за первые встречи с волнами, пока забег не кончился удержанием.
   for (const n of [1, 2, 3]) {
     s.fleets[`cv${n}`] = {
@@ -116,7 +116,7 @@ function armedHome(chain: boolean): GameState {
       owner: 'p1',
       location: 'home_a',
       movement: null,
-      units: [{ unit: 'strike_carrier', count: 1 }],
+      units: [{ unit: 'shuttle_carrier', count: 1 }],
       traits: [],
       orbit: 'near',
       hangar: [{ id: `${CV_SQUAD}${n}`, units: [{ unit: 'bomber', count: 3 }] }],

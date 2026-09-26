@@ -36,9 +36,9 @@ describe('approved ship hulls', () => {
       ['frigate', 'swarmFlock'],
       ['cruiser', 'swarmHunter'],
       ['landing_shuttle', 'swarmDevourer'],
-      ['strike_carrier', 'swarmSporeCarrier'],
+      ['shuttle_carrier', 'swarmSporeCarrier'],
       ['siege_lance', 'swarmDestroyer'],
-      ['shuttle_carrier', 'swarmMatriarch'],
+      ['swarm_brood_mother', 'swarmMatriarch'],
       ['hero', 'swarmLeviathan'],
     ] as const;
     for (const [unit, shape] of forms) {
@@ -54,7 +54,7 @@ describe('approved ship hulls', () => {
     const swarmCruiser = { ...data.units.cruiser!, faction: 'swarm' };
     expect(unitShape(swarmCruiser)).toBe('swarmHunter');
     expect(unitShape({ ...swarmCruiser, traits: ['hero'] })).toBe('swarmLeviathan');
-    expect(unitShape({ ...data.units.strike_carrier!, faction: 'swarm' })).toBe('swarmDevourer');
+    expect(unitShape({ ...data.units.shuttle_carrier!, faction: 'swarm' })).toBe('swarmDevourer');
     expect(unitShape({ ...data.units.scout!, faction: 'swarm' })).toBe('swarmScout');
     expect(unitShape(swarmCruiser, 'cruiser', 'vanguard')).toBe('cruiser');
     expect(unitShape(swarmCruiser, undefined, 'vanguard')).toBe('cruiser');
@@ -71,13 +71,14 @@ describe('approved ship hulls', () => {
     );
   });
 
-  it('never draws the landing ship and the carrier with one picture (owner, 2026-09-24)', () => {
-    // Both used the freighter, so the prep screen showed two different classes as one.
-    // The landing ship now shares the landing family with the landing shuttle instead.
-    expect(unitShape(data.units.strike_carrier!, 'strike_carrier')).toBe('dropship');
+  it('gives the landing shuttle its own picture, the Carrier the freighter (owner, 2026-09-26)', () => {
+    // The carrier and the landing ship became one hull, the Carrier; the dropship art was
+    // the landing shuttle's all along and no ship borrows it any more.
+    expect(data.units.strike_carrier).toBeUndefined();
     expect(unitShape(data.units.shuttle_carrier!, 'shuttle_carrier')).toBe('transport');
-    expect(UNIT_SHAPE.strike_carrier).toBe(UNIT_SHAPE.landing_shuttle);
-    expect(UNIT_SHAPE.strike_carrier).not.toBe(UNIT_SHAPE.shuttle_carrier);
+    expect(Object.entries(UNIT_SHAPE).filter(([, s]) => s === 'dropship').map(([id]) => id)).toEqual([
+      'landing_shuttle',
+    ]);
   });
 
   it('keeps fleet identity stable when cargo or stack order changes', () => {

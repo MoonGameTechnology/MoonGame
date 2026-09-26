@@ -56,8 +56,8 @@ describe('сводка армии — пулы корпуса и щита', () =
   });
 
   it('десант в трюме входит в живучесть — бомбардировка бьёт и по нему', () => {
-    const bare = sum([{ unit: 'strike_carrier', count: 1 }]);
-    const loaded = sum([{ unit: 'strike_carrier', count: 1 }], {
+    const bare = sum([{ unit: 'shuttle_carrier', count: 1 }]);
+    const loaded = sum([{ unit: 'shuttle_carrier', count: 1 }], {
       landing: [{ unit: 'tank', count: 2 }],
     });
     expect(loaded.hull.max).toBe(bare.hull.max + 2 * 46);
@@ -72,7 +72,7 @@ describe('сводка армии — состав', () => {
   it('корабли складываются по архетипам в порядке состава', () => {
     const s = sum([
       { unit: 'cruiser', count: 2 },
-      { unit: 'strike_carrier', count: 1 },
+      { unit: 'shuttle_carrier', count: 1 },
       { unit: 'scout', count: 3 },
     ]);
     expect(s.composition).toEqual([
@@ -120,7 +120,7 @@ describe('сводка армии — состав', () => {
 
 describe('сводка армии — трюм, радар, содержание', () => {
   it('вместимость складывается по кораблям, а возить некому — трюма нет', () => {
-    expect(sum([{ unit: 'strike_carrier', count: 2 }]).cargo).toEqual({ used: 0, cap: 32 });
+    expect(sum([{ unit: 'shuttle_carrier', count: 2 }]).cargo).toEqual({ used: 0, cap: 32 });
     expect(sum([{ unit: 'siege', count: 2 }]).cargo).toBeNull();
   });
 
@@ -132,7 +132,7 @@ describe('сводка армии — трюм, радар, содержание
         tank: { ...data.units.tank!, stats: { ...data.units.tank!.stats, cargoSize: 3 } },
       },
     };
-    const f = fleet([{ unit: 'strike_carrier', count: 1 }], {
+    const f = fleet([{ unit: 'shuttle_carrier', count: 1 }], {
       landing: [{ unit: 'tank', count: 2 }],
     });
     expect(fleetSummary(f, data, 0).cargo).toEqual({ used: 4, cap: 16 }); // танк — 2 места (SHU-5.1)
