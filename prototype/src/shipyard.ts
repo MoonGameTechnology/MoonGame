@@ -73,6 +73,7 @@ const YARD_TABS: [YardTab, string][] = [
 /** Buildable space hulls the «Корабли» pane fits; shuttle/carrier hulls → «Челноки». */
 export const YARD_HULLS = [
   'cruiser',
+  'heavy_cruiser',
   'scout',
   'frigate',
   'picket_frigate',

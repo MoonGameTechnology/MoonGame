@@ -77,6 +77,20 @@ describe('класс корпуса — решение владельца 15', (
     }
   });
 
+  it('усиленный крейсер — тяжёлый корпус: нужен третий стапель (владелец 2026-09-26)', () => {
+    // Сильнее обычного крейсера по всем трём боевым числам и дороже его, а в арсенале лежит
+    // со старта — корпус доступен, ограничивает его верфь.
+    const heavy = data.units.heavy_cruiser!;
+    const cruiser = data.units.cruiser!;
+    expect(heavy.hullClass).toBe('heavy');
+    for (const stat of ['attack', 'defense', 'hp'] as const) {
+      expect(heavy.stats[stat], stat).toBeGreaterThan(cruiser.stats[stat]);
+    }
+    expect(heavy.cost.metal!).toBeGreaterThan(cruiser.cost.metal!);
+    expect(order(3, 'heavy_cruiser')).toBe(true);
+    expect(order(2, 'heavy_cruiser')).toBe('E_YARD_TOO_SMALL');
+  });
+
   it('«верфи нет» и «верфь мала» — РАЗНЫЕ коды: первое лечится стройкой, второе прокачкой', () => {
     // Подменить их значило бы отправить игрока строить вторую верфь там, где нужна та
     // же, но выше.

@@ -96,6 +96,33 @@
     },
     "hullClass": "medium"
   },
+  "heavy_cruiser": {
+    "faction": "vanguard",
+    "stats": {
+      "attack": 24,
+      "defense": 21,
+      "speed": 34,
+      "hp": 90,
+      "cargoCapacity": 5
+    },
+    "line": "front",
+    "signature": 5,
+    "cost": {
+      "metal": 120,
+      "credits": 40,
+      "microelectronics": 6
+    },
+    "buildTimeHours": 5,
+    "upkeep": {
+      "credits": 56
+    },
+    "slots": {
+      "weapon": 1,
+      "defense": 1,
+      "utility": 1
+    },
+    "hullClass": "heavy"
+  },
   "siege_lance": {
     "faction": "vanguard",
     "stats": {

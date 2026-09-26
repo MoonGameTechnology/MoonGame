@@ -877,6 +877,7 @@ export const en: Record<string, string> = {
   'data.credits': 'credits',
   'data.crimson-hegemony': 'Crimson Hegemony',
   'data.cruiser': 'cruiser',
+  'data.heavy-cruiser': 'heavy cruiser',
   'data.crystalline': 'Crystalline',
   'data.dead-world': 'Dead World',
   'data.debris-field': 'Debris Field',
@@ -1118,6 +1119,9 @@ export const en: Record<string, string> = {
   'dossier.unit.cruiser.desc':
     "The battle line's workhorse: {a} attack, {hp} hull and a {c}-place hold for troops and shuttles. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
+  'dossier.unit.heavy-cruiser.desc':
+    'A heavy line hull: {a} attack, {d} defense, {hp} hull, speed {sp}, a {c}-place hold.',
+  'dossier.unit.heavy-cruiser.name': 'Heavy Cruiser',
   'dossier.unit.default': 'A combat unit.',
   'dossier.unit.bomber.desc':
     "A striker: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home. Hold places: {cs}.",

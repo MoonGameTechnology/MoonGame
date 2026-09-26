@@ -429,7 +429,8 @@
     "allowed": {
       "domain": "space",
       "units": [
-        "cruiser"
+        "cruiser",
+        "heavy_cruiser"
       ]
     }
   }
