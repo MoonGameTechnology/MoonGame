@@ -217,14 +217,6 @@ if (zapFile) {
   if (seen) sarifTools.add('ZAP');
 }
 
-// --- pnpm run check ---
-let checkLine = '_неизвестно_';
-const checkFile = files.find((f) => /check-status\.json$/.test(f));
-if (checkFile) {
-  const o = readJson(checkFile)?.check;
-  if (o) checkLine = o === 'success' ? '✅ зелёный (lint+typecheck+test)' : `⚠️ ${o}`;
-}
-
 const sboms = files.filter((f) => /\.cdx\.json$/i.test(f)).map((f) => basename(f));
 
 // --- scan-confirmation (fail-open detector) ---
@@ -308,7 +300,6 @@ if (suppressedCount)
   L.push(
     `**Подавлено сканерами (с обоснованием в коде/конфиге):** ${suppressedCount} — в таблицы ниже не входят.  `,
   );
-L.push(`**pnpm run check:** ${checkLine}  `);
 L.push(`**SBOM (CycloneDX):** ${sboms.length ? `✅ ${sboms.join(', ')}` : '—'}`);
 L.push('');
 

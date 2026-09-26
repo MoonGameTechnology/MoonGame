@@ -81,11 +81,12 @@ backlog'а, словарь статусов кирпичей + живость и
 роадмапах (общий индекс) — исполняемая
 часть правила «verify docs against reality»)
 (CI additionally runs an OSV-Scanner SCA pass over the lockfiles; `pnpm audit` is
-retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on every push:
-`.github/workflows/ci.yml` runs the gate + audit against a service Postgres (so the
-durable-store tests run too), `.github/workflows/security.yml` runs the gate + audit alongside
-a diverse scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor) — on every
-push **and weekly on `main`**, since a pinned prod image outlives the CVE feeds that scanned
+retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on every work-branch
+push, PR and merge-queue run (a push to `main` itself is not re-run: the queue already
+tested that exact tree): `.github/workflows/ci.yml` runs the gate + audit against a service
+Postgres (so the durable-store tests run too), `.github/workflows/security.yml` runs a diverse
+scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor) — on the same events
+**and weekly on `main`**, since a pinned prod image outlives the CVE feeds that scanned
 it — `.github/workflows/android.yml` builds the Android APK, and
 `.github/workflows/image.yml` publishes the prod image (build → blocking Trivy → GHCR →
 keyless cosign signature over the digest; the deploy side verifies it with

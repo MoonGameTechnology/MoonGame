@@ -1,6 +1,7 @@
 name: Security scan
 
-# Security pipeline. Runs a DIVERSE set of scanners on EVERY push (any branch) —
+# Security pipeline. Runs a DIVERSE set of scanners on every push to a work branch,
+# on PRs, in the merge queue and weekly on `main` —
 # different methods / data sources / surfaces, not clones — aggregates everything
 # into ONE report, and posts it back (sticky PR comment, or a commit comment
 # otherwise) + job summary + artifact.
@@ -23,8 +24,10 @@ name: Security scan
 # (trivy-fs) / .trivyignore (trivy-image) WITH a reason + date (see
 # docs/security/pipeline.md). One list per perimeter — see each file's header.
 # Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
-# kics, dependency-review, dependency-check, zizmor, scorecard, and the `check` job (its
-# blocking twin lives in ci.yml).
+# kics, dependency-review, dependency-check, zizmor, scorecard. The functional gate
+# (`pnpm run check`) is NOT run here: it lives once, blocking, in ci.yml. A copy here
+# used to run it a second time on every event, informationally, and only fed one line
+# of the report.
 #
 # One BLOCKING check in `trivy-image` is not a scanner at all: the smoke step runs the
 # image it just built and requires /health and / to answer. Every scanner here reads a
@@ -106,7 +109,14 @@ on:
     # required-чеки не отчитывались, записи выбрасывало по таймауту. Полный разбор — в
     # шапке `push` в ci.yml. Столкновение push и merge_group теперь разводит ключ
     # `concurrency` ниже, а не фильтр событий.
-    branches: ['**']
+    #
+    # `!main`: push в `main` сканеры больше не будит. В `main` попадает только коммит,
+    # который очередь уже прогнала целиком на своей ветке (то же дерево «свежий main + PR»),
+    # так что прогон на push в `main` повторял уже сданный экзамен. Свежесть CVE-лент на
+    # `main` держит недельный cron ниже (SEC-10), Scorecard бежит на нём же. Исключение
+    # точечное: ветки очереди (`gh-readonly-queue/main/...`) под `!main` не подпадают —
+    # шаблон сравнивается с именем ветки целиком.
+    branches: ['**', '!main']
   pull_request:
   # Merge queue: очередь собирает временную ветку «свежий main + этот PR» и ждёт на НЕЙ
   # отчёта от required-чеков — но воркфлоу попадает туда, только если подписан на
@@ -148,43 +158,6 @@ concurrency:
 permissions: {}
 
 jobs:
-  check:
-    name: lint + typecheck + test + audit
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '22'
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: pnpm run check
-        id: check
-        continue-on-error: true
-        run: pnpm run check
-      # pnpm audit retired: npm shut down both audit endpoints (HTTP 410, 2026-07).
-      # SCA over the lockfiles is carried by the BLOCKING osv job below (osv.dev
-      # mirrors GHSA) and by ci.yml's OSV step — no separate audit sentinel.
-      - name: sentinels
-        env:
-          CHECK_OUTCOME: ${{ steps.check.outcome }}
-        run: |
-          echo "{\"check\":\"$CHECK_OUTCOME\"}" > check-status.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: report-check
-          path: |
-            check-status.json
-          if-no-files-found: warn
-
   semgrep:
     name: SAST patterns (Semgrep)
     runs-on: ubuntu-latest
@@ -1494,7 +1467,6 @@ jobs:
     # больше не держится на честном слове: его проверяет `summarize-security.test.mjs`.
     needs:
       [
-        check,
         semgrep,
         codeql,
         gitleaks,

@@ -1,6 +1,7 @@
 name: CI
 
-# The gate for every push to main and every PR: lint + typecheck + test + audit.
+# The gate for every work-branch push, every PR and the merge queue: lint + typecheck +
+# test + audit. (`main` itself is not re-run on push — see the `push` trigger below.)
 # A Postgres service is attached and DATABASE_URL is set, so the durable-path adapter
 # tests (store.test.ts, gated behind DATABASE_URL) actually run in CI instead of being
 # skipped — the production persistence path is exercised, not just the in-memory one.
@@ -26,8 +27,14 @@ on:
   # с ветки очереди. Механизм до конца не доказан, но цена ошибки несимметрична: столкновение
   # прогонов стоит редкого ложного выброса, а нерассылка событий — полной остановки мержа.
   # Возвращаем заведомо рабочую форму, а задачу AUD-9 решаем ключом `concurrency` ниже.
+  #
+  # `!main`: гейт на push в `main` не бежит. В `main` приезжает только коммит, который
+  # очередь уже прогнала на своей ветке (`merge_group`/push в `gh-readonly-queue/**`), —
+  # повторный прогон ничего не проверял и половину раз гасился следующим мержем
+  # (`cancelled`). Ветки очереди под `!main` не подпадают: шаблон сравнивается с именем
+  # ветки целиком. Ручной прогон на `main` — `workflow_dispatch`.
   push:
-    branches: ['**']
+    branches: ['**', '!main']
   pull_request:
   # Merge queue: the queue builds a temporary "latest main + this PR" branch and waits
   # for the REQUIRED checks on it — but a workflow only runs there if it subscribes to
