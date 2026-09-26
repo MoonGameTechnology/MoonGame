@@ -37,6 +37,12 @@ interface Overlay {
   copy: HTMLElement;
   next: HTMLButtonElement;
   skip: HTMLButtonElement;
+  /** Этапное обучение (полигон, TRN-2): пропустить этап и свернуть подсказку. */
+  skipStage: HTMLButtonElement;
+  fold: HTMLButtonElement;
+  /** Кнопка «Подсказка» — открывает свёрнутую подсказку. Живёт ВНЕ `root`: свёрнутый
+   *  оверлей скрыт целиком, а кнопка должна оставаться на экране. */
+  chip: HTMLButtonElement;
 }
 
 let overlay: Overlay | null = null;
@@ -95,11 +101,19 @@ function ensureOverlay(): Overlay {
   skip.type = 'button';
   const next = el('button', 'sl-next');
   next.type = 'button';
-  btns.append(skip, next);
+  const skipStage = el('button', 'sl-skip-stage');
+  skipStage.type = 'button';
+  const fold = el('button', 'sl-fold');
+  fold.type = 'button';
+  btns.append(skip, skipStage, fold, next);
   bubble.append(arrow, count, copy, btns);
   root.append(...dim, ring, bubble);
-  document.body.appendChild(root);
-  overlay = { root, dim, ring, bubble, arrow, count, copy, next, skip };
+  const chip = el('button', 'sl-chip');
+  chip.type = 'button';
+  chip.id = 'spotlight-chip';
+  chip.style.display = 'none';
+  document.body.append(root, chip);
+  overlay = { root, dim, ring, bubble, arrow, count, copy, next, skip, skipStage, fold, chip };
   return overlay;
 }
 
@@ -114,6 +128,15 @@ const HIDDEN: Rect = { left: 0, top: 0, width: 0, height: 0 };
 
 function paint(o: Overlay, view: SpotlightView | null): void {
   if (!view) {
+    o.root.style.display = 'none';
+    o.chip.style.display = 'none';
+    return;
+  }
+  // Свёрнутая подсказка: оверлея нет вовсе (экран свободен), остаётся кнопка
+  // «Подсказка». Шаг при этом засчитывается по делу — движок продолжает опрос.
+  o.chip.style.display = view.collapsed ? 'block' : 'none';
+  o.chip.textContent = t('onb.tour.reopen');
+  if (view.collapsed) {
     o.root.style.display = 'none';
     return;
   }
@@ -162,25 +185,48 @@ function paint(o: Overlay, view: SpotlightView | null): void {
     o.ring.style.display = 'none';
   }
 
-  o.count.textContent = t('onb.tour.step', { k: view.index + 1, n: view.count });
+  o.count.textContent = view.stage
+    ? t('onb.tour.stage', {
+        k: view.stage.index + 1,
+        n: view.stage.count,
+        title: t(`training.stage.${view.stage.id}`),
+      })
+    : t('onb.tour.step', { k: view.index + 1, n: view.count });
   o.copy.textContent = t(view.step.copy);
   // Action/state steps have no «Далее» — the player advances by doing the thing.
   o.next.style.display = view.step.advance.on === 'tap' ? 'inline-block' : 'none';
   o.next.textContent = view.index + 1 >= view.count ? t('onb.tour.got-it') : t('onb.tour.next');
   o.skip.textContent = t('onb.tour.skip');
+  // Пропустить этап и свернуть — только у этапного обучения (полигон): прежние туры
+  // остаются такими, какими их знают игроки.
+  o.skipStage.style.display = view.stage ? 'inline-block' : 'none';
+  o.skipStage.textContent = t('onb.tour.skip-stage');
+  o.fold.style.display = view.stage ? 'inline-block' : 'none';
+  o.fold.textContent = t('onb.tour.collapse');
 
   // Measure the bubble, then position it (and its arrow) next to the target.
   const b = o.bubble.getBoundingClientRect();
-  const pos = placeBubble(
-    view.target,
-    vp,
-    { width: b.width || 280, height: b.height || 120 },
-    view.step.placement ?? 'auto',
-  );
+  const size = { width: b.width || 280, height: b.height || 120 };
+  const pos = topAnchored(view, mode)
+    ? { left: Math.max(8, (vp.width - size.width) / 2), top: TOP_GAP, arrow: 'none' as const }
+    : placeBubble(view.target, vp, size, view.step.placement ?? 'auto');
   o.bubble.style.left = `${pos.left}px`;
   o.bubble.style.top = `${pos.top}px`;
   o.arrow.dataset.dir = pos.arrow;
   o.arrow.style.display = pos.arrow === 'none' ? 'none' : 'block';
+}
+
+/** Отступ подсказки от верхнего края: ниже строки ресурсов. */
+const TOP_GAP = 72;
+
+/**
+ * Подсказка этапного обучения без цели на шаге «сделай сам» встаёт к верхнему краю, а не
+ * в центр (TRN-2, §14.4: «на телефоне подсказка не перекрывает свою цель»). Цель такого
+ * шага — сама карта: игрок ведёт флот или берёт мир, а подсказка по центру закрыла бы
+ * ровно то место, куда он смотрит. Прежние туры центрируются, как раньше.
+ */
+export function topAnchored(view: Pick<SpotlightView, 'target' | 'stage'>, mode: string): boolean {
+  return !view.target && !!view.stage && mode === 'free';
 }
 
 /** A live handle on a running tour — feed it player actions, or stop it early. */
@@ -236,6 +282,9 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
 
   o.next.onclick = () => tour.tap();
   o.skip.onclick = () => tour.skip();
+  o.skipStage.onclick = () => tour.skipStage();
+  o.fold.onclick = () => tour.collapse();
+  o.chip.onclick = () => tour.reopen();
 
   /** Снять тур, что бы ни сломалось, и главное — УБРАТЬ оверлей с экрана (RESIL-2). */
   const abort = (err: unknown): void => {

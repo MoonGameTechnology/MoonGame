@@ -56,6 +56,10 @@ export interface SpotlightStep {
   /** Шаг-подсказка, которую надо попробовать руками: экран остаётся живым, хотя шаг
    *  закрывается кнопкой «Далее». Причины — `tourGate.ts`, правило 5. */
   hands?: boolean;
+  /** Этап, к которому шаг относится (учебный полигон, TRN-2): несколько шагов составляют
+   *  один этап §14.4. «Пропустить этап» уводит к первому шагу следующего этапа. Нет поля —
+   *  обычное обучение без этапов. */
+  stage?: string;
   /** Запереть экран на цели этого шага: нажать можно ТОЛЬКО подсвеченное место.
    *  Ставится там, где цель и есть то, что просят нажать; шаги, где до места ещё надо
    *  добраться (выбрать флот, открыть панель), оставляют HUD свободным. Правила и
@@ -69,6 +73,11 @@ export interface SpotlightView {
   index: number; // 0-based position in the chain
   count: number; // total steps
   target: Rect | null; // located rect, or null (no target / not in DOM)
+  /** Этап шага: его номер среди этапов цепочки и сколько их всего. Нет — шаг без этапа. */
+  stage?: { id: string; index: number; count: number };
+  /** Подсказка свёрнута игроком: оверлей не рисуется, остаётся кнопка «Подсказка»,
+   *  а шаг по-прежнему засчитывается по делу. */
+  collapsed: boolean;
 }
 
 /** The browser (or a fake, in tests) the engine drives. */
@@ -98,12 +107,17 @@ export class SpotlightTour {
   private i = -1;
   private reached = -1;
   private running = false;
+  private folded = false;
+  /** Этапы цепочки по порядку первого появления. */
+  private readonly stages: string[] = [];
 
   constructor(
     private readonly steps: readonly SpotlightStep[],
     private readonly host: SpotlightHost,
     private readonly onEnd?: TourEnd,
-  ) {}
+  ) {
+    for (const step of steps) if (step.stage !== undefined && !this.stages.includes(step.stage)) this.stages.push(step.stage);
+  }
 
   get active(): boolean {
     return this.running;
@@ -125,9 +139,38 @@ export class SpotlightTour {
     this.enter(0);
   }
 
-  /** «Далее/Понятно» — advances a `tap` step; ignored otherwise. */
+  /** «Далее/Понятно» — advances a `tap` step; ignored otherwise. Свёрнутая подсказка
+   *  кнопки не показывает, поэтому и не листается. */
   tap(): void {
-    if (this.running && this.current.advance.on === 'tap') this.next();
+    if (this.running && !this.folded && this.current.advance.on === 'tap') this.next();
+  }
+
+  /** «Пропустить этап» — к первому шагу следующего этапа; за последним — конец обучения
+   *  как пройденного (игрок дошёл до конца цепочки). У шага без этапа — как «Далее». */
+  skipStage(): void {
+    if (!this.running) return;
+    const stage = this.current.stage;
+    let j = this.i + 1;
+    while (stage !== undefined && j < this.steps.length && this.steps[j]!.stage === stage) j++;
+    if (j >= this.steps.length) {
+      this.end({ completed: true, skipped: false, stopped: false, reachedStep: this.reached });
+      return;
+    }
+    this.enter(j);
+  }
+
+  /** «Свернуть» — убрать подсказку с экрана, не прерывая обучения. */
+  collapse(): void {
+    if (!this.running) return;
+    this.folded = true;
+    this.paint();
+  }
+
+  /** «Подсказка» — показать свёрнутую подсказку снова. */
+  reopen(): void {
+    if (!this.running) return;
+    this.folded = false;
+    this.paint();
   }
 
   /** A game action fired — advances a matching `action` step. */
@@ -207,11 +250,23 @@ export class SpotlightTour {
   private paint(): void {
     const step = this.current;
     const target = step.target === null ? null : this.host.locate(step.target);
-    this.host.render({ step, index: this.i, count: this.steps.length, target });
+    const stage =
+      step.stage === undefined
+        ? undefined
+        : { id: step.stage, index: this.stages.indexOf(step.stage), count: this.stages.length };
+    this.host.render({
+      step,
+      index: this.i,
+      count: this.steps.length,
+      target,
+      ...(stage ? { stage } : {}),
+      collapsed: this.folded,
+    });
   }
 
   private end(result: TourResult): void {
     this.running = false;
+    this.folded = false;
     this.i = -1;
     this.host.render(null);
     this.onEnd?.(result);

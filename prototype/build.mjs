@@ -658,6 +658,17 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #spotlight .sl-next{background:var(--cyan);border:none;color:#04121a;font-weight:700;font-size:13px;
   padding:7px 16px;border-radius:7px;cursor:pointer;}
 #spotlight .sl-next:hover{filter:brightness(1.08);}
+/* TRN-2: этапное обучение — «Пропустить этап», «Свернуть» и кнопка «Подсказка», которая
+   остаётся на экране, пока подсказка свёрнута. Кнопки этапа в строке переносятся: на
+   телефоне четыре кнопки в одну строку не встают. */
+#spotlight .sl-btns{flex-wrap:wrap;}
+#spotlight .sl-skip-stage,#spotlight .sl-fold{background:none;border:1px solid var(--line);color:var(--ink);
+  font-size:12px;cursor:pointer;padding:5px 9px;border-radius:6px;}
+#spotlight .sl-skip-stage:hover,#spotlight .sl-fold:hover{border-color:var(--cyan);}
+#spotlight-chip{position:fixed;z-index:50;bottom:100px;right:14px;background:rgba(4,16,22,.95);
+  border:1px solid var(--cyan);color:var(--cyan);font-weight:700;font-size:12px;letter-spacing:.4px;
+  padding:7px 12px;border-radius:16px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5);}
+#spotlight-chip:hover{filter:brightness(1.1);}
 /* codex popup — full stats + description on tile click */
 #codex{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}

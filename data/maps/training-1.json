@@ -18,6 +18,9 @@
           "type": "mine_t1"
         },
         {
+          "type": "barracks"
+        },
+        {
           "type": "shipyard",
           "level": 2
         },
@@ -148,8 +151,11 @@
       "name": "Azure Compact",
       "faction": "vanguard",
       "resources": {
-        "credits": 600,
-        "metal": 600
+        "credits": 800,
+        "metal": 900,
+        "microelectronics": 40,
+        "energy": 100,
+        "food": 100
       }
     },
     "p2": {
@@ -162,6 +168,16 @@
     }
   },
   "fleets": {
+    "p1_carrier": {
+      "owner": "p1",
+      "location": "base",
+      "units": [
+        {
+          "unit": "shuttle_carrier",
+          "count": 1
+        }
+      ]
+    },
     "p1_1": {
       "owner": "p1",
       "location": "base",
