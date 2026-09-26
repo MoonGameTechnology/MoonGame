@@ -1245,8 +1245,8 @@
 | SHU-4.4 | ✅ | core | `docs/shuttles-roadmap.md` | Погоня: удар по движущейся цели 2026-09-13 |
 | SHU-5.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Общий трюм: шаттлы в трюме любого корабля |
 | SHU-5.2 | ✅ | core data | `docs/shuttles-roadmap.md` | Десантный челнок строится с десантом |
-| SHU-5.3 | ⏳ | core | `docs/shuttles-roadmap.md` | Урон шаттлов между вылетами |
-| SHU-5.4 | 🔒 | core data | `docs/shuttles-roadmap.md` | Ремонтный ангар |
+| SHU-5.3 | ✅ | core | `docs/shuttles-roadmap.md` | Урон шаттлов между вылетами |
+| SHU-5.4 | ⏳ | core data | `docs/shuttles-roadmap.md` | Ремонтный ангар |
 | SHU-5.5 | ⏳ | proto | `docs/shuttles-roadmap.md` | Интерфейс фазы 5 |
 | SHU-5.6 | ⏳ | proto | `docs/shuttles-roadmap.md` | Бот и фаза 5 |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |

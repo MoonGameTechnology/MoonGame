@@ -76,6 +76,8 @@ import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
+import { dockHullRate, fleetAtOwnDock } from '../util/repair';
+import { battleLocations } from '../state/battle';
 
 /** Total point-defense (anti-shuttle/anti-missile) firepower of a fleet —
  *  Σ the `pointDefense` stat of its live units (via effectiveStats, so modules
@@ -930,6 +932,8 @@ export const shuttleModule: GameModule = {
         // догонять его нечем — туда эскадра идёт по расписанию, как и раньше.
         ...(targetFleet ? { at: { ...from } } : {}),
         ...(cargo.length > 0 ? { cargo: cargo.map((st) => ({ ...st })) } : {}),
+        // Подбитые машины летят подбитыми (SHU-5.3): урон эскадры — начало счёта вылета.
+        ...(squad.damage ? { damage: squad.damage } : {}),
       };
       h.state.strikes = [...(h.state.strikes ?? []), strike];
       // Удар по МИРУ прилетает точно в срок, как и раньше. У ПОГОНИ срока нет — вместо
@@ -984,10 +988,15 @@ export const shuttleModule: GameModule = {
       // Бойцы расходятся по бортам: уходящим — по одному на борт, остальные остаются.
       const troop = hold[0];
       const goesN = troop ? Math.min(troop.count, goes) : 0;
-      const part = (units: UnitStack[], n: number): Omit<Squadron, 'id'> =>
-        troop && n > 0 ? { units, cargo: [{ unit: troop.unit, count: n }] } : { units };
-      const movedPart = part(moved, goesN);
-      const leftPart = part(left, troop ? troop.count - goesN : 0);
+      // Урон делится по числу бортов (SHU-5.3): он пул корпусов, а не метка на машине.
+      const hurt = squad.damage ?? 0;
+      const part = (units: UnitStack[], n: number, share: number): Omit<Squadron, 'id'> => ({
+        units,
+        ...(troop && n > 0 ? { cargo: [{ unit: troop.unit, count: n }] } : {}),
+        ...(hurt > 0 && share > 0 ? { damage: (hurt * share) / (goes + stay) } : {}),
+      });
+      const movedPart = part(moved, goesN, goes);
+      const leftPart = part(left, troop ? troop.count - goesN : 0, stay);
       const named: Squadron = { id: squad.id, ...(goes > stay ? movedPart : leftPart) };
       const other: Squadron = { id: freshId, ...(goes > stay ? leftPart : movedPart) };
       base.setHangar(base.hangar.flatMap((q) => (q.id === squad.id ? [named, other] : [q])));
@@ -1016,7 +1025,13 @@ export const shuttleModule: GameModule = {
       for (const st of from.units) addUnits(units, st.unit, st.count, st.modules, st.moduleStars, st.moduleRarity);
       const cargo = (into.cargo ?? []).map((st) => ({ ...st }));
       for (const st of from.cargo ?? []) addUnits(cargo, st.unit, st.count);
-      const merged: Squadron = { id: into.id, units, ...(cargo.length > 0 ? { cargo } : {}) };
+      const damage = (into.damage ?? 0) + (from.damage ?? 0);
+      const merged: Squadron = {
+        id: into.id,
+        units,
+        ...(cargo.length > 0 ? { cargo } : {}),
+        ...(damage > 0 ? { damage } : {}),
+      };
       base.setHangar(base.hangar.flatMap((q) => (q.id === from.id ? [] : q.id === into.id ? [merged] : [q])));
       h.emit('squadron.merged', {
         baseId: base.ref.id,
@@ -1157,6 +1172,8 @@ export const shuttleModule: GameModule = {
       const home: Squadron = {
         id: taken ? nextSquadronId(h, strike.owner) : strike.squadronId,
         units: strike.units.map((st) => ({ ...st })),
+        // Недобитый урон вылета остаётся на машинах (SHU-5.3), а не забывается на посадке.
+        ...(strike.damage && strike.damage > 0 ? { damage: strike.damage } : {}),
       };
       base.setHangar(trimHangar([...base.hangar, home], bay, h.ctx.data));
       h.emit('shuttle.landed', {
@@ -1288,6 +1305,40 @@ export const shuttleModule: GameModule = {
           owner: base.owner,
           count: lost,
         });
+      }
+    });
+
+    /**
+     * РЕМОНТ ЭСКАДР (SHU-5.3). Урон, привезённый с вылета, чинится у ДОКА тем же темпом,
+     * что корпус корабля (`shipRepair` живых построек, доля полного корпуса в час): в
+     * порту своего мира и на борту флота, стоящего у своего или союзного дока
+     * (`fleetAtOwnDock` — правило одно на все пути ремонта). Пока на узле бой, док не
+     * чинит — как и корабли (решение владельца 17).
+     */
+    api.on('time.advanced', (event, h: HandlerContext) => {
+      const { from, to } = event.payload as { from: number; to: number };
+      if (to <= from) return;
+      const hours = ((to - from) / MS_PER_HOUR) * timeScaleOf(h.ctx);
+      const data = h.ctx.data;
+      const fighting = battleLocations(h.state);
+      const mend = (hangar: readonly Squadron[], rate: number): void => {
+        if (rate <= 0) return;
+        for (const sq of hangar) {
+          if (!sq.damage) continue;
+          const left = sq.damage - rate * hours * sumUnitStat(sq.units, data, 'hp');
+          if (left > 0) sq.damage = left;
+          else delete sq.damage;
+        }
+      };
+      for (const planet of Object.values(h.state.planets)) {
+        if (!planet.hangar?.length || planet.owner === null || fighting.has(planet.id)) continue;
+        mend(planet.hangar, dockHullRate(planet, data));
+      }
+      for (const fleet of Object.values(h.state.fleets)) {
+        if (!fleet.hangar?.length || fleet.battleId || !fleet.location) continue;
+        if (fighting.has(fleet.location)) continue;
+        if (!fleetAtOwnDock(fleet, h.state, data, (a, b) => isAllied(h, a, b))) continue;
+        mend(fleet.hangar, dockHullRate(h.state.planets[fleet.location]!, data));
       }
     });
 
