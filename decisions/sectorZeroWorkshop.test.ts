@@ -42,7 +42,7 @@ describe('sectorZeroWorkshop — что видно ДО подтверждени
   });
 
   it('пустая лестница выключает мастерскую целиком, без флага в коде', () => {
-    const bare = { ...data, sectorZeroStars: { cap: 0, guaranteed: 0, steps: [], capByRarity: {} } };
+    const bare = { ...data, sectorZeroStars: { cap: 0, guaranteed: 0, steps: [], capByRarity: {}, hulls: { maxSlots: 0, warrants: [] } } };
     expect(workshopRows(profile({ warrants: 9999 }), bare)).toEqual([]);
   });
 });

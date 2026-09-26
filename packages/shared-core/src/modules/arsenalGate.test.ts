@@ -124,6 +124,16 @@ describe('unit.build × arsenal snapshot (ARS-3)', () => {
     expect(errCode(kernel.applyAction(s, build('grunt'), ctx()))).toBe('E_NO_BARRACKS');
   });
 
+  it('звёзды корабля открывают слоты: лишний слот места пускает второй модуль (Sector Zero)', () => {
+    const both: PlayerArsenal = { hulls: ['cruiser'], modules: ['railgun', 'coilgun'] };
+    const two = build('cruiser', ['railgun', 'coilgun']);
+    // У крейсера один оружейный слот — без звезды второй модуль некуда поставить…
+    expect(errCode(kernel.applyAction(stateWith([player('p1', both)]), two, ctx()))).toBe('E_NO_SLOT');
+    // …а звезда корабля этого места прибавила оружейный слот.
+    const starred: PlayerArsenal = { ...both, slots: { cruiser: { weapon: 1 } } };
+    okApply(kernel.applyAction(stateWith([player('p1', starred)]), two, ctx()));
+  });
+
   it('an owned hull with an owned module builds; unowned are E_NOT_OWNED', () => {
     const st = (): GameState => stateWith([player('p1', OWNED)]);
     expect(okApply(kernel.applyAction(st(), build('cruiser', ['railgun']), ctx())).ok).toBe(true);

@@ -21,7 +21,7 @@ import { buildProgress } from '../util/construction';
 import { isAllied } from '../util/combat';
 import { addUnits } from '../util/stacks';
 import { basedLander, basedMachine, shuttleBayAt } from '../state/shuttle';
-import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
+import { effectiveStats, loadoutCost, validateLoadout, withBonusSlots } from '../util/loadout';
 import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
 
 /** Share of the ground assault's round damage that also wears down the planet's
@@ -976,7 +976,9 @@ export const constructionModule: GameModule = {
         if (arsenal && modules.some((m) => !arsenal.modules.includes(m))) {
           return h.reject('E_NOT_OWNED');
         }
-        const valid = validateLoadout(payload.unit, def, modules, h.ctx.data);
+        // Звёзды корабля этого места открывают лишние слоты (Sector Zero).
+        const hull = withBonusSlots(def, arsenal?.slots?.[payload.unit]);
+        const valid = validateLoadout(payload.unit, hull, modules, h.ctx.data);
         if (!valid.ok) return h.reject(valid.code);
       }
       if (laneBusy(h, planet.id, 'units')) {

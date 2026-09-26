@@ -28,6 +28,23 @@ export interface SlotCounts {
   utility: number;
 }
 
+/**
+ * Корпус со слотами, открытыми звёздами корабля (Sector Zero, решение владельца
+ * 2026-09-26): к слотам корпуса из каталога прибавляются лишние слоты этого места
+ * (`PlayerArsenal.slots`). Нет прибавки — тот же объект каталога.
+ */
+export function withBonusSlots(def: UnitDef, bonus: Partial<SlotCounts> | undefined): UnitDef {
+  if (!bonus) return def;
+  return {
+    ...def,
+    slots: {
+      weapon: (def.slots.weapon ?? 0) + (bonus.weapon ?? 0),
+      defense: (def.slots.defense ?? 0) + (bonus.defense ?? 0),
+      utility: (def.slots.utility ?? 0) + (bonus.utility ?? 0),
+    },
+  };
+}
+
 /** Характеристики-МЕСТА: трюм считает места под десант и шаттлы (общий с SHU-5.1), и
  *  «11,9 места» не бывает (владелец 2026-09-24: «трюм не может быть в нецельных
  *  числах»). Звезда модуля множит его прибавку (+6 × 1,1 = 6,6), поэтому итог корпуса

@@ -12,6 +12,8 @@ import {
   sectorHeroShipSlots,
   sectorHeroSlots,
   sectorHullIds,
+  sectorHullSlots,
+  hullStarCost,
   sectorModuleIds,
   sectorModulesFor,
   sectorSkillOpenTo,
@@ -1035,5 +1037,68 @@ describe('AUD-31 — откат версии не стирает купленн�
     expect(parseSectorZeroProgress(JSON.stringify(p), data).shelf).toBeUndefined();
     const back = parseSectorZeroProgress(JSON.stringify(p), olderCatalog());
     expect(parseSectorZeroProgress(JSON.stringify(back), olderCatalog())).toEqual(back);
+  });
+});
+
+describe('звёзды кораблей (решение владельца 2026-09-26): слоты за Варранты, до 6 слотов', () => {
+  const rich = (): SectorZeroProgress => ({ ...fresh(), warrants: 100_000 });
+
+  it('звёзд столько, сколько слотов не хватает до шести: разведчику пять, фрегату две', () => {
+    let scout = rich();
+    const costs: number[] = [];
+    for (let i = 0; i < 10 && hullStarCost('scout', scout, data) !== null; i++) {
+      costs.push(hullStarCost('scout', scout, data)!);
+      scout = change(scout, { kind: 'hull-star', hull: 'scout', slot: 'utility' });
+    }
+    expect(costs).toEqual(data.sectorZeroStars.hulls.warrants.slice(0, 5));
+    const slots = sectorHullSlots('scout', scout, data);
+    expect(slots.weapon + slots.defense + slots.utility).toBe(6);
+    let frigate = rich();
+    frigate = change(frigate, { kind: 'hull-star', hull: 'frigate', slot: 'weapon' });
+    frigate = change(frigate, { kind: 'hull-star', hull: 'frigate', slot: 'weapon' });
+    expect(hullStarCost('frigate', frigate, data)).toBeNull();
+    expect(changeSectorZeroProgress(frigate, { kind: 'hull-star', hull: 'frigate', slot: 'weapon' }, data)).toBeNull();
+    expect(sectorHullSlots('frigate', frigate, data).weapon).toBe((data.units.frigate!.slots.weapon ?? 0) + 2);
+  });
+
+  it('звезда стоит Варранты и приходит без броска; не хватает — профиль не трогается', () => {
+    const cost = hullStarCost('cruiser', fresh(), data)!;
+    expect(changeSectorZeroProgress({ ...fresh(), warrants: cost - 1 }, { kind: 'hull-star', hull: 'cruiser', slot: 'defense' }, data)).toBeNull();
+    const p = change({ ...fresh(), warrants: cost }, { kind: 'hull-star', hull: 'cruiser', slot: 'defense' });
+    expect(p.warrants).toBe(0);
+    expect(p.hullStars.cruiser).toEqual(['defense']);
+    // Мусор вместо типа слота и чужой корпус не проходят.
+    expect(changeSectorZeroProgress(rich(), { kind: 'hull-star', hull: 'cruiser', slot: 'hull' as never }, data)).toBeNull();
+    expect(changeSectorZeroProgress(rich(), { kind: 'hull-star', hull: 'fortress_guns', slot: 'weapon' }, data)).toBeNull();
+  });
+
+  it('открытый слот сразу принимает модуль: второй модуль утилит на крейсер', () => {
+    let p = change(fresh(), { kind: 'fit', hull: 'cruiser', id: 'ion_engine' });
+    expect(changeSectorZeroProgress(p, { kind: 'fit', hull: 'cruiser', id: 'cargo_bay' }, data)).toBeNull();
+    p = change({ ...p, warrants: 100_000 }, { kind: 'hull-star', hull: 'cruiser', slot: 'utility' });
+    p = change(p, { kind: 'fit', hull: 'cruiser', id: 'cargo_bay' });
+    expect(p.loadouts.cruiser).toEqual(['ion_engine', 'cargo_bay']);
+  });
+
+  it('звёзды переживают сохранение; сверх потолка и мусор срезаются, чужой корпус — на полку', () => {
+    let p = change(rich(), { kind: 'hull-star', hull: 'cruiser', slot: 'utility' });
+    p = change(p, { kind: 'fit', hull: 'cruiser', id: 'ion_engine' });
+    p = change(p, { kind: 'fit', hull: 'cruiser', id: 'cargo_bay' });
+    const back = parseSectorZeroProgress(JSON.stringify(p), data);
+    expect(back.hullStars.cruiser).toEqual(['utility']);
+    expect(back.loadouts.cruiser).toEqual(['ion_engine', 'cargo_bay']);
+    const tampered = parseSectorZeroProgress(
+      JSON.stringify({ ...p, hullStars: { frigate: ['weapon', 'weapon', 'weapon', 'junk'], gone_hull: ['defense'] } }),
+      data,
+    );
+    expect(tampered.hullStars.frigate).toEqual(['weapon', 'weapon']);
+    expect(tampered.shelf?.hullStars).toEqual({ gone_hull: ['defense'] });
+  });
+
+  it('слоты едут в забег снимком арсенала — верфь забега строит корабль с этим набором', () => {
+    const p = change(rich(), { kind: 'hull-star', hull: 'cruiser', slot: 'utility' });
+    const run = prepareSectorZeroRun(pveState(data, 0), p, data);
+    expect(run.players.p1!.arsenal!.slots).toEqual({ cruiser: { utility: 1 } });
+    expect(prepareSectorZeroRun(pveState(data, 0), fresh(), data).players.p1!.arsenal!.slots).toBeUndefined();
   });
 });
