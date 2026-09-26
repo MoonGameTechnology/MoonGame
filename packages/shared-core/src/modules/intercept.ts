@@ -1,4 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
+import type { Fleet } from '../state/gameState';
 import {
   INTERCEPT_TOL,
   isHostile,
@@ -10,6 +11,19 @@ import {
 } from '../util/combat';
 
 /**
+ * Флот дерётся в бою НА ДОРОГЕ: приколот к точке полосы, бой на орбитальной фазе. Для
+ * проходящего он — такая же стоящая на дороге точка, и встреча с ним — вступление в его
+ * бой (`combat`: `joinRoadBattle`). Бой у планеты сюда не относится: туда вступают по
+ * прибытии на узел.
+ */
+function roadEngaged(h: HandlerContext, f: Fleet): boolean {
+  if (!f.battleId || f.movement || !f.edge) return false;
+  return h.state.battles[f.battleId]?.phase === 'orbital';
+}
+/** Флот может участвовать во встрече: свободен или стоит в бою на дороге. */
+const canMeet = (h: HandlerContext, f: Fleet): boolean => !f.battleId || roadEngaged(h, f);
+
+/**
  * Schedules a `fleet.intercept` for every hostile fleet whose lane occupancy
  * crosses `fleetId`'s on the SAME lane — the analytic "встреча по формуле". Each
  * pair's position difference is linear in time, so the crossing instant is solved
@@ -19,7 +33,7 @@ import {
  */
 function scanLaneIntercepts(h: HandlerContext, fleetId: string): void {
   const fleet = h.state.fleets[fleetId];
-  if (!fleet || fleet.battleId || !fleet.units.some((s) => s.count > 0)) {
+  if (!fleet || !canMeet(h, fleet) || !fleet.units.some((s) => s.count > 0)) {
     return;
   }
   const occA = laneOccupancy(fleet);
@@ -34,8 +48,11 @@ function scanLaneIntercepts(h: HandlerContext, fleetId: string): void {
       continue;
     }
     const other = h.state.fleets[id];
-    if (!other || other.battleId || !isHostile(h, fleet.owner, other.owner)) {
+    if (!other || !canMeet(h, other) || !isHostile(h, fleet.owner, other.owner)) {
       continue;
+    }
+    if (fleet.battleId && other.battleId) {
+      continue; // оба уже в бою — встречать нечего
     }
     if (!other.units.some((s) => s.count > 0)) {
       continue;
@@ -86,7 +103,7 @@ function scanLaneIntercepts(h: HandlerContext, fleetId: string): void {
  */
 function scanTrunkIntercepts(h: HandlerContext, fleetId: string): void {
   const fleet = h.state.fleets[fleetId];
-  if (!fleet || fleet.battleId || !fleet.units.some((s) => s.count > 0)) return;
+  if (!fleet || !canMeet(h, fleet) || !fleet.units.some((s) => s.count > 0)) return;
   const mine = trunkOccupancies(h.state, fleet);
   if (mine.length === 0) return;
   const now = h.ctx.now;
@@ -94,7 +111,8 @@ function scanTrunkIntercepts(h: HandlerContext, fleetId: string): void {
   for (const id of Object.keys(h.state.fleets).sort()) {
     if (id === fleetId) continue;
     const other = h.state.fleets[id];
-    if (!other || other.battleId || !isHostile(h, fleet.owner, other.owner)) continue;
+    if (!other || !canMeet(h, other) || !isHostile(h, fleet.owner, other.owner)) continue;
+    if (fleet.battleId && other.battleId) continue; // оба уже в бою
     if (!other.units.some((s) => s.count > 0) || sameLane(fleet, other)) continue;
     const theirs = trunkOccupancies(h.state, other);
     for (const occA of mine) {
@@ -135,7 +153,7 @@ function scanTrunkIntercepts(h: HandlerContext, fleetId: string): void {
  */
 export const interceptModule: GameModule = {
   id: 'intercept',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     // Lane combat: a fleet just began a leg / parked on a lane → look for a hostile
     // fleet it will cross ON the lane (not only at a node), or on a trunk it shares with
@@ -149,6 +167,21 @@ export const interceptModule: GameModule = {
       const { fleetId } = event.payload as { fleetId: string };
       scanLaneIntercepts(h, fleetId);
       scanTrunkIntercepts(h, fleetId);
+    });
+    // Бой завязался на дороге: те, кто уже едет по ней, считали встречу с флотами, пока
+    // те ехали, — теперь флоты боя стоят в другой точке. Пересчитать встречи от них,
+    // иначе проходящий проедет сквозь бой (плейтест Sector Zero 2026-09-26).
+    api.on('battle.started', (event, h) => {
+      const { battleId } = event.payload as { battleId: string };
+      const battle = h.state.battles[battleId];
+      if (!battle) return;
+      for (const side of battle.sides) {
+        if (side.ref.kind !== 'fleet') continue;
+        const f = h.state.fleets[side.ref.fleetId];
+        if (!f || !roadEngaged(h, f)) continue;
+        scanLaneIntercepts(h, f.id);
+        scanTrunkIntercepts(h, f.id);
+      }
     });
   },
 };
