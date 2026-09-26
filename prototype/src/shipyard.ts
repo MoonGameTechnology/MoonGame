@@ -28,6 +28,7 @@
  */
 import { splitSupport } from '../../decisions/supportShips';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
+import { isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
 import {
   effectiveStats,
   unitBuildSiteBlocker,
@@ -127,7 +128,13 @@ const STAT_KEY: Record<string, string> = {
   speed: 'stat.speed',
   cargoCapacity: 'stat.cargo',
   radarRange: 'stat.radar',
+  // Доли за игровой час (`perHourShare.ts`): без подписи чип читался бы «+0.05 hullRepair».
+  shieldRegen: 'loadout.stat.shield-regen',
+  hullRepair: 'loadout.stat.hull-repair',
 };
+/** Чип эффекта модуля: доля в час — процентом («+5%/ч»), прочее — как есть. */
+const effectChip = (k: string, v: number): string =>
+  `+${isPerHourShare(k) ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) }) : v} ${t(STAT_KEY[k] ?? k)}`;
 
 /** The order being composed: which hull, what is bolted on, how many, where. Plain
  *  data, so the pane can be rendered (and asserted) without a window. */
@@ -267,7 +274,7 @@ export function loadoutPaneHtml(
         const md = data.modules[sl.moduleId];
         const eff = md
           ? Object.entries(md.effects.stats)
-              .map(([k, v]) => `+${v} ${t(STAT_KEY[k] ?? k)}`)
+              .map(([k, v]) => effectChip(k, v))
               .join(' ') + (md.description ? `<p>${esc(t(md.description))}</p>` : '')
           : '';
         return (
@@ -284,7 +291,7 @@ export function loadoutPaneHtml(
   const palette = m.palette
     .map((o) => {
       const eff = Object.entries(o.effect)
-        .map(([k, v]) => `+${v} ${t(STAT_KEY[k] ?? k)}`)
+        .map(([k, v]) => effectChip(k, v))
         .join(' ');
       if (o.installable) {
         return (

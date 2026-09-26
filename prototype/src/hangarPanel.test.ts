@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { data } from './gameData';
 import { dockedCarrier, fleetHangar, hasHangar, planetHangar, transferOffer } from './hangarPanel';
-import type { Fleet, Planet } from '../../packages/shared-core/src/index';
+import type { Fleet, GameState, Planet } from '../../packages/shared-core/src/index';
 
 const port = (over: Partial<Planet> = {}): Planet => ({
   id: 'A',
@@ -87,6 +87,20 @@ describe('SHU-3.1 — трюм НОСИТЕЛЯ виден той же форм�
     const v = fleetHangar(carrier({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }] }), data)!;
     expect(v.used).toBe(2);
     expect(v.bay).toBe(data.units.shuttle_carrier!.stats.cargoCapacity);
+  });
+
+  // SHU-5.5: место улетевшего страйкера держится за бортом (SHU-5.1). Без этого «0 из 6»
+  // при улетевших читалось бы как «шесть свободны», а погрузку ядро отбило бы.
+  it('места эскадр В ВЫЛЕТЕ не свободны и называются отдельно', () => {
+    const state = {
+      strikes: [{ id: 'st:1', base: { kind: 'fleet', id: 'F' }, units: [{ unit: 'heavy_striker', count: 1 }] }],
+    } as unknown as GameState;
+    const f = carrier({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: 1 }] }] });
+    const v = fleetHangar(f, data, state)!;
+    expect(v.used).toBe(1);
+    expect(v.aloft).toBe(2); // тяжёлый страйкер — два места
+    expect(v.free).toBe(v.bay - 3);
+    expect(fleetHangar(f, data)!.aloft).toBe(0); // без состояния улетевших не видно
   });
 
   // SHU-5.1: шаттлы едут в общем трюме любого корабля — «не носитель» теперь только

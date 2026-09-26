@@ -340,7 +340,7 @@ export const en: Record<string, string> = {
   'data.landing-shuttle': 'landing shuttle',
   'donate.aria': 'Sovereigns: {n}. Top up',
   'donate.soon': 'Sovereign store — coming soon',
-  'dossier.unit.landing-shuttle.desc': 'Landing shuttle: an unarmed hull carrying one ground unit, chosen when ordered; the price is the shuttle plus that unit. It cannot strike ships at all, and the order is refused outright. One-way: it lands and becomes that unit. An empty enemy world falls at once; a defended one gets a BEACHHEAD that opens a ground battle with no ship in sight; your own worlds get reinforcements. Area defense shreds both the craft and what they carried ({hp} hull, range {r}).',
+  'dossier.unit.landing-shuttle.desc': 'Landing shuttle: an unarmed hull carrying one ground unit, chosen when ordered; the price is the shuttle plus that unit. It cannot strike ships at all, and the order is refused outright. One-way: it lands and becomes that unit. An empty enemy world falls at once; a defended one gets a BEACHHEAD that opens a ground battle with no ship in sight; your own worlds get reinforcements. Area defense shreds both the craft and what they carried ({hp} hull, range {r}). Hold places: {cs}, whatever unit it carries.',
   'dossier.unit.landing-shuttle.name': 'Landing Shuttle',
   'hint.wing-aim': '✳ pick the strike target on the map',
   'hint.wing-cancelled': 'strike cancelled',
@@ -350,7 +350,8 @@ export const en: Record<string, string> = {
   'side.fortress.needs-tech': 'Research {tech} first.',
   'side.fortress.or': ' or ',
   'side.fortress.to-tech': 'Open technologies',
-  'side.wing.blocked.busy': 'the carrier is in battle — no squadron is launching now',
+  'side.wing.aloft': 'out on sortie, places: {n}',
+  'side.wing.blocked.busy': 'the ship is in battle — no squadron is launching now',
   'side.wing.blocked.empty': 'the hangar is empty — nothing to launch',
   'side.wing.cargo': 'aboard: {n}',
   'side.wing.duty.off': '🛩 Stand duty',
@@ -358,15 +359,17 @@ export const en: Record<string, string> = {
   'side.wing.empty': 'the hangar is empty',
   'side.wing.blocked.no-fuel': 'out of fuel — waiting on the rearm',
   'side.wing.blocked.rearming': 'the port is rearming — a sortie must wait',
-  'side.wing.blocked.rearming.hold': 'the carrier is rearming — a sortie must wait',
+  'side.wing.blocked.rearming.hold': 'the ship is rearming its squadrons — a sortie must wait',
   'side.wing.fuel': 'sorties left: {n} of {max}',
   'side.wing.merge': '⛬ Merge',
   'side.wing.merge.into': '⛬ into this',
   'side.wing.merge.pick': 'pick the squadron to merge into',
   'side.wing.hangar': 'Port hangar — {used}',
   'side.wing.hold': 'Hold — {used} of {bay}',
+  'side.wing.hull': 'damaged: hull {p}%',
   'side.wing.load': '↑ Aboard',
   'side.wing.no-port': 'no spaceport — no shuttles are based here',
+  'side.wing.places': 'places: {n}',
   'side.wing.split': '⊟ Detach one',
   'side.wing.rearming': 'rearming: {h}h',
   'side.wing.strike': '✳ Strike',
@@ -1106,7 +1109,7 @@ export const en: Record<string, string> = {
   'dossier.tab.ships.desc': 'Garrison ships, fleets in orbit, and the ship order queue.',
   'dossier.tab.ships.name': 'Fleet',
   'dossier.tab.shuttle.desc':
-    'The spaceport squadron: the machines (△) sit in the world\'s hangar and never appear on the map. The strike button sends a sortie out; the target is picked by a tap on the map. A carrier (◈) takes a squadron along — its bay is shown in the fleet panel.',
+    'The spaceport squadron: the machines (△) sit in the world\'s hangar and never appear on the map. The strike button sends a sortie out; the target is picked by a tap on the map. A ship with a hold takes a squadron along — the hold is shown in the fleet panel.',
   'dossier.tab.shuttle.name': 'Squadron',
   'dossier.task.eta': 'Remaining: {r}',
   'dossier.task.output': '{r}: {now}/h now → {final}/h once finished',
@@ -1114,17 +1117,17 @@ export const en: Record<string, string> = {
   'dossier.task.title': 'Building',
   'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
   'dossier.unit.cruiser.desc':
-    "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
+    "The battle line's workhorse: {a} attack, {hp} hull and a {c}-place hold for troops and shuttles. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
   'dossier.unit.default': 'A combat unit.',
   'dossier.unit.bomber.desc':
-    "A striker: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home.",
+    "A striker: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home. Hold places: {cs}.",
   'dossier.unit.bomber.name': 'Striker',
   'dossier.unit.heavy-striker.desc':
-    'Heavy striker: {a} damage to a ship, {s} per hour to buildings, {r} reach — enough for the next province. Slower than the striker, {hp} hull, longer to rearm. Unlocked by Strike Vectors.',
+    'Heavy striker: {a} damage to a ship, {s} per hour to buildings, {r} reach — enough for the next province. Slower than the striker, {hp} hull, longer to rearm. Hold places: {cs}. Unlocked by Strike Vectors.',
   'dossier.unit.heavy-striker.name': 'Heavy Striker',
   'dossier.unit.interceptor.desc':
-    "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or carrier — and burns the base's fuel doing it.",
+    "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or ship — and burns the base's fuel doing it. Hold places: {cs}.",
   'dossier.unit.interceptor.name': 'Interceptor',
   'dossier.unit.frigate.desc':
     "A frigate: a SUPPORT hull. It barely fights on its own ({a} attack, {d} defense) and lives off what you bolt onto it — {n} module bays, more than any other hull carries. Tougher than a scout ({hp} hull), it stands in the mid line.",
@@ -1139,10 +1142,10 @@ export const en: Record<string, string> = {
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go. It carries its own compact radar (+{m}).',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
-    'A spaceport under way: a {bay}-berth hold for shuttles and troops; shuttles launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hold lives exactly as long as its hulls do: lose the carrier and you lose everything aboard.',
+    'A spaceport under way: a {bay}-place hold for shuttles and troops, {d} defense, {hp} hull, {a} attack. Stands in the rear line. Shuttles launch from it on the move and land back; lose the hull and you lose everything aboard.',
   'dossier.unit.shuttle-carrier.name': 'Carrier',
   'dossier.unit.strike-carrier.desc':
-    "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. It carries no shuttles: only the Carrier has a hangar.",
+    "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. Shuttles ride in the same hold.",
   'dossier.unit.strike-carrier.name': 'Landing Ship',
 
   // --- faction — Фракции: пассивный бонус дома.
@@ -1192,6 +1195,7 @@ export const en: Record<string, string> = {
   'loadout.stat.cargo': 'Cargo',
   'loadout.stat.defense': 'Defense damage',
   'loadout.stat.hp': 'Hull',
+  'loadout.stat.hull-repair': 'Hull repair',
   'loadout.stat.radar': 'Radar',
   'loadout.stat.shield-regen': 'Shield regen',
   'loadout.stat.share-per-hour': '{n}%/h',
@@ -2827,7 +2831,7 @@ export const en: Record<string, string> = {
   'side.unit.space': 'space',
   'side.wing.conveyor': 'Shuttle conveyor',
   'side.wing.garrison.hint':
-    'The squadron sits in the port hangar and never appears on the map. "{b}" sends a sortie out — pick the target by tapping the map. A carrier (◈) takes a squadron along: its bay is in the fleet panel.',
+    'The squadron sits in the port hangar and never appears on the map. "{b}" sends a sortie out — pick the target by tapping the map. A ship with a hold takes a squadron along: the hold is in the fleet panel.',
   'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',

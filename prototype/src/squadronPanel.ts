@@ -29,6 +29,8 @@
  *    погрузки у неё нет.
  */
 import type { GameData, Squadron, UnitStack } from '../../packages/shared-core/src/index';
+import { stacksSize } from '../../packages/shared-core/src/index';
+import { squadronHullPercent } from '../../decisions/squadronHull';
 import { fleetCallsign } from './fleetName';
 import type { HangarView } from './hangarPanel';
 
@@ -52,6 +54,10 @@ export interface SquadronCard {
   stacks: UnitStack[];
   /** Сколько бортов всего. */
   machines: number;
+  /** Сколько мест трюма занимает звено (SHU-5.1): машины по своему `cargoSize`. */
+  places: number;
+  /** Корпус подбитого борта в процентах (SHU-5.3); `null` — звено цело. */
+  hull: number | null;
   /** Наземный груз в трюме (пусто — идёт налегке). */
   cargo: UnitStack[];
   canStrike: boolean;
@@ -78,6 +84,8 @@ export function squadronCards(
       name: squadronCallsignOf(sq.id),
       stacks: sq.units.filter((st) => st.count > 0),
       machines: size(sq),
+      places: stacksSize(sq.units, opts.data),
+      hull: squadronHullPercent(sq, opts.data),
       cargo,
       canStrike: opts.mine && view.blocked === null,
       canSplit: opts.mine && splitOne(sq) !== null,

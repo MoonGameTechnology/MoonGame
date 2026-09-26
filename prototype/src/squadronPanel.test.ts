@@ -29,6 +29,7 @@ const view = (squadrons: Squadron[], over: Partial<HangarView> = {}): HangarView
   stacks: squadrons.flatMap((q) => q.units),
   used: squadrons.reduce((n, q) => n + q.units.reduce((m, st) => m + st.count, 0), 0),
   bay: 6,
+  aloft: 0,
   free: 6,
   blocked: null,
   ...over,
@@ -110,5 +111,21 @@ describe('SHU-5.2 — десант в трюме только показывае
       data,
     });
     expect(cards[0]?.cargo).toEqual([{ unit: 'militia', count: 2 }]);
+  });
+});
+
+describe('SHU-5.5 — места и корпус звена', () => {
+  it('КАРТОЧКА НАЗЫВАЕТ МЕСТА ЗВЕНА ПО cargoSize и корпус подбитого борта', () => {
+    const hurt: Squadron = { ...sq('sq:p1:1', [['heavy_striker', 2]]), damage: 15 };
+    const [card] = squadronCards(view([hurt]), { mine: true, data });
+    // Тяжёлый страйкер занимает два места: два борта — четыре места трюма.
+    expect(card?.places).toBe(4);
+    expect(card?.hull).toBe(50); // 15 урона из корпуса 30
+  });
+
+  it('ЦЕЛОЕ ЗВЕНО КОРПУС НЕ ПОКАЗЫВАЕТ', () => {
+    const [card] = squadronCards(view([sq('sq:p1:1', [['interceptor', 2]])]), { mine: true, data });
+    expect(card?.places).toBe(2);
+    expect(card?.hull).toBeNull();
   });
 });

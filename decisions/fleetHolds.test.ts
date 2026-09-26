@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseGameData, type Fleet } from '../packages/shared-core/src/index';
-import { fleetHolds, holdBadgePosition } from './fleetHolds';
+import { parseGameData, type Fleet, type GameState } from '../packages/shared-core/src/index';
+import { fleetAloftPlaces, fleetHolds, holdBadgePosition } from './fleetHolds';
 
 const data = parseGameData({
   version: '0.1.0',
@@ -84,6 +84,20 @@ describe('fleet hold occupancy', () => {
     expect(meters).toMatchObject([
       { kind: 'troops', used: 6, capacity: 6, free: 0, reserved: 0 },
       { kind: 'hangar', used: 4, capacity: 4, free: 0 },
+    ]);
+  });
+
+  it('keeps the places of squadrons out on a sortie off the troops meter (SHU-5.1)', () => {
+    const f = fleet({ hangar: [{ id: 's1', units: [{ unit: 'bomber', count: 1 }] }] });
+    const state = {
+      strikes: [{ id: 'st', base: { kind: 'fleet', id: 'f' }, units: [{ unit: 'bomber', count: 3 }] }],
+    } as unknown as GameState;
+    const aloft = fleetAloftPlaces(state, f, data);
+    expect(aloft).toBe(3);
+    expect(fleetAloftPlaces({ strikes: [] } as unknown as GameState, f, data)).toBe(0);
+    expect(fleetHolds(f, data, 0, aloft)).toMatchObject([
+      { kind: 'troops', used: 0, capacity: 6, free: 6 },
+      { kind: 'hangar', used: 4, capacity: 10 },
     ]);
   });
 

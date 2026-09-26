@@ -223,6 +223,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           a: hl(st.attack),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
+          cs: hl(st.cargoSize ?? 1),
         }),
       };
     case 'bomber':
@@ -233,6 +234,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           s: hl(st.siegeDamage ?? 0),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
+          cs: hl(st.cargoSize ?? 1),
         }),
       };
     case 'heavy_striker':
@@ -243,6 +245,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           s: hl(st.siegeDamage ?? 0),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
+          cs: hl(st.cargoSize ?? 1),
         }),
       };
     case 'landing_shuttle':
@@ -251,6 +254,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         body: t('dossier.unit.landing-shuttle.desc', {
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
+          cs: hl(st.cargoSize ?? 1),
         }),
       };
     case 'hero':

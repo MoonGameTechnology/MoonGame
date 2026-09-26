@@ -31,6 +31,7 @@ import {
 } from '../../decisions/sectorZeroProgress';
 import { contribution, workshopRows, type WorkshopRow } from '../../decisions/sectorZeroWorkshop';
 import { starRow } from '../../decisions/itemRarity';
+import { isPerHourShare } from '../../decisions/perHourShare';
 import { moduleLadder, profileRarity, raiseCheck, rarityOffered, RARITY_COPIES } from '../../decisions/moduleRarity';
 import { statDeltas, type StatDelta } from '../../decisions/itemCompare';
 import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
@@ -82,11 +83,9 @@ const stats: Record<string, string> = {
   radarRange: 'loadout.stat.radar',
   pointDefense: 'data.area-defense-array',
   shieldRegen: 'loadout.stat.shield-regen',
+  hullRepair: 'loadout.stat.hull-repair',
   siegeDamage: 'loadout.stat.siege',
 };
-/** Статы-ДОЛИ за игровой час (`shieldRegen` — доля щита, `construction.ts`). Округление до
- *  десятых превращало +0.02 в «+0»: такие показываются процентом в час (PVR-6.4). */
-const PER_HOUR_SHARE = new Set(['shieldRegen']);
 /** Вклад звёздного модуля — дробный (6 × 1.1 в плавающей точке даёт 6.6000000000000005),
  *  поэтому показываем округлённым до десятых. Округление ТОЛЬКО для показа: считает
  *  матч по неокруглённому, иначе HUD и бой разошлись бы. */
@@ -94,7 +93,9 @@ const num = (value: number): string => String(Math.round(value * 10) / 10);
 /** Значение стата для показа; `signed` — со знаком «+», как у прибавки. */
 const statValue = (key: string, value: number, signed = false): string => {
   const sign = signed && value > 0 ? '+' : '';
-  return PER_HOUR_SHARE.has(key)
+  // Статы-ДОЛИ за игровой час (`perHourShare.ts`): округление до десятых превращало +0.02
+  // в «+0», поэтому они показываются процентом в час (PVR-6.4).
+  return isPerHourShare(key)
     ? t('loadout.stat.share-per-hour', { n: `${sign}${num(value * 100)}` })
     : `${sign}${num(value)}`;
 };
@@ -103,7 +104,7 @@ const effectText = (values: Record<string, number>): string =>
     .map(([key, value]) => `${esc(t(stats[key] ?? key))} ${statValue(key, value, true)}`)
     .join(' · ');
 /** Порядок строк сравнения — тот же, что у полосы статов корабля. */
-const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'cargoCapacity', 'radarRange', 'pointDefense', 'siegeDamage'];
+const STAT_ORDER = ['attack', 'defense', 'hp', 'shield', 'speed', 'shieldRegen', 'hullRepair', 'cargoCapacity', 'radarRange', 'pointDefense', 'siegeDamage'];
 /**
  * «Было → станет» списком (PVR-6.5): одна разметка на корабль и на улучшение модуля. Прибавка
  * зелёная, потеря красная — цвет несёт смысл, а число рядом дублирует его для тех, кто
