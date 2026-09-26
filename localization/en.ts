@@ -2453,7 +2453,7 @@ export const en: Record<string, string> = {
   'sector-zero.difficulty.about.strong':
     'The veteran Swarm thinks: it researches technologies, retreats from lost battles, splits its fleet between two targets, lands troops on defended worlds, launches shuttles and trains its heroes. The Leviathan, the Swarm’s boss, arrives with the last wave.',
   'sector-zero.difficulty.about.weak':
-    'The standard Swarm wins by numbers: its fleets go for the nearest target and fight to the end; it researches nothing and never lands troops on defended worlds.',
+    'The standard Swarm wins by numbers: its fleets go for the nearest target and fight to the end; it researches nothing and never lands troops on defended worlds. In chapter I you start with +3 cruisers and a home garrison of 6 instead of 9.',
   'sector-zero.difficulty.hint': 'Your saved run keeps its original difficulty.',
   'sector-zero.difficulty.same': 'Scheduled waves are the same on both levels.',
   'sector-zero.end.kills': 'Enemies destroyed: {n}',

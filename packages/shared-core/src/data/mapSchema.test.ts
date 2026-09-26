@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { parseMatchMap, safeParseMatchMap } from './mapSchema';
+import { mapForDifficulty, parseMatchMap, safeParseMatchMap } from './mapSchema';
+import { validateMatchMap } from '../state/buildFromMap';
 import { loadGameData } from './loadGameData';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
@@ -181,5 +182,73 @@ describe('shipped maps resolve against the shipped catalogue', () => {
     // (`station.deploy` требует клетку `empty`). Любая другая карта с `empty` — возврат
     // узла-дороги, от которого владелец отказался.
     expect([...emptyOn]).toEqual(['duel-testbed.json']);
+  });
+});
+
+/**
+ * PVR-6.32 — старт главы по сложности забега (решение владельца 2026-09-26): на обычном
+ * Рое у игрока в главе I гарнизон дома 6 вместо 9 и +3 крейсера. Карта объявляет это
+ * сама, блоком `difficultyStart`; `mapForDifficulty` заменяет им гарнизоны и флоты до
+ * сборки мира.
+ */
+describe('старт главы по сложности (PVR-6.32)', () => {
+  const data = loadGameData((name) => JSON.parse(readFileSync(path.join(repoRoot, 'data', name), 'utf8')));
+  const count = (stacks: Array<{ count: number }>): number => stacks.reduce((n, u) => n + u.count, 0);
+
+  it('глава I на обычном Рое: гарнизон дома 6 вместо 9, во втором флоте 5 крейсеров вместо 2', () => {
+    const base = parseMatchMap(readMap('pve-1.json'));
+    const weak = mapForDifficulty(base, 'weak');
+    expect(count(base.sectors.home_a!.garrison)).toBe(9);
+    expect(count(weak.sectors.home_a!.garrison)).toBe(6);
+    expect(base.fleets.p1_2!.units).toEqual([{ unit: 'cruiser', count: 2 }]);
+    expect(weak.fleets.p1_2!.units).toEqual([{ unit: 'cruiser', count: 5 }]);
+    // Остальное — та же карта: первый флот, чужие флоты и прочие сектора не тронуты.
+    expect(weak.fleets.p1_1).toEqual(base.fleets.p1_1);
+    expect(weak.fleets.p3_1).toEqual(base.fleets.p3_1);
+    expect(weak.sectors.hive).toEqual(base.sectors.hive);
+  });
+
+  it('матёрый Рой и забег без сложности играют базовый старт — ту же карту', () => {
+    const base = parseMatchMap(readMap('pve-1.json'));
+    expect(mapForDifficulty(base, 'strong')).toBe(base);
+    expect(mapForDifficulty(base, undefined)).toBe(base);
+    // Имя, совпавшее с полем прототипа, — не сложность: блока под него нет.
+    expect(mapForDifficulty(base, 'constructor')).toBe(base);
+  });
+
+  it('карту на входе не мутирует', () => {
+    const base = parseMatchMap(readMap('pve-1.json'));
+    const before = JSON.stringify(base);
+    mapForDifficulty(base, 'weak');
+    expect(JSON.stringify(base)).toBe(before);
+  });
+
+  it('карта без блока получает пустой, а глава I проходит проверку целиком', () => {
+    expect(parseMatchMap(readMap('skirmish-1.json')).difficultyStart).toEqual({});
+    expect(validateMatchMap(parseMatchMap(readMap('pve-1.json')), data)).toEqual([]);
+  });
+
+  it('опечатка в блоке — ошибка карты, а не молча базовый старт', () => {
+    const raw = readMap('pve-1.json') as Record<string, unknown>;
+    const bad = parseMatchMap({
+      ...raw,
+      difficultyStart: {
+        weak: {
+          garrison: { home_x: [{ unit: 'militia', count: 1 }] },
+          fleets: {
+            p1_9: [{ unit: 'cruiser', count: 1 }],
+            p1_2: [
+              { unit: 'cruser', count: 1 },
+              { unit: 'cruiser', count: 1, modules: ['no_such_module'] },
+            ],
+          },
+        },
+      },
+    });
+    const issues = validateMatchMap(bad, data);
+    expect(issues).toContain('E_START_UNKNOWN_SECTOR:weak:home_x');
+    expect(issues).toContain('E_START_UNKNOWN_FLEET:weak:p1_9');
+    expect(issues).toContain('E_UNKNOWN_UNIT:cruser');
+    expect(issues).toContain('E_MAP_LOADOUT:weak:cruiser:E_UNKNOWN_MODULE');
   });
 });

@@ -392,5 +392,33 @@
         }
       ]
     }
+  },
+  "difficultyStart": {
+    "weak": {
+      "garrison": {
+        "home_a": [
+          {
+            "unit": "militia",
+            "count": 2
+          },
+          {
+            "unit": "heavy_infantry",
+            "count": 2
+          },
+          {
+            "unit": "garrison",
+            "count": 2
+          }
+        ]
+      },
+      "fleets": {
+        "p1_2": [
+          {
+            "unit": "cruiser",
+            "count": 5
+          }
+        ]
+      }
+    }
   }
 }

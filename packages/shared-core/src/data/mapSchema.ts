@@ -25,6 +25,16 @@ const MapUnitStackSchema = z.object({
   modules: z.array(z.string()).optional(),
 });
 
+/** Старт главы под одну сложность забега (PVR-6.32): что ЗАМЕНИТЬ в объявленной карте.
+ *  Гарнизон сектора и состав флота заменяются целиком, а не складываются: автор карты
+ *  видит итоговый старт одной строкой, без арифметики поверх базового. */
+const MapStartOverrideSchema = z.object({
+  /** Сектор → его гарнизон на этой сложности. */
+  garrison: z.record(z.string(), z.array(MapUnitStackSchema)).default({}),
+  /** Флот → его корабли на этой сложности. */
+  fleets: z.record(z.string(), z.array(MapUnitStackSchema)).default({}),
+});
+
 const MapBuildingSchema = z.object({
   type: z.string(),
   level: z.number().int().positive().default(1),
@@ -184,6 +194,11 @@ export const MatchMapSchema = z.object({
    *  seats real players into slots via its `slots` assignments. */
   slots: z.record(z.string(), MapSlotSchema).default({}),
   fleets: z.record(z.string(), MapFleetSchema).default({}),
+  /** Старт по сложности забега (PVR-6.32, решение владельца 2026-09-26): ключ — сложность
+   *  клиента (`weak`, `strong`), значение заменяет гарнизоны и флоты карты. Нет ключа —
+   *  старт один на все сложности. Применяет {@link mapForDifficulty} до сборки мира;
+   *  `buildStateFromMap` этого поля не читает. */
+  difficultyStart: z.record(z.string(), MapStartOverrideSchema).default({}),
 });
 
 export type MatchMap = z.infer<typeof MatchMapSchema>;
@@ -211,6 +226,25 @@ export function avaShape(map: MatchMap): { sides: number; slotsPerSide: number }
 /** Strict parse — throws on a malformed map (use at trusted boot). */
 export function parseMatchMap(raw: unknown): MatchMap {
   return MatchMapSchema.parse(raw);
+}
+
+/** Карта под сложность забега (PVR-6.32): гарнизоны и флоты из `difficultyStart` этой
+ *  сложности заменяют объявленные. Нет блока для сложности (или сложность не задана) —
+ *  та же карта. Цель, которой в карте нет, пропускается: её ловит `validateMatchMap`.
+ *  Вход не мутирует. */
+export function mapForDifficulty(map: MatchMap, difficulty: string | undefined): MatchMap {
+  const own = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
+  if (difficulty === undefined || !own(map.difficultyStart, difficulty)) return map;
+  const start = map.difficultyStart[difficulty]!;
+  const sectors = { ...map.sectors };
+  for (const [id, garrison] of Object.entries(start.garrison)) {
+    if (own(sectors, id)) sectors[id] = { ...sectors[id]!, garrison: garrison.map((g) => ({ ...g })) };
+  }
+  const fleets = { ...map.fleets };
+  for (const [id, units] of Object.entries(start.fleets)) {
+    if (own(fleets, id)) fleets[id] = { ...fleets[id]!, units: units.map((u) => ({ ...u })) };
+  }
+  return { ...map, sectors, fleets };
 }
 
 /** Non-throwing parse — for validating untrusted input before use (A05/A08). */
