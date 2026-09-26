@@ -83,6 +83,17 @@ const hooks = `window.__szTest = {
   },
   knownOwner: (id) => knownOwner(id),
   identified: (id) => known(id),
+  // Разведка честным путём: флот игрока встаёт на провинцию, которой он не видит, — её
+  // опознаёт круг зрения флота, а память тумана ядра (\`visibilityModule\`) запишет.
+  scoutUnknown: () => {
+    const id = Object.keys(s.planets).sort().find((pid) => !known(pid));
+    const f = Object.values(s.fleets).find((x) => x.owner === ME && !x.battleId);
+    if (!id || !f) return null;
+    f.location = id;
+    f.movement = null;
+    return id;
+  },
+  remembered: (id) => Boolean(s.fog?.[ME]?.[id]),
   // Меню каста флагмана и что герой носит — меню обязано быть из надетого.
   casts: () => chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
   worn: () => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)?.equipped ?? null,
@@ -511,6 +522,12 @@ try {
     assert.equal((await progress()).sovereigns, 5, 'пакет стоит 5 ◆');
     assert.match(await page.locator('#rescard .rc-note').textContent(), /2/, 'осталось 2 из 3');
     await page.locator('#rescard .rc-close').click();
+    // Разведка забега попадает на карту главы (проверка ниже). С радарами ×1,5 (PVR-6.33)
+    // старт главы II не опознаёт ничего сверх своих провинций, а забег робота кончается сразу
+    // после старта, — поэтому флот сам встаёт на неопознанную провинцию.
+    const scoutedId = await page.evaluate(() => window.__szTest.scoutUnknown());
+    assert(scoutedId, 'в главе II есть неопознанная провинция');
+    await page.waitForFunction((id) => window.__szTest.remembered(id), scoutedId);
     await page.evaluate(() => window.__szTest.kills(7));
     await page.evaluate(() => window.__szTest.end());
     await page.locator('#endscreen .es-run').waitFor({ state: 'visible' });
