@@ -55,6 +55,7 @@ export const UNIT_ICON: Record<string, string> = {
   shuttle_carrier: '⬢', // плавучий космопорт — сплошной корпус, весь объём под ангар
   interceptor: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
   bomber: '⧨', // челнок с бомбовой нагрузкой — тот же треугольник, но «полный»
+  heavy_striker: '⧯', // тяжёлый страйкер — та же «полная» форма, но крупнее и дальнобойнее
   landing_shuttle: '⧗', // десантный борт: везёт не бомбы, а людей — и садится с ними
   hero: '♔', // the player's projection — a crowned flagship
   militia: '▿', // massed light foot

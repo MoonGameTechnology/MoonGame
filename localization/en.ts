@@ -855,7 +855,7 @@ export const en: Record<string, string> = {
   'data.bastion-marshal': 'Bastion Marshal',
   'data.biomass-pit': 'Biomass Pit',
   'data.boarding-translocation': 'Boarding Translocation',
-  'data.bomber': 'bomber',
+  'data.bomber': 'striker',
   'data.bulwark': 'Bulwark',
   'data.cargo-bay': 'Cargo Bay',
   'data.carrier': 'carrier',
@@ -904,6 +904,7 @@ export const en: Record<string, string> = {
   'data.ground': 'ground',
   'data.guidance-arrays': 'Guidance Arrays',
   'data.heavy-infantry': 'heavy infantry',
+  'data.heavy-striker': 'heavy striker',
   'data.hero': 'hero',
   'data.hydroponics-farm': 'Hydroponics Farm',
   'data.industrial-automation': 'Industrial Automation',
@@ -1117,8 +1118,11 @@ export const en: Record<string, string> = {
   'dossier.unit.cruiser.name': 'Cruiser',
   'dossier.unit.default': 'A combat unit.',
   'dossier.unit.bomber.desc':
-    "A bomber: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home.",
-  'dossier.unit.bomber.name': 'Bomber',
+    "A striker: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home.",
+  'dossier.unit.bomber.name': 'Striker',
+  'dossier.unit.heavy-striker.desc':
+    'Heavy striker: {a} damage to a ship, {s} per hour to buildings, {r} reach — enough for the next province. Slower than the striker, {hp} hull, longer to rearm. Unlocked by Strike Vectors.',
+  'dossier.unit.heavy-striker.name': 'Heavy Striker',
   'dossier.unit.interceptor.desc':
     "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or carrier — and burns the base's fuel doing it.",
   'dossier.unit.interceptor.name': 'Interceptor',
