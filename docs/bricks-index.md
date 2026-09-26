@@ -50,6 +50,37 @@
 | TRN-4 | ⏳ | proto | `docs/backlog.md` | Стартовый пакет и бонусы задач (§14.7). |
 | TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |
 | TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
+| UIX-1.1 | ⏳ | proto | `docs/backlog.md` | Сторож размеров в браузере. |
+| UIX-1.2 | 🔒 | proto cli | `docs/backlog.md` | Шкала текста 12 · 14 · 16 · 20 px. |
+| UIX-1.3 | 🔒 | proto | `docs/backlog.md` | Цели нажатия 44 × 44 px на телефоне. |
+| UIX-2.1 | ⏳ | proto | `docs/backlog.md` | ПК: голографический интерфейс растёт с окном. |
+| UIX-2.2 | 🔒 | proto | `docs/backlog.md` | «Размер интерфейса» 80–150 % в настройках ПК. |
+| UIX-3.1 | ⏳ | proto | `docs/backlog.md` | Телефон: нижняя панель из пяти пунктов. |
+| UIX-3.2 | 🔒 | proto | `docs/backlog.md` | Скорость — одна кнопка. |
+| UIX-4.1 | ⏳ | proto | `docs/backlog.md` | Доход в час на телефоне и отклик «+N». |
+| UIX-4.2 | 🔒 | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
+| UIX-4.3 | ⏳ | srv | `docs/backlog.md` | Push только о своём и срочном. |
+| UIX-4.4 | 🔒 | proto | `docs/backlog.md` | Подписка на push в клиенте. |
+| UIX-5.1 | ⏳ | proto data | `docs/backlog.md` | Ключ вместо слова в верфи. |
+| UIX-5.2 | ⏳ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
+| UIX-5.3 | ⏳ | proto | `docs/backlog.md` | Английский в русской версии и грамматика. |
+| UIX-5.4 | ⏳ | proto | `docs/backlog.md` | Словарь терминов. |
+| UIX-6.1 | ⏳ | proto | `docs/backlog.md` | Прогноз космического боя в прицеле «Атака». |
+| UIX-6.2 | 🔒 | proto | `docs/backlog.md` | Прогноз в окне боя. |
+| UIX-7.1 | ⏳ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
+| UIX-7.2 | ⏳ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
+| UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
+| UIX-8.1 | ⏳ | proto | `docs/backlog.md` | Обучение: одна мысль на шаг. |
+| UIX-8.2 | ⏳ | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
+| UIX-9.1 | ⏳ | proto | `docs/backlog.md` | ПК: горячие клавиши. |
+| UIX-9.2 | ⏳ | proto | `docs/backlog.md` | ПК: правый клик по миру — «Курс сюда». |
+| UIX-9.3 | ⏳ | proto | `docs/backlog.md` | ПК: «Сводка армии» обрезана справа. |
+| UIX-9.4 | ⏳ | proto | `docs/backlog.md` | ПК: подписи значков и термины. |
+| UIX-10.1 | ⏳ | proto | `docs/backlog.md` | Хаб: одна главная дверь. |
+| UIX-11.1 | 🔒 | proto | `docs/backlog.md` | Три стиля кнопок и без КАПС-лейблов. |
+| UIX-12.1 | ⏳ | proto | `docs/backlog.md` | Свой и чужой не только цветом. |
+| UIX-13.1 | ⏳ | proto | `docs/backlog.md` | Верфь: свернуть неподходящие модули и дать группе свою строку. |
+| UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
