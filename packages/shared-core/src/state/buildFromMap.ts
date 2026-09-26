@@ -311,6 +311,30 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       }
   }
 
+  // Старт по сложности (PVR-6.32) — те же правила, что у основного тела карты: цель
+  // обязана существовать, юнит — быть в каталоге, снаряжение — вставать как на верфи.
+  // Иначе опечатка в блоке молча оставляла бы старт базовым на одной из сложностей.
+  for (const [diff, start] of Object.entries(map.difficultyStart)) {
+    const stacks: Array<{ unit: string; modules?: string[] }> = [];
+    for (const [sid, garrison] of Object.entries(start.garrison)) {
+      if (!has(sid)) issues.push(`E_START_UNKNOWN_SECTOR:${diff}:${sid}`);
+      stacks.push(...garrison);
+    }
+    for (const [fid, units] of Object.entries(start.fleets)) {
+      if (!Object.prototype.hasOwnProperty.call(map.fleets, fid)) issues.push(`E_START_UNKNOWN_FLEET:${diff}:${fid}`);
+      stacks.push(...units);
+    }
+    if (data)
+      for (const st of stacks) {
+        const def = data.units[st.unit];
+        if (!def) issues.push(`E_UNKNOWN_UNIT:${st.unit}`);
+        else if (st.modules?.length) {
+          const check = validateLoadout(st.unit, def, st.modules, data);
+          if (!check.ok) issues.push(`E_MAP_LOADOUT:${diff}:${st.unit}:${check.code}`);
+        }
+      }
+  }
+
   // graph connectivity (BFS over the valid undirected edges). Impassable sectors are
   // EXEMPT from the requirement: a rift or a black hole is a hole in the map, so
   // demanding a route to it would force the author to either drill a lane into the

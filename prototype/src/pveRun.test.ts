@@ -297,7 +297,8 @@ describe('глава I: простая оборона доходит до вер
 
   function defend(difficulty: RunDifficulty): { state: GameState; endedAtHour?: number } {
     armRun();
-    let s: GameState = prepareSectorZeroRun(pveState(data), freshSectorZeroProgress(data), data);
+    // Старт — тот, что получает игрок этой сложности (PVR-6.32), а не базовый карты.
+    let s: GameState = prepareSectorZeroRun(pveState(data, 0, difficulty), freshSectorZeroProgress(data), data);
     const home = 'home_a';
     const apply = (a: Action): void => {
       const out = order(s, a, s.time);
@@ -330,14 +331,16 @@ describe('глава I: простая оборона доходит до вер
     return { state: s };
   }
 
-  it('против обычного Роя забег доходит до вердикта — простой обороне он больше не обещан', () => {
-    // Решение владельца 2026-09-24 (AUD-28): матки главы I выходят с выводковой камерой,
-    // как их объявила карта, и с десантом камер обычный Рой вправе сломать простую
-    // оборону — глава I стала сложнее. Держится только срок: вердикт не позже хребта
-    // волн с удержанием, а улей простая оборона не берёт.
+  it('против обычного Роя простая оборона выстаивает главу I (PVR-6.32)', () => {
+    // Решение владельца 2026-09-26: на обычном Рое старт главы I — гарнизон дома 6 вместо
+    // 9 и +3 крейсера (`difficultyStart` карты). С базовым стартом эта же оборона падала
+    // на 40-м часу: после PVR-6.28 четыре группы Роя сходились к дому разом (34–37-й час),
+    // и ~73 десантника ломали гарнизон в 24. Флот у дома сбивает часть десанта на орбите.
+    // Обещание «простая оборона проходит главу I» вернулось — но только на обычном Рое.
     const { state, endedAtHour } = defend('weak');
-    expect(['pve-cleared', 'pve-failed']).toContain(state.match.reason);
+    expect(state.match.reason).toBe('pve-cleared');
     expect(endedAtHour).toBeLessThanOrEqual(RUN_SPINE_HOURS + RUN_TAIL_HOURS);
+    expect(state.planets.home_a?.owner).toBe('p1');
     expect(state.planets.hive?.owner).toBe('p3');
   });
 

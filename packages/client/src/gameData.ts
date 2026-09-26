@@ -5,7 +5,7 @@
  * both. Re-exported here so this module stays the client's single door to game data.
  * Maps stay local: they are the client's own screens, not shared content.
  */
-import { parseMatchMap, buildStateFromMap, pairKey } from '@void/shared-core';
+import { parseMatchMap, buildStateFromMap, mapForDifficulty, pairKey } from '@void/shared-core';
 import type { GameData, GameState, MapObjective, MatchMap } from '@void/shared-core';
 
 import { FRAGMENTS, shippedGameData } from '../../../data/bundle';
@@ -78,8 +78,9 @@ function parsedMission(mission: number): MatchMap {
 }
 
 /** A ready-to-render PvE `GameState` built from the shipped map of that mission. */
-export function pveState(data: GameData, mission = 0): GameState {
-  const map = parseMatchMap(missionMap(mission));
+export function pveState(data: GameData, mission = 0, difficulty?: string): GameState {
+  // Старт главы под сложность забега (PVR-6.32): карта сама объявляет, чем он отличается.
+  const map = mapForDifficulty(parseMatchMap(missionMap(mission)), difficulty);
   // Id карты — в сам мир: у глав один режим, и только по карте видно, КАКАЯ это глава.
   // Его читает дескриптор забега (`YAG-2.1`), чтобы восстановить ту же главу, а не первую.
   return { ...buildStateFromMap(map, data), mapId: map.id };

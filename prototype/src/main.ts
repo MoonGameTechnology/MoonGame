@@ -11955,7 +11955,7 @@ function startPvEMatch(dev = false): void {
       difficulty: pveDifficulty,
       attempt: sectorAttempt,
     });
-  const st = prepareSectorZeroRun(chapterWorld(sectorMission), sectorProgress, data);
+  const st = prepareSectorZeroRun(chapterWorld(sectorMission, pveDifficulty), sectorProgress, data);
   // Гарнизон без полевого ИИ ждёт игрока; сложность управляет штурмом Роя.
   const aiSeats = runAiSeats(st, 'p1', pveDifficulty);
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
@@ -14096,10 +14096,11 @@ function chapterShown(mission: number) {
 }
 
 /** Мир главы на старт забега: карта минус встречи, чьи задачи уже закрыты в профиле
- *  (`retiredEncounters.ts`) — взятое логово пиратов не встаёт заново. */
-function chapterWorld(mission: number): GameState {
+ *  (`retiredEncounters.ts`) — взятое логово пиратов не встаёт заново. Старт — под
+ *  сложность забега (PVR-6.32): новая попытка и восстановленная получают одну карту. */
+function chapterWorld(mission: number, difficulty: RunDifficulty): GameState {
   const chapter = pveChapter(mission);
-  return retireDoneEncounters(pveState(data, mission), chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? []);
+  return retireDoneEncounters(pveState(data, mission, difficulty), chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? []);
 }
 
 /** Задачи главы, что откроются позже: запас минус видимые и выполненные. */
@@ -15017,7 +15018,7 @@ function restorePortable(): boolean {
   const priorMission = sectorMission;
   try {
     sectorMission = mission;
-    const world = prepareSectorZeroRun(chapterWorld(mission), sectorProgress, data);
+    const world = prepareSectorZeroRun(chapterWorld(mission, parseRunDifficulty(save.difficulty)), sectorProgress, data);
     installMatch(world, runAiSeats(world, 'p1', parseRunDifficulty(save.difficulty)), save.mode);
     apply(advance(s, s.time + 1)); // засеять PvE: волна 0, следующая назначена
     const resumed = resumePortableRun(s, save, ME, pve.boons ?? []);

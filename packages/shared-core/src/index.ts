@@ -364,6 +364,7 @@ export {
   MapObjectiveSchema,
   type MapObjective,
   parseMatchMap,
+  mapForDifficulty,
   safeParseMatchMap,
   type MatchMap,
   type MapSector,

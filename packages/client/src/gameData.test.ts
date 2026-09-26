@@ -231,6 +231,28 @@ describe('YAG-2.1 — мир забега знает свою главу', () =>
   });
 });
 
+describe('PVR-6.32 — старт главы под сложность забега', () => {
+  const garrisonOf = (state: ReturnType<typeof pveState>, id: string): number =>
+    state.planets[id]!.garrison.reduce((n, u) => n + u.count, 0);
+  const cruisersOf = (state: ReturnType<typeof pveState>): number =>
+    Object.values(state.fleets)
+      .filter((f) => f.owner === 'p1')
+      .reduce((n, f) => n + f.units.filter((u) => u.unit === 'cruiser').reduce((m, u) => m + u.count, 0), 0);
+
+  it('обычный Рой: в главе I гарнизон дома 6 вместо 9 и на 3 крейсера больше', () => {
+    const base = pveState(data, 0);
+    const weak = pveState(data, 0, 'weak');
+    expect(garrisonOf(base, 'home_a')).toBe(9);
+    expect(garrisonOf(weak, 'home_a')).toBe(6);
+    expect(cruisersOf(weak) - cruisersOf(base)).toBe(3);
+  });
+
+  it('матёрый Рой получает базовый старт, а главы без блока — свою карту как есть', () => {
+    expect(pveState(data, 0, 'strong')).toEqual(pveState(data, 0));
+    expect(pveState(data, 1, 'weak')).toEqual(pveState(data, 1));
+  });
+});
+
 describe('AUD-32 — номер главы из хранилища один на карту и награду', () => {
   // Карта клампила чужой номер к первой главе, а чертёж за первую победу считался по
   // сырому номеру: «5» из правленого хранилища играло главу I, а платило легендарным
