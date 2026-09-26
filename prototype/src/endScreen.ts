@@ -39,6 +39,8 @@ export interface MatchEnd {
   runReward?: number;
   /** Разбивка засчитанного забега Sector Zero (PVR-5.4). Нет — показывается одна сумма. */
   runSummary?: RunSummary;
+  /** Итог учебного полигона (§14): без опыта, счёта и места; «ещё раз» — повтор полигона. */
+  training?: boolean;
   /** Игрок закрыл панель, чтобы посмотреть на замерший стол. */
   dismissed?: boolean;
 }
@@ -99,7 +101,9 @@ export function endScreenHtml(
   const tally = state.pve ? (state.pve.tally?.[me] ?? { lost: 0, destroyed: 0 }) : null;
   const xpLine = end.runSummary
     ? runSummaryHtml(end.runSummary)
-    : end.runReward !== undefined
+    : end.training
+      ? `<div class="es-xp">${t('training.end.none')}</div>`
+      : end.runReward !== undefined
       ? `<div class="es-xp">${t('sector-zero.end.reward', { n: end.runReward })}</div>`
       : end.xp > 0
         ? `<div class="es-xp">${t('end.xp', { n: end.xp })}` +
@@ -118,7 +122,9 @@ export function endScreenHtml(
   const note = view.note ? `<p class="es-note" role="status">${esc(view.note)}</p>` : '';
   // Формулировка «ещё раз» честна по режиму: соло перезапускает схватку, сеть — открывает
   // браузер матчей (пересадить тот же стол клиент не может).
-  const againLabel = end.runReward !== undefined ? t('sector-zero.end.prepare') : view.net ? t('end.new-match') : t('end.play-again');
+  const againLabel = end.training
+    ? t('training.end.again')
+    : end.runReward !== undefined ? t('sector-zero.end.prepare') : view.net ? t('end.new-match') : t('end.play-again');
   return (
     `<div class="es-box">` +
     `<div class="es-head ${cls}">${head}</div>` +
@@ -126,7 +132,7 @@ export function endScreenHtml(
     `<div class="es-grid${tally ? ' tri' : ''}">` +
     // Счёт и место — не про забег Sector Zero (решение владельца 2026-09-24): победа в нём —
     // выстоять волны, а место среди ИИ-соседей ничего не значит.
-    (end.runReward !== undefined
+    (end.runReward !== undefined || end.training
       ? ''
       : `<div class="es-cell wide"><span class="es-k">${t('end.score')}</span><span class="es-v">✦ ${total} <small>· ${t('end.place', { p: place, n: of })}</small></span></div>`) +
     cell(t('end.provinces'), `⬣ ${provinces}`) +

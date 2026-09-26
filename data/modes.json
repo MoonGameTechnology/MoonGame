@@ -39,6 +39,13 @@
     "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100 }, "fleet": 90, "radarScale": 2.5 },
     "technology": { "dayGates": false, "exclude": ["ai_stewardship"] }
   },
+  "training": {
+    "name": "Training Range",
+    "teamFormat": "ffa",
+    "victory": { "dominationPercent": 1, "scoreLimit": 1000000 },
+    "sight": { "world": 0, "byKind": { "planet": 100, "void_station": 100 }, "fleet": 90, "radarScale": 2.5 },
+    "technology": { "dayGates": false, "exclude": ["ai_stewardship"] }
+  },
   "duel": {
     "name": "Duel",
     "teamFormat": "1v1"

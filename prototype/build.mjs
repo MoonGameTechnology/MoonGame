@@ -3683,6 +3683,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <div class="sz-actions">
             <button id="sz-continue" class="sz-action sz-primary" type="button" hidden disabled data-i18n="sector-zero.continue"></button>
             <button id="sz-new" class="sz-action sz-primary" type="button" disabled data-i18n="sector-zero.new"></button>
+            <button id="sz-training" class="sz-action" type="button" disabled data-i18n="sector-zero.training" data-i18n-title="sector-zero.training.hint"></button>
             <!--dev-only--><button id="sz-dev" class="sz-action" type="button" disabled data-i18n="sector-zero.dev.start" data-i18n-title="sector-zero.dev.hint"></button><!--/dev-only-->
             <button id="sz-prep" class="sz-action" type="button" disabled data-i18n="sector-zero.prep"></button>
             <button id="sz-codex" class="sz-action" type="button" data-i18n="sector-zero.codex.open"></button>

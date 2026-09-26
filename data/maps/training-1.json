@@ -1,0 +1,216 @@
+{
+  "id": "training-1",
+  "seed": "training-1",
+  "time": 0,
+  "mode": "training",
+  "sectors": {
+    "base": {
+      "position": {
+        "x": -430,
+        "y": 0
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "p1",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar"
+        },
+        {
+          "type": "fort"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 2
+        }
+      ]
+    },
+    "open_reach": {
+      "position": {
+        "x": 40,
+        "y": -50
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "outpost": {
+      "position": {
+        "x": 250,
+        "y": -230
+      },
+      "kind": "void_station",
+      "terrain": "empty_space",
+      "owner": "p2",
+      "buildings": [
+        {
+          "type": "shipyard"
+        },
+        {
+          "type": "radar"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "target": {
+      "position": {
+        "x": 470,
+        "y": 20
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "p2",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard"
+        },
+        {
+          "type": "fort"
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 1
+        }
+      ]
+    },
+    "neutral": {
+      "position": {
+        "x": -170,
+        "y": 260
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic"
+    },
+    "asteroid_pass": {
+      "position": {
+        "x": 200,
+        "y": 190
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "station": {
+      "position": {
+        "x": -180,
+        "y": 540
+      },
+      "kind": "void_station",
+      "terrain": "empty_space",
+      "traits": ["beacon"]
+    }
+  },
+  "objectives": [
+    {
+      "id": "mission.training-beacon",
+      "kind": "control",
+      "targets": ["station"]
+    },
+    {
+      "id": "mission.training-recon",
+      "kind": "scout",
+      "count": 7
+    }
+  ],
+  "players": {
+    "p1": {
+      "name": "Azure Compact",
+      "faction": "vanguard",
+      "resources": {
+        "credits": 600,
+        "metal": 600
+      }
+    },
+    "p2": {
+      "name": "Training Opposition",
+      "faction": "vanguard",
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
+    }
+  },
+  "fleets": {
+    "p1_1": {
+      "owner": "p1",
+      "location": "base",
+      "landing": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ],
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
+      ]
+    },
+    "p1_2": {
+      "owner": "p1",
+      "location": "base",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "p2_patrol": {
+      "owner": "p2",
+      "location": "open_reach",
+      "units": [
+        {
+          "unit": "frigate",
+          "count": 1
+        }
+      ]
+    },
+    "p2_guard": {
+      "owner": "p2",
+      "location": "target",
+      "units": [
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    }
+  }
+}

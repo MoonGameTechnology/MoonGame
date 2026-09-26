@@ -193,7 +193,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, PVE_MISSION_COUNT } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -4244,6 +4244,7 @@ const matchEnd = initMatchEnd({
   loadMeta,
   saveMeta,
   runAward: () => isSectorZeroRun() ? awardSectorRun() : null,
+  training: isTraining,
   // Dev-забег не засчитывается — его разбивки нет, и чужую (прошлого забега) не показываем.
   runSummary: () =>
     sectorDevActive || sectorProgress.lastRun?.attempt !== sectorAttempt ? null : sectorProgress.lastRun,
@@ -10187,12 +10188,12 @@ if (devFastBtn) devFastBtn.dataset.speed = String(PLAY_BASE * RUN_SPEED_DEV);
 // no-bots sandbox; the end-banner button (delegated) serves a finished bot match.
 // Player build: the button is stripped with the rest of the time controls (no skirmish).
 if (!__PLAYER_BUILD__) restartBtn.addEventListener('click', () => {
-  if (isSectorZeroRun()) openSectorZero();
+  if (leavesToSectorZero()) openSectorZero();
   else openSetup();
 });
 bannerEl.addEventListener('click', (ev) => {
   if (!(ev.target as Element).closest('[data-restart]')) return;
-  if (isSectorZeroRun()) openSectorZero();
+  if (leavesToSectorZero()) openSectorZero();
   else openSetup();
 });
 
@@ -10237,6 +10238,12 @@ const endScreenPanel = initEndScreen({
     // ONB-2: матч мог закончиться посреди гайда — незакрытый тур продолжил бы рисовать
     // свой #spotlight поверх хаба и следующего матча.
     activeTour?.stop();
+    // «Повторить обучение» — сразу новый полигон; «В меню» — в меню Sector Zero.
+    if (!wasNet && isTraining()) {
+      if (which === 'again') startTraining();
+      else openSectorZero();
+      return;
+    }
     if (!wasNet && isSectorZeroRun()) {
       openSectorZero(which === 'again', which === 'replay');
       return;
@@ -10266,6 +10273,7 @@ const renderEndScreen = (): void => endScreenPanel.render();
 // while the hub is visible (see renderEndScreen guard).
 $('tomenu').addEventListener('click', () => {
   const wasRun = isSectorZeroRun();
+  const toSectorZero = leavesToSectorZero();
   if (wasRun) saveRun();
   if (NET) {
     userClosed = true;
@@ -10284,7 +10292,7 @@ $('tomenu').addEventListener('click', () => {
   // Any exit from a live match must kill the tour, not just the ones that walk off
   // its own end (`done`) or its own «Пропустить обучение».
   activeTour?.stop();
-  if (wasRun) openSectorZero();
+  if (toSectorZero) openSectorZero();
   else openHub();
 });
 // Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too.
@@ -11887,6 +11895,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   patrols.clear();
   setRunActive(false);
   sectorDevActive = false;
+  trainingActive = false;
   mapNeedsPreparation = true;
   // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
   // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
@@ -11941,7 +11950,11 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
   const waves = data.modes[modeId ?? '']?.pve?.waves;
-  note(waves ? t('hud.goal.pve', { n: waves }) : t('hud.goal', { n: SCORE_LIMIT }));
+  note(
+    modeId !== undefined && modeId === trainingModeId()
+      ? t('training.goal') // полигон кончается взятием миров противника, а не очками
+      : waves ? t('hud.goal.pve', { n: waves }) : t('hud.goal', { n: SCORE_LIMIT }),
+  );
   defaultView(); // phone / flagship console: home; simple desktop: whole-map fit
   setupEl.style.display = 'none';
   // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
@@ -12021,6 +12034,29 @@ function startPvEMatch(dev = false): void {
   sciWin.classList.remove('show');
   saveRun();
   note(t('setup.pve.started'));
+}
+
+/**
+ * УЧЕБНЫЙ ПОЛИГОН «Протокол допуска» (`docs/sector-zero-map-concepts.md` §14). Не глава и не
+ * забег: у мира нет секции `pve`, поэтому ни волн, ни досье Роя (§14.6), ни снимка забега,
+ * ни засчёта в профиль. Темп и инструменты — забега (`setRunActive`), чтобы полигон учил
+ * тому же управлению, что ждёт в главе I.
+ */
+function startTraining(): void {
+  saveRun(); // пауза обычной экспедиции переживает полигон — «Продолжить» её поднимет
+  // Учебный противник сам не ходит (§14.2: соединения вводятся по этапам) — ИИ-мест нет.
+  // Герой, арсенал и оснащение — те же, что поедут в главу I (`prepareSectorZeroRun`):
+  // полигон учит тем кораблям, с которыми игрок пойдёт дальше.
+  installMatch(prepareSectorZeroRun(trainingState(data), sectorProgress, data), new Map(), trainingModeId());
+  setRunActive(true);
+  trainingActive = true;
+  apply(advance(s, s.time + 1));
+  applyTimeSpeed(RUN_SPEED_NORMAL, RUN_SPEED_FAST);
+  showConnect(false);
+  showHub(false);
+  setupEl.style.display = 'none';
+  sciWin.classList.remove('show');
+  note(t('training.started'));
 }
 
 let creatingMatch = false;
@@ -14013,6 +14049,16 @@ function syncSectorZeroTools(): void {
 }
 
 let sectorDevActive = false;
+/** Идёт учебный полигон «Протокол допуска» (§14). Ставит только {@link startTraining},
+ *  снимает `installMatch` — как у дев-забега, флаг живёт ровно один матч. */
+let trainingActive = false;
+function isTraining(): boolean {
+  return trainingActive && !NET;
+}
+/** Уход из матча ведёт в меню Sector Zero — из забега и из полигона, а не в хаб. */
+function leavesToSectorZero(): boolean {
+  return isSectorZeroRun() || isTraining();
+}
 let runShipLoadouts: Record<string, string[]> = {};
 let savedRun: RunSave | null = null;
 /** Дескриптор с прошлой сессии — запасной путь, когда полный снимок не читается. */
@@ -14102,6 +14148,7 @@ function chapterLater(mission: number) {
 
 /** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
 function runMissionRows(): MissionRow[] {
+  if (isTraining()) return missionRows(trainingObjectives(), s, ME);
   const chapter = pveChapter(sectorMission);
   const rows = missionRows(chapterShown(sectorMission), s, ME, chapter.slots?.base);
   // Босс — своя задача, пока он на поле или пал в этом забеге (PVR-4.7, `runBoss.ts`).
@@ -14143,7 +14190,8 @@ function renderMissionPanel(rows: MissionRow[]): void {
   }
   const html =
     `<div class="mp-head"><b>${t('hud.missions.title')}</b><button type="button" class="mp-close" data-missions-close="1" aria-label="${t('hud.close')}">✕</button></div>` +
-    `<p class="mp-hint">${t('hud.missions.hint')}</p>` +
+    // Полигон пока не платит за задачи — награду не обещаем (§14.5: не определяют победу).
+    `<p class="mp-hint">${t(isTraining() ? 'training.missions.hint' : 'hud.missions.hint')}</p>` +
     rows
       .map(r => {
         // Маяк считает время удержания — реальным временем забега, как его таймеры;
@@ -14157,7 +14205,7 @@ function renderMissionPanel(rows: MissionRow[]): void {
           `<i class="mp-mark" aria-hidden="true">${r.complete ? '✓' : r.failed ? '✗' : '⚑'}</i>` +
           `<span class="mp-name">${esc(t(r.id, { n: missionLabelN(r) }))}</span>` +
           `<b class="mp-prog">${progress}</b>` +
-          missionRewardHtml(r.reward) +
+          (isTraining() ? '' : missionRewardHtml(r.reward)) +
           (r.targets.length ? `<span class="mp-go">${t('hud.missions.show')}</span>` : '');
         return r.targets.length
           ? `<button type="button" class="mp-row" data-mission-go="${esc(r.id)}">${body}</button>`
@@ -14696,6 +14744,7 @@ const sectorZeroMenu = initSectorZeroMenu({
     writeRaw('void.pveMission', String(value));
   },
   start: () => launchSectorRun(),
+  startTraining: () => startTraining(),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
   resume: restoreRun,
   settings: () => settings.open(),

@@ -5,7 +5,7 @@
  * both. Re-exported here so this module stays the client's single door to game data.
  * Maps stay local: they are the client's own screens, not shared content.
  */
-import { parseMatchMap, buildStateFromMap } from '@void/shared-core';
+import { parseMatchMap, buildStateFromMap, pairKey } from '@void/shared-core';
 import type { GameData, GameState, MapObjective, MatchMap } from '@void/shared-core';
 
 import { FRAGMENTS, shippedGameData } from '../../../data/bundle';
@@ -13,6 +13,7 @@ import skirmishMap from '../../../data/maps/skirmish-1.json';
 import pveMap from '../../../data/maps/pve-1.json';
 import pveMap2 from '../../../data/maps/pve-2.json';
 import pveMap3 from '../../../data/maps/pve-3.json';
+import trainingMap from '../../../data/maps/training-1.json';
 
 export { FRAGMENTS, shippedGameData };
 
@@ -118,4 +119,41 @@ export function pveChapter(mission = 0): {
  *  both existed for a long time and nothing said they belonged together. */
 export function pveModeId(mission = 0): string | undefined {
   return parsedMission(mission).mode;
+}
+
+/**
+ * УЧЕБНЫЙ ПОЛИГОН «Протокол допуска» (`docs/sector-zero-map-concepts.md` §14) — не глава:
+ * его нет в {@link PVE_MISSIONS}, он не меняет нумерацию глав и не считается их прохождением.
+ * Карта фиксированная (§14.3): повтор сохраняет знакомую географию.
+ */
+let parsedTraining: MatchMap | null = null;
+function trainingMatchMap(): MatchMap {
+  parsedTraining ??= parseMatchMap(trainingMap);
+  return parsedTraining;
+}
+
+/** Мир полигона — из свежего разбора, как у глав: общий объект в изменяемый мир не отдаётся.
+ *
+ *  Стороны полигона ВОЮЮТ с первой минуты. Карта без команд, а загрузчик сажает такую карту
+ *  в мир (конвенция free-for-all) — и тогда флот не входит в провинцию противника
+ *  (`E_NO_RIGHT_OF_WAY`), то есть полигону нечему учить (найдено аудитом механик, AUDM).
+ *  Главам войну объявляет модуль PvE по `npcFaction` режима; у полигона секции `pve` нет,
+ *  поэтому противника называет сам полигон: все места карты, кроме обитателей, — враги. */
+export function trainingState(data: GameData): GameState {
+  const map = parseMatchMap(trainingMap);
+  const world = buildStateFromMap(map, data);
+  const seats = Object.values(world.players).filter((p) => !p.npc).map((p) => p.id);
+  const diplomacy = { ...world.diplomacy };
+  for (const a of seats) for (const b of seats) if (a < b) diplomacy[pairKey(a, b)] = 'war';
+  return { ...world, mapId: map.id, diplomacy };
+}
+
+/** Задачи полигона (§14.5): маяк и разведка — дополнительные, победу не определяют. */
+export function trainingObjectives(): MapObjective[] {
+  return trainingMatchMap().objectives;
+}
+
+/** Режим, под которым карта полигона играется (`data.modes`). */
+export function trainingModeId(): string | undefined {
+  return trainingMatchMap().mode;
 }

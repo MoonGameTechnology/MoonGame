@@ -8,12 +8,16 @@ import { setLocale } from '../localization/core';
 import { ru } from '../localization/ru';
 import { en } from '../localization/en';
 import { shippedGameData } from '../data/bundle';
-import { PVE_MISSION_COUNT, pveState } from '../packages/client/src/gameData';
+import { PVE_MISSION_COUNT, pveState, trainingState } from '../packages/client/src/gameData';
 import testbed from '../data/maps/duel-testbed.json';
 
 const data = shippedGameData();
-/** Карты глав — ровно те, что открывает дверь Sector Zero, а не список рядом. */
-const chapters = Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveState(data, i));
+/** Карты глав — ровно те, что открывает дверь Sector Zero, а не список рядом, — и карта
+ *  учебного полигона (§14): он не глава, но его провинции названы так же. */
+const chapters = [
+  ...Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveState(data, i)),
+  trainingState(data),
+];
 
 afterEach(() => setLocale('ru'));
 
