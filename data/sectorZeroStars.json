@@ -2,7 +2,7 @@
   "cap": 6,
   "guaranteed": 3,
   "capByRarity": { "simple": 3, "unique": 4, "mythic": 5, "legendary": 6 },
-  "hulls": { "maxSlots": 6, "warrants": [60, 120, 240, 400, 600] },
+  "hulls": { "maxSlots": 6, "warrants": [90, 180, 360, 600, 900] },
   "steps": [
     { "chance": 1, "warrants": 20, "bonus": 0.1, "pity": 0 },
     { "chance": 1, "warrants": 45, "bonus": 0.1, "pity": 0 },
