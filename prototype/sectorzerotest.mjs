@@ -87,7 +87,18 @@ const hooks = `window.__szTest = {
   casts: () => chainAbilitiesFor(['sector-zero:flagship']).map((a) => a.id),
   worn: () => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)?.equipped ?? null,
   // Бой с пиратами до конца — промоткой часов, как их двигает игра (apply(advance)).
-  pirateFight: () => playerOrder(moveFleet(ME, 'p1_1', 'pirate_den')),
+  // Стартовые флоты главы слиты в один вокруг героя (decisions/startFleets.ts). Весь этот
+  // кулак разбивает пиратов быстрее шага перемотки, и окно боя не успело бы открыться, —
+  // в бой идут два крейсера, отделённые от него, как отделил бы игрок.
+  pirateFight: () => {
+    const main = Object.values(s.fleets).find((f) => f.owner === ME && f.location);
+    if (!main) return;
+    const before = new Set(Object.keys(s.fleets));
+    const cruiser = main.units.find((u) => u.unit === 'cruiser');
+    playerOrder(splitFleet(ME, main.id, [{ unit: 'cruiser', count: 2, ...(cruiser?.modules?.length ? { modules: cruiser.modules } : {}) }]));
+    const part = Object.keys(s.fleets).find((id) => !before.has(id)) ?? main.id;
+    playerOrder(moveFleet(ME, part, 'pirate_den'));
+  },
   skip: (min) => { apply(advance(s, s.time + min * 60000)); },
   battles: () => Object.keys(s.battles).length,
   // Карточка корабля флота Роя: портрет — форма Роя с листа владельца, а не корпус людей.
