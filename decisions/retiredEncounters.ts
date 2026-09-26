@@ -7,7 +7,9 @@ import type { GameState, MapObjective } from '../packages/shared-core/src/index'
  * — нет: карта каждый заход строится заново, и логово, патруль и карточка «Первый бой»
  * вставали снова, хотя награды за них больше нет.
  *
- * Списывается только выполненная задача ЗАХВАТА (`control`) и только цель, которой на
+ * Спасённый герой (`recruit`) также не ждёт повторного спасения: станция остаётся,
+ * но её `recruitHero` снимается. Награда коллекции за победу в главе не меняется.
+ * Для задачи ЗАХВАТА (`control`) списывается только цель, которой на
  * старте владеет NPC (`players[owner].npc`): свой мир, Рой и ничья провинция — не
  * встреча. Цель становится ничьей и без гарнизона, флоты этого NPC уходят, а NPC без
  * провинций — и сам игрок вместе со своими войнами: без него `pirateEncounter` молчит. Вход не меняется.
@@ -18,15 +20,19 @@ export function retireDoneEncounters(
   done: readonly string[],
 ): GameState {
   const retired = new Set<string>();
+  const recruited = new Set<string>();
   for (const o of objectives) {
+    if (o.kind === 'recruit' && done.includes(o.id))
+      for (const id of o.targets) if (state.planets[id]?.recruitHero) recruited.add(id);
     if (o.kind !== 'control' || !done.includes(o.id)) continue;
     for (const id of o.targets) {
       const owner = state.planets[id]?.owner;
       if (owner && state.players[owner]?.npc) retired.add(id);
     }
   }
-  if (!retired.size) return state;
+  if (!retired.size && !recruited.size) return state;
   const next: GameState = JSON.parse(JSON.stringify(state));
+  for (const id of recruited) delete next.planets[id]!.recruitHero;
   const npcs = new Set<string>();
   for (const id of retired) {
     const planet = next.planets[id]!;

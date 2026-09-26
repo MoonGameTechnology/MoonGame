@@ -204,9 +204,26 @@
       },
       "kind": "nebula",
       "terrain": "nebula"
+    },
+    "research_station": {
+      "position": {
+        "x": 150,
+        "y": 0
+      },
+      "kind": "void_station",
+      "terrain": "empty_space",
+      "recruitHero": "scientist"
     }
   },
   "objectives": [
+    {
+      "id": "mission.rescue-scientist",
+      "kind": "recruit",
+      "targets": [
+        "research_station"
+      ],
+      "reward": 2
+    },
     {
       "id": "mission.pirate-den",
       "kind": "control",

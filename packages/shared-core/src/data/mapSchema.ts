@@ -46,6 +46,8 @@ export const MapSectorSchema = z.object({
    *  `Planet.kind` by the loader and resolved against game data `sectorKinds` —
    *  capturable / buildable / orbit + the build roster + map appearance. */
   kind: z.string().default('planet'),
+  /** Hero rescued by the first human fleet arriving here. Validated against the hero catalog. */
+  recruitHero: z.string().min(1).optional(),
   /** Terrain id → resolved against game data `sectors` (speed / HP modifiers). */
   terrain: z.string().optional(),
   /** World nature id → game data `planetTypes` (production / defense), if a planet. */
@@ -124,16 +126,16 @@ export const MapSlotSchema = z.object({
 /**
  * ДОПОЛНИТЕЛЬНАЯ ЗАДАЧА КАРТЫ — «миссия», которую игрок может выполнить по дороге
  * (решение владельца 2026-09-22). Объявляется здесь, а ПРОВЕРЯЕТСЯ чистым предикатом в
- * `decisions/missionObjectives.ts`: всё, что владелец назвал задачей, читается из
- * состояния матча напрямую, поэтому ни секции состояния, ни модуля ядра под это не
- * заводится. Тип объявлен ОДИН раз и здесь, потому что это форма ДАННЫХ карты; логика
+ * `decisions/missionObjectives.ts`: текущие условия и накопленные модулями ядра
+ * `missionFacts` читаются из состояния матча. Отдельной сущности задачи в ядре нет.
+ * Тип объявлен ОДИН раз и здесь, потому что это форма ДАННЫХ карты; логика
  * живёт в `/decisions`, которые импортируют его отсюда.
  */
 export const MapObjectiveSchema = z.object({
   /** Ключ локализации заголовка: в коде и в данных живёт КЛЮЧ, не текст. */
   id: z.string(),
-  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build', 'evac', 'rescue', 'beacon', 'isolate']),
-  /** `control`, `rescue`, `beacon` — id провинций; `raze` и `build` — виды построек;
+  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build', 'evac', 'rescue', 'beacon', 'isolate', 'recruit']),
+  /** `control`, `rescue`, `beacon`, `recruit` — id провинций; `raze` и `build` — виды построек;
    *  `scout`/`wave`/`evac` не читают. */
   targets: z.array(z.string()).default([]),
   /** `build` — ГДЕ строить (id провинций; нет — где угодно). Заказ владельца 2026-09-24:

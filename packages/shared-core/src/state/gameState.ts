@@ -412,6 +412,8 @@ export interface Planet {
    *  data `sectorKinds`) — decides capturable / buildable / orbit. Undefined
    *  degrades to the permissive defaults (see `sectorKindDef`). */
   kind?: string;
+  /** Map-authored hero waiting for rescue; consumed once a human fleet arrives. */
+  recruitHero?: string;
   /** Чем узел был ДО того, как его превратили в космическую крепость (`station.deploy`
    *  затирает `kind`). Гибель крепости возвращает узел к этому виду, иначе разрушенная
    *  крепость навсегда стирала бы то, что под ней стояло: астероидное поле не выдумать
@@ -947,15 +949,18 @@ export interface GameState {
    *  же швом, что `swarmIntel`. Память самого Роя лежит отдельно и клиенту не уходит
    *  вовсе: журнал — это знание игрока, а не подсмотренная правда. */
   swarmJournal?: Record<PlayerId, SwarmRepelRecord>;
-  /** Факты для задач забега (`missionFactsModule`): кто и с какого момента держит
-   *  провинцию, какие миры игрок терял, сколько беженцев доставил. Задачи — чистые
+  /** Факты для задач забега (`missionFactsModule`, спасение — `heroModule`): кто и с
+   *  какого момента держит провинцию, какие миры терял, сколько беженцев доставил,
+   *  где спас героя. Задачи — чистые
    *  предикаты над состоянием, а «N часов подряд» и «гарнизон уже пал» из одного кадра
    *  не прочесть: нужна память. Здесь только ФАКТЫ, без знания о конкретных задачах. */
   missionFacts?: MissionFacts;
 }
 
-/** Память фактов для задач забега (`missionFactsModule`). */
+/** Память фактов для задач забега (`missionFactsModule` и `heroModule`). */
 export interface MissionFacts {
+  /** Player → provinces where a hero joined them. Departure or hero death cannot undo rescue. */
+  recruited?: Record<PlayerId, PlanetId[]>;
   /** Провинция → кто её держит и с какого момента (ставится на каждом захвате). Нет
    *  записи — провинция не переходила из рук в руки с начала матча. */
   held?: Record<PlanetId, { owner: PlayerId; since: number }>;

@@ -451,6 +451,7 @@ function project(
       ),
     );
     const mine: NonNullable<GameState['missionFacts']> = {};
+    if (mf.recruited?.[viewerId]) mine.recruited = { [viewerId]: [...mf.recruited[viewerId]!] };
     if (Object.keys(held).length) mine.held = held;
     if (Object.keys(longest).length) mine.longest = longest;
     if (mf.fallen?.[viewerId]) mine.fallen = { [viewerId]: [...mf.fallen[viewerId]!] };

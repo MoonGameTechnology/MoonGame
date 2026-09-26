@@ -131,6 +131,11 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       if (sec.kind && !data.sectorKinds[sec.kind]) issues.push(`E_UNKNOWN_KIND:${id}`);
       if (sec.terrain && !data.sectors[sec.terrain]) issues.push(`E_UNKNOWN_TERRAIN:${id}`);
       if (sec.planetType && !data.planetTypes[sec.planetType]) issues.push(`E_UNKNOWN_PLANET_TYPE:${id}`);
+      if (sec.recruitHero) {
+        const hero = data.heroes[sec.recruitHero];
+        if (!hero || hero.boss || !data.units[hero.ship.unit ?? 'hero'])
+          issues.push(`E_INVALID_RECRUIT_HERO:${id}`);
+      }
       for (const b of sec.buildings) if (!data.buildings[b.type]) issues.push(`E_UNKNOWN_BUILDING:${b.type}`);
       for (const g of sec.garrison) if (!data.units[g.unit]) issues.push(`E_UNKNOWN_UNIT:${g.unit}`);
     }
@@ -570,6 +575,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     if (sec.terrain) planet.terrain = sec.terrain;
     if (sec.planetType) planet.planetType = sec.planetType;
     if (sec.kind) planet.kind = sec.kind;
+    if (sec.recruitHero) planet.recruitHero = sec.recruitHero;
     if (sec.size !== 1) planet.size = sec.size;
     planets[id] = planet;
   }

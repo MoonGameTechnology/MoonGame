@@ -49,9 +49,11 @@ export const en: Record<string, string> = {
 
   'hud.missions.label': 'Objectives',
   'hud.missions.title': 'Run objectives',
-  'hud.missions.hint': 'Rewards are paid at the end of the run.',
+  'hud.missions.hint': 'Research data and warrants are paid at the end of the expedition.',
   'hud.missions.failed': 'failed',
   'hud.missions.show': 'Show',
+  'mission.rescue-scientist': 'Rescue the scientist: bring a ship to the research station',
+  'hud.missions.recruit-reward': 'The hero ship joins immediately upon rescue.',
   'mission.claim-colony': 'Second colony: take the neighbouring world',
   'mission.destroy-hive': 'Destroy the hive: take it by assault',
   'mission.pirate-den': "Destroy the pirates' den: take it by assault",
@@ -1268,6 +1270,7 @@ export const en: Record<string, string> = {
 
   // --- province — Имена провинций карт глав Sector Zero (PVR-6.19). Ключ выводится из
   // карты и узла (`decisions/provinceName.ts`): `province.<карта>.<узел>`, `_` → `-`.
+  'province.pve-1.research-station': 'Research Station',
   'province.pve-1.pirate-den': "Pirates' Den",
   'province.pve-1.home-a': 'Dawn Outpost',
   'province.pve-1.home-b': 'Echo Colony',

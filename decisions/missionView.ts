@@ -85,7 +85,7 @@ export function missionTargets(
       (id) => state.planets[id] !== undefined && state.planets[id]!.owner !== player,
     );
   // Спасение, маяк и разрыв сети называют провинцию — метка стоит, пока задача не решена.
-  if (objective.kind === 'rescue' || objective.kind === 'beacon' || objective.kind === 'isolate')
+  if (objective.kind === 'rescue' || objective.kind === 'beacon' || objective.kind === 'isolate' || objective.kind === 'recruit')
     return (objective.targets ?? []).filter((id) => state.planets[id] !== undefined);
   // Крепость в провинции: названные места, где нужной постройки ещё нет.
   if (objective.kind === 'build' && objective.at && objective.at.length > 0) {
