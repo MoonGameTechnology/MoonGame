@@ -63,6 +63,10 @@ const roundIntervalMs = (ctx: Context): number => hoursToMs(ctx, 1);
  *  and shield pools (see `applyRetreatToll`) — pulling out of a fight is never
  *  free, but the toll alone can never finish a fleet off. */
 const RETREAT_TOLL = 0.4;
+/** Потолок цены отступления после хука `combat.retreatToll` (SM-3.1, тяговый луч).
+ *  Ниже единицы намеренно: «одна цена отступления не добивает флот» держится при любой
+ *  доле < 1, а потолок не даёт вкладам хука подойти к ней вплотную. */
+const RETREAT_TOLL_MAX = 0.75;
 /** How much faster a just-retreated fleet travels while fleeing… */
 const RETREAT_HASTE_MULT = 1.5;
 /** …and for how long (world-time) the boost lasts. */
@@ -74,7 +78,7 @@ const RETREAT_HASTE_MS = 3 * MS_PER_HOUR;
  *  0.6 × a positive pool stays positive, so the carried landing force always
  *  withdraws with its ships. Ships are still lost when the shrunken pool no
  *  longer fills their hulls (Math.ceil keeps the last damaged ship alive). */
-function applyRetreatToll(fleet: Fleet, data: GameData): void {
+function applyRetreatToll(fleet: Fleet, data: GameData, toll = RETREAT_TOLL): void {
   for (const stack of fleet.units) {
     const def = data.units[stack.unit];
     if (!def) {
@@ -84,13 +88,13 @@ function applyRetreatToll(fleet: Fleet, data: GameData): void {
     const effHull = eff.hp ?? 0;
     const perHull = effHull > 0 ? effHull : 1;
     const maxHull = stack.count * perHull;
-    const newHull = (1 - RETREAT_TOLL) * (stack.hp ?? maxHull);
+    const newHull = (1 - toll) * (stack.hp ?? maxHull);
     const newCount = newHull <= 0 ? 0 : Math.ceil(newHull / perHull);
     if (newCount <= 0 || newCount > stack.count) continue; // fail-secure: never grow
 
     const perShield = eff.shield ?? 0;
     if (perShield > 0) {
-      const newShield = (1 - RETREAT_TOLL) * (stack.shieldHp ?? stack.count * perShield);
+      const newShield = (1 - toll) * (stack.shieldHp ?? stack.count * perShield);
       stack.shieldHp = Math.min(newShield, newCount * perShield); // cap at surviving capacity
     }
     stack.count = newCount;
@@ -934,7 +938,8 @@ function groundVolleys(
 
 export const combatModule: GameModule = {
   id: 'combat',
-  version: '2.4.0',
+  // 2.5.0: цена отступления идёт через хук `combat.retreatToll` (SM-3.1).
+  version: '2.5.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -1223,7 +1228,13 @@ export const combatModule: GameModule = {
         return h.reject('E_CANNOT_RETREAT');
       }
 
-      applyRetreatToll(fleet, h.ctx.data);
+      // SM-3.1: цена отступления — хук с базой 0.4 (тяговый луч противника её поднимает).
+      // Нечисловой или вне [база, потолок] вклад не принимается: база — нижняя граница.
+      const hooked = h.hook<number>('combat.retreatToll', RETREAT_TOLL, { fleetId, battleId });
+      const toll = Number.isFinite(hooked)
+        ? Math.min(RETREAT_TOLL_MAX, Math.max(RETREAT_TOLL, hooked))
+        : RETREAT_TOLL;
+      applyRetreatToll(fleet, h.ctx.data, toll);
       fleet.battleId = null;
       // ROADS-8: отступление — СВОЙ приказ игрока, и прерванный боем марш он отменяет:
       // отходящий идёт туда, куда велели отойти, или стоит.

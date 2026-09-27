@@ -10,6 +10,7 @@ const CLIENT_ACTION_TYPES = [
   'fleet.assault',
   'fleet.bombard',
   'fleet.retreat',
+  'fleet.layMines',
   'army.load',
   'army.unload',
   'hero.ability',

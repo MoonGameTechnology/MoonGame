@@ -72,11 +72,16 @@ export const SHIP_CARD_STATS = [
   'shield',
   'shieldRegen',
   'hullRepair',
+  'fleetHullRepair',
   'speed',
   'radarRange',
   'cargoCapacity',
   'pointDefense',
   'siegeDamage',
+  'retreatPull',
+  'salvageBonus',
+  'mineCharge',
+  'mineHit',
 ] as const;
 
 const ALWAYS = new Set<string>(['attack', 'defense', 'hp', 'speed']);
