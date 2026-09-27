@@ -216,6 +216,22 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       'medalBadges() в /decisions добавляет `medal.<линия>` для подписи (VET-3/VET-5)',
   },
   {
+    prefix: 'ally.kind.',
+    built_by: 'allyBoxHtml() в allyScreen.ts — из вида приказа союзнику (guard/attack/scout, PVR-7.5)',
+  },
+  {
+    prefix: 'ally.step.',
+    built_by: 'allyBoxHtml() — из шага плана операции союзника (`decisions/allyOperation.ts`, PVR-7.5)',
+  },
+  {
+    prefix: 'ally.reason.',
+    built_by: 'allyBoxHtml() — из причины плана операции союзника (`AllyOpReason`, PVR-7.5)',
+  },
+  {
+    prefix: 'chain.',
+    built_by: 'панель задач строит подпись шага главной цепочки главы из `ChapterStep.key` (`decisions/chapterChain.ts`, PVR-7.5)',
+  },
+  {
     prefix: 'mission.',
     built_by:
       'строка задач в main.ts берёт ключ из `id` задачи, объявленной в карте ' +

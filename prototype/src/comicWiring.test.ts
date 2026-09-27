@@ -37,6 +37,13 @@ describe('комиксы глав — проводка', () => {
     );
   });
 
+  it('комикс `task` зовётся и шагом главной цепочки главы (глава IV: встреча с союзником)', () => {
+    expect(MAIN).toContain('...(chain ?? []).filter((st) => st.done).map((st) => st.key),');
+    expect(MAIN).toContain(
+      'if (missionsDone > 0 || chain?.some((st) => st.done)) playTaskComic(missions, chain);',
+    );
+  });
+
   it('«назад» и Escape закрывают комикс первым — он верхняя ступень лестницы', () => {
     const ladder = /const BACK_LAYERS: BackLayer\[\] = \[\n\s+\{ id: '([^']+)'/.exec(MAIN)?.[1];
     expect(ladder).toBe('comic');
