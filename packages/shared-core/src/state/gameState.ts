@@ -883,6 +883,10 @@ export interface GameState {
   market?: MarketOrder[];
   /** Monotonic counter handing each market order its id. */
   marketSeq?: number;
+  /** Курс торговца экспедиции (`traderModule`): сдвиг цены каждого товара от базы и момент,
+   *  когда он записан. Публичный — это цена рынка, туман его не режет. Нет раздела ⇒ все
+   *  курсы на базе (режим без торговца его не заводит вовсе). */
+  trader?: Record<string, TraderRate>;
   /** A player's designated capital world (`capitalModule`, `capital.designate`) — the
    *  hero respawn anchor (`heroModule` falls back to `[hero.home, hero.location]`).
    *  Absent for a player who never (re-)designated ⇒ their heroes' `home` is whatever
@@ -1129,6 +1133,14 @@ export interface PveBoss {
 
 /** Which side of the book a standing order sits on (CONV-9). */
 export type MarketSide = 'sell' | 'buy';
+
+/** Курс одного товара у торговца экспедиции (`traderModule`). `shift` — доля от базовой
+ *  цены (0,1 — на 10% дороже), записанная в момент `at` (мс мира); к базе он возвращается
+ *  со временем, и этот возврат считается лениво — при сделке или вопросе. */
+export interface TraderRate {
+  shift: number;
+  at: number;
+}
 
 /** A standing order on the session market. Both sides ESCROW up front, so nothing
  *  on the book can be double-spent:

@@ -41,7 +41,7 @@ export function initHolographicUi(host: HolographicHost) {
   const railIcons: Record<string, HoloIcon> = {
     'rail-diplo': 'handshake', 'rail-msgs': 'envelope-simple', 'rail-pings': 'broadcast',
     'rail-tech': 'atom', 'rail-constructor': 'hammer', 'rail-steward': 'moon',
-    'rail-market': 'arrows-left-right', 'railcorp': 'hexagon', 'rail-chat': 'chat-circle-text',
+    'rail-market': 'arrows-left-right', 'rail-trader': 'arrows-left-right', 'railcorp': 'hexagon', 'rail-chat': 'chat-circle-text',
     'rail-log': 'list-bullets', 'rail-help': 'question', 'rail-settings': 'sliders-horizontal',
     'rail-exit': 'sign-out',
   };

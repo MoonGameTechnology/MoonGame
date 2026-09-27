@@ -1174,6 +1174,7 @@
 | PVR-6.34 | ✅ | proto | `docs/sector-zero-roadmap.md` | Описание навыка по долгому нажатию в меню приказов |
 | PVR-6.35 | ✅ | proto | `docs/sector-zero-roadmap.md` | ⌂ в экспедиции спрашивает и называет награду |
 | PVR-6.36 | ✅ | proto | `docs/sector-zero-roadmap.md` | Вкладка «Флот» — орбита, без наземных частей |
+| PVR-6.37 | ✅ | core data proto | `docs/sector-zero-roadmap.md` | Торговец в экспедиции: живой курс |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

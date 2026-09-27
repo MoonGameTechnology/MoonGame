@@ -184,6 +184,8 @@ import {
   type PausedConstructionSite,
   type QueuedConstruction,
   missingHull,
+  traderOf,
+  type ModeTrader,
 } from '../../packages/shared-core/src/index';
 import {
   MultiplayerClient,
@@ -628,6 +630,7 @@ import { abilityRings } from './abilityRings';
 import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
+import { initTrader } from './traderScreen';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
 import { initResourceCard } from './resourceCard';
@@ -10516,6 +10519,38 @@ const market = __SECTOR_ZERO_ONLY__
     });
 document.getElementById('rail-market')?.addEventListener('click', () => market?.open());
 
+// --- торговец экспедиции («живой курс», решение владельца 2026-09-26) -------------------
+// Рынок основной игры — книга заявок живых игроков, и в забеге его нет; здесь торгуют с самим
+// рынком (`modules/trader.ts`). Окно — `traderScreen.ts`; открыт торговец, пока идёт забег
+// режима с разделом `trader`: кнопка рельса и карточка ресурса спрашивают `runTrader()`.
+const traderWin = $('trader');
+/** Раздел торговца, если он у текущего забега есть. */
+function runTrader(): ModeTrader | undefined {
+  return runInProgress() ? traderOf(ctx(s.time, s)) : undefined;
+}
+const trader = initTrader({
+  root: () => traderWin,
+  state: () => s,
+  me: () => ME,
+  ctx: () => ctx(s.time, s),
+  cfg: runTrader,
+  order: playerOrder,
+});
+const railTrader = $('rail-trader');
+railTrader.addEventListener('click', () => trader.open());
+/** Кадровый такт торговца: кнопка рельса — пока он есть, окно следит за курсом (он плывёт к
+ *  базе) и закрывается само, когда забег кончился. */
+function tickTrader(): void {
+  const live = runTrader() !== undefined;
+  const shown = live ? '' : 'none';
+  if (railTrader.style.display !== shown) railTrader.style.display = shown;
+  if (!live) {
+    if (trader.isOpen()) trader.close();
+    return;
+  }
+  trader.refresh();
+}
+
 // --- resource card (RC-1): tap a resource chip → popup with stats + market button -
 const resCardEl = $('rescard');
 const resourceCard = initResourceCard({
@@ -10525,6 +10560,11 @@ const resourceCard = initResourceCard({
   icons: RES_SVG,
   onOpenMarket: (res) => market?.open(res),
   marketShown: () => toolShown('market', sectorZeroToolsHidden()),
+  traderGoods: () => {
+    const cfg = runTrader();
+    return cfg ? Object.keys(cfg.goods) : null;
+  },
+  onOpenTrader: (res) => trader.open(res),
   // Пакет снабжения за Суверены (решение владельца 2026-09-24): состав и лимит — правило
   // мира (режим), цена — магазин профиля.
   supply: () => {
@@ -13763,6 +13803,7 @@ const BACK_LAYERS: BackLayer[] = [
   // обязан закрывать именно его, а не выделение под ним.
   { id: 'battlewin', isOpen: () => shown('battlewin'), close: () => hide('battlewin') }, // z47
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
+  { id: 'trader', isOpen: () => trader.isOpen(), close: () => trader.close() }, // z47 торговец экспедиции
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
   { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
   // «Постройки» стоят НИЖЕ кодекса (z45): карточка здания открывается поверх окна,
@@ -15234,6 +15275,7 @@ function frame(nowReal: number) {
   renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   tickAbandon();
+  tickTrader();
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
     wave.kind === 'none'

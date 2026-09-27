@@ -26,6 +26,7 @@ export {
   type TempLane,
   type MarketOrder,
   type MarketSide,
+  type TraderRate,
   type Fleet,
   type FleetMovement,
   type FleetEdge,
@@ -450,6 +451,7 @@ export {
   type GameModeDef,
   type ModeVictory,
   type ModePve,
+  type ModeTrader,
   type TeamFormat,
 } from './data/schemas';
 export {
@@ -652,6 +654,16 @@ export {
   MARKET_COMMISSION,
   type MarketEmbargoCapability,
 } from './modules/market';
+export {
+  traderModule,
+  traderOf,
+  traderShift,
+  traderBuyCost,
+  traderSellValue,
+  traderShiftAfter,
+  traderAffordable,
+  TRADER_MAX_UNITS,
+} from './modules/trader';
 export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';
 

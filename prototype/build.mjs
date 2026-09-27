@@ -842,9 +842,9 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .rc-flow{font-size:18px;font-weight:700;text-align:center;padding:8px 0;font-variant-numeric:tabular-nums;}
 .rc-flow.pos{color:#7df0d0;}
 .rc-flow.neg{color:#ff6b6b;}
-.rc-market{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
+.rc-market,.rc-trader{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
   background:rgba(53,214,230,.12);color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;}
-.rc-market:active{background:rgba(53,214,230,.22);}
+.rc-market:active,.rc-trader:active{background:rgba(53,214,230,.22);}
 /* Пакет снабжения за Суверены (решение владельца 2026-09-24): золото — цвет валюты. */
 .rc-supply{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding:6px 0;font-size:13px;}
 .rc-buy{margin-top:8px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cur-sovereigns);
@@ -1885,6 +1885,35 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .sp-go{margin-top:15px;width:100%;padding:12px;border-radius:9px;cursor:pointer;border:1px solid var(--cyan);background:rgba(53,214,230,.12);color:var(--cyan);font:inherit;font-weight:700;font-size:12.5px;letter-spacing:1px;text-transform:uppercase;}
 .sp-go:hover:not(:disabled){background:rgba(53,214,230,.2);box-shadow:0 0 16px rgba(53,214,230,.28);}
 .sp-go:disabled{opacity:.4;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+/* Торговец экспедиции («живой курс»): окно того же вида, что рынок (#market). */
+#trader{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#trader.show{display:flex;}
+#trader .trbox{display:flex;flex-direction:column;width:min(440px,94vw);max-height:86vh;overflow:hidden;
+  background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.tr-purse{margin-left:auto;margin-right:10px;font-size:13px;color:var(--ink);}
+.tr-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.tr-body{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+.tr-rule{margin:0 0 10px;font-size:11px;line-height:1.45;color:var(--dim);}
+.tr-goods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:12px;}
+.tr-good{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:6px 4px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--ink);cursor:pointer;font:12px ui-monospace,monospace;}
+.tr-good.on{border-color:var(--cyan);background:rgba(53,214,230,.1);}
+.tr-shift{font-style:normal;font-size:10px;}
+.tr-shift.up{color:var(--amber);}
+.tr-shift.down{color:var(--cyan);}
+.tr-lbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin:4px 0 6px;}
+.tr-amts,.tr-swaps{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.tr-amt,.tr-swap{min-width:52px;min-height:40px;padding:6px 10px;border-radius:7px;border:1px solid var(--line);
+  background:transparent;color:var(--ink);cursor:pointer;font:12px ui-monospace,monospace;}
+.tr-amt.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.1);}
+.tr-deal{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.tr-go{min-height:44px;padding:8px;border-radius:8px;border:1px solid var(--cyan);background:rgba(53,214,230,.14);
+  color:var(--cyan);cursor:pointer;font:12px ui-monospace,monospace;}
+.tr-go.sell{border-color:var(--amber);color:var(--amber);background:rgba(240,180,80,.1);}
+.tr-go:disabled,.tr-swap:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
+.tr-status{min-height:18px;font-size:12px;color:var(--ink);}
 /* session market (modal, mirrors #tech; tabs mirror .dp-tab) */
 #market{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
@@ -2763,7 +2792,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 /* --- short viewports (landscape phones, split-screen): overlays scroll instead of
    clipping off-screen (#connect already does, see its base rule) --- */
 @media (max-height:680px){
-  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market{
+  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market,#trader{
     align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 }
 /* --- the welcome card is the tallest overlay we have: the roomy version needs ~930px
@@ -3244,6 +3273,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #swarm-dossier.pinned.updating.scan-motion .swarm-sync::before{animation:swarm-intel-scan .7s linear infinite;}
 
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
+  #trader .trbox{width:40vw;max-height:60vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
   #connect .cbox,#connect .cwrap{width:min(520px,62.5vw);}
@@ -3451,6 +3481,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="rail-constructor" data-i18n-title="rail.constructor.title">⚒<span class="rlbl" data-i18n="rail.constructor.label"></span></button>
     <button id="rail-steward" data-i18n-title="rail.steward.title">😴<span class="rlbl" data-i18n="rail.steward.label"></span></button>
     <button id="rail-market" data-i18n-title="rail.market.title">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
+    <!-- Торговец экспедиции («живой курс»): только в забеге с торговцем, видимость — кадр main.ts -->
+    <button id="rail-trader" type="button" data-i18n-title="rail.trader.title" style="display:none">⚖<span class="rlbl" data-i18n="rail.trader.label"></span></button>
     <button id="railcorp" data-i18n-title="rail.corp.title">⬢<span class="rlbl" data-i18n="rail.corp.label"></span></button>
     <button id="rail-chat" data-i18n-title="rail.chat.title" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
     <button id="rail-log" data-i18n-title="rail.log.title">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
@@ -3482,6 +3514,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
+<div id="trader"></div>
 <!-- constructor («Производство») — unified order screen; whole box rendered by renderConstructor() -->
 <div id="constructor"></div>
 <aside id="side"></aside>

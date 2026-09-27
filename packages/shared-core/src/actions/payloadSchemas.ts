@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRADER_MAX_UNITS } from '../modules/trader';
 
 /**
  * SV-1.2 — per-action-type payload schemas, enforced at the action-layer gate BEFORE the
@@ -15,6 +16,8 @@ import { z } from 'zod';
  */
 
 const id = z.string().min(1); // a planet / fleet / unit / building / technology id
+/** Штуки одной сделки у торговца — та же граница, что проверяет модуль. */
+const traderUnits = z.number().int().min(1).max(TRADER_MAX_UNITS);
 const count = z.number().int().positive().safe(); // a unit count: positive safe integer
 
 export const actionPayloadSchemas: Record<string, z.ZodType> = {
@@ -107,6 +110,12 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   }),
   'market.take': z.object({ id: id, amount: z.number().finite().positive().optional() }),
   'market.cancel': z.object({ id: id }),
+  // trader.ts — торговец экспедиции («живой курс»). Клиент шлёт только «сколько штук»:
+  // цену считает ядро по курсу на момент сделки, так что прислать свою цену нечем. Штуки —
+  // целое ≥ 1 и не больше потолка ядра (`TRADER_MAX_UNITS`).
+  'trader.buy': z.object({ resource: id, amount: traderUnits }),
+  'trader.sell': z.object({ resource: id, amount: traderUnits }),
+  'trader.swap': z.object({ give: id, get: id, amount: traderUnits }),
   // diplomacy.ts — one action for the whole protocol (D2+D3): escalation applies
   // at once, a friendlier declaration records/commits a mutual-consent offer
   'diplomacy.declare': z.object({

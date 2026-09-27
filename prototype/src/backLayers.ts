@@ -117,6 +117,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['steward', 'layer'], // окно «Хранителя», z47 — тот самый ST-4, чинившийся поштучно
   ['battlewin', 'layer'], // окно боя, z47 — открывается тапом по значку боя на карте
   ['market', 'layer'], // сессионный рынок, z47
+  ['trader', 'layer'], // торговец экспедиции («живой курс»), z47
   ['constructor', 'layer'], // «Производство» — заказ и оснащение (REFM-13, ROS-3.1), z47
   ['codex', 'layer'], // кодекс объекта, z46
   ['tgted', 'layer'], // меню точки в режиме «Приказ» (CHAIN-UX), z46

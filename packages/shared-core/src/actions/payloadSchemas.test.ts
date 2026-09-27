@@ -34,6 +34,9 @@ const CLIENT_ACTION_TYPES = [
   'espionage.spy',
   'market.list',
   'market.cancel',
+  'trader.buy',
+  'trader.sell',
+  'trader.swap',
   // REL-2 — the prototype-host intents (the netserver runs the prototype's kernel):
   'market.take',
   'fleet.launch',
