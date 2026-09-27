@@ -173,6 +173,8 @@ import {
   scanNodeThreats,
   identifiedNodes,
   sensorCoverage,
+  radarSignatures,
+  type SignatureContact,
   sightCircles,
   sightRulesOf,
   worldRadarReach,
@@ -881,7 +883,7 @@ import {
 import { ambushOf } from '../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from '../../packages/client/src/forkMark';
 import { fleetOrigin } from './fleetOrigin';
-import { netContacts, soloContacts } from './radarContacts';
+import { netContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
 import { AA_SHOTS_MAX, aaImpact, capShots } from './fireEffects';
@@ -895,11 +897,7 @@ import {
 } from './stewardLog';
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
-import {
-  fleetSignature as coreFleetSignature,
-  planetRadar as corePlanetRadar,
-  sigClass,
-} from './sensorScale';
+import { planetRadar as corePlanetRadar } from './sensorScale';
 import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
@@ -1913,11 +1911,11 @@ const SWEEP_PERIOD = TAU * SWEEP_DIV; // ms for a full rotation (~10s) — the r
 /** Radar contacts as PAINTED BY THE SWEEP: a signature is refreshed only as the arm
  *  crosses it, then lingers at that last-swept spot (a dim ghost) until the next
  *  pass repaints it — so radar gives periodic snapshots, never a live feed. */
-const radarMemory = new Map<string, { node: string; size: 'S' | 'M' | 'L'; at: number }>();
+const radarMemory = new Map<string, { node: string; size: 'S' | 'M' | 'L'; at: number; position?: { x: number; y: number } }>();
 /** NET radar picture (BF-18): the server's per-frame contact list. In a network
  *  match the fogged state carries NO radar-only enemy fleets, so the sweep paints
  *  these server-sent contacts instead of scanning `s.fleets`. */
-let netSignatures: Array<{ location: string; size: 'S' | 'M' | 'L' }> = [];
+let netSignatures: SignatureContact[] = [];
 
 /** How brightly a contact at screen-point `c` is lit by the sweep: 1 the instant
  *  the arm crosses it, fading linearly back to 0 just before the next pass (so the
@@ -2037,33 +2035,21 @@ function updateThreatAlerts(): void {
 function updateRadarContacts(now: number): void {
   if (!sweepOn) return;
   if (vision) {
-    // What the sweep may paint. Solo scans the full state for radar-only enemy
-    // fleets; in NET those fleets are physically ABSENT from the fogged state —
-    // the server ships them as coarse contacts (snapshot.signatures, BF-18).
-    // Кто может стать отметкой — `radarContacts.ts` (REFM-96): в соло тот же отбор
-    // делается вручную, иначе одиночная игра покажет больше сетевой.
-    const contacts = NET
-      ? netContacts(netSignatures, known)
-      : soloContacts(
-          Object.values(s.fleets),
-          ME,
-          (f) => fleetNode(f),
-          known,
-          radarHas,
-          (f) => sigClass(fleetSignature(f)),
-        );
+    // Both modes consume the same core projection: sensitivity and grouping are
+    // decided before a sweep paints the anonymous contact.
+    const contacts = netContacts(vision.signatures, known);
     let hit = false; // засекла ли рука хоть кого-то в ЭТОМ кадре
     for (const c of contacts) {
       const node = s.planets[c.node];
       if (!node) continue;
-      const pos = world(node.position);
+      const pos = world(c.position ?? node.position);
       // painted only by an arm whose radar disc actually covers the blip
       // Красит только рука, чей радарный диск реально накрывает отметку (`alerts.ts`).
       if (paintedThisFrame(sweepArms, pos, sweepPrevAng, sweepAng)) {
         hit = true;
         if (!radarMemory.has(c.key))
           note(t('threat.contact', { size: c.size, at: placeName(c.node) }), c.node);
-        radarMemory.set(c.key, { node: c.node, size: c.size, at: now });
+        radarMemory.set(c.key, { node: c.node, size: c.size, at: now, ...(c.position ? { position: { ...c.position } } : {}) });
       }
     }
     // Пинг гидролокатора в момент засечки. ОДИН на кадр, а не на контакт: рука
@@ -2092,7 +2078,7 @@ function drawRadarContacts(now: number): void {
       radarMemory.delete(id);
       continue;
     }
-    const pos = world(node.position);
+    const pos = world(m.position ?? node.position);
     if (!visible(pos, 120)) continue;
     drawSignatureAt(pos, m.size, contactAlpha(age), now);
   }
@@ -2716,14 +2702,6 @@ function laneAim(
 // full identification within the inner half (mirrors shared-core visibility).
 const IDENTIFY_REACH_FRACTION = 0.5;
 
-/** Total radar signature of a fleet = Σ count × per-unit signature (from content). */
-// ШКАЛА датчиков — `sensorScale.ts` (REFM-170): шум это сумма `count × signature`, а не
-// число кораблей; неизвестный клиенту тип шумит за 1, а неизвестное здание слышит на 0 —
-// обе подстановки повторяют умолчания схемы и идут в осторожную сторону (незнание не
-// прячет твой флот и не выдаёт дальности); ступеней три и пороги абсолютные.
-function fleetSignature(f: Fleet): number {
-  return coreFleetSignature(f.units, (u) => data.units[u]);
-}
 /** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
  *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarReach` — не своя копия правила: когда копия
  *  тут читала только `data.units[u].radarRange`, установленный радар-модуль на карте
@@ -2743,6 +2721,7 @@ function planetRadar(p: Planet): number {
 interface Vision {
   identify: Set<string>;
   radar: Set<string>;
+  signatures: SignatureContact[];
 }
 
 // --- espionage (SPY-1 in the prototype) ---------------------------------------
@@ -2800,7 +2779,7 @@ function computeVision(): Vision {
   const grants = myIntel();
   grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
   intelFleetOwners = targetsOf(grants, 'fleets');
-  return { identify, radar };
+  return { identify, radar, signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify) };
 }
 
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
@@ -2845,10 +2824,6 @@ function known(id: string | null | undefined): boolean {
  *  именно его, а не рукописный `if` внутри свитча. */
 function admits(type: string, p: Record<string, unknown>): boolean {
   return recapAdmits(type, p.owner as string | undefined, ME, known(p.planetId as string));
-}
-/** True if node `id` is inside radar reach (signature-level detection). */
-function radarHas(id: string | null | undefined): boolean {
-  return !!vision && id != null && vision.radar.has(id);
 }
 /** Fog gate: «этот мир игроку вообще видно в деталях?» — опознан или свой.
  *  Правило живёт ОДНОЙ функцией в `fogView.ts` (REFM-62): оно нужно и панели, и

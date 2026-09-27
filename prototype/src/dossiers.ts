@@ -20,6 +20,7 @@
 import {
   buildingLevel,
   thresholdRamp,
+  signatureSize,
   unitTier,
   COMBAT_UNIT_CAP,
   type GameState,
@@ -41,6 +42,15 @@ import type { ActiveBuild, BuildKind, BuildLane, QueuedBuild } from './buildQueu
 export interface Dossier {
   name: string;
   body: string;
+}
+
+function signatureLabel(strength: number): string {
+  const size = signatureSize(strength);
+  return size === 'L' ? t('codex.signature.high') : size === 'M' ? t('codex.signature.medium') : t('codex.signature.low');
+}
+
+function radarDetects(level: number): string {
+  return level >= 3 ? t('codex.radar.all') : level >= 2 ? t('codex.radar.medium-plus') : t('codex.radar.high-only');
 }
 
 /** What the dossiers need from the live match screen. */
@@ -88,7 +98,7 @@ export function buildingDossier(id: string, level: number): Dossier | null {
     case 'radar':
       return {
         name,
-        body: t('dossier.building.radar', { r: hl(lv.radarRange ?? 0) }),
+        body: t('dossier.building.radar', { r: hl(lv.radarRange ?? 0), lv: hl(lv.radarLevel), s: radarDetects(lv.radarLevel) }),
       };
     case 'fort':
       return {
@@ -577,7 +587,11 @@ export function createDossiers(host: DossierHost): {
           cxRow(t('codex.row.garrison-defense'), `+${Math.round((lv.defenseBonus ?? 0) * 100)}%`),
         );
       if ((lv.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), String(lv.aaDamage)));
-      if ((lv.radarRange ?? 0) > 0) rows.push(cxRow(t('codex.row.radar'), String(lv.radarRange)));
+      if ((lv.radarRange ?? 0) > 0) {
+        rows.push(cxRow(t('codex.row.radar'), String(lv.radarRange)));
+        rows.push(cxRow(t('codex.row.radar-level'), String(lv.radarLevel)));
+        rows.push(cxRow(t('codex.row.radar-detects'), radarDetects(lv.radarLevel)));
+      }
       if ((def.scoreValue ?? 0) > 0)
         rows.push(
           cxRow(t('codex.row.score'), t('codex.value.per-level', { n: def.scoreValue ?? 0 })),
@@ -635,8 +649,12 @@ export function createDossiers(host: DossierHost): {
     if ((st.cargoCapacity ?? 0) > 0)
       rows.push(cxRow(t('codex.row.cargo'), String(st.cargoCapacity)));
     if ((st.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), String(st.aaDamage)));
-    rows.push(cxRow(t('codex.row.signature'), String(def.signature ?? 1)));
-    if ((def.radarRange ?? 0) > 0) rows.push(cxRow(t('codex.row.radar'), String(def.radarRange)));
+    rows.push(cxRow(t('codex.row.signature'), `${signatureLabel(def.signature)} · ${def.signature}`));
+    if ((def.radarRange ?? 0) > 0) {
+      rows.push(cxRow(t('codex.row.radar'), String(def.radarRange)));
+      rows.push(cxRow(t('codex.row.radar-level'), String(def.radarLevel)));
+      rows.push(cxRow(t('codex.row.radar-detects'), radarDetects(def.radarLevel)));
+    }
     const upkeep = resLine(def.upkeep ?? {}, { per: 'd' });
     if (upkeep) rows.push(cxRow(t('codex.row.upkeep'), upkeep));
     // Домен и трейты могут нести один и тот же ключ (у наземных юнитов domain:

@@ -4,6 +4,8 @@ import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
+import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
+export type { SignatureContact, SignatureSize } from './radarSignals';
 import type {
   Fleet,
   GameState,
@@ -83,19 +85,6 @@ export function worldSightOf(rules: Readonly<SightRules>, kind: string | undefin
  *  (close contacts are resolved; far ones are just blips). */
 const IDENTIFY_REACH_FRACTION = 0.5;
 
-/** Size buckets for a radar contact — a coarse image, never the composition. */
-export type SignatureSize = 'S' | 'M' | 'L';
-function bucket(signature: number): SignatureSize {
-  return signature >= 13 ? 'L' : signature >= 5 ? 'M' : 'S';
-}
-
-/** A radar contact: an enemy fleet detected by radar only — position + a coarse
- *  size, no identity or composition. */
-export interface SignatureContact {
-  location: PlanetId;
-  size: SignatureSize;
-}
-
 /** The state as one player may see it: a filtered `GameState`, the radar
  *  contacts that stand in for fleets detected but not identified, and the ids of
  *  worlds shown from memory (greyed "last known", variant B). */
@@ -103,15 +92,6 @@ export type VisibleState = GameState & {
   signatures: SignatureContact[];
   remembered: PlanetId[];
 };
-
-/** Total radar signature of a fleet = Σ count × per-unit signature. */
-function fleetSignature(fleet: Fleet, data: GameData): number {
-  let total = 0;
-  for (const stack of fleet.units) {
-    total += stack.count * (data.units[stack.unit]?.signature ?? 1);
-  }
-  return total;
-}
 
 /**
  * Radar reach one stack projects: the hull's OWN dish plus what its installed
@@ -353,6 +333,66 @@ export function identifiedNodes(
   return sensorCoverage(state, viewerId, data).identify;
 }
 
+/** Shared radar projection for the server and solo client. It deliberately contains
+ * no fleet identity, owner, count or loadout; identification remains a separate rule. */
+export function radarSignatures(
+  state: GameState,
+  viewerId: PlayerId,
+  data: GameData,
+  identify: ReadonlySet<PlanetId> = identifiedNodes(state, viewerId, data),
+): SignatureContact[] {
+  const sources: RadarSource[] = [];
+  const scale = sightRulesOf(state).radarScale;
+  for (const owner of visionBloc(state, viewerId)) {
+    const mult = scale * radarMultiplier(state, owner, data);
+    const add = (at: { x: number; y: number }, range: number, level: number): void => {
+      if (range * mult > 0) sources.push({ ...at, range: range * mult, level });
+    };
+    for (const planet of Object.values(state.planets)) {
+      if (planet.owner !== owner) continue;
+      for (const b of planet.buildings) {
+        const def = data.buildings[b.type];
+        if (!def) continue;
+        const lv = buildingLevel(def, b.level);
+        add(planet.position, lv.radarRange, lv.radarLevel);
+      }
+    }
+    for (const fleet of Object.values(state.fleets)) {
+      if (fleet.owner !== owner) continue;
+      const at = fleetPosition(state, fleet);
+      if (!at) continue;
+      for (const stack of fleet.units) {
+        const def = data.units[stack.unit];
+        if (def && stack.count > 0) add(at, stackRadarRange(def, stack, data), def.radarLevel);
+      }
+    }
+  }
+  if (!sources.length) return [];
+  const spied = new Set((state.intel?.[viewerId] ?? [])
+    .filter((g) => g.kind === 'fleets' && g.until > state.time).map((g) => g.target));
+  const emitters: SignalEmitter[] = [];
+  for (const fleet of Object.values(state.fleets)) {
+    if (fleet.owner === viewerId || spied.has(fleet.owner)) continue;
+    const location = fleetNode(state, fleet);
+    const at = fleetPosition(state, fleet);
+    if (location === null || identify.has(location) || !at) continue;
+    const emitter: SignalEmitter = { location, ...at, strength: fleetSignalStrength(fleet, data) };
+    const node = state.planets[location]?.position;
+    if (node && (node.x !== at.x || node.y !== at.y)) emitter.inTransit = true;
+    emitters.push(emitter);
+  }
+  // Decoys obey the same sensitivity, proximity and expiry rules as real emissions.
+  for (const hero of Object.values(state.heroes ?? {})) {
+    if (hero.owner === viewerId || hero.alive !== true) continue;
+    for (const decoy of hero.activeDecoys ?? []) {
+      const at = state.planets[decoy.at]?.position;
+      if (decoy.until <= state.time || identify.has(decoy.at) || !at) continue;
+      emitters.push({ location: decoy.at, ...at, strength: decoy.signature });
+    }
+  }
+  return detectSignals(emitters, sources);
+}
+
 /** Ad-hoc query (A4): can `viewerId` see this object at IDENTIFY detail right
  *  now? Exactly the rule `visibleState` projects by — own objects always, others
  *  when their node is currently identified. A radar-only contact answers false
@@ -416,7 +456,7 @@ function project(
   state: GameState,
   viewerId: PlayerId,
   data: GameData,
-  { identify, radar }: Coverage,
+  { identify }: Coverage,
 ): VisibleState {
   const view = deepClone(state) as VisibleState;
   // EVT-2 bookkeeping is SERVER-SIDE ONLY. It is keyed by node and priced from what
@@ -668,45 +708,14 @@ function project(
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.
-  const signatures: SignatureContact[] = [];
+  view.signatures = radarSignatures(state, viewerId, data, identify);
   for (const id of Object.keys(view.fleets).sort()) {
     const fleet = view.fleets[id];
     if (!fleet || fleet.owner === viewerId || spiedFleets.has(fleet.owner)) continue;
     const node = fleetNode(view, fleet);
     if (node !== null && identify.has(node)) continue; // fully identified
-    if (node !== null && radar.has(node)) {
-      signatures.push({ location: node, size: bucket(fleetSignature(fleet, data)) });
-    }
     delete view.fleets[id];
   }
-  // HERO-FX `decoy`: phantom contacts other players' heroes planted (`hero.effect.decoy`).
-  // A lie told to a radar is told HERE, in the per-viewer projection, and never in
-  // `GameState` — a fake fleet there would fight, capture and count toward victory.
-  // Read off `state`, not `view`: other players' heroes are stripped from the view above.
-  //
-  // A phantom passes exactly the two gates a real contact passes, which is what makes it
-  // believable and what makes it beatable:
-  //   · the viewer's RADAR must reach the node — a decoy nobody watches fools nobody;
-  //   · an IDENTIFIED node shows its real (empty) contents, so scouting the spot calls
-  //     the bluff. No extra rule needed for either.
-  // The owner is never fooled by its own decoy, and a DEAD hero radiates nothing —
-  // the same liveness rule its auras and reveals follow.
-  const decoyHeroes = state.heroes;
-  if (decoyHeroes !== undefined) {
-    // Sorted (BF-13): the emitted list must not follow JSONB key order.
-    for (const id of Object.keys(decoyHeroes).sort()) {
-      const hero = decoyHeroes[id]!;
-      if (hero.owner === viewerId || hero.alive !== true) continue;
-      for (const d of hero.activeDecoys ?? []) {
-        if (d.until <= state.time || identify.has(d.at) || !radar.has(d.at)) continue;
-        signatures.push({ location: d.at, size: bucket(d.signature) });
-      }
-    }
-  }
-  signatures.sort((a, b) => (a.location < b.location ? -1 : a.location > b.location ? 1 : 0));
-  view.signatures = signatures;
-
-
   // Battles you cannot see, and enemy timers from the schedule (it leaks future
   // events) — but KEEP the viewer's own pending events: their construction/production/
   // arrivals are their own information, and the client renders the build queue + ETAs
