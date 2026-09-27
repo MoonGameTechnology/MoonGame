@@ -254,6 +254,33 @@ describe('заголовки доставки клиента (SE-7.1)', () => {
     }
   });
 
+  it('другие документы хоста уходят со СВОЕЙ политикой, а не с политикой для JSON', async () => {
+    // Дев-клиент и пульт прото-хоста были обычными маршрутами. Им доставалась базовая
+    // политика API (`default-src 'none'`), и скрипт документа не запускался вовсе.
+    const DEV = '<!doctype html><title>d</title><style>i{color:red}</style><script>dev()</script>';
+    const server = createMultiplayerServer({
+      room: makeRoom(),
+      indexHtml: CLIENT,
+      documents: [{ routes: ['/dev', '/dev/game/:matchId'], html: DEV }],
+    });
+    const base = httpBase(await server.listen());
+    try {
+      const { scripts, styles } = inlineHashes(DEV);
+      for (const path of ['/dev', '/dev/game/m-9f2c4b']) {
+        const res = await fetch(`${base}${path}`);
+        expect(await res.text()).toBe(DEV);
+        const csp = res.headers.get('content-security-policy') ?? '';
+        expect(csp, path).toContain(`script-src ${scripts[0]}`);
+        expect(csp, path).toContain(`style-src ${styles[0]}`);
+        // Хеш игры сюда не подходит: у каждого документа политика по его же блокам.
+        expect(csp, path).not.toContain(inlineHashes(CLIENT).scripts[0]);
+        expect(res.headers.get('cache-control'), path).toBe('no-store, must-revalidate');
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
   it('площадке-порталу встраивание разрешается параметром, а не снятием заголовка', async () => {
     const server = createMultiplayerServer({
       room: makeRoom(),

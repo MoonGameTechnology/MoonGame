@@ -29,6 +29,11 @@ export interface MultiplayerServerOptions {
    *  the client the game itself, so a peer just opens `http://host:port/` (no file
    *  transfer, and the connect overlay auto-fills the same-origin ws:// URL). */
   indexHtml?: string;
+  /** Другие HTML-документы хоста — дев-клиент, пульт администратора: маршруты и текст.
+   *  Каждый уходит, как и игра, с политикой по СВОИМ инлайновым блокам (SE-7.1). Маршрут,
+   *  заведённый мимо этого списка, получил бы политику для JSON, и скрипт документа не
+   *  запустился бы вовсе. */
+  documents?: readonly { routes: readonly string[]; html: string }[];
   /** Кому разрешено встраивать документ в свой iframe (SE-7.1, правило 5). По умолчанию
    *  никому. Площадка-портал (`YAG`) показывает игру в своём фрейме — её origin
    *  перечисляется здесь, а не вырезанием заголовка. */
@@ -206,9 +211,6 @@ export function createMultiplayerServer(
   const wss = new WebSocketServer({ noServer: true, maxPayload: 32_768 });
 
   const indexHtml = options.indexHtml;
-  // SE-7.1: хеши инлайновых блоков считаются ОДИН раз на сборку документа — политика
-  // не может разъехаться с тем, что уходит игроку, а на запрос ничего не считается.
-  const indexInline = indexHtml === undefined ? undefined : inlineHashes(indexHtml);
   const ready = options.ready;
   let draining = false; // flips at close() so /ready reports 503 during graceful drain
 
@@ -291,7 +293,7 @@ export function createMultiplayerServer(
     void reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
     void reply.header('access-control-allow-headers', 'authorization, content-type');
     // SE-7.1: базовый набор на КАЖДЫЙ ответ — JSON исполнять нечего, и браузер не должен
-    // додумывать его тип. Документ игры (`serveIndex`) ставит поверх свою политику.
+    // додумывать его тип. HTML-документы (`serveDocument`) ставят поверх свою политику.
     for (const [name, value] of Object.entries(apiSecurityHeaders(overHttps(options, req.raw))))
       void reply.header(name, value);
     // Ответы API персональные: `/commander/me`, `/arsenal/me`, `/corps/me`, весь `/ava/*`
@@ -338,21 +340,31 @@ export function createMultiplayerServer(
     for (const id of ids) connections += registry.get(id)?.peerCount ?? 0;
     return { matches: ids.length, connections };
   });
-  if (indexHtml !== undefined) {
-    // The single-file client changes every rebuild; never let a browser serve a stale
-    // cached copy (else client fixes silently don't reach the player).
-    const serveIndex = async (request: FastifyRequest, reply: FastifyReply): Promise<string> => {
+  // The single-file client changes every rebuild; never let a browser serve a stale
+  // cached copy (else client fixes silently don't reach the player).
+  const serveDocument = (html: string) => {
+    // SE-7.1: политика документа — по хешам его же инлайновых блоков. Считаются ОДИН раз
+    // на сборку документа: политика не может разъехаться с тем, что уходит игроку, а на
+    // запрос ничего не считается.
+    const inline = inlineHashes(html);
+    return async (request: FastifyRequest, reply: FastifyReply): Promise<string> => {
       void reply.header('content-type', 'text/html; charset=utf-8');
       void reply.header('cache-control', 'no-store, must-revalidate');
-      // SE-7.1: политика документа — по хешам его же инлайновых блоков.
       const headers = securityHeaders({
-        ...(indexInline ? { inline: indexInline } : {}),
+        inline,
         https: overHttps(options, request.raw),
         ...(options.frameAncestors ? { frameAncestors: options.frameAncestors } : {}),
       });
       for (const [name, value] of Object.entries(headers)) void reply.header(name, value);
-      return indexHtml;
+      return html;
     };
+  };
+  for (const doc of options.documents ?? []) {
+    const serve = serveDocument(doc.html);
+    for (const route of doc.routes) app.get(route, serve);
+  }
+  if (indexHtml !== undefined) {
+    const serveIndex = serveDocument(indexHtml);
     app.get('/', serveIndex);
     app.get('/index.html', serveIndex);
     // ADDR-3: партия адресуется ПУТЁМ (`/game/<id>`), а не хвостом (`/?join=<id>`), —
