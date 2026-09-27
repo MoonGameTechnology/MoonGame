@@ -179,6 +179,7 @@ export {
   visibleView,
   identifiedNodes,
   sensorCoverage,
+  radarSignatures,
   isVisibleTo,
   fleetRadarRange,
   stackRadarRange,
@@ -190,6 +191,7 @@ export {
   worldRadarReach,
   fleetRadarReach,
 } from './state/visibility';
+export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
 export type {
   Coverage,
   SightCircle,

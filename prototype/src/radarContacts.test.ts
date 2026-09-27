@@ -1,15 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { netContacts, soloContacts, type ContactFleet, type SigSize } from './radarContacts';
+import { netContacts } from './radarContacts';
 
 const никогдаНеОпознан = () => false;
-const всёПодРадаром = () => true;
-const размер = (): SigSize => 'M';
-
-interface Флот extends ContactFleet {
-  node: string | null;
-}
-const узел = (f: Флот) => f.node;
-
 describe('радар — серверные сигнатуры', () => {
   it('контакт с неопознанного узла становится отметкой', () => {
     expect(netContacts([{ location: 'C1', size: 'L' }], никогдаНеОпознан)).toEqual([
@@ -42,65 +34,10 @@ describe('радар — серверные сигнатуры', () => {
   });
 });
 
-describe('радар — отбор в соло', () => {
-  const чужой: Флот = { id: 'p2-1', owner: 'p2', node: 'C3' };
-
-  it('чужой флот на неопознанном узле под радаром — отметка', () => {
-    expect(soloContacts([чужой], 'p1', узел, никогдаНеОпознан, всёПодРадаром, размер)).toEqual([
-      { key: 'p2-1', node: 'C3', size: 'M' },
-    ]);
-  });
-
-  it('СВОЙ ФЛОТ ОТМЕТКОЙ НЕ БЫВАЕТ: он и так виден', () => {
-    const свой: Флот = { id: 'p1-1', owner: 'p1', node: 'C3' };
-    expect(soloContacts([свой], 'p1', узел, никогдаНеОпознан, всёПодРадаром, размер)).toEqual([]);
-  });
-
-  it('опознанный узел отметкой не бывает и в соло', () => {
-    expect(soloContacts([чужой], 'p1', узел, (id) => id === 'C3', всёПодРадаром, размер)).toEqual(
-      [],
-    );
-  });
-
-  it('ВНЕ РАДАРА ОТМЕТКИ НЕТ: засекать нечем', () => {
-    expect(soloContacts([чужой], 'p1', узел, никогдаНеОпознан, () => false, размер)).toEqual([]);
-  });
-
-  it('флот без узла (в пути мимо графа) отметкой не становится', () => {
-    const вникуда: Флот = { id: 'p2-2', owner: 'p2', node: null };
-    expect(soloContacts([вникуда], 'p1', узел, никогдаНеОпознан, всёПодРадаром, размер)).toEqual(
-      [],
-    );
-  });
-
-  it('ключом в соло служит сам флот, а не узел — два флота в одном узле различимы', () => {
-    const второй: Флот = { id: 'p2-9', owner: 'p2', node: 'C3' };
-    const из = soloContacts([чужой, второй], 'p1', узел, никогдаНеОпознан, всёПодРадаром, размер);
-    expect(из.map((c) => c.key)).toEqual(['p2-1', 'p2-9']);
-  });
-
-  it('ОТБОР В СОЛО НЕ СЛАБЕЕ СЕТЕВОГО: свой, опознанный и «вне радара» отсеиваются разом', () => {
-    const флоты: Флот[] = [
-      { id: 'p1-1', owner: 'p1', node: 'C1' }, // свой
-      { id: 'p2-1', owner: 'p2', node: 'C2' }, // узел опознан
-      { id: 'p2-2', owner: 'p2', node: 'C3' }, // вне радара
-      { id: 'p2-3', owner: 'p2', node: 'C4' }, // единственная настоящая засечка
-    ];
-    const из = soloContacts(
-      флоты,
-      'p1',
-      узел,
-      (id) => id === 'C2',
-      (id) => id !== 'C3',
-      размер,
-    );
-    expect(из).toEqual([{ key: 'p2-3', node: 'C4', size: 'M' }]);
-  });
-
-  it('ничейный флот своим не считается', () => {
-    const ничей: Флот = { id: 'x-1', owner: null, node: 'C5' };
-    expect(soloContacts([ничей], 'p1', узел, никогдаНеОпознан, всёПодРадаром, размер)).toHaveLength(
-      1,
-    );
-  });
+it('keeps a moving contact at its observed position rather than at the node', () => {
+  const position = { x: 250, y: 12 };
+  const contacts = netContacts([{ location: 'C1', size: 'M', position }], () => false);
+  expect(contacts[0]?.position).toEqual(position);
+  position.x = 900;
+  expect(contacts[0]?.position?.x).toBe(250);
 });

@@ -1,42 +1,22 @@
-/**
- * Кто вообще может стать радарной отметкой (REFM-96).
- *
- * У развёртки два разных источника — сервер в сети и полное состояние в соло, — и оба
- * набирались прямо внутри кадра развёртки, вперемешку с рисованием и звуком. Из-за
- * этого не читалось главное: почему в соло приходится ФИЛЬТРОВАТЬ то, что в сети уже
- * отфильтровано сервером.
- *
- * 1. **В сети засечки приходят ГОТОВЫМИ.** Чужие флоты в фог-состоянии физически
- *    отсутствуют, сервер шлёт вместо них грубые контакты — придумывать их клиенту не из
- *    чего и не нужно.
- * 2. **В соло тот же отбор приходится делать САМОМУ, и так же строго,** иначе одиночная
- *    игра покажет больше сетевой: у клиента на руках всё состояние целиком.
- * 3. **Свой флот отметкой не бывает** — он и так виден, а «засечка» собственной эскадры
- *    читалась бы как чужая.
- * 4. **ОПОЗНАННЫЙ узел отметкой не бывает** ни в соло, ни в сети: там флот показывается
- *    сам собой, и отметка была бы вторым, призрачным изображением того же флота.
- * 5. **Вне радарного покрытия отметки нет** — засекать нечем; в сети это правило уже
- *    применил сервер, поэтому его контакты покрытием не проверяются повторно.
- * 6. **Ключ памяти различает источник:** у серверного контакта нет id флота, поэтому
- *    ключ строится из узла и порядкового номера, а в соло ключ — сам флот. Общий ключ
- *    склеил бы две разные отметки в одном узле.
- */
-
+/** Anonymous contacts produced by the shared-core radar projection in both
+ * solo and multiplayer. Rendering never reconstructs hidden fleet identities. */
 /** Класс засечки — насколько крупная отметка. */
-export type SigSize = 'S' | 'M' | 'L';
+export type { SignatureSize as SigSize } from '../../packages/shared-core/src/state/radarSignals';
+import type {
+  SignatureContact,
+  SignatureSize as SigSize,
+} from '../../packages/shared-core/src/state/radarSignals';
 
 /** Отметка на радаре: чем её помнить, где она и какого размера. */
 export interface RadarContact {
   key: string;
   node: string;
   size: SigSize;
+  position?: { x: number; y: number };
 }
 
 /** Грубый контакт, каким его присылает сервер. */
-export interface NetSignature {
-  location: string;
-  size: SigSize;
-}
+export type NetSignature = SignatureContact;
 
 /** Контакты из серверных сигнатур: опознанный узел отбрасывается (правила 1, 4, 6). */
 export function netContacts(
@@ -46,32 +26,9 @@ export function netContacts(
   const out: RadarContact[] = [];
   sigs.forEach((c, i) => {
     if (known(c.location)) return;
-    out.push({ key: `sig:${c.location}:${i}`, node: c.location, size: c.size });
+    const contact: RadarContact = { key: `sig:${c.location}:${i}`, node: c.location, size: c.size };
+    if (c.position) contact.position = { ...c.position };
+    out.push(contact);
   });
-  return out;
-}
-
-/** Флот, каким его видит отбор засечек. */
-export interface ContactFleet {
-  id: string;
-  owner: string | null;
-}
-
-/** Контакты из полного состояния в соло — тот же отбор, что делает сервер (правила 2–6). */
-export function soloContacts<F extends ContactFleet>(
-  fleets: readonly F[],
-  me: string,
-  nodeOf: (f: F) => string | null,
-  known: (id: string) => boolean,
-  radarHas: (id: string) => boolean,
-  sizeOf: (f: F) => SigSize,
-): RadarContact[] {
-  const out: RadarContact[] = [];
-  for (const f of fleets) {
-    if (f.owner === me) continue;
-    const node = nodeOf(f);
-    if (!node || known(node) || !radarHas(node)) continue;
-    out.push({ key: f.id, node, size: sizeOf(f) });
-  }
   return out;
 }

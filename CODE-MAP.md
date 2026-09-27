@@ -243,6 +243,7 @@
 | `kernel/kernel.ts` | `Kernel.applyAction(state, action, ctx)` | чистое применение действия |
 | `kernel/kernel.ts` | `Kernel.advanceTo(state, ctx)` | сдвиг часов + scheduled events |
 | `kernel/kernel.ts` | `Kernel.canApply` / `canApplyAll` | «можно ли?» ЗАРАНЕЕ (RULES-1/3) — тот же прогон, результат выброшен |
+| `state/radarSignals.ts` | `detectSignals`, `signatureSize`, `radarThreshold` | сила сигнала группы и чувствительность радара; `visibility.ts:radarSignatures` собирает источники и скрытые контакты |
 | `state/gameState.ts` | `GameState`, `createInitialState`, `Player`, `Planet`, `Fleet`, `MatchState` | типы состояния |
 | `state/buildFromMap.ts` | `buildStateFromMap(map, data, opts)` | посев матча из карты |
 | `state/diplomacy.ts` | `getStance`, `setStance`, `pairKey`, `DEFAULT_STANCE` | дипломатия |

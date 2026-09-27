@@ -678,6 +678,14 @@ export const en: Record<string, string> = {
   'codex.row.hull': 'Hull',
   'codex.row.levels': 'Tiers',
   'codex.row.produces': 'Produces',
+  'codex.row.radar-level': 'Radar level',
+  'codex.row.radar-detects': 'Detects',
+  'codex.signature.low': 'Low',
+  'codex.signature.medium': 'Medium',
+  'codex.signature.high': 'High',
+  'codex.radar.high-only': 'High signatures',
+  'codex.radar.medium-plus': 'Medium and high signatures',
+  'codex.radar.all': 'All signatures',
   'codex.row.radar': 'Radar reach',
   'codex.row.range': 'Range',
   'codex.row.cooldown': 'Cooldown',
@@ -1092,7 +1100,7 @@ export const en: Record<string, string> = {
   'dossier.building.power-plant':
     "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
   'dossier.building.radar':
-    'A radar complex sees through the space around your world and catches enemy signatures long before they dare attack. Upgrades widen the coverage.',
+    'Range {r}. Level {lv}: {s}. Ships within 40 units of a group anchor combine their signals: medium starts at 5, high at 13. Close identification reveals composition.',
   'dossier.building.refinery':
     'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary shuttles.',
   'dossier.building.starfort':

@@ -28,15 +28,14 @@
  */
 import {
   buildingLevel,
+  signatureSize,
   type BuildingDef,
   type UnitDef,
 } from '../../packages/shared-core/src/index';
 import type { SigSize } from './radarContacts';
 
 /** Ступень крупности: с неё начинается «крупный» (правило 4). */
-export const SIG_LARGE = 13;
-/** Ступень крупности: с неё начинается «средний» (правило 4). */
-export const SIG_MEDIUM = 5;
+export { SIG_LARGE, SIG_MEDIUM } from '../../packages/shared-core/src/state/radarSignals';
 
 /** Стопка состава: сколько единиц одного типа (правило 1). */
 export interface SigStack {
@@ -56,7 +55,7 @@ export function fleetSignature(
 
 /** Ступень, которой отметка называет свою крупность (правила 3–4). */
 export function sigClass(sig: number): SigSize {
-  return sig >= SIG_LARGE ? 'L' : sig >= SIG_MEDIUM ? 'M' : 'S';
+  return signatureSize(sig);
 }
 
 /** Одно построенное здание мира: чем оно является и какого уровня. */

@@ -39,6 +39,7 @@
     "smoke:zoom": "node prototype/zoomtest.mjs",
     "smoke:frontier": "node prototype/frontiertest.mjs",
     "smoke:retreat": "node prototype/retreattest.mjs",
+    "smoke:radar": "node prototype/radartest.mjs",
     "smoke:startup": "node prototype/startuptest.mjs",
     "smoke:bootfail": "node prototype/bootfailuretest.mjs",
     "smoke:mobile": "node prototype/mobiletest.mjs",
