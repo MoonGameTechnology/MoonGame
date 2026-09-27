@@ -36,6 +36,7 @@
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
+| SHIPART-5 | ✅ | data proto cli | `docs/backlog.md` | Наземные портреты и отдельный состав пиратов |
 | SHIPART-4 | ✅ | proto cli | `docs/backlog.md` | Отдельные корпуса четырёх юнитов Sector Zero |
 | TXT-1 | ⏳ | proto | `docs/backlog.md` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
 | TXT-2 | ⏳ | proto | `docs/backlog.md` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |

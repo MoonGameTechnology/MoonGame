@@ -17,19 +17,19 @@ const solo = (faction: string): SetupConfig => ({
 describe('factions (H3) — passive house bonuses over the prototype data', () => {
   it('за стол садятся ЧЕТЫРЕ дома, и пассивки всего каталога — чисто экономика/юниты', () => {
     // CONV-12b развёл два разных факта, которые до сведения каталогов совпадали и
-    // потому читались как один. КАТАЛОГ несёт шесть фракций: к четырём домам лора
+    // потому читались как один. КАТАЛОГ несёт семь фракций: к четырём домам лора
     // добавились `vanguard` (легаси-тег, которым помечены юниты канона) и `swarm`
-    // (со своим зданием `biomass_pit`). За СТОЛ по-прежнему садятся четыре — этот
+    // (со своим зданием `biomass_pit`), а также NPC-пираты. За СТОЛ садятся четыре — этот
     // список держит `PLAYABLE_FACTIONS`, и харнес замера читает именно его.
     expect([...PLAYABLE_FACTIONS].sort()).toEqual(['amber', 'azure', 'crimson', 'violet']);
     expect(Object.keys(data.factions).sort()).toEqual([
-      'amber', 'azure', 'crimson', 'swarm', 'vanguard', 'violet',
+      'amber', 'azure', 'crimson', 'pirates', 'swarm', 'vanguard', 'violet',
     ]);
     // Правило H3 проверяется по ВСЕМУ каталогу, а не только по посаженным: фракция,
     // заведённая с уникальным юнитом или радарным бонусом, нарушит его ещё до того,
     // как её посадят за стол.
     for (const [id, f] of Object.entries(data.factions)) {
-      if (id === 'swarm') continue; // NPC organisms are outside the symmetric human roster.
+      if (id === 'swarm' || id === 'pirates') continue; // NPC rosters are outside player-house symmetry.
       // pure passives: no unique units / faction abilities, no radar reach —
       // strictly «экономика или юниты» (production / damage / fleet speed).
       expect(f.uniqueUnits).toEqual([]);

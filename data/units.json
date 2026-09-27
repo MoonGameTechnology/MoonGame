@@ -711,5 +711,168 @@
       "utility": 1
     },
     "hullClass": "heavy"
+  },
+  "pirate_skiff": {
+    "faction": "pirates",
+    "stats": {
+      "attack": 5,
+      "defense": 4,
+      "speed": 64,
+      "hp": 12,
+      "cargoCapacity": 1
+    },
+    "line": "mid",
+    "cost": {
+      "metal": 20
+    },
+    "buildTimeHours": 1,
+    "upkeep": {
+      "credits": 8
+    },
+    "radarRange": 105,
+    "slots": {
+      "utility": 1
+    },
+    "hullClass": "light",
+    "traits": [
+      "support"
+    ]
+  },
+  "pirate_frigate": {
+    "faction": "pirates",
+    "stats": {
+      "attack": 3,
+      "defense": 5,
+      "speed": 56,
+      "hp": 30,
+      "cargoCapacity": 1
+    },
+    "line": "mid",
+    "radarRange": 60,
+    "cost": {
+      "metal": 55,
+      "microelectronics": 2
+    },
+    "buildTimeHours": 2,
+    "upkeep": {
+      "credits": 16
+    },
+    "slots": {
+      "defense": 1,
+      "utility": 3
+    },
+    "hullClass": "light"
+  },
+  "pirate_cruiser": {
+    "faction": "pirates",
+    "stats": {
+      "attack": 16,
+      "defense": 14,
+      "speed": 40,
+      "hp": 60,
+      "cargoCapacity": 5
+    },
+    "line": "front",
+    "signature": 4,
+    "cost": {
+      "metal": 60,
+      "credits": 20,
+      "microelectronics": 3
+    },
+    "buildTimeHours": 3,
+    "upkeep": {
+      "credits": 32
+    },
+    "slots": {
+      "weapon": 1,
+      "defense": 1,
+      "utility": 1
+    },
+    "hullClass": "medium"
+  },
+  "pirate_boarder": {
+    "faction": "pirates",
+    "domain": "ground",
+    "kind": "infantry",
+    "stats": {
+      "attack": 4,
+      "defense": 8,
+      "attackVsInfantry": 4,
+      "attackVsVehicle": 1,
+      "defenseVsInfantry": 8,
+      "defenseVsVehicle": 4,
+      "speed": 44,
+      "hp": 14,
+      "buildingDamage": 1
+    },
+    "traits": [
+      "ground"
+    ],
+    "cost": {
+      "metal": 15
+    },
+    "buildTimeHours": 1,
+    "upkeep": {
+      "credits": 8,
+      "food": 5
+    }
+  },
+  "pirate_marauder": {
+    "faction": "pirates",
+    "domain": "ground",
+    "kind": "infantry",
+    "stats": {
+      "attack": 8,
+      "defense": 20,
+      "attackVsInfantry": 8,
+      "attackVsVehicle": 4,
+      "defenseVsInfantry": 20,
+      "defenseVsVehicle": 14,
+      "speed": 40,
+      "hp": 34,
+      "buildingDamage": 2
+    },
+    "traits": [
+      "ground"
+    ],
+    "cost": {
+      "metal": 55,
+      "credits": 15
+    },
+    "buildTimeHours": 2,
+    "upkeep": {
+      "credits": 16,
+      "food": 5
+    }
+  },
+  "pirate_tank": {
+    "faction": "pirates",
+    "domain": "ground",
+    "kind": "vehicle",
+    "stats": {
+      "attack": 22,
+      "defense": 14,
+      "attackVsInfantry": 22,
+      "attackVsVehicle": 13,
+      "defenseVsInfantry": 14,
+      "defenseVsVehicle": 9,
+      "speed": 40,
+      "hp": 46,
+      "buildingDamage": 3,
+      "cargoSize": 2
+    },
+    "traits": [
+      "ground"
+    ],
+    "signature": 2,
+    "cost": {
+      "metal": 120,
+      "credits": 30
+    },
+    "buildTimeHours": 4,
+    "upkeep": {
+      "credits": 32,
+      "food": 10
+    }
   }
 }

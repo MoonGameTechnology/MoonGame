@@ -233,5 +233,52 @@
       "fortGarrisonBonus": -1
     },
     "veterans": false
+  },
+  "pirates": {
+    "name": "Pirate Clans",
+    "traits": [],
+    "abilities": [],
+    "uniqueUnits": [
+      "pirate_skiff",
+      "pirate_frigate",
+      "pirate_cruiser",
+      "pirate_boarder",
+      "pirate_marauder",
+      "pirate_tank"
+    ],
+    "startingLoadout": {
+      "resources": {
+        "credits": 500,
+        "metal": 500,
+        "food": 200,
+        "energy": 200,
+        "microelectronics": 100
+      },
+      "fleet": [
+        {
+          "unit": "pirate_cruiser",
+          "count": 3
+        },
+        {
+          "unit": "pirate_skiff",
+          "count": 1
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "pirate_marauder",
+          "count": 3
+        }
+      ],
+      "homeBuildings": [
+        "spaceport",
+        "radar",
+        "power_plant",
+        "fabricator"
+      ]
+    },
+    "passives": {
+      "combatDamageBonus": 0.1
+    }
   }
 }

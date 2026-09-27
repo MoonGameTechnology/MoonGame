@@ -337,7 +337,7 @@
 | `manifest.json` | версия контент-бандла |
 | `units.json` | юниты (корабли, пехота) |
 | `buildings.json` | здания |
-| `factions.json` | фракции — шесть: четыре дома (azure, crimson, amber, violet) + легаси-пара vanguard, swarm |
+| `factions.json` | семь фракций: четыре дома (azure, crimson, amber, violet), легаси-пара vanguard, swarm и NPC pirates |
 | `technologies.json` | технологии |
 | `modes.json` | режимы игры — семь пресетов (`standard`, `pve_waves`, `duel`, `team_2v2`…`team_5v5`): `victory` + `teamFormat` + опц. `modules[]`/`pve` |
 | `market.json` | список товаров сессионной биржи (`goods`) |

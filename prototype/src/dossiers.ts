@@ -154,6 +154,36 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
   if (!def) return null;
   const st = def.stats;
   switch (id) {
+    case 'pirate_skiff':
+      return {
+        name: displayUnit(id),
+        body: t('dossier.unit.pirate-skiff.desc', { sp: hl(st.speed), r: hl(def.radarRange ?? 0), hp: hl(st.hp) }),
+      };
+    case 'pirate_frigate':
+      return {
+        name: displayUnit(id),
+        body: t('dossier.unit.pirate-frigate.desc', { a: hl(st.attack), d: hl(st.defense), hp: hl(st.hp) }),
+      };
+    case 'pirate_cruiser':
+      return {
+        name: displayUnit(id),
+        body: t('dossier.unit.pirate-cruiser.desc', { a: hl(st.attack), hp: hl(st.hp), bay: hl(st.cargoCapacity ?? 0) }),
+      };
+    case 'pirate_boarder':
+      return {
+        name: displayUnit(id),
+        body: t('dossier.unit.pirate-boarder.desc', { hp: hl(st.hp), cs: hl(st.cargoSize ?? 1) }),
+      };
+    case 'pirate_marauder':
+      return {
+        name: displayUnit(id),
+        body: t('dossier.unit.pirate-marauder.desc', { hp: hl(st.hp), d: hl(st.defense) }),
+      };
+    case 'pirate_tank':
+      return {
+        name: displayUnit(id),
+        body: t('dossier.unit.pirate-tank.desc', { hp: hl(st.hp), a: hl(st.attack), cs: hl(st.cargoSize ?? 1) }),
+      };
     case 'scout':
       return {
         name: t('dossier.unit.scout.name'),

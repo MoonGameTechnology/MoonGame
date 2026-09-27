@@ -64,6 +64,12 @@ export const UNIT_ICON: Record<string, string> = {
   tank: '▮', // the heavy armour block
   drop_infantry: '⇓', // сброшенная с орбиты пехота — стрелка вниз, а не ещё один клин
   garrison: '⊓', // гарнизон форта: не клин и не строй — укрытие, из которого не выходят
+  pirate_boarder: '▿',
+  pirate_marauder: '◆',
+  pirate_tank: '▮',
+  pirate_skiff: '◌',
+  pirate_frigate: '⟁',
+  pirate_cruiser: '▲',
 };
 
 /** A small glyph per province KIND, drawn above each province so its type reads at a

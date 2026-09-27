@@ -169,7 +169,7 @@ BUILDINGS = {
 GARRISON = {
     'home_a': [{'unit': 'militia', 'count': 3}],
     'home_b': [{'unit': 'militia', 'count': 3}],
-    'globule': [{'unit': 'militia', 'count': 2}],
+    'globule': [{'unit': 'pirate_boarder', 'count': 2}],
     'observatory': [{'unit': 'militia', 'count': 2}],
 }
 
@@ -190,7 +190,7 @@ m = collections.OrderedDict([
     ('id', 'duel-testbed'), ('seed', 'duel-testbed'), ('time', 0),
     ('sectors', sectors),
     ('players', collections.OrderedDict([
-        ('pirates', {'name': 'Pirate Base', 'faction': 'vanguard', 'npc': 'pirate',
+        ('pirates', {'name': 'Pirate Base', 'faction': 'pirates', 'npc': 'pirate',
                      'resources': {'credits': 0, 'metal': 0}}),
         ('neutrals', {'name': 'Neutral AI Base', 'faction': 'vanguard', 'npc': 'neutral',
                       'resources': {'credits': 0, 'metal': 0}}),
@@ -205,7 +205,7 @@ m = collections.OrderedDict([
         ('fleet_b', {'owner': 'slot_b', 'location': 'home_b',
                      'units': [{'unit': 'cruiser', 'count': 2}]}),
         ('pirate_patrol', {'owner': 'pirates', 'location': 'globule',
-                           'units': [{'unit': 'frigate', 'count': 2}]}),
+                           'units': [{'unit': 'pirate_frigate', 'count': 2}]}),
     ])),
 ])
 open('data/maps/duel-testbed.json', 'w', encoding='utf-8').write(

@@ -15,9 +15,8 @@ describe('faction data (B1 / CR-1.1)', () => {
   const resourceIds = new Set(readJson('resources.json') as unknown as string[]);
   const ids = Object.keys(factions);
 
-  it('ships the four playable factions plus the legacy pair', () => {
-    // The four multiplayer houses (azure/crimson/amber/violet) + legacy vanguard/swarm.
-    expect(ids.sort()).toEqual(['amber', 'azure', 'crimson', 'swarm', 'vanguard', 'violet']);
+  it('ships the four playable factions, the legacy pair and NPC pirates', () => {
+    expect(ids.sort()).toEqual(['amber', 'azure', 'crimson', 'pirates', 'swarm', 'vanguard', 'violet']);
   });
 
   it('each faction validates and carries a loadout, unique units and passives', () => {
@@ -107,8 +106,8 @@ describe('faction data (B1 / CR-1.1)', () => {
     ]);
   });
 
-  it('human factions retain their symmetric roster', () => {
-    for (const id of ids.filter(id => id !== 'swarm')) {
+  it('player human factions retain their symmetric roster', () => {
+    for (const id of ['vanguard', 'azure', 'crimson', 'amber', 'violet']) {
       expect(FactionDefSchema.parse(factions[id]).uniqueUnits, id).toEqual([]);
     }
   });

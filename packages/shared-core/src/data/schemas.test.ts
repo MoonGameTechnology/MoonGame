@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.53'); // торговец экспедиции (`pve_waves.trader`, «живой курс») поверх 0.1.52: четыре универсальных отсека усиленного крейсера (SM-0.9) поверх 0.1.51: усиленный крейсер поверх 0.1.50: авианосец и десантный корабль слиты в «Носитель» поверх 0.1.49: радары забега и полигона ×1,5 вместо ×2,5 (PVR-6.33) поверх 0.1.48 (ремонтный ангар, SHU-5.4)
+    expect(data.version).toBe('0.1.54'); // отдельные корабли и наземные войска пиратов
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -197,12 +197,13 @@ describe('game data schema (docs/architecture.md §2)', () => {
   it('фрегат — платформа поддержки с самой широкой навеской (ROS-1.2)', () => {
     const data = parseGameData(loadShippedBundle());
     const frigate = data.units.frigate!;
-    // Корабль поддержки — отсеков у него больше, чем у любого другого корпуса.
+    // Обычный и пиратский фрегаты — платформы поддержки с одинаковой навеской.
     expect(frigate.slots).toEqual({ weapon: 0, defense: 1, utility: 3 });
+    expect(data.units.pirate_frigate!.slots).toEqual(frigate.slots);
     const bays = (u: typeof frigate): number =>
       u.slots.weapon + u.slots.defense + u.slots.utility;
     for (const [id, def] of Object.entries(data.units)) {
-      if (id === 'frigate') continue;
+      if (id === 'frigate' || id === 'pirate_frigate') continue;
       expect(bays(def), id).toBeLessThan(bays(frigate));
     }
     // Навеска не безразмерна: ЗАЩИТНЫЙ отсек у фрегата один, и второй защитный модуль

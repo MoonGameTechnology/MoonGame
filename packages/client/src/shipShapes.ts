@@ -70,6 +70,21 @@ export const SHIP_SHAPES = {
     detail: 'M12 1V8M12 16V23M2 7 8 10M16 14 22 17M2 17 8 14M16 10 22 7M10 10H14V14H10Z',
     engines: 'M10 12H14M12 10V14',
   },
+  pirateSkiff: {
+    hull: 'M11 1H13L15 8V11L20 14V18H17V22H13V18H10V21H6V16H3V13L8 11V6Z',
+    detail: 'M12 3V9M10 8H14V14H10ZM8 12 6 14V18M15 12 18 15V17M11 15V18M4 14H7M14 20H16',
+    engines: 'M7 20H9M14 21H16',
+  },
+  pirateFrigate: {
+    hull: 'M10 1H13V6H16V9H20V15H18V22H14V19H10V22H5V17H2V12H6V8H9Z',
+    detail: 'M11 3V9H14V16H10V9M7 10V17M4 13H7M16 10H18V14H16ZM7 19H9M15 18H17M10 17H14',
+    engines: 'M6 21H9M15 21H17',
+  },
+  pirateCruiser: {
+    hull: 'M9 1H14L17 5V8H21V12H23V18H20V22H15V20H10V23H4V19H1V12H5V7H8Z',
+    detail: 'M10 3H13V9H10ZM8 10H16V17H8ZM5 9V16H3M18 10V17H21M10 12H14V15H10ZM6 18H10M15 19H18M7 20V22',
+    engines: 'M5 22H9M16 21H19',
+  },
   ...SWARM_SHAPES,
 } as const;
 
@@ -94,6 +109,9 @@ export const UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
   // shuttle alone.
   shuttle_carrier: 'transport',
   landing_shuttle: 'dropship',
+  pirate_skiff: 'pirateSkiff',
+  pirate_frigate: 'pirateFrigate',
+  pirate_cruiser: 'pirateCruiser',
 };
 
 /** Swarm appearances for the shared roster, including the units used by PvE waves.
