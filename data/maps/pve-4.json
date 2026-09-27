@@ -449,7 +449,11 @@
           "unit": "swarm_lander",
           "count": 4
         }
-      ]
+      ],
+      "vault": {
+        "hours": 4,
+        "zone": "staging"
+      }
     },
     "east_reach": {
       "position": {

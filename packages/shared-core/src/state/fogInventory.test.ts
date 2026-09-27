@@ -108,6 +108,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   market: 'public', // сессионный стакан публичен по замыслу
   marketSeq: 'public',
   trader: 'public', // курс торговца экспедиции — цена рынка, одна на всех
+  extraction: 'public', // накопитель главы IV — сценарий PvE, у Роя нет «тайны» носителя: он его не ищет
   capital: 'filtered', // чужая столица — точка респавна героя, наводка
   autoAssault: 'filtered', // всё это — постоянные приказы, будущие намерения
   autoRetreat: 'filtered', // RETR-2: порог отхода и точка — намерение хозяина флота
@@ -381,6 +382,7 @@ function maximalState(): GameState {
     market: [{ id: 'm1', side: 'sell', owner: RIVAL, resource: 'metal', amount: 5, price: 3 }],
     marketSeq: 1,
     trader: { metal: { shift: 0.1, at: 0 } },
+    extraction: { vault: 'a', zone: 'b', hours: 4, doneMs: 0 },
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },
     autoRetreat: { mine: { at: 0.3, to: 'A' }, CANARY_fleet: { at: 0.3, to: 'CANARY_target' } },

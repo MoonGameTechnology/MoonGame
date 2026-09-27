@@ -19,6 +19,7 @@ import {
   takeBoon,
   engageFleet,
   equipHeroAbility,
+  extractionStart,
   forceMarchFleet,
   installHeroModule,
   instantRepairFleet,
@@ -145,6 +146,7 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['uninstallHeroModule', uninstallHeroModule(P, 'h1', 'plating')],
   ['equipHeroAbility', equipHeroAbility(P, 'h1', 'corridor')],
   ['unequipHeroAbility', unequipHeroAbility(P, 'h1', 'corridor')],
+  ['extractionStart', extractionStart(P, 'f1')],
 ];
 
 describe('строители приказов против схем гейта', () => {

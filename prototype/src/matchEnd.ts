@@ -43,6 +43,11 @@ export function endReasonText(reason: string | undefined): string {
       return t('ai.end.pve-cleared');
     case 'pve-failed':
       return t('ai.end.pve-failed');
+    // PVR-7.3: исход главы с архивом решает накопитель, а не волны.
+    case 'pve-extracted':
+      return t('ai.end.pve-extracted');
+    case 'pve-carrier-lost':
+      return t('ai.end.pve-carrier-lost');
     default:
       return t('ai.end.over');
   }

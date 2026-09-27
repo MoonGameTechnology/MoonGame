@@ -131,6 +131,12 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     // (that would be a free human ally) nor a pirate (never at peace to meet).
     if (sec.rendezvous !== undefined && map.players[sec.rendezvous]?.npc !== 'neutral')
       issues.push(`E_INVALID_RENDEZVOUS:${id}`);
+    // An archive's extraction zone must be a real, enterable province of this map.
+    if (sec.vault !== undefined) {
+      const zone = map.sectors[sec.vault.zone];
+      const blocked = zone && data?.sectorKinds[zone.kind]?.traversable === false;
+      if (!zone || blocked || sec.vault.zone === id) issues.push(`E_INVALID_VAULT:${id}`);
+    }
     if (data) {
       if (sec.kind && !data.sectorKinds[sec.kind]) issues.push(`E_UNKNOWN_KIND:${id}`);
       if (sec.terrain && !data.sectors[sec.terrain]) issues.push(`E_UNKNOWN_TERRAIN:${id}`);
@@ -144,6 +150,9 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       for (const g of sec.garrison) if (!data.units[g.unit]) issues.push(`E_UNKNOWN_UNIT:${g.unit}`);
     }
   }
+
+  if (Object.values(map.sectors).filter((s) => s.vault !== undefined).length > 1)
+    issues.push('E_MULTIPLE_VAULTS');
 
   // paths: known endpoints, no self-loop, no duplicate, neighbour-only
   const seen = new Set<string>();
@@ -685,6 +694,11 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     if (map.slots[slotId]) teamOf.set(a.playerId, map.slots[slotId]!.team);
   }
   const diplomacy = seedTeamDiplomacy(teamOf, options.crossTeamStart ?? 'war', players);
+  // Накопитель архива (PVR-7.3): карта объявила архив — у матча есть сценарий извлечения.
+  const vaultId = Object.keys(map.sectors)
+    .sort()
+    .find((id) => map.sectors[id]!.vault !== undefined);
+  const vault = vaultId === undefined ? undefined : map.sectors[vaultId]!.vault!;
 
   return {
     ...base,
@@ -695,5 +709,8 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     fleets,
     ...(diplomacy ? { diplomacy } : {}),
     ...(Object.keys(heroes).length ? { heroes } : {}),
+    ...(vaultId !== undefined && vault
+      ? { extraction: { vault: vaultId, zone: vault.zone, hours: vault.hours, doneMs: 0 } }
+      : {}),
   };
 }

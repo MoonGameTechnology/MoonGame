@@ -8,6 +8,7 @@ import {
   loadoutEffectsModule,
   minefieldModule,
   rendezvousModule,
+  extractionModule,
   captureOnArrivalModule,
 
   combatModule,
@@ -208,6 +209,9 @@ export const DEV_MODULES: GameModule[] = [
   // контакта и стойку `alliance`. В КОНЕЦ: хуков нет, на прибытие отвечает последним, так
   // что бой, захват и мины на узле завязываются как прежде.
   rendezvousModule,
+  // Накопитель архива главы IV (PVR-7.3): своё действие и свои поводы (`time.advanced`,
+  // прибытие, слияние, гибель флота, `ally.contact`), хуков нет. В КОНЕЦ по той же причине.
+  extractionModule,
 ];
 
 /** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
@@ -222,7 +226,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '48'; // PVR-7.2: в конец вошёл `rendezvous` 1.0.0 —
+export const MODULE_MANIFEST_VERSION = '49'; // PVR-7.3: в конец вошёл `extraction` 1.0.0 —
+// накопитель архива главы IV (извлечение у архива, носитель, доставка, потеря), `victory`
+// 1.3.0 судит главу с архивом по накопителю, а не по волнам. У состояния новая запись
+// `extraction`. Партия на 48 не знает этих правил.
+// export const MODULE_MANIFEST_VERSION = '48'; // PVR-7.2: в конец вошёл `rendezvous` 1.0.0 —
 // сценарный союзник главы IV: прибытие в место встречи ставит факт `missionFacts.contacted` и
 // стойку `alliance`. У состояния новые поля `Planet.rendezvous` и `missionFacts.contacted`.
 // Партия на 47 не знает этого правила.
