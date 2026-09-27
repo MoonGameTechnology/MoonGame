@@ -93,10 +93,13 @@ page.setDefaultTimeout(20_000);
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
 // Отчёты CSP браузер пишет в консоль как ошибки; разбираем их по событиям нарушения
-// (там есть директива), а в консоли оставляем всё остальное.
+// (там есть директива), а в консоли оставляем всё остальное. Отчёт узнаём по имени
+// политики, а не по началу фразы: она меняется от версии к версии Chromium
+// («Refused to apply…» у одной, «Applying inline style violates…» у той, что стоит в CI).
 const consoleErrors = [];
 page.on('console', (m) => {
-  if (m.type() === 'error' && !m.text().startsWith('Refused to')) consoleErrors.push(m.text());
+  if (m.type() === 'error' && !m.text().includes('Content Security Policy'))
+    consoleErrors.push(m.text());
 });
 /** Нарушения CSP за весь прогон, через все документы (вход в партию — навигация). */
 const cspSeen = [];
