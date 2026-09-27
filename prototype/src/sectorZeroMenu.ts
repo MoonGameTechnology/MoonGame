@@ -115,6 +115,9 @@ export interface SectorZeroMenuHooks {
   standalone: boolean;
   preparation: { open(): void; close(): void; isOpen(): boolean };
   account?: SectorZeroAccount;
+  /** ВРЕМЕННО (заказ владельца 2026-09-27): «Начать всё заново» — стереть профиль Sector Zero
+   *  и сохранённый забег. Нет хука — нет кнопки. Убирать вместе с `sz-reset*` в разметке. */
+  resetAll?: () => Promise<void>;
 }
 
 const numbersText = (n: ProfileNumbers): string => t('sector-zero.cloud.numbers', { ...n });
@@ -194,6 +197,8 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
   const confirmation = el('sz-confirm');
   const actions = el('sz-actions');
   const cloudChoice = el('sz-cloud-choice');
+  const resetButton = el<HTMLButtonElement>('sz-reset');
+  const resetConfirm = el('sz-reset-confirm');
   const signInRow = el('sz-signin-row');
   const signInButton = el<HTMLButtonElement>('sz-signin');
   const choiceButtons = ['sz-keep-here', 'sz-take-cloud'].map((id) => el<HTMLButtonElement>(id));
@@ -370,6 +375,8 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     }
     renderChapter();
     el('sz-back').hidden = h.standalone;
+    resetButton.hidden = !h.resetAll || !resetConfirm.hidden;
+    resetButton.disabled = loading || busy;
     signInRow.hidden = loading || !h.account?.canSignIn();
     signInButton.disabled = busy;
     // Развилка заменяет кнопки меню: играть до выбора — значит играть профилем, который
@@ -379,6 +386,8 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     if (fork) {
       actions.hidden = true;
       confirmation.hidden = true;
+      resetConfirm.hidden = true;
+      resetButton.hidden = true;
       el('sz-cloud-here').textContent = numbersText(fork.here);
       el('sz-cloud-cloud').textContent = numbersText(fork.cloud);
       for (const button of choiceButtons) button.disabled = busy;
@@ -402,6 +411,7 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     if (codexOpen()) closeCodex();
     document.body.classList.add('sector-zero-home');
     confirmation.hidden = true;
+    resetConfirm.hidden = true;
     actions.hidden = false;
     loading = true;
     render();
@@ -449,6 +459,26 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     h.startDev();
   });
   el('sz-cancel').addEventListener('click', cancel);
+  // ВРЕМЕННО: «Начать всё заново» — своё подтверждение, как у «Новой экспедиции».
+  function cancelReset(): void {
+    resetConfirm.hidden = true;
+    actions.hidden = false;
+    render();
+    resetButton.focus({ preventScroll: true });
+  }
+  resetButton.addEventListener('click', () => {
+    if (loading || busy || !h.resetAll) return;
+    actions.hidden = true;
+    confirmation.hidden = true;
+    resetConfirm.hidden = false;
+    render();
+    el('sz-reset-cancel').focus({ preventScroll: true });
+  });
+  el('sz-reset-cancel').addEventListener('click', cancelReset);
+  el('sz-reset-yes').addEventListener('click', () => {
+    const reset = h.resetAll;
+    if (reset && !resetConfirm.hidden) accountStep('Sector Zero: сброс прогресса', reset);
+  });
   /** Действие с облаком, после которого профиль мог смениться: меню читается заново. */
   function accountStep(what: string, step: () => Promise<void>): void {
     if (loading || busy) return;
@@ -552,11 +582,12 @@ export function initSectorZeroMenu(h: SectorZeroMenuHooks) {
     // then returns to the shared hub only when this menu was opened from there.
     canGoBack: (): boolean =>
       h.root.style.display === 'flex' &&
-      (h.preparation.isOpen() || codexOpen() || !confirmation.hidden || !h.standalone),
+      (h.preparation.isOpen() || codexOpen() || !confirmation.hidden || !resetConfirm.hidden || !h.standalone),
     back: (): void => {
       if (h.preparation.isOpen()) h.preparation.close();
       else if (codexOpen()) closeCodex();
       else if (!confirmation.hidden) cancel();
+      else if (!resetConfirm.hidden) cancelReset();
       else if (!h.standalone) {
         hide();
         h.back();

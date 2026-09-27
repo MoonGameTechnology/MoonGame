@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Void Dominion — player profile mockup</title><style>html,body{margin:0;background:#080f18}body{padding:12px}button{cursor:pointer}:focus-visible{outline:2px solid #a4edeb;outline-offset:3px}@media(max-width:420px){body{padding:0}}</style></head><body>
+<div id="vd-player-profile"  lang="ru">
+  <style>
+    #vd-player-profile{padding:12px 0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#e8f0f8;font-size:14px;line-height:1.45;color-scheme:dark}
+    #vd-player-profile *{box-sizing:border-box}
+    #vd-player-profile [hidden]{display:none!important}
+    #vd-player-profile button{font:inherit;color:inherit}
+    #vd-player-profile .mg-window{background:#0b1522;border:1px solid #2a3b4d;border-radius:16px;overflow:hidden;max-width:736px;margin:auto;box-shadow:0 16px 45px #0003}
+    #vd-player-profile .mg-top{padding:20px 22px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #223345}
+    #vd-player-profile .mg-brand{font-size:11px;letter-spacing:2.5px;color:#7ea1b9;margin-bottom:4px}
+    #vd-player-profile h2{font-size:21px;line-height:1.2;letter-spacing:-.4px;margin:0;font-weight:600;color:#f2f7fb}
+    #vd-player-profile h3{font-size:14px;font-weight:600;margin:0;color:#e8f0f8}
+    #vd-player-profile .mg-prototype{padding:5px 9px;font-size:11px;border:1px solid #476173;color:#b6ceda;border-radius:6px;white-space:nowrap}
+    #vd-player-profile .mg-toolbar{display:flex;gap:8px;padding:14px 22px 0;align-items:center;flex-wrap:wrap}
+    #vd-player-profile .mg-mode{display:flex;gap:3px;padding:3px;background:#101f30;border:1px solid #273b50;border-radius:9px;flex-wrap:wrap}
+    #vd-player-profile .mg-mode button{display:flex;align-items:center;justify-content:center;gap:7px;background:transparent;border:0;border-radius:6px;padding:9px 12px;font-size:12px;min-height:40px;color:#a4b7c8}
+    #vd-player-profile .mg-mode button[aria-pressed="true"]{background:#254354;color:#dcfbff}
+    #vd-player-profile .mg-demo-label{color:#95a7b8;font-size:11px;margin-left:auto}
+    #vd-player-profile .mg-header-tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+    #vd-player-profile .mg-languages{display:flex;gap:2px;border:1px solid #344c60;border-radius:7px;padding:2px;background:#101f30}
+    #vd-player-profile .mg-languages button{min-width:34px;min-height:34px;padding:5px;border:0;border-radius:4px;background:transparent;font-size:11px;color:#a4bbce}
+    #vd-player-profile .mg-languages button[aria-pressed="true"]{background:#28485a;color:#defaf7}
+    #vd-player-profile .mg-body{padding:18px 22px 20px;display:grid;grid-template-columns:minmax(0,1.18fr) minmax(0,1fr);gap:22px;align-items:start}
+    #vd-player-profile .mg-profile{border:1px solid #2b4052;border-radius:12px;overflow:hidden;background:#111f30;min-width:0}
+    #vd-player-profile .mg-stage{position:relative;aspect-ratio:1;background:radial-gradient(ellipse at 50% 30%,#29475b 0,#152c3f 40%,#0b1928 79%);isolation:isolate}
+    #vd-player-profile .mg-stage:before{content:"";position:absolute;inset:14px;border:1px solid #74b9d222;border-radius:50%;z-index:-1}
+    #vd-player-profile .mg-stage:after{content:"";position:absolute;inset:0;box-shadow:inset 0 -20px 30px -16px #08111e;pointer-events:none}
+    #vd-player-profile .mg-main-portrait{display:block;width:100%;height:100%;object-fit:contain}
+    #vd-player-profile .mg-slots{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:76%;min-width:236px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;z-index:2}
+    #vd-player-profile .mg-slot{height:44px;min-width:0;display:flex;align-items:center;justify-content:center;padding:0;border:1px dashed #7796ae88;border-radius:5px;background:#0b1e2e88;color:#b8d0e1;position:relative}
+    #vd-player-profile .mg-slot.mg-occupied{border:1px solid #9bb3c83b;background:#06111b35}
+    #vd-player-profile .mg-slot[aria-pressed="true"]{border:1px solid #98e6e5;background:#2045559c;box-shadow:0 0 0 2px #80dcdb33}
+    #vd-player-profile .mg-slot svg{width:17px;height:17px;flex:none}
+    #vd-player-profile .mg-profile-footer{padding:13px 15px 14px;background:#0c1827;border-top:1px solid #243b50}
+    #vd-player-profile .mg-call-sign{font-size:23px;letter-spacing:-.5px;font-weight:600;margin:0 0 3px;color:#f3f7fa}
+    #vd-player-profile .mg-profile-caption{color:#a2b7c9;display:flex;align-items:center;gap:6px;justify-content:space-between;font-size:11px}
+    #vd-player-profile .mg-count{color:#93dedb;white-space:nowrap}
+    #vd-player-profile .mg-side{min-width:0}
+    #vd-player-profile .mg-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+    #vd-player-profile .mg-section-head span{font-size:11px;color:#89a3bb}
+    #vd-player-profile .mg-portraits{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+    #vd-player-profile .mg-portrait-option{position:relative;padding:0;aspect-ratio:.82;border:1px solid #34485c;border-radius:7px;background:radial-gradient(ellipse at 50% 25%,#2b4357,#132235);overflow:hidden;min-height:44px}
+    #vd-player-profile .mg-portrait-option img{width:100%;height:100%;object-fit:cover;object-position:center top;transform:scale(1.7);transform-origin:50% 8%;display:block}
+    #vd-player-profile .mg-portrait-option[aria-pressed="true"]{border:2px solid #91e1df;box-shadow:0 0 0 2px #6cdad81a}
+    #vd-player-profile .mg-portrait-option .mg-thumb-number{position:absolute;bottom:2px;right:3px;color:#dae9f1;font-size:10px;text-shadow:0 1px 3px #000}
+    #vd-player-profile .mg-selected-name{margin:8px 0 20px;font-size:12px;color:#bfd2e1}
+    #vd-player-profile .mg-divider{height:1px;background:#25394b;margin:0 0 16px}
+    #vd-player-profile .mg-selection-label{color:#98b4c8;font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+    #vd-player-profile .mg-detail-head{display:flex;gap:12px;align-items:center;margin-bottom:9px;min-height:44px}
+    #vd-player-profile .mg-detail-emblem{width:50px;min-width:50px;height:55px;display:flex;align-items:center;justify-content:center;background:#152b3b;border:1px solid #344d60;border-radius:9px}
+    #vd-player-profile .mg-detail-title{font-size:15px;line-height:1.25;font-weight:500;margin:0 0 4px;color:#eef6fb}
+    #vd-player-profile .mg-detail-state{font-size:11px;color:#8ed5cc}
+    #vd-player-profile .mg-criterion{font-size:12px;color:#b1c3d2;margin:0 0 12px;line-height:1.5}
+    #vd-player-profile .mg-actions{display:flex;flex-wrap:wrap;gap:7px}
+    #vd-player-profile .mg-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #3a566b;background:#193246;padding:8px 10px;border-radius:7px;min-height:38px;font-size:12px;color:#d5e9f3}
+    #vd-player-profile .mg-quiet{background:transparent;color:#acbfcf;border-color:#304456}
+    #vd-player-profile .mg-progress{height:4px;background:#203447;border-radius:3px;margin:8px 0 4px;overflow:hidden}
+    #vd-player-profile .mg-progress-fill{height:100%;background:#72b9bd}
+    #vd-player-profile .mg-progress-label{font-size:11px;color:#9db8ca;margin-bottom:12px}
+    #vd-player-profile .mg-empty-symbol{font-size:28px;font-weight:300;color:#86c8cb}
+    #vd-player-profile .mg-collection{border-top:1px solid #273b4e;padding:16px 22px 20px;background:#0d1b2b}
+    #vd-player-profile .mg-collection-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    #vd-player-profile .mg-collection-title{font-size:14px;font-weight:500}
+    #vd-player-profile .mg-done{padding:7px 10px;min-height:36px;background:transparent;border:1px solid #3a5267;border-radius:7px;color:#b7ccdc;font-size:12px}
+    #vd-player-profile .mg-filters{display:flex;gap:14px;margin-bottom:13px;flex-wrap:wrap}
+    #vd-player-profile .mg-filter{padding:0 0 6px;border:0;border-bottom:2px solid transparent;background:none;color:#8ea8bf;font-size:12px;min-height:32px}
+    #vd-player-profile .mg-filter[aria-pressed="true"]{color:#a8e6e5;border-color:#75cdcd}
+    #vd-player-profile .mg-medal-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    #vd-player-profile .mg-medal-choice{border:1px solid #30465a;border-radius:9px;background:#132538;padding:9px 7px;display:flex;gap:8px;align-items:center;text-align:left;min-height:70px;min-width:0}
+    #vd-player-profile .mg-medal-choice[aria-pressed="true"]{border-color:#85d6d4;background:#1b3b49}
+    #vd-player-profile .mg-medal-choice:disabled{opacity:.78}
+    #vd-player-profile .mg-choice-name{font-size:11px;font-weight:500;line-height:1.25;color:#e2edf5;display:block;overflow-wrap:anywhere}
+    #vd-player-profile .mg-choice-status{font-size:10px;color:#90aabd;display:block;margin-top:4px;line-height:1.2}
+    #vd-player-profile .mg-medal-choice.mg-locked{background:#101c2a}
+    #vd-player-profile .mg-locked .mg-medal{filter:grayscale(1);opacity:.65}
+    #vd-player-profile .mg-footnote{padding:10px 22px;background:#091421;border-top:1px solid #223449;color:#92aabd;font-size:11px;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+    #vd-player-profile .mg-live{color:#9bd7d5}
+    #vd-player-profile .mg-public .mg-slots .mg-slot{background:transparent;border-color:transparent;box-shadow:none}
+    #vd-player-profile .mg-public .mg-slots .mg-slot.mg-empty{visibility:hidden}
+    #vd-player-profile .mg-public .mg-profile{max-width:366px}
+    #vd-player-profile .mg-uniform-medals{position:absolute;left:calc(var(--medal-left,57%) - 8px);top:calc(var(--medal-top,61%) - 8px);width:calc(var(--medal-width,26%) + 16px);padding:8px;margin:0;min-width:0;border:0;border-radius:0;background:transparent;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;z-index:2;transform-origin:0 0;transform:var(--medal-plane,matrix(1,.04,-.03,.97,0,0));filter:brightness(var(--medal-light,.87)) saturate(.78)}
+    #vd-player-profile .mg-cloth-slot{display:block;position:relative;aspect-ratio:3/4;min-width:0;transform:rotate(var(--pin-angle,0deg));transform-origin:50% 9%}
+    #vd-player-profile .mg-cloth-slot:nth-child(5n+1){--pin-angle:-.7deg}
+    #vd-player-profile .mg-cloth-slot:nth-child(5n){--pin-angle:.8deg}
+    #vd-player-profile .mg-real-medal{display:inline-block;width:32px;height:auto;aspect-ratio:3/4;flex:none;background-image:var(--medal-atlas);background-repeat:no-repeat;background-size:400% 300%;background-position:var(--atlas-x,0%) var(--atlas-y,0%);vertical-align:middle}
+    #vd-player-profile .mg-cloth-slot .mg-real-medal{display:block;width:100%;height:100%;filter:drop-shadow(.3px .55px .25px #01050ac9) drop-shadow(.55px 1.1px .65px #050b12a6)}
+    #vd-player-profile .mg-detail-emblem .mg-real-medal{width:37px}
+    #vd-player-profile .mg-locked .mg-real-medal{filter:grayscale(.8);opacity:.65}
+    #vd-player-profile .mg-public-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+    #vd-player-profile .mg-public-badge{display:flex;align-items:center;text-align:left;gap:7px;min-height:48px;min-width:0;padding:6px 7px;line-height:1.3}
+    #vd-player-profile .mg-public-badge .mg-real-medal{width:24px}
+    #vd-player-profile .mg-public-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:16px}
+    #vd-player-profile .mg-public-badge{background:#172e40;border:1px solid #304b60;color:#bcd2e2;border-radius:6px;padding:6px 7px;min-height:48px;font-size:11px}
+    #vd-player-profile .mg-public-badge[aria-pressed="true"]{border-color:#8acac9;color:#d6f5f2}
+    #vd-player-profile .mg-pub-caption{font-size:12px;color:#9db5c9;margin:0 0 18px}
+    #vd-player-profile .mg-only-screen-reader{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(hover:hover){#vd-player-profile button:not(:disabled):not(.mg-uniform-medals):hover{filter:brightness(1.14)}}
+    @media(pointer:coarse){#vd-player-profile .mg-languages button{min-width:40px;min-height:44px}}
+    @media(pointer:coarse){#vd-player-profile .mg-action,#vd-player-profile .mg-done,#vd-player-profile .mg-filter,#vd-player-profile .mg-public-badge,#vd-player-profile .mg-mode button{min-height:44px}}
+    @media(max-width:580px){#vd-player-profile .mg-top{padding:17px 16px}#vd-player-profile .mg-toolbar{padding:12px 16px 0}#vd-player-profile .mg-demo-label{width:100%;margin-left:0}#vd-player-profile .mg-body{padding:16px;grid-template-columns:1fr;gap:18px}#vd-player-profile .mg-profile,#vd-player-profile .mg-public .mg-profile{width:100%;max-width:366px;margin:auto}#vd-player-profile .mg-portraits{gap:8px}#vd-player-profile .mg-portrait-option{max-height:82px}#vd-player-profile .mg-selected-name{margin-bottom:14px}#vd-player-profile .mg-collection{padding:15px 16px}#vd-player-profile .mg-medal-list{grid-template-columns:repeat(2,minmax(0,1fr))}#vd-player-profile .mg-footnote{padding:10px 16px}#vd-player-profile .mg-mode{width:100%}#vd-player-profile .mg-mode button{flex:1;padding:8px 7px}#vd-player-profile h2{font-size:20px}}
+
+    #vd-player-profile .mg-pages{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:10px}
+    #vd-player-profile .mg-page-label{font-size:11px;color:#a7bfd0;white-space:nowrap}
+    #vd-player-profile .mg-pages button{font-size:11px;min-height:44px;padding:7px 9px}
+    #vd-player-profile button:disabled{cursor:default;opacity:.5}
+    #vd-player-profile .mg-real-medal{position:relative}
+    #vd-player-profile .mg-grade-pin{position:absolute;top:11%;left:32%;width:40%;height:16%;display:flex;align-items:center;justify-content:center;font:600 7px Georgia,serif;line-height:1;color:#e9d8ad;background:linear-gradient(#b6a780,#706246);border-radius:.5px;text-shadow:0 .5px .3px #18120a;box-shadow:0 .4px .5px #0008}
+    #vd-player-profile .mg-cloth-slot .mg-grade-pin{font-size:3px}
+    #vd-player-profile .mg-grades{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
+    #vd-player-profile .mg-grade-choice{border:1px solid #3b5366;border-radius:6px;background:#15293b;padding:7px 4px;min-height:48px}
+    #vd-player-profile .mg-grade-choice[aria-pressed="true"]{border-color:#9cdedb;background:#234857}
+    #vd-player-profile .mg-grade-choice small{display:block;font-size:10px;color:#b4c8d8;margin-top:3px}
+    #vd-player-profile .mg-apply-grade{margin-bottom:9px;width:100%}
+  </style>
+  <article class="mg-window" aria-label="Макет персонализации карточки игрока Void Dominion">
+    <header class="mg-top">
+      <div><div class="mg-brand">VOID DOMINION</div><h2>Твоя история. Твой портрет.</h2></div>
+      <div class="mg-header-tools"><span class="mg-prototype">Макет</span><div class="mg-languages" role="group" aria-label="Язык интерфейса"><button type="button"  data-language="ru" aria-pressed="true" aria-label="Русский">RU</button><button type="button"  data-language="en" aria-pressed="false" aria-label="English">EN</button></div></div>
+    </header>
+    <div class="mg-toolbar">
+      <div class="mg-mode" aria-label="Режим просмотра">
+        <button  type="button" data-mode="owner" aria-pressed="true">Настроить</button>
+        <button  type="button" data-mode="public" aria-pressed="false">Вид для других</button>
+      </div>
+      <span class="mg-demo-label">Демонстрационный профиль</span>
+    </div>
+    <div class="mg-body">
+      <section class="mg-profile" aria-label="Портрет игрока с медалями">
+        <div class="mg-stage">
+          <img class="mg-main-portrait" alt="Выбранный портрет игрока" width="448" height="448">
+          <div class="mg-slots" role="group" aria-label="Медали на груди: три ряда по пять"></div>
+          <button type="button" class="mg-uniform-medals" data-action="inspect-uniform" aria-label="Медали на мундире" hidden></button>
+        </div>
+        <div class="mg-profile-footer"><div class="mg-call-sign">Moonwuk</div><div class="mg-profile-caption"><span>Личная карточка игрока</span><span class="mg-count"></span></div></div>
+      </section>
+      <aside class="mg-side">
+        <section class="mg-owner-portraits" aria-label="Выбор портрета">
+          <div class="mg-section-head"><h3>Выбери портрет</h3><span class="mg-portrait-counter">01 / 40</span></div>
+          <div class="mg-portraits"></div><nav class="mg-pages" aria-label="Portrait pages"><button type="button" class="mg-action mg-quiet" data-page="-1"></button><span class="mg-page-label" aria-live="polite"></span><button type="button" class="mg-action mg-quiet" data-page="1"></button></nav>
+          <div class="mg-selected-name"></div>
+          <div class="mg-divider"></div>
+        </section>
+        <div class="mg-public-intro" hidden><div class="mg-section-head"><h3>Награды Moonwuk</h3></div><p class="mg-pub-caption">Нажми на медаль, чтобы узнать её историю.</p></div>
+        <section class="mg-detail" aria-label="Выбранная медаль">
+          <div class="mg-selection-label"></div>
+          <div class="mg-detail-head"><div class="mg-detail-emblem"></div><div><div class="mg-detail-title"></div><div class="mg-detail-state"></div></div></div>
+          <div class="mg-grades" role="group"></div><p class="mg-criterion"></p>
+          <div class="mg-progress-wrap" hidden><div class="mg-progress" role="progressbar" aria-label="Прогресс получения медали"><div class="mg-progress-fill"></div></div><div class="mg-progress-label"></div></div>
+          <button type="button" class="mg-action mg-apply-grade" data-action="apply-grade" hidden></button><div class="mg-actions"><button class="mg-action" type="button" data-action="choose">Выбрать медаль</button><button class="mg-action mg-quiet" type="button" data-action="remove" hidden>Снять</button></div>
+        </section>
+        <div class="mg-public-list" aria-label="Медали на портрете" hidden></div>
+      </aside>
+    </div>
+    <section class="mg-collection" aria-label="Коллекция медалей">
+      <div class="mg-collection-top"><span class="mg-collection-title">Медаль для ячейки 5</span><button class="mg-done" type="button" data-action="done">Готово</button></div>
+      <div class="mg-filters" aria-label="Доступность медалей"><button class="mg-filter" type="button" data-filter="earned" aria-pressed="true">Доступны · 8</button><button class="mg-filter" type="button" data-filter="locked" aria-pressed="false">Ещё получить · 4</button></div>
+      <div class="mg-medal-list"></div>
+    </section>
+    <footer class="mg-footnote"><span class="mg-cosmetic-caption">Медали — украшение, без боевых бонусов</span><span class="mg-live" aria-live="polite">Выбери медаль или ячейку на груди</span></footer>
+  </article>
+  <script type="application/json" class="mg-portrait-data">[{"id":"01","label":"Стальной взгляд","en":"Steel Gaze","src":"assets/portrait-01.webp"},{"id":"02","label":"Северное сияние","en":"Northern Lights","src":"assets/portrait-02.webp"},{"id":"03","label":"Глубокий космос","en":"Deep Space","src":"assets/portrait-03.webp"},{"id":"04","label":"Тихая орбита","en":"Quiet Orbit","src":"assets/portrait-04.webp"},{"id":"05","label":"За горизонтом","en":"Beyond the Horizon","src":"assets/portrait-05.webp"},{"id":"06","label":"Серебряная смена","en":"Silver Watch","src":"assets/portrait-06.webp"},{"id":"07","label":"Новый курс","en":"New Course","src":"assets/portrait-07.webp"},{"id":"08","label":"Солнечный ветер","en":"Solar Wind","src":"assets/portrait-08.webp"},{"id":"09","label":"Последний рубеж","en":"Last Frontier","src":"assets/portrait-09.webp"},{"id":"10","label":"Дальний сигнал","en":"Distant Signal","src":"assets/portrait-10.webp"},{"id":"11","label":"Полярная звезда","en":"Polar Star","src":"assets/portrait-11.webp"},{"id":"12","label":"Тёмная материя","en":"Dark Matter","src":"assets/portrait-12.webp"},{"id":"13","label":"Красное смещение","en":"Redshift","src":"assets/portrait-13.webp"},{"id":"14","label":"Небесная механика","en":"Celestial Mechanics","src":"assets/portrait-14.webp"},{"id":"15","label":"Гравитация","en":"Gravity","src":"assets/portrait-15.webp"},{"id":"16","label":"Линия рассвета","en":"Dawn Line","src":"assets/portrait-16.webp"},{"id":"17","label":"Ионный след","en":"Ion Trail","src":"assets/portrait-17.webp"},{"id":"18","label":"Золотой час","en":"Golden Hour","src":"assets/portrait-18.webp"},{"id":"19","label":"Белый карлик","en":"White Dwarf","src":"assets/portrait-19.webp"},{"id":"20","label":"Лунная тень","en":"Moon Shadow","src":"assets/portrait-20.webp"},{"id":"21","label":"Звёздный путь","en":"Star Path","src":"assets/portrait-21.webp"},{"id":"22","label":"Синий импульс","en":"Blue Pulse","src":"assets/portrait-22.webp"},{"id":"23","label":"Точка опоры","en":"Anchor Point","src":"assets/portrait-23.webp"},{"id":"24","label":"Пятый сектор","en":"Fifth Sector","src":"assets/portrait-24.webp"},{"id":"25","label":"Курс на восток","en":"Eastbound","src":"assets/portrait-25.webp"},{"id":"26","label":"Свет маяка","en":"Beacon Light","src":"assets/portrait-26.webp"},{"id":"27","label":"Дальний рубеж","en":"Outer Reach","src":"assets/portrait-27.webp"},{"id":"28","label":"Орбитальный вальс","en":"Orbital Waltz","src":"assets/portrait-28.webp"},{"id":"29","label":"Тихий гром","en":"Quiet Thunder","src":"assets/portrait-29.webp"},{"id":"30","label":"Комета","en":"Comet","src":"assets/portrait-30.webp"},{"id":"31","label":"Пустотный ветер","en":"Void Wind","src":"assets/portrait-31.webp"},{"id":"32","label":"Ледяная орбита","en":"Frozen Orbit","src":"assets/portrait-32.webp"},{"id":"33","label":"Пульсар","en":"Pulsar","src":"assets/portrait-33.webp"},{"id":"34","label":"Пески Марса","en":"Martian Sands","src":"assets/portrait-34.webp"},{"id":"35","label":"Проводник","en":"Pathfinder","src":"assets/portrait-35.webp"},{"id":"36","label":"Первая волна","en":"First Wave","src":"assets/portrait-36.webp"},{"id":"37","label":"Солнечный парус","en":"Solar Sail","src":"assets/portrait-37.webp"},{"id":"38","label":"Созвездие","en":"Constellation","src":"assets/portrait-38.webp"},{"id":"39","label":"Радиомолчание","en":"Radio Silence","src":"assets/portrait-39.webp"},{"id":"40","label":"Новая эра","en":"New Era","src":"assets/portrait-40.webp"}]</script>
+  <script type="application/json" class="mg-atlas-data">{"src":"assets/medals.webp"}</script>
+  <script>
+  (() => {
+    const root = document.getElementById('vd-player-profile');
+    const $ = selector => root.querySelector(selector);
+    const portraits = JSON.parse($('.mg-portrait-data').textContent);
+    const medals = [
+      {id:'first',name:'Первый рубеж'},
+      {id:'map',name:'Картограф'},
+      {id:'shield',name:'Щит сектора'},
+      {id:'rescue',name:'Спасатель'},
+      {id:'colony',name:'Первопроходец'},
+      {id:'ally',name:'Надёжный союзник'},
+      {id:'service',name:'Ветеран'},
+      {id:'engineer',name:'Архитектор'},
+      {id:'pirates',name:'Гроза пиратов'},
+      {id:'flawless',name:'Без потерь'},
+      {id:'legend',name:'Звезда командора'},
+      {id:'explorer',name:'За горизонтом'}
+    ];
+    const byId = Object.fromEntries(medals.map(m => [m.id,m]));
+    const SLOT_COUNT=15;
+    const initialMedals=['first','map','shield','rescue','colony','ally','service','engineer'];
+    const state = {portrait:0,slots:Array.from({length:SLOT_COUNT},(_,i)=>initialMedals[i]??null),slot:0,mode:'public',filter:'earned',open:false,inspect:null,language:'ru',page:0,previewGrade:null,grades:{}};
+    const englishMedals = {
+      first:{name:'First Frontier'},
+      map:{name:'Cartographer'},
+      shield:{name:'Sector Guardian'},
+      rescue:{name:'Lifesaver'},
+      colony:{name:'Pioneer'},
+      ally:{name:'Trusted Ally'},
+      service:{name:'Veteran'},
+      engineer:{name:'Architect'},
+      pirates:{name:'Pirate Hunter'},
+      flawless:{name:'Flawless Victory'},
+      legend:{name:"Commander's Star"},
+      explorer:{name:'Beyond the Horizon'}
+    };
+
+    const tunicFits=[
+      {left:55.6,top:59.2,width:26.0,plane:[1,.047,-.033,.975,0,0],light:.92},
+      {left:56.3,top:60.5,width:25.2,plane:[.99,.025,-.018,.97,0,0],light:.95},
+      {left:55.3,top:60.3,width:26.1,plane:[.985,.056,-.025,.965,0,0],light:.90},
+      {left:55.7,top:60.0,width:25.4,plane:[1,.018,-.008,.98,0,0],light:.95},
+      {left:55.6,top:60.3,width:26.0,plane:[.99,.043,-.03,.97,0,0],light:.90},
+      {left:53.7,top:60.6,width:20.0,plane:[.99,-.018,-.12,.97,0,0],light:.92},
+      {left:55.4,top:60.1,width:26.0,plane:[.995,.029,-.018,.975,0,0],light:.94},
+      {left:55.8,top:60.4,width:25.7,plane:[1,.025,-.018,.97,0,0],light:.94},
+      {left:56.0,top:59.4,width:26.0,plane:[.99,.039,-.023,.975,0,0],light:.92},
+      {left:54.5,top:60.3,width:23.0,plane:[1,.028,-.055,.975,0,0],light:.94}
+    ];
+    const gradeRules={
+      first:{goals:[1,10,50],progress:24,ru:'Победы в матчах',en:'Match victories'},
+      map:{goals:[20,60,150],progress:80,ru:'Разведанные секторы',en:'Sectors scouted'},
+      shield:{goals:[5,20,50],progress:8,ru:'Оборонительные победы',en:'Defensive victories'},
+      rescue:{goals:[1,3,10],progress:3,ru:'Успешные спасательные миссии',en:'Successful rescue missions'},
+      colony:{goals:[1,5,20],progress:2,ru:'Основанные колонии',en:'Colonies founded'},
+      ally:{goals:[5,20,50],progress:22,ru:'Победы с союзниками',en:'Team victories'},
+      service:{goals:[20,100,300],progress:140,ru:'Завершённые матчи',en:'Matches completed'},
+      engineer:{goals:[50,250,1000],progress:1500,ru:'Построенные здания',en:'Buildings constructed'},
+      pirates:{goals:[5,20,50],progress:3,ru:'Уничтоженные пиратские базы',en:'Pirate bases destroyed'},
+      flawless:{goals:[1,10,30],progress:0,ru:'Победы без потерь',en:'Victories without losses'},
+      legend:{goals:[100,250,500],progress:24,ru:'Победы в матчах',en:'Match victories'},
+      explorer:{goals:[100,250,500],progress:80,ru:'Разведанные секторы',en:'Sectors scouted'}
+    };
+    const roman={1:'I',2:'II',3:'III'};
+    const goal=(m,g)=>gradeRules[m.id].goals[3-g];
+    const earned=(m,g)=>gradeRules[m.id].progress>=goal(m,g);
+    medals.forEach(m=>{m.earned=earned(m,3);state.grades[m.id]=[1,2,3].find(g=>earned(m,g))??3;});
+    const t=(ru,en)=>state.language==='en'?en:ru;
+    const mtext=(m,field='name')=>state.language==='en'?englishMedals[m.id][field]:m[field];
+    const pname=i=>state.language==='en'?portraits[i].en:portraits[i].label;
+    const escapeAttr=s=>String(s).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');
+    const icon=name=>'';
+    const gradeName=g=>t(roman[g]+' степень','Class '+roman[g]);
+    const medalName=m=>mtext(m)+' · '+gradeName(state.grades[m.id]);
+    const emblem=(m,g=state.grades[m.id])=>{const i=medals.indexOf(m);return '<span class="mg-real-medal" style="--atlas-x:'+((i%4)*100/3)+'%;--atlas-y:'+(Math.floor(i/4)*50)+'%" aria-hidden="true"><span class="mg-grade-pin">'+roman[g]+'</span></span>';};
+    root.style.setProperty('--medal-atlas','url("'+JSON.parse($('.mg-atlas-data').textContent).src+'")');
+
+    function announce(text){$('.mg-live').textContent=text;}
+    function activeMedal(){return byId[state.inspect||state.slots[state.slot]]||null;}
+    function applyLanguage(){
+      root.lang=state.language;
+      $('article').setAttribute('aria-label',t('Макет персонализации карточки игрока Void Dominion','Void Dominion player profile customization mockup'));
+      $('h2').textContent=t('Твоя история. Твой портрет.','Your story. Your portrait.');
+      $('.mg-prototype').textContent=t('Макет','Mockup');
+      $('.mg-languages').setAttribute('aria-label',t('Язык интерфейса','Interface language'));
+      root.querySelectorAll('[data-language]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.language===state.language));
+      $('.mg-mode').setAttribute('aria-label',t('Режим просмотра','Viewing mode'));
+      $('[data-mode="owner"]').innerHTML=icon('sliders-horizontal')+t('Настроить','Customize');
+      $('[data-mode="public"]').innerHTML=icon('eye')+t('Вид для других','Public view');
+      $('.mg-demo-label').textContent=t('Демонстрационный профиль','Demo profile');
+      $('.mg-profile').setAttribute('aria-label',t('Портрет игрока с медалями','Player portrait with medals'));
+      $('.mg-profile-caption span:first-child').textContent=t('Личная карточка игрока','Player profile');
+      $('.mg-owner-portraits').setAttribute('aria-label',t('Выбор портрета','Portrait selection'));
+      $('.mg-owner-portraits h3').textContent=t('Выбери портрет','Choose a portrait');
+      $('.mg-public-intro h3').textContent=t('Награды Moonwuk',"Moonwuk's awards");
+      $('.mg-pub-caption').textContent=t('Нажми на награду, чтобы узнать, за что она получена.','Select an award to see how it was earned.');
+      $('.mg-detail').setAttribute('aria-label',t('Выбранная медаль','Selected medal'));
+      $('.mg-public-list').setAttribute('aria-label',t('Медали на портрете','Medals worn on the portrait'));
+      $('.mg-collection').setAttribute('aria-label',t('Коллекция медалей','Medal collection'));
+      $('.mg-filters').setAttribute('aria-label',t('Доступность медалей','Medal availability'));
+      $('[data-filter="earned"]').textContent=t('Доступны · 8','Earned · 8');
+      $('[data-filter="locked"]').textContent=t('Ещё получить · 4','To earn · 4');
+      $('[data-action="done"]').textContent=t('Готово','Done');
+      $('[data-action="remove"]').textContent=t('Снять','Remove');
+      $('.mg-progress').setAttribute('aria-label',t('Прогресс получения медали','Progress towards this medal'));
+      $('.mg-cosmetic-caption').textContent=t('Медали — украшение, без боевых бонусов','Cosmetic awards · No combat bonuses');
+    }
+    function drawPortraits(){
+      $('.mg-main-portrait').src=portraits[state.portrait].src;
+      $('.mg-main-portrait').alt=t('Портрет «'+pname(state.portrait)+'» с выбранными медалями',pname(state.portrait)+' portrait with selected medals');
+      $('.mg-portrait-counter').textContent=portraits[state.portrait].id+' / '+portraits.length;
+      $('.mg-selected-name').textContent=pname(state.portrait);
+      $('.mg-portraits').innerHTML=portraits.slice(state.page*10,state.page*10+10).map((p,offset)=>{const i=state.page*10+offset;return '<button type="button" class="mg-portrait-option" data-portrait="'+i+'" aria-label="'+escapeAttr(t('Портрет ','Portrait ')+p.id+': '+pname(i))+'" aria-pressed="'+(i===state.portrait)+'"><img src="'+p.src+'" alt="" width="90" height="90" loading="lazy"><span class="mg-thumb-number" aria-hidden="true">'+p.id+'</span></button>';}).join('');
+      $('.mg-page-label').textContent=(state.page*10+1)+'–'+Math.min((state.page+1)*10,portraits.length)+' / '+portraits.length;
+      $('.mg-pages').setAttribute('aria-label',t('Страницы портретов','Portrait pages'));
+      $('[data-page="-1"]').textContent=t('Назад','Previous');
+      $('[data-page="1"]').textContent=t('Далее','Next');
+      $('[data-page="-1"]').disabled=state.page===0;
+      $('[data-page="1"]').disabled=(state.page+1)*10>=portraits.length;
+      const fit=tunicFits[state.portrait]||{left:55.6,top:60.2,width:25.5,plane:[1,.028,-.025,.975,0,0],light:.94},stage=$('.mg-stage');
+      stage.style.setProperty('--medal-left',fit.left+'%');
+      stage.style.setProperty('--medal-top',fit.top+'%');
+      stage.style.setProperty('--medal-width',fit.width+'%');
+      stage.style.setProperty('--medal-plane','matrix('+fit.plane.join(',')+')');
+      stage.style.setProperty('--medal-light',fit.light);
+    }
+    function awardCount(n){return state.language==='en'?n+(n===1?' award':' awards'):n+(n===1?' награда':n>=2&&n<=4?' награды':' наград');}
+    function drawSlots(){
+      const isPublic=state.mode==='public',count=state.slots.filter(Boolean).length;
+      $('.mg-slots').hidden=isPublic;
+      $('.mg-slots').setAttribute('aria-label',t('Медали на груди: три ряда по пять','Medals on the chest: three rows of five'));
+      $('.mg-slots').innerHTML=state.slots.map((id,i)=>{const m=byId[id];return '<button type="button" class="mg-slot '+(m?'mg-occupied':'mg-empty')+'" data-slot="'+i+'" aria-label="'+escapeAttr(t('Ячейка ','Slot ')+(i+1)+': '+(m?medalName(m):t('добавить медаль','add a medal'))) +'" aria-pressed="'+(i===state.slot)+'">'+(m?emblem(m):icon('plus'))+'</button>';}).join('');
+      $('.mg-uniform-medals').hidden=!isPublic||!count;
+      $('.mg-uniform-medals').setAttribute('aria-label',t('Медали на мундире. Нажми на награду для подробностей.','Medals pinned to the uniform. Select an award for details.'));
+      $('.mg-uniform-medals').innerHTML=state.slots.map((id,i)=>'<span class="mg-cloth-slot" data-cloth-slot="'+i+'" aria-hidden="true">'+(id?emblem(byId[id]):'')+'</span>').join('');
+      $('.mg-count').textContent=isPublic?awardCount(count):count+' / '+SLOT_COUNT+t(' медалей',' medals');
+    }
+    function drawDetail(){
+      const m=activeMedal(),isPublic=state.mode==='public';
+      const grade=m?(isPublic?state.grades[m.id]:(state.previewGrade??state.grades[m.id])):3;
+      const available=m&&earned(m,grade);
+      $('.mg-selection-label').textContent=isPublic?t('Личная награда','Personal award'):t('Ячейка '+(state.slot+1)+' из '+SLOT_COUNT,'Slot '+(state.slot+1)+' of '+SLOT_COUNT);
+      $('.mg-detail-emblem').innerHTML=m?emblem(m,grade):'<span class="mg-empty-symbol" aria-hidden="true">+</span>';
+      $('.mg-detail-title').textContent=m?mtext(m):(isPublic?t('Без медалей','No medals displayed'):t('Свободное место','Empty slot'));
+      $('.mg-detail-state').textContent=m?gradeName(grade)+' · '+(available?t('Получена','Earned'):t('Пока недоступна','Not yet available')):(isPublic?t('Награды не размещены','No awards displayed'):t('Три ряда по пять','Three rows of five'));
+      $('.mg-grades').hidden=!m||isPublic;
+      $('.mg-grades').setAttribute('aria-label',t('Степень медали: I — высшая','Medal class: I is the highest'));
+      $('.mg-grades').innerHTML=m?[3,2,1].map(g=>'<button type="button" class="mg-grade-choice" data-grade="'+g+'" aria-pressed="'+(g===grade)+'" aria-label="'+escapeAttr(gradeName(g)+': '+(earned(m,g)?t('получена','earned'):t('не получена','not earned')))+'"><span>'+roman[g]+'</span><small>'+(earned(m,g)?t('Получена','Earned'):t('Закрыта','Locked'))+'</small></button>').join(''):'';
+      $('.mg-criterion').textContent=m?t(gradeRules[m.id].ru,gradeRules[m.id].en)+': '+goal(m,grade)+'.':(isPublic?t('Игрок ещё не разместил награды на портрете.','This player has not displayed any medals yet.'):t('Нажми на ячейку на груди и выбери медаль из своей коллекции.','Select a chest slot, then choose a medal from your collection.'));
+      $('.mg-progress-wrap').hidden=!m||available;
+      if(m&&!available){const p=$('.mg-progress'),progress=gradeRules[m.id].progress,target=goal(m,grade);p.setAttribute('aria-valuemin','0');p.setAttribute('aria-valuemax',target);p.setAttribute('aria-valuenow',progress);$('.mg-progress-fill').style.width=(100*progress/target)+'%';$('.mg-progress-label').textContent=progress+' / '+target;}
+      $('.mg-apply-grade').hidden=!m||isPublic;
+      $('.mg-apply-grade').disabled=!available||(state.slots[state.slot]===m.id&&state.grades[m.id]===grade);
+      $('.mg-apply-grade').textContent=!available?t('Степень ещё не получена','Class not yet earned'):(state.slots[state.slot]===m.id&&state.grades[m.id]===grade?t('Уже на мундире','Already displayed'):t('Носить '+roman[grade]+' степень','Wear class '+roman[grade]));
+      $('.mg-actions').hidden=isPublic;
+      $('[data-action="choose"]').textContent=state.open?t('К доступным медалям','Show earned medals'):(state.slots[state.slot]?t('Заменить медаль','Replace medal'):t('Выбрать медаль','Choose medal'));
+      $('[data-action="remove"]').hidden=!state.slots[state.slot]||!!state.inspect;
+      $('.mg-public-list').innerHTML=state.slots.filter(Boolean).map(id=>'<button type="button" class="mg-public-badge" data-public-medal="'+id+'" aria-pressed="'+(m&&m.id===id)+'">'+emblem(byId[id])+'<span>'+medalName(byId[id])+'</span></button>').join('');
+    }
+    function drawCollection(){
+      $('.mg-collection').hidden=state.mode==='public'||!state.open;
+      $('.mg-collection-title').textContent=t('Медаль для ячейки ','Medal for slot ')+(state.slot+1);
+      root.querySelectorAll('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.filter===state.filter));
+      $('.mg-medal-list').innerHTML=medals.filter(m=>m.earned===(state.filter==='earned')).map(m=>{
+        const worn=state.slots.indexOf(m.id),same=worn===state.slot;
+        const status=!m.earned?gradeRules[m.id].progress+' / '+goal(m,3):same?t('На этом месте','In this slot'):worn>=0?t('Перенести с ','Move from slot ')+(worn+1):t('Разместить','Equip');
+        const action=!m.earned?t('Условия получения','How to earn'):same?t('Уже размещена','Already equipped'):worn>=0?(state.slots[state.slot]?t('Поменять местами','Swap positions'):t('Перенести','Move')):t('Разместить','Equip');
+        return '<button type="button" class="mg-medal-choice '+(m.earned?'':'mg-locked')+'" data-medal="'+m.id+'" aria-label="'+escapeAttr(mtext(m)+'. '+action)+'" aria-pressed="'+(same||state.inspect===m.id)+'" '+(same?'disabled':'')+'>'+emblem(m)+'<span><span class="mg-choice-name">'+medalName(m)+'</span><span class="mg-choice-status">'+status+'</span></span></button>';
+      }).join('');
+    }
+    function draw(){
+      const previousFocus=document.activeElement;
+      const focusAttr=['data-slot','data-medal','data-public-medal','data-grade'].find(key=>previousFocus&&root.contains(previousFocus)&&previousFocus.hasAttribute(key));
+      const focusValue=focusAttr?previousFocus.getAttribute(focusAttr):null;
+      const isPublic=state.mode==='public';
+      $('.mg-window').classList.toggle('mg-public',isPublic);
+      $('.mg-owner-portraits').hidden=isPublic;
+      $('.mg-public-intro').hidden=!isPublic;
+      $('.mg-public-list').hidden=!isPublic;
+      root.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===state.mode));
+      applyLanguage();drawSlots();drawDetail();drawCollection();
+      if(focusAttr){const target=root.querySelector('['+focusAttr+'="'+focusValue+'"]');if(target&&!target.disabled&&target.getClientRects().length)target.focus({preventScroll:true});else if(focusAttr==='data-medal'&&!isPublic)root.querySelector('[data-slot="'+state.slot+'"]').focus({preventScroll:true});}
+    }
+    root.addEventListener('click',e=>{
+      const b=e.target.closest('button');if(!b||!root.contains(b)||b.disabled)return;
+      if(b.dataset.page){state.page+=Number(b.dataset.page);drawPortraits();const next=root.querySelector('[data-page="'+b.dataset.page+'"]');if(next.disabled)root.querySelector('[data-page="'+(-Number(b.dataset.page))+'"]').focus();return;}
+      if(b.dataset.grade){state.previewGrade=Number(b.dataset.grade);draw();announce(gradeName(state.previewGrade));return;}
+      if(b.dataset.action==='apply-grade'){const m=activeMedal(),g=state.previewGrade??(m&&state.grades[m.id]);if(!m||!earned(m,g))return;const source=state.slots.indexOf(m.id),old=state.slots[state.slot];if(source>=0&&source!==state.slot)state.slots[source]=old;state.slots[state.slot]=m.id;state.grades[m.id]=g;state.inspect=null;draw();announce(medalName(m));return;}
+      if(!b.dataset.language&&b.dataset.portrait===undefined)state.previewGrade=null;
+      if(b.dataset.language){state.language=b.dataset.language;drawPortraits();draw();announce(t('Выбран русский язык','English selected'));return;}
+      if(b.dataset.portrait!==undefined){state.portrait=Number(b.dataset.portrait);drawPortraits();root.querySelector('[data-portrait="'+state.portrait+'"]').focus({preventScroll:true});announce(t('Портрет изменён. Медали сохранены.','Portrait changed. Medal layout preserved.'));return;}
+      if(b.dataset.mode){state.mode=b.dataset.mode;state.inspect=null;if(state.mode==='public'&&!state.slots[state.slot])state.slot=Math.max(0,state.slots.findIndex(Boolean));draw();announce(state.mode==='public'?t('Так карточку видит другой игрок','This is how other players see your profile'):t('Режим настройки','Customization mode'));return;}
+      if(b.dataset.publicMedal){state.inspect=b.dataset.publicMedal;draw();announce(mtext(byId[state.inspect]));return;}
+      if(b.dataset.action==='inspect-uniform'){
+        const candidates=[...b.querySelectorAll('[data-cloth-slot]')].filter(el=>state.slots[Number(el.dataset.clothSlot)]);
+        if(!candidates.length)return;
+        const nearest=e.detail===0?candidates[0]:candidates.reduce((best,el)=>{const r=el.getBoundingClientRect(),d=(r.left+r.width/2-e.clientX)**2+(r.top+r.height/2-e.clientY)**2;return !best||d<best.d?{el,d}:best;},null).el;
+        state.slot=Number(nearest.dataset.clothSlot);state.inspect=null;draw();announce(mtext(byId[state.slots[state.slot]]));return;
+      }
+      if(b.dataset.slot!==undefined){state.slot=Number(b.dataset.slot);state.inspect=null;state.open=true;state.filter='earned';draw();announce(t('Выбрана ячейка ','Selected slot ')+(state.slot+1));return;}
+      if(b.dataset.filter){state.filter=b.dataset.filter;state.inspect=null;draw();return;}
+      if(b.dataset.medal){
+        const m=byId[b.dataset.medal];
+        if(!m.earned){state.inspect=m.id;draw();announce(t('Медаль «'+mtext(m)+'» пока недоступна',mtext(m)+' has not been earned yet'));return;}
+        const source=state.slots.indexOf(m.id),old=state.slots[state.slot];
+        if(source>=0&&source!==state.slot)state.slots[source]=old;
+        state.slots[state.slot]=m.id;state.inspect=null;draw();
+        announce(source>=0?(old?t('Медали поменялись местами','Medals swapped'):t('Медаль перенесена','Medal moved')):t('Медаль «'+mtext(m)+'» размещена',mtext(m)+' equipped'));return;
+      }
+      if(b.dataset.action==='remove'){state.slots[state.slot]=null;state.inspect=null;draw();announce(t('Медаль снята и осталась в коллекции','Medal removed. It remains in your collection.'));return;}
+      if(b.dataset.action==='choose'){state.open=true;state.filter='earned';state.inspect=null;draw();return;}
+      if(b.dataset.action==='done'){state.open=false;state.inspect=null;draw();announce(t('Раскладка готова к просмотру','Layout ready to preview'));}
+    });
+    drawPortraits();draw();announce(t('Так карточку видит другой игрок','This is how other players see your profile'));
+  })();
+  </script>
+</div>
+
+</body></html>

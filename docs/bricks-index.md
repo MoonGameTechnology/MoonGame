@@ -35,6 +35,39 @@
 | REFP-13 | 🗑 | proto | `docs/backlog.md` | division.ts |
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
 | REFM-203 | ✅ | proto | `docs/backlog.md` | missionPanel.ts |
+| REFM-204 | ⏳ | proto | `docs/backlog.md` | smoke:net — сетевая партия в живом браузере. |
+| REFM-205 | 🔒 | proto | `docs/backlog.md` | Выход из партии — одна дверь. |
+| REFM-206 | ⏳ | proto | `docs/backlog.md` | Перерисовка по имени. |
+| REFM-207 | ⏳ | proto | `docs/backlog.md` | Владелец прицелов и поповеров |
+| REFM-208 | 🔒 | proto | `docs/backlog.md` | Владелец выбора |
+| REFM-209 | ⏳ | proto | `docs/backlog.md` | Профиль Sector Zero: хранение, облако, вкладка-хозяйка |
+| REFM-210 | 🔒 | proto | `docs/backlog.md` | Забег: сохранение, восстановление, флаги |
+| REFM-211 | 🔒 | proto | `docs/backlog.md` | Оболочка Sector Zero |
+| REFM-212 | 🔒 | proto | `docs/backlog.md` | Экран настройки схватки |
+| REFM-213 | 🔒 | proto | `docs/backlog.md` | Сохранение схватки |
+| REFM-214 | ⏳ | proto | `docs/backlog.md` | Дипломатия и связь |
+| REFM-215 | ⏳ | proto | `docs/backlog.md` | Сессия аккаунта |
+| REFM-216 | 🔒 | proto | `docs/backlog.md` | Сетевой жизненный цикл |
+| REFM-217 | 🔒 | proto | `docs/backlog.md` | Обзор партий и выбор места |
+| REFM-218 | 🔒 | proto | `docs/backlog.md` | Страницы входа |
+| REFM-219 | 🔒 | proto | `docs/backlog.md` | Жизненный цикл матча |
+| REFM-220 | 🔒 | proto | `docs/backlog.md` | Хаб и настройки |
+| REFM-221 | 🔒 | proto | `docs/backlog.md` | Обучение и справка |
+| REFM-222 | 🔒 | proto | `docs/backlog.md` | Верхняя полоса |
+| REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |
+| REFM-224 | 🔒 | proto | `docs/backlog.md` | Карточка флота |
+| REFM-225 | 🔒 | proto | `docs/backlog.md` | Хозяин боковой панели |
+| REFM-226 | 🔒 | proto | `docs/backlog.md` | Ряд команд: разметка и поповеры |
+| REFM-227 | 🔒 | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
+| REFM-228 | 🔒 | proto | `docs/backlog.md` | Приказы группе |
+| REFM-229 | 🔒 | proto | `docs/backlog.md` | Композер цепочек «Приказ» |
+| REFM-230 | 🔒 | proto | `docs/backlog.md` | Реакция на события мира и лента |
+| REFM-231 | 🔒 | proto | `docs/backlog.md` | Камера и туман |
+| REFM-232 | 🔒 | proto | `docs/backlog.md` | Статический голографический слой |
+| REFM-233 | 🔒 | proto | `docs/backlog.md` | Наложения |
+| REFM-234 | 🔒 | proto | `docs/backlog.md` | Эффекты и метки |
+| REFM-235 | 🔒 | proto | `docs/backlog.md` | render() по слоям |
+| REFM-236 | 🔒 | proto | `docs/backlog.md` | Ввод на канвасе |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | SHIPART-6 | ⏳ | proto cli | `docs/backlog.md` | Портрет и голограмма неподвижной мины |
@@ -992,6 +1025,7 @@
 | MS-2.2 | 🔒 | core data | `docs/missiles-roadmap.md` | Детонация |
 | MS-3.1 | 🔒 | core data | `docs/missiles-roadmap.md` | Пусковой/ракеты как предмет + P2W-guardrail |
 | MS-4.1 | 🔒 | cli | `docs/missiles-roadmap.md` | Рендер полёта/перехвата/удара |
+| MS-5.1 | 🔒 | core data cli | `docs/missiles-roadmap.md` | Легендарная способность «Ракетная мина» |
 | MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md` | Решение владельца: (а), (б) или (в) |
 | MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md` | Battle стал СПИСКОМ сторон |
 | MSB-2 | ✅ | core | `docs/multiside-combat-roadmap.md` | Правило деления урона |

@@ -2,10 +2,14 @@
 
 ## Мина на космической дороге (SHIPART-6, 2026-09-27)
 
-`road-mine.webp`: встроенный imagegen, генерация `caadd4e4-655a-4edf-8a25-3992069d369d`.
-Исходник 1536×1024 → WebP 768×512, quality 83, effort 6, 36462 байта.
-Полный неподвижный корпус: восьмигранный диск, четыре датчика, центральная линза;
-двигателей нет. Нативный вектор той же формы — `packages/client/src/mineShape.ts`.
+`road-mine.webp`: встроенный imagegen, генерация `6cccd76f-8771-4701-b02e-eab81b7319d2`.
+Исходник 1536×1024 → WebP 768×512, quality 83, effort 6, 37348 байт.
+По уточнению владельца космическая мина напоминает морскую: сферический бронированный
+корпус и выступающие во все стороны датчики. Двигателей и опор нет. Нативный вектор
+той же формы — `packages/client/src/mineShape.ts`: круглый корпус, восемь выступов
+и дуги панелей, передающие объём. При низкой детализации остаётся тот же силуэт.
+Прежний плоский диск (генерация `caadd4e4-655a-4edf-8a25-3992069d369d`, версия
+файла в `f658867`) заменён; он служил референсом материалов, освещения и фона.
 Портрет подготовлен для кодекса модуля `mine_layer`; без записи модуля в данных
 `catalogPortraitHtml` ничего не показывает. Шахта `mine` — другой объект.
 
@@ -15,14 +19,14 @@
 Вектор вызывается только после серверной фильтрации видимости; скрытые поля нельзя
 раскрывать ни маркером, ни счётчиком, ни кликом. Радиус и время этот арт не задаёт.
 
-Промпт генерации (без референсов):
+Промпт редактирования прежнего портрета:
 
 > Use case: stylized-concept.
-> Asset type: realistic game menu portrait for Averion: Sector Zero / Void Dominion.
-> Subject: ONE compact stationary space-lane proximity mine. A squat sealed octagonal gunmetal armored disc, four short rigid radial sensor prongs at the cardinal directions, a small recessed central amber sensor lens, layered bolted segmented casing, thin understated cyan status slits. It is an unmanned mine anchored in a space route, with no propulsion, no cockpit and no ship-like nose. Believable manufactured sci-fi device, small and dangerous, still recognizable at thumbnail size.
-> Style: high-end realistic industrial hard-surface render matching the project's gray human fleet, restrained weathering, precise machinery; no toy look. Background plain very dark navy-black #071018. Soft cold rim light and neutral directional studio light make all edges readable.
-> Composition: landscape 3:2, single full device centered, elevated three-quarter view, entire mine and all four prongs visible with at least 10% clear margin, fills about 70% of frame. No other objects, no ground, no road pavement, no stars or planets, no explosions, no wires, no engines or exhaust, no station ring, no human.
-> No text, labels, numbers, logo, watermark, UI, border, diagram or alternate views.
+> Asset type: revised realistic game portrait of a stationary SPACE MINE for Averion: Sector Zero.
+> Input image: the old mine portrait is the EDIT TARGET. Keep its realistic dark gunmetal materials, restrained cyan indicator lights, plain navy-black background, landscape 3:2 framing and polished game-asset rendering. Completely replace the flat disc geometry.
+> Primary request: a space mine whose form is immediately reminiscent of a classic spherical naval sea mine floating in three dimensions. A bulky near-perfect SPHERE made of curved segmented steel armor plates, with eight to ten stout projecting sensor horns distributed radially around the whole sphere in 3D. Horns have flanged bases, short tapered metal stems and small blunt sensor caps. Several horns point sideways around the silhouette, others toward or away from the camera. The spherical core must read as deep and round, with clearly curved latitude and longitude seams; absolutely no flattened base or platter silhouette. Small recessed sensor apertures and tiny cyan status LEDs fit this fleet's technological style.
+> Composition: ONE full floating device, elevated three-quarter view, centered, occupies about 75% of image height; all horns fully within frame with generous margin. Realistic dramatic soft illumination showing spherical volume, cool rim light and fine metal wear; background #071018. Mine is unmanned and stationary, no engines, exhaust, cockpit, fins or wings.
+> No ground, land, water, sea, anchor, tether, chain, stand, pedestal, pressure plate, circular flat disc, landmine shape, bright central button, explosions, smoke, stars, planets, text, numbers, logo, watermark, UI, frame or alternate views. This is a SPACE NAVAL MINE, not a terrestrial anti-tank mine.
 
 ## Наземные войска и пираты
 

@@ -3779,7 +3779,13 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <div class="sz-cloud-side"><b data-i18n="sector-zero.cloud.here"></b><p id="sz-cloud-here"></p><button id="sz-keep-here" class="sz-action" type="button" data-i18n="sector-zero.cloud.keep-here"></button></div>
           <div class="sz-cloud-side"><b data-i18n="sector-zero.cloud.cloud"></b><p id="sz-cloud-cloud"></p><button id="sz-take-cloud" class="sz-action" type="button" data-i18n="sector-zero.cloud.take-cloud"></button></div>
         </div>
-        <div class="sz-tools"><button id="sz-back" type="button" data-i18n="sector-zero.back"></button></div>
+        <div id="sz-reset-confirm" hidden role="group" aria-labelledby="sz-reset-title">
+          <h2 id="sz-reset-title" data-i18n="sector-zero.reset.title"></h2>
+          <p data-i18n="sector-zero.reset.body"></p>
+          <button id="sz-reset-cancel" class="sz-action" type="button" data-i18n="sector-zero.reset.cancel"></button>
+          <button id="sz-reset-yes" class="sz-action sz-primary" type="button" data-i18n="sector-zero.reset.confirm"></button>
+        </div>
+        <div class="sz-tools"><button id="sz-back" type="button" data-i18n="sector-zero.back"></button><button id="sz-reset" type="button" data-i18n="sector-zero.reset"></button></div>
       </div>
       <div class="sz-projection" aria-hidden="true">
         <svg viewBox="0 0 500 500" fill="none" xmlns="http://www.w3.org/2000/svg">
