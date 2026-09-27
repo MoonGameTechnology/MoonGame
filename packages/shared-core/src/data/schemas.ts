@@ -1364,6 +1364,30 @@ const ModeSightSchema = z
   })
   .strict();
 
+/** Торговец экспедиции (решение владельца 2026-09-26, «живой курс»; механика —
+ *  `modules/trader.ts`). Нет раздела ⇒ торговца у режима нет.
+ *  - `goods` — товар → базовая цена в кредитах за единицу. Кредиты — валюта, а не товар:
+ *    в списке их быть не может (иначе «купить кредиты за кредиты»);
+ *  - `spread` — разница покупки и продажи: покупка по курсу × (1 + spread/2), продажа —
+ *    × (1 − spread/2);
+ *  - `impact` — насколько сдвигает курс единица товара, на кредит её базовой цены;
+ *  - `maxShift` — предел сдвига курса в обе стороны (доля базы; < 1, чтобы цена не
+ *    падала до нуля);
+ *  - `recoveryPerHour` — сколько сдвига уходит за игровой час. */
+const ModeTraderSchema = z
+  .object({
+    goods: z
+      .record(z.string(), z.number().positive())
+      .refine((g) => Object.keys(g).length > 0 && !('credits' in g), {
+        message: 'trader goods: at least one good, and never the currency itself',
+      }),
+    spread: z.number().min(0).max(1),
+    impact: z.number().nonnegative(),
+    maxShift: z.number().min(0).max(0.9),
+    recoveryPerHour: z.number().nonnegative(),
+  })
+  .strict();
+
 /** PVR-6.17. Дерево технологий режима (заказ владельца 2026-09-24: «технологии из
  *  сетевой игры надо переделать под Sector Zero — там дневные ограничения, Хранитель,
  *  которого нет, и т. д.»). Сетевой матч идёт неделями, и узлы в нём открываются по
@@ -1401,6 +1425,8 @@ export const GameModeDefSchema = z.object({
   sight: ModeSightSchema.optional(),
   /** Своё дерево технологий режима (PVR-6.17); нет ⇒ как в сетевом матче. */
   technology: ModeTechnologySchema.optional(),
+  /** Торговец экспедиции («живой курс»); нет ⇒ торговца нет. */
+  trader: ModeTraderSchema.optional(),
 });
 
 /** Session-market rules that belong to CONTENT, not to the mechanic (CONV-9).
@@ -1545,6 +1571,7 @@ export type HeroSkillGrants = z.infer<typeof HeroSkillGrantsSchema>;
 export type TeamFormat = z.infer<typeof TeamFormatSchema>;
 export type ModeVictory = z.infer<typeof ModeVictorySchema>;
 export type ModePve = z.infer<typeof ModePveSchema>;
+export type ModeTrader = z.infer<typeof ModeTraderSchema>;
 export type GameModeDef = z.infer<typeof GameModeDefSchema>;
 export type RewardsDef = z.infer<typeof RewardsDefSchema>;
 export type ResearchBoostDef = z.infer<typeof ResearchBoostDefSchema>;

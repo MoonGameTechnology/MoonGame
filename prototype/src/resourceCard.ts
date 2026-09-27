@@ -27,6 +27,11 @@ export interface ResourceCardHost {
   supply?: () => CardSupply | null;
   /** Купить пакет: хост платит профилем и зовёт ядро — карточка только сообщает о нажатии. */
   onBuySupply?: () => void;
+  /** Чем торгует торговец экспедиции («живой курс»); `null` — торговца нет (не забег или
+   *  режим без него), и кнопки нет. */
+  traderGoods?: () => readonly string[] | null;
+  /** Открыть торговца на этом ресурсе. */
+  onOpenTrader?: (resource: string) => void;
 }
 
 /** Что карточка знает о пакете снабжения. */
@@ -53,6 +58,7 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
       host.icons,
       host.marketShown?.() ?? true,
       host.supply?.() ?? null,
+      host.traderGoods?.()?.includes(resource) ?? false,
     );
   }
 
@@ -75,6 +81,12 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
       paint(current); // казна и остаток покупок — уже новые
       return;
     }
+    const traderBtn = tg.closest('[data-rc-trader]') as HTMLElement | null;
+    if (traderBtn) {
+      host.root()?.classList.remove('show');
+      host.onOpenTrader?.(traderBtn.dataset.rcTrader!);
+      return;
+    }
     const marketBtn = tg.closest('[data-rc-market]') as HTMLElement | null;
     if (marketBtn) {
       const res = marketBtn.dataset.rcMarket!;
@@ -95,6 +107,7 @@ export function resourceCardHtml(
   icons: Record<string, string>,
   market = true,
   supply: CardSupply | null = null,
+  trader = false,
 ): string {
   const player = state.players[me];
   const stock = Math.round(player?.resources?.[resource] ?? 0);
@@ -130,6 +143,7 @@ export function resourceCardHtml(
     ${market ? `<button class="rc-market ${canTrade ? '' : 'disabled'}" data-rc-market="${esc(resource)}">
       ${canTrade ? esc(t('rescard.market')) : esc(t('rescard.no-trade'))}
     </button>` : ''}
+    ${trader ? `<button class="rc-trader" data-rc-trader="${esc(resource)}">${esc(t('rescard.trader'))}</button>` : ''}
     <button class="rc-close">${esc(t('rescard.close'))}</button>
   </div>`;
 }

@@ -46,6 +46,7 @@ import {
   fleetOpsModule,
   autoRallyModule,
   marketModule,
+  traderModule,
   fleetBroodModule,
   pveModule,
   swarmMemoryModule,
@@ -155,6 +156,10 @@ export const MODULES: GameModule[] = [
   // (`time.advanced`, `planet.captured`, `fleet.arrived`), хуков нет, чужого порядка он
   // не трогает.
   visibilityModule,
+  // Торговец экспедиции («живой курс», решение владельца 2026-09-26): оживает только в
+  // режиме с разделом `trader`. В КОНЕЦ по той же причине, что два соседа выше: у него нет
+  // ни хуков, ни подписок — только свои действия, чужой порядок он не трогает.
+  traderModule,
 ];
 
 export const kernel = createKernel(MODULES);

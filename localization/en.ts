@@ -1682,6 +1682,8 @@ export const en: Record<string, string> = {
   'err.no-army': 'not that many troops',
   'err.no-artillery': 'no artillery',
   'err.no-supply': 'this mode has no supplies',
+  'err.no-trader': 'there is no trader in this match',
+  'err.trade-too-small': 'the proceeds would not buy a single unit',
   'err.supply-exhausted': 'no supplies left this run',
   'err.swarm-only': 'only the Swarm grows this',
   'err.no-boon': 'nothing to choose right now',
@@ -2136,6 +2138,7 @@ export const en: Record<string, string> = {
   'rescard.upkeep': 'Building upkeep',
   'rescard.army': 'Army upkeep',
   'rescard.market': 'Market',
+  'rescard.trader': 'Trader',
   'rescard.close': 'Close',
   'rescard.no-trade': 'Credits are the currency — not tradeable on the market',
   'hud.score.tip':
@@ -2235,6 +2238,12 @@ export const en: Record<string, string> = {
   'market.side.buy': 'Buy',
   'market.side.sell': 'Sell',
   'market.title': 'MARKET',
+  'trader.title': 'TRADER',
+  'trader.rule': 'Buying raises the price, selling lowers it; a full swing fades in {h}. Selling pays {n}% less than buying.',
+  'trader.amount': 'Units',
+  'trader.buy': 'Buy {n} for {c}',
+  'trader.sell': 'Sell {n} for {c}',
+  'trader.swap': 'Swap {n}',
 
   // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
   'onb.goal.capture': 'Capture a world',
@@ -2372,6 +2381,8 @@ export const en: Record<string, string> = {
   'rail.log.title': 'Dispatches',
   'rail.market.label': 'Market',
   'rail.market.title': 'Market',
+  'rail.trader.label': 'Trader',
+  'rail.trader.title': 'Trader: buy, sell and swap resources',
   'rail.msgs.label': 'Mail',
   'rail.msgs.title': 'Messages',
   'rail.pings.label': 'Markers',

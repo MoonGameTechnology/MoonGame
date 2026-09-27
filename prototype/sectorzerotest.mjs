@@ -146,6 +146,9 @@ const hooks = `window.__szTest = {
   // Суверены на профиле и казна матча — для покупки пакета снабжения.
   sov: n => saveSectorProgress({ ...sectorProgress, sovereigns: n }),
   res: r => s.players[ME]?.resources?.[r] ?? 0,
+  // Торговец экспедиции: положить в казну и прочитать курс товара.
+  fill: (bag) => { for (const [r, n] of Object.entries(bag)) s.players[ME].resources[r] = n; },
+  traderShift: (good) => s.trader?.[good]?.shift ?? 0,
   // Журнал аналитики веб-площадки (YAG-5.1): что игра отдала бы приёмнику.
   events: () => platform.events ?? [],
   // Весь флот игрока погиб — флоты уходят из мира, как после проигранного боя.
@@ -262,6 +265,8 @@ async function check(label, run) {
     run ? 0 : 1,
     `${label}: рынок из карточки`,
   );
+  // Торговец экспедиции — только в забеге: у ресурса в карточке своя кнопка.
+  assert.equal(await page.locator('.rc-trader').count(), run ? 1 : 0, `${label}: торговец из карточки`);
   await page.locator('.rc-close').click();
 }
 
@@ -546,6 +551,25 @@ try {
     assert.equal((await progress()).sovereigns, 5, 'пакет стоит 5 ◆');
     assert.match(await page.locator('#rescard .rc-note').textContent(), /2/, 'осталось 2 из 3');
     await page.locator('#rescard .rc-close').click();
+    // Торговец экспедиции («живой курс», решение владельца 2026-09-26): кнопка рельса только в
+    // забеге; покупка списывает кредиты и поднимает курс, продажа опускает, обмен — одной кнопкой.
+    await page.evaluate(() => window.__szTest.fill({ credits: 2000, metal: 500 }));
+    await page.locator('#rail-trader').click();
+    await page.locator('#trader.show').waitFor();
+    await page.locator('#trader [data-tr-good="metal"]').click();
+    await page.locator('#trader [data-tr-amt="100"]').click();
+    const beforeBuy = await page.evaluate(() => ({ c: window.__szTest.res('credits'), m: window.__szTest.res('metal') }));
+    await page.locator('#trader [data-tr="buy"]').click();
+    const afterBuy = await page.evaluate(() => ({ c: window.__szTest.res('credits'), m: window.__szTest.res('metal'), shift: window.__szTest.traderShift('metal') }));
+    assert.equal(Math.round(afterBuy.m - beforeBuy.m), 100, 'купили 100 металла');
+    assert.ok(afterBuy.c < beforeBuy.c, 'покупка стоит кредитов');
+    assert.ok(afterBuy.shift > 0, 'покупка подняла курс');
+    await page.locator('#trader [data-tr="sell"]').click();
+    assert.ok((await page.evaluate(() => window.__szTest.traderShift('metal'))) < afterBuy.shift, 'продажа опустила курс');
+    const energyBefore = await page.evaluate(() => window.__szTest.res('energy'));
+    await page.locator('#trader [data-tr-swap="energy"]').click();
+    assert.ok((await page.evaluate(() => window.__szTest.res('energy'))) > energyBefore, 'обмен принёс энергию');
+    await page.locator('#trader .tr-close').click();
     // Разведка забега попадает на карту главы (проверка ниже). С радарами ×1,5 (PVR-6.33)
     // старт главы II не опознаёт ничего сверх своих провинций, а забег робота кончается сразу
     // после старта, — поэтому флот сам встаёт на неопознанную провинцию.
@@ -692,7 +716,7 @@ try {
   });
   console.log(
     '\n✓ Sector Zero: чат, почта, маркеры, корпорация, рынок и «Сон» спрятаны; в схватке — на месте;' +
-      ' комиксы глав — до первого забега и после победы, один раз, с пропуском; портреты Академии загружены; страница героя вкладками, навыки деревом с линиями;' +
+      ' комиксы глав — до первого забега и после победы, один раз, с пропуском; портреты Академии загружены; торговец покупает, продаёт и меняет, курс отвечает на сделку; страница героя вкладками, навыки деревом с линиями;' +
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — плитками с подписью, полоской и числами корпуса; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +

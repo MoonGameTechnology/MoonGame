@@ -296,6 +296,15 @@ import type { ChainStep } from '../packages/shared-core/src/index';
 /** Take (fill) up to `amount` from an open lot — buy from a sell lot / sell into a buy lot. */
 export const marketTake = (playerId: string, id: string, amount?: number) =>
   act(playerId, 'market.take', amount === undefined ? { id } : { id, amount });
+/** Торговец экспедиции: купить `amount` штук товара по текущему курсу. */
+export const traderBuy = (playerId: string, resource: string, amount: number) =>
+  act(playerId, 'trader.buy', { resource, amount });
+/** Торговец экспедиции: продать `amount` штук товара по текущему курсу. */
+export const traderSell = (playerId: string, resource: string, amount: number) =>
+  act(playerId, 'trader.sell', { resource, amount });
+/** Торговец экспедиции: продать `amount` штук `give` и на всю выручку купить `get`. */
+export const traderSwap = (playerId: string, give: string, get: string, amount: number) =>
+  act(playerId, 'trader.swap', { give, get, amount });
 /** Reclaim your own lot, refunding its remaining escrow. */
 export const marketCancel = (playerId: string, id: string) =>
   act(playerId, 'market.cancel', { id });
