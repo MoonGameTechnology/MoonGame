@@ -1102,11 +1102,16 @@ BRW-2/3 написаны ровно под это.
   дозвона, повторный вход из «Активных» старого приказа не получает. Смоук падает без
   снятия таймера, без выброса очереди, без снятия баннера и без закрытия сокета (проверено
   возвратом по одному). `smoke:sector-zero` и `smoke:browser` зелёные.
-- **REFM-206** ⏳ `[proto]` **Перерисовка по имени.** `invalidatePanel()` и
-  `invalidateCmdBar()` вместо 26 сбросов `lastPanelHtml = ''` и 13 сбросов
-  `lastCmdHtml = ''`. Кеш остаётся у своей разметки и уедет вместе с ней (REFM-225,
-  REFM-226), а чужим зонам нужна одна функция, а не доступ к переменной. ≈40 правок,
-  поведение не меняется. Проверка: гейт, `smoke:browser`, `smoke:mobile`.
+- **REFM-206** ✅ `[proto]` **Перерисовка по имени.** `invalidatePanel()` и
+  `invalidateCmdBar()` вместо 27 сбросов `lastPanelHtml = ''` и 13 сбросов
+  `lastCmdHtml = ''`. Двери стоят рядом со своей разметкой (`renderPanel`,
+  `renderCmdBar`) и уедут вместе с ней (REFM-225, REFM-226), а чужим зонам хватает вызова
+  вместо доступа к переменной. Поведение не меняется: дверь только гасит кэш, как прежняя
+  запись, а перерисовка приходит, как и раньше, следующим кадром или вызовом рядом.
+  Сторож `redrawWiring`: кэш сбрасывают только двери, нарисованное запоминает только своя
+  разметка (лист через `panelCache.ts`, ряд в `renderChainBar` и `renderCmdBar`); новая
+  ручная запись его роняет (проверено возвратом двух записей). Гейт, `smoke:browser`,
+  `smoke:mobile`, `smoke:sector-zero` и `smoke:retreat` зелёные.
 - **REFM-207** ⏳ `[proto]` **Владелец прицелов и поповеров** (`interaction.ts`, часть 1).
   Пятнадцать флагов переезжают в модуль, который меняет их только своими функциями
   `arm(…)` и `disarm(повод)`: прицелы (`aiming`, `assaultAim`, `engageAim`, `retreatAim`,
@@ -1177,7 +1182,7 @@ BRW-2/3 написаны ровно под это.
 - **REFM-215** ⏳ `[proto]` **Сессия аккаунта**, ≈160. Проба режима (`probeAuthMode`),
   запись и токен сессии, `ensureSession`, `fetchJoinToken`, `askSignIn`, `claimDone`.
   Владелец `authMode` и `pendingJoinToken`. Проверка: `smoke:net`.
-- **REFM-216** 🔒(REFM-206, REFM-208, REFM-214, REFM-215) `[proto]` **Сетевой жизненный цикл**, ≈400.
+- **REFM-216** 🔒(REFM-208, REFM-214, REFM-215) `[proto]` **Сетевой жизненный цикл**, ≈400.
   `netClientFor`, `connect`, `scheduleReconnect`, `dropNetClient`, таймеры пинга и замера.
   Модуль становится владельцем `NET` и флагов сокета, `leaveNetwork()` из REFM-205
   переезжает сюда. Самый связанный кирпич плана: снимок сервера пишет мир, выбор,
@@ -1229,7 +1234,7 @@ BRW-2/3 написаны ровно под это.
   `fleetSummaryHtml`, плитки юнитов, метки эффектов, группа, кнопка мин (SM-3.5). Тоже
   чистая разметка, её можно брать сразу. Сторож `shipCard`. Проверка:
   `ui:shot`.
-- **REFM-225** 🔒(REFM-206, REFM-208) `[proto]` **Хозяин боковой панели**, ≈550.
+- **REFM-225** 🔒(REFM-208) `[proto]` **Хозяин боковой панели**, ≈550.
   Выбор карточки, кеш `lastPanelHtml` вместе с дверью перерисовки, клики `side`
   (`data-act`), описания по наведению, диалог деления. Сторожа `controls`, `buildScreen`,
   `touchSurface`. Проверка: `smoke:browser`, `smoke:mobile`, `smoke:context`.
@@ -1288,7 +1293,7 @@ Escape/Back (`BACK_LAYERS`, ≈130) остаётся в `main.ts`: он пере
 > REFM-12 ✅ → REFM-13 ✅ → REFM-14 ✅ → REFM-15 ✅ → REFM-16 ✅ → REFM-17 ✅ → REFM-18 ✅ →
 > REFM-19 ✅ → REFM-20 ✅ → REFM-21 ✅ → REFM-22 ✅ → REFM-23 ✅ → REFM-24 ✅ → REFM-25 ✅ →
 > REFM-26 ✅ → REFM-27 ✅ → REFM-28 ✅ → REFM-29 ✅ → REFM-30 ✅ → REFM-31 ✅ → REFM-32 ✅ →
-> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160 ✅ → REFM-161 ✅ → REFM-162 ✅ → REFM-163 ✅ → REFM-164 ✅ → REFM-165 ✅ → REFM-166 ✅ → REFM-167 ✅ → REFM-168 ✅ → REFM-169 ✅ → REFM-170 ✅ → REFM-171 ✅ → REFM-172 ✅ → REFM-173 ✅ → REFM-174 ✅ → REFM-175 ✅ → REFM-176 ✅ → REFM-177 ✅ → REFM-178 ✅ → REFM-179 ✅ → REFM-180 ✅ → REFM-181 ✅ → REFM-182 ✅ → REFM-183 ✅ → REFM-184 ✅ → REFM-185 ✅ → REFM-186 ✅ → REFM-187 ✅ → REFM-188 ✅ → REFM-189 ✅ → REFM-190 ✅ → REFM-191 ✅ → REFM-192 ✅ → REFM-193 ✅ → REFM-194 ✅ → REFM-195 ✅ → REFM-196 ✅ → REFM-197 ✅ → REFM-198 ✅ → REFM-199 ✅ → REFM-200 ✅ → REFM-201 ✅ → REFM-202 ✅ → REFM-203 ✅ → REFM-204 ✅ → REFM-205 ✅ → REFM-206…REFM-236 по плану выше (этапы 0–6: кирпич с замком ждёт своих владельцев). Сводка «по таблице сцепки» (REFM-160) этим
+> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160 ✅ → REFM-161 ✅ → REFM-162 ✅ → REFM-163 ✅ → REFM-164 ✅ → REFM-165 ✅ → REFM-166 ✅ → REFM-167 ✅ → REFM-168 ✅ → REFM-169 ✅ → REFM-170 ✅ → REFM-171 ✅ → REFM-172 ✅ → REFM-173 ✅ → REFM-174 ✅ → REFM-175 ✅ → REFM-176 ✅ → REFM-177 ✅ → REFM-178 ✅ → REFM-179 ✅ → REFM-180 ✅ → REFM-181 ✅ → REFM-182 ✅ → REFM-183 ✅ → REFM-184 ✅ → REFM-185 ✅ → REFM-186 ✅ → REFM-187 ✅ → REFM-188 ✅ → REFM-189 ✅ → REFM-190 ✅ → REFM-191 ✅ → REFM-192 ✅ → REFM-193 ✅ → REFM-194 ✅ → REFM-195 ✅ → REFM-196 ✅ → REFM-197 ✅ → REFM-198 ✅ → REFM-199 ✅ → REFM-200 ✅ → REFM-201 ✅ → REFM-202 ✅ → REFM-203 ✅ → REFM-204 ✅ → REFM-205 ✅ → REFM-206 ✅ → REFM-207…REFM-236 по плану выше (этапы 0–6: кирпич с замком ждёт своих владельцев). Сводка «по таблице сцепки» (REFM-160) этим
 > планом заменена: её «секция вычерпана» значило «решений не осталось», а не «строк не
 > осталось» — в `accounts` и `meta-progression` лежат ещё ~1 600 строк состояния и проводки.
 > Блок REFP закрыт, так что зона `prototype/` теперь целиком за REFM.
