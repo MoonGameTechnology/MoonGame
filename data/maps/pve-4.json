@@ -320,7 +320,8 @@
           "type": "radar"
         },
         {
-          "type": "fort"
+          "type": "fort",
+          "level": 2
         }
       ],
       "garrison": [
@@ -330,6 +331,10 @@
         },
         {
           "unit": "heavy_infantry",
+          "count": 4
+        },
+        {
+          "unit": "garrison",
           "count": 2
         }
       ]
@@ -356,6 +361,9 @@
           "unit": "swarm_lander",
           "count": 2
         }
+      ],
+      "traits": [
+        "ally_task"
       ]
     },
     "station_east": {
@@ -371,6 +379,9 @@
           "unit": "swarm_lander",
           "count": 2
         }
+      ],
+      "traits": [
+        "ally_task"
       ]
     },
     "black_hole": {
@@ -633,6 +644,10 @@
       "landing": [
         {
           "unit": "militia",
+          "count": 2
+        },
+        {
+          "unit": "heavy_infantry",
           "count": 2
         }
       ],

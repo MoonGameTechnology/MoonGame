@@ -1894,6 +1894,7 @@ export const ru: Record<string, string> = {
   'err.no-artillery': 'нет артиллерии',
   'err.no-supply': 'в этом режиме снабжения нет',
   'err.no-trader': 'в этой партии торговца нет',
+  'err.no-contact': 'сначала установите связь с союзником',
   'err.no-vault': 'в этой партии архива нет',
   'err.not-at-vault': 'флот не у архива',
   'err.vault-held': 'архив держит враг',

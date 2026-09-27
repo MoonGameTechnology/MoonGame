@@ -226,7 +226,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '49'; // PVR-7.3: в конец вошёл `extraction` 1.0.0 —
+export const MODULE_MANIFEST_VERSION = '50'; // PVR-7.4: `rendezvous` 1.1.0 — приказы союзнику
+// главы IV (`ally.order`/`ally.cancel`, одна операция на жителя, закрытие по событиям мира).
+// У состояния новая запись `allyOps`. Партия на 49 не знает этих действий.
+// export const MODULE_MANIFEST_VERSION = '49'; // PVR-7.3: в конец вошёл `extraction` 1.0.0 —
 // накопитель архива главы IV (извлечение у архива, носитель, доставка, потеря), `victory`
 // 1.3.0 судит главу с архивом по накопителю, а не по волнам. У состояния новая запись
 // `extraction`. Партия на 48 не знает этих правил.
