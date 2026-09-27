@@ -3424,7 +3424,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <button id="startup-retry" type="button" data-i18n="startup.retry"></button>
 </section>
 <canvas id="map" tabindex="-1"></canvas>
-<section id="comic" role="dialog" aria-modal="true" data-i18n-aria="sector-zero.comic.title">
+<section id="comic" role="dialog" aria-modal="true" tabindex="-1" data-i18n-aria="sector-zero.comic.title">
   <button id="comic-skip" type="button" data-i18n="sector-zero.comic.skip"></button>
   <figure class="comic-panel">
     <img id="comic-img" alt="" decoding="async">

@@ -7,12 +7,20 @@
  * его через общую лестницу слоёв (`BACK_LAYERS` в `main.ts`), а панель, чья картинка не
  * пришла, показывает подписи на тёмном фоне — или, если подписей нет, пролистывается сама.
  * Движение (наезд и проявление панели) — только CSS, при reduced motion его нет.
+ *
+ * Каждая страница висит {@link COMIC_HOLD_MS} (решение владельца 2026-09-27): кнопки
+ * «Дальше» и «Пропустить» появляются только потом, а нажатие по панели до этого ничего не
+ * листает — страницу успевают прочитать. «Назад»/Escape закрывают комикс и во время паузы.
  */
 import { t } from '../../localization/runtime';
 import type { ComicPanel } from '../../decisions/chapterComics';
 
-/** Чем кончается комикс: перед забегом — «В бой», после победы — «К итогам». */
-export type ComicFinish = 'battle' | 'results';
+/** Сколько страница держится до появления кнопок. */
+export const COMIC_HOLD_MS = 5000;
+
+/** Чем кончается комикс: перед забегом — «В бой», после победы — «К итогам», посреди
+ *  забега — «Продолжить». */
+export type ComicFinish = 'battle' | 'results' | 'resume';
 
 export interface ComicPlayer {
   /** Показать панели; промис разрешается, когда игрок комикс закрыл (досмотрел или
@@ -45,11 +53,21 @@ export function initComicPlayer({
   let finish: ComicFinish = 'results';
   let at = 0;
   let done: (() => void) | null = null;
+  let holding = false;
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function hold(on: boolean): void {
+    holding = on;
+    next.hidden = on;
+    skip.hidden = on;
+  }
 
   function close(): void {
     if (!done) return;
     const resolve = done;
     done = null;
+    clearTimeout(holdTimer);
+    hold(false);
     root.style.display = 'none';
     img.removeAttribute('src');
     resolve();
@@ -74,17 +92,25 @@ export function initComicPlayer({
         ? 'sector-zero.comic.next'
         : finish === 'battle'
           ? 'sector-zero.comic.to-battle'
-          : 'sector-zero.comic.to-results',
+          : finish === 'results'
+            ? 'sector-zero.comic.to-results'
+            : 'sector-zero.comic.resume',
     );
     // Перезапуск проявления: класс снимается и ставится в следующем кадре раскладки.
     void root.offsetWidth;
     root.classList.add('comic-in');
+    hold(true);
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      hold(false);
+      next.focus({ preventScroll: true });
+    }, COMIC_HOLD_MS);
     const upcoming = panels[i + 1];
     if (upcoming) new Image().src = upcoming.image; // следующая панель — заранее
   }
 
   function advance(): void {
-    if (!done) return;
+    if (!done || holding) return;
     if (at + 1 < panels.length) show(at + 1);
     else close();
   }
@@ -92,7 +118,10 @@ export function initComicPlayer({
   img.addEventListener('error', () => {
     if (!done || !img.getAttribute('src')) return;
     if (panels[at]?.captions?.length) root.classList.add('no-art');
-    else advance();
+    else {
+      hold(false); // пустую панель без подписей держать незачем
+      advance();
+    }
   });
   next.addEventListener('click', advance);
   skip.addEventListener('click', close);
@@ -112,7 +141,7 @@ export function initComicPlayer({
       const closed = new Promise<void>((resolve) => (done = resolve));
       root.style.display = 'flex';
       show(0);
-      next.focus({ preventScroll: true });
+      root.focus({ preventScroll: true });
       return closed;
     },
     isOpen: () => done !== null,

@@ -312,10 +312,11 @@ import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
-import { CHAPTER_COMICS } from './comicArt';
+import { CHAPTER_COMICS, COMIC_TASK_TRIGGERS } from './comicArt';
 import {
   comicDue,
   comicId,
+  comicTaskDue,
   markComicSeen,
   type ComicMoment,
   type ComicRegistry,
@@ -14834,7 +14835,7 @@ const sectorZeroMenu = initSectorZeroMenu({
     writeRaw('void.pveMission', String(value));
   },
   start: () => launchSectorRun(),
-  startTraining: () => startTraining(),
+  startTraining: () => playChapterComic('training-1', 'intro', () => startTraining()),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
   resume: restoreRun,
   settings: () => settings.open(),
@@ -14862,7 +14863,7 @@ function playChapterComic(chapter: string, moment: ComicMoment, then: () => void
     then();
     return;
   }
-  const shown = comicPlayer.play(panels, moment === 'intro' ? 'battle' : 'results');
+  const shown = comicPlayer.play(panels, moment === 'intro' ? 'battle' : moment === 'outro' ? 'results' : 'resume');
   detach(
     'Sector Zero: комикс главы',
     shown.then(() => {
@@ -14870,6 +14871,16 @@ function playChapterComic(chapter: string, moment: ComicMoment, then: () => void
       then();
     }),
   );
+}
+
+/** Комикс главы после её ключевой задачи (`COMIC_TASK_TRIGGERS`): один раз на профиль, в тот
+ *  кадр, когда задача впервые засчитана. Дев-забег и полигон его не показывают. */
+function playTaskComic(missions: readonly MissionRow[]): void {
+  if (isTraining() || sectorDevActive || comicPlayer.isOpen()) return;
+  const chapter = pveChapter(sectorMission).id;
+  const complete = missions.filter((m) => m.complete).map((m) => m.id);
+  if (comicTaskDue(sectorProgress, comicArt.registry, COMIC_TASK_TRIGGERS, chapter, complete))
+    playChapterComic(chapter, 'task', () => {});
 }
 
 /** Новая попытка главы — и меню, и «Сыграть главу снова»: сперва комикс главы (в первый
@@ -15309,6 +15320,7 @@ function frame(nowReal: number) {
     .join('');
   const missions = sectorRunActive ? runMissionRows() : [];
   const missionsDone = missions.filter(m => m.complete).length;
+  if (missionsDone > 0) playTaskComic(missions);
   const missionHtml =
     missions.length === 0
       ? ''

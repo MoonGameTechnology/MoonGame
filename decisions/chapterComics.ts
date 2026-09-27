@@ -10,8 +10,10 @@
  */
 import type { SectorZeroProgress } from './sectorZeroProgress';
 
-/** Когда комикс показывается: перед первым забегом главы и после первой победы в ней. */
-export const COMIC_MOMENTS = ['intro', 'outro'] as const;
+/** Когда комикс показывается: перед первым забегом главы, после первой победы в ней и
+ *  (`task`) когда в забеге впервые выполнена ключевая задача главы — какая, говорит
+ *  реестр арта хозяина ({@link ComicTaskTriggers}). */
+export const COMIC_MOMENTS = ['intro', 'outro', 'task'] as const;
 export type ComicMoment = (typeof COMIC_MOMENTS)[number];
 
 /** Одна панель: картинка (адрес, который отдала сборка) и подписи — КЛЮЧИ локали. Текст
@@ -26,11 +28,14 @@ export type ComicRegistry = Readonly<
   Record<string, Readonly<Partial<Record<ComicMoment, readonly ComicPanel[]>>>>
 >;
 
+/** `id главы → id задачи`, после которой играет её комикс `task`. */
+export type ComicTaskTriggers = Readonly<Record<string, string>>;
+
 /** Имя отметки в профиле: `pve-1:intro`. */
 export const comicId = (chapter: string, moment: ComicMoment): string => `${chapter}:${moment}`;
 
 /** Форма отметки — то, что профиль примет из хранилища (правленый мусор отбрасывается). */
-export const COMIC_ID = /^[a-z0-9-]+:(intro|outro)$/;
+export const COMIC_ID = /^[a-z0-9-]+:(intro|outro|task)$/;
 
 /** Панели к показу — или `null`: комикса нет, он пуст или уже показан этому профилю. */
 export function comicDue(
@@ -42,6 +47,20 @@ export function comicDue(
   const panels = registry[chapter]?.[moment];
   if (!panels || panels.length === 0) return null;
   return progress.comicsSeen.includes(comicId(chapter, moment)) ? null : panels;
+}
+
+/** Комикс `task` к показу: ключевая задача главы только что выполнена (есть в `complete`),
+ *  а комикс ещё не показан. Иначе `null`. */
+export function comicTaskDue(
+  progress: Pick<SectorZeroProgress, 'comicsSeen'>,
+  registry: ComicRegistry,
+  triggers: ComicTaskTriggers,
+  chapter: string,
+  complete: readonly string[],
+): readonly ComicPanel[] | null {
+  const task = triggers[chapter];
+  if (!task || !complete.includes(task)) return null;
+  return comicDue(progress, registry, chapter, 'task');
 }
 
 /** Отметить комикс показанным. Чистая и идемпотентная: повтор отдаёт тот же профиль. */

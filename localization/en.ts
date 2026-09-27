@@ -2657,6 +2657,7 @@ export const en: Record<string, string> = {
   'sector-zero.comic.next': 'Next ›',
   'sector-zero.comic.to-battle': 'To battle',
   'sector-zero.comic.to-results': 'To results',
+  'sector-zero.comic.resume': 'Continue',
   'sector-zero.shop.bought': 'Purchased.',
   'sector-zero.shop.empty': 'The shelf is empty.',
   'sector-zero.shop.sold-out': 'Sold out — the shelf restocks tomorrow.',
