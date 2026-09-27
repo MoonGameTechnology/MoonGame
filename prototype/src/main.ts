@@ -193,7 +193,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -14190,8 +14190,9 @@ async function writeSectorProgress(blob: string): Promise<void> {
 
 let progressWrite = loadSectorProfile().then(pick => {
   sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
-  // Профиль с главами, выигранными до наград-героев, догоняет их при чтении (heroRecruits §3).
-  const granted = grantChapterHeroes(sectorProgress, sectorChapterIds(), data);
+  // Профиль с главами, выигранными до наград-героев, и с уже засчитанными спасениями
+  // догоняет их при чтении (heroRecruits §3, §4).
+  const granted = grantChapterHeroes(sectorProgress, sectorChapterIds(), data, pveRescues());
   // Запись и тогда, когда печать велит: подделка стирается, старый профиль запечатывается.
   if (granted.progress === sectorProgress && !pick.rewrite) return;
   sectorProgress = granted.progress;
@@ -14425,8 +14426,9 @@ function drawDevourSieges(): void {
 }
 
 function saveSectorProgress(next: SectorZeroProgress): void {
-  // Победа в главе приводит её героя (решение владельца 2026-09-23) — на любом пути засчёта.
-  const granted = grantChapterHeroes(next, sectorChapterIds(), data);
+  // Победа в главе приводит её героя (решение владельца 2026-09-23), спасение задачей главы —
+  // спасённого (баг-репорт 2026-09-27) — на любом пути засчёта.
+  const granted = grantChapterHeroes(next, sectorChapterIds(), data, pveRescues());
   // Герой, для которого набралось 10 жетонов (`heroTokens.ts`), — тоже на любом пути:
   // жетоны приходят и с итогов забега, и из магазина.
   const byTokens = grantTokenHeroes(granted.progress, data);
@@ -14586,7 +14588,7 @@ async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress
   // развилке делается и после него. Меню иначе предложило бы «Продолжить» его и засчитало
   // бы облачному профилю чужой забег.
   if (runInProgress()) setRunActive(false);
-  sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data).progress;
+  sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data, pveRescues()).progress;
   await writeSectorProgress(sealProgress(sectorProgress, LOCAL_SEAL));
   // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному: ТОЧНЫМ
   // миром, если облако его привезло (AUD-24), иначе по дескриптору (или его нет вовсе).

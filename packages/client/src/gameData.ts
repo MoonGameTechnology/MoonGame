@@ -115,6 +115,25 @@ export function pveChapter(mission = 0): {
   };
 }
 
+/** Кого приводит в отряд засчитанная задача главы, даже без победы в ней (баг-репорт
+ *  владельца 2026-09-27: спас учёного, завершил экспедицию сам — в подготовке его нет).
+ *  Задача вида `recruit` ведёт к станциям, где карта держит героя (`recruitHero`); правило
+ *  выдачи — `decisions/heroRecruits.ts`. Из карт, а не из мира: ядро снимает `recruitHero`
+ *  со станции в момент спасения, и к итогам забега мир уже не помнит, кто там ждал. */
+export function pveRescues(): { chapter: string; objective: string; hero: string }[] {
+  return PVE_MISSIONS.flatMap((_, i) => {
+    const map = parsedMission(i);
+    return map.objectives
+      .filter((o) => o.kind === 'recruit')
+      .flatMap((o) =>
+        o.targets.flatMap((at) => {
+          const hero = map.sectors[at]?.recruitHero;
+          return hero ? [{ chapter: map.id, objective: o.id, hero }] : [];
+        }),
+      );
+  });
+}
+
 /** The mode the mission's map declares itself played under (`data.modes` id), for the host
  *  to arm the match with. The map carries it so the binding is DATA: the map and the mode
  *  both existed for a long time and nothing said they belonged together. */
