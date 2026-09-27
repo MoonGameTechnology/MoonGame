@@ -119,6 +119,12 @@
 | `docs/explanations/06-pve-wave-spawn-via-schedule.md` | 06. Спавн волн через schedule(), тактика NPC — нет | Дата: 2026-08-18 |
 | `docs/explanations/README.md` | docs/explanations/ — библиотека решений (ADR) | Architecture Decision Records: почему так, а не иначе. Не что делает код (это в |
 
+## docs/mockups/player-profile/
+
+| Документ | Заголовок | Про что |
+| --- | --- | --- |
+| `docs/mockups/player-profile/README.md` | Карточка игрока: портреты, медали и степени | Интерактивный дизайн-макет персонализации Void Dominion: 40 портретов, 15 мест |
+
 ## docs/research/
 
 | Документ | Заголовок | Про что |
