@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Action, GameState } from '../../packages/shared-core/src/index';
+import { setStance, type Action, type GameState } from '../../packages/shared-core/src/index';
 import { newGame, order, HOUR, START_CANDIDATES } from './game';
 import { initSoloDrivers, autoProbeKey, AI_STEP_MS, type SoloHost } from './soloDrivers';
 
@@ -55,6 +55,44 @@ const drain = (h: ReturnType<typeof harness>): void => {
 };
 
 describe('соло-драйверы — ходы ИИ', () => {
+  it('непилотируемый NPC и его удаление не сдвигают ходы остальных ботов', () => {
+    const timeline = (withNpc: boolean) => {
+      const s = newGame();
+      if (withNpc) {
+        // Сосед не меняет военную обстановку: меряем только расписание ходов.
+        for (const id of Object.keys(s.players)) setStance(s, id, 'encounter', 'peace');
+        s.players.encounter = {
+          id: 'encounter', name: 'Encounter', faction: 'azure', npc: 'neutral',
+          status: 'active', resources: {},
+        };
+      }
+      const h = harness({}, s);
+      const issued: Array<{ time: number; playerId: string; type: string; payload: unknown }> = [];
+      for (let tick = 1; tick <= 16; tick++) {
+        if (tick === 9) delete h.state().players.encounter;
+        h.setState(at(h.state(), tick * AI_STEP_MS / 4));
+        const before = h.others.length;
+        drain(h);
+        issued.push(...h.others.slice(before).map(({ playerId, type, payload }) => ({
+          time: h.state().time, playerId, type, payload,
+        })));
+      }
+      return issued;
+    };
+    const baseline = timeline(false);
+    expect(baseline.length).toBeGreaterThan(0);
+    expect(timeline(true)).toEqual(baseline);
+  });
+
+  it('NPC с явным контроллером по-прежнему получает ходы', () => {
+    const s = newGame();
+    s.players.p2!.npc = 'neutral';
+    const h = harness({}, s);
+    h.setState(at(h.state(), AI_STEP_MS));
+    drain(h);
+    expect(h.others.some((a) => a.playerId === 'p2')).toBe(true);
+  });
+
   it('ИИ ходит не чаще своего шага', () => {
     const h = harness();
     h.setState(at(h.state(), AI_STEP_MS));

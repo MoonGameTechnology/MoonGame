@@ -62,6 +62,7 @@
       "kind": "planet",
       "terrain": "empty_space",
       "planetType": "terran",
+      "owner": "covenant",
       "buildings": [
         {
           "type": "mine_t1"
@@ -306,6 +307,16 @@
     "pirates": {
       "name": "Pirate Base",
       "faction": "pirates",
+      "npc": "pirate",
+      "ai": false,
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
+    },
+    "covenant": {
+      "name": "Covenant of Unity",
+      "faction": "vanguard",
       "npc": "pirate",
       "ai": false,
       "resources": {
