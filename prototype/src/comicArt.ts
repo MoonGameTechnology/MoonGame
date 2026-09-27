@@ -33,7 +33,9 @@ export const CHAPTER_COMICS: ComicRegistry = {
   },
 };
 
-/** После какой задачи главы играет её комикс `task`. */
+/** После какой задачи главы играет её комикс `task`. Триггером может быть и шаг главной
+ *  цепочки главы (`decisions/chapterChain.ts`): у главы IV это встреча с союзником (§6.8). */
 export const COMIC_TASK_TRIGGERS: ComicTaskTriggers = {
   'pve-1': 'mission.rescue-scientist',
+  'pve-4': 'chain.contact',
 };

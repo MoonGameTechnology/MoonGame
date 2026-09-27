@@ -1217,7 +1217,7 @@
 | PVR-7.3 | ✅ | core data | `docs/sector-zero-roadmap.md` | Накопитель: извлечение, носитель, победа доставкой |
 | PVR-7.4 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Союзный бот: «Охранять», «Атаковать», «Разведать» |
 | PVR-7.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Панель «Связь с союзником» и интерфейс главы |
-| PVR-7.6 | ⏳ | data cli | `docs/sector-zero-roadmap.md` | Дверь главы IV: маршрут, имена, сквозной прогон |
+| PVR-7.6 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Дверь главы IV: маршрут, имена, сквозной прогон |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

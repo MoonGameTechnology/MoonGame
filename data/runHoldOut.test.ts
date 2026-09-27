@@ -27,6 +27,9 @@ describe('PVR-2.5 — удержание после последней волн�
       const pve = data.modes[modeId]!.pve!;
       expect(pve.holdHours).toBeDefined();
       const s = pveState(data, mission);
+      // Глава с архивом (IV, PVR-7.3) удержанием не выигрывается: её решает доставка
+      // накопителя (`victory` 1.3.0), и срок удержания там ничего не засчитывает.
+      if (s.extraction) return;
       const npc = Object.values(s.players).find((p) => p.faction === pve.npcFaction)!.id;
       // Волна рождается в мире Роя с наименьшим id — так её ставит `pveModule`.
       const staging = Object.keys(s.planets).filter((id) => s.planets[id]!.owner === npc).sort()[0]!;
