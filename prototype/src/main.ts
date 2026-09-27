@@ -3615,7 +3615,7 @@ function setFleetSelection(ids: string[]) {
   selFleet = sel.single;
   inspectFleet = sel.inspect; // UI-14: одинокий чужой уходит на осмотр, а не в никуда
   selPlanet = null; // a fleet selection never co-selects a planet (mutually exclusive)
-  lastPanelHtml = '';
+  invalidatePanel();
 }
 /**
  * Чей флот показывает панель. Осмотр чужого (UI-14) уступает ВСЕМУ: он виден, только
@@ -3644,7 +3644,7 @@ function clearSelection() {
   merging = false;
   splitState = null;
   troopsPlan = null;
-  lastPanelHtml = '';
+  invalidatePanel();
 }
 
 /** Ctrl/⌘-click toggle: fold the current selection into a group and add/remove one. */
@@ -8375,6 +8375,13 @@ function revealMobileSelection(): void {
   clampCam();
 }
 
+/** Дверь перерисовки листа (REFM-206): «я поменял мир, перерисуй» после приказа, смены
+ *  выделения или закрытия окна. Кэш принадлежит разметке листа и уедет вместе с ней
+ *  (REFM-225), а чужим зонам нужна эта функция, а не доступ к переменной. */
+function invalidatePanel(): void {
+  lastPanelHtml = '';
+}
+
 function renderPanel() {
   // Кто прячет лист — решает hudDock.panelOpen: признак один на все режимы прицела
   // («ждём тап по карте»), и «Курс» в нём теперь наравне со слиянием, набором группы
@@ -8493,7 +8500,7 @@ function mobileOrderKind(): MobileOrderKind | null {
 
 function stageMobileTarget(order: MobileOrderKind, target: MobileOrderTarget | null): void {
   mobileDraft = target ? { order, fleetIds: [...selectedFleetIds()], target } : null;
-  lastCmdHtml = '';
+  invalidateCmdBar();
 }
 
 function mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind): boolean {
@@ -8541,8 +8548,8 @@ function cancelMobileOrder(): void {
   engageAim = false;
   merging = false;
   pickMode = false;
-  lastCmdHtml = '';
-  lastPanelHtml = '';
+  invalidateCmdBar();
+  invalidatePanel();
 }
 
 function sendMobileOrder(): void {
@@ -8658,6 +8665,13 @@ function updateChainDom(): void {
   }
 }
 
+/** Дверь перерисовки ряда команд (REFM-206): «состояние ряда поменялось, собери заново».
+ *  Кэш общий у ряда, мобильной полоски приказа и полоски «Приказ» и уедет вместе с их
+ *  разметкой (REFM-226), а чужим зонам нужна эта функция, а не доступ к переменной. */
+function invalidateCmdBar(): void {
+  lastCmdHtml = '';
+}
+
 /** Horizontal fleet command bar — Move (arm) / Stop / Attack / orbit change —
  *  acting on the current fleet selection, buttons enabled by context. */
 function renderCmdBar() {
@@ -8682,7 +8696,7 @@ function renderCmdBar() {
     castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
     retreatMenu = false;
     cmdbar.classList.remove('show');
-    lastCmdHtml = '';
+    invalidateCmdBar();
     return;
   }
   if (MOBILE && (mobileOrderKind() || pickMode)) {
@@ -9007,7 +9021,7 @@ splitdlg.addEventListener('click', (ev) => {
     // click on the dimmed backdrop (outside the box) cancels
     splitState = null;
     renderSplitDialog();
-    lastCmdHtml = '';
+    invalidateCmdBar();
     renderCmdBar();
     return;
   }
@@ -9017,7 +9031,7 @@ splitdlg.addEventListener('click', (ev) => {
   if (sx === 'cancel') {
     splitState = null;
     renderSplitDialog();
-    lastCmdHtml = '';
+    invalidateCmdBar();
     renderCmdBar();
     return;
   }
@@ -9040,8 +9054,8 @@ splitdlg.addEventListener('click', (ev) => {
       );
     splitState = null;
     renderSplitDialog();
-    lastCmdHtml = '';
-    lastPanelHtml = '';
+    invalidateCmdBar();
+    invalidatePanel();
     renderCmdBar();
     renderPanel();
     return;
@@ -9225,7 +9239,7 @@ side.addEventListener('click', (ev) => {
     fleetInfoFor = null;
     planetInfoFor = null;
   }
-  lastPanelHtml = '';
+  invalidatePanel();
   renderPanel();
   if (act === 'summaryback' || act === 'fleetinfo' || act === 'planetinfo') {
     const scroll = side.querySelector<HTMLElement>('.pscroll');
@@ -9319,7 +9333,7 @@ side.addEventListener('contextmenu', (ev) => {
   });
   if (!order || !selPlanet) return;
   enqueueBuild(selPlanet, { kind: order.kind as BuildKind, id: order.id, count: 1 });
-  lastPanelHtml = '';
+  invalidatePanel();
   renderPanel();
 });
 
@@ -9558,7 +9572,7 @@ cmdbar.addEventListener('click', (ev) => {
       const d = undoGesture({ steps: chainMode.steps, gestures: chainMode.gestures });
       chainMode.steps = d.steps;
       chainMode.gestures = d.gestures;
-      lastCmdHtml = '';
+      invalidateCmdBar();
       if (chainMode.menu) renderChainMenu(); // серость пунктов могла измениться
     }
   } else if (cmd === 'chhome') {
@@ -9569,7 +9583,7 @@ cmdbar.addEventListener('click', (ev) => {
       if (home && chainMode.steps.length < MAX_CHAIN_STEPS) {
         chainMode.steps = [...chainMode.steps, { kind: 'move', to: home }];
         chainMode.gestures = [...chainMode.gestures, 1];
-        lastCmdHtml = '';
+        invalidateCmdBar();
       }
     }
   } else if (cmd === 'chsend') {
@@ -9643,8 +9657,8 @@ cmdbar.addEventListener('click', (ev) => {
     aiming = false;
     if (pickMode && !MOBILE) note(t('hint.multiselect'));
   }
-  lastCmdHtml = '';
-  lastPanelHtml = '';
+  invalidateCmdBar();
+  invalidatePanel();
   renderCmdBar();
   renderPanel();
 });
@@ -9701,7 +9715,7 @@ function selectAt(mx: number, my: number) {
     }
     if (anchor) orderMerge(movers, anchor.id);
     merging = false;
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   // ГЛАВА IV (PVR-7.5) — ПРИКАЗ СОЮЗНИКУ ВЗВЕДЁН: тап выбирает цель операции. «Охранять» ищет
@@ -9724,7 +9738,7 @@ function selectAt(mx: number, my: number) {
     if (!ally || (!hit && !node)) note(t('ally.pick-missed'));
     else if (playerOrder(allyOrder(ME, ally, kind, hit ? { fleet: hit.id } : { planet: node!.id })))
       note(t('ally.ordered'));
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   // SHU-3.1 — УДАР ВЗВЕДЁН: следующий тап выбирает цель вылета. Сначала ищем чужой
@@ -9749,7 +9763,7 @@ function selectAt(mx: number, my: number) {
     } else {
       note(t('hint.wing-cancelled'));
     }
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   // «Отступить» взведено: тап по миру — точка отхода. Дорогу, право прохода и то, что флот
@@ -9761,7 +9775,7 @@ function selectAt(mx: number, my: number) {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (n) playerOrder(retreatFleet(ME, fleetId, n.id));
     else note(t('hint.retreat-cancelled'));
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   // Hero cast armed: the next tap picks the target world. Range / cooldown / cost
@@ -9772,7 +9786,7 @@ function selectAt(mx: number, my: number) {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (n) playerOrder(castHeroAbility(ME, cast.heroId, cast.abilityId, n.id));
     else note(t('hint.cast-cancelled'));
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   // Hero deploy armed: the tap picks WHERE the ship rises — your own world; with the
@@ -9796,7 +9810,7 @@ function selectAt(mx: number, my: number) {
     if (pick === 'fleet') playerOrder(spawnHero(ME, heroId, host!.id));
     else if (pick === 'world') playerOrder(spawnHero(ME, heroId, n!.id));
     else note(t('hint.deploy-cancelled'));
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   // ШТУРМ armed (PC): the click picks the target world — someone else's capturable
@@ -9824,7 +9838,7 @@ function selectAt(mx: number, my: number) {
     }
     if (fate === 'fire') tryAssaultGroup(selectedFleetIds(), n!.id);
     assaultAim = false;
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   /**
@@ -9855,7 +9869,7 @@ function selectAt(mx: number, my: number) {
       return;
     }
     engageAim = false;
-    lastPanelHtml = '';
+    invalidatePanel();
     if (!foe) {
       note(t('hint.engage-enemy-only'));
       return;
@@ -9935,7 +9949,7 @@ function selectAt(mx: number, my: number) {
       if (lane) tryMoveEdgeGroup(selectedFleetIds(), { from: lane.from, to: lane.to, t: lane.t });
     }
     aiming = false;
-    lastPanelHtml = '';
+    invalidatePanel();
     return;
   }
   // Plain tap = selection. Правила выбора и перебора стопки — `tapCycle.ts` (REFM-65).
@@ -9982,7 +9996,7 @@ function selectAt(mx: number, my: number) {
     selectionStarted = lastReal;
     selFleet = null;
     selFleets = new Set();
-    lastPanelHtml = '';
+    invalidatePanel();
   };
   if (!pcUi()) {
     // Phone: choose explicitly from overlapping objects. The legacy tablet keeps
@@ -10200,7 +10214,7 @@ function endPointer(ev: PointerEvent) {
     else if (!additive) {
       selFleets = new Set();
       selFleet = null;
-      lastPanelHtml = '';
+      invalidatePanel();
     }
     selectionBox = null;
     boxSelecting = false;
@@ -10525,7 +10539,7 @@ function armRetreat(fleetId: string): void {
   strikeAim = null;
   battleWin.classList.remove('show');
   note(t('hint.pick-retreat'));
-  lastPanelHtml = '';
+  invalidatePanel();
 }
 const battleWindow = initBattleWindow({
   root: () => battleWin,
@@ -12657,7 +12671,7 @@ function netClientFor(seat: string): MultiplayerClient {
         const wait = waitingBanner(!!snap.waiting, banner);
         if (wait === 'show') banner = WAIT_MARK + ' ' + t('net.waiting-host');
         else if (wait === 'clear') banner = null;
-        lastPanelHtml = '';
+        invalidatePanel();
       },
       onRejection: (_id, code) => {
         snd.play('error');
@@ -14056,7 +14070,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
-  { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
+  { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; invalidatePanel(); } }, // z45
   // --- низ экрана (z27…z20) ---
   { id: 'chatwin', isOpen: () => chatWin?.isOpen() ?? false, close: () => chatWin?.close() }, // z27
   { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => { mobileChoices = []; } },
@@ -14070,7 +14084,7 @@ const BACK_LAYERS: BackLayer[] = [
       castMenu = false;
       retreatMenu = false;
       if (MOBILE) cmdMore = false;
-      lastCmdHtml = '';
+      invalidateCmdBar();
     },
   }, // z26
   // …а вторым Back — сам режим (черновик выбрасывается, живые планы не тронуты).
@@ -14084,7 +14098,7 @@ const BACK_LAYERS: BackLayer[] = [
       assaultAim = false;
       retreatAim = null;
       merging = false;
-      lastPanelHtml = '';
+      invalidatePanel();
     },
   },
   // Раскрытая панель инструментов рельсы: на телефоне она занимает пол-экрана, а CSS-опись
@@ -15886,7 +15900,7 @@ if (codexEl) {
       const [kind, id] = build.split(':');
       enqueueBuild(selPlanet, { kind: kind as BuildKind, id: id!, count: 1 });
       codexEl.classList.remove('show');
-      lastPanelHtml = '';
+      invalidatePanel();
       renderPanel();
       return;
     }
@@ -15901,7 +15915,7 @@ if (codexEl) {
     const upg = (tg.closest('[data-cx-upg]') as HTMLElement | null)?.dataset.cxUpg;
     if (upg && selPlanet) {
       enqueueBuild(selPlanet, { kind: 'upgrade', id: upg, count: 1 });
-      lastPanelHtml = '';
+      invalidatePanel();
       renderPanel();
       openCodex(`b:${upg}`);
       return;
@@ -16229,15 +16243,15 @@ function enterChainMode(fleetIds: string[]): void {
   chainMode = { fleetIds: mine, steps: pre.steps, gestures: pre.gestures, menu: null };
   aiming = false;
   note(t('hint.pick-order'));
-  lastCmdHtml = '';
-  lastPanelHtml = '';
+  invalidateCmdBar();
+  invalidatePanel();
 }
 function exitChainMode(): void {
   chainMode = null;
   document.getElementById('tgted')?.classList.remove('show');
   document.body.classList.remove('chain-mode');
-  lastCmdHtml = '';
-  lastPanelHtml = '';
+  invalidateCmdBar();
+  invalidatePanel();
 }
 /** Тап карты в режиме: точка → меню действий по её типу, пустота → закрыть меню.
  *  Радиусы хитов берутся из того же `tapPriority.ts`, что и у selectAt: вторая копия
@@ -16358,7 +16372,7 @@ document.getElementById('tgted')?.addEventListener('click', (ev) => {
   }
   chainMode.steps = next.steps;
   chainMode.gestures = next.gestures;
-  lastCmdHtml = ''; // полоска пересоберётся (счётчик шагов/кнопки)
+  invalidateCmdBar(); // полоска пересоберётся (счётчик шагов/кнопки)
   // ⏱/🎯 наращивают часы повторными тапами — меню живёт; остальное закрывает его.
   if (btn.dataset.keep) renderChainMenu();
   else {
@@ -16614,7 +16628,7 @@ function jumpTo(id: string, kind: JumpKind): void {
     selPlanet = id;
     selFleet = null;
     selFleets = new Set();
-    lastPanelHtml = '';
+    invalidatePanel();
   }
   if (step.closeDiplo) closeDiplo();
   if (step.ring) goFlash = { id, at: performance.now() };

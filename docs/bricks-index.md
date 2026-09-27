@@ -37,7 +37,7 @@
 | REFM-203 | ✅ | proto | `docs/backlog.md` | missionPanel.ts |
 | REFM-204 | ✅ | proto | `docs/backlog.md` | smoke:net — сетевая партия в живом браузере |
 | REFM-205 | ✅ | proto | `docs/backlog.md` | Выход из партии — одна дверь. |
-| REFM-206 | ⏳ | proto | `docs/backlog.md` | Перерисовка по имени. |
+| REFM-206 | ✅ | proto | `docs/backlog.md` | Перерисовка по имени. |
 | REFM-207 | ⏳ | proto | `docs/backlog.md` | Владелец прицелов и поповеров |
 | REFM-208 | 🔒 | proto | `docs/backlog.md` | Владелец выбора |
 | REFM-209 | ⏳ | proto | `docs/backlog.md` | Профиль Sector Zero: хранение, облако, вкладка-хозяйка |
