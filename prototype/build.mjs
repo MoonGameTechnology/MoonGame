@@ -16,6 +16,7 @@ const heroCardsCss = readFileSync(new URL('./hero-cards.css', import.meta.url), 
 const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf8');
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
+const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
 
 const bundle = async (playerBuild) => {
   const res = await build({
@@ -3007,6 +3008,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #profile .pf-close{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:9px;
   border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;z-index:2;}
 
+${profileCss}
 /* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
 #hp-arsenal{overflow-y:auto;gap:10px;}
 #hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:11px}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--glass)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--ink);padding:5px}
@@ -3826,7 +3828,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="hub-bt">VOID DOMINION</div>
   </div>
   <div class="hub-id">
-    <div class="hub-av" id="hubav" data-i18n-title="hub.avatar.title">◆</div>
+    <button type="button" class="hub-av" id="hubav" data-i18n-title="hub.avatar.title" data-i18n-aria="hub.avatar.title">◆</button>
     <div class="hub-who">
       <div class="hub-name" id="hub-name">Командир</div>
       <div class="hub-st" data-i18n="hub.status.online"></div>

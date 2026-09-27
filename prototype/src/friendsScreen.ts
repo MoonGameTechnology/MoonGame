@@ -89,7 +89,7 @@ function rowHtml(r: FriendRow): string {
   return (
     `<div class="fr-row${r.kind === 'incoming' ? ' req' : ''}">` +
     `<i class="fr-dot ${r.kind === 'incoming' ? 'am' : DOT[r.presence.kind]}"></i>` +
-    `<span class="fr-txt"><b>${esc(r.login)}</b><span>${sub}</span></span>` +
+    `<button type="button" class="fr-txt pf-player-link" data-profile="${esc(r.login)}"><b>${esc(r.login)}</b><span>${sub}</span></button>` +
     `<span class="fr-acts">${acts}</span>` +
     `</div>`
   );
@@ -125,6 +125,7 @@ export function friendsPanelHtml(
 
 /** Что вкладке нужно от хаба. */
 export interface FriendsHost {
+  openPlayer?(login: string): void;
   /** Панель вкладки (`#hp-friends`) — она же делегат кликов. */
   root(): HTMLElement;
   /** База + токен сессии, или `null` — гость (друзья привязаны к аккаунту). */
@@ -211,6 +212,8 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
   });
 
   host.root().addEventListener('click', (ev) => {
+    const player = (ev.target as HTMLElement).closest('[data-profile]') as HTMLElement | null;
+    if (player?.dataset.profile) { host.openPlayer?.(player.dataset.profile); return; }
     const btn = (ev.target as HTMLElement).closest('[data-fr-act]') as HTMLElement | null;
     if (!btn) return;
     const id = btn.dataset.frId;

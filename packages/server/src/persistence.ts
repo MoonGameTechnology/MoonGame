@@ -1,4 +1,5 @@
 import type { MatchRoom } from './matchRoom';
+import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
 import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMarket';
 import {
   MemoryAccountStore,
@@ -66,6 +67,7 @@ import {
  * also creates the tables on boot. See `docs/infra-sizing-roadmap.md`, blocker #1.
  */
 export interface Stores {
+  profileStore: ProfileStore;
   store: MatchStore;
   receiptStore: ReceiptStore;
   /** Nick→seat identity. Durable (Postgres) alongside the match itself, so a returning
@@ -118,6 +120,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   const url = env.DATABASE_URL;
   if (!url) {
     return {
+      profileStore: new MemoryProfileStore(),
       store: new MemoryMatchStore(),
       receiptStore: new MemoryReceiptStore(),
       accountStore: new MemoryAccountStore(),
@@ -146,6 +149,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   const pool = new Pool({ connectionString: url });
   await migrate(pool);
   return {
+    profileStore: new PostgresProfileStore(pool),
     store: new PostgresMatchStore(pool),
     receiptStore: new PostgresReceiptStore(pool),
     accountStore: new PostgresAccountStore(pool), // shares the pool; closed by pool.end()

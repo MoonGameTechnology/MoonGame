@@ -325,6 +325,21 @@ export async function migrate(pool: Pool): Promise<void> {
       match_id     text PRIMARY KEY,
       credited_at  timestamptz NOT NULL DEFAULT now()
     );
+    CREATE TABLE IF NOT EXISTS player_profiles (
+      account_id text PRIMARY KEY,
+      appearance jsonb NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS profile_progress (
+      account_id text NOT NULL,
+      metric text NOT NULL,
+      value bigint NOT NULL DEFAULT 0,
+      PRIMARY KEY (account_id, metric)
+    );
+    CREATE TABLE IF NOT EXISTS profile_credits (
+      match_id text NOT NULL,
+      account_id text NOT NULL,
+      PRIMARY KEY (match_id, account_id)
+    );
 
     -- ONB-5: one Web Push subscription per account (a fresh subscribe replaces the
     -- old row — single-device, multi-device fan-out is a later brick).

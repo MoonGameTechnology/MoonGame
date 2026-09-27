@@ -1,15 +1,17 @@
 /**
  * «Профиль командира» — the career dossier (docs/main-menu.md §4.2, REFM-10).
  *
- * ONE overlay behind two doors: the hub identity strip and the in-match player card
- * («досье» button). Observation only — nothing here touches the simulation.
+ * Shared owner/public overlay, opened from the hub, friends, ranking and match cards.
+ * Cosmetic edits persist on the account; nothing here touches the simulation.
  *
  * Where each number comes from, so nothing on this screen is invented:
  *   · matches / winrate / avg place / streak / season score — the local career
  *     counters folded at checkEnd (`meta.ts` `recordMatch`);
  *   · league — a cosmetic band over the commander level (`leagueKey`);
  *   · influence + corporation — the live corp record, when a session has one;
- *   · medals — the account's grants, cache-first like the arsenal.
+ *   · corporation grants — the existing cached showcase;
+ *   · portrait / medal slots / current grades — the server's account profile.
+ * Public cards use ONLY the requested player's server projection, without currency.
  * Anything unavailable prints «—» rather than a plausible-looking zero — that rule is
  * the point of the screen, and it is what `pfCell(…, null)` encodes.
  *
@@ -23,6 +25,16 @@ import { SOV_SVG } from './icons';
 import { averagePlace, leagueKey, metaLevel, winRate, type MetaStats } from './meta';
 import { parseMedals } from './corp';
 import { detach } from './detach';
+import {
+  defaultAppearance,
+  parseAppearance,
+  PROFILE_MEDALS,
+  medalGrade,
+  type PlayerProfile,
+  type ProfileAppearance,
+} from '../../packages/protocol/src/playerProfile';
+import { parsePlayerProfile, placeProfileMedal } from '../../decisions/playerProfile';
+import { profileStudioHtml } from './profileStudio';
 
 /** One medal as the server reports it: an id plus display text. */
 export interface MedalEntry {
@@ -42,6 +54,8 @@ export interface ProfileView {
   /** Medal ids the account holds, and the full catalog to show them against. */
   owned: readonly string[];
   catalog: readonly MedalEntry[];
+  /** Generated locally from validated data, never server-provided HTML. */
+  studio?: string;
 }
 
 /** The cached medal blob (per callsign), parsed fail-soft: a corrupt cache is an empty
@@ -107,6 +121,7 @@ export function profileHtml(v: ProfileView): string {
     `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>` +
     `</div>` +
     `<div class="pf-body">` +
+    (v.studio ?? '') +
     `<div class="pf-h">${esc(t('profile.title'))}</div>` +
     `<div class="pf-grid">` +
     pfCell(t('profile.matches'), String(stats.matches)) +
@@ -128,6 +143,11 @@ export function profileHtml(v: ProfileView): string {
 
 /** What the dossier needs from the shell. */
 export interface ProfileHost {
+  /** Scope cache and pending requests to the selected server AND account. */
+  identity?(): string;
+  readAppearance?(): unknown;
+  writeAppearance?(value: ProfileAppearance): void;
+  appearanceChanged?(portrait: number): void;
   /** The overlay element (`#profile`) — painted and click-delegated here. */
   root(): HTMLElement;
   /** Everything the card prints EXCEPT the medals (those are this module's cache). */
@@ -144,33 +164,75 @@ export interface ProfileHost {
 
 /** Wire the dossier up. Call once at boot (it attaches the overlay's click delegate);
  *  `open()` is what the hub strip and the in-match player card call. */
-export function initProfile(host: ProfileHost): { open: () => void; close: () => void } {
+export function initProfile(host: ProfileHost): {
+  open: (login?: string) => void;
+  close: () => void;
+} {
   let owned: string[] = [];
   let catalog: MedalEntry[] = [];
+  let generation = 0;
+  let target: string | undefined;
+  let identity = '';
+  let custom: PlayerProfile = { ...defaultAppearance(), login: '', xp: 0, progress: {} };
+  let saved = defaultAppearance();
+  let auth: { base: string; token: string } | null = null;
+  let ready = false;
+  let saving = false;
+  let preview = false;
+  let selected = 0;
+  let notice = '';
+  const currentIdentity = (): string => host.identity?.() ?? host.view().nick;
+  const current = (n: number): boolean => n === generation && identity === currentIdentity();
+  const appearance = (): ProfileAppearance => ({
+    portrait: custom.portrait,
+    slots: [...custom.slots],
+  });
+  const dirty = (): boolean => JSON.stringify(appearance()) !== JSON.stringify(saved);
 
   const paint = (): void => {
-    host.root().innerHTML = profileHtml({ ...host.view(), owned, catalog });
+    const root = host.root();
+    const bodyScroll = root.querySelector?.('.pf-body')?.scrollTop ?? 0;
+    const galleryScroll = root.querySelector?.('.ps-portraits')?.scrollTop ?? 0;
+    const active =
+      typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null);
+    const focusData =
+      active && root.contains?.(active) && active.tagName === 'BUTTON'
+        ? JSON.stringify(active.dataset)
+        : null;
+    const studio = profileStudioHtml(custom, {
+      owner: target === undefined,
+      preview,
+      selected,
+      ready,
+      saving,
+      dirty: dirty(),
+      notice,
+    });
+    host.root().innerHTML =
+      target === undefined
+        ? profileHtml({ ...host.view(), owned, catalog, studio })
+        : `<button class="pf-close" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div></div></div><div class="pf-body">${studio}<div class="pf-grid">${pfCell(t('profile.matches'), ready ? String(custom.progress.matches ?? 0) : null)}${pfCell(t('profile.wins'), ready ? String(custom.progress.wins ?? 0) : null)}${pfCell(t('profile.xp'), ready ? String(custom.xp) : null)}</div></div>`;
+    const body = root.querySelector?.('.pf-body');
+    const gallery = root.querySelector?.('.ps-portraits');
+    if (body) body.scrollTop = bodyScroll;
+    if (gallery) gallery.scrollTop = galleryScroll;
+    if (focusData)
+      Array.from(root.querySelectorAll('button'))
+        .find((b) => JSON.stringify(b.dataset) === focusData)
+        ?.focus({ preventScroll: true });
   };
 
-  /** Cache-first paint, then a best-effort session-gated refresh — the arsenal's
-   *  pattern. Note the prototype host does NOT mount `/medals/*` (only the full
-   *  server does), so a playtest session simply keeps an empty showcase. */
-  async function refresh(): Promise<void> {
-    const cached = parseMedalCache(host.readCache());
-    owned = cached.owned;
-    catalog = cached.catalog;
-    paint();
-    const auth = await host.authorizedBase();
-    if (!auth) return;
-    const headers = { authorization: `Bearer ${auth.token}` };
+  async function refreshMedals(session: { base: string; token: string }, n: number): Promise<void> {
+    const headers = { authorization: `Bearer ${session.token}` };
     try {
       const [catRes, mineRes] = await Promise.all([
-        fetch(`${auth.base}/medals`, { headers }),
-        fetch(`${auth.base}/medals/me`, { headers }),
+        fetch(`${session.base}/medals`, { headers }),
+        fetch(`${session.base}/medals/me`, { headers }),
       ]);
       if (!catRes.ok || !mineRes.ok) return;
       const cat = (await catRes.json().catch(() => null)) as { medals?: unknown } | null;
       const mine = (await mineRes.json().catch(() => null)) as { medals?: unknown } | null;
+      if (!current(n)) return;
       catalog = parseMedalCatalog(cat?.medals);
       owned = parseMedals(mine?.medals).map((m) => m.medalId);
       host.writeCache({ owned, catalog });
@@ -180,18 +242,162 @@ export function initProfile(host: ProfileHost): { open: () => void; close: () =>
     }
   }
 
+  async function refresh(n: number): Promise<void> {
+    try {
+      const session = await host.authorizedBase();
+      if (!current(n)) return;
+      auth = session;
+      if (!session) {
+        ready = target === undefined;
+        // Guests can choose a portrait locally; earned medals require an account.
+        custom.slots = defaultAppearance().slots;
+        saved = appearance();
+        notice = t(target === undefined ? 'profile.guest' : 'profile.sign-in-public');
+        paint();
+        return;
+      }
+      if (target === undefined) detach('профиль: награды корпорации', refreshMedals(session, n));
+      const res = await fetch(
+        `${session.base}/profiles${target === undefined ? '' : `?login=${encodeURIComponent(target)}`}`,
+        { headers: { authorization: `Bearer ${session.token}` } },
+      );
+      const parsed = res.ok ? parsePlayerProfile(await res.json()) : null;
+      if (!current(n)) return;
+      if (!parsed) throw new Error('E_PROFILE_READ');
+      custom = parsed;
+      saved = appearance();
+      ready = true;
+      notice = '';
+      if (target === undefined) {
+        host.writeAppearance?.(saved);
+        host.appearanceChanged?.(custom.portrait);
+      }
+    } catch {
+      if (!current(n)) return;
+      notice = t('profile.load-error');
+      ready = false;
+    }
+    paint();
+  }
+
+  async function save(): Promise<void> {
+    if (!ready || saving || target !== undefined || !dirty()) return;
+    const n = generation;
+    if (!current(n)) return;
+    const value = appearance();
+    saving = true;
+    notice = '';
+    paint();
+    try {
+      if (auth) {
+        // Recheck identity before writing: an account/server change invalidates the editor.
+        const session = await host.authorizedBase();
+        if (!current(n)) return;
+        if (!session || session.base !== auth.base || session.token !== auth.token)
+          throw new Error('E_AUTH');
+        const res = await fetch(`${session.base}/profiles/me`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${session.token}`, 'content-type': 'application/json' },
+          body: JSON.stringify(value),
+        });
+        const parsed = res.ok ? parsePlayerProfile(await res.json()) : null;
+        if (!current(n)) return;
+        if (!parsed) throw new Error('E_PROFILE_SAVE');
+        custom = parsed;
+      }
+      if (!current(n)) return;
+      saved = appearance();
+      host.writeAppearance?.(saved);
+      host.appearanceChanged?.(saved.portrait);
+      notice = t(auth ? 'profile.saved' : 'profile.saved-local');
+    } catch {
+      if (!current(n)) return;
+      notice = t('profile.save-error');
+    } finally {
+      if (current(n)) {
+        saving = false;
+        paint();
+      }
+    }
+  }
+
+  const close = (): void => {
+    generation++;
+    host.root().classList.remove('show');
+  };
+
   host.root().addEventListener('click', (ev) => {
     const tg = ev.target as HTMLElement;
     // Close on the ✕ or on the backdrop itself, never on a tap inside the sheet.
-    if (tg.closest('.pf-close') || tg === host.root()) host.root().classList.remove('show');
+    if (tg.closest('.pf-close') || tg === host.root()) {
+      close();
+      return;
+    }
+    const button = tg.closest('button') as HTMLButtonElement | null;
+    if (!button || button.disabled || target !== undefined || saving || !current(generation))
+      return;
+    if (button.dataset.ps === 'mode') {
+      preview = !preview;
+      paint();
+      return;
+    }
+    if (!ready) return;
+    if (button.dataset.ps === 'save') {
+      detach('профиль: сохранение', save());
+      return;
+    }
+    if (button.dataset.ps === 'cancel') {
+      custom = { ...custom, ...structuredClone(saved) };
+      notice = '';
+      paint();
+      return;
+    }
+    if (preview) return;
+    if (button.dataset.portrait) {
+      const next = parseAppearance({ ...appearance(), portrait: Number(button.dataset.portrait) });
+      if (next) custom = { ...custom, ...next };
+    }
+    if (button.dataset.slot !== undefined) {
+      const index = Number(button.dataset.slot);
+      if (Number.isInteger(index) && index >= 0 && index < 15) selected = index;
+    }
+    if (button.dataset.ps === 'remove')
+      custom = { ...custom, ...placeProfileMedal(custom, selected, null) };
+    const medal = PROFILE_MEDALS.find((m) => m.id === button.dataset.medal);
+    if (medal && medalGrade(medal.id, custom.progress))
+      custom = { ...custom, ...placeProfileMedal(custom, selected, medal.id) };
+    notice = dirty() ? t('profile.unsaved') : '';
+    paint();
   });
 
   return {
-    open: () => {
+    open: (login) => {
+      generation++;
+      identity = currentIdentity();
+      target = login;
+      ready = false;
+      saving = false;
+      preview = false;
+      selected = 0;
+      auth = null;
+      notice = t('profile.loading');
+      const cached =
+        login === undefined ? parseMedalCache(host.readCache()) : { owned: [], catalog: [] };
+      owned = cached.owned;
+      catalog = cached.catalog;
+      const local = login === undefined ? parseAppearance(host.readAppearance?.()) : null;
+      custom = {
+        ...(local ?? defaultAppearance()),
+        login: login ?? host.view().nick,
+        xp: 0,
+        progress: {},
+        slots: defaultAppearance().slots,
+      };
+      saved = appearance();
       paint();
       host.root().classList.add('show');
-      detach('профиль: обновление с сервера', refresh()); // cache is already on screen; the server refresh trails
+      detach('профиль: обновление с сервера', refresh(generation));
     },
-    close: () => host.root().classList.remove('show'),
+    close,
   };
 }
