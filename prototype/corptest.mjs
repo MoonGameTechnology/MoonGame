@@ -36,9 +36,10 @@ const browser = await launchBrowser();
 mkdirSync('.playwright-mcp', { recursive: true });
 try {
   for (const [locale, width, height] of [['ru', 1280, 900], ['en', 390, 844]]) {
+    const password = randomBytes(24).toString('base64url');
     const registered = await fetch(`${base}/auth/register`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ login: `Builder${locale}`, password: 'CorpSmoke_4321' }),
+      body: JSON.stringify({ login: `Builder${locale}`, password }),
     });
     assert.equal(registered.status, 201);
     const context = await browser.newContext({ viewport: { width, height }, isMobile: width < 600, hasTouch: width < 600 });
@@ -54,7 +55,7 @@ try {
         if (await page.locator('#hub').isVisible()) return;
         await page.locator('#cwpass').waitFor({ state: 'visible' });
         await page.fill('#cwnick', `Builder${locale}`);
-        await page.fill('#cwpass', 'CorpSmoke_4321');
+        await page.fill('#cwpass', password);
         await page.click('#cwgo');
         await page.locator('#hub').waitFor({ state: 'visible' });
       };
