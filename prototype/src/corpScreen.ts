@@ -1,3 +1,6 @@
+import { parseCorpInfrastructure } from '../../decisions/corpInfrastructure';
+import type { CorpInfrastructureView } from '../../packages/protocol/src/corpInfrastructure';
+import { corpBuildingsHtml, updateCorpConstructionCountdown } from './corpBuildingsView';
 /**
  * Corporation cabinet (AVA-C1/C2, REFM-11) — the cross-session alliance management
  * screen designed in docs/corporation-ui.md, over the live CORP-0/AVA-2..9/MED-1 HTTP
@@ -48,20 +51,11 @@ import {
   type MedalDef,
 } from './corp';
 
-// Six tabs, every one backed by a real route (CORP-HUB). The row is a GRID, not a
-// scrolling strip: six tabs fit a phone in two rows, so no tab can hide off-screen
-// behind a swipe. `icon` is what makes that grid readable at a glance — six labels
-// alone read as a wall of text.
-//
-// What the cabinet deliberately does NOT show, because the server has no such data
-// (inventing it is the one unforgivable bug on a screen people plan around): corp
-// buildings, a crafting bench, a parts inventory, weekly tasks, a resource treasury
-// (influence is the only corp currency), squads, member online status, a corp tag /
-// motto / join policy / tax, and per-battle scores. Sector holdings and a persistent
-// corp chat have no server counterpart either (no meta-layer Контур 2 yet) and stay
-// honest "скоро" lines in Настройки rather than simulated tabs.
+// Live corporation tabs; infrastructure is backed by the same authoritative store
+// as membership and influence. Sector ownership and persistent chat remain future work.
 export const CORP_TABS: { id: string; label: string; icon: string }[] = [
   { id: 'hq', label: 'corp.tab.hq', icon: '⬢' },
+  { id: 'buildings', label: 'corp.tab.buildings', icon: '▥' },
   { id: 'members', label: 'corp.tab.members', icon: '▤' },
   { id: 'wars', label: 'corp.tab.wars', icon: '⚔' },
   { id: 'battles', label: 'corp.tab.battles', icon: '🏆' },
@@ -95,6 +89,9 @@ export const CORP_AUDIT_RU: Record<string, string> = {
   medal: 'corp.audit.medal',
   rent: 'corp.audit.rent',
   rent_return: 'corp.audit.rent-return',
+  building_start: 'corp.audit.building-start',
+  building_complete: 'corp.audit.building-complete',
+  building_income: 'corp.audit.building-income',
 };
 
 // --- pure view builders (CORP-HUB) ------------------------------------------------
@@ -237,6 +234,12 @@ export function initCorp(host: CorpHost): {
   close: () => void;
   mine: () => { corp: CorpRecord | null; membership: CorpMembership | null };
 } {
+  let infrastructure: CorpInfrastructureView | null = null;
+  let infrastructureAt = 0;
+  let infrastructureTimer: ReturnType<typeof setInterval> | undefined;
+  let intentBusy = false;
+  let avaAvailable = true;
+  let medalsAvailable = true;
   let corpTab = 'hq'; // открытая вкладка кабинета
   // Открытая витрина наград (галерея). Не отдельный слой: она заменяет тело кабинета,
   // а Back закрывает СНАЧАЛА её — ступень `corp` в лестнице зовёт `close()` ниже.
@@ -314,11 +317,16 @@ export function initCorp(host: CorpHost): {
   async function refreshCorp(): Promise<void> {
     if (corpFetchBusy) return;
     corpFetchBusy = true;
+    infrastructureAt = performance.now();
     try {
       const mineRaw = (await corpFetch('/corps/me')) as {
         corp?: unknown;
         membership?: unknown;
+        features?: { ava?: boolean; medals?: boolean };
       } | null;
+      avaAvailable = mineRaw?.features?.ava !== false;
+      medalsAvailable = mineRaw?.features?.medals !== false;
+      infrastructure = null;
       corpMine = mineRaw
         ? { corp: parseCorpRecord(mineRaw.corp), membership: parseMembership(mineRaw.membership) }
         : { corp: null, membership: null };
@@ -331,6 +339,11 @@ export function initCorp(host: CorpHost): {
         } | null;
         const corp = detailRaw ? parseCorpRecord(detailRaw.corp) : null;
         corpDetail = corp ? { corp, members: parseMemberships(detailRaw?.members) } : null;
+        if (corpMine.membership.role !== 'recruit') {
+          infrastructure = parseCorpInfrastructure(await corpFetch(`/corps/${encodeURIComponent(corpId)}/infrastructure`));
+          infrastructureAt = performance.now();
+          if (infrastructure && corpMine.corp) corpMine.corp.influence = infrastructure.influence;
+        }
         if (canManage(corpMine.membership.role)) {
           const auditRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}/audit`)) as {
             audit?: unknown;
@@ -355,9 +368,9 @@ export function initCorp(host: CorpHost): {
         } | null;
         const rank = board?.corps?.me?.rank;
         corpRank = typeof rank === 'number' ? rank : null;
-        const catRaw = (await corpFetch('/medals')) as { medals?: unknown } | null;
+        const catRaw = ((medalsAvailable ? await corpFetch('/medals') : null)) as { medals?: unknown } | null;
         medalDefs = parseMedalDefs(catRaw?.medals);
-        const mineMedals = (await corpFetch('/medals/me')) as { medals?: unknown } | null;
+        const mineMedals = ((medalsAvailable ? await corpFetch('/medals/me') : null)) as { medals?: unknown } | null;
         medalsOwned = parseMedals(mineMedals?.medals).map((m) => m.medalId);
       } else {
         corpRank = null;
@@ -365,13 +378,13 @@ export function initCorp(host: CorpHost): {
         medalsOwned = [];
       }
 
-      const challengesRaw = (await corpFetch('/ava/challenges')) as { challenges?: unknown } | null;
+      const challengesRaw = ((avaAvailable ? await corpFetch('/ava/challenges') : null)) as { challenges?: unknown } | null;
       avaChallenges = parseChallenges(challengesRaw?.challenges);
-      const poolRaw = (await corpFetch('/ava/pool')) as { pool?: unknown } | null;
+      const poolRaw = ((avaAvailable ? await corpFetch('/ava/pool') : null)) as { pool?: unknown } | null;
       avaPool = parseReadyPool(poolRaw?.pool);
       // Лента ПУБЛИЧНАЯ и общая: вкладка «Битвы» отбирает из неё свои бои, поэтому окно
       // берётся шире восьми записей — иначе чужие войны вытеснят мои из истории.
-      const feedRaw = (await corpFetch('/ava/feed?limit=40')) as { feed?: unknown } | null;
+      const feedRaw = ((avaAvailable ? await corpFetch('/ava/feed?limit=40') : null)) as { feed?: unknown } | null;
       avaFeed = parseFeed(feedRaw?.feed);
 
       // A locked-or-accepted matchup my corp is party to: show its roster window.
@@ -408,8 +421,30 @@ export function initCorp(host: CorpHost): {
   /** Fire an intent, then always refresh (the server is authoritative — no local
    *  guess at the new state). */
   async function corpIntent(path: string, body?: unknown): Promise<void> {
-    const result = await corpFetch(path, { method: 'POST', body: body ?? {} });
-    if (result) await refreshCorp();
+    if (intentBusy || corpFetchBusy) return;
+    intentBusy = true;
+    renderCorp();
+    try {
+      await corpFetch(path, { method: 'POST', body: body ?? {} });
+      // Refresh even on rejection/timeout: the server may have committed the order.
+      await refreshCorp();
+    } finally {
+      intentBusy = false;
+      renderCorp();
+    }
+  }
+
+  function auditText(entry: CorpAuditEntry): string {
+    if (entry.action === 'building_income') return t('corp.buildings.income-earned', { n: entry.detail ?? '0' });
+    const name = infrastructure?.buildings.find((b) => b.id === entry.target)?.nameKey;
+    if (name && entry.action === 'building_complete') return t('corp.buildings.completed', { name: t(name), n: entry.detail ?? '' });
+    if (name && entry.action === 'building_start') {
+      try {
+        const detail = JSON.parse(entry.detail ?? '{}') as { level?: number; cost?: number };
+        return t('corp.buildings.ordered', { name: t(name), n: detail.level ?? '', cost: detail.cost ?? '' });
+      } catch { return t(CORP_AUDIT_RU[entry.action]!); }
+    }
+    return t(CORP_AUDIT_RU[entry.action] ?? entry.action) + (entry.detail ? ` · ${entry.detail}` : '') + (entry.target ? ` → ${entry.target}` : '');
   }
 
   function corpNameOf(corpId: string): string {
@@ -450,7 +485,7 @@ export function initCorp(host: CorpHost): {
       .slice(0, 6)
       .map(
         (a) =>
-          `<div class="cline"><span>${esc(a.actor)} ${t(CORP_AUDIT_RU[a.action] ?? a.action)}${a.target ? ` → ${esc(a.target)}` : ''}</span>` +
+          `<div class="cline"><span>${esc(a.actor)} ${esc(auditText(a))}</span>` +
           `<em class="cwhen">${new Date(a.at).toLocaleString('ru-RU')}</em></div>`,
       )
       .join('');
@@ -470,6 +505,7 @@ export function initCorp(host: CorpHost): {
       hqTile(t('corp.card.members'), members === null ? null : String(members)) +
       hqTile(t('corp.card.role'), corpRoleLabel(corpMine.membership.role)) +
       `</div>` +
+      `<button class="cbtn2 wide" data-corpact="buildings">▥ ${t('corp.tab.buildings')}</button>` +
       `<h4>${t('corp.showcase')}</h4>` +
       showcaseHtml(showcase, medalDefs, medalsOwned) +
       `<p class="chint">${t('corp.showcase.hint')}</p>` +
@@ -478,6 +514,7 @@ export function initCorp(host: CorpHost): {
   }
 
   function corpBattlesHtml(): string {
+    if (!avaAvailable) return `<p class="chint">${t('corp.ava.unavailable')}</p>`;
     if (!corpMine.membership) return corpNoneHtml();
     const rows = corpBattles(avaFeed, corpMine.membership.corpId)
       .map(
@@ -563,6 +600,7 @@ export function initCorp(host: CorpHost): {
   }
 
   function corpWarsHtml(): string {
+    if (!avaAvailable) return `<p class="chint">${t('corp.ava.unavailable')}</p>`;
     const myCorpId = corpMine.membership?.corpId;
     const iAmHead = corpMine.membership?.role === 'head';
     const iCanFlag = corpMine.membership && corpMine.membership.role !== 'recruit';
@@ -666,10 +704,10 @@ export function initCorp(host: CorpHost): {
   function corpTreasuryHtml(): string {
     if (!corpMine.corp || !corpMine.membership) return corpNoneHtml();
     const rows = corpAudit
-      .filter((a) => a.action === 'influence' || a.action === 'rent' || a.action === 'rent_return')
+      .filter((a) => a.action === 'influence' || a.action === 'rent' || a.action === 'rent_return' || a.action.startsWith('building_'))
       .map(
         (a) =>
-          `<div class="cline"><span>${esc(a.detail ?? t(CORP_AUDIT_RU[a.action] ?? a.action))} <b class="cwhen">· ${new Date(a.at).toLocaleString('ru-RU')}</b></span></div>`,
+          `<div class="cline"><span>${esc(auditText(a))} <b class="cwhen">· ${new Date(a.at).toLocaleString('ru-RU')}</b></span></div>`,
       )
       .join('');
     const ledgerHtml = canManage(corpMine.membership.role)
@@ -706,6 +744,7 @@ export function initCorp(host: CorpHost): {
     ).join('');
     let body = '';
     if (corpTab === 'hq') body = corpHqHtml();
+    else if (corpTab === 'buildings') body = corpBuildingsHtml(infrastructure, performance.now() - infrastructureAt, intentBusy || corpFetchBusy);
     else if (corpTab === 'members') body = corpMembersHtml();
     else if (corpTab === 'wars') body = corpWarsHtml();
     else if (corpTab === 'battles') body = corpBattlesHtml();
@@ -719,6 +758,15 @@ export function initCorp(host: CorpHost): {
     host.root().style.display = 'flex';
     detach('корпорация: обновление кабинета', refreshCorp()); // …then refresh from the server
     host.onIntro('corp');
+    if (infrastructureTimer !== undefined) clearInterval(infrastructureTimer);
+    infrastructureTimer = setInterval(() => {
+      if (corpFetchBusy || intentBusy || corpTab !== 'buildings') return;
+      const elapsed = performance.now() - infrastructureAt;
+      const due = infrastructure?.construction?.completesAt;
+      if (elapsed >= 30_000 || (due !== undefined && infrastructure && infrastructure.serverNow + elapsed >= due)) {
+        detach('corporation infrastructure refresh', refreshCorp());
+      } else if (infrastructure) updateCorpConstructionCountdown(host.body(), infrastructure, elapsed);
+    }, 1000);
   }
   /** Ступень Back: сначала закрывается ВИТРИНА, и только потом сам кабинет — иначе
    *  аппаратная кнопка выбрасывала бы игрока из корпорации целиком с полпути выбора. */
@@ -731,6 +779,8 @@ export function initCorp(host: CorpHost): {
     hideCorp();
   }
   function hideCorp(): void {
+    if (infrastructureTimer !== undefined) clearInterval(infrastructureTimer);
+    infrastructureTimer = undefined;
     cupSlot = null;
     host.root().style.display = 'none';
   }
@@ -775,11 +825,25 @@ export function initCorp(host: CorpHost): {
     }
     const btn = tg.closest('[data-corpact]') as HTMLElement | null;
     const act = btn?.dataset.corpact;
-    if (!act) return;
+    if (!act || (btn as HTMLButtonElement | null)?.disabled) return;
     const arg = btn?.dataset.corparg ?? '';
     const corpId = corpMine.membership?.corpId ?? '';
     const account = btn?.dataset.corpaccount ?? '';
     switch (act) {
+      case 'buildings':
+        corpTab = 'buildings';
+        renderCorp();
+        break;
+      case 'refresh':
+        detach('corporation refresh', refreshCorp());
+        break;
+      case 'build': {
+        const building = infrastructure?.buildings.find((b) => b.id === arg);
+        if (building?.next && building.blocked === null && infrastructure?.canBuild) {
+          corpSend(act, `/corps/${encodeURIComponent(corpId)}/build`, { buildingId: arg, expectedLevel: building.level });
+        }
+        break;
+      }
       case 'create': {
         const input = document.getElementById('corpnewname') as HTMLInputElement | null;
         const name = input?.value.trim() ?? '';

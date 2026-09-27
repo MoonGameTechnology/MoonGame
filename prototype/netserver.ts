@@ -1,3 +1,6 @@
+import { registerCorpApi } from '../packages/server/src/corpApi';
+import { CorpService } from '../packages/server/src/corpService';
+import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
 import { isFrontier, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
 import { registerProfileApi } from '../packages/server/src/profileApi';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from '../packages/server/src/profileStore';
@@ -219,6 +222,7 @@ let userStore: UserStore;
 let friendStore: FriendStore;
 let commanderStore: CommanderStore;
 let profileStore: ProfileStore;
+let corpStore: CorpStore;
 // EC-3: аукцион на прото-хосте — тот же слайс, что в проде. Фаусет Варрантов читается
 // из окружения ЗДЕСЬ (композиционный корень), а по умолчанию выключен: торгуемая выдача
 // на аккаунт превращает регистрацию в монетный двор (ARS-0 anti-RMT).
@@ -234,6 +238,7 @@ if (DATABASE_URL) {
   friendStore = new PostgresFriendStore(pool);
   commanderStore = new PostgresCommanderStore(pool);
   profileStore = new PostgresProfileStore(pool);
+  corpStore = new PostgresCorpStore(pool);
   metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
 } else {
   matchStore = new MemoryMatchStore();
@@ -243,6 +248,7 @@ if (DATABASE_URL) {
   friendStore = new MemoryFriendStore();
   commanderStore = new MemoryCommanderStore();
   profileStore = new MemoryProfileStore();
+  corpStore = new MemoryCorpStore();
   metaMarket = new MemoryMetaMarket(new MemoryArsenalStore(), undefined, metaFaucet);
 }
 
@@ -1013,9 +1019,13 @@ const server = createMultiplayerServer({
           },
         },
       });
-      // Рейтинги (RANK-1) — тот же слайс, что в проде. Корп-хранилища у плейтест-хоста
-      // нет, поэтому доска корпораций тут пустая: API это предусматривает (`corps`
-      // необязателен), и экрану не приходится знать, какой хост его обслуживает.
+      // The playable host shares the same corporation authority and durable storage.
+      // AvA orchestration/medals are not mounted here; the cabinet reads capabilities.
+      registerCorpApi(app, {
+        service: new CorpService({ store: corpStore }),
+        identify: identifySession,
+        features: { ava: false, medals: false },
+      });
       // MetaMarket (EC-3) — тот же слайс аукциона, что в проде: прото-хост не заводит
       // свою торговлю. Фаусет — из окружения, по умолчанию выключен.
       registerMetaMarketApi(app, { market: metaMarket, identify: identifySession });
@@ -1023,6 +1033,7 @@ const server = createMultiplayerServer({
       registerLeaderboardApi(app, {
         commanders: commanderStore,
         users: userStore,
+        corps: corpStore,
         identify: identifySession,
       });
       // ADM-1: админский слайс — состав живой партии и снятие игрока с места. Тот же

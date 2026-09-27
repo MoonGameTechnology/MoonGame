@@ -100,7 +100,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['sector-zero', 'layer'], // own home, z58: confirmation first, shared hub second
   ['testmode', 'layer'], // dev-оверлей сценариев, z59
   ['sandbox', 'layer'], // dev-панель практики, z59
-  ['intro', 'layer'], // ONB-3 карточка механики, z58 — поверх окна, которое объясняет
+  ['intro', 'layer'], // ONB-3 карточка механики, z61 — поверх окна, которое объясняет
   ['seatpick', 'layer'], // выбор кресла/фракции на экране входа, z58
   ['recap', 'layer'], // ONB-5 брифинг возвращения, z57
   ['profile', 'layer'], // профиль командира, z57

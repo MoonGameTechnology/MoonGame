@@ -1,3 +1,4 @@
+import type { CorpBuildOrder, CorpInfrastructureResult } from '@void/protocol';
 import type { CorpMembership, CorpRecord, CorpRole, CorpStore, CorpSummary } from './store';
 
 /**
@@ -56,6 +57,10 @@ export class CorpService {
   constructor(deps: CorpServiceDeps) {
     this.store = deps.store;
     this.now = deps.now ?? ((): number => Date.now());
+  }
+
+  infrastructure(who: CorpActor, corpId: string, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+    return this.store.infrastructure(corpId, who.accountId, this.now(), order);
   }
 
   /** createCorp — the founder becomes the head. */

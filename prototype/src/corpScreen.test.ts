@@ -39,6 +39,8 @@ function fakeEl(): HTMLElement & { html: () => string; fire: (t: unknown) => voi
   return el as unknown as HTMLElement & { html: () => string; fire: (t: unknown) => void };
 }
 
+const closeCabinets: Array<() => void> = [];
+
 function wire(over: Partial<CorpHost> = {}) {
   const root = fakeEl();
   const head = fakeEl();
@@ -57,10 +59,12 @@ function wire(over: Partial<CorpHost> = {}) {
     onIntro: (id) => intros.push(id),
     ...over,
   });
+  closeCabinets.push(() => { api.close(); api.close(); });
   return { api, root, head, tabs, body, notes, intros, shown: () => root.style.display };
 }
 
 afterEach(() => {
+  for (const close of closeCabinets.splice(0)) close();
   vi.unstubAllGlobals();
 });
 
@@ -81,10 +85,11 @@ describe('корпорации — словари', () => {
       expect(t(tab.label), tab.id).not.toContain('corp.tab');
       expect(tab.icon, tab.id).not.toBe('');
     }
-    // CORP-HUB: шесть вкладок, и каждая ведёт на живой маршрут — заглушек-вкладок
+    // CORP-HUB: семь вкладок, и каждая ведёт на живой маршрут — заглушек-вкладок
     // больше нет (владения и чат стали честными строками в «Настройках»)
     expect(CORP_TABS.map((x) => x.id)).toEqual([
       'hq',
+      'buildings',
       'members',
       'wars',
       'battles',
