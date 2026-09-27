@@ -695,3 +695,7 @@ export {
   RALLY_TRAIT,
   type MusterPlan,
 } from './util/pveStaging';
+
+export { rocketMinesModule } from './modules/rocketMines';
+export { rocketMinelayer, missilePositionAt, mineVisibleTo } from './state/ordnance';
+export type { RocketMine, MineMissile, MineInstallation, RocketMineMode, OrdnanceState } from './state/ordnance';

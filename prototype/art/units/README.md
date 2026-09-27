@@ -1,4 +1,34 @@
-# Наземные юниты и пиратский флот
+# Наземные юниты, пиратский флот и мины
+
+## Мина на космической дороге (SHIPART-6, 2026-09-27)
+
+`road-mine.webp`: встроенный imagegen, генерация `6cccd76f-8771-4701-b02e-eab81b7319d2`.
+Исходник 1536×1024 → WebP 768×512, quality 83, effort 6, 37348 байт.
+По уточнению владельца космическая мина напоминает морскую: сферический бронированный
+корпус и выступающие во все стороны датчики. Двигателей и опор нет. Нативный вектор
+той же формы — `packages/client/src/mineShape.ts`: круглый корпус, восемь выступов
+и дуги панелей, передающие объём. При низкой детализации остаётся тот же силуэт.
+Прежний плоский диск (генерация `caadd4e4-655a-4edf-8a25-3992069d369d`, версия
+файла в `f658867`) заменён; он служил референсом материалов, освещения и фона.
+Портрет подготовлен для кодекса модуля `mine_layer`; без записи модуля в данных
+`catalogPortraitHtml` ничего не показывает. Шахта `mine` — другой объект.
+
+**Подключено к игре.** Портрет используется обычным и легендарным ракетным
+заградителем. Вектор рисует неподвижные мины на дороге, а пунктир — постановку.
+Оба типа требуют надетого модуля и 15 игровых минут. Видимость фильтруется до
+рисования и обработки кликов: чужую мину обнаруживают только вблизи, до 24.
+Механика описана в `docs/rocket-mine-design.md` и `docs/ship-modules-roadmap.md`.
+
+Промпт редактирования прежнего портрета:
+
+> Use case: stylized-concept.
+> Asset type: revised realistic game portrait of a stationary SPACE MINE for Averion: Sector Zero.
+> Input image: the old mine portrait is the EDIT TARGET. Keep its realistic dark gunmetal materials, restrained cyan indicator lights, plain navy-black background, landscape 3:2 framing and polished game-asset rendering. Completely replace the flat disc geometry.
+> Primary request: a space mine whose form is immediately reminiscent of a classic spherical naval sea mine floating in three dimensions. A bulky near-perfect SPHERE made of curved segmented steel armor plates, with eight to ten stout projecting sensor horns distributed radially around the whole sphere in 3D. Horns have flanged bases, short tapered metal stems and small blunt sensor caps. Several horns point sideways around the silhouette, others toward or away from the camera. The spherical core must read as deep and round, with clearly curved latitude and longitude seams; absolutely no flattened base or platter silhouette. Small recessed sensor apertures and tiny cyan status LEDs fit this fleet's technological style.
+> Composition: ONE full floating device, elevated three-quarter view, centered, occupies about 75% of image height; all horns fully within frame with generous margin. Realistic dramatic soft illumination showing spherical volume, cool rim light and fine metal wear; background #071018. Mine is unmanned and stationary, no engines, exhaust, cockpit, fins or wings.
+> No ground, land, water, sea, anchor, tether, chain, stand, pedestal, pressure plate, circular flat disc, landmine shape, bright central button, explosions, smoke, stars, planets, text, numbers, logo, watermark, UI, frame or alternate views. This is a SPACE NAVAL MINE, not a terrestrial anti-tank mine.
+
+## Наземные войска и пираты
 
 Дополнение SHIPART-5, 2026-09-27. Все 13 портретов созданы встроенным imagegen по
 отдельному запросу на каждый тип; чужие изображения не использовались. Люди —
@@ -91,4 +121,3 @@ effort 6. Суммарно 734474 байта. Изображения встро�
 
 > Use case: stylized-concept. Asset type: finished realistic pirate ground-unit portrait for dark-space strategy Averion: Sector Zero; one standalone 3:2 landscape image, 1536x1024. SINGLE primary unit centered filling 75 percent of image, clear silhouette at small card size. Photorealistic industrial sci-fi cinematic concept render. Salvaged gray and charcoal steel, mismatched rust-red armor panels, visible repairs and restrained amber lights; dark nearly black navy defocused industrial hideout. Concrete realistic equipment, good functional anatomy and construction. Soft neutral key plus warm practical edge lighting. No text, logo, UI, frame, watermark, decorative skulls, sea-pirate costumes, collage, extra people, gore or combat effects.
 > Subject: A single complete pirate assault tank, camera elevated front three-quarter, all extremities comfortably inside frame. Low industrial tracked bulldozer rebuilt into an armored vehicle, exactly two continuous tracks, visible reinforced front plow, improvised offset low turret with one heavy cannon, welded patchwork gray and rust-red armored skirts, externally secured spare track segments, restrained amber lamps. Stable plausible center of mass, compact brutal utilitarian silhouette; clearly a tank, no giant walker legs and no people.
-

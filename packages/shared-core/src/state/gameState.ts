@@ -699,6 +699,9 @@ export interface Minefield {
   charge: number;
   /** Доля ТЕКУЩЕГО корпуса каждого стека, которую снимает одно срабатывание. */
   hit: number;
+  /** Road fields have a continuous position, separate from the public node id. */
+  position?: RoadPoint;
+  edge?: FleetEdge;
 }
 
 /** Минные поля (SM-3.4). */
@@ -707,6 +710,8 @@ export interface MinefieldState {
   fields: Record<PlanetId, Record<PlayerId, Minefield>>;
   /** Флот → мировое время, с которого он снова может ставить мины. */
   readyAt: Record<FleetId, number>;
+  ownerReadyAt?: Record<PlayerId, number>;
+  installations?: Record<FleetId, { key: string; owner: PlayerId; readyAt: number; field: Minefield }>;
 }
 
 /**
@@ -778,6 +783,8 @@ export interface GameVersion {
 }
 
 export interface GameState {
+  /** Stationary rocket mines and their one-shot missiles; filtered before networking. */
+  ordnance?: import('./ordnance').OrdnanceState;
   /** Authored map identity, persisted and public; absent on legacy saves. */
   mapId?: string;
   /** Game mode the match was created with (`data.modes`), pinned at birth like the map

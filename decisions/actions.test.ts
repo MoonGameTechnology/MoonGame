@@ -11,6 +11,9 @@ import {
   castHeroAbility,
   chainStamp,
   declareWar,
+  deployRocketMine,
+  disarmRocketMine,
+  setRocketMineMode,
   delegateSteward,
   designateCapital,
   takeBoon,
@@ -76,6 +79,9 @@ import {
  */
 const P = 'p1';
 const CALLS: ReadonlyArray<readonly [string, Action]> = [
+  ['deployRocketMine', deployRocketMine(P, 'f1', 'confirmed')],
+  ['setRocketMineMode', setRocketMineMode(P, 'mine:1', 'any')],
+  ['disarmRocketMine', disarmRocketMine(P, 'mine:1')],
   ['moveFleet', moveFleet(P, 'f1', 'beta')],
   ['moveFleetEdge', moveFleetEdge(P, 'f1', { from: 'a', to: 'b', t: 0.5 })],
   ['stopFleet', stopFleet(P, 'f1')],

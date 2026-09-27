@@ -49,6 +49,7 @@ import {
   autoRallyModule,
   marketModule,
   traderModule,
+  rocketMinesModule,
   fleetBroodModule,
   pveModule,
   swarmMemoryModule,
@@ -166,6 +167,7 @@ export const MODULES: GameModule[] = [
   // (в конец, после торговца). Правило и причина — там.
   loadoutEffectsModule,
   minefieldModule,
+  rocketMinesModule, // isolated road-weapon timers; preserve all existing module order
 ];
 
 export const kernel = createKernel(MODULES);

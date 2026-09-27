@@ -4,6 +4,8 @@ import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
+import { emptyOrdnance, inRadius, mineVisibleTo, missilePositionAt } from './ordnance';
+import { visibleMinefields, fieldPosition, fieldVisible, MINE_SIGNATURE, MINE_DETECTION_RANGE } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 export type { SignatureContact, SignatureSize } from './radarSignals';
 import type {
@@ -22,6 +24,7 @@ import type {
  *  production / arrivals in their view (the client renders the build queue + ETAs from
  *  them) while every enemy timer stays hidden. */
 function scheduledOwnedBy(event: ScheduledEvent, viewerId: PlayerId, state: GameState): boolean {
+  if (event.type === 'mines.crossed') return false;
   const p = (event.payload ?? {}) as Record<string, unknown>;
   if (p.owner === viewerId) return true;
   // Per-player events tagged by `playerId` (e.g. `technology.complete`) — the
@@ -229,7 +232,7 @@ export function fleetRadarReach(state: GameState, fleet: Fleet, data: GameData):
 export interface SightCircle {
   owner: PlayerId;
   /** Чей это круг: свой мир, флот или скан героя — клиент выделяет круг выбранного. */
-  source: { kind: 'world' | 'fleet' | 'reveal'; id: string };
+  source: { kind: 'world' | 'fleet' | 'reveal' | 'mine'; id: string };
   x: number;
   y: number;
   identify: number;
@@ -273,6 +276,13 @@ function playerCircles(
     // Круг стоит там, где КОРАБЛЬ, а не в узле назначения и не в ближайшем узле.
     const pos = fleetPosition(state, fleet);
     if (pos) circle({ kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
+  }
+  for (const mine of state.ordnance?.mines ?? []) {
+    const def = data.modules[mine.moduleId]?.rocketMine;
+    if (mine.owner === ownerId && def) out.push({
+      owner: ownerId, source: { kind: 'mine', id: mine.id }, ...mine.position,
+      identify: def.sightRange, signature: def.radarRange,
+    });
   }
   // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
   // light a full-identify zone around their target node until it expires.
@@ -335,12 +345,11 @@ export function identifiedNodes(
 
 /** Shared radar projection for the server and solo client. It deliberately contains
  * no fleet identity, owner, count or loadout; identification remains a separate rule. */
-export function radarSignatures(
+export function radarSources(
   state: GameState,
   viewerId: PlayerId,
   data: GameData,
-  identify: ReadonlySet<PlanetId> = identifiedNodes(state, viewerId, data),
-): SignatureContact[] {
+): RadarSource[] {
   const sources: RadarSource[] = [];
   const scale = sightRulesOf(state).radarScale;
   for (const owner of visionBloc(state, viewerId)) {
@@ -366,7 +375,21 @@ export function radarSignatures(
         if (def && stack.count > 0) add(at, stackRadarRange(def, stack, data), def.radarLevel);
       }
     }
+    for (const mine of state.ordnance?.mines ?? []) {
+      const def = data.modules[mine.moduleId]?.rocketMine;
+      if (mine.owner === owner && def) sources.push({ ...mine.position, range: def.radarRange, level: def.radarLevel });
+    }
   }
+  return sources;
+}
+
+export function radarSignatures(
+  state: GameState,
+  viewerId: PlayerId,
+  data: GameData,
+  identify: ReadonlySet<PlanetId> = identifiedNodes(state, viewerId, data),
+): SignatureContact[] {
+  const sources = radarSources(state, viewerId, data);
   if (!sources.length) return [];
   const spied = new Set((state.intel?.[viewerId] ?? [])
     .filter((g) => g.kind === 'fleets' && g.until > state.time).map((g) => g.target));
@@ -390,7 +413,33 @@ export function radarSignatures(
       emitters.push({ location: decoy.at, ...at, strength: decoy.signature });
     }
   }
-  return detectSignals(emitters, sources);
+  const contacts = detectSignals(emitters, sources);
+  // Mines have the lowest emission and can be picked up only at close range.
+  // A coarse blip carries no mine id, owner, launch doctrine or module configuration.
+  for (const mine of state.ordnance?.mines ?? []) {
+    if (mine.owner === viewerId || mineVisibleTo(state, mine, viewerId, data)) continue;
+    const def = data.modules[mine.moduleId]?.rocketMine;
+    if (!def) continue;
+    let nearest: Planet | undefined;
+    let best = Infinity;
+    for (const node of Object.values(state.planets)) {
+      const d2 = (node.position.x - mine.position.x) ** 2 + (node.position.y - mine.position.y) ** 2;
+      if (d2 < best) { best = d2; nearest = node; }
+    }
+    if (!nearest) continue;
+    contacts.push(...detectSignals([{ ...mine.position, location: nearest.id, inTransit: true, strength: def.mineSignature }],
+      sources.map((r) => ({ ...r, range: Math.min(r.range, def.detectionRange) }))));
+  }
+  for (const [key, owners] of Object.entries(state.minefields?.fields ?? {})) {
+    for (const [owner, field] of Object.entries(owners)) {
+      if (fieldVisible(state, key, owner, field, viewerId)) continue;
+      const at = fieldPosition(state, key, field);
+      if (!at) continue;
+      contacts.push(...detectSignals([{ ...at, location: field.edge?.from ?? key, inTransit: !!field.edge, strength: MINE_SIGNATURE * field.charge }],
+        sources.map((r) => ({ ...r, range: Math.min(r.range, MINE_DETECTION_RANGE) }))));
+    }
+  }
+  return contacts;
 }
 
 /** Ad-hoc query (A4): can `viewerId` see this object at IDENTIFY detail right
@@ -420,6 +469,8 @@ export function isVisibleTo(
   const fleet = state.fleets[target.fleetId];
   if (!fleet) return false;
   if (fleet.owner === viewerId) return true;
+  const at = fleetPositionAt(state, fleet, state.time);
+  if (at && sightCircles(state, viewerId, data).some((c) => c.source.kind === 'mine' && inRadius(at, c, c.identify))) return true;
   const node = fleetNode(state, fleet);
   return node !== null && (identified ?? identifiedNodes(state, viewerId, data)).has(node);
 }
@@ -451,6 +502,50 @@ export function visibleView(state: GameState, viewerId: PlayerId, data: GameData
   return { view: project(state, viewerId, data, coverage), identified: coverage.identify };
 }
 
+/** One visibility boundary reused by networking and the local map/UI. */
+export function visibleOrdnance(state: GameState, viewerId: PlayerId, data: GameData): GameState['ordnance'] {
+  if (!state.ordnance) return undefined;
+  {
+    const cloned = deepClone(state.ordnance);
+    const ord = emptyOrdnance();
+    const source = state.ordnance;
+    if (source.serials[viewerId] !== undefined) ord.serials[viewerId] = source.serials[viewerId]!;
+    if (source.cooldowns[viewerId] !== undefined) ord.cooldowns[viewerId] = source.cooldowns[viewerId]!;
+    ord.installations = cloned.installations.filter((m) => m.owner === viewerId);
+    ord.mines = cloned.mines.filter((m) => mineVisibleTo(state, m, viewerId, data));
+    for (const m of ord.mines) if (m.owner !== viewerId) {
+      delete m.mode;
+      delete m.nextScanAt;
+      delete m.damage;
+    }
+    const circles = sightCircles(state, viewerId, data);
+    const sensors = radarSources(state, viewerId, data);
+    ord.missiles = cloned.missiles.filter((m) => {
+      if (m.owner === viewerId) return true;
+      const def = data.modules[m.moduleId]?.rocketMine;
+      if (!def) return false;
+      const at = missilePositionAt(m, state.time);
+      // An incoming strike warns its potential victims immediately, even if they
+      // have no radar. Otherwise visibility follows the same radar sensitivity.
+      const threatened = Object.values(state.fleets).some((f) => {
+        const pos = f.owner === viewerId && fleetPositionAt(state, f, state.time);
+        return pos && inRadius(pos, m.to, def.blastRadius);
+      });
+      return threatened || circles.some((c) => inRadius(at, c, c.identify)) ||
+        detectSignals([{ ...at, location: '', inTransit: true, strength: def.missileSignature }], sensors).length > 0;
+    });
+    // A radar detects a missile, not the identity of the remote minelayer.
+    for (const m of ord.missiles) if (m.owner !== viewerId) {
+      m.owner = '';
+      delete m.damage;
+      delete m.hp;
+      m.id = `incoming:${m.launchedAt}:${m.from.x}:${m.from.y}:${m.to.x}:${m.to.y}:${m.arrivesAt}`;
+    }
+    if (ord.mines.length || ord.missiles.length || ord.installations.length || Object.keys(ord.serials).length || Object.keys(ord.cooldowns).length) return ord;
+    return undefined;
+  }
+}
+
 /** The projection body, over a precomputed coverage (see `visibleView`). */
 function project(
   state: GameState,
@@ -459,27 +554,17 @@ function project(
   { identify }: Coverage,
 ): VisibleState {
   const view = deepClone(state) as VisibleState;
+  const ord = visibleOrdnance(state, viewerId, data);
+  if (ord) view.ordnance = ord;
+  else delete view.ordnance;
   // EVT-2 bookkeeping is SERVER-SIDE ONLY. It is keyed by node and priced from what
   // died there, so shipping it would report a battle's toll on worlds the viewer
   // cannot see — including ones they have never scouted. The player learns what they
   // salvaged from `salvage.paid`, which is addressed to them by name.
   delete view.salvage;
-  // SM-3.4: мины, видные врагу, мины не работают. Зритель видит только свои поля и
-  // перезарядку своих флотов; чужое снимается целиком.
-  const mines = view.minefields;
-  if (mines) {
-    const fields: NonNullable<GameState['minefields']>['fields'] = {};
-    for (const [node, byOwner] of Object.entries(mines.fields)) {
-      const own = byOwner[viewerId];
-      if (own) fields[node] = { [viewerId]: own };
-    }
-    const readyAt: Record<string, number> = {};
-    for (const [fleetId, at] of Object.entries(mines.readyAt))
-      if (state.fleets[fleetId]?.owner === viewerId) readyAt[fleetId] = at;
-    if (Object.keys(fields).length || Object.keys(readyAt).length)
-      view.minefields = { fields, readyAt };
-    else delete view.minefields;
-  }
+  const fields = visibleMinefields(state, viewerId);
+  if (fields) view.minefields = fields;
+  else delete view.minefields;
   // Private dossier plus this instant's resolved contacts. Never retain another
   // observer's records, and never put remembered fleets back on the live map.
   const contacts = { ...view.swarmIntel?.[viewerId], ...observedSwarm(state, viewerId, identify) };
@@ -725,10 +810,14 @@ function project(
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.
   view.signatures = radarSignatures(state, viewerId, data, identify);
+  const mineCircles = sightCircles(state, viewerId, data).filter((c) => c.source.kind === 'mine');
   for (const id of Object.keys(view.fleets).sort()) {
     const fleet = view.fleets[id];
     if (!fleet || fleet.owner === viewerId || spiedFleets.has(fleet.owner)) continue;
     const node = fleetNode(view, fleet);
+    // Mines identify nearby ships at their continuous positions, including roads.
+    const at = fleetPosition(state, fleet);
+    if (at && mineCircles.some((c) => inRadius(at, c, c.identify))) continue;
     if (node !== null && identify.has(node)) continue; // fully identified
     delete view.fleets[id];
   }

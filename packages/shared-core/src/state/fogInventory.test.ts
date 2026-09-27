@@ -114,6 +114,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   patrols: 'filtered',
   orders: 'filtered',
   forcedMarch: 'filtered',
+  ordnance: 'filtered',
 };
 
 /** Как поле `Player` ведёт себя в ЧУЖОЙ карточке (своя доезжает целиком). */
@@ -389,6 +390,7 @@ function maximalState(): GameState {
       CANARY_fleet: { steps: [{ kind: 'move', to: 'CANARY_dest' }] },
     },
     forcedMarch: { mine: true, CANARY_fleet: true },
+    ordnance: { serials: { [RIVAL]: 7 }, cooldowns: { [RIVAL]: 900 }, installations: [], mines: [], missiles: [] },
     // EVT-2: котёл трофеев. Канарейка на чужом узле — вырезаться обязано ВСЁ поле
     // целиком, так что своей записи тут не нужно: она снимется вместе с чужой.
     salvage: { CANARY_target: { pool: { metal: 100 }, winners: ['CANARY_third'] } },

@@ -545,5 +545,46 @@
     "allowed": {
       "domain": "space"
     }
+  },
+  "rocket_mine_layer": {
+    "name": "Rocket Mine",
+    "description": "module.rocket-mine.desc",
+    "rarity": "legendary",
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {},
+      "enables": [
+        "rocket_mine"
+      ]
+    },
+    "allowed": {
+      "domain": "space"
+    },
+    "cost": {
+      "metal": 120,
+      "microelectronics": 40
+    },
+    "rocketMine": {
+      "armHours": 0.25,
+      "cooldownHours": 1,
+      "scanHours": 0.016666666666666666,
+      "maxActive": 6,
+      "radarRange": 120,
+      "radarLevel": 3,
+      "sightRange": 24,
+      "detectionRange": 24,
+      "speed": 240,
+      "minFlightHours": 0.016666666666666666,
+      "hp": 12,
+      "damage": 80,
+      "blastRadius": 10,
+      "mineSignature": 0.1,
+      "missileSignature": 13,
+      "cost": {
+        "metal": 40,
+        "microelectronics": 20
+      }
+    }
   }
 }

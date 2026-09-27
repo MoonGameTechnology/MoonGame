@@ -37,6 +37,7 @@ import {
   fleetBroodModule,
   pveModule,
   traderModule,
+  rocketMinesModule,
   swarmMemoryModule,
   swarmNetModule,
   swarmAdaptModule,
@@ -201,6 +202,7 @@ export const DEV_MODULES: GameModule[] = [
   // мины бьют входящий флот следом.
   loadoutEffectsModule,
   minefieldModule,
+  rocketMinesModule, // isolated road-weapon timers; preserve all existing module order
 ];
 
 /** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
@@ -215,7 +217,8 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '46'; // Фаза 3 модулей кораблей: в конец вошли
+export const MODULE_MANIFEST_VERSION = '47'; // Road installations and legendary rocket mines.
+// Previous version 46: // Фаза 3 модулей кораблей: в конец вошли
 // `loadoutEffects` 1.0.0 и `minefield` 1.0.0, `combat` 2.5.0 берёт цену отступления из
 // хука, `construction` чинит флот тендером, у состояния появилась запись `minefields`.
 // Партия на 45 не знает `fleet.layMines` и этих правил.

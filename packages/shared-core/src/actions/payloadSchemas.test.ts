@@ -6,6 +6,9 @@ import { actionPayloadSchemas, isValidActionPayload } from './payloadSchemas';
 const CLIENT_ACTION_TYPES = [
   'fleet.move',
   'fleet.stop',
+  'fleet.deployRocketMine',
+  'rocketMine.mode',
+  'rocketMine.disarm',
   'fleet.orbit',
   'fleet.assault',
   'fleet.bombard',

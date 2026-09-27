@@ -20,7 +20,7 @@ export interface MinelayerOffer {
   /** Нажать можно прямо сейчас. */
   ready: boolean;
   /** Почему нельзя: флот идёт или в бою (`busy`), идёт перезарядка (`cooldown`). */
-  reason?: 'busy' | 'cooldown';
+  reason?: 'busy' | 'cooldown' | 'installing';
   /** Сколько мировых мс до конца перезарядки (0 — готов). */
   readyInMs: number;
 }
@@ -35,8 +35,10 @@ export function minelayerOffer(
   if (fleet.owner !== me) return null;
   if (!(bestFleetStat(fleet.units, MINE_CHARGE_STAT, data) >= 1)) return null;
   if (!(bestFleetStat(fleet.units, MINE_HIT_STAT, data) > 0)) return null;
-  const readyInMs = Math.max(0, (state.minefields?.readyAt[fleet.id] ?? 0) - state.time);
-  if (fleet.location === null || fleet.movement || fleet.battleId)
+  const job = state.minefields?.installations?.[fleet.id];
+  if (job) return { ready: false, reason: 'installing', readyInMs: Math.max(0, job.readyAt - state.time) };
+  const readyInMs = Math.max(0, Math.max(state.minefields?.readyAt[fleet.id] ?? 0, state.minefields?.ownerReadyAt?.[me] ?? 0) - state.time);
+  if ((fleet.location === null && !fleet.edge) || fleet.movement || fleet.battleId)
     return { ready: false, reason: 'busy', readyInMs };
   if (readyInMs > 0) return { ready: false, reason: 'cooldown', readyInMs };
   return { ready: true, readyInMs: 0 };

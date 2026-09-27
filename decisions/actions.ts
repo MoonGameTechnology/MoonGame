@@ -349,3 +349,10 @@ export const equipHeroAbility = (playerId: string, heroId: string, abilityId: st
 /** Take an ability back out of its slot — it stays owned, just not worn. */
 export const unequipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
   act(playerId, 'hero.unequip', { heroId, abilityId });
+
+export const deployRocketMine = (playerId: string, fleetId: string, mode: 'any' | 'confirmed') =>
+  act(playerId, 'fleet.deployRocketMine', { fleetId, mode });
+export const setRocketMineMode = (playerId: string, mineId: string, mode: 'any' | 'confirmed') =>
+  act(playerId, 'rocketMine.mode', { mineId, mode });
+export const disarmRocketMine = (playerId: string, mineId: string) =>
+  act(playerId, 'rocketMine.disarm', { mineId });

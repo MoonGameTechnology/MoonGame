@@ -1,3 +1,9 @@
+import { visibleMinefields, fieldPosition } from '../../packages/shared-core/src/state/minefields';
+import { drawMineShape } from '../../packages/client/src/mineShape';
+import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
+import { rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
+import { drawOrdnance } from '../../packages/client/src/ordnanceView';
+import { rocketMinesUi } from './rocketMinesUi';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
 import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
@@ -112,7 +118,7 @@ import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName, worldName } from './planetName';
 import { provinceName } from '../../decisions/provinceName';
-import { minelayerOffer, ownMinefields } from '../../decisions/minefields';
+import { minelayerOffer } from '../../decisions/minefields';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -1416,7 +1422,7 @@ const aaShots: Array<{
 const captureFlashes = new Map<string, { owner: string; at: number }>();
 // SM-3.5: вспышка срабатывания мин — узел → момент (performance.now). Ставится, только
 // если мины задели меня или сработало моё поле.
-const mineFlashes = new Map<string, number>();
+const mineFlashes = new Map<string, { at: number; position?: { x: number; y: number } }>();
 // Casualties per contested location (owner → unit → count), accumulated from
 // unit.died while a battle runs and paid out as a result note on battle.resolved.
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
@@ -3739,6 +3745,15 @@ function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
 function handleEvents(events: DomainEvent[]) {
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
+    if (e.type.startsWith('rocketMine.') && (p.owner === ME || p.playerId === ME)) {
+      const keys: Record<string, string> = {
+        'rocketMine.ready': 'mine.ready', 'rocketMine.cancelled': 'mine.cancelled',
+        'rocketMine.launched': 'mine.launched', 'rocketMine.intercepted': 'mine.intercepted',
+        'rocketMine.hit': 'mine.hit', 'rocketMine.disarmed': 'mine.disarmed',
+      };
+      const key = keys[e.type];
+      if (key) note(t(key, { damage: Math.round(Number(p.damage) || 0) }));
+    }
     switch (e.type) {
       case 'battle.started':
         // Видимость события — `eventVisibility.ts` (REFM-86): своё всегда, чужое только
@@ -4169,7 +4184,7 @@ function handleEvents(events: DomainEvent[]) {
         const victim = p.owner === ME;
         if (!victim && !(p.by as string[] | undefined)?.includes(ME)) break;
         note(t(victim ? 'log.mines.hit' : 'log.mines.triggered', { n: Number(p.lost) || 0 }), at);
-        mineFlashes.set(at, performance.now());
+        mineFlashes.set(at, { at: performance.now(), position: p.position as { x: number; y: number } | undefined });
         break;
       }
       case 'unit.died': {
@@ -5450,6 +5465,8 @@ function render(now: number) {
 
   drawFleetRoutes();
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
+  drawOrdnance(cx, mineView(), ME, s.time, world, cam.scale);
+  mineControls.refresh();
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
 
   // battles — pulsing red contact ring at the actual clash point (an engaged
@@ -6786,6 +6803,8 @@ function fleetPanelHtml(f: Fleet): string {
     h += `<div class="row">💣 <button class="chip" data-act="laymines" data-arg="${f.id}"${mines.ready ? '' : ' disabled'} title="${t('side.fleet.mines.title')}">${
       mines.ready
         ? t('side.fleet.mines.lay')
+        : mines.reason === 'installing'
+          ? t('side.fleet.mines.installing', { in: countdownHMS(mines.readyInMs) })
         : mines.reason === 'cooldown'
           ? t('side.fleet.mines.cooldown', { in: countdownHMS(mines.readyInMs) })
           : t('side.fleet.mines.busy')
@@ -8001,6 +8020,23 @@ function incomeOf(type: string, level: number): string {
 /** Карточка корабля (`shipCard.ts`) в окне справочника: отсеки стека с тем, что надето,
  *  и характеристики одного корабля. Стек адресуется местом во флоте — тем же, что у
  *  плитки; флот исчез или стек сдвинулся — карточки нет, а не чужой корабль. */
+let mineViewState: typeof s | undefined;
+let mineViewOwner = '';
+let mineViewCache: ReturnType<typeof visibleOrdnance>;
+function mineView(): ReturnType<typeof visibleOrdnance> {
+  if (mineViewState !== s || mineViewOwner !== ME) {
+    mineViewState = s; mineViewOwner = ME;
+    mineViewCache = visibleOrdnance(s, ME, data);
+  }
+  return mineViewCache;
+}
+const mineControls = rocketMinesUi({
+  state: () => s, viewer: () => ME, visible: mineView, data,
+  hourMs: () => 3_600_000 / (ctx(s.time, s).config?.timeScale ?? 1),
+  issue: playerOrder, verdict: (action) => canOrder(s, action),
+  portrait: (id) => catalogPortraitHtml('md', id, data),
+});
+
 function openShipCard(fleetId: string, index: number): void {
   const el = document.getElementById('codex');
   const f = s.fleets[fleetId];
@@ -8742,6 +8778,9 @@ function renderCmdBar() {
         )
       : '') +
     cmdBtn('target', '◎', t('cmd.target'), '', false, t('cmd.target.hint')) +
+    (lone && rocketMinelayer(lone, data)
+      ? cmdBtn('rocket-mine', '✺', t('cmd.rocket-mine'), '', false, t('cmd.rocket-mine.hint'))
+      : '') +
     (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
@@ -9402,7 +9441,9 @@ cmdbar.addEventListener('click', (ev) => {
   retreatAim = null;
   heroSpawnAim = null;
   strikeAim = null;
-  if (cmd === 'engage') {
+  if (cmd === 'rocket-mine' && ids.length === 1) {
+    mineControls.openFleet(ids[0]!);
+  } else if (cmd === 'engage') {
     engageAim = !engageAim; // arm / disarm the attack order
     aiming = false;
     assaultAim = false;
@@ -9789,6 +9830,11 @@ function selectAt(mx: number, my: number) {
       return;
     }
   }
+  const mineHit = (mineView()?.mines ?? []).find((m) => {
+    const p = world(m.position);
+    return (p.x - mx) ** 2 + (p.y - my) ** 2 <= 14 ** 2;
+  });
+  if (mineHit) { mineControls.openMine(mineHit.id); return; }
   // Plain tap = selection. Movement happens only when "Move" is armed (aiming), so a
   // fleet selection never blocks picking a planet (and vice versa).
   // A tap on an ally ping marker opens its description popup (takes priority over
@@ -14391,14 +14437,15 @@ function drawMissionTargets(): void {
  *  Текста нет: знак и время, поэтому и локали не нужно. */
 const MINE_FLASH_MS = 1200;
 function drawMinefields(now: number): void {
-  for (const [node, at] of mineFlashes) {
+  for (const [node, flash] of mineFlashes) {
+    const { at } = flash;
     if (flashDone(now, at, MINE_FLASH_MS)) {
       mineFlashes.delete(node);
       continue;
     }
-    const p = s.planets[node];
-    if (!p) continue;
-    const c = world(p.position);
+    const position = flash.position ?? s.planets[node]?.position;
+    if (!position) continue;
+    const c = world(position);
     if (!visible(c, 80)) continue;
     const k = flashProgress(now, at, MINE_FLASH_MS);
     cx.save();
@@ -14409,26 +14456,26 @@ function drawMinefields(now: number): void {
     cx.stroke();
     cx.restore();
   }
-  const fields = ownMinefields(s, ME);
-  if (fields.length === 0) return;
-  cx.save();
-  cx.textAlign = 'center';
-  cx.textBaseline = 'bottom';
-  cx.font = '700 11px ui-monospace, monospace';
+  const view = visibleMinefields(s, ME);
+  if (!view) return;
+  const fields = Object.entries(view.fields).flatMap(([key, owners]) => Object.entries(owners).map(([owner, field]) => ({ key, owner, field, installing: false })));
+  fields.push(...Object.values(view.installations ?? {}).map((job) => ({ ...job, installing: true })));
   for (const m of fields) {
-    const p = s.planets[m.node];
-    if (!p) continue;
-    const c = world(p.position);
-    if (!visible(c, 60)) continue;
-    const label = `💣 ×${m.charge}`;
-    const w = Math.ceil(cx.measureText(label).width) + 10;
-    const top = Math.round(c.y - 44);
-    cx.fillStyle = 'rgba(4,10,12,.85)';
-    cx.fillRect(Math.round(c.x - w / 2), top, w, 15);
-    cx.fillStyle = '#ffb347';
-    cx.fillText(label, c.x, top + 14);
+    const pos = fieldPosition(s, m.key, m.field);
+    if (!pos) continue;
+    const c = world(pos);
+    if (!visible(c, 40)) continue;
+    const y = m.field.edge ? c.y : c.y - 44;
+    cx.save(); cx.translate(c.x - 12, y - 12);
+    cx.strokeStyle = m.owner === ME ? '#60dbe8' : '#ffac62';
+    cx.fillStyle = 'rgba(4,10,12,.85)'; cx.lineWidth = 1.2;
+    cx.setLineDash(m.installing ? [2, 2] : []);
+    drawMineShape(cx, cam.scale >= 0.9);
+    cx.setLineDash([]);
+    cx.fillStyle = cx.strokeStyle; cx.font = '11px ui-monospace, monospace';
+    cx.textAlign = 'left'; cx.fillText(m.installing ? '◷' : `×${m.field.charge}`, 26, 15);
+    cx.restore();
   }
-  cx.restore();
 }
 
 function drawDevourSieges(): void {

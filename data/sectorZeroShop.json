@@ -3,6 +3,12 @@
   "adSovereigns": { "amount": 2, "perDay": 3 },
   "runSupply": { "price": 5 },
   "offers": {
+    "rocket_mine_layer": {
+      "kind": "module",
+      "grants": "rocket_mine_layer",
+      "prices": { "warrants": 900 },
+      "weight": 1
+    },
     "shield_booster": {
       "kind": "module",
       "grants": "shield_booster",

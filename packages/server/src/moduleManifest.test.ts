@@ -79,7 +79,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  46 — фаза 3 модулей кораблей: ЧЛЕНСТВО — в конец вошли `loadoutEffects` (тяговый луч и
  *  сборщик обломков через хуки `combat.retreatToll`/`salvage.share`) и `minefield`
  *  (минный заградитель); порядок остальных не тронут.) */
-const PINNED_FOR_VERSION = '46';
+const PINNED_FOR_VERSION = '47';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -146,6 +146,7 @@ const PINNED_MODULE_IDS = [
   'trader', // торговец экспедиции («живой курс»): только свои действия
   'loadoutEffects', // SM-3.1/3.2: стат носителя вливается в чужие хуки
   'minefield', // SM-3.4: минные поля
+  'rocketMines', // deployment, radar scans and finite missile flights
 ];
 
 describe('сторож манифеста', () => {

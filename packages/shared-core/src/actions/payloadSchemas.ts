@@ -32,6 +32,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
       message: 'fleet.move needs a `to` node or a `toEdge`',
     }),
   'fleet.stop': z.object({ fleetId: id }),
+  'fleet.deployRocketMine': z.object({ fleetId: id, mode: z.enum(['any', 'confirmed']) }),
+  'rocketMine.mode': z.object({ mineId: id, mode: z.enum(['any', 'confirmed']) }),
+  'rocketMine.disarm': z.object({ mineId: id }),
   // orbital.ts
   'fleet.orbit': z.object({ fleetId: id, orbit: z.literal('near') }), // a single orbit (GDD §7.4)
   'fleet.bombard': z.object({ fleetId: id, on: z.boolean() }),

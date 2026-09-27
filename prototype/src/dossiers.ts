@@ -632,6 +632,7 @@ export function createDossiers(host: DossierHost): {
         rows.push(cxRow(tData(k), String(v)));
       return (
         `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.module')}</span></div>` +
+        catalogPortraitHtml('md', id, data) +
         `<div class="cx-stats">${rows.join('')}</div>`
       );
     }

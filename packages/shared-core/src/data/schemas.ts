@@ -793,6 +793,29 @@ export const SIGNAL_COUNTERS: Record<string, readonly string[]> = {
   strike: ['pointDefense', 'pointDefenseRange'],
 };
 
+/** One-shot road weapon. All durations are game hours; distances are map units. */
+export const RocketMineSchema = z.object({
+  armHours: z.number().positive(),
+  cooldownHours: z.number().positive(),
+  scanHours: z.number().positive(),
+  maxActive: z.number().int().min(1).max(32),
+  radarRange: z.number().positive(),
+  radarLevel: z.number().int().min(1).max(3),
+  sightRange: z.number().positive(),
+  detectionRange: z.number().positive(),
+  speed: z.number().positive(),
+  minFlightHours: z.number().positive(),
+  hp: z.number().positive(),
+  damage: z.number().positive(),
+  blastRadius: z.number().positive(),
+  mineSignature: z.number().positive().max(1),
+  missileSignature: z.number().positive(),
+  cost: NonnegativeCostSchema,
+}).refine((m) => m.sightRange <= m.radarRange, {
+  message: 'mine sight must fit within its radar',
+});
+export type RocketMineDef = z.infer<typeof RocketMineSchema>;
+
 export const ModuleDefSchema = z
   .object({
     name: z.string(),
@@ -805,6 +828,7 @@ export const ModuleDefSchema = z
     allowed: ModuleAllowedSchema.optional(),
     /** PVR-6.4: ступень редкости; нет поля — «простой». */
     rarity: RaritySchema.optional(),
+    rocketMine: RocketMineSchema.optional(),
     /**
      * SZE-5.1: НОВЫЙ параметр, который модуль получает на каждой ступени редкости выше
      * своей базовой (решение владельца 2026-09-24: «редкость даёт дополнительный
