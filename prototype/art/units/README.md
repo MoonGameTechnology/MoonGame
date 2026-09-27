@@ -1,4 +1,30 @@
-# Наземные юниты и пиратский флот
+# Наземные юниты, пиратский флот и мины
+
+## Мина на космической дороге (SHIPART-6, 2026-09-27)
+
+`road-mine.webp`: встроенный imagegen, генерация `caadd4e4-655a-4edf-8a25-3992069d369d`.
+Исходник 1536×1024 → WebP 768×512, quality 83, effort 6, 36462 байта.
+Полный неподвижный корпус: восьмигранный диск, четыре датчика, центральная линза;
+двигателей нет. Нативный вектор той же формы — `packages/client/src/mineShape.ts`.
+Портрет подготовлен для кодекса модуля `mine_layer`; без записи модуля в данных
+`catalogPortraitHtml` ничего не показывает. Шахта `mine` — другой объект.
+
+**Подключение карты ещё не выполнено.** На момент подготовки ресурса механика находится
+в черновике PR #1320, не в `main`. Перед завершением нужны установка на дороге с
+затратой времени и надетым модулем, а также обнаружение только вблизи (заказ владельца).
+Вектор вызывается только после серверной фильтрации видимости; скрытые поля нельзя
+раскрывать ни маркером, ни счётчиком, ни кликом. Радиус и время этот арт не задаёт.
+
+Промпт генерации (без референсов):
+
+> Use case: stylized-concept.
+> Asset type: realistic game menu portrait for Averion: Sector Zero / Void Dominion.
+> Subject: ONE compact stationary space-lane proximity mine. A squat sealed octagonal gunmetal armored disc, four short rigid radial sensor prongs at the cardinal directions, a small recessed central amber sensor lens, layered bolted segmented casing, thin understated cyan status slits. It is an unmanned mine anchored in a space route, with no propulsion, no cockpit and no ship-like nose. Believable manufactured sci-fi device, small and dangerous, still recognizable at thumbnail size.
+> Style: high-end realistic industrial hard-surface render matching the project's gray human fleet, restrained weathering, precise machinery; no toy look. Background plain very dark navy-black #071018. Soft cold rim light and neutral directional studio light make all edges readable.
+> Composition: landscape 3:2, single full device centered, elevated three-quarter view, entire mine and all four prongs visible with at least 10% clear margin, fills about 70% of frame. No other objects, no ground, no road pavement, no stars or planets, no explosions, no wires, no engines or exhaust, no station ring, no human.
+> No text, labels, numbers, logo, watermark, UI, border, diagram or alternate views.
+
+## Наземные войска и пираты
 
 Дополнение SHIPART-5, 2026-09-27. Все 13 портретов созданы встроенным imagegen по
 отдельному запросу на каждый тип; чужие изображения не использовались. Люди —
@@ -91,4 +117,3 @@ effort 6. Суммарно 734474 байта. Изображения встро�
 
 > Use case: stylized-concept. Asset type: finished realistic pirate ground-unit portrait for dark-space strategy Averion: Sector Zero; one standalone 3:2 landscape image, 1536x1024. SINGLE primary unit centered filling 75 percent of image, clear silhouette at small card size. Photorealistic industrial sci-fi cinematic concept render. Salvaged gray and charcoal steel, mismatched rust-red armor panels, visible repairs and restrained amber lights; dark nearly black navy defocused industrial hideout. Concrete realistic equipment, good functional anatomy and construction. Soft neutral key plus warm practical edge lighting. No text, logo, UI, frame, watermark, decorative skulls, sea-pirate costumes, collage, extra people, gore or combat effects.
 > Subject: A single complete pirate assault tank, camera elevated front three-quarter, all extremities comfortably inside frame. Low industrial tracked bulldozer rebuilt into an armored vehicle, exactly two continuous tracks, visible reinforced front plow, improvised offset low turret with one heavy cannon, welded patchwork gray and rust-red armored skirts, externally secured spare track segments, restrained amber lamps. Stable plausible center of mass, compact brutal utilitarian silhouette; clearly a tank, no giant walker legs and no people.
-

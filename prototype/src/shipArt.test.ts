@@ -38,9 +38,26 @@ describe('realistic build portraits', () => {
     }
   });
 
-  it('does not assign unit portraits to mines or unknown content', () => {
+  it('does not assign unit portraits to mining buildings or unknown content', () => {
     expect(catalogPortraitHtml('u', 'unknown', data)).toBe('');
     expect(catalogPortraitHtml('b', 'mine', data)).toBe('');
+  });
+
+  it('shows a mine only for a defined minelayer module, never as a buildable hull', () => {
+    // Integration fixture for the minelayer catalogue from PR #1320. Main does not
+    // ship that mechanic yet; the portrait must not invent it or unlock a unit.
+    const withLayer = {
+      ...data,
+      modules: { ...data.modules, mine_layer: { ...data.modules.cargo_bay!, name: 'Minelayer' } },
+    };
+    const { mine_layer: _layer, ...withoutLayer } = withLayer.modules;
+    expect(catalogPortraitHtml('md', 'mine_layer', { ...data, modules: withoutLayer })).toBe('');
+    expect(catalogPortraitHtml('md', 'mine_layer', withLayer)).toContain(
+      'data-ship-art="roadMine"',
+    );
+    expect(catalogPortraitHtml('md', 'cargo_bay', withLayer)).toBe('');
+    expect(catalogPortraitHtml('u', 'mine_layer', withLayer)).toBe('');
+    expect(catalogPortraitHtml('b', 'mine', withLayer)).toBe('');
   });
 
   it('portraits keep build and dossier anchors, and cannot bypass a locked order', () => {

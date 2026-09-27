@@ -37,6 +37,7 @@ import pirateCruiser from '../art/units/pirate-cruiser.webp';
 import pirateBoarder from '../art/units/pirate-boarder.webp';
 import pirateMarauder from '../art/units/pirate-marauder.webp';
 import pirateTank from '../art/units/pirate-tank.webp';
+import roadMine from '../art/units/road-mine.webp';
 
 const PORTRAITS: Partial<Record<ShipShapeId, string>> = {
   fighter,
@@ -82,12 +83,15 @@ const GROUND_PORTRAITS: Readonly<Record<string, string>> = {
  * cruiser is the Hunter; a catalog entry without an owner falls back to `def.faction`.
  */
 export function catalogPortraitHtml(
-  kind: 'b' | 'u',
+  kind: 'b' | 'u' | 'md',
   id: string,
   data: GameData,
   size: 'thumb' | 'portrait' = 'portrait',
   ownerFaction?: string,
 ): string {
+  // The minelayer is equipment, not the metal-mine building or a mobile hull.
+  // Until its catalogue entry is shipped, unknown module pages stay empty.
+  const mine = kind === 'md' && id === 'mine_layer' && !!data.modules[id];
   const def = kind === 'u' ? data.units[id] : undefined;
   const shape = def
     ? def.domain !== 'space'
@@ -99,9 +103,9 @@ export function catalogPortraitHtml(
       ? 'station'
       : undefined;
   const ground = def?.domain === 'ground';
-  const src = ground ? GROUND_PORTRAITS[id] : shape && PORTRAITS[shape];
+  const src = mine ? roadMine : ground ? GROUND_PORTRAITS[id] : shape && PORTRAITS[shape];
   if (!src) return '';
   // The adjacent localized title identifies the unit; the artwork adds no duplicate
   // screen-reader label and contains no language baked into its pixels.
-  return `<span class="ship-art ship-art--${size}" data-ship-art="${ground ? id : shape}" aria-hidden="true"><img src="${src}" alt="" width="768" height="512" loading="lazy" decoding="async" draggable="false"></span>`;
+  return `<span class="ship-art ship-art--${size}" data-ship-art="${mine ? 'roadMine' : ground ? id : shape}" aria-hidden="true"><img src="${src}" alt="" width="768" height="512" loading="lazy" decoding="async" draggable="false"></span>`;
 }
