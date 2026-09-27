@@ -53,6 +53,7 @@
 | `bundle-netserver.mjs` | ОДНА конфигурация сборки бандла на дев и прод — чтобы они не разъехались |
 | `src/main.ts` | клиент целиком: карта, HUD, панели, ввод. Большой (см. блок `REFM` в бэклоге) |
 | `src/protoKernel.ts` | сборка ядра прототипа: список модулей (порядок = контракт детерминизма) + `canOrder`/`canOrderAll` — проба правил с памятью ответов |
+| `src/rocketMinesUi.ts` · `minestest.mjs` | карточка ракетной мины и браузерный smoke; `packages/client/src/ordnanceView.ts` рисует отфильтрованные мины и ракеты |
 | `build.mjs` | сборка клиента в самодостаточный HTML; `data-i18n` подставляется из `/localization` |
 | `selfplay.mjs` · `econplaytest.mjs` | боты друг против друга: баланс и экономика |
 | `perf.mjs` · `report.mjs` · `doctor.mjs` | профиль кадра; разбор JSONL-лога матча (`pnpm metrics`); проверка СВЯЗНОСТИ хоста — «почему не подключаются»: занят ли порт, какие адреса видны снаружи, не слушает ли он только loopback |
@@ -69,14 +70,10 @@
 
 ### Модули ядра (`packages/shared-core/src/modules/`)
 
-Порядок = порядок в `DEV_MODULES` (`packages/server/src/scenario.ts:113`).
-`MODULE_MANIFEST_VERSION = '9'` — bump при изменении состава/порядка (инвариант #6);
-сторож — `moduleManifest.test.ts`. Каталог модулей и `DEV_MODULES` совпадают: канон
-грузит ВСЕ **36** (CORE-PARITY 2026-08-26 внёс последнюю четвёрку — `heroEffects`,
-`espionage`, `steward`, `effects`, — до неё они были написаны, но в графе не стояли).
-Прототип (`protoKernel.ts`) собирает свой набор: 33 из этих плюс два своих
-(`hunger`, `botDiplomacy`), без `pve`, `station`, `visibility` — счётчик и разбор
-живут в `docs/state.md` §9, здесь их копии нет.
+Полный актуальный порядок — `DEV_MODULES` в `packages/server/src/scenario.ts`;
+версия манифеста меняется при изменении состава/порядка (инвариант #6), сторож —
+`moduleManifest.test.ts`. Счётчики канона и прототипа живут в `docs/state.md` §9.
+Ниже — навигация по основным швам модулей.
 
 Звёздочка в колонке emit (`sched:`) — событие ставится в `state.scheduled` через
 `h.schedule`, а не эмитится сразу.
@@ -119,6 +116,10 @@
 | 34 | `visibility` | `visibility.ts` | — | `fleet.arrived`, `planet.captured`, `time.advanced` | — | — |
 | 35 | `effects` | `effects.ts` | — | `planet.captured`, `time.advanced` | — | `effect.applied` |
 | 36 | `seatClaim` | `seatClaim.ts` | `seat.claim`, `seat.confirm`, `seat.release` | — | — | `seat.claimed`, `seat.released`, `seat.seated` |
+| 46 | `loadoutEffects` | `loadoutEffects.ts` | — | — | `combat.retreatToll`, `salvage.share` | — |
+| 47 | `minefield` | `minefield.ts` | `fleet.layMines` | `fleet.leg`, `fleet.arrived`, `fleet.transit`, `mines.armed`, `mines.crossed`, `time.advanced` | — | `mines.installing`, `mines.laid`, `mines.triggered`, `unit.died` · sched: `mines.armed`, `mines.crossed` |
+| 48 | `rocketMines` | `rocketMines.ts` | `fleet.deployRocketMine`, `rocketMine.mode`, `rocketMine.disarm` | `rocketMine.armed`, `rocketMine.scan`, `rocketMine.flight`, `rocketMine.impact`, `fleet.leg`, `fleet.destroyed`, `fleet.merged`, `battle.started` | — | `rocketMine.installing`, `rocketMine.ready`, `rocketMine.cancelled`, `rocketMine.launched`, `rocketMine.intercepted`, `rocketMine.hit`, `rocketMine.detonated`, `rocketMine.modeChanged`, `rocketMine.disarmed` |
+
 
 ### Карта хуков (кто регистрирует → кто вызывает)
 
@@ -243,6 +244,7 @@
 | `kernel/kernel.ts` | `Kernel.applyAction(state, action, ctx)` | чистое применение действия |
 | `kernel/kernel.ts` | `Kernel.advanceTo(state, ctx)` | сдвиг часов + scheduled events |
 | `kernel/kernel.ts` | `Kernel.canApply` / `canApplyAll` | «можно ли?» ЗАРАНЕЕ (RULES-1/3) — тот же прогон, результат выброшен |
+| `state/radarSignals.ts` | `detectSignals`, `signatureSize`, `radarThreshold` | сила сигнала группы и чувствительность радара; `visibility.ts:radarSignatures` собирает источники и скрытые контакты |
 | `state/gameState.ts` | `GameState`, `createInitialState`, `Player`, `Planet`, `Fleet`, `MatchState` | типы состояния |
 | `state/buildFromMap.ts` | `buildStateFromMap(map, data, opts)` | посев матча из карты |
 | `state/diplomacy.ts` | `getStance`, `setStance`, `pairKey`, `DEFAULT_STANCE` | дипломатия |

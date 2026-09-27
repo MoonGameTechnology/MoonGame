@@ -91,7 +91,7 @@ export function catalogPortraitHtml(
 ): string {
   // The minelayer is equipment, not the metal-mine building or a mobile hull.
   // Until its catalogue entry is shipped, unknown module pages stay empty.
-  const mine = kind === 'md' && id === 'mine_layer' && !!data.modules[id];
+  const mine = kind === 'md' && (id === 'mine_layer' || id === 'rocket_mine_layer') && !!data.modules[id];
   const def = kind === 'u' ? data.units[id] : undefined;
   const shape = def
     ? def.domain !== 'space'

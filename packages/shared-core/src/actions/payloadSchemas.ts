@@ -32,6 +32,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
       message: 'fleet.move needs a `to` node or a `toEdge`',
     }),
   'fleet.stop': z.object({ fleetId: id }),
+  'fleet.deployRocketMine': z.object({ fleetId: id, mode: z.enum(['any', 'confirmed']) }),
+  'rocketMine.mode': z.object({ mineId: id, mode: z.enum(['any', 'confirmed']) }),
+  'rocketMine.disarm': z.object({ mineId: id }),
   // orbital.ts
   'fleet.orbit': z.object({ fleetId: id, orbit: z.literal('near') }), // a single orbit (GDD §7.4)
   'fleet.bombard': z.object({ fleetId: id, on: z.boolean() }),
@@ -40,6 +43,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // `to` — точка отхода (RETR-1). Необязательна: без неё отступление только расцепляет
   // бой, как и раньше, поэтому старый клиент остаётся валидным.
   'fleet.retreat': z.object({ fleetId: id, to: id.optional() }),
+  // minefield.ts (SM-3.4): поставить минное поле на узле, где стоит флот
+  'fleet.layMines': z.object({ fleetId: id }),
   // army.ts
   'army.load': z.object({ fleetId: id, unit: id, count: count.optional() }),
   'army.unload': z.object({ fleetId: id, unit: id, count: count.optional() }),

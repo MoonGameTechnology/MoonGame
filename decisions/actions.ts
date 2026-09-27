@@ -246,6 +246,9 @@ export const orderChain = (playerId: string, fleetId: string, steps: ChainStep[]
 /** BOOST-1: toggle форс-марш on an owned fleet (+50% speed, hull wear in transit). */
 export const forceMarchFleet = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'fleet.forcemarch', { fleetId, on });
+/** SM-3.4: поставить минное поле на узле, где стоит флот с заградителем. */
+export const layMinesFleet = (playerId: string, fleetId: string) =>
+  act(playerId, 'fleet.layMines', { fleetId });
 /** Платный мгновенный ремонт корпуса всего флота (цена — `instantRepairCost`). */
 export const instantRepairFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.instantRepair', { fleetId });
@@ -346,3 +349,10 @@ export const equipHeroAbility = (playerId: string, heroId: string, abilityId: st
 /** Take an ability back out of its slot — it stays owned, just not worn. */
 export const unequipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
   act(playerId, 'hero.unequip', { heroId, abilityId });
+
+export const deployRocketMine = (playerId: string, fleetId: string, mode: 'any' | 'confirmed') =>
+  act(playerId, 'fleet.deployRocketMine', { fleetId, mode });
+export const setRocketMineMode = (playerId: string, mineId: string, mode: 'any' | 'confirmed') =>
+  act(playerId, 'rocketMine.mode', { mineId, mode });
+export const disarmRocketMine = (playerId: string, mineId: string) =>
+  act(playerId, 'rocketMine.disarm', { mineId });

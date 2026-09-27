@@ -55,7 +55,7 @@
 | REFM-221 | 🔒 | proto | `docs/backlog.md` | Обучение и справка |
 | REFM-222 | 🔒 | proto | `docs/backlog.md` | Верхняя полоса |
 | REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |
-| REFM-224 | 🔒 | proto | `docs/backlog.md` | Карточка флота |
+| REFM-224 | ⏳ | proto | `docs/backlog.md` | Карточка флота |
 | REFM-225 | 🔒 | proto | `docs/backlog.md` | Хозяин боковой панели |
 | REFM-226 | 🔒 | proto | `docs/backlog.md` | Ряд команд: разметка и поповеры |
 | REFM-227 | 🔒 | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
@@ -70,7 +70,7 @@
 | REFM-236 | 🔒 | proto | `docs/backlog.md` | Ввод на канвасе |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
-| SHIPART-6 | ⏳ | proto cli | `docs/backlog.md` | Портрет и голограмма неподвижной мины |
+| SHIPART-6 | ✅ | proto cli | `docs/backlog.md` | Портрет и голограмма неподвижной мины |
 | SHIPART-5 | ✅ | data proto cli | `docs/backlog.md` | Наземные портреты и отдельный состав пиратов |
 | SHIPART-4 | ✅ | proto cli | `docs/backlog.md` | Отдельные корпуса четырёх юнитов Sector Zero |
 | TXT-1 | ⏳ | proto | `docs/backlog.md` | Досье зданий: 14 ключей, 2505 симв., проза вместо |
@@ -1025,7 +1025,7 @@
 | MS-2.2 | 🔒 | core data | `docs/missiles-roadmap.md` | Детонация |
 | MS-3.1 | 🔒 | core data | `docs/missiles-roadmap.md` | Пусковой/ракеты как предмет + P2W-guardrail |
 | MS-4.1 | 🔒 | cli | `docs/missiles-roadmap.md` | Рендер полёта/перехвата/удара |
-| MS-5.1 | 🔒 | core data cli | `docs/missiles-roadmap.md` | Легендарная способность «Ракетная мина» |
+| MS-5.1 | ✅ | core data cli | `docs/missiles-roadmap.md` | Легендарная способность «Ракетная мина» 2026-09-27 |
 | MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md` | Решение владельца: (а), (б) или (в) |
 | MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md` | Battle стал СПИСКОМ сторон |
 | MSB-2 | ✅ | core | `docs/multiside-combat-roadmap.md` | Правило деления урона |
@@ -1303,6 +1303,11 @@
 | SM-2.4 | 🔒 | core | `docs/ship-modules-roadmap.md` | Завершение + бой-фриз + ОГРАНИЧЕННЫЙ re-defer |
 | SM-2.5 | 🔒 | cli | `docs/ship-modules-roadmap.md` | Рендер фабрики |
 | SM-2.6 | 🔒 | data srv | `docs/ship-modules-roadmap.md` | Фейрнес/P2W-гард фабрики |
+| SM-3.1 | ✅ | core data | `docs/ship-modules-roadmap.md` | Тяговый луч: отступать от него дороже |
+| SM-3.2 | ✅ | core data | `docs/ship-modules-roadmap.md` | Сборщик обломков: больше трофеев с боя |
+| SM-3.3 | ✅ | core data | `docs/ship-modules-roadmap.md` | Ремонтный тендер: чинит соседей по флоту |
+| SM-3.4 | ✅ | core data | `docs/ship-modules-roadmap.md` | Минный заградитель: мины на дорогах |
+| SM-3.5 | ✅ | proto | `docs/ship-modules-roadmap.md` | Мины на карте прототипа |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |

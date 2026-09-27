@@ -42,6 +42,11 @@ function hostOf(over: Partial<DossierHost> = {}): DossierHost {
 }
 
 describe('dossiers — здания', () => {
+  it('radar upgrades explain the actual sensitivity as well as reach', () => {
+    expect(buildingDossier('radar', 1)?.body).toContain('Высокие сигнатуры');
+    expect(buildingDossier('radar', 2)?.body).toContain('Средние и высокие сигнатуры');
+    expect(buildingDossier('radar', 3)?.body).toContain('Любые сигнатуры');
+  });
   it('незнакомое здание не роняет панель, а отдаёт null', () => {
     expect(buildingDossier('ministry_of_silly_walks', 1)).toBeNull();
   });

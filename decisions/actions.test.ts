@@ -11,6 +11,9 @@ import {
   castHeroAbility,
   chainStamp,
   declareWar,
+  deployRocketMine,
+  disarmRocketMine,
+  setRocketMineMode,
   delegateSteward,
   designateCapital,
   takeBoon,
@@ -19,6 +22,7 @@ import {
   forceMarchFleet,
   installHeroModule,
   instantRepairFleet,
+  layMinesFleet,
   premiumRepairFleet,
   buySupply,
   abandonRun,
@@ -75,6 +79,9 @@ import {
  */
 const P = 'p1';
 const CALLS: ReadonlyArray<readonly [string, Action]> = [
+  ['deployRocketMine', deployRocketMine(P, 'f1', 'confirmed')],
+  ['setRocketMineMode', setRocketMineMode(P, 'mine:1', 'any')],
+  ['disarmRocketMine', disarmRocketMine(P, 'mine:1')],
   ['moveFleet', moveFleet(P, 'f1', 'beta')],
   ['moveFleetEdge', moveFleetEdge(P, 'f1', { from: 'a', to: 'b', t: 0.5 })],
   ['stopFleet', stopFleet(P, 'f1')],
@@ -121,6 +128,7 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['orderChain', orderChain(P, 'f1', [{ kind: 'move', to: 'beta' }, { kind: 'assault' }])],
   ['forceMarchFleet', forceMarchFleet(P, 'f1', true)],
   ['instantRepairFleet', instantRepairFleet(P, 'f1')],
+  ['layMinesFleet', layMinesFleet(P, 'f1')],
   ['repairFleet', repairFleet(P, 'f1')],
   ['marketList', marketList(P, 'sell', 'metal', 10, 3)],
   ['marketTake', marketTake(P, 'lot1', 5)],

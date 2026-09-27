@@ -1,5 +1,6 @@
 {
   "scout_drone": {
+    "radarLevel": 3,
     "faction": "vanguard",
     "stats": {
       "attack": 2,
@@ -24,6 +25,8 @@
     "hullClass": "light"
   },
   "frigate": {
+    "signature": 5,
+    "radarLevel": 1,
     "faction": "vanguard",
     "stats": {
       "attack": 3,
@@ -79,7 +82,7 @@
       "cargoCapacity": 5
     },
     "line": "front",
-    "signature": 4,
+    "signature": 8,
     "cost": {
       "metal": 60,
       "credits": 20,
@@ -106,7 +109,7 @@
       "cargoCapacity": 5
     },
     "line": "front",
-    "signature": 5,
+    "signature": 13,
     "cost": {
       "metal": 120,
       "credits": 40,
@@ -298,7 +301,7 @@
     "traits": [
       "hero"
     ],
-    "signature": 6,
+    "signature": 13,
     "cost": {
       "metal": 400,
       "credits": 200
@@ -441,6 +444,8 @@
     }
   },
   "scout": {
+    "signature": 1,
+    "radarLevel": 3,
     "faction": "blue",
     "stats": {
       "attack": 5,
@@ -467,6 +472,8 @@
     ]
   },
   "picket_frigate": {
+    "signature": 5,
+    "radarLevel": 2,
     "faction": "blue",
     "stats": {
       "attack": 2,
@@ -507,7 +514,7 @@
       "carrier",
       "support"
     ],
-    "signature": 6,
+    "signature": 13,
     "cost": {
       "metal": 260,
       "credits": 130,
@@ -583,7 +590,7 @@
       "cargoCapacity": 8
     },
     "line": "rear",
-    "signature": 4,
+    "signature": 5,
     "traits": [
       "brood_host"
     ],
@@ -699,7 +706,7 @@
       "issued",
       "brood_host"
     ],
-    "signature": 12,
+    "signature": 13,
     "cost": {
       "metal": 0
     },
@@ -713,6 +720,7 @@
     "hullClass": "heavy"
   },
   "pirate_skiff": {
+    "radarLevel": 2,
     "faction": "pirates",
     "stats": {
       "attack": 5,
@@ -739,6 +747,8 @@
     ]
   },
   "pirate_frigate": {
+    "signature": 5,
+    "radarLevel": 1,
     "faction": "pirates",
     "stats": {
       "attack": 3,
@@ -773,7 +783,7 @@
       "cargoCapacity": 5
     },
     "line": "front",
-    "signature": 4,
+    "signature": 8,
     "cost": {
       "metal": 60,
       "credits": 20,

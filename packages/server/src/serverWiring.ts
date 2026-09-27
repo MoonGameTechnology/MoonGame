@@ -24,6 +24,8 @@ import { detach } from './detach';
  * Pure assembly over injected deps — no env reads, no listening socket.
  */
 export interface MatchLoaderDeps {
+  /** Account cosmetics consume only committed terminal snapshots; also reconciles a restart. */
+  onTerminalState?: (matchId: string, state: GameState) => Promise<void>;
   stores: Pick<Stores, 'store' | 'receiptStore'>;
   data: GameData;
   /** Present ⇒ every loaded room is gated (validated action.v1 envelopes). */
@@ -119,7 +121,10 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     // hands a terminal `end` to the extras hook (the AvA settlement path).
     const observe = (event: RoomObservation): void => {
       if (event.kind === 'action') driver?.reschedule();
-      if (event.kind === 'end') extras?.onEnd?.(event.winner, event.rewards);
+      if (event.kind === 'end') {
+        extras?.onEnd?.(event.winner, event.rewards);
+        if (deps.onTerminalState) detach('profile progress', deps.onTerminalState(matchId, room.state));
+      }
       if (event.kind === 'events') extras?.onEvents?.(event.events);
     };
 
@@ -135,6 +140,9 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       ...(extras?.denyPlayerActions ? { denyPlayerActions: extras.denyPlayerActions } : {}),
       ...(deps.arsenalStore ? { arsenalStore: deps.arsenalStore } : {}),
     });
+
+    if (snap.state.match.status === 'ended' && deps.onTerminalState)
+      await deps.onTerminalState(matchId, snap.state);
 
     // Re-entrancy guard for the async standing-order pass below: a slow durable submit
     // (awaiting the actor mailbox) must not overlap a later heartbeat's own pass —

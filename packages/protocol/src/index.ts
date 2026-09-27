@@ -15,6 +15,7 @@
  * the wire into those shapes (`parseClientMessage`, `serializeServerMessage`). The client
  * imports TYPES only, so the runtime half tree-shakes away and its bundle is unchanged.
  */
+export * from './playerProfile';
 import type {
   Action,
   DomainEvent,

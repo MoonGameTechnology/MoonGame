@@ -5,6 +5,8 @@ import {
   arsenalSyncModule,
   autoRallyModule,
   salvageModule,
+  loadoutEffectsModule,
+  minefieldModule,
   captureOnArrivalModule,
 
   combatModule,
@@ -35,6 +37,7 @@ import {
   fleetBroodModule,
   pveModule,
   traderModule,
+  rocketMinesModule,
   swarmMemoryModule,
   swarmNetModule,
   swarmAdaptModule,
@@ -192,6 +195,14 @@ export const DEV_MODULES: GameModule[] = [
   // В КОНЕЦ намеренно: модуль не вешает ни хуков, ни подписок на чужие события, поэтому
   // относительный порядок всех остальных остаётся нетронутым (инвариант #6).
   traderModule, // торговец экспедиции («живой курс»): только свои действия, тоже в конец
+  // Фаза 3 модулей кораблей (`ship-modules-roadmap.md`). В КОНЕЦ, чтобы не сдвинуть чужой
+  // порядок. `loadoutEffects` вешает только хуки со сложением (`salvage.share`,
+  // `combat.retreatToll`), и место в конвейере на число не влияет. `minefield` слушает
+  // `fleet.arrived`/`fleet.transit` ПОСЛЕ combat: бой на узле завязывается как прежде, а
+  // мины бьют входящий флот следом.
+  loadoutEffectsModule,
+  minefieldModule,
+  rocketMinesModule, // isolated road-weapon timers; preserve all existing module order
 ];
 
 /** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
@@ -206,7 +217,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '45'; // Торговец экспедиции: в состав вошёл
+export const MODULE_MANIFEST_VERSION = '47'; // Road installations and legendary rocket mines.
+// Previous version 46: // Фаза 3 модулей кораблей: в конец вошли
+// `loadoutEffects` 1.0.0 и `minefield` 1.0.0, `combat` 2.5.0 берёт цену отступления из
+// хука, `construction` чинит флот тендером, у состояния появилась запись `minefields`.
+// Партия на 45 не знает `fleet.layMines` и этих правил.
+// export const MODULE_MANIFEST_VERSION = '45'; // Торговец экспедиции: в состав вошёл
 // `trader` 1.0.0 (в конец списка, порядок остальных тот же), у состояния появилась запись
 // `trader` — курсы товаров. Партия на 44 не знает этих действий и этой записи.
 // export const MODULE_MANIFEST_VERSION = '44'; // Rescue heroes on fleet arrival; persisted recruitment facts.

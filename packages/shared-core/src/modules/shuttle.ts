@@ -1,3 +1,4 @@
+import { fleetPointDefense, planetPointDefense, fleetPDRange, PD_COOLDOWN_MINUTES } from '../util/pointDefense';
 /**
  * ЧЕЛНОКИ (shuttles-roadmap, заказ владельца 2026-09-08) — второй класс космических
  * юнитов, устроенный не как корабли.
@@ -80,26 +81,6 @@ import { MS_PER_HOUR } from '../util/time';
 import { dockHullRate, fleetAtOwnDock, fleetHangarRepairRate } from '../util/repair';
 import { battleLocations } from '../state/battle';
 
-/** Total point-defense (anti-shuttle/anti-missile) firepower of a fleet —
- *  Σ the `pointDefense` stat of its live units (via effectiveStats, so modules
- *  are included). 0 = no point defense. */
-function fleetPointDefense(fleet: Fleet, data: GameData): number {
-  return sumUnitStat(fleet.units, data, 'pointDefense');
-}
-
-/** Σ the `pointDefense` of a planet's standing buildings — ЗОНАЛЬНОЕ ПВО мира
- *  (ROS-2.2). Считается ровно как ПКО в `orbital.ts` (`aaOrbitalAt`): по уровню
- *  постройки, без гарнизона. Гарнизон сюда не входит намеренно — по заказу владельца
- *  зональное ПВО это ЗДАНИЕ и модуль корабля, а не свойство наземных войск. */
-function planetPointDefense(planet: Planet, data: GameData): number {
-  let total = 0;
-  for (const b of planet.buildings) {
-    const def = data.buildings[b.type];
-    if (def) total += buildingLevel(def, b.level).pointDefense;
-  }
-  return total;
-}
-
 /** Доля огня цели-ФЛОТА, которой она огрызается на удар челноков (ROS-2.2, §0.2).
  *  Символическая по замыслу: без зенитки удар почти безнаказан, и платит игрок
  *  именно за зенитку, а не за то, что у него вообще есть корабли. */
@@ -125,11 +106,6 @@ function returnFireAgainstFleet(target: Fleet, data: GameData): number {
   );
 }
 
-/** Default PD engagement range (map units) when the unit's `pointDefenseRange` is 0. */
-const PD_RANGE = 120;
-/** PD cooldown after a volley (game-minutes). Reducible by module upgrades + tech. */
-const PD_COOLDOWN_MINUTES = 20;
-
 /** Как часто идущая ПОГОНЯ пересчитывает координаты цели и правит курс (SHU-4.4), в
  *  минутах игрового времени. Шесть — компромисс, а не круглое число: реже, и быстрая
  *  цель успевала бы проскочить радиус захвата между пересчётами; чаще, и ночь офлайна
@@ -144,17 +120,6 @@ const CHASE_STEP_MINUTES = 6;
  *  отрезок нарезается на шаги по `CHASE_STEP_MINUTES` — точность модели остаётся
  *  минутной, а цена остаётся часовой, как у остальных почасовых механик. */
 const CHASE_WAKE_HOURS = 1;
-
-/** PD range for a fleet — from its units' `pointDefenseRange` stat, or the default. */
-function fleetPDRange(fleet: Fleet, data: GameData): number {
-  let r = 0;
-  for (const s of fleet.units) {
-    if (s.count <= 0) continue;
-    const def = data.units[s.unit];
-    if (def) r = Math.max(r, (def.stats as Record<string, number>).pointDefenseRange ?? 0);
-  }
-  return r > 0 ? r : PD_RANGE;
-}
 
 /** Позиция базы вылета — мира или носителя. Носитель ДВИЖЕТСЯ, поэтому позиция
  *  всегда берётся текущая, а не запомненная при вылете: запомненная разъехалась бы

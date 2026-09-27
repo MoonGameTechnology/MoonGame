@@ -12,6 +12,8 @@ import {
   economyModule,
   effectsModule,
   salvageModule,
+  loadoutEffectsModule,
+  minefieldModule,
   seatClaimModule,
   visibilityModule,
   movementModule,
@@ -47,6 +49,7 @@ import {
   autoRallyModule,
   marketModule,
   traderModule,
+  rocketMinesModule,
   fleetBroodModule,
   pveModule,
   swarmMemoryModule,
@@ -160,6 +163,11 @@ export const MODULES: GameModule[] = [
   // режиме с разделом `trader`. В КОНЕЦ по той же причине, что два соседа выше: у него нет
   // ни хуков, ни подписок — только свои действия, чужой порядок он не трогает.
   traderModule,
+  // Фаза 3 модулей кораблей: те же два модуля и то же место, что в серверном `DEV_MODULES`
+  // (в конец, после торговца). Правило и причина — там.
+  loadoutEffectsModule,
+  minefieldModule,
+  rocketMinesModule, // isolated road-weapon timers; preserve all existing module order
 ];
 
 export const kernel = createKernel(MODULES);

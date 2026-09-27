@@ -21,7 +21,13 @@ import { buildProgress } from '../util/construction';
 import { isAllied } from '../util/combat';
 import { addUnits } from '../util/stacks';
 import { basedLander, basedMachine, shuttleBayAt } from '../state/shuttle';
-import { effectiveStats, loadoutCost, validateLoadout, withBonusSlots } from '../util/loadout';
+import {
+  bestFleetStat,
+  effectiveStats,
+  loadoutCost,
+  validateLoadout,
+  withBonusSlots,
+} from '../util/loadout';
 import { feedsOnBiomass, isInfected, worksFor } from '../util/infestation';
 
 /** Share of the ground assault's round damage that also wears down the planet's
@@ -1539,6 +1545,11 @@ export const constructionModule: GameModule = {
         const shieldFrom = Math.max(from, (fleet.lastDamagedAt ?? -Infinity) + SHIELD_REGEN_DELAY);
         const shieldHours = shieldFrom < to ? ((to - shieldFrom) / MS_PER_HOUR) * scale : 0;
 
+        // SM-3.3 «Ремонтный тендер»: лучший `fleetHullRepair` во флоте чинит корпуса ВСЕХ
+        // его стеков — там же и так же, как собственный `repair_bay` чинит свой стек.
+        // Складывается с доком и с `hullRepair`: это разные источники. Нет тендера — 0.
+        const tender = bestFleetStat(fleet.units, 'fleetHullRepair', data);
+
         for (const stack of fleet.units) {
           const unitDef = data.units[stack.unit];
           if (!unitDef) continue;
@@ -1548,7 +1559,7 @@ export const constructionModule: GameModule = {
           if (stack.hp !== undefined) {
             const eff = effectiveStats(unitDef, stack, data);
             const fullHp = stack.count * (eff.hp ?? 0);
-            const rate = hullRate + (eff.hullRepair ?? 0);
+            const rate = hullRate + (eff.hullRepair ?? 0) + tender;
             if (fullHp <= 0 || stack.hp >= fullHp) stack.hp = undefined;
             else if (rate > 0) {
               const cur = Math.min(fullHp, stack.hp + rate * hours * fullHp);

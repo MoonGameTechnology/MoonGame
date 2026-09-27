@@ -35,6 +35,8 @@ export {
   type RoadPoint,
   type RoadTrail,
   type Battle,
+  type Minefield,
+  type MinefieldState,
   type BattleSide,
   type CombatantRef,
   type ScheduledEvent,
@@ -179,6 +181,7 @@ export {
   visibleView,
   identifiedNodes,
   sensorCoverage,
+  radarSignatures,
   isVisibleTo,
   fleetRadarRange,
   stackRadarRange,
@@ -190,6 +193,7 @@ export {
   worldRadarReach,
   fleetRadarReach,
 } from './state/visibility';
+export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
 export type {
   Coverage,
   SightCircle,
@@ -507,6 +511,7 @@ export {
   withBonusSlots,
   loadoutCost,
   loadoutBays,
+  bestFleetStat,
   type LoadoutBay,
   type ShipBayType,
   type SlotCounts,
@@ -644,6 +649,19 @@ export {
 } from './modules/steward';
 export { effectsModule, type EffectImpl, type EffectOccurrence } from './modules/effects';
 export { salvageModule, SALVAGE_SHARE } from './modules/salvage';
+export {
+  loadoutEffectsModule,
+  RETREAT_PULL_STAT,
+  SALVAGE_BONUS_STAT,
+} from './modules/loadoutEffects';
+export {
+  minefieldModule,
+  MINE_CHARGE_STAT,
+  MINE_HIT_STAT,
+  MINEFIELD_MAX_CHARGE,
+  MINE_HIT_MAX,
+  MINE_COOLDOWN_HOURS,
+} from './modules/minefield';
 export { autoRetreatDue, type AutoRetreatDue } from './state/autoRetreat';
 export { RETREAT_THRESHOLDS, type RetreatThreshold } from './modules/standingOrders';
 export { hullFraction, maxHull } from './util/repair';
@@ -677,3 +695,7 @@ export {
   RALLY_TRAIT,
   type MusterPlan,
 } from './util/pveStaging';
+
+export { rocketMinesModule } from './modules/rocketMines';
+export { rocketMinelayer, missilePositionAt, mineVisibleTo } from './state/ordnance';
+export type { RocketMine, MineMissile, MineInstallation, RocketMineMode, OrdnanceState } from './state/ordnance';

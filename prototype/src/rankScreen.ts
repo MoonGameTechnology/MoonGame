@@ -53,7 +53,9 @@ function rowHtml(r: BoardRow, kind: BoardKind, pinned = false): string {
   return (
     `<div class="rk-row${r.me ? ' me' : ''}${pinned ? ' pin' : ''}">` +
     `<i class="rk-n${r.rank <= 3 ? ' top' : ''}">${rankMark(r.rank)}</i>` +
-    `<span class="rk-txt"><b>${esc(r.name)}</b>${sub ? `<span>${sub}</span>` : ''}</span>` +
+    (kind === 'players'
+      ? `<button type="button" class="rk-txt pf-player-link" data-profile="${esc(r.name)}"><b>${esc(r.name)}</b></button>`
+      : `<span class="rk-txt"><b>${esc(r.name)}</b>${sub ? `<span>${sub}</span>` : ''}</span>`) +
     `<span class="rk-sc">${r.score}<i>${t(kind === 'corps' ? 'rank.unit.influence' : 'rank.unit.xp')}</i></span>` +
     `</div>`
   );
@@ -127,6 +129,7 @@ export function boardHtml(
 
 /** Что вкладке нужно от хаба. */
 export interface RankHost {
+  openPlayer?(login: string): void;
   /** Панель вкладки (`#hp-rank`) — она же делегат кликов. */
   root(): HTMLElement;
   /** База + токен сессии, или `null` — гость (место знает только аккаунт). */
@@ -182,6 +185,8 @@ export function initRank(host: RankHost): { refresh: () => Promise<void> } {
   }
 
   host.root().addEventListener('click', (ev) => {
+    const player = (ev.target as HTMLElement).closest('[data-profile]') as HTMLElement | null;
+    if (player?.dataset.profile) { host.openPlayer?.(player.dataset.profile); return; }
     const tab = (ev.target as HTMLElement).closest('[data-rktab]') as HTMLElement | null;
     const next = tab?.dataset.rktab;
     if (next !== 'players' && next !== 'corps') return;

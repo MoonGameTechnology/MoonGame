@@ -123,6 +123,34 @@ describe('MatchRoom — player-action deny-list (AVA-8)', () => {
 });
 
 describe('MatchRoom', () => {
+  it('sends one anonymous group contact and clears it in a delta after dispersion', () => {
+    const data = parseGameData({ ...testData(),
+      units: { scout: { faction: 'p2', signature: 1, stats: { attack: 1, defense: 1, speed: 1, hp: 10 } } },
+      buildings: { radar: { name: 'Radar', radarRange: 300, radarLevel: 2 } },
+    });
+    const initialState = testState();
+    for (const [id, x] of [['home', 0], ['near', 230], ['far', 290]] as const) {
+      initialState.planets[id] = { id, owner: id === 'home' ? 'p1' : null,
+        position: { x, y: 0 }, links: [], buildings: [], garrison: [], resources: {}, traits: [] };
+    }
+    initialState.planets.home!.buildings = [{ type: 'radar', level: 1, hp: 10 }];
+    initialState.fleets.secretA = { id: 'secretA', owner: 'p2', location: 'near', movement: null,
+      units: [{ unit: 'scout', count: 3 }], traits: [] };
+    initialState.fleets.secretB = { id: 'secretB', owner: 'p2', location: null,
+      movement: { from: 'near', to: 'far', departedAt: 0, arrivesAt: 60 },
+      units: [{ unit: 'scout', count: 2 }], traits: [] };
+    let now = 0;
+    const r = new MatchRoom({ id: 'signals', initialState, kernel: createKernel([]), data, now: () => now });
+    const peer = new MemoryPeer();
+    r.addPeer('p1', peer);
+    expect(peer.messages[0]).toMatchObject({ type: 'welcome', signatures: [{ location: 'near', size: 'M' }] });
+    now = 60;
+    r.tick();
+    expect(peer.messages.at(-1)).toMatchObject({ type: 'delta', signatures: [] });
+    expect(JSON.stringify(peer.messages)).not.toContain('secretA');
+    expect(JSON.stringify(peer.messages)).not.toContain('secretB');
+  });
+
   it('welcomes each player with the authoritative snapshot', () => {
     const r = room();
     const p1 = new MemoryPeer();

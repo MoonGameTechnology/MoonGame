@@ -434,5 +434,157 @@
         "pirate_cruiser"
       ]
     }
+  },
+  "tractor_beam": {
+    "name": "Tractor Beam",
+    "description": "module.tractor-beam.desc",
+    "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "retreatPull": 0.05
+      },
+      "legendary": {
+        "attack": 3
+      }
+    },
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "retreatPull": 0.15
+      }
+    },
+    "cost": {
+      "metal": 70,
+      "microelectronics": 4
+    },
+    "allowed": {
+      "domain": "space"
+    }
+  },
+  "salvage_rig": {
+    "name": "Debris Collector",
+    "description": "module.salvage-rig.desc",
+    "rarity": "simple",
+    "rarityBonus": {
+      "unique": {
+        "cargoCapacity": 2
+      },
+      "mythic": {
+        "hp": 8
+      },
+      "legendary": {
+        "salvageBonus": 0.03
+      }
+    },
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {
+        "salvageBonus": 0.05
+      }
+    },
+    "cost": {
+      "metal": 50
+    },
+    "allowed": {
+      "domain": "space"
+    }
+  },
+  "repair_tender": {
+    "name": "Repair Tender",
+    "description": "module.repair-tender.desc",
+    "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "hp": 10
+      },
+      "legendary": {
+        "fleetHullRepair": 0.01
+      }
+    },
+    "slot": "defense",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {
+        "fleetHullRepair": 0.03
+      }
+    },
+    "cost": {
+      "metal": 80,
+      "credits": 20
+    },
+    "allowed": {
+      "domain": "space"
+    }
+  },
+  "mine_layer": {
+    "name": "Mine Layer",
+    "description": "module.mine-layer.desc",
+    "rarity": "unique",
+    "rarityBonus": {
+      "mythic": {
+        "mineCharge": 1
+      },
+      "legendary": {
+        "mineHit": 0.05
+      }
+    },
+    "slot": "weapon",
+    "tag": "vertical",
+    "effects": {
+      "stats": {
+        "mineCharge": 3,
+        "mineHit": 0.15
+      }
+    },
+    "cost": {
+      "metal": 70,
+      "microelectronics": 4
+    },
+    "allowed": {
+      "domain": "space"
+    }
+  },
+  "rocket_mine_layer": {
+    "name": "Rocket Mine",
+    "description": "module.rocket-mine.desc",
+    "rarity": "legendary",
+    "slot": "utility",
+    "tag": "horizontal",
+    "effects": {
+      "stats": {},
+      "enables": [
+        "rocket_mine"
+      ]
+    },
+    "allowed": {
+      "domain": "space"
+    },
+    "cost": {
+      "metal": 120,
+      "microelectronics": 40
+    },
+    "rocketMine": {
+      "armHours": 0.25,
+      "cooldownHours": 1,
+      "scanHours": 0.016666666666666666,
+      "maxActive": 6,
+      "radarRange": 120,
+      "radarLevel": 3,
+      "sightRange": 24,
+      "detectionRange": 24,
+      "speed": 240,
+      "minFlightHours": 0.016666666666666666,
+      "hp": 12,
+      "damage": 80,
+      "blastRadius": 10,
+      "mineSignature": 0.1,
+      "missileSignature": 13,
+      "cost": {
+        "metal": 40,
+        "microelectronics": 20
+      }
+    }
   }
 }

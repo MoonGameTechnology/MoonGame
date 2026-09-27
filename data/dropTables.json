@@ -14,7 +14,12 @@
     { "kind": "module", "defId": "targeting_array", "weight": 3 },
     { "kind": "module", "defId": "shield_booster", "weight": 3 },
     { "kind": "module", "defId": "ablative_plating", "weight": 3 },
-    { "kind": "module", "defId": "siege_platform", "weight": 2 }
+    { "kind": "module", "defId": "siege_platform", "weight": 2 },
+    { "kind": "module", "defId": "tractor_beam", "weight": 2 },
+    { "kind": "module", "defId": "salvage_rig", "weight": 3 },
+    { "kind": "module", "defId": "repair_tender", "weight": 2 },
+    { "kind": "module", "defId": "mine_layer", "weight": 2 },
+    { "kind": "module", "defId": "rocket_mine_layer", "weight": 1 }
   ],
   "salvage": {
     "default": 1,

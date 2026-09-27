@@ -21,6 +21,7 @@ export const MODULE_ICON: Record<string, string> = {
   shield_booster: '🛡',
   ablative_plating: '🧱',
   point_defense_array: '✴',
+  rocket_mine_layer: '✺',
   void_shield_i: '🔰',
   void_shield_ii: '🔰',
   void_shield_iii: '🔰',
@@ -30,6 +31,10 @@ export const MODULE_ICON: Record<string, string> = {
   cargo_bay: '📦',
   repair_bay: '🔧',
   siege_platform: '💥',
+  tractor_beam: '🧲',
+  salvage_rig: '♻',
+  repair_tender: '🛠',
+  mine_layer: '💣',
   swarm_brood_chamber: '🧬',
 };
 

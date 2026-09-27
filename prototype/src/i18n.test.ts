@@ -189,6 +189,9 @@ function shippedNames(): Array<[string, string]> {
 const DATA_KEY_GAPS = new Set<string>([]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
+  { prefix: 'profile.portrait.', built_by: 'profileStudio.ts: static portrait index 1..40; completeness checked by profileStudio.test.ts' },
+  { prefix: 'profile.medal.', built_by: 'profileStudio.ts: PROFILE_MEDALS ids; completeness checked by profileStudio.test.ts' },
+  { prefix: 'profile.metric.', built_by: 'profileStudio.ts: PROFILE_MEDALS metrics; completeness checked by profileStudio.test.ts' },
   { prefix: 'err.', built_by: 'errText() — из кода отказа ядра: E_NO_CAPACITY → err.no-capacity' },
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
   { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },

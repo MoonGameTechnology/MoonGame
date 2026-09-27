@@ -197,6 +197,9 @@ export const UnitDefSchema = z.object({
   hullClass: z.enum(['light', 'medium', 'heavy']).optional(),
   /** Radar reach (Euclidean distance, map units) the unit projects as a radar-ship (0 = none). */
   radarRange: z.number().nonnegative().default(0),
+  /** Sensitivity tier: 1 = high signatures, 2 = medium+, 3 = all positive signals.
+   * Legacy catalogs omit it and retain their former all-signature detection. */
+  radarLevel: z.number().int().min(1).max(3).default(3),
   /** Радиус СВЯЗИ Роя (map units): флот с таким юнитом — узел сети ретрансляторов
    *  (`docs/swarm-behavior.md`). Два узла связаны, когда их круги пересекаются. Связь —
    *  не радар: в радиусе ничего не разведывается, по ней передаётся опыт боёв. 0 — не узел. */
@@ -282,6 +285,8 @@ export const BuildingLevelSchema = z.object({
   /** Radar reach (Euclidean distance, map units) at this level — lets a radar array widen its
    *  detection radius as it is upgraded. */
   radarRange: z.number().nonnegative().default(0),
+  /** Sensor sensitivity at this building level, independent of its range. */
+  radarLevel: z.number().int().min(1).max(3).default(3),
   /** Радиус связи Роя на этом уровне (см. `UnitDef.relayRange`): здание — узел сети. */
   relayRange: z.number().nonnegative().default(0),
   /** Fraction of a garrison stack's max-HP pool restored per game hour (0.1 = 10%/h).
@@ -414,6 +419,8 @@ export const BuildingDefSchema = z.object({
   /** Radar reach (Euclidean distance, map units) the building projects from the world it sits on
    *  (0 = none). Drives signature detection in `visibleState`. */
   radarRange: z.number().nonnegative().default(0),
+  /** Sensor sensitivity at level 1; upgrades carry their own tier. */
+  radarLevel: z.number().int().min(1).max(3).default(3),
   /** Радиус связи Роя (map units): здание — узел сети ретрансляторов, как центр данных
    *  (`docs/swarm-behavior.md`). 0 — не узел. */
   relayRange: z.number().nonnegative().default(0),
@@ -786,6 +793,29 @@ export const SIGNAL_COUNTERS: Record<string, readonly string[]> = {
   strike: ['pointDefense', 'pointDefenseRange'],
 };
 
+/** One-shot road weapon. All durations are game hours; distances are map units. */
+export const RocketMineSchema = z.object({
+  armHours: z.number().positive(),
+  cooldownHours: z.number().positive(),
+  scanHours: z.number().positive(),
+  maxActive: z.number().int().min(1).max(32),
+  radarRange: z.number().positive(),
+  radarLevel: z.number().int().min(1).max(3),
+  sightRange: z.number().positive(),
+  detectionRange: z.number().positive(),
+  speed: z.number().positive(),
+  minFlightHours: z.number().positive(),
+  hp: z.number().positive(),
+  damage: z.number().positive(),
+  blastRadius: z.number().positive(),
+  mineSignature: z.number().positive().max(1),
+  missileSignature: z.number().positive(),
+  cost: NonnegativeCostSchema,
+}).refine((m) => m.sightRange <= m.radarRange, {
+  message: 'mine sight must fit within its radar',
+});
+export type RocketMineDef = z.infer<typeof RocketMineSchema>;
+
 export const ModuleDefSchema = z
   .object({
     name: z.string(),
@@ -798,6 +828,7 @@ export const ModuleDefSchema = z
     allowed: ModuleAllowedSchema.optional(),
     /** PVR-6.4: ступень редкости; нет поля — «простой». */
     rarity: RaritySchema.optional(),
+    rocketMine: RocketMineSchema.optional(),
     /**
      * SZE-5.1: НОВЫЙ параметр, который модуль получает на каждой ступени редкости выше
      * своей базовой (решение владельца 2026-09-24: «редкость даёт дополнительный
@@ -1581,8 +1612,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, radarLevel, relayRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

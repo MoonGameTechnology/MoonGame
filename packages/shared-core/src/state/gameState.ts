@@ -693,6 +693,27 @@ export interface BattleSide {
   role: 'attacker' | 'defender';
 }
 
+/** Одно минное поле одного владельца на узле (SM-3.4). */
+export interface Minefield {
+  /** Сколько раз поле ещё сработает. На нуле поле снимается. */
+  charge: number;
+  /** Доля ТЕКУЩЕГО корпуса каждого стека, которую снимает одно срабатывание. */
+  hit: number;
+  /** Road fields have a continuous position, separate from the public node id. */
+  position?: RoadPoint;
+  edge?: FleetEdge;
+}
+
+/** Минные поля (SM-3.4). */
+export interface MinefieldState {
+  /** Узел → владелец → поле. */
+  fields: Record<PlanetId, Record<PlayerId, Minefield>>;
+  /** Флот → мировое время, с которого он снова может ставить мины. */
+  readyAt: Record<FleetId, number>;
+  ownerReadyAt?: Record<PlayerId, number>;
+  installations?: Record<FleetId, { key: string; owner: PlayerId; readyAt: number; field: Minefield }>;
+}
+
 /**
  * An ongoing battle — a stateful entity that resolves over real hours, one
  * round per `combat.tick` (GDD §7). Capturing a planet is two sequential
@@ -762,6 +783,8 @@ export interface GameVersion {
 }
 
 export interface GameState {
+  /** Stationary rocket mines and their one-shot missiles; filtered before networking. */
+  ordnance?: import('./ordnance').OrdnanceState;
   /** Authored map identity, persisted and public; absent on legacy saves. */
   mapId?: string;
   /** Game mode the match was created with (`data.modes`), pinned at birth like the map
@@ -811,6 +834,10 @@ export interface GameState {
    *  drain within one; `visibleState` strips it, since it names losses on nodes a viewer
    *  may not see. Absent = nothing is being fought over. */
   salvage?: Record<PlanetId, { pool: Record<string, number>; winners?: PlayerId[] }>;
+  /** SM-3.4, owned by `minefieldModule`: минные поля по узлу и владельцу и перезарядка
+   *  флотов-заградителей. Мины, видные врагу, мины не работают, поэтому `visibleState`
+   *  оставляет зрителю только его поля и его флоты. Отсутствует = мин нигде нет. */
+  minefields?: MinefieldState;
   /** Челночные удары в полёте (SHU-1.2). Пусто/отсутствует = никто никуда не летит. */
   strikes?: ShuttleStrike[];
   /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */

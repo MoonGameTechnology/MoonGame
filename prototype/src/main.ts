@@ -1,3 +1,9 @@
+import { visibleMinefields, fieldPosition } from '../../packages/shared-core/src/state/minefields';
+import { drawMineShape } from '../../packages/client/src/mineShape';
+import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
+import { rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
+import { drawOrdnance } from '../../packages/client/src/ordnanceView';
+import { rocketMinesUi } from './rocketMinesUi';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
 import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
@@ -86,6 +92,7 @@ import {
   forceMarchFleet,
   FORCED_MARCH_MULT,
   instantRepairFleet,
+  layMinesFleet,
   premiumRepairFleet,
   buySupply,
   abandonRun,
@@ -111,6 +118,7 @@ import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName, worldName } from './planetName';
 import { provinceName } from '../../decisions/provinceName';
+import { minelayerOffer } from '../../decisions/minefields';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -173,6 +181,8 @@ import {
   scanNodeThreats,
   identifiedNodes,
   sensorCoverage,
+  radarSignatures,
+  type SignatureContact,
   sightCircles,
   sightRulesOf,
   worldRadarReach,
@@ -627,6 +637,8 @@ import { TerrainRasterCache } from './terrainRasterCache';
 import { TerrainGeometryCache } from './terrainGeometryCache';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
+import { PORTRAITS } from './profileArt';
+import { parseAppearance } from '../../packages/protocol/src/playerProfile';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
 import { abilityRings } from './abilityRings';
 import { initCorp } from './corpScreen';
@@ -881,7 +893,7 @@ import {
 import { ambushOf } from '../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from '../../packages/client/src/forkMark';
 import { fleetOrigin } from './fleetOrigin';
-import { netContacts, soloContacts } from './radarContacts';
+import { netContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
 import { AA_SHOTS_MAX, aaImpact, capShots } from './fireEffects';
@@ -895,11 +907,7 @@ import {
 } from './stewardLog';
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
-import {
-  fleetSignature as coreFleetSignature,
-  planetRadar as corePlanetRadar,
-  sigClass,
-} from './sensorScale';
+import { planetRadar as corePlanetRadar } from './sensorScale';
 import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
@@ -1412,6 +1420,9 @@ const aaShots: Array<{
 // silent capture (previously only a toast) reads on the map at a glance. Fog-gated at
 // push time (a hidden flip never flashes). Keyed by node so a re-capture restarts it.
 const captureFlashes = new Map<string, { owner: string; at: number }>();
+// SM-3.5: вспышка срабатывания мин — узел → момент (performance.now). Ставится, только
+// если мины задели меня или сработало моё поле.
+const mineFlashes = new Map<string, { at: number; position?: { x: number; y: number } }>();
 // Casualties per contested location (owner → unit → count), accumulated from
 // unit.died while a battle runs and paid out as a result note on battle.resolved.
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
@@ -1824,7 +1835,8 @@ function playerEmblem(): string {
 function applyEmblem(): void {
   const g = playerEmblem();
   const hubAv = document.getElementById('hubav');
-  if (hubAv) hubAv.textContent = g;
+  if (hubAv) { hubAv.textContent = g; hubAv.classList.remove('portrait'); }
+  if (!__SECTOR_ZERO_ONLY__) applyProfilePortrait();
   crestMark.textContent = g;
 }
 function setPlayerEmblem(g: string): void {
@@ -1913,11 +1925,11 @@ const SWEEP_PERIOD = TAU * SWEEP_DIV; // ms for a full rotation (~10s) — the r
 /** Radar contacts as PAINTED BY THE SWEEP: a signature is refreshed only as the arm
  *  crosses it, then lingers at that last-swept spot (a dim ghost) until the next
  *  pass repaints it — so radar gives periodic snapshots, never a live feed. */
-const radarMemory = new Map<string, { node: string; size: 'S' | 'M' | 'L'; at: number }>();
+const radarMemory = new Map<string, { node: string; size: 'S' | 'M' | 'L'; at: number; position?: { x: number; y: number } }>();
 /** NET radar picture (BF-18): the server's per-frame contact list. In a network
  *  match the fogged state carries NO radar-only enemy fleets, so the sweep paints
  *  these server-sent contacts instead of scanning `s.fleets`. */
-let netSignatures: Array<{ location: string; size: 'S' | 'M' | 'L' }> = [];
+let netSignatures: SignatureContact[] = [];
 
 /** How brightly a contact at screen-point `c` is lit by the sweep: 1 the instant
  *  the arm crosses it, fading linearly back to 0 just before the next pass (so the
@@ -2037,33 +2049,21 @@ function updateThreatAlerts(): void {
 function updateRadarContacts(now: number): void {
   if (!sweepOn) return;
   if (vision) {
-    // What the sweep may paint. Solo scans the full state for radar-only enemy
-    // fleets; in NET those fleets are physically ABSENT from the fogged state —
-    // the server ships them as coarse contacts (snapshot.signatures, BF-18).
-    // Кто может стать отметкой — `radarContacts.ts` (REFM-96): в соло тот же отбор
-    // делается вручную, иначе одиночная игра покажет больше сетевой.
-    const contacts = NET
-      ? netContacts(netSignatures, known)
-      : soloContacts(
-          Object.values(s.fleets),
-          ME,
-          (f) => fleetNode(f),
-          known,
-          radarHas,
-          (f) => sigClass(fleetSignature(f)),
-        );
+    // Both modes consume the same core projection: sensitivity and grouping are
+    // decided before a sweep paints the anonymous contact.
+    const contacts = netContacts(vision.signatures, known);
     let hit = false; // засекла ли рука хоть кого-то в ЭТОМ кадре
     for (const c of contacts) {
       const node = s.planets[c.node];
       if (!node) continue;
-      const pos = world(node.position);
+      const pos = world(c.position ?? node.position);
       // painted only by an arm whose radar disc actually covers the blip
       // Красит только рука, чей радарный диск реально накрывает отметку (`alerts.ts`).
       if (paintedThisFrame(sweepArms, pos, sweepPrevAng, sweepAng)) {
         hit = true;
         if (!radarMemory.has(c.key))
           note(t('threat.contact', { size: c.size, at: placeName(c.node) }), c.node);
-        radarMemory.set(c.key, { node: c.node, size: c.size, at: now });
+        radarMemory.set(c.key, { node: c.node, size: c.size, at: now, ...(c.position ? { position: { ...c.position } } : {}) });
       }
     }
     // Пинг гидролокатора в момент засечки. ОДИН на кадр, а не на контакт: рука
@@ -2092,7 +2092,7 @@ function drawRadarContacts(now: number): void {
       radarMemory.delete(id);
       continue;
     }
-    const pos = world(node.position);
+    const pos = world(m.position ?? node.position);
     if (!visible(pos, 120)) continue;
     drawSignatureAt(pos, m.size, contactAlpha(age), now);
   }
@@ -2716,14 +2716,6 @@ function laneAim(
 // full identification within the inner half (mirrors shared-core visibility).
 const IDENTIFY_REACH_FRACTION = 0.5;
 
-/** Total radar signature of a fleet = Σ count × per-unit signature (from content). */
-// ШКАЛА датчиков — `sensorScale.ts` (REFM-170): шум это сумма `count × signature`, а не
-// число кораблей; неизвестный клиенту тип шумит за 1, а неизвестное здание слышит на 0 —
-// обе подстановки повторяют умолчания схемы и идут в осторожную сторону (незнание не
-// прячет твой флот и не выдаёт дальности); ступеней три и пороги абсолютные.
-function fleetSignature(f: Fleet): number {
-  return coreFleetSignature(f.units, (u) => data.units[u]);
-}
 /** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
  *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarReach` — не своя копия правила: когда копия
  *  тут читала только `data.units[u].radarRange`, установленный радар-модуль на карте
@@ -2743,6 +2735,7 @@ function planetRadar(p: Planet): number {
 interface Vision {
   identify: Set<string>;
   radar: Set<string>;
+  signatures: SignatureContact[];
 }
 
 // --- espionage (SPY-1 in the prototype) ---------------------------------------
@@ -2800,7 +2793,7 @@ function computeVision(): Vision {
   const grants = myIntel();
   grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
   intelFleetOwners = targetsOf(grants, 'fleets');
-  return { identify, radar };
+  return { identify, radar, signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify) };
 }
 
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
@@ -2845,10 +2838,6 @@ function known(id: string | null | undefined): boolean {
  *  именно его, а не рукописный `if` внутри свитча. */
 function admits(type: string, p: Record<string, unknown>): boolean {
   return recapAdmits(type, p.owner as string | undefined, ME, known(p.planetId as string));
-}
-/** True if node `id` is inside radar reach (signature-level detection). */
-function radarHas(id: string | null | undefined): boolean {
-  return !!vision && id != null && vision.radar.has(id);
 }
 /** Fog gate: «этот мир игроку вообще видно в деталях?» — опознан или свой.
  *  Правило живёт ОДНОЙ функцией в `fogView.ts` (REFM-62): оно нужно и панели, и
@@ -3756,6 +3745,15 @@ function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
 function handleEvents(events: DomainEvent[]) {
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
+    if (e.type.startsWith('rocketMine.') && (p.owner === ME || p.playerId === ME)) {
+      const keys: Record<string, string> = {
+        'rocketMine.ready': 'mine.ready', 'rocketMine.cancelled': 'mine.cancelled',
+        'rocketMine.launched': 'mine.launched', 'rocketMine.intercepted': 'mine.intercepted',
+        'rocketMine.hit': 'mine.hit', 'rocketMine.disarmed': 'mine.disarmed',
+      };
+      const key = keys[e.type];
+      if (key) note(t(key, { damage: Math.round(Number(p.damage) || 0) }));
+    }
     switch (e.type) {
       case 'battle.started':
         // Видимость события — `eventVisibility.ts` (REFM-86): своё всегда, чужое только
@@ -4177,6 +4175,16 @@ function handleEvents(events: DomainEvent[]) {
         const bag = p.resources as Record<string, number> | undefined;
         if (!bag || Object.keys(bag).length === 0) break;
         note(t('log.salvage', { what: costText(bag) }), p.location as string | undefined);
+        break;
+      }
+      // SM-3.5: мины сработали. Жертва и хозяин поля видят сообщение и вспышку на узле;
+      // остальным поле неизвестно, и срабатывание тоже.
+      case 'mines.triggered': {
+        const at = p.at as string;
+        const victim = p.owner === ME;
+        if (!victim && !(p.by as string[] | undefined)?.includes(ME)) break;
+        note(t(victim ? 'log.mines.hit' : 'log.mines.triggered', { n: Number(p.lost) || 0 }), at);
+        mineFlashes.set(at, { at: performance.now(), position: p.position as { x: number; y: number } | undefined });
         break;
       }
       case 'unit.died': {
@@ -5457,6 +5465,8 @@ function render(now: number) {
 
   drawFleetRoutes();
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
+  drawOrdnance(cx, mineView(), ME, s.time, world, cam.scale);
+  mineControls.refresh();
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
 
   // battles — pulsing red contact ring at the actual clash point (an engaged
@@ -6312,6 +6322,7 @@ function render(now: number) {
   drawAssaultTargets();
   drawEngageTargets(lastReal);
   drawMissionTargets();
+  drawMinefields(now); // SM-3.5: свои минные поля «💣 ×заряд» и вспышка срабатывания
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
@@ -6786,6 +6797,18 @@ function fleetPanelHtml(f: Fleet): string {
       h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
   if (f.owner === ME) h += fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)));
+  // SM-3.5: заградитель ставит поле там, где стоит; правило и отказы — в ядре.
+  const mines = minelayerOffer(f, s, data, ME);
+  if (mines)
+    h += `<div class="row">💣 <button class="chip" data-act="laymines" data-arg="${f.id}"${mines.ready ? '' : ' disabled'} title="${t('side.fleet.mines.title')}">${
+      mines.ready
+        ? t('side.fleet.mines.lay')
+        : mines.reason === 'installing'
+          ? t('side.fleet.mines.installing', { in: countdownHMS(mines.readyInMs) })
+        : mines.reason === 'cooldown'
+          ? t('side.fleet.mines.cooldown', { in: countdownHMS(mines.readyInMs) })
+          : t('side.fleet.mines.busy')
+    }</button></div>`;
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
   // корпусам, лимп <30% учтён), с меткой форс-марша. The hero aura (+5%, noted
@@ -7507,6 +7530,7 @@ function seatCardHtml(id: string): string {
     (favBar ? `<div class="pc-stats">${favBar}</div>` : '') +
     `<div class="pc-sec">${t('card.diplomacy')}</div>` +
     seatDiploActionsHtml(id) +
+    (!isAiSeat(id) ? `<button class="pc-dossier">${t('card.dossier')}</button>` : '') +
     `<button class="pc-close">${t('card.close')}</button>`
   );
 }
@@ -7996,6 +8020,23 @@ function incomeOf(type: string, level: number): string {
 /** Карточка корабля (`shipCard.ts`) в окне справочника: отсеки стека с тем, что надето,
  *  и характеристики одного корабля. Стек адресуется местом во флоте — тем же, что у
  *  плитки; флот исчез или стек сдвинулся — карточки нет, а не чужой корабль. */
+let mineViewState: typeof s | undefined;
+let mineViewOwner = '';
+let mineViewCache: ReturnType<typeof visibleOrdnance>;
+function mineView(): ReturnType<typeof visibleOrdnance> {
+  if (mineViewState !== s || mineViewOwner !== ME) {
+    mineViewState = s; mineViewOwner = ME;
+    mineViewCache = visibleOrdnance(s, ME, data);
+  }
+  return mineViewCache;
+}
+const mineControls = rocketMinesUi({
+  state: () => s, viewer: () => ME, visible: mineView, data,
+  hourMs: () => 3_600_000 / (ctx(s.time, s).config?.timeScale ?? 1),
+  issue: playerOrder, verdict: (action) => canOrder(s, action),
+  portrait: (id) => catalogPortraitHtml('md', id, data),
+});
+
 function openShipCard(fleetId: string, index: number): void {
   const el = document.getElementById('codex');
   const f = s.fleets[fleetId];
@@ -8737,6 +8778,9 @@ function renderCmdBar() {
         )
       : '') +
     cmdBtn('target', '◎', t('cmd.target'), '', false, t('cmd.target.hint')) +
+    (lone && rocketMinelayer(lone, data)
+      ? cmdBtn('rocket-mine', '✺', t('cmd.rocket-mine'), '', false, t('cmd.rocket-mine.hint'))
+      : '') +
     (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
@@ -9122,6 +9166,8 @@ side.addEventListener('click', (ev) => {
     if (arg) battleWindow.open(arg);
   } else if (act === 'retreat') {
     armRetreat(selFleet!);
+  } else if (act === 'laymines') {
+    playerOrder(layMinesFleet(ME, arg || selFleet!));
   } else if (act === 'instantrepair') {
     // Платный мгновенный ремонт: цена и отказы — на сервере; панель перерисуется
     // по факту (полный бар = получилось), нотификаций-обещаний не даём.
@@ -9395,7 +9441,9 @@ cmdbar.addEventListener('click', (ev) => {
   retreatAim = null;
   heroSpawnAim = null;
   strikeAim = null;
-  if (cmd === 'engage') {
+  if (cmd === 'rocket-mine' && ids.length === 1) {
+    mineControls.openFleet(ids[0]!);
+  } else if (cmd === 'engage') {
     engageAim = !engageAim; // arm / disarm the attack order
     aiming = false;
     assaultAim = false;
@@ -9782,6 +9830,11 @@ function selectAt(mx: number, my: number) {
       return;
     }
   }
+  const mineHit = (mineView()?.mines ?? []).find((m) => {
+    const p = world(m.position);
+    return (p.x - mx) ** 2 + (p.y - my) ** 2 <= 14 ** 2;
+  });
+  if (mineHit) { mineControls.openMine(mineHit.id); return; }
   // Plain tap = selection. Movement happens only when "Move" is armed (aiming), so a
   // fleet selection never blocks picking a planet (and vice versa).
   // A tap on an ally ping marker opens its description popup (takes priority over
@@ -10863,6 +10916,7 @@ const friends = __SECTOR_ZERO_ONLY__
   : initFriends({
       root: () => $('hp-friends'),
       authorizedBase: hubAuthorizedBase,
+      openPlayer: (login) => profile?.open(login),
     });
 
 // --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
@@ -10875,6 +10929,7 @@ const rank = __SECTOR_ZERO_ONLY__
   : initRank({
       root: () => $('hp-rank'),
       authorizedBase: hubAuthorizedBase,
+      openPlayer: (login) => profile?.open(login),
     });
 
 // --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
@@ -10924,6 +10979,10 @@ const profile = __SECTOR_ZERO_ONLY__
   ? null
   : initProfile({
       root: () => $('profile'),
+      identity: () => profileKey(),
+      readAppearance: readProfileAppearance,
+      writeAppearance: (value) => writeRaw(profileKey(), JSON.stringify(value)),
+      appearanceChanged: applyProfilePortrait,
       view: () => {
         const st = loadMeta();
         return {
@@ -10945,9 +11004,51 @@ const profile = __SECTOR_ZERO_ONLY__
         }
       },
       writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
-      authorizedBase: hubAuthorizedBase,
+      authorizedBase: async () => {
+        const srv = resolveServer();
+        if (!srv) return null;
+        const session = await hubAuthorizedBase();
+        return session && tokenFor(localStorage, srv.base, nickInput.value.trim()) === session.token ? session : null;
+      },
     });
 const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
+function profileKey(): string {
+  return `vd.profile.${resolveServer()?.base ?? 'local'}.${nickInput.value.trim().toLowerCase() || 'guest'}`;
+}
+function readProfileAppearance(): unknown {
+  try { return JSON.parse(readRaw(profileKey()) ?? 'null'); } catch { return null; }
+}
+function applyProfilePortrait(portrait?: number): void {
+  if (__SECTOR_ZERO_ONLY__) return;
+  const id = portrait ?? parseAppearance(readProfileAppearance())?.portrait;
+  const src = id ? PORTRAITS[id - 1] : undefined;
+  const avatar = document.getElementById('hubav');
+  if (!avatar) return;
+  if (!src) { avatar.textContent = playerEmblem(); avatar.classList.remove('portrait'); return; }
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = t('profile.title');
+  avatar.replaceChildren(img);
+  avatar.classList.add('portrait');
+}
+
+async function syncProfileAppearance(): Promise<void> {
+  if (__SECTOR_ZERO_ONLY__) return;
+  const key = profileKey();
+  const srv = resolveServer();
+  if (!srv) return;
+  const session = await hubAuthorizedBase();
+  if (!session || tokenFor(localStorage, srv.base, nickInput.value.trim()) !== session.token) return;
+  try {
+    const response = await fetch(`${session.base}/profiles`, { headers: { authorization: `Bearer ${session.token}` } });
+    if (!response.ok) return;
+    const raw = await response.json() as { portrait?: unknown; slots?: unknown };
+    const appearance = parseAppearance({ portrait: raw.portrait, slots: raw.slots });
+    if (!appearance || key !== profileKey()) return;
+    writeRaw(key, JSON.stringify(appearance));
+    applyProfilePortrait(appearance.portrait);
+  } catch { /* Keep the previously saved portrait while offline. */ }
+}
 
 // --- вход в хаб и зеркало аккаунтного XP ---------------------------------------
 
@@ -10989,12 +11090,14 @@ function openHub(note = ''): void {
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   const nick = nickInput.value.trim();
   $('hub-name').textContent = nick || t('auth.commander');
+  applyProfilePortrait();
   showConnect(false);
   showHub(true);
   hubTab('home');
   hubNote.textContent = note;
   refreshOnboardOffer(); // ONB-0: first-run offer/nudge for a not-yet-onboarded commander
   detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
+  detach('хаб: портрет аккаунта', syncProfileAppearance());
 }
 
 $('cnew').addEventListener('click', () => {
@@ -14316,6 +14419,49 @@ function drawMissionTargets(): void {
 /** Осада «Поглощения мира» над своим миром (PVR-4.7): красное кольцо-часы — дуга тает к
  *  гибели мира — и отсчёт над ним в тех же часах, что у волн (`decisions/devourSiege.ts`).
  *  Текста нет: знак и время, поэтому и локали не нужно. */
+const MINE_FLASH_MS = 1200;
+function drawMinefields(now: number): void {
+  for (const [node, flash] of mineFlashes) {
+    const { at } = flash;
+    if (flashDone(now, at, MINE_FLASH_MS)) {
+      mineFlashes.delete(node);
+      continue;
+    }
+    const position = flash.position ?? s.planets[node]?.position;
+    if (!position) continue;
+    const c = world(position);
+    if (!visible(c, 80)) continue;
+    const k = flashProgress(now, at, MINE_FLASH_MS);
+    cx.save();
+    cx.strokeStyle = `rgba(255,179,71,${0.9 * fadeOf(k)})`;
+    cx.lineWidth = 3;
+    cx.beginPath();
+    cx.arc(c.x, c.y, waveRadius(k, 60, 1), 0, TAU);
+    cx.stroke();
+    cx.restore();
+  }
+  const view = visibleMinefields(s, ME);
+  if (!view) return;
+  const fields = Object.entries(view.fields).flatMap(([key, owners]) => Object.entries(owners).map(([owner, field]) => ({ key, owner, field, installing: false })));
+  fields.push(...Object.values(view.installations ?? {}).map((job) => ({ ...job, installing: true })));
+  for (const m of fields) {
+    const pos = fieldPosition(s, m.key, m.field);
+    if (!pos) continue;
+    const c = world(pos);
+    if (!visible(c, 40)) continue;
+    const y = m.field.edge ? c.y : c.y - 44;
+    cx.save(); cx.translate(c.x - 12, y - 12);
+    cx.strokeStyle = m.owner === ME ? '#60dbe8' : '#ffac62';
+    cx.fillStyle = 'rgba(4,10,12,.85)'; cx.lineWidth = 1.2;
+    cx.setLineDash(m.installing ? [2, 2] : []);
+    drawMineShape(cx, cam.scale >= 0.9);
+    cx.setLineDash([]);
+    cx.fillStyle = cx.strokeStyle; cx.font = '11px ui-monospace, monospace';
+    cx.textAlign = 'left'; cx.fillText(m.installing ? '◷' : `×${m.field.charge}`, 26, 15);
+    cx.restore();
+  }
+}
+
 function drawDevourSieges(): void {
   const marks = devourSieges(s, ME);
   if (marks.length === 0) return;
@@ -15596,21 +15742,10 @@ document.getElementById('railtools')?.addEventListener('click', () => setRailOpe
 document.getElementById('holo-tech')?.addEventListener('click', () => $('rail-tech').click());
 document.getElementById('holo-constructor')?.addEventListener('click', () => $('rail-constructor').click());
 
-// emblem picker — the hub avatar opens a glyph grid; picking one persists + applies it.
+// The hub avatar now opens the account portrait and medal editor.
 const emblemPick = document.getElementById('emblempick');
-const epGrid = document.getElementById('ep-grid');
-function openEmblemPick(): void {
-  if (!emblemPick || !epGrid) return;
-  const cur = playerEmblem();
-  epGrid.innerHTML = EMBLEMS.map(
-    (g) =>
-      `<button type="button" class="ep-cell${g === cur ? ' sel' : ''}" data-emblem="${g}">${g}</button>`,
-  ).join('');
-  emblemPick.classList.add('show');
-}
-document.getElementById('hubav')?.addEventListener('click', openEmblemPick);
-// The identity strip opens the career dossier — the avatar itself keeps the emblem
-// picker (its ✎ badge advertises that), so the name/status column is the door.
+document.getElementById('hubav')?.addEventListener('click', () => profile?.open());
+// Both the portrait and identity strip open the same saved profile.
 document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile?.open());
 document
   .getElementById('ep-close')
@@ -15634,9 +15769,11 @@ if (playerCardEl) {
     const tg = e.target as HTMLElement;
     // Match dossier → career dossier: close this card, open the profile sheet.
     if (tg.closest('.pc-dossier')) {
+      const seat = playerCardEl.dataset.seat;
+      const login = seat ? s.players[seat]?.name : undefined;
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
-      profile?.open();
+      profile?.open(login);
       return;
     }
     if (tg.id === 'playercard' || tg.closest('.pc-close')) {

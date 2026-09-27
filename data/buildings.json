@@ -150,6 +150,7 @@
     "buildTimeHours": 3,
     "hp": 18,
     "radarRange": 240,
+    "radarLevel": 1,
     "scoreValue": 2,
     "upgrades": [
       {
@@ -162,7 +163,8 @@
           "energy": 50
         },
         "hp": 28,
-        "radarRange": 330
+        "radarRange": 330,
+        "radarLevel": 2
       },
       {
         "cost": {
@@ -174,7 +176,8 @@
           "energy": 80
         },
         "hp": 38,
-        "radarRange": 420
+        "radarRange": 420,
+        "radarLevel": 3
       }
     ],
     "upkeep": {

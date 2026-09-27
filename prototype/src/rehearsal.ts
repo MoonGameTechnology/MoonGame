@@ -126,6 +126,9 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'fleet.bombard': { fleetId: 'p1_1', on: true },
   'fleet.assault': { fleetId: 'p1_1' },
   'fleet.retreat': { fleetId: 'p1_1' },
+  'fleet.deployRocketMine': { fleetId: 'p1_1', mode: 'confirmed' },
+  'rocketMine.mode': { mineId: 'mine:1', mode: 'any' },
+  'rocketMine.disarm': { mineId: 'mine:1' },
   'army.load': { fleetId: 'p1_1', unit: 'militia', count: 1 },
   'army.unload': { fleetId: 'p1_1', unit: 'militia', count: 1 },
   'hero.ability': { heroId: 'hero:p1', abilityId: 'scan', target: 'nexus' },
@@ -182,6 +185,7 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'order.scramble': { fleetId: 'p1_1', on: true },
   'fleet.forcemarch': { fleetId: 'p1_1', on: true },
   'fleet.instantRepair': { fleetId: 'p1_1' },
+  'fleet.layMines': { fleetId: 'p1_1' },
   'fleet.repair': { fleetId: 'p1_1' },
   'order.chain': { fleetId: 'p1_1', steps: [] },
 };

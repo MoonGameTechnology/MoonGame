@@ -108,10 +108,11 @@
     #vd-player-profile .mg-grade-pin{position:absolute;top:11%;left:32%;width:40%;height:16%;display:flex;align-items:center;justify-content:center;font:600 7px Georgia,serif;line-height:1;color:#e9d8ad;background:linear-gradient(#b6a780,#706246);border-radius:.5px;text-shadow:0 .5px .3px #18120a;box-shadow:0 .4px .5px #0008}
     #vd-player-profile .mg-cloth-slot .mg-grade-pin{font-size:3px}
     #vd-player-profile .mg-grades{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0}
-    #vd-player-profile .mg-grade-choice{border:1px solid #3b5366;border-radius:6px;background:#15293b;padding:7px 4px;min-height:48px}
-    #vd-player-profile .mg-grade-choice[aria-pressed="true"]{border-color:#9cdedb;background:#234857}
+    #vd-player-profile .mg-grade-choice{display:block;text-align:center;border:1px solid #3b5366;border-radius:6px;background:#15293b;padding:7px 4px;min-height:48px}
+    #vd-player-profile .mg-grade-choice[data-state="current"]{border-color:#9cdedb;background:#234857;box-shadow:inset 0 0 12px #66d6d522}
+    #vd-player-profile .mg-grade-choice[data-state="replaced"]{border-color:#405362;background:#101e2a;color:#78909f}
+    #vd-player-profile .mg-grade-choice[data-state="locked"]{opacity:.58}
     #vd-player-profile .mg-grade-choice small{display:block;font-size:10px;color:#b4c8d8;margin-top:3px}
-    #vd-player-profile .mg-apply-grade{margin-bottom:9px;width:100%}
   </style>
   <article class="mg-window" aria-label="Макет персонализации карточки игрока Void Dominion">
     <header class="mg-top">
@@ -147,7 +148,7 @@
           <div class="mg-detail-head"><div class="mg-detail-emblem"></div><div><div class="mg-detail-title"></div><div class="mg-detail-state"></div></div></div>
           <div class="mg-grades" role="group"></div><p class="mg-criterion"></p>
           <div class="mg-progress-wrap" hidden><div class="mg-progress" role="progressbar" aria-label="Прогресс получения медали"><div class="mg-progress-fill"></div></div><div class="mg-progress-label"></div></div>
-          <button type="button" class="mg-action mg-apply-grade" data-action="apply-grade" hidden></button><div class="mg-actions"><button class="mg-action" type="button" data-action="choose">Выбрать медаль</button><button class="mg-action mg-quiet" type="button" data-action="remove" hidden>Снять</button></div>
+          <div class="mg-actions"><button class="mg-action" type="button" data-action="choose">Выбрать медаль</button><button class="mg-action mg-quiet" type="button" data-action="remove" hidden>Снять</button></div>
         </section>
         <div class="mg-public-list" aria-label="Медали на портрете" hidden></div>
       </aside>
@@ -183,7 +184,7 @@
     const byId = Object.fromEntries(medals.map(m => [m.id,m]));
     const SLOT_COUNT=15;
     const initialMedals=['first','map','shield','rescue','colony','ally','service','engineer'];
-    const state = {portrait:0,slots:Array.from({length:SLOT_COUNT},(_,i)=>initialMedals[i]??null),slot:0,mode:'public',filter:'earned',open:false,inspect:null,language:'ru',page:0,previewGrade:null,grades:{}};
+    const state = {portrait:0,slots:Array.from({length:SLOT_COUNT},(_,i)=>initialMedals[i]??null),slot:0,mode:'public',filter:'earned',open:false,inspect:null,language:'ru',page:0,grades:{}};
     const englishMedals = {
       first:{name:'First Frontier'},
       map:{name:'Cartographer'},
@@ -269,12 +270,21 @@
       $('.mg-progress').setAttribute('aria-label',t('Прогресс получения медали','Progress towards this medal'));
       $('.mg-cosmetic-caption').textContent=t('Медали — украшение, без боевых бонусов','Cosmetic awards · No combat bonuses');
     }
+    function portraitSource(index){return 'assets/portrait-'+String(index+1).padStart(2,'0')+'.webp';}
     function drawPortraits(){
-      $('.mg-main-portrait').src=portraits[state.portrait].src;
+      $('.mg-main-portrait').src=portraitSource(state.portrait);
       $('.mg-main-portrait').alt=t('Портрет «'+pname(state.portrait)+'» с выбранными медалями',pname(state.portrait)+' portrait with selected medals');
       $('.mg-portrait-counter').textContent=portraits[state.portrait].id+' / '+portraits.length;
       $('.mg-selected-name').textContent=pname(state.portrait);
-      $('.mg-portraits').innerHTML=portraits.slice(state.page*10,state.page*10+10).map((p,offset)=>{const i=state.page*10+offset;return '<button type="button" class="mg-portrait-option" data-portrait="'+i+'" aria-label="'+escapeAttr(t('Портрет ','Portrait ')+p.id+': '+pname(i))+'" aria-pressed="'+(i===state.portrait)+'"><img src="'+p.src+'" alt="" width="90" height="90" loading="lazy"><span class="mg-thumb-number" aria-hidden="true">'+p.id+'</span></button>';}).join('');
+      $('.mg-portraits').replaceChildren(...portraits.slice(state.page*10,state.page*10+10).map((p,offset)=>{
+        const i=state.page*10+offset,button=document.createElement('button'),img=document.createElement('img'),number=document.createElement('span');
+        button.type='button';button.className='mg-portrait-option';button.dataset.portrait=i;
+        button.setAttribute('aria-label',t('Портрет ','Portrait ')+p.id+': '+pname(i));
+        button.setAttribute('aria-pressed',i===state.portrait);
+        img.src=portraitSource(i);img.alt='';img.width=90;img.height=90;img.loading='lazy';
+        number.className='mg-thumb-number';number.setAttribute('aria-hidden','true');number.textContent=p.id;
+        button.append(img,number);return button;
+      }));
       $('.mg-page-label').textContent=(state.page*10+1)+'–'+Math.min((state.page+1)*10,portraits.length)+' / '+portraits.length;
       $('.mg-pages').setAttribute('aria-label',t('Страницы портретов','Portrait pages'));
       $('[data-page="-1"]').textContent=t('Назад','Previous');
@@ -301,21 +311,18 @@
     }
     function drawDetail(){
       const m=activeMedal(),isPublic=state.mode==='public';
-      const grade=m?(isPublic?state.grades[m.id]:(state.previewGrade??state.grades[m.id])):3;
-      const available=m&&earned(m,grade);
+      const grade=m?state.grades[m.id]:3;
+      const targetGrade=m?(m.earned?(grade>1?grade-1:null):3):null;
       $('.mg-selection-label').textContent=isPublic?t('Личная награда','Personal award'):t('Ячейка '+(state.slot+1)+' из '+SLOT_COUNT,'Slot '+(state.slot+1)+' of '+SLOT_COUNT);
       $('.mg-detail-emblem').innerHTML=m?emblem(m,grade):'<span class="mg-empty-symbol" aria-hidden="true">+</span>';
       $('.mg-detail-title').textContent=m?mtext(m):(isPublic?t('Без медалей','No medals displayed'):t('Свободное место','Empty slot'));
-      $('.mg-detail-state').textContent=m?gradeName(grade)+' · '+(available?t('Получена','Earned'):t('Пока недоступна','Not yet available')):(isPublic?t('Награды не размещены','No awards displayed'):t('Три ряда по пять','Three rows of five'));
+      $('.mg-detail-state').textContent=m?(m.earned?gradeName(grade)+' · '+t('Текущая степень','Current class'):t('Медаль пока не получена','Medal not yet earned')):(isPublic?t('Награды не размещены','No awards displayed'):t('Три ряда по пять','Three rows of five'));
       $('.mg-grades').hidden=!m||isPublic;
-      $('.mg-grades').setAttribute('aria-label',t('Степень медали: I — высшая','Medal class: I is the highest'));
-      $('.mg-grades').innerHTML=m?[3,2,1].map(g=>'<button type="button" class="mg-grade-choice" data-grade="'+g+'" aria-pressed="'+(g===grade)+'" aria-label="'+escapeAttr(gradeName(g)+': '+(earned(m,g)?t('получена','earned'):t('не получена','not earned')))+'"><span>'+roman[g]+'</span><small>'+(earned(m,g)?t('Получена','Earned'):t('Закрыта','Locked'))+'</small></button>').join(''):'';
-      $('.mg-criterion').textContent=m?t(gradeRules[m.id].ru,gradeRules[m.id].en)+': '+goal(m,grade)+'.':(isPublic?t('Игрок ещё не разместил награды на портрете.','This player has not displayed any medals yet.'):t('Нажми на ячейку на груди и выбери медаль из своей коллекции.','Select a chest slot, then choose a medal from your collection.'));
-      $('.mg-progress-wrap').hidden=!m||available;
-      if(m&&!available){const p=$('.mg-progress'),progress=gradeRules[m.id].progress,target=goal(m,grade);p.setAttribute('aria-valuemin','0');p.setAttribute('aria-valuemax',target);p.setAttribute('aria-valuenow',progress);$('.mg-progress-fill').style.width=(100*progress/target)+'%';$('.mg-progress-label').textContent=progress+' / '+target;}
-      $('.mg-apply-grade').hidden=!m||isPublic;
-      $('.mg-apply-grade').disabled=!available||(state.slots[state.slot]===m.id&&state.grades[m.id]===grade);
-      $('.mg-apply-grade').textContent=!available?t('Степень ещё не получена','Class not yet earned'):(state.slots[state.slot]===m.id&&state.grades[m.id]===grade?t('Уже на мундире','Already displayed'):t('Носить '+roman[grade]+' степень','Wear class '+roman[grade]));
+      $('.mg-grades').setAttribute('aria-label',t('Степени обновляются автоматически; I — высшая','Classes upgrade automatically; I is the highest'));
+      $('.mg-grades').innerHTML=m?[3,2,1].map(g=>{const status=!earned(m,g)?'locked':g===grade?'current':'replaced',label=status==='current'?t('Текущая','Current'):status==='replaced'?t('Заменена','Replaced'):t('Закрыта','Locked');return '<span class="mg-grade-choice" data-state="'+status+'" aria-label="'+escapeAttr(gradeName(g)+': '+label)+'"><span>'+roman[g]+'</span><small>'+label+'</small></span>';}).join(''):'';
+      $('.mg-criterion').textContent=m?(isPublic?t(gradeRules[m.id].ru,gradeRules[m.id].en)+': '+goal(m,grade)+'.':targetGrade?t('Следующая степень заменит текущую автоматически. ','The next class will replace the current one automatically. ')+t(gradeRules[m.id].ru,gradeRules[m.id].en)+': '+goal(m,targetGrade)+'.':t('Получена высшая степень.','Highest class earned.')):(isPublic?t('Игрок ещё не разместил награды на портрете.','This player has not displayed any medals yet.'):t('Нажми на ячейку на груди и выбери медаль из своей коллекции.','Select a chest slot, then choose a medal from your collection.'));
+      $('.mg-progress-wrap').hidden=!m||isPublic||targetGrade===null;
+      if(m&&!isPublic&&targetGrade!==null){const p=$('.mg-progress'),progress=gradeRules[m.id].progress,target=goal(m,targetGrade);p.setAttribute('aria-valuemin','0');p.setAttribute('aria-valuemax',target);p.setAttribute('aria-valuenow',Math.min(progress,target));$('.mg-progress-fill').style.width=(100*Math.min(progress,target)/target)+'%';$('.mg-progress-label').textContent=progress+' / '+target;}
       $('.mg-actions').hidden=isPublic;
       $('[data-action="choose"]').textContent=state.open?t('К доступным медалям','Show earned medals'):(state.slots[state.slot]?t('Заменить медаль','Replace medal'):t('Выбрать медаль','Choose medal'));
       $('[data-action="remove"]').hidden=!state.slots[state.slot]||!!state.inspect;
@@ -334,7 +341,7 @@
     }
     function draw(){
       const previousFocus=document.activeElement;
-      const focusAttr=['data-slot','data-medal','data-public-medal','data-grade'].find(key=>previousFocus&&root.contains(previousFocus)&&previousFocus.hasAttribute(key));
+      const focusAttr=['data-slot','data-medal','data-public-medal'].find(key=>previousFocus&&root.contains(previousFocus)&&previousFocus.hasAttribute(key));
       const focusValue=focusAttr?previousFocus.getAttribute(focusAttr):null;
       const isPublic=state.mode==='public';
       $('.mg-window').classList.toggle('mg-public',isPublic);
@@ -348,9 +355,6 @@
     root.addEventListener('click',e=>{
       const b=e.target.closest('button');if(!b||!root.contains(b)||b.disabled)return;
       if(b.dataset.page){state.page+=Number(b.dataset.page);drawPortraits();const next=root.querySelector('[data-page="'+b.dataset.page+'"]');if(next.disabled)root.querySelector('[data-page="'+(-Number(b.dataset.page))+'"]').focus();return;}
-      if(b.dataset.grade){state.previewGrade=Number(b.dataset.grade);draw();announce(gradeName(state.previewGrade));return;}
-      if(b.dataset.action==='apply-grade'){const m=activeMedal(),g=state.previewGrade??(m&&state.grades[m.id]);if(!m||!earned(m,g))return;const source=state.slots.indexOf(m.id),old=state.slots[state.slot];if(source>=0&&source!==state.slot)state.slots[source]=old;state.slots[state.slot]=m.id;state.grades[m.id]=g;state.inspect=null;draw();announce(medalName(m));return;}
-      if(!b.dataset.language&&b.dataset.portrait===undefined)state.previewGrade=null;
       if(b.dataset.language){state.language=b.dataset.language;drawPortraits();draw();announce(t('Выбран русский язык','English selected'));return;}
       if(b.dataset.portrait!==undefined){state.portrait=Number(b.dataset.portrait);drawPortraits();root.querySelector('[data-portrait="'+state.portrait+'"]').focus({preventScroll:true});announce(t('Портрет изменён. Медали сохранены.','Portrait changed. Medal layout preserved.'));return;}
       if(b.dataset.mode){state.mode=b.dataset.mode;state.inspect=null;if(state.mode==='public'&&!state.slots[state.slot])state.slot=Math.max(0,state.slots.findIndex(Boolean));draw();announce(state.mode==='public'?t('Так карточку видит другой игрок','This is how other players see your profile'):t('Режим настройки','Customization mode'));return;}

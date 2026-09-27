@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.54'); // отдельные корабли и наземные войска пиратов
+    expect(data.version).toBe('0.1.57'); // SM-3: тяговый луч, сборщик обломков, ремонтный тендер, минный заградитель
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -525,6 +525,10 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(buildingLevel(radar!, 1).radarRange).toBe(240);
     expect(buildingLevel(radar!, 2).radarRange).toBe(330);
     expect(buildingLevel(radar!, 3).radarRange).toBe(420);
+    expect([1, 2, 3].map((level) => buildingLevel(radar!, level).radarLevel)).toEqual([1, 2, 3]);
+    expect(data.units.scout!.signature).toBe(1);
+    expect(data.units.frigate!.signature).toBe(5);
+    expect(data.units.heavy_cruiser!.signature).toBe(13);
   });
 
   it('applies defaults for omitted optional fields', () => {
