@@ -69,6 +69,26 @@ describe('герои за главы Sector Zero', () => {
     const p = { ...fresh(), chaptersWon: ['m1', 'm2'] };
     expect(grantChapterHeroes(p, ['m1', 'm2'], data).joined).toEqual(CHAPTER_HEROES.slice(0, 2));
   });
+
+  // Баг-репорт владельца 2026-09-27: спас учёного, завершил экспедицию сам — задача засчитана,
+  // а в подготовке учёного нет. Спасённый приходит по засчитанной задаче, без победы.
+  it('засчитанная задача-спасение приводит героя и без победы в главе', () => {
+    const rescues = [{ chapter: 'm1', objective: 'mission.rescue', hero: 'scientist' }];
+    const p = fresh();
+    expect(grantChapterHeroes(p, ['m1'], data, rescues).progress).toBe(p);
+    const other = { ...p, objectivesDone: { m1: ['mission.other'], m2: ['mission.rescue'] } };
+    expect(grantChapterHeroes(other, ['m1'], data, rescues).progress).toBe(other);
+    const saved = { ...p, objectivesDone: { m1: ['mission.rescue'] } };
+    const r = grantChapterHeroes(saved, ['m1'], data, rescues);
+    expect(r.joined).toEqual(['scientist']);
+    expect(r.progress.heroes.scientist).toMatchObject({ level: 1, skills: [] });
+    expect(r.progress.chaptersWon).toEqual([]); // спасение не выдаёт победу в главе
+    // Спасён и глава выиграна — приходит один раз; уже в отряде — не приходит и не сбрасывается.
+    expect(grantChapterHeroes({ ...saved, chaptersWon: ['m1'] }, ['m1'], data, rescues).joined).toEqual(['scientist']);
+    expect(grantChapterHeroes(r.progress, ['m1'], data, rescues).progress).toBe(r.progress);
+    // Герой, которого нет в каталоге, пропускается, а не роняет профиль.
+    expect(grantChapterHeroes(saved, ['m1'], data, [{ ...rescues[0]!, hero: 'missing' }]).joined).toEqual([]);
+  });
 });
 
 describe('Учёный — пятый герой (решение владельца 2026-09-24)', () => {

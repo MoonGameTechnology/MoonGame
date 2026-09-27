@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { parseMatchMap, validateMatchMap, visibleState, type GameState } from '../packages/shared-core/src/index';
 import { kernel } from '../prototype/src/protoKernel';
 import { data } from '../prototype/src/gameData';
-import { pveObjectives, pveState } from '../packages/client/src/gameData';
+import { pveChapter, pveModeId, pveObjectives, pveRescues, pveState } from '../packages/client/src/gameData';
 import { objectiveProgress, shownObjectives } from '../decisions/missionObjectives';
 import { missionTargets } from '../decisions/missionView';
 import { chapterTargets } from '../decisions/chapterMap';
 import { retireDoneEncounters } from '../decisions/retiredEncounters';
-import { freshSectorZeroProgress, newSectorHero, prepareSectorZeroRun } from '../decisions/sectorZeroProgress';
+import { freshSectorZeroProgress, newSectorHero, prepareSectorZeroRun, settleSectorZeroRun } from '../decisions/sectorZeroProgress';
+import { grantChapterHeroes } from '../decisions/heroRecruits';
 import mapJson from './maps/pve-1.json';
 
 const station = 'research_station';
@@ -17,18 +18,21 @@ const start = () => prepareSectorZeroRun(pveState(data), freshSectorZeroProgress
 const ctx = (now: number) => ({ now, data, config: { timeScale: 1, travelSpeedFactor: 5 } });
 const scientists = (s: GameState) => Object.values(s.heroes ?? {}).filter((h) => h.archetype === 'scientist');
 
+/** The same context under the chapter's PvE mode: waves, the tally and `pve.abandon` live there. */
+const pveCtx = (now: number) => ({ ...ctx(now), config: { ...ctx(now).config, modeId: pveModeId() } });
+
 /** Follow the real movement scheduler, including intermediate road segments. */
-function fly(s: GameState, fleetId: string, to: string): GameState {
+function fly(s: GameState, fleetId: string, to: string, at = ctx): GameState {
   const moved = kernel.applyAction(s, {
     id: `move:${s.time}:${fleetId}`, type: 'fleet.move', playerId: s.fleets[fleetId]!.owner,
     issuedAt: s.time, payload: { fleetId, to },
-  }, ctx(s.time));
+  }, at(s.time));
   if (!moved.ok) throw new Error(moved.code);
   let next = moved.state;
   for (let i = 0; i < 100 && next.fleets[fleetId]?.movement; i++) {
-    const at = next.scheduled.filter((e) => e.type === 'fleet.arrival').map((e) => e.at).sort((a, b) => a - b)[0];
-    expect(at).toBeDefined();
-    const step = kernel.advanceTo(next, ctx(at!));
+    const when = next.scheduled.filter((e) => e.type === 'fleet.arrival').map((e) => e.at).sort((a, b) => a - b)[0];
+    expect(when).toBeDefined();
+    const step = kernel.advanceTo(next, at(when!));
     if (!step.ok) throw new Error(step.code);
     expect(step.failures).toEqual([]);
     next = step.state;
@@ -122,6 +126,25 @@ describe('Chapter I: rescue the scientist on arrival', () => {
     expect(retired.planets[station]!.kind).toBe('void_station');
     expect(scientists(fly(retired, 'p1_1', station))).toHaveLength(0);
     expect(shownObjectives(pveObjectives(), [objectiveId]).some((o) => o.id === objectiveId)).toBe(false);
+  });
+
+  // Баг-репорт владельца 2026-09-27: «выполнил миссию, забрал учёного, завершил сам
+  // экспедицию, а учёного в подготовке не появилось». Выдача была только за победу в главе.
+  it('brings the scientist into the squad after a rescue even when the run is abandoned', () => {
+    expect(pveRescues()).toContainEqual({ chapter: pveChapter(0).id, objective: objectiveId, hero: 'scientist' });
+    const progress = { ...freshSectorZeroProgress(data), nextAttempt: 2 };
+    const rescued = fly(start(), 'p1_1', station, pveCtx);
+    const quit = kernel.applyAction(rescued, { id: 'quit', type: 'pve.abandon', playerId: 'p1', issuedAt: rescued.time, payload: {} }, pveCtx(rescued.time));
+    if (!quit.ok) throw new Error(quit.code);
+    expect(quit.state.match).toMatchObject({ status: 'ended', reason: 'pve-failed' });
+    const settled = settleSectorZeroRun(progress, 1, quit.state, pveChapter(0), data);
+    expect(settled.objectivesDone[pveChapter(0).id]).toContain(objectiveId);
+    expect(settled.chaptersWon).toEqual([]);
+    const { progress: squad, joined } = grantChapterHeroes(settled, [pveChapter(0).id], data, pveRescues());
+    expect(joined).toEqual(['scientist']);
+    // The next expedition can be led by the rescued scientist.
+    const next = prepareSectorZeroRun(pveState(data), { ...squad, selectedHero: 'scientist' }, data);
+    expect(scientists(next).map((h) => h.id)).toEqual(['sector-zero:hero']);
   });
 
   it('rejects an unknown or boss rescue hero in map content', () => {
