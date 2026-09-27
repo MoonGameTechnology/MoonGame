@@ -14,6 +14,7 @@ import {
   salvageModule,
   loadoutEffectsModule,
   minefieldModule,
+  rendezvousModule,
   seatClaimModule,
   visibilityModule,
   movementModule,
@@ -168,6 +169,9 @@ export const MODULES: GameModule[] = [
   loadoutEffectsModule,
   minefieldModule,
   rocketMinesModule, // isolated road-weapon timers; preserve all existing module order
+  // Сценарный союзник главы IV (PVR-7.2): слушает `fleet.arrived` и ставит стойку по месту
+  // встречи. В КОНЕЦ — то же место, что в серверном `DEV_MODULES`.
+  rendezvousModule,
 ];
 
 export const kernel = createKernel(MODULES);

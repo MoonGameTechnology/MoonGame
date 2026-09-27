@@ -414,6 +414,10 @@ export interface Planet {
   kind?: string;
   /** Map-authored hero waiting for rescue; consumed once a human fleet arrives. */
   recruitHero?: string;
+  /** Место встречи со сценарным союзником (PVR-7.2): id жителя карты, с которым первое
+   *  прибытие флота игрока устанавливает связь (`rendezvousModule`). Не снимается после
+   *  контакта — факт живёт в `missionFacts.contacted`. */
+  rendezvous?: PlayerId;
   /** Чем узел был ДО того, как его превратили в космическую крепость (`station.deploy`
    *  затирает `kind`). Гибель крепости возвращает узел к этому виду, иначе разрушенная
    *  крепость навсегда стирала бы то, что под ней стояло: астероидное поле не выдумать
@@ -1002,6 +1006,9 @@ export interface MissionFacts {
   fallen?: Record<PlayerId, PlanetId[]>;
   /** Игрок → сколько беженцев (юниты с признаком `evacuee`) доставлено в убежище. */
   evacuated?: Record<PlayerId, number>;
+  /** Игрок → места встречи (`Planet.rendezvous`), где он установил связь со сценарным
+   *  союзником (PVR-7.2). Исторический факт: уход флота и потеря провинции его не отменяют. */
+  contacted?: Record<PlayerId, PlanetId[]>;
 }
 
 /**

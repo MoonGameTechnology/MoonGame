@@ -598,6 +598,7 @@ function project(
     if (mf.fallen?.[viewerId]) mine.fallen = { [viewerId]: [...mf.fallen[viewerId]!] };
     if (mf.evacuated?.[viewerId] !== undefined)
       mine.evacuated = { [viewerId]: mf.evacuated[viewerId]! };
+    if (mf.contacted?.[viewerId]) mine.contacted = { [viewerId]: [...mf.contacted[viewerId]!] };
     if (Object.keys(mine).length) view.missionFacts = mine;
     else delete view.missionFacts;
   }

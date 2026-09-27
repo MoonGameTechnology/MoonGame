@@ -48,6 +48,9 @@ export const MapSectorSchema = z.object({
   kind: z.string().default('planet'),
   /** Hero rescued by the first human fleet arriving here. Validated against the hero catalog. */
   recruitHero: z.string().min(1).optional(),
+  /** Rendezvous with a scripted ally (PVR-7.2): the id of a map inhabitant (`npc: 'neutral'`)
+   *  that the first human fleet arriving here allies with. Validated against `players`. */
+  rendezvous: z.string().min(1).optional(),
   /** Terrain id → resolved against game data `sectors` (speed / HP modifiers). */
   terrain: z.string().optional(),
   /** World nature id → game data `planetTypes` (production / defense), if a planet. */

@@ -127,6 +127,10 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   // owners reference a declared player or slot
   for (const [id, sec] of Object.entries(map.sectors)) {
     if (sec.owner != null && !isOwnerRef(sec.owner)) issues.push(`E_SECTOR_UNKNOWN_OWNER:${id}`);
+    // A rendezvous names a map inhabitant at peace with everyone — never a playable seat
+    // (that would be a free human ally) nor a pirate (never at peace to meet).
+    if (sec.rendezvous !== undefined && map.players[sec.rendezvous]?.npc !== 'neutral')
+      issues.push(`E_INVALID_RENDEZVOUS:${id}`);
     if (data) {
       if (sec.kind && !data.sectorKinds[sec.kind]) issues.push(`E_UNKNOWN_KIND:${id}`);
       if (sec.terrain && !data.sectors[sec.terrain]) issues.push(`E_UNKNOWN_TERRAIN:${id}`);
@@ -576,6 +580,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     if (sec.planetType) planet.planetType = sec.planetType;
     if (sec.kind) planet.kind = sec.kind;
     if (sec.recruitHero) planet.recruitHero = sec.recruitHero;
+    if (sec.rendezvous) planet.rendezvous = sec.rendezvous;
     if (sec.size !== 1) planet.size = sec.size;
     planets[id] = planet;
   }

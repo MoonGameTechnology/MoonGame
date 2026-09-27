@@ -654,6 +654,7 @@ export {
   RETREAT_PULL_STAT,
   SALVAGE_BONUS_STAT,
 } from './modules/loadoutEffects';
+export { rendezvousModule, contactedAllies } from './modules/rendezvous';
 export {
   minefieldModule,
   MINE_CHARGE_STAT,

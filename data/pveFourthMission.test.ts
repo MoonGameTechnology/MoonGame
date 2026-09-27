@@ -184,6 +184,9 @@ describe('кто где стоит (§6.2–§6.3)', () => {
     const rv = map.sectors.rendezvous!;
     expect(rv.kind).toBe('void_station');
     expect(rv.owner).toBeNull();
+    // Место объявлено картой: первое прибытие игрока устанавливает связь с `ally` (PVR-7.2).
+    expect(rv.rendezvous).toBe('ally');
+    expect(Object.values(map.sectors).filter((sec) => sec.rendezvous)).toHaveLength(1);
     // Путь к ней не идёт через миры Роя, и она ближе любого из них.
     expect(route('staging', 'rendezvous', new Set(swarmWorlds))).toBe(
       route('staging', 'rendezvous'),

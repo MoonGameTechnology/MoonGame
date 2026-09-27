@@ -111,7 +111,8 @@
         "y": 340
       },
       "kind": "void_station",
-      "terrain": "empty_space"
+      "terrain": "empty_space",
+      "rendezvous": "ally"
     },
     "sw_wrecks": {
       "position": {
