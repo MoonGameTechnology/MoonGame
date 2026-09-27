@@ -14773,6 +14773,22 @@ const sectorZeroMenu = initSectorZeroMenu({
   startTraining: () => playChapterComic('training-1', 'intro', () => startTraining()),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
   resume: restoreRun,
+  // ВРЕМЕННО (заказ владельца 2026-09-27): «Начать всё заново». Чистый профиль с тем же сидом
+  // (облако узнаёт его как свой и не спрашивает «какой оставить»), без сохранённого забега —
+  // локально и, через номер правки, в облаке. Аккаунт и настройки не трогает.
+  resetAll: async () => {
+    await progressWrite;
+    await runWrite;
+    if (runInProgress()) setRunActive(false);
+    await runSaveStore.clear();
+    await portableRunStore.clear();
+    savedRun = null;
+    savedPortable = null;
+    nextSectorMission = 0;
+    writeRaw('void.pveMission', '0');
+    saveSectorProgress(freshSectorZeroProgress(data, sectorProgress.seed));
+    await progressWrite;
+  },
   settings: () => settings.open(),
   back: () => {
     openHub();

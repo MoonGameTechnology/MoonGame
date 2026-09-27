@@ -461,10 +461,10 @@
 .sz-star-ladder li { padding: 10px 12px; border: 1px solid #22404a; color: #7f9ca3; font-size: 13px; }
 .sz-star-ladder li.lit { color: #f0c96a; border-color: #5d4f2b; }
 .sz-star-ladder li.next { color: #d5e9e9; border-color: var(--cur-data); }
-#sz-confirm { border-top: 1px solid #a88758; padding-top: 20px; }
-#sz-confirm h2 { color: #efd1a1; font-size: 19px; font-weight: 500; margin: 0 0 10px; }
-#sz-confirm p { color: #bacdd3; font-size: 13px; line-height: 1.65; margin: 0 0 22px; }
-#sz-confirm button + button { margin-top: 10px; }
+#sz-confirm, #sz-reset-confirm { border-top: 1px solid #a88758; padding-top: 20px; }
+#sz-confirm h2, #sz-reset-confirm h2 { color: #efd1a1; font-size: 19px; font-weight: 500; margin: 0 0 10px; }
+#sz-confirm p, #sz-reset-confirm p { color: #bacdd3; font-size: 13px; line-height: 1.65; margin: 0 0 22px; }
+#sz-confirm button + button, #sz-reset-confirm button + button { margin-top: 10px; }
 /* Развилка облака (YAG-1.4): два профиля с числами, выбор — одной кнопкой под каждым. */
 #sz-cloud-choice { border-top: 1px solid #a88758; padding-top: 20px; }
 #sz-cloud-choice h2 { color: #efd1a1; font-size: 19px; font-weight: 500; margin: 0 0 10px; }
