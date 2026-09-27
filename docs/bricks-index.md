@@ -55,7 +55,7 @@
 | REFM-221 | 🔒 | proto | `docs/backlog.md` | Обучение и справка |
 | REFM-222 | 🔒 | proto | `docs/backlog.md` | Верхняя полоса |
 | REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |
-| REFM-224 | 🔒 | proto | `docs/backlog.md` | Карточка флота |
+| REFM-224 | ⏳ | proto | `docs/backlog.md` | Карточка флота |
 | REFM-225 | 🔒 | proto | `docs/backlog.md` | Хозяин боковой панели |
 | REFM-226 | 🔒 | proto | `docs/backlog.md` | Ряд команд: разметка и поповеры |
 | REFM-227 | 🔒 | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
