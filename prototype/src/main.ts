@@ -647,7 +647,7 @@ import { initCorp } from './corpScreen';
 import { initMarket } from './marketScreen';
 import { initTrader } from './traderScreen';
 import { ALLY_EMBLEM, initAllyScreen } from './allyScreen';
-import { allyPanelView, linkedAlly, type AllyOrderKind } from '../../decisions/allyPanel';
+import { allyPanelView, linkedAlly } from '../../decisions/allyPanel';
 import { chapterChain, extractionCandidates, type ChapterStep } from '../../decisions/chapterChain';
 import { allyOrder, extractionStart } from '../../decisions/actions';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
@@ -833,7 +833,30 @@ import {
   timeControlsShown,
 } from './matchExits';
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
-import { disarms } from '../../decisions/armDisarm';
+import {
+  aiming,
+  allyAim,
+  anyArmed,
+  arm,
+  assaultAim,
+  castMenu,
+  cmdMore,
+  disarm,
+  disarmForCommand,
+  drop,
+  engageAim,
+  heroAim,
+  heroSpawnAim,
+  merging,
+  pickMode,
+  retreatAim,
+  retreatMenu,
+  splitState,
+  squadMerge,
+  strikeAim,
+  toggle,
+  troopsPlan,
+} from './interaction';
 import {
   aimPath,
   aimTip,
@@ -1207,36 +1230,8 @@ let selFleets = new Set<string>();
  *  `selFleet` намеренно: `selFleet` — адрес приказа, и чужой id в нём завёл бы приказы,
  *  которые ядро отклонит. Осмотр — состояние панели и только её. */
 let inspectFleet: string | null = null;
-let aiming = false; // "Move" command armed → next world tap orders the move
-// PC ШТУРМ: armed like "Move", but the target must be someone else's capturable
-// world — the fleet flies there and assaults on arrival (one-shot, not the CC-2
-// standing auto-storm). Keyed by fleet id → destination world.
-let assaultAim = false;
-/** Вооружена «Атака» (ATK-1): следующий тап по ЧУЖОМУ флоту — приказ его атаковать.
- *  Кнопка стоит в ряду команд ВСЕГДА, как «Курс»: атака — базовое действие флота, а не
- *  условная возможность, и прятать её значило бы заставлять игрока гадать, отчего она
- *  то есть, то нет. Что цель не годится, скажет ядро — одним понятным отказом. */
-let engageAim = false;
-// SHU-3.1 — «Удар» взведён: следующий тап по карте выбирает цель вылета. Держим ОТКУДА
-// (id мира-порта или флота-носителя): цель у вылета одна, а баз у игрока много, и без
-// источника приказ пришлось бы угадывать по выделению.
-// БАЗА хранится размеченной ({planetId} | {fleetId}), а не голой строкой: ядро ищет
-// мир и носитель в разных картах, и плоский id разъезжался с полем payload молча.
-let strikeAim: { from: { planetId: string } | { fleetId: string }; squadronId: string } | null =
-  null;
-/** Взведённое СЛИЯНИЕ эскадр (SHU-4.3): первый тап называет источник, второй —
- *  приёмника. Два тапа, а не выпадающий список: приёмник это такая же карточка на
- *  экране, и выбирать его удобнее там же, где на него смотрят. */
-let squadMerge: { from: string } | null = null;
-// Hero window armed modes: a cast waits for its target world; a deploy waits for the
-// point the hero's ship rises at (own world / own fleet / allied world by markers).
-let heroAim: { heroId: string; abilityId: string } | null = null;
-/** «Отступить» взведено: следующий тап по карте — точка, куда уйдёт этот флот (RETR-1
- *  `to`). Без точки отход только расцеплял бой и оставлял флот под огнём на том же узле —
- *  аудит механик 2026-09-25; решение владельца: точку выбирает игрок. */
-let retreatAim: string | null = null;
-let heroSpawnAim: string | null = null;
-// Shuttle free-space strike armed → next tap on an enemy fleet sends shuttle.strike
+// Прицелы, режимы и окна командного ряда (`aiming`, `castMenu`, `splitState`…) живут в
+// `interaction.ts` (REFM-207): их меняют только `arm`/`drop`/`disarm(повод)`.
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
@@ -1275,24 +1270,9 @@ let lastHeroCardRefresh = 0;
 let chainHits: Array<{ target: string; fleetIds: string[]; x: number; y: number }> = [];
 // Кэш маршрутов для отрисовки цепочек: граф лейнов статичен всю партию.
 const chainRouteCache = new Map<string, string[] | null>();
-// SEL-1 «Выбрать+»: touch multi-select. While ON the bottom sheet collapses, map
-// taps only toggle OWN fleets in/out of the group, and the group takes any common
-// order (Курс/Штурм/Цель…) — issuing one drops back out of the mode.
-let pickMode = false;
-let cmdMore = false; // ☰ — the second row of the command bar (extras live there)
-let castMenu = false; // ✨ — способности героя-флагмана: поповер-меню каста над рядом
-let retreatMenu = false; // ⮐ — окошко выбора порога авто-отхода (заказ владельца 2026-09-23)
-let merging = false; // "Merge" armed → next tap on a friendly fleet picks the anchor
-// Глава IV (PVR-7.5): взведённый приказ союзнику — следующий тап по карте выбирает цель.
-let allyAim: AllyOrderKind | null = null;
 /** До какого момента (ms, `performance.now`) чип союзника мигает после встречи. */
 let allyPulseUntil = 0;
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
-// Split-fleet dialog: which fleet, and how many of each ship type peel off.
-let splitState: { fleetId: string; take: Record<string, number> } | null = null;
-// GRND-1 ⇅ «Десант»: поповер погрузки/выгрузки над рядом команд. `plan` — знаковая
-// дельта на тип: >0 поднять из гарнизона, <0 высадить. null = меню закрыто.
-let troopsPlan: { fleetId: string; plan: Record<string, number> } | null = null;
 
 // --- session diplomacy & comms menu state ------------------------------------
 // Messages are a prototype-local session log — they don't touch the deterministic
@@ -1793,11 +1773,7 @@ const holographic = initHolographicUi({
   // ✕ окна выбора закрывает его ЦЕЛИКОМ: набор группы и прицелы тоже. Иначе режим набора
   // держал пустое окно «0 флотов», и крестик его не закрывал (плейтест 2026-09-26).
   dismiss: () => {
-    pickMode = false;
-    aiming = false;
-    assaultAim = false;
-    engageAim = false;
-    cmdMore = false;
+    disarm('dismiss', MOBILE);
     clearSelection();
     renderCmdBar();
   },
@@ -2972,8 +2948,8 @@ function apply(out: StepOut) {
   // спрашивает только «существует ли», а группа чистится дважды — живые И свои.
   const alive = (id: string): boolean => !!s.fleets[id];
   if (!refSurvives(selFleet, alive)) selFleet = null;
-  if (splitState && !refSurvives(splitState.fleetId, alive)) splitState = null;
-  if (troopsPlan && !refSurvives(troopsPlan.fleetId, alive)) troopsPlan = null; // ⇅-меню тоже
+  if (splitState && !refSurvives(splitState.fleetId, alive)) drop('splitState');
+  if (troopsPlan && !refSurvives(troopsPlan.fleetId, alive)) drop('troopsPlan'); // ⇅-меню тоже
   // Режим «Приказ»: пропавшие флоты выбрасываются покадрово в renderChainBar; здесь
   // достаточно ничего не делать — режим сам гаснет, когда fleetIds опустеет.
   selFleets = pruneGroup(selFleets, (id) => s.fleets[id]?.owner, ME);
@@ -3630,20 +3606,14 @@ function panelFleet(): string | null {
 function clearSelection() {
   mobileDraft = null;
   mobileChoices = [];
-  if (MOBILE) {
-    aiming = false;
-    assaultAim = false;
-    engageAim = false;
-    pickMode = false;
-    cmdMore = false;
-  }
+  // Что держится за выделение — `armDisarm.ts`, правило 10: прицелы и меню ряда, набор
+  // группы, окно деления, слияние звеньев. Прицелы из окон (отход, каст, удар, союзник)
+  // взводятся без выделения и им не гаснут.
+  disarm('deselect', MOBILE);
   selFleet = null;
   inspectFleet = null;
   selPlanet = null;
   selFleets = new Set();
-  merging = false;
-  splitState = null;
-  troopsPlan = null;
   invalidatePanel();
 }
 
@@ -8543,11 +8513,7 @@ function engageTarget(target: Fleet): void {
 
 function cancelMobileOrder(): void {
   mobileDraft = null;
-  aiming = false;
-  assaultAim = false;
-  engageAim = false;
-  merging = false;
-  pickMode = false;
+  disarm('mobile-cancel', MOBILE);
   invalidateCmdBar();
   invalidatePanel();
 }
@@ -8627,7 +8593,7 @@ function renderChainBar(): void {
   }
   // CAST-UX. Пока каст ПРИЦЕЛИВАЕТСЯ, нижний хаб уходит: он занимает ту самую полосу
   // экрана, по которой целятся на телефоне, и перекрывает круг дальности. Прицел
-  // снимается любым приказом и самим кастом (`heroAim = null`), так что хаб вернётся.
+  // снимается любым приказом и самим кастом (`drop('heroAim')`), так что хаб вернётся.
   if (heroAim) {
     cmdbar.classList.remove('show');
     return;
@@ -8688,13 +8654,9 @@ function renderCmdBar() {
   // живым и на нуле выделенных: ⊕ обязана остаться достижимой, иначе опустевшая группа
   // запирает игрока в режиме без выхода.
   if (!barStays(ids.length, pickMode)) {
-    if (aiming) aiming = false;
-    if (assaultAim) assaultAim = false;
-    if (engageAim) engageAim = false;
-    if (merging) merging = false;
-    troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
-    castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
-    retreatMenu = false;
+    // Прицелы и меню ряда гаснут вместе с ним (`armDisarm.ts`, правило 13): иначе ⇵ или ✨
+    // всплыли бы над СЛЕДУЮЩИМ выбранным флотом, а повторный выбор открывал бы их сам.
+    disarm('bar-hidden', MOBILE);
     cmdbar.classList.remove('show');
     invalidateCmdBar();
     return;
@@ -8777,8 +8739,8 @@ function renderCmdBar() {
     },
     { cast: castMenu, troopsFleetId: troopsPlan?.fleetId ?? null },
   );
-  castMenu = life.cast;
-  if (!life.troops) troopsPlan = null;
+  if (!life.cast) drop('castMenu');
+  if (!life.troops) drop('troopsPlan');
   // Состав ряда — `cmdPresence.ts` (REFM-185): серая кнопка и ОТСУТСТВУЮЩАЯ значат
   // разное. Отсутствием показывается то, чего у выделения нет по природе (нечего
   // останавливать, нет флагмана, нет артиллерии), гашением — то, что есть, но сейчас
@@ -8987,7 +8949,7 @@ function renderSplitDialog() {
   // `|| !plan || !f` — это не второе правило, а хвост для компилятора: их наличие уже
   // гарантировано `lives`, но через вызов функции TS этого не видит.
   if (!lives || !plan || !f) {
-    splitState = null;
+    drop('splitState');
     if (splitdlg.style.display !== 'none') splitdlg.style.display = 'none';
     lastSplitHtml = '';
     return;
@@ -9019,7 +8981,7 @@ function renderSplitDialog() {
 splitdlg.addEventListener('click', (ev) => {
   if (ev.target === splitdlg && splitState) {
     // click on the dimmed backdrop (outside the box) cancels
-    splitState = null;
+    drop('splitState');
     renderSplitDialog();
     invalidateCmdBar();
     renderCmdBar();
@@ -9029,7 +8991,7 @@ splitdlg.addEventListener('click', (ev) => {
   if (!bEl || bEl.disabled || !splitState) return;
   const sx = bEl.dataset.sx;
   if (sx === 'cancel') {
-    splitState = null;
+    drop('splitState');
     renderSplitDialog();
     invalidateCmdBar();
     renderCmdBar();
@@ -9052,7 +9014,7 @@ splitdlg.addEventListener('click', (ev) => {
       playerOrder(
         splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
       );
-    splitState = null;
+    drop('splitState');
     renderSplitDialog();
     invalidateCmdBar();
     invalidatePanel();
@@ -9151,8 +9113,7 @@ side.addEventListener('click', (ev) => {
     // «цели по умолчанию», а гадать за игрока — худший из вариантов.
     const base = squadronBase(arg);
     if (base) {
-      strikeAim = { from: base, squadronId: arg };
-      squadMerge = null;
+      arm('strikeAim', { from: base, squadronId: arg }); // слияние звеньев гаснет само
       note(t('hint.wing-aim'));
     }
   } else if (act === 'wingduty') {
@@ -9171,12 +9132,13 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'wingmerge') {
     // Первый тап взводит источник; повторный по нему же — отмена (взведённый режим
     // обязан иметь выход без приказа).
-    squadMerge = squadMerge?.from === arg ? null : { from: arg };
+    if (squadMerge?.from === arg) drop('squadMerge');
+    else arm('squadMerge', { from: arg });
   } else if (act === 'wingmergeto') {
     const from = squadMerge?.from;
     const found = from ? squadronAt(from) : null;
     if (from && found) playerOrder(mergeSquadron(ME, found.base, from, arg));
-    squadMerge = null;
+    drop('squadMerge');
   } else if (act === 'wingload' || act === 'wingunload') {
     // Что именно перегружать — `hangarPanel.ts` (`transferPick`): первый живой стек
     // источника, столько, сколько влезет в приёмник. Кнопки нет, если брать нечего,
@@ -9460,46 +9422,28 @@ cmdbar.addEventListener('click', (ev) => {
     return;
   }
   if (MOBILE && cmd !== 'more') mobileDraft = null;
-  if (MOBILE && cmd && ['move', 'engage', 'merge', 'attack', 'pick', 'target'].includes(cmd)) cmdMore = false;
-  // Что гаснет от СОСЕДНЕЙ команды — `armDisarm.ts` (REFM-195): у каждого взводимого
-  // состояния свой список «своих» команд, и в нём же подкоманды поповера (иначе ⇅-меню
-  // закрывалось бы от собственной кнопки «+1»); кнопка без команды гасит ВСЁ; а
-  // `chainMode` в таблицу не входит намеренно — в режиме цепочки полоска ЗАМЕНЯЕТ ряд,
-  // других команд там физически нет, и выход только своими кнопками (chexit/chsend),
-  // Back и Escape.
-  if (disarms('merge', cmd)) merging = false;
-  if (disarms('cast', cmd)) castMenu = false;
-  if (disarms('retreat', cmd)) retreatMenu = false;
-  if (disarms('troops', cmd)) troopsPlan = null;
-  if (disarms('assault', cmd)) assaultAim = false;
-  if (disarms('engage', cmd)) engageAim = false;
-  // A real order leaves «Выбрать+» (the group stays selected and takes it);
-  // ☰ and the ⊕ toggle itself keep the picking session alive.
-  if (disarms('pick', cmd)) pickMode = false;
-  // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
-  heroAim = null;
-  retreatAim = null;
-  heroSpawnAim = null;
-  strikeAim = null;
+  // Что гаснет от СОСЕДНЕЙ команды — `armDisarm.ts` (REFM-195, REFM-207): у каждого
+  // взводимого состояния свой список «своих» команд, и в нём же подкоманды поповера (иначе
+  // ⇅-меню закрывалось бы от собственной кнопки «+1»); кнопка без команды гасит ВСЁ;
+  // прицелы из окон гаснут от любой; «Курс» — от нового намерения; ☰ на телефоне
+  // сворачивается выбором приказа. `chainMode` в таблицу не входит намеренно — в режиме
+  // цепочки полоска ЗАМЕНЯЕТ ряд, других команд там физически нет, и выход только своими
+  // кнопками (chexit/chsend), Back и Escape. Ниже ветки только взводят и переключают своё.
+  disarmForCommand(cmd, MOBILE);
   if (cmd === 'rocket-mine' && ids.length === 1) {
     mineControls.openFleet(ids[0]!);
   } else if (cmd === 'engage') {
-    engageAim = !engageAim; // arm / disarm the attack order
-    aiming = false;
-    assaultAim = false;
+    toggle('engageAim'); // arm / disarm the attack order
     if (engageAim && !MOBILE) note(t('hint.pick-engage'));
   } else if (cmd === 'move') {
-    aiming = !aiming; // arm / disarm the move order
-    assaultAim = false;
-    engageAim = false;
+    toggle('aiming'); // arm / disarm the move order
     // Подсказка только на тач: там один палец занят прицелом, и жест камеры надо
     // назвать вслух. На PC мышь и так возит камеру перетаскиванием.
     if (aiming && !pcUi() && !MOBILE) note(t('hint.aim-armed'));
   } else if (cmd === 'merge') {
     if (ids.length >= 2) mergeGroup(ids);
     else {
-      merging = !merging; // lone fleet → arm: next friendly-fleet tap is the anchor
-      aiming = false;
+      toggle('merging'); // lone fleet → arm: next friendly-fleet tap is the anchor
       if (merging && !MOBILE) note(t('hint.pick-merge'));
     }
   } else if (cmd === 'stop') {
@@ -9510,26 +9454,25 @@ cmdbar.addEventListener('click', (ev) => {
     if (pcUi() || MOBILE) {
       // PC: ШТУРМ aims like «Курс» — the next click on someone else's world sends
       // the fleet there and it storms on arrival (valid targets ring up on the map).
-      assaultAim = !assaultAim;
-      aiming = false;
-      engageAim = false;
+      toggle('assaultAim');
       if (assaultAim && !MOBILE) note(t('hint.pick-assault'));
     } else {
       for (const id of ids) if (s.fleets[id]?.orbit === 'near') playerOrder(assaultFleet(ME, id));
-      aiming = false;
     }
   } else if (cmd === 'split') {
     const id = ids[0];
     if (id) {
-      splitState = splitState ? null : { fleetId: id, take: {} }; // toggle the dialog
-      aiming = false;
+      // toggle the dialog
+      if (splitState) drop('splitState');
+      else arm('splitState', { fleetId: id, take: {} });
       renderSplitDialog();
     }
   } else if (cmd === 'troops') {
     const id = ids[0];
     if (id) {
-      troopsPlan = troopsPlan ? null : { fleetId: id, plan: {} }; // toggle the popover
-      aiming = false;
+      // toggle the popover
+      if (troopsPlan) drop('troopsPlan');
+      else arm('troopsPlan', { fleetId: id, plan: {} });
     }
   } else if (cmd === 'tstep' || cmd === 'tmax') {
     // Набор количества. Шаг КЛАМПИТСЯ моделью, а не блокируется — как «+10» в
@@ -9562,7 +9505,7 @@ cmdbar.addEventListener('click', (ev) => {
         for (const o of load) playerOrder(loadArmy(ME, st.fleetId, o.unit, o.count));
       }
     }
-    troopsPlan = null;
+    drop('troopsPlan');
   } else if (cmd === 'target') {
     // CHAIN-UX: вход в режим «Приказ» — карта становится рабочей поверхностью,
     // тапы по точкам собирают план (CC-1 цепочка), полоска заменяет ряд команд.
@@ -9598,18 +9541,17 @@ cmdbar.addEventListener('click', (ev) => {
   } else if (cmd === 'chexit') {
     exitChainMode(); // выход без отправки — живые планы не тронуты
   } else if (cmd === 'more') {
-    cmdMore = !cmdMore; // ☰ — show/hide the extras row
+    toggle('cmdMore'); // ☰ — show/hide the extras row
   } else if (cmd === 'cast') {
-    castMenu = !castMenu; // ✨ — открыть/закрыть меню способностей героя-флагмана
-    aiming = false;
+    toggle('castMenu'); // ✨ — открыть/закрыть меню способностей героя-флагмана
   } else if (cmd === 'castdo') {
     // Cast a hero ability from the row: ranged → arm the map (next world tap = target,
     // via the shared heroAim flow); self/aura → fire in place immediately.
     const heroId = bEl.dataset.hero ?? '';
     const abilityId = bEl.dataset.ab ?? '';
-    castMenu = false;
+    drop('castMenu');
     if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
-      heroAim = { heroId, abilityId };
+      arm('heroAim', { heroId, abilityId });
       note(t('yard.pick.target'));
     } else {
       playerOrder(castHeroAbility(ME, heroId, abilityId));
@@ -9628,7 +9570,7 @@ cmdbar.addEventListener('click', (ev) => {
   } else if (cmd === 'qretr') {
     // RETR-2: авто-отход. Кнопка открывает окошко с порогами (заказ владельца 2026-09-23;
     // раньше она обходила ступени по кругу, и нужный порог приходилось «прощёлкивать»).
-    retreatMenu = !retreatMenu;
+    toggle('retreatMenu');
   } else if (cmd === 'retrset') {
     // Группой единообразно: вся группа снимается с места на одной отметке.
     //
@@ -9650,11 +9592,10 @@ cmdbar.addEventListener('click', (ev) => {
         note(t('hint.auto-retreat', { n: Math.round(at * 100), at: placeName(to) }));
       }
     }
-    retreatMenu = false;
+    drop('retreatMenu');
   } else if (cmd === 'pick') {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
-    pickMode = !pickMode;
-    aiming = false;
+    toggle('pickMode');
     if (pickMode && !MOBILE) note(t('hint.multiselect'));
   }
   invalidateCmdBar();
@@ -9714,7 +9655,7 @@ function selectAt(mx: number, my: number) {
       return;
     }
     if (anchor) orderMerge(movers, anchor.id);
-    merging = false;
+    drop('merging');
     invalidatePanel();
     return;
   }
@@ -9724,7 +9665,7 @@ function selectAt(mx: number, my: number) {
   // молчанием. Промах мимо всего снимает прицел.
   if (owner === 'ally-order' && allyAim) {
     const kind = allyAim;
-    allyAim = null;
+    drop('allyAim');
     const ally = linkedAlly(s, ME);
     const fleets = Object.values(s.fleets);
     const pool =
@@ -9751,7 +9692,7 @@ function selectAt(mx: number, my: number) {
   // (`errText`).
   if (owner === 'shuttle-strike' && strikeAim) {
     const { from, squadronId } = strikeAim;
-    strikeAim = null;
+    drop('strikeAim');
     const foe = nearestHit(hostileFleets(Object.values(s.fleets), ME), fleetAnchor, mx, my, rFleet);
     const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (!squadronAt(squadronId)) {
@@ -9771,7 +9712,7 @@ function selectAt(mx: number, my: number) {
   // отказом (`errText`), а не молчаливым расцеплением. Промах мимо мира снимает прицел.
   if (owner === 'retreat' && retreatAim) {
     const fleetId = retreatAim;
-    retreatAim = null;
+    drop('retreatAim');
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (n) playerOrder(retreatFleet(ME, fleetId, n.id));
     else note(t('hint.retreat-cancelled'));
@@ -9782,7 +9723,7 @@ function selectAt(mx: number, my: number) {
   // are the core's gates — a mis-aim comes back as an honest rejection note.
   if (owner === 'cast' && heroAim) {
     const cast = heroAim;
-    heroAim = null;
+    drop('heroAim');
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (n) playerOrder(castHeroAbility(ME, cast.heroId, cast.abilityId, n.id));
     else note(t('hint.cast-cancelled'));
@@ -9795,7 +9736,7 @@ function selectAt(mx: number, my: number) {
   // on a world under your fleet still means the world.
   if (owner === 'deploy' && heroSpawnAim) {
     const heroId = heroSpawnAim;
-    heroSpawnAim = null;
+    drop('heroSpawnAim');
     const hero = s.heroes?.[heroId];
     const canBoard = (hero?.abilities ?? []).some(
       (a) => a !== null && data.heroAbilities[a]?.type === 'spawn_fleet',
@@ -9837,7 +9778,7 @@ function selectAt(mx: number, my: number) {
       return;
     }
     if (fate === 'fire') tryAssaultGroup(selectedFleetIds(), n!.id);
-    assaultAim = false;
+    drop('assaultAim');
     invalidatePanel();
     return;
   }
@@ -9868,7 +9809,7 @@ function selectAt(mx: number, my: number) {
       stageMobileTarget('engage', foe ? { kind: 'fleet', id: foe.id } : null);
       return;
     }
-    engageAim = false;
+    drop('engageAim');
     invalidatePanel();
     if (!foe) {
       note(t('hint.engage-enemy-only'));
@@ -9948,7 +9889,7 @@ function selectAt(mx: number, my: number) {
       const lane = nearestLanePoint(mx, my);
       if (lane) tryMoveEdgeGroup(selectedFleetIds(), { from: lane.from, to: lane.to, t: lane.t });
     }
-    aiming = false;
+    drop('aiming');
     invalidatePanel();
     return;
   }
@@ -10530,13 +10471,7 @@ document.getElementById('rail-steward')?.addEventListener('click', () => steward
 const battleWin = $('battlewin');
 /** Взвести «Отступить» для флота: остальные прицелы гаснут, окно боя уступает карту. */
 function armRetreat(fleetId: string): void {
-  retreatAim = fleetId;
-  aiming = false;
-  assaultAim = false;
-  engageAim = false;
-  merging = false;
-  heroAim = null;
-  strikeAim = null;
+  arm('retreatAim', fleetId);
   battleWin.classList.remove('show');
   note(t('hint.pick-retreat'));
   invalidatePanel();
@@ -10608,12 +10543,8 @@ const heroStaff = initHeroStaff({
   me: () => ME,
   order: playerOrder,
   note: (msg) => note(msg),
-  armCast: (heroId, abilityId) => {
-    heroAim = { heroId, abilityId };
-  },
-  armSpawn: (heroId) => {
-    heroSpawnAim = heroId;
-  },
+  armCast: (heroId, abilityId) => arm('heroAim', { heroId, abilityId }),
+  armSpawn: (heroId) => arm('heroSpawnAim', heroId),
 });
 
 // --- session market: a two-sided order book, one tab per tradeable good -------
@@ -10682,7 +10613,7 @@ const allyScreen = initAllyScreen({
     return at ? placeName(at) : '—';
   },
   arm: (kind) => {
-    allyAim = kind;
+    arm('allyAim', kind);
     note(t('ally.pick', { order: t(`ally.kind.${kind}`) }));
   },
   armed: () => allyAim,
@@ -10697,7 +10628,7 @@ const allyScreen = initAllyScreen({
 function tickAlly(): void {
   if (!linkedAlly(s, ME)) {
     if (allyScreen.isOpen()) allyScreen.close();
-    allyAim = null;
+    drop('allyAim');
     return;
   }
   allyScreen.refresh();
@@ -12187,13 +12118,8 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   selFleet = null;
   selPlanet = null;
   selFleets = new Set();
-  aiming = false;
-  assaultAim = false;
-  retreatAim = null;
-  merging = false;
+  disarm('match', MOBILE); // прицелы и окна старого матча указывают на то, чего здесь нет
   additive = false;
-  splitState = null;
-  troopsPlan = null;
   if (chainMode) exitChainMode(); // режим «Приказ» не переживает смену матча
   chainRouteCache.clear(); // маршруты принадлежат карте СТАРОГО матча
   killStats = { destroyed: 0, lost: 0 };
@@ -12607,6 +12533,7 @@ function netClientFor(seat: string): MultiplayerClient {
           NET = true;
           ME = snap.playerId ?? ME;
           clearSelection();
+          disarm('match', MOBILE); // как в соло: прицел героя или удара старой сессии гаснет тоже
           endScreen = null; // joining a match must not carry the previous result
           matchEnd.reset(); // переподключение к матчу считает его конец заново
           if (chainMode) exitChainMode(); // черновик прежней сессии не переносится
@@ -14070,7 +13997,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
-  { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; invalidatePanel(); } }, // z45
+  { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
   // --- низ экрана (z27…z20) ---
   { id: 'chatwin', isOpen: () => chatWin?.isOpen() ?? false, close: () => chatWin?.close() }, // z27
   { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => { mobileChoices = []; } },
@@ -14078,26 +14005,22 @@ const BACK_LAYERS: BackLayer[] = [
   // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
   {
     id: 'cmdbar',
-    isOpen: () => troopsPlan !== null || castMenu || retreatMenu || (MOBILE && cmdMore),
+    isOpen: () => anyArmed('back-popover', MOBILE),
     close: () => {
-      troopsPlan = null;
-      castMenu = false;
-      retreatMenu = false;
-      if (MOBILE) cmdMore = false;
+      disarm('back-popover', MOBILE);
       invalidateCmdBar();
     },
   }, // z26
   // …а вторым Back — сам режим (черновик выбрасывается, живые планы не тронуты).
   { id: 'chain', isOpen: () => chainMode !== null, close: () => exitChainMode() },
+  // Любой прицел — и из окон тоже (`armDisarm.ts`, правило 9): прицел героя, удара или
+  // союзника иначе переживал Back, и следующий тап по карте срабатывал.
   {
     id: 'aim',
-    isOpen: () => aiming || assaultAim || merging || !!retreatAim || (MOBILE && (engageAim || pickMode)),
+    isOpen: () => anyArmed('back-aim', MOBILE),
     close: () => {
       if (MOBILE) cancelMobileOrder();
-      aiming = false;
-      assaultAim = false;
-      retreatAim = null;
-      merging = false;
+      disarm('back-aim', MOBILE);
       invalidatePanel();
     },
   },
@@ -16241,7 +16164,7 @@ function enterChainMode(fleetIds: string[]): void {
   if (!mine.length) return;
   const pre = draftFrom(chainStepsOf(mine[0]!) ?? []);
   chainMode = { fleetIds: mine, steps: pre.steps, gestures: pre.gestures, menu: null };
-  aiming = false;
+  drop('aiming');
   note(t('hint.pick-order'));
   invalidateCmdBar();
   invalidatePanel();

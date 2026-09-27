@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
+import { disarmedBy } from '../../decisions/armDisarm';
 import { barStays, popoverLife, type OpenPopovers, type PopoverBases } from './popoverLife';
 
 const БАЗА: PopoverBases = {
@@ -81,6 +82,11 @@ describe('✕ окна выбора на ПК (плейтест 2026-09-26)', ()
     // barStays(0, picking=true) держит ряд живым: если ✕ не снимает набор, окно остаётся
     // пустым «0 флотов» и не закрывается.
     expect(barStays(0, true)).toBe(true);
-    expect(main).toMatch(/dismiss: \(\) => \{\s*pickMode = false;[\s\S]*?clearSelection\(\);\s*renderCmdBar\(\);/);
+    // Что гасит ✕, решает строка таблицы (`armDisarm.ts`, правило 11), а не рукописный
+    // список рядом с крестиком — на обеих платформах.
+    for (const phone of [false, true]) expect(disarmedBy('dismiss', phone)).toContain('pickMode');
+    expect(main).toMatch(
+      /dismiss: \(\) => \{\s*disarm\('dismiss', MOBILE\);\s*clearSelection\(\);\s*renderCmdBar\(\);/,
+    );
   });
 });
