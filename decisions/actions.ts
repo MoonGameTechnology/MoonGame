@@ -308,6 +308,9 @@ export const traderSell = (playerId: string, resource: string, amount: number) =
 /** Торговец экспедиции: продать `amount` штук `give` и на всю выручку купить `get`. */
 export const traderSwap = (playerId: string, give: string, get: string, amount: number) =>
   act(playerId, 'trader.swap', { give, get, amount });
+/** Глава IV: назначить флот у архива на извлечение накопителя (PVR-7.3). */
+export const extractionStart = (playerId: string, fleetId: string) =>
+  act(playerId, 'extraction.start', { fleetId });
 /** Reclaim your own lot, refunding its remaining escrow. */
 export const marketCancel = (playerId: string, id: string) =>
   act(playerId, 'market.cancel', { id });

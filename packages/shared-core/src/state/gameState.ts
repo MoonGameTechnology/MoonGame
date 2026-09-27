@@ -337,7 +337,33 @@ export type MatchEndReason =
    *  standing wins TOGETHER (`match.winners`), there is no single champion. */
   | 'pve-cleared'
   /** PVE-4: every human seat fell. The NPC is the formal winner. */
-  | 'pve-failed';
+  | 'pve-failed'
+  /** PVR-7.3: the archive's data package reached the extraction zone after contact —
+   *  the survivors win together, as on `pve-cleared`. */
+  | 'pve-extracted'
+  /** PVR-7.3: the package's carrier was destroyed. The NPC is the formal winner. */
+  | 'pve-carrier-lost';
+
+/** Состояние извлечения накопителя (PVR-7.3). Отсутствующие поля — «ещё не случилось». */
+export interface ExtractionState {
+  /** Архив — провинция, где извлекают накопитель. */
+  vault: PlanetId;
+  /** Зона вывода — куда носитель должен доставить накопитель. */
+  zone: PlanetId;
+  /** Сколько игровых часов работы нужно (темп матча учитывается при счёте). */
+  hours: number;
+  /** Сделанная работа, мс. Уход с архива ставит на паузу, а не обнуляет. */
+  doneMs: number;
+  /** Назначенный на извлечение флот и его владелец. */
+  fleetId?: FleetId;
+  owner?: PlayerId;
+  /** Флот, везущий готовый накопитель: один на матч, переезжает при слиянии. */
+  carrier?: FleetId;
+  extractedAt?: number;
+  deliveredAt?: number;
+  /** Носитель уничтожен — поражение главы (резолюция владельца 2026-09-27). */
+  lostAt?: number;
+}
 
 export interface MatchScore {
   /** Map control: owned planet/sectors. */
@@ -918,6 +944,9 @@ export interface GameState {
    *  когда он записан. Публичный — это цена рынка, туман его не режет. Нет раздела ⇒ все
    *  курсы на базе (режим без торговца его не заводит вовсе). */
   trader?: Record<string, TraderRate>;
+  /** Накопитель архива главы IV (`extractionModule`, PVR-7.3): заводит загрузчик, если
+   *  карта объявила архив (`vault`). Нет раздела — сценария извлечения в матче нет. */
+  extraction?: ExtractionState;
   /** A player's designated capital world (`capitalModule`, `capital.designate`) — the
    *  hero respawn anchor (`heroModule` falls back to `[hero.home, hero.location]`).
    *  Absent for a player who never (re-)designated ⇒ their heroes' `home` is whatever

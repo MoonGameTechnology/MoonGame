@@ -15,6 +15,7 @@ import {
   loadoutEffectsModule,
   minefieldModule,
   rendezvousModule,
+  extractionModule,
   seatClaimModule,
   visibilityModule,
   movementModule,
@@ -172,6 +173,8 @@ export const MODULES: GameModule[] = [
   // Сценарный союзник главы IV (PVR-7.2): слушает `fleet.arrived` и ставит стойку по месту
   // встречи. В КОНЕЦ — то же место, что в серверном `DEV_MODULES`.
   rendezvousModule,
+  // Накопитель архива главы IV (PVR-7.3): после союзника — слушает его `ally.contact`.
+  extractionModule,
 ];
 
 export const kernel = createKernel(MODULES);

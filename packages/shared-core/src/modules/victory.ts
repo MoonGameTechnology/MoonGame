@@ -307,6 +307,22 @@ function evaluateVictory(h: HandlerContext): void {
       endMatch(h, npcPlayerId, 'pve-failed');
       return;
     }
+    // Глава с архивом (PVR-7.3, резолюция владельца 2026-09-27): исход решает накопитель.
+    // Носитель уничтожен — поражение; доставлен после связи с союзником — победа тех, кто
+    // стоит. Волны и удержание такую главу НЕ выигрывают: «победа — только доставка», —
+    // поэтому ветка зачистки ниже для неё не спрашивается вовсе. Модуль извлечения пишет
+    // факты в `state.extraction`, здесь они только читаются.
+    const extraction = h.state.extraction;
+    if (extraction) {
+      if (extraction.lostAt !== undefined) {
+        endMatch(h, npcPlayerId, 'pve-carrier-lost');
+        return;
+      }
+      if (extraction.deliveredAt !== undefined) {
+        endMatch(h, highestScore(scores, humansAlive), 'pve-extracted', humansAlive);
+        return;
+      }
+    }
     // Cleared: every wave has landed AND either the enemy holds nothing or the humans
     // held out to the deadline. Order matters — wiping the hive early does not end the
     // match, it only starves later waves (`pveModule` skips a spawn with nowhere to
@@ -321,7 +337,7 @@ function evaluateVictory(h: HandlerContext): void {
     // verdict above is judged first.
     const { holdUntil } = h.state.pve;
     const heldOut = holdUntil !== undefined && h.ctx.now >= holdUntil;
-    if (waveNumber >= totalWaves && (!holding(npcPlayerId) || heldOut)) {
+    if (!extraction && waveNumber >= totalWaves && (!holding(npcPlayerId) || heldOut)) {
       // A coalition win with no single champion: the survivors won together, so
       // `winner` is the top scorer among them and every one of them is in `winners`.
       endMatch(h, highestScore(scores, humansAlive), 'pve-cleared', humansAlive);
@@ -440,7 +456,7 @@ function evaluateVictory(h: HandlerContext): void {
  */
 export const victoryModule: GameModule = {
   id: 'victory',
-  version: '1.2.0',
+  version: '1.3.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));
@@ -453,5 +469,8 @@ export const victoryModule: GameModule = {
     api.on('pve.hold', (_event, h) => evaluateVictory(h));
     // Сдача в забеге (PVR-6.29): вердикт сразу, а не на следующем ходе часов.
     api.on('pve.abandoned', (_event, h) => evaluateVictory(h));
+    // Накопитель главы IV (PVR-7.3): доставка и потеря — вердикт в тот же миг.
+    api.on('extraction.delivered', (_event, h) => evaluateVictory(h));
+    api.on('extraction.lost', (_event, h) => evaluateVictory(h));
   },
 };

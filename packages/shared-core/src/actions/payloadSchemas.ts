@@ -121,6 +121,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'trader.buy': z.object({ resource: id, amount: traderUnits }),
   'trader.sell': z.object({ resource: id, amount: traderUnits }),
   'trader.swap': z.object({ give: id, get: id, amount: traderUnits }),
+  // extraction.ts — накопитель архива главы IV: какой флот у архива ведёт извлечение.
+  'extraction.start': z.object({ fleetId: id }),
   // diplomacy.ts — one action for the whole protocol (D2+D3): escalation applies
   // at once, a friendlier declaration records/commits a mutual-consent offer
   'diplomacy.declare': z.object({

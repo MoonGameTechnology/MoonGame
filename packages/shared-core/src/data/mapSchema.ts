@@ -51,6 +51,11 @@ export const MapSectorSchema = z.object({
   /** Rendezvous with a scripted ally (PVR-7.2): the id of a map inhabitant (`npc: 'neutral'`)
    *  that the first human fleet arriving here allies with. Validated against `players`. */
   rendezvous: z.string().min(1).optional(),
+  /** Archive holding the data package (PVR-7.3): `hours` of work by a fleet parked here,
+   *  then the carrier delivers it to `zone`. At most one per map; validated by the loader. */
+  vault: z
+    .object({ hours: z.number().positive(), zone: z.string().min(1) })
+    .optional(),
   /** Terrain id → resolved against game data `sectors` (speed / HP modifiers). */
   terrain: z.string().optional(),
   /** World nature id → game data `planetTypes` (production / defense), if a planet. */

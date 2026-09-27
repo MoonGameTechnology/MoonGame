@@ -268,6 +268,8 @@ export const ru: Record<string, string> = {
   'ai.end.over': 'матч завершён',
   'ai.end.pve-cleared': 'все волны отражены',
   'ai.end.pve-failed': 'оборона пала',
+  'ai.end.pve-extracted': 'накопитель доставлен в зону вывода',
+  'ai.end.pve-carrier-lost': 'носитель накопителя уничтожен',
   'ai.end.score': 'достижением лимита очков',
   'ai.end.timeout': 'истечением времени',
 
@@ -1892,6 +1894,9 @@ export const ru: Record<string, string> = {
   'err.no-artillery': 'нет артиллерии',
   'err.no-supply': 'в этом режиме снабжения нет',
   'err.no-trader': 'в этой партии торговца нет',
+  'err.no-vault': 'в этой партии архива нет',
+  'err.not-at-vault': 'флот не у архива',
+  'err.vault-held': 'архив держит враг',
   'err.trade-too-small': 'выручки не хватит даже на одну единицу',
   'err.supply-exhausted': 'снабжение на эту экспедицию исчерпано',
   'err.swarm-only': 'такое растит только Рой',

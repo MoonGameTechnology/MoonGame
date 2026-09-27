@@ -655,6 +655,7 @@ export {
   SALVAGE_BONUS_STAT,
 } from './modules/loadoutEffects';
 export { rendezvousModule, contactedAllies } from './modules/rendezvous';
+export { extractionModule, extractionNeedMs, extractionRunning } from './modules/extraction';
 export {
   minefieldModule,
   MINE_CHARGE_STAT,

@@ -117,6 +117,9 @@ TRAITS = {'staging': ['haven']}
 # Место встречи: первое прибытие флота игрока с живым кораблём устанавливает связь с союзником
 # (PVR-7.2, `rendezvousModule`).
 RENDEZVOUS = {'rendezvous': 'ally'}
+# Архив с накопителем (PVR-7.3): часы работы флота у очищенного архива и зона вывода — база
+# у входа. Срок — эскиз (§6.10): около полутора минут на ×150.
+VAULT = {'archive': {'hours': 4, 'zone': 'staging'}}
 
 # ЗАДАЧИ ЗАБЕГА — пул из восьми (§6.7 + общие глаголы); видно по правилу PVR-5.3, как во всех
 # главах. Главная цепочка (связь → архив → накопитель → вывод) — не задача пула: она решает
@@ -155,6 +158,8 @@ for sid, (x, y, kind, terrain, owner, garr, blds) in P.items():
         sec['traits'] = TRAITS[sid]
     if sid in RENDEZVOUS:
         sec['rendezvous'] = RENDEZVOUS[sid]
+    if sid in VAULT:
+        sec['vault'] = VAULT[sid]
     sectors[sid] = sec
 
 m = collections.OrderedDict([

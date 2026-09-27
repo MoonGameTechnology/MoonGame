@@ -265,6 +265,8 @@ export const en: Record<string, string> = {
   'ai.end.over': 'the match has ended',
   'ai.end.pve-cleared': 'every wave repelled',
   'ai.end.pve-failed': 'the defence fell',
+  'ai.end.pve-extracted': 'the data package reached the extraction zone',
+  'ai.end.pve-carrier-lost': 'the package carrier was destroyed',
   'ai.end.score': 'by score limit',
   'ai.end.timeout': 'on the clock',
 
@@ -1885,6 +1887,9 @@ export const en: Record<string, string> = {
   'err.no-artillery': 'no artillery',
   'err.no-supply': 'this mode has no supplies',
   'err.no-trader': 'there is no trader in this match',
+  'err.no-vault': 'there is no archive in this match',
+  'err.not-at-vault': 'the fleet is not at the archive',
+  'err.vault-held': 'the enemy holds the archive',
   'err.trade-too-small': 'the proceeds would not buy a single unit',
   'err.supply-exhausted': 'no supplies left this run',
   'err.swarm-only': 'only the Swarm grows this',
