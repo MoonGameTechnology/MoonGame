@@ -15,6 +15,25 @@
  *
  * Пусто — значит комиксов пока нет, и игра идёт как раньше.
  */
-import type { ComicRegistry } from '../../decisions/chapterComics';
+import type { ComicRegistry, ComicTaskTriggers } from '../../decisions/chapterComics';
+import training1Intro1 from '../art/comics/training-1/intro-1.webp';
+import pve1Intro1 from '../art/comics/pve-1/intro-1.webp';
+import pve1Task1 from '../art/comics/pve-1/task-1.webp';
 
-export const CHAPTER_COMICS: ComicRegistry = {};
+// Страницы владельца (`art/comics/sector-zero/`, PR #1341): текст нарисован на самой
+// странице по-русски, поэтому подписей из локали у них нет.
+export const CHAPTER_COMICS: ComicRegistry = {
+  // «Протокол допуска» — перед учебным полигоном.
+  'training-1': { intro: [{ image: training1Intro1 }] },
+  'pve-1': {
+    // Инструктаж — перед первой экспедицией.
+    intro: [{ image: pve1Intro1 }],
+    // Отлёт с учёным — когда задача спасения впервые выполнена.
+    task: [{ image: pve1Task1 }],
+  },
+};
+
+/** После какой задачи главы играет её комикс `task`. */
+export const COMIC_TASK_TRIGGERS: ComicTaskTriggers = {
+  'pve-1': 'mission.rescue-scientist',
+};

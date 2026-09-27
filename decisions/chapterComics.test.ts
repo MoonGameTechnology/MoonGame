@@ -5,6 +5,7 @@ import {
   comicDue,
   comicId,
   comicProblems,
+  comicTaskDue,
   markComicSeen,
   type ComicRegistry,
 } from './chapterComics';
@@ -40,6 +41,22 @@ describe('комикс главы — когда показывать (реше�
   });
 });
 
+describe('комикс после ключевой задачи главы', () => {
+  const REG: ComicRegistry = { 'pve-1': { task: PANELS } };
+  const TRIG = { 'pve-1': 'mission.rescue-scientist' };
+
+  it('задача выполнена, комикс не показан — отдаём панели', () => {
+    expect(comicTaskDue(fresh(), REG, TRIG, 'pve-1', ['mission.rescue-scientist'])).toEqual(PANELS);
+  });
+
+  it('задача не выполнена, у главы нет триггера или комикс уже показан — ничего', () => {
+    expect(comicTaskDue(fresh(), REG, TRIG, 'pve-1', ['mission.recon'])).toBeNull();
+    expect(comicTaskDue(fresh(), REG, TRIG, 'pve-2', ['mission.rescue-scientist'])).toBeNull();
+    const seen = markComicSeen(fresh(), comicId('pve-1', 'task'));
+    expect(comicTaskDue(seen, REG, TRIG, 'pve-1', ['mission.rescue-scientist'])).toBeNull();
+  });
+});
+
 describe('отметка «показан» живёт в профиле — и переживает облако', () => {
   it('новый профиль — ничего не показано', () => {
     expect(fresh().comicsSeen).toEqual([]);
@@ -48,9 +65,9 @@ describe('отметка «показан» живёт в профиле — и 
   it('сохранённая отметка читается обратно, мусор — нет', () => {
     const raw = JSON.stringify({
       ...fresh(),
-      comicsSeen: ['pve-1:intro', 'pve-2:outro', 'pve-1:intro', 42, 'не-то', 'pve-1:credits'],
+      comicsSeen: ['pve-1:intro', 'pve-2:outro', 'pve-1:task', 'pve-1:intro', 42, 'не-то', 'pve-1:credits'],
     });
-    expect(parseSectorZeroProgress(raw, data).comicsSeen).toEqual(['pve-1:intro', 'pve-2:outro']);
+    expect(parseSectorZeroProgress(raw, data).comicsSeen).toEqual(['pve-1:intro', 'pve-2:outro', 'pve-1:task']);
   });
 
   it('старый профиль без поля читается как «ничего не показано»', () => {

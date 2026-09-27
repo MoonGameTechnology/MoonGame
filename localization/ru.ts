@@ -2663,6 +2663,7 @@ export const ru: Record<string, string> = {
   'sector-zero.comic.next': 'Дальше ›',
   'sector-zero.comic.to-battle': 'В бой',
   'sector-zero.comic.to-results': 'К итогам',
+  'sector-zero.comic.resume': 'Продолжить',
   'sector-zero.shop.bought': 'Куплено.',
   'sector-zero.shop.empty': 'Витрина пуста.',
   'sector-zero.shop.sold-out': 'Прилавок раскуплен — новый завоз со сменой суток.',

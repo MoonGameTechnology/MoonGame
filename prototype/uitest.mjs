@@ -48,6 +48,11 @@ function mkEl(id) {
       child.parentNode = this;
       return child;
     },
+    replaceChildren(...kids) {
+      for (const c of this._children) c.parentNode = null;
+      this._children = [];
+      for (const c of kids) this.appendChild(c);
+    },
     insertBefore(child, before) {
       child.parentNode?.removeChild(child);
       const index = this._children.indexOf(before);
@@ -558,6 +563,12 @@ assert.equal(getEl('sz-codex-screen').hidden, true);
 assert.equal(getEl('sz-home').hidden, false, 'back returns to the menu');
 await click('sz-strong');
 await click('sz-new');
+// Первый забег главы I открывает её комикс (инструктаж); «Пропустить» ведёт в бой.
+assert.equal(getEl('comic').style.display, 'flex', 'the chapter comic plays before the first run');
+assert.equal(getEl('comic-next').hidden, true, 'buttons wait while the page is on screen');
+await click('comic-skip');
+await Promise.resolve();
+assert.equal(getEl('comic').style.display, 'none');
 assert.equal(getEl('sector-zero').style.display, 'none');
 assert.equal(getEl('setup').style.display, 'none');
 assert.equal(getEl('scipick').classList.contains('show'), false);
