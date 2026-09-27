@@ -114,6 +114,9 @@ P = collections.OrderedDict([
 ])
 
 TRAITS = {'staging': ['haven']}
+# Место встречи: первое прибытие флота игрока с живым кораблём устанавливает связь с союзником
+# (PVR-7.2, `rendezvousModule`).
+RENDEZVOUS = {'rendezvous': 'ally'}
 
 # ЗАДАЧИ ЗАБЕГА — пул из восьми (§6.7 + общие глаголы); видно по правилу PVR-5.3, как во всех
 # главах. Главная цепочка (связь → архив → накопитель → вывод) — не задача пула: она решает
@@ -150,6 +153,8 @@ for sid, (x, y, kind, terrain, owner, garr, blds) in P.items():
         sec['garrison'] = garr
     if sid in TRAITS:
         sec['traits'] = TRAITS[sid]
+    if sid in RENDEZVOUS:
+        sec['rendezvous'] = RENDEZVOUS[sid]
     sectors[sid] = sec
 
 m = collections.OrderedDict([

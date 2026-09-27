@@ -7,6 +7,7 @@ import {
   salvageModule,
   loadoutEffectsModule,
   minefieldModule,
+  rendezvousModule,
   captureOnArrivalModule,
 
   combatModule,
@@ -203,6 +204,10 @@ export const DEV_MODULES: GameModule[] = [
   loadoutEffectsModule,
   minefieldModule,
   rocketMinesModule, // isolated road-weapon timers; preserve all existing module order
+  // Сценарный союзник главы IV (PVR-7.2): по `fleet.arrived` в месте встречи ставит факт
+  // контакта и стойку `alliance`. В КОНЕЦ: хуков нет, на прибытие отвечает последним, так
+  // что бой, захват и мины на узле завязываются как прежде.
+  rendezvousModule,
 ];
 
 /** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
@@ -217,7 +222,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '47'; // Road installations and legendary rocket mines.
+export const MODULE_MANIFEST_VERSION = '48'; // PVR-7.2: в конец вошёл `rendezvous` 1.0.0 —
+// сценарный союзник главы IV: прибытие в место встречи ставит факт `missionFacts.contacted` и
+// стойку `alliance`. У состояния новые поля `Planet.rendezvous` и `missionFacts.contacted`.
+// Партия на 47 не знает этого правила.
+// export const MODULE_MANIFEST_VERSION = '47'; // Road installations and legendary rocket mines.
 // Previous version 46: // Фаза 3 модулей кораблей: в конец вошли
 // `loadoutEffects` 1.0.0 и `minefield` 1.0.0, `combat` 2.5.0 берёт цену отступления из
 // хука, `construction` чинит флот тендером, у состояния появилась запись `minefields`.
