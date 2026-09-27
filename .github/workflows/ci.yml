@@ -208,3 +208,20 @@ jobs:
             exit 1
           fi
         continue-on-error: true
+
+      # REFM-204: сетевая партия — вход позывным, приказ, обрыв с дозвоном, выход ‹ в хаб.
+      # Страховка распила `main.ts`: сетевую проводку (сокет, дозвон, выход) не видит ни
+      # один другой робот. Собирает прототип сам и поднимает прото-сервер на свободном
+      # порту; `DATABASE_URL` этой джобы он серверу не передаёт — мир каждый раз новый.
+      # Поза та же — не блокирует, сбой всплывает аннотацией.
+      - name: Network match smoke (non-blocking)
+        run: |
+          if ! pnpm run smoke:browser:install; then
+            echo "::warning title=Network match smoke::смоук не смог установиться (Chromium недоступен) — сетевая партия НЕ проверялась"
+            exit 1
+          fi
+          if ! pnpm run smoke:net; then
+            echo "::error title=Network match smoke::робот нашёл ошибку в сетевой партии — смотри лог шага"
+            exit 1
+          fi
+        continue-on-error: true

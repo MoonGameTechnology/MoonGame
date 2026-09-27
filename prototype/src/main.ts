@@ -12427,6 +12427,11 @@ function netClientFor(seat: string): MultiplayerClient {
           chainRouteCache.clear();
           showConnect(false);
           showHub(false); // hide the hub so inMatch() is true → Back works (BF-31)
+          // Экран настройки — по той же причине. Вход из обозревателя партий открывает
+          // партию в СВЕЖЕМ документе (`/game/<id>`), где этот экран никто не прятал: его
+          // инлайновый display пуст, `inMatch()` читал «настройка открыта», и ‹, Back и
+          // Escape «закрывали» её поверх живой партии вместо выхода (нашёл `smoke:net`).
+          setupEl.style.display = 'none';
           note(t('net.connected', { who: NAME[ME] ?? ME }));
           // Latency probe: ping every 2s with a client timestamp the pong echoes.
           if (pingTimer) clearInterval(pingTimer);
@@ -12671,7 +12676,12 @@ function connect(): void {
     // именно, не зависит от кода отказа: иначе ссылка стала бы оракулом существования
     // партий. Признак берётся из `cameFromLink`, а не из невидимости оверлея: оверлей
     // теперь держится до впуска, чтобы не показывать карту тому, кого могут не пустить.
-    if (cameFromLink || !connectShown()) {
+    // Только для отказа ДО впуска. Впущенный сокет сюда не относится: обрыв в партии
+    // переподключается молча, а `keep-reason` у впущенного значит, что игрок ушёл сам
+    // (выходы гасят `NET` до закрытия) и уже стоит там, куда просился. Без этой
+    // оговорки обрыв выкидывал из партии на карточку входа, а ⌂ вёл не в хаб, а на неё
+    // же (нашёл `smoke:net`).
+    if (fate === 'keep-reason' && !socketAdmitted && (cameFromLink || !connectShown())) {
       const reason = statusEl.textContent ?? '';
       const srv = resolveServer();
       const landing = joinLanding({
@@ -12778,8 +12788,10 @@ const authProbe: Promise<void> = (async () => {
   await probeAuthMode(base);
   // Кому раскрывать форму — `identityProbe.ts` (REFM-154, правило 4): только новичку.
   // Запомненный позывной значит, что карточку пропустили: форму никто не увидит, а
-  // `suggestCallsign()` затёр бы уже введённое имя.
-  if (!revealSignup(authMode ? 'accounts' : 'nicks', localStorage.getItem('void.nick') ?? '')) {
+  // `suggestCallsign()` затёр бы уже введённое имя. Режим передаётся как есть: прежнее
+  // `authMode ? 'accounts' : 'nicks'` осталось с тех пор, когда режим был булевым, а строка
+  // истинна всегда — и новичку на сервере без аккаунтов раскрывалось поле пароля.
+  if (!revealSignup(authMode, localStorage.getItem('void.nick') ?? '')) {
     return;
   }
   if (!wNickInput.value.trim()) wNickInput.value = suggestCallsign();
@@ -12943,11 +12955,6 @@ function connectToMatch(
   // Развилка «пустить или послать на вход» — `joinGate.ts` (REFM-140); там же причины,
   // почему просьбу запоминают, почему пароль спрашивают только при известном сервере и
   // почему сессия проверяется наличием, а не совпадением позывного.
-  if (!authMode) {
-    claimDone(id);
-    connect();
-    return;
-  }
   detach(
     'заход в партию: билет и подключение',
     (async () => {
@@ -12958,6 +12965,15 @@ function connectToMatch(
         serverKnown: !!srv,
         hasSession: !!cached,
       });
+      // Сервер без аккаунтов пускает по позывному: билет не нужен, сессии нет. Этот шаг
+      // потерялся, когда режим стал строкой (`IdentityMode`): прежняя проверка
+      // `if (!authMode)` больше никогда не срабатывала, и вход по позывному падал на
+      // `cached!.token` ниже (нашёл `smoke:net`, REFM-204).
+      if (next.step === 'connect') {
+        claimDone(id);
+        connect();
+        return;
+      }
       if (next.step === 'sign-in') {
         askSignIn(id, slot, faction, next.password ? srv : null, scientists);
         return;
