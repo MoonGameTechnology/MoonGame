@@ -35,8 +35,8 @@
 | REFP-13 | 🗑 | proto | `docs/backlog.md` | division.ts |
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
 | REFM-203 | ✅ | proto | `docs/backlog.md` | missionPanel.ts |
-| REFM-204 | ⏳ | proto | `docs/backlog.md` | smoke:net — сетевая партия в живом браузере. |
-| REFM-205 | 🔒 | proto | `docs/backlog.md` | Выход из партии — одна дверь. |
+| REFM-204 | ✅ | proto | `docs/backlog.md` | smoke:net — сетевая партия в живом браузере |
+| REFM-205 | ⏳ | proto | `docs/backlog.md` | Выход из партии — одна дверь. |
 | REFM-206 | ⏳ | proto | `docs/backlog.md` | Перерисовка по имени. |
 | REFM-207 | ⏳ | proto | `docs/backlog.md` | Владелец прицелов и поповеров |
 | REFM-208 | 🔒 | proto | `docs/backlog.md` | Владелец выбора |
