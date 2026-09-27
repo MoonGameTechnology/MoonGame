@@ -22,7 +22,7 @@ const hooks = `window.__minesTest = {
     f.units = [{ unit: 'cruiser', count: 1, modules: ['rocket_mine_layer'] }];
     f.location = null; f.movement = null; f.battleId = null; f.edge = { from: a.id, to: b, t: 0.5 };
     s.players[ME].resources.metal = 1000; s.players[ME].resources.microelectronics = 1000;
-    selFleet = f.id; selFleets = new Set([f.id]); selPlanet = null;
+    setFleetSelection([f.id]);
     lastPanelHtml = ''; lastCmdHtml = ''; renderPanel(); renderCmdBar();
   },
   ord: () => s.ordnance,
@@ -53,6 +53,8 @@ try {
       await enterSkirmish(page);
       await page.waitForFunction(() => window.__minesTest.prepared());
       await page.evaluate(() => window.__minesTest.prepare());
+      // The phone keeps utility commands under the real More button.
+      if (viewport.width < 600) await page.locator('[data-cmd="more"]').click();
       await page.locator('[data-cmd="rocket-mine"]').click();
       const deploy = page.locator('[data-rm="deploy"][data-mode="confirmed"]');
       assert.equal(await deploy.isEnabled(), true);
@@ -75,6 +77,7 @@ try {
         );
       }
     });
+    console.log(`Mines UI ${viewport.width}px passed.`);
     await context.close();
   }
   console.log(
