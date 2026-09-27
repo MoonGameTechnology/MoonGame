@@ -136,9 +136,15 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     // FPS мир идёт с той же быстротой»). Семантика просрочки не тронута: она защищает
     // от приказов, построенных под устаревший мир, — здесь лишь не даём ей срабатывать
     // из-за медленного устройства.
+    // Непилотируемые обитатели карты не занимают очередь хода: появление/удаление
+    // такого NPC иначе сдвигает фазы всех ботов, хотя самому NPC ходить нечем.
+    // Кресла людей остаются в расписании для делегирования Хранителю; NPC — только
+    // при явном включении в контроллеры хоста.
+    const botSeats = host.aiSeats();
+    const seats = Object.keys(current.players).filter((id) => !current.players[id]!.npc || botSeats.has(id));
     let planned = false;
     for (let slices = 0; slices < AI_SLICES_PER_FRAME; ) {
-      const step = ai.step(current.time, Object.keys(current.players), policyFor, planFor);
+      const step = ai.step(current.time, seats, policyFor, planFor);
       if (!step.worked) break;
       if (!step.action) {
         if (planned) break; // это уже следующее место — его план построим в следующем кадре
