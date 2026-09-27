@@ -27,8 +27,12 @@ describe('⌂ в экспедиции спрашивает, а не уходит
     const body = handler('tomenu');
     expect(body.length).toBeGreaterThan(200);
     expect(body).toMatch(/if \(ev\.isTrusted && runInProgress\(\)\) \{\s*openAbandon\('exit', \$\('tomenu'\)\);\s*return;\s*\}/);
-    // Проверка стоит ДО ухода: иначе забег успел бы сохраниться и закрыться.
-    expect(body.indexOf("openAbandon('exit'")).toBeLessThan(body.indexOf('saveRun()'));
+    // Проверка стоит ДО ухода: иначе забег успел бы сохраниться и закрыться. Уход — дверь
+    // `leaveMatch` (REFM-205), и сохраняет забег она.
+    const exit = body.indexOf('leaveMatch();');
+    expect(exit).toBeGreaterThan(0);
+    expect(body.indexOf("openAbandon('exit'")).toBeLessThan(exit);
+    expect(/function leaveMatch\(\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1]).toContain('saveRun();');
   });
 
   it('«В меню» уходит программным кликом — он не доверенный, поэтому карточка не открывается вновь', () => {

@@ -1407,7 +1407,6 @@ export const en: Record<string, string> = {
   'net.bad-address': 'Invalid server address',
   'net.connected': '● connected as {who}',
   'net.connecting': 'Connecting: {nick}…',
-  'net.disconnected': '● disconnected from server',
   'net.error': 'Error: {code}',
   'net.join-closed': 'this match is closed to new players (the entry window has elapsed)',
   'net.match-full': 'match is full — every seat is taken',

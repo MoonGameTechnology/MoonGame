@@ -930,7 +930,7 @@ import { afterTokenRefused, joinStep } from '../../decisions/joinGate';
 import { assaultSteps } from '../../decisions/assaultOrder';
 import { dialIdentity, dialUrl, seatTicketKey } from '../../decisions/netDial';
 import { closeAction, isCurrentSocket } from '../../decisions/socketFate';
-import { welcomePlan } from '../../decisions/netWelcome';
+import { isReconnectBanner, welcomePlan } from '../../decisions/netWelcome';
 import { orderPlan } from '../../decisions/orderRoute';
 import { clientPlan, liveSocket, seatKey } from '../../decisions/netClientReuse';
 import { errorTarget, refusalKey } from '../../decisions/errorRoute';
@@ -10349,16 +10349,9 @@ const endScreenPanel = initEndScreen({
     apply: () => changeSectorProgress({ kind: 'double-reward' }),
   },
   onLeave: (which, wasNet) => {
-    // Уход из сетевого матча — намеренный дисконнект (без авто-реконнекта).
-    if (wasNet) {
-      userClosed = true;
-      NET = false;
-      netAdmitted = false;
-      if (netSock) netSock.close();
-    }
-    // ONB-2: матч мог закончиться посреди гайда — незакрытый тур продолжил бы рисовать
-    // свой #spotlight поверх хаба и следующего матча.
-    activeTour?.stop();
+    // Уход — через дверь `leaveMatch` (REFM-205): из сетевого матча без дозвона, гайд и
+    // первые цели гаснут (матч мог закончиться посреди гайда, ONB-2).
+    leaveMatch();
     // «Повторить обучение» — сразу новый полигон; «В меню» — в меню Sector Zero.
     if (!wasNet && isTraining()) {
       if (which === 'again') startTraining();
@@ -10385,13 +10378,33 @@ const endScreenPanel = initEndScreen({
 });
 const renderEndScreen = (): void => endScreenPanel.render();
 
-// Speedbar "⌂ В меню": leave the current match back to the hub from anywhere in-game.
-// In net mode this is an intentional disconnect (userClosed → no auto-reconnect). The
-// sim keeps ticking underneath as the menu's live backdrop, same as the other overlays.
-// BF-29: in solo, STOP the sim on exit — otherwise the world keeps ticking, the AI
-// loses, elimination fires, and "Victory!" paints over the hub. In net the server is
-// authoritative (it keeps ticking regardless), but the end-screen overlay is suppressed
-// while the hub is visible (see renderEndScreen guard).
+/**
+ * Выход из партии — одна дверь (REFM-205). Её зовут ⌂ (а через него ‹, рельс и аппаратный
+ * Back), итоговый экран, вход в Sector Zero, «Одиночная игра» в хабе и в обзоре партий и
+ * кнопка тестов. Куда вести игрока дальше, решает вызывающий. Пока выход был копиями, они
+ * разошлись: итоговый экран не гасил первые цели, три копии не закрывали сокет, и ни одна
+ * не гасила дозвон (см. `leaveNetwork`).
+ *
+ * - Забег Sector Zero сохраняется, и «Продолжить» поднимет его с этой минуты. Вне забега и
+ *   после его засчёта `saveRun` ничего не пишет.
+ * - Мир под меню встаёт. В соло иначе ИИ доигрывал бы партию, и «Победа!» ложилась поверх
+ *   хаба (BF-29). Сетевому миру после выхода снимков больше не будет, а локальный ход
+ *   сочинял бы его сам.
+ * - Гайд гаснет (ONB-2): его #spotlight — синглтон на document.body, и незакрытый тур
+ *   рисовал свой последний шаг поверх хаба и следующего матча (z-50, выше всего).
+ * - Первые цели гаснут (ONB-7): список первой сессии живёт ровно одну партию.
+ */
+function leaveMatch(): void {
+  saveRun();
+  speed = 0;
+  leaveNetwork();
+  stopFirstGoals();
+  activeTour?.stop();
+}
+
+// Speedbar "⌂ В меню": leave the current match from anywhere in-game — through the one
+// door `leaveMatch`; a run or the training ground leads to the Sector Zero menu, the rest
+// to the hub.
 $('tomenu').addEventListener('click', (ev) => {
   // ⌂ в идущей экспедиции спрашивает (решение владельца 2026-09-26): в меню с сохранением
   // или завершить и забрать награду. Спрашивает только живой тап — программные выходы
@@ -10400,26 +10413,8 @@ $('tomenu').addEventListener('click', (ev) => {
     openAbandon('exit', $('tomenu'));
     return;
   }
-  const wasRun = isSectorZeroRun();
   const toSectorZero = leavesToSectorZero();
-  if (wasRun) saveRun();
-  if (NET) {
-    userClosed = true;
-    NET = false;
-    netAdmitted = false;
-    netAdmitted = false; // BF-30: no longer in a server-assigned seat
-    if (netSock) netSock.close();
-  } else {
-    speed = 0; // BF-29: freeze the solo sim so the AI can't "win" while you're in the hub
-  }
-  stopFirstGoals(); // ONB-7: leaving the match ends the onboarding checklist
-  // ONB-2 (found live): a mid-tutorial exit via ⌂/Back used to leave the guide's
-  // rAF loop running — its own `stop()` never fired, so #spotlight (a document.body
-  // singleton) kept painting the LAST step's overlay over the hub, and over whatever
-  // match got installed next (its dim/ring/bubble sit at z-50, above everything).
-  // Any exit from a live match must kill the tour, not just the ones that walk off
-  // its own end (`done`) or its own «Пропустить обучение».
-  activeTour?.stop();
+  leaveMatch();
   if (toSectorZero) openSectorZero();
   else openHub();
 });
@@ -10809,9 +10804,7 @@ if (!__PLAYER_BUILD__) {
   // The dev client hides the button behind `?dev` / vd.dev (dev chrome).
   if (!DEV_UI) $('ctest').style.display = 'none';
   $('ctest')?.addEventListener('click', () => {
-    userClosed = true;
-    NET = false;
-    netAdmitted = false;
+    leaveMatch();
     showConnect(false);
     openTestMode();
   });
@@ -11521,9 +11514,7 @@ function openReset(token: string): void {
 $('hub-play').addEventListener('click', () => hubTab('games'));
 // Single-player entry from the hub home — offline skirmish vs bots (both builds).
 $('hub-solo').addEventListener('click', () => {
-  userClosed = true; // intentional leave → don't auto-reconnect to a server
-  NET = false;
-  netAdmitted = false;
+  leaveMatch();
   showHub(false);
   openSetup('hub');
 });
@@ -12509,6 +12500,53 @@ function dropNetClient(): void {
   netSeat = null;
 }
 
+/** Погасить телеметрию соединения: пинг и замер производительности живут, пока жив сокет. */
+function stopNetTimers(): void {
+  if (pingTimer) {
+    clearInterval(pingTimer);
+    pingTimer = null;
+  }
+  if (perfTimer) {
+    clearInterval(perfTimer);
+    perfTimer = null;
+  }
+  rttEma = null;
+}
+
+/**
+ * Уйти из сети — одна дверь для каждого выхода из партии (REFM-205, зовёт её `leaveMatch`).
+ * Раньше это были шесть копий трёх флагов, и копии разошлись: три не закрывали сокет, и ни
+ * одна не гасила цикл переподключения. На обрыве `NET` уже ложен, а таймер дозвона жив,
+ * поэтому ⌂ уводил игрока в хаб, а дозвон через секунду возвращал его в партию, из которой
+ * он ушёл (нашёл `smoke:net`). Отсюда три правила:
+ *
+ * 1. Дверь работает и вне сетевой партии: гасит таймер и счётчик дозвона и снимает СВОЙ
+ *    баннер «переподключение…», чужие («ждём хоста», итог матча) не трогает.
+ * 2. Сокет забывается ДО закрытия. Его позднее `close` (как и запоздавший снимок) видит
+ *    чужой сокет и ничего не трогает, иначе отказ до впуска посадил бы игрока в хаб или на
+ *    карточку входа из того места, куда он ушёл (ADDR-5). Телеметрию гасим здесь же:
+ *    обработчик закрытия до неё больше не дойдёт.
+ * 3. Вместе с клиентом уходит его очередь приказов (NETA2-5): приказ, отданный на обрыве,
+ *    не должен догнать игрока, когда тот снова сядет на это место.
+ */
+function leaveNetwork(): void {
+  userClosed = true;
+  NET = false;
+  netAdmitted = false;
+  reconnecting = false;
+  reconnectAttempts = 0;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (isReconnectBanner(banner)) banner = null;
+  stopNetTimers();
+  const sock = netSock;
+  netSock = null;
+  sock?.close();
+  dropNetClient();
+}
+
 /**
  * Транспортный клиент для этого места — прежний со своей очередью или новый
  * (`netClientReuse.ts`, NETA2-5).
@@ -12771,27 +12809,12 @@ function connect(): void {
       admitted: socketAdmitted,
     });
     if (fate === 'ignore') return;
-    if (pingTimer) {
-      clearInterval(pingTimer);
-      pingTimer = null;
-    }
-    if (perfTimer) {
-      clearInterval(perfTimer);
-      perfTimer = null;
-    }
-    rttEma = null;
-    if (fate === 'closed-by-user' || fate === 'reconnect') {
+    stopNetTimers();
+    // Закрытие, затеянное игроком, сюда не доходит: выход идёт через `leaveNetwork`, а она
+    // забывает сокет до закрытия, и `closeAction` видит чужой сокет (REFM-205).
+    if (fate === 'reconnect') {
       NET = false;
       netAdmitted = false;
-    }
-    if (fate === 'closed-by-user') {
-      statusEl.textContent = 'disconnected';
-      note(t('net.disconnected'));
-      // Игрок вышел сам — вместе с клиентом умирает и его очередь (NETA2-5): приказ,
-      // выданный перед выходом, не должен догнать игрока в следующем матче.
-      dropNetClient();
-      showConnect(true);
-    } else if (fate === 'reconnect') {
       // unexpected drop → auto-rejoin our seat (the match keeps running server-side)
       note(t('net.reconnecting'));
       // Клиент переживает обрыв (NETA2-5): с этой секунды приказы копятся у него в
@@ -13461,9 +13484,7 @@ function renderMatches(): void {
       `<div class="msolo"><button class="mbtn" id="msolo-go">▶ ${t('browser.solo')}</button>` +
       `<div class="msolo-sub">${t('browser.solo.hint')}</div></div>`;
     document.getElementById('msolo-go')?.addEventListener('click', () => {
-      userClosed = true;
-      NET = false;
-      netAdmitted = false;
+      leaveMatch();
       openSetup('hub');
     });
   };
@@ -13773,6 +13794,9 @@ function scheduleReconnect(): void {
         'переподключение: новый билет',
         (async () => {
           const join = await fetchJoinToken(srv.base, currentMatchId, session);
+          // Игрок вышел, пока ждали билет: `leaveNetwork` погасил цикл, и дозвон вернул бы
+          // его в партию, из которой он ушёл (REFM-205).
+          if (!reconnecting) return;
           if (!join) {
             scheduleReconnect(); // transient (or session expired — status line explains)
             return;
@@ -14213,8 +14237,7 @@ function restoreSolo(): void {
   try { mapPreset(save.state.mapId); mapNodesFromState(save.state); }
   catch { $('solo-save-status').textContent = t('solo.save.invalid'); return; }
   soloSaveActive = false; // installMatch must not overwrite the checkpoint being read
-  userClosed = true;
-  netAdmitted = false;
+  leaveNetwork(); // схватка из сохранения — не сетевая партия: из сети той же дверью
   cameFromLink = false;
   installMatch(save.state, new Map(save.ai));
   for (const id of save.autoAssault) autoAssault.add(id);
@@ -15225,14 +15248,8 @@ addEventListener('pageshow', checkTabOwner);
 function openSectorZero(preparation = false, replay = false): void {
   claimSectorZero();
   saveSolo();
-  speed = 0;
-  userClosed = true;
-  if (NET && netSock) netSock.close();
-  NET = false;
-  netAdmitted = false;
+  leaveMatch();
   cameFromLink = false; // explicit local entry after a network visit may resume its own run
-  activeTour?.stop();
-  stopFirstGoals();
   hideMapLoading();
   // Close the map's layers before the new screen takes over. Do not route the
   // setup's Back button through the multiplayer hub on the way here.

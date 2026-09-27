@@ -1413,7 +1413,6 @@ export const ru: Record<string, string> = {
   'net.bad-address': 'Неверный адрес сервера',
   'net.connected': '● подключён как {who}',
   'net.connecting': 'Подключение: {nick}…',
-  'net.disconnected': '● отключён от сервера',
   'net.error': 'Ошибка: {code}',
   'net.join-closed': 'вход в этот матч закрыт (окно приёма новых игроков истекло)',
   'net.match-full': 'матч заполнен — все места заняты',
