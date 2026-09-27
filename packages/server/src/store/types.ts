@@ -1,3 +1,4 @@
+import type { CorpBuildOrder, CorpInfrastructureResult } from '@void/protocol';
 import type { ArsenalItem, GameState, PlayerId } from '@void/shared-core';
 
 /** A durable snapshot of a match — enough to resume it byte-for-byte after a
@@ -212,7 +213,10 @@ export interface CorpAuditEntry {
     | 'ready'
     | 'medal'
     | 'rent'
-    | 'rent_return';
+    | 'rent_return'
+    | 'building_start'
+    | 'building_complete'
+    | 'building_income';
   /** Subject account id, when the action has one. */
   target?: string;
   /** Extra context, e.g. the new role for `role`. */
@@ -232,6 +236,9 @@ export const DEFAULT_RESULTS_LIMIT = 50;
 export const DEFAULT_FEED_LIMIT = 50;
 
 export interface CorpStore {
+  /** Settle elapsed construction/income, optionally order a level. Membership,
+   * debit, queue and audit commit together; only the head may spend influence. */
+  infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult>;
   /** Create a corp with `head` as its Глава — atomic, so a duplicate name or an
    *  already-membered founder can't slip in between check and insert. */
   createCorp(

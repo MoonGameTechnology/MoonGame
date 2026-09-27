@@ -1,0 +1,88 @@
+{
+  "buildings": [
+    {
+      "id": "headquarters",
+      "nameKey": "corp.building.headquarters",
+      "descriptionKey": "corp.building.headquarters.desc",
+      "levels": [
+        {
+          "cost": 0,
+          "durationMs": 3600000,
+          "headquarters": 0,
+          "influencePerDay": 24,
+          "constructionReduction": 0
+        },
+        {
+          "cost": 120,
+          "durationMs": 21600000,
+          "headquarters": 1,
+          "influencePerDay": 48,
+          "constructionReduction": 0
+        },
+        {
+          "cost": 360,
+          "durationMs": 43200000,
+          "headquarters": 2,
+          "influencePerDay": 72,
+          "constructionReduction": 0
+        }
+      ]
+    },
+    {
+      "id": "supply_center",
+      "nameKey": "corp.building.supply-center",
+      "descriptionKey": "corp.building.supply-center.desc",
+      "levels": [
+        {
+          "cost": 60,
+          "durationMs": 10800000,
+          "headquarters": 1,
+          "influencePerDay": 48,
+          "constructionReduction": 0
+        },
+        {
+          "cost": 180,
+          "durationMs": 21600000,
+          "headquarters": 2,
+          "influencePerDay": 96,
+          "constructionReduction": 0
+        },
+        {
+          "cost": 420,
+          "durationMs": 43200000,
+          "headquarters": 3,
+          "influencePerDay": 144,
+          "constructionReduction": 0
+        }
+      ]
+    },
+    {
+      "id": "engineering_complex",
+      "nameKey": "corp.building.engineering-complex",
+      "descriptionKey": "corp.building.engineering-complex.desc",
+      "levels": [
+        {
+          "cost": 80,
+          "durationMs": 14400000,
+          "headquarters": 1,
+          "influencePerDay": 0,
+          "constructionReduction": 10
+        },
+        {
+          "cost": 240,
+          "durationMs": 28800000,
+          "headquarters": 2,
+          "influencePerDay": 0,
+          "constructionReduction": 20
+        },
+        {
+          "cost": 560,
+          "durationMs": 57600000,
+          "headquarters": 3,
+          "influencePerDay": 0,
+          "constructionReduction": 30
+        }
+      ]
+    }
+  ]
+}

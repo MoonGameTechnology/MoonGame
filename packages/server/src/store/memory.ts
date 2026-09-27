@@ -1,3 +1,5 @@
+import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
+import { updateCorpInfrastructure } from '../corpConstruction';
 import { randomUUID } from 'node:crypto';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
 import type {
@@ -257,6 +259,22 @@ export class MemoryUserStore implements UserStore {
 
 /** In-memory corp store — membership keyed by account (one corp per account). */
 export class MemoryCorpStore implements CorpStore {
+  private readonly infrastructureStates = new Map<string, CorpInfrastructureState>();
+
+  infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+    // No await between the authorization read and commit: one event-loop operation.
+    const member = this.members.get(actor);
+    const corp = this.corps.get(corpId);
+    if (!corp || !member || member.corpId !== corpId || member.role === 'recruit' || (order && member.role !== 'head')) {
+      return Promise.resolve({ ok: false, code: 'E_FORBIDDEN' });
+    }
+    const updated = updateCorpInfrastructure(corpId, actor, member.role, corp.influence, this.infrastructureStates.get(corpId) ?? null, now, order);
+    corp.influence = updated.influence;
+    this.infrastructureStates.set(corpId, updated.state);
+    this.audit.push(...updated.audit);
+    return Promise.resolve(structuredClone(updated.result));
+  }
+
   private readonly corps = new Map<string, CorpRecord>();
   /** `accountId → membership` — the map key IS the one-corp-per-account invariant. */
   private readonly members = new Map<string, CorpMembership>();
@@ -352,6 +370,7 @@ export class MemoryCorpStore implements CorpStore {
 
   removeCorp(corpId: string): Promise<void> {
     this.corps.delete(corpId);
+    this.infrastructureStates.delete(corpId);
     this.corpReady.delete(corpId);
     for (const [accountId, row] of this.members) {
       if (row.corpId === corpId) {

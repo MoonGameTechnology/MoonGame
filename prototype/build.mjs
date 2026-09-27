@@ -730,7 +730,7 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 /* the always-present in-match «?» help button (rail tool) reuses the rail styles */
 /* ONB-3 just-in-time intro card — one-screen first-contact explainer, z-58 so it
    layers ABOVE the panel it introduces (tech/market/… at z-47) but below settings(59). */
-#intro{position:fixed;inset:0;z-index:58;display:none;align-items:center;justify-content:center;padding:18px;
+#intro{position:fixed;inset:0;z-index:61;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #intro.show{display:flex;}
 #intro .inbox{width:min(400px,92vw);max-height:84vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
@@ -3054,8 +3054,7 @@ ${profileCss}
 #corp .cpoints{flex:none;text-align:center;padding:6px 12px;border:1px solid var(--line-hi);border-radius:10px;}
 #corp .cpoints b{display:block;color:var(--cyan);font-size:17px;line-height:1.1;}
 #corp .cpoints span{color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase;}
-/* Вкладки — СЕТКА, а не лента с прокруткой: шесть штук влезают в два ряда, и ни одна
-   не уезжает за край экрана (полоса прокрутки прятала половину вкладок на телефоне). */
+/* Corporation tabs stay visible in a wrapping grid on every viewport. */
 #corp .corptabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;
   border-bottom:1px solid var(--line);}
 #corp .ctab{display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:7px 6px;
@@ -3095,6 +3094,19 @@ ${profileCss}
 #corp .cmemb.me .cm-role{border-color:var(--cyan-dim);color:var(--cyan);}
 #corp .cm-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
 /* Плитки «Штаба» — четыре числа, ради которых экран и открывают. */
+#corp .ctab:last-child:nth-child(7){grid-column:1 / -1;}
+@media(max-width:600px){#corp .corptabs{grid-template-columns:repeat(2,1fr);}}
+#corp .cbuild-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+#corp .cbuild-summary{display:flex;flex-wrap:wrap;gap:10px 18px;color:var(--cyan);padding:12px 0;}
+#corp .cbuild-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;}
+#corp .cbuild-card{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;}
+#corp .cbuild-card header{display:flex;flex-direction:column;gap:6px;color:var(--cyan);}
+#corp .cbuild-card header span,#corp .cbuild-effects small{color:var(--dim);font-size:11px;}
+#corp .cbuild-effects{display:flex;flex-direction:column;gap:4px;margin:8px 0;}
+#corp .cbuild-card button{margin-top:auto;min-height:44px;}
+#corp .cbuild-card button:disabled{opacity:.45;cursor:default;}
+#corp .cbuild-queue{display:flex;flex-direction:column;gap:10px;border:1px solid var(--cyan);border-radius:10px;padding:14px;margin:12px 0;}
+#corp .cbuild-queue progress{width:100%;height:10px;accent-color:var(--cyan);}
 #corp .chq-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:6px;}
 #corp .chq-tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;
   background:rgba(255,255,255,.02);}

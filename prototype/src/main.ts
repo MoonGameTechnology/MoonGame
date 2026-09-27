@@ -13865,6 +13865,7 @@ const flexed = (id: string): boolean => document.getElementById(id)?.style.displ
 const BACK_LAYERS: BackLayer[] = [
   { id: 'comic', isOpen: () => comicPlayer.isOpen(), close: () => comicPlayer.skip() }, // z90
   { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
+  { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z61, above the cabinet it explains
   // --- модалки поверх всего (z60…z57) ---
   { id: 'solo-replace', isOpen: () => flexed('solo-replace'), close: closeSoloReplace }, // z60
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp?.close() }, // z60
@@ -13876,7 +13877,6 @@ const BACK_LAYERS: BackLayer[] = [
   // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false
   { id: 'testmode', isOpen: () => flexed('testmode'), close: () => hideFlex('testmode') }, // z59
   { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
-  { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z58
   // Оверлей мест остался только заглушкой на время загрузки и на отказ (ENTRY-2):
   // выбор переехал на экран настройки, поэтому закрывать его нечем, кроме как скрыть.
   {
