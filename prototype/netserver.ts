@@ -860,9 +860,8 @@ const server = createMultiplayerServer({
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the
   // claim happens in the join ROUTE below — this transport gate covers the nick path.)
   admitNewSeat: (matchId) => registry.entryOpen(matchId),
-  // The match-browser read-model + archive intents (GET /matches, POST …/archive),
-  // plus the dev client at `/dev` when the player build owns `/` (same no-store
-  // headers as `/` — a stale dev client is as confusing as a stale player one).
+  // The match-browser read-model + archive intents (GET /matches, POST …/archive).
+  // The dev client and the admin console are `documents` below.
   httpRoutes: (app) => {
     // Личность зрителя — из СЕССИИ, когда аккаунты включены: иначе полный матч уходит
     // из «Доступных», а во вкладку «мои» не попадает, и вернуться в свою партию из
@@ -1163,31 +1162,26 @@ const server = createMultiplayerServer({
         return { xp: await commanderStore.xpOf(live.accountId) };
       });
     }
+  },
+  // Остальные страницы хоста. Их отдаёт сервер, как и игру: с `no-store` и политикой по их
+  // же скриптам. Заведённые здесь маршрутом, они получали политику для JSON, и скрипт не
+  // запускался вовсе: с SE-7.1 оба адреса показывали пустую страницу (нашёл `smoke:net`).
+  documents: [
     // ADM-1: страница пульта. Отдаётся только там, где администратор вообще назван —
     // иначе это была бы форма входа, за которой гарантированно нет ни одной двери.
-    // `no-store`, как у остальных клиентов: устаревший пульт так же вреден, как
-    // устаревшая игра, и показывал бы состав, которого уже нет.
-    if (adminHtml !== undefined && AUTH && ADMIN_LOGINS.size > 0) {
-      app.get('/admin', async (_request, reply) => {
-        void reply.header('content-type', 'text/html; charset=utf-8');
-        void reply.header('cache-control', 'no-store, must-revalidate');
-        return adminHtml;
-      });
-    }
-    if (playerHtml !== undefined && devHtml !== undefined) {
-      // ADDR-3: адрес партии живёт ВНУТРИ той сборки, из которой в неё вошли, поэтому
-      // дев-клиент отдаётся и на `/dev/game/<id>`. Без второго маршрута вход с дев-клиента
-      // уводил бы на `/game/<id>`, то есть на игроцкую сборку без дев-оверлея — тихая
-      // подмена клиента прямо посреди сессии.
-      for (const route of ['/dev', '/dev/game/:matchId']) {
-        app.get(route, async (_request, reply) => {
-          void reply.header('content-type', 'text/html; charset=utf-8');
-          void reply.header('cache-control', 'no-store, must-revalidate');
-          return devHtml;
-        });
-      }
-    }
-  },
+    // Устаревший пульт так же вреден, как устаревшая игра, и показывал бы состав,
+    // которого уже нет.
+    ...(adminHtml !== undefined && AUTH && ADMIN_LOGINS.size > 0
+      ? [{ routes: ['/admin'], html: adminHtml }]
+      : []),
+    // ADDR-3: адрес партии живёт ВНУТРИ той сборки, из которой в неё вошли, поэтому
+    // дев-клиент отдаётся и на `/dev/game/<id>`. Без второго маршрута вход с дев-клиента
+    // уводил бы на `/game/<id>`, то есть на игроцкую сборку без дев-оверлея — тихая
+    // подмена клиента прямо посреди сессии.
+    ...(playerHtml !== undefined && devHtml !== undefined
+      ? [{ routes: ['/dev', '/dev/game/:matchId'], html: devHtml }]
+      : []),
+  ],
 });
 let wsUrl: string;
 try {
