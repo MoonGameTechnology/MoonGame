@@ -1,0 +1,605 @@
+{
+  "version": 1,
+  "portraits": [
+    {
+      "id": "01",
+      "name": {
+        "ru": "Стальной взгляд",
+        "en": "Steel Gaze"
+      },
+      "asset": "assets/portrait-01.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 40048,
+      "sha256": "cb4741ab6e9a38446f755e3a0c41e0563650b31d1c0fba886018306ecc768141",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 52-year-old man with light olive skin, a square weathered face, a shaved head, a neatly trimmed salt-and-pepper goatee, strong dark eyebrows, and a faint old scar through one eyebrow. Broad sturdy shoulders."
+    },
+    {
+      "id": "02",
+      "name": {
+        "ru": "Северное сияние",
+        "en": "Northern Lights"
+      },
+      "asset": "assets/portrait-02.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 45738,
+      "sha256": "b4726d9764e894f10a90cbf3dd4d91f825132661195e2b8d9d8c69e89afdf1e9",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 32-year-old woman with pale freckled skin, shoulder-length copper red hair neatly tied back, a few subtle wisps at the temples, gray-green eyes, an angular but friendly face. Athletic shoulders."
+    },
+    {
+      "id": "03",
+      "name": {
+        "ru": "Глубокий космос",
+        "en": "Deep Space"
+      },
+      "asset": "assets/portrait-03.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 35642,
+      "sha256": "452b3d592beb959ab88fa8f70f9cbffc62c9efb01fc5feed13e4ac2b809dc9c8",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 38-year-old Black man with deep brown skin, very short close-cropped black hair, no facial hair, wide cheekbones, a strong jaw and warm dark eyes. Broad athletic shoulders."
+    },
+    {
+      "id": "04",
+      "name": {
+        "ru": "Тихая орбита",
+        "en": "Quiet Orbit"
+      },
+      "asset": "assets/portrait-04.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 39846,
+      "sha256": "cf0d648e1b411a74a86975c86f2114f34e030b0f172aa1bb6723d5abf037ab96",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 30-year-old East Asian woman with warm light skin, sleek straight black hair in a chin-length bob tucked behind her ears, dark eyes, distinct arched eyebrows and an oval face. Slim but squared shoulders."
+    },
+    {
+      "id": "05",
+      "name": {
+        "ru": "За горизонтом",
+        "en": "Beyond the Horizon"
+      },
+      "asset": "assets/portrait-05.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 41830,
+      "sha256": "a87fc0eb480562e5e6992125c3d59b9976dcef9a5a349a5886259195065614b3",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 43-year-old South Asian man with medium brown skin, thick wavy dark hair brushed back, short well-kept full black beard with a few gray strands, deep-set dark eyes and a slightly long nose. Relaxed squared shoulders."
+    },
+    {
+      "id": "06",
+      "name": {
+        "ru": "Серебряная смена",
+        "en": "Silver Watch"
+      },
+      "asset": "assets/portrait-06.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 46590,
+      "sha256": "237023e5fa7ff7d9422cebb2c6191e0a57c51e4ee937e4fb63946f48c8515107",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 61-year-old Black woman with deep warm brown skin, natural short silver-gray curls, dark eyes, visible smile lines and a broad calm face. Poised strong shoulders."
+    },
+    {
+      "id": "07",
+      "name": {
+        "ru": "Новый курс",
+        "en": "New Course"
+      },
+      "asset": "assets/portrait-07.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 44320,
+      "sha256": "fad5b9daa4cc4f721d3c4c3cc4972e40a592439239ad62628dad57521ffa8d80",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 28-year-old light-skinned man with wavy sandy blond hair in a neat short side part, blue-gray eyes, light stubble, a narrow face and a subtly crooked nose. Lean athletic build."
+    },
+    {
+      "id": "08",
+      "name": {
+        "ru": "Солнечный ветер",
+        "en": "Solar Wind"
+      },
+      "asset": "assets/portrait-08.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 43318,
+      "sha256": "25d2a98611455004e3c91510bf42393b1711dec60a84af2e89428b1a5fea6875",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 40-year-old woman with warm medium olive skin, thick dark eyebrows, hazel eyes, dark brown hair pulled into a practical low bun, an aquiline nose and a slightly asymmetrical confident smile. Upright broad shoulders."
+    },
+    {
+      "id": "09",
+      "name": {
+        "ru": "Последний рубеж",
+        "en": "Last Frontier"
+      },
+      "asset": "assets/portrait-09.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 41608,
+      "sha256": "21f045d294fa37fee72bb1426e2b7adf159b446b3e2ace4f23390b404cf82ac7",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 58-year-old East Asian man with weathered medium-light skin, short silver hair brushed upward, clean-shaven angular face, deep expression lines, narrow dark eyes and prominent cheekbones. Strong squared shoulders."
+    },
+    {
+      "id": "10",
+      "name": {
+        "ru": "Дальний сигнал",
+        "en": "Distant Signal"
+      },
+      "asset": "assets/portrait-10.webp",
+      "width": 640,
+      "height": 640,
+      "alpha": true,
+      "bytes": 41948,
+      "sha256": "e31cf1c8f7f108b0d6a0971231da0151f4c060ccabf3e1172309e893093d35f1",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: a single selectable player avatar portrait for the MoonGame science-fiction strategy game.\nReference image 1 is STYLE REFERENCE ONLY: match its realistic painterly 3D game portrait finish, restrained cinematic lighting, credible fabric, and dignified human character design. Create a NEW identity, not any of the four people in the reference.\nOne person only, front-facing, straight upright posture, calm confident expression, eyes toward camera. Square 1024 x 1024 composition, head centered horizontally, top of head at 5% of frame, chin around 35%, both shoulders fully visible, torso extending to bottom edge. Upper-body portrait down to waist. Keep face unobstructed. The jacket's broad front chest from y=50% to 88% must be plain and unobstructed, suitable for attaching UI medals later.\nCostume: sophisticated dark midnight-navy space officer jacket, structured high collar, subtle teal piping and brushed metal fastening, believable woven material. Consistent collar, shoulders and camera framing across the set. Jacket has NO medals, NO badges, NO pins, NO insignia, NO shoulder ranks, NO logos. Hands out of frame. No weapons or props. No helmets, no implants. Transparent background with clean alpha edge; no background scene or shadow rectangle. Soft neutral key light and subtle cool rim light. Detailed natural skin, not beauty retouching, polished but human. No text, no numbers, no grid or collage.\nSubject: A 35-year-old South Asian woman with medium brown skin, short textured dark pixie-cut hair, brown eyes, rounded cheeks and a focused gentle expression. Straight dignified posture."
+    },
+    {
+      "id": "11",
+      "name": {
+        "ru": "Полярная звезда",
+        "en": "Polar Star"
+      },
+      "asset": "assets/portrait-11.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 83358,
+      "sha256": "b6634ed6269785517a57fb4de670d401544611ffbcd6ae86b429d203c0a9bfa7",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 46-year-old woman with fair cool skin, a close silver-white buzz cut, strong cheekbones, pale blue eyes, broad shoulders, no jewelry."
+    },
+    {
+      "id": "12",
+      "name": {
+        "ru": "Тёмная материя",
+        "en": "Dark Matter"
+      },
+      "asset": "assets/portrait-12.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 85712,
+      "sha256": "d3b03a127d702348d2361d7ae058f34091ead6bce1a5297752e11431faa0df1a",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 29-year-old Black man with very dark skin, short tightly coiled high-top hair, slim face, no beard, warm brown eyes."
+    },
+    {
+      "id": "13",
+      "name": {
+        "ru": "Красное смещение",
+        "en": "Redshift"
+      },
+      "asset": "assets/portrait-13.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 99936,
+      "sha256": "220247615461a72f8fb7e33a0714b4bb67246d4a7c3f89ca37a7b7a5476709b9",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 34-year-old white man with copper-red cropped curls, abundant freckles, a neat red mustache, light blue eyes, a long face."
+    },
+    {
+      "id": "14",
+      "name": {
+        "ru": "Небесная механика",
+        "en": "Celestial Mechanics"
+      },
+      "asset": "assets/portrait-14.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 87756,
+      "sha256": "cc95a1a4ca98e085487bf2aaa3b375753aa07096e1a31a1609f91a31e68e1ac1",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 55-year-old East Asian woman with a short salt-and-pepper pixie cut, crow's feet, square jaw and calm dark eyes."
+    },
+    {
+      "id": "15",
+      "name": {
+        "ru": "Гравитация",
+        "en": "Gravity"
+      },
+      "asset": "assets/portrait-15.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 91002,
+      "sha256": "1b192891b66030bd33ba164540ca9dd3db0d50e5e0fcfe62bcb5a0fed118bc3d",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 48-year-old Pacific Islander man, broad substantial build, medium brown skin, thick eyebrows, wavy short black hair and neat short beard."
+    },
+    {
+      "id": "16",
+      "name": {
+        "ru": "Линия рассвета",
+        "en": "Dawn Line"
+      },
+      "asset": "assets/portrait-16.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 76186,
+      "sha256": "ea3089c5c0364dc11a016b1bf9a0c8e0159eac61bc92ecb294205708f4061bfa",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 25-year-old Black woman with deep brown skin, neat narrow braids tied behind the head, round dark eyes, an oval face."
+    },
+    {
+      "id": "17",
+      "name": {
+        "ru": "Ионный след",
+        "en": "Ion Trail"
+      },
+      "asset": "assets/portrait-17.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 85256,
+      "sha256": "bbbeb51cc81bb83a43dd91baebc71a4f0b902a8f7dd7f3aea059bbf06570dbae",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 39-year-old Central Asian man, warm tan skin, high cheekbones, almond-shaped dark eyes, straight black crew cut and no beard."
+    },
+    {
+      "id": "18",
+      "name": {
+        "ru": "Золотой час",
+        "en": "Golden Hour"
+      },
+      "asset": "assets/portrait-18.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 86754,
+      "sha256": "0d97929d4b447c1c845e2af9371a17fb66b8a6f3a561a4b08cc8fb2940d2a3b9",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 44-year-old woman with light warm skin, shoulder-length dark auburn hair tucked behind both ears, hazel eyes and a prominent aquiline nose."
+    },
+    {
+      "id": "19",
+      "name": {
+        "ru": "Белый карлик",
+        "en": "White Dwarf"
+      },
+      "asset": "assets/portrait-19.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 84754,
+      "sha256": "5cbbbd4f2cd114d2a2cc19ec42336a2f6f21806ca488c735b0d7685a387d853a",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 68-year-old white man with wispy short white hair, bushy white eyebrows, a trimmed white mustache, lined face and gentle grey eyes."
+    },
+    {
+      "id": "20",
+      "name": {
+        "ru": "Лунная тень",
+        "en": "Moon Shadow"
+      },
+      "asset": "assets/portrait-20.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 84060,
+      "sha256": "122eb229817163b6402a73686c1abc681308932c6494df5f646863cf995fea58",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 31-year-old Southeast Asian woman with medium tan skin, a sleek black undercut with side-swept short top, angular face and brown eyes."
+    },
+    {
+      "id": "21",
+      "name": {
+        "ru": "Звёздный путь",
+        "en": "Star Path"
+      },
+      "asset": "assets/portrait-21.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 88218,
+      "sha256": "e3c508c9a1da227c7a39a27efaf9a4698984ec62c0f1f8f0b889095d3b0df66e",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 36-year-old Indigenous American man with warm copper-brown skin, strong nose, long straight black hair neatly tied back, clean-shaven."
+    },
+    {
+      "id": "22",
+      "name": {
+        "ru": "Синий импульс",
+        "en": "Blue Pulse"
+      },
+      "asset": "assets/portrait-22.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 87130,
+      "sha256": "825e467aafa1700e92f02ba0c7b29940976a64ab0514f51b30b4dfebd4d24f97",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 27-year-old woman with deep warm brown skin, short natural rounded afro, expressive dark eyebrows, full cheeks and dark eyes."
+    },
+    {
+      "id": "23",
+      "name": {
+        "ru": "Точка опоры",
+        "en": "Anchor Point"
+      },
+      "asset": "assets/portrait-23.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 85918,
+      "sha256": "eb466a22325218a28544937391a39499dbc3841c4eb5acdfe773aeee83f415f3",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 50-year-old Middle Eastern man with olive skin, thick dark hair brushed back with silver at temples, close black-and-grey beard and brown eyes."
+    },
+    {
+      "id": "24",
+      "name": {
+        "ru": "Пятый сектор",
+        "en": "Fifth Sector"
+      },
+      "asset": "assets/portrait-24.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 90388,
+      "sha256": "566492d37497c36555b860f2c93c9aa879baff350f83d5fc3cf196bcf6d08731",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 37-year-old white woman with fair freckled skin, a dark blonde jaw-length blunt bob, grey eyes, broad square face and no makeup."
+    },
+    {
+      "id": "25",
+      "name": {
+        "ru": "Курс на восток",
+        "en": "Eastbound"
+      },
+      "asset": "assets/portrait-25.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 87246,
+      "sha256": "d8708762632b633235be88b41cc2ada975829b14fc04c74e9dcfa634d1b68609",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 24-year-old East Asian man with light warm skin, a softly parted black crop, round face, small beauty mark on left cheek and dark eyes."
+    },
+    {
+      "id": "26",
+      "name": {
+        "ru": "Свет маяка",
+        "en": "Beacon Light"
+      },
+      "asset": "assets/portrait-26.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 90804,
+      "sha256": "22110a92e2fa60894c4c3bd28eb7d756eee0daacae60e48fd0e0050090ad8b92",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 60-year-old South Asian woman with brown skin, silvery hair drawn into a tight low bun, fine smile lines and steady brown eyes."
+    },
+    {
+      "id": "27",
+      "name": {
+        "ru": "Дальний рубеж",
+        "en": "Outer Reach"
+      },
+      "asset": "assets/portrait-27.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 86806,
+      "sha256": "3a7644c24f7d091f2700ccd58aa76e194aa7062b224ae3defc5f43034ccfc70e",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 42-year-old Black man with dark brown skin, shaved head, a neatly groomed full short beard, slightly crooked nose and broad shoulders."
+    },
+    {
+      "id": "28",
+      "name": {
+        "ru": "Орбитальный вальс",
+        "en": "Orbital Waltz"
+      },
+      "asset": "assets/portrait-28.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 84322,
+      "sha256": "80ec39f2f55a53532766101d3c2f504e7f4c76240fc820e3e1d515f0ce86d6ae",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 33-year-old Central Asian woman with golden tan skin, high cheekbones, straight very short black pixie cut and dark eyes."
+    },
+    {
+      "id": "29",
+      "name": {
+        "ru": "Тихий гром",
+        "en": "Quiet Thunder"
+      },
+      "asset": "assets/portrait-29.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 97028,
+      "sha256": "c6e58d9b60a6a71ee0ab144b4c0397ca33e187add3ae5bae1370af1928cfd729",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: original fictional adult avatar for a space strategy game. Create one dignified 57-year-old male space officer, front-facing square shoulders, direct calm gaze. Realistic painterly 3D game art, natural skin texture, soft neutral light and a faint cool rim. A wholly fictional 57-year-old man with light weathered skin, a broad face, close-cropped steel-grey hair, a clean-shaven jaw, slightly large ears and calm green eyes. Original face, not based on any real person. Square upper-body portrait: top of head near 5%, chin at 40%, collar at 55%, torso fills the lower half and continues to the bottom. Dark navy high-collar woven jacket with very subtle thin teal seam trim. The front chest is broad, plain and empty, especially viewer's right at x55–82%, y60–88%, for later UI medals. No medals, emblems, rank badges, insignia, writing, props, weapons or hands. Transparent background, true clean alpha, no scene. One person, no collage."
+    },
+    {
+      "id": "30",
+      "name": {
+        "ru": "Комета",
+        "en": "Comet"
+      },
+      "asset": "assets/portrait-30.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 107786,
+      "sha256": "53fb41f7ba6b1c0111518dfc41557e660474cb06dc989abf06de21dd59f3a130",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 29-year-old Latina woman with warm tan skin, a curly dark-brown bob kept away from the collar, rounded nose and amber-brown eyes."
+    },
+    {
+      "id": "31",
+      "name": {
+        "ru": "Пустотный ветер",
+        "en": "Void Wind"
+      },
+      "asset": "assets/portrait-31.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 79498,
+      "sha256": "27175560bfd6faf3be85a6747e5ab8dea31cf253f92f79ed3a4ce441e808ec98",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 45-year-old South Asian man with medium brown skin, receding short black hair, clean-shaven wide face, thick eyebrows and dark eyes."
+    },
+    {
+      "id": "32",
+      "name": {
+        "ru": "Ледяная орбита",
+        "en": "Frozen Orbit"
+      },
+      "asset": "assets/portrait-32.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 78490,
+      "sha256": "25cace9e1a7ed2547a9d7da465f7bd592bc6a778ed85dc8a27b5437f0f8bc6b5",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 52-year-old white woman with pale skin, a very short steel-grey crop, a long angular face, thin lips and blue-grey eyes."
+    },
+    {
+      "id": "33",
+      "name": {
+        "ru": "Пульсар",
+        "en": "Pulsar"
+      },
+      "asset": "assets/portrait-33.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 84850,
+      "sha256": "9eca4697c86a1a6764c0bb92a6156f108fb4d3811686fc9d495294d0549f7269",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 32-year-old Southeast Asian man with brown skin, thick short wavy black hair, a faint mustache and a broad friendly face."
+    },
+    {
+      "id": "34",
+      "name": {
+        "ru": "Пески Марса",
+        "en": "Martian Sands"
+      },
+      "asset": "assets/portrait-34.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 83782,
+      "sha256": "60d8eeebb4312880a6bcfe33a00c9026b6feb98c8e8f048c47a68a10f6b6da22",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 41-year-old North African woman with medium olive skin, tightly curled black hair tied into a high compact bun, a long nose and dark eyes."
+    },
+    {
+      "id": "35",
+      "name": {
+        "ru": "Проводник",
+        "en": "Pathfinder"
+      },
+      "asset": "assets/portrait-35.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 95170,
+      "sha256": "bcc9d2739ac70e116884333adac22f9c3077a952bf56a1bf1934f9f16ceca282",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 63-year-old Black man with rich brown skin, short white hair, a white close-cropped beard, deep forehead lines and alert brown eyes."
+    },
+    {
+      "id": "36",
+      "name": {
+        "ru": "Первая волна",
+        "en": "First Wave"
+      },
+      "asset": "assets/portrait-36.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 90036,
+      "sha256": "667130a00635a9ca0ba24142d34470ecf6277c4d658aeec9b70dac02beabf412",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 23-year-old East Asian woman with fair warm skin, short dark-brown layered hair, a softly rounded face and dark eyes."
+    },
+    {
+      "id": "37",
+      "name": {
+        "ru": "Солнечный парус",
+        "en": "Solar Sail"
+      },
+      "asset": "assets/portrait-37.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 87102,
+      "sha256": "401529fbf4bb707616285ed8b2eac2b03340dbde06688b0c22f3256a0a482cc7",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 35-year-old white man with fair skin, dark blond close buzz cut, clean-shaven, a broad jaw and subtle vitiligo patches around one eye and temple."
+    },
+    {
+      "id": "38",
+      "name": {
+        "ru": "Созвездие",
+        "en": "Constellation"
+      },
+      "asset": "assets/portrait-38.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 81550,
+      "sha256": "4796fcb1eda02655ed846e281602070357a4a0c14d0bff53e25a95c75814bd4a",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 47-year-old Pacific Islander woman with warm brown skin, thick black wavy hair neatly pulled back, broad face and calm dark eyes."
+    },
+    {
+      "id": "39",
+      "name": {
+        "ru": "Радиомолчание",
+        "en": "Radio Silence"
+      },
+      "asset": "assets/portrait-39.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 81968,
+      "sha256": "ef79772207ec95d4ba9b86ac175075defe03f809b2b6bf0d4c1351d196a0258a",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 40-year-old man with light olive skin, bald head, a dark thick mustache without beard, small ears and deep-set green eyes."
+    },
+    {
+      "id": "40",
+      "name": {
+        "ru": "Новая эра",
+        "en": "New Era"
+      },
+      "asset": "assets/portrait-40.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 78026,
+      "sha256": "72627439e6106ae260ede731de4663cff83313ed7fb1d0ca16d9deba8c1abc9e",
+      "generation": "built-in ImageGen",
+      "prompt": "Use case: stylized-concept. Asset type: one new selectable player avatar for the Void Dominion space strategy game. Input image 1 is STYLE, UNIFORM and FRAMING REFERENCE ONLY, do not copy its person's identity. Primary request: one entirely new fictional adult space officer. Match the reference's realistic painterly 3D finish, detailed natural skin and credible dark navy woven officer jacket with restrained thin teal seam piping. Same front-facing upright pose, shoulders square, direct eye contact, calm confidence. Square full upper torso portrait, top of head near 5%, chin near 40%, collar ends near 55%, both shoulders visible and torso continues to bottom. Wearer's left breast (viewer's right, x55–82%, y60–88%) must be flat uninterrupted dark fabric without seams, buttons, pockets or decorations, so small medals can later be pinned there by the UI. Same neutral soft key light and slight cool rim. Clean transparent alpha background. No scene, no rectangle behind person. No existing medals, badges, insignia, rank markings, logos, text, numbers, jewelry, weapons, hands, props, hats or helmets. One person only, no grid or collage. Subject: A 34-year-old Black woman with deep brown skin, a sculpted short tapered natural haircut with one silver streak, angular cheekbones and brown eyes."
+    }
+  ]
+}
