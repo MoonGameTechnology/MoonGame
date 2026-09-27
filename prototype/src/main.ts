@@ -195,6 +195,7 @@ import {
   type QueuedConstruction,
   missingHull,
   traderOf,
+  extractionNeedMs,
   type ModeTrader,
 } from '../../packages/shared-core/src/index';
 import {
@@ -645,6 +646,10 @@ import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
 import { initTrader } from './traderScreen';
+import { ALLY_EMBLEM, initAllyScreen } from './allyScreen';
+import { allyPanelView, linkedAlly, type AllyOrderKind } from '../../decisions/allyPanel';
+import { chapterChain, extractionCandidates, type ChapterStep } from '../../decisions/chapterChain';
+import { allyOrder, extractionStart } from '../../decisions/actions';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
 import { initResourceCard } from './resourceCard';
@@ -1278,6 +1283,10 @@ let cmdMore = false; // ☰ — the second row of the command bar (extras live t
 let castMenu = false; // ✨ — способности героя-флагмана: поповер-меню каста над рядом
 let retreatMenu = false; // ⮐ — окошко выбора порога авто-отхода (заказ владельца 2026-09-23)
 let merging = false; // "Merge" armed → next tap on a friendly fleet picks the anchor
+// Глава IV (PVR-7.5): взведённый приказ союзнику — следующий тап по карте выбирает цель.
+let allyAim: AllyOrderKind | null = null;
+/** До какого момента (ms, `performance.now`) чип союзника мигает после встречи. */
+let allyPulseUntil = 0;
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
 // Split-fleet dialog: which fleet, and how many of each ship type peel off.
 let splitState: { fleetId: string; take: Record<string, number> } | null = null;
@@ -1749,6 +1758,7 @@ devlineEl.addEventListener('click', (event) => {
   if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
   if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
   if ((event.target as Element).closest('[data-missions]')) { missionPanel.toggle(); return; }
+  if ((event.target as Element).closest('[data-ally-open]')) { allyScreen.open(); return; }
 });
 
 const purse = $('purse');
@@ -4122,6 +4132,21 @@ function handleEvents(events: DomainEvent[]) {
       case 'pve.boss.slain':
         note(t(`boss.${p.hero as string}.${e.type === 'pve.boss.spawned' ? 'spawned' : 'slain'}`));
         break;
+      // Глава IV (PVR-7.5): встреча с союзником — связь, общий обзор и приказы. Чип «⬡
+      // Союзник» мигает несколько секунд: сама встреча и есть приглашение открыть связь.
+      case 'ally.contact':
+        if (p.owner !== ME) break;
+        note(t('ally.contact.note'));
+        allyPulseUntil = performance.now() + 12_000;
+        break;
+      case 'ally.order.done':
+      case 'ally.order.lost':
+        if (p.by !== ME) break;
+        note(t(e.type === 'ally.order.done' ? 'ally.done' : 'ally.lost'));
+        break;
+      case 'extraction.completed':
+        if (p.owner === ME) note(t('chain.carrier-warning'));
+        break;
       // PVR-4.7: осада «Поглощения мира» над СВОИМ миром — начало, срыв и гибель мира. Фраза —
       // по архетипу героя, как у появления босса; отсчёт — тем же часам, что у волн.
       case 'hero.siege.started':
@@ -6322,6 +6347,7 @@ function render(now: number) {
   drawAssaultTargets();
   drawEngageTargets(lastReal);
   drawMissionTargets();
+  drawAllyMarks(); // глава IV: цель операции союзника и носитель накопителя
   drawMinefields(now); // SM-3.5: свои минные поля «💣 ×заряд» и вспышка срабатывания
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
@@ -9652,6 +9678,7 @@ function selectAt(mx: number, my: number) {
     assaultAim,
     engageAim,
     strikeAim: !!strikeAim,
+    allyAim: !!allyAim,
     pickMode,
     aiming,
   });
@@ -9674,6 +9701,29 @@ function selectAt(mx: number, my: number) {
     }
     if (anchor) orderMerge(movers, anchor.id);
     merging = false;
+    lastPanelHtml = '';
+    return;
+  }
+  // ГЛАВА IV (PVR-7.5) — ПРИКАЗ СОЮЗНИКУ ВЗВЕДЁН: тап выбирает цель операции. «Охранять» ищет
+  // сперва свой или союзный флот, «Атаковать» — вражеский, потом мир; «Разведать» — только мир.
+  // Годится ли цель, решает ЯДРО (`ally.order`): отказ приходит объяснением (`errText`), а не
+  // молчанием. Промах мимо всего снимает прицел.
+  if (owner === 'ally-order' && allyAim) {
+    const kind = allyAim;
+    allyAim = null;
+    const ally = linkedAlly(s, ME);
+    const fleets = Object.values(s.fleets);
+    const pool =
+      kind === 'guard'
+        ? fleets.filter((f) => f.owner === ME || f.owner === ally)
+        : kind === 'attack'
+          ? hostileFleets(fleets, ME)
+          : [];
+    const hit = pool.length ? nearestHit(pool, fleetAnchor, mx, my, rFleet) : null;
+    const node = hit ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+    if (!ally || (!hit && !node)) note(t('ally.pick-missed'));
+    else if (playerOrder(allyOrder(ME, ally, kind, hit ? { fleet: hit.id } : { planet: node!.id })))
+      note(t('ally.ordered'));
     lastPanelHtml = '';
     return;
   }
@@ -10604,6 +10654,44 @@ function tickTrader(): void {
     return;
   }
   trader.refresh();
+}
+
+// --- связь с союзником (глава IV, PVR-7.5) ---------------------------------------------
+// Окно — `allyScreen.ts`, статус операции — тот же план, по которому ходит бот союзника
+// (`decisions/allyPanel.ts`). Вход — чип «⬡ Союзник» в строке статуса: он есть и на ПК, и на
+// телефоне, и появляется только после встречи.
+const allyWin = $('ally');
+const allyScreen = initAllyScreen({
+  root: () => allyWin,
+  state: () => s,
+  me: () => ME,
+  data: () => data,
+  targetName: (planet, fleet) => {
+    if (planet) return placeName(planet);
+    const f = fleet ? s.fleets[fleet] : undefined;
+    const at = f ? (f.location ?? f.movement?.to) : undefined;
+    return at ? placeName(at) : '—';
+  },
+  arm: (kind) => {
+    allyAim = kind;
+    note(t('ally.pick', { order: t(`ally.kind.${kind}`) }));
+  },
+  armed: () => allyAim,
+  findFleet: (fleetId) => {
+    const f = s.fleets[fleetId];
+    const at = f ? (f.location ?? f.movement?.to) : undefined;
+    if (at) jumpTo(at, 'goto');
+  },
+  order: playerOrder,
+});
+/** Кадровый такт окна союзника: связи нет — окно закрыто и прицел снят. */
+function tickAlly(): void {
+  if (!linkedAlly(s, ME)) {
+    if (allyScreen.isOpen()) allyScreen.close();
+    allyAim = null;
+    return;
+  }
+  allyScreen.refresh();
 }
 
 // --- resource card (RC-1): tap a resource chip → popup with stats + market button -
@@ -13925,6 +14013,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'battlewin', isOpen: () => shown('battlewin'), close: () => hide('battlewin') }, // z47
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
   { id: 'trader', isOpen: () => trader.isOpen(), close: () => trader.close() }, // z47 торговец экспедиции
+  { id: 'ally', isOpen: () => allyScreen.isOpen(), close: () => allyScreen.close() }, // z47 связь с союзником
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
   { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
   // «Постройки» стоят НИЖЕ кодекса (z45): карточка здания открывается поверх окна,
@@ -14375,13 +14464,37 @@ const missionPanel = initMissionPanel({
   training: isTraining,
   jump: id => jumpTo(id, 'goto'),
   onToggle: () => { lastClockText = ''; },
+  chain: () => runChain(),
+  extractors: () => extractionCandidates(s, ME).map((id) => ({ id, label: fleetLabelOf(id) })),
+  extract: (fleetId) => {
+    if (playerOrder(extractionStart(ME, fleetId))) note(t('chain.carrier-warning'));
+  },
 });
 
+/** Подпись флота для кнопки «Извлечь флотом …»: его корабли, «2× Крейсер, 1× Фрегат». */
+function fleetLabelOf(fleetId: string): string {
+  const f = s.fleets[fleetId];
+  if (!f) return fleetId;
+  return f.units
+    .filter((u) => u.count > 0)
+    .map((u) => `${u.count}× ${unitTitle(u.unit)}`)
+    .join(', ');
+}
+
+/** Главная цепочка главы IV (PVR-7.5): связь → архив → накопитель → вывод. `null` — в этой
+ *  главе цепочки нет. Доля работы — под темп матча (`extractionNeedMs` ядра). */
+function runChain(): ChapterStep[] | null {
+  if (!sectorRunActive) return null;
+  return chapterChain(s, ME, extractionNeedMs(s, ctx(s.time, s)));
+}
+
 /** Метки целей задач на карте: дышащее мятное кольцо и флажок над миром. Выполненная
- *  задача меток не держит (`missionView.ts`, правило 3). */
+ *  задача меток не держит (`missionView.ts`, правило 3). Текущий шаг главной цепочки главы
+ *  (точка встречи, архив, зона вывода) метится так же — это тоже цель. */
 function drawMissionTargets(): void {
   if (!sectorRunActive) return;
-  const ids = new Set(runMissionRows().flatMap(r => r.targets));
+  const chainAt = runChain()?.find((st) => st.active)?.target;
+  const ids = new Set([...runMissionRows().flatMap(r => r.targets), ...(chainAt ? [chainAt] : [])]);
   if (ids.size === 0) return;
   cx.save();
   for (const id of ids) {
@@ -14428,6 +14541,52 @@ function drawMissionTargets(): void {
     cx.closePath();
     cx.fill();
     cx.stroke();
+  }
+  cx.restore();
+}
+
+/** Глава IV (PVR-7.5): синяя метка цели операции союзника с его эмблемой (§6.5) и знак
+ *  накопителя над флотом-носителем (§6.7). Принадлежность различается не только цветом:
+ *  у союзной метки эмблема, у носителя — свой знак. */
+function drawAllyMarks(): void {
+  if (!sectorRunActive) return;
+  cx.save();
+  const view = allyPanelView(s, ME, data);
+  const op = view?.op;
+  const at = op
+    ? (op.planet ?? (op.fleet ? (s.fleets[op.fleet]?.location ?? undefined) : undefined))
+    : undefined;
+  const target = at ? s.planets[at] : undefined;
+  if (target) {
+    const c = world(target.position);
+    if (visible(c, 60)) {
+      const own = op!.source === 'own';
+      cx.strokeStyle = own ? 'rgba(74,140,255,.45)' : COLOR.ally!;
+      cx.lineWidth = 2;
+      cx.setLineDash([4, 4]);
+      cx.beginPath();
+      cx.arc(c.x, c.y, RING_R + 6, 0, TAU);
+      cx.stroke();
+      cx.setLineDash([]);
+      cx.fillStyle = COLOR.ally!;
+      cx.font = '700 13px ui-monospace,monospace';
+      cx.textAlign = 'center';
+      cx.fillText(ALLY_EMBLEM, c.x - RING_R - 4, c.y - RING_R - 2);
+    }
+  }
+  const carrier = s.extraction?.carrier ? s.fleets[s.extraction.carrier] : undefined;
+  const pos = carrier ? fleetAnchor(carrier) : null;
+  if (pos && s.extraction?.deliveredAt === undefined) {
+    const c = world(pos);
+    if (visible(c, 40)) {
+      cx.fillStyle = '#ffb43a';
+      cx.strokeStyle = 'rgba(4,10,12,.9)';
+      cx.lineWidth = 3;
+      cx.font = '700 15px ui-monospace,monospace';
+      cx.textAlign = 'center';
+      cx.strokeText('◈', c.x, c.y - 20);
+      cx.fillText('◈', c.x, c.y - 20);
+    }
   }
   cx.restore();
 }
@@ -14987,11 +15146,16 @@ function playChapterComic(chapter: string, moment: ComicMoment, then: () => void
 }
 
 /** Комикс главы после её ключевой задачи (`COMIC_TASK_TRIGGERS`): один раз на профиль, в тот
- *  кадр, когда задача впервые засчитана. Дев-забег и полигон его не показывают. */
-function playTaskComic(missions: readonly MissionRow[]): void {
+ *  кадр, когда задача впервые засчитана. Ключевым может быть и шаг главной цепочки главы IV
+ *  (`chain.contact` — встреча с союзником): он засчитывается так же. Дев-забег и полигон
+ *  комикс не показывают. */
+function playTaskComic(missions: readonly MissionRow[], chain: readonly ChapterStep[] | null): void {
   if (isTraining() || sectorDevActive || comicPlayer.isOpen()) return;
   const chapter = pveChapter(sectorMission).id;
-  const complete = missions.filter((m) => m.complete).map((m) => m.id);
+  const complete = [
+    ...missions.filter((m) => m.complete).map((m) => m.id),
+    ...(chain ?? []).filter((st) => st.done).map((st) => st.key),
+  ];
   if (comicTaskDue(sectorProgress, comicArt.registry, COMIC_TASK_TRIGGERS, chapter, complete))
     playChapterComic(chapter, 'task', () => {});
 }
@@ -15400,6 +15564,7 @@ function frame(nowReal: number) {
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   tickAbandon();
   tickTrader();
+  tickAlly();
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
     wave.kind === 'none'
@@ -15409,7 +15574,11 @@ function frame(nowReal: number) {
           wave.kind === 'cleared'
             ? t('hud.wave.done')
             : wave.kind === 'hold'
-              ? t('hud.wave.hold', { in: countdownHMS(wave.holdInMs) })
+              ? // Глава с архивом (PVR-7.3): удержание её не выигрывает — обещать «выстоять ещё»
+                // значило бы врать; волны просто кончились, исход решает накопитель.
+                s.extraction
+                ? t('hud.wave.done')
+                : t('hud.wave.hold', { in: countdownHMS(wave.holdInMs) })
               : // На телефоне строка статуса уже экрана: слова «следующая через» уходят, остаётся
                 // отсчёт (прогон кнопок на телефоне, 2026-09-25 — хвост обрезался маской).
                 `<span class="dl-full">${t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>` +
@@ -15433,12 +15602,20 @@ function frame(nowReal: number) {
     .join('');
   const missions = sectorRunActive ? runMissionRows() : [];
   const missionsDone = missions.filter(m => m.complete).length;
-  if (missionsDone > 0) playTaskComic(missions);
+  const chain = runChain();
+  if (missionsDone > 0 || chain?.some((st) => st.done)) playTaskComic(missions, chain);
   const missionHtml =
     missions.length === 0
       ? ''
       : `<button type="button" class="dl-missions" data-missions="1" aria-expanded="${missionPanel.isOpen()}" title="${t('hud.missions.title')}"><i aria-hidden="true">⚑</i><span>${t('hud.missions.label')}</span><b>${missionsDone}/${missions.length}</b></button>`;
   missionPanel.render(missions);
+  // Глава IV (PVR-7.5): чип «⬡ Союзник · шаг операции» — вход в окно связи, только после
+  // встречи. После самой встречи он мигает, пока игрок его не заметит.
+  const allyView = sectorRunActive ? allyPanelView(s, ME, data) : null;
+  const allyHtml = allyView
+    ? `<button type="button" class="dl-ally${performance.now() < allyPulseUntil ? ' pulse' : ''}" data-ally-open="1" title="${esc(t('ally.title'))}">` +
+      `<i aria-hidden="true">${ALLY_EMBLEM}</i><span>${esc(t('ally.label'))}</span><b>${esc(t(`ally.step.${allyView.step}`))}</b></button>`
+    : '';
   // В забеге время суток ничего не значит (дня в шапке нет) — часы показывают, сколько
   // забег идёт, в тех же реальных минутах, что и все его таймеры.
   const clockHtml = `<span id="clock">${isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)}</span>`;
@@ -15448,6 +15625,7 @@ function frame(nowReal: number) {
   }
   const statusHtml =
     missionHtml +
+    allyHtml +
     siegeHtml +
     waveHtml +
     (!__PLAYER_BUILD__ && sectorDevActive ? `<span>${t('sandbox.dev.active')}</span>` : '') +

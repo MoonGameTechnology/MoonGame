@@ -1915,6 +1915,47 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tr-go.sell{border-color:var(--amber);color:var(--amber);background:rgba(240,180,80,.1);}
 .tr-go:disabled,.tr-swap:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
 .tr-status{min-height:18px;font-size:12px;color:var(--ink);}
+/* Связь с союзником главы IV (PVR-7.5): окно того же вида, что торговец; синий — цвет союза. */
+#ally{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#ally.show{display:flex;}
+#ally .albox{display:flex;flex-direction:column;width:min(420px,94vw);max-height:86vh;overflow:hidden;
+  background:var(--glass);border:1px solid #4a8cff;border-radius:10px;
+  box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(74,140,255,.08);}
+.al-emblem{font-style:normal;color:#4a8cff;}
+.al-tag{margin-left:auto;margin-right:10px;padding:1px 8px;border-radius:9px;border:1px solid #4a8cff;color:#4a8cff;font-size:11px;}
+.al-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+.al-body{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+.al-op{padding:10px 12px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(74,140,255,.55);background:rgba(74,140,255,.08);}
+.al-op.own{border-style:dashed;}
+.al-op-head{font-size:13px;color:var(--ink);}
+.al-target{color:#9fc0ff;}
+.al-own,.al-idle{margin:6px 0 0;font-size:11px;line-height:1.45;color:var(--dim);}
+.al-step{margin:6px 0 0;font-size:12px;color:var(--cyan);}
+.al-step.al-blocked{color:var(--amber);}
+.al-op-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.al-act{min-height:36px;padding:6px 10px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;font:12px ui-monospace,monospace;}
+.al-lbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin:4px 0 6px;}
+.al-orders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px;}
+.al-order{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:64px;padding:8px;border-radius:8px;
+  border:1px solid #4a8cff;background:rgba(74,140,255,.1);color:var(--ink);cursor:pointer;font:12px ui-monospace,monospace;text-align:left;}
+.al-order span{font-size:10px;line-height:1.35;color:var(--dim);overflow-wrap:anywhere;}
+.al-order.on{background:rgba(74,140,255,.28);}
+.al-order:disabled{opacity:.4;cursor:not-allowed;}
+.al-status{min-height:18px;font-size:12px;color:var(--ink);}
+#devline .dl-ally{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:2px 10px;border-radius:10px;
+  border:1px solid #4a8cff;background:rgba(74,140,255,.12);color:#9fc0ff;font:inherit;cursor:pointer;}
+#devline .dl-ally i{font-style:normal;}
+#devline .dl-ally.pulse{animation:ally-pulse 1.2s ease-in-out infinite;}
+@keyframes ally-pulse{50%{background:rgba(74,140,255,.38);box-shadow:0 0 12px rgba(74,140,255,.6);}}
+@media (prefers-reduced-motion:reduce){#devline .dl-ally.pulse{animation:none;background:rgba(74,140,255,.3);}}
+/* Главная цепочка главы IV над задачами пула (PVR-7.5). */
+.mp-chainbox{margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+.mp-sub{display:block;margin:2px 0 6px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);}
+.mp-chain.on{border-color:#8ff5c8;}
+.mp-warn{margin:6px 0;font-size:11px;color:var(--amber);}
+.mp-extract{display:block;width:100%;min-height:40px;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--amber);
+  background:rgba(240,180,80,.1);color:var(--amber);cursor:pointer;font:12px ui-monospace,monospace;text-align:left;}
 /* session market (modal, mirrors #tech; tabs mirror .dp-tab) */
 #market{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
@@ -2239,6 +2280,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #devline .dl-siege span{display:none;}
   #devline .dl-missions{font-size:11px;padding:2px 8px;margin-left:8px;}
   #devline .dl-missions span{display:none;}
+  #devline .dl-ally{font-size:11px;padding:2px 8px;margin-left:8px;}
+  #devline .dl-ally span{display:none;}
   #missionpanel{right:12px;left:12px;width:auto;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
@@ -2793,7 +2836,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 /* --- short viewports (landscape phones, split-screen): overlays scroll instead of
    clipping off-screen (#connect already does, see its base rule) --- */
 @media (max-height:680px){
-  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market,#trader{
+  #setup,#codex,#playercard,#settings,#warprompt,#abandon,#diplo,#splitdlg,#pingmenu,#constructor,#market,#trader,#ally{
     align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 }
 /* --- the welcome card is the tallest overlay we have: the roomy version needs ~930px
@@ -3288,6 +3331,7 @@ ${profileCss}
 
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #trader .trbox{width:40vw;max-height:60vh;}
+  #ally .albox{width:40vw;max-height:60vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
   #connect .cbox,#connect .cwrap{width:min(520px,62.5vw);}
@@ -3529,6 +3573,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
 <div id="trader"></div>
+<!-- Связь с союзником главы IV (PVR-7.5): окно открывает чип «⬡ Союзник» строки статуса -->
+<div id="ally"></div>
 <!-- constructor («Производство») — unified order screen; whole box rendered by renderConstructor() -->
 <div id="constructor"></div>
 <aside id="side"></aside>

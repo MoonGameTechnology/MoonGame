@@ -17,6 +17,10 @@ const modes = (over: Partial<TapModes> = {}): TapModes => ({
 
 describe('тап по карте — кто его забирает', () => {
   it('SHU-3.1 — ВЗВЕДЁННЫЙ УДАР ЧЕЛНОКОВ забирает тап: он ждёт ровно одну цель', () => {
+    expect(tapOwner(modes({ allyAim: true }))).toBe('ally-order');
+    // Приказ союзнику — вооружённый: выделение и набор группы ему уступают, план — нет.
+    expect(tapOwner(modes({ allyAim: true, pickMode: true }))).toBe('ally-order');
+    expect(tapOwner(modes({ allyAim: true, chainMode: true }))).toBe('chain-plan');
     expect(tapOwner(modes({ strikeAim: true }))).toBe('shuttle-strike');
     // …но не перебивает режимы, которые взводятся выше по приоритету.
     expect(tapOwner(modes({ strikeAim: true, chainMode: true }))).toBe('chain-plan');
