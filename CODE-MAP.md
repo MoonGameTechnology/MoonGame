@@ -298,7 +298,8 @@
 | `avaOrchestrator.ts` | `AvaSessionSpec` | AvA-оркестратор |
 | `avaMapPool.ts` | `pickAvaMap` | AvA-карты |
 | `avaApi.ts` / `avaService.ts` | AvA API/service | AvA-логика |
-| `corpApi.ts` / `corpService.ts` | corp API/service | корпорации |
+| `corpApi.ts` / `corpService.ts` | corp API/service | корпорации и инфраструктура; оба серверных входа |
+| `corpConstruction.ts` | каталог и атомарный переход инфраструктуры | `data/corpBuildings.json`, очередь, влияние, аудит; Memory/Postgres |
 | `corpArsenalApi.ts` / `corpArsenalService.ts` | corp arsenal | арсенал корпораций |
 | `friendApi.ts` / `friendService.ts` | friend API/service | друзья |
 | `leaderboardApi.ts` | `GET /leaderboard` | лидерборд |

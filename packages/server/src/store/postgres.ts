@@ -1,3 +1,5 @@
+import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
+import { updateCorpInfrastructure } from '../corpConstruction';
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
@@ -114,6 +116,7 @@ export async function migrate(pool: Pool): Promise<void> {
     -- AvA influence (AVA-2): inter-match corp currency; spend is atomic + guarded ≥0.
     -- ALTER … IF NOT EXISTS backfills pre-AVA-2 corps rows with the 0 default.
     ALTER TABLE corps ADD COLUMN IF NOT EXISTS influence bigint NOT NULL DEFAULT 0;
+    ALTER TABLE corps ADD COLUMN IF NOT EXISTS infrastructure jsonb;
 
     -- account_id as the PRIMARY KEY is the one-corp-per-account invariant: a member
     -- (recruit rows included — a recruit row IS the pending application) can't join
@@ -730,6 +733,42 @@ function memberOf(row: CorpMemberRow): CorpMembership {
 }
 
 export class PostgresCorpStore implements CorpStore {
+  async infrastructure(corpId: string, actor: string, now: number, order?: CorpBuildOrder): Promise<CorpInfrastructureResult> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Lock membership first, like disband: role transfer/kick cannot race spending.
+      const members = await client.query<{ role: CorpRole }>(
+        `SELECT role FROM corp_members WHERE account_id = $1 AND corp_id = $2 FOR UPDATE`, [actor, corpId]);
+      const role = members.rows[0]?.role;
+      if (!role || role === 'recruit' || (order && role !== 'head')) {
+        await client.query('ROLLBACK');
+        return { ok: false, code: 'E_FORBIDDEN' };
+      }
+      const corps = await client.query<{ influence: string; infrastructure: CorpInfrastructureState | null }>(
+        `SELECT influence, infrastructure FROM corps WHERE id = $1 FOR UPDATE`, [corpId]);
+      const corp = corps.rows[0];
+      if (!corp) {
+        await client.query('ROLLBACK');
+        return { ok: false, code: 'E_FORBIDDEN' };
+      }
+      const updated = updateCorpInfrastructure(corpId, actor, role, Number(corp.influence), corp.infrastructure, now, order);
+      await client.query(`UPDATE corps SET influence = $2, infrastructure = $3::jsonb WHERE id = $1`,
+        [corpId, updated.influence, JSON.stringify(updated.state)]);
+      for (const entry of updated.audit) {
+        await client.query(`INSERT INTO corp_audit (corp_id, at, actor, action, target, detail) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [corpId, entry.at, entry.actor, entry.action, entry.target ?? null, entry.detail ?? null]);
+      }
+      await client.query('COMMIT');
+      return updated.result;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   constructor(private readonly pool: Pool) {}
 
   async createCorp(

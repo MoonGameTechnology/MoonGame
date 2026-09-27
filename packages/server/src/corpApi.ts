@@ -23,6 +23,7 @@ import { slidingWindowIpLimiter } from './rateLimit';
 
 export interface CorpApiDeps {
   service: CorpService;
+  features?: { ava: boolean; medals: boolean };
   /** Resolve the caller's identity from the session token — REQUIRED: corp intents
    *  are identity-bound, there is no anonymous fallback. */
   identify(request: FastifyRequest): Promise<Identity | null>;
@@ -103,7 +104,7 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
   app.get('/corps/me', async (request, reply) => {
     const who = await identified(request, reply);
     if (!who) return { error: 'E_AUTH' as const };
-    return service.mine(who);
+    return { ...await service.mine(who), features: deps.features ?? { ava: true, medals: true } };
   });
 
   app.get('/corps/:id', async (request, reply) => {
@@ -112,6 +113,40 @@ export function registerCorpApi(app: FastifyInstance, deps: CorpApiDeps): void {
     const result = await service.detail(id);
     if (!result.ok) return failed(reply, result.code);
     return { corp: result.corp, members: result.members };
+  });
+
+  app.get('/corps/:id/infrastructure', async (request, reply) => {
+    const who = await identified(request, reply);
+    if (!who) return { error: 'E_AUTH' };
+    try {
+      const { id } = request.params as { id: string };
+      const result = await service.infrastructure(who, id);
+      if (!result.ok) return reply.code(403).send({ error: result.code });
+      return result.infrastructure;
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(500).send({ error: 'E_INTERNAL' });
+    }
+  });
+
+  app.post('/corps/:id/build', async (request, reply) => {
+    if (rateLimited(request.ip)) return reply.code(429).send({ error: 'E_RATE_LIMIT' });
+    const who = await identified(request, reply);
+    if (!who) return { error: 'E_AUTH' };
+    const body = request.body as { buildingId?: unknown; expectedLevel?: unknown } | null;
+    if (!body || typeof body.buildingId !== 'string' || body.buildingId.length > 64 ||
+        typeof body.expectedLevel !== 'number' || !Number.isSafeInteger(body.expectedLevel) || body.expectedLevel < 0) {
+      return reply.code(400).send({ error: 'E_BAD_MESSAGE' });
+    }
+    try {
+      const { id } = request.params as { id: string };
+      const result = await service.infrastructure(who, id, { buildingId: body.buildingId, expectedLevel: body.expectedLevel });
+      if (!result.ok) return reply.code(result.code === 'E_FORBIDDEN' ? 403 : 409).send({ error: result.code });
+      return result.infrastructure;
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(500).send({ error: 'E_INTERNAL' });
+    }
   });
 
   app.get('/corps/:id/audit', async (request, reply) => {

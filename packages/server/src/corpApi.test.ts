@@ -84,7 +84,7 @@ describe('CORP-0 · corp API', () => {
       membership: { role: 'head' },
     });
     const nobody = await app.inject({ method: 'GET', url: '/corps/me', headers: as('bob') });
-    expect(nobody.json()).toEqual({ corp: null, membership: null });
+    expect(nobody.json()).toEqual({ corp: null, membership: null, features: { ava: true, medals: true } });
     await app.close();
   });
 

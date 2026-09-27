@@ -33,6 +33,7 @@
     "rehearsal": "node prototype/rehearsal.mjs",
     "dev:client": "node testclient/build.mjs",
     "mcp:browser": "node scripts/mcp-browser.mjs",
+    "smoke:corporation": "pnpm run prototype && node prototype/corptest.mjs",
     "smoke:browser": "node prototype/browsertest.mjs",
     "smoke:browser:install": "node prototype/browsertest.mjs --install",
     "smoke:context": "node prototype/contexttest.mjs",
