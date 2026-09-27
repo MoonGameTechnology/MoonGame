@@ -27,6 +27,8 @@ export {
   type MarketOrder,
   type MarketSide,
   type TraderRate,
+  type AllyOperation,
+  type ExtractionState,
   type Fleet,
   type FleetMovement,
   type FleetEdge,

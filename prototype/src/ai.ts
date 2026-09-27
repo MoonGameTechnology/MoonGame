@@ -95,6 +95,7 @@ import { SECTOR_TYPES } from './map';
 import { data } from './gameData';
 import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
+import { planAllyOperation } from '../../decisions/allyOperation';
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
  *  (SES-2.2). `steward` — «Хранитель»: the player's OWN autopilot, a defensive
@@ -372,6 +373,7 @@ export function aiOrders(
   posture: StewardPosture | 'expand' = 'expand',
   profile: AiProfile = 'weak',
 ): Action[] {
+  if (state.players[ai]?.npc === 'neutral') return allySeatOrders(state, ai, posture, profile);
   if (state.pve?.npcPlayerId !== ai) return baseAiOrders(state, ai, posture, profile, new Set());
   // Сеть Роя (`docs/swarm-behavior.md`): посты-ретрансляторы стоят там, куда их ставит
   // сеть, — общий бот их не двигает и не сливает (`swarmNetPlan`, то же правило на сервере).
@@ -429,6 +431,35 @@ export function aiOrders(
     ...netOrders,
     ...adapt,
   ];
+}
+
+/**
+ * Житель-союзник главы IV (PVR-7.4): операция — приказ игрока или своя задача — ведётся по
+ * плану `planAllyOperation` (то же решение показывает игроку карточка операции), а его
+ * флоты общий бот не трогает: не сливает, не уводит и не отзывает на оборону. Остальное —
+ * стройка, найм, оборона дома — прежний бот жителя («активная оборона»). Нет операции —
+ * прежний бот целиком.
+ */
+function allySeatOrders(
+  state: GameState,
+  ai: string,
+  posture: StewardPosture | 'expand',
+  profile: AiProfile,
+): Action[] {
+  const plan = planAllyOperation(state, ai, data);
+  if (plan.step === 'idle') return baseAiOrders(state, ai, posture, profile, new Set());
+  const held = new Set(plan.group);
+  // Флоты, которым план отдаёт приказ (сведение, погрузка), тоже его: общий бот их не трогает.
+  for (const a of plan.actions) {
+    const p = a.payload as { fleetId?: unknown; from?: unknown; into?: unknown } | undefined;
+    for (const id of [p?.fleetId, p?.from, p?.into]) if (typeof id === 'string') held.add(id);
+  }
+  const touchesHeld = (a: Action): boolean => {
+    const p = a.payload as { fleetId?: unknown; from?: unknown; into?: unknown } | undefined;
+    return [p?.fleetId, p?.from, p?.into].some((id) => typeof id === 'string' && held.has(id));
+  };
+  const out = baseAiOrders(state, ai, posture, profile, held).filter((a) => !touchesHeld(a));
+  return [...out, ...plan.actions];
 }
 
 function baseAiOrders(

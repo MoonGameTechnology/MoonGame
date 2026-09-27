@@ -344,6 +344,18 @@ export type MatchEndReason =
   /** PVR-7.3: the package's carrier was destroyed. The NPC is the formal winner. */
   | 'pve-carrier-lost';
 
+/** Операция союзника (PVR-7.4, §6.5): одна на жителя; новый приказ заменяет прежний. */
+export interface AllyOperation {
+  /** Кто отдал приказ. */
+  by: PlayerId;
+  kind: 'guard' | 'attack' | 'scout';
+  /** Цель — провинция… */
+  planet?: PlanetId;
+  /** …или флот (охрана своего/союзного, атака обнаруженного вражеского). */
+  fleet?: FleetId;
+  issuedAt: number;
+}
+
 /** Состояние извлечения накопителя (PVR-7.3). Отсутствующие поля — «ещё не случилось». */
 export interface ExtractionState {
   /** Архив — провинция, где извлекают накопитель. */
@@ -947,6 +959,10 @@ export interface GameState {
   /** Накопитель архива главы IV (`extractionModule`, PVR-7.3): заводит загрузчик, если
    *  карта объявила архив (`vault`). Нет раздела — сценария извлечения в матче нет. */
   extraction?: ExtractionState;
+  /** Приказы союзникам главы IV (PVR-7.4): житель → его единственная активная операция.
+   *  Ставит игрок действием `ally.order`, снимает `ally.cancel` или ядро по событию мира
+   *  (цель взята, разведчик дошёл, цель охраны потеряна). */
+  allyOps?: Record<PlayerId, AllyOperation>;
   /** A player's designated capital world (`capitalModule`, `capital.designate`) — the
    *  hero respawn anchor (`heroModule` falls back to `[hero.home, hero.location]`).
    *  Absent for a player who never (re-)designated ⇒ their heroes' `home` is whatever

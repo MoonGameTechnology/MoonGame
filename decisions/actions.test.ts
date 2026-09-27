@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   act,
+  allyCancel,
+  allyOrder,
   assaultFleet,
   bombardFleet,
   buildBuilding,
@@ -147,6 +149,9 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['equipHeroAbility', equipHeroAbility(P, 'h1', 'corridor')],
   ['unequipHeroAbility', unequipHeroAbility(P, 'h1', 'corridor')],
   ['extractionStart', extractionStart(P, 'f1')],
+  ['allyOrder (провинция)', allyOrder(P, 'ally', 'attack', { planet: 'alpha' })],
+  ['allyOrder (флот)', allyOrder(P, 'ally', 'guard', { fleet: 'f1' })],
+  ['allyCancel', allyCancel(P, 'ally')],
 ];
 
 describe('строители приказов против схем гейта', () => {

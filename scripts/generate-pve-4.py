@@ -81,10 +81,13 @@ P = collections.OrderedDict([
     ('outer_mid',    (130, 285, 'dead_world', 'deep_void', None, [], [])),
     ('outer_e',      (375, 240, 'dead_world', 'depleted_system', None, [], [])),
     ('outer_far',    (640, 225, 'nebula', 'nebula', None, [], [])),
+    # База союзника — крепкая, как дом игрока: отряд живёт своей задачей рядом с Роем, и
+    # его гибель после встречи должна быть исходом боя, а не участью по умолчанию.
     ('ally_base',    (-240, 525, 'planet', 'empty_space', 'ally',
-                      [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 2}],
+                      [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 4},
+                       {'unit': 'garrison', 'count': 2}],
                       [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
-                       {'type': 'fort'}])),
+                       {'type': 'fort', 'level': 2}])),
     ('ally_field',   (30, 575, 'asteroid', 'asteroid_field', 'ally', [], [])),
     ('station_west', (300, 520, 'void_station', 'empty_space', 'swarm',
                       [{'unit': 'swarm_lander', 'count': 2}], [])),
@@ -113,7 +116,9 @@ P = collections.OrderedDict([
                        {'type': 'fort'}, {'type': 'orbital_aa'}])),
 ])
 
-TRAITS = {'staging': ['haven']}
+# Своя задача союзника (§6.5): вернуть две внешние исследовательские станции — признак
+# `ally_task` читает его планировщик (`decisions/allyOperation.ts`).
+TRAITS = {'staging': ['haven'], 'station_west': ['ally_task'], 'station_east': ['ally_task']}
 # Место встречи: первое прибытие флота игрока с живым кораблём устанавливает связь с союзником
 # (PVR-7.2, `rendezvousModule`).
 RENDEZVOUS = {'rendezvous': 'ally'}
@@ -182,8 +187,10 @@ m = collections.OrderedDict([
                             {'unit': 'scout_drone', 'count': 1}]}),
         ('p1_2', {'owner': 'p1', 'location': 'staging',
                   'units': [{'unit': 'cruiser', 'count': 2}]}),
+        # Отряд союзника: ударная группа с десантом под свою задачу — вернуть станции.
         ('ally_1', {'owner': 'ally', 'location': 'ally_base',
-                    'landing': [{'unit': 'militia', 'count': 2}],
+                    'landing': [{'unit': 'militia', 'count': 2},
+                                {'unit': 'heavy_infantry', 'count': 2}],
                     'units': [{'unit': 'cruiser', 'count': 2},
                               {'unit': 'frigate', 'count': 2}]}),
         # «Последняя смена»: транспорты персонала лаборатории ждут вывода к базе.

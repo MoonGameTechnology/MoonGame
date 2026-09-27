@@ -311,6 +311,15 @@ export const traderSwap = (playerId: string, give: string, get: string, amount: 
 /** Глава IV: назначить флот у архива на извлечение накопителя (PVR-7.3). */
 export const extractionStart = (playerId: string, fleetId: string) =>
   act(playerId, 'extraction.start', { fleetId });
+/** Глава IV: приказ союзнику — охранять, атаковать или разведать цель (PVR-7.4). */
+export const allyOrder = (
+  playerId: string,
+  ally: string,
+  kind: 'guard' | 'attack' | 'scout',
+  target: { planet: string } | { fleet: string },
+) => act(playerId, 'ally.order', { ally, kind, ...target });
+/** Глава IV: отменить операцию союзника. */
+export const allyCancel = (playerId: string, ally: string) => act(playerId, 'ally.cancel', { ally });
 /** Reclaim your own lot, refunding its remaining escrow. */
 export const marketCancel = (playerId: string, id: string) =>
   act(playerId, 'market.cancel', { id });

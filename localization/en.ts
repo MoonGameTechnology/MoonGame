@@ -1887,6 +1887,7 @@ export const en: Record<string, string> = {
   'err.no-artillery': 'no artillery',
   'err.no-supply': 'this mode has no supplies',
   'err.no-trader': 'there is no trader in this match',
+  'err.no-contact': 'establish contact with the ally first',
   'err.no-vault': 'there is no archive in this match',
   'err.not-at-vault': 'the fleet is not at the archive',
   'err.vault-held': 'the enemy holds the archive',

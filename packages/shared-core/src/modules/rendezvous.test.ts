@@ -39,6 +39,8 @@ const bell: GameModule = {
   version: '1.0.0',
   setup(api) {
     api.onAction('test.arrived', (action, h) => h.emit('fleet.arrived', action.payload));
+    for (const type of ['planet.captured', 'fleet.destroyed', 'fleet.merged', 'player.eliminated'])
+      api.onAction(`test.${type}`, (action, h) => h.emit(type, action.payload));
   },
 };
 
@@ -218,5 +220,173 @@ describe('место встречи в карте', () => {
       bad({ ...base.players, ally: { name: 'A', faction: 'x', npc: 'pirate' } }, 'ally'),
     ).toContain('E_INVALID_RENDEZVOUS:b');
     expect(bad(base.players, 'ghost')).toContain('E_INVALID_RENDEZVOUS:b');
+  });
+});
+
+describe('приказ союзнику (PVR-7.4)', () => {
+  /** Мир после встречи: у союзника флот и дом, у Роя — мир и флот. */
+  function met(): GameState {
+    const s = arrive(
+      world([
+        fleet('f1', 'p1'),
+        fleet('a1', 'ally', { location: 'road' }),
+        fleet('s1', 'swarm', { location: 'nest' }),
+      ]),
+      'f1',
+    ).state;
+    return {
+      ...s,
+      planets: {
+        ...s.planets,
+        // Гнездо далеко: его не видят ни игрок, ни союзник.
+        nest: planet('nest', { owner: 'swarm', position: { x: 50_000, y: 50_000 } }),
+        mine: planet('mine', { owner: 'p1' }),
+        home: planet('home', { owner: 'ally' }),
+      },
+    };
+  }
+  const order = (s: GameState, payload: Record<string, unknown>, who = 'p1') =>
+    kernel.applyAction(s, act('ally.order', { ally: 'ally', ...payload }, who), ctx(0));
+
+  it('до встречи приказывать нельзя; после — операция встаёт одна на союзника', () => {
+    const before = world([fleet('f1', 'p1')]);
+    expect(order(before, { kind: 'scout', planet: 'road' })).toMatchObject({
+      ok: false,
+      code: 'E_NO_CONTACT',
+    });
+    const r = order(met(), { kind: 'attack', planet: 'nest' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.allyOps).toEqual({
+      ally: { by: 'p1', kind: 'attack', planet: 'nest', issuedAt: 0 },
+    });
+    expect(r.events.map((e) => e.type)).toEqual(['ally.ordered']);
+  });
+
+  it('цели по виду приказа: охранять своё, атаковать врага, разведывать чужое', () => {
+    const s = met();
+    expect(order(s, { kind: 'guard', planet: 'mine' }).ok).toBe(true);
+    expect(order(s, { kind: 'guard', fleet: 'f1' }).ok).toBe(true);
+    expect(order(s, { kind: 'guard', planet: 'nest' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    expect(order(s, { kind: 'guard', fleet: 's1' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    expect(order(s, { kind: 'attack', planet: 'mine' })).toMatchObject({
+      ok: false,
+      code: 'E_NOT_HOSTILE',
+    });
+    // Флот Роя не обнаружен ни игроком, ни союзником — атаковать нечего.
+    expect(order(s, { kind: 'attack', fleet: 's1' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    expect(order(s, { kind: 'scout', planet: 'mine' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    expect(order(s, { kind: 'scout', planet: 'nest' }).ok).toBe(true);
+    expect(order(s, { kind: 'scout', planet: 'ghost' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+  });
+
+  it('кривой приказ и чужой приказчик — стабильные отказы', () => {
+    const s = met();
+    expect(order(s, { kind: 'fly', planet: 'nest' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_PAYLOAD',
+    });
+    expect(order(s, { kind: 'attack' })).toMatchObject({ ok: false, code: 'E_BAD_PAYLOAD' });
+    expect(order(s, { kind: 'attack', planet: 'nest', fleet: 's1' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_PAYLOAD',
+    });
+    expect(order(s, { kind: 'scout', fleet: 's1' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_PAYLOAD',
+    });
+    expect(order(s, { kind: 'scout', planet: 'nest' }, 'swarm')).toMatchObject({
+      ok: false,
+      code: 'E_FORBIDDEN',
+    });
+    const ghost = kernel.applyAction(
+      s,
+      act('ally.order', { ally: 'swarm', kind: 'scout', planet: 'nest' }),
+      ctx(0),
+    );
+    expect(ghost).toMatchObject({ ok: false, code: 'E_NO_PLAYER' });
+  });
+
+  it('повтор того же не множит операцию; новый приказ явно заменяет прежний', () => {
+    const first = run(met(), 'ally.order', { ally: 'ally', kind: 'attack', planet: 'nest' });
+    expect(order(first.state, { kind: 'attack', planet: 'nest' })).toMatchObject({
+      ok: false,
+      code: 'E_ALREADY',
+    });
+    const next = run(first.state, 'ally.order', { ally: 'ally', kind: 'guard', planet: 'mine' });
+    expect(next.state.allyOps?.ally).toMatchObject({ kind: 'guard', planet: 'mine' });
+    // `owner` — адресат события для тумана сервера (`eventFogContract.test.ts`).
+    expect(next.events.find((e) => e.type === 'ally.ordered')?.payload).toMatchObject({
+      owner: 'p1',
+      replaced: true,
+    });
+  });
+
+  it('отмена снимает операцию; снимать нечего — отказ', () => {
+    const s = run(met(), 'ally.order', { ally: 'ally', kind: 'attack', planet: 'nest' }).state;
+    const r = run(s, 'ally.cancel', { ally: 'ally' });
+    expect(r.state.allyOps).toBeUndefined();
+    expect(r.events.map((e) => e.type)).toEqual(['ally.order.cancelled']);
+    expect(kernel.applyAction(r.state, act('ally.cancel', { ally: 'ally' }), ctx(0))).toMatchObject(
+      {
+        ok: false,
+        code: 'E_NO_ORDER',
+      },
+    );
+  });
+
+  it('ядро закрывает операцию по миру: взяли цель, разведчик дошёл, цель охраны потеряна', () => {
+    const attack = run(met(), 'ally.order', { ally: 'ally', kind: 'attack', planet: 'nest' }).state;
+    const taken = run(attack, 'test.planet.captured', {
+      planetId: 'nest',
+      owner: 'ally',
+      from: 'swarm',
+    });
+    expect(taken.state.allyOps).toBeUndefined();
+    expect(taken.events.map((e) => e.type)).toContain('ally.order.done');
+
+    const scout = run(met(), 'ally.order', { ally: 'ally', kind: 'scout', planet: 'nest' }).state;
+    const moved = {
+      ...scout,
+      fleets: { ...scout.fleets, a1: { ...scout.fleets.a1!, location: 'nest' } },
+    };
+    const reported = run(moved, 'test.arrived', { fleetId: 'a1', at: 'nest' });
+    expect(reported.events.map((e) => e.type)).toContain('ally.order.done');
+
+    const guard = run(met(), 'ally.order', { ally: 'ally', kind: 'guard', fleet: 'f1' }).state;
+    const merged = run(guard, 'test.fleet.merged', { from: 'f1', into: 'f9' });
+    expect(merged.state.allyOps?.ally?.fleet).toBe('f9');
+    const lost = run(merged.state, 'test.fleet.destroyed', { fleetId: 'f9' });
+    expect(lost.events.map((e) => e.type)).toContain('ally.order.lost');
+
+    const post = run(met(), 'ally.order', { ally: 'ally', kind: 'guard', planet: 'mine' }).state;
+    const fell = run(post, 'test.planet.captured', {
+      planetId: 'mine',
+      owner: 'swarm',
+      from: 'p1',
+    });
+    expect(fell.events.map((e) => e.type)).toContain('ally.order.lost');
+  });
+
+  it('разведчик союзника уже стоит в цели — доклад сразу', () => {
+    const r = run(met(), 'ally.order', { ally: 'ally', kind: 'scout', planet: 'road' });
+    // `road` — место, где стоит флот союзника, и не его провинция.
+    expect(r.state.allyOps).toBeUndefined();
+    expect(r.events.map((e) => e.type)).toEqual(['ally.ordered', 'ally.order.done']);
   });
 });

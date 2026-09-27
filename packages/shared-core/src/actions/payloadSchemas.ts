@@ -123,6 +123,12 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'trader.swap': z.object({ give: id, get: id, amount: traderUnits }),
   // extraction.ts — накопитель архива главы IV: какой флот у архива ведёт извлечение.
   'extraction.start': z.object({ fleetId: id }),
+  // rendezvous.ts — приказ союзнику главы IV: вид и ОДНА цель — провинция или флот.
+  'ally.order': z.union([
+    z.object({ ally: id, kind: z.enum(['guard', 'attack', 'scout']), planet: id }),
+    z.object({ ally: id, kind: z.enum(['guard', 'attack']), fleet: id }),
+  ]),
+  'ally.cancel': z.object({ ally: id }),
   // diplomacy.ts — one action for the whole protocol (D2+D3): escalation applies
   // at once, a friendlier declaration records/commits a mutual-consent offer
   'diplomacy.declare': z.object({

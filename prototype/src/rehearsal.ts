@@ -155,6 +155,8 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'trader.sell': { resource: 'metal', amount: 10 },
   'trader.swap': { give: 'metal', get: 'energy', amount: 10 },
   'extraction.start': { fleetId: 'p1_1' },
+  'ally.order': { ally: 'p2', kind: 'scout', planet: 'home_p1' },
+  'ally.cancel': { ally: 'p2' },
   'diplomacy.declare': { target: 'p2', stance: 'war' },
   'diplomacy.mapshare': { target: 'p2', on: true },
   'fleet.launch': { planetId: 'home_p1' },
