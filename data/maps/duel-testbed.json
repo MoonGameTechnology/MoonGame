@@ -355,7 +355,7 @@
       ],
       "garrison": [
         {
-          "unit": "militia",
+          "unit": "pirate_boarder",
           "count": 2
         }
       ]
@@ -585,7 +585,7 @@
   "players": {
     "pirates": {
       "name": "Pirate Base",
-      "faction": "vanguard",
+      "faction": "pirates",
       "npc": "pirate",
       "resources": {
         "credits": 0,
@@ -646,7 +646,7 @@
       "location": "globule",
       "units": [
         {
-          "unit": "frigate",
+          "unit": "pirate_frigate",
           "count": 2
         }
       ]

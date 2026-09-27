@@ -305,7 +305,7 @@
     },
     "pirates": {
       "name": "Pirate Base",
-      "faction": "vanguard",
+      "faction": "pirates",
       "npc": "pirate",
       "ai": false,
       "resources": {
@@ -320,7 +320,7 @@
       "location": "pirate_den",
       "units": [
         {
-          "unit": "frigate",
+          "unit": "pirate_frigate",
           "count": 2
         }
       ]

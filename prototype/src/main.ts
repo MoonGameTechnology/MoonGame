@@ -6582,8 +6582,8 @@ function taskGroupPanelHtml(group: Fleet[]): string {
   return h;
 }
 
-/** Тайлы состава Bytro-стиля: силуэт-архетип в цвете стороны (наземные — прежние
- *  текст-глифы с подписью имени), счётчик, мини-бар корпуса стека и его числа
+/** Тайлы состава Bytro-стиля: силуэт-архетип в цвете стороны (наземные — портрет
+ *  с подписью имени), счётчик, мини-бар корпуса стека и его числа
  *  «осталось/всего» (`decisions/unitTile.ts`, заказ владельца 2026-09-25). Тап по кораблю
  *  флота — карточка стека с отсеками и надетыми модулями (`shipCard.ts`), по наземному и
  *  по гарнизону мира — досье юнита. */
@@ -6599,11 +6599,11 @@ function unitTileHtml(u: UnitStack, owner: string | null, open: string): string 
   const eff = effectiveStats(def, u, data);
   const hp = tileHp(stackPools(u, data).hull); // тот же зажим остатка, что в сводке (REFM-37)
   const ground = def.domain === 'ground';
-  const icon = ground
+  const art = ground ? catalogPortraitHtml('u', u.unit, data, 'thumb') : '';
+  const icon = art || (ground
     ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-    : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color: ownerColor(owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
-  // Глиф наземного — не силуэт: без подписи его приходилось угадывать (поэтому «Землю»
-  // когда-то и перевели в список строк). Корабль узнаётся по силуэту, имя — в подсказке.
+    : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color: ownerColor(owner), shield: (eff.shield ?? 0) > 0 })}</span>`);
+  // Наземные портреты сохраняют подпись; корабль узнаётся по силуэту, имя — в подсказке.
   const caption = ground ? `<span class="pt-n">${esc(name)}</span>` : '';
   // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
   // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
@@ -6617,7 +6617,7 @@ function unitTileHtml(u: UnitStack, owner: string | null, open: string): string 
     : '';
   // Ветеран — своя плитка (стеки разной выслуги не сливаются) с шевронами степени.
   const vet = veteranMark(u, data, veteranPowerOn());
-  return `<button class="ptile${vet ? ' vet' : ''}" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}${vet ? veteranTag(vet, 'pt-vet') : ''}${caption}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${hp.low ? ' low' : ''}"><i style="width:${hp.pct}%"></i></span><span class="pt-hpn">${kfmt(hp.cur)}/${kfmt(hp.max)}</span></button>`;
+  return `<button class="ptile${art ? ' with-art' : ''}${vet ? ' vet' : ''}" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}${vet ? veteranTag(vet, 'pt-vet') : ''}${caption}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${hp.low ? ' low' : ''}"><i style="width:${hp.pct}%"></i></span><span class="pt-hpn">${kfmt(hp.cur)}/${kfmt(hp.max)}</span></button>`;
 }
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
   const tiles = stacks

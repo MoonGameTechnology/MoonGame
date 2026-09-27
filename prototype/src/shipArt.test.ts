@@ -25,8 +25,20 @@ describe('realistic build portraits', () => {
     expect(catalogPortraitHtml('b', 'metal_station', data)).toContain('data-ship-art="station"');
   });
 
-  it('does not assign ship art to ground troops, mines or unknown content', () => {
-    expect(catalogPortraitHtml('u', 'tank', data)).toBe('');
+  it('gives every ground type its own portrait, including Swarm and pirate troops', () => {
+    const portraits = new Set<string>();
+    for (const [id, def] of Object.entries(data.units)) {
+      if (def.domain !== 'ground') continue;
+      const html = catalogPortraitHtml('u', id, data);
+      expect(html, id).toContain('<img');
+      const src = html.match(/src="([^"]+)"/)?.[1];
+      expect(src, id).toBeTruthy();
+      expect(portraits.has(src!), id).toBe(false);
+      portraits.add(src!);
+    }
+  });
+
+  it('does not assign unit portraits to mines or unknown content', () => {
     expect(catalogPortraitHtml('u', 'unknown', data)).toBe('');
     expect(catalogPortraitHtml('b', 'mine', data)).toBe('');
   });
@@ -71,7 +83,14 @@ describe('realistic build portraits', () => {
     expect(catalogPortraitHtml('u', 'cruiser', data, 'thumb', 'swarm')).toContain('data-ship-art="swarmHunter"');
     // Юнит самого Роя в кодексе — без владельца, по `def.faction`.
     expect(catalogPortraitHtml('u', 'swarm_brood_mother', data)).toContain('data-ship-art="swarmMatriarch"');
-    // Наземный десант Роя остаётся со своей иконкой.
-    expect(catalogPortraitHtml('u', 'swarm_lander', data, 'portrait', 'swarm')).toBe('');
+    expect(catalogPortraitHtml('u', 'swarm_lander', data, 'portrait', 'swarm')).toContain('data-ship-art="swarm_lander"');
+  });
+
+  it('pirate ships have their own portraits instead of borrowing human hull art', () => {
+    for (const [pirate, human] of [['pirate_skiff', 'scout'], ['pirate_frigate', 'frigate'], ['pirate_cruiser', 'cruiser']]) {
+      const html = catalogPortraitHtml('u', pirate!, data);
+      expect(html, pirate).toContain('<img');
+      expect(html).not.toBe(catalogPortraitHtml('u', human!, data));
+    }
   });
 });

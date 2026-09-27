@@ -98,7 +98,7 @@ describe('достижимость содержимого на гейтиров�
       .filter(
         ([, u]) =>
           u.domain !== 'ground' &&
-          u.faction !== 'swarm' && // NPC organisms are never human loot.
+          u.faction !== 'swarm' && u.faction !== 'pirates' && // NPC rosters are never human loot.
           !(u.traits ?? []).includes('issued'),
       )
       .map(([id]) => id);

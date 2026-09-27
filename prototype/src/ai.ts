@@ -446,6 +446,15 @@ function baseAiOrders(
   // inside the guard-duty tick below.
   if (state.players[ai]!.npc === 'neutral') posture = 'active_defend';
   if (state.players[ai]!.npc === 'pirate') posture = 'expand';
+  // NPC pirates replenish their own roster; ordinary and legacy seats retain theirs.
+  const pirate = state.players[ai]!.faction === 'pirates';
+  const lineUnit = pirate ? 'pirate_cruiser' : 'cruiser';
+  const scoutUnit = pirate ? 'pirate_skiff' : 'scout';
+  const militiaUnit = pirate ? 'pirate_boarder' : 'militia';
+  const groundRoster: readonly string[] = pirate
+    ? ['pirate_tank', 'pirate_marauder', 'pirate_boarder'] : GROUND_ROSTER;
+  const groundDefenders: readonly string[] = pirate
+    ? ['pirate_marauder', 'pirate_tank', 'pirate_boarder'] : GROUND_DEFENDERS;
   const defensive = posture === 'defend' || posture === 'active_defend';
   // Steward guard duty (ST-3.2/3.3): a delegated defensive seat watches its worlds,
   // evacuates a wing the forecast says it would lose ≥ STEWARD_LOSS_LIMIT of, and —
@@ -823,10 +832,10 @@ function baseAiOrders(
       // ПОЛ ГАРНИЗОНА (правило владельца №6) держит и этот путь: пара бойцов эскорта
       // не должна опустить мир ниже того, что он обязан оставить себе. Двойка здесь —
       // не доктрина, а минимальный эскорт, и её кап остаётся как был.
-      const spareMilitia = spareGround(base, data).find((s) => s.unit === 'militia');
+      const spareMilitia = spareGround(base, data).find((s) => s.unit === militiaUnit);
       const hasLanding = (f.landing ?? []).some((s) => s.count > 0);
       if (!hasLanding && spareMilitia) {
-        out.push(loadArmy(ai, f.id, 'militia', Math.min(2, spareMilitia.count)));
+        out.push(loadArmy(ai, f.id, militiaUnit, Math.min(2, spareMilitia.count)));
         continue; // час подъёма — вылет следующим тиком
       }
     }
@@ -1114,7 +1123,7 @@ function baseAiOrders(
       (pl.resources.credits ?? 0) > 120 &&
       (pl.resources.microelectronics ?? 0) >= 3 // ECON-7: warships need the hi-tech good
     ) {
-      out.push(buildUnit(ai, base.id, 'cruiser', 1));
+      out.push(buildUnit(ai, base.id, lineUnit, 1));
     }
     // Wartime posture (self-play M4: wars were free walk-in raids — the leader had no
     // garrisons, so whoever attacked always came back and won): at war the bot
@@ -1134,13 +1143,13 @@ function baseAiOrders(
       // A landing stock at home: strike groups lift militia on sortie (above), so
       // the base keeps a few spare beyond its seeded defenders.
       const baseMilitia = base.garrison
-        .filter((s) => s.unit === 'militia')
+        .filter((s) => s.unit === militiaUnit)
         .reduce((n, s) => n + s.count, 0);
-      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasFacilityFor(base, 'militia')) {
-        out.push(buildUnit(ai, base.id, 'militia', 2));
+      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasFacilityFor(base, militiaUnit)) {
+        out.push(buildUnit(ai, base.id, militiaUnit, 2));
       }
       if (ownFleets < 8 && (pl.resources.metal ?? 0) > 140) {
-        out.push(buildUnit(ai, base.id, 'scout', 1));
+        out.push(buildUnit(ai, base.id, scoutUnit, 1));
       }
     }
     // ═══ СИЛЬНЫЙ БОТ (AI-BAL-3): наземная кампания ═══
@@ -1189,11 +1198,11 @@ function baseAiOrders(
       if (missingYard) {
         if (affordable(missingYard)) out.push(buildBuilding(ai, base.id, missingYard));
       }
-      if (hasFacilityFor(base, 'militia')) {
+      if (hasFacilityFor(base, militiaUnit)) {
         // 2. Запас войск дома: гарнизон столицы + то, что увезёт десант. Берётся самое
         //    тяжёлое по карману, поэтому ростер отыгрывается весь: ранняя казна тянет
         //    ополчение, поздняя — спецназ и танки.
-        const pendingHome = GROUND_ROSTER.reduce(
+        const pendingHome = groundRoster.reduce(
           (n, u) => n + (pendingUnit(base.id, u) ? 2 : 0),
           0,
         );
@@ -1208,8 +1217,8 @@ function baseAiOrders(
           // трюме, и там нужен ударный.
           const list =
             garrisonDefense(base.garrison, data) < garrisonFloor(base)
-              ? GROUND_DEFENDERS
-              : GROUND_ROSTER;
+              ? groundDefenders
+              : groundRoster;
           const pick = list.find((u) => affordableUnit(u, 2) && hasFacilityFor(base, u));
           if (pick) out.push(buildUnit(ai, base.id, pick, 2));
         }
@@ -1228,7 +1237,7 @@ function baseAiOrders(
       let garrisonOrders = 0;
       for (const p of worldsInOrder(state, ai, 'barracks', profile)) {
         if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
-        if (!hasFacilityFor(p, 'militia')) {
+        if (!hasFacilityFor(p, militiaUnit)) {
           if (barracksOrdered || pendingBuild(p.id, 'barracks')) continue;
           if (!affordable('barracks')) continue;
           out.push(buildBuilding(ai, p.id, 'barracks'));
@@ -1239,10 +1248,10 @@ function baseAiOrders(
         // Раньше условием было «гарнизон пуст», и застроенный призовой мир навсегда
         // оставался при той же паре бойцов, что и голый камень.
         if (garrisonOrders >= GARRISON_ORDERS_PER_TICK) break;
-        if (garrisonDefense(p.garrison, data) >= garrisonFloor(p) || pendingUnit(p.id, 'militia'))
+        if (garrisonDefense(p.garrison, data) >= garrisonFloor(p) || pendingUnit(p.id, militiaUnit))
           continue;
-        if (!affordableUnit('militia', 2)) break;
-        out.push(buildUnit(ai, p.id, 'militia', 2));
+        if (!affordableUnit(militiaUnit, 2)) break;
+        out.push(buildUnit(ai, p.id, militiaUnit, 2));
         garrisonOrders += 1;
       }
       // 5. ОБОРОНА (AI-BAL-2): форт → госпиталь → орбитальное ПКО. Порядок — по тому,
@@ -1287,6 +1296,7 @@ function baseAiOrders(
       //    штурм захлёбывается на первом же гарнизоне. Тот же трюм возит челноки — вылет
       //    поднимается с борта у фронта, а не с базы, куда радиус 120–150 не дотягивается.
       if (
+        !pirate &&
         shipsOwned('shuttle_carrier') < CARRIER_CAP &&
         !pendingUnit(base.id, 'shuttle_carrier') &&
         affordableUnit('shuttle_carrier', 1)
@@ -1309,15 +1319,15 @@ function baseAiOrders(
       if (
         warFooting &&
         data.modules[SIEGE_MODULE] &&
-        shipsOwned('cruiser', SIEGE_MODULE) < SIEGE_CAP &&
+        shipsOwned(lineUnit, SIEGE_MODULE) < SIEGE_CAP &&
         !pendingSiege(base.id) &&
-        Object.keys({ ...(data.units.cruiser?.cost ?? {}), ...siegeCost }).every(
+        Object.keys({ ...(data.units[lineUnit]?.cost ?? {}), ...siegeCost }).every(
           (r) =>
             (pl.resources[r] ?? 0) >=
-            (data.units.cruiser?.cost[r] ?? 0) + (siegeCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+            (data.units[lineUnit]?.cost[r] ?? 0) + (siegeCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
         )
       ) {
-        out.push(buildShip(ai, base.id, 'cruiser', 1, [SIEGE_MODULE]));
+        out.push(buildShip(ai, base.id, lineUnit, 1, [SIEGE_MODULE]));
       }
       // РЕМОНТНЫЙ АНГАР (SHU-5.4 → SHU-5.6). Крейсер — тот корпус, что у бота возит
       // шаттлы в трюме (5 мест; авианосец строится редко), и вспомогательный слот у него
@@ -1329,16 +1339,16 @@ function baseAiOrders(
       if (
         warFooting &&
         data.modules[REPAIR_MODULE] &&
-        shipsOwned('cruiser', REPAIR_MODULE) < REPAIR_BAY_CAP &&
+        shipsOwned(lineUnit, REPAIR_MODULE) < REPAIR_BAY_CAP &&
         !pendingSiege(base.id, REPAIR_MODULE) &&
-        Object.keys({ ...(data.units.cruiser?.cost ?? {}), ...repairCost }).every(
+        Object.keys({ ...(data.units[lineUnit]?.cost ?? {}), ...repairCost }).every(
           (r) =>
             (pl.resources[r] ?? 0) >=
-            (data.units.cruiser?.cost[r] ?? 0) + (repairCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+            (data.units[lineUnit]?.cost[r] ?? 0) + (repairCost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
         ) &&
-        canOrder(state, buildShip(ai, base.id, 'cruiser', 1, [REPAIR_MODULE])) === null
+        canOrder(state, buildShip(ai, base.id, lineUnit, 1, [REPAIR_MODULE])) === null
       ) {
-        out.push(buildShip(ai, base.id, 'cruiser', 1, [REPAIR_MODULE]));
+        out.push(buildShip(ai, base.id, lineUnit, 1, [REPAIR_MODULE]));
       }
       // ═══ ЧЕЛНОКИ (SHU-1.1 + SHU-3.2) ═══
       // Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём, поэтому цепочка
@@ -1359,6 +1369,7 @@ function baseAiOrders(
           0,
         );
       const orderShuttle = (unit: string): void => {
+        if (pirate) return; // This roster has ships and ground troops, no shuttle wing.
         if (hangarOwned(unit) >= SHUTTLE_CAP) return;
         if (pendingUnit(base.id, unit)) return;
         if (!affordableUnit(unit, 1)) return;
@@ -1849,4 +1860,3 @@ function baseAiOrders(
   }
   return out;
 }
-

@@ -286,7 +286,7 @@ export function unitScreenHtml(
  * Строка ДЕСАНТНОГО ЧЕЛНОКА (SHU-5.2): он строится сразу с бойцом внутри, поэтому
  * вместо одной кнопки «Строить» — по кнопке на каждого бойца, которого ядро примет на
  * этом мире, с ценой «челнок + боец». Кого можно посадить, решает ядро пробой приказа
- * (`orderableTroops`); некого — строка заперта кодом отказа первого кандидата.
+ * (`orderableTroops`); некого — строка заперта кодом первого кандидата своей фракции.
  */
 function landerRowHtml(
   me: string,
@@ -300,7 +300,8 @@ function landerRowHtml(
   const candidates = landerTroopCandidates(data);
   const order = (g: string): Action => buildUnit(me, planetId, id, 1, g);
   const troops = orderableTroops(candidates, (g) => probe(order(g)));
-  const first = candidates[0];
+  // A faction-exclusive troop must not hide an otherwise available human shuttle.
+  const first = candidates.find((g) => probe(order(g)) !== 'E_FORBIDDEN') ?? candidates[0];
   const code = troops.length === 0 ? (first ? probe(order(first)) : 'E_NOT_BUILDABLE') : null;
   if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
   const head =

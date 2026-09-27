@@ -413,14 +413,20 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     const npc = n.sector === 'pirate_base' ? 'pirate' : 'neutral';
     const id = `npc-${n.id}`;
     players[id] = { ...player(id, npc === 'pirate' ? 'Pirate Base' : 'Neutral AI Base',
-      npc === 'pirate' ? 'crimson' : 'violet',
+      npc === 'pirate' ? 'pirates' : 'violet',
       { credits: 500, metal: 500, food: 200, energy: 200, microelectronics: 100 }, true), npc };
     const home = planets[n.id]!;
     home.owner = id;
     home.buildings = ['spaceport', 'radar', 'power_plant', 'fabricator'].map((type) =>
       ({ type, level: 1, hp: hpOfLevel(type, 1) }));
-    home.garrison = [{ unit: 'heavy_infantry', count: 3 }];
-    fleets[`${id}-1`] = fleet(`${id}-1`, id, n.id, [['cruiser', 3], ['scout', 1]], []);
+    const pirateLoadout = data.factions.pirates!.startingLoadout;
+    home.garrison = npc === 'pirate'
+      ? pirateLoadout.garrison.map((stack) => ({ ...stack }))
+      : [{ unit: 'heavy_infantry', count: 3 }];
+    const ships: [string, number][] = npc === 'pirate'
+      ? pirateLoadout.fleet.map((stack) => [stack.unit, stack.count])
+      : [['cruiser', 3], ['scout', 1]];
+    fleets[`${id}-1`] = fleet(`${id}-1`, id, n.id, ships, []);
   }
   const teamed = setup.seats.some((seat) => seat.team !== undefined);
   const teamOf = new Map(setup.seats.map((seat) => [seat.id, seat.team]));

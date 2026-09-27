@@ -296,8 +296,8 @@ describe('codex — карточка полной информации', () => {
     expect(ship).toContain('data-ship-art="cruiser"');
     const ground = codexHtml('u', 'militia');
     expect(ground).not.toBe('');
-    expect(ground).not.toContain('#3ad17a'); // наземные держат текстовый глиф
-    expect(ground).not.toContain('<img');
+    expect(ground).not.toContain('#3ad17a'); // наземные показывают собственный портрет
+    expect(ground).toContain('data-ship-art="militia"');
   });
 
   it('строка «Класс» не повторяет один тег дважды (domain и трейт делят ключ)', () => {

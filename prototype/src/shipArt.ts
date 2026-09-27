@@ -24,6 +24,19 @@ import swarmSporeCarrier from '../art/ships/swarm-spore-carrier.webp';
 import swarmDestroyer from '../art/ships/swarm-destroyer.webp';
 import swarmMatriarch from '../art/ships/swarm-matriarch.webp';
 import swarmLeviathan from '../art/ships/swarm-leviathan.webp';
+import militia from '../art/units/militia.webp';
+import dropInfantry from '../art/units/drop-infantry.webp';
+import heavyInfantry from '../art/units/heavy-infantry.webp';
+import specialForces from '../art/units/special-forces.webp';
+import tank from '../art/units/tank.webp';
+import garrison from '../art/units/garrison.webp';
+import swarmLander from '../art/units/swarm-lander.webp';
+import pirateSkiff from '../art/units/pirate-skiff.webp';
+import pirateFrigate from '../art/units/pirate-frigate.webp';
+import pirateCruiser from '../art/units/pirate-cruiser.webp';
+import pirateBoarder from '../art/units/pirate-boarder.webp';
+import pirateMarauder from '../art/units/pirate-marauder.webp';
+import pirateTank from '../art/units/pirate-tank.webp';
 
 const PORTRAITS: Partial<Record<ShipShapeId, string>> = {
   fighter,
@@ -46,6 +59,22 @@ const PORTRAITS: Partial<Record<ShipShapeId, string>> = {
   swarmDestroyer,
   swarmMatriarch,
   swarmLeviathan,
+  pirateSkiff,
+  pirateFrigate,
+  pirateCruiser,
+};
+
+const GROUND_PORTRAITS: Readonly<Record<string, string>> = {
+  militia,
+  drop_infantry: dropInfantry,
+  heavy_infantry: heavyInfantry,
+  special_forces: specialForces,
+  tank,
+  garrison,
+  swarm_lander: swarmLander,
+  pirate_boarder: pirateBoarder,
+  pirate_marauder: pirateMarauder,
+  pirate_tank: pirateTank,
 };
 
 /** Orbital station art belongs to orbital buildings, never a new mobile unit.
@@ -69,9 +98,10 @@ export function catalogPortraitHtml(
     : kind === 'b' && data.buildings[id] && (id === 'metal_station' || id === 'starfort')
       ? 'station'
       : undefined;
-  const src = shape && PORTRAITS[shape];
+  const ground = def?.domain === 'ground';
+  const src = ground ? GROUND_PORTRAITS[id] : shape && PORTRAITS[shape];
   if (!src) return '';
   // The adjacent localized title identifies the unit; the artwork adds no duplicate
   // screen-reader label and contains no language baked into its pixels.
-  return `<span class="ship-art ship-art--${size}" data-ship-art="${shape}" aria-hidden="true"><img src="${src}" alt="" width="768" height="512" loading="lazy" decoding="async" draggable="false"></span>`;
+  return `<span class="ship-art ship-art--${size}" data-ship-art="${ground ? id : shape}" aria-hidden="true"><img src="${src}" alt="" width="768" height="512" loading="lazy" decoding="async" draggable="false"></span>`;
 }
