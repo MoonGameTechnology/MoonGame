@@ -253,3 +253,23 @@ export function loadoutBays(slots: ShipSlots, modules: readonly string[], data: 
   }
   return bays;
 }
+
+/** Лучшее значение стата `stat` среди живых стеков флота — с оснащением
+ *  (`effectiveStats`). Модуль с механикой (фаза 3 `ship-modules-roadmap.md`) действует
+ *  по ЛУЧШЕМУ носителю во флоте, а не суммой: второй такой же модуль механику не
+ *  удваивает (то же правило, что у ремонтного ангара, `fleetHangarRepairRate`).
+ *  Нет носителя — 0. */
+export function bestFleetStat(
+  stacks: readonly Pick<UnitStack, 'unit' | 'count' | 'modules' | 'moduleStars' | 'moduleRarity'>[],
+  stat: string,
+  data: GameData,
+): number {
+  let best = 0;
+  for (const st of stacks) {
+    const def = data.units[st.unit];
+    if (!def || !(st.count > 0)) continue;
+    const v = effectiveStats(def, st, data)[stat] ?? 0;
+    if (v > best) best = v;
+  }
+  return best;
+}

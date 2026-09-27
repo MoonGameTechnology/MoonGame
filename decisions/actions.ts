@@ -246,6 +246,9 @@ export const orderChain = (playerId: string, fleetId: string, steps: ChainStep[]
 /** BOOST-1: toggle форс-марш on an owned fleet (+50% speed, hull wear in transit). */
 export const forceMarchFleet = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'fleet.forcemarch', { fleetId, on });
+/** SM-3.4: поставить минное поле на узле, где стоит флот с заградителем. */
+export const layMinesFleet = (playerId: string, fleetId: string) =>
+  act(playerId, 'fleet.layMines', { fleetId });
 /** Платный мгновенный ремонт корпуса всего флота (цена — `instantRepairCost`). */
 export const instantRepairFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.instantRepair', { fleetId });

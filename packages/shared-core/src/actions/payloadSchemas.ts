@@ -40,6 +40,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // `to` — точка отхода (RETR-1). Необязательна: без неё отступление только расцепляет
   // бой, как и раньше, поэтому старый клиент остаётся валидным.
   'fleet.retreat': z.object({ fleetId: id, to: id.optional() }),
+  // minefield.ts (SM-3.4): поставить минное поле на узле, где стоит флот
+  'fleet.layMines': z.object({ fleetId: id }),
   // army.ts
   'army.load': z.object({ fleetId: id, unit: id, count: count.optional() }),
   'army.unload': z.object({ fleetId: id, unit: id, count: count.optional() }),

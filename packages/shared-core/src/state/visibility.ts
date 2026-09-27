@@ -464,6 +464,22 @@ function project(
   // cannot see — including ones they have never scouted. The player learns what they
   // salvaged from `salvage.paid`, which is addressed to them by name.
   delete view.salvage;
+  // SM-3.4: мины, видные врагу, мины не работают. Зритель видит только свои поля и
+  // перезарядку своих флотов; чужое снимается целиком.
+  const mines = view.minefields;
+  if (mines) {
+    const fields: NonNullable<GameState['minefields']>['fields'] = {};
+    for (const [node, byOwner] of Object.entries(mines.fields)) {
+      const own = byOwner[viewerId];
+      if (own) fields[node] = { [viewerId]: own };
+    }
+    const readyAt: Record<string, number> = {};
+    for (const [fleetId, at] of Object.entries(mines.readyAt))
+      if (state.fleets[fleetId]?.owner === viewerId) readyAt[fleetId] = at;
+    if (Object.keys(fields).length || Object.keys(readyAt).length)
+      view.minefields = { fields, readyAt };
+    else delete view.minefields;
+  }
   // Private dossier plus this instant's resolved contacts. Never retain another
   // observer's records, and never put remembered fleets back on the live map.
   const contacts = { ...view.swarmIntel?.[viewerId], ...observedSwarm(state, viewerId, identify) };

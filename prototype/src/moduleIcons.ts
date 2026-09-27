@@ -30,6 +30,10 @@ export const MODULE_ICON: Record<string, string> = {
   cargo_bay: '📦',
   repair_bay: '🔧',
   siege_platform: '💥',
+  tractor_beam: '🧲',
+  salvage_rig: '♻',
+  repair_tender: '🛠',
+  mine_layer: '💣',
   swarm_brood_chamber: '🧬',
 };
 

@@ -86,6 +86,7 @@ import {
   forceMarchFleet,
   FORCED_MARCH_MULT,
   instantRepairFleet,
+  layMinesFleet,
   premiumRepairFleet,
   buySupply,
   abandonRun,
@@ -111,6 +112,7 @@ import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName, worldName } from './planetName';
 import { provinceName } from '../../decisions/provinceName';
+import { minelayerOffer, ownMinefields } from '../../decisions/minefields';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -1412,6 +1414,9 @@ const aaShots: Array<{
 // silent capture (previously only a toast) reads on the map at a glance. Fog-gated at
 // push time (a hidden flip never flashes). Keyed by node so a re-capture restarts it.
 const captureFlashes = new Map<string, { owner: string; at: number }>();
+// SM-3.5: вспышка срабатывания мин — узел → момент (performance.now). Ставится, только
+// если мины задели меня или сработало моё поле.
+const mineFlashes = new Map<string, number>();
 // Casualties per contested location (owner → unit → count), accumulated from
 // unit.died while a battle runs and paid out as a result note on battle.resolved.
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
@@ -4157,6 +4162,16 @@ function handleEvents(events: DomainEvent[]) {
         note(t('log.salvage', { what: costText(bag) }), p.location as string | undefined);
         break;
       }
+      // SM-3.5: мины сработали. Жертва и хозяин поля видят сообщение и вспышку на узле;
+      // остальным поле неизвестно, и срабатывание тоже.
+      case 'mines.triggered': {
+        const at = p.at as string;
+        const victim = p.owner === ME;
+        if (!victim && !(p.by as string[] | undefined)?.includes(ME)) break;
+        note(t(victim ? 'log.mines.hit' : 'log.mines.triggered', { n: Number(p.lost) || 0 }), at);
+        mineFlashes.set(at, performance.now());
+        break;
+      }
       case 'unit.died': {
         // Счёт и ведомость наполняются по РАЗНЫМ условиям — `warTally.ts` (REFM-180):
         // счёт это личная статистика (только мои бои), ведомость питает строку ленты,
@@ -6290,6 +6305,7 @@ function render(now: number) {
   drawAssaultTargets();
   drawEngageTargets(lastReal);
   drawMissionTargets();
+  drawMinefields(now); // SM-3.5: свои минные поля «💣 ×заряд» и вспышка срабатывания
   drawDevourSieges(); // PVR-4.7: осада «Поглощения мира» над своим миром — кольцо-часы и отсчёт
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
@@ -6764,6 +6780,16 @@ function fleetPanelHtml(f: Fleet): string {
       h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
   if (f.owner === ME) h += fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)));
+  // SM-3.5: заградитель ставит поле там, где стоит; правило и отказы — в ядре.
+  const mines = minelayerOffer(f, s, data, ME);
+  if (mines)
+    h += `<div class="row">💣 <button class="chip" data-act="laymines" data-arg="${f.id}"${mines.ready ? '' : ' disabled'} title="${t('side.fleet.mines.title')}">${
+      mines.ready
+        ? t('side.fleet.mines.lay')
+        : mines.reason === 'cooldown'
+          ? t('side.fleet.mines.cooldown', { in: countdownHMS(mines.readyInMs) })
+          : t('side.fleet.mines.busy')
+    }</button></div>`;
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
   // корпусам, лимп <30% учтён), с меткой форс-марша. The hero aura (+5%, noted
@@ -9101,6 +9127,8 @@ side.addEventListener('click', (ev) => {
     if (arg) battleWindow.open(arg);
   } else if (act === 'retreat') {
     armRetreat(selFleet!);
+  } else if (act === 'laymines') {
+    playerOrder(layMinesFleet(ME, arg || selFleet!));
   } else if (act === 'instantrepair') {
     // Платный мгновенный ремонт: цена и отказы — на сервере; панель перерисуется
     // по факту (полный бар = получилось), нотификаций-обещаний не даём.
@@ -14345,6 +14373,48 @@ function drawMissionTargets(): void {
 /** Осада «Поглощения мира» над своим миром (PVR-4.7): красное кольцо-часы — дуга тает к
  *  гибели мира — и отсчёт над ним в тех же часах, что у волн (`decisions/devourSiege.ts`).
  *  Текста нет: знак и время, поэтому и локали не нужно. */
+const MINE_FLASH_MS = 1200;
+function drawMinefields(now: number): void {
+  for (const [node, at] of mineFlashes) {
+    if (flashDone(now, at, MINE_FLASH_MS)) {
+      mineFlashes.delete(node);
+      continue;
+    }
+    const p = s.planets[node];
+    if (!p) continue;
+    const c = world(p.position);
+    if (!visible(c, 80)) continue;
+    const k = flashProgress(now, at, MINE_FLASH_MS);
+    cx.save();
+    cx.strokeStyle = `rgba(255,179,71,${0.9 * fadeOf(k)})`;
+    cx.lineWidth = 3;
+    cx.beginPath();
+    cx.arc(c.x, c.y, waveRadius(k, 60, 1), 0, TAU);
+    cx.stroke();
+    cx.restore();
+  }
+  const fields = ownMinefields(s, ME);
+  if (fields.length === 0) return;
+  cx.save();
+  cx.textAlign = 'center';
+  cx.textBaseline = 'bottom';
+  cx.font = '700 11px ui-monospace, monospace';
+  for (const m of fields) {
+    const p = s.planets[m.node];
+    if (!p) continue;
+    const c = world(p.position);
+    if (!visible(c, 60)) continue;
+    const label = `💣 ×${m.charge}`;
+    const w = Math.ceil(cx.measureText(label).width) + 10;
+    const top = Math.round(c.y - 44);
+    cx.fillStyle = 'rgba(4,10,12,.85)';
+    cx.fillRect(Math.round(c.x - w / 2), top, w, 15);
+    cx.fillStyle = '#ffb347';
+    cx.fillText(label, c.x, top + 14);
+  }
+  cx.restore();
+}
+
 function drawDevourSieges(): void {
   const marks = devourSieges(s, ME);
   if (marks.length === 0) return;

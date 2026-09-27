@@ -206,6 +206,7 @@ export {
   orderChain,
   forceMarchFleet,
   instantRepairFleet,
+  layMinesFleet,
   premiumRepairFleet,
   buySupply,
   abandonRun,

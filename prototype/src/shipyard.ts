@@ -29,7 +29,7 @@
 import { splitSupport } from '../../decisions/supportShips';
 import { moduleGroups } from '../../decisions/moduleGroups';
 import { moduleIcon, SLOT_ICON, SLOT_KEY } from './moduleIcons';
-import { isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
+import { isPercentStat, isPerHourShare, perHourPercent } from '../../decisions/perHourShare';
 import {
   effectiveStats,
   moduleAllowed,
@@ -133,10 +133,21 @@ const STAT_KEY: Record<string, string> = {
   // Доли за игровой час (`perHourShare.ts`): без подписи чип читался бы «+0.05 hullRepair».
   shieldRegen: 'loadout.stat.shield-regen',
   hullRepair: 'loadout.stat.hull-repair',
+  retreatPull: 'loadout.stat.retreat-pull',
+  salvageBonus: 'loadout.stat.salvage',
+  fleetHullRepair: 'loadout.stat.fleet-repair',
+  mineCharge: 'loadout.stat.mine-charge',
+  mineHit: 'loadout.stat.mine-hit',
 };
 /** Чип эффекта модуля: доля в час — процентом («+5%/ч»), прочее — как есть. */
 const effectChip = (k: string, v: number): string =>
-  `+${isPerHourShare(k) ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) }) : v} ${t(STAT_KEY[k] ?? k)}`;
+  `+${
+    isPerHourShare(k)
+      ? t('loadout.stat.share-per-hour', { n: perHourPercent(v) })
+      : isPercentStat(k)
+        ? t('loadout.stat.percent', { n: perHourPercent(v) })
+        : v
+  } ${t(STAT_KEY[k] ?? k)}`;
 
 /** The order being composed: which hull, what is bolted on, how many, where. Plain
  *  data, so the pane can be rendered (and asserted) without a window. */
