@@ -17,6 +17,7 @@ export const CHAPTER_KEYS: readonly { name: string; brief: string }[] = [
   { name: 'sector-zero.mission.1', brief: 'sector-zero.mission.1.brief' },
   { name: 'sector-zero.mission.2', brief: 'sector-zero.mission.2.brief' },
   { name: 'sector-zero.mission.3', brief: 'sector-zero.mission.3.brief' },
+  { name: 'sector-zero.mission.4', brief: 'sector-zero.mission.4.brief' },
 ];
 
 export interface RouteNode {

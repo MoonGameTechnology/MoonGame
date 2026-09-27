@@ -7,8 +7,8 @@
  * зона вывода у входа. Соседство выводится из мозаики (M4.3), поэтому всё это ПРОВЕРЯЕТСЯ здесь
  * числами — любая правка координат может молча поменять карту.
  *
- * Дверь главы (список глав клиента) открывает отдельный кирпич, когда сценарий готов целиком;
- * здесь карта собирается напрямую из своих данных.
+ * Дверь главы (список глав клиента) открыта последним кирпичом фазы (PVR-7.6), когда сценарий
+ * был готов целиком; геометрия ниже собирается напрямую из данных карты.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -20,6 +20,9 @@ import {
   validateMatchMap,
   type MatchMap,
 } from '../packages/shared-core/src/index';
+import { PVE_MISSION_COUNT, pveModeId, pveState } from '../packages/client/src/gameData';
+import { CHAPTER_KEYS } from '../decisions/chapterRoute';
+import { chapterHero } from '../decisions/heroRecruits';
 import { shippedGameData } from './bundle';
 import mapJson from './maps/pve-4.json';
 
@@ -282,5 +285,24 @@ describe('задачи четвёртой главы — пул из восьм�
     expect(line.at).toEqual(['bridge_w']);
     expect(BRIDGES).toContain('bridge_w');
     expect(data.sectorKinds[map.sectors.bridge_w!.kind]?.buildable).toBe(true);
+  });
+});
+
+describe('дверь четвёртой главы (PVR-7.6)', () => {
+  it('глава открывается своей картой под режимом волн, с архивом и точкой встречи', () => {
+    expect(PVE_MISSION_COUNT).toBeGreaterThanOrEqual(4);
+    const s = pveState(data, 3);
+    expect(s.mapId).toBe('pve-4');
+    expect(pveModeId(3)).toBe('pve_waves');
+    expect(s.extraction).toMatchObject({ vault: 'archive', zone: 'staging' });
+    expect(s.planets.rendezvous?.rendezvous).toBe('ally');
+  });
+
+  it('у главы есть название и брифинг; героя-награды нет (§6.7: награда — по экономике)', () => {
+    expect(CHAPTER_KEYS[3]).toEqual({
+      name: 'sector-zero.mission.4',
+      brief: 'sector-zero.mission.4.brief',
+    });
+    expect(chapterHero(3)).toBeNull();
   });
 });

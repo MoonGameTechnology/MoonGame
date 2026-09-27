@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { comicProblems } from '../../decisions/chapterComics';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
-import { PVE_MISSION_COUNT, pveChapter } from '../../packages/client/src/gameData';
+import { PVE_MISSION_COUNT, pveChapter, pveState } from '../../packages/client/src/gameData';
+import { chapterChain } from '../../decisions/chapterChain';
+import { shippedGameData } from '../../data/bundle';
 import trainingMap from '../../data/maps/training-1.json';
 import { CHAPTER_COMICS, COMIC_TASK_TRIGGERS } from './comicArt';
 
@@ -24,6 +26,14 @@ function artFiles(dir = ART, prefix = ''): string[] {
       ? artFiles(`${dir}${name}/`, `${prefix}${name}/`)
       : [`${prefix}${name}`],
   );
+}
+
+/** Чем глава может звать комикс `task`: её задачи и шаги главной цепочки (глава IV). */
+function triggersOf(chapter: string): string[] {
+  const i = Array.from({ length: PVE_MISSION_COUNT }, (_, n) => pveChapter(n).id).indexOf(chapter);
+  if (i < 0) return [];
+  const chain = chapterChain(pveState(shippedGameData(), i), 'p1', 1) ?? [];
+  return [...pveChapter(i).objectives.map((o) => o.id), ...chain.map((st) => st.key)];
 }
 
 describe('комиксы глав — реестр и папка арта', () => {
@@ -66,9 +76,13 @@ describe('комиксы глав — реестр и папка арта', () =
       if (!moments.task) continue;
       const task = COMIC_TASK_TRIGGERS[chapter];
       expect(task, `${chapter}: нет задачи-триггера`).toBeTruthy();
-      const i = Array.from({ length: PVE_MISSION_COUNT }, (_, n) => pveChapter(n).id).indexOf(chapter);
-      expect(pveChapter(i).objectives.map((o) => o.id)).toContain(task);
+      expect(triggersOf(chapter)).toContain(task);
     }
+  });
+
+  it('каждый триггер — задача или шаг цепочки своей главы (арт может прийти позже)', () => {
+    for (const [chapter, task] of Object.entries(COMIC_TASK_TRIGGERS))
+      expect(triggersOf(chapter), chapter).toContain(task);
   });
 
   it('инструкция для художника лежит рядом с артом', () => {
