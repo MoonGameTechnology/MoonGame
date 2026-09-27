@@ -36,22 +36,22 @@
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
 | REFM-203 | ✅ | proto | `docs/backlog.md` | missionPanel.ts |
 | REFM-204 | ✅ | proto | `docs/backlog.md` | smoke:net — сетевая партия в живом браузере |
-| REFM-205 | ⏳ | proto | `docs/backlog.md` | Выход из партии — одна дверь. |
+| REFM-205 | ✅ | proto | `docs/backlog.md` | Выход из партии — одна дверь. |
 | REFM-206 | ⏳ | proto | `docs/backlog.md` | Перерисовка по имени. |
 | REFM-207 | ⏳ | proto | `docs/backlog.md` | Владелец прицелов и поповеров |
 | REFM-208 | 🔒 | proto | `docs/backlog.md` | Владелец выбора |
 | REFM-209 | ⏳ | proto | `docs/backlog.md` | Профиль Sector Zero: хранение, облако, вкладка-хозяйка |
 | REFM-210 | 🔒 | proto | `docs/backlog.md` | Забег: сохранение, восстановление, флаги |
 | REFM-211 | 🔒 | proto | `docs/backlog.md` | Оболочка Sector Zero |
-| REFM-212 | 🔒 | proto | `docs/backlog.md` | Экран настройки схватки |
-| REFM-213 | 🔒 | proto | `docs/backlog.md` | Сохранение схватки |
+| REFM-212 | ⏳ | proto | `docs/backlog.md` | Экран настройки схватки |
+| REFM-213 | ⏳ | proto | `docs/backlog.md` | Сохранение схватки |
 | REFM-214 | ⏳ | proto | `docs/backlog.md` | Дипломатия и связь |
 | REFM-215 | ⏳ | proto | `docs/backlog.md` | Сессия аккаунта |
 | REFM-216 | 🔒 | proto | `docs/backlog.md` | Сетевой жизненный цикл |
 | REFM-217 | 🔒 | proto | `docs/backlog.md` | Обзор партий и выбор места |
 | REFM-218 | 🔒 | proto | `docs/backlog.md` | Страницы входа |
 | REFM-219 | 🔒 | proto | `docs/backlog.md` | Жизненный цикл матча |
-| REFM-220 | 🔒 | proto | `docs/backlog.md` | Хаб и настройки |
+| REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
 | REFM-221 | 🔒 | proto | `docs/backlog.md` | Обучение и справка |
 | REFM-222 | 🔒 | proto | `docs/backlog.md` | Верхняя полоса |
 | REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |

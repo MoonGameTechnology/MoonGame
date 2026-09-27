@@ -11,6 +11,8 @@
  * REFM-204 в `docs/backlog.md`): вход по позывному падал целиком, новичку на сервере без
  * аккаунтов раскрывалось поле пароля, ‹ в партии «закрывал» невидимый экран настройки
  * вместо выхода, а обрыв выкидывал на карточку входа (и ⌂ вёл туда же вместо хаба).
+ * REFM-205 добавил выход на обрыве: он не гасил дозвон, и тот через секунду возвращал
+ * игрока из хаба в партию.
  *
  * Как устроен:
  *  1. прото-сервер на свободном порту — в позе прод-образа (гейт действий и замок мест
@@ -20,9 +22,11 @@
  *     каждое сообщение, а обрыв устраивает сам, не трогая сервер;
  *  4. позывной → хаб → обозреватель партий → свой мир → «В бой»: место принято, мир пришёл;
  *  5. приказ из интерфейса (исследование) — сервер принял, ответ вернулся на экран;
- *  6. обрыв посреди партии: игрок остаётся на карте, приказ без связи ложится в очередь,
+ *  6. выход на обрыве: приказ без связи ложится в очередь, ‹ уводит в хаб, дозвона нет, и
+ *     на новом входе из «Активных» (тот же документ) очередь не догоняет игрока;
+ *  7. обрыв посреди партии: игрок остаётся на карте, приказ без связи ложится в очередь,
  *     клиент дозванивается в своё место по билету, и приказ доходит по новому соединению;
- *  7. выход через ‹ (тот же выход, что ⌂ на телефоне) — игрок в хабе, сокет закрыт,
+ *  8. выход через ‹ (тот же выход, что ⌂ на телефоне) — игрок в хабе, сокет закрыт,
  *     сервер видит уход, нового дозвона нет. Без `netSock.close()` в выходе смоук падает.
  *
  * CSP. Документ отдаётся с настоящей политикой, поэтому смоук видит и её нарушения. Два
@@ -169,6 +173,37 @@ async function pickResearch() {
 /** Исследование идёт на экране — значит, ответ сервера вернулся в клиент. */
 const researching = (tech) =>
   page.locator(`.tt-item.st-res[data-tech="${tech}"]`).waitFor({ state: 'attached' });
+/** Окно технологий; первое открытие показывает поверх него карточку-вводную (ONB-3). */
+async function openTech() {
+  await page.click('#holo-tech');
+  if (await page.locator('#intro.show').isVisible()) await page.click('#intro .in-ok');
+}
+/** Обрыв посреди партии: смоук рвёт обе стороны соединения, и сервер «недоступен». */
+async function drop(link) {
+  hold = true; // попытки дозвона отбиваются, пока не отпустим
+  link.server.close({ code: 1001, reason: 'smoke: обрыв' });
+  link.ws.close({ code: 1001, reason: 'smoke: обрыв' });
+  await page.locator('#banner').waitFor({ state: 'visible' }); // «переподключаюсь…»
+}
+/** ‹ до хаба: сперва закрывает открытый слой (окно технологий), следующим нажатием выходит. */
+async function exitToHub() {
+  for (let i = 0; i < 4 && !(await page.locator('#hub').isVisible()); i++) {
+    assert.equal(await overlay(), 'none', `после ${i} нажатий ‹ партию закрыл экран подключения`);
+    await page.click('#holo-back');
+    await page.waitForTimeout(200);
+  }
+  await page.locator('#hub').waitFor({ state: 'visible' });
+}
+/** Из хаба в свою партию: «Активные» ведут занятое место прямо в игру, в том же документе. */
+async function rejoinFromHub() {
+  const n = live().length;
+  await page.click('#hub-play');
+  await page.click('.mtab[data-tab="active"]');
+  await page.locator('#mlist .mrow .mbtn').first().click();
+  await until('вход из «Активных»', () => live().length === n + 1 && welcomeOf(live()[n]), 20_000);
+  await until('карта после входа', async () => (await overlay()) === 'none');
+  return live()[n];
+}
 
 try {
   await withDiagnostics(page, 'nettest', async () => {
@@ -216,9 +251,7 @@ try {
     console.log(`✓ вход: ${NICK} сел на ${welcome.playerId}, своих узлов ${mine.length}`);
 
     // --- приказ из интерфейса -----------------------------------------------------------
-    await page.click('#holo-tech');
-    // Первое открытие окна показывает карточку-вводную (ONB-3) поверх него — «Понятно».
-    if (await page.locator('#intro.show').isVisible()) await page.click('#intro .in-ok');
+    await openTech();
     const order1 = await pickResearch();
     await order1.take.click();
     await researching(order1.tech);
@@ -226,25 +259,43 @@ try {
     assert.deepEqual(rejections(), [], 'сервер приказ не отверг');
     console.log(`✓ приказ: исследование ${order1.tech} принято сервером и идёт на экране`);
 
+    // --- выход на обрыве ----------------------------------------------------------------
+    // На обрыве `NET` уже ложен, а дозвон жив: выход обязан погасить и его, иначе дозвон
+    // вернёт игрока из хаба в партию (REFM-205). Приказ без связи ложится в очередь и
+    // умирает вместе с выходом: на следующем входе он не должен догнать игрока.
+    await drop(first);
+    await (await pickResearch()).take.click(); // окно технологий открыто с прошлого приказа
+    await exitToHub(); // раньше первой попытки дозвона: она через секунду после обрыва
+    const linksAtExit = links.length;
+    hold = false;
+    await page.waitForTimeout(NO_REDIAL_MS);
+    assert.equal(links.length, linksAtExit, 'выход на обрыве гасит дозвон');
+    assert(await page.locator('#hub').isVisible(), 'дозвон не вернул игрока из хаба в партию');
+    assert(!(await page.locator('#banner').isVisible()), 'баннер переподключения ушёл с выходом');
+    assert.equal((await health()).players.connected, 0, 'сервер не видит подключений');
+    const second = await rejoinFromHub();
+    assert.equal(welcomeOf(second).playerId, welcome.playerId, 'вход из «Активных» — в своё место');
+    await page.waitForTimeout(500); // очередь ушла бы сразу за приветственным снимком
+    assert.equal(envelopes(second).length, 0, 'приказ с обрыва не догнал игрока на новом входе');
+    console.log('✓ выход на обрыве: игрок в хабе, дозвона нет, очередь умерла вместе с выходом');
+
     // --- обрыв посреди партии -----------------------------------------------------------
+    await openTech();
     const before = await health();
-    hold = true; // «сервер недоступен»: попытки дозвона отбиваются, пока не отпустим
-    first.server.close({ code: 1001, reason: 'smoke: обрыв' });
-    first.ws.close({ code: 1001, reason: 'smoke: обрыв' });
-    await page.locator('#banner').waitFor({ state: 'visible' }); // «переподключаюсь…»
+    await drop(second);
     assert.equal(await overlay(), 'none', 'обрыв не выкидывает из партии на экран входа');
     await until('сервер увидел обрыв', async () => (await health()).players.connected === 0);
     // Приказ без связи клиент кладёт в очередь (NETA2-5) — он обязан уйти после дозвона.
     const order2 = await pickResearch();
     await order2.take.click();
     hold = false;
-    await until('клиент дозвонился', () => live().length === 2 && welcomeOf(live()[1]), 20_000);
-    const second = live()[1];
-    assert.match(second.url, /[?&]ticket=/, 'дозвон предъявляет билет места');
-    assert.equal(welcomeOf(second).playerId, welcome.playerId, 'дозвон вернул в то же место');
+    await until('клиент дозвонился', () => live().length === 3 && welcomeOf(live()[2]), 20_000);
+    const third = live()[2];
+    assert.match(third.url, /[?&]ticket=/, 'дозвон предъявляет билет места');
+    assert.equal(welcomeOf(third).playerId, welcome.playerId, 'дозвон вернул в то же место');
     await researching(order2.tech);
     await page.locator('#banner').waitFor({ state: 'hidden' });
-    assert.equal(envelopes(second).length, 1, 'отложенный приказ ушёл по новому соединению');
+    assert.equal(envelopes(third).length, 1, 'отложенный приказ ушёл по новому соединению');
     const after = await health();
     assert.equal(after.players.connected, 1, 'после дозвона снова одно подключение');
     assert.equal(after.players.joins, before.players.joins + 1, 'сервер посчитал дозвон');
@@ -254,15 +305,9 @@ try {
     );
 
     // --- выход в хаб --------------------------------------------------------------------
-    // ‹ сперва закрывает открытый слой (окно технологий), следующим нажатием выходит.
     const linksBeforeExit = links.length;
-    for (let i = 0; i < 4 && !(await page.locator('#hub').isVisible()); i++) {
-      assert.equal(await overlay(), 'none', `после ${i} нажатий ‹ партию закрыл экран подключения`);
-      await page.click('#holo-back');
-      await page.waitForTimeout(200);
-    }
-    await page.locator('#hub').waitFor({ state: 'visible' });
-    await until('страница закрыла сокет', () => second.closedByPage, 5000);
+    await exitToHub();
+    await until('страница закрыла сокет', () => third.closedByPage, 5000);
     await until('сервер увидел уход', async () => (await health()).players.connected === 0);
     await page.waitForTimeout(NO_REDIAL_MS);
     assert.equal(links.length, linksBeforeExit, 'после выхода нет попыток дозвона');
@@ -280,7 +325,9 @@ try {
     if (styleAttrs > 0)
       console.log(`· CSP отрезала атрибутов style: ${styleAttrs} (известно, ждёт решения)`);
   });
-  console.log('\n✓ net smoke: вход позывным, приказ, обрыв с дозвоном и очередью, выход в хаб\n');
+  console.log(
+    '\n✓ net smoke: вход позывным, приказ, выход на обрыве, обрыв с дозвоном и очередью, выход в хаб\n',
+  );
 } finally {
   await browser.close();
   stopServer();
