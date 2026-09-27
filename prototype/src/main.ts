@@ -629,6 +629,8 @@ import { TerrainRasterCache } from './terrainRasterCache';
 import { TerrainGeometryCache } from './terrainGeometryCache';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
+import { PORTRAITS } from './profileArt';
+import { parseAppearance } from '../../packages/protocol/src/playerProfile';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
 import { abilityRings } from './abilityRings';
 import { initCorp } from './corpScreen';
@@ -1822,7 +1824,8 @@ function playerEmblem(): string {
 function applyEmblem(): void {
   const g = playerEmblem();
   const hubAv = document.getElementById('hubav');
-  if (hubAv) hubAv.textContent = g;
+  if (hubAv) { hubAv.textContent = g; hubAv.classList.remove('portrait'); }
+  if (!__SECTOR_ZERO_ONLY__) applyProfilePortrait();
   crestMark.textContent = g;
 }
 function setPlayerEmblem(g: string): void {
@@ -7482,6 +7485,7 @@ function seatCardHtml(id: string): string {
     (favBar ? `<div class="pc-stats">${favBar}</div>` : '') +
     `<div class="pc-sec">${t('card.diplomacy')}</div>` +
     seatDiploActionsHtml(id) +
+    (!isAiSeat(id) ? `<button class="pc-dossier">${t('card.dossier')}</button>` : '') +
     `<button class="pc-close">${t('card.close')}</button>`
   );
 }
@@ -10838,6 +10842,7 @@ const friends = __SECTOR_ZERO_ONLY__
   : initFriends({
       root: () => $('hp-friends'),
       authorizedBase: hubAuthorizedBase,
+      openPlayer: (login) => profile?.open(login),
     });
 
 // --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
@@ -10850,6 +10855,7 @@ const rank = __SECTOR_ZERO_ONLY__
   : initRank({
       root: () => $('hp-rank'),
       authorizedBase: hubAuthorizedBase,
+      openPlayer: (login) => profile?.open(login),
     });
 
 // --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
@@ -10899,6 +10905,10 @@ const profile = __SECTOR_ZERO_ONLY__
   ? null
   : initProfile({
       root: () => $('profile'),
+      identity: () => profileKey(),
+      readAppearance: readProfileAppearance,
+      writeAppearance: (value) => writeRaw(profileKey(), JSON.stringify(value)),
+      appearanceChanged: applyProfilePortrait,
       view: () => {
         const st = loadMeta();
         return {
@@ -10920,9 +10930,51 @@ const profile = __SECTOR_ZERO_ONLY__
         }
       },
       writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
-      authorizedBase: hubAuthorizedBase,
+      authorizedBase: async () => {
+        const srv = resolveServer();
+        if (!srv) return null;
+        const session = await hubAuthorizedBase();
+        return session && tokenFor(localStorage, srv.base, nickInput.value.trim()) === session.token ? session : null;
+      },
     });
 const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
+function profileKey(): string {
+  return `vd.profile.${resolveServer()?.base ?? 'local'}.${nickInput.value.trim().toLowerCase() || 'guest'}`;
+}
+function readProfileAppearance(): unknown {
+  try { return JSON.parse(readRaw(profileKey()) ?? 'null'); } catch { return null; }
+}
+function applyProfilePortrait(portrait?: number): void {
+  if (__SECTOR_ZERO_ONLY__) return;
+  const id = portrait ?? parseAppearance(readProfileAppearance())?.portrait;
+  const src = id ? PORTRAITS[id - 1] : undefined;
+  const avatar = document.getElementById('hubav');
+  if (!avatar) return;
+  if (!src) { avatar.textContent = playerEmblem(); avatar.classList.remove('portrait'); return; }
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = t('profile.title');
+  avatar.replaceChildren(img);
+  avatar.classList.add('portrait');
+}
+
+async function syncProfileAppearance(): Promise<void> {
+  if (__SECTOR_ZERO_ONLY__) return;
+  const key = profileKey();
+  const srv = resolveServer();
+  if (!srv) return;
+  const session = await hubAuthorizedBase();
+  if (!session || tokenFor(localStorage, srv.base, nickInput.value.trim()) !== session.token) return;
+  try {
+    const response = await fetch(`${session.base}/profiles`, { headers: { authorization: `Bearer ${session.token}` } });
+    if (!response.ok) return;
+    const raw = await response.json() as { portrait?: unknown; slots?: unknown };
+    const appearance = parseAppearance({ portrait: raw.portrait, slots: raw.slots });
+    if (!appearance || key !== profileKey()) return;
+    writeRaw(key, JSON.stringify(appearance));
+    applyProfilePortrait(appearance.portrait);
+  } catch { /* Keep the previously saved portrait while offline. */ }
+}
 
 // --- вход в хаб и зеркало аккаунтного XP ---------------------------------------
 
@@ -10964,12 +11016,14 @@ function openHub(note = ''): void {
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   const nick = nickInput.value.trim();
   $('hub-name').textContent = nick || t('auth.commander');
+  applyProfilePortrait();
   showConnect(false);
   showHub(true);
   hubTab('home');
   hubNote.textContent = note;
   refreshOnboardOffer(); // ONB-0: first-run offer/nudge for a not-yet-onboarded commander
   detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
+  detach('хаб: портрет аккаунта', syncProfileAppearance());
 }
 
 $('cnew').addEventListener('click', () => {
@@ -15571,21 +15625,10 @@ document.getElementById('railtools')?.addEventListener('click', () => setRailOpe
 document.getElementById('holo-tech')?.addEventListener('click', () => $('rail-tech').click());
 document.getElementById('holo-constructor')?.addEventListener('click', () => $('rail-constructor').click());
 
-// emblem picker — the hub avatar opens a glyph grid; picking one persists + applies it.
+// The hub avatar now opens the account portrait and medal editor.
 const emblemPick = document.getElementById('emblempick');
-const epGrid = document.getElementById('ep-grid');
-function openEmblemPick(): void {
-  if (!emblemPick || !epGrid) return;
-  const cur = playerEmblem();
-  epGrid.innerHTML = EMBLEMS.map(
-    (g) =>
-      `<button type="button" class="ep-cell${g === cur ? ' sel' : ''}" data-emblem="${g}">${g}</button>`,
-  ).join('');
-  emblemPick.classList.add('show');
-}
-document.getElementById('hubav')?.addEventListener('click', openEmblemPick);
-// The identity strip opens the career dossier — the avatar itself keeps the emblem
-// picker (its ✎ badge advertises that), so the name/status column is the door.
+document.getElementById('hubav')?.addEventListener('click', () => profile?.open());
+// Both the portrait and identity strip open the same saved profile.
 document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile?.open());
 document
   .getElementById('ep-close')
@@ -15609,9 +15652,11 @@ if (playerCardEl) {
     const tg = e.target as HTMLElement;
     // Match dossier → career dossier: close this card, open the profile sheet.
     if (tg.closest('.pc-dossier')) {
+      const seat = playerCardEl.dataset.seat;
+      const login = seat ? s.players[seat]?.name : undefined;
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
-      profile?.open();
+      profile?.open(login);
       return;
     }
     if (tg.id === 'playercard' || tg.closest('.pc-close')) {

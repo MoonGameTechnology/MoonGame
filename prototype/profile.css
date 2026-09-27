@@ -1,0 +1,302 @@
+#profile .pf-body {
+  touch-action: pan-y;
+  scrollbar-gutter: stable;
+}
+.pf-player-link {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 8px 0;
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+.pf-player-link:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+#profile .ps-studio {
+  width: 100%;
+  max-width: 1060px;
+  margin: 0 auto 24px;
+  font-family: system-ui, sans-serif;
+  color: #deebf3;
+}
+#profile .ps-studio h3 {
+  font-size: 15px;
+  margin: 12px 0;
+}
+#profile .ps-studio p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #aac0d1;
+}
+#profile .ps-studio button {
+  font: inherit;
+  color: inherit;
+  border: 1px solid #35546b;
+  background: #102638;
+  border-radius: 7px;
+  min-height: 44px;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+#profile .ps-studio button:focus-visible {
+  outline: 2px solid #9be9e2;
+  outline-offset: 3px;
+}
+#profile .ps-studio button[aria-pressed='true'] {
+  border-color: #93e1dc;
+  background: #214650;
+  box-shadow: 0 0 0 1px #93e1dc;
+}
+#profile .ps-studio button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+#profile .ps-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #081823;
+  padding: 8px 0;
+}
+#profile .ps-notice {
+  min-height: 20px;
+}
+#profile .ps-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+#profile .ps-card {
+  border: 1px solid #2e4b61;
+  border-radius: 12px;
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+  background: #0b1928;
+}
+#profile .ps-stage {
+  position: relative;
+  aspect-ratio: 1;
+  background: radial-gradient(ellipse at 50% 22%, #334b60 0%, #162739 53%, #0b1826 100%);
+  overflow: hidden;
+}
+#profile .ps-portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+#profile .ps-cloth {
+  position: absolute;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0 1.5%;
+  transform-origin: top left;
+}
+#profile .ps-pin {
+  display: block;
+  aspect-ratio: 3/4;
+  min-width: 0;
+  transform: rotate(-0.5deg);
+}
+#profile .ps-medal {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  aspect-ratio: 3/4;
+  background-size: 400% 300%;
+  background-repeat: no-repeat;
+  flex: none;
+}
+#profile .ps-medal i {
+  position: absolute;
+  top: 11%;
+  left: 32%;
+  width: 40%;
+  height: 16%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font:
+    600 7px Georgia,
+    serif;
+  color: #e9d8ad;
+  background: linear-gradient(#b6a780, #706246);
+  border-radius: 1px;
+  text-shadow: 0 0.5px 0.3px #18120a;
+  box-shadow: 0 0.4px 0.5px #0008;
+}
+#profile .ps-pin .ps-medal {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0.3px 0.55px 0.25px #01050ac9) drop-shadow(0.55px 1.1px 0.65px #050b12a6);
+}
+#profile .ps-pin .ps-medal i {
+  font-size: clamp(2px, 0.45vw, 4px);
+}
+#profile .ps-caption {
+  padding: 14px 16px;
+  border-top: 1px solid #294457;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+#profile .ps-caption b {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+#profile .ps-caption span {
+  font-size: 11px;
+  white-space: nowrap;
+  color: #94c8c8;
+}
+#profile .ps-slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  margin: 12px 0;
+}
+#profile .ps-slots button {
+  position: relative;
+  min-width: 0;
+  height: 64px;
+  padding: 3px;
+  display: grid;
+  place-items: center;
+}
+#profile .ps-slots button > span:not(.ps-medal) {
+  font-size: 24px;
+  color: #83adb8;
+}
+#profile .ps-slots small {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 9px;
+  color: #adc4d3;
+}
+#profile .ps-portraits {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 3px;
+}
+#profile .ps-portraits button {
+  position: relative;
+  padding: 0;
+  aspect-ratio: 0.82;
+  overflow: hidden;
+  min-width: 0;
+  background: radial-gradient(ellipse at 50% 25%, #2b4357, #132235);
+}
+#profile .ps-portraits img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  transform: scale(1.7);
+  transform-origin: 50% 8%;
+}
+#profile .ps-portraits small {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  text-shadow: 0 1px 3px #000;
+}
+#profile .ps-collection {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+#profile .ps-collection button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  min-width: 0;
+}
+#profile .ps-collection b {
+  font-size: 12px;
+  display: block;
+}
+#profile .ps-collection small {
+  display: block;
+  color: #a4bbca;
+  font-size: 11px;
+  margin-top: 4px;
+}
+#profile .ps-collection .locked .ps-medal {
+  filter: grayscale(0.9);
+}
+#profile .ps-public-medals {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+#profile .ps-public-medals > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: #102333;
+  border: 1px solid #2b4659;
+  border-radius: 7px;
+  font-size: 14px;
+}
+#hub .hub-av.portrait {
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+}
+#hub .hub-av.portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.7);
+  transform-origin: 50% 8%;
+}
+@media (max-width: 640px) {
+  #profile .ps-layout {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  #profile .ps-card {
+    position: relative;
+    max-width: 420px;
+    width: 100%;
+    margin: auto;
+  }
+  #profile .ps-collection {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  #profile .ps-portraits {
+    max-height: 270px;
+  }
+  #profile .pf-top {
+    padding-left: 12px;
+  }
+  #profile .pf-body {
+    padding: 12px;
+  }
+  #profile .ps-caption b {
+    font-size: 18px;
+  }
+}
+@media (max-width: 360px) {
+  #profile .ps-collection {
+    grid-template-columns: 1fr;
+  }
+}

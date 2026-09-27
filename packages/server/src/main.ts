@@ -1,4 +1,7 @@
 import rateLimit from '@fastify/rate-limit';
+import { registerProfileApi } from './profileApi';
+import { creditProfileMatch } from './profileCredit';
+import { nickSeatAccounts } from './commanderCredit';
 import {
   createDevMatch,
   loadAvaMaps,
@@ -125,6 +128,14 @@ const stores = await createStores();
 const loadMatch = createMatchLoader({
   stores,
   data,
+  onTerminalState: async (matchId, state) => {
+    if (!auth || !signSession) return;
+    const session = await stores.sessionStore.byMatch(matchId);
+    const seats = session
+      ? async () => Object.fromEntries(Object.entries(session.seats).map(([account, player]) => [player, account]))
+      : nickSeatAccounts(stores.accountStore, stores.userStore, matchId);
+    await creditProfileMatch(stores.profileStore, seats, matchId, state);
+  },
   gateFactory,
   // LARS-1: a unit.build the boot-time snapshot would reject gets one fresh live
   // read before that — a module bought mid-match becomes buildable without a new
@@ -534,6 +545,7 @@ const server = createMultiplayerServer({
           registerMedalApi(scope, { service: medalService, identify });
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
+          registerProfileApi(scope, { profiles: stores.profileStore, users: stores.userStore, commanders: stores.commanderStore, identify });
           // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с
           // атомарной передачей и сжиганием комиссии. Пишущие маршруты под per-IP
           // лимитом (EC-0.3 wash-trading), фаусет по умолчанию выключен.

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { EMPTY_STATS, type MetaStats } from './meta';
+import { defaultAppearance } from '../../packages/protocol/src/playerProfile';
 import {
   parseMedalCache,
   parseMedalCatalog,
@@ -60,6 +61,34 @@ function fakeOverlay(): HTMLElement & {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('публичный профиль и устаревшие ответы', () => {
+  const publicData = (login: string) => ({ ...defaultAppearance(), login, xp: 70, progress: { matches: 2, wins: 1 } });
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  function host(root: HTMLElement): ProfileHost {
+    return { root: () => root, view: () => ({ nick: 'Owner', xp: 0, stats: stats(), corp: null, sovereigns: 9999 }), readCache: () => null, writeCache: () => {}, authorizedBase: async () => ({ base: 'https://server', token: 'session' }) };
+  }
+  it('чужая карточка читает именно чужой профиль и не показывает валюту владельца', async () => {
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => publicData('Other') }));
+    vi.stubGlobal('fetch', fetcher);
+    const root = fakeOverlay(); const api = initProfile(host(root)); api.open('Other'); await tick();
+    expect(fetcher).toHaveBeenCalledWith('https://server/profiles?login=Other', expect.anything());
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(root.html()).toContain('Other');
+    expect(root.html()).not.toMatch(/pf-cur|data-portrait=|data-ps="save"|9999|Owner/);
+  });
+  it('запоздалый ответ предыдущей карточки не подменяет новую', async () => {
+    let resolveOld!: (value: unknown) => void;
+    vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('Old')
+      ? new Promise((resolve) => { resolveOld = resolve; })
+      : Promise.resolve({ ok: true, json: async () => publicData('New') })));
+    const root = fakeOverlay(); const api = initProfile(host(root));
+    api.open('Old'); await tick(); api.open('New'); await tick();
+    resolveOld({ ok: true, json: async () => publicData('Old') }); await tick();
+    expect(root.html()).toContain('New'); expect(root.html()).not.toContain('Old');
+    api.close(); expect(root.shown()).toBe(false);
+  });
 });
 
 describe('профиль — «—» вместо правдоподобного нуля', () => {
