@@ -272,7 +272,8 @@ import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
-import { bossMissionRow, missionBriefs, missionLabelN, missionRows, type MissionReward, type MissionRow } from '../../decisions/missionView';
+import { bossMissionRow, missionBriefs, missionRows, type MissionRow } from '../../decisions/missionView';
+import { initMissionPanel } from './missionPanel';
 import { bossTask } from '../../decisions/runBoss';
 import { devourSieges } from '../../decisions/devourSiege';
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
@@ -1736,7 +1737,7 @@ devlineEl.addEventListener('click', (event) => {
   }
   if ((event.target as Element).closest('[data-solo-save]')) { saveSolo(true); return; }
   if ((event.target as Element).closest('[data-donate]')) { toast(t('donate.soon')); return; }
-  if ((event.target as Element).closest('[data-missions]')) { toggleMissionPanel(); return; }
+  if ((event.target as Element).closest('[data-missions]')) { missionPanel.toggle(); return; }
 });
 
 const purse = $('purse');
@@ -13858,7 +13859,7 @@ const BACK_LAYERS: BackLayer[] = [
   // её не видит — узел живёт всегда, раскрытость это класс `.open` (см. EXTRA_LAYERS).
   { id: 'rail', isOpen: () => railEl.classList.contains('open'), close: () => setRailOpen(false) }, // z26
   // Панель задач забега: открыта чипом «Задачи», закрывается и Escape/Back (см. EXTRA_LAYERS).
-  { id: 'missions', isOpen: () => missionPanelOpen, close: () => toggleMissionPanel(false) }, // z44
+  { id: 'missions', isOpen: () => missionPanel.isOpen(), close: () => missionPanel.toggle(false) }, // z44
   { id: 'side', isOpen: () => panelFleet() !== null || selPlanet !== null || selFleets.size > 0, close: () => {
     if (mobileHud.expanded()) mobileHud.collapse();
     else clearSelection();
@@ -14246,83 +14247,15 @@ function runMissionRows(): MissionRow[] {
   const boss = bossTask(s);
   return boss ? [...rows, bossMissionRow(boss)] : rows;
 }
-/** Награда задачи обеими валютами — теми же знаками, что в кошельке шапки. */
-const missionRewardHtml = (r: MissionReward): string =>
-  `<span class="mp-reward"><i class="tw-data">◇ +${r.research}</i><i class="tw-warrants">⌖ +${r.warrants}</i></span>`;
 
 // --- панель задач забега (заказ владельца 2026-09-24) ---------------------------------
-// Что сделать, сколько сделано, сколько придёт на итогах; задача с целью на карте — кнопка:
-// нажатие ведёт камеру к цели, повторное — к следующей.
-let missionPanelOpen = false;
-let lastMissionPanelHtml = '';
-const missionFocus = new Map<string, number>();
-const missionPanel = $('missionpanel');
-function toggleMissionPanel(open = !missionPanelOpen): void {
-  missionPanelOpen = open;
-  missionPanel.hidden = !open;
-  lastClockText = '';
-  lastMissionPanelHtml = '';
-  // На широком экране панель встаёт прямо под чипом: справа её место занято досье Роя.
-  // Узкий экран — во всю ширину (CSS), позицию не трогаем.
-  const chip = document.querySelector('#devline .dl-missions');
-  if (open && chip && window.innerWidth > 700) {
-    const r = chip.getBoundingClientRect();
-    const width = Math.min(360, window.innerWidth - 24);
-    missionPanel.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - width - 12))}px`;
-    missionPanel.style.right = 'auto';
-    missionPanel.style.top = `${r.bottom + 8}px`;
-  }
-}
-function renderMissionPanel(rows: MissionRow[]): void {
-  if (!missionPanelOpen) return;
-  if (rows.length === 0) {
-    toggleMissionPanel(false);
-    return;
-  }
-  const html =
-    `<div class="mp-head"><b>${t('hud.missions.title')}</b><button type="button" class="mp-close" data-missions-close="1" aria-label="${t('hud.close')}">✕</button></div>` +
-    // Полигон пока не платит за задачи — награду не обещаем (§14.5: не определяют победу).
-    `<p class="mp-hint">${t(isTraining() ? 'training.missions.hint' : 'hud.missions.hint')}</p>` +
-    rows
-      .map(r => {
-        // Маяк считает время удержания — реальным временем забега, как его таймеры;
-        // проваленная задача (гарнизон пал) говорит об этом, а не висит «0/1».
-        const progress = r.failed
-          ? t('hud.missions.failed')
-          : r.needMs !== undefined
-            ? `${runClockText(r.holdMs ?? 0)}/${runClockText(r.needMs)}`
-            : `${r.done}/${r.total}`;
-        const body =
-          `<i class="mp-mark" aria-hidden="true">${r.complete ? '✓' : r.failed ? '✗' : '⚑'}</i>` +
-          `<span class="mp-name">${esc(t(r.id, { n: missionLabelN(r) }))}</span>` +
-          `<b class="mp-prog">${progress}</b>` +
-          (r.kind === 'recruit' ? `<span class="mp-reward">${t('hud.missions.recruit-reward')}</span>` : '') +
-          (isTraining() ? '' : missionRewardHtml(r.reward)) +
-          (r.targets.length ? `<span class="mp-go">${t('hud.missions.show')}</span>` : '');
-        return r.targets.length
-          ? `<button type="button" class="mp-row" data-mission-go="${esc(r.id)}">${body}</button>`
-          : `<div class="mp-row${r.complete ? ' done' : r.failed ? ' failed' : ''}">${body}</div>`;
-      })
-      .join('');
-  if (html === lastMissionPanelHtml) return;
-  lastMissionPanelHtml = html;
-  missionPanel.innerHTML = html;
-}
-missionPanel.addEventListener('click', event => {
-  const el = event.target as Element;
-  if (el.closest('[data-missions-close]')) {
-    toggleMissionPanel(false);
-    return;
-  }
-  const go = el.closest<HTMLElement>('[data-mission-go]')?.dataset.missionGo;
-  if (!go) return;
-  const row = runMissionRows().find(r => r.id === go);
-  if (!row || row.targets.length === 0) return;
-  const i = (missionFocus.get(go) ?? -1) + 1;
-  missionFocus.set(go, i);
-  // Панель закрывается: иначе она сама закрыла бы цель, к которой ведёт камера.
-  toggleMissionPanel(false);
-  jumpTo(row.targets[i % row.targets.length]!, 'goto');
+// Разметка и клики — `missionPanel.ts`; здесь только проводка к камере и чипу.
+const missionPanel = initMissionPanel({
+  root: $('missionpanel'),
+  rows: runMissionRows,
+  training: isTraining,
+  jump: id => jumpTo(id, 'goto'),
+  onToggle: () => { lastClockText = ''; },
 });
 
 /** Метки целей задач на карте: дышащее мятное кольцо и флажок над миром. Выполненная
@@ -15326,8 +15259,8 @@ function frame(nowReal: number) {
   const missionHtml =
     missions.length === 0
       ? ''
-      : `<button type="button" class="dl-missions" data-missions="1" aria-expanded="${missionPanelOpen}" title="${t('hud.missions.title')}"><i aria-hidden="true">⚑</i><span>${t('hud.missions.label')}</span><b>${missionsDone}/${missions.length}</b></button>`;
-  renderMissionPanel(missions);
+      : `<button type="button" class="dl-missions" data-missions="1" aria-expanded="${missionPanel.isOpen()}" title="${t('hud.missions.title')}"><i aria-hidden="true">⚑</i><span>${t('hud.missions.label')}</span><b>${missionsDone}/${missions.length}</b></button>`;
+  missionPanel.render(missions);
   // В забеге время суток ничего не значит (дня в шапке нет) — часы показывают, сколько
   // забег идёт, в тех же реальных минутах, что и все его таймеры.
   const clockHtml = `<span id="clock">${isSectorZeroRun() ? runClockText(s.time) : clockHM(s.time)}</span>`;

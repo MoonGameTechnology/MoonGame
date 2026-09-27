@@ -973,7 +973,24 @@ BRW-2/3 написаны ровно под это.
   цикл слота, замок премейда, переименование, закрытие по Escape. `main.ts`
   14 513→14 401 строк. Гейт: 2100 тестов (+16), 189 файлов.
 
-- **REFM-203+** ⏳ `[proto]` — остаток `meta-progression` (`installMatch`/`startMatch`/
+- **REFM-203** ✅ `[proto]` **`missionPanel.ts`** — панель задач забега Sector Zero.
+  Первый срез после паузы с 1 сентября: владелец 2026-09-27 ответил на вопрос из разбора
+  REFM-203+ — `main.ts` режем дальше (16 596 строк; за сентябрь файл вырос на ~3 800, в
+  основном кодом Sector Zero, которого в таблице сцепки ещё не было). Уехали разметка
+  панели (`missionPanelHtml`, чистая, раньше без единого теста), награда задачи
+  (`missionRewardHtml`) и `initMissionPanel(host)` — открытие, позиция под чипом,
+  перерисовка без дребезга, клик «На карте» с перебором целей. Состояние панели
+  (`open`, фокус целей) живёт в модуле, `main.ts` держит только проводку: строки забега,
+  полигон, прыжок камеры и сброс кеша шапки. Слой Escape/Back читает `isOpen()` ЛЕНИВО —
+  реестр слоёв объявлен выше инициализации панели, и прямая ссылка на метод поймала бы
+  TDZ при загрузке. **8 тестов** (`missionPanel.test.ts`): строка со счётом и наградой,
+  кнопка у задачи с целью, полигон без награды, провал, выполненная, маяк часами забега,
+  спасение героя, экранирование id. Живая проверка — в `smoke:sector-zero`: чип открывает
+  панель со строками, ✕ закрывает, `aria-expanded` чипа следует за ней. Метки целей на
+  карте (`drawMissionTargets`) остались в `main.ts`: это рендер карты, его сейчас правит
+  поток модулей кораблей (SM-3.5, мины). `main.ts` 16 596→16 529 строк.
+
+- **REFM-204+** ⏳ `[proto]` — остаток `meta-progression` (`installMatch`/`startMatch`/
   `connect`/`resolveServer`, секция 9575–10066 в `main.ts`) — тяжёлая оркестрация матч-
   лайфцикла, а не «вынос секции» одним заходом: 20+ модульных `let`, сокет, реконнект,
   камера. Брать частями, с живой проверкой на реальном старте/переподключении матча, а не
@@ -1001,7 +1018,7 @@ BRW-2/3 написаны ровно под это.
 > REFM-12 ✅ → REFM-13 ✅ → REFM-14 ✅ → REFM-15 ✅ → REFM-16 ✅ → REFM-17 ✅ → REFM-18 ✅ →
 > REFM-19 ✅ → REFM-20 ✅ → REFM-21 ✅ → REFM-22 ✅ → REFM-23 ✅ → REFM-24 ✅ → REFM-25 ✅ →
 > REFM-26 ✅ → REFM-27 ✅ → REFM-28 ✅ → REFM-29 ✅ → REFM-30 ✅ → REFM-31 ✅ → REFM-32 ✅ →
-> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160 ✅ → REFM-161 ✅ → REFM-162 ✅ → REFM-163 ✅ → REFM-164 ✅ → REFM-165 ✅ → REFM-166 ✅ → REFM-167 ✅ → REFM-168 ✅ → REFM-169 ✅ → REFM-170 ✅ → REFM-171 ✅ → REFM-172 ✅ → REFM-173 ✅ → REFM-174 ✅ → REFM-175 ✅ → REFM-176 ✅ → REFM-177 ✅ → REFM-178 ✅ → REFM-179 ✅ → REFM-180 ✅ → REFM-181 ✅ → REFM-182 ✅ → REFM-183 ✅ → REFM-184 ✅ → REFM-185 ✅ → REFM-186 ✅ → REFM-187 ✅ → REFM-188 ✅ → REFM-189 ✅ → REFM-190 ✅ → REFM-191 ✅ → REFM-192 ✅ → REFM-193 ✅ → REFM-194 ✅ → REFM-195 ✅ → REFM-196 ✅ → REFM-197 ✅ → REFM-198 ✅ → REFM-199 ✅ → REFM-200 ✅ → REFM-201 ✅ → REFM-202 ✅ → REFM-203+ (по таблице сцепки: секции
+> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160 ✅ → REFM-161 ✅ → REFM-162 ✅ → REFM-163 ✅ → REFM-164 ✅ → REFM-165 ✅ → REFM-166 ✅ → REFM-167 ✅ → REFM-168 ✅ → REFM-169 ✅ → REFM-170 ✅ → REFM-171 ✅ → REFM-172 ✅ → REFM-173 ✅ → REFM-174 ✅ → REFM-175 ✅ → REFM-176 ✅ → REFM-177 ✅ → REFM-178 ✅ → REFM-179 ✅ → REFM-180 ✅ → REFM-181 ✅ → REFM-182 ✅ → REFM-183 ✅ → REFM-184 ✅ → REFM-185 ✅ → REFM-186 ✅ → REFM-187 ✅ → REFM-188 ✅ → REFM-189 ✅ → REFM-190 ✅ → REFM-191 ✅ → REFM-192 ✅ → REFM-193 ✅ → REFM-194 ✅ → REFM-195 ✅ → REFM-196 ✅ → REFM-197 ✅ → REFM-198 ✅ → REFM-199 ✅ → REFM-200 ✅ → REFM-201 ✅ → REFM-202 ✅ → REFM-203 ✅ → REFM-204+ (по таблице сцепки: секции
 > `accounts` и камера вычерпаны, диплогейт (17) закрыт, голографический слой (18) и
 > канвас-ввод (19) начаты; TGT-1 (20) и ONB-5 (29) ИСЧЕРПАНЫ — весь их инлайн уже
 > дозвон к вынесенным модулям, выносить больше нечего (сверено REFM-160). Следующая

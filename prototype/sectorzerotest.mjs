@@ -228,6 +228,15 @@ async function check(label, run) {
     `${label}: «Пинг»`,
   );
   if (run) {
+    // Панель задач (REFM-203, `missionPanel.ts`): чип открывает её со строками задач,
+    // ✕ закрывает, и чип это отражает.
+    const chip = page.locator('#devline .dl-missions');
+    await chip.click();
+    await page.locator('#missionpanel .mp-row').first().waitFor();
+    await page.waitForFunction(() => document.querySelector('#devline .dl-missions')?.getAttribute('aria-expanded') === 'true');
+    await page.locator('#missionpanel .mp-close').click();
+    await page.locator('#missionpanel').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.querySelector('#devline .dl-missions')?.getAttribute('aria-expanded') === 'false');
     // Гарнизон — плитками, как состав флота (заказ владельца 2026-09-25): у каждой наземной
     // части подпись, полоска и числа корпуса «осталось/всего».
     await page.evaluate(() => window.__szTest.tab('ground'));
