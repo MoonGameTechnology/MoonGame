@@ -6,7 +6,7 @@ import { drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { rocketMinesUi } from './rocketMinesUi';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
-import { fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
+import { fleetBaseSpeed, fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierBadge, swarmDossierHtml } from './swarmDossier';
@@ -25,6 +25,7 @@ import {
   order,
   canOrder,
   canOrderAll,
+  traceHooks,
   ctx,
   setMatchMode,
   matchMode,
@@ -143,6 +144,29 @@ import {
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
 import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
+import {
+  fleetStatMods,
+  fleetStatQueries,
+  pctText,
+  statSourceKey,
+  type FleetStatMods,
+  type StatBreakdown,
+  type StatTone,
+} from '../../decisions/statModifiers';
+import { anchoredPopover } from '../../decisions/anchoredPopover';
+import {
+  columnTitleHtml,
+  statGridHtml,
+  statPopHtml,
+  troopTableHtml,
+  vitalsHtml,
+  type ConsoleStat,
+  type StatPopRow,
+  type StatPopView,
+  type StatView,
+  type TroopRow,
+  type VitalView,
+} from './fleetConsole';
 import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
 import { veteranMark, fleetVeteranGrade } from '../../decisions/veteranMark';
 import { veteranTag } from './veteranChevrons';
@@ -228,7 +252,7 @@ import { measureViewport, STARS, NEBULAE } from './viewport';
 import { drawSpaceBackdrop, spaceBackdropReady, prepareSpaceBackdrop } from '../../packages/client/src/spaceBackdrop';
 import { MapPreparation, type PreparationJob } from './mapPreparation';
 import { drawHolographicBattle, drawHolographicPing } from './holographicEffects';
-import { commandIcon, skinIcon } from './holographicIcons';
+import { commandIcon, holoIcon, skinIcon } from './holographicIcons';
 import { drawProvinceSelection, insideProvince, selectionPulse, type ProvincePolygon } from '../../packages/client/src/provinceSelection';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
@@ -627,6 +651,9 @@ import {
   motionOn,
   setMotion,
   fxBreath,
+  setWindowOpacity,
+  windowAlpha,
+  windowOpacityPct,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
 import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
@@ -6585,7 +6612,7 @@ function taskGroupPanelHtml(group: Fleet[]): string {
 function veteranPowerOn(): boolean {
   return ctx(s.time, s).config?.veteranPower === true;
 }
-function unitTileHtml(u: UnitStack, owner: string | null, open: string): string {
+function unitTileHtml(u: UnitStack, owner: string | null, open: string, named = false): string {
   if (u.count <= 0) return '';
   const def = data.units[u.unit];
   if (!def) return '';
@@ -6598,7 +6625,8 @@ function unitTileHtml(u: UnitStack, owner: string | null, open: string): string 
     ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
     : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color: ownerColor(owner), shield: (eff.shield ?? 0) > 0 })}</span>`);
   // Наземные портреты сохраняют подпись; корабль узнаётся по силуэту, имя — в подсказке.
-  const caption = ground ? `<span class="pt-n">${esc(name)}</span>` : '';
+  // Окно флота на ПК (`named`) подписывает и корабли — так на макете владельца.
+  const caption = ground || named ? `<span class="pt-n">${esc(name)}</span>` : '';
   // Installed modules at a glance (RULES-2.1 / SM-0.3): two cruisers with different
   // modules are separate stacks. Значками, как в конструкторе, — семипиксельные
   // подписи не читались; имя модуля — в подсказке, полная картина — в карточке.
@@ -6613,14 +6641,14 @@ function unitTileHtml(u: UnitStack, owner: string | null, open: string): string 
   const vet = veteranMark(u, data, veteranPowerOn());
   return `<button class="ptile${art ? ' with-art' : ''}${vet ? ' vet' : ''}" ${open} data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}${vet ? veteranTag(vet, 'pt-vet') : ''}${caption}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${hp.low ? ' low' : ''}"><i style="width:${hp.pct}%"></i></span><span class="pt-hpn">${kfmt(hp.cur)}/${kfmt(hp.max)}</span></button>`;
 }
-function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
+function fleetTilesHtml(f: Fleet, stacks: UnitStack[], named = false): string {
   const tiles = stacks
     .map((u, index) => {
       const def = data.units[u.unit];
       if (!def) return '';
       const open =
         def.domain === 'space' ? `data-shipcard="${esc(f.id)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
-      return unitTileHtml(u, f.owner, open);
+      return unitTileHtml(u, f.owner, open, named);
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
@@ -6708,6 +6736,9 @@ function effectTagText(tag: EffectTag): string {
 }
 
 function fleetPanelHtml(f: Fleet): string {
+  // Окно флота на ПК — консоль по макету владельца (`fleetConsole.ts`): те же куски
+  // карточки, своя раскладка. Карточка ниже остаётся телефону, группе и чужому флоту.
+  if (consoleFleet() === f) return fleetConsoleHtml(f);
   const nShips = sumUnits(f.units);
   const nTr = sumUnits(f.landing ?? []);
   const inOrbit = f.orbit === 'near';
@@ -6720,12 +6751,6 @@ function fleetPanelHtml(f: Fleet): string {
   const hull = sm.hull;
   const pct = hullPct(hull);
   const hullTag = pct < LIMP_PCT ? ` · ⚠ ${t('side.fleet.hull-tag', { p: pct })}` : '';
-  // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
-  // Правила пометок о долгах — `arrearsWarnings.ts` (REFM-89): только своё и только
-  // там, где есть кому голодать.
-  const hungry = showsStarving(f.owner === ME, nTr, s.players[ME]?.arrears)
-    ? ` · 🍽 ${t('side.fleet.hunger')}`
-    : '';
   // Bytro-стиль: авто-имя соединения (слово + позывной), тап → сводка. Слово одно на
   // любой размер (SHU-4.1): «эскадра» и прочие авиационные ступени принадлежат челнокам.
   const fleetTitle = `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`;
@@ -6736,108 +6761,47 @@ function fleetPanelHtml(f: Fleet): string {
       ? t('side.fleet.sub.pc', { s: nShips, tr: nTr })
       : t('side.fleet.sub', { s: nShips, tr: nTr })) +
       hullTag +
-      hungry +
-      (inOrbit ? ' · ' + t('side.fleet.in-orbit') : '') +
-      (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : ''),
+      fleetSubNotes(f, nTr),
     'fleetinfo',
   );
   // Тап по имени открыл сводку армии — она встаёт РЯДОМ с карточкой (`objectPanelHtml`),
   // а не вместо неё.
   const detail = fleetInfoFor === f.id ? fleetSummaryHtml(f) : '';
-  // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
-  // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
-  // (цены — те же формулы, что в гейте).
-  // Условия обеих кнопок — `repairOffer.ts` (REFM-90): общая часть «свой, вне боя, есть
-  // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
-  const repairCost = instantRepairCost(f, data);
-  const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
-  // В забеге Sector Zero платный ремонт — за Суверены со счёта профиля (заказ владельца
-  // 2026-09-24), в остальной игре — за кредиты матча, как было.
-  const premiumCost = isSectorZeroRun() ? sovereignRepairCost(missingHull(f, data)) : 0;
-  // FORT-5.8: док открыт своему И СОЮЗНОМУ флоту. Союзность кнопка резолвит стойкой —
-  // capability `diplomacy` живёт в ядре и требует `HandlerContext`, которого у рендера
-  // нет; база самой capability — та же стойка, поэтому ответы сходятся. Правило «что
-  // считается доком» при этом НЕ переписано: зовётся та же функция ядра.
-  const atDock = canDockRepair(
-    repairable,
-    fleetAtOwnDock(f, s, data, (a, b) => getStance(s, a, b) === 'alliance'),
-  );
+  // Свой флот — числа С надбавками и цветом (`decisions/statModifiers.ts`, заказ
+  // владельца 2026-09-27): технологии, фракция, аура героя, местность уже внутри;
+  // зелёный — бафы, красный — дебафы перевесили; тап по числу — всплывашка источников.
+  // У корпуса и щита цвет — по входящему урону. Чужой флот — голые суммы.
+  const mods = fleetStatModsOf(f);
+  const tone = (x: StatTone | undefined): string => (x && x !== 'neutral' ? ` class="${x}"` : '');
+  const key = mods ? ' role="button" tabindex="0"' : '';
+  const tap = (stat: string): string => (mods ? ` data-stat="${stat}"` : '');
+  // В строке корпуса живут кнопки ремонта, поэтому кнопкой для клавиатуры служит число,
+  // а не вся строка: кнопка внутри кнопки — не кнопка ни для кого.
   if (hull.max > 0) {
-    h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${pct < LIMP_PCT ? ' low' : ''}"><i style="width:${pct}%"></i></span><b>${kfmt(hull.cur)}/${kfmt(hull.max)}</b>${
-      atDock
-        ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
-        : ''
-    }${
-      !repairable
-        ? ''
-        : premiumCost > 0
-          ? `<button class="chip-sov" data-act="premiumrepair" data-arg="${f.id}" title="${t('side.fleet.repair.premium.title')}">🔧 <i>${SOV_SVG}</i><b>${premiumCost}</b></button>`
-          : `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
-    }</div>`;
+    h += `<div class="row hullrow" data-desc="stat:hull"${tap('hull')}><span class="hico">♥</span><span class="hbar${pct < LIMP_PCT ? ' low' : ''}"><i style="width:${pct}%"></i></span><b${tone(mods?.incoming.tone)}${key}>${kfmt(hull.cur)}/${kfmt(hull.max)}</b>${fleetRepairChipsHtml(f)}</div>`;
     if (sm.shield.max > 0)
-      h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
+      h += `<div class="row hullrow" data-desc="stat:shield"${tap('shield')}><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b${tone(mods?.incoming.tone)}${key}>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
   if (f.owner === ME) h += fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)));
-  // SM-3.5: заградитель ставит поле там, где стоит; правило и отказы — в ядре.
-  const mines = minelayerOffer(f, s, data, ME);
-  if (mines)
-    h += `<div class="row">💣 <button class="chip" data-act="laymines" data-arg="${f.id}"${mines.ready ? '' : ' disabled'} title="${t('side.fleet.mines.title')}">${
-      mines.ready
-        ? t('side.fleet.mines.lay')
-        : mines.reason === 'installing'
-          ? t('side.fleet.mines.installing', { in: countdownHMS(mines.readyInMs) })
-        : mines.reason === 'cooldown'
-          ? t('side.fleet.mines.cooldown', { in: countdownHMS(mines.readyInMs) })
-          : t('side.fleet.mines.busy')
-    }</button></div>`;
+  h += fleetMinesRowHtml(f);
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
-  // корпусам, лимп <30% учтён), с меткой форс-марша. The hero aura (+5%, noted
-  // below) is not folded into these totals.
-  const atk = sm.attack.capped;
-  const def = sm.defense;
-  const spd = sm.speed;
+  // корпусам, лимп <30% учтён). У своего флота ход уже включает форс-марш, и метка
+  // ×1.5 не пишется — её прочли бы как ещё один множитель поверх. У чужого — прежняя.
+  const atk = shownFire(sm.attack.capped, mods);
+  const def = shownFire(sm.defense, mods);
+  const spd = mods ? mods.speed.value : sm.speed;
   const boosted = marchFlagged(f.id);
   const spdTxt =
     spd > 0
-      ? boosted
+      ? boosted && !mods
         ? `${Math.round(spd)} ⚡×${FORCED_MARCH_MULT}`
         : String(Math.round(spd))
       : '—';
   // Fleet-card blurb removed (feedback: compact panel) — the header + stat chips carry it.
-  h += `<div class="pstats"><span data-desc="stat:atk">⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def">🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd">⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
+  h += `<div class="pstats"><span data-desc="stat:atk"${tone(mods?.fire.tone)}${tap('atk')}${key}>⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def"${tone(mods?.fire.tone)}${tap('def')}${key}>🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd"${tone(mods?.speed.tone)}${tap('spd')}${key}>⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
 
-  // Active effects (RPG-style buffs/debuffs) — a compact row of tags showing
-  // what's currently affecting this fleet: combat, forced march, patrol, flak,
-  // blackout, hunger, bombardment, point defense, free flight, barrage focus.
-  // О чём карточка говорит и о чём МОЛЧИТ — `fleetEffects.ts` (REFM-197): долговые метки
-  // только на СВОЁМ флоте (иначе мои долги показались бы бедой противника), голод — лишь
-  // когда на борту есть десант, зональное ПВО не считает пустые стопки (они остаются
-  // в составе, но стволов у них нет) и не пишется нулём, а пустая полоса не рисуется
-  // совсем — заголовок без меток выглядит поломкой, а не спокойствием.
-  const onDuty = patrolOn(f.id); // дежурит ли этот носитель (SHU-2.2)
-  const pd = pointDefenseTotal(f.units, (st) => {
-    const def = data.units[st.unit];
-    return def ? (effectiveStats(def, st, data).pointDefense ?? 0) : null;
-  });
-  const tags = fleetEffects(
-    {
-      owner: f.owner,
-      inBattle: !!f.battleId,
-      forcedMarch: boosted,
-      bombarding: !!f.bombarding,
-      patrol: onDuty,
-      troops: nTr,
-      pointDefense: pd,
-    },
-    ME,
-    s.players[ME]?.arrears ?? [],
-  );
-  if (effectsShown(tags)) {
-    h += `<div class="sec">${t('effect.title')}</div><div class="row effects">`;
-    for (const tag of tags) h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
-    h += `</div>`;
-  }
+  h += fleetEffectsHtml(f, boosted, nTr);
 
   // Enemy fleet: show composition only if identified (known node). An
   // unidentified radar contact shows just the signature (ship count), not
@@ -6864,40 +6828,188 @@ function fleetPanelHtml(f: Fleet): string {
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
 
-  // ТРЮМ НОСИТЕЛЯ (SHU-2.1 + SHU-3.1). Ангар ПОРТА живёт в панели мира — челнок не
-  // летает во флоте, он стоит в космопорте и бьёт оттуда (SHU-1.2). Но «Шаттл» —
-  // вторая база челноков, она ездит вместе с флотом, и её трюм показывать больше
-  // негде: до этого кирпича шесть машин на борту не были видны игроку вообще.
-  const hold = f.owner === ME && enemyKnown ? fleetHangar(f, data, s) : null;
-  if (hasHangar(hold)) {
-    h += hangarSectionHtml(hold, f.id, true);
-    // Перегрузка предлагается, только когда пройдёт: носитель стоит у СВОЕГО мира и
-    // место есть с обеих сторон (правило 4 в `hangarPanel.ts`). Иначе кнопок нет —
-    // не серых, а нет: серая обещала бы действие, которого в этом месте не бывает.
-    const at = f.location ? s.planets[f.location] : undefined;
-    const offer = transferOffer(at ? planetHangar(at, data) : null, hold, {
-      docked: !!at && !f.movement && at.owner === ME,
-      mine: f.owner === ME,
-    });
-    if (offer.load || offer.unload) {
-      h +=
-        `<div class="row">` +
-        (offer.load ? btn('wingload', f.id, t('side.wing.load'), true) : '') +
-        (offer.unload ? btn('wingunload', f.id, t('side.wing.unload'), true) : '') +
-        `</div>`;
-    }
-  }
+  h += fleetHangarHtml(f, false);
 
   // The player's projection hero rides here → name it and flag its fleet aura.
-  if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) {
-    const hero = Object.values(s.heroes ?? {}).find((x) => x.owner === f.owner);
-    const heroName = hero ? heroDisplayName(hero) : (NAME[f.owner] ?? f.owner);
+  const heroName = fleetHeroName(f);
+  if (heroName !== null)
     h += `<div class="row"><b>♔ ${esc(heroName)}</b> <span class="dim">${t('side.fleet.hero-aura')}</span></div>`;
-  }
 
   // CC-2 auto-storm: the whole «Дежурный режим» section moved to the ☰ command
   // row («⚔ Авто-штурм» toggle) — SO-UI unloads the bottom sheet.
 
+  h += fleetRouteHtml(f, boosted);
+
+  const here = planet(f.location);
+  // Что эта карточка ПРЕДЛАГАЕТ сделать — `dockedActions.ts` (REFM-200). Ошибка здесь
+  // не падает, а предлагает: живая кнопка, на которую ядро ответит отказом, снаружи
+  // выглядит как «ничего не произошло», а прогноз пустого боя читается как расклад.
+  const docked = fleetDocked(!!here, !!f.movement, !!f.battleId);
+  if (f.battleId) h += fleetBattleRowHtml(f.battleId);
+  if (docked) {
+    const cols: string[] = [];
+    const strike = fleetStrikeHtml(f, here!, inOrbit, nShips);
+    if (strike) cols.push(strike);
+    // Ground army at your own world — СВОДКА, без кнопок: сама погрузка/выгрузка
+    // переехала в ⇅-меню ряда команд (GRND-1), где есть выбор «кого и сколько».
+    // Панель осталась информационной ровно как у стоячих приказов (SO-UI ниже).
+    // Только на СВОЕЙ точке: на чужой сводка перечислила бы гарнизон противника.
+    if (groundSummaryShown(here!.owner, ME)) {
+      let ga = `<div class="sec">${t('side.ground.title')}</div>`;
+      const rows = groundRowsAt(here!.garrison, f.landing ?? []);
+      const loadingN = (f.loading ?? []).reduce((n, claim) => n + claim.count, 0);
+      if (rows.length) {
+        ga += `<div class="row dim">${t('side.ground.legend')}</div>`;
+        for (const r of rows)
+          ga += `<div class="row"><span class="bicon">${unitIconHtml(r.unit, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(r.unit))} <b>${r.planet} ▸ ${r.aboard}</b></div>`;
+      }
+      if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
+      if (!rows.length && !loadingN)
+        ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
+      ga += `<div class="hint">${t('side.ground.via-cmd')}</div>`;
+      cols.push(ga);
+    }
+    h += pcols(cols);
+  }
+  return objectPanelHtml(h, detail);
+}
+
+/** Хвост подзаголовка карточки флота: голод, орбита, бомбардировка. */
+function fleetSubNotes(f: Fleet, nTr: number): string {
+  // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
+  // Правила пометок о долгах — `arrearsWarnings.ts` (REFM-89): только своё и только
+  // там, где есть кому голодать.
+  const hungry = showsStarving(f.owner === ME, nTr, s.players[ME]?.arrears)
+    ? ` · 🍽 ${t('side.fleet.hunger')}`
+    : '';
+  return (
+    hungry +
+    (f.orbit === 'near' ? ' · ' + t('side.fleet.in-orbit') : '') +
+    (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : '')
+  );
+}
+
+/** Кнопки ремонта у полосы корпуса. */
+function fleetRepairChipsHtml(f: Fleet): string {
+  // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
+  // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
+  // (цены — те же формулы, что в гейте).
+  // Условия обеих кнопок — `repairOffer.ts` (REFM-90): общая часть «свой, вне боя, есть
+  // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
+  const repairCost = instantRepairCost(f, data);
+  const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
+  // В забеге Sector Zero платный ремонт — за Суверены со счёта профиля (заказ владельца
+  // 2026-09-24), в остальной игре — за кредиты матча, как было.
+  const premiumCost = isSectorZeroRun() ? sovereignRepairCost(missingHull(f, data)) : 0;
+  // FORT-5.8: док открыт своему И СОЮЗНОМУ флоту. Союзность кнопка резолвит стойкой —
+  // capability `diplomacy` живёт в ядре и требует `HandlerContext`, которого у рендера
+  // нет; база самой capability — та же стойка, поэтому ответы сходятся. Правило «что
+  // считается доком» при этом НЕ переписано: зовётся та же функция ядра.
+  const atDock = canDockRepair(
+    repairable,
+    fleetAtOwnDock(f, s, data, (a, b) => getStance(s, a, b) === 'alliance'),
+  );
+  return (
+    (atDock
+      ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
+      : '') +
+    (!repairable
+      ? ''
+      : premiumCost > 0
+        ? `<button class="chip-sov" data-act="premiumrepair" data-arg="${f.id}" title="${t('side.fleet.repair.premium.title')}">🔧 <i>${SOV_SVG}</i><b>${premiumCost}</b></button>`
+        : `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`)
+  );
+}
+
+/** Строка минного заградителя. SM-3.5: заградитель ставит поле там, где стоит; правило
+ *  и отказы — в ядре. */
+function fleetMinesRowHtml(f: Fleet): string {
+  const mines = minelayerOffer(f, s, data, ME);
+  if (!mines) return '';
+  return `<div class="row">💣 <button class="chip" data-act="laymines" data-arg="${f.id}"${mines.ready ? '' : ' disabled'} title="${t('side.fleet.mines.title')}">${
+    mines.ready
+      ? t('side.fleet.mines.lay')
+      : mines.reason === 'installing'
+        ? t('side.fleet.mines.installing', { in: countdownHMS(mines.readyInMs) })
+      : mines.reason === 'cooldown'
+        ? t('side.fleet.mines.cooldown', { in: countdownHMS(mines.readyInMs) })
+        : t('side.fleet.mines.busy')
+  }</button></div>`;
+}
+
+/** Active effects (RPG-style buffs/debuffs) — a compact row of tags showing what's
+ *  currently affecting this fleet: combat, forced march, patrol, flak, blackout,
+ *  hunger, bombardment, point defense, free flight, barrage focus.
+ *  О чём карточка говорит и о чём МОЛЧИТ — `fleetEffects.ts` (REFM-197): долговые метки
+ *  только на СВОЁМ флоте (иначе мои долги показались бы бедой противника), голод — лишь
+ *  когда на борту есть десант, зональное ПВО не считает пустые стопки (они остаются
+ *  в составе, но стволов у них нет) и не пишется нулём, а пустая полоса не рисуется
+ *  совсем — заголовок без меток выглядит поломкой, а не спокойствием. */
+function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
+  const onDuty = patrolOn(f.id); // дежурит ли этот носитель (SHU-2.2)
+  const pd = pointDefenseTotal(f.units, (st) => {
+    const def = data.units[st.unit];
+    return def ? (effectiveStats(def, st, data).pointDefense ?? 0) : null;
+  });
+  const tags = fleetEffects(
+    {
+      owner: f.owner,
+      inBattle: !!f.battleId,
+      forcedMarch: boosted,
+      bombarding: !!f.bombarding,
+      patrol: onDuty,
+      troops: nTr,
+      pointDefense: pd,
+    },
+    ME,
+    s.players[ME]?.arrears ?? [],
+  );
+  if (!effectsShown(tags)) return '';
+  let h = `<div class="sec">${t('effect.title')}</div><div class="row effects">`;
+  for (const tag of tags) h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
+  return h + `</div>`;
+}
+
+/** ТРЮМ НОСИТЕЛЯ (SHU-2.1 + SHU-3.1). Ангар ПОРТА живёт в панели мира — челнок не
+ *  летает во флоте, он стоит в космопорте и бьёт оттуда (SHU-1.2). Но «Шаттл» — вторая
+ *  база челноков, она ездит вместе с флотом, и её трюм показывать больше негде: до этого
+ *  кирпича шесть машин на борту не были видны игроку вообще. `compact` — окно флота на
+ *  ПК: пустой трюм без вылетов там одна строка «ангар пуст», а не секция с заголовком. */
+function fleetHangarHtml(f: Fleet, compact: boolean): string {
+  const hold = f.owner === ME ? fleetHangar(f, data, s) : null;
+  if (!hasHangar(hold)) return '';
+  const idle = hold.aloft === 0 && !hold.sortie && squadronCards(hold, { mine: true, data }).length === 0;
+  let h =
+    compact && idle
+      ? `<div class="row dim fc-hangar">${esc(t('side.wing.empty'))}</div>`
+      : hangarSectionHtml(hold, f.id, true);
+  // Перегрузка предлагается, только когда пройдёт: носитель стоит у СВОЕГО мира и
+  // место есть с обеих сторон (правило 4 в `hangarPanel.ts`). Иначе кнопок нет —
+  // не серых, а нет: серая обещала бы действие, которого в этом месте не бывает.
+  const at = f.location ? s.planets[f.location] : undefined;
+  const offer = transferOffer(at ? planetHangar(at, data) : null, hold, {
+    docked: !!at && !f.movement && at.owner === ME,
+    mine: f.owner === ME,
+  });
+  if (offer.load || offer.unload) {
+    h +=
+      `<div class="row">` +
+      (offer.load ? btn('wingload', f.id, t('side.wing.load'), true) : '') +
+      (offer.unload ? btn('wingunload', f.id, t('side.wing.unload'), true) : '') +
+      `</div>`;
+  }
+  return h;
+}
+
+/** Имя героя-проекции на борту — его аура даёт флоту +5% атаки и обороны. */
+function fleetHeroName(f: Fleet): string | null {
+  if (!f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) return null;
+  const hero = Object.values(s.heroes ?? {}).find((x) => x.owner === f.owner);
+  return hero ? heroDisplayName(hero) : (NAME[f.owner] ?? f.owner);
+}
+
+/** Где флот идёт или сторожит: цель и ETA в пути, засада или точка на дуге. */
+function fleetRouteHtml(f: Fleet, boosted: boolean): string {
   if (f.movement) {
     // total travel-time estimate to the final destination (next-hop ETA from the
     // authoritative schedule + the remaining route at base speed). The ETA ticks
@@ -6910,114 +7022,355 @@ function fleetPanelHtml(f: Fleet): string {
     const rawRestH =
       dest !== f.movement.to ? estimateTravelHours(s, ctx(s.time), f.movement.to, dest, f) : 0;
     const restH = restRouteHours(rawRestH, boosted, FORCED_MARCH_MULT);
-    h += `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(placeName(dest))}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
-  } else if (f.edge) {
+    return `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(placeName(dest))}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
+  }
+  if (f.edge) {
     // ROADS-4: стоит ровно на развилке — засада, и строка говорит, что она сторожит.
     const ambush = ambushOf(s, f);
     if (ambush) {
-      h += `<div class="row">${t('side.fleet.ambush', { planet: `<b>${esc(placeName(ambush.province))}</b>`, exits: ambush.exits.map((x) => esc(placeName(x))).join(', ') })}</div>`;
-    } else {
-      const pct = Math.round(f.edge.t * 100);
-      h += `<div class="row">${t('side.fleet.on-lane', { lane: `<b>${esc(placeName(f.edge.from))}–${esc(placeName(f.edge.to))}</b>`, p: pct })}</div>`;
+      return `<div class="row">${t('side.fleet.ambush', { planet: `<b>${esc(placeName(ambush.province))}</b>`, exits: ambush.exits.map((x) => esc(placeName(x))).join(', ') })}</div>`;
     }
+    const pct = Math.round(f.edge.t * 100);
+    return `<div class="row">${t('side.fleet.on-lane', { lane: `<b>${esc(placeName(f.edge.from))}–${esc(placeName(f.edge.to))}</b>`, p: pct })}</div>`;
   }
+  return '';
+}
 
+/** Карточка боя переехала в ОКНО (`battleScreen.ts`): там те же стороны, полосы корпуса,
+ *  фаза, отсчёт раунда и отступление, но во весь экран и с доступом к ЧУЖОМУ бою —
+ *  значок на карте открывает то же окно. Панель поэтому не дублирует расклад, а ведёт к
+ *  нему одной кнопкой: две копии одного расклада неизбежно разъехались бы, и расходиться
+ *  они стали бы молча. */
+function fleetBattleRowHtml(battleId: string): string {
+  return `<div class="row">${btn('openbattle', battleId, t('battle.win.open'), true)}</div>`;
+}
+
+/** Удар по миру под флотом: бомбардировка, штурм и прогноз. Пусто, если мир не чужой. */
+function fleetStrikeHtml(f: Fleet, here: Planet, inOrbit: boolean, nShips: number): string {
+  // enemy/neutral world you can act on — empty space is pass-through only
+  // Нейтральная точка считается чужой: она не моя, и взять её можно.
+  const hostile = strikeOffered(here.owner, f.owner, sectorTypeOf(here.id)?.capturable ?? false);
+  if (!hostile) return '';
+  let at = `<div class="sec">${t('side.strike.title')}</div><div class="row">`;
+  at += btn(
+    'bombard',
+    f.bombarding ? 'off' : 'on',
+    f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
+    bombardEnabled(inOrbit, nShips, sectorTypeOf(here.id)?.orbit ?? true),
+  );
+  // Штурм не спрашивает КОРАБЛИ (высаживается десант, а не корпуса), но десант
+  // спрашивает — там, где его требует ядро: на защищённом мире без него ответ
+  // `E_NO_TROOPS`, и живая кнопка обещала бы заведомый отказ (правило 4).
+  at += btn(
+    'assault',
+    '',
+    t('side.strike.assault'),
+    assaultEnabled(inOrbit, sumUnits(f.landing ?? []) > 0, sumUnits(here.garrison) > 0),
+  );
+  at += `</div>`;
+  at += `<div class="hint">${t('side.strike.hint')}</div>`;
+  // Combat forecast (ONB-6): «если атакую — что будет?» — the pure base-model
+  // sim over the landing force vs the garrison the viewer SEES (the fleet is
+  // docked here, so the world is identified — no fog leak). A forecast, not an
+  // oracle: terrain/fortification/tech bonuses of the live fight are not folded
+  // in — the hedge in the copy says so.
+  const landing = f.landing ?? [];
+  const garrison = here.garrison;
+  if (forecastShown(landing, garrison)) {
+    const pv = previewBattle(landing, garrison, data);
+    const verdict =
+      pv.outcome === 'attacker'
+        ? t('side.strike.forecast.attacker')
+        : pv.outcome === 'defender'
+          ? t('side.strike.forecast.defender')
+          : t('side.strike.forecast.draw');
+    at += `<div class="row dim">${t('side.strike.forecast', {
+      v: `<b>${verdict}</b>`,
+      r: pv.roundsEst,
+      a: previewLossCount(pv.attacker),
+      pa: Math.round(pv.attacker.damageFraction * 100),
+      d: previewLossCount(pv.defender),
+      pd: Math.round(pv.defender.damageFraction * 100),
+    })}</div>`;
+    at += `<div class="hint">${t('side.strike.forecast.hint')}</div>`;
+  }
+  return at;
+}
+
+/** Наземные части: тип, сколько в гарнизоне мира и сколько в трюме флота. */
+function groundRowsAt(
+  garrison: readonly UnitStack[],
+  carried: readonly UnitStack[],
+): Array<{ unit: string; planet: number; aboard: number }> {
+  const groundHere = garrison.filter((st) => isGround(st.unit));
+  const types: string[] = [];
+  for (const st of [...groundHere, ...carried])
+    if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
+  const cnt = (stacks: readonly UnitStack[], u: string): number =>
+    stacks.reduce((n, st) => (st.unit === u ? n + st.count : n), 0);
+  return types.map((unit) => ({ unit, planet: cnt(groundHere, unit), aboard: cnt(carried, unit) }));
+}
+
+/** Какой флот окно показывает консолью (макет владельца 2026-09-27): только на ПК и
+ *  планшете, только ОДИН свой флот и не в режимах выбора. Чужой флот приказов не имеет,
+ *  у группы нет одного состава и одного трюма, а в режиме «Приказ» ряд команд заменён
+ *  полоской плана. Спрашивают оба хозяина окна — лист и ряд команд, — чтобы раскладка
+ *  не могла достаться одному из них. */
+function consoleFleet(): Fleet | null {
+  if (!holographic.active() || chainMode || pickMode) return null;
+  const ids = selectedFleetIds();
+  if (ids.length !== 1 || panelFleet() !== ids[0]) return null;
+  const f = s.fleets[ids[0]!];
+  return f && f.owner === ME ? f : null;
+}
+
+/** Надбавки к параметрам СВОЕГО флота (`decisions/statModifiers.ts`). Разбор ядра стоит
+ *  клона состояния, а панель собирается каждый кадр: ответ живёт, пока тот же флот и то
+ *  же состояние, а при идущих часах — не дольше четверти секунды. Чужой флот — `null`:
+ *  его технологии и герои не наше знание. */
+let statModsMemo: { fleetId: string; state: GameState; at: number; mods: FleetStatMods | null } | null = null;
+function fleetStatModsOf(f: Fleet): FleetStatMods | null {
+  if (f.owner !== ME) return null;
+  const now = performance.now();
+  const memo = statModsMemo;
+  if (memo && memo.fleetId === f.id && (memo.state === s || now - memo.at < 250)) return memo.mods;
+  const actual = fleetBaseSpeed(f, data);
+  // Номинальный ход — тот же расчёт ядра по целым корпусам: разница с фактическим и есть
+  // хромота (правило 4 модели надбавок).
+  const nominal = fleetBaseSpeed({ ...f, units: f.units.map(({ hp: _hp, ...st }) => st) }, data);
+  const mods = fleetStatMods(traceHooks(s, fleetStatQueries(f, actual)), nominal);
+  statModsMemo = { fleetId: f.id, state: s, at: now, mods };
+  return mods;
+}
+
+/** Атака или защита так, как их показывают: с надбавками, когда они известны. Одна
+ *  формула на карточку, консоль и всплывашку — иначе число в окне и в её шапке разойдутся. */
+function shownFire(raw: number, mods: FleetStatMods | null): number {
+  return mods ? Math.round(raw * mods.fire.factor) : raw;
+}
+
+// --- Всплывашка надбавок: тап по параметру флота (заказ владельца 2026-09-27) ----------
+// Узел один на оба листа — консоль ПК и карточку телефона: параметры в обоих несут
+// `data-stat`, всплывашка встаёт у нажатого (`anchoredPopover.ts`). Лист пересобирается
+// каждый кадр, поэтому держится не узел, а пара «флот + параметр»: ушёл флот из листа
+// или параметр из разметки — всплывашка закрывается сама, висеть над пустым местом ей
+// не на чем.
+const statPopEl = $('statpop');
+let statPop: { fleetId: string; stat: ConsoleStat } | null = null;
+let lastStatPopHtml = '';
+
+/** Тап по параметру: открыть его всплывашку, повторный тап по нему же — закрыть. */
+function toggleStatPop(stat: ConsoleStat): void {
+  const id = panelFleet();
+  const same = statPop?.fleetId === id && statPop?.stat === stat;
+  statPop = id && !same ? { fleetId: id, stat } : null;
+  renderStatPop();
+}
+
+function closeStatPop(): void {
+  statPop = null;
+  renderStatPop();
+}
+
+/** Что показать про параметр. Числа — те же, что в окне (`shownFire`, ход из модели),
+ *  строки — источники из ядра. Без ответа ядра остаётся одно правило параметра: строк,
+ *  которых ядро не назвало, всплывашка не выдумывает. */
+function statPopModel(f: Fleet, stat: ConsoleStat): StatPopView {
+  const d = objDossier(`stat:${stat}`);
+  const head = { title: d?.name ?? '', desc: d?.body ?? '' };
+  const mods = fleetStatModsOf(f);
+  const sm = fleetSummary(f, data, s.time);
+  const plain = (value: string): StatPopView => ({ ...head, value, tone: 'neutral', rows: [], total: null, plain: true });
+  const rows = (b: StatBreakdown): StatPopRow[] =>
+    b.sources.map((x) => ({ label: t(statSourceKey(x.source)), pct: x.pct }));
+  const total = (b: StatBreakdown): number => (b.factor - 1) * 100;
+  if (stat === 'atk' || stat === 'def') {
+    const raw = stat === 'atk' ? sm.attack.capped : sm.defense;
+    const value = String(shownFire(raw, mods));
+    if (!mods) return plain(value);
+    return { ...head, value, tone: mods.fire.tone, base: String(raw), rows: rows(mods.fire), total: total(mods.fire) };
+  }
+  if (stat === 'spd') {
+    const spd = mods ? mods.speed.value : sm.speed;
+    if (!mods || spd <= 0) return plain(spd > 0 ? String(Math.round(spd)) : '—');
+    return {
+      ...head,
+      value: String(Math.round(spd)),
+      tone: mods.speed.tone,
+      base: String(Math.round(mods.speed.base)),
+      rows: rows(mods.speed),
+      total: total(mods.speed),
+    };
+  }
+  if (stat === 'hull' || stat === 'shield') {
+    const pool = stat === 'hull' ? sm.hull : sm.shield;
+    const value = pool.max > 0 ? `${kfmt(pool.cur)}/${kfmt(pool.max)}` : t('fleet.console.shield.none');
+    if (!mods || pool.max <= 0) return plain(value);
+    return {
+      ...head,
+      value,
+      tone: mods.incoming.tone,
+      sub: t('stat.pop.incoming'),
+      rows: rows(mods.incoming),
+      total: total(mods.incoming),
+      lessIsBetter: true,
+    };
+  }
+  return plain(`${Math.min(sumUnits(f.units), COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}`);
+}
+
+/** Держит всплывашку в согласии с листом: зовётся каждым `renderPanel`. */
+function renderStatPop(): void {
+  const pop = statPop;
+  const f = pop && panelFleet() === pop.fleetId ? s.fleets[pop.fleetId] : undefined;
+  const anchor =
+    pop && f && side.style.display !== 'none'
+      ? side.querySelector<HTMLElement>(`[data-stat="${pop.stat}"]`)
+      : null;
+  if (!pop || !f || !anchor) {
+    statPop = null;
+    if (lastStatPopHtml) {
+      statPopEl.classList.remove('show');
+      statPopEl.replaceChildren();
+      lastStatPopHtml = '';
+    }
+    return;
+  }
+  const html = statPopHtml(statPopModel(f, pop.stat));
+  if (html !== lastStatPopHtml) {
+    statPopEl.innerHTML = html;
+    lastStatPopHtml = html;
+  }
+  statPopEl.classList.add('show');
+  const a = anchor.getBoundingClientRect();
+  // Высота — по содержимому, а не по уже наложенному пределу: иначе всплывашка,
+  // однажды зажатая у края, так и осталась бы зажатой после прокрутки листа.
+  const border = statPopEl.offsetHeight - statPopEl.clientHeight;
+  const at = anchoredPopover(
+    { left: a.left, top: a.top, width: a.width, height: a.height },
+    { width: statPopEl.offsetWidth, height: statPopEl.scrollHeight + border },
+    { width: innerWidth, height: innerHeight },
+  );
+  statPopEl.style.left = `${Math.round(at.left)}px`;
+  statPopEl.style.top = `${Math.round(at.top)}px`;
+  statPopEl.style.maxHeight = at.maxHeight === null ? '' : `${Math.floor(at.maxHeight)}px`;
+  statPopEl.dataset.side = at.side;
+}
+
+// Клик мимо закрывает. Сам параметр не в счёт: его тап — это переключение (делегат листа).
+document.addEventListener(
+  'pointerdown',
+  (ev) => {
+    if (!statPop) return;
+    if ((ev.target as Element | null)?.closest?.('#statpop, [data-stat]')) return;
+    closeStatPop();
+  },
+  true,
+);
+
+/** Окно флота консолью: шапка с корпусом и щитом, «Состав», «Десант», низ окна. «Приказы»
+ *  рисует ряд команд (`renderCmdBar`), а раскладывает всё сетка окна (`holographic.css`). */
+function fleetConsoleHtml(f: Fleet): string {
+  const nShips = sumUnits(f.units);
+  const nTr = sumUnits(f.landing ?? []);
+  const inOrbit = f.orbit === 'near';
+  const sm = fleetSummary(f, data, s.time);
+  const mods = fleetStatModsOf(f);
+  const boosted = marchFlagged(f.id);
+  const node = fleetNode(f);
+  // Шапку листа окно прячет, но её подзаголовок переезжает в шапку окна (`layoutWindows`):
+  // здесь он такой, как на макете, — где флот и сколько в нём кораблей, плюс живые метки.
+  const sub =
+    [node ? placeName(node) : '', t('fleet.console.ships', { n: nShips })].filter(Boolean).join(' · ') +
+    fleetSubNotes(f, nTr);
+  // Шапка окна широкая: подзаголовку не нужно сжатие узкой карточки ПК (` · ` → `·`).
+  const h = kitCardHeader(ownerColor(f.owner), `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub, {
+    titleAct: 'fleetinfo',
+  });
+  const detail = fleetInfoFor === f.id ? fleetSummaryHtml(f) : '';
+
+  // Щит показывается всегда, даже когда его нет: «нет» — тоже ответ (заказ владельца).
+  const incoming = mods?.incoming.tone ?? 'neutral';
+  const vitals: VitalView[] = [
+    {
+      stat: 'hull',
+      label: t('dossier.stat.hull.name'),
+      value: `${kfmt(sm.hull.cur)}/${kfmt(sm.hull.max)}`,
+      pct: hullPct(sm.hull),
+      low: hullPct(sm.hull) < LIMP_PCT,
+      tone: incoming,
+    },
+    {
+      stat: 'shield',
+      label: t('dossier.stat.shield.name'),
+      value:
+        sm.shield.max > 0 ? `${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}` : t('fleet.console.shield.none'),
+      // Щита нет — нет и полосы: пустая полоса читалась бы как «щит сбит».
+      pct: sm.shield.max > 0 ? hullPct(sm.shield) : null,
+      low: false,
+      tone: sm.shield.max > 0 ? incoming : 'neutral',
+    },
+  ];
+  let body = vitalsHtml(vitals, fleetRepairChipsHtml(f));
+
+  // «Состав»: параметры с надбавками, метки эффектов, плитки кораблей с именами.
+  const speed = mods ? mods.speed.value : sm.speed;
+  const stats: StatView[] = [
+    { stat: 'atk', icon: 'sword', label: t('dossier.stat.atk.name'), value: String(shownFire(sm.attack.capped, mods)), tone: mods?.fire.tone ?? 'neutral' },
+    { stat: 'def', icon: 'shield', label: t('dossier.stat.def.name'), value: String(shownFire(sm.defense, mods)), tone: mods?.fire.tone ?? 'neutral' },
+    { stat: 'cap', icon: 'stack', label: t('dossier.stat.cap.name'), value: `${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}`, tone: 'neutral' },
+    { stat: 'spd', icon: 'lightning', label: t('dossier.stat.spd.name'), value: speed > 0 ? String(Math.round(speed)) : '—', tone: mods?.speed.tone ?? 'neutral' },
+  ];
+  const info = esc(t('fleet.console.composition.hint'));
+  body +=
+    `<section class="fc-comp">` +
+    columnTitleHtml(
+      t('fleet.console.composition'),
+      `<span class="fc-info" title="${info}" aria-label="${info}">${holoIcon('info')}</span>`,
+    ) +
+    statGridHtml(stats) +
+    fleetEffectsHtml(f, boosted, nTr) +
+    fleetMinesRowHtml(f) +
+    fleetTilesHtml(f, f.units, true) +
+    fleetRouteHtml(f, boosted) +
+    (f.battleId ? fleetBattleRowHtml(f.battleId) : '') +
+    `</section>`;
+
+  // «Десант»: трюм, кто где, ангар, погрузка и удар по миру под флотом.
   const here = planet(f.location);
-  // Что эта карточка ПРЕДЛАГАЕТ сделать — `dockedActions.ts` (REFM-200). Ошибка здесь
-  // не падает, а предлагает: живая кнопка, на которую ядро ответит отказом, снаружи
-  // выглядит как «ничего не произошло», а прогноз пустого боя читается как расклад.
   const docked = fleetDocked(!!here, !!f.movement, !!f.battleId);
-  if (f.battleId) {
-    // Карточка боя переехала в ОКНО (`battleScreen.ts`): там те же стороны, полосы
-    // корпуса, фаза, отсчёт раунда и отступление, но во весь экран и с доступом к
-    // ЧУЖОМУ бою — значок на карте открывает то же окно. Панель поэтому не дублирует
-    // расклад, а ведёт к нему одной кнопкой: две копии одного расклада неизбежно
-    // разъехались бы, и расходиться они стали бы молча.
-    h += `<div class="row">${btn('openbattle', f.battleId, t('battle.win.open'), true)}</div>`;
-  }
-  if (docked) {
-    // enemy/neutral world you can act on — empty space is pass-through only
-    // Нейтральная точка считается чужой: она не моя, и взять её можно.
-    const hostile = strikeOffered(
-      here!.owner,
-      f.owner,
-      sectorTypeOf(here!.id)?.capturable ?? false,
-    );
-    const cols: string[] = [];
-    if (hostile) {
-      let at = `<div class="sec">${t('side.strike.title')}</div><div class="row">`;
-      at += btn(
-        'bombard',
-        f.bombarding ? 'off' : 'on',
-        f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
-        bombardEnabled(inOrbit, nShips, sectorTypeOf(here!.id)?.orbit ?? true),
-      );
-      // Штурм не спрашивает КОРАБЛИ (высаживается десант, а не корпуса), но десант
-      // спрашивает — там, где его требует ядро: на защищённом мире без него ответ
-      // `E_NO_TROOPS`, и живая кнопка обещала бы заведомый отказ (правило 4).
-      at += btn(
-        'assault',
-        '',
-        t('side.strike.assault'),
-        assaultEnabled(inOrbit, sumUnits(f.landing ?? []) > 0, sumUnits(here!.garrison) > 0),
-      );
-      at += `</div>`;
-      at += `<div class="hint">${t('side.strike.hint')}</div>`;
-      // Combat forecast (ONB-6): «если атакую — что будет?» — the pure base-model
-      // sim over the landing force vs the garrison the viewer SEES (the fleet is
-      // docked here, so the world is identified — no fog leak). A forecast, not an
-      // oracle: terrain/fortification/tech bonuses of the live fight are not folded
-      // in — the hedge in the copy says so.
-      const landing = f.landing ?? [];
-      const garrison = here!.garrison;
-      if (forecastShown(landing, garrison)) {
-        const pv = previewBattle(landing, garrison, data);
-        const verdict =
-          pv.outcome === 'attacker'
-            ? t('side.strike.forecast.attacker')
-            : pv.outcome === 'defender'
-              ? t('side.strike.forecast.defender')
-              : t('side.strike.forecast.draw');
-        at += `<div class="row dim">${t('side.strike.forecast', {
-          v: `<b>${verdict}</b>`,
-          r: pv.roundsEst,
-          a: previewLossCount(pv.attacker),
-          pa: Math.round(pv.attacker.damageFraction * 100),
-          d: previewLossCount(pv.defender),
-          pd: Math.round(pv.defender.damageFraction * 100),
-        })}</div>`;
-        at += `<div class="hint">${t('side.strike.forecast.hint')}</div>`;
-      }
-      cols.push(at);
-    }
-    // Ground army at your own world — СВОДКА, без кнопок: сама погрузка/выгрузка
-    // переехала в ⇅-меню ряда команд (GRND-1), где есть выбор «кого и сколько».
-    // Панель осталась информационной ровно как у стоячих приказов (SO-UI ниже).
-    // Только на СВОЕЙ точке: на чужой сводка перечислила бы гарнизон противника.
-    if (groundSummaryShown(here!.owner, ME)) {
-      let ga = `<div class="sec">${t('side.ground.title')}</div>`;
-      const groundHere = here!.garrison.filter((st) => isGround(st.unit));
-      const carried = f.landing ?? [];
-      const loadingN = (f.loading ?? []).reduce((n, claim) => n + claim.count, 0);
-      const types: string[] = [];
-      for (const st of [...groundHere, ...carried])
-        if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
-      if (types.length) {
-        ga += `<div class="row dim">${t('side.ground.legend')}</div>`;
-        const cnt = (stacks: Array<{ unit: string; count: number }>, u: string): number =>
-          stacks.reduce((n, st) => (st.unit === u ? n + st.count : n), 0);
-        for (const u of types)
-          ga += `<div class="row"><span class="bicon">${unitIconHtml(u, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(u))} <b>${cnt(groundHere, u)} ▸ ${cnt(carried, u)}</b></div>`;
-      }
-      if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
-      if (!types.length && !loadingN)
-        ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
-      ga += `<div class="hint">${t('side.ground.via-cmd')}</div>`;
-      cols.push(ga);
-    }
-    h += pcols(cols);
-  }
-  return objectPanelHtml(h, detail);
+  const ownWorld = !!here && docked && groundSummaryShown(here.owner, ME);
+  const rows: TroopRow[] = groundRowsAt(ownWorld ? here!.garrison : [], f.landing ?? []).map((r) => ({
+    icon: unitIconHtml(r.unit, data, youColor, 16, s.players[ME]?.faction),
+    name: displayUnit(r.unit),
+    planet: ownWorld ? r.planet : null,
+    aboard: r.aboard,
+  }));
+  const troopsIn = troopsInputFor(f.id);
+  let land =
+    fleetHoldsHtml(fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data))) +
+    troopTableHtml(rows, ownWorld) +
+    fleetHangarHtml(f, true) +
+    (troopsIn
+      ? `<button type="button" class="fc-load${troopsPlan?.fleetId === f.id ? ' on' : ''}" data-cmd="troops" title="${esc(t('cmd.troops.hint'))}">${holoIcon('arrows-down-up')}<span>${esc(t('fleet.console.load'))}</span></button>`
+      : '');
+  if (here && docked) land += fleetStrikeHtml(f, here, inOrbit, nShips);
+  if (land) body += `<section class="fc-land">${land}</section>`;
+
+  // Низ окна: герой на борту и его вклад (слева); «Подробнее о флоте» ставит ряд команд.
+  // Вклад — строка героя из разбора ядра: база ауры и пассивки рядом с ним одним числом.
+  // Написанные «+5%» врали бы, стоило герою взять пассивку.
+  const heroName = fleetHeroName(f);
+  const heroPct = mods?.fire.sources.find((x) => x.source === 'hero')?.pct;
+  body +=
+    `<div class="fc-foot">` +
+    (heroName !== null
+      ? `<span class="fc-aura">${holoIcon('sun')}<b>${esc(heroName)}</b>` +
+        (heroPct ? `<span>${esc(t('fleet.console.aura', { p: pctText(heroPct) }))}</span>` : '') +
+        `</span>`
+      : '') +
+    `</div>`;
+  return objectPanelHtml(h + `<div class="fconsole">${body}</div>`, detail);
 }
 
 /** Кнопка «Пинг» карточки мира. Маркер коалиции делится с союзником-человеком, поэтому
@@ -8370,6 +8723,7 @@ function renderPanel() {
     ({ panel: lastPanelHtml, objDesc: lastObjDescHtml } = FORGOTTEN);
     hoverObj = null;
     side.classList.remove('details-open');
+    renderStatPop();
     return;
   }
   const html = panelHtml();
@@ -8394,6 +8748,7 @@ function renderPanel() {
   }
   renderObjDesc();
   updatePanelLive(); // patch live countdowns in place — never rebuild the panel for them
+  renderStatPop();
 }
 
 /** Patch the panel's per-frame text (build progress, travel ETA, battle round) in
@@ -8705,6 +9060,9 @@ function renderCmdBar() {
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
+  // Окно флота консолью (ПК, один свой флот): ⇅ переезжает в колонку «Десант» листа
+  // кнопкой «Погрузка и выгрузка», и его меню встаёт поверх той же колонки.
+  const consoleOn = !!lone && consoleFleet() === lone;
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
   // (the map-tap targeting reuses the same heroAim flow as the hero window).
   // Флагман группы и его кастуемые способности — правила в `heroCasts.ts` (REFM-68).
@@ -8744,15 +9102,21 @@ function renderCmdBar() {
     merging,
     troopsMenu: !!troopsIn,
     troopsOpen: !!troopsPlan,
+    troopsInSheet: consoleOn,
     more: cmdMore,
     picking: pickMode,
   });
+  const castBtn = shown.cast
+    ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
+    : '';
   let html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
     // ATK-1: «Атака» — всегда, как «Курс». Цель у неё ФЛОТ, а не мир (в отличие от
     // ШТУРМА ниже), поэтому и кнопка отдельная, и прицел отдельный.
     cmdBtn('engage', '⚡', t('cmd.engage'), engageAim ? 'on' : '', false, t('cmd.engage.hint')) +
+    // В консоли «Способность» — третья в первом ряду, как на макете владельца.
+    (consoleOn ? castBtn : '') +
     (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
     (shown.assault
       ? cmdBtn(
@@ -8768,9 +9132,7 @@ function renderCmdBar() {
     (lone && rocketMinelayer(lone, data)
       ? cmdBtn('rocket-mine', '✺', t('cmd.rocket-mine'), '', false, t('cmd.rocket-mine.hint'))
       : '') +
-    (shown.cast
-      ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
-      : '') +
+    (consoleOn ? '' : castBtn) +
     (shown.merge
       ? cmdBtn(
           'merge',
@@ -8792,7 +9154,8 @@ function renderCmdBar() {
           t('cmd.troops.hint'),
         )
       : '') +
-    // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
+    // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно; окно
+    // ПК рисует «•••» — так на макете владельца 2026-09-27, `holographicIcons.ts`):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
     (shown.pick
@@ -8869,12 +9232,7 @@ function renderCmdBar() {
         `</div><span class="retr-hint">${t('cmd.retreat.hint')}</span></div>`
       : '') +
     // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
-    (troopsPlan && troopsIn
-      ? troopsMenuHtml(troopsModel(troopsIn), {
-          icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
-          name: displayUnit,
-        })
-      : '');
+    (troopsPlan && troopsIn && !consoleOn ? troopsPopHtml(troopsIn) : '');
   if (holographic.active()) {
     // Пустой набор группы — это режим, а не «0 флотов».
     const title = lone
@@ -8883,7 +9241,13 @@ function renderCmdBar() {
         ? t('cmd.multiselect')
         : t('cmd.selection.many', { n: ids.length });
     const sub = lone ? [fleetNode(lone), t('side.fleet.sub.pc', { s: sumUnits(lone.units), tr: sumUnits(lone.landing ?? []) })].filter(Boolean).join(' · ') : '';
-    html = commandWindowHtml(html, title, sub, !!lone && !aiming && !merging && !pickMode);
+    html = commandWindowHtml(
+      (consoleOn ? `<div class="fc-title fc-orders"><b>${esc(t('fleet.console.orders'))}</b></div>` : '') + html,
+      title,
+      sub,
+      !!lone && !aiming && !merging && !pickMode,
+      consoleOn && troopsPlan && troopsIn ? troopsPopHtml(troopsIn) : '',
+    );
   }
   if (html !== lastCmdHtml) {
     const hadPop = cmdbar.querySelector('.cmdpop') !== null;
@@ -8896,6 +9260,14 @@ function renderCmdBar() {
     if (!hadPop && pop && holographic.active()) pop.scrollIntoView({ block: 'nearest' });
   }
   cmdbar.classList.add('show');
+}
+
+/** ⇅-меню десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение. */
+function troopsPopHtml(input: TroopsInput): string {
+  return troopsMenuHtml(troopsModel(input), {
+    icon: (u) => unitIconHtml(u, data, youColor, 18, s.players[ME]?.faction),
+    name: displayUnit,
+  });
 }
 
 /** Split-dialog rows of a fleet: one per STACK (unit + loadout), ships first, then
@@ -9018,6 +9390,17 @@ splitdlg.addEventListener('click', (ev) => {
   renderSplitDialog();
 });
 
+// Числа карточки телефона — `role="button"` без своей кнопки: Enter и пробел у них
+// открывают ту же всплывашку, что и тап (у консоли это настоящие кнопки).
+side.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  const el = ev.target as HTMLElement;
+  if (el.getAttribute('role') !== 'button') return;
+  const stat = el.closest<HTMLElement>('[data-stat]')?.dataset.stat;
+  if (!stat) return;
+  ev.preventDefault();
+  toggleStatPop(stat as ConsoleStat);
+});
 side.addEventListener('click', (ev) => {
   // A queued order's target is a link: pan the map to that world (briefly ringed)
   // WITHOUT touching the selection — the plan panel must stay open under your finger.
@@ -9027,6 +9410,14 @@ side.addEventListener('click', (ev) => {
     return;
   }
   const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+  // Параметр флота — всплывашка его надбавок. Кнопка ремонта в той же строке корпуса
+  // остаётся своей кнопкой: параметр забирает тап, только если он и есть нажатая кнопка
+  // или кнопки под пальцем нет вовсе.
+  const statEl = (ev.target as HTMLElement).closest<HTMLElement>('[data-stat]');
+  if (statEl?.dataset.stat && (!bEl || bEl === statEl || !statEl.contains(bEl))) {
+    toggleStatPop(statEl.dataset.stat as ConsoleStat);
+    return;
+  }
   if (!bEl || bEl.disabled) {
     // Touch has no hover: a tap that lands on a dossier-able row (not one of its own
     // action buttons, handled below) opens the same summary the desktop pane shows
@@ -9039,6 +9430,12 @@ side.addEventListener('click', (ev) => {
         openDossier(key);
       }
     }
+    return;
+  }
+  // «Погрузка и выгрузка» консоли флота стоит в листе, но это команда ряда: её ведёт тот
+  // же делегат, что и остальные приказы (⇅-меню, `troopsPlan`).
+  if (bEl.dataset.cmd) {
+    onCommandClick(ev);
     return;
   }
   if (bEl.dataset.shipcard) {
@@ -9388,7 +9785,9 @@ document.addEventListener?.('click', (ev) => {
   if (b && !(b as HTMLButtonElement).disabled) snd.play('tap');
 });
 
-cmdbar.addEventListener('click', (ev) => {
+/** Нажатие командной кнопки (`data-cmd`). Слушает ряд команд, а окно флота на ПК
+ *  зовёт сюда же кнопки своей колонки «Десант» — ⇅-меню живёт в ней, а не в ряду. */
+function onCommandClick(ev: MouseEvent): void {
   const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
   if (!bEl || bEl.disabled) return;
   // Серая кнопка с причиной (`cmdBtn`, `why`): приказа нет — есть объяснение.
@@ -9586,7 +9985,8 @@ cmdbar.addEventListener('click', (ev) => {
   invalidatePanel();
   renderCmdBar();
   renderPanel();
-});
+}
+cmdbar.addEventListener('click', onCommandClick);
 
 // --- canvas input ------------------------------------------------------------
 
@@ -11506,6 +11906,11 @@ function mapRenderingReport(): string {
     cameraScale: cam.scale,
   }, null, 2);
 }
+/** Стекло окон ПК и планшета берёт альфу из переменной на `body` (`holographic.css`). */
+function applyWindowOpacity(): void {
+  document.body.style.setProperty('--holo-window-alpha', String(windowAlpha(windowOpacityPct())));
+}
+applyWindowOpacity();
 const settings = initSettings({
   root: () => settingsEl,
   view: () => ({
@@ -11524,8 +11929,13 @@ const settings = initSettings({
     neutralColor,
     palette: rivalPaletteId,
     touchOnly: !pcUi(),
+    ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
   }),
   setSweepOpacity,
+  setWindowOpacity: (v) => {
+    setWindowOpacity(Math.round(v * 100));
+    applyWindowOpacity();
+  },
   setOwnPings: setShowOwnPings,
   setGlow: setGlowFx,
   setStarfield: setStarfield,
@@ -13975,6 +14385,8 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'pingpanel', isOpen: () => pings?.panelOpen() ?? false, close: () => pings?.closePanel() }, // z60
   { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings?.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
+  // Всплывашка надбавок стоит над окном флота: Back закрывает её, а не выделение под ней.
+  { id: 'statpop', isOpen: () => statPop !== null, close: closeStatPop }, // z43
   // --- низ экрана (z27…z20) ---
   { id: 'chatwin', isOpen: () => chatWin?.isOpen() ?? false, close: () => chatWin?.close() }, // z27
   { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => offerChoices([]) },

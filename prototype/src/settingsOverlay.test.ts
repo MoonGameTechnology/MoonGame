@@ -188,13 +188,13 @@ describe('настройки — разметка', () => {
 
   const HOME: Record<string, readonly string[]> = {
     sound: ['set-snd', 'set-snd-vol'],
-    graphics: ['set-glow', 'set-starfield', 'set-motion', 'set-fps'],
+    graphics: ['set-window-opacity', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
     map: ['set-sweep', 'set-ownpings', 'set-colyou', 'set-colneutral', 'set-colreset'],
     controls: [],
   };
 
   it('каждая настройка живёт ровно в одной вкладке, «Готово» — во всех', () => {
-    const view = viewOf({ renderCompatibilitySupported: true });
+    const view = viewOf({ renderCompatibilitySupported: true, windowOpacity: 0.9 });
     const all = Object.values(HOME).flat();
     for (const { id: tab } of SETTINGS_TABS) {
       const html = settingsBoxHtml(view, false, tab);
@@ -287,6 +287,14 @@ describe('настройки — разметка', () => {
     const html = settingsBoxHtml(viewOf({ youColor: '#123456', neutralColor: '#abcdef' }), false, 'map');
     expect(html).toContain('value="#123456"');
     expect(html).toContain('value="#abcdef"');
+  });
+
+  it('ползунок непрозрачности окон — только там, где есть стеклянные окна', () => {
+    expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-window-opacity"');
+    const html = settingsBoxHtml(viewOf({ windowOpacity: 0.9 }), false, 'graphics');
+    expect(html).toContain('id="set-window-opacity" type="range" min="0" max="100" step="5" value="90"');
+    expect(html).toContain(t('settings.gfx.window-opacity'));
+    expect(html).toContain(t('settings.gfx.window-opacity.hint'));
   });
 
   it('громкость показана в процентах, а не долей', () => {
@@ -438,6 +446,20 @@ describe('настройки — окно и обработчики', () => {
     n.value = '40';
     w.win.fire('set-sweep', 'input');
     expect(w.calls).toContainEqual(['sweep', 0.4]);
+  });
+
+  it('непрозрачность окон отдаётся долей и тут же подписывается', () => {
+    const w = wired(
+      { setWindowOpacity: (v) => w.calls.push(['window-opacity', v]) },
+      viewOf({ windowOpacity: 0.9 }),
+    );
+    w.api.open();
+    w.win.tab('graphics');
+    const n = w.win.node('set-window-opacity')!;
+    n.value = '25';
+    w.win.fire('set-window-opacity', 'input');
+    expect(w.calls).toContainEqual(['window-opacity', 0.25]);
+    expect(w.win.node('set-window-opacity-val')?.textContent).toBe('25%');
   });
 
   it('громкость отдаётся долей и звучит предпросмотром', () => {

@@ -341,6 +341,9 @@ export type {
   ActionHandler,
   EventHandler,
   HookFn,
+  HookQuery,
+  HookTrace,
+  HookTraceStep,
   ModuleManifest,
   ModuleManifestEntry,
 } from './kernel/module';
@@ -475,6 +478,7 @@ export {
   lineShares,
   LINE_SHARE,
   TIER_ORDER,
+  mitigationFromPool,
   type Tier,
 } from './util/combat';
 export {

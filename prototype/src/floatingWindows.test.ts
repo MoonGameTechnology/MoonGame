@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitWindowPosition } from './floatingWindows';
+import { fitWindowPosition, onWindowEdge } from './floatingWindows';
 
 describe('movable windows stay reachable without camera input', () => {
   const viewport = { width: 1400, height: 960 };
@@ -21,5 +21,27 @@ describe('movable windows stay reachable without camera input', () => {
     // Taller than the room below the chrome — stays at the chrome and scrolls inside,
     // instead of being pushed up underneath it.
     expect(fitWindowPosition({ x: 130, y: 300 }, size, { width: 1024, height: 700 }, 176)).toEqual({ x: 130, y: 176 });
+  });
+});
+
+describe('окно тянется за любой край (заказ владельца 2026-09-27)', () => {
+  const box = { x: 100, y: 200, width: 600, height: 300 };
+  it('полоса у каждой из четырёх сторон — хватка', () => {
+    expect(onWindowEdge({ x: 104, y: 350 }, box, 8)).toBe(true); // левый край
+    expect(onWindowEdge({ x: 697, y: 350 }, box, 8)).toBe(true); // правый
+    expect(onWindowEdge({ x: 400, y: 202 }, box, 8)).toBe(true); // верх
+    expect(onWindowEdge({ x: 400, y: 495 }, box, 8)).toBe(true); // низ
+  });
+  it('середина окна — не хватка: там кнопки и прокрутка', () => {
+    expect(onWindowEdge({ x: 400, y: 350 }, box, 8)).toBe(false);
+    expect(onWindowEdge({ x: 110, y: 350 }, box, 8)).toBe(false);
+  });
+  it('снаружи окна — не хватка, даже вплотную к рамке', () => {
+    expect(onWindowEdge({ x: 98, y: 350 }, box, 8)).toBe(false);
+    expect(onWindowEdge({ x: 400, y: 501 }, box, 8)).toBe(false);
+  });
+  it('пальцу полоса шире, чем курсору', () => {
+    expect(onWindowEdge({ x: 112, y: 350 }, box, 8)).toBe(false);
+    expect(onWindowEdge({ x: 112, y: 350 }, box, 16)).toBe(true);
   });
 });

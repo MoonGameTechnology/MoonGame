@@ -43,6 +43,45 @@ export function fitWindowPosition(
   };
 }
 
+/**
+ * Лежит ли точка в полосе у края окна: внутри окна и не дальше `band` от его рамки.
+ * Край — вторая ручка окна после заголовка (заказ владельца 2026-09-27: «чтоб перетаскивать
+ * можно было за любой край»): широкое окно флота закрывает пол-экрана, и тянуться к его
+ * шапке через всё окно неудобно.
+ */
+export function onWindowEdge(p: HoloPoint, box: HoloRect, band: number): boolean {
+  const left = p.x - box.x;
+  const top = p.y - box.y;
+  const right = box.x + box.width - p.x;
+  const bottom = box.y + box.height - p.y;
+  if (left < 0 || top < 0 || right < 0 || bottom < 0) return false;
+  return Math.min(left, top, right, bottom) <= band;
+}
+
+/** Ширина полосы края: пальцу нужна шире, чем курсору. */
+const edgeBand = (pointerType: string): number => (pointerType === 'mouse' ? 8 : 16);
+
+/** Что нажимается само: за такие элементы окно не тянут ни за заголовок, ни за край. */
+const INTERACTIVE = 'button,input,select,textarea,a,[contenteditable],[data-act],[data-stat],[role="button"]';
+
+/**
+ * Пришлось ли нажатие на полосу прокрутки внутри окна. Колонка у края окна прокручивается,
+ * и её полоса лежит ровно в полосе края: без этой проверки прокрутка превращалась бы в
+ * перетаскивание окна.
+ */
+function onScrollbar(target: Element, root: Element, x: number, y: number): boolean {
+  for (let el: Element | null = target; el && el !== root.parentElement; el = el.parentElement) {
+    if (!(el instanceof HTMLElement)) continue;
+    const r = el.getBoundingClientRect();
+    if (el.scrollHeight > el.clientHeight && el.clientWidth > 0 && x >= r.left + el.clientLeft + el.clientWidth)
+      return true;
+    if (el.scrollWidth > el.clientWidth && el.clientHeight > 0 && y >= r.top + el.clientTop + el.clientHeight)
+      return true;
+    if (el === root) break;
+  }
+  return false;
+}
+
 interface WindowEntry {
   id: string;
   root: HTMLElement;
@@ -79,7 +118,7 @@ export function initFloatingWindows() {
     const node = entry.node;
     if (!node) return;
     observer?.unobserve(node);
-    node.classList.remove('holo-floating-window');
+    node.classList.remove('holo-floating-window', 'holo-edge-hover');
     node.style.removeProperty('--holo-window-room');
     delete node.dataset.holoWindow;
     const old = previous.get(node);
@@ -121,14 +160,22 @@ export function initFloatingWindows() {
     const node = target.closest<HTMLElement>('[data-holo-window]');
     return entries.find((entry) => entry.node === node);
   };
+  /** Нажатие у края окна, не на кнопке и не на полосе прокрутки — хватка за край. */
+  const edgeGrab = (node: HTMLElement, target: Element, e: PointerEvent): boolean => {
+    if (target.closest(INTERACTIVE)) return false;
+    const r = node.getBoundingClientRect();
+    const p = { x: e.clientX, y: e.clientY };
+    return onWindowEdge(p, { x: r.left, y: r.top, width: r.width, height: r.height }, edgeBand(e.pointerType)) &&
+      !onScrollbar(target, node, p.x, p.y);
+  };
   document.addEventListener('pointerdown', (e) => {
     releasedRoot = null;
     if (!enabled || e.button !== 0 || !e.isPrimary) return;
     const target = e.target as Element;
-    if (!target.closest('.holo-drag-handle') ||
-      target.closest('button,input,select,textarea,a,[contenteditable],[data-act]')) return;
+    if (target.closest(INTERACTIVE)) return;
     const entry = entryFor(target);
     if (!entry?.node || !entry.point) return;
+    if (!target.closest('.holo-drag-handle') && !edgeGrab(entry.node, target, e)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     drag = { entry, id: e.pointerId, start: { x: e.clientX, y: e.clientY }, origin: { ...entry.point } };
@@ -154,6 +201,18 @@ export function initFloatingWindows() {
     drag.entry.userPlaced = true;
     apply(drag.entry);
   }, true);
+  // Курсор «взять» у края окна — подсказка, что за край окно тоже тянется.
+  let edgeHover: HTMLElement | null = null;
+  document.addEventListener('pointermove', (e) => {
+    if (drag || e.pointerType !== 'mouse') return;
+    const target = e.target as Element;
+    const entry = enabled ? entryFor(target) : undefined;
+    const node = entry?.node && edgeGrab(entry.node, target, e) ? entry.node : null;
+    if (node === edgeHover) return;
+    edgeHover?.classList.remove('holo-edge-hover');
+    node?.classList.add('holo-edge-hover');
+    edgeHover = node;
+  }, { passive: true });
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture'] as const)
     document.addEventListener(event, (e) => { if (drag?.id === e.pointerId) finish(); }, true);
   window.addEventListener('blur', finish);

@@ -17,16 +17,20 @@ interface HolographicHost {
   selectionAnchor(): HoloPoint | null;
 }
 
+/** `aside` встаёт между приказами и «Подробнее»: окно флота консолью кладёт туда ⇅-меню
+ *  десанта, и сетка окна ставит его поверх колонки «Десант». */
 export function commandWindowHtml(
   commands: string,
   title: string,
   sub: string,
   details = true,
+  aside = '',
 ): string {
   return (
     `<div class="holo-command-head"><div><b>${esc(title)}</b><span>${esc(sub)}</span></div>` +
     `<button type="button" data-holo-action="close" class="holo-command-close" aria-label="${esc(t('card.close'))}">×</button></div>` +
     `<div class="holo-command-body">${commands}</div>` +
+    aside +
     (details
       ? `<button type="button" data-holo-action="details" class="holo-command-details">${esc(t('hud.command-details'))}</button>`
       : '')
@@ -142,10 +146,16 @@ export function initHolographicUi(host: HolographicHost) {
       if (enabled) {
         const info = host.side.style.display !== 'none';
         const commands = host.commands.classList.contains('show');
+        // Окно флота консолью (макет владельца 2026-09-27): обе половины нарисованы под
+        // неё — лист с «Составом» и «Десантом», ряд с «Приказами». Раскладывает их сетка
+        // окна, поэтому окно — grid, а не колонка/строка.
+        const fleetConsole = info && commands && !!host.side.querySelector('.fconsole') &&
+          !!host.commands.querySelector('.fc-orders');
         selection.classList.toggle('has-info', info);
         selection.classList.toggle('details-open', host.side.classList.contains('details-open'));
         selection.classList.toggle('has-commands', commands);
-        selection.style.display = inGame && (info || commands) ? 'flex' : 'none';
+        selection.classList.toggle('fleet-console', fleetConsole);
+        selection.style.display = inGame && (info || commands) ? (fleetConsole ? 'grid' : 'flex') : 'none';
         // The command header replaces the former dossier header; keep its live
         // orbit, damage and supply notes while removing the duplicate title.
         if (info && commands) {

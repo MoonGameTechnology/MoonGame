@@ -127,6 +127,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['pingpanel', 'layer'], // окно «Метки коалиции», z60
   ['pingpop', 'layer'], // всплывашка пинга, z45
   ['splitdlg', 'layer'], // диалог разделения флота, z45
+  ['statpop', 'layer'], // надбавки параметра флота (тап по числу), z43 — над окном флота
   ['chatwin', 'layer'], // плавающее окно чата, z27
   ['cmdbar', 'layer'], // поповеры ряда команд (десант ⇅, огонь, каст), z26
   ['side', 'layer'], // лист выделения — последняя ступень перед экранами
