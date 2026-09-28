@@ -204,7 +204,8 @@ export type {
   SignatureContact,
   SignatureSize,
 } from './state/visibility';
-export { hashJson, hashState } from './state/hash';
+export { hashJson, hashJsonJob, hashState, hashStateJob } from './state/hash';
+export type { HashJob } from './state/hash';
 
 // Deterministic replay (RPL-1): self-contained log + pure runner — the CI harness
 // and the future audit tooling (GI-1.3) both build on this.

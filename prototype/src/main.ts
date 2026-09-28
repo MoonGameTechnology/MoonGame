@@ -201,7 +201,6 @@ import {
   sumUnitStat,
   getStance,
   getOffer,
-  hashState,
   planRoute,
   previewBattle,
   previewLossCount,
@@ -1052,12 +1051,7 @@ import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './
 import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
-import {
-  WAIT_MARK,
-  desyncVerdict,
-  radarContacts,
-  waitingBanner,
-} from './snapshotIngest';
+import { WAIT_MARK, radarContacts, waitingBanner } from './snapshotIngest';
 import {
   FLAK_LIFE_MS,
   flakBurstRadius,
@@ -1426,8 +1420,8 @@ let pingTimer: ReturnType<typeof setInterval> | null = null;
 // lands in the server's metrics stream (observe → JSONL/сводка), never answered.
 let perfTimer: ReturnType<typeof setInterval> | null = null;
 const PERF_SAMPLE_MS = 30_000;
-let netDesync = false; // last snapshot's hash mismatched (server vs our rebuild)
-let netDesyncCount = 0; // how many snapshots have mismatched this session
+let netDesync = false; // the last hash verdict was a mismatch (server vs our rebuild)
+let netDesyncCount = 0; // how many mismatches were caught this session (one per resync)
 // Auto-reconnect: on an UNEXPECTED drop (not a user action), rejoin our seat with
 // backoff — the server keeps the match running and the nick maps us back.
 let userClosed = false;
@@ -13208,6 +13202,14 @@ function netClientFor(seat: string): MultiplayerClient {
         const rtt = performance.now() - clientTime;
         rttEma = rttEma === null ? rtt : rttEma * 0.7 + rtt * 0.3;
       },
+      // Desync check (M0): the server tags each snapshot with hashState(view) and the
+      // transport compares our rebuilt view with it — in slices over the next frames, so
+      // a verdict lands a little after its snapshot. Mismatch ⇒ the client and server
+      // disagree — the core invariant we most want to catch on a playtest.
+      onHashCheck: (_seq, match) => {
+        netDesync = !match;
+        if (netDesync) netDesyncCount++;
+      },
       onSnapshot: (snap) => {
         // Что значит этот снимок — `netWelcome.ts` (REFM-144): вход подтверждает первый
         // снимок и ровно один раз на сокет, переподключение входит молча (это не новый
@@ -13264,23 +13266,15 @@ function netClientFor(seat: string): MultiplayerClient {
         // from the fogged state — the server sends them as coarse contacts beside
         // each frame. The sweep paints THESE in NET (see updateRadarContacts).
         // Что снимок делает с миром — `snapshotIngest.ts` (REFM-146): контакты живут
-        // ровно один снимок (иначе на карте остаётся призрак), десинк считается только
-        // при присланном хеше, выбор чистится по-разному для одиночного и группового,
-        // а баннер ожидания снимает тот, кто его поставил.
+        // ровно один снимок (иначе на карте остаётся призрак), выбор чистится
+        // по-разному для одиночного и группового, а баннер ожидания снимает тот, кто
+        // его поставил.
         netSignatures = [...radarContacts(snap.signatures)];
         // Re-render the open roster only NOW — the new state is in place, so the
         // stance chips and offer affordances (✓ accept / ⏳ pending) paint fresh.
         if (diploShift && diploOpen && diploTab === 'diplo') renderDiplo();
         if (snap.playerId) ME = snap.playerId;
         if (changedMap && plan.fanfare) defaultView();
-        // Desync check (M0): the server tags each snapshot with hashState(view); we
-        // hash our just-reconstructed view and compare. Mismatch ⇒ the client and
-        // server disagree — the core invariant we most want to catch on a playtest.
-        const verdict = desyncVerdict(snap.hash, () => hashState(snap.state));
-        if (verdict !== null) {
-          netDesync = verdict;
-          if (netDesync) netDesyncCount++;
-        }
         // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
         // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
         pruneSelection(s.fleets, ME);

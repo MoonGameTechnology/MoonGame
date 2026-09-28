@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, type GameState, type Planet, type Player } from './gameState';
 import { applyDelta, diffState } from './delta';
-import { hashJson, hashState } from './hash';
+import { hashJson, hashJsonJob, hashState, hashStateJob } from './hash';
 
 function player(id: string): Player {
   return {
@@ -112,5 +112,135 @@ describe('hashJson', () => {
   it('agrees with hashState on a GameState value (same primitive)', () => {
     const state = fixtureState();
     expect(hashJson(state)).toBe(hashState(state));
+  });
+});
+
+/** The digest as it was first written: build the canonical text, then hash it. The
+ *  streaming walker must stay equal to it byte for byte — the golden above pins one
+ *  value, this pins the whole mapping. */
+function referenceHash(value: unknown): string {
+  const text = (v: unknown): string => {
+    if (v === null || typeof v === 'number' || typeof v === 'boolean') return String(v);
+    if (typeof v === 'string') return JSON.stringify(v);
+    if (Array.isArray(v)) {
+      // By index, not `map`: a hole reads as `null`, as it always has.
+      let out = '[';
+      for (let i = 0; i < v.length; i++) out += (i > 0 ? ',' : '') + text(v[i]);
+      return out + ']';
+    }
+    if (typeof v === 'object') {
+      const obj = v as Record<string, unknown>;
+      const keys = Object.keys(obj)
+        .filter((k) => obj[k] !== undefined)
+        .sort();
+      return '{' + keys.map((k) => JSON.stringify(k) + ':' + text(obj[k])).join(',') + '}';
+    }
+    return 'null';
+  };
+  const input = text(value);
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+}
+
+/** A seeded random JSON tree: nested objects and arrays of every primitive kind. */
+function randomTree(seed: number, depth = 4): unknown {
+  let x = seed >>> 0 || 1;
+  const rnd = (): number => {
+    x ^= x << 13;
+    x ^= x >>> 17;
+    x ^= x << 5;
+    return (x >>> 0) / 4294967296;
+  };
+  const leaf = (): unknown => {
+    const pick = Math.floor(rnd() * 8);
+    if (pick === 0) return null;
+    if (pick === 1) return rnd() < 0.5;
+    if (pick === 2) return Math.floor(rnd() * 2000) - 1000;
+    if (pick === 3) return rnd() * 1e6 - 5e5;
+    if (pick === 4) return undefined;
+    if (pick === 5) return 'id-' + Math.floor(rnd() * 99);
+    if (pick === 6) return 'кириллица "кавычки" \\ \n\u0001 ☄';
+    return '';
+  };
+  const node = (d: number): unknown => {
+    if (d === 0 || rnd() < 0.25) return leaf();
+    const n = Math.floor(rnd() * 6);
+    if (rnd() < 0.4) return Array.from({ length: n }, () => node(d - 1));
+    const obj: Record<string, unknown> = {};
+    for (let i = 0; i < n; i++) obj['k' + Math.floor(rnd() * 20) + (rnd() < 0.2 ? '"\\' : '')] = node(d - 1);
+    return obj;
+  };
+  return node(depth);
+}
+
+describe('hashJson — streamed, never building the text', () => {
+  it('matches the text-then-hash reference on states and random trees', () => {
+    expect(hashState(fixtureState())).toBe(referenceHash(fixtureState()));
+    for (let seed = 1; seed <= 300; seed++) {
+      const tree = randomTree(seed);
+      expect(hashJson(tree)).toBe(referenceHash(tree));
+    }
+  });
+
+  it('matches the reference on the edge values of String() and JSON.stringify()', () => {
+    const sparse: unknown[] = [1];
+    sparse[3] = 2;
+    const edges: unknown[] = [
+      -0,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      1e21,
+      5e-7,
+      [],
+      {},
+      [[], [{}], { a: [] }],
+      [undefined, () => 1, null],
+      { a: undefined, b: null, c: () => 1 },
+      sparse,
+      { '': 1, 'a"b': 2, 'б': 3, 'B': 4, '\u2028': 5 },
+      'plain',
+      '\ud83d\ude80 \ud800',
+    ];
+    for (const value of edges) expect(hashJson(value)).toBe(referenceHash(value));
+    expect(hashJson(edges)).toBe(referenceHash(edges));
+  });
+
+  it('gives the same digest in slices of any size, and null until it is done', () => {
+    const state = fixtureState();
+    const whole = hashState(state);
+    for (const budget of [1, 2, 7, 64]) {
+      const job = hashStateJob(state);
+      let slices = 0;
+      let digest: string | null = null;
+      while (digest === null) {
+        digest = job.step(budget);
+        slices++;
+      }
+      expect(digest).toBe(whole);
+      expect(job.step(budget)).toBe(whole); // a finished job keeps its answer
+      if (budget === 1) expect(slices).toBeGreaterThan(20);
+    }
+    for (let seed = 1; seed <= 50; seed++) {
+      const tree = randomTree(seed, 5);
+      const job = hashJsonJob(tree);
+      let digest: string | null = null;
+      while (digest === null) digest = job.step(3);
+      expect(digest).toBe(hashJson(tree));
+    }
+  });
+
+  it('a primitive root is done on the first step', () => {
+    expect(hashJsonJob('x').step(1)).toBe(hashJson('x'));
+    expect(hashJsonJob(42).step(0)).toBe(referenceHash(42));
   });
 });

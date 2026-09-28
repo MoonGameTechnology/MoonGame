@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { WAIT_MARK, desyncVerdict, radarContacts, waitingBanner } from './snapshotIngest';
+import { describe, expect, it } from 'vitest';
+import { WAIT_MARK, radarContacts, waitingBanner } from './snapshotIngest';
 
 describe('радар-контакты', () => {
   it('КОНТАКТЫ ЖИВУТ ОДИН СНИМОК: нет списка — он пуст, а не «прежний»', () => {
@@ -13,22 +13,6 @@ describe('радар-контакты', () => {
 
   it('пустой список от сервера — это «контактов нет», а не «нечего обновлять»', () => {
     expect(radarContacts([])).toEqual([]);
-  });
-});
-
-describe('проверка расхождения с сервером', () => {
-  it('НЕТ ХЕША — НЕТ ВЕРДИКТА, и свой считать незачем', () => {
-    const наш = vi.fn(() => 'h1');
-    expect(desyncVerdict(undefined, наш)).toBeNull();
-    expect(наш).not.toHaveBeenCalled();
-  });
-
-  it('хеши сошлись — расхождения нет', () => {
-    expect(desyncVerdict('h1', () => 'h1')).toBe(false);
-  });
-
-  it('хеши разошлись — это десинк', () => {
-    expect(desyncVerdict('h1', () => 'h2')).toBe(true);
   });
 });
 
