@@ -22,6 +22,7 @@ export const RECAP_POLICY: Readonly<Record<string, RecapPolicy>> = {
   'building.constructed': 'own',
   'building.upgraded': 'own',
   'unit.built': 'own',
+  'army.load.cancelled': 'own',
   'building.destroyed': 'seen',
   'fleet.launched': 'seen',
 };

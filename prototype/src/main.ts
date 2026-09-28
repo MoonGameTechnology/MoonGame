@@ -3994,6 +3994,18 @@ function handleEvents(events: DomainEvent[]) {
         if (!admits('unit.built', p)) break;
         note(`🛠️ ${p.count}× ${displayUnit(p.unit as string)} · ${placeName(p.planetId as string)}`);
         break;
+      case 'army.load.cancelled':
+        // AUDM-4: вылет снял идущую погрузку. Своё — чужая погрузка это разведданные.
+        if (!admits('army.load.cancelled', p)) break;
+        note(
+          t('log.army.load-cancelled', {
+            n: String(p.count),
+            u: displayUnit(p.unit as string),
+            at: placeName(p.planetId as string),
+          }),
+          p.planetId as string,
+        );
+        break;
       case 'fleet.launched':
         // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
         // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).

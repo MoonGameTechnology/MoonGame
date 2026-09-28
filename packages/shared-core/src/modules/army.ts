@@ -209,12 +209,25 @@ export const armyModule: GameModule = {
 
     /** Ушёл — значит отменил (правило 5 клиентской копии, теперь правило мира).
      *  Снимается СРАЗУ, а не по сроку: иначе бронь держала бы чужой гарнизон ещё час
-     *  после того, как носитель за ним уже не придёт. */
+     *  после того, как носитель за ним уже не придёт.
+     *
+     *  AUDM-4: отмена больше не молчит — на каждую снятую заявку `army.load.cancelled`.
+     *  Без него игрок узнавал о ней, только когда флот прилетал к цели пустым. */
     api.on('fleet.departed', (event, h) => {
       const p = event.payload as { fleetId?: string };
       if (typeof p?.fleetId !== 'string') return;
       const fleet = h.state.fleets[p.fleetId];
-      if (fleet?.loading?.length) delete fleet.loading;
+      if (!fleet?.loading?.length) return;
+      for (const claim of fleet.loading) {
+        h.emit('army.load.cancelled', {
+          fleetId: fleet.id,
+          planetId: claim.from,
+          unit: claim.unit,
+          count: claim.count,
+          owner: fleet.owner,
+        });
+      }
+      delete fleet.loading;
     });
 
     api.onAction('army.unload', (action, h) => {

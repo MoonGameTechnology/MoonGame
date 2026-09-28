@@ -620,6 +620,11 @@ function baseAiOrders(
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
   const expandFleets: Fleet[] = defensive ? [] : Object.values(state.fleets);
+  // Ничьи планеты держит ополчение (`NEUTRAL_PLANET_MILITIA`), и брать их надо десантом
+  // даже в мирное время. Пока такая планета есть, флот грузится дома и без войны.
+  const neutralGuarded = Object.values(state.planets).some(
+    (p) => p.owner === null && capturable(p) && p.garrison.some((st) => st.count > 0),
+  );
   // Отстаю ли я по очкам провинций от кого-то из живых соперников (охота отстающего,
   // см. `huntWeight`). Тот же счёт ниже решает объявление войны.
   const provinceTotal = (who: string): number =>
@@ -785,14 +790,16 @@ function baseAiOrders(
       //     войска, которые месяцами катаются в трюме и пропадают ВМЕСТЕ с флотом:
       //     гибель корпусов стирает `fleet.landing` целиком (`combat.ts`, удаление
       //     флота), отдельного броска у десанта нет. В мирное время брать нечего —
-      //     пустой мир занимается прилётом, и войска ему не нужны.
+      //     пустой мир занимается прилётом, и войска ему не нужны. Исключение — ничья
+      //     планета под ополчением (BAL-10, `NEUTRAL_PLANET_MILITIA`): её тоже берут
+      //     штурмом, поэтому, пока такие есть, флот грузится и без войны.
       //
       //     СКОЛЬКО БРАТЬ, решает `spareGround` (правило №6: досуха не вычёрпывать,
       //     пол растёт с развитостью мира). Отдаёт он УДАРНЫЕ рода, оставляя дома
       //     оборонительные, — танк полезнее на чужой земле, ополченец на своей.
       //     ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), а вылет его ОТМЕНЯЕТ: флот, который
       //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
-      if (here0 && here0.id === base.id && warFooting) {
+      if (here0 && here0.id === base.id && (warFooting || neutralGuarded)) {
         if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
         let free = liftFree(f);
         let ordered = false;
@@ -973,6 +980,14 @@ function baseAiOrders(
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
+      // Ничью планету с гарнизоном, которую этот десант наверняка не возьмёт, не
+      // выбирают, иначе флот повиснет на её орбите до конца матча.
+      if (
+        p.owner === null &&
+        p.garrison.some((st) => st.count > 0) &&
+        !confidentGroundWin(f.landing ?? [], p.garrison, data)
+      )
+        continue;
       // Равные цели (в пределах пикселя) разводятся шумом, а не порядком перебора.
       const dd = d(here.position, p.position) / weight(p) + tieBreak(p);
       if (dd < bestD) {
@@ -1053,6 +1068,9 @@ function baseAiOrders(
         if (closer || !confidentGroundWin(f.landing ?? [], best.garrison, data)) best = needy;
       }
     }
+    // Взять нечего тем, что в трюме, — домой, за десантом.
+    if (!best && neutralGuarded && base && f.location !== base.id && profile === 'strong')
+      best = base;
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
   // War when the race is being LOST (self-play M4 finding): a passive bot loses the

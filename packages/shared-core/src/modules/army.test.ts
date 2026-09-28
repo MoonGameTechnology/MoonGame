@@ -209,14 +209,33 @@ describe('army module — loading ground army onto fleets', () => {
     const ordered = okApply(kernel.applyAction(st, load('F', 'militia', 3), ctx)).state;
     expect(errCode(kernel.applyAction(ordered, load('G', 'militia', 2), ctx))).toBe('E_NO_ARMY');
 
-    const flew = okApply(kernel.applyAction(ordered, move('F', 'B'), ctx)).state;
+    const flight = okApply(kernel.applyAction(ordered, move('F', 'B'), ctx));
+    const flew = flight.state;
     expect(flew.fleets.F?.loading).toBeUndefined(); // заявка снята сразу
+    // AUDM-4: и снята не молча — игроку есть о чём сказать.
+    expect(flight.events.filter((e) => e.type === 'army.load.cancelled').map((e) => e.payload)).toEqual([
+      { fleetId: 'F', planetId: 'A', unit: 'militia', count: 3, owner: 'p1' },
+    ]);
     expect(flew.planets.A?.garrison).toEqual([{ unit: 'militia', count: 4 }]); // ничего не пропало
     okApply(kernel.applyAction(flew, load('G', 'militia', 4), ctx)); // бронь отпустила гарнизон
 
     // И час спустя улетевший ничего не «догружает».
     const later = advanced(kernel, flew, HOUR);
     expect(later.fleets.F?.landing ?? []).toEqual([]);
+  });
+
+  it('вылет без идущей погрузки ничего не отменяет (AUDM-4)', () => {
+    const kernel = createKernel([movementModule, armyModule]);
+    const st = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1', [['militia', 4]]), planet('B', 'p1')],
+      fleets: [fleet('F', 'p1', 'A', [['dropship', 1]])],
+    });
+    st.planets.B!.position = { x: 10, y: 0 };
+    st.planets.A!.links = ['B'];
+    st.planets.B!.links = ['A'];
+    const r = okApply(kernel.applyAction(st, move('F', 'B'), ctx));
+    expect(r.events.map((e) => e.type)).not.toContain('army.load.cancelled');
   });
 
   it('rejects loading beyond the fleet transport capacity', () => {

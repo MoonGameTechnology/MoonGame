@@ -152,7 +152,11 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
     // Войска в трюме гибнут ВМЕСТЕ с флотом: `combat.ts` удаляет погибший флот целиком,
     // и `landing` уходит с ним без отдельного броска. Возить их «на всякий случай»
     // значит держать ресурсы под списание.
-    const s = game2(); // мир, войны нет
+    const s0 = game2(); // мир, войны нет
+    // Ничьи планеты уже заняты — брать десантом нечего.
+    const planets = { ...s0.planets };
+    for (const p of Object.values(planets)) if (p.owner === null) planets[p.id] = { ...p, garrison: [] };
+    const s = { ...s0, planets };
     const home = homeOf(s, 'p2');
     const staged = withPlanet(s, home, { garrison: [{ unit: 'militia', count: 9 }] });
     const withFleet: GameState = {
@@ -160,6 +164,18 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
       fleets: { 'f:test': fleetAt('f:test', home, [{ unit: 'cruiser', count: 1 }]) },
     };
     expect(loads(aiOrders(withFleet, 'p2', 'expand', 'strong'))).toHaveLength(0);
+  });
+
+  it('в мирное время грузит, пока ничьи планеты держит ополчение (BAL-10)', () => {
+    // Ничья планета с гарнизоном — тоже цель атаки: прилётом её не взять.
+    const s = game2();
+    const home = homeOf(s, 'p2');
+    const staged = withPlanet(s, home, { garrison: [{ unit: 'militia', count: 9 }] });
+    const withFleet: GameState = {
+      ...staged,
+      fleets: { 'f:test': fleetAt('f:test', home, [{ unit: 'cruiser', count: 1 }]) },
+    };
+    expect(loads(aiOrders(withFleet, 'p2', 'expand', 'strong')).length).toBeGreaterThan(0);
   });
 
   it('трюм не переполняется: маленький корпус увозит ровно свою вместимость', () => {

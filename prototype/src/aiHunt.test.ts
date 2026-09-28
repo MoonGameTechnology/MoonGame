@@ -3,6 +3,7 @@
 // идёт к ближайшему, как раньше. Замер и довод — у `huntWeight` в `ai.ts`.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
+import { NEUTRAL_PLANET_MILITIA } from './matchSetup';
 import { data } from './gameData';
 import { huntWeight } from './ai';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
@@ -164,5 +165,53 @@ describe('ударный резерв', () => {
       { unit: 'tank', count: 6 },
     ]);
     expect(groundOrders(s, home)).toBe(0);
+  });
+});
+
+// Гарнизон ничьих планет (BAL-10): на старте ничью ПЛАНЕТУ держат два ополченца,
+// прочие провинции открыты. Бот с пустым трюмом такую планету не выбирает, а идёт
+// домой за десантом.
+describe('гарнизон ничьих планет', () => {
+  const s = newGame({
+    seats: [
+      { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: true },
+      { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[5]!, ai: true },
+    ],
+  });
+  const neutral = Object.values(s.planets).filter((p) => p.owner === null && capturable(p));
+
+  it('ничьи планеты под ополчением, прочие провинции пусты', () => {
+    const planets = neutral.filter((p) => p.kind === 'planet');
+    const lesser = neutral.filter((p) => p.kind !== 'planet');
+    expect(planets.length).toBeGreaterThan(0);
+    expect(lesser.length).toBeGreaterThan(0);
+    for (const p of planets)
+      expect(p.garrison).toEqual([{ unit: 'militia', count: NEUTRAL_PLANET_MILITIA }]);
+    for (const p of lesser) expect(p.garrison).toEqual([]);
+  });
+
+  it('пустой трюм не летит к ничьей планете под ополчением, а возвращается домой', () => {
+    const home = START_CANDIDATES[5]!;
+    // Всё, кроме ничьих планет, уже у p2: открытых целей нет.
+    const planets: GameState['planets'] = {};
+    for (const p of Object.values(s.planets))
+      planets[p.id] = p.owner === null && p.kind !== 'planet' && capturable(p) ? { ...p, owner: 'p2' } : p;
+    const away = Object.values(planets).find((p) => p.owner === 'p2' && p.id !== home)!;
+    const fleet: Fleet = {
+      id: 'f:away',
+      owner: 'p2',
+      location: away.id,
+      units: [{ unit: 'cruiser', count: 2 }],
+      landing: [],
+      traits: [],
+      movement: null,
+      orbit: 'near',
+    };
+    const st: GameState = { ...s, planets, fleets: { [fleet.id]: fleet } };
+    const to = aiOrders(st, 'p2', 'expand', 'strong')
+      .filter((a) => a.type === 'fleet.move')
+      .map((a) => a.payload as { fleetId: string; to: string })
+      .find((m) => m.fleetId === 'f:away')?.to;
+    expect(to).toBe(home);
   });
 });

@@ -22,14 +22,19 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 
 const SEEDS = ['sp-0', 'sp-1', 'sp-2', 'sp-3', 'alt-0', 'alt-1', 'alt-2', 'alt-3'];
 
+/** Карта без ополчения на ничьих планетах (`NEUTRAL_PLANET_MILITIA`): пустой трюм
+ *  такие планеты законно пропускает, а здесь проверяется шум выбора, не десант. */
 function game(seed: string): GameState {
-  return newGame({
+  const s = newGame({
     seed,
     seats: [
       { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: true },
       { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
     ],
   });
+  const planets = { ...s.planets };
+  for (const p of Object.values(planets)) if (p.owner === null) planets[p.id] = { ...p, garrison: [] };
+  return { ...s, planets };
 }
 
 /**
