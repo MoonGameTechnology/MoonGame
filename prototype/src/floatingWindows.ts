@@ -93,6 +93,8 @@ interface WindowEntry {
   visible: boolean;
   dirty: boolean;
   userPlaced?: boolean;
+  /** Окно сменило раскладку (`refit`): на следующем `sync` его возвращают в экран. */
+  refit?: boolean;
 }
 
 export function initFloatingWindows() {
@@ -248,6 +250,15 @@ export function initFloatingWindows() {
       topInset = px;
       for (const entry of entries) if (entry.visible) apply(entry);
     },
+    /** The window switched layout (not information): an added column widens it, and the
+     *  next `sync` keeps it on screen. Clamping moves it only by what no longer fits, so
+     *  a window that still fits stays exactly where it was — the player's placement too. */
+    refit(id: string): void {
+      const entry = entries.find((item) => item.id === id);
+      if (!entry) return;
+      entry.refit = true;
+      entry.dirty = true;
+    },
     /** A newly selected object suggests an opening position; a user's placement wins. */
     openAt(id: string, point: HoloPoint): void {
       const entry = entries.find((item) => item.id === id);
@@ -291,14 +302,16 @@ export function initFloatingWindows() {
           const r = node.getBoundingClientRect();
           entry.size = { width: r.width, height: r.height };
           // Growing/shrinking information must never drag a window after the fleet.
-          // Only a user gesture or viewport resize clamps the remembered position.
-          if (resized || !entry.visible || !entry.point) apply(entry);
+          // Only a user gesture, viewport resize or a new layout (`refit`) clamps the
+          // remembered position.
+          if (resized || !entry.visible || !entry.point || entry.refit) apply(entry);
           else {
             node.style.setProperty('left', `${Math.round(entry.point.x)}px`, 'important');
             node.style.setProperty('top', `${Math.round(entry.point.y)}px`, 'important');
             node.style.setProperty('--holo-window-room', `${Math.max(80, height - entry.point.y - 12)}px`);
           }
           entry.dirty = false;
+          entry.refit = false;
         }
         for (const header of node.querySelectorAll<HTMLElement>(entry.handles)) {
           header.classList.add('holo-drag-handle');
