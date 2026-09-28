@@ -236,6 +236,32 @@ const SPLIT_MIN = 6;
 const SPLIT_FLEET_CAP = 6;
 
 /**
+ * ОХОТА ОТСТАЮЩЕГО (снежный ком, 2026-09-28) — сколько «весит» цель, когда её выбирает
+ * флот места, которое ОТСТАЁТ по очкам на войне. Курс берётся по «расстояние ÷ вес», а
+ * не просто к ближайшему.
+ *
+ * Зачем. Во второй половине матча территория у бота ходит по кругу: миры без гарнизона
+ * лидер и отстающий отбирают друг у друга ПОРОВНУ (замер: ~31 мир за матч каждый), и
+ * отставание не сокращается никогда. Отстающий, который идёт к ближайшему, меняет свою
+ * 10-очковую туманность на чужую такую же. Отстающий, который идёт к ценному, отбирает
+ * планеты (50 очков) — и ком тает: snowball 79/73% → 60/64%, разрыв ~420 → ~280.
+ *
+ * Почему только отстающий. То же правило у ОБОИХ дало 68/69% при растущем разрыве:
+ * лидер тоже начинает охотиться, и его большее хозяйство опять решает. Асимметрия — не
+ * поблажка, а доктрина: кто впереди, держит; кто позади, бьёт туда, где больнее.
+ *
+ * Вес = очки провинции / 10 в коридоре [1, 5] (планета 5, прочее 1). Мир с гарнизоном,
+ * который этим десантом наверняка не взять, весит в пять раз меньше: лететь к нему —
+ * значит встать на орбите и ждать.
+ */
+export function huntWeight(target: Planet, landing: readonly UnitStack[]): number {
+  let w = Math.min(5, Math.max(1, provinceScore(data, target) / 10));
+  const guarded = target.garrison.some((st) => st.count > 0);
+  if (guarded && !confidentGroundWin(landing, target.garrison, data)) w /= 5;
+  return w;
+}
+
+/**
  * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1), только для тест-профиля.
  *
  * Зачем. Прогоны баланса не давали статистики: семьи сидов `base` и `alt` совпадали до
@@ -554,6 +580,18 @@ function baseAiOrders(
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
   const expandFleets: Fleet[] = defensive ? [] : Object.values(state.fleets);
+  // Отстаю ли я по очкам провинций от кого-то из живых соперников (охота отстающего,
+  // см. `huntWeight`). Тот же счёт ниже решает объявление войны.
+  const provinceTotal = (who: string): number =>
+    Object.values(state.planets).reduce(
+      (s, p) => (p.owner === who ? s + provinceScore(data, p) : s),
+      0,
+    );
+  const myProvinces = provinceTotal(ai);
+  const trailing = Object.keys(state.players).some(
+    (pid) =>
+      pid !== ai && state.players[pid]?.status === 'active' && provinceTotal(pid) > myProvinces,
+  );
   // Сколько флотов у места СЕЙЧАС — потолок и на постройку кораблей, и на деление кулака
   // (AI-BAL-7). Считается один раз: `state` внутри `aiOrders` не меняется (чистый builder).
   const ownFleets = Object.values(state.fleets).filter((fl) => fl.owner === ai).length;
@@ -887,11 +925,13 @@ function baseAiOrders(
     // среди равных целей выбор идёт по шуму, а не по раскладке объекта.
     const tieBreak = (p: Planet): number =>
       profile === 'strong' ? decisionNoise(state, ai, `tie:${f.id}:${p.id}`) : 0;
+    const hunting = profile === 'strong' && warFooting && trailing;
+    const weight = (p: Planet): number => (hunting ? huntWeight(p, f.landing ?? []) : 1);
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
       // Равные цели (в пределах пикселя) разводятся шумом, а не порядком перебора.
-      const dd = d(here.position, p.position) + tieBreak(p);
+      const dd = d(here.position, p.position) / weight(p) + tieBreak(p);
       if (dd < bestD) {
         secondD = bestD;
         second = best;
@@ -982,12 +1022,8 @@ function baseAiOrders(
   // Declared only from a clean 'peace' stance: pacts/alliances are never betrayed,
   // and favour-driven war (botDiplomacyModule) keeps working on top unchanged.
   if (!defensive) {
-    const scoreOf = (who: string): number =>
-      Object.values(state.planets).reduce(
-        (s, p) => (p.owner === who ? s + provinceScore(data, p) : s),
-        0,
-      );
-    const mine = scoreOf(ai);
+    const scoreOf = provinceTotal;
+    const mine = myProvinces;
     let leader: string | null = null;
     let leaderScore = -1;
     for (const pid of Object.keys(state.players)) {
