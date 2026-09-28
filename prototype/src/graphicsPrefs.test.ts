@@ -122,9 +122,9 @@ describe('CSS: ни одно окно не забыто в списке ПК-з�
 
 describe('графика — непрозрачность окон', () => {
   it('от самого прозрачного стекла до сплошного фона, края зажаты', () => {
-    expect(windowAlpha(0)).toBe(0.3);
+    expect(windowAlpha(0)).toBe(0.1);
     expect(windowAlpha(100)).toBe(1);
-    expect(windowAlpha(-20)).toBe(0.3);
+    expect(windowAlpha(-20)).toBe(0.1);
     expect(windowAlpha(250)).toBe(1);
     expect(windowAlpha(Number.NaN)).toBe(windowAlpha(WINDOW_OPACITY_DEFAULT));
   });

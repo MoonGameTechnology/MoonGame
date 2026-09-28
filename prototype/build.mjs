@@ -1577,24 +1577,20 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-dbtn.danger{background:transparent;border:1px solid #ff5a4d;color:#ff5a4d;}
 #herobody .hx-dbtn:disabled{opacity:.4;cursor:not-allowed;}
 /* Steward («Хранитель») delegate panel */
-/* Окно боя «для взрослых детей» (заказ владельца 2026-09-23): шапка «где и когда
-   следующий залп», полоса остатка сил цветами владельцев, карточки сторон со шкалами
-   корпуса/щита светофором и чипами кораблей, свои флоты — с кнопкой отхода. */
+/* Окно боя «для взрослых детей» (заказ владельца 2026-09-23): где бой и в какой он фазе
+   (в шапке окна: отдельная карточка под это съедала высоту, 2026-09-28), полоса остатка
+   сил цветами владельцев, карточки сторон со шкалами корпуса/щита светофором и чипами
+   кораблей, свои флоты — с кнопкой отхода. */
+#battlewin .lw-head{gap:10px;}
+#battlewin .bw-hd{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;}
+#battlewin .bw-hd b{overflow-wrap:anywhere;}
+#battlewin .bw-phase{font-size:11px;color:var(--dim);letter-spacing:.04em;text-transform:uppercase;}
+#battlewin .bw-phase.ground{color:#ffb44d;}
 #battlewinbody .bw-ended{margin-bottom:10px;padding:10px 12px;border:1px solid #ffd27a88;border-radius:8px;background:rgba(255,210,122,.08);}
 #battlewinbody .bw-ended b{display:block;color:#ffd27a;font-size:14px;}
 #battlewinbody .bw-ended p{margin:4px 0 0;font-size:12px;color:var(--txt,#e8f6fa);}
-#battlewinbody .bw-top{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;border:1px solid var(--line-hi);
-  border-radius:10px;background:linear-gradient(120deg,rgba(255,90,77,.14),rgba(53,214,230,.08));}
-#battlewinbody .bw-top.ground{background:linear-gradient(120deg,rgba(255,180,77,.16),rgba(53,214,230,.06));}
-#battlewinbody .bw-ico{font-size:26px;line-height:1;filter:drop-shadow(0 0 6px rgba(255,120,90,.5));}
-#battlewinbody .bw-title{flex:1;min-width:0;}
-#battlewinbody .bw-title b{display:block;font-size:15px;color:var(--txt,#e8f6fa);overflow-wrap:anywhere;}
-#battlewinbody .bw-head{margin:2px 0 0;font-size:11px;color:var(--cyan);letter-spacing:.04em;text-transform:uppercase;}
-#battlewinbody .bw-next{display:flex;flex-direction:column;align-items:flex-end;flex:0 0 auto;text-align:right;}
-#battlewinbody .bw-next span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;}
-#battlewinbody .bw-next b{font:700 18px ui-monospace,monospace;color:#ffb44d;text-shadow:0 0 8px rgba(255,180,77,.45);}
 #battlewinbody .bw-sub{margin:0 0 6px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;}
-#battlewinbody .bw-balance{margin-bottom:12px;}
+#battlewinbody .bw-balance{margin-bottom:10px;}
 #battlewinbody .bw-bal{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;background:rgba(255,255,255,.05);}
 #battlewinbody .bw-bal i{display:block;min-width:3px;transition:flex .6s ease;}
 #battlewinbody .bw-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:12px;color:var(--dim);}
@@ -1631,25 +1627,23 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #battlewinbody .bw-ret div span{font-size:11px;color:var(--dim);}
 #battlewinbody .bw-ret button{flex:0 0 auto;min-height:36px;}
 #battlewinbody .hint{font-size:11px;color:var(--dim);line-height:1.45;margin:4px 0 0;}
-#battlewinbody .bw-rule{font-size:11px;color:var(--dim);line-height:1.45;margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line);}
-@media (max-width:520px){#battlewinbody .bw-top{flex-wrap:wrap;}
-  #battlewinbody .bw-next{flex-basis:100%;flex-direction:row;justify-content:space-between;align-items:baseline;padding-top:6px;border-top:1px solid var(--line);}}
+#battlewinbody .bw-rule{font-size:11px;color:var(--dim);line-height:1.45;margin:8px 0 0;padding-top:6px;border-top:1px solid var(--line);}
 #battlewinbody .bw-empty{font-size:12px;color:var(--dim);}
 /* Horizontal command window: ownership is independent from combat stance. */
 #battlewin .twbox{width:min(1220px,96vw);max-height:92dvh;}
-#battlewinbody{padding:16px 20px;}
-#battlewinbody .bw-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start;}
+#battlewinbody{padding:12px 16px;}
+#battlewinbody .bw-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;}
 #battlewinbody .bw-column{min-width:0;}
-#battlewinbody .bw-column h3{display:flex;justify-content:space-between;margin:0 0 10px;padding-bottom:9px;border-bottom:1px solid var(--line-hi);font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
+#battlewinbody .bw-column h3{display:flex;justify-content:space-between;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid var(--line-hi);font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
 #battlewinbody .bw-column h3 span{color:var(--dim);}
-#battlewinbody .bw-side{margin-bottom:12px;padding:12px;border-left-color:var(--own);border-radius:7px;background:#0c1a24;}
+#battlewinbody .bw-side{margin-bottom:10px;padding:10px 12px;border-left-color:var(--own);border-radius:7px;background:#0c1a24;}
 #battlewinbody .bw-side.mine{border-color:var(--line-hi);border-left-color:var(--own);background:color-mix(in srgb,var(--own) 10%,#0c1a24);}
 #battlewinbody .bw-who{gap:8px;align-items:center;}
 #battlewinbody .bw-who>div{flex:1;min-width:0;}
 #battlewinbody .bw-who b{display:block;color:var(--own);overflow-wrap:anywhere;font-size:14px;}
 #battlewinbody .bw-who small{display:block;font-size:10px;color:var(--dim);margin-top:3px;}
 #battlewinbody .bw-you{background:transparent;border:1px solid var(--own);color:var(--own);white-space:nowrap;}
-#battlewinbody .bw-damage{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;}
+#battlewinbody .bw-damage{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;}
 #battlewinbody .bw-damage>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
 #battlewinbody .bw-damage span{font-size:10px;color:var(--dim);}
 #battlewinbody .bw-damage b{font:700 17px ui-monospace,monospace;color:var(--txt,#e8f6fa);white-space:nowrap;}
@@ -1667,7 +1661,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #battlewinbody .bw-actions button,#battlewinbody .bw-orders button{min-height:38px;padding:8px 15px;font-size:12px;border:1px solid var(--line-hi);border-radius:4px;cursor:pointer;}
 #battlewinbody button.bw-attack{border-color:#ba7040;background:#47291b;color:#ffd09a;}
 #battlewinbody button:disabled{opacity:.4;cursor:default;}
-#battlewinbody .bw-orders{position:sticky;bottom:-16px;display:flex;justify-content:center;gap:12px;padding:12px;background:#09141ff5;border-top:1px solid var(--line-hi);z-index:1;}
+#battlewinbody .bw-orders{position:sticky;bottom:-12px;display:flex;justify-content:center;gap:12px;padding:10px;background:#09141ff5;border-top:1px solid var(--line-hi);z-index:1;}
 #battlewinbody .bw-effects{padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
 #battlewinbody .bw-effects ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;}
 #battlewinbody .bw-effects li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:11px;}
@@ -3628,7 +3622,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
 <div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
 <!-- окно боя: открывается тапом по значку боя на карте (battleScreen.ts) -->
-<div id="battlewin"><div class="twbox"><div class="lw-head"><b data-i18n="battle.win.head"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
+<div id="battlewin"><div class="twbox"><div class="lw-head"><div id="battlewinhead" class="bw-hd"><b data-i18n="battle.win.head"></b></div><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>

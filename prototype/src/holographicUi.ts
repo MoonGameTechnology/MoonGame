@@ -155,6 +155,14 @@ export function initHolographicUi(host: HolographicHost) {
         selection.classList.toggle('details-open', host.side.classList.contains('details-open'));
         selection.classList.toggle('has-commands', commands);
         selection.classList.toggle('fleet-console', fleetConsole);
+        // Пустой трюм колонку «Десант» не рисует (`decisions/landColumn.ts`) — сетка
+        // окна сужается на её ширину, а не держит пустое место. Колонка может появиться
+        // при открытом окне (погрузка пошла), и окно у правого края ушло бы за экран.
+        const noLand = fleetConsole && !host.side.querySelector('.fc-land');
+        if (selection.classList.contains('no-land') !== noLand) {
+          selection.classList.toggle('no-land', noLand);
+          windows.refit('holo-selection-window');
+        }
         selection.style.display = inGame && (info || commands) ? (fleetConsole ? 'grid' : 'flex') : 'none';
         // The command header replaces the former dossier header; keep its live
         // orbit, damage and supply notes while removing the duplicate title.

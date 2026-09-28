@@ -146,6 +146,7 @@ import {
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
 import { fleetAloftPlaces, fleetHolds } from '../../decisions/fleetHolds';
+import { landColumnShown } from '../../decisions/landColumn';
 import {
   fleetStatMods,
   fleetStatQueries,
@@ -277,6 +278,7 @@ import {
   transferOffer,
   transferPick,
   type HangarView,
+  type TransferOffer,
 } from './hangarPanel';
 // SHU-4.3 — эскадра глазами игрока: карточка соединения, делёж, слияние, десант.
 import {
@@ -6985,14 +6987,7 @@ function fleetHangarHtml(f: Fleet, compact: boolean): string {
     compact && idle
       ? `<div class="row dim fc-hangar">${esc(t('side.wing.empty'))}</div>`
       : hangarSectionHtml(hold, f.id, true);
-  // Перегрузка предлагается, только когда пройдёт: носитель стоит у СВОЕГО мира и
-  // место есть с обеих сторон (правило 4 в `hangarPanel.ts`). Иначе кнопок нет —
-  // не серых, а нет: серая обещала бы действие, которого в этом месте не бывает.
-  const at = f.location ? s.planets[f.location] : undefined;
-  const offer = transferOffer(at ? planetHangar(at, data) : null, hold, {
-    docked: !!at && !f.movement && at.owner === ME,
-    mine: f.owner === ME,
-  });
+  const offer = fleetWingOffer(f, hold);
   if (offer.load || offer.unload) {
     h +=
       `<div class="row">` +
@@ -7001,6 +6996,34 @@ function fleetHangarHtml(f: Fleet, compact: boolean): string {
       `</div>`;
   }
   return h;
+}
+
+/** Перегрузка челноков между носителем и портом под ним. Предлагается, только когда
+ *  пройдёт: носитель стоит у СВОЕГО мира и место есть с обеих сторон (правило 4 в
+ *  `hangarPanel.ts`). Иначе кнопок нет — не серых, а нет: серая обещала бы действие,
+ *  которого в этом месте не бывает. */
+function fleetWingOffer(f: Fleet, hold: HangarView | null): TransferOffer {
+  const at = f.location ? s.planets[f.location] : undefined;
+  return transferOffer(at ? planetHangar(at, data) : null, hold, {
+    docked: !!at && !f.movement && at.owner === ME,
+    mine: f.owner === ME,
+  });
+}
+
+/** Рисовать ли колонку «Десант» окна флота (`decisions/landColumn.ts`). Спрашивают оба
+ *  хозяина окна: лист рисует колонку, а ряд команд по тому же ответу ставит ⇅ к себе. */
+function fleetLandShown(f: Fleet): boolean {
+  const here = planet(f.location);
+  const hold = f.owner === ME ? fleetHangar(f, data, s) : null;
+  const wing = hasHangar(hold) ? fleetWingOffer(f, hold) : null;
+  return landColumnShown({
+    holds: fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)),
+    strike:
+      !!here &&
+      fleetDocked(true, !!f.movement, !!f.battleId) &&
+      strikeOffered(here.owner, f.owner, sectorTypeOf(here.id)?.capturable ?? false),
+    wingTransfer: !!wing && (wing.load || wing.unload),
+  });
 }
 
 /** Имя героя-проекции на борту — его аура даёт флоту +5% атаки и обороны. */
@@ -7357,7 +7380,8 @@ function fleetConsoleHtml(f: Fleet): string {
       ? `<button type="button" class="fc-load${troopsPlan?.fleetId === f.id ? ' on' : ''}" data-cmd="troops" title="${esc(t('cmd.troops.hint'))}">${holoIcon('arrows-down-up')}<span>${esc(t('fleet.console.load'))}</span></button>`
       : '');
   if (here && docked) land += fleetStrikeHtml(f, here, inOrbit, nShips);
-  if (land) body += `<section class="fc-land">${land}</section>`;
+  // Пустой трюм колонку не рисует (`fleetLandShown`): ⇅ тогда стоит в «Приказах».
+  if (land && fleetLandShown(f)) body += `<section class="fc-land">${land}</section>`;
 
   // Низ окна: герой на борту и его вклад (слева); «Подробнее о флоте» ставит ряд команд.
   // Вклад — строка героя из разбора ядра: база ауры и пассивки рядом с ним одним числом.
@@ -9063,8 +9087,10 @@ function renderCmdBar() {
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
   // Окно флота консолью (ПК, один свой флот): ⇅ переезжает в колонку «Десант» листа
-  // кнопкой «Погрузка и выгрузка», и его меню встаёт поверх той же колонки.
+  // кнопкой «Погрузка и выгрузка», и его меню встаёт поверх той же колонки. Пустой трюм
+  // колонку не рисует — тогда ⇅ остаётся в ряду, а меню встаёт поверх «Состава».
   const consoleOn = !!lone && consoleFleet() === lone;
+  const landShown = consoleOn && fleetLandShown(lone);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
   // (the map-tap targeting reuses the same heroAim flow as the hero window).
   // Флагман группы и его кастуемые способности — правила в `heroCasts.ts` (REFM-68).
@@ -9104,7 +9130,7 @@ function renderCmdBar() {
     merging,
     troopsMenu: !!troopsIn,
     troopsOpen: !!troopsPlan,
-    troopsInSheet: consoleOn,
+    troopsInSheet: landShown,
     more: cmdMore,
     picking: pickMode,
   });
@@ -10868,6 +10894,7 @@ let battleReadoutAt = -Infinity;
 const battleWindow = initBattleWindow({
   root: () => battleWin,
   body: () => $('battlewinbody'),
+  head: () => $('battlewinhead'),
   state: () => s,
   me: () => ME,
   model: (id) => {

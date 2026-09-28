@@ -161,7 +161,7 @@ export const ru: Record<string, string> = {
   'chain.extract-with': 'Извлечь флотом {name}',
   'chain.carrier-warning': 'Гибель носителя — поражение главы',
   'production.units': 'Построить юнитов',
-  'battle.win.at': 'Бой: {w}',
+  'battle.win.at': '⚔ Бой: {w}',
   'battle.win.auto.off': 'авто-отход выключен',
   'battle.win.auto.on': 'авто-отход при корпусе ниже {n}%',
   'battle.win.balance': 'Запас прочности сторон',
