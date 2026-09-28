@@ -158,7 +158,7 @@ export const en: Record<string, string> = {
   'chain.extract-with': 'Extract with {name}',
   'chain.carrier-warning': 'Losing the carrier loses the chapter',
   'production.units': 'Build units',
-  'battle.win.at': 'Battle at {w}',
+  'battle.win.at': '⚔ Battle at {w}',
   'battle.win.auto.off': 'auto-retreat off',
   'battle.win.auto.on': 'auto-retreat below {n}% hull',
   'battle.win.balance': 'Remaining strength',

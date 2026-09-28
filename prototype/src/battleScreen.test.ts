@@ -6,7 +6,13 @@
  * REFM-экранов.
  */
 import { describe, it, expect } from 'vitest';
-import { battleEndedHtml, battleWindowHtml, sideRowHtml, battleRetreats } from './battleScreen';
+import {
+  battleEndedHtml,
+  battleHeadHtml,
+  battleWindowHtml,
+  sideRowHtml,
+  battleRetreats,
+} from './battleScreen';
 import { t } from '../../localization/runtime';
 import { displayUnit } from './format';
 import type { BattleModel } from '../../packages/client/src/matchHud';
@@ -164,7 +170,25 @@ describe('окно боя', () => {
     expect(html).toContain('ПАЛАДИН 2');
     expect(html).toContain(t('battle.win.auto.on', { n: 30 }));
     expect(html).toContain('data-battle-retreat="p1-1"');
-    expect(html).toContain(t('battle.win.at', { w: 'Комета' }));
+  });
+
+  // Заказ владельца 2026-09-28: место, фаза и число сторон стояли карточкой над полосой
+  // сил и съедали её высоту — теперь они в шапке окна, а в теле их нет.
+  it('где бой, фаза и число сторон — в шапке окна, не отдельной карточкой в теле', () => {
+    const m = battle([side('p1', 'attacker', true), side('p2', 'defender'), side('p3', 'attacker')]);
+    const head = battleHeadHtml(m, { placeName: () => 'Комета' });
+    expect(head).toContain(t('battle.win.at', { w: 'Комета' }));
+    expect(head).toContain(t('battle.win.phase.orbit'));
+    expect(head).toContain(t('battle.win.sides', { n: 3 }));
+    expect(head).not.toContain('ground');
+    const ground = battleHeadHtml({ ...m, phase: 'ground' });
+    expect(ground).toContain(t('battle.win.phase.ground'));
+    expect(ground).toContain('bw-phase ground');
+    const body = battleWindowHtml(m, [], { placeName: () => 'Комета' });
+    expect(body).not.toContain('Комета');
+    expect(body).not.toContain(t('battle.win.phase.orbit'));
+    // Нет боя — шапка просто «Бой», без места и фазы.
+    expect(battleHeadHtml(null)).toBe(`<b>${t('battle.win.head')}</b>`);
   });
 
   it('БОЙ ИСЧЕЗ, пока палец летел к экрану — честная строка, а не пустая рамка', () => {

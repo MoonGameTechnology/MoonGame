@@ -67,6 +67,8 @@ describe('cmdPresence — слияние и десант по составу (п
   it('в окне флота консолью ⇅ нет в ряду — ни закрытого, ни открытого', () => {
     expect(cmdShown(с({ troopsMenu: true, troopsInSheet: true })).troops).toBe(false);
     expect(cmdShown(с({ troopsOpen: true, troopsInSheet: true })).troops).toBe(false);
+    // Пустой трюм колонку не рисует (`landColumn.ts`) — ⇅ возвращается в ряд.
+    expect(cmdShown(с({ troopsMenu: true, troopsInSheet: false })).troops).toBe(true);
   });
 
   it('десант на борту для штурма и меню десанта — разные вопросы', () => {

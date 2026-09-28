@@ -40,6 +40,9 @@ import type { BattleModel } from '../../packages/client/src/matchHud';
 export interface BattleWindowHost {
   root: () => HTMLElement;
   body: () => HTMLElement;
+  /** Заголовок в шапке окна — туда пишется {@link battleHeadHtml}. Нет узла — шапка
+   *  остаётся той, что в разметке. */
+  head?: () => HTMLElement | null;
   state: () => GameState;
   me: () => PlayerId;
   /** Модель боя (из `@void/client`), либо null — бой исчез или под туманом. */
@@ -260,6 +263,20 @@ function balanceHtml(sides: readonly Side[], view: BattleView): string {
   );
 }
 
+/**
+ * Шапка окна: где бой, фаза и сколько сторон (заказ владельца 2026-09-28). Раньше то же
+ * самое стояло отдельной карточкой над полосой сил и съедало её высоту, хотя в шапке
+ * рядом с «Бой» место и так было. Нет модели — просто «Бой».
+ */
+export function battleHeadHtml(m: BattleModel | null, view: BattleView = {}): string {
+  if (!m) return `<b>${esc(t('battle.win.head'))}</b>`;
+  const ground = m.phase === 'ground';
+  return (
+    `<b>${esc(t('battle.win.at', { w: view.placeName?.(m.location) ?? m.location }))}</b>` +
+    `<span class="bw-phase${ground ? ' ground' : ''}">${esc(t(ground ? 'battle.win.phase.ground' : 'battle.win.phase.orbit'))} · ${esc(t('battle.win.sides', { n: m.sides.length }))}</span>`
+  );
+}
+
 /** Two visual columns only: diplomacy and attack targets stay per participant. */
 export function battleWindowHtml(
   m: BattleModel | null,
@@ -279,8 +296,6 @@ export function battleWindowHtml(
     '</section>';
   const canAttack = m.sides.some((s) => s.mine && s.role === 'defender');
   return (
-    `<div class="bw-top ${ground ? 'ground' : 'orbit'}"><div class="bw-title"><b>${esc(t('battle.win.at', { w: view.placeName?.(m.location) ?? m.location }))}</b>` +
-    `<p class="bw-head">${esc(t(ground ? 'battle.win.phase.ground' : 'battle.win.phase.orbit'))} · ${esc(t('battle.win.sides', { n: m.sides.length }))}</p></div></div>` +
     balanceHtml(m.sides, {
       ...view,
       color: (owner) =>
@@ -343,6 +358,7 @@ export function initBattleWindow(host: BattleWindowHost): {
   let summary: string | null = null;
   const isOpen = (): boolean => host.root().classList.contains('show');
   let lastHtml = '';
+  let lastHead = '';
   let expanded: Set<string> | undefined;
   const fullComposition = new Set<string>();
   const effects = new Set<string>();
@@ -375,6 +391,13 @@ export function initBattleWindow(host: BattleWindowHost): {
       host.body().innerHTML = html;
       host.body().scrollTop = scroll;
       lastHtml = html;
+    }
+    // Шапка — по тому же снимку, что и тело: кончившийся бой держит в ней своё место.
+    const head = battleHeadHtml(model ?? (summary !== null ? lastModel : null), host.view);
+    if (head !== lastHead) {
+      const el = host.head?.();
+      if (el) el.innerHTML = head;
+      lastHead = head;
     }
     // Отсчёт живёт ВНЕ подписи разметки: вписанный в HTML, он менял бы её каждую
     // секунду, и окно пересобиралось бы под пальцем — нажатие «Отступить», чьи down/up
@@ -454,6 +477,7 @@ export function initBattleWindow(host: BattleWindowHost): {
       }
       shown = battleId;
       lastHtml = '';
+      lastHead = '';
       host.root().classList.add('show');
       repaint();
     },
