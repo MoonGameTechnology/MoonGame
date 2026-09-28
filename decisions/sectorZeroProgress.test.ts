@@ -245,7 +245,9 @@ describe('Sector Zero persistent preparation', () => {
     // «Проиграл матч и ничего не получил. Проигрывать — нормально. Каждая экспедиция должна
     // что-то приносить». Счёт уничтоженных ведёт ядро (`PveState.tally`, PVR-6.20).
     const s = pveState(data);
-    s.pve = { waveNumber: 0, totalWaves: 10, npcPlayerId: 'p3', tally: { p1: { lost: 12, destroyed: 17 } } };
+    // Волна пришла: оба забега СЫГРАНЫ, и разница между ними — ровно убитые. Без волны
+    // «голый» забег не сыгран и не платит вовсе (сдача в первую секунду, 2026-09-28).
+    s.pve = { waveNumber: 1, totalWaves: 10, npcPlayerId: 'p3', tally: { p1: { lost: 12, destroyed: 17 } } };
     s.match.status = 'ended';
     s.match.winner = 'p3';
     const p = { ...fresh(), nextAttempt: 2 };

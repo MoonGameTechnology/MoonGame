@@ -51,6 +51,35 @@ describe('выход из экспедиции: превью награды = в
     expect(settled.warrants - p.warrants).toBe(preview.warrants);
   });
 
+  it('сдача в первую секунду не платит ничего (баг-репорт владельца 2026-09-28)', () => {
+    // «Если сразу завершить экспедицию, я могу получить награду, хотя прошла 1 секунда».
+    // Ни волны, ни убитых, ни задач: платить не за что — ни данными, ни Варрантами, ни
+    // добычей. Иначе «начать → завершить» печатало валюту и перебрасывало добычу даром.
+    setMatchMode(pveModeId());
+    const s = advance(pveState(data), 1).state;
+    expect(s.pve!.waveNumber).toBe(0);
+    const chapter = pveChapter(0);
+    const p = { ...freshSectorZeroProgress(data), nextAttempt: 2 };
+    expect(abandonRunReward(p, s, chapter, data)).toEqual({ research: 0, warrants: 0 });
+
+    const ended = order(s, abandonRun('p1'), s.time);
+    expect(ended.error).toBeUndefined();
+    const settled = settleSectorZeroRun(p, 1, ended.state, chapter, data);
+    expect(settled.settledThrough).toBe(1); // засчитан — второй раз не засчитается
+    expect(settled.research).toBe(p.research);
+    expect(settled.warrants).toBe(p.warrants);
+    expect(settled.moduleCopies).toEqual(p.moduleCopies);
+    expect(settled.blueprints).toEqual(p.blueprints);
+    expect(settled.heroTokens).toEqual(p.heroTokens);
+    expect(settled.lastRun).toMatchObject({ total: 0, warrants: 0, loot: { copies: {}, blueprints: {} } });
+
+    // Контроль: пришла первая волна — забег сыгран и платит, как раньше.
+    const waved = { ...s, pve: { ...s.pve!, waveNumber: 1 } };
+    const after = settleSectorZeroRun(p, 1, order(waved, abandonRun('p1'), s.time).state, chapter, data);
+    expect(after.research - p.research).toBe(2);
+    expect(Object.values(after.lastRun!.loot!.copies).reduce((a, b) => a + b, 0)).toBe(1);
+  });
+
   it('не забег — ноль, а не выдуманная сумма', () => {
     const s = pveState(data);
     const p = freshSectorZeroProgress(data);

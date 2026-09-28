@@ -68,9 +68,9 @@ export function heroTokenGoal(
 }
 
 /** Сколько жетонов даёт забег. */
-export function heroTokenCount(won: boolean, newTasks: number): number {
+export function heroTokenCount(won: boolean, newTasks: number, played = true): number {
   return (
-    HERO_TOKEN_DROP.run +
+    (played ? HERO_TOKEN_DROP.run : 0) +
     (won ? HERO_TOKEN_DROP.win : 0) +
     Math.max(0, newTasks) * HERO_TOKEN_DROP.perTask
   );
@@ -89,12 +89,15 @@ export function rollHeroTokens(input: {
   progress: Pick<SectorZeroProgress, 'heroes'>;
   data: GameData;
   won: boolean;
+  /** Забег сыгран (`runPayout`): несыгранный не получает жетон «за забег». Нет — сыгран. */
+  played?: boolean;
   newTasks: number;
 }): Record<string, number> {
   const wanted = Object.keys(input.data.heroes)
     .filter((id) => heroTokenUse(input.progress, id, input.data) !== null)
     .sort();
-  if (wanted.length === 0) return {};
+  const count = heroTokenCount(input.won, input.newTasks, input.played ?? true);
+  if (wanted.length === 0 || count <= 0) return {};
   const pick =
     wanted[
       Math.floor(
@@ -102,7 +105,7 @@ export function rollHeroTokens(input: {
           wanted.length,
       )
     ]!;
-  return { [pick]: heroTokenCount(input.won, input.newTasks) };
+  return { [pick]: count };
 }
 
 /** Сложить жетоны в счётчик профиля (новый объект, вход не трогается). */

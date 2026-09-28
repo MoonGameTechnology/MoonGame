@@ -96,7 +96,7 @@ export function moduleLadder(ladder: RarityLadder, rarity: Rarity): ForgeLadder 
 /**
  * Добыча итогов забега. Числа — **v0** для плейтеста.
  *
- * 4. **Дубли — за сам забег и за задачи.** 1 дубль за любой засчитанный забег, ещё 1 за
+ * 4. **Дубли — за сам забег и за задачи.** 1 дубль за любой СЫГРАННЫЙ забег, ещё 1 за
  *    победу и по 1 за каждую задачу главы, закрытую ВПЕРВЫЕ. Какой модуль продублирован —
  *    бросок из открытых игроком: дубль того, чего у игрока нет, поднимать было бы нечем.
  * 5. **Чертёж — редкий.** Шанс 25% за победу и 8% за поражение; ступень чаще уникальная,
@@ -143,6 +143,9 @@ export function runLoot(input: {
   attempt: number;
   modules: readonly string[];
   won: boolean;
+  /** Забег сыгран (`runPayout`). Несыгранный не получает дубль «за забег» и шанс чертежа —
+   *  иначе сдача в первую секунду перебрасывала бы добычу даром. Нет — сыгран. */
+  played?: boolean;
   newTasks: number;
   firstWinBlueprint: Rarity | null;
   /** Отпечаток итогового мира (`hashState`): один и тот же у живого мира и у его снимка. */
@@ -150,8 +153,9 @@ export function runLoot(input: {
 }): RunLoot {
   const key = `${input.seed}\u0000${input.attempt}\u0000${input.outcome}\u0000`;
   const copies: Record<string, number> = {};
+  const played = input.played ?? true;
   const count =
-    RUN_COPIES.run +
+    (played ? RUN_COPIES.run : 0) +
     (input.won ? RUN_COPIES.win : 0) +
     Math.max(0, input.newTasks) * RUN_COPIES.perTask;
   if (input.modules.length > 0)
@@ -165,7 +169,7 @@ export function runLoot(input: {
     blueprints[r] = (blueprints[r] ?? 0) + 1;
   };
   if (input.firstWinBlueprint) add(input.firstWinBlueprint);
-  if (hashUnit(`${key}blueprint`) < (input.won ? BLUEPRINT_CHANCE.won : BLUEPRINT_CHANCE.lost)) {
+  if (played && hashUnit(`${key}blueprint`) < (input.won ? BLUEPRINT_CHANCE.won : BLUEPRINT_CHANCE.lost)) {
     let roll = hashUnit(`${key}tier`);
     const tier = BLUEPRINT_TIERS.find(([, w]) => (roll -= w) < 0)?.[0] ?? 'unique';
     add(tier);

@@ -1159,7 +1159,6 @@ function runPayout(
   // до конца, — и «дополнительная» задача перестала бы быть дополнительной.
   // Платят только задачи, ПОКАЗАННЫЕ в этом забеге: закрытые раньше в показ не входят и
   // второй раз не платят (PVR-5.3).
-  const base = 1 + Math.max(0, pve.waveNumber) + (won ? 3 : 0);
   const done = progress.objectivesDone[chapter.id] ?? [];
   const tasks = settleObjectives(
     chapter.objectives,
@@ -1168,16 +1167,23 @@ function runPayout(
     'p1',
     chapter.slots ?? DEFAULT_OBJECTIVE_SLOTS,
   );
+  const kills = runKills(state, 'p1');
+  // Забег СЫГРАН, если в нём что-то случилось: пришла волна, убит враг, закрыта задача или
+  // победа. Только сыгранный платит «за участие» — единицу базы, гарантированные дубль и
+  // жетон и шанс чертежа. Иначе «начать и сразу завершить» печатало награду за секунду, а
+  // каждая сдача давала новый отпечаток мира — бесплатный переброс добычи (баг-репорт
+  // владельца 2026-09-28).
+  const played = won || pve.waveNumber >= 1 || kills > 0 || tasks.bonus > 0;
+  const base = played ? 1 + Math.max(0, pve.waveNumber) + (won ? 3 : 0) : 0;
   // VET-7: медали сохранённых ветеранов — третья часть награды, рядом с волнами и
   // задачами. Каталог нужен для порогов медалей; без него платить не за что.
   const veterans = data ? veteranReward(state, 'p1', data) : 0;
   // PVR-4.7: убитый босс — четвёртая часть награды; его цену матч записал при появлении.
   const boss = bossBounty(state);
   const reward = base + tasks.bonus + veterans + boss;
-  const kills = runKills(state, 'p1');
   const killWarrants = kills * WARRANTS_PER_KILL;
   const warrants = reward * WARRANTS_PER_REWARD + killWarrants;
-  return { base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants };
+  return { played, base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants };
 }
 
 /** Сколько экспедиция заплатит, если завершить её СЕЙЧАС (решение владельца 2026-09-26: выход
@@ -1224,7 +1230,7 @@ export function settleSectorZeroRun(
   )
     return progress;
   const won = state.match.winner === 'p1' || state.match.winners?.includes('p1');
-  const { base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants } = runPayout(
+  const { played, base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants } = runPayout(
     progress,
     state,
     state.pve,
@@ -1245,6 +1251,7 @@ export function settleSectorZeroRun(
       attempt,
       modules: progress.modules,
       won: !!won,
+      played,
       newTasks,
       firstWinBlueprint: firstWin ? (chapter.blueprint ?? null) : null,
       outcome,
@@ -1253,7 +1260,7 @@ export function settleSectorZeroRun(
     // кому они нужны, — тогда не падают.
     ...(data
       ? {
-          heroTokens: rollHeroTokens({ seed: progress.seed, attempt, outcome, progress, data, won: !!won, newTasks }),
+          heroTokens: rollHeroTokens({ seed: progress.seed, attempt, outcome, progress, data, won: !!won, played, newTasks }),
         }
       : {}),
   };
