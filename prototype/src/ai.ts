@@ -1069,7 +1069,7 @@ function baseAiOrders(
       }
     }
     // Взять нечего тем, что в трюме, — домой, за десантом.
-    if (!best && neutralGuarded && base && f.location !== base.id && profile === 'strong')
+    if (!best && neutralGuarded && base && f.location !== base.id && skilled)
       best = base;
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
