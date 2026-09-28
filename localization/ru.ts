@@ -2537,6 +2537,8 @@ export const ru: Record<string, string> = {
   'log.fleet.merged': '⛬ флоты объединены · {at}',
   'log.fleet.split': '⊟ флот разделён · {at}',
   'log.fleet.split-transit': '⊟ флот разделён в пути',
+  // AUDM-4: флот ушёл раньше, чем закончилась погрузка, — десант остался в гарнизоне.
+  'log.army.load-cancelled': '⚠ погрузка отменена: флот ушёл, {n}× {u} остались · {at}',
   'log.market.buy': 'покупка',
   'log.market.sell': 'продажа',
   'log.market.trade': '⇄ биржа: {n} {res} за {paid} ¤ ({side})',
