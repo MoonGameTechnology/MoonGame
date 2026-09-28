@@ -220,7 +220,7 @@ module.exports = {
   }),
   selectCard: (kind, id) => {
     clearSelection();
-    if (kind === 'planet') selPlanet = id;
+    if (kind === 'planet') pickWorld(id);
     else {
       setFleetSelection([id]);
       if (kind === 'foreign' && vision) vision.identify.add(fleetNode(s.fleets[id]));

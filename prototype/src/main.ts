@@ -419,7 +419,7 @@ import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from '.
 import { tapOwner, tapRadius } from '../../decisions/tapPriority';
 import { nextPick, retapsSelectedWorld, tapCandidates, touchPick, type TapPick } from '../../decisions/tapCycle';
 import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
-import { mobileDraftMatches, mobileTargetPoint, type MobileOrderDraft, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
+import { mobileDraftMatches, mobileTargetPoint, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, wornAbilities, type CastOption } from './heroCasts';
@@ -841,18 +841,30 @@ import {
   assaultAim,
   castMenu,
   cmdMore,
+  deselectFleets,
   disarm,
   disarmForCommand,
   drop,
   engageAim,
   heroAim,
   heroSpawnAim,
+  inspectFleet,
   merging,
+  mobileChoices,
+  mobileDraft,
+  offerChoices,
+  pickFleets,
   pickMode,
+  pickWorld,
+  pruneSelection,
   retreatAim,
   retreatMenu,
+  selFleet,
+  selFleets,
+  selPlanet,
   splitState,
   squadMerge,
+  stageDraft,
   strikeAim,
   toggle,
   troopsPlan,
@@ -940,7 +952,6 @@ import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
-import { pruneGroup, refSurvives } from '../../decisions/selectionPrune';
 import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
@@ -980,7 +991,7 @@ import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from '../../
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from '../../decisions/authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
-import { selectFleets, toggleInSelection } from '../../decisions/fleetSelection';
+import { toggleInSelection } from '../../decisions/fleetSelection';
 import { mergePlan } from '../../decisions/mergeOrders';
 import { assaultPlan } from './assaultDispatch';
 import { warPromptText, warReason } from './warPromptView';
@@ -994,8 +1005,6 @@ import { pingRoute, relayIntake } from './relayIntake';
 import {
   WAIT_MARK,
   desyncVerdict,
-  keepFocus,
-  keepGroup,
   radarContacts,
   waitingBanner,
 } from './snapshotIngest';
@@ -1223,15 +1232,10 @@ let banner: string | null = null;
 // hide it to look at the final board (the match stays frozen). Reset on a fresh match
 // / reconnect so a new game never opens straight into the old result.
 let endScreen: MatchEnd | null = null;
-let selFleet: string | null = null;
-let selPlanet: string | null = null;
-let selFleets = new Set<string>();
-/** UI-14. ЧУЖОЙ флот, который игрок тапнул, чтобы посмотреть. Держится ОТДЕЛЬНО от
- *  `selFleet` намеренно: `selFleet` — адрес приказа, и чужой id в нём завёл бы приказы,
- *  которые ядро отклонит. Осмотр — состояние панели и только её. */
-let inspectFleet: string | null = null;
-// Прицелы, режимы и окна командного ряда (`aiming`, `castMenu`, `splitState`…) живут в
-// `interaction.ts` (REFM-207): их меняют только `arm`/`drop`/`disarm(повод)`.
+// Выбор (`selFleet`, `selPlanet`, `selFleets`, осмотр `inspectFleet`, мобильные `mobileDraft`
+// и `mobileChoices`) и прицелы, режимы и окна командного ряда (`aiming`, `castMenu`,
+// `splitState`…) живут в `interaction.ts` (REFM-207, REFM-208): их меняют только функции
+// владельца — `pick*`, `arm`/`drop`, `disarm(повод)`.
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
@@ -1371,8 +1375,6 @@ let reconnecting = false;
 let reconnectAttempts = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let aimPointer: { x: number; y: number } | null = null; // last canvas pointer (for the move preview)
-let mobileDraft: MobileOrderDraft | null = null;
-let mobileChoices: TapPick[] = [];
 let hoverObj: string | null = null; // side-panel object under the pointer (data-desc key)
 let planetTab: PlanetTab = 'buildings';
 // Bytro-карточка: тап по имени флота открывает сводку армии — какой флот сейчас
@@ -1773,8 +1775,8 @@ const holographic = initHolographicUi({
   // ✕ окна выбора закрывает его ЦЕЛИКОМ: набор группы и прицелы тоже. Иначе режим набора
   // держал пустое окно «0 флотов», и крестик его не закрывал (плейтест 2026-09-26).
   dismiss: () => {
-    disarm('dismiss', MOBILE);
-    clearSelection();
+    disarm('dismiss', MOBILE); // и выбор забыт: ✕ — это пустое выделение и ☰
+    invalidatePanel();
     renderCmdBar();
   },
   details: () => {
@@ -1793,15 +1795,15 @@ const mobileHud = initMobileHud({
   side,
   commands: cmdbar,
   dismiss: () => {
-    if (mobileChoices.length) mobileChoices = [];
+    if (mobileChoices.length) offerChoices([]);
     else clearSelection();
   },
   choose: (pick) => {
-    mobileChoices = [];
+    offerChoices([]);
     if (pick.kind === 'fleet') setFleetSelection([pick.id]);
     else {
       clearSelection();
-      selPlanet = pick.id;
+      pickWorld(pick.id);
       selectionStarted = lastReal;
     }
   },
@@ -2944,15 +2946,12 @@ function sandboxBuildRestore(snap: Record<string, number> | null, ok: boolean): 
 
 function apply(out: StepOut) {
   s = out.state;
-  // Что теряет силу вместе с флотом — `selectionPrune.ts` (REFM-102): одиночная ссылка
-  // спрашивает только «существует ли», а группа чистится дважды — живые И свои.
-  const alive = (id: string): boolean => !!s.fleets[id];
-  if (!refSurvives(selFleet, alive)) selFleet = null;
-  if (splitState && !refSurvives(splitState.fleetId, alive)) drop('splitState');
-  if (troopsPlan && !refSurvives(troopsPlan.fleetId, alive)) drop('troopsPlan'); // ⇅-меню тоже
+  // Что теряет силу вместе с флотом — владелец выбора (`interaction.ts`, REFM-208) по
+  // правилам `selectionPrune.ts`: одиночная ссылка спрашивает только «существует ли», а
+  // группа чистится дважды — живые И свои. Тот же вызов стоит в снимке сервера.
+  pruneSelection(s.fleets, ME);
   // Режим «Приказ»: пропавшие флоты выбрасываются покадрово в renderChainBar; здесь
   // достаточно ничего не делать — режим сам гаснет, когда fleetIds опустеет.
-  selFleets = pruneGroup(selFleets, (id) => s.fleets[id]?.owner, ME);
   handleEvents(out.events);
 }
 
@@ -3581,16 +3580,8 @@ function syncPlayerNames(state: GameState): void {
     NAME[id] = houseDisplayName(player.name);
 }
 function setFleetSelection(ids: string[]) {
-  mobileDraft = null;
-  mobileChoices = [];
-  // Что значит выделение — `fleetSelection.ts` (REFM-163): выделяется только СВОЁ
-  // (чужой флот в наборе — приказ, который ядро всё равно отклонит), а «ровно один» и
-  // «несколько» это разные состояния: у одиночного своя карточка со всеми приказами.
-  const sel = selectFleets(ids, (id) => s.fleets[id]?.owner === ME);
-  selFleets = new Set(sel.picked);
-  selFleet = sel.single;
-  inspectFleet = sel.inspect; // UI-14: одинокий чужой уходит на осмотр, а не в никуда
-  selPlanet = null; // a fleet selection never co-selects a planet (mutually exclusive)
+  // Что значит выделение (только своё, один или группа, чужой на осмотр) — `pickFleets`.
+  pickFleets(ids, (id) => s.fleets[id]?.owner === ME);
   invalidatePanel();
 }
 /**
@@ -3604,16 +3595,10 @@ function panelFleet(): string | null {
   return inspectFleet;
 }
 function clearSelection() {
-  mobileDraft = null;
-  mobileChoices = [];
-  // Что держится за выделение — `armDisarm.ts`, правило 10: прицелы и меню ряда, набор
-  // группы, окно деления, слияние звеньев. Прицелы из окон (отход, каст, удар, союзник)
-  // взводятся без выделения и им не гаснут.
+  // Пустое выделение забывает выбор (`armDisarm.ts`, правило 16) и гасит то, что держится
+  // за него (правило 10): прицелы и меню ряда, набор группы, окно деления, слияние звеньев.
+  // Прицелы из окон (отход, каст, удар, союзник) взводятся без выделения и им не гаснут.
   disarm('deselect', MOBILE);
-  selFleet = null;
-  inspectFleet = null;
-  selPlanet = null;
-  selFleets = new Set();
   invalidatePanel();
 }
 
@@ -8469,7 +8454,7 @@ function mobileOrderKind(): MobileOrderKind | null {
 }
 
 function stageMobileTarget(order: MobileOrderKind, target: MobileOrderTarget | null): void {
-  mobileDraft = target ? { order, fleetIds: [...selectedFleetIds()], target } : null;
+  stageDraft(target ? { order, fleetIds: [...selectedFleetIds()], target } : null);
   invalidateCmdBar();
 }
 
@@ -8512,7 +8497,7 @@ function engageTarget(target: Fleet): void {
 }
 
 function cancelMobileOrder(): void {
-  mobileDraft = null;
+  stageDraft(null);
   disarm('mobile-cancel', MOBILE);
   invalidateCmdBar();
   invalidatePanel();
@@ -8522,7 +8507,7 @@ function sendMobileOrder(): void {
   const order = mobileOrderKind();
   const ids = selectedFleetIds();
   if (!mobileDraftMatches(mobileDraft, order, ids) || !mobileTargetAvailable(mobileDraft.target, mobileDraft.order)) {
-    mobileDraft = null;
+    stageDraft(null);
     note(t('hud.mobile.target-stale'));
     return;
   }
@@ -8551,7 +8536,7 @@ function updateMobileHud(): void {
       choices.push({ ...pick, title: worldTitle(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
     }
   }
-  mobileChoices = choices.map(({ kind, id }) => ({ kind, id }));
+  offerChoices(choices.map(({ kind, id }) => ({ kind, id })));
   mobileHud.update(key, !!mobileOrderKind() || pickMode || !!chainMode, cmdMore, choices);
 }
 
@@ -8664,7 +8649,7 @@ function renderCmdBar() {
   if (MOBILE && (mobileOrderKind() || pickMode)) {
     const order = mobileOrderKind();
     if (!mobileDraftMatches(mobileDraft, order, ids) ||
-      (mobileDraft && !mobileTargetAvailable(mobileDraft.target, mobileDraft.order))) mobileDraft = null;
+      (mobileDraft && !mobileTargetAvailable(mobileDraft.target, mobileDraft.order))) stageDraft(null);
     const label = pickMode ? t('cmd.multiselect') : order === 'assault' ? t('cmd.assault') :
       order === 'engage' ? t('cmd.engage') : order === 'merge' ? t('cmd.merge.pick') : t('cmd.move');
     const selection = ids.length === 1 ? fleetCallsign(ids[0]!) : t('cmd.selection.many', { n: ids.length });
@@ -9071,8 +9056,7 @@ side.addEventListener('click', (ev) => {
   if (act === 'close') {
     clearSelection();
   } else if (act === 'cancel') {
-    selFleet = null;
-    selFleets = new Set();
+    deselectFleets();
   } else if (act === 'selfleet') {
     setFleetSelection([arg]);
   } else if (act === 'tab') {
@@ -9421,7 +9405,7 @@ cmdbar.addEventListener('click', (ev) => {
     renderCmdBar();
     return;
   }
-  if (MOBILE && cmd !== 'more') mobileDraft = null;
+  if (MOBILE && cmd !== 'more') stageDraft(null);
   // Что гаснет от СОСЕДНЕЙ команды — `armDisarm.ts` (REFM-195, REFM-207): у каждого
   // взводимого состояния свой список «своих» команд, и в нём же подкоманды поповера (иначе
   // ⇅-меню закрывалось бы от собственной кнопки «+1»); кнопка без команды гасит ВСЁ;
@@ -9933,10 +9917,8 @@ function selectAt(mx: number, my: number) {
       setFleetSelection([effect.id]); // (clears any selected planet)
       return;
     }
-    selPlanet = effect.id;
+    pickWorld(effect.id);
     selectionStarted = lastReal;
-    selFleet = null;
-    selFleets = new Set();
     invalidatePanel();
   };
   if (!pcUi()) {
@@ -9959,7 +9941,7 @@ function selectAt(mx: number, my: number) {
         return;
       }
       const choices = tapCandidates(fleetIds, n?.id ?? null);
-      mobileChoices = choices.length > 1 ? choices : [];
+      offerChoices(choices.length > 1 ? choices : []);
       if (mobileChoices.length) return;
     }
     // Второй тап по выбранной провинции снимает выбор (`tapCycle.ts`, правило 6).
@@ -10153,8 +10135,7 @@ function endPointer(ev: PointerEvent) {
     const next = boxSelection(selectedFleetIds(), picked, additive);
     if (next.length) setFleetSelection(next);
     else if (!additive) {
-      selFleets = new Set();
-      selFleet = null;
+      deselectFleets();
       invalidatePanel();
     }
     selectionBox = null;
@@ -12115,10 +12096,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   // `maybeStartPendingTour()` (below) arms this match's own guide, if any.
   activeTour?.stop();
   // Reset interaction + queues + camera to the framed whole-map view.
-  selFleet = null;
-  selPlanet = null;
-  selFleets = new Set();
-  disarm('match', MOBILE); // прицелы и окна старого матча указывают на то, чего здесь нет
+  disarm('match', MOBILE); // выбор, прицелы и окна старого матча указывают на то, чего здесь нет
   additive = false;
   if (chainMode) exitChainMode(); // режим «Приказ» не переживает смену матча
   chainRouteCache.clear(); // маршруты принадлежат карте СТАРОГО матча
@@ -12532,8 +12510,7 @@ function netClientFor(seat: string): MultiplayerClient {
           reconnectAttempts = 0;
           NET = true;
           ME = snap.playerId ?? ME;
-          clearSelection();
-          disarm('match', MOBILE); // как в соло: прицел героя или удара старой сессии гаснет тоже
+          disarm('match', MOBILE); // как в соло: выбор, прицелы и окна старой сессии гаснут одной строкой
           endScreen = null; // joining a match must not carry the previous result
           matchEnd.reset(); // переподключение к матчу считает его конец заново
           if (chainMode) exitChainMode(); // черновик прежней сессии не переносится
@@ -12589,9 +12566,9 @@ function netClientFor(seat: string): MultiplayerClient {
           netDesync = verdict;
           if (netDesync) netDesyncCount++;
         }
-        // mirror apply()'s selection cleanup (we replace `s` directly here)
-        selFleet = keepFocus(selFleet, !!(selFleet && s.fleets[selFleet]));
-        selFleets = new Set(keepGroup(selFleets, (id) => s.fleets[id]?.owner, ME));
+        // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
+        // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
+        pruneSelection(s.fleets, ME);
         // No lobby (SES-2.1): sessions run from creation, a join lands in a live
         // world. `waiting` survives only for the transport's waitForPlayers mode
         // (unused by our hosts) — show the banner, clear it once the clock runs.
@@ -14000,7 +13977,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { drop('splitState'); invalidatePanel(); } }, // z45
   // --- низ экрана (z27…z20) ---
   { id: 'chatwin', isOpen: () => chatWin?.isOpen() ?? false, close: () => chatWin?.close() }, // z27
-  { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => { mobileChoices = []; } },
+  { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => offerChoices([]) },
   // Поповеры ряда команд живут ВНУТРИ #cmdbar: прячет их ближайший renderCmdBar, но
   // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
   {
@@ -15423,7 +15400,7 @@ function frame(nowReal: number) {
   const previousViewport = insets();
   holographic.sync(VW, VH, holoCoarsePointer?.matches ?? false, inMatch());
   mobileHud.sync(MOBILE && inMatch());
-  if (!MOBILE) { mobileDraft = null; mobileChoices = []; }
+  if (!MOBILE) { stageDraft(null); offerChoices([]); }
   if (wasHolographic !== holographic.active()) {
     Object.assign(cam, reframePresentation(cam, previousViewport, insets(), mapBounds()));
     clampCam();
@@ -16548,9 +16525,7 @@ function jumpTo(id: string, kind: JumpKind): void {
   if (!pl || step.do !== 'jump') return;
   centerOn(pl.position, step.scale);
   if (step.select) {
-    selPlanet = id;
-    selFleet = null;
-    selFleets = new Set();
+    pickWorld(id);
     invalidatePanel();
   }
   if (step.closeDiplo) closeDiplo();

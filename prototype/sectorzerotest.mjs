@@ -59,7 +59,7 @@ const hooks = `window.__szTest = {
   homeOnScreen: () => { const h = pickHome(Object.values(s.planets), ME); return h ? world(h.position) : null; },
   // Выбор мира так же, как его делает \`jumpTo\` (переход по ссылке): сама карточка —
   // предмет проверки, а не попадание мышью по карте, где камера у Sector Zero близко к дому.
-  select: id => { selPlanet = id; selFleet = null; selFleets = new Set(); lastPanelHtml = ''; renderPanel(); },
+  select: id => { pickWorld(id); lastPanelHtml = ''; renderPanel(); },
   selected: () => selPlanet,
   // Вкладка карточки мира — как тап по ней; живые наземные части гарнизона мира.
   tab: (x) => { planetTab = x; lastPanelHtml = ''; renderPanel(); },
@@ -152,7 +152,7 @@ const hooks = `window.__szTest = {
   // Журнал аналитики веб-площадки (YAG-5.1): что игра отдала бы приёмнику.
   events: () => platform.events ?? [],
   // Весь флот игрока погиб — флоты уходят из мира, как после проигранного боя.
-  sink: () => { for (const f of Object.values(s.fleets)) if (f.owner === ME) delete s.fleets[f.id]; selFleet = null; selFleets = new Set(); },
+  sink: () => { for (const f of Object.values(s.fleets)) if (f.owner === ME) delete s.fleets[f.id]; pruneSelection(s.fleets, ME); },
   ended: () => s.match.status === 'ended',
   // Учебный полигон (TRN): какая карта открыта и выведен ли герой игрока.
   mapId: () => s.mapId ?? null,

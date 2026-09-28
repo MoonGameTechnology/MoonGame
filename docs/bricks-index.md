@@ -39,7 +39,7 @@
 | REFM-205 | ✅ | proto | `docs/backlog.md` | Выход из партии — одна дверь. |
 | REFM-206 | ✅ | proto | `docs/backlog.md` | Перерисовка по имени. |
 | REFM-207 | ✅ | proto | `docs/backlog.md` | Владелец прицелов и поповеров |
-| REFM-208 | ⏳ | proto | `docs/backlog.md` | Владелец выбора |
+| REFM-208 | ✅ | proto | `docs/backlog.md` | Владелец выбора |
 | REFM-209 | ⏳ | proto | `docs/backlog.md` | Профиль Sector Zero: хранение, облако, вкладка-хозяйка |
 | REFM-210 | 🔒 | proto | `docs/backlog.md` | Забег: сохранение, восстановление, флаги |
 | REFM-211 | 🔒 | proto | `docs/backlog.md` | Оболочка Sector Zero |
@@ -53,16 +53,16 @@
 | REFM-219 | 🔒 | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
 | REFM-221 | 🔒 | proto | `docs/backlog.md` | Обучение и справка |
-| REFM-222 | 🔒 | proto | `docs/backlog.md` | Верхняя полоса |
+| REFM-222 | ⏳ | proto | `docs/backlog.md` | Верхняя полоса |
 | REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |
 | REFM-224 | ⏳ | proto | `docs/backlog.md` | Карточка флота |
-| REFM-225 | 🔒 | proto | `docs/backlog.md` | Хозяин боковой панели |
+| REFM-225 | ⏳ | proto | `docs/backlog.md` | Хозяин боковой панели |
 | REFM-226 | ⏳ | proto | `docs/backlog.md` | Ряд команд: разметка и поповеры |
 | REFM-227 | 🔒 | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
 | REFM-228 | ⏳ | proto | `docs/backlog.md` | Приказы группе |
 | REFM-229 | ⏳ | proto | `docs/backlog.md` | Композер цепочек «Приказ» |
 | REFM-230 | 🔒 | proto | `docs/backlog.md` | Реакция на события мира и лента |
-| REFM-231 | 🔒 | proto | `docs/backlog.md` | Камера и туман |
+| REFM-231 | ⏳ | proto | `docs/backlog.md` | Камера и туман |
 | REFM-232 | 🔒 | proto | `docs/backlog.md` | Статический голографический слой |
 | REFM-233 | 🔒 | proto | `docs/backlog.md` | Наложения |
 | REFM-234 | 🔒 | proto | `docs/backlog.md` | Эффекты и метки |
