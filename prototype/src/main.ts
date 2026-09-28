@@ -930,6 +930,7 @@ import {
   stockBleeds,
 } from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
+import { NET_VIEW_IDLE, netViewAt, netViewSnapshot } from '../../decisions/netViewClock';
 import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
@@ -1396,6 +1397,16 @@ let socketAdmitted = false;
 // M0 net telemetry (dev overlay): smoothed round-trip ms, and a desync check that
 // compares our reconstructed view to the server's hash on every snapshot.
 let rttEma: number | null = null;
+// Часы картинки в сети (`netViewClock.ts`): снимок сервера приходит раз в секунду, и без
+// досчёта флоты на карте двигались бы рывками раз в секунду при любом FPS.
+let netView = NET_VIEW_IDLE;
+let netShownTime = 0;
+/** Игровое «сейчас» ДЛЯ КАРТИНКИ движения: в соло — время мира (оно и так идёт каждый
+ *  кадр), в сети — время снимка, досчитанное до этого кадра. Только для того, ГДЕ рисовать
+ *  движущееся; правила, приказы и таймеры читают `s.time`. */
+function mapNow(): number {
+  return NET ? netShownTime : s.time;
+}
 let pingTimer: ReturnType<typeof setInterval> | null = null;
 // M2 perf telemetry: a light fps/rtt/mem sample every 30s while in a network match —
 // lands in the server's metrics stream (observe → JSONL/сводка), never answered.
@@ -2429,7 +2440,7 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
  *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
 function fleetPos(f: Fleet): { x: number; y: number } | null {
   // По ДОРОГЕ лейна (ROADS-2) — тем же счётом, что ядро (`fleetPositionAt`).
-  return fleetOrigin(f, s.time, (id) => s.planets[id]?.position ?? null, (from, to, t) => {
+  return fleetOrigin(f, mapNow(), (id) => s.planets[id]?.position ?? null, (from, to, t) => {
     const road = laneRoad(s, from, to);
     return road ? pointAlong(road, t) : null;
   });
@@ -2448,7 +2459,7 @@ function strikeWorldPos(strikeId: string): { x: number; y: number } | null {
   const home = strikeBasePos(st.base);
   if (!home) return null;
   const [from, to] = strikeLeg(st, home);
-  const k = strikeProgress(st, s.time);
+  const k = strikeProgress(st, mapNow());
   return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
 }
 /** Та же точка отсчёта, спроецированная НА ЭКРАН.
@@ -2542,7 +2553,7 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
       // Нос — вдоль КУСКА ДОРОГИ, на котором корабль (ROADS-4, `roadHeading`), а не по
       // прямой «мир → мир»: на ветке развилки та смотрела бы мимо дороги.
       const road = laneRoad(s, lane.from, lane.to);
-      const t = f.movement ? legT(f.movement, s.time) : (f.edge?.t ?? 0);
+      const t = f.movement ? legT(f.movement, mapNow()) : (f.edge?.t ?? 0);
       const d = road ? roadHeading(road, t) : { x: 0, y: 0 };
       if (d.x !== 0 || d.y !== 0) {
         const wa = world(mp);
@@ -4539,7 +4550,7 @@ function drawFleetRoutes() {
     const sel = selFleet === f.id || selFleets.has(f.id);
     // Путь впереди — по ДОРОГАМ, тем же правилом развилок, что водит флот ядро
     // (`roadAhead`, ROADS-2): линия не обещает дорогу, по которой флот не полетит.
-    const ahead = roadAhead(s, f.movement, legT(f.movement, s.time)).slice(1);
+    const ahead = roadAhead(s, f.movement, legT(f.movement, mapNow())).slice(1);
     const pts = [{ x: start.x, y: start.y }, ...ahead.map((p) => world(p))];
     if (pts.length < 2) continue;
     const stroke = routeStroke(sel);
@@ -4573,7 +4584,7 @@ function drawFleetRoutes() {
  * вместо пунктира плана и цвет крыла (`R_WING`), а не цвет захвата.
  */
 function drawStrikeTrails(): void {
-  const trails = strikeTrails(s.strikes, { me: ME, now: s.time, basePos: strikeBasePos });
+  const trails = strikeTrails(s.strikes, { me: ME, now: mapNow(), basePos: strikeBasePos });
   if (!trails.length) return;
   cx.save();
   for (const tr of trails) {
@@ -5554,7 +5565,7 @@ function render(now: number) {
 
   drawFleetRoutes();
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
-  drawOrdnance(cx, mineView(), ME, s.time, world, cam.scale);
+  drawOrdnance(cx, mineView(), ME, mapNow(), world, cam.scale);
   mineControls.refresh();
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
 
@@ -13069,6 +13080,7 @@ function netClientFor(seat: string): MultiplayerClient {
         const diploShift = socketAdmitted && s !== snap.state && diffNetDiplomacy(s, snap.state);
         const changedMap = s.mapId !== snap.state.mapId || plan.admit;
         s = snap.state;
+        netView = netViewSnapshot(plan.admit ? NET_VIEW_IDLE : netView, s.time, performance.now());
         if (changedMap) installMapGeometry(s);
         syncPlayerNames(s);
         // Radar picture (BF-18): detected-but-unidentified enemy fleets are absent
@@ -15986,6 +15998,7 @@ function frame(nowReal: number) {
   // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
   // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
   // покадрового насоса здесь тоже нет: приказ исполняется, даже когда вкладка закрыта.
+  netShownTime = netViewAt(netView, nowReal, s.time);
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
