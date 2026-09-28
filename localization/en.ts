@@ -2529,6 +2529,8 @@ export const en: Record<string, string> = {
   'log.fleet.merged': '⛬ fleets merged at {at}',
   'log.fleet.split': '⊟ fleet split at {at}',
   'log.fleet.split-transit': '⊟ fleet split under way',
+  // AUDM-4: the fleet left before loading finished — the troops stayed in the garrison.
+  'log.army.load-cancelled': '⚠ loading cancelled: the fleet left, {n}× {u} stayed at {at}',
   'log.market.buy': 'buy',
   'log.market.sell': 'sell',
   'log.market.trade': '⇄ market: {n} {res} for {paid} ¤ ({side})',
