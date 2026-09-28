@@ -107,3 +107,62 @@ describe('охота отстающего', () => {
     expect(to).toBe(near.id);
   });
 });
+
+// Ударный резерв (`STRIKE_RESERVE` в `ai.ts`): столица, у которой запас в 8 голов целиком
+// уходит в пол гарнизона, продолжает строить войска, пока в десант нечего отдать.
+describe('ударный резерв', () => {
+  function capital(garrison: Array<{ unit: string; count: number }>): {
+    s: GameState;
+    home: string;
+  } {
+    const s = newGame({
+      seats: [
+        { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: true },
+        { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[5]!, ai: true },
+      ],
+    });
+    const home = START_CANDIDATES[5]!;
+    const p = s.planets[home]!;
+    // Застроенная столица: пол гарнизона растёт с уровнями зданий.
+    const extra = ['barracks', 'fort', 'hospital', 'refinery', 'tax_office', 'mine'].map(
+      (type) => ({ type, level: 1, hp: 25 }),
+    );
+    const planets = {
+      ...s.planets,
+      [home]: { ...p, buildings: [...p.buildings, ...extra], garrison },
+    };
+    const players = {
+      ...s.players,
+      p2: {
+        ...s.players.p2!,
+        resources: {
+          ...s.players.p2!.resources,
+          metal: 5000,
+          credits: 5000,
+          microelectronics: 500,
+        },
+      },
+    };
+    return { s: { ...s, planets, players }, home };
+  }
+  const groundOrders = (s: GameState, home: string): number =>
+    aiOrders(s, 'p2', 'expand', 'strong').filter(
+      (a) =>
+        a.type === 'unit.build' &&
+        (a.payload as { planetId: string; unit: string }).planetId === home &&
+        data.units[(a.payload as { unit: string }).unit]?.domain === 'ground',
+    ).length;
+
+  it('восемь ополченцев на полу — войска всё равно заказываются', () => {
+    const { s, home } = capital([{ unit: 'militia', count: 8 }]);
+    expect(groundOrders(s, home)).toBeGreaterThan(0);
+  });
+
+  it('резерв набран — больше не заказывает', () => {
+    const { s, home } = capital([
+      { unit: 'militia', count: 8 },
+      { unit: 'tank', count: 6 },
+    ]);
+    expect(groundOrders(s, home)).toBe(0);
+  });
+});
