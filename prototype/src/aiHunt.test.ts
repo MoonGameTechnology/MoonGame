@@ -9,8 +9,6 @@ import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import type { Fleet, GameState, Planet } from '../../packages/shared-core/src/index';
 
 const capturable = (p: Planet): boolean => data.sectorKinds[p.kind ?? '']?.capturable ?? false;
-const dist = (a: Planet, b: Planet): number =>
-  Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
 
 /**
  * Узел `at` и две цели p1: 10-очковая провинция `near` на расстоянии D и планета
