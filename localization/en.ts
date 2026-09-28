@@ -673,7 +673,7 @@ export const en: Record<string, string> = {
   'cmd.auto-retreat.hint': 'the fleet leaves a battle by itself once its hull drops to the threshold',
   'cmd.auto-assault': 'Auto-storm',
   'cmd.auto-assault.hint': 'the fleet storms an enemy world by itself on arrival',
-  'cmd.cast': 'Cast',
+  'cmd.cast': 'Ability',
   'cmd.cast.cooldown': 'CD {h}',
   'cmd.cast.hint': "use a hero ability from the fleet's roster",
   'cmd.cast.needs-target': 'target on map',
@@ -1314,6 +1314,20 @@ export const en: Record<string, string> = {
   'fleet.kind.ships': 'Fleet',
   'fleet.kind.shuttles': 'Squadron',
 
+  // --- fleet.console — Окно флота на ПК и планшете (макет владельца 2026-09-27): шапка с
+  // корпусом и щитом, приказы, состав, десант. Подписи параметров — `dossier.stat.*`,
+  // надбавки во всплывашке — `stat.*`.
+  'fleet.console.aboard': 'Aboard',
+  'fleet.console.at-planet': 'On planet',
+  'fleet.console.aura': '{p} attack and defense',
+  'fleet.console.composition': 'Composition',
+  'fleet.console.composition.hint': 'Values include modifiers. Tap a stat to see what changes it.',
+  'fleet.console.load': 'Load and unload',
+  'fleet.console.orders': 'Orders',
+  'fleet.console.shield.none': 'none',
+  'fleet.console.ships': 'ships: {n}',
+  'fleet.console.unit': 'Unit',
+
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}h',
   'fmt.minutes': '{n}m',
@@ -1818,9 +1832,26 @@ export const en: Record<string, string> = {
   // --- stat — Характеристики юнита в компактных подписях.
   'stat.cargo': 'cargo',
   'stat.hp': 'hull',
+  // Всплывашка надбавок по тапу на параметр флота (`decisions/statModifiers.ts`).
+  'stat.pop.base': 'Base',
+  'stat.pop.incoming': 'Incoming damage',
+  'stat.pop.none': 'No modifiers',
+  'stat.pop.total': 'Total',
   'stat.radar': 'radar',
   'stat.shield': 'shield',
   'stat.speed': 'speed',
+  // Источник надбавки — модуль ядра, который её дал (`statSourceKey`).
+  'stat.src.faction': 'Faction',
+  'stat.src.forced-march': 'Forced march',
+  'stat.src.hero': 'Hero',
+  'stat.src.hero-effects': 'Hero ability',
+  'stat.src.limp': 'Hull damage',
+  'stat.src.other': 'Other',
+  'stat.src.promotion': 'Promoted crews',
+  'stat.src.retreat': 'Retreat haste',
+  'stat.src.sector': 'Sector',
+  'stat.src.technology': 'Technologies',
+  'stat.src.veteran': 'Veterancy',
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
   'tgt.add-wait': '⏱ +1h',
@@ -2996,6 +3027,8 @@ export const en: Record<string, string> = {
   'settings.gfx.starfield.hint':
     'drifting nebulae and stars in the background — turn off for a flat backdrop',
   'settings.gfx.title': 'Graphics',
+  'settings.gfx.window-opacity': 'Window opacity',
+  'settings.gfx.window-opacity.hint': '0% — clearest glass, 100% — solid background',
   'settings.off': 'off',
   'settings.on': 'on',
   'settings.own-pins': 'My map markers',

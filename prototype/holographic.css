@@ -3,7 +3,7 @@
 body.holo-ui{
   --pcz:1;--vph:100dvh;--tbh:64px;
   --cyan:#8ce9f2;--cyan-dim:#78adbb;--ink:#d8eaf1;--dim:#a1bac7;
-  --line:#233d49;--line-hi:#477381;--glass:rgba(3,13,21,.94);
+  --line:#233d49;--line-hi:#477381;--glass:rgba(3,13,21,var(--holo-window-alpha,.94));
   --holo-surface:#0a202d;--holo-reflection:#b9f5ff;
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   font-size:14px;letter-spacing:.1px;
@@ -329,6 +329,8 @@ body.holo-ui .holo-floating-window{
   max-height:min(calc(100dvh - 24px),var(--holo-window-room,100dvh),var(--holo-window-max-height,100dvh))!important;
 }
 body.holo-ui .holo-drag-handle{cursor:grab;touch-action:none;user-select:none;}
+/* Окно тянется и за край (`floatingWindows.ts`, полоса у рамки): курсор подсказывает это. */
+body.holo-ui .holo-floating-window.holo-edge-hover{cursor:grab;}
 body.holo-ui .holo-drag-handle::before{content:'⠿';display:inline-block;flex:0 0 12px;
   color:var(--cyan-dim);font:16px/1 monospace;opacity:.65;margin-right:5px;pointer-events:none;}
 body.holo-ui .holo-drag-handle:focus-visible{outline-offset:-3px;}
@@ -351,3 +353,176 @@ body.holo-ui #holo-selection-window.details-open #cmdbar .holo-command-body{max-
 #battlewin .bw-ret button{padding:8px 12px;border:1px solid var(--line-hi);background:#102632;color:var(--cyan);cursor:pointer;}
 /* Карточка корабля — карточка, а не справочник на всю ширину: отсеки читаются столбцом. */
 body.holo-ui #codex .cxbox.sc-box{width:min(560px,84vw);}
+/* ОКНО ФЛОТА КОНСОЛЬЮ (макет владельца 2026-09-27). Одно широкое окно: шапка с корпусом и
+   щитом, три колонки — «Приказы» ряда команд, «Состав» и «Десант» листа, — низ с аурой героя
+   и «Подробнее о флоте». Хозяева (#cmdbar, #side) и обёртки листа растворены display:contents:
+   их дети встают прямо в сетку окна, а обработчики, кэши разметки и лестница Back остаются
+   на своих узлах. Включает раскладку класс .fleet-console (`holographicUi.ts`). */
+body.holo-ui #holo-selection-window.fleet-console.has-info{
+  width:min(1180px,calc(100vw - 110px));--holo-window-max-height:min(460px,calc(100dvh - 140px));
+  grid-template-columns:[orders] 348px [comp] minmax(0,1fr) [land] 300px [end];
+  grid-template-rows:[head] auto [main] minmax(0,1fr) [foot] auto [end];
+}
+body.holo-ui #holo-selection-window.fleet-console :is(#cmdbar,#side,#side .pscroll,#side .object-brief,#side .fconsole){
+  display:contents!important;}
+body.holo-ui #holo-selection-window.fleet-console #side :is(.phead,.pdesc){display:none!important;}
+/* Ручка нижнего листа телефона (build.mjs, узкий экран) — окну она ни к чему. */
+body.holo-ui #holo-selection-window.fleet-console #side::before{content:none;}
+body.holo-ui #holo-selection-window.fleet-console :is(.holo-command-body,.fc-comp,.fc-land,#side .object-detail,#cmdbar .tpop){
+  min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;
+  scrollbar-width:thin;scrollbar-color:var(--line-hi) transparent;}
+/* Шапка: захват, имя и где флот — в ширину «Приказов»; корпус и щит — над двумя другими. */
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-head{
+  grid-column:1/-1;grid-row:1;position:relative;z-index:1;align-items:center;min-height:62px;
+  padding:10px 12px 10px 14px;border-bottom:1px solid var(--line-hi);background:rgba(33,81,98,.15);}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-head > div{flex:0 1 auto;min-width:0;max-width:292px;margin-right:auto;}
+body.holo-ui #holo-selection-window.fleet-console .holo-command-head b{display:block;font-size:17px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+body.holo-ui #holo-selection-window.fleet-console .holo-command-head span{margin-top:2px;font-size:13px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar button.holo-command-close{width:40px;min-width:40px;height:40px;
+  min-height:40px;font-size:22px;border-radius:6px;border-color:var(--line-hi);}
+.fc-vitals{display:flex;align-items:center;gap:6px 18px;min-width:0;}
+body.holo-ui #holo-selection-window.fleet-console .fc-vitals{grid-column:comp/end;grid-row:1;align-self:center;
+  position:relative;z-index:4;margin:0 66px 0 10px;flex-wrap:wrap;}
+.fc-vital{display:flex;align-items:center;gap:9px;flex:1 1 0;min-width:170px;min-height:38px;padding:4px 8px;
+  border:1px solid transparent;border-radius:6px;background:none;color:var(--ink);font:inherit;cursor:pointer;text-align:left;}
+.fc-vital.hull{flex-grow:1.6;}
+.fc-vital:hover{border-color:var(--line-hi);background:rgba(45,106,125,.14);}
+.fc-vl{display:inline-flex;align-items:center;gap:7px;color:var(--dim);font-size:13px;white-space:nowrap;}
+.fc-vital.hull .fc-vl .holo-icon{color:#b9b4ff;}
+.fc-vital.shield .fc-vl .holo-icon{color:#7cc8ff;}
+.fc-vl .holo-icon svg{width:17px;height:17px;}
+.fc-vv{font-size:15px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.fc-bar{flex:1 1 auto;min-width:36px;height:8px;border-radius:4px;background:rgba(190,219,229,.14);overflow:hidden;}
+.fc-bar i{display:block;height:100%;border-radius:4px;background:#2fe39a;}
+.fc-vital.shield .fc-bar i{background:#5fb4ff;}
+.fc-vital.low .fc-bar i{background:var(--red);}
+.fc-repair{display:flex;gap:6px;flex:0 0 auto;}
+/* С #side: иначе `#side b` листа (build.mjs) перекрасит числа обратно в белый. */
+#side :is(.fc-vv.buff,.fc-stat.buff b){color:var(--up);}
+#side :is(.fc-vv.debuff,.fc-stat.debuff b){color:var(--dn);}
+/* Заголовок колонки: подпись и, у «Состава», значок подсказки рядом. */
+.fc-title{display:flex;align-items:center;gap:8px;grid-column:1/-1;min-height:22px;}
+.fc-title b{font-size:14px;font-weight:600;letter-spacing:.3px;color:var(--ink);}
+.fc-info{display:inline-flex;color:var(--dim);cursor:help;}
+.fc-info .holo-icon svg{width:16px;height:16px;}
+/* «Приказы»: высокие кнопки сеткой 3×N, значок над подписью. */
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-column:orders;grid-row:2;
+  align-content:start;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px 14px 14px;
+  border-right:1px solid var(--line-hi);}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body > button{grid-column:auto;
+  flex-direction:column;justify-content:center;align-items:center;gap:7px;min-height:74px;padding:10px 3px 9px;
+  text-align:center;border-radius:6px;border-color:var(--line-hi);color:var(--ink);background:rgba(13,40,52,.34);
+  font-family:inherit;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body > button.on{border-color:var(--cyan);
+  color:var(--holo-reflection);background:rgba(26,115,130,.3);box-shadow:inset 0 -2px 0 var(--cyan);}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body > button .ci{flex:0 0 auto;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body > button .ci svg{width:26px;height:26px;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body > button .cl{font-size:12px;font-weight:600;
+  line-height:1.2;}
+/* «Состав»: параметры 2×2 с разделителями, под ними — плитки кораблей. */
+body.holo-ui #holo-selection-window.fleet-console .fc-comp{grid-column:comp;grid-row:2;padding:12px 16px 14px;
+  border-right:1px solid var(--line-hi);}
+.fc-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 0 12px;border-top:1px solid var(--line);}
+.fc-stat{display:flex;align-items:center;gap:9px;min-width:0;min-height:40px;padding:6px 10px;border:0;
+  border-bottom:1px solid var(--line);border-radius:0;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;}
+.fc-stat:nth-child(odd){border-right:1px solid var(--line);}
+.fc-stat:hover{background:rgba(45,106,125,.14);}
+.fc-stat > span:not(.holo-icon){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim);font-size:13px;}
+.fc-stat b{margin-left:auto;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.fc-stat .holo-icon{color:var(--dim);}
+.fc-stat .holo-icon svg{width:19px;height:19px;}
+.fc-stat[data-stat=def] .holo-icon{color:var(--cyan);}
+.fc-stat[data-stat=spd] .holo-icon{color:var(--amber);}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptiles{display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin:0 0 6px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile{min-width:0;min-height:98px;padding:8px 6px 7px;
+  gap:3px;border-radius:6px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-ic .uglyph{width:30px;height:30px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-n{max-width:100%;font-size:12px;color:var(--ink);}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-c{font-size:12px;color:var(--ink);}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-hp{width:84%;height:4px;margin-top:3px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-comp .ptile .pt-hpn{font-size:12px;color:var(--ink);}
+/* «Десант»: трюм заголовком колонки, таблица «кто где», ангар и погрузка. */
+body.holo-ui #holo-selection-window.fleet-console .fc-land{grid-column:land;grid-row:2;padding:12px 16px 14px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-land .holdmeters{margin:0 0 10px;padding:0;border:0;background:none;gap:10px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-land .holdmeter-head{font-size:14px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-land .holdmeter-head > span{font-weight:600;}
+body.holo-ui #holo-selection-window.fleet-console .fc-land .holdmeter-track{height:8px;border-radius:4px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-land .holdmeter-note{font-size:12px;}
+.fc-troops{width:100%;border-collapse:collapse;margin:2px 0 8px;font-size:12px;}
+.fc-troops th{padding:5px 6px;font-size:11px;font-weight:400;color:var(--dim);text-align:center;white-space:nowrap;
+  border-bottom:1px solid var(--line);}
+.fc-troops td{padding:5px 6px;text-align:center;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+.fc-troops :is(th,td) + :is(th,td){border-left:1px solid var(--line);}
+.fc-troops :is(th,td):first-child{text-align:left;}
+.fc-troops td:first-child{color:var(--ink);}
+.fc-troops .bicon{display:inline-flex;vertical-align:middle;margin-right:7px;}
+body.holo-ui #holo-selection-window.fleet-console .fc-hangar{margin:4px 0 8px;font-size:13px;color:var(--dim);}
+body.holo-ui #side .fc-load{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:46px;
+  margin:6px 0 4px;padding:8px 12px;border:1px solid var(--line-hi);border-radius:6px;background:rgba(13,40,52,.34);
+  color:var(--ink);font-family:inherit;font-size:13px;font-weight:600;line-height:1.2;cursor:pointer;}
+body.holo-ui #side .fc-load .holo-icon svg{width:22px;height:22px;}
+body.holo-ui #side .fc-load:hover{border-color:var(--cyan);background:rgba(45,106,125,.2);}
+body.holo-ui #side .fc-load.on{border-color:var(--cyan);color:var(--holo-reflection);background:rgba(26,115,130,.3);}
+/* ⇅-меню десанта встаёт поверх колонки «Десант», а не под кнопками приказов. */
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .cmdpop.tpop{grid-column:land;grid-row:2;position:relative;
+  inset:auto;z-index:5;margin:0;padding:12px 14px;min-width:0;max-width:none;width:auto;max-height:none;border:0;
+  border-radius:0;background:#06131c;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .trow{grid-template-columns:minmax(0,1fr) auto;gap:6px;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .thead{font-family:inherit;font-size:14px;font-weight:600;
+  letter-spacing:.2px;color:var(--ink);white-space:normal;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop :is(.tname,.tcnt,.tdelta,.tbtns button){font-family:inherit;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .tname{font-size:12px;font-weight:600;}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop :is(.tlegend,.tnote){font-size:11px;}
+/* Низ окна: аура героя слева, «Подробнее о флоте» справа. */
+body.holo-ui #holo-selection-window.fleet-console .fc-foot{grid-column:1/-1;grid-row:3;display:flex;align-items:center;
+  min-height:44px;padding:8px 16px;border-top:1px solid var(--line-hi);}
+.fc-aura{display:inline-flex;align-items:center;gap:8px;min-width:0;font-size:13px;color:var(--ink);}
+.fc-aura .holo-icon{color:#d6a3ff;}
+.fc-aura .holo-icon svg{width:20px;height:20px;}
+.fc-aura b{font-weight:500;white-space:nowrap;}
+.fc-aura b:not(:last-child)::after{content:'·';margin-left:8px;color:var(--dim);}
+.fc-aura > span:last-child{color:var(--dim);}
+body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-details{grid-column:comp/end;grid-row:3;
+  justify-self:end;align-self:center;position:relative;z-index:2;margin:0 16px 0 0;padding:4px 0;min-height:32px;
+  border:0;background:none;color:var(--cyan);font-family:inherit;font-size:13px;font-weight:500;letter-spacing:.2px;}
+body.holo-ui #holo-selection-window.fleet-console.details-open #cmdbar .holo-command-details{color:var(--holo-reflection);
+  text-decoration:underline;text-underline-offset:3px;}
+/* «Подробнее о флоте»: сводка встаёт на место «Состава» и «Десанта», приказы остаются. */
+body.holo-ui #holo-selection-window.fleet-console.details-open :is(.fc-comp,.fc-land){display:none;}
+body.holo-ui #holo-selection-window.fleet-console #side .object-detail{grid-column:comp/end;grid-row:2;
+  padding:12px 16px;border-left:0;}
+/* Уже ПК: те же три колонки, «Приказы» — в два столбца кнопок. */
+@media (max-width:1100px){
+  body.holo-ui #holo-selection-window.fleet-console.has-info{width:calc(100vw - 36px);
+    grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [land] 300px [end];}
+  body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-head > div{max-width:196px;}
+  body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+/* Уже планшета: «Приказы» слева на две строки, «Состав» над «Десантом». Строки гибкие, чтобы
+   окно выше свободного места ужимало обе колонки в прокрутку, а не срезало низ окна. Корпус
+   и щит, не встав рядом, встают друг под другом: иначе полоса корпуса сжималась бы в точку. */
+@media (max-width:980px){
+  body.holo-ui #holo-selection-window.fleet-console.has-info{
+    --holo-window-max-height:calc(100dvh - var(--tbh) - 72px);
+    grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [end];
+    grid-template-rows:[head] auto [main] minmax(0,1fr) [land] minmax(0,1fr) [foot] auto [end];}
+  body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-row:2/4;}
+  body.holo-ui #holo-selection-window.fleet-console .fc-comp{grid-column:comp;grid-row:2;border-right:0;}
+  body.holo-ui #holo-selection-window.fleet-console :is(.fc-land,#cmdbar .cmdpop.tpop){grid-column:comp;grid-row:3;
+    border-top:1px solid var(--line-hi);}
+  body.holo-ui #holo-selection-window.fleet-console :is(.fc-vitals,#side .object-detail){grid-column:comp/end;}
+  body.holo-ui #holo-selection-window.fleet-console #side .object-detail{grid-row:2/4;}
+  body.holo-ui #holo-selection-window.fleet-console :is(.fc-foot,#cmdbar .holo-command-details){grid-row:4;}
+  body.holo-ui #holo-selection-window.fleet-console .fc-vital{min-width:220px;}
+}
+/* Всплывашка надбавок в стекле окна. */
+body.holo-ui #statpop{width:min(300px,calc(100vw - 16px));padding:11px 13px 12px;font-size:13px;
+  background:linear-gradient(155deg,rgba(39,84,103,.3),transparent 42%),var(--glass);
+  border:1px solid rgba(140,233,242,.6);border-radius:8px;box-shadow:0 14px 36px rgba(0,0,0,.55);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
+body.holo-ui #statpop .sp-head b{font-size:12px;}
+body.holo-ui #statpop .sp-val{font-size:16px;}
+body.holo-ui #statpop .sp-sub{font-size:10px;}

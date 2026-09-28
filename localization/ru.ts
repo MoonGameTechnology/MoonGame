@@ -679,7 +679,7 @@ export const ru: Record<string, string> = {
   'cmd.auto-retreat.hint': 'флот сам выходит из боя, когда корпус просядет до порога',
   'cmd.auto-assault': 'Авто-штурм',
   'cmd.auto-assault.hint': 'флот сам штурмует вражеский мир по прибытии',
-  'cmd.cast': 'Каст',
+  'cmd.cast': 'Способность',
   'cmd.cast.cooldown': 'КД {h}',
   'cmd.cast.hint': 'применить способность героя из состава флота',
   'cmd.cast.needs-target': 'цель на карте',
@@ -702,7 +702,7 @@ export const ru: Record<string, string> = {
   'cmd.retreat.title': 'Отходить, когда корпус ниже:',
   'cmd.selection.many': '{n} ФЛОТОВ',
   'cmd.selection.one': 'ФЛОТ',
-  'cmd.split': 'Делить',
+  'cmd.split': 'Разделить',
   'cmd.split.hint': 'отделить часть кораблей в новый флот — на стоянке или в пути',
   'cmd.split.why.battle': 'Флот в бою — разделить можно после боя.',
   'cmd.split.why.one': 'Делится один флот — выберите его одного.',
@@ -1321,6 +1321,20 @@ export const ru: Record<string, string> = {
   'fleet.kind.ships': 'Флот',
   'fleet.kind.shuttles': 'Эскадра',
 
+  // --- fleet.console — Окно флота на ПК и планшете (макет владельца 2026-09-27): шапка с
+  // корпусом и щитом, приказы, состав, десант. Подписи параметров — `dossier.stat.*`,
+  // надбавки во всплывашке — `stat.*`.
+  'fleet.console.aboard': 'На борту',
+  'fleet.console.at-planet': 'На планете',
+  'fleet.console.aura': '{p} атаки и обороны',
+  'fleet.console.composition': 'Состав',
+  'fleet.console.composition.hint': 'Числа — с надбавками. Тап по параметру — что его меняет.',
+  'fleet.console.load': 'Погрузка и выгрузка',
+  'fleet.console.orders': 'Приказы',
+  'fleet.console.shield.none': 'нет',
+  'fleet.console.ships': 'кораблей: {n}',
+  'fleet.console.unit': 'Подразделение',
+
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}ч',
   'fmt.minutes': '{n}м',
@@ -1825,9 +1839,26 @@ export const ru: Record<string, string> = {
   // --- stat — Характеристики юнита в компактных подписях.
   'stat.cargo': 'трюм',
   'stat.hp': 'корпус',
+  // Всплывашка надбавок по тапу на параметр флота (`decisions/statModifiers.ts`).
+  'stat.pop.base': 'База',
+  'stat.pop.incoming': 'Входящий урон',
+  'stat.pop.none': 'Надбавок нет',
+  'stat.pop.total': 'Итого',
   'stat.radar': 'радар',
   'stat.shield': 'щит',
   'stat.speed': 'скорость',
+  // Источник надбавки — модуль ядра, который её дал (`statSourceKey`).
+  'stat.src.faction': 'Фракция',
+  'stat.src.forced-march': 'Форсированный марш',
+  'stat.src.hero': 'Герой',
+  'stat.src.hero-effects': 'Способность героя',
+  'stat.src.limp': 'Повреждения корпуса',
+  'stat.src.other': 'Прочее',
+  'stat.src.promotion': 'Отличившиеся экипажи',
+  'stat.src.retreat': 'Спешный отход',
+  'stat.src.sector': 'Сектор',
+  'stat.src.technology': 'Технологии',
+  'stat.src.veteran': 'Выслуга',
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
   'tgt.add-wait': '⏱ +1ч',
@@ -2886,7 +2917,7 @@ export const ru: Record<string, string> = {
   'training.tour.research.grid': 'Изучите «Орбитальную оборонную сеть»: 5 ч. Без неё на этапе 11 не построить Орбитальное ПКО.',
   'training.tour.expand.neutral': 'Отправьте флот к нейтральной планете. Мир без гарнизона переходит к вам по прилёту.',
   'training.tour.missions.beacon': 'Займите наблюдательную станцию с учебным маяком. Дополнительные задачи победу не решают.',
-  'training.tour.fleet.split': 'Отделите от флота один корабль: выберите флот → «Делить».',
+  'training.tour.fleet.split': 'Отделите от флота один корабль: выберите флот → «Разделить».',
   'training.tour.fleet.merge': 'Слейте флоты обратно: «Слить» работает, когда оба стоят в одной провинции.',
   'training.tour.battle.patrol': 'Разбейте патруль на открытом участке: отправьте туда флот с базы. Бой идёт раундами сам.',
   'training.tour.battle.hero': 'Примените способность героя. После применения — перезарядка.',
@@ -3000,6 +3031,8 @@ export const ru: Record<string, string> = {
   'settings.gfx.starfield.hint':
     'дрейфующие туманности и звёзды на фоне — выключите для плоского фона',
   'settings.gfx.title': 'Графика',
+  'settings.gfx.window-opacity': 'Непрозрачность окон',
+  'settings.gfx.window-opacity.hint': '0% — самое прозрачное стекло, 100% — сплошной фон',
   'settings.off': 'выкл',
   'settings.on': 'вкл',
   'settings.own-pins': 'Свои метки на карте',

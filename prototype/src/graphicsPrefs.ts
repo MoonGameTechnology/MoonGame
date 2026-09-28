@@ -14,7 +14,7 @@
  * Форма REFM: имена функций сохранены (`fxBlur`, `pcUi`), поэтому их вызовы в рендере не
  * изменились — переехало только объявление.
  */
-import { readBool, writeBool } from './prefs';
+import { readBool, readRaw, writeBool, writeRaw } from './prefs';
 import { breath, type Breath } from './pulseFx';
 
 /**
@@ -104,6 +104,38 @@ export const showFpsOn = (): boolean => showFps;
 export function setShowFps(v: boolean): void {
   showFps = v;
   writeBool('void.showFps', v);
+}
+
+/**
+ * Непрозрачность окон голографического интерфейса (ПК и планшет) — ползунок «Графики»,
+ * заказ владельца 2026-09-27: «от максимального до непрозрачного». Хранится процентом
+ * ползунка (0..100), в стекло окон уходит альфой {@link windowAlpha}.
+ *
+ * Самое прозрачное стекло — не пустое (`WINDOW_ALPHA_MIN`): окно без фона — это текст,
+ * висящий над картой, и размытие под ним его уже не спасает. По умолчанию — 90%, то есть
+ * альфа .93: то самое стекло (.94), что было до ползунка, с точностью до его шага.
+ */
+const WINDOW_ALPHA_MIN = 0.3;
+export const WINDOW_OPACITY_DEFAULT = 90;
+const clampPct = (v: number): number => Math.max(0, Math.min(100, v));
+
+/** Альфа стекла окон по проценту ползунка. */
+export function windowAlpha(pct: number): number {
+  const p = Number.isFinite(pct) ? clampPct(pct) : WINDOW_OPACITY_DEFAULT;
+  return Math.round((WINDOW_ALPHA_MIN + ((1 - WINDOW_ALPHA_MIN) * p) / 100) * 1000) / 1000;
+}
+
+/** Процент из хранилища; ключа нет или там не число — значение по умолчанию. */
+function readWindowOpacity(): number {
+  const raw = readRaw('void.windowOpacity');
+  const n = raw === null || raw.trim() === '' ? NaN : Number(raw);
+  return Number.isFinite(n) ? clampPct(n) : WINDOW_OPACITY_DEFAULT;
+}
+let windowOpacity = readWindowOpacity();
+export const windowOpacityPct = (): number => windowOpacity;
+export function setWindowOpacity(pct: number): void {
+  windowOpacity = Number.isFinite(pct) ? clampPct(pct) : WINDOW_OPACITY_DEFAULT;
+  writeRaw('void.windowOpacity', String(windowOpacity));
 }
 
 /** Медиа-запрос ПК-раскладки — тот же, на котором висит ПК-часть CSS. */

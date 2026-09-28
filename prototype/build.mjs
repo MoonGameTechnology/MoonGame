@@ -1125,6 +1125,31 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
   width:172px;background:var(--glass);border:1px solid var(--amber);border-radius:8px;padding:8px 10px;
   box-shadow:0 0 22px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #pingpop.show{display:block;}
+/* Надбавки параметра флота (тап по числу в окне флота): кто и насколько двигает число.
+   Ставится JS по getBoundingClientRect параметра, поэтому, как #pingpop, вне списка зума.
+   Зелёный — бафы, красный — дебафы; у корпуса и щита строки — входящий урон. */
+#statpop{position:fixed;left:0;top:0;z-index:43;display:none;width:min(264px,calc(100vw - 16px));
+  overflow:auto;overscroll-behavior:contain;background:var(--glass);border:1px solid var(--line-hi);
+  border-radius:8px;padding:8px 11px 9px;box-shadow:0 0 22px rgba(0,0,0,.6);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);font-size:11px;line-height:1.4;}
+#statpop.show{display:block;}
+.sp-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+.sp-head b{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--cyan);}
+.sp-val{font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+.sp-desc{margin:4px 0 0;color:var(--dim);}
+.sp-sub{margin:7px 0 1px;font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);}
+.sp-row{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-top:1px solid var(--line);}
+.sp-head + .sp-row,.sp-desc + .sp-row{margin-top:6px;}
+.sp-row b{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.sp-row.total{font-weight:700;border-top-color:var(--line-hi);}
+.sp-none{margin-top:6px;padding-top:4px;border-top:1px solid var(--line);color:var(--dim);}
+.sp-val.buff,.sp-row.buff b{color:var(--up);}
+.sp-val.debuff,.sp-row.debuff b{color:var(--dn);}
+/* Число с надбавками в листе флота: тот же цвет, что в шапке всплывашки, и курсор-указатель —
+   по числу можно тапнуть. */
+#side [data-stat]{cursor:pointer;}
+#side .pstats span.buff,#side .hullrow b.buff{color:var(--up);}
+#side .pstats span.debuff,#side .hullrow b.debuff{color:var(--dn);}
 /* TGT-1: target-order composer — opens beside the marked world (CC-1 chains) */
 #tgted{position:fixed;z-index:46;display:none;transform:translate(-50%,calc(-100% - 16px));
   width:208px;background:var(--glass);border:1px solid var(--cyan);border-radius:8px;padding:8px 10px;
@@ -3615,6 +3640,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div></div>
 <div id="diplo"></div>
 <div id="pingpop"></div>
+<!-- Всплывашка надбавок параметра флота: тап по «Атаке», «Корпусу»… (main.ts, renderStatPop) -->
+<div id="statpop" role="dialog" aria-live="polite"></div>
   <div id="pingpanel"></div>
 <div id="tgted"></div>
 <div id="objtip"></div>

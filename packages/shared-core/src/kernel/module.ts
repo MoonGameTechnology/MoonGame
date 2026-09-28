@@ -42,6 +42,31 @@ export type ActionHandler = (action: Action, h: HandlerContext) => void;
 export type EventHandler = (event: DomainEvent, h: HandlerContext) => void;
 export type HookFn<T> = (current: T, args: unknown, h: HandlerContext) => T;
 
+/** One pipeline to trace (`Kernel.traceHooks`): the same `name`, base value and args a
+ *  handler would pass to `h.hook`. */
+export interface HookQuery {
+  name: string;
+  base: unknown;
+  args?: unknown;
+}
+
+/** One contributor that CHANGED the value — subscribers that passed it through
+ *  untouched are left out. `module` is the id of the module that registered it. */
+export interface HookTraceStep<T = unknown> {
+  module: string;
+  before: T;
+  after: T;
+}
+
+/** A pipeline taken apart: `value` is exactly what `h.hook` returns for the same query,
+ *  `steps` are the contributors that moved it, in execution (manifest) order. */
+export interface HookTrace<T = unknown> {
+  name: string;
+  base: T;
+  value: T;
+  steps: HookTraceStep<T>[];
+}
+
 /**
  * Setup-time API. A module registers all of its behavior here exactly once,
  * when the kernel is built from a manifest. After setup the kernel is frozen

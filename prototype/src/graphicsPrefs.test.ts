@@ -13,6 +13,10 @@ import {
   motionOn,
   setMotion,
   fxBreath,
+  setWindowOpacity,
+  windowAlpha,
+  windowOpacityPct,
+  WINDOW_OPACITY_DEFAULT,
 } from './graphicsPrefs';
 
 // REFM-21. Модуль читает окружающее хранилище на импорте, поэтому тесты работают с ЖИВЫМ
@@ -113,6 +117,34 @@ describe('CSS: ни одно окно не забыто в списке ПК-з�
     const windows = [...css.matchAll(/id="([\w-]+)"><div class="twbox"/g)].map((m) => m[1]);
     expect(windows.length).toBeGreaterThanOrEqual(4);
     for (const id of windows) expect(zoomed.has(`#${id}`), id).toBe(true);
+  });
+});
+
+describe('графика — непрозрачность окон', () => {
+  it('от самого прозрачного стекла до сплошного фона, края зажаты', () => {
+    expect(windowAlpha(0)).toBe(0.3);
+    expect(windowAlpha(100)).toBe(1);
+    expect(windowAlpha(-20)).toBe(0.3);
+    expect(windowAlpha(250)).toBe(1);
+    expect(windowAlpha(Number.NaN)).toBe(windowAlpha(WINDOW_OPACITY_DEFAULT));
+  });
+
+  it('по умолчанию — прежнее стекло (.94) с точностью до шага ползунка', () => {
+    expect(Math.abs(windowAlpha(WINDOW_OPACITY_DEFAULT) - 0.94)).toBeLessThanOrEqual(0.02);
+  });
+
+  it('значение сохраняется и читается, мусор становится значением по умолчанию', () => {
+    const before = windowOpacityPct();
+    try {
+      setWindowOpacity(35);
+      expect(windowOpacityPct()).toBe(35);
+      setWindowOpacity(140);
+      expect(windowOpacityPct()).toBe(100);
+      setWindowOpacity(Number.NaN);
+      expect(windowOpacityPct()).toBe(WINDOW_OPACITY_DEFAULT);
+    } finally {
+      setWindowOpacity(before);
+    }
   });
 });
 

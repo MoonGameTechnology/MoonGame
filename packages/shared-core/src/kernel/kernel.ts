@@ -16,9 +16,19 @@ import type {
   GameModule,
   HandlerContext,
   HookFn,
+  HookQuery,
+  HookTrace,
+  HookTraceStep,
   ModuleManifest,
   ModuleSetupApi,
 } from './module';
+
+/** A registered pipeline step. The module id rides along only for `traceHooks`: the
+ *  pipeline itself never reads it. */
+interface HookEntry {
+  module: string;
+  fn: HookFn<unknown>;
+}
 
 type StepResult =
   | { ok: true; state: GameState; events: DomainEvent[] }
@@ -70,7 +80,7 @@ function scheduledInsertPos(arr: readonly ScheduledEvent[], at: number, seq: num
 export class Kernel {
   private readonly actionHandlers = new Map<string, ActionHandler>();
   private readonly eventSubs = new Map<string, EventHandler[]>();
-  private readonly hooks = new Map<string, HookFn<unknown>[]>();
+  private readonly hooks = new Map<string, HookEntry[]>();
   private readonly capabilities = new Map<string, unknown>();
   readonly manifest: ModuleManifest;
 
@@ -95,7 +105,7 @@ export class Kernel {
         },
         hook: (name, fn) => {
           const list = this.hooks.get(name) ?? [];
-          list.push(fn as HookFn<unknown>);
+          list.push({ module: module.id, fn: fn as HookFn<unknown> });
           this.hooks.set(name, list);
         },
         provideCapability: (name, impl) => {
@@ -207,6 +217,39 @@ export class Kernel {
       draft = out.state;
     }
     return null;
+  }
+
+  /**
+   * «ПОЧЕМУ число такое?» — конвейер хука, разобранный по вкладчикам: для каждого
+   * запроса итог (`value`) и те подписчики, что его сдвинули (`steps`, модуль + «было →
+   * стало»), в порядке манифеста. `null` — один из подписчиков бросил: разбор с дырой
+   * выдал бы чужой итог за настоящий, поэтому отказ целиком (инвариант #4).
+   *
+   * Тот же принцип, что у `canApply` (RULES-1): это не второе описание правил, а те же
+   * подписчики на том же `HandlerContext`, что видит обработчик, — итог совпадает с
+   * `h.hook` по построению. Зачем: интерфейс показывает игроку атаку и скорость флота
+   * С УЧЁТОМ технологий, фракции, героя и местности и называет, кто их поднял или
+   * опустил. Сами надбавки — приватные константы модулей; переписанные в интерфейсе,
+   * они разошлись бы с боем молча, при первой же правке баланса.
+   *
+   * Работает на клоне (как любой шаг), состояние вызывающего не меняется. Все запросы
+   * идут одним шагом — один клон на пачку, а не на каждый конвейер.
+   */
+  traceHooks(state: GameState, queries: readonly HookQuery[], ctx: Context): HookTrace[] | null {
+    const traces: HookTrace[] = [];
+    const out = this.runStep(state, ctx, ctx.now, (h) => {
+      for (const query of queries) {
+        const steps: HookTraceStep[] = [];
+        let value: unknown = query.base;
+        for (const entry of this.hooks.get(query.name) ?? []) {
+          const before = value;
+          value = entry.fn(value, query.args ?? null, h);
+          if (!Object.is(before, value)) steps.push({ module: entry.module, before, after: value });
+        }
+        traces.push({ name: query.name, base: query.base, value, steps });
+      }
+    });
+    return out.ok ? traces : null;
   }
 
   /**
@@ -376,8 +419,8 @@ export class Kernel {
           return baseValue; // No contributor → base default. Never a crash.
         }
         let value: unknown = baseValue;
-        for (const fn of entries) {
-          value = fn(value, args ?? null, h);
+        for (const entry of entries) {
+          value = entry.fn(value, args ?? null, h);
         }
         return value as T;
       },

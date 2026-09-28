@@ -61,6 +61,8 @@ import {
   missionFactsModule,
   resolveMatchConfig,
   type GameModule,
+  type HookQuery,
+  type HookTrace,
   type GameState,
   type Action,
   type Context,
@@ -360,4 +362,13 @@ const memo = new Map<string, string | null>();
  */
 export function canOrderAll(state: GameState, actions: readonly Action[]): string | null {
   return kernel.canApplyAll(state, actions, ctx(state.time, state));
+}
+
+/**
+ * «Почему число такое?» — конвейеры хуков, разобранные по вкладчикам (`kernel.traceHooks`).
+ * Спрашивает окно флота: атака, скорость и входящий урон с надбавками и их источниками.
+ * Спрашивается на `state.time` по той же причине, что и `canOrder`.
+ */
+export function traceHooks(state: GameState, queries: readonly HookQuery[]): HookTrace[] | null {
+  return kernel.traceHooks(state, queries, ctx(state.time, state));
 }

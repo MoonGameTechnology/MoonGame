@@ -37,6 +37,9 @@ export interface SettingsView {
   palette: string;
   /** Интерфейс телефона: в «Управлении» — только жесты, клавиш у пальца нет. */
   touchOnly?: boolean;
+  /** Непрозрачность окон ПК и планшета, 0..1. Нет — нет и ползунка: у телефона стеклянных
+   *  окон нет, и строка двигала бы то, чего на экране не бывает. */
+  windowOpacity?: number;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -184,9 +187,17 @@ function mapHtml(view: SettingsView): string {
   );
 }
 
-/** «Графика»: свечение, звёзды, движение, счётчик кадров, совместимость отрисовки. */
+/** «Графика»: стекло окон, свечение, звёзды, движение, счётчик кадров, совместимость отрисовки. */
 function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): string {
   return (
+    (view.windowOpacity !== undefined
+      ? rangeRow(
+          'window-opacity',
+          t('settings.gfx.window-opacity'),
+          t('settings.gfx.window-opacity.hint'),
+          view.windowOpacity,
+        )
+      : '') +
     switchRow('glow', t('settings.gfx.glow'), t('settings.gfx.glow.hint'), view.glow) +
     switchRow(
       'starfield',
@@ -220,6 +231,8 @@ export interface SettingsHost {
   /** Снимок всех настроек на момент отрисовки. */
   view(): SettingsView;
   setSweepOpacity(v: number): void;
+  /** Непрозрачность окон, 0..1 (есть только там, где есть {@link SettingsView.windowOpacity}). */
+  setWindowOpacity?(v: number): void;
   setOwnPings(v: boolean): void;
   setGlow(v: boolean): void;
   setStarfield(v: boolean): void;
@@ -327,6 +340,15 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       const value = Number(sweep.value) / 100;
       host.setSweepOpacity(value);
       label('set-sweep', `${pct(value)}%`);
+    });
+
+    // Окна перекрашиваются на ходу: само окно настроек — такое же стекло, и игрок видит
+    // результат, пока тянет ползунок.
+    const opacity = q<HTMLInputElement>('set-window-opacity');
+    opacity?.addEventListener('input', () => {
+      const value = Number(opacity.value) / 100;
+      host.setWindowOpacity?.(value);
+      label('set-window-opacity', `${pct(value)}%`);
     });
 
     const vol = q<HTMLInputElement>('set-snd-vol');

@@ -545,7 +545,13 @@ export function hookedDamage(
  *  past −1 would divide by zero or flip the sign, so it degrades to "no effect" —
  *  fail-secure, mirroring the guards the individual sources carried. */
 function mitigationFactor(h: HandlerContext, args: DamageHookArgs): number {
-  const pool = h.hook<number>('combat.mitigation', 0, args);
+  return mitigationFromPool(h.hook<number>('combat.mitigation', 0, args));
+}
+
+/** The pool → surviving-fraction rule on its own, for a reader that already holds the
+ *  pool (the fleet window traces `combat.mitigation` and shows the factor the fight will
+ *  apply) — one rule, not a copy of it. */
+export function mitigationFromPool(pool: number): number {
   if (!(1 + pool > 0)) {
     return 1;
   }

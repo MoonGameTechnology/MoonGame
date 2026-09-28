@@ -10,6 +10,7 @@ const пусто: CmdSelection = {
   merging: false,
   troopsMenu: false,
   troopsOpen: false,
+  troopsInSheet: false,
   more: false,
   picking: false,
 };
@@ -59,6 +60,13 @@ describe('cmdPresence — слияние и десант по составу (п
 
   it('открытое меню десанта кнопку не теряет', () => {
     expect(cmdShown(с({ troopsOpen: true })).troops).toBe(true);
+  });
+
+  // Правило 3в (макет владельца 2026-09-27): в окне флота консолью ⇅ стоит под таблицей
+  // войск кнопкой «Погрузка и выгрузка» — вторая такая же в ряду была бы дублем.
+  it('в окне флота консолью ⇅ нет в ряду — ни закрытого, ни открытого', () => {
+    expect(cmdShown(с({ troopsMenu: true, troopsInSheet: true })).troops).toBe(false);
+    expect(cmdShown(с({ troopsOpen: true, troopsInSheet: true })).troops).toBe(false);
   });
 
   it('десант на борту для штурма и меню десанта — разные вопросы', () => {

@@ -454,6 +454,82 @@ describe('kernel — canApply (RULES-1)', () => {
   });
 });
 
+// traceHooks — тот же конвейер `h.hook`, разобранный по вкладчикам. Главный инвариант:
+// итог совпадает с тем, что увидел бы обработчик, — иначе интерфейс показал бы игроку
+// атаку, которой нет в бою.
+describe('kernel — traceHooks', () => {
+  const passModule: GameModule = {
+    id: 'pass',
+    version: '1.0.0',
+    setup(api) {
+      api.hook<number>('speed', (cur) => cur);
+    },
+  };
+  const argsModule: GameModule = {
+    id: 'by-args',
+    version: '1.0.0',
+    setup(api) {
+      api.hook<number>('speed', (cur, args) => cur + ((args as { boost?: number } | null)?.boost ?? 0));
+    },
+  };
+  const boomModule: GameModule = {
+    id: 'boom',
+    version: '1.0.0',
+    setup(api) {
+      api.hook<number>('speed', () => {
+        throw new Error('boom');
+      });
+    },
+  };
+
+  it('итог равен h.hook, шаги — только сдвинувшие значение, в порядке манифеста', () => {
+    const kernel = createKernel([movementModule, addFiveModule, passModule, doubleModule]);
+    const applied = expectOk(
+      kernel.applyAction(baseState(), action('move.computeSpeed', { base: 10 }), ctx()),
+    );
+    const [trace] = kernel.traceHooks(baseState(), [{ name: 'speed', base: 10 }], ctx()) ?? [];
+    expect(applied.events[0]?.payload).toEqual({ speed: trace?.value });
+    expect(trace).toEqual({
+      name: 'speed',
+      base: 10,
+      value: 30,
+      steps: [
+        { module: 'add-five', before: 10, after: 15 },
+        { module: 'double', before: 15, after: 30 },
+      ],
+    });
+  });
+
+  it('пачка запросов: у каждого свои аргументы; без подписчиков — база и пустые шаги', () => {
+    const kernel = createKernel([argsModule]);
+    const traces = kernel.traceHooks(
+      baseState(),
+      [
+        { name: 'speed', base: 1, args: { boost: 2 } },
+        { name: 'speed', base: 1 },
+        { name: 'никто.не.слушает', base: 7 },
+      ],
+      ctx(),
+    );
+    expect(traces?.map((x) => x.value)).toEqual([3, 1, 7]);
+    expect(traces?.[1]?.steps).toEqual([]);
+    expect(traces?.[2]?.steps).toEqual([]);
+  });
+
+  it('упавший подписчик — null целиком, а не разбор с дырой', () => {
+    const kernel = createKernel([addFiveModule, boomModule]);
+    expect(kernel.traceHooks(baseState(), [{ name: 'speed', base: 1 }], ctx())).toBeNull();
+  });
+
+  it('спрашивать безопасно: вход заморожен и не меняется', () => {
+    const kernel = createKernel([addFiveModule, doubleModule]);
+    const state = deepFreeze(baseState());
+    const first = kernel.traceHooks(state, [{ name: 'speed', base: 3 }], ctx());
+    expect(kernel.traceHooks(state, [{ name: 'speed', base: 3 }], ctx())).toEqual(first);
+    expect(first?.[0]?.value).toBe(16);
+  });
+});
+
 describe('шаг на состоянии БЕЗ потока RNG (проекция под туманом)', () => {
   // `visibleState` вырезает `rng` из проекции — клиент с ним прокрутил бы будущие бои
   // вперёд сервера. При этом сетевой клиент зовёт `canApply`, чтобы погасить

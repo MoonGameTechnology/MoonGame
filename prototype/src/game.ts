@@ -56,6 +56,7 @@ export {
   order,
   canOrder,
   canOrderAll,
+  traceHooks,
   type StepOut,
 } from './protoKernel';
 
