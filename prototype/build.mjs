@@ -1635,6 +1635,48 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 @media (max-width:520px){#battlewinbody .bw-top{flex-wrap:wrap;}
   #battlewinbody .bw-next{flex-basis:100%;flex-direction:row;justify-content:space-between;align-items:baseline;padding-top:6px;border-top:1px solid var(--line);}}
 #battlewinbody .bw-empty{font-size:12px;color:var(--dim);}
+/* Horizontal command window: ownership is independent from combat stance. */
+#battlewin .twbox{width:min(1220px,96vw);max-height:92dvh;}
+#battlewinbody{padding:16px 20px;}
+#battlewinbody .bw-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start;}
+#battlewinbody .bw-column{min-width:0;}
+#battlewinbody .bw-column h3{display:flex;justify-content:space-between;margin:0 0 10px;padding-bottom:9px;border-bottom:1px solid var(--line-hi);font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
+#battlewinbody .bw-column h3 span{color:var(--dim);}
+#battlewinbody .bw-side{margin-bottom:12px;padding:12px;border-left-color:var(--own);border-radius:7px;background:#0c1a24;}
+#battlewinbody .bw-side.mine{border-color:var(--line-hi);border-left-color:var(--own);background:color-mix(in srgb,var(--own) 10%,#0c1a24);}
+#battlewinbody .bw-who{gap:8px;align-items:center;}
+#battlewinbody .bw-who>div{flex:1;min-width:0;}
+#battlewinbody .bw-who b{display:block;color:var(--own);overflow-wrap:anywhere;font-size:14px;}
+#battlewinbody .bw-who small{display:block;font-size:10px;color:var(--dim);margin-top:3px;}
+#battlewinbody .bw-you{background:transparent;border:1px solid var(--own);color:var(--own);white-space:nowrap;}
+#battlewinbody .bw-damage{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;}
+#battlewinbody .bw-damage>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
+#battlewinbody .bw-damage span{font-size:10px;color:var(--dim);}
+#battlewinbody .bw-damage b{font:700 17px ui-monospace,monospace;color:var(--txt,#e8f6fa);white-space:nowrap;}
+#battlewinbody .bw-clock{display:flex;justify-content:space-between;align-items:center;padding:7px 0;color:#ffc36b;font-size:11px;}
+#battlewinbody .bw-clock b{font:700 17px ui-monospace,monospace;}
+#battlewinbody .bw-response{margin:8px 0;color:#7fc8ff;font-size:11px;}
+#battlewinbody .bw-expand,#battlewinbody .bw-effect-toggle,#battlewinbody .bw-more{display:block;width:100%;text-align:left;min-height:36px;padding:7px 0;background:transparent;border:0;color:var(--txt,#e8f6fa);font:inherit;font-size:11px;cursor:pointer;}
+#battlewinbody .bw-effect-toggle{color:#a3d9bd;border-bottom:1px solid var(--line);}
+#battlewinbody .bw-no-effects,#battlewinbody .bw-auto{font-size:10px;color:var(--dim);margin:5px 0;}
+#battlewinbody .bw-tiles{gap:6px;margin-top:4px;align-items:stretch;}
+#battlewinbody .bw-tiles .ptile{flex:0 0 56px;min-width:56px;box-sizing:border-box;color:var(--own);}
+#battlewinbody .bw-tiles .ptile.with-art{flex-basis:104px;}
+#battlewinbody .bw-tiles .ptile:focus-visible{outline:2px solid var(--own);outline-offset:2px;}
+#battlewinbody .bw-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
+#battlewinbody .bw-actions button,#battlewinbody .bw-orders button{min-height:38px;padding:8px 15px;font-size:12px;border:1px solid var(--line-hi);border-radius:4px;cursor:pointer;}
+#battlewinbody button.bw-attack{border-color:#ba7040;background:#47291b;color:#ffd09a;}
+#battlewinbody button:disabled{opacity:.4;cursor:default;}
+#battlewinbody .bw-orders{position:sticky;bottom:-16px;display:flex;justify-content:center;gap:12px;padding:12px;background:#09141ff5;border-top:1px solid var(--line-hi);z-index:1;}
+#battlewinbody .bw-effects{padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
+#battlewinbody .bw-effects ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;}
+#battlewinbody .bw-effects li{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:11px;}
+#battlewinbody .bw-effects .buff b{color:#67dca0;}
+#battlewinbody .bw-effects .debuff b{color:#ff887b;}
+#battlewinbody .bw-effects small{grid-column:1/-1;color:var(--dim);}
+#battlewinbody .bw-effects p{font-size:10px;line-height:1.4;color:var(--dim);margin-bottom:0;}
+#battlewinbody button:focus-visible{outline:2px solid #e8f6fa;outline-offset:2px;}
+@media(max-width:700px){#battlewinbody{padding:10px;}#battlewinbody .bw-columns{grid-template-columns:1fr;gap:12px;}#battlewin .twbox{max-height:94dvh;}#battlewinbody .bw-orders{bottom:-10px;}#battlewinbody .bw-damage b{font-size:15px;}}
 #stewardbody .st-status{padding:11px 13px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.08);font-size:12px;color:var(--cyan);line-height:1.55;}
 #stewardbody .st-status.locked{border-color:var(--line);background:rgba(255,255,255,.03);color:var(--dim);}
 #stewardbody .st-status.on{border-color:#7df0d0;background:rgba(125,240,208,.10);color:#9ff0da;}

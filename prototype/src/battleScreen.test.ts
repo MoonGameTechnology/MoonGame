@@ -24,6 +24,9 @@ const side = (
   units: [{ unit: 'cruiser', count: 3 }],
   mine,
   role,
+  ref: kind === 'fleet' || kind === 'landing' ? { kind, fleetId: `${owner}-1` }
+    : kind === 'garrison' ? { kind, planetId: 'P' } : { kind, planetId: 'P', owner },
+  ...(role === 'attacker' ? { nextAttackAt: 9000, attackStartedAt: 0 } : {}),
 });
 
 const battle = (sides: BattleModel['sides']): BattleModel => ({
@@ -212,4 +215,40 @@ it('retreat is available only for living own ship sides, never landing or foreig
   mine.battleId = null;
   expect(battleRetreats(state, 'b', 'p1')).toEqual([]);
   expect(battleRetreats(state, 'missing', 'p1')).toEqual([]);
+});
+
+it('uses the configured own color, fixed blue allies, and never gives allies commands', () => {
+  const mine = side('p1', 'defender', true);
+  const ally = { ...side('p3', 'attacker'), relation: 'ally' as const };
+  const html = battleWindowHtml(battle([mine, ally, side('p2', 'attacker')]), ['p1-1'], { color: () => '#c67dff' });
+  expect(html).toContain('--own:#c67dff');
+  expect(html).toContain('--own:#4a8cff');
+  expect(html.match(/data-battle-attack=/g)).toHaveLength(1);
+  expect(html.match(/class="pn-timer"/g)).toHaveLength(2); // only the two attackers
+  expect(html.indexOf('P3')).toBeLessThan(html.indexOf(t('battle.win.opponents')));
+  expect(sideRowHtml(mine)).toContain('--own:#3ad17a');
+});
+
+it('folding many distinct stacks preserves damage, effects and orders', () => {
+  const mine = { ...side('p1', 'defender', true), key: 'own' };
+  mine.units = Array.from({ length: 23 }, () => ({ unit: 'cruiser', count: 1 }));
+  mine.readout = { attack: 432, defense: { min: 123, max: 123 }, modifiers: [
+    { source: 'sector', hook: 'combat.mitigation', direction: 'incoming', value: -0.15, beneficial: false, against: 'p2' },
+  ] };
+  let requested = -1;
+  const view = { tiles: (_: unknown, limit: number) => { requested = limit; return '<b class="real-tiles"></b>'; } };
+  const folded = sideRowHtml(mine, view, { expanded: new Set(), retreats: ['p1-1'] });
+  expect(folded).toContain('432');
+  expect(folded).toContain('123');
+  expect(folded).toContain('data-battle-effects');
+  expect(folded).toContain('data-battle-attack');
+  expect(folded).not.toContain('real-tiles');
+  expect(requested).toBe(-1);
+  const expanded = sideRowHtml(mine, view, { expanded: new Set(['own']), effects: new Set(['own']) });
+  expect(requested).toBe(16);
+  expect(expanded).toContain(t('battle.win.more', { n: 7 }));
+  expect(expanded).toContain('debuff');
+  expect(expanded).toContain('−15');
+  sideRowHtml(mine, view, { fullComposition: new Set(['own']) });
+  expect(requested).toBe(Infinity);
 });

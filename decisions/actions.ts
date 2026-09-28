@@ -59,6 +59,10 @@ export const assaultFleet = (playerId: string, fleetId: string) =>
  *  без него флот только выходит из боя и остаётся на месте, как было до RETR-1. */
 export const retreatFleet = (playerId: string, fleetId: string, to?: string) =>
   act(playerId, 'fleet.retreat', to === undefined ? { fleetId } : { fleetId, to });
+export const attackBattle = (playerId: string, battleId: string, side?: string) =>
+  act(playerId, 'battle.attack', side === undefined ? { battleId } : { battleId, side });
+export const retreatBattle = (playerId: string, battleId: string, to: string) =>
+  act(playerId, 'battle.retreat', { battleId, to });
 /** Поставить/снять авто-отступление (RETR-2): `at` — доля оставшегося корпуса от
  *  максимального, `to` — куда уходить. Снятие — один `on: false`. */
 export const orderRetreat = (

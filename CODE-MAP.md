@@ -90,7 +90,7 @@
 | 8 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare`, `diplomacy.mapshare` | `player.eliminated` | — | `diplomacy.changed`, `diplomacy.mapshare.changed`, `diplomacy.mapshare.offered`, `diplomacy.offered` |
 | 9 | `espionage` | `espionage.ts` | `espionage.spy` | `time.advanced` | — | `espionage.detected`, `espionage.failed`, `intel.stolen` |
 | 10 | `orbital` | `orbital.ts` | `fleet.bombard`, `fleet.orbit` | `fleet.arrived`, `time.advanced` | — | `aa.fired`, `fleet.bombard`, `fleet.orbit`, `planet.bombarded` |
-| 11 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat` | `combat.tick`, `fleet.arrived`, `fleet.intercept`, `fleet.transit` | `fleet.speed` | `battle.resolved`, `battle.started`, `combat.round`, `fleet.destroyed`, `fleet.retreated`, `planet.captured`, `unit.died` · sched: `combat.tick` |
+| 11 | `combat` | `combat.ts` | `fleet.assault`, `fleet.retreat`, `battle.attack`, `battle.retreat` | `combat.tick`, `fleet.arrived`, `fleet.intercept`, `fleet.transit` | `fleet.speed` | `battle.resolved`, `battle.started`, `combat.round`, `fleet.destroyed`, `fleet.retreated`, `planet.captured`, `unit.died` · sched: `combat.tick` |
 | 12 | `artillery` | `artillery.ts` | `fleet.barrage`, `fleet.barrageMode` | `time.advanced` | — | `artillery.fired`, `fleet.barrage`, `fleet.barrageMode` |
 | 13 | `intercept` | `intercept.ts` | — | `fleet.leg`, `fleet.parked` | — | sched: `fleet.intercept` |
 | 14 | `capture-on-arrival` | `captureOnArrival.ts` | — | `fleet.arrived`, `fleet.transit` | — | `planet.captured` |
@@ -252,6 +252,7 @@
 | `data/mapSchema.ts` | `MatchMapSchema`, `MatchMap`, `avaShape`, `MapSlot` | zod-схемы карт |
 | `action/types.ts` | `Action`, `Context`, `MatchConfig`, `VictoryConfig`, `timeScaleOf` | типы действий |
 | `util/time.ts` | `MS_PER_DAY`, `MS_PER_HOUR` | константы времени |
+| `state/battleReadout.ts` | `inspectBattle` | урон и бафы/дебафы участников через `traceHooks` |
 | `util/combat.ts` | `isHostile`, `posAt`, `laneOccupancy` | утилиты боя |
 
 ---

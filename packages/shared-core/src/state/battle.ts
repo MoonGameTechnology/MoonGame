@@ -23,6 +23,18 @@ export function sidesOf(battle: Battle): readonly BattleSide[] {
   return battle.sides;
 }
 
+/** Current fire order, with support for battles saved before personal clocks. */
+export function attacks(side: BattleSide): boolean {
+  return (side.stance ?? (side.role === 'attacker' ? 'attack' : 'defense')) === 'attack';
+}
+
+/** Stable identity even when participants leave or the list grows. */
+export function combatantKey(ref: BattleSide['ref']): string {
+  return JSON.stringify(ref.kind === 'fleet' || ref.kind === 'landing'
+    ? [ref.kind, ref.fleetId]
+    : ref.kind === 'beachhead' ? [ref.kind, ref.planetId, ref.owner] : [ref.kind, ref.planetId]);
+}
+
 /** Первая сторона с ролью `role`, или `undefined`. */
 function sideByRole(battle: Battle, role: BattleSide['role']): BattleSide | undefined {
   return battle.sides.find((s) => s.role === role);
