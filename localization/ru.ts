@@ -3203,6 +3203,11 @@ export const ru: Record<string, string> = {
   'side.strike.bombard.stop': '⊗ Прекратить бомбардировку',
   'side.strike.forecast':
     'Прогноз штурма: {v} · ~{r} р. · потери {a} дес. ({pa}%) / {d} гарн. ({pd}%)',
+  // UIX-6.1: прогноз у цели «Атаки» (флот против флота). Слово-итог и строка цифр.
+  'engage.forecast.win': 'прогноз: победа',
+  'engage.forecast.draw': 'прогноз: ничья',
+  'engage.forecast.loss': 'прогноз: поражение',
+  'engage.forecast.line': '≈{h} · потери {own}% · у врага {foe}%',
   'side.strike.forecast.attacker': 'десант возьмёт мир',
   'side.strike.forecast.defender': 'гарнизон устоит',
   'side.strike.forecast.draw': 'затяжной пат',

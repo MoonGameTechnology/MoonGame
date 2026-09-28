@@ -308,6 +308,7 @@ import {
 import { medalBadges } from '../../decisions/unitMedals';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
+import { engageForecastCard } from '../../decisions/engageForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -4614,6 +4615,35 @@ function drawEngageTargets(now: number) {
   for (const c of engageCandidates()) targetBrackets(c.x, c.y, 14, now, HOSTILE);
 }
 
+/** UIX-6.1: прогноз у цели «Атаки» — выделенные флоты против флота под прицелом. Слова и
+ *  проценты решает `engageForecast.ts`; цвет только дублирует слово. Туман соблюдён тем,
+ *  что цель берётся из `engageCandidates()`: там лишь флоты, чей состав игрок видит. */
+function drawEngageForecast(foe: Fleet, x: number, y: number): void {
+  const mine = selectedFleetIds().flatMap((id) => s.fleets[id]?.units ?? []);
+  if (sumUnits(mine) <= 0 || sumUnits(foe.units) <= 0) return;
+  const card = engageForecastCard(previewBattle(mine, foe.units, data));
+  const ink = card.tone === 'positive' ? LOCK : card.tone === 'negative' ? HOSTILE : R_ARTY;
+  cx.save();
+  cx.setLineDash([]);
+  cx.textAlign = 'center';
+  cx.lineWidth = 3;
+  cx.strokeStyle = 'rgba(4,10,16,0.85)';
+  const line = (text: string, dy: number, font: string): void => {
+    cx.font = font;
+    cx.strokeText(text, x, y + dy);
+    cx.fillText(text, x, y + dy);
+  };
+  cx.fillStyle = ink;
+  line(t(card.verdictKey), 28, '600 11px ui-monospace,Menlo,monospace');
+  cx.fillStyle = rgba(ink, 0.85);
+  line(
+    t('engage.forecast.line', { h: fmtHrs(card.hours), own: card.ownLossPct, foe: card.foeLossPct }),
+    42,
+    '11px ui-monospace,Menlo,monospace',
+  );
+  cx.restore();
+}
+
 /** While ШТУРМ is armed (PC): ring every valid target — someone else's capturable
  *  world (enemy or friendly faction alike; the friendly path asks to declare war). */
 function drawAssaultTargets() {
@@ -4826,6 +4856,9 @@ function drawAimPreview() {
   if (!pointer) return;
   if (MOBILE && mobileDraft && (engageAim || merging)) {
     targetBrackets(pointer.x, pointer.y, 22, lastReal, engageAim ? HOSTILE : LOCK);
+    const staged = mobileDraft.target;
+    const foe = engageAim && staged.kind === 'fleet' ? s.fleets[staged.id] : undefined;
+    if (foe) drawEngageForecast(foe, pointer.x, pointer.y);
     return;
   }
   if (!(aiming || assaultAim || engageAim)) return;
@@ -4945,6 +4978,8 @@ function drawAimPreview() {
     }
   }
   cx.restore();
+  // Поверх пути, чтобы пунктир не перечёркивал цифры прогноза.
+  if (foeAim) drawEngageForecast(foeAim.fleet, foeAim.x, foeAim.y);
 }
 
 let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;

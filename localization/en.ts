@@ -3198,6 +3198,11 @@ export const en: Record<string, string> = {
   'side.strike.bombard.stop': '⊗ Stop bombard',
   'side.strike.forecast':
     'Assault forecast: {v} · ~{r} rounds · losses {a} landing ({pa}%) / {d} garrison ({pd}%)',
+  // UIX-6.1: forecast at the «Attack» target (fleet vs fleet). Verdict word and a numbers line.
+  'engage.forecast.win': 'forecast: victory',
+  'engage.forecast.draw': 'forecast: draw',
+  'engage.forecast.loss': 'forecast: defeat',
+  'engage.forecast.line': '≈{h} · losses {own}% · enemy {foe}%',
   'side.strike.forecast.attacker': 'the landing takes the world',
   'side.strike.forecast.defender': 'the garrison holds',
   'side.strike.forecast.draw': 'a drawn-out stalemate',
