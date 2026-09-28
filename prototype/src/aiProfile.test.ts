@@ -44,15 +44,26 @@ const research = (actions: Action[]): Action[] =>
   actions.filter((a) => a.type === 'technology.research');
 
 describe('профиль бота — сложность соперника', () => {
-  it('БЕЗ ПРОФИЛЯ — СЛАБЫЙ: дефолт остаётся прежним простым ботом', () => {
-    // Всё, что зовёт `aiOrders` без четвёртого аргумента, получает того же соперника,
-    // что и до AIDIFF-1: ветка исследования у него выключена.
-    expect(research(aiOrders(game2(), 'p2', 'expand'))).toHaveLength(0);
-    expect(research(aiOrders(game2(), 'p2', 'defend'))).toHaveLength(0);
+  it('СЛАБЫЙ знает то же, что сильный: исследует и он (заказ владельца 2026-09-28)', () => {
+    // Слабость — гандикап (`WEAK_HANDICAP`), а не выключенные умения.
+    expect(research(aiOrders(game2(), 'p2', 'expand')).length).toBeGreaterThan(0);
+    expect(research(aiOrders(game2(), 'p2', 'expand', 'strong')).length).toBeGreaterThan(0);
   });
 
-  it('СИЛЬНЫЙ профиль включает эвристику', () => {
-    expect(research(aiOrders(game2(), 'p2', 'expand', 'strong')).length).toBeGreaterThan(0);
+  it('СЛАБЫЙ медленнее: каждый второй ход бота молчит, сильный ходит всегда', () => {
+    const HOUR = 3_600_000;
+    const odd = { ...game2(), time: 2 * HOUR }; // второе двухчасовое окно
+    expect(aiOrders(odd, 'p2', 'expand')).toEqual([]);
+    expect(aiOrders(odd, 'p2', 'expand', 'strong').length).toBeGreaterThan(0);
+    const even = { ...game2(), time: 4 * HOUR };
+    expect(aiOrders(even, 'p2', 'expand').length).toBeGreaterThan(0);
+  });
+
+  it('«Хранитель» игрока гандикапа не получает — это его автопилот, а не соперник', () => {
+    const odd = { ...game2(), time: 2 * 3_600_000 };
+    const shape = (actions: Action[]): string =>
+      JSON.stringify(actions.map((a) => [a.type, a.payload]));
+    expect(shape(aiOrders(odd, 'p2', 'defend'))).toBe(shape(aiOrders(odd, 'p2', 'defend', 'strong')));
   });
 
   it('строка настройки называет ровно эти два профиля', () => {

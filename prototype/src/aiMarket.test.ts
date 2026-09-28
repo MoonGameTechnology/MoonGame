@@ -187,23 +187,22 @@ describe('AI-BAL-9 — границы книги', () => {
     expect(takes(reversed)[0]!.id).toBe('lot:a');
   });
 
-  it('ИГРОВОЙ бот и заявку на микроэлектронику не выставляет', () => {
-    // Прежний набор лотов у игрового бота: излишки на продажу и заявка на МЕТАЛЛ.
-    // Заявка на микроэлектронику — новинка тест-профиля, как и снятие чужих лотов.
+  it('заявку на микроэлектронику выставляют оба профиля (слабый — с гандикапом, 2026-09-28)', () => {
+    // Слабый бот знает то же, что сильный: излишки, заявка на металл И на микроэлектронику.
     const s = book({ ...NEUTRAL, credits: 4000, metal: 10, microelectronics: 10 }, []);
     const bids = (profile: 'weak' | 'strong'): string[] =>
       payloads<{ side: string; resource: string }>(orders(s, profile), 'market.list')
         .filter((l) => l.side === 'buy')
         .map((l) => l.resource);
-    expect(bids('weak')).toEqual(['metal']);
+    expect(bids('weak')).toContain('microelectronics');
     expect(bids('strong')).toContain('microelectronics');
   });
 
-  it('ИГРОВОЙ бот чужих лотов не снимает', () => {
+  it('слабый профиль чужие лоты тоже снимает', () => {
     const s = book({ ...NEUTRAL, microelectronics: 10 }, [
       { id: 'lot:micro', side: 'sell', resource: 'microelectronics', price: 1, amount: 12 },
     ]);
-    expect(takes(s, 'weak')).toHaveLength(0);
+    expect(takes(s, 'weak')).toEqual(takes(s, 'strong'));
   });
 });
 

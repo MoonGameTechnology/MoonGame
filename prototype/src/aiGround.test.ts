@@ -112,12 +112,12 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
     expect(ground[0]!.unit).toBe('heavy_infantry');
   });
 
-  it('ИГРОВОЙ бот в мирное время не строит ни казарму, ни пехоту', () => {
+  it('в мирное время не грузит десант — у обоих профилей', () => {
+    // Слабый бот знает то же, что сильный (гандикап 2026-09-28), поэтому казарму и
+    // войска он строит; проверяется правило владельца №5 — трюм грузится только под атаку.
     const s = game2();
-    const orders = aiOrders(s, 'p2', 'expand');
-    expect(built(orders, 'barracks')).toHaveLength(0);
-    expect(unitOrders(orders).filter((o) => GROUND.includes(o.unit))).toHaveLength(0);
-    expect(loads(orders)).toHaveLength(0);
+    expect(loads(aiOrders(s, 'p2', 'expand'))).toHaveLength(0);
+    expect(loads(aiOrders(s, 'p2', 'expand', 'strong'))).toHaveLength(0);
   });
 
   it('НА ВОЙНЕ десант грузится по вместимости трюма, но ПОЛ гарнизона остаётся', () => {

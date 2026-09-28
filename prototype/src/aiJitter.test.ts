@@ -147,10 +147,9 @@ describe('AI-BAL-5 — детерминизм цел (инвариант #1)', (
     expect(JSON.stringify(s.rng)).toBe(before);
   });
 
-  it('ИГРОВОЙ бот разброса не получил — его решения от сида не зависят', () => {
-    // Правило блока AI-BAL: всё новое достаётся только тест-профилю. Живой игрок
-    // встречает прежнего предсказуемого соперника.
-    expect(new Set(SEEDS.map((seed) => firstBuildAt(midgame(seed), 'weak'))).size).toBe(1);
-    expect(new Set(SEEDS.map((seed) => moveTarget(midgame(seed), 'weak'))).size).toBe(1);
+  it('слабый профиль разброс тоже получил — его решения зависят от сида (2026-09-28)', () => {
+    // Слабый бот — тот же репертуар с гандикапом (`WEAK_HANDICAP` в `ai.ts`), а не
+    // прежний предсказуемый соперник: разные сиды разводят и его.
+    expect(new Set(SEEDS.map((seed) => moveTarget(midgame(seed), 'weak'))).size).toBeGreaterThan(1);
   });
 });

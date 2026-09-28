@@ -95,7 +95,7 @@ describe('соло-драйверы — ходы ИИ', () => {
 
   it('ИИ ходит не чаще своего шага', () => {
     const h = harness();
-    h.setState(at(h.state(), AI_STEP_MS));
+    h.setState(at(h.state(), AI_STEP_MS * 2)); // слабый ходит в чётных окнах
     drain(h);
     const after = h.others.length;
     expect(after).toBeGreaterThan(0);
@@ -115,24 +115,23 @@ describe('соло-драйверы — ходы ИИ', () => {
 
   it('ход ИИ — это НАСТОЯЩИЕ приказы за чужое место, а не пустой прогон', () => {
     const h = harness();
-    h.setState(at(h.state(), AI_STEP_MS));
+    h.setState(at(h.state(), AI_STEP_MS * 2)); // слабый ходит в чётных окнах
     drain(h);
     expect(h.others.length).toBeGreaterThan(0);
     for (const a of h.others) expect(a.playerId).toBe('p2');
   });
 
-  it('СЛОЖНОСТЬ КРЕСЛА ДОЕЗЖАЕТ ДО БОТА: сильный исследует, слабый — нет (AIDIFF-1)', () => {
-    // Разница профилей проверяется тем, чего у слабого нет вовсе (ветка исследований),
-    // а не числом приказов: их количество зависит от казны и меняется от правок баланса.
-    const research = (as: Action[]): Action[] => as.filter((a) => a.type === 'technology.research');
+  it('СЛОЖНОСТЬ КРЕСЛА ДОЕЗЖАЕТ ДО БОТА: во втором окне слабый молчит, сильный ходит (AIDIFF-1)', () => {
+    // Слабый — тот же репертуар с гандикапом (2026-09-28): разница видна по темпу, а не
+    // по числу приказов — их количество зависит от казны и меняется от правок баланса.
     const run = (profile: 'weak' | 'strong'): Action[] => {
       const h = harness({ aiSeats: () => new Map([['p2', profile]]) });
       h.setState(at(h.state(), AI_STEP_MS));
       drain(h);
       return h.others;
     };
-    expect(research(run('weak'))).toHaveLength(0);
-    expect(research(run('strong')).length).toBeGreaterThan(0);
+    expect(run('weak')).toHaveLength(0);
+    expect(run('strong').length).toBeGreaterThan(0);
   });
 
   it('РАЗНЫЕ КРЕСЛА — РАЗНАЯ СИЛА: сложность у места своя, а не одна на матч', () => {
@@ -158,8 +157,8 @@ describe('соло-драйверы — ходы ИИ', () => {
     h.setState(at(h.state(), AI_STEP_MS));
     drain(h);
     const by = (id: string): Action[] => h.others.filter((a) => a.playerId === id);
-    expect(by('p2').some((a) => a.type === 'technology.research')).toBe(true);
-    expect(by('p3').some((a) => a.type === 'technology.research')).toBe(false);
+    expect(by('p2').length).toBeGreaterThan(0);
+    expect(by('p3')).toHaveLength(0);
   });
 
   it('ходы ИИ идут ЛОКАЛЬНЫМ путём, а не как свои приказы', () => {

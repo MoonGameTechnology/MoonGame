@@ -199,11 +199,11 @@ describe('SHU-5.6 — ремонтный ангар', () => {
     expect(builds(s).filter(withBay)).toEqual([]);
   });
 
-  it('ИГРОВОЙ (слабый) бот ремонтный ангар не ставит', () => {
+  it('слабый бот ремонтный ангар ставит тоже (слабый знает то же, 2026-09-28)', () => {
     const { s } = staged();
     const weak = only(aiOrders(s, 'p2', 'expand'), 'unit.build').map(
       (a) => a.payload as { unit: string; modules?: string[] },
     );
-    expect(weak.filter(withBay)).toEqual([]);
+    expect(weak.filter(withBay).length).toBeGreaterThan(0);
   });
 });
