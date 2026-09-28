@@ -27,10 +27,12 @@
  *    честная строка лучше пустой рамки.
  */
 import { t } from '../../localization/runtime';
-import { esc, displayUnit, runClockShown } from './format';
+import { esc, displayUnit, kfmt, runClockShown } from './format';
 import { runRealSeconds } from '../../decisions/runClock';
 import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
 import { veteranBadge } from '../../decisions/veteranBadge';
+import { combatantKey, landingBattleOf } from '../../packages/shared-core/src/state/battle';
+import { safeHexColor, COLOR } from './sideColors';
 import type { GameState, PlayerId } from '../../packages/shared-core/src/index';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
@@ -43,6 +45,8 @@ export interface BattleWindowHost {
   /** Модель боя (из `@void/client`), либо null — бой исчез или под туманом. */
   model: (battleId: string) => BattleModel | null;
   retreat: (fleetId: string) => void;
+  attack?: (battleId: string, side?: string) => void;
+  retreatAll?: (battleId: string) => void;
   /** Оформление (заказ владельца 2026-09-23) — всё необязательно: без него окно честно
    *  рисуется нейтральным цветом, сырым id и без строки авто-отхода. */
   view?: BattleView;
@@ -50,6 +54,9 @@ export interface BattleWindowHost {
 
 /** Как хост называет и красит то, что окно показывает. */
 export interface BattleView {
+  /** The same unit tile renderer used by fleet and garrison cards. */
+  tiles?: (side: Side, limit: number, color: string) => string;
+  ownerName?: (owner: string | null) => string;
   /** Цвет владельца — тот же, что у его флотов и границ на карте. */
   color?: (owner: string | null) => string;
   /** Позывной флота вместо сырого id. */
@@ -88,8 +95,79 @@ function meter(
   );
 }
 
-/** Одна карточка стороны: кто, в какой роли, чем держит узел и сколько осталось. */
-export function sideRowHtml(side: Side, view: BattleView = {}): string {
+/** Local window state never changes the game projection. */
+export interface BattleWindowOptions {
+  expanded?: ReadonlySet<string>;
+  fullComposition?: ReadonlySet<string>;
+  effects?: ReadonlySet<string>;
+  ended?: boolean;
+  retreats?: readonly string[];
+}
+
+function sideKey(side: Side): string {
+  return side.key ?? (side.ref ? combatantKey(side.ref) : `${side.kind}:${side.owner}`);
+}
+
+function sideColor(side: Side, view: BattleView): string {
+  if (side.mine) return safeHexColor(view.color?.(side.owner), COLOR.p1!);
+  if (side.relation === 'ally') return COLOR.ally!;
+  return safeHexColor(view.color?.(side.owner), side.relation === 'neutral' ? NEUTRAL : '#ff5a4d');
+}
+
+function sourceName(source: string): string {
+  const names: Record<string, string> = {
+    sector: t('battle.win.source-sector'),
+    'planet-type': t('battle.win.source-planet'),
+    hero: t('battle.win.source-hero'),
+    heroEffects: t('battle.win.source-aura'),
+    construction: t('battle.win.source-fort'),
+    technology: t('battle.win.source-tech'),
+    faction: t('battle.win.source-faction'),
+    veteran: t('battle.win.source-veteran'),
+    promotion: t('battle.win.source-promotion'),
+    hunger: t('battle.win.source-hunger'),
+  };
+  return names[source] ?? t('battle.win.source-other');
+}
+
+function effectsHtml(side: Side, view: BattleView, open: boolean): string {
+  const mods = side.readout?.modifiers ?? [];
+  if (!mods.length) return `<p class="bw-no-effects">${esc(t('battle.win.effects-empty'))}</p>`;
+  const buffs = mods.filter((m) => m.beneficial).length;
+  const rows = mods
+    .map((m) => {
+      const n = `${m.value > 0 ? '+' : '−'}${Math.round(Math.abs(m.value) * 1000) / 10}`;
+      const value = m.hook === 'combat.damage' ? `${n}%` : t('battle.win.point-value', { n });
+      const metric =
+        m.hook === 'combat.mitigation'
+          ? t('battle.win.mitigation')
+          : t(m.direction === 'outgoing' ? 'battle.win.outgoing' : 'battle.win.incoming');
+      return (
+        `<li class="${m.beneficial ? 'buff' : 'debuff'}"><b>${m.beneficial ? '+' : '−'} ${esc(sourceName(m.source))}</b>` +
+        `<span>${esc(metric)} ${esc(value)}</span><small>${esc(t('battle.win.against', { name: view.ownerName?.(m.against) ?? m.against ?? '—' }))}</small></li>`
+      );
+    })
+    .join('');
+  return (
+    `<button class="bw-effect-toggle" data-battle-effects="${esc(sideKey(side))}" aria-expanded="${open}">${esc(t('battle.win.effects', { buffs, debuffs: mods.length - buffs }))}</button>` +
+    (open
+      ? `<div class="bw-effects"><ul>${rows}</ul><p>${esc(t('battle.win.effects-condition'))}</p></div>`
+      : '')
+  );
+}
+
+/** Hull, shield, damage, effects and commands stay visible when tiles are folded. */
+export function sideRowHtml(
+  side: Side,
+  view: BattleView = {},
+  options: BattleWindowOptions = {},
+): string {
+  const key = sideKey(side);
+  const expanded = options.expanded?.has(key) ?? true;
+  const count = (side.stacks ?? side.units).filter((u) => u.count > 0).length;
+  const full = options.fullComposition?.has(key) ?? false;
+  const ref = side.ref;
+  const fleetId = ref && (ref.kind === 'fleet' || ref.kind === 'landing') ? ref.fleetId : undefined;
   const kind =
     side.kind === 'garrison'
       ? t('side.battle.side.garrison')
@@ -98,31 +176,66 @@ export function sideRowHtml(side: Side, view: BattleView = {}): string {
         : side.kind === 'beachhead'
           ? t('battle.win.beachhead')
           : t('side.battle.side.fleet');
-  const role = t(
-    side.role === 'attacker' ? 'battle.win.role.attacker' : 'battle.win.role.defender',
-  );
+  const name = fleetId ? (view.fleetName?.(fleetId) ?? fleetId) : kind;
+  const badge = side.mine
+    ? t('battle.win.you')
+    : side.relation === 'ally'
+      ? t('battle.win.ally')
+      : side.relation === 'neutral'
+        ? t('battle.win.neutral')
+        : '';
+  const col = sideColor(side, view);
   const tone = side.hull ? hullTone(side.hull.current, side.hull.max) : 'ok';
-  const col = view.color?.(side.owner) ?? NEUTRAL;
-  const units =
-    side.units
-      .map((u) => `<span class="bw-unit"><b>${u.count}×</b> ${esc(displayUnit(u.unit))}</span>`)
-      .join('') || '<span class="bw-unit">—</span>';
-  // PERK-3.3: надбавка за пережитые бои. Решение «что показать и когда молчать» —
-  // в `/decisions/veteranBadge.ts`, здесь только подстановка. Значка нет у сил без
-  // выслуги, поэтому у необстрелянной стороны строка не меняется ни на символ.
   const vet = veteranBadge(side.veteran, side.veteranHull);
-  const vetHtml = vet
-    ? `<span class="bw-vet" title="${esc(vet.title)}" aria-label="${esc(vet.title)}">${vet.glyph}${esc(vet.text)}</span>`
+  const damage = side.readout;
+  const defense = damage
+    ? Math.round(damage.defense.min) === Math.round(damage.defense.max)
+      ? kfmt(damage.defense.max)
+      : `${kfmt(damage.defense.min)}–${kfmt(damage.defense.max)}`
+    : '—';
+  const tiles = expanded
+    ? (view.tiles?.(side, full ? Infinity : 16, col) ??
+      side.units
+        .slice(0, full ? undefined : 16)
+        .map((u) => `<span class="bw-unit"><b>${u.count}×</b> ${esc(displayUnit(u.unit))}</span>`)
+        .join(''))
     : '';
+  const canRetreat = fleetId && options.retreats?.includes(fleetId);
+  const autoAt = fleetId ? view.autoRetreatAt?.(fleetId) : undefined;
   return (
-    `<div class="bw-side${side.mine ? ' mine' : ''} ${side.role}" style="--own:${esc(col)}">` +
-    `<p class="bw-who"><b>${esc(side.ownerName)}</b>` +
-    (side.mine ? `<em class="bw-you">${esc(t('battle.win.you'))}</em>` : '') +
-    `<span class="bw-role">${esc(role)}</span><span class="bw-kind">${esc(kind)}</span>${vetHtml}</p>` +
+    `<article class="bw-side${side.mine ? ' mine' : ''} ${side.role}" style="--own:${esc(col)}">` +
+    `<div class="bw-who"><div><b>${esc(name)}</b><small>${esc(side.ownerName)} · ${esc(kind)}</small></div>` +
+    (badge ? `<em class="bw-you">${esc(badge)}</em>` : '') +
+    `<span class="bw-role">${esc(t(side.role === 'attacker' ? 'battle.win.role.attacker' : 'battle.win.role.defender'))}</span></div>` +
     meter(side.hull, `hull tone-${tone}`, t('battle.win.hull'), t(TONE_KEY[tone])) +
     meter(side.shield, 'shield', t('battle.win.shield')) +
-    `<div class="bw-units">${units}</div>` +
-    `</div>`
+    `<div class="bw-damage" title="${esc(t('battle.win.damage-hint'))}"><div><span>⚔ ${esc(t('battle.win.attack-damage'))}</span><b>${damage ? kfmt(damage.attack) : '—'}</b></div>` +
+    `<div><span>⛨ ${esc(t('battle.win.defense-damage'))}</span><b>${defense}</b></div></div>` +
+    (vet
+      ? `<span class="bw-vet" title="${esc(vet.title)}" aria-label="${esc(vet.title)}">${vet.glyph}${esc(vet.text)}</span>`
+      : '') +
+    (!options.ended
+      ? side.role === 'defender'
+        ? `<p class="bw-response">⛨ ${esc(t('battle.win.response'))}</p>`
+        : `<div class="bw-clock"><span>${esc(t('battle.win.next-attack'))}</span><b class="pn-timer" data-at="${side.nextAttackAt ?? ''}">…</b></div>`
+      : '') +
+    effectsHtml(side, view, options.effects?.has(key) ?? false) +
+    `<button class="bw-expand" data-battle-expand="${esc(key)}" aria-expanded="${expanded}">${expanded ? '▾' : '▸'} ${esc(t('battle.win.composition', { n: count }))}</button>` +
+    (expanded
+      ? `<div class="ptiles bw-tiles">${tiles}</div>` +
+        (count > 16
+          ? `<button class="bw-more" data-battle-more="${esc(key)}">${esc(full ? t('battle.win.less') : t('battle.win.more', { n: count - 16 }))}</button>`
+          : '')
+      : '') +
+    (side.mine && !options.ended
+      ? `<div class="bw-actions">` +
+        `<button class="b bw-attack" data-battle-attack="${esc(key)}"${side.role === 'attacker' ? ' disabled' : ''}>${esc(t(side.role === 'attacker' ? 'battle.win.attacking' : 'battle.win.attack'))}</button>` +
+        `<button class="b" data-battle-retreat="${esc(fleetId ?? '')}"${canRetreat ? '' : ' disabled'}>${esc(t('side.battle.retreat'))}</button></div>` +
+        (fleetId && autoAt !== undefined
+          ? `<p class="bw-auto">${esc(autoAt === null ? t('battle.win.auto.off') : t('battle.win.auto.on', { n: Math.round(autoAt * 100) }))}</p>`
+          : '')
+      : '') +
+    `</article>`
   );
 }
 
@@ -147,44 +260,41 @@ function balanceHtml(sides: readonly Side[], view: BattleView): string {
   );
 }
 
-/** Тело окна целиком. */
+/** Two visual columns only: diplomacy and attack targets stay per participant. */
 export function battleWindowHtml(
   m: BattleModel | null,
   retreats: readonly string[] = [],
   view: BattleView = {},
+  options: BattleWindowOptions = {},
 ): string {
-  if (!m) return `<p class="bw-empty">${esc(t('battle.win.empty'))}</p>`; // правило 4
+  if (!m) return `<p class="bw-empty">${esc(t('battle.win.empty'))}</p>`;
   const ground = m.phase === 'ground';
-  const phase = t(ground ? 'battle.win.phase.ground' : 'battle.win.phase.orbit');
-  const place = view.placeName?.(m.location) ?? m.location;
+  const friends = m.sides.filter((s) => s.mine || s.relation === 'ally');
+  const others = m.sides.filter((s) => !s.mine && s.relation !== 'ally');
+  const expanded =
+    options.expanded ?? new Set([friends[0], others[0]].filter((s): s is Side => !!s).map(sideKey));
+  const renderColumn = (sides: Side[], title: string): string =>
+    `<section class="bw-column"><h3>${esc(title)} <span>${sides.length}</span></h3>` +
+    sides.map((s) => sideRowHtml(s, view, { ...options, expanded, retreats })).join('') +
+    '</section>';
+  const canAttack = m.sides.some((s) => s.mine && s.role === 'defender');
   return (
-    `<div class="bw-top ${ground ? 'ground' : 'orbit'}">` +
-    `<span class="bw-ico">${ground ? '🪐' : '🛰️'}</span>` +
-    `<div class="bw-title"><b>${esc(t('battle.win.at', { w: place }))}</b>` +
-    `<p class="bw-head">${esc(phase)} · ${esc(t('battle.win.round', { r: m.round }))}` +
-    ` · ${esc(t('battle.win.sides', { n: m.sides.length }))}</p></div>` +
-    (m.nextRoundAt != null
-      ? `<div class="bw-next"><span>${esc(t('battle.win.next'))}</span><b class="pn-timer" data-at="${m.nextRoundAt}">…</b></div>`
+    `<div class="bw-top ${ground ? 'ground' : 'orbit'}"><div class="bw-title"><b>${esc(t('battle.win.at', { w: view.placeName?.(m.location) ?? m.location }))}</b>` +
+    `<p class="bw-head">${esc(t(ground ? 'battle.win.phase.ground' : 'battle.win.phase.orbit'))} · ${esc(t('battle.win.sides', { n: m.sides.length }))}</p></div></div>` +
+    balanceHtml(m.sides, {
+      ...view,
+      color: (owner) =>
+        sideColor(
+          m.sides.find((s) => s.owner === owner)!,
+          view,
+        ),
+    }) +
+    `<div class="bw-columns">${renderColumn(friends, t('battle.win.allies'))}${renderColumn(others, t('battle.win.opponents'))}</div>` +
+    (!options.ended && m.sides.some((s) => s.mine)
+      ? `<div class="bw-orders"><button class="b bw-attack" data-battle-attack-all${canAttack ? '' : ' disabled'}>${esc(t('battle.win.attack-all'))}</button>` +
+        `<button class="b" data-battle-retreat-all${retreats.length ? '' : ' disabled'}>${esc(t('battle.win.retreat-all'))}</button></div>` +
+        `<p class="hint">${esc(t(ground ? 'battle.win.ground-retreat' : 'side.battle.retreat.hint'))}</p>`
       : '') +
-    `</div>` +
-    balanceHtml(m.sides, view) +
-    `<div class="bw-sides">${m.sides.map((sd) => sideRowHtml(sd, view)).join('')}</div>` +
-    (retreats.length
-      ? `<div class="bw-orders"><p class="bw-sub">${esc(t('battle.win.yours'))}</p>${retreats
-          .map((id) => {
-            const at = view.autoRetreatAt?.(id) ?? null;
-            const auto =
-              at === null
-                ? t('battle.win.auto.off')
-                : t('battle.win.auto.on', { n: Math.round(at * 100) });
-            return (
-              `<div class="bw-ret"><div><b>${esc(view.fleetName?.(id) ?? id)}</b><span>${esc(auto)}</span></div>` +
-              `<button class="b" data-battle-retreat="${esc(id)}">${esc(t('side.battle.retreat'))}</button></div>`
-            );
-          })
-          .join('')}</div><p class="hint">${esc(t('side.battle.retreat.hint'))}</p>`
-      : '') +
-    // Раунд — игровой час (`combat.ts`); в забеге он называется реальными секундами.
     `<p class="bw-rule">${esc(runClockShown() ? t('battle.win.rule.run', { n: runRealSeconds(3_600_000) }) : t('battle.win.rule'))}</p>`
   );
 }
@@ -199,16 +309,19 @@ export function battleEndedHtml(
   last: BattleModel | null,
   summary: string,
   view: BattleView = {},
+  options: BattleWindowOptions = {},
 ): string {
   const banner = `<div class="bw-ended"><b>${esc(t('battle.win.ended'))}</b><p>${esc(summary)}</p></div>`;
   if (!last) return banner;
   const { nextRoundAt: _gone, ...still } = last;
-  return banner + battleWindowHtml(still, [], view);
+  return banner + battleWindowHtml(still, [], view, { ...options, ended: true });
 }
 
 export function battleRetreats(state: GameState, id: string, me: PlayerId): string[] {
   return (state.battles[id]?.sides ?? []).flatMap((side) =>
+    state.battles[id]?.phase === 'orbital' &&
     side.ref.kind === 'fleet' &&
+    !landingBattleOf(state, side.ref.fleetId, id) &&
     side.owner === me &&
     state.fleets[side.ref.fleetId]?.owner === me &&
     state.fleets[side.ref.fleetId]?.battleId === id
@@ -230,17 +343,32 @@ export function initBattleWindow(host: BattleWindowHost): {
   let summary: string | null = null;
   const isOpen = (): boolean => host.root().classList.contains('show');
   let lastHtml = '';
+  let expanded: Set<string> | undefined;
+  const fullComposition = new Set<string>();
+  const effects = new Set<string>();
   const repaint = (): void => {
     if (!isOpen() || shown === null) return;
     const model = host.model(shown);
-    if (model) lastModel = model;
+    if (model) {
+      lastModel = model;
+      expanded ??= new Set(
+        [
+          model.sides.find((s) => s.mine || s.relation === 'ally'),
+          model.sides.find((s) => !s.mine && s.relation !== 'ally'),
+        ]
+          .filter((s): s is Side => !!s)
+          .map(sideKey),
+      );
+    }
+    const options = { expanded, fullComposition, effects };
     const html =
       !model && summary !== null
-        ? battleEndedHtml(lastModel, summary, host.view)
+        ? battleEndedHtml(lastModel, summary, host.view, options)
         : battleWindowHtml(
             model,
             model ? battleRetreats(host.state(), shown, host.me()) : [],
             host.view,
+            options,
           );
     if (html !== lastHtml) {
       const scroll = host.body().scrollTop;
@@ -254,10 +382,51 @@ export function initBattleWindow(host: BattleWindowHost): {
     const left = host.view?.timeLeft;
     if (left)
       for (const el of Array.from(host.body().querySelectorAll<HTMLElement>('.pn-timer')))
-        el.textContent = left(Number(el.dataset.at));
+        el.textContent = el.dataset.at ? left(Number(el.dataset.at)) : '—';
   };
   host.root().addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
+    for (const [attr, set] of [
+      ['battleExpand', expanded],
+      ['battleMore', fullComposition],
+      ['battleEffects', effects],
+    ] as const) {
+      const name = attr.replace(/[A-Z]/g, (x) => `-${x.toLowerCase()}`);
+      const key = tg.closest<HTMLElement>(`[data-${name}]`)?.dataset[attr];
+      if (key && set) {
+        if (set.has(key)) set.delete(key);
+        else set.add(key);
+        repaint();
+        return;
+      }
+    }
+    if (shown && host.model(shown)) {
+      const model = host.model(shown)!;
+      const attack = tg.closest<HTMLElement>('[data-battle-attack]')?.dataset.battleAttack;
+      if (
+        attack &&
+        model.sides.some((s) => s.mine && s.role === 'defender' && sideKey(s) === attack)
+      ) {
+        host.attack?.(shown, attack);
+        repaint();
+        return;
+      }
+      if (
+        tg.closest('[data-battle-attack-all]') &&
+        model.sides.some((s) => s.mine && s.role === 'defender')
+      ) {
+        host.attack?.(shown);
+        repaint();
+        return;
+      }
+      if (
+        tg.closest('[data-battle-retreat-all]') &&
+        battleRetreats(host.state(), shown, host.me()).length
+      ) {
+        host.retreatAll?.(shown);
+        return;
+      }
+    }
     const fleet = tg.closest<HTMLElement>('[data-battle-retreat]')?.dataset.battleRetreat;
     if (
       fleet &&
@@ -279,6 +448,9 @@ export function initBattleWindow(host: BattleWindowHost): {
       if (battleId !== shown) {
         lastModel = null;
         summary = null;
+        expanded = undefined;
+        fullComposition.clear();
+        effects.clear();
       }
       shown = battleId;
       lastHtml = '';

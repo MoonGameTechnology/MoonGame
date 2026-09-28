@@ -132,27 +132,27 @@ describe('MSB-2 — урон дробится на всех врагов', () =>
   });
 
   it('ТРОЕ: залп каждого делится ПОПОЛАМ между двумя врагами', () => {
-    // Обороняющийся p000 (defense 8 → по 4 каждому), двое атакующих (attack 12 → по 6).
+    // Обороняющийся p000 отвечает по 8 каждому ударившему; атакующие делят 12 пополам.
     const after = oneRound(melee(3));
     expect(hull(after, 'f000')).toBeCloseTo(4000 - 12, 6); // 6 + 6
-    expect(hull(after, 'f001')).toBeCloseTo(4000 - 10, 6); // 4 от обороны + 6 от соседа
-    expect(hull(after, 'f002')).toBeCloseTo(4000 - 10, 6);
+    expect(hull(after, 'f001')).toBeCloseTo(4000 - 14, 6); // полный ответ 8 + атака соседа 6
+    expect(hull(after, 'f002')).toBeCloseTo(4000 - 14, 6);
   });
 
   it('ЧЕТВЕРО: сумма прилетевшего равна сумме выпущенного — делёж ничего не теряет', () => {
     const after = oneRound(melee(4));
-    const dealt = 8 + 3 * 12; // ответ обороны плюс три удара
+    const dealt = 3 * 8 + 3 * 12; // ответ КАЖДОМУ из трёх атакующих
     const taken =
       4 * 4000 - Object.values(after.fleets).reduce((n, f) => n + totalHp(f.units, 4000), 0);
     expect(taken).toBeCloseTo(dealt, 6);
   });
 
   it('РОЛЬ ПРИНАДЛЕЖИТ СТОРОНЕ: обороняющийся отвечает `defense`, а не `attack`', () => {
-    // Двое обороняются (по 8, пополам), один атакует (12, пополам).
+    // Двое обороняются и друг друга не бьют; каждый отвечает 8 одному атакующему.
     const after = oneRound(melee(3, 2));
-    expect(hull(after, 'f000')).toBeCloseTo(4000 - 10, 6); // 4 от второго обороняющегося + 6
-    expect(hull(after, 'f001')).toBeCloseTo(4000 - 10, 6);
-    expect(hull(after, 'f002')).toBeCloseTo(4000 - 8, 6); // 4 + 4 от двух оборон
+    expect(hull(after, 'f000')).toBeCloseTo(4000 - 6, 6); // только половина атаки
+    expect(hull(after, 'f001')).toBeCloseTo(4000 - 6, 6);
+    expect(hull(after, 'f002')).toBeCloseTo(4000 - 16, 6); // два полных ответа по 8
   });
 
   it('НА ДВУХ СТОРОНАХ ИСХОД ПРЕЖНИЙ: весь залп уходит единственному врагу', () => {
@@ -167,8 +167,8 @@ describe('MSB-2 — урон дробится на всех врагов', () =>
     setStance(s, 'p001', 'p002', 'alliance');
     const after = oneRound(s);
     expect(hull(after, 'f000')).toBeCloseTo(4000 - 24, 6); // по 12 от каждого
-    expect(hull(after, 'f001')).toBeCloseTo(4000 - 4, 6); // половина ответа обороны
-    expect(hull(after, 'f002')).toBeCloseTo(4000 - 4, 6);
+    expect(hull(after, 'f001')).toBeCloseTo(4000 - 8, 6); // полный ответ на свой удар
+    expect(hull(after, 'f002')).toBeCloseTo(4000 - 8, 6);
   });
 });
 

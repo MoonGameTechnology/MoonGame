@@ -728,11 +728,16 @@ export interface BattleSide {
   ref: CombatantRef;
   /** Owner of this side (for victory / planet ownership). */
   owner: PlayerId | null;
-  /** MSB-1: which stat this side fires with — an ATTACKER strikes with `attack`, a
-   *  DEFENDER answers with `defense` only. The role belongs to the SIDE, not to the
-   *  pair: once a battle can hold five participants, four of them may be attacking at
-   *  once and «attacker ↔ defender» stops describing the battle as a whole. */
+  /** Initial role: the capture/report anchor, and the default fire order until
+   * a stance command is issued. Read the current order through `attacks(side)`. */
   role: 'attacker' | 'defender';
+  /** Current order. The original role remains the capture/report anchor. */
+  stance?: 'attack' | 'defense';
+  /** Personal attack cycle; defenders have neither field. */
+  attackStartedAt?: number;
+  nextAttackAt?: number;
+  /** Per-attacker stalemate limit; staggered clocks must not shorten the battle. */
+  attackCount?: number;
 }
 
 /** Одно минное поле одного владельца на узле (SM-3.4). */

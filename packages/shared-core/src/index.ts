@@ -707,3 +707,6 @@ export {
 export { rocketMinesModule } from './modules/rocketMines';
 export { rocketMinelayer, missilePositionAt, mineVisibleTo } from './state/ordnance';
 export type { RocketMine, MineMissile, MineInstallation, RocketMineMode, OrdnanceState } from './state/ordnance';
+
+export { attacks, combatantKey } from './state/battle';
+export { inspectBattle, type BattleReadout, type BattleModifier } from './state/battleReadout';

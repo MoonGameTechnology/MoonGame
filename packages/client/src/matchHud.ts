@@ -21,6 +21,9 @@
  * don't exist in the core (docs/hud-inmatch.md HUD-2 ⏳) and land once they ship.
  */
 import {
+  attacks,
+  combatantKey,
+  getStance,
   attackerOf,
   defenderOf,
   effectiveStats,
@@ -35,6 +38,8 @@ import {
 } from '@void/shared-core';
 import type {
   Battle,
+  BattleSide,
+  BattleReadout,
   BattleId,
   BattlePreviewSide,
   CombatantRef,
@@ -752,6 +757,14 @@ export function resolveWorldAction(action: WorldAction, model: WorldModel): Flee
 
 /** One side of a battle (attacker or defender) as the panel shows it. */
 export interface BattleSideView {
+  key?: string;
+  ref?: CombatantRef;
+  relation?: 'own' | 'ally' | 'enemy' | 'neutral';
+  /** Keep loadouts and merit separate, in the original stack order. */
+  stacks?: UnitStack[];
+  attackStartedAt?: number;
+  nextAttackAt?: number;
+  readout?: BattleReadout;
   owner: PlayerId | null;
   /** Owner's `player.name`, or the raw id / '—' for a neutral side. */
   ownerName: string;
@@ -817,7 +830,7 @@ export type BattleResult = ({ ok: true } & BattleModel) | { ok: false; code: str
 function sideView(
   state: GameState,
   battle: Battle,
-  side: { ref: CombatantRef; owner: PlayerId | null; role: 'attacker' | 'defender' },
+  side: BattleSide,
   viewerId: PlayerId,
   data?: Pick<GameData, 'units' | 'veteran'>,
   config?: Pick<MatchConfig, 'veteranPower'>,
@@ -843,7 +856,15 @@ function sideView(
     kind: ref.kind,
     units: toStacks(stacks, data),
     mine: owner != null && owner === viewerId,
-    role: side.role,
+    key: combatantKey(ref),
+    ref: { ...ref },
+    relation: owner === viewerId ? 'own' : owner === null ? 'enemy'
+      : ['alliance', 'pact'].includes(getStance(state, viewerId, owner)) ? 'ally'
+      : getStance(state, viewerId, owner) === 'war' ? 'enemy' : 'neutral',
+    stacks: stacks.map((s) => ({ ...s, ...(s.modules ? { modules: [...s.modules] } : {}) })),
+    role: attacks(side) ? 'attacker' : 'defender',
+    ...(attacks(side) && (side.nextAttackAt ?? battle.nextRoundAt) !== undefined
+      ? { attackStartedAt: side.attackStartedAt, nextAttackAt: side.nextAttackAt ?? battle.nextRoundAt } : {}),
   };
   if (data) {
     view.hull = hullOf(stacks, data);

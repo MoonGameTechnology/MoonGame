@@ -1,3 +1,5 @@
+import { attackBattle, retreatBattle } from '../../decisions/actions';
+import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { visibleMinefields, fieldPosition } from '../../packages/shared-core/src/state/minefields';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
@@ -740,7 +742,7 @@ import {
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
-import { initBattleWindow } from './battleScreen';
+import { battleRetreats, initBattleWindow } from './battleScreen';
 import { battleAtTap, battleBadgePoint } from '../../decisions/battleTap';
 import {
   initSteward,
@@ -6612,7 +6614,7 @@ function taskGroupPanelHtml(group: Fleet[]): string {
 function veteranPowerOn(): boolean {
   return ctx(s.time, s).config?.veteranPower === true;
 }
-function unitTileHtml(u: UnitStack, owner: string | null, open: string, named = false): string {
+function unitTileHtml(u: UnitStack, owner: string | null, open: string, named = false, color = ownerColor(owner)): string {
   if (u.count <= 0) return '';
   const def = data.units[u.unit];
   if (!def) return '';
@@ -6623,7 +6625,7 @@ function unitTileHtml(u: UnitStack, owner: string | null, open: string, named = 
   const art = ground ? catalogPortraitHtml('u', u.unit, data, 'thumb') : '';
   const icon = art || (ground
     ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-    : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color: ownerColor(owner), shield: (eff.shield ?? 0) > 0 })}</span>`);
+    : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, ownerFaction: owner ? s.players[owner]?.faction : undefined, color, shield: (eff.shield ?? 0) > 0 })}</span>`);
   // Наземные портреты сохраняют подпись; корабль узнаётся по силуэту, имя — в подсказке.
   // Окно флота на ПК (`named`) подписывает и корабли — так на макете владельца.
   const caption = ground || named ? `<span class="pt-n">${esc(name)}</span>` : '';
@@ -10098,8 +10100,9 @@ function selectAt(mx: number, my: number) {
     const fleetId = retreatAim;
     drop('retreatAim');
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    if (n) playerOrder(retreatFleet(ME, fleetId, n.id));
+    if (n) playerOrder(battleRetreatAim ? retreatBattle(ME, battleRetreatAim, n.id) : retreatFleet(ME, fleetId, n.id));
     else note(t('hint.retreat-cancelled'));
+    battleRetreatAim = null;
     invalidatePanel();
     return;
   }
@@ -10851,12 +10854,17 @@ document.getElementById('rail-steward')?.addEventListener('click', () => steward
 // бою, — то есть про чужую схватку рядом узнать было нечем.
 const battleWin = $('battlewin');
 /** Взвести «Отступить» для флота: остальные прицелы гаснут, окно боя уступает карту. */
+let battleRetreatAim: string | null = null;
 function armRetreat(fleetId: string): void {
+  battleRetreatAim = null;
   arm('retreatAim', fleetId);
   battleWin.classList.remove('show');
   note(t('hint.pick-retreat'));
   invalidatePanel();
 }
+let battleReadoutCache: ReturnType<typeof inspectBattle> = {};
+let battleReadoutId = '';
+let battleReadoutAt = -Infinity;
 const battleWindow = initBattleWindow({
   root: () => battleWin,
   body: () => $('battlewinbody'),
@@ -10866,17 +10874,47 @@ const battleWindow = initBattleWindow({
     // VET-6: тот же конфиг матча, на котором считает редьюсер, — иначе окно показало бы
     // надбавку ветерана там, где хост её не дал.
     const m = createBattleModel(s, id, ME, data, ctx(s.time, s).config);
-    return m.ok ? m : null;
+    if (!m.ok) return null;
+    const now = performance.now();
+    if (id !== battleReadoutId || now - battleReadoutAt >= 250) {
+      battleReadoutCache = inspectBattle(soloKernel, s, ctx(s.time, s), id);
+      battleReadoutAt = now;
+      battleReadoutId = id;
+    }
+    for (const side of m.sides) side.readout = side.key ? battleReadoutCache[side.key] : undefined;
+    return m;
+  },
+  attack: (id, side) => playerOrder(attackBattle(ME, id, side)),
+  retreatAll: (id) => {
+    const first = battleRetreats(s, id, ME)[0];
+    if (!first) return;
+    armRetreat(first);
+    battleRetreatAim = id;
   },
   // Отступление из окна боя — тот же прицел, что и кнопкой боковой панели.
   retreat: (fleetId) => armRetreat(fleetId),
   view: {
     color: ownerColor,
+    ownerName: (owner) => owner ? NAME[owner] ?? owner : t('side.neutral'),
+    tiles: (side, limit, color) => (side.stacks ?? side.units).map((u, index) => ({ u, index }))
+      .filter(({ u }) => u.count > 0).slice(0, limit).map(({ u, index }) => {
+        const open = side.ref?.kind === 'fleet' && side.mine
+          ? `data-shipcard="${esc(side.ref.fleetId)}|${index}"` : `data-codex="u:${esc(u.unit)}"`;
+        return unitTileHtml(u, side.owner, open, true, color);
+      }).join(''),
     fleetName: fleetCallsign,
     placeName: worldTitle,
     autoRetreatAt,
     timeLeft,
   },
+});
+battleWin.addEventListener('click', (event) => {
+  const tile = (event.target as HTMLElement).closest<HTMLButtonElement>('button.ptile');
+  if (!tile) return;
+  if (tile.dataset.shipcard) {
+    const at = tile.dataset.shipcard.lastIndexOf('|');
+    openShipCard(tile.dataset.shipcard.slice(0, at), Number(tile.dataset.shipcard.slice(at + 1)));
+  } else if (tile.dataset.codex) openCodex(tile.dataset.codex);
 });
 /** Сколько экрана вокруг дома занимают его значки — стек флотов, гарнизон, подписи (YAG-7.2). */
 const HOME_CLEARANCE_PX = 80;

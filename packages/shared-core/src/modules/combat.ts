@@ -1,4 +1,4 @@
-import type { GameModule, HandlerContext } from '../kernel/module';
+import type { GameModule, HandlerContext, ActionHandler } from '../kernel/module';
 import type {
   Battle,
   BattleSide,
@@ -15,7 +15,7 @@ import { MS_PER_HOUR } from '../util/time';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
 import { isCapturable } from '../state/sectorKind';
-import { attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
+import { attacks, combatantKey, attackerOf, defenderOf, landingBattleOf, shipsEngaged } from '../state/battle';
 import type { FleetCourse } from './movement';
 import { splitVolley, volleyShare } from '../util/volley';
 import {
@@ -104,28 +104,26 @@ function applyRetreatToll(fleet: Fleet, data: GameData, toll = RETREAT_TOLL): vo
 
 // --- battle lifecycle --------------------------------------------------------
 
-/** Назначить раунд. `immediate` — ПЕРВЫЙ раунд, на самой встрече (CMB-4).
- *
- *  Раньше первый раунд назначался тем же помощником, что и остальные, то есть через
- *  игровой час после столкновения. Защиты у этой задержки не было — она вышла побочно,
- *  из переиспользования, — а цена оказалась игровой: КОНТАКТ БЫЛ БЕСПЛАТНЫМ. Флот
- *  подходил вплотную, оба вставали, и, успев уйти внутри часа, он не получал и не
- *  наносил ни одного выстрела. Решение владельца после плейтеста: обменяться ударами
- *  обязаны при первой же встрече.
- *
- *  Почему «назначить на сейчас», а не позвать раунд встроенно из `startBattle`:
- *  `advanceTo` продолжает крутить цикл и берёт событие, назначенное на текущий миг,
- *  следующей итерацией (`earliestDue`, ветка `at === committed.time`). Значит
- *  цепочка «победил → сцепился со следующим» пойдёт отдельными событиями в порядке
- *  `(at, seq)`, как всё остальное на таймлайне, а не рекурсией внутри одного шага. */
+/** Schedule only the earliest personal clock. A stale event is harmless: the
+ * handler fires only participants whose clock is due. Equal instants share one
+ * pre-damage snapshot, independent of the order in which they were scheduled. */
 function scheduleTick(h: HandlerContext, battleId: string, immediate = false): void {
-  const at = immediate ? h.ctx.now : h.ctx.now + roundIntervalMs(h.ctx);
-  h.schedule(at, 'combat.tick', { battleId });
-  // Surface the round clock so the client can render a live battle countdown.
   const battle = h.state.battles[battleId];
-  if (battle) {
-    battle.nextRoundAt = at;
+  if (!battle) return;
+  for (const side of battle.sides) {
+    if (!attacks(side)) continue;
+    if (side.nextAttackAt === undefined) {
+      const at = battle.nextRoundAt ?? (immediate ? h.ctx.now : h.ctx.now + roundIntervalMs(h.ctx));
+      side.attackStartedAt = Math.min(h.ctx.now, at);
+      side.nextAttackAt = at;
+    }
   }
+  const times = battle.sides.flatMap((s) => attacks(s) && s.nextAttackAt !== undefined ? [s.nextAttackAt] : []);
+  if (!times.length) { delete battle.nextRoundAt; return; }
+  const at = Math.min(...times);
+  if (battle.nextRoundAt === at) return;
+  battle.nextRoundAt = at;
+  h.schedule(at, 'combat.tick', { battleId });
 }
 
 /** Lowest-id hostile, alive, unengaged fleet sitting at node `at`.
@@ -341,7 +339,9 @@ function enlist(h: HandlerContext, fleet: Fleet, battle: Battle): void {
     ref: { kind: 'fleet', fleetId: fleet.id },
     owner: fleet.owner,
     role: 'attacker',
+    attackStartedAt: h.ctx.now, nextAttackAt: h.ctx.now, attackCount: 0,
   });
+  scheduleTick(h, battle.id, true);
   h.emit('battle.joined', {
     battleId: battle.id,
     location: battle.location,
@@ -506,6 +506,7 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
       ref: { kind: 'landing', fleetId: fleet.id },
       owner: fleet.owner,
       role: 'attacker',
+      attackStartedAt: h.ctx.now, nextAttackAt: h.ctx.now, attackCount: 0,
     });
     // Вступивший флот — В БОЮ, как у `startBattle`. Без отметки он оставался «свободным»:
     // повторный штурм проходил и вписывал в бой ещё одну копию того же десанта (копии
@@ -514,6 +515,7 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
     // бросив свой десант на земле. Освобождает его конец боя, как всех сторон.
     fleet.battleId = joined.id;
     fleet.movement = null;
+    scheduleTick(h, joined.id, true);
     h.emit('battle.joined', { battleId: joined.id, location: at, fleetId: fleet.id, owner: fleet.owner });
     return null;
   }
@@ -938,8 +940,8 @@ function groundVolleys(
 
 export const combatModule: GameModule = {
   id: 'combat',
-  // 2.5.0: цена отступления идёт через хук `combat.retreatToll` (SM-3.1).
-  version: '2.5.0',
+  // 3.0.0: личные часы атакующих; защита отвечает на полученные залпы.
+  version: '3.0.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -1152,7 +1154,8 @@ export const combatModule: GameModule = {
         const b = h.state.battles[id];
         if (!b || b.phase !== 'ground' || b.location !== planetId) continue;
         if (!b.sides.some((x) => x.ref.kind === 'beachhead' && x.ref.owner === owner)) {
-          b.sides.push({ ref, owner, role: 'attacker' });
+          b.sides.push({ ref, owner, role: 'attacker', attackStartedAt: h.ctx.now, nextAttackAt: h.ctx.now, attackCount: 0 });
+          scheduleTick(h, b.id, true);
           h.emit('battle.joined', { battleId: b.id, location: planetId, owner });
         }
         return;
@@ -1198,11 +1201,21 @@ export const combatModule: GameModule = {
     // reward: a temporary speed boost to flee. The 1-v-1 battle dissolves and the
     // opponent is freed to give chase. The toll wounds but never kills — leaving
     // orbit OUTSIDE a battle stays free (a plain fleet.move).
-    api.onAction('fleet.retreat', (action, h) => {
-      const { fleetId, to } = action.payload as { fleetId?: string; to?: string };
-      if (typeof fleetId !== 'string' || (to !== undefined && typeof to !== 'string')) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
+    const retreat: ActionHandler = (action, h) => {
+      const p = action.payload as { fleetId?: unknown; battleId?: unknown; to?: unknown } | null;
+      if (!p || (p.to !== undefined && typeof p.to !== 'string')) return h.reject('E_BAD_PAYLOAD');
+      const bulk = action.type === 'battle.retreat';
+      if (bulk && (typeof p.battleId !== 'string' || typeof p.to !== 'string')) return h.reject('E_BAD_PAYLOAD');
+      const requested = typeof p.battleId === 'string' && Object.hasOwn(h.state.battles, p.battleId)
+        ? h.state.battles[p.battleId] : undefined;
+      const ids = bulk ? (requested?.phase === 'orbital' ? requested.sides.flatMap((s) =>
+        s.ref.kind === 'fleet' && s.owner === action.playerId &&
+        ownFleet(h.state, s.ref.fleetId)?.owner === action.playerId &&
+        ownFleet(h.state, s.ref.fleetId)?.battleId === requested.id &&
+        !landingBattleOf(h.state, s.ref.fleetId, requested.id) ? [s.ref.fleetId] : []) : []) : [];
+      const fleetId = bulk ? ids[0] : p.fleetId;
+      const to = p.to as string | undefined;
+      if (typeof fleetId !== 'string') return h.reject(bulk ? 'E_CANNOT_RETREAT' : 'E_BAD_PAYLOAD');
       const fleet = ownFleet(h.state, fleetId); // own-key — rejects an injected `__proto__`
       // One opaque code for "no such fleet" AND "not your fleet": otherwise a client
       // could enumerate ids and use E_NO_FLEET vs E_FORBIDDEN to confirm the existence
@@ -1218,7 +1231,7 @@ export const combatModule: GameModule = {
       const isThisFleet = (ref: CombatantRef): boolean =>
         ref.kind === 'fleet' && ref.fleetId === fleetId;
       // MSB-1: ищем себя СРЕДИ СТОРОН, а не сверяемся с двумя полями.
-      if (!battle.sides.some((side) => isThisFleet(side.ref))) {
+      if (battle.phase !== 'orbital' || !battle.sides.some((side) => isThisFleet(side.ref))) {
         return h.reject('E_CANNOT_RETREAT'); // the landing force, not the orbital fleet
       }
       // ASSAULT-1. Корабли сцепились на орбите, а десант этого флота дерётся внизу: уйти
@@ -1228,61 +1241,63 @@ export const combatModule: GameModule = {
         return h.reject('E_CANNOT_RETREAT');
       }
 
-      // SM-3.1: цена отступления — хук с базой 0.4 (тяговый луч противника её поднимает).
-      // Нечисловой или вне [база, потолок] вклад не принимается: база — нижняя граница.
-      const hooked = h.hook<number>('combat.retreatToll', RETREAT_TOLL, { fleetId, battleId });
-      const toll = Number.isFinite(hooked)
-        ? Math.min(RETREAT_TOLL_MAX, Math.max(RETREAT_TOLL, hooked))
-        : RETREAT_TOLL;
-      applyRetreatToll(fleet, h.ctx.data, toll);
-      fleet.battleId = null;
-      // ROADS-8: отступление — СВОЙ приказ игрока, и прерванный боем марш он отменяет:
-      // отходящий идёт туда, куда велели отойти, или стоит.
-      delete fleet.resume;
-
-      // Free the opponent's side (a fleet can pursue; a garrison ref is a no-op),
-      // then dissolve the now-one-sided battle.
-      // Отпускаем ВСЕ остальные стороны: на двух это прежний «противник», на N — каждый,
-      // кто остался в распускаемом бою.
+      const leaving = bulk ? ids.map((id) => ownFleet(h.state, id)!) : [fleet];
+      const leavingIds = new Set(leaving.map((f) => f.id));
+      // Validate and execute the whole group on one draft. A refused route rolls
+      // back every toll and movement, so a bulk order can never partly succeed.
+      for (const f of leaving) {
+        const hooked = h.hook<number>('combat.retreatToll', RETREAT_TOLL, { fleetId: f.id, battleId });
+        const toll = Number.isFinite(hooked)
+          ? Math.min(RETREAT_TOLL_MAX, Math.max(RETREAT_TOLL, hooked)) : RETREAT_TOLL;
+        applyRetreatToll(f, h.ctx.data, toll);
+        f.battleId = null;
+        delete f.resume;
+        f.retreatHasteUntil = h.ctx.now + RETREAT_HASTE_MS;
+      }
       for (const side of battle.sides) {
-        if (!isThisFleet(side.ref)) releaseOrDestroyFleet(h, side.ref, battleId);
+        if (side.ref.kind !== 'fleet' || !leavingIds.has(side.ref.fleetId))
+          releaseOrDestroyFleet(h, side.ref, battleId);
       }
       delete h.state.battles[battleId];
-      // ROADS-8: противник остался на дороге один — бой для него кончен, и прерванный
-      // им марш продолжается, как после выигранного боя.
       for (const side of battle.sides) {
-        if (!isThisFleet(side.ref) && side.ref.kind === 'fleet') {
+        if (side.ref.kind === 'fleet' && !leavingIds.has(side.ref.fleetId))
           settleMarch(h, side.ref.fleetId, true);
+      }
+      for (const f of leaving) {
+        if (f.units.length === 0) {
+          h.emit('fleet.destroyed', { fleetId: f.id, owner: f.owner });
+          delete h.state.fleets[f.id];
+          h.emit('fleet.retreated', { fleetId: f.id, owner: action.playerId, battleId, escaped: false });
+          continue;
         }
+        if (to !== undefined) {
+          const course = h.capability<FleetCourse>('fleet.course');
+          const err = course?.({ fleetId: f.id, to, playerId: action.playerId }, h);
+          if (err != null) return h.reject(err);
+        }
+        h.emit('fleet.retreated', { fleetId: f.id, owner: action.playerId, battleId, escaped: true });
       }
+    };
+    api.onAction('fleet.retreat', retreat);
+    api.onAction('battle.retreat', retreat);
 
-      if (fleet.units.length === 0) {
-        // The withdrawal finished off an already-crippled fleet — no escape.
-        h.emit('fleet.destroyed', { fleetId, owner: fleet.owner });
-        delete h.state.fleets[fleetId];
-        h.emit('fleet.retreated', { fleetId, owner: action.playerId, battleId, escaped: false });
-        return;
+    // Missing/foreign participant has one opaque refusal; allies cannot be ordered.
+    api.onAction('battle.attack', (action, h) => {
+      const p = action.payload as { battleId?: unknown; side?: unknown } | null;
+      if (!p || typeof p.battleId !== 'string' || (p.side !== undefined && typeof p.side !== 'string'))
+        return h.reject('E_BAD_PAYLOAD');
+      const battle = Object.hasOwn(h.state.battles, p.battleId) ? h.state.battles[p.battleId] : undefined;
+      const own = battle?.sides.filter((s) => s.owner === action.playerId && sideAlive(h.state, s.ref)
+        && (p.side === undefined || combatantKey(s.ref) === p.side)) ?? [];
+      if (!battle || !own.length) return h.reject('E_NO_BATTLE');
+      for (const side of own) {
+        if (attacks(side)) continue; // repeated/bulk orders never restart an attacker's clock
+        side.stance = 'attack';
+        side.attackCount = 0;
+        side.attackStartedAt = h.ctx.now;
+        side.nextAttackAt = h.ctx.now + roundIntervalMs(h.ctx);
       }
-      fleet.retreatHasteUntil = h.ctx.now + RETREAT_HASTE_MS;
-      // RETR-1. Отступление УВОДИТ, а не просто расцепляет. До этого окно ускорения
-      // (`retreatHasteUntil`) существовало ради бегства, а бежать было некуда: флот
-      // оставался на том же узле, и следующий враг сцеплял его тем же часом — разгон
-      // был, а отхода не было.
-      //
-      // Курс ставит модуль ДВИЖЕНИЯ через реестр возможностей: там живут маршрут, право
-      // прохода и коридоры, и второй такой маршрутизатор здесь был бы копией, которая
-      // отстанет от оригинала. Нет модуля движения — нет возможности, и приказ работает
-      // как прежде (деградация к базовому поведению, инвариант №3).
-      //
-      // Отказ курса роняет ВЕСЬ приказ: кернел отбрасывает черновик целиком, поэтому
-      // «отступить в недостижимую точку» оставляет флот в бою и говорит об этом кодом,
-      // вместо того чтобы вывести его из боя и бросить стоять под огнём.
-      if (to !== undefined) {
-        const course = h.capability<FleetCourse>('fleet.course');
-        const err = course?.({ fleetId, to, playerId: action.playerId }, h);
-        if (err != null) return h.reject(err);
-      }
-      h.emit('fleet.retreated', { fleetId, owner: action.playerId, battleId, escaped: true });
+      scheduleTick(h, battle.id);
     });
 
     api.on('combat.tick', (event, h) => {
@@ -1316,8 +1331,25 @@ export const combatModule: GameModule = {
         return;
       }
 
+      // Old saves acquire personal clocks from their already scheduled first event.
+      for (const side of battle.sides) {
+        if (attacks(side)) side.attackCount ??= battle.round;
+        if (attacks(side) && side.nextAttackAt === undefined) {
+          side.attackStartedAt = h.ctx.now;
+          side.nextAttackAt = h.ctx.now;
+        }
+      }
+      const due = battle.sides.filter((s) => attacks(s) && s.nextAttackAt! <= h.ctx.now);
+      if (!due.length) return; // superseded event, never an extra volley
+      delete battle.nextRoundAt;
+      for (const side of due) {
+        side.attackCount = (side.attackCount ?? 0) + 1;
+        side.attackStartedAt = h.ctx.now;
+        side.nextAttackAt = h.ctx.now + roundIntervalMs(h.ctx);
+      }
+
       battle.round += 1;
-      if (battle.round > MAX_COMBAT_ROUNDS) {
+      if (due.some((side) => side.attackCount! > MAX_COMBAT_ROUNDS)) {
         finishBattle(h, battle, 'stalemate'); // safety valve
         return;
       }
@@ -1350,13 +1382,17 @@ export const combatModule: GameModule = {
         )
           topShooter.set(target, { owner: side.owner, dealt });
       };
-      for (const side of live) {
-        // Враги — только ВРАЖДЕБНЫЕ живые стороны. Спрятаться за спину союзника нельзя
-        // (ради этого выбор и сделан), но и бить союзника залп не имеет права.
+      // Attackers fire on their own clocks. Each defender answers EACH attacker
+      // that strikes it, with a full defensive volley aimed only at that attacker.
+      const exchanges: { side: BattleSide; enemies: BattleSide[]; role: FireRole }[] = [];
+      for (const side of due) {
         const enemies = live.filter((other) => other !== side && sidesHostile(h, side.owner, other.owner));
-        // Разбивка, а не только сумма (VET-1): те же числа, но видно, какой стек что
-        // положил в залп — из этого VET-2 пишет заслугу ветерана.
-        const role = side.role === 'attacker' ? 'attack' : 'defense';
+        exchanges.push({ side, enemies, role: 'attack' });
+        for (const defender of enemies) {
+          if (!attacks(defender)) exchanges.push({ side: defender, enemies: [side], role: 'defense' });
+        }
+      }
+      for (const { side, enemies, role } of exchanges) {
         const ground = enemies.some((e) => hasGroundTargets(sideUnits(h.state, e.ref) ?? [], data));
         if (ground) {
           // Наземный залп пишет в `incoming` сам; вклад этой стороны в каждую цель — прирост.
@@ -1434,7 +1470,7 @@ export const combatModule: GameModule = {
         dmgToDefender: incoming.get(defender) ?? 0,
         sides: battle.sides.map((side) => ({
           owner: side.owner,
-          role: side.role,
+          role: attacks(side) ? 'attacker' : 'defender',
           damage: incoming.get(side) ?? 0,
         })),
       });

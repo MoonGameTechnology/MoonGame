@@ -126,6 +126,8 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'fleet.bombard': { fleetId: 'p1_1', on: true },
   'fleet.assault': { fleetId: 'p1_1' },
   'fleet.retreat': { fleetId: 'p1_1' },
+  'battle.attack': { battleId: 'missing-battle' },
+  'battle.retreat': { battleId: 'missing-battle', to: 'home_p1' },
   'fleet.deployRocketMine': { fleetId: 'p1_1', mode: 'confirmed' },
   'rocketMine.mode': { mineId: 'mine:1', mode: 'any' },
   'rocketMine.disarm': { mineId: 'mine:1' },

@@ -13,6 +13,8 @@ const CLIENT_ACTION_TYPES = [
   'fleet.assault',
   'fleet.bombard',
   'fleet.retreat',
+  'battle.attack',
+  'battle.retreat',
   'fleet.layMines',
   'army.load',
   'army.unload',
@@ -81,6 +83,9 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.orbit', { fleetId: 'f1', orbit: 'near' }],
       ['fleet.assault', { fleetId: 'f1' }],
       ['fleet.bombard', { fleetId: 'f1', on: true }],
+      ['battle.attack', { battleId: 'b1' }],
+      ['battle.attack', { battleId: 'b1', side: '["fleet","f1"]' }],
+      ['battle.retreat', { battleId: 'b1', to: 'p1' }],
       ['fleet.retreat', { fleetId: 'f1' }],
       ['fleet.retreat', { fleetId: 'f1', to: 'p1' }],
       ['order.retreat', { fleetId: 'f1', on: false }],
@@ -163,6 +168,9 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.orbit', { fleetId: 'f1', orbit: 'far' }], // the old far/near switch is gone
       ['fleet.orbit', { fleetId: 'f1' }], // missing orbit
       ['fleet.bombard', { fleetId: 'f1', on: 'yes' }], // on not a boolean
+      ['battle.attack', {}],
+      ['battle.attack', { battleId: 'b1', side: 2 }],
+      ['battle.retreat', { battleId: 'b1' }],
       ['fleet.retreat', {}], // missing fleetId
       ['fleet.repair', {}], // missing fleetId
       ['order.chain', { fleetId: 'f1' }], // missing steps

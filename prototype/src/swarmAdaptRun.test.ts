@@ -15,6 +15,8 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import type { RunDifficulty } from '../../decisions/runDifficulty';
+import { fleetHolder, knowledgeOf, swarmNet } from '../../packages/shared-core/src/util/swarmNet';
+import { recalled } from '../../packages/shared-core/src/modules/swarmMemory';
 
 /**
  * AUD-20 — сценарий MC-01 (`sector-zero-roadmap.md` §3.9) на шипнутой карте `pve-1`,
@@ -68,7 +70,7 @@ interface Mc01 {
     damage: number;
     downed: number;
   }>;
-  started?: { hour: number; moduleId: string };
+  started?: { hour: number; moduleId: string; connectedToHive: boolean; signal: number };
   done?: { hour: number; touched: number };
   /** Час, когда ИИ Роя сам поставил пост-ретранслятор на `drift` — последнее звено сети до
    *  дома игрока. Не поставил — поля нет. */
@@ -152,8 +154,19 @@ function runMc01(difficulty: RunDifficulty, maxHours: number, chain = true): Mc0
           damage: Number(p.damage),
           downed: Number(p.downed ?? 0),
         });
-      if (e.type === 'swarm.adapt.started' && !out.started)
-        out.started = { hour, moduleId: String(p.moduleId) };
+      if (e.type === 'swarm.adapt.started' && !out.started) {
+        const moduleId = String(p.moduleId);
+        const project = s.swarmAdapts!.find((q) => q.moduleId === moduleId && q.dueAt === p.dueAt)!;
+        const holder = fleetHolder(project.fleetId);
+        const net = swarmNet(s, data, 'p3', s.time);
+        const known = knowledgeOf(s, data, 'p3', holder, s.time, net).known;
+        out.started = {
+          hour,
+          moduleId,
+          connectedToHive: net.partOf.get(holder) === net.partOf.get('planet:hive'),
+          signal: recalled(s.swarmMemory, data.modules[moduleId]!.adaptation!.signal, null, known),
+        };
+      }
       // Отложенное событие проекта носит то же имя, что и объявление о нём; объявление —
       // то, где есть `touched`.
       if (e.type === 'swarm.adapt.done' && p.touched !== undefined && !out.done)
@@ -242,10 +255,13 @@ describe('MC-01 на pve-1: удары шаттлов доводят Рой до
     expect(run.hiveBeforeChain).toBe(0);
     if (run.chainAt === undefined) {
       expect(run.state.swarmNet?.holders['planet:hive']?.known ?? []).toEqual([]);
-      expect(run.started).toBeUndefined();
-    } else {
-      expect(run.started === undefined || run.started.hour >= run.chainAt).toBe(true);
+      // Реактивная защита меняет выживаемость волн: отрезанный орган может пережить
+      // три наблюдения и учиться ЛОКАЛЬНО. Улей от этого знания не получает.
+      if (run.started) expect(run.started.connectedToHive).toBe(false);
+    } else if (run.started?.connectedToHive) {
+      expect(run.started.hour).toBeGreaterThanOrEqual(run.chainAt);
     }
+    if (run.started) expect(run.started.signal).toBeGreaterThanOrEqual(3);
   });
   afterEach(disarmRun);
 

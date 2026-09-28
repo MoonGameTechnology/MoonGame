@@ -79,7 +79,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  46 — фаза 3 модулей кораблей: ЧЛЕНСТВО — в конец вошли `loadoutEffects` (тяговый луч и
  *  сборщик обломков через хуки `combat.retreatToll`/`salvage.share`) и `minefield`
  *  (минный заградитель); порядок остальных не тронут.) */
-const PINNED_FOR_VERSION = '50';
+// 51: порядок тот же; combat 3.0.0 сохраняет личные циклы атаки на BattleSide.
+const PINNED_FOR_VERSION = '51';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
