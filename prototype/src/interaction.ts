@@ -1,13 +1,19 @@
 /**
- * Что значит следующий тап (REFM-207): прицелы, режимы и окна командного ряда — у одного
- * владельца.
+ * Что выбрано и что значит следующий тап: выбор (REFM-208) и прицелы, режимы и окна
+ * командного ряда (REFM-207) — у одного владельца.
  *
  * Шестнадцать флагов жили `let`'ами в `main.ts`, и писали их ≈110 мест, каждое со своим
  * рукописным списком «что погасить заодно». Списки разошлись: смена матча в соло гасила
  * одно, в сети другое, прицел героя переживал Back. Теперь флаг меняют только функции
  * ниже, а что гаснет по какому поводу, решает таблица `decisions/armDisarm.ts`.
  *
- * `main.ts` читает флаги как прежде — это `export let`, живая привязка. Записать мимо
+ * Выбор — выделенные флоты или мир, осмотр чужого флота, цель мобильного приказа и список
+ * «флот или мир» — писали ≈45 мест, а чистка после смены мира была написана дважды: для
+ * хода локального мира и для снимка сервера, и сетевая копия не закрывала окно деления и
+ * ⇅-меню погибшего флота. Теперь выбор меняют функции ниже, а забывают его поводы таблицы
+ * (правило 16).
+ *
+ * `main.ts` читает всё это как прежде — это `export let`, живая привязка. Записать мимо
  * владельца не даст компилятор: присваивание импорту — ошибка TS. Содержимое открытого
  * окна (сколько кораблей отделить, план десанта) правится на месте: это данные окна, а не
  * то, открыто ли оно.
@@ -19,7 +25,12 @@ import {
   armDisarms,
   commandDisarms,
   disarmedBy,
+  forgetsSelection,
 } from '../../decisions/armDisarm';
+import { selectFleets } from '../../decisions/fleetSelection';
+import { pruneGroup, refSurvives } from '../../decisions/selectionPrune';
+import type { TapPick } from '../../decisions/tapCycle';
+import type { MobileOrderDraft } from './mobileOrders';
 
 /** Что лежит во флаге, когда он взведён. Погашенный флаг — `false` или `null`. */
 export interface Armed {
@@ -91,6 +102,21 @@ export let troopsPlan: Armed['troopsPlan'] | null = null;
 /** Окно деления флота: какой флот и сколько кораблей каждого типа от него отходит. */
 export let splitState: Armed['splitState'] | null = null;
 
+/** Одиночный СВОЙ флот: адрес приказа и карточка со всеми приказами. */
+export let selFleet: string | null = null;
+/** Выбранный мир. Флоты и мир друг друга исключают. */
+export let selPlanet: string | null = null;
+/** Группа своих флотов: рамка, Ctrl-клик, набор. */
+export let selFleets: ReadonlySet<string> = new Set();
+/** UI-14. ЧУЖОЙ флот, который игрок тапнул, чтобы посмотреть. Держится ОТДЕЛЬНО от
+ *  `selFleet` намеренно: `selFleet` — адрес приказа, и чужой id в нём завёл бы приказы,
+ *  которые ядро отклонит. Осмотр — состояние панели и только её. */
+export let inspectFleet: string | null = null;
+/** Телефон: цель приказа, которая ждёт подтверждения в полоске. */
+export let mobileDraft: MobileOrderDraft | null = null;
+/** Телефон: список «флот или мир», когда под тапом несколько объектов. */
+export let mobileChoices: readonly TapPick[] = [];
+
 /** Флаги, которые кнопка переключает: у них взведённое значение — просто `true`. */
 export type Toggle = { [F in Flag]: Armed[F] extends true ? F : never }[Flag];
 
@@ -157,9 +183,11 @@ export function toggle(flag: Toggle): void {
   else arm(flag, true);
 }
 
-/** Погасить всё, что гасит повод (правила 8–14 таблицы). */
+/** Погасить всё, что гасит повод (правила 8–14 таблицы). Смена матча, пустое выделение и
+ *  ✕ окна выбора забывают и сам выбор (правило 16). */
 export function disarm(reason: Reason, phone: boolean): void {
   for (const flag of disarmedBy(reason, phone)) drop(flag);
+  if (forgetsSelection(reason)) forget();
 }
 
 /** Взведено ли хоть что-то из того, что гасит повод: ступень Back открыта, пока да. */
@@ -171,4 +199,75 @@ export function anyArmed(reason: Reason, phone: boolean): boolean {
  *  (правила 1–7 и 14 таблицы). */
 export function disarmForCommand(cmd: string | undefined, phone: boolean): void {
   for (const flag of commandDisarms(cmd, phone)) drop(flag);
+}
+
+/** Забыть выбор целиком. */
+function forget(): void {
+  selFleet = null;
+  selPlanet = null;
+  selFleets = new Set();
+  inspectFleet = null;
+  mobileDraft = null;
+  mobileChoices = [];
+}
+
+/**
+ * Выделить флоты. Что значит выделение — `fleetSelection.ts` (REFM-163): выделяется только
+ * СВОЁ (чужой флот в наборе — приказ, который ядро всё равно отклонит), «ровно один» и
+ * «несколько» — разные состояния (у одиночного своя карточка со всеми приказами), а
+ * одинокий чужой уходит на осмотр (UI-14). Мир с флотами не выбирается, а мобильная цель и
+ * список «флот или мир» относились к прежнему выбору.
+ */
+export function pickFleets(ids: readonly string[], mine: (id: string) => boolean): void {
+  const sel = selectFleets(ids, mine);
+  selFleets = new Set(sel.picked);
+  selFleet = sel.single;
+  inspectFleet = sel.inspect;
+  selPlanet = null;
+  mobileDraft = null;
+  mobileChoices = [];
+}
+
+/**
+ * Выбрать мир: флоты гаснут, а намерения остаются (`pickApply.ts`). Осмотр чужого флота
+ * не трогается — пока выбран мир, панель его не показывает.
+ */
+export function pickWorld(id: string): void {
+  selPlanet = id;
+  selFleet = null;
+  selFleets = new Set();
+}
+
+/** Снять выделение флотов, не трогая мир и прицелы: «Снять» в карточке группы и пустая
+ *  рамка без модификатора. */
+export function deselectFleets(): void {
+  selFleet = null;
+  selFleets = new Set();
+}
+
+/**
+ * Что теряет силу, когда сменился мир: одна чистка для хода локального мира и для снимка
+ * сервера. Правила — `selectionPrune.ts`: одиночные ссылки (выбранный флот, осмотр, окно
+ * деления, ⇅-меню) держатся, пока флот существует, а группа — пока флот жив и свой.
+ */
+export function pruneSelection(
+  fleets: Readonly<Record<string, { readonly owner: string } | undefined>>,
+  me: string,
+): void {
+  const exists = (id: string): boolean => !!fleets[id];
+  if (!refSurvives(selFleet, exists)) selFleet = null;
+  if (!refSurvives(inspectFleet, exists)) inspectFleet = null;
+  if (splitState && !refSurvives(splitState.fleetId, exists)) drop('splitState');
+  if (troopsPlan && !refSurvives(troopsPlan.fleetId, exists)) drop('troopsPlan');
+  selFleets = pruneGroup(selFleets, (id) => fleets[id]?.owner, me);
+}
+
+/** Телефон: поставить цель приказа на подтверждение, `null` — снять. */
+export function stageDraft(draft: MobileOrderDraft | null): void {
+  mobileDraft = draft;
+}
+
+/** Телефон: показать список «флот или мир», пустой — закрыть. */
+export function offerChoices(choices: readonly TapPick[]): void {
+  mobileChoices = choices;
 }

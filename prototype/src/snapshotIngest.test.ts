@@ -1,12 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  WAIT_MARK,
-  desyncVerdict,
-  keepFocus,
-  keepGroup,
-  radarContacts,
-  waitingBanner,
-} from './snapshotIngest';
+import { WAIT_MARK, desyncVerdict, radarContacts, waitingBanner } from './snapshotIngest';
 
 describe('радар-контакты', () => {
   it('КОНТАКТЫ ЖИВУТ ОДИН СНИМОК: нет списка — он пуст, а не «прежний»', () => {
@@ -36,29 +29,6 @@ describe('проверка расхождения с сервером', () => {
 
   it('хеши разошлись — это десинк', () => {
     expect(desyncVerdict('h1', () => 'h2')).toBe(true);
-  });
-});
-
-describe('чистка выбора после снимка', () => {
-  it('одиночный выбор держится, пока объект в снимке есть', () => {
-    expect(keepFocus('f1', true)).toBe('f1');
-    expect(keepFocus('f1', false)).toBeNull();
-    expect(keepFocus(null, true)).toBeNull();
-  });
-
-  it('ОДИНОЧНЫЙ ВЫБОР ЖИВЁТ И НА ЧУЖОМ ФЛОТЕ: карточка противника — это не приказ', () => {
-    // владелец здесь вообще не спрашивается — важно только, есть ли объект в снимке
-    expect(keepFocus('враг', true)).toBe('враг');
-  });
-
-  it('ГРУППОВОЙ ВЫБОР — ТОЛЬКО СВОИ: приказ чужому флоту отдать нельзя', () => {
-    const владелец = (id: string) => ({ мой: 'p1', чужой: 'p2' })[id];
-    expect(keepGroup(['мой', 'чужой'], владелец, 'p1')).toEqual(['мой']);
-  });
-
-  it('групповой выбор теряет исчезнувших из снимка', () => {
-    const владелец = (id: string) => (id === 'живой' ? 'p1' : undefined);
-    expect(keepGroup(['живой', 'пропал'], владелец, 'p1')).toEqual(['живой']);
   });
 });
 

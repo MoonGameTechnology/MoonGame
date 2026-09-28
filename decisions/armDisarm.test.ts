@@ -14,6 +14,7 @@ import {
   commandDisarms,
   disarmedBy,
   disarms,
+  forgetsSelection,
   keepsArmed,
 } from './armDisarm';
 
@@ -232,6 +233,15 @@ describe('поводы — правила 8–14 словами', () => {
         .flatMap((r) => disarmedBy(r, true)),
     );
     for (const flag of FLAGS) expect(exits).toContain(flag);
+  });
+});
+
+describe('forgetsSelection', () => {
+  // Правило 16: выбор старого матча указывает на флоты, которых нет, а ✕ и пустое выделение
+  // и есть забытый выбор. Back снимает прицел, а выделение оставляет (правило 9).
+  it('only a new match, an empty selection and ✕ forget the selection', () => {
+    const forgets = (Object.keys(DISARMED_BY) as Reason[]).filter(forgetsSelection);
+    expect(forgets.sort()).toEqual(['deselect', 'dismiss', 'match']);
   });
 });
 

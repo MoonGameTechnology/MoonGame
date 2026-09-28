@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DISARMED_BY, FLAGS, type Flag, type Reason, disarmedBy } from '../../decisions/armDisarm';
+import {
+  DISARMED_BY,
+  FLAGS,
+  type Flag,
+  type Reason,
+  disarmedBy,
+  forgetsSelection,
+} from '../../decisions/armDisarm';
 import * as I from './interaction';
+import type { MobileOrderDraft } from './mobileOrders';
 
 /** Живое значение флага по имени: модуль отдаёт их как `export let`. */
 const value = (flag: Flag): unknown => (I as unknown as Record<Flag, unknown>)[flag];
@@ -110,7 +118,117 @@ describe('interaction — владелец флагов', () => {
   });
 });
 
-describe('проводка в main.ts (REFM-207)', () => {
+describe('interaction — владелец выбора (REFM-208)', () => {
+  const mine = (id: string): boolean => id.startsWith('my');
+  const DRAFT: MobileOrderDraft = {
+    order: 'move',
+    fleetIds: ['my1'],
+    target: { kind: 'planet', id: 'w1' },
+  };
+  const selection = () => ({
+    fleet: I.selFleet,
+    planet: I.selPlanet,
+    group: [...I.selFleets],
+    inspect: I.inspectFleet,
+    draft: I.mobileDraft,
+    choices: [...I.mobileChoices],
+  });
+  const NOTHING = {
+    fleet: null,
+    planet: null,
+    group: [],
+    inspect: null,
+    draft: null,
+    choices: [],
+  };
+
+  it('starts empty', () => {
+    expect(selection()).toEqual(NOTHING);
+  });
+
+  it('picks only own fleets: one is a single, several a group, a lone foreign one is inspected', () => {
+    I.pickFleets(['my1'], mine);
+    expect(selection()).toEqual({ ...NOTHING, fleet: 'my1', group: ['my1'] });
+    I.pickFleets(['my1', 'my2', 'foe'], mine);
+    expect(selection()).toEqual({ ...NOTHING, group: ['my1', 'my2'] });
+    I.pickFleets(['foe'], mine);
+    expect(selection()).toEqual({ ...NOTHING, inspect: 'foe' });
+  });
+
+  it('a fleet selection drops the world, the staged phone target and the chooser', () => {
+    I.pickWorld('w1');
+    I.stageDraft(DRAFT);
+    I.offerChoices([{ kind: 'planet', id: 'w1' }]);
+    I.pickFleets(['my1'], mine);
+    expect(selection()).toEqual({ ...NOTHING, fleet: 'my1', group: ['my1'] });
+  });
+
+  it('a world selection drops the fleets and keeps the aims', () => {
+    I.pickFleets(['my1', 'my2'], mine);
+    armSample('aiming');
+    I.pickWorld('w1');
+    expect(selection()).toEqual({ ...NOTHING, planet: 'w1' });
+    expect(I.aiming).toBe(true);
+  });
+
+  it('deselecting the fleets keeps the group picking: «Clear» on the group card, an empty box', () => {
+    armSample('pickMode');
+    I.pickFleets(['my1', 'my2'], mine);
+    I.deselectFleets();
+    expect(selection()).toEqual(NOTHING);
+    expect(I.pickMode).toBe(true);
+  });
+
+  // `selectionPrune.ts`, правила 1–3: одиночные ссылки держатся, пока флот есть; группа —
+  // пока флот жив и свой.
+  it('after a world change drops what points at a vanished fleet, and the captured from the group', () => {
+    I.pickFleets(['my1', 'my2', 'my3'], mine);
+    armSample('splitState');
+    armSample('troopsPlan');
+    I.pruneSelection({ my2: { owner: 'p1' }, my3: { owner: 'p2' } }, 'p1');
+    expect([...I.selFleets]).toEqual(['my2']);
+    expect(I.splitState).toBeNull(); // SAMPLE держит флот f1, его больше нет
+    expect(I.troopsPlan).toBeNull();
+  });
+
+  it('keeps the split dialog and the troops menu of a living fleet', () => {
+    armSample('splitState');
+    armSample('troopsPlan');
+    I.pruneSelection({ f1: { owner: 'p1' } }, 'p1');
+    expect(I.splitState).toEqual(SAMPLE.splitState);
+    expect(I.troopsPlan).toEqual(SAMPLE.troopsPlan);
+  });
+
+  it('a single reference does not ask the owner: the panel shows who owns the fleet now', () => {
+    I.pickFleets(['my1'], mine);
+    I.pruneSelection({ my1: { owner: 'p2' } }, 'p1');
+    expect(selection()).toEqual({ ...NOTHING, fleet: 'my1' });
+    I.pickFleets(['foe'], mine);
+    I.pruneSelection({ foe: { owner: 'p2' } }, 'p1');
+    expect(I.inspectFleet).toBe('foe');
+    I.pruneSelection({}, 'p1');
+    expect(I.inspectFleet).toBeNull();
+  });
+
+  // Правило 16: выбор забывают смена матча, пустое выделение и ✕, остальные поводы его держат.
+  it('a reason forgets the whole selection exactly when the table says so', () => {
+    for (const reason of Object.keys(DISARMED_BY) as Reason[])
+      for (const phone of [false, true]) {
+        I.pickFleets(['my1'], mine);
+        I.stageDraft(DRAFT);
+        I.offerChoices([{ kind: 'fleet', id: 'my1' }]);
+        const before = selection();
+        I.disarm(reason, phone);
+        expect({ reason, phone, after: selection() }).toEqual({
+          reason,
+          phone,
+          after: forgetsSelection(reason) ? NOTHING : before,
+        });
+      }
+  });
+});
+
+describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   const count = (needle: string): number => main.split(needle).length - 1;
 
@@ -129,5 +247,12 @@ describe('проводка в main.ts (REFM-207)', () => {
   it('the row buttons go through the table, not a hand-written preamble', () => {
     expect(count('disarmForCommand(cmd, MOBILE);')).toBe(1);
     expect(main).not.toMatch(/\bdisarms\(/);
+  });
+
+  // Ход локального мира и снимок сервера чистят выбор одним вызовом: у снимка была своя
+  // копия правил, и она не закрывала окно деления и ⇅-меню погибшего флота.
+  it('the local world and the server snapshot prune the selection with one call', () => {
+    expect(count('pruneSelection(s.fleets, ME);')).toBe(2);
+    expect(main).not.toMatch(/\b(keepFocus|keepGroup|refSurvives|pruneGroup)\(/);
   });
 });

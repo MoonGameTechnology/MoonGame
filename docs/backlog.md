@@ -1136,14 +1136,31 @@ BRW-2/3 написаны ровно под это.
   `smoke:net` зелёные; Back и Escape вживую на ПК: «Курс», «Атака», набор группы, прицелы
   героя, удара и высадки, окошко порога отхода, аппаратный Back — снимается прицел, а
   выделение остаётся (со старым списком ступени прицела проверка падает на «Атаке»).
-- **REFM-208** ⏳ `[proto]` **Владелец выбора** (`interaction.ts`, часть 2).
-  `selFleet`, `selPlanet`, `selFleets`, `inspectFleet` и мобильный выбор (`mobileChoices`,
-  `mobileDraft`) — в том же модуле. `clearSelection()` и чистку после смены мира
-  владелец делает одним вызовом для `apply` и для снимка сервера, и две копии правил
-  (`selectionPrune.ts` и `keepFocus`/`keepGroup` из `snapshotIngest.ts`) сходятся в одну.
-  Схватка и сетевая партия меняют матч через один `disarm('смена матча')`. ≈45 мест
-  записи. Проверка: `smoke:browser`, `smoke:mobile`, `smoke:context`, гибель флота с
-  открытым окном деления в сетевой партии.
+- **REFM-208** ✅ `[proto]` **Владелец выбора** (`interaction.ts`, часть 2).
+  Выбор — `selFleet`, `selPlanet`, `selFleets`, осмотр `inspectFleet`, мобильные
+  `mobileDraft` и `mobileChoices` — живёт в `interaction.ts` как `export let` рядом с
+  прицелами: `main.ts` его только читает, а меняют `pickFleets`, `pickWorld`,
+  `deselectFleets`, `pruneSelection`, `stageDraft`, `offerChoices` и поводы таблицы.
+  Чистку после смены мира делает один вызов владельца и для хода локального мира, и для
+  снимка сервера: копия правил в `snapshotIngest.ts` (`keepFocus`/`keepGroup`) удалена,
+  правила остались в `selectionPrune.ts`. Какие поводы забывают сам выбор, решает таблица
+  `armDisarm.ts` (правило 16): смена матча, пустое выделение и ✕ окна выбора. Поэтому
+  `clearSelection()` — это повод `deselect`, а смена матча в соло и в сети — один
+  `disarm('match')`. Поведение меняется так:
+  снимок сервера сам закрывает окно деления и ⇅-меню флота, которого в нём больше нет (раньше
+  их гасила только покадровая самопроверка); новая партия в соло забывает осмотр чужого
+  флота, мобильную цель и список «флот или мир» (осмотр переживал её и показывал флот нового
+  матча с тем же id: стартовые id вида `p2-1` повторяются); осмотр флота, которого больше
+  нет в мире или в снимке, снимается, а раньше держал ступень Back, которая ничего не
+  закрывала. 43 места записи, чтения не менялись.
+  Проверка: тест владельца и сторож проводки (`interaction.test.ts`: выбор флотов и мира,
+  чистка после смены мира, какие поводы забывают выбор; оба пути смены мира зовут
+  `pruneSelection` одной строкой, копий правил в `main.ts` нет), правило 16 в
+  `armDisarm.test.ts`. Харнесы смоуков (`sectorzerotest`, `uitest`, `perf`) выбирают мир
+  функцией владельца. Гейт, `smoke:browser`, `smoke:mobile`, `smoke:context`,
+  `smoke:sector-zero`, `smoke:net` зелёные. Вживую: в сетевой партии флот слит на сервере при
+  открытых окне деления и ⇅, и при остановленных кадрах их закрывает сам снимок; новая партия
+  в соло забывает осмотр. Со старым кодом падают обе проверки.
 
 **Этап 2 · Sector Zero.** Первый из переездов. Это главный продукт и самый живой код: за
 сентябрь файл вырос на ~3 800 строк, в основном им. Его держат 17 сторожей, а из дверей
@@ -1195,7 +1212,7 @@ BRW-2/3 написаны ровно под это.
 - **REFM-215** ⏳ `[proto]` **Сессия аккаунта**, ≈160. Проба режима (`probeAuthMode`),
   запись и токен сессии, `ensureSession`, `fetchJoinToken`, `askSignIn`, `claimDone`.
   Владелец `authMode` и `pendingJoinToken`. Проверка: `smoke:net`.
-- **REFM-216** 🔒(REFM-208, REFM-214, REFM-215) `[proto]` **Сетевой жизненный цикл**, ≈400.
+- **REFM-216** 🔒(REFM-214, REFM-215) `[proto]` **Сетевой жизненный цикл**, ≈400.
   `netClientFor`, `connect`, `scheduleReconnect`, `dropNetClient`, таймеры пинга и замера.
   Модуль становится владельцем `NET` и флагов сокета, `leaveNetwork()` из REFM-205
   переезжает сюда. Самый связанный кирпич плана: снимок сервера пишет мир, выбор,
@@ -1215,7 +1232,7 @@ BRW-2/3 написаны ровно под это.
 тогда его хост сразу состоит из API модулей, а не из функций `main.ts`, которым ещё
 предстоит переезд.
 
-- **REFM-219** 🔒(REFM-208, REFM-210, REFM-213) `[proto]` **Жизненный цикл матча**, ≈340.
+- **REFM-219** 🔒(REFM-210, REFM-213) `[proto]` **Жизненный цикл матча**, ≈340.
   `installMatch`, `startMatch`, `startPvEMatch`, `startTraining`, `createOnlineMatch`,
   итоговый экран, выходы ⌂ и «Покинуть сессию». Список из 22 присваиваний становится
   вызовами владельцев: `disarm('смена матча')`, сохранение схватки, флаги забега, лента,
@@ -1235,7 +1252,7 @@ BRW-2/3 написаны ровно под это.
   матчу, первые цели, заставки, сводка «пока вас не было», справочник. Гид сам готовит
   свою партию и пишет состояние сетапа, поэтому идёт после REFM-212. Проверка: первый
   запуск с гидом и первыми целями вживую.
-- **REFM-222** 🔒(REFM-208) `[proto]` **Верхняя полоса**, ≈320. Полоса скорости и часы,
+- **REFM-222** ⏳ `[proto]` **Верхняя полоса**, ≈320. Полоса скорости и часы,
   тревоги, досье Роя, кеши шапки. Полоса гасит режимы выбора, поэтому идёт после их
   владельца. Сторож `runPauseWiring`. Проверка: `smoke:browser`, `smoke:mobile`.
 - **REFM-223** ⏳ `[proto]` **Карточка мира**, ≈500. `planetPanelHtml`,
@@ -1247,7 +1264,7 @@ BRW-2/3 написаны ровно под это.
   `fleetSummaryHtml`, плитки юнитов, метки эффектов, группа, кнопка мин (SM-3.5). Тоже
   чистая разметка, её можно брать сразу. Сторож `shipCard`. Проверка:
   `ui:shot`.
-- **REFM-225** 🔒(REFM-208) `[proto]` **Хозяин боковой панели**, ≈550.
+- **REFM-225** ⏳ `[proto]` **Хозяин боковой панели**, ≈550.
   Выбор карточки, кеш `lastPanelHtml` вместе с дверью перерисовки, клики `side`
   (`data-act`), описания по наведению, диалог деления. Сторожа `controls`, `buildScreen`,
   `touchSurface`. Проверка: `smoke:browser`, `smoke:mobile`, `smoke:context`.
@@ -1274,7 +1291,7 @@ BRW-2/3 написаны ровно под это.
 подключённые мины (SHIPART-6). Каждый кирпич сверяет стоимость кадра `pnpm run perf`
 до и после.
 
-- **REFM-231** 🔒(REFM-208) `[proto]` **Камера и туман**, ≈590. Вид и переходы (`jumpTo`,
+- **REFM-231** ⏳ `[proto]` **Камера и туман**, ≈590. Вид и переходы (`jumpTo`,
   `focusWorld`), рамка карты, зрение и память тумана. Модуль становится владельцем вида:
   на него 367 ссылок из других зон, и они не меняются. Сторожа `openingView`,
   `clientVision`. Проверка: `smoke:zoom`, `smoke:frontier`, `perf:pan`.
@@ -1290,7 +1307,7 @@ BRW-2/3 написаны ровно под это.
   два PR. Функция в 900 строк делится на слои с явным порядком, кадр зовёт одну
   `renderMap()`. Сторожа `abilityRings`, `engageAim`, `radarSources`. Проверка:
   `pnpm run perf` без роста p95, `ui:shot`.
-- **REFM-236** 🔒(REFM-208, REFM-231) `[proto]` **Ввод на канвасе**, ≈560. `selectAt`,
+- **REFM-236** 🔒(REFM-231) `[proto]` **Ввод на канвасе**, ≈560. `selectAt`,
   указатель, рамка выделения, жесты прицела. Пишет 17 переменных других зон; после
   владельцев это вызовы их функций. Сторож `controls`. Проверка: `smoke:mobile`,
   `smoke:zoom`, `smoke:context`, мышь вживую на ПК.
@@ -1307,7 +1324,7 @@ Escape/Back (`BACK_LAYERS`, ≈130) остаётся в `main.ts`: он пере
 > REFM-12 ✅ → REFM-13 ✅ → REFM-14 ✅ → REFM-15 ✅ → REFM-16 ✅ → REFM-17 ✅ → REFM-18 ✅ →
 > REFM-19 ✅ → REFM-20 ✅ → REFM-21 ✅ → REFM-22 ✅ → REFM-23 ✅ → REFM-24 ✅ → REFM-25 ✅ →
 > REFM-26 ✅ → REFM-27 ✅ → REFM-28 ✅ → REFM-29 ✅ → REFM-30 ✅ → REFM-31 ✅ → REFM-32 ✅ →
-> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160 ✅ → REFM-161 ✅ → REFM-162 ✅ → REFM-163 ✅ → REFM-164 ✅ → REFM-165 ✅ → REFM-166 ✅ → REFM-167 ✅ → REFM-168 ✅ → REFM-169 ✅ → REFM-170 ✅ → REFM-171 ✅ → REFM-172 ✅ → REFM-173 ✅ → REFM-174 ✅ → REFM-175 ✅ → REFM-176 ✅ → REFM-177 ✅ → REFM-178 ✅ → REFM-179 ✅ → REFM-180 ✅ → REFM-181 ✅ → REFM-182 ✅ → REFM-183 ✅ → REFM-184 ✅ → REFM-185 ✅ → REFM-186 ✅ → REFM-187 ✅ → REFM-188 ✅ → REFM-189 ✅ → REFM-190 ✅ → REFM-191 ✅ → REFM-192 ✅ → REFM-193 ✅ → REFM-194 ✅ → REFM-195 ✅ → REFM-196 ✅ → REFM-197 ✅ → REFM-198 ✅ → REFM-199 ✅ → REFM-200 ✅ → REFM-201 ✅ → REFM-202 ✅ → REFM-203 ✅ → REFM-204 ✅ → REFM-205 ✅ → REFM-206 ✅ → REFM-207 ✅ → REFM-208…REFM-236 по плану выше (этапы 0–6: кирпич с замком ждёт своих владельцев). Сводка «по таблице сцепки» (REFM-160) этим
+> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160 ✅ → REFM-161 ✅ → REFM-162 ✅ → REFM-163 ✅ → REFM-164 ✅ → REFM-165 ✅ → REFM-166 ✅ → REFM-167 ✅ → REFM-168 ✅ → REFM-169 ✅ → REFM-170 ✅ → REFM-171 ✅ → REFM-172 ✅ → REFM-173 ✅ → REFM-174 ✅ → REFM-175 ✅ → REFM-176 ✅ → REFM-177 ✅ → REFM-178 ✅ → REFM-179 ✅ → REFM-180 ✅ → REFM-181 ✅ → REFM-182 ✅ → REFM-183 ✅ → REFM-184 ✅ → REFM-185 ✅ → REFM-186 ✅ → REFM-187 ✅ → REFM-188 ✅ → REFM-189 ✅ → REFM-190 ✅ → REFM-191 ✅ → REFM-192 ✅ → REFM-193 ✅ → REFM-194 ✅ → REFM-195 ✅ → REFM-196 ✅ → REFM-197 ✅ → REFM-198 ✅ → REFM-199 ✅ → REFM-200 ✅ → REFM-201 ✅ → REFM-202 ✅ → REFM-203 ✅ → REFM-204 ✅ → REFM-205 ✅ → REFM-206 ✅ → REFM-207 ✅ → REFM-208 ✅ → REFM-209…REFM-236 по плану выше (этапы 0–6: кирпич с замком ждёт своих владельцев). Сводка «по таблице сцепки» (REFM-160) этим
 > планом заменена: её «секция вычерпана» значило «решений не осталось», а не «строк не
 > осталось» — в `accounts` и `meta-progression` лежат ещё ~1 600 строк состояния и проводки.
 > Блок REFP закрыт, так что зона `prototype/` теперь целиком за REFM.

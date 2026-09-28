@@ -202,7 +202,7 @@ module.exports = {
     vision = reveal ? null : computeVision();
     memory.clear();
     if (vision) updateMemory(vision.identify);
-    clearSelection(); selPlanet = home.id;
+    clearSelection(); pickWorld(home.id);
     render(2000); // warm static layers and atlases at this density
     perfSpheres = 0;
     const rings = [];
