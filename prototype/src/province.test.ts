@@ -3,7 +3,7 @@ import { MAP, START_CANDIDATES, newGame } from './game';
 import { clampPowerWeights } from '../../packages/client/src/territory';
 
 // The province map is a weighted Voronoi (power diagram) over the sector centres,
-// weighted by planet `size` (main.ts buildStaticLayer, W = 9000 in base space). A site
+// weighted by planet `size` (provinceMap.ts provinceSeeds, W = 9000 in base space). A site
 // keeps a non-empty cell — i.e. its own visible province with a border — iff
 // `|w_i - w_j| ≤ d_ij²` for every other site `j`. A pair that violates this means the
 // heavier node SWALLOWS the lighter one: it gets no cell and no border (the reported bug).

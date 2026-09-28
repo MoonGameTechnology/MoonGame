@@ -104,6 +104,22 @@ describe('M2.11 — живая граница провинций', () => {
     expect(log.filter((l) => l.startsWith('moveTo('))).toHaveLength(1);
   });
 
+  it('видимая область со сдвигом: камера ушла вправо — виден дальний отрезок, ближний нет', () => {
+    const borders: ClassifiedBorders = {
+      ownedFront: new Map(),
+      ownedInner: new Map(),
+      neutralEdge: [
+        [10, 10, 40, 40],
+        [5000, 10, 5100, 40],
+      ],
+    };
+    const { g, log } = recorder();
+    drawLivingBorders(g, borders, palette, frame, 0, { x: 4500, y: 0, width: 1000, height: 800 });
+    const moves = log.filter((l) => l.startsWith('moveTo('));
+    expect(moves).toHaveLength(1);
+    expect(Number(moves[0]!.slice(7).split(',')[0])).toBeGreaterThan(4000);
+  });
+
   it('стили общие с запечённой картой: те же проходы и толщины, что без сдвига', () => {
     const borders: ClassifiedBorders = {
       ownedFront: new Map([['p1', [[300, 200, 360, 260]]]]),

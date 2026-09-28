@@ -101,6 +101,18 @@ export function worldToScreen(
   return { x: base.x * cam.scale + cam.x, y: base.y * cam.scale + cam.y };
 }
 
+/** `worldToScreen` as its coefficients: screen = `a`·p + (`x`, `y`). The projection is a
+ *  uniform scale plus a shift, so a picture painted under one camera can be shown under
+ *  another by one affine transform — this is what the cached map layer relies on. */
+export function projection(cam: Cam, vp: Viewport, b: Bounds): { a: number; x: number; y: number } {
+  const { scale, offX, offY } = fitTransform(vp, b);
+  return {
+    a: scale * cam.scale,
+    x: (offX - b.minX * scale) * cam.scale + cam.x,
+    y: (offY - b.minY * scale) * cam.scale + cam.y,
+  };
+}
+
 /** Screen point → map point (inverse of `worldToScreen`). */
 export function screenToWorld(
   pt: { x: number; y: number },

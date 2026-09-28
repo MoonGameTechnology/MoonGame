@@ -167,6 +167,7 @@ export function drawTerritory(
   clip: Array<[number, number]>,
   palette: TerritoryPalette,
   cells: TerritoryCell[] = computePowerCells(seeds, clip),
+  view?: TerritoryView,
 ): TerritoryCell[] {
   const detail = palette.provinceDetail ?? 1;
   const trace = (poly: Array<[number, number]>): void => {
@@ -178,7 +179,10 @@ export function drawTerritory(
 
   // Pass 1 — fill every province cell. Same owner ⇒ same colour, so a captured cluster
   // paints as one political field; a faint terrain tint reads through the owner fill.
+  // A cell wholly outside `view` covers no pixel there: tracing it would cost path
+  // building for nothing (most of a big map is off screen at a playing zoom).
   for (const cell of cells) {
+    if (view && !polyMeets(cell.poly, view, 1)) continue;
     trace(cell.poly);
     g.fillStyle = rgba(
       cell.owner ? palette.ownerColor(cell.owner) : palette.neutralFill,
@@ -195,8 +199,47 @@ export function drawTerritory(
 
   // Pass 2 — classify every cell edge (pure, see classifyBorders), then stroke.
   if (palette.strokeBorders !== false)
-    strokeBorders(g, classifyBorders(cells, seeds), palette);
+    strokeBorders(
+      g,
+      classifyBorders(cells, seeds),
+      palette,
+      undefined,
+      // Pad by the widest stroke (the frontier glow) so a line along the edge survives.
+      view ? (sg) => segmentMeets(sg, view, 4) : undefined,
+    );
   return cells;
+}
+
+/** The part of the canvas a draw call is for, in the same coordinates as the cells. */
+export interface TerritoryView {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** Can `poly`, grown by `pad`, touch `view`? A cheap box test — never a false «no». */
+function polyMeets(poly: Array<[number, number]>, view: TerritoryView, pad: number): boolean {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const [x, y] of poly) {
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  return x1 >= view.x0 - pad && x0 <= view.x1 + pad && y1 >= view.y0 - pad && y0 <= view.y1 + pad;
+}
+
+function segmentMeets(sg: BorderSegment, view: TerritoryView, pad: number): boolean {
+  return !(
+    (sg[0] < view.x0 - pad && sg[2] < view.x0 - pad) ||
+    (sg[0] > view.x1 + pad && sg[2] > view.x1 + pad) ||
+    (sg[1] < view.y0 - pad && sg[3] < view.y0 - pad) ||
+    (sg[1] > view.y1 + pad && sg[3] > view.y1 + pad)
+  );
 }
 
 /** Where a border point lands on the canvas. The baked map leaves points where they are;

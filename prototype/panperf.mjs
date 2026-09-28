@@ -23,9 +23,15 @@ const panSamples = { frame: [], bake: [] };
 const originalRender = render;
 render = function(now) { const at = performance.now(); try { originalRender(now); }
   finally { panSamples.frame.push(performance.now() - at); } };
-const originalBake = buildStaticLayer;
-buildStaticLayer = function(...args) { const at = performance.now(); try { originalBake(...args); }
+const originalBake = bakeMapLayer;
+bakeMapLayer = function(...args) { const at = performance.now(); try { originalBake(...args); }
   finally { panSamples.bake.push(performance.now() - at); } };
+const panSettle = async () => {
+  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS + 100));
+  for (let i = 0; i < 2 || (terrainRefine >= 0 && i < 600); i++) await new Promise(requestAnimationFrame);
+  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS + 100));
+  await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+};
 window.__panBenchmark = {
   async scene(reveal) {
     speed = 0; sandboxConfig.enabled = true; sandboxConfig.fog = !reveal;
@@ -37,24 +43,49 @@ window.__panBenchmark = {
   async run(mode) {
     panSamples.frame = []; panSamples.bake = [];
     const state = JSON.stringify(s);
+    // render() alone misses the raster work Chromium defers past the callback: the
+    // interval between animation frames is what the player sees.
+    const ticks = [];
     for (let i = 0; i < 90; i++) {
+      ticks.push(performance.now());
       cam.x = mode === 'idle' ? 0 : Math.sin(i / 12) * 260;
       cam.y = mode === 'idle' ? 0 : Math.cos(i / 15) * 130;
       cam.scale = mode === 'zoom' ? 1.8 + Math.sin(i / 16) * 0.65 : 1.8;
       await new Promise(requestAnimationFrame);
     }
-    return { frame: panSamples.frame, bake: panSamples.bake, stateUnchanged: JSON.stringify(s) === state };
+    const interval = ticks.slice(1).map((t, i) => t - ticks[i]);
+    return { frame: panSamples.frame, bake: panSamples.bake, interval, stateUnchanged: JSON.stringify(s) === state };
   },
-  compareStaticPaths() {
-    cx.save();
-    buildStaticLayer(cx);
-    const direct = cx.getImageData(0,0,canvas.width,canvas.height).data;
-    cx.restore();
-    bgContent = ''; buildStaticLayer();
-    const baked = bgx.getImageData(0,0,bg.width,bg.height).data;
-    let max = 0;
-    for (let i = 0; i < direct.length; i++) max = Math.max(max, Math.abs(direct[i] - baked[i]));
-    return max;
+  async compareStaticPaths() {
+    const read = (c) => c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const diff = (a, b) => { let max = 0; for (let i = 0; i < a.length; i++) max = Math.max(max, Math.abs(a[i] - b[i])); return max; };
+    const surface = () => { const c = document.createElement('canvas'); c.width = canvas.width; c.height = canvas.height; return c; };
+    Object.assign(cam, {x: 0, y: 0, scale: 1.8});
+    await panSettle();
+    // 1. Culling to the painted view never changes a pixel.
+    terrainRaster.beginFrame(Infinity);
+    const culled = surface(); const wide = surface();
+    for (const [c, view] of [[culled, {x0: 0, y0: 0, x1: VW, y1: VH}], [wide, {x0: -1e7, y0: -1e7, x1: 1e7, y1: 1e7}]]) {
+      const g = c.getContext('2d');
+      paintSky(g);
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      paintMapLayer(g, view, false, false);
+    }
+    // 2. A moving frame shows exactly the settled picture at the same camera.
+    const live = surface();
+    paintSky(live.getContext('2d'));
+    showMapLayer(live.getContext('2d'), mapView);
+    const still = diff(read(live), read(bg));
+    // 3. After a whole-pixel pan the bake is reused, and it matches a fresh bake there;
+    //    gradient dithering follows the canvas pixel grid, hence the few levels.
+    const bakes = mapLayerBakes;
+    cam.x += 37; cam.y -= 21;
+    await panSettle();
+    const reused = mapLayerBakes === bakes;
+    const kept = read(bg);
+    invalidateMapSurfaces();
+    await panSettle();
+    return { cull: diff(read(culled), read(wide)), still, reused, pan: diff(kept, read(bg)) };
   },
   async capture() {
     Object.assign(cam, {x: 119.25, y: -51.75, scale: 1.8});
@@ -62,7 +93,7 @@ window.__panBenchmark = {
     cam.x = 121.25;
     await new Promise(requestAnimationFrame);
     Object.assign(cam, {x: 123.25, y: -51.75, scale: 1.8});
-    await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+    await panSettle();
     return bg.toDataURL();
   }
 };`;
@@ -151,14 +182,18 @@ try {
         writeFileSync(prefix + '.cpuprofile', JSON.stringify(profile));
       }
       assert(sample.stateUnchanged, 'camera benchmark does not change simulation state');
-      report[name][mode] = { frame: stats(sample.frame), bake: stats(sample.bake) };
+      report[name][mode] = {
+        frame: stats(sample.frame),
+        interval: stats(sample.interval),
+        bake: stats(sample.bake),
+      };
       console.log(name, mode, JSON.stringify(report[name][mode]));
     }
-    assert.equal(
-      await page.evaluate(() => window.__panBenchmark.compareStaticPaths()),
-      0,
-      'moving and stationary static layers match pixel-for-pixel',
-    );
+    const paths = await page.evaluate(() => window.__panBenchmark.compareStaticPaths());
+    assert.equal(paths.cull, 0, 'culling to the painted view changes no pixel');
+    assert.equal(paths.still, 0, 'moving and stationary frames match pixel-for-pixel');
+    assert(paths.reused, 'a whole-pixel pan reuses the map bake');
+    assert(paths.pan <= 4, `reused bake matches a fresh one (dither only): ${paths.pan}`);
     const png = await page.evaluate(() => window.__panBenchmark.capture());
     writeFileSync(prefix + '-' + name + '.png', Buffer.from(png.split(',')[1], 'base64'));
   }
