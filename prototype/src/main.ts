@@ -7500,8 +7500,9 @@ function unknownPlanetHtml(p: Planet): string {
     // Espionage from memory: you know WHOSE world this was — an agent can reveal
     // its live contents without flying there. Wrong/stale owner → the kernel
     // rejects the attempt (bad target), which is honest: intel decays.
+    // В забеге Sector Zero шпионажа нет и здесь (`espionageShown`).
     const spyRow =
-      mem.owner && mem.owner !== ME
+      mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
         ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }))}</div>`
         : '';
     return (

@@ -24,6 +24,7 @@ import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { buildingName, cost, esc, fmtDur, resLine, displayUnit } from './format';
 import { BUILD_ICON, unitIcon } from './icons';
+import { catalogPortraitHtml } from './shipArt';
 import { buildBuilding, buildUnit } from '../../decisions/actions';
 import {
   isLander,
@@ -263,15 +264,16 @@ export function unitScreenHtml(
     .map((id) => {
       const def = data.units[id];
       if (!def) return '';
-      if (isLander(def)) return landerRowHtml(me, planetId, id, res, probe, lockText);
+      if (isLander(def)) return landerRowHtml(me, planetId, id, res, probe, lockText, unitArt(state, me, id));
       const code = probe(buildUnit(me, planetId, id, 1));
       if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
       const locked = code !== null && code !== 'E_INSUFFICIENT';
       const right = locked
         ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>`
         : `<button class="bw-take" data-unit-go="${esc(id)}"${code ? ' disabled' : ''}>▷ ${t(code ? 'build.action.no-res' : 'build.action.build')}</button>`;
+      const art = unitArt(state, me, id);
       return (
-        `<div class="bw-item st-${locked ? 'lock' : 'ready'}" data-unit-info="${esc(id)}"><div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
+        `<div class="bw-item st-${locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
         `<div class="bw-foot"><span>${cost(def.cost, res)}</span><span class="bw-dur">${fmtDur(def.buildTimeHours)}</span></div></div>`
       );
@@ -281,6 +283,15 @@ export function unitScreenHtml(
     `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state.mapId, planetId))}</b><span>${t('production.units')}</span></div></div>` +
     `<div class="bw-scroll"><div class="bw-list">${rows}</div></div>`
   );
+}
+
+/**
+ * Портрет юнита в строке каталога (как в верфи и карточке корабля): пропал, когда каталог
+ * переехал из боковой панели в это окно (OBJP), и корабли остались одним значком. Семья —
+ * по фракции игрока, как силуэт на карте. Нет арта — пусто, строка остаётся со значком.
+ */
+function unitArt(state: GameState, me: string, id: string): string {
+  return catalogPortraitHtml('u', id, data, 'thumb', state.players[me]?.faction);
 }
 
 /**
@@ -296,6 +307,7 @@ function landerRowHtml(
   res: Record<string, number>,
   probe: (a: Action) => string | null,
   lockText: (code: string) => string,
+  art: string,
 ): string {
   const def = data.units[id]!;
   const candidates = landerTroopCandidates(data);
@@ -321,7 +333,7 @@ function landerRowHtml(
     })
     .join('');
   return (
-    `<div class="bw-item st-${code ? 'lock' : 'ready'}" data-unit-info="${esc(id)}">${head}${fx}` +
+    `<div class="bw-item st-${code ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}${head}${fx}` +
     (pick ? `<div class="bw-fx">${t('build.lander.troop')}</div>${pick}` : '') +
     `</div>`
   );

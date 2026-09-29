@@ -9,6 +9,9 @@
 #side .asset-row.cat.with-art .ship-art{grid-row:1/3;}
 #side .asset-row.cat.with-art b{min-width:0;overflow-wrap:anywhere;align-self:end;}
 #side .asset-row.cat.with-art>.dim{grid-column:2;margin-left:0;white-space:normal;align-self:start;}
+/* Production window rows: the portrait sits left of the row, text keeps its own flow. */
+.bw-item.with-art{padding-left:92px;min-height:70px;}
+.bw-item.with-art>.ship-art{position:absolute;left:10px;top:10px;}
 .ptile.with-art{width:112px;}
 .ptile.with-art .ship-art{width:100%;height:62px;}
 .ptile.with-art .pt-n{max-width:100%;}

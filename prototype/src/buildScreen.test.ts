@@ -416,3 +416,16 @@ describe('окно юнитов — десантный челнок строит
     expect(out).not.toContain('data-unit-troop=');
   });
 });
+
+describe('каталог юнитов окна производства — с портретами', () => {
+  // Портреты кораблей пропали, когда каталог переехал из боковой панели в это окно:
+  // строка осталась с текстовым значком (замечание владельца 2026-09-29).
+  it('у корабля и у десантного челнока в строке — портрет корпуса', () => {
+    const s = newGame();
+    const pid = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
+    const out = unitScreenHtml(s, 'p1', pid, ['frigate', 'cruiser', 'landing_shuttle'], probe(s), lockText);
+    for (const art of ['frigate', 'cruiser', 'dropship'])
+      expect(out, art).toContain(`data-ship-art="${art}"`);
+    expect(out.match(/bw-item[^"]*with-art/g)).toHaveLength(3);
+  });
+});

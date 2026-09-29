@@ -19,7 +19,7 @@ export const en: Record<string, string> = {
   "data.pirate-base": "Pirate Base",
   // Rocket mines
   "data.rocket-mine": "Rocket Mine",
-  "module.rocket-mine.desc": "Legendary road mine. Deployment 15 min; radar 120, sight 24; base damage 80. Mine signature 0.1. Anti-shuttle PD intercepts the missile. Per charge: 40 metal, 20 electronics. Cooldown 1 h; at most 6 mines.",
+  "module.rocket-mine.desc": "Legendary road mine, hero ship only. Deployment 15 min; radar 120, sight 24; base damage 80. Mine signature 0.1. Anti-shuttle PD intercepts the missile. Per charge: 40 metal, 20 electronics. Cooldown 1 h; at most 6 mines.",
   "cmd.rocket-mine": "Rocket mine",
   "cmd.rocket-mine.hint": "Deploy on a road and choose the launch mode",
   "mine.mode.any": "Any signal",
@@ -1174,7 +1174,7 @@ export const en: Record<string, string> = {
   'module.salvage-rig.desc': 'More salvage from a won battle while the ship survives on the field.',
   'module.repair-tender.desc': 'Out of combat, repairs the hulls of every ship in its fleet.',
   'module.mine-layer.desc':
-    'Mines on roads or at nodes. Deployment 15 min; signature 0.1, detection within 24. Base damage: 15% hull per crossing, bypassing shields. Reload 6 h.',
+    'Mines on roads or at nodes, frigates only. Deployment 15 min; signature 0.1, detection within 24. Base damage: 15% hull per crossing, bypassing shields. Reload 6 h.',
   'data.signal-corps': 'Signal Corps',
   'data.solar-flare-zone': 'Solar Flare Zone',
   'data.space': 'space',
