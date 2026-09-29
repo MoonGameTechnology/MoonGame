@@ -7504,6 +7504,12 @@ function planetSummaryHtml(p: Planet): string {
   rows.push(
     `<div class="row">▣ ${t('side.world.buildings')} (${sm.buildings.length}): <b>${blist}</b></div>`,
   );
+  // Защита построек (решение владельца 2026-09-26): сколько урона мир срезает при штурме и
+  // обстреле. Падает с каждой снесённой постройкой — поэтому число, а не значок.
+  if (sm.mitigation > 0)
+    rows.push(
+      `<div class="row" data-desc="stat:mitigation">🛡 ${t('side.world.mitigation', { n: Math.round(sm.mitigation * 100) })}</div>`,
+    );
   rows.push(`<div class="row">✦ ${t('side.world.vp')}: <b>${sm.victoryPoints}</b></div>`);
   if (sm.orbit.fleets) {
     rows.push(

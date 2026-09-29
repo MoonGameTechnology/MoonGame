@@ -23,6 +23,7 @@
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import {
   hangarMachines,
+  worldDamageReduction,
   type Fleet,
   type GameData,
   type Planet,
@@ -88,6 +89,8 @@ export interface PlanetSummary {
   victoryPoints: number;
   /** Флоты НА ОРБИТЕ: те, что стоят здесь; идущие мимо не в счёт. */
   orbit: { fleets: number; ships: number };
+  /** На какую долю постройки мира снижают урон по нему — из ядра (`worldDamageReduction`). */
+  mitigation: number;
 }
 
 /** Сводка мира одним проходом. Чистая: ни DOM, ни состояния, ни текста. */
@@ -117,5 +120,6 @@ export function planetSummary(
       fleets: here.length,
       ships: here.reduce((n, f) => n + f.units.reduce((m, st) => m + st.count, 0), 0),
     },
+    mitigation: worldDamageReduction(p, data),
   };
 }
