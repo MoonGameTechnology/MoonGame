@@ -78,6 +78,14 @@ export interface MatchRoomOptions {
   /** Attach `hashState(view)` to each snapshot so the client can detect desync.
    *  Opt-in (it hashes the per-player view on every broadcast). */
   emitStateHash?: boolean;
+  /** Fog for the HOST's own state keys. `visibleView` projects the core's keys and passes
+   *  a host extension (a top-level key the host's modules keep, e.g. the prototype's
+   *  `approval`: every bot's opinion of every seat) through untouched, so a host whose
+   *  extension holds per-seat secrets narrows it here. Applied to every view the room
+   *  sends (welcome, resync and each delta baseline) before the snapshot hash, so the
+   *  client's reconstruction still hashes the same. Must be pure: return the narrowed
+   *  view, leave the input untouched. Omit ⇒ the core projection alone. */
+  hostFog?: (view: GameState, viewerId: PlayerId) => GameState;
   /** Reject a second LIVE connection to an already-occupied player slot, so two
    *  people cannot command the same empire. A slot frees the moment its peer
    *  disconnects, so reconnect-after-drop still works. Default false. */
@@ -410,6 +418,8 @@ export class MatchRoom {
   private host: PlayerId | null = null;
   private started = false;
   private readonly emitStateHash: boolean;
+  /** Fog for host extension keys (see options.hostFog). */
+  private readonly hostFog?: (view: GameState, viewerId: PlayerId) => GameState;
   private readonly singlePeerPerPlayer: boolean;
   /** Аккаунт, подключённый ЭТИМ сокетом (может отсутствовать — дев-путь без аккаунтов).
    *  `WeakMap`, потому что живёт ровно столько же, сколько сам сокет. */
@@ -534,6 +544,7 @@ export class MatchRoom {
     // default in prod defeated the claim. Tests and dev harnesses override
     // explicitly when they need deterministic-off (e.g. snapshot replay).
     this.emitStateHash = options.emitStateHash ?? (process.env.NODE_ENV === 'production');
+    this.hostFog = options.hostFog;
     this.singlePeerPerPlayer = options.singlePeerPerPlayer ?? false;
     // Enforce the metrics invariant (docs/metrics-roadmap): an observer is PURE
     // telemetry and must NEVER feed back into the room. Wrap it once here so a
@@ -830,8 +841,9 @@ export class MatchRoom {
     identified: Set<string>;
   } {
     const { view, identified } = visibleView(this.stateValue, playerId, this.data);
-    const { signatures, remembered, ...base } = view;
-    return { base: base as GameState, signatures, remembered, identified };
+    const { signatures, remembered, ...core } = view;
+    const base = this.hostFog ? this.hostFog(core as GameState, playerId) : (core as GameState);
+    return { base, signatures, remembered, identified };
   }
 
   removePeer(playerId: PlayerId, peer: RoomPeer): void {

@@ -1279,6 +1279,110 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
   });
 });
 
+describe('MatchRoom — host fog (hostFog)', () => {
+  /** A host extension shaped like the prototype's bot favour ledger: one bot's opinion of
+   *  every seat, in a top-level key the core projection does not know. */
+  type OpinionState = GameState & { opinion: Record<string, Record<string, number>> };
+  const opinionModule: GameModule = {
+    id: 'opinion-test',
+    version: '1.0.0',
+    setup(api) {
+      api.onAction('test.sour', (action, h) => {
+        const { about } = action.payload as { about: string };
+        (h.state as OpinionState).opinion.bot![about]! -= 10;
+      });
+    },
+  };
+  /** The narrowing a host would pass: each viewer sees only the bot's opinion of THEM. */
+  const ownOpinion = (view: GameState, viewer: string): GameState => {
+    const { opinion, ...rest } = view as OpinionState;
+    return { ...rest, opinion: { bot: { [viewer]: opinion.bot![viewer]! } } } as GameState;
+  };
+
+  function hostRoom(hostFog?: (view: GameState, viewer: string) => GameState): MatchRoom {
+    const initialState = { ...testState(), opinion: { bot: { p1: 60, p2: 60 } } } as OpinionState;
+    return new MatchRoom({
+      id: 'host-fog',
+      initialState,
+      kernel: createKernel([opinionModule]),
+      data: testData(),
+      now: () => 10,
+      emitStateHash: true,
+      ...(hostFog ? { hostFog } : {}),
+    });
+  }
+  const welcomeOpinion = (peer: MemoryPeer): OpinionState['opinion'] => {
+    const welcome = peer.messages[0];
+    if (welcome?.type !== 'welcome') throw new Error('expected a welcome snapshot');
+    return (welcome.state as OpinionState).opinion;
+  };
+  const sour = (id: string, about: string): Action => ({
+    id,
+    type: 'test.sour',
+    playerId: 'p2',
+    issuedAt: 1,
+    payload: { about },
+  });
+
+  it('without it a host key rides every view whole', () => {
+    const r = hostRoom();
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    expect(welcomeOpinion(p1)).toEqual({ bot: { p1: 60, p2: 60 } });
+  });
+
+  it('narrows the welcome, and a change outside the slice sends that viewer none of it', () => {
+    const r = hostRoom(ownOpinion);
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    expect(welcomeOpinion(p1)).toEqual({ bot: { p1: 60 } });
+
+    r.submitAction('p2', sour('a1', 'p2'));
+    const delta = p1.messages.at(-1);
+    if (delta?.type !== 'delta') throw new Error('expected a delta');
+    expect(delta.delta.meta?.opinion).toBeUndefined(); // the bot soured on p2: not p1's to see
+
+    r.submitAction('p2', sour('a2', 'p1'));
+    const own = p1.messages.at(-1);
+    if (own?.type !== 'delta') throw new Error('expected a delta');
+    expect(own.delta.meta?.opinion).toEqual({ bot: { p1: 50 } });
+  });
+
+  it("hashes the narrowed view: the client's rebuild matches every tag, resync included", async () => {
+    const r = hostRoom(ownOpinion);
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    const welcome = p1.messages[0];
+    if (welcome?.type !== 'welcome') throw new Error('expected a welcome snapshot');
+    expect(welcome.hash).toBe(hashState(welcome.state));
+
+    let clientState = welcome.state;
+    for (const [id, about] of [
+      ['a1', 'p2'],
+      ['a2', 'p1'],
+    ] as const) {
+      r.submitAction('p2', sour(id, about));
+      const delta = p1.messages.at(-1);
+      if (delta?.type !== 'delta') throw new Error('expected a delta');
+      clientState = applyDelta(clientState, delta.delta);
+      expect(hashState(clientState)).toBe(delta.hash);
+    }
+    const {
+      signatures: _sig,
+      remembered: _rem,
+      ...core
+    } = visibleView(r.state, 'p1', testData()).view;
+    expect(clientState).toEqual(ownOpinion(core as GameState, 'p1'));
+
+    // The resync path goes through the same view: a full `state` is narrowed as well.
+    await r.receive('p1', p1, JSON.stringify({ type: 'desync', seq: 2, hash: 'stale' }));
+    const resync = p1.messages.at(-1);
+    if (resync?.type !== 'state') throw new Error('expected a resync snapshot');
+    expect(resync.state).toEqual(clientState);
+    expect(resync.hash).toBe(hashState(clientState));
+  });
+});
+
 /** Пишет в имя игрока то, что редьюсер РЕАЛЬНО видит в `ctx.config` — правила комнаты
  *  наружу не выставлены (`config` приватный), а смотреть надо именно на них: между
  *  конструктором и `context()` резолв режима мог бы и потеряться. */
