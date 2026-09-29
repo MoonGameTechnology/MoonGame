@@ -4,6 +4,7 @@ import { pveState } from '../packages/client/src/gameData';
 import type { GameState } from '../packages/shared-core/src/index';
 import {
   grantTokenHeroes,
+  HERO_TOKEN_DROP,
   HERO_TOKENS_TO_JOIN,
   heroStarCost,
   heroTokenCount,
@@ -51,6 +52,41 @@ describe('жетоны героев', () => {
   it('за забег: 1, +2 за победу, +1 за новую задачу', () => {
     expect(heroTokenCount(false, 0)).toBe(1);
     expect(heroTokenCount(true, 2)).toBe(5);
+    expect(heroTokenCount(true, 2, false)).toBe(4); // жетон «за забег» не выпал
+  });
+
+  it('сданный раньше конца забег: жетон «за забег» — с шансом по доле волн (2026-09-28)', () => {
+    const p = fresh();
+    const got = (share: number | undefined): number =>
+      Array.from({ length: 2000 }, (_, i) =>
+        rollHeroTokens({
+          seed: 's',
+          attempt: 1,
+          outcome: `w${i}`,
+          progress: p,
+          data,
+          won: false,
+          share,
+          newTasks: 0,
+        }),
+      ).filter((r) => Object.keys(r).length > 0).length / 2000;
+    expect(got(undefined)).toBe(1);
+    expect(got(1)).toBe(1);
+    expect(got(0)).toBe(0); // ни волны, ни задачи — жетона нет, а не «0 жетонов» в итогах
+    expect(Math.abs(got(0.1) - 0.1)).toBeLessThan(0.02);
+    expect(got(Number.NaN)).toBe(0);
+    // Жетоны за победу и новые задачи от доли не зависят.
+    const won = rollHeroTokens({
+      seed: 's',
+      attempt: 1,
+      outcome: 'w',
+      progress: p,
+      data,
+      won: true,
+      share: 0,
+      newTasks: 1,
+    });
+    expect(Object.values(won)).toEqual([HERO_TOKEN_DROP.win + HERO_TOKEN_DROP.perTask]);
   });
 
   it('бросок детерминирован и отдаёт все жетоны одному нуждающемуся герою', () => {

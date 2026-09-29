@@ -234,7 +234,7 @@ describe('Sector Zero persistent preparation', () => {
     s.match.status = 'ended';
     s.match.winner = 'p3';
     const settled = settleSectorZeroRun(p, 1, s);
-    expect(settled.research).toBe(5);
+    expect(settled.research).toBe(4); // поражение на 4-й волне: данные за 4 волны
     const loaded = parseSectorZeroProgress(JSON.stringify(settled), data);
     expect(settleSectorZeroRun(loaded, 1, s)).toBe(loaded);
     s.match.winner = 'p1';
@@ -245,12 +245,15 @@ describe('Sector Zero persistent preparation', () => {
     // «Проиграл матч и ничего не получил. Проигрывать — нормально. Каждая экспедиция должна
     // что-то приносить». Счёт уничтоженных ведёт ядро (`PveState.tally`, PVR-6.20).
     const s = pveState(data);
-    // Волна пришла: оба забега СЫГРАНЫ, и разница между ними — ровно убитые. Без волны
-    // «голый» забег не сыгран и не платит вовсе (сдача в первую секунду, 2026-09-28).
     s.pve = { waveNumber: 1, totalWaves: 10, npcPlayerId: 'p3', tally: { p1: { lost: 12, destroyed: 17 } } };
     s.match.status = 'ended';
     s.match.winner = 'p3';
     const p = { ...fresh(), nextAttempt: 2 };
+    // До первой волны экспедиция не началась, и бой не платит (PVR-6.38): Рой главы II гибнет
+    // о гарнизон Холодной отмели в первую же секунду — сдача «через секунду» получала Варранты.
+    const early = settleSectorZeroRun(p, 1, { ...s, pve: { ...s.pve, waveNumber: 0 } });
+    expect(early.warrants).toBe(p.warrants);
+    expect(early.lastRun).toMatchObject({ kills: 17, killWarrants: 0, warrants: 0 });
     const bare = settleSectorZeroRun(p, 1, { ...s, pve: { ...s.pve, tally: {} } });
     const settled = settleSectorZeroRun(p, 1, s);
     expect(settled.warrants - bare.warrants).toBe(17 * WARRANTS_PER_KILL);
@@ -445,7 +448,7 @@ describe('SZE-1.2 — Мастерская: кошелёк, попытка, ин
     s.match.status = 'ended';
     s.match.winner = 'p1';
     const after = settleSectorZeroRun({ ...seeded({ warrants: 0 }), nextAttempt: 2 }, 1, s);
-    expect(after.research).toBe(8); // 1 + 4 волны + 3 за победу
+    expect(after.research).toBe(8); // 4 волны + 4 за победу
     expect(after.warrants).toBe(8 * WARRANTS_PER_REWARD);
   });
 

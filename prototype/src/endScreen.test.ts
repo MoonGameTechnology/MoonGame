@@ -356,8 +356,9 @@ describe('итог забега Sector Zero — по частям (PVR-5.4)', ()
   it('забег, победа и каждая задача — отдельными строками, сумма и открытое — внизу', () => {
     const html = runSummaryHtml(summary);
     expect(html).toContain('Экспедиция: волн 10 из 10');
-    expect(html).toContain('+11'); // забег без победы: 1 + 10 волн
-    expect(html).toContain('Победа');
+    // 14 = 10 волн + 4 за победу: строка волн и строка победы — каждая своим числом.
+    expect(html).toContain(`<span>${t('sector-zero.end.waves', { n: 10, m: 10 })}</span><b>+10</b>`);
+    expect(html).toContain(`<span>${t('sector-zero.end.victory')}</span><b>+4</b>`);
     expect(html).toContain('✓ Сбор материалов');
     expect(html).toContain('✗ Разведка: опознать 14 провинций');
     expect(html).toContain('+17 данных экспедиций · +85 ⌖');
@@ -382,6 +383,8 @@ describe('итог забега Sector Zero — по частям (PVR-5.4)', ()
     expect(html).toContain('+28 ⌖'); // в сумме Варрантов — вместе с ними
     // Ноль уничтоженных — строки нет, как у медалей: «+0» ничего не сообщает.
     expect(runSummaryHtml({ ...summary, kills: 0, killWarrants: 0 })).not.toContain(t('sector-zero.end.kills', { n: 0 }));
+    // Убитые до первой волны не платят (PVR-6.38) — и строки о них нет: число стоит в сетке ✹.
+    expect(runSummaryHtml({ ...summary, kills: 3, killWarrants: 0 })).not.toContain(t('sector-zero.end.kills', { n: 3 }));
   });
 
   it('панель берёт разбивку вместо одной суммы, когда она есть', () => {

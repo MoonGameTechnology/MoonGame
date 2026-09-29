@@ -19,6 +19,7 @@
  */
 import type { GameData } from '../packages/shared-core/src/index';
 import { hashUnit } from './sectorZeroForge';
+import { lootShare } from './moduleRarity';
 import { heroChapter } from './heroRecruits';
 import { newSectorHero, type SectorZeroProgress } from './sectorZeroProgress';
 
@@ -28,7 +29,8 @@ export const HERO_TOKENS_TO_JOIN = 10;
 export const HERO_MAX_STARS = 3;
 /** Цена звезды: `[★2, ★3]` — сколько жетонов стоит следующая звезда. **v0**. */
 export const HERO_STAR_COSTS: readonly number[] = [10, 20];
-/** Сколько жетонов падает за забег (решение владельца 2026-09-24). */
+/** Сколько жетонов падает за забег (решение владельца 2026-09-24). Жетон «за сам забег» у
+ *  забега, сданного раньше последней волны, — с шансом по доле волн (`lootShare`). */
 export const HERO_TOKEN_DROP = { run: 1, win: 2, perTask: 1 } as const;
 
 /** Сколько жетонов стоит следующая звезда героя со ступенью `stars`; null — потолок. */
@@ -67,10 +69,10 @@ export function heroTokenGoal(
   return null;
 }
 
-/** Сколько жетонов даёт забег. */
-export function heroTokenCount(won: boolean, newTasks: number, played = true): number {
+/** Сколько жетонов даёт забег; `run` — выпал ли жетон «за сам забег». */
+export function heroTokenCount(won: boolean, newTasks: number, run = true): number {
   return (
-    (played ? HERO_TOKEN_DROP.run : 0) +
+    (run ? HERO_TOKEN_DROP.run : 0) +
     (won ? HERO_TOKEN_DROP.win : 0) +
     Math.max(0, newTasks) * HERO_TOKEN_DROP.perTask
   );
@@ -89,22 +91,21 @@ export function rollHeroTokens(input: {
   progress: Pick<SectorZeroProgress, 'heroes'>;
   data: GameData;
   won: boolean;
-  /** Забег сыгран (`runPayout`): несыгранный не получает жетон «за забег». Нет — сыгран. */
-  played?: boolean;
+  /** Доля пройденного забега (`lootShare`): 1 — жетон «за забег» наверняка. */
+  share?: number;
   newTasks: number;
 }): Record<string, number> {
   const wanted = Object.keys(input.data.heroes)
     .filter((id) => heroTokenUse(input.progress, id, input.data) !== null)
     .sort();
-  const count = heroTokenCount(input.won, input.newTasks, input.played ?? true);
+  const key = `${input.seed}\u0000${input.attempt}\u0000${input.outcome}\u0000hero-tokens`;
+  const count = heroTokenCount(
+    input.won,
+    input.newTasks,
+    hashUnit(`${key}\u0000run`) < lootShare(input.share),
+  );
   if (wanted.length === 0 || count <= 0) return {};
-  const pick =
-    wanted[
-      Math.floor(
-        hashUnit(`${input.seed}\u0000${input.attempt}\u0000${input.outcome}\u0000hero-tokens`) *
-          wanted.length,
-      )
-    ]!;
+  const pick = wanted[Math.floor(hashUnit(key) * wanted.length)]!;
   return { [pick]: count };
 }
 

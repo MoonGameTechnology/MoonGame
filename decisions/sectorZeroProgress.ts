@@ -206,7 +206,7 @@ export interface RunSummary {
   won: boolean;
   waves: number;
   totalWaves: number;
-  /** Плата за сам забег: 1 + волны + 3 за победу. */
+  /** Плата за сам забег: пришедшие волны + {@link RUN_WIN_BONUS} за победу. */
   base: number;
   objectives: ObjectiveResult[];
   /** Сумма за задачи. */
@@ -249,6 +249,14 @@ export function forgeLadderOf(data: GameData): RarityLadder {
  *  половина награды). **v0**: забег с четырьмя волнами и победой даёт 40 ⌖, первая звезда
  *  стоит 20, полная лестница одного модуля — 695. Числа калибруются телеметрией. */
 export const WARRANTS_PER_REWARD = 5;
+
+/**
+ * Данные за победу в забеге — сверх данных за волны. Было «1 за сам забег + 3 за победу»,
+ * но единица за сам забег платила и экспедиции, сданной в первую секунду, и начать →
+ * сдаться по кругу печатало награду (баг-репорт владельца 2026-09-28). Единица переехала в
+ * победу: победный забег платит те же `10 + 4 = 14`, проигранный — ровно пришедшие волны.
+ */
+export const RUN_WIN_BONUS = 4;
 /** Варранты за каждого уничтоженного врага (решение владельца 2026-09-25: «проигрывать —
  *  нормально, каждая экспедиция должна что-то приносить»). Платит и поражение: счёт
  *  уничтоженных ведёт ядро (`PveState.tally`, PVR-6.20). **v0** — калибруется телеметрией. */
@@ -274,10 +282,10 @@ export function lastRunWarrants(progress: SectorZeroProgress): number {
  * Выплата та же, что в сетевой партии, — одни медали, одни степени и одна шкала «чем выше
  * степень, тем дороже» (решение владельца 6). Своей шкалы у забега нет намеренно: две
  * лестницы ценности одной медали разошлись бы при первой же правке. Курс нужен потому,
- * что награды забега мелкие (1 + волны + 3 за победу), а шкала медалей — 5–100 за юнит.
+ * что награды забега мелкие (волны + 4 за победу), а шкала медалей — 5–100 за юнит.
  *
  * **Число — по замеру** (2026-09-24, стенд глав, игрок-оборонец): победный забег приносит
- * 1620–1980 очков медалей, то есть +4…+5 к награде при базе 14 — полторы надбавки за
+ * 1620–1980 очков медалей, то есть +4…+5 к награде при базе 14 — около надбавки за
  * победу. В проигранных забегах выживших ветеранов у игрока к концу не остаётся вовсе, и
  * медали не платят ничего.
  */
@@ -1159,6 +1167,16 @@ function runPayout(
   // до конца, — и «дополнительная» задача перестала бы быть дополнительной.
   // Платят только задачи, ПОКАЗАННЫЕ в этом забеге: закрытые раньше в показ не входят и
   // второй раз не платят (PVR-5.3).
+  // Данные — за пришедшие волны и победу, без платы «за сам забег»: её получала и сдача в
+  // первую секунду (баг-репорт владельца 2026-09-28). Волна приходит раз в шесть игровых
+  // часов у всех одинаково, поэтому плата за волны не зависит от того, как игрок режет время
+  // на забеги, а плата за сам забег — зависела.
+  const base = Math.max(0, pve.waveNumber) + (won ? RUN_WIN_BONUS : 0);
+  // Экспедиция начинается с первой волны: до неё из боя не платит ничего — ни медали, ни
+  // убитые. Рой главы II высаживается на Холодную отмель в первую же секунду и гибнет о
+  // гарнизон, и эти трое убитых платили Варранты сдаче «через секунду». Задачи платят и до
+  // волны: каждая — один раз на главу, кругами её не повторить.
+  const begun = won || pve.waveNumber >= 1;
   const done = progress.objectivesDone[chapter.id] ?? [];
   const tasks = settleObjectives(
     chapter.objectives,
@@ -1167,23 +1185,43 @@ function runPayout(
     'p1',
     chapter.slots ?? DEFAULT_OBJECTIVE_SLOTS,
   );
-  const kills = runKills(state, 'p1');
-  // Забег СЫГРАН, если в нём что-то случилось: пришла волна, убит враг, закрыта задача или
-  // победа. Только сыгранный платит «за участие» — единицу базы, гарантированные дубль и
-  // жетон и шанс чертежа. Иначе «начать и сразу завершить» печатало награду за секунду, а
-  // каждая сдача давала новый отпечаток мира — бесплатный переброс добычи (баг-репорт
-  // владельца 2026-09-28).
-  const played = won || pve.waveNumber >= 1 || kills > 0 || tasks.bonus > 0;
-  const base = played ? 1 + Math.max(0, pve.waveNumber) + (won ? 3 : 0) : 0;
   // VET-7: медали сохранённых ветеранов — третья часть награды, рядом с волнами и
   // задачами. Каталог нужен для порогов медалей; без него платить не за что.
-  const veterans = data ? veteranReward(state, 'p1', data) : 0;
+  const veterans = begun && data ? veteranReward(state, 'p1', data) : 0;
   // PVR-4.7: убитый босс — четвёртая часть награды; его цену матч записал при появлении.
   const boss = bossBounty(state);
   const reward = base + tasks.bonus + veterans + boss;
-  const killWarrants = kills * WARRANTS_PER_KILL;
+  const kills = runKills(state, 'p1');
+  const killWarrants = begun ? kills * WARRANTS_PER_KILL : 0;
   const warrants = reward * WARRANTS_PER_REWARD + killWarrants;
-  return { played, base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants };
+  return {
+    base,
+    done,
+    tasks,
+    veterans,
+    boss,
+    reward,
+    kills,
+    killWarrants,
+    warrants,
+    share: runShare(pve, won),
+  };
+}
+
+/**
+ * Какую долю забега игрок прошёл: победа — весь забег, иначе пришедшие волны из всех.
+ *
+ * С этой долей падает добыча «за сам забег» — дубль, жетон героя и шанс чертежа при
+ * поражении (`runLoot`, `rollHeroTokens`). Целиком она падала с любой сдачей, и «дождаться
+ * первой волны и сдаться» по кругу приносило в разы больше дублей и жетонов, чем честная
+ * игра (баг-репорт владельца 2026-09-28). По доле ожидаемая добыча за волну одна и та же,
+ * режь время на забеги как угодно: десять забегов по волне стоят одного на десять волн.
+ * Сколько волн — битый счёт тоже ноль, а не деление на ноль.
+ */
+function runShare(pve: NonNullable<GameState['pve']>, won: boolean): number {
+  if (won) return 1;
+  if (!Number.isSafeInteger(pve.totalWaves) || pve.totalWaves <= 0) return 0;
+  return Math.min(1, Math.max(0, pve.waveNumber) / pve.totalWaves);
 }
 
 /** Сколько экспедиция заплатит, если завершить её СЕЙЧАС (решение владельца 2026-09-26: выход
@@ -1230,14 +1268,8 @@ export function settleSectorZeroRun(
   )
     return progress;
   const won = state.match.winner === 'p1' || state.match.winners?.includes('p1');
-  const { played, base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants } = runPayout(
-    progress,
-    state,
-    state.pve,
-    chapter,
-    data,
-    !!won,
-  );
+  const { base, done, tasks, veterans, boss, reward, kills, killWarrants, warrants, share } =
+    runPayout(progress, state, state.pve, chapter, data, !!won);
   const bossHero = bossTask(state)?.hero;
   const firstWin = !!won && !!chapter.id && !progress.chaptersWon.includes(chapter.id);
   // Дубли и чертежи (SZE-5.3): бросок от сида профиля, номера попытки и отпечатка итогового
@@ -1251,7 +1283,7 @@ export function settleSectorZeroRun(
       attempt,
       modules: progress.modules,
       won: !!won,
-      played,
+      share,
       newTasks,
       firstWinBlueprint: firstWin ? (chapter.blueprint ?? null) : null,
       outcome,
@@ -1260,7 +1292,16 @@ export function settleSectorZeroRun(
     // кому они нужны, — тогда не падают.
     ...(data
       ? {
-          heroTokens: rollHeroTokens({ seed: progress.seed, attempt, outcome, progress, data, won: !!won, played, newTasks }),
+          heroTokens: rollHeroTokens({
+            seed: progress.seed,
+            attempt,
+            outcome,
+            progress,
+            data,
+            won: !!won,
+            share,
+            newTasks,
+          }),
         }
       : {}),
   };

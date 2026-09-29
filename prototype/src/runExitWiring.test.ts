@@ -55,6 +55,9 @@ describe('⌂ в экспедиции спрашивает, а не уходит
     expect(SRC).toContain('settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission), data)');
     // Стенд разработчика не платит — и суммы не обещает.
     expect(SRC).toContain('reward.hidden = sectorDevActive;');
+    // Сдача до первой волны не платит (2026-09-28): ×2 и «забрать награду» — по той же сумме.
+    expect(SRC).toContain('const promise = abandonPromise(r, shopCapabilities(getPlatform().capabilities).ads);');
+    expect(SRC).toContain("t(exit && !promise.collect ? 'run.abandon.go' : txt.go)");
     expect(BUILD).toMatch(/<div class="wp-reward" id="abandon-reward" hidden><\/div>/);
   });
 

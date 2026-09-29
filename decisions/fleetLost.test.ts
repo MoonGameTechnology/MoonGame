@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fleetLostPrompt, shipCount } from './fleetLost';
+import { abandonPromise, fleetLostPrompt, shipCount } from './fleetLost';
 import type { GameState } from '../packages/shared-core/src/index';
 
 const world = (
@@ -30,5 +30,25 @@ describe('«Флот потерян» (PVR-6.29, решение владельц
     expect(fleetLostPrompt(2, 1)).toBe(false);
     // Отстроился и снова потерял — снова спросим.
     expect(fleetLostPrompt(1, 0)).toBe(true);
+  });
+
+  it('карточка «Завершить» не обещает награду и ×2, когда забирать нечего (2026-09-28)', () => {
+    expect(abandonPromise({ research: 0, warrants: 0 }, true)).toEqual({
+      double: false,
+      collect: false,
+    });
+    expect(abandonPromise({ research: 3, warrants: 15 }, true)).toEqual({
+      double: true,
+      collect: true,
+    });
+    expect(abandonPromise({ research: 3, warrants: 15 }, false)).toEqual({
+      double: false,
+      collect: true,
+    });
+    // Только уничтоженные: Варранты забрать можно, а ×2 итоги не предложат — данных нет.
+    expect(abandonPromise({ research: 0, warrants: 4 }, true)).toEqual({
+      double: false,
+      collect: true,
+    });
   });
 });
