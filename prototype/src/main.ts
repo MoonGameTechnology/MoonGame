@@ -809,6 +809,7 @@ import {
   type SplitSlot,
 } from '../../decisions/splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
+import { splitSelectTarget } from '../../decisions/splitFollow';
 import {
   canAssaultAim,
   canAssaultFromOrbit,
@@ -1271,6 +1272,8 @@ let endScreen: MatchEnd | null = null;
 // и `mobileChoices`) и прицелы, режимы и окна командного ряда (`aiming`, `castMenu`,
 // `splitState`…) живут в `interaction.ts` (REFM-207, REFM-208): их меняют только функции
 // владельца — `pick*`, `arm`/`drop`, `disarm(повод)`.
+/** Чей раскол ждёт события, чтобы выделить отделённую часть (`splitSelectTarget`). */
+let splitAwait: string | null = null;
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
@@ -4145,6 +4148,13 @@ function handleEvents(events: DomainEvent[]) {
         // два соединения свели в одно (`fleetNews.ts`, правило 2). В пути места нет.
         if (reorgHeard(p.owner, ME))
           note(typeof p.at === 'string' ? t(reorgKey('split'), { at: placeName(p.at) }) : t('log.fleet.split-transit'));
+        {
+          const pick = splitSelectTarget(splitAwait, p, ME);
+          if (pick) {
+            splitAwait = null;
+            setFleetSelection([pick]);
+          }
+        }
         break;
       // AUD-16: герой больше не гибнет молча. Только свой — в сети геройские события и
       // так строго адресны владельцу, соло повторяет тот же фильтр (`heroNews.ts`).
@@ -9449,10 +9459,17 @@ splitdlg.addEventListener('click', (ev) => {
       if (slot.kind === 'ship') take.push({ unit: slot.unit, modules: slot.modules ?? [], count: n });
       else takeLanding.push({ unit: slot.unit, count: n });
     }
-    if (take.length)
-      playerOrder(
-        splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
-      );
+    if (take.length) {
+      // Отделённую часть выделит событие раскола (`decisions/splitFollow.ts`): её id
+      // выдаёт ядро, а в соло событие приходит ещё внутри `playerOrder`.
+      splitAwait = splitState.fleetId;
+      if (
+        !playerOrder(
+          splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
+        )
+      )
+        splitAwait = null;
+    }
     drop('splitState');
     renderSplitDialog();
     invalidateCmdBar();
