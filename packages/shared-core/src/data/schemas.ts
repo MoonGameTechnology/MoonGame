@@ -274,7 +274,7 @@ export const FactionDefSchema = z.object({
  * 2026-09-26: «Крепость на планетах даёт снижение получаемого урона. Как и каждое
  * здание»). Дефолт поля `defenseBonus`: здание, не объявившее своей доли, прикрывает мир
  * на 5%. Крепость объявляет свою (15/30/45% по уровню); сумма по миру упирается в потолок
- * пула (`MITIGATION_CAP`, 90%). Считает её `worldDamageReduction` (`construction.ts`).
+ * пула (`MITIGATION_CAP`, 90%). Считает её `worldDamageReduction` (`util/worldCover.ts`).
  */
 export const BASE_BUILDING_DEFENSE = 0.05;
 

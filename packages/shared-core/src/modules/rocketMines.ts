@@ -323,6 +323,7 @@ export const rocketMinesModule: GameModule = {
           location: fleetNodeAt(h.state, fleet, h.ctx.now) ?? '',
           attacker: missile.owner,
           defender: fleet.owner,
+          defenderFleet: fleet.id,
         });
         h.emit('rocketMine.hit', {
           owner: missile.owner,

@@ -601,7 +601,8 @@ export {
   MAX_RESEARCH_SLOTS,
   clampResearchSlots,
 } from './modules/technology';
-export { constructionModule, unitBuildSiteBlocker, worldDamageReduction } from './modules/construction';
+export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
+export { coverPoints, worldDamageReduction } from './util/worldCover';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule, STATION_COST, STATION_CORE } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';

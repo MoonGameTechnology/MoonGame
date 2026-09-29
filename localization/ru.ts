@@ -1895,6 +1895,7 @@ export const ru: Record<string, string> = {
   'stat.src.promotion': 'Отличившиеся экипажи',
   'stat.src.retreat': 'Спешный отход',
   'stat.src.sector': 'Сектор',
+  'stat.src.station': 'Постройки крепости',
   'stat.src.technology': 'Технологии',
   'stat.src.veteran': 'Выслуга',
 

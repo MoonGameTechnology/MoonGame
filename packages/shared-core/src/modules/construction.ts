@@ -18,7 +18,8 @@ import { hoursToMs, timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 import { buildProgress } from '../util/construction';
-import { MITIGATION_CAP, isAllied } from '../util/combat';
+import { isAllied, mitigationFactor, type DamageHookArgs } from '../util/combat';
+import { coverPoints, worldDamageReduction } from '../util/worldCover';
 import { addUnits } from '../util/stacks';
 import { basedLander, basedMachine, shuttleBayAt } from '../state/shuttle';
 import {
@@ -619,38 +620,49 @@ function fortificationCovers(
 }
 
 /**
- * На какую долю постройки мира снижают урон по нему (решение владельца 2026-09-26):
- * «Крепость на планетах даёт снижение получаемого урона. Как и каждое здание. Максимум
- * 90%… при разрушении здания бонус начинает уменьшаться».
- *
- * Каждая СТОЯЩАЯ постройка даёт свою долю `defenseBonus`: обычная — 5%
- * (`BASE_BUILDING_DEFENSE`, дефолт схемы), крепость — 15/30/45% по уровню. Доли складываются, сумма
- * упирается в потолок пула {@link MITIGATION_CAP}: форт III и девять других построек — уже
- * 90%. Разрушенная (hp 0) не прикрывает, поэтому обстрел, сносящий постройки, снимает защиту
- * по одной доле.
+ * Урон, который канал огня уже СРЕЗАЛ прикрытием мира: с какими аргументами он спрашивал
+ * пул (`hit`) и какую долю пул пропустил (`factor`, {@link mitigationFactor}). Нужен
+ * {@link damageBuildings}, чтобы пересчитывать остаток урона по мере того, как прикрытие
+ * рушится.
  */
-export function worldDamageReduction(planet: Pick<Planet, 'buildings'>, data: GameData): number {
-  let share = 0;
-  for (const b of planet.buildings) {
-    if (!(b.hp > 0)) continue;
-    const def = data.buildings[b.type];
-    if (def) share += buildingLevel(def, b.level).defenseBonus;
-  }
-  return Math.min(MITIGATION_CAP, Math.max(0, share));
+interface CoveredDamage {
+  hit: DamageHookArgs;
+  factor: number;
 }
 
 /** Wears `amount` of structural damage across a planet's buildings (array order,
  *  carrying overflow). Buildings with no modelled HP are untouched; ones whose
  *  HP reaches zero are removed and announced via `building.destroyed`. `owner` is
  *  passed in (not read from the planet) because a capture may have already
- *  flipped `planet.owner` by the time the round's damage is applied. */
+ *  flipped `planet.owner` by the time the round's damage is applied.
+ *
+ *  `covered` — урон уже срезан прикрытием мира (обстрел, FORT-5.15). Тогда каждая
+ *  снесённая постройка ОСЛАБЛЯЕТ прикрытие для остатка этого же урона: остаток
+ *  пересчитывается долей, которую пул пропускает теперь, без павшей постройки. Без этого
+ *  исход зависел от нарезки времени (замечание Codex на #1389): обстрел, который сервер
+ *  догоняет одним длинным отрезком (матч без зрителей спит до следующего события), весь
+ *  шёл бы под прикрытием начала отрезка, и постройка, павшая в первую минуту, прикрывала
+ *  бы мир до его конца, а тот же обстрел под присмотром (такт раз в секунду) снимал бы
+ *  прикрытие по ходу. С пересчётом один отрезок и сотня коротких дают одно и то же.
+ *
+ *  Пересчёт идёт и ДО первой постройки: события одного отрезка разбираются очередью, и
+ *  обстрел второго флота над тем же миром приходит, когда первый уже мог что-то снести. */
 function damageBuildings(
   h: HandlerContext,
   planet: Planet,
   amount: number,
   owner: string | null,
+  covered?: CoveredDamage,
 ): void {
   let remaining = amount;
+  let factor = covered?.factor ?? 1;
+  const recover = (): void => {
+    if (!covered || !(remaining > 0)) return;
+    const now = mitigationFactor(h, covered.hit);
+    remaining *= now / factor;
+    factor = now;
+  };
+  recover();
   const survivors: BuildingInstance[] = [];
   for (const b of planet.buildings) {
     const def = h.ctx.data.buildings[b.type];
@@ -666,6 +678,7 @@ function damageBuildings(
       survivors.push(b);
     } else {
       h.emit('building.destroyed', { planetId: planet.id, building: b.type, owner });
+      recover(); // hp 0 — постройка больше не прикрывает (`worldDamageReduction`)
     }
   }
   planet.buildings = survivors;
@@ -714,7 +727,8 @@ function clearInfected(h: HandlerContext, planet: Planet, amount: number): void 
 export const constructionModule: GameModule = {
   id: 'construction',
   // 1.1.0: защита построек мира — доля каждой постройки, потолок 90%, штурм и обстрел (FORT-5.15).
-  version: '1.1.0',
+  // 1.2.0: снос постройки пересчитывает прикрытие для остатка того же обстрела (FORT-5.16).
+  version: '1.2.0',
   setup(api) {
     api.onAction('building.construct', (action, h) => {
       const payload = action.payload as Partial<ConstructBuildingPayload>;
@@ -1375,9 +1389,8 @@ export const constructionModule: GameModule = {
 
     // Постройки мира снижают урон по нему — при штурме (наземная фаза) и при обстреле с
     // орбиты (решение владельца 2026-09-26: «и на штурм, и на бомбардировку»). Доля
-    // (`worldDamageReduction`) уходит в пул очками `r / (1 − r)`: одна лишь защита мира даёт
-    // ровно r (1 / (1 + очки) = 1 − r), а с другими источниками пула (корпус ветерана, тип
-    // планеты) складывается по правилу пула под его единым потолком.
+    // (`worldDamageReduction`) уходит в пул очками `coverPoints` — одна лишь защита мира даёт
+    // ровно свою долю, а с другими источниками пула складывается под его единым потолком.
     //
     // Кого именно прикрывают — `fortificationCovers` (решение владельца 5): владельца и
     // его союзника. Раньше здесь стояло `planet.owner !== a.defender` → выход, то есть
@@ -1389,8 +1402,7 @@ export const constructionModule: GameModule = {
       if (a.phase !== 'ground' && a.phase !== 'bombard') return pool;
       const planet = fortificationCovers(h, a.location, a.defender);
       if (!planet) return pool;
-      const r = worldDamageReduction(planet, h.ctx.data);
-      return r > 0 ? pool + r / (1 - r) : pool;
+      return pool + coverPoints(worldDamageReduction(planet, h.ctx.data));
     });
 
     // The ground assault wears down the contested planet's structures each round
@@ -1423,9 +1435,18 @@ export const constructionModule: GameModule = {
     });
 
     // Orbital bombardment wears structures the same way (combat measures the
-    // firepower; the buildings module applies it — GDD §7.4).
+    // firepower; the buildings module applies it — GDD §7.4). Обстрел с орбиты приходит
+    // уже срезанным прикрытием мира и говорит, каким (`hit` + `factor`), — по ходу сноса
+    // остаток пересчитывается (см. `damageBuildings`). Удар челноков такой оговорки не
+    // несёт: прикрытие мира его не срезает, и ложится он как есть.
     api.on('planet.bombarded', (event, h) => {
-      const p = event.payload as { planetId?: string; power?: number; owner?: string | null };
+      const p = event.payload as {
+        planetId?: string;
+        power?: number;
+        owner?: string | null;
+        hit?: DamageHookArgs;
+        factor?: number;
+      };
       if (typeof p.planetId !== 'string' || typeof p.power !== 'number' || p.power <= 0) {
         return;
       }
@@ -1433,7 +1454,11 @@ export const constructionModule: GameModule = {
       if (!planet) {
         return;
       }
-      damageBuildings(h, planet, p.power, p.owner ?? planet.owner);
+      const covered =
+        typeof p.hit === 'object' && p.hit !== null && typeof p.factor === 'number' && p.factor > 0
+          ? { hit: p.hit, factor: p.factor }
+          : undefined;
+      damageBuildings(h, planet, p.power, p.owner ?? planet.owner, covered);
     });
 
     // Hospital healing: regenerate garrison HP each tick proportional to the
