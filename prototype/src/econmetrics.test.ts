@@ -29,3 +29,17 @@ describe('economySnapshot — срез экономики для метрик', 
     expect(economySnapshot(s).players.p1!.arrears).toEqual(['food', 'energy']);
   });
 });
+
+// Прогноз дохода — зеркало ядра: десант на плацдарме (MSB-9) платит содержание своему
+// владельцу, как в `economy.upkeepByOwner` (замечание Codex на #1392).
+describe('прогноз дохода видит десант на плацдарме', () => {
+  it('войска на чужой земле снижают доход своего владельца', () => {
+    const s = newGame();
+    const enemy = Object.values(s.planets).find((p) => p.owner !== null && p.owner !== 'p1')!;
+    const before = netIncome(s, 'p1').credits ?? 0;
+    const landed = structuredClone(s);
+    landed.planets[enemy.id]!.beachheads = [{ owner: 'p1', units: [{ unit: 'heavy_infantry', count: 4 }] }];
+    expect(netIncome(landed, 'p1').credits ?? 0).toBeLessThan(before);
+    expect(netIncome(landed, enemy.owner!)).toEqual(netIncome(s, enemy.owner!));
+  });
+});
