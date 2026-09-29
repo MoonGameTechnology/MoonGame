@@ -4,6 +4,8 @@ import { buildingLevel, type ResourceBag } from '../data/schemas';
 import type { Planet, UnitStack } from '../state/gameState';
 import { effectiveStats } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
+import type { DamageHookArgs } from '../util/combat';
+import { coverPoints, worldDamageReduction } from '../util/worldCover';
 import { isCapturable, isStationable } from '../state/sectorKind';
 
 /**
@@ -190,7 +192,8 @@ function syncStationGuns(h: HandlerContext, planet: Planet): void {
 
 export const stationModule: GameModule = {
   id: 'station',
-  version: '1.0.0',
+  // 1.1.0: постройки крепости прикрывают её орудия (FORT-5.16, замечание Codex на #1389).
+  version: '1.1.0',
   setup(api) {
     api.onAction('station.deploy', (action, h: HandlerContext) => {
       const { planetId } = action.payload as { planetId?: string };
@@ -301,6 +304,32 @@ export const stationModule: GameModule = {
       // выданный фортом гарнизон, очередь и оплаченные стройки. Снести их отсюда руками
       // значило бы оставить всё перечисленное сиротами (модули говорят только через шину).
       h.emit('station.destroyed', { planetId, owner });
+    });
+
+    /**
+     * ПОСТРОЙКИ КРЕПОСТИ ПРИКРЫВАЮТ ЕЁ ОРУДИЯ — тем же правилом, каким постройки мира
+     * прикрывают мир (`worldDamageReduction`: ядро 40%, прочие по 5%, потолок 90%).
+     *
+     * Почему здесь, а не в хуке мира у `construction`. Мир прикрывается при штурме и
+     * обстреле, а крепость не знает ни того, ни другого: обстреливать её нельзя
+     * (`bombardable: false`, решение владельца 16), высадиться при живых орудиях — тоже
+     * (орбита занята). Воюет она ОРУДИЯМИ в орбитальном бою, и фильтр фаз мира отсекал ровно
+     * этот, единственный её бой: досье обещало «−40%», а урон не срезался нигде (замечание
+     * Codex на #1389). Крепость — космический юнит с постройками (решение владельца
+     * 2026-09-29), так что прикрытие получает этот юнит, в любом канале огня.
+     *
+     * Только орудия, а не орбита: обычный флот того же владельца над крепостью прикрытия не
+     * получает — постройки защищают сооружение, которому принадлежат. Поэтому ключ — флот,
+     * получающий удар (`defenderFleet`), а не пара владельцев.
+     */
+    api.hook<number>('combat.mitigation', (pool, args, h) => {
+      const { defenderFleet } = args as DamageHookArgs;
+      if (typeof defenderFleet !== 'string') return pool;
+      const planetId = planetOfGunsFleet(defenderFleet);
+      if (planetId === null) return pool;
+      const node = h.state.planets[planetId];
+      if (!node) return pool;
+      return pool + coverPoints(worldDamageReduction(node, h.ctx.data));
     });
 
     // Захват крепости отдаёт орудия новому владельцу — вместе со зданиями, которые и так

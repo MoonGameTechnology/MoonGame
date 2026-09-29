@@ -1888,6 +1888,7 @@ export const en: Record<string, string> = {
   'stat.src.promotion': 'Promoted crews',
   'stat.src.retreat': 'Retreat haste',
   'stat.src.sector': 'Sector',
+  'stat.src.station': 'Fortress structures',
   'stat.src.technology': 'Technologies',
   'stat.src.veteran': 'Veterancy',
 

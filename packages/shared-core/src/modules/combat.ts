@@ -929,9 +929,10 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  * (admiral / tactic / bombardment), carrying `phase` in its args. EVERY firing channel
  * uses it (CORE-DMG-1): the melee round here, planetary AA and bombardment in
  * `orbital`, point-defense in `shuttle` — so a
- * technology bonus or faction passive reaches all of them alike. Only `phase: 'ground'`
- * opens the defender-side mitigations (fort, standing buildings, planet type), so the
- * other channels are scaled by the attacker's bonuses and nothing else. A new firing
+ * technology bonus or faction passive reaches all of them alike. The world's cover
+ * (standing buildings, FORT-5.15) opens on `phase: 'ground'` and `'bombard'`, the planet
+ * type on `'ground'` alone; the one fleet with cover of its own — a space fortress's guns
+ * — is named by `defenderFleet`, whatever the phase. A new firing
  * channel that skips the hook is a bug, and `damageHookScope.test.ts` fails on it.
  * Deaths publish `unit.died`; outcomes publish `battle.resolved` and
  * `planet.captured`.
@@ -974,6 +975,7 @@ function groundVolleys(
       attacker: side.owner,
       defender: target.owner,
       ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
+      ...(target.ref.kind === 'fleet' ? { defenderFleet: target.ref.fleetId } : {}),
     });
     const running = incoming.get(target);
     incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
@@ -1483,6 +1485,8 @@ export const combatModule: GameModule = {
             // без `attackerFleet` — ауры и пассивы героя усиливают флоты, не гарнизоны,
             // и это правило ближнего боя здесь ровно то же, что было.
             ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
+            // Зеркально — КОГО бьют: прикрытие бывает у одного флота (орудия крепости).
+            ...(target.ref.kind === 'fleet' ? { defenderFleet: target.ref.fleetId } : {}),
           });
           const running = incoming.get(target);
           incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));

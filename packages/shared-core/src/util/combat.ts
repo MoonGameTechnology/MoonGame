@@ -494,6 +494,17 @@ export interface DamageHookArgs {
    * он и отвечает.
    */
   attackerFleet?: string;
+  /**
+   * Флот, ПОЛУЧАЮЩИЙ этот удар, когда удар ложится на флот. `undefined` — бьют не по
+   * флоту: по гарнизону, по постройкам, по вылету челноков, по ракете.
+   *
+   * Зеркало {@link attackerFleet} и по той же причине: пара владельцев не говорит, КАКОЙ
+   * из флотов защитника под огнём, а прикрытие бывает у одного флота, а не у владельца.
+   * Первый такой случай — орудия космической крепости: их прикрывают постройки крепости
+   * (`station`), но не прикрывают обычный флот того же владельца на той же орбите
+   * (замечание Codex на #1389).
+   */
+  defenderFleet?: string;
 }
 
 /**
@@ -543,8 +554,12 @@ export function hookedDamage(
  *  Points below zero AMPLIFY (a hostile world offers its holder no cover, and that
  *  is how the per-source rules always read a negative `defenseBonus`). A pool at or
  *  past −1 would divide by zero or flip the sign, so it degrades to "no effect" —
- *  fail-secure, mirroring the guards the individual sources carried. */
-function mitigationFactor(h: HandlerContext, args: DamageHookArgs): number {
+ *  fail-secure, mirroring the guards the individual sources carried.
+ *
+ *  Exported for a channel whose SINK re-spends the damage over a target that changes as
+ *  it is hit: the bombardment reports the factor it was cut by, and `construction`
+ *  asks again after every felled building (FORT-5.15). */
+export function mitigationFactor(h: HandlerContext, args: DamageHookArgs): number {
   return mitigationFromPool(h.hook<number>('combat.mitigation', 0, args));
 }
 

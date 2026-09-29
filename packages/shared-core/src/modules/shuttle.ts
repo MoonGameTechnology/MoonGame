@@ -735,6 +735,7 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
               attacker: strike.owner,
               defender: target.owner,
               ...strikeAttackerFleet(strike),
+              defenderFleet: target.id,
             });
             h.emit('shuttle.hit', {
               strikeId: strike.id,

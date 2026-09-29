@@ -226,7 +226,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '54'; // MSB-9: штурм — высадка по таймеру, потом
+export const MODULE_MANIFEST_VERSION = '55'; // FORT-5.16: прикрытие построек. Членство и
+// порядок не тронуты; `construction` 1.2.0 пересчитывает прикрытие мира для остатка обстрела
+// после каждой снесённой постройки, `station` 1.1.0 прикрывает постройками крепости её орудия,
+// `orbital` 1.1.0 сообщает, каким прикрытием срезан обстрел. Партия на 54 молча сменила бы
+// исход обстрела и боя у крепости посреди игры.
+// export const MODULE_MANIFEST_VERSION = '54'; // MSB-9: штурм — высадка по таймеру, потом
 // плацдарм; выгрузка на свой мир — час, как погрузка. Членство и порядок не тронуты; `combat`
 // 3.1.0 и `army` 1.1.0, у флота новые поля `assaultLanding` и `unloading`. Партия на 53 не
 // знает этих полей и держала бы флот в наземном бою до конца.
