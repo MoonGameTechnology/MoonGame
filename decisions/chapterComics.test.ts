@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { shippedGameData } from '../data/bundle';
+import { pveState } from '../packages/client/src/gameData';
 import {
   comicDue,
   comicId,
   comicProblems,
   comicTaskDue,
+  echoComicMoment,
   markComicSeen,
   type ComicRegistry,
 } from './chapterComics';
@@ -65,14 +67,59 @@ describe('отметка «показан» живёт в профиле — и 
   it('сохранённая отметка читается обратно, мусор — нет', () => {
     const raw = JSON.stringify({
       ...fresh(),
-      comicsSeen: ['pve-1:intro', 'pve-2:outro', 'pve-1:task', 'pve-1:intro', 42, 'не-то', 'pve-1:credits'],
+      comicsSeen: [
+        'pve-1:intro',
+        'pve-2:outro',
+        'pve-1:task',
+        'pve-1:intro',
+        42,
+        'не-то',
+        'pve-1:credits',
+      ],
     });
-    expect(parseSectorZeroProgress(raw, data).comicsSeen).toEqual(['pve-1:intro', 'pve-2:outro', 'pve-1:task']);
+    expect(parseSectorZeroProgress(raw, data).comicsSeen).toEqual([
+      'pve-1:intro',
+      'pve-2:outro',
+      'pve-1:task',
+    ]);
   });
 
   it('старый профиль без поля читается как «ничего не показано»', () => {
     const { comicsSeen: _dropped, ...old } = fresh();
     expect(parseSectorZeroProgress(JSON.stringify(old), data).comicsSeen).toEqual([]);
+  });
+});
+
+describe('знакомство с Эхо — порядок и архивная версия', () => {
+  const world = () => structuredClone(pveState(data, 0));
+
+  it('разведка или приказ лететь не заменяют прибытие живого своего корабля', () => {
+    const state = world();
+    expect(echoComicMoment(state, 'p1', true, false)).toBeNull();
+    const fleet = Object.values(state.fleets).find((f) => f.owner === 'p1')!;
+    fleet.location = 'home_b';
+    expect(echoComicMoment(state, 'p1', false, false)).toBeNull();
+    expect(echoComicMoment(state, 'p1', true, false)).toBe('echo');
+    for (const stack of fleet.units) stack.count = 0;
+    expect(echoComicMoment(state, 'p1', true, false)).toBeNull();
+  });
+
+  it('раннее освобождение и старое выполнение показывают запись без повторного штурма', () => {
+    const state = world();
+    state.planets.home_b!.owner = 'p1';
+    expect(echoComicMoment(state, 'p1', false, true)).toBeNull();
+    expect(echoComicMoment(state, 'p1', true, false)).toBe('echo-record');
+    state.planets.home_b!.owner = null;
+    expect(echoComicMoment(state, 'p1', true, true)).toBe('echo-record');
+  });
+
+  it('обе версии делят отметку и не повторяются после загрузки профиля', () => {
+    const registry: ComicRegistry = { 'pve-1': { echo: PANELS, 'echo-record': PANELS } };
+    const seen = markComicSeen(fresh(), comicId('pve-1', 'echo-record'));
+    const restored = parseSectorZeroProgress(JSON.stringify(seen), data);
+    expect(restored.comicsSeen).toContain('pve-1:echo');
+    expect(comicDue(restored, registry, 'pve-1', 'echo')).toBeNull();
+    expect(comicDue(restored, registry, 'pve-1', 'echo-record')).toBeNull();
   });
 });
 

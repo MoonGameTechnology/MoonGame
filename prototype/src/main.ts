@@ -353,11 +353,13 @@ import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
+import { createComicQueue } from './comicQueue';
 import { CHAPTER_COMICS, COMIC_TASK_TRIGGERS } from './comicArt';
 import {
   comicDue,
   comicId,
   comicTaskDue,
+  echoComicMoment,
   markComicSeen,
   type ComicMoment,
   type ComicRegistry,
@@ -11061,6 +11063,7 @@ const comicPlayer = initComicPlayer({
   skip: $('comic-skip') as HTMLButtonElement,
 });
 const comicArt: { registry: ComicRegistry } = { registry: CHAPTER_COMICS };
+const comicQueue = createComicQueue();
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
 let stewSnapshot: StewardMetrics | null = null;
 
@@ -14814,7 +14817,7 @@ function setRunActive(on: boolean): void {
  */
 let gameplayMarked: boolean | null = null;
 function markGameplay(): void {
-  const playing = sectorRunActive && speed > 0;
+  const playing = sectorRunActive && speed > 0 && !comicQueue.isBusy();
   gameplayMarked = playing;
   const api = getPlatform() as Partial<PlatformHost>;
   if (playing) api.gameplayStart?.();
@@ -15635,11 +15638,15 @@ function playChapterComic(chapter: string, moment: ComicMoment, then: () => void
     then();
     return;
   }
-  const shown = comicPlayer.play(panels, moment === 'intro' ? 'battle' : moment === 'outro' ? 'results' : 'resume');
   detach(
     'Sector Zero: комикс главы',
-    shown.then(() => {
-      saveSectorProgress(markComicSeen(sectorProgress, comicId(chapter, moment)));
+    comicQueue.enqueue(comicId(chapter, moment), async () => {
+      // Предыдущая страница могла записать ту же отметку (живая/архивная версия Эхо).
+      const current = comicDue(sectorProgress, comicArt.registry, chapter, moment);
+      if (current) {
+        await comicPlayer.play(current, moment === 'intro' ? 'battle' : moment === 'outro' ? 'results' : 'resume');
+        saveSectorProgress(markComicSeen(sectorProgress, comicId(chapter, moment)));
+      }
       then();
     }),
   );
@@ -15650,14 +15657,22 @@ function playChapterComic(chapter: string, moment: ComicMoment, then: () => void
  *  (`chain.contact` — встреча с союзником): он засчитывается так же. Дев-забег и полигон
  *  комикс не показывают. */
 function playTaskComic(missions: readonly MissionRow[], chain: readonly ChapterStep[] | null): void {
-  if (isTraining() || sectorDevActive || comicPlayer.isOpen()) return;
+  if (isTraining() || sectorDevActive || !isSectorZeroRun()) return;
   const chapter = pveChapter(sectorMission).id;
   const complete = [
     ...missions.filter((m) => m.complete).map((m) => m.id),
     ...(chain ?? []).filter((st) => st.done).map((st) => st.key),
+    ...(sectorProgress.objectivesDone[chapter] ?? []),
   ];
   if (comicTaskDue(sectorProgress, comicArt.registry, COMIC_TASK_TRIGGERS, chapter, complete))
     playChapterComic(chapter, 'task', () => {});
+  if (chapter === 'pve-1') {
+    const scientistAvailable = complete.includes('mission.rescue-scientist')
+      || (s.missionFacts?.recruited?.[ME] ?? []).includes('research_station')
+      || sectorProgress.chaptersWon.includes('pve-1');
+    const moment = echoComicMoment(s, ME, scientistAvailable, complete.includes('mission.claim-colony'));
+    if (moment) playChapterComic(chapter, moment, () => {});
+  }
 }
 
 /** Новая попытка главы — и меню, и «Сыграть главу снова»: сперва комикс главы (в первый
@@ -15819,9 +15834,13 @@ function awardSectorRun(): number {
  *  снимок забывается, иначе следующий запуск воскресил бы доигранный мир. */
 function tickRunSave(nowReal: number): void {
   if (sectorDevActive) return;
+  if (isTraining() && s.match.status === 'ended' && s.match.winner === ME)
+    playChapterComic('training-1', 'outro', () => {});
   if (isSectorZeroRun() && s.match.status === 'ended') {
     if (sectorAttempt > 0 && clearedAttempt !== sectorAttempt) {
       const won = s.match.winner === ME || (s.match.winners ?? []).includes(ME);
+      // Спасение/встреча в победном кадре должны показаться до финала главы.
+      playTaskComic(runMissionRows(), runChain());
       // Исход попытки (`YAG-5.1`) — один раз, там же, где засчитывается её награда.
       const outcome = pveOutcomeEvent(s, ME, { chapter: pveChapter(sectorMission).id, attempt: sectorAttempt });
       if (outcome) getPlatform().analytics.emit(outcome.event, outcome.props);
@@ -15979,7 +15998,7 @@ function frame(nowReal: number) {
   // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
   // smooth FPS; ignore absurd gaps (tab backgrounded) so the readout stays sane
   if (saneGap(dt)) fpsEma = fpsNext(fpsEma, dt);
-  if (simRuns(NET, speed, !!banner, !!endScreen)) {
+  if (simRuns(NET, speed, !!banner || comicQueue.isBusy(), !!endScreen)) {
     // Local single-player sim. In net mode the server owns the clock, combat,
     // construction and every rival — a connected human, or the server-side AI for
     // an empty seat — so we only render its snapshots (no local AI runs here).
@@ -15988,14 +16007,19 @@ function frame(nowReal: number) {
     // с той же быстротой, а не медленнее (правило 3).
     const target = advanceTarget(s.time, dt, speed, HOUR);
     apply(advance(s, target));
+    // Прибытие к Эхо — до исполнения следующего приказа цепочки (наземного штурма).
+    // Очередь становится busy сразу, ещё до открытия картинки в микрозадаче.
+    playTaskComic(runMissionRows(), runChain());
     // RETR-2 ПЕРВЫМ среди драйверов: смысл приказа — выйти из боя до следующего
     // раунда, а не после того, как флот отработает остальные намерения.
-    solo.driveAutoRetreat();
-    solo.autoEngage();
-    solo.checkFleetClashes();
-    solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
-    solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
-    solo.runAI();
+    if (!comicQueue.isBusy()) {
+      solo.driveAutoRetreat();
+      solo.autoEngage();
+      solo.checkFleetClashes();
+      solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
+      solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
+      solo.runAI();
+    }
   }
   // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
   // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
@@ -16003,8 +16027,8 @@ function frame(nowReal: number) {
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
-  if (saneGap(dt) && spinRuns(NET, speed, !!banner)) orbitPhase += dt;
-  if (saneGap(dt) && !document.hidden && motionOn() && !endScreen && spinRuns(NET, speed, !!banner)) hologramTime += dt;
+  if (saneGap(dt) && spinRuns(NET, speed, !!banner || comicQueue.isBusy())) orbitPhase += dt;
+  if (saneGap(dt) && !document.hidden && motionOn() && !endScreen && spinRuns(NET, speed, !!banner || comicQueue.isBusy())) hologramTime += dt;
   // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
   const ended = matchEnd.check();
   if (ended) endScreen = ended;
@@ -16053,7 +16077,7 @@ function frame(nowReal: number) {
   // «нечего», и полоса выглядит ровно как до этого кирпича.
   tickRunSave(nowReal);
   tickSoloSave(nowReal);
-  if (gameplayMarked !== (sectorRunActive && speed > 0)) markGameplay();
+  if (gameplayMarked !== (sectorRunActive && speed > 0 && !comicQueue.isBusy())) markGameplay();
   renderSwarmDossier(nowReal);
   pirateIntro.update(!NET && inMatch() ? pirateEncounter(s, ME) : null);
   tickAbandon();
@@ -16097,7 +16121,7 @@ function frame(nowReal: number) {
   const missions = sectorRunActive ? runMissionRows() : [];
   const missionsDone = missions.filter(m => m.complete).length;
   const chain = runChain();
-  if (missionsDone > 0 || chain?.some((st) => st.done)) playTaskComic(missions, chain);
+  if (isSectorZeroRun()) playTaskComic(missions, chain);
   const missionHtml =
     missions.length === 0
       ? ''
