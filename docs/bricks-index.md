@@ -902,6 +902,7 @@
 | FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md` | Технологии открывают постройки крепости |
 | FORT-5.13 | ✅ | core | `docs/fortress-roadmap.md` | Сбитая крепость уничтожается |
 | FORT-5.14 | ✅ | proto | `docs/fortress-roadmap.md` | Кнопка крепости: знает о технологии и не показывает разметку |
+| FORT-5.15 | ✅ | core data proto | `docs/fortress-roadmap.md` | Защита построек мира: форт 15/30/45%, каждая постройка 5%, потолок 90% |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md` | Туман как граница (анти-maphack) (в основном) |

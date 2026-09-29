@@ -393,6 +393,7 @@ export const en: Record<string, string> = {
   'build.fx.aa': 'Interdiction: {n} damage to ships',
   'build.fx.credits': '+{n}% world credits',
   'build.fx.defense': '+{n}% defense',
+  'build.fx.mitigation': '−{n}% damage to the world',
   'build.fx.production': '+{n}% production',
   'build.fx.radar': 'radar: {n}',
   'build.fx.hangar': 'hangar: {n} shuttle berths',
@@ -778,7 +779,7 @@ export const en: Record<string, string> = {
   'codex.row.cargo': 'Cargo capacity',
   'codex.row.class': 'Class',
   'codex.row.cost': 'Cost',
-  'codex.row.garrison-defense': 'Garrison defense',
+  'codex.row.world-mitigation': 'Damage to the world',
   'codex.row.hp': 'Structure HP',
   'codex.row.hull': 'Hull',
   'codex.row.levels': 'Tiers',
@@ -1243,7 +1244,7 @@ export const en: Record<string, string> = {
   'dossier.building.farm':
     'Tiers of hydroponic greenhouses under spectral lamps feed those in your care — hunger is merciless. Grows {f}❖ per hour. Your workers and soldiers eat every day; it would be foolish to lose a battle to a hungry faint.',
   'dossier.building.fort':
-    'A layered planetary bastion. Raises garrison defense by {d} and holds {hp} structure HP under orbital fire. The last line of a besieged world.',
+    'A layered planetary bastion: damage to the world from ground assault and orbital bombardment is {d} lower, {hp} structure HP. Every other intact building cuts another {b}, up to {cap} in total.',
   'dossier.building.metal-station':
     "A mining rig gnawing into a dead world's scorched crust. Where annihilation burned away all life, raw metal ore lies exposed — the station pumps {m}⬢ per hour. Upgrades raise the yield.",
   'dossier.building.mine':
@@ -1259,7 +1260,7 @@ export const en: Record<string, string> = {
   'dossier.building.refinery':
     'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary shuttles.',
   'dossier.building.starfort':
-    'The hull of a void fortress — what the node stands and fights with. {hp} structure HP, {aa} against ships and {pd} against shuttles, {d} to ground defense. Grows with the fortress level; it is never built on its own, it arrives with the fortress.',
+    'The hull of a void fortress — what the node stands and fights with. {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level; it is never built on its own, it arrives with the fortress.',
   'dossier.building.tax-office':
     "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
   'dossier.fleet.desc':
@@ -1278,6 +1279,9 @@ export const en: Record<string, string> = {
   'dossier.stat.ground.name': 'Ground units',
   'dossier.stat.gships.desc': "The world owner's ships here: in orbit and on the planet itself.",
   'dossier.stat.gships.name': 'Ships at the world',
+  'dossier.stat.mitigation.desc':
+    'Damage to the world from ground assault and orbital bombardment is cut by this share. A fort gives {f} by level, every other intact building {b}, up to {cap} in total. A destroyed building stops covering.',
+  'dossier.stat.mitigation.name': 'Structure cover',
   'dossier.stat.hp.name': 'Hit points',
   'dossier.stat.hull.desc':
     'Current/full army hull. Mends over your world with a repair yard — or instantly for credits.',
@@ -3240,6 +3244,7 @@ export const en: Record<string, string> = {
   'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',
+  'side.world.mitigation': 'Structure cover: −{n}% damage',
   'side.world.buildings': 'Structures',
   'side.world.capital': 'Capital',
   'side.world.capital.note': '— heroes respawn and re-fit modules here',

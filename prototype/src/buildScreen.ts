@@ -18,7 +18,7 @@
  * вместо слотов честный счётчик «построено: N») и «Черта: заражено» (каталог
  * прототипа не несёт черт зданий). Оба — остаток в бэклоге, не ложь на экране.
  */
-import { buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/index';
+import { BASE_BUILDING_DEFENSE, buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
@@ -58,9 +58,9 @@ export function buildCategory(def: BuildingDef): BuildCategory {
   if ((lv1.shuttleBay ?? 0) > 0) return 'infra';
   if (Object.values(lv1.produces ?? {}).some((n) => (n ?? 0) > 0) || (def.creditsBonus ?? 0) > 0)
     return 'economy';
-  // Порог 0.01 — как у карточки кодекса: схема даёт КАЖДОМУ зданию защитный дефолт
-  // 0.01, и без порога вся инфраструктура съезжала бы в «оборону».
-  if ((lv1.defenseBonus ?? 0) > 0.01 || (lv1.aaDamage ?? 0) > 0) return 'defense';
+  // Порог — дефолт схемы, как у карточки кодекса: каждое здание прикрывает мир на 5%
+  // (`BASE_BUILDING_DEFENSE`), и без порога вся инфраструктура съезжала бы в «оборону».
+  if ((lv1.defenseBonus ?? 0) > BASE_BUILDING_DEFENSE || (lv1.aaDamage ?? 0) > 0) return 'defense';
   return 'infra';
 }
 
@@ -73,11 +73,12 @@ export function buildFx(def: BuildingDef, level: number): string {
   // Ресурс — иконкой и цветом, а не словом: та же чиповая форма, что у ценника.
   const prod = resLine(lv.produces ?? {}, { sign: true, per: 'h' });
   if (prod) fx.push(prod);
-  if ((def.creditsBonus ?? 0) > 0)
-    fx.push(t('build.fx.credits', { n: Math.round((def.creditsBonus ?? 0) * 100) }));
-  // Тот же порог 0.01, что у категории: дефолт схемы — не эффект, а шум.
-  if ((lv.defenseBonus ?? 0) > 0.01)
-    fx.push(t('build.fx.defense', { n: Math.round((lv.defenseBonus ?? 0) * 100) }));
+  // Прибавка — с ЭТОГО уровня, как выработка: у налоговой их три (+25/+35/+50%).
+  if ((lv.creditsBonus ?? 0) > 0)
+    fx.push(t('build.fx.credits', { n: Math.round((lv.creditsBonus ?? 0) * 100) }));
+  // Тот же порог, что у категории: 5% есть у каждого здания, это не эффект, а шум.
+  if ((lv.defenseBonus ?? 0) > BASE_BUILDING_DEFENSE)
+    fx.push(t('build.fx.mitigation', { n: Math.round((lv.defenseBonus ?? 0) * 100) }));
   if ((lv.aaDamage ?? 0) > 0) fx.push(t('build.fx.aa', { n: lv.aaDamage ?? 0 }));
   if ((lv.radarRange ?? 0) > 0) fx.push(t('build.fx.radar', { n: lv.radarRange ?? 0 }));
   if (def.enablesShipConstruction) fx.push(t('build.fx.shipyard'));
