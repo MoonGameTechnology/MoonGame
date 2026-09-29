@@ -434,6 +434,7 @@ export const ru: Record<string, string> = {
   'cargo.meter.free': 'Свободно: {n}',
   'cargo.meter.hangar': 'Ангар',
   'cargo.meter.loading': 'Погрузка: {p}% · резерв {n}',
+  'cargo.meter.unloading': 'Выгрузка: {p}% · сходят {n}',
   'cargo.meter.over': 'Сверх вместимости: {n}',
   'cargo.meter.troops': 'Десант',
   'cargo.under-assault': 'гарнизон заперт боем — войска не выпустить',
@@ -2543,6 +2544,11 @@ export const ru: Record<string, string> = {
   'log.fleet.split-transit': '⊟ флот разделён в пути',
   // AUDM-4: флот ушёл раньше, чем закончилась погрузка, — десант остался в гарнизоне.
   'log.army.load-cancelled': '⚠ погрузка отменена: флот ушёл, {n}× {u} остались · {at}',
+  // MSB-9: выгрузка идёт по таймеру, и вылет её снимает — десант остался на борту.
+  'log.army.unload-cancelled': '⚠ выгрузка отменена: флот ушёл, {n}× {u} остались на борту · {at}',
+  // MSB-9: высадка штурмом идёт полтора часа; прилёт врага на орбиту её срывает.
+  'log.assault.landing': '⤓ высадка на {at}: десант на земле через {t}',
+  'log.assault.interrupted': '⚠ высадка на {at} сорвана: враг на орбите, десант на борту',
   'log.market.buy': 'покупка',
   'log.market.sell': 'продажа',
   'log.market.trade': '⇄ биржа: {n} {res} за {paid} ¤ ({side})',
@@ -3134,6 +3140,7 @@ export const ru: Record<string, string> = {
   'side.conveyor.waiting': 'Ждёт ресурсы: {c}',
   'side.empty': 'Тапните мир.',
   'side.fleet.bombarding': 'бомбардирует',
+  'side.fleet.landing': 'высадка: {t}',
   'side.fleet.enroute': '↗ курс: {dest} · прибытие через',
   'side.fleet.hero-aura': '— проекция · +5% атаки/обороны этому флоту',
   'side.fleet.hull-tag': 'корпус {p}%',
@@ -3175,6 +3182,7 @@ export const ru: Record<string, string> = {
   'side.ground.legend': 'гарнизон ▸ трюм',
   'side.ground.load': '▲ Погрузить {u}',
   'side.ground.loading': '⏳ грузится: {n}',
+  'side.ground.unloading': '⏳ сходит на берег: {n}',
   'side.ground.title': 'Наземная армия ⇄ гарнизон',
   'side.ground.units': 'Наземные части',
   'side.ground.unload': '▼ Выгрузить {u}',

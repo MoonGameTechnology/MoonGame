@@ -388,8 +388,9 @@ export const movementModule: GameModule = {
       payload: MovePayload,
       playerId: PlayerId,
     ): string | null => {
-      if (fleet.battleId) {
-        return 'E_FLEET_BUSY'; // in battle → not free to re-task
+      // In battle, or mid-landing (the fleet holds orbit until its troops are down).
+      if (fleet.battleId || fleet.assaultLanding) {
+        return 'E_FLEET_BUSY'; // not free to re-task
       }
       if (fleet.movement) {
         // RETASK: a NEW course to a fleet already under way is legal — halt it at its

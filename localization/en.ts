@@ -431,6 +431,7 @@ export const en: Record<string, string> = {
   'cargo.meter.free': 'Free: {n}',
   'cargo.meter.hangar': 'Hangar',
   'cargo.meter.loading': 'Loading: {p}% · reserved {n}',
+  'cargo.meter.unloading': 'Unloading: {p}% · {n} going ashore',
   'cargo.meter.over': 'Over capacity: {n}',
   'cargo.meter.troops': 'Troops',
   'cargo.under-assault': 'the garrison is locked in battle — no troops can leave',
@@ -2535,6 +2536,11 @@ export const en: Record<string, string> = {
   'log.fleet.split-transit': '⊟ fleet split under way',
   // AUDM-4: the fleet left before loading finished — the troops stayed in the garrison.
   'log.army.load-cancelled': '⚠ loading cancelled: the fleet left, {n}× {u} stayed at {at}',
+  // MSB-9: unloading runs on a timer, and departure cancels it — the troops stay aboard.
+  'log.army.unload-cancelled': '⚠ unloading cancelled: the fleet left, {n}× {u} stayed aboard at {at}',
+  // MSB-9: an assault landing takes an hour and a half; an enemy fleet in orbit breaks it off.
+  'log.assault.landing': '⤓ landing on {at}: troops ashore in {t}',
+  'log.assault.interrupted': '⚠ landing on {at} broken off: enemy in orbit, troops stay aboard',
   'log.market.buy': 'buy',
   'log.market.sell': 'sell',
   'log.market.trade': '⇄ market: {n} {res} for {paid} ¤ ({side})',
@@ -3130,6 +3136,7 @@ export const en: Record<string, string> = {
   'side.conveyor.waiting': 'Waiting for resources: {c}',
   'side.empty': 'Tap a world.',
   'side.fleet.bombarding': 'bombarding',
+  'side.fleet.landing': 'landing: {t}',
   'side.fleet.enroute': '↗ en route to {dest} · arrives in',
   'side.fleet.hero-aura': '— projection · +5% attack/defense to this fleet',
   'side.fleet.hull-tag': 'hull {p}%',
@@ -3171,6 +3178,7 @@ export const en: Record<string, string> = {
   'side.ground.legend': 'garrison ▸ hold',
   'side.ground.load': '▲ Load {u}',
   'side.ground.loading': '⏳ loading: {n}',
+  'side.ground.unloading': '⏳ disembarking: {n}',
   'side.ground.title': 'Ground army ⇄ garrison',
   'side.ground.units': 'Ground units',
   'side.ground.unload': '▼ Unload {u}',

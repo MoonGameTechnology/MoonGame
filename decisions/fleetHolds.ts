@@ -1,7 +1,8 @@
 /** Cargo occupancy, shared by map badges and fleet cards. Ground cargo and shuttles
  * share ONE hold (SHU-5.1): each meter shows its own share, and its capacity is the
  * hold minus what the other share already occupies, so both read the same free space. Loading reserves its whole volume until the snapshot
- * moves it aboard; animation progress never changes custody or free space. */
+ * moves it aboard; animation progress never changes custody or free space. Unloading is
+ * the mirror: the troops going ashore stay in `used` until the snapshot moves them out. */
 import {
   fleetHoldFree,
   fleetShuttleBay,
@@ -23,9 +24,19 @@ export interface FleetHold {
   reservedFraction: number;
   /** Volume-weighted progress of the active ground lifts, 0..1. */
   loadingProgress: number;
+  /** Volume already going ashore (`fleet.unloading`) — still aboard, so part of `used`. */
+  unloading: number;
+  /** Volume-weighted progress of the active disembarkations, 0..1. */
+  unloadingProgress: number;
 }
 
 const clamp = (n: number): number => Math.max(0, Math.min(1, n));
+
+/** Progress of a timed claim at `now`, 0..1; a zero-length window is done at its end. */
+function windowProgress(claim: { startAt: number; doneAt: number }, now: number): number {
+  const duration = claim.doneAt - claim.startAt;
+  return duration > 0 ? clamp((now - claim.startAt) / duration) : Number(now >= claim.doneAt);
+}
 
 function hold(
   kind: FleetHold['kind'],
@@ -33,6 +44,8 @@ function hold(
   capacity: number,
   reserved = 0,
   loadingProgress = 0,
+  unloading = 0,
+  unloadingProgress = 0,
 ): FleetHold {
   const usedFraction = capacity > 0 ? clamp(used / capacity) : used > 0 ? 1 : 0;
   return {
@@ -41,6 +54,8 @@ function hold(
     capacity,
     reserved,
     loadingProgress,
+    unloading,
+    unloadingProgress,
     free: Math.max(0, capacity - used - reserved),
     over: Math.max(0, used + reserved - capacity),
     usedFraction,
@@ -67,11 +82,16 @@ export function fleetHolds(fleet: Fleet, data: GameData, now: number, aloft = 0)
   let progressed = 0;
   for (const claim of fleet.loading ?? []) {
     const volume = claim.count * (data.units[claim.unit]?.stats.cargoSize ?? 1);
-    const duration = claim.doneAt - claim.startAt;
-    const progress =
-      duration > 0 ? clamp((now - claim.startAt) / duration) : Number(now >= claim.doneAt);
     reserved += volume;
-    progressed += volume * progress;
+    progressed += volume * windowProgress(claim, now);
+  }
+  // Выгрузка идёт по таймеру, как погрузка (MSB-9): объём ещё на борту, прогресс — тот же.
+  let leaving = 0;
+  let landed = 0;
+  for (const claim of fleet.unloading ?? []) {
+    const volume = claim.count * (data.units[claim.unit]?.stats.cargoSize ?? 1);
+    leaving += volume;
+    landed += volume * windowProgress(claim, now);
   }
   const machines = hangarSize(fleet, data) + aloft;
   const meters: FleetHold[] = [];
@@ -83,6 +103,8 @@ export function fleetHolds(fleet: Fleet, data: GameData, now: number, aloft = 0)
         Math.max(0, capacity - machines),
         reserved,
         reserved > 0 ? progressed / reserved : 0,
+        leaving,
+        leaving > 0 ? landed / leaving : 0,
       ),
     );
   if (machines > 0) meters.push(hold('hangar', machines, fleetShuttleBay(fleet, data)));

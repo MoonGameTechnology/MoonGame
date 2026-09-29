@@ -158,6 +158,23 @@ describe('fleet hold occupancy', () => {
     });
   });
 
+  it('unloading keeps the troops aboard and reports its own progress (MSB-9)', () => {
+    const leaving = { unit: 'tank', count: 1, to: 'home', startAt: 0, doneAt: 100 };
+    const f = fleet({ landing: [{ unit: 'tank', count: 2 }], unloading: [leaving] });
+    // Сходящие ещё в трюме: занятое не уменьшилось, место не освободилось до снимка.
+    expect(fleetHolds(f, data, 40)[0]).toMatchObject({
+      used: 6,
+      free: 4,
+      reserved: 0,
+      unloading: 3,
+      unloadingProgress: expect.closeTo(0.4),
+    });
+    expect(fleetHolds(fleet({ landing: [{ unit: 'tank', count: 2 }] }), data, 40)[0]).toMatchObject({
+      unloading: 0,
+      unloadingProgress: 0,
+    });
+  });
+
   it('zero-length and not-yet-started loading windows never produce invalid progress', () => {
     expect(
       fleetHolds(fleet({ loading: [{ ...claim, doneAt: 0 }] }), data, 0)[0]!.loadingProgress,
