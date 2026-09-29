@@ -194,7 +194,7 @@ m = collections.OrderedDict([
                     'units': [{'unit': 'cruiser', 'count': 2},
                               {'unit': 'frigate', 'count': 2}]}),
         # «Последняя смена»: транспорты персонала лаборатории ждут вывода к базе.
-        ('p1_evac', {'owner': 'p1', 'location': 'lab_outpost',
+        ('p1_evac', {'joinsOnArrival': True, 'owner': 'p1', 'location': 'lab_outpost',
                      'units': [{'unit': 'evac_transport', 'count': 3}]}),
         ('swarm_1', {'owner': 'swarm', 'location': 'hive',
                      'units': [{'unit': 'swarm_brood_mother', 'count': 2}]}),

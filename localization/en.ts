@@ -393,6 +393,7 @@ export const en: Record<string, string> = {
   'build.fx.aa': 'Interdiction: {n} damage to ships',
   'build.fx.credits': '+{n}% world credits',
   'build.fx.defense': '+{n}% defense',
+  'build.fx.mitigation': '−{n}% damage to the world',
   'build.fx.production': '+{n}% production',
   'build.fx.radar': 'radar: {n}',
   'build.fx.hangar': 'hangar: {n} shuttle berths',
@@ -430,6 +431,7 @@ export const en: Record<string, string> = {
   'cargo.meter.free': 'Free: {n}',
   'cargo.meter.hangar': 'Hangar',
   'cargo.meter.loading': 'Loading: {p}% · reserved {n}',
+  'cargo.meter.unloading': 'Unloading: {p}% · {n} going ashore',
   'cargo.meter.over': 'Over capacity: {n}',
   'cargo.meter.troops': 'Troops',
   'cargo.under-assault': 'the garrison is locked in battle — no troops can leave',
@@ -778,7 +780,7 @@ export const en: Record<string, string> = {
   'codex.row.cargo': 'Cargo capacity',
   'codex.row.class': 'Class',
   'codex.row.cost': 'Cost',
-  'codex.row.garrison-defense': 'Garrison defense',
+  'codex.row.world-mitigation': 'Damage to the world',
   'codex.row.hp': 'Structure HP',
   'codex.row.hull': 'Hull',
   'codex.row.levels': 'Tiers',
@@ -1243,7 +1245,7 @@ export const en: Record<string, string> = {
   'dossier.building.farm':
     'Tiers of hydroponic greenhouses under spectral lamps feed those in your care — hunger is merciless. Grows {f}❖ per hour. Your workers and soldiers eat every day; it would be foolish to lose a battle to a hungry faint.',
   'dossier.building.fort':
-    'A layered planetary bastion. Raises garrison defense by {d} and holds {hp} structure HP under orbital fire. The last line of a besieged world.',
+    'A layered planetary bastion: damage to the world from ground assault and orbital bombardment is {d} lower, {hp} structure HP. Every other intact building cuts another {b}, up to {cap} in total.',
   'dossier.building.metal-station':
     "A mining rig gnawing into a dead world's scorched crust. Where annihilation burned away all life, raw metal ore lies exposed — the station pumps {m}⬢ per hour. Upgrades raise the yield.",
   'dossier.building.mine':
@@ -1259,7 +1261,7 @@ export const en: Record<string, string> = {
   'dossier.building.refinery':
     'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary shuttles.',
   'dossier.building.starfort':
-    'The hull of a void fortress — what the node stands and fights with. {hp} structure HP, {aa} against ships and {pd} against shuttles, {d} to ground defense. Grows with the fortress level; it is never built on its own, it arrives with the fortress.',
+    'The hull of a void fortress — what the node stands and fights with. {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level; it is never built on its own, it arrives with the fortress.',
   'dossier.building.tax-office':
     "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
   'dossier.fleet.desc':
@@ -1278,6 +1280,9 @@ export const en: Record<string, string> = {
   'dossier.stat.ground.name': 'Ground units',
   'dossier.stat.gships.desc': "The world owner's ships here: in orbit and on the planet itself.",
   'dossier.stat.gships.name': 'Ships at the world',
+  'dossier.stat.mitigation.desc':
+    'Damage to the world from ground assault and orbital bombardment is cut by this share. A fort gives {f} by level, every other intact building {b}, up to {cap} in total. A destroyed building stops covering.',
+  'dossier.stat.mitigation.name': 'Structure cover',
   'dossier.stat.hp.name': 'Hit points',
   'dossier.stat.hull.desc':
     'Current/full army hull. Mends over your world with a repair yard — or instantly for credits.',
@@ -2531,6 +2536,11 @@ export const en: Record<string, string> = {
   'log.fleet.split-transit': '⊟ fleet split under way',
   // AUDM-4: the fleet left before loading finished — the troops stayed in the garrison.
   'log.army.load-cancelled': '⚠ loading cancelled: the fleet left, {n}× {u} stayed at {at}',
+  // MSB-9: unloading runs on a timer, and departure cancels it — the troops stay aboard.
+  'log.army.unload-cancelled': '⚠ unloading cancelled: the fleet left, {n}× {u} stayed aboard at {at}',
+  // MSB-9: an assault landing takes an hour and a half; an enemy fleet in orbit breaks it off.
+  'log.assault.landing': '⤓ landing on {at}: troops ashore in {t}',
+  'log.assault.interrupted': '⚠ landing on {at} broken off: enemy in orbit, troops stay aboard',
   'log.market.buy': 'buy',
   'log.market.sell': 'sell',
   'log.market.trade': '⇄ market: {n} {res} for {paid} ¤ ({side})',
@@ -3126,6 +3136,7 @@ export const en: Record<string, string> = {
   'side.conveyor.waiting': 'Waiting for resources: {c}',
   'side.empty': 'Tap a world.',
   'side.fleet.bombarding': 'bombarding',
+  'side.fleet.landing': 'landing: {t}',
   'side.fleet.enroute': '↗ en route to {dest} · arrives in',
   'side.fleet.hero-aura': '— projection · +5% attack/defense to this fleet',
   'side.fleet.hull-tag': 'hull {p}%',
@@ -3167,6 +3178,7 @@ export const en: Record<string, string> = {
   'side.ground.legend': 'garrison ▸ hold',
   'side.ground.load': '▲ Load {u}',
   'side.ground.loading': '⏳ loading: {n}',
+  'side.ground.unloading': '⏳ disembarking: {n}',
   'side.ground.title': 'Ground army ⇄ garrison',
   'side.ground.units': 'Ground units',
   'side.ground.unload': '▼ Unload {u}',
@@ -3198,6 +3210,11 @@ export const en: Record<string, string> = {
   'side.strike.bombard.stop': '⊗ Stop bombard',
   'side.strike.forecast':
     'Assault forecast: {v} · ~{r} rounds · losses {a} landing ({pa}%) / {d} garrison ({pd}%)',
+  // UIX-6.1: forecast at the «Attack» target (fleet vs fleet). Verdict word and a numbers line.
+  'engage.forecast.win': 'forecast: victory',
+  'engage.forecast.draw': 'forecast: draw',
+  'engage.forecast.loss': 'forecast: defeat',
+  'engage.forecast.line': '≈{h} · losses {own}% · enemy {foe}%',
   'side.strike.forecast.attacker': 'the landing takes the world',
   'side.strike.forecast.defender': 'the garrison holds',
   'side.strike.forecast.draw': 'a drawn-out stalemate',
@@ -3235,6 +3252,7 @@ export const en: Record<string, string> = {
   'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',
+  'side.world.mitigation': 'Structure cover: −{n}% damage',
   'side.world.buildings': 'Structures',
   'side.world.capital': 'Capital',
   'side.world.capital.note': '— heroes respawn and re-fit modules here',

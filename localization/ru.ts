@@ -396,6 +396,7 @@ export const ru: Record<string, string> = {
   'build.fx.aa': 'ПКО: {n} урона по кораблям',
   'build.fx.credits': '+{n}% к кредитам мира',
   'build.fx.defense': '+{n}% к обороне',
+  'build.fx.mitigation': '−{n}% урона по миру',
   'build.fx.production': '+{n}% к производству',
   'build.fx.radar': 'радар: {n}',
   'build.fx.hangar': 'ангар: {n} мест под шаттлы',
@@ -433,6 +434,7 @@ export const ru: Record<string, string> = {
   'cargo.meter.free': 'Свободно: {n}',
   'cargo.meter.hangar': 'Ангар',
   'cargo.meter.loading': 'Погрузка: {p}% · резерв {n}',
+  'cargo.meter.unloading': 'Выгрузка: {p}% · сходят {n}',
   'cargo.meter.over': 'Сверх вместимости: {n}',
   'cargo.meter.troops': 'Десант',
   'cargo.under-assault': 'гарнизон заперт боем — войска не выпустить',
@@ -787,7 +789,7 @@ export const ru: Record<string, string> = {
   'codex.row.cargo': 'Вместимость трюма',
   'codex.row.class': 'Класс',
   'codex.row.cost': 'Стоимость',
-  'codex.row.garrison-defense': 'Оборона гарнизона',
+  'codex.row.world-mitigation': 'Урон по миру',
   'codex.row.hp': 'Прочность',
   'codex.row.hull': 'Корпус',
   'codex.row.levels': 'Уровней',
@@ -1251,7 +1253,7 @@ export const ru: Record<string, string> = {
   'dossier.building.farm':
     'Ярусы гидропонных оранжерей под спектральными лампами позволяют вашим подопечным питаться, ведь голод беспощаден. Выращивает {f}❖ в час. Ваши рабочие и воины едят каждый день, было бы глупо проиграть сражение из-за голодного обморока.',
   'dossier.building.fort':
-    'Эшелонированный планетарный бастион. Поднимает оборону гарнизона на {d} и держит {hp} структурной прочности под орбитальным огнём. Последний рубеж осаждённого мира.',
+    'Эшелонированный планетарный бастион: урон по миру при штурме и обстреле с орбиты меньше на {d}, {hp} прочности. Каждая другая целая постройка мира срезает ещё {b}, вместе — не больше {cap}.',
   'dossier.building.metal-station':
     'Добывающая платформа, вгрызается в спёкшуюся кору мёртвого мира. Там, где аннигиляция выжгла всё живое, обнажилась чистая металлическая руда — станция качает {m}⬢ в час. Улучшение увеличивает добычу.',
   'dossier.building.mine':
@@ -1267,7 +1269,7 @@ export const ru: Record<string, string> = {
   'dossier.building.refinery':
     'Перерабатывающий комплекс, превращающий руду и логистику в ликвидные кредиты — {c}¤ в час. Топливо для имперской бюрократии, верфей и наёмных эскадр.',
   'dossier.building.starfort':
-    'Корпус космической крепости — то, чем узел держится и отбивается. {hp} прочности, {aa} по кораблям и {pd} по шаттлам, {d} к обороне земли. Растёт с уровнем крепости; отдельно его не строят — он приходит вместе с ней.',
+    'Корпус космической крепости — то, чем узел держится и отбивается. {hp} прочности, {aa} по кораблям и {pd} по шаттлам, урон по узлу меньше на {d}. Растёт с уровнем крепости; отдельно его не строят — он приходит вместе с ней.',
   'dossier.building.tax-office':
     'Налоговая управа имперского образца: сама ничего не добывает, но ставит на учёт население мира и поднимает его кредитный сбор на {b}.',
   'dossier.fleet.desc':
@@ -1286,6 +1288,9 @@ export const ru: Record<string, string> = {
   'dossier.stat.ground.name': 'Наземные части',
   'dossier.stat.gships.desc': 'Корабли владельца мира у него: на орбите и на самой планете.',
   'dossier.stat.gships.name': 'Корабли у мира',
+  'dossier.stat.mitigation.desc':
+    'Урон по миру при штурме и обстреле с орбиты меньше на эту долю. Крепость даёт {f} по уровню, каждая другая целая постройка — {b}, вместе не больше {cap}. Снесённая постройка перестаёт прикрывать.',
+  'dossier.stat.mitigation.name': 'Защита построек',
   'dossier.stat.hp.name': 'Очки здоровья',
   'dossier.stat.hull.desc':
     'Текущая/полная прочность армии. Чинится у своего мира с верфью — или мгновенно за кредиты.',
@@ -2539,6 +2544,11 @@ export const ru: Record<string, string> = {
   'log.fleet.split-transit': '⊟ флот разделён в пути',
   // AUDM-4: флот ушёл раньше, чем закончилась погрузка, — десант остался в гарнизоне.
   'log.army.load-cancelled': '⚠ погрузка отменена: флот ушёл, {n}× {u} остались · {at}',
+  // MSB-9: выгрузка идёт по таймеру, и вылет её снимает — десант остался на борту.
+  'log.army.unload-cancelled': '⚠ выгрузка отменена: флот ушёл, {n}× {u} остались на борту · {at}',
+  // MSB-9: высадка штурмом идёт полтора часа; прилёт врага на орбиту её срывает.
+  'log.assault.landing': '⤓ высадка на {at}: десант на земле через {t}',
+  'log.assault.interrupted': '⚠ высадка на {at} сорвана: враг на орбите, десант на борту',
   'log.market.buy': 'покупка',
   'log.market.sell': 'продажа',
   'log.market.trade': '⇄ биржа: {n} {res} за {paid} ¤ ({side})',
@@ -3130,6 +3140,7 @@ export const ru: Record<string, string> = {
   'side.conveyor.waiting': 'Ждёт ресурсы: {c}',
   'side.empty': 'Тапните мир.',
   'side.fleet.bombarding': 'бомбардирует',
+  'side.fleet.landing': 'высадка: {t}',
   'side.fleet.enroute': '↗ курс: {dest} · прибытие через',
   'side.fleet.hero-aura': '— проекция · +5% атаки/обороны этому флоту',
   'side.fleet.hull-tag': 'корпус {p}%',
@@ -3171,6 +3182,7 @@ export const ru: Record<string, string> = {
   'side.ground.legend': 'гарнизон ▸ трюм',
   'side.ground.load': '▲ Погрузить {u}',
   'side.ground.loading': '⏳ грузится: {n}',
+  'side.ground.unloading': '⏳ сходит на берег: {n}',
   'side.ground.title': 'Наземная армия ⇄ гарнизон',
   'side.ground.units': 'Наземные части',
   'side.ground.unload': '▼ Выгрузить {u}',
@@ -3203,6 +3215,11 @@ export const ru: Record<string, string> = {
   'side.strike.bombard.stop': '⊗ Прекратить бомбардировку',
   'side.strike.forecast':
     'Прогноз штурма: {v} · ~{r} р. · потери {a} дес. ({pa}%) / {d} гарн. ({pd}%)',
+  // UIX-6.1: прогноз у цели «Атаки» (флот против флота). Слово-итог и строка цифр.
+  'engage.forecast.win': 'прогноз: победа',
+  'engage.forecast.draw': 'прогноз: ничья',
+  'engage.forecast.loss': 'прогноз: поражение',
+  'engage.forecast.line': '≈{h} · потери {own}% · у врага {foe}%',
   'side.strike.forecast.attacker': 'десант возьмёт мир',
   'side.strike.forecast.defender': 'гарнизон устоит',
   'side.strike.forecast.draw': 'затяжной пат',
@@ -3240,6 +3257,7 @@ export const ru: Record<string, string> = {
   'side.world.blackout': 'блэкаут: радары и ПКО −50%',
   'side.world.bonus.defense': 'оборона',
   'side.world.bonus.production': 'произв.',
+  'side.world.mitigation': 'Защита построек: −{n}% урона',
   'side.world.buildings': 'Постройки',
   'side.world.capital': 'Столица',
   'side.world.capital.note': '— здесь возродятся и сменят модули герои',

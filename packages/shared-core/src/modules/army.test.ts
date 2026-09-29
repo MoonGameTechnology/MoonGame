@@ -295,9 +295,56 @@ describe('army module — unloading and validation', () => {
       fleets: [fleet('F', 'p1', 'A', [['cruiser', 2]], [['militia', 2]])],
     });
     const r = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
-    expect(r.state.fleets.F?.landing).toEqual([]);
-    expect(r.state.planets.A?.garrison).toEqual([{ unit: 'militia', count: 3 }]); // 1 + 2 merged
-    expect(r.events.map((e) => e.type)).toContain('army.unloaded');
+    // Выгрузка идёт час, как погрузка (решение владельца 2026-09-26): до срока войска на борту.
+    expect(r.state.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }]);
+    expect(r.state.fleets.F?.unloading).toEqual([
+      { unit: 'militia', count: 2, to: 'A', startAt: 0, doneAt: HOUR },
+    ]);
+    expect(r.events.map((e) => e.type)).toContain('army.unloading');
+    const done = kernel.advanceTo(r.state, at(HOUR));
+    if (!done.ok) throw new Error(done.code);
+    expect(done.state.fleets.F?.landing).toEqual([]);
+    expect(done.state.fleets.F?.unloading).toBeUndefined();
+    expect(done.state.planets.A?.garrison).toEqual([{ unit: 'militia', count: 3 }]); // 1 + 2 merged
+    expect(done.events.map((e) => e.type)).toContain('army.unloaded');
+  });
+
+  it('улёт до срока отменяет выгрузку — десант остаётся на борту', () => {
+    const kernel = createKernel([armyModule, movementModule]);
+    const st = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1'), planet('B', 'p1')],
+      fleets: [fleet('F', 'p1', 'A', [['cruiser', 2]], [['militia', 2]])],
+    });
+    st.planets.A!.links = ['B'];
+    st.planets.B!.links = ['A'];
+    const ordered = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
+    const gone = okApply(kernel.applyAction(ordered.state, move('F', 'B'), ctx));
+    expect(gone.state.fleets.F?.unloading).toBeUndefined();
+    // AUDM-4 и для выгрузки: снята не молча — игрок узнаёт, что десант остался на борту.
+    expect(gone.events.filter((e) => e.type === 'army.unload.cancelled').map((e) => e.payload)).toEqual([
+      { fleetId: 'F', planetId: 'A', unit: 'militia', count: 2, owner: 'p1' },
+    ]);
+    expect(gone.events.map((e) => e.type)).not.toContain('army.load.cancelled');
+    const later = advanced(kernel, gone.state, 2 * HOUR);
+    expect(later.planets.A?.garrison).toEqual([]);
+    expect(later.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }]);
+  });
+
+  it('обещанное выгрузке второй приказ не возьмёт; мир, ставший чужим, десант не принимает', () => {
+    const kernel = createKernel([armyModule]);
+    const st = stateWith({
+      players: [player('p1'), player('p2')],
+      planets: [planet('A', 'p1')],
+      fleets: [fleet('F', 'p1', 'A', [['cruiser', 2]], [['militia', 2]])],
+    });
+    const first = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
+    expect(errCode(kernel.applyAction(first.state, unload('F', 'militia', 1), ctx))).toBe('E_NO_ARMY');
+    const lost = structuredClone(first.state);
+    lost.planets.A!.owner = 'p2'; // мир взят, пока шла выгрузка
+    const later = advanced(kernel, lost, HOUR);
+    expect(later.planets.A?.garrison).toEqual([]);
+    expect(later.fleets.F?.landing).toEqual([{ unit: 'militia', count: 2 }]);
   });
 
   it('rejects unauthorized, busy, or wrong-planet transfers', () => {
@@ -396,8 +443,9 @@ describe('army — ALLY-LAND: высадка к союзнику', () => {
 
   it('на мир СОЮЗНИКА десант высаживается и пополняет ЕГО гарнизон', () => {
     const out = okApply(kernel.applyAction(abroad('alliance'), unload('F', 'militia', 2), ctx));
-    expect(out.state.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3); // 1 + 2
-    expect(out.state.fleets.F?.landing?.find((u) => u.unit === 'militia')?.count).toBe(1);
+    const landed = advanced(kernel, out.state, HOUR); // на союзном мире — тот же час, что погрузка
+    expect(landed.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3); // 1 + 2
+    expect(landed.fleets.F?.landing?.find((u) => u.unit === 'militia')?.count).toBe(1);
   });
 
   it('мир и пакт НЕ пускают чужие войска — это решение принимают союзом', () => {
@@ -427,14 +475,16 @@ describe('army — ALLY-LAND: высадка к союзнику', () => {
       round: 1,
     };
     const out = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
-    expect(out.state.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3);
+    const landed = advanced(kernel, out.state, HOUR);
+    expect(landed.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3);
   });
 
   it('ДОГОВОР об обмене картами тоже пускает десант — без союза и без общей войны', () => {
     const st = abroad('peace');
     setMapShare(st, 'p1', 'p2', true);
     const out = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
-    expect(out.state.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3);
+    const landed = advanced(kernel, out.state, HOUR);
+    expect(landed.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3);
     // но поднять чужой гарнизон он по-прежнему не даёт
     expect(errCode(kernel.applyAction(st, load('F', 'militia', 1), ctx))).toBe('E_FORBIDDEN');
   });

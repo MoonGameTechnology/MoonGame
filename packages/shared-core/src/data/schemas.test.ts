@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.57'); // SM-3: тяговый луч, сборщик обломков, ремонтный тендер, минный заградитель
+    expect(data.version).toBe('0.1.60'); // защита построек мира: форт 15/30/45%, прочие по 5%, потолок 90% поверх 0.1.59: улучшения НПЗ дешевле (решение владельца 2026-09-29) поверх 0.1.58: уровни налоговой и кредитного НПЗ (ECON-8)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -510,10 +510,13 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // прототипные, поэтому бандл шипит ровно то, что мерил BAL).
     expect(buildingLevel(fort!, 1).hp).toBe(40);
     expect(buildingLevel(fort!, 3).hp).toBe(85);
-    expect(buildingLevel(fort!, 1).defenseBonus).toBeCloseTo(0.3);
-    expect(buildingLevel(fort!, 3).defenseBonus).toBeCloseTo(0.6);
-    // Every ordinary building still grants the baseline +1%.
-    expect(buildingLevel(data.buildings.barracks!, 1).defenseBonus).toBeCloseTo(0.01);
+    // Доля защиты мира (решение владельца 2026-09-26): форт 15/30/45% по уровню.
+    expect(buildingLevel(fort!, 1).defenseBonus).toBeCloseTo(0.15);
+    expect(buildingLevel(fort!, 2).defenseBonus).toBeCloseTo(0.3);
+    expect(buildingLevel(fort!, 3).defenseBonus).toBeCloseTo(0.45);
+    // Каждая обычная постройка прикрывает мир на 5% — на любом уровне.
+    expect(buildingLevel(data.buildings.barracks!, 1).defenseBonus).toBeCloseTo(0.05);
+    expect(buildingLevel(data.buildings.barracks!, 3).defenseBonus).toBeCloseTo(0.05);
   });
 
   it('the radar array widens its detection radius (distance) across its 3 levels', () => {

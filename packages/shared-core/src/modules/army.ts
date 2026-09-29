@@ -1,5 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, GameState, LoadingClaim } from '../state/gameState';
+import type { Fleet, GameState, LoadingClaim, UnloadingClaim } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
@@ -43,6 +43,25 @@ interface TransferPayload {
  */
 export const LOAD_HOURS = 1;
 
+/** Выгрузка на свой или союзный мир — столько же, сколько погрузка (решение владельца
+ *  2026-09-26: «на союзном или своём мире — одинаково с погрузкой по времени»). Модель та
+ *  же: заявка, а не опека — войска на борту, пока срок не вышел, и улёт её отменяет. */
+export const UNLOAD_HOURS = LOAD_HOURS;
+
+/** Сколько `unit` этого флота уже обещано выгрузкам — второй приказ их не возьмёт. */
+function claimedAboard(fleet: Fleet, unit: string): number {
+  let n = 0;
+  for (const claim of fleet.unloading ?? []) if (claim.unit === unit) n += claim.count;
+  return n;
+}
+
+/** Пустит ли хозяин мира `planetId` войска `playerId` на свою землю (ALLY-LAND): свой мир,
+ *  мир союзника и мир того, с кем обмен картами. */
+function mayLand(h: HandlerContext, playerId: string, host: string | null): boolean {
+  if (host === playerId) return true;
+  return host !== null && (isAllied(h, playerId, host) || hasMapShare(h.state, playerId, host));
+}
+
 /** Units of `unit` at `planetId` already promised to lifts — by ANY fleet docked
  *  there, since one garrison feeds them all. */
 function claimedAt(state: GameState, planetId: string, unit: string): number {
@@ -77,7 +96,7 @@ function claimedCargo(fleet: Fleet, data: GameData): number {
  */
 export const armyModule: GameModule = {
   id: 'army',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     /** Validates a load/unload order and resolves the fleet, its planet and the
      *  ground unit def, or rejects. */
@@ -209,16 +228,18 @@ export const armyModule: GameModule = {
 
     /** Ушёл — значит отменил (правило 5 клиентской копии, теперь правило мира).
      *  Снимается СРАЗУ, а не по сроку: иначе бронь держала бы чужой гарнизон ещё час
-     *  после того, как носитель за ним уже не придёт.
+     *  после того, как носитель за ним уже не придёт. Выгрузка — так же: десант остался на
+     *  борту и улетел вместе с флотом.
      *
-     *  AUDM-4: отмена больше не молчит — на каждую снятую заявку `army.load.cancelled`.
-     *  Без него игрок узнавал о ней, только когда флот прилетал к цели пустым. */
+     *  AUDM-4: отмена больше не молчит — на каждую снятую заявку `army.load.cancelled`
+     *  (и `army.unload.cancelled` на выгрузку). Без него игрок узнавал о ней, только когда
+     *  флот прилетал к цели пустым — или, у выгрузки, с десантом, который считал сошедшим. */
     api.on('fleet.departed', (event, h) => {
       const p = event.payload as { fleetId?: string };
       if (typeof p?.fleetId !== 'string') return;
       const fleet = h.state.fleets[p.fleetId];
-      if (!fleet?.loading?.length) return;
-      for (const claim of fleet.loading) {
+      if (!fleet) return;
+      for (const claim of fleet.loading ?? []) {
         h.emit('army.load.cancelled', {
           fleetId: fleet.id,
           planetId: claim.from,
@@ -227,7 +248,17 @@ export const armyModule: GameModule = {
           owner: fleet.owner,
         });
       }
+      for (const claim of fleet.unloading ?? []) {
+        h.emit('army.unload.cancelled', {
+          fleetId: fleet.id,
+          planetId: claim.to,
+          unit: claim.unit,
+          count: claim.count,
+          owner: fleet.owner,
+        });
+      }
       delete fleet.loading;
+      delete fleet.unloading;
     });
 
     api.onAction('army.unload', (action, h) => {
@@ -236,11 +267,7 @@ export const armyModule: GameModule = {
       // того, с кем заключён ОБМЕН КАРТАМИ (MAPSHARE-1) — оба права даны по взаимному
       // согласию, поэтому пускать чужие войска на свою землю никого не заставляют.
       // Мир, с чьим владельцем всего лишь мир/пакт без договора, по-прежнему закрыт.
-      const host = planet.owner;
-      const guest =
-        host !== null &&
-        (isAllied(h, action.playerId, host) || hasMapShare(h.state, action.playerId, host));
-      if (host !== action.playerId && !guest) {
+      if (!mayLand(h, action.playerId, planet.owner)) {
         return h.reject('E_FORBIDDEN');
       }
       // Высадка в ИДУЩИЙ наземный бой намеренно НЕ запрещена — в отличие от погрузки.
@@ -248,20 +275,61 @@ export const armyModule: GameModule = {
       // — это подкрепление, ровно тот сценарий, ради которого союзная высадка и нужна.
       // Механически это корректно: ссылка защитника (`kind: 'garrison'`) адресует мир,
       // а не снимок стеков, поэтому подошедшие войска считаются со следующего раунда.
+      // Уже обещанное выгрузкам вычитается: два приказа подряд не высадят одну роту.
       const carried = findHealthyStack(fleet.landing ?? [], unit);
-      if (!carried || carried.count < count) {
+      if (!carried || carried.count - claimedAboard(fleet, unit) < count) {
         return h.reject('E_NO_ARMY'); // not that many aboard
       }
-      carried.count -= count;
-      fleet.landing = (fleet.landing ?? []).filter((s) => s.count > 0);
-      addUnits(planet.garrison, unit, count);
-      h.emit('army.unloaded', {
+      // Час не проходит здесь, как и у погрузки: заявка встаёт в мир и созревает событием.
+      const doneAt = h.ctx.now + hoursToMs(h.ctx, UNLOAD_HOURS);
+      const claim: UnloadingClaim = { unit, count, to: planet.id, startAt: h.ctx.now, doneAt };
+      (fleet.unloading ??= []).push(claim);
+      h.schedule(doneAt, 'army.unload.done', { fleetId: fleet.id });
+      h.emit('army.unloading', {
         fleetId: fleet.id,
         planetId: planet.id,
         unit,
         count,
         owner: action.playerId,
+        doneAt,
       });
+    });
+
+    /**
+     * Созревшая выгрузка. Условия — ЗАНОВО, теми же, что на приказе: за час мир мог перейти
+     * к другому или перестать быть союзным, флот — уйти или ввязаться в бой. Не сошлось —
+     * заявка снимается, десант остаётся на борту.
+     */
+    api.on('army.unload.done', (event, h) => {
+      const p = event.payload as { fleetId?: string };
+      if (typeof p?.fleetId !== 'string') return; // malformed → no-op (fail-secure)
+      const fleet = h.state.fleets[p.fleetId];
+      if (!fleet?.unloading?.length) return;
+      const keep: UnloadingClaim[] = [];
+      for (const claim of fleet.unloading) {
+        if (claim.doneAt > h.ctx.now) {
+          keep.push(claim); // ещё не срок — это чужое срабатывание
+          continue;
+        }
+        const planet = h.state.planets[claim.to];
+        const docked = fleet.location === claim.to && !fleet.movement && !fleet.battleId;
+        if (!planet || !docked || !mayLand(h, fleet.owner, planet.owner)) continue;
+        const carried = findHealthyStack(fleet.landing ?? [], claim.unit);
+        const take = Math.min(claim.count, carried?.count ?? 0);
+        if (!carried || take <= 0) continue;
+        carried.count -= take;
+        fleet.landing = (fleet.landing ?? []).filter((s) => s.count > 0);
+        addUnits(planet.garrison, claim.unit, take);
+        h.emit('army.unloaded', {
+          fleetId: fleet.id,
+          planetId: planet.id,
+          unit: claim.unit,
+          count: take,
+          owner: fleet.owner,
+        });
+      }
+      if (keep.length) fleet.unloading = keep;
+      else delete fleet.unloading;
     });
   },
 };

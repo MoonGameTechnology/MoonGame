@@ -25,8 +25,13 @@ describe('RECAP-FOG — чужая экономика в мою сводку н�
     }
   });
 
-  it('события КАРТЫ (взрыв, вылет) видно у чужих — но только там, где вижу', () => {
-    for (const type of ['building.destroyed', 'fleet.launched']) {
+  it('события КАРТЫ (взрыв, вылет, высадка) видно у чужих — но только там, где вижу', () => {
+    for (const type of [
+      'building.destroyed',
+      'fleet.launched',
+      'assault.landing',
+      'assault.interrupted',
+    ]) {
       expect(recapAdmits(type, FOE, ME, true), type).toBe(true);
       expect(recapAdmits(type, FOE, ME, false), type).toBe(false);
     }

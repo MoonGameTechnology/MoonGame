@@ -101,8 +101,8 @@
 | UIX-5.2 | ⏳ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
 | UIX-5.3 | ⏳ | proto | `docs/backlog.md` | Английский в русской версии и грамматика. |
 | UIX-5.4 | ⏳ | proto | `docs/backlog.md` | Словарь терминов. |
-| UIX-6.1 | ⏳ | proto | `docs/backlog.md` | Прогноз космического боя в прицеле «Атака». |
-| UIX-6.2 | 🔒 | proto | `docs/backlog.md` | Прогноз в окне боя. |
+| UIX-6.1 | ✅ | proto | `docs/backlog.md` | Прогноз космического боя в прицеле «Атака». |
+| UIX-6.2 | ⏳ | proto | `docs/backlog.md` | Прогноз в окне боя. |
 | UIX-7.1 | ⏳ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
 | UIX-7.2 | ⏳ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
 | UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
@@ -902,6 +902,7 @@
 | FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md` | Технологии открывают постройки крепости |
 | FORT-5.13 | ✅ | core | `docs/fortress-roadmap.md` | Сбитая крепость уничтожается |
 | FORT-5.14 | ✅ | proto | `docs/fortress-roadmap.md` | Кнопка крепости: знает о технологии и не показывает разметку |
+| FORT-5.15 | ✅ | core data proto | `docs/fortress-roadmap.md` | Защита построек мира: форт 15/30/45%, каждая постройка 5%, потолок 90% |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md` | Туман как граница (анти-maphack) (в основном) |
@@ -1035,6 +1036,7 @@
 | MSB-6 | ✅ | proto cli | `docs/multiside-combat-roadmap.md` | Панель боя на N сторон |
 | MSB-7 | ✅ | core | `docs/multiside-combat-roadmap.md` | Зенитки и обстрел при N сторонах |
 | MSB-8 | ✅ | core | `docs/multiside-combat-roadmap.md` | Штурм не стоит, подмога не ждёт |
+| MSB-9 | ✅ | core proto | `docs/multiside-combat-roadmap.md` | Штурм не запирает флот: высадка по таймеру, потом плацдарм |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (скриптовая соло-песочница) ★ |

@@ -308,6 +308,7 @@ import {
 import { medalBadges } from '../../decisions/unitMedals';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
+import { engageForecastCard } from '../../decisions/engageForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -4008,6 +4009,34 @@ function handleEvents(events: DomainEvent[]) {
           p.planetId as string,
         );
         break;
+      case 'army.unload.cancelled':
+        // AUDM-4 и для выгрузки (MSB-9): вылет снял идущую выгрузку, десант остался на борту.
+        if (!admits('army.unload.cancelled', p)) break;
+        note(
+          t('log.army.unload-cancelled', {
+            n: String(p.count),
+            u: displayUnit(p.unit as string),
+            at: placeName(p.planetId as string),
+          }),
+          p.planetId as string,
+        );
+        break;
+      case 'assault.landing':
+        // MSB-9: высадка идёт полтора часа, и прилёт врага её срывает — защитнику нужно
+        // узнать о ней сразу, иначе ответить нечем. Видна всем, кто видит мир.
+        if (!admits('assault.landing', p)) break;
+        note(
+          t('log.assault.landing', {
+            at: placeName(p.planetId as string),
+            t: timeLeft(p.doneAt as number),
+          }),
+          p.planetId as string,
+        );
+        break;
+      case 'assault.interrupted':
+        if (!admits('assault.interrupted', p)) break;
+        note(t('log.assault.interrupted', { at: placeName(p.planetId as string) }), p.planetId as string);
+        break;
       case 'fleet.launched':
         // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
         // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).
@@ -4616,6 +4645,35 @@ function drawEngageTargets(now: number) {
   for (const c of engageCandidates()) targetBrackets(c.x, c.y, 14, now, HOSTILE);
 }
 
+/** UIX-6.1: прогноз у цели «Атаки» — выделенные флоты против флота под прицелом. Слова и
+ *  проценты решает `engageForecast.ts`; цвет только дублирует слово. Туман соблюдён тем,
+ *  что цель берётся из `engageCandidates()`: там лишь флоты, чей состав игрок видит. */
+function drawEngageForecast(foe: Fleet, x: number, y: number): void {
+  const mine = selectedFleetIds().flatMap((id) => s.fleets[id]?.units ?? []);
+  if (sumUnits(mine) <= 0 || sumUnits(foe.units) <= 0) return;
+  const card = engageForecastCard(previewBattle(mine, foe.units, data));
+  const ink = card.tone === 'positive' ? LOCK : card.tone === 'negative' ? HOSTILE : R_ARTY;
+  cx.save();
+  cx.setLineDash([]);
+  cx.textAlign = 'center';
+  cx.lineWidth = 3;
+  cx.strokeStyle = 'rgba(4,10,16,0.85)';
+  const line = (text: string, dy: number, font: string): void => {
+    cx.font = font;
+    cx.strokeText(text, x, y + dy);
+    cx.fillText(text, x, y + dy);
+  };
+  cx.fillStyle = ink;
+  line(t(card.verdictKey), 28, '600 11px ui-monospace,Menlo,monospace');
+  cx.fillStyle = rgba(ink, 0.85);
+  line(
+    t('engage.forecast.line', { h: fmtHrs(card.hours), own: card.ownLossPct, foe: card.foeLossPct }),
+    42,
+    '11px ui-monospace,Menlo,monospace',
+  );
+  cx.restore();
+}
+
 /** While ШТУРМ is armed (PC): ring every valid target — someone else's capturable
  *  world (enemy or friendly faction alike; the friendly path asks to declare war). */
 function drawAssaultTargets() {
@@ -4828,6 +4886,9 @@ function drawAimPreview() {
   if (!pointer) return;
   if (MOBILE && mobileDraft && (engageAim || merging)) {
     targetBrackets(pointer.x, pointer.y, 22, lastReal, engageAim ? HOSTILE : LOCK);
+    const staged = mobileDraft.target;
+    const foe = engageAim && staged.kind === 'fleet' ? s.fleets[staged.id] : undefined;
+    if (foe) drawEngageForecast(foe, pointer.x, pointer.y);
     return;
   }
   if (!(aiming || assaultAim || engageAim)) return;
@@ -4947,6 +5008,8 @@ function drawAimPreview() {
     }
   }
   cx.restore();
+  // Поверх пути, чтобы пунктир не перечёркивал цифры прогноза.
+  if (foeAim) drawEngageForecast(foeAim.fleet, foeAim.x, foeAim.y);
 }
 
 let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = null;
@@ -6876,13 +6939,16 @@ function fleetPanelHtml(f: Fleet): string {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const rows = groundRowsAt(here!.garrison, f.landing ?? []);
       const loadingN = (f.loading ?? []).reduce((n, claim) => n + claim.count, 0);
+      // Выгрузка идёт час, как погрузка: до срока войска ещё в трюме (`▸` справа).
+      const unloadingN = (f.unloading ?? []).reduce((n, claim) => n + claim.count, 0);
       if (rows.length) {
         ga += `<div class="row dim">${t('side.ground.legend')}</div>`;
         for (const r of rows)
           ga += `<div class="row"><span class="bicon">${unitIconHtml(r.unit, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(r.unit))} <b>${r.planet} ▸ ${r.aboard}</b></div>`;
       }
       if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
-      if (!rows.length && !loadingN)
+      if (unloadingN) ga += `<div class="hint">${t('side.ground.unloading', { n: unloadingN })}</div>`;
+      if (!rows.length && !loadingN && !unloadingN)
         ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
       ga += `<div class="hint">${t('side.ground.via-cmd')}</div>`;
       cols.push(ga);
@@ -6892,7 +6958,7 @@ function fleetPanelHtml(f: Fleet): string {
   return objectPanelHtml(h, detail);
 }
 
-/** Хвост подзаголовка карточки флота: голод, орбита, бомбардировка. */
+/** Хвост подзаголовка карточки флота: голод, орбита, бомбардировка, высадка. */
 function fleetSubNotes(f: Fleet, nTr: number): string {
   // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
   // Правила пометок о долгах — `arrearsWarnings.ts` (REFM-89): только своё и только
@@ -6903,7 +6969,9 @@ function fleetSubNotes(f: Fleet, nTr: number): string {
   return (
     hungry +
     (f.orbit === 'near' ? ' · ' + t('side.fleet.in-orbit') : '') +
-    (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : '')
+    (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : '') +
+    // Высадка штурмом идёт по таймеру (решение владельца 2026-09-26): флот стоит до срока.
+    (f.assaultLanding ? ' · ⤓ ' + t('side.fleet.landing', { t: timeLeft(f.assaultLanding.doneAt) }) : '')
   );
 }
 
@@ -7506,6 +7574,12 @@ function planetSummaryHtml(p: Planet): string {
   rows.push(
     `<div class="row">▣ ${t('side.world.buildings')} (${sm.buildings.length}): <b>${blist}</b></div>`,
   );
+  // Защита построек (решение владельца 2026-09-26): сколько урона мир срезает при штурме и
+  // обстреле. Падает с каждой снесённой постройкой — поэтому число, а не значок.
+  if (sm.mitigation > 0)
+    rows.push(
+      `<div class="row" data-desc="stat:mitigation">🛡 ${t('side.world.mitigation', { n: Math.round(sm.mitigation * 100) })}</div>`,
+    );
   rows.push(`<div class="row">✦ ${t('side.world.vp')}: <b>${sm.victoryPoints}</b></div>`);
   if (sm.orbit.fleets) {
     rows.push(

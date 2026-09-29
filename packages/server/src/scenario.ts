@@ -226,7 +226,19 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '51'; // Личные циклы атаки и приказы сторон, combat 3.0.0.
+export const MODULE_MANIFEST_VERSION = '54'; // MSB-9: штурм — высадка по таймеру, потом
+// плацдарм; выгрузка на свой мир — час, как погрузка. Членство и порядок не тронуты; `combat`
+// 3.1.0 и `army` 1.1.0, у флота новые поля `assaultLanding` и `unloading`. Партия на 53 не
+// знает этих полей и держала бы флот в наземном бою до конца.
+// export const MODULE_MANIFEST_VERSION = '53'; // Беженцы по прибытии (заказ владельца 2026-09-29):
+// членство и порядок не тронуты; `missionFacts` 1.1.0 выпускает в игру флоты карты с
+// `joinsOnArrival`, когда к ним прибыл флот владельца. У провинции новое поле
+// `Planet.awaitingFleets`. Партия на 52 держит транспорты в игре с первой секунды.
+// export const MODULE_MANIFEST_VERSION = '52'; // Защита построек мира (FORT-5.15): членство и
+// порядок не тронуты; `construction` 1.1.0 срезает урон по миру при штурме И обстреле долей
+// построек (форт 15/30/45%, прочие по 5%, потолок 90%) вместо «+0.01 очка за постройку».
+// Партия на 51 молча сменила бы исход каждого штурма и обстрела посреди игры.
+// export const MODULE_MANIFEST_VERSION = '51'; // Личные циклы атаки и приказы сторон, combat 3.0.0.
 // Поля stance/attackStartedAt/nextAttackAt сохраняются на каждой стороне боя.
 // export const MODULE_MANIFEST_VERSION = '50'; // PVR-7.4: `rendezvous` 1.1.0 — приказы союзнику
 // главы IV (`ally.order`/`ally.cancel`, одна операция на жителя, закрытие по событиям мира).

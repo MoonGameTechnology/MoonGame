@@ -57,7 +57,7 @@ export interface ChapterMapView {
  * Цели задач главы на её карте. `control`, `rescue`, `beacon` и `build` с местом называют
  * провинции — метятся всегда: задача сама говорит, куда идти, и клетка на карте есть и в
  * тумане (без вида и хозяина). `raze` метит провинции со стоящей постройкой названного
- * вида, `evac` — убежища, — только ОПОЗНАННЫЕ: иначе метка выдала бы разведку, которой не
+ * вида, `evac` — убежища и место, где ждут беженцы, — только ОПОЗНАННЫЕ: иначе метка выдала бы разведку, которой не
  * было. У `scout`, `wave` и `build` без места одной точки нет.
  * Выполненные задачи в `pool` уже не входят — закрытое не зовёт на карту.
  */
@@ -79,7 +79,11 @@ export function chapterTargets(
     if (o.kind === 'build') return (o.at ?? []).filter((id) => state.planets[id]);
     if (o.kind === 'evac')
       return Object.values(state.planets)
-        .filter((p) => p.traits.includes('haven') && known.has(p.id))
+        .filter(
+          (p) =>
+            known.has(p.id) &&
+            (p.traits.includes('haven') || (p.awaitingFleets ?? []).length > 0),
+        )
         .map((p) => p.id)
         .sort();
     if (o.kind === 'raze') {
