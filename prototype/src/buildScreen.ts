@@ -73,8 +73,9 @@ export function buildFx(def: BuildingDef, level: number): string {
   // Ресурс — иконкой и цветом, а не словом: та же чиповая форма, что у ценника.
   const prod = resLine(lv.produces ?? {}, { sign: true, per: 'h' });
   if (prod) fx.push(prod);
-  if ((def.creditsBonus ?? 0) > 0)
-    fx.push(t('build.fx.credits', { n: Math.round((def.creditsBonus ?? 0) * 100) }));
+  // Прибавка — с ЭТОГО уровня, как выработка: у налоговой их три (+25/+35/+50%).
+  if ((lv.creditsBonus ?? 0) > 0)
+    fx.push(t('build.fx.credits', { n: Math.round((lv.creditsBonus ?? 0) * 100) }));
   // Тот же порог 0.01, что у категории: дефолт схемы — не эффект, а шум.
   if ((lv.defenseBonus ?? 0) > 0.01)
     fx.push(t('build.fx.defense', { n: Math.round((lv.defenseBonus ?? 0) * 100) }));

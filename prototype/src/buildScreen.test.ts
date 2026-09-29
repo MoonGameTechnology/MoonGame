@@ -75,6 +75,13 @@ describe('окно построек — строка эффекта', () => {
     expect(buildFx(data.buildings.mine!, 3)).toContain('+27');
   });
 
+  it('прибавка налоговой — с её уровня, а не с первого (+25 → +35 → +50%)', () => {
+    expect(buildFx(data.buildings.tax_office!, 1)).toContain('+25%');
+    expect(buildFx(data.buildings.tax_office!, 2)).toContain('+35%');
+    expect(buildFx(data.buildings.tax_office!, 3)).toContain('+50%');
+    expect(buildFx(data.buildings.refinery!, 3)).toContain('+18');
+  });
+
   it('здание без числового эффекта отдаёт пустую строку (ряд возьмёт досье)', () => {
     expect(buildFx(data.buildings.barracks!, 1)).toBe('');
   });

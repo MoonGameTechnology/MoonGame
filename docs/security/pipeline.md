@@ -755,6 +755,23 @@ OSV тем же пином. Сам гейт (`pnpm run check`) при этом �
 насильно удержал бы на 3.x и будущего потребителя, которому нужен 5.x. Записи в
 `.trivyignore` и `[[IgnoredVulns]]` не заводились — подавлять нечего.
 
+**Запись триажа (2026-09-29) — две HIGH в `fast-uri` и две MEDIUM в `ip-address`,
+починено апдейтом.** Между последним зелёным мержем в `main` (#1383) и первым прогоном
+PR #1387 в фиде появились `CVE-2026-84292` и `CVE-2026-84394` (HIGH) в `fast-uri` 3.1.6 и
+4.1.3 и `CVE-2026-101910`, `CVE-2026-101913` (MEDIUM) в `ip-address` 10.5.0. Упали
+четыре чека: шаг `Dependency audit (OSV-Scanner)` джобы `lint · typecheck · test · audit`
+(шаг `Gate (…)` в ней зелёный), `SCA — osv.dev (OSV-Scanner)`, `Vuln + IaC — files (Trivy
+fs)` и `Vuln — built image base OS (Trivy image)` — последний из-за тех же пакетов в
+`app/node_modules` образа.
+
+Обе зависимости транзитивные. `fast-uri` берут `ajv` (3.x), `@fastify/ajv-compiler` и
+`fast-json-stringify` (4.x), и версии держали сами пины `fast-uri@3`/`fast-uri@4` в
+`pnpm.overrides`, поэтому правка — поднять пины: 3.1.8 и 4.1.5 (фикс по Trivy — 3.1.7 и
+4.1.4, взяты последние патч-релизы веток). `ip-address` тянет `@fastify/rate-limit` с
+диапазоном `^10.2.0`, фикс 10.5.1 в него входит — override не нужен, lockfile обновлён
+`pnpm update -r --depth Infinity ip-address` до 10.7.2. Вердикт — _true positive_,
+подавлять нечего.
+
 **Запись триажа (SEC-22, 2026-08-11) — две LOW в glibc закрыли очередь мержа целиком.**
 Между 2026-08-10 04:07 и 2026-08-11 09:09 UTC в фиде появились `CVE-2026-6368` и
 `CVE-2026-6791` — обе в `wordexp()` пакета `libc6` базового образа. Код репозитория при
