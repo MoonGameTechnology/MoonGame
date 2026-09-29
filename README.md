@@ -1,4 +1,4 @@
-# Averion: Galactic War
+# Averion: Galactic War или Void Dominion: Galactic War (пока решаем)
 
 **Космическая стратегия в реальном времени для браузера и Android.**
 
