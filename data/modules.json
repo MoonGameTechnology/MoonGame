@@ -530,7 +530,7 @@
         "mineHit": 0.05
       }
     },
-    "slot": "weapon",
+    "slot": "utility",
     "tag": "vertical",
     "effects": {
       "stats": {
@@ -543,7 +543,12 @@
       "microelectronics": 4
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "units": [
+        "frigate",
+        "picket_frigate",
+        "pirate_frigate"
+      ]
     }
   },
   "rocket_mine_layer": {
@@ -559,7 +564,10 @@
       ]
     },
     "allowed": {
-      "domain": "space"
+      "domain": "space",
+      "units": [
+        "hero"
+      ]
     },
     "cost": {
       "metal": 120,

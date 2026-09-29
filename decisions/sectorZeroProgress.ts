@@ -369,6 +369,11 @@ export const HERO_SHIP_STAR_SLOTS: Readonly<Record<number, keyof SlotCounts>> = 
 export function sectorHeroShipUnit(id: string, data: GameData): string {
   return data.heroes[id]?.ship.unit ?? 'hero';
 }
+/** Корпуса кораблей героев, которых игрок может вести (без выданных ядром, как Левиафан). */
+function sectorHeroHullIds(data: GameData): string[] {
+  const units = new Set(Object.keys(data.heroes).map((id) => sectorHeroShipUnit(id, data)));
+  return [...units].filter((u) => data.units[u] !== undefined && !data.units[u].traits.includes('issued'));
+}
 /** Слоты корабля героя: слоты корпуса плюс слоты за его звёзды. */
 export function sectorHeroShipSlots(id: string, hero: SectorHero, data: GameData): SlotCounts {
   const hull = data.units[sectorHeroShipUnit(id, data)]?.slots;
@@ -535,9 +540,11 @@ export const SHOP_AD_REFRESHES_PER_DAY = 1;
  * брал весь каталог — и в нём лежали модули Роя (только для `brood_host`) и щиты пустоты
  * (только для пушек крепости): игрок платил бы данные за то, что поставить некуда. Правило —
  * то же, что у корпусов: модуль остаётся, если встаёт хотя бы на один корпус игрока.
+ * Корабль героя — тоже корпус игрока (PVR-6.24): модуль только для него (ракетная мина,
+ * решение владельца 2026-09-29) иначе пропал бы из подготовки вместе с кораблём.
  */
 export function sectorModuleIds(data: GameData): string[] {
-  const hulls = sectorHullIds(data);
+  const hulls = [...sectorHullIds(data), ...sectorHeroHullIds(data)];
   return Object.keys(data.modules).filter((id) =>
     hulls.some((hull) => moduleAllowed(hull, data.units[hull]!, data.modules[id]!)),
   );
