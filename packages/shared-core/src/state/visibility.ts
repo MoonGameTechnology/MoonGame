@@ -738,6 +738,13 @@ function project(
     // памяти этого поля нет). Режется до развилки видимости и у всех сразу, как `fog` и
     // поток ГСЧ: внутреннее поле ядра, которому в проекции делать нечего.
     delete planet.priorKind;
+    // Ждущий флот (`joinsOnArrival`) ещё не в игре: зритель знает только свой — он и есть
+    // цель, куда вести флот. Чужой выдал бы состав и место до всякой разведки.
+    if (planet.awaitingFleets) {
+      const own = planet.awaitingFleets.filter((f) => f.owner === viewerId);
+      if (own.length > 0) planet.awaitingFleets = own;
+      else delete planet.awaitingFleets;
+    }
     if (planet.owner === viewerId || identify.has(planet.id) || spiedPlanets.has(planet.id))
       continue;
     // Ангар чужого мира не виден НИКОГДА (SHU-1.1): челнок стоит внутри порта, а не на

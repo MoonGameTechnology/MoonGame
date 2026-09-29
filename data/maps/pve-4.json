@@ -663,6 +663,7 @@
       ]
     },
     "p1_evac": {
+      "joinsOnArrival": true,
       "owner": "p1",
       "location": "lab_outpost",
       "units": [

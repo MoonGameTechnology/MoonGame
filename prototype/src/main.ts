@@ -4007,6 +4007,34 @@ function handleEvents(events: DomainEvent[]) {
           p.planetId as string,
         );
         break;
+      case 'army.unload.cancelled':
+        // AUDM-4 и для выгрузки (MSB-9): вылет снял идущую выгрузку, десант остался на борту.
+        if (!admits('army.unload.cancelled', p)) break;
+        note(
+          t('log.army.unload-cancelled', {
+            n: String(p.count),
+            u: displayUnit(p.unit as string),
+            at: placeName(p.planetId as string),
+          }),
+          p.planetId as string,
+        );
+        break;
+      case 'assault.landing':
+        // MSB-9: высадка идёт полтора часа, и прилёт врага её срывает — защитнику нужно
+        // узнать о ней сразу, иначе ответить нечем. Видна всем, кто видит мир.
+        if (!admits('assault.landing', p)) break;
+        note(
+          t('log.assault.landing', {
+            at: placeName(p.planetId as string),
+            t: timeLeft(p.doneAt as number),
+          }),
+          p.planetId as string,
+        );
+        break;
+      case 'assault.interrupted':
+        if (!admits('assault.interrupted', p)) break;
+        note(t('log.assault.interrupted', { at: placeName(p.planetId as string) }), p.planetId as string);
+        break;
       case 'fleet.launched':
         // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
         // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).
@@ -6909,13 +6937,16 @@ function fleetPanelHtml(f: Fleet): string {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const rows = groundRowsAt(here!.garrison, f.landing ?? []);
       const loadingN = (f.loading ?? []).reduce((n, claim) => n + claim.count, 0);
+      // Выгрузка идёт час, как погрузка: до срока войска ещё в трюме (`▸` справа).
+      const unloadingN = (f.unloading ?? []).reduce((n, claim) => n + claim.count, 0);
       if (rows.length) {
         ga += `<div class="row dim">${t('side.ground.legend')}</div>`;
         for (const r of rows)
           ga += `<div class="row"><span class="bicon">${unitIconHtml(r.unit, data, youColor, 16, s.players[ME]?.faction)}</span>${esc(displayUnit(r.unit))} <b>${r.planet} ▸ ${r.aboard}</b></div>`;
       }
       if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
-      if (!rows.length && !loadingN)
+      if (unloadingN) ga += `<div class="hint">${t('side.ground.unloading', { n: unloadingN })}</div>`;
+      if (!rows.length && !loadingN && !unloadingN)
         ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
       ga += `<div class="hint">${t('side.ground.via-cmd')}</div>`;
       cols.push(ga);
@@ -6925,7 +6956,7 @@ function fleetPanelHtml(f: Fleet): string {
   return objectPanelHtml(h, detail);
 }
 
-/** Хвост подзаголовка карточки флота: голод, орбита, бомбардировка. */
+/** Хвост подзаголовка карточки флота: голод, орбита, бомбардировка, высадка. */
 function fleetSubNotes(f: Fleet, nTr: number): string {
   // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
   // Правила пометок о долгах — `arrearsWarnings.ts` (REFM-89): только своё и только
@@ -6936,7 +6967,9 @@ function fleetSubNotes(f: Fleet, nTr: number): string {
   return (
     hungry +
     (f.orbit === 'near' ? ' · ' + t('side.fleet.in-orbit') : '') +
-    (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : '')
+    (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : '') +
+    // Высадка штурмом идёт по таймеру (решение владельца 2026-09-26): флот стоит до срока.
+    (f.assaultLanding ? ' · ⤓ ' + t('side.fleet.landing', { t: timeLeft(f.assaultLanding.doneAt) }) : '')
   );
 }
 

@@ -672,7 +672,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
 
   const fleets: Record<string, Fleet> = {};
   for (const [id, fl] of Object.entries(map.fleets)) {
-    fleets[id] = {
+    const fleet: Fleet = {
       id,
       owner: resolveOwner(fl.owner),
       location: fl.location,
@@ -682,6 +682,10 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
       orbit: 'near',
       traits: [...fl.traits],
     };
+    // Ждущий флот не в игре, пока владелец не придёт за ним (`joinsOnArrival`).
+    const at = planets[fl.location];
+    if (fl.joinsOnArrival && at) (at.awaitingFleets ??= []).push(fleet);
+    else fleets[id] = fleet;
   }
 
   // AVA-1: seed the pairwise stances from the seats' teams (a slot carries its

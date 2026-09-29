@@ -15,6 +15,7 @@ const data: GameData = parseGameData({
   units: {
     transport: { faction: 'x', domain: 'space', stats: { attack: 0, defense: 1, speed: 5, hp: 10 }, traits: ['evacuee'] },
     cruiser: { faction: 'x', domain: 'space', stats: { attack: 5, defense: 5, speed: 5, hp: 40 } },
+    trooper: { faction: 'x', domain: 'ground', stats: { attack: 1, defense: 1, speed: 5, hp: 5 } },
   },
   technologies: {},
   factions: { x: { name: 'X' } },
@@ -128,5 +129,52 @@ describe('missionFacts — эвакуация', () => {
     foreign.planets.safe!.owner = 'swarm';
     const s = run(foreign, 'test.arrived', { fleetId: 'f', at: 'safe' });
     expect(s.missionFacts?.evacuated).toBeUndefined();
+  });
+});
+
+describe('missionFacts — ждущие флоты (беженцы появляются по прибытии)', () => {
+  /** Мир, где на `road` ждут транспорты игрока: их ещё нет среди флотов матча. */
+  function waiting(fleets: Fleet[]): GameState {
+    const s = world(fleets);
+    s.planets.road!.awaitingFleets = [{ ...fleet('evac', 'p1', [['transport', 3]]), location: 'road' }];
+    return s;
+  }
+  const arrive = (s: GameState, id: string, at = 'road'): GameState => {
+    s.fleets[id]!.location = at;
+    return run(s, 'test.arrived', { fleetId: id, at });
+  };
+
+  it('флот владельца с живым кораблём прибыл — транспорты входят в игру под своим id', () => {
+    const r = kernel.applyAction(
+      (() => {
+        const s = waiting([fleet('f', 'p1', [['cruiser', 1]])]);
+        s.fleets.f!.location = 'road';
+        return s;
+      })(),
+      act('test.arrived', { fleetId: 'f', at: 'road' }),
+      ctx(0),
+    );
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.fleets.evac).toMatchObject({ owner: 'p1', location: 'road', movement: null });
+    expect(r.state.fleets.evac?.units).toEqual([{ unit: 'transport', count: 3 }]);
+    expect(r.state.planets.road?.awaitingFleets).toBeUndefined();
+    expect(r.events.some((e) => e.type === 'fleet.joined')).toBe(true);
+  });
+
+  it('до прибытия их нет; чужой флот, десант без корабля и флот в пути их не выпускают', () => {
+    expect(waiting([]).fleets.evac).toBeUndefined();
+    const foreign = arrive(waiting([fleet('s', 'swarm', [['cruiser', 1]])]), 's');
+    expect(foreign.fleets.evac).toBeUndefined();
+    const troops = arrive(waiting([fleet('g', 'p1', [['trooper', 4]])]), 'g');
+    expect(troops.fleets.evac).toBeUndefined();
+    const moving = waiting([fleet('m', 'p1', [['cruiser', 1]])]);
+    moving.fleets.m!.movement = { to: 'beacon' } as unknown as Fleet['movement'];
+    expect(arrive(moving, 'm').fleets.evac).toBeUndefined();
+  });
+
+  it('прибытие в другую провинцию их не выпускает', () => {
+    const s = arrive(waiting([fleet('f', 'p1', [['cruiser', 1]])]), 'f', 'beacon');
+    expect(s.fleets.evac).toBeUndefined();
+    expect(s.planets.road?.awaitingFleets).toHaveLength(1);
   });
 });
