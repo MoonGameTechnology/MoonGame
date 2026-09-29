@@ -620,6 +620,36 @@
       "energy": 40
     },
     "hp": 20,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 190,
+          "credits": 40
+        },
+        "buildTimeHours": 5,
+        "produces": {
+          "credits": 12
+        },
+        "upkeep": {
+          "energy": 65
+        },
+        "hp": 26
+      },
+      {
+        "cost": {
+          "metal": 320,
+          "credits": 90
+        },
+        "buildTimeHours": 6,
+        "produces": {
+          "credits": 18
+        },
+        "upkeep": {
+          "energy": 105
+        },
+        "hp": 32
+      }
+    ],
     "scoreValue": 3
   },
   "starfort": {
@@ -696,7 +726,27 @@
     "buildTimeHours": 4,
     "hp": 16,
     "scoreValue": 3,
-    "creditsBonus": 0.25
+    "creditsBonus": 0.25,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 210,
+          "credits": 100
+        },
+        "buildTimeHours": 5,
+        "hp": 22,
+        "creditsBonus": 0.35
+      },
+      {
+        "cost": {
+          "metal": 350,
+          "credits": 170
+        },
+        "buildTimeHours": 6,
+        "hp": 28,
+        "creditsBonus": 0.5
+      }
+    ]
   },
   "void_hangar": {
     "name": "Fortress Hangar",
