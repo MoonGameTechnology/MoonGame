@@ -2,7 +2,8 @@
  * УРОВНИ НАЛОГОВОЙ И КРЕДИТНОГО НПЗ (решение владельца 2026-09-26: «дать уровни налоговой и
  * здания, которое даёт деньги»). Резолюция — «как у шахты, ×1,5»: три уровня, налоговая
  * +25 → +35 → +50% ко всему кредитному доходу мира, НПЗ 8 → 12 → 18 кредитов в час; цена
- * улучшения, срок и содержание растут, как у шахты и фермы.
+ * улучшения, срок и содержание растут, как у шахты и фермы. Улучшения НПЗ окупаются не дольше
+ * улучшений шахты (решение владельца 2026-09-29: «НПЗ — удешеви улучшения»).
  *
  * Сторожим по шипнутым данным и через настоящие приказ и ход часов: уровень существует,
  * только если его можно купить и если он меняет доход.
@@ -18,6 +19,7 @@ import {
   economyModule,
   taxModule,
   type Action,
+  type BuildingDef,
   type Context,
   type GameState,
   type Planet,
@@ -70,6 +72,23 @@ describe('уровни дохода: налоговая и НПЗ — как у 
     const farm = [1, 2, 3].map((l) => buildingLevel(data.buildings.farm!, l).upkeep.energy!);
     const own = [1, 2, 3].map((l) => buildingLevel(refinery, l).upkeep.energy!);
     for (const l of [1, 2]) expect(own[l]! / own[0]!).toBeCloseTo(farm[l]! / farm[0]!, 0);
+  });
+
+  it('улучшение НПЗ окупается не дольше улучшения шахты', () => {
+    // Окупаемость — цена улучшения (металл + кредиты) на прирост выхода в час, как в таблице
+    // `docs/resource-economy.md` §4. Прежние цены НПЗ окупались за ~58 и ~68 ч против ~23 и
+    // ~31 ч у шахты — владелец решил удешевить (2026-09-29).
+    const payback = (def: BuildingDef, level: number, res: string): number => {
+      const { cost } = buildingLevel(def, level);
+      const gain =
+        (buildingLevel(def, level).produces[res] ?? 0) - (buildingLevel(def, level - 1).produces[res] ?? 0);
+      return ((cost.metal ?? 0) + (cost.credits ?? 0)) / gain;
+    };
+    const mine = data.buildings.mine!;
+    const slowestMine = Math.max(payback(mine, 2, 'metal'), payback(mine, 3, 'metal'));
+    for (const l of [2, 3]) {
+      expect(payback(refinery, l, 'credits'), `НПЗ ${l}`).toBeLessThanOrEqual(slowestMine);
+    }
   });
 
   it('уровни покупаются обычным `building.upgrade`, четвёртого нет', () => {

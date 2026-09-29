@@ -623,8 +623,7 @@
     "upgrades": [
       {
         "cost": {
-          "metal": 190,
-          "credits": 40
+          "metal": 120
         },
         "buildTimeHours": 5,
         "produces": {
@@ -637,8 +636,8 @@
       },
       {
         "cost": {
-          "metal": 320,
-          "credits": 90
+          "metal": 160,
+          "credits": 25
         },
         "buildTimeHours": 6,
         "produces": {
