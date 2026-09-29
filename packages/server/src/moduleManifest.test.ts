@@ -81,7 +81,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  (минный заградитель); порядок остальных не тронут.) */
 // 51: порядок тот же; combat 3.0.0 сохраняет личные циклы атаки на BattleSide.
 // 52: порядок тот же; construction 1.1.0 — защита построек мира (FORT-5.15), правило урона.
-const PINNED_FOR_VERSION = '52';
+const PINNED_FOR_VERSION = '53';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

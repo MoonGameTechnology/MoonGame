@@ -513,6 +513,7 @@
       ]
     },
     "p1_evac": {
+      "joinsOnArrival": true,
       "owner": "p1",
       "location": "deep_drift",
       "units": [
