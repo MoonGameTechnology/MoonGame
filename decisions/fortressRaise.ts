@@ -64,12 +64,46 @@ export function fortressRaise(
   data: GameData,
   completed: readonly string[] = [],
 ): FortressRaise {
-  const cost = STATION_COST;
   const locks = technologiesUnlocking(data, 'building', STATION_CORE);
-  if (node.owner !== viewerId) return { show: false, enabled: false, blocked: 'not-owned', cost, needs: locks };
-  if (!isStationable(data, node)) return { show: false, enabled: false, blocked: 'kind', cost, needs: locks };
-  // Ворота технологий — раньше казны: без технологии деньги не помогут, и «накопи» было бы
-  // неправдой. Ядро спрашивает тот же список тем же правилом «любая из» (FORT-5.1).
+  if (node.owner !== viewerId) return notHere('not-owned', locks);
+  if (!isStationable(data, node)) return notHere('kind', locks);
+  return placeable(locks, treasury, completed);
+}
+
+/**
+ * Решение по РАЗВИЛКЕ (FORT-6.1): поставить ли крепость на развилку тропы провинции.
+ * `province` — провинция, чья это тропа; `site` — площадка развилки, если на ней уже
+ * когда-то стояла крепость (у ядра она живёт узлом `forkSiteId(province, trail)`).
+ *
+ * Правила — редьюсера (`station.deploy` с `trail`), и порядок их тот же: провинция твоя
+ * (развилка — в ЗАХВАЧЕННОЙ провинции, и только сейчас), площадка свободна (одна развилка —
+ * одна крепость), дальше общие ворота технологии и казны. Сама развилка тут не
+ * проверяется: кнопку рисуют на отметке развилки, а отметку без развилки не ставят.
+ */
+export function forkFortressRaise(
+  province: Pick<Planet, 'owner'> | undefined,
+  site: Pick<Planet, 'owner'> | undefined,
+  viewerId: string,
+  treasury: ResourceBag,
+  data: GameData,
+  completed: readonly string[] = [],
+): FortressRaise {
+  const locks = technologiesUnlocking(data, 'building', STATION_CORE);
+  if (province?.owner !== viewerId) return notHere('not-owned', locks);
+  if (site && site.owner !== null) return notHere('kind', locks);
+  return placeable(locks, treasury, completed);
+}
+
+/** Кнопки нет: сюда крепость не ставят (чужое место или место занято). */
+function notHere(blocked: 'not-owned' | 'kind', needs: string[]): FortressRaise {
+  return { show: false, enabled: false, blocked, cost: STATION_COST, needs };
+}
+
+/** Место годится — дальше общие ворота обоих путей. Технология — раньше казны: без неё
+ *  деньги не помогут, и «накопи» было бы неправдой. Ядро спрашивает тот же список тем же
+ *  правилом «любая из» (FORT-5.1). */
+function placeable(locks: string[], treasury: ResourceBag, completed: readonly string[]): FortressRaise {
+  const cost = STATION_COST;
   if (locks.length > 0 && !locks.some((id) => completed.includes(id))) {
     return { show: true, enabled: false, blocked: 'tech', cost, needs: locks };
   }

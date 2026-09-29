@@ -36,6 +36,7 @@ export {
   type PlanetRoads,
   type RoadPoint,
   type RoadTrail,
+  type ForkAnchor,
   type Battle,
   type Minefield,
   type MinefieldState,
@@ -131,6 +132,7 @@ export {
   type RoadInput,
   type TrunkSpan,
 } from './state/roads';
+export { forkPoint, forkSiteEdge, forkSiteId, isForkSite } from './state/forkSite';
 export {
   sectorKindDef,
   provinceScore,

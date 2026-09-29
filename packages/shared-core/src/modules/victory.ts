@@ -10,6 +10,7 @@ import type {
 import type { HandlerContext, GameModule } from '../kernel/module';
 import { MS_PER_DAY } from '../util/time';
 import { isCapturable, provinceScore } from '../state/sectorKind';
+import { isForkSite } from '../state/forkSite';
 import { getStance } from '../state/diplomacy';
 
 /** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
@@ -49,7 +50,10 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
   }
 
   for (const planet of Object.values(h.state.planets)) {
-    if (planet.owner === null) {
+    // Крепость на развилке — космический юнит, а не территория (FORT-6.1): провинцией её
+    // не считают ни в счёте, ни в выбывании. Иначе игрок, потерявший последнюю планету,
+    // жил бы за счёт одной крепости на дороге, которую ещё и не захватить.
+    if (planet.owner === null || isForkSite(planet)) {
       continue;
     }
     const score = scores[planet.owner];
@@ -404,7 +408,7 @@ function evaluateVictory(h: HandlerContext): void {
   let capturableCount = 0;
   const ownedCapturable = new Map<PlayerId, number>();
   for (const p of Object.values(h.state.planets)) {
-    if (!isCapturable(h.ctx.data, p)) continue;
+    if (!isCapturable(h.ctx.data, p) || isForkSite(p)) continue;
     capturableCount += 1;
     if (p.owner !== null) ownedCapturable.set(p.owner, (ownedCapturable.get(p.owner) ?? 0) + 1);
   }
@@ -465,7 +469,8 @@ function evaluateVictory(h: HandlerContext): void {
 export const victoryModule: GameModule = {
   id: 'victory',
   // 1.3.1: в счёт юнитов входит десант на плацдармах (счёт очков не меняется).
-  version: '1.3.1',
+  // 1.4.0: крепость на развилке — не территория (FORT-6.1).
+  version: '1.4.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));
