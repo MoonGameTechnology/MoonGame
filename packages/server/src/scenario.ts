@@ -226,7 +226,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '52'; // Защита построек мира (FORT-5.15): членство и
+export const MODULE_MANIFEST_VERSION = '53'; // Беженцы по прибытии (заказ владельца 2026-09-29):
+// членство и порядок не тронуты; `missionFacts` 1.1.0 выпускает в игру флоты карты с
+// `joinsOnArrival`, когда к ним прибыл флот владельца. У провинции новое поле
+// `Planet.awaitingFleets`. Партия на 52 держит транспорты в игре с первой секунды.
+// export const MODULE_MANIFEST_VERSION = '52'; // Защита построек мира (FORT-5.15): членство и
 // порядок не тронуты; `construction` 1.1.0 срезает урон по миру при штурме И обстреле долей
 // построек (форт 15/30/45%, прочие по 5%, потолок 90%) вместо «+0.01 очка за постройку».
 // Партия на 51 молча сменила бы исход каждого штурма и обстрела посреди игры.

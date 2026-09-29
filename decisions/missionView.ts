@@ -95,10 +95,15 @@ export function missionTargets(
       return !!p && !(p.owner === player && p.buildings.some((b) => kinds.has(b.type) && b.hp > 0));
     });
   }
-  // Эвакуация: куда вести — свои убежища.
+  // Эвакуация: где ждут беженцы (`awaitingFleets`, пока за ними не пришли) и куда их
+  // вести — свои убежища.
   if (objective.kind === 'evac')
     return Object.values(state.planets)
-      .filter((p) => p.owner === player && p.traits.includes(HAVEN_TRAIT))
+      .filter(
+        (p) =>
+          (p.owner === player && p.traits.includes(HAVEN_TRAIT)) ||
+          (p.awaitingFleets ?? []).some((f) => f.owner === player),
+      )
       .map((p) => p.id)
       .sort();
   if (objective.kind === 'raze') {
