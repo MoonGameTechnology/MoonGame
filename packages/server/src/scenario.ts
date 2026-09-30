@@ -226,7 +226,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '55'; // FORT-5.16: прикрытие построек. Членство и
+export const MODULE_MANIFEST_VERSION = '56'; // Находка Codex на #1393: орудия крепости не
+// сливаются и не делятся, прикрытие — только отряду из одних орудий. Членство и порядок не
+// тронуты; `fleet-ops` 1.3.0 отбивает слияние и раскол неподвижного отряда (`E_EMPLACEMENT`),
+// `station` 1.2.0 проверяет состав. Партия на 55 молча сменила бы исход слияния посреди игры.
+// export const MODULE_MANIFEST_VERSION = '55'; // FORT-5.16: прикрытие построек. Членство и
 // порядок не тронуты; `construction` 1.2.0 пересчитывает прикрытие мира для остатка обстрела
 // после каждой снесённой постройки, `station` 1.1.0 прикрывает постройками крепости её орудия,
 // `orbital` 1.1.0 сообщает, каким прикрытием срезан обстрел. Партия на 54 молча сменила бы

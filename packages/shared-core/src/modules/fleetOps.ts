@@ -39,7 +39,8 @@ import { hangarSize, strikesReserved } from '../state/shuttle';
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
-  version: '1.2.0',
+  // 1.3.0: неподвижный отряд не сливается и не делится (находка Codex на #1393).
+  version: '1.3.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -130,6 +131,17 @@ export const fleetOpsModule: GameModule = {
       h.emit('fleet.merged', { from: fromId, into: intoId, owner, at: into.location });
     };
 
+    /**
+     * НЕПОДВИЖНЫЙ ОТРЯД НЕ СЛИВАЕТСЯ И НЕ ДЕЛИТСЯ. Отряд с `immobile`-юнитом — это
+     * орудия крепости: они принадлежат узлу, а не флоту игрока (FORT-5.4). Находка Codex
+     * на #1393: `fleet.merge` в орудия отдавал обычным кораблям прикрытие крепости —
+     * станция узнаёт орудия по id флота, а не по составу. Слияние или раскол В ОБРАТНУЮ
+     * сторону уводил орудия из отряда, и станция досчитывала их до уровня ядра заново —
+     * бесплатные пушки. Правило по трейту, а не по id: модулю флота станция не известна.
+     */
+    const emplaced = (h: HandlerContext, f: Fleet): boolean =>
+      f.units.some((s) => defHasTrait(h.ctx.data.units[s.unit], 'immobile'));
+
     /** Можно ли сплавить эту пару ПРЯМО СЕЙЧАС (оба стоят, свободны, в одном узле). */
     const fusable = (from: Fleet, into: Fleet): boolean =>
       !from.battleId &&
@@ -162,6 +174,9 @@ export const fleetOpsModule: GameModule = {
       }
       if (from.battleId || into.battleId) {
         return h.reject('E_IN_BATTLE');
+      }
+      if (emplaced(h, from) || emplaced(h, into)) {
+        return h.reject('E_EMPLACEMENT');
       }
       const flyingTo = from.movement
         ? (from.movement.destination ?? from.movement.to)
@@ -238,6 +253,10 @@ export const fleetOpsModule: GameModule = {
           delete from.mergeInto; // «один герой на флот» — правило то же, что на заказе
           continue;
         }
+        if (emplaced(h, from) || emplaced(h, into)) {
+          delete from.mergeInto; // орудия с флотом не сливаются — то же правило, что на заказе
+          continue;
+        }
         delete from.mergeInto;
         fuse(h, fromId, intoId, from.owner);
       }
@@ -277,6 +296,9 @@ export const fleetOpsModule: GameModule = {
       }
       if (fleet.battleId) {
         return h.reject('E_IN_BATTLE');
+      }
+      if (emplaced(h, fleet)) {
+        return h.reject('E_EMPLACEMENT');
       }
       // В пути и на линии делить МОЖНО (замечание владельца 2026-09-25: «флот делить можно
       // в любой момент»): отделённая часть продолжает тот же участок курса — ниже.

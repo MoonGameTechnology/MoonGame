@@ -2011,6 +2011,7 @@ export const ru: Record<string, string> = {
   'err.no-battle': 'Бой завершён или приказ недоступен.',
   'err.no-minelayer': 'нет минного заградителя',
   'err.mines-cooldown': 'мины ещё не готовы',
+  'err.emplacement': 'неподвижный отряд не сливается и не делится',
   'err.fleet-immobile': 'этот флот не может выступить',
   'err.forbidden': 'действие запрещено',
   'err.grant-only': 'это не исследуют — это выдают',
