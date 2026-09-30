@@ -15,6 +15,7 @@ import pveMap2 from '../../../data/maps/pve-2.json';
 import pveMap3 from '../../../data/maps/pve-3.json';
 import pveMap4 from '../../../data/maps/pve-4.json';
 import trainingMap from '../../../data/maps/training-1.json';
+import provingGroundMap from '../../../data/maps/proving-ground.json';
 
 export { FRAGMENTS, shippedGameData };
 
@@ -191,3 +192,66 @@ export function trainingObjectives(): MapObjective[] {
 export function trainingModeId(): string | undefined {
   return trainingMatchMap().mode;
 }
+
+/**
+ * ПОЛИГОН ОСНОВНОЙ ИГРЫ (M2.15, заказ владельца 2026-09-29): шесть областей концепции, весь
+ * каталог провинций, все враги (соперник, Рой, пираты, нейтралы) и старт песочницей.
+ * Флот из всех кораблей, гарнизон из всех наземных частей и столицу со всеми постройками
+ * кладёт карта (`scripts/generate-proving-ground.py`). Здесь — то, чего схема карты не
+ * описывает:
+ * - **война всех мест со всеми.** Карта без команд, и загрузчик сажает такую карту в мир
+ *   (так же, как у полигона Sector Zero выше);
+ * - **открытые технологии.** Эффекты технологий выводятся из `completed`, поэтому список
+ *   пишется целиком, как делает команда песочницы «открыть все технологии»;
+ * - **челноки в ангаре космопорта столицы.** По эскадре на машину, десантный челнок — с
+ *   бойцом в трюме (SHU-5.2): так их кладёт в ангар и постройка.
+ */
+export const PROVING_GROUND_PLAYER = 'p1';
+
+/** Боец десантного челнока в ангаре полигона: десантная пехота игрока. */
+const PROVING_GROUND_TROOP = 'drop_infantry';
+
+export function provingGroundState(data: GameData): GameState {
+  const map = parseMatchMap(provingGroundMap);
+  const world = buildStateFromMap(map, data);
+  const seats = Object.values(world.players).filter((p) => !p.npc).map((p) => p.id);
+  const diplomacy = { ...world.diplomacy };
+  for (const a of seats) for (const b of seats) if (a < b) diplomacy[pairKey(a, b)] = 'war';
+  const me = world.players[PROVING_GROUND_PLAYER]!;
+  const players = {
+    ...world.players,
+    [me.id]: { ...me, technologies: { completed: Object.keys(data.technologies).sort(), active: [] } },
+  };
+  const capital = Object.values(world.planets).find((p) => p.owner === me.id && p.kind === 'planet')!;
+  const hangar = provingGroundShuttles(data).map((unit, i) => {
+    const id = `sq:proving-ground:${i + 1}`;
+    return data.units[unit]!.traits.includes('lander')
+      ? { id, units: [{ unit, count: 2 }], cargo: [{ unit: PROVING_GROUND_TROOP, count: 2 }] }
+      : { id, units: [{ unit, count: 4 }] };
+  });
+  const planets = { ...world.planets, [capital.id]: { ...capital, hangar } };
+  return { ...world, mapId: map.id, diplomacy, players, planets };
+}
+
+/** Челноки, которые игрок строит: те же ворота, что у корпусов забега (`sectorHullIds`) —
+ *  не выдаваемые и не уникальные для фракции. */
+export function provingGroundShuttles(data: GameData): string[] {
+  const factionOnly = new Set(Object.values(data.factions).flatMap((f) => f.uniqueUnits));
+  return Object.keys(data.units).filter((id) => {
+    const def = data.units[id]!;
+    return def.traits.includes('shuttle') && !def.traits.includes('issued') && !factionOnly.has(id);
+  });
+}
+
+/**
+ * Подписи областей карты `mapId` (M2.15): область — только подпись, в мир она не попадает
+ * (`MatchMap.regions`), поэтому клиент берёт её из самой карты. Карта без областей или
+ * незнакомая карта — пусто.
+ */
+export function mapRegions(mapId: string | undefined): MatchMap['regions'] {
+  if (mapId !== provingGroundMap.id) return [];
+  // Спрашивают каждый кадр — разбор карты один на сессию, как у полигона Sector Zero.
+  parsedProvingGround ??= parseMatchMap(provingGroundMap);
+  return parsedProvingGround.regions;
+}
+let parsedProvingGround: MatchMap | null = null;

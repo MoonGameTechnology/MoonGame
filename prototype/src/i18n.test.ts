@@ -251,6 +251,12 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
       'полноту и отсутствие сирот держит decisions/provinceName.test.ts',
   },
   {
+    prefix: 'region.',
+    built_by:
+      'regionKey() в /decisions/regionName.ts — из id карты и области (M2.15); ' +
+      'полноту держит data/provingGround.test.ts',
+  },
+  {
     prefix: 'boss.',
     built_by:
       'задача, журнал, осада и итоги забега строят ' +
