@@ -1,0 +1,1170 @@
+{
+  "id": "proving-ground",
+  "seed": "proving-ground",
+  "time": 0,
+  "sectors": {
+    "C8R5": {
+      "position": {
+        "x": 55,
+        "y": 0
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C7R5": {
+      "position": {
+        "x": -253,
+        "y": 44
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "terran",
+      "owner": "p1",
+      "buildings": [
+        {
+          "type": "mine_t1",
+          "level": 1
+        },
+        {
+          "type": "mine_t2",
+          "level": 1
+        },
+        {
+          "type": "shipyard",
+          "level": 3
+        },
+        {
+          "type": "barracks",
+          "level": 4
+        },
+        {
+          "type": "spaceport",
+          "level": 1
+        },
+        {
+          "type": "radar",
+          "level": 3
+        },
+        {
+          "type": "fort",
+          "level": 3
+        },
+        {
+          "type": "orbital_aa",
+          "level": 3
+        },
+        {
+          "type": "zonal_aa",
+          "level": 3
+        },
+        {
+          "type": "power_plant",
+          "level": 3
+        },
+        {
+          "type": "fabricator",
+          "level": 3
+        },
+        {
+          "type": "hospital",
+          "level": 3
+        },
+        {
+          "type": "factory",
+          "level": 3
+        },
+        {
+          "type": "farm",
+          "level": 3
+        },
+        {
+          "type": "mine",
+          "level": 3
+        },
+        {
+          "type": "refinery",
+          "level": 3
+        },
+        {
+          "type": "tax_office",
+          "level": 3
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        },
+        {
+          "unit": "drop_infantry",
+          "count": 3
+        },
+        {
+          "unit": "tank",
+          "count": 3
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 3
+        },
+        {
+          "unit": "special_forces",
+          "count": 3
+        }
+      ]
+    },
+    "C7R6": {
+      "position": {
+        "x": -102,
+        "y": 303
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C7R4": {
+      "position": {
+        "x": -103,
+        "y": -215
+      },
+      "kind": "empty",
+      "terrain": "deep_void"
+    },
+    "C8R6": {
+      "position": {
+        "x": 205,
+        "y": 208
+      },
+      "kind": "void_station",
+      "terrain": "deep_void"
+    },
+    "C8R4": {
+      "position": {
+        "x": 205,
+        "y": -258
+      },
+      "kind": "black_hole",
+      "terrain": "deep_void"
+    },
+    "C9R5": {
+      "position": {
+        "x": 347,
+        "y": -18
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C6R6": {
+      "position": {
+        "x": -423,
+        "y": 313
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C6R4": {
+      "position": {
+        "x": -425,
+        "y": -207
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "C6R5": {
+      "position": {
+        "x": -574,
+        "y": 53
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C7R3": {
+      "position": {
+        "x": -254,
+        "y": -474
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C9R6": {
+      "position": {
+        "x": 497,
+        "y": 243
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "relic_world"
+    },
+    "C8R3": {
+      "position": {
+        "x": 55,
+        "y": -517
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "ringworld"
+    },
+    "C9R4": {
+      "position": {
+        "x": 498,
+        "y": -280
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C10R5": {
+      "position": {
+        "x": 626,
+        "y": 30
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "C7R2": {
+      "position": {
+        "x": -104,
+        "y": -732
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C3R6": {
+      "position": {
+        "x": -1399,
+        "y": 206
+      },
+      "kind": "dead_world",
+      "terrain": "dust_lane",
+      "planetType": "crystalline"
+    },
+    "C3R5": {
+      "position": {
+        "x": -1550,
+        "y": -55
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "C2R6": {
+      "position": {
+        "x": -1705,
+        "y": 221
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "C4R5": {
+      "position": {
+        "x": -1231,
+        "y": -28
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "C3R7": {
+      "position": {
+        "x": -1549,
+        "y": 466
+      },
+      "kind": "asteroid",
+      "terrain": "dust_lane"
+    },
+    "C4R6": {
+      "position": {
+        "x": -1080,
+        "y": 233
+      },
+      "kind": "planet",
+      "terrain": "asteroid_field",
+      "planetType": "gas_giant"
+    },
+    "C4R7": {
+      "position": {
+        "x": -1229,
+        "y": 495
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C2R5": {
+      "position": {
+        "x": -1855,
+        "y": -38
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C3R4": {
+      "position": {
+        "x": -1400,
+        "y": -315
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C2R4": {
+      "position": {
+        "x": -1705,
+        "y": -297
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C5R5": {
+      "position": {
+        "x": -903,
+        "y": 21
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C4R4": {
+      "position": {
+        "x": -1082,
+        "y": -290
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C3R8": {
+      "position": {
+        "x": -1399,
+        "y": 725
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C5R7": {
+      "position": {
+        "x": -901,
+        "y": 544
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "C4R8": {
+      "position": {
+        "x": -1078,
+        "y": 755
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "C5R6": {
+      "position": {
+        "x": -752,
+        "y": 282
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "C4R2": {
+      "position": {
+        "x": -1083,
+        "y": -811
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "energy_nexus"
+    },
+    "C5R2": {
+      "position": {
+        "x": -756,
+        "y": -763
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "C3R2": {
+      "position": {
+        "x": -1401,
+        "y": -834
+      },
+      "kind": "pirate_base",
+      "terrain": "dense_nebula",
+      "owner": "pirates",
+      "buildings": [
+        {
+          "type": "shipyard"
+        },
+        {
+          "type": "radar"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "pirate_boarder",
+          "count": 2
+        }
+      ]
+    },
+    "C4R3": {
+      "position": {
+        "x": -1232,
+        "y": -551
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "C5R3": {
+      "position": {
+        "x": -905,
+        "y": -503
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "C6R1": {
+      "position": {
+        "x": -578,
+        "y": -988
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "C3R3": {
+      "position": {
+        "x": -1551,
+        "y": -575
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "C6R3": {
+      "position": {
+        "x": -576,
+        "y": -468
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C6R2": {
+      "position": {
+        "x": -427,
+        "y": -727
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C5R4": {
+      "position": {
+        "x": -754,
+        "y": -241
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C7R1": {
+      "position": {
+        "x": -255,
+        "y": -992
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "oceanic"
+    },
+    "C11R2": {
+      "position": {
+        "x": 1050,
+        "y": -725
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard"
+    },
+    "C10R2": {
+      "position": {
+        "x": 778,
+        "y": -753
+      },
+      "kind": "graveyard",
+      "terrain": "derelict_graveyard"
+    },
+    "C10R1": {
+      "position": {
+        "x": 629,
+        "y": -1014
+      },
+      "kind": "debris_field",
+      "terrain": "derelict_graveyard"
+    },
+    "C12R2": {
+      "position": {
+        "x": 1322,
+        "y": -739
+      },
+      "kind": "debris_field",
+      "terrain": "derelict_graveyard"
+    },
+    "C11R3": {
+      "position": {
+        "x": 899,
+        "y": -465
+      },
+      "kind": "debris_field",
+      "terrain": "derelict_graveyard"
+    },
+    "C12R3": {
+      "position": {
+        "x": 1171,
+        "y": -481
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "C9R2": {
+      "position": {
+        "x": 499,
+        "y": -802
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "C10R3": {
+      "position": {
+        "x": 628,
+        "y": -493
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "C13R3": {
+      "position": {
+        "x": 1451,
+        "y": -528
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "fortress_world"
+    },
+    "C9R1": {
+      "position": {
+        "x": 349,
+        "y": -1063
+      },
+      "kind": "empty",
+      "terrain": "empty_space"
+    },
+    "C10R4": {
+      "position": {
+        "x": 777,
+        "y": -231
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "C9R3": {
+      "position": {
+        "x": 348,
+        "y": -541
+      },
+      "kind": "neutral_base",
+      "terrain": "empty_space",
+      "owner": "neutrals",
+      "buildings": [
+        {
+          "type": "shipyard"
+        },
+        {
+          "type": "radar"
+        },
+        {
+          "type": "power_plant"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        }
+      ]
+    },
+    "C8R2": {
+      "position": {
+        "x": 205,
+        "y": -774
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "C8R1": {
+      "position": {
+        "x": 55,
+        "y": -1032
+      },
+      "kind": "debris_field",
+      "terrain": "empty_space"
+    },
+    "C12R4": {
+      "position": {
+        "x": 1320,
+        "y": -223
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "C13R7": {
+      "position": {
+        "x": 1449,
+        "y": 506
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "C13R5": {
+      "position": {
+        "x": 1450,
+        "y": -11
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "C12R6": {
+      "position": {
+        "x": 1318,
+        "y": 295
+      },
+      "kind": "ion_storm",
+      "terrain": "ion_storm"
+    },
+    "C13R6": {
+      "position": {
+        "x": 1600,
+        "y": 247
+      },
+      "kind": "planet",
+      "terrain": "solar_flare_zone",
+      "planetType": "irradiated"
+    },
+    "C12R5": {
+      "position": {
+        "x": 1169,
+        "y": 36
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "C12R8": {
+      "position": {
+        "x": 1317,
+        "y": 811
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "C13R4": {
+      "position": {
+        "x": 1601,
+        "y": -269
+      },
+      "kind": "solar_flare",
+      "terrain": "solar_flare_zone"
+    },
+    "C11R4": {
+      "position": {
+        "x": 1048,
+        "y": -205
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C12R7": {
+      "position": {
+        "x": 1168,
+        "y": 554
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "volcanic"
+    },
+    "C14R5": {
+      "position": {
+        "x": 1745,
+        "y": -50
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "planetType": "terran",
+      "owner": "p2",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "barracks"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        }
+      ]
+    },
+    "C11R6": {
+      "position": {
+        "x": 1046,
+        "y": 315
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C11R5": {
+      "position": {
+        "x": 897,
+        "y": 55
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C11R8": {
+      "position": {
+        "x": 1044,
+        "y": 834
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C11R7": {
+      "position": {
+        "x": 895,
+        "y": 575
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C10R6": {
+      "position": {
+        "x": 775,
+        "y": 292
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C7R9": {
+      "position": {
+        "x": -251,
+        "y": 1078
+      },
+      "kind": "planet",
+      "terrain": "depleted_system",
+      "planetType": "barren"
+    },
+    "C7R8": {
+      "position": {
+        "x": -101,
+        "y": 820
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system",
+      "planetType": "dead_world"
+    },
+    "C6R8": {
+      "position": {
+        "x": -422,
+        "y": 833
+      },
+      "kind": "asteroid",
+      "terrain": "depleted_system"
+    },
+    "C8R9": {
+      "position": {
+        "x": 55,
+        "y": 989
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C7R7": {
+      "position": {
+        "x": -252,
+        "y": 562
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C6R9": {
+      "position": {
+        "x": -571,
+        "y": 1093
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C8R8": {
+      "position": {
+        "x": 205,
+        "y": 728
+      },
+      "kind": "dead_world",
+      "terrain": "empty_space"
+    },
+    "C6R7": {
+      "position": {
+        "x": -572,
+        "y": 574
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C8R7": {
+      "position": {
+        "x": 55,
+        "y": 469
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C9R9": {
+      "position": {
+        "x": 345,
+        "y": 1027
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C5R8": {
+      "position": {
+        "x": -750,
+        "y": 804
+      },
+      "kind": "planet",
+      "terrain": "deep_void",
+      "planetType": "terran",
+      "owner": "p3",
+      "buildings": [
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "swarm_synapse"
+        },
+        {
+          "type": "mine_t2"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "orbital_aa"
+        },
+        {
+          "type": "barracks"
+        },
+        {
+          "type": "factory"
+        },
+        {
+          "type": "swarm_datacenter"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 5
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 3
+        }
+      ]
+    },
+    "C9R7": {
+      "position": {
+        "x": 346,
+        "y": 505
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C9R8": {
+      "position": {
+        "x": 496,
+        "y": 766
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C10R9": {
+      "position": {
+        "x": 622,
+        "y": 1075
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C10R7": {
+      "position": {
+        "x": 624,
+        "y": 553
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "C10R8": {
+      "position": {
+        "x": 773,
+        "y": 813
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    }
+  },
+  "regions": [
+    {
+      "id": "open_expanse",
+      "sectors": [
+        "C8R5",
+        "C7R5",
+        "C7R6",
+        "C7R4",
+        "C8R6",
+        "C8R4",
+        "C9R5",
+        "C6R6",
+        "C6R4",
+        "C6R5",
+        "C7R3",
+        "C9R6",
+        "C8R3",
+        "C9R4",
+        "C10R5",
+        "C7R2"
+      ]
+    },
+    {
+      "id": "asteroid_massif",
+      "sectors": [
+        "C3R6",
+        "C3R5",
+        "C2R6",
+        "C4R5",
+        "C3R7",
+        "C4R6",
+        "C4R7",
+        "C2R5",
+        "C3R4",
+        "C2R4",
+        "C5R5",
+        "C4R4",
+        "C3R8",
+        "C5R7",
+        "C4R8",
+        "C5R6"
+      ]
+    },
+    {
+      "id": "nebula_cloud",
+      "sectors": [
+        "C4R2",
+        "C5R2",
+        "C3R2",
+        "C4R3",
+        "C5R3",
+        "C6R1",
+        "C3R3",
+        "C6R3",
+        "C6R2",
+        "C5R4",
+        "C7R1"
+      ]
+    },
+    {
+      "id": "expedition_graveyard",
+      "sectors": [
+        "C11R2",
+        "C10R2",
+        "C10R1",
+        "C12R2",
+        "C11R3",
+        "C12R3",
+        "C9R2",
+        "C10R3",
+        "C13R3",
+        "C9R1",
+        "C10R4",
+        "C9R3",
+        "C8R2",
+        "C8R1"
+      ]
+    },
+    {
+      "id": "storm_front",
+      "sectors": [
+        "C12R4",
+        "C13R7",
+        "C13R5",
+        "C12R6",
+        "C13R6",
+        "C12R5",
+        "C12R8",
+        "C13R4",
+        "C11R4",
+        "C12R7",
+        "C14R5",
+        "C11R6",
+        "C11R5",
+        "C11R8",
+        "C11R7",
+        "C10R6"
+      ]
+    },
+    {
+      "id": "depleted_node",
+      "sectors": [
+        "C7R9",
+        "C7R8",
+        "C6R8",
+        "C8R9",
+        "C7R7",
+        "C6R9",
+        "C8R8",
+        "C6R7",
+        "C8R7",
+        "C9R9",
+        "C5R8",
+        "C9R7",
+        "C9R8",
+        "C10R9",
+        "C10R7",
+        "C10R8"
+      ]
+    }
+  ],
+  "players": {
+    "p1": {
+      "name": "Azure Compact",
+      "faction": "vanguard",
+      "resources": {
+        "credits": 50000,
+        "metal": 50000,
+        "food": 50000,
+        "energy": 50000,
+        "microelectronics": 50000
+      }
+    },
+    "p2": {
+      "name": "Crimson Hegemony",
+      "faction": "crimson",
+      "ai": true,
+      "resources": {
+        "credits": 400,
+        "metal": 400
+      }
+    },
+    "p3": {
+      "name": "Swarm Collective",
+      "faction": "swarm",
+      "ai": true,
+      "resources": {
+        "credits": 800,
+        "metal": 800,
+        "biomass": 300,
+        "microelectronics": 80,
+        "energy": 150
+      }
+    },
+    "pirates": {
+      "name": "Pirate Base",
+      "faction": "pirates",
+      "npc": "pirate",
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
+    },
+    "neutrals": {
+      "name": "Neutral AI Base",
+      "faction": "vanguard",
+      "npc": "neutral",
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
+    }
+  },
+  "fleets": {
+    "p1_armada": {
+      "owner": "p1",
+      "location": "C7R5",
+      "units": [
+        {
+          "unit": "scout_drone",
+          "count": 2
+        },
+        {
+          "unit": "frigate",
+          "count": 2
+        },
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "heavy_cruiser",
+          "count": 2
+        },
+        {
+          "unit": "siege_lance",
+          "count": 2
+        },
+        {
+          "unit": "scout",
+          "count": 2
+        },
+        {
+          "unit": "picket_frigate",
+          "count": 2
+        },
+        {
+          "unit": "shuttle_carrier",
+          "count": 2
+        }
+      ]
+    },
+    "p2_fleet": {
+      "owner": "p2",
+      "location": "C14R5",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    },
+    "p3_brood": {
+      "owner": "p3",
+      "location": "C5R8",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 3,
+          "modules": [
+            "swarm_brood_chamber"
+          ]
+        },
+        {
+          "unit": "scout_drone",
+          "count": 2
+        }
+      ]
+    },
+    "pirate_patrol": {
+      "owner": "pirates",
+      "location": "C3R2",
+      "units": [
+        {
+          "unit": "pirate_frigate",
+          "count": 2
+        }
+      ]
+    }
+  }
+}
