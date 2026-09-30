@@ -556,6 +556,33 @@
       "utility": 0
     }
   },
+  "mine": {
+    "name": "Mine",
+    "faction": "neutral",
+    "domain": "space",
+    "stats": {
+      "attack": 0,
+      "defense": 0,
+      "speed": 0,
+      "hp": 20
+    },
+    "cost": {
+      "metal": 0
+    },
+    "buildTimeHours": 0,
+    "signature": 0.1,
+    "upkeep": {},
+    "traits": [
+      "immobile",
+      "issued",
+      "mine"
+    ],
+    "slots": {
+      "weapon": 0,
+      "defense": 0,
+      "utility": 0
+    }
+  },
   "garrison": {
     "name": "Garrison",
     "faction": "neutral",

@@ -32,7 +32,16 @@ const hooks = `window.__minesTest = {
     s.fleets[selFleet].units[0].modules = ['mine_layer'];
     lastPanelHtml = ''; renderPanel();
   },
-  fields: () => s.minefields
+  fields: () => s.minefields,
+  // SM-3.6: armed, the mine is an immobile unit — its own card, never an order target.
+  mineCard: () => {
+    apply(advance(s, Object.values(s.minefields.installations)[0].readyAt));
+    const id = Object.keys(s.fleets).find((id) => isMineFleet(s.fleets[id], data));
+    if (!id) return null;
+    setFleetSelection([id]);
+    lastPanelHtml = ''; renderPanel();
+    return { card: lastPanelHtml.includes(t('mine.card.rule')), orderable: selectedFleetIds().length };
+  }
 };`;
 
 const host = await serve(await instrumentedGame(hooks));
@@ -75,13 +84,17 @@ try {
           await page.evaluate(() => Object.keys(window.__minesTest.fields().installations).length),
           1,
         );
+        assert.deepEqual(await page.evaluate(() => window.__minesTest.mineCard()), {
+          card: true,
+          orderable: 0,
+        });
       }
     });
     console.log(`Mines UI ${viewport.width}px passed.`);
     await context.close();
   }
   console.log(
-    'Mines UI smoke passed: desktop/mobile deployment, modes, disarm, ordinary minelayer.',
+    'Mines UI smoke passed: desktop/mobile deployment, modes, disarm, ordinary minelayer, mine card.',
   );
 } finally {
   await browser.close();

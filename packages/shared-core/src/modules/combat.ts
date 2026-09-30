@@ -53,6 +53,7 @@ import {
 import { legT } from '../state/fleetPosition';
 import { fleetHoldFree } from '../state/shuttle';
 import { crossingT } from '../state/roads';
+import { isMineFleet } from '../state/minefields';
 
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
  *  node-equivalent edge); mirrors movement's own EPS. */
@@ -159,6 +160,8 @@ function findEnemyFleetAt(
     if (!f.units.some((s) => s.count > 0) || !isHostile(h, owner, f.owner)) {
       continue;
     }
+    // Мина — не противник в бою: встреча с ней — подрыв (`minefield`), а не бой (SM-3.6).
+    if (isMineFleet(f, h.ctx.data)) continue;
     if (best === null || f.id < best.id) {
       best = f;
     }
@@ -406,7 +409,7 @@ function pullInBystanders(h: HandlerContext, at: string): void {
     for (const id of Object.keys(h.state.fleets).sort()) {
       const f = h.state.fleets[id];
       if (!f || shipsEngaged(h.state, f) || f.location !== at) continue;
-      if (!f.units.some((st) => st.count > 0)) continue;
+      if (!f.units.some((st) => st.count > 0) || isMineFleet(f, h.ctx.data)) continue;
       const battle = runningBattleFor(h, at, f.owner);
       if (!battle) continue;
       joinBattle(h, f, battle, at);
@@ -426,7 +429,7 @@ function engageFleets(
   // сцепки: прерванный флот снова свободен и дерётся, как любой другой.
   interruptLandingsAt(h, at);
   const fleet = h.state.fleets[fleetId];
-  if (!fleet || shipsEngaged(h.state, fleet)) {
+  if (!fleet || shipsEngaged(h.state, fleet) || isMineFleet(fleet, h.ctx.data)) {
     return;
   }
   // MSB-3: идущий бой имеет ПРИОРИТЕТ над новой дуэлью. Иначе пятеро прибывших дали бы
@@ -532,7 +535,7 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
 function hostileFleetAt(h: HandlerContext, fleet: Fleet, at: string): boolean {
   for (const id of Object.keys(h.state.fleets)) {
     const f = h.state.fleets[id];
-    if (!f || f.id === fleet.id || f.location !== at) continue;
+    if (!f || f.id === fleet.id || f.location !== at || isMineFleet(f, h.ctx.data)) continue;
     if (f.units.some((s) => s.count > 0) && isHostile(h, fleet.owner, f.owner)) return true;
   }
   return false;
@@ -1098,7 +1101,8 @@ export const combatModule: GameModule = {
   // 3.1.0: штурм — высадка по таймеру, потом плацдарм; флот свободен (MSB-9).
   // 3.2.0: заявка высадки замораживает десант; плацдарм не перезапускается после перемирия
   // и ничьей; выжившие берега союзников при захвате не стираются (замечания Codex на #1392).
-  version: '3.2.0',
+  // 3.3.0: мина — не противник в бою; встреча с ней — подрыв (SM-3.6).
+  version: '3.3.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -1164,6 +1168,10 @@ export const combatModule: GameModule = {
       if (!fa.units.some((s) => s.count > 0) || !fb.units.some((s) => s.count > 0)) {
         return;
       }
+      // Встреча с миной — подрыв, а не бой: её разбирает `minefield` (SM-3.6).
+      if (isMineFleet(fa, h.ctx.data) || isMineFleet(fb, h.ctx.data)) {
+        return;
+      }
       const oa = laneOccupancy(fa);
       const ob = laneOccupancy(fb);
       if (!oa || !ob || oa.lo !== ob.lo || oa.hi !== ob.hi) {
@@ -1210,6 +1218,7 @@ export const combatModule: GameModule = {
       if (!fa || !fb || (fa.battleId && fb.battleId)) return;
       if (!isHostile(h, fa.owner, fb.owner)) return;
       if (!fa.units.some((s) => s.count > 0) || !fb.units.some((s) => s.count > 0)) return;
+      if (isMineFleet(fa, h.ctx.data) || isMineFleet(fb, h.ctx.data)) return; // подрыв — `minefield`
       const oa = trunkOccupancies(h.state, fa).find((o) => o.key === trunk);
       const ob = trunkOccupancies(h.state, fb).find((o) => o.key === trunk);
       if (!oa || !ob) return; // one left the trunk (re-routed / arrived) — stale

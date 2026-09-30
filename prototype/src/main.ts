@@ -1,6 +1,7 @@
 import { attackBattle, deployForkFortress, retreatBattle } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
-import { visibleMinefields, fieldPosition } from '../../packages/shared-core/src/state/minefields';
+import { visibleMinefields, isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
+import { mineCard } from '../../decisions/mineCard';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
@@ -2493,8 +2494,10 @@ function roundFlash(b: Battle): number {
 
 /** The fleets the command bar / move order currently act on (mine only). */
 function selectedFleetIds(): string[] {
-  if (selFleets.size) return [...selFleets].filter((id) => s.fleets[id]?.owner === ME);
-  return selFleet && s.fleets[selFleet]?.owner === ME ? [selFleet] : [];
+  // Мина (SM-3.6) — не флот под приказ: в выбор для приказов она не попадает.
+  const orderable = (id: string): boolean => s.fleets[id]?.owner === ME && !isMineFleet(s.fleets[id]!, data);
+  if (selFleets.size) return [...selFleets].filter(orderable);
+  return selFleet && orderable(selFleet) ? [selFleet] : [];
 }
 
 
@@ -2872,6 +2875,8 @@ function computeVision(): Vision {
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
  *  live `fleets` intel window covers its owner. */
 function fleetSeen(f: Fleet): boolean {
+  // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
+  if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
   // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
   return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
 }
@@ -4271,7 +4276,7 @@ function handleEvents(events: DomainEvent[]) {
         // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
         // разобрано в шапке `fleetNews.ts`: в сети событие едет без места, и сервер
         // отдаёт его только владельцу. Поведение НЕ меняю, вопрос владельцу.
-        if (destroyHeard())
+        if (destroyHeard(p))
           note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       // Тёмное событие (`data/events.json`). Гейт СВОЙ, а не общий `admits()`: тот читает
@@ -4707,7 +4712,7 @@ function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
   const out: Array<EngageCandidate & { fleet: Fleet }> = [];
   for (const g of Object.values(s.fleets)) {
     if (g.owner === ME || sumUnits(g.units) <= 0) continue;
-    if (!fleetVisible(false, fleetKnown(g), intelFleetOwners.has(g.owner))) continue;
+    if (!fleetSeen(g)) continue;
     const at = fleetAnchor(g);
     if (!at) continue;
     out.push({ id: g.id, location: g.location ?? null, x: at.x, y: at.y, ships: sumUnits(g.units), fleet: g });
@@ -6339,6 +6344,7 @@ function render(now: number) {
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
   for (const f of Object.values(s.fleets)) {
+    if (isMineFleet(f, data)) continue; // мину рисует `drawMinefields` своим знаком (SM-3.6)
     if (!fleetSeen(f)) {
       // not identified and no intel window: a radar contact is shown only as a
       // swept signature (drawRadarContacts), painted by the arm — never live here.
@@ -6536,6 +6542,22 @@ function render(now: number) {
 // Кирпичики панели (кнопка, шапка, вкладка, колонки, строки состава) живут в
 // `panelKit.ts` (REFM-35) — там же правила экранирования и «disabled, а не спрятать».
 const btn = actionButton;
+/**
+ * Карточка мины (SM-3.6, решение владельца 2026-09-30: «можно так же выделить и прочитать
+ * характеристики»). Числа — `decisions/mineCard.ts`; приказов у мины нет, а чужую мину бьют
+ * челноки или «Атакой» с карточки своего флота.
+ */
+function mineCardHtml(f: Fleet): string {
+  const card = mineCard(f, data);
+  const pct = card.hull.max > 0 ? Math.round((100 * card.hull.cur) / card.hull.max) : 0;
+  return (
+    cardHeader(ownerColor(f.owner), t('mine.card.title'), t('mine.card.sub', { n: card.charges })) +
+    `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar"><i style="width:${pct}%"></i></span><b>${kfmt(card.hull.cur)}/${kfmt(card.hull.max)}</b></div>` +
+    `<div class="row"><b>💣 ${esc(t('mine.card.hit', { p: card.hitPct }))}</b></div>` +
+    `<div class="hint">${esc(t('mine.card.rule'))}</div>`
+  );
+}
+
 function cardHeader(color: string, title: string, sub: string, titleAct?: string, badge?: string): string {
   return kitCardHeader(color, title, sub, {
     compact: pcUi(),
@@ -6929,6 +6951,8 @@ function effectTagText(tag: EffectTag): string {
 }
 
 function fleetPanelHtml(f: Fleet): string {
+  // Мина (SM-3.6): свой короткий паспорт — заряды, доля за подрыв, прочность.
+  if (isMineFleet(f, data)) return mineCardHtml(f);
   // Окно флота на ПК — консоль по макету владельца (`fleetConsole.ts`): те же куски
   // карточки, своя раскладка. Карточка ниже остаётся телефону, группе и чужому флоту.
   if (consoleFleet() === f) return fleetConsoleHtml(f);
@@ -7730,7 +7754,7 @@ function planetPanelHtml(p: Planet): string {
   // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
   // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
   const { ground, ships } = garrisonByTab(p.garrison, data);
-  const here = Object.values(s.fleets).filter((f) => f.location === p.id);
+  const here = Object.values(s.fleets).filter((f) => f.location === p.id && !isMineFleet(f, data));
   const counts = tabCounts(p, data, here);
   // Bytro-стиль: у мира авто-имя; координата (grid id) остаётся отдельным обозначением в
   // подзаголовке. У провинции главы — её имя, а id узла из подзаголовка уходит: это
@@ -8039,7 +8063,7 @@ function playerCardHtml(): string {
   // garrison on your worlds.
   let units = 0;
   for (const f of Object.values(s.fleets))
-    if (f.owner === ME) units += sumUnits(f.units) + sumUnits(f.landing ?? []);
+    if (f.owner === ME && !isMineFleet(f, data)) units += sumUnits(f.units) + sumUnits(f.landing ?? []);
   for (const pp of Object.values(s.planets)) if (pp.owner === ME) units += sumUnits(pp.garrison);
   const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
   const need = Math.max(0, SCORE_LIMIT - score);
@@ -9057,7 +9081,7 @@ function mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind
   if (!f) return false;
   if (order === 'merge') return f.owner === ME && !selectedFleetIds().includes(f.id);
   return order === 'engage' && f.owner !== ME && sumUnits(f.units) > 0 &&
-    fleetVisible(false, fleetKnown(f), intelFleetOwners.has(f.owner));
+    fleetSeen(f);
 }
 
 function mobileDraftPoint(): { x: number; y: number } | null {
@@ -9112,13 +9136,13 @@ function updateMobileHud(): void {
   if (!MOBILE) return;
   const fid = panelFleet();
   const f = fid ? s.fleets[fid] : null;
-  const inspectable = f && fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
+  const inspectable = f && fleetSeen(f);
   const key = selPlanet && s.planets[selPlanet] ? `planet:${selPlanet}` : inspectable ? `fleet:${fid}` : selectedFleetIds().join('|');
   const choices: MobileChoice[] = [];
   for (const pick of mobileChoices) {
     if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
-      if (!f || !fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner))) continue;
+      if (!f || !fleetSeen(f)) continue;
       choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
     } else if (s.planets[pick.id]) {
       choices.push({ ...pick, title: worldTitle(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
@@ -9275,7 +9299,7 @@ function renderCmdBar() {
         ),
       );
   // Merge: a group fuses in one tap; a lone fleet arms target-pick (needs a partner).
-  const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME).length;
+  const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)).length;
   const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
@@ -10545,8 +10569,9 @@ function selectAt(mx: number, my: number) {
   const fleetIds = fleetsUnderTap(
     Object.values(s.fleets).map((f) => ({
       id: f.id,
-      mine: f.owner === ME,
-      visible: fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner)),
+      // Своя мина (SM-3.6) — осмотр, а не выбор под приказ: у неё нет приказов.
+      mine: f.owner === ME && !isMineFleet(f, data),
+      visible: fleetSeen(f),
       anchor: fleetAnchor(f),
     })),
     mx,
@@ -10686,7 +10711,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     // Кто из троих претендентов забирает этот жест — решает `pressIntent.ts`
     // (REFM-55): там же правило «Shift над своим флотом — добор, а не рамка».
     const overOwnFleet = !!nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner === ME),
+      Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)),
       fleetAnchor,
       p.x,
       p.y,
@@ -10719,7 +10744,7 @@ canvas.addEventListener('pointerdown', (ev) => {
         if (!mapHold.matured) return;
         navigator.vibrate?.(25);
         const mine = nearestHit(
-          Object.values(s.fleets).filter((f) => f.owner === ME),
+          Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)),
           fleetAnchor,
           p.x,
           p.y,
@@ -10788,7 +10813,7 @@ function endPointer(ev: PointerEvent) {
   if (single && boxSelecting && selectionBox) {
     const picked: string[] = [];
     for (const f of Object.values(s.fleets)) {
-      if (f.owner !== ME) continue;
+      if (f.owner !== ME || isMineFleet(f, data)) continue;
       const a = fleetAnchor(f);
       if (a && insideBox(selectionBox, a)) picked.push(f.id);
     }
@@ -15263,24 +15288,33 @@ function drawMinefields(now: number): void {
     cx.stroke();
     cx.restore();
   }
-  const view = visibleMinefields(s, ME);
-  if (!view) return;
-  const fields = Object.entries(view.fields).flatMap(([key, owners]) => Object.entries(owners).map(([owner, field]) => ({ key, owner, field, installing: false })));
-  fields.push(...Object.values(view.installations ?? {}).map((job) => ({ ...job, installing: true })));
-  for (const m of fields) {
-    const pos = fieldPosition(s, m.key, m.field);
-    if (!pos) continue;
-    const c = world(pos);
-    if (!visible(c, 40)) continue;
-    const y = m.field.edge ? c.y : c.y - 44;
-    cx.save(); cx.translate(c.x - 12, y - 12);
+  // Установки — свои, по месту носителя; мины (SM-3.6) — отряды во `fleets`, чужие только
+  // вблизи (`fleetSeen`). Мина стоит там же, куда смотрит палец (`fleetAnchor`: на дороге —
+  // в своей точке, на узле — на кольце орбиты), иначе тап по знаку промахивался бы мимо неё.
+  // Знак один: сфера мины, у установки — пунктиром и «◷».
+  const marks: Array<{ c: { x: number; y: number }; owner: string; label: string; installing: boolean }> = [];
+  for (const job of Object.values(visibleMinefields(s, ME)?.installations ?? {})) {
+    const layer = Object.values(s.fleets).find((f) => s.minefields?.installations?.[f.id] === job);
+    const at = layer ? fleetPos(layer) : job.location ? s.planets[job.location]?.position : null;
+    if (!at) continue;
+    const c = world(at);
+    marks.push({ c: job.location === null ? c : { x: c.x, y: c.y - 44 }, owner: job.owner, label: '◷', installing: true });
+  }
+  for (const f of Object.values(s.fleets)) {
+    if (!isMineFleet(f, data) || !fleetSeen(f)) continue;
+    const c = fleetAnchor(f);
+    if (c) marks.push({ c, owner: f.owner, label: `×${mineCard(f, data).charges}`, installing: false });
+  }
+  for (const m of marks) {
+    if (!visible(m.c, 40)) continue;
+    cx.save(); cx.translate(m.c.x - 12, m.c.y - 12);
     cx.strokeStyle = m.owner === ME ? '#60dbe8' : '#ffac62';
     cx.fillStyle = 'rgba(4,10,12,.85)'; cx.lineWidth = 1.2;
     cx.setLineDash(m.installing ? [2, 2] : []);
     drawMineShape(cx, cam.scale >= 0.9);
     cx.setLineDash([]);
     cx.fillStyle = cx.strokeStyle; cx.font = '11px ui-monospace, monospace';
-    cx.textAlign = 'left'; cx.fillText(m.installing ? '◷' : `×${m.field.charge}`, 26, 15);
+    cx.textAlign = 'left'; cx.fillText(m.label, 26, 15);
     cx.restore();
   }
 }

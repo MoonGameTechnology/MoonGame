@@ -794,25 +794,24 @@ export interface BattleSide {
   attackCount?: number;
 }
 
-/** Одно минное поле одного владельца на узле (SM-3.4). */
-export interface Minefield {
-  /** Сколько раз поле ещё сработает. На нуле поле снимается. */
-  charge: number;
-  /** Доля ТЕКУЩЕГО корпуса каждого стека, которую снимает одно срабатывание. */
-  hit: number;
-  /** Road fields have a continuous position, separate from the public node id. */
-  position?: RoadPoint;
+/** Мина в установке (SM-3.4, SM-3.6): что встанет по сроку и где. */
+export interface MinelayingJob {
+  owner: PlayerId;
+  readyAt: number;
+  /** Узел, на котором встанет мина, или `null` — точка дороги (`edge`). */
+  location: PlanetId | null;
   edge?: FleetEdge;
+  /** Стек мин: `count` — заряды, модули — боевая часть заградителя (её `mineHit`). */
+  stack: UnitStack;
 }
 
-/** Минные поля (SM-3.4). */
+/** Заградители (SM-3.4). Сами мины — отряды во `fleets` (SM-3.6); здесь только
+ *  перезарядки и установки, которые ещё не встали. */
 export interface MinefieldState {
-  /** Узел → владелец → поле. */
-  fields: Record<PlanetId, Record<PlayerId, Minefield>>;
   /** Флот → мировое время, с которого он снова может ставить мины. */
   readyAt: Record<FleetId, number>;
   ownerReadyAt?: Record<PlayerId, number>;
-  installations?: Record<FleetId, { key: string; owner: PlayerId; readyAt: number; field: Minefield }>;
+  installations?: Record<FleetId, MinelayingJob>;
 }
 
 /**
