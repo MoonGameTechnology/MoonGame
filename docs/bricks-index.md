@@ -117,6 +117,7 @@
 | UIX-12.1 | ⏳ | proto | `docs/backlog.md` | Свой и чужой не только цветом. |
 | UIX-13.1 | ⏳ | proto | `docs/backlog.md` | Верфь: свернуть неподходящие модули и дать группе свою строку. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
+| UIX-14.1 | ✅ | proto | `docs/backlog.md` | Окно мира без дублей: шапка фактов и одно число на вкладку. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |

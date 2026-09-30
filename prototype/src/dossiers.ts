@@ -522,6 +522,20 @@ export function createDossiers(host: DossierHost): {
         body: t('dossier.tab.buildings.desc'),
       };
     }
+    if (key.startsWith('fact:')) {
+      // Фишки шапки мира (UIX-14.1): на ПК досье приходит наведением, на телефоне — тапом.
+      // Защита построек в шапке — иконка с числом (заказ владельца 2026-09-29: «оставить
+      // только иконку, и когда топаешь на него, выводит более подробную информацию»), а её
+      // правило — то же досье, что у характеристики `stat:mitigation`.
+      if (key === 'fact:cover') return objDossier('stat:mitigation');
+      const FACT_DOSSIER: Record<string, [string, string]> = {
+        capital: [t('side.world.capital'), t('side.world.capital.note')],
+        vp: [t('side.world.vp'), ''],
+        output: [t('side.world.output'), ''],
+      };
+      const d = FACT_DOSSIER[key.slice(5)];
+      return d ? { name: d[0], body: d[1] } : null;
+    }
     if (key.startsWith('stat:')) {
       // TXT-3: тело есть только у характеристики, которая несёт СВОЁ правило (лимит
       // залпа, бесплатная регенерация щита, починка корпуса, «в гарнизоне, не на
@@ -540,9 +554,6 @@ export function createDossiers(host: DossierHost): {
         hull: [t('dossier.stat.hull.name'), t('dossier.stat.hull.desc')],
         shield: [t('dossier.stat.shield.name'), t('dossier.stat.shield.desc')],
         spd: [t('dossier.stat.spd.name'), t('dossier.stat.spd.desc')],
-        garrison: [t('dossier.stat.garrison.name'), ''],
-        ground: [t('dossier.stat.ground.name'), ''],
-        gships: [t('dossier.stat.gships.name'), t('dossier.stat.gships.desc')],
         // Защита построек мира: правило неочевидно (доли складываются, у крепости своя,
         // снесённая не прикрывает), поэтому тело есть. Числа — из данных, не из текста.
         mitigation: [
@@ -553,7 +564,6 @@ export function createDossiers(host: DossierHost): {
             cap: share(MITIGATION_CAP),
           }),
         ],
-        pbuild: [t('dossier.stat.pbuild.name'), ''],
         datk: [t('dossier.stat.datk.name'), ''],
         ddef: [t('dossier.stat.ddef.name'), ''],
         dhp: [t('dossier.stat.dhp.name'), ''],

@@ -221,7 +221,7 @@ async function check(label, run) {
   // Хук перерисовывает карточку сразу (`renderPanel`, как кадр игры): иначе на той же
   // странице до следующего кадра в `#side` лежала карточка ПРОШЛОЙ партии, и счёт «Пинга»
   // плавал — 2 падения из 10, оба с числом от предыдущей фазы.
-  await page.locator('#side [data-act="planetinfo"]').first().waitFor({ state: 'attached' });
+  await page.locator('#side .ptabs').first().waitFor({ state: 'attached' });
   assert.equal(
     await page.locator('#side [data-act="ping"]').count(),
     run ? 0 : 1,
@@ -253,10 +253,9 @@ async function check(label, run) {
     assert.equal(await page.locator('#side .ptile').count(), 0, `${label}: во «Флоте» нет наземных плиток`);
     assert.equal(await page.locator('#side .sec', { hasText: /Флоты на орбите|Fleets in orbit/ }).count(), 1, `${label}: во «Флоте» — орбита`);
     await page.evaluate(() => window.__szTest.tab('ground'));
-    // SZ-map-ids: карточка мира, её сводка (тап по имени), журнал и панели называют места
-    // именами провинций. Id узлов глав — английские слова (`home_a`, `drift`): на русском
-    // экране забега их быть не должно.
-    await page.locator('#side [data-act="planetinfo"]').first().click();
+    // SZ-map-ids: карточка мира, журнал и панели называют места именами провинций. Id
+    // узлов глав — английские слова (`home_a`, `drift`): на русском экране забега их быть
+    // не должно. Сводки по тапу на имя у мира больше нет (переработка окна, 2026-09-29).
     const raw = await page.evaluate(() => {
       const words = new Set(document.body.innerText.split(/[^\w-]+/));
       return window.__szTest.places().filter((id) => words.has(id));

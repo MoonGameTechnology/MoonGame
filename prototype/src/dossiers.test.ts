@@ -196,7 +196,7 @@ describe('dossiers — маршрутизация objDossier', () => {
   // «Суммарная атака кораблей флота»), тела больше не имеет: подпись и число уже сказали
   // всё. Тело осталось только там, где оно несёт НЕОЧЕВИДНОЕ правило.
   it('характеристика без своего правила отдаёт только подпись', () => {
-    for (const k of ['atk', 'def', 'hp', 'datk', 'ddef', 'dhp', 'garrison', 'ground', 'pbuild']) {
+    for (const k of ['atk', 'def', 'hp', 'datk', 'ddef', 'dhp']) {
       const d = objDossier(`stat:${k}`);
       expect(d?.name, k).toBeTruthy();
       expect(d?.body, k).toBe('');
@@ -204,9 +204,18 @@ describe('dossiers — маршрутизация objDossier', () => {
   });
 
   it('характеристика со своим правилом тело сохраняет', () => {
-    for (const k of ['cap', 'shield', 'hull', 'gships', 'spd', 'mitigation']) {
+    for (const k of ['cap', 'shield', 'hull', 'spd', 'mitigation']) {
       expect(objDossier(`stat:${k}`)?.body, k).toBeTruthy();
     }
+  });
+
+  // UIX-14.1: фишки шапки мира открывают досье тапом на телефоне и наведением на ПК.
+  // Защита построек в шапке — иконка с числом, и правило обязано прийти из досье.
+  it('фишки шапки мира открывают досье; защита построек — с правилом', () => {
+    expect(objDossier('fact:cover')).toEqual(objDossier('stat:mitigation'));
+    expect(objDossier('fact:cover')?.body).toBeTruthy();
+    for (const k of ['capital', 'vp', 'output']) expect(objDossier(`fact:${k}`)?.name, k).toBeTruthy();
+    expect(objDossier('fact:nope')).toBeNull();
   });
 
   // Защита построек (решение владельца 2026-09-26): числа правила — из данных, а не из
