@@ -2004,6 +2004,7 @@ export const en: Record<string, string> = {
   'err.no-battle': 'The battle has ended or the order is unavailable.',
   'err.no-minelayer': 'no mine layer',
   'err.mines-cooldown': 'mines not ready yet',
+  'err.emplacement': 'an emplacement cannot merge or split',
   'err.fleet-immobile': 'this fleet cannot set out',
   'err.forbidden': 'action forbidden',
   'err.grant-only': 'this one is granted, not researched',

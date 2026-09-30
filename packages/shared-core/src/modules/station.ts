@@ -193,7 +193,8 @@ function syncStationGuns(h: HandlerContext, planet: Planet): void {
 export const stationModule: GameModule = {
   id: 'station',
   // 1.1.0: постройки крепости прикрывают её орудия (FORT-5.16, замечание Codex на #1389).
-  version: '1.1.0',
+  // 1.2.0: прикрытие — только отряду из одних орудий (находка Codex на #1393).
+  version: '1.2.0',
   setup(api) {
     api.onAction('station.deploy', (action, h: HandlerContext) => {
       const { planetId } = action.payload as { planetId?: string };
@@ -329,6 +330,10 @@ export const stationModule: GameModule = {
       if (planetId === null) return pool;
       const node = h.state.planets[planetId];
       if (!node) return pool;
+      // Прикрытие привязано к ОРУДИЯМ, а не к контейнеру по id: чужой юнит в отряде
+      // (слияние его запрещает — `fleetOps`) лишает прикрытия весь отряд, а не получает его.
+      const guns = h.state.fleets[defenderFleet];
+      if (!guns || guns.units.some((u) => u.unit !== GUNS_UNIT && u.count > 0)) return pool;
       return pool + coverPoints(worldDamageReduction(node, h.ctx.data));
     });
 

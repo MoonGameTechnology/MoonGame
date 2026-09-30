@@ -84,7 +84,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 53: порядок тот же; missionFacts 1.1.0 — беженцы по прибытии, поле Planet.awaitingFleets.
 // 54: порядок тот же; combat 3.1.0 и army 1.1.0 — высадка по таймеру, у флота новые поля (MSB-9).
 // 55: порядок тот же; construction 1.2.0, station 1.1.0, orbital 1.1.0 — прикрытие построек (FORT-5.16).
-const PINNED_FOR_VERSION = '55';
+// 56: порядок тот же; fleet-ops 1.3.0, station 1.2.0 — орудия крепости не сливаются (Codex #1393).
+const PINNED_FOR_VERSION = '56';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

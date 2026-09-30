@@ -14,6 +14,7 @@ import {
   constructionModule,
   createInitialState,
   createKernel,
+  fleetOpsModule,
   orbitalModule,
   stationModule,
   worldDamageReduction,
@@ -250,5 +251,79 @@ describe('орудия крепости — прикрытие построек 
     const mods = fleetStatMods(kernel.traceHooks(st, fleetStatQueries(st.fleets[GUNS]!, 0), { now: 0, data }), 0);
     expect(mods?.incoming.factor).toBeCloseTo(0.55, 5);
     expect(mods?.incoming.sources.map((x) => x.source)).toEqual(['station']);
+  });
+});
+
+/**
+ * ПРИКРЫТИЕ — ОРУДИЯМ, А НЕ КОНТЕЙНЕРУ (находка Codex на #1393, P1).
+ *
+ * Станция узнавала орудия по id флота. Обычный `fleet.merge` в `fleet:station:*` проходил
+ * все гейты (свой флот, стоят рядом, не в бою) — и крейсеры получали прикрытие крепости
+ * 40–90%. Обратный путь уводил орудия из отряда, и станция досчитывала их до уровня ядра
+ * заново. Теперь неподвижный отряд не сливается и не делится, а прикрытие проверяет состав.
+ */
+describe('орудия крепости — не сливаются, не делятся, прикрытие только им', () => {
+  const GUNS = 'fleet:station:A';
+  const kernel = createKernel([constructionModule, stationModule, fleetOpsModule]);
+  const withCruisers = (): GameState => {
+    const s = createInitialState({ seed: 'guns-merge', version: { data: data.version, manifest: '1' } });
+    return {
+      ...s,
+      players: players('p1', 'p2'),
+      planets: { A: worldNode('A', 'p1', 'void_station', [{ type: 'starfort', level: 2, hp: 70 }]) },
+      fleets: {
+        [GUNS]: hullFleet(GUNS, 'p1', 'A', 'fortress_guns', 2),
+        C: hullFleet('C', 'p1', 'A', 'cruiser', 3),
+      },
+    };
+  };
+  const act = (type: string, payload: unknown) =>
+    kernel.applyAction(withCruisers(), { id: 'a:1', type, playerId: 'p1', payload, issuedAt: 0 }, { now: 0, data });
+
+  it('слить флот в орудия и орудия во флот нельзя', () => {
+    expect(act('fleet.merge', { from: 'C', into: GUNS })).toMatchObject({ ok: false, code: 'E_EMPLACEMENT' });
+    expect(act('fleet.merge', { from: GUNS, into: 'C' })).toMatchObject({ ok: false, code: 'E_EMPLACEMENT' });
+  });
+
+  it('отделить часть орудий нельзя', () => {
+    const r = act('fleet.split', { fleetId: GUNS, take: [{ unit: 'fortress_guns', count: 1 }] });
+    expect(r).toMatchObject({ ok: false, code: 'E_EMPLACEMENT' });
+  });
+
+  it('созревшее намерение слиться с орудиями снимается, а не исполняется', () => {
+    const st: GameState = {
+      ...withCruisers(),
+      scheduled: [{ id: 'e:0', at: 1, type: 'fleet.arrived', payload: { fleetId: 'C', at: 'A' }, seq: 0 }],
+      scheduleSeq: 1,
+    };
+    st.fleets.C = { ...st.fleets.C!, mergeInto: GUNS };
+    const r = kernel.advanceTo(st, { now: 2, data });
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.fleets[GUNS]?.units).toEqual([{ unit: 'fortress_guns', count: 2 }]);
+    expect(r.state.fleets.C?.mergeInto).toBeUndefined();
+  });
+
+  it('отряд с чужим юнитом прикрытия не получает', () => {
+    const probe: GameModule = {
+      id: 'guns-probe',
+      version: '1.0.0',
+      setup(api) {
+        api.onAction('probe.damage', (_action, h) => {
+          const args: DamageHookArgs = { phase: 'orbital', location: 'A', attacker: 'p2', defender: 'p1', defenderFleet: GUNS };
+          h.emit('probe.result', { dmg: hookedDamage(h, 100, args) });
+        });
+      },
+    };
+    const k = createKernel([constructionModule, stationModule, probe]);
+    const damage = (st: GameState): number => {
+      const r = k.applyAction(st, { id: 'p:1', type: 'probe.damage', playerId: 'p1', payload: {}, issuedAt: 0 }, { now: 0, data });
+      if (!r.ok) throw new Error(r.code);
+      return (r.events.find((e) => e.type === 'probe.result')!.payload as { dmg: number }).dmg;
+    };
+    const clean = withCruisers();
+    expect(damage(clean)).toBeCloseTo(60, 5); // ядро 40%
+    const polluted = withCruisers();
+    polluted.fleets[GUNS] = { ...polluted.fleets[GUNS]!, units: [{ unit: 'fortress_guns', count: 2 }, { unit: 'cruiser', count: 3 }] };
+    expect(damage(polluted)).toBe(100);
   });
 });

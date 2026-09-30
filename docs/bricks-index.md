@@ -906,6 +906,7 @@
 | FORT-5.15 | ✅ | core data proto | `docs/fortress-roadmap.md` | Защита построек мира: форт 15/30/45%, каждая постройка 5%, потолок 90% |
 | FORT-5.16 | ✅ | core | `docs/fortress-roadmap.md` | Прикрытие построек: обстрел пересчитывает его по ходу сноса, орудия крепости его получают |
 | FORT-5.17 | ⏳ | core | `docs/fortress-roadmap.md` | Обстрел и флак мира по отрезку: сила флота и зенитки меняются посреди него |
+| FORT-5.18 | ✅ | core sec | `docs/fortress-roadmap.md` | Орудия крепости не сливаются и не делятся, прикрытие — только им |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md` | Туман как граница (анти-maphack) (в основном) |
