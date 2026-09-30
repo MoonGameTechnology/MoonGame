@@ -120,7 +120,14 @@ function capturingStacks(
   payload: { planetId: string; owner: string; by?: unknown },
 ): UnitStack[] {
   if (typeof payload.by === 'string') {
-    return h.state.fleets[payload.by]?.units ?? [];
+    const fleet = h.state.fleets[payload.by];
+    if (fleet) return fleet.units;
+    // Мир взят ПЛАЦДАРМОМ (ROS-1.5; с MSB-9 — любым штурмом обороняемого мира): флота нет,
+    // и `by` — id самого мира. Взявшие его войска к этому моменту и есть его гарнизон; без
+    // этой ветки правило с трейтом захватчика не срабатывало бы ни на одном штурме
+    // (замечание Codex на #1392).
+    if (payload.by === payload.planetId) return h.state.planets[payload.planetId]?.garrison ?? [];
+    return [];
   }
   return Object.values(h.state.fleets)
     .filter((f) => f.owner === payload.owner && f.location === payload.planetId)
@@ -129,7 +136,8 @@ function capturingStacks(
 
 export const effectsModule: GameModule = {
   id: 'effects',
-  version: '0.1.0',
+  // 0.2.0: захват плацдармом отдаёт правилам с трейтом состав взявших мир войск.
+  version: '0.2.0',
   setup(api) {
     api.on('planet.captured', (event, h) => {
       const p = event.payload as { planetId?: unknown; owner?: unknown; by?: unknown };

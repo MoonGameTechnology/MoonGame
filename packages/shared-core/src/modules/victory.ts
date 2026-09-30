@@ -87,6 +87,14 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
     tallyUnits(score, fleet.units);
     tallyUnits(score, fleet.landing ?? []);
   }
+  // Десант на плацдарме — войска штурмующего, на чьей бы земле он ни стоял (замечание
+  // Codex на #1392: с MSB-9 весь штурмующий десант живёт плацдармом до конца боя).
+  for (const planet of Object.values(h.state.planets)) {
+    for (const b of planet.beachheads ?? []) {
+      const score = scores[b.owner];
+      if (score) tallyUnits(score, b.units);
+    }
+  }
 
   return scores;
 }
@@ -456,7 +464,8 @@ function evaluateVictory(h: HandlerContext): void {
  */
 export const victoryModule: GameModule = {
   id: 'victory',
-  version: '1.3.0',
+  // 1.3.1: в счёт юнитов входит десант на плацдармах (счёт очков не меняется).
+  version: '1.3.1',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));

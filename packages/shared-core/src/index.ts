@@ -185,6 +185,7 @@ export {
   sensorCoverage,
   radarSignatures,
   isVisibleTo,
+  engagementOf,
   fleetRadarRange,
   stackRadarRange,
   BLACKOUT_MULT,
@@ -198,6 +199,7 @@ export {
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
 export type {
   Coverage,
+  Engagement,
   SightCircle,
   VisibleState,
   VisibleView,
