@@ -234,7 +234,8 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
+import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -2955,6 +2956,35 @@ function worldTitle(id: string): string {
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
  *  marker if it has never been identified. */
+/**
+ * ИМЕНА ОБЛАСТЕЙ (M2.15, `decisions/regionName.ts`): проступают при отдалении, когда
+ * внутренние границы растворяются, и гаснут, когда снова читаются провинции. Анимации нет —
+ * прозрачность следует за масштабом, который задаёт игрок. У карты без областей не рисуется
+ * ничего.
+ */
+function drawRegionLabels(lod: MapLod): void {
+  const alpha = regionLabelAlpha(lod.provinceDetail);
+  if (alpha <= 0) return;
+  const labels = regionLabels(s.mapId, mapRegions(s.mapId), (id) => s.planets[id]?.position);
+  if (labels.length === 0) return;
+  cx.save();
+  cx.globalAlpha *= alpha;
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
+  cx.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+  cx.lineJoin = 'round';
+  for (const label of labels) {
+    const c = world(label);
+    if (!visible(c, 240)) continue;
+    const text = label.text.toUpperCase();
+    cx.lineWidth = 4;
+    cx.strokeStyle = 'rgba(4,10,12,.85)';
+    cx.strokeText(text, c.x, c.y);
+    cx.fillStyle = 'rgba(214,236,244,.92)';
+    cx.fillText(text, c.x, c.y);
+  }
+  cx.restore();
+}
 function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined, lod: MapLod): void {
   cx.save();
   if (lod.detail === 0) {
@@ -5784,6 +5814,7 @@ function render(now: number) {
     }
     cx.restore();
   }
+  drawRegionLabels(lod);
   /**
    * Силуэт КРЕПОСТИ: прозрачный орбитальный каркас и — у крепости с ядром — корпус и
    * полоса прочности ядра (FORT-5.2). Один рисунок на крепость на узле, пиратскую и
@@ -12170,6 +12201,7 @@ $('hub-solo').addEventListener('click', () => {
 });
 $('hub-solo-continue').addEventListener('click', restoreSolo);
 $('hub-sector-zero').addEventListener('click', () => openSectorZero());
+$('hub-proving-ground').addEventListener('click', () => startProvingGround());
 $('hub-msg').addEventListener('click', () => {
   hubNote.textContent = t('hub.messages.soon');
 });
@@ -12979,6 +13011,22 @@ function startTraining(): void {
   setupEl.style.display = 'none';
   sciWin.classList.remove('show');
   note(t('training.started'));
+}
+
+/**
+ * ПОЛИГОН ОСНОВНОЙ ИГРЫ (M2.15, заказ владельца 2026-09-29): все области и весь каталог,
+ * старт песочницей (`provingGroundState`). Обычная партия основной игры — без режима, волн
+ * и наград; соперник и Рой ходят местами ИИ, как в главах (`runAiSeats`). В одиночное
+ * сохранение полигон не пишется: «Продолжить» в хабе остаётся за обычной партией.
+ */
+function startProvingGround(): void {
+  leaveMatch();
+  const st = provingGroundState(data);
+  installMatch(st, runAiSeats(st, PROVING_GROUND_PLAYER, 'weak'));
+  applyTimeSpeed(setupSpeed);
+  showConnect(false);
+  showHub(false);
+  note(t('proving-ground.started'));
 }
 
 let creatingMatch = false;

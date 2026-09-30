@@ -213,6 +213,15 @@ export const MatchMapSchema = z.object({
    *  старт один на все сложности. Применяет {@link mapForDifficulty} до сборки мира;
    *  `buildStateFromMap` этого поля не читает. */
   difficultyStart: z.record(z.string(), MapStartOverrideSchema).default({}),
+  /** ПОДПИСИ ОБЛАСТЕЙ (M2.15, решение владельца 2026-09-29): группа провинций, которую
+   *  игрок читает одним именем, когда отдаляет карту. Только подпись, не игровая сущность
+   *  (`docs/map-terrain-regions-concept.md` §1): у области нет владельца, захвата и бонуса,
+   *  `buildStateFromMap` поля не читает, и снятие подписей матч не меняет. Имени в данных
+   *  нет: текст живёт в `/localization` по ключу из id карты и области
+   *  (`decisions/regionName.ts`). */
+  regions: z
+    .array(z.object({ id: z.string().min(1), sectors: z.array(z.string()).min(1) }))
+    .default([]),
 });
 
 export type MatchMap = z.infer<typeof MatchMapSchema>;
