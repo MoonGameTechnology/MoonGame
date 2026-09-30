@@ -9,17 +9,20 @@
  * всплывёт. Нет арта — нет и комикса: пустой реестр значит, что игра идёт как раньше.
  */
 import type { SectorZeroProgress } from './sectorZeroProgress';
+import type { GameState, PlayerId } from '../packages/shared-core/src/index';
 
 /** Когда комикс показывается: перед первым забегом главы, после первой победы в ней и
  *  (`task`) когда в забеге впервые выполнена ключевая задача главы — какая, говорит
  *  реестр арта хозяина ({@link ComicTaskTriggers}). */
-export const COMIC_MOMENTS = ['intro', 'outro', 'task'] as const;
+export const COMIC_MOMENTS = ['intro', 'outro', 'task', 'echo', 'echo-record'] as const;
 export type ComicMoment = (typeof COMIC_MOMENTS)[number];
 
-/** Одна панель: картинка (адрес, который отдала сборка) и подписи — КЛЮЧИ локали. Текст
- *  не вшивается в картинку: подпись из локали работает и на английском. */
+/** Одна страница: картинка и необязательные подписи — КЛЮЧИ локали. У утверждённых
+ *  страниц владельца русские реплики нарисованы внутри картинки. */
 export interface ComicPanel {
   image: string;
+  /** Английская версия страницы с нарисованными репликами, если уже подготовлена. */
+  imageEn?: string;
   captions?: readonly string[];
 }
 
@@ -32,10 +35,29 @@ export type ComicRegistry = Readonly<
 export type ComicTaskTriggers = Readonly<Record<string, string>>;
 
 /** Имя отметки в профиле: `pve-1:intro`. */
-export const comicId = (chapter: string, moment: ComicMoment): string => `${chapter}:${moment}`;
+export const comicId = (chapter: string, moment: ComicMoment): string =>
+  `${chapter}:${moment === 'echo-record' ? 'echo' : moment}`;
 
 /** Форма отметки — то, что профиль примет из хранилища (правленый мусор отбрасывается). */
-export const COMIC_ID = /^[a-z0-9-]+:(intro|outro|task)$/;
+export const COMIC_ID = /^[a-z0-9-]+:(intro|outro|task|echo)$/;
+
+/** Эхо (§ «Кто это?»): только после спасения Учёного и прибытия живого корабля.
+ *  Уже освобождённая колония показывает запись; старое выполнение не сбрасывается.
+ *  Обе версии делят одну отметку просмотра. Вызывать только для главы I. */
+export function echoComicMoment(
+  state: GameState,
+  me: PlayerId,
+  scientistAvailable: boolean,
+  echoCompleted: boolean,
+): 'echo' | 'echo-record' | null {
+  if (!scientistAvailable || !state.planets.home_b) return null;
+  if (echoCompleted || state.planets.home_b.owner === me) return 'echo-record';
+  const arrived = Object.values(state.fleets).some(
+    (f) =>
+      f.owner === me && f.location === 'home_b' && !f.movement && f.units.some((u) => u.count > 0),
+  );
+  return arrived ? 'echo' : null;
+}
 
 /** Панели к показу — или `null`: комикса нет, он пуст или уже показан этому профилю. */
 export function comicDue(

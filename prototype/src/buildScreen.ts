@@ -18,12 +18,13 @@
  * вместо слотов честный счётчик «построено: N») и «Черта: заражено» (каталог
  * прототипа не несёт черт зданий). Оба — остаток в бэклоге, не ложь на экране.
  */
-import { buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/index';
+import { BASE_BUILDING_DEFENSE, buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { buildingName, cost, esc, fmtDur, resLine, displayUnit } from './format';
 import { BUILD_ICON, unitIcon } from './icons';
+import { catalogPortraitHtml } from './shipArt';
 import { buildBuilding, buildUnit } from '../../decisions/actions';
 import {
   isLander,
@@ -58,9 +59,9 @@ export function buildCategory(def: BuildingDef): BuildCategory {
   if ((lv1.shuttleBay ?? 0) > 0) return 'infra';
   if (Object.values(lv1.produces ?? {}).some((n) => (n ?? 0) > 0) || (def.creditsBonus ?? 0) > 0)
     return 'economy';
-  // Порог 0.01 — как у карточки кодекса: схема даёт КАЖДОМУ зданию защитный дефолт
-  // 0.01, и без порога вся инфраструктура съезжала бы в «оборону».
-  if ((lv1.defenseBonus ?? 0) > 0.01 || (lv1.aaDamage ?? 0) > 0) return 'defense';
+  // Порог — дефолт схемы, как у карточки кодекса: каждое здание прикрывает мир на 5%
+  // (`BASE_BUILDING_DEFENSE`), и без порога вся инфраструктура съезжала бы в «оборону».
+  if ((lv1.defenseBonus ?? 0) > BASE_BUILDING_DEFENSE || (lv1.aaDamage ?? 0) > 0) return 'defense';
   return 'infra';
 }
 
@@ -76,9 +77,9 @@ export function buildFx(def: BuildingDef, level: number): string {
   // Прибавка — с ЭТОГО уровня, как выработка: у налоговой их три (+25/+35/+50%).
   if ((lv.creditsBonus ?? 0) > 0)
     fx.push(t('build.fx.credits', { n: Math.round((lv.creditsBonus ?? 0) * 100) }));
-  // Тот же порог 0.01, что у категории: дефолт схемы — не эффект, а шум.
-  if ((lv.defenseBonus ?? 0) > 0.01)
-    fx.push(t('build.fx.defense', { n: Math.round((lv.defenseBonus ?? 0) * 100) }));
+  // Тот же порог, что у категории: 5% есть у каждого здания, это не эффект, а шум.
+  if ((lv.defenseBonus ?? 0) > BASE_BUILDING_DEFENSE)
+    fx.push(t('build.fx.mitigation', { n: Math.round((lv.defenseBonus ?? 0) * 100) }));
   if ((lv.aaDamage ?? 0) > 0) fx.push(t('build.fx.aa', { n: lv.aaDamage ?? 0 }));
   if ((lv.radarRange ?? 0) > 0) fx.push(t('build.fx.radar', { n: lv.radarRange ?? 0 }));
   if (def.enablesShipConstruction) fx.push(t('build.fx.shipyard'));
@@ -263,15 +264,16 @@ export function unitScreenHtml(
     .map((id) => {
       const def = data.units[id];
       if (!def) return '';
-      if (isLander(def)) return landerRowHtml(me, planetId, id, res, probe, lockText);
+      if (isLander(def)) return landerRowHtml(me, planetId, id, res, probe, lockText, unitArt(state, me, id));
       const code = probe(buildUnit(me, planetId, id, 1));
       if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET') return '';
       const locked = code !== null && code !== 'E_INSUFFICIENT';
       const right = locked
         ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>`
         : `<button class="bw-take" data-unit-go="${esc(id)}"${code ? ' disabled' : ''}>▷ ${t(code ? 'build.action.no-res' : 'build.action.build')}</button>`;
+      const art = unitArt(state, me, id);
       return (
-        `<div class="bw-item st-${locked ? 'lock' : 'ready'}" data-unit-info="${esc(id)}"><div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
+        `<div class="bw-item st-${locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
         `<div class="bw-fx">⚔ ${def.stats.attack} · 🛡 ${def.stats.defense} · ♥ ${def.stats.hp}</div>` +
         `<div class="bw-foot"><span>${cost(def.cost, res)}</span><span class="bw-dur">${fmtDur(def.buildTimeHours)}</span></div></div>`
       );
@@ -281,6 +283,15 @@ export function unitScreenHtml(
     `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state.mapId, planetId))}</b><span>${t('production.units')}</span></div></div>` +
     `<div class="bw-scroll"><div class="bw-list">${rows}</div></div>`
   );
+}
+
+/**
+ * Портрет юнита в строке каталога (как в верфи и карточке корабля): пропал, когда каталог
+ * переехал из боковой панели в это окно (OBJP), и корабли остались одним значком. Семья —
+ * по фракции игрока, как силуэт на карте. Нет арта — пусто, строка остаётся со значком.
+ */
+function unitArt(state: GameState, me: string, id: string): string {
+  return catalogPortraitHtml('u', id, data, 'thumb', state.players[me]?.faction);
 }
 
 /**
@@ -296,6 +307,7 @@ function landerRowHtml(
   res: Record<string, number>,
   probe: (a: Action) => string | null,
   lockText: (code: string) => string,
+  art: string,
 ): string {
   const def = data.units[id]!;
   const candidates = landerTroopCandidates(data);
@@ -321,7 +333,7 @@ function landerRowHtml(
     })
     .join('');
   return (
-    `<div class="bw-item st-${code ? 'lock' : 'ready'}" data-unit-info="${esc(id)}">${head}${fx}` +
+    `<div class="bw-item st-${code ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}${head}${fx}` +
     (pick ? `<div class="bw-fx">${t('build.lander.troop')}</div>${pick}` : '') +
     `</div>`
   );

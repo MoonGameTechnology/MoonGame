@@ -107,6 +107,10 @@ const MapFleetSchema = z.object({
   landing: z.array(MapUnitStackSchema).default([]),
   /** Признаки флота (`Fleet.traits`), например `sentinel` — дозорный маяка задачи. */
   traits: z.array(z.string()).default([]),
+  /** Флот ждёт на месте невидимым и входит в игру, когда туда ПРИБЫВАЕТ флот его владельца
+   *  с живым кораблём (транспорты беженцев в задаче эвакуации, заказ владельца 2026-09-29).
+   *  До этого его нет среди флотов матча: загрузчик кладёт его в `Planet.awaitingFleets`. */
+  joinsOnArrival: z.boolean().default(false),
 });
 
 /** How a slot's home is placed at session creation (read by the server

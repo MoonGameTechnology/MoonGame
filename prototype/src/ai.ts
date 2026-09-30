@@ -770,6 +770,9 @@ function baseAiOrders(
   }
   for (const f of expandFleets) {
     if (f.owner !== ai || f.location == null || f.movement || f.battleId) continue;
+    // Высадка штурмом и выгрузка идут по таймеру (решение владельца 2026-09-26): флот стоит,
+    // пока десант не сошёл, — любой приказ ему был бы отказом, а курс отменил бы выгрузку.
+    if (f.assaultLanding || (f.unloading ?? []).length > 0) continue;
     if (skipMove.has(f.id)) continue;
     // ═══ СИЛЬНЫЙ БОТ (AI-BAL-3): десант и штурм ═══
     // Игровой бот не делает НИ ТОГО, НИ ДРУГОГО, и вот почему вторая фаза захвата
@@ -833,6 +836,7 @@ function baseAiOrders(
         const carried = (f.landing ?? []).filter((st) => st.count > 0);
         if (need > 0 && carried.length > 0) {
           const target = assaultTargetFor(f);
+          let gave = false;
           for (const give of pickForGarrison(carried, need, data)) {
             // Оставшееся обязано взять цель. Нет цели — отдаём без оглядки: возить
             // десант некуда, а мир без гарнизона перекидывают прилётом.
@@ -841,7 +845,11 @@ function baseAiOrders(
             );
             if (target && !confidentGroundWin(left, target.garrison, data)) break;
             out.push(unloadArmy(ai, f.id, give.unit, give.count));
+            gave = true;
           }
+          // ВЫГРУЗКА ЗАНИМАЕТ ЧАС (как подъём), а вылет её ОТМЕНЯЕТ: флот, отдавший войска
+          // миру, этот тик стоит, иначе улетел бы с ними же на борту.
+          if (gave) continue;
         }
       }
       // (а3) ПОДВОЗ ПОДКРЕПЛЕНИЯ — вторая половина правила владельца №4 (2026-09-16).

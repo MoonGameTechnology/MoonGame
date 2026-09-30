@@ -56,8 +56,15 @@ describe('statModifiers — что спросить у ядра', () => {
       attackerFleet: 'f1',
     });
     expect(q[2]).toEqual({ name: 'fleet.speed', base: 40, args: { fleetId: 'f1', from: 'lethe' } });
-    // Под огнём наш флот — защищающийся, стрелок неизвестен.
-    expect(q[4]!.args).toEqual({ phase: 'orbital', location: 'lethe', attacker: null, defender: 'p1' });
+    // Под огнём наш флот — защищающийся, стрелок неизвестен. Флот назван сам: прикрытие
+    // бывает у одного флота (орудия крепости, FORT-5.16), а не у владельца.
+    expect(q[4]!.args).toEqual({
+      phase: 'orbital',
+      location: 'lethe',
+      attacker: null,
+      defender: 'p1',
+      defenderFleet: 'f1',
+    });
   });
 
   it('в пути: узла нет, ход — по текущему переходу', () => {

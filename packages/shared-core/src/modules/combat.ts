@@ -38,6 +38,7 @@ import {
   MAX_COMBAT_ROUNDS,
   ownFleet,
   posAt,
+  removeIfWiped,
   sideAlive,
   creditBattle,
   creditVolley,
@@ -56,6 +57,14 @@ import { crossingT } from '../state/roads';
 const EDGE_EPS = 1e-4;
 
 const roundIntervalMs = (ctx: Context): number => hoursToMs(ctx, 1);
+
+/**
+ * Сколько идёт высадка штурмом на чужой мир (решение владельца 2026-09-26: «высадка
+ * занимает чуть больше времени, чем погрузка»; погрузка — `LOAD_HOURS`, час). Всё это время
+ * флот стоит на орбите и приказов не берёт; по сроку десант ступает на землю плацдармом, и
+ * флот свободен. Прилёт вражеского флота высадку прерывает — десант остаётся на борту.
+ */
+export const ASSAULT_LANDING_HOURS = 1.5;
 
 // --- retreat -----------------------------------------------------------------
 
@@ -411,6 +420,9 @@ function engageFleets(
   at: string,
   except?: ReadonlySet<string> | null,
 ): void {
+  // Враг на орбите — высадка под ним сорвана (решение владельца 2026-09-26). Раньше
+  // сцепки: прерванный флот снова свободен и дерётся, как любой другой.
+  interruptLandingsAt(h, at);
   const fleet = h.state.fleets[fleetId];
   if (!fleet || shipsEngaged(h.state, fleet)) {
     return;
@@ -444,9 +456,9 @@ function engageFleets(
 
 /**
  * A ground assault / occupation ordered from the near orbit (`fleet.assault`):
- * storm a defended garrison with the carried landing force, or walk into an
- * undefended hostile/neutral world. Returns a reject code, or null on success
- * (a ground battle was started or the planet was occupied).
+ * land the carried force on a defended world (a timed landing, then a beachhead),
+ * or walk into an undefended hostile/neutral world. Returns a reject code, or null
+ * on success (a landing was started or the planet was occupied).
  */
 function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
   const at = fleet.location;
@@ -484,7 +496,7 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
       // запрет стоял не против совместного штурма, а против ДВУХ БОЁВ за один гарнизон:
       // они делили бы одну ссылку защитника, и тот отвечал бы дважды за раунд и мог быть
       // захвачен дважды подряд. Один бой на гарнизон остаётся — просто сторон в нём
-      // больше. Десант адресуется своим флотом, поэтому ссылки не сливаются.
+      // больше. Второй десант высаживается своим плацдармом, и бой его принимает.
       if (!(fleet.landing ?? []).some((x) => x.count > 0)) return 'E_NO_TROOPS';
       joined = b;
       break;
@@ -494,50 +506,92 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
   // including one locked in a battle. `findEnemyFleetAt` skips battleId fleets (it
   // looks for a fleet TO engage), which let a second attacker start the ground phase
   // while the orbital fight was still undecided — GDD §7.4 is two SEQUENTIAL phases.
-  for (const id of Object.keys(h.state.fleets)) {
-    const f = h.state.fleets[id];
-    if (!f || f.id === fleet.id || f.location !== at) continue;
-    if (f.units.some((s) => s.count > 0) && isHostile(h, fleet.owner, f.owner)) {
-      return 'E_ORBIT_CONTESTED'; // beat the defending fleet first
-    }
+  if (hostileFleetAt(h, fleet, at)) {
+    return 'E_ORBIT_CONTESTED'; // beat the defending fleet first
   }
-  if (joined) {
-    joined.sides.push({
-      ref: { kind: 'landing', fleetId: fleet.id },
-      owner: fleet.owner,
-      role: 'attacker',
-      attackStartedAt: h.ctx.now, nextAttackAt: h.ctx.now, attackCount: 0,
-    });
-    // Вступивший флот — В БОЮ, как у `startBattle`. Без отметки он оставался «свободным»:
-    // повторный штурм проходил и вписывал в бой ещё одну копию того же десанта (копии
-    // стреляли каждая за себя), драйвер авто-штурма отдавал такой штурм каждый кадр —
-    // «Рой бесконечно высаживает десант» (плейтест 2026-09-24), — а флот мог улететь,
-    // бросив свой десант на земле. Освобождает его конец боя, как всех сторон.
-    fleet.battleId = joined.id;
-    fleet.movement = null;
-    scheduleTick(h, joined.id, true);
-    h.emit('battle.joined', { battleId: joined.id, location: at, fleetId: fleet.id, owner: fleet.owner });
-    return null;
-  }
+  // Живой гарнизон или идущий наземный бой — десант ВЫСАЖИВАЕТСЯ, а не бьётся с орбиты
+  // (решение владельца 2026-09-26: «штурм не запирает флот — только на таймер высадки»).
+  // Флот стоит, пока идёт высадка; по сроку десант ступает на землю плацдармом и
+  // вступает в бой тем же путём, что десантный челнок (`beachhead.landed`), а флот
+  // свободен. Прежде десант дрался ИЗ ТРЮМА, и флот был заперт в наземном бою до конца.
   const defended = (planet.garrison ?? []).some((s) => s.count > 0);
-  if (defended) {
+  if (joined || defended) {
     if (!(fleet.landing ?? []).some((s) => s.count > 0)) {
       return 'E_NO_TROOPS'; // a defended world needs a landing force
     }
-    startBattle(h, {
-      id: `battle:${h.state.battleSeq++}`,
-      location: at,
-      phase: 'ground',
-      sides: [
-        { ref: { kind: 'landing', fleetId: fleet.id }, owner: fleet.owner, role: 'attacker' },
-        { ref: { kind: 'garrison', planetId: at }, owner: planet.owner, role: 'defender' },
-      ],
-      round: 0,
-    });
+    beginAssaultLanding(h, fleet, at);
     return null;
   }
   capturePlanet(h, at, fleet.id, planet.owner, false); // undefended → occupy
   return null;
+}
+
+/** Стоит ли на узле `at` враждебный `fleet` флот с кораблями — хоть свободный, хоть в бою. */
+function hostileFleetAt(h: HandlerContext, fleet: Fleet, at: string): boolean {
+  for (const id of Object.keys(h.state.fleets)) {
+    const f = h.state.fleets[id];
+    if (!f || f.id === fleet.id || f.location !== at) continue;
+    if (f.units.some((s) => s.count > 0) && isHostile(h, fleet.owner, f.owner)) return true;
+  }
+  return false;
+}
+
+/** Начать высадку штурмом: флот встаёт на срок, по сроку `assault.landed` ставит десант
+ *  плацдармом. Срок — событием таймлайна, а не счётом тиков: иначе момент высадки зависел
+ *  бы от шага `advanceTo` (детерминизм, как у погрузки). */
+function beginAssaultLanding(h: HandlerContext, fleet: Fleet, planetId: string): void {
+  const doneAt = h.ctx.now + hoursToMs(h.ctx, ASSAULT_LANDING_HOURS);
+  fleet.assaultLanding = { planetId, startAt: h.ctx.now, doneAt };
+  h.schedule(doneAt, 'assault.landed', { fleetId: fleet.id });
+  h.emit('assault.landing', { fleetId: fleet.id, planetId, owner: fleet.owner, doneAt });
+}
+
+/** Сорвать высадки на узле `at`, над которыми появился враг: десант остаётся на борту,
+ *  флот свободен. Порядок обхода зафиксирован сортировкой (детерминизм). */
+function interruptLandingsAt(h: HandlerContext, at: string): void {
+  for (const id of Object.keys(h.state.fleets).sort()) {
+    const f = h.state.fleets[id];
+    if (!f?.assaultLanding || f.assaultLanding.planetId !== at) continue;
+    if (!hostileFleetAt(h, f, at)) continue;
+    delete f.assaultLanding;
+    h.emit('assault.interrupted', { fleetId: f.id, planetId: at, owner: f.owner });
+  }
+}
+
+/**
+ * Срок высадки вышел: десант ступает на землю. Условия проверяются ЗАНОВО — за полтора
+ * часа мир мог перейти к другому или стать союзным, над ним мог встать враг, а флот —
+ * ввязаться в бой. Не сошлось — высадка снимается, десант на борту: терять нечего, он всё
+ * это время был в трюме.
+ */
+function landAssault(h: HandlerContext, fleet: Fleet): void {
+  const claim = fleet.assaultLanding;
+  if (!claim || claim.doneAt > h.ctx.now) return; // не этот срок
+  delete fleet.assaultLanding;
+  const planet = h.state.planets[claim.planetId];
+  const troops = (fleet.landing ?? []).filter((s) => s.count > 0);
+  if (!planet || fleet.location !== planet.id || fleet.movement || fleet.battleId) return;
+  if (troops.length === 0 || !isCapturable(h.ctx.data, planet)) return;
+  if (planet.owner === fleet.owner) return;
+  if (planet.owner !== null && !isHostile(h, fleet.owner, planet.owner)) return;
+  if (hostileFleetAt(h, fleet, planet.id)) return;
+  fleet.landing = [];
+  const defended = planet.garrison.some((s) => s.count > 0);
+  const fighting = Object.values(h.state.battles).some(
+    (b) => b.phase === 'ground' && b.location === planet.id,
+  );
+  h.emit('assault.ashore', { fleetId: fleet.id, planetId: planet.id, owner: fleet.owner });
+  if (!defended && !fighting) {
+    // Гарнизон пал, пока шла высадка, — мир берут те, кто на земле.
+    capturePlanetByBeachhead(h, planet, { owner: fleet.owner, units: troops }, planet.owner);
+  } else {
+    const own = (planet.beachheads ?? []).find((b) => b.owner === fleet.owner);
+    if (own) own.units.push(...troops);
+    else (planet.beachheads ??= []).push({ owner: fleet.owner, units: troops });
+    h.emit('beachhead.landed', { planetId: planet.id, owner: fleet.owner });
+  }
+  // Флот без кораблей держался только десантом в трюме; десант сошёл — флота больше нет.
+  removeIfWiped(h, fleet.id);
 }
 
 function capturePlanet(
@@ -875,9 +929,10 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  * (admiral / tactic / bombardment), carrying `phase` in its args. EVERY firing channel
  * uses it (CORE-DMG-1): the melee round here, planetary AA and bombardment in
  * `orbital`, point-defense in `shuttle` — so a
- * technology bonus or faction passive reaches all of them alike. Only `phase: 'ground'`
- * opens the defender-side mitigations (fort, standing buildings, planet type), so the
- * other channels are scaled by the attacker's bonuses and nothing else. A new firing
+ * technology bonus or faction passive reaches all of them alike. The world's cover
+ * (standing buildings, FORT-5.15) opens on `phase: 'ground'` and `'bombard'`, the planet
+ * type on `'ground'` alone; the one fleet with cover of its own — a space fortress's guns
+ * — is named by `defenderFleet`, whatever the phase. A new firing
  * channel that skips the hook is a bug, and `damageHookScope.test.ts` fails on it.
  * Deaths publish `unit.died`; outcomes publish `battle.resolved` and
  * `planet.captured`.
@@ -920,6 +975,7 @@ function groundVolleys(
       attacker: side.owner,
       defender: target.owner,
       ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
+      ...(target.ref.kind === 'fleet' ? { defenderFleet: target.ref.fleetId } : {}),
     });
     const running = incoming.get(target);
     incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));
@@ -941,7 +997,8 @@ function groundVolleys(
 export const combatModule: GameModule = {
   id: 'combat',
   // 3.0.0: личные часы атакующих; защита отвечает на полученные залпы.
-  version: '3.0.0',
+  // 3.1.0: штурм — высадка по таймеру, потом плацдарм; флот свободен (MSB-9).
+  version: '3.1.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -1134,6 +1191,13 @@ export const combatModule: GameModule = {
         // неуместна.
         if (left.length < 2) finishBattle(h, battle, 'ceasefire');
       }
+    });
+
+    api.on('assault.landed', (event, h) => {
+      const { fleetId } = event.payload as { fleetId?: unknown };
+      if (typeof fleetId !== 'string') return; // malformed → no-op (fail-secure)
+      const fleet = h.state.fleets[fleetId];
+      if (fleet) landAssault(h, fleet);
     });
 
     api.on('beachhead.landed', (event, h) => {
@@ -1421,6 +1485,8 @@ export const combatModule: GameModule = {
             // без `attackerFleet` — ауры и пассивы героя усиливают флоты, не гарнизоны,
             // и это правило ближнего боя здесь ровно то же, что было.
             ...(side.ref.kind === 'fleet' ? { attackerFleet: side.ref.fleetId } : {}),
+            // Зеркально — КОГО бьют: прикрытие бывает у одного флота (орудия крепости).
+            ...(target.ref.kind === 'fleet' ? { defenderFleet: target.ref.fleetId } : {}),
           });
           const running = incoming.get(target);
           incoming.set(target, running === undefined ? dealt : addHooked(running, dealt));

@@ -23,8 +23,12 @@ export const RECAP_POLICY: Readonly<Record<string, RecapPolicy>> = {
   'building.upgraded': 'own',
   'unit.built': 'own',
   'army.load.cancelled': 'own',
+  'army.unload.cancelled': 'own',
   'building.destroyed': 'seen',
   'fleet.launched': 'seen',
+  // MSB-9: высадка на мир — событие КАРТЫ: защитнику это повод привести флот и сорвать её.
+  'assault.landing': 'seen',
+  'assault.interrupted': 'seen',
 };
 
 /**

@@ -18,7 +18,10 @@
  * that read live match state come out of `createDossiers(host)`.
  */
 import {
+  BASE_BUILDING_DEFENSE,
+  MITIGATION_CAP,
   buildingLevel,
+  buildingMaxLevel,
   thresholdRamp,
   signatureSize,
   unitTier,
@@ -71,6 +74,16 @@ export interface DossierHost {
   progressPct(active: ActiveBuild): number;
 }
 
+/** Доля защиты мира без знака («45%»): текст сам говорит, что урон МЕНЬШЕ. */
+const share = (n: number): string => `${Math.round(n * 100)}%`;
+/** Доли крепости по уровням из данных — «15/30/45%». */
+function fortShares(): string {
+  const fort = data.buildings.fort;
+  if (!fort) return '';
+  const levels = Array.from({ length: buildingMaxLevel(fort) }, (_, i) => buildingLevel(fort, i + 1));
+  return `${levels.map((lv) => Math.round(lv.defenseBonus * 100)).join('/')}%`;
+}
+
 export function buildingDossier(id: string, level: number): Dossier | null {
   const def = data.buildings[id];
   if (!def) return null;
@@ -103,7 +116,12 @@ export function buildingDossier(id: string, level: number): Dossier | null {
     case 'fort':
       return {
         name,
-        body: t('dossier.building.fort', { d: hl(pct(lv.defenseBonus ?? 0)), hp: hl(lv.hp) }),
+        body: t('dossier.building.fort', {
+          d: hl(share(lv.defenseBonus ?? 0)),
+          hp: hl(lv.hp),
+          b: hl(share(BASE_BUILDING_DEFENSE)),
+          cap: hl(share(MITIGATION_CAP)),
+        }),
       };
     case 'starfort':
       return {
@@ -112,7 +130,7 @@ export function buildingDossier(id: string, level: number): Dossier | null {
           hp: hl(lv.hp),
           aa: hl(lv.aaDamage ?? 0),
           pd: hl(lv.pointDefense ?? 0),
-          d: hl(pct(lv.defenseBonus ?? 0)),
+          d: hl(share(lv.defenseBonus ?? 0)),
         }),
       };
     case 'orbital_aa':
@@ -504,6 +522,20 @@ export function createDossiers(host: DossierHost): {
         body: t('dossier.tab.buildings.desc'),
       };
     }
+    if (key.startsWith('fact:')) {
+      // Фишки шапки мира (UIX-14.1): на ПК досье приходит наведением, на телефоне — тапом.
+      // Защита построек в шапке — иконка с числом (заказ владельца 2026-09-29: «оставить
+      // только иконку, и когда топаешь на него, выводит более подробную информацию»), а её
+      // правило — то же досье, что у характеристики `stat:mitigation`.
+      if (key === 'fact:cover') return objDossier('stat:mitigation');
+      const FACT_DOSSIER: Record<string, [string, string]> = {
+        capital: [t('side.world.capital'), t('side.world.capital.note')],
+        vp: [t('side.world.vp'), ''],
+        output: [t('side.world.output'), ''],
+      };
+      const d = FACT_DOSSIER[key.slice(5)];
+      return d ? { name: d[0], body: d[1] } : null;
+    }
     if (key.startsWith('stat:')) {
       // TXT-3: тело есть только у характеристики, которая несёт СВОЁ правило (лимит
       // залпа, бесплатная регенерация щита, починка корпуса, «в гарнизоне, не на
@@ -522,10 +554,16 @@ export function createDossiers(host: DossierHost): {
         hull: [t('dossier.stat.hull.name'), t('dossier.stat.hull.desc')],
         shield: [t('dossier.stat.shield.name'), t('dossier.stat.shield.desc')],
         spd: [t('dossier.stat.spd.name'), t('dossier.stat.spd.desc')],
-        garrison: [t('dossier.stat.garrison.name'), ''],
-        ground: [t('dossier.stat.ground.name'), ''],
-        gships: [t('dossier.stat.gships.name'), t('dossier.stat.gships.desc')],
-        pbuild: [t('dossier.stat.pbuild.name'), ''],
+        // Защита построек мира: правило неочевидно (доли складываются, у крепости своя,
+        // снесённая не прикрывает), поэтому тело есть. Числа — из данных, не из текста.
+        mitigation: [
+          t('dossier.stat.mitigation.name'),
+          t('dossier.stat.mitigation.desc', {
+            f: fortShares(),
+            b: share(BASE_BUILDING_DEFENSE),
+            cap: share(MITIGATION_CAP),
+          }),
+        ],
         datk: [t('dossier.stat.datk.name'), ''],
         ddef: [t('dossier.stat.ddef.name'), ''],
         dhp: [t('dossier.stat.dhp.name'), ''],
@@ -582,9 +620,9 @@ export function createDossiers(host: DossierHost): {
       if (prod) rows.push(cxRow(t('codex.row.produces'), prod));
       const keep = resLine(lv.upkeep ?? {}, { per: 'h' });
       if (keep) rows.push(cxRow(t('codex.row.upkeep'), keep));
-      if ((lv.defenseBonus ?? 0) > 0.01)
+      if ((lv.defenseBonus ?? 0) > BASE_BUILDING_DEFENSE)
         rows.push(
-          cxRow(t('codex.row.garrison-defense'), `+${Math.round((lv.defenseBonus ?? 0) * 100)}%`),
+          cxRow(t('codex.row.world-mitigation'), `−${Math.round((lv.defenseBonus ?? 0) * 100)}%`),
         );
       if ((lv.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), String(lv.aaDamage)));
       if ((lv.radarRange ?? 0) > 0) {

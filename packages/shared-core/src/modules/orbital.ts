@@ -9,7 +9,14 @@ import { requireOwnedIdleFleet } from '../util/fleet';
 import { isActivelyBombarding } from '../state/orbit';
 import { hasOrbit } from '../state/sectorKind';
 import { BLACKOUT_MULT } from '../state/visibility';
-import { applyDamageToSide, hookedDamage, isHostile, removeIfWiped } from '../util/combat';
+import {
+  applyDamageToSide,
+  hookedDamage,
+  isHostile,
+  mitigationFactor,
+  removeIfWiped,
+  type DamageHookArgs,
+} from '../util/combat';
 import { splitVolley } from '../util/volley';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
@@ -178,6 +185,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
               attacker: planet.owner,
               defender: target.owner,
               // `attackerFleet` нет намеренно: стреляет МИР. Ауры героя — бонус флотам.
+              defenderFleet: target.id,
             });
             // Announce BEFORE applying: the client draws the flak burst planet→fleet
             // even when this very volley destroys the target (H2 — visible AA fire).
@@ -225,18 +233,25 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
             // обстрел уезжает по шине, а `construction` уже сам стачивает им постройки.
             // Тип в payload события не уедет (по шине идёт JSON), поэтому шов тут
             // остаётся явным и держится тестом `damageHookScope.test.ts` (CORE-DMG-2).
-            const shelling = hookedDamage(h, power, {
+            const hit: DamageHookArgs = {
               phase: 'bombard',
               location: planetId,
               attacker: f.owner,
               defender: planet.owner,
               attackerFleet: f.id, // обстрел ведёт флот на орбите (CORE-DMG-3)
-            });
+            };
+            const shelling = hookedDamage(h, power, hit);
+            // `hit` и `factor` — чем этот обстрел срезан: постройки, которые он снесёт,
+            // перестают прикрывать мир для остатка того же урона, и `construction`
+            // пересчитывает его по ходу (FORT-5.15, замечание Codex на #1389). Без этого
+            // весь отрезок шёл бы под прикрытием его начала.
             h.emit('planet.bombarded', {
               planetId,
               power: shelling,
               owner: planet.owner,
               by: f.owner,
+              hit,
+              factor: mitigationFactor(h, hit),
             });
           }
         }
@@ -256,7 +271,8 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
  */
 export const orbitalModule: GameModule = {
   id: 'orbital',
-  version: '1.0.0',
+  // 1.1.0: обстрел сообщает, каким прикрытием он срезан (`hit` + `factor`, FORT-5.16).
+  version: '1.1.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this

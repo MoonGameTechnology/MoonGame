@@ -42,9 +42,13 @@ describe('YAG-1.2a — разметка геймплея не может раз�
 
   it('YAG-6.2: «геймплей идёт» = забег идёт И мир не стоит — и это видит каждый кадр', () => {
     // Темп мира меняют больше десятка мест; дверь зовётся из кадра при смене ответа, иначе
-    // пауза или выход в меню оставили бы индикатор площадки зелёным.
-    expect(fnBody('markGameplay')).toContain('const playing = sectorRunActive && speed > 0;');
-    expect(SRC).toContain('if (gameplayMarked !== (sectorRunActive && speed > 0)) markGameplay();');
+    // пауза, чтение комикса или выход в меню оставили бы индикатор площадки зелёным.
+    expect(fnBody('markGameplay')).toContain(
+      'const playing = sectorRunActive && speed > 0 && !comicQueue.isBusy();',
+    );
+    expect(SRC).toContain(
+      'if (gameplayMarked !== (sectorRunActive && speed > 0 && !comicQueue.isBusy())) markGameplay();',
+    );
     expect(fnBody('runPauseEvent')).toContain('markGameplay()');
   });
 

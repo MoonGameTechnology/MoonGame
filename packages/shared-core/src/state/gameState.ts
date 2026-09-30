@@ -456,6 +456,10 @@ export interface Planet {
    *  прибытие флота игрока устанавливает связь (`rendezvousModule`). Не снимается после
    *  контакта — факт живёт в `missionFacts.contacted`. */
   rendezvous?: PlayerId;
+  /** Флоты карты, которые ждут здесь прибытия своего владельца (`joinsOnArrival`): первое
+   *  прибытие его флота с живым кораблём переносит их в `GameState.fleets` под их же id
+   *  (`missionFactsModule`). Пусто — поля нет. */
+  awaitingFleets?: Fleet[];
   /** Чем узел был ДО того, как его превратили в космическую крепость (`station.deploy`
    *  затирает `kind`). Гибель крепости возвращает узел к этому виду, иначе разрушенная
    *  крепость навсегда стирала бы то, что под ней стояло: астероидное поле не выдумать
@@ -636,6 +640,33 @@ export interface LoadingClaim {
   doneAt: number;
 }
 
+/** Выгрузка десанта на свой или союзный мир (решение владельца 2026-09-26: «на союзном или
+ *  своём мире — одинаково с погрузкой по времени»). Зеркало {@link LoadingClaim}: войска
+ *  ЕЩЁ НА БОРТУ, пока срок не вышел, и улёт флота отменяет выгрузку. */
+export interface UnloadingClaim {
+  unit: string;
+  count: number;
+  /** Мир, на который высаживаются. Выгрузка завершается, только пока флот стоит ТАМ. */
+  to: PlanetId;
+  /** Мировое время (мс) начала — клиент рисует по нему заполнение. */
+  startAt: number;
+  /** Мировое время (мс) конца выгрузки. */
+  doneAt: number;
+}
+
+/** Высадка штурмом на чужой мир (решение владельца 2026-09-26: «штурм не запирает флот —
+ *  только на таймер высадки»). Пока она идёт, флот стоит на орбите и приказов не берёт;
+ *  по сроку десант становится плацдармом, а флот свободен. Прилёт вражеского флота
+ *  высадку прерывает — десант остаётся на борту. */
+export interface AssaultLanding {
+  /** Мир, на который высаживаются. */
+  planetId: PlanetId;
+  /** Мировое время (мс) начала высадки. */
+  startAt: number;
+  /** Мировое время (мс), когда десант ступит на землю. */
+  doneAt: number;
+}
+
 export interface Fleet {
   id: FleetId;
   owner: PlayerId;
@@ -655,6 +686,11 @@ export interface Fleet {
    *  but they are promised to this fleet and become `landing` when the hour is up.
    *  Absent/empty = nothing being winched aboard. */
   loading?: LoadingClaim[];
+  /** Выгрузки на свой/союзный мир в работе ({@link UnloadingClaim}). Пусто/нет — никто не
+   *  сходит на берег. */
+  unloading?: UnloadingClaim[];
+  /** Идущая высадка штурмом ({@link AssaultLanding}); нет — флот не высаживается. */
+  assaultLanding?: AssaultLanding;
   /** Standing "merge into that fleet once we are together" (MRG-1). Set when
    *  `fleet.merge` is ordered while this fleet is already FLYING to the target's
    *  node: the order then waits in the world instead of in a client's memory, and

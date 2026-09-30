@@ -42,13 +42,20 @@ describe('Chapter I: liberate Echo from the Covenant of Unity', () => {
     }, ctx(0));
     if (!assault.ok) throw new Error(assault.code);
     state = assault.state;
-    expect(Object.values(state.battles).some((b) => b.location === 'home_b' && b.phase === 'ground')).toBe(true);
+    // MSB-9: штурм сначала высаживает десант по таймеру; бой с гарнизоном — уже на земле.
+    expect(state.fleets.p1_1!.assaultLanding).toMatchObject({ planetId: 'home_b' });
+    let fought = false;
     for (let hour = 1; hour <= 48 && state.planets.home_b!.owner !== 'p1'; hour++) {
       const step = kernel.advanceTo(state, ctx(hour * 3_600_000));
       if (!step.ok) throw new Error(step.code);
       expect(step.failures).toEqual([]);
+      fought ||= step.events.some(
+        (e) => e.type === 'battle.started' && (e.payload as { location?: string; phase?: string }).location === 'home_b'
+          && (e.payload as { phase?: string }).phase === 'ground',
+      );
       state = step.state;
     }
+    expect(fought).toBe(true); // гарнизон пришлось разбить, а не просто занять орбиту
     expect(state.planets.home_b!.owner).toBe('p1');
     expect(objectiveProgress(objective(), state, 'p1')).toMatchObject({ complete: true, reward: 3 });
     expect(missionTargets(objective(), state, 'p1')).toEqual([]);

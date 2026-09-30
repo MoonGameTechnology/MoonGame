@@ -1291,11 +1291,35 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .ptitle{flex:1 1 auto;min-width:0;}
 .ptitle b{display:block;color:#eafffb;font-size:15px;font-weight:700;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ptitle span{color:var(--cyan-dim);font-size:10px;letter-spacing:1px;}
+/* Крестик карточки — как у всех окон (.tw-close, .dp-close, .mk-close…): закрыть окно —
+   не опасное действие, и красный здесь спорил с красным опасности (заказ владельца
+   2026-09-29: «кнопки где-то красные, где-то не красные»). */
 .pclose{flex:0 0 auto;width:24px;height:24px;cursor:pointer;font-size:11px;border-radius:7px;
-  background:transparent;border:1px solid #7a221c;color:var(--red);}
+  background:transparent;border:1px solid var(--line);color:var(--dim);}
+.pclose:hover{color:var(--ink);border-color:var(--line-hi);}
+/* Очки победы мира — в шапке рядом с именем (заказ владельца 2026-09-29). */
+.pbadge{flex:none;padding:3px 8px;border:1px solid var(--line);border-radius:4px;font-size:12px;
+  color:var(--ink);background:rgba(53,214,230,.06);white-space:nowrap;}
 .pstats{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 4px;}
 .pstats span{background:rgba(53,214,230,.06);border:1px solid var(--line);padding:4px 9px;font-size:11px;color:var(--ink);}
 .effects{display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 4px;}
+/* Шапка мира (переработка окна мира, 2026-09-29): под именем — факты о мире и действия с
+   ним. Фишка — СВОЙСТВО или СОСТОЯНИЕ мира, а не счётчик: состав считают вкладки. */
+.pfacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 6px;}
+.pfact{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--line);border-radius:4px;
+  background:rgba(53,214,230,.06);font-size:11px;line-height:1.35;color:var(--ink);white-space:nowrap;}
+.pfact.good{color:var(--grn);border-color:var(--grn-dim);}
+.pfact.bad{color:var(--red);border-color:currentColor;}
+.pfact.cyan{color:var(--cyan);}
+.pfact i{font-style:normal;}
+.pfact i.up{color:var(--up);}
+.pfact i.dn{color:var(--dn);}
+.pacts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:auto;}
+/* Выход мира — «/ч» один раз, в конце строки, а не у каждого ресурса. */
+.pfact .rcost:not(:last-child) .rc-per{display:none;}
+/* Липкие вкладки заходят вверх на 13px (чтобы закрыть отступ листа при прокрутке) и под
+   шапкой мира наезжали бы на её последнюю строку. */
+.pfacts + .ptabs{margin-top:0;}
 .effect-tag{background:rgba(53,214,230,.04);border:1px solid var(--line-hi);padding:3px 8px;font-size:10px;color:var(--cyan-dim);border-radius:3px;white-space:nowrap;}
 .ptabs{display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap;
   position:sticky;top:-13px;z-index:5;padding-top:13px;margin-top:-13px;

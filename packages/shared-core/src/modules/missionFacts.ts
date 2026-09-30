@@ -16,6 +16,10 @@
  *    с признаком `haven` (убежище), высаживает юниты с признаком `evacuee`: они уходят
  *    из флота в счёт игрока. Опустевший флот удаляется.
  *
+ * Ещё модуль выпускает в игру флоты, которые карта держит ждущими (`joinsOnArrival`,
+ * `Planet.awaitingFleets`): транспорты беженцев появляются, когда флот игрока ПРИБЫЛ к
+ * ним с живым кораблём (заказ владельца 2026-09-29), а не с первой секунды забега.
+ *
  * Модуль ничего не знает о задачах: он пишет общие факты, а какая задача их читает,
  * решают данные карты. Нет задач — факты копятся и никому не мешают (правило «нет
  * модуля → база, а не падение» здесь в обратную сторону: нет читателя → нет эффекта).
@@ -33,9 +37,32 @@ function facts(h: HandlerContext): MissionFacts {
   return (h.state.missionFacts ??= {});
 }
 
+/** Ждущие флоты владельца прибывшего флота входят в игру под своими id. Курс, пролёт,
+ *  десант без корабля и чужой флот их не выпускают. */
+function releaseAwaiting(h: HandlerContext, fleetId: string, at: string): void {
+  const fleet = h.state.fleets[fleetId];
+  const planet = h.state.planets[at];
+  if (!fleet || !planet?.awaitingFleets || fleet.location !== at || fleet.movement) return;
+  const alive = fleet.units.some(
+    (u) => u.count > 0 && (u.hp ?? 1) > 0 && h.ctx.data.units[u.unit]?.domain === 'space',
+  );
+  if (!alive) return;
+  const joining = planet.awaitingFleets.filter((f) => f.owner === fleet.owner);
+  if (joining.length === 0) return;
+  const rest = planet.awaitingFleets.filter((f) => f.owner !== fleet.owner);
+  if (rest.length > 0) planet.awaitingFleets = rest;
+  else delete planet.awaitingFleets;
+  for (const f of joining) {
+    // Id занят (невозможно для карты, но не повод затереть чужой флот) — ждущий не входит.
+    if (h.state.fleets[f.id]) continue;
+    h.state.fleets[f.id] = { ...f, location: at, movement: null };
+    h.emit('fleet.joined', { owner: f.owner, fleetId: f.id, at });
+  }
+}
+
 export const missionFactsModule: GameModule = {
   id: 'missionFacts',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.on('planet.captured', (event, h) => {
       const p = event.payload as { planetId?: unknown; owner?: unknown; from?: unknown };
@@ -57,6 +84,7 @@ export const missionFactsModule: GameModule = {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
       if (typeof p.fleetId !== 'string' || typeof p.at !== 'string') return;
+      releaseAwaiting(h, p.fleetId, p.at);
       const fleet = h.state.fleets[p.fleetId];
       const planet = h.state.planets[p.at];
       if (!fleet || !planet || planet.owner !== fleet.owner) return;

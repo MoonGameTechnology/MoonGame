@@ -191,7 +191,7 @@
     },
     "buildTimeHours": 4,
     "hp": 40,
-    "defenseBonus": 0.3,
+    "defenseBonus": 0.15,
     "scoreValue": 5,
     "upgrades": [
       {
@@ -201,7 +201,7 @@
         },
         "buildTimeHours": 6,
         "hp": 60,
-        "defenseBonus": 0.45,
+        "defenseBonus": 0.3,
         "pointDefense": 12,
         "issuesGarrison": 2
       },
@@ -212,7 +212,7 @@
         },
         "buildTimeHours": 8,
         "hp": 85,
-        "defenseBonus": 0.6,
+        "defenseBonus": 0.45,
         "pointDefense": 16,
         "issuesGarrison": 3
       }

@@ -9,6 +9,7 @@ import {
   planetSummary,
 } from './planetSummary';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
+import { worldDamageReduction } from '../../packages/shared-core/src/index';
 import type { Fleet, Planet, UnitStack } from '../../packages/shared-core/src/index';
 
 const s = newGame();
@@ -209,5 +210,20 @@ describe('сводка мира — флоты на орбите', () => {
 
   it('пустая орбита — нули, а не отсутствие', () => {
     expect(planetSummary(p, data, []).orbit).toEqual({ fleets: 0, ships: 0 });
+  });
+});
+
+describe('сводка мира — защита построек', () => {
+  // Число сводки — то же, что срезает бой (`worldDamageReduction` ядра), а не своя формула.
+  it('доля защиты мира — из ядра: форт III и мина → 50%, пустой мир — 0', () => {
+    const built = planet({
+      buildings: [
+        { type: 'fort', level: 3, hp: 85 },
+        { type: 'mine', level: 1, hp: 20 },
+      ],
+    });
+    expect(planetSummary(built, data, []).mitigation).toBeCloseTo(0.5);
+    expect(planetSummary(built, data, []).mitigation).toBe(worldDamageReduction(built, data));
+    expect(planetSummary(planet(), data, []).mitigation).toBe(0);
   });
 });

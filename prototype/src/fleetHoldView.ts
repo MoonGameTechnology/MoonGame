@@ -28,10 +28,18 @@ export function fleetHoldsHtml(meters: readonly FleetHold[]): string {
               p: Math.floor(m.loadingProgress * 100),
             })
           : '';
+      // Выгрузка по таймеру (MSB-9): войска ещё в трюме, строка говорит, что они сходят.
+      const unloading =
+        m.unloading > 0
+          ? t('cargo.meter.unloading', {
+              n: number(m.unloading),
+              p: Math.floor(m.unloadingProgress * 100),
+            })
+          : '';
       return `<div class="holdmeter${m.over > 0 ? ' over' : ''}" style="--hold-color:${color(m)}">
       <div class="holdmeter-head"><span>${icon(m)} ${esc(label(m))}</span><b>${number(m.used)} / ${number(m.capacity)}</b></div>
       <div class="holdmeter-track" aria-hidden="true"><i style="width:${m.usedFraction * 100}%"></i><i class="reserved" style="width:${m.reservedFraction * 100}%"></i></div>
-      <div class="holdmeter-note"><span>${esc(status)}</span>${loading ? `<span class="holdmeter-loading">${esc(loading)}</span>` : ''}</div>
+      <div class="holdmeter-note"><span>${esc(status)}</span>${loading ? `<span class="holdmeter-loading">${esc(loading)}</span>` : ''}${unloading ? `<span class="holdmeter-loading">${esc(unloading)}</span>` : ''}</div>
     </div>`;
     })
     .join('')}</div>`;
