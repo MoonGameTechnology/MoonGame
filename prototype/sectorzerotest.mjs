@@ -307,13 +307,13 @@ try {
     await page.locator('#sz-route [data-lost]').first().click({ force: true });
     assert.equal(await page.locator('#sz-route [aria-pressed="true"]').getAttribute('data-mission'), '0');
     assert.notEqual(await page.locator('#sz-chapter-stats').textContent(), null);
-    // PVR-7.6: дверь главы IV — узел выбирается, у главы своя мозаика и восемь задач, а
-    // героя-награды нет (§6.7: награда главы — по экономике, не герой).
+    // PVR-7.6: дверь главы IV — узел выбирается, у главы своя мозаика и двенадцать задач
+    // (PVR-7.7), а героя-награды нет (§6.7: награда главы — по экономике, не герой).
     await page.locator('#sz-mission-3').click();
     assert.equal(await page.locator('#sz-mission-3').getAttribute('aria-pressed'), 'true');
     await page.locator('#sz-map-panel').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('#sz-map-body polygon').count(), 40, 'мозаика главы IV');
-    assert.match(await page.locator('#sz-chapter-stats').textContent(), /8/, 'задачи главы IV');
+    assert.equal(await page.locator('#sz-map-body polygon').count(), 51, 'мозаика главы IV');
+    assert.match(await page.locator('#sz-chapter-stats').textContent(), /12/, 'задачи главы IV');
     assert.equal(await page.locator('#sz-chapter-hero').isVisible(), false, 'у главы IV нет героя-награды');
     await page.locator('#sz-mission-1').click();
     assert.equal(await page.locator('#sz-mission-1').getAttribute('aria-pressed'), 'true');
