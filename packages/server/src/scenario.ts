@@ -226,7 +226,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '58'; // FORT-6.1: крепость на развилке. Членство и
+export const MODULE_MANIFEST_VERSION = '59'; // SM-3.6: мина — неподвижный отряд. Членство и
+// порядок не тронуты; `minefield` 2.0.0 ставит мину отрядом во `fleets` (юнит `mine`) и
+// подрывает её при встрече вплотную, флот летит дальше; `combat` 3.3.0 не заводит бой с миной,
+// `intercept` 1.3.0 не сводит стоящую мину со стоящим флотом, `fleet-ops` 1.4.0 — «Атака» по
+// мине = подрыв, `capture-on-arrival` 0.3.0 и `victory` 1.5.0 мину не считают. Из
+// `state.minefields` ушли поля — партия на 58 не знает мин-отрядов.
+// export const MODULE_MANIFEST_VERSION = '58'; // FORT-6.1: крепость на развилке. Членство и
 // порядок не тронуты; `station` 1.3.0 ставит крепость на развилку дороги (`station.deploy`
 // с `trail`), у провинции-площадки новое поле `Planet.fork`; `victory` 1.4.0 и `pve` 1.7.0
 // не считают площадку территорией, `hero` 4.5.0 не поднимает на ней корабль. Партия на 57

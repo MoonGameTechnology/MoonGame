@@ -1,9 +1,11 @@
 /**
- * МИННЫЙ ЗАГРАДИТЕЛЬ (SM-3.4, `ship-modules-roadmap.md` фаза 3).
+ * МИННЫЙ ЗАГРАДИТЕЛЬ (SM-3.4) И МИНА — НЕПОДВИЖНЫЙ ОТРЯД (SM-3.6).
  *
- * Поставить поле может свой стоящий флот с заградителем. Враждебный флот на входе
- * (конечная точка или транзит) теряет долю текущего корпуса каждого стека, поле тратит
- * заряд. Поле видит только владелец. Без мин всё идёт бит-в-бит как прежде.
+ * Поставить мину может свой стоящий флот с заградителем; через 15 минут она встаёт
+ * отрядом (`fleets`) с юнитом `mine`, в стеке — заряды. Враждебный флот, сошедшийся с ней
+ * вплотную (узел, дорога, приказ «Атака»), теряет долю текущего корпуса каждого
+ * космического стека и летит дальше; мина тратит заряд. Чужую мину видно только вблизи.
+ * Без мин всё идёт бит-в-бит как прежде.
  */
 import { describe, expect, it } from 'vitest';
 import { createKernel } from '../kernel/kernel';
@@ -17,16 +19,24 @@ import {
 import { createInitialState, type Fleet, type GameState, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
 import { deepFreeze } from '../util/clone';
-import { visibleState } from '../state/visibility';
+import { isVisibleTo, visibleState } from '../state/visibility';
 import type { Action, ApplyResult, Context, DomainEvent } from '../action/types';
 import { movementModule } from './movement';
-import { fieldRoadT, MINE_SIGNATURE } from '../state/minefields';
+import { interceptModule } from './intercept';
+import { isMineFleet, MINE_SIGNATURE } from '../state/minefields';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['metal'],
   units: {
     ship: { faction: 'x', stats: { attack: 5, defense: 5, speed: 5, hp: 10, shield: 4 } },
+    trooper: { faction: 'x', domain: 'ground', stats: { attack: 2, defense: 2, speed: 0, hp: 5 } },
+    mine: {
+      faction: 'neutral',
+      stats: { attack: 0, defense: 0, speed: 0, hp: 20 },
+      signature: 0.1,
+      traits: ['immobile', 'issued', 'mine'],
+    },
   },
   modules: {
     mine_layer: {
@@ -41,6 +51,7 @@ const data: GameData = parseGameData({
       tag: 'vertical',
       effects: { stats: { mineCharge: 5, mineHit: 0.4 } },
     },
+    armor: { name: 'Armor', slot: 'defense', tag: 'vertical', effects: { stats: { hp: 5 } } },
   },
   factions: {},
   buildings: {},
@@ -76,10 +87,10 @@ function fleet(
 }
 function world(fleets: Fleet[]): GameState {
   const s = createInitialState({ seed: 'sm34', version: { data: '0.1.0', manifest: '1' } });
-  const node = (id: string) => ({
+  const node = (id: string, x: number) => ({
     id,
     owner: null,
-    position: { x: 0, y: 0 },
+    position: { x, y: 0 },
     resources: {},
     buildings: [],
     garrison: [],
@@ -88,9 +99,10 @@ function world(fleets: Fleet[]): GameState {
   return {
     ...s,
     players: { p1: player('p1'), p2: player('p2') },
-    planets: { N: node('N'), M: node('M') },
+    planets: { N: node('N', 0), M: node('M', 100) },
     fleets: Object.fromEntries(fleets.map((f) => [f.id, f])),
     battles: {},
+    diplomacy: { 'p1|p2': 'war' },
   };
 }
 
@@ -104,7 +116,7 @@ const emitter: GameModule = {
     });
   },
 };
-const kernel = createKernel([movementModule, minefieldModule, emitter]);
+const kernel = createKernel([movementModule, interceptModule, minefieldModule, emitter]);
 const ok = (r: ApplyResult): ApplyResult & { ok: true } => {
   if (!r.ok) throw new Error(`apply failed: ${r.code}`);
   return r;
@@ -116,84 +128,94 @@ const lay = (fleetId: string, playerId = 'p1'): Action => ({
   payload: { fleetId },
   issuedAt: 0,
 });
+const mineOf = (s: GameState, owner = 'p1'): Fleet | undefined =>
+  Object.values(s.fleets).find((f) => f.owner === owner && isMineFleet(f, data));
+const charges = (f: Fleet | undefined): number => (f?.units ?? []).reduce((n, st) => n + st.count, 0);
+function advance(s: GameState, now: number) {
+  const r = kernel.advanceTo(s, ctx(now));
+  if (!r.ok) throw new Error(r.code);
+  expect(r.failures).toEqual([]);
+  return r.state;
+}
 
-describe('ordinary mines on roads', () => {
+describe('SM-3.6 — мина на дороге: отряд, встреча вплотную, флот летит дальше', () => {
   function road() {
     const layer = fleet('L', 'p1', null, 1, ['mine_layer']);
     layer.edge = { from: 'N', to: 'M', t: 0.5 };
     const s = world([layer, fleet('E', 'p2', 'N')]);
-    s.planets.N!.links = ['M']; s.planets.M!.links = ['N']; s.planets.M!.position.x = 100;
+    s.planets.N!.links = ['M']; s.planets.M!.links = ['N'];
     return s;
-  }
-  function advance(s: GameState, now: number) {
-    const r = kernel.advanceTo(s, ctx(now));
-    if (!r.ok) throw new Error(r.code);
-    expect(r.failures).toEqual([]);
-    return r.state;
   }
   function move(s: GameState, fleetId: string, to: string) {
     return ok(kernel.applyAction(s, { id: 'move', playerId: s.fleets[fleetId]!.owner,
       type: 'fleet.move', payload: { fleetId, to }, issuedAt: s.time }, ctx(s.time))).state;
   }
-  it('takes time, remains stationary on the road, and triggers at an exact crossing once', () => {
-    const initial = road();
-    const laying = ok(kernel.applyAction(deepFreeze(initial), lay('L'), ctx(0))).state;
-    expect(advance(laying, HOUR / 4 - 1).minefields!.fields).toEqual({});
+  it('встаёт через 15 минут отрядом в точке дороги и подрывает встречного один раз', () => {
+    const laying = ok(kernel.applyAction(deepFreeze(road()), lay('L'), ctx(0))).state;
+    expect(mineOf(advance(laying, HOUR / 4 - 1))).toBeUndefined();
     const armed = advance(laying, HOUR / 4);
-    expect(armed.minefields!.fields['road:50:0']!.p1!.position).toEqual({ x: 50, y: 0 });
+    const mine = mineOf(armed)!;
+    expect(mine).toMatchObject({ location: null, edge: { from: 'N', to: 'M', t: 0.5 }, movement: null });
+    expect(mine.units).toEqual([{ unit: 'mine', count: 3, modules: ['mine_layer'] }]);
     const moving = move(armed, 'E', 'M');
-    const crossing = moving.scheduled.find((e) => e.type === 'mines.crossed')!;
-    expect(crossing).toBeDefined();
-    expect(advance(moving, crossing.at - 1).fleets.E!.units[0]!.hp).toBeUndefined();
-    const hit = advance(moving, crossing.at);
+    const meet = moving.scheduled.find((e) => e.type === 'fleet.intercept')!;
+    expect(meet).toBeDefined();
+    expect(advance(moving, meet.at - 1).fleets.E!.units[0]!.hp).toBeUndefined();
+    const hit = advance(moving, meet.at);
     expect(hit.fleets.E!.units[0]!.hp).toBe(80);
-    expect(hit.minefields!.fields['road:50:0']!.p1!.charge).toBe(2);
-    expect(advance(hit, moving.fleets.E!.movement!.arrivesAt).fleets.E!.units[0]!.hp).toBe(80);
-    expect(advance(JSON.parse(JSON.stringify(moving)), crossing.at)).toEqual(hit);
-  });
-  it('hits once when a leg ends at the mine and does not hit again on departure', () => {
-    const armed = advance(ok(kernel.applyAction(road(), lay('L'), ctx(0))).state, HOUR / 4);
-    const moving = ok(kernel.applyAction(armed, { id: 'park', playerId: 'p2', type: 'fleet.move',
-      payload: { fleetId: 'E', toEdge: { from: 'N', to: 'M', t: 0.5 } }, issuedAt: armed.time }, ctx(armed.time))).state;
-    const arrived = advance(moving, moving.fleets.E!.movement!.arrivesAt);
-    expect(arrived.fleets.E!.movement).toBeNull();
+    expect(charges(mineOf(hit))).toBe(2);
+    expect(hit.fleets.E!.movement).not.toBeNull(); // летит дальше: ловушка, а не стена
+    const arrived = advance(hit, moving.fleets.E!.movement!.arrivesAt);
+    expect(arrived.fleets.E!.location).toBe('M');
     expect(arrived.fleets.E!.units[0]!.hp).toBe(80);
-    expect(arrived.minefields!.fields['road:50:0']!.p1!.charge).toBe(2);
-    const leaving = move(arrived, 'E', 'M');
-    expect(advance(leaving, leaving.fleets.E!.movement!.arrivesAt).fleets.E!.units[0]!.hp).toBe(80);
+    expect(advance(JSON.parse(JSON.stringify(moving)), meet.at)).toEqual(hit);
   });
-  it('moving the carrier cancels installation, and changing the target route invalidates a crossing', () => {
+  it('флот, вставший на мину, подрывается один раз и не повторно при отъезде', () => {
+    const armed = advance(ok(kernel.applyAction(road(), lay('L'), ctx(0))).state, HOUR / 4);
+    const parking = ok(kernel.applyAction(armed, { id: 'park', playerId: 'p2', type: 'fleet.move',
+      payload: { fleetId: 'E', toEdge: { from: 'N', to: 'M', t: 0.5 } }, issuedAt: armed.time }, ctx(armed.time))).state;
+    const parked = advance(parking, parking.fleets.E!.movement!.arrivesAt);
+    expect(parked.fleets.E!.movement).toBeNull();
+    expect(parked.fleets.E!.units[0]!.hp).toBe(80);
+    expect(charges(mineOf(parked))).toBe(2);
+    const leaving = move(parked, 'E', 'M');
+    const gone = advance(leaving, leaving.fleets.E!.movement!.arrivesAt);
+    expect(gone.fleets.E!.units[0]!.hp).toBe(80);
+    expect(charges(mineOf(gone))).toBe(2);
+  });
+  it('движение носителя отменяет установку; сменивший курс флот мину не цепляет', () => {
     const laying = ok(kernel.applyAction(road(), lay('L'), ctx(0))).state;
-    expect(advance(move(laying, 'L', 'M'), HOUR / 4).minefields!.fields).toEqual({});
+    expect(mineOf(advance(move(laying, 'L', 'M'), HOUR / 4))).toBeUndefined();
     const armed = advance(laying, HOUR / 4);
     const moving = move(armed, 'E', 'M');
-    const at = moving.scheduled.find((e) => e.type === 'mines.crossed')!.at;
-    const stopped = ok(kernel.applyAction(moving, { id: 'stop', type: 'fleet.stop', playerId: 'p2', payload: { fleetId: 'E' }, issuedAt: moving.time }, ctx(moving.time))).state;
+    const at = moving.scheduled.find((e) => e.type === 'fleet.intercept')!.at;
+    const stopped = ok(kernel.applyAction(moving, { id: 'stop', type: 'fleet.stop', playerId: 'p2',
+      payload: { fleetId: 'E' }, issuedAt: moving.time }, ctx(moving.time))).state;
     expect(advance(stopped, at).fleets.E!.units[0]!.hp).toBeUndefined();
   });
-  it('requires the fitted module throughout installation and cannot bypass cooldown using another carrier', () => {
+  it('заградитель нужен до конца установки; перезарядку не обойти другим носителем', () => {
     const laying = ok(kernel.applyAction(road(), lay('L'), ctx(0))).state;
     laying.fleets.other = { ...structuredClone(laying.fleets.L!), id: 'other' };
     expect(kernel.applyAction(laying, lay('other'), ctx(0))).toMatchObject({ code: 'E_MINES_COOLDOWN' });
     laying.fleets.L!.units[0]!.modules = [];
-    expect(advance(laying, HOUR / 4).minefields!.fields).toEqual({});
+    expect(mineOf(advance(laying, HOUR / 4))).toBeUndefined();
   });
-  it('keeps hidden crossing timers and installations out of the target projection', () => {
+  it('чужой не видит ни установки, ни мины издалека; вблизи видит мину отрядом', () => {
     const laying = ok(kernel.applyAction(road(), lay('L'), ctx(0))).state;
     expect(visibleState(laying, 'p2', data).minefields).toBeUndefined();
-    const moving = move(advance(laying, HOUR / 4), 'E', 'M');
-    const view = visibleState(moving, 'p2', data);
-    expect(view.minefields).toBeUndefined();
-    expect(view.scheduled.some((e) => e.type === 'mines.crossed')).toBe(false);
+    const armed = advance(laying, HOUR / 4);
+    const mineId = mineOf(armed)!.id;
+    expect(visibleState(armed, 'p2', data).fleets[mineId]).toBeUndefined();
+    expect(isVisibleTo(armed, 'p2', { fleetId: mineId }, data)).toBe(false);
+    expect(visibleState(armed, 'p1', data).fleets[mineId]).toBeDefined();
+    armed.fleets.E!.location = null;
+    armed.fleets.E!.edge = { from: 'N', to: 'M', t: 0.4 }; // 10 от мины
+    expect(visibleState(armed, 'p2', data).fleets[mineId]?.units).toEqual(mineOf(armed)!.units);
+    expect(isVisibleTo(armed, 'p2', { fleetId: mineId }, data)).toBe(true);
     expect(MINE_SIGNATURE).toBeLessThan(data.units.ship!.signature);
   });
-  it('uses road geometry in either direction, including shared trunks', () => {
-    const s = road();
-    expect(fieldRoadT(s, 'N', 'M', { x: 25, y: 0 })).toBe(0.25);
-    expect(fieldRoadT(s, 'M', 'N', { x: 25, y: 0 })).toBe(0.75);
-    expect(fieldRoadT(s, 'N', 'M', { x: 25, y: 20 })).toBeNull();
-  });
 });
+
 const enter = (fleetId: string, at: string, type = 'fleet.arrived'): Action => ({
   id: `e:${fleetId}:${at}`,
   type: 'emit',
@@ -202,28 +224,27 @@ const enter = (fleetId: string, at: string, type = 'fleet.arrived'): Action => (
   issuedAt: 0,
 });
 
-/** Мир, где флот L игрока p1 уже поставил поле на N. */
+/** Мир, где флот L игрока p1 уже поставил мину на N. */
 function mined(extra: Fleet[] = [], modules = ['mine_layer']): GameState {
   const laid = ok(kernel.applyAction(world([fleet('L', 'p1', 'N', 1, modules), ...extra]), lay('L'), ctx(0))).state;
-  const armed = kernel.advanceTo(laid, ctx(HOUR / 4));
-  if (!armed.ok) throw new Error(armed.code);
-  return armed.state;
+  return advance(laid, HOUR / 4);
 }
 
-describe('SM-3.4 — минный заградитель', () => {
-  it('поставить: поле владельца на узле флота, заряд и доля из модуля', () => {
-    const r = ok(
-      kernel.applyAction(
-        deepFreeze(world([fleet('L', 'p1', 'N', 1, ['mine_layer'])])),
-        lay('L'),
-        ctx(0),
-      ),
-    );
-    expect(r.state.minefields?.fields).toEqual({});
-    expect(r.state.minefields?.installations?.L?.field).toMatchObject({ charge: 3, hit: 0.2 });
-    expect(mined().minefields?.fields.N?.p1).toMatchObject({ charge: 3, hit: 0.2 });
+describe('SM-3.4 / SM-3.6 — мина на узле', () => {
+  it('поставить: отряд владельца на узле, заряды и боевая часть из модуля', () => {
+    const r = ok(kernel.applyAction(deepFreeze(world([fleet('L', 'p1', 'N', 1, ['mine_layer'])])), lay('L'), ctx(0)));
+    expect(r.state.minefields?.installations?.L).toMatchObject({
+      location: 'N',
+      stack: { unit: 'mine', count: 3, modules: ['mine_layer'] },
+    });
+    expect(mineOf(mined())).toMatchObject({ location: 'N', units: [{ unit: 'mine', count: 3 }] });
     expect(r.state.minefields?.readyAt['L']).toBe(MINE_COOLDOWN_HOURS * HOUR);
     expect(r.events.map((e) => e.type)).toContain('mines.installing');
+  });
+
+  it('мине передаётся только боевая часть: прочие модули носителя остаются на нём', () => {
+    const s = mined([], ['mine_layer', 'armor']);
+    expect(mineOf(s)!.units[0]!.modules).toEqual(['mine_layer']);
   });
 
   it('без заградителя — отказ', () => {
@@ -248,42 +269,37 @@ describe('SM-3.4 — минный заградитель', () => {
     }
   });
 
-  it('перезарядка: вторая постановка раньше срока — отказ, после срока — заряд копится до потолка', () => {
+  it('перезарядка: раньше срока — отказ, после срока заряды копятся в той же мине до потолка', () => {
     const s = mined([], ['mine_layer_heavy']);
     const early = kernel.applyAction(s, lay('L'), ctx(HOUR));
     expect(early.ok ? 'ok' : early.code).toBe('E_MINES_COOLDOWN');
     const later = ok(kernel.applyAction(s, lay('L'), ctx(MINE_COOLDOWN_HOURS * HOUR))).state;
-    const ready = kernel.advanceTo(later, ctx((MINE_COOLDOWN_HOURS + 0.25) * HOUR));
-    if (!ready.ok) throw new Error(ready.code);
-    expect(ready.state.minefields?.fields['N']?.['p1']?.charge).toBe(MINEFIELD_MAX_CHARGE);
+    const ready = advance(later, (MINE_COOLDOWN_HOURS + 0.25) * HOUR);
+    const mines = Object.values(ready.fleets).filter((f) => isMineFleet(f, data));
+    expect(mines).toHaveLength(1);
+    expect(charges(mines[0])).toBe(MINEFIELD_MAX_CHARGE);
   });
 
-  it('враг на входе теряет долю корпуса, поле тратит заряд', () => {
-    const s = mined([fleet('E', 'p2', 'M')]);
+  it('враг на входе теряет долю корпуса кораблей, мина тратит заряд; десант в трюме цел', () => {
+    const e = fleet('E', 'p2', 'M');
+    e.landing = [{ unit: 'trooper', count: 4 }];
+    const s = mined([e]);
     const r = ok(kernel.applyAction(s, enter('E', 'N'), ctx(HOUR / 4)));
     const stack = r.state.fleets['E']!.units[0]!;
     expect(stack.hp).toBeCloseTo(80); // 0.8 × пул 100
     expect(stack.count).toBe(8);
-    expect(r.state.minefields?.fields['N']?.['p1']?.charge).toBe(2);
-    const died = r.events.find((e) => e.type === 'unit.died');
-    expect(died?.payload).toMatchObject({
-      unit: 'ship',
-      count: 2,
-      owner: 'p2',
-      killedBy: 'p1',
-      at: 'N',
+    expect(r.state.fleets['E']!.landing).toEqual([{ unit: 'trooper', count: 4 }]);
+    expect(charges(mineOf(r.state))).toBe(2);
+    expect(r.events.find((e) => e.type === 'unit.died')?.payload).toMatchObject({
+      unit: 'ship', count: 2, owner: 'p2', killedBy: 'p1', at: 'N',
     });
     expect(r.events.find((e) => e.type === 'mines.triggered')?.payload).toMatchObject({
-      owner: 'p2',
-      by: ['p1'],
-      lost: 2,
+      owner: 'p2', by: ['p1'], lost: 2,
     });
   });
 
-  it('транзит через узел поле не проскакивает', () => {
-    const r = ok(
-      kernel.applyAction(mined([fleet('E', 'p2', 'M')]), enter('E', 'N', 'fleet.transit'), ctx(HOUR / 4)),
-    );
+  it('транзит через узел мину не проскакивает', () => {
+    const r = ok(kernel.applyAction(mined([fleet('E', 'p2', 'M')]), enter('E', 'N', 'fleet.transit'), ctx(HOUR / 4)));
     expect(r.state.fleets['E']!.units[0]!.hp).toBeCloseTo(80);
   });
 
@@ -294,17 +310,24 @@ describe('SM-3.4 — минный заградитель', () => {
     expect(r.state.fleets['E']!.units[0]!.shieldHp).toBe(32); // 8 кораблей × 4
   });
 
-  it('свой флот поле не трогает', () => {
+  it('свой флот мина не трогает', () => {
     const r = ok(kernel.applyAction(mined([fleet('F', 'p1', 'M')]), enter('F', 'N'), ctx(HOUR / 4)));
     expect(r.state.fleets['F']!.units[0]!.hp).toBeUndefined();
-    expect(r.state.minefields?.fields['N']?.['p1']?.charge).toBe(3);
+    expect(charges(mineOf(r.state))).toBe(3);
   });
 
-  it('заряд кончается — поле снимается, следующий вход бесплатен', () => {
+  it('заряды кончились — отряд мины снимается, следующий вход бесплатен', () => {
     let s = mined([fleet('E', 'p2', 'M')]);
-    for (let i = 0; i < 3; i++)
-      s = ok(kernel.applyAction(s, { ...enter('E', 'N'), id: `e${i}` }, ctx(HOUR / 4))).state;
-    expect(s.minefields?.fields['N']).toBeUndefined();
+    const id = mineOf(s)!.id;
+    const removed: DomainEvent[] = [];
+    for (let i = 0; i < 3; i++) {
+      const r = ok(kernel.applyAction(s, { ...enter('E', 'N'), id: `e${i}` }, ctx(HOUR / 4)));
+      removed.push(...r.events.filter((e) => e.type === 'fleet.destroyed'));
+      s = r.state;
+    }
+    expect(mineOf(s)).toBeUndefined();
+    // Израсходованная мина — не потеря: пометка `spent` не даёт журналу объявить её гибель.
+    expect(removed.map((e) => e.payload)).toEqual([{ fleetId: id, owner: 'p1', spent: true }]);
     const before = s.fleets['E']!.units[0]!.hp;
     s = ok(kernel.applyAction(s, { ...enter('E', 'N'), id: 'e-last' }, ctx(HOUR / 4))).state;
     expect(s.fleets['E']!.units[0]!.hp).toBe(before);
@@ -317,12 +340,13 @@ describe('SM-3.4 — минный заградитель', () => {
     expect(MINE_HIT_MAX).toBeLessThan(1);
   });
 
-  it('поле видно владельцу и приблизившемуся флоту', () => {
+  it('мина видна владельцу и приблизившемуся флоту, издалека — нет', () => {
     const s = mined([fleet('E', 'p2', 'N')]);
-    expect(visibleState(s, 'p1', data).minefields?.fields['N']?.['p1']).toBeDefined();
-    expect(visibleState(s, 'p2', data).minefields?.fields.N?.p1).toBeDefined();
-    s.fleets.E!.location = 'M'; s.planets.M!.position.x = 100;
-    expect(visibleState(s, 'p2', data).minefields).toBeUndefined();
+    const id = mineOf(s)!.id;
+    expect(visibleState(s, 'p1', data).fleets[id]).toBeDefined();
+    expect(visibleState(s, 'p2', data).fleets[id]).toBeDefined();
+    s.fleets.E!.location = 'M';
+    expect(visibleState(s, 'p2', data).fleets[id]).toBeUndefined();
   });
 
   it('без мин вход на узел ничего не меняет', () => {
