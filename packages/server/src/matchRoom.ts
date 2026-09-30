@@ -21,6 +21,7 @@ import {
   visibleView,
 } from '@void/shared-core';
 import type { AcceptedAction, ActionGate } from '@void/action-layer';
+import type { ClientPerfMessage } from '@void/protocol';
 import {
   parseClientMessage,
   serializeServerMessage,
@@ -271,9 +272,10 @@ export type RoomObservation =
    *  this record is the log half (the doc's desync-rate target is 0). */
   | { kind: 'desync'; playerId: PlayerId; atSeq: number; clientHash: string }
   /** A client perf sample (M2): smoothed fps + round-trip + JS-heap as the player's
-   *  device experiences the match. Rate-limited at the room (floods are dropped
-   *  silently — telemetry, not a conversation); values already range-checked at parse. */
-  | { kind: 'client_perf'; playerId: PlayerId; fps: number; rttMs?: number; memMb?: number }
+   *  device experiences the match, plus its long frames and their worst main-thread block
+   *  since the previous sample. Rate-limited at the room (floods are dropped silently —
+   *  telemetry, not a conversation); values already range-checked at parse. */
+  | ({ kind: 'client_perf'; playerId: PlayerId } & Omit<ClientPerfMessage, 'type'>)
   /** Hourly per-player economy snapshot (ECON-6): treasury, net hourly income and
    *  arrears at world instant `atTime`. Emitted by the HOST's wake driver (the room
    *  itself never produces it) — the type lives in the union so every observer
@@ -983,13 +985,10 @@ export class MatchRoom {
       const last = this.lastPerfAt.get(playerId);
       if (last === undefined || wallNow - last >= PERF_SAMPLE_MIN_MS) {
         this.lastPerfAt.set(playerId, wallNow);
-        this.observe?.({
-          kind: 'client_perf',
-          playerId,
-          fps: message.fps,
-          ...(message.rttMs !== undefined ? { rttMs: message.rttMs } : {}),
-          ...(message.memMb !== undefined ? { memMb: message.memMb } : {}),
-        });
+        // The parse built the message from validated fields only, so the rest carries no
+        // unchecked or undefined key into the metrics stream.
+        const { type: _type, ...sample } = message;
+        this.observe?.({ kind: 'client_perf', playerId, ...sample });
       }
       return;
     }

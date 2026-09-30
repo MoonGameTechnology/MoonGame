@@ -593,6 +593,57 @@ describe('MatchRoom — M1 observations (events / broadcast / timing / desync)',
       { kind: 'client_perf', playerId: 'p1', fps: 30 },
     ]);
   });
+
+  it('carries the long frames and the worst main-thread block through', async () => {
+    const { r, events, peers } = observed();
+    const [p1] = peers;
+    const sample = {
+      fps: 21,
+      longFrames: 204,
+      worstFrameMs: 133,
+      loafMs: 1024,
+      loafScriptMs: 1017,
+      loafLayoutMs: 4,
+      loafBy: 'FrameRequestCallback',
+    };
+    await r.receive('p1', p1, JSON.stringify({ type: 'perf', ...sample }));
+    expect(events.filter((e) => e.kind === 'client_perf')).toEqual([
+      { kind: 'client_perf', playerId: 'p1', ...sample },
+    ]);
+  });
+
+  it('drops a bad long-frame field alone, and never logs an unsafe invoker name', async () => {
+    const { r, events, peers } = observed();
+    const [p1] = peers;
+    await r.receive(
+      'p1',
+      p1,
+      JSON.stringify({
+        type: 'perf',
+        fps: 30,
+        longFrames: 2.5,
+        worstFrameMs: 120,
+        loafMs: -1,
+        loafScriptMs: 'x',
+        loafLayoutMs: 1e9,
+        loafBy: 'FrameRequestCallback\n{"kind":"forged"}',
+      }),
+    );
+    expect(events.filter((e) => e.kind === 'client_perf')).toEqual([
+      { kind: 'client_perf', playerId: 'p1', fps: 30, worstFrameMs: 120 },
+    ]);
+
+    const other = observed();
+    const [q1] = other.peers;
+    await other.r.receive(
+      'p1',
+      q1,
+      JSON.stringify({ type: 'perf', fps: 30, loafBy: 'a'.repeat(81), junk: 'kept?' }),
+    );
+    expect(other.events.filter((e) => e.kind === 'client_perf')).toEqual([
+      { kind: 'client_perf', playerId: 'p1', fps: 30 },
+    ]);
+  });
 });
 
 describe('MatchRoom — lobby gate (waitForPlayers)', () => {

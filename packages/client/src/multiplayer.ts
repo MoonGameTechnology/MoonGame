@@ -5,6 +5,7 @@ import { createActionEnvelope, type ActionEnvelope } from '@void/action-layer';
 import type {
   ChatChannel,
   ChatMessage as MultiplayerChatMessage,
+  ClientPerfMessage,
   Ping as MultiplayerPing,
   PingAnchor,
   PingKind,
@@ -350,10 +351,11 @@ export class MultiplayerClient {
     this.socket.send(JSON.stringify({ type: 'ping', clientTime }));
   }
 
-  /** Send a lightweight perf sample (M2): smoothed fps + optional rtt/mem. Pure
-   *  telemetry — the server observes it into the metrics stream (rate-limited) and
-   *  never answers. Dropped while disconnected (nothing to report a dead wire to). */
-  sendPerf(sample: { fps: number; rttMs?: number; memMb?: number }): void {
+  /** Send a lightweight perf sample (M2): smoothed fps + optional rtt/mem and long-frame
+   *  fields. Pure telemetry — the server observes it into the metrics stream
+   *  (rate-limited) and never answers. Dropped while disconnected (nothing to report a
+   *  dead wire to). */
+  sendPerf(sample: Omit<ClientPerfMessage, 'type'>): void {
     if (this.queueing) return;
     this.socket.send(JSON.stringify({ type: 'perf', ...sample }));
   }

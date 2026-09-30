@@ -741,4 +741,21 @@ describe('MultiplayerClient · perf sample (M2)', () => {
     client.sendPerf({ fps: 60 });
     expect(socket.sent).toEqual([]);
   });
+
+  it('sends the long-frame fields with it', () => {
+    const socket = new FakeSocket();
+    const client = new MultiplayerClient(socket);
+    client.open();
+    const sample = {
+      fps: 21,
+      longFrames: 204,
+      worstFrameMs: 133,
+      loafMs: 1024,
+      loafScriptMs: 1017,
+      loafLayoutMs: 4,
+      loafBy: 'FrameRequestCallback',
+    };
+    client.sendPerf(sample);
+    expect(JSON.parse(socket.sent[0] ?? '')).toEqual({ type: 'perf', ...sample });
+  });
 });

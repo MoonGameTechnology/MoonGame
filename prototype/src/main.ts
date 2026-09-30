@@ -955,6 +955,13 @@ import {
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { NET_VIEW_IDLE, netViewAt, netViewSnapshot } from '../../decisions/netViewClock';
 import {
+  FRAME_WINDOW_EMPTY,
+  countFrame,
+  framePerfFields,
+  noteBlock,
+  type LongFrameEntry,
+} from '../../decisions/frameTelemetry';
+import {
   SETTLE_MS,
   exactOffset,
   layerTransform,
@@ -1450,6 +1457,20 @@ let pingTimer: ReturnType<typeof setInterval> | null = null;
 // lands in the server's metrics stream (observe → JSONL/сводка), never answered.
 let perfTimer: ReturnType<typeof setInterval> | null = null;
 const PERF_SAMPLE_MS = 30_000;
+// Долгие кадры окна сэмпла (`frameTelemetry.ts`): интервалы копит `frame()`, самую долгую
+// блокировку главного потока — наблюдатель Long Animation Frames; сэмпл забирает окно.
+let frameWin = FRAME_WINDOW_EMPTY;
+// Long Animation Frames есть только в Chromium; где его нет, полей о блокировке в сэмпле нет.
+if (
+  typeof PerformanceObserver !== 'undefined' &&
+  (PerformanceObserver.supportedEntryTypes ?? []).includes('long-animation-frame')
+) {
+  new PerformanceObserver((list) => {
+    for (const e of list.getEntries() as unknown as LongFrameEntry[]) {
+      frameWin = noteBlock(frameWin, e);
+    }
+  }).observe({ type: 'long-animation-frame' });
+}
 let netDesync = false; // the last hash verdict was a mismatch (server vs our rebuild)
 let netDesyncCount = 0; // how many mismatches were caught this session (one per resync)
 // Auto-reconnect: on an UNEXPECTED drop (not a user action), rejoin our seat with
@@ -13670,9 +13691,11 @@ function netClientFor(seat: string): MultiplayerClient {
           if (pingTimer) clearInterval(pingTimer);
           pingTimer = setInterval(() => netClient?.ping(performance.now()), 2000);
           netClient?.ping(performance.now()); // seed an RTT reading immediately
-          // Perf sample (M2): smoothed fps + rtt + JS-heap (Chrome-only field),
-          // every 30s — cheap enough to never matter, useful on every playtest.
+          // Perf sample (M2): smoothed fps + rtt + JS-heap (Chrome-only field) + the
+          // window's long frames, every 30s — cheap enough to never matter, useful on
+          // every playtest. The window starts with the match, not with the hub before it.
           if (perfTimer) clearInterval(perfTimer);
+          frameWin = FRAME_WINDOW_EMPTY;
           perfTimer = setInterval(() => {
             const mem = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory
               ?.usedJSHeapSize;
@@ -13680,7 +13703,9 @@ function netClientFor(seat: string): MultiplayerClient {
               fps: Math.round(fpsEma),
               ...(rttEma !== null ? { rttMs: Math.round(rttEma) } : {}),
               ...(mem !== undefined ? { memMb: Math.round(mem / 1048576) } : {}),
+              ...framePerfFields(frameWin),
             });
+            frameWin = FRAME_WINDOW_EMPTY;
           }, PERF_SAMPLE_MS);
         }
         const diploShift = socketAdmitted && s !== snap.state && diffNetDiplomacy(s, snap.state);
@@ -16645,7 +16670,10 @@ function frame(nowReal: number) {
   lastReal = nowReal;
   // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
   // smooth FPS; ignore absurd gaps (tab backgrounded) so the readout stays sane
-  if (saneGap(dt)) fpsEma = fpsNext(fpsEma, dt);
+  if (saneGap(dt)) {
+    fpsEma = fpsNext(fpsEma, dt);
+    frameWin = countFrame(frameWin, dt);
+  }
   if (simRuns(NET, speed, !!banner || comicQueue.isBusy(), !!endScreen)) {
     // Local single-player sim. In net mode the server owns the clock, combat,
     // construction and every rival — a connected human, or the server-side AI for

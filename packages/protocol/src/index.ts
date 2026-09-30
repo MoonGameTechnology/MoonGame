@@ -246,6 +246,18 @@ export interface ClientPerfMessage {
   fps: number;
   rttMs?: number;
   memMb?: number;
+  /** Frames since the previous sample whose interval ran past 50 ms — a hitch the player
+   *  saw, which the smoothed `fps` hides. Absent when the window drew no frame at all. */
+  longFrames?: number;
+  /** The longest frame interval since the previous sample, ms. */
+  worstFrameMs?: number;
+  /** The longest Long Animation Frame since the previous sample (Chromium only): how long
+   *  the main thread was blocked, the script and the style/layout time inside it, and the
+   *  invoker of its longest script (`FrameRequestCallback`, `WebSocket.onmessage`…). */
+  loafMs?: number;
+  loafScriptMs?: number;
+  loafLayoutMs?: number;
+  loafBy?: string;
 }
 
 export type ClientMessage =
@@ -493,6 +505,17 @@ export function parseClientMessage(raw: string): ClientMessage | null {
     const message: ClientPerfMessage = { type: 'perf', fps: decoded.fps };
     if (inRange(decoded.rttMs, 120_000)) message.rttMs = decoded.rttMs;
     if (inRange(decoded.memMb, 1_000_000)) message.memMb = decoded.memMb;
+    if (inRange(decoded.longFrames, 100_000) && Number.isInteger(decoded.longFrames)) {
+      message.longFrames = decoded.longFrames;
+    }
+    if (inRange(decoded.worstFrameMs, 120_000)) message.worstFrameMs = decoded.worstFrameMs;
+    if (inRange(decoded.loafMs, 120_000)) message.loafMs = decoded.loafMs;
+    if (inRange(decoded.loafScriptMs, 120_000)) message.loafScriptMs = decoded.loafScriptMs;
+    if (inRange(decoded.loafLayoutMs, 120_000)) message.loafLayoutMs = decoded.loafLayoutMs;
+    // Printable ASCII only, bounded: the name lands verbatim in the metrics log.
+    if (typeof decoded.loafBy === 'string' && /^[\x20-\x7E]{1,80}$/.test(decoded.loafBy)) {
+      message.loafBy = decoded.loafBy;
+    }
     return message;
   }
   return null;

@@ -162,7 +162,10 @@ avg/p95/max в сценариях **idle / pan / zoom** (реальные pointe
 `continue-on-error`), `PERF_STRICT=1` — локальный гейт с exit 1; строка
 `PERF_JSON {...}` для трекинга трендов. Меряет main-thread (draw-вызовы — no-op
 прокси), не GPU. (2) ✅ клиентский перф-сэмпл: прототип раз в 30 с шлёт
-`{fps, rttMs, memMb}` (`MultiplayerClient.sendPerf`, сообщение `perf`) — сервер
+`{fps, rttMs, memMb}` и долгие кадры окна (`MultiplayerClient.sendPerf`, сообщение
+`perf`): `longFrames`/`worstFrameMs` по интервалам кадров (порог 50 мс, любой
+браузер) и худшую блокировку главного потока `loafMs`/`loafScriptMs`/`loafLayoutMs`/
+`loafBy` из Long Animation Frames (только Chromium; `decisions/frameTelemetry.ts`) — сервер
 только наблюдает (`client_perf` в observe-поток, per-player rate-limit 5 с,
 значения range-валидируются при parse — вне диапазона сообщение дропается / поле опускается, не клампится), агрегатор сводит fps avg/min + rtt avg/max в
 сводку плейтеста.
@@ -180,7 +183,7 @@ Postgres-стор — позже, со Stage 3 (см. `persistence-roadmap.md`).
 `pnpm run metrics [файл]` (`prototype/report.mjs`, по умолчанию — свежайший лог):
 длина матча + лобби, микс действий по типам/игрокам, реджекты по кодам, события,
 **контроль во времени** (таймлайн `planet.captured` — кто когда что взял), desync
-(с криком при ≠0), клиентские fps/rtt-сэмплы, латентности submit/advance/broadcast
+(с криком при ≠0), клиентские fps/rtt-сэмплы и долгие кадры, латентности submit/advance/broadcast
 и размер дельты из summary-строки (без неё — деградация с оговоркой), исход матча.
 **Готово, когда:** один матч → один отчёт одной командой. ✅
 
