@@ -19,6 +19,7 @@
  */
 
 import {
+  isForkSite,
   provinceScore,
   type GameData,
   type GameState,
@@ -55,7 +56,9 @@ export function scoreParts(state: GameState, data: GameData): Record<PlayerId, S
   for (const playerId of Object.keys(state.players)) out[playerId] = empty();
 
   for (const planet of Object.values(state.planets)) {
-    if (planet.owner === null) continue;
+    // Крепость на развилке — не территория (FORT-6.1): ядро её не считает (`victory.ts`),
+    // и разбор счёта обязан сойтись с итогом.
+    if (planet.owner === null || isForkSite(planet)) continue;
     const parts = out[planet.owner];
     if (!parts) continue;
     parts.planets += 1;

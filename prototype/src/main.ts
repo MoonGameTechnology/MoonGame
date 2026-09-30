@@ -1,4 +1,4 @@
-import { attackBattle, retreatBattle } from '../../decisions/actions';
+import { attackBattle, deployForkFortress, retreatBattle } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { visibleMinefields, fieldPosition } from '../../packages/shared-core/src/state/minefields';
 import { drawMineShape } from '../../packages/client/src/mineShape';
@@ -8,7 +8,7 @@ import { drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { rocketMinesUi } from './rocketMinesUi';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
-import { fleetBaseSpeed, fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
+import { fleetBaseSpeed, fleetNodeAt, forkSiteId, hashJson, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierBadge, swarmDossierHtml } from './swarmDossier';
@@ -308,7 +308,7 @@ import {
   type RunDifficulty,
 } from '../../decisions/runDifficulty';
 import { medalBadges } from '../../decisions/unitMedals';
-import { fortressRaise } from '../../decisions/fortressRaise';
+import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { engageForecastCard } from '../../decisions/engageForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
@@ -892,12 +892,14 @@ import {
   offerChoices,
   pickFleets,
   pickMode,
+  pickFork,
   pickWorld,
   pruneSelection,
   retreatAim,
   retreatMenu,
   selFleet,
   selFleets,
+  selFork,
   selPlanet,
   splitState,
   squadMerge,
@@ -1080,6 +1082,7 @@ import {
 } from './onboarding';
 import type {
   GameState,
+  BuildingInstance,
   Fleet,
   Hero,
   Battle,
@@ -2714,6 +2717,41 @@ function nearestLanePoint(
   return { from, to, t, x: at.x, y: at.y };
 }
 
+/** Крепость на развилке под пальцем (FORT-6.1): её площадки нет в `MAP` — она не узел
+ *  карты, — поэтому попадание ищется по состоянию. Только стоящая и видимая: пустая
+ *  площадка — это развилка, и тап по ней выбирает место, а не мир. */
+function forkFortressAt(mx: number, my: number, r: number): string | null {
+  let best: string | null = null;
+  let bestD = r * r;
+  for (const p of Object.values(s.planets)) {
+    if (!isForkSite(p) || p.owner === null || !(p.owner === ME || known(p.id))) continue;
+    const c = world(p.position);
+    const d = (c.x - mx) * (c.x - mx) + (c.y - my) * (c.y - my);
+    if (d <= bestD) {
+      bestD = d;
+      best = p.id;
+    }
+  }
+  return best;
+}
+
+/** Свободная развилка под пальцем — место, куда ставят крепость (FORT-6.1). Развилка с
+ *  крепостью сюда не попадает: тап по ней — выбор самой крепости (`forkFortressAt`). */
+function forkMarkAt(mx: number, my: number, r: number): ForkMark | null {
+  let best: ForkMark | null = null;
+  let bestD = r * r;
+  for (const m of roadDrawingOf(s).marks) {
+    if ((s.planets[forkSiteId(m.province, m.trail)]?.owner ?? null) !== null) continue;
+    const c = world(m.at);
+    const d = (c.x - mx) * (c.x - mx) + (c.y - my) * (c.y - my);
+    if (d <= bestD) {
+      bestD = d;
+      best = m;
+    }
+  }
+  return best;
+}
+
 /** For a march to a lane point: which endpoint the fleet routes through and the
  *  total ETA (node route + the partial leg into the lane), mirroring the kernel's
  *  cheaper-end choice. Used only for the move preview. */
@@ -2898,10 +2936,15 @@ function seesDetails(p: Planet): boolean {
 /** Имя места для игрока (PVR-6.19): у карт глав — имя провинции
  *  (`decisions/provinceName.ts`), у карт без имён — как было: id узла (подписи, журнал). */
 function placeName(id: string): string {
+  const fork = s.planets[id]?.fork;
+  if (fork) return t('place.fork-fortress', { planet: placeName(fork.province) });
   return provinceName(s.mapId, id) ?? id;
 }
-/** То же для окна боя и меток: у карт без имён — авто-имя (`planetName.ts`), как было. */
+/** То же для окна боя и меток: у карт без имён — авто-имя (`planetName.ts`), как было.
+ *  Крепость на развилке (FORT-6.1) — не провинция, и имя у неё по провинции её развилки. */
 function worldTitle(id: string): string {
+  const fork = s.planets[id]?.fork;
+  if (fork) return t('place.fork-fortress', { planet: worldTitle(fork.province) });
   return worldName(s.mapId, id);
 }
 
@@ -3119,7 +3162,9 @@ function maybeStartPendingTour(): void {
   requestAnimationFrame(run); // let the fresh HUD paint a frame so selectors resolve
 }
 const myScore = (): number => Math.round(s.match?.scores?.[ME]?.total ?? 0);
-const myWorldCount = (): number => Object.values(s.planets).filter((p) => p.owner === ME).length;
+// Крепость на развилке (FORT-6.1) — не мир: её постройка не «захват нового мира».
+const myWorldCount = (): number =>
+  Object.values(s.planets).filter((p) => p.owner === ME && !isForkSite(p)).length;
 // ONB-2: start a bot-free solo sandbox and arm the guided first match over its HUD.
 function startGuidedMatch(): void {
   setupMapId = 'nexus';
@@ -5734,6 +5779,60 @@ function render(now: number) {
     }
     cx.restore();
   }
+  /**
+   * Силуэт КРЕПОСТИ: прозрачный орбитальный каркас и — у крепости с ядром — корпус и
+   * полоса прочности ядра (FORT-5.2). Один рисунок на крепость на узле, пиратскую и
+   * нейтральную базы и крепость на развилке (FORT-6.1): крепость одна и та же, другое у
+   * неё только место, и вторая копия рисунка разошлась бы с первой на первой правке.
+   * Пиратская и нейтральная базы ядра не несут — полосы у них просто нет.
+   */
+  const drawStationArt = (
+    c: { x: number; y: number },
+    col: string,
+    buildings: readonly BuildingInstance[],
+    R: number,
+  ): void => {
+    cx.save();
+    cx.strokeStyle = rgba(col, 0.7);
+    cx.lineWidth = 0.85;
+    for (const offset of [-3 * ns, 3 * ns]) {
+      cx.beginPath();
+      cx.ellipse(c.x, c.y + offset, R, R * 0.45, 0, 0, TAU);
+      cx.stroke();
+    }
+    cx.beginPath();
+    for (const [dx, dy] of CARDINAL) {
+      const x = c.x + dx * R;
+      const y = c.y + dy * R * 0.45;
+      cx.moveTo(x, y - 3 * ns);
+      cx.lineTo(x, y + 3 * ns);
+      cx.moveTo(c.x, c.y);
+      cx.lineTo(c.x + dx * R * 1.2, c.y + dy * R * 0.6);
+    }
+    cx.moveTo(c.x, c.y - R);
+    cx.lineTo(c.x, c.y + R * 0.7);
+    cx.stroke();
+    poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
+    cx.stroke();
+    cx.restore();
+    const core = buildings.find((b) => b.type === 'starfort');
+    if (core) {
+      cx.save();
+      cx.strokeStyle = col;
+      cx.lineWidth = 1.6;
+      cx.shadowColor = col;
+      cx.shadowBlur = fxBlur(8);
+      cx.fillStyle = rgba(col, 0.24);
+      cx.translate(c.x - 12, c.y - 12);
+      drawShipShape(cx, 'station', detail > 0.5);
+      cx.restore();
+      const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+      cx.fillStyle = 'rgba(2,9,13,.7)';
+      cx.fillRect(c.x - 12, c.y - 22, 24, 3);
+      cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
+      cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+    }
+  };
   cx.save();
   cx.globalAlpha *= lod.art;
   if (lod.art > 0)
@@ -6106,51 +6205,7 @@ function render(now: number) {
       cx.fill();
       cx.restore();
     } else if (['void_station', 'pirate_base', 'neutral_base'].includes(n.sector)) {
-      // Station volume is a transparent orbital scaffold in the plotting plane.
-      cx.save();
-      cx.strokeStyle = rgba(col, 0.7);
-      cx.lineWidth = 0.85;
-      for (const offset of [-3 * ns, 3 * ns]) {
-        cx.beginPath();
-        cx.ellipse(c.x, c.y + offset, R, R * 0.45, 0, 0, TAU);
-        cx.stroke();
-      }
-      cx.beginPath();
-      for (const [dx, dy] of CARDINAL) {
-        const x = c.x + dx * R;
-        const y = c.y + dy * R * 0.45;
-        cx.moveTo(x, y - 3 * ns);
-        cx.lineTo(x, y + 3 * ns);
-        cx.moveTo(c.x, c.y);
-        cx.lineTo(c.x + dx * R * 1.2, c.y + dy * R * 0.6);
-      }
-      cx.moveTo(c.x, c.y - R);
-      cx.lineTo(c.x, c.y + R * 0.7);
-      cx.stroke();
-      poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
-      cx.stroke();
-      cx.restore();
-      // КОРПУС крепости — полоса прочности её ядра (FORT-5.2). Полоса и силуэт стояли в
-      // ветке астероида, пока крепостью было здание на астероидном поле; теперь крепость
-      // это сам узел, и её здоровье принадлежит сюда. Пиратская и нейтральная базы ядра
-      // не несут — у них полосы просто нет.
-      const core = p.buildings.find((b) => b.type === 'starfort');
-      if (core) {
-        cx.save();
-        cx.strokeStyle = col;
-        cx.lineWidth = 1.6;
-        cx.shadowColor = col;
-        cx.shadowBlur = fxBlur(8);
-        cx.fillStyle = rgba(col, 0.24);
-        cx.translate(c.x - 12, c.y - 12);
-        drawShipShape(cx, 'station', detail > 0.5);
-        cx.restore();
-        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
-        cx.fillStyle = 'rgba(2,9,13,.7)';
-        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
-        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
-        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
-      }
+      drawStationArt(c, col, p.buildings, R);
     } else {
       // Fallback for any other non-planet type: small hexagon marker
       const kc = sectorTypeOf(n.id)?.color ?? col;
@@ -6208,6 +6263,30 @@ function render(now: number) {
       cx.fillText(`G:${g}  B:${icons || '—'}`, c.x + R + 12, c.y + (isWorld ? 12 : 11));
     }
     cx.restore();
+  }
+
+  // FORT-6.1: крепости на РАЗВИЛКАХ. Их площадок нет в `MAP` — это не узлы карты, а
+  // сооружения на дороге, — поэтому они рисуются отдельным проходом по состоянию, тем же
+  // силуэтом, что крепость на узле, только меньше: она стоит на тропе, а не в центре мира.
+  // Чужая — только видимая: память о ней тумана не обходит (площадку зритель получает,
+  // лишь увидев её). Выбранная развилка без крепости — рамкой вокруг ромба.
+  if (lod.art > 0) {
+    for (const p of Object.values(s.planets)) {
+      if (!isForkSite(p) || p.owner === null || !(p.owner === ME || known(p.id))) continue;
+      const c = world(p.position);
+      if (!visible(c, 40)) continue;
+      drawStationArt(c, ownerColor(p.owner), p.buildings, R * 0.7);
+      if (selPlanet === p.id) targetBrackets(c.x, c.y, R, now);
+    }
+    if (selFork) {
+      const mark = roadDrawingOf(s).marks.find(
+        (m) => m.province === selFork!.province && m.trail === selFork!.trail,
+      );
+      if (mark) {
+        const c = world(mark.at);
+        targetBrackets(c.x, c.y, 10, now);
+      }
+    }
   }
 
   cx.restore();
@@ -7871,8 +7950,51 @@ function planetPanelHtml(p: Planet): string {
   return h + pcols(cols);
 }
 
+/**
+ * Карточка РАЗВИЛКИ (FORT-6.1): чья это тропа, куда она ведёт и можно ли поставить здесь
+ * крепость. Правило кнопки — `forkFortressRaise` (`decisions/fortressRaise.ts`), то же, что
+ * у ядра; здесь только отрисовка. Причины без кнопки и отказ технологии — теми же строками,
+ * что у крепости на узле: крепость одна и та же, другое у неё только место.
+ */
+function forkPanelHtml(fork: { province: string; trail: number }): string {
+  const province = s.planets[fork.province];
+  const exits = (province?.roads?.trails[fork.trail]?.exits ?? [])
+    .map((x) => `<b>${esc(placeName(x))}</b>`)
+    .join(', ');
+  let h =
+    cardHeader(ownerColor(province?.owner ?? null), `◇ ${t('side.fork.title')}`, placeName(fork.province)) +
+    `<div class="row">${t('side.fork.where', { exits })}</div>` +
+    `<div class="hint">${esc(t('side.fork.hint'))}</div>`;
+  const raise = forkFortressRaise(
+    province,
+    s.planets[forkSiteId(fork.province, fork.trail)],
+    ME,
+    s.players[ME]?.resources ?? {},
+    data,
+    s.players[ME]?.technologies?.completed ?? [],
+  );
+  if (raise.show) {
+    const off = raise.enabled ? '' : ' disabled';
+    h +=
+      `<button class="bw-open" data-act="forkfortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
+      ` <span class="dim">${resLine(raise.cost)}</span></button>`;
+    if (raise.blocked === 'tech') {
+      const names = raise.needs
+        .map((id) => `«${tData(data.technologies[id]?.name ?? id)}»`)
+        .join(t('side.fortress.or'));
+      h +=
+        `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
+        `<button class="bw-open" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+    }
+  } else if (raise.blocked === 'not-owned') {
+    h += `<div class="row dim">${esc(t('side.fork.not-owned'))}</div>`;
+  }
+  return h;
+}
+
 /** The side-panel dispatcher: task group → single fleet → unknown world → known world. */
 function panelHtml(): string {
+  if (selFork) return forkPanelHtml(selFork);
   // Приоритет претендентов и отсев мёртвых ссылок — в `panelSelect.ts` (REFM-39):
   // устаревший выбор флота проваливается на мир, а не запирает панель пустотой.
   const pick = pickPanel({ fleets: selFleets, fleet: panelFleet(), planet: selPlanet }, s, seesDetails);
@@ -7912,7 +8034,7 @@ function playerCardHtml(): string {
   const fdef = data.factions[fid];
   const bonus = factionBonusLine(fid);
   const faction = fdef ? `${tData(fdef.name)}${bonus ? ` · ${bonus}` : ''}` : fid || '—';
-  const worlds = Object.values(s.planets).filter((p) => p.owner === ME).length;
+  const worlds = Object.values(s.planets).filter((p) => p.owner === ME && !isForkSite(p)).length;
   // Total units you command: ships + carried troops across your fleets, plus every
   // garrison on your worlds.
   let units = 0;
@@ -8015,7 +8137,7 @@ function stanceRu(st: DiplomaticStance): string {
 
 function worldsOf(id: string): number {
   let n = 0;
-  for (const p of Object.values(s.planets)) if (p.owner === id) n++;
+  for (const p of Object.values(s.planets)) if (p.owner === id && !isForkSite(p)) n++;
   return n;
 }
 /** A seat the AI drives. Everyone else (ME, or another human in net play) is human —
@@ -9589,6 +9711,13 @@ side.addEventListener('click', (ev) => {
       buildWin.open(selPlanet, arg);
   } else if (act === 'fortress') {
     playerOrder(deployStation(ME, selPlanet!));
+  } else if (act === 'forkfortress') {
+    // Крепость на развилке (FORT-6.1): встала — выбираем её саму, как мир, чтобы сразу
+    // было видно ядро, постройки и кнопку стройки. Отказ оставляет карточку развилки.
+    const fork = selFork;
+    if (fork && playerOrder(deployForkFortress(ME, fork.province, fork.trail))) {
+      pickWorld(forkSiteId(fork.province, fork.trail));
+    }
   } else if (act === 'opentech') {
     techTree.open();
   } else if (act === 'build') {
@@ -10399,7 +10528,11 @@ function selectAt(mx: number, my: number) {
   // обычного тапа: приказы выше сохраняют свои прежние цели, флоты — приоритет ниже.
   buildStaticLayer();
   const provinceId = [...provincePolygons].find(([, poly]) => insideProvince(poly, mx, my))?.[0];
-  const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode)
+  // FORT-6.1: крепость на развилке не узел карты, но выбирается тапом как мир — прямым
+  // попаданием, раньше запасного выбора по площади провинции (развилка лежит внутри неё).
+  const direct = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  const fortress = direct ? null : forkFortressAt(mx, my, rNode);
+  const n = direct ?? (fortress ? { id: fortress } : undefined)
     ?? MAP.find((node) => node.id === provinceId);
   // Свои флоты под тапом, ближайший первым: и мобильной ветке (ей нужен только
   // первый), и перебору на ПК (ему нужны все).
@@ -10438,6 +10571,18 @@ function selectAt(mx: number, my: number) {
     selectionStarted = lastReal;
     invalidatePanel();
   };
+  // FORT-6.1: пустая развилка — МЕСТО, где можно поставить крепость (ромб на дороге). Флот
+  // на развилке (засада) и мир под пальцем важнее: их выбирают как прежде. Иначе тап по
+  // ромбу открывает карточку развилки, а не провинцию вокруг неё.
+  if (fleetIds.length === 0 && !direct && !fortress && !additive) {
+    const mark = forkMarkAt(mx, my, Math.max(12, rNode * 0.6));
+    if (mark) {
+      pickFork({ province: mark.province, trail: mark.trail });
+      selectionStarted = lastReal;
+      invalidatePanel();
+      return;
+    }
+  }
   if (!pcUi()) {
     // Phone: choose explicitly from overlapping objects. The legacy tablet keeps
     // the nearest tappable fleet, else the world, else clear. No invisible cycling.
