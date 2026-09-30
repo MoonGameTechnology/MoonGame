@@ -211,6 +211,10 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nex
   });
 }
 
+/** Militia holding each neutral planet at match start (BAL-10: two break the snowball's
+ *  free early grab, and more left ~half the planets neutral all match in self-play). */
+export const NEUTRAL_PLANET_MILITIA = 2;
+
 export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   const preset = mapPreset(setup.mapId);
   const seed = setup.seed ?? 'prototype-1';
@@ -233,7 +237,9 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       planetType: n.type,
       resources: {},
       buildings: [],
-      garrison: [],
+      // BAL-10 (2026-09-28): a neutral PLANET is held by a token militia, so it takes a
+      // landing, not a fly-by. Lesser provinces stay open for fleets alone.
+      garrison: n.sector === 'planet' ? [{ unit: 'militia', count: NEUTRAL_PLANET_MILITIA }] : [],
       traits: [],
     };
   }
