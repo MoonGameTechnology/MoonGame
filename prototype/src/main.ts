@@ -209,6 +209,8 @@ import {
   identifiedNodes,
   sensorCoverage,
   radarSignatures,
+  engagementOf,
+  type Engagement,
   type SignatureContact,
   sightCircles,
   sightRulesOf,
@@ -2762,6 +2764,8 @@ interface Vision {
   identify: Set<string>;
   radar: Set<string>;
   signatures: SignatureContact[];
+  /** Мои бои и флоты в них — видны, даже где узел не опознан (`engagementOf`). */
+  engaged: Engagement;
 }
 
 // --- espionage (SPY-1 in the prototype) ---------------------------------------
@@ -2819,14 +2823,31 @@ function computeVision(): Vision {
   const grants = myIntel();
   grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
   intelFleetOwners = targetsOf(grants, 'fleets');
-  return { identify, radar, signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify) };
+  return {
+    identify,
+    radar,
+    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify),
+    engaged: engagementOf(s, ME),
+  };
 }
 
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
  *  live `fleets` intel window covers its owner. */
 function fleetSeen(f: Fleet): boolean {
   // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
-  return fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+  return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
+}
+
+/** Опознан ли флот: стоит у опознанного узла ИЛИ дерётся в моём бою. Перехват на
+ *  полпути идёт вдали от миров — без второго условия флот вставал перед невидимым
+ *  врагом (владелец 2026-09-29). Правило то же, что у ядра, — `engagementOf`. */
+function fleetKnown(f: Fleet): boolean {
+  return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id);
+}
+
+/** Виден ли бой: его узел опознан ИЛИ в нём дерусь я (или мой блок зрения). */
+function battleKnown(b: Battle): boolean {
+  return known(b.location) || !!vision?.engaged.battles.has(b.id);
 }
 
 // Per-viewer MEMORY of the last identified state of a node (variant B): once you
@@ -4100,7 +4121,7 @@ function handleEvents(events: DomainEvent[]) {
         const ship = s.fleets[p.fleetId as string];
         const from = ship ? fleetPos(ship) : null;
         if (!ship || !from) break;
-        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), known(fleetNode(ship))))
+        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), fleetKnown(ship)))
           break;
         aaShots.push({
           from: { ...from },
@@ -4641,7 +4662,7 @@ function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
   const out: Array<EngageCandidate & { fleet: Fleet }> = [];
   for (const g of Object.values(s.fleets)) {
     if (g.owner === ME || sumUnits(g.units) <= 0) continue;
-    if (!fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner))) continue;
+    if (!fleetVisible(false, fleetKnown(g), intelFleetOwners.has(g.owner))) continue;
     const at = fleetAnchor(g);
     if (!at) continue;
     out.push({ id: g.id, location: g.location ?? null, x: at.x, y: at.y, ships: sumUnits(g.units), fleet: g });
@@ -5578,7 +5599,7 @@ function render(now: number) {
     // нет вовсе, а отсчёт живёт только по назначенному ядром раунду.
     const roundAt = typeof b.nextRoundAt === 'number' ? b.nextRoundAt : undefined;
     const mark = battleMark({
-      identified: known(b.location),
+      identified: battleKnown(b),
       hasPoint: !!anchor,
       detail,
       nextRoundAt: roundAt,
@@ -6899,7 +6920,7 @@ function fleetPanelHtml(f: Fleet): string {
   // Enemy fleet: show composition only if identified (known node). An
   // unidentified radar contact shows just the signature (ship count), not
   // the exact unit breakdown — fog of war hides the details.
-  const enemyKnown = f.owner === ME || known(fleetNode(f));
+  const enemyKnown = f.owner === ME || fleetKnown(f);
   if (enemyKnown) {
     h += nShips ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units) : '';
     if (nTr > 0)
@@ -8914,7 +8935,7 @@ function mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind
   if (!f) return false;
   if (order === 'merge') return f.owner === ME && !selectedFleetIds().includes(f.id);
   return order === 'engage' && f.owner !== ME && sumUnits(f.units) > 0 &&
-    fleetVisible(false, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+    fleetVisible(false, fleetKnown(f), intelFleetOwners.has(f.owner));
 }
 
 function mobileDraftPoint(): { x: number; y: number } | null {
@@ -8969,13 +8990,13 @@ function updateMobileHud(): void {
   if (!MOBILE) return;
   const fid = panelFleet();
   const f = fid ? s.fleets[fid] : null;
-  const inspectable = f && fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+  const inspectable = f && fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
   const key = selPlanet && s.planets[selPlanet] ? `planet:${selPlanet}` : inspectable ? `fleet:${fid}` : selectedFleetIds().join('|');
   const choices: MobileChoice[] = [];
   for (const pick of mobileChoices) {
     if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
-      if (!f || !fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner))) continue;
+      if (!f || !fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner))) continue;
       choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
     } else if (s.planets[pick.id]) {
       choices.push({ ...pick, title: worldTitle(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
@@ -10342,7 +10363,7 @@ function selectAt(mx: number, my: number) {
       return {
         id: b.id,
         at: anchor ? battleBadgePoint(world(anchor)) : null,
-        identified: known(b.location),
+        identified: battleKnown(b),
       };
     }),
     { x: mx, y: my },
@@ -10392,7 +10413,7 @@ function selectAt(mx: number, my: number) {
     Object.values(s.fleets).map((f) => ({
       id: f.id,
       mine: f.owner === ME,
-      visible: fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner)),
+      visible: fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner)),
       anchor: fleetAnchor(f),
     })),
     mx,
