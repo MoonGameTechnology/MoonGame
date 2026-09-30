@@ -6,7 +6,12 @@
  * Same REFM shape as the other screens: pure markup functions + `initResourceCard(host)`
  * takes its host dependencies explicitly.
  */
-import type { GameState } from '../../packages/shared-core/src/index';
+import {
+  type GameState,
+  sprawlFactor,
+  ownedProvinceCount,
+  SPRAWL_FREE,
+} from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { esc, flowPer, flowRate, resLine } from './format';
 import { incomeBreakdown } from './economy';
@@ -124,6 +129,14 @@ export function resourceCardHtml(
   };
   const netStr = (bd.net >= 0 ? '+' : '') + fmt(bd.net);
   const netCls = bd.net >= 0 ? 'pos' : 'neg';
+  // BAL-10: налог на рост державы уже вычтен из «Производства миров»; строка объясняет,
+  // почему доход ниже, и показывается только тем, кто его платит.
+  const provinces = ownedProvinceCount(state, me);
+  const sprawlPct = Math.round((1 - sprawlFactor(provinces)) * 100);
+  const sprawlNote =
+    sprawlPct > 0
+      ? `<div class="rc-note">${esc(t('rescard.sprawl', { p: sprawlPct, n: provinces, free: SPRAWL_FREE }))}</div>`
+      : '';
 
   return `<div class="rc-box">
     <div class="rc-head">
@@ -134,6 +147,7 @@ export function resourceCardHtml(
     ${inDeficit ? `<div style="color:#ff6b6b;font-size:12px;text-align:center;padding:4px 0">${esc(t('hud.deficit'))}</div>` : ''}
     <div class="rc-sec">${esc(t('rescard.income'))}</div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.production'))}</span><span class="rc-v pos">+${fmt(bd.production)}</span></div>
+    ${sprawlNote}
     <div class="rc-sec">${esc(t('rescard.expense'))}</div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.upkeep'))}</span><span class="rc-v neg">−${fmt(bd.buildingUpkeep)}</span></div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.army'))}</span><span class="rc-v neg">−${fmt(bd.unitUpkeep)}</span></div>

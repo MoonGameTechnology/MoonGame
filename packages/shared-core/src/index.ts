@@ -617,6 +617,13 @@ export {
 } from './modules/technology';
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
+export {
+  sprawlModule,
+  sprawlFactor,
+  ownedProvinceCount,
+  SPRAWL_FREE,
+  SPRAWL_RATE,
+} from './modules/sprawl';
 export { veteranModule } from './modules/veteran';
 export { promotionModule } from './modules/promotion';
 export { armyModule } from './modules/army';

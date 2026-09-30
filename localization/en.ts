@@ -2503,6 +2503,7 @@ export const en: Record<string, string> = {
   'rescard.expense': 'Expenses',
   'rescard.net': 'Net income',
   'rescard.production': 'World production',
+  'rescard.sprawl': 'Growth tax: −{p}% ({n} provinces, tax-free up to {free})',
   'rescard.upkeep': 'Building upkeep',
   'rescard.army': 'Army upkeep',
   'rescard.market': 'Market',

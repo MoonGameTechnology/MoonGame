@@ -21,6 +21,8 @@ import {
   isInhabited,
   civicTax,
   inhabitedWorldCount,
+  sprawlFactor,
+  ownedProvinceCount,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
 import { feedsOnBiomass, isInfected } from '../../packages/shared-core/src/util/infestation';
@@ -68,7 +70,9 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
   let techBonus = 0;
   for (const id of me?.technologies?.completed ?? [])
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
-  const bonusMult = (1 + factionBonus) * (1 + techBonus);
+  // BAL-10: налог на рост державы (sprawlModule) — тоже чистый множитель всего выхода мира.
+  const bonusMult =
+    (1 + factionBonus) * (1 + techBonus) * sprawlFactor(ownedProvinceCount(state, playerId));
   for (const p of Object.values(state.planets)) {
     if (p.owner !== playerId || isBombarded(state, p.id, data)) continue;
     const mult =
@@ -237,7 +241,9 @@ export function incomeBreakdown(
   let techBonus = 0;
   for (const id of me?.technologies?.completed ?? [])
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
-  const bonusMult = (1 + factionBonus) * (1 + techBonus);
+  // BAL-10: налог на рост державы (sprawlModule) — тоже чистый множитель всего выхода мира.
+  const bonusMult =
+    (1 + factionBonus) * (1 + techBonus) * sprawlFactor(ownedProvinceCount(state, playerId));
 
   for (const p of Object.values(state.planets)) {
     if (p.owner !== playerId || isBombarded(state, p.id, data)) continue;
