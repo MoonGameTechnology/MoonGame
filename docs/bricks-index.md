@@ -33,6 +33,7 @@
 | BAL-7 | ⏳ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
+| SEC-42 | ✅ | sec ops | `docs/backlog.md` | исправленная libssl3t64 в серверном образе: trivy image |
 | REFP-13 | 🗑 | proto | `docs/backlog.md` | division.ts |
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
 | REFM-203 | ✅ | proto | `docs/backlog.md` | missionPanel.ts |
