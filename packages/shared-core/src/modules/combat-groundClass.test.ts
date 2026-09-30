@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import type { GameModule } from '../kernel/module';
-import { combatModule } from './combat';
+import { ASSAULT_LANDING_HOURS, combatModule } from './combat';
 import { orbitalModule } from './orbital';
 import { interceptModule } from './intercept';
 import {
@@ -77,6 +77,8 @@ const data: GameData = parseGameData({
   events: {},
 });
 const HOUR = 3_600_000;
+/** Срок высадки штурмом: наземный бой начинается, когда десант ступил на землю. */
+const LANDED = ASSAULT_LANDING_HOURS * HOUR;
 const combatFamily = [orbitalModule, combatModule, interceptModule];
 
 const arrivalModule: GameModule = {
@@ -132,19 +134,23 @@ function storm(landing: Array<[string, number]>, garrison: Array<[string, number
   };
   const st: GameState = { ...s0, fleets: { A: fleet }, planets: { P: planet } };
   const arrived = okApply(kernel.applyAction(st, act('arrive', 'A'), ctx(0)));
-  const started = okApply(kernel.applyAction(arrived.state, act('fleet.assault', 'A'), ctx(0)));
+  const ordered = okApply(kernel.applyAction(arrived.state, act('fleet.assault', 'A'), ctx(0)));
+  // Высадка идёт полтора часа (решение владельца 2026-09-26); бой — с плацдарма после неё.
+  const started = okAdvance(kernel.advanceTo(ordered.state, ctx(LANDED)));
   return { kernel, started };
 }
 
 /** Урон ПЕРВОГО наземного раунда по обороне. */
 function firstRound(landing: Array<[string, number]>, garrison: Array<[string, number]>) {
   const { kernel, started } = storm(landing, garrison);
-  const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR)));
-  const round = [...started.events, ...r.events].find(
+  const r = okAdvance(kernel.advanceTo(started.state, ctx(LANDED + HOUR)));
+  // Первый раунд идёт в сам момент высадки — его события у `started`.
+  const events = [...started.events, ...r.events];
+  const round = events.find(
     (e) => e.type === 'combat.round' && (e.payload as { phase?: string }).phase === 'ground',
   );
   expect(round).toBeDefined();
-  return { round: round!.payload as { dmgToDefender: number; dmgToAttacker: number }, r };
+  return { round: round!.payload as { dmgToDefender: number; dmgToAttacker: number }, r, events };
 }
 
 describe('наземный бой: урон по роду войск', () => {
@@ -156,8 +162,8 @@ describe('наземный бой: урон по роду войск', () => {
   it('павшие наземного боя засчитываются стрелку — `killedBy` (PVR-6.20)', () => {
     // Наземный залп идёт своим путём (`groundVolleys`), и учёт стрелка обязан видеть его:
     // иначе боевой счёт экспедиции терял бы всех павших в штурмах.
-    const { r } = firstRound([['tank', 2]], [['rifle', 2]]); // 40 по пехоте ≥ 2 × 10
-    const deaths = r.events
+    const { events } = firstRound([['tank', 2]], [['rifle', 2]]); // 40 по пехоте ≥ 2 × 10
+    const deaths = events
       .filter((e) => e.type === 'unit.died')
       .map((e) => e.payload as { owner?: string; killedBy?: string });
     expect(deaths.some((d) => d.owner === 'p2')).toBe(true);
@@ -223,7 +229,7 @@ describe('наземный бой: урон по роду войск', () => {
       ['tank', 1],
     ];
     const { kernel, started } = storm(landing, garrison);
-    const end = okAdvance(kernel.advanceTo(started.state, ctx(200 * HOUR)));
+    const end = okAdvance(kernel.advanceTo(started.state, ctx(LANDED + 200 * HOUR)));
     const pv = previewBattle(stacks(landing), stacks(garrison), data);
     const attackerWon = end.state.planets.P!.owner === 'p1';
     expect(pv.outcome).toBe(attackerWon ? 'attacker' : 'defender');

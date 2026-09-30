@@ -51,9 +51,11 @@ describe('комиксы глав — реестр и папка арта', () =
 
   it('в папке только арт и инструкция; имена — латиница, цифры и дефис (требование 1.22)', () => {
     const odd = artFiles().filter(
-      (f) => f !== 'README.md' && !/^[a-z0-9-]+\/(intro|outro|task)-\d+\.webp$/.test(f),
+      (f) =>
+        f !== 'README.md' &&
+        !/^[a-z0-9-]+\/(intro|outro|task|echo|echo-record)(-en)?-\d+\.webp$/.test(f),
     );
-    expect(odd, 'файлы вне схемы <глава>/<intro|outro|task>-<n>.webp').toEqual([]);
+    expect(odd, 'файлы вне схемы <глава>/<момент>-<n>.webp').toEqual([]);
   });
 
   it('каждая картинка папки подключена в реестр — и наоборот', () => {

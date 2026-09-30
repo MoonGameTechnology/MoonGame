@@ -92,7 +92,9 @@ export function fleetStatQueries(fleet: Fleet, speedBase: number): HookQuery[] {
     ...(fleet.battleId != null ? { battleId: fleet.battleId } : {}),
   };
   const firing = { ...shot, attacker: fleet.owner, defender: null, attackerFleet: fleet.id };
-  const underFire = { ...shot, attacker: null, defender: fleet.owner };
+  // Под огнём — сам флот (`defenderFleet`): прикрытие бывает у одного флота, а не у
+  // владельца, — орудия крепости прикрывают её постройки (FORT-5.16).
+  const underFire = { ...shot, attacker: null, defender: fleet.owner, defenderFleet: fleet.id };
   const leg = fleet.movement
     ? { from: fleet.movement.from, to: fleet.movement.to }
     : { from: location };
@@ -202,6 +204,7 @@ const SOURCE_KEYS: Readonly<Record<string, string>> = {
   hero: 'stat.src.hero',
   heroEffects: 'stat.src.hero-effects',
   sector: 'stat.src.sector',
+  station: 'stat.src.station',
   veteran: 'stat.src.veteran',
   promotion: 'stat.src.promotion',
   'forced-march': 'stat.src.forced-march',

@@ -101,8 +101,8 @@
 | UIX-5.2 | ⏳ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
 | UIX-5.3 | ⏳ | proto | `docs/backlog.md` | Английский в русской версии и грамматика. |
 | UIX-5.4 | ⏳ | proto | `docs/backlog.md` | Словарь терминов. |
-| UIX-6.1 | ⏳ | proto | `docs/backlog.md` | Прогноз космического боя в прицеле «Атака». |
-| UIX-6.2 | 🔒 | proto | `docs/backlog.md` | Прогноз в окне боя. |
+| UIX-6.1 | ✅ | proto | `docs/backlog.md` | Прогноз космического боя в прицеле «Атака». |
+| UIX-6.2 | ⏳ | proto | `docs/backlog.md` | Прогноз в окне боя. |
 | UIX-7.1 | ⏳ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
 | UIX-7.2 | ⏳ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
 | UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
@@ -117,6 +117,7 @@
 | UIX-12.1 | ⏳ | proto | `docs/backlog.md` | Свой и чужой не только цветом. |
 | UIX-13.1 | ⏳ | proto | `docs/backlog.md` | Верфь: свернуть неподходящие модули и дать группе свою строку. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
+| UIX-14.1 | ✅ | proto | `docs/backlog.md` | Окно мира без дублей: шапка фактов и одно число на вкладку. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
@@ -902,6 +903,10 @@
 | FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md` | Технологии открывают постройки крепости |
 | FORT-5.13 | ✅ | core | `docs/fortress-roadmap.md` | Сбитая крепость уничтожается |
 | FORT-5.14 | ✅ | proto | `docs/fortress-roadmap.md` | Кнопка крепости: знает о технологии и не показывает разметку |
+| FORT-5.15 | ✅ | core data proto | `docs/fortress-roadmap.md` | Защита построек мира: форт 15/30/45%, каждая постройка 5%, потолок 90% |
+| FORT-5.16 | ✅ | core | `docs/fortress-roadmap.md` | Прикрытие построек: обстрел пересчитывает его по ходу сноса, орудия крепости его получают |
+| FORT-5.17 | ⏳ | core | `docs/fortress-roadmap.md` | Обстрел и флак мира по отрезку: сила флота и зенитки меняются посреди него |
+| FORT-5.18 | ✅ | core sec | `docs/fortress-roadmap.md` | Орудия крепости не сливаются и не делятся, прикрытие — только им |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md` | Туман как граница (анти-maphack) (в основном) |
@@ -1035,6 +1040,7 @@
 | MSB-6 | ✅ | proto cli | `docs/multiside-combat-roadmap.md` | Панель боя на N сторон |
 | MSB-7 | ✅ | core | `docs/multiside-combat-roadmap.md` | Зенитки и обстрел при N сторонах |
 | MSB-8 | ✅ | core | `docs/multiside-combat-roadmap.md` | Штурм не стоит, подмога не ждёт |
+| MSB-9 | ✅ | core proto | `docs/multiside-combat-roadmap.md` | Штурм не запирает флот: высадка по таймеру, потом плацдарм |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md` | Гайдовый первый матч (скриптовая соло-песочница) ★ |
@@ -1218,6 +1224,7 @@
 | PVR-7.4 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Союзный бот: «Охранять», «Атаковать», «Разведать» |
 | PVR-7.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Панель «Связь с союзником» и интерфейс главы |
 | PVR-7.6 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Дверь главы IV: маршрут, имена, сквозной прогон |
+| PVR-7.7 | ✅ | data | `docs/sector-zero-roadmap.md` | Глава IV крупнее: старт с одной планеты, фанатики Завета, двенадцать задач |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Сервисные идентичности и scoped-токены |

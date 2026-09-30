@@ -14,10 +14,17 @@
 оставляют способ пройти главу без этого героя.
 
 КТО ГДЕ. У входа (запад) — база игрока: она же зона вывода накопителя (§6.2), рядом объекты
-развития. Точка встречи — стыковочный узел на пути к внешней дуге, раньше основного
-сопротивления. Союзник — на внешнем направлении, его стартовая база далеко от сенсоров игрока:
-география разводит отряды до встречи (§6.3). Архив — на дальней стороне (восток), его держит
-десант Роя; улей Роя — на юго-востоке, в конце внешней дуги, так что ни одна дуга не безопасна.
+развития. Игрок стартует с ОДНОЙ планетой (заказ владельца 2026-09-28): Приют Завета на
+северо-западе и Лабораторию Смена за дырой держат фанатики Завета Единения
+(`docs/covenant-of-unity.md`) — их отбивают задачами. Точка встречи — стыковочный узел на
+пути к внешней дуге, раньше основного сопротивления. Союзник — на внешнем направлении, его
+стартовая база далеко от сенсоров игрока: география разводит отряды до встречи (§6.3). Архив —
+на дальней стороне (восток), его держит десант Роя; улей Роя — на юго-востоке, в конце
+внешней дуги, так что ни одна дуга не безопасна.
+
+РАЗМЕР (редакция PVR-7.7, «карту бы побольше»): 45 провинций вместо 34 — земли Завета на
+северо-западе, свободная колония за базой, южный пояс под внешней дугой с гнездовьем Роя,
+врата района союзника и отмель за архивом. Дыра, дуги, перемычки и разломы — прежние.
 
 ЧТО ПРОВЕРЯЕТСЯ ЧИСЛАМИ — `data/pveFourthMission.test.ts`. Двигая провинцию руками, перемерь:
 любая правка координат может молча поменять соседство (оно выводится из мозаики, M4.3).
@@ -40,11 +47,18 @@ P = collections.OrderedDict([
     ('salvage_yard', (-750, -330, 'dead_world', 'depleted_system', None, [], [])),
     ('south_camp',   (-950, 240, 'planet', 'empty_space', None, [], [])),
     ('approach',     (-650, 60, 'dead_world', 'deep_void', None, [], [])),
-    # Северо-запад: небольшая община Завета Единения под защитой экспедиции (§6.7, «Книга
-    # голосов») — Рой уже осаждает её; за ней богатый тупик (`asteroid_cluster`, один подход).
-    ('covenant_hold', (-570, -490, 'planet', 'empty_space', 'p1',
+    # Запад за базой: свободная колония — первая планета, которую можно занять и развить.
+    ('west_colony',  (-1060, 90, 'planet', 'empty_space', None, [], [])),
+
+    # ── ЗЕМЛИ ЗАВЕТА (северо-запад). Община Завета Единения (§6.7, «Книга голосов»); её
+    # приют захватили фанатики Скорого Принятия (`docs/covenant-of-unity.md`). За приютом —
+    # богатый тупик (`asteroid_cluster`, один подход), на севере — станция-колокол.
+    ('pilgrim_way',  (-830, -560, 'nebula', 'nebula', None, [], [])),
+    ('covenant_hold', (-570, -490, 'planet', 'empty_space', 'covenant',
                        [{'unit': 'militia', 'count': 2}, {'unit': 'heavy_infantry', 'count': 2}], [])),
     ('north_drift',  (-320, -590, 'asteroid_cluster', 'asteroid_cluster', None, [], [])),
+    ('choir_bell',   (-610, -800, 'void_station', 'empty_space', None, [], [])),
+    ('quiet_belt',   (-980, -790, 'asteroid', 'asteroid_field', None, [], [])),
 
     # ── ТОЧКА ВСТРЕЧИ — стыковочный узел по дороге к внешней дуге (§6.3).
     ('rendezvous',   (-610, 340, 'void_station', 'empty_space', None, [], [])),
@@ -89,10 +103,19 @@ P = collections.OrderedDict([
                       [{'type': 'mine_t1'}, {'type': 'shipyard', 'level': 2}, {'type': 'radar'},
                        {'type': 'fort', 'level': 2}])),
     ('ally_field',   (30, 575, 'asteroid', 'asteroid_field', 'ally', [], [])),
+    ('bulwark_gate', (-60, 390, 'dead_world', 'depleted_system', None, [], [])),
     ('station_west', (300, 520, 'void_station', 'empty_space', 'swarm',
                       [{'unit': 'swarm_lander', 'count': 2}], [])),
     ('station_east', (575, 505, 'void_station', 'empty_space', 'swarm',
                       [{'unit': 'swarm_lander', 'count': 2}], [])),
+
+    # ── ЮЖНЫЙ ПОЯС под внешней дугой: третий ряд, длинный и пустой; на востоке — гнездовье Роя.
+    ('south_verge',  (-900, 560, 'nebula', 'nebula', None, [], [])),
+    ('scrap_belt',   (-430, 800, 'asteroid', 'asteroid_field', None, [], [])),
+    ('deep_relay',   (-60, 810, 'void_station', 'empty_space', None, [], [])),
+    ('murk',         (310, 790, 'nebula', 'nebula', None, [], [])),
+    ('nest',         (640, 790, 'dead_world', 'deep_void', 'swarm',
+                      [{'unit': 'swarm_lander', 'count': 3}], [])),
 
     # ── ЧЁРНАЯ ДЫРА, смещённая к северу, и разломы вокруг неё: непроходимая область.
     ('black_hole',   (110, -395, 'black_hole', 'empty_space', None, [], [])),
@@ -101,14 +124,16 @@ P = collections.OrderedDict([
     ('rift_n',       (130, -635, 'rift', 'empty_space', None, [], [])),
 
     # ── ДАЛЬНЯЯ СТОРОНА (восток): архив, подступы и северный карман за дырой.
-    # Лаборатория за дырой: «Последняя смена» — персонал ждёт эвакуации (§6.7).
-    ('lab_outpost',  (540, -465, 'dead_world', 'deep_void', 'p1',
+    # Лаборатория за дырой: её заняли фанатики Завета; персонал ушёл на транспорты и ждёт
+    # эвакуации на орбите («Последняя смена», §6.7).
+    ('lab_outpost',  (540, -465, 'dead_world', 'deep_void', 'covenant',
                       [{'unit': 'militia', 'count': 1}], [])),
     ('far_eye',      (690, -615, 'void_station', 'empty_space', None, [], [])),
     ('archive_ring', (820, -300, 'dead_world', 'depleted_system', None, [], [])),
     ('archive',      (930, -85, 'void_station', 'empty_space', 'swarm',
                       [{'unit': 'swarm_lander', 'count': 4}], [])),
     ('east_reach',   (905, 205, 'dead_world', 'deep_void', None, [], [])),
+    ('east_shoal',   (1070, 60, 'asteroid', 'asteroid_field', None, [], [])),
     ('hive',         (870, 525, 'planet', 'empty_space', 'swarm',
                       [{'unit': 'swarm_lander', 'count': 6}],
                       [{'type': 'swarm_hive'}, {'type': 'swarm_datacenter'},
@@ -118,7 +143,9 @@ P = collections.OrderedDict([
 
 # Своя задача союзника (§6.5): вернуть две внешние исследовательские станции — признак
 # `ally_task` читает его планировщик (`decisions/allyOperation.ts`).
-TRAITS = {'staging': ['haven'], 'station_west': ['ally_task'], 'station_east': ['ally_task']}
+TRAITS = {'staging': ['haven'], 'station_west': ['ally_task'], 'station_east': ['ally_task'],
+          # Колокол Хора — маяк задачи (PVR-5.3): флот игрока на нём, и сигнал притягивает Рой.
+          'choir_bell': ['beacon']}
 # Место встречи: первое прибытие флота игрока с живым кораблём устанавливает связь с союзником
 # (PVR-7.2, `rendezvousModule`).
 RENDEZVOUS = {'rendezvous': 'ally'}
@@ -137,17 +164,29 @@ OBJECTIVES = [
                              ('count', 1), ('reward', 2)]),
     collections.OrderedDict([('id', 'mission.last-shift'), ('kind', 'evac'),
                              ('count', 3), ('reward', 4)]),
-    collections.OrderedDict([('id', 'mission.book-of-voices'), ('kind', 'rescue'),
+    collections.OrderedDict([('id', 'mission.book-of-voices'), ('kind', 'control'),
                              ('targets', ['covenant_hold']), ('reward', 3)]),
+    collections.OrderedDict([('id', 'mission.shift-lab'), ('kind', 'control'),
+                             ('targets', ['lab_outpost']), ('reward', 3)]),
     collections.OrderedDict([('id', 'mission.take-spire'), ('kind', 'control'),
                              ('targets', ['spire']), ('reward', 3)]),
     collections.OrderedDict([('id', 'mission.raze-biomass'), ('kind', 'raze'),
                              ('targets', ['biomass_pit']), ('reward', 3)]),
     collections.OrderedDict([('id', 'mission.recon'), ('kind', 'scout'),
-                             ('count', 18), ('reward', 2)]),
+                             ('count', 24), ('reward', 2)]),
     collections.OrderedDict([('id', 'mission.hold-out'), ('kind', 'wave'),
                              ('count', 6), ('reward', 2)]),
+    collections.OrderedDict([('id', 'mission.choir-bell'), ('kind', 'beacon'),
+                             ('targets', ['choir_bell']), ('count', 8), ('reward', 3)]),
+    collections.OrderedDict([('id', 'mission.second-yard'), ('kind', 'build'),
+                             ('targets', ['shipyard']), ('at', ['west_colony']),
+                             ('count', 1), ('reward', 2)]),
+    collections.OrderedDict([('id', 'mission.nest'), ('kind', 'control'),
+                             ('targets', ['nest']), ('reward', 3)]),
 ]
+# Карта крупнее прочих, и задач видно больше (заказ владельца 2026-09-28): четыре с первого
+# захода, потолок шесть — вместо общих 3 и 5.
+OBJECTIVE_SLOTS = {'base': 4, 'cap': 6}
 
 sectors = collections.OrderedDict()
 for sid, (x, y, kind, terrain, owner, garr, blds) in P.items():
@@ -171,6 +210,7 @@ m = collections.OrderedDict([
     ('id', 'pve-4'), ('seed', 'pve-4'), ('time', 0), ('mode', 'pve_waves'),
     ('sectors', sectors),
     ('objectives', OBJECTIVES),
+    ('objectiveSlots', OBJECTIVE_SLOTS),
     ('players', collections.OrderedDict([
         ('p1', {'name': 'Azure Compact', 'faction': 'vanguard',
                 'resources': {'credits': 500, 'metal': 500}}),
@@ -179,6 +219,10 @@ m = collections.OrderedDict([
         ('swarm', {'name': 'Swarm Collective', 'faction': 'swarm', 'ai': True,
                    'resources': {'credits': 1000, 'metal': 1000, 'biomass': 400,
                                  'microelectronics': 100, 'energy': 150}}),
+        # Фанатики Завета — сценарные люди, как Колония Эхо в главе I: враждебный житель
+        # (`npc: 'pirate'`), без бота и без флота, держит только гарнизоны.
+        ('covenant', {'name': 'Covenant of Unity', 'faction': 'vanguard', 'npc': 'pirate',
+                      'ai': False, 'resources': {'credits': 0, 'metal': 0}}),
     ])),
     ('fleets', collections.OrderedDict([
         ('p1_1', {'owner': 'p1', 'location': 'staging',
@@ -194,16 +238,12 @@ m = collections.OrderedDict([
                     'units': [{'unit': 'cruiser', 'count': 2},
                               {'unit': 'frigate', 'count': 2}]}),
         # «Последняя смена»: транспорты персонала лаборатории ждут вывода к базе.
-        ('p1_evac', {'owner': 'p1', 'location': 'lab_outpost',
+        ('p1_evac', {'joinsOnArrival': True, 'owner': 'p1', 'location': 'lab_outpost',
                      'units': [{'unit': 'evac_transport', 'count': 3}]}),
         ('swarm_1', {'owner': 'swarm', 'location': 'hive',
                      'units': [{'unit': 'swarm_brood_mother', 'count': 2}]}),
         ('swarm_2', {'owner': 'swarm', 'location': 'hollow',
                      'units': [{'unit': 'swarm_brood_mother', 'count': 1}]}),
-        # Осада общины: десант Роя уже над ней (задача «Книга голосов»).
-        ('swarm_siege', {'owner': 'swarm', 'location': 'covenant_hold',
-                         'units': [{'unit': 'swarm_brood_mother', 'count': 1}],
-                         'landing': [{'unit': 'swarm_lander', 'count': 3}]}),
         ('swarm_relay_1', {'owner': 'swarm', 'location': 'spore_gate',
                            'units': [{'unit': 'swarm_relay', 'count': 1},
                                      {'unit': 'frigate', 'count': 2}]}),

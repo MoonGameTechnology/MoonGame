@@ -56,7 +56,9 @@ export function requireOwnedIdleFleet(
   if (!fleet || fleet.owner !== playerId) {
     h.reject('E_NO_FLEET');
   }
-  if (fleet.location === null || fleet.movement || fleet.battleId) {
+  // Высадка штурмом держит флот на орбите до срока (решение владельца 2026-09-26): улететь
+  // или взять другой приказ он не может, пока десант не сошёл на землю.
+  if (fleet.location === null || fleet.movement || fleet.battleId || fleet.assaultLanding) {
     h.reject('E_FLEET_BUSY');
   }
   return fleet as IdleFleet;

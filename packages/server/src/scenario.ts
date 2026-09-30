@@ -226,7 +226,28 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '51'; // Личные циклы атаки и приказы сторон, combat 3.0.0.
+export const MODULE_MANIFEST_VERSION = '56'; // Находка Codex на #1393: орудия крепости не
+// сливаются и не делятся, прикрытие — только отряду из одних орудий. Членство и порядок не
+// тронуты; `fleet-ops` 1.3.0 отбивает слияние и раскол неподвижного отряда (`E_EMPLACEMENT`),
+// `station` 1.2.0 проверяет состав. Партия на 55 молча сменила бы исход слияния посреди игры.
+// export const MODULE_MANIFEST_VERSION = '55'; // FORT-5.16: прикрытие построек. Членство и
+// порядок не тронуты; `construction` 1.2.0 пересчитывает прикрытие мира для остатка обстрела
+// после каждой снесённой постройки, `station` 1.1.0 прикрывает постройками крепости её орудия,
+// `orbital` 1.1.0 сообщает, каким прикрытием срезан обстрел. Партия на 54 молча сменила бы
+// исход обстрела и боя у крепости посреди игры.
+// export const MODULE_MANIFEST_VERSION = '54'; // MSB-9: штурм — высадка по таймеру, потом
+// плацдарм; выгрузка на свой мир — час, как погрузка. Членство и порядок не тронуты; `combat`
+// 3.1.0 и `army` 1.1.0, у флота новые поля `assaultLanding` и `unloading`. Партия на 53 не
+// знает этих полей и держала бы флот в наземном бою до конца.
+// export const MODULE_MANIFEST_VERSION = '53'; // Беженцы по прибытии (заказ владельца 2026-09-29):
+// членство и порядок не тронуты; `missionFacts` 1.1.0 выпускает в игру флоты карты с
+// `joinsOnArrival`, когда к ним прибыл флот владельца. У провинции новое поле
+// `Planet.awaitingFleets`. Партия на 52 держит транспорты в игре с первой секунды.
+// export const MODULE_MANIFEST_VERSION = '52'; // Защита построек мира (FORT-5.15): членство и
+// порядок не тронуты; `construction` 1.1.0 срезает урон по миру при штурме И обстреле долей
+// построек (форт 15/30/45%, прочие по 5%, потолок 90%) вместо «+0.01 очка за постройку».
+// Партия на 51 молча сменила бы исход каждого штурма и обстрела посреди игры.
+// export const MODULE_MANIFEST_VERSION = '51'; // Личные циклы атаки и приказы сторон, combat 3.0.0.
 // Поля stance/attackStartedAt/nextAttackAt сохраняются на каждой стороне боя.
 // export const MODULE_MANIFEST_VERSION = '50'; // PVR-7.4: `rendezvous` 1.1.0 — приказы союзнику
 // главы IV (`ally.order`/`ally.cancel`, одна операция на жителя, закрытие по событиям мира).

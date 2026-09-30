@@ -12,7 +12,7 @@
  * «Дальше» и «Пропустить» появляются только потом, а нажатие по панели до этого ничего не
  * листает — страницу успевают прочитать. «Назад»/Escape закрывают комикс и во время паузы.
  */
-import { t } from '../../localization/runtime';
+import { LOCALE, t } from '../../localization/runtime';
 import type { ComicPanel } from '../../decisions/chapterComics';
 
 /** Сколько страница держится до появления кнопок. */
@@ -77,7 +77,7 @@ export function initComicPlayer({
     at = i;
     const panel = panels[i]!;
     root.classList.remove('no-art', 'comic-in');
-    img.src = panel.image;
+    img.src = LOCALE === 'en' && panel.imageEn ? panel.imageEn : panel.image;
     const lines = (panel.captions ?? []).map((key) => {
       const p = document.createElement('p');
       p.textContent = t(key);
@@ -106,7 +106,8 @@ export function initComicPlayer({
       next.focus({ preventScroll: true });
     }, COMIC_HOLD_MS);
     const upcoming = panels[i + 1];
-    if (upcoming) new Image().src = upcoming.image; // следующая панель — заранее
+    if (upcoming)
+      new Image().src = LOCALE === 'en' && upcoming.imageEn ? upcoming.imageEn : upcoming.image;
   }
 
   function advance(): void {

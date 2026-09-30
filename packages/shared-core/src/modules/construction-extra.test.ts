@@ -367,9 +367,11 @@ describe('construction module — combat.damage hook phase guard', () => {
     return (r.events.find((e) => e.type === 'probe.result')?.payload as { dmg: number }).dmg;
   };
 
-  it('reduces GROUND damage by the pooled defenseBonus and per-building points (fort 0.5 + 1 building 0.01 → ÷1.51)', () => {
-    // PERK-2.1: один пул очков, одно деление. Раньше делений было два: (100/1.5)*0.99.
-    expect(damageVia('ground')).toBeCloseTo(100 / 1.51, 5);
+  it('срезает урон на долю защиты мира — и при штурме, и при обстреле (форт 0.5 → вдвое)', () => {
+    // Решение владельца 2026-09-26: доля — прямо проценты урона. В пул она уходит очками
+    // r / (1 − r), поэтому одна лишь защита мира даёт ровно r.
+    expect(damageVia('ground')).toBeCloseTo(50, 5);
+    expect(damageVia('bombard')).toBeCloseTo(50, 5);
   });
 
   it('does not apply the defense bonus in the orbital phase', () => {

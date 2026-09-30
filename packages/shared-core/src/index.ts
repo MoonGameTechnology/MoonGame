@@ -388,6 +388,7 @@ export {
   safeParseGameData,
   buildingLevel,
   buildingMaxLevel,
+  BASE_BUILDING_DEFENSE,
   GameDataSchema,
   UnitDefSchema,
   FactionDefSchema,
@@ -477,6 +478,7 @@ export {
   unitTier,
   lineShares,
   LINE_SHARE,
+  MITIGATION_CAP,
   TIER_ORDER,
   mitigationFromPool,
   type Tier,
@@ -600,6 +602,7 @@ export {
   clampResearchSlots,
 } from './modules/technology';
 export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
+export { coverPoints, worldDamageReduction } from './util/worldCover';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule, STATION_COST, STATION_CORE } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';

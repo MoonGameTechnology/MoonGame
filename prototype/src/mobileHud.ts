@@ -25,6 +25,8 @@ interface MobileHudHost {
   choose(pick: TapPick): void;
   ping(): void;
   summary(): void;
+  /** Досье по ключу `data-desc` — для метки в шапке листа (очки победы мира). */
+  describe(key: string): void;
   resized(): void;
 }
 
@@ -48,7 +50,15 @@ export function initMobileHud(host: MobileHudHost) {
   close.className = 'mobile-close';
   close.dataset.mobile = 'close';
   close.textContent = '×';
+  // Метка карточки рядом с именем (`.phead .pbadge`, очки победы мира): шапка карточки на
+  // телефоне скрыта, и метка переезжает сюда. Тап — её досье, как у фишек мира.
+  const badge = document.createElement('button');
+  badge.type = 'button';
+  badge.className = 'mobile-badge';
+  badge.dataset.mobile = 'badge';
+  badge.hidden = true;
   head.appendChild(grab);
+  head.appendChild(badge);
   head.appendChild(close);
   const choices = document.createElement('div');
   choices.className = 'mobile-choices';
@@ -85,6 +95,8 @@ export function initMobileHud(host: MobileHudHost) {
   let panelNode: ChildNode | null = null;
   let title = '';
   let sub = '';
+  let badgeText = '';
+  let badgeKey = '';
   const setText = (el: HTMLElement, text: string): void => {
     if (el.textContent !== text) el.textContent = text;
   };
@@ -125,6 +137,9 @@ export function initMobileHud(host: MobileHudHost) {
       swiped = false;
     } else if (action === 'close') host.dismiss();
     else if (action === 'ping') host.ping();
+    else if (action === 'badge') {
+      if (badgeKey) host.describe(badgeKey);
+    }
     else if (action === 'summary') {
       expand(true);
       host.summary();
@@ -177,6 +192,10 @@ export function initMobileHud(host: MobileHudHost) {
         title =
           host.side.querySelector('.ptitle > :first-child')?.textContent?.replace(/ ▸$/, '') ?? '';
         sub = host.side.querySelector('.ptitle > span')?.textContent ?? '';
+        const mark = host.side.querySelector<HTMLElement>('.phead .pbadge');
+        badgeText = mark?.textContent ?? '';
+        badgeKey = mark?.dataset.desc ?? '';
+        badge.setAttribute('aria-label', mark?.getAttribute('aria-label') ?? badgeText);
       }
       choiceList = list;
       const choosing = list.length > 0;
@@ -201,13 +220,15 @@ export function initMobileHud(host: MobileHudHost) {
       grab.disabled = choosing;
       setText(caption, choosing ? t('hud.mobile.choose') : title);
       setText(subtitle, choosing ? t('hud.mobile.choose-hint') : sub);
+      setText(badge, badgeText);
+      badge.hidden = choosing || !badgeText;
       grab.setAttribute('aria-label', `${title} — ${t('hud.mobile.details')}`);
       close.setAttribute('aria-label', t('card.close'));
       setText(detailButton, expanded ? t('hud.mobile.collapse') : t('hud.mobile.details'));
       setText(pingButton, t('side.world.ping'));
       setText(summaryButton, t('hud.mobile.summary'));
       summaryButton.hidden =
-        !expanded || !host.side.querySelector('[data-act="fleetinfo"], [data-act="planetinfo"]');
+        !expanded || !host.side.querySelector('[data-act="fleetinfo"]');
       pingButton.hidden =
         !host.side.querySelector('[data-act="ping"]') || !key.startsWith('planet:');
     },
