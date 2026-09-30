@@ -13,7 +13,7 @@
  * import the same helpers rather than reach into the window), and `initSteward(host)`
  * takes its host dependencies explicitly.
  */
-import { stewardActive, type Action, type GameState } from '../../packages/shared-core/src/index';
+import { isForkSite, stewardActive, type Action, type GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 // Straight from the source modules, not through the `game.ts` barrel — same as the
 // other REFM screens, so this module never leans on the façade.
@@ -39,7 +39,7 @@ export interface StewardMetrics {
 
 export function stewMetrics(state: GameState, me: string): StewardMetrics {
   let planets = 0;
-  for (const pl of Object.values(state.planets)) if (pl.owner === me) planets += 1;
+  for (const pl of Object.values(state.planets)) if (pl.owner === me && !isForkSite(pl)) planets += 1;
   const r = (state.players[me]?.resources ?? {}) as Record<string, number>;
   return { planets, metal: Math.round(r.metal ?? 0), credits: Math.round(r.credits ?? 0) };
 }

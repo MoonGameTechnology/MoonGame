@@ -14,7 +14,7 @@ import { emblemTally } from '../../../decisions/fleetTally';
 import { forkMarks, roadStrokes } from '../../../decisions/roadNetwork';
 import { ambushOf } from '../../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from './forkMark';
-import { effectiveStats, fleetPositionAt, type GameData, type GameState, type PlayerId } from '@void/shared-core';
+import { effectiveStats, fleetPositionAt, isForkSite, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
@@ -92,7 +92,10 @@ export function renderMap(
   const ownerColor = (o: PlayerId): string => colors.get(o) ?? theme.dim;
   const vw = vp.right;
   const vh = vp.bottom;
-  const planets = Object.values(state.planets);
+  // Площадка крепости на развилке (FORT-6.1) — не провинция: клетки мозаики и узла карты у
+  // неё нет. Эта поверхность её пока не рисует вовсе (рисует прототип), но и провинцией в
+  // точке развилки не покажет.
+  const planets = Object.values(state.planets).filter((p) => !isForkSite(p));
   const gap = mapSpacing(planets.map((p) => ({ id: p.id, ...p.position, links: p.links })));
   const lod = mapLod(gap * fitTransform(vp, bounds).scale * cam.scale, cam.scale);
   g.clearRect(vp.left, vp.top, vw - vp.left, vh - vp.top);

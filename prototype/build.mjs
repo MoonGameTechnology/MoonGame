@@ -3016,7 +3016,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #solo-replace button{min-height:44px;padding:10px 16px;margin:6px;border:1px solid var(--line-hi);border-radius:8px;background:var(--glass);color:var(--ink);cursor:pointer;}
 #solo-save-status{font-size:12px;color:var(--dim);line-height:1.5;}
 #hub-solo-continue[hidden]{display:none;}
-#hub #hub-sector-zero{min-height:44px;}
+#hub #hub-sector-zero,#hub #hub-proving-ground{min-height:44px;}
 #hub .hub-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin-top:4px;
   padding-bottom:6px;border-bottom:1px solid var(--line);}
 #hub .hub-card{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line-hi);border-radius:10px;
@@ -3989,6 +3989,8 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <p id="solo-save-status" role="status"></p>
       <button id="hub-solo" class="hub-solo" type="button" data-i18n="hub.solo"></button>
       <button id="hub-sector-zero" class="hub-solo" type="button" data-i18n="sector-zero.enter"></button>
+      <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
+      <button id="hub-proving-ground" class="hub-solo" type="button" data-i18n="hub.proving-ground"></button>
       <!-- ONB-0 first-run offer: shown only to a not-yet-onboarded commander -->
       <div class="hub-card ob-nudge" id="onboard-nudge" style="display:none">
         <div class="hc-ic">◎</div>

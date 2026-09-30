@@ -214,7 +214,11 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
       addUpkeep(f.units);
       if (f.landing) addUpkeep(f.landing);
     }
-  for (const p of Object.values(state.planets)) if (p.owner === playerId) addUpkeep(p.garrison);
+  for (const p of Object.values(state.planets)) {
+    if (p.owner === playerId) addUpkeep(p.garrison);
+    // Десант на плацдарме содержит его владелец — как ядро (`economy.upkeepByOwner`).
+    for (const b of p.beachheads ?? []) if (b.owner === playerId) addUpkeep(b.units);
+  }
   return out;
 }
 
@@ -294,7 +298,10 @@ export function incomeBreakdown(
       addUnitUpkeep(f.units);
       if (f.landing) addUnitUpkeep(f.landing);
     }
-  for (const p of Object.values(state.planets)) if (p.owner === playerId) addUnitUpkeep(p.garrison);
+  for (const p of Object.values(state.planets)) {
+    if (p.owner === playerId) addUnitUpkeep(p.garrison);
+    for (const b of p.beachheads ?? []) if (b.owner === playerId) addUnitUpkeep(b.units);
+  }
   for (const res of Object.keys(result)) {
     const c = result[res]!;
     c.net = c.production - c.buildingUpkeep - c.unitUpkeep;

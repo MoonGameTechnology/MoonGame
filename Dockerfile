@@ -31,7 +31,7 @@
 # node:26-slim digest refreshed 2026-09-13 (SEC-40; the tag had moved on from the 2026-07
 # pin). This stage is NOT shipped, so the bump closes nothing in `trivy image` — it keeps
 # the builder off a stale base and the SEC-34 pin-vs-tag step quiet.
-FROM node:26-slim@sha256:14bf3eac4bf209d906d3c41256597d3ab1f926b2e93a79e9bdfe1efd32454239 AS build
+FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS build
 WORKDIR /app
 # Node ≥25 no longer ships corepack in the distribution (the 22→26 bump, PR #106,
 # silently broke this line — caught by the SEC-1 blocking trivy-image gate), so install
@@ -50,6 +50,9 @@ COPY . .
 # The base still carries libc6 deb13u3. Stage Debian's fixed package separately:
 # bytes + architecture + version are checked before extraction; no package scripts run.
 RUN node deploy/runtime/prepare-libc.mjs /runtime-libc
+# Same for libssl3t64 deb13u2 (SEC-42): apt fetches the pinned deb13u3 and accepts it only
+# against Debian's signed index (this digest-pinned builder's keyring); no package scripts run.
+RUN node deploy/runtime/prepare-libssl.mjs /runtime-libssl
 RUN pnpm run prototype # bake dist/void-dominion{,-player}.html (player at /, dev at /dev)
 
 # Bake the server bundle HERE instead of at container startup. Two reasons, and the
@@ -102,10 +105,15 @@ RUN mkdir -p playtest-logs
 # libc6 2.41-12+deb13u3. The former already fixes the old openssl ignore group.
 # SEC-39 overlays the complete, SHA-256-pinned Debian libc6 deb13u4 package plus its
 # inventory, fixing CVE-2026-5450/5928 while keeping the runtime shell/package-manager free.
-# On a base bump, compare actual package versions and remove the overlay once upstream
-# includes this fix; a scan with old suppressions cannot establish that a CVE was fixed.
+# SEC-42 overlays the complete Debian libssl3t64 3.5.7-1~deb13u3 package too (13 fixable
+# openssl CVEs, two HIGH), verified by apt against Debian's signed index instead of a repo
+# hash. On 2026-09-30 the tag already pointed at a rebuild (sha256:5ef534d3…) with libc6
+# deb13u4 but still libssl3t64 deb13u2 — a bump alone would not have closed them.
+# On a base bump, compare actual package versions and remove each overlay once upstream
+# includes its fix; a scan with old suppressions cannot establish that a CVE was fixed.
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b AS runtime
 COPY --from=build /runtime-libc/ /
+COPY --from=build /runtime-libssl/ /
 # Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
 # bundle) and hand the tree to the non-root user so the one runtime write left
 # (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout, so copying

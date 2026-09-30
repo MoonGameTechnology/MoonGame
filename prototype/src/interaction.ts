@@ -106,6 +106,10 @@ export let splitState: Armed['splitState'] | null = null;
 export let selFleet: string | null = null;
 /** Выбранный мир. Флоты и мир друг друга исключают. */
 export let selPlanet: string | null = null;
+/** Выбранная РАЗВИЛКА дороги — место, где можно поставить крепость (FORT-6.1): провинция и
+ *  номер её тропы. Исключает и мир, и флоты: у развилки своя карточка. Развилка, на которой
+ *  крепость уже стоит, сюда не попадает — тап выбирает саму крепость, как мир. */
+export let selFork: { province: string; trail: number } | null = null;
 /** Группа своих флотов: рамка, Ctrl-клик, набор. */
 export let selFleets: ReadonlySet<string> = new Set();
 /** UI-14. ЧУЖОЙ флот, который игрок тапнул, чтобы посмотреть. Держится ОТДЕЛЬНО от
@@ -205,6 +209,7 @@ export function disarmForCommand(cmd: string | undefined, phone: boolean): void 
 function forget(): void {
   selFleet = null;
   selPlanet = null;
+  selFork = null;
   selFleets = new Set();
   inspectFleet = null;
   mobileDraft = null;
@@ -224,6 +229,7 @@ export function pickFleets(ids: readonly string[], mine: (id: string) => boolean
   selFleet = sel.single;
   inspectFleet = sel.inspect;
   selPlanet = null;
+  selFork = null;
   mobileDraft = null;
   mobileChoices = [];
 }
@@ -234,6 +240,15 @@ export function pickFleets(ids: readonly string[], mine: (id: string) => boolean
  */
 export function pickWorld(id: string): void {
   selPlanet = id;
+  selFork = null;
+  selFleet = null;
+  selFleets = new Set();
+}
+
+/** Выбрать развилку (FORT-6.1): мир и флоты гаснут, как при выборе мира. */
+export function pickFork(fork: { province: string; trail: number }): void {
+  selFork = fork;
+  selPlanet = null;
   selFleet = null;
   selFleets = new Set();
 }

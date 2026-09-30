@@ -17,6 +17,7 @@
 
 | ID | Ст. | Зоны | Где | Заголовок |
 | --- | --- | --- | --- | --- |
+| FOG-11 | ✅ | core srv proto | `docs/backlog.md` | Свой бой виден целиком. |
 | B4 | 🗑 |  | `docs/backlog.md` | вырезано: |
 | G2 | 🗑 |  | `docs/backlog.md` | Skia-рендер карты (зум / скролл / culling) — RN-вариант, снят вместе с RN. |
 | H4 | 🗑 |  | `docs/backlog.md` | Конструктор наземной армии: пехота в 3 вариантах (militia — дешёвое мясо, |
@@ -32,6 +33,7 @@
 | BAL-7 | ⏳ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |
+| SEC-42 | ✅ | sec ops | `docs/backlog.md` | исправленная libssl3t64 в серверном образе: trivy image |
 | REFP-13 | 🗑 | proto | `docs/backlog.md` | division.ts |
 | REFM-8 | 🗑 | proto | `docs/backlog.md` | divisionDesigner.ts |
 | REFM-203 | ✅ | proto | `docs/backlog.md` | missionPanel.ts |
@@ -907,6 +909,7 @@
 | FORT-5.16 | ✅ | core | `docs/fortress-roadmap.md` | Прикрытие построек: обстрел пересчитывает его по ходу сноса, орудия крепости его получают |
 | FORT-5.17 | ⏳ | core | `docs/fortress-roadmap.md` | Обстрел и флак мира по отрезку: сила флота и зенитки меняются посреди него |
 | FORT-5.18 | ✅ | core sec | `docs/fortress-roadmap.md` | Орудия крепости не сливаются и не делятся, прикрытие — только им |
+| FORT-6.1 | ✅ | core data proto | `docs/fortress-roadmap.md` | Крепость на развилке — новая точка постройки |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md` | Туман как граница (анти-maphack) (в основном) |
@@ -1003,6 +1006,7 @@
 | M2.12 | ✅ | cli proto | `docs/map-roadmap.md` | Край карты — линия карты, а не провинций; пунктир барьера снят — 2026-09-24 |
 | M2.13 | ✅ | cli proto | `docs/map-roadmap.md` | Ореол края карты на телефоне и слабое горение рамки — 2026-09-25 |
 | M2.14 | ✅ | data core | `docs/map-roadmap.md` | Тестовая дуэльная карта «Колыбель у мёртвой звезды» — 2026-09-25 |
+| M2.15 | ✅ | data core proto | `docs/map-roadmap.md` | Полигон основной игры: все области, весь каталог, имена областей — 2026-09-30 |
 | M3.1 | 🔒 |  | `docs/map-roadmap.md` | Редактор карты [tools] |
 | M3.2 | ⏳ |  | `docs/map-roadmap.md` | Процедурный пресет → формат карты [tools] |
 | M4.1 | ✅ | cli | `docs/map-roadmap.md` | Рендер из данных сектора — /🚧 |
@@ -1321,6 +1325,8 @@
 | SM-3.3 | ✅ | core data | `docs/ship-modules-roadmap.md` | Ремонтный тендер: чинит соседей по флоту |
 | SM-3.4 | ✅ | core data | `docs/ship-modules-roadmap.md` | Минный заградитель: мины на дорогах |
 | SM-3.5 | ✅ | proto | `docs/ship-modules-roadmap.md` | Мины на карте прототипа |
+| SM-3.6 | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Мина — неподвижный отряд: выделяется, подрыв при встрече, флот летит дальше |
+| SM-3.7 | ⏳ | core proto | `docs/ship-modules-roadmap.md` | Ракетная мина и её ракета — тоже отряды |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |

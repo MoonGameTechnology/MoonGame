@@ -3,11 +3,12 @@
  *
  * Правило постановки живёт в ядре (`modules/minefield.ts`), здесь — только что показать:
  * есть ли у флота заградитель, можно ли ставить сейчас и сколько ждать перезарядки, и
- * какие СВОИ поля лежат на карте. Чужих полей клиент не знает вовсе: проекция тумана
- * (`visibleState`) их вырезает.
+ * какие СВОИ мины стоят на карте. Мина с SM-3.6 — неподвижный отряд во `fleets`; чужую
+ * клиент видит, только когда его флот рядом (`mineFleetVisible`).
  */
 import {
   bestFleetStat,
+  isMineFleet,
   MINE_CHARGE_STAT,
   MINE_HIT_STAT,
   type Fleet,
@@ -44,15 +45,15 @@ export function minelayerOffer(
   return { ready: true, readyInMs: 0 };
 }
 
-/** Свои минные поля: узел и остаток заряда, в порядке узлов. */
+/** Свои мины (SM-3.6 — отряды во `fleets`): отряд и остаток зарядов, в порядке id. */
 export function ownMinefields(
   state: GameState,
   me: string,
-): Array<{ node: string; charge: number }> {
-  const out: Array<{ node: string; charge: number }> = [];
-  for (const [node, byOwner] of Object.entries(state.minefields?.fields ?? {})) {
-    const f = byOwner[me];
-    if (f && f.charge > 0) out.push({ node, charge: f.charge });
-  }
-  return out.sort((a, b) => (a.node < b.node ? -1 : a.node > b.node ? 1 : 0));
+  data: GameData,
+): Array<{ fleetId: string; charge: number }> {
+  return Object.keys(state.fleets)
+    .sort()
+    .map((id) => state.fleets[id]!)
+    .filter((f) => f.owner === me && isMineFleet(f, data))
+    .map((f) => ({ fleetId: f.id, charge: f.units.reduce((n, st) => n + st.count, 0) }));
 }

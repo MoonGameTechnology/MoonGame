@@ -30,6 +30,8 @@ import {
   swarmNetPlan,
   musterPlan,
   SWARM_MEMORY_WINDOW,
+  isMineFleet,
+  mineFleetVisible,
   type GameState,
   type Action,
   type Battle,
@@ -48,6 +50,7 @@ import { fleetHangarRepairRate } from '../../packages/shared-core/src/util/repai
 import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
 import { canOrder } from './protoKernel';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
+import { isForkSite } from '../../packages/shared-core/src/state/forkSite';
 import {
   moveFleet,
   launchFleet,
@@ -417,16 +420,31 @@ export function seatAiDecision(
   return { kind: 'substitute', posture: 'expand' };
 }
 
+/**
+ * Состояние глазами бота: только провинции. Площадка крепости на развилке (FORT-6.1) — не
+ * мир: лейнов к ней нет, захватить её нельзя, и бот, увидевший в ней цель или базу, слал
+ * бы флоты туда, куда дороги нет. Её орудия — обычный флот на дороге, и его бот видит как
+ * прежде. Без площадок на карте состояние отдаётся как есть — копии не заводим.
+ */
+function provincesOnly(state: GameState): GameState {
+  if (!Object.values(state.planets).some(isForkSite)) return state;
+  return {
+    ...state,
+    planets: Object.fromEntries(Object.entries(state.planets).filter(([, p]) => !isForkSite(p))),
+  };
+}
+
 /** One decision tick's orders for an AI-driven seat, evaluated against `state`.
  *  Read-only: it builds and returns the actions; the caller applies them — the
  *  client to its local sim, the server through the authoritative room. Drives
  *  empty seats the same way in solo and multiplayer (a seat with no human). */
 export function aiOrders(
-  state: GameState,
+  full: GameState,
   ai: string,
   posture: StewardPosture | 'expand' = 'expand',
   profile: AiProfile = 'weak',
 ): Action[] {
+  const state = provincesOnly(full);
   if (state.players[ai]?.npc === 'neutral') return allySeatOrders(state, ai, posture, profile);
   if (state.pve?.npcPlayerId !== ai) return baseAiOrders(state, ai, posture, profile, new Set());
   // Сеть Роя (`docs/swarm-behavior.md`): посты-ретрансляторы стоят там, куда их ставит
@@ -1656,7 +1674,8 @@ function baseAiOrders(
       }
       const foeFleetAt = new Set<string>();
       for (const fl of Object.values(state.fleets)) {
-        if (fl.owner !== ai && fl.location && fl.units.some((st) => st.count > 0)) {
+        // Мина (SM-3.6) орбиту не занимает: высадке под ней она не помеха.
+        if (fl.owner !== ai && fl.location && fl.units.some((st) => st.count > 0) && !isMineFleet(fl, data)) {
           foeFleetAt.add(fl.location);
         }
       }
@@ -1710,6 +1729,8 @@ function baseAiOrders(
               getStance(state, ai, fl.owner) === 'war' &&
               fl.location !== null &&
               fl.units.some((st) => st.count > 0) &&
+              // Мину бот бьёт челноками, только когда видит её — вблизи (SM-3.6).
+              (!isMineFleet(fl, data) || mineFleetVisible(state, fl, ai, data)) &&
               inReach(state.planets[fl.location]?.position ?? { x: 1e9, y: 1e9 }),
           ),
           bombPad.at,

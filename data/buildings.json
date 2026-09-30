@@ -778,7 +778,8 @@
     },
     "scoreValue": 4,
     "onlyOn": [
-      "void_station"
+      "void_station",
+      "fork_station"
     ],
     "upgrades": [
       {

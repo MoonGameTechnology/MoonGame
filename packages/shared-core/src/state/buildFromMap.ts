@@ -353,6 +353,20 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       }
   }
 
+  // Подписи областей (M2.15): провинция — настоящая и не больше чем в одной области.
+  // Правилам подписи не нужны, но опечатка в id положила бы имя области не туда.
+  const regionOf = new Map<string, string>();
+  const regionIds = new Set<string>();
+  for (const region of map.regions) {
+    if (regionIds.has(region.id)) issues.push(`E_REGION_DUPLICATE:${region.id}`);
+    regionIds.add(region.id);
+    for (const sid of region.sectors) {
+      if (!has(sid)) issues.push(`E_REGION_UNKNOWN_SECTOR:${region.id}:${sid}`);
+      else if (regionOf.has(sid)) issues.push(`E_REGION_OVERLAP:${sid}`);
+      else regionOf.set(sid, region.id);
+    }
+  }
+
   // graph connectivity (BFS over the valid undirected edges). Impassable sectors are
   // EXEMPT from the requirement: a rift or a black hole is a hole in the map, so
   // demanding a route to it would force the author to either drill a lane into the

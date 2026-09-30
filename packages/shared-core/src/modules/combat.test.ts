@@ -488,7 +488,12 @@ describe('combat — two-phase planet capture (GDD §7.4)', () => {
     const started = okApply(kernel.applyAction(near.state, assault('A'), ctx(0)));
     // Приказ начинает ВЫСАДКУ, а не бой: флот стоит на орбите, десант ещё на борту.
     expect(Object.keys(started.state.battles)).toHaveLength(0);
-    expect(started.state.fleets.A?.assaultLanding).toEqual({ planetId: 'P', startAt: 0, doneAt: LANDED });
+    expect(started.state.fleets.A?.assaultLanding).toEqual({
+      planetId: 'P',
+      startAt: 0,
+      doneAt: LANDED,
+      troops: { marine: 2 },
+    });
     const r = okAdvance(kernel.advanceTo(started.state, ctx(LANDED + HOUR)));
 
     expect(r.state.planets.P?.owner).toBe('p1');
@@ -1578,6 +1583,79 @@ describe('combat — высадка штурмом идёт по таймеру 
     expect(r.state.planets.P?.owner).toBe('p1');
     expect(r.state.planets.P?.garrison).toEqual([{ unit: 'marine', count: 2 }]);
     expect(types(r.events)).not.toContain('battle.started');
+  });
+});
+
+/**
+ * Замечания Codex на #1392 (MSB-9): заявка высадки, перемирие на плацдарме и союзные берега.
+ */
+describe('combat — высадка: заявка, перемирие и берега союзников (замечания Codex на #1392)', () => {
+  const seat = (id: string): Player => ({ id, name: id, faction: 'x', status: 'active', resources: {} });
+  const declare = (playerId: string, target: string, stance: string): Action => ({
+    id: `s:${playerId}:${stance}`,
+    type: 'diplomacy.declare',
+    playerId,
+    payload: { target, stance },
+    issuedAt: 0,
+  });
+  const marines = (list: UnitStack[] | undefined): number =>
+    (list ?? []).filter((x) => x.unit === 'marine').reduce((n, x) => n + x.count, 0);
+
+  it('влитое в трюм после начала высадки остаётся на борту: сходит только заявка', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
+    a.orbit = 'near';
+    const st = baseState([a], [planet('P', 'p2', 0, 0, [['militia', 5]])]);
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    // Под конец окна срыва к флоту подсадили основную силу (слияние флотов).
+    const reinforced = structuredClone(started.state);
+    reinforced.fleets.A!.landing = stacks([['marine', 6]]);
+    const r = okAdvance(kernel.advanceTo(reinforced, ctx(LANDED)));
+    const ashore = (r.state.planets.P?.beachheads ?? []).flatMap((b) => b.units);
+    expect(marines(ashore)).toBe(2);
+    expect(marines(r.state.fleets.A?.landing)).toBe(4);
+  });
+
+  it('перемирие на плацдарме закрывает бой и НЕ заводит его заново', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule, diplomacyModule]);
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 1]]);
+    a.orbit = 'near';
+    const st = {
+      ...baseState([a], [planet('P', 'p2', 0, 0, [['militia', 20]])]),
+      players: { p1: seat('p1'), p2: seat('p2') },
+    };
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const landed = okAdvance(kernel.advanceTo(started.state, ctx(LANDED)));
+    expect(Object.keys(landed.state.battles)).toHaveLength(1);
+    const offer = okApply(kernel.applyAction(landed.state, declare('p1', 'p2', 'peace'), ctx(LANDED)));
+    const peace = okApply(kernel.applyAction(offer.state, declare('p2', 'p1', 'peace'), ctx(LANDED)));
+    expect(Object.keys(peace.state.battles)).toEqual([]);
+    const resolvedAt = types(peace.events).indexOf('battle.resolved');
+    expect(resolvedAt).toBeGreaterThanOrEqual(0);
+    expect(types(peace.events).slice(resolvedAt)).not.toContain('battle.started');
+    // Берег стоит на земле без боя и не оживает со временем.
+    expect(peace.state.planets.P?.beachheads?.[0]?.owner).toBe('p1');
+    const later = okAdvance(kernel.advanceTo(peace.state, ctx(LANDED + 3 * HOUR)));
+    expect(Object.keys(later.state.battles)).toEqual([]);
+    expect(later.state.planets.P?.owner).toBe('p2');
+  });
+
+  it('совместный штурм союзников: выжившие войска второго не исчезают при захвате', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    const a = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
+    const c = fleet('C', 'p3', 'P', [['fighter', 1]], [['marine', 2]]);
+    a.orbit = 'near';
+    c.orbit = 'near';
+    const st = baseState([a, c], [planet('P', 'p2', 0, 0, [['militia', 1]])]);
+    setStance(st, 'p1', 'p3', 'alliance');
+    const one = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const two = okApply(kernel.applyAction(one.state, assault('C', 'p3'), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(two.state, ctx(LANDED + HOUR)));
+    const p = r.state.planets.P!;
+    expect(p.owner).toBe('p1');
+    // У носителей нет трюма — войска союзника остаются гарнизоном взятого вместе мира.
+    expect(marines(p.garrison)).toBe(4);
+    expect(p.beachheads).toBeUndefined();
   });
 });
 

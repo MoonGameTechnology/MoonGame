@@ -176,6 +176,11 @@ export const engageFleet = (playerId: string, fleetId: string, targetId: string)
  *  тем же правилом, что и редьюсер. */
 export const deployStation = (playerId: string, planetId: string) =>
   act(playerId, 'station.deploy', { planetId });
+/** Поставить космическую крепость на РАЗВИЛКУ тропы `trail` своей провинции `province`
+ *  (FORT-6.1): крепость встаёт на ромб развилки, её орудия ловят каждого на этой тропе.
+ *  Можно ли — решает `forkFortressRaise` (`fortressRaise.ts`) тем же правилом, что и ядро. */
+export const deployForkFortress = (playerId: string, province: string, trail: number) =>
+  act(playerId, 'station.deploy', { planetId: province, trail });
 /** Begin researching a session technology (one active at a time — technologyModule). */
 export const researchTech = (playerId: string, technology: string) =>
   act(playerId, 'technology.research', { technology });
