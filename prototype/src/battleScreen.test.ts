@@ -14,7 +14,9 @@ import {
   battleRetreats,
 } from './battleScreen';
 import { t } from '../../localization/runtime';
-import { displayUnit } from './format';
+import { displayUnit, esc, fmtHrs } from './format';
+import { engageForecastCard } from '../../decisions/engageForecast';
+import type { BattleForecast, ForecastSide } from '../../decisions/battleForecast';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
 const side = (
@@ -214,6 +216,92 @@ describe('окно боя', () => {
     const html = battleEndedHtml(null, 'отбились');
     expect(html).toContain('bw-ended');
     expect(html).not.toContain('bw-side');
+  });
+});
+
+describe('прогноз и правила в окне боя (UIX-6.2)', () => {
+  const card: BattleForecast = {
+    kind: 'card',
+    card: engageForecastCard({
+      outcome: 'attacker',
+      roundsEst: 3,
+      attacker: { damageFraction: 0.2 },
+      defender: { damageFraction: 1 },
+    }),
+  };
+
+  it('прогноз — словом, сроком и потерями; цвет лишь дублирует слово', () => {
+    const html = battleWindowHtml(
+      battle([side('p1', 'attacker', true), side('p2', 'defender')]),
+      [],
+      { forecast: () => card },
+    );
+    expect(html).toContain('bw-forecast positive');
+    expect(html).toContain(t('engage.forecast.win'));
+    expect(html).toContain(esc(t('engage.forecast.line', { h: fmtHrs(3), own: 20, foe: 100 })));
+    // Прогноз стоит над колонками сторон, а не теряется под ними.
+    expect(html.indexOf('bw-forecast')).toBeLessThan(html.indexOf('bw-columns'));
+  });
+
+  it('в прогноз идёт текущий состав стороны — стеки с остатком корпуса', () => {
+    const a = side('p1', 'attacker', true);
+    a.stacks = [{ unit: 'cruiser', count: 3, hp: 50 }];
+    let seen: readonly ForecastSide[] = [];
+    battleWindowHtml(battle([a, side('p2', 'defender')]), [], {
+      forecast: (sides) => ((seen = sides), null),
+    });
+    expect(seen).toEqual([
+      { mine: true, role: 'attacker', units: [{ unit: 'cruiser', count: 3, hp: 50 }] },
+      { mine: false, role: 'defender', units: [{ unit: 'cruiser', count: 3 }] },
+    ]);
+  });
+
+  it('сторон больше двух — честная строка «прогноза нет»; без прогноза — ни строки', () => {
+    const m = battle([side('p1', 'attacker', true), side('p2', 'defender'), side('p3', 'attacker')]);
+    expect(battleWindowHtml(m, [], { forecast: () => ({ kind: 'many' }) })).toContain(
+      t('battle.win.forecast-many'),
+    );
+    expect(battleWindowHtml(m, [], { forecast: () => null })).not.toContain('bw-forecast');
+    expect(battleWindowHtml(m)).not.toContain('bw-forecast');
+  });
+
+  it('кончившийся бой прогноза не показывает', () => {
+    const last = battle([side('p1', 'attacker', true), side('p2', 'defender')]);
+    expect(battleEndedHtml(last, 'отбились', { forecast: () => card })).not.toContain(
+      'bw-forecast',
+    );
+  });
+
+  it('на виду одна строка цены отхода, правила — под «?»', () => {
+    const m = battle([side('p1', 'attacker', true), side('p2', 'defender')]);
+    const closed = battleWindowHtml(m, ['p1-1']);
+    expect(closed).toContain(t('battle.win.retreat-cost'));
+    expect(closed).toContain('data-battle-rules aria-expanded="false"');
+    expect(closed).not.toContain(esc(t('battle.win.retreat-rules')));
+    expect(closed).not.toContain(esc(t('battle.win.rule')));
+    const open = battleWindowHtml(m, ['p1-1'], {}, { rules: true });
+    expect(open).toContain('data-battle-rules aria-expanded="true"');
+    expect(open).toContain(esc(t('battle.win.retreat-rules')));
+    expect(open).toContain(esc(t('battle.win.rule')));
+  });
+
+  it('на земле на виду «не отступают», под «?» — только правила раундов', () => {
+    const m = {
+      ...battle([side('p1', 'attacker', true, 'beachhead'), side('p2', 'defender', false, 'garrison')]),
+      phase: 'ground' as const,
+    };
+    const open = battleWindowHtml(m, [], {}, { rules: true });
+    expect(open).toContain(t('battle.win.ground-retreat'));
+    expect(open).not.toContain(t('battle.win.retreat-cost'));
+    expect(open).not.toContain(esc(t('battle.win.retreat-rules')));
+    expect(open).toContain(esc(t('battle.win.rule')));
+  });
+
+  it('в чужом бою приказов нет — под «?» только правила боя', () => {
+    const html = battleWindowHtml(battle([side('p2', 'attacker'), side('p3', 'defender')]));
+    expect(html).toContain(t('battle.win.rules'));
+    expect(html).not.toContain(t('battle.win.retreat-cost'));
+    expect(html).not.toContain('bw-orders');
   });
 });
 

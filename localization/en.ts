@@ -203,6 +203,11 @@ export const en: Record<string, string> = {
   'battle.win.against': 'Against: {name}',
   'battle.win.next-attack': 'Next attack',
   'battle.win.ground-retreat': 'Ground forces cannot retreat',
+  'battle.win.retreat-cost': 'Retreat: −40% of current hull and shield, speed burst',
+  'battle.win.retreat-rules':
+    "Retreat never finishes off a wounded fleet. Troops mid-landing can't retreat; outside battle a ship leaves orbit at no cost. After tapping, pick where to fall back on the map.",
+  'battle.win.rules': 'Battle rules',
+  'battle.win.forecast-many': 'No forecast: more than two sides',
   'battle.win.source-sector': 'Sector',
   'battle.win.source-planet': 'Planet type',
   'battle.win.source-hunger': 'Hunger',
@@ -3151,8 +3156,6 @@ export const en: Record<string, string> = {
   'side.arch.swarm': 'swarm',
   'side.arch.transport': 'transports',
   'side.battle.retreat': '⤺ Retreat',
-  'side.battle.retreat.hint':
-    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely. After tapping, pick where to fall back on the map.",
   'side.battle.side.fleet': 'fleet',
   'side.battle.side.garrison': 'garrison',
   'side.battle.side.landing': 'landing',
