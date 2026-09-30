@@ -36,11 +36,13 @@ import { isHostile, ownFleet } from '../util/combat';
 import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
 import { hangarSize, strikesReserved } from '../state/shuttle';
+import { isMineFleet } from '../state/minefields';
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
   // 1.3.0: неподвижный отряд не сливается и не делится (находка Codex на #1393).
-  version: '1.3.0',
+  // 1.4.0: атака мины — подрыв по атакующему, мина сама не атакует (SM-3.6).
+  version: '1.4.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -497,6 +499,13 @@ export const fleetOpsModule: GameModule = {
       }
       if (!f.location || f.movement || target.movement || f.location !== target.location) {
         return h.reject('E_NOT_COLOCATED');
+      }
+      // Мина не атакует; атаковать мину — значит сойтись с ней вплотную: подрыв по
+      // атакующему, без боя (решение владельца 2026-09-30, SM-3.6). Разбирает `minefield`.
+      if (isMineFleet(f, h.ctx.data)) return h.reject('E_MINE_PASSIVE');
+      if (isMineFleet(target, h.ctx.data)) {
+        h.emit('mine.contact', { fleetId: f.id, mines: [target.id], at: f.location, owner: f.owner });
+        return;
       }
       const battleId = `battle:${h.state.battleSeq++}`;
       // Round cadence mirrors combatModule's own: one round per GAME hour

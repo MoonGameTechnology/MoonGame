@@ -1324,6 +1324,8 @@
 | SM-3.3 | ✅ | core data | `docs/ship-modules-roadmap.md` | Ремонтный тендер: чинит соседей по флоту |
 | SM-3.4 | ✅ | core data | `docs/ship-modules-roadmap.md` | Минный заградитель: мины на дорогах |
 | SM-3.5 | ✅ | proto | `docs/ship-modules-roadmap.md` | Мины на карте прототипа |
+| SM-3.6 | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Мина — неподвижный отряд: выделяется, подрыв при встрече, флот летит дальше |
+| SM-3.7 | ⏳ | core proto | `docs/ship-modules-roadmap.md` | Ракетная мина и её ракета — тоже отряды |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |

@@ -38,7 +38,7 @@ export {
   type RoadTrail,
   type ForkAnchor,
   type Battle,
-  type Minefield,
+  type MinelayingJob,
   type MinefieldState,
   type BattleSide,
   type CombatantRef,
@@ -684,6 +684,13 @@ export {
   MINE_HIT_MAX,
   MINE_COOLDOWN_HOURS,
 } from './modules/minefield';
+export {
+  isMineFleet,
+  mineFleetVisible,
+  MINE_UNIT,
+  MINE_TRAIT,
+  MINE_DETECTION_RANGE,
+} from './state/minefields';
 export { autoRetreatDue, type AutoRetreatDue } from './state/autoRetreat';
 export { RETREAT_THRESHOLDS, type RetreatThreshold } from './modules/standingOrders';
 export { hullFraction, maxHull } from './util/repair';

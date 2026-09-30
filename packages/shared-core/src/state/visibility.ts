@@ -5,7 +5,7 @@ import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, mineVisibleTo, missilePositionAt } from './ordnance';
-import { visibleMinefields, fieldPosition, fieldVisible, MINE_SIGNATURE, MINE_DETECTION_RANGE } from './minefields';
+import { visibleMinefields, isMineFleet, mineFleetVisible, MINE_DETECTION_RANGE } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 export type { SignatureContact, SignatureSize } from './radarSignals';
 import type {
@@ -27,7 +27,6 @@ import type {
  *  production / arrivals in their view (the client renders the build queue + ETAs from
  *  them) while every enemy timer stays hidden. */
 function scheduledOwnedBy(event: ScheduledEvent, viewerId: PlayerId, state: GameState): boolean {
-  if (event.type === 'mines.crossed') return false;
   const p = (event.payload ?? {}) as Record<string, unknown>;
   if (p.owner === viewerId) return true;
   // Per-player events tagged by `playerId` (e.g. `technology.complete`) — the
@@ -275,7 +274,8 @@ function playerCircles(
     circle({ kind: 'world', id: planet.id }, planet.position, worldSightOf(rules, planet.kind), radar);
   }
   for (const fleet of Object.values(state.fleets)) {
-    if (fleet.owner !== ownerId) continue;
+    // Мина не глаз: своих кругов зрения у неё нет (SM-3.6).
+    if (fleet.owner !== ownerId || isMineFleet(fleet, data)) continue;
     // Круг стоит там, где КОРАБЛЬ, а не в узле назначения и не в ближайшем узле.
     const pos = fleetPosition(state, fleet);
     if (pos) circle({ kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
@@ -370,7 +370,7 @@ export function radarSources(
       }
     }
     for (const fleet of Object.values(state.fleets)) {
-      if (fleet.owner !== owner) continue;
+      if (fleet.owner !== owner || isMineFleet(fleet, data)) continue;
       const at = fleetPosition(state, fleet);
       if (!at) continue;
       for (const stack of fleet.units) {
@@ -399,8 +399,19 @@ export function radarSignatures(
   // A fleet in the viewer's own battle is shown in full (`engagementOf`) — no blip on top.
   const engaged = engagementOf(state, viewerId).fleets;
   const emitters: SignalEmitter[] = [];
+  const mineEmitters: SignalEmitter[] = [];
   for (const fleet of Object.values(state.fleets)) {
-    if (fleet.owner === viewerId || spied.has(fleet.owner) || engaged.has(fleet.id)) continue;
+    if (fleet.owner === viewerId) continue;
+    // Мина (SM-3.6): видимая вблизи — полностью, иначе — слабая отметка, которую ловит
+    // только близкий радар. Шпионаж, опознанный узел и чужой бой её не раскрывают.
+    if (isMineFleet(fleet, data)) {
+      const node = fleetNode(state, fleet);
+      const at = fleetPosition(state, fleet);
+      if (node === null || !at || mineFleetVisible(state, fleet, viewerId, data)) continue;
+      mineEmitters.push({ location: node, ...at, inTransit: !!fleet.edge, strength: fleetSignalStrength(fleet, data) });
+      continue;
+    }
+    if (spied.has(fleet.owner) || engaged.has(fleet.id)) continue;
     const location = fleetNode(state, fleet);
     const at = fleetPosition(state, fleet);
     if (location === null || identify.has(location) || !at) continue;
@@ -435,15 +446,8 @@ export function radarSignatures(
     contacts.push(...detectSignals([{ ...mine.position, location: nearest.id, inTransit: true, strength: def.mineSignature }],
       sources.map((r) => ({ ...r, range: Math.min(r.range, def.detectionRange) }))));
   }
-  for (const [key, owners] of Object.entries(state.minefields?.fields ?? {})) {
-    for (const [owner, field] of Object.entries(owners)) {
-      if (fieldVisible(state, key, owner, field, viewerId)) continue;
-      const at = fieldPosition(state, key, field);
-      if (!at) continue;
-      contacts.push(...detectSignals([{ ...at, location: field.edge?.from ?? key, inTransit: !!field.edge, strength: MINE_SIGNATURE * field.charge }],
-        sources.map((r) => ({ ...r, range: Math.min(r.range, MINE_DETECTION_RANGE) }))));
-    }
-  }
+  for (const emitter of mineEmitters)
+    contacts.push(...detectSignals([emitter], sources.map((r) => ({ ...r, range: Math.min(r.range, MINE_DETECTION_RANGE) }))));
   return contacts;
 }
 
@@ -512,6 +516,8 @@ export function isVisibleTo(
   const fleet = state.fleets[target.fleetId];
   if (!fleet) return false;
   if (fleet.owner === viewerId) return true;
+  // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
+  if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
   if (battle && fightsIn(battle, new Set(visionBloc(state, viewerId)))) return true;
   const at = fleetPositionAt(state, fleet, state.time);
@@ -876,7 +882,14 @@ function project(
   const engaged = engagementOf(state, viewerId);
   for (const id of Object.keys(view.fleets).sort()) {
     const fleet = view.fleets[id];
-    if (!fleet || fleet.owner === viewerId || spiedFleets.has(fleet.owner)) continue;
+    if (!fleet || fleet.owner === viewerId) continue;
+    // Чужая мина — только вблизи; шпионаж, бой и опознанный узел её не раскрывают (SM-3.6).
+    if (isMineFleet(fleet, data)) {
+      const original = state.fleets[id];
+      if (!original || !mineFleetVisible(state, original, viewerId, data)) delete view.fleets[id];
+      continue;
+    }
+    if (spiedFleets.has(fleet.owner)) continue;
     if (engaged.fleets.has(id)) continue; // the enemy in YOUR battle is not a secret
     const node = fleetNode(view, fleet);
     // Mines identify nearby ships at their continuous positions, including roads.

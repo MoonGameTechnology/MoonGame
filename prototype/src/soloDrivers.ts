@@ -17,7 +17,7 @@
  * хозяин отдаёт оба, и драйверы проверяются на настоящем состоянии без DOM.
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
-import { autoRetreatDue, beaconSentinels, RELAY_POST_TRAIT, shipsEngaged } from '../../packages/shared-core/src/index';
+import { autoRetreatDue, beaconSentinels, isMineFleet, RELAY_POST_TRAIT, shipsEngaged } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
 import type { StewardPosture } from './stewardScreen';
 import { StaggeredAi } from './aiScheduler';
@@ -166,15 +166,17 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
       f.units.some((u) => data.units[u.unit]?.traits.includes(RELAY_POST_TRAIT) ?? false);
     for (const f of Object.values(s.fleets)) {
       if (f.location == null || f.movement || f.battleId) continue;
-      if (sentinels.has(f.id) || post(f)) continue;
+      if (sentinels.has(f.id) || post(f) || isMineFleet(f, data)) continue;
       const mine = f.owner === host.me();
       // Чужие всегда давят цикл захвата; свой флот — только если игрок сам включил
       // авто-штурм (CC-2), иначе штурмами он распоряжается руками.
       if (mine && !host.autoAssault(f.id)) continue;
       const here = s.planets[f.location];
       if (!here || here.owner === f.owner) continue; // свой мир штурмовать нечего
+      // Мина (SM-3.6) захвату не мешает — как и в ядре (`captureOnArrival`).
       const enemyHere = Object.values(s.fleets).some(
-        (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
+        (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0) &&
+          !isMineFleet(g, data),
       );
       if (enemyHere) continue; // ПОЛИТИКА клиента: дать орбитальному бою утихнуть
       // RULES-1. Выше — только политика; ПРАВИЛА (захватываемая провинция, дипломатия,
@@ -209,9 +211,12 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     const fleets = Object.values(s.fleets);
     for (const f of fleets) {
       if (!f.location || f.movement || shipsEngaged(s, f)) continue;
+      // Мина (SM-3.6) — не противник в бою: «Атака» по ней — подрыв, и сводить с ней
+      // стоящий рядом флот каждый кадр значило бы взрывать его заряд за зарядом.
+      if (isMineFleet(f, data)) continue;
       for (const g of fleets) {
         if (g.id <= f.id) continue; // пара обрабатывается один раз
-        if (!g.location || g.movement || shipsEngaged(s, g)) continue;
+        if (!g.location || g.movement || shipsEngaged(s, g) || isMineFleet(g, data)) continue;
         if (f.owner === g.owner || f.location !== g.location) continue;
         // Бой начинается со стороны игрока, если он в паре есть.
         const myFleet = f.owner === me ? f : g.owner === me ? g : f;

@@ -12,6 +12,7 @@ import { MS_PER_DAY } from '../util/time';
 import { isCapturable, provinceScore } from '../state/sectorKind';
 import { isForkSite } from '../state/forkSite';
 import { getStance } from '../state/diplomacy';
+import { isMineFleet } from '../state/minefields';
 
 /** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
  *  pinned to them by test instead of to copied literals — the same fact now lives in
@@ -84,7 +85,9 @@ function computeScores(h: HandlerContext): Record<PlayerId, MatchScore> {
 
   for (const fleet of Object.values(h.state.fleets)) {
     const score = scores[fleet.owner];
-    if (!score) {
+    // Мина — ловушка, а не войско (решение владельца 2026-09-30, SM-3.6): не держит игрока
+    // в живых и не идёт в счёт флотов.
+    if (!score || isMineFleet(fleet, data)) {
       continue;
     }
     score.fleets += 1;
@@ -470,7 +473,8 @@ export const victoryModule: GameModule = {
   id: 'victory',
   // 1.3.1: в счёт юнитов входит десант на плацдармах (счёт очков не меняется).
   // 1.4.0: крепость на развилке — не территория (FORT-6.1).
-  version: '1.4.0',
+  // 1.5.0: мина не идёт в счёт флотов и юнитов (SM-3.6).
+  version: '1.5.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));

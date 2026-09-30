@@ -30,6 +30,8 @@ import {
   swarmNetPlan,
   musterPlan,
   SWARM_MEMORY_WINDOW,
+  isMineFleet,
+  mineFleetVisible,
   type GameState,
   type Action,
   type Battle,
@@ -1571,7 +1573,8 @@ function baseAiOrders(
       }
       const foeFleetAt = new Set<string>();
       for (const fl of Object.values(state.fleets)) {
-        if (fl.owner !== ai && fl.location && fl.units.some((st) => st.count > 0)) {
+        // Мина (SM-3.6) орбиту не занимает: высадке под ней она не помеха.
+        if (fl.owner !== ai && fl.location && fl.units.some((st) => st.count > 0) && !isMineFleet(fl, data)) {
           foeFleetAt.add(fl.location);
         }
       }
@@ -1625,6 +1628,8 @@ function baseAiOrders(
               getStance(state, ai, fl.owner) === 'war' &&
               fl.location !== null &&
               fl.units.some((st) => st.count > 0) &&
+              // Мину бот бьёт челноками, только когда видит её — вблизи (SM-3.6).
+              (!isMineFleet(fl, data) || mineFleetVisible(state, fl, ai, data)) &&
               inReach(state.planets[fl.location]?.position ?? { x: 1e9, y: 1e9 }),
           ),
           bombPad.at,

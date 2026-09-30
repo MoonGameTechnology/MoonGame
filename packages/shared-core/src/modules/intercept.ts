@@ -9,6 +9,7 @@ import {
   trunkOccupancies,
   trunkPosAt,
 } from '../util/combat';
+import { isMineFleet } from '../state/minefields';
 
 /**
  * Флот дерётся в бою НА ДОРОГЕ: приколот к точке полосы, бой на орбитальной фазе. Для
@@ -20,6 +21,10 @@ function roadEngaged(h: HandlerContext, f: Fleet): boolean {
   if (!f.battleId || f.movement || !f.edge) return false;
   return h.state.battles[f.battleId]?.phase === 'orbital';
 }
+/** Одна из двух — мина (SM-3.6). */
+const mineInPair = (h: HandlerContext, a: Fleet, b: Fleet): boolean =>
+  isMineFleet(a, h.ctx.data) || isMineFleet(b, h.ctx.data);
+
 /** Флот может участвовать во встрече: свободен или стоит в бою на дороге. */
 const canMeet = (h: HandlerContext, f: Fleet): boolean => !f.battleId || roadEngaged(h, f);
 
@@ -68,8 +73,10 @@ function scanLaneIntercepts(h: HandlerContext, fleetId: string): void {
     }
     let tc: number | null = null;
     if (!occA.moving && !occB.moving) {
-      // Both parked: a crossing only if they sit on the very same point (rare).
-      if (Math.abs(occA.s0 - occB.s0) <= INTERCEPT_TOL) {
+      // Both parked: a crossing only if they sit on the very same point (rare). A mine
+      // (SM-3.6) is struck by MOVING into it: a fleet that stopped on it was hit on the way
+      // in, and a mine laid under a standing fleet waits for it to move.
+      if (Math.abs(occA.s0 - occB.s0) <= INTERCEPT_TOL && !mineInPair(h, fleet, other)) {
         tc = lo;
       }
     } else {
@@ -123,8 +130,9 @@ function scanTrunkIntercepts(h: HandlerContext, fleetId: string): void {
         if (!(hi >= lo)) continue;
         let tc: number | null = null;
         if (!occA.moving && !occB.moving) {
-          // Both parked: a meeting only if they stand on the very same point.
-          if (Math.abs(occA.s0 - occB.s0) <= INTERCEPT_TOL) tc = lo;
+          // Both parked: a meeting only if they stand on the very same point (a mine —
+          // only by moving into it, as on a lane).
+          if (Math.abs(occA.s0 - occB.s0) <= INTERCEPT_TOL && !mineInPair(h, fleet, other)) tc = lo;
         } else {
           const dLo = trunkPosAt(occA, lo) - trunkPosAt(occB, lo);
           const dHi = trunkPosAt(occA, hi) - trunkPosAt(occB, hi);
@@ -153,7 +161,8 @@ function scanTrunkIntercepts(h: HandlerContext, fleetId: string): void {
  */
 export const interceptModule: GameModule = {
   id: 'intercept',
-  version: '1.2.0',
+  // 1.3.0: две стоящие точки не встречаются, если одна из них — мина (SM-3.6).
+  version: '1.3.0',
   setup(api) {
     // Lane combat: a fleet just began a leg / parked on a lane → look for a hostile
     // fleet it will cross ON the lane (not only at a node), or on a trunk it shares with
