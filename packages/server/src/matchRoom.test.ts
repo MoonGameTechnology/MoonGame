@@ -1192,6 +1192,24 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         const { at } = action.payload as { at: string };
         h.emit('hero.spawned', { owner: action.playerId, heroId: 'h1', fleetId: 'f1', at });
       });
+      // Бой p1 против p3 в мире `far`, которого не опознаёт никто.
+      api.onAction('test.battle', (_action, h) => {
+        h.state.battles['battle:9'] = {
+          id: 'battle:9',
+          location: 'far',
+          phase: 'orbital',
+          round: 0,
+          sides: [
+            { ref: { kind: 'fleet', fleetId: 'f1' }, owner: 'p1', role: 'attacker' },
+            { ref: { kind: 'fleet', fleetId: 'f3' }, owner: 'p3', role: 'defender' },
+          ],
+        };
+        h.emit('battle.started', { battleId: 'battle:9', location: 'far', phase: 'orbital', attacker: 'p1', defender: 'p3' });
+      });
+      api.onAction('test.battle-end', (_action, h) => {
+        delete h.state.battles['battle:9'];
+        h.emit('battle.resolved', { battleId: 'battle:9', location: 'far', winner: 'p3', winners: ['p3'] });
+      });
     },
   };
 
@@ -1209,6 +1227,15 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
           id: 'node1',
           owner: 'p2',
           position: { x: 0, y: 0 },
+          resources: {},
+          buildings: [],
+          garrison: [],
+          traits: [],
+        },
+        far: {
+          id: 'far',
+          owner: null,
+          position: { x: 50_000, y: 0 },
           resources: {},
           buildings: [],
           garrison: [],
@@ -1276,6 +1303,19 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     expect(lastEvents(p1)).toContain('hero.spawned');
     expect(lastEvents(p2)).not.toContain('hero.spawned'); // the leak BF-16 plugged
     expect(lastEvents(p3)).not.toContain('hero.spawned');
+  });
+
+  it('a battle reports to its own sides even where nobody identifies the world — start and end', () => {
+    const { r, p1, p2, p3 } = fogRoom();
+    r.submitAction('p1', { id: 'e4', type: 'test.battle', playerId: 'p1', issuedAt: 1, payload: {} }, p1);
+    expect(lastEvents(p1)).toContain('battle.started');
+    expect(lastEvents(p3)).toContain('battle.started');
+    expect(lastEvents(p2)).not.toContain('battle.started'); // not a side, world unseen
+    // Итог приходит, когда боя в состоянии уже нет: его несёт кадр, в котором бой был.
+    r.submitAction('p1', { id: 'e5', type: 'test.battle-end', playerId: 'p1', issuedAt: 2, payload: {} }, p1);
+    expect(lastEvents(p1)).toContain('battle.resolved');
+    expect(lastEvents(p3)).toContain('battle.resolved');
+    expect(lastEvents(p2)).not.toContain('battle.resolved');
   });
 });
 
