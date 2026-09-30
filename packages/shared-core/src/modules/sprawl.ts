@@ -1,6 +1,7 @@
 import type { ResourceBag } from '../data/schemas';
 import type { GameModule } from '../kernel/module';
 import type { GameState } from '../state/gameState';
+import { isForkSite } from '../state/forkSite';
 
 /**
  * BAL-10 · Growth tax («налог на рост державы», owner decision 2026-09-30). The
@@ -31,11 +32,12 @@ export function sprawlFactor(n: number): number {
 }
 
 /** Provinces (planet-map nodes of every kind) `owner` holds — the `n` fed to
- *  {@link sprawlFactor}. Neutral (`null`) owns nothing. */
+ *  {@link sprawlFactor}. Neutral (`null`) owns nothing. A fortress pad on a road fork
+ *  is not a province (`isForkSite`), so building a fortress does not raise the tax. */
 export function ownedProvinceCount(state: GameState, owner: string | null): number {
   if (owner === null) return 0;
   let n = 0;
-  for (const p of Object.values(state.planets)) if (p.owner === owner) n += 1;
+  for (const p of Object.values(state.planets)) if (p.owner === owner && !isForkSite(p)) n += 1;
   return n;
 }
 

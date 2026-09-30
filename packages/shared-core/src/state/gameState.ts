@@ -466,6 +466,11 @@ export interface Planet {
    *  заново, когда вид уже перезаписан. Присутствует только у стоящей крепости и
    *  снимается вместе с ней; отсутствует у всех остальных узлов. */
   priorKind?: string;
+  /** ПЛОЩАДКА КРЕПОСТИ НА РАЗВИЛКЕ (FORT-6.1): развилка какой тропы какой провинции.
+   *  Узел с этим полем — не провинция, а место, где стоит (или стояла) космическая
+   *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не
+   *  считают территорией (`state/forkSite.ts`). Отсутствует у всех обычных узлов. */
+  fork?: ForkAnchor;
   /** Relative size / weight of the sector (default 1). Drives how much territory
    *  it claims: a sector's border with a neighbour sits proportionally to their
    *  sizes, so resizing one shifts its neighbours' borders evenly. Undefined = 1. */
@@ -591,6 +596,13 @@ export interface FleetMovement {
 export interface RoadPoint {
   x: number;
   y: number;
+}
+
+/** Где стоит крепость на развилке (FORT-6.1): провинция и номер её тропы
+ *  (`Planet.roads.trails[trail]`), чья развилка и есть место. */
+export interface ForkAnchor {
+  province: PlanetId;
+  trail: number;
 }
 
 /** One trail leaving a province's world (ROADS-1). */

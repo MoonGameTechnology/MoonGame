@@ -51,6 +51,12 @@ describe('sprawlFactor', () => {
     expect(ownedProvinceCount(s, 'p2')).toBe(1);
     expect(ownedProvinceCount(s, null)).toBe(0);
   });
+
+  it('does not count a fortress pad on a road fork as a province', () => {
+    const s = empire(3);
+    s.planets.pad = { ...s.planets.n1!, id: 'pad', fork: { province: 'n0', trail: 0 } };
+    expect(ownedProvinceCount(s, 'p1')).toBe(3);
+  });
 });
 
 describe('sprawl module', () => {

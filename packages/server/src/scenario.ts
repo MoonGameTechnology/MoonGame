@@ -231,10 +231,15 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '58'; // BAL-10: налог на рост державы. В ЧЛЕНСТВО
+export const MODULE_MANIFEST_VERSION = '59'; // BAL-10: налог на рост державы. В ЧЛЕНСТВО
 // вошёл `sprawl` 1.0.0 сразу за `faction`: у места больше 35 провинций выход всех миров
-// умножается на 1/(1 + 0,1 × лишние). Партия на 57 молча сменила бы доход посреди игры.
-// const MODULE_MANIFEST_VERSION = '57'; // Замечания Codex на MSB-9 (#1392). Членство и
+// умножается на 1/(1 + 0,1 × лишние). Партия на 58 молча сменила бы доход посреди игры.
+// const MODULE_MANIFEST_VERSION = '58'; // FORT-6.1: крепость на развилке. Членство и
+// порядок не тронуты; `station` 1.3.0 ставит крепость на развилку дороги (`station.deploy`
+// с `trail`), у провинции-площадки новое поле `Planet.fork`; `victory` 1.4.0 и `pve` 1.7.0
+// не считают площадку территорией, `hero` 4.5.0 не поднимает на ней корабль. Партия на 57
+// не знает площадок.
+// export const MODULE_MANIFEST_VERSION = '57'; // Замечания Codex на MSB-9 (#1392). Членство и
 // порядок не тронуты; `combat` 3.2.0 замораживает заявку высадки, не перезапускает плацдарм
 // после перемирия и ничьей и не стирает берега союзников при захвате; `effects` 0.2.0 видит
 // состав захвативших плацдармом; `economy` 1.1.0, `technology` 1.1.0 и `victory` 1.3.1 считают

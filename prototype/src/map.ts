@@ -71,6 +71,9 @@ const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
   // серо-синие): крепость единственная на карте появляется ПО ВОЛЕ игрока, и её надо
   // отличать от ландшафта с одного взгляда, а не вчитываясь в подпись.
   void_station: { name: 'Void Fortress', core: 'empty_space', color: '#ffb347' },
+  // Площадка той же крепости на РАЗВИЛКЕ дороги (FORT-6.1) — тот же рукотворный цвет:
+  // крепость одна и та же, другое у неё только место.
+  fork_station: { name: 'Fork Fortress', core: 'empty_space', color: '#ffb347' },
 };
 
 /** SECTOR_TYPES = UI delta + gameplay flags DERIVED from `data.sectorKinds` via the
