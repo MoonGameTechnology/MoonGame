@@ -226,7 +226,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '56'; // Находка Codex на #1393: орудия крепости не
+export const MODULE_MANIFEST_VERSION = '57'; // Замечания Codex на MSB-9 (#1392). Членство и
+// порядок не тронуты; `combat` 3.2.0 замораживает заявку высадки, не перезапускает плацдарм
+// после перемирия и ничьей и не стирает берега союзников при захвате; `effects` 0.2.0 видит
+// состав захвативших плацдармом; `economy` 1.1.0, `technology` 1.1.0 и `victory` 1.3.1 считают
+// десант на плацдармах. У заявки высадки новое поле `troops`. Партия на 56 молча сменила бы
+// исход штурма, содержание и счёт посреди игры.
+// export const MODULE_MANIFEST_VERSION = '56'; // Находка Codex на #1393: орудия крепости не
 // сливаются и не делятся, прикрытие — только отряду из одних орудий. Членство и порядок не
 // тронуты; `fleet-ops` 1.3.0 отбивает слияние и раскол неподвижного отряда (`E_EMPLACEMENT`),
 // `station` 1.2.0 проверяет состав. Партия на 55 молча сменила бы исход слияния посреди игры.
