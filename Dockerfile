@@ -31,7 +31,7 @@
 # node:26-slim digest refreshed 2026-09-13 (SEC-40; the tag had moved on from the 2026-07
 # pin). This stage is NOT shipped, so the bump closes nothing in `trivy image` — it keeps
 # the builder off a stale base and the SEC-34 pin-vs-tag step quiet.
-FROM node:26-slim@sha256:14bf3eac4bf209d906d3c41256597d3ab1f926b2e93a79e9bdfe1efd32454239 AS build
+FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS build
 WORKDIR /app
 # Node ≥25 no longer ships corepack in the distribution (the 22→26 bump, PR #106,
 # silently broke this line — caught by the SEC-1 blocking trivy-image gate), so install
