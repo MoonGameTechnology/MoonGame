@@ -14,6 +14,7 @@ import {
   type Fleet,
   type GameData,
   type GameState,
+  type MinelayingJob,
 } from '../packages/shared-core/src/index';
 
 /** Кнопка постановки на карточке флота. */
@@ -56,4 +57,22 @@ export function ownMinefields(
     .map((id) => state.fleets[id]!)
     .filter((f) => f.owner === me && isMineFleet(f, data))
     .map((f) => ({ fleetId: f.id, charge: f.units.reduce((n, st) => n + st.count, 0) }));
+}
+
+/**
+ * Свои установки мин (SM-3.4) с носителем — в порядке id. Ключ записи среза и есть id
+ * носителя: по нему, а не по ссылке на запись, — клиент читает срез из копии
+ * (`visibleMinefields`), и сравнение по ссылке не находило носителя. У установки на узле
+ * это пряталось за позицией мира, а дорожная (`location: null`) теряла знак на все
+ * 15 минут постановки (ревью #1411).
+ */
+export function ownInstallations(
+  state: GameState,
+  me: string,
+): Array<{ layerId: string; layer: Fleet | undefined; job: MinelayingJob }> {
+  const jobs = state.minefields?.installations ?? {};
+  return Object.keys(jobs)
+    .sort()
+    .filter((id) => jobs[id]!.owner === me)
+    .map((id) => ({ layerId: id, layer: state.fleets[id], job: jobs[id]! }));
 }

@@ -2039,7 +2039,7 @@ export const en: Record<string, string> = {
   'err.no-minelayer': 'no mine layer',
   'err.mines-cooldown': 'mines not ready yet',
   'err.emplacement': 'an emplacement cannot merge or split',
-  'err.mine-passive': 'a mine does not attack',
+  'err.mine-passive': 'a mine takes no orders',
   'err.fleet-immobile': 'this fleet cannot set out',
   'err.forbidden': 'action forbidden',
   'err.grant-only': 'this one is granted, not researched',

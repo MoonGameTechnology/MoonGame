@@ -10,10 +10,12 @@ import type { GameModule } from '../kernel/module';
 import { missingHull, INSTANT_REPAIR_CREDITS_PER_HP } from '../util/repair';
 import { canAfford, payCost } from '../util/treasury';
 import { ownFleet } from '../util/combat';
+import { rejectMine } from '../util/fleet';
 
 export const instantRepairModule: GameModule = {
   id: 'instant-repair',
-  version: '1.1.0',
+  // 1.2.0: мину не чинят — она без приказов (`E_MINE_PASSIVE`, ревью #1411).
+  version: '1.2.0',
   setup(api) {
     api.onAction('fleet.instantRepair', (action, h) => {
       const p = action.payload as { fleetId?: unknown };
@@ -21,6 +23,7 @@ export const instantRepairModule: GameModule = {
       const f = ownFleet(h.state, p.fleetId);
       // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
       if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       if (f.battleId) return h.reject('E_IN_BATTLE');
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_NO_PLAYER');
@@ -43,6 +46,7 @@ export const instantRepairModule: GameModule = {
       if (typeof p?.fleetId !== 'string') return h.reject('E_BAD_PAYLOAD');
       const f = ownFleet(h.state, p.fleetId);
       if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       if (f.battleId) return h.reject('E_IN_BATTLE');
       const hull = missingHull(f, h.ctx.data);
       if (hull <= 0) return h.reject('E_NOTHING_TO_REPAIR');

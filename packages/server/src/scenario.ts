@@ -226,7 +226,14 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '59'; // SM-3.6: мина — неподвижный отряд. Членство и
+export const MODULE_MANIFEST_VERSION = '60'; // Ревью мины (#1411). Членство и порядок не
+// тронуты; мина — отряд без приказов: общий пропуск приказов флота (`util/fleet`) и
+// `standing-orders` 1.1.0, `fleet-repair` 1.1.0, `instant-repair` 1.2.0, `forced-march`
+// 1.1.0, `extraction` 1.1.0 отбивают её `E_MINE_PASSIVE`; `orbital` 1.2.0 не даёт ей
+// обстреливать и делить залп ПВО; `shuttle` 1.3.0 не бьёт невидимую мину; `minefield` 2.1.0
+// взрывает мины одной точки дороги одним подрывом (новое поле `minefields.struck`) и не
+// назначает повторную встречу при пополнении.
+// export const MODULE_MANIFEST_VERSION = '59'; // SM-3.6: мина — неподвижный отряд. Членство и
 // порядок не тронуты; `minefield` 2.0.0 ставит мину отрядом во `fleets` (юнит `mine`) и
 // подрывает её при встрече вплотную, флот летит дальше; `combat` 3.3.0 не заводит бой с миной,
 // `intercept` 1.3.0 не сводит стоящую мину со стоящим флотом, `fleet-ops` 1.4.0 — «Атака» по

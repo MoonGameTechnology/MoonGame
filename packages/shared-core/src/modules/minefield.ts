@@ -71,7 +71,8 @@ function tidy(h: HandlerContext): void {
   if (!m) return;
   if (m.installations && !Object.keys(m.installations).length) delete m.installations;
   if (m.ownerReadyAt && !Object.keys(m.ownerReadyAt).length) delete m.ownerReadyAt;
-  if (!Object.keys(m.readyAt).length && !m.installations && !m.ownerReadyAt) delete h.state.minefields;
+  if (m.struck && !Object.keys(m.struck).length) delete m.struck;
+  if (!Object.keys(m.readyAt).length && !m.installations && !m.ownerReadyAt && !m.struck) delete h.state.minefields;
 }
 
 /** `mineHit` стека — доля, которую снимает один его заряд. */
@@ -132,8 +133,9 @@ const sameWarhead = (a: UnitStack, b: UnitStack): boolean =>
   JSON.stringify(a.moduleStars ?? {}) === JSON.stringify(b.moduleStars ?? {}) &&
   JSON.stringify(a.moduleRarity ?? {}) === JSON.stringify(b.moduleRarity ?? {});
 
-/** Поставить мину: добавить заряды своей мине в той же точке или завести новый отряд. */
-function placeMine(h: HandlerContext, job: MinelayingJob): Fleet {
+/** Поставить мину: добавить заряды своей мине в той же точке или завести новый отряд.
+ *  `created` — отряд новый: только о нём модулю перехвата есть что сказать. */
+function placeMine(h: HandlerContext, job: MinelayingJob): { mine: Fleet; created: boolean } {
   const own = Object.keys(h.state.fleets).sort()
     .map((id) => h.state.fleets[id]!)
     .find((f) => f.owner === job.owner && !f.movement && isMineFleet(f, h.ctx.data) && samePlace(f, job));
@@ -148,7 +150,7 @@ function placeMine(h: HandlerContext, job: MinelayingJob): Fleet {
       room -= st.count;
     }
     own.units = own.units.filter((st) => st.count > 0);
-    return own;
+    return { mine: own, created: false };
   }
   const id = `fleet:mine:${job.owner}:${h.ctx.now}:${nextFleetSeq(h.state)}`;
   const mine: Fleet = {
@@ -163,7 +165,7 @@ function placeMine(h: HandlerContext, job: MinelayingJob): Fleet {
     battleId: null,
   };
   h.state.fleets[id] = mine;
-  return mine;
+  return { mine, created: true };
 }
 
 /** Снять одну мину со стека: заряд потрачен, корпус урезан под оставшиеся. */
@@ -241,6 +243,37 @@ function detonate(h: HandlerContext, victimId: string, mineIds: readonly string[
   }
 }
 
+/** Та же точка дороги у двух стоящих отрядов: та же дорога и та же доля (в любую сторону). */
+function sameRoadPoint(a: Fleet, b: Fleet): boolean {
+  const ea = a.edge, eb = b.edge;
+  if (a.location !== null || b.location !== null || !ea || !eb) return false;
+  if (ea.from === eb.from && ea.to === eb.to) return Math.abs(ea.t - eb.t) < 1e-9;
+  return ea.from === eb.to && ea.to === eb.from && Math.abs(1 - ea.t - eb.t) < 1e-9;
+}
+
+/**
+ * Подрыв на дороге: флот `victimId` сошёлся с миной `mineId`. Срабатывают ВСЕ мины этой
+ * точки дороги разом — как на узле, с одним потолком `MINE_HIT_MAX` на вход. Встреч с
+ * ними модуль перехвата назначил по одной на пару; первая в эту секунду подрывает всё,
+ * остальные уже не находят, что взрывать (ревью #1411: доли разных владельцев
+ * применялись по очереди к уменьшенному корпусу, и потолок считался на каждую отдельно).
+ */
+function detonateOnRoad(h: HandlerContext, victimId: string, mineId: string): void {
+  const m = slice(h);
+  if (m.struck?.[victimId] === h.ctx.now) {
+    tidy(h);
+    return;
+  }
+  const hit = h.state.fleets[mineId];
+  if (!hit) return;
+  const mines = Object.keys(h.state.fleets).sort().filter((id) => {
+    const f = h.state.fleets[id]!;
+    return id === mineId || (isMineFleet(f, h.ctx.data) && sameRoadPoint(f, hit));
+  });
+  (m.struck ??= {})[victimId] = h.ctx.now;
+  detonate(h, victimId, mines);
+}
+
 /**
  * Мина и другой флот встретились — вернуть пару «жертва, мина», если это она.
  *
@@ -262,7 +295,9 @@ function mineAndVictim(h: HandlerContext, a: string, b: string): { victim: strin
 export const minefieldModule: GameModule = {
   id: 'minefield',
   // 2.0.0: мина — неподвижный отряд; подрыв при встрече, флот летит дальше (SM-3.6).
-  version: '2.0.0',
+  // 2.1.0: ревью #1411 — мина не ставит мины; мины одной точки дороги срабатывают одним
+  // подрывом с общим потолком; пополнение не назначает вторую встречу.
+  version: '2.1.0',
   setup(api) {
     api.onAction('fleet.layMines', (action, h) => {
       const { fleetId } = (action.payload ?? {}) as { fleetId?: unknown };
@@ -309,13 +344,15 @@ export const minefieldModule: GameModule = {
         tidy(h);
         return;
       }
-      const mine = placeMine(h, job);
+      const { mine, created } = placeMine(h, job);
       const charge = mine.units.reduce((n, st) => n + st.count, 0);
       const position = fleetPositionAt(h.state, mine, h.ctx.now);
       h.emit('mines.laid', { owner: job.owner, fleetId: mine.id, at: job.location ?? job.edge!.from, ...(position ? { position } : {}), charge });
       // Мина на дороге — стоящая точка для модуля перехвата: он назначит встречу каждому,
-      // кто идёт по этой дороге, как с любым стоящим на ней флотом.
-      if (mine.edge) h.emit('fleet.parked', { fleetId: mine.id, edge: mine.edge });
+      // кто идёт по этой дороге, как с любым стоящим на ней флотом. Только НОВАЯ: у
+      // пополненной встречи уже назначены, и повтор дал бы второй подрыв за один проход
+      // (ревью #1411).
+      if (created && mine.edge) h.emit('fleet.parked', { fleetId: mine.id, edge: mine.edge });
       tidy(h);
     });
 
@@ -351,7 +388,7 @@ export const minefieldModule: GameModule = {
       const ob = laneOccupancy(h.state.fleets[b]!);
       if (!oa || !ob || oa.lo !== ob.lo || oa.hi !== ob.hi) return;
       if (Math.abs(posAt(oa, h.ctx.now) - posAt(ob, h.ctx.now)) > INTERCEPT_TOL) return;
-      detonate(h, pair.victim, [pair.mine]);
+      detonateOnRoad(h, pair.victim, pair.mine);
     });
     api.on('fleet.meet', (event, h) => {
       const { a, b, trunk } = event.payload as { a: string; b: string; trunk: string };
@@ -361,7 +398,7 @@ export const minefieldModule: GameModule = {
       const ob = trunkOccupancies(h.state, h.state.fleets[b]!).find((o) => o.key === trunk);
       if (!oa || !ob) return;
       if (Math.abs(trunkPosAt(oa, h.ctx.now) - trunkPosAt(ob, h.ctx.now)) > INTERCEPT_TOL) return;
-      detonate(h, pair.victim, [pair.mine]);
+      detonateOnRoad(h, pair.victim, pair.mine);
     });
 
     // Корабли атаковали мину приказом (`fleet.engage`): вплотную — значит, подрыв по ним.
@@ -380,6 +417,8 @@ export const minefieldModule: GameModule = {
         if (at <= h.ctx.now || !h.state.fleets[fleetId]) delete m.readyAt[fleetId];
       for (const [owner, at] of Object.entries(m.ownerReadyAt ?? {}))
         if (at <= h.ctx.now) delete m.ownerReadyAt![owner];
+      for (const [fleetId, at] of Object.entries(m.struck ?? {}))
+        if (at < h.ctx.now) delete m.struck![fleetId];
       tidy(h);
     });
   },
