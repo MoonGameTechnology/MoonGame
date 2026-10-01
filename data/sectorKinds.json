@@ -117,6 +117,25 @@
     "stationable": false,
     "bombardable": false
   },
+  "fork_station": {
+    "name": "Fork Fortress",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": true,
+    "orbit": false,
+    "traversable": false,
+    "allowedBuildings": [
+      "radar",
+      "void_shield"
+    ],
+    "appearance": {
+      "color": "#5f8f8c",
+      "label": "fork fortress",
+      "shape": "station"
+    },
+    "stationable": false,
+    "bombardable": false
+  },
   "pirate_base": {
     "name": "Pirate Base",
     "capturable": true,

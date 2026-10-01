@@ -24,6 +24,7 @@ import { bossFallen, heroByFleet, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
+import { isForkSite } from '../state/forkSite';
 import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
 import { knownSkillNodes } from '../util/heroSkills';
@@ -699,7 +700,8 @@ export const heroModule: GameModule = {
   // 4.3.0 PVR-4.7: босс умирает насовсем; смерть героя узнаётся по корпусу его архетипа;
   // «Поглощение мира» (`devour`) — осада мира вместо мгновенной аннигиляции.
   // 4.4.0: map-authored hero rescue on arrival, with one-time persisted recruitment facts.
-  version: '4.4.0',
+  // 4.5.0: герой не появляется на крепости у развилки — это не мир (FORT-6.1).
+  version: '4.5.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -1030,13 +1032,13 @@ export const heroModule: GameModule = {
       if (!hero || hero.alive) return;
       const owner = hero.owner;
       if (activeHeroCount(h.state, owner) >= HERO_ACTIVE_CAP) return;
+      // Крепость на развилке — не мир (FORT-6.1): у её площадки нет лейнов, и корабль,
+      // поднятый там, не ушёл бы никуда.
       const owned = (id: PlanetId | undefined): id is PlanetId =>
-        id !== undefined && h.state.planets[id]?.owner === owner;
-      const at =
-        [hero.home, hero.location].find(owned) ??
-        Object.keys(h.state.planets)
-          .sort()
-          .find((id) => h.state.planets[id]?.owner === owner);
+        id !== undefined &&
+        h.state.planets[id]?.owner === owner &&
+        !isForkSite(h.state.planets[id]);
+      const at = [hero.home, hero.location].find(owned) ?? Object.keys(h.state.planets).sort().find(owned);
       if (at === undefined) return;
       const fleetId = formHeroShip(h, hero, at);
       h.emit('hero.respawned', { owner, heroId, fleetId, at });
@@ -1067,6 +1069,8 @@ export const heroModule: GameModule = {
       const host = planet === undefined ? h.state.fleets[at] : undefined;
       if (!planet && !host) return h.reject('E_NO_PLANET');
       if (planet) {
+        // Площадка крепости на развилке — не мир (FORT-6.1): уйти оттуда кораблю некуда.
+        if (isForkSite(planet)) return h.reject('E_BAD_SPAWN');
         const own = planet.owner === action.playerId;
         const allied =
           !own &&

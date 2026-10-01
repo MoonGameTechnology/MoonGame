@@ -1,11 +1,23 @@
 import type { Fleet, GameState, PlanetId } from '../state/gameState';
 import type { HandlerContext } from '../kernel/module';
 import { ownFleet } from './combat';
+import { isMineFleet } from '../state/minefields';
 
 /** A fleet that has been validated as stationed at a planet and idle (not
  *  moving, not in battle). The `location` is guaranteed non-null. */
 export interface IdleFleet extends Fleet {
   location: PlanetId;
+}
+
+/**
+ * Мина — отряд без приказов (SM-3.6, решение владельца 2026-09-30). Находка Codex на
+ * #1411: мина стоит во `fleets`, поэтому общие приказы флота принимали её как актёра —
+ * `fleet.orbit` и `fleet.bombard` морозили вражеское производство безоружной миной,
+ * `fleet.layMines` перезаряжал её самой собой. Правило стоит здесь, в общем пропуске
+ * приказов флота, и по трейту: модулю, который принимает приказ, мина не известна.
+ */
+export function rejectMine(h: HandlerContext, fleet: Fleet): void {
+  if (isMineFleet(fleet, h.ctx.data)) h.reject('E_MINE_PASSIVE');
 }
 
 /** Resolves a fleet the player owns and that is idle (docked, not moving, not
@@ -39,6 +51,7 @@ export function requireOwnedUnengagedFleet(
   if (!fleet || fleet.owner !== playerId) {
     h.reject('E_NO_FLEET');
   }
+  rejectMine(h, fleet);
   if (fleet.battleId) {
     h.reject('E_FLEET_BUSY');
   }
@@ -56,6 +69,7 @@ export function requireOwnedIdleFleet(
   if (!fleet || fleet.owner !== playerId) {
     h.reject('E_NO_FLEET');
   }
+  rejectMine(h, fleet);
   // Высадка штурмом держит флот на орбите до срока (решение владельца 2026-09-26): улететь
   // или взять другой приказ он не может, пока десант не сошёл на землю.
   if (fleet.location === null || fleet.movement || fleet.battleId || fleet.assaultLanding) {

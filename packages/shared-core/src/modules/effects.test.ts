@@ -411,3 +411,37 @@ describe('effectsModule — capability extension seam (EFX-1)', () => {
     expect(advanced.state.players['p1']!.resources['energy']).toBe(999);
   });
 });
+
+// Захват ПЛАЦДАРМОМ (MSB-9: так берётся любой обороняемый мир) публикует `planet.captured`
+// с `by` = id самого мира — флота-захватчика нет. Взявшие мир войска к этому моменту и
+// есть его гарнизон: правило с трейтом захватчика читает их (замечание Codex на #1392).
+describe('effectsModule — захват плацдармом (by = id мира)', () => {
+  const data = makeData({ infect_planet: INFECT });
+  const captureByBeachhead: GameModule = {
+    id: 'test-beachhead-capture',
+    version: '1.0.0',
+    setup(api) {
+      api.onAction('test.capture', (action, h) => {
+        const planetId = (action.payload as { planetId: string }).planetId;
+        h.state.planets[planetId]!.owner = action.playerId;
+        h.emit('planet.captured', { planetId, owner: action.playerId, by: planetId });
+      });
+    },
+  };
+  const kernel = createKernel([captureByBeachhead, effectsModule]);
+  const capture = (garrison: string): GameState => {
+    const b = planet('B', 'p2', 0);
+    b.garrison = [{ unit: garrison, count: 1 }];
+    const st = baseState([b], [], [player('p1', 0), player('p2', 0)]);
+    const action: Action = { id: 'c', type: 'test.capture', playerId: 'p1', payload: { planetId: 'B' }, issuedAt: 0 };
+    return okApply(kernel.applyAction(st, action, { now: 0, data })).state;
+  };
+
+  it('войска с трейтом, взявшие мир с земли, запускают правило', () => {
+    expect(capture('plaguebearer').planets.B?.traits).toContain('infected');
+  });
+
+  it('без трейта у взявших — правило молчит', () => {
+    expect(capture('scout').planets.B?.traits).not.toContain('infected');
+  });
+});

@@ -11,6 +11,7 @@ import {
 } from './gameState';
 import {
   DEFAULT_SIGHT,
+  engagementOf,
   fleetRadarRange,
   identifiedNodes,
   isVisibleTo,
@@ -1118,5 +1119,83 @@ describe('обзор мира по виду провинции (решение �
       expect(sightRulesOf({ sight })).toBe(DEFAULT_SIGHT);
     }
     expect(sightRulesOf({ sight: RULES })).toBe(RULES);
+  });
+});
+
+describe('свой бой виден целиком (баг владельца 2026-09-29: «столкнулся с невидимым флотом»)', () => {
+  /** Перехват посреди длинной трассы L1 (x=1000) — L2 (x=1300): флоты стоят на x=1150,
+   *  в 150 от обоих миров. Круг зрения флота — 40, мира — 120, радаров нет: ближайший к
+   *  флотам узел не опознан никем. До починки флот p1 вставал, а врага и боя не было. */
+  function laneBattle(sides: [string, string] = ['p1', 'p2']): GameState {
+    const base = createInitialState({ seed: 'lane-fight', version: { data: '0.1.0', manifest: '1' } });
+    const at = (x: number): Partial<Planet> => ({ position: { x, y: 0 } });
+    const onLane = (id: string, owner: string): Fleet => ({
+      ...fleet(id, owner, 'L1', [['cruiser', 2]]),
+      location: null,
+      edge: { from: 'L1', to: 'L2', t: 0.5 },
+      battleId: 'battle:0',
+    });
+    return {
+      ...base,
+      players: { p1: player('p1'), p2: player('p2'), p3: player('p3') },
+      planets: {
+        H1: planet('H1', 'p1', ['L1'], at(0)),
+        L1: planet('L1', null, ['H1', 'L2'], at(1000)),
+        L2: planet('L2', null, ['L1'], at(1300)),
+      },
+      fleets: { mine: onLane('mine', sides[0]), foe: onLane('foe', sides[1]) },
+      battles: {
+        'battle:0': {
+          id: 'battle:0',
+          location: 'L1',
+          phase: 'orbital',
+          round: 0,
+          sides: [
+            { ref: { kind: 'fleet', fleetId: 'mine' }, owner: sides[0], role: 'attacker' },
+            { ref: { kind: 'fleet', fleetId: 'foe' }, owner: sides[1], role: 'defender' },
+          ],
+        },
+      },
+      scheduled: [],
+    };
+  }
+
+  it('узел боя не опознан — предпосылка бага', () => {
+    expect(identifiedNodes(laneBattle(), 'p1', data).has('L1')).toBe(false);
+  });
+
+  it('участник видит и бой, и врага, с кем дерётся, — полным составом, а не отметкой радара', () => {
+    const view = visibleState(laneBattle(), 'p1', data);
+    expect(view.battles['battle:0']).toBeDefined();
+    expect(view.fleets.foe?.units).toEqual([{ unit: 'cruiser', count: 2 }]);
+    expect(view.signatures.some((c) => c.location === 'L1' || c.location === 'L2')).toBe(false);
+    expect(isVisibleTo(laneBattle(), 'p1', { fleetId: 'foe' }, data)).toBe(true);
+    expect(engagementOf(laneBattle(), 'p1')).toEqual({
+      battles: new Set(['battle:0']),
+      fleets: new Set(['mine', 'foe']),
+    });
+  });
+
+  it('посторонний чужого боя не видит: участие — не разведка для третьих', () => {
+    const view = visibleState(laneBattle(['p2', 'p3']), 'p1', data);
+    expect(view.battles['battle:0']).toBeUndefined();
+    expect(view.fleets.mine).toBeUndefined();
+    expect(view.fleets.foe).toBeUndefined();
+    expect(isVisibleTo(laneBattle(['p2', 'p3']), 'p1', { fleetId: 'foe' }, data)).toBe(false);
+  });
+
+  it('союзник видит бой союзника — как видит всё, что видит тот', () => {
+    const allied = laneBattle(['p3', 'p2']);
+    allied.diplomacy = { ...allied.diplomacy, [pairKey('p1', 'p3')]: 'alliance' };
+    const view = visibleState(allied, 'p1', data);
+    expect(view.battles['battle:0']).toBeDefined();
+    expect(view.fleets.foe).toBeDefined();
+  });
+
+  it('бой кончился — враг снова прячется в тумане', () => {
+    const after = laneBattle();
+    after.battles = {};
+    after.fleets.foe = { ...after.fleets.foe!, battleId: null };
+    expect(visibleState(after, 'p1', data).fleets.foe).toBeUndefined();
   });
 });

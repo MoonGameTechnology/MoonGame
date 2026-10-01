@@ -26,6 +26,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { GameState, PlayerId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { getStance } from '../state/diplomacy';
+import { rejectMine } from '../util/fleet';
 
 /** Сколько мс работы нужно на извлечение (часы карты под темп матча). */
 export function extractionNeedMs(
@@ -65,7 +66,8 @@ function deliver(h: HandlerContext): void {
 
 export const extractionModule: GameModule = {
   id: 'extraction',
-  version: '1.0.0',
+  // 1.1.0: мина не берёт груз хранилища — она без приказов (`E_MINE_PASSIVE`, ревью #1411).
+  version: '1.1.0',
   setup(api) {
     api.onAction('extraction.start', (action, h) => {
       const { fleetId } = (action.payload ?? {}) as { fleetId?: unknown };
@@ -79,6 +81,7 @@ export const extractionModule: GameModule = {
       const fleet = h.state.fleets[fleetId];
       if (!fleet) return h.reject('E_NO_FLEET');
       if (fleet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      rejectMine(h, fleet);
       if (fleet.movement) return h.reject('E_IN_TRANSIT');
       if (fleet.location !== ex.vault) return h.reject('E_NOT_AT_VAULT');
       if (fleet.battleId) return h.reject('E_IN_BATTLE');

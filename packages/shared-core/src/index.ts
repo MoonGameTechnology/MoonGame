@@ -36,8 +36,9 @@ export {
   type PlanetRoads,
   type RoadPoint,
   type RoadTrail,
+  type ForkAnchor,
   type Battle,
-  type Minefield,
+  type MinelayingJob,
   type MinefieldState,
   type BattleSide,
   type CombatantRef,
@@ -131,6 +132,7 @@ export {
   type RoadInput,
   type TrunkSpan,
 } from './state/roads';
+export { forkPoint, forkSiteEdge, forkSiteId, isForkSite } from './state/forkSite';
 export {
   sectorKindDef,
   provinceScore,
@@ -185,6 +187,7 @@ export {
   sensorCoverage,
   radarSignatures,
   isVisibleTo,
+  engagementOf,
   fleetRadarRange,
   stackRadarRange,
   BLACKOUT_MULT,
@@ -198,6 +201,7 @@ export {
 export { signatureSize, fleetSignalStrength, radarThreshold, SIG_MEDIUM, SIG_LARGE, SIGNAL_CLUSTER_RADIUS } from './state/radarSignals';
 export type {
   Coverage,
+  Engagement,
   SightCircle,
   VisibleState,
   VisibleView,
@@ -673,6 +677,13 @@ export {
   MINE_HIT_MAX,
   MINE_COOLDOWN_HOURS,
 } from './modules/minefield';
+export {
+  isMineFleet,
+  mineFleetVisible,
+  MINE_UNIT,
+  MINE_TRAIT,
+  MINE_DETECTION_RANGE,
+} from './state/minefields';
 export { autoRetreatDue, type AutoRetreatDue } from './state/autoRetreat';
 export { RETREAT_THRESHOLDS, type RetreatThreshold } from './modules/standingOrders';
 export { hullFraction, maxHull } from './util/repair';

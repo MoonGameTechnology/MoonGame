@@ -166,6 +166,21 @@ describe('economy module — fleet landing troops count as upkeep', () => {
   });
 });
 
+describe('economy module — десант на плацдарме платит содержание (замечание Codex на #1392)', () => {
+  it('войска на чужой земле содержит их владелец, а не хозяин мира', () => {
+    const kernel = createKernel([economyModule]);
+    const world = planet('P', 'p2');
+    world.beachheads = [{ owner: 'p1', units: [{ unit: 'cruiser', count: 2 }] }];
+    const st = stateWith({
+      players: [player('p1', { credits: 100 }), player('p2', { credits: 100 })],
+      planets: [world],
+    });
+    const r = okAdvance(kernel.advanceTo(st, ctx(DAY)));
+    expect(r.state.players.p1?.resources.credits).toBe(84); // 2 × 8 в сутки
+    expect(r.state.players.p2?.resources.credits).toBe(100);
+  });
+});
+
 describe('economy module — unknown unit in upkeep is gracefully skipped', () => {
   it('ignores stacks with no matching unit definition', () => {
     const kernel = createKernel([economyModule]);
