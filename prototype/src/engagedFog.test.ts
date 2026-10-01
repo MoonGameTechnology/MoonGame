@@ -40,7 +40,9 @@ describe('туман спрашивает о флоте и бое только �
     // Бой союзника, начатый и законченный одним пакетом, в `s` уже не найти (замечание
     // Codex на #1417); аудиторию ему считает `flashBattles` ядра, как и на сервере.
     expect(main).toContain('const flash = flashBattles(events, s);');
-    expect(count('flashSeen(p.battleId)')).toBe(2);
+    // Начало, запоминание боя и ведомость потерь — одна видимость (замечание Codex на #1418).
+    expect(count('flashSeen(p.battleId)')).toBe(3);
+    expect(main).toContain('const lossSeen = battleEngaged(p.battleId) || flashSeen(p.battleId);');
   });
 
   it('память боёв блока зрения не переживает смену матча', () => {

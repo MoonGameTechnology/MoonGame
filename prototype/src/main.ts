@@ -4641,7 +4641,11 @@ function handleEvents(events: DomainEvent[]) {
         // а чужой бой на опознанном узле игрок видит и о цене исхода читает.
         const at = p.at as string;
         if (myBattleLocs.has(at)) killStats = tallyDeath(killStats, p.owner, ME, p.count);
-        if (seenTail(myBattleLocs.has(at), known(at))) {
+        // Бой блока зрения на неопознанном узле — и мгновенный — платит ведомость той же
+        // видимостью, что его начало и итог, иначе строка итога выходит без потерь
+        // (замечание Codex на #1418).
+        const lossSeen = battleEngaged(p.battleId) || flashSeen(p.battleId);
+        if (seenTail(myBattleLocs.has(at), known(at) || lossSeen)) {
           battleLosses.set(
             at,
             recordLoss(battleLosses.get(at), p.owner, p.unit as string, p.count),
