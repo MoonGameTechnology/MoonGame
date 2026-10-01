@@ -349,6 +349,8 @@ describe('ПОДВОЗ ПОДКРЕПЛЕНИЯ — вторая половин�
 });
 
 describe('ГАРНИЗОН ПРИЗОВЫХ МИРОВ — стройка и войска в разных очередях', () => {
+  /** BAL-7: гарнизон добирается оборонительным списком — тяжёлая пехота, если по карману. */
+  const GARRISON_UNITS = ['militia', 'heavy_infantry'];
   /**
    * До 2026-09-16 ветка казармы выходила из ВСЕГО цикла призовых миров, и за тик бот
    * заказывал ЛИБО одну казарму, ЛИБО одну пару ополченцев — на всю империю. Первым в
@@ -397,7 +399,7 @@ describe('ГАРНИЗОН ПРИЗОВЫХ МИРОВ — стройка и в�
     const militia = orders
       .filter((a) => a.type === 'unit.build')
       .map((a) => a.payload as { planetId: string; unit: string })
-      .filter((p) => p.unit === 'militia' && armed.includes(p.planetId));
+      .filter((p) => GARRISON_UNITS.includes(p.unit) && armed.includes(p.planetId));
     expect(barracks.map((b) => b.planetId)).toContain(bare);
     expect(militia.length).toBeGreaterThan(0);
   });
@@ -421,8 +423,18 @@ describe('ГАРНИЗОН ПРИЗОВЫХ МИРОВ — стройка и в�
     const militia = aiOrders(st, 'p2', 'expand', 'strong')
       .filter((a) => a.type === 'unit.build')
       .map((a) => a.payload as { planetId: string; unit: string })
-      .filter((p) => p.unit === 'militia' && armed.includes(p.planetId));
+      .filter((p) => GARRISON_UNITS.includes(p.unit) && armed.includes(p.planetId));
     expect(militia.length).toBeGreaterThan(1);
     expect(militia.length).toBeLessThanOrEqual(3);
+  });
+
+  it('BAL-7: БОГАТАЯ КАЗНА ДОБИРАЕТ ГАРНИЗОН ТЯЖЁЛОЙ ПЕХОТОЙ, а не ополчением', () => {
+    const { st, armed } = empire();
+    const picks = aiOrders(st, 'p2', 'expand', 'strong')
+      .filter((a) => a.type === 'unit.build')
+      .map((a) => a.payload as { planetId: string; unit: string })
+      .filter((p) => armed.includes(p.planetId));
+    expect(picks.length).toBeGreaterThan(0);
+    expect(picks.every((p) => p.unit === 'heavy_infantry')).toBe(true);
   });
 });
