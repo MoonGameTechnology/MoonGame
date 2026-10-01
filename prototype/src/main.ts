@@ -764,6 +764,7 @@ import {
 import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
 import { initHubWallet } from './hubWallet';
+import { setupRivalsHtml } from './setupRivals';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
@@ -1490,6 +1491,8 @@ let setupSlots: SeatRole[] = freshSetupSlots();
 // is always side A; the default when enabling pairs you with seat 1 vs seats 2-3.
 // Off ⇒ classic free-for-all. See newGame's team-aware diplomacy seeding.
 let setupTeams = false;
+// «?» над местами: раскрыто ли правило соперников (UIX-8.2). Только вид, в матч не идёт.
+let setupHelp = false;
 const DEFAULT_TEAM_SIDES: ReadonlyArray<'A' | 'B'> = [
   'A',
   'A',
@@ -12829,13 +12832,15 @@ function renderSetupSlots(): void {
   }
   f2 += `</div>`;
   setupFactionsEl.innerHTML = f2;
+  // Над местами — сколько соперников и одна строка правила; подробности — под «?»
+  // (UIX-8.2: инструкция в восемь строк стояла над картой и дублировала подсказки).
   // Team-battle toggle: sides fight as allies. Only meaningful with ≥2 rivals (a 2v2
   // needs three AI seats on); shown always so the player can arm it before adding them.
-  // Sector Zero has its own home; this entry no longer launches a run directly.
+  // Sector Zero — режим со своей дверью на хабе, а не настройка этой схватки (UIX-15.1).
   let h =
+    setupRivalsHtml(rivalCount(setupSlots), setupHelp) +
     `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
-    `<button class="tmtog pve-btn" data-pvestart="1">${t('sector-zero.enter')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
   if (isFrontier(setupMapId)) {
@@ -13369,8 +13374,9 @@ setupSlotsEl.addEventListener('click', (ev) => {
     renderSetup();
     return;
   }
-  if ((ev.target as Element).closest('[data-pvestart]')) {
-    openSectorZero();
+  if ((ev.target as Element).closest('[data-setuphelp]')) {
+    setupHelp = !setupHelp;
+    renderSetup();
     return;
   }
   const ts = (ev.target as Element).closest('[data-teamseat]');

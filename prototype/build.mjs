@@ -78,6 +78,22 @@ const css = `
   --glass:rgba(3,14,18,.82);
   --void:#030810; /* holographicTheme.void — opaque loading surface */
   --up:#5ff0a8;--dn:#ff7a6a;--p1:#35d6e6;
+  /* Меню-экраны: настройка схватки, выбор места и остальная семья хаба (UIX-15) — одна палитра
+     на телефоне и ПК. Копия surfaceTheme из packages/client/src/theme.ts, правятся парой
+     (сторож — surfaceTokens.test.ts). Акцент — прежний cyan: var(--cyan) раскрывается здесь,
+     в :root, поэтому голографический вид, где --cyan бледнее, акцент экранов не перекрашивает. */
+  --sf-text:#e2f1f6;--sf-dim:#a9c6d1;--sf-head:#b4d3dd;--sf-hi:#f2fdff;
+  --sf-card:rgba(8,26,38,.72);--sf-card-off:rgba(6,18,27,.5);--sf-inset:rgba(4,16,25,.9);
+  --sf-edge:rgba(118,206,229,.32);--sf-edge-hi:rgba(140,233,242,.7);
+  --sf-panel-from:rgba(10,30,43,.985);--sf-panel-to:rgba(3,12,23,.985);--sf-panel-edge:rgba(118,206,229,.45);
+  --sf-panel:linear-gradient(155deg,var(--sf-panel-from),var(--sf-panel-to));
+  --sf-accent:var(--cyan);
+  --sf-sel:color-mix(in srgb,var(--cyan) 14%,transparent);
+  --sf-primary:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 32%,transparent),color-mix(in srgb,var(--cyan) 8%,transparent) 70%);
+  --sf-primary-hi:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 42%,transparent),color-mix(in srgb,var(--cyan) 12%,transparent) 70%);
+  --sf-glow:0 0 0 1px color-mix(in srgb,var(--cyan) 15%,transparent),0 10px 32px color-mix(in srgb,var(--cyan) 16%,transparent);
+  --sf-shadow:0 18px 50px rgba(0,0,0,.6);
+  --sf-font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
@@ -2515,7 +2531,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:var(--ink);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;font:inherit;min-height:44px;}
 #setup .inp:focus-visible,#match-create .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
 #setup-bot-count{max-width:140px;}
-#setup-network-create{margin:12px 0;padding:10px 14px;color:var(--cyan);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;cursor:pointer;}
+#setup-network-create{display:block;width:100%;min-height:44px;margin:16px 0 0;padding:0 16px;color:var(--sf-text);background:var(--sf-card);
+  border:1px solid var(--sf-edge);border-radius:12px;font:inherit;font-size:16px;font-weight:600;cursor:pointer;}
+#setup-network-create:hover{border-color:var(--sf-edge-hi);}
 #connect .cfield input,#connect .cfield select{display:block;width:100%;margin-top:5px;padding:11px 12px;
   background:rgba(2,10,14,.9);border:1px solid var(--line-hi);border-radius:7px;color:var(--ink);
   font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3px;}
@@ -2638,87 +2656,125 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .cfoot a:hover{color:var(--cyan);opacity:1;}
 #setup{position:fixed;inset:0;z-index:58;display:none;align-items:center;justify-content:center;
   background:rgba(2,8,11,.72);}
-#setup .sbox{width:min(560px,95vw);max-height:92vh;overflow:auto;background:var(--glass);
-  border:1px solid var(--line-hi);border-radius:14px;padding:22px;box-shadow:0 0 40px rgba(0,0,0,.6);}
-#setup .stitle{display:flex;align-items:center;gap:10px;font-size:18px;letter-spacing:3px;color:var(--cyan);}
-#setup .stitle .dia{width:12px;height:12px;transform:rotate(45deg);background:var(--cyan);box-shadow:0 0 10px var(--cyan);border:none;}
-#setup .ssub{margin:8px 0 14px;color:var(--dim);font-size:12px;line-height:1.5;}
-#setup .smap{width:100%;height:200px;display:block;border:1px solid var(--line-hi);border-radius:10px;
-  background:radial-gradient(circle at 50% 40%,rgba(53,214,230,.06),transparent 70%),#06141a;margin-bottom:6px;}
+/* Настройка схватки и выбор места — в палитре хаба (UIX-15.1, заказ владельца 2026-10-01): окно,
+   карточки и главная кнопка из токенов --sf-*; текст пропорциональным шрифтом, числа ровными
+   столбцами, подписи разделов без КАПС с разрядкой. */
+:is(#setup,#seatpick) .sbox{font-family:var(--sf-font);font-variant-numeric:tabular-nums;color:var(--sf-text);}
+:is(#setup,#seatpick) :is(button,select,input):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
+#setup .sbox{width:min(560px,95vw);max-height:92vh;overflow:auto;background:var(--sf-panel);
+  border:1px solid var(--sf-panel-edge);border-radius:18px;padding:22px;box-shadow:var(--sf-shadow);}
+:is(#setup,#seatpick) .stitle{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700;line-height:1.3;color:var(--sf-hi);}
+:is(#setup,#seatpick) .stitle .dia{width:10px;height:10px;transform:rotate(45deg);background:var(--sf-accent);
+  box-shadow:0 0 10px var(--sf-accent);border:none;}
+#setup .smap{width:100%;height:200px;display:block;margin-top:10px;border:1px solid var(--sf-edge);border-radius:12px;
+  background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--sf-accent) 8%,transparent),transparent 70%),var(--sf-inset);}
 #setup .smap .cand{cursor:pointer;}
-#setup .smaphint{text-align:center;color:var(--dim);font-size:11px;margin:0 0 14px;}
-#setup .sslots{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
-/* H3 faction picker: four houses, each a pure passive bonus (economy or units) */
-#setup .fph{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin:0 0 6px;}
-#setup .fpick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
-#setup .fchip{display:flex;flex-direction:column;gap:3px;text-align:left;padding:9px 11px;border:1px solid var(--line-hi);
-  border-radius:9px;background:rgba(255,255,255,.02);color:var(--dim);cursor:pointer;font:inherit;}
-#setup .fchip b{font:700 12px ui-monospace,monospace;color:#eafffb;}
-#setup .fchip span{font:10.5px ui-monospace,monospace;color:var(--grn);}
-#setup .fchip.on{border-color:var(--cyan);background:rgba(53,214,230,.1);}
-#setup .fchip.on b{color:var(--cyan);}
-#setup .scouncil{display:flex;align-items:center;gap:10px;width:100%;margin-bottom:14px;padding:10px 12px;
-  border:1px solid var(--line-hi);border-radius:9px;background:rgba(255,255,255,.02);cursor:pointer;font:inherit;text-align:left;}
-#setup .scouncil .sc-h{font:10px ui-monospace,monospace;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);flex:none;}
-#setup .scouncil .sc-n{flex:1;font:12px ui-monospace,monospace;color:#eafffb;}
-#setup .scouncil .sc-go{font:10.5px ui-monospace,monospace;letter-spacing:1px;color:var(--cyan);flex:none;}
+#setup .smaphint{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--sf-dim);}
+/* Подписи разделов: «Карта», «Домашний мир», «Фракция…», «Скорость времени». */
+#setup :is(.scol > label:not(.sbx-check),.fph,.sspeedlabel){display:block;margin:16px 0 8px;font-size:14px;font-weight:600;
+  line-height:1.3;color:var(--sf-head);}
+#setup .scol > label:first-of-type{margin-top:0;}
+#setup :is(.inp,#setup-bot-count){min-height:48px;margin:0;padding:0 14px;border:1px solid var(--sf-edge);border-radius:12px;
+  background:var(--sf-inset);color:var(--sf-text);font-size:16px;}
+#setup .sslots{display:flex;flex-direction:column;gap:6px;}
+/* Фронтир: вместо строк мест — число ботов. */
+#setup #setupslots > label{display:block;font-size:14px;font-weight:600;line-height:1.3;color:var(--sf-head);}
+#setup #setupslots > label > input{margin-top:8px;}
+/* H3 faction picker: four houses, each a pure passive bonus (economy or units).
+   Две колонки — только где карточке хватает 200 px: в узкой колонке (телефон, планшет стоя)
+   «владычество» шире половины, и карточка вылезала за край. */
+#setup .fpick{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:8px;}
+#setup .fchip{position:relative;display:flex;flex-direction:column;gap:4px;min-height:64px;padding:11px 36px 11px 14px;
+  border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);text-align:left;cursor:pointer;font:inherit;}
+#setup .fchip b{font-size:16px;font-weight:600;line-height:1.3;color:var(--sf-text);}
+#setup .fchip span{font-size:14px;line-height:1.35;color:var(--grn);}
+#setup .fchip:hover{border-color:var(--sf-edge-hi);}
+#setup .fchip.on{border-color:var(--sf-accent);background:var(--sf-sel);}
+#setup .fchip.on b{color:var(--sf-hi);}
+/* Выбранный дом — ещё и галочкой: на ПК одна рамка не отличает выбор от наведения. */
+#setup .fchip.on::after{content:'✓';position:absolute;top:10px;right:10px;display:grid;place-items:center;width:20px;height:20px;
+  border-radius:50%;background:var(--sf-accent);color:var(--void);font-size:12px;font-weight:800;}
+/* Совет учёных строкой: подпись над именами, «изменить» справа. */
+#setup .scouncil{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"h go" "n go";gap:2px 12px;
+  width:100%;min-height:60px;margin:16px 0 0;padding:10px 14px;border:1px solid var(--sf-edge);border-radius:12px;
+  background:var(--sf-card);cursor:pointer;font:inherit;text-align:left;}
+#setup .scouncil:hover{border-color:var(--sf-edge-hi);}
+#setup .scouncil .sc-h{grid-area:h;font-size:14px;color:var(--sf-dim);}
+#setup .scouncil .sc-n{grid-area:n;font-size:16px;font-weight:600;color:var(--sf-text);}
+#setup .scouncil .sc-go{grid-area:go;align-self:center;font-size:14px;font-weight:600;color:var(--sf-accent);}
 /* Неполный совет должен ЧИТАТЬСЯ как незаконченный: Back закрывает окно мимо запертого
    подтверждения, и без этой пометки потеря выбора выглядит как норма. */
 #setup .scouncil.partial{border-color:var(--amber);}
 #setup .scouncil.partial .sc-n{color:var(--amber);}
-#setup .srow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line-hi);
-  border-radius:8px;font:13px ui-monospace,monospace;color:var(--ink);}
-#setup .srow .dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor;}
+/* Над местами — «Соперники: N» и одна строка правила; подробности — под «?» (UIX-8.2). */
+#setup .srivals{display:flex;align-items:flex-start;gap:12px;margin:0 0 10px;}
+#setup .srivals > div{flex:1;min-width:0;}
+#setup .srivals b{display:block;font-size:14px;font-weight:600;line-height:1.3;color:var(--sf-head);}
+#setup .srivals span{display:block;margin-top:4px;font-size:14px;line-height:1.45;color:var(--sf-dim);}
+#setup .srivals button{flex:none;width:44px;height:44px;border:1px solid var(--sf-edge);border-radius:12px;background:var(--sf-card);
+  color:var(--sf-text);font:inherit;font-size:16px;font-weight:700;cursor:pointer;}
+#setup .srivals button[aria-expanded="true"]{border-color:var(--sf-accent);background:var(--sf-sel);color:var(--sf-hi);}
+#setup .shelp{margin:0 0 10px;padding:10px 14px;border-radius:12px;background:var(--sf-inset);font-size:14px;line-height:1.5;
+  color:var(--sf-dim);}
+#setup .srow{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 6px 6px 14px;border:1px solid var(--sf-edge);
+  border-radius:12px;background:var(--sf-card);font-size:16px;color:var(--sf-text);}
+#setup .srow .dot{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:0 0 0 2px rgba(0,0,0,.45),0 0 8px currentColor;}
 #setup .srow .nm{flex:1;}
-#setup .srow .you{font-size:10px;color:var(--cyan);letter-spacing:1px;}
-#setup .srow.off{opacity:.45;}
-#setup .srow .stog{font:11px ui-monospace,monospace;letter-spacing:1px;border:1px solid var(--line-hi);
-  border-radius:6px;padding:6px 12px;min-width:64px;cursor:pointer;background:transparent;color:var(--dim);}
-#setup .srow .stog.ai{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
-#setup .srow .stog.strong{border-color:var(--amber);color:var(--amber);background:rgba(255,180,58,.14);}
-#setup .tmrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px;}
-#setup .tmtog{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font:700 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;text-align:left;}
-#setup .tmtog.on{border-color:var(--amber);color:var(--amber);background:rgba(232,178,74,.12);}
-#setup .pve-btn{flex:0 0 auto;padding:9px 12px;border-radius:8px;border:1px solid var(--cyan);background:rgba(53,214,230,.12);color:var(--cyan);}
+#setup .srow .you{margin-right:6px;padding:4px 12px;border:1px solid color-mix(in srgb,var(--sf-accent) 50%,transparent);
+  border-radius:999px;background:var(--sf-sel);color:var(--sf-hi);font-size:14px;font-weight:600;}
+/* Пустое место — пунктиром, а не полупрозрачностью: имя и кнопка остаются читаемыми. */
+#setup .srow.off{border-style:dashed;background:var(--sf-card-off);color:var(--sf-dim);}
+#setup .srow.off .dot{opacity:.5;box-shadow:none;}
+#setup .srow .stog{min-width:104px;min-height:40px;padding:0 12px;border:1px solid var(--sf-edge);border-radius:10px;
+  background:transparent;color:var(--sf-dim);font:inherit;font-size:14px;font-weight:600;cursor:pointer;}
+#setup .srow .stog:hover{border-color:var(--sf-edge-hi);}
+#setup .srow .stog.ai{border-color:var(--sf-accent);color:var(--sf-hi);background:var(--sf-sel);}
+#setup .srow .stog.strong{border-color:var(--amber);color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent);}
+#setup .tmrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px;}
+#setup .tmtog{flex:1;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--sf-edge);background:var(--sf-card);
+  color:var(--sf-text);font:inherit;font-size:14px;font-weight:600;cursor:pointer;text-align:left;}
+#setup .tmtog.on{border-color:var(--amber);color:var(--amber);background:color-mix(in srgb,var(--amber) 12%,transparent);}
 /* Сложность забега (PVR-2.1) — спутник кнопки запуска, а не вторая кнопка запуска:
    тише по контрасту, тот же размер, чтобы на телефоне пара читалась как одна строка. */
 #setup .pve-diff{flex:0 0 auto;padding:9px 12px;border-radius:8px;border:1px solid rgba(53,214,230,.35);background:transparent;color:var(--dim);}
 /* Третья кнопка в строке не влезает в узкий экран: строка переносится (flex-wrap выше),
    а подпись сложности не ломается посередине. */
 #setup .pve-diff{white-space:nowrap;}
-#setup .tmhint{font-size:10px;color:var(--dim);letter-spacing:.3px;}
-#setup .srow .tmchip{width:30px;height:30px;flex:none;border-radius:7px;border:1px solid var(--line-hi);
-  background:transparent;font:800 13px ui-monospace,monospace;cursor:pointer;color:var(--dim);}
+#setup .tmhint{font-size:14px;color:var(--sf-dim);}
+#setup .srow .tmchip{width:36px;height:36px;flex:none;border-radius:9px;border:1px solid var(--sf-edge);
+  background:transparent;font:800 14px ui-monospace,monospace;cursor:pointer;color:var(--sf-dim);}
 #setup .srow .tmchip.sA{border-color:#4fe0b0;color:#4fe0b0;background:rgba(79,224,176,.14);}
 #setup .srow .tmchip.sB{border-color:#e5884a;color:#e5884a;background:rgba(229,136,74,.14);}
 #setup .srow .tmchip.lock{cursor:default;opacity:.85;}
-#setup .sspeedlabel{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin:0 0 4px;}
-#setup .sspeedhint{font-size:11px;color:var(--dim);margin:0 0 8px;line-height:1.45;}
-#setup .sspeed{display:flex;gap:8px;margin-bottom:16px;}
-#setup .sspeed .spdchip{flex:1;padding:10px 6px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font:13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
-#setup .sspeed .spdchip.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.14);}
-#setup .sgo{width:100%;padding:13px 10px;border-radius:8px;border:1px solid var(--cyan);
-  background:rgba(53,214,230,.16);color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;min-height:46px;}
-#setup .sgo:disabled{opacity:.4;cursor:not-allowed;}
-#setup .scancel{width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--line-hi);
-  background:transparent;color:var(--dim);font:12px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
+#setup .sspeedhint{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--sf-dim);}
+/* Скорость — одним переключателем: дорожка, на ней подсвечен выбранный множитель. */
+#setup .sspeed{display:flex;gap:4px;margin:10px 0 0;padding:4px;border:1px solid var(--sf-edge);border-radius:12px;
+  background:var(--sf-inset);}
+#setup .sspeed .spdchip{flex:1;min-height:40px;padding:0 4px;border:0;border-radius:9px;background:transparent;
+  color:var(--sf-dim);font:inherit;font-size:16px;font-weight:600;cursor:pointer;}
+#setup .sspeed .spdchip:hover{color:var(--sf-text);background:color-mix(in srgb,var(--sf-accent) 6%,transparent);}
+#setup .sspeed .spdchip.on{color:var(--sf-hi);background:var(--sf-sel);box-shadow:inset 0 0 0 1px var(--sf-accent);}
+@media (prefers-reduced-motion:no-preference){
+  #setup :is(.fchip,.scouncil,.srow .stog,.sspeed .spdchip){transition:background-color .15s,border-color .15s,color .15s;}}
+/* «Запуск» — та же главная кнопка, что «Играть сейчас» на хабе; «Назад» — карточкой. */
+:is(#setup,#seatpick) .sgo{width:100%;min-height:52px;margin-top:16px;padding:0 16px;border:1px solid var(--sf-accent);
+  border-radius:12px;background:var(--sf-primary);color:var(--sf-hi);font:inherit;font-size:16px;font-weight:700;
+  box-shadow:var(--sf-glow);cursor:pointer;}
+:is(#setup,#seatpick) .sgo:hover:not(:disabled){background:var(--sf-primary-hi);}
+:is(#setup,#seatpick) .sgo:disabled{opacity:.45;box-shadow:none;cursor:not-allowed;}
+:is(#setup,#seatpick) .scancel{width:100%;min-height:44px;margin-top:8px;padding:0 16px;border:1px solid var(--sf-edge);
+  border-radius:12px;background:var(--sf-card);color:var(--sf-text);font:inherit;font-size:16px;font-weight:600;cursor:pointer;}
+:is(#setup,#seatpick) .scancel:hover{border-color:var(--sf-edge-hi);}
+/* Телефон: колонки идут одна под другой — между ними отступ и черта, а не стык. */
+body:not(.holo-ui) #setup .stitle{margin-bottom:14px;}
+body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;border-top:1px solid var(--sf-edge);}
 /* REL-7: seat/faction picker for multiplayer — reuses #setup styles */
 #seatpick{position:fixed;inset:0;z-index:58;display:none;align-items:center;justify-content:center;
   background:rgba(2,8,12,.86);backdrop-filter:blur(6px);}
-#seatpick .sbox{width:min(520px,95vw);max-height:92vh;overflow:auto;background:var(--glass);
-  border:1px solid var(--line-hi);border-radius:14px;padding:22px;}
-#seatpick .stitle{display:flex;align-items:center;gap:10px;font-size:18px;letter-spacing:3px;color:var(--cyan);}
-#seatpick .stitle .dia{width:12px;height:12px;transform:rotate(45deg);background:var(--cyan);box-shadow:0 0 10px var(--cyan);border:none;}
-#seatpick .ssub{margin:8px 0 14px;color:var(--dim);font-size:12px;line-height:1.5;}
-#seatpick .sgo{width:100%;padding:13px 10px;border-radius:8px;border:1px solid var(--cyan);
-  background:linear-gradient(180deg,rgba(53,214,230,.22),rgba(53,214,230,.08));color:var(--cyan);
-  font:700 13px ui-monospace,monospace;letter-spacing:2px;cursor:pointer;}
-#seatpick .sgo:disabled{opacity:.4;cursor:not-allowed;}
-#seatpick .scancel{width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--line-hi);
-  background:transparent;color:var(--dim);font:12px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
-#seatpick-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+#seatpick .sbox{width:min(520px,95vw);max-height:92vh;overflow:auto;background:var(--sf-panel);
+  border:1px solid var(--sf-panel-edge);border-radius:18px;padding:22px;box-shadow:var(--sf-shadow);}
+#seatpick .ssub{margin:8px 0 14px;font-size:14px;line-height:1.5;color:var(--sf-dim);}
+#seatpick-list{display:flex;flex-direction:column;gap:8px;}
 .seat-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line-hi);
   border-radius:8px;background:rgba(2,9,13,.5);cursor:pointer;transition:border-color .15s,background .15s;}
 .seat-row:hover:not(.taken){border-color:var(--cyan);background:rgba(53,214,230,.06);}
@@ -3458,10 +3514,8 @@ ${profileCss}
      scrolls on its own; the title and the LAUNCH/Back buttons never leave the screen. */
   #setup .sbox{width:min(1080px,62vw);max-height:61vh;display:flex;flex-direction:column;overflow:hidden;}
   #setup .spane{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;}
-  #setup .scol{min-height:0;overflow-y:auto;border:1px solid var(--line-hi);border-radius:12px;
-    padding:14px 16px;background:rgba(255,255,255,.015);}
-  #setup .scol .ssub{margin-top:0;}
-  #setup .scol .fpick,#setup .scol .sspeed{margin-bottom:2px;}
+  #setup .scol{min-height:0;overflow-y:auto;border:1px solid var(--sf-edge);border-radius:14px;
+    padding:16px 18px;background:var(--sf-card-off);}
   #setup .sgo{margin-top:14px;}
   #setup .sgo,#setup .scancel{flex:0 0 auto;}
   #updbar{width:min(440px,calc(66.7vw - 20px));}
@@ -4104,7 +4158,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <div class="stitle"><span class="dia"></span><b data-i18n="setup.title"></b></div>
     <div id="setup-start" class="spane">
       <div class="scol">
-        <p class="ssub" data-i18n="setup.sub"></p>
         <label for="setup-map-id" data-i18n="setup.map"></label>
         <select id="setup-map-id" class="inp">
           <option value="frontier-100" data-i18n="setup.map.frontier-100" disabled hidden></option>
@@ -4121,7 +4174,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       </div>
       <div class="scol" id="setup-solo-col">
         <div id="setupslots" class="sslots"></div>
-        <button id="setup-network-create" class="mbtn" type="button" data-i18n="setup.network.create"></button>
         <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
         <p class="sspeedhint" data-i18n="setup.speed.hint"></p>
         <div id="setupspeed" class="sspeed">
@@ -4132,6 +4184,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <button class="spdchip" type="button" data-spd="50">×50</button>
           <button class="spdchip" type="button" data-spd="100">×100</button>
         </div>
+        <button id="setup-network-create" class="mbtn" type="button" data-i18n="setup.network.create"></button>
         <!-- SANDBOX — setup checkbox; delete this fenced block + the #sandbox markup to cut it -->
         <!--dev-only--><label class="sbx-check"><input id="setupsandbox" type="checkbox"><span data-i18n="setup.sandbox"></span></label><!--/dev-only-->
       </div>
