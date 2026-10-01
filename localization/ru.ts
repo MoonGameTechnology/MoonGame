@@ -2490,6 +2490,7 @@ export const ru: Record<string, string> = {
   'hub.tile.support': 'Поддержка',
   'hub.tile.tutorial': 'Обучение',
   'hub.tile.updates': 'Обновления',
+  'hub.wallet.auction': 'Варранты: {n}. Открыть аукцион',
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
   'hud.back.title': 'Назад',

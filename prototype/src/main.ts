@@ -763,6 +763,7 @@ import {
 } from './stewardScreen';
 import { initArsenal } from './arsenalScreen';
 import { initMetaMarket } from './metaMarketScreen';
+import { initHubWallet } from './hubWallet';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
@@ -11800,6 +11801,7 @@ const HUB_PANELS: Record<string, string> = {
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
 function hubTab(tab: string): void {
   hubNote.textContent = '';
+  hubWallet?.render();
   if (tab === 'games') {
     showHub(false);
     showConnect(true);
@@ -11810,6 +11812,8 @@ function hubTab(tab: string): void {
   // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
   // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
   if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
+  // Кошелёк Варрантов в шапке (UIX-10.2) — тихо: гостю и при сбое сервера остаётся прежнее число.
+  if (tab === 'home' && metaMarket) detach('хаб: кошелёк аукциона', metaMarket.sync());
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends' && friends) detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
   if (tab === 'rank' && rank) detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
@@ -11941,6 +11945,19 @@ const metaMarket = __SECTOR_ZERO_ONLY__
       note: (message) => {
         hubNote.textContent = message;
       },
+      changed: () => hubWallet?.render(),
+    });
+// Кошелёк главного экрана (UIX-10.2, заказ владельца 2026-10-01): Суверены — та же плашка с
+// «+», что в строке статуса партии; Варранты аукциона — плашкой, которая и есть дверь в аукцион.
+const hubWallet = __SECTOR_ZERO_ONLY__
+  ? null
+  : initHubWallet({
+      root: $('hubwallet'),
+      wallet: () => ({ sovereigns: SOVEREIGNS, warrants: metaMarket?.balance() ?? 0 }),
+      donate: () => {
+        hubNote.textContent = t('donate.soon');
+      },
+      auction: () => hubTab('auction'),
     });
 
 function arsenalKey(): string {
