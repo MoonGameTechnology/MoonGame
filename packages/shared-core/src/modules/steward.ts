@@ -1,6 +1,7 @@
 import type { GameData } from '../data/schemas';
 import type { GameModule } from '../kernel/module';
 import type { GameState, Player, PlayerId, StewardLogEntry } from '../state/gameState';
+import { isForkSite } from '../state/forkSite';
 
 /**
  * Steward — "hand the seat to the AI while I sleep" (the automation pillar for a 24/7
@@ -122,7 +123,8 @@ export function stewardActive(
 
 export const stewardModule: GameModule = {
   id: 'steward',
-  version: '1.0.0',
+  // 1.1.0: a fork-site fortress is no hold point; a station's fall frees its point (Codex on #1410).
+  version: '1.1.0',
   setup(api) {
     // Delegate the seat to the AI: posture + a game-time instant to hand control back.
     api.onAction('steward.delegate', (action, h) => {
@@ -171,6 +173,10 @@ export const stewardModule: GameModule = {
       const planet = h.state.planets[payload.planetId];
       if (!planet) return h.reject('E_NO_PLANET');
       if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN'); // anchor OWN worlds only
+      // A fork-site fortress is not a world (FORT-6.1): the guard's bot never defends it, and
+      // its fall emits only `station.destroyed`, so a point here would sit forever and hold a
+      // limit slot (Codex review on #1410).
+      if (isForkSite(planet)) return h.reject('E_FORBIDDEN');
       if (points.includes(payload.planetId)) return; // already held: safe no-op
       if (points.length >= MAX_STEWARD_HOLD_POINTS) return h.reject('E_LIMIT');
       player.stewardHoldPoints = [...points, payload.planetId];
@@ -211,7 +217,8 @@ export const stewardModule: GameModule = {
 
     // Hold points follow ownership: any path that takes a world away (arrival
     // capture, battle outcome, ground assault, annihilation) frees its anchor slot.
-    for (const lost of ['planet.captured', 'planet.destroyed'] as const) {
+    // `station.destroyed` too: a point written on a fork site before 1.1.0 must not outlive it.
+    for (const lost of ['planet.captured', 'planet.destroyed', 'station.destroyed'] as const) {
       api.on(lost, (event, h) => {
         const planetId = (event.payload as { planetId?: unknown }).planetId;
         if (typeof planetId === 'string') pruneHoldPoints(h.state, planetId);

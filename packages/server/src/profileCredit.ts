@@ -1,4 +1,4 @@
-import type { GameState } from '@void/shared-core';
+import { isForkSite, type GameState } from '@void/shared-core';
 import type { ProfileProgress } from '@void/protocol';
 import type { SeatAccounts } from './commanderCredit';
 import type { ProfileStore } from './profileStore';
@@ -7,14 +7,16 @@ import type { ProfileStore } from './profileStore';
  *  holdings, never presented as construction/capture events we do not have a ledger for. */
 export function matchProfileProgress(state: GameState, player: string): ProfileProgress {
   const won = state.match.winners?.includes(player) || state.match.winner === player;
-  const worlds = Object.values(state.planets).filter((p) => p.owner === player);
+  // Площадка крепости на развилке — не мир и не разведанная провинция (замечание Codex на
+  // #1410): иначе уцелевшая крепость шла в медали колоний и щита, а увиденная — в разведку.
+  const worlds = Object.values(state.planets).filter((p) => p.owner === player && !isForkSite(p));
   const fallen = state.missionFacts?.fallen?.[player]?.length ?? 0;
   const pirates = Object.values(state.players).filter((p) => p.npc === 'pirate');
   return {
     matches: 1,
     wins: won ? 1 : 0,
     teamWins: won && (state.match.winners?.length ?? 0) > 1 ? 1 : 0,
-    explored: Object.keys(state.fog?.[player] ?? {}).length,
+    explored: Object.keys(state.fog?.[player] ?? {}).filter((id) => !isForkSite(state.planets[id])).length,
     rescued: state.missionFacts?.recruited?.[player]?.length ?? 0,
     worlds: worlds.length,
     buildings: worlds.reduce((n, p) => n + p.buildings.length, 0),
