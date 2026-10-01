@@ -39,6 +39,7 @@ import { hoursToMs } from '../action/types';
 import { setStance } from '../state/diplomacy';
 import { mergeStacks } from '../util/stacks';
 import { producedForcesAt, waveStagingWorld } from '../util/pveStaging';
+import { isForkSite } from '../state/forkSite';
 
 /** The scheduled event a due wave fires. Internal: it has no payload schema, so the
  *  action gate treats it as non-submittable — a player cannot call a wave down. */
@@ -169,6 +170,9 @@ function oweBoons(h: HandlerContext, pve: NonNullable<GameState['pve']>, cfg: Mo
   if (!cfg.boons || cfg.boons.length === 0) return; // режим усилений не объявлял
   const holds = new Set<PlayerId>();
   for (const planet of Object.values(h.state.planets)) {
+    // Мир, а не крепость на развилке (FORT-6.1): её одной для «держится» мало, как и для
+    // выбывания в `victory`.
+    if (isForkSite(planet)) continue;
     if (planet.owner !== null && planet.owner !== pve.npcPlayerId) holds.add(planet.owner);
   }
   for (const id of Object.keys(h.state.players).sort()) {
@@ -264,7 +268,8 @@ function fieldBoss(
 export const pveModule: GameModule = {
   id: 'pve',
   // 1.6.0 — PVR-4.7: the boss joins the last wave when the host asks for it.
-  version: '1.6.0',
+  // 1.7.0 — FORT-6.1: крепость на развилке не держит место в раздаче усилений.
+  version: '1.7.0',
   setup(api) {
     // Флоты NPC-стороны идут со множителем режима (`npcSpeedFactor`, решение владельца
     // 2026-09-25). Сторона — засеянная (`state.pve`), до засева — та же, что засеет модуль.

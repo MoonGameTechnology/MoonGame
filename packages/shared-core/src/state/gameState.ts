@@ -466,6 +466,11 @@ export interface Planet {
    *  заново, когда вид уже перезаписан. Присутствует только у стоящей крепости и
    *  снимается вместе с ней; отсутствует у всех остальных узлов. */
   priorKind?: string;
+  /** ПЛОЩАДКА КРЕПОСТИ НА РАЗВИЛКЕ (FORT-6.1): развилка какой тропы какой провинции.
+   *  Узел с этим полем — не провинция, а место, где стоит (или стояла) космическая
+   *  крепость: у него нет ни лейнов, ни клетки на карте, его не захватывают и не
+   *  считают территорией (`state/forkSite.ts`). Отсутствует у всех обычных узлов. */
+  fork?: ForkAnchor;
   /** Relative size / weight of the sector (default 1). Drives how much territory
    *  it claims: a sector's border with a neighbour sits proportionally to their
    *  sizes, so resizing one shifts its neighbours' borders evenly. Undefined = 1. */
@@ -593,6 +598,13 @@ export interface RoadPoint {
   y: number;
 }
 
+/** Где стоит крепость на развилке (FORT-6.1): провинция и номер её тропы
+ *  (`Planet.roads.trails[trail]`), чья развилка и есть место. */
+export interface ForkAnchor {
+  province: PlanetId;
+  trail: number;
+}
+
 /** One trail leaving a province's world (ROADS-1). */
 export interface RoadTrail {
   /** Neighbours this trail leads to, in angular order around the world. */
@@ -665,6 +677,12 @@ export interface AssaultLanding {
   startAt: number;
   /** Мировое время (мс), когда десант ступит на землю. */
   doneAt: number;
+  /** Сколько войск каждого вида ЗАЯВЛЕНО в высадку — снимок трюма на её начало. По сроку
+   *  сходит не больше заявленного: влитые в трюм позже (слияние флотов, пополнение) остаются
+   *  на борту. Иначе к концу полуторачасового окна срыва подсаживали бы основную силу, и
+   *  защитнику нечего было бы срывать (замечание Codex на #1392). Нет поля — высадка из
+   *  старого снимка, сходит весь трюм. */
+  troops?: Record<string, number>;
 }
 
 export interface Fleet {
@@ -776,25 +794,28 @@ export interface BattleSide {
   attackCount?: number;
 }
 
-/** Одно минное поле одного владельца на узле (SM-3.4). */
-export interface Minefield {
-  /** Сколько раз поле ещё сработает. На нуле поле снимается. */
-  charge: number;
-  /** Доля ТЕКУЩЕГО корпуса каждого стека, которую снимает одно срабатывание. */
-  hit: number;
-  /** Road fields have a continuous position, separate from the public node id. */
-  position?: RoadPoint;
+/** Мина в установке (SM-3.4, SM-3.6): что встанет по сроку и где. */
+export interface MinelayingJob {
+  owner: PlayerId;
+  readyAt: number;
+  /** Узел, на котором встанет мина, или `null` — точка дороги (`edge`). */
+  location: PlanetId | null;
   edge?: FleetEdge;
+  /** Стек мин: `count` — заряды, модули — боевая часть заградителя (её `mineHit`). */
+  stack: UnitStack;
 }
 
-/** Минные поля (SM-3.4). */
+/** Заградители (SM-3.4). Сами мины — отряды во `fleets` (SM-3.6); здесь только
+ *  перезарядки и установки, которые ещё не встали. */
 export interface MinefieldState {
-  /** Узел → владелец → поле. */
-  fields: Record<PlanetId, Record<PlayerId, Minefield>>;
   /** Флот → мировое время, с которого он снова может ставить мины. */
   readyAt: Record<FleetId, number>;
   ownerReadyAt?: Record<PlayerId, number>;
-  installations?: Record<FleetId, { key: string; owner: PlayerId; readyAt: number; field: Minefield }>;
+  installations?: Record<FleetId, MinelayingJob>;
+  /** Флот → мировое время его последнего подрыва на дороге. Одна точка дороги — один
+   *  подрыв за вход, сколько бы мин и встреч с ними ни сработало в этот же момент (ревью
+   *  #1411). Снимается, как только мировое время ушло дальше. */
+  struck?: Record<FleetId, number>;
 }
 
 /**

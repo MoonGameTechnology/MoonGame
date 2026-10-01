@@ -9,7 +9,8 @@ const anyPlanet = Object.values(s.planets)[0]!;
 const planet = (garrison: UnitStack[], buildings: Planet['buildings'] = []): Planet =>
   ({ ...anyPlanet, garrison, buildings }) as Planet;
 
-const fleet = (id: string): Fleet => ({ id, owner: 'p1', units: [] }) as unknown as Fleet;
+const fleet = (id: string, units: UnitStack[] = []): Fleet =>
+  ({ id, owner: 'p1', units }) as unknown as Fleet;
 
 const ROSTER = [
   'cruiser',
@@ -67,19 +68,36 @@ describe('вкладки мира — счётчики', () => {
   it('ВКЛАДКА ФЛОТА СЧИТАЕТ И ОРБИТУ: построенное само уходит в космос', () => {
     const p = planet([{ unit: 'militia', count: 2 }]);
     const empty = tabCounts(p, data, []);
-    const withOrbit = tabCounts(p, data, [fleet('f1'), fleet('f2')]);
+    const withOrbit = tabCounts(p, data, [
+      fleet('f1', [{ unit: 'cruiser', count: 3 }]),
+      fleet('f2', [{ unit: 'scout', count: 1 }]),
+    ]);
     expect(empty.ships).toBe(0);
-    expect(withOrbit.ships).toBe(2); // иначе над полной орбитой висел бы ноль
+    expect(withOrbit.ships).toBe(4); // иначе над полной орбитой висел бы ноль
   });
 
-  it('гарнизонные корабли складываются с флотами на орбите', () => {
+  it('гарнизонные корабли складываются с кораблями флотов на орбите', () => {
     const p = planet([{ unit: 'cruiser', count: 1 }]);
-    expect(tabCounts(p, data, [fleet('f1')]).ships).toBe(2);
+    expect(tabCounts(p, data, [fleet('f1', [{ unit: 'cruiser', count: 2 }])]).ships).toBe(3);
   });
 
-  it('счётчик считает СТЕКИ, а не головы — вкладка показывает строки', () => {
-    const p = planet([{ unit: 'militia', count: 50 }]);
-    expect(tabCounts(p, data, []).ground).toBe(1);
+  // Переработка окна мира (2026-09-29): ряд фишек с юнитами над вкладками ушёл, и число
+  // на вкладке — единственное число состава. Раньше вкладка считала стеки, а фишка над ней
+  // — юниты, и «◆ 4» стояло над «Земля 2».
+  it('счётчик считает ЮНИТЫ, а не стеки', () => {
+    const p = planet([
+      { unit: 'militia', count: 50 },
+      { unit: 'tank', count: 2 },
+    ]);
+    expect(tabCounts(p, data, []).ground).toBe(52);
+  });
+
+  it('ЭСКАДРА СЧИТАЕТ АНГАР: челноки живут там, а не в гарнизоне (SHU-3.1)', () => {
+    const p = {
+      ...planet([]),
+      hangar: [{ id: 'sq1', units: [{ unit: 'interceptor', count: 3 }] }],
+    } as unknown as Planet;
+    expect(tabCounts(p, data, []).shuttle).toBe(3);
   });
 
   it('постройки считаются своим числом', () => {

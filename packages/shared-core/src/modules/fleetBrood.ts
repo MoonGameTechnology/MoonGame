@@ -69,12 +69,16 @@ function seed(h: HandlerContext): void {
 
 /** Data-driven growth organs: `brood.count` organisms per fitted hull and cycle (one for
  * the Brood Mother's chamber, a litter for the Leviathan's brood — PVR-4.7). A completed
- * cycle consumes the real treasury; empty resources, combat or a full hold yield no
- * organisms and no charge. The next cycle takes its full duration, so splitting/merging
- * cannot speed growth. */
+ * cycle consumes the real treasury; empty resources, combat, an assault landing or a full
+ * hold yield no organisms and no charge. The landing freezes the hold: its claim counts the
+ * landing party, and a newborn merged into a claimed stack would dilute the merit that goes
+ * ashore (Codex review on #1409). The next cycle takes its full duration, so
+ * splitting/merging cannot speed growth. */
 export const fleetBroodModule: GameModule = {
   id: 'fleetBrood',
-  version: '1.1.0', // PVR-4.7: `brood.count` — organisms per hull and cycle
+  // 1.1.0 — PVR-4.7: `brood.count` — organisms per hull and cycle.
+  // 1.2.0 — no growth while the fleet is landing an assault (Codex review on #1409).
+  version: '1.2.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => seed(h));
     api.on('pve.wave.spawned', (_event, h) => seed(h));
@@ -88,7 +92,7 @@ export const fleetBroodModule: GameModule = {
       const unit = h.ctx.data.units[brood.unit];
       const player = h.state.players[fleet.owner];
       if (hulls <= 0 || !unit || unit.domain !== 'ground' || !player) return;
-      if (!fleet.battleId && player.status === 'active') {
+      if (!fleet.battleId && !fleet.assaultLanding && player.status === 'active') {
         const reserved = (fleet.loading ?? []).reduce(
           (n, claim) => n + claim.count * (h.ctx.data.units[claim.unit]?.stats.cargoSize ?? 1),
           0,

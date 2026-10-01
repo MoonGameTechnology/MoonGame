@@ -369,17 +369,26 @@ const clickSide = (dataset) => {
 // the rendered Back button must operate on that card without issuing an order.
 for (const [kind, id] of Object.entries(mod.exports.cards())) {
   mod.exports.selectCard(kind, id);
+  if (kind === 'planet') {
+    // Окно мира (переработка 2026-09-29): второго режима «Сводка» у мира нет — всё её
+    // уникальное стоит в шапке (`.pfacts`), а числа состава живут только на вкладках.
+    assert.doesNotMatch(sideEl.innerHTML, /data-act="(?:planetinfo|fleetinfo)"/, 'planet: no summary mode');
+    assert.ok(sideEl.innerHTML.includes('class="pfacts"'), 'planet: facts under the name');
+    assert.ok(!sideEl.innerHTML.includes('class="pstats"'), 'planet: no second row of counters');
+    assert.ok((sideEl.innerHTML.match(/data-act="ping"/g) ?? []).length <= 1, 'planet: Ping at most once');
+    continue;
+  }
   const selected = mod.exports.selected();
   const state = mod.exports.state();
   const backButton = () => [...sideEl.innerHTML.matchAll(/<button[^>]*data-act="([^"]+)"[^>]*>([^<]*)<\/button>/g)]
     .find((match) => match[2] === mod.exports.backLabel()) ?? null;
   assert.equal(backButton(), null, `${kind}: the regular card must not offer Back to itself`);
-  const title = kind === 'planet' ? 'planetinfo' : 'fleetinfo';
+  const title = 'fleetinfo';
   clickSide({ act: title });
   assert.ok(backButton(), `${kind}: Details must open its section`);
   assert.ok(sideEl.innerHTML.includes('class="object-brief"'));
   assert.ok(sideEl.innerHTML.includes('class="object-detail"'));
-  assert.equal((sideEl.innerHTML.match(/data-act="(?:fleetinfo|planetinfo)"/g) ?? []).length, 1);
+  assert.equal((sideEl.innerHTML.match(/data-act="fleetinfo"/g) ?? []).length, 1);
   const back = backButton()[1];
   clickSide({ act: back });
   assert.equal(backButton(), null, `${kind}: Back must restore the regular card`);

@@ -177,6 +177,37 @@ describe('validateMatchMap — neighbour-only paths + integrity (M1.3)', () => {
   });
 });
 
+describe('подписи областей — только подпись, не сущность (M2.15)', () => {
+  const labelled = (): MatchMap => {
+    const map = exampleMap();
+    map.regions = [
+      { id: 'east', sectors: ['home_green', 'drift'] },
+      { id: 'west', sectors: ['home_red', 'veil'] },
+    ];
+    return map;
+  };
+
+  it('карта с подписями проходит валидатор', () => {
+    expect(validateMatchMap(labelled(), data)).toEqual([]);
+  });
+
+  it('несуществующая провинция, провинция в двух областях и повтор id — отказы', () => {
+    const map = labelled();
+    map.regions[0]!.sectors.push('ghost');
+    map.regions[1]!.sectors.push('drift');
+    map.regions.push({ id: 'east', sectors: ['nexus'] });
+    const issues = validateMatchMap(map, data);
+    expect(issues).toContain('E_REGION_UNKNOWN_SECTOR:east:ghost');
+    expect(issues).toContain('E_REGION_OVERLAP:drift');
+    expect(issues).toContain('E_REGION_DUPLICATE:east');
+  });
+
+  // Критерий приёмки №1 концепции областей: снятие служебных групп матч не меняет.
+  it('мир из карты с подписями и без них — один и тот же', () => {
+    expect(buildStateFromMap(labelled(), data)).toEqual(buildStateFromMap(exampleMap(), data));
+  });
+});
+
 describe('slot-based maps — team-aware start slots (corporation-wars.md §4)', () => {
   const avaMap = (): MatchMap => parseMatchMap(readJson('data/maps/ava-duel-1.json'));
 

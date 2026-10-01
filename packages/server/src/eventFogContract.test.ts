@@ -33,7 +33,8 @@ const MODULES_DIR = fileURLToPath(new URL('../../shared-core/src/modules', impor
 const AUDIENCE = ['owner', 'playerId', 'a', 'b', 'from', 'to', 'buyer', 'seller'] as const;
 const PLACE = ['location', 'planetId', 'at'] as const;
 const OWNERSHIP = ['fleetId'] as const;
-const ROUTABLE = new Set<string>([...AUDIENCE, ...PLACE, ...OWNERSHIP]);
+const BATTLE = ['battleId'] as const;
+const ROUTABLE = new Set<string>([...AUDIENCE, ...PLACE, ...OWNERSHIP, ...BATTLE]);
 
 /** Events `eventVisibleTo` shows to everybody before it ever looks at the payload. */
 const isBroadcast = (type: string): boolean =>

@@ -23,7 +23,7 @@
  * Лежит в `/decisions`: условие одинаково нужно и клиенту (показать), и хозяину забега
  * (выплатить), а две копии такого правила разойдутся молча.
  */
-import type { GameState, MapObjective, PlayerId } from '../packages/shared-core/src/index';
+import { isForkSite, type GameState, type MapObjective, type PlayerId } from '../packages/shared-core/src/index';
 
 /**
  * Объявление задачи — это ФОРМА ДАННЫХ КАРТЫ, и живёт она в схеме карты
@@ -53,7 +53,9 @@ export interface ObjectiveProgress {
 /** Сколько провинций игрок опознал: ключи его памяти тумана. Нет памяти — ноль, а не
  *  падение: забег мог идти на хосте, который тумана не ведёт. */
 function identified(state: GameState, player: PlayerId): number {
-  return Object.keys(state.fog?.[player] ?? {}).length;
+  // Площадка крепости на развилке (FORT-6.1) — не провинция: увиденная крепость на дороге
+  // в разведку карты не засчитывается.
+  return Object.keys(state.fog?.[player] ?? {}).filter((id) => !isForkSite(state.planets[id])).length;
 }
 
 /** Прогресс ОДНОЙ задачи. Чистая функция состояния — зови сколько угодно. */

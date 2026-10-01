@@ -36,10 +36,14 @@ import { isHostile, ownFleet } from '../util/combat';
 import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
 import { hangarSize, strikesReserved } from '../state/shuttle';
+import { isMineFleet } from '../state/minefields';
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
-  version: '1.2.0',
+  // 1.3.0: неподвижный отряд не сливается и не делится (находка Codex на #1393).
+  // 1.4.0: атака мины — подрыв по атакующему, мина сама не атакует (SM-3.6).
+  // 1.5.0: флот на высадке штурмом не сливается (замечание Codex на #1409).
+  version: '1.5.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -130,6 +134,17 @@ export const fleetOpsModule: GameModule = {
       h.emit('fleet.merged', { from: fromId, into: intoId, owner, at: into.location });
     };
 
+    /**
+     * НЕПОДВИЖНЫЙ ОТРЯД НЕ СЛИВАЕТСЯ И НЕ ДЕЛИТСЯ. Отряд с `immobile`-юнитом — это
+     * орудия крепости: они принадлежат узлу, а не флоту игрока (FORT-5.4). Находка Codex
+     * на #1393: `fleet.merge` в орудия отдавал обычным кораблям прикрытие крепости —
+     * станция узнаёт орудия по id флота, а не по составу. Слияние или раскол В ОБРАТНУЮ
+     * сторону уводил орудия из отряда, и станция досчитывала их до уровня ядра заново —
+     * бесплатные пушки. Правило по трейту, а не по id: модулю флота станция не известна.
+     */
+    const emplaced = (h: HandlerContext, f: Fleet): boolean =>
+      f.units.some((s) => defHasTrait(h.ctx.data.units[s.unit], 'immobile'));
+
     /** Можно ли сплавить эту пару ПРЯМО СЕЙЧАС (оба стоят, свободны, в одном узле). */
     const fusable = (from: Fleet, into: Fleet): boolean =>
       !from.battleId &&
@@ -162,6 +177,17 @@ export const fleetOpsModule: GameModule = {
       }
       if (from.battleId || into.battleId) {
         return h.reject('E_IN_BATTLE');
+      }
+      // ВЫСАДКА ЗАМОРАЖИВАЕТ ТРЮМ (замечание Codex на #1409). Заявка высадки помнит, СКОЛЬКО
+      // десанта сойдёт, а не каким он был: слияние усредняет заслугу стеков одной выслуги
+      // (`mergeStacks`), и ветераны, влитые после начала высадки, сходили бы на землю
+      // долей своей заслуги в заявленных бойцах. Флот на высадке не сливается ни в одну
+      // сторону, пока десант не сошёл или высадку не сорвали.
+      if (from.assaultLanding || into.assaultLanding) {
+        return h.reject('E_FLEET_BUSY');
+      }
+      if (emplaced(h, from) || emplaced(h, into)) {
+        return h.reject('E_EMPLACEMENT');
       }
       const flyingTo = from.movement
         ? (from.movement.destination ?? from.movement.to)
@@ -230,12 +256,18 @@ export const fleetOpsModule: GameModule = {
           continue;
         }
         if (into.battleId) continue;
+        // Высадка приостанавливает намерение, как бой: трюм заморожен до её конца (см. приказ).
+        if (from.assaultLanding || into.assaultLanding) continue;
         if (!fusable(from, into)) {
           delete from.mergeInto; // разминулись
           continue;
         }
         if (heroByFleet(h.state, fromId) && heroByFleet(h.state, intoId)) {
           delete from.mergeInto; // «один герой на флот» — правило то же, что на заказе
+          continue;
+        }
+        if (emplaced(h, from) || emplaced(h, into)) {
+          delete from.mergeInto; // орудия с флотом не сливаются — то же правило, что на заказе
           continue;
         }
         delete from.mergeInto;
@@ -277,6 +309,9 @@ export const fleetOpsModule: GameModule = {
       }
       if (fleet.battleId) {
         return h.reject('E_IN_BATTLE');
+      }
+      if (emplaced(h, fleet)) {
+        return h.reject('E_EMPLACEMENT');
       }
       // В пути и на линии делить МОЖНО (замечание владельца 2026-09-25: «флот делить можно
       // в любой момент»): отделённая часть продолжает тот же участок курса — ниже.
@@ -406,10 +441,10 @@ export const fleetOpsModule: GameModule = {
       // SHU-1.1 челнок живёт в ангаре и в `Fleet.units` не попадает ниоткуда (правило 5
       // в `shuttleHangar.test.ts`), поэтому отделять было нечего — ветка не срабатывала
       // ни разу. Отделение обычных кораблей она не касалась и не касается.
-      // В пути отделённая часть получает копию ТЕКУЩЕГО участка (те же вылет и прибытие —
-      // половины не разъезжаются посреди линии) и своё прибытие. Следующие участки
-      // `beginLeg` считает уже по её собственной скорости. Стоявший на линии флот делится
-      // на той же точке линии.
+      // В пути отделённая часть получает копию ТЕКУЩЕГО участка и своё прибытие, а
+      // модуль движения по событию `fleet.split` пересчитывает остаток участка у обеих
+      // половин по их новой скорости (замечание владельца 2026-09-29): ушёл тихоход —
+      // остальные больше его не ждут. Стоявший на линии флот делится на той же точке линии.
       const movement = fleet.movement
         ? {
             ...fleet.movement,
@@ -475,6 +510,13 @@ export const fleetOpsModule: GameModule = {
       }
       if (!f.location || f.movement || target.movement || f.location !== target.location) {
         return h.reject('E_NOT_COLOCATED');
+      }
+      // Мина не атакует; атаковать мину — значит сойтись с ней вплотную: подрыв по
+      // атакующему, без боя (решение владельца 2026-09-30, SM-3.6). Разбирает `minefield`.
+      if (isMineFleet(f, h.ctx.data)) return h.reject('E_MINE_PASSIVE');
+      if (isMineFleet(target, h.ctx.data)) {
+        h.emit('mine.contact', { fleetId: f.id, mines: [target.id], at: f.location, owner: f.owner });
+        return;
       }
       const battleId = `battle:${h.state.battleSeq++}`;
       // Round cadence mirrors combatModule's own: one round per GAME hour

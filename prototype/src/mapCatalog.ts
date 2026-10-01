@@ -1,4 +1,5 @@
 import type { GameState } from '../../packages/shared-core/src/index';
+import { isForkSite } from '../../packages/shared-core/src/state/forkSite';
 import frontier50 from '../../data/frontier-50.json';
 import frontier100 from '../../data/frontier-100.json';
 import { MAP, START_CANDIDATES, type MapNode } from './map';
@@ -88,7 +89,10 @@ export function scoreLimitFor(state: Pick<GameState, 'mapId'>): number {
 }
 /** Geometry comes from the authoritative snapshot, including custom scenarios. */
 export function mapNodesFromState(state: GameState): MapNode[] {
-  const planets = Object.values(state.planets);
+  // Площадка крепости на развилке (FORT-6.1) — не узел карты: ни клетки мозаики, ни лейнов,
+  // ни подписи провинции. Её рисует и выбирает отдельный проход по состоянию, а здесь она
+  // стала бы провинцией в точке развилки.
+  const planets = Object.values(state.planets).filter((p) => !isForkSite(p));
   // Current snapshots carry their own kinds. Do not materialize another full graph
   // just to restore one; the fallback is for older snapshots without kind metadata.
   const authored = planets.some((p) => !p.kind)

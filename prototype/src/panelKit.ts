@@ -39,13 +39,14 @@ export function pcols(blocks: readonly string[]): string {
  * Шапка карточки. `compact` — ПК-раскладка: однострочная шапка обрезает подпись, поэтому
  * пробелы вокруг разделителей убираются и в строку влезает больше. `titleAct` делает имя
  * кнопкой (Bytro-стиль: тап по имени открывает сводку) — без него это просто заголовок,
- * и прочие панели не меняются.
+ * и прочие панели не меняются. `badge` — короткая метка рядом с именем (очки победы мира);
+ * это готовая разметка, собранная вызывающим из экранированных частей.
  */
 export function cardHeader(
   color: string,
   title: string,
   sub: string,
-  opts: { compact?: boolean; titleAct?: string } = {},
+  opts: { compact?: boolean; titleAct?: string; badge?: string } = {},
 ): string {
   const subFit = opts.compact ? sub.replace(/ · /g, '·') : sub;
   const tt = opts.titleAct
@@ -53,7 +54,7 @@ export function cardHeader(
     : `<b>${esc(title)}</b>`;
   return `<div class="phead">
     <span class="pflag" style="background:${color}"></span>
-    <div class="ptitle">${tt}<span>${esc(subFit)}</span></div>
+    <div class="ptitle">${tt}<span>${esc(subFit)}</span></div>${opts.badge ?? ''}
     <button class="pclose" data-act="close" data-arg="">✕</button>
   </div>`;
 }
