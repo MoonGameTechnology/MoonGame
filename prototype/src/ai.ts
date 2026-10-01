@@ -160,6 +160,15 @@ const GROUND_YARDS = ['barracks', 'factory'] as const;
 
 /** Сколько наземных юнитов сильный бот держит дома: гарнизон + запас на десант. */
 const GROUND_STOCK = 8;
+/**
+ * УДАРНЫЙ РЕЗЕРВ (снежный ком, 2026-09-28): сколько бойцов СВЕРХ пола гарнизона столица
+ * держит под десант. `GROUND_STOCK` считает головы, а пол (`garrisonFloor`) растёт с
+ * развитостью: у застроенной столицы он ≈ 8 ополченцев, то есть весь запас уходил в пол,
+ * и `spareGround` отдавал в трюм одного бойца — десант не брал ни одного гарнизона.
+ * Замер `selfplay 200` поверх охоты отстающего: snowball 62/57% → 52/57%, лидерство с
+ * д7.4/7.8 → д9.1/9.4, штурмов 897/858 → 1568/1660.
+ */
+const STRIKE_RESERVE = 4;
 /** Сколько ПРИЗОВЫХ миров получают гарнизон за один тик. Не единица (иначе империя
  *  добирает пол по одному миру за два игровых часа) и не «сколько влезет»: `affordable*`
  *  меряет казну до ВСЕХ заказов тика, поэтому щедрость обернулась бы пачкой отказов. */
@@ -237,6 +246,32 @@ const SPLIT_MIN = 6;
 /** …и до какого числа флотов у места это вообще разрешено. Потолок ниже боевого предела
  *  постройки (8): деление не должно возвращать рой одиночек, вылеченный в self-play M4. */
 const SPLIT_FLEET_CAP = 6;
+
+/**
+ * ОХОТА ОТСТАЮЩЕГО (снежный ком, 2026-09-28) — сколько «весит» цель, когда её выбирает
+ * флот места, которое ОТСТАЁТ по очкам на войне. Курс берётся по «расстояние ÷ вес», а
+ * не просто к ближайшему.
+ *
+ * Зачем. Во второй половине матча территория у бота ходит по кругу: миры без гарнизона
+ * лидер и отстающий отбирают друг у друга ПОРОВНУ (замер: ~31 мир за матч каждый), и
+ * отставание не сокращается никогда. Отстающий, который идёт к ближайшему, меняет свою
+ * 10-очковую туманность на чужую такую же. Отстающий, который идёт к ценному, отбирает
+ * планеты (50 очков) — и ком тает: snowball 79/73% → 60/64%, разрыв ~420 → ~280.
+ *
+ * Почему только отстающий. То же правило у ОБОИХ дало 68/69% при растущем разрыве:
+ * лидер тоже начинает охотиться, и его большее хозяйство опять решает. Асимметрия — не
+ * поблажка, а доктрина: кто впереди, держит; кто позади, бьёт туда, где больнее.
+ *
+ * Вес = очки провинции / 10 в коридоре [1, 5] (планета 5, прочее 1). Мир с гарнизоном,
+ * который этим десантом наверняка не взять, весит в пять раз меньше: лететь к нему —
+ * значит встать на орбите и ждать.
+ */
+export function huntWeight(target: Planet, landing: readonly UnitStack[]): number {
+  let w = Math.min(5, Math.max(1, provinceScore(data, target) / 10));
+  const guarded = target.garrison.some((st) => st.count > 0);
+  if (guarded && !confidentGroundWin(landing, target.garrison, data)) w /= 5;
+  return w;
+}
 
 /**
  * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1), только для тест-профиля.
@@ -572,6 +607,23 @@ function baseAiOrders(
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
   const expandFleets: Fleet[] = defensive ? [] : Object.values(state.fleets);
+  // Ничьи планеты держит ополчение (`NEUTRAL_PLANET_MILITIA`), и брать их надо десантом
+  // даже в мирное время. Пока такая планета есть, флот грузится дома и без войны.
+  const neutralGuarded = Object.values(state.planets).some(
+    (p) => p.owner === null && capturable(p) && p.garrison.some((st) => st.count > 0),
+  );
+  // Отстаю ли я по очкам провинций от кого-то из живых соперников (охота отстающего,
+  // см. `huntWeight`). Тот же счёт ниже решает объявление войны.
+  const provinceTotal = (who: string): number =>
+    Object.values(state.planets).reduce(
+      (s, p) => (p.owner === who ? s + provinceScore(data, p) : s),
+      0,
+    );
+  const myProvinces = provinceTotal(ai);
+  const trailing = Object.keys(state.players).some(
+    (pid) =>
+      pid !== ai && state.players[pid]?.status === 'active' && provinceTotal(pid) > myProvinces,
+  );
   // Сколько флотов у места СЕЙЧАС — потолок и на постройку кораблей, и на деление кулака
   // (AI-BAL-7). Считается один раз: `state` внутри `aiOrders` не меняется (чистый builder).
   const ownFleets = Object.values(state.fleets).filter((fl) => fl.owner === ai).length;
@@ -726,14 +778,16 @@ function baseAiOrders(
       //     войска, которые месяцами катаются в трюме и пропадают ВМЕСТЕ с флотом:
       //     гибель корпусов стирает `fleet.landing` целиком (`combat.ts`, удаление
       //     флота), отдельного броска у десанта нет. В мирное время брать нечего —
-      //     пустой мир занимается прилётом, и войска ему не нужны.
+      //     пустой мир занимается прилётом, и войска ему не нужны. Исключение — ничья
+      //     планета под ополчением (BAL-10, `NEUTRAL_PLANET_MILITIA`): её тоже берут
+      //     штурмом, поэтому, пока такие есть, флот грузится и без войны.
       //
       //     СКОЛЬКО БРАТЬ, решает `spareGround` (правило №6: досуха не вычёрпывать,
       //     пол растёт с развитостью мира). Отдаёт он УДАРНЫЕ рода, оставляя дома
       //     оборонительные, — танк полезнее на чужой земле, ополченец на своей.
       //     ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), а вылет его ОТМЕНЯЕТ: флот, который
       //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
-      if (here0 && here0.id === base.id && warFooting) {
+      if (here0 && here0.id === base.id && (warFooting || neutralGuarded)) {
         if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
         let free = liftFree(f);
         let ordered = false;
@@ -913,11 +967,21 @@ function baseAiOrders(
     // среди равных целей выбор идёт по шуму, а не по раскладке объекта.
     const tieBreak = (p: Planet): number =>
       profile === 'strong' ? decisionNoise(state, ai, `tie:${f.id}:${p.id}`) : 0;
+    const hunting = profile === 'strong' && warFooting && trailing;
+    const weight = (p: Planet): number => (hunting ? huntWeight(p, f.landing ?? []) : 1);
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
+      // Ничью планету с гарнизоном, которую этот десант наверняка не возьмёт, не
+      // выбирают, иначе флот повиснет на её орбите до конца матча.
+      if (
+        p.owner === null &&
+        p.garrison.some((st) => st.count > 0) &&
+        !confidentGroundWin(f.landing ?? [], p.garrison, data)
+      )
+        continue;
       // Равные цели (в пределах пикселя) разводятся шумом, а не порядком перебора.
-      const dd = d(here.position, p.position) + tieBreak(p);
+      const dd = d(here.position, p.position) / weight(p) + tieBreak(p);
       if (dd < bestD) {
         secondD = bestD;
         second = best;
@@ -996,6 +1060,9 @@ function baseAiOrders(
         if (closer || !confidentGroundWin(f.landing ?? [], best.garrison, data)) best = needy;
       }
     }
+    // Взять нечего тем, что в трюме, — домой, за десантом.
+    if (!best && neutralGuarded && base && f.location !== base.id && profile === 'strong')
+      best = base;
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
   // War when the race is being LOST (self-play M4 finding): a passive bot loses the
@@ -1008,12 +1075,8 @@ function baseAiOrders(
   // Declared only from a clean 'peace' stance: pacts/alliances are never betrayed,
   // and favour-driven war (botDiplomacyModule) keeps working on top unchanged.
   if (!defensive) {
-    const scoreOf = (who: string): number =>
-      Object.values(state.planets).reduce(
-        (s, p) => (p.owner === who ? s + provinceScore(data, p) : s),
-        0,
-      );
-    const mine = scoreOf(ai);
+    const scoreOf = provinceTotal;
+    const mine = myProvinces;
     let leader: string | null = null;
     let leaderScore = -1;
     for (const pid of Object.keys(state.players)) {
@@ -1263,7 +1326,11 @@ function baseAiOrders(
           (n, u) => n + (pendingUnit(base.id, u) ? 2 : 0),
           0,
         );
-        if (groundCount(base) + pendingHome < GROUND_STOCK) {
+        const spareHome = spareGround(base, data).reduce((n, st) => n + st.count, 0);
+        if (
+          groundCount(base) + pendingHome < GROUND_STOCK ||
+          spareHome + pendingHome < STRIKE_RESERVE
+        ) {
           // Пока дома нет даже домашней стражи — заказывается ОБОРОНИТЕЛЬНЫЙ род войск;
           // всё сверх неё уедет в трюме, поэтому там нужен ударный.
           // ПРАВИЛО ВЛАДЕЛЬЦА №4 (2026-09-16): «чем больше развита планета, тем больше
