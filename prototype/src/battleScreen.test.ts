@@ -16,7 +16,7 @@ import {
 import { t } from '../../localization/runtime';
 import { displayUnit, esc, fmtHrs } from './format';
 import { engageForecastCard } from '../../decisions/engageForecast';
-import type { BattleForecast, ForecastSide } from '../../decisions/battleForecast';
+import type { ForecastSide } from '../../decisions/battleForecast';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 
 const side = (
@@ -32,8 +32,12 @@ const side = (
   units: [{ unit: 'cruiser', count: 3 }],
   mine,
   role,
-  ref: kind === 'fleet' || kind === 'landing' ? { kind, fleetId: `${owner}-1` }
-    : kind === 'garrison' ? { kind, planetId: 'P' } : { kind, planetId: 'P', owner },
+  ref:
+    kind === 'fleet' || kind === 'landing'
+      ? { kind, fleetId: `${owner}-1` }
+      : kind === 'garrison'
+        ? { kind, planetId: 'P' }
+        : { kind, planetId: 'P', owner },
   ...(role === 'attacker' ? { nextAttackAt: 9000, attackStartedAt: 0 } : {}),
 });
 
@@ -177,7 +181,11 @@ describe('окно боя', () => {
   // Заказ владельца 2026-09-28: место, фаза и число сторон стояли карточкой над полосой
   // сил и съедали её высоту — теперь они в шапке окна, а в теле их нет.
   it('где бой, фаза и число сторон — в шапке окна, не отдельной карточкой в теле', () => {
-    const m = battle([side('p1', 'attacker', true), side('p2', 'defender'), side('p3', 'attacker')]);
+    const m = battle([
+      side('p1', 'attacker', true),
+      side('p2', 'defender'),
+      side('p3', 'attacker'),
+    ]);
     const head = battleHeadHtml(m, { placeName: () => 'Комета' });
     expect(head).toContain(t('battle.win.at', { w: 'Комета' }));
     expect(head).toContain(t('battle.win.phase.orbit'));
@@ -220,15 +228,12 @@ describe('окно боя', () => {
 });
 
 describe('прогноз и правила в окне боя (UIX-6.2)', () => {
-  const card: BattleForecast = {
-    kind: 'card',
-    card: engageForecastCard({
-      outcome: 'attacker',
-      roundsEst: 3,
-      attacker: { damageFraction: 0.2 },
-      defender: { damageFraction: 1 },
-    }),
-  };
+  const card = engageForecastCard({
+    outcome: 'attacker',
+    roundsEst: 3,
+    attacker: { damageFraction: 0.2 },
+    defender: { damageFraction: 1 },
+  });
 
   it('прогноз — словом, сроком и потерями; цвет лишь дублирует слово', () => {
     const html = battleWindowHtml(
@@ -251,18 +256,51 @@ describe('прогноз и правила в окне боя (UIX-6.2)', () => 
       forecast: (sides) => ((seen = sides), null),
     });
     expect(seen).toEqual([
-      { mine: true, role: 'attacker', units: [{ unit: 'cruiser', count: 3, hp: 50 }] },
-      { mine: false, role: 'defender', units: [{ unit: 'cruiser', count: 3 }] },
+      {
+        mine: true,
+        role: 'attacker',
+        owner: 'p1',
+        key: 'p1-1',
+        units: [{ unit: 'cruiser', count: 3, hp: 50 }],
+      },
+      {
+        mine: false,
+        role: 'defender',
+        owner: 'p2',
+        key: 'p2-1',
+        units: [{ unit: 'cruiser', count: 3 }],
+      },
     ]);
   });
 
-  it('сторон больше двух — честная строка «прогноза нет»; без прогноза — ни строки', () => {
-    const m = battle([side('p1', 'attacker', true), side('p2', 'defender'), side('p3', 'attacker')]);
-    expect(battleWindowHtml(m, [], { forecast: () => ({ kind: 'many' }) })).toContain(
-      t('battle.win.forecast-many'),
-    );
+  it('сторон больше двух — прогноз тоже есть; без прогноза — ни строки (UIX-6.3)', () => {
+    const m = battle([
+      side('p1', 'attacker', true),
+      side('p2', 'defender'),
+      side('p3', 'attacker'),
+    ]);
+    let seen: readonly ForecastSide[] = [];
+    const html = battleWindowHtml(m, [], { forecast: (sides) => ((seen = sides), card) });
+    expect(seen.map((x) => x.owner)).toEqual(['p1', 'p2', 'p3']);
+    expect(html).toContain('bw-forecast positive');
     expect(battleWindowHtml(m, [], { forecast: () => null })).not.toContain('bw-forecast');
     expect(battleWindowHtml(m)).not.toContain('bw-forecast');
+  });
+
+  it('на земле гарнизон помечен как держащий мир, а ключей флотов нет', () => {
+    const m = {
+      ...battle([
+        side('p1', 'attacker', true, 'beachhead'),
+        side('p0', 'defender', false, 'garrison'),
+      ]),
+      phase: 'ground' as const,
+    };
+    let seen: readonly ForecastSide[] = [];
+    battleWindowHtml(m, [], { forecast: (sides) => ((seen = sides), null) });
+    expect(seen.map((x) => [x.owner, x.key, x.holds])).toEqual([
+      ['p1', undefined, undefined],
+      ['p0', undefined, true],
+    ]);
   });
 
   it('кончившийся бой прогноза не показывает', () => {
@@ -287,7 +325,10 @@ describe('прогноз и правила в окне боя (UIX-6.2)', () => 
 
   it('на земле на виду «не отступают», под «?» — только правила раундов', () => {
     const m = {
-      ...battle([side('p1', 'attacker', true, 'beachhead'), side('p2', 'defender', false, 'garrison')]),
+      ...battle([
+        side('p1', 'attacker', true, 'beachhead'),
+        side('p2', 'defender', false, 'garrison'),
+      ]),
       phase: 'ground' as const,
     };
     const open = battleWindowHtml(m, [], {}, { rules: true });
@@ -332,7 +373,9 @@ it('retreat is available only for living own ship sides, never landing or foreig
 it('uses the configured own color, fixed blue allies, and never gives allies commands', () => {
   const mine = side('p1', 'defender', true);
   const ally = { ...side('p3', 'attacker'), relation: 'ally' as const };
-  const html = battleWindowHtml(battle([mine, ally, side('p2', 'attacker')]), ['p1-1'], { color: () => '#c67dff' });
+  const html = battleWindowHtml(battle([mine, ally, side('p2', 'attacker')]), ['p1-1'], {
+    color: () => '#c67dff',
+  });
   expect(html).toContain('--own:#c67dff');
   expect(html).toContain('--own:#4a8cff');
   expect(html.match(/data-battle-attack=/g)).toHaveLength(1);
@@ -344,11 +387,27 @@ it('uses the configured own color, fixed blue allies, and never gives allies com
 it('folding many distinct stacks preserves damage, effects and orders', () => {
   const mine = { ...side('p1', 'defender', true), key: 'own' };
   mine.units = Array.from({ length: 23 }, () => ({ unit: 'cruiser', count: 1 }));
-  mine.readout = { attack: 432, defense: { min: 123, max: 123 }, modifiers: [
-    { source: 'sector', hook: 'combat.mitigation', direction: 'incoming', value: -0.15, beneficial: false, against: 'p2' },
-  ] };
+  mine.readout = {
+    attack: 432,
+    defense: { min: 123, max: 123 },
+    modifiers: [
+      {
+        source: 'sector',
+        hook: 'combat.mitigation',
+        direction: 'incoming',
+        value: -0.15,
+        beneficial: false,
+        against: 'p2',
+      },
+    ],
+  };
   let requested = -1;
-  const view = { tiles: (_: unknown, limit: number) => { requested = limit; return '<b class="real-tiles"></b>'; } };
+  const view = {
+    tiles: (_: unknown, limit: number) => {
+      requested = limit;
+      return '<b class="real-tiles"></b>';
+    },
+  };
   const folded = sideRowHtml(mine, view, { expanded: new Set(), retreats: ['p1-1'] });
   expect(folded).toContain('432');
   expect(folded).toContain('123');
@@ -356,7 +415,10 @@ it('folding many distinct stacks preserves damage, effects and orders', () => {
   expect(folded).toContain('data-battle-attack');
   expect(folded).not.toContain('real-tiles');
   expect(requested).toBe(-1);
-  const expanded = sideRowHtml(mine, view, { expanded: new Set(['own']), effects: new Set(['own']) });
+  const expanded = sideRowHtml(mine, view, {
+    expanded: new Set(['own']),
+    effects: new Set(['own']),
+  });
   expect(requested).toBe(16);
   expect(expanded).toContain(t('battle.win.more', { n: 7 }));
   expect(expanded).toContain('debuff');

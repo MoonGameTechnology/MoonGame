@@ -210,7 +210,6 @@ export const ru: Record<string, string> = {
   'battle.win.retreat-rules':
     'Отход не добивает израненный флот. Десант в высадке не отступает; вне боя корабль уходит с орбиты без потерь. После нажатия выберите на карте, куда отойти.',
   'battle.win.rules': 'Правила боя',
-  'battle.win.forecast-many': 'Прогноза нет: сторон больше двух',
   'battle.win.source-sector': 'Сектор',
   'battle.win.source-planet': 'Тип планеты',
   'battle.win.source-hunger': 'Голод',

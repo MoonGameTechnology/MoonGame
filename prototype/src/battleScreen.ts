@@ -19,12 +19,13 @@
  *    (MSB-3/MSB-4), и порядок о роли не говорит ничего.
  * 2. **Своя сторона помечена.** В свалке на пять сторон «где я» — первый вопрос игрока, и
  *    искать себя по имени владельца в списке одинаковых строк было бы мучением.
- * 3. **Прогноз — только там, где у боя один ответ (UIX-6.2).** В бою двух сторон, одна из
- *    которых моя, над колонками стоит итог словом, срок и потери (`decisions/battleForecast.ts`).
- *    Он считается от текущего состава, поэтому новый раунд сам даёт новый прогноз. У боя
- *    трёх сторон и больше исход честно не определён: бой кончается первой гибелью, и
- *    выжившие сцепляются заново. Одно число там было бы враньём, и окно пишет «прогноза
- *    нет». В чужом бою прогноза нет вовсе: победа и поражение бывают только у своей стороны.
+ * 3. **Прогноз — в своём бою, сколько бы в нём ни было сторон (UIX-6.2, UIX-6.3).** Над
+ *    колонками стоит итог словом, срок и потери (`decisions/battleForecast.ts`). Он
+ *    считается от текущего состава, поэтому новый раунд сам даёт новый прогноз, а в бою
+ *    трёх сторон и больше досчитывает цепочку: после гибели выжившие сцепляются заново.
+ *    Для этого окно отдаёт прогнозу владельцев (вражду), id флотов (кто нападёт в новом
+ *    звене) и гарнизон (кто держит мир). В чужом бою прогноза нет: победа и поражение
+ *    бывают только у своей стороны.
  * 4. **Пустое окно не открывается молча.** Бой мог кончиться, пока палец летел к экрану;
  *    честная строка лучше пустой рамки.
  * 5. **Правила — под «?», на виду одна строка (UIX-6.2).** Цена отхода нужна в момент
@@ -34,7 +35,8 @@
 import { t } from '../../localization/runtime';
 import { esc, displayUnit, fmtHrs, kfmt, runClockShown } from './format';
 import { runRealSeconds } from '../../decisions/runClock';
-import type { BattleForecast, ForecastSide } from '../../decisions/battleForecast';
+import type { ForecastSide } from '../../decisions/battleForecast';
+import type { EngageForecastCard } from '../../decisions/engageForecast';
 import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
 import { veteranBadge } from '../../decisions/veteranBadge';
 import { combatantKey, landingBattleOf } from '../../packages/shared-core/src/state/battle';
@@ -77,7 +79,7 @@ export interface BattleView {
   /** Остаток до отметки времени мира — текст отсчёта до следующего раунда. */
   timeLeft?: (at: number) => string;
   /** UIX-6.2: прогноз боя по текущему составу сторон (`decisions/battleForecast.ts`). */
-  forecast?: (sides: readonly ForecastSide[]) => BattleForecast | null;
+  forecast?: (sides: readonly ForecastSide[]) => EngageForecastCard | null;
 }
 
 type Side = BattleModel['sides'][number];
@@ -274,10 +276,8 @@ function balanceHtml(sides: readonly Side[], view: BattleView): string {
 }
 
 /** Прогноз (правило 3): слово итога, срок и потери; цвет лишь дублирует слово. */
-function forecastHtml(f: BattleForecast | null | undefined): string {
-  if (!f) return '';
-  if (f.kind === 'many') return `<p class="bw-forecast">${esc(t('battle.win.forecast-many'))}</p>`;
-  const c = f.card;
+function forecastHtml(c: EngageForecastCard | null | undefined): string {
+  if (!c) return '';
   return (
     `<p class="bw-forecast ${c.tone}"><b>${esc(t(c.verdictKey))}</b>` +
     `<span>${esc(t('engage.forecast.line', { h: fmtHrs(c.hours), own: c.ownLossPct, foe: c.foeLossPct }))}</span></p>`
@@ -341,7 +341,14 @@ export function battleWindowHtml(
       ? ''
       : forecastHtml(
           view.forecast?.(
-            m.sides.map((s) => ({ mine: s.mine, role: s.role, units: s.stacks ?? s.units })),
+            m.sides.map((s) => ({
+              mine: s.mine,
+              role: s.role,
+              units: s.stacks ?? s.units,
+              owner: s.owner,
+              ...(s.ref?.kind === 'fleet' ? { key: s.ref.fleetId } : {}),
+              ...(s.kind === 'garrison' ? { holds: true } : {}),
+            })),
           ),
         )) +
     `<div class="bw-columns">${renderColumn(friends, t('battle.win.allies'))}${renderColumn(others, t('battle.win.opponents'))}</div>` +

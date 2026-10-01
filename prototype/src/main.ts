@@ -312,8 +312,7 @@ import {
 import { medalBadges } from '../../decisions/unitMedals';
 import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
-import { engageForecastCard } from '../../decisions/engageForecast';
-import { battleForecast } from '../../decisions/battleForecast';
+import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -4805,11 +4804,31 @@ function drawEngageTargets(now: number) {
 
 /** UIX-6.1: прогноз у цели «Атаки» — выделенные флоты против флота под прицелом. Слова и
  *  проценты решает `engageForecast.ts`; цвет только дублирует слово. Туман соблюдён тем,
- *  что цель берётся из `engageCandidates()`: там лишь флоты, чей состав игрок видит. */
+ *  что цель берётся из `engageCandidates()`: там лишь флоты, чей состав игрок видит.
+ *  UIX-6.3: каждый выделенный флот — своя сторона, как в бою: у каждого свой кап линии
+ *  огня, и цель отвечает каждому полным залпом. Слитые в одну сторону, они считались бы
+ *  один раз. */
 function drawEngageForecast(foe: Fleet, x: number, y: number): void {
-  const mine = selectedFleetIds().flatMap((id) => s.fleets[id]?.units ?? []);
-  if (sumUnits(mine) <= 0 || sumUnits(foe.units) <= 0) return;
-  const card = engageForecastCard(previewBattle(mine, foe.units, data));
+  const mine = selectedFleetIds().flatMap((id) => {
+    const f = s.fleets[id];
+    return f && sumUnits(f.units) > 0 ? [f] : [];
+  });
+  if (mine.length === 0 || sumUnits(foe.units) <= 0) return;
+  const card = battleForecast(
+    [
+      ...mine.map((f) => ({
+        mine: true,
+        role: 'attacker' as const,
+        units: f.units,
+        owner: f.owner,
+        key: f.id,
+      })),
+      { mine: false, role: 'defender', units: foe.units, owner: foe.owner, key: foe.id },
+    ],
+    data,
+    battleHostility(s),
+  );
+  if (!card) return;
   const ink = card.tone === 'positive' ? LOCK : card.tone === 'negative' ? HOSTILE : R_ARTY;
   cx.save();
   cx.setLineDash([]);
@@ -11426,7 +11445,7 @@ const battleWindow = initBattleWindow({
     autoRetreatAt,
     timeLeft,
     // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
-    forecast: (sides) => battleForecast(sides, data),
+    forecast: (sides) => battleForecast(sides, data, battleHostility(s)),
   },
 });
 battleWin.addEventListener('click', (event) => {
