@@ -202,7 +202,6 @@ import {
   sumUnitStat,
   getStance,
   getOffer,
-  hashState,
   planRoute,
   previewBattle,
   previewLossCount,
@@ -243,6 +242,7 @@ import {
   clampCam as camClampCam,
   centerOn as camCenterOn,
   fitTransform as camFitTransform,
+  projection as camProjection,
 } from '../../packages/client/src/camera';
 import {
   rgba,
@@ -433,7 +433,7 @@ import { cardCovers, leftCardSlackFor, panelSlackFor, type Slack } from './panel
 import { longPressAction, pressIntent } from '../../decisions/pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
-import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
+import { bakeSignature, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { frontierOutline } from './frontierOutline';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
@@ -937,6 +937,20 @@ import {
   stockBleeds,
 } from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
+import { NET_VIEW_IDLE, netViewAt, netViewSnapshot } from '../../decisions/netViewClock';
+import {
+  SETTLE_MS,
+  exactOffset,
+  layerTransform,
+  mapLayerAction,
+  onPixelGrid,
+  overscanFor,
+  toBake,
+  visibleInBake,
+  type LayerTransform,
+  type MapProjection,
+  type Overscan,
+} from '../../decisions/mapLayerView';
 import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
@@ -1044,12 +1058,7 @@ import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './
 import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
-import {
-  WAIT_MARK,
-  desyncVerdict,
-  radarContacts,
-  waitingBanner,
-} from './snapshotIngest';
+import { WAIT_MARK, radarContacts, waitingBanner } from './snapshotIngest';
 import {
   FLAK_LIFE_MS,
   flakBurstRadius,
@@ -1406,13 +1415,23 @@ let socketAdmitted = false;
 // M0 net telemetry (dev overlay): smoothed round-trip ms, and a desync check that
 // compares our reconstructed view to the server's hash on every snapshot.
 let rttEma: number | null = null;
+// Часы картинки в сети (`netViewClock.ts`): снимок сервера приходит раз в секунду, и без
+// досчёта флоты на карте двигались бы рывками раз в секунду при любом FPS.
+let netView = NET_VIEW_IDLE;
+let netShownTime = 0;
+/** Игровое «сейчас» ДЛЯ КАРТИНКИ движения: в соло — время мира (оно и так идёт каждый
+ *  кадр), в сети — время снимка, досчитанное до этого кадра. Только для того, ГДЕ рисовать
+ *  движущееся; правила, приказы и таймеры читают `s.time`. */
+function mapNow(): number {
+  return NET ? netShownTime : s.time;
+}
 let pingTimer: ReturnType<typeof setInterval> | null = null;
 // M2 perf telemetry: a light fps/rtt/mem sample every 30s while in a network match —
 // lands in the server's metrics stream (observe → JSONL/сводка), never answered.
 let perfTimer: ReturnType<typeof setInterval> | null = null;
 const PERF_SAMPLE_MS = 30_000;
-let netDesync = false; // last snapshot's hash mismatched (server vs our rebuild)
-let netDesyncCount = 0; // how many snapshots have mismatched this session
+let netDesync = false; // the last hash verdict was a mismatch (server vs our rebuild)
+let netDesyncCount = 0; // how many mismatches were caught this session (one per resync)
 // Auto-reconnect: on an UNEXPECTED drop (not a user action), rejoin our seat with
 // backoff — the server keeps the match running and the nick maps us back.
 let userClosed = false;
@@ -1907,8 +1926,8 @@ function resize() {
 if (typeof window !== 'undefined') window.addEventListener('resize', resize);
 resize();
 
-// The backdrop (deep-space + nebulae + radar grid + star ticks) is baked into the
-// cached static layer (see buildStaticLayer). This is the only live backdrop bit:
+// The backdrop (deep-space + nebulae + radar grid + star ticks) is part of the cached
+// static layer (see paintSky / blitStaticLayer). This is the only live backdrop bit:
 // a slow radar sweep across the plotting table — console chrome that follows the
 // HARDWARE: one rotating arm per OWN radar source (planet array / radar ship),
 // pivoted on the source and clipped to ITS reach; co-located sources collapse into
@@ -2180,21 +2199,32 @@ let galaxyOutline: Array<{ x: number; y: number }> = [];
 let mapNodeSpacing = mapSpacing(MAP);
 /**
  * ROADS-7: рисунок сети дорог — штрихи и отметки развилок — меняется только вместе с
- * топологией (временный коридор героя бьёт `state.topology`), а статический слой во время
- * движения камеры рисуется КАЖДЫЙ кадр. Пересчёт сети на каждом кадре стоил ~3 мс кадра на
- * frontier-50; теперь она считается раз на топологию и сбрасывается вместе с геометрией
- * карты. Объявлено здесь, выше первого вызова `installMapGeometry`: иначе сброс при
- * инициализации модуля упал бы на временной мёртвой зоне.
+ * топологией (временный коридор героя бьёт `state.topology`), а слой карты перепекается
+ * куда чаще: смена владельца, туман, зум, уход камеры за запас выпечки. Пересчёт сети на
+ * каждой выпечке стоил ~3 мс на frontier-50; теперь она считается раз на топологию и
+ * сбрасывается вместе с геометрией карты. Там же рамка каждого штриха в координатах
+ * карты: дорогу вне выпечки отсеивают, не проецируя ни одной её точки. Объявлено здесь,
+ * выше первого вызова `installMapGeometry`: иначе сброс при инициализации модуля упал бы
+ * на временной мёртвой зоне.
  */
-let roadDrawing: { topology: number; strokes: NetPoint[][]; marks: ForkMark[] } | null = null;
-function roadDrawingOf(state: GameState): { strokes: NetPoint[][]; marks: ForkMark[] } {
+type RoadDrawing = { strokes: NetPoint[][]; boxes: Float64Array; marks: ForkMark[] };
+let roadDrawing: (RoadDrawing & { topology: number }) | null = null;
+function roadDrawingOf(state: GameState): RoadDrawing {
   const topology = state.topology ?? 0;
   if (roadDrawing?.topology !== topology) {
-    roadDrawing = {
-      topology,
-      strokes: roadStrokes(state.planets),
-      marks: forkMarks(state.planets),
-    };
+    const strokes = roadStrokes(state.planets);
+    const boxes = new Float64Array(strokes.length * 4);
+    strokes.forEach((line, i) => {
+      let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+      for (const p of line) {
+        if (p.x < x0) x0 = p.x;
+        if (p.x > x1) x1 = p.x;
+        if (p.y < y0) y0 = p.y;
+        if (p.y > y1) y1 = p.y;
+      }
+      boxes.set([x0, y0, x1, y1], i * 4);
+    });
+    roadDrawing = { topology, strokes, boxes, marks: forkMarks(state.planets) };
   }
   return roadDrawing;
 }
@@ -2440,7 +2470,7 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
  *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
 function fleetPos(f: Fleet): { x: number; y: number } | null {
   // По ДОРОГЕ лейна (ROADS-2) — тем же счётом, что ядро (`fleetPositionAt`).
-  return fleetOrigin(f, s.time, (id) => s.planets[id]?.position ?? null, (from, to, t) => {
+  return fleetOrigin(f, mapNow(), (id) => s.planets[id]?.position ?? null, (from, to, t) => {
     const road = laneRoad(s, from, to);
     return road ? pointAlong(road, t) : null;
   });
@@ -2459,7 +2489,7 @@ function strikeWorldPos(strikeId: string): { x: number; y: number } | null {
   const home = strikeBasePos(st.base);
   if (!home) return null;
   const [from, to] = strikeLeg(st, home);
-  const k = strikeProgress(st, s.time);
+  const k = strikeProgress(st, mapNow());
   return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
 }
 /** Та же точка отсчёта, спроецированная НА ЭКРАН.
@@ -2555,7 +2585,7 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
       // Нос — вдоль КУСКА ДОРОГИ, на котором корабль (ROADS-4, `roadHeading`), а не по
       // прямой «мир → мир»: на ветке развилки та смотрела бы мимо дороги.
       const road = laneRoad(s, lane.from, lane.to);
-      const t = f.movement ? legT(f.movement, s.time) : (f.edge?.t ?? 0);
+      const t = f.movement ? legT(f.movement, mapNow()) : (f.edge?.t ?? 0);
       const d = road ? roadHeading(road, t) : { x: 0, y: 0 };
       if (d.x !== 0 || d.y !== 0) {
         const wa = world(mp);
@@ -4665,7 +4695,7 @@ function drawFleetRoutes() {
     const sel = selFleet === f.id || selFleets.has(f.id);
     // Путь впереди — по ДОРОГАМ, тем же правилом развилок, что водит флот ядро
     // (`roadAhead`, ROADS-2): линия не обещает дорогу, по которой флот не полетит.
-    const ahead = roadAhead(s, f.movement, legT(f.movement, s.time)).slice(1);
+    const ahead = roadAhead(s, f.movement, legT(f.movement, mapNow())).slice(1);
     const pts = [{ x: start.x, y: start.y }, ...ahead.map((p) => world(p))];
     if (pts.length < 2) continue;
     const stroke = routeStroke(sel);
@@ -4699,7 +4729,7 @@ function drawFleetRoutes() {
  * вместо пунктира плана и цвет крыла (`R_WING`), а не цвет захвата.
  */
 function drawStrikeTrails(): void {
-  const trails = strikeTrails(s.strikes, { me: ME, now: s.time, basePos: strikeBasePos });
+  const trails = strikeTrails(s.strikes, { me: ME, now: mapNow(), basePos: strikeBasePos });
   if (!trails.length) return;
   cx.save();
   for (const tr of trails) {
@@ -5150,18 +5180,33 @@ let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = nu
  * stretching, and never shimmers. Rebuilt only on viewport / ownership change.
  */
 // --- holographic static layer (territory + hyperlanes), camera-baked & cached --
-// Idle frames reuse one screen-sized bake. Moving frames paint directly to the
-// visible canvas, reusing native-resolution province art without snapshotting a
-// freshly mutated full-screen surface on every move.
+// Two caches (`decisions/mapLayerView.ts`). The MAP LAYER holds the political map on a
+// transparent canvas with a margin beyond the screen: while the camera moves it is shown
+// under one scale + shift instead of being repainted, and it is re-baked only when its
+// content changes, it stops covering the screen, or the camera settles off its pixel
+// grid (after a zoom). The SKY under it (backdrop art, grid, stars) keeps its own bounded
+// parallax, so moving frames paint it live — it is cheap. A settled camera composes sky
+// and map into `bg` once, and idle frames are one 1:1 blit.
 const bg = document.createElement('canvas');
 const bgx = (mapContextOptions ? bg.getContext('2d', mapContextOptions) : bg.getContext('2d')) as CanvasRenderingContext2D;
+const mapLayer = document.createElement('canvas');
+const mapLayerX = (mapContextOptions ? mapLayer.getContext('2d', mapContextOptions) : mapLayer.getContext('2d')) as CanvasRenderingContext2D;
 const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
 const terrainGeometry = new TerrainGeometryCache();
 const mapContextEvents = { lost: 0, restored: 0 };
 const backgroundContextEvents = { lost: 0, restored: 0 };
-let bgContent = ''; // viewport + ownership signature (camera-independent)
-let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
-let presentedCam: { x: number; y: number; scale: number } | null = null;
+let mapLayerContent = ''; // content signature of the map-layer bake ('' — none or invalid)
+let mapLayerAt: MapProjection = { a: 1, x: 0, y: 0 }; // projection the map layer was painted at
+let mapLayerMargin: Overscan = { x: 0, y: 0 }; // its margin beyond the screen, CSS px
+let mapLayerBakes = 0; // bumps on every bake, so the composite knows its map is current
+/** This frame's transform from the map layer's bake space to the screen. The province
+ *  geometry below (polygons, borders, terrain fields, glass frame) lives in bake space. */
+let mapView: LayerTransform = { k: 1, tx: 0, ty: 0 };
+/** Next terrain field whose sharp raster a bake could not afford yet; -1 — none. */
+let terrainRefine = -1;
+let bgComposite = ''; // what `bg` holds: which map bake, at which offset, over which sky
+let camSeen = ''; // projection of the previous frame, to notice the camera moving
+let camMovedAt = -Infinity;
 let provincePolygons = new Map<string, ProvincePolygon>();
 /** M2.11: границы провинций с последней выпечки — рисуются КАЖДЫЙ кадр живыми, а не
  *  запекаются. `null` — плоская карта: там граница стоит в статичном слое, как и рамка. */
@@ -5173,17 +5218,24 @@ let selectionStarted = 0;
 
 /** WebView can restore contexts without changing canvas dimensions or camera state. */
 function invalidateMapSurfaces(): void {
-  bgContent = '';
-  presentedCam = null;
+  mapLayerContent = '';
+  bgComposite = '';
+  terrainRefine = -1;
   terrainRaster.clear();
   clearHolographicSprites();
 }
 canvas.addEventListener('contextlost', () => { mapContextEvents.lost++; invalidateMapSurfaces(); });
 canvas.addEventListener('contextrestored', () => { mapContextEvents.restored++; invalidateMapSurfaces(); });
 // Offscreen contexts can also be lost independently. Their events do not bubble
-// through document, so observe the actual cached surface.
-bg.addEventListener?.('contextlost', () => { backgroundContextEvents.lost++; bgContent = ''; });
-bg.addEventListener?.('contextrestored', () => { backgroundContextEvents.restored++; bgContent = ''; });
+// through document, so observe the actual cached surfaces.
+bg.addEventListener?.('contextlost', () => { backgroundContextEvents.lost++; bgComposite = ''; });
+bg.addEventListener?.('contextrestored', () => { backgroundContextEvents.restored++; bgComposite = ''; });
+for (const type of ['contextlost', 'contextrestored'] as const)
+  mapLayer.addEventListener?.(type, () => {
+    backgroundContextEvents[type === 'contextlost' ? 'lost' : 'restored']++;
+    mapLayerContent = '';
+    bgComposite = '';
+  });
 
 /** The owner of node `id` AS THE VIEWER MAY KNOW IT: live when identified (or fog
  *  off), last-known from memory when only remembered, unknown otherwise. The
@@ -5229,41 +5281,31 @@ function provinceClip(): Array<[number, number]> {
   return clipPolygon(world(frame.topLeft), world(frame.bottomRight));
 }
 
-/** Rebuild the cached province map when the camera/ownership/viewport moves. */
-/** Одна на прототип: геометрия провинций не зависит от того, в какой холст её пишут,
- *  а статик-слой чередует `bgx` (устоявшийся кадр) и `cx` (кадр в движении). */
+/** Одна на прототип: геометрия провинций не зависит от того, в какой холст её пишут. */
 const territoryGeometry = new TerritoryGeometryCache();
 
-function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
-  const lod = currentMapLod();
-  // Always cover newly exposed edges at the current camera. Only the stationary
-  // offscreen bake can be reused; the viewer's knowledge remains its invalidator.
-  const content = bakeSignature({
+/** Everything the map layer depends on except the camera (`staticLayerCache.ts`): the
+ *  viewer's knowledge of owners and of explored provinces, never the raw truth. */
+function mapLayerSignature(): string {
+  return bakeSignature({
     vw: VW,
     vh: VH,
     dpr: DPR,
     me: ME,
     owners: ownersSig(),
     starfield: starfieldOn(),
-  }) + `|sky:${starfieldOn() && spaceBackdropReady(holographicMapOn()) ? 1 : 0}` +
-    `|holo:${holographicMapOn()}|glow:${glowOn()}` +
+  }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
     `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}`;
-  const width = Math.round(VW * DPR);
-  const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
-  if (g === bgx) {
-    if (bgx.isContextLost?.()) return;
-    if (!needsRebake(baked, { signature: content, cam, width })) return;
-    bgContent = ''; // publish the cache signature only after a complete paint
-    // Preserve the allocation when only the scene changed.
-    if (bg.width !== Math.round(VW * DPR)) bg.width = Math.round(VW * DPR);
-    if (bg.height !== Math.round(VH * DPR)) bg.height = Math.round(VH * DPR);
-  }
+}
+
+/** The sky under the map — backdrop art (or the fallback nebulae), grid and stars — in
+ *  screen space with the camera's bounded parallax. Opaque, so it also clears `g`. */
+function paintSky(g: CanvasRenderingContext2D): void {
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   g.clearRect(0, 0, VW, VH);
-
-  // Dark space is embedded in the offline bundle. Bake it with the static layer;
-  // loading the image invalidates this cache once, even if the camera stays still.
-  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn(), holographicMapOn());
+  // Dark space is embedded in the offline bundle. The settled composite keys on its
+  // readiness, so loading the image refreshes it once, even if the camera stays still.
+  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn(), holographicMapOn(), DPR);
   // Graphics pref: `starfield` off leaves the flat fill + grid (nebulae/stars skipped).
   if (starfieldOn() && !spaceBackdropReady(holographicMapOn()))
     for (const neb of NEBULAE) {
@@ -5294,7 +5336,23 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
       g.fillStyle = rgba('#bfeee6', st.b * 0.45);
       g.fillRect(st.x * VW, st.y * VH, 0.7, 0.7);
     }
+}
 
+/** A screen rectangle in CSS pixels; a bake's view reaches past the screen by its margin. */
+interface ScreenRect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * The political map at the current camera: glass, provinces, terrain art, roads and the
+ * board edge, culled to `view`. Publishes the province geometry the frame and input
+ * read — in these same (screen-at-bake) coordinates.
+ */
+function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: boolean, preparing: boolean): void {
+  const lod = currentMapLod();
   // PROVINCES — political map (Bytro-style). Every sector is a filled CELL of a
   // weighted Voronoi (power diagram) over the sector centres: the cells tile the
   // map and share borders, so a bigger `size` claims more territory and resizing
@@ -5335,9 +5393,9 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
-  // Тесселяция степенной диаграммы квадратична по числу семян, а статик-слой
-  // перепекается КАЖДЫЙ кадр, пока камера едет, — то есть ровно тогда, когда кадр и так
-  // самый дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
+  // Тесселяция степенной диаграммы квадратична по числу семян, а слой карты
+  // перепекается и посреди жеста (ушёл за запас, растянут зумом) — ровно тогда, когда
+  // кадр и так дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
   // нормализованных по первой точке клипа и масштабу, поэтому панорама и зум из неё
   // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
   // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
@@ -5352,7 +5410,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
     // M2.11: на голографической карте граница живёт, как рамка, — её рисует кадр, а не
     // выпечка. Запеки её и здесь — линия легла бы дважды, одна из них застывшей.
     strokeBorders: !holographicMapOn(),
-  }, territoryGeometry.project(seeds, clip, cam.scale, provinceWave()));
+  }, territoryGeometry.project(seeds, clip, cam.scale, provinceWave()), view);
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   provinceBorders = holographicMapOn() ? classifyBorders(cells, seeds) : null;
   terrainFields = [];
@@ -5363,16 +5421,16 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
       const poly = provincePolygons.get(n.id);
       if (!poly) continue;
       // Cull using the cheap polygon bounds BEFORE constructing rock geometry.
-      if (poly.every(([x]) => x < 0) || poly.every(([x]) => x > VW) ||
-        poly.every(([, y]) => y < 0) || poly.every(([, y]) => y > VH)) continue;
+      if (poly.every(([x]) => x < view.x0) || poly.every(([x]) => x > view.x1) ||
+        poly.every(([, y]) => y < view.y0) || poly.every(([, y]) => y > view.y1)) continue;
       const field = terrainGeometry.project(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain), sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
         known(n.id) || memory.has(n.id), world(n));
-      if (!field || field.box.x > VW || field.box.y > VH ||
-        field.box.x + field.box.width < 0 || field.box.y + field.box.height < 0) continue;
+      if (!field || field.box.x > view.x1 || field.box.y > view.y1 ||
+        field.box.x + field.box.width < view.x0 || field.box.y + field.box.height < view.y0) continue;
       terrainFields.push(field);
       if (preparing) continue; // prewarm these fields in bounded loading slices
-      // Reuse the last sharp bake through the gesture; refine in bounded slices
-      // once settled, instead of redrawing thousands of vector strokes per tick.
+      // Reuse the last sharp bake through the gesture; sharpen in bounded slices
+      // once settled (`blitStaticLayer`), instead of redrawing vector strokes per tick.
       terrainRaster.draw(g, field, DPR, zooming);
     }
     g.restore();
@@ -5397,9 +5455,20 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // грани. Какими отрезками её рисовать (каждый кусок один раз, прямая — только у лейна
   // без дороги) — чистое решение `decisions/roadNetwork.ts`; здесь проекция и отсев.
   const M = 1 + g.lineWidth;
+  const roads = roadDrawingOf(s);
+  // The same frame in map units (the projection is a positive uniform scale), one pixel
+  // wider: a road whose box misses it is dropped before a single point is projected.
+  const pr = camProjection(cam, insets(), mapBounds());
+  const pad = (M + 1) / pr.a;
+  const rx0 = (view.x0 - pr.x) / pr.a - pad;
+  const rx1 = (view.x1 - pr.x) / pr.a + pad;
+  const ry0 = (view.y0 - pr.y) / pr.a - pad;
+  const ry1 = (view.y1 - pr.y) / pr.a + pad;
   g.beginPath();
-  for (const line of lod.provinceDetail > 0 ? roadDrawingOf(s).strokes : []) {
-    const pts = line.map((p) => world(p));
+  for (let r = 0; lod.provinceDetail > 0 && r < roads.strokes.length; r++) {
+    const b = roads.boxes;
+    if (b[r * 4 + 2]! < rx0 || b[r * 4]! > rx1 || b[r * 4 + 3]! < ry0 || b[r * 4 + 1]! > ry1) continue;
+    const pts = roads.strokes[r]!.map((p) => world(p));
     let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
     for (const p of pts) {
       if (p.x < x0) x0 = p.x;
@@ -5407,7 +5476,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
       if (p.y < y0) y0 = p.y;
       if (p.y > y1) y1 = p.y;
     }
-    if (x1 < -M || x0 > VW + M || y1 < -M || y0 > VH + M) continue;
+    if (x1 < view.x0 - M || x0 > view.x1 + M || y1 < view.y0 - M || y0 > view.y1 + M) continue;
     g.moveTo(pts[0]!.x, pts[0]!.y);
     for (let i = 1; i < pts.length; i++) g.lineTo(pts[i]!.x, pts[i]!.y);
   }
@@ -5417,9 +5486,9 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // чем рисовать — общий с клиентом `drawForkMark`.
   if (lod.provinceDetail > 0) {
     g.fillStyle = rgba('#96b9c3', 0.55 * lod.provinceDetail);
-    for (const m of roadDrawingOf(s).marks) {
+    for (const m of roads.marks) {
       const c = world(m.at);
-      if (c.x < -6 || c.x > VW + 6 || c.y < -6 || c.y > VH + 6) continue;
+      if (c.x < view.x0 - 6 || c.x > view.x1 + 6 || c.y < view.y0 - 6 || c.y > view.y1 + 6) continue;
       drawForkMark(g, c.x, c.y);
     }
   }
@@ -5447,29 +5516,125 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   } else if (!holographicMapOn()) {
     g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }
-  if (g === bgx && !bgx.isContextLost?.()) {
-    bgContent = terrainRaster.pending ? '' : content;
-    bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
-  }
 }
 
-/** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
-function blitStaticLayer(): void {
+/** Bake the map layer at the current camera, with its margin beyond the screen. */
+function bakeMapLayer(content: string, zooming: boolean, preparing = false): void {
+  if (mapLayerX.isContextLost?.()) return;
+  const margin = overscanFor(VW, VH, DPR);
+  const ox = Math.round(margin.x * DPR);
+  const oy = Math.round(margin.y * DPR);
+  const width = Math.round(VW * DPR) + 2 * ox;
+  const height = Math.round(VH * DPR) + 2 * oy;
+  mapLayerContent = ''; // publish the signature only after a complete paint
+  // Preserve the allocation when only the scene changed.
+  if (mapLayer.width !== width) mapLayer.width = width;
+  if (mapLayer.height !== height) mapLayer.height = height;
+  mapLayerX.setTransform(1, 0, 0, 1, 0, 0);
+  mapLayerX.clearRect(0, 0, width, height);
+  mapLayerX.setTransform(DPR, 0, 0, DPR, ox, oy);
+  paintMapLayer(mapLayerX, { x0: -margin.x, y0: -margin.y, x1: VW + margin.x, y1: VH + margin.y }, zooming, preparing);
+  mapLayerAt = camProjection(cam, insets(), mapBounds());
+  mapLayerMargin = margin;
+  mapLayerBakes++;
+  // A loading bake is geometry only; the finished one follows it (`prepareEnteringMap`).
+  if (!preparing && !mapLayerX.isContextLost?.()) mapLayerContent = content;
+  // Sharp terrain the frame budget could not afford is refined a few rasters per frame
+  // and baked once at the end — the map is not re-baked every frame meanwhile.
+  terrainRefine = !preparing && terrainRaster.pending ? 0 : -1;
+}
+
+/** Draw the map layer into `g` under `view` (bake space → screen). */
+function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform): void {
+  const ox = Math.round(mapLayerMargin.x * DPR);
+  const oy = Math.round(mapLayerMargin.y * DPR);
+  const exact = exactOffset(view, DPR);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  // On its pixel grid the layer is a plain copy; otherwise it is resampled — for the
+  // frames of a gesture only, since a settled camera gets an exact bake (rule 4).
+  if (exact) g.drawImage(mapLayer, exact.x - ox, exact.y - oy);
+  else
+    g.drawImage(mapLayer, view.tx * DPR - view.k * ox, view.ty * DPR - view.k * oy,
+      view.k * mapLayer.width, view.k * mapLayer.height);
+}
+
+/** Province geometry for input and the transform from the screen into it. Bakes the map
+ *  layer first when there is none yet (a tap before the first frame). */
+function mapLayerForInput(): LayerTransform {
+  if (!mapLayerContent && !mapLayerX.isContextLost?.()) bakeMapLayer(mapLayerSignature(), false);
+  return layerTransform(mapLayerAt, camProjection(cam, insets(), mapBounds()));
+}
+
+/** Put the static layer — sky and political map — under the live art of this frame. */
+function blitStaticLayer(now: number): void {
   terrainRaster.beginFrame(2);
-  const moving = presentedCam && (presentedCam.x !== cam.x || presentedCam.y !== cam.y || presentedCam.scale !== cam.scale);
-  const pinching = pinchStart !== null;
-  if (moving || pinching || bgx.isContextLost?.()) {
-    // Copying a freshly painted full-screen canvas forces its thousands of draw
-    // commands to flush before drawImage can snapshot it. Paint directly during
-    // motion; province textures remain cached and every exposed edge is current.
+  const here = camProjection(cam, insets(), mapBounds());
+  const seen = `${here.a},${here.x},${here.y},${VW},${VH},${DPR}`;
+  if (seen !== camSeen) {
+    camSeen = seen;
+    camMovedAt = now;
+  }
+  // A pinch stays open while its fingers pause: no bake at each intermediate scale.
+  const settled = pinchStart === null && now - camMovedAt >= SETTLE_MS;
+  const content = mapLayerSignature();
+  if (mapLayerX.isContextLost?.()) {
+    // No offscreen map to reuse: paint it straight into the frame.
     cx.save();
-    // A touch stream can leave idle frames between moves. Do not allocate a new
-    // terrain bake at each intermediate scale; settle once when the pinch ends.
-    buildStaticLayer(cx, pinching || (!!presentedCam && presentedCam.scale !== cam.scale));
+    paintSky(cx);
+    paintMapLayer(cx, { x0: 0, y0: 0, x1: VW, y1: VH }, !settled, false);
     cx.restore();
-  } else {
-    // Once settled, bake once at the final camera; idle frames are one 1:1 blit.
-    buildStaticLayer();
+    mapLayerAt = here;
+    mapView = { k: 1, tx: 0, ty: 0 };
+    return;
+  }
+  let view = layerTransform(mapLayerAt, here);
+  const action = mapLayerAction({
+    fresh: mapLayerContent === content,
+    transform: view,
+    width: VW,
+    height: VH,
+    dpr: DPR,
+    margin: mapLayerMargin,
+    settled,
+  });
+  if (action === 'rebake') {
+    // A bake inside a gesture reuses terrain art at its last scale; a settled one
+    // sharpens it.
+    bakeMapLayer(content, !settled);
+    view = { k: 1, tx: 0, ty: 0 };
+  } else if (terrainRefine >= 0 && view.k === 1) {
+    // Sharpen the terrain the last bake could not afford, two rasters a frame, without
+    // repainting the map; once all are sharp, bake it one last time.
+    while (terrainRefine < terrainFields.length) {
+      terrainRaster.prepare(terrainFields[terrainRefine]!, DPR);
+      if (terrainRaster.pending) break;
+      terrainRefine++;
+    }
+    if (terrainRefine >= terrainFields.length && settled) {
+      // Room for whatever the raster cache evicted meanwhile: never loop on it.
+      terrainRaster.beginFrame(Infinity);
+      bakeMapLayer(content, false);
+      view = { k: 1, tx: 0, ty: 0 };
+    }
+  }
+  // In motion a pan moves the layer by whole device pixels — a copy, not a resample;
+  // what is drawn from bake geometry follows the same rounded transform.
+  mapView = onPixelGrid(view, DPR);
+  const exact = settled ? exactOffset(view, DPR) : null;
+  if (exact && !bgx.isContextLost?.()) {
+    // Settled: compose sky + map once, then every idle frame is one 1:1 blit.
+    const key = `${mapLayerBakes}|${exact.x},${exact.y}|${VW}x${VH}:${DPR}|` +
+      `${starfieldOn()}:${spaceBackdropReady(holographicMapOn())}:${holographicMapOn()}|${cam.x},${cam.y},${cam.scale}`;
+    if (bgComposite !== key) {
+      bgComposite = '';
+      const width = Math.round(VW * DPR);
+      const height = Math.round(VH * DPR);
+      if (bg.width !== width) bg.width = width;
+      if (bg.height !== height) bg.height = height;
+      paintSky(bgx);
+      showMapLayer(bgx, view);
+      if (!bgx.isContextLost?.()) bgComposite = key;
+    }
     cx.save();
     cx.setTransform(1, 0, 0, 1, 0, 0);
     // Replace the entire frame even if a backing store disappears between the
@@ -5477,8 +5642,13 @@ function blitStaticLayer(): void {
     cx.globalCompositeOperation = 'copy';
     cx.drawImage(bg, 0, 0);
     cx.restore();
+    return;
   }
-  presentedCam = { x: cam.x, y: cam.y, scale: cam.scale };
+  // In motion (or settling): the sky live, the baked map under the camera's transform.
+  cx.save();
+  paintSky(cx);
+  showMapLayer(cx, mapView);
+  cx.restore();
 }
 
 const mapPreparation = new MapPreparation();
@@ -5540,7 +5710,7 @@ function prepareEnteringMap(): boolean {
       { label: t('map-loading.background'), run: () => starfieldOn() ? prepareSpaceBackdrop(holographicMapOn()) : undefined },
       { label: t('map-loading.geometry'), run: () => {
         terrainRaster.beginFrame(Infinity);
-        bgContent = ''; buildStaticLayer(bgx, false, true);
+        bakeMapLayer(mapLayerSignature(), false, true);
       } },
       ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
         // Prepare known geometry beyond the first screen, in cooperative loading
@@ -5551,7 +5721,7 @@ function prepareEnteringMap(): boolean {
         const field = terrainFields.find(f => f.id === n.id);
         if (field) terrainRaster.prepare(field, DPR);
       } })),
-      { label: t('map-loading.ready'), run: () => { bgContent = ''; buildStaticLayer(); presentedCam = null; } },
+      { label: t('map-loading.ready'), run: () => { bakeMapLayer(mapLayerSignature(), false); bgComposite = ''; } },
     ];
     void mapPreparation.start(jobs, (done, total, label) => {
       mapLoadingBar.max = total;
@@ -5560,7 +5730,7 @@ function prepareEnteringMap(): boolean {
       if (mapLoadingStatus.textContent !== label) mapLoadingStatus.textContent = label;
     }).catch(error => {
       console.warn('map preparation failed', error);
-      bgContent = '';
+      mapLayerContent = '';
       hideMapLoading(); // ordinary rendering retains its existing error handling
     });
   }
@@ -5640,7 +5810,12 @@ function render(now: number) {
   // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
   const lod = currentMapLod();
   const detail = lod.detail;
-  blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
+  blitStaticLayer(now); // sky + political map (a cached bake, moved with the camera)
+  // Everything drawn from the bake's province geometry lives in its space: the same
+  // transform that placed the map layer places the glass, borders, glints and waves.
+  const sight = visibleInBake(mapView, VW, VH);
+  cx.save();
+  cx.setTransform(DPR * mapView.k, 0, 0, DPR * mapView.k, DPR * mapView.tx, DPR * mapView.ty);
   if (holographicMapOn()) {
     cx.save();
     clipGlassSurface(cx, holographicFrame);
@@ -5652,11 +5827,17 @@ function render(now: number) {
         ownerColor,
         hideOwnedInner: true,
         provinceDetail: lod.provinceDetail,
-      }, holographicFrame, hologramTime, { width: VW, height: VH });
+      }, holographicFrame, hologramTime, sight);
     }
     if (detail > 0) {
       cx.save(); cx.globalAlpha *= detail;
-      for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
+      // The bake holds fields beyond the screen too (its margin): glints only where seen.
+      for (const field of terrainFields) {
+        const b = field.box;
+        if (b.x > sight.x + sight.width || b.y > sight.y + sight.height ||
+          b.x + b.width < sight.x || b.y + b.height < sight.y) continue;
+        drawTerrainField(cx, field, hologramTime, true);
+      }
       cx.restore();
     }
     drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
@@ -5672,6 +5853,7 @@ function render(now: number) {
     cx.restore();
     drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
   }
+  cx.restore(); // back to screen space
   drawScanSweep(now); // slow radar sweep — pure console chrome
   updateRadarContacts(now); // the arm paints enemy signatures as it crosses them
   updateThreatAlerts(); // «враг у ваших рубежей» — once per game step
@@ -5680,7 +5862,7 @@ function render(now: number) {
 
   drawFleetRoutes();
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
-  drawOrdnance(cx, mineView(), ME, s.time, world, cam.scale);
+  drawOrdnance(cx, mineView(), ME, mapNow(), world, cam.scale);
   mineControls.refresh();
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
 
@@ -10601,8 +10783,8 @@ function selectAt(mx: number, my: number) {
   // Plain tap = selection. Правила выбора и перебора стопки — `tapCycle.ts` (REFM-65).
   // Контур берём из уже нарисованных ячеек. Этот запасной выбор касается только
   // обычного тапа: приказы выше сохраняют свои прежние цели, флоты — приоритет ниже.
-  buildStaticLayer();
-  const provinceId = [...provincePolygons].find(([, poly]) => insideProvince(poly, mx, my))?.[0];
+  const bakeAt = toBake(mapLayerForInput(), mx, my); // ячейки живут в пространстве выпечки
+  const provinceId = [...provincePolygons].find(([, poly]) => insideProvince(poly, bakeAt.x, bakeAt.y))?.[0];
   // FORT-6.1: крепость на развилке не узел карты, но выбирается тапом как мир — прямым
   // попаданием, раньше запасного выбора по площади провинции (развилка лежит внутри неё).
   const direct = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
@@ -13296,6 +13478,14 @@ function netClientFor(seat: string): MultiplayerClient {
         const rtt = performance.now() - clientTime;
         rttEma = rttEma === null ? rtt : rttEma * 0.7 + rtt * 0.3;
       },
+      // Desync check (M0): the server tags each snapshot with hashState(view) and the
+      // transport compares our rebuilt view with it — in slices over the next frames, so
+      // a verdict lands a little after its snapshot. Mismatch ⇒ the client and server
+      // disagree — the core invariant we most want to catch on a playtest.
+      onHashCheck: (_seq, match) => {
+        netDesync = !match;
+        if (netDesync) netDesyncCount++;
+      },
       onSnapshot: (snap) => {
         // Что значит этот снимок — `netWelcome.ts` (REFM-144): вход подтверждает первый
         // снимок и ровно один раз на сокет, переподключение входит молча (это не новый
@@ -13345,29 +13535,22 @@ function netClientFor(seat: string): MultiplayerClient {
         const diploShift = socketAdmitted && s !== snap.state && diffNetDiplomacy(s, snap.state);
         const changedMap = s.mapId !== snap.state.mapId || plan.admit;
         s = snap.state;
+        netView = netViewSnapshot(plan.admit ? NET_VIEW_IDLE : netView, s.time, performance.now());
         if (changedMap) installMapGeometry(s);
         syncPlayerNames(s);
         // Radar picture (BF-18): detected-but-unidentified enemy fleets are absent
         // from the fogged state — the server sends them as coarse contacts beside
         // each frame. The sweep paints THESE in NET (see updateRadarContacts).
         // Что снимок делает с миром — `snapshotIngest.ts` (REFM-146): контакты живут
-        // ровно один снимок (иначе на карте остаётся призрак), десинк считается только
-        // при присланном хеше, выбор чистится по-разному для одиночного и группового,
-        // а баннер ожидания снимает тот, кто его поставил.
+        // ровно один снимок (иначе на карте остаётся призрак), выбор чистится
+        // по-разному для одиночного и группового, а баннер ожидания снимает тот, кто
+        // его поставил.
         netSignatures = [...radarContacts(snap.signatures)];
         // Re-render the open roster only NOW — the new state is in place, so the
         // stance chips and offer affordances (✓ accept / ⏳ pending) paint fresh.
         if (diploShift && diploOpen && diploTab === 'diplo') renderDiplo();
         if (snap.playerId) ME = snap.playerId;
         if (changedMap && plan.fanfare) defaultView();
-        // Desync check (M0): the server tags each snapshot with hashState(view); we
-        // hash our just-reconstructed view and compare. Mismatch ⇒ the client and
-        // server disagree — the core invariant we most want to catch on a playtest.
-        const verdict = desyncVerdict(snap.hash, () => hashState(snap.state));
-        if (verdict !== null) {
-          netDesync = verdict;
-          if (netDesync) netDesyncCount++;
-        }
         // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
         // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
         pruneSelection(s.fleets, ME);
@@ -16272,6 +16455,7 @@ function frame(nowReal: number) {
   // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
   // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
   // покадрового насоса здесь тоже нет: приказ исполняется, даже когда вкладка закрыта.
+  netShownTime = netViewAt(netView, nowReal, s.time);
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
@@ -17411,7 +17595,9 @@ function drawCaptureFlashes(now: number): void {
     const planet = s.planets[node];
     if (!poly || !planet) continue;
     const cell = { poly };
-    const c = world(planet.position);
+    // The cell comes from the map layer's bake — its centre goes into the same space.
+    const at = world(planet.position);
+    const c = toBake(mapView, at.x, at.y);
     // Кламп прогресса и затухание — `flashFx.ts`: метка кадра rAF может опередить
     // постановку вспышки, а отрицательный радиус роняет cx.arc().
     const k = flashProgress(now, flash.at, CAPTURE_FLASH_MS); // 0 → 1

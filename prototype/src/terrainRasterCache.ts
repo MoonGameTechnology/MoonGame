@@ -109,6 +109,9 @@ export class TerrainRasterCache {
       surface.addEventListener?.('contextlost', invalidate);
       surface.addEventListener?.('contextrestored', invalidate);
       this.pixels += pixels;
+    } else if (!sharp) {
+      // A gesture shows the last raster at another scale: a sharp one is still owed.
+      this.pending = true;
     }
     this.entries.delete(field.id);
     this.entries.set(field.id, entry!);

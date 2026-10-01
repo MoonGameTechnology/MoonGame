@@ -17,9 +17,10 @@ const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json
   'playwright-core',
 );
 const bridge = `
+// A map-layer bake starts by clearing that canvas: count those — the expensive paint.
 let zoomBakes = 0;
-const zoomClear = bgx.clearRect.bind(bgx);
-bgx.clearRect = (...args) => { zoomBakes++; zoomClear(...args); };
+const zoomClear = mapLayerX.clearRect.bind(mapLayerX);
+mapLayerX.clearRect = (...args) => { zoomBakes++; zoomClear(...args); };
 window.__zoomTest = {
   settings() { settings.open(); },
   report() { return mapRenderingReport(); },
@@ -155,7 +156,7 @@ try {
             mid.y,
             'vertical anchor',
           );
-          assert.equal(current.bakes, 0, 'no intermediate background rebakes while pinching');
+          assert.equal(current.bakes, 0, 'no intermediate map rebakes while pinching');
           assert.equal(current.width, before.width);
           assert.equal(current.height, before.height);
         }
@@ -164,7 +165,7 @@ try {
         near(returned.camera.x, before.camera.x, 'round-trip x');
         near(returned.camera.y, before.camera.y, 'round-trip y');
         near(returned.camera.scale, before.camera.scale, 'round-trip scale');
-        assert(returned.bakes <= 1, 'at most one background bake after the final scale settles');
+        assert(returned.bakes <= 1, 'at most one map bake after the final scale settles');
         assert.equal(returned.state, before.state, 'camera gestures preserve the game');
         assert.deepEqual(returned.selected, before.selected, 'pinch release does not select');
 

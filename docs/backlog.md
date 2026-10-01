@@ -1333,7 +1333,7 @@ BRW-2/3 написаны ровно под это.
   на него 367 ссылок из других зон, и они не меняются. Сторожа `openingView`,
   `clientVision`. Проверка: `smoke:zoom`, `smoke:frontier`, `perf:pan`.
 - **REFM-232** 🔒(REFM-231) `[proto]` **Статический голографический слой**, ≈380.
-  `buildStaticLayer` и его кеш. Сторож `controls`. Проверка: `ui:shot`, `pnpm run perf`.
+  `bakeMapLayer`/`blitStaticLayer` и их кеш. Сторож `controls`. Проверка: `ui:shot`, `pnpm run perf`.
 - **REFM-233** 🔒(REFM-231) `[proto]` **Наложения**, ≈580. Превью прицелов, кольца
   способностей и целей, радиусы, дуги. Сторожа `abilityRings`, `engageAim`,
   `clientVision`. Проверка: `ui:shot`, `pnpm run perf`.

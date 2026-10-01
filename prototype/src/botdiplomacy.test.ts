@@ -6,6 +6,8 @@ import {
   declareWar,
   botFavour,
   botEmbargoes,
+  approvalView,
+  networkSeats,
   DEFAULT_SETUP,
   FAVOUR_BASE,
   FAVOUR_WAR,
@@ -13,7 +15,12 @@ import {
   DAY,
   HOUR,
 } from './game';
-import { getStance, getOffer } from '../../packages/shared-core/src/index';
+import {
+  diffState,
+  getStance,
+  getOffer,
+  type GameState,
+} from '../../packages/shared-core/src/index';
 
 // In the default setup p1 is the human, p2 the AI (a tracked bot).
 describe('bot diplomacy — favour meter', () => {
@@ -143,5 +150,50 @@ describe('bot diplomacy — the dead leave the table (BF-33)', () => {
     expect(st.players.p2!.status).toBe('defeated');
     // The ledger entry is GONE (not merely frozen): favour reads the untracked default.
     expect(botFavour(st, 'p2', 'p1')).toBe(FAVOUR_BASE);
+  });
+});
+
+describe('approvalView — the favour a viewer is sent', () => {
+  type Ledger = GameState & { approval?: Record<string, Record<string, number>> };
+  /** The human plus TWO bots, so the ledger can hold a grudge that is not about the viewer. */
+  const threeSeats = (): GameState =>
+    newGame({
+      seats: [...DEFAULT_SETUP.seats, { ...networkSeats('ffa')[2]!, id: 'p3', ai: true }],
+    });
+
+  it("keeps each bot's opinion of the viewer and nothing else", () => {
+    let st = order(threeSeats(), declareWar('p2', 'p3'), 0).state; // a grudge between two bots
+    st = order(st, declareWar('p1', 'p2'), 0).state; // and one about the viewer: 60 → 30
+    const view = approvalView(st, 'p1') as Ledger;
+    expect(view.approval).toEqual({
+      p2: { p1: FAVOUR_BASE - FAVOUR_WAR_DECLARED_HIT },
+      p3: { p1: FAVOUR_BASE },
+    });
+    // What the client reads off it answers exactly as the full ledger does.
+    for (const bot of ['p2', 'p3']) {
+      expect(botFavour(view, bot, 'p1')).toBe(botFavour(st, bot, 'p1'));
+      expect(botEmbargoes(view, bot, 'p1')).toBe(botEmbargoes(st, bot, 'p1'));
+    }
+  });
+
+  it('leaves its input alone and drops a ledger with nothing about the viewer', () => {
+    const st = threeSeats();
+    const before = JSON.stringify(st);
+    approvalView(st, 'p1');
+    expect(JSON.stringify(st)).toBe(before);
+    expect('approval' in approvalView(st, 'someone-untracked')).toBe(false);
+    const { approval: _ledger, ...bare } = st as Ledger;
+    expect(approvalView(bare as GameState, 'p1')).toBe(bare); // no ledger: nothing to narrow
+  });
+
+  it('a second of war between two bots moves the ledger, not what the viewer is sent', () => {
+    const st = order(threeSeats(), declareWar('p2', 'p3'), 0).state;
+    const next = advance(st, st.time + 1000).state;
+    // War decay runs every span, so the full table changes each second…
+    expect((next as Ledger).approval).not.toEqual((st as Ledger).approval);
+    // …and none of that rides the viewer's delta: their slice did not move.
+    expect(
+      diffState(approvalView(st, 'p1'), approvalView(next, 'p1')).meta?.approval,
+    ).toBeUndefined();
   });
 });

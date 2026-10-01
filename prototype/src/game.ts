@@ -156,6 +156,7 @@ export {
   FAVOUR_HEAL_PER_DAY,
   botFavour,
   botEmbargoes,
+  approvalView,
 } from './botFavour';
 
 // --- heroes + capital --------------------------------------------------------

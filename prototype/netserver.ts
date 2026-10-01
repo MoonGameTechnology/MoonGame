@@ -94,6 +94,7 @@ import {
   serverChainActions,
   chainStamp,
   economySnapshot,
+  approvalView,
 } from './src/game';
 import { ActionGate } from '../packages/action-layer/src/index';
 import { isValidActionPayload } from '../packages/shared-core/src/actions/payloadSchemas';
@@ -504,6 +505,9 @@ async function createHostedMatch(
     initiallyStarted: true,
     singlePeerPerPlayer: true, // one live connection per chair — no two people command one empire
     emitStateHash: true, // attach hashState(view) so the client overlay can flag desync
+    // Bot favour (`approval`) is a prototype key the core fog passes through whole:
+    // each player gets only the bots' opinion of THEM, not every bot's of every seat.
+    hostFog: approvalView,
     observe, // M0: log every room event to JSONL + count for the on-exit summary
     initialReceipts, // rehydrated idempotency (deduped action stays deduped after restart)
     // PVE-5.2: тактика Роя. Для PvP-сессии `pveOrders` возвращает пустой список
