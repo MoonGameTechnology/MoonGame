@@ -129,6 +129,11 @@ export type SeatAiKind = 'steward' | 'substitute' | 'none';
  * экране настройки переключается «выкл → слабый → сильный», и соло-драйвер зовёт
  * `aiOrders` с выбранным профилем.
  *
+ * **Слабый — тот же репертуар с гандикапом (заказ владельца 2026-09-28).** Прежде всё из
+ * блока AI-BAL доставалось только сильному, а слабый оставался простым ботом, который не
+ * исследует и не штурмует. Теперь у обычного места оба профиля умеют одно и то же, а
+ * слабый медленнее и чаще ошибается (`WEAK_HANDICAP`). NPC на слабом профиле — прежние.
+ *
  * Что НЕ изменилось и меняться не должно: профиль остаётся ПАРАМЕТРОМ ФУНКЦИИ, а не полем
  * `GameState`, не сообщением протокола и не частью сохранения. Поэтому в СЕТЕВОМ матче
  * подделать его нечем — там сложность мест решает сервер, а не клиент; выбор игрока живёт
@@ -274,6 +279,20 @@ export function huntWeight(target: Planet, landing: readonly UnitStack[]): numbe
 }
 
 /**
+ * ГАНДИКАП СЛАБОГО ПРОФИЛЯ (заказ владельца 2026-09-28). Слабый бот знает всё то же, что
+ * сильный, но хуже этим пользуется:
+ * - `turnEvery` — в какой из ходов бота он вообще отдаёт приказы: ход — двухчасовое окно
+ *   (`AI_STEP_MS`, та же каденция у соло-драйвера, сервера и self-play), слабый пропускает
+ *   каждый второй, то есть реагирует вдвое медленнее;
+ * - `wrongTarget` — шанс увести флот ко второй по близости цели вместо лучшей;
+ * - `missRetreat` — шанс не заметить проигранный бой и остаться в нём.
+ * «Хранитель» игрока (оборонительные позы) гандикапа не получает: это его собственный
+ * автопилот, а не соперник.
+ */
+const WEAK_HANDICAP = { turnEvery: 2, wrongTarget: 0.6, missRetreat: 0.5 } as const;
+const NO_HANDICAP = { turnEvery: 1, wrongTarget: 0.35, missRetreat: 0 } as const;
+
+/**
  * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1), только для тест-профиля.
  *
  * Зачем. Прогоны баланса не давали статистики: семьи сидов `base` и `alt` совпадали до
@@ -320,9 +339,9 @@ function decisionNoise(state: GameState, ai: string, salt: string): number {
  * порядок (это не перемешивание: жадность бота не страдает), но сдвигает точку входа,
  * так что развиваться первым начинает разный мир. Игровой профиль обходит как раньше.
  */
-function worldsInOrder(state: GameState, ai: string, salt: string, profile: AiProfile): Planet[] {
+function worldsInOrder(state: GameState, ai: string, salt: string, skilled: boolean): Planet[] {
   const all = Object.values(state.planets);
-  if (profile !== 'strong') return all;
+  if (!skilled) return all;
   // Ротируются именно СВОИ миры, а не весь список: чужих и нейтральных на карте вчетверо
   // больше, и они лежат вперемешку, так что поворот всего массива почти всегда возвращал
   // к тем же двум-трём своим в его начале — точка входа не менялась. Прочие миры едут
@@ -532,6 +551,18 @@ function baseAiOrders(
   if (state.players[ai]!.npc === 'pirate') posture = 'expand';
   // NPC pirates replenish their own roster; ordinary and legacy seats retain theirs.
   const pirate = state.players[ai]!.faction === 'pirates';
+  // ОДИН РЕПЕРТУАР, РАЗНАЯ РУКА (заказ владельца 2026-09-28: «слабый бот тоже умный, но
+  // менее шустрый и чаще ошибается»). Эвристики блока AI-BAL достаются ОБОИМ профилям
+  // обычного места; слабость — это `WEAK_HANDICAP`, а не отсутствие умений. NPC (пираты,
+  // нейтральные союзники, Рой забега) на слабом профиле играют прежним простым ботом: это PvE-контент,
+  // и его баланс здесь не трогается.
+  const skilled =
+    profile === 'strong' || (!state.players[ai]!.npc && state.pve?.npcPlayerId !== ai);
+  const hand = profile === 'weak' && skilled && posture === 'expand' ? WEAK_HANDICAP : NO_HANDICAP;
+  // Медленнее: слабый бот отдаёт приказы в каждом `turnEvery`-м двухчасовом окне, а в
+  // остальных молчит. Окно, а не час: при двухчасовой каденции окна чередуются при любой
+  // фазе тиков. Ритм — от часов мира, так что реплей не страдает.
+  if (Math.floor(state.time / (2 * 3_600_000)) % hand.turnEvery !== 0) return out;
   const lineUnit = pirate ? 'pirate_cruiser' : 'cruiser';
   const scoutUnit = pirate ? 'pirate_skiff' : 'scout';
   const militiaUnit = pirate ? 'pirate_boarder' : 'militia';
@@ -700,7 +731,7 @@ function baseAiOrders(
   // освобождён. Оставшийся стоять беглец был бы втянут заново и платил бы пошлину каждые
   // два часа, пока не сточится в ноль, — ровно та «драка до нуля», от которой уводит
   // кирпич, только медленнее. Скоростная фора беглеца выдана ядром именно под этот шаг.
-  if (profile === 'strong') {
+  if (skilled) {
     const sideUnits = (ref: CombatantRef): UnitStack[] => {
       if (ref.kind === 'garrison') return state.planets[ref.planetId]?.garrison ?? [];
       // ROS-1.5: плацдарм держит мир, а не флот — оценивается так же, как гарнизон.
@@ -733,6 +764,8 @@ function baseAiOrders(
         ? previewBattle(f.units, foe, data)
         : previewBattle(foe, f.units, data);
       if (forecast.outcome !== (weAttack ? 'defender' : 'attacker')) continue;
+      // Слабый профиль замечает проигранный бой не всегда (`WEAK_HANDICAP.missRetreat`).
+      if (decisionNoise(state, ai, `retreat:${f.id}`) < hand.missRetreat) continue;
       out.push(retreatFleet(ai, f.id));
       // Куда бежать: ближайший СВОЙ мир, а при перехвате на лейне (узла под флотом нет)
       // — домой. Некуда — флот всё равно выходит из боя: пошлина дешевле уничтожения.
@@ -769,7 +802,7 @@ function baseAiOrders(
     // Итог в батче: гарнизонный мир для бота просто НЕПРОХОДИМ — флот прилетает,
     // `captureOnArrival` пропускает защищённый мир, и флот стоит на орбите до конца
     // матча. Игровой профиль не тронут: это лаборатория.
-    if (profile === 'strong' && base) {
+    if (skilled && base) {
       const here0 = state.planets[f.location];
       // (а) Погрузка ДОМА — ТОЛЬКО ПОД АТАКУ (правило владельца №5, 2026-09-16:
       //     «загружает наземные юниты только когда целенаправленно нападает на планеты
@@ -966,8 +999,9 @@ function baseAiOrders(
     // Лечение — seeded тай-брейк (только тест-профиль, как и весь разброс AI-BAL-5):
     // среди равных целей выбор идёт по шуму, а не по раскладке объекта.
     const tieBreak = (p: Planet): number =>
-      profile === 'strong' ? decisionNoise(state, ai, `tie:${f.id}:${p.id}`) : 0;
-    const hunting = profile === 'strong' && warFooting && trailing;
+      skilled ? decisionNoise(state, ai, `tie:${f.id}:${p.id}`) : 0;
+    // Охота отстающего — у обоих профилей обычного места (игровой бот, 2026-09-28).
+    const hunting = skilled && warFooting && trailing;
     const weight = (p: Planet): number => (hunting ? huntWeight(p, f.landing ?? []) : 1);
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
@@ -998,10 +1032,10 @@ function baseAiOrders(
     // только если она сопоставима по дальности (не дальше 2×), то есть бот остаётся
     // жадным — расходятся лишь РАВНОЦЕННЫЕ ветки, а не качество игры.
     if (
-      profile === 'strong' &&
+      skilled &&
       second &&
       secondD <= bestD * 2 &&
-      decisionNoise(state, ai, `target:${f.id}`) < 0.35
+      decisionNoise(state, ai, `target:${f.id}`) < hand.wrongTarget
     ) {
       best = second;
     }
@@ -1021,7 +1055,7 @@ function baseAiOrders(
     // Обе границы стоят против роя, который лечил M4: делится только КРУПНЫЙ кулак и
     // только пока флотов у места немного.
     if (
-      profile === 'strong' &&
+      skilled &&
       best &&
       here.owner === ai &&
       second &&
@@ -1053,7 +1087,7 @@ function baseAiOrders(
     // Роли «подвоз» нет, и памяти о задании тоже: оба условия выводятся из состояния
     // КАЖДЫЙ тик, а «хватит ли на цель» спрашивает ту же `confidentGroundWin`, которой
     // меряет себя сам штурм. Уверенный флот с далёким голодным миром идёт воевать.
-    if (profile === 'strong' && best && (f.landing ?? []).some((st) => st.count > 0)) {
+    if (skilled && best && (f.landing ?? []).some((st) => st.count > 0)) {
       const needy = neediestWorld(here.position);
       if (needy && needy.id !== here.id) {
         const closer = d(here.position, needy.position) < d(here.position, best.position);
@@ -1061,7 +1095,7 @@ function baseAiOrders(
       }
     }
     // Взять нечего тем, что в трюме, — домой, за десантом.
-    if (!best && neutralGuarded && base && f.location !== base.id && profile === 'strong')
+    if (!best && neutralGuarded && base && f.location !== base.id && skilled)
       best = base;
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
@@ -1093,7 +1127,7 @@ function baseAiOrders(
     // в один и тот же игровой час при одинаковых стартах — а момент объявления решает,
     // кто успел развернуться. Коридор узкий: бот по-прежнему воюет, когда проигрывает
     // гонку, просто не секунда-в-секунду с самим собой из другого матча.
-    const warGap = profile === 'strong' ? 50 * (0.8 + 0.4 * decisionNoise(state, ai, 'war')) : 50;
+    const warGap = skilled ? 50 * (0.8 + 0.4 * decisionNoise(state, ai, 'war')) : 50;
     const losingRace = leaderScore - mine >= warGap || (!neutralLeft && leaderScore >= mine);
     if (leader && losingRace && getStance(state, ai, leader) === 'peace') {
       out.push(declareWar(ai, leader));
@@ -1161,7 +1195,7 @@ function baseAiOrders(
       if (affordable(b) && !pendingBuild(base.id, b)) out.push(buildBuilding(ai, base.id, b));
       break; // one link at a time — wait out the current one either way
     }
-    for (const p of worldsInOrder(state, ai, 'mine', profile)) {
+    for (const p of worldsInOrder(state, ai, 'mine', skilled)) {
       if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
       if (p.buildings.some((x) => x.type === 'mine') || pendingBuild(p.id, 'mine')) continue;
       if (!affordable('mine')) break;
@@ -1175,8 +1209,8 @@ function baseAiOrders(
     // выше берёт только `kind === 'planet'`, так что без этой ветки аннигиляция оставляла
     // бы после себя ровно пустырь. Салвага и есть плата за разрушенный мир: 30 металла в
     // час против 10 базовых.
-    if (profile === 'strong') {
-      for (const p of worldsInOrder(state, ai, 'salvage', profile)) {
+    if (skilled) {
+      for (const p of worldsInOrder(state, ai, 'salvage', skilled)) {
         if (p.owner !== ai || p.kind !== 'dead_world') continue;
         if (
           p.buildings.some((x) => x.type === 'metal_station') ||
@@ -1207,7 +1241,7 @@ function baseAiOrders(
     const techState = pl.technologies;
     const activeTech = techState?.active ?? [];
     const doneTech = techState?.completed ?? [];
-    if (profile === 'strong' && activeTech.length < BASE_RESEARCH_SLOTS) {
+    if (skilled && activeTech.length < BASE_RESEARCH_SLOTS) {
       const affordableTech = (cost: Record<string, number>): boolean =>
         Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
       const candidates = Object.keys(data.technologies)
@@ -1284,7 +1318,7 @@ function baseAiOrders(
     //
     // Порядок здесь и есть цепочка захвата: казарма → войска → гарнизон на призовых
     // мирах (он-то и превращает «прилетел и забрал» в ШТУРМ) → десантный корпус.
-    if (profile === 'strong') {
+    if (skilled) {
       const pendingUnit = (planetId: string, unit: string): boolean =>
         state.scheduled.some((e) => {
           if (e.type !== 'construction.complete') return false;
@@ -1359,7 +1393,7 @@ function baseAiOrders(
       // одна за тик, а гарнизон теперь считается своим счётчиком.
       let barracksOrdered = false;
       let garrisonOrders = 0;
-      for (const p of worldsInOrder(state, ai, 'barracks', profile)) {
+      for (const p of worldsInOrder(state, ai, 'barracks', skilled)) {
         if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
         if (!hasFacilityFor(p, militiaUnit)) {
           if (barracksOrdered || pendingBuild(p.id, 'barracks')) continue;
@@ -1389,7 +1423,7 @@ function baseAiOrders(
       //    мир дорог сам по себе. Только призовые миры: провинций вчетверо больше, и
       //    застраивать их — разорить казну на десятую долю территории.
       const DEFENSE_CHAIN = ['fort', 'hospital', 'orbital_aa', 'zonal_aa'] as const;
-      for (const p of warFooting ? worldsInOrder(state, ai, 'defense', profile) : []) {
+      for (const p of warFooting ? worldsInOrder(state, ai, 'defense', skilled) : []) {
         if (p.owner !== ai || p.kind !== 'planet') continue;
         const missing = DEFENSE_CHAIN.find(
           (b) =>
@@ -1537,7 +1571,7 @@ function baseAiOrders(
     // тик (топливо у порта общее, вторым приказом его не растянуть), цель — БЛИЖАЙШАЯ
     // в радиусе, тай-брейк по id. Ближайшая, а не «лучшая»: выбор цели — это стратегия,
     // а кирпичу нужно, чтобы механика заработала и попала в измерение.
-    if (profile === 'strong' && warFooting) {
+    if (skilled && warFooting) {
       // ═══ ПОГРУЗКА НА НОСИТЕЛЬ (SHU-2.1) ═══
       // Носитель без эскадр — просто дорогой корпус с плохими пушками. Грузим, пока он
       // СТОИТ у своего мира с портом: ядро возит соединение целиком и только со стоянки.
@@ -1740,7 +1774,7 @@ function baseAiOrders(
   // матч ему выдал. Что именно можно взять, решает САМО ЯДРО (ветка архетипа, `requires`,
   // казна, кэп активных, кулдаун) — копии этих правил здесь нет, иначе первая же
   // расходимость с модулем обернулась бы не ошибкой, а тихо изменившимся балансом.
-  if (profile === 'strong' && pl) {
+  if (skilled && pl) {
     // Порядок обхода — по id инстанса, а не по раскладке объекта: `hero:{место}:{n}`
     // сеет `matchSetup`, так что сортировка стабильна и один сид разыгрывается
     // одинаково (инвариант #1).
@@ -1923,10 +1957,9 @@ function baseAiOrders(
     for (const good of goods) {
       const book = TRADE_BOOK[good]!;
       const have = stock(good);
-      // ИГРОВОМУ боту достаётся ровно прежний набор лотов: излишки на продажу и заявка на
-      // металл. Заявка на микроэлектронику — новинка, а всё новое в блоке AI-BAL достаётся
-      // лаборатории (AI-BAL-1.1), поэтому живой игрок встречает прежнего соперника.
-      const bid = profile === 'strong' || good === 'metal' ? book.bid : undefined;
+      // NPC на слабом профиле получает прежний набор лотов: излишки на продажу и заявка на
+      // металл. Заявка на микроэлектронику — из блока AI-BAL, она у обычных мест.
+      const bid = skilled || good === 'metal' ? book.bid : undefined;
       if (book.ask !== undefined && have >= book.keep + 40 && !hasLot('sell', good)) {
         out.push(marketList(ai, 'sell', good, Math.floor((have - book.keep) / 2), book.ask));
       }
@@ -1956,7 +1989,7 @@ function baseAiOrders(
     // отказом каждые два часа на один и тот же лот. Правило то же самое (`botEmbargoes`),
     // взятое из общего места, а не переписанное здесь второй копией.
     let best: { id: string; qty: number; gain: number } | null = null;
-    for (const lot of profile === 'strong' ? lots : []) {
+    for (const lot of skilled ? lots : []) {
       if (lot.owner === ai || lot.amount <= 0) continue;
       if (botEmbargoes(state, lot.owner, ai)) continue;
       const book = TRADE_BOOK[lot.resource];

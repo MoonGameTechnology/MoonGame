@@ -104,8 +104,8 @@ describe('AI-BAL-8 — подъём ростера (`hero.spawn`)', () => {
     expect(only(orders(s), 'hero.spawn').length).toBeGreaterThan(0);
   });
 
-  it('ИГРОВОЙ бот ростер не поднимает', () => {
-    expect(only(orders(rich(game2()), 'weak'), 'hero.spawn')).toHaveLength(0);
+  it('слабый бот ростер поднимает тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(only(orders(rich(game2()), 'weak'), 'hero.spawn').length).toBeGreaterThan(0);
   });
 });
 
@@ -173,8 +173,8 @@ describe('AI-BAL-8 — дерево навыков (`hero.skill.unlock`)', () =>
     expect(only(orders(s), 'hero.skill.unlock')).toHaveLength(0);
   });
 
-  it('ИГРОВОЙ бот дерево не качает', () => {
-    expect(only(orders(rich(game2()), 'weak'), 'hero.skill.unlock')).toHaveLength(0);
+  it('слабый бот дерево качает тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(only(orders(rich(game2()), 'weak'), 'hero.skill.unlock').length).toBeGreaterThan(0);
   });
 });
 
@@ -217,8 +217,8 @@ describe('AI-BAL-8 — железо корабля (`hero.install`)', () => {
     }
   });
 
-  it('ИГРОВОЙ бот железо не ставит', () => {
-    expect(only(orders(docked(rich(game2())), 'weak'), 'hero.install')).toHaveLength(0);
+  it('слабый бот железо ставит тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(only(orders(docked(rich(game2())), 'weak'), 'hero.install').length).toBeGreaterThan(0);
   });
 });
 
@@ -350,8 +350,8 @@ describe('AI-BAL-8 — способности (`hero.ability`)', () => {
     ).toBe(false);
   });
 
-  it('ИГРОВОЙ бот способностей не кастует', () => {
-    expect(only(orders(heroInBattle(rich(game2())), 'weak'), 'hero.ability')).toHaveLength(0);
+  it('слабый бот способности кастует тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(only(orders(heroInBattle(rich(game2())), 'weak'), 'hero.ability').length).toBeGreaterThan(0);
   });
 });
 

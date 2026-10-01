@@ -62,8 +62,8 @@ describe('SIEGE-1 — осада модулем', () => {
     expect(siegeBuilt(aiOrders(rich(game2(), false), 'p2', 'expand', 'strong'))).toBe(0);
   });
 
-  it('ИГРОВОЙ бот осадных крейсеров не строит даже на войне', () => {
-    expect(siegeBuilt(aiOrders(rich(game2()), 'p2', 'expand'))).toBe(0);
+  it('слабый бот осадные крейсеры на войне строит тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(siegeBuilt(aiOrders(rich(game2()), 'p2', 'expand'))).toBeGreaterThan(0);
   });
 
   it('юнита `siege` бот не заказывает никогда — его нет в данных', () => {
@@ -91,8 +91,8 @@ describe('AI-BAL-4 / SHU-1.1 — челноки строятся в КОСМОП
     );
   });
 
-  it('ИГРОВОЙ (слабый) бот челноков не заказывает', () => {
-    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand'))).not.toContain(
+  it('слабый бот челноки заказывает тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand'))).toContain(
       'interceptor',
     );
   });
@@ -186,10 +186,9 @@ describe('SHU-3.2 — бот СТРОИТ новый ростер челноко
     expect(peace).not.toContain('landing_shuttle');
   });
 
-  it('ИГРОВОЙ (слабый) бот новых челноков не заказывает', () => {
+  it('слабый бот новый ростер челноков заказывает тоже (слабый знает то же, 2026-09-28)', () => {
     const weak = unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand'));
-    expect(weak).not.toContain('bomber');
-    expect(weak).not.toContain('landing_shuttle');
+    expect(weak).toContain('bomber');
   });
 
   it('ПОЛНЫЙ АНГАР ОСТАНАВЛИВАЕТ ЗАКАЗ: челноки живут в порту, а не во флоте', () => {
@@ -273,9 +272,9 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
     expect(strikes(armed({ hangar: [] }))).toEqual([]);
   });
 
-  it('ИГРОВОЙ (слабый) бот вылетов не поднимает', () => {
+  it('слабый бот вылеты поднимает тоже (слабый знает то же, 2026-09-28)', () => {
     const s = armed();
-    expect(only(aiOrders(s, 'p2', 'expand'), 'shuttle.strike')).toEqual([]);
+    expect(only(aiOrders(s, 'p2', 'expand'), 'shuttle.strike').length).toBeGreaterThan(0);
   });
 
   it('ОДИН ВЫЛЕТ НА ПОРТ ЗА ТИК — топливо порта общее, вторым приказом его не растянуть', () => {

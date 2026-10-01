@@ -99,13 +99,13 @@ describe('охота отстающего', () => {
     expect(courseOf(s)).toBe(near.id);
   });
 
-  it('слабый профиль охоты не знает', () => {
-    const { s, near } = scene('p3');
+  it('слабый профиль охотится так же — это игровой бот (перенос 2026-09-28)', () => {
+    const { s, prize } = scene('p3');
     const to = aiOrders(s, 'p2', 'expand', 'weak')
       .filter((a) => a.type === 'fleet.move')
       .map((a) => a.payload as { fleetId: string; to: string })
       .find((m) => m.fleetId === 'f:hunt')?.to;
-    expect(to).toBe(near.id);
+    expect(to).toBe(prize.id);
   });
 });
 

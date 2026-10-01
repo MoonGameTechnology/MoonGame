@@ -274,8 +274,8 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
     expect(only(aiOrders(staged, 'p2', 'expand', 'strong'), 'fleet.bombard')).toHaveLength(0);
   });
 
-  it('ИГРОВОЙ бот не осаждает', () => {
-    expect(only(aiOrders(siegeState(game2()), 'p2', 'expand'), 'fleet.bombard')).toHaveLength(0);
+  it('слабый бот осаждает тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(only(aiOrders(siegeState(game2()), 'p2', 'expand'), 'fleet.bombard').length).toBeGreaterThan(0);
   });
 });
 
@@ -368,8 +368,8 @@ describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
     expect(take.some((t) => t.unit === 'hero')).toBe(false);
   });
 
-  it('ИГРОВОЙ бот кулак не делит', () => {
-    expect(only(aiOrders(fistState(game2(), 8), 'p2', 'expand'), 'fleet.split')).toHaveLength(0);
+  it('слабый бот кулак делит тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(only(aiOrders(fistState(game2(), 8), 'p2', 'expand'), 'fleet.split').length).toBeGreaterThan(0);
   });
 });
 

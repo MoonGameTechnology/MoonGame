@@ -26,8 +26,11 @@ function game2(): GameState {
 describe('aiOrders — Steward «Оборона» posture (brick 2)', () => {
   it('expands by default but HOLDS fleets under defend', () => {
     const s = game2();
+    // Погрузка десанта — тоже выход в экспансию: ничьи планеты держит ополчение (BAL-10),
+    // и флот сначала грузится дома.
     const moves = (posture: 'expand' | 'defend'): number =>
-      aiOrders(s, 'p2', posture).filter((a) => a.type === 'fleet.move').length;
+      aiOrders(s, 'p2', posture).filter((a) => a.type === 'fleet.move' || a.type === 'army.load')
+        .length;
     // The full AI sends idle fleets off to capture; the defensive Steward never does —
     // "autopilot keeps you alive; active play wins".
     expect(moves('expand')).toBeGreaterThan(0);

@@ -112,12 +112,17 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
     expect(ground[0]!.unit).toBe('heavy_infantry');
   });
 
-  it('ИГРОВОЙ бот в мирное время не строит ни казарму, ни пехоту', () => {
-    const s = game2();
-    const orders = aiOrders(s, 'p2', 'expand');
-    expect(built(orders, 'barracks')).toHaveLength(0);
-    expect(unitOrders(orders).filter((o) => GROUND.includes(o.unit))).toHaveLength(0);
-    expect(loads(orders)).toHaveLength(0);
+  it('в мирное время не грузит десант — у обоих профилей', () => {
+    // Слабый бот знает то же, что сильный (гандикап 2026-09-28), поэтому казарму и
+    // войска он строит; проверяется правило владельца №5 — трюм грузится только под атаку.
+    const s0 = game2();
+    // Ничьи планеты без ополчения — брать десантом нечего (BAL-10).
+    const planets = { ...s0.planets };
+    for (const p of Object.values(planets))
+      if (p.owner === null) planets[p.id] = { ...p, garrison: [] };
+    const s = { ...s0, planets };
+    expect(loads(aiOrders(s, 'p2', 'expand'))).toHaveLength(0);
+    expect(loads(aiOrders(s, 'p2', 'expand', 'strong'))).toHaveLength(0);
   });
 
   it('НА ВОЙНЕ десант грузится по вместимости трюма, но ПОЛ гарнизона остаётся', () => {

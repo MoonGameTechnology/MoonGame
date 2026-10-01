@@ -120,9 +120,9 @@ describe('AI-BAL-2 — оборонительные здания (тест-пр�
     expect(types).not.toContain('fort'); // дважды одно и то же не заказывается
   });
 
-  it('ИГРОВОЙ бот обороны не строит даже на войне', () => {
+  it('слабый бот на войне оборону строит тоже (слабый знает то же, 2026-09-28)', () => {
     const types = builtTypes(aiOrders(atWar(game2()), 'p2', 'expand'));
-    for (const b of ['fort', 'hospital', 'orbital_aa']) expect(types).not.toContain(b);
+    expect(types).toContain('fort');
   });
 });
 
@@ -215,8 +215,8 @@ describe('AI-BAL-2 — гарнизон на занятом мире', () => {
     expect(unloads(aiOrders(heldEmpty(game2(), 0), 'p2', 'expand', 'strong'))).toHaveLength(0);
   });
 
-  it('ИГРОВОЙ бот гарнизоны не расставляет', () => {
-    expect(unloads(aiOrders(heldEmpty(game2(), 4), 'p2', 'expand'))).toHaveLength(0);
+  it('слабый бот гарнизоны расставляет тоже (слабый знает то же, 2026-09-28)', () => {
+    expect(unloads(aiOrders(heldEmpty(game2(), 4), 'p2', 'expand')).length).toBeGreaterThan(0);
   });
 });
 
