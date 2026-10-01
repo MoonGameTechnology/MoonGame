@@ -1,6 +1,7 @@
-import { attackBattle, retreatBattle } from '../../decisions/actions';
+import { attackBattle, deployForkFortress, retreatBattle } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
-import { visibleMinefields, fieldPosition } from '../../packages/shared-core/src/state/minefields';
+import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
+import { mineCard } from '../../decisions/mineCard';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
@@ -8,7 +9,7 @@ import { drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { rocketMinesUi } from './rocketMinesUi';
 import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
 import { soloSaveStore } from './soloSaveLocal';
-import { fleetBaseSpeed, fleetNodeAt, hashJson, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
+import { fleetBaseSpeed, fleetNodeAt, forkSiteId, hashJson, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierBadge, swarmDossierHtml } from './swarmDossier';
@@ -121,7 +122,7 @@ import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName, worldName } from './planetName';
 import { provinceName } from '../../decisions/provinceName';
-import { minelayerOffer } from '../../decisions/minefields';
+import { minelayerOffer, ownInstallations } from '../../decisions/minefields';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -209,6 +210,8 @@ import {
   identifiedNodes,
   sensorCoverage,
   radarSignatures,
+  engagementOf,
+  type Engagement,
   type SignatureContact,
   sightCircles,
   sightRulesOf,
@@ -231,7 +234,8 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
+import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -306,7 +310,7 @@ import {
   type RunDifficulty,
 } from '../../decisions/runDifficulty';
 import { medalBadges } from '../../decisions/unitMedals';
-import { fortressRaise } from '../../decisions/fortressRaise';
+import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { engageForecastCard } from '../../decisions/engageForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
@@ -809,6 +813,7 @@ import {
   type SplitSlot,
 } from '../../decisions/splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
+import { splitSelectTarget } from '../../decisions/splitFollow';
 import {
   canAssaultAim,
   canAssaultFromOrbit,
@@ -889,12 +894,14 @@ import {
   offerChoices,
   pickFleets,
   pickMode,
+  pickFork,
   pickWorld,
   pruneSelection,
   retreatAim,
   retreatMenu,
   selFleet,
   selFleets,
+  selFork,
   selPlanet,
   splitState,
   squadMerge,
@@ -934,6 +941,7 @@ import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
+import { worldFacts, type WorldFact } from '../../decisions/worldFacts';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { mountLocaleMenu } from './localeMenu';
 import { artScale, calloutAlpha, chevronAlpha, sphereBloom } from './semanticZoom';
@@ -1076,6 +1084,7 @@ import {
 } from './onboarding';
 import type {
   GameState,
+  BuildingInstance,
   Fleet,
   Hero,
   Battle,
@@ -1270,6 +1279,8 @@ let endScreen: MatchEnd | null = null;
 // и `mobileChoices`) и прицелы, режимы и окна командного ряда (`aiming`, `castMenu`,
 // `splitState`…) живут в `interaction.ts` (REFM-207, REFM-208): их меняют только функции
 // владельца — `pick*`, `arm`/`drop`, `disarm(повод)`.
+/** Чей раскол ждёт события, чтобы выделить отделённую часть (`splitSelectTarget`). */
+let splitAwait: string | null = null;
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
@@ -1414,9 +1425,6 @@ let planetTab: PlanetTab = 'buildings';
 // Bytro-карточка: тап по имени флота открывает сводку армии — какой флот сейчас
 // в режиме сводки (другой флот в панели → обычная карточка сама собой).
 let fleetInfoFor: string | null = null;
-// Тап по имени МИРА открывает карточку статистики планеты (какой мир сейчас в
-// режиме сводки; другой мир в панели → обычная карточка сама собой).
-let planetInfoFor: string | null = null;
 const logLines: string[] = [];
 // Player ids the local sim drives as AI (empty seats become AI), each with the
 // DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
@@ -1842,7 +1850,10 @@ const mobileHud = initMobileHud({
     }
   },
   ping: () => side.querySelector<HTMLButtonElement>('[data-act="ping"]')?.click(),
-  summary: () => side.querySelector<HTMLElement>('[data-act="fleetinfo"], [data-act="planetinfo"]')?.click(),
+  summary: () => side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click(),
+  describe: (key) => {
+    openDossier(key);
+  },
   resized: () => revealMobileSelection(),
 });
 
@@ -2484,8 +2495,10 @@ function roundFlash(b: Battle): number {
 
 /** The fleets the command bar / move order currently act on (mine only). */
 function selectedFleetIds(): string[] {
-  if (selFleets.size) return [...selFleets].filter((id) => s.fleets[id]?.owner === ME);
-  return selFleet && s.fleets[selFleet]?.owner === ME ? [selFleet] : [];
+  // Мина (SM-3.6) — не флот под приказ: в выбор для приказов она не попадает.
+  const orderable = (id: string): boolean => s.fleets[id]?.owner === ME && !isMineFleet(s.fleets[id]!, data);
+  if (selFleets.size) return [...selFleets].filter(orderable);
+  return selFleet && orderable(selFleet) ? [selFleet] : [];
 }
 
 
@@ -2708,6 +2721,41 @@ function nearestLanePoint(
   return { from, to, t, x: at.x, y: at.y };
 }
 
+/** Крепость на развилке под пальцем (FORT-6.1): её площадки нет в `MAP` — она не узел
+ *  карты, — поэтому попадание ищется по состоянию. Только стоящая и видимая: пустая
+ *  площадка — это развилка, и тап по ней выбирает место, а не мир. */
+function forkFortressAt(mx: number, my: number, r: number): string | null {
+  let best: string | null = null;
+  let bestD = r * r;
+  for (const p of Object.values(s.planets)) {
+    if (!isForkSite(p) || p.owner === null || !(p.owner === ME || known(p.id))) continue;
+    const c = world(p.position);
+    const d = (c.x - mx) * (c.x - mx) + (c.y - my) * (c.y - my);
+    if (d <= bestD) {
+      bestD = d;
+      best = p.id;
+    }
+  }
+  return best;
+}
+
+/** Свободная развилка под пальцем — место, куда ставят крепость (FORT-6.1). Развилка с
+ *  крепостью сюда не попадает: тап по ней — выбор самой крепости (`forkFortressAt`). */
+function forkMarkAt(mx: number, my: number, r: number): ForkMark | null {
+  let best: ForkMark | null = null;
+  let bestD = r * r;
+  for (const m of roadDrawingOf(s).marks) {
+    if ((s.planets[forkSiteId(m.province, m.trail)]?.owner ?? null) !== null) continue;
+    const c = world(m.at);
+    const d = (c.x - mx) * (c.x - mx) + (c.y - my) * (c.y - my);
+    if (d <= bestD) {
+      bestD = d;
+      best = m;
+    }
+  }
+  return best;
+}
+
 /** For a march to a lane point: which endpoint the fleet routes through and the
  *  total ETA (node route + the partial leg into the lane), mirroring the kernel's
  *  cheaper-end choice. Used only for the move preview. */
@@ -2758,6 +2806,8 @@ interface Vision {
   identify: Set<string>;
   radar: Set<string>;
   signatures: SignatureContact[];
+  /** Мои бои и флоты в них — видны, даже где узел не опознан (`engagementOf`). */
+  engaged: Engagement;
 }
 
 // --- espionage (SPY-1 in the prototype) ---------------------------------------
@@ -2815,14 +2865,33 @@ function computeVision(): Vision {
   const grants = myIntel();
   grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
   intelFleetOwners = targetsOf(grants, 'fleets');
-  return { identify, radar, signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify) };
+  return {
+    identify,
+    radar,
+    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify),
+    engaged: engagementOf(s, ME),
+  };
 }
 
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
  *  live `fleets` intel window covers its owner. */
 function fleetSeen(f: Fleet): boolean {
+  // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
+  if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
   // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
-  return fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+  return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
+}
+
+/** Опознан ли флот: стоит у опознанного узла ИЛИ дерётся в моём бою. Перехват на
+ *  полпути идёт вдали от миров — без второго условия флот вставал перед невидимым
+ *  врагом (владелец 2026-09-29). Правило то же, что у ядра, — `engagementOf`. */
+function fleetKnown(f: Fleet): boolean {
+  return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id);
+}
+
+/** Виден ли бой: его узел опознан ИЛИ в нём дерусь я (или мой блок зрения). */
+function battleKnown(b: Battle): boolean {
+  return known(b.location) || !!vision?.engaged.battles.has(b.id);
 }
 
 // Per-viewer MEMORY of the last identified state of a node (variant B): once you
@@ -2873,15 +2942,49 @@ function seesDetails(p: Planet): boolean {
 /** Имя места для игрока (PVR-6.19): у карт глав — имя провинции
  *  (`decisions/provinceName.ts`), у карт без имён — как было: id узла (подписи, журнал). */
 function placeName(id: string): string {
+  const fork = s.planets[id]?.fork;
+  if (fork) return t('place.fork-fortress', { planet: placeName(fork.province) });
   return provinceName(s.mapId, id) ?? id;
 }
-/** То же для окна боя и меток: у карт без имён — авто-имя (`planetName.ts`), как было. */
+/** То же для окна боя и меток: у карт без имён — авто-имя (`planetName.ts`), как было.
+ *  Крепость на развилке (FORT-6.1) — не провинция, и имя у неё по провинции её развилки. */
 function worldTitle(id: string): string {
+  const fork = s.planets[id]?.fork;
+  if (fork) return t('place.fork-fortress', { planet: worldTitle(fork.province) });
   return worldName(s.mapId, id);
 }
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
  *  marker if it has never been identified. */
+/**
+ * ИМЕНА ОБЛАСТЕЙ (M2.15, `decisions/regionName.ts`): проступают при отдалении, когда
+ * внутренние границы растворяются, и гаснут, когда снова читаются провинции. Анимации нет —
+ * прозрачность следует за масштабом, который задаёт игрок. У карты без областей не рисуется
+ * ничего.
+ */
+function drawRegionLabels(lod: MapLod): void {
+  const alpha = regionLabelAlpha(lod.provinceDetail);
+  if (alpha <= 0) return;
+  const labels = regionLabels(s.mapId, mapRegions(s.mapId), (id) => s.planets[id]?.position);
+  if (labels.length === 0) return;
+  cx.save();
+  cx.globalAlpha *= alpha;
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
+  cx.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+  cx.lineJoin = 'round';
+  for (const label of labels) {
+    const c = world(label);
+    if (!visible(c, 240)) continue;
+    const text = label.text.toUpperCase();
+    cx.lineWidth = 4;
+    cx.strokeStyle = 'rgba(4,10,12,.85)';
+    cx.strokeText(text, c.x, c.y);
+    cx.fillStyle = 'rgba(214,236,244,.92)';
+    cx.fillText(text, c.x, c.y);
+  }
+  cx.restore();
+}
 function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | undefined, lod: MapLod): void {
   cx.save();
   if (lod.detail === 0) {
@@ -3094,7 +3197,9 @@ function maybeStartPendingTour(): void {
   requestAnimationFrame(run); // let the fresh HUD paint a frame so selectors resolve
 }
 const myScore = (): number => Math.round(s.match?.scores?.[ME]?.total ?? 0);
-const myWorldCount = (): number => Object.values(s.planets).filter((p) => p.owner === ME).length;
+// Крепость на развилке (FORT-6.1) — не мир: её постройка не «захват нового мира».
+const myWorldCount = (): number =>
+  Object.values(s.planets).filter((p) => p.owner === ME && !isForkSite(p)).length;
 // ONB-2: start a bot-free solo sandbox and arm the guided first match over its HUD.
 function startGuidedMatch(): void {
   setupMapId = 'nexus';
@@ -4096,7 +4201,7 @@ function handleEvents(events: DomainEvent[]) {
         const ship = s.fleets[p.fleetId as string];
         const from = ship ? fleetPos(ship) : null;
         if (!ship || !from) break;
-        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), known(fleetNode(ship))))
+        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), fleetKnown(ship)))
           break;
         aaShots.push({
           from: { ...from },
@@ -4144,6 +4249,13 @@ function handleEvents(events: DomainEvent[]) {
         // два соединения свели в одно (`fleetNews.ts`, правило 2). В пути места нет.
         if (reorgHeard(p.owner, ME))
           note(typeof p.at === 'string' ? t(reorgKey('split'), { at: placeName(p.at) }) : t('log.fleet.split-transit'));
+        {
+          const pick = splitSelectTarget(splitAwait, p, ME);
+          if (pick) {
+            splitAwait = null;
+            setFleetSelection([pick]);
+          }
+        }
         break;
       // AUD-16: герой больше не гибнет молча. Только свой — в сети геройские события и
       // так строго адресны владельцу, соло повторяет тот же фильтр (`heroNews.ts`).
@@ -4194,7 +4306,7 @@ function handleEvents(events: DomainEvent[]) {
         // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
         // разобрано в шапке `fleetNews.ts`: в сети событие едет без места, и сервер
         // отдаёт его только владельцу. Поведение НЕ меняю, вопрос владельцу.
-        if (destroyHeard())
+        if (destroyHeard(p))
           note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       // Тёмное событие (`data/events.json`). Гейт СВОЙ, а не общий `admits()`: тот читает
@@ -4630,7 +4742,7 @@ function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
   const out: Array<EngageCandidate & { fleet: Fleet }> = [];
   for (const g of Object.values(s.fleets)) {
     if (g.owner === ME || sumUnits(g.units) <= 0) continue;
-    if (!fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner))) continue;
+    if (!fleetSeen(g)) continue;
     const at = fleetAnchor(g);
     if (!at) continue;
     out.push({ id: g.id, location: g.location ?? null, x: at.x, y: at.y, ships: sumUnits(g.units), fleet: g });
@@ -5567,7 +5679,7 @@ function render(now: number) {
     // нет вовсе, а отсчёт живёт только по назначенному ядром раунду.
     const roundAt = typeof b.nextRoundAt === 'number' ? b.nextRoundAt : undefined;
     const mark = battleMark({
-      identified: known(b.location),
+      identified: battleKnown(b),
       hasPoint: !!anchor,
       detail,
       nextRoundAt: roundAt,
@@ -5702,6 +5814,61 @@ function render(now: number) {
     }
     cx.restore();
   }
+  drawRegionLabels(lod);
+  /**
+   * Силуэт КРЕПОСТИ: прозрачный орбитальный каркас и — у крепости с ядром — корпус и
+   * полоса прочности ядра (FORT-5.2). Один рисунок на крепость на узле, пиратскую и
+   * нейтральную базы и крепость на развилке (FORT-6.1): крепость одна и та же, другое у
+   * неё только место, и вторая копия рисунка разошлась бы с первой на первой правке.
+   * Пиратская и нейтральная базы ядра не несут — полосы у них просто нет.
+   */
+  const drawStationArt = (
+    c: { x: number; y: number },
+    col: string,
+    buildings: readonly BuildingInstance[],
+    R: number,
+  ): void => {
+    cx.save();
+    cx.strokeStyle = rgba(col, 0.7);
+    cx.lineWidth = 0.85;
+    for (const offset of [-3 * ns, 3 * ns]) {
+      cx.beginPath();
+      cx.ellipse(c.x, c.y + offset, R, R * 0.45, 0, 0, TAU);
+      cx.stroke();
+    }
+    cx.beginPath();
+    for (const [dx, dy] of CARDINAL) {
+      const x = c.x + dx * R;
+      const y = c.y + dy * R * 0.45;
+      cx.moveTo(x, y - 3 * ns);
+      cx.lineTo(x, y + 3 * ns);
+      cx.moveTo(c.x, c.y);
+      cx.lineTo(c.x + dx * R * 1.2, c.y + dy * R * 0.6);
+    }
+    cx.moveTo(c.x, c.y - R);
+    cx.lineTo(c.x, c.y + R * 0.7);
+    cx.stroke();
+    poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
+    cx.stroke();
+    cx.restore();
+    const core = buildings.find((b) => b.type === 'starfort');
+    if (core) {
+      cx.save();
+      cx.strokeStyle = col;
+      cx.lineWidth = 1.6;
+      cx.shadowColor = col;
+      cx.shadowBlur = fxBlur(8);
+      cx.fillStyle = rgba(col, 0.24);
+      cx.translate(c.x - 12, c.y - 12);
+      drawShipShape(cx, 'station', detail > 0.5);
+      cx.restore();
+      const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+      cx.fillStyle = 'rgba(2,9,13,.7)';
+      cx.fillRect(c.x - 12, c.y - 22, 24, 3);
+      cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
+      cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+    }
+  };
   cx.save();
   cx.globalAlpha *= lod.art;
   if (lod.art > 0)
@@ -6074,51 +6241,7 @@ function render(now: number) {
       cx.fill();
       cx.restore();
     } else if (['void_station', 'pirate_base', 'neutral_base'].includes(n.sector)) {
-      // Station volume is a transparent orbital scaffold in the plotting plane.
-      cx.save();
-      cx.strokeStyle = rgba(col, 0.7);
-      cx.lineWidth = 0.85;
-      for (const offset of [-3 * ns, 3 * ns]) {
-        cx.beginPath();
-        cx.ellipse(c.x, c.y + offset, R, R * 0.45, 0, 0, TAU);
-        cx.stroke();
-      }
-      cx.beginPath();
-      for (const [dx, dy] of CARDINAL) {
-        const x = c.x + dx * R;
-        const y = c.y + dy * R * 0.45;
-        cx.moveTo(x, y - 3 * ns);
-        cx.lineTo(x, y + 3 * ns);
-        cx.moveTo(c.x, c.y);
-        cx.lineTo(c.x + dx * R * 1.2, c.y + dy * R * 0.6);
-      }
-      cx.moveTo(c.x, c.y - R);
-      cx.lineTo(c.x, c.y + R * 0.7);
-      cx.stroke();
-      poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
-      cx.stroke();
-      cx.restore();
-      // КОРПУС крепости — полоса прочности её ядра (FORT-5.2). Полоса и силуэт стояли в
-      // ветке астероида, пока крепостью было здание на астероидном поле; теперь крепость
-      // это сам узел, и её здоровье принадлежит сюда. Пиратская и нейтральная базы ядра
-      // не несут — у них полосы просто нет.
-      const core = p.buildings.find((b) => b.type === 'starfort');
-      if (core) {
-        cx.save();
-        cx.strokeStyle = col;
-        cx.lineWidth = 1.6;
-        cx.shadowColor = col;
-        cx.shadowBlur = fxBlur(8);
-        cx.fillStyle = rgba(col, 0.24);
-        cx.translate(c.x - 12, c.y - 12);
-        drawShipShape(cx, 'station', detail > 0.5);
-        cx.restore();
-        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
-        cx.fillStyle = 'rgba(2,9,13,.7)';
-        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
-        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
-        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
-      }
+      drawStationArt(c, col, p.buildings, R);
     } else {
       // Fallback for any other non-planet type: small hexagon marker
       const kc = sectorTypeOf(n.id)?.color ?? col;
@@ -6178,6 +6301,30 @@ function render(now: number) {
     cx.restore();
   }
 
+  // FORT-6.1: крепости на РАЗВИЛКАХ. Их площадок нет в `MAP` — это не узлы карты, а
+  // сооружения на дороге, — поэтому они рисуются отдельным проходом по состоянию, тем же
+  // силуэтом, что крепость на узле, только меньше: она стоит на тропе, а не в центре мира.
+  // Чужая — только видимая: память о ней тумана не обходит (площадку зритель получает,
+  // лишь увидев её). Выбранная развилка без крепости — рамкой вокруг ромба.
+  if (lod.art > 0) {
+    for (const p of Object.values(s.planets)) {
+      if (!isForkSite(p) || p.owner === null || !(p.owner === ME || known(p.id))) continue;
+      const c = world(p.position);
+      if (!visible(c, 40)) continue;
+      drawStationArt(c, ownerColor(p.owner), p.buildings, R * 0.7);
+      if (selPlanet === p.id) targetBrackets(c.x, c.y, R, now);
+    }
+    if (selFork) {
+      const mark = roadDrawingOf(s).marks.find(
+        (m) => m.province === selFork!.province && m.trail === selFork!.trail,
+      );
+      if (mark) {
+        const c = world(mark.at);
+        targetBrackets(c.x, c.y, 10, now);
+      }
+    }
+  }
+
   cx.restore();
 
   // the orbit ring around any CITY that holds a stationed fleet (a single orbit).
@@ -6228,6 +6375,7 @@ function render(now: number) {
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
   for (const f of Object.values(s.fleets)) {
+    if (isMineFleet(f, data)) continue; // мину рисует `drawMinefields` своим знаком (SM-3.6)
     if (!fleetSeen(f)) {
       // not identified and no intel window: a radar contact is shown only as a
       // swept signature (drawRadarContacts), painted by the arm — never live here.
@@ -6425,10 +6573,27 @@ function render(now: number) {
 // Кирпичики панели (кнопка, шапка, вкладка, колонки, строки состава) живут в
 // `panelKit.ts` (REFM-35) — там же правила экранирования и «disabled, а не спрятать».
 const btn = actionButton;
-function cardHeader(color: string, title: string, sub: string, titleAct?: string): string {
+/**
+ * Карточка мины (SM-3.6, решение владельца 2026-09-30: «можно так же выделить и прочитать
+ * характеристики»). Числа — `decisions/mineCard.ts`; приказов у мины нет, а чужую мину бьют
+ * челноки или «Атакой» с карточки своего флота.
+ */
+function mineCardHtml(f: Fleet): string {
+  const card = mineCard(f, data);
+  const pct = card.hull.max > 0 ? Math.round((100 * card.hull.cur) / card.hull.max) : 0;
+  return (
+    cardHeader(ownerColor(f.owner), t('mine.card.title'), t('mine.card.sub', { n: card.charges })) +
+    `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar"><i style="width:${pct}%"></i></span><b>${kfmt(card.hull.cur)}/${kfmt(card.hull.max)}</b></div>` +
+    `<div class="row"><b>💣 ${esc(t('mine.card.hit', { p: card.hitPct }))}</b></div>` +
+    `<div class="hint">${esc(t('mine.card.rule'))}</div>`
+  );
+}
+
+function cardHeader(color: string, title: string, sub: string, titleAct?: string, badge?: string): string {
   return kitCardHeader(color, title, sub, {
     compact: pcUi(),
     ...(titleAct ? { titleAct } : {}),
+    ...(badge ? { badge } : {}),
   });
 }
 /**
@@ -6817,6 +6982,8 @@ function effectTagText(tag: EffectTag): string {
 }
 
 function fleetPanelHtml(f: Fleet): string {
+  // Мина (SM-3.6): свой короткий паспорт — заряды, доля за подрыв, прочность.
+  if (isMineFleet(f, data)) return mineCardHtml(f);
   // Окно флота на ПК — консоль по макету владельца (`fleetConsole.ts`): те же куски
   // карточки, своя раскладка. Карточка ниже остаётся телефону, группе и чужому флоту.
   if (consoleFleet() === f) return fleetConsoleHtml(f);
@@ -6887,7 +7054,7 @@ function fleetPanelHtml(f: Fleet): string {
   // Enemy fleet: show composition only if identified (known node). An
   // unidentified radar contact shows just the signature (ship count), not
   // the exact unit breakdown — fog of war hides the details.
-  const enemyKnown = f.owner === ME || known(fleetNode(f));
+  const enemyKnown = f.owner === ME || fleetKnown(f);
   if (enemyKnown) {
     h += nShips ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units) : '';
     if (nTr > 0)
@@ -7485,7 +7652,7 @@ function fleetConsoleHtml(f: Fleet): string {
  *  в одиночном забеге Sector Zero её нет (PVR-6.1). */
 function pingRowHtml(): string {
   if (!toolShown('pings', sectorZeroToolsHidden())) return '';
-  return `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+  return `<div class="row">${btn('ping', '', t('side.world.ping'), true)}</div>`;
 }
 
 /** Side-panel: a world outside sensor coverage — last-scan memory, or no telemetry. */
@@ -7505,97 +7672,106 @@ function unknownPlanetHtml(p: Planet): string {
       mem.owner && mem.owner !== ME && espionageShown(sectorZeroToolsHidden())
         ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }))}</div>`
         : '';
+    // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
+    // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
     return (
       cardHeader(ownerColor(mem.owner), p.id, t('side.scan.title')) +
+      `<div class="pscan">` +
       `<div class="row dim">${t('side.scan.stale')}</div>` +
       `<div class="row">${t('side.scan.owner')}: <b>${mem.owner ? NAME[mem.owner] : t('side.neutral')}</b></div>` +
       `<div class="row">${t('side.scan.garrison')}: <b>${mem.garrison}</b></div>` +
       `<div class="row">${t('side.scan.buildings')}: ${icons}</div>` +
       spyRow +
-      `<div class="hint">${t('side.scan.hint')}</div>` + ping
+      `<div class="hint">${t('side.scan.hint')}</div>` + ping +
+      `</div>`
     );
   }
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
   return (
     cardHeader('#5f8f8c', p.id, t('side.notelemetry.title')) +
+    `<div class="pscan">` +
     `<div class="row dim">${t('side.notelemetry.sub')}</div>` +
-    `<div class="hint">${t('side.notelemetry.hint')}</div>` + ping
+    `<div class="hint">${t('side.notelemetry.hint')}</div>` + ping +
+    `</div>`
   );
 }
 
-/** Карточка статистики мира (тап по имени планеты) — полная сводка: обозначение,
- *  владелец, вид/тип/местность, пассивный выход по ресурсам (ECON-7 перекос),
- *  бонусы типа, гарнизон, постройки, очки победы, флоты на орбите. */
-function planetSummaryHtml(p: Planet): string {
-  // Числа и разбор гарнизона считает `planetSummary.ts` (REFM-38) — там же правила
-  // «крыло не корабль», «выход перечисляет и нули» и «очки победы из ядра».
-  const sm = planetSummary(p, data, Object.values(s.fleets));
-  const rows: string[] = [];
-  const pt = p.planetType ? data.planetTypes[p.planetType] : undefined;
-  const ptName = tData(pt?.name ?? p.planetType ?? '—');
-  const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
-  const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
-  if (!provinceName(s.mapId, p.id))
-    rows.push(`<div class="row">${t('side.world.designation')}: <b>${esc(p.id)}</b></div>`);
-  rows.push(
-    `<div class="row">${t('side.world.owner')}: <b style="color:${ownerColor(p.owner)}">${p.owner ? esc(NAME[p.owner] ?? p.owner) : t('side.neutral')}</b></div>`,
-  );
-  rows.push(
-    `<div class="row">${t('side.world.kind')}: <b>${esc(kindName)}</b> · ${esc(ptName)} · ${esc(sec)}</div>`,
-  );
-  // ECON-7: пассивный базовый выход мира по ресурсам — перекос типа планеты.
-  // UI-RES2: одно правило показа ресурса. Прежняя форма падала на СЛОВО для
-  // ресурса без глифа в TECH_CUR — то есть ровно там, где игроку опереться не на что.
-  const baseStr = resLine(sm.baseOutput, { per: 'h' });
-  if (baseStr)
-    rows.push(
-      `<div class="row">${t('side.world.output')}: <b>${baseStr}</b> <span class="dim">${t('side.world.output.note')}</span></div>`,
-    );
-  const pctf = (n: number) => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
-  const bonus: string[] = [];
-  if (sm.bonuses.production !== undefined)
-    bonus.push(`${t('side.world.bonus.production')} ${pctf(sm.bonuses.production)}`);
-  if (sm.bonuses.defense !== undefined)
-    bonus.push(`${t('side.world.bonus.defense')} ${pctf(sm.bonuses.defense)}`);
-  if (bonus.length)
-    rows.push(
-      `<div class="row">${t('side.world.type-bonuses')}: <b>${bonus.join(' · ')}</b></div>`,
-    );
-  rows.push(
-    `<div class="row">⚔ ${t('side.world.garrison')}: <b>${sm.garrison.ground}</b> ${t('side.world.count.ground')} · <b>${sm.garrison.ships}</b> ${t('side.world.count.ships')}${sm.garrison.wings ? ` · <b>${sm.garrison.wings}</b> ${t('side.world.count.shuttles')}` : ''}</div>`,
-  );
-  const blist =
-    sm.buildings
-      .map(
-        (b) =>
-          `${BUILD_ICON[b.type] ?? '▣'} ${buildingName(data.buildings[b.type]?.name, b.type)}${b.level > 1 ? ' L' + b.level : ''}`,
-      )
-      .join(', ') || t('side.none');
-  rows.push(
-    `<div class="row">▣ ${t('side.world.buildings')} (${sm.buildings.length}): <b>${blist}</b></div>`,
-  );
-  // Защита построек (решение владельца 2026-09-26): сколько урона мир срезает при штурме и
-  // обстреле. Падает с каждой снесённой постройкой — поэтому число, а не значок.
-  if (sm.mitigation > 0)
-    rows.push(
-      `<div class="row" data-desc="stat:mitigation">🛡 ${t('side.world.mitigation', { n: Math.round(sm.mitigation * 100) })}</div>`,
-    );
-  rows.push(`<div class="row">✦ ${t('side.world.vp')}: <b>${sm.victoryPoints}</b></div>`);
-  if (sm.orbit.fleets) {
-    rows.push(
-      `<div class="row">▲ ${t('side.world.fleets')}: <b>${sm.orbit.fleets}</b> <span class="dim">(${t('side.world.fleet-ships', { n: sm.orbit.ships })})</span></div>`,
-    );
+/** Фишка шапки мира (`decisions/worldFacts.ts`). Слова — из локали, значки — те же, что в
+ *  остальном интерфейсе: ★ столица, ✦ очки победы, значки ресурсов. */
+function worldFactHtml(f: WorldFact): string {
+  const pct = (n: number): string => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
+  const tone = (n: number): string => (n >= 0 ? 'up' : 'dn');
+  switch (f.kind) {
+    case 'capital':
+      return `<span class="pfact good" data-desc="fact:capital">★ ${t('side.world.capital')}</span>`;
+    case 'blackout':
+      return `<span class="pfact bad">⚡ ${t('side.world.blackout')}</span>`;
+    case 'type': {
+      const parts: string[] = [];
+      if (f.production !== undefined)
+        parts.push(`<i class="${tone(f.production)}">${t('side.world.production', { p: pct(f.production) })}</i>`);
+      if (f.defense !== undefined)
+        parts.push(`<i class="${tone(f.defense)}">${t('side.world.defense', { p: pct(f.defense) })}</i>`);
+      return `<span class="pfact">${parts.join(' · ')}</span>`;
+    }
+    case 'cover':
+      // Иконка и число, правило — в досье по тапу/наведению (заказ владельца 2026-09-29).
+      // Число, а не один значок: защита падает с каждой снесённой постройкой (FORT-5.15).
+      return `<span class="pfact" data-desc="fact:cover" aria-label="${esc(t('side.world.mitigation', { n: Math.round(f.share * 100) }))}">🛡 −${Math.round(f.share * 100)}%</span>`;
+    case 'output':
+      return `<span class="pfact" data-desc="fact:output">${resLine({ ...f.perHour }, { per: 'h' })}</span>`;
   }
-  if (p.owner === ME && capitalOf(s, ME) === p.id)
-    rows.push(
-      `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b></div>`,
-    );
-  return (
-    `<div class="sec detail-head">${t('side.world.summary')}</div>` +
-    rows.join('') +
-    `<div class="row">${btn('summaryback', '', t('side.summary.back'), true)}</div>`
+}
+
+/**
+ * Действия с миром в его шапке: сделать столицей, точка удержания, «Пинг», разведка.
+ * ЧТО предлагать, решают `worldOrders.ts` и `spyOffer.ts` (REFM-91/92), здесь только
+ * кнопки. На телефоне «Пинг» стоит в нижней полосе листа, и в шапке его прячет CSS: кнопка
+ * остаётся в разметке, потому что полоса листа показывается по её наличию.
+ */
+function worldActionsHtml(p: Planet, mine: boolean): string {
+  const out: string[] = [];
+  // Столица — здесь возрождаются герои и меняют модули (Phase C).
+  if (capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p)) === 'designate')
+    out.push(btn('capital', '', t('side.world.make-capital'), true));
+  // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
+  // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
+  // Лимит ГАСИТ кнопку, но не прячет её, а снять точку можно всегда — иначе игрок,
+  // исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую (правило 6).
+  const points = s.players[ME]?.stewardHoldPoints ?? [];
+  const hold = holdOffer(
+    mine,
+    stewardTechDone(s, ME),
+    points.includes(p.id),
+    points.length,
+    MAX_STEWARD_HOLD_POINTS,
   );
+  if (hold === 'clear') {
+    out.push(
+      `<span class="pfact cyan">🚩 ${t('side.world.hold.title')}</span>` +
+        btn('holdpoint', 'off', t('side.world.hold.clear'), true),
+    );
+  } else if (hold !== 'none') {
+    out.push(btn('holdpoint', 'on', pcUi() ? t('side.world.hold') : t('side.world.hold.set'), hold === 'set'));
+  }
+  // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
+  if (toolShown('pings', sectorZeroToolsHidden())) out.push(btn('ping', '', t('side.world.ping'), true));
+  // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a window lives
+  // its countdown replaces the button. В забеге Sector Zero шпионажа нет (`espionageShown`).
+  if (espionageShown(sectorZeroToolsHidden())) {
+    const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
+    // Свой и ничейный мир не шпионят; нехватка кредитов гасит кнопку, но не прячет её.
+    const spy = spyOffer(mine, !!p.owner, !!live, afford({ credits: SPY_COST }));
+    if (spy === 'window' && live) {
+      out.push(
+        `<span class="pfact cyan">${t('side.world.spy-window')} ${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span>`,
+      );
+    } else if (spy !== 'none') {
+      out.push(btn('spyplanet', p.owner ?? '', t('side.scan.spy', { c: SPY_COST }), spy === 'buy'));
+    }
+  }
+  return out.length ? `<div class="pacts">${out.join('')}</div>` : '';
 }
 
 /** Side-panel: a known world — ownership header + ground/ships/shuttle/buildings tabs. */
@@ -7609,88 +7785,41 @@ function planetPanelHtml(p: Planet): string {
   // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
   // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
   const { ground, ships } = garrisonByTab(p.garrison, data);
-  const gcount = sumUnits(p.garrison);
-  const here = Object.values(s.fleets).filter((f) => f.location === p.id);
-  // «N кораблей» в шапке — корабли ВЛАДЕЛЬЦА у этого мира: на орбите и на самой планете.
-  // Одни гарнизонные корабли давали здесь вечный ноль — построенное уходит на орбиту само.
-  const shipsHere =
-    sumUnits(ships) + here.filter((f) => f.owner === p.owner).reduce((n, f) => n + sumUnits(f.units), 0);
+  const here = Object.values(s.fleets).filter((f) => f.location === p.id && !isMineFleet(f, data));
   const counts = tabCounts(p, data, here);
-  // Bytro-стиль: у мира авто-имя (тап → карточка статистики); координата (grid id)
-  // остаётся отдельным обозначением в подзаголовке. У провинции главы — её имя, а id
-  // узла из подзаголовка уходит: это служебное имя, а не координата (PVR-6.19).
+  // Bytro-стиль: у мира авто-имя; координата (grid id) остаётся отдельным обозначением в
+  // подзаголовке. У провинции главы — её имя, а id узла из подзаголовка уходит: это
+  // служебное имя, а не координата (PVR-6.19).
   const named = provinceName(s.mapId, p.id);
-  const header = cardHeader(
+  const sm = planetSummary(p, data, here);
+  // Очки победы — рядом с именем (заказ владельца 2026-09-29: «эти 50 можно в шапку»). На
+  // телефоне их переносит в шапку листа `mobileHud.ts`, досье — тем же тапом, что у фишек.
+  const vp =
+    sm.victoryPoints > 0
+      ? `<span class="pbadge" data-desc="fact:vp" aria-label="${esc(t('side.world.vp'))}">✦ ${sm.victoryPoints}</span>`
+      : '';
+  let h = cardHeader(
     ownerColor(p.owner),
     named ?? planetName(p.id),
     `${named ? '' : `${esc(p.id)} · `}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
-    'planetinfo',
+    undefined,
+    vp,
   );
-  // Тап по имени открыл сводку мира — она встаёт РЯДОМ с панелью (`objectPanelHtml`).
-  const detail = planetInfoFor === p.id ? planetSummaryHtml(p) : '';
-  let h =
-    header +
-    `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${shipsHere} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
-  // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПКО этого владельца вдвое.
-  // Блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
-  if (showsBlackout(mine, s.players[ME]?.arrears)) {
-    h += `<div class="row" style="color:var(--red)">⚡ ${t('side.world.blackout')}</div>`;
-  }
-  if (pt && (pt.productionBonus !== 0 || pt.defenseBonus !== 0)) {
-    const pct = (n: number) => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
-    const parts: string[] = [];
-    if (pt.productionBonus !== 0)
-      parts.push(t('side.world.production', { p: pct(pt.productionBonus) }));
-    if (pt.defenseBonus !== 0) parts.push(t('side.world.defense', { p: pct(pt.defenseBonus) }));
-    h += `<div class="row dim">${pcUi() ? t('side.world.type', { pt: esc(ptName), mods: parts.join(' · ') }) : t('side.world.type.long', { pt: esc(ptName), mods: parts.join(' · ') })}</div>`;
-  }
-
-  // Capital marker / designate — heroes respawn here (and re-fit modules, Phase C).
-  // Что панель предлагает сделать с миром — `worldOrders.ts` (REFM-91).
-  {
-    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p));
-    if (cap === 'marked') {
-      h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${pcUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
-    } else if (cap === 'designate') {
-      h += `<div class="row">${btn('capital', '', t('side.world.make-capital'), true)}</div>`;
-    }
-    // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
-    // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
-    const points = s.players[ME]?.stewardHoldPoints ?? [];
-    // Лимит ГАСИТ кнопку, но не прячет её, а снять точку можно всегда — иначе игрок,
-    // исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую (правило 6).
-    const hold = holdOffer(
-      mine,
-      stewardTechDone(s, ME),
-      points.includes(p.id),
-      points.length,
-      MAX_STEWARD_HOLD_POINTS,
-    );
-    if (hold === 'clear') {
-      h += `<div class="row"><b style="color:var(--cyan)">🚩 ${t('side.world.hold.title')}</b> ${btn('holdpoint', 'off', t('side.world.hold.clear'), true)}</div>`;
-    } else if (hold !== 'none') {
-      h += `<div class="row">${btn('holdpoint', 'on', pcUi() ? t('side.world.hold') : t('side.world.hold.set'), hold === 'set')}</div>`;
-    }
-  }
-
-  // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
-  h += pingRowHtml();
-
-  // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
-  // window lives its countdown replaces the button — the node stays identified.
-  // В забеге Sector Zero шпионажа нет (`espionageShown`, заказ владельца 2026-09-25).
-  if (espionageShown(sectorZeroToolsHidden())) {
-    const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    // Кому и что предлагаем — `spyOffer.ts` (REFM-92): свой и ничейный мир не шпионят,
-    // живое окно показывает отсчёт вместо кнопки, а нехватка кредитов кнопку гасит, но
-    // не прячет — цена должна остаться на виду.
-    const spy = spyOffer(mine, !!p.owner, !!live, afford({ credits: SPY_COST }));
-    if (spy === 'window' && live) {
-      h += `<div class="row"><b style="color:var(--cyan)">${t('side.world.spy-window')}</b> <span class="dim">${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span></div>`;
-    } else if (spy !== 'none') {
-      h += `<div class="row">${btn('spyplanet', p.owner ?? '', t('side.scan.spy', { c: SPY_COST }), spy === 'buy')}</div>`;
-    }
-  }
+  // ШАПКА МИРА (переработка окна, заказ владельца 2026-09-29): под именем — то, чего нет во
+  // вкладках (состояние и свойства мира, `decisions/worldFacts.ts`), и действия с миром.
+  // Числа состава живут только на вкладках: прежний ряд фишек дублировал их другим счётом.
+  const facts = worldFacts({
+    mine,
+    capital: capitalOf(s, ME) === p.id,
+    // ECON-2: блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
+    blackout: showsBlackout(mine, s.players[ME]?.arrears),
+    bonuses: sm.bonuses,
+    mitigation: sm.mitigation,
+    baseOutput: sm.baseOutput,
+  });
+  const factsRow = facts.map(worldFactHtml).join('') + worldActionsHtml(p, mine);
+  // Пустой строки нет: без фактов и действий шапка кончается своей чертой.
+  if (factsRow) h += `<div class="pfacts">${factsRow}</div>`;
 
   h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), counts.ground, 'tab:ground')}${tabButton(
     'ships',
@@ -7716,8 +7845,11 @@ function planetPanelHtml(p: Planet): string {
         garrisonTilesHtml(p.owner, ground),
     );
     if (mine) {
+      // Очередь юнитов у мира ОДНА на три вкладки (полоса `units`): прежде она звалась
+      // «наземным конвейером», «конвейером кораблей» и «конвейером шаттлов», и корабль в
+      // очереди стоял во «наземном». Имя теперь одно — какая есть очередь, такая и названа.
       cols.push(
-        `<div class="sec">${t('side.ground.conveyor')}</div>` +
+        `<div class="sec">${t('side.units.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
           unitCatalogButton('ground'),
       );
@@ -7745,7 +7877,7 @@ function planetPanelHtml(p: Planet): string {
     }
     if (mine) {
       cols.push(
-        `<div class="sec">${t('side.shipyard.conveyor')}</div>` +
+        `<div class="sec">${t('side.units.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
           unitCatalogButton('ships'),
       );
@@ -7788,7 +7920,7 @@ function planetPanelHtml(p: Planet): string {
     }
     if (mine) {
       cols.push(
-        `<div class="sec">${t('side.wing.conveyor')}</div>` +
+        `<div class="sec">${t('side.units.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
           unitCatalogButton('shuttle'),
       );
@@ -7803,12 +7935,9 @@ function planetPanelHtml(p: Planet): string {
       );
     }
   } else {
-    cols.push(
-      `<div class="sec">${t('side.build.conveyor')}</div>` +
-        (mine
-          ? conveyorHtml(p.id, 'buildings')
-          : `<div class="row dim">${t('side.build.enemy-hidden')}</div>`),
-    );
+    // Сначала то, что СТОИТ на мире, потом очередь стройки — как на вкладках юнитов. Очередь
+    // есть только у своего мира: у чужого вместо неё стояла строка «телеметрия недоступна»,
+    // целый блок о том, чего не видно.
     let blds = `<div class="sec">${t('side.tab.buildings')}</div>`;
     if (p.buildings.length === 0) blds += `<div class="row dim">${t('side.none')}</div>`;
     // BUILD-1 (макет владельца): построенное — ИКОНКАМИ со значком уровня. Тап
@@ -7871,12 +8000,56 @@ function planetPanelHtml(p: Planet): string {
       }
     }
     cols.push(blds);
+    if (mine) cols.push(`<div class="sec">${t('side.build.conveyor')}</div>` + conveyorHtml(p.id, 'buildings'));
   }
-  return objectPanelHtml(h + pcols(cols), detail);
+  return h + pcols(cols);
+}
+
+/**
+ * Карточка РАЗВИЛКИ (FORT-6.1): чья это тропа, куда она ведёт и можно ли поставить здесь
+ * крепость. Правило кнопки — `forkFortressRaise` (`decisions/fortressRaise.ts`), то же, что
+ * у ядра; здесь только отрисовка. Причины без кнопки и отказ технологии — теми же строками,
+ * что у крепости на узле: крепость одна и та же, другое у неё только место.
+ */
+function forkPanelHtml(fork: { province: string; trail: number }): string {
+  const province = s.planets[fork.province];
+  const exits = (province?.roads?.trails[fork.trail]?.exits ?? [])
+    .map((x) => `<b>${esc(placeName(x))}</b>`)
+    .join(', ');
+  let h =
+    cardHeader(ownerColor(province?.owner ?? null), `◇ ${t('side.fork.title')}`, placeName(fork.province)) +
+    `<div class="row">${t('side.fork.where', { exits })}</div>` +
+    `<div class="hint">${esc(t('side.fork.hint'))}</div>`;
+  const raise = forkFortressRaise(
+    province,
+    s.planets[forkSiteId(fork.province, fork.trail)],
+    ME,
+    s.players[ME]?.resources ?? {},
+    data,
+    s.players[ME]?.technologies?.completed ?? [],
+  );
+  if (raise.show) {
+    const off = raise.enabled ? '' : ' disabled';
+    h +=
+      `<button class="bw-open" data-act="forkfortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
+      ` <span class="dim">${resLine(raise.cost)}</span></button>`;
+    if (raise.blocked === 'tech') {
+      const names = raise.needs
+        .map((id) => `«${tData(data.technologies[id]?.name ?? id)}»`)
+        .join(t('side.fortress.or'));
+      h +=
+        `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
+        `<button class="bw-open" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+    }
+  } else if (raise.blocked === 'not-owned') {
+    h += `<div class="row dim">${esc(t('side.fork.not-owned'))}</div>`;
+  }
+  return h;
 }
 
 /** The side-panel dispatcher: task group → single fleet → unknown world → known world. */
 function panelHtml(): string {
+  if (selFork) return forkPanelHtml(selFork);
   // Приоритет претендентов и отсев мёртвых ссылок — в `panelSelect.ts` (REFM-39):
   // устаревший выбор флота проваливается на мир, а не запирает панель пустотой.
   const pick = pickPanel({ fleets: selFleets, fleet: panelFleet(), planet: selPlanet }, s, seesDetails);
@@ -7916,12 +8089,12 @@ function playerCardHtml(): string {
   const fdef = data.factions[fid];
   const bonus = factionBonusLine(fid);
   const faction = fdef ? `${tData(fdef.name)}${bonus ? ` · ${bonus}` : ''}` : fid || '—';
-  const worlds = Object.values(s.planets).filter((p) => p.owner === ME).length;
+  const worlds = Object.values(s.planets).filter((p) => p.owner === ME && !isForkSite(p)).length;
   // Total units you command: ships + carried troops across your fleets, plus every
   // garrison on your worlds.
   let units = 0;
   for (const f of Object.values(s.fleets))
-    if (f.owner === ME) units += sumUnits(f.units) + sumUnits(f.landing ?? []);
+    if (f.owner === ME && !isMineFleet(f, data)) units += sumUnits(f.units) + sumUnits(f.landing ?? []);
   for (const pp of Object.values(s.planets)) if (pp.owner === ME) units += sumUnits(pp.garrison);
   const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
   const need = Math.max(0, SCORE_LIMIT - score);
@@ -8019,7 +8192,7 @@ function stanceRu(st: DiplomaticStance): string {
 
 function worldsOf(id: string): number {
   let n = 0;
-  for (const p of Object.values(s.planets)) if (p.owner === id) n++;
+  for (const p of Object.values(s.planets)) if (p.owner === id && !isForkSite(p)) n++;
   return n;
 }
 /** A seat the AI drives. Everyone else (ME, or another human in net play) is human —
@@ -8844,7 +9017,7 @@ function renderPanel() {
   const html = panelHtml();
   // Раскрытая секция подробностей — это ШИРИНА листа (две колонки в `#side.details-open`),
   // а не только его содержимое. Класс снимается с самой разметки, а не со второго флага:
-  // `fleetInfoFor`/`planetInfoFor` могут указывать на объект, которого в панели уже нет.
+  // `fleetInfoFor` может указывать на флот, которого в панели уже нет.
   side.classList.toggle('details-open', html.includes('class="object-detail"'));
   if (panelChanged(html, lastPanelHtml)) {
     // Scrollable content on the left, a fixed dossier pane glued to the right edge
@@ -8939,7 +9112,7 @@ function mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind
   if (!f) return false;
   if (order === 'merge') return f.owner === ME && !selectedFleetIds().includes(f.id);
   return order === 'engage' && f.owner !== ME && sumUnits(f.units) > 0 &&
-    fleetVisible(false, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+    fleetSeen(f);
 }
 
 function mobileDraftPoint(): { x: number; y: number } | null {
@@ -8994,13 +9167,13 @@ function updateMobileHud(): void {
   if (!MOBILE) return;
   const fid = panelFleet();
   const f = fid ? s.fleets[fid] : null;
-  const inspectable = f && fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+  const inspectable = f && fleetSeen(f);
   const key = selPlanet && s.planets[selPlanet] ? `planet:${selPlanet}` : inspectable ? `fleet:${fid}` : selectedFleetIds().join('|');
   const choices: MobileChoice[] = [];
   for (const pick of mobileChoices) {
     if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
-      if (!f || !fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner))) continue;
+      if (!f || !fleetSeen(f)) continue;
       choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
     } else if (s.planets[pick.id]) {
       choices.push({ ...pick, title: worldTitle(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
@@ -9157,7 +9330,7 @@ function renderCmdBar() {
         ),
       );
   // Merge: a group fuses in one tap; a lone fleet arms target-pick (needs a partner).
-  const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME).length;
+  const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)).length;
   const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
@@ -9484,10 +9657,17 @@ splitdlg.addEventListener('click', (ev) => {
       if (slot.kind === 'ship') take.push({ unit: slot.unit, modules: slot.modules ?? [], count: n });
       else takeLanding.push({ unit: slot.unit, count: n });
     }
-    if (take.length)
-      playerOrder(
-        splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
-      );
+    if (take.length) {
+      // Отделённую часть выделит событие раскола (`decisions/splitFollow.ts`): её id
+      // выдаёт ядро, а в соло событие приходит ещё внутри `playerOrder`.
+      splitAwait = splitState.fleetId;
+      if (
+        !playerOrder(
+          splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
+        )
+      )
+        splitAwait = null;
+    }
     drop('splitState');
     renderSplitDialog();
     invalidateCmdBar();
@@ -9586,6 +9766,13 @@ side.addEventListener('click', (ev) => {
       buildWin.open(selPlanet, arg);
   } else if (act === 'fortress') {
     playerOrder(deployStation(ME, selPlanet!));
+  } else if (act === 'forkfortress') {
+    // Крепость на развилке (FORT-6.1): встала — выбираем её саму, как мир, чтобы сразу
+    // было видно ядро, постройки и кнопку стройки. Отказ оставляет карточку развилки.
+    const fork = selFork;
+    if (fork && playerOrder(deployForkFortress(ME, fork.province, fork.trail))) {
+      pickWorld(forkSiteId(fork.province, fork.trail));
+    }
   } else if (act === 'opentech') {
     techTree.open();
   } else if (act === 'build') {
@@ -9691,17 +9878,13 @@ side.addEventListener('click', (ev) => {
     // Осматриваемый чужой флот живёт вне selFleet — действие относится к карточке.
     const id = panelFleet();
     if (id) fleetInfoFor = fleetInfoFor === id ? null : id;
-  } else if (act === 'planetinfo') {
-    // Тап по имени мира: карточка ⇄ сводка статистики (для выбранной планеты).
-    if (selPlanet) planetInfoFor = planetInfoFor === selPlanet ? null : selPlanet;
   } else if (act === 'summaryback') {
     // «Назад» только закрывает сводку; повторный тап не открывает её заново.
     fleetInfoFor = null;
-    planetInfoFor = null;
   }
   invalidatePanel();
   renderPanel();
-  if (act === 'summaryback' || act === 'fleetinfo' || act === 'planetinfo') {
+  if (act === 'summaryback' || act === 'fleetinfo') {
     const scroll = side.querySelector<HTMLElement>('.pscroll');
     if (scroll) scroll.scrollTop = 0;
   }
@@ -10168,7 +10351,8 @@ function selectAt(mx: number, my: number) {
     const kind = allyAim;
     drop('allyAim');
     const ally = linkedAlly(s, ME);
-    const fleets = Object.values(s.fleets);
+    // Цель — только видимый флот, как у «Атаки» и удара челноков (ревью #1411).
+    const fleets = Object.values(s.fleets).filter(fleetSeen);
     const pool =
       kind === 'guard'
         ? fleets.filter((f) => f.owner === ME || f.owner === ally)
@@ -10194,7 +10378,8 @@ function selectAt(mx: number, my: number) {
   if (owner === 'shuttle-strike' && strikeAim) {
     const { from, squadronId } = strikeAim;
     drop('strikeAim');
-    const foe = nearestHit(hostileFleets(Object.values(s.fleets), ME), fleetAnchor, mx, my, rFleet);
+    // Только то, что игрок видит: невидимую мину (SM-3.6) палец не находит (ревью #1411).
+    const foe = nearestHit(hostileFleets(Object.values(s.fleets).filter(fleetSeen), ME), fleetAnchor, mx, my, rFleet);
     const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (!squadronAt(squadronId)) {
       note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
@@ -10364,7 +10549,7 @@ function selectAt(mx: number, my: number) {
       return {
         id: b.id,
         at: anchor ? battleBadgePoint(world(anchor)) : null,
-        identified: known(b.location),
+        identified: battleKnown(b),
       };
     }),
     { x: mx, y: my },
@@ -10400,7 +10585,11 @@ function selectAt(mx: number, my: number) {
   // обычного тапа: приказы выше сохраняют свои прежние цели, флоты — приоритет ниже.
   buildStaticLayer();
   const provinceId = [...provincePolygons].find(([, poly]) => insideProvince(poly, mx, my))?.[0];
-  const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode)
+  // FORT-6.1: крепость на развилке не узел карты, но выбирается тапом как мир — прямым
+  // попаданием, раньше запасного выбора по площади провинции (развилка лежит внутри неё).
+  const direct = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  const fortress = direct ? null : forkFortressAt(mx, my, rNode);
+  const n = direct ?? (fortress ? { id: fortress } : undefined)
     ?? MAP.find((node) => node.id === provinceId);
   // Свои флоты под тапом, ближайший первым: и мобильной ветке (ей нужен только
   // первый), и перебору на ПК (ему нужны все).
@@ -10413,8 +10602,9 @@ function selectAt(mx: number, my: number) {
   const fleetIds = fleetsUnderTap(
     Object.values(s.fleets).map((f) => ({
       id: f.id,
-      mine: f.owner === ME,
-      visible: fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner)),
+      // Своя мина (SM-3.6) — осмотр, а не выбор под приказ: у неё нет приказов.
+      mine: f.owner === ME && !isMineFleet(f, data),
+      visible: fleetSeen(f),
       anchor: fleetAnchor(f),
     })),
     mx,
@@ -10439,6 +10629,18 @@ function selectAt(mx: number, my: number) {
     selectionStarted = lastReal;
     invalidatePanel();
   };
+  // FORT-6.1: пустая развилка — МЕСТО, где можно поставить крепость (ромб на дороге). Флот
+  // на развилке (засада) и мир под пальцем важнее: их выбирают как прежде. Иначе тап по
+  // ромбу открывает карточку развилки, а не провинцию вокруг неё.
+  if (fleetIds.length === 0 && !direct && !fortress && !additive) {
+    const mark = forkMarkAt(mx, my, Math.max(12, rNode * 0.6));
+    if (mark) {
+      pickFork({ province: mark.province, trail: mark.trail });
+      selectionStarted = lastReal;
+      invalidatePanel();
+      return;
+    }
+  }
   if (!pcUi()) {
     // Phone: choose explicitly from overlapping objects. The legacy tablet keeps
     // the nearest tappable fleet, else the world, else clear. No invisible cycling.
@@ -10542,7 +10744,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     // Кто из троих претендентов забирает этот жест — решает `pressIntent.ts`
     // (REFM-55): там же правило «Shift над своим флотом — добор, а не рамка».
     const overOwnFleet = !!nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner === ME),
+      Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)),
       fleetAnchor,
       p.x,
       p.y,
@@ -10575,7 +10777,7 @@ canvas.addEventListener('pointerdown', (ev) => {
         if (!mapHold.matured) return;
         navigator.vibrate?.(25);
         const mine = nearestHit(
-          Object.values(s.fleets).filter((f) => f.owner === ME),
+          Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)),
           fleetAnchor,
           p.x,
           p.y,
@@ -10644,7 +10846,7 @@ function endPointer(ev: PointerEvent) {
   if (single && boxSelecting && selectionBox) {
     const picked: string[] = [];
     for (const f of Object.values(s.fleets)) {
-      if (f.owner !== ME) continue;
+      if (f.owner !== ME || isMineFleet(f, data)) continue;
       const a = fleetAnchor(f);
       if (a && insideBox(selectionBox, a)) picked.push(f.id);
     }
@@ -12001,6 +12203,7 @@ $('hub-solo').addEventListener('click', () => {
 });
 $('hub-solo-continue').addEventListener('click', restoreSolo);
 $('hub-sector-zero').addEventListener('click', () => openSectorZero());
+$('hub-proving-ground').addEventListener('click', () => startProvingGround());
 $('hub-msg').addEventListener('click', () => {
   hubNote.textContent = t('hub.messages.soon');
 });
@@ -12810,6 +13013,22 @@ function startTraining(): void {
   setupEl.style.display = 'none';
   sciWin.classList.remove('show');
   note(t('training.started'));
+}
+
+/**
+ * ПОЛИГОН ОСНОВНОЙ ИГРЫ (M2.15, заказ владельца 2026-09-29): все области и весь каталог,
+ * старт песочницей (`provingGroundState`). Обычная партия основной игры — без режима, волн
+ * и наград; соперник и Рой ходят местами ИИ, как в главах (`runAiSeats`). В одиночное
+ * сохранение полигон не пишется: «Продолжить» в хабе остаётся за обычной партией.
+ */
+function startProvingGround(): void {
+  leaveMatch();
+  const st = provingGroundState(data);
+  installMatch(st, runAiSeats(st, PROVING_GROUND_PLAYER, 'weak'));
+  applyTimeSpeed(setupSpeed);
+  showConnect(false);
+  showHub(false);
+  note(t('proving-ground.started'));
 }
 
 let creatingMatch = false;
@@ -15119,24 +15338,34 @@ function drawMinefields(now: number): void {
     cx.stroke();
     cx.restore();
   }
-  const view = visibleMinefields(s, ME);
-  if (!view) return;
-  const fields = Object.entries(view.fields).flatMap(([key, owners]) => Object.entries(owners).map(([owner, field]) => ({ key, owner, field, installing: false })));
-  fields.push(...Object.values(view.installations ?? {}).map((job) => ({ ...job, installing: true })));
-  for (const m of fields) {
-    const pos = fieldPosition(s, m.key, m.field);
-    if (!pos) continue;
-    const c = world(pos);
-    if (!visible(c, 40)) continue;
-    const y = m.field.edge ? c.y : c.y - 44;
-    cx.save(); cx.translate(c.x - 12, y - 12);
+  // Установки — свои, по месту носителя; мины (SM-3.6) — отряды во `fleets`, чужие только
+  // вблизи (`fleetSeen`). Мина стоит там же, куда смотрит палец (`fleetAnchor`: на дороге —
+  // в своей точке, на узле — на кольце орбиты), иначе тап по знаку промахивался бы мимо неё.
+  // Знак один: сфера мины, у установки — пунктиром и «◷».
+  const marks: Array<{ c: { x: number; y: number }; owner: string; label: string; installing: boolean }> = [];
+  // Носитель — по ключу среза (`ownInstallations`): сравнение по ссылке не находило его,
+  // и дорожная установка теряла знак (ревью #1411).
+  for (const { layer, job } of ownInstallations(s, ME)) {
+    const at = layer ? fleetPos(layer) : job.location ? s.planets[job.location]?.position : null;
+    if (!at) continue;
+    const c = world(at);
+    marks.push({ c: job.location === null ? c : { x: c.x, y: c.y - 44 }, owner: job.owner, label: '◷', installing: true });
+  }
+  for (const f of Object.values(s.fleets)) {
+    if (!isMineFleet(f, data) || !fleetSeen(f)) continue;
+    const c = fleetAnchor(f);
+    if (c) marks.push({ c, owner: f.owner, label: `×${mineCard(f, data).charges}`, installing: false });
+  }
+  for (const m of marks) {
+    if (!visible(m.c, 40)) continue;
+    cx.save(); cx.translate(m.c.x - 12, m.c.y - 12);
     cx.strokeStyle = m.owner === ME ? '#60dbe8' : '#ffac62';
     cx.fillStyle = 'rgba(4,10,12,.85)'; cx.lineWidth = 1.2;
     cx.setLineDash(m.installing ? [2, 2] : []);
     drawMineShape(cx, cam.scale >= 0.9);
     cx.setLineDash([]);
     cx.fillStyle = cx.strokeStyle; cx.font = '11px ui-monospace, monospace';
-    cx.textAlign = 'left'; cx.fillText(m.installing ? '◷' : `×${m.field.charge}`, 26, 15);
+    cx.textAlign = 'left'; cx.fillText(m.label, 26, 15);
     cx.restore();
   }
 }

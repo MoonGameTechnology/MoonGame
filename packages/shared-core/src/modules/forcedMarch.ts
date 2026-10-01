@@ -10,6 +10,7 @@ import type { GameModule } from '../kernel/module';
 import { effectiveStats } from '../util/loadout';
 import { timeScaleOf } from '../action/types';
 import { ownFleet } from '../util/combat';
+import { rejectMine } from '../util/fleet';
 
 const HOUR = 3_600_000;
 
@@ -18,7 +19,8 @@ export const FORCED_MARCH_WEAR = 0.05; // share of max HP per game-hour
 
 export const forcedMarchModule: GameModule = {
   id: 'forced-march',
-  version: '1.0.0',
+  // 1.1.0: мине приказы не отдаются (`E_MINE_PASSIVE`, ревью #1411).
+  version: '1.1.0',
   setup(api) {
     api.onAction('fleet.forcemarch', (action, h) => {
       const p = action.payload as { fleetId?: unknown; on?: unknown };
@@ -26,6 +28,7 @@ export const forcedMarchModule: GameModule = {
       const f = ownFleet(h.state, p.fleetId);
       // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
       if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       if (p.on) {
         (h.state.forcedMarch ??= {})[f.id] = true;
       } else if (h.state.forcedMarch) {

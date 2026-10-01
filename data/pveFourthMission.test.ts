@@ -9,6 +9,9 @@
  *
  * Дверь главы (список глав клиента) открыта последним кирпичом фазы (PVR-7.6), когда сценарий
  * был готов целиком; геометрия ниже собирается напрямую из данных карты.
+ *
+ * Редакция PVR-7.7 (заказ владельца 2026-09-28): карта крупнее, игрок стартует с одной
+ * планетой, две другие держат фанатики Завета Единения, задач в запасе двенадцать.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -17,14 +20,25 @@ import {
   identifiedNodes,
   matchMapEdges,
   parseMatchMap,
+  playablePlayerIds,
   validateMatchMap,
   type MatchMap,
 } from '../packages/shared-core/src/index';
-import { PVE_MISSION_COUNT, pveModeId, pveState } from '../packages/client/src/gameData';
+import {
+  PVE_MISSION_COUNT,
+  pveChapter,
+  pveModeId,
+  pveObjectives,
+  pveState,
+} from '../packages/client/src/gameData';
 import { CHAPTER_KEYS } from '../decisions/chapterRoute';
 import { chapterHero } from '../decisions/heroRecruits';
+import { objectiveProgress, shownObjectives } from '../decisions/missionObjectives';
+import { retireDoneEncounters } from '../decisions/retiredEncounters';
+import { runAiSeats } from '../decisions/runAiSeats';
 import { shippedGameData } from './bundle';
 import mapJson from './maps/pve-4.json';
+import thirdMapJson from './maps/pve-3.json';
 
 const data = shippedGameData();
 const map: MatchMap = parseMatchMap(mapJson);
@@ -80,9 +94,9 @@ describe('карта четвёртой главы — «Архив без от�
     expect((mapJson as { paths?: unknown }).paths).toBeUndefined();
   });
 
-  it('провинций 30–36 (§6.2): связность выросла, а не длина пустых перелётов', () => {
-    expect(provinces.length).toBeGreaterThanOrEqual(30);
-    expect(provinces.length).toBeLessThanOrEqual(36);
+  it('провинций 42–50 (§6.2, «карту бы побольше» — 2026-09-28): связность выросла, а не длина пустых перелётов', () => {
+    expect(provinces.length).toBeGreaterThanOrEqual(42);
+    expect(provinces.length).toBeLessThanOrEqual(50);
     // Средний перелёт — как на третьей карте, а не длинные пустые плечи.
     const mean = edges.reduce((s, [a, b]) => s + dist(a, b), 0) / edges.length;
     expect(mean).toBeLessThan(320);
@@ -172,6 +186,17 @@ describe('карта четвёртой главы — «Архив без от�
 describe('кто где стоит (§6.2–§6.3)', () => {
   const state = buildStateFromMap(map, data);
 
+  it('игрок стартует с ОДНОЙ планетой: база у входа — его единственное владение', () => {
+    expect(Object.keys(map.sectors).filter((id) => map.sectors[id]!.owner === 'p1')).toEqual([
+      'staging',
+    ]);
+    // Первая свободная планета — рядом, за базой: её можно занять и развить.
+    const colony = map.sectors.west_colony!;
+    expect(colony.kind).toBe('planet');
+    expect(colony.owner).toBeNull();
+    expect(neighbours('staging')).toContain('west_colony');
+  });
+
   it('база у входа — она же зона вывода накопителя', () => {
     const base = map.sectors.staging!;
     expect(base.owner).toBe('p1');
@@ -242,17 +267,71 @@ describe('кто где стоит (§6.2–§6.3)', () => {
   });
 });
 
-describe('задачи четвёртой главы — пул из восьми (§6.7)', () => {
+describe('Завет Единения: фанатики держат две планеты (docs/covenant-of-unity.md)', () => {
+  const state = buildStateFromMap(map, data);
+  const held = Object.keys(map.sectors).filter((id) => map.sectors[id]!.owner === 'covenant');
+
+  it('Приют Завета и Лабораторию Смена держат сценарные люди, как Эхо в главе I', () => {
+    expect(held.sort()).toEqual(['covenant_hold', 'lab_outpost']);
+    for (const id of held)
+      expect(
+        map.sectors[id]!.garrison.reduce((n, u) => n + u.count, 0),
+        id,
+      ).toBeGreaterThan(0);
+    expect(state.players.covenant).toMatchObject({
+      name: 'Covenant of Unity',
+      faction: 'vanguard',
+      npc: 'pirate',
+    });
+    expect(state.players.covenant!.ai).not.toBe(true);
+    // Флота у фанатиков нет: они держат гарнизоны, а не ходят по карте.
+    expect(Object.values(map.fleets).filter((f) => f.owner === 'covenant')).toEqual([]);
+  });
+
+  it('враждебный житель, а не место игрока и не бот', () => {
+    expect(getStance(state, 'p1', 'covenant')).toBe('war');
+    expect(playablePlayerIds(state)).not.toContain('covenant');
+    expect([...runAiSeats(state, 'p1', 'weak').keys()]).not.toContain('covenant');
+  });
+
+  it('освобождённое не возвращается: зачтённая задача списывает своего фанатика', () => {
+    const start = pveState(data, 3);
+    const pool = pveObjectives(3);
+    const one = retireDoneEncounters(start, pool, ['mission.book-of-voices']);
+    expect(one.planets.covenant_hold!.owner).toBeNull();
+    expect(one.planets.covenant_hold!.garrison).toEqual([]);
+    // Лаборатория ещё у них — Завет остаётся за столом.
+    expect(one.planets.lab_outpost!.owner).toBe('covenant');
+    expect(one.players.covenant).toBeDefined();
+    const both = retireDoneEncounters(start, pool, ['mission.book-of-voices', 'mission.shift-lab']);
+    expect(both.players.covenant).toBeUndefined();
+    expect(both.planets.lab_outpost!.owner).toBeNull();
+    // Транспорты «Последней смены» — флот игрока, ждущий на планете прибытия
+    // (`awaitingFleets`); списание фанатиков их не трогает.
+    expect(both.planets.lab_outpost!.awaitingFleets?.map((f) => f.id)).toEqual(['p1_evac']);
+  });
+});
+
+describe('задачи четвёртой главы — пул из двенадцати (§6.7)', () => {
   const objectives = map.objectives;
 
-  it('восемь задач, не меньше, чем у третьей главы (PVR-5.6: запас не убывает)', () => {
-    expect(objectives).toHaveLength(8);
-    expect(new Set(objectives.map((o) => o.id)).size).toBe(8);
+  it('двенадцать задач — больше, чем у третьей главы (PVR-5.6: запас не убывает)', () => {
+    expect(objectives).toHaveLength(12);
+    expect(new Set(objectives.map((o) => o.id)).size).toBe(12);
+    expect(objectives.length).toBeGreaterThan(parseMatchMap(thirdMapJson).objectives.length);
+  });
+
+  it('за заход видно больше задач: четыре с первого захода, потолок шесть', () => {
+    expect(map.objectiveSlots).toEqual({ base: 4, cap: 6 });
+    const { slots } = pveChapter(3);
+    expect(shownObjectives(pveObjectives(3), [], slots)).toHaveLength(4);
+    const done = objectives.slice(0, 5).map((o) => o.id);
+    expect(shownObjectives(pveObjectives(3), done, slots)).toHaveLength(6);
   });
 
   it('каждая цель задачи есть на карте', () => {
     for (const o of objectives) {
-      for (const id of ['control', 'rescue'].includes(o.kind) ? (o.targets ?? []) : [])
+      for (const id of ['control', 'rescue', 'beacon'].includes(o.kind) ? (o.targets ?? []) : [])
         expect(map.sectors[id], `${o.id}: ${id}`).toBeDefined();
       if (o.kind === 'build' || o.kind === 'raze')
         for (const b of o.targets ?? []) expect(data.buildings[b], `${o.id}: ${b}`).toBeDefined();
@@ -272,12 +351,43 @@ describe('задачи четвёртой главы — пул из восьм�
     expect(route('lab_outpost', 'staging')).toBeGreaterThan(route('staging', 'archive'));
   });
 
-  it('«Книга голосов»: община наша и уже в осаде Роя', () => {
-    expect(map.sectors.covenant_hold!.owner).toBe('p1');
-    const siege = Object.values(map.fleets).find(
-      (f) => f.location === 'covenant_hold' && f.owner === 'swarm',
-    );
-    expect(siege?.landing?.length).toBeGreaterThan(0);
+  it('«Книга голосов» и «Лаборатория Смена»: отбить у фанатиков — захват, а не прибытие', () => {
+    const state = buildStateFromMap(map, data);
+    for (const [id, at] of [
+      ['mission.book-of-voices', 'covenant_hold'],
+      ['mission.shift-lab', 'lab_outpost'],
+    ] as const) {
+      const o = objectives.find((x) => x.id === id)!;
+      expect(o).toMatchObject({ kind: 'control', targets: [at] });
+      expect(map.sectors[at]!.owner).toBe('covenant');
+      expect(objectiveProgress(o, state, 'p1').complete).toBe(false);
+    }
+    // Роя над Приютом больше нет: община в руках людей, а не в осаде.
+    expect(Object.values(map.fleets).some((f) => f.location === 'covenant_hold')).toBe(false);
+  });
+
+  it('«Колокол Хора» — маяк задачи в землях Завета, за Приютом', () => {
+    const bell = objectives.find((o) => o.id === 'mission.choir-bell')!;
+    expect(bell).toMatchObject({ kind: 'beacon', targets: ['choir_bell'] });
+    expect(map.sectors.choir_bell!.traits).toContain('beacon');
+    expect(map.sectors.choir_bell!.owner).toBeNull();
+    expect(data.sectorKinds[map.sectors.choir_bell!.kind]?.capturable).toBe(true);
+    expect(route('staging', 'choir_bell')).toBeGreaterThan(route('staging', 'covenant_hold'));
+  });
+
+  it('«Вторая верфь» — в свободной колонии за базой, где верфь можно построить', () => {
+    const yard = objectives.find((o) => o.id === 'mission.second-yard')!;
+    expect(yard).toMatchObject({ kind: 'build', targets: ['shipyard'], at: ['west_colony'] });
+    const kind = data.sectorKinds[map.sectors.west_colony!.kind]!;
+    expect(kind.buildable).toBe(true);
+    expect(kind.allowedBuildings ?? ['shipyard']).toContain('shipyard');
+  });
+
+  it('«Гнездовье» — мир Роя на южном поясе, под внешней дугой', () => {
+    const nest = objectives.find((o) => o.id === 'mission.nest')!;
+    expect(nest).toMatchObject({ kind: 'control', targets: ['nest'] });
+    expect(map.sectors.nest!.owner).toBe('swarm');
+    expect(pos('nest').y).toBeGreaterThan(Math.max(...OUTER.map((id) => pos(id).y)));
   });
 
   it('«Запасной рубеж» — на перемычке, где форт можно построить', () => {

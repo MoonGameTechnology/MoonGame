@@ -1,12 +1,13 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Context } from '../action/types';
 import { buildingLevel, type ResourceBag } from '../data/schemas';
-import type { Planet, UnitStack } from '../state/gameState';
+import type { Planet, PlayerId, UnitStack } from '../state/gameState';
 import { effectiveStats } from '../util/loadout';
 import { canAfford, payCost } from '../util/treasury';
 import type { DamageHookArgs } from '../util/combat';
 import { coverPoints, worldDamageReduction } from '../util/worldCover';
 import { isCapturable, isStationable } from '../state/sectorKind';
+import { forkPoint, forkSiteEdge, forkSiteId, isForkSite } from '../state/forkSite';
 
 /**
  * КОСМИЧЕСКАЯ КРЕПОСТЬ (`fortress-roadmap.md` §0.6, решение владельца 2026-09-15).
@@ -39,6 +40,11 @@ import { isCapturable, isStationable } from '../state/sectorKind';
  */
 
 const STATION_KIND = 'void_station';
+/** Вид ПЛОЩАДКИ крепости на развилке (FORT-6.1): что на ней можно строить и чем она не
+ *  является (не захватывается, без орбиты, в неё не проложить коридор) — в данных
+ *  (`sectorKinds.fork_station`), а не условиями здесь. Вид площадки не меняется ни при
+ *  постройке, ни при гибели: площадка — место на дороге, а не местность под крепостью. */
+const FORK_KIND = 'fork_station';
 /** Чем становится узел, если крепость погибла, а память о прежнем виде взять неоткуда:
  *  так бывает у крепости, ПОСЕЯННОЙ картой или сценарием сразу как `void_station` —
  *  конверсии не было, значит и запоминать было нечего. Пустое пространство — честный
@@ -158,22 +164,32 @@ function syncStationGuns(h: HandlerContext, planet: Planet): void {
   const core = planet.buildings.find((b) => b.type === CORE_BUILDING && b.hp > 0);
   if (!core || planet.owner === null) {
     if (existing) delete h.state.fleets[id];
+    // Крепость на развилке без ядра — уже не крепость, а занятая развилка: вторую там не
+    // поставить, пока площадка чья-то. Гасим её так же, как гибель орудий.
+    if (isForkSite(planet) && planet.owner !== null) releaseForkSite(h, planet);
     return;
   }
   const step = shieldStep(planet);
   if (!existing) {
     const fresh: UnitStack = { unit: GUNS_UNIT, count: core.level };
     fitShield(fresh, step, h.ctx);
+    // Крепость на развилке держит орудия НА САМОЙ развилке — на дороге, а не на
+    // площадке: оттуда они видят все дороги тропы (FORT-6.1).
+    const edge = planet.fork ? forkSiteEdge(h.state, planet.fork) : null;
     h.state.fleets[id] = {
       id,
       owner: planet.owner,
-      location: planet.id,
+      location: edge ? null : planet.id,
+      ...(edge ? { edge } : {}),
       movement: null,
       units: [fresh],
       landing: [],
       traits: [],
       battleId: null,
     };
+    // Встал на дорогу — объявить стоянку, как это делает остановившийся флот: по ней
+    // модуль встреч назначает бой каждому, кто уже идёт по тропе (засада ROADS-3).
+    if (edge) h.emit('fleet.parked', { fleetId: id, edge });
     return;
   }
   existing.owner = planet.owner;
@@ -190,25 +206,54 @@ function syncStationGuns(h: HandlerContext, planet: Planet): void {
   }
 }
 
+/**
+ * Погасить крепость на развилке: площадка остаётся, но без хозяина, — развилка свободна, и
+ * поставить крепость там снова может любой, чья провинция (решение владельца 2026-09-29:
+ * «уничтожена — развилка свободна»). Постройки сносит модуль стройки по `station.destroyed`
+ * — ровно так же, как у крепости на узле: там живут очередь и оплаченные завершения.
+ */
+function releaseForkSite(h: HandlerContext, site: Planet): void {
+  const owner = site.owner;
+  site.owner = null;
+  h.emit('station.destroyed', { planetId: site.id, owner });
+}
+
 export const stationModule: GameModule = {
   id: 'station',
   // 1.1.0: постройки крепости прикрывают её орудия (FORT-5.16, замечание Codex на #1389).
-  version: '1.1.0',
+  // 1.2.0: прикрытие — только отряду из одних орудий (находка Codex на #1393).
+  // 1.3.0: крепость на развилке — новая точка постройки (FORT-6.1).
+  version: '1.3.0',
   setup(api) {
     api.onAction('station.deploy', (action, h: HandlerContext) => {
-      const { planetId } = action.payload as { planetId?: string };
+      const { planetId, trail } = action.payload as { planetId?: string; trail?: unknown };
       if (typeof planetId !== 'string') return h.reject('E_BAD_PAYLOAD');
+      if (trail !== undefined && !(Number.isInteger(trail) && (trail as number) >= 0)) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
       const node = h.state.planets[planetId];
       if (!node) return h.reject('E_NO_PLANET');
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_FORBIDDEN'); // not a participant / no treasury
       // Правило 1: только СВОЙ узел. Чужой и ничейный отбиваются одним кодом намеренно —
-      // fail-secure: отказ не обязан рассказывать, чей узел на самом деле.
-      if (node.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      // fail-secure: отказ не обязан рассказывать, чей узел на самом деле. С `trail` узел —
+      // ПРОВИНЦИЯ, на развилке чьей тропы ставят крепость (FORT-6.1): захвачена должна
+      // быть она, и только в момент постройки. Площадка развилки сама провинцией не
+      // бывает, поэтому ни крепость на ней, ни развилку «от неё» не ставят.
+      if (isForkSite(node) || node.owner !== action.playerId) return h.reject('E_FORBIDDEN');
       // Правило 2: вид должен принимать крепость. Уже стоящая крепость отбивается тем же
       // флагом (`void_station.stationable: false`), поэтому «второй раз» — не отдельная
-      // ветка, а тот же запрет.
-      if (!isStationable(h.ctx.data, node)) return h.reject('E_NOT_STATIONABLE');
+      // ветка, а тот же запрет. У развилки своё место: она должна быть, и одна развилка —
+      // одна крепость (площадка с хозяином — там уже стоит чья-то).
+      const anchor = trail === undefined ? null : { province: planetId, trail: trail as number };
+      const siteId = anchor ? forkSiteId(anchor.province, anchor.trail) : planetId;
+      const site = h.state.planets[siteId];
+      if (anchor) {
+        if (!forkSiteEdge(h.state, anchor)) return h.reject('E_NOT_STATIONABLE');
+        if (site && (!isForkSite(site) || site.owner !== null)) return h.reject('E_NOT_STATIONABLE');
+      } else if (!isStationable(h.ctx.data, node)) {
+        return h.reject('E_NOT_STATIONABLE');
+      }
       if (!canAfford(player.resources, STATION_COST)) return h.reject('E_INSUFFICIENT');
 
       // Ядро обязано быть в каталоге: без него крепость вышла бы бестелесной — без HP,
@@ -230,6 +275,30 @@ export const stationModule: GameModule = {
       if (!unlock.allowed) return h.reject(unlock.code ?? 'E_LOCKED');
 
       payCost(player.resources, STATION_COST);
+      const coreHp = buildingLevel(core, 1).hp;
+      if (anchor) {
+        // Площадка развилки: при первой крепости здесь её ещё нет — заводим; после гибели
+        // прежней она стоит пустой и принимает новую (id тот же — развилка та же).
+        const point = forkPoint(h.state, anchor)!;
+        const fresh: Planet = site ?? {
+          id: siteId,
+          owner: null,
+          kind: FORK_KIND,
+          position: { x: point.x, y: point.y },
+          links: [],
+          resources: {},
+          buildings: [],
+          garrison: [],
+          traits: [],
+          fork: anchor,
+        };
+        fresh.owner = action.playerId;
+        fresh.buildings.push({ type: CORE_BUILDING, level: 1, hp: coreHp });
+        h.state.planets[siteId] = fresh;
+        syncStationGuns(h, fresh);
+        h.emit('station.deployed', { planetId: siteId, owner: action.playerId, fork: anchor });
+        return;
+      }
       // Чем узел БЫЛ до конверсии — запоминаем, потому что гибель крепости обязана его
       // вернуть (FORT-5.13, решение владельца 22). Без этой памяти разрушенная крепость
       // навсегда стирала бы астероидное поле под собой: вид узла затирается здесь, а
@@ -237,7 +306,7 @@ export const stationModule: GameModule = {
       // уже ловило на добыче — «разрушат, а отстраивать негде».
       node.priorKind = node.kind ?? DEFAULT_PRIOR_KIND;
       node.kind = STATION_KIND; // ownable + buildable: radar/fort/… via building.construct
-      node.buildings.push({ type: CORE_BUILDING, level: 1, hp: buildingLevel(core, 1).hp });
+      node.buildings.push({ type: CORE_BUILDING, level: 1, hp: coreHp });
       syncStationGuns(h, node);
       h.emit('station.deployed', { planetId, owner: action.playerId });
     });
@@ -289,6 +358,12 @@ export const stationModule: GameModule = {
       if (planetId === null) return;
       const planet = h.state.planets[planetId];
       if (!planet || !planet.buildings.some((b) => b.type === CORE_BUILDING)) return;
+      // Крепость на развилке гибнет иначе: площадка остаётся (вид у неё свой и не менялся),
+      // а развилка освобождается (FORT-6.1).
+      if (isForkSite(planet)) {
+        if (planet.owner !== null) releaseForkSite(h, planet);
+        return;
+      }
       const owner = planet.owner;
       planet.kind = planet.priorKind ?? DEFAULT_PRIOR_KIND;
       delete planet.priorKind;
@@ -329,6 +404,10 @@ export const stationModule: GameModule = {
       if (planetId === null) return pool;
       const node = h.state.planets[planetId];
       if (!node) return pool;
+      // Прикрытие привязано к ОРУДИЯМ, а не к контейнеру по id: чужой юнит в отряде
+      // (слияние его запрещает — `fleetOps`) лишает прикрытия весь отряд, а не получает его.
+      const guns = h.state.fleets[defenderFleet];
+      if (!guns || guns.units.some((u) => u.unit !== GUNS_UNIT && u.count > 0)) return pool;
       return pool + coverPoints(worldDamageReduction(node, h.ctx.data));
     });
 
@@ -341,6 +420,22 @@ export const stationModule: GameModule = {
       if (typeof p.planetId !== 'string') return;
       const planet = h.state.planets[p.planetId];
       if (planet) syncStationGuns(h, planet);
+    });
+
+    // Выбывший игрок теряет флоты без боя (`victory` удаляет их, не объявляя гибели), и
+    // крепость на развилке осталась бы его навсегда: без орудий, с постройками и с
+    // запертой развилкой. Крепость на узле этой беды не знает — выбывает тот, у кого узлов
+    // нет. Гасим площадки выбывшего; флот орудий снимаем и сами — выбывание могло прийти
+    // и не от модуля победы.
+    api.on('player.eliminated', (event, h) => {
+      const playerId = (event.payload as { playerId?: unknown }).playerId;
+      if (typeof playerId !== 'string') return;
+      for (const id of Object.keys(h.state.planets).sort()) {
+        const site = h.state.planets[id];
+        if (!site || !isForkSite(site) || site.owner !== (playerId as PlayerId)) continue;
+        delete h.state.fleets[gunsFleetId(id)];
+        releaseForkSite(h, site);
+      }
     });
   },
 };
