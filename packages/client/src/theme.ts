@@ -54,3 +54,52 @@ export const holographicTheme: Theme & { void: string; surface: string; reflecti
   surface: '#0a202d',
   reflection: '#b9f5ff',
 };
+
+/**
+ * Menu screens — match setup, seat pick and the rest of the hub's family (UIX-15, owner's
+ * order 2026-10-01: «те же цвета, что на главном»). One palette in both skins: the phone
+ * skin's `dim` reads 3.4:1 on a card and the holographic one repaints the accent, so a
+ * screen drawn from `theme` looked different on the phone and on the PC. Text tokens keep
+ * at least 4.5:1 on `card` (WCAG 1.4.3). The accent stays `theme.cyan`; selection fills,
+ * the primary button and its glow are that cyan at partial opacity, so they need no token.
+ */
+export interface SurfaceTheme {
+  /** Body text on cards and windows. */
+  text: string;
+  /** Secondary text: hints and captions. */
+  textDim: string;
+  /** Section headings inside a window. */
+  textHead: string;
+  /** Titles and the chosen option. */
+  textHi: string;
+  /** Card fill. */
+  card: string;
+  /** A card that cannot be chosen right now. */
+  cardOff: string;
+  /** Input fields and segmented tracks: a well below the card. */
+  inset: string;
+  /** Card border. */
+  edge: string;
+  /** Card border under the pointer. */
+  edgeHi: string;
+  /** Window fill, a diagonal gradient from `panelFrom` to `panelTo`. */
+  panelFrom: string;
+  panelTo: string;
+  /** Window border. */
+  panelEdge: string;
+}
+
+export const surfaceTheme: SurfaceTheme = {
+  text: '#e2f1f6',
+  textDim: '#a9c6d1',
+  textHead: '#b4d3dd',
+  textHi: '#f2fdff',
+  card: 'rgba(8,26,38,0.72)',
+  cardOff: 'rgba(6,18,27,0.5)',
+  inset: 'rgba(4,16,25,0.9)',
+  edge: 'rgba(118,206,229,0.32)',
+  edgeHi: 'rgba(140,233,242,0.7)',
+  panelFrom: 'rgba(10,30,43,0.985)',
+  panelTo: 'rgba(3,12,23,0.985)',
+  panelEdge: 'rgba(118,206,229,0.45)',
+};
