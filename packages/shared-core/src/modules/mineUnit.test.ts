@@ -185,7 +185,8 @@ describe('мину нельзя слить, разделить и сдвинут
 
 describe('челноки уничтожают мину безопасно', () => {
   it('удар бомбардировщиков снимает мину по корпусу, ни одна машина не сбита', () => {
-    const s0 = world([mine({ location: 'M' }, 3)]);
+    // Свой флот рядом — иначе чужую мину не видно, и приказ удара её не найдёт (ревью #1411).
+    const s0 = world([mine({ location: 'M' }, 3), ships('SCOUT', 'p1', 'M', 1)]);
     s0.fleets.MINE!.owner = 'p2';
     s0.planets.N = { ...s0.planets.N!, owner: 'p1', buildings: [{ type: 'spaceport', level: 1, hp: 30 }],
       hangar: [{ id: 'sq:b', units: [{ unit: 'bomber', count: 3 }] }] };
