@@ -11,6 +11,7 @@ import {
   START_CANDIDATES,
 } from './game';
 import type { GameState } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 // A 2-seat skirmish: p1 human, p2 AI — both spawn with a home fleet and reachable neutral
 // worlds, so the default AI has somewhere to expand to.
@@ -25,7 +26,7 @@ function game2(): GameState {
 
 describe('aiOrders — Steward «Оборона» posture (brick 2)', () => {
   it('expands by default but HOLDS fleets under defend', () => {
-    const s = game2();
+    const s = atWeakTurn(game2(), 'full');
     // Погрузка десанта — тоже выход в экспансию: ничьи планеты держит ополчение (BAL-10),
     // и флот сначала грузится дома.
     const moves = (posture: 'expand' | 'defend'): number =>

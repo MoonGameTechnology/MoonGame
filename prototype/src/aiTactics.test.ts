@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import { data } from './gameData';
 import type { Action, Battle, Fleet, GameState } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 function game2(): GameState {
   return newGame({
@@ -275,7 +276,8 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
   });
 
   it('слабый бот осаждает тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(only(aiOrders(siegeState(game2()), 'p2', 'expand'), 'fleet.bombard').length).toBeGreaterThan(0);
+    const s = atWeakTurn(siegeState(game2()), 'full');
+    expect(only(aiOrders(s, 'p2', 'expand'), 'fleet.bombard').length).toBeGreaterThan(0);
   });
 });
 
@@ -369,7 +371,8 @@ describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
   });
 
   it('слабый бот кулак делит тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(only(aiOrders(fistState(game2(), 8), 'p2', 'expand'), 'fleet.split').length).toBeGreaterThan(0);
+    const s = atWeakTurn(fistState(game2(), 8), 'full');
+    expect(only(aiOrders(s, 'p2', 'expand'), 'fleet.split').length).toBeGreaterThan(0);
   });
 });
 

@@ -16,6 +16,7 @@ import { newGame, aiOrders, START_CANDIDATES, kernel, ctx } from './game';
 import { data } from './gameData';
 import type { Action, GameState, Squadron } from '../../packages/shared-core/src/index';
 import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
+import { atWeakTurn } from './weakTurnFixture';
 
 function game2(): GameState {
   return newGame({
@@ -63,7 +64,8 @@ describe('SIEGE-1 — осада модулем', () => {
   });
 
   it('слабый бот осадные крейсеры на войне строит тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(siegeBuilt(aiOrders(rich(game2()), 'p2', 'expand'))).toBeGreaterThan(0);
+    const s = atWeakTurn(rich(game2()), 'full');
+    expect(siegeBuilt(aiOrders(s, 'p2', 'expand'))).toBeGreaterThan(0);
   });
 
   it('юнита `siege` бот не заказывает никогда — его нет в данных', () => {
@@ -92,9 +94,8 @@ describe('AI-BAL-4 / SHU-1.1 — челноки строятся в КОСМОП
   });
 
   it('слабый бот челноки заказывает тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand'))).toContain(
-      'interceptor',
-    );
+    const s = atWeakTurn(withPort(rich(game2())), 'full');
+    expect(unitsBuilt(aiOrders(s, 'p2', 'expand'))).toContain('interceptor');
   });
 
   /**
@@ -187,7 +188,8 @@ describe('SHU-3.2 — бот СТРОИТ новый ростер челноко
   });
 
   it('слабый бот новый ростер челноков заказывает тоже (слабый знает то же, 2026-09-28)', () => {
-    const weak = unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand'));
+    const s = atWeakTurn(withPort(rich(game2())), 'full');
+    const weak = unitsBuilt(aiOrders(s, 'p2', 'expand'));
     expect(weak).toContain('bomber');
   });
 
@@ -273,7 +275,7 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
   });
 
   it('слабый бот вылеты поднимает тоже (слабый знает то же, 2026-09-28)', () => {
-    const s = armed();
+    const s = atWeakTurn(armed(), 'full');
     expect(only(aiOrders(s, 'p2', 'expand'), 'shuttle.strike').length).toBeGreaterThan(0);
   });
 

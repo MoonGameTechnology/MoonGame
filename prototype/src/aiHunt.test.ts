@@ -8,6 +8,7 @@ import { data } from './gameData';
 import { huntWeight } from './ai';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import type { Fleet, GameState, Planet } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 const capturable = (p: Planet): boolean => data.sectorKinds[p.kind ?? '']?.capturable ?? false;
 
@@ -101,7 +102,7 @@ describe('охота отстающего', () => {
 
   it('слабый профиль охотится так же — это игровой бот (перенос 2026-09-28)', () => {
     const { s, prize } = scene('p3');
-    const to = aiOrders(s, 'p2', 'expand', 'weak')
+    const to = aiOrders(atWeakTurn(s, 'full'), 'p2', 'expand', 'weak')
       .filter((a) => a.type === 'fleet.move')
       .map((a) => a.payload as { fleetId: string; to: string })
       .find((m) => m.fleetId === 'f:hunt')?.to;

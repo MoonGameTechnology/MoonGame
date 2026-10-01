@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 function game2(): GameState {
   return newGame({
@@ -251,7 +252,7 @@ describe('AI-BAL-3 — дом бота стоит на ВЕРФИ, а не на 
     // Раньше `base` был «первый owned-мир с постройками»: одна шахта на призовом мире
     // переносила дом туда, и ЛЮБОЙ заказ корабля отбивался ядром — флот переставал
     // пополняться. Проверяем игровой профиль: починка общая.
-    const s = prizeFirst(game2(), 'p2');
+    const s = atWeakTurn(prizeFirst(game2(), 'p2'), 'full');
     const home = homeOf(s, 'p2');
     const ships = unitOrders(aiOrders(s, 'p2', 'expand')).filter((o) => !GROUND.includes(o.unit));
     expect(ships.length).toBeGreaterThan(0);

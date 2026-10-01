@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { setStance, type Action, type GameState } from '../../packages/shared-core/src/index';
 import { newGame, order, HOUR, START_CANDIDATES } from './game';
 import { initSoloDrivers, autoProbeKey, AI_STEP_MS, type SoloHost } from './soloDrivers';
+import { atWeakTurn } from './weakTurnFixture';
 
 /**
  * REFM-26: драйверы проверяются на НАСТОЯЩЕМ состоянии матча — они читают мир
@@ -95,7 +96,7 @@ describe('соло-драйверы — ходы ИИ', () => {
 
   it('ИИ ходит не чаще своего шага', () => {
     const h = harness();
-    h.setState(at(h.state(), AI_STEP_MS * 2)); // слабый ходит в чётных окнах
+    h.setState(atWeakTurn(at(h.state(), AI_STEP_MS * 2), 'full')); // слабый ходит в этом окне
     drain(h);
     const after = h.others.length;
     expect(after).toBeGreaterThan(0);
@@ -115,18 +116,18 @@ describe('соло-драйверы — ходы ИИ', () => {
 
   it('ход ИИ — это НАСТОЯЩИЕ приказы за чужое место, а не пустой прогон', () => {
     const h = harness();
-    h.setState(at(h.state(), AI_STEP_MS * 2)); // слабый ходит в чётных окнах
+    h.setState(atWeakTurn(at(h.state(), AI_STEP_MS * 2), 'full')); // слабый ходит в этом окне
     drain(h);
     expect(h.others.length).toBeGreaterThan(0);
     for (const a of h.others) expect(a.playerId).toBe('p2');
   });
 
-  it('СЛОЖНОСТЬ КРЕСЛА ДОЕЗЖАЕТ ДО БОТА: во втором окне слабый молчит, сильный ходит (AIDIFF-1)', () => {
+  it('СЛОЖНОСТЬ КРЕСЛА ДОЕЗЖАЕТ ДО БОТА: в окне пропуска слабый молчит, сильный ходит (AIDIFF-1)', () => {
     // Слабый — тот же репертуар с гандикапом (2026-09-28): разница видна по темпу, а не
     // по числу приказов — их количество зависит от казны и меняется от правок баланса.
     const run = (profile: 'weak' | 'strong'): Action[] => {
       const h = harness({ aiSeats: () => new Map([['p2', profile]]) });
-      h.setState(at(h.state(), AI_STEP_MS));
+      h.setState(atWeakTurn(at(h.state(), AI_STEP_MS), 'skip'));
       drain(h);
       return h.others;
     };
@@ -154,7 +155,7 @@ describe('соло-драйверы — ходы ИИ', () => {
       },
       three,
     );
-    h.setState(at(h.state(), AI_STEP_MS));
+    h.setState(atWeakTurn(at(h.state(), AI_STEP_MS), 'skip', 'p3'));
     drain(h);
     const by = (id: string): Action[] => h.others.filter((a) => a.playerId === id);
     expect(by('p2').length).toBeGreaterThan(0);

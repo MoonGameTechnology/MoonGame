@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import { MARKET_COMMISSION } from '../../packages/shared-core/src/index';
 import type { Action, GameState, MarketOrder } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 function game2(): GameState {
   return newGame({
@@ -189,7 +190,10 @@ describe('AI-BAL-9 — границы книги', () => {
 
   it('заявку на микроэлектронику выставляют оба профиля (слабый — с гандикапом, 2026-09-28)', () => {
     // Слабый бот знает то же, что сильный: излишки, заявка на металл И на микроэлектронику.
-    const s = book({ ...NEUTRAL, credits: 4000, metal: 10, microelectronics: 10 }, []);
+    const s = atWeakTurn(
+      book({ ...NEUTRAL, credits: 4000, metal: 10, microelectronics: 10 }, []),
+      'full',
+    );
     const bids = (profile: 'weak' | 'strong'): string[] =>
       payloads<{ side: string; resource: string }>(orders(s, profile), 'market.list')
         .filter((l) => l.side === 'buy')
@@ -199,9 +203,12 @@ describe('AI-BAL-9 — границы книги', () => {
   });
 
   it('слабый профиль чужие лоты тоже снимает', () => {
-    const s = book({ ...NEUTRAL, microelectronics: 10 }, [
-      { id: 'lot:micro', side: 'sell', resource: 'microelectronics', price: 1, amount: 12 },
-    ]);
+    const s = atWeakTurn(
+      book({ ...NEUTRAL, microelectronics: 10 }, [
+        { id: 'lot:micro', side: 'sell', resource: 'microelectronics', price: 1, amount: 12 },
+      ]),
+      'full',
+    );
     expect(takes(s, 'weak')).toEqual(takes(s, 'strong'));
   });
 });
