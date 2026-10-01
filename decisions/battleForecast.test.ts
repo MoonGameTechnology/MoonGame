@@ -94,17 +94,19 @@ describe('прогноз в окне боя (UIX-6.2)', () => {
     expect(f!.ownLossPct).toBeLessThan(100);
   });
 
+  /** Враждебен только `foe`: союзник и сосед воюют с ним, но не со мной. */
+  const onlyFoe: Parameters<typeof battleForecast>[2] = (a, b) =>
+    a !== b && !(a !== 'foe' && b !== 'foe');
+
   it('союзник — не враг: он дерётся рядом, и его выживание победе не мешает', () => {
-    const allies: Parameters<typeof battleForecast>[2] = (a, b) =>
-      a !== b && !(a !== 'foe' && b !== 'foe');
     const f = battleForecast(
       [
         side(true, 'attacker', 4),
-        side(false, 'attacker', 5, undefined, 'ally'),
+        { ...side(false, 'attacker', 5, undefined, 'ally'), ally: true },
         side(false, 'defender', 8),
       ],
       data,
-      allies,
+      onlyFoe,
     );
     expect(f).toMatchObject({ verdict: 'win', foeLossPct: 100 });
     // Один на один тот же враг мне не по зубам: победу дал союзник.
@@ -113,17 +115,30 @@ describe('прогноз в окне боя (UIX-6.2)', () => {
     ).toMatchObject({ verdict: 'loss' });
   });
 
-  it('моя сторона пала рядом с победившим союзником — это не моя победа', () => {
-    const allies: Parameters<typeof battleForecast>[2] = (a, b) =>
-      a !== b && !(a !== 'foe' && b !== 'foe');
+  // Решение владельца 2026-10-01: «если победа, то победа». Союз выиграл — это победа, и
+  // гибель моих кораблей не делает её ничьей: потери стоят в карточке отдельной цифрой.
+  it('моя сторона пала, а союзник победил — это победа, потери моих 100%', () => {
     const f = battleForecast(
       [
         side(true, 'attacker', 1),
-        side(false, 'attacker', 30, undefined, 'ally'),
+        { ...side(false, 'attacker', 30, undefined, 'ally'), ally: true },
         side(false, 'defender', 4),
       ],
       data,
-      allies,
+      onlyFoe,
+    );
+    expect(f).toMatchObject({ verdict: 'win', ownLossPct: 100, foeLossPct: 100 });
+  });
+
+  it('устоял сосед — не союзник и не враг: его победа не моя, ничья', () => {
+    const f = battleForecast(
+      [
+        side(true, 'attacker', 1),
+        side(false, 'attacker', 30, undefined, 'neutral'),
+        side(false, 'defender', 4),
+      ],
+      data,
+      onlyFoe,
     );
     expect(f).toMatchObject({ verdict: 'draw', ownLossPct: 100, foeLossPct: 100 });
   });

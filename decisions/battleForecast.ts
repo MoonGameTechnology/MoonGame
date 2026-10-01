@@ -7,12 +7,14 @@
  * словами на обоих экранах. Прицел и зовёт этот модуль, подавая каждый выделенный флот
  * своей стороной.
  *
- * 1. **Сторон сколько угодно, вердикт — моим силам.** Победа: мои стороны устояли, а
- *    враждебных мне не осталось. Поражение: моих не осталось, а враг стоит. Остальное —
- *    ничья: предохранитель развёл бойцов или пали все. Союзник дерётся в прогнозе рядом
- *    со мной, но его исход — не мой вердикт: моя гибель рядом с победившим союзником —
- *    не победа. Многосторонний бой кончается не первой гибелью, а цепочкой (§0.0 №5
- *    `multiside-combat-roadmap.md`), и прогноз досчитывает её до конца.
+ * 1. **Сторон сколько угодно, вердикт — моей колонке.** Своя колонка окна — мои стороны и
+ *    союзники. Победа: враждебных мне не осталось, а кто-то из своей колонки стоит, даже
+ *    если мои корабли пали (решение владельца 2026-10-01: победа есть победа, потери её
+ *    ничьей не делают — они стоят в карточке отдельной цифрой). Поражение: своя колонка
+ *    пала, а враг стоит. Остальное — ничья: предохранитель развёл бойцов, пали все или
+ *    устоял лишь сосед, который мне не союзник и не враг. Многосторонний бой кончается
+ *    не первой гибелью, а цепочкой (§0.0 №5 `multiside-combat-roadmap.md`), и прогноз
+ *    досчитывает её до конца.
  * 2. **Меня в бою нет — вердикта нет.** «Победа» и «поражение» бывают только у своей
  *    стороны; чужую схватку окно показывает без прогноза. Врага у меня в бою нет
  *    (помирились) — тоже нет.
@@ -39,6 +41,8 @@ import { engageForecastCard, type EngageForecastCard } from './engageForecast';
 /** Сторона боя — то, что прогнозу нужно из модели окна. */
 export interface ForecastSide {
   mine: boolean;
+  /** Союзник — сторона в моей колонке окна: его победа — моя победа (правило 1). */
+  ally?: boolean;
   role: 'attacker' | 'defender';
   /** Текущий состав: стеки вместе с остатком корпуса (`hp`). */
   units: readonly UnitStack[];
@@ -74,7 +78,10 @@ export function battleForecast(
   const me = sides.find((s) => s.mine);
   if (!me || sides.some((s) => !alive(s.units))) return null;
   const mine = sides.flatMap((s, i) => (s.mine ? [i] : []));
-  const foes = sides.flatMap((s, i) => (!s.mine && hostile(me.owner, s.owner) ? [i] : []));
+  const ours = sides.flatMap((s, i) => (s.mine || s.ally ? [i] : []));
+  const foes = sides.flatMap((s, i) =>
+    !s.mine && !s.ally && hostile(me.owner, s.owner) ? [i] : [],
+  );
   if (foes.length === 0) return null;
   const sim = previewSides(sides, data, hostile);
   const standing = (idx: number[]): boolean => idx.some((i) => alive(sim.sides[i]!.survivors));
@@ -88,8 +95,8 @@ export function battleForecast(
     }
     return before > 0 ? 1 - after / before : 0;
   };
-  const won = standing(mine) && !standing(foes);
-  const beaten = !standing(mine) && standing(foes);
+  const won = standing(ours) && !standing(foes);
+  const beaten = !standing(ours) && standing(foes);
   // В карточке прицела «атакующий» — это игрок, какую бы роль ни несла его сторона.
   return engageForecastCard({
     outcome: won ? 'attacker' : beaten ? 'defender' : 'stalemate',

@@ -287,6 +287,25 @@ describe('прогноз и правила в окне боя (UIX-6.2)', () => 
     expect(battleWindowHtml(m)).not.toContain('bw-forecast');
   });
 
+  it('союзник из моей колонки помечен: его победа — моя победа', () => {
+    const ally = { ...side('p3', 'attacker'), relation: 'ally' as const };
+    const neutral = { ...side('p4', 'attacker'), relation: 'neutral' as const };
+    let seen: readonly ForecastSide[] = [];
+    battleWindowHtml(
+      battle([side('p1', 'attacker', true), side('p2', 'defender'), ally, neutral]),
+      [],
+      {
+        forecast: (sides) => ((seen = sides), null),
+      },
+    );
+    expect(seen.map((x) => [x.owner, x.ally])).toEqual([
+      ['p1', undefined],
+      ['p2', undefined],
+      ['p3', true],
+      ['p4', undefined],
+    ]);
+  });
+
   it('на земле гарнизон помечен как держащий мир, а ключей флотов нет', () => {
     const m = {
       ...battle([
