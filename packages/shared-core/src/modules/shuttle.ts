@@ -47,6 +47,7 @@ import { fleetPositionAt } from '../state/fleetPosition';
 import { isMineFleet, mineFleetVisible } from '../state/minefields';
 import { hasMapShare } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
+import { isForkSite } from '../state/forkSite';
 import {
   canSortie,
   fleetHoldFree,
@@ -71,6 +72,7 @@ import {
   beachheadOf,
   hookedDamage,
   isAllied,
+  isHostile,
   removeIfWiped,
   type HookedDamage,
 } from '../util/combat';
@@ -554,7 +556,9 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
   const own = beachheadOf(h.state, planet.id, owner);
   const others = (planet.beachheads ?? []).some((b) => b.owner !== owner);
 
-  if (cargo.length === 0) {
+  if (cargo.length === 0 || isForkSite(planet)) {
+    // Площадка развилки десанта не принимает (приказ отбит ещё на вылете) — подстраховка.
+    landed = [];
     mode = 'lost';
   } else if (friendly) {
     landStacks(planet.garrison, cargo, share, h.ctx.data);
@@ -565,6 +569,19 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
     // следующего раунда.
     landStacks(own.units, cargo, share, h.ctx.data);
     mode = 'beachhead';
+    // Берег мог стоять на земле БЕЗ БОЯ — после ничьей или перемирия. Тогда подкрепление
+    // продолжает штурм так же, как новый десант с флота: `beachhead.landed` заводит бой или
+    // вводит берег в идущий (замечание Codex на #1409: челнок довозил войска, а бой так и не
+    // начинался). Против невраждебного хозяина — нет: перемирие драку и сняло.
+    const fighting = Object.values(h.state.battles).some(
+      (b) =>
+        b.phase === 'ground' &&
+        b.location === planet.id &&
+        b.sides.some((x) => x.ref.kind === 'beachhead' && x.ref.owner === owner),
+    );
+    if (!fighting && (planet.owner === null || isHostile(h, owner, planet.owner))) {
+      h.emit('beachhead.landed', { planetId: planet.id, owner });
+    }
   } else if (!isCapturable(h.ctx.data, planet)) {
     landed = []; // пустое пространство не занимают пехотой
   } else if (
@@ -821,7 +838,9 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
 export const shuttleModule: GameModule = {
   id: 'shuttle',
   // 1.3.0: невидимая чужая мина — не цель вылета (`E_NO_TARGET`, ревью #1411).
-  version: '1.3.0',
+  // 1.4.0: подкрепление берегу без боя продолжает штурм (замечание Codex на #1409).
+  // 1.5.0: десант на площадку крепости на развилке не садится (замечание Codex на #1410).
+  version: '1.5.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -893,6 +912,9 @@ export const shuttleModule: GameModule = {
       // не относится. Признак — ГРУЗ В ТРЮМЕ (SHU-4.2 грузит его заранее, до приказа).
       const cargo = (squad.cargo ?? []).filter((st) => st.count > 0);
       if (targetOwner === action.playerId && cargo.length === 0) return h.reject('E_NOT_HOSTILE');
+      // На площадку крепости на развилке десант не садится: это не мир, уйти оттуда нельзя, а
+      // при гибели крепости войска остались бы у ничейного узла (замечание Codex на #1410).
+      if (targetPlanet && isForkSite(targetPlanet) && cargo.length > 0) return h.reject('E_NOT_CAPTURABLE');
 
       const from = base.position;
       if (!from) return h.reject('E_NO_PORT'); // носитель без позиции (в перелёте) — не база

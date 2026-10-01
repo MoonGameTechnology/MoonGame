@@ -231,9 +231,20 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '61'; // BAL-10: налог на рост державы. В ЧЛЕНСТВО
+export const MODULE_MANIFEST_VERSION = '63'; // BAL-10: налог на рост державы. В ЧЛЕНСТВО
 // вошёл `sprawl` 1.0.0 сразу за `faction`: у места больше 35 провинций выход всех миров
-// умножается на 1/(1 + 0,1 × лишние). Партия на 60 молча сменила бы доход посреди игры.
+// умножается на 1/(1 + 0,1 × лишние). Партия на 62 молча сменила бы доход посреди игры.
+// export const MODULE_MANIFEST_VERSION = '62'; // Ревью крепости на развилке (#1410). Членство
+// и порядок не тронуты; площадка — не мир: `technology` 1.2.0 не считает её сектором, `steward`
+// 1.1.0 не берёт её точкой удержания и снимает точку при `station.destroyed`, `shuttle` 1.5.0 не
+// сажает на неё десант; `construction` 1.3.0 ставит её стройку на паузу в бою с её орудиями.
+// Заодно `fleet-ops` 1.6.0: слияние, приостановленное высадкой, созревает по её концу (#1415).
+// export const MODULE_MANIFEST_VERSION = '61'; // Ревью высадки (#1409). Членство и порядок
+// не тронуты; `combat` 3.4.0 отдаёт мир и продолжает штурм только берегами завершённого боя
+// (все уцелевшие враги нового хозяина вступают в новый бой, берега без боя остаются), а
+// посадка на борт не уводит трюм в минус; `fleet-ops` 1.5.0 не сливает флот на высадке;
+// `fleetBrood` 1.2.0 не растит выводок на высадке; `shuttle` 1.4.0 — подкрепление берегу без
+// боя продолжает штурм.
 // export const MODULE_MANIFEST_VERSION = '60'; // Ревью мины (#1411). Членство и порядок не
 // тронуты; мина — отряд без приказов: общий пропуск приказов флота (`util/fleet`) и
 // `standing-orders` 1.1.0, `fleet-repair` 1.1.0, `instant-repair` 1.2.0, `forced-march`
