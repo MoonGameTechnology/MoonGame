@@ -1206,6 +1206,12 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         };
         h.emit('battle.started', { battleId: 'battle:9', location: 'far', phase: 'orbital', attacker: 'p1', defender: 'p3' });
       });
+      // Бой, начатый и законченный одним пакетом (первый залп добил флот): в состоянии
+      // его нет ни до, ни после.
+      api.onAction('test.battle-flash', (_action, h) => {
+        h.emit('battle.started', { battleId: 'battle:8', location: 'far', phase: 'orbital', attacker: 'p1', defender: 'p3' });
+        h.emit('battle.resolved', { battleId: 'battle:8', location: 'far', winner: 'p3', winners: ['p3'] });
+      });
       api.onAction('test.battle-end', (_action, h) => {
         delete h.state.battles['battle:9'];
         h.emit('battle.resolved', { battleId: 'battle:9', location: 'far', winner: 'p3', winners: ['p3'] });
@@ -1315,6 +1321,17 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     r.submitAction('p1', { id: 'e5', type: 'test.battle-end', playerId: 'p1', issuedAt: 2, payload: {} }, p1);
     expect(lastEvents(p1)).toContain('battle.resolved');
     expect(lastEvents(p3)).toContain('battle.resolved');
+    expect(lastEvents(p2)).not.toContain('battle.resolved');
+  });
+
+  it('a battle started and ended in one batch still reports to its sides (Codex review on #1408)', () => {
+    const { r, p1, p2, p3 } = fogRoom();
+    r.submitAction('p1', { id: 'e6', type: 'test.battle-flash', playerId: 'p1', issuedAt: 1, payload: {} }, p1);
+    for (const peer of [p1, p3]) {
+      expect(lastEvents(peer)).toContain('battle.started');
+      expect(lastEvents(peer)).toContain('battle.resolved');
+    }
+    expect(lastEvents(p2)).not.toContain('battle.started');
     expect(lastEvents(p2)).not.toContain('battle.resolved');
   });
 });

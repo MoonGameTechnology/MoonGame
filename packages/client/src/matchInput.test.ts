@@ -36,3 +36,17 @@ describe('matchInput — myFleetAt', () => {
     expect(myFleetAt(STATE, 'b', 'green')).toBeNull(); // no fleet here
   });
 });
+
+describe('matchInput — площадка развилки не выбирается тапом (замечание Codex на #1410)', () => {
+  it('тап по площадке крепости, которую карта не рисует, ничего не выбирает', () => {
+    const withSite = {
+      ...STATE,
+      planets: {
+        ...STATE.planets,
+        site: { id: 'site', owner: 'green', position: { x: 50, y: 0 }, links: [], fork: { province: 'a', trail: 0 } },
+      },
+    } as unknown as GameState;
+    const at = worldToScreen({ x: 50, y: 0 }, CAM, VP, BOUNDS);
+    expect(nearestPlanet(withSite, at.x, at.y, CAM, VP, BOUNDS, 20)).toBeNull();
+  });
+});

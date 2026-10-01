@@ -352,7 +352,7 @@ import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
-import { fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
+import { abandonPromise, fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
@@ -1673,20 +1673,21 @@ function openAbandon(reason: AbandonReason, opener: HTMLElement | null = null): 
   const txt = ABANDON_TEXT[reason];
   const exit = reason === 'exit';
   $('abandon-title').textContent = t(txt.title);
-  // ×2 за ролик живёт на экране итогов (`run.double`); здесь о нём только говорят — и лишь
-  // там, где у площадки есть реклама: обещать удвоение без ролика значило бы соврать.
-  const double = exit && shopCapabilities(getPlatform().capabilities).ads;
-  $('abandon-text').textContent = double ? `${t(txt.text)} ${t('run.exit.double')}` : t(txt.text);
   // Сколько заберёт «Завершить» (решение владельца 2026-09-26) — та же формула, что засчёт
   // после сдачи. Стенд разработчика не платит (`awardSectorRun`), и обещать там нечего.
   const reward = $('abandon-reward');
   reward.hidden = sectorDevActive;
-  if (!sectorDevActive) {
-    const r = abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data);
-    reward.textContent = t('run.exit.reward', { n: r.research, w: r.warrants });
-  }
+  const r = sectorDevActive
+    ? { research: 0, warrants: 0 }
+    : abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data);
+  if (!sectorDevActive) reward.textContent = t('run.exit.reward', { n: r.research, w: r.warrants });
+  // ×2 за ролик живёт на экране итогов (`run.double`); здесь о нём только говорят — и лишь
+  // там, где его предложат: без рекламы или без награды обещать удвоение значило бы соврать.
+  const promise = abandonPromise(r, shopCapabilities(getPlatform().capabilities).ads);
+  $('abandon-text').textContent = exit && promise.double ? `${t(txt.text)} ${t('run.exit.double')}` : t(txt.text);
   $('abandon-stay').textContent = t(txt.stay);
-  $('abandon-go').textContent = t(txt.go);
+  // «Завершить и забрать награду» без награды — просто «Завершить экспедицию».
+  $('abandon-go').textContent = t(exit && !promise.collect ? 'run.abandon.go' : txt.go);
   $('abandon-menu').hidden = !exit;
   abandonCard.classList.toggle('exit', exit);
   abandonOpener = opener;
@@ -2924,6 +2925,18 @@ function battleKnown(b: Battle): boolean {
   return known(b.location) || !!vision?.engaged.battles.has(b.id);
 }
 
+/** Бои моего блока зрения, начало которых журнал уже показал: итог приходит, когда боя в
+ *  состоянии нет, и спросить «мой ли он» тогда уже не у кого. */
+const engagedBattleIds = new Set<string>();
+
+/** Дерётся ли в бое `battleId` мой блок зрения — то же правило, что `battleKnown`, для
+ *  событий: узел союзного боя может быть не опознан (замечание Codex на #1408). */
+function battleEngaged(battleId: unknown): boolean {
+  if (typeof battleId !== 'string') return false;
+  if (engagedBattleIds.has(battleId) || vision?.engaged.battles.has(battleId)) return true;
+  return Object.hasOwn(s.battles, battleId) && engagementOf(s, ME).battles.has(battleId);
+}
+
 // Per-viewer MEMORY of the last identified state of a node (variant B): once you
 // have seen a system, you remember its last-known state (greyed) when sight lifts.
 // Само хранилище и правила снимка — в `scanMemory.ts` (REFM-43): пишутся только
@@ -3896,7 +3909,7 @@ function handleEvents(events: DomainEvent[]) {
         if (
           seen(
             isMine([p.attacker as string, p.defender as string], ME),
-            known(p.location as string),
+            known(p.location as string) || battleEngaged(p.battleId),
           )
         )
           // Чем названы строки боя — `battleLog.ts` (REFM-179): фаза называется ВСЕГДА,
@@ -3912,6 +3925,7 @@ function handleEvents(events: DomainEvent[]) {
         // уйдёт под туман по ходу схватки (правило 3).
         if (isMine([p.attacker as string, p.defender as string], ME))
           myBattleLocs.add(p.location as string);
+        if (typeof p.battleId === 'string' && battleEngaged(p.battleId)) engagedBattleIds.add(p.battleId);
         break;
       case 'battle.resolved': {
         const loc = p.location as string;
@@ -3926,12 +3940,13 @@ function handleEvents(events: DomainEvent[]) {
               ? t(out.key, { who: NAME[p.winner as string] ?? (p.winner as string) })
               : t(out.key),
           }) + (tally ? t('log.battle.losses', { tally }) : '');
-        if (seenTail(myBattleLocs.has(loc), known(loc))) note(endText, loc);
+        if (seenTail(myBattleLocs.has(loc), known(loc) || battleEngaged(p.battleId))) note(endText, loc);
         // Окно на этом бою держит итог до закрытия (решение владельца 2026-09-25): бой у
         // планеты при осаде длится раунд-два, и окно пустело сразу после открытия.
         if (typeof p.battleId === 'string') battleWindow.ended(p.battleId, endText);
         battleLosses.delete(loc);
         myBattleLocs.delete(loc);
+        if (typeof p.battleId === 'string') engagedBattleIds.delete(p.battleId);
         break;
       }
       case 'technology.researched':
@@ -7922,12 +7937,15 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // Лимит ГАСИТ кнопку, но не прячет её, а снять точку можно всегда — иначе игрок,
   // исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую (правило 6).
   const points = s.players[ME]?.stewardHoldPoints ?? [];
+  // Крепость на развилке — не мир: точкой удержания её ядро не принимает (`steward` 1.1.0),
+  // но старую точку на ней снять можно.
   const hold = holdOffer(
     mine,
     stewardTechDone(s, ME),
     points.includes(p.id),
     points.length,
     MAX_STEWARD_HOLD_POINTS,
+    !isForkSite(p),
   );
   if (hold === 'clear') {
     out.push(
@@ -16677,7 +16695,7 @@ function frame(nowReal: number) {
     msgBadge.style.display = countShown(unreadMsgs) ? '' : 'none';
     msgBadge.textContent = String(unreadMsgs);
   }
-  const battles = myBattleCount(Object.values(s.battles), ME, known);
+  const battles = myBattleCount(Object.values(s.battles), ME, known, (b) => !!vision?.engaged.battles.has(b.id));
   const alertText = String(battles);
   if (alertText !== lastAlertText) {
     alertBadge.style.display = countShown(battles) ? 'grid' : 'none';

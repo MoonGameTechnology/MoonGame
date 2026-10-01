@@ -15,6 +15,7 @@ import {
   getStance,
   hashState,
   identifiedNodes,
+  inVisionBloc,
   resolveMatchConfig,
   Rejection,
   visibleView,
@@ -1773,6 +1774,10 @@ export class MatchRoom {
     const now = this.clock();
     const lobby = this.lobbyField();
     const startedAt = this.observe ? performance.now() : 0;
+    // Бои, которые начались и кончились в этом же пакете: в состоянии их нет ни кадром
+    // раньше, ни сейчас, и аудиторию им дают только их же события (замечание Codex на
+    // #1408 — первый залп скрытого перехвата добивал флот, и стороны не узнавали о бое).
+    const flash = flashBattles(events, this.stateValue);
     const deltaBytes: Record<PlayerId, number> = {};
     for (const [playerId, playerPeers] of this.peers) {
       // Broadcast is BEST-EFFORT and per-player isolated: computing one player's fogged
@@ -1787,6 +1792,7 @@ export class MatchRoom {
         // Бои, которые игрок видит сейчас или видел кадром раньше: `battle.resolved`
         // приходит, когда боя в состоянии уже нет.
         const battles = new Set([...Object.keys(baseline.battles), ...Object.keys(view.base.battles)]);
+        for (const [id, owners] of flash) if (inVisionBloc(this.stateValue, playerId, owners)) battles.add(id);
         const delta = diffState(baseline, view.base);
         const message: ServerMessage = {
           type: 'delta',
@@ -2099,4 +2105,25 @@ export class MatchRoom {
       peer.close?.();
     }
   }
+}
+
+/** Стороны боёв, которых в итоговом состоянии уже нет, — по событиям пакета: `battle.started`
+ *  называет атакующего и обороняющегося, `battle.joined` — каждого вступившего. */
+function flashBattles(events: readonly DomainEvent[], state: GameState): Map<string, Array<PlayerId | null>> {
+  const out = new Map<string, Array<PlayerId | null>>();
+  for (const e of events) {
+    const p = (e.payload ?? {}) as Record<string, unknown>;
+    const id = p.battleId;
+    if (typeof id !== 'string' || Object.hasOwn(state.battles, id)) continue;
+    const owners = out.get(id) ?? [];
+    if (e.type === 'battle.started') owners.push(ownerOf(p.attacker), ownerOf(p.defender));
+    else if (e.type === 'battle.joined') owners.push(ownerOf(p.owner));
+    else continue;
+    out.set(id, owners);
+  }
+  return out;
+}
+
+function ownerOf(v: unknown): PlayerId | null {
+  return typeof v === 'string' ? v : null;
 }

@@ -335,6 +335,31 @@ describe('BLD-1 — отмена, потолок, захват, туман', () 
     expect(c.state.players.p1?.resources.metal).toBe(180); // 150 + 50 возврат − 20 форт
   });
 
+  it('отмена посреди боя не теряет очередь: голова ждёт повтора и стартует после боя', () => {
+    // Замечание Codex на #1416: под подавлением `startNextQueued` просто выходил, и голова
+    // очереди, оставшаяся без события завершения, не стартовала уже никогда.
+    const kernel = createKernel([constructionModule]);
+    const st = stateWith({
+      players: [player('p1', { metal: 200, credits: 50 })],
+      planets: [planet('A', 'p1')],
+    });
+    const a = okApply(kernel.applyAction(st, construct('mine'), ctx(0)));
+    const b = okApply(kernel.applyAction(a.state, construct('fort'), ctx(0)));
+    const fighting: GameState = {
+      ...b.state,
+      battles: {
+        b1: { id: 'b1', location: 'A', phase: 'orbital', sides: [], round: 0 },
+      },
+    };
+    const c = okApply(kernel.applyAction(fighting, cancel(activeSeq(fighting)), ctx(0)));
+    expect(c.state.planets.A?.buildQueue).toHaveLength(1);
+    expect(c.state.scheduled.some((e) => e.type === 'construction.queue.pump')).toBe(true);
+
+    const calm: GameState = { ...c.state, battles: {} };
+    const d = okAdvance(kernel.advanceTo(calm, ctx(24 * HOUR)));
+    expect(d.state.planets.A?.buildings.some((x) => x.type === 'fort')).toBe(true);
+  });
+
   it('очередь полосы ограничена — сверх потолка отказ, а не рост состояния', () => {
     // Проверяется на полосе ВЕРФИ: потолок один на обе (`enqueueOrder` не знает, чья
     // полоса), а одинаковые корабли заказывать можно — в отличие от зданий, где

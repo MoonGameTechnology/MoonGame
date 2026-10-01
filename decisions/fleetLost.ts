@@ -21,3 +21,22 @@ export function shipCount(state: GameState, me: string): number {
 export function fleetLostPrompt(prev: number | null, now: number): boolean {
   return prev !== null && prev > 0 && now === 0;
 }
+
+/**
+ * Что карточка «Завершить» обещает при сдаче (решение владельца 2026-09-26: выход показывает,
+ * сколько награды заберёшь сейчас). Сдача до первой волны не платит ничего (баг-репорт
+ * владельца 2026-09-28), и прежняя карточка тогда противоречила себе: «+0 данных, +0 ⌖»
+ * рядом с «Завершить и забрать награду» и «удвоить за ролик».
+ * - `double` — упомянуть ×2 за ролик: реклама есть, и итоги его предложат (`doubleReward`
+ *   удваивает только забег с данными);
+ * - `collect` — кнопке есть что забирать; нет — она просто завершает экспедицию.
+ */
+export function abandonPromise(
+  reward: { research: number; warrants: number },
+  ads: boolean,
+): { double: boolean; collect: boolean } {
+  return {
+    double: ads && reward.research > 0,
+    collect: reward.research > 0 || reward.warrants > 0,
+  };
+}

@@ -3007,7 +3007,7 @@ export const en: Record<string, string> = {
   'sector-zero.prep.back': 'Main menu',
   'sector-zero.prep.double': 'Double for an ad: +{n} data · +{m} ⌖',
   'sector-zero.prep.doubled': 'Reward doubled: +{n} data · +{m} ⌖.',
-  'sector-zero.prep.earn': 'Completed runs award data for both victory and defeat.',
+  'sector-zero.prep.earn': 'Data comes from waves, objectives and victory — defeats pay too.',
   'sector-zero.prep.equip': 'Equip',
   'sector-zero.prep.equipped': 'Equipped · remove',
   'sector-zero.prep.full': 'No free slot',
@@ -3071,7 +3071,7 @@ export const en: Record<string, string> = {
   'sector-zero.shop.sovereigns': 'Sovereigns: {n} ◆',
   'sector-zero.summary': 'Waves: {wave} / {total} · {difficulty}',
   'sector-zero.title': 'SECTOR ZERO',
-  'sector-zero.wallet.data': 'Expedition data ◇ unlocks modules, heroes and skills. Every finished expedition pays it — win or lose.',
+  'sector-zero.wallet.data': 'Expedition data ◇ unlocks modules, heroes and skills. Waves, objectives and victory pay it — defeats too.',
   'sector-zero.wallet.sovereigns': 'Sovereigns ◆: instant repair ({hp} hull per 1 ◆), a supply pack ({supply} ◆) and shop items. An ad gives +{ad} ◆, up to {day} times a day.',
   'sector-zero.wallet.warrants': 'Warrants ⌖ buy module stars in the Workshop and shop items; a failed forge attempt burns them. An expedition pays {n} ⌖ per reward point.',
 
