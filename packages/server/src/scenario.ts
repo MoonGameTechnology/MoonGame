@@ -231,7 +231,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '64'; // BAL-10: налог на рост державы. В ЧЛЕНСТВО
+export const MODULE_MANIFEST_VERSION = '65'; // Ревью #1417. Членство и порядок не тронуты;
+// `fleet-ops` 1.8.0: «разминулись» решает прибытие — конец боя или высадки не снимает
+// намерение слияния с догоняющего, который ещё в пути.
+// export const MODULE_MANIFEST_VERSION = '64'; // BAL-10: налог на рост державы. В ЧЛЕНСТВО
 // вошёл `sprawl` 1.0.0 сразу за `faction`: у места больше 35 провинций выход всех миров
 // умножается на 1/(1 + 0,1 × лишние). Партия на 63 молча сменила бы доход посреди игры.
 // export const MODULE_MANIFEST_VERSION = '63'; // Ревью #1416. Членство и порядок не тронуты;
