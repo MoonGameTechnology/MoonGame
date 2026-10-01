@@ -20,7 +20,7 @@ import type { GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc } from './format';
-import type { RunSummary } from '../../decisions/sectorZeroProgress';
+import { RUN_WIN_BONUS, type RunSummary } from '../../decisions/sectorZeroProgress';
 import { adRefusalKey, type AdOutcome, type AdPlacement } from '../../decisions/adPlacements';
 
 /** Что игрок выбрал на панели: сыграть ещё или уйти в меню. */
@@ -166,10 +166,10 @@ export function endScreenHtml(
 export function runSummaryHtml(r: RunSummary): string {
   const row = (cls: string, label: string, value: string): string =>
     `<li class="${cls}"><span>${label}</span><b>${value}</b></li>`;
-  const runPart = r.base - (r.won ? 3 : 0);
+  const runPart = r.base - (r.won ? RUN_WIN_BONUS : 0);
   const rows = [
     row('run', t('sector-zero.end.waves', { n: r.waves, m: r.totalWaves }), `+${runPart}`),
-    ...(r.won ? [row('run', t('sector-zero.end.victory'), '+3')] : []),
+    ...(r.won ? [row('run', t('sector-zero.end.victory'), `+${RUN_WIN_BONUS}`)] : []),
     ...r.objectives.map((o) =>
       row(
         o.complete ? 'task done' : 'task',
@@ -181,7 +181,9 @@ export function runSummaryHtml(r: RunSummary): string {
     // победы: «+0» за пустое место игроку ничего не сообщает.
     ...(r.veterans ? [row('run', t('sector-zero.end.veterans'), `+${r.veterans}`)] : []),
     // Уничтоженные враги платят Варрантами и при поражении (решение владельца 2026-09-25).
-    ...(r.kills ? [row('run kills', t('sector-zero.end.kills', { n: r.kills }), `+${r.killWarrants ?? 0} ⌖`)] : []),
+    // До первой волны бой не платит (PVR-6.38) — строки нет, а число уничтоженных и так
+    // стоит в сетке итогов (✹).
+    ...(r.killWarrants ? [row('run kills', t('sector-zero.end.kills', { n: r.kills ?? 0 }), `+${r.killWarrants} ⌖`)] : []),
     // PVR-4.7: убитый босс — своей строкой, его именем (ключ по архетипу: у имени свой падеж).
     ...(r.boss ? [row('run', t(`boss.${r.boss.hero}.slain`), `+${r.boss.reward}`)] : []),
   ].join('');

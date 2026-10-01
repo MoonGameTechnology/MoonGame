@@ -150,7 +150,7 @@ describe('засчёт забега', () => {
       chapter('a', [easy('m1'), hard('m2'), hard('m3'), easy('m4'), easy('m5')]),
     );
     const r = p.lastRun!;
-    expect(r.base).toBe(1 + ended().pve!.waveNumber);
+    expect(r.base).toBe(ended().pve!.waveNumber); // поражение: только пришедшие волны
     expect(r.bonus).toBe(3);
     expect(r.total).toBe(r.base + r.bonus);
     expect(p.lastReward).toBe(r.total);

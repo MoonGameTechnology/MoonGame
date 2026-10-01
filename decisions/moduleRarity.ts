@@ -96,12 +96,14 @@ export function moduleLadder(ladder: RarityLadder, rarity: Rarity): ForgeLadder 
 /**
  * Добыча итогов забега. Числа — **v0** для плейтеста.
  *
- * 4. **Дубли — за сам забег и за задачи.** 1 дубль за любой засчитанный забег, ещё 1 за
- *    победу и по 1 за каждую задачу главы, закрытую ВПЕРВЫЕ. Какой модуль продублирован —
- *    бросок из открытых игроком: дубль того, чего у игрока нет, поднимать было бы нечем.
- * 5. **Чертёж — редкий.** Шанс 25% за победу и 8% за поражение; ступень чаще уникальная,
- *    реже мифическая, совсем редко легендарная. Первая победа в главе даёт чертёж
- *    ГАРАНТИРОВАННО — ступень растёт к эпицентру.
+ * 4. **Дубли — за сам забег и за задачи.** 1 дубль за забег, ещё 1 за победу и по 1 за
+ *    каждую задачу главы, закрытую ВПЕРВЫЕ. Дубль «за сам забег» наверняка — у победы и у
+ *    забега, дожившего до последней волны; сданный раньше даёт его с шансом по доле
+ *    пришедших волн ({@link lootShare}). Какой модуль продублирован — бросок из открытых
+ *    игроком: дубль того, чего у игрока нет, поднимать было бы нечем.
+ * 5. **Чертёж — редкий.** Шанс 25% за победу и 8% за поражение (умноженные на долю
+ *    пройденных волн); ступень чаще уникальная, реже мифическая, совсем редко легендарная.
+ *    Первая победа в главе даёт чертёж ГАРАНТИРОВАННО — ступень растёт к эпицентру.
  * 6. **Бросок детерминирован**: ключ — сид профиля и номер попытки, тот же хеш, что у
  *    заточки. Перезагрузка страницы итог не перекатывает.
  */
@@ -119,6 +121,17 @@ export interface RunLoot {
   copies: Record<string, number>;
   blueprints: Record<string, number>;
   heroTokens?: Record<string, number>;
+}
+
+/**
+ * Доля пройденного забега для добычи «за сам забег» — дубля, жетона героя и шанса чертежа
+ * при поражении (баг-репорт владельца 2026-09-28: сдача сразу после первой волны по кругу
+ * приносила в разы больше дублей и жетонов, чем честная игра). Не передана — весь забег;
+ * мусор — ноль: битый счёт не платит.
+ */
+export function lootShare(share: number | undefined): number {
+  if (share === undefined) return 1;
+  return Number.isFinite(share) ? Math.min(1, Math.max(0, share)) : 0;
 }
 
 /** Гарантированный чертёж за первую победу в главе `index`: к эпицентру — ступень выше. */
@@ -143,6 +156,8 @@ export function runLoot(input: {
   attempt: number;
   modules: readonly string[];
   won: boolean;
+  /** Доля пройденного забега ({@link lootShare}): 1 — дубль «за забег» наверняка. */
+  share?: number;
   newTasks: number;
   firstWinBlueprint: Rarity | null;
   /** Отпечаток итогового мира (`hashState`): один и тот же у живого мира и у его снимка. */
@@ -150,8 +165,9 @@ export function runLoot(input: {
 }): RunLoot {
   const key = `${input.seed}\u0000${input.attempt}\u0000${input.outcome}\u0000`;
   const copies: Record<string, number> = {};
+  const share = lootShare(input.share);
   const count =
-    RUN_COPIES.run +
+    (hashUnit(`${key}run`) < share ? RUN_COPIES.run : 0) +
     (input.won ? RUN_COPIES.win : 0) +
     Math.max(0, input.newTasks) * RUN_COPIES.perTask;
   if (input.modules.length > 0)
@@ -165,7 +181,10 @@ export function runLoot(input: {
     blueprints[r] = (blueprints[r] ?? 0) + 1;
   };
   if (input.firstWinBlueprint) add(input.firstWinBlueprint);
-  if (hashUnit(`${key}blueprint`) < (input.won ? BLUEPRINT_CHANCE.won : BLUEPRINT_CHANCE.lost)) {
+  if (
+    hashUnit(`${key}blueprint`) <
+    (input.won ? BLUEPRINT_CHANCE.won : BLUEPRINT_CHANCE.lost) * share
+  ) {
     let roll = hashUnit(`${key}tier`);
     const tier = BLUEPRINT_TIERS.find(([, w]) => (roll -= w) < 0)?.[0] ?? 'unique';
     add(tier);

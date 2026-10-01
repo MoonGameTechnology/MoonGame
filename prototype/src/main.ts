@@ -352,7 +352,7 @@ import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
-import { fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
+import { abandonPromise, fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
 import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
@@ -1654,20 +1654,21 @@ function openAbandon(reason: AbandonReason, opener: HTMLElement | null = null): 
   const txt = ABANDON_TEXT[reason];
   const exit = reason === 'exit';
   $('abandon-title').textContent = t(txt.title);
-  // ×2 за ролик живёт на экране итогов (`run.double`); здесь о нём только говорят — и лишь
-  // там, где у площадки есть реклама: обещать удвоение без ролика значило бы соврать.
-  const double = exit && shopCapabilities(getPlatform().capabilities).ads;
-  $('abandon-text').textContent = double ? `${t(txt.text)} ${t('run.exit.double')}` : t(txt.text);
   // Сколько заберёт «Завершить» (решение владельца 2026-09-26) — та же формула, что засчёт
   // после сдачи. Стенд разработчика не платит (`awardSectorRun`), и обещать там нечего.
   const reward = $('abandon-reward');
   reward.hidden = sectorDevActive;
-  if (!sectorDevActive) {
-    const r = abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data);
-    reward.textContent = t('run.exit.reward', { n: r.research, w: r.warrants });
-  }
+  const r = sectorDevActive
+    ? { research: 0, warrants: 0 }
+    : abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data);
+  if (!sectorDevActive) reward.textContent = t('run.exit.reward', { n: r.research, w: r.warrants });
+  // ×2 за ролик живёт на экране итогов (`run.double`); здесь о нём только говорят — и лишь
+  // там, где его предложат: без рекламы или без награды обещать удвоение значило бы соврать.
+  const promise = abandonPromise(r, shopCapabilities(getPlatform().capabilities).ads);
+  $('abandon-text').textContent = exit && promise.double ? `${t(txt.text)} ${t('run.exit.double')}` : t(txt.text);
   $('abandon-stay').textContent = t(txt.stay);
-  $('abandon-go').textContent = t(txt.go);
+  // «Завершить и забрать награду» без награды — просто «Завершить экспедицию».
+  $('abandon-go').textContent = t(exit && !promise.collect ? 'run.abandon.go' : txt.go);
   $('abandon-menu').hidden = !exit;
   abandonCard.classList.toggle('exit', exit);
   abandonOpener = opener;
