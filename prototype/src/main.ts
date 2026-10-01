@@ -7754,13 +7754,15 @@ function worldActionsHtml(p: Planet, mine: boolean): string {
   // Лимит ГАСИТ кнопку, но не прячет её, а снять точку можно всегда — иначе игрок,
   // исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую (правило 6).
   const points = s.players[ME]?.stewardHoldPoints ?? [];
-  // Крепость на развилке — не мир: точкой удержания её ядро не принимает (`steward` 1.1.0).
+  // Крепость на развилке — не мир: точкой удержания её ядро не принимает (`steward` 1.1.0),
+  // но старую точку на ней снять можно.
   const hold = holdOffer(
-    mine && !isForkSite(p),
+    mine,
     stewardTechDone(s, ME),
     points.includes(p.id),
     points.length,
     MAX_STEWARD_HOLD_POINTS,
+    !isForkSite(p),
   );
   if (hold === 'clear') {
     out.push(

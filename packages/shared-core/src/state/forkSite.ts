@@ -69,6 +69,11 @@ export function forkSiteEdge(state: GameState, anchor: ForkAnchor): FleetEdge | 
  * поэтому бой с ними носит место провинции-якоря, и проверка «бой на узле» площадку не
  * видела — стройка и улучшения крепости шли посреди атаки (замечание Codex на #1410). Бой
  * у площадки — бой, в котором стоит флот в точке её орудий.
+ *
+ * Точку сравниваем в ЛЮБУЮ сторону дороги: встреча на полосе (`fleet.intercept`)
+ * перепривязывает обоих к каноническому ребру `lo → hi` с зеркальным `t`, и если выход
+ * развилки меньше провинции, орудия в бою стоят на `exit → province` с `1 - t` (замечание
+ * Codex на #1416).
  */
 export function forkSiteInBattle(state: GameState, site: Pick<Planet, 'fork'> | undefined): boolean {
   if (!site?.fork) return false;
@@ -78,7 +83,9 @@ export function forkSiteInBattle(state: GameState, site: Pick<Planet, 'fork'> | 
     for (const side of b.sides) {
       if (side.ref.kind !== 'fleet') continue;
       const e = state.fleets[side.ref.fleetId]?.edge;
-      if (e && e.from === at.from && e.to === at.to && Math.abs(e.t - at.t) < 1e-9) return true;
+      if (!e) continue;
+      if (e.from === at.from && e.to === at.to && Math.abs(e.t - at.t) < 1e-9) return true;
+      if (e.from === at.to && e.to === at.from && Math.abs(1 - e.t - at.t) < 1e-9) return true;
     }
   }
   return false;
