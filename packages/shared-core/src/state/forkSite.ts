@@ -63,3 +63,23 @@ export function forkSiteEdge(state: GameState, anchor: ForkAnchor): FleetEdge | 
   }
   return null;
 }
+
+/**
+ * Идёт ли бой У ПЛОЩАДКИ: орудия стоят на дороге (`forkSiteEdge`), а не на узле площадки,
+ * поэтому бой с ними носит место провинции-якоря, и проверка «бой на узле» площадку не
+ * видела — стройка и улучшения крепости шли посреди атаки (замечание Codex на #1410). Бой
+ * у площадки — бой, в котором стоит флот в точке её орудий.
+ */
+export function forkSiteInBattle(state: GameState, site: Pick<Planet, 'fork'> | undefined): boolean {
+  if (!site?.fork) return false;
+  const at = forkSiteEdge(state, site.fork);
+  if (!at) return false;
+  for (const b of Object.values(state.battles)) {
+    for (const side of b.sides) {
+      if (side.ref.kind !== 'fleet') continue;
+      const e = state.fleets[side.ref.fleetId]?.edge;
+      if (e && e.from === at.from && e.to === at.to && Math.abs(e.t - at.t) < 1e-9) return true;
+    }
+  }
+  return false;
+}

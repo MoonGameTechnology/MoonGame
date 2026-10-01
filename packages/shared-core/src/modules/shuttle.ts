@@ -47,6 +47,7 @@ import { fleetPositionAt } from '../state/fleetPosition';
 import { isMineFleet, mineFleetVisible } from '../state/minefields';
 import { hasMapShare } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
+import { isForkSite } from '../state/forkSite';
 import {
   canSortie,
   fleetHoldFree,
@@ -555,7 +556,9 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
   const own = beachheadOf(h.state, planet.id, owner);
   const others = (planet.beachheads ?? []).some((b) => b.owner !== owner);
 
-  if (cargo.length === 0) {
+  if (cargo.length === 0 || isForkSite(planet)) {
+    // Площадка развилки десанта не принимает (приказ отбит ещё на вылете) — подстраховка.
+    landed = [];
     mode = 'lost';
   } else if (friendly) {
     landStacks(planet.garrison, cargo, share, h.ctx.data);
@@ -836,7 +839,8 @@ export const shuttleModule: GameModule = {
   id: 'shuttle',
   // 1.3.0: невидимая чужая мина — не цель вылета (`E_NO_TARGET`, ревью #1411).
   // 1.4.0: подкрепление берегу без боя продолжает штурм (замечание Codex на #1409).
-  version: '1.4.0',
+  // 1.5.0: десант на площадку крепости на развилке не садится (замечание Codex на #1410).
+  version: '1.5.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -908,6 +912,9 @@ export const shuttleModule: GameModule = {
       // не относится. Признак — ГРУЗ В ТРЮМЕ (SHU-4.2 грузит его заранее, до приказа).
       const cargo = (squad.cargo ?? []).filter((st) => st.count > 0);
       if (targetOwner === action.playerId && cargo.length === 0) return h.reject('E_NOT_HOSTILE');
+      // На площадку крепости на развилке десант не садится: это не мир, уйти оттуда нельзя, а
+      // при гибели крепости войска остались бы у ничейного узла (замечание Codex на #1410).
+      if (targetPlanet && isForkSite(targetPlanet) && cargo.length > 0) return h.reject('E_NOT_CAPTURABLE');
 
       const from = base.position;
       if (!from) return h.reject('E_NO_PORT'); // носитель без позиции (в перелёте) — не база

@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest';
 import {
   captureOnArrivalModule,
   combatModule,
+  conditionMet,
   constructionModule,
   createInitialState,
   createKernel,
@@ -29,7 +30,9 @@ import {
   interceptModule,
   movementModule,
   setStance,
+  shuttleModule,
   stationModule,
+  stewardModule,
   STATION_COST,
   victoryModule,
   visibleState,
@@ -240,5 +243,93 @@ describe('крепость на развилке — новая точка по�
     expect(visibleState(st, 'p3', data).planets[SITE]).toBeUndefined();
     // Провинции карты при этом видны всем — это и есть карта.
     expect(visibleState(st, 'p3', data).planets.A).toBeDefined();
+  });
+});
+
+describe('крепость на развилке — доводка по ревью (замечания Codex на #1410)', () => {
+  it('площадка не сектор: условие технологии «своих секторов» её не считает', () => {
+    const st = built();
+    // У p1 провинция B и площадка развилки — сектор один.
+    expect(conditionMet({ type: 'own_sectors', min: 2 }, st, 'p1', data)).toBe(false);
+    expect(conditionMet({ type: 'own_sectors', min: 1 }, st, 'p1', data)).toBe(true);
+  });
+
+  it('бой с орудиями развилки ставит стройку площадки на паузу, как бой на узле', () => {
+    const kernel = createKernel([stationModule, constructionModule]);
+    const st = built(kernel);
+    const raider = cruisers('R', 'p2', 'A', 1);
+    const fighting: GameState = {
+      ...st,
+      fleets: { ...st.fleets, R: raider },
+      battles: {
+        b1: {
+          id: 'b1',
+          location: 'B', // бой с орудиями на дороге носит место провинции-якоря
+          phase: 'orbital',
+          sides: [
+            { ref: { kind: 'fleet', fleetId: GUNS }, owner: 'p1', role: 'defender' },
+            { ref: { kind: 'fleet', fleetId: 'R' }, owner: 'p2', role: 'attacker' },
+          ],
+          round: 0,
+        },
+      },
+    };
+    const r = kernel.applyAction(
+      fighting,
+      { id: 's:p1:radar', type: 'building.construct', playerId: 'p1', payload: { planetId: SITE, building: 'radar' }, issuedAt: 0 },
+      ctx(),
+    );
+    expect(r.ok ? 'ok' : r.code).toBe('E_BATTLE_HERE');
+  });
+
+  it('площадку нельзя назначить точкой удержания, а гибель крепости снимает старую точку', () => {
+    const kernel = createKernel([stationModule, constructionModule, movementModule, combatModule, interceptModule, stewardModule]);
+    const st = built(kernel);
+    st.players.p1!.technologies = { completed: ['ai_stewardship'] } as never;
+    const hold = kernel.applyAction(
+      st,
+      { id: 's:p1:hold', type: 'steward.holdpoint', playerId: 'p1', payload: { planetId: SITE, on: true }, issuedAt: 0 },
+      ctx(),
+    );
+    expect(hold.ok ? 'ok' : hold.code).toBe('E_FORBIDDEN');
+    // Точка, записанная до правила, уходит вместе с крепостью.
+    const withPoint: GameState = {
+      ...st,
+      players: { ...st.players, p1: { ...st.players.p1!, stewardHoldPoints: [SITE] } },
+      fleets: { ...st.fleets, R: cruisers('R', 'p2', 'A', 8) },
+    };
+    const moved = kernel.applyAction(
+      withPoint,
+      { id: 's:p2:1', type: 'fleet.move', playerId: 'p2', payload: { fleetId: 'R', to: 'C' }, issuedAt: 0 },
+      ctx(),
+    );
+    if (!moved.ok) throw new Error(`отказ ${moved.code}`);
+    const after = kernel.advanceTo(moved.state, ctx(40 * HOUR));
+    if (!after.ok) throw new Error('advance отказ');
+    expect(after.events.some((e) => e.type === 'station.destroyed')).toBe(true);
+    expect(after.state.players.p1?.stewardHoldPoints).toBeUndefined();
+  });
+
+  it('десант на площадку развилки не летит: своя крепость — не мир', () => {
+    const kernel = createKernel([stationModule, shuttleModule]);
+    const st = built(kernel);
+    const home = st.planets.B!;
+    const staged: GameState = {
+      ...st,
+      planets: {
+        ...st.planets,
+        B: {
+          ...home,
+          buildings: [{ type: 'spaceport', level: 1, hp: data.buildings.spaceport!.hp }],
+          hangar: [{ id: 'sq', units: [{ unit: 'landing_shuttle', count: 1 }], cargo: [{ unit: 'militia', count: 1 }] }],
+        },
+      },
+    };
+    const r = kernel.applyAction(
+      staged,
+      { id: 's:p1:drop', type: 'shuttle.strike', playerId: 'p1', payload: { planetId: 'B', squadronId: 'sq', targetPlanetId: SITE }, issuedAt: 0 },
+      ctx(),
+    );
+    expect(r.ok ? 'ok' : r.code).toBe('E_NOT_CAPTURABLE');
   });
 });

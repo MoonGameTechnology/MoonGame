@@ -2,6 +2,7 @@ import {
   beaconCallouts,
   beaconSentinels,
   isCapturable,
+  isForkSite,
   swarmAdaptDue,
   swarmNetPlan,
   musterPlan,
@@ -103,8 +104,11 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   if (state.match.status === 'ended') return [];
 
   const planets = Object.values(state.planets).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  // Площадка крепости на развилке — не провинция: связей у неё нет, и `fleet.move` к ней
+  // отбивается `E_NO_ROUTE`. Целью волны она стать не может (замечание Codex на #1410: волны
+  // стояли на месте, раз за разом целясь в уцелевшую крепость игрока).
   const humanHeld = (p: Planet): boolean =>
-    p.owner !== null && p.owner !== npc && state.players[p.owner]?.status === 'active';
+    !isForkSite(p) && p.owner !== null && p.owner !== npc && state.players[p.owner]?.status === 'active';
   const neutral = (p: Planet): boolean => p.owner === null && isCapturable(data, p);
 
   const out: Action[] = [];

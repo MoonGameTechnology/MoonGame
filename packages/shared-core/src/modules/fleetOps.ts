@@ -43,7 +43,8 @@ export const fleetOpsModule: GameModule = {
   // 1.3.0: неподвижный отряд не сливается и не делится (находка Codex на #1393).
   // 1.4.0: атака мины — подрыв по атакующему, мина сама не атакует (SM-3.6).
   // 1.5.0: флот на высадке штурмом не сливается (замечание Codex на #1409).
-  version: '1.5.0',
+  // 1.6.0: слияние, приостановленное высадкой, созревает по её концу (замечание Codex на #1415).
+  version: '1.6.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -234,7 +235,7 @@ export const fleetOpsModule: GameModule = {
      * отдавал. Живой бой намерение НЕ снимает: `fusable` его просто не пропустит, а
      * после боя уцелевшие, скорее всего, всё ещё рядом.
      */
-    api.on('fleet.arrived', (event, h) => {
+    const settleMerges = (event: { payload: unknown }, h: HandlerContext): void => {
       const p = event.payload as { fleetId?: string };
       if (typeof p?.fleetId !== 'string') return;
       const arrived = h.state.fleets[p.fleetId];
@@ -273,7 +274,14 @@ export const fleetOpsModule: GameModule = {
         delete from.mergeInto;
         fuse(h, fromId, intoId, from.owner);
       }
-    });
+    };
+    api.on('fleet.arrived', settleMerges);
+    // Высадка кончилась (сошла, снялась по сроку или сорвана) — намерение, которое она
+    // приостановила, созревает сейчас: нового прибытия у стоящих рядом флотов не будет
+    // (замечание Codex на #1415). `combat` идёт в манифесте раньше, поэтому к этому
+    // обработчику высадка по сроку уже снята.
+    api.on('assault.landed', settleMerges);
+    api.on('assault.interrupted', settleMerges);
 
     // Peel a chosen set of ships off a fleet that is not in battle into a fresh fleet
     // at the same place: the same sector (same orbit), the same point of a lane, or the

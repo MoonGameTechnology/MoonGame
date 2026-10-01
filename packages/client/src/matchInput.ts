@@ -7,7 +7,7 @@
  * sends INTENT only (docs/architecture.md §5) — the server validates/authorizes/applies
  * and broadcasts the new state.
  */
-import type { GameState, PlayerId, PlanetId } from '@void/shared-core';
+import { isForkSite, type GameState, type PlayerId, type PlanetId } from '@void/shared-core';
 import { worldToScreen, type Cam, type Viewport, type Bounds } from './camera';
 
 /** The planet nearest to a screen point within `maxPx`, or null — the tap hit-test. */
@@ -23,6 +23,10 @@ export function nearestPlanet(
   let best: PlanetId | null = null;
   let bestD2 = maxPx * maxPx;
   for (const p of Object.values(state.planets)) {
+    // Площадку крепости на развилке карта не рисует (`mapRender`), значит, и тап её не
+    // выбирает: иначе тап по ромбу развилки отдавал невидимый узел, а приказ к нему —
+    // `E_NO_ROUTE` (замечание Codex на #1410).
+    if (isForkSite(p)) continue;
     const c = worldToScreen(p.position, cam, vp, bounds);
     const dx = c.x - sx;
     const dy = c.y - sy;

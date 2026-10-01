@@ -286,3 +286,14 @@ describe('pveOrchestrator — адаптация Роя (AUD-20)', () => {
     expect(adaptOrders(adaptWorld(3))).toEqual([]);
   });
 });
+
+describe('pveOrchestrator — площадка крепости на развилке не цель (замечание Codex на #1410)', () => {
+  it('ближайшая крепость игрока на развилке не уводит волну — цель ближайший мир', () => {
+    // Площадка без связей ближе любого мира: прежде волна целилась в неё и получала E_NO_ROUTE.
+    const site: Planet = { ...planet('fork-near-0', 'human', 20), links: [], fork: { province: 'near', trail: 0 } };
+    const s = world();
+    s.planets[site.id] = site;
+    const moves = orders(s).filter((a) => a.type === 'fleet.move');
+    expect(moves.map((a) => (a.payload as { to: string }).to)).toEqual(['near']);
+  });
+});
