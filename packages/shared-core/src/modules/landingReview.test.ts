@@ -154,6 +154,16 @@ describe('флот на высадке не сливается (замечани
     expect(r.state.fleets.B?.mergeInto).toBe('A');
     expect(r.state.fleets.A?.landing).toEqual(stacks([['marine', 2]]));
   });
+
+  it('высадка кончилась — приостановленное слияние созревает само (замечание Codex на #1415)', () => {
+    const s = structuredClone(started());
+    s.fleets.B!.mergeInto = 'A';
+    const waited = okApply(kernel.applyAction(s, act('arrive', { fleetId: 'B' }), ctx(0))).state;
+    expect(waited.fleets.B?.mergeInto).toBe('A');
+    const r = okAdvance(kernel.advanceTo(waited, ctx(LANDED)));
+    expect(r.state.fleets.B).toBeUndefined();
+    expect(r.events.some((e) => e.type === 'fleet.merged')).toBe(true);
+  });
 });
 
 /**
