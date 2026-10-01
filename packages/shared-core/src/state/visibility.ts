@@ -8,6 +8,7 @@ import { emptyOrdnance, inRadius, mineVisibleTo, missilePositionAt } from './ord
 import { visibleMinefields, isMineFleet, mineFleetVisible, MINE_DETECTION_RANGE } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 export type { SignatureContact, SignatureSize } from './radarSignals';
+import type { DomainEvent } from '../action/types';
 import type {
   Battle,
   BattleId,
@@ -560,6 +561,29 @@ export function inVisionBloc(state: GameState, viewerId: PlayerId, owners: Itera
   return false;
 }
 
+/** Стороны боёв, которых в итоговом состоянии уже нет, — по событиям пакета: `battle.started`
+ *  называет атакующего и обороняющегося, `battle.joined` — каждого вступившего. Аудиторию
+ *  такого боя (`inVisionBloc` по этим сторонам) одинаково считают сервер, раздавая события,
+ *  и местная симуляция клиента, повторяя тот же фильтр (замечание Codex на #1417). */
+export function flashBattles(events: readonly DomainEvent[], state: GameState): Map<string, Array<PlayerId | null>> {
+  const out = new Map<string, Array<PlayerId | null>>();
+  for (const e of events) {
+    const p = (e.payload ?? {}) as Record<string, unknown>;
+    const id = p.battleId;
+    if (typeof id !== 'string' || Object.hasOwn(state.battles, id)) continue;
+    const owners = out.get(id) ?? [];
+    if (e.type === 'battle.started') owners.push(sideOwner(p.attacker), sideOwner(p.defender));
+    else if (e.type === 'battle.joined') owners.push(sideOwner(p.owner));
+    else continue;
+    out.set(id, owners);
+  }
+  return out;
+}
+
+function sideOwner(v: unknown): PlayerId | null {
+  return typeof v === 'string' ? v : null;
+}
+
 /** Бои, в которых дерётся зритель или его блок зрения, и флоты этих боёв. */
 export interface Engagement {
   battles: Set<BattleId>;
@@ -871,10 +895,16 @@ function project(
   // проекция и так оставляет (`engagementOf`), а обе его стороны живут в самом мире —
   // гарнизон и плацдармы. Без них неопознанный мир отдавал бы бой с пустыми сторонами или
   // протухший снимок памяти (замечание Codex на #1408).
+  // Мир → владельцы плацдармов, стоящих СТОРОНАМИ этих боёв: берег, оставшийся на земле без
+  // боя (после перемирия или ничьей), в бою не участвует и остаётся в тумане (замечание Codex
+  // на #1417).
   const engagedBattles = engagementOf(state, viewerId).battles;
-  const groundFights = new Set<PlanetId>();
+  const groundFights = new Map<PlanetId, Set<PlayerId>>();
   for (const b of Object.values(state.battles)) {
-    if (b.phase === 'ground' && engagedBattles.has(b.id)) groundFights.add(b.location);
+    if (b.phase !== 'ground' || !engagedBattles.has(b.id)) continue;
+    const shores = groundFights.get(b.location) ?? new Set<PlayerId>();
+    for (const side of b.sides) if (side.ref.kind === 'beachhead') shores.add(side.ref.owner);
+    groundFights.set(b.location, shores);
   }
   for (const planet of Object.values(view.planets)) {
     // BLD-1. Очередь стройки — БУДУЩЕЕ НАМЕРЕНИЕ, ровно то, за что ниже режут
@@ -952,14 +982,17 @@ function project(
       delete planet.planetType;
       delete planet.kind;
     }
-    // Свой наземный бой: его стороны — живые. Хозяин, гарнизон и плацдармы — то, с чем и
-    // против кого зритель дерётся прямо сейчас; постройки и склады мира остаются в тумане.
-    if (groundFights.has(planet.id)) {
+    // Свой наземный бой: его стороны — живые. Хозяин, гарнизон и плацдармы боя — то, с чем и
+    // против кого зритель дерётся прямо сейчас; постройки, склады и посторонние берега мира
+    // остаются в тумане.
+    const shores = groundFights.get(planet.id);
+    if (shores) {
       const live = state.planets[planet.id]!;
       planet.owner = live.owner;
       planet.garrison = live.garrison.map((st) => ({ ...st }));
-      if (live.beachheads) {
-        planet.beachheads = live.beachheads.map((b) => ({ ...b, units: b.units.map((st) => ({ ...st })) }));
+      const fighting = (live.beachheads ?? []).filter((b) => shores.has(b.owner));
+      if (fighting.length > 0) {
+        planet.beachheads = fighting.map((b) => ({ ...b, units: b.units.map((st) => ({ ...st })) }));
       }
     }
   }

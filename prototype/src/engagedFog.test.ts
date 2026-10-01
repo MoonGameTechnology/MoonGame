@@ -35,4 +35,16 @@ describe('туман спрашивает о флоте и бое только �
   it('зрение кадра несёт флоты, опознанные по позиции, из ядра (SHU-6.7)', () => {
     expect(main).toContain('const seenAt = fleetsSeenByPosition(s, ME, data);');
   });
+
+  it('мгновенный бой журнал адресует по сторонам из событий — тем же правилом, что сервер', () => {
+    // Бой союзника, начатый и законченный одним пакетом, в `s` уже не найти (замечание
+    // Codex на #1417); аудиторию ему считает `flashBattles` ядра, как и на сервере.
+    expect(main).toContain('const flash = flashBattles(events, s);');
+    expect(count('flashSeen(p.battleId)')).toBe(2);
+  });
+
+  it('память боёв блока зрения не переживает смену матча', () => {
+    // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417).
+    expect(main).toMatch(/myBattleLocs\.clear\(\);\n\s*engagedBattleIds\.clear\(\);/);
+  });
 });
