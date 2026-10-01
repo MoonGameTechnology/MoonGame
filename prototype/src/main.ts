@@ -11110,7 +11110,17 @@ canvas.addEventListener('dblclick', () => defaultView());
 // track the pointer for the "Move" preview line (desktop only)
 canvas.addEventListener('pointermove', (ev) => {
   if (!MOBILE || !mobileOrderKind()) aimPointer = ptXY(ev);
+  // Курсор нагревается над миром или видимым флотом (`prototype/cursors.mjs`) — теми же
+  // радиусами, что берёт клик мышью; пустота карты остаётся холодной.
+  if (ev.pointerType === 'mouse') canvas.classList.toggle('cur-hot', mapHotAt(ptXY(ev)));
 });
+canvas.addEventListener('pointerleave', () => canvas.classList.remove('cur-hot'));
+function mapHotAt(p: { x: number; y: number }): boolean {
+  return (
+    !!nearestHit(MAP, (nn) => world(nn), p.x, p.y, tapRadius('node', false)) ||
+    !!nearestHit(Object.values(s.fleets).filter(fleetSeen), fleetAnchor, p.x, p.y, tapRadius('fleet', false))
+  );
+}
 
 // --- top bar / speed ---------------------------------------------------------
 
