@@ -12,6 +12,7 @@ import {
 import {
   DEFAULT_SIGHT,
   engagementOf,
+  flashBattles,
   fleetRadarRange,
   identifiedNodes,
   isVisibleTo,
@@ -1225,6 +1226,56 @@ describe('свой бой виден целиком (баг владельца 2
     expect(view.planets.L2?.buildings).toEqual([]);
     // Посторонний того же мира не видит.
     expect(visibleState(st, 'p3', data).planets.L2?.garrison).toEqual([]);
+  });
+
+  it('берег без боя на том же мире остаётся в тумане: видны только стороны боя', () => {
+    // Плацдарм p3 стоит на L2 после перемирия с p2 и в бою не участвует. Бой с одним
+    // противником не раскрывает посторонние войска мира (замечание Codex на #1417).
+    const st = laneBattle();
+    st.fleets = {};
+    st.planets.L2 = {
+      ...st.planets.L2!,
+      owner: 'p2',
+      garrison: [{ unit: 'cruiser', count: 3 }],
+      beachheads: [
+        { owner: 'p3', units: [{ unit: 'cruiser', count: 5 }] },
+        { owner: 'p1', units: [{ unit: 'cruiser', count: 2 }] },
+      ],
+    };
+    st.battles = {
+      g: {
+        id: 'g',
+        location: 'L2',
+        phase: 'ground',
+        round: 0,
+        sides: [
+          { ref: { kind: 'beachhead', planetId: 'L2', owner: 'p1' }, owner: 'p1', role: 'attacker' },
+          { ref: { kind: 'garrison', planetId: 'L2' }, owner: 'p2', role: 'defender' },
+        ],
+      },
+    };
+    expect(identifiedNodes(st, 'p1', data).has('L2')).toBe(false);
+    const view = visibleState(st, 'p1', data);
+    expect(view.planets.L2?.beachheads).toEqual([{ owner: 'p1', units: [{ unit: 'cruiser', count: 2 }] }]);
+    expect(view.planets.L2?.garrison).toEqual([{ unit: 'cruiser', count: 3 }]);
+  });
+
+  it('мгновенный бой: стороны берутся из событий пакета, бой из состояния не в счёт', () => {
+    // Бой, начавшийся и кончившийся между двумя кадрами, знают только по событиям: сервер
+    // раздаёт их по этим сторонам, и клиент повторяет тот же фильтр (замечание Codex на #1417).
+    const st = laneBattle();
+    const flash = flashBattles(
+      [
+        { type: 'battle.started', payload: { battleId: 'b9', attacker: 'p2', defender: null } },
+        { type: 'battle.joined', payload: { battleId: 'b9', owner: 'p3' } },
+        { type: 'battle.resolved', payload: { battleId: 'b9' } },
+        // Бой, который ещё идёт, — не мгновенный: его видимость решает состояние.
+        { type: 'battle.started', payload: { battleId: 'battle:0', attacker: 'p1', defender: 'p2' } },
+      ],
+      st,
+    );
+    expect([...flash.keys()]).toEqual(['b9']);
+    expect(flash.get('b9')).toEqual(['p2', null, 'p3']);
   });
 
   it('бой кончился — враг снова прячется в тумане', () => {

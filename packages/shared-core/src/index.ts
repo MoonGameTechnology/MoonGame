@@ -189,6 +189,7 @@ export {
   isVisibleTo,
   engagementOf,
   inVisionBloc,
+  flashBattles,
   fleetRadarRange,
   stackRadarRange,
   BLACKOUT_MULT,

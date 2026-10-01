@@ -210,6 +210,8 @@ import {
   sensorCoverage,
   radarSignatures,
   engagementOf,
+  flashBattles,
+  inVisionBloc,
   type Engagement,
   type SignatureContact,
   sightCircles,
@@ -3890,6 +3892,11 @@ function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
   else note(text);
 }
 function handleEvents(events: DomainEvent[]) {
+  // Бои, начавшиеся и кончившиеся в этом пакете: в `s` их уже нет, и «мой ли он» отвечают
+  // стороны из самих событий — тем же правилом, что сервер раздаёт их (замечание Codex на
+  // #1417: мгновенный бой союзника на неопознанном узле журнал отбрасывал целиком).
+  const flash = flashBattles(events, s);
+  const flashSeen = (id: unknown): boolean => typeof id === 'string' && inVisionBloc(s, ME, flash.get(id) ?? []);
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
     if (e.type.startsWith('rocketMine.') && (p.owner === ME || p.playerId === ME)) {
@@ -3909,7 +3916,7 @@ function handleEvents(events: DomainEvent[]) {
         if (
           seen(
             isMine([p.attacker as string, p.defender as string], ME),
-            known(p.location as string) || battleEngaged(p.battleId),
+            known(p.location as string) || battleEngaged(p.battleId) || flashSeen(p.battleId),
           )
         )
           // Чем названы строки боя — `battleLog.ts` (REFM-179): фаза называется ВСЕГДА,
@@ -3925,7 +3932,8 @@ function handleEvents(events: DomainEvent[]) {
         // уйдёт под туман по ходу схватки (правило 3).
         if (isMine([p.attacker as string, p.defender as string], ME))
           myBattleLocs.add(p.location as string);
-        if (typeof p.battleId === 'string' && battleEngaged(p.battleId)) engagedBattleIds.add(p.battleId);
+        if (typeof p.battleId === 'string' && (battleEngaged(p.battleId) || flashSeen(p.battleId)))
+          engagedBattleIds.add(p.battleId);
         break;
       case 'battle.resolved': {
         const loc = p.location as string;
@@ -13070,6 +13078,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   chainRouteCache.clear(); // маршруты принадлежат карте СТАРОГО матча
   killStats = { destroyed: 0, lost: 0 };
   myBattleLocs.clear();
+  engagedBattleIds.clear(); // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417)
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
   radarMemory.clear();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
