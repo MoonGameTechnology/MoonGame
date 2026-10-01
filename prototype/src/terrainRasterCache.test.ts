@@ -67,6 +67,11 @@ describe('province raster cache', () => {
     expect(f.strokes).not.toHaveBeenCalled();
     expect(f.created).toHaveLength(1);
     expect(f.drawImage.mock.calls.at(-1)?.slice(1)).toEqual([6, -9, 248, 188]);
+    // The stretched raster is a stand-in: whoever baked it with the map still owes a sharp one.
+    expect(cache.pending).toBe(true);
+    cache.beginFrame(2);
+    cache.draw(f.target, base, 2, true);
+    expect(cache.pending).toBe(false);
     cache.draw(f.target, scaled(2), 2);
     expect(f.created).toHaveLength(2);
     expect(f.strokes).toHaveBeenCalled();
