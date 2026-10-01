@@ -8,6 +8,7 @@
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
+import { cursorCss, heatPointers } from './cursors.mjs';
 
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
@@ -3548,7 +3549,9 @@ ${profileCss}
 
 /** Все листы одной строкой: платформенная цель пишет их файлом, остальные — инлайном. */
 const allCss = () =>
-  `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`;
+  `${cursorCss()}\n${heatPointers(
+    `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`,
+  )}`;
 
 /**
  * Лоадер SDK площадки — ДОСЛОВНО как в документации (требование 1.19.1).
