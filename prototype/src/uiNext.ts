@@ -262,13 +262,21 @@ export function installUiNext(host: UiNextHost): void {
         const el = source(m.src);
         return !!el && (m.src.startsWith('[') || el.style.display !== 'none');
       })
-        .map((m) => {
-          const badge = m.src === 'rail-msgs' ? $('msgbadge') : null;
-          const n = badge && shown(badge) ? badge.textContent : '';
-          return `<button type="button" data-uin-src="${m.src}"><i aria-hidden="true">${m.glyph}</i><span>${t(m.key)}</span>${n ? `<b class="uin-badge">${n}</b>` : ''}</button>`;
-        })
+        .map(
+          (m) =>
+            `<button type="button" data-uin-src="${m.src}"><i aria-hidden="true">${m.glyph}</i><span>${t(m.key)}</span></button>`,
+        )
         .join('') +
       `</div>`;
+    // Счётчик писем — текст со страницы: только через textContent, не через разметку.
+    const badge = $('msgbadge');
+    const msgs = more.querySelector('[data-uin-src="rail-msgs"]');
+    if (msgs && badge && shown(badge) && badge.textContent) {
+      const b = document.createElement('b');
+      b.className = 'uin-badge';
+      b.textContent = badge.textContent;
+      msgs.appendChild(b);
+    }
   };
   const closeMore = (): void => {
     more.hidden = true;
