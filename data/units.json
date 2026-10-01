@@ -251,8 +251,8 @@
       "ground"
     ],
     "cost": {
-      "metal": 55,
-      "credits": 15
+      "metal": 40,
+      "credits": 10
     },
     "buildTimeHours": 2,
     "upkeep": {
