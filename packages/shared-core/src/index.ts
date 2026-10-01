@@ -188,6 +188,7 @@ export {
   radarSignatures,
   isVisibleTo,
   engagementOf,
+  inVisionBloc,
   fleetRadarRange,
   stackRadarRange,
   BLACKOUT_MULT,

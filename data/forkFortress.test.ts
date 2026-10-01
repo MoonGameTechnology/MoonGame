@@ -26,6 +26,7 @@ import {
   createInitialState,
   createKernel,
   forkSiteId,
+  forkSiteInBattle,
   forkTAtStart,
   interceptModule,
   movementModule,
@@ -280,6 +281,41 @@ describe('крепость на развилке — доводка по рев�
       ctx(),
     );
     expect(r.ok ? 'ok' : r.code).toBe('E_BATTLE_HERE');
+  });
+
+  it('бой с орудиями узнаётся и на зеркальном ребре: встреча на полосе пишет его каноническим', () => {
+    // Замечание Codex на #1416: `fleet.intercept` перепривязывает бойцов к ребру `lo → hi`
+    // с `1 - t`, и если выход развилки меньше провинции, орудия стоят на `exit → province`.
+    const st = built();
+    const guns = st.fleets[GUNS]!;
+    const at = guns.edge!;
+    const mirrored: GameState = {
+      ...st,
+      fleets: {
+        ...st.fleets,
+        [GUNS]: { ...guns, edge: { from: at.to, to: at.from, t: 1 - at.t } },
+        R: cruisers('R', 'p2', 'A', 1),
+      },
+      battles: {
+        b1: {
+          id: 'b1',
+          location: 'B',
+          phase: 'orbital',
+          sides: [
+            { ref: { kind: 'fleet', fleetId: GUNS }, owner: 'p1', role: 'defender' },
+            { ref: { kind: 'fleet', fleetId: 'R' }, owner: 'p2', role: 'attacker' },
+          ],
+          round: 0,
+        },
+      },
+    };
+    expect(forkSiteInBattle(mirrored, mirrored.planets[SITE])).toBe(true);
+    // Та же дорога, но другая точка — не бой у площадки.
+    const elsewhere: GameState = {
+      ...mirrored,
+      fleets: { ...mirrored.fleets, [GUNS]: { ...guns, edge: { from: at.to, to: at.from, t: at.t / 2 } } },
+    };
+    expect(forkSiteInBattle(elsewhere, elsewhere.planets[SITE])).toBe(false);
   });
 
   it('площадку нельзя назначить точкой удержания, а гибель крепости снимает старую точку', () => {

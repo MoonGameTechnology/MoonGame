@@ -3014,7 +3014,7 @@ export const ru: Record<string, string> = {
   'sector-zero.prep.back': 'В главное меню',
   'sector-zero.prep.double': 'Удвоить за рекламу: +{n} данных · +{m} ⌖',
   'sector-zero.prep.doubled': 'Награда удвоена: +{n} данных · +{m} ⌖.',
-  'sector-zero.prep.earn': 'Данные выдаются за завершённые экспедиции — и за победу, и за поражение.',
+  'sector-zero.prep.earn': 'Данные приходят за волны, задачи и победу — и при поражении тоже.',
   'sector-zero.prep.equip': 'Установить',
   'sector-zero.prep.equipped': 'Установлено · снять',
   'sector-zero.prep.full': 'Нет свободного слота',
@@ -3078,7 +3078,7 @@ export const ru: Record<string, string> = {
   'sector-zero.shop.sovereigns': 'Суверены: {n} ◆',
   'sector-zero.summary': 'Волны: {wave} / {total} · {difficulty}',
   'sector-zero.title': 'SECTOR ZERO',
-  'sector-zero.wallet.data': 'Данные экспедиций ◇ открывают модули, героев и навыки. Приходят за каждую завершённую экспедицию — и за победу, и за поражение.',
+  'sector-zero.wallet.data': 'Данные экспедиций ◇ открывают модули, героев и навыки. Приходят за волны, задачи и победу — и при поражении тоже.',
   'sector-zero.wallet.sovereigns': 'Суверены ◆: мгновенный ремонт ({hp} корпуса за 1 ◆), пакет снабжения ({supply} ◆) и товары витрины. Ролик даёт +{ad} ◆, до {day} раз в день.',
   'sector-zero.wallet.warrants': 'Варранты ⌖ идут на звёзды модулей в Мастерской и товары витрины; при неудачной заточке сгорают. Экспедиция даёт {n} ⌖ за очко награды.',
 

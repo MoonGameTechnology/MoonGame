@@ -959,6 +959,10 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
       : [...new Set(aliveSides.map((x) => x.owner).filter((o): o is string => o !== null))].sort(),
     rounds: battle.round,
     end,
+    // Флоты-участники: бой ПРИОСТАНАВЛИВАЕТ их намерения (слияние), и тому, кто их
+    // держит, нужно знать, кого будить, — у стоящих после боя флотов нового прибытия не
+    // будет (замечание Codex на #1416). Погибшие тут тоже есть: их уже нет в состоянии.
+    fleets: battle.sides.flatMap((x) => (x.ref.kind === 'fleet' ? [x.ref.fleetId] : [])),
   });
 
   // CMB-6. Здесь стоял ранний выход «после ничьей не сцеплять НИКОГО», и его причина
@@ -1125,7 +1129,7 @@ export const combatModule: GameModule = {
   // 3.4.0: захват и продолжение штурма — только берегами завершённого боя, все уцелевшие
   // враги нового хозяина вступают в новый бой; посадка на борт не уводит трюм в минус
   // (замечания Codex на #1409).
-  version: '3.4.0',
+  version: '3.5.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };

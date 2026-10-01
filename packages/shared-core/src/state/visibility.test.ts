@@ -1192,6 +1192,41 @@ describe('свой бой виден целиком (баг владельца 2
     expect(view.fleets.foe).toBeDefined();
   });
 
+  it('свой наземный бой на неопознанном мире — его стороны живые, постройки в тумане', () => {
+    // Десант p1 на L2 бьётся с гарнизоном p2; десантного флота над миром уже нет, узел не
+    // опознан. Прежде бой оставался, а гарнизон и плацдарм обнулялись (замечание Codex на #1408).
+    const st = laneBattle();
+    st.fleets = {};
+    st.planets.L2 = {
+      ...st.planets.L2!,
+      owner: 'p2',
+      garrison: [{ unit: 'cruiser', count: 3 }],
+      buildings: [{ type: 'radar', level: 1, hp: 10 }],
+      beachheads: [{ owner: 'p1', units: [{ unit: 'cruiser', count: 2 }] }],
+    };
+    st.battles = {
+      g: {
+        id: 'g',
+        location: 'L2',
+        phase: 'ground',
+        round: 0,
+        sides: [
+          { ref: { kind: 'beachhead', planetId: 'L2', owner: 'p1' }, owner: 'p1', role: 'attacker' },
+          { ref: { kind: 'garrison', planetId: 'L2' }, owner: 'p2', role: 'defender' },
+        ],
+      },
+    };
+    expect(identifiedNodes(st, 'p1', data).has('L2')).toBe(false);
+    const view = visibleState(st, 'p1', data);
+    expect(view.battles.g).toBeDefined();
+    expect(view.planets.L2?.owner).toBe('p2');
+    expect(view.planets.L2?.garrison).toEqual([{ unit: 'cruiser', count: 3 }]);
+    expect(view.planets.L2?.beachheads).toEqual([{ owner: 'p1', units: [{ unit: 'cruiser', count: 2 }] }]);
+    expect(view.planets.L2?.buildings).toEqual([]);
+    // Посторонний того же мира не видит.
+    expect(visibleState(st, 'p3', data).planets.L2?.garrison).toEqual([]);
+  });
+
   it('бой кончился — враг снова прячется в тумане', () => {
     const after = laneBattle();
     after.battles = {};

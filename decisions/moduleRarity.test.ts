@@ -4,6 +4,7 @@ import {
   addLoot,
   BLUEPRINT_CHANCE,
   chapterBlueprint,
+  lootShare,
   moduleLadder,
   nextRarity,
   profileRarity,
@@ -174,6 +175,32 @@ describe('добыча забега: дубли и чертежи (SZE-5.3)', ()
     expect(rate(true)).toBeGreaterThan(rate(false));
     expect(Math.abs(rate(true) - BLUEPRINT_CHANCE.won)).toBeLessThan(0.05);
     expect(Math.abs(rate(false) - BLUEPRINT_CHANCE.lost)).toBeLessThan(0.04);
+  });
+
+  it('сданный раньше конца забег: дубль «за забег» и шанс чертежа — по доле волн (2026-09-28)', () => {
+    // Баг-репорт владельца: сдача через секунду платила, а после фикса — сдача сразу после
+    // первой волны. Целый дубль за любой забег делал десять забегов по волне в десять раз
+    // выгоднее одного на десять волн. По доле ожидаемая добыча за волну одна и та же.
+    const runs = (share: number | undefined) =>
+      Array.from({ length: 2000 }, (_, i) => runLoot({ ...base, share, outcome: `w${i}` }));
+    const copyRate = (share: number | undefined): number =>
+      runs(share).filter((l) => total(l.copies) > 0).length / 2000;
+    const blueprintRate = (share: number | undefined): number =>
+      runs(share).filter((l) => total(l.blueprints) > 0).length / 2000;
+    expect(copyRate(undefined)).toBe(1); // не передана — весь забег, как раньше
+    expect(copyRate(1)).toBe(1);
+    expect(copyRate(0)).toBe(0);
+    expect(Math.abs(copyRate(0.1) - 0.1)).toBeLessThan(0.02);
+    expect(Math.abs(copyRate(0.4) - 0.4)).toBeLessThan(0.03);
+    expect(blueprintRate(0)).toBe(0);
+    expect(blueprintRate(0.5)).toBeLessThan(blueprintRate(1));
+    // Мусор в доле не платит; больше единицы — не больше целого забега.
+    expect(copyRate(Number.NaN)).toBe(0);
+    expect(copyRate(-1)).toBe(0);
+    expect(copyRate(7)).toBe(1);
+    expect(lootShare(Number.POSITIVE_INFINITY)).toBe(0);
+    // Победа платит за себя сама: её дубль от доли не зависит.
+    expect(total(runLoot({ ...base, won: true, share: 0 }).copies)).toBe(1);
   });
 
   it('добыча складывается в счётчики, входы не меняются', () => {

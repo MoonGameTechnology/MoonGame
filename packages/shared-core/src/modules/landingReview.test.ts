@@ -164,6 +164,37 @@ describe('флот на высадке не сливается (замечани
     expect(r.state.fleets.B).toBeUndefined();
     expect(r.events.some((e) => e.type === 'fleet.merged')).toBe(true);
   });
+
+  it('бой кончился — приостановленное боем слияние созревает само (замечание Codex на #1416)', () => {
+    // Прерванный штурм вступает в бой раньше, чем `assault.interrupted` дойдёт до
+    // `fleetOps`, и слияние откладывается ещё раз; будит его теперь `battle.resolved`.
+    const a = fleet('A', 'p1', [['fighter', 1]], []);
+    const b = { ...fleet('B', 'p1', [['fighter', 3]], []), mergeInto: 'A', battleId: 'b1' };
+    const e = { ...fleet('E', 'p2', [['fighter', 1]], []), battleId: 'b1' };
+    const st = world([a, b, e], []);
+    setStance(st, 'p1', 'p2', 'war');
+    const s: GameState = {
+      ...st,
+      battles: {
+        b1: {
+          id: 'b1',
+          location: 'P',
+          phase: 'orbital',
+          sides: [
+            { ref: { kind: 'fleet', fleetId: 'B' }, owner: 'p1', role: 'attacker' },
+            { ref: { kind: 'fleet', fleetId: 'E' }, owner: 'p2', role: 'defender' },
+          ],
+          round: 0,
+        },
+      },
+      scheduled: [{ id: 'evt:0', at: 0, type: 'combat.tick', payload: { battleId: 'b1' }, seq: 0 }],
+      scheduleSeq: 1,
+    };
+    const r = okAdvance(kernel.advanceTo(s, ctx(4 * HOUR)));
+    expect(r.events.some((x) => x.type === 'battle.resolved')).toBe(true);
+    expect(r.state.fleets.B).toBeUndefined();
+    expect(r.events.some((x) => x.type === 'fleet.merged')).toBe(true);
+  });
 });
 
 /**
