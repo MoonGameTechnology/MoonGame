@@ -1071,6 +1071,7 @@ import {
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
 import { jumpStep, type JumpKind } from './mapJump';
+import { INTRO_HINT, installUiNext, setUiScale, uiNextOn, uiScale } from './uiNext';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -2988,7 +2989,8 @@ function seesDetails(p: Planet): boolean {
 function placeName(id: string): string {
   const fork = s.planets[id]?.fork;
   if (fork) return t('place.fork-fortress', { planet: placeName(fork.province) });
-  return provinceName(s.mapId, id) ?? id;
+  // Прототип «доделанного интерфейса» (`uiNext.ts`, правка 5): мир по имени, а не по координате.
+  return provinceName(s.mapId, id) ?? (uiNextOn() ? planetName(id) : id);
 }
 /** То же для окна боя и меток: у карт без имён — авто-имя (`planetName.ts`), как было.
  *  Крепость на развилке (FORT-6.1) — не провинция, и имя у неё по провинции её развилки. */
@@ -5295,7 +5297,7 @@ function mapLayerSignature(): string {
     me: ME,
     owners: ownersSig(),
     starfield: starfieldOn(),
-  }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
+  }) + `|holo:${holographicMapOn()}|glow:${glowOn()}|uin:${uiNextOn()}` +
     `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}`;
 }
 
@@ -9024,6 +9026,15 @@ function seenIntrosKey(): string {
 function showIntro(card: IntroCard): void {
   const el = document.getElementById('intro');
   if (!el) return;
+  // Прототип `uiNext.ts` (правка 8): одна строка с числом и «Понятно», окно не запирается.
+  const hint = uiNextOn() ? INTRO_HINT[card.titleKey] : undefined;
+  if (hint) {
+    el.innerHTML =
+      `<div class="inbox uin-hint"><span class="in-ic">✦</span><div class="uin-hint-text"><b>${esc(t(card.titleKey))}</b>` +
+      `<span>${esc(t(hint))}</span></div><button class="in-ok">${t('onb.intro.ok')}</button></div>`;
+    el.classList.add('show');
+    return;
+  }
   el.innerHTML =
     `<div class="inbox"><div class="in-head"><span class="in-ic">✦</span><b>${esc(t(card.titleKey))}</b>` +
     `<span class="in-tag">${t('onb.intro.badge')}</span></div>` +
@@ -12491,7 +12502,9 @@ const settings = initSettings({
     palette: rivalPaletteId,
     touchOnly: !pcUi(),
     ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
+    ...(uiNextOn() && document.body.classList.contains('holo-ui') ? { uiScale: uiScale() } : {}),
   }),
+  setUiScale,
   setSweepOpacity,
   setWindowOpacity: (v) => {
     setWindowOpacity(Math.round(v * 100));
@@ -16669,13 +16682,16 @@ function frame(nowReal: number) {
     const stock = r[key] ?? 0;
     // Часы забега: в забеге приток — за минуту (решение владельца 2026-09-24).
     const flow = flowRounded(flowRate(inc[key] ?? 0));
-    const flowTxt = flowShown(MOBILE, flow)
+    // Прототип `uiNext.ts` (правка 4): доход в час виден и на телефоне.
+    const phoneChip = MOBILE && !uiNextOn();
+    const flowTxt = flowShown(phoneChip, flow)
       ? `<em class="${flowSign(flow)}">${flowPrefix(flow)}${flowDigits(flow, kfmt)}${flowPer()}</em>`
       : '';
     const dead = chipDead(stock, flow) ? ' dead' : '';
     const short = chipShort(myArrears, key) ? ' short' : '';
-    const bleed = stockBleeds(MOBILE, flow) ? ' class="neg"' : '';
-    return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
+    const bleed = stockBleeds(phoneChip, flow) ? ' class="neg"' : '';
+    const exact = uiNextOn() ? ` data-n="${floor(stock)}"` : '';
+    return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}${exact}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
   };
   // Capsule icons = RES_SVG (line art traced from the mock; TECH_CUR keeps the text
   // glyphs for prose); capsule order follows the mock: coins, cube, sprout, bolt, chip.
@@ -17827,3 +17843,32 @@ const corp = __SECTOR_ZERO_ONLY__
     });
 $('ccorp').addEventListener('click', () => corp?.open());
 $('railcorp').addEventListener('click', () => corp?.open());
+
+// --- прототип «доделанного интерфейса» (`uiNext.ts`) ---------------------------------
+// Слой включается классом `body.ui-next` (`?ui=next` или переключатель страницы-витрины).
+installUiNext({
+  inMatch,
+  toMap: () => {
+    for (let i = 0; i < 16; i++) {
+      const top = BACK_LAYERS.find((l) => l.isOpen());
+      if (!top || top.id === 'side' || top.id === 'setup') return;
+      top.close();
+    }
+  },
+  home: () => {
+    const capital = capitalOf(s, ME);
+    if (capital) jumpTo(capital, 'goto');
+  },
+  nextFleet: () => {
+    const mine = Object.values(s.fleets)
+      .filter((f) => f.owner === ME && !isMineFleet(f, data))
+      .map((f) => f.id)
+      .sort();
+    if (!mine.length) return;
+    const at = selFleet ? mine.indexOf(selFleet) : -1;
+    const id = mine[(at + 1) % mine.length]!;
+    setFleetSelection([id]);
+    const pos = fleetPos(s.fleets[id]!);
+    if (pos) centerOn(pos, Math.max(cam.scale, 2));
+  },
+});

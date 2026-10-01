@@ -138,13 +138,19 @@ export function initFloatingWindows() {
     }
     entry.node = null;
   };
+  /** Окно под CSS-зумом (масштаб ПК прототипа `uiNext.ts`): его px — в координатах зума,
+   *  а точка и размер — экранные, поэтому делим на действующий зум. Без зума — делитель 1. */
+  const place = (node: HTMLElement, point: HoloPoint, roomHeight: number): void => {
+    const z = (node as HTMLElement & { currentCSSZoom?: number }).currentCSSZoom || 1;
+    node.style.setProperty('left', `${Math.round(point.x / z)}px`, 'important');
+    node.style.setProperty('top', `${Math.round(point.y / z)}px`, 'important');
+    node.style.setProperty('--holo-window-room', `${Math.max(80, (roomHeight - point.y - 12) / z)}px`);
+  };
   const apply = (entry: WindowEntry): void => {
     if (!entry.node || !entry.point || !entry.size) return;
     const point = fitWindowPosition(entry.point, entry.size, viewport, topInset);
     entry.point = point;
-    entry.node.style.setProperty('left', `${Math.round(point.x)}px`, 'important');
-    entry.node.style.setProperty('top', `${Math.round(point.y)}px`, 'important');
-    entry.node.style.setProperty('--holo-window-room', `${Math.max(80, viewport.height - point.y - 12)}px`);
+    place(entry.node, point, viewport.height);
   };
   const finish = (): void => {
     const active = drag;
@@ -305,11 +311,7 @@ export function initFloatingWindows() {
           // Only a user gesture, viewport resize or a new layout (`refit`) clamps the
           // remembered position.
           if (resized || !entry.visible || !entry.point || entry.refit) apply(entry);
-          else {
-            node.style.setProperty('left', `${Math.round(entry.point.x)}px`, 'important');
-            node.style.setProperty('top', `${Math.round(entry.point.y)}px`, 'important');
-            node.style.setProperty('--holo-window-room', `${Math.max(80, height - entry.point.y - 12)}px`);
-          }
+          else place(node, entry.point, height);
           entry.dirty = false;
           entry.refit = false;
         }

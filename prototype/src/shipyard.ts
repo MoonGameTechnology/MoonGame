@@ -39,6 +39,8 @@ import {
   type GameState,
 } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
+import { uiNextOn } from './uiNext';
+import { worldName } from './planetName';
 import { data } from './gameData';
 import { esc, displayUnit } from './format';
 import { unitIconHtml } from './icons';
@@ -120,6 +122,7 @@ const RES_KEY: Record<string, string> = {
   energy: 'res.of.energy',
   food: 'res.of.food',
   microelectronics: 'res.of.microelectronics',
+  biomass: 'res.of.biomass',
 };
 // Short stat labels for module-effect chips («+4 атака», «+15 щит»).
 const STAT_KEY: Record<string, string> = {
@@ -138,6 +141,7 @@ const STAT_KEY: Record<string, string> = {
   fleetHullRepair: 'loadout.stat.fleet-repair',
   mineCharge: 'loadout.stat.mine-charge',
   mineHit: 'loadout.stat.mine-hit',
+  pointDefense: 'stat.point-defense',
 };
 /** Чип эффекта модуля: доля в час — процентом («+5%/ч»), прочее — как есть. */
 const effectChip = (k: string, v: number): string =>
@@ -364,7 +368,8 @@ export function loadoutPaneHtml(
   const planOpts = worlds
     .map(
       (p) =>
-        `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(p.id)}</option>`,
+        // Прототип `uiNext.ts` (правка 5): мир по имени, как на карте.
+        `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(uiNextOn() ? worldName(state.mapId, p.id) : p.id)}</option>`,
     )
     .join('');
   // ДЕСАНТНЫЙ ЧЕЛНОК (SHU-5.2) строится с бойцом внутри: выбор бойца и его цена — в

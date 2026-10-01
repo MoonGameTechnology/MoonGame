@@ -17,6 +17,8 @@ const shipArtCss = readFileSync(new URL('./ship-art.css', import.meta.url), 'utf
 const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 const sectorZeroCss = readFileSync(new URL('./sector-zero.css', import.meta.url), 'utf8');
 const profileCss = readFileSync(new URL('./profile.css', import.meta.url), 'utf8');
+// Прототип «доделанного интерфейса» (src/uiNext.ts): каждое правило под body.ui-next.
+const uiNextCss = readFileSync(new URL('./ui-next.css', import.meta.url), 'utf8');
 
 const bundle = async (playerBuild) => {
   const res = await build({
@@ -3548,7 +3550,7 @@ ${profileCss}
 
 /** Все листы одной строкой: платформенная цель пишет их файлом, остальные — инлайном. */
 const allCss = () =>
-  `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`;
+  `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}\n${uiNextCss}`;
 
 /**
  * Лоадер SDK площадки — ДОСЛОВНО как в документации (требование 1.19.1).

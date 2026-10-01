@@ -40,6 +40,8 @@ export interface SettingsView {
   /** Непрозрачность окон ПК и планшета, 0..1. Нет — нет и ползунка: у телефона стеклянных
    *  окон нет, и строка двигала бы то, чего на экране не бывает. */
   windowOpacity?: number;
+  /** «Размер интерфейса» ПК, 0,8..1,5 (прототип `uiNext.ts`, правка 2). Нет — нет и строки. */
+  uiScale?: number;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -189,7 +191,15 @@ function mapHtml(view: SettingsView): string {
 
 /** «Графика»: стекло окон, свечение, звёзды, движение, счётчик кадров, совместимость отрисовки. */
 function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): string {
+  const scale = view.uiScale === undefined ? 0 : pct(view.uiScale);
   return (
+    (view.uiScale !== undefined
+      ? `<div class="set-row">` +
+        `<div class="set-lbl">${t('uinext.settings.scale')}<span class="set-sub">${t('uinext.settings.scale.hint')}</span></div>` +
+        `<div class="set-ctl"><input id="set-ui-scale" type="range" min="80" max="150" step="10" value="${scale}" aria-label="${t('uinext.settings.scale')}">` +
+        `<span id="set-ui-scale-val" class="set-val">${scale}%</span></div>` +
+        `</div>`
+      : '') +
     (view.windowOpacity !== undefined
       ? rangeRow(
           'window-opacity',
@@ -233,6 +243,8 @@ export interface SettingsHost {
   setSweepOpacity(v: number): void;
   /** Непрозрачность окон, 0..1 (есть только там, где есть {@link SettingsView.windowOpacity}). */
   setWindowOpacity?(v: number): void;
+  /** «Размер интерфейса» ПК, 0,8..1,5. */
+  setUiScale?(v: number): void;
   setOwnPings(v: boolean): void;
   setGlow(v: boolean): void;
   setStarfield(v: boolean): void;
@@ -350,6 +362,14 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       host.setWindowOpacity?.(value);
       label('set-window-opacity', `${pct(value)}%`);
     });
+
+    const uiScaleInput = q<HTMLInputElement>('set-ui-scale');
+    uiScaleInput?.addEventListener('change', () => {
+      const value = Number(uiScaleInput.value) / 100;
+      host.setUiScale?.(value);
+      label('set-ui-scale', `${pct(value)}%`);
+    });
+    uiScaleInput?.addEventListener('input', () => label('set-ui-scale', `${uiScaleInput.value}%`));
 
     const vol = q<HTMLInputElement>('set-snd-vol');
     vol?.addEventListener('input', () => {
