@@ -42,7 +42,8 @@ export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
   // 1.3.0: неподвижный отряд не сливается и не делится (находка Codex на #1393).
   // 1.4.0: атака мины — подрыв по атакующему, мина сама не атакует (SM-3.6).
-  version: '1.4.0',
+  // 1.5.0: флот на высадке штурмом не сливается (замечание Codex на #1409).
+  version: '1.5.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -177,6 +178,14 @@ export const fleetOpsModule: GameModule = {
       if (from.battleId || into.battleId) {
         return h.reject('E_IN_BATTLE');
       }
+      // ВЫСАДКА ЗАМОРАЖИВАЕТ ТРЮМ (замечание Codex на #1409). Заявка высадки помнит, СКОЛЬКО
+      // десанта сойдёт, а не каким он был: слияние усредняет заслугу стеков одной выслуги
+      // (`mergeStacks`), и ветераны, влитые после начала высадки, сходили бы на землю
+      // долей своей заслуги в заявленных бойцах. Флот на высадке не сливается ни в одну
+      // сторону, пока десант не сошёл или высадку не сорвали.
+      if (from.assaultLanding || into.assaultLanding) {
+        return h.reject('E_FLEET_BUSY');
+      }
       if (emplaced(h, from) || emplaced(h, into)) {
         return h.reject('E_EMPLACEMENT');
       }
@@ -247,6 +256,8 @@ export const fleetOpsModule: GameModule = {
           continue;
         }
         if (into.battleId) continue;
+        // Высадка приостанавливает намерение, как бой: трюм заморожен до её конца (см. приказ).
+        if (from.assaultLanding || into.assaultLanding) continue;
         if (!fusable(from, into)) {
           delete from.mergeInto; // разминулись
           continue;

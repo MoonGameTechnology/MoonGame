@@ -226,7 +226,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '60'; // Ревью мины (#1411). Членство и порядок не
+export const MODULE_MANIFEST_VERSION = '61'; // Ревью высадки (#1409). Членство и порядок
+// не тронуты; `combat` 3.4.0 отдаёт мир и продолжает штурм только берегами завершённого боя
+// (все уцелевшие враги нового хозяина вступают в новый бой, берега без боя остаются), а
+// посадка на борт не уводит трюм в минус; `fleet-ops` 1.5.0 не сливает флот на высадке;
+// `fleetBrood` 1.2.0 не растит выводок на высадке; `shuttle` 1.4.0 — подкрепление берегу без
+// боя продолжает штурм.
+// export const MODULE_MANIFEST_VERSION = '60'; // Ревью мины (#1411). Членство и порядок не
 // тронуты; мина — отряд без приказов: общий пропуск приказов флота (`util/fleet`) и
 // `standing-orders` 1.1.0, `fleet-repair` 1.1.0, `instant-repair` 1.2.0, `forced-march`
 // 1.1.0, `extraction` 1.1.0 отбивают её `E_MINE_PASSIVE`; `orbital` 1.2.0 не даёт ей
