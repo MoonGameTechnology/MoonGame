@@ -244,11 +244,14 @@ function detonate(h: HandlerContext, victimId: string, mineIds: readonly string[
 }
 
 /** Та же точка дороги у двух стоящих отрядов: та же дорога и та же доля (в любую сторону). */
-function sameRoadPoint(a: Fleet, b: Fleet): boolean {
-  const ea = a.edge, eb = b.edge;
-  if (a.location !== null || b.location !== null || !ea || !eb) return false;
-  if (ea.from === eb.from && ea.to === eb.to) return Math.abs(ea.t - eb.t) < 1e-9;
-  return ea.from === eb.to && ea.to === eb.from && Math.abs(1 - ea.t - eb.t) < 1e-9;
+/** Одна ли это ФИЗИЧЕСКАЯ точка дороги. Сравниваются координаты, а не записи рёбер: мины в
+ *  ромбе развилки стоят на разных лейнах тропы, но в одной точке общего ствола, и встречи с
+ *  ними перехват назначает одновременно (замечание Codex на #1414). */
+function sameRoadPoint(h: HandlerContext, a: Fleet, b: Fleet): boolean {
+  if (a.location !== null || b.location !== null || !a.edge || !b.edge) return false;
+  const pa = fleetPositionAt(h.state, a, h.ctx.now);
+  const pb = fleetPositionAt(h.state, b, h.ctx.now);
+  return !!pa && !!pb && Math.abs(pa.x - pb.x) < 1e-6 && Math.abs(pa.y - pb.y) < 1e-6;
 }
 
 /**
@@ -268,7 +271,7 @@ function detonateOnRoad(h: HandlerContext, victimId: string, mineId: string): vo
   if (!hit) return;
   const mines = Object.keys(h.state.fleets).sort().filter((id) => {
     const f = h.state.fleets[id]!;
-    return id === mineId || (isMineFleet(f, h.ctx.data) && sameRoadPoint(f, hit));
+    return id === mineId || (isMineFleet(f, h.ctx.data) && sameRoadPoint(h, f, hit));
   });
   (m.struck ??= {})[victimId] = h.ctx.now;
   detonate(h, victimId, mines);

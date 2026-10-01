@@ -32,6 +32,8 @@ import { forcedMarchModule } from './forcedMarch';
 import { createInitialState, type Fleet, type GameState, type Planet, type Player } from '../state/gameState';
 import { bombardedPlanets } from '../state/orbit';
 import { patrolScrambles } from '../state/patrol';
+import { forkTAtStart } from '../state/roads';
+import { visibleMinefields } from '../state/minefields';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, Context, DomainEvent } from '../action/types';
 
@@ -234,6 +236,53 @@ describe('мины одной точки дороги — один подрыв 
     expect(state.fleets.E!.units[0]!.count).toBe(5);
     expect(state.fleets.A!.units[0]!.count).toBe(2);
     expect(state.fleets.B!.units[0]!.count).toBe(2);
+  });
+});
+
+describe('мины ромба развилки на разных лейнах — одна точка, один подрыв (замечание Codex на #1414)', () => {
+  // Тропа B ветвится в F(60,0) к A и C: мина на лейне B→A и мина на лейне B→C стоят в одной
+  // физической точке общего ствола.
+  function forkWorld(fleets: Fleet[]): GameState {
+    const base = world(fleets);
+    const xab = { x: 100, y: -75 };
+    const xcb = { x: 100, y: 75 };
+    const at = (id: string, x: number, y: number, links: string[], owner: string | null = null): Planet => ({
+      ...planet(id, 0, links, owner),
+      position: { x, y },
+    });
+    base.planets = {
+      A: { ...at('A', 200, -150, ['B']), roads: { crossings: { B: xab }, trails: [{ exits: ['B'], fork: null }] } },
+      B: {
+        ...at('B', 0, 0, ['A', 'C'], 'p2'),
+        roads: { crossings: { A: xab, C: xcb }, trails: [{ exits: ['A', 'C'], fork: { x: 60, y: 0 } }] },
+      },
+      C: { ...at('C', 200, 150, ['B']), roads: { crossings: { B: xcb }, trails: [{ exits: ['B'], fork: null }] } },
+    };
+    return base;
+  }
+
+  it('флот по стволу подрывается обеими минами разом, а не одной', () => {
+    const probe = forkWorld([]);
+    const s0 = forkWorld([
+      ships('E', 'p2', 'A'),
+      mine('X', 'p1', { edge: { from: 'B', to: 'A', t: forkTAtStart(probe, 'B', 'A') } }, 3, 'heavy_layer'),
+      mine('Y', 'p3', { edge: { from: 'B', to: 'C', t: forkTAtStart(probe, 'B', 'C') } }, 3, 'heavy_layer'),
+    ]);
+    const moving = apply(s0, act('fleet.move', 'p2', { fleetId: 'E', to: 'B' })).state;
+    const { state, events } = advance(moving, moving.fleets.E!.movement!.arrivesAt);
+    const hits = events.filter((e) => e.type === 'mines.triggered');
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.payload).toMatchObject({ fleetId: 'E', mines: ['X', 'Y'] });
+    expect(state.fleets.X!.units[0]!.count).toBe(2);
+    expect(state.fleets.Y!.units[0]!.count).toBe(2);
+  });
+});
+
+describe('метка подрыва не уходит в проекцию (замечание Codex на #1414)', () => {
+  it('срез мин зрителя без `struck`, даже когда у него есть своя перезарядка', () => {
+    const s = world([ships('L', 'p1', 'N')]);
+    s.minefields = { readyAt: { L: 999 }, struck: { hidden: 5 } };
+    expect(visibleMinefields(s, 'p1')).toEqual({ readyAt: { L: 999 } });
   });
 });
 
