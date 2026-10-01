@@ -111,7 +111,7 @@
 | UIX-7.2 | ⏳ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
 | UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
 | UIX-8.1 | ⏳ | proto | `docs/backlog.md` | Обучение: одна мысль на шаг. |
-| UIX-8.2 | ⏳ | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
+| UIX-8.2 | 🔶 | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
 | UIX-9.1 | ⏳ | proto | `docs/backlog.md` | ПК: горячие клавиши. |
 | UIX-9.2 | ⏳ | proto | `docs/backlog.md` | ПК: правый клик по миру — «Курс сюда». |
 | UIX-9.3 | ⏳ | proto | `docs/backlog.md` | ПК: «Сводка армии» обрезана справа. |
@@ -123,6 +123,7 @@
 | UIX-13.1 | ⏳ | proto | `docs/backlog.md` | Верфь: свернуть неподходящие модули и дать группе свою строку. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | UIX-14.1 | ✅ | proto | `docs/backlog.md` | Окно мира без дублей: шапка фактов и одно число на вкладку. |
+| UIX-15.1 | ✅ | proto | `docs/backlog.md` | Настройка схватки и выбор места — в палитре хаба. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
