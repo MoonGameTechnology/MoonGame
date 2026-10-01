@@ -105,7 +105,7 @@
 | UIX-5.4 | ⏳ | proto | `docs/backlog.md` | Словарь терминов. |
 | UIX-6.1 | ✅ | proto | `docs/backlog.md` | Прогноз космического боя в прицеле «Атака». |
 | UIX-6.2 | ✅ | proto | `docs/backlog.md` | Прогноз в окне боя. |
-| UIX-6.3 | ⏳ | core proto | `docs/backlog.md` | Прогноз боя трёх сторон и больше. |
+| UIX-6.3 | ✅ | core proto | `docs/backlog.md` | Прогноз боя трёх сторон и больше. |
 | UIX-7.1 | ⏳ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
 | UIX-7.2 | ⏳ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
 | UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
