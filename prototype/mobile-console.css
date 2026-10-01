@@ -33,14 +33,16 @@ body.mobile-ui #mobile-sheet {
   align-items: center;
   flex: none;
   padding: 0 8px 0 14px;
-  min-height: 78px;
+  min-height: 60px;
   gap: 8px;
 }
+/* Полоски-ручки над заголовком нет (заказ владельца 2026-09-29: убрать и освободить место):
+   вся шапка и так тянется пальцем и раскрывает лист тапом. */
 .mobile-grab {
   position: relative;
   flex: 1;
   min-width: 0;
-  padding: 23px 0 10px;
+  padding: 10px 0 8px;
   background: none;
   border: 0;
   text-align: left;
@@ -49,13 +51,7 @@ body.mobile-ui #mobile-sheet {
   cursor: pointer;
 }
 .mobile-grab i {
-  position: absolute;
-  top: 9px;
-  left: 50%;
-  width: 34px;
-  height: 3px;
-  border-radius: 3px;
-  background: #85bdcc66;
+  display: none;
 }
 .mobile-grab b {
   display: block;
@@ -73,6 +69,18 @@ body.mobile-ui #mobile-sheet {
     monospace;
   color: #8dafbd;
   margin-top: 4px;
+}
+.mobile-badge {
+  flex: none;
+  padding: 6px 9px;
+  border: 1px solid #7da8bc30;
+  border-radius: 10px;
+  background: #0c1b2b;
+  color: #e1f5fc;
+  font:
+    12px ui-monospace,
+    monospace;
+  white-space: nowrap;
 }
 .mobile-close {
   flex: none;
@@ -125,7 +133,7 @@ body.mobile-ui #mobile-sheet #side .phead {
   display: none;
 }
 body.mobile-ui #mobile-sheet #side .pscroll {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-top: 1px solid #6292a32e;
   max-height: 46dvh;
   overflow-y: auto;
@@ -134,6 +142,37 @@ body.mobile-ui #mobile-sheet #side .pscroll {
 }
 body.mobile-ui #mobile-sheet #side .ptile {
   min-height: 48px;
+}
+/* Окно мира на телефоне (переработка 2026-09-29): «Пинг» стоит в нижней полосе листа, и
+   его второй экземпляр в шапке прячется; вкладки — одним рядом, а не двумя; отступы
+   плотнее — лист высотой в полэкрана, и каждая строка на счету. */
+body.mobile-ui #mobile-sheet #side .pfacts {
+  gap: 5px;
+  margin-bottom: 2px;
+}
+body.mobile-ui #mobile-sheet #side .pfact {
+  padding: 2px 6px;
+}
+body.mobile-ui #mobile-sheet #side .sec {
+  margin: 10px 0 5px;
+}
+body.mobile-ui #mobile-sheet #side .pacts [data-act='ping'] {
+  display: none;
+}
+body.mobile-ui #mobile-sheet #side .ptabs {
+  flex-wrap: nowrap;
+}
+body.mobile-ui #mobile-sheet #side .ptab {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 body.mobile-ui #mobile-sheet #cmdbar {
   position: relative;

@@ -78,6 +78,22 @@
       "kind": "dead_world",
       "terrain": "deep_void"
     },
+    "west_colony": {
+      "position": {
+        "x": -1060,
+        "y": 90
+      },
+      "kind": "planet",
+      "terrain": "empty_space"
+    },
+    "pilgrim_way": {
+      "position": {
+        "x": -830,
+        "y": -560
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
     "covenant_hold": {
       "position": {
         "x": -570,
@@ -85,7 +101,7 @@
       },
       "kind": "planet",
       "terrain": "empty_space",
-      "owner": "p1",
+      "owner": "covenant",
       "garrison": [
         {
           "unit": "militia",
@@ -104,6 +120,25 @@
       },
       "kind": "asteroid_cluster",
       "terrain": "asteroid_cluster"
+    },
+    "choir_bell": {
+      "position": {
+        "x": -610,
+        "y": -800
+      },
+      "kind": "void_station",
+      "terrain": "empty_space",
+      "traits": [
+        "beacon"
+      ]
+    },
+    "quiet_belt": {
+      "position": {
+        "x": -980,
+        "y": -790
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
     },
     "rendezvous": {
       "position": {
@@ -348,6 +383,14 @@
       "terrain": "asteroid_field",
       "owner": "ally"
     },
+    "bulwark_gate": {
+      "position": {
+        "x": -60,
+        "y": 390
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system"
+    },
     "station_west": {
       "position": {
         "x": 300,
@@ -382,6 +425,53 @@
       ],
       "traits": [
         "ally_task"
+      ]
+    },
+    "south_verge": {
+      "position": {
+        "x": -900,
+        "y": 560
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "scrap_belt": {
+      "position": {
+        "x": -430,
+        "y": 800
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "deep_relay": {
+      "position": {
+        "x": -60,
+        "y": 810
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "murk": {
+      "position": {
+        "x": 310,
+        "y": 790
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "nest": {
+      "position": {
+        "x": 640,
+        "y": 790
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
       ]
     },
     "black_hole": {
@@ -423,7 +513,7 @@
       },
       "kind": "dead_world",
       "terrain": "deep_void",
-      "owner": "p1",
+      "owner": "covenant",
       "garrison": [
         {
           "unit": "militia",
@@ -473,6 +563,14 @@
       },
       "kind": "dead_world",
       "terrain": "deep_void"
+    },
+    "east_shoal": {
+      "position": {
+        "x": 1070,
+        "y": 60
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
     },
     "hive": {
       "position": {
@@ -540,9 +638,17 @@
     },
     {
       "id": "mission.book-of-voices",
-      "kind": "rescue",
+      "kind": "control",
       "targets": [
         "covenant_hold"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.shift-lab",
+      "kind": "control",
+      "targets": [
+        "lab_outpost"
       ],
       "reward": 3
     },
@@ -565,7 +671,7 @@
     {
       "id": "mission.recon",
       "kind": "scout",
-      "count": 18,
+      "count": 24,
       "reward": 2
     },
     {
@@ -573,8 +679,41 @@
       "kind": "wave",
       "count": 6,
       "reward": 2
+    },
+    {
+      "id": "mission.choir-bell",
+      "kind": "beacon",
+      "targets": [
+        "choir_bell"
+      ],
+      "count": 8,
+      "reward": 3
+    },
+    {
+      "id": "mission.second-yard",
+      "kind": "build",
+      "targets": [
+        "shipyard"
+      ],
+      "at": [
+        "west_colony"
+      ],
+      "count": 1,
+      "reward": 2
+    },
+    {
+      "id": "mission.nest",
+      "kind": "control",
+      "targets": [
+        "nest"
+      ],
+      "reward": 3
     }
   ],
+  "objectiveSlots": {
+    "base": 4,
+    "cap": 6
+  },
   "players": {
     "p1": {
       "name": "Azure Compact",
@@ -604,6 +743,16 @@
         "biomass": 400,
         "microelectronics": 100,
         "energy": 150
+      }
+    },
+    "covenant": {
+      "name": "Covenant of Unity",
+      "faction": "vanguard",
+      "npc": "pirate",
+      "ai": false,
+      "resources": {
+        "credits": 0,
+        "metal": 0
       }
     }
   },
@@ -690,22 +839,6 @@
         {
           "unit": "swarm_brood_mother",
           "count": 1
-        }
-      ]
-    },
-    "swarm_siege": {
-      "owner": "swarm",
-      "location": "covenant_hold",
-      "units": [
-        {
-          "unit": "swarm_brood_mother",
-          "count": 1
-        }
-      ],
-      "landing": [
-        {
-          "unit": "swarm_lander",
-          "count": 3
         }
       ]
     },

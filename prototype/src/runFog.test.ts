@@ -47,9 +47,10 @@ function byDistance(st: GameState) {
 
 describe('туман забега — круги на картах глав', () => {
   it('у режима забега свои числа: колония и крепость видят 100, остальные виды — только себя', () => {
+    // Крепость на развилке (FORT-6.1) — та же крепость, и видит так же.
     expect(data.modes.pve_waves?.sight).toEqual({
       world: 0,
-      byKind: { planet: 100, void_station: 100 },
+      byKind: { planet: 100, void_station: 100, fork_station: 100 },
       fleet: 90,
       radarScale: 1.5,
     });

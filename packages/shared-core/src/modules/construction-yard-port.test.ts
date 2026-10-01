@@ -130,8 +130,11 @@ describe('стартовый мир: верфь есть, космопорта �
       expect(homes.length).toBeGreaterThan(0);
       for (const [id, sec] of homes) {
         const planet = world((sec.buildings ?? []).map((b) => b.type));
-        // Ангар — то, что игрок обязан ПОСТРОИТЬ: иначе челноки достаются даром.
-        expect([id, shuttleBayAt(planet, data)]).toEqual([id, 0]);
+        // Ангар — то, что игрок обязан ПОСТРОИТЬ: иначе челноки достаются даром. Исключение
+        // одно — столица песочницы полигона (M2.15, решение владельца 2026-09-29: «столица
+        // со всеми постройками»): полигон нужен, чтобы сразу пробовать любую механику.
+        const sandboxHome = file === 'proving-ground.json' && sec.owner === 'p1';
+        if (!sandboxHome) expect([id, shuttleBayAt(planet, data)]).toEqual([id, 0]);
         // Верфь — то, с чего игра начинается: без неё первый корабль не заложить.
         expect([id, unitBuildSiteBlocker(planet, data.units[someShip]!, data)]).toEqual([id, null]);
       }

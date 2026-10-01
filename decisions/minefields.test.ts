@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { createInitialState, type Fleet, type GameState } from '../packages/shared-core/src/index';
-import { minelayerOffer, ownMinefields } from './minefields';
+import { minelayerOffer, ownInstallations, ownMinefields } from './minefields';
 
 const data = shippedGameData();
 
@@ -46,7 +46,7 @@ describe('SM-3.5 — кнопка «Поставить мины» и свои п
   });
 
   it('перезарядка: нельзя и видно, сколько ждать', () => {
-    const s = state({ minefields: { fields: {}, readyAt: { F: 4000 } } });
+    const s = state({ minefields: { readyAt: { F: 4000 } } });
     expect(minelayerOffer(fleet(), s, data, 'p1')).toEqual({
       ready: false,
       reason: 'cooldown',
@@ -54,21 +54,39 @@ describe('SM-3.5 — кнопка «Поставить мины» и свои п
     });
   });
 
-  it('на карте только свои поля с зарядом', () => {
+  it('на карте только свои мины-отряды с зарядами', () => {
+    const mine = (id: string, owner: string, count: number): Fleet => ({
+      id, owner, location: 'N', movement: null, traits: [], battleId: null,
+      units: [{ unit: 'mine', count, modules: ['mine_layer'] }],
+    });
     const s = state({
+      fleets: { 'm:b': mine('m:b', 'p1', 2), 'm:a': mine('m:a', 'p1', 1), 'm:c': mine('m:c', 'p2', 3), F: fleet() },
+    });
+    expect(ownMinefields(s, 'p1', data)).toEqual([
+      { fleetId: 'm:a', charge: 1 },
+      { fleetId: 'm:b', charge: 2 },
+    ]);
+    expect(ownMinefields(state(), 'p1', data)).toEqual([]);
+  });
+});
+
+describe('ревью #1411 — установка мин находит своего носителя', () => {
+  it('дорожная установка: носитель — по ключу среза, знак не теряется', () => {
+    const edge = { from: 'N', to: 'M', t: 0.5 };
+    const layer = fleet({ location: null, edge });
+    const s = state({
+      fleets: { F: layer },
       minefields: {
-        fields: {
-          B: { p1: { charge: 2, hit: 0.1 } },
-          A: { p1: { charge: 1, hit: 0.1 }, p2: { charge: 4, hit: 0.1 } },
-          C: { p2: { charge: 3, hit: 0.1 } },
-        },
         readyAt: {},
+        installations: {
+          F: { owner: 'p1', readyAt: 5000, location: null, edge, stack: { unit: 'mine', count: 3 } },
+          G: { owner: 'p2', readyAt: 5000, location: 'N', stack: { unit: 'mine', count: 3 } },
+        },
       },
     });
-    expect(ownMinefields(s, 'p1')).toEqual([
-      { node: 'A', charge: 1 },
-      { node: 'B', charge: 2 },
-    ]);
-    expect(ownMinefields(state(), 'p1')).toEqual([]);
+    const marks = ownInstallations(s, 'p1');
+    expect(marks.map((m) => m.layerId)).toEqual(['F']);
+    expect(marks[0]!.layer).toBe(layer);
+    expect(marks[0]!.job.location).toBeNull();
   });
 });

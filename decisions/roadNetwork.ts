@@ -103,6 +103,9 @@ export function lanePieceT(piece: LanePiece, k: number): number {
 /** Развилка на карте — МЕСТО (ROADS-4): где она, чья это тропа и к каким соседям она ведёт. */
 export interface ForkMark {
   province: string;
+  /** Номер тропы в `roads.trails` провинции — им ядро адресует развилку: крепость на
+   *  развилке ставится приказом `station.deploy { planetId: province, trail }` (FORT-6.1). */
+  trail: number;
   at: NetPoint;
   exits: string[];
 }
@@ -118,12 +121,12 @@ export function forkMarks(planets: Readonly<Record<string, NetPlanet>>): ForkMar
   for (const id of Object.keys(planets).sort()) {
     const p = planets[id]!;
     const links = new Set(p.links ?? []);
-    for (const trail of p.roads?.trails ?? []) {
+    for (const [index, trail] of (p.roads?.trails ?? []).entries()) {
       if (!trail.fork) continue;
       const exits = trail.exits.filter(
         (n) => links.has(n) && planets[n] && hasRoad(planets, id, n),
       );
-      if (exits.length > 0) out.push({ province: id, at: trail.fork, exits });
+      if (exits.length > 0) out.push({ province: id, trail: index, at: trail.fork, exits });
     }
   }
   return out;

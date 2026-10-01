@@ -326,6 +326,29 @@ body.holo-ui #holo-selection-window.has-info #side .phead{position:static;column
 body.holo-ui #holo-selection-window.has-info #side .ptabs{column-span:all;margin:8px 0 10px;}
 body.holo-ui #holo-selection-window.has-info #side .pcols{columns:auto;column-rule:none;}
 body.holo-ui #holo-selection-window.details-open{width:min(1180px,calc(100vw - 120px));}
+/* ОКНО МИРА — по содержимому (переработка 2026-09-29; заказ владельца: «если для окна не
+   так много информации, то пусть сжимаются»). Ширина идёт от числа блоков открытой вкладки:
+   блок — колонка ~230px, два блока — окно в две колонки, а не четыре, из которых три пусты.
+   Высота — по содержимому до потолка экрана. Шапка, факты и вкладки ширину не задают: их
+   строки переносятся внутри той, что нужна блокам. Неразведанный мир (`.pscan`) — одна
+   узкая колонка. С приказами слева окно остаётся прежним широким. */
+body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pscroll > :is(.ptabs,.pscan)){
+  --holo-window-max-height:min(600px,calc(100dvh - 140px));width:min(560px,calc(100vw - 24px));}
+body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pscroll > .pscan),
+body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pscroll > .ptabs):not(:has(#side .pcols > .block:nth-child(2))){
+  width:min(440px,calc(100vw - 24px));}
+body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pcols > .block:nth-child(3)){
+  width:min(810px,calc(100vw - 150px));}
+body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pcols > .block:nth-child(4)){
+  width:min(1040px,calc(100vw - 150px));}
+body.holo-ui #holo-selection-window.has-info #side .pscroll:has(> :is(.ptabs,.pscan)){
+  columns:auto;column-rule:none;overflow-x:hidden;overflow-y:auto;height:auto;}
+body.holo-ui #holo-selection-window.has-info #side .pscroll:has(> .ptabs) .pcols{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));align-items:start;gap:0 18px;}
+body.holo-ui #holo-selection-window.has-info #side .pscroll:has(> .ptabs) .pcols > .block{min-width:0;}
+/* Факты липнут к шапке: одна полоса «кто · что даёт · что сделать», граница — под ними. */
+body.holo-ui #holo-selection-window #side .phead:has(+ .pfacts){margin-bottom:0;border-bottom:0;padding-bottom:6px;background:none;}
+body.holo-ui #holo-selection-window #side .phead + .pfacts{padding-bottom:10px;border-bottom:1px solid var(--line-hi);}
 /* Titles stay graspable; content and controls retain their own pointer/scroll gestures. */
 body.holo-ui .holo-floating-window{
   position:fixed!important;right:auto!important;bottom:auto!important;margin:0!important;transform:none!important;

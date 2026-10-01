@@ -940,3 +940,21 @@ describe('victory — PvE-исход (PVE-4)', () => {
     expect(r.state.match).toMatchObject({ status: 'ended', reason: 'timeout' });
   });
 });
+
+// С MSB-9 штурмующий десант весь бой живёт плацдармом на чужой земле — счёт юнитов обязан
+// его видеть (замечание Codex на #1392), иначе армия «пропадала» на время штурма.
+describe('victory — десант на плацдарме в счёте юнитов', () => {
+  it('войска на чужом плацдарме считаются их владельцу', () => {
+    const kernel = createKernel([victoryModule]);
+    const state: GameState = {
+      ...baseState(),
+      planets: {
+        A: planet('A', 'p1'),
+        B: planet('B', 'p2', { beachheads: [{ owner: 'p1', units: [{ unit: 'cruiser', count: 3 }] }] }),
+      },
+    };
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match.scores?.p1?.units).toBe(3);
+    expect(r.state.match.scores?.p2?.units).toBe(0);
+  });
+});

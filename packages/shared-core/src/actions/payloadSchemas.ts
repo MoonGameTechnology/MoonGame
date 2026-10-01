@@ -60,8 +60,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'hero.unequip': z.object({ heroId: id, abilityId: id }),
   'hero.install': z.object({ heroId: id, moduleId: id }),
   'hero.uninstall': z.object({ heroId: id, moduleId: id }),
-  // station.ts
-  'station.deploy': z.object({ planetId: id }),
+  // station.ts. `trail` — крепость на развилке этой тропы провинции `planetId` (FORT-6.1).
+  'station.deploy': z.object({ planetId: id, trail: z.number().int().nonnegative().optional() }),
   // seatClaim.ts (ENTRY-3). Оба поля необязательны: заявка без выбора законна —
   // игрок берёт место с домом из расклада и пустым советом. Совет капается двумя
   // и здесь, и в обработчике: схема режет явную чушь до редьюсера, обработчик

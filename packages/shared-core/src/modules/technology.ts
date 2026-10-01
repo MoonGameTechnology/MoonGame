@@ -151,6 +151,11 @@ function countUnit(state: GameState, playerId: string, unit: string): number {
     if (f.owner === playerId) total += inStacks(f.units) + inStacks(f.landing);
   }
   for (const p of ownedPlanets(state, playerId)) total += inStacks(p.garrison);
+  // Десант на чужой земле — тоже его войска (замечание Codex на #1392: с MSB-9 штурмующий
+  // десант весь бой живёт плацдармом, а не в трюме).
+  for (const p of Object.values(state.planets)) {
+    for (const b of p.beachheads ?? []) if (b.owner === playerId) total += inStacks(b.units);
+  }
   return total;
 }
 
@@ -386,7 +391,8 @@ function boostResearch(action: Action, h: HandlerContext): void {
 
 export const technologyModule: GameModule = {
   id: 'technology',
-  version: '1.0.0',
+  // 1.1.0: условие «есть юнит» видит и десант на плацдарме.
+  version: '1.1.0',
   setup(api) {
     api.onAction('technology.research', startResearch);
     api.onAction('technology.boost', boostResearch);
