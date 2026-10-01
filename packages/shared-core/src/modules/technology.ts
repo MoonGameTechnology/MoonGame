@@ -14,6 +14,7 @@ import type {
 } from '../state/gameState';
 import { scientistsOf } from '../state/gameState';
 import { canAfford, payCost } from '../util/treasury';
+import { isForkSite } from '../state/forkSite';
 
 interface ResearchPayload {
   technology: string;
@@ -178,7 +179,9 @@ export function conditionMet(
 ): boolean {
   switch (cond.type) {
     case 'own_sectors':
-      return ownedPlanets(state, playerId).length >= cond.min;
+      // Площадка крепости на развилке — не сектор: она стоит на дороге, а не на карте
+      // провинций (замечание Codex на #1410: каждая крепость приближала порог).
+      return ownedPlanets(state, playerId).filter((p) => !isForkSite(p)).length >= cond.min;
     case 'has_building':
       return countBuilding(state, playerId, cond.building) >= cond.min;
     case 'controls_planet_type':
@@ -392,7 +395,8 @@ function boostResearch(action: Action, h: HandlerContext): void {
 export const technologyModule: GameModule = {
   id: 'technology',
   // 1.1.0: условие «есть юнит» видит и десант на плацдарме.
-  version: '1.1.0',
+  // 1.2.0: площадка крепости на развилке не считается сектором (замечание Codex на #1410).
+  version: '1.2.0',
   setup(api) {
     api.onAction('technology.research', startResearch);
     api.onAction('technology.boost', boostResearch);

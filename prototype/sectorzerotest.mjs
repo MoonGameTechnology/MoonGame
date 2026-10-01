@@ -140,6 +140,9 @@ const hooks = `window.__szTest = {
   end: () => { s.pve.waveNumber = s.pve.totalWaves; s.match.status = 'ended'; s.match.winner = 'p1'; s.match.winners = ['p1']; s.match.endedAt = s.time; },
   // Счёт уничтоженных игроком (PveState.tally, PVR-6.20) — чтобы итоги показали их плату.
   kills: (n) => { s.pve.tally = { ...(s.pve.tally ?? {}), p1: { lost: s.pve.tally?.p1?.lost ?? 0, destroyed: n } }; },
+  // Пришедшие волны — чтобы карточке выхода было что платить (PVR-6.38: платят волны, а не
+  // сам забег).
+  waves: (n) => { s.pve.waveNumber = n; },
   // Комиксы глав: арт владельца ещё не приехал — робот подкладывает свой реестр.
   comics: registry => { comicArt.registry = registry; },
   comicsSeen: () => sectorProgress.comicsSeen,
@@ -650,10 +653,25 @@ try {
     // ⌂ в экспедиции спрашивает (решение владельца 2026-09-26): «Продолжить» оставляет забег,
     // «В меню» уводит с сохранением, «Завершить и забрать награду» — та же сдача с итогами.
     // На ПК ⌂ в полосе скорости спрятан — видимый выход там шеврон «‹».
+    // Только что начатый забег (баг-репорт владельца 2026-09-28): сдача не платит ничего, и
+    // карточка не обещает ни награды, ни ×2 — кнопка просто завершает экспедицию.
     await page.locator('#holo-back').click();
     await page.locator('#abandon').waitFor({ state: 'visible' });
     assert.match(await page.locator('#abandon-title').textContent(), /Выйти из экспедиции\?|Leave the expedition\?/);
     assert(await page.locator('#abandon-menu').isVisible(), '⌂: есть «В меню»');
+    assert.match(
+      await page.locator('#abandon-reward').textContent(),
+      /^(Заберёте сейчас: \+0 данных, \+0 ⌖|You take now: \+0 data, \+0 ⌖)$/,
+      'сдача в первую секунду — ноль',
+    );
+    assert.match(await page.locator('#abandon-go').textContent(), /^(Завершить экспедицию|End expedition)$/, 'нечего забирать');
+    assert.doesNotMatch(await page.locator('#abandon-text').textContent(), /удвоить за ролик|doubled for an ad/, 'нечего удваивать');
+    await page.locator('#abandon-stay').click();
+    await page.locator('#abandon').waitFor({ state: 'hidden' });
+    // Пришла волна — есть что забрать и что удвоить.
+    await page.evaluate(() => window.__szTest.waves(1));
+    await page.locator('#holo-back').click();
+    await page.locator('#abandon').waitFor({ state: 'visible' });
     assert.match(await page.locator('#abandon-go').textContent(), /Завершить и забрать награду|End and collect the reward/);
     assert.match(await page.locator('#abandon-text').textContent(), /удвоить за ролик|doubled for an ad/, 'дев-сборка с рекламой: ×2 названо');
     assert.match(

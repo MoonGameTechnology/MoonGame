@@ -44,15 +44,20 @@ export function capitalOffer(mine: boolean, isCapital: boolean, inhabited: boole
   return inhabited ? 'designate' : 'none';
 }
 
-/** Предложение про точку удержания (правила 1, 4–6). */
+/** Предложение про точку удержания (правила 1, 4–6). `settable` — можно ли этот узел
+ *  ПОСТАВИТЬ точкой (площадку крепости на развилке ядро не принимает, `steward` 1.1.0);
+ *  уже записанную точку снять можно всегда — ядро это разрешает, и иначе она занимала бы
+ *  лимит до гибели крепости (замечание Codex на #1416). */
 export function holdOffer(
   mine: boolean,
   techDone: boolean,
   isPoint: boolean,
   used: number,
   max: number,
+  settable = true,
 ): HoldOffer {
   if (!mine || !techDone) return 'none';
   if (isPoint) return 'clear';
+  if (!settable) return 'none';
   return used < max ? 'set' : 'set-disabled';
 }

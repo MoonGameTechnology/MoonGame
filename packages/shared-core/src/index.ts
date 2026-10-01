@@ -132,7 +132,7 @@ export {
   type RoadInput,
   type TrunkSpan,
 } from './state/roads';
-export { forkPoint, forkSiteEdge, forkSiteId, isForkSite } from './state/forkSite';
+export { forkPoint, forkSiteEdge, forkSiteId, forkSiteInBattle, isForkSite } from './state/forkSite';
 export {
   sectorKindDef,
   provinceScore,
@@ -188,6 +188,7 @@ export {
   radarSignatures,
   isVisibleTo,
   engagementOf,
+  inVisionBloc,
   fleetRadarRange,
   stackRadarRange,
   BLACKOUT_MULT,

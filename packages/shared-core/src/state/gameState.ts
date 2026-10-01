@@ -812,6 +812,10 @@ export interface MinefieldState {
   readyAt: Record<FleetId, number>;
   ownerReadyAt?: Record<PlayerId, number>;
   installations?: Record<FleetId, MinelayingJob>;
+  /** Флот → мировое время его последнего подрыва на дороге. Одна точка дороги — один
+   *  подрыв за вход, сколько бы мин и встреч с ними ни сработало в этот же момент (ревью
+   *  #1411). Снимается, как только мировое время ушло дальше. */
+  struck?: Record<FleetId, number>;
 }
 
 /**

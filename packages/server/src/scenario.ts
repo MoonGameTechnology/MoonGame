@@ -226,7 +226,29 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '59'; // SM-3.6: мина — неподвижный отряд. Членство и
+export const MODULE_MANIFEST_VERSION = '63'; // Ревью #1416. Членство и порядок не тронуты;
+// `combat` 3.5.0 называет флоты боя в `battle.resolved`, и `fleet-ops` 1.7.0 по нему будит
+// слияние, приостановленное боем; `construction` 1.4.0 держит повтор очереди, пока узел
+// подавлен (обстрел, бой, бой у площадки развилки — теперь в обе стороны дороги).
+// export const MODULE_MANIFEST_VERSION = '62'; // Ревью крепости на развилке (#1410). Членство
+// и порядок не тронуты; площадка — не мир: `technology` 1.2.0 не считает её сектором, `steward`
+// 1.1.0 не берёт её точкой удержания и снимает точку при `station.destroyed`, `shuttle` 1.5.0 не
+// сажает на неё десант; `construction` 1.3.0 ставит её стройку на паузу в бою с её орудиями.
+// Заодно `fleet-ops` 1.6.0: слияние, приостановленное высадкой, созревает по её концу (#1415).
+// export const MODULE_MANIFEST_VERSION = '61'; // Ревью высадки (#1409). Членство и порядок
+// не тронуты; `combat` 3.4.0 отдаёт мир и продолжает штурм только берегами завершённого боя
+// (все уцелевшие враги нового хозяина вступают в новый бой, берега без боя остаются), а
+// посадка на борт не уводит трюм в минус; `fleet-ops` 1.5.0 не сливает флот на высадке;
+// `fleetBrood` 1.2.0 не растит выводок на высадке; `shuttle` 1.4.0 — подкрепление берегу без
+// боя продолжает штурм.
+// export const MODULE_MANIFEST_VERSION = '60'; // Ревью мины (#1411). Членство и порядок не
+// тронуты; мина — отряд без приказов: общий пропуск приказов флота (`util/fleet`) и
+// `standing-orders` 1.1.0, `fleet-repair` 1.1.0, `instant-repair` 1.2.0, `forced-march`
+// 1.1.0, `extraction` 1.1.0 отбивают её `E_MINE_PASSIVE`; `orbital` 1.2.0 не даёт ей
+// обстреливать и делить залп ПВО; `shuttle` 1.3.0 не бьёт невидимую мину; `minefield` 2.1.0
+// взрывает мины одной точки дороги одним подрывом (новое поле `minefields.struck`) и не
+// назначает повторную встречу при пополнении.
+// export const MODULE_MANIFEST_VERSION = '59'; // SM-3.6: мина — неподвижный отряд. Членство и
 // порядок не тронуты; `minefield` 2.0.0 ставит мину отрядом во `fleets` (юнит `mine`) и
 // подрывает её при встрече вплотную, флот летит дальше; `combat` 3.3.0 не заводит бой с миной,
 // `intercept` 1.3.0 не сводит стоящую мину со стоящим флотом, `fleet-ops` 1.4.0 — «Атака» по

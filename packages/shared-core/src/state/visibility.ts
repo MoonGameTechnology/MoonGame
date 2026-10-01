@@ -456,6 +456,15 @@ function fightsIn(battle: Pick<Battle, 'sides'>, bloc: ReadonlySet<PlayerId>): b
   return battle.sides.some((side) => side.owner !== null && bloc.has(side.owner));
 }
 
+/** Входит ли кто-то из `owners` в блок зрения зрителя (он сам, союзники, обмен картами).
+ *  Нужен там, где боя в состоянии уже нет: бой, начавшийся и кончившийся между двумя
+ *  кадрами, знают только по событиям, и аудиторию ему отвечает список его сторон. */
+export function inVisionBloc(state: GameState, viewerId: PlayerId, owners: Iterable<PlayerId | null>): boolean {
+  const bloc = new Set(visionBloc(state, viewerId));
+  for (const owner of owners) if (owner !== null && bloc.has(owner)) return true;
+  return false;
+}
+
 /** Бои, в которых дерётся зритель или его блок зрения, и флоты этих боёв. */
 export interface Engagement {
   battles: Set<BattleId>;
@@ -768,6 +777,15 @@ function project(
   // one never identified shows nothing.
   const remembered: PlanetId[] = [];
   const memory = state.fog?.[viewerId];
+  // Миры, на земле которых идёт СВОЙ наземный бой зрителя (или его блока зрения). Бой
+  // проекция и так оставляет (`engagementOf`), а обе его стороны живут в самом мире —
+  // гарнизон и плацдармы. Без них неопознанный мир отдавал бы бой с пустыми сторонами или
+  // протухший снимок памяти (замечание Codex на #1408).
+  const engagedBattles = engagementOf(state, viewerId).battles;
+  const groundFights = new Set<PlanetId>();
+  for (const b of Object.values(state.battles)) {
+    if (b.phase === 'ground' && engagedBattles.has(b.id)) groundFights.add(b.location);
+  }
   for (const planet of Object.values(view.planets)) {
     // BLD-1. Очередь стройки — БУДУЩЕЕ НАМЕРЕНИЕ, ровно то, за что ниже режут
     // `scheduled` и выше — цепочки приказов: «что он собирается построить» это разведка
@@ -839,6 +857,16 @@ function project(
       delete planet.terrain;
       delete planet.planetType;
       delete planet.kind;
+    }
+    // Свой наземный бой: его стороны — живые. Хозяин, гарнизон и плацдармы — то, с чем и
+    // против кого зритель дерётся прямо сейчас; постройки и склады мира остаются в тумане.
+    if (groundFights.has(planet.id)) {
+      const live = state.planets[planet.id]!;
+      planet.owner = live.owner;
+      planet.garrison = live.garrison.map((st) => ({ ...st }));
+      if (live.beachheads) {
+        planet.beachheads = live.beachheads.map((b) => ({ ...b, units: b.units.map((st) => ({ ...st })) }));
+      }
     }
   }
   remembered.sort();

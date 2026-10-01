@@ -595,8 +595,9 @@ function landAssault(h: HandlerContext, fleet: Fleet): void {
     capturePlanetByBeachhead(h, planet, { owner: fleet.owner, units: troops }, planet.owner);
     // Чужие берега, оставшиеся на этой земле без боя (перемирие, ничья), решаются так же,
     // как после захвата в бою: враг нового хозяина продолжает штурм, остальные уходят.
-    const next = settleBeachheads(h, planet, fleet.owner);
-    if (next !== null) h.emit('beachhead.landed', { planetId: planet.id, owner: next });
+    for (const next of settleBeachheads(h, planet, fleet.owner)) {
+      h.emit('beachhead.landed', { planetId: planet.id, owner: next });
+    }
   } else {
     const own = (planet.beachheads ?? []).find((b) => b.owner === fleet.owner);
     if (own) own.units.push(...troops);
@@ -638,8 +639,11 @@ function splitClaimed(
  * захвата оставался на борту своих флотов.
  *
  *  - ВРАГ нового хозяина остаётся на земле — за этот мир он и дрался. Штурм продолжается:
- *    возвращается владелец первого такого берега, и вызывающий объявляет `beachhead.landed`
- *    ПОСЛЕ того, как закрыл прежний бой (та же ловушка порядка, что у MSB-4).
+ *    возвращаются владельцы ВСЕХ таких берегов, и вызывающий объявляет `beachhead.landed`
+ *    каждому ПОСЛЕ того, как закрыл прежний бой (та же ловушка порядка, что у MSB-4).
+ *    Первое объявление заводит бой, остальные в него вступают. Прежде возвращался только
+ *    первый берег (замечание Codex на #1409): второй враг оставался на земле вне боя, а
+ *    гарнизон между боями лечился до полного — совместный штурм распадался на очередь.
  *  - Остальные ВОЗВРАЩАЮТСЯ НА БОРТ своих флотов над этим миром — в порядке id флотов и
  *    в пределах свободного трюма (`fleetHoldFree`), как если бы и не сходили.
  *  - Кому места не хватило: СОЮЗНИК нового хозяина остаётся гарнизоном взятого мира
@@ -647,7 +651,7 @@ function splitClaimed(
  *    союзе с новым хозяином — распускаются: чужой гарнизон им не место, а плацдарм без боя
  *    модель не держит (MSB-4: «поля после боя не остаётся»). Этот край записан в роадмапе.
  */
-function settleBeachheads(h: HandlerContext, planet: Planet, owner: string): string | null {
+function settleBeachheads(h: HandlerContext, planet: Planet, owner: string): string[] {
   type Beachhead = NonNullable<Planet['beachheads']>[number];
   const hostile: Beachhead[] = [];
   for (const b of planet.beachheads ?? []) {
@@ -662,7 +666,7 @@ function settleBeachheads(h: HandlerContext, planet: Planet, owner: string): str
   }
   if (hostile.length > 0) planet.beachheads = hostile;
   else delete planet.beachheads;
-  return hostile[0]?.owner ?? null;
+  return hostile.map((b) => b.owner);
 }
 
 /** Посадить войска `owner` на его флоты над миром `at`, в пределах свободного трюма, в
@@ -675,7 +679,11 @@ function boardOwnFleets(h: HandlerContext, at: string, owner: string, units: Uni
     const next: UnitStack[] = [];
     for (const s of rest) {
       const size = h.ctx.data.units[s.unit]?.stats.cargoSize ?? 1;
-      const fit = size > 0 ? Math.min(s.count, Math.floor(fleetHoldFree(h.state, f, h.ctx.data) / size)) : s.count;
+      // Свободный трюм бывает ОТРИЦАТЕЛЬНЫМ: вылеты держат места, а вместимость ушла с
+      // потерянными корпусами. Без нуля снизу `fit` уходил в минус, и остаток `s.count - fit`
+      // ВЫРАСТАЛ — союзник получал гарнизон больше, чем было на берегу (замечание Codex на #1409).
+      const free = Math.max(0, fleetHoldFree(h.state, f, h.ctx.data));
+      const fit = size > 0 ? Math.min(s.count, Math.floor(free / size)) : s.count;
       if (fit > 0) (f.landing ??= []).push({ ...s, count: fit });
       if (s.count - fit > 0) next.push({ ...s, count: s.count - fit });
     }
@@ -866,7 +874,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // выигравший десант становится гарнизоном, проигравший исчезает вместе с боем.
   // Иначе на карте завелись бы вечные «чужие войска на моей земле», которых в модели
   // нет и заводить которые этот кирпич не стал.
-  let resumeAssaultFor: string | null = null;
+  let resumeAssaultFor: string[] = [];
   if (battle.phase === 'ground' && battle.sides.some((x) => x.ref.kind === 'beachhead')) {
     const planet = h.state.planets[battle.location];
     if (planet) {
@@ -877,17 +885,27 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
       // допущением в §0.0 №4: если первый берег выбит, а мир дожал второй, отдавать
       // мир мёртвому значило бы отдать его тому, кого на земле уже нет.
       const alive = (planet.beachheads ?? []).filter((b) => b.units.some((st) => st.count > 0));
-      if (!dAlive && alive[0] && planet.owner === defender.owner) {
-        const [first, ...others] = alive;
-        capturePlanetByBeachhead(h, planet, first!, defender.owner);
+      // «Плацдарм» — ЭТОГО боя. На земле могут стоять берега, оставшиеся без боя после
+      // перемирия или ничьей: они в этом бою не дрались, поэтому мир не получают и штурм не
+      // продолжают — хотя и не стираются (замечание Codex на #1409: прежде мир уходил
+      // первому берегу списка, даже простоявшему весь бой в стороне).
+      const fought = alive.filter((b) =>
+        battle.sides.some((x) => x.ref.kind === 'beachhead' && x.ref.owner === b.owner),
+      );
+      const idle = alive.filter((b) => !fought.includes(b));
+      if (!dAlive && fought[0] && planet.owner === defender.owner) {
+        const first = fought[0];
+        capturePlanetByBeachhead(h, planet, first, defender.owner);
         // Остальные выжившие берега не стираются (замечание Codex на #1392): враг нового
         // хозяина продолжает штурм, остальные уходят на борт или остаются у союзника.
-        planet.beachheads = others;
-        resumeAssaultFor = settleBeachheads(h, planet, first!.owner);
-      } else if (!dAlive || alive.length === 0) {
-        // Все берега выбиты — поля после боя не остаётся. Иначе на карте завелись бы вечные
-        // «чужие войска на моей земле», которых в модели нет: плацдарм ВРЕМЕННЫЙ.
-        delete planet.beachheads;
+        planet.beachheads = alive.filter((b) => b !== first);
+        resumeAssaultFor = settleBeachheads(h, planet, first.owner);
+      } else if (!dAlive || fought.length === 0) {
+        // Берега этого боя выбиты — их поля после боя не остаётся. Иначе на карте завелись
+        // бы вечные «чужие войска на моей земле», которых в модели нет: плацдарм ВРЕМЕННЫЙ.
+        // Берега без боя остаются, какими были: этот бой их не касался.
+        if (idle.length > 0) planet.beachheads = idle;
+        else delete planet.beachheads;
       } else if (end !== 'decided') {
         // ПЕРЕМИРИЕ ИЛИ НИЧЬЯ (`MAX_COMBAT_ROUNDS`): бой закончен, и заводить его заново
         // нельзя (замечание Codex на #1392). Перемирие сняло вражду — драться незачем; ничья
@@ -906,8 +924,10 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
         // Перезапуск штурма объявляется НИЖЕ, после удаления этого боя: обработчик
         // `beachhead.landed` ищет идущий наземный бой на мире и, увидев ещё не удалённый,
         // «вступил» бы в бой, который через строку исчезнет, — берег остался бы на земле
-        // без боя вовсе.
-        resumeAssaultFor = alive[0]?.owner ?? null;
+        // без боя вовсе. Объявляются ВСЕ уцелевшие берега этого боя: первое объявление
+        // заводит бой, остальные в него вступают (прежде объявлялся один первый, и
+        // остальные оставались на земле вне боя).
+        resumeAssaultFor = fought.map((b) => b.owner);
       }
     }
   }
@@ -919,9 +939,9 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   for (const side of battle.sides) releaseOrDestroyFleet(h, side.ref, battle.id);
   delete h.state.battles[battle.id];
   // Штурм продолжают уцелевшие берега (MSB-4): теперь, когда прежний бой удалён,
-  // обработчик заведёт новый и подтянет в него остальные плацдармы.
-  if (resumeAssaultFor !== null) {
-    h.emit('beachhead.landed', { planetId: battle.location, owner: resumeAssaultFor });
+  // первое объявление заводит новый бой, остальные вступают в него своими сторонами.
+  for (const owner of resumeAssaultFor) {
+    h.emit('beachhead.landed', { planetId: battle.location, owner });
   }
   h.emit('battle.resolved', {
     battleId: battle.id,
@@ -939,6 +959,10 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
       : [...new Set(aliveSides.map((x) => x.owner).filter((o): o is string => o !== null))].sort(),
     rounds: battle.round,
     end,
+    // Флоты-участники: бой ПРИОСТАНАВЛИВАЕТ их намерения (слияние), и тому, кто их
+    // держит, нужно знать, кого будить, — у стоящих после боя флотов нового прибытия не
+    // будет (замечание Codex на #1416). Погибшие тут тоже есть: их уже нет в состоянии.
+    fleets: battle.sides.flatMap((x) => (x.ref.kind === 'fleet' ? [x.ref.fleetId] : [])),
   });
 
   // CMB-6. Здесь стоял ранний выход «после ничьей не сцеплять НИКОГО», и его причина
@@ -1102,7 +1126,10 @@ export const combatModule: GameModule = {
   // 3.2.0: заявка высадки замораживает десант; плацдарм не перезапускается после перемирия
   // и ничьей; выжившие берега союзников при захвате не стираются (замечания Codex на #1392).
   // 3.3.0: мина — не противник в бою; встреча с ней — подрыв (SM-3.6).
-  version: '3.3.0',
+  // 3.4.0: захват и продолжение штурма — только берегами завершённого боя, все уцелевшие
+  // враги нового хозяина вступают в новый бой; посадка на борт не уводит трюм в минус
+  // (замечания Codex на #1409).
+  version: '3.5.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };

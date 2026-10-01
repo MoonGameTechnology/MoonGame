@@ -11,10 +11,12 @@ import { missingHull, dockRepairCost, fleetAtOwnDock } from '../util/repair';
 import { isAllied } from '../util/combat';
 import { canAfford, payCost } from '../util/treasury';
 import { ownFleet } from '../util/combat';
+import { rejectMine } from '../util/fleet';
 
 export const fleetRepairModule: GameModule = {
   id: 'fleet-repair',
-  version: '1.0.0',
+  // 1.1.0: мину не чинят — она без приказов (`E_MINE_PASSIVE`, ревью #1411).
+  version: '1.1.0',
   setup(api) {
     api.onAction('fleet.repair', (action, h) => {
       const p = action.payload as { fleetId?: unknown };
@@ -22,6 +24,7 @@ export const fleetRepairModule: GameModule = {
       const f = ownFleet(h.state, p.fleetId);
       // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
       if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       if (f.battleId) return h.reject('E_IN_BATTLE');
       const allied = (a: string, b: string): boolean => isAllied(h, a, b);
       if (!fleetAtOwnDock(f, h.state, h.ctx.data, allied)) return h.reject('E_NO_DOCK');

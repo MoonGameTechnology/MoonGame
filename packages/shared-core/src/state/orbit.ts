@@ -1,5 +1,6 @@
 import { getStance } from './diplomacy';
 import { hasOrbit, isBombardable } from './sectorKind';
+import { isMineFleet } from './minefields';
 import type { GameData } from '../data/schemas';
 import type { Fleet, GameState, PlanetId, PlayerId } from './gameState';
 
@@ -35,6 +36,12 @@ export function isActivelyBombarding(
   data: GameData,
 ): boolean {
   if (!fleet.bombarding || fleet.battleId || fleet.orbit !== 'near' || fleet.location === null) {
+    return false;
+  }
+  // Мина не обстреливает (ревью #1411): безоружный отряд морозил бы производство мира.
+  // Приказ `fleet.bombard` мине уже не отдать, но правило живёт и в общем предикате —
+  // по той же причине, по которой здесь стоят вид провинции и крепость.
+  if (isMineFleet(fleet, data)) {
     return false;
   }
   const planet = state.planets[fleet.location];
