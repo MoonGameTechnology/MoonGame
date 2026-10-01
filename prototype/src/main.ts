@@ -12868,7 +12868,10 @@ function renderSetup(): void {
   mapSelect.disabled = !!netSetup;
   $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-legacy-info' : isFrontier(setupMapId) ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
   const homeSelect = $('setup-home-id') as HTMLSelectElement;
-  homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
+  // Прототип «доделанного интерфейса»: мир в списке и в подсказке — по имени, а не по
+  // координате «C0R1» (правка 5); значение опции остаётся id.
+  const homeName = (id: string): string => (uiNextOn() ? worldName(setupMapId, id) : id);
+  homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(homeName(id))}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
   homeSelect.value = setupStart;
   renderSetupMap();
   renderSetupSlots();
@@ -12890,7 +12893,7 @@ function renderSetup(): void {
       free === 0
         ? t('seatpick.none-free')
         : ready
-          ? t('setup.home.pick', { home: setupStart })
+          ? t('setup.home.pick', { home: homeName(setupStart) })
           : t('setup.map-hint');
     for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
       c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
@@ -12900,7 +12903,7 @@ function renderSetup(): void {
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
   setupHintEl.textContent = t(rivals === 0 ? 'setup.home.solo' : 'setup.home.pick', {
-    home: setupStart,
+    home: homeName(setupStart),
   });
   for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
     c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
@@ -17848,6 +17851,16 @@ $('railcorp').addEventListener('click', () => corp?.open());
 // Слой включается классом `body.ui-next` (`?ui=next` или переключатель страницы-витрины).
 installUiNext({
   inMatch,
+  wallet: () => ({ sovereigns: SOVEREIGNS, warrants: metaMarket?.balance() ?? 0 }),
+  donate: () => {
+    hubNote.textContent = t('donate.soon');
+  },
+  auction: () => hubTab('auction'),
+  refresh: () => {
+    if (setupEl.style.display === 'flex') renderSetup();
+    if (sciWin.classList.contains('show')) sciPick.render();
+    profile?.repaint();
+  },
   toMap: () => {
     for (let i = 0; i < 16; i++) {
       const top = BACK_LAYERS.find((l) => l.isOpen());

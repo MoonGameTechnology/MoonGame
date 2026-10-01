@@ -167,6 +167,8 @@ export interface ProfileHost {
 export function initProfile(host: ProfileHost): {
   open: (login?: string) => void;
   close: () => void;
+  /** Repaint the open dossier as it stands (the page skin changed under it). */
+  repaint: () => void;
 } {
   let owned: string[] = [];
   let catalog: MedalEntry[] = [];
@@ -399,5 +401,8 @@ export function initProfile(host: ProfileHost): {
       detach('профиль: обновление с сервера', refresh(generation));
     },
     close,
+    repaint: () => {
+      if (host.root().classList.contains('show')) paint();
+    },
   };
 }

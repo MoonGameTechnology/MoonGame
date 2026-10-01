@@ -1,13 +1,23 @@
 /* Прототип «доделанного интерфейса» (prototype/src/uiNext.ts). Каждое правило — под
    body.ui-next: класс снят — игра выглядит как раньше, ни одно правило не действует. */
-#uin-nav,#uin-more,#uin-speed,#uin-keys,#uin-door,.uin-modes-head,.uin-mine-empty,.uin-only{display:none;}
+#uin-nav,#uin-more,#uin-speed,#uin-keys,#uin-door,#uin-wallet,.uin-modes-head,.uin-mine-empty,.uin-only,
+.uin-setup-head,.uin-pf-tabs{display:none;}
 /* Карточки хаба получают display от своих правил с большей точностью: без слоя — прятать наверняка. */
-body:not(.ui-next) :is(#uin-door,.uin-modes-head,.uin-mine-empty,.uin-only){display:none!important;}
+body:not(.ui-next) :is(#uin-door,#uin-wallet,.uin-modes-head,.uin-mine-empty,.uin-only,.uin-setup-head,.uin-pf-tabs){
+  display:none!important;}
 
 /* --- 11. Один шрифт текста, числа ровными столбцами, без КАПС с разрядкой ------------- */
 body.ui-next{
   --uin-font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
   --uin-ink:#e2f1f6;--uin-dim:#a9c6d1;--uin-line:rgba(118,206,229,.32);--uin-accent:#35d6e6;
+  /* Палитра всех экранов (правка 12): те же карточки, рамки и главная кнопка, что на хабе. */
+  --uin-head:#b4d3dd;--uin-white:#f2fdff;--uin-line-hi:rgba(140,233,242,.7);
+  --uin-card:rgba(8,26,38,.72);--uin-card-off:rgba(6,18,27,.5);--uin-sel:rgba(53,214,230,.14);
+  --uin-panel:linear-gradient(155deg,rgba(10,30,43,.985),rgba(3,12,23,.985));--uin-panel-line:rgba(118,206,229,.45);
+  --uin-primary:linear-gradient(135deg,rgba(53,214,230,.32),rgba(53,214,230,.08) 70%);
+  --uin-primary-hi:linear-gradient(135deg,rgba(53,214,230,.42),rgba(53,214,230,.12) 70%);
+  --uin-glow:0 0 0 1px rgba(53,214,230,.15),0 10px 32px rgba(53,214,230,.16);
+  --uin-good:#7ff0c0;--uin-warn:#ffb43a;
   font-variant-numeric:tabular-nums;
 }
 body.ui-next :is(div,span,b,strong,em,i,p,small,label,button,input,select,textarea,h1,h2,h3,h4,li,dt,dd,a,
@@ -199,3 +209,341 @@ body.ui-next #intro .uin-hint-text span{font-size:14px;line-height:1.4;color:#cf
 body.ui-next #intro .uin-hint .in-ok{flex:none;width:auto;margin:0;padding:0 16px;min-height:44px;}
 body.ui-next.holo-ui #intro{align-items:flex-end;padding-bottom:28px;}
 body.ui-next.holo-ui:has(#intro.show) #uin-keys{display:none!important;}
+
+/* --- 2.1 ПК: окна поверх карты влезают в экран и при увеличенном зуме -------------------- */
+/* Слой растит зум (правка 2), а окна мерят себя в vw/dvh, которые зум растит тоже: при 1,25
+   «высота экрана минус 48 px» становилась на 60 px выше экрана, и «Запуск» с «Назад» в
+   настройке схватки уходили за край. Здесь те же доли экрана, делённые на зум. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine){
+  body.ui-next.holo-ui #setup .sbox{width:min(1080px,calc(94vw / var(--pcz)));max-height:calc(var(--vph) - 48px);}
+  body.ui-next.holo-ui #settings .setbox{max-height:calc(var(--vph) - 48px);}
+  body.ui-next.holo-ui #scipick .twbox{max-height:calc(var(--vph) - 48px);}
+  body.ui-next.holo-ui #endscreen .es-box{max-height:calc(86dvh / var(--pcz));}
+  body.ui-next.holo-ui :is(#codex .cxbox,#codexhub .chbox){max-height:calc(82dvh / var(--pcz));}
+  body.ui-next.holo-ui #playercard .pcbox{max-height:calc(82dvh / var(--pcz));}
+  body.ui-next.holo-ui #splitdlg .sbox{max-height:calc(80dvh / var(--pcz));}
+  body.ui-next.holo-ui #corp .corpbox{max-height:calc(84dvh / var(--pcz));}
+  body.ui-next.holo-ui #recap .rcbox{max-height:calc(82dvh / var(--pcz));}
+}
+
+/* --- 12. Одна палитра на всех экранах: те же панели, карточки и главная кнопка, что на хабе -- */
+/* 12.1 Настройка схватки и выбор места в сетевой партии. */
+body.ui-next :is(#setup,#seatpick) .sbox{background:var(--uin-panel);border:1px solid var(--uin-panel-line);
+  border-radius:18px;box-shadow:0 18px 50px rgba(0,0,0,.6);}
+body.ui-next :is(#setup,#seatpick) .stitle{gap:12px;color:var(--uin-white);font-size:20px;font-weight:700;line-height:1.3;}
+body.ui-next :is(#setup,#seatpick) .stitle .dia{width:10px;height:10px;border:0;background:var(--uin-accent);
+  box-shadow:0 0 10px rgba(53,214,230,.6);}
+body.ui-next #setup .ssub{display:none;}
+body.ui-next #seatpick .ssub{font-size:14px;line-height:1.5;color:var(--uin-dim);}
+body.ui-next.holo-ui #setup .scol{padding:16px 18px;border:1px solid var(--uin-line);border-radius:14px;background:rgba(4,16,25,.55);}
+body.ui-next #setup :is(.scol > label:not(.sbx-check),.fph,.sspeedlabel){display:block;margin:16px 0 8px;font-size:14px;
+  font-weight:600;line-height:1.3;color:var(--uin-head);}
+body.ui-next #setup .scol > label:first-of-type{margin-top:0;}
+body.ui-next #setup .inp{min-height:48px;margin:0;padding:0 14px;border:1px solid var(--uin-line);border-radius:12px;
+  background:rgba(4,16,25,.9);color:var(--uin-ink);font-size:15px;}
+body.ui-next #setup .inp:focus-visible{outline:2px solid var(--uin-accent);outline-offset:2px;}
+body.ui-next #setup :is(.smaphint,.sspeedhint){margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--uin-dim);text-align:left;}
+body.ui-next #setup .smap{margin-top:10px;border:1px solid var(--uin-line);border-radius:12px;
+  background:radial-gradient(circle at 50% 40%,rgba(53,214,230,.08),transparent 70%),rgba(3,12,20,.9);}
+body.ui-next #setup .fpick{gap:8px;margin-bottom:0;}
+body.ui-next #setup .fchip{position:relative;gap:4px;min-height:64px;padding:11px 36px 11px 14px;border:1px solid var(--uin-line);
+  border-radius:12px;background:var(--uin-card);}
+body.ui-next #setup .fchip b{font-size:15px;font-weight:600;line-height:1.3;color:var(--uin-ink);}
+body.ui-next #setup .fchip span{font-size:13px;line-height:1.35;color:var(--uin-good);}
+body.ui-next #setup .fchip:hover{border-color:var(--uin-line-hi);}
+body.ui-next #setup .fchip.on{border-color:var(--uin-accent);background:var(--uin-sel);}
+body.ui-next #setup .fchip.on b{color:var(--uin-white);}
+body.ui-next #setup .fchip.on::after{content:'✓';position:absolute;top:10px;right:10px;}
+body.ui-next #setup .fchip.on::after,body.ui-next #scipick .sp-card .sp-tick{display:grid;place-items:center;width:20px;height:20px;
+  border-radius:50%;background:var(--uin-accent);color:#04161c;font-size:12px;font-weight:800;}
+/* Совет учёных строкой: подпись над именами, «изменить» справа. */
+body.ui-next #setup .scouncil{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"h go" "n go";
+  gap:2px 12px;min-height:60px;margin:16px 0 0;padding:10px 14px;border:1px solid var(--uin-line);border-radius:12px;
+  background:var(--uin-card);}
+body.ui-next #setup .scouncil .sc-h{grid-area:h;font-size:13px;color:var(--uin-dim);}
+body.ui-next #setup .scouncil .sc-n{grid-area:n;font-size:15px;font-weight:600;color:var(--uin-ink);}
+body.ui-next #setup .scouncil .sc-go{grid-area:go;align-self:center;font-size:14px;font-weight:600;color:#8ce9f2;}
+body.ui-next #setup .scouncil .sc-go::after{content:' ›';font-size:18px;}
+body.ui-next #setup .scouncil:hover{border-color:var(--uin-line-hi);}
+body.ui-next #setup .scouncil.partial{border-color:var(--uin-warn);}
+body.ui-next #setup .scouncil.partial .sc-n{color:#ffd79a;}
+/* Соперники: заголовок с числом и подсказкой, строки мест — карточками. */
+body.ui-next #setup #setup-solo-col{display:flex;flex-direction:column;}
+body.ui-next #setup #setup-solo-col > *{order:1;}
+body.ui-next #setup #setup-solo-col > #setup-network-create{order:2;}
+body.ui-next #setup #setup-solo-col > .sbx-check{order:3;}
+body.ui-next #setup .uin-setup-head{display:flex;flex-direction:column;gap:4px;margin:0 0 10px;}
+/* Телефон: колонки идут одна под другой — между ними отступ и черта, а не стык. */
+body.ui-next:not(.holo-ui) #setup .stitle{margin-bottom:14px;}
+body.ui-next:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;border-top:1px solid var(--uin-line);}
+body.ui-next #setup .uin-setup-head b{font-size:14px;font-weight:600;color:var(--uin-head);}
+body.ui-next #setup .uin-setup-head span{font-size:13px;line-height:1.45;color:var(--uin-dim);}
+body.ui-next #setup .tmrow{gap:8px;margin-bottom:8px;}
+body.ui-next #setup .tmtog{min-height:44px;padding:0 14px;border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);
+  color:var(--uin-ink);font-size:14px;font-weight:600;}
+body.ui-next #setup .tmtog.on{border-color:var(--uin-warn);background:rgba(255,180,58,.12);color:#ffd79a;}
+/* Sector Zero — режим со своей дверью на главном экране, а не настройка этой схватки. */
+body.ui-next #setup .tmrow .pve-btn{display:none;}
+body.ui-next #setup .tmhint{font-size:13px;color:var(--uin-dim);}
+body.ui-next #setup .sslots{gap:6px;margin-bottom:0;}
+body.ui-next #setup .srow{min-height:52px;gap:12px;padding:6px 6px 6px 14px;border:1px solid var(--uin-line);border-radius:12px;
+  background:var(--uin-card);color:var(--uin-ink);font-size:15px;}
+body.ui-next #setup .srow.off{opacity:1;border-style:dashed;border-color:rgba(118,206,229,.22);background:var(--uin-card-off);color:#93b2bd;}
+body.ui-next #setup .srow .dot{width:12px;height:12px;box-shadow:0 0 0 2px rgba(0,0,0,.45),0 0 8px currentColor;}
+body.ui-next #setup .srow.off .dot{opacity:.5;box-shadow:none;}
+body.ui-next #setup .srow .you{margin-right:6px;padding:4px 12px;border:1px solid rgba(53,214,230,.5);border-radius:999px;
+  background:var(--uin-sel);color:#bff6fb;font-size:13px;font-weight:600;}
+body.ui-next #setup .srow .stog{min-width:104px;min-height:40px;padding:0 12px;border:1px solid var(--uin-line);border-radius:10px;
+  background:rgba(255,255,255,.03);color:var(--uin-dim);font-size:14px;font-weight:600;}
+body.ui-next #setup .srow .stog:hover{border-color:var(--uin-line-hi);}
+body.ui-next #setup .srow .stog.ai{border-color:var(--uin-accent);background:var(--uin-sel);color:#dffaff;}
+body.ui-next #setup .srow .stog.strong{border-color:var(--uin-warn);background:rgba(255,180,58,.14);color:#ffd79a;}
+body.ui-next #setup .srow .tmchip{width:36px;height:36px;border-radius:9px;font-size:14px;}
+body.ui-next:not(.holo-still) #setup .srow .stog{transition:background-color .15s,border-color .15s,color .15s;}
+/* Скорость — одним переключателем. */
+body.ui-next #setup .sspeed{gap:4px;margin:10px 0 0;padding:4px;border:1px solid var(--uin-line);border-radius:12px;background:rgba(4,16,25,.7);}
+body.ui-next #setup .sspeed .spdchip{min-height:40px;padding:0 4px;border:0;border-radius:9px;background:transparent;color:var(--uin-dim);
+  font-size:15px;font-weight:600;}
+body.ui-next #setup .sspeed .spdchip:hover{color:var(--uin-ink);background:rgba(53,214,230,.06);}
+body.ui-next #setup .sspeed .spdchip.on{background:var(--uin-sel);color:var(--uin-white);box-shadow:inset 0 0 0 1px var(--uin-accent);}
+body.ui-next #setup #setup-network-create{align-self:stretch;min-height:44px;margin:16px 0 0;padding:0 16px;border:1px solid var(--uin-line);
+  border-radius:12px;background:var(--uin-card);color:var(--uin-ink);font-size:15px;font-weight:600;}
+body.ui-next #setup #setup-network-create:hover{border-color:var(--uin-line-hi);}
+/* Запуск — как главная дверь хаба; «Назад» — карточкой. */
+body.ui-next :is(#setup,#seatpick) .sgo{min-height:52px;border:1px solid var(--uin-accent);border-radius:12px;background:var(--uin-primary);
+  color:var(--uin-white);font-size:17px;font-weight:700;box-shadow:var(--uin-glow);}
+body.ui-next :is(#setup,#seatpick) .sgo:hover:not(:disabled){background:var(--uin-primary-hi);}
+body.ui-next :is(#setup,#seatpick) .sgo:disabled{opacity:.45;box-shadow:none;}
+body.ui-next :is(#setup,#seatpick) .scancel{min-height:44px;border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);
+  color:var(--uin-ink);font-size:15px;font-weight:600;}
+body.ui-next :is(#setup,#seatpick) .scancel:hover{border-color:var(--uin-line-hi);}
+body.ui-next .seat-row{min-height:56px;border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);}
+body.ui-next .seat-row:hover:not(.taken){border-color:var(--uin-line-hi);background:var(--uin-card);}
+body.ui-next .seat-row.selected{border-color:var(--uin-accent);background:var(--uin-sel);}
+body.ui-next .seat-name{font-size:15px;font-weight:600;color:var(--uin-ink);}
+body.ui-next :is(.seat-faction,.seat-status){font-size:13px;}
+body.ui-next .seat-faction{color:var(--uin-dim);}
+
+/* 12.2 Совет учёных. */
+body.ui-next #scipick .twbox{border:1px solid var(--uin-panel-line);border-radius:18px;background:var(--uin-panel);
+  box-shadow:0 18px 50px rgba(0,0,0,.6);}
+body.ui-next #scipick .lw-head{min-height:56px;padding:10px 12px 10px 18px;border-bottom:1px solid var(--uin-line);background:none;}
+body.ui-next #scipick .lw-head b{font-size:18px;font-weight:700;color:var(--uin-white);}
+body.ui-next #scipick .sp-cancel{min-height:40px;padding:0 14px;border:1px solid var(--uin-line);border-radius:10px;background:var(--uin-card);
+  color:var(--uin-ink);font-size:14px;}
+body.ui-next #scipick .sp-slots{gap:10px;}
+body.ui-next #scipick .sp-slot{min-height:104px;padding:14px 16px;border-radius:14px;}
+body.ui-next #scipick .sp-slot.filled{border:1px solid var(--uin-accent);background:var(--uin-primary);box-shadow:var(--uin-glow);}
+body.ui-next #scipick .sp-slot .sp-sn{padding-right:36px;font-size:16px;font-weight:700;color:var(--uin-white);}
+body.ui-next #scipick .sp-slot .sp-inf{font-size:13px;line-height:1.45;color:#bfe6ee;}
+body.ui-next #scipick .sp-slot.empty{border:1.5px dashed rgba(53,214,230,.55);background:rgba(53,214,230,.04);color:#8ce9f2;}
+body.ui-next #scipick .sp-slot.empty .sp-hint{font-size:14px;}
+body.ui-next #scipick .sp-rm{top:8px;right:8px;width:32px;height:32px;border:1px solid rgba(191,230,238,.4);border-radius:9px;
+  background:rgba(3,12,20,.4);color:#dffaff;font-size:14px;}
+body.ui-next #scipick .sp-rm:hover{border-color:#ff8f84;color:#ffb3ab;}
+body.ui-next #scipick .sp-warn{margin-top:12px;padding:12px 14px;border-radius:12px;font-size:14px;line-height:1.45;}
+body.ui-next #scipick .sp-h{margin:16px 0 10px;font-size:14px;font-weight:600;line-height:1.4;color:var(--uin-head);}
+body.ui-next #scipick .sp-roster{gap:8px;}
+body.ui-next #scipick .sp-card{gap:4px;min-height:72px;padding:12px 14px;border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);}
+body.ui-next #scipick .sp-card:hover:not(:disabled){border-color:var(--uin-line-hi);background:rgba(14,40,54,.85);box-shadow:none;}
+body.ui-next #scipick .sp-card .sp-cn{font-size:15px;font-weight:600;color:var(--uin-ink);}
+body.ui-next #scipick .sp-card .sp-inf{font-size:13px;line-height:1.45;color:var(--uin-dim);}
+/* Полный совет гасит остальных, но имя и влияние читаются: по ним и выбирают замену. */
+body.ui-next #scipick .sp-card:disabled{opacity:1;border-color:rgba(118,206,229,.16);background:var(--uin-card-off);}
+body.ui-next #scipick .sp-card:disabled .sp-cn{color:#9fb8c2;}
+body.ui-next #scipick .sp-card:disabled .sp-inf{color:#7f9aa5;}
+body.ui-next #scipick .sp-card.picked{border-color:var(--uin-accent);background:var(--uin-sel);}
+body.ui-next #scipick .sp-card.picked .sp-cn{color:var(--uin-white);}
+body.ui-next #scipick .sp-card.picked .sp-inf{color:#bfe6ee;}
+body.ui-next #scipick .sp-go{min-height:52px;margin-top:14px;border:1px solid var(--uin-accent);border-radius:12px;background:var(--uin-primary);
+  color:var(--uin-white);font-size:16px;font-weight:700;box-shadow:var(--uin-glow);}
+body.ui-next #scipick .sp-go:hover:not(:disabled){background:var(--uin-primary-hi);}
+body.ui-next #scipick .sp-go:disabled{opacity:.45;box-shadow:none;}
+
+/* 12.3 Кошелёк на главном экране: те же плашки, что в партии; аукцион — рядом. */
+body.ui-next #hub .hub-id{flex-wrap:wrap;}
+body.ui-next #uin-wallet{display:flex;align-items:center;gap:8px;min-width:0;}
+body.ui-next.holo-ui #uin-wallet{margin-left:auto;}
+body.ui-next:not(.holo-ui) #uin-wallet{order:10;flex:1 0 100%;}
+.uin-cur{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border:1px solid currentColor;border-radius:999px;
+  background:color-mix(in srgb,currentColor 12%,transparent);font-size:15px;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums;white-space:nowrap;}
+.uin-cur i{display:inline-grid;place-items:center;font-style:normal;font-size:16px;}
+.uin-cur i svg{display:block;width:17px;height:17px;}
+.uin-cur-sov{cursor:pointer;color:#ffd978;border-color:rgba(255,207,98,.75);
+  background:linear-gradient(180deg,rgba(66,46,8,.94),rgba(26,18,4,.96));
+  box-shadow:0 0 10px rgba(255,186,52,.24),inset 0 1px 0 rgba(255,238,176,.28);}
+.uin-cur-sov i{color:#fff1bf;filter:drop-shadow(0 0 4px rgba(255,196,70,.9));}
+.uin-cur-sov i svg{fill:rgba(255,190,56,.55);}
+.uin-cur-sov em{margin-left:2px;padding-left:9px;border-left:1px solid rgba(255,207,98,.45);font-style:normal;font-weight:400;
+  font-size:18px;color:#ffe28a;}
+.uin-cur-sov:hover{filter:brightness(1.12);}
+.uin-cur-war{color:var(--cur-warrants,#b48cff);}
+.uin-auction{min-height:40px;margin-left:auto;padding:0 16px;border:1px solid var(--uin-accent);border-radius:999px;
+  background:var(--uin-primary);color:var(--uin-white);font-size:15px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.uin-auction::after{content:' ›';font-size:18px;}
+.uin-auction:hover{background:var(--uin-primary-hi);}
+body.ui-next.holo-ui .uin-auction{margin-left:0;}
+
+/* 12.4 Профиль: портрет и медали. Механика досье прежняя, меняется вид. */
+body.ui-next #profile{background:radial-gradient(130% 80% at 50% 0%,#0b2333,#02070d);}
+/* ПК: досье в том же масштабе, что хаб и окна вокруг него. */
+body.ui-next.holo-ui #profile :is(.pf-top,.pf-body,.pf-close){zoom:var(--pcz,1);}
+body.ui-next #profile .pf-top{gap:14px;padding:14px 72px 14px 18px;border-bottom:1px solid var(--uin-line);background:rgba(6,20,30,.6);}
+body.ui-next #profile .pf-av{width:56px;height:56px;border-radius:14px;border:1px solid var(--uin-panel-line);background:#0d2333;overflow:hidden;}
+body.ui-next #profile .pf-av.uin-face img{display:block;width:100%;height:100%;object-fit:cover;object-position:center top;
+  transform:scale(1.7);transform-origin:50% 8%;}
+body.ui-next #profile .pf-nm{font-size:20px;color:var(--uin-white);}
+body.ui-next #profile .pf-sub{margin-top:4px;font-size:14px;color:var(--uin-dim);}
+body.ui-next #profile .pf-cur{min-height:40px;padding:0 14px;font-size:15px;color:#ffd978;border-color:rgba(255,207,98,.75);
+  background:linear-gradient(180deg,rgba(66,46,8,.94),rgba(26,18,4,.96));box-shadow:0 0 10px rgba(255,186,52,.24);}
+body.ui-next #profile .pf-close{top:14px;right:16px;width:44px;height:44px;border:1px solid var(--uin-line);border-radius:12px;
+  background:var(--uin-card);color:var(--uin-ink);font-size:18px;}
+body.ui-next #profile .pf-body{padding:18px;}
+body.ui-next #profile .ps-studio{display:flex;flex-direction:column;gap:14px;max-width:1120px;margin-bottom:0;color:var(--uin-ink);}
+body.ui-next #profile .ps-notice{margin:0;min-height:0;font-size:14px;line-height:1.45;color:var(--uin-dim);}
+body.ui-next #profile .ps-notice:empty{display:none;}
+body.ui-next #profile .ps-layout{grid-template-columns:minmax(260px,380px) minmax(0,1fr);gap:24px;}
+body.ui-next #profile .ps-card{top:0;border:1px solid var(--uin-panel-line);border-radius:18px;background:var(--uin-panel);
+  box-shadow:0 18px 40px rgba(0,0,0,.45);}
+body.ui-next #profile .ps-stage{background:radial-gradient(ellipse at 50% 22%,#2c5468 0%,#123044 53%,#081a27 100%);}
+body.ui-next:not(.holo-still) #profile .ps-stage.uin-new .ps-portrait{animation:uin-face .45s ease-out;}
+@keyframes uin-face{from{opacity:.35;transform:scale(1.03);}to{opacity:1;transform:none;}}
+body.ui-next #profile .ps-caption{padding:12px 16px;border-top:1px solid var(--uin-line);}
+body.ui-next #profile .ps-caption b{font-size:18px;color:var(--uin-white);}
+body.ui-next #profile .ps-caption span{font-size:13px;color:var(--uin-dim);}
+/* «Вид для другого игрока» — строкой под портретом, переключателем карточки. */
+body.ui-next #profile .ps-card > [data-ps="mode"]{display:block;width:100%;min-height:46px;margin:0;padding:0 14px;border:0;
+  border-top:1px solid var(--uin-line);border-radius:0;background:rgba(3,12,20,.45);color:var(--uin-ink);font-size:14px;font-weight:600;}
+body.ui-next #profile .ps-card > [data-ps="mode"]:hover{background:rgba(53,214,230,.08);}
+body.ui-next #profile .ps-card > [data-ps="mode"][aria-pressed="true"]{background:var(--uin-sel);color:var(--uin-white);
+  box-shadow:inset 0 2px 0 var(--uin-accent);}
+/* Вкладки прилипают к верху: до «Медалей» не надо листать обратно через портрет. */
+body.ui-next #profile .uin-pf-tabs{position:sticky;top:-18px;z-index:3;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;
+  margin:0 0 14px;padding:4px;border:1px solid var(--uin-line);border-radius:14px;background:rgba(4,16,25,.97);
+  box-shadow:0 8px 20px rgba(2,7,13,.6);}
+body.ui-next #profile .uin-pf-tabs button{min-height:44px;padding:0 6px;border:0;border-radius:10px;background:transparent;color:var(--uin-dim);
+  font-size:15px;font-weight:600;}
+body.ui-next #profile .uin-pf-tabs button:hover{color:var(--uin-ink);}
+body.ui-next #profile .uin-pf-tabs button[aria-selected="true"]{background:var(--uin-sel);color:var(--uin-white);
+  box-shadow:inset 0 0 0 1px var(--uin-accent);}
+body.ui-next #profile[data-uin-tab="portrait"] [data-uin-sec]:not([data-uin-sec="portrait"]),
+body.ui-next #profile[data-uin-tab="medals"] [data-uin-sec]:not([data-uin-sec="medals"]),
+body.ui-next #profile[data-uin-tab="career"] [data-uin-sec]:not([data-uin-sec="career"]){display:none!important;}
+body.ui-next #profile .ps-side > h3{margin:6px 0 4px;font-size:16px;font-weight:600;color:var(--uin-head);}
+body.ui-next #profile .ps-side > p{margin:0 0 10px;font-size:14px;line-height:1.45;color:var(--uin-dim);}
+/* Ячейки мундира 5 × 3: выбранная — светится; надетая в неё медаль коротко «встаёт». */
+body.ui-next #profile .ps-slots{gap:8px;margin:6px 0 10px;}
+body.ui-next #profile .ps-slots button{height:68px;border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);}
+body.ui-next #profile .ps-slots button > span:not(.ps-medal){font-size:22px;color:rgba(140,233,242,.45);}
+body.ui-next #profile .ps-slots small{font-size:12px;color:var(--uin-dim);}
+body.ui-next #profile .ps-slots button[aria-pressed="true"]{border-color:var(--uin-accent);background:var(--uin-sel);
+  box-shadow:0 0 0 2px rgba(53,214,230,.35),0 0 16px rgba(53,214,230,.25);}
+body.ui-next:not(.holo-still) #profile .ps-slots button[aria-pressed="true"] .ps-medal{animation:uin-pop .35s ease-out;}
+@keyframes uin-pop{0%{transform:scale(.6);}60%{transform:scale(1.12);}100%{transform:none;}}
+body.ui-next #profile .ps-side > [data-ps="remove"]{min-height:44px;margin-bottom:6px;padding:0 16px;border:1px solid var(--uin-line);
+  border-radius:12px;background:var(--uin-card);color:var(--uin-ink);font-size:14px;font-weight:600;}
+/* Портреты сеткой без внутренней прокрутки: выбранный — рамкой и галочкой. */
+body.ui-next #profile .ps-portraits{grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:8px;max-height:none;overflow:visible;padding:2px;}
+body.ui-next #profile .ps-portraits button{border:1px solid var(--uin-line);border-radius:12px;
+  background:radial-gradient(ellipse at 50% 25%,#244a5c,#0e2232);}
+body.ui-next:not(.holo-still) #profile .ps-portraits button{transition:transform .12s ease-out,border-color .12s;}
+body.ui-next #profile .ps-portraits button:hover:not(:disabled){transform:translateY(-2px);border-color:var(--uin-line-hi);}
+body.ui-next #profile .ps-portraits button[aria-pressed="true"]{border-color:var(--uin-accent);background:radial-gradient(ellipse at 50% 25%,#2d6274,#103446);
+  box-shadow:0 0 0 2px var(--uin-accent),0 0 18px rgba(53,214,230,.35);}
+body.ui-next #profile .ps-portraits button[aria-pressed="true"]::after{content:'✓';position:absolute;top:6px;right:6px;display:grid;
+  place-items:center;width:22px;height:22px;border-radius:50%;background:var(--uin-accent);color:#04161c;font-size:12px;font-weight:800;}
+body.ui-next #profile .ps-portraits small{display:none;}
+/* Коллекция: полученные первыми, у каждой — полоса до следующей степени. */
+body.ui-next #profile .ps-collection{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;}
+body.ui-next #profile .ps-collection button{position:relative;gap:12px;min-height:84px;padding:10px 14px 18px;overflow:hidden;
+  border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);}
+body.ui-next #profile .ps-collection button::after{content:'';position:absolute;left:14px;right:14px;bottom:8px;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--uin-accent) var(--uin-p,0%),rgba(118,206,229,.16) var(--uin-p,0%));}
+body.ui-next #profile .ps-collection b{font-size:15px;font-weight:600;line-height:1.3;color:var(--uin-ink);}
+body.ui-next #profile .ps-collection small{margin-top:3px;font-size:13px;line-height:1.35;color:var(--uin-dim);}
+body.ui-next #profile .ps-collection .ps-medal{width:40px;}
+body.ui-next #profile .ps-collection button:disabled{opacity:1;}
+body.ui-next #profile .ps-collection .locked{order:1;border-style:dashed;background:var(--uin-card-off);}
+body.ui-next #profile .ps-collection .locked b{color:#a9c1cb;}
+body.ui-next #profile .ps-collection .locked::after{background:linear-gradient(90deg,rgba(140,233,242,.5) var(--uin-p,0%),rgba(118,206,229,.1) var(--uin-p,0%));}
+body.ui-next #profile .ps-collection button[aria-pressed="true"]{border-color:var(--uin-accent);background:var(--uin-sel);box-shadow:none;}
+/* Карьера — плитками, как итоги партии; в «виде для другого игрока» — той же колонкой, что досье. */
+body.ui-next #profile .pf-body > :not(.ps-studio,.ps-toolbar){width:100%;max-width:1120px;margin-inline:auto;}
+body.ui-next #profile :is(.pf-h,.pf-sec){margin:10px 0 8px;font-size:16px;font-weight:600;color:var(--uin-head);}
+body.ui-next #profile .ps-side > .pf-h{margin-top:0;}
+body.ui-next #profile .pf-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+body.ui-next #profile .pf-cell{min-height:84px;padding:12px 14px;border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);}
+body.ui-next #profile .pf-k{font-size:13px;color:var(--uin-dim);}
+body.ui-next #profile .pf-v{font-size:26px;color:var(--uin-white);}
+body.ui-next #profile .pf-v.accent{color:#8ce9f2;}
+body.ui-next #profile .pf-hint{font-size:14px;line-height:1.45;color:var(--uin-dim);}
+body.ui-next #profile .ps-public-medals > div{border:1px solid var(--uin-line);border-radius:12px;background:var(--uin-card);}
+/* «Сохранить» и «Отменить» — панелью снизу, только пока есть что сохранять. */
+body.ui-next #profile .ps-toolbar{position:sticky;top:auto;bottom:-18px;z-index:4;display:none;justify-content:flex-end;gap:8px;
+  margin:0 -18px -18px;padding:12px max(18px,calc((100% - 1120px) / 2 + 18px)) calc(12px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--uin-panel-line);
+  background:linear-gradient(180deg,rgba(7,24,35,.96),rgba(3,12,20,.99));box-shadow:0 -12px 30px rgba(0,0,0,.45);}
+body.ui-next #profile .ps-toolbar.uin-dirty{display:flex;}
+body.ui-next:not(.holo-still) #profile .ps-toolbar.uin-appear{animation:uin-rise .18s ease-out;}
+body.ui-next #profile .ps-toolbar [data-ps="cancel"]{min-height:48px;padding:0 18px;border:1px solid var(--uin-line);border-radius:12px;
+  background:var(--uin-card);color:var(--uin-ink);font-size:15px;font-weight:600;}
+body.ui-next #profile .ps-toolbar [data-ps="save"]{min-height:48px;padding:0 26px;border:1px solid var(--uin-accent);border-radius:12px;
+  background:var(--uin-primary);color:var(--uin-white);font-size:16px;font-weight:700;box-shadow:var(--uin-glow);}
+body.ui-next #profile .ps-toolbar [data-ps="save"]:disabled{opacity:.6;}
+@media (max-width:640px){
+  body.ui-next #profile .ps-layout{grid-template-columns:1fr;gap:14px;}
+  body.ui-next #profile .pf-top{padding-left:12px;}
+  body.ui-next #profile .pf-body{padding:12px;}
+  body.ui-next #profile .uin-pf-tabs{top:-12px;}
+  body.ui-next #profile .ps-toolbar{bottom:-12px;margin:0 -12px -12px;padding:12px 12px calc(12px + env(safe-area-inset-bottom));}
+  body.ui-next #profile .ps-card{max-width:300px;}
+  body.ui-next #profile .ps-toolbar [data-ps="save"]{flex:1;}
+  body.ui-next #profile .ps-toolbar [data-ps="cancel"]{padding:0 12px;font-size:14px;white-space:nowrap;}
+  body.ui-next #profile .ps-collection{grid-template-columns:1fr;}
+  body.ui-next #profile .ps-portraits{grid-template-columns:repeat(5,minmax(0,1fr));}
+}
+
+/* 12.5 Sector Zero: та же палитра — скругления, карточки, вкладки и главная кнопка, как на хабе.
+   Цвета валют на кнопках трат (Варранты, Суверены, данные) остаются: цвет говорит, чем платишь. */
+body.ui-next #sector-zero{--sz-muted:var(--uin-dim);}
+body.ui-next #sector-zero :is(.sz-lang,.sz-gear){border-radius:10px;}
+body.ui-next #sector-zero .sz-action{min-height:56px;padding:12px 18px;border:1px solid var(--uin-line);border-radius:12px;
+  background:var(--uin-card);color:var(--uin-ink);font-size:16px!important;font-weight:600;}
+body.ui-next #sector-zero .sz-action::after{content:'›';font-size:24px;font-weight:300;line-height:1;color:#8ce9f2;}
+body.ui-next #sector-zero .sz-action:hover{border-color:var(--uin-line-hi);background:rgba(14,40,54,.85);}
+body.ui-next #sector-zero .sz-action.sz-primary{border-color:var(--uin-accent);background:var(--uin-primary);color:var(--uin-white);
+  font-weight:700;box-shadow:var(--uin-glow);}
+body.ui-next #sector-zero .sz-action.sz-primary::after{color:var(--uin-white);}
+body.ui-next #sector-zero .sz-action.sz-primary:hover{background:var(--uin-primary-hi);}
+body.ui-next #sector-zero .sz-options button{border-color:var(--uin-line);border-radius:10px;background:var(--uin-card);color:var(--uin-dim);}
+body.ui-next #sector-zero .sz-options button[aria-pressed="true"]{border-color:var(--uin-accent);background:var(--uin-sel);color:var(--uin-white);}
+body.ui-next #sector-zero .sz-chapter{border-radius:0 12px 12px 0;background:var(--uin-card);}
+body.ui-next #sector-zero .sz-difficulty{margin-top:18px;padding-top:4px;}
+body.ui-next #sector-zero .sz-signin button{border-color:var(--uin-line);border-radius:10px;background:var(--uin-card);}
+body.ui-next #sz-workshop button:not(.sz-tree-node),body.ui-next #sz-codex-screen .sz-workhead button{border-color:var(--uin-line);
+  border-radius:10px;background-color:var(--uin-card);color:var(--uin-ink);}
+body.ui-next #sz-workshop button:not(.sz-tree-node):hover:not(:disabled){border-color:var(--uin-line-hi);}
+body.ui-next #sz-workshop button.selected:not(.sz-tree-node){border-color:var(--uin-accent);background-color:var(--uin-sel);color:var(--uin-white);}
+body.ui-next #sz-workshop :is([data-prep="forge"],[data-prep="buy:warrants"]):not(:disabled){color:var(--cur-warrants);border-color:var(--cur-warrants);}
+body.ui-next #sz-workshop [data-prep="buy:sovereigns"]:not(:disabled){color:var(--cur-sovereigns);border-color:var(--cur-sovereigns);}
+body.ui-next #sz-workshop :is([data-prep="unlock-module"],[data-prep="unlock-hero"],[data-prep="upgrade-hero"]):not(:disabled){
+  color:var(--cur-data);border-color:var(--cur-data);}
+body.ui-next #sz-workshop .sz-stick{margin-inline:-10px;padding:8px 10px;border-radius:16px;background:rgba(3,12,20,.92);}
+body.ui-next #sz-workshop :is(.sz-tabs,.sz-subtabs){gap:4px;padding:4px;border:1px solid var(--uin-line);border-radius:14px;
+  background:rgba(4,16,25,.7);}
+body.ui-next #sz-workshop :is(.sz-tabs,.sz-subtabs) button{border:0;background-color:transparent;color:var(--uin-dim);box-shadow:none;}
+body.ui-next #sz-workshop :is(.sz-tabs,.sz-subtabs) button.selected{background-color:var(--uin-sel);color:var(--uin-white);
+  box-shadow:inset 0 0 0 1px var(--uin-accent);}
+body.ui-next #sz-workshop .sz-tabs i{color:#8ce9f2;}
+body.ui-next #sz-workshop .sz-card{border-radius:12px;}
+body.ui-next #sz-workshop .sz-card:not(.sz-item){border-color:var(--uin-line);}
+body.ui-next #sz-workshop .sz-card.selected:not(.sz-item){border-color:var(--uin-accent);}
+body.ui-next #sz-workshop :is(.sz-slot,.sz-bay,.sz-star-ladder li,.sz-delta,.sz-hero-reward,.sz-map-task-row){border-radius:10px;}
+body.ui-next #sz-workshop .sz-roster button{border-radius:14px;}
+body.ui-next #sz-workshop .sz-roster button.selected{box-shadow:0 0 0 1px var(--uin-accent),0 0 18px rgba(53,214,230,.2);}
+body.ui-next #sz-workshop .sz-face{border-bottom-color:var(--uin-accent);}
+body.ui-next :is(#sz-workshop,#sz-codex-screen) h1{color:var(--uin-white);}
+
+/* 12.6 ПК: рамки хаба — тем же скруглением, что окна и карточки. */
+body.ui-next.holo-ui #hub :is(.hub-id,.hub-body,.hub-nav){border-radius:18px;}

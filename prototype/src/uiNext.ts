@@ -17,11 +17,15 @@
  *  9. ПК: клавиши (T, B, L, M, H, Tab, Пробел, 1–4) и подписи значков рельсы.
  * 10. Хаб: одна главная дверь, режимы списком с одной строкой отличия, пять вкладок.
  * 11. Один шрифт текста на обеих платформах, без КАПС с разрядкой.
+ * 12. Второй заход (заказ 2026-10-01): одна палитра на экранах вне партии — выбор старта,
+ *     совет учёных, профиль с медалями, Sector Zero; кошелёк и «Аукцион» на главном экране.
  *
  * Слой ничего не решает за игру: каждая его кнопка нажимает НАСТОЯЩУЮ кнопку нынешнего
  * интерфейса (рельсы, скорости, сохранения), поэтому правила, звуки и счётчики те же.
  */
 import { t } from '../../localization/runtime';
+import { kfmt } from './format';
+import { SOV_SVG } from './icons';
 
 /** Что слою нужно от игры сверх DOM. */
 export interface UiNextHost {
@@ -33,6 +37,14 @@ export interface UiNextHost {
   home(): void;
   /** Выделить следующий свой флот и показать его. */
   nextFleet(): void;
+  /** Кошелёк главного экрана: Суверены и Варранты аукциона. */
+  wallet(): { sovereigns: number; warrants: number };
+  /** «+» у Суверенов: сказать, что магазин ещё не открыт. */
+  donate(): void;
+  /** Открыть аукцион. */
+  auction(): void;
+  /** Перерисовать открытые экраны вне партии (настройку, совет, профиль) под новый вид. */
+  refresh(): void;
 }
 
 const PREF = 'vd.uinext';
@@ -217,6 +229,8 @@ export function installUiNext(host: UiNextHost): void {
     enforceDue = true;
     applyScale();
     tick();
+    // Экраны, которые слой дополняет после каждой их перерисовки, рисуются заново.
+    host.refresh();
     // Раскладки игры (рельса, лист выбора, окна ПК) пересчитываются по resize.
     window.dispatchEvent(new Event('resize'));
   };
@@ -495,7 +509,7 @@ export function installUiNext(host: UiNextHost): void {
   /** Мельче 12 px текста не бывает; на телефоне кнопка меньше 44 px получает поле нажатия. */
   /** Подписи и строки, у которых слой поправил текст: вернуть их, когда слой снимают. */
   const origText = new Map<Text, string>();
-  const checked = new WeakSet<Element>();
+  let checked = new WeakSet<Element>();
   const enforce = (): void => {
     const phone = isPhone();
     for (const el of document.querySelectorAll<HTMLElement>(
@@ -530,13 +544,30 @@ export function installUiNext(host: UiNextHost): void {
   const restoreAll = (): void => {
     for (const [node, data] of origText) if (node.isConnected) node.data = data;
     origText.clear();
-    for (const el of document.querySelectorAll('.uin-min,.uin-tap')) {
-      el.classList.remove('uin-min', 'uin-tap');
-      checked.delete(el);
-    }
+    for (const el of document.querySelectorAll('.uin-min,.uin-tap')) el.classList.remove('uin-min', 'uin-tap');
+    // Слой включат снова — всё проверяется заново, иначе подписи останутся в старом виде.
+    checked = new WeakSet<Element>();
   };
   let enforceDue = true;
-  new MutationObserver(() => (enforceDue = true)).observe(body, { childList: true, subtree: true });
+  new MutationObserver((list) => {
+    enforceDue = true;
+    if (!body.classList.contains('ui-next')) return;
+    // Игра переписала подпись уже проверенного узла («ЗАПУСК» при каждой перерисовке
+    // настройки) — новый текст правится сразу, а не остаётся в старом виде.
+    for (const m of list) {
+      const el = m.target;
+      if (!(el instanceof Element) || el.parentElement === body || el.closest('svg,script,style')) continue;
+      for (const n of m.addedNodes) {
+        if (n.nodeType !== 3) continue;
+        const node = n as Text;
+        const next = normText(node.data);
+        if (next === node.data) continue;
+        origText.set(node, node.data);
+        node.data = next;
+      }
+    }
+    if (origText.size > 2000) for (const [node] of origText) if (!node.isConnected) origText.delete(node);
+  }).observe(body, { childList: true, subtree: true });
 
   // --- 10. хаб ---------------------------------------------------------------------------
   const hubDoor = document.createElement('button');
@@ -602,7 +633,166 @@ export function installUiNext(host: UiNextHost): void {
         `<button type="button" class="uin-mine-go">${t('uinext.hub.mine.start')}</button></div>`;
     const digestSub = document.querySelector<HTMLElement>('#hp-home .hub-card .hc-s');
     swapText(digestSub, t('uinext.hub.digest.sub'));
+    paintWallet();
+    setupScreen();
   };
+
+  // --- 12. экраны вне партии: кошелёк хаба, выбор старта, совет учёных, профиль ----------
+  /** Кошелёк на главном экране: Суверены с «+», Варранты и рядом — вход в аукцион. */
+  const wallet = document.createElement('div');
+  wallet.id = 'uin-wallet';
+  wallet.innerHTML =
+    `<button type="button" class="uin-cur uin-cur-sov" data-uin-wallet="donate" title="${t('hub.sovereigns')}">` +
+    `<i aria-hidden="true">${SOV_SVG}</i><b></b><em aria-hidden="true">+</em></button>` +
+    `<span class="uin-cur uin-cur-war" title="${t('uinext.hub.wallet.warrants')}"><i aria-hidden="true">⌖</i><b></b></span>` +
+    `<button type="button" class="uin-auction" data-uin-wallet="auction">${t('hub.tile.auction')}</button>`;
+  $('hub-lang')?.before(wallet);
+  wallet.addEventListener('click', (ev) => {
+    const go = (ev.target as Element).closest<HTMLElement>('[data-uin-wallet]')?.dataset.uinWallet;
+    if (go === 'donate') host.donate();
+    if (go === 'auction') host.auction();
+  });
+  const paintWallet = (): void => {
+    const w = host.wallet();
+    const [sov, war] = Array.from(wallet.querySelectorAll('b'));
+    const sv = kfmt(w.sovereigns);
+    if (sov && sov.textContent !== sv) {
+      sov.textContent = sv;
+      wallet.querySelector('[data-uin-wallet="donate"]')?.setAttribute('aria-label', t('donate.aria', { n: sv }));
+    }
+    const wv = kfmt(w.warrants);
+    if (war && war.textContent !== wv) war.textContent = wv;
+  };
+
+  /** Настройка схватки: «Соперники: N» и подсказка к строкам мест — над ними. */
+  const slotsEl = $('setupslots');
+  const rivals = document.createElement('div');
+  rivals.className = 'uin-setup-head';
+  rivals.innerHTML = `<b></b><span>${t('uinext.setup.rivals.hint')}</span>`;
+  slotsEl?.before(rivals);
+  const setupScreen = (): void => {
+    if (!slotsEl) return;
+    const count = slotsEl.querySelector<HTMLInputElement>('#setup-bot-count');
+    const n = count
+      ? Number(count.value) || 0
+      : Math.max(0, slotsEl.querySelectorAll('.srow:not(.off)').length - 1);
+    const label = t('uinext.setup.rivals', { n });
+    const b = rivals.querySelector('b');
+    if (b && b.textContent !== label) b.textContent = label;
+  };
+  if (slotsEl) new MutationObserver(setupScreen).observe(slotsEl, { childList: true });
+
+  /** Совет учёных: полный совет говорит, почему кандидаты погасли и как сменить учёного. */
+  const sciBody = $('scipickbody');
+  const sciScreen = (): void => {
+    if (!sciBody || !uiNextOn()) return;
+    const head = sciBody.querySelector<HTMLElement>('.sp-h');
+    if (head && !sciBody.querySelector('.sp-slot.empty')) head.textContent = t('uinext.scipick.full');
+  };
+  if (sciBody) new MutationObserver(sciScreen).observe(sciBody, { childList: true });
+
+  /**
+   * Профиль: вкладки «Портрет · Медали · Карьера», портрет в шапке вместо буквы, «Сохранить»
+   * и «Отменить» — панелью снизу, пока есть несохранённое. Досье перерисовывает себя целиком
+   * на каждый клик (`profileScreen.ts`), поэтому всё это повторяется после каждой
+   * перерисовки; клик по вкладке до досье не доходит — механика и её состояние прежние.
+   */
+  const pf = $('profile');
+  let pfTab = 'portrait';
+  let pfFace = '';
+  let pfDirty = false;
+  const PF_TABS: readonly (readonly [string, string])[] = [
+    ['portrait', 'uinext.profile.tab.portrait'],
+    ['medals', 'uinext.profile.tab.medals'],
+    ['career', 'uinext.profile.tab.career'],
+  ];
+  const profileScreen = (): void => {
+    if (!pf || !uiNextOn()) return;
+    const studio = pf.querySelector('.ps-studio');
+    const stage = studio?.querySelector('.ps-stage');
+    const face = stage?.querySelector<HTMLImageElement>('img.ps-portrait');
+    const av = pf.querySelector('.pf-av');
+    if (av && face) {
+      const img = face.cloneNode() as HTMLImageElement;
+      img.removeAttribute('class');
+      img.alt = '';
+      av.replaceChildren(img);
+      av.classList.add('uin-face');
+    }
+    // Сменился портрет — сцена коротко вспыхивает: видно, что выбор принят.
+    const src = face?.getAttribute('src') ?? '';
+    if (stage && pfFace && src && src !== pfFace) stage.classList.add('uin-new');
+    if (src) pfFace = src;
+    const side = studio?.querySelector('.ps-side');
+    const bar = studio?.querySelector('.ps-toolbar');
+    if (!studio || !side || !bar) return;
+    // «Вид для другого игрока» — строкой под портретом: он переключает карточку, а не панель.
+    const mode = bar.querySelector('[data-ps="mode"]');
+    const card = stage?.closest('.ps-card');
+    if (mode && card) card.appendChild(mode);
+    const cancel = bar.querySelector<HTMLButtonElement>('[data-ps="cancel"]');
+    const save = bar.querySelector<HTMLButtonElement>('[data-ps="save"]');
+    const dirty = (!!cancel && !cancel.disabled) || save?.textContent === t('profile.saving');
+    bar.classList.toggle('uin-dirty', dirty);
+    // Панель выезжает один раз — когда появилось что сохранять, а не на каждую перерисовку.
+    if (dirty && !pfDirty) bar.classList.add('uin-appear');
+    pfDirty = dirty;
+    // Панель — последней в прокрутке досье, чтобы прилипать к низу экрана в обоих видах.
+    const dock = (): void => {
+      (pf.querySelector('.pf-body') ?? studio).appendChild(bar);
+    };
+    if (!side.querySelector('.ps-slots')) {
+      dock();
+      return; // «вид для другого игрока»: вкладок нет
+    }
+    const tag = (el: Element | null | undefined, sec: string): void => {
+      if (el instanceof HTMLElement) el.dataset.uinSec = sec;
+    };
+    for (const el of Array.from(side.children)) tag(el, 'medals');
+    const gallery = side.querySelector('.ps-portraits');
+    tag(gallery, 'portrait');
+    tag(gallery?.previousElementSibling, 'portrait');
+    // Коллекция медалей встаёт к ячейкам, в ту же колонку; карьера — третьей вкладкой.
+    for (const el of Array.from(studio.children)) {
+      if (el.matches('.ps-toolbar,.ps-notice,.ps-layout')) continue;
+      tag(el, 'medals');
+      side.appendChild(el);
+    }
+    for (const el of Array.from(pf.querySelector('.pf-body')?.children ?? [])) {
+      if (el === studio) continue;
+      tag(el, 'career');
+      side.appendChild(el);
+    }
+    // Прогресс медали полосой: «3 / 10» из нижней строки карточки.
+    for (const card of Array.from(side.querySelectorAll<HTMLElement>('.ps-collection button'))) {
+      const m = /(\d+)\s*\/\s*(\d+)/.exec(card.querySelector('small:last-of-type')?.textContent ?? '');
+      const p = m ? Math.min(1, Number(m[1]) / Math.max(1, Number(m[2]))) : 0;
+      card.style.setProperty('--uin-p', `${Math.round(p * 100)}%`);
+    }
+    const tabs = document.createElement('div');
+    tabs.className = 'uin-pf-tabs';
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', t('uinext.profile.tabs'));
+    tabs.innerHTML = PF_TABS.map(
+      ([id, key]) => `<button type="button" role="tab" data-uin-tab="${id}">${t(key)}</button>`,
+    ).join('');
+    side.prepend(tabs);
+    const sync = (): void => {
+      pf.dataset.uinTab = pfTab;
+      for (const b of Array.from(tabs.querySelectorAll<HTMLElement>('[data-uin-tab]')))
+        b.setAttribute('aria-selected', String(b.dataset.uinTab === pfTab));
+    };
+    tabs.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const b = (ev.target as Element).closest<HTMLElement>('[data-uin-tab]');
+      if (!b?.dataset.uinTab) return;
+      pfTab = b.dataset.uinTab;
+      sync();
+    });
+    sync();
+    dock();
+  };
+  if (pf) new MutationObserver(profileScreen).observe(pf, { childList: true });
 
   // --- кадр слоя ------------------------------------------------------------------------
   const tick = (): void => {

@@ -44,7 +44,11 @@ export function metaMarketHtml(view: MarketView, mine: readonly ArsenalItem[]): 
   return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.subtitle')}</small></div><b>⌖ ${nfmt(view.balance)}</b></header><p class="mm-fee">${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</p><h3>${t('auction.browse')}</h3><div class="mm-grid">${lots || `<p class="hub-empty">${t('auction.empty')}</p>`}</div><h3>${t('auction.sell')}</h3><div class="mm-grid">${sell || `<p class="hub-empty">${t('auction.no-items')}</p>`}</div>`;
 }
 
-export function initMetaMarket(host: MetaMarketHost): { refresh(): Promise<void> } {
+export function initMetaMarket(host: MetaMarketHost): {
+  refresh(): Promise<void>;
+  /** The warrant balance from the last server answer (0 until then, as the header prints it). */
+  balance(): number;
+} {
   let view = empty;
   const paint = () => {
     host.root().innerHTML = metaMarketHtml(view, host.arsenal());
@@ -101,5 +105,5 @@ export function initMetaMarket(host: MetaMarketHost): { refresh(): Promise<void>
       })(),
     );
   });
-  return { refresh };
+  return { refresh, balance: () => view.balance };
 }
