@@ -13,6 +13,14 @@ now ships **net mode**: its connect overlay can join a live session served by
 `pnpm dev:proto-server`. See `docs/multiplayer.md` → "Two phones, one session" for
 the friend-test runbook (server + `wss://` tunnel → sideload → both connect).
 
+## Sector Zero on RuStore — release plan
+
+The [RuStore research and release roadmap](rustore-sector-zero-release-roadmap.md)
+(Russian, researched 2026-09-30) covers the proposed standalone Sector Zero Android
+profile, production signing, store updates, save safety, listing requirements,
+testing, moderation, and optional monetization. It does **not** claim that a
+store-ready APK exists or change the existing dev/player release lanes below.
+
 ## Install on a phone (easiest)
 
 Every push to `main` that touches the game refreshes **two rolling prereleases**

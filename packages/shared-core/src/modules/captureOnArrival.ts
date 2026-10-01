@@ -1,6 +1,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import { getStance } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
+import { isMineFleet } from '../state/minefields';
 
 /**
  * Capture-on-arrival (map-roadmap.md M2.2). A fleet that reaches an undefended,
@@ -45,8 +46,10 @@ function tryCapture(h: HandlerContext, payload: unknown): void {
   if (!isCapturable(h.ctx.data, planet)) return;
   if (planet.owner !== null && getStance(h.state, fleet.owner, planet.owner) !== 'war') return;
   if (planet.garrison.some((s) => s.count > 0)) return; // ≥1 garrison unit → assault only
+  // Мина захвату не мешает (решение владельца 2026-09-30): она не гарнизон, а ловушка.
   const contested = Object.values(h.state.fleets).some(
-    (g) => g.owner !== fleet.owner && g.location === at && g.units.some((u) => u.count > 0),
+    (g) => g.owner !== fleet.owner && g.location === at && g.units.some((u) => u.count > 0) &&
+      !isMineFleet(g, h.ctx.data),
   );
   if (contested) return;
   const from = planet.owner;
@@ -58,7 +61,8 @@ function tryCapture(h: HandlerContext, payload: unknown): void {
 
 export const captureOnArrivalModule: GameModule = {
   id: 'capture-on-arrival',
-  version: '0.2.0',
+  // 0.3.0: мина захвату не мешает (SM-3.6).
+  version: '0.3.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => tryCapture(h, event.payload));
     api.on('fleet.transit', (event, h) => tryCapture(h, event.payload));

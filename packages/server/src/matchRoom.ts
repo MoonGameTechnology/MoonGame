@@ -1784,6 +1784,9 @@ export class MatchRoom {
         const view = this.viewFor(playerId);
         const baseline = this.lastVisible.get(playerId) ?? view.base;
         const identify = view.identified;
+        // Бои, которые игрок видит сейчас или видел кадром раньше: `battle.resolved`
+        // приходит, когда боя в состоянии уже нет.
+        const battles = new Set([...Object.keys(baseline.battles), ...Object.keys(view.base.battles)]);
         const delta = diffState(baseline, view.base);
         const message: ServerMessage = {
           type: 'delta',
@@ -1791,7 +1794,7 @@ export class MatchRoom {
           seq: this.seq,
           serverTime: now,
           delta,
-          events: events.filter((e) => this.eventVisibleTo(e, playerId, identify)),
+          events: events.filter((e) => this.eventVisibleTo(e, playerId, identify, battles)),
           signatures: view.signatures,
           remembered: view.remembered,
           ...this.hashField(view.base),
@@ -1822,13 +1825,19 @@ export class MatchRoom {
    *
    *  ⚠ CONVENTION COUPLING: this filter reads the payload KEY NAMES every core
    *  module uses today (audience: `owner`/`playerId`/`a`/`b`/`from`/`to`/
-   *  `buyer`/`seller`; place: `location`/`planetId`/`at`; ownership: `fleetId`)
+   *  `buyer`/`seller`; place: `location`/`planetId`/`at`; ownership: `fleetId`;
+   *  battle: `battleId`)
    *  — documented in docs/modulesystem.md («События и фог»). A new module that
    *  names its addressee differently (`target`, `recipient`, …) will have its
    *  events silently HIDDEN from that player (fail-closed, never a leak) until
    *  the key is added here. Name payload keys by the convention — or extend the
    *  lists below together with a test in matchRoom.test.ts. */
-  private eventVisibleTo(event: DomainEvent, playerId: PlayerId, identify: Set<string>): boolean {
+  private eventVisibleTo(
+    event: DomainEvent,
+    playerId: PlayerId,
+    identify: Set<string>,
+    battles: ReadonlySet<string>,
+  ): boolean {
     if (event.type === 'time.advanced' || event.type.startsWith('match.')) return true;
     const p = (event.payload ?? {}) as Record<string, unknown>;
     // Hero events are strictly owner-only: their payloads carry the hero's node
@@ -1850,6 +1859,11 @@ export class MatchRoom {
     if (typeof fleetId === 'string' && this.stateValue.fleets[fleetId]?.owner === playerId) {
       return true;
     }
+    // A battle's events reach whoever sees that battle in their fog view. Its own sides
+    // always do (`engagementOf`): a fight mid-lane, far from any identified world, used
+    // to stop the player's fleet without a single word about why.
+    const battleId = p.battleId;
+    if (typeof battleId === 'string' && battles.has(battleId)) return true;
     return false;
   }
 

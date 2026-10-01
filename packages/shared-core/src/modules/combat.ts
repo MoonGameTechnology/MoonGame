@@ -33,6 +33,7 @@ import {
   applyDamageToSide,
   hookedDamage,
   INTERCEPT_TOL,
+  isAllied,
   isHostile,
   laneOccupancy,
   MAX_COMBAT_ROUNDS,
@@ -50,7 +51,9 @@ import {
   type HookedDamage,
 } from '../util/combat';
 import { legT } from '../state/fleetPosition';
+import { fleetHoldFree } from '../state/shuttle';
 import { crossingT } from '../state/roads';
+import { isMineFleet } from '../state/minefields';
 
 /** Keep a pinned crossing point off the lane's endpoints (avoids a degenerate
  *  node-equivalent edge); mirrors movement's own EPS. */
@@ -157,6 +160,8 @@ function findEnemyFleetAt(
     if (!f.units.some((s) => s.count > 0) || !isHostile(h, owner, f.owner)) {
       continue;
     }
+    // Мина — не противник в бою: встреча с ней — подрыв (`minefield`), а не бой (SM-3.6).
+    if (isMineFleet(f, h.ctx.data)) continue;
     if (best === null || f.id < best.id) {
       best = f;
     }
@@ -404,7 +409,7 @@ function pullInBystanders(h: HandlerContext, at: string): void {
     for (const id of Object.keys(h.state.fleets).sort()) {
       const f = h.state.fleets[id];
       if (!f || shipsEngaged(h.state, f) || f.location !== at) continue;
-      if (!f.units.some((st) => st.count > 0)) continue;
+      if (!f.units.some((st) => st.count > 0) || isMineFleet(f, h.ctx.data)) continue;
       const battle = runningBattleFor(h, at, f.owner);
       if (!battle) continue;
       joinBattle(h, f, battle, at);
@@ -424,7 +429,7 @@ function engageFleets(
   // сцепки: прерванный флот снова свободен и дерётся, как любой другой.
   interruptLandingsAt(h, at);
   const fleet = h.state.fleets[fleetId];
-  if (!fleet || shipsEngaged(h.state, fleet)) {
+  if (!fleet || shipsEngaged(h.state, fleet) || isMineFleet(fleet, h.ctx.data)) {
     return;
   }
   // MSB-3: идущий бой имеет ПРИОРИТЕТ над новой дуэлью. Иначе пятеро прибывших дали бы
@@ -530,7 +535,7 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
 function hostileFleetAt(h: HandlerContext, fleet: Fleet, at: string): boolean {
   for (const id of Object.keys(h.state.fleets)) {
     const f = h.state.fleets[id];
-    if (!f || f.id === fleet.id || f.location !== at) continue;
+    if (!f || f.id === fleet.id || f.location !== at || isMineFleet(f, h.ctx.data)) continue;
     if (f.units.some((s) => s.count > 0) && isHostile(h, fleet.owner, f.owner)) return true;
   }
   return false;
@@ -541,7 +546,10 @@ function hostileFleetAt(h: HandlerContext, fleet: Fleet, at: string): boolean {
  *  бы от шага `advanceTo` (детерминизм, как у погрузки). */
 function beginAssaultLanding(h: HandlerContext, fleet: Fleet, planetId: string): void {
   const doneAt = h.ctx.now + hoursToMs(h.ctx, ASSAULT_LANDING_HOURS);
-  fleet.assaultLanding = { planetId, startAt: h.ctx.now, doneAt };
+  // Заявка — снимок трюма на начало высадки: по сроку сойдёт не больше (см. `troops`).
+  const troops: Record<string, number> = {};
+  for (const s of fleet.landing ?? []) if (s.count > 0) troops[s.unit] = (troops[s.unit] ?? 0) + s.count;
+  fleet.assaultLanding = { planetId, startAt: h.ctx.now, doneAt, troops };
   h.schedule(doneAt, 'assault.landed', { fleetId: fleet.id });
   h.emit('assault.landing', { fleetId: fleet.id, planetId, owner: fleet.owner, doneAt });
 }
@@ -569,13 +577,14 @@ function landAssault(h: HandlerContext, fleet: Fleet): void {
   if (!claim || claim.doneAt > h.ctx.now) return; // не этот срок
   delete fleet.assaultLanding;
   const planet = h.state.planets[claim.planetId];
-  const troops = (fleet.landing ?? []).filter((s) => s.count > 0);
   if (!planet || fleet.location !== planet.id || fleet.movement || fleet.battleId) return;
-  if (troops.length === 0 || !isCapturable(h.ctx.data, planet)) return;
+  if (!isCapturable(h.ctx.data, planet)) return;
   if (planet.owner === fleet.owner) return;
   if (planet.owner !== null && !isHostile(h, fleet.owner, planet.owner)) return;
   if (hostileFleetAt(h, fleet, planet.id)) return;
-  fleet.landing = [];
+  const { ashore: troops, aboard } = splitClaimed(fleet.landing ?? [], claim.troops);
+  if (troops.length === 0) return;
+  fleet.landing = aboard;
   const defended = planet.garrison.some((s) => s.count > 0);
   const fighting = Object.values(h.state.battles).some(
     (b) => b.phase === 'ground' && b.location === planet.id,
@@ -584,6 +593,10 @@ function landAssault(h: HandlerContext, fleet: Fleet): void {
   if (!defended && !fighting) {
     // Гарнизон пал, пока шла высадка, — мир берут те, кто на земле.
     capturePlanetByBeachhead(h, planet, { owner: fleet.owner, units: troops }, planet.owner);
+    // Чужие берега, оставшиеся на этой земле без боя (перемирие, ничья), решаются так же,
+    // как после захвата в бою: враг нового хозяина продолжает штурм, остальные уходят.
+    const next = settleBeachheads(h, planet, fleet.owner);
+    if (next !== null) h.emit('beachhead.landed', { planetId: planet.id, owner: next });
   } else {
     const own = (planet.beachheads ?? []).find((b) => b.owner === fleet.owner);
     if (own) own.units.push(...troops);
@@ -592,6 +605,84 @@ function landAssault(h: HandlerContext, fleet: Fleet): void {
   }
   // Флот без кораблей держался только десантом в трюме; десант сошёл — флота больше нет.
   removeIfWiped(h, fleet.id);
+}
+
+/**
+ * Разделить трюм на то, что сходит по заявке высадки, и то, что остаётся на борту.
+ * Заявка — снимок на начало высадки (`AssaultLanding.troops`): сходит не больше
+ * заявленного по каждому виду, в порядке стеков. Без заявки (старый снимок) сходит всё.
+ */
+function splitClaimed(
+  landing: readonly UnitStack[],
+  claimed: Record<string, number> | undefined,
+): { ashore: UnitStack[]; aboard: UnitStack[] } {
+  const left = { ...claimed };
+  const ashore: UnitStack[] = [];
+  const aboard: UnitStack[] = [];
+  for (const s of landing) {
+    if (!(s.count > 0)) continue;
+    const take = claimed ? Math.min(s.count, Math.max(0, left[s.unit] ?? 0)) : s.count;
+    if (take > 0) {
+      ashore.push({ ...s, count: take });
+      left[s.unit] = (left[s.unit] ?? 0) - take;
+    }
+    if (s.count - take > 0) aboard.push({ ...s, count: s.count - take });
+  }
+  return { ashore, aboard };
+}
+
+/**
+ * Чужие плацдармы на мире, который только что сменил хозяина (`owner`) — захватом в бою или
+ * высадкой на опустевшую землю. Раньше они просто стирались, и помощь союзников исчезала
+ * вместе с боем (замечание Codex на #1392): до MSB-9 их десант дрался из трюма и после
+ * захвата оставался на борту своих флотов.
+ *
+ *  - ВРАГ нового хозяина остаётся на земле — за этот мир он и дрался. Штурм продолжается:
+ *    возвращается владелец первого такого берега, и вызывающий объявляет `beachhead.landed`
+ *    ПОСЛЕ того, как закрыл прежний бой (та же ловушка порядка, что у MSB-4).
+ *  - Остальные ВОЗВРАЩАЮТСЯ НА БОРТ своих флотов над этим миром — в порядке id флотов и
+ *    в пределах свободного трюма (`fleetHoldFree`), как если бы и не сходили.
+ *  - Кому места не хватило: СОЮЗНИК нового хозяина остаётся гарнизоном взятого мира
+ *    (явная передача — войска и дальше держат его вместе). Прочие — игрок в мире, но не в
+ *    союзе с новым хозяином — распускаются: чужой гарнизон им не место, а плацдарм без боя
+ *    модель не держит (MSB-4: «поля после боя не остаётся»). Этот край записан в роадмапе.
+ */
+function settleBeachheads(h: HandlerContext, planet: Planet, owner: string): string | null {
+  type Beachhead = NonNullable<Planet['beachheads']>[number];
+  const hostile: Beachhead[] = [];
+  for (const b of planet.beachheads ?? []) {
+    const units = b.units.filter((s) => s.count > 0);
+    if (units.length === 0 || b.owner === owner) continue;
+    if (isHostile(h, b.owner, owner)) {
+      hostile.push({ ...b, units });
+      continue;
+    }
+    const rest = boardOwnFleets(h, planet.id, b.owner, units);
+    if (rest.length > 0 && isAllied(h, b.owner, owner)) planet.garrison.push(...rest);
+  }
+  if (hostile.length > 0) planet.beachheads = hostile;
+  else delete planet.beachheads;
+  return hostile[0]?.owner ?? null;
+}
+
+/** Посадить войска `owner` на его флоты над миром `at`, в пределах свободного трюма, в
+ *  порядке id флотов. Возвращает то, что не поместилось. */
+function boardOwnFleets(h: HandlerContext, at: string, owner: string, units: UnitStack[]): UnitStack[] {
+  let rest = units.map((s) => ({ ...s }));
+  for (const id of Object.keys(h.state.fleets).sort()) {
+    const f = h.state.fleets[id];
+    if (!f || f.owner !== owner || f.location !== at || f.movement || f.battleId) continue;
+    const next: UnitStack[] = [];
+    for (const s of rest) {
+      const size = h.ctx.data.units[s.unit]?.stats.cargoSize ?? 1;
+      const fit = size > 0 ? Math.min(s.count, Math.floor(fleetHoldFree(h.state, f, h.ctx.data) / size)) : s.count;
+      if (fit > 0) (f.landing ??= []).push({ ...s, count: fit });
+      if (s.count - fit > 0) next.push({ ...s, count: s.count - fit });
+    }
+    rest = next;
+    if (rest.length === 0) break;
+  }
+  return rest;
 }
 
 function capturePlanet(
@@ -787,13 +878,23 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
       // мир мёртвому значило бы отдать его тому, кого на земле уже нет.
       const alive = (planet.beachheads ?? []).filter((b) => b.units.some((st) => st.count > 0));
       if (!dAlive && alive[0] && planet.owner === defender.owner) {
-        capturePlanetByBeachhead(h, planet, alive[0], defender.owner);
-      }
-      if (!dAlive || alive.length === 0) {
-        // Гарнизон пал (мир взят) либо все берега выбиты — поля после боя не остаётся.
-        // Иначе на карте завелись бы вечные «чужие войска на моей земле», которых в
-        // модели нет: плацдарм ВРЕМЕННЫЙ по определению.
+        const [first, ...others] = alive;
+        capturePlanetByBeachhead(h, planet, first!, defender.owner);
+        // Остальные выжившие берега не стираются (замечание Codex на #1392): враг нового
+        // хозяина продолжает штурм, остальные уходят на борт или остаются у союзника.
+        planet.beachheads = others;
+        resumeAssaultFor = settleBeachheads(h, planet, first!.owner);
+      } else if (!dAlive || alive.length === 0) {
+        // Все берега выбиты — поля после боя не остаётся. Иначе на карте завелись бы вечные
+        // «чужие войска на моей земле», которых в модели нет: плацдарм ВРЕМЕННЫЙ.
         delete planet.beachheads;
+      } else if (end !== 'decided') {
+        // ПЕРЕМИРИЕ ИЛИ НИЧЬЯ (`MAX_COMBAT_ROUNDS`): бой закончен, и заводить его заново
+        // нельзя (замечание Codex на #1392). Перемирие сняло вражду — драться незачем; ничья
+        // — предохранитель от вечного боя, и перезапуск в тот же миг отменил бы его, создав
+        // цепочку событий в одном времени. Берега стоят на земле без боя; штурм продолжит
+        // новый десант (`beachhead.landed` заведёт бой заново).
+        planet.beachheads = alive;
       } else {
         // ГАРНИЗОН ЖИВ, А КТО-ТО НА БЕРЕГУ ЕЩЁ ДЕРЖИТСЯ. Такое стало возможно только с
         // MSB-4: цепочка (§0.0 №5) закрывает бой на ЛЮБОЙ смерти, и раньше эта смерть
@@ -998,7 +1099,10 @@ export const combatModule: GameModule = {
   id: 'combat',
   // 3.0.0: личные часы атакующих; защита отвечает на полученные залпы.
   // 3.1.0: штурм — высадка по таймеру, потом плацдарм; флот свободен (MSB-9).
-  version: '3.1.0',
+  // 3.2.0: заявка высадки замораживает десант; плацдарм не перезапускается после перемирия
+  // и ничьей; выжившие берега союзников при захвате не стираются (замечания Codex на #1392).
+  // 3.3.0: мина — не противник в бою; встреча с ней — подрыв (SM-3.6).
+  version: '3.3.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
@@ -1064,6 +1168,10 @@ export const combatModule: GameModule = {
       if (!fa.units.some((s) => s.count > 0) || !fb.units.some((s) => s.count > 0)) {
         return;
       }
+      // Встреча с миной — подрыв, а не бой: её разбирает `minefield` (SM-3.6).
+      if (isMineFleet(fa, h.ctx.data) || isMineFleet(fb, h.ctx.data)) {
+        return;
+      }
       const oa = laneOccupancy(fa);
       const ob = laneOccupancy(fb);
       if (!oa || !ob || oa.lo !== ob.lo || oa.hi !== ob.hi) {
@@ -1110,6 +1218,7 @@ export const combatModule: GameModule = {
       if (!fa || !fb || (fa.battleId && fb.battleId)) return;
       if (!isHostile(h, fa.owner, fb.owner)) return;
       if (!fa.units.some((s) => s.count > 0) || !fb.units.some((s) => s.count > 0)) return;
+      if (isMineFleet(fa, h.ctx.data) || isMineFleet(fb, h.ctx.data)) return; // подрыв — `minefield`
       const oa = trunkOccupancies(h.state, fa).find((o) => o.key === trunk);
       const ob = trunkOccupancies(h.state, fb).find((o) => o.key === trunk);
       if (!oa || !ob) return; // one left the trunk (re-routed / arrived) — stale

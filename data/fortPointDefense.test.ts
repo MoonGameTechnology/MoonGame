@@ -63,7 +63,9 @@ describe('где ставится космическая крепость — р
   // тех, где уже есть планета». Флаг `stationable` записывает ИСКЛЮЧЕНИЯ, а не
   // перечисляет разрешённое, поэтому сторож нужен именно на исключения: перевернуть флаг
   // — одна буква в json, и никакой другой тест этого не заметит.
-  const NOT_STATIONABLE = ['planet', 'void_station', 'pirate_base', 'neutral_base'];
+  // `fork_station` — площадка крепости на развилке (FORT-6.1): на ней уже стоит крепость, и
+  // обычную крепость поверх не ставят, ровно как на `void_station`.
+  const NOT_STATIONABLE = ['planet', 'void_station', 'fork_station', 'pirate_base', 'neutral_base'];
 
   it('крепость НЕЛЬЗЯ ставить ровно там, где решил владелец', () => {
     for (const kind of NOT_STATIONABLE) {
@@ -87,7 +89,11 @@ describe('где ставится космическая крепость — р
     const uncapturable = Object.keys(data.sectorKinds).filter((k) => !isCapturable(data, { kind: k }));
     // `rift` (MAP-BARRIER, M2.6) присоединился к списку по тому же рассуждению: это дыра
     // в карте, её не захватывают, значит крепости там не будет и без отдельного флага.
-    expect(uncapturable.sort()).toEqual(['black_hole', 'debris_field', 'empty', 'rift']);
+    // `fork_station` — единственное исключение из рассуждения, и флаг у неё стоит: площадку
+    // развилки не захватывают, но хозяин у неё ЕСТЬ — строитель крепости (FORT-6.1).
+    // Своим незахватываемое тут становится, поэтому закрыта она флагом, а не владением.
+    expect(uncapturable.sort()).toEqual(['black_hole', 'debris_field', 'empty', 'fork_station', 'rift']);
+    expect(isStationable(data, { kind: 'fork_station' })).toBe(false);
   });
 
   it('у КАЖДОГО вида из ростера крепости есть само здание в каталоге', () => {

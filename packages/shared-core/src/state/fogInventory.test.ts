@@ -398,12 +398,12 @@ function maximalState(): GameState {
     // EVT-2: котёл трофеев. Канарейка на чужом узле — вырезаться обязано ВСЁ поле
     // целиком, так что своей записи тут не нужно: она снимется вместе с чужой.
     salvage: { CANARY_target: { pool: { metal: 100 }, winners: ['CANARY_third'] } },
+    // SM-3.6: сами мины — отряды во `fleets`; здесь только перезарядки и установки.
     minefields: {
-      fields: {
-        A: { [VIEWER]: { charge: 2, hit: 0.2 }, [RIVAL]: { charge: 3, hit: 0.2 } },
-        CANARY_node: { [RIVAL]: { charge: 1, hit: 0.1 } },
-      },
       readyAt: { mine: 5, CANARY_fleet: 9 },
+      installations: {
+        CANARY_fleet: { owner: RIVAL, readyAt: 9, location: 'CANARY_node', stack: { unit: 'mine', count: 1 } },
+      },
     },
     // Ни одной канарейки: волны публичны целиком (см. опись), и подсадить сюда чужой
     // секрет было бы неправдой о поле — оно его не носит.

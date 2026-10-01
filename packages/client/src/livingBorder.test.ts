@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { drawLivingBorders, LIVING_AMP, livingOffset, type LivingFrame } from './livingBorder';
+import { drawLivingBorders, LIVING_AMP, LIVING_MAX_PX, livingOffset, type LivingFrame } from './livingBorder';
 import {
   drawTerritory,
   strokeBorders,
@@ -24,6 +24,8 @@ function recorder(): { g: CanvasRenderingContext2D; log: string[] } {
 const frame: LivingFrame = { x: 100, y: 50, width: 800, height: 600 };
 const palette = { ownerColor: () => '#40c0e0', hideOwnedInner: true, provinceDetail: 1 };
 const scale = Math.min(frame.width, frame.height);
+/** Заявленный размах: доля рамки, не больше потолка в экранных пикселях. */
+const amp = Math.min(scale * LIVING_AMP, LIVING_MAX_PX);
 
 describe('M2.11 — живая граница провинций', () => {
   it('одна и та же точка в один и тот же миг — один и тот же сдвиг: стоящие часы замораживают линию', () => {
@@ -36,13 +38,13 @@ describe('M2.11 — живая граница провинций', () => {
     for (let i = 0; i < 20; i++) {
       const [ax, ay] = livingOffset(150 + i * 31, 90 + i * 17, frame, 0);
       const [bx, by] = livingOffset(150 + i * 31, 90 + i * 17, frame, 1500);
-      if (Math.hypot(bx - ax, by - ay) > scale * LIVING_AMP * 0.05) moved++;
+      if (Math.hypot(bx - ax, by - ay) > amp * 0.05) moved++;
     }
     expect(moved).toBeGreaterThan(10);
   });
 
   it('амплитуда ограничена: линия не отходит от застывшей заливки дальше заявленного', () => {
-    const cap = scale * LIVING_AMP + 1e-9;
+    const cap = amp + 1e-9;
     for (let x = frame.x; x <= frame.x + frame.width; x += 37)
       for (let y = frame.y; y <= frame.y + frame.height; y += 29)
         for (const clock of [0, 777, 9_000, 123_456]) {
@@ -60,12 +62,32 @@ describe('M2.11 — живая граница провинций', () => {
     expect(by).toBeCloseTo(ay, 9);
   });
 
-  it('и зум тоже: сдвиг растёт вместе с картой, рисунок не переезжает', () => {
-    const zoomed: LivingFrame = { x: frame.x, y: frame.y, width: frame.width * 2, height: frame.height * 2 };
-    const [ax, ay] = livingOffset(420, 310, frame, 2500);
-    const [bx, by] = livingOffset(frame.x + (420 - frame.x) * 2, frame.y + (310 - frame.y) * 2, zoomed, 2500);
+  it('и зум тоже: рисунок не переезжает, а ниже потолка размах растёт вместе с картой', () => {
+    const small: LivingFrame = { x: 40, y: 30, width: 300, height: 200 }; // размах 0,36 пикселя
+    const zoomed: LivingFrame = { x: small.x, y: small.y, width: small.width * 2, height: small.height * 2 };
+    const [ax, ay] = livingOffset(120, 90, small, 2500);
+    const [bx, by] = livingOffset(small.x + (120 - small.x) * 2, small.y + (90 - small.y) * 2, zoomed, 2500);
     expect(bx).toBeCloseTo(ax * 2, 9);
     expect(by).toBeCloseTo(ay * 2, 9);
+  });
+
+  // Просьба владельца 2026-09-30: «сделай, чтоб границы провинций не так сильно "качались"».
+  // Рамка растёт с зумом, и без потолка на стартовом виде партии (×3) граница качалась на
+  // 3 пикселя на ПК, а вблизи — ещё сильнее.
+  it('вблизи размах не растёт выше потолка: тот же рисунок, что и издалека, той же силы', () => {
+    const k = 8;
+    const near: LivingFrame = { x: frame.x, y: frame.y, width: frame.width * k, height: frame.height * k };
+    const [ax, ay] = livingOffset(420, 310, frame, 2500);
+    const [bx, by] = livingOffset(frame.x + (420 - frame.x) * k, frame.y + (310 - frame.y) * k, near, 2500);
+    expect(bx).toBeCloseTo(ax, 9);
+    expect(by).toBeCloseTo(ay, 9);
+    for (let x = near.x; x <= near.x + 2000; x += 41)
+      for (let y = near.y; y <= near.y + 1500; y += 37)
+        for (const clock of [0, 4_321, 88_000]) {
+          const [dx, dy] = livingOffset(x, y, near, clock);
+          expect(Math.abs(dx)).toBeLessThanOrEqual(LIVING_MAX_PX + 1e-9);
+          expect(Math.abs(dy)).toBeLessThanOrEqual(LIVING_MAX_PX + 1e-9);
+        }
   });
 
   it('общая граница остаётся общей: обе стороны фронтира кладут концы в одни точки', () => {

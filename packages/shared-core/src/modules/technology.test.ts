@@ -315,6 +315,13 @@ describe('technology module — session research tree', () => {
         fleets: [{ ...fleet('f1', 'p1', 'A'), units: [], landing: [{ unit: 'scout', count: 1 }] }],
       }),
     ).toBe(true);
+    // …и десант на чужом плацдарме (MSB-9: штурмующий десант весь бой живёт на земле).
+    expect(
+      openFor('carriers', {
+        players: [p1()],
+        planets: [{ ...planet('B', 'p2'), beachheads: [{ owner: 'p1', units: [{ unit: 'scout', count: 1 }] }] }],
+      }),
+    ).toBe(true);
 
     // count-based (min > 1): the data `min` is the balancing lever — two refineries
     // open the "+" tier, one does not.
