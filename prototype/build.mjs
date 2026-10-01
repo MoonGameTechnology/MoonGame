@@ -1650,8 +1650,22 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #battlewinbody .bw-ret div b{display:block;font-size:13px;}
 #battlewinbody .bw-ret div span{font-size:11px;color:var(--dim);}
 #battlewinbody .bw-ret button{flex:0 0 auto;min-height:36px;}
-#battlewinbody .hint{font-size:11px;color:var(--dim);line-height:1.45;margin:4px 0 0;}
-#battlewinbody .bw-rule{font-size:11px;color:var(--dim);line-height:1.45;margin:8px 0 0;padding-top:6px;border-top:1px solid var(--line);}
+/* UIX-6.2: прогноз над колонками — слово итога и строка «срок · потери»; цвет тот же, что у
+   прогноза в прицеле «Атаки», и лишь дублирует слово. */
+#battlewinbody .bw-forecast{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;margin:0 0 10px;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--line-hi);border-radius:7px;font-size:12px;color:var(--dim);}
+#battlewinbody .bw-forecast b{font-size:14px;color:var(--txt,#e8f6fa);}
+#battlewinbody .bw-forecast.positive{border-left-color:#7df0d0;}
+#battlewinbody .bw-forecast.positive b{color:#7df0d0;}
+#battlewinbody .bw-forecast.negative{border-left-color:#ff5a4d;}
+#battlewinbody .bw-forecast.negative b{color:#ff5a4d;}
+#battlewinbody .bw-forecast.neutral{border-left-color:#ffb43a;}
+#battlewinbody .bw-forecast.neutral b{color:#ffb43a;}
+/* UIX-6.2: правила отхода и раундов под «?» — на виду одна строка, она же кнопка. */
+#battlewinbody .bw-rules-toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;margin-top:8px;padding:6px 0;border:0;border-top:1px solid var(--line);background:transparent;color:var(--dim);font:inherit;font-size:12px;line-height:1.4;text-align:left;cursor:pointer;}
+#battlewinbody .bw-rules-toggle span{flex:1;min-width:0;}
+#battlewinbody .bw-rules-toggle i{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line-hi);border-radius:50%;font-style:normal;font-weight:700;line-height:20px;text-align:center;color:var(--cyan);}
+#battlewinbody .bw-rules-toggle[aria-expanded="true"] i{background:var(--cyan);border-color:var(--cyan);color:#05161c;}
+#battlewinbody .bw-rules p{font-size:12px;color:var(--dim);line-height:1.45;margin:4px 0 0;}
 #battlewinbody .bw-empty{font-size:12px;color:var(--dim);}
 /* Horizontal command window: ownership is independent from combat stance. */
 #battlewin .twbox{width:min(1220px,96vw);max-height:92dvh;}
@@ -1694,7 +1708,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #battlewinbody .bw-effects small{grid-column:1/-1;color:var(--dim);}
 #battlewinbody .bw-effects p{font-size:10px;line-height:1.4;color:var(--dim);margin-bottom:0;}
 #battlewinbody button:focus-visible{outline:2px solid #e8f6fa;outline-offset:2px;}
-@media(max-width:700px){#battlewinbody{padding:10px;}#battlewinbody .bw-columns{grid-template-columns:1fr;gap:12px;}#battlewin .twbox{max-height:94dvh;}#battlewinbody .bw-orders{bottom:-10px;}#battlewinbody .bw-damage b{font-size:15px;}}
+@media(max-width:700px){#battlewinbody{padding:10px;}#battlewinbody .bw-columns{grid-template-columns:1fr;gap:12px;}#battlewin .twbox{max-height:94dvh;}#battlewinbody .bw-orders{bottom:-10px;}#battlewinbody .bw-damage b{font-size:15px;}#battlewinbody .bw-rules-toggle{min-height:44px;}}
 #stewardbody .st-status{padding:11px 13px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.08);font-size:12px;color:var(--cyan);line-height:1.55;}
 #stewardbody .st-status.locked{border-color:var(--line);background:rgba(255,255,255,.03);color:var(--dim);}
 #stewardbody .st-status.on{border-color:#7df0d0;background:rgba(125,240,208,.10);color:#9ff0da;}

@@ -313,6 +313,7 @@ import { medalBadges } from '../../decisions/unitMedals';
 import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { engageForecastCard } from '../../decisions/engageForecast';
+import { battleForecast } from '../../decisions/battleForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -11424,6 +11425,8 @@ const battleWindow = initBattleWindow({
     placeName: worldTitle,
     autoRetreatAt,
     timeLeft,
+    // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
+    forecast: (sides) => battleForecast(sides, data),
   },
 });
 battleWin.addEventListener('click', (event) => {

@@ -19,16 +19,22 @@
  *    (MSB-3/MSB-4), и порядок о роли не говорит ничего.
  * 2. **Своя сторона помечена.** В свалке на пять сторон «где я» — первый вопрос игрока, и
  *    искать себя по имени владельца в списке одинаковых строк было бы мучением.
- * 3. **Прогноза здесь НЕТ, и это решение.** Окно отвечает на вопрос «кто и какими силами»,
- *    а не «чем кончится»: у многостороннего боя исход честно не определён, пока выживших
- *    может остаться несколько, и показать там одно число значило бы соврать. Прогноз живёт
- *    в карточке штурма, где сторон ровно две и ответ существует.
+ * 3. **Прогноз — только там, где у боя один ответ (UIX-6.2).** В бою двух сторон, одна из
+ *    которых моя, над колонками стоит итог словом, срок и потери (`decisions/battleForecast.ts`).
+ *    Он считается от текущего состава, поэтому новый раунд сам даёт новый прогноз. У боя
+ *    трёх сторон и больше исход честно не определён: бой кончается первой гибелью, и
+ *    выжившие сцепляются заново. Одно число там было бы враньём, и окно пишет «прогноза
+ *    нет». В чужом бою прогноза нет вовсе: победа и поражение бывают только у своей стороны.
  * 4. **Пустое окно не открывается молча.** Бой мог кончиться, пока палец летел к экрану;
  *    честная строка лучше пустой рамки.
+ * 5. **Правила — под «?», на виду одна строка (UIX-6.2).** Цена отхода нужна в момент
+ *    решения, поэтому видна она; остальное (отход не добивает, десант не отступает, как
+ *    ходят залпы) раскрывается нажатием и остаётся открытым между раундами.
  */
 import { t } from '../../localization/runtime';
-import { esc, displayUnit, kfmt, runClockShown } from './format';
+import { esc, displayUnit, fmtHrs, kfmt, runClockShown } from './format';
 import { runRealSeconds } from '../../decisions/runClock';
+import type { BattleForecast, ForecastSide } from '../../decisions/battleForecast';
 import { hullTone, meterShare, powerShares } from '../../decisions/battleBalance';
 import { veteranBadge } from '../../decisions/veteranBadge';
 import { combatantKey, landingBattleOf } from '../../packages/shared-core/src/state/battle';
@@ -70,6 +76,8 @@ export interface BattleView {
   autoRetreatAt?: (fleetId: string) => number | null;
   /** Остаток до отметки времени мира — текст отсчёта до следующего раунда. */
   timeLeft?: (at: number) => string;
+  /** UIX-6.2: прогноз боя по текущему составу сторон (`decisions/battleForecast.ts`). */
+  forecast?: (sides: readonly ForecastSide[]) => BattleForecast | null;
 }
 
 type Side = BattleModel['sides'][number];
@@ -105,6 +113,8 @@ export interface BattleWindowOptions {
   effects?: ReadonlySet<string>;
   ended?: boolean;
   retreats?: readonly string[];
+  /** Раскрыты ли правила под «?» (UIX-6.2). */
+  rules?: boolean;
 }
 
 function sideKey(side: Side): string {
@@ -263,6 +273,25 @@ function balanceHtml(sides: readonly Side[], view: BattleView): string {
   );
 }
 
+/** Прогноз (правило 3): слово итога, срок и потери; цвет лишь дублирует слово. */
+function forecastHtml(f: BattleForecast | null | undefined): string {
+  if (!f) return '';
+  if (f.kind === 'many') return `<p class="bw-forecast">${esc(t('battle.win.forecast-many'))}</p>`;
+  const c = f.card;
+  return (
+    `<p class="bw-forecast ${c.tone}"><b>${esc(t(c.verdictKey))}</b>` +
+    `<span>${esc(t('engage.forecast.line', { h: fmtHrs(c.hours), own: c.ownLossPct, foe: c.foeLossPct }))}</span></p>`
+  );
+}
+
+/** Правила под «?» (правило 5): строка на виду и есть кнопка, подробности — по нажатию. */
+function rulesHtml(line: string, detail: readonly string[], open: boolean): string {
+  return (
+    `<button class="bw-rules-toggle" data-battle-rules aria-expanded="${open}"><span>${esc(line)}</span><i aria-hidden="true">?</i></button>` +
+    (open ? `<div class="bw-rules">${detail.map((p) => `<p>${esc(p)}</p>`).join('')}</div>` : '')
+  );
+}
+
 /**
  * Шапка окна: где бой, фаза и сколько сторон (заказ владельца 2026-09-28). Раньше то же
  * самое стояло отдельной карточкой над полосой сил и съедало её высоту, хотя в шапке
@@ -295,6 +324,10 @@ export function battleWindowHtml(
     sides.map((s) => sideRowHtml(s, view, { ...options, expanded, retreats })).join('') +
     '</section>';
   const canAttack = m.sides.some((s) => s.mine && s.role === 'defender');
+  const orders = !options.ended && m.sides.some((s) => s.mine);
+  const rule = runClockShown()
+    ? t('battle.win.rule.run', { n: runRealSeconds(3_600_000) })
+    : t('battle.win.rule');
   return (
     balanceHtml(m.sides, {
       ...view,
@@ -304,13 +337,27 @@ export function battleWindowHtml(
           view,
         ),
     }) +
+    (options.ended
+      ? ''
+      : forecastHtml(
+          view.forecast?.(
+            m.sides.map((s) => ({ mine: s.mine, role: s.role, units: s.stacks ?? s.units })),
+          ),
+        )) +
     `<div class="bw-columns">${renderColumn(friends, t('battle.win.allies'))}${renderColumn(others, t('battle.win.opponents'))}</div>` +
-    (!options.ended && m.sides.some((s) => s.mine)
+    (orders
       ? `<div class="bw-orders"><button class="b bw-attack" data-battle-attack-all${canAttack ? '' : ' disabled'}>${esc(t('battle.win.attack-all'))}</button>` +
-        `<button class="b" data-battle-retreat-all${retreats.length ? '' : ' disabled'}>${esc(t('battle.win.retreat-all'))}</button></div>` +
-        `<p class="hint">${esc(t(ground ? 'battle.win.ground-retreat' : 'side.battle.retreat.hint'))}</p>`
+        `<button class="b" data-battle-retreat-all${retreats.length ? '' : ' disabled'}>${esc(t('battle.win.retreat-all'))}</button></div>`
       : '') +
-    `<p class="bw-rule">${esc(runClockShown() ? t('battle.win.rule.run', { n: runRealSeconds(3_600_000) }) : t('battle.win.rule'))}</p>`
+    rulesHtml(
+      !orders
+        ? t('battle.win.rules')
+        : ground
+          ? t('battle.win.ground-retreat')
+          : t('battle.win.retreat-cost'),
+      orders && !ground ? [t('battle.win.retreat-rules'), rule] : [rule],
+      options.rules ?? false,
+    )
   );
 }
 
@@ -362,6 +409,7 @@ export function initBattleWindow(host: BattleWindowHost): {
   let expanded: Set<string> | undefined;
   const fullComposition = new Set<string>();
   const effects = new Set<string>();
+  let rules = false;
   const repaint = (): void => {
     if (!isOpen() || shown === null) return;
     const model = host.model(shown);
@@ -376,7 +424,7 @@ export function initBattleWindow(host: BattleWindowHost): {
           .map(sideKey),
       );
     }
-    const options = { expanded, fullComposition, effects };
+    const options = { expanded, fullComposition, effects, rules };
     const html =
       !model && summary !== null
         ? battleEndedHtml(lastModel, summary, host.view, options)
@@ -422,6 +470,13 @@ export function initBattleWindow(host: BattleWindowHost): {
         repaint();
         return;
       }
+    }
+    if (tg.closest('[data-battle-rules]')) {
+      rules = !rules;
+      repaint();
+      // Правила раскрываются в самом низу окна: без прокрутки была бы видна одна их строка.
+      if (rules) host.body().querySelector('.bw-rules')?.scrollIntoView({ block: 'nearest' });
+      return;
     }
     if (shown && host.model(shown)) {
       const model = host.model(shown)!;
@@ -474,6 +529,7 @@ export function initBattleWindow(host: BattleWindowHost): {
         expanded = undefined;
         fullComposition.clear();
         effects.clear();
+        rules = false;
       }
       shown = battleId;
       lastHtml = '';

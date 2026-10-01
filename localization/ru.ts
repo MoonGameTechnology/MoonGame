@@ -206,6 +206,11 @@ export const ru: Record<string, string> = {
   'battle.win.against': 'Против: {name}',
   'battle.win.next-attack': 'До атаки',
   'battle.win.ground-retreat': 'Наземные войска не отступают',
+  'battle.win.retreat-cost': 'Отход: −40% текущих корпуса и щита, рывок скорости',
+  'battle.win.retreat-rules':
+    'Отход не добивает израненный флот. Десант в высадке не отступает; вне боя корабль уходит с орбиты без потерь. После нажатия выберите на карте, куда отойти.',
+  'battle.win.rules': 'Правила боя',
+  'battle.win.forecast-many': 'Прогноза нет: сторон больше двух',
   'battle.win.source-sector': 'Сектор',
   'battle.win.source-planet': 'Тип планеты',
   'battle.win.source-hunger': 'Голод',
@@ -3155,8 +3160,6 @@ export const ru: Record<string, string> = {
   'side.arch.swarm': 'рой',
   'side.arch.transport': 'транспорты',
   'side.battle.retreat': '⤺ Отступить',
-  'side.battle.retreat.hint':
-    'Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно. После нажатия выберите на карте, куда отойти.',
   'side.battle.side.fleet': 'флот',
   'side.battle.side.garrison': 'гарнизон',
   'side.battle.side.landing': 'десант',
