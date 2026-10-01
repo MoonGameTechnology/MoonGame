@@ -117,6 +117,7 @@
 | UIX-9.3 | ⏳ | proto | `docs/backlog.md` | ПК: «Сводка армии» обрезана справа. |
 | UIX-9.4 | ⏳ | proto | `docs/backlog.md` | ПК: подписи значков и термины. |
 | UIX-10.1 | ⏳ | proto | `docs/backlog.md` | Хаб: одна главная дверь. |
+| UIX-10.2 | ✅ | proto | `docs/backlog.md` | Хаб: кошелёк и дверь в аукцион. |
 | UIX-11.1 | 🔒 | proto | `docs/backlog.md` | Три стиля кнопок и без КАПС-лейблов. |
 | UIX-12.1 | ⏳ | proto | `docs/backlog.md` | Свой и чужой не только цветом. |
 | UIX-13.1 | ⏳ | proto | `docs/backlog.md` | Верфь: свернуть неподходящие модули и дать группе свою строку. |

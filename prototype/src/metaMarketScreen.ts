@@ -23,6 +23,8 @@ export interface MetaMarketHost {
   arsenal(): readonly ArsenalItem[];
   authorizedBase(): Promise<{ base: string; token: string } | null>;
   note(message: string): void;
+  /** The server answered: the warrant balance may differ (the hub wallet repaints, UIX-10.2). */
+  changed?(): void;
 }
 
 const empty: MarketView = { balance: 0, feeRate: 0.08, listings: [] };
@@ -44,7 +46,13 @@ export function metaMarketHtml(view: MarketView, mine: readonly ArsenalItem[]): 
   return `<header class="mm-head"><div><strong>${t('auction.title')}</strong><small>${t('auction.subtitle')}</small></div><b>⌖ ${nfmt(view.balance)}</b></header><p class="mm-fee">${t('auction.fee', { n: Math.round(view.feeRate * 100) })}</p><h3>${t('auction.browse')}</h3><div class="mm-grid">${lots || `<p class="hub-empty">${t('auction.empty')}</p>`}</div><h3>${t('auction.sell')}</h3><div class="mm-grid">${sell || `<p class="hub-empty">${t('auction.no-items')}</p>`}</div>`;
 }
 
-export function initMetaMarket(host: MetaMarketHost): { refresh(): Promise<void> } {
+export function initMetaMarket(host: MetaMarketHost): {
+  refresh(): Promise<void>;
+  /** Quiet refresh for the hub wallet: no session or a failed call leaves the last balance. */
+  sync(): Promise<void>;
+  /** The warrant balance from the last server answer (0 until then, as the header prints it). */
+  balance(): number;
+} {
   let view = empty;
   const paint = () => {
     host.root().innerHTML = metaMarketHtml(view, host.arsenal());
@@ -69,8 +77,18 @@ export function initMetaMarket(host: MetaMarketHost): { refresh(): Promise<void>
     try {
       view = (await request('/meta-market')) as unknown as MarketView;
       paint();
+      host.changed?.();
     } catch (e) {
       host.note(e instanceof Error ? e.message : 'E_NETWORK');
+    }
+  };
+  const sync = async () => {
+    try {
+      view = (await request('/meta-market')) as unknown as MarketView;
+      host.changed?.();
+    } catch {
+      // A guest or an unreachable server: the wallet keeps the last balance, and the hub
+      // has no place for an auction error — the auction tab itself reports it.
     }
   };
   host.root().addEventListener('click', (ev) => {
@@ -101,5 +119,5 @@ export function initMetaMarket(host: MetaMarketHost): { refresh(): Promise<void>
       })(),
     );
   });
-  return { refresh };
+  return { refresh, sync, balance: () => view.balance };
 }

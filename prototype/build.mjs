@@ -8,6 +8,7 @@
 import { build } from 'esbuild';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { platformBuildOptions, platformLocaleFiles } from './platformBuild.mjs';
+import { cursorCss, heatPointers } from './cursors.mjs';
 
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
@@ -188,18 +189,18 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 #tbwallet[hidden]{display:none;}
 /* Валюта — кнопка: тап раскрывает её описание (.tw-info). Значок крупный, шапке забега места
    хватает (заказ владельца 2026-09-24: «увеличить иконки, а то вон сколько места»). */
-#tbwallet .tw-cur{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 9px;border:1px solid currentColor;border-radius:999px;
+:is(#tbwallet,#hubwallet) .tw-cur{display:inline-flex;align-items:center;gap:6px;padding:3px 12px 3px 9px;border:1px solid currentColor;border-radius:999px;
   background:color-mix(in srgb,currentColor 12%,transparent);font:600 13px/1.4 ui-monospace,monospace;font-variant-numeric:tabular-nums;
   cursor:pointer;}
-#tbwallet .tw-cur i{font-style:normal;font-size:19px;line-height:1;}
+:is(#tbwallet,#hubwallet) .tw-cur i{font-style:normal;font-size:19px;line-height:1;}
 #tbwallet .tw-cur[aria-expanded="true"]{box-shadow:0 0 0 2px color-mix(in srgb,currentColor 45%,transparent);}
-#tbwallet .tw-cur:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
+:is(#tbwallet,#hubwallet) .tw-cur:focus-visible{outline:2px solid currentColor;outline-offset:2px;}
 #tbwallet .tw-info{position:absolute;top:calc(100% + 6px);right:0;z-index:40;margin:0;width:max-content;
   max-width:min(320px,calc(100vw - 24px));padding:10px 14px;border-radius:10px;border:1px solid currentColor;
   background:rgba(4,14,18,.97);box-shadow:0 6px 20px rgba(0,0,0,.5);font:500 13px/1.45 system-ui,sans-serif;white-space:normal;}
 #tbwallet .tw-info.tw-sovereigns{color:#ffd978;border-color:rgba(255,207,98,.8);}
 #tbwallet .tw-data{color:var(--cur-data);}
-#tbwallet .tw-warrants{color:var(--cur-warrants);}
+:is(#tbwallet,#hubwallet) .tw-warrants{color:var(--cur-warrants);}
 /* Суверены в кошельке — та же золотая стеклянная плашка, что фишка на карте (.dl-donate,
    заказ владельца 2026-09-24 «сделай красивой»): тёмное стекло, золотая кромка, светящийся
    самоцвет, число золотым градиентом; «+» — золотая клавиша, приставленная к плашке. */
@@ -367,7 +368,7 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
    фишка стоит левее отступа и маской не задета. */
 #devline{-webkit-mask-image:linear-gradient(to left,transparent 14px,#000 14px);
   mask-image:linear-gradient(to left,transparent 14px,#000 14px);}
-#devline .dl-donate{position:sticky;right:0;z-index:1;overflow:hidden;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;
+:is(#devline,#hubwallet) .dl-donate{position:sticky;right:0;z-index:1;overflow:hidden;margin-left:auto;flex:0 0 auto;display:flex;align-items:center;
   gap:7px;height:26px;padding:0 3px 0 6px;border-radius:8px;cursor:pointer;
   font:800 13px/1 inherit;letter-spacing:.4px;font-variant-numeric:tabular-nums;white-space:nowrap;
   background:linear-gradient(180deg,rgba(66,46,8,.94) 0%,rgba(26,18,4,.96) 100%);
@@ -375,24 +376,24 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
   box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 12px rgba(255,186,52,.3),inset 0 1px 0 rgba(255,238,176,.28),
     inset 0 -6px 12px rgba(0,0,0,.35);
   animation:donateBreath 3.2s ease-in-out infinite;transition:transform .12s,filter .2s;}
-#devline .dl-donate:hover{transform:translateY(-1px);filter:brightness(1.15);}
-#devline .dl-donate:active{transform:translateY(1px);filter:brightness(.95);}
-#devline .dl-donate:focus-visible{outline:2px solid #ffe28a;outline-offset:2px;}
+:is(#devline,#hubwallet) .dl-donate:hover{transform:translateY(-1px);filter:brightness(1.15);}
+:is(#devline,#hubwallet) .dl-donate:active{transform:translateY(1px);filter:brightness(.95);}
+:is(#devline,#hubwallet) .dl-donate:focus-visible{outline:2px solid #ffe28a;outline-offset:2px;}
 /* самоцвет: заливка гранями + свечение — читается даже крошечным на телефоне */
-#devline .dl-donate i{display:grid;place-items:center;width:18px;height:18px;color:#fff1bf;
+:is(#devline,#hubwallet) .dl-donate i{display:grid;place-items:center;width:18px;height:18px;color:#fff1bf;
   filter:drop-shadow(0 0 4px rgba(255,196,70,.9));}
-#devline .dl-donate i svg{display:block;width:18px;height:18px;fill:rgba(255,190,56,.55);stroke-width:1.2;}
-#devline .dl-donate b{font-weight:900;color:#ffd978;
+:is(#devline,#hubwallet) .dl-donate i svg{display:block;width:18px;height:18px;fill:rgba(255,190,56,.55);stroke-width:1.2;}
+:is(#devline,#hubwallet) .dl-donate b{font-weight:900;color:#ffd978;
   background:linear-gradient(180deg,#fff6d2 0%,#ffd466 55%,#e9a326 100%);
   -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
   text-shadow:0 0 10px rgba(255,190,60,.25);}
 /* «+» — пополнить: золотая клавиша внутри плашки */
-#devline .dl-donate em{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;
+:is(#devline,#hubwallet) .dl-donate em{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;
   font-style:normal;font-weight:900;font-size:15px;line-height:1;color:#3b2500;
   background:linear-gradient(180deg,#ffec9e 0%,#ffc93f 55%,#e59a17 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.65),inset 0 -1px 0 rgba(120,70,0,.5),0 0 8px rgba(255,190,60,.5);}
 /* блик: узкая светлая полоса раз в несколько секунд */
-#devline .dl-donate::after{content:"";position:absolute;top:-40%;left:-40%;width:22%;height:180%;
+:is(#devline,#hubwallet) .dl-donate::after{content:"";position:absolute;top:-40%;left:-40%;width:22%;height:180%;
   background:linear-gradient(90deg,transparent,rgba(255,244,200,.45),transparent);transform:rotate(18deg);
   animation:donateShine 5s ease-in-out infinite;pointer-events:none;}
 @keyframes donateBreath{
@@ -402,8 +403,8 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
     box-shadow:0 0 0 1px rgba(0,0,0,.55),0 0 16px rgba(255,196,70,.5),inset 0 1px 0 rgba(255,238,176,.28),inset 0 -6px 12px rgba(0,0,0,.35);}}
 @keyframes donateShine{0%,70%{left:-40%;}100%{left:130%;}}
 @media (prefers-reduced-motion:reduce){
-  #devline .dl-donate,#devline .dl-donate::after{animation:none;}
-  #devline .dl-donate::after{display:none;}}
+  :is(#devline,#hubwallet) .dl-donate,:is(#devline,#hubwallet) .dl-donate::after{animation:none;}
+  :is(#devline,#hubwallet) .dl-donate::after{display:none;}}
 /* ремонт за Суверены в карточке флота (забег Sector Zero): та же золотая плашка в малом */
 .chip-sov{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font-size:10px;cursor:pointer;
   color:#ffd978;border:1px solid rgba(255,207,98,.7);border-radius:6px;
@@ -3017,6 +3018,21 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;flex:0 0 auto;}
 #hub .hub-msg .badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;padding:0 4px;
   background:var(--red);color:#180605;font:700 10px/18px ui-monospace,monospace;text-align:center;}
+/* Кошелёк главного экрана (hubWallet.ts, UIX-10.2): те же плашки, что фишка Суверенов в строке
+   статуса партии и кошелёк забега, ростом с кнопки шапки. Клавиша при Варрантах — дверь в аукцион. */
+#hub .hub-wallet{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
+#hubwallet .dl-donate{position:relative;right:auto;margin-left:0;height:42px;gap:8px;padding:0 5px 0 12px;border-radius:10px;
+  font-size:16px;}
+#hubwallet .dl-donate :is(i,i svg){width:20px;height:20px;}
+#hubwallet .dl-donate em{width:30px;height:30px;border-radius:8px;font-size:18px;}
+#hubwallet .tw-cur{height:42px;gap:8px;padding:0 5px 0 14px;font-size:16px;cursor:pointer;}
+#hubwallet .tw-cur i{font-size:20px;}
+#hubwallet .hw-go{display:inline-flex;align-items:center;height:30px;margin-left:4px;padding:0 12px;border-radius:999px;
+  background:color-mix(in srgb,currentColor 24%,transparent);color:color-mix(in srgb,currentColor 30%,var(--ink));
+  font:600 14px/1 system-ui,sans-serif;}
+#hubwallet .tw-cur:hover .hw-go{background:color-mix(in srgb,currentColor 36%,transparent);}
+/* Узкий экран: кошелёк — своей строкой под именем, а не вместо него. */
+@media (max-width:900px){#hub .hub-id{flex-wrap:wrap;row-gap:10px;}#hub .hub-wallet{order:10;flex:1 0 100%;}}
 #hub .hub-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px 14px;}
 #hub .hub-panel{display:flex;flex-direction:column;gap:14px;}
 #hub .hub-play{width:100%;padding:18px;border-radius:12px;border:1px solid var(--cyan);cursor:pointer;
@@ -3548,7 +3564,9 @@ ${profileCss}
 
 /** Все листы одной строкой: платформенная цель пишет их файлом, остальные — инлайном. */
 const allCss = () =>
-  `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`;
+  `${cursorCss()}\n${heatPointers(
+    `${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${shipArtCss}\n${heroCardsCss}\n${mobileStrategyCss}\n${sectorZeroCss}`,
+  )}`;
 
 /**
  * Лоадер SDK площадки — ДОСЛОВНО как в документации (требование 1.19.1).
@@ -3992,6 +4010,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-name" id="hub-name">Командир</div>
       <div class="hub-st" data-i18n="hub.status.online"></div>
     </div>
+    <div class="hub-wallet" id="hubwallet"></div>
     <button class="hub-lang" id="hub-lang" type="button" data-i18n-aria="locale.pick.aria"></button>
     <button class="hub-gear" id="hub-gear" type="button" data-i18n-aria="hub.tile.settings"><span class="hg-ic" aria-hidden="true">⚙</span><span class="hg-lbl" data-i18n="hub.tile.settings"></span></button>
     <button class="hub-msg" id="hub-msg" type="button" data-i18n-aria="hub.msgs.aria">✉</button>

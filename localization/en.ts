@@ -2481,6 +2481,7 @@ export const en: Record<string, string> = {
   'hub.tile.support': 'Support',
   'hub.tile.tutorial': 'Tutorial',
   'hub.tile.updates': 'Updates',
+  'hub.wallet.auction': 'Warrants: {n}. Open the auction',
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
   'hud.back.title': 'Back',
