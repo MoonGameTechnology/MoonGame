@@ -42,13 +42,16 @@ export function battleConcernsMe(
   return b.sides.some((s) => s.owner === me) || known(b.location);
 }
 
-/** Сколько боёв просится ко мне на тревогу. */
-export function myBattleCount(
-  battles: readonly BattleLike[],
+/** Сколько боёв просится ко мне на тревогу. `engaged` — бой, где дерётся мой блок зрения
+ *  (союзник, обмен картами): его видно и без опознанного узла, и счёт обязан его видеть,
+ *  иначе кольцо боя на карте есть, а на тревоге ноль (замечание Codex на #1408). */
+export function myBattleCount<B extends BattleLike>(
+  battles: readonly B[],
   me: string,
   known: (id: string) => boolean,
+  engaged: (b: B) => boolean = () => false,
 ): number {
-  return battles.filter((b) => battleConcernsMe(b, me, known)).length;
+  return battles.filter((b) => battleConcernsMe(b, me, known) || engaged(b)).length;
 }
 
 /** Правило 2: значок показывается только при непустом счёте. */
