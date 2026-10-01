@@ -107,3 +107,11 @@ describe('railBadge', () => {
     expect(railBadge(0, false)).toBe('');
   });
 });
+
+describe('бой блока зрения на неопознанном узле (замечание Codex на #1408)', () => {
+  it('бой союзника, видимый без опознанного узла, считается на тревоге', () => {
+    const allied = { id: 'b1', sides: [{ owner: 'ally' }, { owner: 'foe' }], location: 'far' };
+    expect(myBattleCount([allied], 'me', () => false)).toBe(0);
+    expect(myBattleCount([allied], 'me', () => false, (b) => b.id === 'b1')).toBe(1);
+  });
+});

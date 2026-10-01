@@ -226,7 +226,16 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '61'; // Ревью высадки (#1409). Членство и порядок
+export const MODULE_MANIFEST_VERSION = '63'; // Ревью #1416. Членство и порядок не тронуты;
+// `combat` 3.5.0 называет флоты боя в `battle.resolved`, и `fleet-ops` 1.7.0 по нему будит
+// слияние, приостановленное боем; `construction` 1.4.0 держит повтор очереди, пока узел
+// подавлен (обстрел, бой, бой у площадки развилки — теперь в обе стороны дороги).
+// export const MODULE_MANIFEST_VERSION = '62'; // Ревью крепости на развилке (#1410). Членство
+// и порядок не тронуты; площадка — не мир: `technology` 1.2.0 не считает её сектором, `steward`
+// 1.1.0 не берёт её точкой удержания и снимает точку при `station.destroyed`, `shuttle` 1.5.0 не
+// сажает на неё десант; `construction` 1.3.0 ставит её стройку на паузу в бою с её орудиями.
+// Заодно `fleet-ops` 1.6.0: слияние, приостановленное высадкой, созревает по её концу (#1415).
+// export const MODULE_MANIFEST_VERSION = '61'; // Ревью высадки (#1409). Членство и порядок
 // не тронуты; `combat` 3.4.0 отдаёт мир и продолжает штурм только берегами завершённого боя
 // (все уцелевшие враги нового хозяина вступают в новый бой, берега без боя остаются), а
 // посадка на борт не уводит трюм в минус; `fleet-ops` 1.5.0 не сливает флот на высадке;

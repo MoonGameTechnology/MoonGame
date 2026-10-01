@@ -37,6 +37,11 @@ describe('панель мира — точка удержания', () => {
     expect(holdOffer(true, true, true, 3, 3)).toBe('clear');
   });
 
+  it('площадку развилки поставить нельзя, а старую точку на ней снять можно', () => {
+    expect(holdOffer(true, true, false, 0, 3, false)).toBe('none');
+    expect(holdOffer(true, true, true, 1, 3, false)).toBe('clear');
+  });
+
   it('ЛИМИТ ГАСИТ КНОПКУ, НО НЕ ПРЯЧЕТ: игрок видит, почему поставить нельзя', () => {
     expect(holdOffer(true, true, false, 3, 3)).toBe('set-disabled');
     expect(holdOffer(true, true, false, 4, 3)).toBe('set-disabled');

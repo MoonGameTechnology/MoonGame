@@ -12,6 +12,7 @@ import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
 import { fleetAtOwnDock } from '../util/repair';
 import { battleAt, battleLocations } from '../state/battle';
+import { forkSiteInBattle } from '../state/forkSite';
 import { allowedBuildings, isBuildable } from '../state/sectorKind';
 import type { Action } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
@@ -396,12 +397,20 @@ function scheduleQueuePump(h: HandlerContext, planetId: string, lane: BuildLane)
 function suppressed(h: HandlerContext, planetId: string): 'E_BOMBARDED' | 'E_BATTLE_HERE' | null {
   if (isBombarded(h.state, planetId, h.ctx.data)) return 'E_BOMBARDED';
   if (battleAt(h.state, planetId)) return 'E_BATTLE_HERE';
+  // Площадка крепости на развилке: бой с её орудиями идёт на дороге, а не на узле площадки.
+  if (forkSiteInBattle(h.state, h.state.planets[planetId])) return 'E_BATTLE_HERE';
   return null;
 }
 
 function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): void {
   if (laneBusy(h, planet.id, lane)) return;
-  if (suppressed(h, planet.id)) return; // узел не работает — не старт, а пауза
+  if (suppressed(h, planet.id)) {
+    // Узел не работает — не старт, а пауза. Но пауза с повтором: без него голова очереди,
+    // оставшаяся без события завершения (активную стройку отменили посреди боя), не
+    // стартовала бы никогда — конец боя и обстрела очередь не будит (замечание Codex на #1416).
+    if ((planet.buildQueue ?? []).some((q) => laneOfKind(q.kind) === lane)) scheduleQueuePump(h, planet.id, lane);
+    return;
+  }
   for (;;) {
     const queue = planet.buildQueue ?? [];
     const head = queue.find((q) => laneOfKind(q.kind) === lane);
@@ -728,7 +737,8 @@ export const constructionModule: GameModule = {
   id: 'construction',
   // 1.1.0: защита построек мира — доля каждой постройки, потолок 90%, штурм и обстрел (FORT-5.15).
   // 1.2.0: снос постройки пересчитывает прикрытие для остатка того же обстрела (FORT-5.16).
-  version: '1.2.0',
+  // 1.3.0: бой с орудиями крепости на развилке ставит её стройку на паузу (Codex на #1410).
+  version: '1.4.0',
   setup(api) {
     api.onAction('building.construct', (action, h) => {
       const payload = action.payload as Partial<ConstructBuildingPayload>;

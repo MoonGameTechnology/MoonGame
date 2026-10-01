@@ -27,6 +27,7 @@ import {
   attackerOf,
   defenderOf,
   effectiveStats,
+  isForkSite,
   isInhabited,
   MAX_STEWARD_HOLD_POINTS,
   MS_PER_DAY,
@@ -706,12 +707,15 @@ export function createWorldModel(
       state.capital?.[viewerId] === planet.id,
       !!data && isInhabited(data, planet),
     ),
+    // Крепость на развилке — не мир: точкой удержания её ядро не принимает (`steward` 1.1.0),
+    // но старую точку на ней снять можно.
     hold: holdOffer(
       mine,
       !!player && !!data && stewardUnlocked(player, data),
       points.includes(planet.id),
       points.length,
       MAX_STEWARD_HOLD_POINTS,
+      !isForkSite(planet),
     ),
   };
 
