@@ -21,6 +21,7 @@ import {
   effectsModule,
   espionageModule,
   factionModule,
+  sprawlModule,
   fleetOpsModule,
   fleetRepairModule,
   forcedMarchModule,
@@ -163,6 +164,10 @@ export const DEV_MODULES: GameModule[] = [
   scientistModule, // per-player research leader: +slot via research.slots + has_scientist gates
   stewardModule, // «Хранитель»: место играет серверный ИИ, пока игрок офлайн (гейт — техно ai_stewardship)
   factionModule, // always-on faction passives (production / speed / combat) via hooks
+  // BAL-10: налог на рост державы. После `tax` обязательно — множитель должен задеть и
+  // гражданский налог, который тот кладёт в `economy.production`; с остальными вкладами
+  // (чистые множители) порядок на число не влияет. Место зеркалит прототип.
+  sprawlModule,
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
@@ -226,7 +231,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '63'; // Ревью #1416. Членство и порядок не тронуты;
+export const MODULE_MANIFEST_VERSION = '64'; // BAL-10: налог на рост державы. В ЧЛЕНСТВО
+// вошёл `sprawl` 1.0.0 сразу за `faction`: у места больше 35 провинций выход всех миров
+// умножается на 1/(1 + 0,1 × лишние). Партия на 63 молча сменила бы доход посреди игры.
+// export const MODULE_MANIFEST_VERSION = '63'; // Ревью #1416. Членство и порядок не тронуты;
 // `combat` 3.5.0 называет флоты боя в `battle.resolved`, и `fleet-ops` 1.7.0 по нему будит
 // слияние, приостановленное боем; `construction` 1.4.0 держит повтор очереди, пока узел
 // подавлен (обстрел, бой, бой у площадки развилки — теперь в обе стороны дороги).

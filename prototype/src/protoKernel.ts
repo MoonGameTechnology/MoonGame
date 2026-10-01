@@ -20,6 +20,7 @@ import {
   visibilityModule,
   movementModule,
   factionModule,
+  sprawlModule,
   heroModule,
   heroEffectsModule,
   combatModule,
@@ -78,6 +79,9 @@ export const MODULES: GameModule[] = [
   planetTypeModule,
   taxModule, // civic tax on inhabited worlds (hooks economy.production, after planetType)
   factionModule, // H3: чисто пассивные бонусы дома (production / fleet.speed / combat.damage)
+  // BAL-10: налог на рост державы. После `tax` обязательно — множитель должен задеть и
+  // гражданский налог; с остальными вкладами (чистые множители) порядок на число не влияет.
+  sprawlModule,
   hungerModule, // ECON-1: food в arrears → наземный урон ×0.75 (корабли едят кредиты)
   economyModule,
   movementModule,
