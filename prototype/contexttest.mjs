@@ -23,7 +23,7 @@ const originalRecoveryFrame = frame;
 frame = (now) => originalRecoveryFrame(frozenRecoveryTime ?? now);
 window.__canvasRecovery = {
   freeze() { frozenRecoveryTime = performance.now(); },
-  repaint() { bgContent = ''; presentedCam = null; terrainRaster.clear(); clearHolographicSprites(); },
+  repaint() { invalidateMapSurfaces(); },
   state() { return JSON.stringify(s); },
 };`;
 const responses = new Map();
@@ -121,8 +121,12 @@ try {
       window.__holdMapContext = false;
     });
     await page.locator('#maploading').waitFor({ state: 'hidden' });
+    // Toasts sit over the map and expire on a real-time timer (the match goal lives
+    // ~5 s): one expiring between the two screenshots is not a map difference.
     await page.addStyleTag({
-      content: '*,*::before,*::after{animation:none!important;transition:none!important}',
+      content:
+        '*,*::before,*::after{animation:none!important;transition:none!important}' +
+        '#toasts{visibility:hidden!important}',
     });
     await page.evaluate(() => window.__canvasRecovery.freeze());
     const settle = () =>

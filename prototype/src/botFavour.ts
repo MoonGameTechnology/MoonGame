@@ -36,3 +36,27 @@ export function botEmbargoes(state: GameState, bot: string, player: string): boo
     botFavour(state, bot, player) < FAVOUR_EMBARGO
   );
 }
+
+/**
+ * The favour ledger as `viewer` may see it: every bot's opinion of the VIEWER, nothing
+ * else. That is all a client reads (`botFavour(state, bot, ME)` in the favour bar, and the
+ * market embargo check when the viewer takes a bot's order); how a bot regards everyone
+ * else is the bot's private state. It also moves every second — war decay runs per span, and
+ * neutrals are at war with pirates from the first minute — so the whole matrix, riding
+ * every snapshot as one host key, cost each player the full table per second.
+ *
+ * `botFavour` and `botEmbargoes` answer the same for the viewer on the narrowed view as
+ * on the full state. Pure: the input is left untouched; no ledger ⇒ the same object.
+ */
+export function approvalView(view: GameState, viewer: string): GameState {
+  const { approval, ...rest } = view as ApprovalState;
+  if (approval === undefined) return view;
+  const mine: Record<string, Record<string, number>> = {};
+  for (const [bot, meter] of Object.entries(approval)) {
+    const favour = meter[viewer];
+    if (favour !== undefined) mine[bot] = { [viewer]: favour };
+  }
+  // An empty ledger is dropped, not shipped as `{}` — the same delta hygiene the core
+  // projection keeps for its per-viewer maps.
+  return (Object.keys(mine).length > 0 ? { ...rest, approval: mine } : rest) as GameState;
+}

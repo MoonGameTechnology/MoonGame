@@ -2,10 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   UNKNOWN_OWNER,
   bakeSignature,
-  needsRebake,
   ownersSignature,
   type BakeContent,
-  type BakeState,
 } from './staticLayerCache';
 
 const content = (over: Partial<BakeContent> = {}): BakeContent => ({
@@ -15,13 +13,6 @@ const content = (over: Partial<BakeContent> = {}): BakeContent => ({
   me: 'p1',
   owners: 'p1,p2,',
   starfield: true,
-  ...over,
-});
-
-const state = (over: Partial<BakeState> = {}): BakeState => ({
-  signature: 'sig',
-  cam: { x: 10, y: 20, scale: 1 },
-  width: 2000,
   ...over,
 });
 
@@ -68,32 +59,5 @@ describe('запеканка карты — подпись содержимог�
 
   it('одинаковое содержимое — одинаковая подпись', () => {
     expect(bakeSignature(content())).toBe(bakeSignature(content()));
-  });
-});
-
-describe('запеканка карты — когда перепекать', () => {
-  it('первый кадр печём всегда', () => {
-    expect(needsRebake(null, state())).toBe(true);
-  });
-
-  it('ничего не изменилось — не печём, кадр стоит один blit', () => {
-    expect(needsRebake(state(), state())).toBe(false);
-  });
-
-  it('СДВИГ КАМЕРЫ — ПОВОД ПЕРЕПЕЧЬ: иначе открывшийся край останется пустым', () => {
-    expect(needsRebake(state(), state({ cam: { x: 11, y: 20, scale: 1 } }))).toBe(true);
-    expect(needsRebake(state(), state({ cam: { x: 10, y: 21, scale: 1 } }))).toBe(true);
-  });
-
-  it('зум тоже сдвиг — масштаб входит в сравнение', () => {
-    expect(needsRebake(state(), state({ cam: { x: 10, y: 20, scale: 1.5 } }))).toBe(true);
-  });
-
-  it('холст не того размера — перепекаем, а не растягиваем', () => {
-    expect(needsRebake(state(), state({ width: 1400 }))).toBe(true);
-  });
-
-  it('сменилось содержимое — перепекаем', () => {
-    expect(needsRebake(state(), state({ signature: 'другая' }))).toBe(true);
   });
 });

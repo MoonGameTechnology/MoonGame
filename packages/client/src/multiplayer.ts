@@ -1,4 +1,4 @@
-import { applyDelta, hashState, type Action, type DomainEvent, type GameState, type PlayerId, type SignatureContact, type StateDelta } from '@void/shared-core';
+import { applyDelta, hashStateJob, type Action, type DomainEvent, type GameState, type HashJob, type PlayerId, type SignatureContact, type StateDelta } from '@void/shared-core';
 import { createActionEnvelope, type ActionEnvelope } from '@void/action-layer';
 // NETA2-4: формы wire-контракта приходят из общего пакета. Импорт type-only — в бандл не
 // едет ничего, рантайм-половина `@void/protocol` вытряхивается tree-shaking'ом.
@@ -19,6 +19,24 @@ const RESEND_DELAY_MS = 400; // one flush per window — spreads a big burst bel
 const RESEND_BATCH = 10; // envelopes per flush, lowest clientSeq first (chain re-admits in order)
 const RESEND_MAX = 5; // give up after this many attempts and surface the rejection
 const SENT_CAP = 64; // remembered recent envelopes (retry window, not a full history)
+
+// M1 hash-desync check in slices. Hashing a whole world view at once stalled the frame by
+// tens of milliseconds on EVERY snapshot — a hitch the player felt once a second even at a
+// steady FPS. The digest is now walked this many values per slice, one slice per painted
+// frame (about a millisecond on a desktop): a big view is checked over the next frames, a
+// small one within the snapshot's own call, as before.
+const HASH_SLICE = 1024;
+
+/** Run `fn` on the next painted frame where there is one — one slice per frame keeps the
+ *  added work per frame bounded — or on the next task outside a browser. Returns a cancel. */
+function nextSlice(fn: () => void): () => void {
+  if (typeof requestAnimationFrame === 'function') {
+    const id = requestAnimationFrame(() => fn());
+    return () => cancelAnimationFrame(id);
+  }
+  const id = setTimeout(fn, 0);
+  return () => clearTimeout(id);
+}
 
 export type MultiplayerStatus = 'connecting' | 'open' | 'closed';
 
@@ -100,6 +118,14 @@ export interface MultiplayerClientHandlers {
    *  for a full resync snapshot in the same breath; this is the UI's chance to flag
    *  it (overlay / diagnostics). Fired at most once per pending resync. */
   onHashDesync?(seq: number): void;
+  /** A verdict of the hash-desync check (M1) for the snapshot at `seq`: `match` is false
+   *  exactly when {@link onHashDesync} fired for it. A delta's verdict can land a few
+   *  frames after its `onSnapshot` (the check runs in slices, and a delta that arrives
+   *  while one runs goes unchecked); a full snapshot carrying a hash is the server's own
+   *  view, so it matches by construction and settles the verdict at once, unhashed. A
+   *  snapshot without a hash gets no verdict: a host that doesn't tag its snapshots has
+   *  given nothing to compare with, and "mismatch" there would be noise. */
+  onHashCheck?(seq: number, match: boolean): void;
 }
 
 /** Cap on actions queued while disconnected (CP1.4) — beyond it new actions are
@@ -165,6 +191,10 @@ export class MultiplayerClient {
   /** True while a hash-desync report is awaiting its full resync snapshot (M1) —
    *  suppresses repeat reports so a persistent mismatch is one request, not a flood. */
   private resyncPending = false;
+  /** The running hash-desync check (M1): the seq it checks, the server's hash for it and
+   *  the sliced digest of our state at that seq. One at a time. */
+  private hashCheck: { seq: number; theirs: string; job: HashJob } | null = null;
+  private cancelSlice: (() => void) | null = null;
   /** Actions issued while disconnected, flushed after the reconnect `welcome` (CP1.4).
    *  Only never-sent actions are queued, so the flush cannot duplicate an action the
    *  server already applied (an in-flight send that DID land is visible in the
@@ -185,6 +215,7 @@ export class MultiplayerClient {
 
   close(): void {
     this.clearRetryState();
+    this.stopHashCheck();
     this.socket.close();
     this.setStatus('closed');
   }
@@ -196,6 +227,9 @@ export class MultiplayerClient {
   connectionLost(): void {
     if (this.status === 'closed') return;
     this.queueing = true;
+    // The reconnect welcome is the full resync: a check of the old baseline has nothing
+    // left to report, and a report could not reach the server anyway.
+    this.stopHashCheck();
     this.setStatus('connecting');
   }
 
@@ -286,6 +320,32 @@ export class MultiplayerClient {
     this.resendQueue.clear();
   }
 
+  /** One slice of the running hash-desync check; the next waits for the next frame. */
+  private continueHashCheck(): void {
+    this.cancelSlice = null;
+    const check = this.hashCheck;
+    if (check === null) return;
+    const ours = check.job.step(HASH_SLICE);
+    if (ours === null) {
+      this.cancelSlice = nextSlice(() => this.continueHashCheck());
+      return;
+    }
+    this.hashCheck = null;
+    const match = ours === check.theirs;
+    if (!match) {
+      this.resyncPending = true;
+      this.socket.send(JSON.stringify({ type: 'desync', seq: check.seq, hash: ours }));
+      this.handlers.onHashDesync?.(check.seq);
+    }
+    this.handlers.onHashCheck?.(check.seq, match);
+  }
+
+  private stopHashCheck(): void {
+    this.cancelSlice?.();
+    this.cancelSlice = null;
+    this.hashCheck = null;
+  }
+
   ping(clientTime: number): void {
     this.socket.send(JSON.stringify({ type: 'ping', clientTime }));
   }
@@ -345,6 +405,7 @@ export class MultiplayerClient {
       this.lastState = message.state;
       this.lastSeq = message.seq;
       this.resyncPending = false;
+      this.stopHashCheck(); // the baseline it was checking is gone
       this.matchId = message.matchId;
       this.playerId = message.playerId ?? this.playerId;
       if (message.type === 'welcome') {
@@ -360,6 +421,7 @@ export class MultiplayerClient {
         // it BEFORE onSnapshot so the caller has persisted it by the time it reacts.
         if (message.seatTicket) this.handlers.onSeatTicket?.(message.seatTicket);
       }
+      if (message.hash !== undefined) this.handlers.onHashCheck?.(message.seq, true);
       this.handlers.onSnapshot?.({
         matchId: message.matchId,
         playerId: this.playerId,
@@ -400,16 +462,23 @@ export class MultiplayerClient {
       this.lastState = applyDelta(this.lastState, message.delta);
       this.lastSeq = message.seq;
       // M1 hash-desync detector: the server tagged this snapshot with hashState(view);
-      // hash our reconstruction and compare. On mismatch, report it (the server logs
-      // the metric) and ask for a full resync in the same message — one in-flight
-      // request at a time, so a persistent mismatch can't flood the wire.
-      if (message.hash !== undefined && !this.resyncPending && !this.queueing) {
-        const ours = hashState(this.lastState);
-        if (ours !== message.hash) {
-          this.resyncPending = true;
-          this.socket.send(JSON.stringify({ type: 'desync', seq: message.seq, hash: ours }));
-          this.handlers.onHashDesync?.(message.seq);
-        }
+      // hash our reconstruction (in slices — see HASH_SLICE) and compare. On mismatch,
+      // report it (the server logs the metric) and ask for a full resync in the same
+      // message — one in-flight request at a time, so a persistent mismatch can't flood
+      // the wire. A delta landing while a check runs goes unchecked; a divergence that
+      // lasts is caught by the next check.
+      if (
+        message.hash !== undefined &&
+        !this.resyncPending &&
+        !this.queueing &&
+        this.hashCheck === null
+      ) {
+        this.hashCheck = {
+          seq: message.seq,
+          theirs: message.hash,
+          job: hashStateJob(this.lastState),
+        };
+        this.continueHashCheck();
       }
       this.handlers.onSnapshot?.({
         matchId: this.matchId,

@@ -87,17 +87,23 @@ export function drawLivingBorders(
   palette: Pick<TerritoryPalette, 'ownerColor' | 'hideOwnedInner' | 'provinceDetail'>,
   frame: LivingFrame,
   clock: number,
-  view: { width: number; height: number },
+  view: { x?: number; y?: number; width: number; height: number },
 ): void {
   if (!(frame.width > 0 && frame.height > 0)) return;
   // Запас на сдвиг и толщину самой широкой линии (свечение фронтира — 3 пикселя).
   const pad = livingAmp(frame) + 3;
+  // Видимая область начинается не в нуле, когда граница рисуется в координатах
+  // выпечки карты, сдвинутой камерой (`decisions/mapLayerView.ts`).
+  const x0 = (view.x ?? 0) - pad;
+  const y0 = (view.y ?? 0) - pad;
+  const x1 = (view.x ?? 0) + view.width + pad;
+  const y1 = (view.y ?? 0) + view.height + pad;
   const keep = (sg: BorderSegment): boolean =>
     !(
-      (sg[0] < -pad && sg[2] < -pad) ||
-      (sg[0] > view.width + pad && sg[2] > view.width + pad) ||
-      (sg[1] < -pad && sg[3] < -pad) ||
-      (sg[1] > view.height + pad && sg[3] > view.height + pad)
+      (sg[0] < x0 && sg[2] < x0) ||
+      (sg[0] > x1 && sg[2] > x1) ||
+      (sg[1] < y0 && sg[3] < y0) ||
+      (sg[1] > y1 && sg[3] > y1)
     );
   strokeBorders(
     g,

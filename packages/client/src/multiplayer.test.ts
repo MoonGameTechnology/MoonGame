@@ -587,6 +587,134 @@ describe('MultiplayerClient · hash desync → report + resync (M1)', () => {
     expect(desyncs).toEqual([]);
     expect(socket.sent).toEqual([]);
   });
+
+  // A whole world hashed at once stalled the frame on every snapshot: a big view is
+  // checked in slices after the call that brought it.
+  describe('in slices', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    /** A view worth several slices: 400 more players, ~9 hashed values each. */
+    function bigState(credits: number): GameState {
+      const s = baseState(credits);
+      const players = { ...s.players };
+      for (let i = 0; i < 400; i++) {
+        const id = `n${i}`;
+        players[id] = {
+          id,
+          name: id,
+          faction: 'vanguard',
+          status: 'active',
+          resources: { credits: i },
+        };
+      }
+      return { ...s, players };
+    }
+    function watch(socket: FakeSocket) {
+      const checks: [number, boolean][] = [];
+      const desyncs: number[] = [];
+      const client = new MultiplayerClient(socket, {
+        onHashDesync: (seq) => desyncs.push(seq),
+        onHashCheck: (seq, match) => checks.push([seq, match]),
+      });
+      return { client, checks, desyncs };
+    }
+
+    it('the verdict lands after the call, and a delta arriving meanwhile goes unchecked', () => {
+      const socket = new FakeSocket();
+      const { client, checks, desyncs } = watch(socket);
+      const s0 = baseState(10);
+      const s1 = bigState(20);
+      const s2 = bigState(30);
+      client.receive(welcome(s0));
+      client.receive(hashedDelta(s0, s1, 1, 'bogus'));
+      expect(checks).toEqual([]); // not done within the call
+      client.receive(hashedDelta(s1, s2, 2, 'bogus-too')); // mid-check: unchecked
+      vi.runAllTimers();
+      expect(checks).toEqual([[1, false]]);
+      expect(desyncs).toEqual([1]);
+      expect(socket.sent.map((m) => JSON.parse(m))).toEqual([
+        { type: 'desync', seq: 1, hash: hashState(s1) }, // the digest of the view at seq 1
+      ]);
+    });
+
+    it('a matching view passes, and the next delta is checked again', () => {
+      const socket = new FakeSocket();
+      const { client, checks } = watch(socket);
+      const s0 = baseState(10);
+      const s1 = bigState(20);
+      const s2 = bigState(30);
+      client.receive(welcome(s0));
+      client.receive(hashedDelta(s0, s1, 1, hashState(s1)));
+      vi.runAllTimers();
+      client.receive(hashedDelta(s1, s2, 2, hashState(s2)));
+      vi.runAllTimers();
+      expect(checks).toEqual([
+        [1, true],
+        [2, true],
+      ]);
+      expect(socket.sent).toEqual([]);
+    });
+
+    it('a full snapshot drops the running check and settles the verdict itself', () => {
+      const socket = new FakeSocket();
+      const { client, checks } = watch(socket);
+      const s0 = baseState(10);
+      const s1 = bigState(20);
+      client.receive(welcome(s0));
+      client.receive(hashedDelta(s0, s1, 1, 'bogus'));
+      client.receive(
+        JSON.stringify({
+          type: 'state',
+          matchId: 'm',
+          seq: 1,
+          serverTime: 0,
+          state: s1,
+          hash: hashState(s1),
+        }),
+      );
+      vi.runAllTimers();
+      expect(checks).toEqual([[1, true]]);
+      expect(socket.sent).toEqual([]);
+    });
+
+    it('a lost connection or close() drops the running check: nothing goes into a dead wire', () => {
+      const s0 = baseState(10);
+      const s1 = bigState(20);
+      for (const end of ['connectionLost', 'close'] as const) {
+        const socket = new FakeSocket();
+        const { client, checks } = watch(socket);
+        client.receive(welcome(s0));
+        client.receive(hashedDelta(s0, s1, 1, 'bogus'));
+        client[end]();
+        vi.runAllTimers();
+        expect(checks).toEqual([]);
+        expect(socket.sent).toEqual([]);
+      }
+    });
+
+    it('in a browser, one slice per painted frame', () => {
+      const frames: (() => void)[] = [];
+      vi.stubGlobal('requestAnimationFrame', (fn: () => void) => frames.push(fn));
+      vi.stubGlobal('cancelAnimationFrame', () => {});
+      const { client, checks } = watch(new FakeSocket());
+      const s0 = baseState(10);
+      const s1 = bigState(20);
+      client.receive(welcome(s0));
+      client.receive(hashedDelta(s0, s1, 1, hashState(s1)));
+      let painted = 0;
+      while (frames.length > 0) {
+        expect(frames).toHaveLength(1); // never more than one slice queued per frame
+        frames.shift()!();
+        painted++;
+      }
+      expect(painted).toBeGreaterThan(1);
+      expect(checks).toEqual([[1, true]]);
+    });
+  });
 });
 
 // M2 perf telemetry: a light fps/rtt/mem sample the caller (the prototype's 30s

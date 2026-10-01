@@ -7,6 +7,7 @@ import {
   MAX_SCALE,
   clampScale,
   projectBase,
+  projection,
   worldToScreen,
   screenToWorld,
   zoomAt,
@@ -46,6 +47,21 @@ describe('camera — projection', () => {
     expect(w).toBeLessThanOrEqual(400); // fits inside the play area
     expect(near((tl.x + br.x) / 2, 200)).toBe(true); // centred on X
     expect(near((tl.y + br.y) / 2, 400)).toBe(true); // centred on Y
+  });
+
+  it('projection gives the same screen point as worldToScreen, for an offset map too', () => {
+    const b: Bounds = { minX: -2600, minY: 300, maxX: 5400, maxY: 4100 };
+    const cam: Cam = { scale: 3.7, x: -1210.5, y: 388.25 };
+    const pr = projection(cam, VP, b);
+    for (const p of [
+      { x: -2600, y: 300 },
+      { x: 5400, y: 4100 },
+      { x: 17, y: 2222 },
+    ]) {
+      const s = worldToScreen(p, cam, VP, b);
+      expect(Math.abs(pr.a * p.x + pr.x - s.x)).toBeLessThan(1e-9);
+      expect(Math.abs(pr.a * p.y + pr.y - s.y)).toBeLessThan(1e-9);
+    }
   });
 });
 
