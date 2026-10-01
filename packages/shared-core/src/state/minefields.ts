@@ -45,6 +45,9 @@ export function mineFleetVisible(state: GameState, mine: Fleet, viewer: string, 
 export function visibleMinefields(state: GameState, viewer: string): GameState['minefields'] {
   if (!state.minefields) return undefined;
   const view = deepClone(state.minefields);
+  // `struck` — служебная метка подрыва: id подорвавшегося флота, в том числе скрытого
+  // туманом. Наружу не идёт никому (замечание Codex на #1414).
+  delete view.struck;
   for (const id of Object.keys(view.readyAt))
     if (state.fleets[id]?.owner !== viewer) delete view.readyAt[id];
   for (const owner of Object.keys(view.ownerReadyAt ?? {}))

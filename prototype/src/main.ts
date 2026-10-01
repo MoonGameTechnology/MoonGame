@@ -1,6 +1,6 @@
 import { attackBattle, deployForkFortress, retreatBattle } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
-import { visibleMinefields, isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
+import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
@@ -122,7 +122,7 @@ import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName, worldName } from './planetName';
 import { provinceName } from '../../decisions/provinceName';
-import { minelayerOffer } from '../../decisions/minefields';
+import { minelayerOffer, ownInstallations } from '../../decisions/minefields';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -10351,7 +10351,8 @@ function selectAt(mx: number, my: number) {
     const kind = allyAim;
     drop('allyAim');
     const ally = linkedAlly(s, ME);
-    const fleets = Object.values(s.fleets);
+    // Цель — только видимый флот, как у «Атаки» и удара челноков (ревью #1411).
+    const fleets = Object.values(s.fleets).filter(fleetSeen);
     const pool =
       kind === 'guard'
         ? fleets.filter((f) => f.owner === ME || f.owner === ally)
@@ -10377,7 +10378,8 @@ function selectAt(mx: number, my: number) {
   if (owner === 'shuttle-strike' && strikeAim) {
     const { from, squadronId } = strikeAim;
     drop('strikeAim');
-    const foe = nearestHit(hostileFleets(Object.values(s.fleets), ME), fleetAnchor, mx, my, rFleet);
+    // Только то, что игрок видит: невидимую мину (SM-3.6) палец не находит (ревью #1411).
+    const foe = nearestHit(hostileFleets(Object.values(s.fleets).filter(fleetSeen), ME), fleetAnchor, mx, my, rFleet);
     const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (!squadronAt(squadronId)) {
       note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
@@ -15341,8 +15343,9 @@ function drawMinefields(now: number): void {
   // в своей точке, на узле — на кольце орбиты), иначе тап по знаку промахивался бы мимо неё.
   // Знак один: сфера мины, у установки — пунктиром и «◷».
   const marks: Array<{ c: { x: number; y: number }; owner: string; label: string; installing: boolean }> = [];
-  for (const job of Object.values(visibleMinefields(s, ME)?.installations ?? {})) {
-    const layer = Object.values(s.fleets).find((f) => s.minefields?.installations?.[f.id] === job);
+  // Носитель — по ключу среза (`ownInstallations`): сравнение по ссылке не находило его,
+  // и дорожная установка теряла знак (ревью #1411).
+  for (const { layer, job } of ownInstallations(s, ME)) {
     const at = layer ? fleetPos(layer) : job.location ? s.planets[job.location]?.position : null;
     if (!at) continue;
     const c = world(at);

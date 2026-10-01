@@ -88,8 +88,9 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 57: порядок тот же; combat 3.2.0, effects 0.2.0, economy 1.1.0, technology 1.1.0, victory 1.3.1 — ревью MSB-9 (#1392).
 // 58: порядок тот же; station 1.3.0, victory 1.4.0, pve 1.7.0, hero 4.5.0 — крепость на развилке (FORT-6.1).
 // 59: порядок тот же; minefield 2.0.0, combat 3.3.0, intercept 1.3.0, fleet-ops 1.4.0, capture-on-arrival 0.3.0, victory 1.5.0 — мина-отряд (SM-3.6).
-// 60: ЧЛЕНСТВО — `sprawl` 1.0.0 сразу за `faction`, налог на рост державы (BAL-10).
-const PINNED_FOR_VERSION = '60';
+// 60: порядок тот же; minefield 2.1.0, orbital 1.2.0, shuttle 1.3.0, standing-orders 1.1.0, fleet-repair 1.1.0, instant-repair 1.2.0, forced-march 1.1.0, extraction 1.1.0 — ревью мины (#1411).
+// 61: ЧЛЕНСТВО — `sprawl` 1.0.0 сразу за `faction`, налог на рост державы (BAL-10).
+const PINNED_FOR_VERSION = '61';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

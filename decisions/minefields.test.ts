@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { createInitialState, type Fleet, type GameState } from '../packages/shared-core/src/index';
-import { minelayerOffer, ownMinefields } from './minefields';
+import { minelayerOffer, ownInstallations, ownMinefields } from './minefields';
 
 const data = shippedGameData();
 
@@ -67,5 +67,26 @@ describe('SM-3.5 — кнопка «Поставить мины» и свои п
       { fleetId: 'm:b', charge: 2 },
     ]);
     expect(ownMinefields(state(), 'p1', data)).toEqual([]);
+  });
+});
+
+describe('ревью #1411 — установка мин находит своего носителя', () => {
+  it('дорожная установка: носитель — по ключу среза, знак не теряется', () => {
+    const edge = { from: 'N', to: 'M', t: 0.5 };
+    const layer = fleet({ location: null, edge });
+    const s = state({
+      fleets: { F: layer },
+      minefields: {
+        readyAt: {},
+        installations: {
+          F: { owner: 'p1', readyAt: 5000, location: null, edge, stack: { unit: 'mine', count: 3 } },
+          G: { owner: 'p2', readyAt: 5000, location: 'N', stack: { unit: 'mine', count: 3 } },
+        },
+      },
+    });
+    const marks = ownInstallations(s, 'p1');
+    expect(marks.map((m) => m.layerId)).toEqual(['F']);
+    expect(marks[0]!.layer).toBe(layer);
+    expect(marks[0]!.job.location).toBeNull();
   });
 });
