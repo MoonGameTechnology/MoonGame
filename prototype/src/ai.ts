@@ -1406,10 +1406,18 @@ function baseAiOrders(
         // Раньше условием было «гарнизон пуст», и застроенный призовой мир навсегда
         // оставался при той же паре бойцов, что и голый камень.
         if (garrisonOrders >= GARRISON_ORDERS_PER_TICK) break;
-        if (garrisonDefense(p.garrison, data) >= garrisonFloor(p) || pendingUnit(p.id, militiaUnit))
+        // BAL-7 (2026-10-01): гарнизон добирается тем же ОБОРОНИТЕЛЬНЫМ списком, что и
+        // столица, — тяжёлая пехота первой, если по карману. Раньше здесь стояло одно
+        // ополчение, и тяжёлую пехоту бот почти не строил (selfplay 200: 2746 против
+        // 22428 ополченцев; с этим и ценой 40+10 — 6646 против 18466).
+        if (
+          garrisonDefense(p.garrison, data) >= garrisonFloor(p) ||
+          groundDefenders.some((u) => pendingUnit(p.id, u))
+        )
           continue;
-        if (!affordableUnit(militiaUnit, 2)) break;
-        out.push(buildUnit(ai, p.id, militiaUnit, 2));
+        const pick = groundDefenders.find((u) => affordableUnit(u, 2) && hasFacilityFor(p, u));
+        if (!pick) break;
+        out.push(buildUnit(ai, p.id, pick, 2));
         garrisonOrders += 1;
       }
       // 5. ОБОРОНА (AI-BAL-2): форт → госпиталь → орбитальное ПКО. Порядок — по тому,
