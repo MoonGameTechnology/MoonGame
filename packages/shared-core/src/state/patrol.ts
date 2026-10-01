@@ -36,6 +36,7 @@ import type { GameData } from '../data/schemas';
 import type { GameState, Squadron } from './gameState';
 import { getStance } from './diplomacy';
 import { identifiedNodes } from './visibility';
+import { isMineFleet, mineFleetVisible } from './minefields';
 import { canSortie, freshSortie, hangarMachines, squadronReach, withinRange } from './shuttle';
 
 /** Точка на карте. */
@@ -140,6 +141,9 @@ export function patrolScrambles(state: GameState, data: GameData): PatrolScrambl
       if (!g.units.some((u) => u.count > 0)) continue;
       if (getStance(state, owner, g.owner) !== 'war') continue; // только объявленная война
       if (!seen.has(g.location)) continue; // опознанные контакты — честно по туману
+      // Мину опознанный узел не раскрывает: её видно только своим флотом вблизи (SM-3.6).
+      // Без этой строки дежурный вылет находил и снимал невидимую мину (ревью #1411).
+      if (isMineFleet(g, data) && !mineFleetVisible(state, g, owner, data)) continue;
       const pos = state.planets[g.location]?.position;
       if (pos) targets.push({ id: g.id, pos });
     }

@@ -218,6 +218,10 @@ function upkeepByOwner(state: GameState, data: GameData): Map<string, ResourceBa
   }
   for (const pid of Object.keys(state.planets).sort()) {
     const planet = state.planets[pid]!;
+    // Десант на плацдарме содержит его владелец, на чьей бы земле он ни стоял: с MSB-9 весь
+    // штурмующий десант живёт плацдармом до конца боя, и без этой строки штурм снимал
+    // содержание с войск на каждый его час (замечание Codex на #1392).
+    for (const b of planet.beachheads ?? []) addStacks(b.owner, b.units);
     if (planet.owner === null) {
       continue;
     }
@@ -262,7 +266,8 @@ function upkeepByOwner(state: GameState, data: GameData): Map<string, ResourceBa
  */
 export const economyModule: GameModule = {
   id: 'economy',
-  version: '1.0.0',
+  // 1.1.0: содержание войск на плацдармах (замечание Codex на #1392).
+  version: '1.1.0',
   setup(api) {
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };

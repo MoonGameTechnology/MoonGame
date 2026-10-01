@@ -801,6 +801,57 @@ describe('fleetOps — fleet.split в пути (замечание владел�
     expect(adv.state.fleets.F1!.units).toEqual([{ unit: 'cruiser', count: 2 }]);
   });
 
+  // «После разделения должна обновиться скорость флота» (владелец, 2026-09-29): остаток
+  // участка каждая половина проходит со своей скоростью, а не с темпом старого состава.
+  /** F1 (`units`) летит с B на A (10 единиц) и прошёл половину пути. */
+  const midwayMixed = (units: Array<[string, number]>): { state: GameState; now: number } => {
+    const st = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1'), planet('B', 'p1')],
+      fleets: [fleet('F1', 'p1', 'B', units)],
+    });
+    st.planets.B!.position = { x: 10, y: 0 };
+    st.planets.A!.links = ['B'];
+    st.planets.B!.links = ['A'];
+    const flying = okApply(kernel.applyAction(st, move, ctx)).state;
+    const now = flying.fleets.F1!.movement!.arrivesAt / 2;
+    const adv = kernel.advanceTo(flying, { now, data });
+    if (!adv.ok) throw new Error(`advance failed: ${adv.code}`);
+    return { state: adv.state, now };
+  };
+
+  it('отделённый быстрый корабль долетает остаток по своей скорости', () => {
+    const { state, now } = midwayMixed([['cruiser', 2], ['scout', 1]]);
+    const oldArrival = state.fleets.F1!.movement!.arrivesAt;
+    const r = okApply(
+      kernel.applyAction(state, split('F1', [{ unit: 'scout', count: 1 }]), { now, data }),
+    );
+    const out = Object.values(r.state.fleets).find((f) => f.id !== 'F1')!;
+    // Скаут (10) шёл в темпе крейсеров (6): остаток 5 единиц — полчаса, а не 5/6 часа.
+    expect(out.movement!.arrivesAt).toBeCloseTo(now + 0.5 * HOUR, 0);
+    expect(r.state.fleets.F1!.movement!.arrivesAt).toBe(oldArrival);
+    // Точка на линии та же: половины расходятся с места раскола, а не с начала участка.
+    expect(out.movement!.startT).toBeCloseTo(0.5, 6);
+    const early = kernel.advanceTo(r.state, { now: now + 0.5 * HOUR + 1, data });
+    if (!early.ok) throw new Error(`advance failed: ${early.code}`);
+    expect(early.state.fleets[out.id]?.location).toBe('A');
+    expect(early.state.fleets.F1?.location).toBeNull();
+  });
+
+  it('оставшиеся без тихохода ускоряются', () => {
+    const { state, now } = midwayMixed([['cruiser', 1], ['scout', 2]]);
+    const r = okApply(
+      kernel.applyAction(state, split('F1', [{ unit: 'cruiser', count: 1 }]), { now, data }),
+    );
+    const out = Object.values(r.state.fleets).find((f) => f.id !== 'F1')!;
+    expect(r.state.fleets.F1!.movement!.arrivesAt).toBeCloseTo(now + 0.5 * HOUR, 0);
+    expect(out.movement!.arrivesAt).toBe(state.fleets.F1!.movement!.arrivesAt);
+    const adv = kernel.advanceTo(r.state, { now: now + 0.5 * HOUR + 1, data });
+    if (!adv.ok) throw new Error(`advance failed: ${adv.code}`);
+    expect(adv.state.fleets.F1?.location).toBe('A');
+    expect(adv.state.fleets[out.id]?.location).toBeNull();
+  });
+
   it('флот, стоящий на линии, делится на той же точке линии', () => {
     const st = stateWith({
       players: [player('p1')],

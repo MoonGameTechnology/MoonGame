@@ -8,6 +8,7 @@ import { cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { isActivelyBombarding } from '../state/orbit';
 import { hasOrbit } from '../state/sectorKind';
+import { isMineFleet } from '../state/minefields';
 import { BLACKOUT_MULT } from '../state/visibility';
 import {
   applyDamageToSide,
@@ -67,6 +68,12 @@ function nearOrbitHostiles(
   const hostiles: Fleet[] = [];
   for (const f of candidates) {
     if (f.orbit !== 'near' || f.battleId) {
+      continue;
+    }
+    // Мина не подставляет себя под залп ПВО вместо кораблей (ревью #1411): на орбиту её
+    // не пускает общий пропуск приказов, а старое состояние с миной на орбите сюда не
+    // протечёт — правило по трейту стоит и здесь.
+    if (isMineFleet(f, h.ctx.data)) {
       continue;
     }
     if (!f.units.some((s) => s.count > 0) || owner === null || !isHostile(h, owner, f.owner)) {
@@ -272,7 +279,8 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
 export const orbitalModule: GameModule = {
   id: 'orbital',
   // 1.1.0: обстрел сообщает, каким прикрытием он срезан (`hit` + `factor`, FORT-5.16).
-  version: '1.1.0',
+  // 1.2.0: мина не встаёт на орбиту, не обстреливает и не делит залп ПВО (ревью #1411).
+  version: '1.2.0',
   setup(api) {
     // A single orbit (GDD §7.4): arriving = stationed in orbit, not bombarding
     // until ordered. Registered BEFORE the melee module in the manifest, so this

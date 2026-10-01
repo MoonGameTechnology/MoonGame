@@ -157,6 +157,37 @@ function beginLeg(
   return true;
 }
 
+/**
+ * Re-times the CURRENT leg of a fleet whose make-up just changed under way (a split):
+ * the fleet keeps its lane, its point on it and the rest of its path, but covers what
+ * is left of the leg at its OWN speed now. Without this both halves of a split kept the
+ * old leg's timing — the slowest hull that had just left still set the pace to the next
+ * node (owner's report 2026-09-29: «после разделения должна обновиться скорость флота»).
+ * A corridor is a jump with no middle and keeps its timing. A leg whose timing does not
+ * change is left as it is — no fresh arrival, no `fleet.leg` for interception to re-read.
+ */
+function retimeLeg(h: HandlerContext, fleet: Fleet | undefined): void {
+  const mv = fleet?.movement;
+  if (!fleet || !mv || fleet.battleId) return;
+  if (isCorridorEdge(h.state, mv.from, mv.to)) return;
+  const t = legT(mv, h.ctx.now);
+  const endT = mv.endT ?? 1;
+  if (t >= endT) return;
+  const speed = h.hook<number>('fleet.speed', fleetTravelSpeed(fleet, h.ctx), {
+    fleetId: fleet.id,
+    from: mv.from,
+    to: mv.to,
+  });
+  if (speed <= 0) return;
+  const arrivesAt =
+    h.ctx.now + hoursToMs(h.ctx, (laneLength(h.state, mv.from, mv.to) * (endT - t)) / speed);
+  if (Math.abs(arrivesAt - mv.arrivesAt) < 1) return;
+  fleet.movement = { ...mv, departedAt: h.ctx.now, arrivesAt, ...(t > 0 ? { startT: t } : {}) };
+  // The old leg's arrival stays in the timeline and is ignored (its times no longer match).
+  h.schedule(arrivesAt, 'fleet.arrival', { fleetId: fleet.id, departedAt: h.ctx.now, arrivesAt });
+  h.emit('fleet.leg', { fleetId: fleet.id });
+}
+
 /** Origin candidate: where a leg can start from (a node, or one end of the lane
  *  a parked fleet sits on). `lead` is the node(s) the first leg traverses to
  *  reach `routingNode`; `cost` is that lead's distance. */
@@ -538,6 +569,14 @@ export const movementModule: GameModule = {
       // The leg's scheduled arrival is now stale; the arrival handler ignores it
       // (its `departedAt` no longer matches this fleet's movement).
       h.emit('fleet.parked', { fleetId, edge });
+    });
+
+    // Split under way: each half flies the rest of its leg at its own speed.
+    api.on('fleet.split', (event, h) => {
+      const { from, to } = event.payload as { from?: string; to?: string };
+      for (const id of [from, to]) {
+        if (typeof id === 'string') retimeLeg(h, h.state.fleets[id]);
+      }
     });
 
     api.on('fleet.arrival', (event, h) => {

@@ -29,6 +29,7 @@ import type { Fleet, Planet } from '../state/gameState';
 import { validateChainSteps } from '../state/chain';
 import { hangarMachines, shuttleBayAt } from '../state/shuttle';
 import { ownFleet } from '../util/combat';
+import { rejectMine } from '../util/fleet';
 
 /** Ступени авто-отступления (RETR-2, решение владельца 2026-09-22): доля ОСТАВШЕГОСЯ
  *  корпуса от максимального, при которой флот уходит. Список закрыт намеренно — игрок
@@ -38,7 +39,8 @@ export type RetreatThreshold = (typeof RETREAT_THRESHOLDS)[number];
 
 export const standingOrdersModule: GameModule = {
   id: 'standing-orders',
-  version: '1.0.0',
+  // 1.1.0: мине приказы не отдаются (`E_MINE_PASSIVE`, ревью #1411).
+  version: '1.1.0',
   setup(api) {
     function ownedFleet(state: Parameters<typeof ownFleet>[0], playerId: string, id: unknown) {
       if (typeof id !== 'string') return undefined;
@@ -52,6 +54,7 @@ export const standingOrdersModule: GameModule = {
       if (typeof p?.on !== 'boolean') return h.reject('E_BAD_PAYLOAD');
       const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p.fleetId);
       if (!f) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       if (p.on) {
         (h.state.autoAssault ??= {})[f.id] = true;
       } else if (h.state.autoAssault) {
@@ -74,6 +77,7 @@ export const standingOrdersModule: GameModule = {
       if (typeof p?.on !== 'boolean') return h.reject('E_BAD_PAYLOAD');
       const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p.fleetId);
       if (!f) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       if (!p.on) {
         if (h.state.autoRetreat) {
           delete h.state.autoRetreat[f.id];
@@ -127,6 +131,7 @@ export const standingOrdersModule: GameModule = {
       } else {
         const f: Fleet | undefined = ownedFleet(h.state, action.playerId, rawId);
         if (!f) return h.reject('E_NO_FLEET');
+        rejectMine(h, f);
         baseId = f.id;
         if (p.on && hangarMachines(f).length === 0) return h.reject('E_NO_SQUADRON');
       }
@@ -145,6 +150,7 @@ export const standingOrdersModule: GameModule = {
       const p = action.payload as { fleetId?: unknown; steps?: unknown };
       const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p?.fleetId);
       if (!f) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       const steps = validateChainSteps(p?.steps, h.state, h.ctx.data.heroAbilities);
       if (steps === null) return h.reject('E_BAD_PAYLOAD');
       if (steps.length === 0) {
@@ -163,6 +169,7 @@ export const standingOrdersModule: GameModule = {
       const p = action.payload as { fleetId?: unknown; steps?: unknown; waitUntil?: unknown };
       const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p?.fleetId);
       if (!f) return h.reject('E_NO_FLEET');
+      rejectMine(h, f);
       if (!h.state.orders?.[f.id]) return h.reject('E_NO_TARGET');
       const steps = validateChainSteps(p?.steps, h.state, h.ctx.data.heroAbilities);
       if (steps === null) return h.reject('E_BAD_PAYLOAD');

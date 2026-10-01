@@ -31,6 +31,7 @@ import type { FleetId, GameState, Planet, PlanetId, PlayerId } from '../state/ga
 import type { GameData } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
 import { fleetPositionAt } from '../state/fleetPosition';
+import { isForkSite } from '../state/forkSite';
 import { swarmNet } from './swarmNet';
 
 /** Признак юнита — большой ретранслятор, пост сети. */
@@ -113,8 +114,10 @@ export function swarmNetPlan(state: GameState, data: GameData, npc: PlayerId): S
   const view = swarmNet(state, data, npc, state.time);
   const centers = view.nodes.filter((n) => n.kind === 'center' && view.powered.has(n.id));
   const mine = Object.values(state.planets).filter((p) => p.owner === npc);
+  // Крепость игрока на развилке — не мир и не фронт (FORT-6.1): лейнов к ней нет, и
+  // цепочка к ней не протянулась бы никогда.
   const human = (p: Planet): boolean =>
-    p.owner !== null && p.owner !== npc && !state.players[p.owner]?.npc;
+    p.owner !== null && p.owner !== npc && !state.players[p.owner]?.npc && !isForkSite(p);
   let front: Planet | undefined;
   let frontD = Infinity;
   for (const p of Object.values(state.planets)

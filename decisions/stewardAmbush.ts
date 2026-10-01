@@ -5,6 +5,7 @@ import {
   getStance,
   hoursToMs,
   hullPool,
+  isMineFleet,
   isVisibleTo,
   journeyDestination,
   laneRoadLength,
@@ -94,7 +95,8 @@ export function stewardAmbushes(
           !f.battleId &&
           !opts.busy(f.id) &&
           !claimed.has(f.id) &&
-          f.units.some((s) => s.count > 0),
+          f.units.some((s) => s.count > 0) &&
+          !isMineFleet(f, ctx.data), // мина не выходит в засаду: она неподвижна (SM-3.6)
       )
       .sort(
         (a, b) =>

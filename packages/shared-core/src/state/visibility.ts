@@ -5,11 +5,14 @@ import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import { emptyOrdnance, inRadius, mineVisibleTo, missilePositionAt } from './ordnance';
-import { visibleMinefields, fieldPosition, fieldVisible, MINE_SIGNATURE, MINE_DETECTION_RANGE } from './minefields';
+import { visibleMinefields, isMineFleet, mineFleetVisible, MINE_DETECTION_RANGE } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 export type { SignatureContact, SignatureSize } from './radarSignals';
 import type {
+  Battle,
+  BattleId,
   Fleet,
+  FleetId,
   GameState,
   Planet,
   PlanetId,
@@ -24,7 +27,6 @@ import type {
  *  production / arrivals in their view (the client renders the build queue + ETAs from
  *  them) while every enemy timer stays hidden. */
 function scheduledOwnedBy(event: ScheduledEvent, viewerId: PlayerId, state: GameState): boolean {
-  if (event.type === 'mines.crossed') return false;
   const p = (event.payload ?? {}) as Record<string, unknown>;
   if (p.owner === viewerId) return true;
   // Per-player events tagged by `playerId` (e.g. `technology.complete`) — the
@@ -272,7 +274,8 @@ function playerCircles(
     circle({ kind: 'world', id: planet.id }, planet.position, worldSightOf(rules, planet.kind), radar);
   }
   for (const fleet of Object.values(state.fleets)) {
-    if (fleet.owner !== ownerId) continue;
+    // Мина не глаз: своих кругов зрения у неё нет (SM-3.6).
+    if (fleet.owner !== ownerId || isMineFleet(fleet, data)) continue;
     // Круг стоит там, где КОРАБЛЬ, а не в узле назначения и не в ближайшем узле.
     const pos = fleetPosition(state, fleet);
     if (pos) circle({ kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
@@ -367,7 +370,7 @@ export function radarSources(
       }
     }
     for (const fleet of Object.values(state.fleets)) {
-      if (fleet.owner !== owner) continue;
+      if (fleet.owner !== owner || isMineFleet(fleet, data)) continue;
       const at = fleetPosition(state, fleet);
       if (!at) continue;
       for (const stack of fleet.units) {
@@ -393,9 +396,22 @@ export function radarSignatures(
   if (!sources.length) return [];
   const spied = new Set((state.intel?.[viewerId] ?? [])
     .filter((g) => g.kind === 'fleets' && g.until > state.time).map((g) => g.target));
+  // A fleet in the viewer's own battle is shown in full (`engagementOf`) — no blip on top.
+  const engaged = engagementOf(state, viewerId).fleets;
   const emitters: SignalEmitter[] = [];
+  const mineEmitters: SignalEmitter[] = [];
   for (const fleet of Object.values(state.fleets)) {
-    if (fleet.owner === viewerId || spied.has(fleet.owner)) continue;
+    if (fleet.owner === viewerId) continue;
+    // Мина (SM-3.6): видимая вблизи — полностью, иначе — слабая отметка, которую ловит
+    // только близкий радар. Шпионаж, опознанный узел и чужой бой её не раскрывают.
+    if (isMineFleet(fleet, data)) {
+      const node = fleetNode(state, fleet);
+      const at = fleetPosition(state, fleet);
+      if (node === null || !at || mineFleetVisible(state, fleet, viewerId, data)) continue;
+      mineEmitters.push({ location: node, ...at, inTransit: !!fleet.edge, strength: fleetSignalStrength(fleet, data) });
+      continue;
+    }
+    if (spied.has(fleet.owner) || engaged.has(fleet.id)) continue;
     const location = fleetNode(state, fleet);
     const at = fleetPosition(state, fleet);
     if (location === null || identify.has(location) || !at) continue;
@@ -430,21 +446,52 @@ export function radarSignatures(
     contacts.push(...detectSignals([{ ...mine.position, location: nearest.id, inTransit: true, strength: def.mineSignature }],
       sources.map((r) => ({ ...r, range: Math.min(r.range, def.detectionRange) }))));
   }
-  for (const [key, owners] of Object.entries(state.minefields?.fields ?? {})) {
-    for (const [owner, field] of Object.entries(owners)) {
-      if (fieldVisible(state, key, owner, field, viewerId)) continue;
-      const at = fieldPosition(state, key, field);
-      if (!at) continue;
-      contacts.push(...detectSignals([{ ...at, location: field.edge?.from ?? key, inTransit: !!field.edge, strength: MINE_SIGNATURE * field.charge }],
-        sources.map((r) => ({ ...r, range: Math.min(r.range, MINE_DETECTION_RANGE) }))));
-    }
-  }
+  for (const emitter of mineEmitters)
+    contacts.push(...detectSignals([emitter], sources.map((r) => ({ ...r, range: Math.min(r.range, MINE_DETECTION_RANGE) }))));
   return contacts;
 }
 
+/** Стоит ли в бою сторона кого-то из `bloc`. */
+function fightsIn(battle: Pick<Battle, 'sides'>, bloc: ReadonlySet<PlayerId>): boolean {
+  return battle.sides.some((side) => side.owner !== null && bloc.has(side.owner));
+}
+
+/** Бои, в которых дерётся зритель или его блок зрения, и флоты этих боёв. */
+export interface Engagement {
+  battles: Set<BattleId>;
+  fleets: Set<FleetId>;
+}
+
+/**
+ * Свой бой виден целиком — сам бой и каждый флот в нём, где бы ни стоял его якорь.
+ *
+ * Опознание привязано к УЗЛАМ: чужой флот виден, когда опознан ближайший к нему мир. А
+ * перехват случается на полпути: посреди длинной трассы оба флота далеко от миров, и
+ * ни один круг зрения ближайший узел не накрывает. Бой при этом идёт — `startBattle`
+ * снимает с флота движение, — и игрок видел, как его флот встал посреди пустоты без
+ * врага и без отметки боя (владелец 2026-09-29: «мой флот столкнулся с невидимым
+ * вражеским флотом. Я сначала даже и не понял, почему замер мой флот»).
+ *
+ * Утечки тут нет: кто стреляет по твоим кораблям, ты знаешь из самого боя. Блок зрения
+ * (союз, обмен картами) делит и это — ровно как делит круги зрения.
+ */
+export function engagementOf(state: GameState, viewerId: PlayerId): Engagement {
+  const bloc = new Set(visionBloc(state, viewerId));
+  const battles = new Set<BattleId>();
+  for (const battle of Object.values(state.battles)) {
+    if (fightsIn(battle, bloc)) battles.add(battle.id);
+  }
+  const fleets = new Set<FleetId>();
+  for (const fleet of Object.values(state.fleets)) {
+    if (fleet.battleId && battles.has(fleet.battleId)) fleets.add(fleet.id);
+  }
+  return { battles, fleets };
+}
+
 /** Ad-hoc query (A4): can `viewerId` see this object at IDENTIFY detail right
- *  now? Exactly the rule `visibleState` projects by — own objects always, others
- *  when their node is currently identified. A radar-only contact answers false
+ *  now? Exactly the rule `visibleState` projects by — own objects always, a fleet in
+ *  the viewer's own battle always (`engagementOf`), others when their node is
+ *  currently identified. A radar-only contact answers false
  *  (detected is not seen), remembered fog answers false (stale is not now), and
  *  an unknown id answers false (fail-secure). Fog is opt-in: a host that does
  *  not enforce it simply never consults this and everything stays visible.
@@ -469,6 +516,10 @@ export function isVisibleTo(
   const fleet = state.fleets[target.fleetId];
   if (!fleet) return false;
   if (fleet.owner === viewerId) return true;
+  // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
+  if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
+  const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
+  if (battle && fightsIn(battle, new Set(visionBloc(state, viewerId)))) return true;
   const at = fleetPositionAt(state, fleet, state.time);
   if (at && sightCircles(state, viewerId, data).some((c) => c.source.kind === 'mine' && inRadius(at, c, c.identify))) return true;
   const node = fleetNode(state, fleet);
@@ -747,6 +798,15 @@ function project(
     }
     if (planet.owner === viewerId || identify.has(planet.id) || spiedPlanets.has(planet.id))
       continue;
+    // FORT-6.1: площадка крепости на развилке — не топология карты, а сооружение, и само
+    // её существование говорит «здесь стоит (или стояла) крепость». Провинции видны всем
+    // (они и есть карта), а площадку, которую зритель не видел ни разу, он не получает
+    // вовсе — иначе туман выдавал бы каждую крепость на дорогах. Увиденную помнит, как и
+    // любой мир.
+    if (planet.fork && !memory?.[planet.id]) {
+      delete view.planets[planet.id];
+      continue;
+    }
     // Ангар чужого мира не виден НИКОГДА (SHU-1.1): челнок стоит внутри порта, а не на
     // орбите — снаружи видно здание, но не то, сколько машин в нём. Единственное
     // исключение выше по функции: шпионаж (`spiedPlanets`) вскрывает мир целиком и
@@ -819,9 +879,18 @@ function project(
   // everything else is removed entirely.
   view.signatures = radarSignatures(state, viewerId, data, identify);
   const mineCircles = sightCircles(state, viewerId, data).filter((c) => c.source.kind === 'mine');
+  const engaged = engagementOf(state, viewerId);
   for (const id of Object.keys(view.fleets).sort()) {
     const fleet = view.fleets[id];
-    if (!fleet || fleet.owner === viewerId || spiedFleets.has(fleet.owner)) continue;
+    if (!fleet || fleet.owner === viewerId) continue;
+    // Чужая мина — только вблизи; шпионаж, бой и опознанный узел её не раскрывают (SM-3.6).
+    if (isMineFleet(fleet, data)) {
+      const original = state.fleets[id];
+      if (!original || !mineFleetVisible(state, original, viewerId, data)) delete view.fleets[id];
+      continue;
+    }
+    if (spiedFleets.has(fleet.owner)) continue;
+    if (engaged.fleets.has(id)) continue; // the enemy in YOUR battle is not a secret
     const node = fleetNode(view, fleet);
     // Mines identify nearby ships at their continuous positions, including roads.
     const at = fleetPosition(state, fleet);
@@ -835,7 +904,7 @@ function project(
   // from them. (A blanket strip is why the build queue showed nothing in net mode.)
   for (const id of Object.keys(view.battles)) {
     const battle = view.battles[id];
-    if (battle && !identify.has(battle.location)) delete view.battles[id];
+    if (battle && !identify.has(battle.location) && !engaged.battles.has(id)) delete view.battles[id];
   }
   view.scheduled = view.scheduled.filter((e) => scheduledOwnedBy(e, viewerId, state));
 

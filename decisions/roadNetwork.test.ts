@@ -105,7 +105,7 @@ describe('попадание пальцем по дороге', () => {
 
 describe('ROADS-4 — развилка видна как место', () => {
   it('одна отметка на развилку — там, где тропа ветвится, с её соседями', () => {
-    expect(forkMarks(planets)).toEqual([{ province: 'B', at: F, exits: ['A', 'C'] }]);
+    expect(forkMarks(planets)).toEqual([{ province: 'B', trail: 0, at: F, exits: ['A', 'C'] }]);
   });
 
   it('тропа без развилки и лейн без дороги отметки не дают', () => {

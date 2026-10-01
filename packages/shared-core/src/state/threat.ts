@@ -2,6 +2,7 @@ import type { Fleet, FleetId, GameState, PlanetId, PlayerId } from './gameState'
 import type { Context } from '../action/types';
 import { getStance } from './diplomacy';
 import { identifiedNodes, isVisibleTo } from './visibility';
+import { isMineFleet } from './minefields';
 import { journeyDestination, journeyEtaMs } from './route';
 
 /**
@@ -105,6 +106,8 @@ export function scanNodeThreats(
   for (const fleetId of Object.keys(state.fleets)) {
     const fleet = state.fleets[fleetId]!;
     if (fleet.owner === viewerId) continue;
+    // Мина (SM-3.6) не угроза миру: она стоит и ждёт, а не идёт в атаку.
+    if (isMineFleet(fleet, ctx.data)) continue;
     if (getStance(state, viewerId, fleet.owner) !== 'war') continue;
     const bearing = classify(state, fleet, nodeId, ctx);
     if (bearing === null) continue;

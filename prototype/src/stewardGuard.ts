@@ -9,6 +9,7 @@
  * tests (until REFP-28).
  */
 import {
+  isForkSite,
   scanNodeThreats,
   previewBattle,
   hullPool,
@@ -103,7 +104,9 @@ export function stewardGuardOrders(
     report.push(entry);
   };
   const identified = identifiedNodes(state, ai, data);
-  const mine = Object.values(state.planets).filter((p) => p.owner === ai);
+  // Крепость на развилке (FORT-6.1) — не мир: лейнов к ней нет, ни убежищем, ни целью
+  // обороны она быть не может. Её орудия — обычный флот на дороге.
+  const mine = Object.values(state.planets).filter((p) => p.owner === ai && !isForkSite(p));
   // Threat scans are per-node; cache them — the haven search re-reads them.
   const threatCache = new Map<string, ReturnType<typeof scanNodeThreats>>();
   const threatsOf = (node: string): ReturnType<typeof scanNodeThreats> => {
