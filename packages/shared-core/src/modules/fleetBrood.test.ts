@@ -169,3 +169,15 @@ it('rejects a human attempt to build a faction-exclusive organism', () => {
   );
   expect(result).toMatchObject({ ok: false, code: 'E_FORBIDDEN' });
 });
+
+describe('brood during an assault landing (Codex review on #1409)', () => {
+  it('grows nothing and charges nothing while the fleet is landing an assault', () => {
+    const s = world();
+    // A veteran landing party is claimed; a newborn merged into it would dilute its merit.
+    s.fleets.f!.landing = [{ unit: 'lander', count: 2, damageDealt: 80 }];
+    s.fleets.f!.assaultLanding = { planetId: 'A', startAt: 0, doneAt: 100 * HOUR, troops: { lander: 2 } };
+    const after = advance(prime(s), first);
+    expect(after.fleets.f!.landing).toEqual([{ unit: 'lander', count: 2, damageDealt: 80 }]);
+    expect(after.players.p!.resources).toEqual({ biomass: 200, metal: 200, microelectronics: 60 });
+  });
+});

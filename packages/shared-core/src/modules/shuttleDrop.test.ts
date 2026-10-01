@@ -406,3 +406,15 @@ describe('SHU-5.2 — челнок строится с бойцом внутри
     ]);
   });
 });
+
+describe('подкрепление берегу без боя (замечание Codex на #1409)', () => {
+  it('челнок довёз войска к своему берегу, стоящему без боя, — штурм продолжается', () => {
+    const s = world({ target: { garrison: [['militia', 2]] } });
+    // Свой берег на земле без боя — так остаётся плацдарм после ничьей.
+    s.planets.B!.beachheads = [{ owner: 'p1', units: [{ unit: 'militia', count: 1 }] }];
+    const { state, events } = advance(apply(s, drop()), 2);
+    const started = events.filter((e) => e.type === 'battle.started');
+    expect(started.map((e) => (e.payload as { attacker?: unknown }).attacker)).toEqual(['p1']);
+    expect(state.planets.B?.beachheads?.map((b) => b.owner)).toEqual(['p1']);
+  });
+});
