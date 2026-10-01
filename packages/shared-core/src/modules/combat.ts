@@ -419,6 +419,15 @@ function pullInBystanders(h: HandlerContext, at: string): void {
   }
 }
 
+/**
+ * Контракт возможности `battle.pullIn` (ATK-3): «у мира `at` завязался бой — втяни
+ * ждавших рядом». Предоставляет модуль боя, потребляет `fleet.engage` модуля fleet-ops: тот
+ * собирает бой «Атаки» сам (модули не импортируют друг друга, инвариант №3), и без этого
+ * шва бой «Атаки» обходил правило S3, которое держит бой прибытия. Нет модуля боя — нет
+ * возможности, и бой «Атаки» остаётся парой.
+ */
+export type BattlePullIn = (at: string, h: HandlerContext) => void;
+
 function engageFleets(
   h: HandlerContext,
   fleetId: string,
@@ -1129,8 +1138,11 @@ export const combatModule: GameModule = {
   // 3.4.0: захват и продолжение штурма — только берегами завершённого боя, все уцелевшие
   // враги нового хозяина вступают в новый бой; посадка на борт не уводит трюм в минус
   // (замечания Codex на #1409).
-  version: '3.5.0',
+  // 3.6.0: бой «Атаки» втягивает ждавших у мира — возможность `battle.pullIn` (ATK-3).
+  version: '3.6.0',
   setup(api) {
+    api.provideCapability<BattlePullIn>('battle.pullIn', (at, h) => pullInBystanders(h, at));
+
     api.on('fleet.arrived', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
       engageFleets(h, fleetId, at);
