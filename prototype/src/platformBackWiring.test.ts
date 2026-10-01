@@ -21,7 +21,11 @@ describe('YAG-6.4 — «назад» и выход площадки', () => {
   });
 
   it('выход площадки ставит забег на паузу и сохраняет его и облачную копию', () => {
-    const exit = /host\.onExit\?\.\(\(\) => \{([\s\S]*?)\}\);/.exec(SRC)?.[1] ?? '';
+    // Один путь «сохранить всё сразу» на выход площадки и перезапуск ради обновления
+    // из магазина (RUS-3): разойдись они — один из двух уходов терял бы прогресс.
+    expect(SRC).toContain('host.onExit?.(saveAllNow);');
+    expect(SRC).toContain('initApkUpdater({ beforeRestart: saveAllNow });');
+    const exit = /function saveAllNow\(\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1] ?? '';
     expect(exit).toContain("runPauseEvent('hidden');");
     expect(exit).toContain('saveRun();');
     expect(exit).toContain('pushCloud(true);');

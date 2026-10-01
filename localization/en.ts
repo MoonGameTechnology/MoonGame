@@ -3469,6 +3469,8 @@ export const en: Record<string, string> = {
   'upd.http-error': '✗ GitHub answered {s}',
   'upd.later': 'Later',
   'upd.no-network': "✗ can't reach GitHub (network / VPN?)",
+  'upd.ready': 'Update downloaded',
+  'upd.restart': 'Restart',
 
   // --- welcome — Экран приветствия: вход, регистрация, восстановление, список матчей, подвал.
   'welcome.apple': 'Sign in with Apple',

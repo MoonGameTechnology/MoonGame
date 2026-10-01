@@ -769,7 +769,19 @@ Sector Zero: `decisions/sectorZeroMenu.ts`, `decisions/sectorZeroProgress.ts` (�
   Тихая проверка: на старте, при возврате приложения в форграунд
   (`visibilitychange`) и раз в 4ч — с троттлингом 15 мин; ручная — кнопка на
   `#connect` (диагностика в `cver`) и **тайл «Обновления» в хабе** (диагностика в
-  `hub-note`). Браузерная «автообновляемость» — GitHub Pages
+  `hub-note`). **Стор-канал (RUS-3):** всё выше — канал `github`; упаковка с
+  `VOID_CHANNEL=rustore` (`mobile/channel.mjs`) вшивает `channel:'rustore'` в `__BUILD__`,
+  и GitHub-полоса в такой сборке выключена в самом `updater.ts` (ни запроса, ни ссылки на
+  APK). Вместо неё — SDK обновлений RuStore (`ru.rustore.sdk:appupdate` через BOM,
+  `mobile/patch-rustore.mjs` — эксклюзивный Maven-репозиторий RuStore + мост
+  `window.VoidRuStore`, пускающий вызовы только с локальной страницы): тот же `#updbar`
+  предлагает «Обновить» (диалог магазина) и после скачивания «Перезапустить», перед
+  установкой игра сохраняет всё (`saveAllNow`, тот же путь, что выход площадки); любой
+  сбой SDK — тишина. Решение — `decisions/storeUpdate.ts`, проводка —
+  `prototype/src/rustoreUpdate.ts`. Собирается только как CI-проверка компиляции (третий
+  элемент матрицы `android.yml`, артефакт без релиза): своей стор-сборки (RUS-1) и
+  release-подписи (RUS-2) ещё нет, а SDK отвечает только опубликованному в RuStore
+  приложению. Браузерная «автообновляемость» — GitHub Pages
   (`pages.yml` → https://moongametechnology.github.io/MoonGame/ — ссылка всегда на свежий main);
   ⚠ требует ручного включения: Settings → Pages → Source **«GitHub Actions»**, и это
   НЕ одноразовый шаг — 2026-09-14 Pages-сайт пропал сам, и десять пушей подряд не
@@ -4620,7 +4632,8 @@ guided sandbox) в player-клиенте живо — идёт на фикс-т�
 APK собирается в двух лейнах (matrix в `android.yml`): дев — rolling-релиз `alpha`
 (`com.voiddominion.prototype`, как раньше), player — rolling-релиз `player`
 (`void-dominion-player.apk`, свой `com.voiddominion.player` — ставится рядом с
-дев-версией); каждый APK автообновляется из своего лейна.
+дев-версией); каждый APK автообновляется из своего лейна. Третий элемент матрицы —
+не лейн, а проверка компиляции стор-канала RuStore (RUS-3, артефакт без релиза).
 
 - **Реальное ядро** в браузере: `createKernel([sector, planetType, tax, faction, hunger,
 economy, movement, hero, heroEffects, orbital, combat, intercept, captureOnArrival,

@@ -6,7 +6,8 @@
 // and tolerates whatever Capacitor's template already provides.
 //
 // It does two things:
-//   1. MainActivity.java — replace with a version that exposes window.VoidNative.open(url),
+//   1. MainActivity.java (github channel only, see channel.mjs) — replace with a version
+//      that exposes window.VoidNative.open(url),
 //      a tiny bridge handing the update APK's URL to the SYSTEM BROWSER (which downloads it
 //      and offers to install). No install permission / DownloadManager / FileProvider — that
 //      earlier in-app-install path proved unreliable across devices and was dropped, so the
@@ -15,6 +16,7 @@
 //      Android treats each rolling build as a strictly newer update.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { packagingChannel } from './channel.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const read = (p) => readFileSync(p, 'utf8');
@@ -27,7 +29,12 @@ const mainActivityPath = here(`./android/app/src/main/java/${pkgPath}/MainActivi
 const buildGradlePath = here('./android/app/build.gradle');
 
 // --- 1. MainActivity.java ---------------------------------------------------
-{
+// Only in the github channel (channel.mjs). The store build (VOID_CHANNEL=rustore) must
+// not carry the browser-open bridge at all — no third-party APK links — and its
+// MainActivity belongs to patch-rustore.mjs, so exactly one script writes the file.
+if (packagingChannel() === 'rustore') {
+  console.log('patch-updater: rustore channel — GitHub updater bridge NOT installed (patch-rustore.mjs owns MainActivity).');
+} else {
   const java = `package ${appId};
 
 import android.content.Context;

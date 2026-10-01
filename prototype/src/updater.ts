@@ -81,7 +81,7 @@ export function isTrustedApkUrl(url: string): boolean {
 }
 
 interface GlobalWithBuild {
-  __BUILD__?: { versionCode?: unknown; sha?: unknown };
+  __BUILD__?: { versionCode?: unknown; sha?: unknown; channel?: unknown };
 }
 
 /** Our own build identity, injected into the APK's index.html at package time. */
@@ -89,6 +89,23 @@ export function currentBuild(): BuildInfo | null {
   const b = (globalThis as GlobalWithBuild).__BUILD__;
   if (!b || typeof b.versionCode !== 'number' || !Number.isFinite(b.versionCode)) return null;
   return { versionCode: b.versionCode, sha: typeof b.sha === 'string' ? b.sha : '' };
+}
+
+/** Where this build's updates come from — the packaging channel (`mobile/channel.mjs`). */
+export type BuildChannel = 'github' | 'rustore';
+
+/**
+ * The packaging channel baked next to the build identity (mobile/inject-build.mjs, RUS-3).
+ * No field means `github` — that is how the dev/player lanes are packaged. A store build
+ * (`rustore`) must never reach the GitHub lane: the store forbids links to third-party
+ * APKs. An unknown value enables NO lane (null) — guessing here would risk exactly that
+ * link in a store build. Null in the browser / dev build, like `currentBuild()`.
+ */
+export function buildChannel(): BuildChannel | null {
+  if (!currentBuild()) return null;
+  const channel = (globalThis as GlobalWithBuild).__BUILD__?.channel;
+  if (channel === undefined || channel === 'github') return 'github';
+  return channel === 'rustore' ? 'rustore' : null;
 }
 
 interface ReleaseAsset {
@@ -158,7 +175,8 @@ export type UpdateCheck =
 
 export async function checkForUpdateDetailed(fetchImpl: typeof fetch = fetch): Promise<UpdateCheck> {
   const local = currentBuild();
-  if (!local) return { kind: 'dormant' };
+  // The GitHub lane belongs to the github channel only; a store build updates via its store.
+  if (!local || buildChannel() !== 'github') return { kind: 'dormant' };
   let res: Response;
   try {
     res = await fetchImpl(RELEASE_API, { headers: { Accept: 'application/vnd.github+json' } });

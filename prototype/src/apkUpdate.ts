@@ -14,9 +14,10 @@
  *    случается десятки раз в час, поэтому без порога это стало бы стуком по API.
  */
 import { t } from '../../localization/runtime';
-import { buildLabel, checkForUpdateDetailed, currentBuild } from './updater';
+import { buildChannel, buildLabel, checkForUpdateDetailed, currentBuild } from './updater';
 import type { UpdateCheck, UpdateInfo } from './updater';
 import { detach } from './detach';
+import { initRuStoreUpdate, type RuStoreUpdateOptions } from './rustoreUpdate';
 
 /** Минимальный зазор между молчаливыми проверками. */
 export const CHECK_GAP_MS = 15 * 60_000;
@@ -56,12 +57,40 @@ export function shouldCheck(now: number, lastCheckAt: number, online: boolean): 
 const el = (id: string): HTMLElement | null => document.getElementById(id);
 
 /**
- * Повесить всю проводку обновления. Вне APK (нет вшитой сборки) — тихо ничего не
- * делает: ни кнопок, ни таймеров, ни сетевых запросов.
+ * Молчаливые перепроверки: на запуске, при каждом возврате в ПЕРЕДНИЙ план (телефонный
+ * сценарий — запустил офлайн, открыл позже на Wi-Fi) и раз в 4 часа для долгой сессии.
+ * С порогом, чтобы мигание переднего плана не долбило проверку. Расписание одно на оба
+ * канала поставки: оно про телефон, а не про то, откуда приходит обновление.
  */
-export function initApkUpdater(): void {
+function scheduleChecks(check: () => void): void {
+  let lastCheckAt = 0;
+  const maybeCheck = (): void => {
+    const now = Date.now();
+    if (!shouldCheck(now, lastCheckAt, navigator.onLine !== false)) return;
+    lastCheckAt = now;
+    check();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) maybeCheck();
+  });
+  window.setInterval(maybeCheck, 4 * 3_600_000);
+  maybeCheck(); // проверка запуска (со штампом порога: передний план сразу после — бесплатно)
+}
+
+/**
+ * Повесить всю проводку обновления. Вне APK (нет вшитой сборки) — тихо ничего не
+ * делает: ни кнопок, ни таймеров, ни сетевых запросов. Стор-сборка (канал `rustore`,
+ * RUS-3) обновляется через SDK магазина, и GitHub-полосы в ней нет вовсе.
+ */
+export function initApkUpdater(options: RuStoreUpdateOptions = {}): void {
+  const channel = buildChannel();
+  if (channel === 'rustore') {
+    const store = initRuStoreUpdate(options);
+    if (store) scheduleChecks(store.check);
+    return;
+  }
   const myBuild = currentBuild();
-  if (!myBuild) return;
+  if (channel !== 'github' || !myBuild) return;
 
   const cver = el('cver');
   if (cver) cver.textContent = t('upd.build', { b: buildLabel(myBuild) });
@@ -126,19 +155,5 @@ export function initApkUpdater(): void {
     );
   }
 
-  // Silent re-checks: once at launch, whenever the app returns to the FOREGROUND
-  // (the phone pattern — launch offline, open later on wifi), and every 4h for a
-  // long-lived session. Throttled so foreground flapping can't hammer the API.
-  let lastCheckAt = 0;
-  const maybeCheck = (): void => {
-    const now = Date.now();
-    if (!shouldCheck(now, lastCheckAt, navigator.onLine !== false)) return;
-    lastCheckAt = now;
-    detach('обновление APK: фоновая проверка', runCheck(false));
-  };
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) maybeCheck();
-  });
-  window.setInterval(maybeCheck, 4 * 3_600_000);
-  maybeCheck(); // launch check (throttle-stamped so a foreground right after boot is free)
+  scheduleChecks(() => detach('обновление APK: фоновая проверка', runCheck(false)));
 }

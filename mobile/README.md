@@ -21,6 +21,41 @@ profile, production signing, store updates, save safety, listing requirements,
 testing, moderation, and optional monetization. It does **not** claim that a
 store-ready APK exists or change the existing dev/player release lanes below.
 
+## RuStore store channel — the in-app update SDK (RUS-3)
+
+Every packaging step reads one knob, `VOID_CHANNEL` (`channel.mjs`), that says **where
+the APK takes its updates from**. It is independent of the HTML profile (dev / player /
+Sector Zero):
+
+- **`github`** (default, unset) — everything in the sections below: the rolling
+  `alpha`/`player` releases, the `VoidNative.open` browser bridge. Unchanged by RUS-3 —
+  same bridge, same Gradle file, same baked build identity as before.
+- **`rustore`** — the store build. `patch-rustore.mjs` adds RuStore's Maven repository
+  (declared **exclusive** for the `ru.rustore` groups), the SDK BOM and
+  `ru.rustore.sdk:appupdate`, and writes a MainActivity exposing `window.VoidRuStore`
+  (`checkUpdate` / `startUpdate` / `completeUpdate`, answering with `void-rustore`
+  events; calls are accepted only from the bundled local page). `patch-updater.mjs`
+  installs **no** GitHub bridge, and `inject-build.mjs` bakes `channel: 'rustore'`, so
+  `prototype/src/updater.ts` never contacts GitHub — the store forbids links to
+  third-party APKs. In the game the same `#updbar` offers «Обновить» (RuStore's own
+  download dialog) and, once downloaded, «Перезапустить»; everything is saved before the
+  restart. Any SDK failure is silence, not an error screen
+  (`decisions/storeUpdate.ts`, `prototype/src/rustoreUpdate.ts`).
+
+```bash
+VOID_CHANNEL=rustore npm run apk:player   # local store-channel build (needs RuStore's Maven repo)
+```
+
+CI builds this channel as a **compile check only** — the third matrix entry of
+`android.yml`, artifact `void-dominion-rustore-check-apk`, throwaway appId
+`com.voiddominion.rustorecheck`, never published. It is debug-signed and ships the player
+HTML, because the store's own profile (RUS-1) and release signing (RUS-2) do not exist
+yet. The SDK only answers for an app **published in RuStore, signed with the key RuStore
+knows, on a phone with RuStore installed and signed in** — so on a phone this APK shows
+the quiet fallback (no banner), and the real update path can first be exercised in a
+RuStore closed alpha. RuStore Pay SDK is deliberately not wired: it waits for the owner's
+monetization decision (RUS-M).
+
 ## Install on a phone (easiest)
 
 Every push to `main` that touches the game refreshes **two rolling prereleases**
@@ -123,7 +158,8 @@ npm run apk          # sync → brand (icon/splash + landscape) → ./gradlew as
 `node patch-android.mjs` (enables rotation — `fullUser` + in-place `configChanges`
 so rotating never reloads the WebView / drops game state), then `node patch-updater.mjs`
 (wires the in-app updater: install permission + FileProvider + MainActivity download/
-install hook, and stamps `versionCode`/`versionName` from `VOID_VC`/`VOID_VN` when set).
+install hook, and stamps `versionCode`/`versionName` from `VOID_VC`/`VOID_VN` when set),
+then `node patch-rustore.mjs` (a no-op unless `VOID_CHANNEL=rustore`, see above).
 A local build leaves `versionCode 1` and ships no `window.__BUILD__`, so its updater stays
 dormant — those are injected by CI from the git commit count; the native hook still
 compiles locally, which is the point of running it here.

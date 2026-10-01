@@ -3473,6 +3473,8 @@ export const ru: Record<string, string> = {
   'upd.http-error': '✗ GitHub ответил {s}',
   'upd.later': 'Позже',
   'upd.no-network': '✗ нет связи с GitHub (сеть / VPN?)',
+  'upd.ready': 'Обновление скачано',
+  'upd.restart': 'Перезапустить',
 
   // --- welcome — Экран приветствия: вход, регистрация, восстановление, список матчей, подвал.
   'welcome.apple': 'Войти через Apple',

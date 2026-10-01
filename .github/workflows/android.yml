@@ -10,6 +10,9 @@ name: Android APK (prototype)
 #     applicationId, so a host can install BOTH side by side.
 # Each APK's in-app updater checks ITS OWN release lane (prototype/src/updater.ts
 # resolves tag/asset from the baked __PLAYER_BUILD__ define).
+# A THIRD matrix entry is a compile check, not a lane: the RuStore packaging channel
+# (VOID_CHANNEL=rustore, mobile/channel.mjs — RuStore In-App Updates SDK + VoidRuStore
+# bridge, no GitHub lane; RUS-3). It is uploaded as an artifact and NEVER published.
 # Runs on GitHub's ubuntu runner, which has the Android SDK preinstalled. On main it
 # also publishes each APK to its rolling prerelease for a stable download link;
 # every run still uploads the APKs as build artifacts too.
@@ -55,6 +58,17 @@ jobs:
             release_tag: player
             asset: void-dominion-player.apk
             release_title: Void Dominion — Player (rolling)
+          # RuStore SDK compile check (RUS-3). No release_tag → never published. The HTML
+          # is the player client until the store's own profile lands (RUS-1); the throwaway
+          # appId keeps this APK from installing over a real lane. Debug-signed: the SDK
+          # answers only for a RuStore-published, release-signed app (RUS-2), so on a
+          # phone this APK shows the quiet fallback, not an update.
+          - profile: rustore
+            channel: rustore
+            html: void-dominion-player.html
+            vn_prefix: rustore
+            app_id: com.voiddominion.rustorecheck
+            artifact: void-dominion-rustore-check-apk
     # Matrix values are consumed through env (never inline ${{ }} in run bodies) —
     # keeps run scripts injection-free by construction (zizmor template-injection).
     env:
@@ -65,6 +79,8 @@ jobs:
       RELEASE_TAG: ${{ matrix.release_tag }}
       ASSET: ${{ matrix.asset }}
       RELEASE_TITLE: ${{ matrix.release_title }}
+      # Packaging channel (mobile/channel.mjs): empty = github, the dev/player lanes.
+      VOID_CHANNEL: ${{ matrix.channel }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -142,6 +158,8 @@ jobs:
           # Wire the in-app updater (MainActivity VoidNative.open bridge) and stamp
           # versionCode/versionName (VOID_VC / VOID_VN from the env above).
           node patch-updater.mjs
+          # RuStore SDK + VoidRuStore bridge — only when VOID_CHANNEL=rustore (no-op otherwise).
+          node patch-rustore.mjs
 
       # Sign with a COMMITTED debug keystore (standard android/android credentials —
       # not a secret) so every build has the SAME signature. Without this, the Gradle
@@ -221,7 +239,8 @@ jobs:
       # refreshed on every main build. Only from main — branch builds still produce the
       # artifact above, just no release.
       - name: Publish to the rolling release
-        if: github.ref == 'refs/heads/main'
+        # Only real lanes: the RuStore compile check has no release_tag and never publishes.
+        if: github.ref == 'refs/heads/main' && matrix.release_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

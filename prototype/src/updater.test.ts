@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  buildChannel,
   buildLabel,
   checkForUpdate,
   checkForUpdateDetailed,
@@ -10,12 +11,17 @@ import {
   type UpdateInfo,
 } from './updater';
 
+interface BakedBuild {
+  versionCode?: unknown;
+  sha?: unknown;
+  channel?: unknown;
+}
 interface GlobalWithBuild {
-  __BUILD__?: { versionCode?: unknown; sha?: unknown };
+  __BUILD__?: BakedBuild;
 }
 const g = globalThis as GlobalWithBuild;
 
-function setBuild(b: { versionCode?: unknown; sha?: unknown } | undefined): void {
+function setBuild(b: BakedBuild | undefined): void {
   if (b === undefined) delete g.__BUILD__;
   else g.__BUILD__ = b;
 }
@@ -53,6 +59,25 @@ describe('currentBuild', () => {
   it('tolerates a missing sha', () => {
     setBuild({ versionCode: 7 });
     expect(currentBuild()).toEqual({ versionCode: 7, sha: '' });
+  });
+});
+
+describe('buildChannel (RUS-3)', () => {
+  it('a build without a baked channel is the github lane — how dev/player are packaged', () => {
+    setBuild({ versionCode: 42, sha: 'abc1234' });
+    expect(buildChannel()).toBe('github');
+  });
+  it('reads the store channel', () => {
+    setBuild({ versionCode: 42, sha: 'abc1234', channel: 'rustore' });
+    expect(buildChannel()).toBe('rustore');
+  });
+  it('an unknown channel enables no lane at all', () => {
+    setBuild({ versionCode: 42, sha: 'abc1234', channel: 'rustor' });
+    expect(buildChannel()).toBeNull();
+  });
+  it('is null in the browser / dev build', () => {
+    setBuild(undefined);
+    expect(buildChannel()).toBeNull();
   });
 });
 
@@ -185,5 +210,17 @@ describe('checkForUpdateDetailed (diagnosable outcomes)', () => {
   it('reports "dormant" in the browser / dev build', async () => {
     setBuild(undefined);
     expect((await checkForUpdateDetailed(fetchOk(release(9, 'x')))).kind).toBe('dormant');
+  });
+  it('never touches GitHub from a store build, even with a newer release out (RUS-3)', async () => {
+    for (const channel of ['rustore', 'rustor']) {
+      setBuild({ versionCode: 1, sha: 'me', channel });
+      let called = false;
+      const spy = (async () => {
+        called = true;
+        return { ok: true, json: async () => release(99, 'x') };
+      }) as unknown as typeof fetch;
+      expect((await checkForUpdateDetailed(spy)).kind).toBe('dormant');
+      expect(called).toBe(false);
+    }
   });
 });

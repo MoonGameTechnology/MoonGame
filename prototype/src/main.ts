@@ -17787,11 +17787,13 @@ host.onPlatformPause?.((paused) => runPauseEvent(paused ? 'platform-pause' : 'pl
 // что и браузерный; без обработчика она выкинула бы игрока из игры посреди забега. Выход
 // площадки сохраняет всё сразу — тем же путём, что уход со страницы.
 host.onHistoryBack?.(() => stepBack(false));
-host.onExit?.(() => {
+/** Сохранить всё сразу: выход площадки и перезапуск ради обновления из магазина (RUS-3). */
+function saveAllNow(): void {
   runPauseEvent('hidden');
   saveRun();
   pushCloud(true);
-});
+}
+host.onExit?.(saveAllNow);
 // YAG-2.2: уходя, страница отправляет облачную копию СРАЗУ — таймер окна квоты после
 // выгрузки не сработает. Порядок важен: сначала снимок забега (он же двигает правку).
 addEventListener('pagehide', () => pushCloud(true));
@@ -17806,8 +17808,9 @@ if (!bootJoinId && !bootReset && document.body.dataset.entry === 'sector-zero')
 
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —
-// в `apkUpdate.ts`. Вне APK вызов тихо ничего не делает.
-if (!__SECTOR_ZERO_ONLY__) initApkUpdater();
+// в `apkUpdate.ts`. Вне APK вызов тихо ничего не делает. Стор-сборка перезапускается
+// ради установки, поэтому сначала сохраняет всё — тем же путём, что выход площадки.
+if (!__SECTOR_ZERO_ONLY__) initApkUpdater({ beforeRestart: saveAllNow });
 
 // --- corporation cabinet (AVA-C1/C2) -----------------------------------------
 // Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки и две двери,
