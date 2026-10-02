@@ -3133,6 +3133,8 @@ export const ru: Record<string, string> = {
   'settings.gfx.starfield.hint':
     'дрейфующие туманности и звёзды на фоне — выключите для плоского фона',
   'settings.gfx.title': 'Графика',
+  'settings.gfx.ui-scale': 'Размер интерфейса',
+  'settings.gfx.ui-scale.hint': '100% — по размеру окна, от 80% мельче до 150% крупнее',
   'settings.gfx.window-opacity': 'Непрозрачность окон',
   'settings.gfx.window-opacity.hint': '0% — самое прозрачное стекло, 100% — сплошной фон',
   'settings.off': 'выкл',

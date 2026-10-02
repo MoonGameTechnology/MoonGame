@@ -280,37 +280,35 @@ body.holo-ui :is(#hub, #connect, #setup, #seatpick, #endscreen, #settings) :is(b
 }
 body.holo-ui :is(#hub, #connect, #setup, #seatpick) button:disabled { opacity: .42; cursor: not-allowed; }
 
-@media (max-width: 1050px) {
-  body.holo-ui #connect { padding: 26px 40px; }
-  body.holo-ui #connect .cwrap { margin-left: auto; }
-  body.holo-ui #connect::after { right: calc(var(--vpw) * -.42); opacity: .65; }
-  body.holo-ui #hub { padding: 18px 22px; gap: 10px; }
-  body.holo-ui #hub .hub-banner { height: 76px; min-height: 64px; }
-  body.holo-ui #hub .hub-bt { font-size: 25px; letter-spacing: 4px; }
-  body.holo-ui #hub .hub-body { padding: 20px; }
-  body.holo-ui #setup .sbox { padding: 20px; }
-  body.holo-ui #setup .spane { gap: 12px; }
-  body.holo-ui #setup .scol { padding: 12px; }
-}
-@media (max-height: 760px) {
-  body.holo-ui #connect { padding-top: 18px; padding-bottom: 18px; }
-  body.holo-ui #connect .cwrap { padding-top: 42px; padding-bottom: 36px; }
-  body.holo-ui #connect .cbox { padding: 24px 30px; }
-  body.holo-ui #connect .ccrest { margin-bottom: 16px; gap: 9px; }
-  body.holo-ui #connect .ccrest .ring { width: 40px; height: 40px; margin: 0 0 10px; }
-  body.holo-ui #connect .ccrest .wm { font-size: 25px; }
-  body.holo-ui #connect .csub { margin-bottom: 18px; }
-  body.holo-ui #connect .cdiv { margin: 15px 0 12px; }
-  body.holo-ui #connect .cstack { margin-top: 16px; }
-  body.holo-ui #hub { padding-top: 12px; padding-bottom: 12px; }
-  body.holo-ui #hub .hub-banner { height: 56px; min-height: 48px; padding: 4px; }
-  body.holo-ui #hub .hub-bt { font-size: 25px; }
-  body.holo-ui #hub .hub-crest { transform: scale(.8); }
-  body.holo-ui #hub .hub-id { padding: 11px 18px; }
-  body.holo-ui #hub .hub-nav { min-height: 58px; padding: 5px; }
-  body.holo-ui #hub .hub-body { padding: 18px; }
-  body.holo-ui #setup .smap { height: 180px; }
-}
+/* Узкая и низкая раскладки — классы `body` от размера раскладки под зумом (`narrowLayouts`,
+   `decisions/pcScale.ts`), а не медиа-запросы по окну. */
+body.holo-ui:where(.holo-w1050) #connect { padding: 26px 40px; }
+body.holo-ui:where(.holo-w1050) #connect .cwrap { margin-left: auto; }
+body.holo-ui:where(.holo-w1050) #connect::after { right: calc(var(--vpw) * -.42); opacity: .65; }
+body.holo-ui:where(.holo-w1050) #hub { padding: 18px 22px; gap: 10px; }
+body.holo-ui:where(.holo-w1050) #hub .hub-banner { height: 76px; min-height: 64px; }
+body.holo-ui:where(.holo-w1050) #hub .hub-bt { font-size: 25px; letter-spacing: 4px; }
+body.holo-ui:where(.holo-w1050) #hub .hub-body { padding: 20px; }
+body.holo-ui:where(.holo-w1050) #setup .sbox { padding: 20px; }
+body.holo-ui:where(.holo-w1050) #setup .spane { gap: 12px; }
+body.holo-ui:where(.holo-w1050) #setup .scol { padding: 12px; }
+body.holo-ui:where(.holo-h760) #connect { padding-top: 18px; padding-bottom: 18px; }
+body.holo-ui:where(.holo-h760) #connect .cwrap { padding-top: 42px; padding-bottom: 36px; }
+body.holo-ui:where(.holo-h760) #connect .cbox { padding: 24px 30px; }
+body.holo-ui:where(.holo-h760) #connect .ccrest { margin-bottom: 16px; gap: 9px; }
+body.holo-ui:where(.holo-h760) #connect .ccrest .ring { width: 40px; height: 40px; margin: 0 0 10px; }
+body.holo-ui:where(.holo-h760) #connect .ccrest .wm { font-size: 25px; }
+body.holo-ui:where(.holo-h760) #connect .csub { margin-bottom: 18px; }
+body.holo-ui:where(.holo-h760) #connect .cdiv { margin: 15px 0 12px; }
+body.holo-ui:where(.holo-h760) #connect .cstack { margin-top: 16px; }
+body.holo-ui:where(.holo-h760) #hub { padding-top: 12px; padding-bottom: 12px; }
+body.holo-ui:where(.holo-h760) #hub .hub-banner { height: 56px; min-height: 48px; padding: 4px; }
+body.holo-ui:where(.holo-h760) #hub .hub-bt { font-size: 25px; }
+body.holo-ui:where(.holo-h760) #hub .hub-crest { transform: scale(.8); }
+body.holo-ui:where(.holo-h760) #hub .hub-id { padding: 11px 18px; }
+body.holo-ui:where(.holo-h760) #hub .hub-nav { min-height: 58px; padding: 5px; }
+body.holo-ui:where(.holo-h760) #hub .hub-body { padding: 18px; }
+body.holo-ui:where(.holo-h760) #setup .smap { height: 180px; }
 @media (prefers-reduced-motion: reduce) {
   body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *,
   body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *::before,

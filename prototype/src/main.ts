@@ -664,6 +664,8 @@ import {
   setWindowOpacity,
   windowAlpha,
   windowOpacityPct,
+  setUiScale,
+  uiScalePct,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
 import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
@@ -12529,12 +12531,16 @@ const settings = initSettings({
     palette: rivalPaletteId,
     touchOnly: !pcUi(),
     ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
+    // Размер интерфейса — множитель зума ПК (`holographicUi.ts`), у телефона его нет.
+    ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
   }),
   setSweepOpacity,
   setWindowOpacity: (v) => {
     setWindowOpacity(Math.round(v * 100));
     applyWindowOpacity();
   },
+  // Новый зум подхватит `holographic.sync` на ближайшем кадре.
+  setUiScale: (v) => setUiScale(Math.round(v * 100)),
   setOwnPings: setShowOwnPings,
   setGlow: setGlowFx,
   setStarfield: setStarfield,
