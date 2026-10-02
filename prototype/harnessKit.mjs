@@ -182,6 +182,21 @@ export async function enterSkirmish(page, { tap = false, fromWelcome = true } = 
   if (await page.locator('#solo-replace').isVisible()) await press('solo-replace-confirm');
 }
 
+/**
+ * Нажать кнопку полосы скорости (`#spd-pause`, `[data-mult="100"]`…). На телефоне ряд
+ * прячется за одной кнопкой скорости (UIX-3.2) — её раскрывают первой, как игрок; выбор
+ * сворачивает ряд обратно. `tap` — сенсорный ввод.
+ */
+export async function pressSpeed(page, selector, { tap = false } = {}) {
+  const press = (locator) => (tap ? locator.tap() : locator.click());
+  const target = page.locator(selector);
+  const toggle = page.locator('#phone-speed');
+  // Кнопка скорости появляется кадром позже входа в партию — ждём её или сам ряд.
+  await target.or(toggle).filter({ visible: true }).first().waitFor();
+  if (!(await target.isVisible())) await press(toggle);
+  await press(target);
+}
+
 /** Что было на экране в момент падения: то, что иначе приходится выяснять руками. */
 export function screenReport(page) {
   return page.evaluate(() => {

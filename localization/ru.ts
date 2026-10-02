@@ -3334,6 +3334,7 @@ export const ru: Record<string, string> = {
   'speed.mult.real': 'реальное время',
   'speed.mult.two-hours': 'два часа в секунду',
   'speed.restart': 'Перезапуск — к выбору ботов',
+  'speed.toggle': 'Скорость времени',
 
   // --- steward — «Хранитель»: передача места ИИ на сон, позы, журнал вахты.
   'steward.duration': 'Передать на',

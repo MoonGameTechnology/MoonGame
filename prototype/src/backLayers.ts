@@ -75,6 +75,8 @@ export type LayerVerdict =
 // «потыкать все кнопки», 2026-09-25).
 // `phone-more` — лист «Ещё» нижней панели телефона (`#phone-more`, UIX-3.1): узел создаёт
 // `phoneNav.ts`, открытость — атрибут `hidden`, стили — в `mobile-console.css`, вне описи.
+// `phone-speed` — раскрытый ряд скорости телефона (UIX-3.2): узел — полоса скорости, которая
+// живёт всегда, раскрытость — класс `phone-speed-open` на `body` (`phoneSpeed.ts`).
 export const EXTRA_LAYERS: readonly string[] = [
   'chain',
   'aim',
@@ -82,6 +84,7 @@ export const EXTRA_LAYERS: readonly string[] = [
   'mobile-picker',
   'missions',
   'phone-more',
+  'phone-speed',
 ];
 
 /**

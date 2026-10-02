@@ -6,7 +6,14 @@
  */
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
-import { builtPage, enterSkirmish, instrumentedGame, launchBrowser, serve } from './harnessKit.mjs';
+import {
+  builtPage,
+  enterSkirmish,
+  instrumentedGame,
+  launchBrowser,
+  pressSpeed,
+  serve,
+} from './harnessKit.mjs';
 import { checkMobileStrategy } from './mobileStrategyTest.mjs';
 
 const hooks = `window.__mobileTest = {
@@ -119,7 +126,7 @@ try {
   await p.addInitScript(() => localStorage.setItem('vd.locale', 'ru'));
   await p.goto(`http://127.0.0.1:${server.address().port}`);
   await enterSkirmish(p, { tap: true });
-  await p.locator('#spd-pause').tap();
+  await pressSpeed(p, '#spd-pause', { tap: true });
   await pause();
   assert((await ui()).mobile);
   assert.equal(await p.locator('#purse .res').count(), 5);
@@ -291,7 +298,7 @@ try {
   // это ~12 с. Свежая партия: снимки состояния шагов выше этим не задеты.
   await p.goto(`http://127.0.0.1:${server.address().port}`);
   await enterSkirmish(p, { tap: true });
-  await p.locator('#spd-pause').tap();
+  await pressSpeed(p, '#spd-pause', { tap: true });
   await pause();
   const trooper = (await p.evaluate(() => window.__mobileTest.fleets())).find(
     (x) => x.owner === me,
@@ -320,14 +327,14 @@ try {
   // Панель скорости на телефоне прячется под открытой карточкой.
   await p.locator('[data-mobile="close"]').tap();
   await pause();
-  await p.locator('#spd-fast').tap();
-  await p.locator('.spd-mult-legacy [data-mult="100"]').tap();
+  await pressSpeed(p, '#spd-fast', { tap: true });
+  await pressSpeed(p, '.spd-mult-legacy [data-mult="100"]', { tap: true });
   await p.waitForFunction(
     (id) => (window.__mobileTest.state().fleets[id].landing ?? []).length > 0,
     trooper.id,
     { timeout: 60000, polling: 250 },
   );
-  await p.locator('#spd-pause').tap();
+  await pressSpeed(p, '#spd-pause', { tap: true });
   await pause();
   await selectTrooper();
   const loaded = await snapshot();

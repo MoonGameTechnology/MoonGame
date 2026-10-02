@@ -31,7 +31,8 @@
  * 9. язык (`YAG-1.1d`): игрок скачивает файл только своего языка, и разметка подписана
  *    текстом, а не ключами, — и для русского, и для англоязычного игрока;
  * 10. темп забега (`matchExits.ts`, правило 6): полоса скорости несёт ‖ ▶ ▶▶ — и на ПК, и
- *    на телефоне, — а множителей ×1…×100 в забеге нет.
+ *    на телефоне (там её ряд раскрывает кнопка скорости, UIX-3.2), — а множителей ×1…×100
+ *    в забеге нет.
  * 11. две вкладки (`AUD-29`): открывшая Sector Zero последней становится хозяйкой, прежняя
  *    встаёт под заставкой и больше не пишет, — правки обеих доживают до хранилища;
  * 12. битый журнал забега (`AUD-33`) не запирает меню, а герой `constructor` в профиле
@@ -532,7 +533,8 @@ try {
   );
   await english.close();
 
-  // 10. Телефон: та же полоса в забеге — ▶ и ▶▶, выход ⌂ на месте, множителей нет.
+  // 10. Телефон: в забеге скорость — одна кнопка (UIX-3.2), её ряд несёт тот же темп без
+  // множителей. Выхода ⌂ в ряду нет: он в листе «Ещё» нижней панели (UIX-3.1).
   const phone = await browser.newContext({
     locale: 'ru-RU',
     viewport: { width: 390, height: 844 },
@@ -547,8 +549,14 @@ try {
   await phonePage.locator('#sz-new').tap();
   await passChapterComic(phonePage);
   await phonePage.locator('.dl-wave').first().waitFor({ state: 'visible' });
+  await phonePage.locator('#phone-speed').tap();
   await runTempoOnly(phonePage, 'телефон');
-  assert.ok(await phonePage.locator('#tomenu').isVisible(), 'телефон: выход ⌂ на полосе');
+  assert.equal(await phonePage.locator('#tomenu').isVisible(), false, 'телефон: ⌂ в ряду нет');
+  await phonePage.locator('#phone-nav [data-phone-tab="more"]').tap();
+  assert.ok(
+    await phonePage.locator('#phone-more [data-phone-more="exit"]').isVisible(),
+    'телефон: выход — в «Ещё»',
+  );
   // п. 1.6.1.8: долгий тап не открывает системное меню — ни на карте, ни на картинке.
   const menuBlocked = await phonePage.evaluate(() =>
     ['map', 'comic-img'].map((id) => {

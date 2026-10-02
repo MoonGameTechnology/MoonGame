@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { launchBrowser, profileSeal, waitForApp } from './harnessKit.mjs';
+import { launchBrowser, pressSpeed, profileSeal, waitForApp } from './harnessKit.mjs';
 
 const ROOT = fileURLToPath(new URL('./dist/yandex/', import.meta.url));
 /** Печать профиля — та же, что у игры: кошелёк кадров кладётся запечатанным. */
@@ -175,7 +175,7 @@ try {
         await page.mouse.wheel(0, 240);
         await page.waitForTimeout(150);
       }
-      await page.locator('#spd-fast').click();
+      await pressSpeed(page, '#spd-fast');
       // Первая волна Роя — через 2:11 на ▶, то есть ~87 с на ▶▶: снять её на подходе.
       await page.waitForTimeout(95000);
       await shot(4, 'run');
