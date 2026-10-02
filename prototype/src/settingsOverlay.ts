@@ -37,6 +37,9 @@ export interface SettingsView {
   palette: string;
   /** Интерфейс телефона: в «Управлении» — только жесты, клавиш у пальца нет. */
   touchOnly?: boolean;
+  /** У ПК есть кнопки скорости ×1…×7200 (дев-управление временем): без них в «Управлении» нет
+   *  и клавиш 1–4 (UIX-9.1). */
+  speedKeys?: boolean;
   /** Непрозрачность окон ПК и планшета, 0..1. Нет — нет и ползунка: у телефона стеклянных
    *  окон нет, и строка двигала бы то, чего на экране не бывает. */
   windowOpacity?: number;
@@ -116,7 +119,7 @@ function tabOf(id: string | undefined): SettingsTab {
 /** «Управление» (UX-KEYS-1): что нажать → что будет. Таблица и её сторож —
  *  `decisions/controls.ts`. */
 function controlsHtml(view: SettingsView): string {
-  return `<dl class="set-keys">${controlsFor(!!view.touchOnly)
+  return `<dl class="set-keys">${controlsFor(!!view.touchOnly, !!view.speedKeys)
     .map((row) => `<div><dt>${t(row.keys)}</dt><dd>${t(row.does)}</dd></div>`)
     .join('')}</dl>`;
 }

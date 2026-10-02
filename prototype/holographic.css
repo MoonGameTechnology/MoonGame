@@ -76,6 +76,26 @@ body.holo-ui .holo-nav button{display:flex;align-items:center;justify-content:ce
   padding:7px 14px;border:1px solid var(--line);border-radius:4px;background:var(--glass);color:var(--ink);font-size:12px;}
 body.holo-ui .holo-nav button{cursor:pointer;}
 body.holo-ui .holo-nav button:hover{border-color:var(--cyan-dim);}
+/* Горячие клавиши ПК (UIX-9.1, `pcHotkeys.ts`): значок клавиши на вкладке и памятка внизу —
+   правее колонки инструментов (18 + 58 + зазор) и до полосы скорости (18 + 301 + зазор): на
+   низком окне колонка опускается до низа, а памятка рядом с ней её не накрывает. Памятка не
+   ловит мышь, кроме ✕, и стоит на z 25 — над картой и полосой скорости, под вкладками (27) и
+   окнами: подсказка не закрывает рабочий интерфейс. */
+body.holo-ui .holo-nav button[data-kbd]::after{content:attr(data-kbd);margin-left:8px;min-width:18px;padding:0 4px;
+  border:1px solid var(--line-hi);border-bottom-width:2px;border-radius:4px;font-size:11px;font-weight:600;
+  line-height:16px;text-align:center;color:var(--dim);}
+#key-memo{display:none;}
+body.holo-ui.holo-in-match #key-memo:not([hidden]){display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;
+  position:fixed;left:92px;bottom:16px;z-index:25;max-width:min(780px,calc(var(--vpw) - 432px));
+  padding:8px 44px 8px 14px;border:1px solid var(--line-hi);border-radius:8px;background:var(--glass);color:var(--ink);
+  font-size:13px;pointer-events:none;box-shadow:0 10px 28px rgba(0,0,0,.5);}
+#key-memo b{font-weight:600;color:var(--cyan);}
+#key-memo span{display:inline-flex;align-items:center;gap:6px;}
+#key-memo kbd{min-width:22px;padding:1px 6px;border:1px solid var(--line-hi);border-bottom-width:2px;border-radius:4px;
+  font-family:inherit;font-size:12px;font-weight:600;text-align:center;color:var(--ink);background:rgba(20,48,60,.5);}
+#key-memo button{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;
+  background:none;color:var(--dim);font-size:15px;cursor:pointer;pointer-events:auto;}
+#key-memo button:hover{color:var(--cyan);}
 /* Инструменты — постоянная колонка иконок у левого края под вкладками (заказ владельца
    2026-09-25: кнопку «☰ Ещё», прятавшую их, убрать). Подпись — всплывающая подсказка. */
 body.holo-ui #rail{left:18px;top:calc(var(--tbh) + 84px);bottom:auto;gap:0;flex-direction:column;align-items:flex-start;}
@@ -229,7 +249,7 @@ body.holo-ui #connect .mfmenu{max-height:calc(var(--vph) * .38);}
    остаётся в масштабе 1: его перетаскивание и размер считает `chatWindow.ts` в экранных px. */
 @media (min-width:900px) and (hover:hover) and (pointer:fine){
   body.holo-ui :is(.holo-nav,.holo-back,#holo-selection-window,#missionpanel,#swarm-tab,#rescard,#pingpanel,
-    #trader,#ally,#profile,#seatpick,#maploading,.locmenu){zoom:var(--pcz);}
+    #trader,#ally,#profile,#seatpick,#maploading,.locmenu,#key-memo){zoom:var(--pcz);}
   /* Окна, чей размер задаёт PC-блок `build.mjs` в vw/vh, — те же доли видимого окна. */
   body.holo-ui #scipick .twbox{width:calc(var(--vpw) * .534);max-height:calc(var(--vph) * .585);}
   body.holo-ui :is(#trader .trbox,#ally .albox){width:calc(var(--vpw) * .4);max-height:calc(var(--vph) * .6);}

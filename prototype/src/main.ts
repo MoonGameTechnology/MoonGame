@@ -459,6 +459,8 @@ import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
 import { initPhoneSpeed } from './phoneSpeed';
 import { tempoOf } from '../../decisions/phoneSpeed';
+import { initPcHotkeys } from './pcHotkeys';
+import { HOTKEY_SILENT_LAYERS, cycledFleets, homeTarget, nextFleet } from '../../decisions/hotkeys';
 import { initPurseFloats } from './purseFloats';
 import type { PurseReading } from '../../decisions/purseDelta';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
@@ -1081,7 +1083,7 @@ import {
 } from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
-import { jumpStep, type JumpKind } from './mapJump';
+import { GOTO_MIN_ZOOM, jumpStep, type JumpKind } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -12547,6 +12549,7 @@ const settings = initSettings({
     neutralColor,
     palette: rivalPaletteId,
     touchOnly: !pcUi(),
+    speedKeys: devSpeedControl,
     ...(document.body.classList.contains('holo-available') ? { windowOpacity: windowOpacityPct() / 100 } : {}),
     // Размер интерфейса — множитель зума ПК (`holographicUi.ts`), у телефона его нет.
     ...(pcUi() ? { uiScale: uiScalePct() / 100 } : {}),
@@ -15118,6 +15121,29 @@ const phoneNav = initPhoneNav({
 });
 // UIX-3.2: скорость на телефоне — одна кнопка, ряд раскрывается над ней (`phoneSpeed.ts`).
 const phoneSpeed = initPhoneSpeed();
+// UIX-9.1: горячие клавиши ПК. Что делает клавиша и когда молчит — `decisions/hotkeys.ts`;
+// кнопки, подсказки и памятка — `pcHotkeys.ts`. Окна клавиша открывает кнопками рельсы, а
+// сюда приходит то, у чего кнопки нет: камера к столице и перебор флотов.
+const SILENT_LAYERS = new Set(HOTKEY_SILENT_LAYERS);
+const pcHotkeys = initPcHotkeys({
+  pc: pcUi,
+  inMatch,
+  silentLayer: () => BACK_LAYERS.some((layer) => SILENT_LAYERS.has(layer.id) && layer.isOpen()),
+  pauseToggles: runPauseShown,
+  home: () => {
+    const fallback = pickHome(Object.values(s.planets), ME)?.id ?? null;
+    const to = homeTarget(capitalOf(s, ME), (id) => s.planets[id]?.owner, ME, fallback);
+    if (to) jumpTo(to, 'goto');
+  },
+  nextFleet: () => {
+    const immobile = (unit: string): boolean => data.units[unit]?.traits.includes('immobile') === true;
+    const id = nextFleet(cycledFleets(Object.values(s.fleets), ME, immobile), selFleet);
+    if (!id) return;
+    setFleetSelection([id]);
+    const at = fleetPos(s.fleets[id]!);
+    if (at) centerOn(at, Math.max(cam.scale, GOTO_MIN_ZOOM));
+  },
+});
 
 // Что ЗНАЧИТ нажатие «Назад» — `backGesture.ts` (REFM-198): пока есть что закрыть, Back
 // разбирает стопку; в матче первое нажатие только предупреждает (аппаратный Back жмут
@@ -16589,6 +16615,9 @@ function frame(nowReal: number) {
       : computeVision(); // fog projection for this frame
   if (vision) updateMemory(vision.identify); // variant B: remember what we see
   const preparingMap = prepareEnteringMap();
+  // Памятка клавиш ПК (UIX-9.1) ждёт конца подготовки карты: в кадре входа подготовка ещё
+  // не началась, и памятка встала бы под заставку, отсчитывая свои секунды впустую.
+  pcHotkeys.sync();
   // Opaque entry screens and hidden tabs do not paint the covered map. Setup is
   // translucent and keeps its backdrop; an admitted match waits for preparation.
   if (

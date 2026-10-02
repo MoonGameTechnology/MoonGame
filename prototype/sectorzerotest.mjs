@@ -67,6 +67,9 @@ const hooks = `window.__szTest = {
   garrisonUnits: (id) => s.planets[id].garrison.filter((st) => st.count > 0).map((st) => st.unit),
   // Открыт ли слой, который закроет Escape/Back.
   layerOpen: () => topLayerOpen(),
+  // Горячие клавиши ПК (UIX-9.1): открытые слои лестницы «Назад» и темп часов.
+  layers: () => BACK_LAYERS.filter((l) => l.isOpen()).map((l) => l.id),
+  speed: () => speed,
   // Подготовка карты закончилась: пока она идёт, Escape — это «уйти, пока карта готовится».
   prepared: () => inMatch() && mapWasEntered && !mapPreparation.active,
   // Захват Роем провинции игрока — тем же путём событий, что в игре (handleEvents).
@@ -279,6 +282,26 @@ async function check(label, run) {
   // Торговец экспедиции — только в забеге: у ресурса в карточке своя кнопка.
   assert.equal(await page.locator('.rc-trader').count(), run ? 1 : 0, `${label}: торговец из карточки`);
   await page.locator('.rc-close').click();
+
+  // Горячие клавиши ПК (UIX-9.1) нажимают кнопки этого режима. В забеге нет «Производства»,
+  // почты и кнопок ×1…×7200 — B, M и 2 молчат; пробел ставит паузу и продолжает с прежним
+  // темпом и там, и в схватке.
+  const layers = () => page.evaluate(() => window.__szTest.layers());
+  const pace = await page.evaluate(() => window.__szTest.speed());
+  assert(pace > 0, `${label}: часы идут`);
+  await page.keyboard.press('KeyB');
+  assert.equal((await layers()).includes('constructor'), !run, `${label}: B — производство`);
+  for (let i = 0; i < 4 && (await layers()).length; i++) await page.keyboard.press('Escape');
+  await page.keyboard.press('Space');
+  assert.equal(await page.evaluate(() => window.__szTest.speed()), 0, `${label}: пробел — пауза`);
+  await page.keyboard.press('Space');
+  assert.equal(await page.evaluate(() => window.__szTest.speed()), pace, `${label}: пробел продолжает`);
+  if (run) {
+    await page.keyboard.press('KeyM');
+    await page.keyboard.press('Digit2');
+    assert.deepEqual(await layers(), [], `${label}: M молчит`);
+    assert.equal(await page.evaluate(() => window.__szTest.speed()), pace, `${label}: 2 молчит`);
+  }
 }
 
 /** Выход в меню путём игрока на десктопе: «Выход» в колонке инструментов. */
@@ -724,6 +747,11 @@ try {
     await page.locator('#spd-dev').click();
     assert(await page.locator('#spd-dev.on').isVisible(), 'дев-забег: ▶▶▶ включает свой темп');
     assert(await page.locator('#spd-pause').isVisible(), 'пауза — в полосе скорости');
+    // Пробел (UIX-9.1) — та же «‖» забега: продолжает с ▶▶▶, а не с ▶.
+    await page.keyboard.press('Space');
+    assert.equal(await page.evaluate(() => window.__szTest.speed()), 0, 'дев-забег: пробел — пауза');
+    await page.keyboard.press('Space');
+    assert(await page.locator('#spd-dev.on').isVisible(), 'дев-забег: пробел продолжает с ▶▶▶');
     // Дев-забег не пишет профиль — и попыткой для аналитики он тоже не считается.
     const devEvents = await page.evaluate(() => window.__szTest.events());
     assert.equal(devEvents.filter((e) => e.event === 'pve_started').length, 2, 'дев-забег — не попытка');
@@ -754,7 +782,8 @@ try {
       ' аналитика забега — сессия, старт, один исход, открытия, шаг обучения;' +
       ' «+» у Суверенов даёт ролик прямо в забеге; пакет снабжения за 5 ◆ — из карточки ресурса; итог забега — по частям, ×2 за ролик прямо на итогах, глава повторяется с итогов и отмечена пройденной;' +
       ' без флота — карточка «Отстроиться / Завершить экспедицию», сдача ставит поражение с итогами; гарнизон мира — плитками с подписью, полоской и числами корпуса; карта главы показывает накопленную разведку; в дев-забеге есть ▶▶▶; время забега — реальные минуты;' +
-      ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап\n',
+      ' «Обучение» открывает полигон с героем и объявленным противником; подсказка этапов сворачивается и пропускает этап;' +
+      ' горячие клавиши ПК — только кнопки режима: в забеге B, M и 2 молчат, пробел — пауза с прежним темпом\n',
   );
 } finally {
   await browser.close();
