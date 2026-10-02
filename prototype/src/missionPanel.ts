@@ -128,12 +128,15 @@ export function initMissionPanel(host: MissionPanelHost): MissionPanel {
     // На широком экране панель встаёт прямо под чипом: справа её место занято досье Роя.
     // Узкий экран — во всю ширину (CSS), позицию не трогаем.
     const chip = document.querySelector('#devline .dl-missions');
+    // Чип и экран меряются в экранных px, а панель под зумом ПК (UIX-2.1) — в своих,
+    // растянутых зумом: делим на него, иначе панель уезжала бы вправо и вниз от чипа.
     if (next && chip && window.innerWidth > 700) {
+      const zoom = panel.currentCSSZoom || 1;
       const r = chip.getBoundingClientRect();
-      const width = Math.min(360, window.innerWidth - 24);
-      panel.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - width - 12))}px`;
+      const width = Math.min(360 * zoom, window.innerWidth - 24);
+      panel.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - width - 12)) / zoom}px`;
       panel.style.right = 'auto';
-      panel.style.top = `${r.bottom + 8}px`;
+      panel.style.top = `${(r.bottom + 8) / zoom}px`;
     }
   }
 
