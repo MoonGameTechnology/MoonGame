@@ -1927,13 +1927,18 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .swarm-biology summary{cursor:pointer;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);}
 .swarm-biology p{font-size:12px;line-height:1.5;color:var(--ink);}
 .swarm-biology h4{margin:10px 0 4px;font-size:12px;color:var(--cyan);}
-/* scientist council picker (setup-time, over the start-point screen) */
+/* scientist council picker (setup-time, over the start-point screen). В палитре хаба, как
+   настройка схватки (UIX-15.2): окно, слоты и карточки из токенов --sf-*. */
 #scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
 #scipick.show{display:flex;}
 #scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
-  background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
-#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+  font-family:var(--sf-font);font-variant-numeric:tabular-nums;color:var(--sf-text);background:var(--sf-panel);
+  border:1px solid var(--sf-panel-edge);border-radius:18px;box-shadow:var(--sf-shadow);}
+#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;
+  padding:10px 12px 10px 18px;border-bottom:1px solid var(--sf-edge);background:none;}
+#scipick .lw-head b{font-size:18px;font-weight:700;letter-spacing:0;color:var(--sf-hi);}
+#scipick button:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
 /* Досье Роя открывается СПРАВА (заказ владельца 2026-09-23): на телефоне — выдвижная
    панель во всю высоту у правого края, на ПК — приколото в правом столбце (ниже).
    Без затемнения (жалоба владельца 2026-09-24: «экран чернеет, будто поверх открывается
@@ -1973,35 +1978,51 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #swarm-dossier-body,#scipickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
 .sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px;}
 .sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
-.sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
-.sp-slot{min-height:96px;border-radius:11px;padding:12px;display:flex;flex-direction:column;gap:5px;position:relative;}
-.sp-slot.empty{border:1.5px dashed var(--cyan-dim);background:rgba(53,214,230,.03);align-items:center;justify-content:center;text-align:center;color:var(--cyan-dim);}
-.sp-slot.empty .sp-plus{font-size:22px;color:var(--cyan);line-height:1;}
-.sp-slot.empty .sp-hint{font-size:10.5px;letter-spacing:1px;}
-@media (prefers-reduced-motion:no-preference){.sp-slot.empty{animation:sppulse 1.5s ease-in-out infinite;}}
-@keyframes sppulse{0%,100%{border-color:var(--cyan-dim);box-shadow:0 0 0 0 rgba(53,214,230,0);}50%{border-color:var(--cyan);box-shadow:0 0 18px 1px rgba(53,214,230,.30);background:rgba(53,214,230,.08);}}
-.sp-slot.filled{border:1px solid var(--cyan);background:linear-gradient(180deg,rgba(53,214,230,.10),rgba(53,214,230,.03));}
+#scipick .sp-cancel{min-height:40px;padding:0 14px;border-color:var(--sf-edge);border-radius:10px;background:var(--sf-card);
+  color:var(--sf-text);font-size:14px;}
+#scipick .sp-cancel:hover{border-color:var(--sf-edge-hi);color:var(--sf-hi);}
+#scipick .sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+#scipick .sp-slot{position:relative;display:flex;flex-direction:column;gap:6px;min-height:104px;padding:14px 16px;border-radius:14px;}
+#scipick .sp-slot.empty{align-items:center;justify-content:center;text-align:center;color:var(--sf-accent);
+  border:1.5px dashed color-mix(in srgb,var(--sf-accent) 55%,transparent);background:color-mix(in srgb,var(--sf-accent) 4%,transparent);}
+#scipick .sp-slot.empty .sp-plus{font-size:22px;line-height:1;}
+#scipick .sp-slot.empty .sp-hint{font-size:14px;font-weight:600;}
+@media (prefers-reduced-motion:no-preference){#scipick .sp-slot.empty{animation:sppulse 1.5s ease-in-out infinite;}}
+@keyframes sppulse{0%,100%{border-color:color-mix(in srgb,var(--sf-accent) 55%,transparent);box-shadow:0 0 0 0 transparent;}
+  50%{border-color:var(--sf-accent);box-shadow:0 0 18px 1px color-mix(in srgb,var(--sf-accent) 30%,transparent);
+  background:color-mix(in srgb,var(--sf-accent) 8%,transparent);}}
+#scipick .sp-slot.filled{border:1px solid var(--sf-accent);background:var(--sf-primary);box-shadow:var(--sf-glow);}
 /* name reserves the ✕-corner (long names like «Командир крыла» wrapped UNDER the
    remove button and made it look misplaced) */
-.sp-slot .sp-sn{font-weight:700;color:#eafffb;font-size:13px;padding-right:24px;}
-.sp-slot .sp-inf{font-size:10px;color:var(--dim);line-height:1.4;}
-.sp-rm{position:absolute;top:7px;right:7px;width:18px;height:18px;border-radius:5px;border:1px solid var(--line-hi);background:transparent;color:var(--dim);cursor:pointer;font-size:10px;line-height:1;padding:0;display:grid;place-items:center;}
-.sp-rm:hover{border-color:var(--red);color:var(--red);}
-.sp-warn{margin-top:12px;display:flex;gap:8px;padding:10px 12px;border:1px solid #6a4a17;border-radius:9px;background:rgba(255,180,58,.09);color:#f4d199;font-size:11.5px;line-height:1.5;}
-.sp-h{margin:15px 0 8px;font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);}
-.sp-roster{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-/* усиление забега (PVR-1.4): те же карточки, что у совета, в один столбец —
-   выбор здесь делается в бою, и колонка читается быстрее решётки. */
-.sp-card{text-align:left;cursor:pointer;border:1px solid var(--line-hi);border-radius:9px;padding:9px 10px;background:rgba(53,214,230,.04);color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:3px;}
-.sp-card:hover:not(:disabled){border-color:var(--cyan);background:rgba(53,214,230,.11);box-shadow:0 0 12px rgba(53,214,230,.16);}
-.sp-card:disabled{opacity:.34;cursor:not-allowed;}
-.sp-card.picked{border-color:var(--cyan-dim);}
-.sp-card .sp-cn{display:flex;align-items:center;gap:6px;font-weight:700;font-size:12px;color:#eafffb;}
-.sp-card .sp-tick{margin-left:auto;color:var(--grn);font-size:11px;}
-.sp-card .sp-inf{font-size:9.5px;color:var(--dim);line-height:1.4;}
-.sp-go{margin-top:15px;width:100%;padding:12px;border-radius:9px;cursor:pointer;border:1px solid var(--cyan);background:rgba(53,214,230,.12);color:var(--cyan);font:inherit;font-weight:700;font-size:12.5px;letter-spacing:1px;text-transform:uppercase;}
-.sp-go:hover:not(:disabled){background:rgba(53,214,230,.2);box-shadow:0 0 16px rgba(53,214,230,.28);}
-.sp-go:disabled{opacity:.4;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+#scipick .sp-slot .sp-sn{padding-right:36px;font-size:16px;font-weight:700;color:var(--sf-hi);}
+#scipick .sp-slot .sp-inf{font-size:14px;line-height:1.45;color:var(--sf-text);}
+#scipick .sp-rm{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:32px;height:32px;padding:0;
+  border:1px solid var(--sf-edge-hi);border-radius:9px;background:var(--sf-inset);color:var(--sf-text);cursor:pointer;
+  font:inherit;font-size:14px;line-height:1;}
+#scipick .sp-rm:hover{border-color:var(--red);color:var(--red);}
+#scipick .sp-warn{display:flex;gap:8px;margin-top:12px;padding:12px 14px;border:1px solid #6a4a17;border-radius:12px;
+  background:rgba(255,180,58,.09);color:#f4d199;font-size:14px;line-height:1.45;}
+#scipick .sp-h{margin:16px 0 10px;font-size:14px;font-weight:600;line-height:1.4;color:var(--sf-head);}
+/* Ростер — две колонки, а в узком окне (телефон) одна: в половине телефона описание
+   кандидата шло в пять строк по одному слову. */
+#scipick .sp-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,max(200px,calc(50% - 4px))),1fr));gap:8px;}
+#scipick .sp-card{display:flex;flex-direction:column;gap:4px;min-height:72px;padding:12px 14px;border:1px solid var(--sf-edge);
+  border-radius:12px;background:var(--sf-card);color:var(--sf-text);font:inherit;text-align:left;cursor:pointer;}
+#scipick .sp-card:hover:not(:disabled){border-color:var(--sf-edge-hi);}
+#scipick .sp-card .sp-cn{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;line-height:1.3;}
+#scipick .sp-card .sp-tick{display:grid;place-items:center;flex:none;width:20px;height:20px;margin-left:auto;border-radius:50%;
+  background:var(--sf-accent);color:var(--void);font-size:12px;font-weight:800;}
+#scipick .sp-card .sp-inf{font-size:14px;line-height:1.45;color:var(--sf-dim);}
+/* Полный совет гасит остальных, но имя и влияние читаются: по ним выбирают замену. */
+#scipick .sp-card:disabled{cursor:not-allowed;border-style:dashed;background:var(--sf-card-off);color:var(--sf-dim);}
+#scipick .sp-card.picked{border-style:solid;border-color:var(--sf-accent);background:var(--sf-sel);color:var(--sf-hi);}
+#scipick .sp-card.picked .sp-inf{color:var(--sf-text);}
+#scipick .sp-go{width:100%;min-height:52px;margin-top:14px;padding:0 16px;border:1px solid var(--sf-accent);border-radius:12px;
+  background:var(--sf-primary);color:var(--sf-hi);font:inherit;font-size:16px;font-weight:700;box-shadow:var(--sf-glow);cursor:pointer;}
+#scipick .sp-go:hover:not(:disabled){background:var(--sf-primary-hi);}
+#scipick .sp-go:disabled{opacity:.45;box-shadow:none;cursor:not-allowed;}
+@media (prefers-reduced-motion:no-preference){
+  #scipick :is(.sp-card,.sp-rm,.sp-cancel,.sp-go){transition:border-color .15s,background-color .15s,color .15s;}}
 /* Торговец экспедиции («живой курс»): окно того же вида, что рынок (#market). */
 #trader{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
