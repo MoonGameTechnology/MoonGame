@@ -73,7 +73,16 @@ export type LayerVerdict =
 // `missions` — панель задач забега (`#missionpanel`): раскрытость у неё атрибут `hidden`, а не
 // класс, и опись CSS её не видит. Без ветки в лестнице Escape её не закрывал (нашёл прогон
 // «потыкать все кнопки», 2026-09-25).
-export const EXTRA_LAYERS: readonly string[] = ['chain', 'aim', 'rail', 'mobile-picker', 'missions'];
+// `phone-more` — лист «Ещё» нижней панели телефона (`#phone-more`, UIX-3.1): узел создаёт
+// `phoneNav.ts`, открытость — атрибут `hidden`, стили — в `mobile-console.css`, вне описи.
+export const EXTRA_LAYERS: readonly string[] = [
+  'chain',
+  'aim',
+  'rail',
+  'mobile-picker',
+  'missions',
+  'phone-more',
+];
 
 /**
  * ОПИСЬ ВСЕХ ОВЕРЛЕЕВ. Ключ — id из CSS (`prototype/build.mjs`), значение — вердикт.

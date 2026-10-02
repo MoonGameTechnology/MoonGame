@@ -1,4 +1,4 @@
-/* global window, document, localStorage, innerWidth, innerHeight -- browser */
+/* global window, document, localStorage, innerWidth, innerHeight, getComputedStyle -- browser */
 import assert from 'node:assert/strict';
 
 import { enterSkirmish } from './harnessKit.mjs';
@@ -21,9 +21,23 @@ export async function checkMobileStrategy(browser, url) {
     await enterSkirmish(page, { tap: true });
     await page.locator('#spd-pause').tap();
   };
+  // На телефоне окна открывает нижняя панель (UIX-3.1): «Наука» и «Производство» — её
+  // разделы, рынок и дипломатия — плитки листа «Ещё». На ПК — колонка рельсы, как раньше.
+  const PHONE_PATH = {
+    tech: ['science'],
+    constructor: ['production'],
+    market: ['more', 'market'],
+    diplo: ['more', 'diplomacy'],
+  };
   const open = async (id) => {
-    if (!(await page.locator('#rail-' + id).isVisible())) await page.locator('#railtoggle').tap();
-    await page.locator('#rail-' + id).tap();
+    if (await page.locator('#phone-nav').isVisible()) {
+      const [tab, item] = PHONE_PATH[id];
+      await page.locator(`#phone-nav [data-phone-tab="${tab}"]`).tap();
+      if (item) await page.locator(`#phone-more [data-phone-more="${item}"]`).tap();
+    } else {
+      if (!(await page.locator('#rail-' + id).isVisible())) await page.locator('#railtoggle').tap();
+      await page.locator('#rail-' + id).tap();
+    }
     if (await page.locator('#intro.show').isVisible()) await page.locator('#intro .in-ok').tap();
   };
   const dismissIntro = async () => {
@@ -89,6 +103,76 @@ export async function checkMobileStrategy(browser, url) {
     const box = await page.locator(selector).boundingBox();
     assert(box.width >= 43 && box.height >= 43, selector + ' is a 44px touch target');
   };
+  // UIX-3.1: внизу пять разделов с подписями от 12 px целиком, в «Ещё» — Настройки и Выход.
+  // Всплывающее сообщение лежит там, где в альбомной ориентации стоят плитки «Ещё»: лист
+  // обязан быть над ним, иначе сообщение закрывает плитку и ловит нажатие.
+  const phoneNav = async () => {
+    const tabs = await page.locator('#phone-nav button:not([hidden])').evaluateAll((els) =>
+      els.map((b) => {
+        const label = b.querySelector('span');
+        const r = b.getBoundingClientRect();
+        return {
+          tab: b.dataset.phoneTab,
+          size: parseFloat(getComputedStyle(label).fontSize),
+          clipped: label.scrollWidth > label.clientWidth + 1,
+          width: r.width,
+          height: r.height,
+        };
+      }),
+    );
+    assert.deepEqual(
+      tabs.map((x) => x.tab),
+      ['map', 'production', 'science', 'events', 'more'],
+    );
+    for (const x of tabs) {
+      assert(
+        x.size >= 12 && !x.clipped,
+        'bottom bar label is 12px+ and whole: ' + JSON.stringify(x),
+      );
+      assert(
+        x.width >= 43 && x.height >= 43,
+        'bottom bar tab is a 44px touch target: ' + JSON.stringify(x),
+      );
+    }
+    await page.evaluate(() => {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.dataset.probe = '1';
+      toast.textContent = '✦ 1100';
+      document.getElementById('toasts').appendChild(toast);
+    });
+    await page.locator('#phone-nav [data-phone-tab="more"]').tap();
+    await fits('#phone-more .phone-more-panel');
+    const tiles = await page.locator('#phone-more [data-phone-more]').evaluateAll((els) =>
+      els.map((b) => {
+        b.scrollIntoView({ block: 'nearest' });
+        const r = b.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return {
+          id: b.dataset.phoneMore,
+          covered: !b.contains(hit),
+          width: r.width,
+          height: r.height,
+        };
+      }),
+    );
+    for (const id of ['settings', 'exit'])
+      assert(
+        tiles.some((x) => x.id === id),
+        'More holds ' + id + ': ' + JSON.stringify(tiles),
+      );
+    for (const x of tiles) {
+      assert(!x.covered, 'More tile is not covered: ' + JSON.stringify(x));
+      assert(
+        x.width >= 43 && x.height >= 43,
+        'More tile is a 44px touch target: ' + JSON.stringify(x),
+      );
+    }
+    await touchTarget('#phone-more [data-phone-close]');
+    await page.locator('#phone-more [data-phone-close]').tap();
+    assert(!(await page.locator('#phone-more').isVisible()));
+    await page.evaluate(() => document.querySelector('#toasts [data-probe]')?.remove());
+  };
   try {
     for (const locale of ['ru', 'en']) {
       await enter(locale);
@@ -100,6 +184,7 @@ export async function checkMobileStrategy(browser, url) {
         await page.setViewportSize(viewport);
         console.log('STRATEGY_LAYOUT', locale, viewport.width, viewport.height);
         await topBarReadable();
+        await phoneNav();
         for (const [id, box, close] of [
           ['tech', '.twbox', '.tw-close'],
           ['constructor', '.cnbox', '.cn-close'],
@@ -189,7 +274,7 @@ export async function checkMobileStrategy(browser, url) {
     assert(desktop.width < 1000 && desktop.height < 790);
     assert.deepEqual(errors, []);
     console.log(
-      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, top bar row 1, all tabs, dossiers, keyboard-size viewport, market/research actions and desktop restoration',
+      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, top bar row 1, bottom bar and More over toasts, all tabs, dossiers, keyboard-size viewport, market/research actions and desktop restoration',
     );
   } catch (error) {
     await page.screenshot({ path: 'prototype/dist/mobile-strategy-failure.png' });

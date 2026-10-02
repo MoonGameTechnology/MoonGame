@@ -93,10 +93,10 @@
 | UIX-1.3 | 🔒 | proto | `docs/backlog.md` | Цели нажатия 44 × 44 px на телефоне. |
 | UIX-2.1 | ✅ | proto | `docs/backlog.md` | ПК: голографический интерфейс растёт с окном. |
 | UIX-2.2 | ✅ | proto | `docs/backlog.md` | «Размер интерфейса» 80–150 % в настройках ПК. |
-| UIX-3.1 | ⏳ | proto | `docs/backlog.md` | Телефон: нижняя панель из пяти пунктов. |
-| UIX-3.2 | 🔒 | proto | `docs/backlog.md` | Скорость — одна кнопка. |
+| UIX-3.1 | ✅ | proto | `docs/backlog.md` | Телефон: нижняя панель из пяти пунктов. |
+| UIX-3.2 | ⏳ | proto | `docs/backlog.md` | Скорость — одна кнопка. |
 | UIX-4.1 | ⏳ | proto | `docs/backlog.md` | Доход в час на телефоне и отклик «+N». |
-| UIX-4.2 | 🔒 | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
+| UIX-4.2 | ⏳ | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
 | UIX-4.3 | ⏳ | srv | `docs/backlog.md` | Push только о своём и срочном. |
 | UIX-4.4 | 🔒 | proto | `docs/backlog.md` | Подписка на push в клиенте. |
 | UIX-5.1 | ✅ | proto data | `docs/backlog.md` | Ключ вместо слова в верфи. |

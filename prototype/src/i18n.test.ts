@@ -13,6 +13,7 @@ import { FIRST_GOALS } from './firstGoals';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildFirstMatchTour } from './firstMatchTour';
 import { refusalKeyOf } from '../../decisions/refusalText';
+import { PHONE_MORE, PHONE_TABS } from '../../decisions/phoneNav';
 
 /** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
 const TOUR_DEPS_STUB = {
@@ -430,6 +431,7 @@ describe('локализация — ключи', () => {
       ['INTROS', INTROS.flatMap((c) => [c.titleKey, c.bodyKey])],
       ['FIRST_GOALS', FIRST_GOALS.map((g) => g.labelKey)],
       ['HUD_ORIENTATION_TOUR', HUD_ORIENTATION_TOUR.map((s) => s.copy)],
+      ['PHONE_NAV', [...PHONE_TABS, ...PHONE_MORE].map((item) => item.label)],
       ['firstMatchTour', buildFirstMatchTour(TOUR_DEPS_STUB).map((s) => s.copy)],
     ];
     const bad: string[] = [];

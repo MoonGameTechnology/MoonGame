@@ -2513,6 +2513,7 @@ export const en: Record<string, string> = {
   'hud.window.move': 'Move window — drag the title bar or use the arrow keys',
   'hud.main-menu': 'Main menu',
   'hud.map': 'Map',
+  'hud.sections': 'Match sections',
   'hud.tools': 'More',
   'hud.crest.title': 'Your profile',
   'hud.deficit': '⚠ SHORTAGE — consuming buildings run at 50%',
@@ -2790,8 +2791,8 @@ export const en: Record<string, string> = {
   'rail.abandon.title': 'End the expedition',
   'rail.help.label': 'Help',
   'rail.help.title': 'Codex',
-  'rail.log.label': 'Dispatches',
-  'rail.log.title': 'Dispatches',
+  'rail.log.label': 'Events',
+  'rail.log.title': 'Events',
   'rail.market.label': 'Market',
   'rail.market.title': 'Market',
   'rail.trader.label': 'Trader',
@@ -3332,6 +3333,7 @@ export const en: Record<string, string> = {
   'steward.duration': 'Delegate for',
   'steward.duration.hours': '{h} h',
   'steward.locked': 'The “Steward Protocol” is not researched yet.',
+  'steward.name': 'Steward',
   'steward.locked.go': 'Open technologies',
   'steward.locked.how':
     'Research it in the technology window — then you can hand your seat to the AI while you sleep.',
@@ -3537,7 +3539,7 @@ export const en: Record<string, string> = {
 
   // --- win — Заголовки окон матча (сводки, технологии, хранитель, конструкторы).
   'win.log.recap': 'Return digest',
-  'win.log.title': 'DISPATCHES',
+  'win.log.title': 'EVENTS',
   'win.scipick.back': '↩ Menu',
   'win.scipick.title': 'Science council',
   'win.steward.title': 'STEWARD · AI WHILE ASLEEP',
