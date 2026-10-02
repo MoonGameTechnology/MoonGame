@@ -20,7 +20,8 @@
  * lookups from untrusted payload use `ownFleet` (own-key, A06/A08 — a poisoned
  * id like `__proto__` reads as no-fleet); `fleet.engage`'s battle creation is
  * self-contained here rather than reusing `combat.ts`'s private `startBattle`
- * (modules don't import each other — invariant #3); the prototype's
+ * (modules don't import each other — invariant #3), and the combat module pulls
+ * the bystanders into it through the `battle.pullIn` capability (ATK-3); the prototype's
  * division-carrier re-pointing on merge is dropped — the canonical core has
  * no division/army-carrier concept (that's prototype-only state,
  * `docs/backlog.md` REFP-13). Hero re-pointing on merge IS kept: heroes are
@@ -37,6 +38,7 @@ import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
 import { hangarSize, strikesReserved } from '../state/shuttle';
 import { isMineFleet } from '../state/minefields';
+import type { BattlePullIn } from './combat';
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
@@ -44,7 +46,9 @@ export const fleetOpsModule: GameModule = {
   // 1.4.0: атака мины — подрыв по атакующему, мина сама не атакует (SM-3.6).
   // 1.5.0: флот на высадке штурмом не сливается (замечание Codex на #1409).
   // 1.6.0: слияние, приостановленное высадкой, созревает по её концу (замечание Codex на #1415).
-  version: '1.7.0',
+  // 1.8.0: бой «Атаки» втягивает ждавших у мира, «Атака» по дерущейся цели вступает в её бой
+  // (ATK-3).
+  version: '1.8.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -524,7 +528,7 @@ export const fleetOpsModule: GameModule = {
       }
       // ASSAULT-1: флот, чей десант дерётся на земле, для орбитального боя свободен —
       // то же правило, что у автосцепки на прибытии (`shipsEngaged`).
-      if (shipsEngaged(h.state, f) || shipsEngaged(h.state, target)) {
+      if (shipsEngaged(h.state, f)) {
         return h.reject('E_IN_BATTLE');
       }
       if (!f.location || f.movement || target.movement || f.location !== target.location) {
@@ -535,6 +539,16 @@ export const fleetOpsModule: GameModule = {
       if (isMineFleet(f, h.ctx.data)) return h.reject('E_MINE_PASSIVE');
       if (isMineFleet(target, h.ctx.data)) {
         h.emit('mine.contact', { fleetId: f.id, mines: [target.id], at: f.location, owner: f.owner });
+        return;
+      }
+      // ATK-3: бой у мира втягивает ждавших рядом (S3, MSB-3) — и бой «Атаки» тоже, как бой
+      // прибытия. Втягивает модуль боя; без него втягивать некому.
+      const pullIn = h.capability<BattlePullIn>('battle.pullIn');
+      // Цель уже дерётся у этого мира — «Атака» вступает в её бой, как вступил бы прибывший:
+      // идущий бой важнее новой дуэли. Вступить некуда — прежний отказ.
+      if (shipsEngaged(h.state, target)) {
+        pullIn?.(f.location, h);
+        if (!shipsEngaged(h.state, f)) return h.reject('E_IN_BATTLE');
         return;
       }
       const battleId = `battle:${h.state.battleSeq++}`;
@@ -566,6 +580,7 @@ export const fleetOpsModule: GameModule = {
         attacker: f.owner,
         defender: target.owner,
       });
+      pullIn?.(f.location, h);
     });
   },
 };
