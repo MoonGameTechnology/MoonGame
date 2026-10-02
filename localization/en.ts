@@ -1258,32 +1258,32 @@ export const en: Record<string, string> = {
 
   // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
   'dossier.building.barracks':
-    'Trains infantry — without barracks it cannot be ordered. {hp} structure HP.',
+    'Trains infantry. {hp} structure HP.',
   'dossier.building.default': 'A planetary structure.',
   'dossier.building.fabricator':
-    'Prints {m}▦ per hour. Upkeep is energy and food; microelectronics go into shuttles and siege doctrines.',
+    'Prints {m}▦ per hour for shuttles and siege doctrines. Consumes energy and food.',
   'dossier.building.farm':
-    'Hydroponic tiers: {f}❖ per hour. Food feeds ground troops and the Microelectronics Fab.',
+    'Grows {f}❖ per hour. Food is consumed by ground troops and the Microelectronics Fab.',
   'dossier.building.fort':
-    'A layered planetary bastion: damage to the world from ground assault and orbital bombardment is {d} lower, {hp} structure HP. Every other intact building cuts another {b}, up to {cap} in total.',
+    'A planetary bastion: damage to the world from ground assault and orbital bombardment is {d} lower, {hp} structure HP. Every other intact building adds {b}, up to {cap} in total.',
   'dossier.building.metal-station':
-    "A rig on a dead world's scorched crust: {m}⬢ per hour.",
+    "Mines {m}⬢ per hour from a dead world's crust.",
   'dossier.building.mine':
-    'A drilling rig: {m}⬢ per hour.',
+    'Mines {m}⬢ per hour.',
   'dossier.building.orbital-aa':
-    "Hits SHIPS in orbit: {dmg} damage per hour. Can't reach shuttles — that is area defense's job; does not block capture.",
+    'Deals {dmg} damage per hour to ships in orbit. Does not fire on shuttles or block capture.',
   'dossier.building.zonal-aa':
-    "Hits SHUTTLES diving into the world's airspace: {dmg} damage to the wave as it strikes. Without it shuttles leave intact. Ships in orbit are orbital interdiction's job.",
+    'Deals {dmg} damage to a shuttle wave striking the world. Does not fire on ships in orbit.',
   'dossier.building.power-plant':
-    'A fusion reactor: {e}↯ per hour. Short on energy for upkeep — buildings run at half output.',
+    'Generates {e}↯ per hour. When energy runs short, buildings run at half strength.',
   'dossier.building.radar':
-    'Range {r}. Level {lv}: {s}. Ships within 40 units of a group anchor combine their signals: medium starts at 5, high at 13. Close identification reveals composition.',
+    'Range {r}. Level {lv}: {s}. Ships within 40 units of a group anchor combine their signals: medium from 5, high from 13. Close identification reveals composition.',
   'dossier.building.refinery':
-    'A refining complex: {c}¤ per hour.',
+    'Yields {c}¤ per hour.',
   'dossier.building.starfort':
-    'The hull of a void fortress: {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level; never built on its own.',
+    'The hull of a void fortress: {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level.',
   'dossier.building.tax-office':
-    "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
+    "Raises the world's credit take by {b}.",
   'dossier.fleet.desc':
     'A mobile task force of ships. Select it to give maneuver, orbit and strike orders.',
   'dossier.fleet.name': 'Fleet',
