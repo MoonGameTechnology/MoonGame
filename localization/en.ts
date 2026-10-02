@@ -1679,6 +1679,10 @@ export const en: Record<string, string> = {
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
   'profile.title': 'Profile',
+  'profile.tabs': 'Profile sections',
+  'profile.tab.portrait': 'Portrait',
+  'profile.tab.medals': 'Medals',
+  'profile.tab.career': 'Career',
   "profile.portraits": "40 portraits",
   "profile.slots": "Uniform medals · 5 × 3",
   "profile.slot": "Slot {n}",

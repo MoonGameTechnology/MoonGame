@@ -34,7 +34,15 @@ import {
   type ProfileAppearance,
 } from '../../packages/protocol/src/playerProfile';
 import { parsePlayerProfile, placeProfileMedal } from '../../decisions/playerProfile';
-import { profileStudioHtml } from './profileStudio';
+import {
+  parseProfileTab,
+  profileSaveBarHtml,
+  profileStudioHtml,
+  PROFILE_TABS,
+  type ProfileTab,
+  type StudioState,
+} from './profileStudio';
+import { PORTRAITS } from './profileArt';
 
 /** One medal as the server reports it: an id plus display text. */
 export interface MedalEntry {
@@ -54,7 +62,11 @@ export interface ProfileView {
   /** Medal ids the account holds, and the full catalog to show them against. */
   owned: readonly string[];
   catalog: readonly MedalEntry[];
-  /** Generated locally from validated data, never server-provided HTML. */
+  /** Header portrait, a static asset URL; without it the avatar is the callsign's first
+   *  letter. */
+  face?: string;
+  /** The editor (`profileStudioHtml`), which places the career block itself. Generated
+   *  locally from validated data, never server-provided HTML. */
   studio?: string;
 }
 
@@ -89,15 +101,11 @@ export function pfCell(label: string, value: string | null, accent = false): str
   );
 }
 
-/** The dossier body — pure string building over an already-gathered view. */
-export function profileHtml(v: ProfileView): string {
-  const nick = v.nick.trim() || t('auth.commander');
+/** Career numbers and the corporation's medal showcase. `titled` heads them with the
+ *  dossier title where they stand under the card; the owner's Career tab is its own
+ *  title (UIX-15.3). */
+export function profileCareerHtml(v: ProfileView, titled = true): string {
   const stats = v.stats;
-  const league = t(leagueKey(metaLevel(v.xp)));
-  // Subtitle mirrors the mock: «<corp> · Лига: <band>», degrading to the league
-  // alone when this commander flies without a corporation.
-  const sub =
-    (v.corp ? `${esc(v.corp.name)} · ` : '') + `${esc(t('profile.league'))}: ${esc(league)}`;
   const avg = averagePlace(stats);
   const played = stats.matches > 0;
   const medals = v.catalog.length
@@ -114,15 +122,7 @@ export function profileHtml(v: ProfileView): string {
         .join('')
     : '';
   return (
-    `<button class="pf-close" type="button" aria-label="${esc(t('card.close'))}">✕</button>` +
-    `<div class="pf-top">` +
-    `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>` +
-    `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div></div>` +
-    `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>` +
-    `</div>` +
-    `<div class="pf-body">` +
-    (v.studio ?? '') +
-    `<div class="pf-h">${esc(t('profile.title'))}</div>` +
+    (titled ? `<div class="pf-h">${esc(t('profile.title'))}</div>` : '') +
     `<div class="pf-grid">` +
     pfCell(t('profile.matches'), String(stats.matches)) +
     pfCell(t('profile.winrate'), played ? `${winRate(stats)}%` : null, true) +
@@ -136,7 +136,29 @@ export function profileHtml(v: ProfileView): string {
     `<div class="pf-sec">${esc(t('profile.medals'))}</div>` +
     (medals
       ? `<div class="pf-medals">${medals}</div>`
-      : `<p class="pf-hint">${esc(t('profile.medals.empty'))}</p>`) +
+      : `<p class="pf-hint">${esc(t('profile.medals.empty'))}</p>`)
+  );
+}
+
+/** The dossier — pure string building over an already-gathered view. */
+export function profileHtml(v: ProfileView): string {
+  const nick = v.nick.trim() || t('auth.commander');
+  const league = t(leagueKey(metaLevel(v.xp)));
+  // Subtitle mirrors the mock: «<corp> · Лига: <band>», degrading to the league
+  // alone when this commander flies without a corporation.
+  const sub =
+    (v.corp ? `${esc(v.corp.name)} · ` : '') + `${esc(t('profile.league'))}: ${esc(league)}`;
+  return (
+    `<button class="pf-close" type="button" aria-label="${esc(t('card.close'))}">✕</button>` +
+    `<div class="pf-top">` +
+    (v.face
+      ? `<div class="pf-av face"><img src="${esc(v.face)}" alt=""></div>`
+      : `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>`) +
+    `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div></div>` +
+    `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(v.sovereigns)}</b><em>+</em></div>` +
+    `</div>` +
+    `<div class="pf-body">` +
+    (v.studio ?? profileCareerHtml(v)) +
     `</div>`
   );
 }
@@ -181,6 +203,13 @@ export function initProfile(host: ProfileHost): {
   let preview = false;
   let selected = 0;
   let notice = '';
+  // Kept across opens: the dossier comes back on the section the player left.
+  let tab: ProfileTab = 'portrait';
+  // One-shot motion for the next paint: the stage after a new portrait, the slot that
+  // just took a medal. The dossier repaints whole on every click, so motion keyed to
+  // state alone would replay on each one.
+  let flash: { stage?: boolean; slot?: number } = {};
+  let barShown = false;
   const currentIdentity = (): string => host.identity?.() ?? host.view().nick;
   const current = (n: number): boolean => n === generation && identity === currentIdentity();
   const appearance = (): ProfileAppearance => ({
@@ -189,17 +218,16 @@ export function initProfile(host: ProfileHost): {
   });
   const dirty = (): boolean => JSON.stringify(appearance()) !== JSON.stringify(saved);
 
-  const paint = (): void => {
+  const paint = (opts: { tabSwitched?: boolean } = {}): void => {
     const root = host.root();
     const bodyScroll = root.querySelector?.('.pf-body')?.scrollTop ?? 0;
-    const galleryScroll = root.querySelector?.('.ps-portraits')?.scrollTop ?? 0;
     const active =
       typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null);
     const focusData =
       active && root.contains?.(active) && active.tagName === 'BUTTON'
         ? JSON.stringify(active.dataset)
         : null;
-    const studio = profileStudioHtml(custom, {
+    const state: StudioState = {
       owner: target === undefined,
       preview,
       selected,
@@ -207,19 +235,50 @@ export function initProfile(host: ProfileHost): {
       saving,
       dirty: dirty(),
       notice,
-    });
-    host.root().innerHTML =
-      target === undefined
-        ? profileHtml({ ...host.view(), owned, catalog, studio })
-        : `<button class="pf-close" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div></div></div><div class="pf-body">${studio}<div class="pf-grid">${pfCell(t('profile.matches'), ready ? String(custom.progress.matches ?? 0) : null)}${pfCell(t('profile.wins'), ready ? String(custom.progress.wins ?? 0) : null)}${pfCell(t('profile.xp'), ready ? String(custom.xp) : null)}</div></div>`;
+      tab,
+    };
+    if (target === undefined) {
+      const view: ProfileView = {
+        ...host.view(),
+        owned,
+        catalog,
+        face: PORTRAITS[custom.portrait - 1],
+      };
+      const studio = profileStudioHtml(custom, state, profileCareerHtml(view, preview));
+      root.innerHTML = profileHtml({ ...view, studio }) + profileSaveBarHtml(state);
+    } else {
+      const grid = `<div class="pf-grid">${pfCell(t('profile.matches'), ready ? String(custom.progress.matches ?? 0) : null)}${pfCell(t('profile.wins'), ready ? String(custom.progress.wins ?? 0) : null)}${pfCell(t('profile.xp'), ready ? String(custom.xp) : null)}</div>`;
+      root.innerHTML = `<button class="pf-close" type="button" aria-label="${esc(t('card.close'))}">✕</button><div class="pf-top"><div class="pf-who"><div class="pf-nm">${esc(custom.login)}</div><div class="pf-sub">${esc(t('profile.public'))}</div></div></div><div class="pf-body">${profileStudioHtml(custom, state, grid)}</div>`;
+    }
     const body = root.querySelector?.('.pf-body');
-    const gallery = root.querySelector?.('.ps-portraits');
-    if (body) body.scrollTop = bodyScroll;
-    if (gallery) gallery.scrollTop = galleryScroll;
+    if (body) {
+      body.scrollTop = bodyScroll;
+      // A new tab opens at its top: scrolled past the tab bar, come back up to it.
+      const side = opts.tabSwitched ? root.querySelector('.ps-side') : null;
+      if (side)
+        body.scrollTop = Math.min(
+          body.scrollTop,
+          side.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop,
+        );
+    }
+    if (flash.stage) root.querySelector?.('.ps-stage')?.classList.add('ps-new');
+    if (flash.slot !== undefined)
+      root.querySelector?.(`[data-slot="${flash.slot}"]`)?.classList.add('ps-placed');
+    flash = {};
+    // The save bar rises once, when changes appear, not on every repaint after that.
+    const bar = root.querySelector?.('.ps-savebar');
+    if (bar && !barShown) bar.classList.add('ps-rise');
+    barShown = !!bar;
     if (focusData)
       Array.from(root.querySelectorAll('button'))
         .find((b) => JSON.stringify(b.dataset) === focusData)
         ?.focus({ preventScroll: true });
+  };
+
+  const openTab = (next: ProfileTab): void => {
+    if (target !== undefined || next === tab) return;
+    tab = next;
+    paint({ tabSwitched: true });
   };
 
   async function refreshMedals(session: { base: string; token: string }, n: number): Promise<void> {
@@ -333,6 +392,14 @@ export function initProfile(host: ProfileHost): {
       close();
       return;
     }
+    // Tabs only navigate, so they answer even while the profile loads or saves.
+    const tabId = parseProfileTab(
+      (tg.closest('[data-pstab]') as HTMLElement | null)?.dataset.pstab,
+    );
+    if (tabId) {
+      openTab(tabId);
+      return;
+    }
     const button = tg.closest('button') as HTMLButtonElement | null;
     if (!button || button.disabled || target !== undefined || saving || !current(generation))
       return;
@@ -355,6 +422,7 @@ export function initProfile(host: ProfileHost): {
     if (preview) return;
     if (button.dataset.portrait) {
       const next = parseAppearance({ ...appearance(), portrait: Number(button.dataset.portrait) });
+      if (next && next.portrait !== custom.portrait) flash.stage = true;
       if (next) custom = { ...custom, ...next };
     }
     if (button.dataset.slot !== undefined) {
@@ -364,10 +432,42 @@ export function initProfile(host: ProfileHost): {
     if (button.dataset.ps === 'remove')
       custom = { ...custom, ...placeProfileMedal(custom, selected, null) };
     const medal = PROFILE_MEDALS.find((m) => m.id === button.dataset.medal);
-    if (medal && medalGrade(medal.id, custom.progress))
+    if (medal && medalGrade(medal.id, custom.progress)) {
+      if (custom.slots[selected] !== medal.id) flash.slot = selected;
       custom = { ...custom, ...placeProfileMedal(custom, selected, medal.id) };
+    }
     notice = dirty() ? t('profile.unsaved') : '';
     paint();
+  });
+
+  // Arrow keys, Home and End walk the tabs (the WAI-ARIA tabs pattern); focus follows.
+  host.root().addEventListener('keydown', (ev) => {
+    const e = ev as KeyboardEvent;
+    const at = parseProfileTab(
+      (e.target as HTMLElement | null)?.closest?.<HTMLElement>('[data-pstab]')?.dataset.pstab,
+    );
+    if (!at) return;
+    const i = PROFILE_TABS.indexOf(at);
+    const last = PROFILE_TABS.length - 1;
+    const to =
+      e.key === 'ArrowRight'
+        ? i === last
+          ? 0
+          : i + 1
+        : e.key === 'ArrowLeft'
+          ? i === 0
+            ? last
+            : i - 1
+          : e.key === 'Home'
+            ? 0
+            : e.key === 'End'
+              ? last
+              : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    const next = PROFILE_TABS[to]!;
+    openTab(next);
+    (host.root().querySelector?.(`[data-pstab="${next}"]`) as HTMLElement | null)?.focus();
   });
 
   return {
