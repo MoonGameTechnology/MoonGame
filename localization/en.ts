@@ -1796,6 +1796,7 @@ export const en: Record<string, string> = {
   'res.per.day': '/d',
   'res.per.hour': '/h',
   'res.per.minute': '/min',
+  'res.of.biomass': 'biomass',
   'res.of.credits': 'credits',
   'res.of.energy': 'energy',
   'res.of.food': 'food',
@@ -1908,6 +1909,7 @@ export const en: Record<string, string> = {
   // --- stat — Характеристики юнита в компактных подписях.
   'stat.cargo': 'cargo',
   'stat.hp': 'hull',
+  'stat.point-defense': 'point defense',
   // Всплывашка надбавок по тапу на параметр флота (`decisions/statModifiers.ts`).
   'stat.pop.base': 'Base',
   'stat.pop.incoming': 'Incoming damage',

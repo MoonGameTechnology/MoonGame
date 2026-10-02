@@ -114,7 +114,11 @@ export function hullsOfTab(tab: YardTab): string[] {
 /** How many hulls one order may queue at once (the ± stepper's range). */
 const MAX_COUNT = 20;
 
-const RES_KEY: Record<string, string> = {
+// Подписи ресурса в ценнике и статов в чипе. Ключа нет — `t()` отдаёт его как есть
+// («+8 pointDefense», «25 biomass»), поэтому сторож в `shipyard.test.ts` сверяет оба
+// словаря со всеми статами модулей и ресурсами из `data/` (UIX-5.1).
+export const RES_KEY: Record<string, string> = {
+  biomass: 'res.of.biomass',
   metal: 'res.of.metal',
   credits: 'res.of.credits',
   energy: 'res.of.energy',
@@ -122,7 +126,7 @@ const RES_KEY: Record<string, string> = {
   microelectronics: 'res.of.microelectronics',
 };
 // Short stat labels for module-effect chips («+4 атака», «+15 щит»).
-const STAT_KEY: Record<string, string> = {
+export const STAT_KEY: Record<string, string> = {
   attack: 'div.stat.attack',
   defense: 'div.stat.defense',
   hp: 'stat.hp',
@@ -130,6 +134,8 @@ const STAT_KEY: Record<string, string> = {
   speed: 'stat.speed',
   cargoCapacity: 'stat.cargo',
   radarRange: 'stat.radar',
+  pointDefense: 'stat.point-defense',
+  siegeDamage: 'loadout.stat.siege',
   // Доли за игровой час (`perHourShare.ts`): без подписи чип читался бы «+0.05 hullRepair».
   shieldRegen: 'loadout.stat.shield-regen',
   hullRepair: 'loadout.stat.hull-repair',
