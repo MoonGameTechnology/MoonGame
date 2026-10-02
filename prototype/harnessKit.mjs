@@ -1,4 +1,4 @@
-/* global document, location, getComputedStyle -- эти имена живут внутри page.evaluate */
+/* global document, location, getComputedStyle, window, MutationObserver -- эти имена живут внутри page.evaluate */
 /**
  * Общая база браузерных харнесов (BRWH-3).
  *
@@ -195,6 +195,50 @@ export async function pressSpeed(page, selector, { tap = false } = {}) {
   await target.or(toggle).filter({ visible: true }).first().waitFor();
   if (!(await target.isVisible())) await press(toggle);
   await press(target);
+}
+
+/**
+ * Запись «+N» у плашек ресурсов (UIX-4.1): каждое всплывшее число — текст, знак, плашка, под
+ * которой оно встало, его анимация (уплывает или, без движения, гаснет на месте) и время
+ * экрана. Число живёт секунду, поэтому его ловит наблюдатель, а не опрос. Новая запись на той
+ * же странице заменяет прежнюю; `read()` отдаёт записанное, `settle(n)` — то же, дождавшись
+ * n чисел (не дольше 5 с: сверку с ожидаемым делает тест, и её сообщение понятнее таймаута).
+ */
+export async function recordPurseFloats(page) {
+  await page.evaluate(() => {
+    window.__purseFloatsObserver?.disconnect();
+    const floats = [];
+    window.__purseFloats = floats;
+    window.__purseFloatsObserver = new MutationObserver((list) => {
+      for (const change of list)
+        for (const node of change.addedNodes) {
+          if (!node.classList?.contains('purse-float')) continue;
+          const x = parseFloat(node.style.left);
+          const chip = [...document.querySelectorAll('#purse .res')].find((c) => {
+            const r = c.getBoundingClientRect();
+            return Math.abs(r.left + r.width / 2 - x) <= 1;
+          });
+          floats.push({
+            text: node.textContent,
+            sign: node.classList.contains('up') ? 'up' : 'dn',
+            res: chip?.dataset.res ?? null,
+            motion: getComputedStyle(node).animationName,
+            at: performance.now(),
+          });
+        }
+    });
+    window.__purseFloatsObserver.observe(document.body, { childList: true });
+  });
+  const read = () => page.evaluate(() => window.__purseFloats);
+  return {
+    read,
+    settle: async (n) => {
+      await page
+        .waitForFunction((n) => window.__purseFloats.length >= n, n, { timeout: 5000 })
+        .catch(() => {});
+      return read();
+    },
+  };
 }
 
 /** Что было на экране в момент падения: то, что иначе приходится выяснять руками. */

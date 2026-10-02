@@ -95,7 +95,7 @@
 | UIX-2.2 | ✅ | proto | `docs/backlog.md` | «Размер интерфейса» 80–150 % в настройках ПК. |
 | UIX-3.1 | ✅ | proto | `docs/backlog.md` | Телефон: нижняя панель из пяти пунктов. |
 | UIX-3.2 | ✅ | proto | `docs/backlog.md` | Скорость — одна кнопка. |
-| UIX-4.1 | ⏳ | proto | `docs/backlog.md` | Доход в час на телефоне и отклик «+N». |
+| UIX-4.1 | ✅ | proto | `docs/backlog.md` | Доход в час на телефоне и отклик «+N». |
 | UIX-4.2 | ⏳ | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
 | UIX-4.3 | ⏳ | srv | `docs/backlog.md` | Push только о своём и срочном. |
 | UIX-4.4 | 🔒 | proto | `docs/backlog.md` | Подписка на push в клиенте. |
