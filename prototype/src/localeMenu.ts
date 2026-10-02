@@ -63,10 +63,12 @@ export function mountLocaleMenu(button: HTMLElement, host: LocaleMenuHost): void
     }
     document.body.append(list);
     // Список встаёт под кнопкой, прижатый к её правому краю, и не вылезает за экран.
+    // Кнопка меряется в экранных px, а список под зумом ПК (UIX-2.1) — в своих: делим.
     const r = button.getBoundingClientRect();
-    list.style.top = `${Math.round(r.bottom + 6)}px`;
-    list.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
-    list.style.minWidth = `${Math.round(r.width)}px`;
+    const zoom = list.currentCSSZoom || 1;
+    list.style.top = `${Math.round((r.bottom + 6) / zoom)}px`;
+    list.style.right = `${Math.round(Math.max(8, window.innerWidth - r.right) / zoom)}px`;
+    list.style.minWidth = `${Math.round(r.width / zoom)}px`;
     button.setAttribute('aria-expanded', 'true');
     open = { list, button };
     list.querySelector<HTMLElement>('.lm-item.on')?.focus({ preventScroll: true });

@@ -2,9 +2,14 @@
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
-import { motionOn, glowOn } from './graphicsPrefs';
+import { motionOn, glowOn, uiScalePct } from './graphicsPrefs';
 import { supportsHolography, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
+import { narrowLayouts, pcScale } from '../../decisions/pcScale';
+
+/** Где CSS зумит интерфейс (PC-блок `build.mjs`): ПК с мышью от 900 px. Масштаб считается
+ *  только там — иначе `--vph` поделили бы на зум, которого у слоёв нет. */
+const PC_ZOOM_QUERY = '(min-width:900px) and (hover:hover) and (pointer:fine)';
 
 interface HolographicHost {
   commands: HTMLElement;
@@ -73,11 +78,13 @@ export function initHolographicUi(host: HolographicHost) {
   const threadPaths = thread.querySelectorAll<SVGPathElement>('path');
   let threadPath = '';
   const windows = initFloatingWindows();
+  const pcZoom = typeof window !== 'undefined' ? window.matchMedia?.(PC_ZOOM_QUERY) : undefined;
   let enabled = false;
   let inGame = false;
   let signature = '';
   let width = 1280;
   let height = 720;
+  let scale = 1;
   let selected = '';
   /** Where the HUD chrome ends: the resource bar, the tab row and the objectives/wave
    *  line on the right. Windows must not open or be dragged above it. */
@@ -115,11 +122,13 @@ export function initHolographicUi(host: HolographicHost) {
       // The redesigned console is the only desktop/tablet UI. Ignore the retired
       // void.holography preference; phones keep their dedicated responsive layout.
       const next = supported;
-      const sig = `${w}|${h}|${supported}|${next}|${inMatch}|${motionOn()}|${glowOn()}`;
+      const zoom = next && pcZoom?.matches ? pcScale(w, h, uiScalePct()) : 1;
+      const sig = `${w}|${h}|${supported}|${next}|${inMatch}|${motionOn()}|${glowOn()}|${zoom}`;
       if (sig === signature) return;
       signature = sig;
       width = w;
       height = h;
+      scale = zoom;
       inGame = inMatch;
       if (!next || !inMatch) thread.style.display = 'none';
       document.body.classList.toggle('holo-available', supported);
@@ -127,6 +136,13 @@ export function initHolographicUi(host: HolographicHost) {
       document.body.classList.toggle('holo-in-match', next && inMatch);
       document.body.classList.toggle('holo-still', !motionOn());
       document.body.classList.toggle('holo-no-glow', !glowOn());
+      // UIX-2.1: интерфейс ПК растёт с окном (`decisions/pcScale.ts`). Слоям зум ставит CSS
+      // через `--pcz` (`holographic.css`), здесь — только его величина.
+      if (zoom === 1) document.body.style.removeProperty('--holo-pcz');
+      else document.body.style.setProperty('--holo-pcz', String(zoom));
+      // Узкие раскладки — по раскладке под зумом, а не по окну (`narrowLayouts`, UIX-2.2).
+      for (const [name, on] of Object.entries(narrowLayouts(w, h, zoom)))
+        document.body.classList.toggle(name, on);
       if (next !== enabled) {
         if (next) {
           selection.appendChild(host.commands);
@@ -185,7 +201,7 @@ export function initHolographicUi(host: HolographicHost) {
         if (!key) selected = '';
       }
       // Window coordinates only respond to the user's drag/keys and viewport resize.
-      windows.sync(enabled, width, height);
+      windows.sync(enabled, width, height, scale);
       const box = enabled && inGame ? windows.bounds('holo-selection-window') : null;
       const anchor = box ? host.selectionAnchor() : null;
       const line = box && anchor && anchor.x >= 0 && anchor.y >= 0 && anchor.x <= width && anchor.y <= height

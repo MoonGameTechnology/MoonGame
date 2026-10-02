@@ -44,6 +44,23 @@ export function fitWindowPosition(
 }
 
 /**
+ * Где встать окну под CSS-зумом (масштаб ПК, UIX-2.1). Точку и высоту экрана считают в
+ * экранных px (`getBoundingClientRect`, курсор), а `left`, `top` и место под окном
+ * (`--holo-window-room`) окно меряет в своих, растянутых зумом: без деления окно при зуме
+ * 1,25 вставало бы на четверть дальше от угла, чем его поставили, и уезжало за край.
+ */
+export function zoomedPlacement(
+  p: HoloPoint, viewportHeight: number, zoom: number,
+): { left: number; top: number; room: number } {
+  const z = zoom > 0 ? zoom : 1;
+  return {
+    left: Math.round(p.x / z),
+    top: Math.round(p.y / z),
+    room: Math.max(80, (viewportHeight - p.y - 12) / z),
+  };
+}
+
+/**
  * Лежит ли точка в полосе у края окна: внутри окна и не дальше `band` от его рамки.
  * Край — вторая ручка окна после заголовка (заказ владельца 2026-09-27: «чтоб перетаскивать
  * можно было за любой край»): широкое окно флота закрывает пол-экрана, и тянуться к его
@@ -106,6 +123,7 @@ export function initFloatingWindows() {
   const previous = new WeakMap<HTMLElement, { left: string; top: string; leftPriority: string; topPriority: string }>();
   let enabled = false;
   let viewport = { width: 1280, height: 720 };
+  let viewZoom = 1;
   let topInset = 12;
   let drag: { entry: WindowEntry; id: number; start: HoloPoint; origin: HoloPoint } | null = null;
   let releasedRoot: HTMLElement | null = null;
@@ -138,13 +156,18 @@ export function initFloatingWindows() {
     }
     entry.node = null;
   };
+  /** Зум — самого узла (`currentCSSZoom`): окна вне списка зума остаются в масштабе 1. */
+  const place = (node: HTMLElement, point: HoloPoint): void => {
+    const at = zoomedPlacement(point, viewport.height, node.currentCSSZoom || 1);
+    node.style.setProperty('left', `${at.left}px`, 'important');
+    node.style.setProperty('top', `${at.top}px`, 'important');
+    node.style.setProperty('--holo-window-room', `${at.room}px`);
+  };
   const apply = (entry: WindowEntry): void => {
     if (!entry.node || !entry.point || !entry.size) return;
     const point = fitWindowPosition(entry.point, entry.size, viewport, topInset);
     entry.point = point;
-    entry.node.style.setProperty('left', `${Math.round(point.x)}px`, 'important');
-    entry.node.style.setProperty('top', `${Math.round(point.y)}px`, 'important');
-    entry.node.style.setProperty('--holo-window-room', `${Math.max(80, viewport.height - point.y - 12)}px`);
+    place(entry.node, point);
   };
   const finish = (): void => {
     const active = drag;
@@ -266,15 +289,17 @@ export function initFloatingWindows() {
       entry.point = point;
       entry.dirty = true;
     },
-    sync(active: boolean, width: number, height: number): void {
+    /** `zoom` — масштаб интерфейса ПК: сменился он — окна встают заново, как при ресайзе. */
+    sync(active: boolean, width: number, height: number, zoom = 1): void {
       if (!active) {
         if (enabled) { finish(); entries.forEach(restore); }
         enabled = false;
         return;
       }
-      const resized = width !== viewport.width || height !== viewport.height;
+      const resized = width !== viewport.width || height !== viewport.height || zoom !== viewZoom;
       enabled = true;
       viewport = { width, height };
+      viewZoom = zoom;
       for (const entry of entries) {
         const node = entry.box ? entry.root.querySelector<HTMLElement>(entry.box) : entry.root;
         const visible = entry.root.classList.contains('show') ||
@@ -305,11 +330,7 @@ export function initFloatingWindows() {
           // Only a user gesture, viewport resize or a new layout (`refit`) clamps the
           // remembered position.
           if (resized || !entry.visible || !entry.point || entry.refit) apply(entry);
-          else {
-            node.style.setProperty('left', `${Math.round(entry.point.x)}px`, 'important');
-            node.style.setProperty('top', `${Math.round(entry.point.y)}px`, 'important');
-            node.style.setProperty('--holo-window-room', `${Math.max(80, height - entry.point.y - 12)}px`);
-          }
+          else place(node, entry.point);
           entry.dirty = false;
           entry.refit = false;
         }
