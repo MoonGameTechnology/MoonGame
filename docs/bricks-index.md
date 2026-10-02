@@ -99,13 +99,14 @@
 | UIX-4.2 | 🔒 | proto | `docs/backlog.md` | «События»: сверху то, что ждёт решения. |
 | UIX-4.3 | ⏳ | srv | `docs/backlog.md` | Push только о своём и срочном. |
 | UIX-4.4 | 🔒 | proto | `docs/backlog.md` | Подписка на push в клиенте. |
-| UIX-5.1 | ⏳ | proto data | `docs/backlog.md` | Ключ вместо слова в верфи. |
-| UIX-5.2 | ⏳ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
+| UIX-5.1 | ✅ | proto data | `docs/backlog.md` | Ключ вместо слова в верфи. |
+| UIX-5.2 | ✅ | proto | `docs/backlog.md` | Провинция по имени и одна запись скорости. |
 | UIX-5.3 | ⏳ | proto | `docs/backlog.md` | Английский в русской версии и грамматика. |
 | UIX-5.4 | ⏳ | proto | `docs/backlog.md` | Словарь терминов. |
 | UIX-6.1 | ✅ | proto | `docs/backlog.md` | Прогноз космического боя в прицеле «Атака». |
 | UIX-6.2 | ✅ | proto | `docs/backlog.md` | Прогноз в окне боя. |
-| UIX-6.3 | ⏳ | core proto | `docs/backlog.md` | Прогноз боя трёх сторон и больше. |
+| UIX-6.3 | ✅ | core proto | `docs/backlog.md` | Прогноз боя трёх сторон и больше. |
+| ATK-3 | ⏳ | core proto | `docs/backlog.md` | «Атака» у того же мира заводит бой мимо втягивания. |
 | UIX-7.1 | ⏳ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
 | UIX-7.2 | ⏳ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
 | UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
@@ -115,7 +116,7 @@
 | UIX-9.2 | ⏳ | proto | `docs/backlog.md` | ПК: правый клик по миру — «Курс сюда». |
 | UIX-9.3 | ⏳ | proto | `docs/backlog.md` | ПК: «Сводка армии» обрезана справа. |
 | UIX-9.4 | ⏳ | proto | `docs/backlog.md` | ПК: подписи значков и термины. |
-| UIX-10.1 | ⏳ | proto | `docs/backlog.md` | Хаб: одна главная дверь. |
+| UIX-10.1 | ✅ | proto | `docs/backlog.md` | Хаб: одна главная дверь. |
 | UIX-10.2 | ✅ | proto | `docs/backlog.md` | Хаб: кошелёк и дверь в аукцион. |
 | UIX-11.1 | 🔒 | proto | `docs/backlog.md` | Три стиля кнопок и без КАПС-лейблов. |
 | UIX-12.1 | ⏳ | proto | `docs/backlog.md` | Свой и чужой не только цветом. |

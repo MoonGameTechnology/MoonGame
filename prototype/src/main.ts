@@ -120,8 +120,7 @@ import {
 } from './unitGlyphs';
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
-import { planetName, worldName } from './planetName';
-import { provinceName } from '../../decisions/provinceName';
+import { mapWorldName, worldName } from './planetName';
 import { minelayerOffer, ownInstallations } from '../../decisions/minefields';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
@@ -312,8 +311,7 @@ import {
 import { medalBadges } from '../../decisions/unitMedals';
 import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
-import { engageForecastCard } from '../../decisions/engageForecast';
-import { battleForecast } from '../../decisions/battleForecast';
+import { battleForecast, battleHostility } from '../../decisions/battleForecast';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -1037,6 +1035,7 @@ import {
   shareAddress,
 } from '../../decisions/matchAddress';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
+import { hubDoor } from '../../decisions/hubDoor';
 import {
   entryOffer,
   reconcileSelection,
@@ -2987,19 +2986,11 @@ function seesDetails(p: Planet): boolean {
   return fogSeesDetails({ identified: known(p.id), mine: p.owner === ME });
 }
 
-/** Имя места для игрока (PVR-6.19): у карт глав — имя провинции
- *  (`decisions/provinceName.ts`), у карт без имён — как было: id узла (подписи, журнал). */
+/** Имя места для игрока — одно на подписи, журнал, окно боя и метки (`planetName.ts`):
+ *  раньше подпись и журнал на картах без имён показывали координату («бой · C0R2»), а окно
+ *  того же боя — авто-имя («Бой: STYX-3»), UIX-5.2. */
 function placeName(id: string): string {
-  const fork = s.planets[id]?.fork;
-  if (fork) return t('place.fork-fortress', { planet: placeName(fork.province) });
-  return provinceName(s.mapId, id) ?? id;
-}
-/** То же для окна боя и меток: у карт без имён — авто-имя (`planetName.ts`), как было.
- *  Крепость на развилке (FORT-6.1) — не провинция, и имя у неё по провинции её развилки. */
-function worldTitle(id: string): string {
-  const fork = s.planets[id]?.fork;
-  if (fork) return t('place.fork-fortress', { planet: worldTitle(fork.province) });
-  return worldName(s.mapId, id);
+  return worldName(s, id);
 }
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
@@ -3382,11 +3373,6 @@ document.getElementById('goals')?.addEventListener('click', (ev) => {
     renderGoals();
   }
 });
-// Show the first-run offer to a not-yet-onboarded commander (idempotent per visit).
-function refreshOnboardOffer(): void {
-  const nudge = document.getElementById('onboard-nudge');
-  if (nudge) nudge.style.display = welcomeMode(loadOnboard()) === 'new' ? 'flex' : 'none';
-}
 // «Начать обучение» / «Ещё → Обучение»: launch the guided first match.
 function beginOnboarding(): void {
   saveOnboard(markStarted(loadOnboard()));
@@ -3397,7 +3383,7 @@ function beginOnboarding(): void {
 document.getElementById('ob-start')?.addEventListener('click', beginOnboarding);
 document.getElementById('ob-skip')?.addEventListener('click', () => {
   saveOnboard(markSkipped(loadOnboard())); // respected forever — never nagged again
-  refreshOnboardOffer();
+  refreshHubDoor();
 });
 document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboarding);
 
@@ -4809,11 +4795,31 @@ function drawEngageTargets(now: number) {
 
 /** UIX-6.1: прогноз у цели «Атаки» — выделенные флоты против флота под прицелом. Слова и
  *  проценты решает `engageForecast.ts`; цвет только дублирует слово. Туман соблюдён тем,
- *  что цель берётся из `engageCandidates()`: там лишь флоты, чей состав игрок видит. */
+ *  что цель берётся из `engageCandidates()`: там лишь флоты, чей состав игрок видит.
+ *  UIX-6.3: каждый выделенный флот — своя сторона, как в бою: у каждого свой кап линии
+ *  огня, и цель отвечает каждому полным залпом. Слитые в одну сторону, они считались бы
+ *  один раз. */
 function drawEngageForecast(foe: Fleet, x: number, y: number): void {
-  const mine = selectedFleetIds().flatMap((id) => s.fleets[id]?.units ?? []);
-  if (sumUnits(mine) <= 0 || sumUnits(foe.units) <= 0) return;
-  const card = engageForecastCard(previewBattle(mine, foe.units, data));
+  const mine = selectedFleetIds().flatMap((id) => {
+    const f = s.fleets[id];
+    return f && sumUnits(f.units) > 0 ? [f] : [];
+  });
+  if (mine.length === 0 || sumUnits(foe.units) <= 0) return;
+  const card = battleForecast(
+    [
+      ...mine.map((f) => ({
+        mine: true,
+        role: 'attacker' as const,
+        units: f.units,
+        owner: f.owner,
+        key: f.id,
+      })),
+      { mine: false, role: 'defender', units: foe.units, owner: foe.owner, key: foe.id },
+    ],
+    data,
+    battleHostility(s),
+  );
+  if (!card) return;
   const ink = card.tone === 'positive' ? LOCK : card.tone === 'negative' ? HOSTILE : R_ARTY;
   cx.save();
   cx.setLineDash([]);
@@ -5259,11 +5265,11 @@ function ownersSig(): string {
   );
 }
 
-/** Подпись карты в списках партий. Обе карты Фронтира показываются одним именем —
- *  раньше это был тернарник, скопированный в два места, и два ключа локали с
- *  ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
+/** Подпись карты в списках партий и на двери «Продолжить» хаба. Обе карты Фронтира
+ *  показываются одним именем — раньше это был тернарник, скопированный в два места, и два
+ *  ключа локали с ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
 function mapLabel(mapId: string | undefined): string {
-  return isFrontier(mapId) ? t('map.frontier') : (mapId ?? '');
+  return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 
 /** Map art is shared by desktop and phone; floating windows remain desktop-only. */
@@ -7877,7 +7883,7 @@ function unknownPlanetHtml(p: Planet): string {
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
     return (
-      cardHeader(ownerColor(mem.owner), p.id, t('side.scan.title')) +
+      cardHeader(ownerColor(mem.owner), placeName(p.id), t('side.scan.title')) +
       `<div class="pscan">` +
       `<div class="row dim">${t('side.scan.stale')}</div>` +
       `<div class="row">${t('side.scan.owner')}: <b>${mem.owner ? NAME[mem.owner] : t('side.neutral')}</b></div>` +
@@ -7891,7 +7897,7 @@ function unknownPlanetHtml(p: Planet): string {
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
   return (
-    cardHeader('#5f8f8c', p.id, t('side.notelemetry.title')) +
+    cardHeader('#5f8f8c', placeName(p.id), t('side.notelemetry.title')) +
     `<div class="pscan">` +
     `<div class="row dim">${t('side.notelemetry.sub')}</div>` +
     `<div class="hint">${t('side.notelemetry.hint')}</div>` + ping +
@@ -7992,10 +7998,8 @@ function planetPanelHtml(p: Planet): string {
   const { ground, ships } = garrisonByTab(p.garrison, data);
   const here = Object.values(s.fleets).filter((f) => f.location === p.id && !isMineFleet(f, data));
   const counts = tabCounts(p, data, here);
-  // Bytro-стиль: у мира авто-имя; координата (grid id) остаётся отдельным обозначением в
-  // подзаголовке. У провинции главы — её имя, а id узла из подзаголовка уходит: это
-  // служебное имя, а не координата (PVR-6.19).
-  const named = provinceName(s.mapId, p.id);
+  // Имя мира — то же, что в подписи на карте и в журнале; код узла («C0R2», «home_a») в
+  // подзаголовке — только в режиме отладки (UIX-5.2).
   const sm = planetSummary(p, data, here);
   // Очки победы — рядом с именем (заказ владельца 2026-09-29: «эти 50 можно в шапку»). На
   // телефоне их переносит в шапку листа `mobileHud.ts`, досье — тем же тапом, что у фишек.
@@ -8005,8 +8009,8 @@ function planetPanelHtml(p: Planet): string {
       : '';
   let h = cardHeader(
     ownerColor(p.owner),
-    named ?? planetName(p.id),
-    `${named ? '' : `${esc(p.id)} · `}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
+    placeName(p.id),
+    `${DEV_UI ? `${esc(p.id)} · ` : ''}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
     undefined,
     vp,
   );
@@ -8579,7 +8583,7 @@ function intelRowHtml(target: string): string {
     } else if (g.kind === 'fleets' && g.target === target) {
       bits.push(t('comms.intel.fleets', { left }));
     } else if (g.kind === 'planet' && s.planets[g.target]?.owner === target) {
-      bits.push(t('comms.intel.world', { id: esc(g.target), left }));
+      bits.push(t('comms.intel.world', { id: esc(placeName(g.target)), left }));
     }
   }
   if (!bits.length) return '';
@@ -9381,7 +9385,7 @@ function updateMobileHud(): void {
       if (!f || !fleetSeen(f)) continue;
       choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
     } else if (s.planets[pick.id]) {
-      choices.push({ ...pick, title: worldTitle(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
+      choices.push({ ...pick, title: placeName(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
     }
   }
   offerChoices(choices.map(({ kind, id }) => ({ kind, id })));
@@ -11436,11 +11440,11 @@ const battleWindow = initBattleWindow({
         return unitTileHtml(u, side.owner, open, true, color);
       }).join(''),
     fleetName: fleetCallsign,
-    placeName: worldTitle,
+    placeName,
     autoRetreatAt,
     timeLeft,
     // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
-    forecast: (sides) => battleForecast(sides, data),
+    forecast: (sides) => battleForecast(sides, data, battleHostility(s)),
   },
 });
 battleWin.addEventListener('click', (event) => {
@@ -11802,6 +11806,8 @@ const HUB_PANELS: Record<string, string> = {
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
+/** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends']);
 function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
@@ -11824,8 +11830,9 @@ function hubTab(tab: string): void {
   if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
+  const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
-    b.classList.toggle('active', (b as HTMLElement).dataset.hub === tab);
+    b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
 }
 
 // --- «Прокачка» — the commander's meta-progression trees (hub tab) -----------------
@@ -12083,7 +12090,6 @@ async function syncCommanderFromServer(): Promise<void> {
 }
 function openHub(note = ''): void {
   if (soloSaveActive) { saveSolo(); speed = 0; }
-  refreshSoloContinue();
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   const nick = nickInput.value.trim();
   $('hub-name').textContent = nick || t('auth.commander');
@@ -12092,7 +12098,7 @@ function openHub(note = ''): void {
   showHub(true);
   hubTab('home');
   hubNote.textContent = note;
-  refreshOnboardOffer(); // ONB-0: first-run offer/nudge for a not-yet-onboarded commander
+  refreshHubDoor(); // после позывного: пройденное обучение помнится по нику (`onboardKey`)
   detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
   detach('хаб: портрет аккаунта', syncProfileAppearance());
 }
@@ -12453,9 +12459,11 @@ $('hub-logout').addEventListener('click', () => {
 for (const b of Array.from(document.querySelectorAll('.hub-tab'))) {
   b.addEventListener('click', () => hubTab((b as HTMLElement).dataset.hub ?? 'home'));
 }
-// «Прокачка» уехала из нижней навигации (там семь вкладок — предел) в «Ещё»: плитка
-// открывает ТУ ЖЕ панель `hp-meta`, а не свою копию экрана.
+// «Прокачка», а с UIX-10.1 и «Рейтинг» с «Друзьями» уехали из нижней навигации (вкладок в ней
+// пять) в «Ещё»: плитка открывает ТУ ЖЕ панель, а не свою копию экрана.
 document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('meta'));
+document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
+document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
@@ -12887,7 +12895,10 @@ function renderSetup(): void {
   mapSelect.disabled = !!netSetup;
   $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-legacy-info' : isFrontier(setupMapId) ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
   const homeSelect = $('setup-home-id') as HTMLSelectElement;
-  homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
+  // Дом — по имени, как его подпишет карта партии, а не по коду «C0R1» (UIX-5.2); значение
+  // опции остаётся id.
+  const homeName = (id: string): string => mapWorldName(setupMapId, setupPreset().nodes, id);
+  homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(homeName(id))}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
   homeSelect.value = setupStart;
   renderSetupMap();
   renderSetupSlots();
@@ -12909,7 +12920,7 @@ function renderSetup(): void {
       free === 0
         ? t('seatpick.none-free')
         : ready
-          ? t('setup.home.pick', { home: setupStart })
+          ? t('setup.home.pick', { home: homeName(setupStart) })
           : t('setup.map-hint');
     for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
       c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
@@ -12919,7 +12930,7 @@ function renderSetup(): void {
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
   setupHintEl.textContent = t(rivals === 0 ? 'setup.home.solo' : 'setup.home.pick', {
-    home: setupStart,
+    home: homeName(setupStart),
   });
   for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
     c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
@@ -13625,7 +13636,7 @@ function netClientFor(seat: string): MultiplayerClient {
           at: ping.createdAt,
           from: ping.owner,
           to: COALITION,
-          text: ping.label ?? t('chat.ping.mark', { node }),
+          text: ping.label ?? t('chat.ping.mark', { node: placeName(node) }),
           sys: false,
           ping: node,
           pingId: ping.id,
@@ -14538,14 +14549,19 @@ function renderMyMatches(serverHttp: string): void {
   if (!el) return;
   const view = myMatches(matchLists, HUB_MY_MATCHES);
   // Правило 5: ленты нет — молчим. «У вас нет партий» поверх трёх идущих отправило бы
-  // игрока заводить четвёртую.
+  // игрока заводить четвёртую. Молчит и заголовок: пустой раздел читается как поломка.
+  $('hub-mine-sec').hidden = view.kind === 'unknown';
   if (view.kind === 'unknown') {
     el.textContent = '';
     return;
   }
-  // Правило 6: пустота — нормальное начало, и она зовёт туда, где партии берут.
+  // Правило 6: пустота — нормальное начало, и она зовёт туда, где партии берут:
+  // строка и «Начать партию» в обозреватель (UIX-10.1).
   if (view.kind === 'none') {
-    el.innerHTML = `<div class="hm-empty">${t('hub.mine.empty')}</div>`;
+    el.innerHTML =
+      `<div class="hub-card"><div class="hc-ic">◇</div><div><div class="hc-t">${t('hub.mine.empty')}</div>` +
+      `<button type="button" class="hm-go">${t('hub.mine.start')}</button></div></div>`;
+    el.querySelector('.hm-go')?.addEventListener('click', () => hubTab('games'));
     return;
   }
   el.textContent = '';
@@ -15146,14 +15162,27 @@ function tickSoloSave(now: number): void {
   soloSavedAtReal = now;
   saveSolo();
 }
-function refreshSoloContinue(): void {
+/**
+ * Главная дверь хаба (UIX-10.1): «Продолжить» с картой и днём сохранённой партии или, новичку
+ * (ONB-0), «Начать обучение» — какая из двух, решает `decisions/hubDoor.ts`. Строка под
+ * дверью — только беда со слотом: не сохранилось или сохранение не читается.
+ */
+function refreshHubDoor(): void {
   const stored = soloStore.load();
-  const valid = stored.ok && parseSoloSave(stored.raw, soloRules) !== null;
+  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  const door = hubDoor(
+    // Сохранение без карты — «Нексус»: так его читает и `mapPreset` при загрузке.
+    save ? { mapId: save.state.mapId ?? 'nexus', time: save.state.time } : stored.ok && stored.raw === null ? 'empty' : 'unreadable',
+    welcomeMode(loadOnboard()) === 'new',
+  );
   const button = $('hub-solo-continue') as HTMLButtonElement;
-  button.hidden = stored.ok && stored.raw === null;
-  button.disabled = !valid;
-  $('solo-save-status').textContent = !stored.ok || soloSaveFailed ? t('solo.save.failed') :
-    stored.raw && !valid ? t('solo.save.invalid') : t('solo.save.info');
+  button.hidden = door.kind !== 'continue' && door.kind !== 'broken';
+  button.disabled = door.kind !== 'continue';
+  $('hub-continue-sub').textContent =
+    door.kind === 'continue' ? t('solo.save.continue.sub', { map: mapLabel(door.mapId), day: gameDay(door.time) }) : '';
+  $('onboard-nudge').style.display = door.kind === 'tutorial' ? 'flex' : 'none';
+  $('solo-save-status').textContent =
+    !stored.ok || soloSaveFailed ? t('solo.save.failed') : door.kind === 'broken' ? t('solo.save.invalid') : '';
 }
 function closeSoloReplace(): void {
   $('solo-replace').style.display = 'none';
@@ -15168,7 +15197,7 @@ function restoreSolo(): void {
   if (NET) return;
   const stored = soloStore.load();
   const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
-  if (!save) { refreshSoloContinue(); return; }
+  if (!save) { refreshHubDoor(); return; }
   // Verify the map before replacing the in-memory match; future maps need an
   // explicit migration, not an accidental fallback to another board.
   try { mapPreset(save.state.mapId); mapNodesFromState(save.state); }
@@ -17036,7 +17065,7 @@ function pingSelected(): void {
     // `ping.added` back to us + allies — that echo is what adds it (see onPingAdded).
     sendProvincePing(selPlanet, desc);
   } else {
-    pushMsg(COALITION, desc || t('chat.ping.mark', { node: selPlanet }), false, ME, selPlanet);
+    pushMsg(COALITION, desc || t('chat.ping.mark', { node: placeName(selPlanet) }), false, ME, selPlanet);
   }
   if (input) {
     input.value = '';
@@ -17082,7 +17111,7 @@ const pings = __SECTOR_ZERO_ONLY__
       name: (id) => NAME[id] ?? id,
       color: ownerColor,
       badge: seatBadge,
-      provinceName: worldTitle,
+      provinceName: placeName,
       note,
       focus: focusWorld,
       jump: jumpToPing,

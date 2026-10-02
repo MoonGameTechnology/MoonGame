@@ -3112,26 +3112,49 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 @media (max-width:900px){#hub .hub-id{flex-wrap:wrap;row-gap:10px;}#hub .hub-wallet{order:10;flex:1 0 100%;}}
 #hub .hub-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 16px 14px;}
 #hub .hub-panel{display:flex;flex-direction:column;gap:14px;}
-#hub .hub-play{width:100%;padding:18px;border-radius:12px;border:1px solid var(--cyan);cursor:pointer;
-  background:linear-gradient(180deg,rgba(53,214,230,.30),rgba(53,214,230,.12));color:#eafdff;
-  font:700 17px ui-monospace,monospace;letter-spacing:2px;box-shadow:0 0 28px rgba(53,214,230,.26);min-height:58px;}
-#hub .hub-play:active{background:linear-gradient(180deg,rgba(53,214,230,.44),rgba(53,214,230,.2));}
+/* Главная дверь хаба (UIX-10.1, decisions/hubDoor.ts): крупная кнопка в палитре меню над
+   режимами — «Продолжить» с картой и днём партии или, новичку, «Начать обучение». */
+#hub .hub-door{display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:100%;padding:20px 22px;
+  border-radius:14px;border:1px solid var(--sf-accent);background:var(--sf-primary);box-shadow:var(--sf-glow);
+  color:var(--sf-hi);font-family:var(--sf-font);text-align:left;cursor:pointer;}
+#hub .hub-door[hidden]{display:none;}
+#hub .hub-door b{font-size:22px;font-weight:700;line-height:1.2;}
+#hub .hub-door span{font-size:15px;line-height:1.35;color:var(--sf-text);}
+#hub .hub-door span:empty{display:none;}
+#hub .hub-door:hover:not(:disabled){background:var(--sf-primary-hi);}
+#hub .hub-door:active:not(:disabled){transform:translateY(1px);}
+#hub .hub-door:disabled{opacity:.5;box-shadow:none;cursor:not-allowed;}
+/* «Пропустить» под дверью обучения — тихая ссылка: урок остаётся в «Ещё → Обучение». */
+#hub .hub-tutor{flex-direction:column;align-items:flex-start;gap:2px;}
+#hub .hub-tutor .ob-later{min-height:44px;padding:0 4px;border:0;background:none;color:var(--sf-dim);
+  font:14px var(--sf-font);text-decoration:underline;cursor:pointer;}
+#hub .hub-tutor .ob-later:hover{color:var(--sf-text);}
+/* Режимы списком: название и строка, чем режим отличается; «›» — строка ведёт дальше. */
+#hub .hub-mode{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;
+  width:100%;min-height:68px;padding:12px 48px 12px 18px;border-radius:12px;border:1px solid var(--sf-edge);
+  background:var(--sf-card);color:var(--sf-text);font-family:var(--sf-font);text-align:left;cursor:pointer;}
+#hub .hub-mode b{font-size:17px;font-weight:600;line-height:1.25;}
+#hub .hub-mode span{font-size:14px;line-height:1.35;color:var(--sf-dim);}
+#hub .hub-mode::after{content:"›";position:absolute;right:18px;top:50%;transform:translateY(-52%);
+  font-size:26px;font-weight:300;color:var(--sf-accent);}
+#hub .hub-mode:hover{border-color:var(--sf-edge-hi);}
+#hub .hub-mode:active{transform:translateY(1px);}
 #hub .hub-solo{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
 #solo-replace{display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;background:#000b;padding:20px;}
 #solo-replace .solo-box{width:min(440px,100%);padding:24px;background:#091b20;border:1px solid var(--cyan-dim);border-radius:12px;}
 #solo-replace button{min-height:44px;padding:10px 16px;margin:6px;border:1px solid var(--line-hi);border-radius:8px;background:var(--glass);color:var(--ink);cursor:pointer;}
-#solo-save-status{font-size:12px;color:var(--dim);line-height:1.5;}
-#hub-solo-continue[hidden]{display:none;}
-#hub #hub-sector-zero,#hub #hub-proving-ground{min-height:44px;}
-#hub .hub-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin-top:4px;
-  padding-bottom:6px;border-bottom:1px solid var(--line);}
+/* Под дверью — только беда со слотом (не сохранилось, не читается); пустая строка не занимает места. */
+#solo-save-status{margin:0;font-size:14px;line-height:1.4;color:var(--amber);}
+#solo-save-status:empty{display:none;}
+#hub .hub-sec{margin-top:4px;padding-bottom:6px;border-bottom:1px solid var(--line);
+  font:600 14px var(--sf-font);color:var(--sf-head);}
 #hub .hub-card{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line-hi);border-radius:10px;
   padding:13px 14px;background:rgba(255,255,255,.02);}
 #hub .hub-card .hc-ic{width:38px;height:38px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto;
   background:rgba(53,214,230,.1);color:var(--cyan);font-size:18px;}
-#hub .hub-card .hc-t{font-size:13px;color:#dfeef2;}
-#hub .hub-card .hc-s{font-size:11px;color:var(--dim);margin-top:4px;line-height:1.45;}
+#hub .hub-card .hc-t{font-size:16px;color:#dfeef2;}
+#hub .hub-card .hc-s{font-size:14px;color:var(--dim);margin-top:4px;line-height:1.4;}
 /* ADDR-4 «Мои партии» — свои партии прямо на главном экране */
 #hub .hm-list{display:flex;flex-direction:column;gap:8px;}
 #hub .hm-row .hm-body{flex:1;min-width:0;}
@@ -3141,16 +3164,10 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 #hub .hm-row .hm-btns .mbtn{white-space:nowrap;}
 #hub .hm-more{font-size:11px;color:var(--dim);background:transparent;border:none;padding:2px 0;
   cursor:pointer;text-align:left;text-decoration:underline;}
-#hub .hm-empty{font-size:11px;color:var(--dim);line-height:1.45;}
-/* ONB-0 first-run offer card (hub home) */
-#hub .ob-nudge{border-color:var(--cyan);background:rgba(53,214,230,.06);}
-#hub .ob-nudge .ob-body{flex:1;}
-#hub .ob-nudge .ob-btns{display:flex;gap:8px;margin-top:10px;}
-#hub .ob-nudge .ob-go{background:var(--cyan);border:none;color:#04121a;font-weight:700;font-size:12px;
-  padding:7px 14px;border-radius:7px;cursor:pointer;letter-spacing:.4px;}
-#hub .ob-nudge .ob-later{background:none;border:1px solid var(--line-hi);color:var(--dim);font-size:12px;
-  padding:7px 12px;border-radius:7px;cursor:pointer;}
-#hub .ob-nudge .ob-later:active{border-color:var(--cyan);color:#dfeef2;}
+/* Своих партий нет: строка и дверь туда, где партии берут (правило 6 decisions/myMatches.ts). */
+#hub .hm-go{margin-top:10px;min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--sf-accent);
+  background:var(--sf-sel);color:var(--sf-hi);font:600 15px var(--sf-font);cursor:pointer;}
+#hub .hm-go:hover{border-color:var(--sf-edge-hi);}
 #hub .hub-empty{padding:54px 16px;text-align:center;color:var(--dim);font-size:14px;letter-spacing:1px;line-height:1.9;}
 #hub .hub-empty .he-ic{font-size:38px;color:var(--cyan-dim);display:block;margin-bottom:14px;
   text-shadow:0 0 16px rgba(53,214,230,.3);}
@@ -3266,8 +3283,8 @@ ${profileCss}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
   padding-bottom:env(safe-area-inset-bottom,0);}
 #hub .hub-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;cursor:pointer;
-  background:transparent;border:0;color:var(--cyan-dim);font:9px ui-monospace,monospace;letter-spacing:.5px;}
-#hub .hub-tab .hn-ic{font-size:18px;line-height:1;}
+  background:transparent;border:0;color:var(--sf-head);font:12px var(--sf-font);}
+#hub .hub-tab .hn-ic{font-size:20px;line-height:1;}
 #hub .hub-tab.active{color:var(--cyan);}
 #hub .hub-tab.active .hn-ic{text-shadow:0 0 8px rgba(53,214,230,.6);}
 
@@ -3554,7 +3571,7 @@ ${profileCss}
   #corp .corpbox{width:53.4vw;max-height:61vh;}
   #railtools #rail-settings,#railtools #rail-exit{display:grid;}
   /* speedbar on PC: exit (⌂) lives in the rail and ▶▶ is dropped; the multiplier set
-     swaps to 1/30/60/120. (The whole bar's show/hide rides the dev toggle in main.ts.) */
+     swaps to ×1/×1800/×3600/×7200. (The whole bar's show/hide rides the dev toggle in main.ts.) */
   .spd .spd-pc-hide{display:none;}
   .spd .spd-mult-legacy{display:none;}
   .spd .spd-mult-pc{display:contents;}
@@ -3782,9 +3799,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="speedbar" class="spd">
   <!-- time controls. PC: shown only via the developer «speed control» toggle (whole
        bar hidden otherwise); ⌂/▶▶ are PC-hidden (exit lives in the rail). Mobile is
-       frozen: keeps ⌂/▶▶ and the legacy ×1/×10/×50/×100 chips; PC swaps in 1/30/60/120
-       (data-mult = real wall-clock multiplier: 1800=½h·s, 3600=1h·s, 7200=2h·s). -->
-  <span id="spd-ctl"><button id="spd-pause" data-speed="0" data-i18n-title="hud.run.pause" data-i18n-aria="hud.run.pause">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><!--dev-only--><button id="spd-dev" type="button" data-speed="0" hidden>▶▶▶</button><!--/dev-only--><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">1×</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">30×</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">60×</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">120×</button></span><span class="sep"></span></span>
+       frozen: keeps ⌂/▶▶ and the legacy ×1/×10/×50/×100 chips; PC swaps in ×1/×1800/×3600/×7200
+       (data-mult = real wall-clock multiplier: 1800=½h·s, 3600=1h·s, 7200=2h·s). One notation
+       «×N» everywhere, N = the real multiplier (UIX-5.2): the PC chips used to read 30×/60×/120×,
+       which looked close to the phone's ×100 while running 18–72 times faster. -->
+  <span id="spd-ctl"><button id="spd-pause" data-speed="0" data-i18n-title="hud.run.pause" data-i18n-aria="hud.run.pause">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><!--dev-only--><button id="spd-dev" type="button" data-speed="0" hidden>▶▶▶</button><!--/dev-only--><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">×1800</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">×3600</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">×7200</button></span><span class="sep"></span></span>
   <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" data-i18n-title="speed.restart" style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" data-i18n-title="speed.exit">⌂</button>
 </div>
 <div id="cmdbar"></div>
@@ -4100,27 +4119,23 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   </div>
   <div class="hub-body">
     <div class="hub-panel" id="hp-home">
-      <button id="hub-play" class="hub-play" type="button" data-i18n="hub.play"></button>
-      <button id="hub-solo-continue" class="hub-solo" type="button" hidden data-i18n="solo.save.continue"></button>
+      <!-- UIX-10.1: одна главная дверь — «Продолжить» или, новичку, «Начать обучение»
+           (какая из двух — decisions/hubDoor.ts); под ней режимы, у каждого строка отличия. -->
+      <button id="hub-solo-continue" class="hub-door" type="button" hidden><b data-i18n="solo.save.continue"></b><span id="hub-continue-sub"></span></button>
       <p id="solo-save-status" role="status"></p>
-      <button id="hub-solo" class="hub-solo" type="button" data-i18n="hub.solo"></button>
-      <button id="hub-sector-zero" class="hub-solo" type="button" data-i18n="sector-zero.enter"></button>
-      <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
-      <button id="hub-proving-ground" class="hub-solo" type="button" data-i18n="hub.proving-ground"></button>
       <!-- ONB-0 first-run offer: shown only to a not-yet-onboarded commander -->
-      <div class="hub-card ob-nudge" id="onboard-nudge" style="display:none">
-        <div class="hc-ic">◎</div>
-        <div class="ob-body">
-          <div class="hc-t" data-i18n="hub.onboard.title"></div>
-          <div class="hc-s" data-i18n="hub.onboard.sub"></div>
-          <div class="ob-btns">
-            <button id="ob-start" class="ob-go" type="button" data-i18n="hub.onboard.start"></button>
-            <button id="ob-skip" class="ob-later" type="button" data-i18n="hub.onboard.skip"></button>
-          </div>
-        </div>
+      <div class="hub-tutor" id="onboard-nudge" style="display:none">
+        <button id="ob-start" class="hub-door" type="button"><b data-i18n="hub.onboard.start"></b><span data-i18n="hub.onboard.sub"></span></button>
+        <button id="ob-skip" class="ob-later" type="button" data-i18n="hub.onboard.skip"></button>
       </div>
+      <div class="hub-sec" data-i18n="hub.modes"></div>
+      <button id="hub-solo" class="hub-mode" type="button"><b data-i18n="hub.solo"></b><span data-i18n="hub.solo.desc"></span></button>
+      <button id="hub-play" class="hub-mode" type="button"><b data-i18n="hub.play"></b><span data-i18n="hub.play.desc"></span></button>
+      <button id="hub-sector-zero" class="hub-mode" type="button"><b data-i18n="sector-zero.enter"></b><span data-i18n="hub.sector-zero.desc"></span></button>
+      <!-- M2.15: полигон основной игры — все области и весь каталог, старт песочницей -->
+      <button id="hub-proving-ground" class="hub-mode" type="button"><b data-i18n="hub.proving-ground"></b><span data-i18n="hub.proving-ground.desc"></span></button>
       <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
-      <div class="hub-sec" data-i18n="hub.mine.section"></div>
+      <div class="hub-sec" id="hub-mine-sec" data-i18n="hub.mine.section"></div>
       <div class="hm-list" id="hub-mine"></div>
       <div class="hub-sec" data-i18n="hub.digest.section"></div>
       <div class="hub-card">
@@ -4143,6 +4158,9 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     </div>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
+        <!-- UIX-10.1: рейтинг и друзья — из нижней панели сюда, вкладок пять вместо семи -->
+        <button class="hub-tile" id="hub-rank" type="button"><span class="ht-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
+        <button class="hub-tile" id="hub-friends" type="button"><span class="ht-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
         <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
         <button class="hub-tile" id="hub-auction" type="button"><span class="ht-ic">⌖</span><span data-i18n="hub.tile.auction"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>
@@ -4162,8 +4180,6 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <nav class="hub-nav">
     <button class="hub-tab active" data-hub="home" type="button"><span class="hn-ic">⌂</span><span data-i18n="hub.nav.home"></span></button>
     <button class="hub-tab" data-hub="games" type="button"><span class="hn-ic">▶</span><span data-i18n="hub.nav.games"></span></button>
-    <button class="hub-tab" data-hub="rank" type="button"><span class="hn-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
-    <button class="hub-tab" data-hub="friends" type="button"><span class="hn-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
     <button class="hub-tab" data-hub="arsenal" type="button"><span class="hn-ic">⚔</span><span data-i18n="hub.nav.arsenal"></span></button>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>

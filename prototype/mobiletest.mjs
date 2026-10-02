@@ -14,7 +14,7 @@ const hooks = `window.__mobileTest = {
   camera: () => ({...cam}),
   ui: () => ({ mobile: MOBILE, me: ME, ids: selectedFleetIds(), planet: selPlanet, choices: mobileChoices, draft: mobileDraft, aiming, assaultAim, engageAim, merging, pickMode }),
   fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
-  worlds: () => MAP.map(n => ({ id:n.id, p:world(n), known:known(n.id) })),
+  worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
   destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) }))
 };`;
 // Корень — игра с хуками; `/built` и `/player` — сборки как есть, без инструментовки.
@@ -245,7 +245,9 @@ try {
   assert.equal((await ui()).planet, unknown.id);
   await sheet.locator('[data-mobile="ping"]').tap();
   assert(await p.locator('#pingmenu.show').isVisible());
-  assert((await p.locator('#pingmenu').textContent()).includes(unknown.id));
+  // Метку ставят на мир по имени, а не по коду узла (UIX-5.2).
+  const menuText = await p.locator('#pingmenu').textContent();
+  assert(menuText.includes(unknown.name) && !menuText.includes(unknown.id), menuText);
   await p.keyboard.press('Escape');
   await pause();
   assert.equal(await snapshot(), stopped);

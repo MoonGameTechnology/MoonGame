@@ -21,6 +21,7 @@ import { delegateSteward, recallSteward } from '../../decisions/actions';
 import { DAY, HOUR } from './time';
 import { runClockShown } from './format';
 import { runClockText } from '../../decisions/runClock';
+import { worldName } from './planetName';
 
 /** Game-hours a single delegation can run — the three offered buttons. */
 const STEW_DURATIONS = [4, 8, 12];
@@ -74,13 +75,19 @@ export interface StewardLogEntry {
 }
 
 /** One localized line of the journal. An unknown kind degrades to `kind: node` rather
- *  than vanishing — a watch that did something must never read as a watch that slept. */
-export function stewLogLine(e: StewardLogEntry): string {
+ *  than vanishing — a watch that did something must never read as a watch that slept.
+ *  `place` names a world for the player (UIX-5.2): the journal reads «STYX-3», not «C0R2». */
+export function stewLogLine(e: StewardLogEntry, place: (id: string) => string = (id) => id): string {
   const pct = e.fraction !== undefined ? String(Math.round(e.fraction * 100)) : '?';
-  const node = e.node ?? '?';
+  const node = e.node !== undefined ? place(e.node) : '?';
   switch (e.kind) {
     case 'evac':
-      return t('steward.log.evac', { node, to: e.to ?? '?', pct, n: String(e.count ?? 0) });
+      return t('steward.log.evac', {
+        node,
+        to: e.to !== undefined ? place(e.to) : '?',
+        pct,
+        n: String(e.count ?? 0),
+      });
     case 'ferry':
       return t('steward.log.ferry', { node });
     case 'stranded':
@@ -110,7 +117,7 @@ export function stewLogHtml(state: GameState, me: string): string {
     .slice(0, 12)
     .map(
       (e) =>
-        `<div class="st-log-line"><span class="st-log-when">${t('steward.log.ago', { dur: stewFmtDur(Math.max(0, state.time - (e.at ?? 0))) })}</span> ${stewLogLine(e)}</div>`,
+        `<div class="st-log-line"><span class="st-log-when">${t('steward.log.ago', { dur: stewFmtDur(Math.max(0, state.time - (e.at ?? 0))) })}</span> ${stewLogLine(e, (id) => worldName(state, id))}</div>`,
     )
     .join('');
   return `<div class="st-h">${t('steward.log.title')}</div><div class="st-log">${lines}</div>`;
