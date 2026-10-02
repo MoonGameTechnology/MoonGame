@@ -3128,6 +3128,8 @@ export const en: Record<string, string> = {
   'settings.gfx.starfield.hint':
     'drifting nebulae and stars in the background — turn off for a flat backdrop',
   'settings.gfx.title': 'Graphics',
+  'settings.gfx.ui-scale': 'Interface size',
+  'settings.gfx.ui-scale.hint': '100% — fits the window, 80% smaller to 150% larger',
   'settings.gfx.window-opacity': 'Window opacity',
   'settings.gfx.window-opacity.hint': '0% — clearest glass, 100% — solid background',
   'settings.off': 'off',

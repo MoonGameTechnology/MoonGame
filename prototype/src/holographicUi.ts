@@ -2,10 +2,10 @@
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
-import { motionOn, glowOn } from './graphicsPrefs';
+import { motionOn, glowOn, uiScalePct } from './graphicsPrefs';
 import { supportsHolography, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
-import { pcScale } from '../../decisions/pcScale';
+import { narrowLayouts, pcScale } from '../../decisions/pcScale';
 
 /** Где CSS зумит интерфейс (PC-блок `build.mjs`): ПК с мышью от 900 px. Масштаб считается
  *  только там — иначе `--vph` поделили бы на зум, которого у слоёв нет. */
@@ -122,7 +122,7 @@ export function initHolographicUi(host: HolographicHost) {
       // The redesigned console is the only desktop/tablet UI. Ignore the retired
       // void.holography preference; phones keep their dedicated responsive layout.
       const next = supported;
-      const zoom = next && pcZoom?.matches ? pcScale(w, h) : 1;
+      const zoom = next && pcZoom?.matches ? pcScale(w, h, uiScalePct()) : 1;
       const sig = `${w}|${h}|${supported}|${next}|${inMatch}|${motionOn()}|${glowOn()}|${zoom}`;
       if (sig === signature) return;
       signature = sig;
@@ -140,6 +140,9 @@ export function initHolographicUi(host: HolographicHost) {
       // через `--pcz` (`holographic.css`), здесь — только его величина.
       if (zoom === 1) document.body.style.removeProperty('--holo-pcz');
       else document.body.style.setProperty('--holo-pcz', String(zoom));
+      // Узкие раскладки — по раскладке под зумом, а не по окну (`narrowLayouts`, UIX-2.2).
+      for (const [name, on] of Object.entries(narrowLayouts(w, h, zoom)))
+        document.body.classList.toggle(name, on);
       if (next !== enabled) {
         if (next) {
           selection.appendChild(host.commands);

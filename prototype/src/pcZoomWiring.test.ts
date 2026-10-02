@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { narrowLayouts } from '../../decisions/pcScale';
 
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const holoCss = read('../holographic.css');
@@ -23,8 +24,8 @@ const VIEWPORT_UNIT = /(?<![\w-])\d*\.?\d+[dsl]?v(?:h|w|min|max)\b/;
 const UNZOOMED = /#objtip|#statpop/;
 
 describe('масштаб ПК доходит до стилей (UIX-2.1)', () => {
-  it('holographicUi считает масштаб и кладёт его в --holo-pcz', () => {
-    expect(holoUi).toMatch(/pcScale\(w, h\)/);
+  it('holographicUi считает масштаб с «Размером интерфейса» и кладёт его в --holo-pcz', () => {
+    expect(holoUi).toMatch(/pcScale\(w, h, uiScalePct\(\)\)/);
     expect(holoUi).toMatch(/setProperty\('--holo-pcz'/);
   });
 
@@ -42,5 +43,18 @@ describe('масштаб ПК доходит до стилей (UIX-2.1)', () =>
       .filter(([selector, body]) => !UNZOOMED.test(selector) && VIEWPORT_UNIT.test(body.replace(DEFINITIONS, '')))
       .map(([selector]) => selector);
     expect(offenders).toEqual([]);
+  });
+
+  it('узкие раскладки — классы от раскладки под зумом, а не медиа-запросы по окну (UIX-2.2)', () => {
+    const css = holoCss + bridgeCss;
+    const queries = [...css.matchAll(/@media\s*([^{]+)\{/g)].map((m) => (m[1] ?? '').trim());
+    // (max-width:700px) голограмме не достаётся: консоль включается от 720 px окна, а под
+    // зумом ПК раскладка не уже 900 px.
+    expect(queries.filter((q) => /max-(width|height)/.test(q) && q !== '(max-width:700px)')).toEqual(
+      [],
+    );
+    const used = new Set([...css.matchAll(/:where\(\.(holo-[wh]\d+)\)/g)].map((m) => m[1]));
+    expect([...used].sort()).toEqual(Object.keys(narrowLayouts(1, 1, 1)).sort());
+    expect(holoUi).toMatch(/narrowLayouts\(w, h, zoom\)/);
   });
 });
