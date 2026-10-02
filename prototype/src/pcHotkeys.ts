@@ -38,7 +38,7 @@ const BUTTONS: Partial<Record<HotkeyAction, readonly string[]>> = {
 
 /** Строки памятки: клавиша и ключ подписи. */
 const MEMO: readonly { action: HotkeyAction; label: string }[] = [
-  { action: 'tech', label: 'rail.tech.label' },
+  { action: 'tech', label: 'rail.tech.title' },
   { action: 'production', label: 'rail.constructor.label' },
   { action: 'events', label: 'rail.log.label' },
   { action: 'home', label: 'keys.memo.home' },
