@@ -1258,30 +1258,30 @@ export const en: Record<string, string> = {
 
   // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
   'dossier.building.barracks':
-    'Barracks defend your world from invaders. Home to your valiant defenders.',
+    'Trains infantry — without barracks it cannot be ordered. {hp} structure HP.',
   'dossier.building.default': 'A planetary structure.',
   'dossier.building.fabricator':
-    'Clean lithography halls print {m}▦ per hour. Hungry for power and people, but its output guides strike wings and unlocks siege doctrines. Upgrades pay for themselves in their own product.',
+    'Prints {m}▦ per hour. Upkeep is energy and food; microelectronics go into shuttles and siege doctrines.',
   'dossier.building.farm':
-    'Tiers of hydroponic greenhouses under spectral lamps feed those in your care — hunger is merciless. Grows {f}❖ per hour. Your workers and soldiers eat every day; it would be foolish to lose a battle to a hungry faint.',
+    'Hydroponic tiers: {f}❖ per hour. Food feeds ground troops and the Microelectronics Fab.',
   'dossier.building.fort':
     'A layered planetary bastion: damage to the world from ground assault and orbital bombardment is {d} lower, {hp} structure HP. Every other intact building cuts another {b}, up to {cap} in total.',
   'dossier.building.metal-station':
-    "A mining rig gnawing into a dead world's scorched crust. Where annihilation burned away all life, raw metal ore lies exposed — the station pumps {m}⬢ per hour. Upgrades raise the yield.",
+    "A rig on a dead world's scorched crust: {m}⬢ per hour.",
   'dossier.building.mine':
-    'A drilling rig gnaws into the planet, mining {m}⬢ per hour. Upgrades dig deeper to reach the richest veins. The foundation for building your fleet.',
+    'A drilling rig: {m}⬢ per hour.',
   'dossier.building.orbital-aa':
-    "Orbital interdiction: a fixed battery that fires on SHIPS in orbit — {dmg} damage per hour. Against shuttles it is useless: those dive into the world's airspace, and area defense is what meets them there. It does not block capture (that is ground defense's job) — it just mows down the fleet overhead.",
+    "Hits SHIPS in orbit: {dmg} damage per hour. Can't reach shuttles — that is area defense's job; does not block capture.",
   'dossier.building.zonal-aa':
-    "Area defense: a battery that meets SHUTTLES once they dive into the world's airspace — {dmg} damage to the wave at the moment it strikes. Without it a shuttle raid on your world costs the raider nothing: they hit and leave intact. With it, half the wave never flies home. It does nothing against ships in orbit — that is orbital interdiction's job.",
+    "Hits SHUTTLES diving into the world's airspace: {dmg} damage to the wave as it strikes. Without it shuttles leave intact. Ships in orbit are orbital interdiction's job.",
   'dossier.building.power-plant':
-    "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
+    'A fusion reactor: {e}↯ per hour. Short on energy for upkeep — buildings run at half output.',
   'dossier.building.radar':
     'Range {r}. Level {lv}: {s}. Ships within 40 units of a group anchor combine their signals: medium starts at 5, high at 13. Close identification reveals composition.',
   'dossier.building.refinery':
-    'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary shuttles.',
+    'A refining complex: {c}¤ per hour.',
   'dossier.building.starfort':
-    'The hull of a void fortress — what the node stands and fights with. {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level; it is never built on its own, it arrives with the fortress.',
+    'The hull of a void fortress: {hp} structure HP, {aa} against ships and {pd} against shuttles, damage to the node {d} lower. Grows with the fortress level; never built on its own.',
   'dossier.building.tax-office':
     "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
   'dossier.fleet.desc':
