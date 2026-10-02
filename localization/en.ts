@@ -1678,6 +1678,10 @@ export const en: Record<string, string> = {
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
   'profile.title': 'Profile',
+  'profile.tabs': 'Profile sections',
+  'profile.tab.portrait': 'Portrait',
+  'profile.tab.medals': 'Medals',
+  'profile.tab.career': 'Career',
   "profile.portraits": "40 portraits",
   "profile.slots": "Uniform medals · 5 × 3",
   "profile.slot": "Slot {n}",
@@ -1875,8 +1879,9 @@ export const en: Record<string, string> = {
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Candidates · tap to fill a slot',
-  'scipick.confirm': 'Lock in and continue to start pick →',
+  'scipick.confirm': 'Lock in and continue to start pick',
   'scipick.focus': '{br} branch focus',
+  'scipick.full': 'Council full: remove a scientist (✕ above) to pick another',
   'scipick.generalist': '+1 research slot (a generalist, no branch focus)',
   'scipick.need-two': 'Pick two scientists',
   'scipick.note':
@@ -3525,7 +3530,7 @@ export const en: Record<string, string> = {
   'win.log.recap': 'Return digest',
   'win.log.title': 'DISPATCHES',
   'win.scipick.back': '↩ Menu',
-  'win.scipick.title': 'SCIENCE COUNCIL',
+  'win.scipick.title': 'Science council',
   'win.steward.title': 'STEWARD · AI WHILE ASLEEP',
   'win.tech.title': 'TECHNOLOGIES',
 };

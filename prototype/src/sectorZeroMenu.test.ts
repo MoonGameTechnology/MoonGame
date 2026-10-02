@@ -95,3 +95,25 @@ describe('крестик панелей меню', () => {
     expect(button![0]).toMatch(/data-i18n-aria="[^"]+"/); // имя кнопки — подпись, а не картинка
   });
 });
+
+describe('меню Sector Zero в палитре хаба (UIX-15.4)', () => {
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{};]+)\{([^{}]*)\}/g)].map((m) => ({
+    sel: m[1]!.trim(),
+    body: m[2]!,
+  }));
+
+  it('моноширинный шрифт — только у счётчика страниц комикса (комикс в этот круг не входил)', () => {
+    expect(rules.filter((r) => /monospace/.test(r.body)).map((r) => r.sel)).toEqual(['#comic-count']);
+  });
+
+  it('КАПС — только первая буква подписи', () => {
+    const caps = rules.filter((r) => /text-transform:\s*uppercase/.test(r.body));
+    expect(caps.length).toBeGreaterThan(0);
+    for (const r of caps) expect(r.sel).toMatch(/::first-letter$/);
+  });
+
+  it('текст не мельче 12 px; мельче — только значки ✓ и ★ в углу', () => {
+    const tiny = rules.filter((r) => /(?:font-size:|font:[^;]*?)\s(?:\d|1[01])(?:\.\d+)?px/.test(r.body));
+    expect(tiny.map((r) => r.sel)).toEqual(['#sector-zero .sz-node.sz-passed::before', '.sz-slot.star::after']);
+  });
+});

@@ -1927,13 +1927,18 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .swarm-biology summary{cursor:pointer;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);}
 .swarm-biology p{font-size:12px;line-height:1.5;color:var(--ink);}
 .swarm-biology h4{margin:10px 0 4px;font-size:12px;color:var(--cyan);}
-/* scientist council picker (setup-time, over the start-point screen) */
+/* scientist council picker (setup-time, over the start-point screen). В палитре хаба, как
+   настройка схватки (UIX-15.2): окно, слоты и карточки из токенов --sf-*. */
 #scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
 #scipick.show{display:flex;}
 #scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
-  background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
-#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+  font-family:var(--sf-font);font-variant-numeric:tabular-nums;color:var(--sf-text);background:var(--sf-panel);
+  border:1px solid var(--sf-panel-edge);border-radius:18px;box-shadow:var(--sf-shadow);}
+#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;
+  padding:10px 12px 10px 18px;border-bottom:1px solid var(--sf-edge);background:none;}
+#scipick .lw-head b{font-size:18px;font-weight:700;letter-spacing:0;color:var(--sf-hi);}
+#scipick button:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
 /* Досье Роя открывается СПРАВА (заказ владельца 2026-09-23): на телефоне — выдвижная
    панель во всю высоту у правого края, на ПК — приколото в правом столбце (ниже).
    Без затемнения (жалоба владельца 2026-09-24: «экран чернеет, будто поверх открывается
@@ -1973,35 +1978,51 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #swarm-dossier-body,#scipickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
 .sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px;}
 .sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
-.sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
-.sp-slot{min-height:96px;border-radius:11px;padding:12px;display:flex;flex-direction:column;gap:5px;position:relative;}
-.sp-slot.empty{border:1.5px dashed var(--cyan-dim);background:rgba(53,214,230,.03);align-items:center;justify-content:center;text-align:center;color:var(--cyan-dim);}
-.sp-slot.empty .sp-plus{font-size:22px;color:var(--cyan);line-height:1;}
-.sp-slot.empty .sp-hint{font-size:10.5px;letter-spacing:1px;}
-@media (prefers-reduced-motion:no-preference){.sp-slot.empty{animation:sppulse 1.5s ease-in-out infinite;}}
-@keyframes sppulse{0%,100%{border-color:var(--cyan-dim);box-shadow:0 0 0 0 rgba(53,214,230,0);}50%{border-color:var(--cyan);box-shadow:0 0 18px 1px rgba(53,214,230,.30);background:rgba(53,214,230,.08);}}
-.sp-slot.filled{border:1px solid var(--cyan);background:linear-gradient(180deg,rgba(53,214,230,.10),rgba(53,214,230,.03));}
+#scipick .sp-cancel{min-height:40px;padding:0 14px;border-color:var(--sf-edge);border-radius:10px;background:var(--sf-card);
+  color:var(--sf-text);font-size:14px;}
+#scipick .sp-cancel:hover{border-color:var(--sf-edge-hi);color:var(--sf-hi);}
+#scipick .sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+#scipick .sp-slot{position:relative;display:flex;flex-direction:column;gap:6px;min-height:104px;padding:14px 16px;border-radius:14px;}
+#scipick .sp-slot.empty{align-items:center;justify-content:center;text-align:center;color:var(--sf-accent);
+  border:1.5px dashed color-mix(in srgb,var(--sf-accent) 55%,transparent);background:color-mix(in srgb,var(--sf-accent) 4%,transparent);}
+#scipick .sp-slot.empty .sp-plus{font-size:22px;line-height:1;}
+#scipick .sp-slot.empty .sp-hint{font-size:14px;font-weight:600;}
+@media (prefers-reduced-motion:no-preference){#scipick .sp-slot.empty{animation:sppulse 1.5s ease-in-out infinite;}}
+@keyframes sppulse{0%,100%{border-color:color-mix(in srgb,var(--sf-accent) 55%,transparent);box-shadow:0 0 0 0 transparent;}
+  50%{border-color:var(--sf-accent);box-shadow:0 0 18px 1px color-mix(in srgb,var(--sf-accent) 30%,transparent);
+  background:color-mix(in srgb,var(--sf-accent) 8%,transparent);}}
+#scipick .sp-slot.filled{border:1px solid var(--sf-accent);background:var(--sf-primary);box-shadow:var(--sf-glow);}
 /* name reserves the ✕-corner (long names like «Командир крыла» wrapped UNDER the
    remove button and made it look misplaced) */
-.sp-slot .sp-sn{font-weight:700;color:#eafffb;font-size:13px;padding-right:24px;}
-.sp-slot .sp-inf{font-size:10px;color:var(--dim);line-height:1.4;}
-.sp-rm{position:absolute;top:7px;right:7px;width:18px;height:18px;border-radius:5px;border:1px solid var(--line-hi);background:transparent;color:var(--dim);cursor:pointer;font-size:10px;line-height:1;padding:0;display:grid;place-items:center;}
-.sp-rm:hover{border-color:var(--red);color:var(--red);}
-.sp-warn{margin-top:12px;display:flex;gap:8px;padding:10px 12px;border:1px solid #6a4a17;border-radius:9px;background:rgba(255,180,58,.09);color:#f4d199;font-size:11.5px;line-height:1.5;}
-.sp-h{margin:15px 0 8px;font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);}
-.sp-roster{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-/* усиление забега (PVR-1.4): те же карточки, что у совета, в один столбец —
-   выбор здесь делается в бою, и колонка читается быстрее решётки. */
-.sp-card{text-align:left;cursor:pointer;border:1px solid var(--line-hi);border-radius:9px;padding:9px 10px;background:rgba(53,214,230,.04);color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:3px;}
-.sp-card:hover:not(:disabled){border-color:var(--cyan);background:rgba(53,214,230,.11);box-shadow:0 0 12px rgba(53,214,230,.16);}
-.sp-card:disabled{opacity:.34;cursor:not-allowed;}
-.sp-card.picked{border-color:var(--cyan-dim);}
-.sp-card .sp-cn{display:flex;align-items:center;gap:6px;font-weight:700;font-size:12px;color:#eafffb;}
-.sp-card .sp-tick{margin-left:auto;color:var(--grn);font-size:11px;}
-.sp-card .sp-inf{font-size:9.5px;color:var(--dim);line-height:1.4;}
-.sp-go{margin-top:15px;width:100%;padding:12px;border-radius:9px;cursor:pointer;border:1px solid var(--cyan);background:rgba(53,214,230,.12);color:var(--cyan);font:inherit;font-weight:700;font-size:12.5px;letter-spacing:1px;text-transform:uppercase;}
-.sp-go:hover:not(:disabled){background:rgba(53,214,230,.2);box-shadow:0 0 16px rgba(53,214,230,.28);}
-.sp-go:disabled{opacity:.4;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+#scipick .sp-slot .sp-sn{padding-right:36px;font-size:16px;font-weight:700;color:var(--sf-hi);}
+#scipick .sp-slot .sp-inf{font-size:14px;line-height:1.45;color:var(--sf-text);}
+#scipick .sp-rm{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:32px;height:32px;padding:0;
+  border:1px solid var(--sf-edge-hi);border-radius:9px;background:var(--sf-inset);color:var(--sf-text);cursor:pointer;
+  font:inherit;font-size:14px;line-height:1;}
+#scipick .sp-rm:hover{border-color:var(--red);color:var(--red);}
+#scipick .sp-warn{display:flex;gap:8px;margin-top:12px;padding:12px 14px;border:1px solid #6a4a17;border-radius:12px;
+  background:rgba(255,180,58,.09);color:#f4d199;font-size:14px;line-height:1.45;}
+#scipick .sp-h{margin:16px 0 10px;font-size:14px;font-weight:600;line-height:1.4;color:var(--sf-head);}
+/* Ростер — две колонки, а в узком окне (телефон) одна: в половине телефона описание
+   кандидата шло в пять строк по одному слову. */
+#scipick .sp-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,max(200px,calc(50% - 4px))),1fr));gap:8px;}
+#scipick .sp-card{display:flex;flex-direction:column;gap:4px;min-height:72px;padding:12px 14px;border:1px solid var(--sf-edge);
+  border-radius:12px;background:var(--sf-card);color:var(--sf-text);font:inherit;text-align:left;cursor:pointer;}
+#scipick .sp-card:hover:not(:disabled){border-color:var(--sf-edge-hi);}
+#scipick .sp-card .sp-cn{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600;line-height:1.3;}
+#scipick .sp-card .sp-tick{display:grid;place-items:center;flex:none;width:20px;height:20px;margin-left:auto;border-radius:50%;
+  background:var(--sf-accent);color:var(--void);font-size:12px;font-weight:800;}
+#scipick .sp-card .sp-inf{font-size:14px;line-height:1.45;color:var(--sf-dim);}
+/* Полный совет гасит остальных, но имя и влияние читаются: по ним выбирают замену. */
+#scipick .sp-card:disabled{cursor:not-allowed;border-style:dashed;background:var(--sf-card-off);color:var(--sf-dim);}
+#scipick .sp-card.picked{border-style:solid;border-color:var(--sf-accent);background:var(--sf-sel);color:var(--sf-hi);}
+#scipick .sp-card.picked .sp-inf{color:var(--sf-text);}
+#scipick .sp-go{width:100%;min-height:52px;margin-top:14px;padding:0 16px;border:1px solid var(--sf-accent);border-radius:12px;
+  background:var(--sf-primary);color:var(--sf-hi);font:inherit;font-size:16px;font-weight:700;box-shadow:var(--sf-glow);cursor:pointer;}
+#scipick .sp-go:hover:not(:disabled){background:var(--sf-primary-hi);}
+#scipick .sp-go:disabled{opacity:.45;box-shadow:none;cursor:not-allowed;}
+@media (prefers-reduced-motion:no-preference){
+  #scipick :is(.sp-card,.sp-rm,.sp-cancel,.sp-go){transition:border-color .15s,background-color .15s,color .15s;}}
 /* Торговец экспедиции («живой курс»): окно того же вида, что рынок (#market). */
 #trader{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
@@ -3175,52 +3196,60 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 .mp-note{color:var(--dim);font-size:10px;margin:2px 0 0;}
 /* --- Профиль командира: the career dossier (main-menu.md §4.2). One overlay, two
    entry points: the hub identity strip and the in-match player card, so the mount
-   below is a full-screen sheet rather than a hub panel. */
-#profile{position:fixed;inset:0;z-index:57;display:none;flex-direction:column;
-  background:radial-gradient(130% 80% at 50% 0%,#06161e,#010409);color:var(--ink);}
+   below is a full-screen sheet rather than a hub panel. In the hub palette (UIX-15.3):
+   panels, cards and type from the --sf-* tokens, the same on the phone and the PC. */
+#profile{position:fixed;inset:0;z-index:57;display:none;flex-direction:column;--pf-pad:18px;
+  background:radial-gradient(130% 80% at 50% 0%,#06161e,#010409);color:var(--sf-text);
+  font:15px/1.4 var(--sf-font);font-variant-numeric:tabular-nums;}
 #profile.show{display:flex;}
 /* right padding clears the fixed ✕ in the corner — the capsule must never sit under it */
-#profile .pf-top{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 54px 14px 16px;border-bottom:1px solid var(--line);}
-#profile .pf-av{width:52px;height:52px;border-radius:50%;border:1px solid var(--cyan-dim);background:rgba(3,12,16,.8);
-  display:grid;place-items:center;color:var(--cyan);font-size:21px;font-weight:700;flex:0 0 auto;
-  box-shadow:inset 0 0 12px rgba(53,214,230,.14);font-variant-emoji:text;}
+#profile .pf-top{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:14px 76px 14px 18px;
+  border-bottom:1px solid var(--sf-edge);background:var(--sf-card-off);}
+#profile .pf-av{width:56px;height:56px;border-radius:14px;border:1px solid var(--sf-panel-edge);background:var(--sf-inset);
+  display:grid;place-items:center;overflow:hidden;color:var(--sf-accent);font-size:22px;font-weight:700;flex:0 0 auto;
+  font-variant-emoji:text;}
+/* the portrait framed as on the hub avatar: the face, not the whole tunic */
+#profile .pf-av.face img{display:block;width:100%;height:100%;object-fit:cover;object-position:center top;
+  transform:scale(1.7);transform-origin:50% 8%;}
 #profile .pf-who{flex:1;min-width:0;}
-#profile .pf-nm{font-size:19px;color:#eafffb;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-#profile .pf-sub{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4;}
+#profile .pf-nm{font-size:20px;color:var(--sf-hi);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#profile .pf-sub{font-size:14px;color:var(--sf-dim);margin-top:4px;line-height:1.4;}
 /* Sovereigns capsule — the premium currency reads GOLD everywhere it appears
-   (same #ffd45e as the in-match #devline counter), never the UI's cyan. */
-#profile .pf-cur{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:8px 12px;border-radius:999px;
-  border:1px solid rgba(255,212,94,.45);background:rgba(255,212,94,.08);color:#ffd45e;
-  font:700 15px ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+   (the hub wallet's plaque), never the UI's cyan. */
+#profile .pf-cur{flex:0 0 auto;display:flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border-radius:999px;
+  border:1px solid rgba(255,207,98,.75);background:linear-gradient(180deg,rgba(66,46,8,.94),rgba(26,18,4,.96));
+  box-shadow:0 0 10px rgba(255,186,52,.24);color:#ffd978;font-size:16px;font-weight:700;}
 #profile .pf-cur i{font-style:normal;font-size:15px;text-shadow:0 0 9px rgba(255,212,94,.85);}
 #profile .pf-cur i svg{display:block;width:16px;height:16px;
   filter:drop-shadow(0 0 3px rgba(255,212,94,.75));}
 #profile .pf-cur b{font-weight:700;}
-#profile .pf-cur em{font-style:normal;color:rgba(255,212,94,.7);font-weight:400;font-size:15px;}
-#profile .pf-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;flex-direction:column;gap:14px;}
-#profile .pf-h{font-size:22px;font-weight:700;color:#eafffb;letter-spacing:.5px;}
-/* Stat tiles: the end screen's canonical shape (label-caps over a big tabular
-   number), re-declared here because those rules are scoped to #endscreen. */
-#profile .pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-#profile .pf-cell{border:1px solid var(--line-hi);border-radius:12px;padding:14px;background:rgba(6,18,22,.6);
-  display:flex;flex-direction:column-reverse;gap:6px;min-height:96px;justify-content:flex-end;}
-#profile .pf-k{font-size:11px;letter-spacing:.6px;color:var(--dim);}
-#profile .pf-v{font-size:30px;font-weight:700;color:#eafffb;font-variant-numeric:tabular-nums;line-height:1.1;}
-#profile .pf-v.accent{color:var(--cyan);}
-#profile .pf-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:4px;}
+#profile .pf-cur em{font-style:normal;color:rgba(255,212,94,.7);font-weight:400;font-size:16px;}
+#profile .pf-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:var(--pf-pad);}
+#profile :is(.pf-h,.pf-sec){margin:18px 0 10px;font-size:16px;font-weight:600;color:var(--sf-head);}
+/* Stat tiles: the end screen's shape (caption under a big tabular number), re-declared
+   here because those rules are scoped to #endscreen. */
+#profile .pf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+#profile .pf-cell{border:1px solid var(--sf-edge);border-radius:12px;padding:12px 14px;background:var(--sf-card);
+  display:flex;flex-direction:column-reverse;gap:4px;min-height:84px;justify-content:flex-end;}
+#profile .pf-k{font-size:14px;color:var(--sf-dim);}
+#profile .pf-v{font-size:26px;font-weight:700;color:var(--sf-hi);line-height:1.1;}
+#profile .pf-v.accent{color:var(--sf-accent);}
 #profile .pf-medals{display:flex;flex-wrap:wrap;gap:18px;padding:4px 0 2px;}
 #profile .pf-medal{width:92px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;}
 #profile .pf-mc{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;font-size:30px;
-  border:1px solid var(--cyan);color:var(--cyan);background:rgba(53,214,230,.06);
-  box-shadow:0 0 14px rgba(53,214,230,.18),inset 0 0 12px rgba(53,214,230,.08);font-variant-emoji:text;}
-/* Not earned yet: the same silhouette, drained of colour — the showcase shows what
-   is still ahead instead of hiding it. */
-#profile .pf-medal.off .pf-mc{border-color:var(--line-hi);color:var(--dim);background:rgba(3,12,16,.6);box-shadow:none;}
-#profile .pf-mn{font-size:11px;color:#dfeef2;line-height:1.35;}
-#profile .pf-medal.off .pf-mn{color:var(--dim);}
-#profile .pf-hint{color:var(--dim);font-size:11px;line-height:1.5;margin:0;}
-#profile .pf-close{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:9px;
-  border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;z-index:2;}
+  border:1px solid var(--sf-accent);color:var(--sf-accent);background:var(--sf-sel);box-shadow:var(--sf-glow);
+  font-variant-emoji:text;}
+/* Not earned yet: the same silhouette, dashed and drained of colour — the showcase shows
+   what is still ahead instead of hiding it. */
+#profile .pf-medal.off .pf-mc{border-style:dashed;border-color:var(--sf-edge);color:var(--sf-dim);background:var(--sf-card-off);
+  box-shadow:none;}
+#profile .pf-mn{font-size:14px;color:var(--sf-text);line-height:1.35;}
+#profile .pf-medal.off .pf-mn{color:var(--sf-dim);}
+#profile .pf-hint{color:var(--sf-dim);font-size:14px;line-height:1.5;margin:0;}
+#profile .pf-close{position:absolute;top:20px;right:16px;width:44px;height:44px;border-radius:12px;
+  border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);font-size:18px;cursor:pointer;z-index:2;}
+#profile .pf-close:hover{border-color:var(--sf-edge-hi);color:var(--sf-hi);}
+#profile .pf-close:focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
 
 ${profileCss}
 /* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */

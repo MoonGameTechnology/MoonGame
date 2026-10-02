@@ -124,6 +124,9 @@
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |
 | UIX-14.1 | ✅ | proto | `docs/backlog.md` | Окно мира без дублей: шапка фактов и одно число на вкладку. |
 | UIX-15.1 | ✅ | proto | `docs/backlog.md` | Настройка схватки и выбор места — в палитре хаба. |
+| UIX-15.2 | ✅ | proto | `docs/backlog.md` | Совет учёных — в палитре хаба. |
+| UIX-15.3 | ✅ | proto | `docs/backlog.md` | Профиль командира — вкладками и в палитре хаба. |
+| UIX-15.4 | ✅ | proto | `docs/backlog.md` | Sector Zero — в палитре хаба. |
 | A1 | ✅ |  | `docs/backlog-archive.md` | Проекция visibleState(state, viewerId, data) — identify (1 прыжок) + |
 | A1m | ✅ |  | `docs/backlog-archive.md` | Память последнего увиденного (вариант B): GameState.fog (per-player |
 | A2 | ✅ |  | `docs/backlog-archive.md` | радар-постройка с 3 уровнями |
