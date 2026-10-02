@@ -3554,7 +3554,7 @@ ${profileCss}
   #corp .corpbox{width:53.4vw;max-height:61vh;}
   #railtools #rail-settings,#railtools #rail-exit{display:grid;}
   /* speedbar on PC: exit (⌂) lives in the rail and ▶▶ is dropped; the multiplier set
-     swaps to 1/30/60/120. (The whole bar's show/hide rides the dev toggle in main.ts.) */
+     swaps to ×1/×1800/×3600/×7200. (The whole bar's show/hide rides the dev toggle in main.ts.) */
   .spd .spd-pc-hide{display:none;}
   .spd .spd-mult-legacy{display:none;}
   .spd .spd-mult-pc{display:contents;}
@@ -3782,9 +3782,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="speedbar" class="spd">
   <!-- time controls. PC: shown only via the developer «speed control» toggle (whole
        bar hidden otherwise); ⌂/▶▶ are PC-hidden (exit lives in the rail). Mobile is
-       frozen: keeps ⌂/▶▶ and the legacy ×1/×10/×50/×100 chips; PC swaps in 1/30/60/120
-       (data-mult = real wall-clock multiplier: 1800=½h·s, 3600=1h·s, 7200=2h·s). -->
-  <span id="spd-ctl"><button id="spd-pause" data-speed="0" data-i18n-title="hud.run.pause" data-i18n-aria="hud.run.pause">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><!--dev-only--><button id="spd-dev" type="button" data-speed="0" hidden>▶▶▶</button><!--/dev-only--><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">1×</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">30×</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">60×</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">120×</button></span><span class="sep"></span></span>
+       frozen: keeps ⌂/▶▶ and the legacy ×1/×10/×50/×100 chips; PC swaps in ×1/×1800/×3600/×7200
+       (data-mult = real wall-clock multiplier: 1800=½h·s, 3600=1h·s, 7200=2h·s). One notation
+       «×N» everywhere, N = the real multiplier (UIX-5.2): the PC chips used to read 30×/60×/120×,
+       which looked close to the phone's ×100 while running 18–72 times faster. -->
+  <span id="spd-ctl"><button id="spd-pause" data-speed="0" data-i18n-title="hud.run.pause" data-i18n-aria="hud.run.pause">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><!--dev-only--><button id="spd-dev" type="button" data-speed="0" hidden>▶▶▶</button><!--/dev-only--><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">×1800</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">×3600</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">×7200</button></span><span class="sep"></span></span>
   <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" data-i18n-title="speed.restart" style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" data-i18n-title="speed.exit">⌂</button>
 </div>
 <div id="cmdbar"></div>

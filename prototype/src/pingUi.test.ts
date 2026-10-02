@@ -210,12 +210,18 @@ describe('метки — список', () => {
 
 describe('метки — попап маркера', () => {
   it('своя метка предлагает снятие, чужая — только переход', () => {
-    expect(pingPopHtml('C1R1', 'Вы', '#0ff', 'тут', true)).toContain('pp-del');
-    expect(pingPopHtml('C1R1', 'Красные', '#f00', 'тут', false)).not.toContain('pp-del');
+    expect(pingPopHtml('C1R1', 'STYX-3', 'Вы', '#0ff', 'тут', true)).toContain('pp-del');
+    expect(pingPopHtml('C1R1', 'STYX-3', 'Красные', '#f00', 'тут', false)).not.toContain('pp-del');
+  });
+
+  it('место названо именем, а код остаётся только кнопкам (UIX-5.2)', () => {
+    const html = pingPopHtml('C1R1', 'STYX-3', 'Вы', '#0ff', 'тут', true);
+    expect(html).toContain('<span>STYX-3</span>');
+    expect(html.replace(/data-loc="C1R1"/g, '')).not.toContain('C1R1');
   });
 
   it('метка без описания честно говорит, что описания нет', () => {
-    const html = pingPopHtml('C1R1', 'Вы', '#0ff', '', true);
+    const html = pingPopHtml('C1R1', 'STYX-3', 'Вы', '#0ff', '', true);
     expect(html).toContain('<i>'); // курсивная заглушка вместо пустой строки
     expect(html).toContain('pp-jump');
   });
@@ -247,11 +253,11 @@ describe('метки — композер', () => {
     expect(w.api.menuOpen()).toBe(false);
   });
 
-  it('открытое окно знает свою провинцию', () => {
+  it('открытое окно знает свою провинцию — по имени (UIX-5.2)', () => {
     const w = wired();
     w.api.openMenu();
     expect(w.menu.raw.shown).toBe(true);
-    expect(w.menu.raw.innerHTML).toContain('C1R1');
+    expect(w.menu.raw.innerHTML).toContain('<b>Мир C1R1</b>');
     expect(w.api.menuOpen()).toBe(true);
   });
 
@@ -289,7 +295,7 @@ describe('метки — композер', () => {
     w.api.openMenu();
     w.api.createTo(COALITION);
     expect(w.pushed[0]![1]).toBeTruthy();
-    expect(w.pushed[0]![1]).toContain('C1R1');
+    expect(w.pushed[0]![1]).toContain('Мир C1R1');
   });
 
   it('слишком длинное описание обрезается до предела поля', () => {

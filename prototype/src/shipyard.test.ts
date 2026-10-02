@@ -4,6 +4,7 @@ import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import { newGame, canOrder } from './game';
 import { data } from './gameData';
+import { worldName } from './planetName';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import {
   bagText,
@@ -644,6 +645,15 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     // А на вкладке кораблей тот же экран показывает нормальный выбор мира.
     const ships = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
     expect(loadoutPaneHtml(s, 'p1', ships, YARD_HULLS, view)).toContain('id="cn-planet"');
+  });
+
+  it('мир в выборе места назван именем, как на карте, а не кодом (UIX-5.2)', () => {
+    const s = rich();
+    const d = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    const option = new RegExp(`<option value="${d.planet}" selected>([^<]*)</option>`).exec(html);
+    expect(option?.[1]).toBe(worldName(s, d.planet));
+    expect(option?.[1]).not.toBe(d.planet);
   });
 
   it('смена вкладки на «Пехоту» переводит конструктор на её ростер и её мир', () => {

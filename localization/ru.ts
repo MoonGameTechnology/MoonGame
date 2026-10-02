@@ -1868,7 +1868,7 @@ export const ru: Record<string, string> = {
   'sandbox.tog.instant-cooldown.hint': 'Умения командиров всегда готовы',
   'sandbox.tog.speed': 'Управление скоростью',
   'sandbox.tog.speed.hint':
-    'панель времени в матче — пауза и множители ускорения (1× — реальное время)',
+    'панель времени в матче — пауза и множители ускорения (×1 — реальное время)',
   'sandbox.unlock-techs': 'Открыть все технологии',
   'sandbox.toggles': 'Переключатели',
   'sandbox.wars-ended': 'Войны прекращены: {n} — отношения нейтральные',
