@@ -65,9 +65,14 @@ async function exitMatch() {
   if (await exit.isVisible()) return exit.click();
   const back = page.locator('#holo-back');
   // «‹» есть и вне партии — жмём, пока не открылся хаб или меню Sector Zero.
-  const out = async () => (await page.locator('#hub').isVisible()) || (await page.locator('#sector-zero').isVisible());
+  const out = async () =>
+    (await page.locator('#hub').isVisible()) || (await page.locator('#sector-zero').isVisible());
   for (let i = 0; i < 6 && !(await out()); i++) {
-    await back.click();
+    // Из идущей экспедиции «‹» спрашивает, выйти ли (карточка «В меню / Завершить»): игрок
+    // выбирает «В меню» — забег сохраняется, как раньше.
+    const menu = page.locator('#abandon-menu');
+    if (await menu.isVisible()) await menu.click();
+    else await back.click();
     await page.waitForTimeout(150);
   }
 }
@@ -217,6 +222,16 @@ async function runTempoOnly(p, label) {
   assert.equal(await p.locator('#runpause').count(), 0, `${label}: второй паузы нет`);
 }
 const wave = () => page.locator('.dl-wave').first();
+/** Первый забег главы I открывает её комикс (PR #1342): страница висит 5 секунд, потом
+ *  «В бой». Игрок видит то же самое; смоук проходит его, как игрок, и заодно проверяет,
+ *  что картинка комикса доехала в архиве. */
+async function passChapterComic(p) {
+  await p.locator('#comic').waitFor({ state: 'visible' });
+  // Картинка из `assets/` архива действительно пришла, а не упала в подписи без арта.
+  await p.waitForFunction(() => document.getElementById('comic-img').naturalWidth > 0);
+  await p.locator('#comic-next').click({ timeout: 15000 });
+  await p.locator('#comic').waitFor({ state: 'hidden' });
+}
 const log = () => page.evaluate(() => window.__ya.log);
 const progress = () =>
   page.evaluate(() => JSON.parse(localStorage.getItem('sector-zero.progress.v1') ?? 'null'));
@@ -240,6 +255,7 @@ try {
     // 2. Новый забег.
     await page.waitForFunction(() => !document.getElementById('sz-new').disabled);
     await page.locator('#sz-new').click();
+    await passChapterComic(page);
     await wave().waitFor({ state: 'visible' });
     await page.locator('#maploading').waitFor({ state: 'hidden' });
     assert.ok((await log()).includes('start'), 'площадке сообщено начало геймплея');
@@ -529,6 +545,7 @@ try {
   await waitForApp(phonePage);
   await phonePage.waitForFunction(() => !document.getElementById('sz-new').disabled);
   await phonePage.locator('#sz-new').tap();
+  await passChapterComic(phonePage);
   await phonePage.locator('.dl-wave').first().waitFor({ state: 'visible' });
   await runTempoOnly(phonePage, 'телефон');
   assert.ok(await phonePage.locator('#tomenu').isVisible(), 'телефон: выход ⌂ на полосе');
@@ -626,6 +643,7 @@ try {
     'битый журнал: меню говорит, что сохранение не открылось, и пускает дальше',
   );
   await brokenPage.locator('#sz-new').click();
+  await passChapterComic(brokenPage);
   await brokenPage.locator('.dl-wave').first().waitFor({ state: 'visible' });
   await broken.close();
 
