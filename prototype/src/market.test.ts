@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { newGame, order, marketList, marketTake, marketCancel, declareWar, aiOrders } from './game';
 import type { GameState, MarketOrder } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 // САМ МОДУЛЬ рынка живёт в ядре и там же проверяется (CONV-9 снял копию прототипа):
 // двусторонняя книга, эскроу, комиссия 15%, белый список товаров, цена ≥ 1 и капабилити
@@ -54,7 +55,7 @@ describe('рынок в сборке прототипа — эмбарго че�
 
 describe('рынок в сборке прототипа — бот торгует излишками', () => {
   it('бот выставляет только излишек сверх резерва, и эмбарго держит соурнувшегося', () => {
-    let s = newGame(); // p2 = AI
+    let s = atWeakTurn(newGame(), 'full'); // p2 = AI
     // Экономика зданий научила бота рабочему РЕЗЕРВУ (120 food) — стартовый запас ровно
     // такой, поэтому на старте он не продаёт НИЧЕГО…
     const atStart = aiOrders(s, 'p2').filter(

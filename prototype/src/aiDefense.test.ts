@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 function game2(): GameState {
   return newGame({
@@ -121,7 +122,8 @@ describe('AI-BAL-2 — оборонительные здания (тест-пр�
   });
 
   it('слабый бот на войне оборону строит тоже (слабый знает то же, 2026-09-28)', () => {
-    const types = builtTypes(aiOrders(atWar(game2()), 'p2', 'expand'));
+    const s = atWeakTurn(atWar(game2()), 'full');
+    const types = builtTypes(aiOrders(s, 'p2', 'expand'));
     expect(types).toContain('fort');
   });
 });
@@ -216,7 +218,8 @@ describe('AI-BAL-2 — гарнизон на занятом мире', () => {
   });
 
   it('слабый бот гарнизоны расставляет тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(unloads(aiOrders(heldEmpty(game2(), 4), 'p2', 'expand')).length).toBeGreaterThan(0);
+    const s = atWeakTurn(heldEmpty(game2(), 4), 'full');
+    expect(unloads(aiOrders(s, 'p2', 'expand')).length).toBeGreaterThan(0);
   });
 });
 

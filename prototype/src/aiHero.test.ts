@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import { data } from './gameData';
 import type { Action, GameState, Hero } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 function game2(): GameState {
   return newGame({
@@ -105,7 +106,8 @@ describe('AI-BAL-8 — подъём ростера (`hero.spawn`)', () => {
   });
 
   it('слабый бот ростер поднимает тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(only(orders(rich(game2()), 'weak'), 'hero.spawn').length).toBeGreaterThan(0);
+    const s = atWeakTurn(rich(game2()), 'full');
+    expect(only(orders(s, 'weak'), 'hero.spawn').length).toBeGreaterThan(0);
   });
 });
 
@@ -174,7 +176,8 @@ describe('AI-BAL-8 — дерево навыков (`hero.skill.unlock`)', () =>
   });
 
   it('слабый бот дерево качает тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(only(orders(rich(game2()), 'weak'), 'hero.skill.unlock').length).toBeGreaterThan(0);
+    const s = atWeakTurn(rich(game2()), 'full');
+    expect(only(orders(s, 'weak'), 'hero.skill.unlock').length).toBeGreaterThan(0);
   });
 });
 
@@ -218,7 +221,8 @@ describe('AI-BAL-8 — железо корабля (`hero.install`)', () => {
   });
 
   it('слабый бот железо ставит тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(only(orders(docked(rich(game2())), 'weak'), 'hero.install').length).toBeGreaterThan(0);
+    const s = atWeakTurn(docked(rich(game2())), 'full');
+    expect(only(orders(s, 'weak'), 'hero.install').length).toBeGreaterThan(0);
   });
 });
 
@@ -351,7 +355,8 @@ describe('AI-BAL-8 — способности (`hero.ability`)', () => {
   });
 
   it('слабый бот способности кастует тоже (слабый знает то же, 2026-09-28)', () => {
-    expect(only(orders(heroInBattle(rich(game2())), 'weak'), 'hero.ability').length).toBeGreaterThan(0);
+    const s = atWeakTurn(heroInBattle(rich(game2())), 'full');
+    expect(only(orders(s, 'weak'), 'hero.ability').length).toBeGreaterThan(0);
   });
 });
 

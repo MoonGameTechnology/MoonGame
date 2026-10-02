@@ -14,8 +14,9 @@
 // Тесты ниже читают исходники, как i18n-гейт читает их на русские литералы.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { newGame, aiOrders, START_CANDIDATES } from './game';
+import { newGame, aiOrders, START_CANDIDATES, type AiProfile } from './game';
 import { seatAiProfile } from './setupSeats';
+import { atWeakTurn } from './weakTurnFixture';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 
 /** Харнесы баланса: они обязаны просить сильного бота ЯВНО — иначе прибор мерил бы
@@ -43,24 +44,41 @@ function game2(): GameState {
 const research = (actions: Action[]): Action[] =>
   actions.filter((a) => a.type === 'technology.research');
 
+/** Сорок двухчасовых окон одного мира: меняются только часы, а с ними — жребий хода. */
+function windows(): GameState[] {
+  const s = game2();
+  return Array.from({ length: 40 }, (_, k) => ({ ...s, time: k * 2 * 3_600_000 }));
+}
+
 describe('профиль бота — сложность соперника', () => {
   it('СЛАБЫЙ знает то же, что сильный: исследует и он (заказ владельца 2026-09-28)', () => {
     // Слабость — гандикап (`WEAK_HANDICAP`), а не выключенные умения.
-    expect(research(aiOrders(game2(), 'p2', 'expand')).length).toBeGreaterThan(0);
+    expect(windows().some((s) => research(aiOrders(s, 'p2', 'expand')).length > 0)).toBe(true);
     expect(research(aiOrders(game2(), 'p2', 'expand', 'strong')).length).toBeGreaterThan(0);
   });
 
-  it('СЛАБЫЙ медленнее: каждый второй ход бота молчит, сильный ходит всегда', () => {
-    const HOUR = 3_600_000;
-    const odd = { ...game2(), time: 2 * HOUR }; // второе двухчасовое окно
-    expect(aiOrders(odd, 'p2', 'expand')).toEqual([]);
-    expect(aiOrders(odd, 'p2', 'expand', 'strong').length).toBeGreaterThan(0);
-    const even = { ...game2(), time: 4 * HOUR };
-    expect(aiOrders(even, 'p2', 'expand').length).toBeGreaterThan(0);
+  it('СЛАБЫЙ медленнее: молчит в части ходов, и вразнобой с соседом (2026-10-01)', () => {
+    const silent = (seat: string, profile?: AiProfile): boolean[] =>
+      windows().map((s) => aiOrders(s, seat, 'expand', profile).length === 0);
+    const p2 = silent('p2');
+    const share = p2.filter(Boolean).length / p2.length;
+    expect(share).toBeGreaterThan(0.25);
+    expect(share).toBeLessThan(0.75);
+    expect(silent('p1'), 'жребий свой у каждого бота').not.toEqual(p2);
+    expect(silent('p2', 'strong').some(Boolean), 'сильный ходит всегда').toBe(false);
+  });
+
+  it('СЛАБЫЙ в части ходов играет простым ботом: приказы отдаёт, но не исследует', () => {
+    const acting = windows()
+      .map((s) => aiOrders(s, 'p2', 'expand'))
+      .filter((a) => a.length > 0);
+    const simple = acting.filter((a) => research(a).length === 0).length / acting.length;
+    expect(simple).toBeGreaterThan(0.2);
+    expect(simple).toBeLessThan(0.8);
   });
 
   it('«Хранитель» игрока гандикапа не получает — это его автопилот, а не соперник', () => {
-    const odd = { ...game2(), time: 2 * 3_600_000 };
+    const odd = atWeakTurn(game2(), 'skip'); // окно, где слабый соперник промолчал бы
     const shape = (actions: Action[]): string =>
       JSON.stringify(actions.map((a) => [a.type, a.payload]));
     expect(shape(aiOrders(odd, 'p2', 'defend'))).toBe(shape(aiOrders(odd, 'p2', 'defend', 'strong')));
@@ -78,9 +96,9 @@ describe('профиль бота — сложность соперника', ()
     // не имеет — сравнение объектов целиком падало бы на нём, а не на поведении.
     const shape = (actions: Action[]): string =>
       JSON.stringify(actions.map((a) => [a.type, a.payload]));
-    expect(shape(aiOrders(game2(), 'p2', 'expand', 'weak'))).toBe(
-      shape(aiOrders(game2(), 'p2', 'expand')),
-    );
+    const shapes = (profile?: AiProfile): string[] =>
+      windows().map((s) => shape(aiOrders(s, 'p2', 'expand', profile)));
+    expect(shapes('weak')).toEqual(shapes());
   });
 
   it('СЕТЕВОЙ путь сложность не выбирает (сторож по исходникам)', () => {

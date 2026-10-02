@@ -279,21 +279,30 @@ export function huntWeight(target: Planet, landing: readonly UnitStack[]): numbe
 }
 
 /**
- * ГАНДИКАП СЛАБОГО ПРОФИЛЯ (заказ владельца 2026-09-28). Слабый бот знает всё то же, что
- * сильный, но хуже этим пользуется:
- * - `turnEvery` — в какой из ходов бота он вообще отдаёт приказы: ход — двухчасовое окно
- *   (`AI_STEP_MS`, та же каденция у соло-драйвера, сервера и self-play), слабый пропускает
- *   каждый второй, то есть реагирует вдвое медленнее;
+ * ГАНДИКАП СЛАБОГО ПРОФИЛЯ (заказ владельца 2026-09-28, ритм пересмотрен 2026-10-01). Слабый
+ * бот знает всё то же, что сильный, но хуже этим пользуется:
+ * - `skipTurn` — шанс пропустить ход целиком: ход — двухчасовое окно (`AI_STEP_MS`, та же
+ *   каденция у соло-драйвера, сервера и self-play). Жребий свой у каждого бота и каждого
+ *   окна (`decisionNoise`), поэтому слабые молчат вразнобой. Прежний строгий ритм «через
+ *   окно» был общим для всех слабых: отстающий не успевал ответить, и в партиях слабых между
+ *   собой лидер середины партии выигрывал 58–66% матчей (self-play, 2026-10-01);
+ * - `simpleTurn` — шанс сыграть сделанный ход прежним простым ботом (`skilled` выключен):
+ *   он строит, летит и воюет себе на пользу, но без эвристик блока AI-BAL;
  * - `wrongTarget` — шанс увести флот ко второй по близости цели вместо лучшей;
  * - `missRetreat` — шанс не заметить проигранный бой и остаться в нём.
  * «Хранитель» игрока (оборонительные позы) гандикапа не получает: это его собственный
  * автопилот, а не соперник.
  */
-const WEAK_HANDICAP = { turnEvery: 2, wrongTarget: 0.6, missRetreat: 0.5 } as const;
-const NO_HANDICAP = { turnEvery: 1, wrongTarget: 0.35, missRetreat: 0 } as const;
+const WEAK_HANDICAP = {
+  skipTurn: 0.5,
+  simpleTurn: 0.5,
+  wrongTarget: 0.6,
+  missRetreat: 0.5,
+} as const;
+const NO_HANDICAP = { wrongTarget: 0.35, missRetreat: 0 } as const;
 
 /**
- * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1), только для тест-профиля.
+ * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1).
  *
  * Зачем. Прогоны баланса не давали статистики: семьи сидов `base` и `alt` совпадали до
  * последней цифры, то есть 300 матчей были 4 конфигурациями (слот × фракция) по 75
@@ -314,7 +323,8 @@ const NO_HANDICAP = { turnEvery: 1, wrongTarget: 0.35, missRetreat: 0 } as const
  *
  * Это НЕ «случайная игра»: бот остаётся жадным и предсказуемым, шум лишь разводит
  * равноценные ветки — вторая по близости цель вместо первой, порог войны в коридоре
- * ±20%, точка входа в обход миров. Игрового бота не касается вовсе (профиль `test`).
+ * ±20%, точка входа в обход миров. Слабому боту тем же шумом бросаются жребии гандикапа
+ * (`WEAK_HANDICAP`, `weakTurn`).
  */
 function decisionNoise(state: GameState, ai: string, salt: string): number {
   const r = state.rng;
@@ -328,6 +338,16 @@ function decisionNoise(state: GameState, ai: string, salt: string): number {
   h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0;
   h = (h ^ (h >>> 13)) >>> 0;
   return h / 4294967296;
+}
+
+/**
+ * Ход слабого бота в этом двухчасовом окне (`WEAK_HANDICAP`): пропуск, ход простым ботом
+ * или полный. Экспорт — для тестов: умения слабого проверяются в его полном ходе.
+ */
+export function weakTurn(state: GameState, ai: string): 'skip' | 'simple' | 'full' {
+  const turn = Math.floor(state.time / (2 * 3_600_000));
+  if (decisionNoise(state, ai, `turn:${turn}`) < WEAK_HANDICAP.skipTurn) return 'skip';
+  return decisionNoise(state, ai, `simple:${turn}`) < WEAK_HANDICAP.simpleTurn ? 'simple' : 'full';
 }
 
 /**
@@ -556,13 +576,14 @@ function baseAiOrders(
   // обычного места; слабость — это `WEAK_HANDICAP`, а не отсутствие умений. NPC (пираты,
   // нейтральные союзники, Рой забега) на слабом профиле играют прежним простым ботом: это PvE-контент,
   // и его баланс здесь не трогается.
-  const skilled =
+  const capable =
     profile === 'strong' || (!state.players[ai]!.npc && state.pve?.npcPlayerId !== ai);
-  const hand = profile === 'weak' && skilled && posture === 'expand' ? WEAK_HANDICAP : NO_HANDICAP;
-  // Медленнее: слабый бот отдаёт приказы в каждом `turnEvery`-м двухчасовом окне, а в
-  // остальных молчит. Окно, а не час: при двухчасовой каденции окна чередуются при любой
-  // фазе тиков. Ритм — от часов мира, так что реплей не страдает.
-  if (Math.floor(state.time / (2 * 3_600_000)) % hand.turnEvery !== 0) return out;
+  const hand = profile === 'weak' && capable && posture === 'expand' ? WEAK_HANDICAP : NO_HANDICAP;
+  // Медленнее и неровнее: слабый бот молчит в части двухчасовых окон, а в части играет
+  // простым ботом. Оба жребия — от сида и часов мира, так что реплей не страдает.
+  const turn = hand === WEAK_HANDICAP ? weakTurn(state, ai) : 'full';
+  if (turn === 'skip') return out;
+  const skilled = capable && turn === 'full';
   const lineUnit = pirate ? 'pirate_cruiser' : 'cruiser';
   const scoutUnit = pirate ? 'pirate_skiff' : 'scout';
   const militiaUnit = pirate ? 'pirate_boarder' : 'militia';

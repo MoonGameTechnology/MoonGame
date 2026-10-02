@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES, kernel, ctx } from './game';
 import { data } from './gameData';
 import type { Action, GameState, Planet } from '../../packages/shared-core/src/index';
+import { atWeakTurn } from './weakTurnFixture';
 
 function game2(): GameState {
   return newGame({
@@ -201,7 +202,7 @@ describe('SHU-5.6 — ремонтный ангар', () => {
 
   it('слабый бот ремонтный ангар ставит тоже (слабый знает то же, 2026-09-28)', () => {
     const { s } = staged();
-    const weak = only(aiOrders(s, 'p2', 'expand'), 'unit.build').map(
+    const weak = only(aiOrders(atWeakTurn(s, 'full'), 'p2', 'expand'), 'unit.build').map(
       (a) => a.payload as { unit: string; modules?: string[] },
     );
     expect(weak.filter(withBay).length).toBeGreaterThan(0);
