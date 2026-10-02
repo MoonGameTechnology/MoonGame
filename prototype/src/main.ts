@@ -456,6 +456,7 @@ import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from '.
 import { tapOwner, tapRadius } from '../../decisions/tapPriority';
 import { nextPick, retapsSelectedWorld, tapCandidates, touchPick, type TapPick } from '../../decisions/tapCycle';
 import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
+import { initPhoneNav } from './phoneNav';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
@@ -15043,6 +15044,8 @@ const BACK_LAYERS: BackLayer[] = [
   // Раскрытая панель инструментов рельсы: на телефоне она занимает пол-экрана, а CSS-опись
   // её не видит — узел живёт всегда, раскрытость это класс `.open` (см. EXTRA_LAYERS).
   { id: 'rail', isOpen: () => railEl.classList.contains('open'), close: () => setRailOpen(false) }, // z26
+  // Лист «Ещё» нижней панели телефона (UIX-3.1): узел живёт всегда, открытость — `hidden`.
+  { id: 'phone-more', isOpen: () => phoneNav.moreOpen(), close: () => phoneNav.closeMore() }, // z41
   // Панель задач забега: открыта чипом «Задачи», закрывается и Escape/Back (см. EXTRA_LAYERS).
   { id: 'missions', isOpen: () => missionPanel.isOpen(), close: () => missionPanel.toggle(false) }, // z44
   { id: 'side', isOpen: () => panelFleet() !== null || selPlanet !== null || selFleets.size > 0, close: () => {
@@ -15074,6 +15077,21 @@ function topLayerOpen(): boolean {
 function closeTopLayer(): boolean {
   return closeTop(BACK_LAYERS) !== null;
 }
+
+/** Что остаётся, когда нижняя панель телефона ведёт к карте: выделение, экран настройки и
+ *  то, что окном не является, — снять комикс, подготовку карты или обучающий тур значило
+ *  бы пропустить урок или уйти из партии. */
+const MAP_KEEPS = new Set(['comic', 'maploading', 'spotlight', 'side', 'setup']);
+// UIX-3.1: нижняя панель телефона. Состав и правила — `decisions/phoneNav.ts`; разделы
+// нажимают кнопки рельсы, а перед этим убирают окна над картой, как «Назад».
+const phoneNav = initPhoneNav({
+  toMap: () => {
+    for (const layer of BACK_LAYERS) if (!MAP_KEEPS.has(layer.id) && layer.isOpen()) layer.close();
+  },
+  windowOpen: (tab) =>
+    (tab === 'production' ? constructorWin : tab === 'science' ? techWin : logWin)?.classList.contains('show') ===
+    true,
+});
 
 // Что ЗНАЧИТ нажатие «Назад» — `backGesture.ts` (REFM-198): пока есть что закрыть, Back
 // разбирает стопку; в матче первое нажатие только предупреждает (аппаратный Back жмут
@@ -16478,6 +16496,7 @@ function frame(nowReal: number) {
   const previousViewport = insets();
   holographic.sync(VW, VH, holoCoarsePointer?.matches ?? false, inMatch());
   mobileHud.sync(MOBILE && inMatch());
+  phoneNav.sync(MOBILE && inMatch());
   if (!MOBILE) { stageDraft(null); offerChoices([]); }
   if (wasHolographic !== holographic.active()) {
     Object.assign(cam, reframePresentation(cam, previousViewport, insets(), mapBounds()));
@@ -16778,6 +16797,7 @@ function frame(nowReal: number) {
     if (railAlertText) railAlert.textContent = railAlertText;
     lastRailAlert = railAlertText;
   }
+  phoneNav.badges(battles, unreadMsgs); // те же значки на «Событиях» и «Ещё» телефона
   const logHtml = logLines.map((l) => `<div>${esc(l)}</div>`).join('');
   if (logHtml !== lastLogHtml) {
     logEl.innerHTML = logHtml;

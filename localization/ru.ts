@@ -2522,6 +2522,7 @@ export const ru: Record<string, string> = {
   'hud.window.move': 'Переместить окно — потяните за заголовок или используйте стрелки',
   'hud.main-menu': 'В главное меню',
   'hud.map': 'Карта',
+  'hud.sections': 'Разделы партии',
   'hud.tools': 'Ещё',
   'hud.crest.title': 'Ваш профиль',
   'hud.deficit': '⚠ ДЕФИЦИТ — здания-потребители работают на 50%',
@@ -2797,8 +2798,8 @@ export const ru: Record<string, string> = {
   'rail.abandon.title': 'Завершить экспедицию',
   'rail.help.label': 'Справка',
   'rail.help.title': 'Справочник',
-  'rail.log.label': 'Сводки',
-  'rail.log.title': 'Сводки',
+  'rail.log.label': 'События',
+  'rail.log.title': 'События',
   'rail.market.label': 'Рынок',
   'rail.market.title': 'Рынок',
   'rail.trader.label': 'Торговец',
@@ -3338,6 +3339,7 @@ export const ru: Record<string, string> = {
   'steward.duration': 'Передать на',
   'steward.duration.hours': '{h} ч',
   'steward.locked': '«Протокол Хранитель» ещё не изучен.',
+  'steward.name': 'Хранитель',
   'steward.locked.go': 'Открыть технологии',
   'steward.locked.how':
     'Изучите его в окне технологий — затем сможете передать место ИИ на время сна.',
@@ -3542,7 +3544,7 @@ export const ru: Record<string, string> = {
 
   // --- win — Заголовки окон матча (сводки, технологии, хранитель, конструкторы).
   'win.log.recap': 'Сводка возвращения',
-  'win.log.title': 'СВОДКИ',
+  'win.log.title': 'СОБЫТИЯ',
   'win.scipick.back': '↩ В меню',
   'win.scipick.title': 'Совет учёных',
   'win.steward.title': 'ХРАНИТЕЛЬ · ИИ НА СОН',

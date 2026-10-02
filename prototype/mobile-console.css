@@ -8,6 +8,13 @@
 }
 body.mobile-ui {
   --tbh: 96px;
+  /* UIX-3.1: высота нижней панели. Лист выбора, окна и полоса скорости встают над ней. */
+  --phone-navh: calc(64px + env(safe-area-inset-bottom));
+}
+/* В прицельных режимах низ экрана уходит целиком (заказ владельца в CHAIN-UX: «на мобиле
+   убирается нижний хаб»), панель тоже: карта ждёт тап там, где она стояла. */
+body.mobile-ui:is(.aim-mode, .chain-mode) {
+  --phone-navh: 0px;
 }
 body.mobile-ui #mobile-sheet {
   position: fixed;
@@ -15,9 +22,9 @@ body.mobile-ui #mobile-sheet {
   flex-direction: column;
   left: max(8px, env(safe-area-inset-left));
   right: max(8px, env(safe-area-inset-right));
-  bottom: max(8px, env(safe-area-inset-bottom));
+  bottom: max(calc(var(--phone-navh) + 8px), env(safe-area-inset-bottom));
   z-index: 29;
-  max-height: calc(100dvh - var(--tbh) - 52px - env(safe-area-inset-top));
+  max-height: calc(100dvh - var(--tbh) - 52px - var(--phone-navh) - env(safe-area-inset-top));
   border: 1px solid rgba(118, 206, 229, 0.5);
   border-radius: 18px;
   background: linear-gradient(155deg, rgba(10, 30, 43, 0.98), rgba(3, 12, 23, 0.98));
@@ -407,16 +414,8 @@ body.mobile-ui #devline {
      and keeps the gap it had under the card */
   top: calc(var(--tbh) + 4px + env(safe-area-inset-top));
 }
-body.mobile-ui #railtools {
-  max-height: 65dvh;
-  overflow-y: auto;
-  border-radius: 14px;
-}
 body.mobile-ui.aim-mode #toasts .toast:not(.jump) {
   pointer-events: none;
-}
-body.mobile-ui #railtoggle {
-  border-radius: 14px;
 }
 /* The bar hugs its buttons from the right edge instead of stretching from the rail: an
    expedition shows only ‖ ▶ ▶▶ ⌂, and a stretched bar left an empty band to the left of the
@@ -447,9 +446,267 @@ body.mobile-ui #mobile-sheet button:focus-visible {
 body.mobile-ui.holo-no-glow #mobile-sheet {
   box-shadow: none;
 }
+
+/* UIX-3.1: нижняя панель — Карта, Производство, Наука, События, Ещё (`phoneNav.ts`). Она
+   заменила «☰» с колонкой инструментов, а кнопка сохранения из строки статуса уехала в
+   «Ещё»: пункты нажимают их, спрятанных, поэтому окна и обработчики прежние. */
+body.mobile-ui #rail,
+body.mobile-ui #devline [data-solo-save] {
+  display: none;
+}
+#phone-nav,
+#phone-more {
+  display: none;
+}
+body.mobile-ui #phone-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: grid;
+  /* «Производство» — самая длинная подпись: её столбец не уже подписи. */
+  grid-template-columns: minmax(0, 1fr) minmax(max-content, 1.25fr) repeat(3, minmax(0, 1fr));
+  height: var(--phone-navh);
+  box-sizing: border-box;
+  padding: 0 max(2px, env(safe-area-inset-right)) env(safe-area-inset-bottom)
+    max(2px, env(safe-area-inset-left));
+  border-top: 1px solid rgba(118, 206, 229, 0.32);
+  background: linear-gradient(180deg, rgba(7, 22, 33, 0.97), rgba(2, 9, 15, 0.99));
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.45);
+}
+/* В забеге Sector Zero «Производства» нет — четыре равных столбца. */
+body.mobile-ui #phone-nav[data-tabs='4'] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+body.mobile-ui:is(.aim-mode, .chain-mode) #phone-nav {
+  display: none;
+}
+#phone-nav button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 6px 2px 4px;
+  border: 0;
+  background: none;
+  color: #93b4c0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#phone-nav button[hidden] {
+  display: none;
+}
+#phone-nav button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#phone-nav svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#phone-nav button.on {
+  color: #9df2fa;
+}
+#phone-nav button.on svg {
+  filter: drop-shadow(0 0 6px rgba(53, 214, 230, 0.6));
+}
+#phone-nav button.on::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 24%;
+  right: 24%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: #35d6e6;
+  box-shadow: 0 0 10px #35d6e6;
+}
+#phone-nav button:active {
+  background: rgba(53, 214, 230, 0.08);
+}
+.phone-badge {
+  position: absolute;
+  top: 5px;
+  left: calc(50% + 7px);
+  min-width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ff5a4d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #04111a;
+}
+.phone-badge[hidden] {
+  display: none;
+}
+/* «Ещё»: остальные окна плиткой и полными словами. Тап по затемнению закрывает лист.
+   z 41 — как у открытого меню рельсы, которое лист заменил: над всплывающими сообщениями
+   (#toasts, z 40), иначе они ложатся на плитки и ловят нажатие; окна пунктов — выше (44+). */
+body.mobile-ui #phone-more:not([hidden]) {
+  position: fixed;
+  inset: 0 0 var(--phone-navh) 0;
+  z-index: 41;
+  display: flex;
+  align-items: flex-end;
+  padding: 8px max(8px, env(safe-area-inset-right)) 8px max(8px, env(safe-area-inset-left));
+  background: rgba(1, 6, 10, 0.45);
+}
+.phone-more-panel {
+  flex: 1;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  border: 1px solid rgba(118, 206, 229, 0.45);
+  border-radius: 18px;
+  background: linear-gradient(155deg, rgba(10, 30, 43, 0.985), rgba(3, 12, 23, 0.985));
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+}
+.phone-more-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 10px;
+}
+.phone-more-head b {
+  color: #d9f6fb;
+  font-size: 16px;
+}
+.phone-more-head button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #93b4c0;
+  font: inherit;
+  font-size: 22px;
+  cursor: pointer;
+}
+.phone-more-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.phone-more-grid button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 76px;
+  padding: 8px 4px;
+  border: 1px solid rgba(118, 206, 229, 0.22);
+  border-radius: 12px;
+  background: rgba(12, 34, 48, 0.55);
+  color: #d9f6fb;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.phone-more-grid button:active {
+  background: rgba(53, 214, 230, 0.14);
+}
+.phone-more-grid i {
+  color: #8ce9f2;
+  font-size: 22px;
+  font-style: normal;
+  font-variant-emoji: text;
+  line-height: 1;
+}
+.phone-more-grid .phone-badge {
+  top: 6px;
+  left: auto;
+  right: 8px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  body.mobile-ui:not(.holo-still) #phone-more:not([hidden]) .phone-more-panel {
+    animation: phone-more-rise 0.16s ease-out;
+  }
+}
+@keyframes phone-more-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Над панелью: полоса скорости, цели первой сессии и вводная пиратов. */
+body.mobile-ui #speedbar {
+  bottom: max(calc(var(--phone-navh) + 12px), calc(12px + env(safe-area-inset-bottom)));
+}
+@media (max-width: 640px) {
+  body.mobile-ui #goals {
+    bottom: calc(120px + var(--phone-navh));
+  }
+  body.mobile-ui #pirate-intro {
+    bottom: calc(112px + var(--phone-navh));
+  }
+}
+/* Окна партии кончаются над панелью: она видна и переключает разделы. Окна стратегии
+   (наука, производство, рынок, дипломатия, постройки) — в `mobile-strategy.css`. */
+body.mobile-ui
+  :is(
+    #logwin,
+    #steward,
+    #battlewin,
+    #codex,
+    #codexhub,
+    #playercard,
+    #settings,
+    #corp,
+    #trader,
+    #ally,
+    #rescard,
+    #recap,
+    #pingpanel,
+    #swarm-dossier
+  ) {
+  bottom: var(--phone-navh);
+}
 @media (max-height: 520px) {
   body.mobile-ui {
     --tbh: 54px;
+    --phone-navh: calc(48px + env(safe-area-inset-bottom));
+  }
+  #phone-nav button {
+    flex-direction: row;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 4px;
+  }
+  #phone-nav .phone-badge {
+    top: 3px;
+    left: calc(50% - 2px);
   }
   body.mobile-ui #top {
     flex-direction: row;
