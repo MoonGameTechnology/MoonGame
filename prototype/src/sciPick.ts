@@ -78,10 +78,11 @@ export function sciPickBodyHtml(
     })
     .join('');
   const ready = chosen.length >= COUNCIL_SIZE;
+  // Полный совет гасит весь ростер — подпись говорит почему и как взять другого (UIX-15.2).
   return (
     `<div class="sp-slots">${slots}</div>` +
     `<div class="sp-warn">${t('scipick.note')}</div>` +
-    `<div class="sp-h">${t('scipick.candidates')}</div>` +
+    `<div class="sp-h">${t(ready ? 'scipick.full' : 'scipick.candidates')}</div>` +
     `<div class="sp-roster">${roster}</div>` +
     `<button class="sp-go" id="sp-go"${ready ? '' : ' disabled'}>${ready ? t('scipick.confirm') : t('scipick.need-two')}</button>`
   );
