@@ -1,7 +1,7 @@
 /* global window, document, localStorage, innerWidth, innerHeight, getComputedStyle -- browser */
 import assert from 'node:assert/strict';
 
-import { enterSkirmish, pressSpeed } from './harnessKit.mjs';
+import { enterSkirmish, pressSpeed, recordPurseFloats } from './harnessKit.mjs';
 
 /** Real phone layouts and actions through the existing controllers/reducer. */
 export async function checkMobileStrategy(browser, url) {
@@ -96,6 +96,47 @@ export async function checkMobileStrategy(browser, url) {
       'top bar row 1 does not overlap itself: ' + JSON.stringify(bar),
     );
     assert(!bar.placeClipped, 'the standing is readable in full: ' + JSON.stringify(bar));
+  };
+  // UIX-4.1: под запасом — доход в час, как на ПК. Значок и запас — первой строкой, доход —
+  // второй; оба от 12 px, целиком и в пределах своей плашки, плашка — под палец.
+  const purseChips = async () => {
+    const chips = await page.locator('#purse .res').evaluateAll((els) =>
+      els.map((chip) => {
+        const box = chip.getBoundingClientRect();
+        const part = (el) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return {
+            text: el.textContent,
+            size: parseFloat(getComputedStyle(el).fontSize),
+            clipped: el.scrollWidth > el.clientWidth + 1,
+            inside: r.left >= box.left - 1 && r.right <= box.right + 1,
+            top: r.top,
+            bottom: r.bottom,
+          };
+        };
+        return {
+          res: chip.dataset.res,
+          height: box.height,
+          stock: part(chip.querySelector('b')),
+          flow: part(chip.querySelector('em')),
+        };
+      }),
+    );
+    assert(
+      chips.some((x) => x.flow),
+      'the phone prints the income under the stock: ' + JSON.stringify(chips),
+    );
+    for (const x of chips) {
+      assert(x.height >= 43, 'a resource chip is a 44px touch target: ' + JSON.stringify(x));
+      for (const part of [x.stock, x.flow].filter(Boolean))
+        assert(
+          part.size >= 12 && !part.clipped && part.inside,
+          'a resource chip reads in full at 12px+: ' + JSON.stringify(x),
+        );
+      if (x.flow)
+        assert(x.flow.top >= x.stock.bottom - 1, 'the income is the second line: ' + JSON.stringify(x));
+    }
   };
   const touchTarget = async (selector) => {
     await page.locator(selector).tap({ trial: true });
@@ -268,6 +309,7 @@ export async function checkMobileStrategy(browser, url) {
         await page.setViewportSize(viewport);
         console.log('STRATEGY_LAYOUT', locale, viewport.width, viewport.height);
         await topBarReadable();
+        await purseChips();
         await phoneNav();
         await phoneSpeed(locale);
         for (const [id, box, close] of [
@@ -342,14 +384,39 @@ export async function checkMobileStrategy(browser, url) {
     await page.setViewportSize({ width: 390, height: 844 });
     await open('tech');
     await page.locator('[data-ttab="space"]').tap();
-    const before = await page.evaluate(
-      () => (window.__mobileTest.state().players.p1.technologies?.active?.length ?? 0),
-    );
+    // UIX-4.1: цена исследования уходит с плашек числом «-N» — ровно той суммой, что
+    // заплачена, — и число гаснет само. Возврат металла при отмене продажи выше мог ещё
+    // ждать, пока погаснет прежнее число (секунда), и сложился бы с ценой: запись — после.
+    await page.waitForTimeout(1100);
+    const floats = await recordPurseFloats(page);
+    const before = await page.evaluate(() => {
+      const me = window.__mobileTest.state().players.p1;
+      return { active: me.technologies?.active?.length ?? 0, purse: { ...me.resources } };
+    });
     await page.locator('#tech .tt-take:not(:disabled)').first().tap();
     await page.waitForFunction(
       (before) => (window.__mobileTest.state().players.p1.technologies?.active?.length ?? 0) === before + 1,
-      before,
+      before.active,
     );
+    const after = await page.evaluate(() => ({ ...window.__mobileTest.state().players.p1.resources }));
+    const byRes = (a, b) => a.res.localeCompare(b.res);
+    const price = Object.keys(before.purse)
+      .filter((res) => before.purse[res] - after[res] >= 1)
+      .map((res) => ({ res, sign: 'dn', text: String(Math.round(after[res] - before.purse[res])) }))
+      .sort(byRes);
+    assert(price.length > 0, 'the research has a price: ' + JSON.stringify({ before, after }));
+    const shown = (await floats.settle(price.length)).map(({ res, sign, text, motion }) => ({
+      res,
+      sign,
+      text,
+      motion,
+    }));
+    assert.deepEqual(
+      shown.sort(byRes),
+      price.map((x) => ({ ...x, motion: 'purse-float' })),
+      'the price floats off its chips',
+    );
+    await page.waitForFunction(() => !document.querySelector('.purse-float'), null, { timeout: 3000 });
     await page.keyboard.press('Escape');
     assert(!(await page.locator('#tech').isVisible()));
     // The adapter restores desktop sizing; the same windows are not permanently stretched.
@@ -359,7 +426,7 @@ export async function checkMobileStrategy(browser, url) {
     assert(desktop.width < 1000 && desktop.height < 790);
     assert.deepEqual(errors, []);
     console.log(
-      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, top bar row 1, bottom bar and More over toasts, speed button and its row, all tabs, dossiers, keyboard-size viewport, market/research actions and desktop restoration',
+      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, top bar row 1, two-line resource chips, bottom bar and More over toasts, speed button and its row, all tabs, dossiers, keyboard-size viewport, market/research actions, the price floating off its chips and desktop restoration',
     );
   } catch (error) {
     await page.screenshot({ path: 'prototype/dist/mobile-strategy-failure.png' });

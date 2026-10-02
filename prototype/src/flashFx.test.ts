@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fadeOf, flashAge, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
+import { fadeOf, flashAge, flashDone, flashProgress, growRadius, noticeRing, waveRadius } from './flashFx';
 
 const ЖИЗНЬ = 1500;
 
@@ -63,5 +63,18 @@ describe('вспышка — затухание и радиусы', () => {
 
   it('в начале волны радиуса нет', () => {
     expect(waveRadius(0, 200, 1.25)).toBe(0);
+  });
+});
+
+describe('малая вспышка — постройка готова, флот прибыл (UIX-4.1)', () => {
+  it('кольцо расходится и гаснет', () => {
+    expect(noticeRing(0, true, 12, 10)).toEqual({ r: 12, alpha: 1 });
+    expect(noticeRing(1, true, 12, 10)).toEqual({ r: 22, alpha: 0 });
+  });
+
+  it('БЕЗ ДВИЖЕНИЯ КОЛЬЦО НЕ РАСХОДИТСЯ, НО ВСЁ РАВНО ВИДНО: уходит разлёт, а не сама вспышка', () => {
+    for (const k of [0, 0.5, 1]) expect(noticeRing(k, false, 12, 10).r).toBe(17);
+    expect(noticeRing(0, false, 12, 10).alpha).toBe(1);
+    expect(noticeRing(1, false, 12, 10).alpha).toBe(0);
   });
 });

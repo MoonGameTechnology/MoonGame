@@ -12,6 +12,7 @@ import {
   instrumentedGame,
   launchBrowser,
   pressSpeed,
+  recordPurseFloats,
   serve,
 } from './harnessKit.mjs';
 import { checkMobileStrategy } from './mobileStrategyTest.mjs';
@@ -22,7 +23,10 @@ const hooks = `window.__mobileTest = {
   ui: () => ({ mobile: MOBILE, me: ME, ids: selectedFleetIds(), planet: selPlanet, choices: mobileChoices, draft: mobileDraft, aiming, assaultAim, engageAim, merging, pickMode }),
   fleets: () => Object.values(s.fleets).map(f => ({ id:f.id, owner:f.owner, p:fleetAnchor(f) })),
   worlds: () => MAP.map(n => ({ id:n.id, name:placeName(n.id), p:world(n), known:known(n.id) })),
-  destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) }))
+  destinations: id => MAP.filter(n => n.id !== s.fleets[id].location && canOrder(s,moveFleet(ME,id,n.id)) === null).map(n => ({ id:n.id, p:world(n) })),
+  notices: () => noticeFlashes.length,
+  emit: events => handleEvents(events),
+  motion: on => setMotion(on)
 };`;
 // Корень — игра с хуками; `/built` и `/player` — сборки как есть, без инструментовки.
 const site = await serve({
@@ -327,6 +331,11 @@ try {
   // Панель скорости на телефоне прячется под открытой карточкой.
   await p.locator('[data-mobile="close"]').tap();
   await pause();
+  // UIX-4.1: доход капает, а не скачет — «+N» всплывает на плашке не чаще раза в 4 секунды,
+  // а убыль по капле не всплывает вовсе. Движение выключено: число гаснет на месте, а не
+  // уплывает (с движением его проверяет цена исследования в `mobileStrategyTest.mjs`).
+  await p.evaluate(() => window.__mobileTest.motion(false));
+  const run = await recordPurseFloats(p);
   await pressSpeed(p, '#spd-fast', { tap: true });
   await pressSpeed(p, '.spd-mult-legacy [data-mult="100"]', { tap: true });
   await p.waitForFunction(
@@ -336,6 +345,22 @@ try {
   );
   await pressSpeed(p, '#spd-pause', { tap: true });
   await pause();
+  const drips = await run.read();
+  await p.evaluate(() => window.__mobileTest.motion(true));
+  assert(drips.some((x) => x.sign === 'up'), 'income floats up its chip: ' + JSON.stringify(drips));
+  assert(
+    drips.every((x) => x.sign === 'up' && x.res),
+    'a running economy floats no loss: ' + JSON.stringify(drips),
+  );
+  assert(
+    drips.every((x) => x.motion === 'purse-fade'),
+    'without motion the number fades in place: ' + JSON.stringify(drips),
+  );
+  for (const res of new Set(drips.map((x) => x.res))) {
+    const at = drips.filter((x) => x.res === res).map((x) => x.at);
+    for (let i = 1; i < at.length; i++)
+      assert(at[i] - at[i - 1] >= 3500, 'income floats drip-wise, not per frame: ' + JSON.stringify(drips));
+  }
   await selectTrooper();
   const loaded = await snapshot();
   if (!(await sheet.locator('[data-cmd="attack"]').isVisible()))
@@ -348,6 +373,40 @@ try {
   assert(!(await ui()).assaultAim, 'Back cancels assault targeting in one step');
   assert.equal(await snapshot(), loaded, 'arming and cancelling the assault sends nothing');
   console.log('PASS troops load through the real popover, assault via More and one-step Back');
+
+  // UIX-4.1: свой флот дошёл, своя постройка готова — малая вспышка на месте, 200 мс. Чужой
+  // приход и чужая стройка — не мои новости: их видно по самому флоту и миру.
+  const own = await p.evaluate((me) => {
+    const state = window.__mobileTest.state();
+    const fleet = (mine) =>
+      Object.values(state.fleets).find((f) => f.owner && (f.owner === me) === mine);
+    const planet = (mine) =>
+      Object.values(state.planets).find(
+        (x) => x.owner && (x.owner === me) === mine && x.buildings.length > 0,
+      );
+    const news = (mine) => {
+      const f = fleet(mine);
+      const w = planet(mine);
+      const built = { planetId: w.id, building: w.buildings[0].type, owner: w.owner };
+      return [
+        { type: 'fleet.arrived', payload: { fleetId: f.id, at: f.location } },
+        { type: 'fleet.parked', payload: { fleetId: f.id, edge: 'probe' } },
+        { type: 'building.constructed', payload: built },
+        { type: 'building.upgraded', payload: { ...built, level: 2 } },
+      ];
+    };
+    return { theirs: news(false), mine: news(true) };
+  }, me);
+  const ring = (events) =>
+    p.evaluate((events) => {
+      window.__mobileTest.emit(events);
+      return window.__mobileTest.notices();
+    }, events);
+  await p.waitForFunction(() => window.__mobileTest.notices() === 0);
+  assert.equal(await ring(own.theirs), 0, 'foreign arrivals and builds do not ring');
+  assert.equal(await ring(own.mine), 4, 'my arrival, parking, build and upgrade ring once each');
+  await p.waitForFunction(() => window.__mobileTest.notices() === 0, null, { timeout: 2000 });
+  console.log('PASS income drips in place without motion and notice rings for my own news only');
 
   for (const route of ['/built', '/player']) {
     await p.goto(`http://127.0.0.1:${server.address().port}${route}`);

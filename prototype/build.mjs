@@ -263,7 +263,7 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 .res:last-child{border-right-color:transparent;}
 .res.short{border-color:rgba(255,90,77,.4);}
 /* amount + flow share one "value line" (.rv); the amount owns the room (flex:0 0 auto),
-   the flow rate clips first (phones drop flow digits entirely — see the chip builder). */
+   the flow rate clips first (phones stack the two — mobile-console.css). */
 .rv{display:flex;align-items:baseline;justify-content:center;gap:3px;min-width:0;overflow:hidden;flex:0 1 auto;}
 .res em{font:9px ui-monospace,monospace;font-style:normal;white-space:nowrap;
   flex:0 1 auto;min-width:0;overflow:hidden;}
@@ -311,8 +311,18 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 .rc-per{font-style:normal;font-size:.82em;opacity:.6;margin-left:1px;}
 .res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
-/* phones hide the flow digits — a NEGATIVE net income paints the stock itself red */
-.res b.neg{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.35);}
+/* UIX-4.1: «+N» под плашкой ресурса (purseFloats.ts). Живёт в body, а не в плашке: плашку
+   перерисовывает patchPurse и обрезает её overflow. Без движения (.still) число не уплывает,
+   а гаснет на месте. 42 — над листом «Ещё» (41), под окнами (44+). */
+.purse-float{position:fixed;z-index:42;transform:translate(-50%,0);pointer-events:none;white-space:nowrap;
+  font-size:calc(14px * var(--pcz,1));font-weight:700;font-variant-numeric:tabular-nums;
+  text-shadow:0 1px 4px #000,0 0 2px #000;animation:purse-float 1s ease-out forwards;}
+.purse-float.up{color:var(--grn,#5ff0a8);}
+.purse-float.dn{color:var(--red,#ff5a4d);}
+.purse-float.still{animation:purse-fade 1s linear forwards;}
+@keyframes purse-float{0%{opacity:0;transform:translate(-50%,-2px);}15%{opacity:1;}
+  100%{opacity:0;transform:translate(-50%,16px);}}
+@keyframes purse-fade{0%,60%{opacity:1;}100%{opacity:0;}}
 /* player emblem — a console crest the player picks in the main menu (hub), worn in the
    TOP-LEFT corner. Tap → player dossier (bubbles to the .crest handler). */
 #crestmark{width:34px;height:34px;border-radius:50%;flex:0 0 auto;cursor:pointer;padding:0;

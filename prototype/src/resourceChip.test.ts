@@ -8,7 +8,7 @@ import {
   flowRounded,
   flowShown,
   flowSign,
-  stockBleeds,
+  stockText,
 } from './resourceChip';
 
 describe('flowRounded', () => {
@@ -65,20 +65,14 @@ describe('chipShort', () => {
 
 describe('flowShown', () => {
   // Правило 4: нулевой поток не пишется.
-  it('hides a zero rate on desktop', () => {
-    expect(flowShown(false, 0)).toBe(false);
+  it('hides a zero rate', () => {
+    expect(flowShown(0)).toBe(false);
   });
 
-  it('prints a live rate on desktop', () => {
-    expect(flowShown(false, 3)).toBe(true);
-    expect(flowShown(false, -0.4)).toBe(true);
-  });
-
-  // Правило 6: телефон не печатает скорость никогда.
-  it('never prints a rate on a phone', () => {
-    expect(flowShown(true, 3)).toBe(false);
-    expect(flowShown(true, -0.4)).toBe(false);
-    expect(flowShown(true, 0)).toBe(false);
+  // Правило 6: на телефоне скорость та же, что на ПК, — второй строкой.
+  it('prints a live rate, a slow drain included', () => {
+    expect(flowShown(3)).toBe(true);
+    expect(flowShown(-0.4)).toBe(true);
   });
 });
 
@@ -113,17 +107,20 @@ describe('flowDigits', () => {
   });
 });
 
-describe('stockBleeds', () => {
-  it('paints the stock red on a phone while the resource drains', () => {
-    expect(stockBleeds(true, -2)).toBe(true);
+describe('stockText', () => {
+  // Правило 7: на телефоне сотни тысяч — без десятой, иначе шесть знаков обрезаются.
+  it('drops the tenth from hundreds of thousands on a phone', () => {
+    expect(stockText(123_456, true, kfmt)).toBe('123k');
+    expect(stockText(1_234_567, true, kfmt)).toBe('1235k');
   });
 
-  it('leaves the stock alone on a gain or a standstill', () => {
-    expect(stockBleeds(true, 2)).toBe(false);
-    expect(stockBleeds(true, 0)).toBe(false);
+  it('keeps the usual format below a hundred thousand', () => {
+    expect(stockText(12_345, true, kfmt)).toBe('12.3k');
+    expect(stockText(99_999, true, kfmt)).toBe('100k');
+    expect(stockText(260, true, kfmt)).toBe('260');
   });
 
-  it('never paints the stock on desktop — the rate is printed there instead', () => {
-    expect(stockBleeds(false, -2)).toBe(false);
+  it('leaves the desktop format alone', () => {
+    expect(stockText(123_456, false, kfmt)).toBe('123.5k');
   });
 });

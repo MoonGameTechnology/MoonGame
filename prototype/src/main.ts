@@ -459,12 +459,14 @@ import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
 import { initPhoneSpeed } from './phoneSpeed';
 import { tempoOf } from '../../decisions/phoneSpeed';
+import { initPurseFloats } from './purseFloats';
+import type { PurseReading } from '../../decisions/purseDelta';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, wornAbilities, type CastOption } from './heroCasts';
 import { fromScreen, stickToPoint, toScreen } from './screenAnchor';
-import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
+import { fadeOf, flashDone, flashProgress, growRadius, noticeRing, waveRadius } from './flashFx';
 import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
 import {
   BADGE_DY,
@@ -943,7 +945,7 @@ import {
   flowRounded,
   flowShown,
   flowSign,
-  stockBleeds,
+  stockText,
 } from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from '../../decisions/simClock';
 import { NET_VIEW_IDLE, netViewAt, netViewSnapshot } from '../../decisions/netViewClock';
@@ -1821,6 +1823,8 @@ devlineEl.addEventListener('click', (event) => {
 });
 
 const purse = $('purse');
+// UIX-4.1: «+N» под плашками — что и когда решает `decisions/purseDelta.ts`.
+const purseFloats = initPurseFloats(purse);
 // top-bar row 1: nick + live standing (left), victory chip (gap), day card (right)
 const topEl = $('top');
 const tbName = $('tbname');
@@ -4133,10 +4137,12 @@ function handleEvents(events: DomainEvent[]) {
       case 'building.constructed':
         if (!admits('building.constructed', p)) break;
         tellBuild('constructed', p);
+        noticeFlash(s.planets[p.planetId as string]?.position); // UIX-4.1: малая вспышка
         break;
       case 'building.upgraded':
         if (!admits('building.upgraded', p)) break;
         tellBuild('upgraded', p);
+        noticeFlash(s.planets[p.planetId as string]?.position);
         break;
       // Разрушение — исключение по туману: своё узнаю всегда, чужое лишь там, где ВИЖУ
       // (тот же фог-гейт, что у `aa.fired`). Взрыв на наблюдаемом мире — наблюдение, а
@@ -4189,6 +4195,15 @@ function handleEvents(events: DomainEvent[]) {
         if (!admits('assault.interrupted', p)) break;
         note(t('log.assault.interrupted', { at: placeName(p.planetId as string) }), p.planetId as string);
         break;
+      // UIX-4.1: свой флот дошёл — малая вспышка на месте (скилл `mobile-game-feel`). Стоянка
+      // в точке дороги (`fleet.parked`) — тот же приход, только не в мир. Чужой приход —
+      // не моя новость: его видно по самому флоту.
+      case 'fleet.arrived':
+      case 'fleet.parked': {
+        const fleet = s.fleets[p.fleetId as string];
+        if (fleet?.owner === ME) noticeFlash(fleetPos(fleet));
+        break;
+      }
       case 'fleet.launched':
         // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
         // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).
@@ -5876,6 +5891,7 @@ function render(now: number) {
   drawOrdnance(cx, mineView(), ME, mapNow(), world, cam.scale);
   mineControls.refresh();
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
+  drawNoticeFlashes(now); // UIX-4.1: своя постройка готова, свой флот дошёл
 
   // battles — pulsing red contact ring at the actual clash point (an engaged
   // fleet's position, so a mid-lane intercept shows where it really happens) with a
@@ -16758,18 +16774,20 @@ function frame(nowReal: number) {
   // Как число на фишке говорит правду — `resourceChip.ts` (REFM-190): поток меньше
   // единицы округляется до ДЕСЯТОЙ (содержание даёт доли за час, и целое врало бы «0»),
   // фишка гаснет только когда пусто И не течёт, долг вытесняет скорость (при долге она
-  // считает производство, которое уже не доходит), а телефон уносит скорость в цвет.
+  // считает производство, которое уже не доходит), а телефон печатает скорость, как ПК.
+  // Показания плашек идут и в «+N» под ними (UIX-4.1, `purseFloats.ts`).
+  const purseReadings: Record<string, PurseReading> = {};
   const chip = (icon: string, key: string) => {
     const stock = r[key] ?? 0;
+    purseReadings[key] = { stock, perHour: inc[key] ?? 0 };
     // Часы забега: в забеге приток — за минуту (решение владельца 2026-09-24).
     const flow = flowRounded(flowRate(inc[key] ?? 0));
-    const flowTxt = flowShown(MOBILE, flow)
+    const flowTxt = flowShown(flow)
       ? `<em class="${flowSign(flow)}">${flowPrefix(flow)}${flowDigits(flow, kfmt)}${flowPer()}</em>`
       : '';
     const dead = chipDead(stock, flow) ? ' dead' : '';
     const short = chipShort(myArrears, key) ? ' short' : '';
-    const bleed = stockBleeds(MOBILE, flow) ? ' class="neg"' : '';
-    return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
+    return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b>${stockText(stock, MOBILE, kfmt)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
   };
   // Capsule icons = RES_SVG (line art traced from the mock; TECH_CUR keeps the text
   // glyphs for prose); capsule order follows the mock: coins, cube, sprout, bolt, chip.
@@ -16784,6 +16802,8 @@ function frame(nowReal: number) {
     patchPurse(hudHtml);
     lastHudHtml = hudHtml;
   }
+  // Пока карта готовится или сеть ещё не впустила, мира на экране нет: не с чего и всплывать.
+  purseFloats.watch(inMatch() && !(NET && !netAdmitted) && !preparingMap, purseReadings, s.time, nowReal);
   // Кого зовут значки внимания и куда ложится цифра — `attentionBadges.ts` (REFM-189):
   // ноль ПРЯЧЕТ значок (значок с «0» гонит игрока в пустоту), бой считается моим и когда
   // я его лишь ВИЖУ, а зеркало на гамбургере молчит при открытой панели — там свои значки.
@@ -17680,6 +17700,35 @@ function drawGoFlash(now: number): void {
   cx.arc(c.x, c.y, growRadius(14, 10, 1 - k), 0, TAU);
   cx.stroke();
   cx.restore();
+}
+/** Малая вспышка (UIX-4.1, скилл `mobile-game-feel`): своя постройка готова, свой флот
+ *  дошёл. Одно кольцо на 200 мс — малый тир; размер и затухание — `noticeRing`. */
+const NOTICE_FLASH_MS = 200;
+const NOTICE_FLASHES_MAX = 16;
+const noticeFlashes: { at: { x: number; y: number }; t: number }[] = [];
+function noticeFlash(at: { x: number; y: number } | null | undefined): void {
+  if (!at) return;
+  noticeFlashes.push({ at: { x: at.x, y: at.y }, t: performance.now() });
+  capShots(noticeFlashes, NOTICE_FLASHES_MAX);
+}
+function drawNoticeFlashes(now: number): void {
+  for (let i = noticeFlashes.length - 1; i >= 0; i--) {
+    const f = noticeFlashes[i]!;
+    if (flashDone(now, f.t, NOTICE_FLASH_MS)) {
+      noticeFlashes.splice(i, 1);
+      continue;
+    }
+    const c = world(f.at);
+    if (!visible(c, 30)) continue;
+    const ring = noticeRing(flashProgress(now, f.t, NOTICE_FLASH_MS), motionOn(), 12, 10);
+    cx.save();
+    cx.strokeStyle = rgba(LOCK, 0.9 * ring.alpha);
+    cx.lineWidth = 2;
+    cx.beginPath();
+    cx.arc(c.x, c.y, ring.r, 0, TAU);
+    cx.stroke();
+    cx.restore();
+  }
 }
 const CAPTURE_FLASH_MS = 1500;
 /** Capture waves use the exact projected polygons just painted by blitStaticLayer.

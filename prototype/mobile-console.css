@@ -396,16 +396,38 @@ body.mobile-ui #purse {
   padding: 0 6px 5px;
   overflow: visible;
 }
+/* UIX-4.1: под запасом — доход в час, как на ПК («+22/ч»). Значок и запас — первой строкой,
+   скорость — второй, во всю ширину плашки: рядом со значком на 320 px не влезает и «+150/ч». */
 body.mobile-ui #purse .res {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-content: center;
   min-width: 0;
   padding: 2px;
   justify-content: center;
-  gap: 3px;
+  column-gap: 3px;
   min-height: 44px;
   height: auto;
 }
+body.mobile-ui #purse .rv {
+  display: contents;
+}
 body.mobile-ui #purse .res b {
-  font-size: 11px;
+  font-size: 14px;
+  line-height: 1.15;
+}
+body.mobile-ui #purse .res em {
+  grid-column: 1 / -1;
+  justify-self: start;
+  font-size: 12px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+/* Уже 360 px пять знаков запаса («12.3k») при 14 px упираются в края плашки. */
+@media (max-width: 359px) {
+  body.mobile-ui #purse .res b {
+    font-size: 12px;
+  }
 }
 body.mobile-ui #devline {
   padding-left: 18px;
