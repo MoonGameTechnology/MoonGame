@@ -16,71 +16,80 @@
   outline: 2px solid var(--cyan);
   outline-offset: 3px;
 }
+/* The editor in the hub palette (UIX-15.3): the card with the portrait on the left, the
+   Portrait / Medals / Career tabs on the right, Save only while there is something to save. */
 #profile .ps-studio {
   width: 100%;
-  max-width: 1060px;
-  margin: 0 auto 24px;
-  font-family: system-ui, sans-serif;
-  color: #deebf3;
+  max-width: 1120px;
+  margin: 0 auto;
 }
 #profile .ps-studio h3 {
-  font-size: 15px;
-  margin: 12px 0;
+  margin: 6px 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sf-head);
 }
 #profile .ps-studio p {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #aac0d1;
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--sf-dim);
 }
-#profile .ps-studio button {
+#profile :is(.ps-studio, .ps-savebar) button {
   font: inherit;
-  color: inherit;
-  border: 1px solid #35546b;
-  background: #102638;
-  border-radius: 7px;
+  color: var(--sf-text);
+  border: 1px solid var(--sf-edge);
+  background: var(--sf-card);
+  border-radius: 12px;
   min-height: 44px;
-  padding: 9px 12px;
+  padding: 0 16px;
   cursor: pointer;
 }
-#profile .ps-studio button:focus-visible {
-  outline: 2px solid #9be9e2;
-  outline-offset: 3px;
+#profile :is(.ps-studio, .ps-savebar) button:hover:not(:disabled) {
+  border-color: var(--sf-edge-hi);
+}
+#profile :is(.ps-studio, .ps-savebar) button:focus-visible {
+  outline: 2px solid var(--sf-accent);
+  outline-offset: 2px;
 }
 #profile .ps-studio button[aria-pressed='true'] {
-  border-color: #93e1dc;
-  background: #214650;
-  box-shadow: 0 0 0 1px #93e1dc;
+  border-color: var(--sf-accent);
+  background: var(--sf-sel);
+  color: var(--sf-hi);
 }
-#profile .ps-studio button:disabled {
+#profile :is(.ps-studio, .ps-savebar) button:disabled {
   cursor: default;
   opacity: 0.6;
 }
-#profile .ps-toolbar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #081823;
-  padding: 8px 0;
-}
 #profile .ps-notice {
-  min-height: 20px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--sf-dim);
 }
+#profile .ps-notice:empty {
+  display: none;
+}
+/* The card takes a third of the column, up to 380 px: on a tablet the tabs keep room. */
 #profile .ps-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(240px, min(380px, 34%)) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
+#profile .ps-layout + .pf-grid {
+  margin-top: 14px;
+}
+/* The card and the tabs stick flush under the header: the sticky offset counts from the
+   scroll padding, so it is pulled back by that padding. */
 #profile .ps-card {
-  border: 1px solid #2e4b61;
-  border-radius: 12px;
-  overflow: hidden;
   position: sticky;
-  top: 0;
-  background: #0b1928;
+  top: calc(-1 * var(--pf-pad));
+  overflow: hidden;
+  border: 1px solid var(--sf-panel-edge);
+  border-radius: 18px;
+  background: var(--sf-panel);
+  box-shadow: var(--sf-shadow);
 }
 #profile .ps-stage {
   position: relative;
@@ -143,63 +152,139 @@
 #profile .ps-pin .ps-medal i {
   font-size: clamp(2px, 0.45vw, 4px);
 }
+/* A narrow card drops the count under the callsign instead of breaking the callsign. */
 #profile .ps-caption {
-  padding: 14px 16px;
-  border-top: 1px solid #294457;
+  padding: 12px 16px;
+  border-top: 1px solid var(--sf-edge);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
 }
 #profile .ps-caption b {
-  font-size: 20px;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  font-size: 18px;
+  color: var(--sf-hi);
+  overflow-wrap: break-word;
 }
 #profile .ps-caption span {
-  font-size: 11px;
+  font-size: 14px;
   white-space: nowrap;
-  color: #94c8c8;
+  color: var(--sf-dim);
 }
+/* The preview toggle is a strip of the card: it switches the card, not the panel. */
+#profile .ps-studio .ps-mode {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-top: 1px solid var(--sf-edge);
+  border-radius: 0;
+  background: var(--sf-inset);
+  font-weight: 600;
+}
+#profile .ps-studio .ps-mode[aria-pressed='true'] {
+  background: var(--sf-sel);
+  box-shadow: inset 0 2px 0 var(--sf-accent);
+}
+/* The tabs stick to the top, so the medals are one tap away even deep in the portraits. */
+#profile .ps-tabs {
+  position: sticky;
+  top: calc(-1 * var(--pf-pad));
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 4px;
+  border: 1px solid var(--sf-edge);
+  border-radius: 14px;
+  background: var(--sf-panel);
+}
+#profile .ps-studio .ps-tabs button {
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--sf-dim);
+  font-size: 15px;
+  font-weight: 600;
+}
+#profile .ps-studio .ps-tabs button:hover {
+  color: var(--sf-text);
+}
+#profile .ps-studio .ps-tabs button[aria-selected='true'] {
+  background: var(--sf-sel);
+  color: var(--sf-hi);
+  box-shadow: inset 0 0 0 1px var(--sf-accent);
+}
+/* Uniform slots, 5 × 3: the chosen one glows, a medal just put in it pops. */
 #profile .ps-slots {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 7px;
-  margin: 12px 0;
+  gap: 8px;
+  margin: 6px 0 10px;
 }
-#profile .ps-slots button {
+#profile .ps-studio .ps-slots button {
   position: relative;
   min-width: 0;
-  height: 64px;
+  height: 68px;
   padding: 3px;
   display: grid;
   place-items: center;
 }
 #profile .ps-slots button > span:not(.ps-medal) {
-  font-size: 24px;
-  color: #83adb8;
+  font-size: 22px;
+  color: var(--sf-dim);
 }
 #profile .ps-slots small {
   position: absolute;
-  right: 4px;
-  bottom: 2px;
-  font-size: 9px;
-  color: #adc4d3;
+  right: 6px;
+  bottom: 3px;
+  font-size: 14px;
+  color: var(--sf-dim);
 }
+#profile .ps-studio .ps-slots button[aria-pressed='true'] {
+  box-shadow: var(--sf-glow);
+}
+#profile .ps-studio [data-ps='remove'] {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+/* Portraits as a grid without an inner scroll; the chosen one has a frame and a tick. */
 #profile .ps-portraits {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 7px;
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 3px;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 8px;
+  padding: 2px;
 }
-#profile .ps-portraits button {
+#profile .ps-studio .ps-portraits button {
   position: relative;
   padding: 0;
   aspect-ratio: 0.82;
   overflow: hidden;
   min-width: 0;
   background: radial-gradient(ellipse at 50% 25%, #2b4357, #132235);
+}
+#profile .ps-studio .ps-portraits button[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--sf-accent);
+}
+#profile .ps-portraits button[aria-pressed='true']::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--sf-accent);
+  color: var(--void);
+  font-size: 13px;
+  font-weight: 800;
 }
 #profile .ps-portraits img {
   display: block;
@@ -210,36 +295,63 @@
   transform: scale(1.7);
   transform-origin: 50% 8%;
 }
-#profile .ps-portraits small {
-  position: absolute;
-  right: 4px;
-  bottom: 2px;
-  text-shadow: 0 1px 3px #000;
-}
+/* The collection: earned medals first, each with a bar to its next grade. */
 #profile .ps-collection {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 8px;
 }
-#profile .ps-collection button {
+#profile .ps-studio .ps-collection button {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  text-align: left;
+  gap: 12px;
   min-width: 0;
+  min-height: 84px;
+  padding: 10px 14px 18px;
+  overflow: hidden;
+  text-align: left;
+}
+#profile .ps-collection button::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sf-accent) var(--p, 0%), var(--sf-edge) var(--p, 0%));
 }
 #profile .ps-collection b {
-  font-size: 12px;
   display: block;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--sf-text);
 }
 #profile .ps-collection small {
   display: block;
-  color: #a4bbca;
-  font-size: 11px;
-  margin-top: 4px;
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--sf-dim);
+}
+#profile .ps-collection .ps-medal {
+  width: 40px;
+}
+/* A locked medal stays readable: its terms are what the player is aiming for. */
+#profile .ps-studio .ps-collection button:disabled {
+  opacity: 1;
+}
+#profile .ps-studio .ps-collection .locked {
+  border-style: dashed;
+  background: var(--sf-card-off);
 }
 #profile .ps-collection .locked .ps-medal {
   filter: grayscale(0.9);
+}
+#profile .ps-collection .locked::after {
+  background: linear-gradient(90deg, var(--sf-dim) var(--p, 0%), var(--sf-edge) var(--p, 0%));
 }
 #profile .ps-public-medals {
   display: grid;
@@ -250,11 +362,84 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px;
-  background: #102333;
-  border: 1px solid #2b4659;
-  border-radius: 7px;
+  padding: 8px 12px;
+  border: 1px solid var(--sf-edge);
+  border-radius: 12px;
+  background: var(--sf-card);
   font-size: 14px;
+}
+/* Save and Cancel: a bar under the dossier, aligned with its column. */
+#profile .ps-savebar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px max(18px, calc((100% - 1120px) / 2)) calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--sf-panel-edge);
+  background: var(--sf-panel);
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.45);
+}
+#profile .ps-savebar button {
+  min-height: 48px;
+  padding: 0 18px;
+  font-size: 15px;
+  font-weight: 600;
+}
+#profile .ps-savebar .ps-save {
+  padding: 0 26px;
+  border-color: var(--sf-accent);
+  background: var(--sf-primary);
+  color: var(--sf-hi);
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: var(--sf-glow);
+}
+#profile .ps-savebar .ps-save:hover:not(:disabled) {
+  background: var(--sf-primary-hi);
+}
+/* Motion only in answer to the player: a new portrait settles in, a medal pops into its
+   slot, the save bar rises once when there is something to save. */
+@media (prefers-reduced-motion: no-preference) {
+  body:not(.holo-still) #profile .ps-stage.ps-new .ps-portrait {
+    animation: ps-face 0.45s ease-out;
+  }
+  body:not(.holo-still) #profile .ps-slots .ps-placed .ps-medal {
+    animation: ps-pop 0.35s ease-out;
+  }
+  body:not(.holo-still) #profile .ps-savebar.ps-rise {
+    animation: ps-rise 0.18s ease-out;
+  }
+}
+@keyframes ps-face {
+  from {
+    opacity: 0.35;
+    transform: scale(1.03);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ps-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes ps-rise {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 #hub .hub-av.portrait {
   overflow: hidden;
@@ -269,34 +454,65 @@
   transform-origin: 50% 8%;
 }
 @media (max-width: 640px) {
+  #profile {
+    --pf-pad: 12px;
+  }
   #profile .ps-layout {
     grid-template-columns: 1fr;
     gap: 14px;
   }
+  /* On the phone the card scrolls away: the tabs need the screen more than the portrait. */
   #profile .ps-card {
     position: relative;
-    max-width: 420px;
+    top: auto;
+    max-width: 300px;
     width: 100%;
-    margin: auto;
+    margin: 0 auto;
   }
-  #profile .ps-collection {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  #profile .ps-portraits {
-    max-height: 270px;
-  }
-  #profile .pf-top {
-    padding-left: 12px;
-  }
-  #profile .pf-body {
-    padding: 12px;
-  }
-  #profile .ps-caption b {
-    font-size: 18px;
-  }
-}
-@media (max-width: 360px) {
   #profile .ps-collection {
     grid-template-columns: 1fr;
+  }
+  #profile .ps-portraits {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  /* A smaller face and capsule keep «Лига: …» on one line next to the name. */
+  #profile .pf-top {
+    gap: 12px;
+    padding: 14px 68px 14px 12px;
+  }
+  #profile .pf-close {
+    top: 16px;
+    right: 12px;
+  }
+  #profile .pf-av {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+  #profile .pf-cur {
+    padding: 0 12px;
+    font-size: 15px;
+  }
+  #profile .ps-savebar {
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  }
+  #profile .ps-savebar .ps-save {
+    flex: 1;
+  }
+  #profile .ps-savebar [data-ps='cancel'] {
+    padding: 0 12px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+}
+/* The narrowest phones (360 px): a little tighter still, so a short callsign is not cut. */
+@media (max-width: 400px) {
+  #profile .pf-top {
+    gap: 10px;
+  }
+  #profile .pf-cur {
+    gap: 5px;
+    padding: 0 10px;
+    font-size: 14px;
   }
 }
