@@ -490,6 +490,8 @@ await click('tomenu');
 const soloCheckpoint = storage.get('void.solo.v1');
 assert.ok(soloCheckpoint);
 assert.equal(getEl('hub-solo-continue').disabled, false);
+// UIX-10.1: главная дверь называет партию — режим, карта и день.
+assert.match(getEl('hub-continue-sub').textContent, / · (Фронтир|Frontier) · \S+ \d+$/);
 await click('hub-solo-continue');
 assert.deepEqual(JSON.parse(mod.exports.state()), JSON.parse(soloCheckpoint).payload.state);
 assert.equal(mod.exports.solo().speed, 0);

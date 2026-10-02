@@ -1038,6 +1038,7 @@ import {
   shareAddress,
 } from '../../decisions/matchAddress';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
+import { hubDoor } from '../../decisions/hubDoor';
 import {
   entryOffer,
   reconcileSelection,
@@ -3375,11 +3376,6 @@ document.getElementById('goals')?.addEventListener('click', (ev) => {
     renderGoals();
   }
 });
-// Show the first-run offer to a not-yet-onboarded commander (idempotent per visit).
-function refreshOnboardOffer(): void {
-  const nudge = document.getElementById('onboard-nudge');
-  if (nudge) nudge.style.display = welcomeMode(loadOnboard()) === 'new' ? 'flex' : 'none';
-}
 // «Начать обучение» / «Ещё → Обучение»: launch the guided first match.
 function beginOnboarding(): void {
   saveOnboard(markStarted(loadOnboard()));
@@ -3390,7 +3386,7 @@ function beginOnboarding(): void {
 document.getElementById('ob-start')?.addEventListener('click', beginOnboarding);
 document.getElementById('ob-skip')?.addEventListener('click', () => {
   saveOnboard(markSkipped(loadOnboard())); // respected forever — never nagged again
-  refreshOnboardOffer();
+  refreshHubDoor();
 });
 document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboarding);
 
@@ -5261,11 +5257,11 @@ function ownersSig(): string {
   );
 }
 
-/** Подпись карты в списках партий. Обе карты Фронтира показываются одним именем —
- *  раньше это был тернарник, скопированный в два места, и два ключа локали с
- *  ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
+/** Подпись карты в списках партий и на двери «Продолжить» хаба. Обе карты Фронтира
+ *  показываются одним именем — раньше это был тернарник, скопированный в два места, и два
+ *  ключа локали с ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
 function mapLabel(mapId: string | undefined): string {
-  return isFrontier(mapId) ? t('map.frontier') : (mapId ?? '');
+  return isFrontier(mapId) ? t('map.frontier') : mapId === 'nexus' ? t('map.nexus') : (mapId ?? '');
 }
 
 /** Map art is shared by desktop and phone; floating windows remain desktop-only. */
@@ -11804,6 +11800,8 @@ const HUB_PANELS: Record<string, string> = {
   more: 'hp-more',
 };
 let currentHubTab = 'home'; // the visible hub panel, so an async XP sync can repaint it
+/** Панели, в которые входят из «Ещё»: пока открыта любая, подсвечена вкладка «Ещё» (UIX-10.1). */
+const HUB_UNDER_MORE: ReadonlySet<string> = new Set(['meta', 'auction', 'rank', 'friends']);
 function hubTab(tab: string): void {
   hubNote.textContent = '';
   hubWallet?.render();
@@ -11826,8 +11824,9 @@ function hubTab(tab: string): void {
   if (tab === 'auction' && metaMarket) detach('хаб: аукцион', metaMarket.refresh());
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
+  const navTab = HUB_UNDER_MORE.has(tab) ? 'more' : tab;
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
-    b.classList.toggle('active', (b as HTMLElement).dataset.hub === tab);
+    b.classList.toggle('active', (b as HTMLElement).dataset.hub === navTab);
 }
 
 // --- «Прокачка» — the commander's meta-progression trees (hub tab) -----------------
@@ -12085,7 +12084,6 @@ async function syncCommanderFromServer(): Promise<void> {
 }
 function openHub(note = ''): void {
   if (soloSaveActive) { saveSolo(); speed = 0; }
-  refreshSoloContinue();
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   const nick = nickInput.value.trim();
   $('hub-name').textContent = nick || t('auth.commander');
@@ -12094,7 +12092,7 @@ function openHub(note = ''): void {
   showHub(true);
   hubTab('home');
   hubNote.textContent = note;
-  refreshOnboardOffer(); // ONB-0: first-run offer/nudge for a not-yet-onboarded commander
+  refreshHubDoor(); // после позывного: пройденное обучение помнится по нику (`onboardKey`)
   detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
   detach('хаб: портрет аккаунта', syncProfileAppearance());
 }
@@ -12455,9 +12453,11 @@ $('hub-logout').addEventListener('click', () => {
 for (const b of Array.from(document.querySelectorAll('.hub-tab'))) {
   b.addEventListener('click', () => hubTab((b as HTMLElement).dataset.hub ?? 'home'));
 }
-// «Прокачка» уехала из нижней навигации (там семь вкладок — предел) в «Ещё»: плитка
-// открывает ТУ ЖЕ панель `hp-meta`, а не свою копию экрана.
+// «Прокачка», а с UIX-10.1 и «Рейтинг» с «Друзьями» уехали из нижней навигации (вкладок в ней
+// пять) в «Ещё»: плитка открывает ТУ ЖЕ панель, а не свою копию экрана.
 document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('meta'));
+document.getElementById('hub-rank')?.addEventListener('click', () => hubTab('rank'));
+document.getElementById('hub-friends')?.addEventListener('click', () => hubTab('friends'));
 document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
@@ -14543,14 +14543,19 @@ function renderMyMatches(serverHttp: string): void {
   if (!el) return;
   const view = myMatches(matchLists, HUB_MY_MATCHES);
   // Правило 5: ленты нет — молчим. «У вас нет партий» поверх трёх идущих отправило бы
-  // игрока заводить четвёртую.
+  // игрока заводить четвёртую. Молчит и заголовок: пустой раздел читается как поломка.
+  $('hub-mine-sec').hidden = view.kind === 'unknown';
   if (view.kind === 'unknown') {
     el.textContent = '';
     return;
   }
-  // Правило 6: пустота — нормальное начало, и она зовёт туда, где партии берут.
+  // Правило 6: пустота — нормальное начало, и она зовёт туда, где партии берут:
+  // строка и «Начать партию» в обозреватель (UIX-10.1).
   if (view.kind === 'none') {
-    el.innerHTML = `<div class="hm-empty">${t('hub.mine.empty')}</div>`;
+    el.innerHTML =
+      `<div class="hub-card"><div class="hc-ic">◇</div><div><div class="hc-t">${t('hub.mine.empty')}</div>` +
+      `<button type="button" class="hm-go">${t('hub.mine.start')}</button></div></div>`;
+    el.querySelector('.hm-go')?.addEventListener('click', () => hubTab('games'));
     return;
   }
   el.textContent = '';
@@ -15151,14 +15156,27 @@ function tickSoloSave(now: number): void {
   soloSavedAtReal = now;
   saveSolo();
 }
-function refreshSoloContinue(): void {
+/**
+ * Главная дверь хаба (UIX-10.1): «Продолжить» с картой и днём сохранённой партии или, новичку
+ * (ONB-0), «Начать обучение» — какая из двух, решает `decisions/hubDoor.ts`. Строка под
+ * дверью — только беда со слотом: не сохранилось или сохранение не читается.
+ */
+function refreshHubDoor(): void {
   const stored = soloStore.load();
-  const valid = stored.ok && parseSoloSave(stored.raw, soloRules) !== null;
+  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
+  const door = hubDoor(
+    // Сохранение без карты — «Нексус»: так его читает и `mapPreset` при загрузке.
+    save ? { mapId: save.state.mapId ?? 'nexus', time: save.state.time } : stored.ok && stored.raw === null ? 'empty' : 'unreadable',
+    welcomeMode(loadOnboard()) === 'new',
+  );
   const button = $('hub-solo-continue') as HTMLButtonElement;
-  button.hidden = stored.ok && stored.raw === null;
-  button.disabled = !valid;
-  $('solo-save-status').textContent = !stored.ok || soloSaveFailed ? t('solo.save.failed') :
-    stored.raw && !valid ? t('solo.save.invalid') : t('solo.save.info');
+  button.hidden = door.kind !== 'continue' && door.kind !== 'broken';
+  button.disabled = door.kind !== 'continue';
+  $('hub-continue-sub').textContent =
+    door.kind === 'continue' ? t('solo.save.continue.sub', { map: mapLabel(door.mapId), day: gameDay(door.time) }) : '';
+  $('onboard-nudge').style.display = door.kind === 'tutorial' ? 'flex' : 'none';
+  $('solo-save-status').textContent =
+    !stored.ok || soloSaveFailed ? t('solo.save.failed') : door.kind === 'broken' ? t('solo.save.invalid') : '';
 }
 function closeSoloReplace(): void {
   $('solo-replace').style.display = 'none';
@@ -15173,7 +15191,7 @@ function restoreSolo(): void {
   if (NET) return;
   const stored = soloStore.load();
   const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
-  if (!save) { refreshSoloContinue(); return; }
+  if (!save) { refreshHubDoor(); return; }
   // Verify the map before replacing the in-memory match; future maps need an
   // explicit migration, not an accidental fallback to another board.
   try { mapPreset(save.state.mapId); mapNodesFromState(save.state); }
