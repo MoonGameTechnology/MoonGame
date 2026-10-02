@@ -57,7 +57,7 @@ describe('speedbarRestartShown', () => {
 });
 
 describe('speedbarShown', () => {
-  // Правило 4: на телефоне полоса несёт выход ⌂ — прятать её нельзя никогда.
+  // Правило 4: на телефоне ряд раскрывает кнопка скорости — гасить узел нельзя никогда.
   it('always shows the bar on a phone', () => {
     expect(speedbarShown(false, false, false)).toBe(true);
     expect(speedbarShown(false, true, false)).toBe(true);

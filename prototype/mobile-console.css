@@ -417,21 +417,41 @@ body.mobile-ui #devline {
 body.mobile-ui.aim-mode #toasts .toast:not(.jump) {
   pointer-events: none;
 }
-/* The bar hugs its buttons from the right edge instead of stretching from the rail: an
-   expedition shows only ‖ ▶ ▶▶ ⌂, and a stretched bar left an empty band to the left of the
-   pause (owner, 2026-09-24). The cap keeps the 76px rail strip clear, as `left: 76px` did,
-   so a full match's longer row still wraps before it reaches the rail. */
+/* UIX-3.2: на телефоне полоса скорости — ряд, который раскрывает кнопка скорости
+   (`phoneSpeed.ts`), а без неё он спрятан. Ряд облегает свои кнопки у правого края:
+   растянутая полоса оставляла пустоту левее паузы (владелец, 2026-09-24). Темп и множители —
+   две группы. Где ряд не помещается в строку, множители целиком встают второй строкой, а
+   обе строки растягиваются на всю его ширину — иначе та же пустота вернулась бы слева.
+   ⌂ в ряду нет: выход на телефоне — «Выход в меню» в «Ещё» и «‹» в углу. */
 body.mobile-ui #speedbar {
+  display: none;
   right: max(8px, env(safe-area-inset-right));
-  max-width: calc(100vw - 76px - max(8px, env(safe-area-inset-right)));
+  bottom: calc(var(--phone-navh) + 64px);
+  max-width: calc(
+    100vw - max(8px, env(safe-area-inset-left)) - max(8px, env(safe-area-inset-right))
+  );
   border-radius: 14px;
   gap: 5px;
+}
+/* Раскрытый ряд — открытое меню, как лист «Ещё»: над всплывающими сообщениями (z 40), иначе
+   в альбомной ориентации их стопка ложится на «‖» и ловит выбор скорости; под окнами (44+). */
+body.mobile-ui.phone-speed-open:not(.sheet-open, .aim-mode, .chain-mode) #speedbar {
+  display: flex;
+  z-index: 41;
 }
 body.mobile-ui #spd-ctl {
   display: contents;
 }
-body.mobile-ui #speedbar .sep,
-body.mobile-ui #speedbar .spddiv {
+body.mobile-ui #speedbar:not(.spd-run) .spd-mult-legacy {
+  display: flex;
+  gap: 5px;
+}
+body.mobile-ui
+  #speedbar
+  :is(#spd-pause, #spd-play, #spd-fast, #spd-dev, .spd-mult-legacy, .spd-mult-legacy button) {
+  flex: 1 1 0;
+}
+body.mobile-ui #speedbar :is(.sep, .spddiv, #tomenu) {
   display: none;
 }
 body.mobile-ui #speedbar button {
@@ -660,9 +680,41 @@ body.mobile-ui #phone-more:not([hidden]) {
     transform: none;
   }
 }
-/* Над панелью: полоса скорости, цели первой сессии и вводная пиратов. */
-body.mobile-ui #speedbar {
-  bottom: max(calc(var(--phone-navh) + 12px), calc(12px + env(safe-area-inset-bottom)));
+/* Над панелью: кнопка скорости (UIX-3.2), цели первой сессии и вводная пиратов. Кнопка — над
+   целями и вводной (z 32); раскрытый ряд (z 41) ложится на них, пока игрок выбирает скорость. */
+#phone-speed {
+  display: none;
+}
+body.mobile-ui #phone-speed:not([hidden]) {
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: calc(var(--phone-navh) + 12px);
+  z-index: 33;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 84px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border: 1px solid rgba(118, 206, 229, 0.55);
+  border-radius: 22px;
+  background: rgba(6, 22, 32, 0.94);
+  color: #d9f6fb;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+body.mobile-ui.phone-speed-open #phone-speed {
+  border-color: #35d6e6;
+  background: rgba(18, 52, 66, 0.96);
+}
+body.mobile-ui:is(.sheet-open, .aim-mode, .chain-mode) #phone-speed {
+  display: none;
 }
 @media (max-width: 640px) {
   body.mobile-ui #goals {

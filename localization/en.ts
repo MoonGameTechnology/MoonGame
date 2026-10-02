@@ -3328,6 +3328,7 @@ export const en: Record<string, string> = {
   'speed.mult.real': 'real time',
   'speed.mult.two-hours': 'two hours per second',
   'speed.restart': 'Restart — back to bot selection',
+  'speed.toggle': 'Time speed',
 
   // --- steward — «Хранитель»: передача места ИИ на сон, позы, журнал вахты.
   'steward.duration': 'Delegate for',

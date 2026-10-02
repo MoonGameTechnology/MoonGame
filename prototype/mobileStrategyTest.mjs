@@ -1,7 +1,7 @@
 /* global window, document, localStorage, innerWidth, innerHeight, getComputedStyle -- browser */
 import assert from 'node:assert/strict';
 
-import { enterSkirmish } from './harnessKit.mjs';
+import { enterSkirmish, pressSpeed } from './harnessKit.mjs';
 
 /** Real phone layouts and actions through the existing controllers/reducer. */
 export async function checkMobileStrategy(browser, url) {
@@ -19,7 +19,7 @@ export async function checkMobileStrategy(browser, url) {
     await page.goto(url);
     // Вторая локаль — второй запуск: сохранение уже есть, `enterSkirmish` его заменяет.
     await enterSkirmish(page, { tap: true });
-    await page.locator('#spd-pause').tap();
+    await pressSpeed(page, '#spd-pause', { tap: true });
   };
   // На телефоне окна открывает нижняя панель (UIX-3.1): «Наука» и «Производство» — её
   // разделы, рынок и дипломатия — плитки листа «Ещё». На ПК — колонка рельсы, как раньше.
@@ -173,6 +173,90 @@ export async function checkMobileStrategy(browser, url) {
     assert(!(await page.locator('#phone-more').isVisible()));
     await page.evaluate(() => document.querySelector('#toasts [data-probe]')?.remove());
   };
+  // UIX-3.2: скорость — одна кнопка с текущим темпом над нижней панелью. Нажатие раскрывает
+  // ряд над ней; выбор, «Назад» и нажатие мимо сворачивают его. Выхода ⌂ в ряду нет — он в
+  // «Ещё». Где ряд не помещается в строку, множители целиком уходят на вторую.
+  const phoneSpeed = async (locale) => {
+    const pill = page.locator('#phone-speed');
+    const row = page.locator('#speedbar');
+    const paused = new RegExp(`^‖ ${locale === 'ru' ? 'Пауза' : 'Pause'}$`);
+    // Надпись кнопки обновляет кадр, а не нажатие, — её ждут, а не читают сразу.
+    const pillReads = async (text, what) => {
+      try {
+        await pill.filter({ hasText: text }).waitFor({ timeout: 3000 });
+      } catch {
+        assert.fail(what + ': ' + JSON.stringify(await pill.textContent()));
+      }
+    };
+    await pillReads(paused, 'the speed button shows the pause');
+    assert(!(await row.isVisible()), 'the speed row is folded into its button');
+    await touchTarget('#phone-speed');
+    await pill.tap();
+    await fits('#speedbar');
+    assert(!(await page.locator('#tomenu').isVisible()), 'no ⌂ in the phone speed row');
+    const layout = await page.evaluate(() => {
+      // Стопка всплывающих сообщений (z 40) до низа экрана: раскрытый ряд обязан лежать над ней.
+      const probes = Array.from({ length: 8 }, () => {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = '✦ 1100 — флот прибыл к дальней орбите, постройка готова';
+        return document.getElementById('toasts').appendChild(toast);
+      });
+      const buttons = [...document.querySelectorAll('#speedbar button')]
+        .filter((b) => b.getBoundingClientRect().width > 0)
+        .map((b) => {
+          const r = b.getBoundingClientRect();
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          const group = b.closest('.spd-mult-legacy') ? 'mult' : 'tempo';
+          return { label: b.textContent, group, covered: !b.contains(hit), ...r.toJSON() };
+        });
+      for (const probe of probes) probe.remove();
+      const bar = document.getElementById('speedbar');
+      const style = getComputedStyle(bar);
+      return {
+        buttons,
+        inner: bar.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        rowBottom: bar.getBoundingClientRect().bottom,
+        pillTop: document.getElementById('phone-speed').getBoundingClientRect().top,
+      };
+    });
+    assert.deepEqual(
+      layout.buttons.map((b) => b.label),
+      ['‖', '▶', '▶▶', '×1', '×10', '×50', '×100'],
+    );
+    for (const b of layout.buttons) {
+      assert(!b.covered, 'speed button is not covered: ' + JSON.stringify(b));
+      assert(
+        b.width >= 43 && b.height >= 43,
+        'speed button is a 44px touch target: ' + JSON.stringify(b),
+      );
+    }
+    for (const group of ['tempo', 'mult']) {
+      const tops = layout.buttons.filter((b) => b.group === group).map((b) => Math.round(b.top));
+      assert(new Set(tops).size === 1, group + ' buttons share one line: ' + JSON.stringify(tops));
+    }
+    // Каждая строка ряда занята кнопками от края до края — пустоты левее паузы нет.
+    for (const top of new Set(layout.buttons.map((b) => Math.round(b.top)))) {
+      const line = layout.buttons.filter((b) => Math.round(b.top) === top);
+      const span = Math.max(...line.map((b) => b.right)) - Math.min(...line.map((b) => b.left));
+      assert(span >= layout.inner - 1, 'a speed row line has no gap: ' + JSON.stringify(layout));
+    }
+    assert(
+      layout.rowBottom <= layout.pillTop + 1,
+      'the row opens above its button: ' + JSON.stringify(layout),
+    );
+    await page.locator('#spd-play').tap();
+    assert(!(await row.isVisible()), 'choosing a speed folds the row');
+    await pillReads(/^▶ ×(1|10|50|100)$/, 'the button shows the new speed');
+    await pill.tap();
+    await page.keyboard.press('Escape');
+    assert(!(await row.isVisible()), 'Back folds the row');
+    await pill.tap();
+    await page.locator('#phone-nav [data-phone-tab="map"]').tap();
+    assert(!(await row.isVisible()), 'a tap elsewhere folds the row');
+    await pressSpeed(page, '#spd-pause', { tap: true });
+    await pillReads(paused, 'the button shows the pause again');
+  };
   try {
     for (const locale of ['ru', 'en']) {
       await enter(locale);
@@ -185,6 +269,7 @@ export async function checkMobileStrategy(browser, url) {
         console.log('STRATEGY_LAYOUT', locale, viewport.width, viewport.height);
         await topBarReadable();
         await phoneNav();
+        await phoneSpeed(locale);
         for (const [id, box, close] of [
           ['tech', '.twbox', '.tw-close'],
           ['constructor', '.cnbox', '.cn-close'],
@@ -274,7 +359,7 @@ export async function checkMobileStrategy(browser, url) {
     assert(desktop.width < 1000 && desktop.height < 790);
     assert.deepEqual(errors, []);
     console.log(
-      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, top bar row 1, bottom bar and More over toasts, all tabs, dossiers, keyboard-size viewport, market/research actions and desktop restoration',
+      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, top bar row 1, bottom bar and More over toasts, speed button and its row, all tabs, dossiers, keyboard-size viewport, market/research actions and desktop restoration',
     );
   } catch (error) {
     await page.screenshot({ path: 'prototype/dist/mobile-strategy-failure.png' });

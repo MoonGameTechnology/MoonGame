@@ -146,7 +146,9 @@ try {
       [1688, 780],
     );
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('#tomenu').tap();
+    // Выход путём игрока: на телефоне — «Выход в меню» в листе «Ещё» нижней панели.
+    await page.locator('#phone-nav [data-phone-tab="more"]').tap();
+    await page.locator('#phone-more [data-phone-more="exit"]').tap();
     await page.locator('#hub-solo').waitFor({ state: 'visible' });
     await sample('returned to hub', false);
     verify(`${profile} errors`, () => assert.deepEqual(errors, []));

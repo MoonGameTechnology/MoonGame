@@ -457,6 +457,8 @@ import { tapOwner, tapRadius } from '../../decisions/tapPriority';
 import { nextPick, retapsSelectedWorld, tapCandidates, touchPick, type TapPick } from '../../decisions/tapCycle';
 import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
 import { initPhoneNav } from './phoneNav';
+import { initPhoneSpeed } from './phoneSpeed';
+import { tempoOf } from '../../decisions/phoneSpeed';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
@@ -1286,6 +1288,9 @@ const ORBIT_COLOR = '#7df0d0'; // the single orbit ring (GDD §7.4 — no near/f
 
 let s: GameState = newGame();
 let speed = 1 / 3600; // game-hours per real second (0 = paused); ×1 = wall-clock, overwritten at launch
+/** Множитель «×N», на который настроена пара «играть / ускорить», — его пишет кнопка скорости
+ *  телефона (UIX-3.2): у ряда нет чипа на каждый множитель настройки матча (×2, ×5, ×300). */
+let timeMult = 1;
 let banner: string | null = null;
 // Terminal end screen (the match-over overlay): outcome + reason + XP award, filled
 // once by checkEnd from the authoritative `match` state. `dismissed` lets the player
@@ -11162,6 +11167,7 @@ const PLAY_BASE = 1 / 3600; // game-hours per real second; 1/3600 ⇒ 1 game-hou
  */
 function applyTimeSpeed(mult: number, fastMult: number = mult * 3): void {
   const play = PLAY_BASE * mult;
+  timeMult = mult;
   const playBtn = $('spd-play');
   const fastBtn = $('spd-fast');
   if (playBtn) playBtn.dataset.speed = String(play);
@@ -15046,6 +15052,8 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'rail', isOpen: () => railEl.classList.contains('open'), close: () => setRailOpen(false) }, // z26
   // Лист «Ещё» нижней панели телефона (UIX-3.1): узел живёт всегда, открытость — `hidden`.
   { id: 'phone-more', isOpen: () => phoneNav.moreOpen(), close: () => phoneNav.closeMore() }, // z41
+  // Раскрытый ряд скорости телефона (UIX-3.2): узел — полоса скорости, раскрытость — класс `body`.
+  { id: 'phone-speed', isOpen: () => phoneSpeed.isOpen(), close: () => phoneSpeed.close() }, // z41
   // Панель задач забега: открыта чипом «Задачи», закрывается и Escape/Back (см. EXTRA_LAYERS).
   { id: 'missions', isOpen: () => missionPanel.isOpen(), close: () => missionPanel.toggle(false) }, // z44
   { id: 'side', isOpen: () => panelFleet() !== null || selPlanet !== null || selFleets.size > 0, close: () => {
@@ -15092,6 +15100,8 @@ const phoneNav = initPhoneNav({
     (tab === 'production' ? constructorWin : tab === 'science' ? techWin : logWin)?.classList.contains('show') ===
     true,
 });
+// UIX-3.2: скорость на телефоне — одна кнопка, ряд раскрывается над ней (`phoneSpeed.ts`).
+const phoneSpeed = initPhoneSpeed();
 
 // Что ЗНАЧИТ нажатие «Назад» — `backGesture.ts` (REFM-198): пока есть что закрыть, Back
 // разбирает стопку; в матче первое нажатие только предупреждает (аппаратный Back жмут
@@ -15172,6 +15182,9 @@ function suspendSolo(): void {
   if (!soloSaveActive || NET) return;
   saveSolo();
   speed = 0;
+  // Мир стоит, пока игрок не нажмёт ▶, — ряд скорости показывает паузу, а не прежний темп.
+  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === 0);
 }
 function tickSoloSave(now: number): void {
   if (!soloSaveActive || !inMatch()) return;
@@ -16806,8 +16819,8 @@ function frame(nowReal: number) {
   // Пути НАРУЖУ из матча — `matchExits.ts` (REFM-193): кнопка перезапуска в баннере только
   // на настоящем конце СОЛО-матча (на сетевом «переподключаюсь» она увела бы из живой
   // партии), убранный баннер ЗАБЫВАЕТ разметку (иначе следующий такой же не нарисуется), а
-  // на ТЕЛЕФОНЕ полоса скорости показывается всегда: выход ⌂ живёт в ней, и спрятать её
-  // значит запереть игрока в матче.
+  // на ТЕЛЕФОНЕ узел полосы скорости не гасится никогда: её ряд раскрывает кнопка скорости
+  // (UIX-3.2), и погашенный узел не раскрылся бы.
   if (banner) {
     const html = bannerOffersRestart(NET, s.match?.status)
       ? `<div class="bn-text">${esc(banner)}</div><button class="bn-btn" data-restart>${t('hub.back-to-bots')}</button>`
@@ -16836,6 +16849,14 @@ function frame(nowReal: number) {
   if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
   const showBar = displayOf(holographic.active() || speedbarShown(pcUi(), devSpeedControl, run));
   if (speedbarEl && speedbarEl.style.display !== showBar) speedbarEl.style.display = showBar;
+  // Телефон прячет полосу за кнопкой скорости (UIX-3.2): кнопка есть, пока есть управление
+  // временем; на ней темп по скорости мира и множитель партии (в забеге множителей нет).
+  const devRate = devFastBtn && !devFastBtn.hidden ? Number(devFastBtn.dataset.speed) : undefined;
+  phoneSpeed.sync(
+    MOBILE && inMatch() && showSpdCtl === '' && showBar === '',
+    tempoOf(speed, { play: Number($('spd-play').dataset.speed), fast: Number($('spd-fast').dataset.speed), dev: devRate }),
+    run ? null : timeMult,
+  );
   // Как часто живёт открытое окно — `liveWindows.ts` (REFM-194): дроссель считает РЕАЛЬНОЕ
   // время (по игровому он на разгоне ×7200 пробивался бы каждым кадром, а на паузе — никогда),
   // отметка у каждого окна СВОЯ (с общей два открытых окна обновлялись бы вдвое реже), и

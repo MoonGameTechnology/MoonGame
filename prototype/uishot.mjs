@@ -25,6 +25,7 @@ import {
   builtPage,
   enterSkirmish,
   launchBrowser,
+  pressSpeed,
   screenReport,
   serve,
   waitForApp,
@@ -82,7 +83,7 @@ try {
   } else if (opts.screen === 'match') {
     await enterSkirmish(page, { tap: opts.phone });
     await page.locator('#maploading').waitFor({ state: 'hidden' });
-    await press('#spd-pause');
+    await pressSpeed(page, '#spd-pause', { tap: opts.phone });
   }
   // Два кадра — чтобы на снимок попал уже отрисованный, а не промежуточный экран.
   await page.evaluate(
