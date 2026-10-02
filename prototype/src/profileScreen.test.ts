@@ -2,10 +2,12 @@ import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { EMPTY_STATS, type MetaStats } from './meta';
 import { defaultAppearance } from '../../packages/protocol/src/playerProfile';
+import { PORTRAITS } from './profileArt';
 import {
   parseMedalCache,
   parseMedalCatalog,
   pfCell,
+  profileCareerHtml,
   profileHtml,
   initProfile,
   type MedalEntry,
@@ -30,12 +32,16 @@ const view = (over: Partial<ProfileView> = {}): ProfileView => ({
   ...over,
 });
 
-function fakeOverlay(): HTMLElement & {
+type FakeOverlay = HTMLElement & {
   html: () => string;
   fire: (t: unknown) => void;
+  key: (t: unknown, key: string) => void;
   shown: () => boolean;
-} {
-  let handler: ((ev: unknown) => void) | null = null;
+};
+
+function fakeOverlay(): FakeOverlay {
+  // Слушатели по типу события: оверлей слушает и клики, и клавиши вкладок.
+  const handlers: Record<string, (ev: unknown) => void> = {};
   const classes = new Set<string>();
   const el = {
     innerHTML: '',
@@ -45,18 +51,16 @@ function fakeOverlay(): HTMLElement & {
       remove: (c: string) => classes.delete(c),
       contains: (c: string) => classes.has(c),
     },
-    addEventListener: (_t: string, h: (ev: unknown) => void) => {
-      handler = h;
+    addEventListener: (type: string, h: (ev: unknown) => void) => {
+      handlers[type] = h;
     },
     html: () => el.innerHTML,
-    fire: (target: unknown) => handler?.({ target }),
+    fire: (target: unknown) => handlers.click?.({ target }),
+    key: (target: unknown, key: string) =>
+      handlers.keydown?.({ target, key, preventDefault: () => {} }),
     shown: () => classes.has('show'),
   };
-  return el as unknown as HTMLElement & {
-    html: () => string;
-    fire: (t: unknown) => void;
-    shown: () => boolean;
-  };
+  return el as unknown as FakeOverlay;
 }
 
 afterEach(() => {
@@ -146,6 +150,12 @@ describe('профиль — шапка', () => {
     expect(profileHtml(view({ nick: 'комета' }))).toContain('>К<');
     const blank = profileHtml(view({ nick: '   ' }));
     expect(blank).not.toContain('pf-nm"></div>');
+  });
+
+  it('с портретом аватар шапки — лицо командира, а не буква (UIX-15.3)', () => {
+    const html = profileHtml(view({ nick: 'комета', face: '/p.webp' }));
+    expect(html).toContain('<div class="pf-av face"><img src="/p.webp" alt=""></div>');
+    expect(html).not.toContain('>К<');
   });
 
   it('позывной и имя корпорации экранируются — их вводят люди (CWE-79)', () => {
@@ -296,5 +306,77 @@ describe('профиль — оверлей', () => {
     api.open();
     root.fire({ closest: () => null }); // что-то внутри листа
     expect(root.shown()).toBe(true);
+  });
+});
+
+describe('профиль — вкладки и панель сохранения (UIX-15.3)', () => {
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  // Кнопка редактора: `closest('button')` находит её, остальные селекторы — null.
+  const press = (dataset: Record<string, string>) => ({
+    closest: (s: string) => (s === 'button' ? { dataset, disabled: false } : null),
+  });
+  // Вкладка — для клика и для клавиш одинаково.
+  const onTab = (id: string) => ({
+    closest: (s: string) => (s === '[data-pstab]' ? { dataset: { pstab: id } } : null),
+  });
+  const openTab = (html: string) =>
+    /data-pstab="([a-z]+)"[^>]*aria-selected="true"/.exec(html)?.[1];
+  function wire() {
+    const root = fakeOverlay();
+    const api = initProfile({
+      root: () => root,
+      view: () => ({ nick: 'Комета-2', xp: 0, stats: stats(), corp: null, sovereigns: 500 }),
+      readCache: () => null,
+      writeCache: () => {},
+      authorizedBase: () => Promise.resolve(null), // гость: портрет сохраняется на устройстве
+    });
+    return { api, root };
+  }
+
+  it('карьера во вкладке без заголовка «Профиль», под карточкой — с ним', () => {
+    expect(profileCareerHtml(view(), false)).not.toContain('class="pf-h"');
+    expect(profileCareerHtml(view(), false)).toContain('pf-grid');
+    expect(profileCareerHtml(view())).toContain('<div class="pf-h">Профиль</div>');
+  });
+
+  it('вкладка открывается кликом и остаётся открытой до следующего входа', () => {
+    const { api, root } = wire();
+    api.open();
+    expect(openTab(root.html())).toBe('portrait');
+    root.fire(onTab('career'));
+    expect(openTab(root.html())).toBe('career');
+    api.close();
+    api.open();
+    expect(openTab(root.html())).toBe('career');
+  });
+
+  it('стрелки и Home/End ходят по вкладкам по кругу', () => {
+    const { api, root } = wire();
+    api.open();
+    root.fire(onTab('portrait'));
+    root.key(onTab('portrait'), 'ArrowLeft');
+    expect(openTab(root.html())).toBe('career');
+    root.key(onTab('career'), 'ArrowRight');
+    expect(openTab(root.html())).toBe('portrait');
+    root.key(onTab('portrait'), 'End');
+    expect(openTab(root.html())).toBe('career');
+    root.key(onTab('career'), 'Home');
+    expect(openTab(root.html())).toBe('portrait');
+    root.key(onTab('portrait'), 'Enter'); // не стрелка — вкладка та же
+    expect(openTab(root.html())).toBe('portrait');
+  });
+
+  it('«Сохранить» появляется с первым изменением и уходит с отменой', async () => {
+    const { api, root } = wire();
+    api.open();
+    await tick();
+    expect(root.html()).not.toContain('ps-savebar');
+    root.fire(press({ portrait: '5' }));
+    expect(root.html()).toContain('class="ps-savebar"');
+    // шапка показывает выбранное лицо сразу, ещё до сохранения
+    expect(root.html()).toContain(`<div class="pf-av face"><img src="${PORTRAITS[4]}"`);
+    root.fire(press({ ps: 'cancel' }));
+    expect(root.html()).not.toContain('ps-savebar');
+    expect(root.html()).toContain(`<div class="pf-av face"><img src="${PORTRAITS[0]}"`);
   });
 });

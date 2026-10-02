@@ -157,6 +157,15 @@ describe('совет учёных — разметка окна', () => {
     const html = sciPickBodyHtml(ids().slice(0, COUNCIL_SIZE), data, branchLabel);
     for (let i = 0; i < COUNCIL_SIZE; i++) expect(html).toContain(`data-sprm="${i}"`);
   });
+
+  it('полный совет объясняет над ростером, почему кандидаты погасли (UIX-15.2)', () => {
+    const open = sciPickBodyHtml([ids()[0]!], data, branchLabel);
+    expect(open).toContain(`<div class="sp-h">${t('scipick.candidates')}</div>`);
+    const full = sciPickBodyHtml(ids().slice(0, COUNCIL_SIZE), data, branchLabel);
+    expect(full).toContain(
+      '<div class="sp-h">Совет полон: уберите учёного (✕ сверху), чтобы взять другого</div>',
+    );
+  });
 });
 
 describe('совет учёных — клики', () => {

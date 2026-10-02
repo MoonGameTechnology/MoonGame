@@ -1685,6 +1685,10 @@ export const ru: Record<string, string> = {
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
   'profile.title': 'Профиль',
+  'profile.tabs': 'Разделы профиля',
+  'profile.tab.portrait': 'Портрет',
+  'profile.tab.medals': 'Медали',
+  'profile.tab.career': 'Карьера',
   "profile.portraits": "40 портретов",
   "profile.slots": "Медали на мундире · 5 × 3",
   "profile.slot": "Ячейка {n}",
@@ -1883,8 +1887,9 @@ export const ru: Record<string, string> = {
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Кандидаты · нажмите, чтобы занять слот',
-  'scipick.confirm': 'Закрепить и продолжить к выбору места →',
+  'scipick.confirm': 'Закрепить и продолжить к выбору места',
   'scipick.focus': 'Фокус ветки «{br}»',
+  'scipick.full': 'Совет полон: уберите учёного (✕ сверху), чтобы взять другого',
   'scipick.generalist': '+1 слот исследования (генералист, без фокуса ветки)',
   'scipick.need-two': 'Выберите двух учёных',
   'scipick.note':
@@ -3530,7 +3535,7 @@ export const ru: Record<string, string> = {
   'win.log.recap': 'Сводка возвращения',
   'win.log.title': 'СВОДКИ',
   'win.scipick.back': '↩ В меню',
-  'win.scipick.title': 'СОВЕТ УЧЁНЫХ',
+  'win.scipick.title': 'Совет учёных',
   'win.steward.title': 'ХРАНИТЕЛЬ · ИИ НА СОН',
   'win.tech.title': 'ТЕХНОЛОГИИ',
 };
