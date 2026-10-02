@@ -136,6 +136,21 @@ describe('rule 6 in the frame', () => {
   });
 });
 
+describe('одна запись скорости (UIX-5.2)', () => {
+  // Скорость везде пишется «×N», и N — настоящий множитель к реальному времени (`data-mult`
+  // полосы, `data-spd` настройки матча): ПК подписывал ×1800 как «30×», и это читалось почти
+  // как «×50» телефона.
+  const markup = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+  const chips = [
+    ...markup.matchAll(/<button class="spd(?:mini|chip)"[^>]* data-(?:mult|spd)="(\d+)"[^>]*>([^<]*)<\/button>/g),
+  ];
+
+  it('подпись каждого чипа — «×» и его множитель', () => {
+    expect(chips.length).toBe(14); // полоса: 4 телефона + 4 ПК; настройка матча: 6
+    for (const [, mult, label] of chips) expect(label).toBe(`×${mult}`);
+  });
+});
+
 describe('displayOf', () => {
   it('maps shown/hidden onto the two style values', () => {
     expect(displayOf(true)).toBe('');

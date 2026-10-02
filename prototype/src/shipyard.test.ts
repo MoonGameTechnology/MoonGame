@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
+import { ru } from '../../localization/ru';
+import { en } from '../../localization/en';
 import { newGame, canOrder } from './game';
 import { data } from './gameData';
+import { worldName } from './planetName';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import {
   bagText,
@@ -18,6 +21,8 @@ import {
   groundHullsOf,
   hullsOfTab,
   buildSites,
+  RES_KEY,
+  STAT_KEY,
   type YardDraft,
   type YardHost,
 } from './shipyard';
@@ -642,6 +647,15 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
     expect(loadoutPaneHtml(s, 'p1', ships, YARD_HULLS, view)).toContain('id="cn-planet"');
   });
 
+  it('мир в выборе места назван именем, как на карте, а не кодом (UIX-5.2)', () => {
+    const s = rich();
+    const d = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    const option = new RegExp(`<option value="${d.planet}" selected>([^<]*)</option>`).exec(html);
+    expect(option?.[1]).toBe(worldName(s, d.planet));
+    expect(option?.[1]).not.toBe(d.planet);
+  });
+
   it('смена вкладки на «Пехоту» переводит конструктор на её ростер и её мир', () => {
     const s = withBuilding(rich(), 'barracks');
     const win = fakeWin();
@@ -725,5 +739,37 @@ describe('верфь — десантный челнок с бойцом (SHU-5.
     const troop = (orders[0]!.payload as { troop?: string }).troop;
     expect(troop).toBeTruthy();
     expect(canOrder(s, orders[0]!)).toBeNull();
+  });
+});
+
+describe('верфь — подписи статов и ресурсов (UIX-5.1)', () => {
+  // Без записи в словаре `t()` отдаёт сам ключ данных: чип читался «+8 pointDefense»,
+  // ценник — «25 biomass». Сторож берёт статы и ресурсы прямо из `data/`, поэтому новый
+  // стат или ресурс без подписи роняет его сразу.
+  const moduleStats = [
+    ...new Set(
+      Object.values(data.modules).flatMap((m) => [
+        ...Object.keys(m.effects.stats),
+        ...Object.values(m.rarityBonus ?? {}).flatMap((bag) => Object.keys(bag ?? {})),
+      ]),
+    ),
+  ];
+
+  it.each(moduleStats)('стат модуля %s подписан по-русски и по-английски', (stat) => {
+    const key = STAT_KEY[stat];
+    expect(key).toBeDefined();
+    expect(ru[key!]).toBeTruthy();
+    expect(en[key!]).toBeTruthy();
+  });
+
+  it.each(data.resources)('ресурс %s подписан по-русски и по-английски', (res) => {
+    const key = RES_KEY[res];
+    expect(key).toBeDefined();
+    expect(ru[key!]).toBeTruthy();
+    expect(en[key!]).toBeTruthy();
+  });
+
+  it('цена в биомассе — словом', () => {
+    expect(bagText({ biomass: 25 })).toBe('25 биомассы');
   });
 });

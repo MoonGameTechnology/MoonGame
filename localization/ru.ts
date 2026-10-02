@@ -1802,6 +1802,7 @@ export const ru: Record<string, string> = {
   'res.per.day': '/д',
   'res.per.hour': '/ч',
   'res.per.minute': '/мин',
+  'res.of.biomass': 'биомассы',
   'res.of.credits': 'кредитов',
   'res.of.energy': 'энергии',
   'res.of.food': 'еды',
@@ -1867,7 +1868,7 @@ export const ru: Record<string, string> = {
   'sandbox.tog.instant-cooldown.hint': 'Умения командиров всегда готовы',
   'sandbox.tog.speed': 'Управление скоростью',
   'sandbox.tog.speed.hint':
-    'панель времени в матче — пауза и множители ускорения (1× — реальное время)',
+    'панель времени в матче — пауза и множители ускорения (×1 — реальное время)',
   'sandbox.unlock-techs': 'Открыть все технологии',
   'sandbox.toggles': 'Переключатели',
   'sandbox.wars-ended': 'Войны прекращены: {n} — отношения нейтральные',
@@ -1915,6 +1916,7 @@ export const ru: Record<string, string> = {
   // --- stat — Характеристики юнита в компактных подписях.
   'stat.cargo': 'трюм',
   'stat.hp': 'корпус',
+  'stat.point-defense': 'ПВО',
   // Всплывашка надбавок по тапу на параметр флота (`decisions/statModifiers.ts`).
   'stat.pop.base': 'База',
   'stat.pop.incoming': 'Входящий урон',
