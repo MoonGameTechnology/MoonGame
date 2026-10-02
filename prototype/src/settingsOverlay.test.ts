@@ -188,13 +188,13 @@ describe('настройки — разметка', () => {
 
   const HOME: Record<string, readonly string[]> = {
     sound: ['set-snd', 'set-snd-vol'],
-    graphics: ['set-window-opacity', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
+    graphics: ['set-ui-scale', 'set-window-opacity', 'set-glow', 'set-starfield', 'set-motion', 'set-fps'],
     map: ['set-sweep', 'set-ownpings', 'set-colyou', 'set-colneutral', 'set-colreset'],
     controls: [],
   };
 
   it('каждая настройка живёт ровно в одной вкладке, «Готово» — во всех', () => {
-    const view = viewOf({ renderCompatibilitySupported: true, windowOpacity: 0.9 });
+    const view = viewOf({ renderCompatibilitySupported: true, windowOpacity: 0.9, uiScale: 1 });
     const all = Object.values(HOME).flat();
     for (const { id: tab } of SETTINGS_TABS) {
       const html = settingsBoxHtml(view, false, tab);
@@ -295,6 +295,14 @@ describe('настройки — разметка', () => {
     expect(html).toContain('id="set-window-opacity" type="range" min="0" max="100" step="5" value="90"');
     expect(html).toContain(t('settings.gfx.window-opacity'));
     expect(html).toContain(t('settings.gfx.window-opacity.hint'));
+  });
+
+  it('ползунок размера интерфейса — только на ПК, 80–150 % с шагом 10', () => {
+    expect(settingsBoxHtml(viewOf(), false, 'graphics')).not.toContain('id="set-ui-scale"');
+    const html = settingsBoxHtml(viewOf({ uiScale: 1.2 }), false, 'graphics');
+    expect(html).toContain('id="set-ui-scale" type="range" min="80" max="150" step="10" value="120"');
+    expect(html).toContain('id="set-ui-scale-val" class="set-val">120%</span>');
+    expect(html).toContain(t('settings.gfx.ui-scale.hint'));
   });
 
   it('громкость показана в процентах, а не долей', () => {
@@ -460,6 +468,19 @@ describe('настройки — окно и обработчики', () => {
     w.win.fire('set-window-opacity', 'input');
     expect(w.calls).toContainEqual(['window-opacity', 0.25]);
     expect(w.win.node('set-window-opacity-val')?.textContent).toBe('25%');
+  });
+
+  it('размер интерфейса подписывается на ходу, а меняется, когда ползунок отпустили', () => {
+    const w = wired({ setUiScale: (v) => w.calls.push(['ui-scale', v]) }, viewOf({ uiScale: 1 }));
+    w.api.open();
+    w.win.tab('graphics');
+    const n = w.win.node('set-ui-scale')!;
+    n.value = '130';
+    w.win.fire('set-ui-scale', 'input');
+    expect(w.win.node('set-ui-scale-val')?.textContent).toBe('130%');
+    expect(w.calls.some(([k]) => k === 'ui-scale')).toBe(false);
+    w.win.fire('set-ui-scale', 'change');
+    expect(w.calls).toContainEqual(['ui-scale', 1.3]);
   });
 
   it('громкость отдаётся долей и звучит предпросмотром', () => {

@@ -1,7 +1,12 @@
 /* Optional flagship console. Every rule is gated; the existing phone/simple skin stays available. */
 .holo-back,.holo-nav,.holo-more{display:none;}
 body.holo-ui{
-  --pcz:1;--vph:100dvh;--tbh:64px;
+  /* UIX-2.1: интерфейс ПК растёт с окном. Масштаб считает `holographicUi.ts`
+     (`decisions/pcScale.ts`) и кладёт в --holo-pcz; без него (телефон, планшет) — 1.
+     --vph и --vpw — видимые высота и ширина окна в px зумленного слоя (см. PC-блок
+     `build.mjs`): vh и vw внутри слоя под зумом растут вместе с ним, и окно «во весь экран»
+     вылезло бы за край. Поэтому размеры окон ниже — от них, а не от vh и vw. */
+  --pcz:var(--holo-pcz,1);--vph:calc(100dvh / var(--pcz));--vpw:calc(100dvw / var(--pcz));--tbh:64px;
   --cyan:#8ce9f2;--cyan-dim:#78adbb;--ink:#d8eaf1;--dim:#a1bac7;
   --line:#233d49;--line-hi:#477381;--glass:rgba(3,13,21,var(--holo-window-alpha,.94));
   /* Блик и размытие стекла слабеют вместе с ним (ползунок «Непрозрачность окон»): иначе
@@ -77,7 +82,7 @@ body.holo-ui #rail{left:18px;top:calc(var(--tbh) + 84px);bottom:auto;gap:0;flex-
 body.holo-ui #railtoggle{display:none!important;}
 body.holo-ui .holo-more{display:inline;font-size:12px;}
 body.holo-ui #railtools,body.holo-ui #rail.open #railtools{display:flex;flex-direction:column;width:auto;
-  max-height:calc(100dvh - var(--tbh) - 132px);overflow-y:auto;padding:6px;gap:6px;}
+  max-height:calc(var(--vph) - var(--tbh) - 132px);overflow-y:auto;padding:6px;gap:6px;}
 body.holo-ui #railtools::before,body.holo-ui #railtools::after{display:none;}
 body.holo-ui #railtools button{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:44px;height:44px;
   padding:0;font-size:18px;color:var(--cyan);border-radius:6px;}
@@ -95,15 +100,15 @@ body.holo-ui #devline .dl-missions{pointer-events:auto;}
 body.holo-ui #missionpanel{top:calc(var(--tbh) + 64px);}
 /* YAG-6.2: пауза забега на ПК — строка статуса глуха к нажатиям, кнопка паузы — нет. */
 body.holo-ui #fps{top:calc(var(--tbh) + 70px);right:18px;font-size:10px;}
-body.holo-ui #toasts{top:calc(var(--tbh) + 76px);max-width:min(560px,70vw);}
+body.holo-ui #toasts{top:calc(var(--tbh) + 76px);max-width:min(560px,calc(var(--vpw) * .7));}
 body.holo-ui #goals{top:calc(var(--tbh) + 82px);left:84px;right:auto;max-width:240px;font-size:12px;}
 /* The selection card remains the game's own full dossier, with all its live actions. */
 /* Досье Роя — в том же правом столбце, что и карточка выбранного (заказ владельца
    2026-09-23): те же край и верх, чтобы столбец не прыгал, когда одно сменяет другое. */
-body.holo-ui #swarm-dossier.pinned{right:18px;top:calc(var(--tbh) + 96px);width:min(330px,26vw);}
-body.holo-ui #swarm-dossier.pinned .twbox{max-height:calc(100dvh - var(--tbh) - 180px);}
-body.holo-ui #side{left:auto;right:18px;top:calc(var(--tbh) + 96px);bottom:auto;width:min(410px,39vw);
-  height:auto;max-height:calc(100dvh - var(--tbh) - 182px);overflow:hidden;z-index:20;flex-direction:column;}
+body.holo-ui #swarm-dossier.pinned{right:18px;top:calc(var(--tbh) + 96px);width:min(330px,calc(var(--vpw) * .26));}
+body.holo-ui #swarm-dossier.pinned .twbox{max-height:calc(var(--vph) - var(--tbh) - 180px);}
+body.holo-ui #side{left:auto;right:18px;top:calc(var(--tbh) + 96px);bottom:auto;width:min(410px,calc(var(--vpw) * .39));
+  height:auto;max-height:calc(var(--vph) - var(--tbh) - 182px);overflow:hidden;z-index:20;flex-direction:column;}
 body.holo-ui #side .pscroll{padding:15px 16px;overflow-y:auto;min-height:0;touch-action:pan-y;}
 body.holo-ui #side .pdesc{display:none;}
 body.holo-ui #side .phead{margin:0 0 12px;padding-bottom:12px;gap:10px;}
@@ -126,7 +131,7 @@ body.holo-ui #side .conveyor{padding:10px;margin:8px 0;}
 body.holo-ui #side .hint{font-size:12px;line-height:1.5;}
 /* The SAME command buttons are wrapped, not reimplemented or reduced to mock actions. */
 body.holo-ui #cmdbar,body.holo-ui.sheet-open #cmdbar{left:50%;top:40%;bottom:auto;transform:none;zoom:1;
-  width:292px;max-width:calc(100vw - 28px);padding:0;gap:0;overflow:auto;touch-action:pan-y;transition:none;}
+  width:292px;max-width:calc(var(--vpw) - 28px);padding:0;gap:0;overflow:auto;touch-action:pan-y;transition:none;}
 body.holo-ui #cmdbar.show{display:flex;flex-direction:column;align-items:stretch;}
 body.holo-ui #cmdbar .cmdlabel{display:none;}
 body.holo-ui #cmdbar .holo-command-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
@@ -171,18 +176,18 @@ body.holo-ui :is(#tech,#buildwin,#steward,#market,#constructor,#logwin,#diplo){
 body.holo-ui :is(.twbox,.lwbox,.cnbox,.mkbox,.dpbox){pointer-events:auto;}
 body.holo-ui :is(#tech,#steward,#buildwin) .twbox,
 body.holo-ui #market .mkbox,body.holo-ui #logwin .lwbox,body.holo-ui #diplo .dpbox{
-  width:min(740px,72vw);max-height:calc(100dvh - var(--tbh) - 176px);
+  width:min(740px,calc(var(--vpw) * .72));max-height:calc(var(--vph) - var(--tbh) - 176px);
 }
-body.holo-ui #constructor .cnbox{width:min(960px,78vw);max-height:calc(100dvh - var(--tbh) - 176px);}
+body.holo-ui #constructor .cnbox{width:min(960px,calc(var(--vpw) * .78));max-height:calc(var(--vph) - var(--tbh) - 176px);}
 body.holo-ui :is(.lw-head,.cn-head,.mk-head){min-height:48px;padding:12px 16px;background:rgba(14,40,54,.25);}
 body.holo-ui :is(.lw-head,.cn-head,.mk-head) b{font-size:14px;letter-spacing:.5px;}
 body.holo-ui :is(.tw-close,.lw-close,.cn-close,.mk-close){min-width:28px;min-height:28px;border-radius:4px;}
-body.holo-ui :is(#codex .cxbox,#codexhub .chbox){width:min(800px,84vw);max-height:82dvh;}
-body.holo-ui :is(#playercard .pcbox,#settings .setbox,#rescard .rc-box){width:min(520px,86vw);max-height:82dvh;}
-body.holo-ui #splitdlg .sbox{width:min(620px,84vw);max-height:80dvh;}
-body.holo-ui #corp .corpbox{width:min(960px,88vw);max-height:84dvh;}
-body.holo-ui #recap .rcbox{width:min(620px,86vw);max-height:82dvh;}
-body.holo-ui #intro .inbox{width:min(540px,86vw);max-height:82dvh;}
+body.holo-ui :is(#codex .cxbox,#codexhub .chbox){width:min(800px,calc(var(--vpw) * .84));max-height:calc(var(--vph) * .82);}
+body.holo-ui :is(#playercard .pcbox,#settings .setbox,#rescard .rc-box){width:min(520px,calc(var(--vpw) * .86));max-height:calc(var(--vph) * .82);}
+body.holo-ui #splitdlg .sbox{width:min(620px,calc(var(--vpw) * .84));max-height:calc(var(--vph) * .8);}
+body.holo-ui #corp .corpbox{width:min(960px,calc(var(--vpw) * .88));max-height:calc(var(--vph) * .84);}
+body.holo-ui #recap .rcbox{width:min(620px,calc(var(--vpw) * .86));max-height:calc(var(--vph) * .82);}
+body.holo-ui #intro .inbox{width:min(540px,calc(var(--vpw) * .86));max-height:calc(var(--vph) * .82);}
 body.holo-ui #objtip{max-width:min(410px,38vw);opacity:1;background:var(--glass);border-color:var(--line-hi);}
 body.holo-ui #objtip .pd-title{font-size:14px;letter-spacing:.3px;}
 body.holo-ui #objtip .pd-body{font-size:12px;}
@@ -210,31 +215,48 @@ body.holo-ui .cw-send{border-radius:4px;}
 @keyframes holo-receive{0%{opacity:.9;transform:scaleY(.2);}35%{opacity:.8;transform:scaleY(1);}100%{opacity:0;transform:scaleY(1);}}
 body.holo-ui #hub{background-color:var(--glass);}
 body.holo-ui #hub :is(.hub-banner,.hub-id,.hub-body,.hub-note,.hub-nav){width:min(1040px,86%);}
-body.holo-ui #connect :is(.cbox,.cwrap){width:min(700px,88vw);}
-body.holo-ui #setup .sbox{width:min(1080px,90vw);max-height:88dvh;}
+body.holo-ui #connect :is(.cbox,.cwrap){width:min(700px,calc(var(--vpw) * .88));}
+body.holo-ui #setup .sbox{width:min(1080px,calc(var(--vpw) * .9));max-height:calc(var(--vph) * .88);}
 body.holo-ui #setup .spane{min-height:0;}
-body.holo-ui #endscreen .es-box{width:min(620px,86vw);max-height:86dvh;}
+body.holo-ui #endscreen .es-box{width:min(620px,calc(var(--vpw) * .86));max-height:calc(var(--vph) * .86);}
+/* То же для окон, чей размер задают базовые правила в vw/vh. */
+body.holo-ui #battlewin .twbox{width:min(1220px,calc(var(--vpw) * .96));max-height:calc(var(--vph) * .92);}
+body.holo-ui #seatpick .sbox{width:min(520px,calc(var(--vpw) * .95));max-height:calc(var(--vph) * .92);}
+body.holo-ui #connect .mfmenu{max-height:calc(var(--vph) * .38);}
+/* Свои слои голограммы растут вместе со старыми (список зума в PC-блоке `build.mjs`); туда
+   же окна и экраны, которых в том списке не было: карточка ресурса, список меток, торговец
+   и союзник забега, профиль, выбор места, заставка загрузки карты и список языков. Чат
+   остаётся в масштабе 1: его перетаскивание и размер считает `chatWindow.ts` в экранных px. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine){
+  body.holo-ui :is(.holo-nav,.holo-back,#holo-selection-window,#missionpanel,#swarm-tab,#rescard,#pingpanel,
+    #trader,#ally,#profile,#seatpick,#maploading,.locmenu){zoom:var(--pcz);}
+  /* Окна, чей размер задаёт PC-блок `build.mjs` в vw/vh, — те же доли видимого окна. */
+  body.holo-ui #scipick .twbox{width:calc(var(--vpw) * .534);max-height:calc(var(--vph) * .585);}
+  body.holo-ui :is(#trader .trbox,#ally .albox){width:calc(var(--vpw) * .4);max-height:calc(var(--vph) * .6);}
+  body.holo-ui #sandbox .sbx-box-w{width:min(460px,calc(var(--vpw) * .44));max-height:calc(var(--vph) * .61);}
+  body.holo-ui #testmode .tmbox{width:min(620px,calc(var(--vpw) * .64));max-height:calc(var(--vph) * .61);}
+}
+/* Узкие и низкие раскладки включает не медиа-запрос, а класс `body` (`holo-w1200` … `holo-h650`):
+   под зумом ПК слои верстаются в «окно / зум» px, и порог считается от этого размера
+   (`narrowLayouts` в `decisions/pcScale.ts`, UIX-2.2). `:where` специфичности не добавляет —
+   правила перекрывают друг друга так же, как внутри прежних @media. */
 /* The footer remains reachable on short desktop windows; tablets use two resource rows. */
-@media(max-width:1200px){
-  body.holo-ui{--tbh:108px;}
-  body.holo-ui #top{display:grid;grid-template-columns:minmax(140px,1fr) auto auto;gap:6px 12px;padding:10px 12px;}
-  body.holo-ui .crest{grid-row:1;grid-column:1;min-width:0;}
-  body.holo-ui #tbscore{grid-row:1;grid-column:2;}
-  body.holo-ui #daycard{grid-row:1;grid-column:3;}
-  body.holo-ui #purse{grid-row:2;grid-column:1/-1;justify-content:space-between;border-top:1px solid var(--line);padding-top:5px;height:38px;}
-  body.holo-ui #side{width:min(380px,42vw);}
-}
-@media(max-width:900px){
-  body.holo-ui #top{left:70px;right:12px;gap:5px 8px;}
-  body.holo-ui .holo-back{left:12px;}
-  body.holo-ui #daycard span{font-size:9px;}
-  body.holo-ui #tbscore{font-size:10px;padding:4px 6px;}
-  body.holo-ui #side{width:min(340px,40vw);right:12px;}
-  body.holo-ui #devline #clock{display:none;}
-  body.holo-ui :is(#tech,#buildwin,#steward,#market,#constructor,#logwin,#diplo){padding-right:12px;padding-left:12px;}
-  body.holo-ui :is(#tech,#steward,#buildwin) .twbox,body.holo-ui #market .mkbox,
-  body.holo-ui #logwin .lwbox,body.holo-ui #diplo .dpbox,body.holo-ui #constructor .cnbox{width:min(720px,92vw);}
-}
+body.holo-ui:where(.holo-w1200){--tbh:108px;}
+body.holo-ui:where(.holo-w1200) #top{display:grid;grid-template-columns:minmax(140px,1fr) auto auto;gap:6px 12px;padding:10px 12px;}
+body.holo-ui:where(.holo-w1200) .crest{grid-row:1;grid-column:1;min-width:0;}
+body.holo-ui:where(.holo-w1200) #tbscore{grid-row:1;grid-column:2;}
+body.holo-ui:where(.holo-w1200) #daycard{grid-row:1;grid-column:3;}
+body.holo-ui:where(.holo-w1200) #purse{grid-row:2;grid-column:1/-1;justify-content:space-between;border-top:1px solid var(--line);padding-top:5px;height:38px;}
+body.holo-ui:where(.holo-w1200) #side{width:min(380px,calc(var(--vpw) * .42));}
+body.holo-ui:where(.holo-w900) #top{left:70px;right:12px;gap:5px 8px;}
+body.holo-ui:where(.holo-w900) .holo-back{left:12px;}
+body.holo-ui:where(.holo-w900) #daycard span{font-size:9px;}
+body.holo-ui:where(.holo-w900) #tbscore{font-size:10px;padding:4px 6px;}
+body.holo-ui:where(.holo-w900) #side{width:min(340px,calc(var(--vpw) * .4));right:12px;}
+body.holo-ui:where(.holo-w900) #devline #clock{display:none;}
+body.holo-ui:where(.holo-w900) :is(#tech,#buildwin,#steward,#market,#constructor,#logwin,#diplo){padding-right:12px;padding-left:12px;}
+body.holo-ui:where(.holo-w900) :is(#tech,#steward,#buildwin) .twbox,body.holo-ui:where(.holo-w900) #market .mkbox,
+body.holo-ui:where(.holo-w900) #logwin .lwbox,body.holo-ui:where(.holo-w900) #diplo .dpbox,body.holo-ui:where(.holo-w900) #constructor .cnbox{width:min(720px,calc(var(--vpw) * .92));}
 @media(pointer:coarse){
   body.holo-ui .holo-back{width:44px;}
   body.holo-ui #cmdbar button,body.holo-ui #cmdbar .cmdpop button,
@@ -250,11 +272,9 @@ body.holo-ui #endscreen .es-box{width:min(620px,86vw);max-height:86dvh;}
   body.holo-ui .cw-compose input{min-height:44px;}
   body.holo-ui #speedbar button{height:44px;min-width:44px;}
 }
-@media(max-height:650px){
-  body.holo-ui #side{top:calc(var(--tbh) + 80px);max-height:calc(100dvh - var(--tbh) - 152px);}
-  body.holo-ui #side .pscroll{padding:10px 12px;}
-  body.holo-ui #speedbar{bottom:12px;padding:6px 10px;}
-}
+body.holo-ui:where(.holo-h650) #side{top:calc(var(--tbh) + 80px);max-height:calc(var(--vph) - var(--tbh) - 152px);}
+body.holo-ui:where(.holo-h650) #side .pscroll{padding:10px 12px;}
+body.holo-ui:where(.holo-h650) #speedbar{bottom:12px;padding:6px 10px;}
 body.holo-no-glow.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.twbox,.lwbox,.cnbox,.mkbox,
   .dpbox,.pcbox,.setbox,.cxbox,.chbox,.rc-box,.rcbox,.sbox,.corpbox,.ep-box,.inbox){
   box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
@@ -269,8 +289,8 @@ body.holo-no-glow.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.
 #holo-selection-thread .holo-thread-glow{stroke-width:3.5;opacity:.1;}
 body.holo-no-glow #holo-selection-thread .holo-thread-glow{display:none;}
 body.holo-ui #holo-selection-window{
-  position:fixed;left:50%;top:40%;width:min(372px,calc(100vw - 36px));
-  --holo-window-max-height:min(620px,74dvh);
+  position:fixed;left:50%;top:40%;width:min(372px,calc(var(--vpw) - 36px));
+  --holo-window-max-height:min(620px,calc(var(--vph) * .74));
   /* z 40 — наравне с тостами и позже них в DOM, то есть над ними: тост поверх окна накрывал
      «Курс» и ✕ (заказ владельца 2026-09-25). Открытое меню (41) и его окна (44+) — выше. */
   max-height:var(--holo-window-max-height);z-index:40;flex-direction:column;overflow:hidden;
@@ -289,7 +309,7 @@ body.holo-ui #holo-selection-window #side .phead{
 }
 body.holo-ui #holo-selection-window #cmdbar{flex:0 1 auto;min-height:0;max-height:100%;overflow:auto;overscroll-behavior:contain;}
 body.holo-ui #holo-selection-window.has-info #cmdbar{flex-shrink:0;
-  max-height:min(46dvh,calc(var(--holo-window-room,100dvh) - 100px));border-bottom:1px solid var(--line-hi);}
+  max-height:min(calc(var(--vph) * .46),calc(var(--holo-window-room,var(--vph)) - 100px));border-bottom:1px solid var(--line-hi);}
 body.holo-ui #holo-selection-window #cmdbar .holo-command-head{position:sticky;top:0;z-index:3;
   background:linear-gradient(120deg,#102632,#081721);}
 body.holo-ui #holo-selection-window.has-commands #side .phead{display:none;}
@@ -311,7 +331,7 @@ body.holo-ui #holo-selection-window .holo-command-body:has(> [data-cmd=move]) > 
    край экрана и прятало низ под прокрутку. Теперь окно широкое и низкое: приказы — столбцом
    слева, сведения справа текут колонками газетой, а не вниз. */
 body.holo-ui #holo-selection-window.has-info{
-  width:min(1040px,calc(100vw - 150px));--holo-window-max-height:min(420px,calc(100dvh - 140px));
+  width:min(1040px,calc(var(--vpw) - 150px));--holo-window-max-height:min(420px,calc(var(--vph) - 140px));
   flex-direction:row;
 }
 body.holo-ui #holo-selection-window.has-info.has-commands #cmdbar{
@@ -325,7 +345,7 @@ body.holo-ui #holo-selection-window.has-info #side .phead{position:static;column
 /* Вкладки мира — полосой во всю ширину: сведения над ними, список под ними, оба — колонками. */
 body.holo-ui #holo-selection-window.has-info #side .ptabs{column-span:all;margin:8px 0 10px;}
 body.holo-ui #holo-selection-window.has-info #side .pcols{columns:auto;column-rule:none;}
-body.holo-ui #holo-selection-window.details-open{width:min(1180px,calc(100vw - 120px));}
+body.holo-ui #holo-selection-window.details-open{width:min(1180px,calc(var(--vpw) - 120px));}
 /* ОКНО МИРА — по содержимому (переработка 2026-09-29; заказ владельца: «если для окна не
    так много информации, то пусть сжимаются»). Ширина идёт от числа блоков открытой вкладки:
    блок — колонка ~230px, два блока — окно в две колонки, а не четыре, из которых три пусты.
@@ -333,14 +353,14 @@ body.holo-ui #holo-selection-window.details-open{width:min(1180px,calc(100vw - 1
    строки переносятся внутри той, что нужна блокам. Неразведанный мир (`.pscan`) — одна
    узкая колонка. С приказами слева окно остаётся прежним широким. */
 body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pscroll > :is(.ptabs,.pscan)){
-  --holo-window-max-height:min(600px,calc(100dvh - 140px));width:min(560px,calc(100vw - 24px));}
+  --holo-window-max-height:min(600px,calc(var(--vph) - 140px));width:min(560px,calc(var(--vpw) - 24px));}
 body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pscroll > .pscan),
 body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pscroll > .ptabs):not(:has(#side .pcols > .block:nth-child(2))){
-  width:min(440px,calc(100vw - 24px));}
+  width:min(440px,calc(var(--vpw) - 24px));}
 body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pcols > .block:nth-child(3)){
-  width:min(810px,calc(100vw - 150px));}
+  width:min(810px,calc(var(--vpw) - 150px));}
 body.holo-ui #holo-selection-window.has-info:not(.has-commands):not(.fleet-console):has(#side .pcols > .block:nth-child(4)){
-  width:min(1040px,calc(100vw - 150px));}
+  width:min(1040px,calc(var(--vpw) - 150px));}
 body.holo-ui #holo-selection-window.has-info #side .pscroll:has(> :is(.ptabs,.pscan)){
   columns:auto;column-rule:none;overflow-x:hidden;overflow-y:auto;height:auto;}
 body.holo-ui #holo-selection-window.has-info #side .pscroll:has(> .ptabs) .pcols{
@@ -352,8 +372,8 @@ body.holo-ui #holo-selection-window #side .phead + .pfacts{padding-bottom:10px;b
 /* Titles stay graspable; content and controls retain their own pointer/scroll gestures. */
 body.holo-ui .holo-floating-window{
   position:fixed!important;right:auto!important;bottom:auto!important;margin:0!important;transform:none!important;
-  max-width:calc(100dvw - 24px)!important;
-  max-height:min(calc(100dvh - 24px),var(--holo-window-room,100dvh),var(--holo-window-max-height,100dvh))!important;
+  max-width:calc(var(--vpw) - 24px)!important;
+  max-height:min(calc(var(--vph) - 24px),var(--holo-window-room,var(--vph)),var(--holo-window-max-height,var(--vph)))!important;
 }
 body.holo-ui .holo-drag-handle{cursor:grab;touch-action:none;user-select:none;}
 /* Окно тянется и за край (`floatingWindows.ts`, полоса у рамки): курсор подсказывает это. */
@@ -370,7 +390,7 @@ body.holo-no-glow #holo-selection-window{backdrop-filter:none;-webkit-backdrop-f
 #side .detail-head{position:sticky;top:0;background:#0b1d28;z-index:3;padding:6px 0;}
 #side .object-detail .pcols{columns:1;}
 #side .object-brief .pstats{flex-wrap:wrap;}
-body.holo-ui #holo-selection-window.details-open{width:min(740px,calc(100vw - 36px));}
+body.holo-ui #holo-selection-window.details-open{width:min(740px,calc(var(--vpw) - 36px));}
 body.holo-ui #holo-selection-window #side.details-open .pscroll{display:grid;}
 body.holo-ui #holo-selection-window.details-open #cmdbar .holo-command-body{max-width:340px;}
 @media (max-width:700px){
@@ -390,14 +410,14 @@ body.holo-ui #battlewinbody .bw-side.mine{
 body.holo-ui #battlewinbody :is(.bw-damage>div,.bw-effects){background:rgba(7,18,28,var(--holo-window-alpha,.94));}
 body.holo-ui #battlewinbody .bw-orders{background:rgba(9,20,31,calc(.96 * var(--holo-window-alpha,.94)));}
 /* Карточка корабля — карточка, а не справочник на всю ширину: отсеки читаются столбцом. */
-body.holo-ui #codex .cxbox.sc-box{width:min(560px,84vw);}
+body.holo-ui #codex .cxbox.sc-box{width:min(560px,calc(var(--vpw) * .84));}
 /* ОКНО ФЛОТА КОНСОЛЬЮ (макет владельца 2026-09-27). Одно широкое окно: шапка с корпусом и
    щитом, три колонки — «Приказы» ряда команд, «Состав» и «Десант» листа, — низ с аурой героя
    и «Подробнее о флоте». Хозяева (#cmdbar, #side) и обёртки листа растворены display:contents:
    их дети встают прямо в сетку окна, а обработчики, кэши разметки и лестница Back остаются
    на своих узлах. Включает раскладку класс .fleet-console (`holographicUi.ts`). */
 body.holo-ui #holo-selection-window.fleet-console.has-info{
-  width:min(1180px,calc(100vw - 110px));--holo-window-max-height:min(460px,calc(100dvh - 140px));
+  width:min(1180px,calc(var(--vpw) - 110px));--holo-window-max-height:min(460px,calc(var(--vph) - 140px));
   grid-template-columns:[orders] 348px [comp] minmax(0,1fr) [land] 300px [end];
   grid-template-rows:[head] auto [main] minmax(0,1fr) [foot] auto [end];
 }
@@ -533,46 +553,38 @@ body.holo-ui #holo-selection-window.fleet-console.details-open :is(.fc-comp,.fc-
 body.holo-ui #holo-selection-window.fleet-console #side .object-detail{grid-column:comp/end;grid-row:2;
   padding:12px 16px;border-left:0;}
 /* Уже ПК: те же три колонки, «Приказы» — в два столбца кнопок. */
-@media (max-width:1100px){
-  body.holo-ui #holo-selection-window.fleet-console.has-info{width:calc(100vw - 36px);
-    grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [land] 300px [end];}
-  body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-head > div{max-width:196px;}
-  body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-template-columns:repeat(2,minmax(0,1fr));}
-}
+body.holo-ui:where(.holo-w1100) #holo-selection-window.fleet-console.has-info{width:calc(var(--vpw) - 36px);
+  grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [land] 300px [end];}
+body.holo-ui:where(.holo-w1100) #holo-selection-window.fleet-console #cmdbar .holo-command-head > div{max-width:196px;}
+body.holo-ui:where(.holo-w1100) #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-template-columns:repeat(2,minmax(0,1fr));}
 /* Уже планшета: «Приказы» слева на две строки, «Состав» над «Десантом». Строки гибкие, чтобы
    окно выше свободного места ужимало обе колонки в прокрутку, а не срезало низ окна. Корпус
    и щит, не встав рядом, встают друг под другом: иначе полоса корпуса сжималась бы в точку. */
-@media (max-width:980px){
-  body.holo-ui #holo-selection-window.fleet-console.has-info{
-    --holo-window-max-height:calc(100dvh - var(--tbh) - 72px);
-    grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [end];
-    grid-template-rows:[head] auto [main] minmax(0,1fr) [land] minmax(0,1fr) [foot] auto [end];}
-  body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-row:2/4;}
-  body.holo-ui #holo-selection-window.fleet-console .fc-comp{grid-column:comp;grid-row:2;border-right:0;}
-  body.holo-ui #holo-selection-window.fleet-console :is(.fc-land,#cmdbar .cmdpop.tpop){grid-column:comp;grid-row:3;
-    border-top:1px solid var(--line-hi);}
-  body.holo-ui #holo-selection-window.fleet-console :is(.fc-vitals,#side .object-detail){grid-column:comp/end;}
-  body.holo-ui #holo-selection-window.fleet-console #side .object-detail{grid-row:2/4;}
-  body.holo-ui #holo-selection-window.fleet-console :is(.fc-foot,#cmdbar .holo-command-details){grid-row:4;}
-  body.holo-ui #holo-selection-window.fleet-console .fc-vital{min-width:220px;}
-}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.has-info{
+  --holo-window-max-height:calc(var(--vph) - var(--tbh) - 72px);
+  grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [end];
+  grid-template-rows:[head] auto [main] minmax(0,1fr) [land] minmax(0,1fr) [foot] auto [end];}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console #cmdbar .holo-command-body{grid-row:2/4;}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console .fc-comp{grid-column:comp;grid-row:2;border-right:0;}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console :is(.fc-land,#cmdbar .cmdpop.tpop){grid-column:comp;grid-row:3;
+  border-top:1px solid var(--line-hi);}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console :is(.fc-vitals,#side .object-detail){grid-column:comp/end;}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console #side .object-detail{grid-row:2/4;}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console :is(.fc-foot,#cmdbar .holo-command-details){grid-row:4;}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console .fc-vital{min-width:220px;}
 /* Пустой трюм — колонки «Десант» нет (`decisions/landColumn.ts`): окно уже на её ширину,
    ⇅ стоит в «Приказах», а его меню встаёт поверх «Состава». */
-body.holo-ui #holo-selection-window.fleet-console.no-land.has-info{width:min(880px,calc(100vw - 110px));
+body.holo-ui #holo-selection-window.fleet-console.no-land.has-info{width:min(880px,calc(var(--vpw) - 110px));
   grid-template-columns:[orders] 348px [comp] minmax(0,1fr) [end];}
 body.holo-ui #holo-selection-window.fleet-console.no-land .fc-comp{border-right:0;}
 body.holo-ui #holo-selection-window.fleet-console.no-land #cmdbar .cmdpop.tpop{grid-column:comp;}
-@media (max-width:1100px){
-  body.holo-ui #holo-selection-window.fleet-console.no-land.has-info{width:min(880px,calc(100vw - 36px));
-    grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [end];}
-}
-@media (max-width:980px){
-  body.holo-ui #holo-selection-window.fleet-console.no-land.has-info{
-    grid-template-rows:[head] auto [main] minmax(0,1fr) [foot] auto [end];}
-  body.holo-ui #holo-selection-window.fleet-console.no-land :is(#cmdbar .holo-command-body,#side .object-detail){grid-row:2;}
-  body.holo-ui #holo-selection-window.fleet-console.no-land #cmdbar .cmdpop.tpop{grid-row:2;border-top:0;}
-  body.holo-ui #holo-selection-window.fleet-console.no-land :is(.fc-foot,#cmdbar .holo-command-details){grid-row:3;}
-}
+body.holo-ui:where(.holo-w1100) #holo-selection-window.fleet-console.no-land.has-info{width:min(880px,calc(var(--vpw) - 36px));
+  grid-template-columns:[orders] 232px [comp] minmax(0,1fr) [end];}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land.has-info{
+  grid-template-rows:[head] auto [main] minmax(0,1fr) [foot] auto [end];}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land :is(#cmdbar .holo-command-body,#side .object-detail){grid-row:2;}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land #cmdbar .cmdpop.tpop{grid-row:2;border-top:0;}
+body.holo-ui:where(.holo-w980) #holo-selection-window.fleet-console.no-land :is(.fc-foot,#cmdbar .holo-command-details){grid-row:3;}
 /* Всплывашка надбавок в стекле окна. */
 body.holo-ui #statpop{width:min(300px,calc(100vw - 16px));padding:11px 13px 12px;font-size:13px;
   background:linear-gradient(155deg,var(--glass-sheen),transparent 42%),var(--glass);

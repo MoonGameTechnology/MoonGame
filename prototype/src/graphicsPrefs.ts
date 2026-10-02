@@ -14,7 +14,7 @@
  * Форма REFM: имена функций сохранены (`fxBlur`, `pcUi`), поэтому их вызовы в рендере не
  * изменились — переехало только объявление.
  */
-import { readBool, readRaw, writeBool, writeRaw } from './prefs';
+import { readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
 import { breath, type Breath } from './pulseFx';
 
 /**
@@ -139,6 +139,23 @@ export const windowOpacityPct = (): number => windowOpacity;
 export function setWindowOpacity(pct: number): void {
   windowOpacity = Number.isFinite(pct) ? clampPct(pct) : WINDOW_OPACITY_DEFAULT;
   writeRaw('void.windowOpacity', String(windowOpacity));
+}
+
+/**
+ * «Размер интерфейса» на ПК (UIX-2.2): ползунок «Графики», 80–150 % с шагом 10, множитель
+ * поверх масштаба по окну (`decisions/pcScale.ts`). Хранится процентом; ключа нет или там
+ * не число из диапазона — 100.
+ */
+export const UI_SCALE_MIN = 80;
+export const UI_SCALE_MAX = 150;
+export const UI_SCALE_DEFAULT = 100;
+const clampUiScale = (v: number): number =>
+  Math.max(UI_SCALE_MIN, Math.min(UI_SCALE_MAX, Math.round(v / 10) * 10));
+let uiScale = clampUiScale(readNum('void.uiScale', UI_SCALE_DEFAULT, UI_SCALE_MIN, UI_SCALE_MAX));
+export const uiScalePct = (): number => uiScale;
+export function setUiScale(pct: number): void {
+  uiScale = Number.isFinite(pct) ? clampUiScale(pct) : UI_SCALE_DEFAULT;
+  writeRaw('void.uiScale', String(uiScale));
 }
 
 /** Медиа-запрос ПК-раскладки — тот же, на котором висит ПК-часть CSS. */

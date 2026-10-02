@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fitWindowPosition, onWindowEdge } from './floatingWindows';
+import { fitWindowPosition, onWindowEdge, zoomedPlacement } from './floatingWindows';
 
 describe('movable windows stay reachable without camera input', () => {
   const viewport = { width: 1400, height: 960 };
@@ -43,5 +43,19 @@ describe('окно тянется за любой край (заказ влад�
   it('пальцу полоса шире, чем курсору', () => {
     expect(onWindowEdge({ x: 112, y: 350 }, box, 8)).toBe(false);
     expect(onWindowEdge({ x: 112, y: 350 }, box, 16)).toBe(true);
+  });
+});
+
+describe('окно под зумом ПК встаёт туда, куда его поставили (UIX-2.1)', () => {
+  it('в масштабе 1 экранные px и есть px окна', () => {
+    expect(zoomedPlacement({ x: 500, y: 200 }, 768, 1)).toEqual({ left: 500, top: 200, room: 556 });
+  });
+  it('под зумом 1,25 точку и место под окном делят на зум', () => {
+    // Без деления окно встало бы в 625 × 250 экранных px — на четверть дальше от угла.
+    expect(zoomedPlacement({ x: 500, y: 200 }, 1080, 1.25)).toEqual({ left: 400, top: 160, room: 694.4 });
+  });
+  it('место под окном не меньше 80 px, нулевой зум считается за 1', () => {
+    expect(zoomedPlacement({ x: 10, y: 1070 }, 1080, 1.25).room).toBe(80);
+    expect(zoomedPlacement({ x: 500, y: 200 }, 768, 0)).toEqual({ left: 500, top: 200, room: 556 });
   });
 });

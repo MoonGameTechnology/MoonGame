@@ -17,6 +17,9 @@ import {
   windowAlpha,
   windowOpacityPct,
   WINDOW_OPACITY_DEFAULT,
+  setUiScale,
+  uiScalePct,
+  UI_SCALE_DEFAULT,
 } from './graphicsPrefs';
 
 // REFM-21. Модуль читает окружающее хранилище на импорте, поэтому тесты работают с ЖИВЫМ
@@ -144,6 +147,26 @@ describe('графика — непрозрачность окон', () => {
       expect(windowOpacityPct()).toBe(WINDOW_OPACITY_DEFAULT);
     } finally {
       setWindowOpacity(before);
+    }
+  });
+});
+
+describe('графика — размер интерфейса ПК (UIX-2.2)', () => {
+  it('80–150 % с шагом 10, края зажаты, мусор — 100 %', () => {
+    const before = uiScalePct();
+    try {
+      setUiScale(130);
+      expect(uiScalePct()).toBe(130);
+      setUiScale(124);
+      expect(uiScalePct()).toBe(120);
+      setUiScale(200);
+      expect(uiScalePct()).toBe(150);
+      setUiScale(50);
+      expect(uiScalePct()).toBe(80);
+      setUiScale(Number.NaN);
+      expect(uiScalePct()).toBe(UI_SCALE_DEFAULT);
+    } finally {
+      setUiScale(before);
     }
   });
 });

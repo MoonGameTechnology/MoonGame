@@ -40,6 +40,9 @@ export interface SettingsView {
   /** Непрозрачность окон ПК и планшета, 0..1. Нет — нет и ползунка: у телефона стеклянных
    *  окон нет, и строка двигала бы то, чего на экране не бывает. */
   windowOpacity?: number;
+  /** «Размер интерфейса» ПК (UIX-2.2), доля 0,8..1,5. Нет — нет и ползунка: масштаб есть
+   *  только у ПК с мышью. */
+  uiScale?: number;
 }
 
 /** Палитры соперников: id и ключ подписи. Порядок — порядок кнопок. */
@@ -69,13 +72,21 @@ function switchRow(id: string, label: string, hint: string, on: boolean, status 
 
 /** Строка-ползунок в процентах. `aria` — отдельная подпись для скринридера, когда
  *  видимая («Развёртка радара») менее точна, чем то, чем ползунок управляет
- *  («Прозрачность развёртки»). По умолчанию совпадает с видимой. */
-function rangeRow(id: string, label: string, hint: string, value: number, aria = label): string {
+ *  («Прозрачность развёртки»). По умолчанию совпадает с видимой. `range` — пределы и шаг
+ *  в процентах. */
+function rangeRow(
+  id: string,
+  label: string,
+  hint: string,
+  value: number,
+  aria = label,
+  range = { min: 0, max: 100, step: 5 },
+): string {
   const v = pct(value);
   return (
     `<div class="set-row">` +
     `<div class="set-lbl">${label}${hint ? `<span class="set-sub">${hint}</span>` : ''}</div>` +
-    `<div class="set-ctl"><input id="set-${id}" type="range" min="0" max="100" step="5" value="${v}" aria-label="${aria}">` +
+    `<div class="set-ctl"><input id="set-${id}" type="range" min="${range.min}" max="${range.max}" step="${range.step}" value="${v}" aria-label="${aria}">` +
     `<span id="set-${id}-val" class="set-val">${v}%</span></div>` +
     `</div>`
   );
@@ -187,9 +198,20 @@ function mapHtml(view: SettingsView): string {
   );
 }
 
-/** «Графика»: стекло окон, свечение, звёзды, движение, счётчик кадров, совместимость отрисовки. */
+/** «Графика»: размер интерфейса, стекло окон, свечение, звёзды, движение, счётчик кадров,
+ *  совместимость отрисовки. */
 function graphicsHtml(view: SettingsView, renderingReportAvailable: boolean): string {
   return (
+    (view.uiScale !== undefined
+      ? rangeRow(
+          'ui-scale',
+          t('settings.gfx.ui-scale'),
+          t('settings.gfx.ui-scale.hint'),
+          view.uiScale,
+          t('settings.gfx.ui-scale'),
+          { min: 80, max: 150, step: 10 },
+        )
+      : '') +
     (view.windowOpacity !== undefined
       ? rangeRow(
           'window-opacity',
@@ -233,6 +255,8 @@ export interface SettingsHost {
   setSweepOpacity(v: number): void;
   /** Непрозрачность окон, 0..1 (есть только там, где есть {@link SettingsView.windowOpacity}). */
   setWindowOpacity?(v: number): void;
+  /** Размер интерфейса, доля 0,8..1,5 (есть только там, где есть {@link SettingsView.uiScale}). */
+  setUiScale?(v: number): void;
   setOwnPings(v: boolean): void;
   setGlow(v: boolean): void;
   setStarfield(v: boolean): void;
@@ -350,6 +374,12 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       host.setWindowOpacity?.(value);
       label('set-window-opacity', `${pct(value)}%`);
     });
+
+    // Размер интерфейса меняется, когда ползунок отпустили: окно настроек растёт вместе со
+    // всем интерфейсом, и на каждом `input` ползунок уезжал бы из-под курсора посреди жеста.
+    const scale = q<HTMLInputElement>('set-ui-scale');
+    scale?.addEventListener('input', () => label('set-ui-scale', `${scale.value}%`));
+    scale?.addEventListener('change', () => host.setUiScale?.(Number(scale.value) / 100));
 
     const vol = q<HTMLInputElement>('set-snd-vol');
     vol?.addEventListener('input', () => {
