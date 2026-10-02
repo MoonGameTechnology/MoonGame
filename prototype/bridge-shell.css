@@ -182,7 +182,7 @@ body.holo-ui #hub .hub-crest .dia { border-color: #a8dce8; box-shadow: 0 0 24px 
 body.holo-ui #hub .hub-bt { color: #e1edf5; font-size: 29px; font-weight: 450; letter-spacing: 5px; text-shadow: none; }
 body.holo-ui #hub :is(.hub-id, .hub-body, .hub-nav) {
   border: 1px solid var(--bridge-edge);
-  border-radius: 5px 16px 5px 16px;
+  border-radius: 18px; /* UIX-10.1: то же скругление, что у окон и карточек меню */
   background: var(--bridge-face);
   box-shadow: var(--bridge-shadow);
   backdrop-filter: blur(14px);
@@ -198,40 +198,33 @@ body.holo-ui #hub .hub-body { padding: 24px; min-height: 0; }
 body.holo-ui #hub .hub-panel { gap: 15px; }
 body.holo-ui #hub #hp-home { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
 body.holo-ui #hub #hp-home > * { flex: 1 0 100%; min-width: 0; }
-body.holo-ui #hub #hp-home > :is(.hub-play, .hub-solo) { flex: 1 1 calc(50% - 8px); width: auto; }
-body.holo-ui #hub #hp-home > #hub-sector-zero { flex-basis: 100%; }
-body.holo-ui #hub #hp-home > .hub-card:not(.ob-nudge) { flex: 1 1 calc(50% - 8px); }
-body.holo-ui #hub :is(.hub-play, .hub-solo) {
+/* Дверь — во всю ширину, режимы — два на два (UIX-10.1). */
+body.holo-ui #hub #hp-home > .hub-mode { flex: 1 1 calc(50% - 8px); width: auto; }
+body.holo-ui #hub #hp-home > .hub-card { flex: 1 1 calc(50% - 8px); }
+body.holo-ui #hub .hub-solo {
   min-height: 58px;
   border-radius: 4px 10px 4px 10px;
   font-family: inherit;
   font-size: 14px;
   font-weight: 550;
   letter-spacing: .7px;
+  color: #b9cdda;
+  border-color: var(--bridge-edge);
+  background: rgba(4, 16, 29, .32);
 }
-body.holo-ui #hub .hub-play {
-  border-color: #6ca2b2;
-  background: linear-gradient(120deg, rgba(68, 124, 147, .38), rgba(26, 60, 83, .44));
-  color: #e6f8ff;
-  box-shadow: inset 0 1px rgba(202, 243, 255, .15), 0 0 26px rgba(90, 172, 195, .07);
-}
-body.holo-ui #hub .hub-solo { color: #b9cdda; border-color: var(--bridge-edge); background: rgba(4, 16, 29, .32); }
-body.holo-ui #hub :is(.hub-play, .hub-solo):hover:not(:disabled) { border-color: #b3e6f2; background-color: rgba(107, 187, 208, .11); }
-body.holo-ui #hub .hub-sec { color: #a2bacb; margin-top: 11px; font-size: 10px; letter-spacing: 1.5px; padding-bottom: 10px; }
+body.holo-ui #hub .hub-solo:hover:not(:disabled) { border-color: #b3e6f2; background-color: rgba(107, 187, 208, .11); }
+body.holo-ui #hub .hub-sec { margin-top: 11px; padding-bottom: 10px; }
 body.holo-ui #hub .hub-card { border-color: rgba(130, 197, 218, .18); border-radius: 5px; padding: 18px; background: rgba(16, 36, 51, .28); }
 body.holo-ui #hub .hub-card .hc-ic { width: 35px; height: 35px; border-radius: 5px; font-size: 18px; background: rgba(91, 151, 176, .08); color: #a1d1df; }
 body.holo-ui #hub .hub-card .hc-t { font-size: 14px; line-height: 1.4; }
 body.holo-ui #hub .hub-card .hc-s { font-size: 12px; line-height: 1.6; margin-top: 5px; }
-body.holo-ui #hub :is(.hm-empty, .hm-more) { font-size: 12px; line-height: 1.6; }
-body.holo-ui #hub .ob-nudge { border-color: rgba(120, 189, 207, .4); background: rgba(23, 55, 72, .22); }
-body.holo-ui #hub .ob-nudge :is(.ob-go, .ob-later) { font-family: inherit; min-height: 36px; border-radius: 4px; }
-body.holo-ui #hub .ob-nudge .ob-go { background: #9ed1dc; color: #081522; }
+body.holo-ui #hub .hm-more { font-size: 12px; line-height: 1.6; }
 body.holo-ui #hub .hub-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 12px; }
 body.holo-ui #hub .hub-tile { min-height: 91px; border-radius: 5px; font-family: inherit; font-size: 12px; font-weight: 500; letter-spacing: .2px; gap: 10px; }
 body.holo-ui #hub .hub-tile .ht-ic { color: #a4cddf; text-shadow: none; }
 body.holo-ui #hub .hub-tile.wide { min-height: 44px; }
 body.holo-ui #hub .hub-nav { padding: 8px; gap: 5px; min-height: 66px; }
-body.holo-ui #hub .hub-tab { border: 1px solid transparent; border-radius: 5px; font-family: inherit; font-size: 11px; letter-spacing: .2px; gap: 6px; color: #9db6c6; padding: 8px 6px; }
+body.holo-ui #hub .hub-tab { border: 1px solid transparent; border-radius: 5px; font-family: inherit; font-size: 12px; letter-spacing: .2px; gap: 6px; color: #9db6c6; padding: 8px 6px; }
 body.holo-ui #hub .hub-tab .hn-ic { color: inherit; font-size: 18px; }
 body.holo-ui #hub .hub-tab.active { border-color: rgba(123, 191, 211, .3); background: rgba(83, 140, 165, .12); color: #d1eef5; }
 body.holo-ui #hub .hub-tab.active .hn-ic { text-shadow: none; }
