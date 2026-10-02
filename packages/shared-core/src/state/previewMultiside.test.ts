@@ -21,6 +21,8 @@ const data: GameData = parseGameData({
   resources: ['metal'],
   units: {
     fighter: { faction: 'x', stats: { attack: 10, defense: 5, speed: 10, hp: 100 } },
+    // Гибнет за один раунд и успевает ответить: на нём видно, сколько ответ весит.
+    striker: { faction: 'x', stats: { attack: 100, defense: 30, speed: 10, hp: 100 } },
   },
   factions: {},
   buildings: {},
@@ -28,6 +30,7 @@ const data: GameData = parseGameData({
 });
 
 const f = (count: number): UnitStack[] => [{ unit: 'fighter', count }];
+const striker = (count: number): UnitStack[] => [{ unit: 'striker', count }];
 
 describe('MSB-6 — прогноз считает N сторон теми же правилами, что бой', () => {
   it('ДУЭЛЬ не изменилась: тот же исход, что у двустороннего прогноза', () => {
@@ -109,5 +112,73 @@ describe('MSB-6 — прогноз считает N сторон теми же �
     );
     // Двое союзников добили третьего и оба живы — единственного победителя нет.
     expect(twoLeft.outcome).toBe('stalemate');
+  });
+});
+
+describe('UIX-6.3 — раунд прогноза = раунд живого боя 3.x, и цепочка досчитывается', () => {
+  it('ОБОРОНЯЮЩИЙСЯ отвечает КАЖДОМУ атакующему полным залпом (§0.0 №1, 2026-09-28)', () => {
+    // Двое союзников бьют одного. Он гибнет за раунд, но успевает ответить обоим — каждому
+    // всей своей обороной (30), а не половиной: прежний прогноз делил ответ между ними.
+    const r = previewSides(
+      [
+        { units: striker(1), role: 'attacker', owner: 'a1' },
+        { units: striker(1), role: 'attacker', owner: 'a2' },
+        { units: striker(1), role: 'defender', owner: 'd' },
+      ],
+      data,
+      (x, y) => x !== y && (x === 'd' || y === 'd'),
+    );
+    expect(r.roundsEst).toBe(1);
+    expect(r.sides[0]!.damageFraction).toBeCloseTo(0.3, 10);
+    expect(r.sides[1]!.damageFraction).toBeCloseTo(0.3, 10);
+  });
+
+  it('ОБОРОНЯЮЩИЙСЯ стреляет, только когда его атакуют: двое обороняющихся друг друга не бьют', () => {
+    // `d1` враждебен всем, `a` и `d2` в мире. `d2` никто не атакует — и он не стреляет;
+    // `d1` с ним враждует, но тоже лишь обороняется. Прежний прогноз давал залп обоим.
+    const r = previewSides(
+      [
+        { units: f(9), role: 'attacker', owner: 'a' },
+        { units: f(2), role: 'defender', owner: 'd1' },
+        { units: f(2), role: 'defender', owner: 'd2' },
+      ],
+      data,
+      (x, y) => x !== y && (x === 'd1' || y === 'd1'),
+    );
+    expect(r.sides[1]!.survivors).toEqual([]);
+    expect(r.sides[2]!.damageFraction).toBe(0);
+  });
+
+  it('ЦЕПОЧКА: после первой гибели выжившие сцепляются заново и дерутся до конца (§0.0 №5)', () => {
+    // Все против всех. Слабый погибает первым, но бой на этом не кончается: двое
+    // оставшихся сходятся новым боем, и победитель остаётся один.
+    const r = previewSides(
+      [
+        { units: f(3), role: 'attacker' },
+        { units: f(1), role: 'defender' },
+        { units: f(3), role: 'attacker' },
+      ],
+      data,
+    );
+    expect(r.outcome).toBe('decided');
+    expect(r.sides.filter((x) => x.survivors.length > 0)).toHaveLength(1);
+  });
+
+  it('ПЕРЕСЦЕПКА — по ключу, а не по месту в списке: порядок входа исход не меняет', () => {
+    const a = { units: f(4), role: 'attacker' as const, key: 'f2' };
+    const d = { units: f(1), role: 'defender' as const, key: 'f0' };
+    const b = {
+      units: [
+        { unit: 'fighter', count: 2 },
+        { unit: 'striker', count: 1 },
+      ],
+      role: 'attacker' as const,
+      key: 'f1',
+    };
+    const one = previewSides([a, d, b], data);
+    const two = previewSides([b, a, d], data);
+    expect(two.roundsEst).toBe(one.roundsEst);
+    expect(two.sides[0]!.survivors).toEqual(one.sides[2]!.survivors);
+    expect(two.sides[1]!.survivors).toEqual(one.sides[0]!.survivors);
   });
 });

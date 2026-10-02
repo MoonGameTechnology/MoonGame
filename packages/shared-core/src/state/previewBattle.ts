@@ -8,6 +8,7 @@ import {
   splitDealt,
   targetedVolley,
   type ClassPools,
+  type FireRole,
 } from '../util/groundTargets';
 import { cappedUnitStat } from '../util/stacks';
 import { volleyShare } from '../util/volley';
@@ -98,26 +99,58 @@ function lossesOf(before: readonly UnitStack[], after: UnitStack[]): UnitStack[]
 /** Одна сторона в многостороннем прогнозе: чем она бьёт и кому враждебна. */
 export interface PreviewSideInput {
   units: readonly UnitStack[];
+  /** Роль в ИДУЩЕМ бою: атакующий бьёт `attack`, обороняющийся отвечает `defense`. В
+   *  следующих звеньях цепочки роли раздаёт правило пересцепки (см. {@link previewSides}). */
   role: 'attacker' | 'defender';
   /** Владелец — нужен только чтобы спросить вражду; для безымянной дуэли не нужен. */
   owner?: string | null;
+  /** Порядок пересцепки после гибели: живой бой обходит выживших флоты по id. Ключи — у
+   *  всех сторон или ни у одной; без них порядок — порядок входа. */
+  key?: string;
+  /** Сторона держит мир — гарнизон наземного боя. Есть такая сторона — бой наземный: она
+   *  обороняется в каждом звене, а выжившие между звеньями отдыхают (см. {@link previewSides}). */
+  holds?: boolean;
 }
 
 export interface MultiBattlePreview {
-  /** `stalemate`, если выжили не все… точнее: если выживших не ровно один. */
+  /** `decided` — в конце цепочки осталась ровно одна сторона (как `winner` живого боя,
+   *  MSB-3). `stalemate` — всё остальное: предохранитель, никто никому не враг, погибли
+   *  все или устояли несколько невраждующих. */
   outcome: 'decided' | 'stalemate';
+  /** Раундов во всех звеньях цепочки вместе. */
   roundsEst: number;
   /** В ТОМ ЖЕ порядке, что и вход. */
   sides: BattlePreviewSide[];
 }
 
+type Role = PreviewSideInput['role'];
+
 /**
- * ПРОГНОЗ НА N СТОРОН (MSB-6) — зеркало такта живого боя, правило в правило.
+ * ПРОГНОЗ НА N СТОРОН (MSB-6, UIX-6.3) — зеркало живого боя, правило в правило.
  *
- * Считает то же, что `combat.tick`: предраундовый снимок (сперва ВСЕ залпы, потом весь
- * урон), кап линии огня на сторону, делёж залпа между всеми враждебными живыми
- * (`splitVolley`, MSB-2), предохранитель на `MAX_COMBAT_ROUNDS` и конец боя по гибели
- * ЛЮБОЙ стороны (§0.0 №5 «цепочка»).
+ * РАУНД — тот же, что `combat.tick` 3.x. Предраундовый снимок (сперва ВСЕ залпы, потом
+ * весь урон), кап линии огня на сторону. Атакующий делит свой `attack` между всеми
+ * враждебными живыми (`volleyShare`, MSB-2), а обороняющийся отвечает КАЖДОМУ атакующему,
+ * который его бьёт, полным `defense` по нему одному (§0.0 №1, уточнение 2026-09-28). Сам
+ * обороняющийся первым не стреляет: двое обороняющихся друг друга не бьют. Часы у всех
+ * атакующих общие — разнесённые «В атаку» по времени залпы прогноз сводит в один раунд.
+ *
+ * ЦЕПОЧКА (§0.0 №5). Гибель любой стороны закрывает бой, но выжившие тут же сцепляются
+ * заново, поэтому прогноз досчитывает все звенья до конца:
+ *  · на орбите — как `finishBattle`→`engageFleets`: первый по ключу выживший, у которого
+ *    есть враг, нападает; его первый по ключу враг обороняется; все, кто враждебен
+ *    кому-нибудь в новом бою, вступают атакующими. Корабли уносят урон в новое звено;
+ *  · на земле (есть сторона `holds`) — как штурм после гибели: мир держит обороняющийся,
+ *    враждебные ему берега атакуют. Пал гарнизон — мир берёт первый уцелевший берег этого
+ *    звена и уже сам обороняется. Между звеньями наземные стороны возвращаются в покой —
+ *    полный корпус и щит у уцелевших стеков, как после любого наземного боя.
+ * Цепочку обрывает предохранитель `MAX_COMBAT_ROUNDS` в любом звене (после ничьей никто
+ * не сцепляется, CMB-6) или бой, где стрелять некому.
+ *
+ * Чего прогноз не знает: что в звено вступят флоты, которых нет во входе, и что выжившие
+ * разобьются на два независимых боя (он ведёт один бой за раз). Союзные берега после
+ * захвата садятся на флоты или вливаются в гарнизон — это уже не бой, и этого он тоже не
+ * считает.
  *
  * `hostile` спрашивается у вызывающего, потому что вражда живёт в состоянии, а прогноз
  * чистый: у него нет ни шины, ни дипломатии. Не передали — все против всех (так считает
@@ -130,56 +163,55 @@ export function previewSides(
 ): MultiBattlePreview {
   // damageUnits мутирует то, что ему дали, — симуляция идёт по приватным копиям.
   const live = input.map((s) => deepClone(s.units as UnitStack[]).filter((x) => x.count > 0));
-  const enemies = (i: number): number[] => {
-    const out: number[] = [];
-    for (let j = 0; j < input.length; j++) {
-      if (j === i || !alive(live[j]!)) continue;
-      if (hostile ? hostile(input[i]!.owner, input[j]!.owner) : true) out.push(j);
-    }
-    return out;
-  };
-  let rounds = 0;
-  let stalemate = false;
-  while (live.every((u) => alive(u))) {
-    rounds += 1;
-    // Как и у живого предохранителя: счётчик ПРЕВЫШАЕТ кап, сам раунд не считается.
-    if (rounds > MAX_COMBAT_ROUNDS) {
-      stalemate = true;
-      break;
-    }
+  const up = (i: number): boolean => alive(live[i]!);
+  const foes = (i: number, j: number): boolean =>
+    i !== j && (hostile ? hostile(input[i]!.owner, input[j]!.owner) : true);
+  // Порядок пересцепки: по ключу, если он есть у всех, иначе порядок входа.
+  const order = input.map((_, i) => i);
+  if (input.length > 0 && input.every((s) => s.key !== undefined)) {
+    order.sort((a, b) => {
+      const ka = input[a]!.key!;
+      const kb = input[b]!.key!;
+      return ka < kb ? -1 : ka > kb ? 1 : a - b;
+    });
+  }
+  const ground = input.some((s) => s.holds);
+  let holder = input.findIndex((s) => s.holds);
+
+  /** Один раунд звена `link`. Ложь — стрелять некому (никто из атакующих не враг никому). */
+  const round = (link: readonly number[], roles: readonly Role[]): boolean => {
     const incoming = new Array<number>(input.length).fill(0);
     // Урон по роду войск — то же правило, что в живом раунде (`util/groundTargets.ts`):
     // против наземных войск залп считается под состав цели и ложится по родам.
     const byClass = new Array<ClassPools | undefined>(input.length).fill(undefined);
-    let anyFired = false;
-    for (let i = 0; i < input.length; i++) {
-      if (!alive(live[i]!)) continue;
-      const foes = enemies(i);
-      if (foes.length === 0) continue;
-      anyFired = true;
-      const role = input[i]!.role === 'attacker' ? 'attack' : 'defense';
-      if (foes.some((j) => hasGroundTargets(live[j]!, data))) {
-        for (const j of foes) {
-          const shot = targetedVolley(live[i]!, live[j]!, data, role);
-          const share = volleyShare(shot.total, foes.length);
+    const fire = (from: number, targets: readonly number[], role: FireRole): void => {
+      if (targets.some((j) => hasGroundTargets(live[j]!, data))) {
+        for (const j of targets) {
+          const shot = targetedVolley(live[from]!, live[j]!, data, role);
+          const share = volleyShare(shot.total, targets.length);
           incoming[j]! += share;
           const pools = splitDealt(shot.pools, shot.total, share);
           byClass[j] = byClass[j] ? addPools(byClass[j]!, pools) : pools;
         }
-        continue;
+        return;
       }
-      const volley = cappedUnitStat(live[i]!, data, role);
-      const share = volleyShare(volley, foes.length);
-      for (const j of foes) incoming[j]! += share;
+      const share = volleyShare(cappedUnitStat(live[from]!, data, role), targets.length);
+      for (const j of targets) incoming[j]! += share;
+    };
+    // Порядок обмена — порядок живого такта: атакующий бьёт, и тут же ему отвечают
+    // обороняющиеся из его врагов. Числа те же при любом порядке; порядок держит
+    // сложение долей бит в бит.
+    let fired = false;
+    for (const i of link) {
+      if (roles[i] !== 'attacker') continue;
+      const targets = link.filter((j) => foes(i, j));
+      if (targets.length === 0) continue;
+      fired = true;
+      fire(i, targets, 'attack');
+      for (const j of targets) if (roles[j] === 'defender') fire(j, [i], 'defense');
     }
-    // Никто никому не враг — бой не идёт вовсе, и крутить его до предохранителя значило
-    // бы обещать игроку 240 раундов там, где не будет ни одного (живой такт закрывает
-    // такой бой перемирием, CMB-7).
-    if (!anyFired) {
-      stalemate = true;
-      break;
-    }
-    for (let i = 0; i < input.length; i++) {
+    if (!fired) return false;
+    for (const i of link) {
       if (!(incoming[i]! > 0)) continue;
       const pools = byClass[i];
       live[i] = pools
@@ -190,6 +222,76 @@ export function previewSides(
           ).survivors
         : damageUnits(live[i]!, incoming[i]!, data).survivors;
     }
+    return true;
+  };
+
+  /** Следующее звено цепочки: участники в порядке сторон нового боя и их роли, либо
+   *  null — враждебной пары среди выживших больше нет. */
+  const relink = (last: readonly number[]): [number[], Role[]] | null => {
+    const standing = order.filter(up);
+    const rolesFor = (defender: number): Role[] =>
+      input.map((_, i) => (i === defender ? 'defender' : 'attacker'));
+    if (ground) {
+      // Мир взят — его держит первый уцелевший берег этого звена (MSB-4, §0.0 №4).
+      if (!up(holder)) {
+        const captor = standing.find((i) => last.includes(i));
+        if (captor === undefined) return null;
+        holder = captor;
+      }
+      const attackers = standing.filter((i) => foes(i, holder));
+      if (attackers.length === 0) return null;
+      return [[attackers[0]!, holder, ...attackers.slice(1)], rolesFor(holder)];
+    }
+    const first = standing.find((i) => standing.some((j) => foes(i, j)));
+    if (first === undefined) return null;
+    const defender = standing.find((j) => foes(first, j))!;
+    const link = [first, defender];
+    // Втягиваются все, кому в новом бою есть с кем драться; проходы — пока кто-то вступает
+    // (вступивший мог стать врагом тому, кто прошлым проходом врагов не имел).
+    for (let joined = true; joined;) {
+      joined = false;
+      for (const i of standing) {
+        if (link.includes(i) || !link.some((j) => foes(i, j))) continue;
+        link.push(i);
+        joined = true;
+      }
+    }
+    return [link, rolesFor(defender)];
+  };
+
+  // Звено первое — бой как он есть: все стороны, роли со входа.
+  let link = input.map((_, i) => i);
+  let roles: Role[] = input.map((s) => s.role);
+  let rounds = 0;
+  let stalemate = false;
+  for (;;) {
+    let linkRounds = 0;
+    while (link.every(up)) {
+      rounds += 1;
+      linkRounds += 1;
+      // Как и у живого предохранителя: счётчик ПРЕВЫШАЕТ кап, сам раунд не считается.
+      // Никто никому не враг — бой не идёт вовсе, и крутить его до предохранителя значило
+      // бы обещать игроку 240 раундов там, где не будет ни одного (живой такт закрывает
+      // такой бой перемирием, CMB-7).
+      if (linkRounds > MAX_COMBAT_ROUNDS || !round(link, roles)) {
+        stalemate = true;
+        break;
+      }
+    }
+    if (stalemate) break;
+    // Наземный бой отпускает выживших «в покое» (`finishBattle`): частичный корпус и щит
+    // стеков сбрасываются, и новое звено они начинают целыми.
+    if (ground) {
+      for (const i of link) {
+        for (const st of live[i]!) {
+          delete st.hp;
+          delete st.shieldHp;
+        }
+      }
+    }
+    const next = relink(link);
+    if (!next) break;
+    [link, roles] = next;
   }
   const survivorCount = live.filter((u) => alive(u)).length;
   const sideOf = (before: readonly UnitStack[], after: UnitStack[]): BattlePreviewSide => {

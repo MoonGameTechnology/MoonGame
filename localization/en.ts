@@ -207,7 +207,6 @@ export const en: Record<string, string> = {
   'battle.win.retreat-rules':
     "Retreat never finishes off a wounded fleet. Troops mid-landing can't retreat; outside battle a ship leaves orbit at no cost. After tapping, pick where to fall back on the map.",
   'battle.win.rules': 'Battle rules',
-  'battle.win.forecast-many': 'No forecast: more than two sides',
   'battle.win.source-sector': 'Sector',
   'battle.win.source-planet': 'Planet type',
   'battle.win.source-hunger': 'Hunger',
