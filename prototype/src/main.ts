@@ -224,6 +224,7 @@ import {
   missingHull,
   traderOf,
   extractionNeedMs,
+  shipsEngaged,
   type ModeTrader,
 } from '../../packages/shared-core/src/index';
 import {
@@ -312,6 +313,8 @@ import { medalBadges } from '../../decisions/unitMedals';
 import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
 import { battleForecast, battleHostility } from '../../decisions/battleForecast';
+import { engageOrders } from '../../decisions/engageOrders';
+import { engageRoster } from '../../decisions/engageRoster';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import { shownObjectives } from '../../decisions/missionObjectives';
@@ -4800,27 +4803,16 @@ function drawEngageTargets(now: number) {
  *  что цель берётся из `engageCandidates()`: там лишь флоты, чей состав игрок видит.
  *  UIX-6.3: каждый выделенный флот — своя сторона, как в бою: у каждого свой кап линии
  *  огня, и цель отвечает каждому полным залпом. Слитые в одну сторону, они считались бы
- *  один раз. */
+ *  один раз. ATK-3: в прогноз идёт весь бой, каким его заведёт ядро, — с идущим боем цели
+ *  и с теми, кого бой втянет у её мира (`engageRoster.ts`). */
 function drawEngageForecast(foe: Fleet, x: number, y: number): void {
   const mine = selectedFleetIds().flatMap((id) => {
     const f = s.fleets[id];
     return f && sumUnits(f.units) > 0 ? [f] : [];
   });
   if (mine.length === 0 || sumUnits(foe.units) <= 0) return;
-  const card = battleForecast(
-    [
-      ...mine.map((f) => ({
-        mine: true,
-        role: 'attacker' as const,
-        units: f.units,
-        owner: f.owner,
-        key: f.id,
-      })),
-      { mine: false, role: 'defender', units: foe.units, owner: foe.owner, key: foe.id },
-    ],
-    data,
-    battleHostility(s),
-  );
+  const hostile = battleHostility(s);
+  const card = battleForecast(engageRoster(s, ME, mine, foe, data, hostile), data, hostile);
   if (!card) return;
   const ink = card.tone === 'positive' ? LOCK : card.tone === 'negative' ? HOSTILE : R_ARTY;
   cx.save();
@@ -9339,15 +9331,17 @@ function mobileTargetLabel(target: MobileOrderTarget): string {
   return t('hud.mobile.lane', { from: placeName(target.from), to: placeName(target.to) });
 }
 
-/** Same existing engage/march actions for mouse and confirmed phone targeting. */
+/** Same existing engage/march actions for mouse and confirmed phone targeting. Кому какой
+ *  приказ — `engageOrders.ts` (ATK-3): у цели приказ получает один флот, остальных втянет бой. */
 function engageTarget(target: Fleet): void {
-  for (const id of selectedFleetIds()) {
-    const mine = s.fleets[id];
-    if (!mine) continue;
-    if (mine.location && mine.location === target.location) playerOrder(engageFleet(ME, id, target.id));
-    else if (target.location) playerOrder(moveFleet(ME, id, target.location));
-    else note(t('hint.engage-in-flight'));
-  }
+  const fleets = selectedFleetIds().flatMap((id) => {
+    const f = s.fleets[id];
+    return f ? [{ id, location: f.location ?? null, engaged: shipsEngaged(s, f) }] : [];
+  });
+  const plan = engageOrders(fleets, target.location ?? null);
+  for (const id of plan.engage) if (playerOrder(engageFleet(ME, id, target.id))) break;
+  for (const id of plan.march) playerOrder(moveFleet(ME, id, target.location!));
+  if (plan.adrift) note(t('hint.engage-in-flight'));
 }
 
 function cancelMobileOrder(): void {
