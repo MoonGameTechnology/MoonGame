@@ -112,7 +112,7 @@
 | UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
 | UIX-8.1 | ⏳ | proto | `docs/backlog.md` | Обучение: одна мысль на шаг. |
 | UIX-8.2 | 🔶 | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
-| UIX-9.1 | ⏳ | proto | `docs/backlog.md` | ПК: горячие клавиши. |
+| UIX-9.1 | ✅ | proto | `docs/backlog.md` | ПК: горячие клавиши. |
 | UIX-9.2 | ⏳ | proto | `docs/backlog.md` | ПК: правый клик по миру — «Курс сюда». |
 | UIX-9.3 | ⏳ | proto | `docs/backlog.md` | ПК: «Сводка армии» обрезана справа. |
 | UIX-9.4 | ⏳ | proto | `docs/backlog.md` | ПК: подписи значков и термины. |
