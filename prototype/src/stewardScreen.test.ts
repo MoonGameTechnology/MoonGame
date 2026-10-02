@@ -3,6 +3,7 @@ import { setLocale } from '../../localization/runtime';
 import { setRunClock } from './format';
 import { runClockText } from '../../decisions/runClock';
 import { newGame, HOUR, DAY } from './game';
+import { worldName } from './planetName';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
   stewMetrics,
@@ -139,6 +140,17 @@ describe('хранитель — журнал вахты', () => {
   it('пустой журнал не рисует секцию вовсе', () => {
     const s = newGame();
     expect(stewLogHtml(s, 'p1')).toBe('');
+  });
+
+  it('мир в журнале назван именем, а не кодом узла (UIX-5.2)', () => {
+    const s = newGame();
+    s.players.p1!.stewardLog = [
+      { kind: 'evac', at: 0, node: 'C0R2', to: 'C2R4', fraction: 0.5, count: 2 },
+    ] as never;
+    const html = stewLogHtml(s, 'p1');
+    expect(html).toContain(worldName(s, 'C0R2'));
+    expect(html).toContain(worldName(s, 'C2R4'));
+    expect(html).not.toMatch(/C\dR\d/);
   });
 
   it('журнал показывает последние 12 решений, свежие сверху', () => {

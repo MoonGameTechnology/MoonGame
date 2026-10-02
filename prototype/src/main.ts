@@ -120,8 +120,7 @@ import {
 } from './unitGlyphs';
 import { drawShipShape } from '../../packages/client/src/shipShapes';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
-import { planetName, worldName } from './planetName';
-import { provinceName } from '../../decisions/provinceName';
+import { mapWorldName, worldName } from './planetName';
 import { minelayerOffer, ownInstallations } from '../../decisions/minefields';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
@@ -2986,19 +2985,11 @@ function seesDetails(p: Planet): boolean {
   return fogSeesDetails({ identified: known(p.id), mine: p.owner === ME });
 }
 
-/** Имя места для игрока (PVR-6.19): у карт глав — имя провинции
- *  (`decisions/provinceName.ts`), у карт без имён — как было: id узла (подписи, журнал). */
+/** Имя места для игрока — одно на подписи, журнал, окно боя и метки (`planetName.ts`):
+ *  раньше подпись и журнал на картах без имён показывали координату («бой · C0R2»), а окно
+ *  того же боя — авто-имя («Бой: STYX-3»), UIX-5.2. */
 function placeName(id: string): string {
-  const fork = s.planets[id]?.fork;
-  if (fork) return t('place.fork-fortress', { planet: placeName(fork.province) });
-  return provinceName(s.mapId, id) ?? id;
-}
-/** То же для окна боя и меток: у карт без имён — авто-имя (`planetName.ts`), как было.
- *  Крепость на развилке (FORT-6.1) — не провинция, и имя у неё по провинции её развилки. */
-function worldTitle(id: string): string {
-  const fork = s.planets[id]?.fork;
-  if (fork) return t('place.fork-fortress', { planet: worldTitle(fork.province) });
-  return worldName(s.mapId, id);
+  return worldName(s, id);
 }
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
@@ -7896,7 +7887,7 @@ function unknownPlanetHtml(p: Planet): string {
     // `.pscan` — тело карточки одним столбцом: окно выбора сжимается под него, а не
     // растягивает три строки газетой на всю ширину (переработка окна мира, 2026-09-29).
     return (
-      cardHeader(ownerColor(mem.owner), p.id, t('side.scan.title')) +
+      cardHeader(ownerColor(mem.owner), placeName(p.id), t('side.scan.title')) +
       `<div class="pscan">` +
       `<div class="row dim">${t('side.scan.stale')}</div>` +
       `<div class="row">${t('side.scan.owner')}: <b>${mem.owner ? NAME[mem.owner] : t('side.neutral')}</b></div>` +
@@ -7910,7 +7901,7 @@ function unknownPlanetHtml(p: Planet): string {
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
   return (
-    cardHeader('#5f8f8c', p.id, t('side.notelemetry.title')) +
+    cardHeader('#5f8f8c', placeName(p.id), t('side.notelemetry.title')) +
     `<div class="pscan">` +
     `<div class="row dim">${t('side.notelemetry.sub')}</div>` +
     `<div class="hint">${t('side.notelemetry.hint')}</div>` + ping +
@@ -8011,10 +8002,8 @@ function planetPanelHtml(p: Planet): string {
   const { ground, ships } = garrisonByTab(p.garrison, data);
   const here = Object.values(s.fleets).filter((f) => f.location === p.id && !isMineFleet(f, data));
   const counts = tabCounts(p, data, here);
-  // Bytro-стиль: у мира авто-имя; координата (grid id) остаётся отдельным обозначением в
-  // подзаголовке. У провинции главы — её имя, а id узла из подзаголовка уходит: это
-  // служебное имя, а не координата (PVR-6.19).
-  const named = provinceName(s.mapId, p.id);
+  // Имя мира — то же, что в подписи на карте и в журнале; код узла («C0R2», «home_a») в
+  // подзаголовке — только в режиме отладки (UIX-5.2).
   const sm = planetSummary(p, data, here);
   // Очки победы — рядом с именем (заказ владельца 2026-09-29: «эти 50 можно в шапку»). На
   // телефоне их переносит в шапку листа `mobileHud.ts`, досье — тем же тапом, что у фишек.
@@ -8024,8 +8013,8 @@ function planetPanelHtml(p: Planet): string {
       : '';
   let h = cardHeader(
     ownerColor(p.owner),
-    named ?? planetName(p.id),
-    `${named ? '' : `${esc(p.id)} · `}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
+    placeName(p.id),
+    `${DEV_UI ? `${esc(p.id)} · ` : ''}${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
     undefined,
     vp,
   );
@@ -8598,7 +8587,7 @@ function intelRowHtml(target: string): string {
     } else if (g.kind === 'fleets' && g.target === target) {
       bits.push(t('comms.intel.fleets', { left }));
     } else if (g.kind === 'planet' && s.planets[g.target]?.owner === target) {
-      bits.push(t('comms.intel.world', { id: esc(g.target), left }));
+      bits.push(t('comms.intel.world', { id: esc(placeName(g.target)), left }));
     }
   }
   if (!bits.length) return '';
@@ -9400,7 +9389,7 @@ function updateMobileHud(): void {
       if (!f || !fleetSeen(f)) continue;
       choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
     } else if (s.planets[pick.id]) {
-      choices.push({ ...pick, title: worldTitle(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
+      choices.push({ ...pick, title: placeName(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
     }
   }
   offerChoices(choices.map(({ kind, id }) => ({ kind, id })));
@@ -11455,7 +11444,7 @@ const battleWindow = initBattleWindow({
         return unitTileHtml(u, side.owner, open, true, color);
       }).join(''),
     fleetName: fleetCallsign,
-    placeName: worldTitle,
+    placeName,
     autoRetreatAt,
     timeLeft,
     // UIX-6.2: прогноз по текущему составу сторон — новый раунд сам даёт новый прогноз.
@@ -12906,7 +12895,10 @@ function renderSetup(): void {
   mapSelect.disabled = !!netSetup;
   $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-legacy-info' : isFrontier(setupMapId) ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
   const homeSelect = $('setup-home-id') as HTMLSelectElement;
-  homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
+  // Дом — по имени, как его подпишет карта партии, а не по коду «C0R1» (UIX-5.2); значение
+  // опции остаётся id.
+  const homeName = (id: string): string => mapWorldName(setupMapId, setupPreset().nodes, id);
+  homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(homeName(id))}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
   homeSelect.value = setupStart;
   renderSetupMap();
   renderSetupSlots();
@@ -12928,7 +12920,7 @@ function renderSetup(): void {
       free === 0
         ? t('seatpick.none-free')
         : ready
-          ? t('setup.home.pick', { home: setupStart })
+          ? t('setup.home.pick', { home: homeName(setupStart) })
           : t('setup.map-hint');
     for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
       c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
@@ -12938,7 +12930,7 @@ function renderSetup(): void {
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
   setupHintEl.textContent = t(rivals === 0 ? 'setup.home.solo' : 'setup.home.pick', {
-    home: setupStart,
+    home: homeName(setupStart),
   });
   for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
     c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
@@ -13644,7 +13636,7 @@ function netClientFor(seat: string): MultiplayerClient {
           at: ping.createdAt,
           from: ping.owner,
           to: COALITION,
-          text: ping.label ?? t('chat.ping.mark', { node }),
+          text: ping.label ?? t('chat.ping.mark', { node: placeName(node) }),
           sys: false,
           ping: node,
           pingId: ping.id,
@@ -17055,7 +17047,7 @@ function pingSelected(): void {
     // `ping.added` back to us + allies — that echo is what adds it (see onPingAdded).
     sendProvincePing(selPlanet, desc);
   } else {
-    pushMsg(COALITION, desc || t('chat.ping.mark', { node: selPlanet }), false, ME, selPlanet);
+    pushMsg(COALITION, desc || t('chat.ping.mark', { node: placeName(selPlanet) }), false, ME, selPlanet);
   }
   if (input) {
     input.value = '';
@@ -17101,7 +17093,7 @@ const pings = __SECTOR_ZERO_ONLY__
       name: (id) => NAME[id] ?? id,
       color: ownerColor,
       badge: seatBadge,
-      provinceName: worldTitle,
+      provinceName: placeName,
       note,
       focus: focusWorld,
       jump: jumpToPing,

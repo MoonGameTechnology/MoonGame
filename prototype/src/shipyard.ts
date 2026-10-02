@@ -44,6 +44,7 @@ import { esc, displayUnit } from './format';
 import { unitIconHtml } from './icons';
 import { catalogPortraitHtml } from './shipArt';
 import { SECTOR_TYPES } from './map';
+import { worldName } from './planetName';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
 import { buildShip } from '../../decisions/actions';
@@ -370,7 +371,8 @@ export function loadoutPaneHtml(
   const planOpts = worlds
     .map(
       (p) =>
-        `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(p.id)}</option>`,
+        // Мир по имени, как на карте (UIX-5.2); значение опции — id.
+        `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`,
     )
     .join('');
   // ДЕСАНТНЫЙ ЧЕЛНОК (SHU-5.2) строится с бойцом внутри: выбор бойца и его цена — в

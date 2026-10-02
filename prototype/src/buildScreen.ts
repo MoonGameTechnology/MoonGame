@@ -177,7 +177,7 @@ export function buildScreenHtml(
   }
   // Честный счётчик вместо выдуманных «слотов»: сколько зданий уже стоит.
   const head =
-    `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state.mapId, p.id))}</b>` +
+    `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state, p.id))}</b>` +
     (sub.length ? `<span>${sub.join(' · ')}</span>` : '') +
     `</div><span class="bw-cnt">⛭ ${t('build.head.built', { n: p.buildings.length })}</span></div>`;
 
@@ -280,7 +280,7 @@ export function unitScreenHtml(
     })
     .join('');
   return (
-    `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state.mapId, planetId))}</b><span>${t('production.units')}</span></div></div>` +
+    `<div class="bw-top"><div class="bw-world"><b>${esc(worldName(state, planetId))}</b><span>${t('production.units')}</span></div></div>` +
     `<div class="bw-scroll"><div class="bw-list">${rows}</div></div>`
   );
 }
