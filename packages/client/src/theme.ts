@@ -10,7 +10,7 @@
 export interface Theme {
   /** Primary accent — links, focus rings, the diamond crest. */
   cyan: string;
-  /** Muted accent — secondary text, idle borders. */
+  /** Muted accent — idle borders. Not for text: on the void it reads 3.4:1 (UIX-1.2). */
   cyanDim: string;
   /** Danger / destructive. */
   red: string;
@@ -18,7 +18,7 @@ export interface Theme {
   amber: string;
   /** Body text on the void. */
   ink: string;
-  /** De-emphasised text. */
+  /** De-emphasised text: hints, captions, section labels (at least 4.5:1 on the glass). */
   dim: string;
   /** Hairline divider. */
   line: string;
@@ -103,3 +103,18 @@ export const surfaceTheme: SurfaceTheme = {
   panelTo: 'rgba(3,12,23,0.985)',
   panelEdge: 'rgba(118,206,229,0.45)',
 };
+
+/**
+ * Text scale (UIX-1.2): four sizes in CSS px, nothing smaller than `caption`. `caption` is for
+ * labels that must fit a narrow slot (a phone tab, a resource chip, a tile); `body` is the
+ * text a player reads; `heading` titles a section inside a window; `title` titles a window.
+ * Sizes are before the PC zoom (UIX-2.1), which grows the whole interface with the window.
+ */
+export interface TypeScale {
+  caption: number;
+  body: number;
+  heading: number;
+  title: number;
+}
+
+export const typeScale: TypeScale = { caption: 12, body: 14, heading: 16, title: 20 };

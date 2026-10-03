@@ -5,7 +5,7 @@
  * содержимое шире окна на ключевых экранах.
  *
  * Прогон открывает хаб, карту партии, выбранный флот, производство, науку, бой и настройки на
- * телефоне 390×844 и на ПК 1366×768 и 1920×1080 и считает на каждом экране:
+ * телефоне 390×844 и на ПК 1366×768, 1920×1080 и 2560×1440 и считает на каждом экране:
  *
  * - **текст мельче 12 px** — элемент со своим текстом, у которого `font-size × currentCSSZoom`
  *   меньше 12 (голографический ПК растёт зумом, UIX-2.1, и размер без зума врал бы);
@@ -13,6 +13,10 @@
  *   попадает и в мелкую цель, палец нет;
  * - **содержимое шире окна** — элемент окна, вылезший за его край по горизонтали (считается
  *   внешний: вылезшая строка, а не каждый её потомок).
+ *
+ * И медиану видимого текста партии (карта, флот, производство, наука, бой вместе): при
+ * 1920×1080 не меньше 17 px, при 2560×1440 — не меньше 22 px (UIX-1.2: основной текст 14 px
+ * и масштаб ПК UIX-2.1). Вид 2560×1440 открыт ради неё.
  *
  * Видимым считается то, что игрок может увидеть: элемент на экране, и в его середине
  * `elementFromPoint` находит его самого (или его потомка, или предка — подпись внутри кнопки).
@@ -92,9 +96,11 @@ function measure({ phone, windows }) {
       [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()),
   );
   const shownTexts = texts.filter(seen);
-  const small = shownTexts
-    .map((el) => ({ el, px: parseFloat(getComputedStyle(el).fontSize) * zoomOf(el) }))
-    .filter((x) => x.px < 12 - 0.01);
+  const sized = shownTexts.map((el) => ({
+    el,
+    px: parseFloat(getComputedStyle(el).fontSize) * zoomOf(el),
+  }));
+  const small = sized.filter((x) => x.px < 12 - 0.01);
 
   // Цели нажатия — то, что игрок нажимает пальцем; выключенная кнопка не цель.
   const TARGETS =
@@ -127,6 +133,7 @@ function measure({ phone, windows }) {
     measured: windows.filter((id) => document.getElementById(id)?.checkVisibility?.()),
     counts: { text: small.length, tap: taps.length, wide: wide.length },
     of: { text: shownTexts.length },
+    sizes: sized.map((x) => x.px),
     samples: {
       text: small.slice(0, 6).map((x) => `${label(x.el)} ${x.px.toFixed(1)}px`),
       tap: taps.slice(0, 6).map((el) => {
@@ -150,14 +157,31 @@ const VIEWS = [
     },
   },
   { id: 'pc-1366x768', phone: false, page: { viewport: { width: 1366, height: 768 } } },
-  { id: 'pc-1920x1080', phone: false, page: { viewport: { width: 1920, height: 1080 } } },
+  {
+    id: 'pc-1920x1080',
+    phone: false,
+    median: 17,
+    page: { viewport: { width: 1920, height: 1080 } },
+  },
+  {
+    id: 'pc-2560x1440',
+    phone: false,
+    median: 22,
+    page: { viewport: { width: 2560, height: 1440 } },
+  },
 ];
+/** Экраны партии: по ним считается медиана текста (UIX-1.2). Хаб и настройки — не партия. */
+const MATCH = new Set(['map', 'fleet', 'production', 'science', 'battle']);
+/** Нижняя медиана: половина надписей не меньше неё. */
+const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor((xs.length - 1) / 2)] ?? 0;
 
 const site = await serve(await instrumentedGame(hooks));
 const browser = await launchBrowser();
 /** Счёт: вид → экран → { text, tap, wide }. */
 const result = {};
 const errors = [];
+/** Медиана текста партии ниже порога вида: «вид: медиана < порог». */
+const lowMedians = [];
 
 try {
   for (const view of VIEWS) {
@@ -166,6 +190,7 @@ try {
     page.on('pageerror', (e) => errors.push(`${view.id}: ${e.message}`));
     await page.addInitScript(() => localStorage.setItem('vd.locale', 'ru'));
     const screens = (result[view.id] = {});
+    const matchSizes = [];
     await withDiagnostics(page, `sizetest:${view.id}`, async () => {
       const press = (sel) => (view.phone ? page.locator(sel).tap() : page.locator(sel).click());
       /** Окно открывается той же кнопкой, что у игрока: на телефоне — вкладкой или «Ещё». */
@@ -183,6 +208,7 @@ try {
           windows: [...layers, 'side', 'holo-selection-window', 'hub'],
         });
         screens[name] = m.counts;
+        if (MATCH.has(name)) matchSizes.push(...m.sizes);
         console.log(
           `${view.id.padEnd(13)} ${name.padEnd(11)} текст<12: ${String(m.counts.text).padStart(3)} из ${String(m.of.text).padStart(3)}` +
             (view.phone ? ` · цели<44: ${String(m.counts.tap).padStart(3)}` : '') +
@@ -242,8 +268,16 @@ try {
       await back();
     });
     await page.close();
+    const mid = median(matchSizes);
+    console.log(
+      `${view.id.padEnd(13)} медиана текста партии: ${mid.toFixed(1)} px` +
+        (view.median ? ` (порог ${view.median})` : ''),
+    );
+    if (view.median && mid < view.median)
+      lowMedians.push(`${view.id}: ${mid.toFixed(1)} < ${view.median}`);
   }
   assert.deepEqual(errors, [], 'ошибки страницы');
+  assert.deepEqual(lowMedians, [], 'медиана текста партии ниже порога');
 
   if (WRITE) {
     writeFileSync(BASELINE, JSON.stringify(result, null, 2) + '\n');

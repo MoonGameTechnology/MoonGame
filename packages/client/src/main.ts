@@ -11,7 +11,7 @@
  */
 import { createInitialState, type GameState } from '@void/shared-core';
 import { t, LOCALE, isLocaleId, setLocale } from '../../../localization/core';
-import { theme } from './theme';
+import { theme, typeScale } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
 import type { WelcomeModel, WelcomeOutcome, AuthProviderId } from './welcomeScreen';
 import { clampCam, zoomAt, type Cam, type Viewport, type Bounds } from './camera';
@@ -67,6 +67,10 @@ function applyTheme(): void {
     '--line': theme.line,
     '--line-hi': theme.lineHi,
     '--glass': theme.glass,
+    '--fs-caption': `${typeScale.caption}px`,
+    '--fs-body': `${typeScale.body}px`,
+    '--fs-heading': `${typeScale.heading}px`,
+    '--fs-title': `${typeScale.title}px`,
   };
   for (const [k, v] of Object.entries(vars)) s.setProperty(k, v);
 }
@@ -518,7 +522,7 @@ function setNetStatus(text: string): void {
     el.id = 'netstatus';
     el.style.cssText =
       'position:fixed;left:10px;top:10px;z-index:10;max-width:76vw;padding:6px 10px;border-radius:8px;' +
-      'font:12px ui-monospace,monospace;color:var(--ink,#bfeee6);pointer-events:none;' +
+      'font:var(--fs-body) ui-monospace,monospace;color:var(--ink,#bfeee6);pointer-events:none;' +
       'background:rgba(3,14,18,.82);border:1px solid var(--line-hi,#1d6b70);';
     document.body.appendChild(el);
   }
@@ -537,7 +541,7 @@ function showUpdateBanner(apply: () => void): void {
   bar.id = 'update';
   bar.style.cssText =
     'position:fixed;right:10px;bottom:10px;z-index:11;display:flex;align-items:center;gap:8px;' +
-    'padding:8px 10px;border-radius:8px;font:12px ui-monospace,monospace;color:var(--ink,#bfeee6);' +
+    'padding:8px 10px;border-radius:8px;font:var(--fs-body) ui-monospace,monospace;color:var(--ink,#bfeee6);' +
     'background:rgba(3,14,18,.92);border:1px solid var(--cyan,#35d6e6);';
   const text = document.createElement('span');
   text.textContent = t('client.update.ready');

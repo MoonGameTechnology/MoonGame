@@ -144,7 +144,7 @@ export function resourceCardHtml(
       <b>${esc(name)}</b>
     </div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.stock'))}</span><span class="rc-v">${stock}</span></div>
-    ${inDeficit ? `<div style="color:#ff6b6b;font-size:12px;text-align:center;padding:4px 0">${esc(t('hud.deficit'))}</div>` : ''}
+    ${inDeficit ? `<div style="color:#ff6b6b;font-size:var(--fs-body);text-align:center;padding:4px 0">${esc(t('hud.deficit'))}</div>` : ''}
     <div class="rc-sec">${esc(t('rescard.income'))}</div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.production'))}</span><span class="rc-v pos">+${fmt(bd.production)}</span></div>
     ${sprawlNote}

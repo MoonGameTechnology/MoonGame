@@ -81,7 +81,7 @@ export function arsenalPanelHtml(
   if (items.length === 0) {
     return (
       `<div class="hub-empty"><span class="he-ic">⚔</span>${t('arsenal.empty')}<br>` +
-      `<span style="font-size:11px;color:var(--cyan-dim)">${t('arsenal.empty.hint')}</span></div>`
+      `<span style="font-size:var(--fs-caption);color:var(--dim)">${t('arsenal.empty.hint')}</span></div>`
     );
   }
   const kinds: Array<ArsenalItem['kind']> = ['hull', 'module'];

@@ -89,8 +89,8 @@
 | TRN-5 | ⏳ | proto | `docs/backlog.md` | Повтор упражнения с начала этапа (§14.8). |
 | TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
 | UIX-1.1 | ✅ | proto | `docs/backlog.md` | Сторож размеров в браузере. |
-| UIX-1.2 | ⏳ | proto cli | `docs/backlog.md` | Шкала текста 12 · 14 · 16 · 20 px. |
-| UIX-1.3 | 🔒 | proto | `docs/backlog.md` | Цели нажатия 44 × 44 px на телефоне. |
+| UIX-1.2 | ✅ | proto cli | `docs/backlog.md` | Шкала текста 12 · 14 · 16 · 20 px. |
+| UIX-1.3 | ⏳ | proto | `docs/backlog.md` | Цели нажатия 44 × 44 px на телефоне. |
 | UIX-2.1 | ✅ | proto | `docs/backlog.md` | ПК: голографический интерфейс растёт с окном. |
 | UIX-2.2 | ✅ | proto | `docs/backlog.md` | «Размер интерфейса» 80–150 % в настройках ПК. |
 | UIX-3.1 | ✅ | proto | `docs/backlog.md` | Телефон: нижняя панель из пяти пунктов. |
@@ -118,7 +118,7 @@
 | UIX-9.4 | 🔶 | proto | `docs/backlog.md` | ПК: подписи значков и термины. |
 | UIX-10.1 | ✅ | proto | `docs/backlog.md` | Хаб: одна главная дверь. |
 | UIX-10.2 | ✅ | proto | `docs/backlog.md` | Хаб: кошелёк и дверь в аукцион. |
-| UIX-11.1 | 🔒 | proto | `docs/backlog.md` | Три стиля кнопок и без КАПС-лейблов. |
+| UIX-11.1 | ⏳ | proto | `docs/backlog.md` | Три стиля кнопок и без КАПС-лейблов. |
 | UIX-12.1 | ⏳ | proto | `docs/backlog.md` | Свой и чужой не только цветом. |
 | UIX-13.1 | ⏳ | proto | `docs/backlog.md` | Верфь: свернуть неподходящие модули и дать группе свою строку. |
 | UIX-13.2 | ⏳ | docs | `docs/backlog.md` | Плейтест с секундомером до и после. |

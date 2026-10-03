@@ -23,6 +23,10 @@
         --line: #0e3b40;
         --line-hi: #1d6b70;
         --glass: rgba(3, 14, 18, 0.82);
+        --fs-caption: 12px;
+        --fs-body: 14px;
+        --fs-heading: 16px;
+        --fs-title: 20px;
         color-scheme: dark;
       }
       * {
@@ -76,7 +80,7 @@
         color: var(--dim);
         letter-spacing: 4px;
         text-transform: uppercase;
-        font-size: 11px;
+        font-size: var(--fs-caption);
       }
       .btn {
         width: 100%;
@@ -112,7 +116,7 @@
         width: 100%;
         text-align: center;
         color: var(--dim);
-        font-size: 11px;
+        font-size: var(--fs-caption);
         letter-spacing: 2px;
         text-transform: uppercase;
         border-top: 1px solid var(--line);
@@ -153,7 +157,7 @@
         justify-content: center;
         gap: 6px;
         margin-top: 6px;
-        font-size: 10px;
+        font-size: var(--fs-caption);
         color: var(--dim);
       }
       footer a {
@@ -175,7 +179,7 @@
         background: transparent;
         color: var(--dim);
         font: inherit;
-        font-size: 10px;
+        font-size: var(--fs-caption);
         letter-spacing: 1px;
         cursor: pointer;
       }
@@ -187,11 +191,11 @@
         min-height: 1.4em;
         width: 100%;
         text-align: center;
-        font-size: 12px;
+        font-size: var(--fs-body);
         color: var(--amber);
       }
       .engine {
-        font-size: 10px;
+        font-size: var(--fs-caption);
         color: var(--dim);
         letter-spacing: 1px;
       }
@@ -215,7 +219,7 @@
         inset: 0;
         z-index: 9;
         pointer-events: none; /* карта под HUD остаётся перетаскиваемой */
-        font: 12px ui-monospace, monospace;
+        font: var(--fs-body) ui-monospace, monospace;
         color: var(--ink);
       }
       #hud > * {
@@ -270,7 +274,7 @@
       }
       .hud-panel h3 {
         margin: 0 0 6px;
-        font-size: 13px;
+        font-size: var(--fs-body);
         color: var(--cyan);
       }
       .hud-panel p {
@@ -303,7 +307,7 @@
         position: absolute;
         inset: 0;
         text-align: center;
-        font-size: 10px;
+        font-size: var(--fs-caption);
         line-height: 12px;
       }
       .stacks {
@@ -356,7 +360,7 @@
       /* PERK-3.3: надбавка за пережитые бои. Янтарь — цвет семьи ветерана, тот же,
          что у вымпела «Выслуга» в прототипе. */
       .side .owner .vet {
-        font-size: 11px;
+        font-size: var(--fs-caption);
         font-variant-numeric: tabular-nums;
         color: var(--amber);
         white-space: nowrap;
@@ -368,7 +372,7 @@
       .btn.tiny {
         width: auto;
         padding: 4px 8px;
-        font-size: 11px;
+        font-size: var(--fs-caption);
       }
       .btn.off,
       .btn[disabled] {
