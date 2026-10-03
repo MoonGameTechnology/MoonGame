@@ -387,6 +387,8 @@ export const ru: Record<string, string> = {
   'ai.end.pve-failed': 'оборона пала',
   'ai.end.pve-extracted': 'накопитель доставлен в зону вывода',
   'ai.end.pve-carrier-lost': 'носитель накопителя уничтожен',
+  'ai.end.pve-operation': 'очаги подавлены, главные силы разбиты, люди выведены',
+  'ai.end.pve-evac-lost': 'беженцев осталось меньше, чем нужно вывести',
   'ai.end.score': 'достижением лимита очков',
   'ai.end.timeout': 'истечением времени',
 

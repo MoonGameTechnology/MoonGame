@@ -92,6 +92,79 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     });
   });
 
+  describe('контракт операции (PVR-8.3)', () => {
+    /** Пример с контрактом: очаги `red` — его дом и `veil`, соединение — его флот, три
+     *  беженца ждут в `drift`, убежище — дом `green`, порог эвакуации — два. */
+    const contractMap = (): MatchMap => {
+      const map = exampleMap();
+      map.sectors.veil = { ...map.sectors.veil!, owner: 'red' };
+      map.sectors.home_green = { ...map.sectors.home_green!, traits: ['haven'] };
+      map.fleets.green_evac = {
+        owner: 'green',
+        location: 'drift',
+        units: [{ unit: 'evac_transport', count: 3 }],
+        landing: [],
+        traits: [],
+        joinsOnArrival: true,
+      };
+      map.operation = {
+        production: ['home_red', 'veil'],
+        forces: ['red_1'],
+        breakAt: 0.2,
+        evacuate: 2,
+      };
+      return map;
+    };
+
+    it('загрузчик заводит контракт: соединение — свой флот и стартовый корпус кораблей', () => {
+      const state = buildStateFromMap(contractMap(), data);
+      expect(state.operation).toEqual({
+        production: ['home_red', 'veil'],
+        forces: { red_1: { fleets: ['red_1'], hp: 2 * data.units.cruiser!.stats.hp } },
+        breakAt: 0.2,
+        evacuate: 2,
+      });
+    });
+
+    it('без контракта раздела нет — главу решают волны, как прежде', () => {
+      expect(buildStateFromMap(exampleMap(), data).operation).toBeUndefined();
+    });
+
+    it('ошибки контракта — ошибки карты', () => {
+      const broken = (edit: (op: NonNullable<MatchMap['operation']>, map: MatchMap) => void) => {
+        const map = contractMap();
+        edit(map.operation!, map);
+        return validateMatchMap(map, data).filter((i) => i.startsWith('E_INVALID_OPERATION'));
+      };
+      expect(broken(() => {})).toEqual([]);
+      expect(broken((op) => op.production.push('nowhere'))).toEqual([
+        'E_INVALID_OPERATION:nowhere',
+      ]);
+      expect(broken((op) => op.forces.push('ghost'))).toEqual(['E_INVALID_OPERATION:ghost']);
+      // Ждущий флот соединением не бывает: его нет в игре с первой минуты.
+      expect(broken((op) => op.forces.push('green_evac'))).toEqual([
+        'E_INVALID_OPERATION:green_evac',
+      ]);
+      expect(broken((op) => op.production.push('veil'))).toEqual(['E_INVALID_OPERATION:duplicate']);
+      expect(
+        broken((_op, map) => {
+          map.sectors.home_green = { ...map.sectors.home_green!, traits: [] };
+        }),
+      ).toEqual(['E_INVALID_OPERATION:haven']);
+      expect(
+        broken((_op, map) => {
+          map.sectors.drift = { ...map.sectors.drift!, vault: { hours: 4, zone: 'nexus' } };
+        }),
+      ).toEqual(['E_INVALID_OPERATION:vault']);
+      // Порог выше объявленных беженцев — глава проиграна бы с первой проверки.
+      expect(
+        broken((op) => {
+          op.evacuate = 4;
+        }),
+      ).toEqual(['E_INVALID_OPERATION:evacuate']);
+    });
+  });
+
   it('модули стартового флота доезжают из карты в стек (AUD-28)', () => {
     // Матки Роя на `pve-1` объявлены с выводковой камерой — и в игре они с ней.
     const map = parseMatchMap(readJson('data/maps/pve-1.json'));

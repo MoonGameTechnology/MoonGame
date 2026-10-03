@@ -342,7 +342,13 @@ export type MatchEndReason =
    *  the survivors win together, as on `pve-cleared`. */
   | 'pve-extracted'
   /** PVR-7.3: the package's carrier was destroyed. The NPC is the formal winner. */
-  | 'pve-carrier-lost';
+  | 'pve-carrier-lost'
+  /** PVR-8.3: the operation contract is met — production suppressed, main forces broken,
+   *  the main evacuation delivered. The survivors win together, as on `pve-cleared`. */
+  | 'pve-operation'
+  /** PVR-8.3: the main evacuation became impossible — fewer evacuees are left (delivered,
+   *  under way and still waiting) than the contract needs. The NPC is the formal winner. */
+  | 'pve-evac-lost';
 
 /** Операция союзника (PVR-7.4, §6.5): одна на жителя; новый приказ заменяет прежний. */
 export interface AllyOperation {
@@ -374,6 +380,35 @@ export interface ExtractionState {
   extractedAt?: number;
   deliveredAt?: number;
   /** Носитель уничтожен — поражение главы (резолюция владельца 2026-09-27). */
+  lostAt?: number;
+}
+
+/** Главное соединение контракта операции (PVR-8.3, §8.8). */
+export interface OperationForce {
+  /** Флоты соединения сейчас: учёт идёт за слиянием и делением, а влитые подкрепления —
+   *  его часть. Мёртвые id вычищаются при каждой проверке. */
+  fleets: FleetId[];
+  /** Корпус кораблей соединения на старте (Σ count × hp) — база порога разгрома. */
+  hp: number;
+  /** Миг разгрома: корпуса осталось не больше `breakAt` стартового. Навсегда: остаток,
+   *  в который влились подкрепления, соединение не воскрешает (§8.7). */
+  brokenAt?: number;
+}
+
+/** Контракт операции главы VI (PVR-8.3, §8.8): главу выигрывают три результата вместе.
+ *  Заводит загрузчик из `operation` карты; отсутствующие поля — «ещё не случилось». */
+export interface OperationState {
+  /** Производящие очаги: провинции, которые враг должен потерять — кто бы их ни взял. */
+  production: PlanetId[];
+  /** Главные соединения: id из карты → учёт соединения. */
+  forces: Record<string, OperationForce>;
+  /** Доля стартового корпуса, при которой соединение считается разгромленным. */
+  breakAt: number;
+  /** Сколько беженцев довести до убежища — основная эвакуация. */
+  evacuate: number;
+  /** Три результата сошлись — победа. */
+  completedAt?: number;
+  /** Эвакуация стала невозможной: беженцев (доставленных, в пути и ждущих) меньше порога. */
   lostAt?: number;
 }
 
@@ -1021,6 +1056,9 @@ export interface GameState {
   /** Накопитель архива главы IV (`extractionModule`, PVR-7.3): заводит загрузчик, если
    *  карта объявила архив (`vault`). Нет раздела — сценария извлечения в матче нет. */
   extraction?: ExtractionState;
+  /** Контракт операции главы VI (`operationModule`, PVR-8.3): заводит загрузчик, если карта
+   *  объявила `operation`. Нет раздела — исход главы решают волны, как прежде. */
+  operation?: OperationState;
   /** Приказы союзникам главы IV (PVR-7.4): житель → его единственная активная операция.
    *  Ставит игрок действием `ally.order`, снимает `ally.cancel` или ядро по событию мира
    *  (цель взята, разведчик дошёл, цель охраны потеряна). */

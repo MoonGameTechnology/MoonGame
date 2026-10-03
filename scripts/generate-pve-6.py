@@ -201,6 +201,17 @@ OBJECTIVES = [
 # Пул как у четвёртой главы (заказ владельца 2026-09-28): четыре с первого захода, потолок шесть.
 OBJECTIVE_SLOTS = {'base': 4, 'cap': 6}
 
+# КОНТРАКТ ОПЕРАЦИИ (§8.8, PVR-8.3): главу выигрывают три результата вместе — Рой потерял
+# все три производящих очага (кто бы их ни взял), три главных соединения разгромлены
+# (корпуса осталось не больше пятой части стартового; учёт идёт за слиянием и делением),
+# в убежище доведены три транспорта из четырёх. Беженцев стало меньше порога — поражение.
+OPERATION = collections.OrderedDict([
+    ('production', ['complex', 'north_foundry', 'west_foundry']),
+    ('forces', ['swarm_guard', 'swarm_host', 'swarm_reserve']),
+    ('breakAt', 0.2),
+    ('evacuate', 3),
+])
+
 sectors = collections.OrderedDict()
 for sid, (x, y, kind, terrain, owner, garr, blds) in P.items():
     sec = collections.OrderedDict([('position', {'x': x, 'y': y}), ('kind', kind),
@@ -221,11 +232,12 @@ m = collections.OrderedDict([
     ('sectors', sectors),
     ('objectives', OBJECTIVES),
     ('objectiveSlots', OBJECTIVE_SLOTS),
+    ('operation', OPERATION),
     ('players', collections.OrderedDict([
         ('p1', {'name': 'Azure Compact', 'faction': 'vanguard',
                 'resources': {'credits': 500, 'metal': 500}}),
         # Прикомандированный отряд — житель карты, как в четвёртой главе. Союз с первой минуты
-        # (§8.3) объявит отдельный кирпич фазы.
+        # (§8.3) ставит `contactAtStart` на его лагере (LINK выше).
         ('ally', {'name': 'Attached Detachment', 'faction': 'vanguard', 'npc': 'neutral',
                   'ai': True, 'resources': {'credits': 300, 'metal': 300}}),
         ('swarm', {'name': 'Swarm Collective', 'faction': 'swarm', 'ai': True,

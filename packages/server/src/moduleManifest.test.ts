@@ -95,7 +95,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 64: ЧЛЕНСТВО — `sprawl` 1.0.0 сразу за `faction`, налог на рост державы (BAL-10).
 // 65: порядок тот же; combat 3.6.0, fleet-ops 1.8.0 — бой «Атаки» втягивает ждавших у мира (ATK-3).
 // 66: ЧЛЕНСТВО — `auto-merge` 1.0.0 в самый конец, автослияние флотов на прибытии.
-const PINNED_FOR_VERSION = '66';
+// 67: ЧЛЕНСТВО — `operation` 1.0.0 перед `auto-merge`, контракт операции главы VI (PVR-8.3).
+const PINNED_FOR_VERSION = '67';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -166,6 +167,7 @@ const PINNED_MODULE_IDS = [
   'rocketMines', // deployment, radar scans and finite missile flights
   'rendezvous', // PVR-7.2: сценарный союзник главы IV
   'extraction', // PVR-7.3: накопитель архива главы IV
+  'operation', // PVR-8.3: контракт операции главы VI
   'auto-merge', // долетевший флот вливается в свой, стоящий в узле (заказ владельца 2026-10-03)
 ];
 

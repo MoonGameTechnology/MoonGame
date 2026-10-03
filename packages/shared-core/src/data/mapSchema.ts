@@ -167,6 +167,26 @@ export const MapObjectiveSchema = z.object({
 });
 export type MapObjective = z.infer<typeof MapObjectiveSchema>;
 
+/**
+ * КОНТРАКТ ОПЕРАЦИИ (PVR-8.3, глава VI §8.8): главу выигрывают три результата вместе —
+ * производящие очаги потеряны врагом, главные соединения разгромлены, основная эвакуация
+ * доставлена в убежище. Перечень явный и конечный: не «все существа Роя», а названные
+ * провинции и флоты карты. Есть контракт — волны и удержание главу не выигрывают;
+ * загрузчик заводит `state.operation`, судит `operationModule`.
+ */
+export const MapOperationSchema = z.object({
+  /** Производящие очаги — провинции, которые враг должен потерять (кто бы их ни взял). */
+  production: z.array(z.string()).min(1),
+  /** Главные соединения — флоты карты. Учёт идёт за их слиянием и делением. */
+  forces: z.array(z.string()).min(1),
+  /** Соединение разгромлено, когда корпуса в нём осталось не больше этой доли стартового:
+   *  последний спрятавшийся разведчик не держит главу (§8.8). */
+  breakAt: z.number().min(0).max(1).default(0.2),
+  /** Сколько беженцев (юниты с признаком `evacuee`) довести до убежища. */
+  evacuate: z.number().int().positive(),
+});
+export type MapOperation = z.infer<typeof MapOperationSchema>;
+
 export const MatchMapSchema = z.object({
   id: z.string(),
   seed: z.string(),
@@ -195,6 +215,8 @@ export const MatchMapSchema = z.object({
   objectiveSlots: z
     .object({ base: z.number().int().positive(), cap: z.number().int().positive() })
     .optional(),
+  /** Контракт операции (PVR-8.3): нет — исход решают волны, как прежде. */
+  operation: MapOperationSchema.optional(),
   /** Undirected adjacency: each pair is a two-way path. Order within a pair is
    *  irrelevant; symmetry, no self-loops and the neighbour-only rule are enforced
    *  in `validateMatchMap`.

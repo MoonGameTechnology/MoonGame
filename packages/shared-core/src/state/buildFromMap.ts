@@ -8,6 +8,8 @@ import {
   type Fleet,
   type GameState,
   type Hero,
+  type OperationForce,
+  type OperationState,
   type Planet,
   type Player,
   type PlayerArsenal,
@@ -156,6 +158,35 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
 
   if (Object.values(map.sectors).filter((s) => s.vault !== undefined).length > 1)
     issues.push('E_MULTIPLE_VAULTS');
+
+  // Контракт операции (PVR-8.3): очаги — провинции карты, соединения — её флоты, которые в
+  // игре с первой минуты (ждущий флот соединением не бывает), без повторов. Беженцам нужно
+  // убежище, а порог эвакуации должен быть достижим объявленными беженцами — иначе глава
+  // проиграна с первой проверки. Архив и контракт — два разных исхода главы, вместе их нет.
+  // Признаки `haven`/`evacuee` — словарь данных `missionFactsModule`.
+  const op = map.operation;
+  if (op) {
+    for (const sid of op.production) if (!has(sid)) issues.push(`E_INVALID_OPERATION:${sid}`);
+    for (const fid of op.forces) {
+      const fl = Object.prototype.hasOwnProperty.call(map.fleets, fid)
+        ? map.fleets[fid]
+        : undefined;
+      if (!fl || fl.joinsOnArrival) issues.push(`E_INVALID_OPERATION:${fid}`);
+    }
+    if (new Set([...op.production, ...op.forces]).size !== op.production.length + op.forces.length)
+      issues.push('E_INVALID_OPERATION:duplicate');
+    if (!Object.values(map.sectors).some((s) => s.traits.includes('haven')))
+      issues.push('E_INVALID_OPERATION:haven');
+    if (Object.values(map.sectors).some((s) => s.vault !== undefined))
+      issues.push('E_INVALID_OPERATION:vault');
+    if (data) {
+      let evacuees = 0;
+      for (const fl of Object.values(map.fleets))
+        for (const st of fl.units)
+          if (data.units[st.unit]?.traits.includes('evacuee')) evacuees += st.count;
+      if (evacuees < op.evacuate) issues.push('E_INVALID_OPERATION:evacuate');
+    }
+  }
 
   // paths: known endpoints, no self-loop, no duplicate, neighbour-only
   const seen = new Set<string>();
@@ -516,6 +547,28 @@ function seedContactsAtStart(
   return contacted;
 }
 
+/** Контракт операции (PVR-8.3): каждое соединение получает свой флот и стартовый корпус
+ *  кораблей (Σ count × hp) — базу порога разгрома. Флоты к этому мигу уже собраны, со
+ *  стартом по сложности, если он был: порог считается от того, что реально стоит на поле. */
+function seedOperation(
+  map: MatchMap,
+  fleets: Record<string, Fleet>,
+  data: GameData,
+): OperationState | undefined {
+  const op = map.operation;
+  if (!op) return undefined;
+  const forces: Record<string, OperationForce> = {};
+  for (const id of op.forces) {
+    let hp = 0;
+    for (const st of fleets[id]?.units ?? []) {
+      const def = data.units[st.unit];
+      if (def?.domain === 'space') hp += st.count * def.stats.hp;
+    }
+    forces[id] = { fleets: [id], hp };
+  }
+  return { production: [...op.production], forces, breakAt: op.breakAt, evacuate: op.evacuate };
+}
+
 /** Normalizes a slot's scientist council (new `scientists`, else the legacy single
  *  `scientist`) into ≤2 distinct, catalog-known leaders. Fail-secure at boot:
  *  `E_UNKNOWN_SCIENTIST` / `E_DUPLICATE_SCIENTIST` / `E_TOO_MANY_SCIENTISTS`. */
@@ -742,6 +795,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
   }
   const diplomacy = seedTeamDiplomacy(teamOf, options.crossTeamStart ?? 'war', players);
   const contacted = seedContactsAtStart(map, players, diplomacy);
+  const operation = seedOperation(map, fleets, data);
   // Накопитель архива (PVR-7.3): карта объявила архив — у матча есть сценарий извлечения.
   const vaultId = Object.keys(map.sectors)
     .sort()
@@ -757,6 +811,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     fleets,
     ...(diplomacy ? { diplomacy } : {}),
     ...(contacted ? { missionFacts: { contacted } } : {}),
+    ...(operation ? { operation } : {}),
     ...(Object.keys(heroes).length ? { heroes } : {}),
     ...(vaultId !== undefined && vault
       ? { extraction: { vault: vaultId, zone: vault.zone, hours: vault.hours, doneMs: 0 } }

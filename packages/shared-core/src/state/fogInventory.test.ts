@@ -110,6 +110,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   trader: 'public', // курс торговца экспедиции — цена рынка, одна на всех
   extraction: 'public', // накопитель главы IV — сценарий PvE, у Роя нет «тайны» носителя: он его не ищет
   allyOps: 'public', // приказ союзнику главы IV — сценарий PvE; бот Роя его не читает
+  operation: 'filtered', // контракт главы VI: правила публичны, флоты соединений — только видимые
   capital: 'filtered', // чужая столица — точка респавна героя, наводка
   autoAssault: 'filtered', // всё это — постоянные приказы, будущие намерения
   autoRetreat: 'filtered', // RETR-2: порог отхода и точка — намерение хозяина флота
@@ -385,6 +386,13 @@ function maximalState(): GameState {
     trader: { metal: { shift: 0.1, at: 0 } },
     extraction: { vault: 'a', zone: 'b', hours: 4, doneMs: 0 },
     allyOps: { ally: { by: 'p1', kind: 'scout', planet: 'x', issuedAt: 0 } },
+    // Учёт соединения идёт и за частями в тумане: их id вырезаются, видимые остаются.
+    operation: {
+      production: ['Z'],
+      forces: { host: { fleets: ['mine', 'CANARY_fleet'], hp: 100, brokenAt: 5 } },
+      breakAt: 0.2,
+      evacuate: 3,
+    },
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },
     autoRetreat: { mine: { at: 0.3, to: 'A' }, CANARY_fleet: { at: 0.3, to: 'CANARY_target' } },

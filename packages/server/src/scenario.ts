@@ -9,6 +9,7 @@ import {
   minefieldModule,
   rendezvousModule,
   extractionModule,
+  operationModule,
   autoMergeModule,
   captureOnArrivalModule,
 
@@ -218,6 +219,11 @@ export const DEV_MODULES: GameModule[] = [
   // Накопитель архива главы IV (PVR-7.3): своё действие и свои поводы (`time.advanced`,
   // прибытие, слияние, гибель флота, `ally.contact`), хуков нет. В КОНЕЦ по той же причине.
   extractionModule,
+  // Контракт операции главы VI (PVR-8.3): следит за главными соединениями Роя через
+  // слияние и деление, судит три результата и шлёт `operation.completed`/`operation.lost`.
+  // Хуков нет. Вплотную перед автослиянием: слияние на прибытии он слышит событием
+  // `fleet.merged`, а место в конце не сдвигает чужой порядок.
+  operationModule,
   // Автослияние на прибытии (заказ владельца 2026-10-03): долетевший флот вливается в свой,
   // стоящий в узле. В САМЫЙ КОНЕЦ: прибытие сначала слышат все (бой, захват, мины, союзник,
   // архив), и только потом флот исчезает в стоявшем.
@@ -236,7 +242,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '66'; // Автослияние на прибытии. В ЧЛЕНСТВО вошёл
+export const MODULE_MANIFEST_VERSION = '67'; // PVR-8.3: контракт операции главы VI. В
+// ЧЛЕНСТВО вошёл `operation` 1.0.0 вплотную перед `auto-merge`; `victory` 1.6.0 судит главу
+// с контрактом по его трём результатам, у состояния новое поле `operation`.
+// export const MODULE_MANIFEST_VERSION = '66'; // Автослияние на прибытии. В ЧЛЕНСТВО вошёл
 // `auto-merge` 1.0.0 в самый конец: долетевший флот вливается в свой, стоящий в узле.
 // Партия на 65 молча сменила бы состав флотов посреди игры.
 // export const MODULE_MANIFEST_VERSION = '65'; // ATK-3. Членство и порядок не тронуты;

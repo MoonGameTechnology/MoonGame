@@ -695,6 +695,20 @@
     "base": 4,
     "cap": 6
   },
+  "operation": {
+    "production": [
+      "complex",
+      "north_foundry",
+      "west_foundry"
+    ],
+    "forces": [
+      "swarm_guard",
+      "swarm_host",
+      "swarm_reserve"
+    ],
+    "breakAt": 0.2,
+    "evacuate": 3
+  },
   "players": {
     "p1": {
       "name": "Azure Compact",

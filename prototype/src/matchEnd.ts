@@ -48,6 +48,11 @@ export function endReasonText(reason: string | undefined): string {
       return t('ai.end.pve-extracted');
     case 'pve-carrier-lost':
       return t('ai.end.pve-carrier-lost');
+    // PVR-8.3: исход главы с контрактом операции решают его три результата.
+    case 'pve-operation':
+      return t('ai.end.pve-operation');
+    case 'pve-evac-lost':
+      return t('ai.end.pve-evac-lost');
     default:
       return t('ai.end.over');
   }
