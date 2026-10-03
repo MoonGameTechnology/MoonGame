@@ -253,6 +253,22 @@ export function pickFork(fork: { province: string; trail: number }): void {
   selFleets = new Set();
 }
 
+/**
+ * Выбрано ли хоть что-то, о чём рассказывает лист: флот, группа, осмотр чужого флота, мир
+ * или развилка. Один ответ на «открыт ли лист» и «закрывает ли его Escape»: каждый держал
+ * свою копию списка, и в обеих развилки не было — её выбор не открывал лист с кнопкой
+ * крепости (сообщение владельца 2026-10-03: «развилка выделилась, а кнопки нет»).
+ */
+export function hasSelection(): boolean {
+  return (
+    selFleet !== null ||
+    selFleets.size > 0 ||
+    inspectFleet !== null ||
+    selPlanet !== null ||
+    selFork !== null
+  );
+}
+
 /** Снять выделение флотов, не трогая мир и прицелы: «Снять» в карточке группы и пустая
  *  рамка без модификатора. */
 export function deselectFleets(): void {

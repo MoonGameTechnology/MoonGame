@@ -210,6 +210,21 @@ describe('interaction — владелец выбора (REFM-208)', () => {
     expect(I.inspectFleet).toBeNull();
   });
 
+  // Развилка (FORT-6.1) — тоже выбор: без неё в списке лист с кнопкой крепости не открывался.
+  it('any pick holds the sheet open, the fork included; nothing picked holds nothing', () => {
+    expect(I.hasSelection()).toBe(false);
+    I.pickFork({ province: 'w1', trail: 0 });
+    expect(I.hasSelection()).toBe(true);
+    I.pickWorld('w1');
+    expect(I.hasSelection()).toBe(true);
+    I.pickFleets(['foe'], mine);
+    expect(I.hasSelection()).toBe(true);
+    I.pickFleets(['my1', 'my2'], mine);
+    expect(I.hasSelection()).toBe(true);
+    I.disarm('match', false);
+    expect(I.hasSelection()).toBe(false);
+  });
+
   // Правило 16: выбор забывают смена матча, пустое выделение и ✕, остальные поводы его держат.
   it('a reason forgets the whole selection exactly when the table says so', () => {
     for (const reason of Object.keys(DISARMED_BY) as Reason[])
@@ -247,6 +262,14 @@ describe('проводка в main.ts (REFM-207, REFM-208)', () => {
   it('the row buttons go through the table, not a hand-written preamble', () => {
     expect(count('disarmForCommand(cmd, MOBILE);')).toBe(1);
     expect(main).not.toMatch(/\bdisarms\(/);
+  });
+
+  // Лист и его Escape спрашивают «выбрано ли что-то» у владельца, а не своей копией списка:
+  // в копиях не было развилки, и её карточка не открывалась.
+  it('the sheet and its Escape layer ask the owner whether anything is picked', () => {
+    expect(count('hasSelection: hasSelection(),')).toBe(1);
+    expect(count("{ id: 'side', isOpen: hasSelection,")).toBe(1);
+    expect(main).not.toMatch(/selPlanet !== null \|\| selFleets\.size > 0/);
   });
 
   // Ход локального мира и снимок сервера чистят выбор одним вызовом: у снимка была своя
