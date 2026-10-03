@@ -3070,7 +3070,7 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 #hub .hub-bt{position:relative;font-size:18px;letter-spacing:6px;color:var(--cyan);font-weight:700;
   text-shadow:0 0 14px rgba(53,214,230,.45);}
 #hub .hub-id{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);}
-#hub .hub-av{width:42px;height:42px;border-radius:50%;border:1px solid var(--line-hi);background:rgba(3,12,16,.8);
+#hub .hub-av{width:44px;height:44px;border-radius:50%;border:1px solid var(--line-hi);background:rgba(3,12,16,.8);
   display:grid;place-items:center;color:var(--cyan);font-size:17px;flex:0 0 auto;box-shadow:inset 0 0 10px rgba(53,214,230,.1);
   cursor:pointer;position:relative;font-variant-emoji:text;}
 #hub .hub-av:hover{border-color:var(--cyan);box-shadow:inset 0 0 12px rgba(53,214,230,.22),0 0 12px rgba(53,214,230,.2);}
@@ -3099,7 +3099,7 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 #hub .hub-st::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#3ad17a;
   box-shadow:0 0 6px #3ad17a;margin-right:6px;vertical-align:middle;}
 /* Язык и настройки — на виду в шапке хаба (заказ владельца 2026-09-25), а не только в «Ещё». */
-#hub .hub-lang,#hub .hub-gear{height:42px;display:flex;align-items:center;gap:7px;padding:0 13px;border-radius:10px;
+#hub .hub-lang,#hub .hub-gear{height:44px;min-width:44px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 13px;border-radius:10px;
   border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:#d6eef2;cursor:pointer;flex:0 0 auto;
   font:600 var(--fs-caption) ui-monospace,monospace;letter-spacing:1.5px;}
 #hub .hub-lang .lm-car{font-size:var(--fs-caption);opacity:.7;}
@@ -3110,18 +3110,18 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 /* На телефоне подписи вытесняли имя командира — остаются значки 🌐 и ⚙. */
 @media (max-width:560px){#hub .hub-lang .lm-cur,#hub .hub-gear .hg-lbl{display:none;}
   #hub .hub-lang,#hub .hub-gear{padding:0 11px;}}
-#hub .hub-msg{position:relative;width:42px;height:42px;border-radius:10px;border:1px solid var(--line-hi);
+#hub .hub-msg{position:relative;width:44px;height:44px;border-radius:10px;border:1px solid var(--line-hi);
   background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;flex:0 0 auto;}
 #hub .hub-msg .badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;border-radius:9px;padding:0 4px;
   background:var(--red);color:#180605;font:700 var(--fs-caption)/18px ui-monospace,monospace;text-align:center;}
 /* Кошелёк главного экрана (hubWallet.ts, UIX-10.2): те же плашки, что фишка Суверенов в строке
    статуса партии и кошелёк забега, ростом с кнопки шапки. Клавиша при Варрантах — дверь в аукцион. */
 #hub .hub-wallet{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
-#hubwallet .dl-donate{position:relative;right:auto;margin-left:0;height:42px;gap:8px;padding:0 5px 0 12px;border-radius:10px;
+#hubwallet .dl-donate{position:relative;right:auto;margin-left:0;height:44px;gap:8px;padding:0 5px 0 12px;border-radius:10px;
   font-size:16px;}
 #hubwallet .dl-donate :is(i,i svg){width:20px;height:20px;}
 #hubwallet .dl-donate em{width:30px;height:30px;border-radius:8px;font-size:18px;}
-#hubwallet .tw-cur{height:42px;gap:8px;padding:0 5px 0 14px;font-size:16px;cursor:pointer;}
+#hubwallet .tw-cur{height:44px;gap:8px;padding:0 5px 0 14px;font-size:16px;cursor:pointer;}
 #hubwallet .tw-cur i{font-size:20px;}
 #hubwallet .hw-go{display:inline-flex;align-items:center;height:30px;margin-left:4px;padding:0 12px;border-radius:999px;
   background:color-mix(in srgb,currentColor 24%,transparent);color:color-mix(in srgb,currentColor 30%,var(--ink));
@@ -3144,7 +3144,7 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 #hub .hub-door:active:not(:disabled){transform:translateY(1px);}
 #hub .hub-door:disabled{opacity:.5;box-shadow:none;cursor:not-allowed;}
 /* «Пропустить» под дверью обучения — тихая ссылка: урок остаётся в «Ещё → Обучение». */
-#hub .hub-tutor{flex-direction:column;align-items:flex-start;gap:2px;}
+#hub .hub-tutor{flex-direction:column;align-items:flex-start;gap:8px;}
 #hub .hub-tutor .ob-later{min-height:44px;padding:0 4px;border:0;background:none;color:var(--sf-dim);
   font:14px var(--sf-font);text-decoration:underline;cursor:pointer;}
 #hub .hub-tutor .ob-later:hover{color:var(--sf-text);}

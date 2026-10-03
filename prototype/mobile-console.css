@@ -194,7 +194,7 @@ body.mobile-ui #mobile-sheet #cmdbar {
   border-radius: 0;
   box-shadow: none;
   background: none;
-  gap: 7px;
+  gap: 8px;
 }
 body.mobile-ui #mobile-sheet #cmdbar.show {
   display: grid;
@@ -377,18 +377,18 @@ body.mobile-ui #daycard {
   border-radius: 0;
   background: none;
 }
+/* UIX-1.3: цель пальца на телефоне — не меньше 44 × 44 px. */
 body.mobile-ui #crestmark {
-  min-width: 40px;
-  min-height: 40px;
+  min-width: 44px;
+  min-height: 44px;
 }
-/* The ‹ is an 8px glyph that was sitting in a 40px box: 16px of air to the screen edge and
-   18px more to the emblem, the widest gap in a row that has none to spare. Narrower box,
-   same glyph — 12px a side. The HEIGHT is what keeps it thumb-sized (it fills the 48px row,
-   and the hit area runs to the very screen edge, where a miss has nowhere to land), so the
-   width is the one dimension that can give; the emblem beside it keeps the full 40. */
+/* The ‹ is an 8px glyph. It once sat in a 40px box, was narrowed to 32px to give the row
+   back its air, and is 44px wide again under the 44 × 44 rule (UIX-1.3): the glyph stays the
+   same, only the box around it — the part the thumb hits — grows. The height fills the 48px
+   row, and the hit area runs to the very screen edge, where a miss has nowhere to land. */
 body.mobile-ui #topback {
-  width: 32px;
-  min-height: 40px;
+  width: 44px;
+  min-height: 44px;
 }
 body.mobile-ui #purse {
   display: grid;
@@ -428,6 +428,17 @@ body.mobile-ui #purse .res em {
   body.mobile-ui #purse .res b {
     font-size: var(--fs-body);
   }
+  /* «‹» и герб стали шире на 16 px (UIX-1.3): на 320 px их отдают поля счёта и дня, иначе
+     имя командира и место («1-е из 2») обрезались многоточием. */
+  body.mobile-ui #tbscore {
+    padding: 0 4px;
+  }
+  body.mobile-ui #daycard {
+    padding-left: 6px;
+  }
+  body.mobile-ui .crest {
+    gap: 6px;
+  }
 }
 body.mobile-ui #devline {
   padding-left: 18px;
@@ -435,6 +446,15 @@ body.mobile-ui #devline {
   /* the bar lost its 6px top margin, so the status line follows it up by the same 6px
      and keeps the gap it had under the card */
   top: calc(var(--tbh) + 4px + env(safe-area-inset-top));
+  /* UIX-1.3: строка ростом с цель пальца — «▶ Продолжить», «500 +», ⚑ задач и союзник были
+     по 24 px в высоту. Строка прозрачна и пропускает нажатия на карту везде, кроме кнопок. */
+  height: 44px;
+}
+body.mobile-ui #devline button {
+  min-height: 44px;
+}
+body.mobile-ui #devline .dl-donate {
+  height: 44px;
 }
 body.mobile-ui.aim-mode #toasts .toast:not(.jump) {
   pointer-events: none;
@@ -829,5 +849,66 @@ body.mobile-ui
   body.mobile-ui #mobile-sheet.order-mode #cmdbar {
     grid-template-columns: 1fr 90px 140px;
     align-items: center;
+  }
+}
+
+/* UIX-1.3: цель пальца на телефоне — не меньше 44 × 44 px. Кнопка с подписью растёт сама;
+   мелкому значку достаётся невидимое поле нажатия, а рисунок остаётся прежним. Шапка и строка
+   статуса — выше, у своих правил. */
+body.mobile-ui #toasts {
+  top: calc(var(--tbh) + 56px + env(safe-area-inset-top));
+}
+body.mobile-ui #missionpanel {
+  top: calc(var(--tbh) + 52px + env(safe-area-inset-top));
+}
+body.mobile-ui #missionpanel .mp-close {
+  min-width: 44px;
+  min-height: 44px;
+}
+body.mobile-ui #battlewinbody :is(.bw-expand, .bw-effect-toggle, .bw-more),
+body.mobile-ui #battlewinbody :is(.bw-actions, .bw-orders) button {
+  min-height: 44px;
+}
+/* 8 px между соседними кнопками, чтобы палец не задевал соседнюю. Ячейки нижней панели и
+   строки списков стоят встык: промежутка, куда можно промахнуться, у них нет. */
+body.mobile-ui #tech .tt-tabs,
+body.mobile-ui .cn-hulls,
+body.mobile-ui #battlewinbody .bw-tiles {
+  gap: 8px;
+}
+body.mobile-ui #battlewinbody .bw-tiles {
+  margin-top: 8px;
+}
+body.mobile-ui #battlewinbody .bw-orders {
+  padding-bottom: 16px;
+}
+/* Настройки, совет учёных и подсказки обучения открываются и до партии, где класса телефона
+   ещё нет: их правило — по сенсорному экрану. */
+@media (pointer: coarse) {
+  .set-tabs button,
+  .pc-close,
+  #spotlight :is(.sl-skip, .sl-next, .sl-skip-stage, .sl-fold),
+  #scipick .sp-cancel {
+    min-height: 44px;
+  }
+  .set-tabs button {
+    min-width: 44px;
+  }
+  /* Ползунок громкости: дорожка та же, выше только поле, за которое берётся палец. */
+  .set-ctl input[type='range'] {
+    height: 44px;
+  }
+  /* «✕» убирает учёного из совета: значок 32 × 32, поле нажатия 44 × 44. */
+  #scipick .sp-rm::after {
+    content: '';
+    position: absolute;
+    /* от внутреннего края рамки в 1 px: 32 − 2 + 2 × 7 = 44 */
+    inset: -7px;
+  }
+}
+/* Уже 361 px четыре вкладки настроек с промежутком 8 px в окно не входят: там 4 px. */
+@media (pointer: coarse) and (min-width: 361px) {
+  .set-tabs {
+    gap: 8px;
   }
 }

@@ -2,17 +2,17 @@
   "phone-390x844": {
     "hub": {
       "text": 0,
-      "tap": 6,
+      "tap": 0,
       "wide": 0
     },
     "map": {
       "text": 0,
-      "tap": 4,
+      "tap": 0,
       "wide": 0
     },
     "fleet": {
       "text": 0,
-      "tap": 4,
+      "tap": 0,
       "wide": 0
     },
     "production": {
@@ -27,12 +27,12 @@
     },
     "battle": {
       "text": 0,
-      "tap": 4,
+      "tap": 0,
       "wide": 0
     },
     "settings": {
       "text": 0,
-      "tap": 6,
+      "tap": 0,
       "wide": 0
     }
   },
