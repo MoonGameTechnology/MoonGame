@@ -3,7 +3,7 @@
 // `.btn-second`, `.btn-quiet` (лист `build.mjs`), а правило экрана задаёт ей только размер и
 // место. Сторож держит обе половины на переведённых экранах — карточке флота (телефон и ПК),
 // производстве и науке (UIX-11.1), карточке мира, разделении флота, окне боя, рынке, штабе
-// героев и корпорации (UIX-11.2):
+// героев, корпорации, итоге партии, входе и обозревателе партий (UIX-11.2):
 // разметка ставит класс, а лист не красит кнопку поверх него. Правило с id в селекторе
 // перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
 import { readFileSync } from 'node:fs';
@@ -13,6 +13,8 @@ import { cargoSplit, splitSlots } from '../../decisions/splitPlan';
 import type { BattleModel } from '../../packages/client/src/matchHud';
 import { battleWindowHtml } from './battleScreen';
 import { chainStripHtml } from './chainPlanner';
+import { endScreenHtml, type MatchEnd } from './endScreen';
+import { newGame } from './game';
 import { commandWindowHtml } from './holographicUi';
 import { mobileOrderBar } from './mobileHud';
 import { actionButton } from './panelKit';
@@ -26,6 +28,7 @@ const BUILD = read('../build.mjs');
 const GAME = BUILD.slice(BUILD.indexOf('const css = `'), BUILD.indexOf('const adminCss = `'));
 const SHEETS: Record<string, string> = {
   'build.mjs': GAME,
+  'bridge-shell.css': read('../bridge-shell.css'),
   'holographic.css': read('../holographic.css'),
   'mobile-console.css': read('../mobile-console.css'),
   'mobile-strategy.css': read('../mobile-strategy.css'),
@@ -72,12 +75,17 @@ function subject(part: string): string {
 }
 
 /** Кнопка переведённого экрана: ряд приказов флота, «Сведения» листа телефона, главные
- *  кнопки науки и производства, кнопки карточки мира, разделения флота и окна боя. Крестик
- *  окна ПК — не приказ и рисуется как крестики окон; раскрывашки окна боя («Состав»,
- *  «Эффекты», «Правила») — строки списка, а не кнопки действия. */
+ *  кнопки науки и производства, кнопки карточки мира, разделения флота, окна боя, итога
+ *  партии, входа и обозревателя партий. Крестик окна ПК — не приказ и рисуется как крестики
+ *  окон; раскрывашки окна боя («Состав», «Эффекты», «Правила») — строки списка, а не кнопки
+ *  действия; «×2 за ролик» на итоге горит золотом наград, как ролик в кошельке хаба. */
 function converted(part: string): boolean {
   const s = subject(part);
   if (s.includes('holo-command-close')) return false;
+  if (/^\.es-btn\b/.test(s)) return !s.includes('.ad');
+  // Вход и обозреватель партий; «Мои партии» хаба — те же кнопки `.mbtn`.
+  if (/#(connect|hub)\b/.test(part) && /(^|[(,\s])\.(cnew|cbtn|mbtn|cback|clink)\b/.test(s))
+    return true;
   if (
     /^\.(tt-take|tt-mbtn|bw-take|cn-build|bw-open|mk-go|mk-btn|hx-btn|hx-dbtn|cbtn2|ctoggle)\b/.test(
       s,
@@ -293,11 +301,87 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(src).toContain('class="mk-btn btn-second danger" data-mkcancel=');
   });
 
-  it('выбранная вкладка науки и построек — токенами, без мятной заливки', () => {
-    for (const sel of ['.tt-tab.on', '.bw-tab.on']) {
+  it('итог партии: «Ещё раз» или повтор главы — главная, меню — вторичная, таблица — тихая', () => {
+    const end: MatchEnd = { won: true, draw: false, why: '', xp: 0, levelUp: null };
+    const view = { net: false, worldsFallback: 0, fmtStamp: () => '' };
+    const run = {
+      attempt: 1,
+      chapter: 'pve-1',
+      won: true,
+      waves: 10,
+      totalWaves: 10,
+      base: 12,
+      objectives: [],
+      bonus: 0,
+      total: 12,
+      warrants: 40,
+      unlocked: 0,
+    };
+    const looks = (html: string): string[] =>
+      [...html.matchAll(/<button class="es-btn([^"]*)" data-es="(\w+)"/g)].map(
+        (m) => `${m[2]}:${STYLES.find((c) => m[1]!.includes(c)) ?? m[1]!.trim()}`,
+      );
+    expect(looks(endScreenHtml(newGame(), 'p1', end, view))).toEqual([
+      'again:btn-main',
+      'menu:btn-second',
+      'board:btn-quiet',
+    ]);
+    const ran = endScreenHtml(newGame(), 'p1', { ...end, runReward: 12, runSummary: run }, {
+      ...view,
+      double: { research: 12, warrants: 40 },
+    });
+    expect(looks(ran)).toEqual([
+      'double:ad',
+      'replay:btn-main',
+      'again:btn-second',
+      'menu:btn-second',
+      'board:btn-quiet',
+    ]);
+  });
+
+  it('вход: одна главная на шаг, «назад» и восстановление — тихие', () => {
+    const markup = BUILD.slice(BUILD.indexOf('<div id="connect">'), BUILD.indexOf('<div class="cfoot">'));
+    const tags = [
+      ...markup.matchAll(/<button id="([\w-]+)"[^>]*class="(cnew|cbtn|mbtn|cback|clink)\b([^"]*)"/g),
+    ].map((m) => `${m[1]}:${STYLES.find((c) => m[3]!.includes(c)) ?? '—'}`);
+    expect(tags.sort()).toEqual(
+      [
+        'cnew:btn-main',
+        'clogin:btn-second',
+        'cwgo:btn-second',
+        'crback:btn-quiet',
+        'crgo:btn-main',
+        'crrecover:btn-quiet',
+        'crecback:btn-quiet',
+        'crecgo:btn-main',
+        'cresetgo:btn-main',
+        'cback:btn-quiet',
+        'cgo:btn-second',
+        'match-create-go:btn-main',
+        'ctest:—',
+      ].sort(),
+    );
+    const main = read('./main.ts');
+    expect(main).toContain('<button class="mbtn btn-second" id="msolo-go">');
+    expect(main).toContain("join.className = 'mbtn btn-second';");
+    expect(main).toContain("arch.className = 'mbtn btn-quiet';");
+    expect(main).toContain("open.className = 'mbtn btn-second';");
+    expect(main).toContain("copy.className = 'mbtn btn-quiet';");
+  });
+
+  it('выбранная вкладка — токенами, без мятной заливки', () => {
+    const sels = [
+      '.tt-tab.on',
+      '.bw-tab.on',
+      '.rk-tab.on',
+      '.cx-lv.on',
+      '#connect .mtab.active',
+      '#connect .mfbtn.active',
+    ];
+    for (const sel of sels) {
       const body = rules(GAME).find((r) => r.sel === sel)?.body ?? '';
-      expect(body).toContain('var(--sf-sel)');
-      expect(body).not.toMatch(/#4fe0b0|--grn/);
+      expect(body, sel).toContain('var(--sf-sel)');
+      expect(body, sel).not.toMatch(/#4fe0b0|--grn/);
     }
   });
 });

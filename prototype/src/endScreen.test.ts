@@ -397,10 +397,13 @@ describe('итог забега Sector Zero — по частям (PVR-5.4)', ()
     // Повтор главы — главная кнопка засчитанного забега (п. 6 предложений владельцу).
     expect(html).toContain('data-es="replay"');
     expect(html).toContain('Сыграть главу снова');
-    expect(html).not.toContain('class="es-btn primary" data-es="again"');
+    // Главная одна (UIX-11.2): при повторе главы «подготовка» — вторичная.
+    expect(html).toContain('class="es-btn wide btn-main" data-es="replay"');
+    expect(html).toContain('class="es-btn btn-second" data-es="again"');
     const bare = endScreenHtml(scored(), 'p1', endOf({ runReward: 17 }), { net: false, worldsFallback: 0, fmtStamp: () => '' });
     expect(bare).not.toContain('es-run');
     expect(bare).not.toContain('data-es="replay"');
+    expect(bare).toContain('class="es-btn btn-main" data-es="again"');
   });
 });
 

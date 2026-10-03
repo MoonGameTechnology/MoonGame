@@ -14521,7 +14521,7 @@ function renderMatches(): void {
   const soloCard = (msg: string): void => {
     el.innerHTML =
       `<div class="mempty">${msg}</div>` +
-      `<div class="msolo"><button class="mbtn" id="msolo-go">▶ ${t('browser.solo')}</button>` +
+      `<div class="msolo"><button class="mbtn btn-second" id="msolo-go">▶ ${t('browser.solo')}</button>` +
       `<div class="msolo-sub">${t('browser.solo.hint')}</div></div>`;
     document.getElementById('msolo-go')?.addEventListener('click', () => {
       leaveMatch();
@@ -14600,7 +14600,7 @@ function renderMatches(): void {
     const btns = document.createElement('div');
     btns.className = 'mbtns';
     const join = document.createElement('button');
-    join.className = 'mbtn';
+    join.className = 'mbtn btn-second';
     // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
     // о возвращении, а не о вступлении.
     const seated = activeTab === 'active';
@@ -14611,7 +14611,7 @@ function renderMatches(): void {
     if (action) {
       const restore = action === 'restore';
       const arch = document.createElement('button');
-      arch.className = 'mbtn ghost';
+      arch.className = 'mbtn btn-quiet';
       arch.textContent = restore ? t('browser.restore') : t('browser.archive');
       arch.addEventListener('click', () =>
         detach('обозреватель: архив партии', toggleArchive(m.matchId, restore)),
@@ -14674,7 +14674,7 @@ function renderMyMatches(serverHttp: string): void {
     const btns = document.createElement('div');
     btns.className = 'hm-btns';
     const open = document.createElement('button');
-    open.className = 'mbtn';
+    open.className = 'mbtn btn-second';
     // Лента хаба — это СВОИ партии (`myMatches` читает `lists.active`), поэтому здесь
     // всегда возвращение.
     open.textContent = t('browser.resume');
@@ -14682,7 +14682,7 @@ function renderMyMatches(serverHttp: string): void {
     btns.appendChild(open);
     if (addr) {
       const copy = document.createElement('button');
-      copy.className = 'mbtn ghost';
+      copy.className = 'mbtn btn-quiet';
       copy.textContent = t('hub.mine.copy');
       copy.addEventListener('click', () => {
         // Буфер обмена может быть недоступен (нет разрешения, небезопасный контекст) —
