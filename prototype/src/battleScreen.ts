@@ -84,6 +84,11 @@ export interface BattleView {
 
 type Side = BattleModel['sides'][number];
 
+/** Имя владельца стороны словами игрока: модель несёт `player.name` из состояния — имя дома
+ *  из данных, английское («Azure Compact»), — а перевод знает хост (UIX-5.3). */
+const ownerLabel = (side: Side, view: BattleView): string =>
+  view.ownerName?.(side.owner) ?? side.ownerName;
+
 const NEUTRAL = '#8aa0ad';
 
 /** Словом рядом с цветом шкалы: цвет не единственный носитель смысла. */
@@ -219,7 +224,7 @@ export function sideRowHtml(
   const autoAt = fleetId ? view.autoRetreatAt?.(fleetId) : undefined;
   return (
     `<article class="bw-side${side.mine ? ' mine' : ''} ${side.role}" style="--own:${esc(col)}">` +
-    `<div class="bw-who"><div><b>${esc(name)}</b><small>${esc(side.ownerName)} · ${esc(kind)}</small></div>` +
+    `<div class="bw-who"><div><b>${esc(name)}</b><small>${esc(ownerLabel(side, view))} · ${esc(kind)}</small></div>` +
     (badge ? `<em class="bw-you">${esc(badge)}</em>` : '') +
     `<span class="bw-role">${esc(t(side.role === 'attacker' ? 'battle.win.role.attacker' : 'battle.win.role.defender'))}</span></div>` +
     meter(side.hull, `hull tone-${tone}`, t('battle.win.hull'), t(TONE_KEY[tone])) +
@@ -268,7 +273,7 @@ function balanceHtml(sides: readonly Side[], view: BattleView): string {
     sides
       .map(
         (s, i) =>
-          `<span${s.mine ? ' class="mine"' : ''}><i style="background:${col(s)}"></i>${esc(s.ownerName)} ${Math.round((shares[i] ?? 0) * 100)}%</span>`,
+          `<span${s.mine ? ' class="mine"' : ''}><i style="background:${col(s)}"></i>${esc(ownerLabel(s, view))} ${Math.round((shares[i] ?? 0) * 100)}%</span>`,
       )
       .join('') +
     `</div></div>`

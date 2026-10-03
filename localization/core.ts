@@ -146,9 +146,20 @@ export function pluralForm(id: LocaleId, n: number, forms: readonly string[]): s
   return forms[Math.min(at, forms.length - 1)] ?? '';
 }
 
-/** Число значения подстановки: из текста без тегов (правило 3). */
-const countOf = (v: string | number): number =>
-  typeof v === 'number' ? v : Number(v.replace(/<[^>]*>/g, ''));
+/** Число значения подстановки: из текста без тегов (правило 3). Теги пропускаются обходом,
+ *  а не заменой по регулярке: это чтение числа, а не очистка разметки, и строка дальше
+ *  `Number` не уходит. */
+function countOf(v: string | number): number {
+  if (typeof v === 'number') return v;
+  let text = '';
+  let inTag = false;
+  for (const ch of v) {
+    if (ch === '<') inTag = true;
+    else if (ch === '>') inTag = false;
+    else if (!inTag) text += ch;
+  }
+  return Number(text);
+}
 
 /** `{имя}` — значение, `{имя|форма|форма…}` — слово по числу. */
 const SLOT_RE = /\{(\w+)((?:\|[^|{}]*)+)?\}/g;
