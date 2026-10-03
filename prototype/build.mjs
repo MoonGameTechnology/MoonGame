@@ -488,18 +488,13 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #cmdbar .chlabel b{color:#eafffb;font-variant-numeric:tabular-nums;}
 #cmdbar .chlabel .chhint{color:var(--dim);font-style:normal;}
 #cmdbar .chlabel .chwarn{color:var(--amber,#f5cf6b);cursor:help;}
+/* Вид кнопок ряда — один из трёх стилей (.btn-main/.btn-second/.btn-quiet, UIX-11.1), вместе с
+   состояниями: включённый режим (.on), красный «Стоп» (.danger), серая кнопка с причиной
+   (aria-disabled — нажатие объясняет запрет). Здесь только размер и раскладка. */
 #cmdbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  min-width:48px;height:44px;padding:4px 7px;cursor:pointer;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
-  background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:9px;}
+  min-width:48px;height:44px;padding:4px 7px;font-size:var(--fs-caption);border-radius:9px;}
 #cmdbar button .ci{font-size:17px;line-height:1;}
-#cmdbar button .cl{font-size:var(--fs-caption);opacity:.82;}
-#cmdbar button:hover:not(:disabled){background:rgba(53,214,230,.14);box-shadow:0 0 10px rgba(53,214,230,.35);}
-#cmdbar button:disabled{opacity:.3;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
-/* Серая кнопка с причиной (cmdBtn, why): выглядит погашенной, но нажатие объясняет запрет. */
-#cmdbar button[aria-disabled="true"]{opacity:.3;cursor:help;color:var(--dim);border-color:var(--line);}
-#cmdbar button.on{background:rgba(53,214,230,.18);border-color:var(--cyan);}
-#cmdbar button.danger{color:var(--red);border-color:#7a2a22;}
-#cmdbar button.danger:hover:not(:disabled){background:rgba(255,90,77,.12);box-shadow:0 0 10px rgba(255,90,77,.3);}
+#cmdbar button .cl{font-size:var(--fs-caption);}
 /* 🔥 режим огня: поповер-меню над командным рядом (одна кнопка → выбор режима) */
 #cmdbar .cmdpop{position:absolute;bottom:calc(100% + 8px);right:0;display:flex;flex-direction:column;gap:4px;
   padding:6px;background:rgba(3,12,16,.94);border:1px solid var(--line-hi);border-radius:3px;
@@ -515,7 +510,6 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #cmdbar .cmdpop-retr .retr-row{display:flex;gap:6px;}
 #cmdbar .cmdpop-retr .retr-row button{flex:1;justify-content:center;padding:9px 4px;border-radius:6px;min-height:38px;}
 #cmdbar .cmdpop-retr .retr-row button b{font-size:var(--fs-body);}
-#cmdbar .cmdpop-retr .retr-row button.on{border-color:var(--cyan);background:rgba(53,214,230,.18);color:var(--cyan);box-shadow:0 0 10px rgba(53,214,230,.35);}
 #cmdbar .cmdpop-retr .retr-hint{font-size:var(--fs-caption);color:var(--dim);}
 /* ⇅ десант (GRND-1): тот же поповер, но не список приказов, а строки «кого и сколько».
    Кнопки в нём — компактные глифы в ряд, поэтому базовые правила .cmdpop button
@@ -534,12 +528,10 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #cmdbar .tpop .tcnt em{color:var(--amber);font-style:normal;}
 #cmdbar .tpop .tbtns{display:flex;align-items:center;gap:3px;}
 #cmdbar .tpop .tbtns button{flex-direction:row;justify-content:center;gap:0;min-width:30px;width:30px;
-  height:30px;padding:0;text-align:center;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;border-radius:5px;}
+  height:30px;padding:0;text-align:center;font-size:var(--fs-body);border-radius:5px;}
 /* пресеты «до упора» — форма и вес отличаются от мелкого шага, чтобы под пальцем
-   ▲ и + не читались как одна кнопка */
-#cmdbar .tpop .tbtns button.tall{font-size:var(--fs-caption);border-color:var(--line-hi);color:var(--dim);
-  background:rgba(53,214,230,.07);}
-#cmdbar .tpop .tbtns button.tall:hover:not(:disabled){background:rgba(53,214,230,.18);}
+   ▲ и + не читались как одна кнопка: шаг — вторичная кнопка в рамке, пресет — тихая */
+#cmdbar .tpop .tbtns button.tall{font-size:var(--fs-caption);}
 #cmdbar .tpop .tdelta{min-width:30px;text-align:center;color:var(--dim);
   font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;font-variant-numeric:tabular-nums;}
 #cmdbar .tpop .tdelta.pos{color:var(--grn);}
@@ -1425,6 +1417,30 @@ button.b{background:transparent;color:var(--cyan);border:1px solid var(--cyan-di
   padding:5px 10px;margin:3px 4px 2px 0;cursor:pointer;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;}
 button.b:hover:not(:disabled){background:rgba(53,214,230,.14);box-shadow:0 0 10px rgba(53,214,230,.35);}
 button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+/* Три стиля кнопок (UIX-11.1) — на всю игру, эталон — Sector Zero и дверь хаба. Экран задаёт
+   кнопке размер и место, а вид она берёт классом: главная — действие, ради которого карточка
+   открыта (одна на карточку), вторичная — остальные действия, тихая — переход и пояснение.
+   Правило экрана поэтому не красит такую кнопку: селектор с id перебил бы класс. */
+.btn-main,.btn-second,.btn-quiet{font-family:var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
+.btn-main{border:1px solid var(--sf-accent);background:var(--sf-primary);color:var(--sf-hi);font-weight:700;
+  box-shadow:var(--sf-glow);}
+.btn-main:hover:not(:disabled,[aria-disabled="true"]){background:var(--sf-primary-hi);}
+.btn-second{border:1px solid var(--sf-edge);background:var(--sf-card);color:var(--sf-text);font-weight:600;box-shadow:none;}
+.btn-second:hover:not(:disabled,[aria-disabled="true"]){border-color:var(--sf-edge-hi);}
+.btn-quiet{border:1px solid transparent;background:none;color:var(--sf-accent);font-weight:500;box-shadow:none;}
+.btn-quiet:hover:not(:disabled,[aria-disabled="true"]){text-decoration:underline;text-underline-offset:3px;}
+/* Включённый режим (прицел «Курса», порог отхода) — черта снизу, как у выбранной вкладки. */
+.btn-second.on{border-color:var(--sf-accent);background:var(--sf-sel);color:var(--sf-hi);
+  box-shadow:inset 0 -2px 0 var(--sf-accent);}
+.btn-main.on{background:var(--sf-primary-hi);box-shadow:inset 0 -2px 0 var(--sf-hi),var(--sf-glow);}
+/* Красный — состояние, а не четвёртый стиль: приказ, который обрывает начатое. */
+.btn-second.danger{border-color:color-mix(in srgb,var(--red) 45%,transparent);color:var(--red);}
+:is(.btn-main,.btn-second,.btn-quiet):is(:disabled,[aria-disabled="true"]){border-color:var(--sf-edge);
+  background:var(--sf-card-off);color:var(--sf-dim);box-shadow:none;opacity:.6;cursor:not-allowed;}
+.btn-quiet:is(:disabled,[aria-disabled="true"]){border-color:transparent;background:none;}
+/* Серая кнопка с причиной нажимается: нажатие говорит, почему нельзя (cmdBtn, why). */
+:is(.btn-main,.btn-second,.btn-quiet)[aria-disabled="true"]{cursor:help;}
+:is(.btn-main,.btn-second,.btn-quiet):focus-visible{outline:2px solid var(--sf-accent);outline-offset:2px;}
 
 /* desktop: spread the panel's scrollable sections into side-by-side columns,
    divided by faint vertical rules, instead of one tall single-width stack. Each
@@ -1774,10 +1790,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   min-height:40px;padding:6px 4px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;
   color:var(--ink);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 .tt-tab>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.tt-tab.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+/* Выбранная ветка — как включённый режим кнопки (UIX-11.1): мятная заливка спорила с главной
+   кнопкой «Исследовать» за взгляд. */
+.tt-tab.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 /* «готово/всего» на вкладке: где ещё есть что исследовать — видно без обхода веток */
 .tt-cnt{font-style:normal;font-size:var(--fs-caption);color:var(--dim);}
-.tt-tab.on .tt-cnt{color:#04231c;opacity:.75;}
+.tt-tab.on .tt-cnt{color:var(--sf-text);}
 .tt-lead{padding:0 12px 8px;font-size:var(--fs-caption);color:var(--dim);border-bottom:1px solid var(--line);flex:none;}
 .tt-lead b{color:#4fe0b0;}
 .tt-lead.closed{color:var(--amber);}
@@ -1814,10 +1832,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-st{flex:none;max-width:56%;font-size:var(--fs-caption);line-height:1.3;text-align:right;color:var(--dim);}
 .tt-st.done{color:#4fe0b0;}
 .tt-st.run{color:var(--amber);font-weight:700;}
-.tt-take{flex:none;padding:6px 11px;border-radius:8px;border:1px solid var(--grn);cursor:pointer;
-  font:800 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;white-space:nowrap;
-  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
-.tt-take:disabled{background:#0a1a1f;border-color:var(--line-hi);color:var(--dim);opacity:.8;cursor:not-allowed;}
+/* Вид «Изучить» — классом .btn-main (UIX-11.1); здесь только размер и место. */
+.tt-take{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
 /* Доступный И оплачиваемый узел дышит — то же правило, что зажигает кнопку в досье */
 .tt-item.st-avail{border-color:var(--cyan);}
 .tt-item.st-res{border-color:var(--amber);}
@@ -1853,11 +1869,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-mdesc{margin:10px 0 0;padding-left:10px;border-left:2px solid var(--line-hi);font-size:var(--fs-caption);line-height:1.55;color:var(--ink);}
 .tt-mstats{margin-top:10px;display:grid;grid-template-columns:1fr;gap:5px;font-size:var(--fs-caption);color:var(--dim);}
 .tt-mstats b{color:var(--ink);font-weight:600;}
-.tt-mbtn{margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--grn);cursor:pointer;
-  font:800 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
-  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
-.tt-mbtn.wait{background:#0a1a1f;border-color:var(--line-hi);color:var(--dim);cursor:default;}
-.tt-mbtn:disabled{opacity:.75;cursor:not-allowed;}
+.tt-mbtn{margin-top:12px;width:100%;padding:10px;border-radius:10px;font-size:var(--fs-caption);}
+/* Состояние узла («идёт», «изучено», «закрыто») — ответ, а не запрет: курсор не спорит. */
+.tt-mbtn.wait{cursor:default;}
 /* BUILD-1: окно построек мира — список категориями, строки «имя+уровень / состояние /
    эффект / цена+срок» в том же языке, что список технологий (TT-4). */
 .bw-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px 8px;flex:none;border-bottom:1px solid var(--line);}
@@ -1870,7 +1884,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .bw-tabs::-webkit-scrollbar{display:none;}
 .bw-tab{flex:none;padding:7px 12px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
   color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap;}
-.bw-tab.on{color:#04231c;background:linear-gradient(180deg,var(--cyan),#4fe0b0);border-color:var(--cyan);}
+/* Выбранная категория — как ветка науки (UIX-11.1): заливка остаётся главной кнопке «Строить». */
+.bw-tab.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 .bw-cath{margin:10px 0 1px;font:800 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--dim);}
 .bw-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
   background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
@@ -1887,10 +1902,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .bw-st{flex:none;max-width:56%;font-size:var(--fs-caption);line-height:1.3;text-align:right;color:var(--dim);}
 .bw-st.done{color:#4fe0b0;}
 .bw-st.run{color:var(--amber);font-weight:700;}
-.bw-take{flex:none;padding:6px 11px;border-radius:8px;border:1px solid var(--grn);cursor:pointer;
-  font:800 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;white-space:nowrap;
-  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
-.bw-take:disabled{background:#0a1a1f;border-color:var(--line-hi);color:var(--dim);opacity:.8;cursor:not-allowed;}
+/* Вид «Построить» — классом .btn-main (UIX-11.1); здесь только размер и место. */
+.bw-take{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
 .bw-item.st-avail{border-color:var(--cyan);}
 .bw-item.st-queued{border-color:var(--amber);}
 .bw-item.st-built{opacity:.75;}
@@ -2251,10 +2264,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cn-cost .cn-crow .cn-cv{margin-left:auto;color:var(--ink);font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
 .cn-cost .cn-crow.total .cn-cl{color:#eafffb;font-weight:700;}
 .cn-cost .cn-crow.total .cn-cv{color:var(--amber);font-size:14px;}
-.cn-build{width:100%;margin-top:12px;padding:14px;border-radius:10px;border:1px solid var(--cyan);
-  background:rgba(53,214,230,.16);color:var(--cyan);font:800 14px var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.cn-build:hover:not(:disabled){background:rgba(53,214,230,.24);box-shadow:0 0 20px rgba(53,214,230,.25);}
-.cn-build:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
+/* Вид — классом .btn-main (UIX-11.1); здесь только размер и место. */
+.cn-build{width:100%;margin-top:12px;padding:14px;border-radius:10px;font-size:14px;}
 .cn-lock{margin-top:12px;display:flex;gap:8px;font-size:var(--fs-caption);color:var(--dim);line-height:1.5;}
 .cn-lock b{color:var(--amber);}
 /* count + planet steppers */

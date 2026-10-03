@@ -37,7 +37,7 @@ export function commandWindowHtml(
     `<div class="holo-command-body">${commands}</div>` +
     aside +
     (details
-      ? `<button type="button" data-holo-action="details" class="holo-command-details">${esc(t('hud.command-details'))}</button>`
+      ? `<button type="button" data-holo-action="details" class="holo-command-details btn-quiet">${esc(t('hud.command-details'))}</button>`
       : '')
   );
 }

@@ -9331,12 +9331,15 @@ function cmdBtn(
   // Серая кнопка с причиной (`why`) остаётся нажимаемой: нажатие говорит, ПОЧЕМУ нельзя
   // (сообщение владельца 2026-09-24 про «Делить»). `disabled` проглотил бы нажатие, а на
   // телефоне подсказки мыши нет — кнопка выглядела бы просто сломанной.
+  // Вид — один из трёх стилей (UIX-11.1): «Курс» — главная кнопка карточки флота, остальные
+  // приказы — вторичные; `cls` добавляет состояние (`on` — режим включён, `danger`).
+  const look = `${cmd === 'move' ? 'btn-main' : 'btn-second'}${cls ? ` ${cls}` : ''}`;
   if (disabled && why) {
     const reason = t(why);
-    return `<button data-cmd="${cmd}" class="${cls}" title="${esc(`${label} — ${reason}`)}" aria-label="${esc(`${label} — ${reason}`)}" aria-disabled="true" data-why="${esc(why)}"><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+    return `<button data-cmd="${cmd}" class="${look}" title="${esc(`${label} — ${reason}`)}" aria-label="${esc(`${label} — ${reason}`)}" aria-disabled="true" data-why="${esc(why)}"><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
   }
   const tip = desc ? `${label} — ${desc}` : label;
-  return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+  return `<button data-cmd="${cmd}" class="${look}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
 }
 
 function mobileOrderKind(): MobileOrderKind | null {
@@ -9758,7 +9761,7 @@ function renderCmdBar() {
             // Описание навыка: удержание на телефоне открывает сводку `ab:` (как у плиток и
             // строк), наведение на ПК — подсказку (заказ владельца 2026-09-25).
             const hint = ad.description ? ` title="${esc(t(ad.description))}"` : '';
-            return `<button data-cmd="castdo" data-ab="${opt.id}" data-hero="${castHero.id}" data-desc="ab:${opt.id}"${hint}${opt.cdH > 0 ? ' disabled' : ''}><b>${esc(tData(ad.name))}</b><span>${sub}</span></button>`;
+            return `<button data-cmd="castdo" class="btn-second" data-ab="${opt.id}" data-hero="${castHero.id}" data-desc="ab:${opt.id}"${hint}${opt.cdH > 0 ? ' disabled' : ''}><b>${esc(tData(ad.name))}</b><span>${sub}</span></button>`;
           })
           .join('') +
         `</div>`
@@ -9770,7 +9773,7 @@ function renderCmdBar() {
           .map((at) => {
             const cur = autoRetreatAt(ids[0] ?? '') ?? 0;
             const on = Math.abs(cur - at) < 1e-9;
-            return `<button data-cmd="retrset" data-at="${at}"${on ? ' class="on"' : ''}><b>${at === 0 ? t('cmd.retreat.off') : `${Math.round(at * 100)}%`}</b></button>`;
+            return `<button data-cmd="retrset" data-at="${at}" class="btn-second${on ? ' on' : ''}"><b>${at === 0 ? t('cmd.retreat.off') : `${Math.round(at * 100)}%`}</b></button>`;
           })
           .join('') +
         `</div><span class="retr-hint">${t('cmd.retreat.hint')}</span></div>`

@@ -101,15 +101,12 @@ body.mobile-ui #mobile-sheet {
   padding: 8px 12px 12px;
   flex: none;
 }
+/* Вид — классом .btn-second (UIX-11.1); здесь только размер. */
 .mobile-quick button {
   flex: 1;
   min-height: 44px;
-  background: #0a1c2b;
-  border: 1px solid #6191a13d;
   border-radius: 10px;
-  color: #a9d5e4;
-  font: var(--fs-body) var(--sf-font);
-  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #mobile-sheet #side {
   position: relative;
@@ -194,20 +191,19 @@ body.mobile-ui #mobile-sheet #cmdbar.show {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
 }
+/* Вид приказов — три стиля кнопок (UIX-11.1): «Курс» и «Отправить» — главные, остальное —
+   вторичное. Здесь только размер плиток. */
 body.mobile-ui #mobile-sheet #cmdbar > button {
   min-width: 0;
   width: 100%;
   min-height: 54px;
   height: auto;
   padding: 8px 3px;
-  border: 1px solid #659ca449;
   border-radius: 11px;
-  background: #092130;
-  color: #9ddde9;
 }
 body.mobile-ui #mobile-sheet #cmdbar > button .cl {
-  font: var(--fs-caption)/1.25 var(--sf-font);
-  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-caption);
+  line-height: 1.25;
   letter-spacing: 0;
   text-transform: none;
   opacity: 1;
@@ -225,15 +221,6 @@ body.mobile-ui
 }
 body.mobile-ui #mobile-sheet #cmdbar > button[data-cmd='more'] {
   order: 1;
-}
-body.mobile-ui #mobile-sheet #cmdbar > button[data-cmd='move'],
-body.mobile-ui #mobile-sheet #cmdbar > .mobile-primary {
-  background: #194556;
-  border-color: #68c2d2;
-  color: #e3fbff;
-}
-body.mobile-ui #mobile-sheet #cmdbar > button:disabled {
-  opacity: 0.38;
 }
 body.mobile-ui #mobile-sheet #cmdbar .cmdpop {
   position: relative;
@@ -278,8 +265,7 @@ body.mobile-ui #mobile-sheet.order-mode #cmdbar {
   font-weight: 500;
 }
 body.mobile-ui #mobile-sheet.order-mode #cmdbar > button {
-  font: var(--fs-body) var(--sf-font);
-  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-body);
   min-height: 46px;
 }
 body.mobile-ui #mobile-sheet.order-mode #side,

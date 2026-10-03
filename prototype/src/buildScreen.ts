@@ -198,7 +198,7 @@ export function buildScreenHtml(
           ? `<span class="bw-st run">⏳ ${t('build.state.queued')}</span>`
           : st.st === 'lock'
             ? `<span class="bw-st lock">🔒 ${esc(lockText(st.code))}</span>`
-            : `<button class="bw-take" data-bw-go="${id}"${st.affordable ? '' : ' disabled'}>▷ ${
+            : `<button class="bw-take btn-main" data-bw-go="${id}"${st.affordable ? '' : ' disabled'}>▷ ${
                 st.affordable ? t('build.action.build') : t('build.action.no-res')
               }</button>`;
     // Эффект СВОЕГО уровня: построенное показывает, что даёт СЕЙЧАС, остальное — L1.
@@ -270,7 +270,7 @@ export function unitScreenHtml(
       const locked = code !== null && code !== 'E_INSUFFICIENT';
       const right = locked
         ? `<span class="bw-st lock">🔒 ${esc(lockText(code))}</span>`
-        : `<button class="bw-take" data-unit-go="${esc(id)}"${code ? ' disabled' : ''}>▷ ${t(code ? 'build.action.no-res' : 'build.action.build')}</button>`;
+        : `<button class="bw-take btn-main" data-unit-go="${esc(id)}"${code ? ' disabled' : ''}>▷ ${t(code ? 'build.action.no-res' : 'build.action.build')}</button>`;
       const art = unitArt(state, me, id);
       return (
         `<div class="bw-item st-${locked ? 'lock' : 'ready'}${art ? ' with-art' : ''}" data-unit-info="${esc(id)}">${art}<div class="bw-ih"><span class="bw-ic">${unitIcon(id, data)}</span><b>${esc(displayUnit(id))}</b>${right}</div>` +
@@ -327,7 +327,7 @@ function landerRowHtml(
       const short = probe(order(g)) !== null; // E_INSUFFICIENT: цена видна, кнопка серая
       const hours = Math.max(def.buildTimeHours, data.units[g]?.buildTimeHours ?? 0);
       return (
-        `<div class="bw-foot"><button class="bw-take" data-unit-go="${esc(id)}" data-unit-troop="${esc(g)}"${short ? ' disabled' : ''}>▷ ${unitIcon(g, data)} ${esc(displayUnit(g))}</button>` +
+        `<div class="bw-foot"><button class="bw-take btn-main" data-unit-go="${esc(id)}" data-unit-troop="${esc(g)}"${short ? ' disabled' : ''}>▷ ${unitIcon(g, data)} ${esc(displayUnit(g))}</button>` +
         `<span>${cost(landerCost(data, id, g), res)}</span><span class="bw-dur">${fmtDur(hours)}</span></div>`
       );
     })

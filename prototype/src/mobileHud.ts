@@ -13,8 +13,8 @@ export function mobileOrderBar(title: string, target: string | null, picking = f
     `<div class="mobile-order-copy"><b>${esc(title)}</b><span>${esc(
       picking ? t('hud.mobile.pick-hint') : t('hud.mobile.target-hint'),
     )}</span>${picking ? '' : `<strong>${esc(target ?? t('hud.mobile.target-none'))}</strong>`}</div>` +
-    `<button data-cmd="mobile-cancel">${esc(t('hud.mobile.cancel'))}</button>` +
-    `<button data-cmd="${picking ? 'pick' : 'mobile-send'}" class="mobile-primary"${!picking && !target ? ' disabled' : ''}>${esc(picking ? t('hud.mobile.ready') : t('hud.mobile.send'))}</button>`
+    `<button data-cmd="mobile-cancel" class="btn-second">${esc(t('hud.mobile.cancel'))}</button>` +
+    `<button data-cmd="${picking ? 'pick' : 'mobile-send'}" class="btn-main"${!picking && !target ? ' disabled' : ''}>${esc(picking ? t('hud.mobile.ready') : t('hud.mobile.send'))}</button>`
   );
 }
 
@@ -64,14 +64,19 @@ export function initMobileHud(host: MobileHudHost) {
   choices.className = 'mobile-choices';
   const quick = document.createElement('div');
   quick.className = 'mobile-quick';
+  // «Сведения», «Сводка», «Метка» — вторичные кнопки карточки (UIX-11.1): главная у неё
+  // приказ «Курс» в ряду команд.
   const detailButton = document.createElement('button');
   detailButton.type = 'button';
+  detailButton.className = 'btn-second';
   detailButton.dataset.mobile = 'details';
   const pingButton = document.createElement('button');
   pingButton.type = 'button';
+  pingButton.className = 'btn-second';
   pingButton.dataset.mobile = 'ping';
   const summaryButton = document.createElement('button');
   summaryButton.type = 'button';
+  summaryButton.className = 'btn-second';
   summaryButton.dataset.mobile = 'summary';
   quick.appendChild(detailButton);
   quick.appendChild(summaryButton);

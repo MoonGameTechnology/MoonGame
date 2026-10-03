@@ -98,6 +98,8 @@ body.mobile-ui #tech .tt-ifoot {
 body.mobile-ui #tech .tt-take {
   width: 100%;
   font-size: var(--fs-body);
+  /* «Не хватает ресурсов» в плитке на две колонки длиннее кнопки — переносится, а не вылезает. */
+  white-space: normal;
 }
 body.mobile-ui #tech .tt-mwin {
   width: calc(100% - 16px);
@@ -165,10 +167,12 @@ body.mobile-ui #constructor .cn-plan {
 body.mobile-ui #constructor .cn-row2 {
   gap: 10px;
 }
+/* Липкая кнопка едет над списком: под полупрозрачной заливкой .btn-main — плотная подложка
+   окна, иначе сквозь неё читаются строки. */
 body.mobile-ui #constructor .cn-build {
   position: sticky;
   bottom: 0;
-  background: #143b4b;
+  background-color: var(--sf-panel-from);
 }
 body.mobile-ui #buildwin :is(.bw-row, .bw-top) {
   min-width: 0;

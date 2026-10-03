@@ -217,18 +217,18 @@ describe('troopsMenuHtml — разметка поповера', () => {
     expect(html).toContain('class="cmdpop tpop"');
     expect(html).toContain('data-cmd="tstep" data-unit="militia" data-n="1"');
     expect(html).toContain('data-cmd="tstep" data-unit="militia" data-n="-1"');
-    expect(html).toContain('data-cmd="tmax" class="tall" data-unit="militia" data-dir="1"');
-    expect(html).toContain('data-cmd="tmax" class="tall" data-unit="militia" data-dir="-1"');
+    expect(html).toContain('data-cmd="tmax" class="tall btn-quiet" data-unit="militia" data-dir="1"');
+    expect(html).toContain('data-cmd="tmax" class="tall btn-quiet" data-unit="militia" data-dir="-1"');
     expect(html).toContain('MILITIA');
     expect(html).toContain('5 ▸ 0');
   });
 
   it('подтверждение выключено, пока план пуст, и включается с планом', () => {
     expect(troopsMenuHtml(troopsModel(input()), opts)).toContain(
-      'data-cmd="tok" class="cbtn" disabled',
+      'data-cmd="tok" class="cbtn btn-main" disabled',
     );
     const withPlan = troopsMenuHtml(troopsModel(input({ plan: { militia: 2 } })), opts);
-    expect(withPlan).toContain('data-cmd="tok" class="cbtn">Подтвердить');
+    expect(withPlan).toContain('data-cmd="tok" class="cbtn btn-main">Подтвердить');
   });
 
   it('кнопки погрузки гаснут, когда брать нечего', () => {
