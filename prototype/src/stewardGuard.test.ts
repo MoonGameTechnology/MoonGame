@@ -397,7 +397,9 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     const adv = advance(s, NOW + 4 * HOUR);
     expect(adv.error).toBeUndefined();
     s = adv.state;
-    expect(s.fleets.F2!.location).toBe('H');
+    // The relief docked beside the anchor and joined it on arrival (`autoMerge`).
+    expect(s.fleets.F2).toBeUndefined();
+    expect(s.fleets.F1!.units).toEqual(stacks([['cruiser', 9]]));
     const tick2 = stewardGuardOrders(s, 'p1');
     expect(tick2.map((a) => a.type)).toEqual(['steward.report']);
     expect(reportEntries(tick2)).toMatchObject([{ kind: 'hold', node: 'H' }]);

@@ -35,7 +35,8 @@ import { heroByFleet } from '../state/heroes';
 import { shipsEngaged } from '../state/battle';
 import { isHostile, ownFleet } from '../util/combat';
 import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
-import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
+import { sumUnitStat, takeFromStacks, loadoutKey } from '../util/stacks';
+import { emplacedFleet, fuseFleets } from '../util/fleetMerge';
 import { hangarSize, strikesReserved } from '../state/shuttle';
 import { isMineFleet } from '../state/minefields';
 import type { BattlePullIn } from './combat';
@@ -115,41 +116,6 @@ export const fleetOpsModule: GameModule = {
       h.emit('fleet.launched', { fleetId: id, planetId: planet.id, owner: action.playerId });
     });
 
-    /**
-     * Сплавить `from` в `into`. Общая ЧАСТЬ: одна и та же плавка нужна и приказу
-     * игрока, и созревшему намерению (MRG-1), а два исполнения одного правила — это
-     * ровно тот баг, из-за которого модуль и заводили.
-     */
-    const fuse = (h: HandlerContext, fromId: string, intoId: string, owner: string): void => {
-      const from = h.state.fleets[fromId];
-      const into = h.state.fleets[intoId];
-      if (!from || !into) return;
-      into.units = mergeStacks(into.units, from.units);
-      into.landing = mergeStacks(into.landing ?? [], from.landing ?? []);
-      // Шаттлы в трюме едут вместе с кораблями (SHU-5.1): без этой строки эскадры
-      // сплавленного флота исчезали бы молча вместе с его записью.
-      if (from.hangar?.length) into.hangar = [...(into.hangar ?? []), ...from.hangar];
-      // Heroes are bound by fleetId: the hero UNIT rides into the merged fleet, so
-      // the hero ENTITY must follow — a stale fleetId would orphan it (and
-      // hero.spawn could then mint a duplicate free flagship).
-      for (const hr of Object.values(h.state.heroes ?? {})) {
-        if (hr.fleetId === fromId) hr.fleetId = intoId;
-      }
-      delete h.state.fleets[fromId];
-      h.emit('fleet.merged', { from: fromId, into: intoId, owner, at: into.location });
-    };
-
-    /**
-     * НЕПОДВИЖНЫЙ ОТРЯД НЕ СЛИВАЕТСЯ И НЕ ДЕЛИТСЯ. Отряд с `immobile`-юнитом — это
-     * орудия крепости: они принадлежат узлу, а не флоту игрока (FORT-5.4). Находка Codex
-     * на #1393: `fleet.merge` в орудия отдавал обычным кораблям прикрытие крепости —
-     * станция узнаёт орудия по id флота, а не по составу. Слияние или раскол В ОБРАТНУЮ
-     * сторону уводил орудия из отряда, и станция досчитывала их до уровня ядра заново —
-     * бесплатные пушки. Правило по трейту, а не по id: модулю флота станция не известна.
-     */
-    const emplaced = (h: HandlerContext, f: Fleet): boolean =>
-      f.units.some((s) => defHasTrait(h.ctx.data.units[s.unit], 'immobile'));
-
     /** Можно ли сплавить эту пару ПРЯМО СЕЙЧАС (оба стоят, свободны, в одном узле). */
     const fusable = (from: Fleet, into: Fleet): boolean =>
       !from.battleId &&
@@ -191,7 +157,7 @@ export const fleetOpsModule: GameModule = {
       if (from.assaultLanding || into.assaultLanding) {
         return h.reject('E_FLEET_BUSY');
       }
-      if (emplaced(h, from) || emplaced(h, into)) {
+      if (emplacedFleet(h, from) || emplacedFleet(h, into)) {
         return h.reject('E_EMPLACEMENT');
       }
       const flyingTo = from.movement
@@ -227,7 +193,7 @@ export const fleetOpsModule: GameModule = {
         });
         return;
       }
-      fuse(h, payload.from, payload.into, action.playerId);
+      fuseFleets(h, payload.from, payload.into, action.playerId);
     });
 
     /**
@@ -271,12 +237,12 @@ export const fleetOpsModule: GameModule = {
           delete from.mergeInto; // «один герой на флот» — правило то же, что на заказе
           continue;
         }
-        if (emplaced(h, from) || emplaced(h, into)) {
+        if (emplacedFleet(h, from) || emplacedFleet(h, into)) {
           delete from.mergeInto; // орудия с флотом не сливаются — то же правило, что на заказе
           continue;
         }
         delete from.mergeInto;
-        fuse(h, fromId, intoId, from.owner);
+        fuseFleets(h, fromId, intoId, from.owner);
       }
     };
     api.on('fleet.arrived', settleMerges);
@@ -333,7 +299,7 @@ export const fleetOpsModule: GameModule = {
       if (fleet.battleId) {
         return h.reject('E_IN_BATTLE');
       }
-      if (emplaced(h, fleet)) {
+      if (emplacedFleet(h, fleet)) {
         return h.reject('E_EMPLACEMENT');
       }
       // В пути и на линии делить МОЖНО (замечание владельца 2026-09-25: «флот делить можно

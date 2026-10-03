@@ -42,6 +42,9 @@ function until(s: GameState, ok: (s: GameState) => boolean, limit = 48): GameSta
   return cur;
 }
 const heroOf = (s: GameState) => Object.values(s.heroes ?? {}).find((h) => h.owner === ME)!;
+/** Ударный флот героя. Вернувшись туда, где стоит свой флот, он вливается в него
+ *  (`autoMerge`), и герой едет вместе с кораблями — его `fleetId` и есть ударный флот. */
+const main = (s: GameState): string => heroOf(s)?.fleetId ?? 'p1_1';
 
 describe('учебный полигон: все двенадцать этапов проходимы', () => {
   afterEach(() => setMatchMode(undefined));
@@ -92,13 +95,13 @@ describe('учебный полигон: все двенадцать этапо�
     s = act(s, 'hero.ability', { heroId: hero.id, abilityId: hero.equipped![0] });
 
     // 8. Отход и восстановление: войти в бой у планеты-цели, отступить, отремонтироваться.
-    s = act(s, 'fleet.move', { fleetId: 'p1_1', to: 'target' });
-    s = until(s, (x) => !!x.fleets.p1_1?.battleId);
-    s = act(s, 'fleet.retreat', { fleetId: 'p1_1', to: 'open_reach' });
-    s = until(s, (x) => x.fleets.p1_1?.location === 'open_reach' && !x.fleets.p1_1?.battleId);
-    s = act(s, 'fleet.move', { fleetId: 'p1_1', to: 'base' });
-    s = until(s, (x) => x.fleets.p1_1?.location === 'base' && !x.fleets.p1_1?.movement);
-    s = act(s, 'fleet.repair', { fleetId: 'p1_1' });
+    s = act(s, 'fleet.move', { fleetId: main(s), to: 'target' });
+    s = until(s, (x) => !!x.fleets[main(x)]?.battleId);
+    s = act(s, 'fleet.retreat', { fleetId: main(s), to: 'open_reach' });
+    s = until(s, (x) => x.fleets[main(x)]?.location === 'open_reach' && !x.fleets[main(x)]?.battleId);
+    s = act(s, 'fleet.move', { fleetId: main(s), to: 'base' });
+    s = until(s, (x) => x.fleets[main(x)]?.location === 'base' && !x.fleets[main(x)]?.movement);
+    s = act(s, 'fleet.repair', { fleetId: main(s) });
 
     // 9. Носитель и челноки: удар эскадры по посту, возвращение в ангар.
     const carrier = Object.values(s.fleets).find((f) => f.owner === ME && (f.hangar ?? []).length > 0)!;
@@ -117,16 +120,16 @@ describe('учебный полигон: все двенадцать этапо�
     expect(squadronHome(s, ME)).toBe(true);
 
     // 10. Орбита и наземный штурм: погрузить армию, очистить орбиту поста, высадиться.
-    s = act(s, 'army.load', { fleetId: 'p1_1', unit: 'heavy_infantry', count: 2 });
-    s = act(s, 'army.load', { fleetId: 'p1_1', unit: 'militia', count: 3 });
+    s = act(s, 'army.load', { fleetId: main(s), unit: 'heavy_infantry', count: 2 });
+    s = act(s, 'army.load', { fleetId: main(s), unit: 'militia', count: 3 });
     // Погрузка — заявка на час (CARGO-1): войска на борту, когда час прошёл; улетишь
     // раньше — погрузка отменится.
-    s = until(s, (x) => (x.fleets.p1_1?.landing ?? []).some((u) => u.unit === 'heavy_infantry'));
-    s = act(s, 'fleet.move', { fleetId: 'p1_1', to: 'outpost' });
+    s = until(s, (x) => (x.fleets[main(x)]?.landing ?? []).some((u) => u.unit === 'heavy_infantry'));
+    s = act(s, 'fleet.move', { fleetId: main(s), to: 'outpost' });
     s = until(s, (x) => inOrbit(x, ME, 'outpost'));
     expect(inOrbit(s, ME, 'outpost')).toBe(true);
     if (!owns(s, ME, 'outpost')) {
-      s = act(s, 'fleet.assault', { fleetId: 'p1_1' });
+      s = act(s, 'fleet.assault', { fleetId: main(s) });
       s = until(s, (x) => owns(x, ME, 'outpost'));
     }
     expect(owns(s, ME, 'outpost')).toBe(true);
@@ -141,22 +144,23 @@ describe('учебный полигон: все двенадцать этапо�
     // 12. Финал: собрать все крейсеры в один кулак, взять с поста десант и штурмовать
     // планету-цель (форт, батарея, два фрегата) — операция окончена победой.
     const rally = Object.values(s.fleets).filter(
-      (f) => f.owner === ME && f.id !== 'p1_1' && f.units.some((u) => u.unit === 'cruiser'),
+      (f) => f.owner === ME && f.id !== main(s) && f.units.some((u) => u.unit === 'cruiser'),
     );
     // У цели форт и гарнизон крепче, чем был у поста: десант набирают в казармах базы.
     s = act(s, 'unit.build', { planetId: 'base', unit: 'heavy_infantry', count: 8 });
-    s = act(s, 'fleet.move', { fleetId: 'p1_1', to: 'base' });
+    s = act(s, 'fleet.move', { fleetId: main(s), to: 'base' });
     for (const f of rally) if (f.location !== 'base') s = act(s, 'fleet.move', { fleetId: f.id, to: 'base' });
+    // Долетевшие к базе сливаются сами (`autoMerge`); вручную — только те, кто уже стоял там.
     s = until(s, (x) =>
-      ['p1_1', ...rally.map((f) => f.id)].every((id) => x.fleets[id]?.location === 'base' && !x.fleets[id]?.movement) &&
+      [main(x), ...rally.map((f) => f.id)].every((id) => !x.fleets[id] || (x.fleets[id]!.location === 'base' && !x.fleets[id]!.movement)) &&
       (x.planets.base?.garrison ?? []).some((g) => g.unit === 'heavy_infantry' && g.count >= 8));
-    for (const f of rally) s = act(s, 'fleet.merge', { from: f.id, into: 'p1_1' });
-    s = act(s, 'army.load', { fleetId: 'p1_1', unit: 'heavy_infantry', count: 8 });
-    s = until(s, (x) => (x.fleets.p1_1?.landing ?? []).some((u) => u.unit === 'heavy_infantry'));
-    s = act(s, 'fleet.move', { fleetId: 'p1_1', to: 'target' });
-    s = until(s, (x) => inOrbit(x, ME, 'target') || !x.fleets.p1_1);
+    for (const f of rally) if (s.fleets[f.id] && f.id !== main(s)) s = act(s, 'fleet.merge', { from: f.id, into: main(s) });
+    s = act(s, 'army.load', { fleetId: main(s), unit: 'heavy_infantry', count: 8 });
+    s = until(s, (x) => (x.fleets[main(x)]?.landing ?? []).some((u) => u.unit === 'heavy_infantry'));
+    s = act(s, 'fleet.move', { fleetId: main(s), to: 'target' });
+    s = until(s, (x) => inOrbit(x, ME, 'target') || !x.fleets[main(x)]);
     if (!owns(s, ME, 'target')) {
-      s = act(s, 'fleet.assault', { fleetId: 'p1_1' });
+      s = act(s, 'fleet.assault', { fleetId: main(s) });
       s = until(s, (x) => owns(x, ME, 'target') || x.match.status === 'ended');
     }
     expect({ status: s.match.status, winner: s.match.winner }).toEqual({ status: 'ended', winner: ME });

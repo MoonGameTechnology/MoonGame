@@ -16,6 +16,7 @@ import {
   minefieldModule,
   rendezvousModule,
   extractionModule,
+  autoMergeModule,
   seatClaimModule,
   visibilityModule,
   movementModule,
@@ -181,6 +182,9 @@ export const MODULES: GameModule[] = [
   rendezvousModule,
   // Накопитель архива главы IV (PVR-7.3): после союзника — слушает его `ally.contact`.
   extractionModule,
+  // Автослияние на прибытии (заказ владельца 2026-10-03). В САМЫЙ КОНЕЦ — то же место, что в
+  // серверном `DEV_MODULES`: прибытие сначала слышат все, потом флот вливается в стоявший.
+  autoMergeModule,
 ];
 
 export const kernel = createKernel(MODULES);

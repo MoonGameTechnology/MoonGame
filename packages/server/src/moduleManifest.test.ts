@@ -94,7 +94,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 63: порядок тот же; combat 3.5.0, fleet-ops 1.7.0, construction 1.4.0 — ревью #1416.
 // 64: ЧЛЕНСТВО — `sprawl` 1.0.0 сразу за `faction`, налог на рост державы (BAL-10).
 // 65: порядок тот же; combat 3.6.0, fleet-ops 1.8.0 — бой «Атаки» втягивает ждавших у мира (ATK-3).
-const PINNED_FOR_VERSION = '65';
+// 66: ЧЛЕНСТВО — `auto-merge` 1.0.0 в самый конец, автослияние флотов на прибытии.
+const PINNED_FOR_VERSION = '66';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -165,6 +166,7 @@ const PINNED_MODULE_IDS = [
   'rocketMines', // deployment, radar scans and finite missile flights
   'rendezvous', // PVR-7.2: сценарный союзник главы IV
   'extraction', // PVR-7.3: накопитель архива главы IV
+  'auto-merge', // долетевший флот вливается в свой, стоящий в узле (заказ владельца 2026-10-03)
 ];
 
 describe('сторож манифеста', () => {
