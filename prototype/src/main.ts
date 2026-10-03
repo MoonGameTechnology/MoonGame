@@ -607,7 +607,7 @@ import {
   flowPer,
   flowRate,
   gameDay,
-  dayHour,
+  gameStamp,
   clockHM,
   countdownHMS,
   costText,
@@ -1020,7 +1020,7 @@ import { planetRadar as corePlanetRadar } from './sensorScale';
 import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
-import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
+import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded } from './noteLog';
 import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
@@ -2690,13 +2690,13 @@ let lastNoteMsg = '';
 let lastNoteAtMs = 0;
 /** Append a line to the session log (bounded). Patches the feed if it's on screen. */
 function note(msg: string, at?: string) {
-  // Защита от повторов, метка времени и пределы лент — `noteLog.ts` (REFM-101):
-  // повтор глушится по РЕАЛЬНОМУ времени, а метка ставится ИГРОВОЕ.
+  // Защита от повторов и пределы лент — `noteLog.ts` (REFM-101): повтор глушится по
+  // РЕАЛЬНОМУ времени, а метка ставится ИГРОВОЕ — «День 3, 07:45» (`gameStamp`, UIX-5.3).
   const nowMs = Date.now();
   if (isRepeat(msg, lastNoteMsg, nowMs, lastNoteAtMs)) return;
   lastNoteMsg = msg;
   lastNoteAtMs = nowMs;
-  pushBounded(logLines, `${stamp(s.time, DAY, HOUR)} · ${msg}`, LOG_LINES);
+  pushBounded(logLines, `${gameStamp(s.time)} · ${msg}`, LOG_LINES);
   pushBounded(eventLog, { at: s.time, text: msg, anchor: at }, EVENT_LOG_MAX);
   toast(msg, at);
 }
@@ -3501,7 +3501,10 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
 // declares war on …") instead of dispatching. The AI honours the same rule (see
 // aiOrders); the kernel only fights once a `war` stance exists (combat.isHostile).
 function blockerName(id: string): string {
-  return s.players[id]?.name ?? NAME[id] ?? id;
+  // Имя в состоянии — английское имя данных («Azure Compact»): его, как и `NAME`,
+  // показывают через `houseDisplayName` (UIX-5.3).
+  const name = s.players[id]?.name;
+  return name !== undefined ? houseDisplayName(name) : (NAME[id] ?? id);
 }
 /** Distinct PEACE owners that make the move IMPOSSIBLE without a war — mirrors the
  *  kernel's D2 gate, including its detour: since the right-of-way fix the kernel
@@ -5794,7 +5797,7 @@ function drawRadarRange(now: number): void {
   cx.textAlign = 'left';
   cx.font = '700 10px ui-monospace,Menlo,monospace';
 
-  // outer — signature reach (coarse blips in fog)
+  // outer — signature reach (coarse blips in fog): «засечка», как в досье радара
   const o = radiusPx(reach);
   cx.fillStyle = rgba('#5ff0c0', 0.012);
   cx.beginPath();
@@ -5807,9 +5810,9 @@ function drawRadarRange(now: number): void {
   cx.shadowBlur = fxBlur(2);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.85);
-  cx.fillText(`◌ SIGNATURE ${reach}`, c.x + o + 7, c.y + 3);
+  cx.fillText(t('map.radar.detect', { n: reach }), c.x + o + 7, c.y + 3);
 
-  // inner — full-reveal reach (contacts fully identified)
+  // inner — full-reveal reach (contacts fully identified): «опознание»
   const inner = rings.reveal; // та же доля, что у сводного покрытия (REFM-63, правило 4)
   const i = radiusPx(inner);
   cx.fillStyle = rgba('#5ff0c0', 0.02);
@@ -5822,7 +5825,7 @@ function drawRadarRange(now: number): void {
   cx.shadowBlur = fxBlur(3);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.9);
-  cx.fillText(`● REVEAL ${Math.round(inner)}`, c.x + i + 7, c.y - 7);
+  cx.fillText(t('map.radar.identify', { n: Math.round(inner) }), c.x + i + 7, c.y - 7);
   cx.restore();
 }
 
@@ -8434,16 +8437,17 @@ function isAiSeat(id: string): boolean {
 function diploSeats(): string[] {
   return Object.keys(s.players);
 }
-/** Message stamp. Defaults to `Day N · HH:MM` (game day + game time, mirrors the status
- *  strip); the chat passes toggles to add/drop fields and append the real wall-clock. */
+/** Message stamp. Defaults to «День N, ЧЧ:ММ» (game day + game time, `gameStamp`); the
+ *  chat passes toggles to add/drop fields and append the real wall-clock. */
 function fmtStamp(at: number, opts?: StampOpts): string {
   const o = opts ?? { day: true, time: true };
   const p2 = (n: number) => String(n).padStart(2, '0');
   const parts: string[] = [];
   // День и время суток — `format.ts` (REFM-136): счёт дней с единицы и остатки суток/часа
   // одинаковы во всех четырёх местах, где игрок читает игровое время.
-  if (o.day) parts.push(`D${gameDay(at)}`);
-  if (o.time) parts.push(clockHM(at));
+  if (o.day && o.time) parts.push(gameStamp(at));
+  else if (o.day) parts.push(t('hud.day', { d: gameDay(at) }));
+  else if (o.time) parts.push(clockHM(at));
   if (o.real && o.realAt != null) {
     const dt = new Date(o.realAt);
     parts.push(`⌚${p2(dt.getHours())}:${p2(dt.getMinutes())}`);
@@ -8761,11 +8765,7 @@ function intelTabHtml(): string {
     .join('');
   const log = [...spyLog]
     .reverse()
-    .map((e) => {
-      const d = gameDay(e.at);
-      const h = dayHour(e.at);
-      return `<div class="in-log">D${d} ${t('fmt.hours', { n: String(h).padStart(2, '0') })} · ${esc(e.text)}</div>`;
-    })
+    .map((e) => `<div class="in-log">${gameStamp(e.at)} · ${esc(e.text)}</div>`)
     .join('');
   return (
     `<div class="dp-list in-list">` +
@@ -9656,8 +9656,9 @@ function renderCmdBar() {
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
     // ATK-1: «Атака» — всегда, как «Курс». Цель у неё ФЛОТ, а не мир (в отличие от
-    // ШТУРМА ниже), поэтому и кнопка отдельная, и прицел отдельный.
-    cmdBtn('engage', '⚡', t('cmd.engage'), engageAim ? 'on' : '', false, t('cmd.engage.hint')) +
+    // ШТУРМА ниже), поэтому и кнопка отдельная, и прицел отдельный. Значок — прицел ✛, как
+    // на ПК (`crosshair`): молния ⚡ — это скорость и «Ускорить» (UIX-5.3).
+    cmdBtn('engage', '✛', t('cmd.engage'), engageAim ? 'on' : '', false, t('cmd.engage.hint')) +
     // В консоли «Способность» — третья в первом ряду, как на макете владельца.
     (consoleOn ? castBtn : '') +
     (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +

@@ -99,3 +99,91 @@ describe('подсказка языка от площадки (YAG-1.3)', () => 
     vi.unstubAllGlobals();
   });
 });
+
+// UIX-5.3: слово при числе выбирается в строке локали — `{n|корабль|корабля|кораблей}`.
+describe('склонение по числу', () => {
+  it('русский: одна, две и пять — три формы, 11–14 — «много»', async () => {
+    const core = await freshCore();
+    core.setLocale('ru');
+    core.registerMessages('ru', { 'x.ships': '{n} {n|корабль|корабля|кораблей}' });
+    const ships = (n: number) => core.t('x.ships', { n });
+    expect([1, 2, 4, 5, 11, 12, 14, 21, 22, 25, 101, 111, 0].map(ships)).toEqual([
+      '1 корабль',
+      '2 корабля',
+      '4 корабля',
+      '5 кораблей',
+      '11 кораблей',
+      '12 кораблей',
+      '14 кораблей',
+      '21 корабль',
+      '22 корабля',
+      '25 кораблей',
+      '101 корабль',
+      '111 кораблей',
+      '0 кораблей',
+    ]);
+  });
+
+  it('английский: две формы', async () => {
+    const core = await freshCore();
+    core.setLocale('en');
+    core.registerMessages('en', { 'x.ships': '{n} {n|ship|ships}' });
+    expect([1, 2, 0, 21].map((n) => core.t('x.ships', { n }))).toEqual([
+      '1 ship',
+      '2 ships',
+      '0 ships',
+      '21 ships',
+    ]);
+  });
+
+  it('пропущенная форма берёт последнюю: русскому «other» для дробных можно не писать', async () => {
+    const core = await freshCore();
+    core.setLocale('ru');
+    core.registerMessages('ru', {
+      'x.three': '{n|корабль|корабля|кораблей}',
+      'x.four': '{n|корабль|корабля|кораблей|корабля}',
+    });
+    expect(core.t('x.three', { n: 1.5 })).toBe('кораблей');
+    expect(core.t('x.four', { n: 1.5 })).toBe('корабля');
+  });
+
+  it('значение строкой — число из неё; не число — последняя форма', async () => {
+    const core = await freshCore();
+    core.setLocale('ru');
+    core.registerMessages('ru', { 'x.ships': '{n} {n|корабль|корабля|кораблей}' });
+    expect(core.t('x.ships', { n: '3' })).toBe('3 корабля');
+    expect(core.t('x.ships', { n: '1.2k' })).toBe('1.2k кораблей');
+  });
+
+  it('число в разметке читается без тегов: досье выделяют значения `<em class="hl">`', async () => {
+    const core = await freshCore();
+    core.setLocale('ru');
+    core.registerMessages('ru', { 'x.ships': '{n} {n|корабль|корабля|кораблей}' });
+    expect(core.t('x.ships', { n: '<em class="hl">1</em>' })).toBe('<em class="hl">1</em> корабль');
+    expect(core.t('x.ships', { n: '<b>3</b>' })).toBe('<b>3</b> корабля');
+  });
+
+  it('форма — только слово: несколько чисел в строке склоняются каждое своим', async () => {
+    const core = await freshCore();
+    core.setLocale('ru');
+    core.registerMessages('ru', {
+      'x.group': '{f} {f|флот|флота|флотов} · {s} {s|корабль|корабля|кораблей}',
+    });
+    expect(core.t('x.group', { f: 1, s: 22 })).toBe('1 флот · 22 корабля');
+  });
+
+  it('нет значения — слот остаётся как есть, а не пропадает', async () => {
+    const core = await freshCore();
+    core.setLocale('ru');
+    core.registerMessages('ru', { 'x.ships': '{n|корабль|корабля|кораблей}' });
+    expect(core.t('x.ships', { m: 1 })).toBe('{n|корабль|корабля|кораблей}');
+  });
+
+  it('непереведённый ключ склоняется по-русски, а не по правилу выбранного языка', async () => {
+    const core = await freshCore();
+    core.setLocale('en');
+    core.registerMessages('ru', { 'x.ships': '{n} {n|корабль|корабля|кораблей}' });
+    core.registerMessages('en', {});
+    expect(core.t('x.ships', { n: 5 })).toBe('5 кораблей');
+  });
+});

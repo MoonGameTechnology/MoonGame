@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import { dataKey } from '../../localization';
+import { pluralCategories } from '../../localization/core';
 import { composeGameDataBundle } from '../../packages/shared-core/src/index';
 import { GLOSSARY } from './codexIndex';
 import { data } from './gameData';
@@ -420,6 +421,27 @@ describe('локализация — ключи', () => {
       .filter(([, v]) => hasCyrillic(v))
       .map(([k]) => k);
     expect(leaks).toEqual([]);
+  });
+
+  it('слово при числе дано во всех формах своего языка (UIX-5.3)', () => {
+    // `{n|корабль|корабля|кораблей}` — формы в порядке категорий языка
+    // (`localization/core.ts`). Две формы в русском промолчали бы и показали «3 кораблей»,
+    // лишняя — это чаще всего потерянная или лишняя черта. Последнюю категорию («other»,
+    // у русского — дробные) можно не писать: её заменит последняя форма.
+    const bad: string[] = [];
+    let seen = 0;
+    for (const [id, table] of [['ru', ru], ['en', en]] as const) {
+      const cats = pluralCategories(id).length;
+      for (const [key, text] of Object.entries(table))
+        for (const m of text.matchAll(/\{\w+((?:\|[^|{}]*)+)\}/g)) {
+          seen++;
+          const forms = m[1]!.slice(1).split('|');
+          if (forms.length < Math.max(2, cats - 1) || forms.length > cats || forms.some((f) => !f.trim()))
+            bad.push(`${id} ${key}: ${m[0]}`);
+        }
+    }
+    expect(seen).toBeGreaterThan(40); // разбор не должен молча опустеть
+    expect(bad.sort()).toEqual([]);
   });
 
   it('таблицы копии отдают ключи, а не текст', () => {
