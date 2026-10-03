@@ -21,6 +21,9 @@
  *    точки нет — меток нет.
  * 3. **Выполненная и проваленная задача меток не держит**: на карту зовёт только то, что
  *    ещё можно сделать.
+ * 4. **Задача места эпизода молчит, пока о месте не знают** (`revealedBy`, глава VI §8.4):
+ *    меток нет, пока место не попало в сведения игрока (`missionFacts.found` — его зрение
+ *    или зрение союзника). Иначе метка открыла бы доки раньше эпизода.
  */
 import { HAVEN_TRAIT, type GameState, type PlayerId } from '../packages/shared-core/src/index';
 import {
@@ -80,6 +83,8 @@ export function missionTargets(
 ): string[] {
   const progress = objectiveProgress(objective, state, player);
   if (progress.complete || progress.failed) return [];
+  const site = objective.revealedBy;
+  if (site !== undefined && !(state.missionFacts?.found?.[player] ?? []).includes(site)) return [];
   if (objective.kind === 'control')
     return (objective.targets ?? []).filter(
       (id) => state.planets[id] !== undefined && state.planets[id]!.owner !== player,

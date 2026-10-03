@@ -5,6 +5,8 @@ import type { GameModule } from '../kernel/module';
 import { createInitialState, type Fleet, type GameState, type Planet, type Player } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, Context, MatchConfig } from '../action/types';
+import { setStance } from '../state/diplomacy';
+import { visibleState } from '../state/visibility';
 
 // Память фактов для задач забега: удержание с момента захвата, потерянные миры,
 // доставленные беженцы. Модуль задач не знает — только факты.
@@ -176,5 +178,79 @@ describe('missionFacts — ждущие флоты (беженцы появля�
     const s = arrive(waiting([fleet('f', 'p1', [['cruiser', 1]])]), 'f', 'beacon');
     expect(s.fleets.evac).toBeUndefined();
     expect(s.planets.road?.awaitingFleets).toHaveLength(1);
+  });
+
+  it('прибыл флот союзника — транспорты игрока входят в игру; мир — ещё не союз (PVR-8.4)', () => {
+    const allied = (stance: 'alliance' | 'peace'): GameState => {
+      const s = waiting([fleet('a', 'ally', [['cruiser', 1]])]);
+      s.players.ally = player('ally');
+      setStance(s, 'p1', 'ally', stance);
+      return s;
+    };
+    const s = arrive(allied('alliance'), 'a');
+    expect(s.fleets.evac).toMatchObject({ owner: 'p1', location: 'road' });
+    expect(s.planets.road?.awaitingFleets).toBeUndefined();
+    expect(arrive(allied('peace'), 'a').fleets.evac).toBeUndefined();
+  });
+});
+
+describe('missionFacts — сведения о месте эпизода (глава VI §8.4, PVR-8.4)', () => {
+  /** Доки далеко от базы: их не видно, пока туда не придёт флот игрока или союзника. */
+  function far(fleets: Fleet[]): GameState {
+    const s = world(fleets);
+    s.players.ally = { ...player('ally'), npc: 'neutral' };
+    s.pve = { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' };
+    s.planets.docks = { ...planet('docks', 'swarm', ['refuge']), position: { x: 9000, y: 0 } };
+    s.planets.ally_camp = { ...planet('ally_camp', 'ally'), position: { x: -9000, y: 0 } };
+    setStance(s, 'p1', 'ally', 'alliance');
+    return s;
+  }
+  const at = (f: Fleet, location: string): Fleet => ({ ...f, location });
+  const arrive = (s: GameState, id: string): ReturnType<typeof kernel.applyAction> => {
+    s.fleets[id]!.location = 'docks';
+    return kernel.applyAction(s, act('test.arrived', { fleetId: id, at: 'docks' }), ctx(0));
+  };
+
+  it('на старте доков не знает никто; флот игрока опознал их — факт и событие', () => {
+    const s = far([fleet('f', 'p1', [['cruiser', 1]])]);
+    expect(s.missionFacts?.found).toBeUndefined();
+    const r = arrive(s, 'f');
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.missionFacts?.found).toEqual({ p1: ['docks'] });
+    expect(r.events.filter((e) => e.type === 'refuge.found').map((e) => e.payload)).toEqual([
+      { owner: 'p1', at: 'docks' },
+    ]);
+    // Сведения — его: сетевой клиент видит свои (метки задач читают их), чужому не достаются.
+    expect(visibleState(r.state, 'p1', data).missionFacts?.found).toEqual({ p1: ['docks'] });
+    expect(visibleState(r.state, 'swarm', data).missionFacts?.found).toBeUndefined();
+  });
+
+  it('доки опознал союзник — сведения получает игрок; житель карты своей записи не ведёт', () => {
+    const r = arrive(far([fleet('a', 'ally', [['cruiser', 1]])]), 'a');
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.missionFacts?.found).toEqual({ p1: ['docks'] });
+  });
+
+  it('эпизод — один раз: второй взгляд и потеря обзора факта не меняют', () => {
+    const first = arrive(far([fleet('f', 'p1', [['cruiser', 1]])]), 'f');
+    if (!first.ok) throw new Error(first.code);
+    const again = arrive(first.state, 'f');
+    if (!again.ok) throw new Error(again.code);
+    expect(again.events.some((e) => e.type === 'refuge.found')).toBe(false);
+    const away = again.state;
+    away.fleets.f = at(away.fleets.f!, 'safe');
+    const later = kernel.advanceTo(away, ctx(3_600_000));
+    if (!later.ok) throw new Error(later.code);
+    expect(later.state.missionFacts?.found).toEqual({ p1: ['docks'] });
+  });
+
+  it('враг штурма у доков сведений никому не даёт; ход часов открывает то, что видно', () => {
+    const swarm = arrive(far([fleet('s', 'swarm', [['cruiser', 1]])]), 's');
+    if (!swarm.ok) throw new Error(swarm.code);
+    expect(swarm.state.missionFacts?.found).toBeUndefined();
+    // Флот игрока уже стоит у доков: сведения приходят с ходом часов, без прибытия.
+    const r = kernel.advanceTo(far([at(fleet('f', 'p1', [['cruiser', 1]]), 'docks')]), ctx(1000));
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.missionFacts?.found).toEqual({ p1: ['docks'] });
   });
 });

@@ -162,6 +162,46 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
           op.evacuate = 4;
         }),
       ).toEqual(['E_INVALID_OPERATION:evacuate']);
+      // Контрудар (PVR-8.4) называет провинции карты.
+      expect(
+        broken((op) => {
+          op.counterattack = { after: ['veil', 'lost'], target: 'drift' };
+        }),
+      ).toEqual(['E_INVALID_OPERATION:lost']);
+      expect(
+        broken((op) => {
+          op.counterattack = { after: ['veil'], target: 'void' };
+        }),
+      ).toEqual(['E_INVALID_OPERATION:void']);
+    });
+
+    it('замысел контрудара доезжает в состояние копией (PVR-8.4)', () => {
+      const map = contractMap();
+      map.operation!.counterattack = { after: ['veil'], target: 'drift' };
+      const state = buildStateFromMap(map, data);
+      expect(state.operation?.counterattack).toEqual({ after: ['veil'], target: 'drift' });
+      expect(state.operation?.counterattack).not.toBe(map.operation!.counterattack);
+    });
+
+    it('метки задачи по сведениям — только о месте эпизода с признаком `refuge` (PVR-8.4)', () => {
+      const issues = (site: string, traits: string[]): string[] => {
+        const map = contractMap();
+        map.sectors.drift = { ...map.sectors.drift!, traits };
+        map.objectives = [
+          {
+            id: 'mission.survivors',
+            kind: 'evac',
+            targets: [],
+            count: 2,
+            reward: 1,
+            revealedBy: site,
+          },
+        ];
+        return validateMatchMap(map, data).filter((i) => i.startsWith('E_INVALID_OBJECTIVE'));
+      };
+      expect(issues('drift', ['refuge'])).toEqual([]);
+      expect(issues('drift', [])).toEqual(['E_INVALID_OBJECTIVE:mission.survivors']);
+      expect(issues('nowhere', ['refuge'])).toEqual(['E_INVALID_OBJECTIVE:mission.survivors']);
     });
   });
 

@@ -20,7 +20,15 @@ function fleet(id: string, over: Partial<Fleet> = {}): Fleet {
   } as unknown as Fleet;
 }
 function planet(id: string, pos: { x: number; y: number }, owner: string | null = null, links: string[] = []): Planet {
-  return { id, owner, position: pos, links, garrison: [], buildings: [] } as unknown as Planet;
+  return {
+    id,
+    owner,
+    position: pos,
+    links,
+    garrison: [],
+    buildings: [],
+    traits: [],
+  } as unknown as Planet;
 }
 function stateWith(fleets: Fleet[], planets: Planet[] = [planet('A', { x: 0, y: 0 })]): GameState {
   const s = createInitialState({ seed: 'so', version: { data: '0.1.0', manifest: '1' } });

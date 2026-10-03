@@ -297,3 +297,58 @@ describe('pveOrchestrator — площадка крепости на разви�
     expect(moves.map((a) => (a.payload as { to: string }).to)).toEqual(['near']);
   });
 });
+
+describe('pveOrchestrator — последний контрудар главы VI (PVR-8.4)', () => {
+  // Литейная у людей, доки известны: соединение из улья и построенное на заставе идут к докам.
+  // Правило — `counterattackPlan` в ядре, то же у бота забега; здесь — что сервер его слушает.
+  const ca = (found: Record<string, string[]>): GameState =>
+    world({
+      planets: {
+        hive: planet('hive', 'swarm', 0),
+        outpost: planet('outpost', 'swarm', 40),
+        foundry: planet('foundry', 'human', 100),
+        docks: planet('docks', null, 500),
+      },
+      fleets: {
+        'pve:wave:1': fleet('pve:wave:1', 'swarm', 'hive'),
+        guard: fleet('guard', 'swarm', 'hive'),
+        built: fleet('built', 'swarm', 'outpost', { traits: ['rally'] }),
+      },
+      operation: {
+        production: ['hive'],
+        forces: { guard: { fleets: ['guard'], hp: 10 } },
+        breakAt: 0.2,
+        evacuate: 1,
+        counterattack: { after: ['foundry'], target: 'docks' },
+      },
+      missionFacts: { found },
+    });
+  // Каждый курс отдельной строкой: второй приказ тому же флоту виден как лишняя строка.
+  const moves = (s: GameState): string[] =>
+    orders(s)
+      .filter((a) => a.type === 'fleet.move')
+      .map((a) => {
+        const p = a.payload as { fleetId: string; to: string };
+        return `${p.fleetId} → ${p.to}`;
+      })
+      .sort();
+
+  it('пора — соединение и построенное идут к докам, волна — своей дорогой', () => {
+    expect(moves(ca({ human: ['docks'] }))).toEqual([
+      'built → docks',
+      'guard → docks',
+      'pve:wave:1 → foundry',
+    ]);
+  });
+
+  it('флот игрока на маяке: отвечает волна, а флоты контрудара курса не меняют', () => {
+    const s = ca({ human: ['docks'] });
+    s.planets.beacon = { ...planet('beacon', null, 60), traits: ['beacon'] };
+    s.fleets.you = fleet('you', 'human', 'beacon');
+    expect(moves(s)).toEqual(['built → docks', 'guard → docks', 'pve:wave:1 → beacon']);
+  });
+
+  it('доки никому не известны — прежняя тактика: соединение к ближайшему миру, построенное в улей', () => {
+    expect(moves(ca({}))).toEqual(['built → hive', 'guard → foundry', 'pve:wave:1 → foundry']);
+  });
+});

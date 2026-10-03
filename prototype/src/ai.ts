@@ -26,6 +26,7 @@ import {
   squadronSize,
   beaconCallouts,
   beaconSentinels,
+  counterattackPlan,
   swarmAdaptDue,
   swarmNetPlan,
   musterPlan,
@@ -478,11 +479,16 @@ export function aiOrders(
   const besieging = Object.values(state.heroes ?? {}).flatMap((x) =>
     x.owner === ai && x.siege && x.fleetId !== undefined ? [x.fleetId] : [],
   );
+  // PVR-8.4 (глава VI §8.7): потеряв внешние позиции, Рой ведёт к известному месту эвакуации
+  // уцелевшие соединения и построенное. Правило одно на оба хоста (`counterattackPlan`, его же
+  // зовёт серверный оркестратор); флоты контрудара общий бот не трогает, улей их не ждёт.
+  const counter = counterattackPlan(state, data, ai);
   const pinned = new Set([
     ...beaconSentinels(state, ai),
     ...net.held,
     ...muster.held,
     ...besieging,
+    ...counter.held,
   ]);
   const out = baseAiOrders(state, ai, posture, profile, pinned);
   // AUD-20: адаптация Роя. Правило «пора» одно на оба хоста (`swarmAdaptDue`, то же зовёт
@@ -498,11 +504,14 @@ export function aiOrders(
   // силы. Правило одно на оба хоста (`beaconCallouts`, общее с серверным оркестратором);
   // флот, ушедший отвечать на маяк, в этот тик других приказов от бота не получает, а
   // дозорный на самом маяке не получает их вовсе (`beaconSentinels`).
-  const callouts = beaconCallouts(state, ai, net.held);
+  const callouts = beaconCallouts(state, ai, new Set([...net.held, ...counter.held]));
   const held = new Set(pinned);
   for (const c of callouts) held.add(c.fleetId);
   const netOrders = [
-    ...muster.moves.map((m) => moveFleet(ai, m.fleetId, m.to)),
+    ...muster.moves
+      .filter((m) => !counter.held.has(m.fleetId))
+      .map((m) => moveFleet(ai, m.fleetId, m.to)),
+    ...counter.moves.map((m) => moveFleet(ai, m.fleetId, m.to)),
     ...net.moves.map((m) => moveFleet(ai, m.fleetId, m.to)),
     ...net.splits.map((sp) => splitFleet(ai, sp.fleetId, sp.take)),
     ...net.builds.map((b) =>

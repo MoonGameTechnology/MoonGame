@@ -512,3 +512,36 @@ describe('задачи шестой главы — пул из двенадца�
     ).toBeGreaterThan(0);
   });
 });
+
+describe('«Последний приют» и последний контрудар (§8.4, §8.7, PVR-8.4)', () => {
+  const state = buildStateFromMap(map, data);
+
+  it('место эпизода одно — доки, и на старте сведений о нём нет ни у кого', () => {
+    expect(
+      Object.keys(map.sectors).filter((id) => map.sectors[id]!.traits.includes('refuge')),
+    ).toEqual([DOCK]);
+    expect(state.missionFacts?.found).toBeUndefined();
+  });
+
+  it('задачи доков молчат на карте, пока о доках не узнали: книги, все выжившие, рубеж', () => {
+    expect(
+      map.objectives.filter((o) => o.revealedBy !== undefined).map((o) => [o.id, o.revealedBy]),
+    ).toEqual([
+      ['mission.chapel-books', DOCK],
+      ['mission.all-survivors', DOCK],
+      ['mission.dock-line', DOCK],
+    ]);
+  });
+
+  it('контрудар — после потери обеих литейных и по докам; комплекс в условие не входит', () => {
+    expect(map.operation!.counterattack).toEqual({
+      after: ['north_foundry', 'west_foundry'],
+      target: DOCK,
+    });
+    // Внешние позиции — литейные из списка очагов; сердце операции — комплекс.
+    for (const id of map.operation!.counterattack!.after)
+      expect(map.operation!.production).toContain(id);
+    expect(map.operation!.counterattack!.after).not.toContain(COMPLEX);
+    expect(state.operation?.counterattack).toEqual(map.operation!.counterattack);
+  });
+});

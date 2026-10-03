@@ -700,6 +700,7 @@ import { ALLY_EMBLEM, initAllyScreen } from './allyScreen';
 import { allyPanelView, linkedAlly } from '../../decisions/allyPanel';
 import { chapterChain, extractionCandidates, type ChapterStep } from '../../decisions/chapterChain';
 import { allyOrder, extractionStart } from '../../decisions/actions';
+import { refugeThreats } from '../../decisions/refugeThreat';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
 import { initResourceCard } from './resourceCard';
@@ -2094,6 +2095,8 @@ function drawScanSweep(now: number) {
 // fog-clean — the fogged state only ever holds fleets the player may see.
 const threatMemory = new Set<string>();
 let threatScanAt = -1;
+/** Флоты главных сил, о курсе которых к докам союзник уже доложил (глава VI, PVR-8.4). */
+const refugeReported = new Set<string>();
 function updateThreatAlerts(): void {
   // РЕЖИМ звонка — `threatAlerts.ts` (REFM-169): дроссель на игровой час (соло двигает
   // время каждый кадр, поэтому сторож «время изменилось» пустой), один звонок на эпизод
@@ -2118,6 +2121,11 @@ function updateThreatAlerts(): void {
       a.node,
     );
   }
+  // Глава VI (PVR-8.4, §8.7): союзник докладывает наблюдаемую угрозу месту эвакуации —
+  // видимый курс главных сил к найденным докам, один раз на флот (`refugeThreat.ts`).
+  const toRefuge = refugeThreats(s, ME, fleetSeen, refugeReported);
+  for (const th of toRefuge) refugeReported.add(th.fleetId);
+  if (toRefuge.length > 0) note(t('refuge.threat'), toRefuge[0]!.at);
 }
 
 /** Refresh radar contacts the arm crossed this frame: snapshot each radar-only enemy
@@ -4368,6 +4376,11 @@ function handleEvents(events: DomainEvent[]) {
         if (p.owner !== ME) break;
         note(t('ally.contact.note'));
         allyPulseUntil = performance.now() + 12_000;
+        break;
+      // Глава VI (PVR-8.4, §8.4): доки найдены — своим зрением или зрением союзника. Живой
+      // сигнал общины; адресат — тот, кто получил сведения (`owner`).
+      case 'refuge.found':
+        if (p.owner === ME) note(t('refuge.signal'), p.at as string);
         break;
       case 'ally.order.done':
       case 'ally.order.lost':
@@ -13210,6 +13223,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   radarMemory.clear();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
   threatScanAt = -1;
+  refugeReported.clear(); // id флотов карты повторяются от забега к забегу
   battleLosses.clear();
   aaShots.length = 0;
   logLines.length = 0; // fresh log — drop notes from the menu-background match

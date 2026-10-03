@@ -96,7 +96,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 65: порядок тот же; combat 3.6.0, fleet-ops 1.8.0 — бой «Атаки» втягивает ждавших у мира (ATK-3).
 // 66: ЧЛЕНСТВО — `auto-merge` 1.0.0 в самый конец, автослияние флотов на прибытии.
 // 67: ЧЛЕНСТВО — `operation` 1.0.0 перед `auto-merge`, контракт операции главы VI (PVR-8.3).
-const PINNED_FOR_VERSION = '67';
+// 68: порядок тот же; missionFacts 1.2.0 — места эпизода и выпуск ждущих союзником (PVR-8.4).
+const PINNED_FOR_VERSION = '68';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

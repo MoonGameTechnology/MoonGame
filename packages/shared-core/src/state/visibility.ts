@@ -659,6 +659,8 @@ function project(
     if (mf.evacuated?.[viewerId] !== undefined)
       mine.evacuated = { [viewerId]: mf.evacuated[viewerId]! };
     if (mf.contacted?.[viewerId]) mine.contacted = { [viewerId]: [...mf.contacted[viewerId]!] };
+    // PVR-8.4: о каком месте эпизода знает сосед — разведка его разведки.
+    if (mf.found?.[viewerId]) mine.found = { [viewerId]: [...mf.found[viewerId]!] };
     if (Object.keys(mine).length) view.missionFacts = mine;
     else delete view.missionFacts;
   }
@@ -939,9 +941,13 @@ function project(
   // Контракт операции (PVR-8.3): очаги, пороги и факты разгрома — правила главы, их видят
   // все. Флоты соединений — только те, что зритель видит и так: учёт идёт и за частями,
   // отделёнными в тумане, и их id рассказали бы, что враг разделился и когда.
-  if (view.operation)
+  // Контрудар (PVR-8.4) — замысел врага: когда и куда он двинет уцелевшее, игрок узнаёт по
+  // наблюдаемому курсу, а не из состояния.
+  if (view.operation) {
     for (const force of Object.values(view.operation.forces))
       force.fleets = force.fleets.filter((id) => view.fleets[id] !== undefined);
+    delete view.operation.counterattack;
+  }
 
   return view;
 }

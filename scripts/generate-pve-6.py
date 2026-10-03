@@ -156,8 +156,10 @@ P = collections.OrderedDict([
 
 # Своя задача союзника (§8.3): снять заставу на пути эвакуации — признак `ally_task` читает его
 # планировщик (`decisions/allyOperation.ts`). Часовня — маяк задачи (PVR-5.3): флот игрока на
-# ней, и сигнал притягивает Рой.
-TRAITS = {'forward_base': ['haven'], 'toll_post': ['ally_task'], 'voices_chapel': ['beacon']}
+# ней, и сигнал притягивает Рой. Доки — место эпизода «Последний приют» (§8.4, PVR-8.4):
+# сведения о них приходят, когда доки опознаны зрением игрока или союзника (`refuge`).
+TRAITS = {'forward_base': ['haven'], 'toll_post': ['ally_task'], 'voices_chapel': ['beacon'],
+          'quarantine_docks': ['refuge']}
 
 # Союзник с первой минуты (§8.3, PVR-8.2): повторного знакомства нет — встреча состоялась до
 # операции. Место связи — лагерь союзника; загрузчик записывает контакт и ставит союз
@@ -166,20 +168,22 @@ LINK = {'ally_camp': {'rendezvous': 'ally', 'contactAtStart': True}}
 
 # ЗАДАЧИ ЗАБЕГА — пул из двенадцати (§8.8 + общие глаголы); видно по правилу PVR-5.3, как во
 # всех главах. Три результата операции (производство, главные силы, основная эвакуация) — не
-# задачи пула: они решают исход главы, а задачи — надбавка.
+# задачи пула: они решают исход главы, а задачи — надбавка. Задачи доков (`revealedBy`) молчат
+# на карте, пока о доках не узнали: метка не открывает место раньше эпизода (§8.4).
 OBJECTIVES = [
     # Три побочные задачи §8.8.
     collections.OrderedDict([('id', 'mission.chapel-books'), ('kind', 'beacon'),
-                             ('targets', ['voices_chapel']), ('count', 8), ('reward', 3)]),
+                             ('targets', ['voices_chapel']), ('count', 8), ('reward', 3),
+                             ('revealedBy', 'quarantine_docks')]),
     collections.OrderedDict([('id', 'mission.outer-station'), ('kind', 'control'),
                              ('targets', ['outer_station']), ('reward', 3)]),
     # Основной эвакуации хватит трёх транспортов из четырёх; эта задача — довести всех.
     collections.OrderedDict([('id', 'mission.all-survivors'), ('kind', 'evac'),
-                             ('count', 4), ('reward', 4)]),
+                             ('count', 4), ('reward', 4), ('revealedBy', 'quarantine_docks')]),
     # Укреплённый рубеж на пути конвоя (§8.7).
     collections.OrderedDict([('id', 'mission.dock-line'), ('kind', 'build'),
                              ('targets', ['fort']), ('at', ['dock_approach']),
-                             ('count', 1), ('reward', 2)]),
+                             ('count', 1), ('reward', 2), ('revealedBy', 'quarantine_docks')]),
     collections.OrderedDict([('id', 'mission.take-rampart'), ('kind', 'control'),
                              ('targets', ['rampart']), ('reward', 3)]),
     collections.OrderedDict([('id', 'mission.north-watch'), ('kind', 'control'),
@@ -205,11 +209,15 @@ OBJECTIVE_SLOTS = {'base': 4, 'cap': 6}
 # все три производящих очага (кто бы их ни взял), три главных соединения разгромлены
 # (корпуса осталось не больше пятой части стартового; учёт идёт за слиянием и делением),
 # в убежище доведены три транспорта из четырёх. Беженцев стало меньше порога — поражение.
+# Последний контрудар (§8.7, PVR-8.4): потеряв обе литейные, Рой ведёт уцелевшие соединения
+# и построенное к докам, если о доках уже знают. Ничего не рождается: идёт то, что осталось.
 OPERATION = collections.OrderedDict([
     ('production', ['complex', 'north_foundry', 'west_foundry']),
     ('forces', ['swarm_guard', 'swarm_host', 'swarm_reserve']),
     ('breakAt', 0.2),
     ('evacuate', 3),
+    ('counterattack', collections.OrderedDict([('after', ['north_foundry', 'west_foundry']),
+                                               ('target', 'quarantine_docks')])),
 ])
 
 sectors = collections.OrderedDict()

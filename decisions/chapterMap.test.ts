@@ -93,6 +93,17 @@ describe('цели задач на карте главы (заказ владе�
     );
   });
 
+  it('задача места эпизода метится, только когда это место разведано (PVR-8.4)', () => {
+    // Глава VI: «Книги голосов» у часовни ждут, пока игрок не узнал о доках, — иначе метка
+    // в меню открыла бы место раньше эпизода.
+    const [site, chapel] = Object.keys(s.planets).sort();
+    const books = { id: 'mission.books', kind: 'beacon', targets: [chapel!], revealedBy: site! };
+    expect(chapterTargets(s, [books], new Set([books.id]), new Set()).active).toEqual([]);
+    expect(chapterTargets(s, [books], new Set([books.id]), new Set([site!])).active).toEqual([
+      chapel,
+    ]);
+  });
+
   it('разведка, волны и форты одной точки не имеют', () => {
     const rest = pool.filter((o) => ['scout', 'wave', 'build'].includes(o.kind));
     const t = chapterTargets(s, rest, new Set(rest.map((o) => o.id)), new Set(Object.keys(s.planets)));
