@@ -130,10 +130,10 @@ function rowHtml(r: SplitRow, hooks: SplitDialogHooks): string {
       <span class="sname"><span class="bicon">${hooks.icon(r.unit)}</span>${esc(hooks.name(r.unit))}${mods}</span>
       <b class="scur">${r.stay}</b>
       <span class="sbtns">
-        <button data-sx="dec" data-key="${esc(r.key)}" data-n="1" ${r.take <= 0 ? 'disabled' : ''}>−1</button>
-        <button data-sx="inc" data-key="${esc(r.key)}" data-n="1" ${r.take >= r.have ? 'disabled' : ''}>+1</button>
-        <button data-sx="inc" data-key="${esc(r.key)}" data-n="10" ${r.take >= r.have ? 'disabled' : ''}>+10</button>
-        <button data-sx="all" data-key="${esc(r.key)}" ${r.take >= r.have ? 'disabled' : ''}>${t('split.all')}</button>
+        <button class="btn-second" data-sx="dec" data-key="${esc(r.key)}" data-n="1" ${r.take <= 0 ? 'disabled' : ''}>−1</button>
+        <button class="btn-second" data-sx="inc" data-key="${esc(r.key)}" data-n="1" ${r.take >= r.have ? 'disabled' : ''}>+1</button>
+        <button class="btn-second" data-sx="inc" data-key="${esc(r.key)}" data-n="10" ${r.take >= r.have ? 'disabled' : ''}>+10</button>
+        <button class="btn-second" data-sx="all" data-key="${esc(r.key)}" ${r.take >= r.have ? 'disabled' : ''}>${t('split.all')}</button>
       </span>
       <b class="snew">→ ${r.take}</b>
     </div>`;
@@ -171,8 +171,8 @@ export function splitDialogHtml(m: SplitDialogModel, hooks: SplitDialogHooks): s
     <div class="srows">${ships.map((r) => rowHtml(r, hooks)).join('')}${hold}</div>
     <div class="sfoot">${t('split.preview', { a: `<b>${takeTotal}</b>`, b: `<b>${total - takeTotal}</b>` })}</div>
     <div class="sactions">
-      <button data-sx="confirm" class="cbtn" ${valid ? '' : 'disabled'}>${t('split.confirm')}</button>
-      <button data-sx="cancel" class="cbtn ghost">${t('ping.cancel')}</button>
+      <button data-sx="confirm" class="cbtn btn-main" ${valid ? '' : 'disabled'}>${t('split.confirm')}</button>
+      <button data-sx="cancel" class="cbtn btn-quiet">${t('ping.cancel')}</button>
     </div>
   </div>`;
 }

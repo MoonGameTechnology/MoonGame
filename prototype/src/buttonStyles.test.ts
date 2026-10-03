@@ -2,14 +2,20 @@
 // остальные действия, тихая — переход и пояснение. Вид кнопка берёт классом `.btn-main`,
 // `.btn-second`, `.btn-quiet` (лист `build.mjs`), а правило экрана задаёт ей только размер и
 // место. Сторож держит обе половины на переведённых экранах — карточке флота (телефон и ПК),
-// производстве и науке: разметка ставит класс, а лист не красит кнопку поверх него. Правило с
-// id в селекторе перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
+// производстве и науке (UIX-11.1), карточке мира, разделении флота и окне боя (UIX-11.2):
+// разметка ставит класс, а лист не красит кнопку поверх него. Правило с id в селекторе
+// перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setLocale } from '../../localization/runtime';
+import { cargoSplit, splitSlots } from '../../decisions/splitPlan';
+import type { BattleModel } from '../../packages/client/src/matchHud';
+import { battleWindowHtml } from './battleScreen';
 import { chainStripHtml } from './chainPlanner';
 import { commandWindowHtml } from './holographicUi';
 import { mobileOrderBar } from './mobileHud';
+import { actionButton } from './panelKit';
+import { splitDialogHtml, splitRows } from './splitDialog';
 import { troopsMenuHtml, troopsModel } from './troopsMenu';
 
 beforeAll(() => setLocale('ru'));
@@ -65,19 +71,27 @@ function subject(part: string): string {
 }
 
 /** Кнопка переведённого экрана: ряд приказов флота, «Сведения» листа телефона, главные
- *  кнопки науки и производства. Крестик окна ПК — не приказ и рисуется как крестики окон. */
+ *  кнопки науки и производства, кнопки карточки мира, разделения флота и окна боя. Крестик
+ *  окна ПК — не приказ и рисуется как крестики окон; раскрывашки окна боя («Состав»,
+ *  «Эффекты», «Правила») — строки списка, а не кнопки действия. */
 function converted(part: string): boolean {
   const s = subject(part);
   if (s.includes('holo-command-close')) return false;
-  if (/^\.(tt-take|tt-mbtn|bw-take|cn-build)\b/.test(s)) return true;
+  if (/^\.(tt-take|tt-mbtn|bw-take|cn-build|bw-open)\b/.test(s)) return true;
+  if (/^button\.b(?![-\w])/.test(s)) return true;
+  if (part.includes('#splitdlg') && /^(button|\.cbtn)\b/.test(s)) return true;
+  if (/#battlewinbody (\.bw-(actions|orders) )?button\b/.test(part) || s.includes('bw-attack'))
+    return true;
   if (part.includes('#cmdbar') && /^(button|\[data-cmd|\.holo-command-details)/.test(s))
     return true;
   return part.includes('.mobile-quick') && s.startsWith('button');
 }
 
-/** Свойства вида. Подложка (`background-color`) разрешена: липкой кнопке нужна плотная. */
+/** Свойства вида. Подложка (`background-color`) разрешена: липкой кнопке нужна плотная.
+ *  Рамка целиком (`border: 1px solid …`) красит её так же, как `border-color`; снять рамку
+ *  (`border: 0`) — можно. */
 const LOOK =
-  /(?<![-\w])(background|background-image|color|border-color|box-shadow|opacity|font|font-weight|font-family):/;
+  /(?<![-\w])(background|background-image|color|border-color|box-shadow|opacity|font|font-weight|font-family|border(?=:\s*(?!0\b|none\b))):/;
 
 describe('три стиля кнопок (UIX-11.1)', () => {
   it('классы стилей заданы токенами, без своих цветов', () => {
@@ -183,6 +197,75 @@ describe('три стиля кнопок (UIX-11.1)', () => {
       'holo-command-close',
     ]);
     expect(html).toContain('class="holo-command-details btn-quiet"');
+  });
+
+  it('карточка мира: «Постройки» и «Юниты» — главные, крепость — вторичная, путь в науку — тихий', () => {
+    const main = read('./main.ts');
+    const tags = [...main.matchAll(/<button class="bw-open[^"]*" data-act="(\w+)"/g)].map(
+      (m) => `${m[1]}:${m[0].match(/btn-\w+/)?.[0]}`,
+    );
+    expect(tags).toEqual([
+      'openunits:btn-main',
+      'openbuild:btn-main',
+      'fortress:btn-second',
+      'opentech:btn-quiet',
+      'forkfortress:btn-main',
+      'opentech:btn-quiet',
+    ]);
+    expect(actionButton('ping', '', 'Метка', true)).toContain('class="b btn-second"');
+  });
+
+  it('разделение флота: шаги — вторичные, «Разделить» — главная, «Отмена» — тихая', () => {
+    const units = [{ unit: 'cruiser', count: 3 }];
+    const key = splitSlots(units)[0]!.key;
+    const html = splitDialogHtml(
+      {
+        fleetId: 'f1',
+        rows: splitRows(splitSlots(units), { [key]: 1 }),
+        cargo: cargoSplit(
+          [],
+          {},
+          () => 0,
+          () => 1,
+        ),
+      },
+      { icon: () => '', name: (u) => u, moduleName: (m) => m },
+    );
+    expect(unstyled(html)).toEqual([]);
+    expect(html).toMatch(/data-sx="confirm" class="cbtn btn-main"/);
+    expect(html).toMatch(/data-sx="cancel" class="cbtn btn-quiet"/);
+  });
+
+  it('окно боя: «Атаковать всеми» — главная, отход и атака стороны — вторичные', () => {
+    const side = (owner: string, role: 'attacker' | 'defender', mine: boolean) => ({
+      owner,
+      ownerName: owner,
+      ownerFaction: 'x',
+      kind: 'fleet' as const,
+      units: [{ unit: 'cruiser', count: 3 }],
+      mine,
+      role,
+      ref: { kind: 'fleet' as const, fleetId: `${owner}-1` },
+    });
+    const sides = [side('p1', 'defender', true), side('p2', 'attacker', false)];
+    const m = {
+      kind: 'battle',
+      id: 'b1',
+      location: 'L',
+      phase: 'orbital',
+      round: 1,
+      nextRoundAt: 9000,
+      sides,
+      attacker: sides[1],
+      defender: sides[0],
+    } as unknown as BattleModel;
+    const html = battleWindowHtml(m, ['p1-1']);
+    const toggles = /class="bw-(expand|effect-toggle|more|rules-toggle)\b|class="ptile/;
+    expect(unstyled(html).filter((tag) => !toggles.test(tag))).toEqual([]);
+    expect(html).toMatch(/class="b bw-attack btn-main" data-battle-attack-all/);
+    expect(html).toMatch(/class="b btn-second" data-battle-retreat-all/);
+    expect(html).toMatch(/class="b bw-attack btn-second" data-battle-attack=/);
+    expect(html).toMatch(/class="b btn-second" data-battle-retreat=/);
   });
 
   it('выбранная вкладка науки и построек — токенами, без мятной заливки', () => {

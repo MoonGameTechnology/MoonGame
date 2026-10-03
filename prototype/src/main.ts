@@ -7048,7 +7048,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
  */
 function unitCatalogButton(tab: UnitCatalogTab): string {
   return buildRoster(tab, BUILD_UNITS, data).length
-    ? `<button class="bw-open" data-act="openunits" data-arg="${tab}">▣ ${t('production.units')}</button>`
+    ? `<button class="bw-open btn-main" data-act="openunits" data-arg="${tab}">▣ ${t('production.units')}</button>`
     : '';
 }
 /** Side-panel: the multi-fleet TASK-GROUP card (Shift-frame selection). */
@@ -8197,7 +8197,7 @@ function planetPanelHtml(p: Planet): string {
     // полноэкранное окно построек. Кнопка есть только там, где строить можно
     // (свой мир И каталог что-то здесь предлагает — CMD-VIS: нет приказа — нет кнопки).
     if (mine && buildsAnything(p, data, feedsOnBiomass(s, ME, data))) {
-      blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
+      blds += `<button class="bw-open btn-main" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
     // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
     // самое, каким решает редьюсер (сверено тестом по всем раскладам): здесь только
@@ -8216,7 +8216,7 @@ function planetPanelHtml(p: Planet): string {
       // видел сырой `<span class="rcost">…<svg…>` вместо цены (сообщение владельца
       // 2026-09-24: «непонятный текст там»).
       blds +=
-        `<button class="bw-open" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
+        `<button class="bw-open btn-second" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
         ` <span class="dim">${resLine(fortress.cost)}</span></button>`;
       // Не изучена — говорим, ЧТО изучить, и ведём туда: кнопка раньше горела, а ядро
       // отвечало безымянным «нужна технология».
@@ -8226,7 +8226,7 @@ function planetPanelHtml(p: Planet): string {
           .join(t('side.fortress.or'));
         blds +=
           `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
-          `<button class="bw-open" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+          `<button class="bw-open btn-quiet" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
       }
     }
     cols.push(blds);
@@ -8261,7 +8261,7 @@ function forkPanelHtml(fork: { province: string; trail: number }): string {
   if (raise.show) {
     const off = raise.enabled ? '' : ' disabled';
     h +=
-      `<button class="bw-open" data-act="forkfortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
+      `<button class="bw-open btn-main" data-act="forkfortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
       ` <span class="dim">${resLine(raise.cost)}</span></button>`;
     if (raise.blocked === 'tech') {
       const names = raise.needs
@@ -8269,7 +8269,7 @@ function forkPanelHtml(fork: { province: string; trail: number }): string {
         .join(t('side.fortress.or'));
       h +=
         `<div class="fort-why">${esc(t('side.fortress.needs-tech', { tech: names }))}</div>` +
-        `<button class="bw-open" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
+        `<button class="bw-open btn-quiet" data-act="opentech">⚗ ${esc(t('side.fortress.to-tech'))}</button>`;
     }
   } else if (raise.blocked === 'not-owned') {
     h += `<div class="row dim">${esc(t('side.fork.not-owned'))}</div>`;
