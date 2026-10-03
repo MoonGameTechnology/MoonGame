@@ -1,6 +1,26 @@
 {
   "phone-390x844": {
+    "welcome": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "register": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "browse": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
     "hub": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "rank": {
       "text": 0,
       "tap": 0,
       "wide": 0
@@ -31,13 +51,43 @@
       "wide": 0
     },
     "settings": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "codex": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "end": {
       "text": 0,
       "tap": 0,
       "wide": 0
     }
   },
   "pc-1366x768": {
+    "welcome": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "register": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "browse": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
     "hub": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "rank": {
       "text": 0,
       "tap": 0,
       "wide": 0
@@ -68,13 +118,43 @@
       "wide": 0
     },
     "settings": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "codex": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "end": {
       "text": 0,
       "tap": 0,
       "wide": 0
     }
   },
   "pc-1920x1080": {
+    "welcome": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "register": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "browse": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
     "hub": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "rank": {
       "text": 0,
       "tap": 0,
       "wide": 0
@@ -105,13 +185,43 @@
       "wide": 0
     },
     "settings": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "codex": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "end": {
       "text": 0,
       "tap": 0,
       "wide": 0
     }
   },
   "pc-2560x1440": {
+    "welcome": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "register": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "browse": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
     "hub": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "rank": {
       "text": 0,
       "tap": 0,
       "wide": 0
@@ -142,6 +252,16 @@
       "wide": 0
     },
     "settings": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "codex": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "end": {
       "text": 0,
       "tap": 0,
       "wide": 0
