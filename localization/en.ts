@@ -1389,6 +1389,7 @@ export const en: Record<string, string> = {
   // --- fleet — Автоимя соединения: слово + позывной. Лестница размеров снята в
   // SHU-4.1: её ступени были авиационными, а те принадлежат челнокам («эскадра»).
   'fleet.kind.ships': 'Fleet',
+  'fleet.kind.fortress': 'Space Fortress',
   'fleet.kind.shuttles': 'Squadron',
 
   // --- fleet.console — Окно флота на ПК и планшете (макет владельца 2026-09-27): шапка с

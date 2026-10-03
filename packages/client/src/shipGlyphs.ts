@@ -66,6 +66,9 @@ export function unitShape(
   ownerFaction?: string,
 ): ShipShapeId | null {
   if (def.domain === 'ground') return null;
+  // A structure (the space fortress) is not a faction hull: the Swarm owner keeps it.
+  const structure = unitId && def.traits.includes('immobile') ? UNIT_SHAPE[unitId] : undefined;
+  if (structure) return structure;
   if ((ownerFaction ?? def.faction) === 'swarm') {
     const known = unitId ? SWARM_UNIT_SHAPE[unitId] : undefined;
     if (known) return known;
