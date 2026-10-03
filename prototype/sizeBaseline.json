@@ -1,0 +1,113 @@
+{
+  "phone-390x844": {
+    "hub": {
+      "text": 2,
+      "tap": 6,
+      "wide": 0
+    },
+    "map": {
+      "text": 5,
+      "tap": 4,
+      "wide": 0
+    },
+    "fleet": {
+      "text": 9,
+      "tap": 4,
+      "wide": 0
+    },
+    "production": {
+      "text": 10,
+      "tap": 0,
+      "wide": 0
+    },
+    "science": {
+      "text": 17,
+      "tap": 0,
+      "wide": 0
+    },
+    "battle": {
+      "text": 21,
+      "tap": 4,
+      "wide": 0
+    },
+    "settings": {
+      "text": 2,
+      "tap": 6,
+      "wide": 0
+    }
+  },
+  "pc-1366x768": {
+    "hub": {
+      "text": 3,
+      "tap": 0,
+      "wide": 0
+    },
+    "map": {
+      "text": 10,
+      "tap": 0,
+      "wide": 0
+    },
+    "fleet": {
+      "text": 10,
+      "tap": 0,
+      "wide": 0
+    },
+    "production": {
+      "text": 30,
+      "tap": 0,
+      "wide": 0
+    },
+    "science": {
+      "text": 52,
+      "tap": 0,
+      "wide": 0
+    },
+    "battle": {
+      "text": 38,
+      "tap": 0,
+      "wide": 0
+    },
+    "settings": {
+      "text": 2,
+      "tap": 0,
+      "wide": 0
+    }
+  },
+  "pc-1920x1080": {
+    "hub": {
+      "text": 1,
+      "tap": 0,
+      "wide": 0
+    },
+    "map": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "fleet": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "production": {
+      "text": 7,
+      "tap": 0,
+      "wide": 0
+    },
+    "science": {
+      "text": 15,
+      "tap": 0,
+      "wide": 0
+    },
+    "battle": {
+      "text": 18,
+      "tap": 0,
+      "wide": 0
+    },
+    "settings": {
+      "text": 1,
+      "tap": 0,
+      "wide": 0
+    }
+  }
+}
