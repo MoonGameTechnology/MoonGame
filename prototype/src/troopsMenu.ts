@@ -192,13 +192,14 @@ export interface TroopsMenuOpts {
 }
 
 const stepBtn = (unit: string, n: number, glyph: string, title: string, off: boolean): string =>
-  `<button data-cmd="tstep" data-unit="${esc(unit)}" data-n="${n}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
+  `<button class="btn-second" data-cmd="tstep" data-unit="${esc(unit)}" data-n="${n}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
 
 /** Пресет «до упора»: набить трюм этим типом (dir=1) / высадить всё своё (dir=-1).
  *  Треугольник против «+/−» — намеренная разница формы: крайние значения и мелкий
- *  шаг не должны выглядеть одинаково под пальцем на 30-пиксельной кнопке. */
+ *  шаг не должны выглядеть одинаково под пальцем на 30-пиксельной кнопке. Поэтому и
+ *  стиль другой (UIX-11.1): шаг — вторичная кнопка в рамке, пресет — тихая, без рамки. */
 const maxBtn = (unit: string, dir: 1 | -1, glyph: string, title: string, off: boolean): string =>
-  `<button data-cmd="tmax" class="tall" data-unit="${esc(unit)}" data-dir="${dir}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
+  `<button data-cmd="tmax" class="tall btn-quiet" data-unit="${esc(unit)}" data-dir="${dir}" title="${esc(title)}" aria-label="${esc(title)}"${off ? ' disabled' : ''}>${glyph}</button>`;
 
 /** Разметка поповера. Живёт внутри строки #cmdbar, поэтому диспатчится общим
  *  `data-cmd`-обработчиком ряда и не заводит ни своего узла, ни своего слушателя.
@@ -247,8 +248,8 @@ export function troopsMenuHtml(m: TroopsModel, opts: TroopsMenuOpts): string {
     (m.anyDamaged ? `<div class="tnote">${esc(t('troops.damaged'))}</div>` : '') +
     `<div class="tnote">${esc(t('troops.timing'))}</div>` +
     `<div class="tacts">` +
-    `<button data-cmd="tok" class="cbtn"${m.valid ? '' : ' disabled'}>${esc(t('split.confirm'))}</button>` +
-    `<button data-cmd="tcancel" class="cbtn ghost">${esc(t('ping.cancel'))}</button>` +
+    `<button data-cmd="tok" class="cbtn btn-main"${m.valid ? '' : ' disabled'}>${esc(t('split.confirm'))}</button>` +
+    `<button data-cmd="tcancel" class="cbtn btn-quiet">${esc(t('ping.cancel'))}</button>` +
     `</div>` +
     `</div>`
   );

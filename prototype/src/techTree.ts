@@ -265,7 +265,7 @@ export function techTreeHtml(
         : st.st === 'res'
           ? `<span class="tt-st run">⚗ ${fmtEta(st.eta)}</span>`
           : st.st === 'avail'
-            ? `<button class="tt-take" data-go="${id}"${affordable ? '' : ' disabled'}>▷ ${
+            ? `<button class="tt-take btn-main" data-go="${id}"${affordable ? '' : ' disabled'}>▷ ${
                 affordable ? t('tech.action.research') : t('tech.action.no-resources')
               }</button>`
             : `<span class="tt-st lock">🔒 ${lockText(id, st.st)}</span>`;
@@ -329,16 +329,16 @@ export function techTreeHtml(
             : `<span class="tt-tag dim">${t('tech.state.locked')}</span>`;
     const btn =
       st.st === 'avail'
-        ? `<button class="tt-mbtn" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('tech.action.research') : t('tech.action.no-resources')}</button>`
+        ? `<button class="tt-mbtn btn-main" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('tech.action.research') : t('tech.action.no-resources')}</button>`
         : st.st === 'done'
-          ? `<button class="tt-mbtn wait" disabled>✓ ${t('tech.action.done')}</button>`
+          ? `<button class="tt-mbtn wait btn-main" disabled>✓ ${t('tech.action.done')}</button>`
           : st.st === 'res'
-            ? `<button class="tt-mbtn wait" disabled>⏳ ${t('tech.action.running', { n: st.eta })}</button>`
+            ? `<button class="tt-mbtn wait btn-main" disabled>⏳ ${t('tech.action.running', { n: st.eta })}</button>`
             : st.st === 'gate'
-              ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.opens-day', { n: gate + 1 })}</button>`
+              ? `<button class="tt-mbtn wait btn-main" disabled>🔒 ${t('tech.action.opens-day', { n: gate + 1 })}</button>`
               : st.st === 'chain'
-                ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.needs-parent')}</button>`
-                : `<button class="tt-mbtn wait" disabled>⚗ ${t('tech.action.unmet')}</button>`;
+                ? `<button class="tt-mbtn wait btn-main" disabled>🔒 ${t('tech.action.needs-parent')}</button>`
+                : `<button class="tt-mbtn wait btn-main" disabled>⚗ ${t('tech.action.unmet')}</button>`;
     modal =
       `<div class="tt-modal"><div class="tt-mback" data-mclose="1"></div><div class="tt-mwin">` +
       `<button class="tt-mx" data-mclose="1">✕</button>` +

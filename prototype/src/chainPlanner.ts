@@ -296,14 +296,15 @@ export function chainStripHtml(m: ChainStripModel): string {
       : ` · <i class="chhint">${esc(t('hint.pick-order'))}</i>`) +
     (m.overwrite ? ` <b class="chwarn" title="${esc(t('chain.overwrite'))}">⚠</b>` : '') +
     `</span>`;
-  const btn = (cmd: string, icon: string, lbl: string, disabled: boolean, cls = ''): string =>
+  // Вид — один из трёх стилей (UIX-11.1): «Отправить» — главная кнопка полоски.
+  const btn = (cmd: string, icon: string, lbl: string, disabled: boolean, cls = 'btn-second'): string =>
     `<button data-cmd="${cmd}" class="${cls}" title="${esc(lbl)}" aria-label="${esc(lbl)}" ${disabled ? 'disabled' : ''}><span class="ci">${icon}</span><span class="cl">${esc(lbl)}</span></button>`;
   return (
     label +
     btn('chundo', '⟲', t('chain.undo'), !m.canUndo) +
     btn('chhome', '⌂', t('tgt.step.home'), !m.canHome) +
-    btn('chsend', '✓', m.clearMode ? t('tgt.clear') : t('tgt.send'), !m.canSend, 'on') +
-    btn('chexit', '✕', t('ping.cancel'), false, 'danger')
+    btn('chsend', '✓', m.clearMode ? t('tgt.clear') : t('tgt.send'), !m.canSend, 'btn-main') +
+    btn('chexit', '✕', t('ping.cancel'), false, 'btn-second danger')
   );
 }
 

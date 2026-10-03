@@ -115,7 +115,7 @@ try {
       assert(typeof order.to === 'string' && order.to.length > 0, 'точка отхода названа');
       assert.equal(
         await page.evaluate(() =>
-          document.querySelector('#cmdbar [data-cmd="qretr"]').className.includes('on'),
+          document.querySelector('#cmdbar [data-cmd="qretr"]').classList.contains('on'),
         ),
         true,
         'кнопка подсвечена, пока приказ стоит',
@@ -123,9 +123,10 @@ try {
     }
     // Текущий порог подсвечен в окошке.
     await retr.click();
-    assert.equal(
-      await page.locator('#cmdbar .cmdpop-retr [data-at="0.5"]').getAttribute('class'),
-      'on',
+    assert.ok(
+      (await page.locator('#cmdbar .cmdpop-retr [data-at="0.5"]').getAttribute('class'))
+        .split(' ')
+        .includes('on'),
       'в окошке подсвечен действующий порог',
     );
     await retr.click(); // повторное нажатие закрывает окошко без приказа
@@ -135,7 +136,7 @@ try {
     assert.equal(await orderOf(), null, '«Выкл» снимает приказ');
     assert.equal(
       await page.evaluate(() =>
-        document.querySelector('#cmdbar [data-cmd="qretr"]').className.includes('on'),
+        document.querySelector('#cmdbar [data-cmd="qretr"]').classList.contains('on'),
       ),
       false,
       'снятый приказ гасит подсветку',

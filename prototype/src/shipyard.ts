@@ -418,7 +418,7 @@ export function loadoutPaneHtml(
     (worlds.length
       ? `<select class="cn-plan" id="cn-planet">${planOpts}</select></div>`
       : `<div class="cn-noplace">${t('yard.no-place')}</div></div>`) +
-    `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(draft.count) })}</button>` +
+    `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(draft.count) })}</button>` +
     `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div></div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
 }

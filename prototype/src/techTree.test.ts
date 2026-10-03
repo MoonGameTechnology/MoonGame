@@ -410,7 +410,7 @@ describe('дерево технологий — разметка', () => {
       Object.entries(td.cost).map(([k, v]) => [k, (v as number) * 2]),
     );
     expect(techTreeHtml(st, 'p1', 'space', null)).toMatch(
-      new RegExp(`tt-take" data-go="${id}">`),
+      new RegExp(`tt-take btn-main" data-go="${id}">`),
     );
     st.players.p1!.resources = {};
     expect(techTreeHtml(st, 'p1', 'space', null)).toContain(`data-go="${id}" disabled`);
