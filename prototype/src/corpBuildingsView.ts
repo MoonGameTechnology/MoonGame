@@ -40,7 +40,7 @@ export function corpBuildingsHtml(
   elapsedMs = 0,
   busy = false,
 ): string {
-  const refresh = `<button class="cbtn2" data-corpact="refresh"${busy ? ' disabled' : ''}>${t('corp.buildings.refresh')}</button>`;
+  const refresh = `<button class="cbtn2 btn-second" data-corpact="refresh"${busy ? ' disabled' : ''}>${t('corp.buildings.refresh')}</button>`;
   if (!view) return `<p class="chint">${t('corp.buildings.unavailable')}</p>${refresh}`;
   const progress = corpConstructionProgress(view, elapsedMs);
   const job = view.construction;
@@ -73,7 +73,7 @@ export function corpBuildingsHtml(
               ? `<p class="chint">${t('corp.buildings.requirement', { n: next.headquarters })}</p>`
               : '')
           : '') +
-        `<button class="cbtn2 wide" data-corpact="build" data-corparg="${esc(b.id)}"${disabled ? ' disabled' : ''}>${!next ? t('corp.buildings.max') : b.level ? t('corp.buildings.upgrade') : t('corp.buildings.build')}</button>` +
+        `<button class="cbtn2 wide btn-main" data-corpact="build" data-corparg="${esc(b.id)}"${disabled ? ' disabled' : ''}>${!next ? t('corp.buildings.max') : b.level ? t('corp.buildings.upgrade') : t('corp.buildings.build')}</button>` +
         (reason && next ? `<p class="chint">${esc(reason)}</p>` : '') +
         `</article>`
       );

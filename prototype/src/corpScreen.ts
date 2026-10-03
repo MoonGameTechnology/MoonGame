@@ -196,9 +196,9 @@ export function medalGalleryHtml(defs: readonly MedalDef[], owned: readonly stri
     })
     .join('');
   return (
-    `<div class="cmg-head"><button class="cbtn2" data-corpback="1">‹ ${t('corp.medals.back')}</button>` +
+    `<div class="cmg-head"><button class="cbtn2 btn-quiet" data-corpback="1">‹ ${t('corp.medals.back')}</button>` +
     `<b>${t('corp.medals.title')}</b>` +
-    `<button class="cbtn2 danger" data-corppick="">${t('corp.medals.clear')}</button></div>` +
+    `<button class="cbtn2 btn-second danger" data-corppick="">${t('corp.medals.clear')}</button></div>` +
     (rows
       ? `<div class="cmg-list">${rows}</div>`
       : `<p class="chint">${t('corp.medals.empty')}</p>`)
@@ -463,14 +463,14 @@ export function initCorp(host: CorpHost): {
           `<div class="crow2"><span class="cnm">${esc(c.name)}</span>` +
           `<span class="cinf">${nfmt(c.influence)} ⟡</span>` +
           `<span class="cpres">${t('corp.members.count', { n: String(c.members) })}</span>` +
-          `<span class="cman"><button class="cbtn2" data-corpact="apply" data-corparg="${esc(c.corpId)}">${t('corp.apply')}</button></span></div>`,
+          `<span class="cman"><button class="cbtn2 btn-second" data-corpact="apply" data-corparg="${esc(c.corpId)}">${t('corp.apply')}</button></span></div>`,
       )
       .join('');
     return (
       `<div class="ccols">` +
       `<section class="ccard"><h4>${t('corp.create.title')}</h4>` +
       `<div class="cinput"><input id="corpnewname" placeholder="${t('corp.create.name-ph')}" maxlength="24">` +
-      `<button class="cbtn2" data-corpact="create">${t('corp.create.go')}</button></div></section>` +
+      `<button class="cbtn2 btn-main" data-corpact="create">${t('corp.create.go')}</button></div></section>` +
       `<section class="ccard"><h4>${t('corp.browse.title')}</h4>` +
       `<div class="ctable">${rows || `<p class="chint">${t('corp.browse.empty')}</p>`}</div></section>` +
       `</div>`
@@ -505,7 +505,7 @@ export function initCorp(host: CorpHost): {
       hqTile(t('corp.card.members'), members === null ? null : String(members)) +
       hqTile(t('corp.card.role'), corpRoleLabel(corpMine.membership.role)) +
       `</div>` +
-      `<button class="cbtn2 wide" data-corpact="buildings">▥ ${t('corp.tab.buildings')}</button>` +
+      `<button class="cbtn2 wide btn-second" data-corpact="buildings">▥ ${t('corp.tab.buildings')}</button>` +
       `<h4>${t('corp.showcase')}</h4>` +
       showcaseHtml(showcase, medalDefs, medalsOwned) +
       `<p class="chint">${t('corp.showcase.hint')}</p>` +
@@ -538,8 +538,8 @@ export function initCorp(host: CorpHost): {
     const mine = corpMine.membership;
     const leave =
       mine.role === 'head'
-        ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('corp.disband')}</button>`
-        : `<button class="cbtn2 wide" data-corpact="leave">${t('corp.leave')}</button>`;
+        ? `<button class="cbtn2 wide btn-second danger" data-corpact="disband">${t('corp.disband')}</button>`
+        : `<button class="cbtn2 wide btn-second" data-corpact="leave">${t('corp.leave')}</button>`;
     return (
       `<section class="ccard"><h4>${t('corp.settings.identity')}</h4>` +
       `<div class="cline"><span>${t('corp.settings.name')}</span><em>${esc(corpMine.corp.name)}</em></div>` +
@@ -564,22 +564,22 @@ export function initCorp(host: CorpHost): {
         let manage = '';
         if (m.role === 'recruit' && canManage(myRole)) {
           manage =
-            `<button class="cbtn2" data-corpact="accept" data-corparg="${esc(m.accountId)}">✓ ${t('corp.request.accept')}</button>` +
-            `<button class="cbtn2 danger" data-corpact="decline" data-corparg="${esc(m.accountId)}">✖ ${t('corp.request.reject')}</button>`;
+            `<button class="cbtn2 btn-second" data-corpact="accept" data-corparg="${esc(m.accountId)}">✓ ${t('corp.request.accept')}</button>` +
+            `<button class="cbtn2 btn-second danger" data-corpact="decline" data-corparg="${esc(m.accountId)}">✖ ${t('corp.request.reject')}</button>`;
         } else if (!isMe && m.role !== 'head') {
           const bits: string[] = [];
           if (myRole === 'head') {
             const toRole = m.role === 'officer' ? 'member' : 'officer';
             bits.push(
-              `<button class="cbtn2" data-corpact="role" data-corparg="${esc(m.accountId)}" data-corprole="${toRole}">↑ ${corpRoleLabel(toRole)}</button>`,
+              `<button class="cbtn2 btn-second" data-corpact="role" data-corparg="${esc(m.accountId)}" data-corprole="${toRole}">↑ ${corpRoleLabel(toRole)}</button>`,
             );
             bits.push(
-              `<button class="cbtn2" data-corpact="transfer" data-corparg="${esc(m.accountId)}">⬆ ${t('corp.transfer-lead')}</button>`,
+              `<button class="cbtn2 btn-second" data-corpact="transfer" data-corparg="${esc(m.accountId)}">⬆ ${t('corp.transfer-lead')}</button>`,
             );
           }
           if (canManage(myRole) && !(myRole === 'officer' && m.role === 'officer')) {
             bits.push(
-              `<button class="cbtn2 danger" data-corpact="kick" data-corparg="${esc(m.accountId)}">✖</button>`,
+              `<button class="cbtn2 btn-second danger" data-corpact="kick" data-corparg="${esc(m.accountId)}">✖</button>`,
             );
           }
           manage = bits.join('');
@@ -609,12 +609,12 @@ export function initCorp(host: CorpHost): {
       `<div class="cbig">` +
       `<div><span>${t('corp.ready.corp')}</span><b>${corpReady ? t('corp.ready.yes') : t('corp.ready.no')}</b>` +
       (iAmHead
-        ? `<button class="cbtn2" data-corpact="${corpReady ? 'ready-corp-clear' : 'ready-corp'}">${corpReady ? t('corp.ready.clear') : t('corp.ready.to-pool')}</button>`
+        ? `<button class="cbtn2 btn-second" data-corpact="${corpReady ? 'ready-corp-clear' : 'ready-corp'}">${corpReady ? t('corp.ready.clear') : t('corp.ready.to-pool')}</button>`
         : `<span class="chint">${t('corp.ready.lead-only')}</span>`) +
       `</div>` +
       `<div><span>${t('corp.ready.mine')}</span><b>${playerReadyOptimistic ? t('corp.ready.yes') : t('—')}</b>` +
       (iCanFlag
-        ? `<button class="cbtn2" data-corpact="${playerReadyOptimistic ? 'ready-player-clear' : 'ready-player'}">${playerReadyOptimistic ? t('corp.ready.clear') : t('corp.ready.set')}</button>`
+        ? `<button class="cbtn2 btn-second" data-corpact="${playerReadyOptimistic ? 'ready-player-clear' : 'ready-player'}">${playerReadyOptimistic ? t('corp.ready.clear') : t('corp.ready.set')}</button>`
         : '') +
       `</div></div>`;
 
@@ -633,13 +633,13 @@ export function initCorp(host: CorpHost): {
         };
         const canRespond = w.status === 'pending' && !iAmChallenger && iAmHead;
         const act = canRespond
-          ? `<button class="cbtn2" data-corpact="ava-accept" data-corparg="${esc(w.id)}">${t('corp.war.accept')}</button>` +
-            `<button class="cbtn2 danger" data-corpact="ava-decline" data-corparg="${esc(w.id)}">${t('corp.war.decline')}</button>`
+          ? `<button class="cbtn2 btn-second" data-corpact="ava-accept" data-corparg="${esc(w.id)}">${t('corp.war.accept')}</button>` +
+            `<button class="cbtn2 btn-second danger" data-corpact="ava-decline" data-corparg="${esc(w.id)}">${t('corp.war.decline')}</button>`
           : w.status === 'accepted' &&
               corpMine.membership &&
               corpMine.membership.role !== 'recruit' &&
               !avaRoster?.mine.some((r) => r.accountId === corpMine.membership!.accountId)
-            ? `<button class="cbtn2" data-corpact="ava-join" data-corparg="${esc(w.id)}">${t('corp.war.join-roster')}</button>`
+            ? `<button class="cbtn2 btn-second" data-corpact="ava-join" data-corparg="${esc(w.id)}">${t('corp.war.join-roster')}</button>`
             : '';
         const rosterOpen = w.status === 'accepted' && avaRoster && avaRoster.matchupId === w.id;
         const rosterLine = rosterOpen
@@ -657,7 +657,7 @@ export function initCorp(host: CorpHost): {
                     corpDetail?.members.find((m) => m.accountId === accountId)?.login ?? accountId;
                   const on = avaRoster!.mine.some((r) => r.accountId === accountId);
                   return (
-                    `<button class="cbtn2 ctoggle${on ? ' on' : ''}" data-corpact="ava-roster-toggle" ` +
+                    `<button class="cbtn2 btn-second ctoggle${on ? ' on' : ''}" data-corpact="ava-roster-toggle" ` +
                     `data-corparg="${esc(w.id)}" data-corpaccount="${esc(accountId)}">${on ? '✓' : '·'} ${esc(login)}</button>`
                   );
                 })
@@ -678,7 +678,7 @@ export function initCorp(host: CorpHost): {
         (p) =>
           `<div class="crow2"><span class="cnm">${esc(p.name)}</span><span class="cinf">${nfmt(p.influence)} ⟡</span>` +
           (iAmHead
-            ? `<span class="cman"><button class="cbtn2" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('corp.war.challenge')}</button></span>`
+            ? `<span class="cman"><button class="cbtn2 btn-second" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('corp.war.challenge')}</button></span>`
             : '') +
           `</div>`,
       )
