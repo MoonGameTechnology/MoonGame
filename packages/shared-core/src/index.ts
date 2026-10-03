@@ -635,6 +635,7 @@ export { promotionModule } from './modules/promotion';
 export { armyModule } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { autoRallyModule } from './modules/autoRally';
+export { autoMergeModule } from './modules/autoMerge';
 export { shuttleModule } from './modules/shuttle';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
 export { standingOrdersModule } from './modules/standingOrders';

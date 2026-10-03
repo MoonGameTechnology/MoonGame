@@ -35,13 +35,21 @@ afterEach(() => {
   setMatchTravelSpeed(1);
 });
 
+/** Довести флот до узла. Долетевший туда, где стоит свой флот, вливается в него
+ *  (`autoMerge`) — тогда следим за тем, в кого он влился. */
 function flyTo(s: GameState, fleetId: string, to: string, maxHours = 24): GameState {
   const sent = order(s, moveFleet('p1', fleetId, to), s.time);
   expect(sent.error).toBeUndefined();
   let cur = sent.state;
+  let id = fleetId;
   for (let q = 1; q <= maxHours * 4; q++) {
-    cur = advance(cur, s.time + (q * HOUR) / 4).state;
-    const f = cur.fleets[fleetId];
+    const step = advance(cur, s.time + (q * HOUR) / 4);
+    cur = step.state;
+    for (const e of step.events) {
+      const m = e.payload as { from?: string; into?: string };
+      if (e.type === 'fleet.merged' && m.from === id && m.into) id = m.into;
+    }
+    const f = cur.fleets[id];
     if (cur.match.status === 'ended' || (f && f.location === to && !f.movement)) return cur;
   }
   throw new Error(`${fleetId} не долетел до ${to}`);

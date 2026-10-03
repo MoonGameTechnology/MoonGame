@@ -21,7 +21,9 @@ const scientists = (s: GameState) => Object.values(s.heroes ?? {}).filter((h) =>
 /** The same context under the chapter's PvE mode: waves, the tally and `pve.abandon` live there. */
 const pveCtx = (now: number) => ({ ...ctx(now), config: { ...ctx(now).config, modeId: pveModeId() } });
 
-/** Follow the real movement scheduler, including intermediate road segments. */
+/** Follow the real movement scheduler, including intermediate road segments. A fleet that
+ *  lands where an own fleet stands merges into it on arrival (`autoMerge`), so the check
+ *  follows the fleet into the one it joined. */
 function fly(s: GameState, fleetId: string, to: string, at = ctx): GameState {
   const moved = kernel.applyAction(s, {
     id: `move:${s.time}:${fleetId}`, type: 'fleet.move', playerId: s.fleets[fleetId]!.owner,
@@ -29,15 +31,20 @@ function fly(s: GameState, fleetId: string, to: string, at = ctx): GameState {
   }, at(s.time));
   if (!moved.ok) throw new Error(moved.code);
   let next = moved.state;
-  for (let i = 0; i < 100 && next.fleets[fleetId]?.movement; i++) {
+  let id = fleetId;
+  for (let i = 0; i < 100 && next.fleets[id]?.movement; i++) {
     const when = next.scheduled.filter((e) => e.type === 'fleet.arrival').map((e) => e.at).sort((a, b) => a - b)[0];
     expect(when).toBeDefined();
     const step = kernel.advanceTo(next, at(when!));
     if (!step.ok) throw new Error(step.code);
     expect(step.failures).toEqual([]);
     next = step.state;
+    for (const e of step.events) {
+      const m = e.payload as { from?: string; into?: string };
+      if (e.type === 'fleet.merged' && m.from === id && m.into) id = m.into;
+    }
   }
-  expect(next.fleets[fleetId]?.location).toBe(to);
+  expect(next.fleets[id]?.location).toBe(to);
   return next;
 }
 
@@ -80,8 +87,12 @@ describe('Chapter I: rescue the scientist on arrival', () => {
     expect(scientists(s)).toHaveLength(1);
     expect(hero).toMatchObject({ owner: 'p1', alive: true, location: station, abilities: ['scan'], passives: ['field_lab', 'ballistic_model'] });
     expect(hero!.equipped).toEqual(['scan', 'ballistic_model']);
-    expect(Object.keys(s.fleets)).toHaveLength(Object.keys(before.fleets).length + 1);
-    expect(s.fleets[hero!.fleetId!]).toMatchObject({ owner: 'p1', location: station, units: [{ unit: data.heroes.scientist!.ship.unit, count: 1 }] });
+    // The rescued ship is born at the station, and the fleet that brought the rescue
+    // joins it there (`autoMerge`): one fleet with the scientist's ship aboard.
+    expect(Object.keys(s.fleets)).toHaveLength(Object.keys(before.fleets).length);
+    expect(s.fleets.p1_1).toBeUndefined();
+    expect(s.fleets[hero!.fleetId!]).toMatchObject({ owner: 'p1', location: station });
+    expect(s.fleets[hero!.fleetId!]!.units).toContainEqual(expect.objectContaining({ unit: data.heroes.scientist!.ship.unit, count: 1 }));
     const view = visibleState(s, 'p1', data);
     expect(objectiveProgress(objective(), view, 'p1').complete).toBe(true);
     expect(visibleState(s, 'p3', data).missionFacts?.recruited?.p1).toBeUndefined();
@@ -102,7 +113,7 @@ describe('Chapter I: rescue the scientist on arrival', () => {
     let s = fly(start(), 'p1_1', station);
     const heroId = scientists(s)[0]!.id;
     s = JSON.parse(JSON.stringify(s));
-    s = fly(s, 'p1_1', 'home_a');
+    s = fly(s, scientists(s)[0]!.fleetId!, 'home_a'); // p1_1 joined the scientist's ship
     s = fly(s, 'p1_2', station);
     expect(scientists(s).map((h) => h.id)).toEqual([heroId]);
     expect(s.missionFacts?.recruited?.p1).toEqual([station]);

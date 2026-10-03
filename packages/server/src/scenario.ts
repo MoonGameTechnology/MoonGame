@@ -9,6 +9,7 @@ import {
   minefieldModule,
   rendezvousModule,
   extractionModule,
+  autoMergeModule,
   captureOnArrivalModule,
 
   combatModule,
@@ -217,6 +218,10 @@ export const DEV_MODULES: GameModule[] = [
   // Накопитель архива главы IV (PVR-7.3): своё действие и свои поводы (`time.advanced`,
   // прибытие, слияние, гибель флота, `ally.contact`), хуков нет. В КОНЕЦ по той же причине.
   extractionModule,
+  // Автослияние на прибытии (заказ владельца 2026-10-03): долетевший флот вливается в свой,
+  // стоящий в узле. В САМЫЙ КОНЕЦ: прибытие сначала слышат все (бой, захват, мины, союзник,
+  // архив), и только потом флот исчезает в стоявшем.
+  autoMergeModule,
 ];
 
 /** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
@@ -231,7 +236,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '65'; // ATK-3. Членство и порядок не тронуты;
+export const MODULE_MANIFEST_VERSION = '66'; // Автослияние на прибытии. В ЧЛЕНСТВО вошёл
+// `auto-merge` 1.0.0 в самый конец: долетевший флот вливается в свой, стоящий в узле.
+// Партия на 65 молча сменила бы состав флотов посреди игры.
+// export const MODULE_MANIFEST_VERSION = '65'; // ATK-3. Членство и порядок не тронуты;
 // `combat` 3.6.0 даёт возможность `battle.pullIn`, и `fleet-ops` 1.8.0 втягивает ею в бой
 // «Атаки» ждавших у мира, а «Атакой» по дерущейся цели вступает в её бой. Партия на 64
 // молча сменила бы состав боёв «Атаки» посреди игры.
