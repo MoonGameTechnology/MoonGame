@@ -884,6 +884,29 @@ body.mobile-ui #battlewinbody .bw-orders {
     /* от внутреннего края рамки в 1 px: 32 − 2 + 2 × 7 = 44 */
     inset: -7px;
   }
+  /* Вход и обозреватель партий, вкладки рейтинга хаба, справочник (его открывают и с хаба). */
+  #connect :is(.clang, .cback, .clink, .mtab, .mfbtn, .mbtn),
+  #connect :is(.cfield input, .cfield select, .cwlogin input),
+  .rk-tab,
+  .cx-lv,
+  .cx-close {
+    min-height: 44px;
+  }
+  #connect .mfbtn {
+    min-width: 44px;
+  }
+  #connect .mfrange {
+    height: 44px;
+  }
+  #connect :is(.mtabs, .mfseg, .mbtns),
+  .rk-tabs,
+  .cx-lvls {
+    gap: 8px;
+  }
+}
+/* Итог партии бывает только в партии. */
+body.mobile-ui #endscreen .es-btn {
+  min-height: 44px;
 }
 /* Уже 361 px четыре вкладки настроек с промежутком 8 px в окно не входят: там 4 px. */
 @media (pointer: coarse) and (min-width: 361px) {

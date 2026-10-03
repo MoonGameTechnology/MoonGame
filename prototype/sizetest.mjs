@@ -4,8 +4,9 @@
  * UIX-1.1 — сторож размеров в настоящем браузере: мелкий текст, мелкие цели нажатия и
  * содержимое шире окна на ключевых экранах.
  *
- * Прогон открывает хаб, карту партии, выбранный флот, производство, науку, бой и настройки на
- * телефоне 390×844 и на ПК 1366×768, 1920×1080 и 2560×1440 и считает на каждом экране:
+ * Прогон открывает вход, регистрацию, обозреватель партий, хаб, рейтинг, карту партии,
+ * выбранный флот, производство, науку, бой, настройки, справочник и итог партии на телефоне
+ * 390×844 и на ПК 1366×768, 1920×1080 и 2560×1440 и считает на каждом экране:
  *
  * - **текст мельче 12 px** — элемент со своим текстом, у которого `font-size × currentCSSZoom`
  *   меньше 12 (голографический ПК растёт зумом, UIX-2.1, и размер без зума врал бы);
@@ -63,7 +64,41 @@ const hooks = `window.__sizeTest = {
     return s.fleets[mine.id]?.battleId ?? null;
   },
   openBattle: (id) => battleWindow.open(id),
+  // Шаги входа и обозреватель партий — без сервера: список партий подставляется готовым.
+  stage: (st) => showStage(st),
+  browse: (lists) => {
+    showStage('browse');
+    statusEl.textContent = '';
+    matchLists = lists;
+    activeTab = 'available';
+    renderMatches();
+  },
+  hubTab: (tab) => hubTab(tab),
+  openCodex: (key) => openCodex(key),
+  // Итог партии — сразу, без игры до победы: окно рисуется из той же записи итога.
+  showEnd: () => {
+    endScreen = { won: true, draw: false, why: '', xp: 40, levelUp: null };
+    endScreenPanel.render();
+  },
 };`;
+/** Строка обозревателя: одна открытая партия, чтобы на экране была и кнопка «Войти». */
+const LISTS = {
+  available: [
+    {
+      matchId: 'm-size',
+      mapId: 'nexus',
+      rules: { timeScale: 1, victory: { scoreLimit: 500 } },
+      days: 3,
+      players: { seated: 4, capacity: 8 },
+      status: 'running',
+      entryOpen: true,
+      entryClosesInMs: 30 * 3600000,
+      kind: 'pvp',
+    },
+  ],
+  active: [],
+  archived: [],
+};
 
 /** Счёт экрана — в браузере. `phone` включает счёт целей нажатия. */
 function measure({ phone, windows }) {
@@ -205,7 +240,7 @@ try {
         const layers = await page.evaluate(() => window.__sizeTest?.layers() ?? []);
         const m = await page.evaluate(measure, {
           phone: view.phone,
-          windows: [...layers, 'side', 'holo-selection-window', 'hub'],
+          windows: [...layers, 'side', 'holo-selection-window', 'hub', 'connect', 'endscreen'],
         });
         screens[name] = m.counts;
         if (MATCH.has(name)) matchSizes.push(...m.sizes);
@@ -229,10 +264,21 @@ try {
 
       await page.goto(site.url);
       await waitForApp(page);
+      await page.waitForTimeout(300);
+      await shot('welcome');
+      await page.evaluate(() => window.__sizeTest.stage('register'));
+      await shot('register');
+      await page.evaluate((lists) => window.__sizeTest.browse(lists), LISTS);
+      await shot('browse');
+      await page.evaluate(() => window.__sizeTest.stage('welcome'));
+
       await press('#cnew');
       await page.locator('#hub-solo').waitFor({ state: 'visible' });
       await page.waitForTimeout(300);
       await shot('hub');
+      await page.evaluate(() => window.__sizeTest.hubTab('rank'));
+      await shot('rank');
+      await page.evaluate(() => window.__sizeTest.hubTab('home'));
 
       await enterSkirmish(page, { tap: view.phone, fromWelcome: false });
       await page.locator('#maploading').waitFor({ state: 'hidden' });
@@ -266,6 +312,15 @@ try {
       await open('#phone-more [data-phone-more="settings"]', '#rail-settings');
       await shot('settings');
       await back();
+
+      await page.evaluate(() => window.__sizeTest.openCodex('b:mine'));
+      await page.waitForTimeout(350);
+      await shot('codex');
+      await back();
+
+      await page.evaluate(() => window.__sizeTest.showEnd());
+      await page.waitForTimeout(350);
+      await shot('end');
     });
     await page.close();
     const mid = median(matchSizes);
