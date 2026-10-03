@@ -3758,24 +3758,24 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
   <div id="railtools">
     <!-- Досье Роя — там, где на телефоне у панели нет места в строке статуса (заказ владельца
          2026-09-24); показывается в PvE-партии, пока досье не приколото справа -->
-    <button id="rail-dossier" type="button" data-i18n-title="swarm.intel.title" style="display:none">☣<span class="rlbl" data-i18n="swarm.intel.title"></span></button>
-    <button id="rail-diplo" data-i18n-title="rail.diplo.title">⬡<span class="rlbl" data-i18n="rail.diplo.label"></span></button>
-    <button id="rail-msgs" data-i18n-title="rail.msgs.title">✉<span class="rlbl" data-i18n="rail.msgs.label"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
+    <button id="rail-dossier" type="button" style="display:none">☣<span class="rlbl" data-i18n="swarm.intel.title"></span></button>
+    <button id="rail-diplo">⬡<span class="rlbl" data-i18n="rail.diplo.title"></span></button>
+    <button id="rail-msgs">✉<span class="rlbl" data-i18n="rail.msgs.title"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
     <button id="rail-pings" data-i18n-title="rail.pings.title">📍<span class="rlbl" data-i18n="rail.pings.label"></span></button>
     <button id="rail-tech" data-i18n-title="rail.tech.title">⚛<span class="rlbl" data-i18n="rail.tech.label"></span></button>
     <button id="rail-constructor" data-i18n-title="rail.constructor.title">⚒<span class="rlbl" data-i18n="rail.constructor.label"></span></button>
-    <button id="rail-steward" data-i18n-title="rail.steward.title">😴<span class="rlbl" data-i18n="rail.steward.label"></span></button>
-    <button id="rail-market" data-i18n-title="rail.market.title">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
+    <button id="rail-steward" data-i18n-title="rail.steward.title">😴<span class="rlbl" data-i18n="steward.name"></span></button>
+    <button id="rail-market">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
     <!-- Торговец экспедиции («живой курс»): только в забеге с торговцем, видимость — кадр main.ts -->
     <button id="rail-trader" type="button" data-i18n-title="rail.trader.title" style="display:none">⚖<span class="rlbl" data-i18n="rail.trader.label"></span></button>
-    <button id="railcorp" data-i18n-title="rail.corp.title">⬢<span class="rlbl" data-i18n="rail.corp.label"></span></button>
-    <button id="rail-chat" data-i18n-title="rail.chat.title" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
-    <button id="rail-log" data-i18n-title="rail.log.title">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
-    <button id="rail-help" data-i18n-title="rail.help.title">?<span class="rlbl" data-i18n="rail.help.label"></span></button>
-    <button id="rail-settings" data-i18n-title="rail.settings.title">⚙<span class="rlbl" data-i18n="rail.settings.label"></span></button>
+    <button id="railcorp">⬢<span class="rlbl" data-i18n="rail.corp.title"></span></button>
+    <button id="rail-chat" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
+    <button id="rail-log">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
+    <button id="rail-help">?<span class="rlbl" data-i18n="rail.help.title"></span></button>
+    <button id="rail-settings">⚙<span class="rlbl" data-i18n="rail.settings.label"></span></button>
     <!-- «Завершить экспедицию» (PVR-6.29): только пока идёт забег, видимость — кадр main.ts -->
-    <button id="rail-abandon" type="button" data-i18n-title="rail.abandon.title" style="display:none">⚑<span class="rlbl" data-i18n="rail.abandon.label"></span></button>
-    <button id="rail-exit" data-i18n-title="rail.exit.title">⌂<span class="rlbl" data-i18n="rail.exit.label"></span></button>
+    <button id="rail-abandon" type="button" style="display:none">⚑<span class="rlbl" data-i18n="rail.abandon.title"></span></button>
+    <button id="rail-exit" data-i18n-title="rail.exit.title">⌂<span class="rlbl" data-i18n="speed.exit"></span></button>
   </div>
   <button id="railtoggle" data-i18n-title="rail.toggle.title" type="button" aria-expanded="false"><span id="railglyph">☰</span><span class="holo-more" data-i18n="hud.tools"></span><span class="badge" id="railalert" style="display:none">0</span></button>
 </nav>
