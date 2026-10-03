@@ -202,7 +202,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
     : fleet
       ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
-      : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
+      : `<button class="hx-btn btn-main" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
   const bonuses = activePassivesOf(hero)
     .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
     .join('');
@@ -455,7 +455,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
         `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(pd.name))}</span>` +
           `<div class="hx-note">${esc(t(pd.description ?? ''))}</div></div>` +
           `<div class="hx-bayact"><span class="hx-badge on">${t('hero.stat.active')}</span>` +
-          `<button class="hx-btn ghost" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+          `<button class="hx-btn btn-quiet" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
           `</div></div>`,
       );
       continue;
@@ -466,13 +466,13 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
       cdLeft > 0
         ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
         : HERO_CASTABLE.has(ad.type)
-          ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
+          ? `<button class="hx-btn btn-second" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
     bays.push(
       `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(ad.name))}</span>` +
         `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>` +
         `<div class="hx-bayact">${cast}` +
-        `<button class="hx-btn ghost" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+        `<button class="hx-btn btn-quiet" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
         `</div></div>`,
     );
   }
@@ -488,7 +488,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
     if (pd) {
       const action =
         free > 0
-          ? `<button class="hx-btn" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
+          ? `<button class="hx-btn btn-second" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
           : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
       poolHtml +=
         `<div class="hx-row${free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
@@ -502,7 +502,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
     const action = perk
       ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
       : free > 0
-        ? `<button class="hx-btn" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
+        ? `<button class="hx-btn btn-second" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
         : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
     poolHtml +=
       `<div class="hx-row${perk || free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
@@ -566,7 +566,7 @@ function heroShipHtml(hero: HeroInst): string {
     const md = data.modules[mid]!;
     const off = deployed
       ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
-      : `<button class="hx-btn ghost" data-huninstall="${hero.id}" data-mod="${mid}">${t('hero.slot.remove')}</button>`;
+      : `<button class="hx-btn btn-quiet" data-huninstall="${hero.id}" data-mod="${mid}">${t('hero.slot.remove')}</button>`;
     rows.push(
       `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(md.name))}</span>` +
         `<div class="hx-note">${esc(moduleLine(mid))}</div></div>` +
@@ -589,7 +589,7 @@ function heroShipHtml(hero: HeroInst): string {
       : deployed
         ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
         : fits
-          ? `<button class="hx-btn" data-hinstall="${hero.id}" data-mod="${mid}">${t('hero.slot.equip')}</button>`
+          ? `<button class="hx-btn btn-second" data-hinstall="${hero.id}" data-mod="${mid}">${t('hero.slot.equip')}</button>`
           : `<span class="hx-badge">${t('hero.ship.no-bay')}</span>`;
     poolHtml +=
       `<div class="hx-row${fits && !deployed ? '' : ' dim'}"><div class="hx-grow">` +
@@ -699,7 +699,7 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
       ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
       : !branchOk
         ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, res)}</button>`;
+        : `<button class="hx-dbtn btn-main" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, res)}</button>`;
     return (
       `<div class="hx-dossier">` +
       `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(tData(nd.name))}</span>${close}</div>` +

@@ -73,10 +73,10 @@ export function marketBoxHtml(
     const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
     let btn: string;
     if (mine) {
-      btn = `<button class="mk-btn cancel" data-mkcancel="${l.id}">${t('market.cancel')}</button>`;
+      btn = `<button class="mk-btn btn-second danger" data-mkcancel="${l.id}">${t('market.cancel')}</button>`;
     } else {
       const can = l.side === 'sell' ? (res.credits ?? 0) >= l.price : (res[l.resource] ?? 0) >= 1;
-      btn = `<button class="mk-btn" data-mktake="${l.id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('market.buy') : t('market.sell')}</button>`;
+      btn = `<button class="mk-btn btn-second" data-mktake="${l.id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('market.buy') : t('market.sell')}</button>`;
     }
     return `<div class="mk-row ${bid ? 'buy' : ''}">${qp}${who}${btn}</div>`;
   };
@@ -91,7 +91,7 @@ export function marketBoxHtml(
     `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
     `<label class="mk-lbl" for="mk-amt">${t('market.qty')}</label><input class="mk-in" id="mk-amt" type="number" inputmode="numeric" min="1" value="10">` +
     `<label class="mk-lbl" for="mk-price">${t('market.price')}</label><input class="mk-in" id="mk-price" type="number" inputmode="decimal" min="0" value="3">` +
-    `<button class="mk-go" data-mkgo>${t('market.place')}</button></div>` +
+    `<button class="mk-go btn-main" data-mkgo>${t('market.place')}</button></div>` +
     `<div class="mk-lbl" id="mk-net"></div>`;
   const askList = asks.length
     ? asks.map((l) => lotRow(l, false)).join('')

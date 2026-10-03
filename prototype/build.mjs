@@ -1521,8 +1521,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #herobody .hx-grow{flex:1;min-width:0;}
 #herobody .hx-an{color:var(--cyan);font-weight:600;}
 #herobody .hx-note{font-size:var(--fs-caption);color:var(--dim);line-height:1.45;}
-#herobody .hx-btn{padding:5px 10px;border-radius:7px;border:1px solid var(--cyan);background:rgba(53,214,230,.10);color:var(--cyan);cursor:pointer;font:inherit;font-size:var(--fs-caption);white-space:nowrap;}
-#herobody .hx-btn:disabled{opacity:.4;cursor:not-allowed;}
+#herobody .hx-btn{padding:5px 10px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
 #herobody .hx-badge{font-size:var(--fs-caption);border:1px solid var(--line-hi);border-radius:5px;padding:2px 6px;color:var(--dim);white-space:nowrap;}
 #herobody .hx-badge.on{border-color:#7df0d0;color:#9ff0da;}
 #herobody .hx-badge.cd{border-color:#e2a15a;color:#e2a15a;}
@@ -1622,8 +1621,6 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #herobody .hx-bay.on{border-color:var(--cyan-dim);background:rgba(53,214,230,.05);}
 #herobody .hx-bay.off{justify-content:center;border-style:dashed;color:var(--dim);font-size:var(--fs-caption);}
 #herobody .hx-bayact{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-/* «Снять» — тихая кнопка: убрать скилл не должно выглядеть так же зазывно, как применить его. */
-#herobody .hx-btn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
 /* Не влезающее ПОКАЗЫВАЕТСЯ погашенным, а не прячется: экран не должен врать о том, чем игрок владеет. */
 #herobody .hx-row.dim{opacity:.55;}
 #herobody .hx-dossier{margin-top:12px;border:1px solid var(--cyan);border-radius:10px;padding:12px;background:var(--glass);}
@@ -1640,9 +1637,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #herobody .hx-no{color:#e2a15a;}
 #herobody .hx-warn{display:flex;align-items:center;gap:6px;margin:10px 0 0;font-size:var(--fs-caption);color:#ff5a4d;}
 #herobody .hx-warn:before{content:"⚠";}
-#herobody .hx-dbtn{display:block;width:100%;margin-top:10px;padding:10px;border-radius:7px;border:0;background:var(--cyan);color:#042026;font:inherit;font-weight:700;font-size:var(--fs-body);cursor:pointer;}
-#herobody .hx-dbtn.danger{background:transparent;border:1px solid #ff5a4d;color:#ff5a4d;}
-#herobody .hx-dbtn:disabled{opacity:.4;cursor:not-allowed;}
+#herobody .hx-dbtn{display:block;width:100%;margin-top:10px;padding:10px;border-radius:7px;font-size:var(--fs-body);}
 /* Steward («Хранитель») delegate panel */
 /* Окно боя «для взрослых детей» (заказ владельца 2026-09-23): где бой и в какой он фазе
    (в шапке окна: отдельная карточка под это съедала высоту, 2026-09-28), полоса остатка
@@ -2138,9 +2133,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .mk-in{width:64px;padding:6px 7px;border:1px solid var(--line-hi);border-radius:6px;background:rgba(0,0,0,.25);
   color:var(--ink);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
 .mk-lbl{font-size:var(--fs-caption);color:var(--dim);}
-.mk-go{margin-left:auto;padding:7px 12px;border-radius:7px;border:1px solid var(--cyan);background:rgba(53,214,230,.14);
-  color:var(--cyan);font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.mk-go:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
+.mk-go{margin-left:auto;padding:7px 12px;border-radius:7px;font-size:var(--fs-caption);}
 .mk-sec{margin:12px 0 6px;font-size:var(--fs-caption);color:var(--dim);}
 .mk-sec.buy{color:var(--amber);}
 .mk-row{display:flex;align-items:center;gap:9px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--line-hi);
@@ -2149,10 +2142,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .mk-row .mk-qp b{color:var(--cyan);}
 .mk-row.buy .mk-qp b{color:var(--amber);}
 .mk-row .mk-who{flex:1;min-width:0;font-size:var(--fs-caption);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.mk-btn{flex:none;padding:6px 11px;border-radius:7px;border:1px solid var(--cyan);background:rgba(53,214,230,.14);
-  color:var(--cyan);font:var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap;}
-.mk-btn.cancel{border-color:var(--line-hi);color:var(--dim);background:transparent;}
-.mk-btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
+.mk-btn{flex:none;padding:6px 11px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
 .mk-empty{padding:10px 2px;font-size:var(--fs-caption);color:var(--dim);opacity:.8;}
 
 /* === CONSTRUCTOR («Производство») — unified order screen; two-column designer === */
@@ -3433,10 +3423,7 @@ ${profileCss}
 #corp .cthreat.t-low{color:var(--grn);}
 #corp .cthreat.t-med{color:var(--amber);}
 #corp .cthreat.t-high{color:var(--red);border-color:var(--red);}
-#corp .cbtn2{padding:7px 11px;border-radius:7px;border:1px solid var(--cyan);background:rgba(53,214,230,.1);
-  color:var(--cyan);font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-#corp .cbtn2:active{background:rgba(53,214,230,.24);}
-#corp .cbtn2.danger{border-color:var(--red);color:var(--red);background:rgba(255,90,77,.08);}
+#corp .cbtn2{padding:7px 11px;border-radius:7px;font-size:var(--fs-caption);}
 #corp .cbtn2.wide{width:100%;margin-top:12px;}
 #corp .cbig{display:flex;gap:14px;margin-bottom:14px;}
 #corp .cbig>div{flex:1;border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
@@ -3453,8 +3440,6 @@ ${profileCss}
 #corp .cst.st-incoming{color:var(--amber);border-color:var(--amber);}
 #corp .cwmid{color:var(--dim);font-size:var(--fs-caption);margin:6px 0 9px;}
 #corp .cwroster{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 9px;}
-#corp .ctoggle{opacity:.55;}
-#corp .ctoggle.on{opacity:1;background:rgba(53,214,230,.24);}
 #corp .cchat{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
 #corp .cmsg{border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:var(--fs-body);}
 #corp .cmsg.audit{border-style:dashed;color:var(--dim);}

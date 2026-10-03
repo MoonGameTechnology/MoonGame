@@ -2,7 +2,8 @@
 // остальные действия, тихая — переход и пояснение. Вид кнопка берёт классом `.btn-main`,
 // `.btn-second`, `.btn-quiet` (лист `build.mjs`), а правило экрана задаёт ей только размер и
 // место. Сторож держит обе половины на переведённых экранах — карточке флота (телефон и ПК),
-// производстве и науке (UIX-11.1), карточке мира, разделении флота и окне боя (UIX-11.2):
+// производстве и науке (UIX-11.1), карточке мира, разделении флота, окне боя, рынке, штабе
+// героев и корпорации (UIX-11.2):
 // разметка ставит класс, а лист не красит кнопку поверх него. Правило с id в селекторе
 // перебило бы класс, и кнопка тихо вернулась бы к своему цвету.
 import { readFileSync } from 'node:fs';
@@ -77,7 +78,12 @@ function subject(part: string): string {
 function converted(part: string): boolean {
   const s = subject(part);
   if (s.includes('holo-command-close')) return false;
-  if (/^\.(tt-take|tt-mbtn|bw-take|cn-build|bw-open)\b/.test(s)) return true;
+  if (
+    /^\.(tt-take|tt-mbtn|bw-take|cn-build|bw-open|mk-go|mk-btn|hx-btn|hx-dbtn|cbtn2|ctoggle)\b/.test(
+      s,
+    )
+  )
+    return true;
   if (/^button\.b(?![-\w])/.test(s)) return true;
   if (part.includes('#splitdlg') && /^(button|\.cbtn)\b/.test(s)) return true;
   if (/#battlewinbody (\.bw-(actions|orders) )?button\b/.test(part) || s.includes('bw-attack'))
@@ -266,6 +272,25 @@ describe('три стиля кнопок (UIX-11.1)', () => {
     expect(html).toMatch(/class="b btn-second" data-battle-retreat-all/);
     expect(html).toMatch(/class="b bw-attack btn-second" data-battle-attack=/);
     expect(html).toMatch(/class="b btn-second" data-battle-retreat=/);
+  });
+
+  it('рынок, штаб героев, корпорация: у каждой кнопки действия — стиль, главная — одна на форму', () => {
+    const src = ['marketScreen.ts', 'heroStaff.ts', 'corpScreen.ts', 'corpBuildingsView.ts']
+      .map((f) => read(`./${f}`))
+      .join('\n');
+    const tags = [
+      ...src.matchAll(/<button class="(mk-go|mk-btn|hx-btn|hx-dbtn|cbtn2)[^"]*"[^>]*/g),
+    ].map((m) => m[0]);
+    expect(tags.length).toBeGreaterThanOrEqual(30);
+    expect(tags.filter((tag) => !STYLES.some((c) => tag.includes(c)))).toEqual([]);
+    const main = tags
+      .filter((tag) => tag.includes('btn-main'))
+      .map((tag) => /data-(\w+)/.exec(tag)?.[1]);
+    expect(main).toEqual(['mkgo', 'hspawn', 'hskill', 'corpact', 'corpact']);
+    expect(src).toContain('class="cbtn2 btn-main" data-corpact="create"');
+    expect(src).toContain('class="cbtn2 wide btn-main" data-corpact="build"');
+    expect(src).toMatch(/class="hx-btn btn-quiet" data-hunequip=/);
+    expect(src).toContain('class="mk-btn btn-second danger" data-mkcancel=');
   });
 
   it('выбранная вкладка науки и построек — токенами, без мятной заливки', () => {
