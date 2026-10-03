@@ -1,81 +1,81 @@
 {
   "phone-390x844": {
     "hub": {
-      "text": 2,
+      "text": 0,
       "tap": 6,
       "wide": 0
     },
     "map": {
-      "text": 5,
+      "text": 0,
       "tap": 4,
       "wide": 0
     },
     "fleet": {
-      "text": 9,
+      "text": 0,
       "tap": 4,
       "wide": 0
     },
     "production": {
-      "text": 10,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "science": {
-      "text": 17,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "battle": {
-      "text": 21,
+      "text": 0,
       "tap": 4,
       "wide": 0
     },
     "settings": {
-      "text": 2,
+      "text": 0,
       "tap": 6,
       "wide": 0
     }
   },
   "pc-1366x768": {
     "hub": {
-      "text": 3,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "map": {
-      "text": 10,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "fleet": {
-      "text": 10,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "production": {
-      "text": 30,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "science": {
-      "text": 52,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "battle": {
-      "text": 38,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "settings": {
-      "text": 2,
+      "text": 0,
       "tap": 0,
       "wide": 0
     }
   },
   "pc-1920x1080": {
     "hub": {
-      "text": 1,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
@@ -90,22 +90,59 @@
       "wide": 0
     },
     "production": {
-      "text": 7,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "science": {
-      "text": 15,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "battle": {
-      "text": 18,
+      "text": 0,
       "tap": 0,
       "wide": 0
     },
     "settings": {
-      "text": 1,
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    }
+  },
+  "pc-2560x1440": {
+    "hub": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "map": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "fleet": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "production": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "science": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "battle": {
+      "text": 0,
+      "tap": 0,
+      "wide": 0
+    },
+    "settings": {
+      "text": 0,
       "tap": 0,
       "wide": 0
     }

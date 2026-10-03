@@ -107,7 +107,7 @@ export function friendsPanelHtml(
   if (!opts.signedIn) {
     return (
       `<div class="hub-empty"><span class="he-ic">☍</span>${t('friends.guest.title')}<br>` +
-      `<span style="font-size:11px;color:var(--cyan-dim)">${t('friends.guest.sub')}</span></div>`
+      `<span style="font-size:var(--fs-caption);color:var(--dim)">${t('friends.guest.sub')}</span></div>`
     );
   }
   const search =
@@ -119,7 +119,7 @@ export function friendsPanelHtml(
   const list = rows.length
     ? sortRows(rows).map(rowHtml).join('')
     : `<div class="hub-empty"><span class="he-ic">☍</span>${t('friends.empty.title')}<br>` +
-      `<span style="font-size:11px;color:var(--cyan-dim)">${t('friends.empty.sub')}</span></div>`;
+      `<span style="font-size:var(--fs-caption);color:var(--dim)">${t('friends.empty.sub')}</span></div>`;
   return search + note + `<div class="fr-list">${list}</div>`;
 }
 

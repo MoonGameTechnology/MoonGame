@@ -85,7 +85,7 @@ export function boardHtml(
     return (
       tabs +
       `<div class="hub-empty"><span class="he-ic">▤</span>${t('rank.guest.title')}<br>` +
-      `<span style="font-size:11px;color:var(--cyan-dim)">${t('rank.guest.sub')}</span></div>`
+      `<span style="font-size:var(--fs-caption);color:var(--dim)">${t('rank.guest.sub')}</span></div>`
     );
   }
   if (view.rows.length === 0) {
@@ -93,7 +93,7 @@ export function boardHtml(
       tabs +
       `<div class="hub-empty"><span class="he-ic">▤</span>${t(
         kind === 'corps' ? 'rank.empty.corps' : 'rank.empty.players',
-      )}<br><span style="font-size:11px;color:var(--cyan-dim)">${t(
+      )}<br><span style="font-size:var(--fs-caption);color:var(--dim)">${t(
         kind === 'corps' ? 'rank.empty.corps.sub' : 'rank.empty.players.sub',
       )}</span></div>`
     );

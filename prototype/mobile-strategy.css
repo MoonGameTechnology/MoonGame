@@ -52,7 +52,7 @@ body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-he
 }
 body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-head) b {
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--fs-body);
   letter-spacing: 1px;
 }
 body.mobile-ui :is(.tw-close, .cn-close, .mk-close, .dp-close) {
@@ -71,7 +71,7 @@ body.mobile-ui :is(#marketbody, #constructorbody, .tt-scroll, .bw-scroll, .dp-li
 
 /* Branches stay visible together; long node titles have their own line. */
 body.mobile-ui #tech .tt-tab {
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #tech .tt-tab > span {
   white-space: normal;
@@ -87,10 +87,10 @@ body.mobile-ui #tech .tt-ih {
 }
 body.mobile-ui #tech .tt-ih > b {
   flex: none;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #tech :is(.tt-ifx, .tt-lead) {
-  font-size: 12px;
+  font-size: var(--fs-body);
   line-height: 1.5;
 }
 body.mobile-ui #tech .tt-ifoot {
@@ -98,7 +98,7 @@ body.mobile-ui #tech .tt-ifoot {
 }
 body.mobile-ui #tech .tt-take {
   width: 100%;
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #tech .tt-mwin {
   width: calc(100% - 16px);
@@ -117,7 +117,7 @@ body.mobile-ui #tech .tt-mx {
   z-index: 1;
 }
 body.mobile-ui #tech :is(.tt-mdesc, .tt-mstats) {
-  font-size: 12px;
+  font-size: var(--fs-body);
   line-height: 1.5;
 }
 body.mobile-ui #tech .tt-mbtn {
@@ -184,7 +184,7 @@ body.mobile-ui #market .mk-tabs {
 }
 body.mobile-ui #market .mk-tab {
   padding: 8px 5px;
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #market .mk-form {
   display: grid;
@@ -197,7 +197,7 @@ body.mobile-ui #market .mk-seg {
 }
 body.mobile-ui #market .mk-seg button {
   flex: 1;
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #market .mk-in {
   width: 100%;
@@ -206,10 +206,10 @@ body.mobile-ui #market .mk-go {
   grid-column: 1/-1;
   width: 100%;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #market .mk-lbl {
-  font-size: 12px;
+  font-size: var(--fs-body);
   line-height: 1.5;
 }
 body.mobile-ui #market .mk-row {
@@ -241,7 +241,7 @@ body.mobile-ui #diplo .dp-head {
 body.mobile-ui #diplo .dp-head > b {
   display: block;
   grid-column: 1 / span 2;
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 body.mobile-ui #diplo .dp-close {
   grid-column: 3;
@@ -251,7 +251,7 @@ body.mobile-ui #diplo .dp-tab {
   grid-row: 2;
   min-width: 0;
   padding: 6px 2px;
-  font-size: 11px;
+  font-size: var(--fs-caption);
 }
 body.mobile-ui #diplo :is(.dp-sorts, .dp-filters) {
   flex: none;

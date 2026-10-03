@@ -72,7 +72,7 @@ body.mobile-ui #mobile-sheet {
 .mobile-grab span {
   display: block;
   font:
-    11px/1.5 ui-monospace,
+    var(--fs-caption)/1.5 ui-monospace,
     monospace;
   color: #8dafbd;
   margin-top: 4px;
@@ -85,7 +85,7 @@ body.mobile-ui #mobile-sheet {
   background: #0c1b2b;
   color: #e1f5fc;
   font:
-    12px ui-monospace,
+    var(--fs-body) ui-monospace,
     monospace;
   white-space: nowrap;
 }
@@ -113,7 +113,7 @@ body.mobile-ui #mobile-sheet {
   border-radius: 10px;
   color: #a9d5e4;
   font:
-    12px ui-monospace,
+    var(--fs-body) ui-monospace,
     monospace;
 }
 body.mobile-ui #mobile-sheet #side {
@@ -175,7 +175,7 @@ body.mobile-ui #mobile-sheet #side .ptab {
   justify-content: center;
   padding-left: 4px;
   padding-right: 4px;
-  font-size: 10px;
+  font-size: var(--fs-caption);
   letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
@@ -213,7 +213,7 @@ body.mobile-ui #mobile-sheet #cmdbar > button {
 }
 body.mobile-ui #mobile-sheet #cmdbar > button .cl {
   font:
-    10px/1.25 ui-monospace,
+    var(--fs-caption)/1.25 ui-monospace,
     monospace;
   letter-spacing: 0;
   text-transform: none;
@@ -270,16 +270,16 @@ body.mobile-ui #mobile-sheet.order-mode #cmdbar {
   gap: 5px;
   margin-bottom: 5px;
   font:
-    12px/1.45 ui-monospace,
+    var(--fs-body)/1.45 ui-monospace,
     monospace;
 }
 .mobile-order-copy > b {
   color: #dbf6ff;
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .mobile-order-copy > span {
   color: #86abba;
-  font-size: 11px;
+  font-size: var(--fs-caption);
 }
 .mobile-order-copy > strong {
   color: #afe0e7;
@@ -287,7 +287,7 @@ body.mobile-ui #mobile-sheet.order-mode #cmdbar {
 }
 body.mobile-ui #mobile-sheet.order-mode #cmdbar > button {
   font:
-    12px ui-monospace,
+    var(--fs-body) ui-monospace,
     monospace;
   min-height: 46px;
 }
@@ -323,12 +323,12 @@ body.mobile-ui #mobile-sheet.choosing #cmdbar {
 .mobile-choices small {
   display: block;
   font:
-    12px/1.45 ui-monospace,
+    var(--fs-body)/1.45 ui-monospace,
     monospace;
 }
 .mobile-choices small {
   color: #829fab;
-  font-size: 10px;
+  font-size: var(--fs-caption);
   margin-top: 3px;
 }
 .mobile-choices i {
@@ -419,14 +419,14 @@ body.mobile-ui #purse .res b {
 body.mobile-ui #purse .res em {
   grid-column: 1 / -1;
   justify-self: start;
-  font-size: 12px;
+  font-size: var(--fs-body);
   line-height: 1.15;
   letter-spacing: 0;
 }
 /* Уже 360 px пять знаков запаса («12.3k») при 14 px упираются в края плашки. */
 @media (max-width: 359px) {
   body.mobile-ui #purse .res b {
-    font-size: 12px;
+    font-size: var(--fs-body);
   }
 }
 body.mobile-ui #devline {
@@ -538,7 +538,8 @@ body.mobile-ui:is(.aim-mode, .chain-mode) #phone-nav {
   background: none;
   color: #93b4c0;
   font: inherit;
-  font-size: 12px;
+  /* Подпись вкладки — пятая часть ширины телефона: «Производство» входит только размером подписи. */
+  font-size: var(--fs-caption);
   line-height: 1.1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -593,7 +594,7 @@ body.mobile-ui:is(.aim-mode, .chain-mode) #phone-nav {
   border-radius: 9px;
   background: #ff5a4d;
   color: #fff;
-  font-size: 12px;
+  font-size: var(--fs-body);
   font-weight: 700;
   line-height: 18px;
   text-align: center;
@@ -666,7 +667,7 @@ body.mobile-ui #phone-more:not([hidden]) {
   background: rgba(12, 34, 48, 0.55);
   color: #d9f6fb;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-body);
   line-height: 1.2;
   text-align: center;
   overflow-wrap: anywhere;
