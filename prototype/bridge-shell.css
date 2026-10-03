@@ -104,26 +104,9 @@ body.holo-ui #connect .csub {
   line-height: 1.7;
   color: #9fb3c4;
 }
-body.holo-ui #connect :is(.cnew, .cbtn, .mbtn) {
-  font-family: inherit;
-  font-weight: 550;
-  border-radius: 4px 10px 4px 10px;
-  border-color: #6196a5;
-  color: #dff9ff;
-  background: linear-gradient(110deg, rgba(75, 132, 152, .35), rgba(30, 68, 90, .44));
-  box-shadow: inset 0 1px rgba(195, 245, 255, .1);
-}
+/* Вид кнопок входа — классами трёх стилей (UIX-11.2); мостик даёт им только свои углы. */
+body.holo-ui #connect :is(.cnew, .cbtn, .mbtn) { border-radius: 4px 10px 4px 10px; }
 body.holo-ui #connect .cnew { min-height: 54px; font-size: 14px; }
-body.holo-ui #connect :is(.cbtn, .mbtn).ghost {
-  color: #b5c7d4;
-  border-color: var(--bridge-edge);
-  background: rgba(9, 23, 36, .45);
-}
-body.holo-ui #connect :is(.cnew, .cbtn, .mbtn):hover:not(:disabled) {
-  border-color: #a7dce7;
-  background-color: rgba(97, 165, 190, .13);
-  box-shadow: inset 0 1px rgba(211, 246, 255, .2), 0 0 18px rgba(97, 171, 195, .1);
-}
 body.holo-ui #connect .cdiv { margin: 21px 0 17px; font-size: var(--fs-caption); }
 body.holo-ui #connect .cdiv::before,
 body.holo-ui #connect .cdiv::after { background: var(--bridge-edge); }
@@ -145,7 +128,7 @@ body.holo-ui #connect :is(.cfield input, .cfield select, .cwlogin input) {
 }
 body.holo-ui #connect .cwlogin input { margin-top: 0; }
 body.holo-ui #connect input::placeholder { color: #859aaf; opacity: 1; }
-body.holo-ui #connect :is(.clang, .cfoot a, .clink, .cback) { font-family: inherit; color: #a0b9ca; }
+body.holo-ui #connect :is(.clang, .cfoot a) { font-family: inherit; color: #a0b9ca; }
 body.holo-ui #connect .clang { border-radius: 5px; padding: 8px 11px; font-size: var(--fs-caption); }
 body.holo-ui #connect .cback { margin-bottom: 24px; font-size: var(--fs-body); }
 body.holo-ui #connect .cfoot { gap: 18px; justify-content: flex-start; }
@@ -263,7 +246,7 @@ body.holo-ui #endscreen .es-grid { margin: 25px 0 12px; gap: 12px; }
 body.holo-ui #endscreen .es-cell { padding: 15px; border-radius: 5px; border-color: var(--bridge-edge); background: rgba(8, 25, 41, .48); }
 body.holo-ui #endscreen .es-k { font-size: var(--fs-caption); color: #9db8c8; }
 body.holo-ui #endscreen .es-v { margin-top: 8px; font-size: 24px; font-weight: 500; }
-body.holo-ui #endscreen .es-btn { font-family: inherit; min-height: 44px; border-radius: 5px; font-size: var(--fs-body); }
+body.holo-ui #endscreen .es-btn { min-height: 44px; border-radius: 5px; font-size: var(--fs-body); }
 body.holo-ui #settings .setbox { width: min(510px, calc(var(--vpw) * .88)); max-height: calc(var(--vph) - 48px); }
 body.holo-ui #settings .set-row { gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(120, 180, 199, .12); }
 body.holo-ui #settings .set-lbl { font-family: inherit; font-size: var(--fs-body); line-height: 1.5; gap: 4px; }

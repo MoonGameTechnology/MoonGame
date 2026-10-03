@@ -1049,7 +1049,7 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .rk-tabs{display:flex;gap:6px;padding:0 0 10px;}
 .rk-tab{flex:1;padding:9px 10px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;
   color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.rk-tab.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+.rk-tab.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 .rk-total{padding:0 2px 8px;font-size:var(--fs-caption);color:var(--dim);}
 .rk-list{display:flex;flex-direction:column;gap:6px;}
 .rk-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
@@ -1915,7 +1915,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cx-lvls{display:flex;gap:6px;margin:10px 0 0;}
 .cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
   color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-.cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+.cx-lv.on{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 #devline [data-solo-play],#devline [data-solo-save]{flex:0 0 auto;border:1px solid var(--cyan-dim);border-radius:6px;background:var(--glass);color:var(--cyan);font:inherit;padding:3px 9px;cursor:pointer;}
 /* YAG-6.2: пауза забега. Идёт мир — неброская «‖» рядом с часами; стоит — янтарная
    «▶ Продолжить»: после ухода со страницы мир ждёт именно её, и её должно быть видно. */
@@ -2400,16 +2400,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #endscreen .es-loot{margin:6px 0 0;font-size:var(--fs-body);color:#e6d8a8;}
 #endscreen .es-blueprint{color:#ffcf6b;font-weight:600;}
 #endscreen .es-acts{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px;}
-#endscreen .es-btn{flex:1 1 45%;min-width:120px;padding:12px;border-radius:8px;cursor:pointer;
-  font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;border:1px solid var(--line-hi);
-  background:transparent;color:var(--ink);}
-#endscreen .es-btn.primary{border-color:var(--cyan);background:rgba(53,214,230,.16);color:var(--cyan);}
-#endscreen .es-btn.primary:hover{background:rgba(53,214,230,.28);box-shadow:0 0 12px rgba(53,214,230,.35);}
-#endscreen .es-btn:hover{border-color:var(--cyan-dim);}
+/* Вид кнопок итога — классами .btn-main/.btn-second/.btn-quiet (UIX-11.2); здесь только размер и место. */
+#endscreen .es-btn{flex:1 1 45%;min-width:120px;padding:12px;border-radius:8px;font-size:var(--fs-body);}
 #endscreen .es-btn.wide{flex-basis:100%;}
-#endscreen .es-btn.ghost{flex-basis:100%;background:transparent;color:var(--dim);border-color:var(--line);}
-/* ×2 за ролик (YAG-3.2) — под наградой забега, во всю ширину, золотом наград */
-#endscreen .es-btn.ad{display:block;width:100%;margin-top:10px;border-color:#c99a3b;color:#ffcf6b;background:rgba(255,190,80,.08);}
+/* ×2 за ролик (YAG-3.2) — под наградой забега, во всю ширину, золотом наград: так же горит
+   предложение ролика в кошельке хаба (.tw-ad). Золото здесь — цвет награды, а не четвёртый стиль. */
+#endscreen .es-btn.ad{display:block;width:100%;margin-top:10px;cursor:pointer;font:700 var(--fs-body) var(--sf-font);
+  font-variant-numeric:tabular-nums;border:1px solid #c99a3b;color:#ffcf6b;background:rgba(255,190,80,.08);}
 #endscreen .es-btn.ad:hover{border-color:#ffcf6b;background:rgba(255,190,80,.16);}
 #endscreen .es-note{margin:8px 0 0;font-size:var(--fs-body);color:var(--cyan);}
 
@@ -2574,10 +2571,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   font:var(--fs-body)/1.4 var(--sf-font);font-variant-numeric:tabular-nums;}
 #connect .cfield input:focus,#connect .cfield select:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.2);}
 #connect .crow{display:flex;gap:10px;margin-top:18px;}
-#connect .cbtn{flex:1;padding:13px 10px;border-radius:8px;border:1px solid var(--cyan);background:rgba(53,214,230,.12);
-  color:var(--cyan);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;min-height:46px;}
-#connect .cbtn:active{background:rgba(53,214,230,.24);}
-#connect .cbtn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
+/* Вид кнопок входа и обозревателя партий — классами .btn-main/.btn-second/.btn-quiet (UIX-11.2);
+   правила .cnew, .cbtn, .mbtn, .cback и .clink задают только размер и место. */
+#connect .cbtn{flex:1;padding:13px 10px;border-radius:8px;font-size:var(--fs-body);min-height:46px;}
 /* Credential fields must sit inside a form element, or the browser refuses to
    pair login+password for its password manager (Chrome warns «Password field is
    not contained in a form»). display:contents makes the wrapper layout-invisible,
@@ -2594,13 +2590,11 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
    buttons down. On a freshly opened welcome card there IS no message, and the reserved
    row read as a dead strip under the last button — collapse it while it is empty. */
 #connect .cstat:empty{margin-top:0;min-height:0;}
-#connect .clink{display:block;width:100%;margin-top:14px;padding:4px;background:none;border:none;cursor:pointer;
-  color:var(--dim);font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;text-align:center;}
-#connect .clink:hover{color:var(--cyan);text-decoration:underline;}
+#connect .clink{display:block;width:100%;margin-top:14px;padding:4px;font-size:var(--fs-body);text-align:center;}
 #connect .mtabs{display:flex;gap:6px;margin-top:16px;}
 #connect .mtab{flex:1;padding:8px 6px;border-radius:7px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font-size:var(--fs-caption);cursor:pointer;}
-#connect .mtab.active{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.10);}
+  color:var(--dim);font-family:var(--sf-font);font-size:var(--fs-caption);cursor:pointer;}
+#connect .mtab.active{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 /* Панель фильтров над списком (BRW-3) — только на вкладке «Доступные». */
 #connect .mfilter{margin-top:10px;padding:8px 10px;border:1px solid var(--line-hi);border-radius:8px;
   display:flex;flex-direction:column;gap:7px;}
@@ -2608,8 +2602,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .mflabel{flex:none;width:64px;color:var(--dim);font-size:var(--fs-caption);}
 #connect .mfseg{display:flex;gap:4px;}
 #connect .mfbtn{padding:5px 10px;border-radius:6px;border:1px solid var(--line-hi);background:transparent;
-  color:var(--dim);font-size:var(--fs-caption);cursor:pointer;}
-#connect .mfbtn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.10);}
+  color:var(--dim);font-family:var(--sf-font);font-size:var(--fs-caption);cursor:pointer;}
+#connect .mfbtn.active{color:var(--sf-hi);background:var(--sf-sel);border-color:var(--sf-accent);box-shadow:inset 0 -2px 0 var(--sf-accent);}
 #connect .mfdrop{position:relative;flex:1;min-width:0;}
 #connect .mfwide{width:100%;text-align:left;}
 #connect .mfmenu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;max-height:38vh;overflow-y:auto;
@@ -2637,10 +2631,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .mmeta .mwin.soon{color:var(--amber,#e0a942);}
 #connect .mmeta .mwin.shut{color:var(--dim);text-decoration:line-through;}
 #connect .mbtns{display:flex;gap:6px;flex:none;}
-#connect .mbtn{padding:8px 11px;border-radius:7px;border:1px solid var(--cyan);background:rgba(53,214,230,.12);
-  color:var(--cyan);font-size:var(--fs-caption);cursor:pointer;white-space:nowrap;}
-#connect .mbtn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
-#connect .mbtn:active{background:rgba(53,214,230,.24);}
+#connect .mbtn{padding:8px 11px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
 /* welcome stage — first-launch identity screen (new commander / sign-in) */
 /* The chip above the card and the legal footer below it are absolutely positioned, so
    they carry no height of their own — the padding here RESERVES their strip inside the
@@ -2670,10 +2661,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #connect .ccrest .wm{font-size:clamp(20px,6.5vw,26px);letter-spacing:clamp(3px,2vw,8px);color:var(--cyan);
   font-weight:700;text-shadow:0 0 18px rgba(53,214,230,.45);text-align:center;white-space:nowrap;}
 #connect .ccrest .wtag{font-size:var(--fs-caption);letter-spacing:clamp(2px,1.4vw,5px);color:var(--dim);text-transform:uppercase;}
-#connect .cnew{width:100%;padding:16px;border-radius:10px;border:1px solid var(--cyan);cursor:pointer;
-  background:linear-gradient(180deg,rgba(53,214,230,.30),rgba(53,214,230,.12));color:#eafdff;
-  font:700 15px var(--sf-font);font-variant-numeric:tabular-nums;box-shadow:0 0 26px rgba(53,214,230,.26);min-height:54px;}
-#connect .cnew:active{background:linear-gradient(180deg,rgba(53,214,230,.44),rgba(53,214,230,.20));}
+#connect .cnew{width:100%;padding:16px;border-radius:10px;font-size:15px;min-height:54px;}
 #connect .cdiv{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:var(--dim);
   font-size:var(--fs-caption);}
 #connect .cdiv::before,#connect .cdiv::after{content:"";flex:1;height:1px;background:var(--line-hi);}
@@ -2682,9 +2670,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   display:grid;place-items:center;cursor:pointer;color:var(--ink);font:700 17px system-ui,sans-serif;}
 #connect .csoc:hover{border-color:var(--cyan);box-shadow:0 0 12px rgba(53,214,230,.3);color:var(--cyan);}
 #connect .cstack{display:flex;flex-direction:column;gap:10px;margin-top:18px;}
-#connect .cback{align-self:flex-start;background:none;border:none;color:var(--dim);
-  font:var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;padding:0;margin-bottom:8px;}
-#connect .cback:hover{color:var(--cyan);}
+#connect .cback{align-self:flex-start;padding:0;margin-bottom:8px;font-size:var(--fs-body);}
 #connect .cfoot{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;
   justify-content:center;gap:6px 16px;padding:0 8px;}
 #connect .cfoot a{color:var(--dim);font-size:var(--fs-caption);text-decoration:none;cursor:pointer;opacity:.85;}
@@ -2912,7 +2898,8 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 #connect .cupd:active{background:rgba(53,214,230,.12);}
 #connect .cver{margin-top:8px;text-align:center;font-size:var(--fs-caption);color:var(--dim);opacity:.8;}
 /* === DEV TEST MODE — self-contained; delete this whole block to cut the styles === */
-#connect .tm-open{flex:none;width:100%;margin-top:10px;border-style:dashed;border-color:var(--line-hi);color:var(--dim);}
+#connect .tm-open{flex:none;width:100%;margin-top:10px;border:1px dashed var(--line-hi);background:transparent;color:var(--dim);
+  font:600 var(--fs-body) var(--sf-font);}
 #connect .tm-open:active{background:rgba(53,214,230,.12);}
 #testmode{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
   background:radial-gradient(120% 100% at 50% 30%,rgba(4,20,28,.94),rgba(1,4,10,.98));
@@ -3175,7 +3162,9 @@ body:not(.holo-ui) #setup #setup-solo-col{margin-top:20px;padding-top:18px;borde
 #hub .hm-row .hm-addr{font-size:var(--fs-caption);color:var(--dim);margin-top:6px;
   overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;}
 #hub .hm-row .hm-btns{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}
-#hub .hm-row .hm-btns .mbtn{white-space:nowrap;}
+/* «Продолжить» и «Копировать адрес» — классами .btn-second/.btn-quiet (UIX-11.2): правило
+   #connect .mbtn сюда не доходит, и без них это были кнопки браузера по умолчанию. */
+#hub .hm-row .hm-btns .mbtn{min-height:44px;padding:0 14px;border-radius:10px;font-size:var(--fs-body);white-space:nowrap;}
 #hub .hm-more{font-size:var(--fs-caption);color:var(--dim);background:transparent;border:none;padding:2px 0;
   cursor:pointer;text-align:left;text-decoration:underline;}
 /* Своих партий нет: строка и дверь туда, где партии берут (правило 6 decisions/myMatches.ts). */
@@ -3864,7 +3853,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           <div class="wtag" data-i18n="welcome.tagline"></div>
         </div>
         <p class="csub" data-i18n="welcome.sub"></p>
-        <button id="cnew" class="cnew" type="button" data-i18n="welcome.new"></button>
+        <button id="cnew" class="cnew btn-main" type="button" data-i18n="welcome.new"></button>
         <div class="cdiv" data-i18n="welcome.divider"></div>
         <div class="csocial">
           <button id="cgoogle" class="csoc" type="button" data-i18n-title="welcome.google" data-i18n-aria="welcome.google">G</button>
@@ -3874,12 +3863,12 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
              an unauthenticated visitor must not be able to start matches from it. The
              skirmish setup lives behind the login, in the hub. -->
         <div class="cstack">
-          <button id="clogin" class="cbtn ghost" type="button" data-i18n="welcome.login"></button>
+          <button id="clogin" class="cbtn btn-second" type="button" data-i18n="welcome.login"></button>
         </div>
         <form class="authform" onsubmit="return false">
           <div id="cwlogin" class="cwlogin" style="display:none">
             <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-            <button id="cwgo" class="cbtn" type="button" data-i18n="welcome.go"></button>
+            <button id="cwgo" class="cbtn btn-second" type="button" data-i18n="welcome.go"></button>
           </div>
           <div id="cwpassrow" class="cwlogin" style="display:none">
             <input id="cwpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
@@ -3887,7 +3876,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
         </form>
       </div>
       <div id="cregister" style="display:none">
-        <button id="crback" class="cback" type="button" data-i18n="welcome.back"></button>
+        <button id="crback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.register.title"></b></div>
         <p class="csub" data-i18n="welcome.register.sub"></p>
         <form class="authform" onsubmit="return false">
@@ -3905,19 +3894,19 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           </label>
         </form>
         <div class="crow">
-          <button id="crgo" class="cbtn" type="button" data-i18n="welcome.register.go"></button>
+          <button id="crgo" class="cbtn btn-main" type="button" data-i18n="welcome.register.go"></button>
         </div>
-        <button id="crrecover" class="clink" type="button" data-i18n="welcome.register.recover"></button>
+        <button id="crrecover" class="clink btn-quiet" type="button" data-i18n="welcome.register.recover"></button>
       </div>
       <div id="crecover" style="display:none">
-        <button id="crecback" class="cback" type="button" data-i18n="welcome.back"></button>
+        <button id="crecback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.recover.title"></b></div>
         <p class="csub" data-i18n="welcome.recover.sub"></p>
         <label class="cfield"><span data-i18n="welcome.recover.mail"></span>
           <input id="crecmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
         </label>
         <div class="crow">
-          <button id="crecgo" class="cbtn" type="button" data-i18n="welcome.recover.go"></button>
+          <button id="crecgo" class="cbtn btn-main" type="button" data-i18n="welcome.recover.go"></button>
         </div>
       </div>
       <div id="creset" style="display:none">
@@ -3937,11 +3926,11 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           </label>
         </form>
         <div class="crow">
-          <button id="cresetgo" class="cbtn" type="button" data-i18n="welcome.reset.go"></button>
+          <button id="cresetgo" class="cbtn btn-main" type="button" data-i18n="welcome.reset.go"></button>
         </div>
       </div>
       <div id="cbrowse" style="display:none">
-        <button id="cback" class="cback" type="button" data-i18n="welcome.back"></button>
+        <button id="cback" class="cback btn-quiet" type="button" data-i18n="welcome.back"></button>
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.browse.title"></b></div>
         <p class="csub" data-i18n="welcome.browse.sub"></p>
         <label class="cfield"><span data-i18n="welcome.browse.server"></span>
@@ -3956,7 +3945,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
           </label>
         </form>
         <div class="crow">
-          <button id="cgo" class="cbtn" type="button" data-i18n="welcome.browse.go"></button>
+          <button id="cgo" class="cbtn btn-second" type="button" data-i18n="welcome.browse.go"></button>
         </div>
         <div class="mtabs">
           <button class="mtab active" data-tab="available" data-i18n="welcome.browse.tab.available"></button>
@@ -3992,7 +3981,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
             <option value="nexus" data-i18n="setup.map.nexus"></option>
             <option value="frontier-50" data-i18n="setup.map.frontier-50"></option>
           </select>
-          <button id="match-create-go" type="button" class="mbtn" data-i18n="setup.network.create"></button>
+          <button id="match-create-go" type="button" class="mbtn btn-main" data-i18n="setup.network.create"></button>
         </div>
         <div id="mlist" class="mlist"></div>
       </div>
@@ -4001,7 +3990,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
     <button id="cupd" class="cupd" type="button" style="display:none" data-i18n="welcome.update-check"></button>
     <div id="cver" class="cver"></div>
     <!-- DEV TEST MODE — remove this button (and the #testmode block + CSS + main.ts hook) to cut the feature -->
-    <!--dev-only--><button id="ctest" class="cbtn ghost tm-open" data-i18n="welcome.testmode"></button><!--/dev-only-->
+    <!--dev-only--><button id="ctest" class="cbtn tm-open" data-i18n="welcome.testmode"></button><!--/dev-only-->
     <!-- /DEV TEST MODE -->
     <div class="cfoot">
       <a id="cl-imprint" data-i18n="welcome.imprint"></a>

@@ -148,11 +148,11 @@ export function endScreenHtml(
     note +
     `<div class="es-acts">` +
     // Повтор главы — только у засчитанного забега Sector Zero: у dev-забега разбивки нет.
-    (end.runSummary ? `<button class="es-btn primary wide" data-es="replay">↻ ${t('sector-zero.end.replay')}</button>` : '') +
+    (end.runSummary ? `<button class="es-btn wide btn-main" data-es="replay">↻ ${t('sector-zero.end.replay')}</button>` : '') +
     // Главная кнопка одна: при повторе главы «подготовка» становится второстепенной.
-    `<button class="es-btn${end.runSummary ? '' : ' primary'}" data-es="again">${againLabel}</button>` +
-    `<button class="es-btn" data-es="menu">⌂ ${t('end.to-menu')}</button>` +
-    `<button class="es-btn ghost" data-es="board">${t('end.board')}</button>` +
+    `<button class="es-btn ${end.runSummary ? 'btn-second' : 'btn-main'}" data-es="again">${againLabel}</button>` +
+    `<button class="es-btn btn-second" data-es="menu">⌂ ${t('end.to-menu')}</button>` +
+    `<button class="es-btn wide btn-quiet" data-es="board">${t('end.board')}</button>` +
     `</div></div>`
   );
 }
