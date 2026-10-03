@@ -2694,36 +2694,29 @@ export const en: Record<string, string> = {
     '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
   'onb.goals.title': 'First-session goals',
   'onb.intro.async-delay.body':
-    'This fleet will arrive in real hours — the world of Void Dominion runs continuously, even while you are offline. You can close the game: your orders carry out on their own, and on your return we will send a notification and show a "while you were away" digest.',
+    'The fleet travels for real hours — you can leave, the order will run.',
   'onb.intro.async-delay.title': 'The world runs without you',
   'onb.intro.ava.body':
-    'Here corporations challenge each other to an organised war. Mark your corporation ready and yourself ready — once both sides are ready, a challenge can be accepted. Next comes roster sign-up and the scheduled war itself.',
+    'A challenge can be accepted once both corporations mark themselves ready; the war runs on a schedule.',
   'onb.intro.ava.title': 'Alliance wars (AvA)',
-  'onb.intro.badge': 'first time',
   'onb.intro.constructor.body':
-    'Here you assemble ships, shuttles, divisions and heroes from modules. The loadout is locked at build time — choose slots up front, a finished unit cannot be re-fitted. The «Heroes» tab is your commander HQ.',
+    'Modules are fixed at build time — a finished ship cannot be refitted.',
   'onb.intro.constructor.title': 'Production — orders and loadouts',
-  'onb.intro.corp.body':
-    'A corporation is your squad within the session: a shared warehouse, member roles, and joint alliance-vs-alliance wars (AvA). Join one or found your own — the «Wars» tab opens challenges between corporations.',
+  'onb.intro.corp.body': 'Shared storage, member roles and alliance wars.',
   'onb.intro.corp.title': 'Corporation cabinet',
-  'onb.intro.diplomacy.body':
-    'Declare war and peace, sign pacts and alliances. A coalition is capped by combined strength — you cannot gang everyone up on one player. Watch the stances: an ally today can be a rival tomorrow.',
+  'onb.intro.diplomacy.body': 'War, peace, pacts and alliances. Coalitions are capped by strength.',
   'onb.intro.diplomacy.title': 'Diplomacy',
   'onb.intro.hero.body':
-    'Each hero has its own skill tree — tap a node to see what it unlocks, then learn it once its requirements and cost are met. Unlocked nodes grant abilities (active, with range and a cooldown) or passives. A fallen hero respawns at your capital.',
+    'Each skill node grants an ability or a passive; a fallen hero respawns at the capital.',
   'onb.intro.hero.title': 'Heroes — fleet commanders',
-  'onb.intro.market.body':
-    'Trade resources with the other players in the session: post your own lots and take theirs. The market smooths shortages — swap a surplus of one resource for the one you lack.',
+  'onb.intro.market.body': 'Trade resources with players in this match: post a lot or take one.',
   'onb.intro.market.title': 'Session market',
   'onb.intro.ok': 'Got it',
-  'onb.intro.retreat.body':
-    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely. After tapping, pick where to fall back on the map.",
+  'onb.intro.retreat.body': 'Retreat: −40% of current hull and shield, plus a speed burst.',
   'onb.intro.retreat.title': 'Retreat is not free',
-  'onb.intro.steward.body':
-    'Away for a while? Hand your defence to the Steward — it holds your worlds by your rules while you are gone. The world runs 24/7, but a baseline defence stays up even when you are offline.',
+  'onb.intro.steward.body': 'The Steward defends your worlds while you are away.',
   'onb.intro.steward.title': 'Steward — AI on sleep',
-  'onb.intro.tech.body':
-    'Here you unlock technologies — permanent upgrades to your fleet, economy and defence. A node costs resources and time; once researched, the bonus lasts the rest of the game. Plan the branch to fit your playstyle.',
+  'onb.intro.tech.body': 'A node costs resources and time; its bonus lasts the whole match.',
   'onb.intro.tech.title': 'Technology tree',
   'onb.recap.attention': 'Needs attention · {n}',
   'onb.recap.close': 'CLOSE',

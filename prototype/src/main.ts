@@ -9041,20 +9041,20 @@ document.getElementById('hub-help')?.addEventListener('click', openCodexHub);
 document.getElementById('rail-help')?.addEventListener('click', openCodexHub);
 
 // --- ONB-3 just-in-time mechanic intros --------------------------------------
-// The first time a player opens an advanced panel, a one-screen card explains it,
+// The first time a player opens an advanced panel, a one-line hint explains it,
 // then never again (per-callsign seen-set). A veteran (has finished a match →
 // meta XP > 0) is marked seen silently, so they are never nagged.
 function seenIntrosKey(): string {
   return 'vd.seenIntros.' + (nickInput.value.trim() || 'guest');
 }
+/** UIX-8.1: вводная — подсказка одной строкой у низа экрана, а не окно поверх того, что она
+ *  объясняет: нажатия мимо неё проходят насквозь, и первое из них её убирает (ниже). */
 function showIntro(card: IntroCard): void {
   const el = document.getElementById('intro');
   if (!el) return;
   el.innerHTML =
-    `<div class="inbox"><div class="in-head"><span class="in-ic">✦</span><b>${esc(t(card.titleKey))}</b>` +
-    `<span class="in-tag">${t('onb.intro.badge')}</span></div>` +
-    `<div class="in-body">${esc(t(card.bodyKey))}</div>` +
-    `<button class="in-ok">${t('onb.intro.ok')}</button></div>`;
+    `<div class="inbox"><span class="in-ic">✦</span><div class="in-text"><b>${esc(t(card.titleKey))}</b>` +
+    `<span>${esc(t(card.bodyKey))}</span></div><button class="in-ok">${t('onb.intro.ok')}</button></div>`;
   el.classList.add('show');
 }
 // Panel-open hook: show the intro for `id` once (unless already seen / a veteran).
@@ -9065,11 +9065,35 @@ function maybeIntro(id: string): void {
   localStorage.setItem(seenIntrosKey(), JSON.stringify(next));
   if (card) showIntro(card);
 }
-document.getElementById('intro')?.addEventListener('click', (ev) => {
-  const el = document.getElementById('intro')!;
-  const tg = ev.target as HTMLElement;
-  if (tg === el || tg.closest('.in-ok')) el.classList.remove('show'); // backdrop / «Понятно»
+// «Понятно» — и любое нажатие по самой подсказке: под ней остаётся то, что она закрыла
+// (на телефоне — кнопка скорости), и следующее нажатие должно попасть туда. Мышь ловит
+// только коробка подсказки, поэтому щелчок сюда — щелчок по ней.
+document.getElementById('intro')?.addEventListener('click', () => {
+  document.getElementById('intro')!.classList.remove('show');
 });
+// Первое действие игрока — нажатие мимо подсказки — убирает её и делает своё: подсказка
+// учит в момент нужды, а не ждёт «Понятно» (UIX-8.1). Escape закрывает её первой, как раньше.
+document.addEventListener(
+  'pointerdown',
+  (ev) => {
+    const el = document.getElementById('intro');
+    if (el?.classList.contains('show') && !(ev.target as Element).closest?.('#intro'))
+      el.classList.remove('show');
+  },
+  true,
+);
+// С клавиатуры так же: клавиша убирает подсказку раньше, чем её прочтут горячие клавиши, и
+// срабатывает сама — пробел ставит паузу, T открывает науку. Escape остаётся лестнице
+// «Назад»: она закрывает подсказку, и только её. Повтор зажатой клавиши и одиночный
+// модификатор — ещё не действие: подсказка, открытая нажатием T, не гаснет от того же T.
+const INTRO_KEEP_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'AltGraph', 'Meta', 'CapsLock']);
+window.addEventListener(
+  'keydown',
+  (ev) => {
+    if (!ev.repeat && !INTRO_KEEP_KEYS.has(ev.key)) document.getElementById('intro')?.classList.remove('show');
+  },
+  true,
+);
 
 // --- ONB-5 return digest ("пока тебя не было") -------------------------------
 // The world runs while you're away (a backgrounded tab catches up on return, and
