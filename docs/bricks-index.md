@@ -90,7 +90,7 @@
 | TRN-6 | ⏳ | proto docs | `docs/backlog.md` | Матрица «механика → упражнение → результат» (§14.4, §14.10). |
 | UIX-1.1 | ✅ | proto | `docs/backlog.md` | Сторож размеров в браузере. |
 | UIX-1.2 | ✅ | proto cli | `docs/backlog.md` | Шкала текста 12 · 14 · 16 · 20 px. |
-| UIX-1.3 | ⏳ | proto | `docs/backlog.md` | Цели нажатия 44 × 44 px на телефоне. |
+| UIX-1.3 | ✅ | proto | `docs/backlog.md` | Цели нажатия 44 × 44 px на телефоне. |
 | UIX-2.1 | ✅ | proto | `docs/backlog.md` | ПК: голографический интерфейс растёт с окном. |
 | UIX-2.2 | ✅ | proto | `docs/backlog.md` | «Размер интерфейса» 80–150 % в настройках ПК. |
 | UIX-3.1 | ✅ | proto | `docs/backlog.md` | Телефон: нижняя панель из пяти пунктов. |
