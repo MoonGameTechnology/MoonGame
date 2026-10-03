@@ -18,6 +18,7 @@ const data: GameData = parseGameData({
     heavy: { faction: 'x', domain: 'ground', kind: 'infantry', stats: { attack: 8, defense: 20, hp: 34, speed: 40 } },
     tank: { faction: 'x', domain: 'ground', kind: 'vehicle', stats: { attack: 22, defense: 14, hp: 46, speed: 40 } },
     frigate: { faction: 'x', domain: 'space', stats: { attack: 3, defense: 2, hp: 30, speed: 56 } },
+    garrison: { faction: 'x', domain: 'ground', kind: 'infantry', stats: { attack: 3, defense: 9, hp: 26, speed: 0 }, traits: ['immobile', 'issued'] },
   },
   factions: {},
   buildings: { mine: { name: 'Mine', cost: {}, buildTimeHours: 0, hp: 20 } },
@@ -82,6 +83,15 @@ describe('политика гарнизона', () => {
   it('КОРАБЛЬ НЕ ГАРНИЗОН: в счёт обороны земли он не идёт и в десант не уезжает', () => {
     expect(garrisonDefense([{ unit: 'frigate', count: 9 }], data)).toBe(0);
     expect(spareGround(planet([['frigate', 9]]), data)).toEqual([]);
+  });
+
+  it('ГАРНИЗОН ФОРТА НЕ УЕЗЖАЕТ: он неподвижен, но его оборона держит пол', () => {
+    // 9 гарнизона (81 очко) с полом 16 отдали бы 7, но `army.load` их не поднимет.
+    expect(spareGround(planet([['garrison', 9]]), data)).toEqual([]);
+    // Пол уже закрыт гарнизоном — ополчение можно увезти целиком.
+    expect(spareGround(planet([['militia', 3], ['garrison', 2]]), data)).toEqual([
+      { unit: 'militia', count: 3 },
+    ]);
   });
 });
 

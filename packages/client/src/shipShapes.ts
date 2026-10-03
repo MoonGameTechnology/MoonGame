@@ -112,6 +112,9 @@ export const UNIT_SHAPE: Readonly<Record<string, ShipShapeId>> = {
   pirate_skiff: 'pirateSkiff',
   pirate_frigate: 'pirateFrigate',
   pirate_cruiser: 'pirateCruiser',
+  // Owner decision 2026-10-03: the fortress stands on the map as one immobile unit
+  // drawn with its own station model, not as a generic warship.
+  fortress_guns: 'station',
 };
 
 /** Swarm appearances for the shared roster, including the units used by PvE waves.

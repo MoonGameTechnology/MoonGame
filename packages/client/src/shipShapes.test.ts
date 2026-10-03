@@ -71,6 +71,13 @@ describe('approved ship hulls', () => {
     );
   });
 
+  it('draws the space fortress with its station model for every owner (owner, 2026-10-03)', () => {
+    const guns = data.units.fortress_guns!;
+    expect(unitShape(guns, 'fortress_guns')).toBe('station');
+    expect(unitShape(guns, 'fortress_guns', 'vanguard')).toBe('station');
+    expect(unitShape(guns, 'fortress_guns', 'swarm')).toBe('station');
+  });
+
   it('gives the landing shuttle its own picture, the Carrier the freighter (owner, 2026-09-26)', () => {
     // The carrier and the landing ship became one hull, the Carrier; the dropship art was
     // the landing shuttle's all along and no ship borrows it any more.

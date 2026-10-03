@@ -59,8 +59,15 @@ export function spareGround(
 ): UnitStack[] {
   const floor = garrisonFloor(planet);
   let left = garrisonDefense(planet.garrison, data);
+  // Неподвижное (`immobile`: «Гарнизон» форта) не поднимается — ядро ответит
+  // `E_IMMOBILE`, и бот ждал бы погрузки, которой не будет. Его оборона остаётся в `left`.
   const rows = planet.garrison
-    .filter((st) => st.count > 0 && data.units[st.unit]?.domain === 'ground')
+    .filter(
+      (st) =>
+        st.count > 0 &&
+        data.units[st.unit]?.domain === 'ground' &&
+        !data.units[st.unit]?.traits.includes('immobile'),
+    )
     .map((st) => ({
       unit: st.unit,
       count: st.count,

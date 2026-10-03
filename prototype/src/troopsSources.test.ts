@@ -4,19 +4,29 @@ import { groundTypes, hasTroops, totalOf, troopSources, type Stack } from './tro
 const пехота = (count: number): Stack => ({ unit: 'infantry', count });
 const танк = (count: number): Stack => ({ unit: 'tank', count });
 const корабль = (count: number): Stack => ({ unit: 'cruiser', count });
-const наземный = (u: string) => u === 'infantry' || u === 'tank';
+const гарнизон = (count: number): Stack => ({ unit: 'garrison', count });
+const наземный = (u: string) => u === 'infantry' || u === 'tank' || u === 'garrison';
+const поднимаемый = (u: string) => u !== 'garrison';
 
 describe('десант — откуда берутся источники', () => {
   it('НА СВОЁМ МИРЕ ИСТОЧНИКОВ ДВА: и поднимаем, и высаживаем', () => {
-    expect(troopSources(true, [пехота(3)], [танк(1)])).toEqual([пехота(3), танк(1)]);
+    expect(troopSources(true, [пехота(3)], [танк(1)], поднимаемый)).toEqual([пехота(3), танк(1)]);
   });
 
   it('НА СОЮЗНОМ МИРЕ ПОДНИМАТЬ НЕЧЕГО: чужой гарнизон не твой, ядро отобьёт погрузку', () => {
-    expect(troopSources(false, [пехота(9)], [танк(1)])).toEqual([танк(1)]);
+    expect(troopSources(false, [пехота(9)], [танк(1)], поднимаемый)).toEqual([танк(1)]);
   });
 
   it('пустой трюм над чужим миром — источников нет вовсе', () => {
-    expect(troopSources(false, [пехота(9)], [])).toEqual([]);
+    expect(troopSources(false, [пехота(9)], [], поднимаемый)).toEqual([]);
+  });
+
+  it('НЕПОДВИЖНЫЙ ГАРНИЗОН ФОРТА НЕ ИСТОЧНИК: ядро ответит E_IMMOBILE, меню его не предлагает', () => {
+    expect(troopSources(true, [пехота(2), гарнизон(3)], [], поднимаемый)).toEqual([пехота(2)]);
+  });
+
+  it('мир, где стоит один гарнизон форта, меню десанта не открывает', () => {
+    expect(hasTroops(groundTypes(troopSources(true, [гарнизон(3)], [], поднимаемый), наземный))).toBe(false);
   });
 });
 

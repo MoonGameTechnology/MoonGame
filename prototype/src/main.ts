@@ -2,6 +2,7 @@ import { attackBattle, deployForkFortress, retreatBattle } from '../../decisions
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
+import { EMPLACEMENT_HEADING, isEmplacementFleet } from '../../decisions/emplacement';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
@@ -2545,10 +2546,20 @@ function roundFlash(b: Battle): number {
   return left > 0 && left < ROUND_FLASH_MS ? 1 - left / ROUND_FLASH_MS : 0;
 }
 
+/** Имя соединения в карточке и списках: «Флот «ПОЗЫВНОЙ»», а крепость зовётся
+ *  крепостью — она сооружение, а не флот (`emplacement.ts`). */
+function fleetTitleOf(id: string): string {
+  const f = s.fleets[id];
+  if (f && isEmplacementFleet(f, data)) return t('fleet.kind.fortress');
+  return `${t(FLEET_KIND_KEY)} «${fleetCallsign(id)}»`;
+}
+
 /** The fleets the command bar / move order currently act on (mine only). */
 function selectedFleetIds(): string[] {
-  // Мина (SM-3.6) — не флот под приказ: в выбор для приказов она не попадает.
-  const orderable = (id: string): boolean => s.fleets[id]?.owner === ME && !isMineFleet(s.fleets[id]!, data);
+  // Мина (SM-3.6) и крепость (`emplacement.ts`, правило 4) — не флоты под приказ: в выбор
+  // для приказов они не попадают.
+  const orderable = (id: string): boolean =>
+    s.fleets[id]?.owner === ME && !isMineFleet(s.fleets[id]!, data) && !isEmplacementFleet(s.fleets[id]!, data);
   if (selFleets.size) return [...selFleets].filter(orderable);
   return selFleet && orderable(selFleet) ? [selFleet] : [];
 }
@@ -2596,6 +2607,12 @@ function orbitAngle(idx: number, nPeers: number): number {
  *  берут `fleetOriginPx` — точку, которую знает ядро. Здесь же остаются отрисовка
  *  шеврона, попадание тапом/рамкой по нему и привязка меню к его картинке. */
 function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
+  // Крепость стоит в точке постройки носом вверх — ни кольца, ни строя боя
+  // (`emplacement.ts`, правило 2). На развилке эта точка — на дороге, на узле — его центр.
+  if (isEmplacementFleet(f, data)) {
+    const at = fleetPos(f);
+    return at ? { ...world(at), ang: EMPLACEMENT_HEADING } : null;
+  }
   if (f.movement || !f.location) {
     const mp = fleetPos(f);
     if (!mp) return null;
@@ -2623,7 +2640,8 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   // стороны лицом к противнику (`decisions/battleStance.ts`).
   if (f.battleId) {
     const fighting = Object.values(s.fleets).filter(
-      (g) => g.battleId === f.battleId && g.location === f.location && !g.movement,
+      (g) =>
+        g.battleId === f.battleId && g.location === f.location && !g.movement && !isEmplacementFleet(g, data),
     );
     const slot = battleStance(fighting, ME).get(f.id);
     if (slot) {
@@ -2632,8 +2650,9 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
     }
   }
   // a single orbit: every stationed (non-transit, not fighting) fleet here shares the one ring
+  // Крепость слота на кольце не занимает (`emplacement.ts`, правило 3).
   const peers = Object.values(s.fleets).filter(
-    (g) => g.location === f.location && !g.movement && !g.battleId,
+    (g) => g.location === f.location && !g.movement && !g.battleId && !isEmplacementFleet(g, data),
   );
   const idx = Math.max(
     0,
@@ -3470,7 +3489,9 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
   if (gate === 'closed') return null;
   // Источники, типы и суммы — `troopsSources.ts` (REFM-81): на союзном мире поднимать
   // нечего, поэтому счётчик выходит односторонним сам собой, без отдельного режима меню.
-  const types = groundTypes(troopSources(mine, here.garrison, landing), isGround);
+  // «Гарнизон» форта неподвижен (`immobile`) — ядро его не поднимет, меню не предлагает.
+  const liftable = (u: string) => !data.units[u]?.traits.includes('immobile');
+  const types = groundTypes(troopSources(mine, here.garrison, landing, liftable), isGround);
   if (!hasTroops(types)) return null;
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
@@ -6051,6 +6072,12 @@ function render(now: number) {
    * неё только место, и вторая копия рисунка разошлась бы с первой на первой правке.
    * Пиратская и нейтральная базы ядра не несут — полосы у них просто нет.
    */
+  // Где корпус крепости уже нарисует её ЮНИТ (`emplacement.ts`): там силуэт ниже
+  // рисует только каркас и полосу ядра, иначе корпус лёг бы дважды.
+  const fortressUnits = Object.values(s.fleets)
+    .filter((f) => isEmplacementFleet(f, data) && fleetSeen(f))
+    .map((f) => fleetAnchor(f))
+    .filter((a): a is { x: number; y: number; ang: number } => !!a);
   const drawStationArt = (
     c: { x: number; y: number },
     col: string,
@@ -6082,15 +6109,18 @@ function render(now: number) {
     cx.restore();
     const core = buildings.find((b) => b.type === 'starfort');
     if (core) {
-      cx.save();
-      cx.strokeStyle = col;
-      cx.lineWidth = 1.6;
-      cx.shadowColor = col;
-      cx.shadowBlur = fxBlur(8);
-      cx.fillStyle = rgba(col, 0.24);
-      cx.translate(c.x - 12, c.y - 12);
-      drawShipShape(cx, 'station', detail > 0.5);
-      cx.restore();
+      // Корпус — у юнита, если тот стоит здесь; каркас и полоса ядра остаются силуэту.
+      if (!fortressUnits.some((a) => Math.hypot(a.x - c.x, a.y - c.y) < 4)) {
+        cx.save();
+        cx.strokeStyle = col;
+        cx.lineWidth = 1.6;
+        cx.shadowColor = col;
+        cx.shadowBlur = fxBlur(8);
+        cx.fillStyle = rgba(col, 0.24);
+        cx.translate(c.x - 12, c.y - 12);
+        drawShipShape(cx, 'station', detail > 0.5);
+        cx.restore();
+      }
       const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
       cx.fillStyle = 'rgba(2,9,13,.7)';
       cx.fillRect(c.x - 12, c.y - 22, 24, 3);
@@ -6677,8 +6707,10 @@ function render(now: number) {
       drawShipShape(cx, shape, false);
       cx.restore();
     }
+    // Крепость — одно сооружение: счёт «×N» у неё читался бы как N крепостей.
+    const emplacement = isEmplacementFleet(f, data);
     if (detail === 0) {
-      drawFleetHoldBadge(cx, A, null, ships, [], false, col, fleetVeteranGrade(f.units, data));
+      if (!emplacement) drawFleetHoldBadge(cx, A, null, ships, [], false, col, fleetVeteranGrade(f.units, data));
       // selection still reads on the schematic view; the rest of the kit is gone
       if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 12, now);
       continue;
@@ -6744,7 +6776,7 @@ function render(now: number) {
     // Own hold occupancy is read from the snapshot; foreign manifests stay private.
     // The badge remains horizontal and outside the orbit even as heading changes.
     const dock = !f.movement && f.location ? s.planets[f.location] : null;
-    drawFleetHoldBadge(
+    if (!emplacement) drawFleetHoldBadge(
       cx, A, heroesByFleet.has(f.id) ? null : dock ? world(dock.position) : null, ships,
       f.owner === ME ? fleetHolds(f, data, s.time, fleetAloftPlaces(s, f, data)) : [],
       selFleet === f.id || selFleets.has(f.id) || lod.scale >= 1.9,
@@ -7230,7 +7262,7 @@ function fleetPanelHtml(f: Fleet): string {
   const hullTag = pct < LIMP_PCT ? ` · ⚠ ${t('side.fleet.hull-tag', { p: pct })}` : '';
   // Bytro-стиль: авто-имя соединения (слово + позывной), тап → сводка. Слово одно на
   // любой размер (SHU-4.1): «эскадра» и прочие авиационные ступени принадлежат челнокам.
-  const fleetTitle = `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`;
+  const fleetTitle = fleetTitleOf(f.id);
   let h = cardHeader(
     ownerColor(f.owner),
     fleetTitle,
@@ -7787,7 +7819,7 @@ function fleetConsoleHtml(f: Fleet): string {
     [node ? placeName(node) : '', t('fleet.console.ships', { n: nShips })].filter(Boolean).join(' · ') +
     fleetSubNotes(f, nTr);
   // Шапка окна широкая: подзаголовку не нужно сжатие узкой карточки ПК (` · ` → `·`).
-  const h = kitCardHeader(ownerColor(f.owner), `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub, {
+  const h = kitCardHeader(ownerColor(f.owner), fleetTitleOf(f.id), sub, {
     titleAct: 'fleetinfo',
   });
   const detail = fleetInfoFor === f.id ? fleetSummaryHtml(f) : '';
@@ -8908,7 +8940,7 @@ function openShipCard(fleetId: string, index: number): void {
     },
     {
       hpPct: stackHullPct(stack, data),
-      fleetName: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`,
+      fleetName: fleetTitleOf(f.id),
       veteran: veteranMark(stack, data, veteranPowerOn()),
     },
   );
@@ -9378,7 +9410,7 @@ function mobileDraftPoint(): { x: number; y: number } | null {
 
 function mobileTargetLabel(target: MobileOrderTarget): string {
   if (target.kind === 'planet') return placeName(target.id);
-  if (target.kind === 'fleet') return `${t(FLEET_KIND_KEY)} «${fleetCallsign(target.id)}»`;
+  if (target.kind === 'fleet') return fleetTitleOf(target.id);
   return t('hud.mobile.lane', { from: placeName(target.from), to: placeName(target.to) });
 }
 
@@ -9430,7 +9462,7 @@ function updateMobileHud(): void {
     if (pick.kind === 'fleet') {
       const f = s.fleets[pick.id];
       if (!f || !fleetSeen(f)) continue;
-      choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
+      choices.push({ ...pick, title: fleetTitleOf(f.id), sub: NAME[f.owner] ?? f.owner });
     } else if (s.planets[pick.id]) {
       choices.push({ ...pick, title: placeName(pick.id), sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
     }
@@ -10583,9 +10615,10 @@ function selectAt(mx: number, my: number) {
   if (owner === 'merge') {
     const movers = selectedFleetIds();
     // Якорь — свой флот НЕ из выделения (`aimTargets.ts`, REFM-187): иначе ближайшим
-    // окажется сам выделенный, и приказ уйдёт «слить себя с собой».
+    // окажется сам выделенный, и приказ уйдёт «слить себя с собой». Крепость якорем не
+    // бывает: ядро не сливает неподвижное (`E_EMPLACEMENT`, `emplacement.ts`, правило 4).
     const anchor = nearestHit(
-      mergeAnchors(Object.values(s.fleets), ME, movers),
+      mergeAnchors(Object.values(s.fleets).filter((f) => !isEmplacementFleet(f, data)), ME, movers),
       fleetAnchor,
       mx,
       my,
@@ -10859,8 +10892,9 @@ function selectAt(mx: number, my: number) {
   const fleetIds = fleetsUnderTap(
     Object.values(s.fleets).map((f) => ({
       id: f.id,
-      // Своя мина (SM-3.6) — осмотр, а не выбор под приказ: у неё нет приказов.
-      mine: f.owner === ME && !isMineFleet(f, data),
+      // Своя мина (SM-3.6) и крепость (`emplacement.ts`, правило 4) — осмотр, а не выбор
+      // под приказ: у них нет приказов.
+      mine: f.owner === ME && !isMineFleet(f, data) && !isEmplacementFleet(f, data),
       visible: fleetSeen(f),
       anchor: fleetAnchor(f),
     })),
@@ -11103,7 +11137,7 @@ function endPointer(ev: PointerEvent) {
   if (single && boxSelecting && selectionBox) {
     const picked: string[] = [];
     for (const f of Object.values(s.fleets)) {
-      if (f.owner !== ME || isMineFleet(f, data)) continue;
+      if (f.owner !== ME || isMineFleet(f, data) || isEmplacementFleet(f, data)) continue;
       const a = fleetAnchor(f);
       if (a && insideBox(selectionBox, a)) picked.push(f.id);
     }
