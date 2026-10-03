@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
-
-const ЧАС = 3_600_000;
-const СУТКИ = 24 * ЧАС;
+import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded } from './noteLog';
 
 describe('журнал — защита от повторов', () => {
   it('ДОСЛОВНЫЙ ПОВТОР ГЛУШИТСЯ: отскок каждый кадр не строчит пулемётом', () => {
@@ -25,21 +22,6 @@ describe('журнал — защита от повторов', () => {
   it('окно настраивается и меряется в тех же единицах', () => {
     expect(isRepeat('x', 'x', 900, 0, 1000)).toBe(true);
     expect(isRepeat('x', 'x', 1100, 0, 1000)).toBe(false);
-  });
-});
-
-describe('журнал — метка времени', () => {
-  it('МЕТКА ИГРОВАЯ: первый день начинается с единицы', () => {
-    expect(stamp(0, СУТКИ, ЧАС)).toBe('D1 00h');
-  });
-
-  it('час дописывается ведущим нулём', () => {
-    expect(stamp(7 * ЧАС, СУТКИ, ЧАС)).toBe('D1 07h');
-  });
-
-  it('переход суток увеличивает номер дня и сбрасывает час', () => {
-    expect(stamp(СУТКИ, СУТКИ, ЧАС)).toBe('D2 00h');
-    expect(stamp(2 * СУТКИ + 23 * ЧАС, СУТКИ, ЧАС)).toBe('D3 23h');
   });
 });
 

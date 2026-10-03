@@ -216,7 +216,7 @@ describe('разметка', () => {
     expect(html).toContain('data-cmd="chsend"');
     expect(html).toContain('data-cmd="chexit"');
     expect(html).toContain('chwarn'); // ⚠ разные планы группы
-    expect(html).toContain('2 флотов');
+    expect(html).toContain('2 флота'); // слово по числу (UIX-5.3), было «2 флотов»
   });
 
   it('пустой черновик: подсказка вместо счётчика, ✓ превращается в «снять приказ»', () => {

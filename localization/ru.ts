@@ -60,9 +60,9 @@ export const ru: Record<string, string> = {
   'dossier.unit.pirate-skiff.desc': 'Переделанный буксир: скорость {sp}, обзор {r}, корпус {hp}.',
   'dossier.unit.pirate-frigate.desc': 'Патрульный фрегат из трофейных узлов: атака {a}, защита {d}, корпус {hp}.',
   'dossier.unit.pirate-cruiser.desc': 'Бронированный рейдер: атака {a}, корпус {hp}, трюм на {bay}.',
-  'dossier.unit.pirate-boarder.desc': 'Лёгкая абордажная пехота: корпус {hp}, {cs} место в трюме.',
+  'dossier.unit.pirate-boarder.desc': 'Лёгкая абордажная пехота: корпус {hp}, {cs} {cs|место|места|мест} в трюме.',
   'dossier.unit.pirate-marauder.desc': 'Трофейный тяжёлый экзокостюм: корпус {hp}, защита от пехоты {d}.',
-  'dossier.unit.pirate-tank.desc': 'Переделанный гусеничный тягач: корпус {hp}, атака по технике {a}, {cs} места в трюме.',
+  'dossier.unit.pirate-tank.desc': 'Переделанный гусеничный тягач: корпус {hp}, атака по технике {a}, {cs} {cs|место|места|мест} в трюме.',
   "data.neutral-ai-base": "База нейтрального ИИ",
   "data.black-hole": "Чёрная дыра",
   "map.frontier": "Фронтир",
@@ -131,23 +131,23 @@ export const ru: Record<string, string> = {
   'mission.fortify': 'Укрепления: построить форты ({n})',
   'mission.hold-out': 'Удержаться: дожить до волны {n}',
   'mission.raze-biomass': 'Зачистка производства: снести биореакторы Роя',
-  'mission.recon': 'Разведка: опознать {n} провинций',
+  'mission.recon': 'Разведка: опознать {n} {n|провинцию|провинции|провинций}',
   'mission.salvage': 'Сбор материалов: взять поля обломков',
   'mission.beacon': 'Маяк: удерживать маяк {n} подряд — Рой ответит силами',
   'mission.starfort': 'Крепость: построить космическую крепость на второй колонии',
   'mission.rescue': 'Спасение: снять осаду с гарнизона, пока он держится',
   'mission.cut-network': 'Разорвать сеть: отрезать гнездо Роя от улья — убей ретранслятор на пути',
-  'mission.evac': 'Эвакуация: довести {n} транспорта с беженцами до базы',
+  'mission.evac': 'Эвакуация: довести {n} {n|транспорт|транспорта|транспортов} с беженцами до базы',
   'mission.beachhead': 'Плацдарм: взять передовой плацдарм Роя',
   'mission.fort-east': 'Форт: построить форт на восточной колонии',
   'mission.starfort-west': 'Крепость: построить космическую крепость на западной колонии',
   'mission.watch-post': 'Наблюдательный пост: занять западный пост',
   'mission.retake-station': 'Станция карантина: вернуть центральную станцию',
   'mission.training-beacon': 'Учебный маяк: занять наблюдательную станцию',
-  'mission.training-recon': 'Разведка: опознать весь полигон — {n} провинций',
+  'mission.training-recon': 'Разведка: опознать весь полигон — {n} {n|провинцию|провинции|провинций}',
   'mission.far-eye': 'Дальний глаз: занять наблюдательную станцию за архивом',
   'mission.fallback-line': 'Запасной рубеж: построить форт на западной перемычке',
-  'mission.last-shift': 'Последняя смена: довести {n} транспорта лаборатории до базы',
+  'mission.last-shift': 'Последняя смена: довести {n} {n|транспорт|транспорта|транспортов} лаборатории до базы',
   'mission.book-of-voices': 'Книга голосов: отбить Приют Завета у фанатиков',
   'mission.shift-lab': 'Лаборатория Смена: выбить фанатиков Завета',
   'mission.take-spire': 'Шпиль: взять опорный мир Роя на внутренней дуге',
@@ -219,7 +219,7 @@ export const ru: Record<string, string> = {
   'battle.win.attack-damage': 'Атака / залп',
   'battle.win.defense-damage': 'Защита / ответ',
   'battle.win.response': 'Ответный огонь · без таймера',
-  'battle.win.composition': 'Состав · {n} плиток',
+  'battle.win.composition': 'Состав · {n} {n|плитка|плитки|плиток}',
   'battle.win.more': 'Ещё {n}',
   'battle.win.less': 'Свернуть состав',
   'battle.win.effects': 'Эффекты · +{buffs} / −{debuffs}',
@@ -436,7 +436,7 @@ export const ru: Record<string, string> = {
   'build.fx.mitigation': '−{n}% урона по миру',
   'build.fx.production': '+{n}% к производству',
   'build.fx.radar': 'радар: {n}',
-  'build.fx.hangar': 'ангар: {n} мест под шаттлы',
+  'build.fx.hangar': 'ангар: {n} {n|место|места|мест} под шаттлы',
   'build.fx.shipyard': 'открывает постройку кораблей',
   'build.head.built': 'построено: {n}',
   'build.state.done': 'Построено',
@@ -773,11 +773,11 @@ export const ru: Record<string, string> = {
   'cmd.move': 'Курс',
   'cmd.move.hint': 'выберите планету — флот пойдёт к ней по звёздным трассам',
   'cmd.multiselect': 'Выбрать+',
-  'cmd.multiselect.hint': 'добавлять флоты в группу по одному тапу',
+  'cmd.multiselect.hint': 'добавлять флоты в группу по одному нажатию',
   'cmd.retreat.hint': 'Точка отхода — выбранный свой мир, иначе столица',
   'cmd.retreat.off': 'Выкл',
   'cmd.retreat.title': 'Отходить, когда корпус ниже:',
-  'cmd.selection.many': '{n} ФЛОТОВ',
+  'cmd.selection.many': '{n} {n|ФЛОТ|ФЛОТА|ФЛОТОВ}',
   'cmd.selection.one': 'ФЛОТ',
   'cmd.split': 'Разделить',
   'cmd.split.hint': 'отделить часть кораблей в новый флот — на стоянке или в пути',
@@ -791,7 +791,7 @@ export const ru: Record<string, string> = {
   'cmd.stop.hint': 'отменить текущее движение флота',
   'cmd.target': 'Приказ',
   'cmd.target.hint':
-    'режим плана: тапайте точки карты — курс · ждать · штурм · огонь; флот исполнит цепочку сам',
+    'режим плана: нажимайте на точки карты — курс · ждать · штурм · огонь; флот исполнит цепочку сам',
 
   // --- codex — Кодекс: карточка здания/юнита/модуля (строки характеристик) и статьи-термины.
   'codex.hub.close': 'ЗАКРЫТЬ',
@@ -1006,7 +1006,7 @@ export const ru: Record<string, string> = {
   'corp.medals.empty': 'Каталог наград пуст.',
   'corp.medals.locked': 'не получена',
   'corp.medals.title': 'Все награды',
-  'corp.members.count': '{n} участников',
+  'corp.members.count': '{n} {n|участник|участника|участников}',
   'corp.my-role': 'Моя роль',
   'corp.ready.clear': 'снять',
   'corp.ready.corp': 'Готовность корпорации',
@@ -1322,7 +1322,7 @@ export const ru: Record<string, string> = {
   'dossier.hint': 'Наведите на объект слева — здесь появится его досье.',
   'dossier.stat.atk.name': 'Атака',
   'dossier.stat.cap.desc':
-    'В залпе бьют максимум {n} юнитов — сильнейшие первыми; все сверх капа только впитывают урон.',
+    'В залпе {n|бьёт|бьют|бьют} максимум {n} {n|юнит|юнита|юнитов} — сильнейшие первыми; все сверх капа только впитывают урон.',
   'dossier.stat.cap.name': 'Линия огня',
   'dossier.stat.datk.name': 'Атака',
   'dossier.stat.ddef.name': 'Защита',
@@ -1356,10 +1356,10 @@ export const ru: Record<string, string> = {
   'dossier.task.title': 'Стройка',
   'dossier.task.unit-ready': 'По готовности пополнит гарнизон/флот планеты.',
   'dossier.unit.cruiser.desc':
-    'Рабочая лошадь линейного флота: {a} атаки, {hp} корпуса и трюм на {c} мест под десант и шаттлы. Универсальный боевой корабль, одинаково уверенный в обороне и в наступлении.',
+    'Рабочая лошадь линейного флота: {a} атаки, {hp} корпуса и трюм на {c} {c|место|места|мест} под десант и шаттлы. Универсальный боевой корабль, одинаково уверенный в обороне и в наступлении.',
   'dossier.unit.cruiser.name': 'Крейсер',
   'dossier.unit.heavy-cruiser.desc':
-    'Тяжёлый корпус линии: {a} атаки, {d} защиты, {hp} корпуса, ход {sp}, трюм на {c} мест. Универсальных отсеков: {n} — в каждый встаёт модуль любого типа.',
+    'Тяжёлый корпус линии: {a} атаки, {d} защиты, {hp} корпуса, ход {sp}, трюм на {c} {c|место|места|мест}. Универсальных отсеков: {n} — в каждый встаёт модуль любого типа.',
   'dossier.unit.heavy-cruiser.name': 'Усиленный крейсер',
   'dossier.unit.default': 'Боевая единица.',
   'dossier.unit.bomber.desc':
@@ -1372,7 +1372,7 @@ export const ru: Record<string, string> = {
     'Перехватчик: охотник за ЧУЖИМИ ШАТТЛАМИ — {s} урона по ним, больше, чем у кого-либо. По кораблям почти безвреден ({a} атаки), по постройкам тем более. Стремительный (ход {sp}), но брони нет ({hp} корпуса), радиус {r}. Главное: он поднимается САМ, без приказа, когда чужой удар проходит рядом с его портом или кораблём, — и тратит на это топливо базы. Место в трюме: {cs}.',
   'dossier.unit.interceptor.name': 'Перехватчик',
   'dossier.unit.frigate.desc':
-    'Фрегат: корабль ПОДДЕРЖКИ. Сам почти не воюет ({a} атаки, {d} защиты) и живёт за счёт того, что на него вешают — {n} отсека под модули, больше, чем у любого другого корпуса. Держит удар лучше разведчика ({hp} корпуса) и стоит в средней линии.',
+    'Фрегат: корабль ПОДДЕРЖКИ. Сам почти не воюет ({a} атаки, {d} защиты) и живёт за счёт того, что на него вешают — {n} {n|отсек|отсека|отсеков} под модули, больше, чем у любого другого корпуса. Держит удар лучше разведчика ({hp} корпуса) и стоит в средней линии.',
   'dossier.unit.frigate.name': 'Фрегат',
   'dossier.unit.hero.desc':
     'Боевая проекция самого командующего — флагман во главе родного флота: {a} атаки и {hp} корпуса. Но решает не это: его присутствие держит эскадру в кулаке, давая {b} к атаке и обороне всем кораблям рядом. Падёт — командующий лишается проекции, пока та не отстроится заново на родном мире.',
@@ -1384,7 +1384,7 @@ export const ru: Record<string, string> = {
     'Лёгкий разведывательный корпус. Быстрый (ход {sp}) и почти неслышный (сигнатура {sig}) — чертит карту пустоты там, куда боится соваться линейный флот. Носит свой компактный радар (+{m}).',
   'dossier.unit.scout.name': 'Разведчик',
   'dossier.unit.shuttle-carrier.desc':
-    'Плавучий космопорт: трюм на {bay} мест под шаттлы и десант, {d} защиты, {hp} корпуса, {a} атаки. Везёт и армию для высадки, и шаттлы. Стоит в линии поддержки. Шаттлы вылетают с борта на ходу и садятся обратно; погибнет корпус — погибнет всё на борту.',
+    'Плавучий космопорт: трюм на {bay} {bay|место|места|мест} под шаттлы и десант, {d} защиты, {hp} корпуса, {a} атаки. Везёт и армию для высадки, и шаттлы. Стоит в линии поддержки. Шаттлы вылетают с борта на ходу и садятся обратно; погибнет корпус — погибнет всё на борту.',
   'dossier.unit.shuttle-carrier.name': 'Носитель',
 
   // --- faction — Фракции: пассивный бонус дома.
@@ -1405,7 +1405,7 @@ export const ru: Record<string, string> = {
   'fleet.console.at-planet': 'На планете',
   'fleet.console.aura': '{p} атаки и обороны',
   'fleet.console.composition': 'Состав',
-  'fleet.console.composition.hint': 'Числа — с надбавками. Тап по параметру — что его меняет.',
+  'fleet.console.composition.hint': 'Числа — с надбавками. Нажмите на параметр — что его меняет.',
   'fleet.console.load': 'Погрузка и выгрузка',
   'fleet.console.orders': 'Приказы',
   'fleet.console.shield.none': 'нет',
@@ -1415,6 +1415,7 @@ export const ru: Record<string, string> = {
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}ч',
   'fmt.minutes': '{n}м',
+  'fmt.stamp': 'День {d}, {hm}',
 
   // --- form — Рода войск дивизии.
 
@@ -1430,7 +1431,7 @@ export const ru: Record<string, string> = {
   'hint.cast-cancelled': '✖ каст отменён',
   'hint.deploy-cancelled': '✖ развёртывание отменено',
   'hint.forced-march': '⚡ форс-марш: +50% скорости, −5% прочности за час хода',
-  'hint.multiselect': '⊕ тапайте свои флоты — соберите группу и отдайте общий приказ',
+  'hint.multiselect': '⊕ щёлкайте по своим флотам — соберите группу и отдайте общий приказ',
   'hint.pick-assault': '⚔ выберите чужой мир для штурма',
   'hint.pick-retreat': '⤺ выберите на карте, куда отойти',
   'hint.retreat-cancelled': '✖ отход отменён',
@@ -1438,7 +1439,7 @@ export const ru: Record<string, string> = {
   'hint.engage-enemy-only': 'здесь нет вражеского флота — цели в красных уголках',
   'hint.engage-in-flight': 'цель в пути — курса к ней нет, дождитесь остановки',
   'hint.pick-merge': '⛬ выберите флот для объединения',
-  'hint.pick-order': 'тапните точку на карте — каждый тап добавляет приказ',
+  'hint.pick-order': 'нажмите на точку карты — каждое нажатие добавляет приказ',
   'hint.standing-sortie': '🛩 дежурный вылет включён — шаттлы бьют врага в радиусе',
 
   // --- loadout — Оснащение корабля (packages/client): подписи характеристик в превью.
@@ -1460,9 +1461,11 @@ export const ru: Record<string, string> = {
   'loadout.stat.mine-hit': 'Урон мин',
   'loadout.stat.percent': '{n}%',
 
-  // --- map — Значки на карте: фазы боя.
+  // --- map — Значки на карте: фазы боя; кольца радара выбранного мира.
   'map.badge.landing': '⚒ десант',
   'map.badge.orbit': '⚔ орбита',
+  'map.radar.detect': '◌ засечка {n}',
+  'map.radar.identify': '● опознание {n}',
 
   // --- meta — Прокачка командующего: уровень, очки, узлы.
   'meta.branch.command': 'Командование',
@@ -1934,7 +1937,7 @@ export const ru: Record<string, string> = {
   'split.hold.over': 'десант не влезает',
   'split.note':
     'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме делится вместе с кораблями.',
-  'split.preview': 'новый флот: {a} кораблей · у исходного останется {b}',
+  'split.preview': 'новый флот: {a} {a|корабль|корабля|кораблей} · у исходного останется {b}',
   'split.section.landing': 'Десант в трюме',
   'split.title': 'РАЗДЕЛЕНИЕ ФЛОТА',
 
@@ -1967,7 +1970,7 @@ export const ru: Record<string, string> = {
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
   'tgt.add-wait': '⏱ +1ч',
   'tgt.clear': 'снять приказ',
-  'tgt.fleets': '{n} флотов',
+  'tgt.fleets': '{n} {n|флот|флота|флотов}',
   'tgt.placed': '◎ приказ поставлен — флот исполнит план сам',
   'tgt.send': 'Отправить',
   'tgt.step.here': 'Сюда',
@@ -2017,7 +2020,7 @@ export const ru: Record<string, string> = {
   'yard.slot.universal': 'Универсальный',
   'yard.slot.utility': 'Система',
   'yard.slot.weapon': 'Оружие',
-  'yard.slots.count': '{n} слота под модули (по размеру корпуса)',
+  'yard.slots.count': '{n} {n|слот|слота|слотов} под модули (по размеру корпуса)',
   'yard.slots.note':
     'Модуль встаёт в слот своего типа, а когда тот занят — в универсальный. <b>Серые</b> — не для свободного слота или уже стоят.',
   'yard.tab.heroes': 'Герои',
@@ -2551,7 +2554,7 @@ export const ru: Record<string, string> = {
   'hud.crest.title': 'Ваш профиль',
   'hud.deficit': '⚠ ДЕФИЦИТ — здания-потребители работают на 50%',
   'hud.goal': 'Задача: ✦ {n} (мир — 50, сектор — 10) или уничтожение соперников.',
-  'hud.goal.pve': 'Задача: выстоять {n} волн и удержать свой мир до конца главы.',
+  'hud.goal.pve': 'Задача: выстоять {n} {n|волну|волны|волн} и удержать свой мир до конца главы.',
   'hud.next-day.cap': 'до след. дня',
   'hud.place': '{p}-е из {n}',
   'hud.resource.credits': 'Кредиты',
@@ -2572,7 +2575,7 @@ export const ru: Record<string, string> = {
   'rescard.expense': 'Расходы',
   'rescard.net': 'Чистый доход',
   'rescard.production': 'Производство миров',
-  'rescard.sprawl': 'Налог на рост: −{p}% ({n} провинций, без налога до {free})',
+  'rescard.sprawl': 'Налог на рост: −{p}% ({n} {n|провинция|провинции|провинций}, без налога до {free})',
   'rescard.upkeep': 'Содержание зданий',
   'rescard.army': 'Содержание войск',
   'rescard.market': 'Рынок',
@@ -2580,7 +2583,7 @@ export const ru: Record<string, string> = {
   'rescard.close': 'Закрыть',
   'rescard.no-trade': 'Кредиты — валюта, их нельзя продать на рынке',
   'hud.score.tip':
-    '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} миров, {s} секторов). Победа: ✦ {limit}, уничтожение соперников или доминирование.',
+    '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} {w|мир|мира|миров}, {s} {s|сектор|сектора|секторов}). Победа: ✦ {limit}, уничтожение соперников или доминирование.',
 
   // --- log — Журнал событий матча (сводки) и гейт объявления войны.
   'log.assault.no-troops':
@@ -2655,12 +2658,12 @@ export const ru: Record<string, string> = {
   'log.tech.done': '⚛ изучено: {tech}',
   'log.war.declared': '⚔ Война объявлена — флоты выдвигаются',
   'war.confirm.cancel': 'ОТМЕНА',
-  'war.confirm.friendly': 'Это мир дружественной фракции. Вы хотите объявить войну <b>{names}</b>?',
+  'war.confirm.friendly': 'Это мир дружественной фракции — <b>{names}</b>. Объявить войну?',
   'war.confirm.go': 'ОБЪЯВИТЬ ВОЙНУ',
   'war.confirm.no': 'НЕТ',
   'war.confirm.title': 'ОБЪЯВИТЬ ВОЙНУ?',
   'war.confirm.transit':
-    'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.',
+    'Маршрут проходит через миры тех, с кем у вас <b>мир</b>: <b>{names}</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.',
   'war.confirm.yes': 'ДА',
 
   // --- market — Сессионная биржа: вкладки ресурсов, книга заявок, лот, комиссия.
@@ -2840,7 +2843,7 @@ export const ru: Record<string, string> = {
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
   'setup.bonus.damage': '+{n}% урон',
   'setup.bonus.economy': '+{n}% экономика',
-  'setup.ai.hint': 'Тап переключает: выкл → слабый → сильный',
+  'setup.ai.hint': 'Щелчок переключает: выкл → слабый → сильный',
   'setup.ai.strong': 'Сильный',
   'setup.ai.weak': 'Слабый',
   'setup.bonus.radar': '+{n}% радар',
@@ -2851,10 +2854,10 @@ export const ru: Record<string, string> = {
   'setup.council.label': 'Совет учёных',
   'setup.faction.note': 'Фракция — пассивный бонус дома',
   'setup.go': 'Запуск',
-  'setup.home.pick': 'Дом: {home} — тапните другой светящийся мир, чтобы сменить',
+  'setup.home.pick': 'Дом: {home} — нажмите на другой светящийся мир, чтобы сменить',
   'setup.home.solo':
-    'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить',
-  'setup.map-hint': 'Тапните светящийся мир, чтобы выбрать старт',
+    'Дом: {home} — одиночная песочница, без соперников · нажмите на светящийся мир, чтобы сменить',
+  'setup.map-hint': 'Нажмите на светящийся мир, чтобы выбрать старт',
   'setup.off': 'Выкл',
   'setup.rivals': 'Соперники: {n}',
   'setup.rivals.help':
@@ -2930,13 +2933,13 @@ export const ru: Record<string, string> = {
   'sector-zero.end.copies': 'Дубли: {list}',
   'sector-zero.end.tokens': 'Жетоны героя: {name} +{n}',
   'sector-zero.rarity.blueprints': 'Чертежи:',
-  'sector-zero.rarity.hint': 'Редкость даёт новый параметр и поднимает потолок звёзд: нужен чертёж следующей ступени и {n} дубля.',
+  'sector-zero.rarity.hint': 'Редкость даёт новый параметр и поднимает потолок звёзд: нужен чертёж следующей ступени и {n} {n|дубль|дубля|дублей}.',
   'sector-zero.rarity.need': 'Чертёж {b}/1 · дубли {c}/{m}',
   'sector-zero.rarity.raise': 'Повысить редкость',
   'sector-zero.rarity.raised': 'Редкость повышена: {r}',
   'sector-zero.rarity.to': 'Повысить до: {r}',
   'sector-zero.shop.blueprint': 'Чертёж: {r}',
-  'sector-zero.shop.blueprint.gives': 'Поднимает модуль на эту ступень вместе с {n} дублями',
+  'sector-zero.shop.blueprint.gives': 'Поднимает модуль на эту ступень вместе с {n} {n|дублем|дублями|дублями}',
   'sector-zero.shop.duplicate': 'придёт дублем для редкости',
   'sector-zero.shop.grants.blueprint': 'Чертёж редкости',
   'sector-zero.shop.grants.hero-tokens': 'Жетоны героя',
@@ -2960,7 +2963,7 @@ export const ru: Record<string, string> = {
   'sector-zero.forge.burn': 'При неудаче Варранты сгорают. Достигнутая звёздность не падает.',
   'sector-zero.forge.cap': 'Потолок звёзд достигнут',
   'sector-zero.forge.cost': 'Цена: {n} ⌖',
-  'sector-zero.hull.max': '{n} слотов — максимум',
+  'sector-zero.hull.max': '{n} {n|слот|слота|слотов} — максимум',
   'sector-zero.hull.star': 'Звезда {n}: +1 слот',
   'sector-zero.forge.chance': 'Шанс успеха: {n}%',
   'sector-zero.forge.lost': 'Попытка не удалась. Звёздность не изменилась.',
@@ -3093,7 +3096,7 @@ export const ru: Record<string, string> = {
   'sector-zero.shop.grants.module': 'Модуль корабля',
   'sector-zero.shop.grants.research': '+{n} данных экспедиций',
   'sector-zero.shop.grants.skill': 'Узел навыка героя',
-  'sector-zero.shop.grants.warrants': '+{n} Варрантов',
+  'sector-zero.shop.grants.warrants': '+{n} {n|Варрант|Варранта|Варрантов}',
   'sector-zero.shop.hint': 'Модули, навыки, ресурсы, чертежи редкости и жетоны героев. Открытый модуль приходит дублем. Каждый товар продаётся своими способами оплаты.',
   'sector-zero.shop.locked': 'Недоступно выбранному герою',
   'sector-zero.shop.owned': 'Уже открыто',
@@ -3201,7 +3204,7 @@ export const ru: Record<string, string> = {
   'side.conveyor.queue-empty': 'очередь пуста',
   'side.conveyor.resume.title': 'Возобновить — доплатить остаток',
   'side.conveyor.waiting': 'Ждёт ресурсы: {c}',
-  'side.empty': 'Тапните мир.',
+  'side.empty': 'Выберите мир.',
   'side.fleet.bombarding': 'бомбардирует',
   'side.fleet.landing': 'высадка: {t}',
   'side.fleet.enroute': '↗ курс: {dest} · прибытие через',
@@ -3230,11 +3233,11 @@ export const ru: Record<string, string> = {
     'Постановка 15 мин. Носитель должен оставаться на месте. Перезарядка 6 ч.',
   'side.fleet.repair.premium.title': 'Мгновенный ремонт всего корпуса за Суверены',
   'side.fleet.repair.premium.short': 'Не хватает Суверенов: нужно {n}',
-  'side.fleet.ships': 'Корабли — тап: оснащение и характеристики',
-  'side.fleet.signature': 'радарный контакт: ~{n} кораблей',
-  'side.fleet.sub': '{s} кораблей · {tr} десанта',
+  'side.fleet.ships': 'Корабли — нажмите: оснащение и характеристики',
+  'side.fleet.signature': 'радарный контакт: ~{n} {n|корабль|корабля|кораблей}',
+  'side.fleet.sub': '{s} {s|корабль|корабля|кораблей} · {tr} десанта',
   'side.fleet.sub.pc': 'Корабли: {s} · Десант: {tr}',
-  'side.fleet.tile.hint': 'тап — оснащение и характеристики',
+  'side.fleet.tile.hint': 'щёлкните — оснащение и характеристики',
   'side.fleet.troops': 'Десант на борту',
   'side.garrison.plus-troops': '+{n} десанта',
   'side.garrison.select': 'Выбрать →',
@@ -3252,7 +3255,7 @@ export const ru: Record<string, string> = {
   'side.group.clear': 'Снять выделение группы',
   'side.group.hint':
     'Нажмите «Курс» и тапните цель — все выбранные флоты пойдут туда (проложат маршрут и встанут). «Слить» сплавляет группу в один флот (дальние сначала подлетят). Shift- или Ctrl/⌘-клик по флоту добавляет его в группу; Shift-рамка по пустому месту выделяет несколько.',
-  'side.group.sub': '{f} флот(ов) · {s} кораблей · {tr} десанта',
+  'side.group.sub': '{f} {f|флот|флота|флотов} · {s} {s|корабль|корабля|кораблей} · {tr} десанта',
   'side.group.title': 'ОПЕРАТИВНАЯ ГРУППА',
   'side.neutral': 'Нейтрал',
   'side.none': 'нет',
@@ -3294,7 +3297,7 @@ export const ru: Record<string, string> = {
   'side.summary.cargo': 'Трюм',
   'side.summary.composition': 'Состав',
   'side.summary.defense': 'Защита',
-  'side.summary.firing-cap': 'бьют {n} юнитов',
+  'side.summary.firing-cap': '{n|бьёт|бьют|бьют} {n} {n|юнит|юнита|юнитов}',
   'side.summary.forced-march': 'форс-марш',
   'side.summary.hull': 'Корпус',
   'side.summary.radar': 'Радар',
@@ -3319,7 +3322,7 @@ export const ru: Record<string, string> = {
   'side.world.capital': 'Столица',
   'side.world.capital.note': 'Здесь возрождаются герои и меняют модули',
   'side.world.defense': 'оборона {p}',
-  'side.world.fleet-ships': '{n} кораблей',
+  'side.world.fleet-ships': '{n} {n|корабль|корабля|кораблей}',
   'side.world.fleets': 'Флоты на орбите',
   'side.world.hold': '🚩 Держать',
   'side.world.hold.clear': 'Снять точку',

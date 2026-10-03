@@ -31,3 +31,22 @@ describe('SZ-map-ids — места называются именами', () => 
     expect(MAIN).not.toContain("'asteroid field'");
   });
 });
+
+describe('UIX-5.3 — надписи холста словами языка игрока', () => {
+  it('литерал в `fillText` несёт значок и число, но не английское слово', () => {
+    // «◌ SIGNATURE 240» и «● REVEAL 120» у колец радара стояли на обоих языках: литерал
+    // холста гейт локализации не видит, он ищет `t('…')`. Слово — только через ключ.
+    const literals = [...MAIN.matchAll(/fillText\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)].map((m) =>
+      m[2]!.replace(/\$\{[^}]*\}/g, ''),
+    );
+    expect(literals.length).toBeGreaterThan(5); // разбор не должен молча опустеть
+    // «G:», «B:» и «✦last» в подписях тумана и схемы — словарь терминов (UIX-5.4). Список
+    // обязан сокращаться: починенная подпись уронит тест, и её надо отсюда убрать.
+    expect(literals.filter((l) => /[A-Za-z]{2,}/.test(l))).toEqual(['G:  ✦last']);
+  });
+
+  it('кольца радара выбранного мира подписаны ключами', () => {
+    expect(MAIN).toContain("t('map.radar.detect'");
+    expect(MAIN).toContain("t('map.radar.identify'");
+  });
+});
