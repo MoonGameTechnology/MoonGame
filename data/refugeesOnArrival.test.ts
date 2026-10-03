@@ -22,6 +22,7 @@ import { missionTargets } from '../decisions/missionView';
 import { shippedGameData } from './bundle';
 import pve2 from './maps/pve-2.json';
 import pve4 from './maps/pve-4.json';
+import pve6 from './maps/pve-6.json';
 
 const data = shippedGameData();
 
@@ -38,6 +39,7 @@ const ctx: Context = { now: 0, data, config: { timeScale: 1 } as MatchConfig };
 describe.each([
   ['pve-2', pve2, 'deep_drift', 'p1_1'],
   ['pve-4', pve4, 'lab_outpost', 'p1_1'],
+  ['pve-6', pve6, 'quarantine_docks', 'p1_1'],
 ])('%s: транспорты беженцев ждут прибытия флота игрока', (_id, raw, site, escort) => {
   const start = (): GameState => buildStateFromMap(parseMatchMap(raw), data);
 
