@@ -51,6 +51,11 @@ export const MapSectorSchema = z.object({
   /** Rendezvous with a scripted ally (PVR-7.2): the id of a map inhabitant (`npc: 'neutral'`)
    *  that the first human fleet arriving here allies with. Validated against `players`. */
   rendezvous: z.string().min(1).optional(),
+  /** The rendezvous already happened before the match (PVR-8.2, chapter VI: «повторного
+   *  знакомства нет»): the loader records the contact for every human seat and seeds the
+   *  alliance, so the ally's link, orders and shared view work from minute one. Only next
+   *  to `rendezvous` on the same sector (`E_INVALID_RENDEZVOUS` otherwise). */
+  contactAtStart: z.boolean().optional(),
   /** Archive holding the data package (PVR-7.3): `hours` of work by a fleet parked here,
    *  then the carrier delivers it to `zone`. At most one per map; validated by the loader. */
   vault: z
