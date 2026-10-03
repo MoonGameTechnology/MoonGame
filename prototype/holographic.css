@@ -76,14 +76,16 @@ body.holo-ui .holo-nav button{display:flex;align-items:center;justify-content:ce
   padding:7px 14px;border:1px solid var(--line);border-radius:4px;background:var(--glass);color:var(--ink);font-size:12px;}
 body.holo-ui .holo-nav button{cursor:pointer;}
 body.holo-ui .holo-nav button:hover{border-color:var(--cyan-dim);}
-/* Горячие клавиши ПК (UIX-9.1, `pcHotkeys.ts`): значок клавиши на вкладке и памятка внизу —
-   правее колонки инструментов (18 + 58 + зазор) и до полосы скорости (18 + 301 + зазор): на
-   низком окне колонка опускается до низа, а памятка рядом с ней её не накрывает. Памятка не
-   ловит мышь, кроме ✕, и стоит на z 25 — над картой и полосой скорости, под вкладками (27) и
-   окнами: подсказка не закрывает рабочий интерфейс. */
-body.holo-ui .holo-nav button[data-kbd]::after{content:attr(data-kbd);margin-left:8px;min-width:18px;padding:0 4px;
+/* Горячие клавиши ПК (UIX-9.1, `pcHotkeys.ts`): значок клавиши на вкладке и в раскрытой
+   колонке инструментов (UIX-9.4) и памятка внизу — правее колонки инструментов (18 + 58 +
+   зазор) и до полосы скорости (18 + 301 + зазор): на низком окне колонка опускается до низа,
+   а памятка рядом с ней её не накрывает. Памятка не ловит мышь, кроме ✕, и стоит на z 25 — над
+   картой и полосой скорости, под вкладками (27) и окнами: подсказка не закрывает рабочий
+   интерфейс. */
+body.holo-ui :is(.holo-nav,#railtools) button[data-kbd]::after{margin-left:8px;min-width:18px;padding:0 4px;
   border:1px solid var(--line-hi);border-bottom-width:2px;border-radius:4px;font-size:11px;font-weight:600;
   line-height:16px;text-align:center;color:var(--dim);}
+body.holo-ui .holo-nav button[data-kbd]::after{content:attr(data-kbd);}
 #key-memo{display:none;}
 body.holo-ui.holo-in-match #key-memo:not([hidden]){display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;
   position:fixed;left:92px;bottom:16px;z-index:25;max-width:min(780px,calc(var(--vpw) - 432px));
@@ -97,7 +99,8 @@ body.holo-ui.holo-in-match #key-memo:not([hidden]){display:flex;flex-wrap:wrap;a
   background:none;color:var(--dim);font-size:15px;cursor:pointer;pointer-events:auto;}
 #key-memo button:hover{color:var(--cyan);}
 /* Инструменты — постоянная колонка иконок у левого края под вкладками (заказ владельца
-   2026-09-25: кнопку «☰ Ещё», прятавшую их, убрать). Подпись — всплывающая подсказка. */
+   2026-09-25: кнопку «☰ Ещё», прятавшую их, убрать). Подписи раскрываются под курсором (UIX-9.4,
+   ниже); у свёрнутой колонки подпись остаётся экранному диктору — именем кнопки. */
 body.holo-ui #rail{left:18px;top:calc(var(--tbh) + 84px);bottom:auto;gap:0;flex-direction:column;align-items:flex-start;}
 body.holo-ui #railtoggle{display:none!important;}
 body.holo-ui .holo-more{display:inline;font-size:12px;}
@@ -106,11 +109,30 @@ body.holo-ui #railtools,body.holo-ui #rail.open #railtools{display:flex;flex-dir
 body.holo-ui #railtools::before,body.holo-ui #railtools::after{display:none;}
 body.holo-ui #railtools button{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:44px;height:44px;
   padding:0;font-size:18px;color:var(--cyan);border-radius:6px;}
-body.holo-ui #railtools .rlbl{display:none;}
+body.holo-ui #railtools .rlbl{display:block;position:absolute;width:1px;height:1px;overflow:hidden;
+  clip-path:inset(50%);white-space:nowrap;}
 body.holo-ui #railtools #rail-settings{display:flex;}
 /* Дубли убраны (заказ владельца 2026-09-25): «Технологии» и «Производство» — вкладки сверху,
    выход в меню — «‹» в углу. Узлы остаются: вкладки нажимают их программно, телефон — пальцем. */
 body.holo-ui #railtools :is(#rail-tech,#rail-constructor,#rail-exit){display:none!important;}
+/* UIX-9.4: подпись — сразу под курсором, а не через секунду подсказкой. Под мышью и при фокусе
+   с клавиатуры (класс `focus-kbd` от `pcHotkeys.ts`; `:focus-visible` Chromium ставит и кнопке,
+   щёлкнутой мышью, на первом нажатии клавиши) колонка раскрывается подписями полными словами —
+   теми же, что у плиток «Ещё» телефона, — с числом непрочитанного после подписи и значком
+   клавиши у края. Значок кнопки не сдвигается: отступ слева тот же, что в узкой кнопке
+   ((44 − 19) / 2). Раскрытая колонка — над карточками у её края (32), под окнами. Подсказка
+   `title` осталась только там, где говорит больше подписи (сторож `railLabels.test.ts`).
+   Касанию раскрываться незачем: на планшете наведение «залипало» бы после нажатия. */
+@media (hover:hover){
+  body.holo-ui #rail:is(:hover,.focus-kbd :focus-within){z-index:33;}
+  body.holo-ui #railtools:is(:hover,.focus-kbd :focus-within){box-shadow:0 14px 36px rgba(0,0,0,.55),0 0 0 1px rgba(124,212,230,.3);}
+  body.holo-ui #railtools:is(:hover,.focus-kbd :focus-within) button{width:auto;justify-content:flex-start;gap:10px;
+    padding:0 12px 0 12.5px;}
+  body.holo-ui #railtools:is(:hover,.focus-kbd :focus-within) .rlbl{position:static;width:auto;height:auto;overflow:visible;
+    clip-path:none;font-family:inherit;font-size:13px;font-weight:500;line-height:1.2;letter-spacing:0;color:var(--ink);}
+  body.holo-ui #railtools:is(:hover,.focus-kbd :focus-within) :is(.railbadge,.badge){position:static;}
+  body.holo-ui #railtools:is(:hover,.focus-kbd :focus-within) button[data-kbd]::after{content:attr(data-kbd);margin-left:auto;}
+}
 body.holo-ui #devline{top:calc(var(--tbh) + 31px);left:auto;right:18px;width:auto;gap:16px;
   background:transparent;border:0;font-size:11px;pointer-events:none;}
 /* Суверены — приманка и на ПК (заказ владельца 2026-09-23): голографическое гашение фишки снято. */

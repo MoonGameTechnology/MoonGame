@@ -5,8 +5,9 @@
  * 1. **Клавиша нажимает ту же кнопку, что и мышь.** Окна открывают обработчики кнопок, а не
  *    копия их логики здесь. Нет кнопки в этом режиме (почты и «Производства» в забеге, скорости
  *    без дев-управления временем) — нет и клавиши.
- * 2. **Клавиша видна в подсказке кнопки:** «Технологии (T)», «Пауза (Пробел)», у кнопок
- *    скорости — цифра; у вкладок над картой — значок клавиши. Раскладка не ПК — подсказки
+ * 2. **Клавиша видна на кнопке:** значком на вкладках над картой и в раскрытой колонке
+ *    инструментов (UIX-9.4), а у «‖» и кнопок скорости, где значку нет места, — в подсказке:
+ *    «Пауза (Пробел)», у кнопок скорости — цифра. Раскладка не ПК — значков нет и подсказки
  *    прежние: клавиши там молчат.
  * 3. **Нажатая клавиша подсвечивает свою кнопку** коротким кольцом: видно, что сработало.
  * 4. **Памятка** встаёт при входе в партию на ПК, когда над картой нет слоя выше окон, и гаснет
@@ -15,6 +16,10 @@
  * 5. **Чей пробел, решает то, как получен фокус** (правило 6 решения). Фокус после нажатия
  *    мышью случайный: клавиша его снимает, иначе браузер обвёл бы кнопку рамкой. Фокус после
  *    Tab'а с клавиатуры клавиша оставляет.
+ * 6. **Фокус с клавиатуры виден странице** классом `focus-kbd` у `body`: по нему колонка
+ *    инструментов раскрывается подписями, когда до неё дошли Tab'ом (UIX-9.4). Не по
+ *    `:focus-visible` — его Chromium ставит кнопке после мыши на первом же нажатии любой
+ *    клавиши, и Escape, закрывший окно, раскрывал бы колонку под щёлкнутой кнопкой.
  */
 import { t } from '../../localization/runtime';
 import { HOTKEYS, SPEED_SLOTS, capOf, hotkeyStep, type HotkeyAction } from '../../decisions/hotkeys';
@@ -27,7 +32,8 @@ export const MEMO_MS = 14_000;
 const FLASH_MS = 350;
 const LEARNED = 'void.keys.learned';
 
-/** Кнопки окон: нажимается первая видимая, подсвечиваются все видимые. */
+/** Кнопки окон: нажимается первая видимая, подсвечиваются все видимые. Все они — на вкладках
+ *  над картой или в колонке инструментов, и клавиша на них — значком (правило 2). */
 const BUTTONS: Partial<Record<HotkeyAction, readonly string[]>> = {
   tech: ['rail-tech', 'holo-tech'],
   production: ['rail-constructor', 'holo-constructor'],
@@ -80,10 +86,9 @@ export function initPcHotkeys(host: PcHotkeysHost) {
     for (const [action, ids] of Object.entries(BUTTONS) as [HotkeyAction, readonly string[]][])
       for (const id of ids) {
         const el = byId(id);
-        if (el?.closest('.holo-nav')) {
-          if (pc) el.dataset.kbd = capFor(action);
-          else delete el.dataset.kbd;
-        } else titled(el, pc ? capFor(action) : null);
+        if (!el) continue;
+        if (pc) el.dataset.kbd = capFor(action);
+        else delete el.dataset.kbd;
       }
     titled(byId('spd-pause'), pc ? capFor('pause') : null);
     speedChips().forEach((chip, i) => titled(chip, pc ? String(i + 1) : null));
@@ -126,11 +131,18 @@ export function initPcHotkeys(host: PcHotkeysHost) {
   };
 
   // --- нажатия ------------------------------------------------------------------------------
-  /** Откуда пришёл последний ввод и чем получен текущий фокус (правило 5). */
+  /** Откуда пришёл последний ввод и чем получен текущий фокус (правила 5 и 6). */
   let lastInput: 'pointer' | 'keyboard' = 'pointer';
   let focusFromKeyboard = false;
   document.addEventListener('pointerdown', () => (lastInput = 'pointer'), true);
-  document.addEventListener('focusin', () => (focusFromKeyboard = lastInput === 'keyboard'), true);
+  document.addEventListener(
+    'focusin',
+    () => {
+      focusFromKeyboard = lastInput === 'keyboard';
+      document.body.classList.toggle('focus-kbd', focusFromKeyboard);
+    },
+    true,
+  );
   /** Элемент в фокусе, кроме страницы и самой карты. */
   const focused = (): HTMLElement | null => {
     const el = document.activeElement;

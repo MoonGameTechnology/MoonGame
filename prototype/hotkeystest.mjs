@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /* global window, document, getComputedStyle, localStorage -- эти имена живут внутри page.evaluate */
 /**
- * UIX-9.1 — горячие клавиши ПК в настоящем браузере.
+ * UIX-9.1 и UIX-9.4 — горячие клавиши и подписи колонки инструментов ПК в настоящем браузере.
  *
  * Правила клавиш держит юнит-тест (`decisions/hotkeys.test.ts`), но он не видит того, что
  * видит игрок: открылось ли окно, встала ли пауза, куда ушли камера и фокус. Здесь — схватка
- * на ПК 1366×768: памятка, подсказки кнопок, каждая клавиша и места, где клавиши обязаны
- * молчать (поле чата, окно настроек); и игроцкая сборка, где управления временем на ПК нет.
+ * на ПК 1366×768: памятка, значки клавиш, каждая клавиша и места, где клавиши обязаны
+ * молчать (поле чата, окно настроек); колонка инструментов, которая раскрывается подписями под
+ * курсором и при фокусе с клавиатуры; и игроцкая сборка, где управления временем на ПК нет.
  * Забег (почты и «Производства» нет, пробел — пауза забега) проверяет `sectorzerotest.mjs`.
  *
  *   node prototype/hotkeystest.mjs      # или pnpm run smoke:hotkeys
@@ -33,6 +34,7 @@ const hooks = `window.__keysTest = {
   capitalAt: () => world(s.planets[capitalOf(s, ME)].position),
   fleetAt: (id) => fleetAnchor(s.fleets[id]),
   middle: () => { const i = insets(); return { x: (i.left + i.right) / 2, y: (i.top + i.bottom) / 2 }; },
+  say: (key) => t(key),
 };`;
 
 const site = await serve({
@@ -104,18 +106,17 @@ try {
     assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('key-memo')).pointerEvents), 'none');
     assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#key-memo button')).pointerEvents), 'auto');
 
-    // 2. Клавиша видна в подсказке кнопки и на вкладках над картой.
-    const titles = await page.evaluate(() =>
-      ['rail-tech', 'rail-constructor', 'rail-log', 'rail-msgs', 'rail-help', 'spd-pause'].map((id) => document.getElementById(id).title),
+    // 2. Клавиша видна на кнопке: значком на вкладках и в колонке инструментов, а у «‖» и
+    //    кнопок скорости — в подсказке.
+    assert.deepEqual(
+      await page.evaluate(() =>
+        ['holo-tech', 'holo-constructor', 'rail-log', 'rail-msgs', 'rail-help'].map((id) => document.getElementById(id).dataset.kbd),
+      ),
+      ['T', 'B', 'L', 'M', 'F1'],
     );
-    for (const [title, key] of titles.map((title, i) => [title, ['T', 'B', 'L', 'M', 'F1', '(Space|Пробел)'][i]]))
-      assert.match(title, new RegExp(` \\(${key}\\)$`), `подсказка «${title}»`);
+    assert.match(await page.locator('#spd-pause').getAttribute('title'), / \((Space|Пробел)\)$/, 'подсказка «‖»');
     const chipTitles = await page.evaluate(() => [...document.querySelectorAll('#speedbar .spd-mult-pc .spdmini')].map((c) => c.title));
     chipTitles.forEach((title, i) => assert.match(title, new RegExp(` \\(${i + 1}\\)$`), `подсказка «${title}»`));
-    assert.deepEqual(
-      await page.evaluate(() => ['holo-tech', 'holo-constructor'].map((id) => document.getElementById(id).dataset.kbd)),
-      ['T', 'B'],
-    );
 
     // 3. Окна: T, B, L, M, F1 — те же окна, что у кнопок рельсы. Первая клавиша гасит памятку.
     for (const [code, layer] of [['KeyT', 'tech'], ['KeyB', 'constructor'], ['KeyL', 'logwin'], ['KeyM', 'diplo'], ['F1', 'codexhub']]) {
@@ -185,10 +186,79 @@ try {
     await page.keyboard.press('KeyT');
     assert.deepEqual(await t('layers'), ['settings'], 'над настройками T молчит');
     await clear();
+
+    // 8. Колонка инструментов (UIX-9.4). Свёрнутая — значки по 44 px, подпись есть только для
+    //    диктора. Под мышью — подписи полными словами и значки клавиш, а значки кнопок стоят на
+    //    месте; колонка над карточками и на экране. Мышь ушла — свернулась. Подсказка осталась
+    //    только там, где говорит больше подписи.
+    const rail = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('#railtools > button')]
+          .filter((b) => b.getClientRects().length)
+          .map((b) => {
+            const box = b.getBoundingClientRect();
+            const label = b.querySelector('.rlbl');
+            const l = label.getBoundingClientRect();
+            return {
+              id: b.id,
+              width: box.width,
+              icon: b.querySelector('.holo-icon').getBoundingClientRect().left,
+              text: label.textContent,
+              folded: l.width <= 1 && l.height <= 1,
+              shown: l.width > 20 && l.height > 8 && l.left >= box.left && l.right <= box.right,
+              size: parseFloat(getComputedStyle(label).fontSize),
+              kbd: getComputedStyle(b, '::after').content,
+              title: b.title,
+            };
+          }),
+      );
+    const columnWidth = () => page.evaluate(() => document.getElementById('railtools').getBoundingClientRect().width);
+    const folded = await rail();
+    assert(folded.length >= 8, 'колонка инструментов на месте');
+    for (const b of folded) {
+      assert.equal(b.width, 44, `${b.id}: свёрнутая кнопка — только значок`);
+      assert(b.folded && b.text, `${b.id}: подпись свёрнута, но есть для диктора`);
+    }
+    assert.equal(folded.find((b) => b.id === 'rail-log').kbd, 'none', 'у свёрнутой кнопки значка клавиши нет');
+    await page.locator('#rail-diplo').hover();
+    const open = await rail();
+    open.forEach((b, i) => {
+      assert(b.shown && b.size >= 13, `${b.id}: подпись видна в кнопке и не мельче 13 px`);
+      assert(Math.abs(b.icon - folded[i].icon) < 1, `${b.id}: значок кнопки не сдвинулся`);
+    });
+    const button = (id) => open.find((b) => b.id === id);
+    assert.equal(button('rail-diplo').text, await t('say', 'rail.diplo.title'), 'подпись — полное имя');
+    assert.deepEqual(['rail-log', 'rail-msgs', 'rail-help'].map((id) => button(id).kbd), ['"L"', '"M"', '"F1"'], 'значки клавиш');
+    assert.deepEqual([button('rail-diplo').title, button('rail-log').title], ['', ''], 'подсказка не повторяет подпись');
+    const steward = await page.evaluate(() => [
+      document.getElementById('rail-steward').title,
+      document.querySelector('#rail-steward .rlbl').textContent,
+    ]);
+    assert(steward[0] && steward[0] !== steward[1], 'у «Хранителя» подсказка говорит больше подписи');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('rail')).zIndex), '33');
+    const column = await rectOf(page, '#railtools');
+    assert(column.r - column.l > 100 && column.r <= VIEW.width && column.b <= VIEW.height, 'раскрытая колонка на экране');
+    await page.mouse.move(1200, 420);
+    assert(await columnWidth() < 70, 'мышь ушла — колонка свернулась');
+
+    // 9. Колонку раскрывает фокус с клавиатуры, а не фокус после мыши: щелчок по «Событиям»,
+    //    мышь прочь, Escape закрыл окно — фокус остался на кнопке, а колонка свёрнута. Shift+Tab —
+    //    до колонки дошли с клавиатуры, она раскрыта; щелчок по карте — свёрнута.
+    await page.locator('#rail-log').click();
+    await page.mouse.move(1200, 420);
+    await page.keyboard.press('Escape');
+    assert.deepEqual(await t('layers'), [], 'Escape закрыл окно');
+    assert.equal(await active(), 'rail-log');
+    assert(await columnWidth() < 70, 'фокус после мыши колонку не раскрывает');
+    await page.keyboard.press('Shift+Tab');
+    assert(await page.evaluate(() => !!document.activeElement.closest('#railtools')), 'Shift+Tab ведёт по колонке');
+    assert(await columnWidth() > 100, 'фокус с клавиатуры раскрывает колонку');
+    await page.mouse.click(1200, 420);
+    assert(await columnWidth() < 70, 'щелчок по карте свернул колонку');
   });
   await page.close();
 
-  // 8. Игроцкая сборка: управления временем на ПК нет — нет и пробела; ✕ гасит памятку навсегда.
+  // 10. Игроцкая сборка: управления временем на ПК нет — нет и пробела; ✕ гасит памятку навсегда.
   const player = await browser.newPage({ viewport: VIEW });
   player.setDefaultTimeout(10000);
   watch(player);
@@ -215,7 +285,8 @@ try {
   });
   assert.deepEqual(errors, [], 'ошибки страницы');
   console.log(
-    'PASS PC hotkeys: memo, button hints, T/B/L/M/F1 windows, Space and 1–4, focus, Tab and H, silent in chat and settings, player build',
+    'PASS PC hotkeys: memo, key badges and hints, T/B/L/M/F1 windows, Space and 1–4, focus, Tab and H, silent in chat and settings, ' +
+      'rail labels on hover and keyboard focus, player build',
   );
 } finally {
   await browser.close();
