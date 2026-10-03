@@ -1,7 +1,8 @@
 /**
  * ONB-3 · Just-in-time mechanic intros (progressive disclosure). The FIRST time a
  * player opens an advanced panel (tech / market / steward / shipyard / diplomacy),
- * a one-screen intro card explains it — then never again. This spreads learning
+ * a one-line hint explains it — then never again (UIX-8.1: a non-modal hint at the
+ * bottom of the screen, gone on the player's first action). This spreads learning
  * across sessions instead of front-loading it, and only surfaces a system at the
  * moment of first contact (docs/onboarding-roadmap.md ONB-3).
  *

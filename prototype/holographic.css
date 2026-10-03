@@ -229,7 +229,12 @@ body.holo-ui :is(#playercard .pcbox,#settings .setbox,#rescard .rc-box){width:mi
 body.holo-ui #splitdlg .sbox{width:min(620px,calc(var(--vpw) * .84));max-height:calc(var(--vph) * .8);}
 body.holo-ui #corp .corpbox{width:min(960px,calc(var(--vpw) * .88));max-height:calc(var(--vph) * .84);}
 body.holo-ui #recap .rcbox{width:min(620px,calc(var(--vpw) * .86));max-height:calc(var(--vph) * .82);}
-body.holo-ui #intro .inbox{width:min(540px,calc(var(--vpw) * .86));max-height:calc(var(--vph) * .82);}
+/* Вводная «впервые» (UIX-8.1) — подсказка у низа поля карты, над нижним рядом (полоса
+   скорости, 76 px — тот же запас, что у поля в `insets()`). Памятка клавиш на это время
+   гаснет: две подсказки внизу одна на другой не читались бы. */
+body.holo-ui #intro{padding-bottom:76px;}
+body.holo-ui #intro .inbox{width:min(560px,calc(var(--vpw) - 32px));max-height:calc(var(--vph) * .42);}
+body.holo-ui.holo-in-match:has(#intro.show) #key-memo{display:none;}
 body.holo-ui #objtip{max-width:min(410px,38vw);opacity:1;background:var(--glass);border-color:var(--line-hi);}
 body.holo-ui #objtip .pd-title{font-size:14px;letter-spacing:.3px;}
 body.holo-ui #objtip .pd-body{font-size:12px;}

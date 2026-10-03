@@ -746,6 +746,10 @@ body.mobile-ui:is(.sheet-open, .aim-mode, .chain-mode) #phone-speed {
     bottom: calc(112px + var(--phone-navh));
   }
 }
+/* Вводная «впервые» (UIX-8.1) — над нижней панелью: панель остаётся видна и нажимается. */
+body.mobile-ui #intro {
+  padding-bottom: max(calc(var(--phone-navh) + 8px), env(safe-area-inset-bottom));
+}
 /* Окна партии кончаются над панелью: она видна и переключает разделы. Окна стратегии
    (наука, производство, рынок, дипломатия, постройки) — в `mobile-strategy.css`. */
 body.mobile-ui

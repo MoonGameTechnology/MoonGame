@@ -110,7 +110,7 @@
 | UIX-7.1 | ⏳ | proto | `docs/backlog.md` | Касание по своему миру с флотом — одна карточка. |
 | UIX-7.2 | ⏳ | proto | `docs/backlog.md` | Прицел «Курс» показывает досягаемые миры. |
 | UIX-7.3 | ⏳ | proto | `docs/backlog.md` | Производство на телефоне — в два экрана, а не в 3,8. |
-| UIX-8.1 | ⏳ | proto | `docs/backlog.md` | Обучение: одна мысль на шаг. |
+| UIX-8.1 | 🔶 | proto | `docs/backlog.md` | Обучение: одна мысль на шаг. |
 | UIX-8.2 | 🔶 | proto | `docs/backlog.md` | Настройка матча и совет учёных. |
 | UIX-9.1 | ✅ | proto | `docs/backlog.md` | ПК: горячие клавиши. |
 | UIX-9.2 | ⏳ | proto | `docs/backlog.md` | ПК: правый клик по миру — «Курс сюда». |

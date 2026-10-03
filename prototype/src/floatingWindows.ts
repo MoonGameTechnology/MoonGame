@@ -20,7 +20,6 @@ const WINDOWS = [
   ['recap', '.rcbox', '.rc-head'],
   ['splitdlg', '.sbox', '.shead'],
   ['warprompt', '.wpbox', '.wp-head'],
-  ['intro', '.inbox', '.in-head'],
   ['corp', '.corpbox', '.corphd'],
   ['emblempick', '.ep-box', '.ep-head'],
   ['pingpanel', '', '.lw-head'],

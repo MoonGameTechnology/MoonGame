@@ -755,20 +755,25 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #codexhub .ch-empty{padding:24px 8px;text-align:center;color:var(--dim);font-size:13px;}
 #codexhub .cx-close{margin-top:10px;}
 /* the always-present in-match «?» help button (rail tool) reuses the rail styles */
-/* ONB-3 just-in-time intro card — one-screen first-contact explainer, z-58 so it
-   layers ABOVE the panel it introduces (tech/market/… at z-47) but below settings(59). */
-#intro{position:fixed;inset:0;z-index:61;display:none;align-items:center;justify-content:center;padding:18px;
-  background:rgba(1,5,9,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+/* ONB-3 вводная «впервые» — подсказка одной строкой у низа экрана (UIX-8.1): значок, заголовок,
+   строка и «Понятно». Окно, которое она объясняет, не запирает и не затемняет: нажатия мимо
+   неё проходят насквозь, и первое действие игрока — нажатие или клавиша — её убирает
+   (main.ts). z 61 — над окнами (47) и кабинетами (60), иначе её закрыло бы само
+   объясняемое окно. */
+#intro{position:fixed;left:0;right:0;bottom:0;z-index:61;display:none;justify-content:center;
+  padding:0 max(8px,env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+  pointer-events:none;}
 #intro.show{display:flex;}
-#intro .inbox{width:min(400px,92vw);max-height:84vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
-  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
-#intro .in-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
-#intro .in-ic{font-size:20px;color:var(--cyan);}
-#intro .in-head b{font-size:15px;letter-spacing:1px;color:#eafffb;flex:1;}
-#intro .in-tag{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan-dim);border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
-#intro .in-body{font-size:13px;line-height:1.62;color:#cfe9e4;}
-#intro .in-ok{margin-top:14px;width:100%;padding:10px;cursor:pointer;border-radius:7px;border:1px solid var(--cyan-dim);
-  background:rgba(53,214,230,.12);color:var(--cyan);font:700 13px ui-monospace,monospace;letter-spacing:1px;}
+#intro .inbox{display:flex;align-items:center;gap:12px;width:min(560px,100%);max-height:42vh;overflow:auto;
+  padding:12px 12px 12px 16px;border:1px solid var(--cyan);border-radius:10px;pointer-events:auto;
+  background:linear-gradient(155deg,rgba(14,40,54,.99),rgba(4,15,24,.99));
+  box-shadow:0 0 0 1px rgba(53,214,230,.45),0 16px 40px rgba(0,0,0,.6);}
+#intro .in-ic{flex:none;font-size:20px;color:var(--cyan);}
+#intro .in-text{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
+#intro .in-text b{font-size:15px;font-weight:600;color:#eafffb;}
+#intro .in-text span{font-size:14px;line-height:1.4;color:#cfe9e4;}
+#intro .in-ok{flex:none;min-height:44px;padding:0 16px;cursor:pointer;border-radius:7px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.12);color:var(--cyan);font:700 15px ui-monospace,monospace;letter-spacing:1px;}
 #intro .in-ok:active{background:rgba(53,214,230,.24);}
 /* ONB-5 return digest — "пока тебя не было": events since you left, attention first */
 #recap{position:fixed;inset:0;z-index:57;display:none;align-items:center;justify-content:center;padding:18px;
@@ -3519,7 +3524,7 @@ ${profileCss}
      console windows outgrew their phone-sized boxes (long RU copy overflowed) */
   #codex .cxbox{width:53.4vw;max-height:56vh;}
   #codexhub .chbox{width:53.4vw;max-height:57vh;}
-  #intro .inbox{width:min(400px,61vw);max-height:56vh;}
+  #intro .inbox{width:min(560px,61vw);max-height:28vh;}
   #recap .rcbox{width:min(440px,62.5vw);max-height:57vh;}
   #playercard .pcbox{width:min(380px,61vw);max-height:57vh;}
   #settings .setbox{width:min(380px,61vw);max-height:57vh;}
