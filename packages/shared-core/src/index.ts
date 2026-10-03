@@ -29,6 +29,8 @@ export {
   type TraderRate,
   type AllyOperation,
   type ExtractionState,
+  type OperationForce,
+  type OperationState,
   type Fleet,
   type FleetMovement,
   type FleetEdge,
@@ -379,6 +381,8 @@ export {
   avaShape,
   MapObjectiveSchema,
   type MapObjective,
+  MapOperationSchema,
+  type MapOperation,
   parseMatchMap,
   mapForDifficulty,
   safeParseMatchMap,
@@ -679,6 +683,12 @@ export {
 } from './modules/loadoutEffects';
 export { rendezvousModule, contactedAllies } from './modules/rendezvous';
 export { extractionModule, extractionNeedMs, extractionRunning } from './modules/extraction';
+export {
+  operationModule,
+  operationStatus,
+  forceHp,
+  type OperationStatus,
+} from './modules/operation';
 export {
   minefieldModule,
   MINE_CHARGE_STAT,

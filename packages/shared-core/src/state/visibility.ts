@@ -936,5 +936,12 @@ function project(
   }
   view.scheduled = view.scheduled.filter((e) => scheduledOwnedBy(e, viewerId, state));
 
+  // Контракт операции (PVR-8.3): очаги, пороги и факты разгрома — правила главы, их видят
+  // все. Флоты соединений — только те, что зритель видит и так: учёт идёт и за частями,
+  // отделёнными в тумане, и их id рассказали бы, что враг разделился и когда.
+  if (view.operation)
+    for (const force of Object.values(view.operation.forces))
+      force.fleets = force.fleets.filter((id) => view.fleets[id] !== undefined);
+
   return view;
 }

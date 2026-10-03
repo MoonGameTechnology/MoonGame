@@ -338,6 +338,21 @@ function evaluateVictory(h: HandlerContext): void {
         return;
       }
     }
+    // Глава с контрактом операции (PVR-8.3, глава VI §8.8): исход решают три результата
+    // вместе — их судит модуль операции и пишет факты в `state.operation`, здесь они только
+    // читаются. Эвакуация стала невозможной — поражение; контракт выполнен — победа тех, кто
+    // стоит. Волны и удержание такую главу не выигрывают, как и главу с архивом.
+    const operation = h.state.operation;
+    if (operation) {
+      if (operation.lostAt !== undefined) {
+        endMatch(h, npcPlayerId, 'pve-evac-lost');
+        return;
+      }
+      if (operation.completedAt !== undefined) {
+        endMatch(h, highestScore(scores, humansAlive), 'pve-operation', humansAlive);
+        return;
+      }
+    }
     // Cleared: every wave has landed AND either the enemy holds nothing or the humans
     // held out to the deadline. Order matters — wiping the hive early does not end the
     // match, it only starves later waves (`pveModule` skips a spawn with nowhere to
@@ -352,7 +367,12 @@ function evaluateVictory(h: HandlerContext): void {
     // verdict above is judged first.
     const { holdUntil } = h.state.pve;
     const heldOut = holdUntil !== undefined && h.ctx.now >= holdUntil;
-    if (!extraction && waveNumber >= totalWaves && (!holding(npcPlayerId) || heldOut)) {
+    if (
+      !extraction &&
+      !operation &&
+      waveNumber >= totalWaves &&
+      (!holding(npcPlayerId) || heldOut)
+    ) {
       // A coalition win with no single champion: the survivors won together, so
       // `winner` is the top scorer among them and every one of them is in `winners`.
       endMatch(h, highestScore(scores, humansAlive), 'pve-cleared', humansAlive);
@@ -474,7 +494,8 @@ export const victoryModule: GameModule = {
   // 1.3.1: в счёт юнитов входит десант на плацдармах (счёт очков не меняется).
   // 1.4.0: крепость на развилке — не территория (FORT-6.1).
   // 1.5.0: мина не идёт в счёт флотов и юнитов (SM-3.6).
-  version: '1.5.0',
+  // 1.6.0: исход главы с контрактом операции решают его три результата (PVR-8.3).
+  version: '1.6.0',
   setup(api) {
     api.on('time.advanced', (_event, h) => evaluateVictory(h));
     api.on('planet.captured', (_event, h) => evaluateVictory(h));
@@ -490,5 +511,8 @@ export const victoryModule: GameModule = {
     // Накопитель главы IV (PVR-7.3): доставка и потеря — вердикт в тот же миг.
     api.on('extraction.delivered', (_event, h) => evaluateVictory(h));
     api.on('extraction.lost', (_event, h) => evaluateVictory(h));
+    // Контракт операции главы VI (PVR-8.3): выполнен или сорван — вердикт в тот же миг.
+    api.on('operation.completed', (_event, h) => evaluateVictory(h));
+    api.on('operation.lost', (_event, h) => evaluateVictory(h));
   },
 };

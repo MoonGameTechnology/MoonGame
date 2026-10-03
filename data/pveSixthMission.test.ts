@@ -291,6 +291,9 @@ describe('кто где стоит (§8.2–§8.4)', () => {
       ),
     );
     expect(producing.sort()).toEqual(['complex', 'north_foundry', 'west_foundry']);
+    // Контракт операции (§8.8, PVR-8.3) называет очагами ровно их: Бастион и прочие миры Роя
+    // в обязательную зачистку не входят.
+    expect([...map.operation!.production].sort()).toEqual(producing);
     const complex = map.sectors[COMPLEX]!.buildings.map((b) => b.type);
     expect(complex).toEqual(expect.arrayContaining(['swarm_hive', 'swarm_datacenter']));
     const rampart = map.sectors.rampart!.buildings.map((b) => b.type);
@@ -316,6 +319,15 @@ describe('кто где стоит (§8.2–§8.4)', () => {
         map.fleets[id]!.units.some((u) => u.unit === 'swarm_brood_mother'),
         id,
       ).toBe(true);
+    // Они же — главные силы в контракте операции (§8.8, PVR-8.3); волны и ретранслятор — нет.
+    expect(map.operation!.forces).toEqual(['swarm_guard', 'swarm_host', 'swarm_reserve']);
+  });
+
+  it('основной эвакуации хватит трёх транспортов из четырёх, «Никого не оставить» — всех', () => {
+    const transports = map.fleets.p1_evac!.units.reduce((n, u) => n + u.count, 0);
+    expect(transports).toBe(4);
+    expect(map.operation!.evacuate).toBe(3);
+    expect(map.objectives.find((o) => o.id === 'mission.all-survivors')?.count).toBe(transports);
   });
 
   it('волны рождаются в комплексе, а Рой воюет и с игроком, и с союзником', () => {

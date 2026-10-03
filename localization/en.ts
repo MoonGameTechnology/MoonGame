@@ -384,6 +384,8 @@ export const en: Record<string, string> = {
   'ai.end.pve-failed': 'the defence fell',
   'ai.end.pve-extracted': 'the data package reached the extraction zone',
   'ai.end.pve-carrier-lost': 'the package carrier was destroyed',
+  'ai.end.pve-operation': 'production suppressed, main forces broken, survivors evacuated',
+  'ai.end.pve-evac-lost': 'fewer survivors are left than must be evacuated',
   'ai.end.score': 'by score limit',
   'ai.end.timeout': 'on the clock',
 
