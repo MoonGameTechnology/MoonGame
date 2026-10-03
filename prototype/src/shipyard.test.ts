@@ -580,7 +580,7 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
 
   it('ЭКРАН НАЗЫВАЕТСЯ ПРОИЗВОДСТВОМ, а здание остаётся верфью — это разные вещи', () => {
     expect(yardBoxHtml('ships', '')).toContain(t('yard.title'));
-    expect(t('yard.title')).toBe('ПРОИЗВОДСТВО');
+    expect(t('yard.title')).toBe('Производство');
     // Здание владелец не переименовывал: у него своё имя из данных.
     expect(tData(data.buildings.shipyard!.name)).toBe('Орбитальная верфь');
   });

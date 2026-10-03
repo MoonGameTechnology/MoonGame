@@ -107,7 +107,6 @@ body.holo-ui #connect .csub {
 body.holo-ui #connect :is(.cnew, .cbtn, .mbtn) {
   font-family: inherit;
   font-weight: 550;
-  letter-spacing: .7px;
   border-radius: 4px 10px 4px 10px;
   border-color: #6196a5;
   color: #dff9ff;
@@ -125,13 +124,13 @@ body.holo-ui #connect :is(.cnew, .cbtn, .mbtn):hover:not(:disabled) {
   background-color: rgba(97, 165, 190, .13);
   box-shadow: inset 0 1px rgba(211, 246, 255, .2), 0 0 18px rgba(97, 171, 195, .1);
 }
-body.holo-ui #connect .cdiv { margin: 21px 0 17px; font-size: var(--fs-caption); letter-spacing: 1px; }
+body.holo-ui #connect .cdiv { margin: 21px 0 17px; font-size: var(--fs-caption); }
 body.holo-ui #connect .cdiv::before,
 body.holo-ui #connect .cdiv::after { background: var(--bridge-edge); }
 body.holo-ui #connect .csocial { gap: 12px; }
 body.holo-ui #connect .csoc { width: 48px; height: 44px; border-radius: 6px; box-shadow: none; color: #b4c9d8; }
 body.holo-ui #connect .cstack { margin-top: 21px; }
-body.holo-ui #connect .cfield { margin-bottom: 17px; font-size: var(--fs-caption); letter-spacing: .6px; }
+body.holo-ui #connect .cfield { margin-bottom: 17px; font-size: var(--fs-caption); }
 body.holo-ui #connect :is(.cfield input, .cfield select, .cwlogin input) {
   font-family: inherit;
   font-size: 14px;
@@ -143,7 +142,6 @@ body.holo-ui #connect :is(.cfield input, .cfield select, .cwlogin input) {
   border-color: var(--bridge-edge);
   border-radius: 5px;
   color: #deedf4;
-  letter-spacing: .2px;
 }
 body.holo-ui #connect .cwlogin input { margin-top: 0; }
 body.holo-ui #connect input::placeholder { color: #859aaf; opacity: 1; }
@@ -151,12 +149,12 @@ body.holo-ui #connect :is(.clang, .cfoot a, .clink, .cback) { font-family: inher
 body.holo-ui #connect .clang { border-radius: 5px; padding: 8px 11px; font-size: var(--fs-caption); }
 body.holo-ui #connect .cback { margin-bottom: 24px; font-size: var(--fs-body); }
 body.holo-ui #connect .cfoot { gap: 18px; justify-content: flex-start; }
-body.holo-ui #connect .cfoot a { font-size: var(--fs-caption); letter-spacing: .2px; }
-body.holo-ui #connect .ctitle { font-size: 19px; letter-spacing: 1px; color: #dcecf5; line-height: 1.4; }
+body.holo-ui #connect .cfoot a { font-size: var(--fs-caption); }
+body.holo-ui #connect .ctitle { font-size: 19px; color: #dcecf5; line-height: 1.4; }
 body.holo-ui #connect .ctitle .dia { width: 8px; height: 8px; flex-shrink: 0; box-shadow: 0 0 12px rgba(116, 232, 237, .25); }
 body.holo-ui #connect .cstat { font-size: var(--fs-body); line-height: 1.6; text-align: left; }
 body.holo-ui #connect .cstat:not(:empty) { padding: 12px; background: rgba(140, 109, 53, .08); border-left: 2px solid var(--amber); }
-body.holo-ui #connect :is(.mtab, .mfbtn, .mflabel, .mfval, .mname, .mmeta) { font-family: inherit; letter-spacing: .2px; }
+body.holo-ui #connect :is(.mtab, .mfbtn, .mflabel, .mfval, .mname, .mmeta) { font-family: inherit; }
 body.holo-ui #connect .mrow { border-color: var(--bridge-edge); background: rgba(10, 26, 42, .5); border-radius: 5px; }
 body.holo-ui #connect .mlist { max-height: calc(var(--vph) * .42); }
 
@@ -191,7 +189,7 @@ body.holo-ui #hub .hub-id { padding: 15px 21px; gap: 15px; }
 body.holo-ui #hub .hub-av { width: 42px; height: 42px; border-radius: 8px; font-size: 19px; }
 body.holo-ui #hub .hub-av::after { box-shadow: none; background: #95cedb; }
 body.holo-ui #hub .hub-name { font-size: 16px; font-weight: 550; }
-body.holo-ui #hub .hub-st { color: #9ab6c4; font-size: var(--fs-caption); letter-spacing: 1px; margin-top: 5px; }
+body.holo-ui #hub .hub-st { color: #9ab6c4; font-size: var(--fs-caption); margin-top: 5px; }
 body.holo-ui #hub .hub-st::before { box-shadow: none; }
 body.holo-ui #hub .hub-msg { border-radius: 5px; border-color: var(--bridge-edge); }
 body.holo-ui #hub .hub-body { padding: 24px; min-height: 0; }
@@ -207,7 +205,6 @@ body.holo-ui #hub .hub-solo {
   font-family: inherit;
   font-size: 14px;
   font-weight: 550;
-  letter-spacing: .7px;
   color: #b9cdda;
   border-color: var(--bridge-edge);
   background: rgba(4, 16, 29, .32);
@@ -220,11 +217,11 @@ body.holo-ui #hub .hub-card .hc-t { font-size: 14px; line-height: 1.4; }
 body.holo-ui #hub .hub-card .hc-s { font-size: var(--fs-body); line-height: 1.6; margin-top: 5px; }
 body.holo-ui #hub .hm-more { font-size: var(--fs-body); line-height: 1.6; }
 body.holo-ui #hub .hub-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 12px; }
-body.holo-ui #hub .hub-tile { min-height: 91px; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); font-weight: 500; letter-spacing: .2px; gap: 10px; }
+body.holo-ui #hub .hub-tile { min-height: 91px; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); font-weight: 500; gap: 10px; }
 body.holo-ui #hub .hub-tile .ht-ic { color: #a4cddf; text-shadow: none; }
 body.holo-ui #hub .hub-tile.wide { min-height: 44px; }
 body.holo-ui #hub .hub-nav { padding: 8px; gap: 5px; min-height: 66px; }
-body.holo-ui #hub .hub-tab { border: 1px solid transparent; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); letter-spacing: .2px; gap: 6px; color: #9db6c6; padding: 8px 6px; }
+body.holo-ui #hub .hub-tab { border: 1px solid transparent; border-radius: 5px; font-family: inherit; font-size: var(--fs-body); gap: 6px; color: #9db6c6; padding: 8px 6px; }
 body.holo-ui #hub .hub-tab .hn-ic { color: inherit; font-size: 18px; }
 body.holo-ui #hub .hub-tab.active { border-color: rgba(123, 191, 211, .3); background: rgba(83, 140, 165, .12); color: #d1eef5; }
 body.holo-ui #hub .hub-tab.active .hn-ic { text-shadow: none; }
@@ -260,13 +257,13 @@ body.holo-ui #setup .scol { min-height: 0; overflow-y: auto; padding: 16px 18px;
 body.holo-ui #setup .smap { height: 220px; }
 body.holo-ui :is(#setup, #seatpick) :is(.stitle, .sgo, .scancel) { flex-shrink: 0; }
 body.holo-ui #endscreen .es-box { width: min(560px, calc(var(--vpw) * .88)); padding: 34px; }
-body.holo-ui #endscreen .es-head { font-size: 30px; font-weight: 550; letter-spacing: 2px; line-height: 1.3; text-shadow: none; }
+body.holo-ui #endscreen .es-head { font-size: 30px; font-weight: 550; line-height: 1.3; text-shadow: none; }
 body.holo-ui #endscreen .es-why { font-size: var(--fs-body); line-height: 1.6; }
 body.holo-ui #endscreen .es-grid { margin: 25px 0 12px; gap: 12px; }
 body.holo-ui #endscreen .es-cell { padding: 15px; border-radius: 5px; border-color: var(--bridge-edge); background: rgba(8, 25, 41, .48); }
-body.holo-ui #endscreen .es-k { font-size: var(--fs-caption); color: #9db8c8; letter-spacing: .8px; }
+body.holo-ui #endscreen .es-k { font-size: var(--fs-caption); color: #9db8c8; }
 body.holo-ui #endscreen .es-v { margin-top: 8px; font-size: 24px; font-weight: 500; }
-body.holo-ui #endscreen .es-btn { font-family: inherit; min-height: 44px; border-radius: 5px; font-size: var(--fs-body); letter-spacing: .4px; }
+body.holo-ui #endscreen .es-btn { font-family: inherit; min-height: 44px; border-radius: 5px; font-size: var(--fs-body); }
 body.holo-ui #settings .setbox { width: min(510px, calc(var(--vpw) * .88)); max-height: calc(var(--vph) - 48px); }
 body.holo-ui #settings .set-row { gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(120, 180, 199, .12); }
 body.holo-ui #settings .set-lbl { font-family: inherit; font-size: var(--fs-body); line-height: 1.5; gap: 4px; }

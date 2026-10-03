@@ -34,7 +34,7 @@ export const DEFAULT_LOCALE: LocaleId = 'ru';
 export const LOCALE_IDS: LocaleId[] = ['ru', 'en'];
 
 /** Подпись языка в переключателе — на самом языке, не в переводе. */
-export const LOCALE_LABEL: Record<LocaleId, string> = { ru: 'РУССКИЙ', en: 'ENGLISH' };
+export const LOCALE_LABEL: Record<LocaleId, string> = { ru: 'Русский', en: 'English' };
 
 export const isLocaleId = (v: unknown): v is LocaleId =>
   typeof v === 'string' && (LOCALE_IDS as string[]).includes(v);

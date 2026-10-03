@@ -16,7 +16,7 @@ describe('список языков', () => {
   });
 
   it('подпись — на самом языке', () => {
-    expect(localeOptions('ru').find((o) => o.id === 'en')?.label).toBe('ENGLISH');
+    expect(localeOptions('ru').find((o) => o.id === 'en')?.label).toBe('English');
   });
 
   it('выбор текущего языка не перезагружает страницу', () => {
