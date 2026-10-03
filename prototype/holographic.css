@@ -15,7 +15,7 @@ body.holo-ui{
   --glass-blur:blur(calc(8px * var(--holo-window-alpha,.94)));
   --holo-surface:#0a202d;--holo-reflection:#b9f5ff;
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-  font-size:14px;letter-spacing:.1px;
+  font-size:14px;
 }
 /* The bevel belongs to each window. The map's much larger rim is drawn in world coordinates. */
 body.holo-ui :is(#top,#side,#cmdbar,#holo-selection-window,#speedbar,#railtools,#chatwin,.twbox,.lwbox,.cnbox,.mkbox,
@@ -53,8 +53,8 @@ body.holo-ui #top .tbar{display:contents;}
 body.holo-ui #topback{display:none;}
 body.holo-ui .crest{order:1;padding:0;gap:12px;flex:0 1 190px;min-width:130px;}
 body.holo-ui #crestmark{width:36px;height:36px;font-size:20px;box-shadow:inset 0 0 12px rgba(116,232,237,.07);}
-body.holo-ui .who b{font-size:15px;font-weight:600;letter-spacing:.15px;}
-body.holo-ui .who span{font-size:var(--fs-caption);letter-spacing:.2px;color:var(--dim);}
+body.holo-ui .who b{font-size:15px;font-weight:600;}
+body.holo-ui .who span{font-size:var(--fs-caption);color:var(--dim);}
 body.holo-ui #purse{order:2;flex:1 1 auto;padding:0;gap:6px;min-width:0;height:40px;}
 body.holo-ui .res{height:36px;padding:0 4px;gap:6px;border:0;justify-content:flex-start;}
 body.holo-ui .res b{font-size:15px;font-weight:500;font-variant-numeric:tabular-nums;}
@@ -62,7 +62,7 @@ body.holo-ui .res em{font-size:var(--fs-caption);}
 body.holo-ui .res i svg{width:17px;height:17px;}
 body.holo-ui #tbscore{order:3;margin:0;padding:5px 8px;font-size:var(--fs-body);border-radius:5px;}
 body.holo-ui #daycard{order:4;margin:0;padding:0 0 0 10px;border:0;border-left:1px solid var(--line);border-radius:0;background:none;}
-body.holo-ui #daycard b{font-size:var(--fs-body);letter-spacing:.3px;}
+body.holo-ui #daycard b{font-size:var(--fs-body);}
 body.holo-ui #daycard span{font-size:var(--fs-caption);letter-spacing:0;}
 body.holo-ui .holo-back{position:fixed;display:grid;place-items:center;left:18px;top:16px;width:42px;height:44px;
   z-index:31;color:var(--ink);font:26px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;
@@ -155,11 +155,11 @@ body.holo-ui #side .pscroll{padding:15px 16px;overflow-y:auto;min-height:0;touch
 body.holo-ui #side .pdesc{display:none;}
 body.holo-ui #side .phead{margin:0 0 12px;padding-bottom:12px;gap:10px;}
 body.holo-ui #side .ptitle{display:block;min-width:0;}
-body.holo-ui #side .ptitle b{font-size:15px;letter-spacing:.4px;}
+body.holo-ui #side .ptitle b{font-size:15px;}
 body.holo-ui #side .ptitle span{display:block;font-size:var(--fs-body);margin-top:5px;white-space:normal;line-height:1.5;}
 body.holo-ui #side .pclose{width:28px;height:28px;flex:0 0 auto;border-radius:4px;}
 body.holo-ui #side .row{font-size:var(--fs-body);line-height:1.6;margin:6px 0;}
-body.holo-ui #side .sec{font-size:var(--fs-caption);letter-spacing:.5px;margin:15px 0 7px;color:var(--dim);}
+body.holo-ui #side .sec{font-size:var(--fs-caption);margin:15px 0 7px;color:var(--dim);}
 body.holo-ui #side .pstats span{font-size:var(--fs-caption);padding:5px 7px;}
 body.holo-ui #side .ptabs{gap:6px;margin:10px 0;padding:0;top:0;}
 body.holo-ui #side .ptab{min-height:34px;padding:7px 10px;font-size:var(--fs-body);border-radius:4px;}
@@ -178,7 +178,7 @@ body.holo-ui #cmdbar.show{display:flex;flex-direction:column;align-items:stretch
 body.holo-ui #cmdbar .cmdlabel{display:none;}
 body.holo-ui #cmdbar .holo-command-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
   padding:13px 14px 11px;border-bottom:1px solid var(--line);background:rgba(33,81,98,.15);}
-body.holo-ui .holo-command-head b{font-size:14px;font-weight:600;letter-spacing:.4px;}
+body.holo-ui .holo-command-head b{font-size:14px;font-weight:600;}
 body.holo-ui .holo-command-head span{display:block;color:var(--dim);font-size:var(--fs-body);line-height:1.5;margin-top:4px;}
 body.holo-ui #cmdbar .holo-command-close{width:26px;min-width:26px;height:26px;padding:0;border-radius:4px;font-size:18px;}
 body.holo-ui .holo-command-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:10px 12px;}
@@ -222,7 +222,7 @@ body.holo-ui #market .mkbox,body.holo-ui #logwin .lwbox,body.holo-ui #diplo .dpb
 }
 body.holo-ui #constructor .cnbox{width:min(960px,calc(var(--vpw) * .78));max-height:calc(var(--vph) - var(--tbh) - 176px);}
 body.holo-ui :is(.lw-head,.cn-head,.mk-head){min-height:48px;padding:12px 16px;background:rgba(14,40,54,.25);}
-body.holo-ui :is(.lw-head,.cn-head,.mk-head) b{font-size:14px;letter-spacing:.5px;}
+body.holo-ui :is(.lw-head,.cn-head,.mk-head) b{font-size:14px;}
 body.holo-ui :is(.tw-close,.lw-close,.cn-close,.mk-close){min-width:28px;min-height:28px;border-radius:4px;}
 body.holo-ui :is(#codex .cxbox,#codexhub .chbox){width:min(800px,calc(var(--vpw) * .84));max-height:calc(var(--vph) * .82);}
 body.holo-ui :is(#playercard .pcbox,#settings .setbox,#rescard .rc-box){width:min(520px,calc(var(--vpw) * .86));max-height:calc(var(--vph) * .82);}
@@ -236,12 +236,12 @@ body.holo-ui #intro{padding-bottom:76px;}
 body.holo-ui #intro .inbox{width:min(560px,calc(var(--vpw) - 32px));max-height:calc(var(--vph) * .42);}
 body.holo-ui.holo-in-match:has(#intro.show) #key-memo{display:none;}
 body.holo-ui #objtip{max-width:min(410px,38vw);opacity:1;background:var(--glass);border-color:var(--line-hi);}
-body.holo-ui #objtip .pd-title{font-size:14px;letter-spacing:.3px;}
+body.holo-ui #objtip .pd-title{font-size:14px;}
 body.holo-ui #objtip .pd-body{font-size:var(--fs-body);}
 /* Transmission accents only decorate actual arrivals; history and channel changes stay still. */
 body.holo-ui #chatwin{--cw-edge:rgba(140,233,242,.46);}
 body.holo-ui .cw-head{position:relative;padding:9px 10px;border-radius:9px 9px 0 0;background:rgba(24,62,78,.16);}
-body.holo-ui .cw-title{font-family:inherit;font-weight:600;font-size:var(--fs-body);line-height:1.4;letter-spacing:.3px;color:var(--ink);}
+body.holo-ui .cw-title{font-family:inherit;font-weight:600;font-size:var(--fs-body);line-height:1.4;color:var(--ink);}
 body.holo-ui .cw-btn{opacity:1;color:var(--cyan-dim);border-radius:4px;}
 body.holo-ui .cw-btn .holo-icon svg{width:15px;height:15px;}
 body.holo-ui .cw-tabs{gap:4px;padding:8px 8px 0;}
@@ -369,7 +369,7 @@ body.holo-ui #holo-selection-window #side .ptitle span{display:-webkit-box;-webk
   -webkit-line-clamp:2;line-clamp:2;overflow:hidden;white-space:normal;}
 body.holo-ui #holo-selection-window #side .ptabs{flex-wrap:nowrap;gap:5px;}
 body.holo-ui #holo-selection-window #side .ptab{flex:1 1 0;min-width:0;padding:7px 4px;justify-content:center;
-  text-align:center;font-size:var(--fs-caption);letter-spacing:.4px;white-space:nowrap;}
+  text-align:center;font-size:var(--fs-caption);white-space:nowrap;}
 body.holo-ui #holo-selection-window #side .ptab b{margin-left:5px;}
 body.holo-ui #holo-selection-window .holo-command-body:has(> [data-cmd=move]) > button:last-of-type:nth-of-type(even){
   grid-column:1/-1;}
@@ -482,7 +482,7 @@ body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-head{
   padding:10px 12px 10px 14px;border-bottom:1px solid var(--line-hi);background:rgba(33,81,98,.15);}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-head > div{flex:0 1 auto;min-width:0;max-width:292px;margin-right:auto;}
 body.holo-ui #holo-selection-window.fleet-console .holo-command-head b{display:block;font-size:17px;font-weight:700;
-  letter-spacing:.6px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 body.holo-ui #holo-selection-window.fleet-console .holo-command-head span{margin-top:2px;font-size:var(--fs-body);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar button.holo-command-close{width:40px;min-width:40px;height:40px;
@@ -509,7 +509,7 @@ body.holo-ui #holo-selection-window.fleet-console .fc-vitals{grid-column:comp/en
 #side :is(.fc-vv.debuff,.fc-stat.debuff b){color:var(--dn);}
 /* Заголовок колонки: подпись и, у «Состава», значок подсказки рядом. */
 .fc-title{display:flex;align-items:center;gap:8px;grid-column:1/-1;min-height:22px;}
-.fc-title b{font-size:14px;font-weight:600;letter-spacing:.3px;color:var(--ink);}
+.fc-title b{font-size:14px;font-weight:600;color:var(--ink);}
 .fc-info{display:inline-flex;color:var(--dim);cursor:help;}
 .fc-info .holo-icon svg{width:16px;height:16px;}
 /* «Приказы»: высокие кнопки сеткой 3×N, значок над подписью. */
@@ -577,7 +577,7 @@ body.holo-ui #holo-selection-window.fleet-console #cmdbar .cmdpop.tpop{grid-colu
   border-radius:0;background:#06131c;}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .trow{grid-template-columns:minmax(0,1fr) auto;gap:6px;}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .thead{font-family:inherit;font-size:14px;font-weight:600;
-  letter-spacing:.2px;color:var(--ink);white-space:normal;}
+  color:var(--ink);white-space:normal;}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop :is(.tname,.tcnt,.tdelta,.tbtns button){font-family:inherit;}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop .tname{font-size:var(--fs-body);font-weight:600;}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar .tpop :is(.tlegend,.tnote){font-size:var(--fs-caption);}
@@ -592,7 +592,7 @@ body.holo-ui #holo-selection-window.fleet-console .fc-foot{grid-column:1/-1;grid
 .fc-aura > span:last-child{color:var(--dim);}
 body.holo-ui #holo-selection-window.fleet-console #cmdbar .holo-command-details{grid-column:comp/end;grid-row:3;
   justify-self:end;align-self:center;position:relative;z-index:2;margin:0 16px 0 0;padding:4px 0;min-height:32px;
-  border:0;background:none;color:var(--cyan);font-family:inherit;font-size:var(--fs-body);font-weight:500;letter-spacing:.2px;}
+  border:0;background:none;color:var(--cyan);font-family:inherit;font-size:var(--fs-body);font-weight:500;}
 body.holo-ui #holo-selection-window.fleet-console.details-open #cmdbar .holo-command-details{color:var(--holo-reflection);
   text-decoration:underline;text-underline-offset:3px;}
 /* «Подробнее о флоте»: сводка встаёт на место «Состава» и «Десанта», приказы остаются. */

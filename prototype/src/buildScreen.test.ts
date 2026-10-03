@@ -162,7 +162,7 @@ describe('окно построек — разметка', () => {
 
   it('категории идут заголовками, пустые не рисуются', () => {
     const out = html(s, pid);
-    expect(out).toContain('ЭКОНОМИКА');
+    expect(out).toContain('Экономика');
     expect((out.match(/bw-cath/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 

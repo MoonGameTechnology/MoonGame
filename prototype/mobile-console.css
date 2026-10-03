@@ -62,18 +62,15 @@ body.mobile-ui #mobile-sheet {
 }
 .mobile-grab b {
   display: block;
-  font:
-    600 14px ui-monospace,
-    monospace;
+  font: 600 14px var(--sf-font);
+  font-variant-numeric: tabular-nums;
   line-height: 1.3;
-  letter-spacing: 0.35px;
   color: #e1f5fc;
 }
 .mobile-grab span {
   display: block;
-  font:
-    var(--fs-caption)/1.5 ui-monospace,
-    monospace;
+  font: var(--fs-caption)/1.5 var(--sf-font);
+  font-variant-numeric: tabular-nums;
   color: #8dafbd;
   margin-top: 4px;
 }
@@ -84,9 +81,8 @@ body.mobile-ui #mobile-sheet {
   border-radius: 10px;
   background: #0c1b2b;
   color: #e1f5fc;
-  font:
-    var(--fs-body) ui-monospace,
-    monospace;
+  font: var(--fs-body) var(--sf-font);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .mobile-close {
@@ -112,9 +108,8 @@ body.mobile-ui #mobile-sheet {
   border: 1px solid #6191a13d;
   border-radius: 10px;
   color: #a9d5e4;
-  font:
-    var(--fs-body) ui-monospace,
-    monospace;
+  font: var(--fs-body) var(--sf-font);
+  font-variant-numeric: tabular-nums;
 }
 body.mobile-ui #mobile-sheet #side {
   position: relative;
@@ -176,7 +171,6 @@ body.mobile-ui #mobile-sheet #side .ptab {
   padding-left: 4px;
   padding-right: 4px;
   font-size: var(--fs-caption);
-  letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -212,9 +206,8 @@ body.mobile-ui #mobile-sheet #cmdbar > button {
   color: #9ddde9;
 }
 body.mobile-ui #mobile-sheet #cmdbar > button .cl {
-  font:
-    var(--fs-caption)/1.25 ui-monospace,
-    monospace;
+  font: var(--fs-caption)/1.25 var(--sf-font);
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   text-transform: none;
   opacity: 1;
@@ -269,9 +262,8 @@ body.mobile-ui #mobile-sheet.order-mode #cmdbar {
   flex-direction: column;
   gap: 5px;
   margin-bottom: 5px;
-  font:
-    var(--fs-body)/1.45 ui-monospace,
-    monospace;
+  font: var(--fs-body)/1.45 var(--sf-font);
+  font-variant-numeric: tabular-nums;
 }
 .mobile-order-copy > b {
   color: #dbf6ff;
@@ -286,9 +278,8 @@ body.mobile-ui #mobile-sheet.order-mode #cmdbar {
   font-weight: 500;
 }
 body.mobile-ui #mobile-sheet.order-mode #cmdbar > button {
-  font:
-    var(--fs-body) ui-monospace,
-    monospace;
+  font: var(--fs-body) var(--sf-font);
+  font-variant-numeric: tabular-nums;
   min-height: 46px;
 }
 body.mobile-ui #mobile-sheet.order-mode #side,
@@ -322,9 +313,8 @@ body.mobile-ui #mobile-sheet.choosing #cmdbar {
 .mobile-choices b,
 .mobile-choices small {
   display: block;
-  font:
-    var(--fs-body)/1.45 ui-monospace,
-    monospace;
+  font: var(--fs-body)/1.45 var(--sf-font);
+  font-variant-numeric: tabular-nums;
 }
 .mobile-choices small {
   color: #829fab;
@@ -527,8 +517,11 @@ body.mobile-ui #phone-nav {
   bottom: 0;
   z-index: 30;
   display: grid;
-  /* «Производство» — самая длинная подпись: её столбец не уже подписи. */
-  grid-template-columns: minmax(0, 1fr) minmax(max-content, 1.25fr) repeat(3, minmax(0, 1fr));
+  /* Столбец не уже своей подписи. «Производство» — самая длинная, ей и доля больше; но на
+     320 px пропорциональным шрифтом не входит в пятую часть и «События». */
+  grid-template-columns:
+    minmax(max-content, 1fr) minmax(max-content, 1.25fr)
+    repeat(3, minmax(max-content, 1fr));
   height: var(--phone-navh);
   box-sizing: border-box;
   padding: 0 max(2px, env(safe-area-inset-right)) env(safe-area-inset-bottom)
