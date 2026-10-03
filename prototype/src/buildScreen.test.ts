@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
-import { newGame, canOrder, data } from './game';
-import { buildBuilding } from '../../decisions/actions';
+import { newGame, canOrder, data, order } from './game';
+import { buildBuilding, upgradeBuilding } from '../../decisions/actions';
+import { cost } from './format';
 import { buildingLevel } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
@@ -33,6 +34,14 @@ const lockText = (code: string) => `код:${code}`;
 
 function html(s: GameState, pid: string) {
   return buildScreenHtml(s, 'p1', pid, probe(s), noQueue, lockText);
+}
+
+/** Разметка одной строки окна: от её `bw-item` до следующей. */
+function rowOf(out: string, id: string): string {
+  const at = out.indexOf(`data-bw="${id}"`);
+  if (at < 0) return '';
+  const next = out.indexOf('<div class="bw-item', at);
+  return out.slice(out.lastIndexOf('<div class="bw-item', at), next < 0 ? undefined : next);
 }
 
 describe('окно построек — категории из данных', () => {
@@ -146,7 +155,7 @@ describe('окно построек — состояние строки от п�
     s.planets[pid]!.kind = 'void_station';
     s.planets[pid]!.buildings.push({ type: 'starfort', level: 2, hp: 110 });
     expect(canOrder(s, buildBuilding('p1', pid, 'starfort'))).toBe('E_WRONG_SECTOR');
-    expect(buildRowState(s, 'p1', pid, 'starfort', probe(s), noQueue)).toEqual({
+    expect(buildRowState(s, 'p1', pid, 'starfort', probe(s), noQueue)).toMatchObject({
       st: 'built',
       level: 2,
       count: 1,
@@ -154,15 +163,89 @@ describe('окно построек — состояние строки от п�
     expect(html(s, pid)).not.toContain('код:E_WRONG_SECTOR');
   });
 
-  it('локальная соло-очередь читается как «строится» — ядро о ней не знает', () => {
+  it('заказ в очереди хоста читается как «строится»', () => {
     const s = newGame();
-    expect(buildRowState(s, 'p1', home(s), 'mine', probe(s), () => true).st).toBe('queued');
+    expect(buildRowState(s, 'p1', home(s), 'fort', probe(s), () => true).st).toBe('queued');
+  });
+
+  // Очередь хоста (main.ts) знает и улучшения: у стоящего здания в ней лежит следующий
+  // уровень, и строка горела «строится» с первым уровнем вместо своего.
+  it('идущее улучшение — «улучшается», ждущее — «в очереди», оба со своим уровнем', () => {
+    const s0 = newGame();
+    const pid = home(s0);
+    const a = order(s0, upgradeBuilding('p1', pid, 'mine'), s0.time);
+    expect(a.error).toBeUndefined();
+    const b = order(a.state, upgradeBuilding('p1', pid, 'radar'), a.state.time);
+    expect(b.error).toBeUndefined();
+    const s = b.state;
+    // Полоса зданий занята улучшением шахты — радар ждёт в очереди мира.
+    expect(s.planets[pid]!.buildQueue?.map((q) => [q.kind, q.building])).toEqual([
+      ['upgrade', 'radar'],
+    ]);
+    const hostQueued = (p: string, id: string) =>
+      (s.planets[p]?.buildQueue ?? []).some((q) => q.building === id);
+    const out = buildScreenHtml(s, 'p1', pid, probe(s), hostQueued, lockText);
+    for (const [id, waiting, label] of [
+      ['mine', false, '⏳ улучшается'],
+      ['radar', true, '⏳ в очереди'],
+    ] as const) {
+      expect(buildRowState(s, 'p1', pid, id, probe(s), hostQueued)).toMatchObject({
+        st: 'built',
+        level: 1,
+        up: { up: 'queued', waiting },
+      });
+      const row = rowOf(out, id);
+      expect(row, id).toContain(label);
+      expect(row, id).toContain('Ур. 1 / 3');
+      expect(row, id).not.toContain('строится');
+      expect(row, id).not.toContain('data-bw-up');
+    }
+  });
+
+  it('новое здание: идущая стройка — «строится», ждущая в очереди мира — «в очереди»', () => {
+    const s0 = newGame();
+    const pid = home(s0);
+    const a = order(s0, buildBuilding('p1', pid, 'fort'), s0.time);
+    expect(a.error).toBeUndefined();
+    const b = order(a.state, buildBuilding('p1', pid, 'refinery'), a.state.time);
+    expect(b.error).toBeUndefined();
+    const s = b.state;
+    expect(s.planets[pid]!.buildQueue?.map((q) => [q.kind, q.building])).toEqual([
+      ['building', 'refinery'],
+    ]);
+    expect(buildRowState(s, 'p1', pid, 'fort', probe(s), noQueue)).toEqual({
+      st: 'queued',
+      waiting: false,
+    });
+    expect(buildRowState(s, 'p1', pid, 'refinery', probe(s), noQueue)).toEqual({
+      st: 'queued',
+      waiting: true,
+    });
+    const out = html(s, pid);
+    expect(rowOf(out, 'fort')).toContain('⏳ строится');
+    expect(rowOf(out, 'refinery')).toContain('⏳ в очереди');
+  });
+
+  it('стоящее здание остаётся построенным, чем бы ни отказала проба «поставить ещё одно»', () => {
+    const s = newGame();
+    const pid = home(s);
+    // Места кончились, технология не изучена — улучшению это не мешает, и строка не замок.
+    for (const code of ['E_NO_BUILD_SLOTS', 'E_TECH_LOCKED']) {
+      const answer = (a: Action) => (a.type === 'building.construct' ? code : canOrder(s, a));
+      expect(buildRowState(s, 'p1', pid, 'mine', answer, noQueue), code).toMatchObject({
+        st: 'built',
+        up: { up: 'ready', affordable: true },
+      });
+    }
   });
 
   it('незнакомый код отказа НЕ прячется — строка показывает причину', () => {
     const s = newGame();
-    const st = buildRowState(s, 'p1', home(s), 'mine', () => 'E_НОВОЕ_ПРАВИЛО', noQueue);
+    const st = buildRowState(s, 'p1', home(s), 'fort', () => 'E_НОВОЕ_ПРАВИЛО', noQueue);
     expect(st).toEqual({ st: 'lock', code: 'E_НОВОЕ_ПРАВИЛО' });
+    // У стоящего здания та же причина встаёт на место «Улучшить».
+    const built = buildRowState(s, 'p1', home(s), 'mine', () => 'E_НОВОЕ_ПРАВИЛО', noQueue);
+    expect(built).toMatchObject({ st: 'built', up: { up: 'lock', code: 'E_НОВОЕ_ПРАВИЛО' } });
   });
 });
 
@@ -207,14 +290,53 @@ describe('окно построек — разметка', () => {
     expect(out).toContain('data-bw="fort"');
   });
 
-  it('построенное — галочкой без кнопки, доступное — кнопкой с приказом', () => {
+  // Сообщение владельца 2026-10-03: у построенного горело «Построено», и не было видно,
+  // что у здания есть уровни.
+  it('построенное — с уровнем и кнопкой «Улучшить», доступное — кнопкой «Строить»', () => {
     const out = html(s, pid);
-    const built = s.planets[pid]!.buildings[0]!.type;
-    const at = out.indexOf(`data-bw="${built}"`);
-    const row = out.slice(at, at + 400);
-    expect(row).toContain('bw-st done');
+    const row = rowOf(out, 'mine');
+    expect(row).toContain('st-up');
+    expect(row).toContain('Ур. 1 / 3');
+    expect(row).toContain('<button class="bw-take btn-main" data-bw-up="mine">▲ Улучшить</button>');
     expect(row).not.toContain('data-bw-go');
+    expect(row).not.toContain('bw-st done');
     expect(out).toMatch(/data-bw-go="fort"(?! disabled)/);
+  });
+
+  it('на пределе уровней — «Макс. уровень», без кнопки и без цены', () => {
+    const s2 = newGame();
+    const pid2 = home(s2);
+    s2.planets[pid2]!.buildings.find((b) => b.type === 'mine')!.level = 3;
+    expect(buildRowState(s2, 'p1', pid2, 'mine', probe(s2), noQueue)).toMatchObject({
+      st: 'built',
+      level: 3,
+      up: { up: 'max' },
+    });
+    const row = rowOf(html(s2, pid2), 'mine');
+    expect(row).toContain('Ур. 3 / 3');
+    expect(row).toContain('✓ Макс. уровень');
+    expect(row).toContain('st-built');
+    expect(row).not.toContain('data-bw-up');
+    expect(row).not.toContain('bw-foot');
+  });
+
+  it('здание без уровней — «Построено», без значка уровня', () => {
+    const s2 = newGame();
+    const pid2 = home(s2);
+    const hp = data.buildings.spaceport!.hp;
+    s2.planets[pid2]!.buildings.push({ type: 'spaceport', level: 1, hp });
+    const row = rowOf(html(s2, pid2), 'spaceport');
+    expect(row).toContain('✓ Построено');
+    expect(row).not.toContain('bw-lv');
+    expect(row).not.toContain('data-bw-up');
+  });
+
+  it('без казны «Улучшить» гаснет, а не исчезает — причина видна', () => {
+    const poor = newGame();
+    poor.players.p1!.resources = {};
+    const row = rowOf(html(poor, home(poor)), 'mine');
+    expect(row).toContain('data-bw-up="mine" disabled');
+    expect(row).toContain('Не хватает ресурсов');
   });
 
   it('безденежному кнопка гаснет, а не исчезает — причина видна', () => {
@@ -225,18 +347,19 @@ describe('окно построек — разметка', () => {
     expect(out).toContain('Не хватает ресурсов');
   });
 
-  it('здание с прокачкой несёт римский уровень в имени', () => {
+  it('уровень — у стоящего здания и словами, у нестоящего уровня нет', () => {
     const out = html(s, pid);
-    const at = out.indexOf('data-bw="mine"');
-    expect(out.slice(at, at + 200)).toContain('bw-lv');
+    expect(rowOf(out, 'mine')).toContain('<i class="bw-lv">Ур. 1 / 3</i>');
+    expect(rowOf(out, 'shipyard')).toContain('<i class="bw-lv">Ур. 2 / 3</i>');
+    expect(rowOf(out, 'fort')).not.toContain('bw-lv');
   });
 
   it('у построенного в подвале — цена СЛЕДУЮЩЕГО уровня с пометкой ▲', () => {
     // шахта стоит на домашнем мире стартом (newGame) — ряд built из живого состояния
-    const out = html(s, pid);
-    const at = out.indexOf('data-bw="mine"');
-    expect(out.slice(at, at + 900)).toContain('bw-next');
-    expect(out.slice(at, at + 400)).toContain('bw-st done');
+    const row = rowOf(html(s, pid), 'mine');
+    expect(row).toContain('<i class="bw-next">▲ Ур. 2</i>');
+    const next = buildingLevel(data.buildings.mine!, 2).cost;
+    expect(row).toContain(cost(next, s.players.p1!.resources));
   });
 
   it('чужой мир не отдаёт разметку с кнопками заказа', () => {
@@ -244,6 +367,7 @@ describe('окно построек — разметка', () => {
     const enemy = Object.values(s2.planets).find((x) => x.owner && x.owner !== 'p1');
     if (!enemy) return;
     expect(html(s2, enemy.id)).not.toContain('data-bw-go');
+    expect(html(s2, enemy.id)).not.toContain('data-bw-up');
   });
 });
 
@@ -283,6 +407,7 @@ describe('окно построек — проводка', () => {
     const body = fakeEl();
     const s = newGame();
     const built: Array<[string, string]> = [];
+    const upgraded: Array<[string, string]> = [];
     const opened: string[] = [];
     const host: BuildHost = {
       root: () => root,
@@ -292,6 +417,7 @@ describe('окно построек — проводка', () => {
       probe: (a) => canOrder(s, a),
       localQueued: () => false,
       build: (pid, id) => built.push([pid, id]),
+      upgrade: (pid, id) => upgraded.push([pid, id]),
       unitIds: () => ['militia'],
       buildUnit: (pid, id) => built.push([pid, id]),
       openUnitInfo: (id) => opened.push(id),
@@ -299,7 +425,7 @@ describe('окно построек — проводка', () => {
       lockText,
       dossierBody: () => 'описание',
     };
-    return { api: initBuildScreen(host), root, body, s, built, opened };
+    return { api: initBuildScreen(host), root, body, s, built, upgraded, opened };
   }
 
   it('units reuse the catalog and send a unit order, without opening the dossier', () => {
@@ -324,6 +450,15 @@ describe('окно построек — проводка', () => {
     api.open(home(s));
     root.fire(tap('[data-bw-go]', { bwGo: 'refinery' }));
     expect(built).toEqual([[home(s), 'refinery']]);
+    expect(opened).toEqual([]);
+  });
+
+  it('«Улучшить» в строке улучшает и НЕ открывает карточку поверх', () => {
+    const { api, root, s, built, upgraded, opened } = wire();
+    api.open(home(s));
+    root.fire(tap('[data-bw-up]', { bwUp: 'mine' }));
+    expect(upgraded).toEqual([[home(s), 'mine']]);
+    expect(built).toEqual([]);
     expect(opened).toEqual([]);
   });
 
@@ -383,6 +518,13 @@ describe('окно построек — подключение к main.ts', () =
     expect(src).toMatch(
       /build: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'building', id, count: 1 \}\)/,
     );
+  });
+
+  it('улучшение — тем же enqueueBuild, что «Улучшить» в карточке здания', () => {
+    expect(src).toMatch(
+      /upgrade: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'upgrade', id, count: 1 \}\)/,
+    );
+    expect(src).toContain("enqueueBuild(selPlanet, { kind: 'upgrade', id: upg, count: 1 })");
   });
 });
 
