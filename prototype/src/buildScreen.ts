@@ -1,14 +1,16 @@
 /**
  * BUILD-1 — окно построек мира (макет владельца): полноэкранный список зданий,
- * сгруппированный категориями, каждая строка — имя с уровнем, состояние
- * (✓ построено / ⏳ строится / кнопка «Строить» / причина замка), эффект, цена
- * с пометкой нехватки и срок. Открывается кнопкой «Построить» из панели мира.
+ * сгруппированный категориями, каждая строка — имя (у построенного с уровнем
+ * «Ур. 1 / 3»), состояние (кнопка «Строить» / у построенного кнопка «Улучшить»,
+ * «улучшается» или «Макс. уровень» / ⏳ строится или в очереди / причина замка), эффект,
+ * цена с пометкой нехватки и срок. Открывается кнопкой «Построить» из панели мира.
  *
  * Тот же раздел труда, что у techTree/rankScreen: разметка ЧИСТАЯ
  * (`buildScreenHtml`, `buildCategory`), хоста трогает только `initBuildScreen(host)`.
  *
  * Правила НЕ копируются: состояние каждой строки — ответ ядра на настоящий приказ
- * (`probe(buildBuilding(...))`, RULES-1). Одна проба покрывает все причины разом:
+ * (`probe(buildBuilding(...))`, у стоящего здания — `probe(upgradeBuilding(...))`,
+ * RULES-1). Одна проба покрывает все причины разом:
  * ростер сектора, лимит экземпляров, идущую стройку, казну — и любую будущую.
  * `E_FORBIDDEN` не приглушает строку, а УБИРАЕТ её (CMD-VIS: чего нельзя — того нет):
  * на мёртвом мире список честно состоит из одной сборочной вышки.
@@ -25,7 +27,7 @@ import { data } from './gameData';
 import { buildingName, cost, esc, fmtDur, resLine, displayUnit } from './format';
 import { BUILD_ICON, unitIcon } from './icons';
 import { catalogPortraitHtml } from './shipArt';
-import { buildBuilding, buildUnit } from '../../decisions/actions';
+import { buildBuilding, buildUnit, upgradeBuilding } from '../../decisions/actions';
 import {
   isLander,
   landerCost,
@@ -37,10 +39,6 @@ import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation'
 import { worldName } from './planetName';
 
 type BuildingDef = (typeof data.buildings)[string];
-
-/** Ярус римской цифрой — как на дереве технологий. Уровней у зданий единицы. */
-const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V'];
-const roman = (n: number): string => ROMAN[n] ?? String(n);
 
 export type BuildCategory = 'economy' | 'defense' | 'infra';
 export const BUILD_CATEGORIES: ReadonlyArray<{ key: BuildCategory; label: string }> = [
@@ -96,14 +94,30 @@ export function buildFx(def: BuildingDef, level: number): string {
 }
 
 /** Состояние строки. Ядро — единственный судья: `probe` гоняет НАСТОЯЩИЙ приказ.
- *  `localQueued` добавляет только локальную (соло) очередь прототипа — её ядро не
- *  видит, стройку в ней таймит сам клиент. */
+ *  `localQueued` — заказ нового экземпляра, который хост уже поставил в очередь.
+ *  `waiting` — заказ ждёт в очереди мира (полоса занята), а не строится. */
 export type BuildRowSt =
-  | { st: 'built'; level: number; count: number }
-  | { st: 'queued' }
+  | { st: 'built'; level: number; count: number; up: BuildUpSt }
+  | { st: 'queued'; waiting: boolean }
   | { st: 'avail'; affordable: boolean }
   | { st: 'hidden' }
   | { st: 'lock'; code: string };
+
+/** Что можно сделать со СТОЯЩИМ зданием — ответ ядра на приказ «улучшить»: кнопка
+ *  (с казной или без), идущее либо ждущее улучшение, предел уровней или причина отказа. */
+export type BuildUpSt =
+  | { up: 'ready'; affordable: boolean }
+  | { up: 'queued'; waiting: boolean }
+  | { up: 'max' }
+  | { up: 'lock'; code: string };
+
+function upgradeState(code: string | null, waiting: boolean): BuildUpSt {
+  if (code === null) return { up: 'ready', affordable: true };
+  if (code === 'E_INSUFFICIENT') return { up: 'ready', affordable: false };
+  if (code === 'E_MAX_LEVEL') return { up: 'max' };
+  if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED') return { up: 'queued', waiting };
+  return { up: 'lock', code };
+}
 
 export function buildRowState(
   state: GameState,
@@ -113,39 +127,70 @@ export function buildRowState(
   probe: (a: Action) => string | null,
   localQueued: (planetId: string, id: string) => boolean,
 ): BuildRowSt {
-  if (localQueued(planetId, id)) return { st: 'queued' };
+  const node = state.planets[planetId];
+  const mine = (node?.buildings ?? []).filter((b) => b.type === id);
+  // Заказ ЖДЁТ в очереди мира (BLD-1), а не строится: строка говорит «в очереди», иначе
+  // второй заказ подряд горел бы идущим, как первый.
+  const waiting = (kind: 'building' | 'upgrade'): boolean =>
+    (node?.buildQueue ?? []).some((q) => q.kind === kind && q.building === id);
+  // Очередь хоста знает и улучшения: у стоящего здания в ней лежит его следующий уровень,
+  // и строка горела «строится» с первым уровнем. Его состояние — проба улучшения ниже.
+  if (mine.length === 0 && localQueued(planetId, id))
+    return { st: 'queued', waiting: waiting('building') };
   // Вид провинции этого здания не пускает — строки нет вовсе, а не замок с причиной
   // (решение владельца 2026-09-26: «если в провинции по её типу нельзя что-то строить,
   // этого просто нет в выборе»). Спрашиваем воротами вида, а не кодом отказа: ядро
   // проверяет технологию раньше вида, и запертое ЕЩЁ И технологией показалось бы замком.
   // Уже стоящее здание остаётся строкой всегда — его улучшают, а вид мира мог смениться
   // после постройки (`station.deploy`).
-  const node = state.planets[planetId];
-  const mine = (node?.buildings ?? []).filter((b) => b.type === id);
   if (node && mine.length === 0 && !canBuildHere(node, id, data, feedsOnBiomass(state, me, data)))
     return { st: 'hidden' };
   const code = probe(buildBuilding(me, planetId, id));
   if (code === null) return { st: 'avail', affordable: true };
   if (code === 'E_INSUFFICIENT') return { st: 'avail', affordable: false };
-  if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED') return { st: 'queued' };
-  // Вид, который здание НЕ пускает, ядро называет раньше, чем «уже стоит»: ядро крепости
-  // (`starfort`) не в ростере ни одной крепости, его ставит `station.deploy`, — и строка
-  // стоящего ядра горела замком «неверный тип сектора» (сообщение владельца 2026-10-03:
-  // «нет возможности строить на крепости»). Стоящее здание — построенное, чем бы ни отказал
-  // приказ поставить ещё одно.
-  if (code === 'E_ALREADY_BUILT' || (code === 'E_WRONG_SECTOR' && mine.length > 0)) {
-    if (mine.length === 0) return { st: 'queued' }; // достроится — станет built
-    return {
-      st: 'built',
-      level: Math.max(...mine.map((b) => b.level)),
-      count: mine.length,
-    };
-  }
+  if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED')
+    return { st: 'queued', waiting: waiting('building') };
   // Ростер сектора / не тот мир / орган Роя у не-Роя: приказа не существует — нет и
   // строки (CMD-VIS).
   if (code === 'E_FORBIDDEN' || code === 'E_NO_PLANET' || code === 'E_SWARM_ONLY')
     return { st: 'hidden' };
+  // Стоящее здание — построенное, чем бы ни отказал приказ поставить ещё одно. Ядро
+  // называет многое раньше, чем «уже стоит»: вид мира (ядра крепости, `starfort`, нет в
+  // ростере ни одной крепости — его ставит `station.deploy`; сообщение владельца 2026-10-03
+  // «нет возможности строить на крепости»), кончившиеся места, технологию. Строка с
+  // такой причиной прятала главное — уровень и путь к следующему.
+  if (mine.length > 0)
+    return {
+      st: 'built',
+      level: Math.max(...mine.map((b) => b.level)),
+      count: mine.length,
+      up: upgradeState(probe(upgradeBuilding(me, planetId, id)), waiting('upgrade')),
+    };
+  // Достроится — станет built.
+  if (code === 'E_ALREADY_BUILT') return { st: 'queued', waiting: false };
   return { st: 'lock', code }; // незнакомый отказ показываем причиной, не прячем
+}
+
+/** Правое поле стоящего здания: кнопка «Улучшить» на месте «Строить», идущее улучшение,
+ *  предел уровней или причина отказа. */
+function builtRight(
+  st: Extract<BuildRowSt, { st: 'built' }>,
+  id: string,
+  maxLvl: number,
+  lockText: (code: string) => string,
+): string {
+  const up = st.up;
+  if (up.up === 'ready') {
+    const label = up.affordable ? t('build.action.upgrade') : t('build.action.no-res');
+    return `<button class="bw-take btn-main" data-bw-up="${id}"${up.affordable ? '' : ' disabled'}>▲ ${label}</button>`;
+  }
+  if (up.up === 'queued') {
+    const label = up.waiting ? t('build.state.waiting') : t('build.state.upgrading');
+    return `<span class="bw-st run">⏳ ${label}</span>`;
+  }
+  if (up.up === 'lock') return `<span class="bw-st lock">🔒 ${esc(lockText(up.code))}</span>`;
+  const done = maxLvl > 1 ? t('build.state.max') : t('build.state.done');
+  return `<span class="bw-st done">✓ ${done}${st.count > 1 ? ` ×${st.count}` : ''}</span>`;
 }
 
 /** Всё тело окна для одного мира. Чистая функция — `initBuildScreen` кормит её живым
@@ -189,14 +234,19 @@ export function buildScreenHtml(
     if (st.st === 'hidden') continue;
     const maxLvl = buildingMaxLevel(def);
     const shownLvl = st.st === 'built' ? st.level : 1;
+    // Уровень — у СТОЯЩЕГО здания и словами, «Ур. 1 / 3»: римская цифра после имени
+    // читалась частью имени, и владелец не увидел, что у построенного есть уровни
+    // (сообщение 2026-10-03). У нестоящего уровня нет — строится первый.
     const name =
       esc(buildingName(def.name, id)) +
-      (maxLvl > 1 ? ` <i class="bw-lv">${roman(shownLvl)}</i>` : '');
+      (st.st === 'built' && maxLvl > 1
+        ? ` <i class="bw-lv">${t('build.level.now', { n: st.level, max: maxLvl })}</i>`
+        : '');
     const right =
       st.st === 'built'
-        ? `<span class="bw-st done">✓ ${t('build.state.done')}${st.count > 1 ? ` ×${st.count}` : ''}</span>`
+        ? builtRight(st, id, maxLvl, lockText)
         : st.st === 'queued'
-          ? `<span class="bw-st run">⏳ ${t('build.state.queued')}</span>`
+          ? `<span class="bw-st run">⏳ ${st.waiting ? t('build.state.waiting') : t('build.state.queued')}</span>`
           : st.st === 'lock'
             ? `<span class="bw-st lock">🔒 ${esc(lockText(st.code))}</span>`
             : `<button class="bw-take btn-main" data-bw-go="${id}"${st.affordable ? '' : ' disabled'}>▷ ${
@@ -209,11 +259,20 @@ export function buildScreenHtml(
     const nextLvl = st.st === 'built' ? st.level + 1 : 1;
     const lv = nextLvl <= maxLvl ? buildingLevel(def, nextLvl) : null;
     const foot = lv
-      ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${roman(nextLvl)}</i> ` : ''}${cost(lv.cost, res)}</span>` +
+      ? `<div class="bw-foot"><span>${st.st === 'built' ? `<i class="bw-next">▲ ${t('build.level.next', { n: nextLvl })}</i> ` : ''}${cost(lv.cost, res)}</span>` +
         `<span class="bw-dur">${fmtDur(lv.buildTimeHours)}</span></div>`
       : '';
+    // Рамка строки — что с ней можно сделать: улучшаемое горит, как доступное к стройке.
+    const look =
+      st.st !== 'built'
+        ? st.st
+        : st.up.up === 'ready'
+          ? 'up'
+          : st.up.up === 'max'
+            ? 'built'
+            : st.up.up;
     const row =
-      `<div class="bw-item st-${st.st}" data-bw="${id}">` +
+      `<div class="bw-item st-${look}" data-bw="${id}">` +
       `<div class="bw-ih"><span class="bw-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${name}</b>${right}</div>` +
       (fx ? `<div class="bw-fx">${fx}</div>` : '') +
       foot +
@@ -350,10 +409,12 @@ export interface BuildHost {
   me(): string;
   /** Проба ядра (canOrder) — та же, которой решается сам приказ. */
   probe(a: Action): string | null;
-  /** Локальная (соло) очередь прототипа: заказ уже лежит, ядро о нём не знает. */
+  /** Очередь стройки мира: заказ этого здания уже лежит в ней. */
   localQueued(planetId: string, id: string): boolean;
   /** Заказ стройки хостовым путём (enqueueBuild: сеть → приказ, соло → очередь). */
   build(planetId: string, id: string): void;
+  /** Улучшение стоящего здания тем же хостовым путём, что и «Улучшить» в его карточке. */
+  upgrade(planetId: string, id: string): void;
   unitIds(tab: UnitCatalogTab): string[];
   /** `troop` — боец десантного челнока (SHU-5.2); у остальных юнитов его нет. */
   buildUnit(planetId: string, id: string, troop?: string): void;
@@ -441,6 +502,13 @@ export function initBuildScreen(host: BuildHost): {
     if (go && planetId) {
       host.build(planetId, go);
       repaint(); // строка тут же перекрашивается в «строится»
+      return;
+    }
+    // «Улучшить» лежит там же и выходит так же рано.
+    const up = (tg.closest('[data-bw-up]') as HTMLElement | null)?.dataset.bwUp;
+    if (up && planetId) {
+      host.upgrade(planetId, up);
+      repaint(); // строка тут же перекрашивается в «улучшается»
       return;
     }
     const row = (tg.closest('[data-bw]') as HTMLElement | null)?.dataset.bw;

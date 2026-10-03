@@ -11432,6 +11432,7 @@ const buildWin = initBuildScreen({
   localQueued: (pid, id) =>
     coreQueue(pid, 'buildings').some((q) => q.building === id),
   build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
+  upgrade: (pid, id) => enqueueBuild(pid, { kind: 'upgrade', id, count: 1 }),
   // Юнитные вкладки окна стройки (BUILD-2): тот же путь, которым их строила боковая
   // панель, — ростер по вкладке, заказ через ту же очередь, карточка через тот же кодекс.
   // Новой логики здесь нет и быть не должно: окно переехало, правила остались.

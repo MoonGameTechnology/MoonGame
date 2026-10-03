@@ -1881,7 +1881,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .bw-ih{display:flex;align-items:center;gap:8px;}
 .bw-ic{flex:none;font-size:15px;font-variant-emoji:text;color:var(--cyan);}
 .bw-ih b{flex:1;min-width:0;font-size:var(--fs-body);font-weight:700;color:#eafffb;}
-.bw-lv{font-style:normal;font-size:var(--fs-caption);color:var(--cyan);}
+.bw-lv{display:inline-block;margin-left:4px;padding:1px 7px;border:1px solid var(--line-hi);border-radius:10px;
+  font-style:normal;font-weight:600;font-size:var(--fs-caption);color:var(--cyan);white-space:nowrap;}
 .bw-fx{margin-top:4px;font-size:var(--fs-caption);line-height:1.45;color:var(--dim);}
 .bw-foot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--fs-caption);color:var(--dim);}
 .bw-dur{flex:none;font-variant-numeric:tabular-nums;}
@@ -1892,7 +1893,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .bw-st.run{color:var(--amber);font-weight:700;}
 /* Вид «Построить» — классом .btn-main (UIX-11.1); здесь только размер и место. */
 .bw-take{flex:none;padding:6px 11px;border-radius:8px;font-size:var(--fs-body);white-space:nowrap;}
-.bw-item.st-avail{border-color:var(--cyan);}
+/* Улучшаемое здание горит так же, как доступное к стройке: в строке есть что нажать. */
+.bw-item:is(.st-avail,.st-up){border-color:var(--cyan);}
 .bw-item.st-queued{border-color:var(--amber);}
 .bw-item.st-built{opacity:.75;}
 .bw-item.st-lock{opacity:.62;}
