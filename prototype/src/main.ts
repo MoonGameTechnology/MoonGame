@@ -3470,7 +3470,9 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
   if (gate === 'closed') return null;
   // Источники, типы и суммы — `troopsSources.ts` (REFM-81): на союзном мире поднимать
   // нечего, поэтому счётчик выходит односторонним сам собой, без отдельного режима меню.
-  const types = groundTypes(troopSources(mine, here.garrison, landing), isGround);
+  // «Гарнизон» форта неподвижен (`immobile`) — ядро его не поднимет, меню не предлагает.
+  const liftable = (u: string) => !data.units[u]?.traits.includes('immobile');
+  const types = groundTypes(troopSources(mine, here.garrison, landing, liftable), isGround);
   if (!hasTroops(types)) return null;
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
