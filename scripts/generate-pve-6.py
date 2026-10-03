@@ -159,6 +159,11 @@ P = collections.OrderedDict([
 # ней, и сигнал притягивает Рой.
 TRAITS = {'forward_base': ['haven'], 'toll_post': ['ally_task'], 'voices_chapel': ['beacon']}
 
+# Союзник с первой минуты (§8.3, PVR-8.2): повторного знакомства нет — встреча состоялась до
+# операции. Место связи — лагерь союзника; загрузчик записывает контакт и ставит союз
+# (`contactAtStart`), поэтому окно связи, приказы и общий обзор работают с нулевой минуты.
+LINK = {'ally_camp': {'rendezvous': 'ally', 'contactAtStart': True}}
+
 # ЗАДАЧИ ЗАБЕГА — пул из двенадцати (§8.8 + общие глаголы); видно по правилу PVR-5.3, как во
 # всех главах. Три результата операции (производство, главные силы, основная эвакуация) — не
 # задачи пула: они решают исход главы, а задачи — надбавка.
@@ -208,6 +213,7 @@ for sid, (x, y, kind, terrain, owner, garr, blds) in P.items():
         sec['garrison'] = garr
     if sid in TRAITS:
         sec['traits'] = TRAITS[sid]
+    sec.update(LINK.get(sid, {}))
     sectors[sid] = sec
 
 m = collections.OrderedDict([

@@ -47,6 +47,51 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     ]);
   });
 
+  describe('связь с союзником до матча (PVR-8.2)', () => {
+    /** Пример с жителем-союзником: встреча в `drift`, `red` — ИИ-место, пираты — житель без ИИ. */
+    const linkedMap = (contactAtStart: boolean | undefined): MatchMap => {
+      const map = exampleMap();
+      map.players.ally = {
+        name: 'Ally',
+        faction: 'vanguard',
+        resources: {},
+        ai: true,
+        npc: 'neutral',
+      };
+      map.players.pirates = {
+        name: 'Pirates',
+        faction: 'vanguard',
+        resources: {},
+        ai: false,
+        npc: 'pirate',
+      };
+      map.players.red!.ai = true;
+      map.sectors.drift = { ...map.sectors.drift!, rendezvous: 'ally', contactAtStart };
+      return map;
+    };
+
+    it('встреча уже была: контакт записан людям, союз поставлен', () => {
+      const state = buildStateFromMap(linkedMap(true), data);
+      expect(state.missionFacts?.contacted).toEqual({ green: ['drift'] });
+      expect(getStance(state, 'green', 'ally')).toBe('alliance');
+      // ИИ-место и житель связи не получают — как и по прибытию (`rendezvousModule`).
+      expect(getStance(state, 'red', 'ally')).toBe('peace');
+      expect(getStance(state, 'pirates', 'ally')).not.toBe('alliance');
+    });
+
+    it('без поля — встреча впереди, как в главе IV', () => {
+      const state = buildStateFromMap(linkedMap(undefined), data);
+      expect(state.missionFacts).toBeUndefined();
+      expect(getStance(state, 'green', 'ally')).toBe('peace');
+    });
+
+    it('связь без места встречи — ошибка карты', () => {
+      const map = linkedMap(true);
+      map.sectors.drift = { ...map.sectors.drift!, rendezvous: undefined };
+      expect(validateMatchMap(map, data)).toContain('E_INVALID_RENDEZVOUS:drift');
+    });
+  });
+
   it('модули стартового флота доезжают из карты в стек (AUD-28)', () => {
     // Матки Роя на `pve-1` объявлены с выводковой камерой — и в игре они с ней.
     const map = parseMatchMap(readJson('data/maps/pve-1.json'));

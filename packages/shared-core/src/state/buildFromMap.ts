@@ -131,6 +131,9 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     // (that would be a free human ally) nor a pirate (never at peace to meet).
     if (sec.rendezvous !== undefined && map.players[sec.rendezvous]?.npc !== 'neutral')
       issues.push(`E_INVALID_RENDEZVOUS:${id}`);
+    // A contact made before the match needs the meeting place it is recorded against.
+    if (sec.contactAtStart && sec.rendezvous === undefined)
+      issues.push(`E_INVALID_RENDEZVOUS:${id}`);
     // An archive's extraction zone must be a real, enterable province of this map.
     if (sec.vault !== undefined) {
       const zone = map.sectors[sec.vault.zone];
@@ -487,6 +490,32 @@ function seedTeamDiplomacy(
   return diplomacy;
 }
 
+/** Связь со сценарным союзником, установленная ДО матча (PVR-8.2, глава VI §8.3): место
+ *  встречи с `contactAtStart` записывается в контакты каждого человека-игрока — тот же факт,
+ *  что пишет `rendezvousModule` по прибытию, — и пара получает союз (дополняет `diplomacy`
+ *  на месте). Читатели факта — окно связи, приказы и бот союзника — работают с первой минуты
+ *  без своей ветки. ИИ-места и жители контакта не получают: так же, как по прибытию. Ключи
+ *  и места идут по сортировке — тот же мир на тех же данных (инвариант #1). */
+function seedContactsAtStart(
+  map: MatchMap,
+  players: Record<string, Player>,
+  diplomacy: Record<string, DiplomaticStance> | undefined,
+): Record<string, string[]> | undefined {
+  const places = Object.keys(map.sectors)
+    .sort()
+    .filter((id) => map.sectors[id]!.contactAtStart && map.sectors[id]!.rendezvous);
+  const humans = Object.keys(players)
+    .sort()
+    .filter((id) => !players[id]!.npc && !players[id]!.ai);
+  if (places.length === 0 || humans.length === 0 || !diplomacy) return undefined;
+  const contacted: Record<string, string[]> = {};
+  for (const seat of humans) {
+    contacted[seat] = [...places];
+    for (const at of places) diplomacy[pairKey(seat, map.sectors[at]!.rendezvous!)] = 'alliance';
+  }
+  return contacted;
+}
+
 /** Normalizes a slot's scientist council (new `scientists`, else the legacy single
  *  `scientist`) into ≤2 distinct, catalog-known leaders. Fail-secure at boot:
  *  `E_UNKNOWN_SCIENTIST` / `E_DUPLICATE_SCIENTIST` / `E_TOO_MANY_SCIENTISTS`. */
@@ -712,6 +741,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     if (map.slots[slotId]) teamOf.set(a.playerId, map.slots[slotId]!.team);
   }
   const diplomacy = seedTeamDiplomacy(teamOf, options.crossTeamStart ?? 'war', players);
+  const contacted = seedContactsAtStart(map, players, diplomacy);
   // Накопитель архива (PVR-7.3): карта объявила архив — у матча есть сценарий извлечения.
   const vaultId = Object.keys(map.sectors)
     .sort()
@@ -726,6 +756,7 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     planets: shareRoadNetwork(planets),
     fleets,
     ...(diplomacy ? { diplomacy } : {}),
+    ...(contacted ? { missionFacts: { contacted } } : {}),
     ...(Object.keys(heroes).length ? { heroes } : {}),
     ...(vaultId !== undefined && vault
       ? { extraction: { vault: vaultId, zone: vault.zone, hours: vault.hours, doneMs: 0 } }

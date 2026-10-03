@@ -115,7 +115,9 @@
           "unit": "garrison",
           "count": 2
         }
-      ]
+      ],
+      "rendezvous": "ally",
+      "contactAtStart": true
     },
     "south_wake": {
       "position": {

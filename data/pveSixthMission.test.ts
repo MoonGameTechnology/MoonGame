@@ -13,17 +13,22 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildStateFromMap,
+  contactedAllies,
   createKernel,
   getStance,
   identifiedNodes,
   matchMapEdges,
   parseMatchMap,
   pveModule,
+  rendezvousModule,
   validateMatchMap,
   waveStagingWorld,
+  type GameModule,
   type MatchConfig,
   type MatchMap,
 } from '../packages/shared-core/src/index';
+import { linkedAlly } from '../decisions/allyPanel';
+import { allyActiveOp } from '../decisions/allyOperation';
 import { ru } from '../localization/ru';
 import { en } from '../localization/en';
 import { shippedGameData } from './bundle';
@@ -325,6 +330,95 @@ describe('кто где стоит (§8.2–§8.4)', () => {
     expect(waveStagingWorld(seeded.state)).toBe(COMPLEX);
     for (const side of ['p1', 'ally'])
       expect(getStance(seeded.state, 'swarm', side), side).toBe('war');
+  });
+});
+
+describe('союзник с первой минуты (§8.3, PVR-8.2)', () => {
+  const state = buildStateFromMap(map, data);
+  /** Мир после посева PvE: Рой уже объявил войну всем (посев едет на `time.advanced`, нулевой отрезок его не зовёт). */
+  const seeded = () => {
+    const r = createKernel([pveModule]).advanceTo(state, {
+      now: 3_600_000,
+      data,
+      config: { timeScale: 1, modeId: map.mode } as MatchConfig,
+    });
+    if (!r.ok) throw new Error(r.code);
+    return r.state;
+  };
+
+  it('повторного знакомства нет: связь и союз — с нулевой минуты', () => {
+    expect(getStance(state, 'p1', 'ally')).toBe('alliance');
+    expect(contactedAllies(state, 'p1')).toEqual(['ally']);
+    expect(state.missionFacts?.contacted).toEqual({ p1: ['ally_camp'] });
+    // Рою союз не достаётся: связь пишется только людям.
+    expect(getStance(state, 'swarm', 'ally')).not.toBe('alliance');
+  });
+
+  it('прибытие в лагерь союзника — не вторая встреча: события знакомства нет', () => {
+    /** Звонок — поднимает прибытие так же, как его поднимает движение (как в `rendezvous.test.ts`). */
+    const bell: GameModule = {
+      id: 'test-bell',
+      version: '1.0.0',
+      setup(api) {
+        api.onAction('test.arrived', (action, h) => h.emit('fleet.arrived', action.payload));
+      },
+    };
+    const there = JSON.parse(JSON.stringify(state)) as typeof state;
+    there.fleets.p1_1 = { ...there.fleets.p1_1!, location: 'ally_camp', movement: null };
+    const r = createKernel([rendezvousModule, bell]).applyAction(
+      there,
+      {
+        id: 'a1',
+        type: 'test.arrived',
+        playerId: 'p1',
+        payload: { fleetId: 'p1_1', at: 'ally_camp' },
+        issuedAt: 0,
+      },
+      { now: 0, data, config: { timeScale: 1 } as MatchConfig },
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.events.map((e) => e.type)).toEqual(['fleet.arrived']);
+    expect(r.state.missionFacts?.contacted).toEqual({ p1: ['ally_camp'] });
+  });
+
+  it('обзор общий: что опознал один, опознал и другой', () => {
+    const mine = [...identifiedNodes(state, 'p1', data)].sort();
+    expect(mine).toEqual([...identifiedNodes(state, 'ally', data)].sort());
+    // Лагерь союзника виден игроку с первой минуты, хотя до него два перехода от базы.
+    expect(neighbours(BASE)).not.toContain('ally_camp');
+    expect(mine).toContain('ally_camp');
+  });
+
+  it('окно «Связь с союзником» открыто, без приказа союзник ведёт свою задачу', () => {
+    expect(linkedAlly(state, 'p1')).toBe('ally');
+    expect(allyActiveOp(seeded(), 'ally')).toMatchObject({
+      source: 'own',
+      op: { kind: 'attack', planet: 'toll_post' },
+    });
+  });
+
+  it('приказ союзнику принимается с первой минуты и переживает сохранение', () => {
+    const order = (s: typeof state) =>
+      createKernel([rendezvousModule]).applyAction(
+        s,
+        {
+          id: 'o1',
+          type: 'ally.order',
+          playerId: 'p1',
+          payload: { ally: 'ally', kind: 'guard', planet: BASE },
+          issuedAt: 0,
+        },
+        { now: 0, data, config: { timeScale: 1 } as MatchConfig },
+      );
+    const r = order(state);
+    expect(r.ok).toBe(true);
+    if (r.ok)
+      expect(r.state.allyOps?.ally).toMatchObject({ by: 'p1', kind: 'guard', planet: BASE });
+    // Сохранение — это JSON: связь и союз из него не выпадают.
+    const reloaded = JSON.parse(JSON.stringify(state)) as typeof state;
+    expect(contactedAllies(reloaded, 'p1')).toEqual(['ally']);
+    expect(order(reloaded).ok).toBe(true);
   });
 });
 
