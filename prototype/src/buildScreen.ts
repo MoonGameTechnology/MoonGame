@@ -121,18 +121,19 @@ export function buildRowState(
   // Уже стоящее здание остаётся строкой всегда — его улучшают, а вид мира мог смениться
   // после постройки (`station.deploy`).
   const node = state.planets[planetId];
-  if (
-    node &&
-    !node.buildings.some((b) => b.type === id) &&
-    !canBuildHere(node, id, data, feedsOnBiomass(state, me, data))
-  )
+  const mine = (node?.buildings ?? []).filter((b) => b.type === id);
+  if (node && mine.length === 0 && !canBuildHere(node, id, data, feedsOnBiomass(state, me, data)))
     return { st: 'hidden' };
   const code = probe(buildBuilding(me, planetId, id));
   if (code === null) return { st: 'avail', affordable: true };
   if (code === 'E_INSUFFICIENT') return { st: 'avail', affordable: false };
   if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED') return { st: 'queued' };
-  if (code === 'E_ALREADY_BUILT') {
-    const mine = (state.planets[planetId]?.buildings ?? []).filter((b) => b.type === id);
+  // Вид, который здание НЕ пускает, ядро называет раньше, чем «уже стоит»: ядро крепости
+  // (`starfort`) не в ростере ни одной крепости, его ставит `station.deploy`, — и строка
+  // стоящего ядра горела замком «неверный тип сектора» (сообщение владельца 2026-10-03:
+  // «нет возможности строить на крепости»). Стоящее здание — построенное, чем бы ни отказал
+  // приказ поставить ещё одно.
+  if (code === 'E_ALREADY_BUILT' || (code === 'E_WRONG_SECTOR' && mine.length > 0)) {
     if (mine.length === 0) return { st: 'queued' }; // достроится — станет built
     return {
       st: 'built',

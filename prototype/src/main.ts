@@ -899,6 +899,7 @@ import {
   disarmForCommand,
   drop,
   engageAim,
+  hasSelection,
   heroAim,
   heroSpawnAim,
   inspectFleet,
@@ -9271,7 +9272,7 @@ function renderPanel() {
     merging,
     picking: pickMode,
     chaining: chainMode !== null,
-    hasSelection: panelFleet() !== null || selPlanet !== null || selFleets.size > 0,
+    hasSelection: hasSelection(),
   };
   const open = panelOpen(dock);
   side.style.display = open ? 'flex' : 'none';
@@ -15137,7 +15138,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'phone-speed', isOpen: () => phoneSpeed.isOpen(), close: () => phoneSpeed.close() }, // z41
   // Панель задач забега: открыта чипом «Задачи», закрывается и Escape/Back (см. EXTRA_LAYERS).
   { id: 'missions', isOpen: () => missionPanel.isOpen(), close: () => missionPanel.toggle(false) }, // z44
-  { id: 'side', isOpen: () => panelFleet() !== null || selPlanet !== null || selFleets.size > 0, close: () => {
+  { id: 'side', isOpen: hasSelection, close: () => {
     if (mobileHud.expanded()) mobileHud.collapse();
     else clearSelection();
   } }, // z20

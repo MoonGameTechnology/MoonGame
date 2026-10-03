@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame, canOrder, data } from './game';
+import { buildBuilding } from '../../decisions/actions';
 import { buildingLevel } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
@@ -135,6 +136,22 @@ describe('окно построек — состояние строки от п�
     // Уже стоящее остаётся: его улучшают, даже если вид мира сменился после постройки.
     const built = s.planets[pid]!.buildings[0]!.type;
     expect(html(s, pid)).toContain(`data-bw="${built}"`);
+  });
+
+  // Ядро крепости ставит `station.deploy`, а не стройка: в ростере крепости его нет, и проба
+  // «поставить ещё одно» отвечает видом раньше, чем «уже стоит».
+  it('стоящее ядро крепости — построенное, а не замок «неверный тип сектора»', () => {
+    const s = newGame();
+    const pid = home(s);
+    s.planets[pid]!.kind = 'void_station';
+    s.planets[pid]!.buildings.push({ type: 'starfort', level: 2, hp: 110 });
+    expect(canOrder(s, buildBuilding('p1', pid, 'starfort'))).toBe('E_WRONG_SECTOR');
+    expect(buildRowState(s, 'p1', pid, 'starfort', probe(s), noQueue)).toEqual({
+      st: 'built',
+      level: 2,
+      count: 1,
+    });
+    expect(html(s, pid)).not.toContain('код:E_WRONG_SECTOR');
   });
 
   it('локальная соло-очередь читается как «строится» — ядро о ней не знает', () => {

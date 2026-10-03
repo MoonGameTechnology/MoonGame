@@ -1869,7 +1869,11 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .bw-cnt{flex:none;font-size:var(--fs-caption);color:var(--cyan);border:1px solid var(--line-hi);border-radius:10px;padding:3px 9px;}
 .bw-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-y;}
 .bw-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;}
-.bw-tabs{display:flex;gap:5px;padding:10px 0 2px;flex:none;overflow-x:auto;touch-action:pan-x;scrollbar-width:none;}
+/* Вкладки прилипают к верху списка (просьба владельца 2026-10-03): прокрутил длинный каталог —
+   переключить категорию можно, не листая назад. Плотная подложка во всю ширину списка, иначе
+   сквозь вкладки читаются строки. */
+.bw-tabs{display:flex;gap:5px;padding:10px 12px 6px;margin:0 -12px;flex:none;overflow-x:auto;touch-action:pan-x;scrollbar-width:none;
+  position:sticky;top:0;z-index:2;background:rgba(3,14,18,.92);backdrop-filter:blur(4px);}
 .bw-tabs::-webkit-scrollbar{display:none;}
 .bw-tab{flex:none;padding:7px 12px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
   color:var(--dim);font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap;}
