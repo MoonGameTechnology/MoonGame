@@ -13,7 +13,8 @@ import type { MedalBadge } from '../../decisions/unitMedals';
  */
 import { esc } from './format';
 
-/** Кнопка действия панели. `ok = false` → видна, но нажать нельзя. */
+/** Кнопка действия панели — вторичная (UIX-11.2): главная у карточки своя. `ok = false` →
+ *  видна, но нажать нельзя. */
 export function actionButton(
   act: string,
   arg: string,
@@ -22,7 +23,7 @@ export function actionButton(
   desc?: string,
 ): string {
   const d = desc ? ` data-desc="${esc(desc)}"` : '';
-  return `<button class="b" data-act="${esc(act)}" data-arg="${esc(arg)}"${d} ${ok ? '' : 'disabled'}>${esc(label)}</button>`;
+  return `<button class="b btn-second" data-act="${esc(act)}" data-arg="${esc(arg)}"${d} ${ok ? '' : 'disabled'}>${esc(label)}</button>`;
 }
 
 /** Обернуть секцию так, чтобы многоколоночная раскладка ПК не разорвала её по колонкам. */

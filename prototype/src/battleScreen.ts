@@ -249,8 +249,8 @@ export function sideRowHtml(
       : '') +
     (side.mine && !options.ended
       ? `<div class="bw-actions">` +
-        `<button class="b bw-attack" data-battle-attack="${esc(key)}"${side.role === 'attacker' ? ' disabled' : ''}>${esc(t(side.role === 'attacker' ? 'battle.win.attacking' : 'battle.win.attack'))}</button>` +
-        `<button class="b" data-battle-retreat="${esc(fleetId ?? '')}"${canRetreat ? '' : ' disabled'}>${esc(t('side.battle.retreat'))}</button></div>` +
+        `<button class="b bw-attack btn-second" data-battle-attack="${esc(key)}"${side.role === 'attacker' ? ' disabled' : ''}>${esc(t(side.role === 'attacker' ? 'battle.win.attacking' : 'battle.win.attack'))}</button>` +
+        `<button class="b btn-second" data-battle-retreat="${esc(fleetId ?? '')}"${canRetreat ? '' : ' disabled'}>${esc(t('side.battle.retreat'))}</button></div>` +
         (fleetId && autoAt !== undefined
           ? `<p class="bw-auto">${esc(autoAt === null ? t('battle.win.auto.off') : t('battle.win.auto.on', { n: Math.round(autoAt * 100) }))}</p>`
           : '')
@@ -359,8 +359,8 @@ export function battleWindowHtml(
         )) +
     `<div class="bw-columns">${renderColumn(friends, t('battle.win.allies'))}${renderColumn(others, t('battle.win.opponents'))}</div>` +
     (orders
-      ? `<div class="bw-orders"><button class="b bw-attack" data-battle-attack-all${canAttack ? '' : ' disabled'}>${esc(t('battle.win.attack-all'))}</button>` +
-        `<button class="b" data-battle-retreat-all${retreats.length ? '' : ' disabled'}>${esc(t('battle.win.retreat-all'))}</button></div>`
+      ? `<div class="bw-orders"><button class="b bw-attack btn-main" data-battle-attack-all${canAttack ? '' : ' disabled'}>${esc(t('battle.win.attack-all'))}</button>` +
+        `<button class="b btn-second" data-battle-retreat-all${retreats.length ? '' : ' disabled'}>${esc(t('battle.win.retreat-all'))}</button></div>`
       : '') +
     rulesHtml(
       !orders

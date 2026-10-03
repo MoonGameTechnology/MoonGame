@@ -1413,10 +1413,7 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .conveyor .paused span{display:flex;align-items:center;gap:4px;border:1px solid var(--amber,#f0b429);
   background:rgba(240,180,41,.08);padding:3px 6px;font-size:var(--fs-caption);color:var(--ink);}
 .conveyor .paused em{font-style:normal;color:var(--amber,#f0b429);margin-right:2px;}
-button.b{background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:2px;
-  padding:5px 10px;margin:3px 4px 2px 0;cursor:pointer;font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;}
-button.b:hover:not(:disabled){background:rgba(53,214,230,.14);box-shadow:0 0 10px rgba(53,214,230,.35);}
-button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(--fs-caption);}
 /* Три стиля кнопок (UIX-11.1) — на всю игру, эталон — Sector Zero и дверь хаба. Экран задаёт
    кнопке размер и место, а вид она берёт классом: главная — действие, ради которого карточка
    открыта (одна на карточку), вторичная — остальные действия, тихая — переход и пояснение.
@@ -1476,17 +1473,11 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 /* Флагман героя не отделяется (ядро: E_HERO_UNIT) — строка без кнопок, с пометкой. */
 #splitdlg .sstays{justify-self:center;padding:0 8px;color:var(--dim);font-size:var(--fs-caption);}
 #splitdlg .ssub.shero{margin-top:-6px;color:#e6c77a;}
-#splitdlg .sbtns button{min-width:34px;height:30px;padding:0 7px;cursor:pointer;border-radius:2px;
-  font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);}
-#splitdlg .sbtns button:hover:not(:disabled){background:rgba(53,214,230,.14);}
-#splitdlg .sbtns button:disabled{opacity:.3;cursor:not-allowed;color:var(--dim);border-color:var(--line);}
+#splitdlg .sbtns button{min-width:34px;height:30px;padding:0 7px;border-radius:2px;font-size:var(--fs-caption);}
 #splitdlg .sfoot{margin:13px 0 2px;color:var(--dim);font-size:var(--fs-body);text-align:center;}
 #splitdlg .sfoot b{color:#eafffb;}
 #splitdlg .sactions{display:flex;gap:10px;justify-content:center;margin-top:10px;}
-#splitdlg .sactions .cbtn{flex:1;max-width:160px;padding:11px 10px;border-radius:7px;border:1px solid var(--cyan);
-  background:rgba(53,214,230,.12);color:var(--cyan);font:600 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
-#splitdlg .sactions .cbtn:disabled{opacity:.35;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
-#splitdlg .sactions .cbtn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
+#splitdlg .sactions .cbtn{flex:1;max-width:160px;padding:11px 10px;border-radius:7px;font-size:var(--fs-body);}
 
 /* event log lives in a tap-to-open window (rail ≡), not a permanent panel */
 #logwin{position:fixed;inset:0;z-index:46;display:none;align-items:center;justify-content:center;padding:16px;
@@ -1748,9 +1739,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #battlewinbody .bw-tiles .ptile.with-art{flex-basis:104px;}
 #battlewinbody .bw-tiles .ptile:focus-visible{outline:2px solid var(--own);outline-offset:2px;}
 #battlewinbody .bw-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
-#battlewinbody .bw-actions button,#battlewinbody .bw-orders button{min-height:38px;padding:8px 15px;font-size:var(--fs-body);border:1px solid var(--line-hi);border-radius:4px;cursor:pointer;}
-#battlewinbody button.bw-attack{border-color:#ba7040;background:#47291b;color:#ffd09a;}
-#battlewinbody button:disabled{opacity:.4;cursor:default;}
+#battlewinbody .bw-actions button,#battlewinbody .bw-orders button{min-height:38px;padding:8px 15px;font-size:var(--fs-body);border-radius:4px;}
 #battlewinbody .bw-orders{position:sticky;bottom:-12px;display:flex;justify-content:center;gap:12px;padding:10px;background:#09141ff5;border-top:1px solid var(--line-hi);z-index:1;}
 #battlewinbody .bw-effects{padding:8px;background:#07121c;border:1px solid var(--line);border-radius:4px;}
 #battlewinbody .bw-effects ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;}
@@ -1911,16 +1900,15 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 @media(hover:hover){
   :where(.bw-item:hover){border-color:var(--line-hi);}
 }
-/* Кнопка панели, открывающая окно, — акцентная, во всю ширину колонки */
-.bw-open{margin-top:8px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--grn);cursor:pointer;
-  font:800 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;
-  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
+/* Кнопка панели во всю ширину колонки: «Постройки», «Юниты», крепость, путь к технологиям.
+   Вид — классом стиля (UIX-11.2). */
+.bw-open{margin-top:8px;width:100%;padding:10px;border-radius:10px;font-size:var(--fs-caption);}
 /* Крепость не изучена — причина под серой кнопкой и путь к технологиям (сообщение владельца
    2026-09-24: кнопка горела, а ядро отвечало безымянным «нужна технология»). */
 .fort-why{margin-top:6px;font-size:var(--fs-caption);line-height:1.45;color:#e6c77a;}
 /* Серая кнопка панели должна БЫТЬ серой: погашенная «Возвести крепость» светилась так же, как
-   живая, и нажатие «ничего не делало». Цена внутри — цветом кнопки, а не бледным .dim. */
-.bw-open:disabled{cursor:not-allowed;background:transparent;color:var(--dim);border-color:var(--line-hi);}
+   живая, и нажатие «ничего не делало». Серой её делает класс стиля; цена внутри — цветом
+   кнопки, а не бледным .dim. */
 .bw-open .dim{color:inherit;opacity:.85;}
 /* Листалка уровней в карточке кодекса (BUILD-1) */
 .cx-lvls{display:flex;gap:6px;margin:10px 0 0;}
