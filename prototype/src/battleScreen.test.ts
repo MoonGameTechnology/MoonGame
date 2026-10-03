@@ -163,6 +163,20 @@ describe('окно боя', () => {
     ).not.toContain('bw-bal');
   });
 
+  it('владелец назван словами хоста, а не именем из состояния (UIX-5.3)', () => {
+    // В состоянии имя дома — английское имя данных; окно стояло на нём и в русской версии:
+    // «Azure Compact · флот» в строке стороны и в легенде полосы сил.
+    const a = side('p1', 'attacker', true);
+    const b = side('p2', 'defender');
+    a.hull = { current: 300, max: 300 };
+    b.hull = { current: 100, max: 300 };
+    const ownerName = (o: string | null): string => (o === 'p2' ? 'Багровая гегемония' : 'Вы');
+    const html = battleWindowHtml(battle([a, b]), [], { ownerName });
+    expect(html).toContain(`Багровая гегемония · ${t('side.battle.side.fleet')}`);
+    expect(html).toContain('Багровая гегемония 25%');
+    expect(html).not.toContain('P2');
+  });
+
   it('свой флот в бою назван позывным и показывает авто-отход', () => {
     const html = battleWindowHtml(
       battle([side('p1', 'attacker', true), side('p2', 'defender')]),
