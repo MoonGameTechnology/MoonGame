@@ -242,7 +242,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '67'; // PVR-8.3: контракт операции главы VI. В
+export const MODULE_MANIFEST_VERSION = '68'; // PVR-8.4: «Последний приют» главы VI.
+// Членство и порядок не тронуты; `missionFacts` 1.2.0 пишет сведения о местах эпизода
+// (`missionFacts.found`) и выпускает ждущих флотом союзника, у `operation` новое поле
+// `counterattack` — замысел последнего удара Роя.
+// export const MODULE_MANIFEST_VERSION = '67'; // PVR-8.3: контракт операции главы VI. В
 // ЧЛЕНСТВО вошёл `operation` 1.0.0 вплотную перед `auto-merge`; `victory` 1.6.0 судит главу
 // с контрактом по его трём результатам, у состояния новое поле `operation`.
 // export const MODULE_MANIFEST_VERSION = '66'; // Автослияние на прибытии. В ЧЛЕНСТВО вошёл

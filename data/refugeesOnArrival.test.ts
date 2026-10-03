@@ -37,10 +37,11 @@ const kernel = createKernel([missionFactsModule, bell]);
 const ctx: Context = { now: 0, data, config: { timeScale: 1 } as MatchConfig };
 
 describe.each([
-  ['pve-2', pve2, 'deep_drift', 'p1_1'],
-  ['pve-4', pve4, 'lab_outpost', 'p1_1'],
-  ['pve-6', pve6, 'quarantine_docks', 'p1_1'],
-])('%s: транспорты беженцев ждут прибытия флота игрока', (_id, raw, site, escort) => {
+  ['pve-2', pve2, 'deep_drift', 'p1_1', false],
+  ['pve-4', pve4, 'lab_outpost', 'p1_1', false],
+  // Глава VI: доки — место эпизода (PVR-8.4), задача метит их, когда о доках узнали.
+  ['pve-6', pve6, 'quarantine_docks', 'p1_1', true],
+])('%s: транспорты беженцев ждут прибытия флота игрока', (_id, raw, site, escort, episode) => {
   const start = (): GameState => buildStateFromMap(parseMatchMap(raw), data);
 
   it('на старте их нет среди флотов — они ждут на месте, и задача метит это место', () => {
@@ -48,6 +49,11 @@ describe.each([
     expect(s.fleets.p1_evac).toBeUndefined();
     expect(s.planets[site]?.awaitingFleets?.map((f) => f.id)).toEqual(['p1_evac']);
     const evac = parseMatchMap(raw).objectives.find((o) => o.kind === 'evac')!;
+    expect(evac.revealedBy !== undefined).toBe(episode);
+    if (episode) {
+      expect(missionTargets(evac, s, 'p1')).toEqual([]);
+      s.missionFacts = { ...s.missionFacts, found: { p1: [site] } };
+    }
     expect(missionTargets(evac, s, 'p1')).toContain(site);
   });
 

@@ -392,6 +392,7 @@ function maximalState(): GameState {
       forces: { host: { fleets: ['mine', 'CANARY_fleet'], hp: 100, brokenAt: 5 } },
       breakAt: 0.2,
       evacuate: 3,
+      counterattack: { after: ['CANARY_after'], target: 'CANARY_target' },
     },
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },
@@ -428,6 +429,7 @@ function maximalState(): GameState {
       longest: { a: { mine: 5, CANARY_player: 7 } },
       fallen: { mine: ['a'], CANARY_player: ['CANARY_fallen'] },
       evacuated: { mine: 2, CANARY_player: 9 },
+      found: { mine: ['a'], CANARY_player: ['CANARY_found'] },
     },
   };
 }

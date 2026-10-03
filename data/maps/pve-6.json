@@ -206,6 +206,9 @@
           "unit": "swarm_lander",
           "count": 3
         }
+      ],
+      "traits": [
+        "refuge"
       ]
     },
     "cold_moorings": {
@@ -597,7 +600,8 @@
         "voices_chapel"
       ],
       "count": 8,
-      "reward": 3
+      "reward": 3,
+      "revealedBy": "quarantine_docks"
     },
     {
       "id": "mission.outer-station",
@@ -611,7 +615,8 @@
       "id": "mission.all-survivors",
       "kind": "evac",
       "count": 4,
-      "reward": 4
+      "reward": 4,
+      "revealedBy": "quarantine_docks"
     },
     {
       "id": "mission.dock-line",
@@ -623,7 +628,8 @@
         "dock_approach"
       ],
       "count": 1,
-      "reward": 2
+      "reward": 2,
+      "revealedBy": "quarantine_docks"
     },
     {
       "id": "mission.take-rampart",
@@ -707,7 +713,14 @@
       "swarm_reserve"
     ],
     "breakAt": 0.2,
-    "evacuate": 3
+    "evacuate": 3,
+    "counterattack": {
+      "after": [
+        "north_foundry",
+        "west_foundry"
+      ],
+      "target": "quarantine_docks"
+    }
   },
   "players": {
     "p1": {

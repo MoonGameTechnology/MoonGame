@@ -191,6 +191,8 @@ export const en: Record<string, string> = {
   'ally.ordered': 'The ally accepted the order',
   'ally.done': 'Ally: task complete',
   'ally.lost': 'Ally: target lost',
+  'refuge.signal': 'Quarantine dock speaking. There are still people here. We need evacuation',
+  'refuge.threat': 'Ally: the enemy main force is changing course. It is heading for the docks',
   'chain.title': 'Chapter operation',
   'chain.contact': 'Link: reach the rendezvous',
   'chain.archive': 'Archive: clear the station of the Swarm',

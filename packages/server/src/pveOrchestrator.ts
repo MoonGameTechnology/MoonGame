@@ -1,6 +1,7 @@
 import {
   beaconCallouts,
   beaconSentinels,
+  counterattackPlan,
   isCapturable,
   isForkSite,
   swarmAdaptDue,
@@ -143,9 +144,13 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
   const net = swarmNetPlan(state, data, npc);
   // Построенное Роем ждёт в улье и уходит с волной (`musterPlan`, то же у бота забега).
   const muster = musterPlan(state, data, npc);
+  // Последний контрудар главы VI (`counterattackPlan`, то же у бота забега): уцелевшее идёт
+  // к известному месту эвакуации, и ни сбор, ни маяк, ни общий выбор цели его не уводят.
+  const counter = counterattackPlan(state, data, npc);
   const answering = beaconSentinels(state, npc); // дозорный на маяке не уходит
-  for (const id of [...net.held, ...muster.held]) answering.add(id);
-  for (const move of [...muster.moves, ...net.moves]) {
+  for (const id of [...net.held, ...muster.held, ...counter.held]) answering.add(id);
+  const musterMoves = muster.moves.filter((m) => !counter.held.has(m.fleetId));
+  for (const move of [...musterMoves, ...net.moves, ...counter.moves]) {
     out.push({
       id: `${opts.session}:${npc}:${seq++}`,
       type: 'fleet.move',
@@ -173,7 +178,7 @@ export function pveOrders(state: GameState, data: GameData, opts: PveOrdersOptio
         : { type: 'building.construct', payload: { planetId: build.planetId, building: build.building } }),
     });
   }
-  for (const call of beaconCallouts(state, npc, net.held)) {
+  for (const call of beaconCallouts(state, npc, new Set([...net.held, ...counter.held]))) {
     answering.add(call.fleetId);
     out.push({
       id: `${opts.session}:${npc}:${seq++}`,

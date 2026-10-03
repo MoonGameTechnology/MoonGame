@@ -164,6 +164,10 @@ export const MapObjectiveSchema = z.object({
   count: z.number().int().positive().optional(),
   /** Надбавка к награде за забег; складывается с выплатой за волны, а не заменяет её. */
   reward: z.number().nonnegative().default(0),
+  /** Место эпизода (провинция с признаком `refuge`), сведения о котором открывают метки
+   *  задачи: пока игрок о нём не знает (`missionFacts.found`), меток нет — метка не выдаёт
+   *  разведку, которой не было (глава VI §8.4, PVR-8.4). */
+  revealedBy: z.string().optional(),
 });
 export type MapObjective = z.infer<typeof MapObjectiveSchema>;
 
@@ -184,6 +188,10 @@ export const MapOperationSchema = z.object({
   breakAt: z.number().min(0).max(1).default(0.2),
   /** Сколько беженцев (юниты с признаком `evacuee`) довести до убежища. */
   evacuate: z.number().int().positive(),
+  /** Последний контрудар (PVR-8.4, §8.7): Рой потерял все провинции `after` — его
+   *  сохранившиеся соединения и построенные подкрепления идут к `target`, когда сторона
+   *  штурма уже знает это место. Ничего не рождается: идёт то, что уцелело. */
+  counterattack: z.object({ after: z.array(z.string()).min(1), target: z.string() }).optional(),
 });
 export type MapOperation = z.infer<typeof MapOperationSchema>;
 

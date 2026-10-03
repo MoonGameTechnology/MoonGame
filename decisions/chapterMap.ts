@@ -59,7 +59,9 @@ export interface ChapterMapView {
  * тумане (без вида и хозяина). `raze` метит провинции со стоящей постройкой названного
  * вида, `evac` — убежища и место, где ждут беженцы, — только ОПОЗНАННЫЕ: иначе метка выдала бы разведку, которой не
  * было. У `scout`, `wave` и `build` без места одной точки нет.
- * Выполненные задачи в `pool` уже не входят — закрытое не зовёт на карту.
+ * Выполненные задачи в `pool` уже не входят — закрытое не зовёт на карту. Задача места
+ * эпизода (`revealedBy`) метится, только когда это место опознано: метка не открывает доки
+ * раньше эпизода (глава VI §8.4).
  */
 export function chapterTargets(
   state: GameState,
@@ -68,11 +70,13 @@ export function chapterTargets(
     kind: string;
     targets?: readonly string[];
     at?: readonly string[];
+    revealedBy?: string;
   }>,
   active: ReadonlySet<string>,
   known: ReadonlySet<string>,
 ): ChapterTargets {
   const where = (o: (typeof pool)[number]): string[] => {
+    if (o.revealedBy !== undefined && !known.has(o.revealedBy)) return [];
     // Названное место метится всегда: задача сама говорит, куда идти.
     if (o.kind === 'control' || o.kind === 'rescue' || o.kind === 'beacon' || o.kind === 'isolate' || o.kind === 'recruit')
       return (o.targets ?? []).filter((id) => state.planets[id]);

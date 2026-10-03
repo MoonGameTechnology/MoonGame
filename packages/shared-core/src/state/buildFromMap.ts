@@ -186,6 +186,20 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
           if (data.units[st.unit]?.traits.includes('evacuee')) evacuees += st.count;
       if (evacuees < op.evacuate) issues.push('E_INVALID_OPERATION:evacuate');
     }
+    // Контрудар (PVR-8.4): внешние позиции и цель — провинции карты.
+    const ca = op.counterattack;
+    if (ca)
+      for (const sid of [...ca.after, ca.target])
+        if (!has(sid)) issues.push(`E_INVALID_OPERATION:${sid}`);
+  }
+
+  // Метки задачи после сведений о месте эпизода (PVR-8.4): место — провинция с `refuge`.
+  for (const o of map.objectives) {
+    if (o.revealedBy === undefined) continue;
+    const site = Object.prototype.hasOwnProperty.call(map.sectors, o.revealedBy)
+      ? map.sectors[o.revealedBy]
+      : undefined;
+    if (!site?.traits.includes('refuge')) issues.push(`E_INVALID_OBJECTIVE:${o.id}`);
   }
 
   // paths: known endpoints, no self-loop, no duplicate, neighbour-only
@@ -566,7 +580,14 @@ function seedOperation(
     }
     forces[id] = { fleets: [id], hp };
   }
-  return { production: [...op.production], forces, breakAt: op.breakAt, evacuate: op.evacuate };
+  const ca = op.counterattack;
+  return {
+    production: [...op.production],
+    forces,
+    breakAt: op.breakAt,
+    evacuate: op.evacuate,
+    ...(ca ? { counterattack: { after: [...ca.after], target: ca.target } } : {}),
+  };
 }
 
 /** Normalizes a slot's scientist council (new `scientists`, else the legacy single

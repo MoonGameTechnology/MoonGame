@@ -588,7 +588,12 @@ export {
   type SwarmNetView,
   type SwarmKnown,
 } from './util/swarmNet';
-export { missionFactsModule, HAVEN_TRAIT, EVACUEE_TRAIT } from './modules/missionFacts';
+export {
+  missionFactsModule,
+  HAVEN_TRAIT,
+  EVACUEE_TRAIT,
+  REFUGE_TRAIT,
+} from './modules/missionFacts';
 export {
   beaconCallouts,
   beaconSentinels,
@@ -596,6 +601,7 @@ export {
   SENTINEL_TRAIT,
   type BeaconCallout,
 } from './util/beacon';
+export { counterattackDue, counterattackPlan, type CounterattackPlan } from './util/counterattack';
 export { fleetBroodModule } from './modules/fleetBrood';
 export {
   taxModule,
