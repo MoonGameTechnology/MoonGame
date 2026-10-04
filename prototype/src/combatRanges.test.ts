@@ -28,25 +28,21 @@ function withFleet(units: Array<{ unit: string; count: number }>): {
   return { s: { ...base, fleets: { ...base.fleets, [fleet.id]: fleet } }, fleet };
 }
 
+/** Эскадра в ангаре — там шаттл живёт с SHU-1.1 (и у мира, и у флота). */
+const squad = (unit: string, count: number): Squadron => ({ id: `sq:${unit}`, units: [{ unit, count }] });
+
 describe('RANGE-UX — радиусы приходят из ядра, а не из интерфейса', () => {
-  it('круг эскадрильи равен shuttleStrikeRange ядра', () => {
-    const { s, fleet } = withFleet([
-      { unit: 'interceptor', count: 2 },
-      { unit: 'shuttle_carrier', count: 1 },
-    ]);
-    const core = shuttleStrikeRange(fleet, data);
-    const ring = combatRanges(s, data, [fleet.id], ME, locate, seen).rings.find(
+  it('SHU-6.1: круг носителя равен shuttleStrikeRange ядра — по эскадрам В АНГАРЕ', () => {
+    const { s, fleet } = withFleet([{ unit: 'shuttle_carrier', count: 1 }]);
+    const carrier: Fleet = { ...fleet, hangar: [squad('interceptor', 2)] };
+    const state: GameState = { ...s, fleets: { ...s.fleets, [carrier.id]: carrier } };
+    const core = shuttleStrikeRange(carrier, data);
+    expect(core).toBeGreaterThan(0); // раньше здесь был ноль: радиус искался в `units`
+    const ring = combatRanges(state, data, [carrier.id], ME, locate, seen).rings.find(
       (r) => r.kind === 'shuttle',
     );
-    // Радиус крыла даёт НОСИТЕЛЬ, а не сама эскадрилья (в форк-каталоге прототипа у
-    // `interceptor` strikeRange = 0). Сторож держит равенство с ядром в любом
-    // случае: есть радиус — есть круг, нет радиуса — нет круга.
-    if (core > 0) {
-      expect(ring).toBeDefined();
-      expect(ring!.radius).toBe(core);
-    } else {
-      expect(ring).toBeUndefined();
-    }
+    expect(ring).toBeDefined();
+    expect(ring!.radius).toBe(core);
   });
 
   it('флот без крыла кругов не даёт — пустой оверлей, а не нулевой радиус', () => {
@@ -55,6 +51,50 @@ describe('RANGE-UX — радиусы приходят из ядра, а не и
       (r) => r.sourceId === fleet.id,
     );
     expect(rings).toEqual([]);
+  });
+
+  it('SHU-6.1: ЧУЖОЙ носитель круга не даёт — состав чужого ангара закрыт', () => {
+    const { s, fleet } = withFleet([{ unit: 'shuttle_carrier', count: 1 }]);
+    const foe: Fleet = { ...fleet, owner: 'p2', hangar: [squad('interceptor', 2)] };
+    const state: GameState = { ...s, fleets: { ...s.fleets, [foe.id]: foe } };
+    const rings = combatRanges(state, data, [foe.id], ME, locate, seen).rings.filter(
+      (r) => r.sourceId === foe.id,
+    );
+    expect(rings).toEqual([]);
+  });
+
+  it('SHU-6.1: выбранный СВОЙ мир с эскадрой в порту даёт круг радиуса порта', () => {
+    const base = newGame();
+    const home = Object.values(base.planets).find((p) => p.owner === ME)!;
+    const planet = { ...home, hangar: [squad('bomber', 1), squad('interceptor', 1)] };
+    const s: GameState = { ...base, planets: { ...base.planets, [planet.id]: planet } };
+    const ring = combatRanges(s, data, [], ME, locate, seen, planet.id).rings.find(
+      (r) => r.kind === 'shuttle',
+    );
+    expect(ring).toBeDefined();
+    expect(ring!.sourceId).toBe(planet.id);
+    expect(ring!.x).toBe(planet.position.x);
+    expect(ring!.y).toBe(planet.position.y);
+    // Самая длинная рука ангара: база говорит, на что способна в принципе.
+    expect(ring!.radius).toBe(shuttleStrikeRange(planet, data));
+    expect(ring!.radius).toBe(
+      Math.max(data.units.bomber!.stats.strikeRange, data.units.interceptor!.stats.strikeRange),
+    );
+  });
+
+  it('SHU-6.1: мир без эскадр и чужой мир кругов не дают', () => {
+    const base = newGame();
+    const home = Object.values(base.planets).find((p) => p.owner === ME)!;
+    const empty = { ...home, hangar: [] };
+    const s1: GameState = { ...base, planets: { ...base.planets, [empty.id]: empty } };
+    expect(
+      combatRanges(s1, data, [], ME, locate, seen, empty.id).rings.filter((r) => r.kind === 'shuttle'),
+    ).toEqual([]);
+    const foe = { ...home, owner: 'p2', hangar: [squad('bomber', 1)] };
+    const s2: GameState = { ...base, planets: { ...base.planets, [foe.id]: foe } };
+    expect(
+      combatRanges(s2, data, [], ME, locate, seen, foe.id).rings.filter((r) => r.kind === 'shuttle'),
+    ).toEqual([]);
   });
 });
 
