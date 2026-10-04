@@ -1246,7 +1246,7 @@
 | PVR-8.4 | ✅ | core proto | `docs/sector-zero-roadmap.md` | «Последний приют» и последний контрудар |
 | PVR-8.5 | ✅ | proto | `docs/sector-zero-roadmap.md` | Интерфейс главы и совместный зачёт |
 | PVR-8.6 | ✅ | proto | `docs/sector-zero-roadmap.md` | Комиксы главы VI |
-| PVR-8.7 | ⏳ | data cli | `docs/sector-zero-roadmap.md` | Дверь главы VI: маршрут, имена, сквозной прогон |
+| PVR-8.7 | ✅ | data cli | `docs/sector-zero-roadmap.md` | Дверь главы VI: маршрут, имена, сквозной прогон |
 | PVR-9.1 | ✅ | data | `docs/sector-zero-roadmap.md` | Карта главы V |
 | PVR-9.2 | ✅ | data proto | `docs/sector-zero-roadmap.md` | Союзник с первой минуты |
 | PVR-9.3 | ✅ | core proto | `docs/sector-zero-roadmap.md` | Контракт операции из одних очагов |

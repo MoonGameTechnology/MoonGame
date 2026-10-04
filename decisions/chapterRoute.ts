@@ -2,9 +2,9 @@
  * Маршрут глав Sector Zero (PVR-6.9): от края сектора к эпицентру заражения.
  *
  * Кампания задумана из шести глав (`docs/sector-zero-map-concepts.md` §2: MAP-01 «Заглохший
- * сигнал» → … → MAP-06 «Нулевой комплекс»), а играбельных сегодня меньше. Экран рисует весь
- * путь, чтобы было видно, КУДА он ведёт, но ещё не сделанные главы — безымянным узлом
- * «сигнал потерян»: названия в концепте рабочие (§13), и обещанное имя потом пришлось бы
+ * сигнал» → … → MAP-06 «Нулевой комплекс»); с главой VI (PVR-8.7) играбельны все шесть. Экран
+ * рисует весь путь, чтобы было видно, КУДА он ведёт, а ещё не сделанную главу — безымянным
+ * узлом «сигнал потерян»: названия в концепте рабочие (§13), и обещанное имя потом пришлось бы
  * менять на глазах у игрока.
  */
 
@@ -19,6 +19,7 @@ export const CHAPTER_KEYS: readonly { name: string; brief: string }[] = [
   { name: 'sector-zero.mission.3', brief: 'sector-zero.mission.3.brief' },
   { name: 'sector-zero.mission.4', brief: 'sector-zero.mission.4.brief' },
   { name: 'sector-zero.mission.5', brief: 'sector-zero.mission.5.brief' },
+  { name: 'sector-zero.mission.6', brief: 'sector-zero.mission.6.brief' },
 ];
 
 export interface RouteNode {

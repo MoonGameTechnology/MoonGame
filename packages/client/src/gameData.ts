@@ -15,6 +15,7 @@ import pveMap2 from '../../../data/maps/pve-2.json';
 import pveMap3 from '../../../data/maps/pve-3.json';
 import pveMap4 from '../../../data/maps/pve-4.json';
 import pveMap5 from '../../../data/maps/pve-5.json';
+import pveMap6 from '../../../data/maps/pve-6.json';
 import trainingMap from '../../../data/maps/training-1.json';
 import provingGroundMap from '../../../data/maps/proving-ground.json';
 
@@ -37,7 +38,7 @@ export function skirmishState(data: GameData): GameState {
  * испорченное хранилище или старая ссылка не должны ронять вход в игру — они открывают
  * первую главу, а не падают.
  */
-const PVE_MISSIONS = [pveMap, pveMap2, pveMap3, pveMap4, pveMap5];
+const PVE_MISSIONS = [pveMap, pveMap2, pveMap3, pveMap4, pveMap5, pveMap6];
 
 /** Сколько глав у Сектора Зеро сегодня — чтобы интерфейс не держал своего числа. */
 export const PVE_MISSION_COUNT = PVE_MISSIONS.length;

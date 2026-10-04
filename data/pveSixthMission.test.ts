@@ -7,8 +7,8 @@
  * Соседство выводится из мозаики (M4.3), поэтому всё это ПРОВЕРЯЕТСЯ здесь числами — любая
  * правка координат может молча поменять карту.
  *
- * Дверь главы (список глав клиента) откроется последним кирпичом фазы (PVR-8.7), когда сценарий
- * будет готов целиком; геометрия ниже собирается напрямую из данных карты.
+ * Дверь главы (список глав клиента) открыта последним кирпичом фазы (PVR-8.7), когда сценарий
+ * был готов целиком; геометрия ниже собирается напрямую из данных карты.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -27,8 +27,16 @@ import {
   type MatchConfig,
   type MatchMap,
 } from '../packages/shared-core/src/index';
+import {
+  PVE_MISSION_COUNT,
+  pveMissionOfMap,
+  pveModeId,
+  pveState,
+} from '../packages/client/src/gameData';
 import { linkedAlly } from '../decisions/allyPanel';
 import { allyActiveOp } from '../decisions/allyOperation';
+import { CHAPTER_KEYS } from '../decisions/chapterRoute';
+import { chapterHero } from '../decisions/heroRecruits';
 import { ru } from '../localization/ru';
 import { en } from '../localization/en';
 import { shippedGameData } from './bundle';
@@ -543,5 +551,25 @@ describe('«Последний приют» и последний контруд
       expect(map.operation!.production).toContain(id);
     expect(map.operation!.counterattack!.after).not.toContain(COMPLEX);
     expect(state.operation?.counterattack).toEqual(map.operation!.counterattack);
+  });
+});
+
+describe('дверь шестой главы (PVR-8.7)', () => {
+  it('глава открывается своей картой под режимом волн, с контрактом операции и союзником', () => {
+    expect(PVE_MISSION_COUNT).toBeGreaterThanOrEqual(6);
+    const s = pveState(data, 5);
+    expect(s.mapId).toBe('pve-6');
+    expect(pveMissionOfMap('pve-6')).toBe(5);
+    expect(pveModeId(5)).toBe('pve_waves');
+    expect(s.operation).toMatchObject({ production: map.operation!.production, evacuate: 3 });
+    expect(linkedAlly(s, 'p1')).toBe('ally');
+  });
+
+  it('у главы есть название и брифинг; героя-награды нет', () => {
+    expect(CHAPTER_KEYS[5]).toEqual({
+      name: 'sector-zero.mission.6',
+      brief: 'sector-zero.mission.6.brief',
+    });
+    expect(chapterHero(5)).toBeNull();
   });
 });
