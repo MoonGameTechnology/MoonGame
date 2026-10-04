@@ -7,11 +7,13 @@ import {
 import { shippedGameData } from '../data/bundle';
 import mapJson from '../data/maps/pve-4.json';
 import pve3 from '../data/maps/pve-3.json';
+import pve5 from '../data/maps/pve-5.json';
 import pve6 from '../data/maps/pve-6.json';
 import { chapterChain, extractionCandidates, rendezvousOf } from './chapterChain';
 
-// Главная цепочка главы IV (PVR-7.5): связь → архив → извлечение → вывод. Шаги, текущий шаг,
-// куда вести камеру и сколько сделано; в мире без сценария цепочки нет.
+// Главная цепочка глав IV (PVR-7.5: связь → архив → извлечение → вывод), VI (PVR-8.5: доки →
+// эвакуация → очаги → главные силы) и V (PVR-9.7: звено сети → очаги). Шаги, текущий шаг, куда
+// вести камеру и сколько сделано; в мире без сценария цепочки нет.
 
 const data = shippedGameData();
 const HOUR = 3_600_000;
@@ -153,5 +155,67 @@ describe('цепочка главы VI', () => {
     const s = six();
     s.planets[DOCKS]!.awaitingFleets![0]!.units = [{ unit: 'evac_transport', count: 2 }];
     expect(chapterChain(s, 'p1', NEED, data)![1]!.rule).toEqual({ need: 3, of: 2 });
+  });
+});
+
+describe('цепочка главы V', () => {
+  /** Мир главы V с начатым штурмом: врага судья знает по `pve.npcPlayerId`. */
+  const five = (): GameState =>
+    ({
+      ...buildStateFromMap(parseMatchMap(pve5), data),
+      pve: { npcPlayerId: 'swarm' },
+    }) as unknown as GameState;
+  const view = (s: GameState) =>
+    chapterChain(s, 'p1', NEED, data)!.map((st) => [
+      st.id,
+      st.done,
+      st.active,
+      st.target ?? null,
+      st.count ?? null,
+    ]);
+  /** Игрок (или союзник: обзор общий) опознал флот Роя с такими кораблями. */
+  const sighted = (s: GameState, unit: string): GameState => ({
+    ...s,
+    swarmIntel: {
+      p1: { seen: { owner: 'swarm', location: 'w_link', at: s.time, units: [{ unit, count: 1 }] } },
+    },
+  });
+  const owned = (s: GameState, owner: string | null, ...ids: string[]): GameState => {
+    for (const id of ids) s.planets[id] = { ...s.planets[id]!, owner };
+    return s;
+  };
+
+  it('на старте: звено и очаги; ни эвакуации, ни главных сил, ни связи шагом', () => {
+    expect(view(five())).toEqual([
+      ['link', false, true, 'w_link', null],
+      ['production', false, false, 'focus_west', { done: 0, total: 3 }],
+    ]);
+  });
+
+  it('звено найдено, когда опознан ретранслятор; простой флот Роя звеном не считается', () => {
+    expect(view(sighted(five(), 'frigate'))[0]).toEqual(['link', false, true, 'w_link', null]);
+    expect(view(sighted(five(), 'swarm_relay'))).toEqual([
+      ['link', true, false, 'w_link', null],
+      ['production', false, true, 'focus_west', { done: 0, total: 3 }],
+    ]);
+  });
+
+  it('звено победу не запирает: очаги считаются и без него', () => {
+    expect(view(owned(five(), 'p1', 'focus_west'))[1]).toEqual([
+      'production',
+      false,
+      false,
+      'focus_center',
+      { done: 1, total: 3 },
+    ]);
+  });
+
+  it('очаг без Роя засчитан, кто бы его ни взял; отбитый Роем снова открыт', () => {
+    let s = owned(sighted(five(), 'swarm_relay'), 'ally', 'focus_east');
+    s = owned(s, 'p1', 'focus_west', 'focus_center');
+    expect(view(s)[1]).toEqual(['production', true, false, null, { done: 3, total: 3 }]);
+    expect(chapterChain(s, 'p1', NEED, data)!.every((st) => st.done && !st.active)).toBe(true);
+    s = owned(s, 'swarm', 'focus_center');
+    expect(view(s)[1]).toEqual(['production', false, true, 'focus_center', { done: 2, total: 3 }]);
   });
 });

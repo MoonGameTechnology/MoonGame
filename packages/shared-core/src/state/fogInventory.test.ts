@@ -111,6 +111,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   extraction: 'public', // накопитель главы IV — сценарий PvE, у Роя нет «тайны» носителя: он его не ищет
   allyOps: 'public', // приказ союзнику главы IV — сценарий PvE; бот Роя его не читает
   operation: 'filtered', // контракт главы VI: правила публичны, флоты соединений — только видимые
+  captive: 'public', // пленный главы V — сценарий PvE: укрытие и носитель Рой не ищет
   capital: 'filtered', // чужая столица — точка респавна героя, наводка
   autoAssault: 'filtered', // всё это — постоянные приказы, будущие намерения
   autoRetreat: 'filtered', // RETR-2: порог отхода и точка — намерение хозяина флота
@@ -394,6 +395,7 @@ function maximalState(): GameState {
       evacuate: 3,
       counterattack: { after: ['CANARY_after'], target: 'CANARY_target' },
     },
+    captive: { hideout: 'a', zone: 'b' },
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },
     autoRetreat: { mine: { at: 0.3, to: 'A' }, CANARY_fleet: { at: 0.3, to: 'CANARY_target' } },

@@ -372,6 +372,7 @@ import {
   comicsTriggered,
   echoComicMoment,
   markComicSeen,
+  storyFacts,
   type ComicMoment,
   type ComicRegistry,
 } from '../../decisions/chapterComics';
@@ -703,8 +704,9 @@ import { initTrader } from './traderScreen';
 import { ALLY_EMBLEM, initAllyScreen } from './allyScreen';
 import { allyPanelView, linkedAlly } from '../../decisions/allyPanel';
 import { chapterChain, extractionCandidates, type ChapterStep } from '../../decisions/chapterChain';
-import { allyOrder, extractionStart } from '../../decisions/actions';
+import { allyOrder, captiveLoad, extractionStart } from '../../decisions/actions';
 import { refugeThreats } from '../../decisions/refugeThreat';
+import { captiveAtRisk, captiveCandidates } from '../../decisions/captive';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
 import { initResourceCard } from './resourceCard';
@@ -4459,6 +4461,13 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'extraction.completed':
         if (p.owner === ME) note(t('chain.carrier-warning'));
+        break;
+      // Глава V (PVR-9.5): пленный взят или потерян. Доставку объявляет страница комикса.
+      case 'captive.taken':
+        note(t(p.by === ME ? 'captive.taken.note' : 'captive.taken.ally'));
+        break;
+      case 'captive.lost':
+        note(t('captive.lost.note'));
         break;
       // PVR-4.7: осада «Поглощения мира» над СВОИМ миром — начало, срыв и гибель мира. Фраза —
       // по архетипу героя, как у появления босса; отсчёт — тем же часам, что у волн.
@@ -10811,6 +10820,10 @@ cmdbar.addEventListener('click', onCommandClick);
 
 // --- canvas input ------------------------------------------------------------
 
+/** Убежище пленного главы V (PVR-9.5), по которому уже предупредили: удар, губящий мир,
+ *  по нему проходит со второго тапа (`captiveAtRisk`). Любой другой тап прицела сбрасывает. */
+let captiveWarned: string | null = null;
+
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
 function selectAt(mx: number, my: number) {
   pings?.closePop(); // any map tap dismisses an open ping popup (a marker tap reopens below)
@@ -10942,6 +10955,18 @@ function selectAt(mx: number, my: number) {
     const cast = heroAim;
     drop('heroAim');
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+    // Глава V: удар, уничтожающий мир, по убежищу с пленным — сперва предупреждение, и
+    // прицел остаётся взведённым; повторный тап по тому же миру — удар («Предупреждение
+    // показывается до опасного приказа, а не после удара», `docs/covenant-of-unity.md`).
+    const kind = data.heroAbilities[cast.abilityId]?.type;
+    const ruins = kind === 'annihilate' || kind === 'devour';
+    if (n && ruins && captiveAtRisk(s, n.id) && captiveWarned !== n.id) {
+      captiveWarned = n.id;
+      arm('heroAim', cast);
+      note(t('captive.warn-destroy'));
+      return;
+    }
+    captiveWarned = null;
     if (n) playerOrder(castHeroAbility(ME, cast.heroId, cast.abilityId, n.id));
     else note(t('hint.cast-cancelled'));
     invalidatePanel();
@@ -13554,6 +13579,12 @@ function startPvEMatch(dev = false): void {
   sciWin.classList.remove('show');
   saveRun();
   note(t('setup.pve.started'));
+  // Союзник на связи с первой минуты (`contactAtStart`, главы V и VI): встречи, которая
+  // зажигает чип «⬡ Союзник» в главе IV, не будет — та же заметка и мигание со старта.
+  if (linkedAlly(s, ME)) {
+    note(t('ally.contact.note'));
+    allyPulseUntil = performance.now() + 12_000;
+  }
 }
 
 /**
@@ -15842,6 +15873,10 @@ const missionPanel = initMissionPanel({
   extract: (fleetId) => {
     if (playerOrder(extractionStart(ME, fleetId))) note(t('chain.carrier-warning'));
   },
+  captiveLoaders: () => captiveCandidates(s, ME).map((id) => ({ id, label: fleetLabelOf(id) })),
+  loadCaptive: (fleetId) => {
+    if (playerOrder(captiveLoad(ME, fleetId))) note(t('captive.carrier-warning'));
+  },
 });
 
 /** Подпись флота для кнопки «Извлечь флотом …»: его корабли, «2× Крейсер, 1× Фрегат». */
@@ -15854,9 +15889,9 @@ function fleetLabelOf(fleetId: string): string {
     .join(', ');
 }
 
-/** Главная цепочка главы: IV (PVR-7.5) — связь → архив → накопитель → вывод; VI (PVR-8.5) —
- *  доки → эвакуация → очаги → главные силы. `null` — в этой главе цепочки нет. Доля работы —
- *  под темп матча (`extractionNeedMs` ядра). */
+/** Главная цепочка главы: IV (PVR-7.5) — связь → архив → накопитель → вывод; V (PVR-9.7) —
+ *  звено сети → очаги; VI (PVR-8.5) — доки → эвакуация → очаги → главные силы. `null` — в этой
+ *  главе цепочки нет. Доля работы — под темп матча (`extractionNeedMs` ядра). */
 function runChain(): ChapterStep[] | null {
   if (!sectorRunActive) return null;
   return chapterChain(s, ME, extractionNeedMs(s, ctx(s.time, s)), data);
@@ -15948,19 +15983,24 @@ function drawAllyMarks(): void {
       cx.fillText(ALLY_EMBLEM, c.x - RING_R - 4, c.y - RING_R - 2);
     }
   }
-  const carrier = s.extraction?.carrier ? s.fleets[s.extraction.carrier] : undefined;
-  const pos = carrier ? fleetAnchor(carrier) : null;
-  if (pos && s.extraction?.deliveredAt === undefined) {
+  // Носитель — накопителя главы IV или пленного главы V (PVR-9.5): тот же янтарный ◈.
+  const carriers = [
+    s.extraction?.deliveredAt === undefined ? s.extraction?.carrier : undefined,
+    s.captive?.deliveredAt === undefined && s.captive?.lostAt === undefined ? s.captive?.carrier : undefined,
+  ];
+  for (const id of carriers) {
+    const carrier = id ? s.fleets[id] : undefined;
+    const pos = carrier ? fleetAnchor(carrier) : null;
+    if (!pos) continue;
     const c = world(pos);
-    if (visible(c, 40)) {
-      cx.fillStyle = '#ffb43a';
-      cx.strokeStyle = 'rgba(4,10,12,.9)';
-      cx.lineWidth = 3;
-      cx.font = '700 15px ui-monospace,monospace';
-      cx.textAlign = 'center';
-      cx.strokeText('◈', c.x, c.y - 20);
-      cx.fillText('◈', c.x, c.y - 20);
-    }
+    if (!visible(c, 40)) continue;
+    cx.fillStyle = '#ffb43a';
+    cx.strokeStyle = 'rgba(4,10,12,.9)';
+    cx.lineWidth = 3;
+    cx.font = '700 15px ui-monospace,monospace';
+    cx.textAlign = 'center';
+    cx.strokeText('◈', c.x, c.y - 20);
+    cx.fillText('◈', c.x, c.y - 20);
   }
   cx.restore();
 }
@@ -16536,7 +16576,8 @@ function playChapterComic(chapter: string, moment: ComicMoment, then: () => void
 /** Комиксы главы по событиям (`COMIC_TRIGGERS`): один раз на профиль, в тот кадр, когда
  *  триггер впервые засчитан. Триггером может быть и шаг главной цепочки главы: встреча с
  *  союзником в IV (`chain.contact`), доки и основная эвакуация в VI (`chain.docks`,
- *  `chain.evacuate`). Дев-забег и полигон комикс не показывают. */
+ *  `chain.evacuate`), — и факт мира (`storyFacts`): разрыв сети Роя в V (`net.cut`).
+ *  Дев-забег и полигон комикс не показывают. */
 function playTaskComic(missions: readonly MissionRow[], chain: readonly ChapterStep[] | null): void {
   if (isTraining() || sectorDevActive || !isSectorZeroRun()) return;
   const chapter = pveChapter(sectorMission).id;
@@ -16544,6 +16585,7 @@ function playTaskComic(missions: readonly MissionRow[], chain: readonly ChapterS
     ...missions.filter((m) => m.complete).map((m) => m.id),
     ...(chain ?? []).filter((st) => st.done).map((st) => st.key),
     ...(sectorProgress.objectivesDone[chapter] ?? []),
+    ...storyFacts(s),
   ];
   for (const moment of comicsTriggered(sectorProgress, comicArt.registry, COMIC_TRIGGERS, chapter, complete))
     playChapterComic(chapter, moment, () => {});
@@ -16985,9 +17027,10 @@ function frame(nowReal: number) {
           wave.kind === 'cleared'
             ? t('hud.wave.done')
             : wave.kind === 'hold'
-              ? // Глава с архивом (PVR-7.3): удержание её не выигрывает — обещать «выстоять ещё»
-                // значило бы врать; волны просто кончились, исход решает накопитель.
-                s.extraction
+              ? // Глава с архивом (PVR-7.3) или с контрактом операции (главы V и VI): удержание
+                // её не выигрывает — обещать «выстоять ещё» значило бы врать; волны просто
+                // кончились, исход решает накопитель или операция.
+                s.extraction || s.operation
                 ? t('hud.wave.done')
                 : t('hud.wave.hold', { in: countdownHMS(wave.holdInMs) })
               : // На телефоне строка статуса уже экрана: слова «следующая через» уходят, остаётся

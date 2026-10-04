@@ -119,6 +119,7 @@
 | 46 | `loadoutEffects` | `loadoutEffects.ts` | — | — | `combat.retreatToll`, `salvage.share` | — |
 | 47 | `minefield` | `minefield.ts` | `fleet.layMines` | `fleet.leg`, `fleet.arrived`, `fleet.transit`, `mines.armed`, `mines.crossed`, `time.advanced` | — | `mines.installing`, `mines.laid`, `mines.triggered`, `unit.died` · sched: `mines.armed`, `mines.crossed` |
 | 48 | `rocketMines` | `rocketMines.ts` | `fleet.deployRocketMine`, `rocketMine.mode`, `rocketMine.disarm` | `rocketMine.armed`, `rocketMine.scan`, `rocketMine.flight`, `rocketMine.impact`, `fleet.leg`, `fleet.destroyed`, `fleet.merged`, `battle.started` | — | `rocketMine.installing`, `rocketMine.ready`, `rocketMine.cancelled`, `rocketMine.launched`, `rocketMine.intercepted`, `rocketMine.hit`, `rocketMine.detonated`, `rocketMine.modeChanged`, `rocketMine.disarmed` |
+| 53 | `captive` | `captive.ts` | `captive.load` | `planet.captured`, `planet.destroyed`, `fleet.merged`, `fleet.destroyed`, `time.advanced`, `fleet.arrived` | — | `captive.taken`, `captive.loaded`, `captive.lost`, `captive.delivered` |
 
 
 ### Карта хуков (кто регистрирует → кто вызывает)

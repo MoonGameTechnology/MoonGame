@@ -15,7 +15,7 @@
  */
 import type { RunSummary } from '../../decisions/sectorZeroProgress';
 import { t } from '../../localization/runtime';
-import type { GameState } from '../../packages/shared-core/src/index';
+import type { GameState, OperationState } from '../../packages/shared-core/src/index';
 import type { MatchEnd } from './endScreen';
 import { matchXp, metaLevel, recordMatch, type MetaState } from './meta';
 
@@ -26,8 +26,20 @@ export interface AwardMarker {
   xp: number;
 }
 
-/** Причина конца матча простыми словами (чья это победа — говорит заголовок). */
-export function endReasonText(reason: string | undefined): string {
+/**
+ * Победа по контракту операции — тем, что контракт объявил (PVR-9.3): у главы VI очаги,
+ * главные силы и эвакуация, у главы V — одни очаги. Ключи литералами: их видит гейт локали.
+ */
+function operationEndText(op: OperationState | undefined): string {
+  const parts = [t('ai.end.op.production')];
+  if (op && Object.keys(op.forces).length > 0) parts.push(t('ai.end.op.forces'));
+  if (op && op.evacuate > 0) parts.push(t('ai.end.op.evacuate'));
+  return parts.join(', ');
+}
+
+/** Причина конца матча простыми словами (чья это победа — говорит заголовок). `operation` —
+ *  контракт главы, если он есть: текст победы по нему называет только объявленное. */
+export function endReasonText(reason: string | undefined, operation?: OperationState): string {
   switch (reason) {
     case 'domination':
       return t('ai.end.domination');
@@ -48,9 +60,9 @@ export function endReasonText(reason: string | undefined): string {
       return t('ai.end.pve-extracted');
     case 'pve-carrier-lost':
       return t('ai.end.pve-carrier-lost');
-    // PVR-8.3: исход главы с контрактом операции решают его три результата.
+    // PVR-8.3: исход главы с контрактом операции решают его результаты.
     case 'pve-operation':
-      return t('ai.end.pve-operation');
+      return operationEndText(operation);
     case 'pve-evac-lost':
       return t('ai.end.pve-evac-lost');
     default:
@@ -178,13 +190,13 @@ export function initMatchEnd(host: MatchEndHost): MatchEndWatch {
     if (runReward !== undefined && runReward !== null) {
       const runSummary = host.runSummary?.() ?? undefined;
       return {
-        won, draw, why: endReasonText(s.match.reason), xp: 0, levelUp: null,
+        won, draw, why: endReasonText(s.match.reason, s.operation), xp: 0, levelUp: null,
         runReward, ...(runSummary ? { runSummary } : {}), dismissed: false,
       };
     }
     // Полигон не платит карьерный опыт основной игры (§14.7) — это не партия, а симуляция.
     if (host.training?.())
-      return { won, draw, why: endReasonText(s.match.reason), xp: 0, levelUp: null, training: true, dismissed: false };
+      return { won, draw, why: endReasonText(s.match.reason, s.operation), xp: 0, levelUp: null, training: true, dismissed: false };
     const key = awardKeyFor(host.nick());
     const stamp = endStampOf(s.match);
     const reward = s.match.rewards?.[host.me()];
@@ -199,7 +211,7 @@ export function initMatchEnd(host: MatchEndHost): MatchEndWatch {
     return {
       won,
       draw,
-      why: endReasonText(s.match.reason),
+      why: endReasonText(s.match.reason, s.operation),
       xp: award.xp,
       levelUp: award.levelUp,
       dismissed: false,

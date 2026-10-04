@@ -1,9 +1,10 @@
 /**
  * Комиксы глав Sector Zero (решение владельца 2026-09-24): короткий комикс, когда игрок
  * ПЕРВЫЙ раз начинает главу (`intro`), и когда первый раз её проходит (`outro`). Между ними —
- * страницы по событиям главы: ключевая задача (`task`) и сюжетные сцены главы VI (§8.9 каталога
- * карт, PVR-8.6). Арт делает владелец отдельно; здесь — только правило «когда показывать» и
- * проверка реестра, общие обоим клиентам. Картинки подключает хозяин (`prototype/src/comicArt.ts`).
+ * страницы по событиям главы: ключевая задача (`task`) и сюжетные сцены глав VI (§8.9 каталога
+ * карт, PVR-8.6) и V (§7.7, PVR-9.7). Арт делает владелец отдельно; здесь — только правило
+ * «когда показывать» и проверка реестра, общие обоим клиентам. Картинки подключает хозяин
+ * (`prototype/src/comicArt.ts`).
  *
  * Показ — ОДИН раз на профиль, отметка живёт в профиле ({@link SectorZeroProgress.comicsSeen})
  * и переезжает с ним через облако: на новом устройстве тот же комикс второй раз не
@@ -23,16 +24,20 @@ export const COMIC_MOMENTS = [
   'echo-record',
   'refuge',
   'rescued',
+  'network',
+  'captive',
 ] as const;
 export type ComicMoment = (typeof COMIC_MOMENTS)[number];
 
 /**
- * Моменты, которые играют, когда в забеге впервые засчитан их триггер — задача главы или шаг
- * её главной цепочки (`decisions/chapterChain.ts`); какой, говорит таблица хозяина
- * ({@link ComicTriggers}). `task` — ключевая задача главы; `refuge` и `rescued` — сцены главы VI:
- * «Последний приют» по эпизоду доков и «Мы пришли за людьми» по основной эвакуации (§8.9).
+ * Моменты, которые играют, когда в забеге впервые засчитан их триггер — задача главы, шаг
+ * её главной цепочки (`decisions/chapterChain.ts`) или факт мира ({@link storyFacts}); какой,
+ * говорит таблица хозяина ({@link ComicTriggers}). `task` — ключевая задача главы; `refuge` и
+ * `rescued` — сцены главы VI: «Последний приют» по эпизоду доков и «Мы пришли за людьми» по
+ * основной эвакуации (§8.9); `network` и `captive` — сцены главы V: «Связь прервана» по
+ * первому разрыву сети и «Голос Единения» по доставке пленного (§7.7).
  */
-export const TRIGGERED_MOMENTS = ['task', 'refuge', 'rescued'] as const;
+export const TRIGGERED_MOMENTS = ['task', 'refuge', 'rescued', 'network', 'captive'] as const;
 export type TriggeredMoment = (typeof TRIGGERED_MOMENTS)[number];
 
 /** Одна страница: картинка и необязательные подписи — КЛЮЧИ локали. У утверждённых
@@ -49,7 +54,8 @@ export type ComicRegistry = Readonly<
   Record<string, Readonly<Partial<Record<ComicMoment, readonly ComicPanel[]>>>>
 >;
 
-/** `id главы → момент → id задачи или шага цепочки`, после которого этот момент играет. */
+/** `id главы → момент → id задачи, шага цепочки или факта мира`, после которого этот момент
+ *  играет. */
 export type ComicTriggers = Readonly<
   Record<string, Readonly<Partial<Record<TriggeredMoment, string>>>>
 >;
@@ -80,6 +86,22 @@ export function echoComicMoment(
       f.owner === me && f.location === 'home_b' && !f.movement && f.units.some((u) => u.count > 0),
   );
   return arrived ? 'echo' : null;
+}
+
+/**
+ * Факты мира, которые служат триггером страницы наравне с задачами и шагами цепочки (глава V,
+ * PVR-9.7): `net.cut` — сеть Роя разорвана: очаг контракта, бывший на связи с ульем, отрезан
+ * от него (`swarmNet.cut` ∩ очаги, §7.7). Не гибель любого ретранслятора и не окраина Роя,
+ * которую перестал накрывать проходящий узел, а разделение самой сети; несколько разрывов
+ * разом дают одну сцену, починка сети факт не отменяет. Хозяин добавляет их к засчитанному,
+ * когда спрашивает {@link comicsTriggered}.
+ */
+export const STORY_FACTS = ['net.cut'] as const;
+export type StoryFact = (typeof STORY_FACTS)[number];
+
+export function storyFacts(state: GameState): StoryFact[] {
+  const cut = new Set(state.swarmNet?.cut ?? []);
+  return (state.operation?.production ?? []).some((id) => cut.has(id)) ? ['net.cut'] : [];
 }
 
 /** Панели к показу — или `null`: комикса нет, он пуст или уже показан этому профилю. */

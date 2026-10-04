@@ -12,10 +12,14 @@
  *   счёт у них тот же, по которому судит ядро (`operationStatus`): панель не напишет «3/3»,
  *   пока ядро победы не видит. Порядок результатов — подсказка: их берут в любом порядке.
  *   Связь шагом не служит — союзник на связи с первой минуты (§8.3).
+ * - **Глава V** (§7.4–7.5, кирпич PVR-9.7) — тот же контракт, но из одних очагов: найти
+ *   связующее звено сети Роя → подавить очаги. Звено — направляющий шаг: знакомит с сетью,
+ *   но победу не запирает. Результата, которого контракт не объявил, в цепочке нет.
  */
 import type { GameData, GameState, PlayerId } from '../packages/shared-core/src/index';
 import {
   HAVEN_TRAIT,
+  RELAY_POST_TRAIT,
   REFUGE_TRAIT,
   contactedAllies,
   getStance,
@@ -23,7 +27,18 @@ import {
 } from '../packages/shared-core/src/index';
 
 export type ChapterStepId =
-  'contact' | 'archive' | 'extract' | 'deliver' | 'docks' | 'evacuate' | 'production' | 'forces';
+  | 'contact'
+  | 'archive'
+  | 'extract'
+  | 'deliver'
+  | 'link'
+  | 'docks'
+  | 'evacuate'
+  | 'production'
+  | 'forces';
+
+/** Признак провинции — ближайшее соединение сети Роя, к которому ведёт шаг «звено» (глава V). */
+export const NET_LEAD_TRAIT = 'net_lead';
 
 export interface ChapterStep {
   id: ChapterStepId;
@@ -36,7 +51,7 @@ export interface ChapterStep {
   target?: string;
   /** Доля работы (извлечение), 0…1. */
   progress?: number;
-  /** Счёт результата операции: сколько сделано из нужного (глава VI). */
+  /** Счёт результата операции: сколько сделано из нужного (главы V и VI). */
   count?: { done: number; total: number };
   /** Правило, которое игрок видит до риска (§8.8): довести `need` из `of` возможных. */
   rule?: { need: number; of: number };
@@ -115,12 +130,33 @@ function scenarioSteps(state: GameState, me: PlayerId, needMs: number): Step[] |
   return steps;
 }
 
-/** Глава VI: доки и три результата контракта. `null` — штурм ещё не начат (врага не знаем). */
+/**
+ * Звено сети найдено (глава V, §7.4): игрок хоть раз опознал флот Роя с большим
+ * ретранслятором — своим зрением или зрением союзника, обзор у них общий. Знакомство
+ * историческое: `swarmIntel` помнит контакт и после ухода разведчика, но устаревшие сведения
+ * текущими не объявляет.
+ */
+function relaySighted(state: GameState, me: PlayerId, data: GameData): boolean {
+  return Object.values(state.swarmIntel?.[me] ?? {}).some((contact) =>
+    contact.units.some((u) => data.units[u.unit]?.traits.includes(RELAY_POST_TRAIT)),
+  );
+}
+
+/** Контракт операции: звено сети (глава V), доки (глава VI) и объявленные результаты.
+ *  `null` — штурм ещё не начат (врага не знаем). */
 function operationSteps(state: GameState, me: PlayerId, data: GameData): Step[] | null {
   const op = state.operation;
   const status = operationStatus(state, data);
   if (!op || !status) return null;
   const steps: Step[] = [];
+  const lead = siteWith(state, NET_LEAD_TRAIT);
+  if (lead !== undefined)
+    steps.push({
+      id: 'link',
+      key: 'chain.link',
+      done: relaySighted(state, me, data),
+      target: lead,
+    });
   const docks = siteWith(state, REFUGE_TRAIT);
   const found = docks !== undefined && (state.missionFacts?.found?.[me] ?? []).includes(docks);
   if (docks !== undefined)
@@ -131,14 +167,16 @@ function operationSteps(state: GameState, me: PlayerId, data: GameData): Step[] 
     docks !== undefined && (state.planets[docks]!.awaitingFleets ?? []).some((f) => f.owner === me);
   const evacTo =
     docks !== undefined && !found ? undefined : waiting ? docks : siteWith(state, HAVEN_TRAIT, me);
-  steps.push({
-    id: 'evacuate',
-    key: 'chain.evacuate',
-    done: status.delivered >= status.need,
-    count: { done: Math.min(status.delivered, status.need), total: status.need },
-    rule: { need: status.need, of: status.possible },
-    ...(evacTo !== undefined ? { target: evacTo } : {}),
-  });
+  // Эвакуации в контракте нет (глава V) — нет и шага.
+  if (status.need > 0)
+    steps.push({
+      id: 'evacuate',
+      key: 'chain.evacuate',
+      done: status.delivered >= status.need,
+      count: { done: Math.min(status.delivered, status.need), total: status.need },
+      rule: { need: status.need, of: status.possible },
+      ...(evacTo !== undefined ? { target: evacTo } : {}),
+    });
   steps.push({
     id: 'production',
     key: 'chain.production',
@@ -146,12 +184,13 @@ function operationSteps(state: GameState, me: PlayerId, data: GameData): Step[] 
     count: { done: op.production.length - status.held.length, total: op.production.length },
     ...(status.held[0] !== undefined ? { target: status.held[0] } : {}),
   });
-  steps.push({
-    id: 'forces',
-    key: 'chain.forces',
-    done: status.broken.length === status.forces,
-    count: { done: status.broken.length, total: status.forces },
-  });
+  if (status.forces > 0)
+    steps.push({
+      id: 'forces',
+      key: 'chain.forces',
+      done: status.broken.length === status.forces,
+      count: { done: status.broken.length, total: status.forces },
+    });
   return steps;
 }
 

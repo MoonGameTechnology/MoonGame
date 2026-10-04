@@ -694,6 +694,7 @@ export {
 } from './modules/loadoutEffects';
 export { rendezvousModule, contactedAllies } from './modules/rendezvous';
 export { extractionModule, extractionNeedMs, extractionRunning } from './modules/extraction';
+export { captiveModule, captiveSide } from './modules/captive';
 export {
   operationModule,
   operationStatus,

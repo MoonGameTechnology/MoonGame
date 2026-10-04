@@ -10,6 +10,7 @@ import {
   rendezvousModule,
   extractionModule,
   operationModule,
+  captiveModule,
   autoMergeModule,
   captureOnArrivalModule,
 
@@ -224,6 +225,10 @@ export const DEV_MODULES: GameModule[] = [
   // Хуков нет. Вплотную перед автослиянием: слияние на прибытии он слышит событием
   // `fleet.merged`, а место в конце не сдвигает чужой порядок.
   operationModule,
+  // Пленный главы V (PVR-9.5): своё действие `captive.load` и свои поводы (захват и гибель
+  // укрытия, слияние, гибель и прибытие носителя), хуков нет. Перед автослиянием, как и
+  // контракт: прибытие носителя в зону он слышит до слияния, а само слияние — событием.
+  captiveModule,
   // Автослияние на прибытии (заказ владельца 2026-10-03): долетевший флот вливается в свой,
   // стоящий в узле. В САМЫЙ КОНЕЦ: прибытие сначала слышат все (бой, захват, мины, союзник,
   // архив), и только потом флот исчезает в стоявшем.
@@ -242,7 +247,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '70'; // SHU-6.4: перелёт шаттлов и посадка без базы.
+export const MODULE_MANIFEST_VERSION = '71'; // PVR-9.5: пленный главы V «Голос Единения».
+// В ЧЛЕНСТВО вошёл `captive` 1.0.0 перед `auto-merge`, у состояния новое поле `captive`.
+// Партия на 70 не знает правил пленного.
+// export const MODULE_MANIFEST_VERSION = '70'; // SHU-6.4: перелёт шаттлов и посадка без базы.
 // Членство и порядок не тронуты; `shuttle` 1.7.0 — приказ `shuttle.relocate`, вылет, чья база
 // пропала, садится на ближайшую свою базу; у вылета новая цель `base` и поля `origin`/`baseAt`
 // — форма, которой правила 69 не знают.

@@ -7,7 +7,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { COMIC_MOMENTS, TRIGGERED_MOMENTS, comicProblems } from '../../decisions/chapterComics';
+import {
+  COMIC_MOMENTS,
+  STORY_FACTS,
+  TRIGGERED_MOMENTS,
+  comicProblems,
+} from '../../decisions/chapterComics';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import {
@@ -65,12 +70,16 @@ function chapterStart(chapter: string): { state: GameState; objectives: MapObjec
   };
 }
 
-/** Чем глава может звать комикс по событиям: её задачи и шаги главной цепочки (главы IV и VI). */
+/** Чем глава может звать комикс по событиям: её задачи, шаги главной цепочки (главы IV–VI) и
+ *  факты мира, которые её мир умеет записать: разрыв сети — там, где у Роя есть улей, а у
+ *  контракта операции очаги (глава V). */
 function triggersOf(chapter: string): string[] {
   const start = chapterStart(chapter);
   if (!start) return [];
-  const chain = chapterChain(start.state, 'p1', 1, shippedGameData()) ?? [];
-  return [...start.objectives.map((o) => o.id), ...chain.map((st) => st.key)];
+  const { state } = start;
+  const chain = chapterChain(state, 'p1', 1, shippedGameData()) ?? [];
+  const facts = state.pve?.home && state.operation?.production.length ? [...STORY_FACTS] : [];
+  return [...start.objectives.map((o) => o.id), ...chain.map((st) => st.key), ...facts];
 }
 
 describe('комиксы глав — реестр и папка арта', () => {
@@ -118,7 +127,7 @@ describe('комиксы глав — реестр и папка арта', () =
       }
   });
 
-  it('каждый триггер — задача или шаг цепочки своей главы (арт может прийти позже)', () => {
+  it('каждый триггер — задача, шаг цепочки или факт мира своей главы (арт может прийти позже)', () => {
     for (const [chapter, moments] of Object.entries(COMIC_TRIGGERS))
       for (const trigger of Object.values(moments))
         expect(triggersOf(chapter), chapter).toContain(trigger);

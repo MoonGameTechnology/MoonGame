@@ -127,3 +127,20 @@ describe('метки при совместном зачёте с назначе�
     expect(missionTargets(raze, s, 'p1')).toEqual(['b']);
   });
 });
+
+describe('метки пленного «Голос Единения» (PVR-9.5)', () => {
+  const voice: MissionObjective = { id: 'mission.voice-of-unity', kind: 'captive', targets: ['hideout'], reward: 4 };
+  const five = (captive: Partial<NonNullable<GameState['captive']>> = {}): GameState =>
+    ({
+      ...world([planet('hideout', 'covenant'), planet('staging', 'p1')]),
+      captive: { hideout: 'hideout', zone: 'staging', ...captive },
+    }) as unknown as GameState;
+
+  it('до погрузки — укрытие, на борту — зона доставки, доставлен или потерян — меток нет', () => {
+    expect(missionTargets(voice, five(), 'p1')).toEqual(['hideout']);
+    expect(missionTargets(voice, five({ takenBy: 'p1' }), 'p1')).toEqual(['hideout']);
+    expect(missionTargets(voice, five({ takenBy: 'p1', carrier: 'p1_1' }), 'p1')).toEqual(['staging']);
+    expect(missionTargets(voice, five({ takenBy: 'p1', deliveredAt: 3 }), 'p1')).toEqual([]);
+    expect(missionTargets(voice, five({ lostAt: 1 }), 'p1')).toEqual([]);
+  });
+});

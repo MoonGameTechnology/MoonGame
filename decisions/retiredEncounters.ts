@@ -13,6 +13,9 @@ import type { GameState, MapObjective } from '../packages/shared-core/src/index'
  * старте владеет NPC (`players[owner].npc`): свой мир, Рой и ничья провинция — не
  * встреча. Цель становится ничьей и без гарнизона, флоты этого NPC уходят, а NPC без
  * провинций — и сам игрок вместе со своими войнами: без него `pirateEncounter` молчит. Вход не меняется.
+ *
+ * Доставленный пленный главы V (`captive`) тоже не возвращается: пленного в мире больше
+ * нет, а его убежище списывается как цель захвата — вооружённая группа уже разбита.
  */
 export function retireDoneEncounters(
   state: GameState,
@@ -21,18 +24,21 @@ export function retireDoneEncounters(
 ): GameState {
   const retired = new Set<string>();
   const recruited = new Set<string>();
+  let captive = false;
   for (const o of objectives) {
     if (o.kind === 'recruit' && done.includes(o.id))
       for (const id of o.targets) if (state.planets[id]?.recruitHero) recruited.add(id);
-    if (o.kind !== 'control' || !done.includes(o.id)) continue;
+    if (o.kind === 'captive' && done.includes(o.id) && state.captive) captive = true;
+    if ((o.kind !== 'control' && o.kind !== 'captive') || !done.includes(o.id)) continue;
     for (const id of o.targets) {
       const owner = state.planets[id]?.owner;
       if (owner && state.players[owner]?.npc) retired.add(id);
     }
   }
-  if (!retired.size && !recruited.size) return state;
+  if (!retired.size && !recruited.size && !captive) return state;
   const next: GameState = JSON.parse(JSON.stringify(state));
   for (const id of recruited) delete next.planets[id]!.recruitHero;
+  if (captive) delete next.captive;
   const npcs = new Set<string>();
   for (const id of retired) {
     const planet = next.planets[id]!;

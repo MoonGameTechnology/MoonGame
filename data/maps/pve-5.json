@@ -1,0 +1,859 @@
+{
+  "id": "pve-5",
+  "seed": "pve-5",
+  "time": 0,
+  "mode": "pve_waves",
+  "sectors": {
+    "staging": {
+      "position": {
+        "x": -560,
+        "y": 600
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "p1",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar"
+        },
+        {
+          "type": "fort",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 4
+        },
+        {
+          "unit": "garrison",
+          "count": 2
+        }
+      ],
+      "traits": [
+        "haven"
+      ]
+    },
+    "west_colony": {
+      "position": {
+        "x": -900,
+        "y": 700
+      },
+      "kind": "planet",
+      "terrain": "empty_space"
+    },
+    "ore_field": {
+      "position": {
+        "x": -800,
+        "y": 430
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "w_verge": {
+      "position": {
+        "x": -1100,
+        "y": 450
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "supply_drift": {
+      "position": {
+        "x": -300,
+        "y": 790
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system"
+    },
+    "south_mid": {
+      "position": {
+        "x": -280,
+        "y": 360
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "rear_dock": {
+      "position": {
+        "x": 0,
+        "y": 560
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "outpost_south": {
+      "position": {
+        "x": 230,
+        "y": 470
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ],
+      "traits": [
+        "ally_task"
+      ]
+    },
+    "south_verge": {
+      "position": {
+        "x": 330,
+        "y": 800
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "south_rim": {
+      "position": {
+        "x": 10,
+        "y": 830
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "ally_base": {
+      "position": {
+        "x": 600,
+        "y": 620
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "ally",
+      "buildings": [
+        {
+          "type": "mine_t1"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "radar"
+        },
+        {
+          "type": "fort",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 2
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 4
+        },
+        {
+          "unit": "garrison",
+          "count": 2
+        }
+      ],
+      "rendezvous": "ally",
+      "contactAtStart": true
+    },
+    "ally_field": {
+      "position": {
+        "x": 880,
+        "y": 720
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field",
+      "owner": "ally"
+    },
+    "outpost_east": {
+      "position": {
+        "x": 880,
+        "y": 400
+      },
+      "kind": "void_station",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ],
+      "traits": [
+        "ally_task"
+      ]
+    },
+    "e_verge": {
+      "position": {
+        "x": 1120,
+        "y": 330
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "crossroad": {
+      "position": {
+        "x": 0,
+        "y": 110
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "west_approach": {
+      "position": {
+        "x": -560,
+        "y": 170
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "east_approach": {
+      "position": {
+        "x": 560,
+        "y": 180
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system"
+    },
+    "east_mid": {
+      "position": {
+        "x": 330,
+        "y": 260
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "west_bypass": {
+      "position": {
+        "x": -1000,
+        "y": 180
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "east_bypass": {
+      "position": {
+        "x": 1060,
+        "y": 30
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "w_cross": {
+      "position": {
+        "x": -320,
+        "y": -100
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "e_cross": {
+      "position": {
+        "x": 320,
+        "y": -90
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "c_south": {
+      "position": {
+        "x": 0,
+        "y": -180
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "focus_west": {
+      "position": {
+        "x": -640,
+        "y": -560
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "swarm_datacenter"
+        },
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 3
+        }
+      ]
+    },
+    "w_link": {
+      "position": {
+        "x": -350,
+        "y": -470
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field",
+      "traits": [
+        "net_lead"
+      ]
+    },
+    "w_shoal": {
+      "position": {
+        "x": -520,
+        "y": -230
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "w_rocks": {
+      "position": {
+        "x": -860,
+        "y": -300
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "w_north": {
+      "position": {
+        "x": -400,
+        "y": -760
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "w_far": {
+      "position": {
+        "x": -900,
+        "y": -720
+      },
+      "kind": "asteroid_cluster",
+      "terrain": "asteroid_cluster"
+    },
+    "hideout": {
+      "position": {
+        "x": -760,
+        "y": -80
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "covenant",
+      "garrison": [
+        {
+          "unit": "militia",
+          "count": 3
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 2
+        }
+      ],
+      "captive": {
+        "zone": "staging"
+      }
+    },
+    "listening_post": {
+      "position": {
+        "x": -1060,
+        "y": -470
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "focus_center": {
+      "position": {
+        "x": 0,
+        "y": -620
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "swarm_hive"
+        },
+        {
+          "type": "swarm_datacenter"
+        },
+        {
+          "type": "biomass_pit"
+        },
+        {
+          "type": "swarm_synapse"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "barracks"
+        },
+        {
+          "type": "fort"
+        },
+        {
+          "type": "orbital_aa"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 6
+        }
+      ]
+    },
+    "c_gate": {
+      "position": {
+        "x": 320,
+        "y": -400
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "c_north": {
+      "position": {
+        "x": 330,
+        "y": -840
+      },
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula"
+    },
+    "c_ridge": {
+      "position": {
+        "x": -150,
+        "y": -880
+      },
+      "kind": "nebula",
+      "terrain": "nebula"
+    },
+    "beacon_post": {
+      "position": {
+        "x": -60,
+        "y": -440
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void",
+      "traits": [
+        "beacon"
+      ]
+    },
+    "focus_east": {
+      "position": {
+        "x": 660,
+        "y": -570
+      },
+      "kind": "planet",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "swarm_datacenter"
+        },
+        {
+          "type": "swarm_synapse"
+        },
+        {
+          "type": "shipyard",
+          "level": 2
+        },
+        {
+          "type": "fort"
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 4
+        }
+      ]
+    },
+    "e_open": {
+      "position": {
+        "x": 590,
+        "y": -270
+      },
+      "kind": "dead_world",
+      "terrain": "deep_void"
+    },
+    "remote_yard": {
+      "position": {
+        "x": 1000,
+        "y": -440
+      },
+      "kind": "void_station",
+      "terrain": "empty_space",
+      "owner": "swarm",
+      "buildings": [
+        {
+          "type": "shipyard",
+          "level": 2
+        }
+      ],
+      "garrison": [
+        {
+          "unit": "swarm_lander",
+          "count": 2
+        }
+      ]
+    },
+    "e_north": {
+      "position": {
+        "x": 720,
+        "y": -860
+      },
+      "kind": "dead_world",
+      "terrain": "depleted_system"
+    },
+    "far_eye": {
+      "position": {
+        "x": 1080,
+        "y": -760
+      },
+      "kind": "void_station",
+      "terrain": "empty_space"
+    },
+    "e_drift": {
+      "position": {
+        "x": 880,
+        "y": -150
+      },
+      "kind": "asteroid",
+      "terrain": "asteroid_field"
+    },
+    "rift_w": {
+      "position": {
+        "x": -200,
+        "y": -470
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    },
+    "rift_e": {
+      "position": {
+        "x": 470,
+        "y": -340
+      },
+      "kind": "rift",
+      "terrain": "empty_space"
+    }
+  },
+  "objectives": [
+    {
+      "id": "mission.break-net",
+      "kind": "isolate",
+      "targets": [
+        "focus_west"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.voice-of-unity",
+      "kind": "captive",
+      "targets": [
+        "hideout"
+      ],
+      "reward": 4
+    },
+    {
+      "id": "mission.watch-station",
+      "kind": "control",
+      "targets": [
+        "far_eye"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.last-session",
+      "kind": "evac",
+      "count": 3,
+      "reward": 4
+    },
+    {
+      "id": "mission.bulwark",
+      "kind": "build",
+      "targets": [
+        "fort"
+      ],
+      "at": [
+        "crossroad"
+      ],
+      "count": 1,
+      "reward": 2
+    },
+    {
+      "id": "mission.bypass-channel",
+      "kind": "isolate",
+      "targets": [
+        "focus_east"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.direction-finder",
+      "kind": "beacon",
+      "targets": [
+        "beacon_post"
+      ],
+      "count": 6,
+      "reward": 3
+    },
+    {
+      "id": "mission.remote-yard",
+      "kind": "control",
+      "targets": [
+        "remote_yard"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.field-yard",
+      "kind": "build",
+      "targets": [
+        "shipyard"
+      ],
+      "at": [
+        "west_colony"
+      ],
+      "count": 1,
+      "reward": 2
+    },
+    {
+      "id": "mission.raze-biomass",
+      "kind": "raze",
+      "targets": [
+        "biomass_pit"
+      ],
+      "reward": 3
+    },
+    {
+      "id": "mission.recon",
+      "kind": "scout",
+      "count": 25,
+      "reward": 2
+    },
+    {
+      "id": "mission.hold-out",
+      "kind": "wave",
+      "count": 6,
+      "reward": 2
+    }
+  ],
+  "objectiveSlots": {
+    "base": 4,
+    "cap": 6
+  },
+  "operation": {
+    "production": [
+      "focus_west",
+      "focus_center",
+      "focus_east"
+    ]
+  },
+  "players": {
+    "p1": {
+      "name": "Azure Compact",
+      "faction": "vanguard",
+      "resources": {
+        "credits": 500,
+        "metal": 500
+      }
+    },
+    "ally": {
+      "name": "Attached Detachment",
+      "faction": "vanguard",
+      "npc": "neutral",
+      "ai": true,
+      "resources": {
+        "credits": 300,
+        "metal": 300
+      }
+    },
+    "swarm": {
+      "name": "Swarm Collective",
+      "faction": "swarm",
+      "ai": true,
+      "resources": {
+        "credits": 1000,
+        "metal": 1000,
+        "biomass": 400,
+        "microelectronics": 100,
+        "energy": 150
+      }
+    },
+    "covenant": {
+      "name": "Covenant of Unity",
+      "faction": "vanguard",
+      "npc": "pirate",
+      "ai": false,
+      "resources": {
+        "credits": 0,
+        "metal": 0
+      }
+    }
+  },
+  "fleets": {
+    "p1_1": {
+      "owner": "p1",
+      "location": "staging",
+      "landing": [
+        {
+          "unit": "militia",
+          "count": 1
+        }
+      ],
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "scout_drone",
+          "count": 1
+        }
+      ]
+    },
+    "p1_2": {
+      "owner": "p1",
+      "location": "staging",
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        }
+      ]
+    },
+    "p1_evac": {
+      "joinsOnArrival": true,
+      "owner": "p1",
+      "location": "listening_post",
+      "units": [
+        {
+          "unit": "evac_transport",
+          "count": 3
+        }
+      ]
+    },
+    "ally_1": {
+      "owner": "ally",
+      "location": "ally_base",
+      "landing": [
+        {
+          "unit": "militia",
+          "count": 2
+        },
+        {
+          "unit": "heavy_infantry",
+          "count": 2
+        }
+      ],
+      "units": [
+        {
+          "unit": "cruiser",
+          "count": 2
+        },
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    },
+    "ally_2": {
+      "owner": "ally",
+      "location": "ally_base",
+      "units": [
+        {
+          "unit": "frigate",
+          "count": 1
+        }
+      ]
+    },
+    "swarm_1": {
+      "owner": "swarm",
+      "location": "focus_center",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 2
+        }
+      ]
+    },
+    "swarm_2": {
+      "owner": "swarm",
+      "location": "focus_west",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1
+        }
+      ]
+    },
+    "swarm_3": {
+      "owner": "swarm",
+      "location": "focus_east",
+      "units": [
+        {
+          "unit": "swarm_brood_mother",
+          "count": 1
+        }
+      ]
+    },
+    "relay_west": {
+      "owner": "swarm",
+      "location": "w_link",
+      "units": [
+        {
+          "unit": "swarm_relay",
+          "count": 1
+        },
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    },
+    "relay_gate": {
+      "owner": "swarm",
+      "location": "c_gate",
+      "units": [
+        {
+          "unit": "swarm_relay",
+          "count": 1
+        },
+        {
+          "unit": "frigate",
+          "count": 2
+        }
+      ]
+    },
+    "relay_north": {
+      "owner": "swarm",
+      "location": "c_north",
+      "units": [
+        {
+          "unit": "swarm_relay",
+          "count": 1
+        },
+        {
+          "unit": "frigate",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

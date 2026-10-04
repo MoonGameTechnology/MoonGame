@@ -343,8 +343,9 @@ export type MatchEndReason =
   | 'pve-extracted'
   /** PVR-7.3: the package's carrier was destroyed. The NPC is the formal winner. */
   | 'pve-carrier-lost'
-  /** PVR-8.3: the operation contract is met — production suppressed, main forces broken,
-   *  the main evacuation delivered. The survivors win together, as on `pve-cleared`. */
+  /** PVR-8.3: the operation contract is met — production suppressed, and the main forces
+   *  broken and the main evacuation delivered where the map declared them (chapter V declares
+   *  production only, PVR-9.3). The survivors win together, as on `pve-cleared`. */
   | 'pve-operation'
   /** PVR-8.3: the main evacuation became impossible — fewer evacuees are left (delivered,
    *  under way and still waiting) than the contract needs. The NPC is the formal winner. */
@@ -395,25 +396,45 @@ export interface OperationForce {
   brokenAt?: number;
 }
 
-/** Контракт операции главы VI (PVR-8.3, §8.8): главу выигрывают три результата вместе.
- *  Заводит загрузчик из `operation` карты; отсутствующие поля — «ещё не случилось». */
+/** Контракт операции (PVR-8.3, §8.8): главу выигрывают объявленные результаты вместе — у
+ *  главы VI все три, у главы V только очаги (PVR-9.3). Заводит загрузчик из `operation`
+ *  карты; отсутствующие поля — «ещё не случилось». */
 export interface OperationState {
   /** Производящие очаги: провинции, которые враг должен потерять — кто бы их ни взял. */
   production: PlanetId[];
-  /** Главные соединения: id из карты → учёт соединения. */
+  /** Главные соединения: id из карты → учёт соединения. Пусто — громить некого. */
   forces: Record<string, OperationForce>;
   /** Доля стартового корпуса, при которой соединение считается разгромленным. */
   breakAt: number;
-  /** Сколько беженцев довести до убежища — основная эвакуация. */
+  /** Сколько беженцев довести до убежища — основная эвакуация; 0 — эвакуации в контракте
+   *  нет. */
   evacuate: number;
   /** Последний контрудар (PVR-8.4, §8.7): Рой потерял все внешние позиции `after`, а место
    *  `target` сторона штурма уже знает (`missionFacts.found`), — сохранившиеся соединения и
    *  построенные Роем подкрепления идут к `target`. Тактика драйверов Роя
    *  (`counterattackPlan`), не правило мира; клиенту не уходит — это замысел врага. */
   counterattack?: { after: PlanetId[]; target: PlanetId };
-  /** Три результата сошлись — победа. */
+  /** Объявленные результаты сошлись — победа. */
   completedAt?: number;
   /** Эвакуация стала невозможной: беженцев (доставленных, в пути и ждущих) меньше порога. */
+  lostAt?: number;
+}
+
+/** Пленный главы V (PVR-9.5, «Голос Единения»). Отсутствующие поля — «ещё не случилось». */
+export interface CaptiveState {
+  /** Убежище — провинция, где пленного берут живым наземным штурмом. */
+  hideout: PlanetId;
+  /** Безопасная зона — куда носитель должен его доставить. */
+  zone: PlanetId;
+  /** Кто взял убежище штурмом — игрок или его союзник по сценарию. */
+  takenBy?: PlayerId;
+  takenAt?: number;
+  /** Флот, везущий пленного: один на матч, переезжает при слиянии. */
+  carrier?: FleetId;
+  loadedAt?: number;
+  deliveredAt?: number;
+  /** Пленный потерян: убежище пало врагу или уничтожено, носитель погиб. Задача провалена,
+   *  пленный больше не появляется. */
   lostAt?: number;
 }
 
@@ -1064,6 +1085,9 @@ export interface GameState {
   /** Контракт операции главы VI (`operationModule`, PVR-8.3): заводит загрузчик, если карта
    *  объявила `operation`. Нет раздела — исход главы решают волны, как прежде. */
   operation?: OperationState;
+  /** Пленный главы V (`captiveModule`, PVR-9.5): заводит загрузчик, если карта объявила
+   *  убежище (`captive`). Нет раздела — пленного в матче нет. */
+  captive?: CaptiveState;
   /** Приказы союзникам главы IV (PVR-7.4): житель → его единственная активная операция.
    *  Ставит игрок действием `ally.order`, снимает `ally.cancel` или ядро по событию мира
    *  (цель взята, разведчик дошёл, цель охраны потеряна). */

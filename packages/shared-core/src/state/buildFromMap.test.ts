@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import type { GameData } from '../data/schemas';
 import { hashGameDataBundle, loadGameData } from '../data/loadGameData';
-import { avaShape, parseMatchMap, type MatchMap } from '../data/mapSchema';
+import { avaShape, MapOperationSchema, parseMatchMap, type MatchMap } from '../data/mapSchema';
 import { buildStateFromMap, validateMatchMap } from './buildFromMap';
 import { getStance } from './diplomacy';
 
@@ -36,7 +36,13 @@ const authoredMap = (): MatchMap => {
 describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
   it('builds a GameState from the example map', () => {
     const state = buildStateFromMap(exampleMap(), data);
-    expect(Object.keys(state.planets).sort()).toEqual(['drift', 'home_green', 'home_red', 'nexus', 'veil']);
+    expect(Object.keys(state.planets).sort()).toEqual([
+      'drift',
+      'home_green',
+      'home_red',
+      'nexus',
+      'veil',
+    ]);
     expect(state.planets.home_green!.owner).toBe('green');
     expect(state.planets.nexus!.owner).toBeNull();
     expect(state.players.green!.faction).toBe('vanguard');
@@ -126,6 +132,20 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
       });
     });
 
+    it('контракт из одних очагов (PVR-9.3): ни соединений, ни эвакуации, ни убежища', () => {
+      const map = exampleMap();
+      map.operation = MapOperationSchema.parse({ production: ['home_red'] });
+      expect(
+        validateMatchMap(map, data).filter((i) => i.startsWith('E_INVALID_OPERATION')),
+      ).toEqual([]);
+      expect(buildStateFromMap(map, data).operation).toEqual({
+        production: ['home_red'],
+        forces: {},
+        breakAt: 0.2,
+        evacuate: 0,
+      });
+    });
+
     it('без контракта раздела нет — главу решают волны, как прежде', () => {
       expect(buildStateFromMap(exampleMap(), data).operation).toBeUndefined();
     });
@@ -212,15 +232,21 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     const brood = state.fleets.p3_1!.units.find((u) => u.unit === 'swarm_brood_mother');
     expect(brood?.modules).toEqual(['swarm_brood_chamber']);
     // Стек без модулей поля не получает — как и раньше.
-    expect(state.fleets.p3_1!.units.find((u) => u.unit === 'scout_drone')).not.toHaveProperty('modules');
+    expect(state.fleets.p3_1!.units.find((u) => u.unit === 'scout_drone')).not.toHaveProperty(
+      'modules',
+    );
   });
 
   it('модуль, который корпусу не встать, карта не пропускает (AUD-28)', () => {
     const map = exampleMap();
     map.fleets.green_1!.units = [{ unit: 'cruiser', count: 2, modules: ['swarm_brood_chamber'] }];
-    expect(validateMatchMap(map, data).some((i) => i.startsWith('E_MAP_LOADOUT:green_1:cruiser'))).toBe(true);
+    expect(
+      validateMatchMap(map, data).some((i) => i.startsWith('E_MAP_LOADOUT:green_1:cruiser')),
+    ).toBe(true);
     map.fleets.green_1!.units = [{ unit: 'cruiser', count: 2, modules: ['no_such_module'] }];
-    expect(validateMatchMap(map, data).some((i) => i.startsWith('E_MAP_LOADOUT:green_1:cruiser'))).toBe(true);
+    expect(
+      validateMatchMap(map, data).some((i) => i.startsWith('E_MAP_LOADOUT:green_1:cruiser')),
+    ).toBe(true);
   });
 
   it('carries a map player ai flag onto the seated player', () => {
@@ -297,7 +323,7 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     expect(buildStateFromMap(exampleMap(), data)).toEqual(buildStateFromMap(exampleMap(), data));
   });
 
-  it('stamps version.dataHash with the deployed bundle\'s fingerprint (MP-4)', () => {
+  it("stamps version.dataHash with the deployed bundle's fingerprint (MP-4)", () => {
     const state = buildStateFromMap(exampleMap(), data);
     expect(state.version.dataHash).toBe(hashGameDataBundle(data));
   });
@@ -319,7 +345,15 @@ describe('validateMatchMap — neighbour-only paths + integrity (M1.3)', () => {
 
   it('flags a disconnected sector', () => {
     const map = authoredMap();
-    map.sectors.isle = { position: { x: 999, y: 999 }, kind: 'planet', size: 1, owner: null, buildings: [], garrison: [], traits: [] };
+    map.sectors.isle = {
+      position: { x: 999, y: 999 },
+      kind: 'planet',
+      size: 1,
+      owner: null,
+      buildings: [],
+      garrison: [],
+      traits: [],
+    };
     expect(validateMatchMap(map, data)).toContain('E_MAP_DISCONNECTED');
   });
 
@@ -388,9 +422,9 @@ describe('slot-based maps — team-aware start slots (corporation-wars.md §4)',
   });
 
   it('rejects a slot owner with no assignment (fail-secure)', () => {
-    expect(() => buildStateFromMap(avaMap(), data, { slots: { slot_a: { playerId: 'p1' } } })).toThrow(
-      /E_SLOT_UNASSIGNED/,
-    );
+    expect(() =>
+      buildStateFromMap(avaMap(), data, { slots: { slot_a: { playerId: 'p1' } } }),
+    ).toThrow(/E_SLOT_UNASSIGNED/);
   });
 
   it('seats the arsenal snapshot onto the slot player, deduped + sorted (ARS-3)', () => {
@@ -556,7 +590,10 @@ describe('slot-based maps — team-aware start slots (corporation-wars.md §4)',
   it('rejects a slot granting an unknown technology (fail-secure at boot)', () => {
     expect(() =>
       buildStateFromMap(avaMap(), data, {
-        slots: { slot_a: { playerId: 'p1', technologies: ['ghost_tech'] }, slot_b: { playerId: 'p2' } },
+        slots: {
+          slot_a: { playerId: 'p1', technologies: ['ghost_tech'] },
+          slot_b: { playerId: 'p2' },
+        },
       }),
     ).toThrow(/E_UNKNOWN_TECHNOLOGY/);
   });
@@ -759,7 +796,10 @@ describe('validateMatchMap — terrain decides how many lanes a sector carries (
     // line does not add to it, it cuts it (PVR-0.4).
     const onTheLine = parseMatchMap({
       ...beside,
-      sectors: { ...beside.sectors, c: { position: { x: 0, y: 0 }, kind: 'planet', terrain: 'empty_space' } },
+      sectors: {
+        ...beside.sectors,
+        c: { position: { x: 0, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+      },
     });
     expect(validateMatchMap(onTheLine, data)).toContain('E_PATH_NOT_NEIGHBOR:a|b');
   });
