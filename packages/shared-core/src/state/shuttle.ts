@@ -105,14 +105,21 @@ export function fleetHasShuttle(f: Fleet | undefined, data: GameData): boolean {
   );
 }
 
-/** The wing's strike radius (map units) — the longest `strikeRange` among its live
- *  shuttle ships. 0 = carries no strike wing. */
-export function shuttleStrikeRange(fleet: Fleet, data: GameData): number {
+/**
+ * Радиус БАЗЫ (map units) — самая длинная `strikeRange` среди живых машин её ангара:
+ * на что база способна в принципе. Хост — любая база, мир или флот: форма ангара у них
+ * одна. 0 = базировать нечего.
+ *
+ * Читается именно ангар (SHU-6.1). Функция пережила модель, для которой писалась: в
+ * старом «крыле» (снято в SHU-2.2) шаттлы летали КАК ФЛОТ и лежали в `fleet.units`, а с
+ * SHU-1.1 туда они не попадают ниоткуда. Продолжая смотреть в старое место, функция
+ * отвечала ноль на любой носитель, и кольцо радиуса вокруг выбранного корабля не
+ * рисовалось ни разу — та же поломка, что `sortieSpec` пережила в SHU-3.1.
+ */
+export function shuttleStrikeRange(host: { hangar?: Squadron[] }, data: GameData): number {
   let r = 0;
-  for (const st of fleet.units) {
-    if (st.count > 0 && (data.units[st.unit]?.traits.includes('shuttle') ?? false)) {
-      r = Math.max(r, data.units[st.unit]?.stats.strikeRange ?? 0);
-    }
+  for (const st of hangarMachines(host)) {
+    r = Math.max(r, data.units[st.unit]?.stats.strikeRange ?? 0);
   }
   return r;
 }
@@ -132,12 +139,12 @@ export function withinRange(
 /** Can the wing strike `targetPos` from its launch node at `fromPos`? Only a real
  *  strike wing (range > 0) whose target lies inside the radius (SQ-3.1). */
 export function shuttleReaches(
-  fleet: Fleet,
+  host: { hangar?: Squadron[] },
   data: GameData,
   fromPos: { x: number; y: number },
   targetPos: { x: number; y: number },
 ): boolean {
-  const r = shuttleStrikeRange(fleet, data);
+  const r = shuttleStrikeRange(host, data);
   return r > 0 && withinRange(fromPos, targetPos, r);
 }
 

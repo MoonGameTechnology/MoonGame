@@ -189,16 +189,49 @@ describe('sortie / rearm counter (SQ-2.1)', () => {
   });
 });
 
-describe('shuttle strike radius (SQ-3.1, real shipped data)', () => {
+describe('shuttle strike radius (SQ-3.1, SHU-6.1, real shipped data)', () => {
   const range = data.units[shuttleUnit]!.stats.strikeRange;
+  /** База с эскадрой в АНГАРЕ — там шаттл живёт с SHU-1.1, у мира и у флота одинаково. */
+  const based = (units: Array<{ unit: string; count: number }>) => ({
+    ...fleet([{ unit: nonShuttleUnit, count: 1 }]),
+    hangar: [squadron(units)],
+  });
 
-  it('reads the longest strikeRange among live shuttle ships', () => {
-    expect(shuttleStrikeRange(fleet([{ unit: shuttleUnit, count: 2 }]), data)).toBe(range);
+  it('reads the longest strikeRange among live machines in the hangar', () => {
+    expect(shuttleStrikeRange(based([{ unit: shuttleUnit, count: 2 }]), data)).toBe(range);
     expect(range).toBeGreaterThan(0);
   });
 
-  it('a fleet without a shuttle has no strike radius', () => {
+  it('SHU-6.1: shuttles in fleet.units are not a wing — that place is dead since SHU-1.1', () => {
+    // Раньше радиус искался в `fleet.units`, куда шаттл не попадает ниоткуда, поэтому
+    // кольцо вокруг носителя не рисовалось ни разу. Сторож держит новое место чтения.
+    expect(shuttleStrikeRange(fleet([{ unit: shuttleUnit, count: 2 }]), data)).toBe(0);
+  });
+
+  it('a world hangar has the same radius as a carrier hangar (one host shape)', () => {
+    const world = { hangar: [squadron([{ unit: shuttleUnit, count: 1 }])] };
+    expect(shuttleStrikeRange(world, data)).toBe(range);
+  });
+
+  it('the base radius is the LONGEST arm across squadrons, dead stacks ignored', () => {
+    const arms = Object.keys(data.units)
+      .filter((u) => data.units[u]!.traits.includes('shuttle'))
+      .map((u) => ({ u, r: data.units[u]!.stats.strikeRange }))
+      .sort((a, b) => a.r - b.r);
+    const short = arms[0]!;
+    const long = arms[arms.length - 1]!;
+    expect(long.r).toBeGreaterThan(short.r);
+    const host = {
+      hangar: [squadron([{ unit: short.u, count: 1 }]), squadron([{ unit: long.u, count: 0 }])],
+    };
+    expect(shuttleStrikeRange(host, data)).toBe(short.r); // мёртвый стек руки не даёт
+    host.hangar.push(squadron([{ unit: long.u, count: 1 }]));
+    expect(shuttleStrikeRange(host, data)).toBe(long.r);
+  });
+
+  it('a base without shuttles has no strike radius', () => {
     expect(shuttleStrikeRange(fleet([{ unit: nonShuttleUnit, count: 3 }]), data)).toBe(0);
+    expect(shuttleStrikeRange({ hangar: [] }, data)).toBe(0);
   });
 
   it('withinRange is boundary-inclusive (exactly on the edge reaches)', () => {
@@ -208,13 +241,13 @@ describe('shuttle strike radius (SQ-3.1, real shipped data)', () => {
   });
 
   it('the wing strikes inside its radius and not beyond it (boundary)', () => {
-    const wing = fleet([{ unit: shuttleUnit, count: 2 }]);
+    const wing = based([{ unit: shuttleUnit, count: 2 }]);
     const from = { x: 500, y: 500 };
     expect(shuttleReaches(wing, data, from, { x: 500 + range, y: 500 })).toBe(true); // edge
     expect(shuttleReaches(wing, data, from, { x: 500 + range + 1, y: 500 })).toBe(false); // out
   });
 
-  it('a non-strike fleet never reaches (range 0)', () => {
+  it('a non-strike base never reaches (range 0)', () => {
     const nonWing = fleet([{ unit: nonShuttleUnit, count: 3 }]);
     expect(shuttleReaches(nonWing, data, { x: 0, y: 0 }, { x: 0, y: 0 })).toBe(false);
   });

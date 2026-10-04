@@ -58,10 +58,16 @@ export interface RangeOverlay {
 export type Locate = (id: string) => { x: number; y: number } | null;
 
 /**
- * Разметка оверлея для ВЫДЕЛЕННЫХ флотов плюс отметки ПКО на видимых мирах.
+ * Разметка оверлея для ВЫДЕЛЕННЫХ флотов и выбранного мира плюс отметки ПКО на видимых
+ * мирах.
  *
  * `visible` — фог-гейт: чужие зубы ПКО показываются только там, где мир опознан, иначе
  * оверлей стал бы разведкой (та же ошибка, что чинил RECAP-FOG). Свои миры видны всегда.
+ *
+ * Радиус вылета (SHU-6.1) — только у СВОИХ баз: у выделенного носителя и у выбранного
+ * мира с эскадрами в порту. Круг считается по составу ангара, а состав чужого ангара —
+ * закрытые сведения: кольцо вокруг чужого носителя выдало бы, что и сколько у него на
+ * борту.
  */
 export function combatRanges(
   state: GameState,
@@ -70,18 +76,34 @@ export function combatRanges(
   me: string,
   locate: Locate,
   visible: (planetId: string) => boolean,
+  selectedPlanetId: string | null = null,
 ): RangeOverlay {
   const rings: RangeRing[] = [];
 
   for (const id of selectedFleetIds) {
     const fleet: Fleet | undefined = state.fleets[id];
-    if (!fleet) continue;
+    if (!fleet || fleet.owner !== me) continue;
     const at = locate(id);
     if (!at) continue;
 
     const wing = shuttleStrikeRange(fleet, data);
     if (wing > 0) {
       rings.push({ kind: 'shuttle', x: at.x, y: at.y, radius: wing, sourceId: id });
+    }
+  }
+
+  // Порт выбранного мира — та же база, что носитель, и круг у неё тот же (SHU-6.1).
+  const home = selectedPlanetId ? state.planets[selectedPlanetId] : undefined;
+  if (home && home.owner === me) {
+    const reach = shuttleStrikeRange(home, data);
+    if (reach > 0) {
+      rings.push({
+        kind: 'shuttle',
+        x: home.position.x,
+        y: home.position.y,
+        radius: reach,
+        sourceId: home.id,
+      });
     }
   }
 
