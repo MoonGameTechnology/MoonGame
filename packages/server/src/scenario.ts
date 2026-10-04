@@ -242,7 +242,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '69'; // SHU-6.2: патруль шаттлов в точке.
+export const MODULE_MANIFEST_VERSION = '70'; // SHU-6.4: перелёт шаттлов и посадка без базы.
+// Членство и порядок не тронуты; `shuttle` 1.7.0 — приказ `shuttle.relocate`, вылет, чья база
+// пропала, садится на ближайшую свою базу; у вылета новая цель `base` и поля `origin`/`baseAt`
+// — форма, которой правила 69 не знают.
+// export const MODULE_MANIFEST_VERSION = '69'; // SHU-6.2: патруль шаттлов в точке.
 // Членство и порядок не тронуты; `shuttle` 1.6.0 — приказы `shuttle.patrol`/`shuttle.recall`,
 // тик раз в 15 минут бьёт цель в круге; у вылета новая нога `patrol`, цель-точка и поле
 // `patrol` — форма, которой правила 68 не знают.

@@ -98,7 +98,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 67: ЧЛЕНСТВО — `operation` 1.0.0 перед `auto-merge`, контракт операции главы VI (PVR-8.3).
 // 68: порядок тот же; missionFacts 1.2.0 — места эпизода и выпуск ждущих союзником (PVR-8.4).
 // 69: порядок тот же; shuttle 1.6.0 — патруль шаттлов в точке (SHU-6.2).
-const PINNED_FOR_VERSION = '69';
+// 70: порядок тот же; shuttle 1.7.0 — перелёт шаттлов и посадка без базы (SHU-6.4).
+const PINNED_FOR_VERSION = '70';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

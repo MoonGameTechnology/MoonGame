@@ -18,8 +18,10 @@ import { fleetPointDefense, planetPointDefense, fleetPDRange, PD_COOLDOWN_MINUTE
  * 2. **Полёт живёт в состоянии** (`state.strikes`), а не считается мгновенно. Мгновенный
  *    удар не оставил бы против себя никакой защиты и обнулил бы зональное ПВО.
  * 3. **Порт — и дом, и условие.** Вылет невозможен без живого порта (повреждён больше
- *    чем на 30% — не выпускает), возврат идёт в него же, а не стало порта — челноки
- *    гибнут вместе с ним. Топливо и перезарядка тоже принадлежат порту.
+ *    чем на 30% — не выпускает), возврат идёт в него же, а не стало порта — стоящие в нём
+ *    челноки гибнут вместе с ним. Летящие садятся на ближайшую свою базу в дальности
+ *    перелёта, а нет такой — гибнут (SHU-6.4, `divert`). Топливо и перезарядка тоже
+ *    принадлежат порту. Дом можно и сменить — перелётом (`shuttle.relocate`, SHU-6.4).
  *
  * Здесь же живёт ЗОНАЛЬНОЕ ПВО (`pointDefense`) — контрмера челнокам вместе с
  * перехватом (SHU-1.3). Не путать с ПКО (`aaDamage`): та бьёт по КОРАБЛЯМ на орбите.
@@ -54,10 +56,12 @@ import {
   fleetHoldFree,
   fleetShuttleBay,
   hangarMachines,
+  hangarSize,
   hangarUsed,
   freshSortie,
   shuttleBayAt,
   spendSortie,
+  squadronFerryRange,
   squadronSize,
   squadronPatrol,
   squadronReach,
@@ -75,6 +79,7 @@ import {
   hookedDamage,
   isAllied,
   isHostile,
+  ownFleet,
   removeIfWiped,
   type HookedDamage,
 } from '../util/combat';
@@ -153,6 +158,28 @@ function basePosition(
   return fleet ? fleetPositionAt(state, fleet, now) : null;
 }
 
+/** Где база вылета сейчас — а погибший корабль там, где его видели в последний раз
+ *  (`baseAt`, SHU-6.4). Мир с карты не пропадает, корабль уносит позицию с собой: без
+ *  этой точки у эскадры, летящей к нему, не стало бы ни места на карте, ни точки, откуда
+ *  искать, где сесть. */
+function homePosition(
+  strike: ShuttleStrike,
+  state: GameState,
+  now: number,
+): { x: number; y: number } | null {
+  return basePosition(strike.base, state, now) ?? strike.baseAt ?? null;
+}
+
+/** Запомнить, где сейчас база-корабль (SHU-6.4). Зовётся только в моменты, назначенные
+ *  расписанием самого вылета (взлёт, поворот, пересчёт погони, тик патруля), и никогда на
+ *  `time.advanced`: нарезку времени выбирает хост, и точка, снятая на его границах, у двух
+ *  хостов вышла бы разной (инвариант детерминизма). */
+function noteBase(h: HandlerContext, strike: ShuttleStrike): void {
+  if (strike.base.kind !== 'fleet') return;
+  const at = basePosition(strike.base, h.state, h.ctx.now);
+  if (at) strike.baseAt = at;
+}
+
 /**
  * ОДНА форма для двух баз (SHU-2.1). Космопорт и носитель делают одно и то же —
  * вмещают челноки, держат топливо и принимают их обратно, — поэтому все проверки
@@ -173,7 +200,8 @@ interface BaseView {
   hangar: Squadron[];
   setHangar: (next: Squadron[]) => void;
   sortie: SortieState | undefined;
-  setSortie: (next: SortieState) => void;
+  /** `undefined` снимает счётчик: следующий вылет начнёт со свежего запаса. */
+  setSortie: (next: SortieState | undefined) => void;
 }
 
 function planetBase(planet: Planet, data: GameData): BaseView {
@@ -189,7 +217,8 @@ function planetBase(planet: Planet, data: GameData): BaseView {
     },
     sortie: planet.sortie,
     setSortie: (next) => {
-      planet.sortie = next;
+      if (next) planet.sortie = next;
+      else delete planet.sortie;
     },
   };
 }
@@ -207,7 +236,8 @@ function fleetBase(fleet: Fleet, state: GameState, data: GameData, now: number):
     },
     sortie: fleet.sortie,
     setSortie: (next) => {
-      fleet.sortie = next;
+      if (next) fleet.sortie = next;
+      else delete fleet.sortie;
     },
   };
 }
@@ -266,7 +296,11 @@ function baseSortieSpec(
  *  получать один ответ.
  *
  *  ВИСЯЩИЙ ПАТРУЛЬ (SHU-6.2) стоит ровно над своей точкой: по нему ПВО и перехват бьют
- *  так же, как по летящему вылету, и это не отдельное правило, а та же развилка. */
+ *  так же, как по летящему вылету, и это не отдельное правило, а та же развилка.
+ *
+ *  ПЕРЕЛЁТ (SHU-6.4) — обратная нога от точки взлёта к новой базе, и отдельной ветки у
+ *  него нет. Корабль, к которому летят, погиб — нога кончается там, где его видели в
+ *  последний раз (`homePosition`). */
 function strikePosition(
   strike: ShuttleStrike,
   state: GameState,
@@ -282,7 +316,7 @@ function strikePosition(
       y: strike.at.y + (strike.to.y - strike.at.y) * k,
     };
   }
-  const home = basePosition(strike.base, state, now);
+  const home = homePosition(strike, state, now);
   if (!home) return null;
   const [a, b] = strike.leg === 'out' ? [home, strike.to] : [strike.to, home];
   const span = strike.arrivesAt - strike.departedAt;
@@ -705,29 +739,167 @@ function strikeSpeed(strike: ShuttleStrike, ctx: Context): number {
 }
 
 /**
- * РАЗВОРОТ ДОМОЙ — тем же путём и с той же скоростью. Один на всех, кто разворачивает
- * эскадру: удар состоялся, погоня сорвалась, цель исчезла. Три копии этих пяти строк
- * разъехались бы на первой же правке правил возврата.
+ * ПОСАДОЧНОЕ МЕСТО БАЗЫ (SHU-6.4) — одно правило на посадку, приказ перелёта и поиск
+ * запасной базы: три копии разъехались бы ровно там, где игрок теряет эскадру.
+ *
+ * `bay` — сколько мест ангар базы может занять после посадки, `room` — сколько из них
+ * свободно сейчас. У порта места без предела. У корабля — трюм за вычетом мест, которые
+ * держат за собой ДРУГИЕ вылеты, летящие к нему (`except` — сам садящийся: своё место он
+ * занимает сам). `null` — сесть нельзя вовсе: базы нет, она чужая, порт снесён, трюма нет.
+ */
+function landingSpot(
+  h: HandlerContext,
+  owner: string,
+  ref: StrikeBase,
+  except?: string,
+): { base: BaseView; bay: number; room: number } | null {
+  const base = baseOf(ref, h.state, h.ctx.data, h.ctx.now);
+  if (!base || base.owner !== owner) return null;
+  const bay =
+    ref.kind === 'fleet' ? base.bay - strikesReserved(h.state, ref.id, h.ctx.data, except) : base.bay;
+  if (bay <= 0) return null;
+  return { base, bay, room: bay - hangarSize({ hangar: base.hangar }, h.ctx.data) };
+}
+
+/**
+ * БЛИЖАЙШАЯ СВОЯ БАЗА, куда эскадра сядет целиком (SHU-6.4): мир с портом или ангаром
+ * крепости либо корабль с трюмом, в том числе идущий, — в дальности ПЕРЕЛЁТА от точки
+ * `from`. Дальность та же, что у приказа: дальше эскадра не долетает ни по приказу, ни
+ * без него.
+ *
+ * Детерминированно: ближе — раньше, при равной дистанции мир раньше корабля, дальше по
+ * id. Союзник не база — сажать машины на чужой порт владелец не заказывал.
+ */
+function nearestBase(
+  h: HandlerContext,
+  strike: ShuttleStrike,
+  from: { x: number; y: number },
+  need: number,
+): StrikeBase | null {
+  const reach = squadronFerryRange(strike, h.ctx.data);
+  const candidates: Array<{ ref: StrikeBase; at: { x: number; y: number } | null }> = [];
+  for (const id of Object.keys(h.state.planets).sort()) {
+    const planet = h.state.planets[id]!;
+    if (planet.owner === strike.owner) candidates.push({ ref: { kind: 'planet', id }, at: planet.position });
+  }
+  for (const id of Object.keys(h.state.fleets).sort()) {
+    const fleet = h.state.fleets[id]!;
+    if (fleet.owner !== strike.owner) continue;
+    candidates.push({ ref: { kind: 'fleet', id }, at: fleetPositionAt(h.state, fleet, h.ctx.now) });
+  }
+  let best: StrikeBase | null = null;
+  let bestDist = Infinity;
+  for (const c of candidates) {
+    if (!c.at) continue;
+    const d = distance(from, c.at);
+    // Строго ближе: при равной дистанции остаётся тот, кто раньше в обходе.
+    if (d > reach || d >= bestDist) continue;
+    const spot = landingSpot(h, strike.owner, c.ref, strike.id);
+    if (!spot || spot.room < need) continue;
+    best = c.ref;
+    bestDist = d;
+  }
+  return best;
+}
+
+/**
+ * ЛЕТЕТЬ НА БАЗУ — обратной ногой из точки `from` (SHU-6.4). Одна на возврат домой,
+ * перелёт и посадку без базы: та же позиция на карте, тот же зенит по трассе, та же
+ * посадка. Копия у каждого разъехалась бы на первой же правке правил возврата.
  *
  * Позиция базы берётся ТЕКУЩАЯ: носитель мог сдвинуться, пока челноки летели, и лететь
- * они должны к нему, а не к точке, где он стоял на вылете.
+ * они должны к нему, а не к точке, где он стоял на вылете. Дальше нога ползёт за живой
+ * позицией корабля (`strikePosition`), а садится по сроку.
  *
  * `to` становится точкой РАЗВОРОТА, а живой след (`at`) снимается: с этой секунды у
- * эскадры снова есть расписание, и позицию надо выводить, а не хранить (см.
- * `strikePosition`).
+ * эскадры снова есть расписание, и позицию надо выводить, а не хранить.
  */
-function turnHome(h: HandlerContext, strike: ShuttleStrike): void {
-  const from = strike.at ?? strike.to;
-  const home = basePosition(strike.base, h.state, h.ctx.now);
-  const back = home ? distance(from, home) : 0;
+function flyTo(
+  h: HandlerContext,
+  strike: ShuttleStrike,
+  dest: StrikeBase,
+  from: { x: number; y: number },
+): void {
+  const at = basePosition(dest, h.state, h.ctx.now);
+  const back = at ? distance(from, at) : 0;
   const speed = strikeSpeed(strike, h.ctx);
   const flightMs = speed > 0 ? Math.max(1, Math.round((back / speed) * hourMs(h))) : 1;
-  strike.to = from;
+  strike.base = dest;
+  if (dest.kind === 'planet') delete strike.baseAt;
+  else noteBase(h, strike);
+  strike.to = { x: from.x, y: from.y };
   delete strike.at;
   strike.leg = 'back';
   strike.departedAt = h.ctx.now;
   strike.arrivesAt = h.ctx.now + flightMs;
   h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
+}
+
+/**
+ * БАЗА НЕ ПРИНЯЛА — ИСКАТЬ, ГДЕ СЕСТЬ (SHU-6.4, резолюция владельца 2026-10-04).
+ *
+ * Раньше вылет, чья база пропала, просто гиб на посадке. Теперь:
+ *
+ * 1. **Перелёт возвращается туда, откуда ушёл** (`origin`), если там есть место, — без
+ *    предела дальности: дорогу назад эскадра только что пролетела. Поле снимается сразу:
+ *    вторая неудача ведёт уже к ближайшей базе, а не по кругу между двумя.
+ * 2. **Иначе — ближайшая своя база в дальности перелёта** (`nearestBase`), куда эскадра
+ *    влезает ЦЕЛИКОМ: искать место, чтобы потерять там половину машин, нечестно.
+ * 3. **Некуда — эскадра гибнет**, и это громко (`shuttle.lost` с базой, которая не
+ *    приняла), а не тихое исчезновение из состояния.
+ *
+ * Решение принимается в точке, назначенной расписанием вылета (поворот, прибытие), а не
+ * на `time.advanced`: нарезка хоста не должна решать, где эскадра сядет.
+ */
+function divert(
+  h: HandlerContext,
+  strike: ShuttleStrike,
+  from: { x: number; y: number },
+  failed: StrikeBase,
+): void {
+  const need = Math.max(1, stacksSize(strike.units, h.ctx.data));
+  const origin = strike.origin;
+  delete strike.origin;
+  const home = origin ? landingSpot(h, strike.owner, origin, strike.id) : null;
+  const dest = origin && home && home.room >= need ? origin : nearestBase(h, strike, from, need);
+  if (!dest) {
+    h.state.strikes = (h.state.strikes ?? []).filter((st) => st.id !== strike.id);
+    h.emit('shuttle.lost', {
+      baseId: failed.id,
+      baseKind: failed.kind,
+      owner: strike.owner,
+      count: strike.units.reduce((n, st) => n + st.count, 0),
+    });
+    return;
+  }
+  h.emit('shuttle.diverted', {
+    strikeId: strike.id,
+    owner: strike.owner,
+    squadronId: strike.squadronId,
+    fromId: failed.id,
+    fromKind: failed.kind,
+    baseId: dest.id,
+    baseKind: dest.kind,
+  });
+  // С этой секунды у эскадры одно дело — сесть целиком, как у перелёта. Патруль, если это
+  // был он, кончился: поле `patrol` есть только у вылета с целью-точкой.
+  strike.target = { kind: 'base' };
+  delete strike.patrol;
+  flyTo(h, strike, dest, from);
+}
+
+/**
+ * РАЗВОРОТ ДОМОЙ — тем же путём и с той же скоростью. Один на всех, кто разворачивает
+ * эскадру: удар состоялся, погоня сорвалась, цель исчезла, патруль кончился. Дома не
+ * стало, пока эскадра была в воздухе, — она ищет другую базу сразу, из точки разворота
+ * (`divert`), а не летит в пустоту.
+ */
+function turnHome(h: HandlerContext, strike: ShuttleStrike): void {
+  const from = strike.at ?? strike.to;
+  if (!landingSpot(h, strike.owner, strike.base, strike.id)) {
+    return divert(h, strike, from, strike.base);
+  }
+  flyTo(h, strike, strike.base, from);
 }
 
 
@@ -783,10 +955,13 @@ function flightTime(
 }
 
 /**
- * ВЗЛЁТ — один на удар и патруль (SHU-6.2): эскадра покидает ангар, база тратит вылет, в
- * состоянии появляется летящий вылет. Id, снятие с ангара и расход топлива у двух
- * приказов не должны расходиться. Расписание (прибытие или погоню) ставит вызывающий:
- * оно у приказов разное.
+ * ВЗЛЁТ — один на удар, патруль и перелёт (SHU-6.2, SHU-6.4): эскадра покидает ангар,
+ * база тратит вылет, в состоянии появляется летящий вылет. Id, снятие с ангара и расход
+ * топлива у приказов не должны расходиться. Расписание (прибытие или погоню) ставит
+ * вызывающий: оно у приказов разное.
+ *
+ * `dest` — у ПЕРЕЛЁТА: эскадра сразу идёт обратной ногой на новую базу, а база, с
+ * которой она ушла, запоминается в `origin` — туда она вернётся, если новая не примет.
  */
 function launchFlight(
   h: HandlerContext,
@@ -794,7 +969,7 @@ function launchFlight(
   base: BaseView,
   ready: ReturnType<typeof readySquadron>,
   flight: Pick<ShuttleStrike, 'target' | 'to' | 'arrivesAt'> &
-    Partial<Pick<ShuttleStrike, 'at' | 'cargo' | 'patrol'>>,
+    Partial<Pick<ShuttleStrike, 'at' | 'cargo' | 'patrol'>> & { dest?: StrikeBase },
 ): ShuttleStrike {
   const { squad, spec, sortie } = ready;
   // Эскадра покидает ангар ЦЕЛИКОМ — с этой секунды её в базе нет. Груз уже в трюме
@@ -806,20 +981,22 @@ function launchFlight(
   const strike: ShuttleStrike = {
     id: `strike:${owner}:${h.ctx.now}:${seq}`,
     owner,
-    base: base.ref,
+    base: flight.dest ?? base.ref,
     squadronId: squad.id,
     units: squad.units.map((st) => ({ ...st })),
     target: flight.target,
     to: flight.to,
     departedAt: h.ctx.now,
     arrivesAt: flight.arrivesAt,
-    leg: 'out',
+    leg: flight.dest ? 'back' : 'out',
     ...(flight.at ? { at: flight.at } : {}),
     ...(flight.cargo ? { cargo: flight.cargo } : {}),
     // Подбитые машины летят подбитыми (SHU-5.3): урон эскадры — начало счёта вылета.
     ...(squad.damage ? { damage: squad.damage } : {}),
     ...(flight.patrol ? { patrol: flight.patrol } : {}),
+    ...(flight.dest ? { origin: base.ref } : {}),
   };
+  noteBase(h, strike);
   h.state.strikes = [...(h.state.strikes ?? []), strike];
   h.emit('shuttle.launched', {
     strikeId: strike.id,
@@ -994,6 +1171,9 @@ function patrolStrike(h: HandlerContext, strike: ShuttleStrike): void {
  * сколько. Две копии этой резолюции разъехались бы на первой же правке правил урона.
  */
 function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
+      // Перелёт и посадка без базы (SHU-6.4) идут обратной ногой с первой секунды: цели,
+      // до которой лететь, у них нет. Сюда их не приводит ни одно расписание — страховка.
+      if (strike.target.kind === 'base') return turnHome(h, strike);
       // ПАТРУЛЬ дошёл до точки — он не бьёт по прилёте, а встаёт в круг (SHU-6.2).
       if (strike.target.kind === 'point') return startPatrol(h, strike);
       if (strike.target.kind === 'fleet') {
@@ -1062,7 +1242,9 @@ export const shuttleModule: GameModule = {
   // 1.5.0: десант на площадку крепости на развилке не садится (замечание Codex на #1410).
   // 1.6.0: патруль в точке (SHU-6.2) — `shuttle.patrol`/`shuttle.recall`, нога `patrol`,
   //        тик раз в 15 минут; прибытие по устаревшему сроку больше не сажает эскадру.
-  version: '1.6.0',
+  // 1.7.0: перелёт и посадка без базы (SHU-6.4) — `shuttle.relocate`, цель `base`,
+  //        `origin`/`baseAt`, событие `shuttle.diverted`; опустевшая база снимает счётчик.
+  version: '1.7.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -1231,6 +1413,85 @@ export const shuttleModule: GameModule = {
       if (here) strike.to = here;
       delete strike.at;
       turnHome(h, strike);
+    });
+
+    /**
+     * `shuttle.relocate { planetId | fleetId, squadronId, toPlanetId | toFleetId }` —
+     * ПЕРЕБАЗИРОВАНИЕ (SHU-6.4, резолюция владельца 2026-10-04, по образцу Conflict of
+     * Nations): эскадра перелетает на другую СВОЮ базу и остаётся там.
+     *
+     * Базы — обе формы с обеих сторон (уточнение владельца: «учти наши базы, в виде
+     * трюмов»): мир с портом или ангаром крепости и любой корабль с трюмом, в том числе
+     * идущий. Решения, которые легко потерять при правке:
+     *
+     * 1. **Дальность — два радиуса удара** (`squadronFerryRange`): радиус удара — туда и
+     *    обратно, перелёт — в одну сторону. По самой короткой руке, как всё у эскадры.
+     * 2. **Перелёт — обратная нога с самого взлёта.** Лететь на новую базу — то же, что
+     *    возвращаться домой: та же позиция на карте, тот же зенит по трассе, та же посадка
+     *    на живую позицию идущего корабля. Своей ноги и своего прибытия у перелёта нет —
+     *    вторая копия посадки разъехалась бы с первой.
+     * 3. **Место в трюме корабля держится с взлёта** (`strikesReserved` считает вылет,
+     *    чья база — этот корабль): два перелёта на одно место иначе оба взлетели бы, а сел
+     *    бы один.
+     * 4. **Тратится один вылет базы, с которой ушли**, как у удара и патруля.
+     * 5. **Боец летит с бортом.** Десантный челнок перебирается вместе со своим бойцом:
+     *    это не высадка, на землю он не сходит.
+     * 6. **Новая база не приняла — назад, а нет и дома — на ближайшую** (`divert`): тем же
+     *    правилом садится и удар, чья база пропала, пока он был в воздухе.
+     */
+    api.onAction('shuttle.relocate', (action, h: HandlerContext) => {
+      const p = (action.payload ?? {}) as {
+        planetId?: unknown;
+        fleetId?: unknown;
+        squadronId?: unknown;
+        toPlanetId?: unknown;
+        toFleetId?: unknown;
+      };
+      const base = baseFromPayload(h, action.playerId, p);
+      const ready = readySquadron(h, base, p.squadronId);
+      const squad = ready.squad;
+      // Куда — ровно одна база из двух, как и откуда (fail-secure: схема этого не выражает).
+      const toPlanet = typeof p.toPlanetId === 'string';
+      const toFleet = typeof p.toFleetId === 'string';
+      if (toPlanet === toFleet) return h.reject('E_BAD_PAYLOAD');
+      const dest: StrikeBase = toPlanet
+        ? { kind: 'planet', id: p.toPlanetId as string }
+        : { kind: 'fleet', id: p.toFleetId as string };
+      // На свою же базу — не перелёт, а пустой расход вылета.
+      if (dest.kind === base.ref.kind && dest.id === base.ref.id) return h.reject('E_BAD_PAYLOAD');
+      if (dest.kind === 'planet') {
+        const planet = h.state.planets[dest.id];
+        if (!planet) return h.reject('E_NO_PLANET');
+        if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+        if (shuttleBayAt(planet, h.ctx.data) <= 0) return h.reject('E_NO_PORT');
+      } else {
+        // Чужой и несуществующий корабль — один ответ: иначе перебором id читались бы
+        // скрытые туманом флоты (A06), как и у всех приказов флота.
+        const fleet = ownFleet(h.state, dest.id);
+        if (!fleet || fleet.owner !== action.playerId) return h.reject('E_NO_FLEET');
+        if (fleetShuttleBay(fleet, h.ctx.data) <= 0) return h.reject('E_NO_PORT');
+      }
+      const spot = landingSpot(h, action.playerId, dest);
+      if (!spot || spot.room < stacksSize(squad.units, h.ctx.data)) return h.reject('E_NO_CAPACITY');
+
+      const from = base.position;
+      if (!from) return h.reject('E_NO_PORT');
+      const to = basePosition(dest, h.state, h.ctx.now);
+      if (!to) return h.reject('E_NO_TARGET_POSITION');
+      const range = squadronFerryRange(squad, h.ctx.data);
+      if (range <= 0) return h.reject('E_NO_RANGE');
+      if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
+
+      const cargo = (squad.cargo ?? []).filter((st) => st.count > 0);
+      const strike = launchFlight(h, action.playerId, base, ready, {
+        target: { kind: 'base' },
+        // Обратная нога идёт от `to` к базе: начало перелёта — точка взлёта.
+        to: { ...from },
+        arrivesAt: h.ctx.now + flightTime(h, squad, from, to),
+        dest,
+        ...(cargo.length > 0 ? { cargo: cargo.map((st) => ({ ...st })) } : {}),
+      });
+      h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
     });
 
     /**
@@ -1431,39 +1692,40 @@ export const shuttleModule: GameModule = {
         return;
       }
 
-      // Посадка. База могла погибнуть, пока челноки летели (снесённый порт, сбитый
-      // носитель, захваченный мир), — тогда садиться некуда.
-      h.state.strikes = strikes.filter((s) => s.id !== strikeId);
-      const base = baseOf(strike.base, h.state, h.ctx.data, h.ctx.now);
-      // У флота места считаются БЕЗ этого вылета (он уже снят со списка выше), но с
-      // остальными, ещё летящими: их места заняты до их собственной посадки.
-      const bay =
-        base && base.owner === strike.owner
-          ? base.ref.kind === 'fleet'
-            ? base.bay - strikesReserved(h.state, base.ref.id, h.ctx.data)
-            : base.bay
-          : 0;
-      if (!base || bay <= 0) {
-        h.emit('shuttle.lost', {
-          baseId: strike.base.id,
-          baseKind: strike.base.kind,
-          owner: strike.owner,
-          count: strike.units.reduce((n, st) => n + st.count, 0),
-        });
-        return;
+      // Посадка — домой после удара или патруля, на новую базу при перелёте. У корабля
+      // места считаются БЕЗ этого вылета (своё место он занимает сам), но с остальными,
+      // ещё летящими: их места заняты до их собственной посадки.
+      const spot = landingSpot(h, strike.owner, strike.base, strike.id);
+      // База пропала, пока эскадра летела (снесённый порт, сбитый корабль, захваченный
+      // мир), — или перелёту не хватает места: садиться сюда некуда, эскадра ищет другую
+      // базу (SHU-6.4). Вернувшийся домой удар при нехватке места садится, чем влезет
+      // (`trimHangar`): место за ним держалось с взлёта, и не хватить его может, только
+      // если сам корабль потерял корпуса.
+      if (
+        !spot ||
+        (strike.target.kind === 'base' && spot.room < stacksSize(strike.units, h.ctx.data))
+      ) {
+        return divert(h, strike, homePosition(strike, h.state, h.ctx.now) ?? strike.to, strike.base);
       }
+      h.state.strikes = strikes.filter((s) => s.id !== strikeId);
+      const base = spot.base;
       // Эскадра встаёт в ангар ПОД СВОИМ ИМЕНЕМ (SHU-4.2): она уходила соединением и
       // возвращается им же. Если её id за время полёта занят (перегрузка, слияние —
       // ангар живёт своей жизнью, пока машины летят), соединение садится под свежим,
       // потому что двух эскадр с одним именем в модели быть не может.
       const taken = base.hangar.some((q) => q.id === strike.squadronId);
+      // Боец перелетевшего десантного челнока сходит в ангар вместе с бортом (SHU-6.4) —
+      // по одному на уцелевший борт, как и при высадке.
+      trimCargoToSurvivors(strike);
+      const cargo = (strike.cargo ?? []).filter((st) => st.count > 0);
       const home: Squadron = {
         id: taken ? nextSquadronId(h, strike.owner) : strike.squadronId,
         units: strike.units.map((st) => ({ ...st })),
+        ...(cargo.length > 0 ? { cargo: cargo.map((st) => ({ ...st })) } : {}),
         // Недобитый урон вылета остаётся на машинах (SHU-5.3), а не забывается на посадке.
         ...(strike.damage && strike.damage > 0 ? { damage: strike.damage } : {}),
       };
-      base.setHangar(trimHangar([...base.hangar, home], bay, h.ctx.data));
+      base.setHangar(trimHangar([...base.hangar, home], spot.bay, h.ctx.data));
       h.emit('shuttle.landed', {
         baseId: base.ref.id,
         baseKind: base.ref.kind,
@@ -1518,7 +1780,7 @@ export const shuttleModule: GameModule = {
       const stepMs = Math.max(1, (CHASE_STEP_MINUTES / 60) * hour);
       const speed = strikeSpeed(strike, h.ctx);
       const radius = chaseRadius(strike.units, data);
-      const leash = squadronReach({ id: strike.squadronId, units: strike.units }, data);
+      const leash = squadronReach(strike, data);
 
       let cursor = strike.departedAt; // прошлый пересчёт (правило 2)
       let caught = false;
@@ -1543,6 +1805,7 @@ export const shuttleModule: GameModule = {
         cursor = next;
       }
 
+      noteBase(h, strike); // корабль-база жив — запомнить, где он (SHU-6.4)
       if (caught) return resolveOutLeg(h, strike); // правило 5
       if (lost) return turnHome(h, strike);
       // Ни догнала, ни сорвалась: закрыть отрезок и переназначить пересчёт. `departedAt`
@@ -1565,6 +1828,7 @@ export const shuttleModule: GameModule = {
       const strike = (h.state.strikes ?? []).find((s) => s.id === strikeId);
       // Отозван, сбит, уже летит домой — тик ничей (dead letter).
       if (!strike || strike.leg !== 'patrol') return;
+      noteBase(h, strike); // корабль-база жив — запомнить, где он (SHU-6.4)
       patrolStrike(h, strike);
       // Ответка цели могла сбить патруль целиком — домой лететь некому.
       if (strike.units.length === 0) {
@@ -1591,7 +1855,8 @@ export const shuttleModule: GameModule = {
      *
      * Флот, погибший ЦЕЛИКОМ, отдельного правила не требует: ангар лежит НА флоте, и
      * удаление флота уносит его с собой — осиротеть здесь нечему. Вылет, чья база
-     * исчезла за время полёта, ловится на посадке (`shuttle.lost` там же).
+     * исчезла за время полёта, ловится на повороте к ней или на посадке и ищет, где сесть
+     * (`divert`, SHU-6.4): решение в точке расписания, а не здесь, на нарезке хоста.
      */
     api.on('time.advanced', (_event, h: HandlerContext) => {
       const bases: BaseView[] = [
@@ -1809,7 +2074,12 @@ export const shuttleModule: GameModule = {
      *
      *  Часы считаются от НАКОПЛЕННОГО времени, а не от отрезка (AUD-27): остаток сверх
      *  целых часов переходит в следующий отрезок (`SortieState.carry`). Иначе итог зависел
-     *  бы от нарезки времени — от частоты событий и вызовов `advanceTo`. */
+     *  бы от нарезки времени — от частоты событий и вызовов `advanceTo`.
+     *
+     *  Перезарядка кончилась, а заправлять НЕЧЕГО — счётчик снимается (SHU-6.4). База
+     *  опустела насовсем: эскадра перелетела, сгрузилась на корабль, погибла. «Полный»
+     *  бак нулевого размера остался бы на базе навсегда, и следующая эскадра, севшая сюда,
+     *  не взлетела бы никогда; без счётчика она начнёт со свежего запаса своих машин. */
     api.on('time.advanced', (event, h: HandlerContext) => {
       const { from, to } = event.payload as { from: number; to: number };
       const span = to - from;
@@ -1827,6 +2097,10 @@ export const shuttleModule: GameModule = {
         const hours = Math.floor(total / hour);
         let next: SortieState = { fuel: sortie.fuel, rearming: sortie.rearming };
         for (let i = 0; i < hours && next.rearming > 0; i++) next = tickRearm(next, spec.maxFuel);
+        if (next.rearming <= 0 && next.fuel <= 0) {
+          base.setSortie(undefined);
+          continue;
+        }
         const carry = total - hours * hour;
         base.setSortie(next.rearming > 0 && carry > 0 ? { ...next, carry } : next);
       }

@@ -237,7 +237,9 @@ describe('носитель — вылет и возврат (правила 3–
     expect(code(s, strike(3))).toBe(null);
   });
 
-  it('носитель погиб, пока челноки летели — садиться некуда', () => {
+  // Своя база в дальности перелёта нашлась бы — эскадра села бы на неё (SHU-6.4,
+  // `shuttleRelocate.test.ts`); HOME отсюда за тысячу единиц, а перелёт — 360.
+  it('носитель погиб, пока челноки летели, а своей базы рядом нет — садиться некуда', () => {
     let s = deploy(load(world(), 2));
     s = apply(s, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }));
     const { CV: _gone, ...rest } = s.fleets;

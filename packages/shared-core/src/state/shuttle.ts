@@ -291,13 +291,22 @@ export function squadronCargoUsed(sq: Squadron): number {
  *  этому числу ядро отбивает `E_OUT_OF_RANGE`, и им же интерфейс рисует круг взведённого
  *  прицела. Своя копия формулы в клиенте разъехалась бы на первой правке данных, и игрок
  *  целился бы по одному радиусу, а вылет шёл бы по другому. */
-export function squadronReach(sq: Squadron, data: GameData): number {
+export function squadronReach(sq: Pick<Squadron, 'units'>, data: GameData): number {
   let shortest = Infinity;
   for (const st of sq.units) {
     if (st.count <= 0) continue;
     shortest = Math.min(shortest, data.units[st.unit]?.stats.strikeRange ?? 0);
   }
   return Number.isFinite(shortest) ? shortest : 0;
+}
+
+/** Дальность ПЕРЕЛЁТА эскадры (SHU-6.4) — два радиуса удара по самой короткой руке.
+ *  Радиус удара — это «туда и обратно», перелёт — в одну сторону (резолюция владельца
+ *  2026-10-04, §0.7 роадмапа челноков). Этим числом ядро отбивает `E_OUT_OF_RANGE` у
+ *  перелёта и меряет, на какую базу сядет эскадра, потерявшая свою, — и им же интерфейс
+ *  нарисует круг перелёта: своя копия разъехалась бы так же, как у `squadronReach`. */
+export function squadronFerryRange(sq: Pick<Squadron, 'units'>, data: GameData): number {
+  return 2 * squadronReach(sq, data);
 }
 
 /** ПАТРУЛЬ ЭСКАДРЫ (SHU-6.2): сколько часов она висит над точкой и какой круг держит.

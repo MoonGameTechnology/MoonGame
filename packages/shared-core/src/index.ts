@@ -288,6 +288,8 @@ export {
   // SHU-6.2: часы и круг патруля считаются по слабому звену — той же функцией, по которой
   // ядро отбивает `E_CANNOT_PATROL`.
   squadronPatrol,
+  // SHU-6.4: дальность перелёта — два радиуса удара; ей же меряется посадка без базы.
+  squadronFerryRange,
   type SortieState,
 } from './state/shuttle';
 export { chaseRadius, chaseStep, type ChasePoint, type ChaseStep } from './state/chase';
