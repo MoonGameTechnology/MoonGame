@@ -35,7 +35,7 @@ The prototype starts with fog of war enabled — only nearby sectors are visible
 
 1. **Temporarily disable fog** in `main.ts` around line 7303:
    ```typescript
-   // Change: vision = computeVision();
+   // Change: vision = currentVision();
    // To:     vision = null;
    ```
 2. Rebuild: `node prototype/build.mjs`
