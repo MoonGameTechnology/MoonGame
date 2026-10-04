@@ -2395,6 +2395,8 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #endscreen .es-run li b{font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap;}
 #endscreen .es-run li.task.done span{color:var(--ink);}
 #endscreen .es-run li.task.done b{color:#5fd07a;}
+/* Реплика союзного офицера под итогом операции главы VI (PVR-8.5, §8.9). */
+#endscreen .es-op-say{margin:7px 0 0;font-size:var(--fs-caption);color:#4a8cff;}
 #endscreen .es-total{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin-top:8px;padding-top:7px;border-top:1px solid var(--line-hi);font-size:var(--fs-body);color:var(--amber);font-weight:700;}
 #endscreen .es-next{margin:7px 0 0;font-size:var(--fs-caption);color:var(--cyan);}
 #endscreen .es-loot{margin:6px 0 0;font-size:var(--fs-body);color:#e6d8a8;}

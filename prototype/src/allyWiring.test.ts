@@ -46,3 +46,24 @@ describe('глава IV — проводка интерфейса', () => {
     );
   });
 });
+
+describe('глава VI — проводка интерфейса (PVR-8.4, PVR-8.5)', () => {
+  it('панель берёт цепочку главы с данными: у главы VI счёт контракта операции', () => {
+    expect(MAIN).toMatch(
+      /return chapterChain\(s, ME, extractionNeedMs\(s, ctx\(s\.time, s\)\), data\);/,
+    );
+  });
+
+  it('доки найдены — живой сигнал; угроза докам — доклад и мигающий чип связи', () => {
+    expect(MAIN).toMatch(
+      /case 'refuge\.found':\s*if \(p\.owner === ME\) note\(t\('refuge\.signal'\)/,
+    );
+    expect(MAIN).toMatch(
+      /note\(t\('refuge\.threat'\), toRefuge\[0\]!\.at\);\s*allyPulseUntil = performance\.now\(\) \+ /,
+    );
+  });
+
+  it('окно связи видит флоты так же, как карта: предложение охранять доки — по видимому', () => {
+    expect(MAIN).toMatch(/order: playerOrder,\s*sees: fleetSeen,\s*\}\);/);
+  });
+});

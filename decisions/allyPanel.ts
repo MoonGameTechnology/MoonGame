@@ -7,9 +7,12 @@
  * (`planAllyOperation`): карточка не может написать «собираем силы», пока бот уже летит.
  */
 import type { GameData, GameState, PlayerId } from '../packages/shared-core/src/index';
-import { contactedAllies } from '../packages/shared-core/src/index';
 import { planAllyOperation, type AllyOpReason, type AllyOpStep } from './allyOperation';
-import { rendezvousOf } from './chapterChain';
+import { linkedAlly } from './chapterChain';
+
+// Правило «с кем игрок на связи» живёт рядом с местом встречи (`chapterChain.ts`): его читают
+// и панель, и зачёт задач пула союзнику (`missionObjectives.ts`).
+export { linkedAlly };
 
 export type AllyOrderKind = 'guard' | 'attack' | 'scout';
 export const ALLY_ORDER_KINDS: readonly AllyOrderKind[] = ['guard', 'attack', 'scout'];
@@ -29,13 +32,6 @@ export interface AllyPanelView {
   group: string[];
   /** Жив ли союзник: выбыл — приказывать некому. */
   alive: boolean;
-}
-
-/** Союзник, с которым игрок на связи, — или `null`: панели в этом мире нет. */
-export function linkedAlly(state: GameState, me: PlayerId): PlayerId | null {
-  const meet = rendezvousOf(state);
-  if (!meet) return null;
-  return contactedAllies(state, me).includes(meet.ally) ? meet.ally : null;
 }
 
 /** Что показать в панели. `null` — связи нет (ещё не встречались или сценария нет). */

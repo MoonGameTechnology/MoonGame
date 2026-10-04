@@ -12,7 +12,7 @@ import {
   objectiveProgress,
   type MissionObjective,
 } from './missionObjectives';
-import type { GameState, Planet } from '../packages/shared-core/src/index';
+import { setStance, type GameState, type Planet } from '../packages/shared-core/src/index';
 
 const planet = (id: string, owner: string | null, buildings: Array<[string, number]> = []): Planet => ({
   id,
@@ -188,5 +188,49 @@ describe('разрыв сети Роя (2026-09-24)', () => {
     expect(objectiveProgress(cutNest, s(), 'p1').complete).toBe(false);
     expect(objectiveProgress(cutNest, s(['other']), 'p1').complete).toBe(false);
     expect(objectiveProgress(cutNest, s(['nest']), 'p1').complete).toBe(true);
+  });
+});
+
+describe('совместный зачёт: успехи назначенного союзника — наравне с нашими (§7.5, §8.3)', () => {
+  const HOUR = 3_600_000;
+  /** Мир с местом встречи `camp` (союзник `ally`); `contacted` — связь установлена. */
+  const allied = (planets: Planet[], contacted = true, extra: Partial<GameState> = {}): GameState =>
+    ({
+      ...world([...planets, { ...planet('camp', 'ally'), rendezvous: 'ally' }]),
+      fleets: {},
+      missionFacts: contacted ? { contacted: { p1: ['camp'] } } : {},
+      ...extra,
+    }) as unknown as GameState;
+
+  it('захват: цель, взятая союзником, засчитана — отбирать её у него не нужно', () => {
+    const s = allied([planet('w1', 'ally'), planet('w2', 'p1')]);
+    expect(objectiveProgress(salvage, s, 'p1')).toMatchObject({ done: 2, total: 2, complete: true });
+  });
+
+  it('без связи и чужой ИИ в союзе — не засчитываются: союзник назначенный', () => {
+    expect(objectiveProgress(salvage, allied([planet('w1', 'ally'), planet('w2', 'p1')], false), 'p1').complete).toBe(false);
+    const bot = allied([planet('w1', 'bot'), planet('w2', 'p1')]);
+    setStance(bot, 'p1', 'bot', 'alliance');
+    expect(objectiveProgress(salvage, bot, 'p1').complete).toBe(false);
+  });
+
+  it('зачистка: постройка в мире союзника уже не у врага — последний удар игрока не нужен', () => {
+    expect(objectiveProgress(raze, allied([planet('nest', 'ally', [['biomass_pit', 40]])]), 'p1').complete).toBe(true);
+    expect(objectiveProgress(raze, allied([planet('nest', 'swarm', [['biomass_pit', 40]])]), 'p1').complete).toBe(false);
+  });
+
+  it('маяк: идущая серия союзника и его прошлая серия засчитаны', () => {
+    const beacon: MissionObjective = { id: 'm.beacon', kind: 'beacon', targets: ['b'], count: 6, reward: 3 };
+    const holding = allied([planet('b', 'ally')], true, { time: 7 * HOUR });
+    holding.missionFacts = { ...holding.missionFacts, held: { b: { owner: 'ally', since: HOUR } } };
+    expect(objectiveProgress(beacon, holding, 'p1').complete).toBe(true);
+    const past = allied([planet('b', 'swarm')], true, { time: 9 * HOUR });
+    past.missionFacts = { ...past.missionFacts, longest: { b: { ally: 6 * HOUR } } };
+    expect(objectiveProgress(beacon, past, 'p1').complete).toBe(true);
+  });
+
+  it('платит один раз — игроку, кто бы ни выполнил', () => {
+    const s = allied([planet('w1', 'ally'), planet('w2', 'ally')]);
+    expect(objectiveBonus([salvage], s, 'p1')).toBe(salvage.reward);
   });
 });

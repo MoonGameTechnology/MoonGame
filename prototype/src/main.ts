@@ -2143,10 +2143,14 @@ function updateThreatAlerts(): void {
     );
   }
   // Глава VI (PVR-8.4, §8.7): союзник докладывает наблюдаемую угрозу месту эвакуации —
-  // видимый курс главных сил к найденным докам, один раз на флот (`refugeThreat.ts`).
+  // видимый курс главных сил к найденным докам, один раз на флот (`refugeThreat.ts`). Чип
+  // «⬡ Союзник» мигает: в окне связи ждёт его предложение охранять доки (PVR-8.5).
   const toRefuge = refugeThreats(s, ME, fleetSeen, refugeReported);
   for (const th of toRefuge) refugeReported.add(th.fleetId);
-  if (toRefuge.length > 0) note(t('refuge.threat'), toRefuge[0]!.at);
+  if (toRefuge.length > 0) {
+    note(t('refuge.threat'), toRefuge[0]!.at);
+    allyPulseUntil = performance.now() + 12_000;
+  }
 }
 
 /** Refresh radar contacts the arm crossed this frame: snapshot each radar-only enemy
@@ -11701,6 +11705,7 @@ const allyScreen = initAllyScreen({
     if (at) jumpTo(at, 'goto');
   },
   order: playerOrder,
+  sees: fleetSeen,
 });
 /** Кадровый такт окна союзника: связи нет — окно закрыто и прицел снят. */
 function tickAlly(): void {
@@ -15646,11 +15651,12 @@ function fleetLabelOf(fleetId: string): string {
     .join(', ');
 }
 
-/** Главная цепочка главы IV (PVR-7.5): связь → архив → накопитель → вывод. `null` — в этой
- *  главе цепочки нет. Доля работы — под темп матча (`extractionNeedMs` ядра). */
+/** Главная цепочка главы: IV (PVR-7.5) — связь → архив → накопитель → вывод; VI (PVR-8.5) —
+ *  доки → эвакуация → очаги → главные силы. `null` — в этой главе цепочки нет. Доля работы —
+ *  под темп матча (`extractionNeedMs` ядра). */
 function runChain(): ChapterStep[] | null {
   if (!sectorRunActive) return null;
-  return chapterChain(s, ME, extractionNeedMs(s, ctx(s.time, s)));
+  return chapterChain(s, ME, extractionNeedMs(s, ctx(s.time, s)), data);
 }
 
 /** Метки целей задач на карте: дышащее мятное кольцо и флажок над миром. Выполненная

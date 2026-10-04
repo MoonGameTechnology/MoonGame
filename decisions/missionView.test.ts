@@ -107,3 +107,23 @@ describe('метки новых задач (2026-09-24)', () => {
     expect(missionTargets({ id: 'r', kind: 'rescue', targets: ['keep'], reward: 1 }, s, 'p1')).toEqual([]);
   });
 });
+
+describe('метки при совместном зачёте с назначенным союзником (PVR-8.5)', () => {
+  const allied = (planets: Planet[], memory: Record<string, PlanetSnapshot> = {}): GameState =>
+    ({
+      ...world([...planets, { ...planet('camp', 'ally'), rendezvous: 'ally' }], memory),
+      missionFacts: { contacted: { p1: ['camp'] } },
+    }) as unknown as GameState;
+
+  it('захват: мир, взятый союзником, не метится — он уже засчитан', () => {
+    expect(missionTargets(claim, allied([planet('w1', 'ally'), planet('w2', 'swarm')]), 'p1')).toEqual(['w2']);
+  });
+
+  it('зачистка: мир союзника не метится, даже если в памяти он ещё вражеский', () => {
+    const s = allied([planet('a', 'ally', [['biomass_pit', 30]]), planet('b', 'swarm', [['biomass_pit', 30]])], {
+      a: seen('swarm', [['biomass_pit', 30]]),
+      b: seen('swarm', [['biomass_pit', 30]]),
+    });
+    expect(missionTargets(raze, s, 'p1')).toEqual(['b']);
+  });
+});

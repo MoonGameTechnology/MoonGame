@@ -14,7 +14,8 @@
  *    показывается по номиналу с учётом числа видимых задач (`objectiveNominal`) — ровно
  *    то, что придёт на итогах.
  * 2. **Метка — только там, куда игроку идти.** `control` метит названные миры, которые
- *    ещё не взяты; `raze` — миры, где игрок ПОМНИТ стоящую постройку названного вида
+ *    ещё не взяты стороной игрока (он сам и назначенный союзник, `creditSide`); `raze` —
+ *    чужие миры, где игрок ПОМНИТ стоящую постройку названного вида
  *    (память тумана, а не правда состояния: метка не выдаёт разведку, которой не было);
  *    `rescue` и `beacon` — свою провинцию; `isolate` — мир Роя, который надо отрезать; `build` с `at` — названные места без нужной
  *    постройки; `evac` — свои убежища. У `scout`, `wave` и `build` без места одной
@@ -28,6 +29,7 @@
 import { HAVEN_TRAIT, type GameState, type PlayerId } from '../packages/shared-core/src/index';
 import {
   DEFAULT_OBJECTIVE_SLOTS,
+  creditSide,
   objectiveNominal,
   objectiveProgress,
   type MissionObjective,
@@ -85,9 +87,10 @@ export function missionTargets(
   if (progress.complete || progress.failed) return [];
   const site = objective.revealedBy;
   if (site !== undefined && !(state.missionFacts?.found?.[player] ?? []).includes(site)) return [];
+  const side = creditSide(state, player);
   if (objective.kind === 'control')
     return (objective.targets ?? []).filter(
-      (id) => state.planets[id] !== undefined && state.planets[id]!.owner !== player,
+      (id) => state.planets[id] !== undefined && !side.has(state.planets[id]!.owner ?? ''),
     );
   // Спасение, маяк и разрыв сети называют провинцию — метка стоит, пока задача не решена.
   if (objective.kind === 'rescue' || objective.kind === 'beacon' || objective.kind === 'isolate' || objective.kind === 'recruit')
@@ -117,7 +120,7 @@ export function missionTargets(
     return Object.keys(memory)
       .filter((id) => {
         const seen = memory[id]!;
-        if (seen.owner === player || state.planets[id]?.owner === player) return false;
+        if (side.has(seen.owner ?? '') || side.has(state.planets[id]?.owner ?? '')) return false;
         return seen.buildings.some((b) => kinds.has(b.type) && b.hp > 0);
       })
       .sort();

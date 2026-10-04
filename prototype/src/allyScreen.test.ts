@@ -1,11 +1,20 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { setLocale } from '../../localization/runtime';
-import { allyBoxHtml } from './allyScreen';
+import { allyBoxHtml, initAllyScreen } from './allyScreen';
 import { chapterChainHtml } from './missionPanel';
 import type { AllyPanelView } from '../../decisions/allyPanel';
 import type { ChapterStep } from '../../decisions/chapterChain';
+import { allyOrder } from '../../decisions/actions';
+import {
+  buildStateFromMap,
+  parseMatchMap,
+  type Action,
+  type GameState,
+} from '../../packages/shared-core/src/index';
+import { shippedGameData } from '../../data/bundle';
+import pve6 from '../../data/maps/pve-6.json';
 
-// Окно «Связь с союзником» и цепочка главы IV (PVR-7.5): что видит игрок.
+// Окно «Связь с союзником» и цепочка главы (IV — PVR-7.5, VI — PVR-8.5): что видит игрок.
 
 beforeAll(() => setLocale('ru'));
 
@@ -126,5 +135,117 @@ describe('цепочка главы в панели задач', () => {
     expect(html).toContain('<b class="mp-prog">40%</b>');
     expect(html).toContain('Гибель носителя — поражение главы');
     expect(html).toContain('data-extract="p1_1">Извлечь флотом 2× Крейсер</button>');
+  });
+
+  it('глава VI: у результатов счёт, а порог эвакуации виден, пока она не выполнена', () => {
+    const chain = (evacDone: boolean): string =>
+      chapterChainHtml(
+        [
+          step('docks', true, false),
+          step('evacuate', evacDone, !evacDone, {
+            count: { done: evacDone ? 3 : 1, total: 3 },
+            rule: { need: 3, of: 4 },
+          }),
+          step('production', false, evacDone, { count: { done: 0, total: 3 } }),
+          step('forces', false, false, { count: { done: 2, total: 3 }, target: undefined }),
+        ],
+        [],
+      );
+    const html = chain(false);
+    expect(html).toContain(
+      'Эвакуация: довести транспорты с людьми до базы</span><b class="mp-prog">1/3</b>',
+    );
+    expect(html).toContain(
+      'Главные силы: разгромить соединения Роя</span><b class="mp-prog">2/3</b>',
+    );
+    expect(html).toContain('Довести нужно 3 из 4 транспортов. Меньше — поражение главы');
+    expect(chain(true)).not.toContain('Довести нужно');
+  });
+});
+
+describe('глава VI: союзник предлагает охранять доки (PVR-8.5, §8.7)', () => {
+  const data = shippedGameData();
+  const DOCKS = 'quarantine_docks';
+
+  it('карточка предложения — над операцией; выбывший союзник ничего не предлагает', () => {
+    const html = allyBoxHtml(view({}), name, null, '', { at: DOCKS });
+    expect(html).toContain(
+      'Основное соединение противника идёт к докам. Мы можем задержать его, но для атаки комплекса придётся оставить вам меньше сил',
+    );
+    expect(html).toContain('data-ally="guard-offer">Охранять доки</button>');
+    expect(html.indexOf('al-offer')).toBeLessThan(html.indexOf('al-idle'));
+    expect(allyBoxHtml(view({}), name, null, '')).not.toContain('guard-offer');
+    const dead = view({ alive: false, step: 'blocked', reason: 'no-forces' });
+    expect(allyBoxHtml(dead, name, null, '', { at: DOCKS })).not.toContain('guard-offer');
+  });
+
+  /** Node без DOM: окну хватает `innerHTML`, `classList` и делегирования кликов. */
+  function fakeRoot() {
+    const classes = new Set<string>();
+    let handler: ((ev: unknown) => void) | null = null;
+    const el = {
+      innerHTML: '',
+      classList: {
+        add: (c: string) => void classes.add(c),
+        remove: (c: string) => void classes.delete(c),
+        contains: (c: string) => classes.has(c),
+      },
+      addEventListener: (_type: string, h: (ev: unknown) => void) => {
+        handler = h;
+      },
+      fire: (target: unknown) => handler?.({ target }),
+    };
+    return el;
+  }
+
+  it('«Охранять доки» — обычный приказ союзнику, и окно говорит, что он принят', () => {
+    // Доки найдены, охрана Роя видимо идёт к ним.
+    const base = buildStateFromMap(parseMatchMap(pve6), data);
+    const guard = base.fleets.swarm_guard!;
+    const s: GameState = {
+      ...base,
+      missionFacts: { ...base.missionFacts, found: { p1: [DOCKS] } },
+      fleets: {
+        ...base.fleets,
+        swarm_guard: {
+          ...guard,
+          location: null,
+          movement: {
+            from: guard.location!,
+            to: DOCKS,
+            departedAt: 0,
+            arrivesAt: 1,
+            destination: DOCKS,
+          },
+        },
+      },
+    };
+    const root = fakeRoot();
+    const orders: Action[] = [];
+    const screen = initAllyScreen({
+      root: () => root as unknown as HTMLElement,
+      state: () => s,
+      me: () => 'p1',
+      data: () => data,
+      targetName: (planet) => planet ?? '—',
+      arm: () => {},
+      armed: () => null,
+      findFleet: () => {},
+      order: (a) => {
+        orders.push(a);
+        return true;
+      },
+      sees: () => true,
+    });
+    screen.open();
+    expect(root.innerHTML).toContain('data-ally="guard-offer"');
+    root.fire({
+      closest: (sel: string) =>
+        sel === '[data-ally]' ? { dataset: { ally: 'guard-offer' } } : null,
+    });
+    // Тот же приказ, что из прицела на карте (id действия у каждого свой).
+    const guardDocks = allyOrder('p1', 'ally', 'guard', { planet: DOCKS });
+    expect(orders.map((a) => [a.type, a.payload])).toEqual([[guardDocks.type, guardDocks.payload]]);
+    expect(root.innerHTML).toContain('Союзник принял приказ');
   });
 });

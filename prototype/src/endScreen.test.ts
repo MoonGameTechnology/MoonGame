@@ -1,11 +1,18 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t } from '../../localization/runtime';
 import { newGame } from './game';
-import type { GameState } from '../../packages/shared-core/src/index';
+import { data } from './gameData';
+import {
+  buildStateFromMap,
+  parseMatchMap,
+  type GameState,
+} from '../../packages/shared-core/src/index';
+import pve6 from '../../data/maps/pve-6.json';
 import {
   placementOf,
   outcomeTitle,
   endScreenHtml,
+  operationResultHtml,
   runSummaryHtml,
   initEndScreen,
   type MatchEnd,
@@ -547,5 +554,78 @@ describe('×2 к награде забега на экране итогов (YAG
     w.ov.click('double');
     expect(w.left).toEqual([]);
     expect(w.getEnd()).not.toBeNull();
+  });
+});
+
+describe('итог операции главы VI — честный отчёт (PVR-8.5, §8.9)', () => {
+  /** Конец забега главы VI: штурм начат, доки найдены, союзник на связи с первой минуты. */
+  function sixEnd(evacuated: number, taken: string[], broken: string[]): GameState {
+    const s = {
+      ...buildStateFromMap(parseMatchMap(pve6), data),
+      pve: { waveNumber: 3, totalWaves: 10, npcPlayerId: 'swarm' },
+    } as GameState;
+    s.missionFacts = {
+      ...s.missionFacts,
+      found: { p1: ['quarantine_docks'] },
+      evacuated: { p1: evacuated },
+    };
+    for (const id of taken) s.planets[id] = { ...s.planets[id]!, owner: 'p1' };
+    for (const id of broken) s.operation!.forces[id]!.brokenAt = 1;
+    return s;
+  }
+  const won = (): GameState => {
+    const s = sixEnd(
+      3,
+      ['complex', 'north_foundry', 'west_foundry'],
+      ['swarm_guard', 'swarm_host', 'swarm_reserve'],
+    );
+    s.operation!.completedAt = 1;
+    return s;
+  };
+  const SAY = '<p class="es-op-say">Союзный офицер: «Задача выполнена, командир».</p>';
+
+  it('победа — три результата выполнены, в порядке отчёта: очаги, главные силы, люди', () => {
+    const s = won();
+    const html = operationResultHtml(s, 'p1');
+    expect(html).toBe(
+      '<div class="es-run es-op"><ul>' +
+        '<li class="task done"><span>✓ Очаги подавлены</span><b>3/3</b></li>' +
+        '<li class="task done"><span>✓ Главные силы разгромлены</span><b>3/3</b></li>' +
+        '<li class="task done"><span>✓ Люди выведены</span><b>3/3</b></li>' +
+        '</ul>' +
+        SAY +
+        '</div>',
+    );
+    expect(endScreenHtml(s, 'p1', endOf({ runReward: 7 }), view)).toContain(html);
+  });
+
+  it('поражение — сделанное и несделанное видно, ложного «всё выполнено» нет', () => {
+    const s = sixEnd(1, ['north_foundry', 'west_foundry'], ['swarm_host']);
+    s.operation!.lostAt = 1;
+    const html = operationResultHtml(s, 'p1');
+    expect(html).toContain('<li class="task"><span>✗ Очаги подавлены</span><b>2/3</b></li>');
+    expect(html).toContain(
+      '<li class="task"><span>✗ Главные силы разгромлены</span><b>1/3</b></li>',
+    );
+    expect(html).toContain('<li class="task"><span>✗ Люди выведены</span><b>1/3</b></li>');
+    expect(html).not.toContain('✓');
+    expect(html).not.toContain('es-op-say');
+  });
+
+  it('реплика офицера — только после победы и при союзнике на связи', () => {
+    // Всё выполнено, но вердикта ещё нет — реплики нет.
+    const done = won();
+    delete done.operation!.completedAt;
+    expect(operationResultHtml(done, 'p1')).not.toContain('es-op-say');
+    // Связи с союзником нет — нет и его реплики.
+    const alone = won();
+    alone.missionFacts = { ...alone.missionFacts, contacted: {} };
+    expect(operationResultHtml(alone, 'p1')).toContain('✓ Люди выведены');
+    expect(operationResultHtml(alone, 'p1')).not.toContain('es-op-say');
+  });
+
+  it('у других глав и партий отчёта операции нет', () => {
+    expect(operationResultHtml(scored(), 'p1')).toBe('');
+    expect(endScreenHtml(scored(), 'p1', endOf(), view)).not.toContain('es-op');
   });
 });
