@@ -100,6 +100,7 @@ import { data } from './gameData';
 import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
 import { planAllyOperation } from '../../decisions/allyOperation';
+import { allyCaptiveOrders } from '../../decisions/captive';
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
  *  (SES-2.2). `steward` — «Хранитель»: the player's OWN autopilot, a defensive
@@ -540,6 +541,10 @@ export function aiOrders(
  * флоты общий бот не трогает: не сливает, не уводит и не отзывает на оборону. Остальное —
  * стройка, найм, оборона дома — прежний бот жителя («активная оборона»). Нет операции —
  * прежний бот целиком.
+ *
+ * Пленный главы V (PVR-9.5) важнее операции: взявший убежище союзник грузит его на флот и
+ * ведёт носитель в безопасную зону (`allyCaptiveOrders`), и этот флот не трогает ни план, ни
+ * общий бот.
  */
 function allySeatOrders(
   state: GameState,
@@ -547,20 +552,24 @@ function allySeatOrders(
   posture: StewardPosture | 'expand',
   profile: AiProfile,
 ): Action[] {
+  const captive = allyCaptiveOrders(state, ai);
   const plan = planAllyOperation(state, ai, data);
-  if (plan.step === 'idle') return baseAiOrders(state, ai, posture, profile, new Set());
-  const held = new Set(plan.group);
+  if (plan.step === 'idle' && captive.held.length === 0)
+    return baseAiOrders(state, ai, posture, profile, new Set());
+  const touches = (a: Action, fleets: ReadonlySet<string>): boolean => {
+    const p = a.payload as { fleetId?: unknown; from?: unknown; into?: unknown } | undefined;
+    return [p?.fleetId, p?.from, p?.into].some((id) => typeof id === 'string' && fleets.has(id));
+  };
+  const carrying = new Set(captive.held);
+  const planActions = plan.step === 'idle' ? [] : plan.actions.filter((a) => !touches(a, carrying));
+  const held = new Set([...(plan.step === 'idle' ? [] : plan.group), ...carrying]);
   // Флоты, которым план отдаёт приказ (сведение, погрузка), тоже его: общий бот их не трогает.
-  for (const a of plan.actions) {
+  for (const a of planActions) {
     const p = a.payload as { fleetId?: unknown; from?: unknown; into?: unknown } | undefined;
     for (const id of [p?.fleetId, p?.from, p?.into]) if (typeof id === 'string') held.add(id);
   }
-  const touchesHeld = (a: Action): boolean => {
-    const p = a.payload as { fleetId?: unknown; from?: unknown; into?: unknown } | undefined;
-    return [p?.fleetId, p?.from, p?.into].some((id) => typeof id === 'string' && held.has(id));
-  };
-  const out = baseAiOrders(state, ai, posture, profile, held).filter((a) => !touchesHeld(a));
-  return [...out, ...plan.actions];
+  const out = baseAiOrders(state, ai, posture, profile, held).filter((a) => !touches(a, held));
+  return [...out, ...planActions, ...captive.actions];
 }
 
 function baseAiOrders(

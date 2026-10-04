@@ -68,3 +68,24 @@ describe('встреча, закрытая задачей, не возвраща
     );
   });
 });
+
+describe('доставленный пленный главы V не возвращается (PVR-9.5)', () => {
+  const chapterFive = () => pveChapter(4);
+
+  it('доставлен в прошлом заходе — пленного нет, убежище ничьё, ковенант ушёл', () => {
+    const start = pveState(data, 4);
+    const s = retireDoneEncounters(start, chapterFive().objectives, ['mission.voice-of-unity']);
+    expect(s.captive).toBeUndefined();
+    expect(s.planets.hideout!.owner).toBeNull();
+    expect(s.planets.hideout!.garrison).toEqual([]);
+    expect(s.players.covenant).toBeUndefined();
+    expect(start.captive).toBeDefined(); // вход не меняется
+  });
+
+  it('не доставлен — убежище и пленный на месте', () => {
+    const start = pveState(data, 4);
+    const s = retireDoneEncounters(start, chapterFive().objectives, ['mission.break-net']);
+    expect(s.captive).toEqual(start.captive);
+    expect(s.planets.hideout!.owner).toBe('covenant');
+  });
+});

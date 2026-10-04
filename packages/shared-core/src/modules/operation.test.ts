@@ -380,3 +380,41 @@ describe('контракт операции — исход главы (PVR-8.3)'
     expect(JSON.stringify(s)).toBe(before);
   });
 });
+
+describe('контракт из одних очагов — глава V (PVR-9.3)', () => {
+  /** Контракт главы V: два очага, соединений и эвакуации нет, беженцев на карте нет. */
+  function netWorld(): GameState {
+    const s = world();
+    s.operation = { production: ['hive', 'foundry'], forces: {}, breakAt: 0.2, evacuate: 0 };
+    s.planets.docks = { ...s.planets.docks!, awaitingFleets: undefined };
+    return s;
+  }
+
+  it('на старте: оба очага у врага, остальных результатов в контракте нет', () => {
+    expect(operationStatus(netWorld(), data)).toEqual({
+      held: ['hive', 'foundry'],
+      broken: [],
+      forces: 0,
+      delivered: 0,
+      need: 0,
+      possible: 0,
+      done: false,
+      lost: false,
+    });
+  });
+
+  it('враг потерял все очаги — победа, его флоты при этом целы', () => {
+    let s = capture(netWorld(), 'p1', 'hive');
+    expect(s.match.status).toBe('ongoing');
+    s = capture(s, 'p1', 'foundry');
+    expect(s.match).toMatchObject({ status: 'ended', reason: 'pve-operation', winner: 'p1' });
+    expect(Object.keys(s.fleets).sort()).toEqual(['guard', 'host']);
+  });
+
+  it('проиграть контракт нельзя: беженцев нет, и бой это не меняет', () => {
+    const r = ring(without(netWorld(), 'guard', 'host'), 'battle.resolved', {}, 5000);
+    expect(r.state.operation!.lostAt).toBeUndefined();
+    expect(r.events.map((e) => e.type)).not.toContain('operation.lost');
+    expect(r.state.match.status).toBe('ongoing');
+  });
+});

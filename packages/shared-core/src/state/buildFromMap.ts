@@ -142,6 +142,15 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       const blocked = zone && data?.sectorKinds[zone.kind]?.traversable === false;
       if (!zone || blocked || sec.vault.zone === id) issues.push(`E_INVALID_VAULT:${id}`);
     }
+    // A captive's hideout is held by a map inhabitant (the captive is taken by a ground
+    // assault on it), and the captive is delivered to a real, enterable other province.
+    if (sec.captive !== undefined) {
+      const zone = map.sectors[sec.captive.zone];
+      const blocked = zone && data?.sectorKinds[zone.kind]?.traversable === false;
+      const held = sec.owner != null && map.players[sec.owner]?.npc !== undefined;
+      if (!zone || blocked || sec.captive.zone === id || !held)
+        issues.push(`E_INVALID_CAPTIVE:${id}`);
+    }
     if (data) {
       if (sec.kind && !data.sectorKinds[sec.kind]) issues.push(`E_UNKNOWN_KIND:${id}`);
       if (sec.terrain && !data.sectors[sec.terrain]) issues.push(`E_UNKNOWN_TERRAIN:${id}`);
@@ -158,12 +167,16 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
 
   if (Object.values(map.sectors).filter((s) => s.vault !== undefined).length > 1)
     issues.push('E_MULTIPLE_VAULTS');
+  // The captive exists once per match (PVR-9.5): a second hideout would be a second copy.
+  if (Object.values(map.sectors).filter((s) => s.captive !== undefined).length > 1)
+    issues.push('E_MULTIPLE_CAPTIVES');
 
   // Контракт операции (PVR-8.3): очаги — провинции карты, соединения — её флоты, которые в
-  // игре с первой минуты (ждущий флот соединением не бывает), без повторов. Беженцам нужно
-  // убежище, а порог эвакуации должен быть достижим объявленными беженцами — иначе глава
-  // проиграна с первой проверки. Архив и контракт — два разных исхода главы, вместе их нет.
-  // Признаки `haven`/`evacuee` — словарь данных `missionFactsModule`.
+  // игре с первой минуты (ждущий флот соединением не бывает), без повторов. Объявленной
+  // эвакуации нужно убежище, а её порог должен быть достижим объявленными беженцами — иначе
+  // глава проиграна с первой проверки; контракт без эвакуации (глава V, PVR-9.3) убежища не
+  // требует. Архив и контракт — два разных исхода главы, вместе их нет. Признаки
+  // `haven`/`evacuee` — словарь данных `missionFactsModule`.
   const op = map.operation;
   if (op) {
     for (const sid of op.production) if (!has(sid)) issues.push(`E_INVALID_OPERATION:${sid}`);
@@ -175,16 +188,17 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
     }
     if (new Set([...op.production, ...op.forces]).size !== op.production.length + op.forces.length)
       issues.push('E_INVALID_OPERATION:duplicate');
-    if (!Object.values(map.sectors).some((s) => s.traits.includes('haven')))
+    const evacuate = op.evacuate;
+    if (evacuate !== undefined && !Object.values(map.sectors).some((s) => s.traits.includes('haven')))
       issues.push('E_INVALID_OPERATION:haven');
     if (Object.values(map.sectors).some((s) => s.vault !== undefined))
       issues.push('E_INVALID_OPERATION:vault');
-    if (data) {
+    if (data && evacuate !== undefined) {
       let evacuees = 0;
       for (const fl of Object.values(map.fleets))
         for (const st of fl.units)
           if (data.units[st.unit]?.traits.includes('evacuee')) evacuees += st.count;
-      if (evacuees < op.evacuate) issues.push('E_INVALID_OPERATION:evacuate');
+      if (evacuees < evacuate) issues.push('E_INVALID_OPERATION:evacuate');
     }
     // Контрудар (PVR-8.4): внешние позиции и цель — провинции карты.
     const ca = op.counterattack;
@@ -585,7 +599,8 @@ function seedOperation(
     production: [...op.production],
     forces,
     breakAt: op.breakAt,
-    evacuate: op.evacuate,
+    // Эвакуации в контракте нет — порог ноль: она выполнена и проиграна быть не может.
+    evacuate: op.evacuate ?? 0,
     ...(ca ? { counterattack: { after: [...ca.after], target: ca.target } } : {}),
   };
 }
@@ -822,6 +837,10 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     .sort()
     .find((id) => map.sectors[id]!.vault !== undefined);
   const vault = vaultId === undefined ? undefined : map.sectors[vaultId]!.vault!;
+  // Пленный главы V (PVR-9.5): карта объявила убежище — в матче есть пленный.
+  const hideoutId = Object.keys(map.sectors)
+    .sort()
+    .find((id) => map.sectors[id]!.captive !== undefined);
 
   return {
     ...base,
@@ -836,6 +855,9 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
     ...(Object.keys(heroes).length ? { heroes } : {}),
     ...(vaultId !== undefined && vault
       ? { extraction: { vault: vaultId, zone: vault.zone, hours: vault.hours, doneMs: 0 } }
+      : {}),
+    ...(hideoutId !== undefined
+      ? { captive: { hideout: hideoutId, zone: map.sectors[hideoutId]!.captive!.zone } }
       : {}),
   };
 }

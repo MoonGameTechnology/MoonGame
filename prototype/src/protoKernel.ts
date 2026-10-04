@@ -17,6 +17,7 @@ import {
   rendezvousModule,
   extractionModule,
   operationModule,
+  captiveModule,
   autoMergeModule,
   seatClaimModule,
   visibilityModule,
@@ -186,6 +187,9 @@ export const MODULES: GameModule[] = [
   // Контракт операции главы VI (PVR-8.3): то же место, что в серверном `DEV_MODULES`, —
   // вплотную перед автослиянием.
   operationModule,
+  // Пленный главы V (PVR-9.5): своё действие и свои поводы, хуков нет. То же место, что в
+  // серверном `DEV_MODULES`, — перед автослиянием.
+  captiveModule,
   // Автослияние на прибытии (заказ владельца 2026-10-03). В САМЫЙ КОНЕЦ — то же место, что в
   // серверном `DEV_MODULES`: прибытие сначала слышат все, потом флот вливается в стоявший.
   autoMergeModule,

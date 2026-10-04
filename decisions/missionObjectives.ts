@@ -62,6 +62,16 @@ export function creditSide(state: GameState, player: PlayerId): ReadonlySet<Play
   return new Set(ally ? [player, ally] : [player]);
 }
 
+/** Этап задания «Голос Единения» (PVR-9.5): 0 — не взят, 1 — взят живым, 2 — на борту,
+ *  3 — доставлен. Взятие засчитывается стороне игрока (`creditSide`): он сам или назначенный
+ *  союзник главы. */
+export function captiveStage(state: GameState, player: PlayerId): 0 | 1 | 2 | 3 {
+  const c = state.captive;
+  if (!c || c.takenBy === undefined || !creditSide(state, player).has(c.takenBy)) return 0;
+  if (c.deliveredAt !== undefined) return 3;
+  return c.carrier !== undefined ? 2 : 1;
+}
+
 /** Сколько провинций игрок опознал: ключи его памяти тумана. Нет памяти — ноль, а не
  *  падение: забег мог идти на хосте, который тумана не ведёт. */
 function identified(state: GameState, player: PlayerId): number {
@@ -139,6 +149,13 @@ export function objectiveProgress(
     // по флотам уже нельзя.
     const done = Math.min(state.missionFacts?.evacuated?.[player] ?? 0, need);
     return { ...base, done, total: need, complete: done >= need };
+  }
+  if (objective.kind === 'captive') {
+    // «Голос Единения» (PVR-9.5): штурм, погрузка, доставка — три этапа с понятным
+    // прогрессом. Факты пишет модуль пленного ядра; потеря — провал без повторного шанса.
+    const done = captiveStage(state, player);
+    const failed = state.captive?.lostAt !== undefined && done < 3;
+    return { ...base, done, total: 3, complete: done === 3, failed };
   }
   if (objective.kind === 'rescue') {
     // «Снять осаду, пока гарнизон держится» (решение владельца 2026-09-24: пал —

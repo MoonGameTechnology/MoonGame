@@ -339,6 +339,9 @@ export const traderSwap = (playerId: string, give: string, get: string, amount: 
 /** Глава IV: назначить флот у архива на извлечение накопителя (PVR-7.3). */
 export const extractionStart = (playerId: string, fleetId: string) =>
   act(playerId, 'extraction.start', { fleetId });
+/** Глава V: принять взятого пленного на борт флота у убежища (PVR-9.5). */
+export const captiveLoad = (playerId: string, fleetId: string) =>
+  act(playerId, 'captive.load', { fleetId });
 /** Глава IV: приказ союзнику — охранять, атаковать или разведать цель (PVR-7.4). */
 export const allyOrder = (
   playerId: string,

@@ -61,6 +61,10 @@ export const MapSectorSchema = z.object({
   vault: z
     .object({ hours: z.number().positive(), zone: z.string().min(1) })
     .optional(),
+  /** Hideout holding the chapter's captive (PVR-9.5, «Голос Единения»): the captive is taken
+   *  alive by a ground assault here, loaded onto one fleet and delivered to `zone`. At most one
+   *  per map; validated by the loader. */
+  captive: z.object({ zone: z.string().min(1) }).optional(),
   /** Terrain id → resolved against game data `sectors` (speed / HP modifiers). */
   terrain: z.string().optional(),
   /** World nature id → game data `planetTypes` (production / defense), if a planet. */
@@ -151,9 +155,9 @@ export const MapSlotSchema = z.object({
 export const MapObjectiveSchema = z.object({
   /** Ключ локализации заголовка: в коде и в данных живёт КЛЮЧ, не текст. */
   id: z.string(),
-  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build', 'evac', 'rescue', 'beacon', 'isolate', 'recruit']),
-  /** `control`, `rescue`, `beacon`, `recruit` — id провинций; `raze` и `build` — виды построек;
-   *  `scout`/`wave`/`evac` не читают. */
+  kind: z.enum(['control', 'raze', 'scout', 'wave', 'build', 'evac', 'rescue', 'beacon', 'isolate', 'recruit', 'captive']),
+  /** `control`, `rescue`, `beacon`, `recruit`, `captive` — id провинций; `raze` и `build` — виды
+   *  построек; `scout`/`wave`/`evac` не читают. */
   targets: z.array(z.string()).default([]),
   /** `build` — ГДЕ строить (id провинций; нет — где угодно). Заказ владельца 2026-09-24:
    *  «построить космическую крепость в провинции X». */
@@ -172,22 +176,26 @@ export const MapObjectiveSchema = z.object({
 export type MapObjective = z.infer<typeof MapObjectiveSchema>;
 
 /**
- * КОНТРАКТ ОПЕРАЦИИ (PVR-8.3, глава VI §8.8): главу выигрывают три результата вместе —
- * производящие очаги потеряны врагом, главные соединения разгромлены, основная эвакуация
- * доставлена в убежище. Перечень явный и конечный: не «все существа Роя», а названные
- * провинции и флоты карты. Есть контракт — волны и удержание главу не выигрывают;
- * загрузчик заводит `state.operation`, судит `operationModule`.
+ * КОНТРАКТ ОПЕРАЦИИ (PVR-8.3, глава VI §8.8): главу выигрывают объявленные результаты
+ * вместе — производящие очаги потеряны врагом, главные соединения разгромлены, основная
+ * эвакуация доставлена в убежище. Очаги есть у каждого контракта; соединения и эвакуация —
+ * если карта их объявила: глава V судится одними очагами (§7.5, PVR-9.3). Перечень явный и
+ * конечный: не «все существа Роя», а названные провинции и флоты карты. Есть контракт —
+ * волны и удержание главу не выигрывают; загрузчик заводит `state.operation`, судит
+ * `operationModule`.
  */
 export const MapOperationSchema = z.object({
   /** Производящие очаги — провинции, которые враг должен потерять (кто бы их ни взял). */
   production: z.array(z.string()).min(1),
-  /** Главные соединения — флоты карты. Учёт идёт за их слиянием и делением. */
-  forces: z.array(z.string()).min(1),
+  /** Главные соединения — флоты карты. Учёт идёт за их слиянием и делением. Пусто —
+   *  разгромить нужно некого. */
+  forces: z.array(z.string()).default([]),
   /** Соединение разгромлено, когда корпуса в нём осталось не больше этой доли стартового:
    *  последний спрятавшийся разведчик не держит главу (§8.8). */
   breakAt: z.number().min(0).max(1).default(0.2),
-  /** Сколько беженцев (юниты с признаком `evacuee`) довести до убежища. */
-  evacuate: z.number().int().positive(),
+  /** Сколько беженцев (юниты с признаком `evacuee`) довести до убежища. Нет поля —
+   *  эвакуации в контракте нет. */
+  evacuate: z.number().int().positive().optional(),
   /** Последний контрудар (PVR-8.4, §8.7): Рой потерял все провинции `after` — его
    *  сохранившиеся соединения и построенные подкрепления идут к `target`, когда сторона
    *  штурма уже знает это место. Ничего не рождается: идёт то, что уцелело. */

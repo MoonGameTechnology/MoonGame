@@ -358,6 +358,14 @@ try {
     assert.equal(await page.locator('#sz-map-body polygon').count(), 51, 'мозаика главы IV');
     assert.match(await page.locator('#sz-chapter-stats').textContent(), /12/, 'задачи главы IV');
     assert.equal(await page.locator('#sz-chapter-hero').isVisible(), false, 'у главы IV нет героя-награды');
+    // PVR-9.8: дверь главы V «Разорванная сеть» — свой узел, своя мозаика и двенадцать задач,
+    // героя-награды нет (§7.7: награда главы — по действующей экономике, не герой).
+    await page.locator('#sz-mission-4').click();
+    assert.equal(await page.locator('#sz-mission-4').getAttribute('aria-pressed'), 'true');
+    await page.locator('#sz-map-panel').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#sz-map-body polygon').count(), 44, 'мозаика главы V');
+    assert.match(await page.locator('#sz-chapter-stats').textContent(), /12/, 'задачи главы V');
+    assert.equal(await page.locator('#sz-chapter-hero').isVisible(), false, 'у главы V нет героя-награды');
     await page.locator('#sz-mission-1').click();
     assert.equal(await page.locator('#sz-mission-1').getAttribute('aria-pressed'), 'true');
     // Выбор главы открывает её карту справа: клетка на каждый из 24 секторов главы II,

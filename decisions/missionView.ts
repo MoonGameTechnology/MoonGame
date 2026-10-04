@@ -18,8 +18,8 @@
  *    чужие миры, где игрок ПОМНИТ стоящую постройку названного вида
  *    (память тумана, а не правда состояния: метка не выдаёт разведку, которой не было);
  *    `rescue` и `beacon` — свою провинцию; `isolate` — мир Роя, который надо отрезать; `build` с `at` — названные места без нужной
- *    постройки; `evac` — свои убежища. У `scout`, `wave` и `build` без места одной
- *    точки нет — меток нет.
+ *    постройки; `evac` — свои убежища; `captive` — укрытие пленного, а на борту — зону
+ *    доставки. У `scout`, `wave` и `build` без места одной точки нет — меток нет.
  * 3. **Выполненная и проваленная задача меток не держит**: на карту зовёт только то, что
  *    ещё можно сделать.
  * 4. **Задача места эпизода молчит, пока о месте не знают** (`revealedBy`, глава VI §8.4):
@@ -28,6 +28,7 @@
  */
 import { HAVEN_TRAIT, type GameState, type PlayerId } from '../packages/shared-core/src/index';
 import {
+  captiveStage,
   DEFAULT_OBJECTIVE_SLOTS,
   creditSide,
   objectiveNominal,
@@ -92,6 +93,12 @@ export function missionTargets(
     return (objective.targets ?? []).filter(
       (id) => state.planets[id] !== undefined && !side.has(state.planets[id]!.owner ?? ''),
     );
+  // Пленный: до погрузки — укрытие, на борту — безопасная зона.
+  if (objective.kind === 'captive') {
+    const c = state.captive;
+    if (!c) return [];
+    return captiveStage(state, player) === 2 ? [c.zone] : [c.hideout];
+  }
   // Спасение, маяк и разрыв сети называют провинцию — метка стоит, пока задача не решена.
   if (objective.kind === 'rescue' || objective.kind === 'beacon' || objective.kind === 'isolate' || objective.kind === 'recruit')
     return (objective.targets ?? []).filter((id) => state.planets[id] !== undefined);

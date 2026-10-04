@@ -44,6 +44,7 @@ const CLIENT_ACTION_TYPES = [
   'trader.sell',
   'trader.swap',
   'extraction.start',
+  'captive.load',
   'ally.order',
   'ally.cancel',
   // REL-2 — the prototype-host intents (the netserver runs the prototype's kernel):

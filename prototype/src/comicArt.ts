@@ -30,6 +30,10 @@ import pve3Outro1 from '../art/comics/pve-3/outro-1.webp';
 import pve4Intro1 from '../art/comics/pve-4/intro-1.webp';
 import pve4Task1 from '../art/comics/pve-4/task-1.webp';
 import pve4Outro1 from '../art/comics/pve-4/outro-1.webp';
+import pve5Intro1 from '../art/comics/pve-5/intro-1.webp';
+import pve5Network1 from '../art/comics/pve-5/network-1.webp';
+import pve5Captive1 from '../art/comics/pve-5/captive-1.webp';
+import pve5Outro1 from '../art/comics/pve-5/outro-1.webp';
 import pve6Intro1 from '../art/comics/pve-6/intro-1.webp';
 import pve6Refuge1 from '../art/comics/pve-6/refuge-1.webp';
 import pve6Rescued1 from '../art/comics/pve-6/rescued-1.webp';
@@ -59,6 +63,15 @@ export const CHAPTER_COMICS: ComicRegistry = {
     task: [{ image: pve4Task1 }],
     outro: [{ image: pve4Outro1 }],
   },
+  // Глава V (§7.7): «Связь прервана» и «Голос Единения» — по событиям главы.
+  'pve-5': {
+    intro: [{ image: pve5Intro1 }],
+    // Первый разрыв сети Роя — факт мира `net.cut` (`storyFacts`, §7.7).
+    network: [{ image: pve5Network1 }],
+    // Пленный «Голос Единения» доставлен на базу.
+    captive: [{ image: pve5Captive1 }],
+    outro: [{ image: pve5Outro1 }],
+  },
   // Глава VI (§8.9–8.10): «Последний приют» и «Мы пришли за людьми» — по событиям главы,
   // эпилог Учёного — только после победы. В игру глава войдёт с дверью (PVR-8.7).
   'pve-6': {
@@ -72,9 +85,10 @@ export const CHAPTER_COMICS: ComicRegistry = {
 /** После какой задачи главы играет комикс момента по событиям. Триггером может быть и шаг
  *  главной цепочки главы (`decisions/chapterChain.ts`): у главы IV это встреча с союзником
  *  (§6.8), у главы VI — доки найдены (запись и живой сигнал, §8.4) и основная эвакуация
- *  завершена (§8.9). */
+ *  завершена (§8.9). И факт мира (`storyFacts`): у главы V — первый разрыв сети Роя (§7.7). */
 export const COMIC_TRIGGERS: ComicTriggers = {
   'pve-1': { task: 'mission.rescue-scientist' },
   'pve-4': { task: 'chain.contact' },
+  'pve-5': { network: 'net.cut', captive: 'mission.voice-of-unity' },
   'pve-6': { refuge: 'chain.docks', rescued: 'chain.evacuate' },
 };

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
-import type { GameState } from '../../packages/shared-core/src/index';
+import type { GameState, OperationState } from '../../packages/shared-core/src/index';
 import { newGame } from './game';
 import { EMPTY_STATS, matchXp, metaLevel, type MetaState } from './meta';
 import {
@@ -77,7 +77,7 @@ function wired(over: Partial<MatchEndHost> = {}, seed: GameState = ended()) {
 
 describe('конец матча — причина', () => {
   it('у каждой причины своя строка', () => {
-    const said = ['domination', 'elimination', 'score', 'timeout'].map(endReasonText);
+    const said = ['domination', 'elimination', 'score', 'timeout'].map((r) => endReasonText(r));
     expect(new Set(said).size).toBe(4);
     expect(said.every((x) => x.length > 0)).toBe(true);
   });
@@ -85,6 +85,23 @@ describe('конец матча — причина', () => {
   it('незнакомая причина не оставляет игрока с пустотой', () => {
     expect(endReasonText(undefined)).toBeTruthy();
     expect(endReasonText('что-то новое')).toBeTruthy();
+  });
+
+  it('победа по контракту операции называет только объявленное в нём (PVR-9.3)', () => {
+    const op = (forces: number, evacuate: number): OperationState => ({
+      production: ['a', 'b', 'c'],
+      forces: Object.fromEntries(
+        Array.from({ length: forces }, (_, i) => [`f${i}`, { fleets: [], hp: 100 }]),
+      ),
+      breakAt: 0.2,
+      evacuate,
+    });
+    // Глава V: одни очаги.
+    expect(endReasonText('pve-operation', op(0, 0))).toBe('очаги подавлены');
+    // Глава VI: три результата.
+    expect(endReasonText('pve-operation', op(3, 3))).toBe(
+      'очаги подавлены, главные силы разбиты, люди выведены',
+    );
   });
 });
 

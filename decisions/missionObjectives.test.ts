@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  captiveStage,
   missionProgress,
   objectiveBonus,
   objectiveProgress,
@@ -232,5 +233,57 @@ describe('совместный зачёт: успехи назначенного
   it('платит один раз — игроку, кто бы ни выполнил', () => {
     const s = allied([planet('w1', 'ally'), planet('w2', 'ally')]);
     expect(objectiveBonus([salvage], s, 'p1')).toBe(salvage.reward);
+  });
+});
+
+describe('пленный «Голос Единения» — три этапа (PVR-9.5)', () => {
+  const voice: MissionObjective = {
+    id: 'mission.voice-of-unity',
+    kind: 'captive',
+    targets: ['hideout'],
+    reward: 4,
+  };
+  /** Мир главы V: союзник на связи с первой минуты, пленный в укрытии ковенанта. */
+  const five = (captive: Partial<NonNullable<GameState['captive']>> = {}): GameState =>
+    ({
+      ...world([
+        planet('hideout', 'covenant'),
+        planet('staging', 'p1'),
+        { ...planet('camp', 'ally'), rendezvous: 'ally' },
+      ]),
+      fleets: {},
+      missionFacts: { contacted: { p1: ['camp'] } },
+      captive: { hideout: 'hideout', zone: 'staging', ...captive },
+    }) as unknown as GameState;
+
+  it('взят, на борту, доставлен — и союзник на связи засчитан наравне', () => {
+    expect(captiveStage(five(), 'p1')).toBe(0);
+    expect(objectiveProgress(voice, five(), 'p1')).toMatchObject({
+      done: 0,
+      total: 3,
+      complete: false,
+      failed: false,
+    });
+    expect(captiveStage(five({ takenBy: 'ally', takenAt: 1 }), 'p1')).toBe(1);
+    expect(captiveStage(five({ takenBy: 'p1', carrier: 'p1_1' }), 'p1')).toBe(2);
+    expect(objectiveProgress(voice, five({ takenBy: 'p1', deliveredAt: 3 }), 'p1')).toMatchObject({
+      done: 3,
+      complete: true,
+      failed: false,
+    });
+  });
+
+  it('взял чужой — этап не наш; без связи союзник не засчитан', () => {
+    expect(captiveStage(five({ takenBy: 'swarm' }), 'p1')).toBe(0);
+    const stranger = { ...five({ takenBy: 'ally' }), missionFacts: {} } as GameState;
+    expect(captiveStage(stranger, 'p1')).toBe(0);
+  });
+
+  it('потерянный пленный — провал до конца забега; доставленный провалом не становится', () => {
+    const lost = five({ takenBy: 'p1', carrier: 'p1_1', lostAt: 3 });
+    expect(objectiveProgress(voice, lost, 'p1')).toMatchObject({ done: 2, complete: false, failed: true });
+    expect(objectiveProgress(voice, five({ lostAt: 1 }), 'p1')).toMatchObject({ done: 0, failed: true });
+    const safe = five({ takenBy: 'p1', deliveredAt: 2, lostAt: 3 });
+    expect(objectiveProgress(voice, safe, 'p1')).toMatchObject({ complete: true, failed: false });
   });
 });

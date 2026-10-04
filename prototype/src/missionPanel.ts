@@ -28,6 +28,10 @@ export interface MissionPanelHost {
   extractors?: () => Array<{ id: string; label: string }>;
   /** Start extracting with this fleet (`extraction.start`). */
   extract?: (fleetId: string) => void;
+  /** Chapter V captive (PVR-9.5): own fleets that can take the captive aboard right now. */
+  captiveLoaders?: () => Array<{ id: string; label: string }>;
+  /** Take the captive aboard this fleet (`captive.load`). */
+  loadCaptive?: (fleetId: string) => void;
   /** Panel opened or closed — the host redraws the chip (`aria-expanded`). */
   onToggle: () => void;
 }
@@ -37,11 +41,11 @@ export const missionRewardHtml = (r: MissionReward): string =>
   `<span class="mp-reward"><i class="tw-data">◇ +${r.research}</i><i class="tw-warrants">⌖ +${r.warrants}</i></span>`;
 
 /**
- * Главная цепочка главы (IV — PVR-7.5, VI — PVR-8.5) — над задачами пула: она решает исход
- * главы и ничего не платит. Шаг — кнопка к своей цели; у текущего шага извлечения — доля
- * работы и кнопки «Извлечь флотом N» с предупреждением о носителе (§6.7: сообщается ДО
- * назначения). У результатов операции главы VI — счёт «сделано из нужного», а порог
- * эвакуации виден с начала главы, пока она не выполнена (§8.8: правило — до риска).
+ * Главная цепочка главы (IV — PVR-7.5, VI — PVR-8.5, V — PVR-9.7) — над задачами пула: она
+ * решает исход главы и ничего не платит. Шаг — кнопка к своей цели; у текущего шага
+ * извлечения — доля работы и кнопки «Извлечь флотом N» с предупреждением о носителе (§6.7:
+ * сообщается ДО назначения). У результатов операции глав VI и V — счёт «сделано из нужного»,
+ * а порог эвакуации виден с начала главы, пока она не выполнена (§8.8: правило — до риска).
  */
 export function chapterChainHtml(
   chain: readonly ChapterStep[],
@@ -81,10 +85,40 @@ export function chapterChainHtml(
   return `<div class="mp-chainbox"><b class="mp-sub">${esc(t('chain.title'))}</b>${steps}${ruleHtml}${acts}</div>`;
 }
 
+/** Этап задания «Голос Единения» (PVR-9.5) → что делать дальше. Ключи — литералы: так их
+ *  видит сторож локализации. */
+const CAPTIVE_HINT = ['captive.hint.take', 'captive.hint.load', 'captive.hint.carry'] as const;
+
+/**
+ * Под строкой пленного главы V — следующий шаг задания (штурм, погрузка, доставка), а на
+ * этапе погрузки — кнопка «Принять на борт флотом N» на каждый свой флот у убежища и
+ * предупреждение о носителе ДО назначения. Решённое и проваленное задание подсказок не держит.
+ */
+export function captiveStepHtml(
+  row: MissionRow,
+  loaders: ReadonlyArray<{ id: string; label: string }>,
+): string {
+  if (row.kind !== 'captive' || row.complete || row.failed) return '';
+  const hint = CAPTIVE_HINT[row.done];
+  if (!hint) return '';
+  const load =
+    row.done === 1 && loaders.length > 0
+      ? `<p class="mp-warn">${esc(t('captive.carrier-warning'))}</p>` +
+        loaders
+          .map(
+            (f) =>
+              `<button type="button" class="mp-extract" data-captive-load="${esc(f.id)}">${esc(t('captive.load-with', { name: f.label }))}</button>`,
+          )
+          .join('')
+      : '';
+  return `<p class="mp-hint">${esc(t(hint))}</p>${load}`;
+}
+
 export function missionPanelHtml(
   rows: readonly MissionRow[],
   training: boolean,
   chainHtml = '',
+  captiveLoaders: ReadonlyArray<{ id: string; label: string }> = [],
 ): string {
   return (
     `<div class="mp-head"><b>${t('hud.missions.title')}</b><button type="button" class="mp-close" data-missions-close="1" aria-label="${t('hud.close')}">✕</button></div>` +
@@ -107,9 +141,10 @@ export function missionPanelHtml(
           (r.kind === 'recruit' ? `<span class="mp-reward">${t('hud.missions.recruit-reward')}</span>` : '') +
           (training ? '' : missionRewardHtml(r.reward)) +
           (r.targets.length ? `<span class="mp-go">${t('hud.missions.show')}</span>` : '');
-        return r.targets.length
+        const row = r.targets.length
           ? `<button type="button" class="mp-row" data-mission-go="${esc(r.id)}">${body}</button>`
           : `<div class="mp-row${r.complete ? ' done' : r.failed ? ' failed' : ''}">${body}</div>`;
+        return row + captiveStepHtml(r, captiveLoaders);
       })
       .join('')
   );
@@ -159,6 +194,7 @@ export function initMissionPanel(host: MissionPanelHost): MissionPanel {
       rows,
       host.training(),
       chain ? chapterChainHtml(chain, host.extractors?.() ?? []) : '',
+      host.captiveLoaders?.() ?? [],
     );
     if (html === lastHtml) return;
     lastHtml = html;
@@ -174,6 +210,12 @@ export function initMissionPanel(host: MissionPanelHost): MissionPanel {
     const fleetId = el.closest<HTMLElement>('[data-extract]')?.dataset.extract;
     if (fleetId) {
       host.extract?.(fleetId);
+      lastHtml = '';
+      return;
+    }
+    const loader = el.closest<HTMLElement>('[data-captive-load]')?.dataset.captiveLoad;
+    if (loader) {
+      host.loadCaptive?.(loader);
       lastHtml = '';
       return;
     }

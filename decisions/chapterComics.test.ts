@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { shippedGameData } from '../data/bundle';
 import { pveState } from '../packages/client/src/gameData';
 import {
+  COMIC_ID,
   comicDue,
   comicId,
   comicProblems,
   comicsTriggered,
   echoComicMoment,
   markComicSeen,
+  storyFacts,
   type ComicRegistry,
 } from './chapterComics';
 import { freshSectorZeroProgress, parseSectorZeroProgress } from './sectorZeroProgress';
@@ -178,5 +180,55 @@ describe('реестр арта проверяется до того, как д�
   it('ловит неизвестный момент — комикс, который никто никогда не покажет', () => {
     const odd = { 'pve-1': { credits: PANELS } } as unknown as ComicRegistry;
     expect(comicProblems(odd, chapters, hasKey)).toEqual(['pve-1:credits: такого момента нет']);
+  });
+});
+
+describe('факты мира — триггеры сцен главы V (PVR-9.7)', () => {
+  const start = () => pveState(data, 4);
+  const triggers = { 'pve-5': { network: 'net.cut', captive: 'mission.voice-of-unity' } };
+  const registry: ComicRegistry = { 'pve-5': { network: PANELS, captive: PANELS } };
+
+  it('на старте фактов нет', () => {
+    expect(storyFacts(start())).toEqual([]);
+  });
+
+  it('«net.cut» — отрезан очаг контракта, а не погиб ретранслятор или окраина', () => {
+    const s = start();
+    s.swarmNet = { holders: {}, linked: ['focus_west'], cut: [] };
+    expect(storyFacts(s)).toEqual([]);
+    // Окраина, которую Рой захватил и перестал накрывать, — не разделение сети.
+    s.swarmNet.cut = ['c_ridge'];
+    expect(storyFacts(s)).toEqual([]);
+    // Несколько разрывов разом — один факт и одна сцена.
+    s.swarmNet.cut = ['c_ridge', 'focus_west', 'focus_east'];
+    expect(storyFacts(s)).toEqual(['net.cut']);
+    expect(comicsTriggered(fresh(), registry, triggers, 'pve-5', storyFacts(s))).toEqual([
+      'network',
+    ]);
+  });
+
+  it('без контракта операции фактов нет: разрыв окраины в другой главе — не сцена', () => {
+    const s = start();
+    delete s.operation;
+    s.swarmNet = { holders: {}, cut: ['focus_west'] };
+    expect(storyFacts(s)).toEqual([]);
+  });
+
+  it('сцена пленного — по задаче: доставка засчитала её, обе сцены идут по сюжету', () => {
+    const s = start();
+    s.swarmNet = { holders: {}, cut: ['focus_west'] };
+    const complete = ['mission.voice-of-unity', ...storyFacts(s)];
+    expect(comicsTriggered(fresh(), registry, triggers, 'pve-5', complete)).toEqual([
+      'network',
+      'captive',
+    ]);
+  });
+
+  it('отметка сцены переживает профиль, как остальные моменты', () => {
+    expect(comicId('pve-5', 'network')).toBe('pve-5:network');
+    expect(COMIC_ID.test('pve-5:network')).toBe(true);
+    expect(COMIC_ID.test('pve-5:captive')).toBe(true);
+    const seen = markComicSeen(fresh(), comicId('pve-5', 'captive'));
+    expect(comicDue(seen, registry, 'pve-5', 'captive')).toBeNull();
   });
 });
