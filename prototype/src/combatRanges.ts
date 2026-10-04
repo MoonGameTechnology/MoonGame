@@ -25,6 +25,7 @@
 import {
   hasOrbit,
   shuttleStrikeRange,
+  squadronFerryRange,
   squadronReach,
   type Fleet,
   type GameData,
@@ -134,13 +135,19 @@ export function combatRanges(
  *
  * Звено без дальности круга не получает вовсе: «радиус 0» — не факт о мире, а линия ни о
  * чём (то же правило, что у блока вместимости в `hangarPanel.ts`).
+ *
+ * У ПЕРЕЛЁТА (`relocate`, SHU-6.5) мерка своя — `squadronFerryRange`, два радиуса удара:
+ * удар летит туда и обратно, перелёт — в одну сторону. По этой мерке ядро отбивает
+ * `E_OUT_OF_RANGE` у перелёта, и по ней же подсвечены базы назначения.
  */
 export function aimRing(
-  aim: { squadron: Squadron; at: { x: number; y: number } } | null,
+  aim: { squadron: Squadron; at: { x: number; y: number }; relocate?: boolean } | null,
   data: GameData,
 ): RangeRing | null {
   if (!aim) return null;
-  const radius = squadronReach(aim.squadron, data);
+  const radius = aim.relocate
+    ? squadronFerryRange(aim.squadron, data)
+    : squadronReach(aim.squadron, data);
   if (radius <= 0) return null;
   return { kind: 'aim', x: aim.at.x, y: aim.at.y, radius, sourceId: aim.squadron.id };
 }

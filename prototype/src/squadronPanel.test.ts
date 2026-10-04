@@ -179,3 +179,53 @@ describe('SHU-6.3 — кнопка «Патруль»', () => {
     expect(card?.canStrike).toBe(false); // но база не готова — кнопка серая
   });
 });
+
+describe('SHU-6.5 — кнопка «Перебазировать»', () => {
+  it('КНОПКА ЕСТЬ, КОГДА ЕСТЬ КУДА: о базах спрашивают по каждому звену', () => {
+    const asked: string[] = [];
+    const cards = squadronCards(view([sq('a', [['interceptor', 2]]), sq('b', [['bomber', 1]])]), {
+      mine: true,
+      data,
+      relocate: (q) => {
+        asked.push(q.id);
+        return q.id === 'a';
+      },
+    });
+    expect(cards.map((c) => c.canRelocate)).toEqual([true, false]);
+    expect(asked).toEqual(['a', 'b']);
+  });
+
+  it('БЕЗ ВОПРОСА О БАЗАХ ПЕРЕЛЁТА НЕТ: некуда — кнопки нет, а не серая', () => {
+    const [card] = squadronCards(view([sq('a', [['interceptor', 2]])]), { mine: true, data });
+    expect(card?.canRelocate).toBe(false);
+  });
+
+  it('ЧУЖОЙ ЭСКАДРЕ ПЕРЕЛЁТ НЕ ПРЕДЛАГАЮТ', () => {
+    const [card] = squadronCards(view([sq('a', [['interceptor', 2]])]), {
+      mine: false,
+      data,
+      relocate: () => true,
+    });
+    expect(card?.canRelocate).toBe(false);
+  });
+
+  it('ДЕСАНТНЫЙ ЧЕЛНОК ПЕРЕЛЕТАЕТ С БОЙЦОМ: груз гасит патруль, но не перелёт', () => {
+    const [card] = squadronCards(view([sq('a', [['landing_shuttle', 1]], [['militia', 1]])]), {
+      mine: true,
+      data,
+      relocate: () => true,
+    });
+    expect(card?.canRelocate).toBe(true);
+    expect(card?.canPatrol).toBe(false);
+  });
+
+  it('ГОТОВНОСТЬ БАЗЫ ТА ЖЕ, ЧТО У УДАРА: на перезарядке кнопка есть, но серая', () => {
+    const [card] = squadronCards(view([sq('a', [['interceptor', 2]])], { blocked: 'rearming' }), {
+      mine: true,
+      data,
+      relocate: () => true,
+    });
+    expect(card?.canRelocate).toBe(true);
+    expect(card?.canStrike).toBe(false);
+  });
+});

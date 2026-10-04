@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { shuttleStrikeRange } from '../../packages/shared-core/src/index';
 import { newGame, data } from './game';
 import { aimRing, combatRanges, ringLook, type RangeKind } from './combatRanges';
-import { squadronReach } from '../../packages/shared-core/src/index';
+import { squadronFerryRange, squadronReach } from '../../packages/shared-core/src/index';
 import type { Squadron } from '../../packages/shared-core/src/index';
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
 
@@ -188,6 +188,14 @@ describe('SHU-3.1 — круг ВЗВЕДЁННОГО прицела', () => {
     expect(aimRing({ squadron: mixed, at: { x: 0, y: 0 } }, data)?.radius ?? 0).toBe(
       squadronReach(mixed, data),
     );
+  });
+
+  it('У ПЕРЕЛЁТА КРУГ — ДАЛЬНОСТЬ ПЕРЕЛЁТА ЯДРА (SHU-6.5): в одну сторону, вдвое дальше удара', () => {
+    const sq = squad([['interceptor', 2]]);
+    const ring = aimRing({ squadron: sq, at: { x: 0, y: 0 }, relocate: true }, data);
+    expect(ring?.radius).toBe(squadronFerryRange(sq, data));
+    expect(ring?.radius).toBe(2 * squadronReach(sq, data));
+    expect(ring?.kind).toBe('aim');
   });
 
   it('ПРИЦЕЛ НЕ ВЗВЕДЁН — КРУГА НЕТ: кольцо показывает режим, а не свойство базы', () => {

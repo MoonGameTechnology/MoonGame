@@ -27,9 +27,11 @@
  *    разворота значок на обратной ноге полз бы вспять: доля пройденного времени у обеих
  *    ног считается от своего `departedAt`. Висящий ПАТРУЛЬ (`patrol`, SHU-6.2) никуда не
  *    идёт: его нога — точка патруля, и значок стоит над ней, где его бьёт и ядро.
- * 6. **Без живой базы трассы нет.** Порт снесли, носитель сбит — рисовать линию в
- *    никуда нечестно: у неё не будет второго конца. Машины при этом ещё летят, и их
- *    судьбу разберёт ядро на посадке (`shuttle.lost`).
+ * 6. **Погибший корабль — там, где его видели последним.** Носитель или корабль, к
+ *    которому шёл перелёт (SHU-6.4), сбит, пока эскадра летела: ядро ведёт её к
+ *    последней точке корабля (`baseAt`, его `homePosition`) и там решает, где сесть, —
+ *    трасса идёт туда же (`strikeHome`). Нет ни базы, ни её последней точки — трассы
+ *    нет: рисовать линию в никуда нечестно, у неё не будет второго конца.
  */
 import type { ShuttleStrike, StrikeBase, UnitStack } from '../../packages/shared-core/src/index';
 
@@ -86,6 +88,16 @@ export function strikeLeg(
   return [strike.at ?? home, strike.to];
 }
 
+/** Где для вылета ДОМ — база, к которой он вернётся, а у погибшего корабля последняя
+ *  точка, где его видели (правило 6). Читателей два, как у `strikeLeg`: трасса и вспышки
+ *  огня по вылету в `main.ts`. */
+export function strikeHome(
+  strike: Pick<ShuttleStrike, 'base' | 'baseAt'>,
+  basePos: BasePos,
+): XY | null {
+  return basePos(strike.base) ?? strike.baseAt ?? null;
+}
+
 /** Точка на отрезке по доле пути. */
 function lerp(a: XY, b: XY, k: number): XY {
   return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
@@ -99,7 +111,7 @@ export function strikeTrails(
   const out: StrikeTrail[] = [];
   for (const st of strikes ?? []) {
     if (st.owner !== opts.me) continue; // правило 1
-    const home = opts.basePos(st.base); // правило 2
+    const home = strikeHome(st, opts.basePos); // правила 2 и 6
     if (!home) continue; // правило 6
     const [from, to] = strikeLeg(st, home); // правила 5 и 2а
     const k = strikeProgress(st, opts.now);

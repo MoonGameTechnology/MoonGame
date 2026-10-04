@@ -1,4 +1,11 @@
-import { attackBattle, deployForkFortress, patrolShuttle, recallPatrol, retreatBattle } from '../../decisions/actions';
+import {
+  attackBattle,
+  deployForkFortress,
+  patrolShuttle,
+  recallPatrol,
+  relocateShuttle,
+  retreatBattle,
+} from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
@@ -223,6 +230,7 @@ import {
   type PausedConstructionSite,
   type QueuedConstruction,
   missingHull,
+  squadronFerryRange,
   squadronPatrol,
   squadronReach,
   traderOf,
@@ -239,6 +247,7 @@ import {
 import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import { basePatrols, patrolMarks } from '../../decisions/patrolMarks';
+import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import {
   worldToScreen as camWorldToScreen,
   screenToWorld as camScreenToWorld,
@@ -1105,7 +1114,7 @@ import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
 import { aimRing, combatRanges, ringLook } from './combatRanges';
 // Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
-import { strikeLeg, strikeProgress, strikeTrails } from './strikeTrail';
+import { strikeHome, strikeLeg, strikeProgress, strikeTrails } from './strikeTrail';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
@@ -2553,7 +2562,7 @@ function strikeBasePos(base: StrikeBase): { x: number; y: number } | null {
 function strikeWorldPos(strikeId: string): { x: number; y: number } | null {
   const st = (s.strikes ?? []).find((x) => x.id === strikeId);
   if (!st) return null;
-  const home = strikeBasePos(st.base);
+  const home = strikeHome(st, strikeBasePos); // погибший корабль — его последняя точка
   if (!home) return null;
   const [from, to] = strikeLeg(st, home);
   const k = strikeProgress(st, mapNow());
@@ -5141,14 +5150,18 @@ function drawCombatRanges(): void {
   );
   // Круг ВЗВЕДЁННОГО прицела (остаток SHU-3.1) — рядом с пассивными радиусами, потому
   // что это тот же вопрос «докуда дотянется», только про конкретное звено и здесь и
-  // сейчас. Дальность — `squadronReach` ядра, та самая, по которой оно отобьёт промах.
+  // сейчас. Дальность — `squadronReach` ядра, та самая, по которой оно отобьёт промах;
+  // у перелёта (SHU-6.5) — `squadronFerryRange`, по которой ядро отбивает его.
   const aiming = strikeAim ? squadronAt(strikeAim.squadronId) : null;
   const aimAt = aiming
     ? 'planetId' in aiming.base
       ? (s.planets[aiming.base.planetId]?.position ?? null)
       : ((f) => (f ? fleetPos(f) : null))(s.fleets[aiming.base.fleetId])
     : null;
-  const aim = aiming && aimAt ? aimRing({ squadron: aiming.sq, at: aimAt }, data) : null;
+  const aim =
+    aiming && aimAt
+      ? aimRing({ squadron: aiming.sq, at: aimAt, relocate: !!strikeAim?.relocate }, data)
+      : null;
   if (aim) rings.push(aim);
   if (!rings.length) return;
   const tint: Record<string, string> = { shuttle: R_WING, aa: R_AA, aim: R_WING };
@@ -5231,6 +5244,49 @@ function drawPatrolAim(): void {
   const far = Math.hypot(at.x - home.x, at.y - home.y) > squadronReach(found.sq, data);
   const rPx = worldDist(squadronPatrol(found.sq, data).radius);
   drawPatrolCircle(aimPointer, rPx, 'aim', far ? CAST_FAR : R_WING);
+}
+
+/**
+ * ПЕРЕЛЁТ ВЗВЕДЁН (SHU-6.5): каждая база, куда эскадра перелетит, — в уголках цвета
+ * крыла, как цель «Атаки» в красных. Какие базы — решает `relocateTargets.ts` тем же
+ * условием, по которому ядро примет приказ, поэтому база без уголков — та, куда эскадра
+ * не долетит или где ей не хватит мест. Круг дальности перелёта вокруг базы рисует
+ * `drawCombatRanges`.
+ */
+function drawRelocateTargets(now: number): void {
+  for (const spot of relocateSpots()) {
+    const at = relocateSpotPx(spot.base);
+    if (at) targetBrackets(at.x, at.y, 16, now, R_WING);
+  }
+}
+
+/** Куда может перелететь эскадра взведённого перелёта; не взведён — никуда. База — та,
+ *  с которой взведён прицел: с неё же уйдёт приказ. */
+function relocateSpots(): RelocateTarget[] {
+  if (!strikeAim?.relocate) return [];
+  const found = squadronAt(strikeAim.squadronId);
+  return found ? squadronRelocateSpots(found.sq, strikeAim.from) : [];
+}
+
+/** Свои базы, куда эскадра перелетит с базы `from` (`relocateTargets.ts`). Позиции — та
+ *  же `strikeBasePos`, что у трассы: идущий корабль стоит там, где его рисует карта. */
+function squadronRelocateSpots(
+  sq: Squadron,
+  from: { planetId: string } | { fleetId: string },
+): RelocateTarget[] {
+  const base: StrikeBase =
+    'planetId' in from ? { kind: 'planet', id: from.planetId } : { kind: 'fleet', id: from.fleetId };
+  return relocateTargets(s, { me: ME, from: base, squadron: sq, data, pos: strikeBasePos });
+}
+
+/** Где база на ЭКРАНЕ — там, куда тапают: мир в своей точке, корабль у шеврона. */
+function relocateSpotPx(base: StrikeBase): { x: number; y: number } | null {
+  if (base.kind === 'planet') {
+    const p = s.planets[base.id];
+    return p ? world(p.position) : null;
+  }
+  const f = s.fleets[base.id];
+  return f ? fleetAnchor(f) : null;
 }
 
 /**
@@ -7016,6 +7072,7 @@ function render(now: number) {
   drawAimPreview();
   drawCastAim(); // CAST-UX: дальность каста + область действия
   drawPatrolAim(); // SHU-6.3: круг патруля под указателем
+  drawRelocateTargets(lastReal); // SHU-6.5: базы, куда эскадра перелетит
 }
 
 // --- side panel --------------------------------------------------------------
@@ -7113,7 +7170,14 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
   // не нашёл бы, где его вернуть. Стоят и над пустым ангаром — в небе может висеть весь
   // состав.
   const patrols = mine ? patrolRowsHtml(owner) : '';
-  const cards = squadronCards(view, { mine, data });
+  // Перелёт (SHU-6.5) — только туда, где ядро его примет: своя база в дальности, где
+  // звено поместится. Вид базы выводится по карте, где нашёлся id, как у дежурства.
+  const from = s.planets[owner] ? { planetId: owner } : { fleetId: owner };
+  const cards = squadronCards(view, {
+    mine,
+    data,
+    relocate: (sq) => squadronRelocateSpots(sq, from).length > 0,
+  });
   if (cards.length === 0) {
     return head + patrols + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
   }
@@ -7195,6 +7259,8 @@ function squadronCardHtml(card: SquadronCard, view: HangarView): string {
     // Патруль (SHU-6.3) — только у звена, которое умеет висеть; готовность базы та же,
     // что у удара: топливо и перезарядка у места общие.
     (card.canPatrol ? btn('wingpatrol', card.id, t('side.wing.patrol'), card.canStrike) : '') +
+    // Перелёт (SHU-6.5) — только когда есть куда; база готова — та же, что у удара.
+    (card.canRelocate ? btn('wingrelocate', card.id, t('side.wing.relocate'), card.canStrike) : '') +
     (card.canSplit ? btn('wingsplit', card.id, t('side.wing.split'), true) : '') +
     merge +
     `</div>` +
@@ -9485,11 +9551,12 @@ function renderPanel() {
   // и режимом «Приказ». Раньше движение было исключением: игрок жал ⤳ и тапал в лист,
   // который закрывал пол-карты (заказ владельца — убирать нижний хаб и на движении).
   const dock: DockState = {
-    // Прицел ПАТРУЛЯ (SHU-6.3) прячет лист и на ПК: точку выбирают у самой базы, а окно
-    // мира стоит ровно над ней.
+    // Прицел ПАТРУЛЯ (SHU-6.3) и ПЕРЕЛЁТА (SHU-6.5) прячет лист и на ПК: точку и базу
+    // выбирают на карте вокруг базы, а окно мира стоит ровно над ней.
     aiming:
       aiming ||
       !!strikeAim?.patrol ||
+      !!strikeAim?.relocate ||
       (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim || !!retreatAim)),
     merging,
     picking: pickMode,
@@ -10327,6 +10394,14 @@ side.addEventListener('click', (ev) => {
       if (MOBILE) aimPointer = null;
       note(t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }));
     }
+  } else if (act === 'wingrelocate') {
+    // SHU-6.5 — тот же прицел, но тап выбирает СВОЮ БАЗУ, куда эскадра перелетит: вокруг
+    // базы — круг дальности перелёта, подходящие базы в уголках (`drawRelocateTargets`).
+    const found = squadronAt(arg);
+    if (found) {
+      arm('strikeAim', { from: found.base, squadronId: arg, relocate: true });
+      note(t('hint.wing-relocate-aim', { r: Math.round(squadronFerryRange(found.sq, data)) }));
+    }
   } else if (act === 'wingrecall') {
     // `arg` — id ВЫЛЕТА: патруль уже не в ангаре, и адресуется он так же, как его
     // принимает ядро (`shuttle.recall { strikeId }`).
@@ -10911,13 +10986,33 @@ function selectAt(mx: number, my: number) {
   // проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
   // (`errText`).
   if (owner === 'shuttle-strike' && strikeAim) {
-    const { from, squadronId, patrol } = strikeAim;
+    const { from, squadronId, patrol, relocate } = strikeAim;
     drop('strikeAim');
     // SHU-6.3 — ПАТРУЛЬ: тап и есть точка. Дальность ядро меряет от живой позиции базы
     // (`E_OUT_OF_RANGE`), поэтому тап мимо круга приходит отказом, а не тишиной.
     if (patrol) {
       if (!squadronAt(squadronId)) note(t('hint.wing-empty'));
       else playerOrder(patrolShuttle(ME, from, squadronId, unworld({ x: mx, y: my })));
+      invalidatePanel();
+      return;
+    }
+    // SHU-6.5 — ПЕРЕЛЁТ: тап ловится только по базе в уголках — по той, что примет ядро.
+    // Мимо них — отмена, как у удара: взведённый режим обязан иметь выход без приказа.
+    if (relocate) {
+      const found = squadronAt(squadronId);
+      const spots = found ? squadronRelocateSpots(found.sq, from) : [];
+      const hit = nearestHit(spots, (spot) => relocateSpotPx(spot.base), mx, my, rNode);
+      if (!found) note(t('hint.wing-empty'));
+      else if (!hit) note(t('hint.wing-relocate-cancelled'));
+      else
+        playerOrder(
+          relocateShuttle(
+            ME,
+            from,
+            squadronId,
+            hit.base.kind === 'planet' ? { toPlanetId: hit.base.id } : { toFleetId: hit.base.id },
+          ),
+        );
       invalidatePanel();
       return;
     }

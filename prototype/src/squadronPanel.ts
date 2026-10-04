@@ -32,6 +32,11 @@
  *    которым ядро отобьёт `E_CANNOT_PATROL` и `E_HAS_CARGO`. Десантный челнок кнопки не
  *    получает вовсе. Готовность БАЗЫ у патруля та же, что у удара (`canStrike`): топливо
  *    и перезарядка общие на все вылеты места.
+ * 7. **«Перебазировать» есть, только когда есть КУДА** (SHU-6.5): своя база в дальности
+ *    перелёта, где эскадра поместится целиком. Список баз считает
+ *    `decisions/relocateTargets.ts` — по состоянию и живым позициям, которых у карточки
+ *    нет, поэтому сюда он приходит вопросом `relocate`. Груз кнопку не гасит: десантный
+ *    челнок перелетает вместе с бойцом. Готовность базы та же, что у удара.
  */
 import type { GameData, Squadron, UnitStack } from '../../packages/shared-core/src/index';
 import { squadronPatrol, stacksSize } from '../../packages/shared-core/src/index';
@@ -69,6 +74,9 @@ export interface SquadronCard {
   /** Эскадра УМЕЕТ патрулировать (правило 6). Кнопка доступна, когда готова база —
    *  `canStrike`. */
   canPatrol: boolean;
+  /** Есть своя база, куда звено перелетит (правило 7). Кнопка доступна, когда готова
+   *  база, — `canStrike`. */
+  canRelocate: boolean;
   canSplit: boolean;
   canMerge: boolean;
 }
@@ -82,7 +90,12 @@ const size = (sq: Squadron): number => sq.units.reduce((n, st) => n + Math.max(0
  */
 export function squadronCards(
   view: HangarView,
-  opts: { mine: boolean; data: GameData },
+  opts: {
+    mine: boolean;
+    data: GameData;
+    /** Есть ли куда перебазировать это звено (правило 7). Без вопроса — некуда. */
+    relocate?: (sq: Squadron) => boolean;
+  },
 ): SquadronCard[] {
   const live = view.squadrons.filter((sq) => size(sq) > 0);
   return live.map((sq) => {
@@ -98,6 +111,7 @@ export function squadronCards(
       cargo,
       canStrike: opts.mine && view.blocked === null,
       canPatrol: opts.mine && plan.hours > 0 && plan.radius > 0 && cargo.length === 0,
+      canRelocate: opts.mine && (opts.relocate?.(sq) ?? false),
       canSplit: opts.mine && splitOne(sq) !== null,
       canMerge: opts.mine && live.length > 1,
     };
