@@ -2978,6 +2978,39 @@ function computeVision(): Vision {
   };
 }
 
+/** Зрение этого кадра — по миру, а не по кадру (шаг 3 плавности). `computeVision` читает
+ *  только мир, игрока, режим сети и контакты сервера, а мир здесь не правится на месте, а
+ *  заменяется целиком: ход соло (`apply`), снимок сервера (`applyDelta` отдаёт новый
+ *  объект), загрузка. Значит, пока мир и контакты — те же объекты, а игрок и режим сети
+ *  прежние, прежнее зрение верно, и пересчёт вместе с записью в память разведки идёт только
+ *  при смене одного из четырёх. В сети это раз на снимок, а не на каждый кадр, на паузе
+ *  соло — только после действия игрока; в ходу соло мир новый каждый кадр, и круг радара
+ *  летит за флотом, как раньше. Кто правит мир на месте или чистит память разведки, тот
+ *  сбрасывает `visionMemo`: песочница — каждым кадром, смена матча — вместе с памятью.
+ *  Новый вход у `computeVision` обязан попасть и в эту проверку. */
+let visionMemo: {
+  state: GameState;
+  me: string;
+  net: boolean;
+  contacts: SignatureContact[];
+  vision: Vision;
+} | null = null;
+function currentVision(): Vision {
+  const memo = visionMemo;
+  if (
+    memo &&
+    memo.state === s &&
+    memo.me === ME &&
+    memo.net === NET &&
+    memo.contacts === netSignatures
+  )
+    return memo.vision;
+  const fresh = computeVision();
+  updateMemory(fresh.identify); // variant B: remember what we see
+  visionMemo = { state: s, me: ME, net: NET, contacts: netSignatures, vision: fresh };
+  return fresh;
+}
+
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
  *  live `fleets` intel window covers its owner. */
 function fleetSeen(f: Fleet): boolean {
@@ -13246,6 +13279,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   killStats = { destroyed: 0, lost: 0 };
   myBattleLocs.clear();
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
+  visionMemo = null; // its vision was written into the memory just cleared
   radarMemory.clear();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
   threatScanAt = -1;
@@ -16718,14 +16752,18 @@ function frame(nowReal: number) {
   // SANDBOX — fenced hook. Hold the "immortal home" + "frozen queues" toggles every
   // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
   // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.
-  if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) enforceSandbox(s, ME, sandboxHomeId);
+  // The sandbox edits the world in place (here and from its panel), so the same world
+  // object no longer means the same world: a sandboxed match keeps no vision memo.
+  if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) {
+    enforceSandbox(s, ME, sandboxHomeId);
+    visionMemo = null;
+  }
   // SANDBOX — fenced hook. The "fog of war" toggle defaults ON; turning it OFF drops the
   // fog projection (null vision ⇒ everything is `known`, mirroring the dev reveal).
   vision =
     !__PLAYER_BUILD__ && !NET && sandboxConfig.enabled && !sandboxConfig.fog
       ? null
-      : computeVision(); // fog projection for this frame
-  if (vision) updateMemory(vision.identify); // variant B: remember what we see
+      : currentVision(); // fog projection for this frame; recomputed only when the world changes
   const preparingMap = prepareEnteringMap();
   // Памятка клавиш ПК (UIX-9.1) ждёт конца подготовки карты: в кадре входа подготовка ещё
   // не началась, и памятка встала бы под заставку, отсчитывая свои секунды впустую.
