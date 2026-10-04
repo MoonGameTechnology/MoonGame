@@ -83,6 +83,10 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // заранее знает о налёте, и внезапность, ради которой челнок и летит мимо линий,
   // исчезает. Перехвату (SHU-1.3) проекция не нужна: ПВО реагирует на сервере.
   strikes: 'filtered',
+  // SHU-6.10: поле ТОЛЬКО ПРОЕКЦИИ — её пишет сама проекция (чужой висящий патруль в обзоре
+  // зрителя: круг и состав), в живом состоянии его не бывает. Что бы там ни лежало, оно
+  // не доезжает: проекция пишет своё.
+  seenPatrols: 'filtered',
   strikeSeq: 'public', // счётчик id, как battleSeq — предсказывать в нём нечего
   squadronSeq: 'public', // тот же счётчик id для эскадр (SHU-4.2)
  // счётчик, не факт о мире
@@ -326,8 +330,25 @@ function maximalState(): GameState {
         arrivesAt: 100,
         leg: 'out',
       },
+      // SHU-6.10: чужой патруль висит в обзоре зрителя — его круг и состав доезжают
+      // (`seenPatrols`), а база, эскадра, удержание и срок — нет: канарейки там.
+      {
+        id: 'CANARY_patrol',
+        owner: RIVAL,
+        base: { kind: 'fleet', id: 'CANARY_carrier' },
+        squadronId: 'CANARY_squadron',
+        units: [{ unit: 'interceptor', count: 2, modules: ['CANARY_module'], hp: 7 }],
+        target: { kind: 'point' },
+        to: { x: 40, y: 0 },
+        departedAt: 0,
+        arrivesAt: 100,
+        leg: 'patrol',
+        patrol: { hours: 4, radius: 60, hold: true },
+      },
     ],
-    strikeSeq: 2,
+    // Канарейка, которой в живом состоянии не бывает: проекция обязана её переписать.
+    seenPatrols: [{ owner: 'CANARY_seer', at: { x: 0, y: 0 }, radius: 1, units: [] }],
+    strikeSeq: 3,
     squadronSeq: 3,
     scheduled: [
       { id: 'evt:1', at: 200, type: 'own.timer', payload: { owner: VIEWER }, seq: 0 },

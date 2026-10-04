@@ -223,6 +223,8 @@ import {
   type SignatureContact,
   sightCircles,
   fleetsSeenByPosition,
+  patrolsSeenBy,
+  type SeenPatrol,
   sightRulesOf,
   worldRadarReach,
   fleetRadarReach,
@@ -2937,6 +2939,9 @@ interface Vision {
   /** Чужие флоты в круге моей мины или висящего патруля — опознаны по позиции, даже на
    *  линии вдали от миров (`fleetsSeenByPosition`, SHU-6.7). */
   seenAt: Set<string>;
+  /** Чужие висящие патрули в моём обзоре — круг и состав (SHU-6.10). В сети их считает
+   *  проекция сервера, в соло — то же правило ядра (`patrolsSeenBy`) по полному миру. */
+  seenPatrols: SeenPatrol[];
 }
 
 // --- espionage (SPY-1 in the prototype) ---------------------------------------
@@ -3001,6 +3006,7 @@ function computeVision(): Vision {
     signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify, seenAt),
     engaged: engagementOf(s, ME),
     seenAt,
+    seenPatrols: NET ? (s.seenPatrols ?? []) : patrolsSeenBy(s, ME, data),
   };
 }
 
@@ -4982,6 +4988,49 @@ function drawPatrolCircle(
   cx.restore();
 }
 
+/**
+ * ЧУЖИЕ ПАТРУЛИ В ОБЗОРЕ (SHU-6.10) — кто держит небо рядом со мной и чем.
+ *
+ * Кого видно, решает ядро (`patrolsSeenBy`): в сети — проекция сервера, в соло — то же
+ * правило по полному миру. Здесь только канва: сплошной круг цветом хозяина (враг,
+ * союзник, нейтрал — та же палитра, что у его флотов), в центре корпус ведущей машины и
+ * число бортов. Отсчёта нет: срок висения чужого патруля наблюдателю не виден.
+ */
+function drawSeenPatrols(): void {
+  const seen = vision?.seenPatrols ?? [];
+  if (!seen.length) return;
+  cx.save();
+  for (const p of seen) {
+    const c = world(p.at);
+    const r = worldDist(p.radius);
+    if (!visible(c, r + 40)) continue;
+    const tone = ownerColor(p.owner);
+    drawPatrolCircle(c, r, 'live', tone);
+    const dom = dominantUnit(p.units, data);
+    cx.save();
+    cx.translate(c.x, c.y);
+    cx.scale(0.68, 0.68);
+    cx.translate(-12, -12);
+    cx.fillStyle = rgba(tone, 0.24);
+    cx.strokeStyle = rgba(tone, 0.95);
+    drawShipShape(
+      cx,
+      (dom && unitShape(dom.def, dom.unit, s.players[p.owner]?.faction)) || 'fighter',
+      cam.scale >= 0.9,
+    );
+    cx.restore();
+    if (cam.scale >= 0.9) {
+      const machines = p.units.reduce((n, u) => n + u.count, 0);
+      cx.fillStyle = rgba(tone, 0.8);
+      cx.font = '10px ui-monospace, monospace';
+      cx.textAlign = 'center';
+      cx.fillText(`·${machines}`, c.x, c.y - 9);
+      cx.textAlign = 'start';
+    }
+  }
+  cx.restore();
+}
+
 /** Кого может ударить «Атака»: видимые флоты противника с кораблями — один список на
  *  прицел, превью и нажатие (`engageAim.ts`). */
 function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
@@ -6350,6 +6399,7 @@ function render(now: number) {
 
   drawFleetRoutes();
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
+  drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
   drawOrdnance(cx, mineView(), ME, mapNow(), world, cam.scale);
   mineControls.refresh();

@@ -159,3 +159,25 @@ describe('RULES-5 — блэкаут пережил переезд', () => {
     expect(see(unpaid).size).toBeLessThan(see(paid).size);
   });
 });
+
+describe('SHU-6.10 — чужой висящий патруль на карте — по правилу ядра', () => {
+  const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  const fnOf = (name: string): string => {
+    const body = src.slice(src.indexOf(`function ${name}(`));
+    return body.slice(0, body.indexOf('\n}\n') + 3);
+  };
+
+  it('зрение кадра берёт список у ядра: в сети — из проекции, в соло — `patrolsSeenBy`', () => {
+    expect(fnOf('computeVision')).toContain(
+      'seenPatrols: NET ? (s.seenPatrols ?? []) : patrolsSeenBy(s, ME, data),',
+    );
+  });
+
+  it('drawSeenPatrols рисует этот список и не читает чужие вылеты из `strikes` сам', () => {
+    // Чужой вылет в соло лежит в полном мире целиком — с базой, сроком и летящими ногами.
+    // Прочти его карта напрямую, и соло показало бы больше сети (правило 1 `strikeTrail.ts`).
+    const fn = fnOf('drawSeenPatrols');
+    expect(fn).toContain('vision?.seenPatrols');
+    expect(fn).not.toContain('strikes');
+  });
+});
