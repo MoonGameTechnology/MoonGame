@@ -47,6 +47,7 @@ import {
   setMatchPveBoss,
   data,
   MAP as LEGACY_MAP,
+  type MapNode,
   SECTOR_TYPES,
   SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
@@ -265,7 +266,7 @@ import {
   blitSphere as hdBlitSphere,
   clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
-import { classifyBorders, drawTerritory, type ClassifiedBorders } from '../../packages/client/src/territory';
+import { classifyBorders, drawTerritory, type ClassifiedBorders, type TerritoryCell } from '../../packages/client/src/territory';
 import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
@@ -452,7 +453,7 @@ import { longPressAction, pressIntent } from '../../decisions/pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, ownersSignature } from './staticLayerCache';
-import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
+import { clipPolygon, clipRect, provinceSeeds, type ProvinceSeed } from './provinceMap';
 import { frontierOutline } from './frontierOutline';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
 import {
@@ -699,7 +700,7 @@ import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation } from './holographicLayout';
 import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
-import { TerrainRasterCache } from './terrainRasterCache';
+import { TERRAIN_PAD, TerrainRasterCache } from './terrainRasterCache';
 import { TerrainGeometryCache } from './terrainGeometryCache';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
@@ -978,17 +979,23 @@ import {
   type LongFrameEntry,
 } from '../../decisions/frameTelemetry';
 import {
+  NO_SCROLL,
   SETTLE_MS,
   exactOffset,
+  exposedStrips,
+  gridNudge,
   layerTransform,
   mapLayerAction,
   onPixelGrid,
   overscanFor,
+  recentredScroll,
   toBake,
   visibleInBake,
+  type LayerScroll,
   type LayerTransform,
   type MapProjection,
   type Overscan,
+  type PixelRect,
 } from '../../decisions/mapLayerView';
 import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -5474,12 +5481,18 @@ const backgroundContextEvents = { lost: 0, restored: 0 };
 let mapLayerContent = ''; // content signature of the map-layer bake ('' — none or invalid)
 let mapLayerAt: MapProjection = { a: 1, x: 0, y: 0 }; // projection the map layer was painted at
 let mapLayerMargin: Overscan = { x: 0, y: 0 }; // its margin beyond the screen, CSS px
-let mapLayerBakes = 0; // bumps on every bake, so the composite knows its map is current
+let mapLayerScroll: LayerScroll = NO_SCROLL; // how far its window moved since (rule 3), CSS px
+let mapLayerBakes = 0; // bumps on every bake and move, so the composite knows its map is current
 /** This frame's transform from the map layer's bake space to the screen. The province
  *  geometry below (polygons, borders, terrain fields, glass frame) lives in bake space. */
 let mapView: LayerTransform = { k: 1, tx: 0, ty: 0 };
 /** Next terrain field whose sharp raster a bake could not afford yet; -1 — none. */
 let terrainRefine = -1;
+/** Where the map layer owes that terrain: the strips that moves painted without it, in the
+ *  bake's own device pixels (a canvas rect less {@link mapLayerOffset}); `null` — all of it. */
+let terrainOwed: PixelRect[] | null = [];
+/** Past this many strips owing terrain, one bake of the map is cheaper than repainting them. */
+const MAX_OWED_STRIPS = 8;
 let bgComposite = ''; // what `bg` holds: which map bake, at which offset, over which sky
 let camSeen = ''; // projection of the previous frame, to notice the camera moving
 let camMovedAt = -Infinity;
@@ -5571,6 +5584,9 @@ function mapLayerSignature(): string {
     owners: ownersSig(),
     starfield: starfieldOn(),
   }) + `|holo:${holographicMapOn()}|glow:${glowOn()}` +
+    // The roads: a hero's corridor lays new lanes mid-match. A scroll paints its strips with
+    // the roads of the moment, so a bake that missed them would end at the strip's edge.
+    `|topo:${s.topology ?? 0}` +
     `|known:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}`;
 }
 
@@ -5623,12 +5639,30 @@ interface ScreenRect {
 }
 
 /**
- * The political map at the current camera: glass, provinces, terrain art, roads and the
- * board edge, culled to `view`. Publishes the province geometry the frame and input
- * read — in these same (screen-at-bake) coordinates.
+ * A bake's province geometry, in its own space. It costs O(provinces) whatever the view
+ * (the seeds, the reprojected power diagram), so a bake computes it once and the strips a
+ * scroll later paints into the same bake reuse it (rule 3, `decisions/mapLayerView.ts`).
  */
-function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: boolean, preparing: boolean): void {
-  const lod = currentMapLod();
+interface MapLayerGeometry {
+  /** The bake's space: map point `p` lies at `at.a·p + (at.x, at.y)` in it. */
+  readonly at: MapProjection;
+  readonly lod: MapLod;
+  readonly seeds: ProvinceSeed[];
+  /** The province of `seeds[i]`. */
+  readonly nodes: readonly MapNode[];
+  readonly cells: TerritoryCell[];
+  /** The box of `cells[i]` at `4i` (x0, y0, x1, y1): a strip finds its few provinces by
+   *  these, where walking every vertex of the map would cost it as much as a bake's cull. */
+  readonly boxes: Float64Array;
+  readonly polys: Map<string, ProvincePolygon>;
+  readonly clip: Array<[number, number]>;
+  readonly frame: { x: number; y: number; width: number; height: number };
+}
+/** The current bake's geometry; `null` before the first bake. */
+let mapLayerGeometry: MapLayerGeometry | null = null;
+
+/** The political map's geometry at the current camera. */
+function measureMapLayer(): MapLayerGeometry {
   // PROVINCES — political map (Bytro-style). Every sector is a filled CELL of a
   // weighted Voronoi (power diagram) over the sector centres: the cells tile the
   // map and share borders, so a bigger `size` claims more territory and resizing
@@ -5638,15 +5672,15 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   // would draw a different map than the one being played (provinceMap.ts, rule 1).
   // Вес семени — там же (REFM-61): растёт квадратично по масштабу, иначе карта
   // перекраивается при зуме.
-  const provinceIds: string[] = [];
+  const nodes: MapNode[] = [];
   const seeds = provinceSeeds(MAP, cam.scale, (n) => {
     const p = s.planets[n.id];
     if (!p) return null;
-    provinceIds.push(n.id);
+    nodes.push(n);
     return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
   });
   for (let i = 0; i < seeds.length; i++) {
-    const id = provinceIds[i]!;
+    const id = nodes[i]!.id;
     if (!known(id) && !memory.has(id)) seeds[i]!.kind = 'unknown';
   }
   // Clip cells to the MAP boundary (province bounding box + padding), not the
@@ -5656,11 +5690,66 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   const tl = world(frame.topLeft);
   const br = world(frame.bottomRight);
   const clip = provinceClip();
-  holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
+  // Тесселяция степенной диаграммы квадратична по числу семян, а слой карты
+  // перепекается и посреди жеста (растянут зумом) — ровно тогда, когда кадр и так
+  // дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
+  // нормализованных по первой точке клипа и масштабу, поэтому панорама и зум из неё
+  // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
+  // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
+  // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
+  const cells = territoryGeometry.project(seeds, clip, cam.scale, provinceWave());
+  const boxes = new Float64Array(cells.length * 4);
+  cells.forEach((cell, i) => {
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of cell.poly) {
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+    boxes[i * 4] = x0;
+    boxes[i * 4 + 1] = y0;
+    boxes[i * 4 + 2] = x1;
+    boxes[i * 4 + 3] = y1;
+  });
+  return {
+    at: camProjection(cam, insets(), mapBounds()),
+    lod: currentMapLod(),
+    seeds,
+    nodes,
+    cells,
+    boxes,
+    polys: new Map(cells.map((cell) => [nodes[cell.idx]!.id, cell.poly])),
+    clip,
+    frame: { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y },
+  };
+}
+
+/** Hand a bake's geometry to the frame and input: they read the provinces in its space. */
+function publishMapGeometry(geo: MapLayerGeometry): void {
+  provincePolygons = geo.polys;
+  provinceBorders = holographicMapOn() ? classifyBorders(geo.cells, geo.seeds) : null;
+  holographicFrame = geo.frame;
+}
+
+/**
+ * The political map in the space of `geo` (by default, the current camera): glass,
+ * provinces, terrain art, roads and the board edge, culled to `view` in that space.
+ * Returns the terrain fields it met there: the frame draws their live glints.
+ */
+function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: boolean, preparing: boolean,
+  geo = measureMapLayer()): TerrainField[] {
+  const { at, lod } = geo;
+  // Every map point goes through the bake's own projection, so a strip painted into the
+  // bake later lands exactly where the first paint put its neighbours.
+  const inBake = (p: { x: number; y: number }): { x: number; y: number } => ({ x: at.a * p.x + at.x, y: at.a * p.y + at.y });
+  /** Can `cells[i]`, grown by `pad`, touch `view`? */
+  const meets = (i: number, pad: number): boolean => geo.boxes[i * 4 + 2]! >= view.x0 - pad &&
+    geo.boxes[i * 4]! <= view.x1 + pad && geo.boxes[i * 4 + 3]! >= view.y0 - pad && geo.boxes[i * 4 + 1]! <= view.y1 + pad;
   if (holographicMapOn()) {
-    drawGlassScreen(g, holographicFrame);
+    drawGlassScreen(g, geo.frame);
     g.save();
-    clipGlassSurface(g, holographicFrame);
+    clipGlassSurface(g, geo.frame);
   }
   // Weighted-Voronoi political fill + classified borders — the shared @void/client
   // territory renderer clamps the weights (so no cell is swallowed), tessellates the
@@ -5669,14 +5758,7 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
-  // Тесселяция степенной диаграммы квадратична по числу семян, а слой карты
-  // перепекается и посреди жеста (ушёл за запас, растянут зумом) — ровно тогда, когда
-  // кадр и так дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
-  // нормализованных по первой точке клипа и масштабу, поэтому панорама и зум из неё
-  // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
-  // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
-  // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
-  const cells = drawTerritory(g, seeds, clip, {
+  drawTerritory(g, geo.seeds, geo.clip, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
@@ -5686,24 +5768,32 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
     // M2.11: на голографической карте граница живёт, как рамка, — её рисует кадр, а не
     // выпечка. Запеки её и здесь — линия легла бы дважды, одна из них застывшей.
     strokeBorders: !holographicMapOn(),
-  }, territoryGeometry.project(seeds, clip, cam.scale, provinceWave()), view);
-  provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
-  provinceBorders = holographicMapOn() ? classifyBorders(cells, seeds) : null;
-  terrainFields = [];
+    // The glass map gets only the cells its view meets — the same test, by box, that the
+    // renderer makes by vertices (pad 1). The flat one strokes borders as well, and
+    // classifying them takes every cell: a shared edge is drawn from one side only.
+  }, holographicMapOn() ? geo.cells.filter((_, i) => meets(i, 1)) : geo.cells, view);
+  const fields: TerrainField[] = [];
   if (holographicMapOn() && lod.art > 0) {
     g.save();
     g.globalAlpha *= lod.art;
-    for (const n of MAP) {
-      const poly = provincePolygons.get(n.id);
-      if (!poly) continue;
-      // Cull using the cheap polygon bounds BEFORE constructing rock geometry.
-      if (poly.every(([x]) => x < view.x0) || poly.every(([x]) => x > view.x1) ||
-        poly.every(([, y]) => y < view.y0) || poly.every(([, y]) => y > view.y1)) continue;
-      const field = terrainGeometry.project(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain), sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
-        known(n.id) || memory.has(n.id), world(n));
-      if (!field || field.box.x > view.x1 || field.box.y > view.y1 ||
-        field.box.x + field.box.width < view.x0 || field.box.y + field.box.height < view.y0) continue;
-      terrainFields.push(field);
+    // A field's raster reaches past its box by its padding: cull by that reach, or a field
+    // just outside one paint would miss the edge pixels a later strip keeps from it.
+    const reach = TERRAIN_PAD + 1;
+    const x0 = view.x0 - reach;
+    const x1 = view.x1 + reach;
+    const y0 = view.y0 - reach;
+    const y1 = view.y1 + reach;
+    // Cells keep the map's order, so the fields overlap as they always did.
+    for (let i = 0; i < geo.cells.length; i++) {
+      // Cull by the province's box BEFORE constructing rock geometry.
+      if (!meets(i, reach)) continue;
+      const cell = geo.cells[i]!;
+      const n = geo.nodes[cell.idx]!;
+      const field = terrainGeometry.project(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain), sectorTypeOf(n.id)?.color ?? '#9fb6bd', cell.poly,
+        known(n.id) || memory.has(n.id), inBake(n));
+      if (!field || field.box.x > x1 || field.box.y > y1 ||
+        field.box.x + field.box.width < x0 || field.box.y + field.box.height < y0) continue;
+      fields.push(field);
       if (preparing) continue; // prewarm these fields in bounded loading slices
       // Reuse the last sharp bake through the gesture; sharpen in bounded slices
       // once settled (`blitStaticLayer`), instead of redrawing vector strokes per tick.
@@ -5734,17 +5824,16 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   const roads = roadDrawingOf(s);
   // The same frame in map units (the projection is a positive uniform scale), one pixel
   // wider: a road whose box misses it is dropped before a single point is projected.
-  const pr = camProjection(cam, insets(), mapBounds());
-  const pad = (M + 1) / pr.a;
-  const rx0 = (view.x0 - pr.x) / pr.a - pad;
-  const rx1 = (view.x1 - pr.x) / pr.a + pad;
-  const ry0 = (view.y0 - pr.y) / pr.a - pad;
-  const ry1 = (view.y1 - pr.y) / pr.a + pad;
+  const pad = (M + 1) / at.a;
+  const rx0 = (view.x0 - at.x) / at.a - pad;
+  const rx1 = (view.x1 - at.x) / at.a + pad;
+  const ry0 = (view.y0 - at.y) / at.a - pad;
+  const ry1 = (view.y1 - at.y) / at.a + pad;
   g.beginPath();
   for (let r = 0; lod.provinceDetail > 0 && r < roads.strokes.length; r++) {
     const b = roads.boxes;
     if (b[r * 4 + 2]! < rx0 || b[r * 4]! > rx1 || b[r * 4 + 3]! < ry0 || b[r * 4 + 1]! > ry1) continue;
-    const pts = roads.strokes[r]!.map((p) => world(p));
+    const pts = roads.strokes[r]!.map(inBake);
     let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
     for (const p of pts) {
       if (p.x < x0) x0 = p.x;
@@ -5763,7 +5852,7 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   if (lod.provinceDetail > 0) {
     g.fillStyle = rgba('#96b9c3', 0.55 * lod.provinceDetail);
     for (const m of roads.marks) {
-      const c = world(m.at);
+      const c = inBake(m.at);
       if (c.x < view.x0 - 6 || c.x > view.x1 + 6 || c.y < view.y0 - 6 || c.y > view.y1 + 6) continue;
       drawForkMark(g, c.x, c.y);
     }
@@ -5783,15 +5872,16 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   if (galaxyOutline.length) {
     g.beginPath();
     galaxyOutline.forEach((pt, i) => {
-      const v = world(pt);
+      const v = inBake(pt);
       if (i === 0) g.moveTo(v.x, v.y);
       else g.lineTo(v.x, v.y);
     });
     g.closePath();
     g.stroke();
   } else if (!holographicMapOn()) {
-    g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    g.strokeRect(geo.frame.x, geo.frame.y, geo.frame.width, geo.frame.height);
   }
+  return fields;
 }
 
 /** Bake the map layer at the current camera, with its margin beyond the screen. */
@@ -5809,21 +5899,114 @@ function bakeMapLayer(content: string, zooming: boolean, preparing = false): voi
   mapLayerX.setTransform(1, 0, 0, 1, 0, 0);
   mapLayerX.clearRect(0, 0, width, height);
   mapLayerX.setTransform(DPR, 0, 0, DPR, ox, oy);
-  paintMapLayer(mapLayerX, { x0: -margin.x, y0: -margin.y, x1: VW + margin.x, y1: VH + margin.y }, zooming, preparing);
-  mapLayerAt = camProjection(cam, insets(), mapBounds());
+  const geo = measureMapLayer();
+  publishMapGeometry(geo);
+  terrainFields = paintMapLayer(mapLayerX, { x0: -margin.x, y0: -margin.y, x1: VW + margin.x, y1: VH + margin.y },
+    zooming, preparing, geo);
+  mapLayerGeometry = geo;
+  mapLayerAt = geo.at;
   mapLayerMargin = margin;
+  mapLayerScroll = NO_SCROLL;
   mapLayerBakes++;
   // A loading bake is geometry only; the finished one follows it (`prepareEnteringMap`).
   if (!preparing && !mapLayerX.isContextLost?.()) mapLayerContent = content;
   // Sharp terrain the frame budget could not afford is refined a few rasters per frame
   // and baked once at the end — the map is not re-baked every frame meanwhile.
   terrainRefine = !preparing && terrainRaster.pending ? 0 : -1;
+  terrainOwed = terrainRefine < 0 ? [] : null;
+}
+
+/** Canvas pixel `c` of the map layer shows the bake's point `(c − offset) / DPR`: the bake
+ *  sits past the screen by its margin, and its window moved by its scroll. */
+function mapLayerOffset(): { x: number; y: number } {
+  return {
+    x: Math.round(mapLayerMargin.x * DPR) - Math.round(mapLayerScroll.x * DPR),
+    y: Math.round(mapLayerMargin.y * DPR) - Math.round(mapLayerScroll.y * DPR),
+  };
+}
+
+/** Paint the canvas rect `r` of the map layer afresh from the bake's geometry; the terrain
+ *  fields it meets join `fields` (once: `met` holds their ids). */
+function paintMapLayerRect(r: PixelRect, geo: MapLayerGeometry, zooming: boolean, fields: TerrainField[],
+  met: Set<string>): void {
+  const g = mapLayerX;
+  const o = mapLayerOffset();
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(r.x, r.y, r.width, r.height);
+  g.beginPath();
+  g.rect(r.x, r.y, r.width, r.height);
+  g.clip();
+  g.setTransform(DPR, 0, 0, DPR, o.x, o.y);
+  const view = { x0: (r.x - o.x) / DPR, y0: (r.y - o.y) / DPR, x1: (r.x + r.width - o.x) / DPR, y1: (r.y + r.height - o.y) / DPR };
+  for (const field of paintMapLayer(g, view, zooming, false, geo))
+    if (!met.has(field.id)) {
+      met.add(field.id);
+      fields.push(field);
+    }
+  g.restore();
+}
+
+/**
+ * Rule 3: move the bake's window to `to` instead of baking the map again. Its pixels move
+ * by whole device pixels with a copy, and only the strips that nothing covered before are
+ * painted, from the bake's own geometry: no province is measured again. The bake's space
+ * does not move, so the geometry the frame and input read stays valid as it is.
+ */
+function scrollMapLayer(to: LayerScroll, zooming: boolean): void {
+  const geo = mapLayerGeometry;
+  const content = mapLayerContent;
+  mapLayerContent = ''; // a half-moved picture is no picture of the map
+  if (!geo || mapLayerX.isContextLost?.()) return;
+  const dx = Math.round(to.x * DPR) - Math.round(mapLayerScroll.x * DPR);
+  const dy = Math.round(to.y * DPR) - Math.round(mapLayerScroll.y * DPR);
+  const g = mapLayerX;
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'copy'; // a canvas drawn onto itself reads it as it was
+  g.drawImage(mapLayer, -dx, -dy);
+  g.restore();
+  mapLayerScroll = to;
+  const o = mapLayerOffset();
+  // The frame's glints need the fields of the window, not of every place it has been.
+  const fields = terrainFields.filter((f) => f.box.x + f.box.width >= -o.x / DPR && f.box.x <= (mapLayer.width - o.x) / DPR &&
+    f.box.y + f.box.height >= -o.y / DPR && f.box.y <= (mapLayer.height - o.y) / DPR);
+  const met = new Set(fields.map((f) => f.id));
+  const strips = exposedStrips(mapLayer.width, mapLayer.height, dx, dy);
+  for (const r of strips) paintMapLayerRect(r, geo, zooming, fields, met);
+  terrainFields = fields;
+  mapLayerBakes++; // the settled composite holds the pixels from before the move
+  if (!mapLayerX.isContextLost?.()) mapLayerContent = content;
+  // A strip may meet terrain the frame budget could not raster yet: sharpen it as after a
+  // bake, then paint the strips that owe it once more, not the whole map. They are kept in
+  // the bake's own pixels, which a later move does not shift.
+  if (terrainRaster.pending && terrainOwed) {
+    for (const r of strips) terrainOwed.push({ ...r, x: r.x - o.x, y: r.y - o.y });
+    if (terrainOwed.length > MAX_OWED_STRIPS) terrainOwed = null; // past this the bake is cheaper
+  }
+  // The fields to sharpen changed: walk them from the start.
+  if (terrainRaster.pending || terrainRefine >= 0) terrainRefine = 0;
+}
+
+/** Paint the strips that owed sharp terrain once more, now that the cache holds it. */
+function repaintOwedTerrain(owed: PixelRect[]): void {
+  const geo = mapLayerGeometry;
+  if (!geo || mapLayerX.isContextLost?.()) return;
+  const o = mapLayerOffset();
+  const met = new Set(terrainFields.map((f) => f.id));
+  for (const r of owed) {
+    const x0 = Math.max(0, r.x + o.x);
+    const y0 = Math.max(0, r.y + o.y);
+    const x1 = Math.min(mapLayer.width, r.x + o.x + r.width);
+    const y1 = Math.min(mapLayer.height, r.y + o.y + r.height);
+    if (x1 > x0 && y1 > y0) paintMapLayerRect({ x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, geo, false, terrainFields, met);
+  }
+  mapLayerBakes++;
 }
 
 /** Draw the map layer into `g` under `view` (bake space → screen). */
 function showMapLayer(g: CanvasRenderingContext2D, view: LayerTransform): void {
-  const ox = Math.round(mapLayerMargin.x * DPR);
-  const oy = Math.round(mapLayerMargin.y * DPR);
+  const { x: ox, y: oy } = mapLayerOffset();
   const exact = exactOffset(view, DPR);
   g.setTransform(1, 0, 0, 1, 0, 0);
   // On its pixel grid the layer is a plain copy; otherwise it is resampled — for the
@@ -5844,8 +6027,9 @@ function mapLayerForInput(): LayerTransform {
 /** Put the static layer — sky and political map — under the live art of this frame. */
 function blitStaticLayer(now: number): void {
   terrainRaster.beginFrame(2);
-  const here = camProjection(cam, insets(), mapBounds());
-  const seen = `${here.a},${here.x},${here.y},${VW},${VH},${DPR}`;
+  let here = camProjection(cam, insets(), mapBounds());
+  const seenOf = (p: MapProjection): string => `${p.a},${p.x},${p.y},${VW},${VH},${DPR}`;
+  const seen = seenOf(here);
   if (seen !== camSeen) {
     camSeen = seen;
     camMovedAt = now;
@@ -5857,40 +6041,68 @@ function blitStaticLayer(now: number): void {
     // No offscreen map to reuse: paint it straight into the frame.
     cx.save();
     paintSky(cx);
-    paintMapLayer(cx, { x0: 0, y0: 0, x1: VW, y1: VH }, !settled, false);
+    const geo = measureMapLayer();
+    publishMapGeometry(geo);
+    terrainFields = paintMapLayer(cx, { x0: 0, y0: 0, x1: VW, y1: VH }, !settled, false, geo);
     cx.restore();
     mapLayerAt = here;
     mapView = { k: 1, tx: 0, ty: 0 };
     return;
   }
   let view = layerTransform(mapLayerAt, here);
-  const action = mapLayerAction({
+  const decide = (): ReturnType<typeof mapLayerAction> => mapLayerAction({
     fresh: mapLayerContent === content,
     transform: view,
     width: VW,
     height: VH,
     dpr: DPR,
     margin: mapLayerMargin,
+    scroll: mapLayerScroll,
     settled,
   });
+  let action = decide();
+  if (action === 'snap') {
+    // Rule 4: a pan that came to rest between device pixels (a finger on a phone moves
+    // the camera by fractions of one) puts the camera on the bake's grid instead of
+    // baking the map again. The camera's shift is a term of the projection, and it is
+    // under half a device pixel: nothing on the screen visibly moves.
+    const nudge = gridNudge(view, DPR);
+    cam.x += nudge.x;
+    cam.y += nudge.y;
+    here = camProjection(cam, insets(), mapBounds());
+    camSeen = seenOf(here); // the camera stays at rest
+    view = layerTransform(mapLayerAt, here);
+    action = decide();
+    if (action === 'snap') action = 'rebake'; // the grid is out of reach: never chase it
+  }
   if (action === 'rebake') {
     // A bake inside a gesture reuses terrain art at its last scale; a settled one
     // sharpens it.
     bakeMapLayer(content, !settled);
     view = { k: 1, tx: 0, ty: 0 };
-  } else if (terrainRefine >= 0 && view.k === 1) {
-    // Sharpen the terrain the last bake could not afford, two rasters a frame, without
-    // repainting the map; once all are sharp, bake it one last time.
-    while (terrainRefine < terrainFields.length) {
-      terrainRaster.prepare(terrainFields[terrainRefine]!, DPR);
-      if (terrainRaster.pending) break;
-      terrainRefine++;
-    }
-    if (terrainRefine >= terrainFields.length && settled) {
-      // Room for whatever the raster cache evicted meanwhile: never loop on it.
-      terrainRaster.beginFrame(Infinity);
-      bakeMapLayer(content, false);
-      view = { k: 1, tx: 0, ty: 0 };
+  } else {
+    if (action === 'scroll') scrollMapLayer(recentredScroll(view, DPR), !settled);
+    if (terrainRefine >= 0 && view.k === 1) {
+      // Sharpen the terrain the last bake or move could not afford, two rasters a frame,
+      // without repainting the map; once all are sharp, paint what owes it one last time:
+      // the strips a move left without it, or the whole bake.
+      while (terrainRefine < terrainFields.length) {
+        terrainRaster.prepare(terrainFields[terrainRefine]!, DPR);
+        if (terrainRaster.pending) break;
+        terrainRefine++;
+      }
+      if (terrainRefine >= terrainFields.length && settled) {
+        // Room for whatever the raster cache evicted meanwhile: never loop on it.
+        terrainRaster.beginFrame(Infinity);
+        if (terrainOwed) {
+          repaintOwedTerrain(terrainOwed);
+          terrainRefine = -1;
+          terrainOwed = [];
+        } else {
+          bakeMapLayer(content, false);
+          view = { k: 1, tx: 0, ty: 0 };
+        }
+      }
     }
   }
   // In motion a pan moves the layer by whole device pixels — a copy, not a resample;

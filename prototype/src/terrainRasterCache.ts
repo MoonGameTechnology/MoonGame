@@ -1,7 +1,9 @@
 /** Static terrain strokes cached at native device resolution; live glints stay vector. */
 import { drawTerrainField, type TerrainField } from './holographicSurface';
 
-const PAD = 2;
+/** How far a field's raster reaches past its box, CSS px: room for the strokes on its edge. */
+export const TERRAIN_PAD = 2;
+const PAD = TERRAIN_PAD;
 const MAX_PIXELS = 8 * 1024 * 1024; // at most 32 MiB of retained RGBA pixels
 interface Entry {
   key: string;

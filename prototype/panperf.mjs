@@ -85,7 +85,25 @@ window.__panBenchmark = {
     const kept = read(bg);
     invalidateMapSurfaces();
     await panSettle();
-    return { cull: diff(read(culled), read(wide)), still, reused, pan: diff(kept, read(bg)) };
+    const pan = diff(kept, read(bg));
+    // 4. A pan that comes to rest between device pixels puts the camera on the bake's grid,
+    //    by less than half a pixel, instead of baking the map again.
+    const before = mapLayerBakes;
+    const x = cam.x + 10.3;
+    cam.x = x;
+    await panSettle();
+    const snapped = mapLayerBakes === before && Math.abs(cam.x - x) <= 0.5 / DPR && cam.x !== x;
+    // 5. A pan past the margin moves the bake's window: no province is measured again, and
+    //    the strips it paints match a fresh bake.
+    const geometry = mapLayerGeometry;
+    cam.x -= Math.round(VW * 0.6);
+    cam.y += Math.round(VH * 0.4);
+    await panSettle();
+    const scrolled = mapLayerGeometry === geometry && mapLayerScroll.x !== 0 && mapLayerScroll.y !== 0;
+    const moved = read(bg);
+    invalidateMapSurfaces();
+    await panSettle();
+    return { cull: diff(read(culled), read(wide)), still, reused, pan, snapped, scrolled, scroll: diff(moved, read(bg)) };
   },
   async capture() {
     Object.assign(cam, {x: 119.25, y: -51.75, scale: 1.8});
@@ -190,10 +208,14 @@ try {
       console.log(name, mode, JSON.stringify(report[name][mode]));
     }
     const paths = await page.evaluate(() => window.__panBenchmark.compareStaticPaths());
+    console.log(name, 'paths', JSON.stringify(paths));
     assert.equal(paths.cull, 0, 'culling to the painted view changes no pixel');
     assert.equal(paths.still, 0, 'moving and stationary frames match pixel-for-pixel');
     assert(paths.reused, 'a whole-pixel pan reuses the map bake');
     assert(paths.pan <= 4, `reused bake matches a fresh one (dither only): ${paths.pan}`);
+    assert(paths.snapped, 'a pan at rest between pixels snaps the camera, not bakes the map');
+    assert(paths.scrolled, 'a pan past the margin moves the bake, not bakes it');
+    assert(paths.scroll <= 4, `moved bake matches a fresh one (dither only): ${paths.scroll}`);
     const png = await page.evaluate(() => window.__panBenchmark.capture());
     writeFileSync(prefix + '-' + name + '.png', Buffer.from(png.split(',')[1], 'base64'));
   }
