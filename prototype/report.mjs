@@ -158,6 +158,24 @@ if (perf.length > 0) {
     `  client    : ${perf.length} сэмплов · fps avg ${(fps.reduce((a, b) => a + b, 0) / fps.length).toFixed(0)} · min ${Math.min(...fps)}` +
       (rtt.length ? ` · rtt avg ${(rtt.reduce((a, b) => a + b, 0) / rtt.length).toFixed(0)}ms · max ${Math.max(...rtt)}ms` : ''),
   );
+  // Долгие кадры (decisions/frameTelemetry.ts): рывки, которые сглаженный fps прячет, и
+  // худшая блокировка главного потока — у кого, на чём и сколько в ней было скриптов.
+  const framed = perf.filter((p) => p.longFrames !== undefined);
+  if (framed.length > 0) {
+    const long = framed.map((p) => p.longFrames);
+    out.push(
+      `  frames    : долгих кадров (>50ms) avg ${(long.reduce((a, b) => a + b, 0) / long.length).toFixed(1)} за сэмпл · max ${Math.max(...long)}` +
+        ` · худший кадр ${Math.max(...framed.map((p) => p.worstFrameMs ?? 0))}ms`,
+    );
+  }
+  const blocked = perf.filter((p) => p.loafMs !== undefined);
+  if (blocked.length > 0) {
+    const b = blocked.reduce((a, p) => (p.loafMs > a.loafMs ? p : a));
+    out.push(
+      `  blocking  : худшая ${b.loafMs}ms у ${b.playerId} · скрипты ${b.loafScriptMs ?? 0}ms · раскладка ${b.loafLayoutMs ?? 0}ms` +
+        (b.loafBy ? ` · ${b.loafBy}` : ''),
+    );
+  }
 }
 if (summary) {
   out.push(`  submit    : ${msStat(summary.submitMs)}`);

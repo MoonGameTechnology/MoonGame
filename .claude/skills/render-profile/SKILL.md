@@ -28,8 +28,9 @@ description: Профилирование рендера и кадра прот�
   затем по 120 кадров на сценарий.
 
 Смежное, но другое: `pnpm run metrics` (`prototype/report.mjs`) сводит JSONL плейтеста,
-включая клиентские сэмплы `client_perf` (прототип шлёт `{fps, rttMs, memMb}` раз в 30 с
-через `MultiplayerClient.sendPerf`). Это телеметрия живой сессии, не профайлер.
+включая клиентские сэмплы `client_perf` (прототип шлёт `{fps, rttMs, memMb}` и долгие
+кадры окна раз в 30 с через `MultiplayerClient.sendPerf`, что считается долгим —
+`decisions/frameTelemetry.ts`). Это телеметрия живой сессии, не профайлер.
 
 ## Шаг 0 — убедись, что харнес запускается
 
