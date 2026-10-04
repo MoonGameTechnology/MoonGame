@@ -46,6 +46,7 @@ export interface Armed {
     from: { planetId: string } | { fleetId: string };
     squadronId: string;
     patrol?: true;
+    relocate?: true;
   };
   allyAim: AllyOrderKind;
   squadMerge: { from: string };
@@ -87,8 +88,9 @@ export let heroSpawnAim: string | null = null;
  *  выделению. БАЗА хранится размеченной ({planetId} | {fleetId}), а не голой строкой:
  *  ядро ищет мир и носитель в разных картах, и плоский id разъезжался с полем payload
  *  молча. С `patrol` (SHU-6.3) тот же прицел ставит ПАТРУЛЬ: тап выбирает не цель, а
- *  точку, над которой эскадра повиснет. Флаг один, потому что у обоих приказов одна
- *  база, один круг дальности и одни правила взвода и сброса. */
+ *  точку, над которой эскадра повиснет; с `relocate` (SHU-6.5) — ПЕРЕЛЁТ: тап выбирает
+ *  свою базу, куда эскадра перелетит. Флаг один, потому что у всех трёх приказов одна
+ *  база, круг дальности вокруг неё и одни правила взвода и сброса. */
 export let strikeAim: Armed['strikeAim'] | null = null;
 /** Глава IV (PVR-7.5): взведённый приказ союзнику — следующий тап по карте выбирает цель. */
 export let allyAim: AllyOrderKind | null = null;

@@ -6,7 +6,7 @@
  * (канва) остаётся в `main.ts`.
  */
 import { describe, expect, it } from 'vitest';
-import { strikeProgress, strikeTrails, type BasePos } from './strikeTrail';
+import { strikeHome, strikeProgress, strikeTrails, type BasePos } from './strikeTrail';
 import type { ShuttleStrike } from '../../packages/shared-core/src/index';
 
 const strike = (over: Partial<ShuttleStrike> = {}): ShuttleStrike => ({
@@ -71,9 +71,21 @@ describe('SHU-3.1 — трасса', () => {
     expect(strikeTrails([strike({ owner: 'p2' })], { me: 'p1', now: 250, basePos })).toEqual([]);
   });
 
-  it('БЕЗ ЖИВОЙ БАЗЫ ТРАССЫ НЕТ: порт снесли — тянуть линию в никуда нечестно', () => {
-    const gone = strike({ base: { kind: 'planet', id: 'Z' } });
+  it('НИ БАЗЫ, НИ ЕЁ ПОСЛЕДНЕЙ ТОЧКИ — ТРАССЫ НЕТ: тянуть линию в никуда нечестно', () => {
+    const gone = strike({ base: { kind: 'fleet', id: 'Z' } });
     expect(strikeTrails([gone], { me: 'p1', now: 250, basePos })).toEqual([]);
+  });
+
+  it('КОРАБЛЬ СБИТ — ТРАССА ИДЁТ К ПОСЛЕДНЕЙ ТОЧКЕ, куда ядро и ведёт эскадру (SHU-6.4)', () => {
+    const lost = strike({ base: { kind: 'fleet', id: 'Z' }, baseAt: { x: 0, y: -40 }, leg: 'back' });
+    const [tr] = strikeTrails([lost], { me: 'p1', now: 500, basePos });
+    expect(tr?.to).toEqual({ x: 0, y: -40 });
+    expect(tr?.at).toEqual({ x: 50, y: -20 });
+    // Живая база важнее старой точки: корабль жив — трасса идёт за ним.
+    expect(strikeHome({ base: { kind: 'fleet', id: 'F' }, baseAt: { x: 9, y: 9 } }, basePos)).toEqual({
+      x: 0,
+      y: 60,
+    });
   });
 
   it('ПУСТОЙ СПИСОК — НЕ ОШИБКА: вылетов нет, рисовать нечего', () => {
