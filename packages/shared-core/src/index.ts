@@ -285,6 +285,9 @@ export {
   shuttleStrikeRange,
   withinRange,
   shuttleReaches,
+  // SHU-6.2: часы и круг патруля считаются по слабому звену — той же функцией, по которой
+  // ядро отбивает `E_CANNOT_PATROL`.
+  squadronPatrol,
   type SortieState,
 } from './state/shuttle';
 export { chaseRadius, chaseStep, type ChasePoint, type ChaseStep } from './state/chase';

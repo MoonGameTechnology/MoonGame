@@ -87,6 +87,17 @@ export const strikeShuttle = (
   squadronId: string,
   target: { targetFleetId: string } | { targetPlanetId: string },
 ) => act(playerId, 'shuttle.strike', { ...base, squadronId, ...target });
+/** Поставить ЭСКАДРУ в патруль над точкой карты (SHU-6.2): та же база, что у удара, а
+ *  цель — точка в мировых координатах, а не флот или мир. */
+export const patrolShuttle = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+  at: { x: number; y: number },
+) => act(playerId, 'shuttle.patrol', { ...base, squadronId, at: { x: at.x, y: at.y } });
+/** Вернуть патруль домой раньше срока (SHU-6.2) — по id вылета: эскадра в воздухе. */
+export const recallPatrol = (playerId: string, strikeId: string) =>
+  act(playerId, 'shuttle.recall', { strikeId });
 /** Перегрузка ЭСКАДРЫ между космопортом мира и стоящим там носителем (SHU-2.1):
  *  `load` — с мира на борт, `unload` — с борта на мир. Соединение едет целиком. */
 export const loadShuttle = (playerId: string, fleetId: string, squadronId: string) =>

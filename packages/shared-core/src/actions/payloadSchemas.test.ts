@@ -54,6 +54,8 @@ const CLIENT_ACTION_TYPES = [
   'fleet.engage',
   'shuttle.load',
   'shuttle.merge',
+  'shuttle.patrol',
+  'shuttle.recall',
   'shuttle.split',
   'shuttle.strike',
   'shuttle.unload',
@@ -153,6 +155,10 @@ describe('SV-1.2 · action payload schemas', () => {
         },
       ],
       ['unit.build', { planetId: 'p1', unit: 'cruiser', modules: ['targeting_array'] }],
+      // SHU-6.2: патруль — точка карты вместо цели; отзыв — по id вылета.
+      ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 100, y: -40.5 } }],
+      ['shuttle.patrol', { fleetId: 'f1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 } }],
+      ['shuttle.recall', { strikeId: 'strike:p1:0:1' }],
     ];
     for (const [type, payload] of valid) {
       expect(isValidActionPayload(type, payload), `${type}: ${JSON.stringify(payload)}`).toBe(true);
@@ -211,6 +217,11 @@ describe('SV-1.2 · action payload schemas', () => {
       ['diplomacy.mapshare', { target: 'p2', on: 'yes' }], // `on` не булев
       ['espionage.spy', { target: 'p2', kind: 'planet' }], // planet theft needs a planetId
       ['espionage.spy', { target: 'p2', kind: 'pings' }], // not a stealable kind (yet)
+      ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1' }], // SHU-6.2: no point
+      ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 5 } }], // half a point
+      ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: NaN, y: 0 } }], // not finite
+      ['shuttle.patrol', { planetId: 'p1', at: { x: 0, y: 0 } }], // missing squadronId
+      ['shuttle.recall', {}], // missing strikeId
     ];
     for (const [type, payload] of bad) {
       expect(isValidActionPayload(type, payload), `${type}: ${JSON.stringify(payload)}`).toBe(
