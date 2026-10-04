@@ -1369,12 +1369,12 @@
 | SHU-5.6 | ✅ | proto | `docs/shuttles-roadmap.md` | Бот и фаза 5 |
 | SHU-5.7 | ✅ | core | `docs/shuttles-roadmap.md` | Подбитый шаттл слабее и медленнее |
 | SHU-6.1 | ✅ | core proto | `docs/shuttles-roadmap.md` | Радиус на виду |
-| SHU-6.2 | ⏳ | core data | `docs/shuttles-roadmap.md` | Патруль в точке |
-| SHU-6.3 | 🔒 | proto | `docs/shuttles-roadmap.md` | Патруль в интерфейсе |
-| SHU-6.4 | 🔒 | core | `docs/shuttles-roadmap.md` | Перебазирование и посадка без базы |
+| SHU-6.2 | ✅ | core data | `docs/shuttles-roadmap.md` | Патруль в точке |
+| SHU-6.3 | ⏳ | proto | `docs/shuttles-roadmap.md` | Патруль в интерфейсе |
+| SHU-6.4 | ⏳ | core | `docs/shuttles-roadmap.md` | Перебазирование и посадка без базы |
 | SHU-6.5 | 🔒 | proto | `docs/shuttles-roadmap.md` | Перебазирование в интерфейсе |
-| SHU-6.6 | 🔒 | core proto srv | `docs/shuttles-roadmap.md` | «Держать патруль» вместо дежурного вылета |
-| SHU-6.7 | 🔒 | core | `docs/shuttles-roadmap.md` | Обзор в круге патруля |
+| SHU-6.6 | ⏳ | core proto srv | `docs/shuttles-roadmap.md` | «Держать патруль» вместо дежурного вылета |
+| SHU-6.7 | ⏳ | core | `docs/shuttles-roadmap.md` | Обзор в круге патруля |
 | SHU-6.8 | 🔒 | proto | `docs/shuttles-roadmap.md` | Бот: патруль и перелёт |
 | SHU-6.9 | 🔒 | data | `docs/shuttles-roadmap.md` | Баланс фазы 6 |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |

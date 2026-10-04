@@ -175,6 +175,17 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     targetFleetId: id.optional(),
     targetPlanetId: id.optional(),
   }),
+  // ПАТРУЛЬ (SHU-6.2): та же база и та же эскадра, что у удара, но цель — ТОЧКА карты, а
+  // не флот или мир. Радиус точки от базы проверяет обработчик: схема его не знает.
+  'shuttle.patrol': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id,
+    at: z.object({ x: z.number().finite(), y: z.number().finite() }),
+  }),
+  // Отзыв патруля домой раньше срока (SHU-6.2) — по id вылета: эскадры в ангаре нет, она
+  // в воздухе.
+  'shuttle.recall': z.object({ strikeId: id }),
   // Перегрузка челноков между космопортом и стоящим там носителем (SHU-2.1).
   'shuttle.load': z.object({ fleetId: id, squadronId: id }),
   'shuttle.unload': z.object({ fleetId: id, squadronId: id }),

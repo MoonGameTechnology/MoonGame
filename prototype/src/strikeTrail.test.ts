@@ -102,4 +102,18 @@ describe('SHU-3.1 — трасса', () => {
     const [tr] = strikeTrails([strike()], { me: 'p1', now: 0, basePos });
     expect(tr?.squadronId).toBe('sq:p1:1');
   });
+
+  it('ВИСЯЩИЙ ПАТРУЛЬ СТОИТ НАД СВОЕЙ ТОЧКОЙ (SHU-6.2): значок там же, где его бьёт ядро', () => {
+    const patrol = strike({
+      target: { kind: 'point' },
+      to: { x: 80, y: 30 },
+      leg: 'patrol',
+      patrol: { hours: 4, radius: 60 },
+    });
+    const [tr] = strikeTrails([patrol], { me: 'p1', now: 500, basePos });
+    expect(tr?.from).toEqual({ x: 80, y: 30 });
+    expect(tr?.to).toEqual({ x: 80, y: 30 });
+    expect(tr?.at).toEqual({ x: 80, y: 30 });
+    expect(tr?.leg).toBe('patrol');
+  });
 });

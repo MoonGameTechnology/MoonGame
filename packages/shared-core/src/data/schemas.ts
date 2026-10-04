@@ -118,6 +118,14 @@ export const UnitStatsSchema = z
     /** Combat rounds a spent shuttle sits rearming on its carrier before it can
      *  sortie again (SQ-2.1). Deterministic cooldown, like a hero ability. */
     rearmRounds: z.number().nonnegative().default(0),
+    /** Game hours a shuttle loiters over a patrol point before it flies home to rearm
+     *  (SHU-6.2). 0 = cannot patrol at all — the landing shuttle has none. A squadron
+     *  loiters for its SHORTEST time, the same weakest-link rule as `strikeRange`. */
+    patrolHours: z.number().nonnegative().default(0),
+    /** Radius (map units) of the circle a loitering shuttle guards around its patrol
+     *  point: every 15 minutes it hits one hostile fleet or strike inside (SHU-6.2).
+     *  0 = cannot patrol. A squadron guards its TIGHTEST circle. */
+    patrolRadius: z.number().nonnegative().default(0),
   })
   .catchall(z.number());
 

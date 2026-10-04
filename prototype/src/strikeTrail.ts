@@ -25,7 +25,8 @@
  *    тик, стоит в конце пути, а не в NaN.
  * 5. **Нога решает НАПРАВЛЕНИЕ.** `out` идёт база → цель, `back` — цель → база. Без
  *    разворота значок на обратной ноге полз бы вспять: доля пройденного времени у обеих
- *    ног считается от своего `departedAt`.
+ *    ног считается от своего `departedAt`. Висящий ПАТРУЛЬ (`patrol`, SHU-6.2) никуда не
+ *    идёт: его нога — точка патруля, и значок стоит над ней, где его бьёт и ядро.
  * 6. **Без живой базы трассы нет.** Порт снесли, носитель сбит — рисовать линию в
  *    никуда нечестно: у неё не будет второго конца. Машины при этом ещё летят, и их
  *    судьбу разберёт ядро на посадке (`shuttle.lost`).
@@ -51,7 +52,7 @@ export interface StrikeTrail {
   to: XY;
   /** Где эскадра в эту секунду. */
   at: XY;
-  leg: 'out' | 'back';
+  leg: ShuttleStrike['leg'];
   /** Сколько бортов идёт — подпись значка. */
   machines: number;
   /** Own, already visibility-filtered hulls for the shared map silhouette resolver. */
@@ -81,6 +82,7 @@ export function strikeLeg(
   home: XY,
 ): [XY, XY] {
   if (strike.leg === 'back') return [strike.to, home];
+  if (strike.leg === 'patrol') return [strike.to, strike.to];
   return [strike.at ?? home, strike.to];
 }
 

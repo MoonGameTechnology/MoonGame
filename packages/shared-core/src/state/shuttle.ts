@@ -300,6 +300,29 @@ export function squadronReach(sq: Squadron, data: GameData): number {
   return Number.isFinite(shortest) ? shortest : 0;
 }
 
+/** ПАТРУЛЬ ЭСКАДРЫ (SHU-6.2): сколько часов она висит над точкой и какой круг держит.
+ *  Оба числа — по СЛАБОМУ ЗВЕНУ, как дальность и скорость: соединение висит вместе, и
+ *  уходит оно тогда, когда время кончилось у первой машины. Ноль хотя бы в одном — эскадра
+ *  не патрулирует вовсе (у десантного челнока этих чисел в данных нет).
+ *
+ *  Живёт здесь, рядом с `squadronReach`, по той же причине: этими числами ядро пускает
+ *  патруль, и ими же интерфейс рисует круг и таймер. */
+export function squadronPatrol(
+  sq: Pick<Squadron, 'units'>,
+  data: GameData,
+): { hours: number; radius: number } {
+  let hours = Infinity;
+  let radius = Infinity;
+  for (const st of sq.units) {
+    if (st.count <= 0) continue;
+    const stats = data.units[st.unit]?.stats;
+    hours = Math.min(hours, stats?.patrolHours ?? 0);
+    radius = Math.min(radius, stats?.patrolRadius ?? 0);
+  }
+  if (!Number.isFinite(hours) || !Number.isFinite(radius)) return { hours: 0, radius: 0 };
+  return { hours, radius };
+}
+
 /** Построенная (или севшая) машина встаёт в ПЕРВУЮ эскадру базы, где такой юнит уже
  *  есть, иначе заводит свою (SHU-4.2). Правило одно на весь ангар и держит две вещи
  *  сразу: шесть заказанных перехватчиков не превращаются в шесть эскадр по одному, а

@@ -242,7 +242,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '68'; // PVR-8.4: «Последний приют» главы VI.
+export const MODULE_MANIFEST_VERSION = '69'; // SHU-6.2: патруль шаттлов в точке.
+// Членство и порядок не тронуты; `shuttle` 1.6.0 — приказы `shuttle.patrol`/`shuttle.recall`,
+// тик раз в 15 минут бьёт цель в круге; у вылета новая нога `patrol`, цель-точка и поле
+// `patrol` — форма, которой правила 68 не знают.
+// export const MODULE_MANIFEST_VERSION = '68'; // PVR-8.4: «Последний приют» главы VI.
 // Членство и порядок не тронуты; `missionFacts` 1.2.0 пишет сведения о местах эпизода
 // (`missionFacts.found`) и выпускает ждущих флотом союзника, у `operation` новое поле
 // `counterattack` — замысел последнего удара Роя.

@@ -328,6 +328,8 @@
       "chaseRadius": 20,
       "fuel": 3,
       "rearmRounds": 2,
+      "patrolHours": 4,
+      "patrolRadius": 60,
       "siegeDamage": 1,
       "shuttleDamage": 22,
       "cargoSize": 1
@@ -361,6 +363,8 @@
       "chaseRadius": 12,
       "fuel": 2,
       "rearmRounds": 3,
+      "patrolHours": 3,
+      "patrolRadius": 60,
       "siegeDamage": 18,
       "shuttleDamage": 2,
       "cargoSize": 1
@@ -394,6 +398,8 @@
       "chaseRadius": 10,
       "fuel": 2,
       "rearmRounds": 4,
+      "patrolHours": 2,
+      "patrolRadius": 60,
       "siegeDamage": 30,
       "shuttleDamage": 3,
       "cargoSize": 2

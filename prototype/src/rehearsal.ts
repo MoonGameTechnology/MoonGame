@@ -170,6 +170,8 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
     squadronId: 'missing-squadron',
     targetFleetId: 'missing-fleet',
   },
+  'shuttle.patrol': { planetId: 'C0R1', squadronId: 'missing-squadron', at: { x: 0, y: 0 } },
+  'shuttle.recall': { strikeId: 'missing-strike' },
   'shuttle.load': { fleetId: 'p1_1', squadronId: 'missing-squadron' },
   'shuttle.unload': { fleetId: 'p1_1', squadronId: 'missing-squadron' },
   'shuttle.split': {
