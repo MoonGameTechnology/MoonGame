@@ -42,7 +42,8 @@ import { PerKeyWindow } from './rateLimit';
 import { detach } from './detach';
 
 export interface RoomPeer {
-  send(data: string): void;
+  /** `compress: false` keeps this one message out of socket compression (a `ws` option). */
+  send(data: string, options?: { compress?: boolean }): void;
   close?(code?: number, reason?: string): void;
   readonly readyState?: number;
   /** Bytes queued but not yet flushed to the socket (a `ws` getter). When this
@@ -339,7 +340,8 @@ type FrontDecision =
 const OPEN = 1;
 /** Backpressure cap: drop a peer whose unflushed outbound buffer exceeds this (it
  *  isn't draining — a fast sender outrunning a slow receiver). Deltas are KB-sized,
- *  so 1 MiB is hundreds of un-acked updates — a genuinely stuck client, not a blip. */
+ *  so 1 MiB is hundreds of un-acked updates — a genuinely stuck client, not a blip.
+ *  Counted on top of the last full snapshot sent to the peer (see `send`). */
 const MAX_BUFFERED_BYTES = 1_048_576;
 
 /** Max partial-advance chunks one `advance` call will chain before returning. Each
@@ -436,6 +438,9 @@ export class MatchRoom {
   /** Аккаунт, подключённый ЭТИМ сокетом (может отсутствовать — дев-путь без аккаунтов).
    *  `WeakMap`, потому что живёт ровно столько же, сколько сам сокет. */
   private readonly peerAccountId = new WeakMap<RoomPeer, string | undefined>();
+  /** Bytes of the last full snapshot (welcome, resync) sent to each socket, which the
+   *  backpressure cap leaves room for (see `send`). `WeakMap` for the same reason. */
+  private readonly snapshotBytes = new WeakMap<RoomPeer, number>();
   private readonly observe?: (event: RoomObservation) => void;
   private readonly record?: (step: { at: number; action?: Action }) => void;
   /** Durable write for strict commit-before-broadcast (see options.persist). */
@@ -2127,7 +2132,12 @@ export class MatchRoom {
     // and the server's memory grows without bound (a fast sender flooding a slow
     // receiver). Drop it; the client auto-reconnects and gets a fresh `welcome` (a
     // full resync), so it can't desync from the delta we skip here.
-    if (peer.bufferedAmount !== undefined && peer.bufferedAmount > MAX_BUFFERED_BYTES) {
+    // The cap comes on top of the last full snapshot: right after a join the welcome still
+    // counts as unsent (just over 1 MiB on the 1675-province map; with socket compression it
+    // waits in ws's queue uncompressed while zlib runs), and the chat back-log sent next
+    // would otherwise drop every player joining there.
+    const cap = MAX_BUFFERED_BYTES + (this.snapshotBytes.get(peer) ?? 0);
+    if (peer.bufferedAmount !== undefined && peer.bufferedAmount > cap) {
       peer.close?.(1013, 'backpressure');
       return;
     }
@@ -2135,7 +2145,19 @@ export class MatchRoom {
     // `ws.send`. Never let a dead peer throw into room logic — it would abort a broadcast
     // loop or, on the committed path, escape into the commit queue. Drop the peer instead.
     try {
-      peer.send(serializeServerMessage(message));
+      const data = serializeServerMessage(message);
+      if (message.type === 'welcome' || message.type === 'state') {
+        this.snapshotBytes.set(peer, Buffer.byteLength(data));
+      }
+      // The seat ticket is the one secret this socket carries, so the welcome holding it
+      // goes out uncompressed: a compressed message's length must never depend on how well
+      // the rest of it matches a secret (the CRIME family). A seat gets its ticket once,
+      // so this costs one uncompressed welcome per seat.
+      if (message.type === 'welcome' && message.seatTicket !== undefined) {
+        peer.send(data, { compress: false });
+      } else {
+        peer.send(data);
+      }
     } catch {
       peer.close?.();
     }
