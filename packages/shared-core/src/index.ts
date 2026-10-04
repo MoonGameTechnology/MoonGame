@@ -198,6 +198,8 @@ export {
   sightRulesOf,
   worldSightOf,
   sightCircles,
+  // SHU-6.7: кого зритель опознаёт по позиции — в круге мины или висящего патруля.
+  fleetsSeenByPosition,
   worldRadarReach,
   fleetRadarReach,
 } from './state/visibility';

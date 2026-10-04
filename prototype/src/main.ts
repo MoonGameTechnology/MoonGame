@@ -221,6 +221,7 @@ import {
   type Engagement,
   type SignatureContact,
   sightCircles,
+  fleetsSeenByPosition,
   sightRulesOf,
   worldRadarReach,
   fleetRadarReach,
@@ -2926,6 +2927,9 @@ interface Vision {
   signatures: SignatureContact[];
   /** Мои бои и флоты в них — видны, даже где узел не опознан (`engagementOf`). */
   engaged: Engagement;
+  /** Чужие флоты в круге моей мины или висящего патруля — опознаны по позиции, даже на
+   *  линии вдали от миров (`fleetsSeenByPosition`, SHU-6.7). */
+  seenAt: Set<string>;
 }
 
 // --- espionage (SPY-1 in the prototype) ---------------------------------------
@@ -2983,11 +2987,13 @@ function computeVision(): Vision {
   const grants = myIntel();
   grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
   intelFleetOwners = targetsOf(grants, 'fleets');
+  const seenAt = fleetsSeenByPosition(s, ME, data);
   return {
     identify,
     radar,
-    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify),
+    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify, seenAt),
     engaged: engagementOf(s, ME),
+    seenAt,
   };
 }
 
@@ -3033,11 +3039,13 @@ function fleetSeen(f: Fleet): boolean {
   return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
 }
 
-/** Опознан ли флот: стоит у опознанного узла ИЛИ дерётся в моём бою. Перехват на
- *  полпути идёт вдали от миров — без второго условия флот вставал перед невидимым
- *  врагом (владелец 2026-09-29). Правило то же, что у ядра, — `engagementOf`. */
+/** Опознан ли флот: стоит у опознанного узла, дерётся в моём бою ИЛИ идёт в круге моей
+ *  мины или висящего патруля. Перехват на полпути идёт вдали от миров — без второго
+ *  условия флот вставал перед невидимым врагом (владелец 2026-09-29); патруль висит над
+ *  дорогой — без третьего он не видел бы того, по кому бьёт (SHU-6.7). Правила те же, что
+ *  у ядра, — `engagementOf` и `fleetsSeenByPosition`. */
 function fleetKnown(f: Fleet): boolean {
-  return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id);
+  return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
 }
 
 /** Виден ли бой: его узел опознан ИЛИ в нём дерусь я (или мой блок зрения). */

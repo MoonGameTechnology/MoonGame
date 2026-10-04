@@ -62,8 +62,9 @@ export const visibilityModule: GameModule = {
   id: 'visibility',
   // 2.0.0 — зрение кругами вместо соседства по линиям (решение владельца 2026-09-24):
   // память тумана старых реплеев пишется иначе. 2.1.0 — обзор мира по виду провинции
-  // (`sight.byKind`, решение владельца 2026-09-25).
-  version: '2.1.0',
+  // (`sight.byKind`, решение владельца 2026-09-25). 2.2.0 — висящий патруль шаттлов
+  // видит свой круг (SHU-6.7): память пишет и миры под ним.
+  version: '2.2.0',
   setup(api) {
     // Continuous time advances refresh memory; captures and arrivals refresh it
     // immediately so a just-scouted world is remembered at once.
