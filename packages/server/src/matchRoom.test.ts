@@ -1321,6 +1321,107 @@ describe('MatchRoom — backpressure (drop a peer that stops draining)', () => {
     expect(closed).toBe(1013); // dropped with "try again later"
     expect(sent).toBe(0); // nothing queued onto the stuck peer
   });
+
+  it('leaves room for the full snapshot still on its way: a big welcome keeps the joiner', async () => {
+    // The 1675-province map's welcome is just over 1 MiB, and right after the join it still
+    // counts as unsent: with socket compression it waits in ws's queue uncompressed while
+    // zlib runs. Model that with a peer from which nothing drains.
+    const state = testState();
+    state.players.p1!.name = 'x'.repeat(1_100_000);
+    const r = new MatchRoom({
+      id: 'test-room',
+      initialState: state,
+      kernel: createKernel([renameModule]),
+      data: testData(),
+      now: () => 10,
+    });
+    const talker = new MemoryPeer();
+    r.addPeer('p2', talker);
+    const say = (text: string) =>
+      r.receive('p2', talker, JSON.stringify({ type: 'chat.send', channel: 'session', text }));
+    await say('hi'); // the joiner gets the chat back-log right after the welcome
+    let buffered = 0;
+    let closed: number | undefined;
+    const got: string[] = [];
+    const joiner: RoomPeer = {
+      get bufferedAmount() {
+        return buffered;
+      },
+      send: (data) => {
+        buffered += Buffer.byteLength(data);
+        got.push((JSON.parse(data) as ServerMessage).type);
+      },
+      close: (code) => {
+        closed = code;
+      },
+    };
+    r.addPeer('p1', joiner);
+    expect(buffered).toBeGreaterThan(1_048_576); // the welcome alone is over the cap
+    expect(got).toEqual(['welcome', 'chat.msg']);
+    await say('again');
+    expect(got).toEqual(['welcome', 'chat.msg', 'chat.msg']);
+    expect(closed).toBeUndefined();
+    buffered += 1_048_576; // a megabyte of backlog beyond the snapshot: a stuck client
+    await say('and again');
+    expect(closed).toBe(1013);
+  });
+
+  it('counts a resync as the snapshot on its way, as a welcome', async () => {
+    const r = room();
+    let buffered = 0;
+    let closed: number | undefined;
+    const got: string[] = [];
+    const p1: RoomPeer = {
+      get bufferedAmount() {
+        return buffered;
+      },
+      send: (data) => {
+        buffered += Buffer.byteLength(data);
+        got.push((JSON.parse(data) as ServerMessage).type);
+      },
+      close: (code) => {
+        closed = code;
+      },
+    };
+    r.addPeer('p1', p1); // a small welcome
+    // The view grows past the cap after the join (the server path: no wire payload limit).
+    expect(r.submitAction('p1', action('a1', 'p1', 'x'.repeat(1_100_000))).ok).toBe(true);
+    buffered = 0; // everything so far went out
+    const send = (message: object) => r.receive('p1', p1, JSON.stringify(message));
+    await send({ type: 'desync', seq: 1, hash: 'mismatch' }); // answered with the full view
+    expect(got.at(-1)).toBe('state');
+    expect(buffered).toBeGreaterThan(1_048_576);
+    await send({ type: 'ping', clientTime: 1 });
+    expect(got.at(-1)).toBe('pong');
+    expect(closed).toBeUndefined();
+  });
+});
+
+describe('MatchRoom — socket compression', () => {
+  it('sends the welcome that carries a seat ticket uncompressed, everything else as is', async () => {
+    const r = room();
+    const sent: Array<{ to: string; type: string; options?: { compress?: boolean } }> = [];
+    const peer = (to: string): RoomPeer => ({
+      send: (data, options) => {
+        const { type } = JSON.parse(data) as ServerMessage;
+        sent.push({ to, type, ...(options ? { options } : {}) });
+      },
+    });
+    const p1 = peer('p1');
+    r.addPeer('p1', p1, undefined, { seatTicket: 'ticket-of-p1' });
+    r.addPeer('p2', peer('p2'));
+    await r.receive(
+      'p1',
+      p1,
+      JSON.stringify({ type: 'action', matchId: 'test-room', action: action('a1', 'p1', 'Uno') }),
+    );
+    expect(sent).toEqual([
+      { to: 'p1', type: 'welcome', options: { compress: false } },
+      { to: 'p2', type: 'welcome' },
+      { to: 'p1', type: 'delta' },
+      { to: 'p2', type: 'delta' },
+    ]);
+  });
 });
 
 // BF-15/BF-16: event fog. Personal and bilateral events (research, steward,

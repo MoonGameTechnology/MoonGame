@@ -6,7 +6,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import type { Duplex } from 'node:stream';
 import type { PlayerId } from '@void/shared-core';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
-import { WebSocket, WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer, type PerMessageDeflateOptions } from 'ws';
 import type { MatchRoom } from './matchRoom';
 import { InMemoryRoomRegistry, type RoomRegistry } from './roomRegistry';
 import type { AccountStore } from './store';
@@ -197,6 +197,31 @@ export const SOCKET_FLOOD_WINDOW_MS = 1_000;
  *  2s ping), so 50 is slack. */
 export const SOCKET_FLOOD_MAX = 50;
 
+/**
+ * Socket compression (permessage-deflate, RFC 7692). A full snapshot (welcome, resync) is
+ * about 0.5 MB of JSON on the 831-province map and just over 1 MB on the 1675-province one,
+ * and deflates about 6x: on a phone link that is the wait before the map appears, after
+ * every reconnect too. A delta is mostly under `threshold` and goes out as is. Browsers
+ * inflate natively.
+ *
+ * - `serverNoContextTakeover`: each message is compressed on its own, so no message's
+ *   compressed length depends on another's content (the CRIME family), and ws applies
+ *   `threshold` only in this mode.
+ * - `serverMaxWindowBits: 12` with `memLevel: 5`: about 0.3-0.4 MB of server memory per
+ *   connection instead of 0.5 MB at zlib's defaults, for a snapshot about 1% larger
+ *   (measured on both maps). These are also the defaults of Python's `websockets`.
+ * - No `clientMaxWindowBits`: WebKit (every iOS browser) offers a bare `permessage-deflate`,
+ *   and ws refuses the whole handshake (400) when it has a client window to impose.
+ * - Clients may compress their messages too; `maxPayload` bounds the INFLATED size (ws
+ *   closes with 1009 past it), so a small compressed bomb cannot grow past the cap.
+ */
+const SOCKET_DEFLATE: PerMessageDeflateOptions = {
+  serverNoContextTakeover: true,
+  serverMaxWindowBits: 12,
+  zlibDeflateOptions: { memLevel: 5 },
+  threshold: 1024,
+};
+
 export function createMultiplayerServer(
   options: MultiplayerServerOptions,
 ): MultiplayerServerHandle {
@@ -208,7 +233,11 @@ export function createMultiplayerServer(
   }
   const registry: RoomRegistry =
     options.registry ?? new InMemoryRoomRegistry([options.room as MatchRoom]);
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 32_768 });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: 32_768,
+    perMessageDeflate: SOCKET_DEFLATE,
+  });
 
   const indexHtml = options.indexHtml;
   const ready = options.ready;
@@ -631,8 +660,9 @@ export function createMultiplayerServer(
       sockets.add(ws);
       alive.set(ws, true);
       ws.on('pong', () => alive.set(ws, true));
-      // A frame ws rejects (over `maxPayload`, malformed) makes it close the socket (1009,
-      // 1002) and then emit 'error'. Unheard, that error is an uncaught exception, on which
+      // A frame ws rejects (over `maxPayload`, counted inflated when compressed; malformed)
+      // makes it close the socket (1009, 1002) and then emit 'error', and so does a failed
+      // compression on our side. Unheard, that error is an uncaught exception, on which
       // the hosts' fatal handler (`fatal.ts`) ends the process with every match in it: one
       // client could stop the server. The socket is closing already; the operator gets a line.
       ws.on('error', (err) => {

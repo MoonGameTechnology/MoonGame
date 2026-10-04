@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
+import { request } from 'node:http';
 import { connect, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
+import { constants, deflateRawSync, inflateRawSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import {
@@ -31,15 +33,15 @@ const markerModule: GameModule = {
   },
 };
 
-function player(id: string): Player {
-  return { id, name: id, faction: id, status: 'active', resources: {} };
+function player(id: string, name = id): Player {
+  return { id, name, faction: id, status: 'active', resources: {} };
 }
 
-function makeRoom(): MatchRoom {
+function makeRoom(p1Name = 'p1'): MatchRoom {
   const base = createInitialState({ seed: 'ws-test', version: { data: 'test', manifest: 'test' } });
   return new MatchRoom({
     id: 'ws-room',
-    initialState: { ...base, players: { p1: player('p1'), p2: player('p2') } },
+    initialState: { ...base, players: { p1: player('p1', p1Name), p2: player('p2') } },
     kernel: createKernel([markerModule]),
     data: parseGameData({
       version: 'test',
@@ -447,6 +449,179 @@ describe('заголовки доставки клиента (SE-7.1)', () => {
       expect(res.headers.get('x-content-type-options')).toBe('nosniff');
       expect(res.headers.get('referrer-policy')).toBe('no-referrer');
     } finally {
+      await server.close();
+    }
+  });
+});
+
+/** A WebSocket handshake by hand, offering `extensions` exactly as a browser words it. */
+function upgrade(
+  url: string,
+  extensions?: string,
+): Promise<{ status: number; extensions?: string; socket?: Socket; head?: Buffer }> {
+  return new Promise((resolve, reject) => {
+    const req = request(url.replace(/^ws/, 'http'), {
+      headers: {
+        Connection: 'Upgrade',
+        Upgrade: 'websocket',
+        'Sec-WebSocket-Version': '13',
+        'Sec-WebSocket-Key': randomBytes(16).toString('base64'),
+        ...(extensions ? { 'Sec-WebSocket-Extensions': extensions } : {}),
+      },
+    });
+    req.on('upgrade', (res, socket, head) => {
+      const ext = res.headers['sec-websocket-extensions'];
+      resolve({ status: res.statusCode ?? 0, ...(ext ? { extensions: ext } : {}), socket, head });
+    });
+    req.on('response', (res) => resolve({ status: res.statusCode ?? 0 }));
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+interface Frame {
+  opcode: number;
+  rsv1: boolean;
+  payload: Buffer;
+}
+
+/** The server's frames off a raw socket, one at a time (a server never masks). */
+function frameReader(socket: Socket, head: Buffer): () => Promise<Frame> {
+  let buf = head;
+  const ready: Frame[] = [];
+  let waiting: ((f: Frame) => void) | null = null;
+  const parse = (): void => {
+    for (;;) {
+      if (buf.length < 2) return;
+      let len = buf[1]! & 0x7f;
+      let at = 2;
+      if (len === 126) {
+        if (buf.length < 4) return;
+        len = buf.readUInt16BE(2);
+        at = 4;
+      } else if (len === 127) {
+        if (buf.length < 10) return;
+        len = Number(buf.readBigUInt64BE(2));
+        at = 10;
+      }
+      if (buf.length < at + len) return;
+      const frame = {
+        opcode: buf[0]! & 0x0f,
+        rsv1: (buf[0]! & 0x40) !== 0,
+        payload: buf.subarray(at, at + len),
+      };
+      buf = buf.subarray(at + len);
+      if (waiting) {
+        const w = waiting;
+        waiting = null;
+        w(frame);
+      } else ready.push(frame);
+    }
+  };
+  socket.on('data', (chunk: Buffer) => {
+    buf = Buffer.concat([buf, chunk]);
+    parse();
+  });
+  parse();
+  return () => {
+    const f = ready.shift();
+    return f ? Promise.resolve(f) : new Promise((resolve) => (waiting = resolve));
+  };
+}
+
+/** A permessage-deflate payload back to text: the sender flushed (no final block) and
+ *  dropped the 00 00 ff ff tail of the flush. */
+const inflate = (payload: Buffer): string =>
+  inflateRawSync(Buffer.concat([payload, Buffer.from([0, 0, 0xff, 0xff])]), {
+    finishFlush: constants.Z_SYNC_FLUSH,
+  }).toString();
+
+/** A client's compressed text frame (RSV1 set, masked) carrying `text`, as a browser
+ *  compresses it: raw deflate, flushed, without the 00 00 ff ff tail. */
+function compressedFrame(text: string): Buffer {
+  const payload = deflateRawSync(text, { finishFlush: constants.Z_SYNC_FLUSH }).subarray(0, -4);
+  const mask = randomBytes(4);
+  const head =
+    payload.length < 126
+      ? Buffer.from([0xc1, 0x80 | payload.length])
+      : Buffer.from([0xc1, 0x80 | 126, payload.length >> 8, payload.length & 0xff]);
+  return Buffer.concat([head, mask, payload.map((b, i) => b ^ mask[i % 4]!)]);
+}
+
+describe('socket compression (permessage-deflate)', () => {
+  const AGREED = 'permessage-deflate; server_no_context_takeover; server_max_window_bits=12';
+
+  it('agrees to the offers browsers make: bare from WebKit (every iOS browser), windowed from Chromium', async () => {
+    const server = createMultiplayerServer({ room: makeRoom() });
+    const url = await server.listen();
+    try {
+      for (const offer of ['permessage-deflate', 'permessage-deflate; client_max_window_bits']) {
+        const r = await upgrade(`${url}?player=p1`, offer);
+        expect([offer, r.status, r.extensions]).toEqual([offer, 101, AGREED]);
+        r.socket?.destroy();
+      }
+      const plain = await upgrade(`${url}?player=p2`); // no offer: the socket stays uncompressed
+      expect([plain.status, plain.extensions]).toEqual([101, undefined]);
+      plain.socket?.destroy();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('sends a full snapshot compressed and whole, a small delta as is', async () => {
+    const server = createMultiplayerServer({ room: makeRoom('Империя '.repeat(5_000)) });
+    const url = await server.listen();
+    const p2 = new WebSocket(`${url}?player=p2`);
+    const p2Open = once(p2, 'open');
+    try {
+      const r = await upgrade(`${url}?player=p1`, 'permessage-deflate'); // as WebKit offers it
+      const next = frameReader(r.socket!, r.head!);
+      const welcome = await next();
+      const json = inflate(welcome.payload);
+      expect(welcome.rsv1).toBe(true);
+      expect(JSON.parse(json)).toMatchObject({ type: 'welcome', playerId: 'p1' });
+      expect(welcome.payload.length * 20).toBeLessThan(Buffer.byteLength(json));
+
+      await p2Open;
+      p2.send(
+        JSON.stringify({
+          type: 'action',
+          action: { id: 'p2:1', type: 'marker.set', playerId: 'p2', issuedAt: 1, payload: {} },
+        }),
+      );
+      const delta = await next(); // under the threshold: not worth compressing
+      expect(delta.rsv1).toBe(false);
+      expect(JSON.parse(delta.payload.toString())).toMatchObject({ type: 'delta', seq: 1 });
+      r.socket?.destroy();
+    } finally {
+      p2.close();
+      await server.close();
+    }
+  });
+
+  it('cuts a compressed client message off at the payload cap, counted inflated', async () => {
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const server = createMultiplayerServer({ room: makeRoom() });
+    const url = await server.listen();
+    try {
+      const r = await upgrade(`${url}?player=p1`, 'permessage-deflate');
+      const next = frameReader(r.socket!, r.head!);
+      // 200 KB that deflates to a few hundred bytes: small on the wire, over the cap inflated.
+      const bomb = compressedFrame(
+        JSON.stringify({ type: 'chat.send', channel: 'session', text: 'a'.repeat(200_000) }),
+      );
+      expect(bomb.length).toBeLessThan(1_000);
+      r.socket!.write(bomb);
+      let frame = await next(); // the welcome first
+      while (frame.opcode !== 0x8) frame = await next();
+      expect(frame.payload.readUInt16BE(0)).toBe(1009); // message too big
+      expect(write).toHaveBeenCalledWith(expect.stringContaining('Max payload size exceeded'));
+      const p2 = new WebSocket(`${url}?player=p2`);
+      expect(await nextMessage(p2)).toMatchObject({ type: 'welcome' });
+      p2.close();
+      r.socket?.destroy();
+    } finally {
+      write.mockRestore();
       await server.close();
     }
   });

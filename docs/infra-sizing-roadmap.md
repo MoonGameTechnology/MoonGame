@@ -41,8 +41,9 @@
 | CPU на действие | O(игроков): на действие — цикл по пирам с `visibleState`+`diffState`+delta на каждого | `broadcastState` в `matchRoom.ts` |
 | Память live-state | ~(игроки+1) клонов `GameState` на комнату (`stateValue` + `lastVisible` на игрока) | `stateValue` + `lastVisible` в `matchRoom.ts` |
 | Потолок burst | 20 действий/с/игрок; 50 msg/с/сокет (pre-parse) | `ACTION_RATE_MAX_DEFAULT` в `matchRoom.ts`; `SOCKET_FLOOD_MAX` в `wsServer.ts` |
-| Backpressure-cap | 1 MiB на сокет, дальше drop (close 1013) | `MAX_BUFFERED_BYTES` в `matchRoom.ts` |
-| Payload-cap | 32 KB вход | `maxPayload` в `wsServer.ts` |
+| Backpressure-cap | 1 MiB на сокет сверх последнего полного снимка, дальше drop (close 1013) | `MAX_BUFFERED_BYTES` в `matchRoom.ts` |
+| Payload-cap | 32 KB вход (разжатый размер) | `maxPayload` в `wsServer.ts` |
+| Сжатие сокета | permessage-deflate: снимок ~6× меньше на проводе, дельта меньше 1 КБ как есть; ~0,3–0,37 МБ памяти на соединение | `SOCKET_DEFLATE` в `wsServer.ts` |
 | Данные игры | **~33 KB** JSON | `wc -c data/*.json` = 33 451 |
 
 **Реальный драйвер стоимости** — CPU на действие внутри одного event-loop, не число
@@ -51,7 +52,8 @@
 **Память тривиальна:** ~(игроки+1) объектов размером с `GameState` на комнату; на 10
 комнат — десятки МБ. Структурная формула сверена с кодом (`lastVisible` = 1 клон на
 игрока); абсолютный размер сериализованного `GameState` — **[оценка]** десятки-сотни КБ,
-подтвердить замером в OPS-1.2.
+подтвердить замером в OPS-1.2. Сверху — сжатие сокета, ~0,3–0,37 МБ на соединение (замер на
+200 соединениях, 2026-10-04): на 100 игроков это ~35 МБ.
 
 ## Архитектура
 

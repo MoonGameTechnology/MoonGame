@@ -308,7 +308,8 @@ reconnect(lastSeq): missing patches | snapshot
 - interest management: клиент подписан только на видимые/близкие sectors;
 - low-frequency background updates для далёких объектов;
 - high-frequency only for selected/visible fleets;
-- compression/binary protocol только после стабилизации JSON-протокола.
+- compression/binary protocol только после стабилизации JSON-протокола (сжатие транспорта,
+  permessage-deflate, включено 2026-10-04: протокол оно не меняет).
 
 Моё предложение: не начинать с binary protocol. Сначала JSON + строгие версии + тесты, потом оптимизировать размер.
 
