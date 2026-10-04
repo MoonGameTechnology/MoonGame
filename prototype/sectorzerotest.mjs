@@ -344,10 +344,10 @@ try {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     assert.deepEqual(await motion(), ['none', 'none', 'none'], 'reduced motion — покой');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    // PVR-6.9: маршрут глав — шесть узлов до эпицентра; закрытый узел показывает карточку,
-    // но главу не меняет, играбельный — выбирает.
+    // PVR-6.9: маршрут глав — шесть узлов до эпицентра. С главой VI (PVR-8.7) узлов «сигнал
+    // потерян» на нём нет, и новый профиль стоит на первой главе.
     assert.equal(await page.locator('#sz-route .sz-node').count(), 6, 'путь во всю кампанию');
-    await page.locator('#sz-route [data-lost]').first().click({ force: true });
+    assert.equal(await page.locator('#sz-route [data-lost]').count(), 0, 'все шесть глав открыты');
     assert.equal(await page.locator('#sz-route [aria-pressed="true"]').getAttribute('data-mission'), '0');
     assert.notEqual(await page.locator('#sz-chapter-stats').textContent(), null);
     // PVR-7.6: дверь главы IV — узел выбирается, у главы своя мозаика и двенадцать задач
@@ -366,6 +366,15 @@ try {
     assert.equal(await page.locator('#sz-map-body polygon').count(), 44, 'мозаика главы V');
     assert.match(await page.locator('#sz-chapter-stats').textContent(), /12/, 'задачи главы V');
     assert.equal(await page.locator('#sz-chapter-hero').isVisible(), false, 'у главы V нет героя-награды');
+    // PVR-8.7: дверь главы VI «Нулевой комплекс» — шестой узел, эпицентр пути: своя мозаика из
+    // 50 клеток и двенадцать задач, героя-награды нет.
+    await page.locator('#sz-mission-5').click();
+    assert.equal(await page.locator('#sz-mission-5').getAttribute('aria-pressed'), 'true');
+    assert.match(await page.locator('#sz-chapter-name').textContent(), /^VI · /, 'название главы VI');
+    await page.locator('#sz-map-panel').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#sz-map-body polygon').count(), 50, 'мозаика главы VI');
+    assert.match(await page.locator('#sz-chapter-stats').textContent(), /12/, 'задачи главы VI');
+    assert.equal(await page.locator('#sz-chapter-hero').isVisible(), false, 'у главы VI нет героя-награды');
     await page.locator('#sz-mission-1').click();
     assert.equal(await page.locator('#sz-mission-1').getAttribute('aria-pressed'), 'true');
     // Выбор главы открывает её карту справа: клетка на каждый из 24 секторов главы II,

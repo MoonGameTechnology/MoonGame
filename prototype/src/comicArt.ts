@@ -73,7 +73,7 @@ export const CHAPTER_COMICS: ComicRegistry = {
     outro: [{ image: pve5Outro1 }],
   },
   // Глава VI (§8.9–8.10): «Последний приют» и «Мы пришли за людьми» — по событиям главы,
-  // эпилог Учёного — только после победы. В игру глава войдёт с дверью (PVR-8.7).
+  // эпилог Учёного — только после победы.
   'pve-6': {
     intro: [{ image: pve6Intro1 }],
     refuge: [{ image: pve6Refuge1 }],

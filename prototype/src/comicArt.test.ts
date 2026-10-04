@@ -21,16 +21,10 @@ import {
   pveModeId,
   pveState,
 } from '../../packages/client/src/gameData';
-import {
-  buildStateFromMap,
-  parseMatchMap,
-  type GameState,
-  type MapObjective,
-} from '../../packages/shared-core/src/index';
+import type { GameState, MapObjective } from '../../packages/shared-core/src/index';
 import { chapterChain } from '../../decisions/chapterChain';
 import { shippedGameData } from '../../data/bundle';
 import trainingMap from '../../data/maps/training-1.json';
-import pve6Map from '../../data/maps/pve-6.json';
 import { advance, setMatchMode } from './game';
 import { CHAPTER_COMICS, COMIC_TRIGGERS } from './comicArt';
 
@@ -48,26 +42,16 @@ function artFiles(dir = ART, prefix = ''): string[] {
 
 const MISSIONS = Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveChapter(i).id);
 
-/** Главы, чья карта уже собрана, а дверь ещё нет (глава VI войдёт в игру с PVR-8.7): их комиксы
- *  подключаются заранее и сыграют, как только глава появится на маршруте. */
-const AWAITING_DOOR = { [pve6Map.id]: pve6Map } as const;
-
 afterEach(() => setMatchMode(undefined));
 
 /** Мир главы с первого шага часов, как в забеге: штурм заведён (`state.pve`), и цепочка
  *  главы с контрактом операции уже видна. */
 function chapterStart(chapter: string): { state: GameState; objectives: MapObjective[] } | null {
-  const data = shippedGameData();
   const i = MISSIONS.indexOf(chapter);
-  const json = i < 0 ? AWAITING_DOOR[chapter] : undefined;
-  if (i < 0 && !json) return null;
-  const map = json ? parseMatchMap(json) : null;
-  const state = map ? { ...buildStateFromMap(map, data), mapId: map.id } : pveState(data, i);
-  setMatchMode(map ? map.mode : pveModeId(i));
-  return {
-    state: advance(state, state.time + 1).state,
-    objectives: map ? map.objectives : pveChapter(i).objectives,
-  };
+  if (i < 0) return null;
+  const state = pveState(shippedGameData(), i);
+  setMatchMode(pveModeId(i));
+  return { state: advance(state, state.time + 1).state, objectives: pveChapter(i).objectives };
 }
 
 /** Чем глава может звать комикс по событиям: её задачи, шаги главной цепочки (главы IV–VI) и
@@ -84,11 +68,7 @@ function triggersOf(chapter: string): string[] {
 
 describe('комиксы глав — реестр и папка арта', () => {
   // Полигон «Протокол допуска» — тоже глава для комикса: его вступление играет перед ним.
-  const chapters = [trainingMap.id, ...MISSIONS, ...Object.keys(AWAITING_DOOR)];
-
-  it('глава без двери — с картой и ещё не на маршруте: с дверью её убирают из списка', () => {
-    for (const id of Object.keys(AWAITING_DOOR)) expect(MISSIONS, id).not.toContain(id);
-  });
+  const chapters = [trainingMap.id, ...MISSIONS];
 
   it('реестр чист: главы настоящие, панели с картинкой, подписи есть в обеих локалях', () => {
     expect(chapters.length).toBeGreaterThan(0);
