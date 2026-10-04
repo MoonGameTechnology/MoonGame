@@ -4,17 +4,30 @@
  * комикс чужой главы, подпись без перевода, картинка, которая лежит в папке, но не
  * подключена (или подключена, но лежит не там), и имя файла, которое площадка не примет.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { comicProblems } from '../../decisions/chapterComics';
+import { COMIC_MOMENTS, TRIGGERED_MOMENTS, comicProblems } from '../../decisions/chapterComics';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
-import { PVE_MISSION_COUNT, pveChapter, pveState } from '../../packages/client/src/gameData';
+import {
+  PVE_MISSION_COUNT,
+  pveChapter,
+  pveModeId,
+  pveState,
+} from '../../packages/client/src/gameData';
+import {
+  buildStateFromMap,
+  parseMatchMap,
+  type GameState,
+  type MapObjective,
+} from '../../packages/shared-core/src/index';
 import { chapterChain } from '../../decisions/chapterChain';
 import { shippedGameData } from '../../data/bundle';
 import trainingMap from '../../data/maps/training-1.json';
-import { CHAPTER_COMICS, COMIC_TASK_TRIGGERS } from './comicArt';
+import pve6Map from '../../data/maps/pve-6.json';
+import { advance, setMatchMode } from './game';
+import { CHAPTER_COMICS, COMIC_TRIGGERS } from './comicArt';
 
 const ART = fileURLToPath(new URL('../art/comics/', import.meta.url));
 const REGISTRY_SRC = readFileSync(new URL('./comicArt.ts', import.meta.url), 'utf8');
@@ -28,21 +41,45 @@ function artFiles(dir = ART, prefix = ''): string[] {
   );
 }
 
-/** Чем глава может звать комикс `task`: её задачи и шаги главной цепочки (глава IV). */
-function triggersOf(chapter: string): string[] {
-  const i = Array.from({ length: PVE_MISSION_COUNT }, (_, n) => pveChapter(n).id).indexOf(chapter);
-  if (i < 0) return [];
+const MISSIONS = Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveChapter(i).id);
+
+/** Главы, чья карта уже собрана, а дверь ещё нет (глава VI войдёт в игру с PVR-8.7): их комиксы
+ *  подключаются заранее и сыграют, как только глава появится на маршруте. */
+const AWAITING_DOOR = { [pve6Map.id]: pve6Map } as const;
+
+afterEach(() => setMatchMode(undefined));
+
+/** Мир главы с первого шага часов, как в забеге: штурм заведён (`state.pve`), и цепочка
+ *  главы с контрактом операции уже видна. */
+function chapterStart(chapter: string): { state: GameState; objectives: MapObjective[] } | null {
   const data = shippedGameData();
-  const chain = chapterChain(pveState(data, i), 'p1', 1, data) ?? [];
-  return [...pveChapter(i).objectives.map((o) => o.id), ...chain.map((st) => st.key)];
+  const i = MISSIONS.indexOf(chapter);
+  const json = i < 0 ? AWAITING_DOOR[chapter] : undefined;
+  if (i < 0 && !json) return null;
+  const map = json ? parseMatchMap(json) : null;
+  const state = map ? { ...buildStateFromMap(map, data), mapId: map.id } : pveState(data, i);
+  setMatchMode(map ? map.mode : pveModeId(i));
+  return {
+    state: advance(state, state.time + 1).state,
+    objectives: map ? map.objectives : pveChapter(i).objectives,
+  };
+}
+
+/** Чем глава может звать комикс по событиям: её задачи и шаги главной цепочки (главы IV и VI). */
+function triggersOf(chapter: string): string[] {
+  const start = chapterStart(chapter);
+  if (!start) return [];
+  const chain = chapterChain(start.state, 'p1', 1, shippedGameData()) ?? [];
+  return [...start.objectives.map((o) => o.id), ...chain.map((st) => st.key)];
 }
 
 describe('комиксы глав — реестр и папка арта', () => {
   // Полигон «Протокол допуска» — тоже глава для комикса: его вступление играет перед ним.
-  const chapters = [
-    trainingMap.id,
-    ...Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveChapter(i).id),
-  ];
+  const chapters = [trainingMap.id, ...MISSIONS, ...Object.keys(AWAITING_DOOR)];
+
+  it('глава без двери — с картой и ещё не на маршруте: с дверью её убирают из списка', () => {
+    for (const id of Object.keys(AWAITING_DOOR)) expect(MISSIONS, id).not.toContain(id);
+  });
 
   it('реестр чист: главы настоящие, панели с картинкой, подписи есть в обеих локалях', () => {
     expect(chapters.length).toBeGreaterThan(0);
@@ -51,11 +88,8 @@ describe('комиксы глав — реестр и папка арта', () =
   });
 
   it('в папке только арт и инструкция; имена — латиница, цифры и дефис (требование 1.22)', () => {
-    const odd = artFiles().filter(
-      (f) =>
-        f !== 'README.md' &&
-        !/^[a-z0-9-]+\/(intro|outro|task|echo|echo-record)(-en)?-\d+\.webp$/.test(f),
-    );
+    const name = new RegExp(`^[a-z0-9-]+/(${COMIC_MOMENTS.join('|')})(-en)?-\\d+\\.webp$`);
+    const odd = artFiles().filter((f) => f !== 'README.md' && !name.test(f));
     expect(odd, 'файлы вне схемы <глава>/<момент>-<n>.webp').toEqual([]);
   });
 
@@ -74,18 +108,20 @@ describe('комиксы глав — реестр и папка арта', () =
     ).toEqual([]);
   });
 
-  it('у комикса `task` есть задача-триггер, и она есть в главе', () => {
-    for (const [chapter, moments] of Object.entries(CHAPTER_COMICS)) {
-      if (!moments.task) continue;
-      const task = COMIC_TASK_TRIGGERS[chapter];
-      expect(task, `${chapter}: нет задачи-триггера`).toBeTruthy();
-      expect(triggersOf(chapter)).toContain(task);
-    }
+  it('у комикса по событиям есть триггер, и он есть в главе', () => {
+    for (const [chapter, moments] of Object.entries(CHAPTER_COMICS))
+      for (const moment of TRIGGERED_MOMENTS) {
+        if (!moments[moment]) continue;
+        const trigger = COMIC_TRIGGERS[chapter]?.[moment];
+        expect(trigger, `${chapter}:${moment}: нет триггера`).toBeTruthy();
+        expect(triggersOf(chapter)).toContain(trigger);
+      }
   });
 
   it('каждый триггер — задача или шаг цепочки своей главы (арт может прийти позже)', () => {
-    for (const [chapter, task] of Object.entries(COMIC_TASK_TRIGGERS))
-      expect(triggersOf(chapter), chapter).toContain(task);
+    for (const [chapter, moments] of Object.entries(COMIC_TRIGGERS))
+      for (const trigger of Object.values(moments))
+        expect(triggersOf(chapter), chapter).toContain(trigger);
   });
 
   it('инструкция для художника лежит рядом с артом', () => {

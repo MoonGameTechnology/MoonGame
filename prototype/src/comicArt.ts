@@ -14,7 +14,7 @@
  *
  * Пусто — значит комиксов пока нет, и игра идёт как раньше.
  */
-import type { ComicRegistry, ComicTaskTriggers } from '../../decisions/chapterComics';
+import type { ComicRegistry, ComicTriggers } from '../../decisions/chapterComics';
 import training1Intro1 from '../art/comics/training-1/intro-1.webp';
 import training1IntroEn1 from '../art/comics/training-1/intro-en-1.webp';
 import pve1Intro1 from '../art/comics/pve-1/intro-1.webp';
@@ -30,6 +30,10 @@ import pve3Outro1 from '../art/comics/pve-3/outro-1.webp';
 import pve4Intro1 from '../art/comics/pve-4/intro-1.webp';
 import pve4Task1 from '../art/comics/pve-4/task-1.webp';
 import pve4Outro1 from '../art/comics/pve-4/outro-1.webp';
+import pve6Intro1 from '../art/comics/pve-6/intro-1.webp';
+import pve6Refuge1 from '../art/comics/pve-6/refuge-1.webp';
+import pve6Rescued1 from '../art/comics/pve-6/rescued-1.webp';
+import pve6Outro1 from '../art/comics/pve-6/outro-1.webp';
 
 // Реплики нарисованы на самих страницах. Пока английская версия есть только у
 // учебного вступления; остальные страницы используют русский оригинал.
@@ -55,11 +59,22 @@ export const CHAPTER_COMICS: ComicRegistry = {
     task: [{ image: pve4Task1 }],
     outro: [{ image: pve4Outro1 }],
   },
+  // Глава VI (§8.9–8.10): «Последний приют» и «Мы пришли за людьми» — по событиям главы,
+  // эпилог Учёного — только после победы. В игру глава войдёт с дверью (PVR-8.7).
+  'pve-6': {
+    intro: [{ image: pve6Intro1 }],
+    refuge: [{ image: pve6Refuge1 }],
+    rescued: [{ image: pve6Rescued1 }],
+    outro: [{ image: pve6Outro1 }],
+  },
 };
 
-/** После какой задачи главы играет её комикс `task`. Триггером может быть и шаг главной
- *  цепочки главы (`decisions/chapterChain.ts`): у главы IV это встреча с союзником (§6.8). */
-export const COMIC_TASK_TRIGGERS: ComicTaskTriggers = {
-  'pve-1': 'mission.rescue-scientist',
-  'pve-4': 'chain.contact',
+/** После какой задачи главы играет комикс момента по событиям. Триггером может быть и шаг
+ *  главной цепочки главы (`decisions/chapterChain.ts`): у главы IV это встреча с союзником
+ *  (§6.8), у главы VI — доки найдены (запись и живой сигнал, §8.4) и основная эвакуация
+ *  завершена (§8.9). */
+export const COMIC_TRIGGERS: ComicTriggers = {
+  'pve-1': { task: 'mission.rescue-scientist' },
+  'pve-4': { task: 'chain.contact' },
+  'pve-6': { refuge: 'chain.docks', rescued: 'chain.evacuate' },
 };

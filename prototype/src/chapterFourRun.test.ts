@@ -2,11 +2,11 @@ import { describe, it, expect, afterEach } from 'vitest';
 
 import { advance, order, setMatchMode, setMatchTravelSpeed } from './game';
 import { data } from './gameData';
-import { COMIC_TASK_TRIGGERS } from './comicArt';
+import { COMIC_TRIGGERS } from './comicArt';
 import { extractionNeedMs, getStance, type GameState } from '../../packages/shared-core/src/index';
 import { pveModeId, pveState } from '../../packages/client/src/gameData';
 import { chapterChain, extractionCandidates, type ChapterStep } from '../../decisions/chapterChain';
-import { comicTaskDue, type ComicRegistry } from '../../decisions/chapterComics';
+import { comicsTriggered, type ComicRegistry } from '../../decisions/chapterComics';
 import { extractionStart, moveFleet } from '../../decisions/actions';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
@@ -77,17 +77,17 @@ describe('глава IV через дверь: главная цепочка ш�
   it('связь → союз → архив → извлечение → доставка → победа; панель и комикс идут следом', () => {
     const fakeComic: ComicRegistry = { 'pve-4': { task: [{ image: 'встреча.webp' }] } };
     const comicDue = (s: GameState) =>
-      comicTaskDue({ comicsSeen: [] }, fakeComic, COMIC_TASK_TRIGGERS, 'pve-4', doneKeys(s));
+      comicsTriggered({ comicsSeen: [] }, fakeComic, COMIC_TRIGGERS, 'pve-4', doneKeys(s));
 
     let s = start();
-    expect(comicDue(s)).toBeNull();
+    expect(comicDue(s)).toEqual([]);
 
     // 1. Связь: флот игрока долетает до точки встречи.
     s = flyTo(s, 'p1_1', 'rendezvous');
     expect(getStance(s, 'p1', 'ally')).toBe('alliance');
     expect(activeStep(s)).toBe('archive');
     // Комикс встречи офицеров (§6.8) положен ровно с этого шага.
-    expect(comicDue(s)).not.toBeNull();
+    expect(comicDue(s)).toEqual(['task']);
 
     // 2. Архив очищен — штурм не играется (см. шапку).
     s = {

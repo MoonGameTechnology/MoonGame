@@ -42,6 +42,20 @@ describe('комиксы глав — проводка', () => {
     expect(MAIN).toContain('if (isSectorZeroRun()) playTaskComic(missions, chain);');
   });
 
+  it('комиксы по событиям — каждый момент таблицы, сцены главы VI тоже, и раньше финала', () => {
+    expect(MAIN).toMatch(
+      /for \(const moment of comicsTriggered\(sectorProgress, comicArt\.registry, COMIC_TRIGGERS, chapter, complete\)\)\n\s+playChapterComic\(chapter, moment, \(\) => \{\}\);/,
+    );
+    // Победный кадр: сцена и задача встают в очередь раньше финала главы.
+    const block =
+      /if \(sectorAttempt > 0 && clearedAttempt !== sectorAttempt\) \{[\s\S]*?\n {4}\}/.exec(
+        MAIN,
+      )?.[0] ?? '';
+    const scenes = block.indexOf('playTaskComic(runMissionRows(), runChain());');
+    expect(scenes).toBeGreaterThan(-1);
+    expect(scenes).toBeLessThan(block.indexOf("'outro'"));
+  });
+
   it('«назад» и Escape закрывают комикс первым — он верхняя ступень лестницы', () => {
     const ladder = /const BACK_LAYERS: BackLayer\[\] = \[\n\s+\{ id: '([^']+)'/.exec(MAIN)?.[1];
     expect(ladder).toBe('comic');
