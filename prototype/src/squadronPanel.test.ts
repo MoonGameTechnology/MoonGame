@@ -129,3 +129,53 @@ describe('SHU-5.5 — места и корпус звена', () => {
     expect(card?.hull).toBeNull();
   });
 });
+
+describe('SHU-6.3 — кнопка «Патруль»', () => {
+  it('ПЕРЕХВАТЧИК И СТРАЙКЕРЫ ПАТРУЛИРУЮТ: у них есть часы и круг патруля', () => {
+    const cards = squadronCards(
+      view([
+        sq('a', [['interceptor', 2]]),
+        sq('b', [['bomber', 1]]),
+        sq('c', [['heavy_striker', 1]]),
+      ]),
+      { mine: true, data },
+    );
+    expect(cards.map((c) => c.canPatrol)).toEqual([true, true, true]);
+  });
+
+  it('ДЕСАНТНЫЙ ЧЕЛНОК КНОПКИ НЕ ПОЛУЧАЕТ: ядро отбило бы его `E_CANNOT_PATROL`', () => {
+    // Без бойца в трюме, чтобы проверялось именно правило часов, а не груз.
+    const [card] = squadronCards(view([sq('a', [['landing_shuttle', 1]])]), { mine: true, data });
+    expect(card?.canPatrol).toBe(false);
+  });
+
+  it('СМЕШАННОЕ ЗВЕНО ВИСИТ ПО СЛАБОМУ: с челноком внутри патрулировать нечем', () => {
+    const [card] = squadronCards(view([sq('a', [['interceptor', 2], ['landing_shuttle', 1]])]), {
+      mine: true,
+      data,
+    });
+    expect(card?.canPatrol).toBe(false);
+  });
+
+  it('ЗВЕНО С ГРУЗОМ НЕ ПАТРУЛИРУЕТ: обратная нога сажает только машины (`E_HAS_CARGO`)', () => {
+    const [card] = squadronCards(view([sq('a', [['interceptor', 2]], [['militia', 1]])]), {
+      mine: true,
+      data,
+    });
+    expect(card?.canPatrol).toBe(false);
+  });
+
+  it('ЧУЖОЙ ЭСКАДРЕ ПАТРУЛЬ НЕ ПРЕДЛАГАЮТ', () => {
+    const [card] = squadronCards(view([sq('a', [['interceptor', 2]])]), { mine: false, data });
+    expect(card?.canPatrol).toBe(false);
+  });
+
+  it('ГОТОВНОСТЬ БАЗЫ У ПАТРУЛЯ ТА ЖЕ, ЧТО У УДАРА: перезарядка гасит обе кнопки разом', () => {
+    const [card] = squadronCards(view([sq('a', [['interceptor', 2]])], { blocked: 'rearming' }), {
+      mine: true,
+      data,
+    });
+    expect(card?.canPatrol).toBe(true); // умеет
+    expect(card?.canStrike).toBe(false); // но база не готова — кнопка серая
+  });
+});

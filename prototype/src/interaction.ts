@@ -42,7 +42,11 @@ export interface Armed {
   retreatAim: string;
   heroAim: { heroId: string; abilityId: string };
   heroSpawnAim: string;
-  strikeAim: { from: { planetId: string } | { fleetId: string }; squadronId: string };
+  strikeAim: {
+    from: { planetId: string } | { fleetId: string };
+    squadronId: string;
+    patrol?: true;
+  };
   allyAim: AllyOrderKind;
   squadMerge: { from: string };
   cmdMore: true;
@@ -82,7 +86,9 @@ export let heroSpawnAim: string | null = null;
  *  вылета одна, а баз у игрока много, и без источника приказ пришлось бы угадывать по
  *  выделению. БАЗА хранится размеченной ({planetId} | {fleetId}), а не голой строкой:
  *  ядро ищет мир и носитель в разных картах, и плоский id разъезжался с полем payload
- *  молча. */
+ *  молча. С `patrol` (SHU-6.3) тот же прицел ставит ПАТРУЛЬ: тап выбирает не цель, а
+ *  точку, над которой эскадра повиснет. Флаг один, потому что у обоих приказов одна
+ *  база, один круг дальности и одни правила взвода и сброса. */
 export let strikeAim: Armed['strikeAim'] | null = null;
 /** Глава IV (PVR-7.5): взведённый приказ союзнику — следующий тап по карте выбирает цель. */
 export let allyAim: AllyOrderKind | null = null;

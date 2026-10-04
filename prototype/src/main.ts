@@ -1,4 +1,4 @@
-import { attackBattle, deployForkFortress, retreatBattle } from '../../decisions/actions';
+import { attackBattle, deployForkFortress, patrolShuttle, recallPatrol, retreatBattle } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
@@ -223,6 +223,8 @@ import {
   type PausedConstructionSite,
   type QueuedConstruction,
   missingHull,
+  squadronPatrol,
+  squadronReach,
   traderOf,
   extractionNeedMs,
   shipsEngaged,
@@ -236,8 +238,10 @@ import {
 } from '../../packages/client/src/index';
 import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
+import { basePatrols, patrolMarks } from '../../decisions/patrolMarks';
 import {
   worldToScreen as camWorldToScreen,
+  screenToWorld as camScreenToWorld,
   zoomAt as camZoomAt,
   pinchAt as camPinchAt,
   clampCam as camClampCam,
@@ -2310,6 +2314,11 @@ function sectorTypeOf(id: string) {
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
 }
+/** Обратный перевод: точка экрана → мировые координаты. Нужен там, где целью служит
+ *  САМА ТОЧКА карты, а не мир или флот под пальцем (точка патруля, SHU-6.3). */
+function unworld(p: { x: number; y: number }): { x: number; y: number } {
+  return camScreenToWorld(p, cam, insets(), mapBounds());
+}
 /** Дальность карты в пикселях — ЕДИНСТВЕННЫЙ перевод на весь рендер (`mapRadius.ts`,
  *  REFM-132). Там же причина, почему множитель — подгон карты под экран × зум камеры:
  *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */
@@ -4332,7 +4341,10 @@ function handleEvents(events: DomainEvent[]) {
       // перехват читался бы как «звено не взлетело».
       case 'shuttle.intercepted': {
         const base = { kind: p.baseKind, id: p.baseId } as StrikeBase;
-        const home = strikeBasePos(base); // одна функция на «где база» — и здесь, и у трассы
+        // Перехват ИЗ ПАТРУЛЯ (SHU-6.3) бьёт из круга, а не с базы: `patrolId` — вылет,
+        // который стрелял, и залп выходит из его точки. Иначе — с базы, как подъём звена.
+        const patrol = typeof p.patrolId === 'string' ? strikeWorldPos(p.patrolId) : null;
+        const home = patrol ?? strikeBasePos(base); // одна функция на «где база» — и здесь, и у трассы
         if (!home) break;
         const carrier = base.kind === 'fleet' ? s.fleets[base.id] : undefined;
         const node = base.kind === 'planet' ? base.id : carrier ? fleetNode(carrier) : null;
@@ -4896,6 +4908,74 @@ function drawStrikeTrails(): void {
   cx.restore();
 }
 
+/**
+ * КРУГИ ПАТРУЛЕЙ (SHU-6.3) — где свои эскадры держат небо и сколько ещё.
+ *
+ * Что считается патрулём и чей он — `patrolMarks.ts`; здесь только канва. Цвет крыла
+ * (`R_WING`), как у трассы: это та же эскадра, только не в пути, а над точкой. Патруль на
+ * пути к точке — пунктир: круг ещё не работает. Висящий — сплошной круг и отсчёт до
+ * разворота под значком, на тёмной плашке (тот же приём, что у осады, `drawDevourSieges`):
+ * значок стоит в центре круга, и отсчёт держится рядом с ним при любом зуме.
+ */
+function drawPatrolRings(): void {
+  const marks = patrolMarks(s.strikes, { me: ME, now: mapNow() });
+  if (!marks.length) return;
+  cx.save();
+  cx.font = '700 11px ui-monospace, monospace';
+  cx.textAlign = 'center';
+  cx.textBaseline = 'top';
+  for (const m of marks) {
+    const c = world(m.at);
+    const r = worldDist(m.radius);
+    if (!visible(c, r + 40)) continue;
+    drawPatrolCircle(c, r, m.active ? 'live' : 'route');
+    if (m.leftMs === null) continue;
+    const label = countdownHMS(m.leftMs);
+    const w = Math.ceil(cx.measureText(label).width) + 10;
+    const top = Math.round(c.y + 11);
+    const left = Math.round(c.x - w / 2);
+    cx.fillStyle = 'rgba(4,10,12,.85)';
+    cx.fillRect(left, top, w, 15);
+    cx.fillStyle = rgba(R_WING, 0.95);
+    cx.fillText(label, c.x, top + 2);
+  }
+  cx.restore();
+}
+
+/** Как выглядит круг патруля: висящий (`live`) — сплошной, с заливкой; летящий к точке
+ *  (`route`) — бледный пунктир, круг ещё не работает; под указателем (`aim`) — яркий
+ *  пунктир прицела (`ringLook('aim')`): это режим, в котором игрок прямо сейчас. */
+const PATROL_LOOK = {
+  live: { dash: [] as number[], alpha: 0.6, width: 1.2, fill: 0.06 },
+  route: { dash: [6, 6], alpha: 0.45, width: 1.2, fill: 0 },
+  aim: { dash: [7, 5], alpha: 0.85, width: 1.6, fill: 0.08 },
+};
+
+/** Сам круг патруля: у прицела (`drawPatrolAim`) и у метки на карте радиус один и тот же
+ *  (`patrol.radius` снят с того же `squadronPatrol`), иначе игрок целится по одной
+ *  окружности, а висеть эскадра будет в другой. */
+function drawPatrolCircle(
+  c: { x: number; y: number },
+  rPx: number,
+  look: keyof typeof PATROL_LOOK,
+  tone = R_WING,
+): void {
+  if (rPx <= 0) return;
+  const k = PATROL_LOOK[look];
+  cx.save();
+  cx.setLineDash(k.dash);
+  cx.lineWidth = k.width;
+  cx.strokeStyle = rgba(tone, k.alpha);
+  cx.beginPath();
+  cx.arc(c.x, c.y, rPx, 0, TAU);
+  if (k.fill > 0) {
+    cx.fillStyle = rgba(tone, k.fill);
+    cx.fill();
+  }
+  cx.stroke();
+  cx.restore();
+}
+
 /** Кого может ударить «Атака»: видимые флоты противника с кораблями — один список на
  *  прицел, превью и нажатие (`engageAim.ts`). */
 function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
@@ -5119,6 +5199,29 @@ function drawCastAim(): void {
   }
   if (aoe > 0) drawAbilityCircle(aimPointer.x, aimPointer.y, worldDist(aoe), 0.14);
   cx.restore();
+}
+
+/**
+ * ПРИЦЕЛ ПАТРУЛЯ (SHU-6.3): под указателем — круг, в котором эскадра будет бить, если
+ * поставить точку здесь. Круг дальности вокруг базы рисует `drawCombatRanges` — тот же,
+ * что у удара: дальность у обоих приказов одна (`squadronReach`). Точка за дальностью
+ * красит круг отказом — подсказка, а не запрет, вердикт за ядром (`E_OUT_OF_RANGE`), как
+ * у каста (`drawCastAim`).
+ */
+function drawPatrolAim(): void {
+  if (!strikeAim?.patrol || !aimPointer) return;
+  const found = squadronAt(strikeAim.squadronId);
+  if (!found) return;
+  const home = strikeBasePos(
+    'planetId' in found.base
+      ? { kind: 'planet', id: found.base.planetId }
+      : { kind: 'fleet', id: found.base.fleetId },
+  );
+  if (!home) return;
+  const at = unworld(aimPointer);
+  const far = Math.hypot(at.x - home.x, at.y - home.y) > squadronReach(found.sq, data);
+  const rPx = worldDist(squadronPatrol(found.sq, data).radius);
+  drawPatrolCircle(aimPointer, rPx, 'aim', far ? CAST_FAR : R_WING);
 }
 
 /**
@@ -5988,6 +6091,7 @@ function render(now: number) {
   drawSwarmNet(); // сеть Роя: круги связи разведанных узлов
 
   drawFleetRoutes();
+  drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
   drawOrdnance(cx, mineView(), ME, mapNow(), world, cam.scale);
   mineControls.refresh();
@@ -6902,6 +7006,7 @@ function render(now: number) {
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
   drawAimPreview();
   drawCastAim(); // CAST-UX: дальность каста + область действия
+  drawPatrolAim(); // SHU-6.3: круг патруля под указателем
 }
 
 // --- side panel --------------------------------------------------------------
@@ -6995,9 +7100,13 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
           : view.blocked === 'no-fuel'
             ? t('side.wing.blocked.no-fuel')
             : '';
+  // ПАТРУЛИ ЭТОЙ БАЗЫ (SHU-6.3): улетевшего звена в ангаре нет, и без этих строк игрок
+  // не нашёл бы, где его вернуть. Стоят и над пустым ангаром — в небе может висеть весь
+  // состав.
+  const patrols = mine ? patrolRowsHtml(owner) : '';
   const cards = squadronCards(view, { mine, data });
   if (cards.length === 0) {
-    return head + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
+    return head + patrols + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
   }
   const body = cards.map((c) => squadronCardHtml(c, view)).join('');
   // ДЕЖУРНЫЙ ВЫЛЕТ (CC-4) — стойка БАЗЫ, а не отдельного звена (SHU-2.2), поэтому
@@ -7012,7 +7121,29 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
         true,
       )}</div>`
     : '';
-  return head + body + duty + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
+  return head + patrols + body + duty + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
+}
+
+/**
+ * Строки патрулей, поднятых с базы `owner` (SHU-6.3): позывной, остаток висения и
+ * «Вернуть». Что считается патрулём и чей он — `patrolMarks.ts`; здесь только разметка.
+ * Вид базы выводится тем же способом, что у дежурства: id мира и id флота живут в разных
+ * картах состояния.
+ */
+function patrolRowsHtml(owner: string): string {
+  const base: StrikeBase = s.planets[owner]
+    ? { kind: 'planet', id: owner }
+    : { kind: 'fleet', id: owner };
+  return basePatrols(patrolMarks(s.strikes, { me: ME, now: s.time }), base)
+    .map((m) => {
+      const name = squadronCallsignOf(m.squadronId);
+      const text =
+        m.leftMs !== null
+          ? t('side.wing.patrol.on', { name, left: fmtEta(m.leftMs / HOUR) })
+          : t('side.wing.patrol.out', { name });
+      return `<div class="row"><span class="dim">${esc(text)}</span> ${btn('wingrecall', m.id, t('side.wing.recall'), true)}</div>`;
+    })
+    .join('');
 }
 
 /**
@@ -7052,6 +7183,9 @@ function squadronCardHtml(card: SquadronCard, view: HangarView): string {
   const buttons =
     `<div class="row">` +
     btn('wingstrike', card.id, t('side.wing.strike'), card.canStrike) +
+    // Патруль (SHU-6.3) — только у звена, которое умеет висеть; готовность базы та же,
+    // что у удара: топливо и перезарядка у места общие.
+    (card.canPatrol ? btn('wingpatrol', card.id, t('side.wing.patrol'), card.canStrike) : '') +
     (card.canSplit ? btn('wingsplit', card.id, t('side.wing.split'), true) : '') +
     merge +
     `</div>` +
@@ -9342,7 +9476,12 @@ function renderPanel() {
   // и режимом «Приказ». Раньше движение было исключением: игрок жал ⤳ и тапал в лист,
   // который закрывал пол-карты (заказ владельца — убирать нижний хаб и на движении).
   const dock: DockState = {
-    aiming: aiming || (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim || !!retreatAim)),
+    // Прицел ПАТРУЛЯ (SHU-6.3) прячет лист и на ПК: точку выбирают у самой базы, а окно
+    // мира стоит ровно над ней.
+    aiming:
+      aiming ||
+      !!strikeAim?.patrol ||
+      (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim || !!retreatAim)),
     merging,
     picking: pickMode,
     chaining: chainMode !== null,
@@ -10165,6 +10304,24 @@ side.addEventListener('click', (ev) => {
       arm('strikeAim', { from: base, squadronId: arg }); // слияние звеньев гаснет само
       note(t('hint.wing-aim'));
     }
+  } else if (act === 'wingpatrol') {
+    // SHU-6.3 — тот же прицел, но тап выбирает ТОЧКУ патруля, а не цель: под пальцем
+    // идёт круг патруля (`drawPatrolAim`), вокруг базы — круг дальности, как у удара.
+    // Часы и круг подсказка называет числами: у разных машин они разные
+    // (`squadronPatrol`).
+    const found = squadronAt(arg);
+    if (found) {
+      const plan = squadronPatrol(found.sq, data);
+      arm('strikeAim', { from: found.base, squadronId: arg, patrol: true });
+      // У пальца нет наведения: прежняя точка касания нарисовала бы круг там, где игрок
+      // уже не целится. Круг появится с первым касанием карты.
+      if (MOBILE) aimPointer = null;
+      note(t('hint.wing-patrol-aim', { h: plan.hours, r: plan.radius }));
+    }
+  } else if (act === 'wingrecall') {
+    // `arg` — id ВЫЛЕТА: патруль уже не в ангаре, и адресуется он так же, как его
+    // принимает ядро (`shuttle.recall { strikeId }`).
+    playerOrder(recallPatrol(ME, arg));
   } else if (act === 'wingduty') {
     // CC-4: стойка БАЗЫ — `arg` это id мира или носителя (SHU-2.2). Вид базы выводим
     // по тому, где она нашлась: id мира и id флота живут в разных картах состояния.
@@ -10741,8 +10898,16 @@ function selectAt(mx: number, my: number) {
   // проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
   // (`errText`).
   if (owner === 'shuttle-strike' && strikeAim) {
-    const { from, squadronId } = strikeAim;
+    const { from, squadronId, patrol } = strikeAim;
     drop('strikeAim');
+    // SHU-6.3 — ПАТРУЛЬ: тап и есть точка. Дальность ядро меряет от живой позиции базы
+    // (`E_OUT_OF_RANGE`), поэтому тап мимо круга приходит отказом, а не тишиной.
+    if (patrol) {
+      if (!squadronAt(squadronId)) note(t('hint.wing-empty'));
+      else playerOrder(patrolShuttle(ME, from, squadronId, unworld({ x: mx, y: my })));
+      invalidatePanel();
+      return;
+    }
     // Только то, что игрок видит: невидимую мину (SM-3.6) палец не находит (ревью #1411).
     const foe = nearestHit(hostileFleets(Object.values(s.fleets).filter(fleetSeen), ME), fleetAnchor, mx, my, rFleet);
     const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
@@ -11128,7 +11293,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     boxSelecting = intent.boxSelect;
     selectionBox = boxSelecting ? { x1: p.x, y1: p.y, x2: p.x, y2: p.y } : null;
     dragged = false;
-    if (aiming || assaultAim) aimPointer = p; // the aim preview starts under the finger at once
+    if (aiming || assaultAim || strikeAim?.patrol) aimPointer = p; // the aim preview starts under the finger at once
     // Touch long-press: a still finger for ~350ms picks a fleet ADDITIVELY (the
     // Ctrl-click of phones) or opens a BOX-SELECT from empty space (the Shift-drag).
     if (intent.longPress) {
