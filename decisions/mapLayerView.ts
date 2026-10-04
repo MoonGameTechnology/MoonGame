@@ -16,14 +16,24 @@
  * 2. **Выпечка шире экрана.** Со всех сторон печётся запас ({@link overscanFor}), и
  *    панорама в его пределах не открывает пустого края. Запас ограничен бюджетом
  *    пикселей: на телефоне с плотным экраном он меньше, чем на ПК.
- * 3. **Перепечь, когда картинка перестала покрывать экран** (панорама ушла за запас,
- *    отдаление сжало выпечку) или растянута больше {@link MAX_STRETCH} раз — тогда она
- *    заметно мыльная. Иначе во время движения показывается старая выпечка.
+ * 3. **Панорама за край запаса сдвигает выпечку, а не перепекает её.** Окно выпечки
+ *    едет за камерой на целые физические пиксели ({@link recentredScroll}): готовые
+ *    пиксели переезжают копией, а рисуется только открывшаяся полоса ({@link exposedStrips})
+ *    по той же геометрии провинций. Раньше свайп, ушедший за запас, перепекал карту
+ *    целиком посреди жеста: на 1675 провинциях — раз на свайп. Перепекается выпечка,
+ *    когда при зуме она перестала покрывать экран (отдаление сжало её), когда она
+ *    растянута больше {@link MAX_STRETCH} раз (тогда она заметно мыльная) или когда сдвиг
+ *    не оставил бы от неё ни пикселя. Иначе во время движения показывается старая выпечка.
  * 4. **Остановилась камера — картинка должна быть чёткой.** Через {@link SETTLE_MS}
  *    без движения (и не посреди щипка) выпечка остаётся, только если она ложится
- *    пиксель в пиксель: тот же масштаб и целый сдвиг в физических пикселях. Иначе —
- *    перепечь на текущей камере. Поэтому обычная панорама мышью или пальцем в покое не
- *    стоит ничего, а зум перепекается один раз, когда закончился.
+ *    пиксель в пиксель: тот же масштаб и целый сдвиг в физических пикселях. Панорама,
+ *    вставшая между пикселями, не перепекает карту: камера сама встаёт на сетку выпечки
+ *    ({@link gridNudge}), меньше чем на полпикселя, и глазу это не видно. Палец на
+ *    телефоне двигает камеру на дробные пиксели (у экрана свой масштаб, а холст держит
+ *    не больше двух пикселей на CSS-пиксель), поэтому без этого карта перепекалась после
+ *    каждого свайпа, а на медленном телефоне и посреди него: между событиями пальца камера
+ *    стоит дольше {@link SETTLE_MS}. На 1675 провинциях в тумане при ЦП вчетверо медленнее
+ *    это 22–29 выпечек по ~40 мс за четыре свайпа. Зум перепекается один раз, когда закончился.
  * 5. **Панорама сдвигает картинку на целые пиксели.** Пока камера едет, выпечка того же
  *    масштаба ставится со сдвигом, округлённым до физического пикселя ({@link onPixelGrid}):
  *    это копия, а не пересэмплирование всего экрана (без GPU — десятки миллисекунд на
@@ -129,20 +139,76 @@ export function onPixelGrid(tr: LayerTransform, dpr: number): LayerTransform {
   return { k: 1, tx: Math.round(tr.tx * dpr) / dpr, ty: Math.round(tr.ty * dpr) / dpr };
 }
 
-/** Правило 3: закрывает ли выпечка с запасом `margin` экран `width × height`. */
+/** Насколько окно выпечки уехало от места, где её испекли (правило 3): CSS-пиксели
+ *  выпечки, всегда на целый физический пиксель. */
+export interface LayerScroll {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** Окно свежей выпечки стоит там, где её испекли. */
+export const NO_SCROLL: LayerScroll = { x: 0, y: 0 };
+
+/** Правило 3: закрывает ли выпечка с запасом `margin`, окно которой сдвинуто на `scroll`,
+ *  экран `width × height`. */
 export function coversScreen(
   tr: LayerTransform,
   width: number,
   height: number,
   margin: Overscan,
+  scroll: LayerScroll = NO_SCROLL,
 ): boolean {
   const eps = 1e-6;
   return (
-    tr.k * -margin.x + tr.tx <= eps &&
-    tr.k * -margin.y + tr.ty <= eps &&
-    tr.k * (width + margin.x) + tr.tx >= width - eps &&
-    tr.k * (height + margin.y) + tr.ty >= height - eps
+    tr.k * (scroll.x - margin.x) + tr.tx <= eps &&
+    tr.k * (scroll.y - margin.y) + tr.ty <= eps &&
+    tr.k * (scroll.x + width + margin.x) + tr.tx >= width - eps &&
+    tr.k * (scroll.y + height + margin.y) + tr.ty >= height - eps
   );
+}
+
+/**
+ * Правило 3: куда поставить окно выпечки, чтобы экран снова встал в его середину, —
+ * для панорамы (масштаб 1). Окно ездит только на целые физические пиксели: тогда копия
+ * старых пикселей ложится точно туда, куда их положила бы новая выпечка.
+ */
+export function recentredScroll(tr: LayerTransform, dpr: number): LayerScroll {
+  // `|| 0` — без минус нуля: окно на месте записывается как место.
+  return { x: (-Math.round(tr.tx * dpr) || 0) / dpr, y: (-Math.round(tr.ty * dpr) || 0) / dpr };
+}
+
+/** Прямоугольник холста в физических пикселях. */
+export interface PixelRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Правило 3: что осталось без картинки на холсте `width × height`, когда окно уехало на
+ * (`dx`, `dy`) физических пикселей, а старые пиксели — на столько же в обратную сторону.
+ * Не больше двух полос, и они не перекрываются: вертикальная во всю высоту,
+ * горизонтальная — в оставшуюся ширину.
+ */
+export function exposedStrips(width: number, height: number, dx: number, dy: number): PixelRect[] {
+  const w = Math.min(Math.abs(dx), width);
+  const h = Math.min(Math.abs(dy), height);
+  const strips: PixelRect[] = [];
+  // Окно уехало вправо — картинка влево, новым стал правый край (и так же по вертикали).
+  if (w > 0) strips.push({ x: dx > 0 ? width - w : 0, y: 0, width: w, height });
+  if (h > 0 && w < width)
+    strips.push({ x: dx > 0 ? 0 : w, y: dy > 0 ? height - h : 0, width: width - w, height: h });
+  return strips;
+}
+
+/**
+ * Правило 4: на сколько CSS-пикселей сдвинуть проекцию кадра, чтобы панорама встала на
+ * сетку своей выпечки. Меньше половины физического пикселя по каждой оси. Камера
+ * сдвигается на столько же: её сдвиг входит в проекцию слагаемым.
+ */
+export function gridNudge(tr: LayerTransform, dpr: number): { x: number; y: number } {
+  return { x: Math.round(tr.tx * dpr) / dpr - tr.tx, y: Math.round(tr.ty * dpr) / dpr - tr.ty };
 }
 
 /** Что известно о кадре, чтобы решить судьбу выпечки. */
@@ -156,18 +222,33 @@ export interface MapLayerFrame {
   readonly dpr: number;
   /** Запас, с которым выпечка испечена. */
   readonly margin: Overscan;
+  /** Насколько окно выпечки уехало с тех пор (правило 3). */
+  readonly scroll: LayerScroll;
   /** Камера не двигалась {@link SETTLE_MS} и не держится жестом (правило 4). */
   readonly settled: boolean;
 }
 
-/** `show` — показать имеющуюся выпечку преобразованием; `rebake` — испечь на текущей камере. */
-export type MapLayerAction = 'show' | 'rebake';
+/**
+ * `show` — показать имеющуюся выпечку преобразованием; `scroll` — сдвинуть её окно в
+ * {@link recentredScroll} и дорисовать {@link exposedStrips} (правило 3); `snap` — сдвинуть
+ * камеру на {@link gridNudge} и решить заново (правило 4); `rebake` — испечь на текущей камере.
+ */
+export type MapLayerAction = 'show' | 'scroll' | 'snap' | 'rebake';
 
 export function mapLayerAction(f: MapLayerFrame): MapLayerAction {
   if (!f.fresh) return 'rebake'; // правило 6
   const { k } = f.transform;
   if (!(k > 0) || k > MAX_STRETCH || k < 1 / MAX_STRETCH) return 'rebake'; // правило 3
-  if (!coversScreen(f.transform, f.width, f.height, f.margin)) return 'rebake';
-  if (f.settled && !exactOffset(f.transform, f.dpr)) return 'rebake'; // правило 4
-  return 'show';
+  // Тот же масштаб: выпечку можно сдвигать и копировать, не пересэмплируя.
+  const pan = k === 1;
+  if (f.settled && !exactOffset(f.transform, f.dpr)) return pan ? 'snap' : 'rebake'; // правило 4
+  // Покрытие судится по тому, что покажут: в движении панорама стоит на целом пикселе.
+  const shown = onPixelGrid(f.transform, f.dpr);
+  if (coversScreen(shown, f.width, f.height, f.margin, f.scroll)) return 'show';
+  if (!pan) return 'rebake'; // правило 3: отдаление сжало выпечку
+  const to = recentredScroll(f.transform, f.dpr);
+  const keeps =
+    Math.abs(to.x - f.scroll.x) < f.width + 2 * f.margin.x &&
+    Math.abs(to.y - f.scroll.y) < f.height + 2 * f.margin.y;
+  return keeps ? 'scroll' : 'rebake';
 }
