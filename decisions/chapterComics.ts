@@ -1,8 +1,9 @@
 /**
  * Комиксы глав Sector Zero (решение владельца 2026-09-24): короткий комикс, когда игрок
- * ПЕРВЫЙ раз начинает главу (`intro`), и когда первый раз её проходит (`outro`). Арт
- * делает владелец отдельно; здесь — только правило «когда показывать» и проверка реестра,
- * общие обоим клиентам. Картинки подключает хозяин (`prototype/src/comicArt.ts`).
+ * ПЕРВЫЙ раз начинает главу (`intro`), и когда первый раз её проходит (`outro`). Между ними —
+ * страницы по событиям главы: ключевая задача (`task`) и сюжетные сцены главы VI (§8.9 каталога
+ * карт, PVR-8.6). Арт делает владелец отдельно; здесь — только правило «когда показывать» и
+ * проверка реестра, общие обоим клиентам. Картинки подключает хозяин (`prototype/src/comicArt.ts`).
  *
  * Показ — ОДИН раз на профиль, отметка живёт в профиле ({@link SectorZeroProgress.comicsSeen})
  * и переезжает с ним через облако: на новом устройстве тот же комикс второй раз не
@@ -11,11 +12,28 @@
 import type { SectorZeroProgress } from './sectorZeroProgress';
 import type { GameState, PlayerId } from '../packages/shared-core/src/index';
 
-/** Когда комикс показывается: перед первым забегом главы, после первой победы в ней и
- *  (`task`) когда в забеге впервые выполнена ключевая задача главы — какая, говорит
- *  реестр арта хозяина ({@link ComicTaskTriggers}). */
-export const COMIC_MOMENTS = ['intro', 'outro', 'task', 'echo', 'echo-record'] as const;
+/** Когда комикс показывается: перед первым забегом главы, после первой победы в ней и по
+ *  событиям забега ({@link TRIGGERED_MOMENTS}). `echo`/`echo-record` — знакомство с Эхо
+ *  главы I, его зовёт хозяин по {@link echoComicMoment}. */
+export const COMIC_MOMENTS = [
+  'intro',
+  'outro',
+  'task',
+  'echo',
+  'echo-record',
+  'refuge',
+  'rescued',
+] as const;
 export type ComicMoment = (typeof COMIC_MOMENTS)[number];
+
+/**
+ * Моменты, которые играют, когда в забеге впервые засчитан их триггер — задача главы или шаг
+ * её главной цепочки (`decisions/chapterChain.ts`); какой, говорит таблица хозяина
+ * ({@link ComicTriggers}). `task` — ключевая задача главы; `refuge` и `rescued` — сцены главы VI:
+ * «Последний приют» по эпизоду доков и «Мы пришли за людьми» по основной эвакуации (§8.9).
+ */
+export const TRIGGERED_MOMENTS = ['task', 'refuge', 'rescued'] as const;
+export type TriggeredMoment = (typeof TRIGGERED_MOMENTS)[number];
 
 /** Одна страница: картинка и необязательные подписи — КЛЮЧИ локали. У утверждённых
  *  страниц владельца русские реплики нарисованы внутри картинки. */
@@ -31,15 +49,20 @@ export type ComicRegistry = Readonly<
   Record<string, Readonly<Partial<Record<ComicMoment, readonly ComicPanel[]>>>>
 >;
 
-/** `id главы → id задачи`, после которой играет её комикс `task`. */
-export type ComicTaskTriggers = Readonly<Record<string, string>>;
+/** `id главы → момент → id задачи или шага цепочки`, после которого этот момент играет. */
+export type ComicTriggers = Readonly<
+  Record<string, Readonly<Partial<Record<TriggeredMoment, string>>>>
+>;
 
 /** Имя отметки в профиле: `pve-1:intro`. */
 export const comicId = (chapter: string, moment: ComicMoment): string =>
   `${chapter}:${moment === 'echo-record' ? 'echo' : moment}`;
 
-/** Форма отметки — то, что профиль примет из хранилища (правленый мусор отбрасывается). */
-export const COMIC_ID = /^[a-z0-9-]+:(intro|outro|task|echo)$/;
+/** Форма отметки — то, что профиль примет из хранилища (правленый мусор отбрасывается).
+ *  Моменты — из {@link COMIC_MOMENTS}: новый момент не потеряет отметку при загрузке. */
+export const COMIC_ID = new RegExp(
+  `^[a-z0-9-]+:(${COMIC_MOMENTS.filter((m) => m !== 'echo-record').join('|')})$`,
+);
 
 /** Эхо (§ «Кто это?»): только после спасения Учёного и прибытия живого корабля.
  *  Уже освобождённая колония показывает запись; старое выполнение не сбрасывается.
@@ -71,18 +94,23 @@ export function comicDue(
   return progress.comicsSeen.includes(comicId(chapter, moment)) ? null : panels;
 }
 
-/** Комикс `task` к показу: ключевая задача главы только что выполнена (есть в `complete`),
- *  а комикс ещё не показан. Иначе `null`. */
-export function comicTaskDue(
+/** Моменты по событиям к показу: триггер засчитан (есть в `complete`), а комикс есть и ещё
+ *  не показан. Порядок — {@link TRIGGERED_MOMENTS}: сцены одного кадра идут по сюжету. */
+export function comicsTriggered(
   progress: Pick<SectorZeroProgress, 'comicsSeen'>,
   registry: ComicRegistry,
-  triggers: ComicTaskTriggers,
+  triggers: ComicTriggers,
   chapter: string,
   complete: readonly string[],
-): readonly ComicPanel[] | null {
-  const task = triggers[chapter];
-  if (!task || !complete.includes(task)) return null;
-  return comicDue(progress, registry, chapter, 'task');
+): TriggeredMoment[] {
+  return TRIGGERED_MOMENTS.filter((moment) => {
+    const trigger = triggers[chapter]?.[moment];
+    return (
+      trigger !== undefined &&
+      complete.includes(trigger) &&
+      comicDue(progress, registry, chapter, moment) !== null
+    );
+  });
 }
 
 /** Отметить комикс показанным. Чистая и идемпотентная: повтор отдаёт тот же профиль. */

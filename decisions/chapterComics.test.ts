@@ -6,7 +6,7 @@ import {
   comicDue,
   comicId,
   comicProblems,
-  comicTaskDue,
+  comicsTriggered,
   echoComicMoment,
   markComicSeen,
   type ComicRegistry,
@@ -45,17 +45,44 @@ describe('комикс главы — когда показывать (реше�
 
 describe('комикс после ключевой задачи главы', () => {
   const REG: ComicRegistry = { 'pve-1': { task: PANELS } };
-  const TRIG = { 'pve-1': 'mission.rescue-scientist' };
+  const TRIG = { 'pve-1': { task: 'mission.rescue-scientist' } };
 
-  it('задача выполнена, комикс не показан — отдаём панели', () => {
-    expect(comicTaskDue(fresh(), REG, TRIG, 'pve-1', ['mission.rescue-scientist'])).toEqual(PANELS);
+  it('задача выполнена, комикс не показан — его момент к показу', () => {
+    expect(comicsTriggered(fresh(), REG, TRIG, 'pve-1', ['mission.rescue-scientist'])).toEqual([
+      'task',
+    ]);
   });
 
   it('задача не выполнена, у главы нет триггера или комикс уже показан — ничего', () => {
-    expect(comicTaskDue(fresh(), REG, TRIG, 'pve-1', ['mission.recon'])).toBeNull();
-    expect(comicTaskDue(fresh(), REG, TRIG, 'pve-2', ['mission.rescue-scientist'])).toBeNull();
+    expect(comicsTriggered(fresh(), REG, TRIG, 'pve-1', ['mission.recon'])).toEqual([]);
+    expect(comicsTriggered(fresh(), REG, TRIG, 'pve-2', ['mission.rescue-scientist'])).toEqual([]);
     const seen = markComicSeen(fresh(), comicId('pve-1', 'task'));
-    expect(comicTaskDue(seen, REG, TRIG, 'pve-1', ['mission.rescue-scientist'])).toBeNull();
+    expect(comicsTriggered(seen, REG, TRIG, 'pve-1', ['mission.rescue-scientist'])).toEqual([]);
+  });
+});
+
+describe('сцены главы VI по событиям (PVR-8.6, §8.9)', () => {
+  const REG: ComicRegistry = { 'pve-6': { refuge: PANELS, rescued: PANELS } };
+  const TRIG = { 'pve-6': { refuge: 'chain.docks', rescued: 'chain.evacuate' } };
+
+  it('доки найдены — «Последний приют»; эвакуация завершена — «Мы пришли за людьми»', () => {
+    expect(comicsTriggered(fresh(), REG, TRIG, 'pve-6', [])).toEqual([]);
+    expect(comicsTriggered(fresh(), REG, TRIG, 'pve-6', ['chain.docks'])).toEqual(['refuge']);
+    expect(comicsTriggered(fresh(), REG, TRIG, 'pve-6', ['chain.evacuate'])).toEqual(['rescued']);
+  });
+
+  it('обе сцены в одном кадре — по сюжету: сначала приют, потом спасённые', () => {
+    expect(comicsTriggered(fresh(), REG, TRIG, 'pve-6', ['chain.evacuate', 'chain.docks'])).toEqual(
+      ['refuge', 'rescued'],
+    );
+  });
+
+  it('каждая сцена — один раз на профиль; без арта сцены нет', () => {
+    const seen = markComicSeen(fresh(), comicId('pve-6', 'refuge'));
+    const both = ['chain.docks', 'chain.evacuate'];
+    expect(comicsTriggered(seen, REG, TRIG, 'pve-6', both)).toEqual(['rescued']);
+    const noArt: ComicRegistry = { 'pve-6': { refuge: PANELS } };
+    expect(comicsTriggered(fresh(), noArt, TRIG, 'pve-6', both)).toEqual(['refuge']);
   });
 });
 
@@ -71,6 +98,8 @@ describe('отметка «показан» живёт в профиле — и 
         'pve-1:intro',
         'pve-2:outro',
         'pve-1:task',
+        'pve-6:refuge',
+        'pve-6:rescued',
         'pve-1:intro',
         42,
         'не-то',
@@ -81,6 +110,8 @@ describe('отметка «показан» живёт в профиле — и 
       'pve-1:intro',
       'pve-2:outro',
       'pve-1:task',
+      'pve-6:refuge',
+      'pve-6:rescued',
     ]);
   });
 

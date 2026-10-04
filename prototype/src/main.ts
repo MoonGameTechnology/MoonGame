@@ -361,11 +361,11 @@ import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
 import { createComicQueue } from './comicQueue';
-import { CHAPTER_COMICS, COMIC_TASK_TRIGGERS } from './comicArt';
+import { CHAPTER_COMICS, COMIC_TRIGGERS } from './comicArt';
 import {
   comicDue,
   comicId,
-  comicTaskDue,
+  comicsTriggered,
   echoComicMoment,
   markComicSeen,
   type ComicMoment,
@@ -16330,10 +16330,10 @@ function playChapterComic(chapter: string, moment: ComicMoment, then: () => void
   );
 }
 
-/** Комикс главы после её ключевой задачи (`COMIC_TASK_TRIGGERS`): один раз на профиль, в тот
- *  кадр, когда задача впервые засчитана. Ключевым может быть и шаг главной цепочки главы IV
- *  (`chain.contact` — встреча с союзником): он засчитывается так же. Дев-забег и полигон
- *  комикс не показывают. */
+/** Комиксы главы по событиям (`COMIC_TRIGGERS`): один раз на профиль, в тот кадр, когда
+ *  триггер впервые засчитан. Триггером может быть и шаг главной цепочки главы: встреча с
+ *  союзником в IV (`chain.contact`), доки и основная эвакуация в VI (`chain.docks`,
+ *  `chain.evacuate`). Дев-забег и полигон комикс не показывают. */
 function playTaskComic(missions: readonly MissionRow[], chain: readonly ChapterStep[] | null): void {
   if (isTraining() || sectorDevActive || !isSectorZeroRun()) return;
   const chapter = pveChapter(sectorMission).id;
@@ -16342,8 +16342,8 @@ function playTaskComic(missions: readonly MissionRow[], chain: readonly ChapterS
     ...(chain ?? []).filter((st) => st.done).map((st) => st.key),
     ...(sectorProgress.objectivesDone[chapter] ?? []),
   ];
-  if (comicTaskDue(sectorProgress, comicArt.registry, COMIC_TASK_TRIGGERS, chapter, complete))
-    playChapterComic(chapter, 'task', () => {});
+  for (const moment of comicsTriggered(sectorProgress, comicArt.registry, COMIC_TRIGGERS, chapter, complete))
+    playChapterComic(chapter, moment, () => {});
   if (chapter === 'pve-1') {
     const scientistAvailable = complete.includes('mission.rescue-scientist')
       || (s.missionFacts?.recruited?.[ME] ?? []).includes('research_station')
