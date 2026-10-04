@@ -24,6 +24,7 @@
  * (выплатить), а две копии такого правила разойдутся молча.
  */
 import { isForkSite, type GameState, type MapObjective, type PlayerId } from '../packages/shared-core/src/index';
+import { linkedAlly } from './chapterChain';
 
 /**
  * Объявление задачи — это ФОРМА ДАННЫХ КАРТЫ, и живёт она в схеме карты
@@ -50,6 +51,17 @@ export interface ObjectiveProgress {
   needMs?: number;
 }
 
+/**
+ * Чьи успехи засчитывает задача (§7.5, §8.3, §8.8): игрок и НАЗНАЧЕННЫЙ союзник главы — тот,
+ * с кем игрок на связи в месте встречи. Случайный ИИ в союзе сюда не входит. Цель, взятая
+ * союзником, выполнена: отбирать её у союзника или добивать самому не нужно, а платит задача
+ * один раз — игроку. Без союзника сторона — один игрок, и задачи судятся как прежде.
+ */
+export function creditSide(state: GameState, player: PlayerId): ReadonlySet<PlayerId> {
+  const ally = linkedAlly(state, player);
+  return new Set(ally ? [player, ally] : [player]);
+}
+
 /** Сколько провинций игрок опознал: ключи его памяти тумана. Нет памяти — ноль, а не
  *  падение: забег мог идти на хосте, который тумана не ведёт. */
 function identified(state: GameState, player: PlayerId): number {
@@ -72,8 +84,10 @@ export function objectiveProgress(
     return { ...base, done, total: targets.length, complete: targets.length > 0 && done === targets.length };
   }
   if (objective.kind === 'control') {
+    // Взятое назначенным союзником — тоже взято (`creditSide`).
+    const side = creditSide(state, player);
     const targets = objective.targets ?? [];
-    const done = targets.filter((id) => state.planets[id]?.owner === player).length;
+    const done = targets.filter((id) => side.has(state.planets[id]?.owner ?? '')).length;
     return {
       ...base,
       done,
@@ -82,13 +96,14 @@ export function objectiveProgress(
     };
   }
   if (objective.kind === 'raze') {
-    // Считаем ОСТАВШИЕСЯ постройки названных видов у всех, кроме игрока: задача про то,
-    // чтобы их не стало, а не про то, кто их снёс. Разрушенное здание (`hp <= 0`) уже не
+    // Считаем ОСТАВШИЕСЯ постройки названных видов у всех, кроме стороны игрока: задача про
+    // то, чтобы их не стало, а не про то, кто их снёс. Разрушенное здание (`hp <= 0`) уже не
     // считается стоящим — иначе «снеси» выполнялось бы только полным исчезновением записи.
+    const side = creditSide(state, player);
     const kinds = new Set(objective.targets ?? []);
     let left = 0;
     for (const planet of Object.values(state.planets)) {
-      if (planet.owner === player) continue;
+      if (side.has(planet.owner ?? '')) continue;
       for (const b of planet.buildings) if (kinds.has(b.type) && b.hp > 0) left += 1;
     }
     // Всего — сколько их объявлено в каталоге карты, знать неоткуда, поэтому «всего»
@@ -146,17 +161,19 @@ export function objectiveProgress(
   if (objective.kind === 'beacon') {
     // «Удерживать маяк N часов подряд» (2026-09-24): текущая серия — от захвата
     // (`missionFacts.held`), либо лучшая уже закончившаяся (`longest`) — выполненное
-    // потерей после не отменяется. Мир свой с начала матча — серия с начала.
+    // потерей после не отменяется. Мир свой с начала матча — серия с начала. Держит сторона
+    // игрока (`creditSide`): серия назначенного союзника засчитывается так же.
     const HOUR_MS = 3_600_000;
     const needMs = need * HOUR_MS;
+    const side = creditSide(state, player);
     let best = 0;
     for (const id of objective.targets ?? []) {
-      const planet = state.planets[id];
+      const owner = state.planets[id]?.owner;
       const held = state.missionFacts?.held?.[id];
       let current = 0;
-      if (planet?.owner === player)
-        current = state.time - (held && held.owner === player ? held.since : 0);
-      const past = state.missionFacts?.longest?.[id]?.[player] ?? 0;
+      if (owner && side.has(owner))
+        current = state.time - (held && held.owner === owner ? held.since : 0);
+      const past = Math.max(0, ...[...side].map((p) => state.missionFacts?.longest?.[id]?.[p] ?? 0));
       best = Math.max(best, current, past);
     }
     const complete = (objective.targets ?? []).length > 0 && best >= needMs;

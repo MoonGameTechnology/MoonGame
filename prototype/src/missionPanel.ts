@@ -21,7 +21,8 @@ export interface MissionPanelHost {
   training: () => boolean;
   /** Move the camera to a mission target. */
   jump: (planetId: string) => void;
-  /** Chapter IV main chain (PVR-7.5): contact → archive → package → extraction; `null` — none. */
+  /** Chapter main chain: IV (PVR-7.5) contact → archive → package → extraction; VI (PVR-8.5)
+   *  docks → evacuation → production → main forces; `null` — none. */
   chain?: () => ChapterStep[] | null;
   /** Fleets that can start extracting right now, with their labels. */
   extractors?: () => Array<{ id: string; label: string }>;
@@ -36,9 +37,11 @@ export const missionRewardHtml = (r: MissionReward): string =>
   `<span class="mp-reward"><i class="tw-data">◇ +${r.research}</i><i class="tw-warrants">⌖ +${r.warrants}</i></span>`;
 
 /**
- * Главная цепочка главы IV (PVR-7.5) — над задачами пула: она решает исход главы и ничего не
- * платит. Шаг — кнопка к своей цели; у текущего шага извлечения — доля работы и кнопки
- * «Извлечь флотом N» с предупреждением о носителе (§6.7: сообщается ДО назначения).
+ * Главная цепочка главы (IV — PVR-7.5, VI — PVR-8.5) — над задачами пула: она решает исход
+ * главы и ничего не платит. Шаг — кнопка к своей цели; у текущего шага извлечения — доля
+ * работы и кнопки «Извлечь флотом N» с предупреждением о носителе (§6.7: сообщается ДО
+ * назначения). У результатов операции главы VI — счёт «сделано из нужного», а порог
+ * эвакуации виден с начала главы, пока она не выполнена (§8.8: правило — до риска).
  */
 export function chapterChainHtml(
   chain: readonly ChapterStep[],
@@ -47,8 +50,9 @@ export function chapterChainHtml(
   const steps = chain
     .map((st) => {
       const mark = st.done ? '✓' : st.active ? '▶' : '·';
-      const prog =
-        st.id === 'extract' && !st.done && (st.progress ?? 0) > 0
+      const prog = st.count
+        ? `<b class="mp-prog">${st.count.done}/${st.count.total}</b>`
+        : st.id === 'extract' && !st.done && (st.progress ?? 0) > 0
           ? `<b class="mp-prog">${Math.floor((st.progress ?? 0) * 100)}%</b>`
           : '';
       const body =
@@ -59,6 +63,10 @@ export function chapterChainHtml(
         : `<div class="mp-row mp-chain${st.done ? ' done' : ''}">${body}</div>`;
     })
     .join('');
+  const rule = chain.find((st) => st.rule && !st.done)?.rule;
+  const ruleHtml = rule
+    ? `<p class="mp-warn">${esc(t('chain.evacuate-rule', { need: rule.need, of: rule.of }))}</p>`
+    : '';
   const extracting = chain.some((st) => st.id === 'extract' && st.active);
   const acts =
     extracting && extractors.length > 0
@@ -70,7 +78,7 @@ export function chapterChainHtml(
           )
           .join('')
       : '';
-  return `<div class="mp-chainbox"><b class="mp-sub">${esc(t('chain.title'))}</b>${steps}${acts}</div>`;
+  return `<div class="mp-chainbox"><b class="mp-sub">${esc(t('chain.title'))}</b>${steps}${ruleHtml}${acts}</div>`;
 }
 
 export function missionPanelHtml(

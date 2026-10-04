@@ -32,7 +32,8 @@ function artFiles(dir = ART, prefix = ''): string[] {
 function triggersOf(chapter: string): string[] {
   const i = Array.from({ length: PVE_MISSION_COUNT }, (_, n) => pveChapter(n).id).indexOf(chapter);
   if (i < 0) return [];
-  const chain = chapterChain(pveState(shippedGameData(), i), 'p1', 1) ?? [];
+  const data = shippedGameData();
+  const chain = chapterChain(pveState(data, i), 'p1', 1, data) ?? [];
   return [...pveChapter(i).objectives.map((o) => o.id), ...chain.map((st) => st.key)];
 }
 

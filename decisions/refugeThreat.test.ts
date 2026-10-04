@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { refugeThreats } from './refugeThreat';
+import { refugeGuardOffer, refugeThreats } from './refugeThreat';
 import type { Fleet, GameState } from '../packages/shared-core/src/index';
 
 // Доклад союзника (PVR-8.4, §8.7): «Основное соединение противника меняет курс. Идёт к
@@ -85,5 +85,30 @@ describe('доклад об угрозе месту эвакуации (PVR-8.4)
     delete s.fleets.reserve;
     expect(threats(s)).toEqual([]);
     expect(threats(world({ operation: undefined }))).toEqual([]);
+  });
+});
+
+describe('предложение союзника охранять доки (PVR-8.5, §8.7)', () => {
+  const offer = (s: GameState, sees = (_f: Fleet): boolean => true) =>
+    refugeGuardOffer(s, 'p1', 'ally', sees);
+
+  it('видимая угроза доклада — союзник предлагает охранять доки', () => {
+    expect(offer(world())).toEqual({ at: 'docks' });
+  });
+
+  it('угрозы не видно или доки неизвестны — предложения нет', () => {
+    expect(offer(world(), (f) => f.id !== 'guard')).toBeNull();
+    expect(offer(world({ missionFacts: {} }))).toBeNull();
+  });
+
+  it('союзник уже охраняет доки по приказу — предлагать нечего; занят другим — предлагает', () => {
+    const guarding = world({
+      allyOps: { ally: { by: 'p1', kind: 'guard', planet: 'docks', issuedAt: 0 } },
+    });
+    expect(offer(guarding)).toBeNull();
+    const elsewhere = world({
+      allyOps: { ally: { by: 'p1', kind: 'attack', planet: 'rim', issuedAt: 0 } },
+    });
+    expect(offer(elsewhere)).toEqual({ at: 'docks' });
   });
 });

@@ -16,6 +16,7 @@
  * матча — дело хоста (сеть, туры, хаб), модуль только сообщает, что выбрал игрок.
  */
 import { missionLabelN } from '../../decisions/missionView';
+import { chapterChain, linkedAlly, type ChapterStepId } from '../../decisions/chapterChain';
 import type { GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
@@ -143,6 +144,7 @@ export function endScreenHtml(
       ? cell(t('end.lost'), `☠ ${tally.lost}`) + cell(t('end.destroyed'), `✹ ${tally.destroyed}`)
       : '') +
     `</div>` +
+    operationResultHtml(state, me) +
     xpLine +
     double +
     note +
@@ -155,6 +157,38 @@ export function endScreenHtml(
     `<button class="es-btn wide btn-quiet" data-es="board">${t('end.board')}</button>` +
     `</div></div>`
   );
+}
+
+/** Результаты операции в порядке отчёта §8.9 — подписи литералами, их видит гейт локали. */
+const OPERATION_RESULTS: ReadonlyArray<readonly [ChapterStepId, string]> = [
+  ['production', 'end.op.production'],
+  ['forces', 'end.op.forces'],
+  ['evacuate', 'end.op.evacuate'],
+];
+
+/**
+ * Итог операции главы VI (§8.9, PVR-8.5): три результата контракта такими, какими их застал
+ * конец забега, — тем же счётом, по которому судит ядро. Победа требует всех трёх, поэтому
+ * победный отчёт честен сам; при поражении видно, что сделано, а что нет, — ложного «всё
+ * выполнено» нет. Реплика союзного офицера «Задача выполнена, командир» — только после
+ * победы и при назначенном союзнике на связи. Мир без контракта операции — пусто.
+ */
+export function operationResultHtml(state: GameState, me: string): string {
+  const chain = state.operation ? chapterChain(state, me, 0, data) : null;
+  const rows = OPERATION_RESULTS.flatMap(([id, key]) => {
+    const st = chain?.find((c) => c.id === id);
+    if (!st?.count) return [];
+    return [
+      `<li class="${st.done ? 'task done' : 'task'}"><span>${st.done ? '✓' : '✗'} ${esc(t(key))}</span>` +
+        `<b>${st.count.done}/${st.count.total}</b></li>`,
+    ];
+  }).join('');
+  if (!rows) return '';
+  const say =
+    state.operation?.completedAt !== undefined && linkedAlly(state, me)
+      ? `<p class="es-op-say">${esc(t('end.op.ally-done'))}</p>`
+      : '';
+  return `<div class="es-run es-op"><ul>${rows}</ul>${say}</div>`;
 }
 
 /**

@@ -1,16 +1,29 @@
 /**
- * Главная цепочка главы IV (`docs/sector-zero-map-concepts.md` §6.1, кирпич PVR-7.5):
- * **связь с союзником → архив → извлечение накопителя → доставка в зону вывода**. Это не
- * дополнительные задачи пула: цепочка решает исход главы, поэтому показывается отдельно от
- * них и ничего не платит.
+ * Главная цепочка главы. Это не дополнительные задачи пула: цепочка решает исход главы,
+ * поэтому показывается отдельно от них и ничего не платит.
  *
  * Чистое решение для панели задач, чипа и меток: шаги, какой из них текущий, куда вести
  * камеру и сколько сделано. Мир без сценария (главы I–III, партия) цепочки не имеет — `null`.
+ *
+ * - **Глава IV** (`docs/sector-zero-map-concepts.md` §6.1, кирпич PVR-7.5): связь с союзником →
+ *   архив → извлечение накопителя → доставка в зону вывода.
+ * - **Глава VI** (§8.8, кирпич PVR-8.5) — мир с контрактом операции: найти доки → вывести людей
+ *   → подавить очаги → разгромить главные силы. Три последних шага — результаты контракта, и
+ *   счёт у них тот же, по которому судит ядро (`operationStatus`): панель не напишет «3/3»,
+ *   пока ядро победы не видит. Порядок результатов — подсказка: их берут в любом порядке.
+ *   Связь шагом не служит — союзник на связи с первой минуты (§8.3).
  */
-import type { GameState, PlayerId } from '../packages/shared-core/src/index';
-import { contactedAllies, getStance } from '../packages/shared-core/src/index';
+import type { GameData, GameState, PlayerId } from '../packages/shared-core/src/index';
+import {
+  HAVEN_TRAIT,
+  REFUGE_TRAIT,
+  contactedAllies,
+  getStance,
+  operationStatus,
+} from '../packages/shared-core/src/index';
 
-export type ChapterStepId = 'contact' | 'archive' | 'extract' | 'deliver';
+export type ChapterStepId =
+  'contact' | 'archive' | 'extract' | 'deliver' | 'docks' | 'evacuate' | 'production' | 'forces';
 
 export interface ChapterStep {
   id: ChapterStepId;
@@ -23,7 +36,13 @@ export interface ChapterStep {
   target?: string;
   /** Доля работы (извлечение), 0…1. */
   progress?: number;
+  /** Счёт результата операции: сколько сделано из нужного (глава VI). */
+  count?: { done: number; total: number };
+  /** Правило, которое игрок видит до риска (§8.8): довести `need` из `of` возможных. */
+  rule?: { need: number; of: number };
 }
+
+type Step = Omit<ChapterStep, 'active'>;
 
 /** Место встречи этого мира (первое по id — карта объявляет одно). */
 export function rendezvousOf(state: GameState): { at: string; ally: PlayerId } | null {
@@ -35,14 +54,31 @@ export function rendezvousOf(state: GameState): { at: string; ally: PlayerId } |
 }
 
 /**
- * Цепочка главы глазами игрока `me`. `needMs` — сколько работы нужно на извлечение в мс
- * матча (`extractionNeedMs` ядра: часы карты под темп): решение не знает темпа само.
+ * Назначенный союзник главы, с которым игрок на связи, — или `null`: встречи ещё не было
+ * или сценария нет. Случайный ИИ в союзе назначенным не считается (§7.5).
  */
-export function chapterChain(state: GameState, me: PlayerId, needMs: number): ChapterStep[] | null {
+export function linkedAlly(state: GameState, me: PlayerId): PlayerId | null {
+  const meet = rendezvousOf(state);
+  if (!meet) return null;
+  return contactedAllies(state, me).includes(meet.ally) ? meet.ally : null;
+}
+
+/** Первая по id провинция с признаком; с `owner` — только его. */
+function siteWith(state: GameState, trait: string, owner?: PlayerId): string | undefined {
+  return Object.keys(state.planets)
+    .sort()
+    .find((id) => {
+      const p = state.planets[id]!;
+      return p.traits.includes(trait) && (owner === undefined || p.owner === owner);
+    });
+}
+
+/** Глава IV: связь → архив → извлечение → вывод. `null` — сценария нет. */
+function scenarioSteps(state: GameState, me: PlayerId, needMs: number): Step[] | null {
   const meet = rendezvousOf(state);
   const ex = state.extraction;
   if (!meet && !ex) return null;
-  const steps: Omit<ChapterStep, 'active'>[] = [];
+  const steps: Step[] = [];
   if (meet) {
     steps.push({
       id: 'contact',
@@ -76,6 +112,64 @@ export function chapterChain(state: GameState, me: PlayerId, needMs: number): Ch
       target: carrierAt ?? ex.zone,
     });
   }
+  return steps;
+}
+
+/** Глава VI: доки и три результата контракта. `null` — штурм ещё не начат (врага не знаем). */
+function operationSteps(state: GameState, me: PlayerId, data: GameData): Step[] | null {
+  const op = state.operation;
+  const status = operationStatus(state, data);
+  if (!op || !status) return null;
+  const steps: Step[] = [];
+  const docks = siteWith(state, REFUGE_TRAIT);
+  const found = docks !== undefined && (state.missionFacts?.found?.[me] ?? []).includes(docks);
+  if (docks !== undefined)
+    steps.push({ id: 'docks', key: 'chain.docks', done: found, target: docks });
+  // Люди ждут в доках, пока за ними не пришли; дальше их путь — к своему убежищу. До сведений
+  // о доках цели у эвакуации нет: метка не открывает место раньше эпизода (§8.4).
+  const waiting =
+    docks !== undefined && (state.planets[docks]!.awaitingFleets ?? []).some((f) => f.owner === me);
+  const evacTo =
+    docks !== undefined && !found ? undefined : waiting ? docks : siteWith(state, HAVEN_TRAIT, me);
+  steps.push({
+    id: 'evacuate',
+    key: 'chain.evacuate',
+    done: status.delivered >= status.need,
+    count: { done: Math.min(status.delivered, status.need), total: status.need },
+    rule: { need: status.need, of: status.possible },
+    ...(evacTo !== undefined ? { target: evacTo } : {}),
+  });
+  steps.push({
+    id: 'production',
+    key: 'chain.production',
+    done: status.held.length === 0,
+    count: { done: op.production.length - status.held.length, total: op.production.length },
+    ...(status.held[0] !== undefined ? { target: status.held[0] } : {}),
+  });
+  steps.push({
+    id: 'forces',
+    key: 'chain.forces',
+    done: status.broken.length === status.forces,
+    count: { done: status.broken.length, total: status.forces },
+  });
+  return steps;
+}
+
+/**
+ * Цепочка главы глазами игрока `me`. `needMs` — сколько работы нужно на извлечение в мс
+ * матча (`extractionNeedMs` ядра: часы карты под темп): решение не знает темпа само.
+ * `data` — для счёта контракта операции (беженцы и корпус соединений).
+ */
+export function chapterChain(
+  state: GameState,
+  me: PlayerId,
+  needMs: number,
+  data: GameData,
+): ChapterStep[] | null {
+  const steps = state.operation
+    ? operationSteps(state, me, data)
+    : scenarioSteps(state, me, needMs);
+  if (!steps) return null;
   const firstOpen = steps.findIndex((st) => !st.done);
   return steps.map((st, i) => ({ ...st, active: i === firstOpen }));
 }

@@ -45,7 +45,7 @@ const needMs = (s: GameState): number =>
     data,
     config: { timeScale: 1, modeId: pveModeId(CHAPTER), travelSpeedFactor: RUN_TRAVEL_SPEED },
   });
-const chain = (s: GameState): ChapterStep[] => chapterChain(s, 'p1', needMs(s))!;
+const chain = (s: GameState): ChapterStep[] => chapterChain(s, 'p1', needMs(s), data)!;
 const activeStep = (s: GameState): string | undefined => chain(s).find((st) => st.active)?.id;
 const doneKeys = (s: GameState): string[] =>
   chain(s)
