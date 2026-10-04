@@ -128,8 +128,8 @@
 симуляцию) — `RoomObservation` для join/leave/lobby/action/end; прото-сервер
 (`prototype/netserver.ts`) пишет per-match **JSONL** в `playtest-logs/` и печатает
 сводку по `SIGINT`. (2) ✅ опция `emitStateHash` кладёт `hashState(view)` в каждый
-снапшот; клиент (`MultiplayerClient.onPong` + сверка хеша) считает RTT и desync,
-прото-оверлей показывает **FPS · RTT · sync ✓ / desync ✗**. (3) ✅
+полный снапшот и в дельту игрока раз в 3 с; клиент (`MultiplayerClient.onPong` + сверка
+хеша) считает RTT и desync, прото-оверлей показывает **FPS · RTT · sync ✓ / desync ✗**. (3) ✅
 `docs/playtest-template.md` — чеклист после теста (связь, баги, что путало, фан 1–5).
 **Готово, когда:** один тест → JSONL + заполненный чеклист. *(механика готова и
 покрыта тестами `matchRoom.test.ts`; ждёт первого живого прогона на двоих.)*
@@ -142,8 +142,8 @@
 сериализованной дельты per-player) и `timing` (`submit` = advance→apply→(persist→)
 broadcast, `advance` = heartbeat-догон); `MetricsAggregator`
 (`packages/server/src/metrics.ts`) сводит поток в счётчики/avg/max. (2) ✅
-**desync-детектор**: хеш уже ехал в каждом снапшоте (M0) — теперь `MultiplayerClient`
-сверяет свою реконструкцию на каждой дельте с `hash`, при mismatch шлёт серверу
+**desync-детектор**: хеш едет в снапшотах (M0) — `MultiplayerClient` сверяет с ним свою
+реконструкцию (по куску за кадр), при mismatch шлёт серверу
 `desync`-репорт (`ClientDesyncMessage`) и получает **полный `state`-ресинк без
 реконнекта** (один запрос за раз; сервер наблюдает `desync` всегда, отвечает с
 cool-down 2 с — репорт-шторм не станет DoS). (3) ✅ тайминги + размер дельты в

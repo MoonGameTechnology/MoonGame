@@ -77,8 +77,9 @@ export interface MatchRoomOptions {
    *  `timeScale` applies. Omit both flags ⇒ the clock is raw wall time (the
    *  production entry seeds `initialState.time = Date.now()` instead). */
   initiallyStarted?: boolean;
-  /** Attach `hashState(view)` to each snapshot so the client can detect desync.
-   *  Opt-in (it hashes the per-player view on every broadcast). */
+  /** Attach `hashState(view)` to snapshots so the client can detect desync: every full
+   *  snapshot (welcome, resync) and one delta per player every `STATE_HASH_EVERY_MS`.
+   *  Default: on when `NODE_ENV=production` (see the constructor). */
   emitStateHash?: boolean;
   /** Fog for the HOST's own state keys. `visibleView` projects the core's keys and passes
    *  a host extension (a top-level key the host's modules keep, e.g. the prototype's
@@ -403,6 +404,14 @@ const DESYNC_RESYNC_COOLDOWN_MS = 2_000;
  *  ~30 s; anything faster is a bug or a flood — dropped silently (telemetry). */
 const PERF_SAMPLE_MIN_MS = 5_000;
 
+/** How often one player's delta carries the snapshot hash (M1 desync check, wall ms).
+ *  The hash is a third to a half of what a delta costs the server per player (a
+ *  1675-province view: ~16 ms), while the client checks its rebuild in slices over the
+ *  next frames (~2 s on a desktop at that size) and skips every delta that lands
+ *  meanwhile: a hash on each snapshot was mostly computed for nobody. A divergence that
+ *  lasts is still caught at the next hashed delta. Full snapshots are always hashed. */
+const STATE_HASH_EVERY_MS = 3_000;
+
 export class MatchRoom {
   readonly id: string;
 
@@ -496,6 +505,10 @@ export class MatchRoom {
   private readonly lastResyncAt = new Map<PlayerId, number>();
   /** Per-player wall time of the last accepted perf sample (rate limit). */
   private readonly lastPerfAt = new Map<PlayerId, number>();
+  /** Per-player wall time from which a delta carries the snapshot hash again. */
+  private readonly hashDueAt = new Map<PlayerId, number>();
+  /** Players booked on the hash schedule so far — places each new one in the period. */
+  private hashBooked = 0;
   /** Wall→game clock multiplier (1 = real-time; >1 fast-forwards the match). */
   private readonly timeScale: number;
   /** Множитель игрового времени к реальному. Нужен снаружи там, где окно измеряется в
@@ -589,6 +602,20 @@ export class MatchRoom {
   /** `hashState` of a per-player view, for the desync field (only when enabled). */
   private hashField(view: GameState): { hash?: string } {
     return this.emitStateHash ? { hash: hashState(view) } : {};
+  }
+
+  /** Whether this broadcast's delta to `playerId` carries the snapshot hash: the first
+   *  delta at or after each point of the player's own grid (their phase, then every
+   *  `STATE_HASH_EVERY_MS`). Counted from the grid, not from the delta that carried it:
+   *  two players whose points fall between the same two broadcasts share that one and
+   *  then part, where counting from the delta would keep them together for good (in an
+   *  hour-long model of irregular broadcasts, all 50 seats ended up on one). */
+  private hashDue(playerId: PlayerId, wall: number): boolean {
+    const due = this.hashDueAt.get(playerId) ?? wall;
+    if (!this.emitStateHash || wall < due) return false;
+    const passed = Math.floor((wall - due) / STATE_HASH_EVERY_MS); // points an idle spell skipped
+    this.hashDueAt.set(playerId, due + (passed + 1) * STATE_HASH_EVERY_MS);
+    return true;
   }
 
   /** Report a match end exactly once (after an action ends it). */
@@ -800,6 +827,13 @@ export class MatchRoom {
     const playerPeers = this.peers.get(playerId) ?? new Set<RoomPeer>();
     playerPeers.add(peer);
     this.peers.set(playerId, playerPeers);
+    // The welcome below is hashed; the player's first hashed delta falls within one period.
+    // Golden-ratio steps of the booking count spread players over it, so the ones who
+    // arrive together (a restart's reconnect wave) are not all hashed on one broadcast.
+    if (this.emitStateHash && !this.hashDueAt.has(playerId)) {
+      const phase = (this.hashBooked++ * 0.6180339887) % 1;
+      this.hashDueAt.set(playerId, this.now() + phase * STATE_HASH_EVERY_MS);
+    }
     // Кто именно сидит на этом сокете. Отдельно от `playerAccountId`: та карта хранит
     // ПЕРВОГО владельца кресла на всю жизнь комнаты (и правильно делает — это договор
     // арсенала), а для перехвата нужен тот, кто сидит сейчас.
@@ -858,6 +892,7 @@ export class MatchRoom {
       this.lastVisible.delete(playerId); // reclaim the per-player snapshot — no leak after a leave
       this.lastResyncAt.delete(playerId); // and the desync-resync cool-down stamp
       this.lastPerfAt.delete(playerId); // and the perf-sample rate-limit stamp
+      this.hashDueAt.delete(playerId); // and the snapshot-hash schedule
       this.observe?.({ kind: 'leave', playerId });
       // Manual-start lobby: if the host leaves before starting, hand the Start
       // button to whoever's still here (insertion order) so the lobby isn't stuck.
@@ -1771,6 +1806,7 @@ export class MatchRoom {
     // last visible view, so hidden worlds/fleets are physically never sent. Only
     // what changed in that player's view goes out (an idle world ⇒ tiny payload).
     const now = this.clock();
+    const wall = this.now();
     const lobby = this.lobbyField();
     const startedAt = this.observe ? performance.now() : 0;
     // Бои, которые начались и кончились в этом же пакете: в состоянии их нет ни кадром
@@ -1802,7 +1838,7 @@ export class MatchRoom {
           events: events.filter((e) => this.eventVisibleTo(e, playerId, identify, battles)),
           signatures: view.signatures,
           remembered: view.remembered,
-          ...this.hashField(view.base),
+          ...(this.hashDue(playerId, wall) ? this.hashField(view.base) : {}),
           ...lobby,
         };
         this.lastVisible.set(playerId, view.base);
