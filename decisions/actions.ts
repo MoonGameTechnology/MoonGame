@@ -98,6 +98,14 @@ export const patrolShuttle = (
 /** Вернуть патруль домой раньше срока (SHU-6.2) — по id вылета: эскадра в воздухе. */
 export const recallPatrol = (playerId: string, strikeId: string) =>
   act(playerId, 'shuttle.recall', { strikeId });
+/** ПЕРЕЛЁТ эскадры на другую свою базу (SHU-6.4). Обе базы размечены, как у удара: ядро
+ *  ищет мир в `planets`, корабль — в `fleets`, и перепутать их молча нельзя. */
+export const relocateShuttle = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+  dest: { toPlanetId: string } | { toFleetId: string },
+) => act(playerId, 'shuttle.relocate', { ...base, squadronId, ...dest });
 /** Перегрузка ЭСКАДРЫ между космопортом мира и стоящим там носителем (SHU-2.1):
  *  `load` — с мира на борт, `unload` — с борта на мир. Соединение едет целиком. */
 export const loadShuttle = (playerId: string, fleetId: string, squadronId: string) =>

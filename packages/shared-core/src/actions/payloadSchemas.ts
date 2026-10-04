@@ -186,6 +186,16 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // Отзыв патруля домой раньше срока (SHU-6.2) — по id вылета: эскадры в ангаре нет, она
   // в воздухе.
   'shuttle.recall': z.object({ strikeId: id }),
+  // ПЕРЕЛЁТ на другую свою базу (SHU-6.4). И откуда, и куда — ровно одна база из двух
+  // (мир или корабль): «обе или ни одной» схема не выражает, это гейт обработчика, как и
+  // дальность перелёта.
+  'shuttle.relocate': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id,
+    toPlanetId: id.optional(),
+    toFleetId: id.optional(),
+  }),
   // Перегрузка челноков между космопортом и стоящим там носителем (SHU-2.1).
   'shuttle.load': z.object({ fleetId: id, squadronId: id }),
   'shuttle.unload': z.object({ fleetId: id, squadronId: id }),

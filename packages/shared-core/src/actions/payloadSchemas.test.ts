@@ -56,6 +56,7 @@ const CLIENT_ACTION_TYPES = [
   'shuttle.merge',
   'shuttle.patrol',
   'shuttle.recall',
+  'shuttle.relocate',
   'shuttle.split',
   'shuttle.strike',
   'shuttle.unload',
@@ -159,6 +160,9 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 100, y: -40.5 } }],
       ['shuttle.patrol', { fleetId: 'f1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 } }],
       ['shuttle.recall', { strikeId: 'strike:p1:0:1' }],
+      // SHU-6.4: перелёт — с мира на корабль и с корабля на мир.
+      ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toFleetId: 'f1' }],
+      ['shuttle.relocate', { fleetId: 'f1', squadronId: 'sq:p1:1', toPlanetId: 'p2' }],
     ];
     for (const [type, payload] of valid) {
       expect(isValidActionPayload(type, payload), `${type}: ${JSON.stringify(payload)}`).toBe(true);
@@ -222,6 +226,8 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: NaN, y: 0 } }], // not finite
       ['shuttle.patrol', { planetId: 'p1', at: { x: 0, y: 0 } }], // missing squadronId
       ['shuttle.recall', {}], // missing strikeId
+      ['shuttle.relocate', { planetId: 'p1', toPlanetId: 'p2' }], // SHU-6.4: missing squadronId
+      ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toPlanetId: 7 }], // not an id
     ];
     for (const [type, payload] of bad) {
       expect(isValidActionPayload(type, payload), `${type}: ${JSON.stringify(payload)}`).toBe(
