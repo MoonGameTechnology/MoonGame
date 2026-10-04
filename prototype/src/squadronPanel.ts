@@ -27,9 +27,14 @@
  * 5. **Десант не грузится, а строится.** С SHU-5.2 десантный челнок выходит с верфи с
  *    бойцом внутри, поэтому трюм карточка только ПОКАЗЫВАЕТ (`cargo`), а кнопки
  *    погрузки у неё нет.
+ * 6. **«Патруль» есть только у эскадры, которая умеет висеть** (SHU-6.3): часы и круг
+ *    патруля по слабому звену (`squadronPatrol`) и пустой трюм — те же условия, по
+ *    которым ядро отобьёт `E_CANNOT_PATROL` и `E_HAS_CARGO`. Десантный челнок кнопки не
+ *    получает вовсе. Готовность БАЗЫ у патруля та же, что у удара (`canStrike`): топливо
+ *    и перезарядка общие на все вылеты места.
  */
 import type { GameData, Squadron, UnitStack } from '../../packages/shared-core/src/index';
-import { stacksSize } from '../../packages/shared-core/src/index';
+import { squadronPatrol, stacksSize } from '../../packages/shared-core/src/index';
 import { squadronHullPercent } from '../../decisions/squadronHull';
 import { fleetCallsign } from './fleetName';
 import type { HangarView } from './hangarPanel';
@@ -61,6 +66,9 @@ export interface SquadronCard {
   /** Наземный груз в трюме (пусто — идёт налегке). */
   cargo: UnitStack[];
   canStrike: boolean;
+  /** Эскадра УМЕЕТ патрулировать (правило 6). Кнопка доступна, когда готова база —
+   *  `canStrike`. */
+  canPatrol: boolean;
   canSplit: boolean;
   canMerge: boolean;
 }
@@ -79,6 +87,7 @@ export function squadronCards(
   const live = view.squadrons.filter((sq) => size(sq) > 0);
   return live.map((sq) => {
     const cargo = (sq.cargo ?? []).filter((st) => st.count > 0);
+    const plan = squadronPatrol(sq, opts.data);
     return {
       id: sq.id,
       name: squadronCallsignOf(sq.id),
@@ -88,6 +97,7 @@ export function squadronCards(
       hull: squadronHullPercent(sq, opts.data),
       cargo,
       canStrike: opts.mine && view.blocked === null,
+      canPatrol: opts.mine && plan.hours > 0 && plan.radius > 0 && cargo.length === 0,
       canSplit: opts.mine && splitOne(sq) !== null,
       canMerge: opts.mine && live.length > 1,
     };
