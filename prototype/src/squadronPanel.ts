@@ -37,6 +37,12 @@
  *    `decisions/relocateTargets.ts` — по состоянию и живым позициям, которых у карточки
  *    нет, поэтому сюда он приходит вопросом `relocate`. Груз кнопку не гасит: десантный
  *    челнок перелетает вместе с бойцом. Готовность базы та же, что у удара.
+ * 8. **Удержание патруля видно на карточке дома** (SHU-6.6): эскадра с `hold` вернулась
+ *    из удерживаемого патруля и встанет снова сама, как только база будет готова.
+ *    Карточка помечает её и даёт снять удержание — снять стоячий приказ можно в любую
+ *    минуту, в том числе пока база перезаряжается, поэтому эта кнопка не ждёт
+ *    `canStrike`. Остальные приказы ядро такой эскадре не запрещает: удар, перелёт,
+ *    погрузка и делёж снимают удержание сами.
  */
 import type { GameData, Squadron, UnitStack } from '../../packages/shared-core/src/index';
 import { squadronPatrol, stacksSize } from '../../packages/shared-core/src/index';
@@ -79,6 +85,8 @@ export interface SquadronCard {
   canRelocate: boolean;
   canSplit: boolean;
   canMerge: boolean;
+  /** Держит патруль: встанет снова сама, снять можно всегда (правило 8). */
+  hold: boolean;
 }
 
 const size = (sq: Squadron): number => sq.units.reduce((n, st) => n + Math.max(0, st.count), 0);
@@ -114,6 +122,7 @@ export function squadronCards(
       canRelocate: opts.mine && (opts.relocate?.(sq) ?? false),
       canSplit: opts.mine && splitOne(sq) !== null,
       canMerge: opts.mine && live.length > 1,
+      hold: opts.mine && sq.hold !== undefined,
     };
   });
 }

@@ -5,7 +5,6 @@ import {
   standingOrdersModule,
   orderAuto,
   serverAutoAssaultActions,
-  serverPatrolActions,
   data,
 } from './game';
 
@@ -48,7 +47,6 @@ function rej(r: ApplyResult): string {
 }
 type SOState = GameState & {
   autoAssault?: Record<string, true>;
-  patrols?: Record<string, { kind: 'planet' | 'fleet' }>;
 };
 
 describe('standingOrdersModule — CC-2 auto-storm stance (authoritative)', () => {
@@ -136,34 +134,3 @@ describe('serverAutoAssaultActions — the CC-2 server driver core', () => {
   });
 });
 
-/**
- * CC-4 у прототипа — ТОНКАЯ обёртка (SHU-2.2): и выбор цели, и чтение мира живут в ядре
- * (`patrolScrambles`), а правила дежурства — в `standingOrdersModule`. Оба покрыты
- * своими тестами в `packages/`, поэтому здесь сторожится ровно проводка: обёртка отдаёт
- * `shuttle.strike` с базой в правильном поле. Раньше на этом месте лежала третья копия
- * тех же правил.
- */
-describe('serverPatrolActions — проводка прототипной обёртки (CC-4)', () => {
-  it('дежурная БАЗА отдаёт `shuttle.strike` с id мира в поле мира', () => {
-    const port = planet('A', { x: 0, y: 0 }, 'green');
-    const s = stateWith([fleet('foe', { owner: 'red', location: 'A' })], [port]);
-    s.planets.A = {
-      ...s.planets.A!,
-      buildings: [{ type: 'spaceport', level: 1, hp: 200 }],
-      hangar: [{ id: 'sq:green:1', units: [{ unit: 'interceptor', count: 2 }] }],
-    } as unknown as Planet;
-    (s as SOState).patrols = { A: { kind: 'planet' } };
-    const out = serverPatrolActions(s);
-    expect(out).toHaveLength(1);
-    expect(out[0]!.actions[0]!.type).toBe('shuttle.strike');
-    expect(out[0]!.actions[0]!.payload).toMatchObject({
-      planetId: 'A',
-      squadronId: 'sq:green:1',
-      targetFleetId: 'foe',
-    });
-  });
-
-  it('без дежурных баз обёртка молчит', () => {
-    expect(serverPatrolActions(stateWith([fleet('F')]))).toEqual([]);
-  });
-});

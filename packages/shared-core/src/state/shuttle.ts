@@ -9,8 +9,8 @@
  * in `/decisions/wingOrders.ts`. NOT wired into a `fleet.launch` action or any
  * kernel module yet: that needs new GameState shape (where a launched wing's
  * `SortieState` lives) and touches the action/reducer pipeline, a separate,
- * riskier pass. `patrolTarget`/`scrambleOrder` (the auto-scramble driver, CC-4)
- * live in the prototype's `game.ts`, not `shuttle.ts` — out of scope here.
+ * riskier pass. The patrol tick's target pick (`patrolTarget`, SHU-6.2) lives in
+ * `state/patrol.ts`.
  */
 import type { Fleet, GameState, Planet, Squadron, UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
@@ -166,6 +166,26 @@ export function shuttleBayAt(planet: Planet, data: GameData): number {
     if (def) bay += buildingLevel(def, b.level).shuttleBay;
   }
   return bay;
+}
+
+/** Доля, ниже которой порт перестаёт выпускать челноки: повреждён БОЛЕЕ чем на 30%
+ *  (резолюция владельца 2026-09-08). Порог на вылет, не на возврат. */
+const PORT_LAUNCH_HP = 0.7;
+
+/** Не выпускает ли порт челноки из-за повреждений. Считается по САМОМУ ЦЕЛОМУ порту
+ *  мира: два порта — вылет идёт из уцелевшего, а не блокируется разрушенным. Здесь, а
+ *  не в модуле челноков: Хранитель ставит патруль только туда, где ядро его примет
+ *  (SHU-6.6), и вторая копия порога разъехалась бы с этой. */
+export function portDisabled(planet: Planet, data: GameData): boolean {
+  let best = 0;
+  for (const b of planet.buildings) {
+    const def = data.buildings[b.type];
+    if (!def) continue;
+    const level = buildingLevel(def, b.level);
+    if (level.shuttleBay <= 0 || level.hp <= 0) continue;
+    best = Math.max(best, b.hp / level.hp);
+  }
+  return best < PORT_LAUNCH_HP;
 }
 
 /** Сколько МЕСТ занимает одна машина или один боец: `cargoSize` юнита (SHU-5.1). Трюм

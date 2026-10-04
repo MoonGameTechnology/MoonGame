@@ -48,8 +48,6 @@ function start(): Run {
     applyLocal: apply,
     playerOrder: apply,
     autoAssault: () => false,
-    patrols: () => new Map(),
-    known: () => true,
   });
   let hour = 0;
   return {

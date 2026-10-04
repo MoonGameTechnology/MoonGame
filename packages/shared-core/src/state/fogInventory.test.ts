@@ -115,7 +115,6 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   capital: 'filtered', // чужая столица — точка респавна героя, наводка
   autoAssault: 'filtered', // всё это — постоянные приказы, будущие намерения
   autoRetreat: 'filtered', // RETR-2: порог отхода и точка — намерение хозяина флота
-  patrols: 'filtered',
   orders: 'filtered',
   forcedMarch: 'filtered',
   ordnance: 'filtered',
@@ -399,7 +398,6 @@ function maximalState(): GameState {
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },
     autoRetreat: { mine: { at: 0.3, to: 'A' }, CANARY_fleet: { at: 0.3, to: 'CANARY_target' } },
-    patrols: { mine: { kind: 'fleet' }, CANARY_fleet: { kind: 'fleet' } },
     orders: {
       mine: { steps: [{ kind: 'move', to: 'A' }] },
       CANARY_fleet: { steps: [{ kind: 'move', to: 'CANARY_dest' }] },

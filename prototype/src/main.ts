@@ -1,8 +1,10 @@
 import {
   attackBattle,
   deployForkFortress,
+  holdPatrol,
   patrolShuttle,
   recallPatrol,
+  releaseHold,
   relocateShuttle,
   retreatBattle,
 } from '../../decisions/actions';
@@ -91,7 +93,6 @@ import {
   type SeatConfig,
   type StepOut,
   orderAuto,
-  orderScramble,
   botFavour,
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
@@ -224,7 +225,6 @@ import {
   worldRadarReach,
   fleetRadarReach,
   abilityRange,
-  hangarMachines,
   type Squadron,
   type StrikeBase,
   type PausedConstructionSite,
@@ -246,7 +246,7 @@ import {
 } from '../../packages/client/src/index';
 import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
-import { basePatrols, patrolMarks } from '../../decisions/patrolMarks';
+import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import {
   worldToScreen as camWorldToScreen,
@@ -1042,7 +1042,7 @@ import {
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import { planetRadar as corePlanetRadar } from './sensorScale';
-import { autoStance, scrambleStance } from './stanceToggle';
+import { autoStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded } from './noteLog';
@@ -1335,13 +1335,6 @@ let splitAwait: string | null = null;
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
-// CC-4 ДЕЖУРНЫЙ ВЫЛЕТ (на БАЗЕ с SHU-2.2): миры с портом и носители, которым разрешено
-// самим поднимать эскадру навстречу опознанному врагу в её радиусе. Здесь только флаг —
-// топливо и перезарядка принадлежат базе (SHU-1.2) и тратятся самим ударом, поэтому ни
-// запаса, ни его «заначки на время выключения» больше нет: включить-выключить перестало
-// быть бесплатной дозаправкой само собой. Соло-план, как очередь приказов; в сети
-// авторитетно состояние (`order.scramble`).
-const patrols = new Map<string, { kind: 'planet' | 'fleet' }>();
 // A staged move that would cross territory of a player you're at PEACE with: held
 // until you confirm in the war-prompt (declaring war opens the route) or cancel.
 let warPrompt: {
@@ -4406,6 +4399,19 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       }
+      // «Держать патруль» снят ядром (SHU-6.6): помеха сама не пройдёт — эскадра больше не
+      // висит, точка за радиусом. Без строки игрок ждал бы патруль над базой, который уже
+      // не встанет, и не знал бы почему.
+      case 'shuttle.hold.ended':
+        if (p.owner !== ME) break;
+        note(
+          t('log.shuttle.hold-ended', {
+            name: squadronCallsignOf(p.squadronId as string),
+            why: errText(p.code as string),
+          }),
+          p.baseKind === 'planet' ? (p.baseId as string) : undefined,
+        );
+        break;
       case 'market.bought':
         // Сделка слышна обеим сторонам, и сторона выбирает СЛОВО, а не знак числа —
         // `fleetNews.ts` (REFM-181): «купил» и «продал» это разные события в голове.
@@ -4566,7 +4572,7 @@ function handleEvents(events: DomainEvent[]) {
 // in single-player alike; the resulting `planet.captured` event is noted above.
 
 // --- red AI ------------------------------------------------------------------
-// Ходы ИИ, авто-штурм, столкновения флотов, дежурные вылеты и цепочки приказов живут в
+// Ходы ИИ, авто-штурм, столкновения флотов, авто-отступление и цепочки приказов живут в
 // `soloDrivers.ts` (REFM-26): в сетевом матче всё это делает сервер, в одиночном —
 // подталкивает кадр. Здесь только хуки: состояние, два пути приказов (свой идёт через
 // `playerOrder`, чужой применяется локально) и опт-ин авто-штурма.
@@ -4577,8 +4583,6 @@ const solo = initSoloDrivers({
   applyLocal: (a) => apply(order(s, a, s.time)),
   playerOrder: (a) => void playerOrder(a),
   autoAssault: (id) => autoAssault.has(id),
-  patrols: () => patrols,
-  known,
 });
 
 /** The CC-2 auto-storm stance of a fleet — authoritative state in NET, local Set solo. */
@@ -4586,13 +4590,6 @@ function isAutoAssault(fleetId: string): boolean {
   return NET
     ? ((s as { autoAssault?: Record<string, true> }).autoAssault?.[fleetId] ?? false)
     : autoAssault.has(fleetId);
-}
-/** Дежурит ли эта БАЗА (мир или носитель) — авторитетное состояние в сети, локальная
- *  карта в соло. */
-function patrolOn(baseId: string): boolean {
-  return NET
-    ? !!(s as { patrols?: Record<string, unknown> }).patrols?.[baseId]
-    : patrols.has(baseId);
 }
 /**
  * RETR-2: порог авто-отхода, стоящий на флоте, или `null`, если приказа нет.
@@ -4618,30 +4615,6 @@ function setAutoAssault(ids: string[], on: boolean): void {
     else if (on) autoAssault.add(id);
     else autoAssault.delete(id);
   }
-}
-/**
- * CC-4: включить/выключить «дежурный вылет» у БАЗЫ — мира с портом или носителя
- * (SHU-2.2; раньше стойка армилась на флот челноков).
- *
- * Авторитетно в сети (`order.scramble` — сервер поднимает эскадру, пока игрок офлайн),
- * локальная карта плюс кадровый драйвер в соло. Условия — `stanceToggle.ts`.
- */
-function setScramble(base: { kind: 'planet' | 'fleet'; id: string }, on: boolean): void {
-  const host = base.kind === 'planet' ? s.planets[base.id] : s.fleets[base.id];
-  const want = scrambleStance(
-    !!host && host.owner === ME,
-    hangarMachines(host ?? { hangar: [] }).length > 0,
-    patrolOn(base.id),
-    on,
-  );
-  if (want === 'skip') return;
-  const payload = base.kind === 'planet' ? { planetId: base.id } : { fleetId: base.id };
-  if (NET) {
-    playerOrder(orderScramble(ME, payload, want === 'set'));
-    return;
-  }
-  if (want === 'set') patrols.set(base.id, { kind: base.kind });
-  else patrols.delete(base.id);
 }
 
 // Итог матча и награда за него живут в `matchEnd.ts` (REFM-27): исход берётся из
@@ -7171,7 +7144,8 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
   // состав.
   const patrols = mine ? patrolRowsHtml(owner) : '';
   // Перелёт (SHU-6.5) — только туда, где ядро его примет: своя база в дальности, где
-  // звено поместится. Вид базы выводится по карте, где нашёлся id, как у дежурства.
+  // звено поместится. Вид базы выводится по карте, где нашёлся id: id мира и id флота
+  // живут в разных картах состояния.
   const from = s.planets[owner] ? { planetId: owner } : { fleetId: owner };
   const cards = squadronCards(view, {
     mine,
@@ -7182,26 +7156,14 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
     return head + patrols + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
   }
   const body = cards.map((c) => squadronCardHtml(c, view)).join('');
-  // ДЕЖУРНЫЙ ВЫЛЕТ (CC-4) — стойка БАЗЫ, а не отдельного звена (SHU-2.2), поэтому
-  // кнопка стоит здесь, под общей строкой топлива, а не на карточке. Включённое
-  // дежурство само поднимает ближайшую эскадру навстречу опознанному врагу в радиусе,
-  // тратя тот же запас вылетов, что и ручной удар.
-  const duty = mine
-    ? `<div class="row">${btn(
-        'wingduty',
-        owner,
-        t(patrolOn(owner) ? 'side.wing.duty.on' : 'side.wing.duty.off'),
-        true,
-      )}</div>`
-    : '';
-  return head + patrols + body + duty + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
+  return head + patrols + body + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
 }
 
 /**
- * Строки патрулей, поднятых с базы `owner` (SHU-6.3): позывной, остаток висения и
- * «Вернуть». Что считается патрулём и чей он — `patrolMarks.ts`; здесь только разметка.
- * Вид базы выводится тем же способом, что у дежурства: id мира и id флота живут в разных
- * картах состояния.
+ * Строки патрулей, поднятых с базы `owner` (SHU-6.3): позывной, остаток висения,
+ * «Держать патруль» (SHU-6.6) и «Вернуть». Что считается патрулём и чей он —
+ * `patrolMarks.ts`; здесь только разметка. Вид базы выводится по карте, где нашёлся id:
+ * id мира и id флота живут в разных картах состояния.
  */
 function patrolRowsHtml(owner: string): string {
   const base: StrikeBase = s.planets[owner]
@@ -7214,7 +7176,10 @@ function patrolRowsHtml(owner: string): string {
         m.leftMs !== null
           ? t('side.wing.patrol.on', { name, left: fmtEta(m.leftMs / HOUR) })
           : t('side.wing.patrol.out', { name });
-      return `<div class="row"><span class="dim">${esc(text)}</span> ${btn('wingrecall', m.id, t('side.wing.recall'), true)}</div>`;
+      // «Держать патруль» стоит у САМОГО патруля, а не у базы: удержание принадлежит
+      // вылету и уходит с ним, и с одной базы могут висеть два патруля в разных точках.
+      const keep = m.hold ? t('side.wing.keep.off') : t('side.wing.keep');
+      return `<div class="row"><span class="dim">${esc(text)}</span> ${btn('wingkeep', m.id, keep, true)} ${btn('wingrecall', m.id, t('side.wing.recall'), true)}</div>`;
     })
     .join('');
 }
@@ -7236,11 +7201,13 @@ function squadronCardHtml(card: SquadronCard, view: HangarView): string {
     t('side.wing.places', { n: card.places }),
     ...(cargo > 0 ? [t('side.wing.cargo', { n: cargo })] : []),
     ...(card.hull !== null ? [t('side.wing.hull', { p: card.hull })] : []),
+    // Вернулась из удерживаемого патруля и встанет снова сама (SHU-6.6).
+    ...(card.hold ? [t('side.wing.holding')] : []),
   ];
   const sub = ` <span class="dim">· ${esc(notes.join(' · '))}</span>`;
   const head = `<div class="row"><b>${esc(title)}</b>${sub}</div>`;
   const rows = unitRows(card.stacks);
-  if (!card.canStrike && !card.canSplit && !card.canMerge) return head + rows;
+  if (!card.canStrike && !card.canSplit && !card.canMerge && !card.hold) return head + rows;
 
   // Слияние — ДВА ТАПА: первый взводит источник, второй выбирает приёмника. Пока
   // источник взведён, у остальных карточек кнопка меняет смысл на «сюда», а у самого
@@ -7259,6 +7226,9 @@ function squadronCardHtml(card: SquadronCard, view: HangarView): string {
     // Патруль (SHU-6.3) — только у звена, которое умеет висеть; готовность базы та же,
     // что у удара: топливо и перезарядка у места общие.
     (card.canPatrol ? btn('wingpatrol', card.id, t('side.wing.patrol'), card.canStrike) : '') +
+    // Снять удержание (SHU-6.6) можно и на перезарядке: это отмена стоячего приказа, а не
+    // вылет (правило 8 `squadronPanel.ts`).
+    (card.hold ? btn('wingrelease', card.id, t('side.wing.keep.off'), true) : '') +
     // Перелёт (SHU-6.5) — только когда есть куда; база готова — та же, что у удара.
     (card.canRelocate ? btn('wingrelocate', card.id, t('side.wing.relocate'), card.canStrike) : '') +
     (card.canSplit ? btn('wingsplit', card.id, t('side.wing.split'), true) : '') +
@@ -7744,7 +7714,6 @@ function fleetMinesRowHtml(f: Fleet): string {
  *  в составе, но стволов у них нет) и не пишется нулём, а пустая полоса не рисуется
  *  совсем — заголовок без меток выглядит поломкой, а не спокойствием. */
 function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
-  const onDuty = patrolOn(f.id); // дежурит ли этот носитель (SHU-2.2)
   const pd = pointDefenseTotal(f.units, (st) => {
     const def = data.units[st.unit];
     return def ? (effectiveStats(def, st, data).pointDefense ?? 0) : null;
@@ -7755,7 +7724,9 @@ function fleetEffectsHtml(f: Fleet, boosted: boolean, nTr: number): string {
       inBattle: !!f.battleId,
       forcedMarch: boosted,
       bombarding: !!f.bombarding,
-      patrol: onDuty,
+      // Корабль-база держит патруль (SHU-6.6) — у своего флота: чужие вылеты в состоянии
+      // клиента не видны (`visibleState`), а метка без них соврала бы «не держит».
+      patrol: f.owner === ME && holdsPatrol(s.strikes, f.hangar, { kind: 'fleet', id: f.id }, ME),
       troops: nTr,
       pointDefense: pd,
     },
@@ -10406,13 +10377,16 @@ side.addEventListener('click', (ev) => {
     // `arg` — id ВЫЛЕТА: патруль уже не в ангаре, и адресуется он так же, как его
     // принимает ядро (`shuttle.recall { strikeId }`).
     playerOrder(recallPatrol(ME, arg));
-  } else if (act === 'wingduty') {
-    // CC-4: стойка БАЗЫ — `arg` это id мира или носителя (SHU-2.2). Вид базы выводим
-    // по тому, где она нашлась: id мира и id флота живут в разных картах состояния.
-    const kind: 'planet' | 'fleet' = s.planets[arg] ? 'planet' : 'fleet';
-    const on = !patrolOn(arg);
-    setScramble({ kind, id: arg }, on);
-    if (on) note(t('hint.standing-sortie'));
+  } else if (act === 'wingkeep') {
+    // «Держать патруль» (SHU-6.6) — `arg` это id ВЫЛЕТА, как у «Вернуть». Новое
+    // состояние берётся из самого патруля: строка могла устареть между отрисовкой и тапом.
+    const held = (s.strikes ?? []).find((st) => st.id === arg)?.patrol?.hold === true;
+    if (playerOrder(holdPatrol(ME, arg, !held)) && !held) note(t('hint.wing-keep'));
+  } else if (act === 'wingrelease') {
+    // Снять удержание с эскадры, которая ждёт дома перезарядки (правило 8
+    // `squadronPanel.ts`): `arg` — id эскадры, база выводится из состояния.
+    const base = squadronBase(arg);
+    if (base) playerOrder(releaseHold(ME, base, arg));
   } else if (act === 'wingsplit') {
     // Отделяет ОДНУ машину в новое звено (правило 3 в `squadronPanel.ts`): повторный
     // тап отделяет ещё одну. Что именно уходит, решает чистый `splitOne`.
@@ -13532,7 +13506,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   saveSolo();
   soloSaveActive = false;
   autoAssault.clear();
-  patrols.clear();
   setRunActive(false);
   sectorDevActive = false;
   trainingActive = false;
@@ -15643,7 +15616,7 @@ function currentSoloSave(): SoloSave {
     state: s, ai: [...AI_PLAYERS],
     normalSpeed: Number($('spd-play').dataset.speed) / PLAY_BASE,
     fastSpeed: Number($('spd-fast').dataset.speed) / PLAY_BASE,
-    autoAssault: [...autoAssault], patrols: [...patrols], memory: memory.dump(),
+    autoAssault: [...autoAssault], memory: memory.dump(),
   };
 }
 function saveSolo(explicit = false): void {
@@ -15717,7 +15690,6 @@ function restoreSolo(): void {
   cameFromLink = false;
   installMatch(save.state, new Map(save.ai));
   for (const id of save.autoAssault) autoAssault.add(id);
-  for (const [id, order] of save.patrols) patrols.set(id, order);
   memory.restore(save.memory);
   applyTimeSpeed(save.normalSpeed, save.fastSpeed);
   speed = 0;
@@ -17038,7 +17010,6 @@ function frame(nowReal: number) {
       solo.driveAutoRetreat();
       solo.autoEngage();
       solo.checkFleetClashes();
-      solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
       solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
       solo.runAI();
     }

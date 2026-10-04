@@ -13,7 +13,6 @@ export interface SoloSave {
   normalSpeed: number;
   fastSpeed: number;
   autoAssault: string[];
-  patrols: Array<[string, { kind: 'planet' | 'fleet' }]>;
   memory: Array<[string, SoloIntel]>;
 }
 
@@ -78,10 +77,6 @@ export function parseSoloSave(raw: string | null, rules: string): SoloSave | nul
       !p.ai.every((x) => pair(x) && (x[1] === 'weak' || x[1] === 'strong') && x[0] in players) ||
       !Array.isArray(p.autoAssault) ||
       !p.autoAssault.every((x) => typeof x === 'string') ||
-      !Array.isArray(p.patrols) ||
-      !p.patrols.every(
-        (x) => pair(x) && record(x[1]) && (x[1].kind === 'planet' || x[1].kind === 'fleet'),
-      ) ||
       !Array.isArray(p.memory) ||
       !p.memory.every(
         (x) =>

@@ -229,3 +229,20 @@ describe('SHU-6.5 — кнопка «Перебазировать»', () => {
     expect(card?.canStrike).toBe(false);
   });
 });
+
+describe('SHU-6.6 — «Держать патруль» на карточке дома', () => {
+  it('ЭСКАДРА С УДЕРЖАНИЕМ ПОМЕЧЕНА, и снять его можно на перезарядке базы', () => {
+    const held: Squadron = { ...sq('a', [['interceptor', 2]]), hold: { at: { x: 1, y: 2 } } };
+    const [card] = squadronCards(view([held], { blocked: 'rearming' }), { mine: true, data });
+    expect(card?.hold).toBe(true);
+    expect(card?.canStrike).toBe(false); // база ждёт — а снять удержание можно уже сейчас
+  });
+
+  it('БЕЗ УДЕРЖАНИЯ И У ЧУЖОЙ ЭСКАДРЫ ОТМЕТКИ НЕТ', () => {
+    const held: Squadron = { ...sq('a', [['interceptor', 2]]), hold: {} };
+    expect(squadronCards(view([sq('a', [['interceptor', 2]])]), { mine: true, data })[0]?.hold).toBe(
+      false,
+    );
+    expect(squadronCards(view([held]), { mine: false, data })[0]?.hold).toBe(false);
+  });
+});

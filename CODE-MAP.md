@@ -107,7 +107,7 @@
 | 25 | `auto-rally` | `autoRally.ts` | — | `unit.built` | — | — |
 | 26 | `shuttle` | `shuttle.ts` | `shuttle.return`, `shuttle.strike` | `shuttle.arrived`, `time.advanced` | — | `fleet.arrived`, `pd.fired`, `shuttle.docked`, `shuttle.launched`, `shuttle.returning` · sched: `shuttle.arrived` |
 | 27 | `capital` | `capital.ts` | `capital.designate` | — | — | `capital.designated` |
-| 28 | `standing-orders` | `standingOrders.ts` | `chain.stamp`, `order.auto`, `order.chain`, `order.scramble`, `patrol.stamp` | `time.advanced` | — | — |
+| 28 | `standing-orders` | `standingOrders.ts` | `chain.stamp`, `order.auto`, `order.chain`, `order.retreat` | `time.advanced` | — | — |
 | 29 | `instant-repair` | `instantRepair.ts` | `fleet.instantRepair` | — | — | `fleet.instantRepaired` |
 | 30 | `fleet-repair` | `fleetRepair.ts` | `fleet.repair` | — | — | `fleet.repaired` |
 | 31 | `forced-march` | `forcedMarch.ts` | `fleet.forcemarch` | `fleet.arrived`, `time.advanced` | `fleet.speed` | — |

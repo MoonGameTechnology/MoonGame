@@ -409,7 +409,7 @@ export const ru: Record<string, string> = {
   'browser.solo.hint': 'Сервер не нужен — свободные места займут боты.',
   'browser.taken': 'занято',
 
-  // --- ai — Красный ИИ: условия конца матча и отказы дежурного вылета.
+  // --- ai — Красный ИИ: условия конца матча.
   'ai.end.domination': 'доминированием в галактике',
   'ai.end.elimination': 'уничтожением соперников',
   'ai.end.over': 'матч завершён',
@@ -557,6 +557,7 @@ export const ru: Record<string, string> = {
   'hint.wing-patrol-aim': '◎ выберите точку патруля в круге: висит {h} ч, раз в 15 мин бьёт цель в радиусе {r}',
   'hint.wing-relocate-aim': '⇄ выберите подсвеченную базу: дальность перелёта {r}',
   'hint.wing-relocate-cancelled': 'перелёт отменён',
+  'hint.wing-keep': '⟳ патруль держится: после возврата и перезарядки взлетит снова сам',
   'side.build.open': 'Построить',
   'side.fortress.raise': 'Возвести крепость',
   'side.fortress.needs-tech': 'Сначала изучите технологию {tech}.',
@@ -571,8 +572,6 @@ export const ru: Record<string, string> = {
   'side.wing.blocked.busy': 'корабль в бою — звеньям не до вылета',
   'side.wing.blocked.empty': 'ангар пуст — поднимать нечего',
   'side.wing.cargo': 'в трюме: {n}',
-  'side.wing.duty.off': '🛩 Дежурный вылет',
-  'side.wing.duty.on': '🛩 Снять с дежурства',
   'side.wing.empty': 'ангар пуст',
   'side.wing.blocked.no-fuel': 'топливо кончилось — ждём перезарядки',
   'side.wing.blocked.rearming': 'порт перезаряжается — вылет позже',
@@ -595,6 +594,9 @@ export const ru: Record<string, string> = {
   'side.wing.patrol.on': 'патруль «{name}»: ещё {left}',
   'side.wing.patrol.out': 'патруль «{name}»: летит к точке',
   'side.wing.recall': '↩ Вернуть',
+  'side.wing.keep': '⟳ Держать патруль',
+  'side.wing.keep.off': '⟳ Не держать патруль',
+  'side.wing.holding': 'держит патруль',
   'side.wing.unload': '↓ В порт',
   'spy.log.empty': 'попыток ещё не было',
   'spy.log.title': 'Журнал',
@@ -1497,7 +1499,6 @@ export const ru: Record<string, string> = {
   'hint.engage-in-flight': 'цель в пути — курса к ней нет, дождитесь остановки',
   'hint.pick-merge': '⛬ выберите флот для объединения',
   'hint.pick-order': 'нажмите на точку карты — каждое нажатие добавляет приказ',
-  'hint.standing-sortie': '🛩 дежурный вылет включён — шаттлы бьют врага в радиусе',
 
   // --- loadout — Оснащение корабля (packages/client): подписи характеристик в превью.
   'loadout.stat.attack': 'Урон в атаке',
@@ -2796,6 +2797,7 @@ export const ru: Record<string, string> = {
   'log.salvage': '🔧 Поле боя разобрано: {what}',
   'log.shuttle.repelled.mine': '✳ ПВО сбило наших машин: {n} · {at}',
   'log.shuttle.repelled.theirs': '✳ Наше ПВО сбило чужих машин: {n} · {at}',
+  'log.shuttle.hold-ended': '⟳ Патруль «{name}» больше не держится: {why}',
   'log.spy.caught': '🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!',
   'log.spy.fail': '🕵 Агент провалился ({who}) — плата сгорела',
   'log.spy.fail.short': '✖ Провал против {who} — плата сгорела',
@@ -3382,7 +3384,7 @@ export const ru: Record<string, string> = {
   'effect.in-battle': 'в бою',
   'effect.forced-march': 'форс-марш',
   'effect.bombarding': 'бомбардировка',
-  'effect.patrol': 'дежурный вылет',
+  'effect.patrol': 'держит патруль',
   'effect.blackout': 'блэкаут: ПКО/радары −50%',
   'effect.hunger': 'голод: −25% наземный урон',
   'effect.point-defense': 'зональное ПВО {n}',
@@ -3530,11 +3532,11 @@ export const ru: Record<string, string> = {
   'steward.log.ferry': '🚚 Паром выслан к {node} за гарнизоном',
   'steward.log.held': '🛡 Рубеж {node} удержан: прогноз потерь {pct}%',
   'steward.log.reinforce': '🚩 Подкрепление выслано к {node}: прогноз потерь {pct}%',
-  'steward.log.sortie': '🛫 Дежурный вылет поднят у {node}',
+  'steward.log.sortie': '🛫 Патруль поставлен над {node}',
   'steward.log.title': 'Журнал Хранителя',
   'steward.on.active': 'Хранитель ведёт активную оборону.',
   'steward.on.active.note':
-    'Пока вы спите: держит рубежи, поднимает дежурные шаттлы и контратакует у своих миров, когда прогноз потерь приемлем.',
+    'Пока вы спите: держит рубежи и патрули шаттлов над мирами, контратакует у своих миров, когда прогноз потерь приемлем.',
   'steward.on.defense': 'Хранитель ведёт оборону.',
   'steward.on.defense.note':
     'Пока вы спите: держит рубежи и отбивает атаки, застраивает очередь и торгует — без наступлений.',
@@ -3547,7 +3549,7 @@ export const ru: Record<string, string> = {
   'steward.stance': 'Поза',
   'steward.stance.active': 'Активная оборона',
   'steward.stance.active.note':
-    'Активная оборона: всё то же, плюс контрудар по врагу у своих миров при приемлемом прогнозе потерь (до 35%) и дежурные вылеты шаттлов. Свою территорию не покидает.',
+    'Активная оборона: всё то же, плюс контрудар по врагу у своих миров при приемлемом прогнозе потерь (до 35%) и патрули шаттлов над своими мирами. Свою территорию не покидает.',
   'steward.stance.defense': 'Оборона',
   'steward.stance.defense.note':
     'Поза «Оборона»: держит и отбивает, застраивает очередь, торгует — без наступлений и дипломатии. Управление вернётся автоматически, с утренней сводкой.',

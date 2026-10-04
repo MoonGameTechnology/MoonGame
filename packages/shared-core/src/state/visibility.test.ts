@@ -173,22 +173,47 @@ describe('visibleState — order chains are the owner’s secret (future intent)
     expect('orders' in visibleState(state, 'p1', data)).toBe(false);
   });
 
-  it('стоячие приказы (autoAssault / patrols) снимаются тем же правилом', () => {
+  it('стоячий авто-штурм снимается тем же правилом', () => {
     const state = scenario();
     state.autoAssault = { 'mine-1': true, 'enemy-near': true };
-    // Дежурство армится на БАЗУ (SHU-2.2): хозяин ищется по СВОЕМУ виду — у флота в
-    // `fleets`, у мира в `planets`. Общий проход по флотам снял бы и собственный мир.
-    const myWorld = Object.values(state.planets).find((p) => p.owner === 'p1')!;
-    const foreignWorld = Object.values(state.planets).find((p) => p.owner === 'p2')!;
-    state.patrols = {
-      'mine-1': { kind: 'fleet' },
-      'enemy-near': { kind: 'fleet' },
-      [myWorld.id]: { kind: 'planet' },
-      [foreignWorld.id]: { kind: 'planet' },
-    };
     const view = visibleState(state, 'p1', data) as VisibleState & GameState;
     expect(view.autoAssault).toEqual({ 'mine-1': true });
-    expect(Object.keys(view.patrols ?? {}).sort()).toEqual(['mine-1', myWorld.id].sort());
+  });
+
+  it('«Держать патруль» (SHU-6.6) — тоже намерение: у чужой эскадры флаг снят, у своей цел', () => {
+    const state = scenario();
+    const squad = (id: string, hold: { at?: { x: number; y: number } }) => ({
+      id,
+      units: [{ unit: 'cruiser', count: 1 }],
+      hold,
+    });
+    // B — опознанный узел (прыжок от A), и он же рядом с A: каждая сторона опознаёт базы
+    // другой.
+    state.planets.A = { ...state.planets.A!, hangar: [squad('sq:p1:1', { at: { x: 40, y: 0 } })] };
+    state.planets.B = { ...state.planets.B!, owner: 'p2', hangar: [squad('sq:p2:1', { at: { x: 120, y: 5 } })] };
+    state.fleets['mine-1'] = { ...state.fleets['mine-1']!, hangar: [squad('sq:p1:2', {})] };
+    state.fleets['enemy-near'] = { ...state.fleets['enemy-near']!, hangar: [squad('sq:p2:2', {})] };
+    /** Эскадры чужих баз в проекции — и те из них, что несут флаг удержания. */
+    const foreign = (view: VisibleState, me: string) => {
+      const all = [
+        ...Object.values(view.planets).filter((pl) => pl.owner !== me).flatMap((pl) => pl.hangar ?? []),
+        ...Object.values(view.fleets).filter((f) => f.owner !== me).flatMap((f) => f.hangar ?? []),
+      ];
+      return { ids: all.map((q) => q.id), held: all.filter((q) => q.hold !== undefined).map((q) => q.id) };
+    };
+    for (const [me, other] of [['p1', 'sq:p2:2'], ['p2', 'sq:p1:2']] as const) {
+      const view = visibleState(state, me, data);
+      // Опознанный чужой корабль показывает ангар — значит, проверка не пустая…
+      expect(foreign(view, me).ids).toContain(other);
+      // …а где хозяин снова встанет кругом — не показывает ни у мира, ни у корабля.
+      expect(foreign(view, me).held).toEqual([]);
+    }
+    // Свои удержания — свои: панель ангара рисует по ним «держит патруль».
+    const mine = visibleState(state, 'p1', data);
+    expect(mine.planets.A?.hangar?.[0]?.hold).toEqual({ at: { x: 40, y: 0 } });
+    expect(mine.fleets['mine-1']?.hangar?.[0]?.hold).toEqual({});
+    // Проекция не трогает сам мир: туман режет копию.
+    expect(state.planets.B?.hangar?.[0]?.hold).toEqual({ at: { x: 120, y: 5 } });
   });
 
   it('forced-march flags (BOOST-1) are stripped by the same rule', () => {

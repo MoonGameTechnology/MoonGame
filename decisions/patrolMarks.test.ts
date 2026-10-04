@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShuttleStrike } from '../packages/shared-core/src/index';
-import { basePatrols, patrolMarks } from './patrolMarks';
+import { basePatrols, holdsPatrol, patrolMarks } from './patrolMarks';
 
 const patrol = (over: Partial<ShuttleStrike> = {}): ShuttleStrike => ({
   id: 'st:1',
@@ -28,6 +28,7 @@ describe('SHU-6.3 — метки патрулей', () => {
         radius: 60,
         active: true,
         leftMs: 3000,
+        hold: false,
       },
     ]);
   });
@@ -80,5 +81,37 @@ describe('SHU-6.3 — патрули базы', () => {
     );
     expect(basePatrols(marks, { kind: 'planet', id: 'A' }).map((m) => m.id)).toEqual(['st:port']);
     expect(basePatrols(marks, { kind: 'fleet', id: 'A' }).map((m) => m.id)).toEqual(['st:ship']);
+  });
+});
+
+describe('SHU-6.6 — «Держать патруль» глазами игрока', () => {
+  it('МЕТКА НЕСЁТ ФЛАГ ЯДРА: переключатель в строке читает его, а не свою копию', () => {
+    const [m] = patrolMarks([patrol({ patrol: { hours: 4, radius: 60, hold: true } })], {
+      me: 'p1',
+      now: 2000,
+    });
+    expect(m?.hold).toBe(true);
+  });
+
+  it('БАЗА ДЕРЖИТ ПАТРУЛЬ И НА ОБРАТНОЙ НОГЕ: метки нет, а патруль встанет снова', () => {
+    const back = patrol({ leg: 'back', patrol: { hours: 4, radius: 60, hold: true } });
+    expect(patrolMarks([back], { me: 'p1', now: 2000 })).toEqual([]);
+    expect(holdsPatrol([back], [], { kind: 'planet', id: 'A' }, 'p1')).toBe(true);
+  });
+
+  it('БАЗА ДЕРЖИТ ПАТРУЛЬ, ПОКА ЭСКАДРА С УДЕРЖАНИЕМ ЖДЁТ ДОМА ПЕРЕЗАРЯДКИ', () => {
+    const home = [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }], hold: {} }];
+    expect(holdsPatrol([], home, { kind: 'fleet', id: 'CV' }, 'p1')).toBe(true);
+  });
+
+  it('НЕ ДЕРЖИТ: патруль без удержания, чужой или с другой базы', () => {
+    const base = { kind: 'planet', id: 'A' } as const;
+    const held = { hours: 4, radius: 60, hold: true } as const;
+    expect(holdsPatrol([patrol()], [], base, 'p1')).toBe(false);
+    expect(holdsPatrol([patrol({ owner: 'p2', patrol: held })], [], base, 'p1')).toBe(false);
+    expect(
+      holdsPatrol([patrol({ base: { kind: 'fleet', id: 'A' }, patrol: held })], [], base, 'p1'),
+    ).toBe(false);
+    expect(holdsPatrol(undefined, undefined, base, 'p1')).toBe(false);
   });
 });

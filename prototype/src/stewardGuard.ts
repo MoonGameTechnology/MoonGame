@@ -19,12 +19,16 @@ import {
   estimateTravelHours,
   identifiedNodes,
   hoursToMs,
+  portDisabled,
+  squadronPatrol,
+  squadronReach,
   STEWARD_LOSS_LIMIT,
   type GameState,
   type Action,
   type StewardPosture,
   type StewardLogEntry,
   type Fleet,
+  type Squadron,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
 import { findHealthyStack, sumUnitStat } from '../../packages/shared-core/src/util/stacks';
@@ -35,16 +39,25 @@ import {
   moveFleetEdge,
   loadArmy,
   engageFleet,
-  orderScramble,
+  patrolShuttle,
 } from '../../decisions/actions';
+import { holdsPatrol } from '../../decisions/patrolMarks';
 import { stewardAmbushes } from '../../decisions/stewardAmbush';
 import { data } from './gameData';
+import { planetHangar } from './hangarPanel';
 import { ctx } from './protoKernel';
-import { hangarMachines } from '../../packages/shared-core/src/index';
 
-/** The guard's narrow view of the prototype state extension it reads (the standing
- *  patrols peek) — the same local-projection pattern as `division.ts`/`serverDrivers.ts`. */
-type GuardState = GameState & { patrols?: Record<string, { kind: 'planet' | 'fleet' }> };
+/** Может ли эскадра висеть в патруле над своей базой — те же условия, по которым ядро
+ *  отбивает `E_CANNOT_PATROL`, `E_HAS_CARGO` и `E_NO_RANGE` (SHU-6.6). */
+const canHoldPatrol = (sq: Squadron): boolean => {
+  const plan = squadronPatrol(sq, data);
+  return (
+    plan.hours > 0 &&
+    plan.radius > 0 &&
+    squadronReach(sq, data) > 0 &&
+    !(sq.cargo ?? []).some((st) => st.count > 0)
+  );
+};
 
 /** A garrison unit the evacuation can actually lift: the same gate `army.load`
  *  enforces (ground cargo only, fixed emplacements stay). */
@@ -454,16 +467,23 @@ export function stewardGuardOrders(
       });
     }
   }
-  // Дежурная вахта (ST-3.3, только «Активная оборона»): поставить CC-4 на каждый СВОЙ
-  // мир, у которого в ангаре есть эскадра и дежурство ещё не включено, — дальше вылет
-  // сам отвечает налётчикам в своём радиусе. С SHU-2.2 вахту несёт БАЗА, а не флот
-  // челноков: такого флота не бывает, и раньше эта ветка не срабатывала ни разу.
+  // Патрульная вахта (ST-3.3, только «Активная оборона»; с SHU-6.6 — патруль вместо
+  // дежурного вылета): над каждым СВОИМ миром, который ещё не держит патруль, Хранитель
+  // поднимает удерживаемый патруль первой эскадрой, которая умеет висеть. Дальше её
+  // поднимает снова само ядро после каждой перезарядки. Приказ уходит, только когда ядро
+  // его примет: иначе журнал утром соврал бы «патруль поставлен», а отказ повторялся бы
+  // каждый тик. Корабли-базы Хранитель не трогает: они идут с флотом, а вахта — у миров.
   if (posture === 'active_defend') {
-    const patrols = (state as GuardState).patrols;
     for (const planet of Object.values(state.planets)) {
-      if (planet.owner !== ai || patrols?.[planet.id]) continue;
-      if (hangarMachines(planet).length === 0) continue; // дежурить нечем
-      out.push(orderScramble(ai, { planetId: planet.id }, true));
+      if (planet.owner !== ai) continue;
+      const base = { kind: 'planet', id: planet.id } as const;
+      if (holdsPatrol(state.strikes, planet.hangar, base, ai)) continue; // уже держит
+      const port = planetHangar(planet, data);
+      // Топливо, перезарядка и целый порт — та же готовность базы, что у приказа.
+      if (!port || port.blocked !== null || portDisabled(planet, data)) continue;
+      const squad = port.squadrons.find(canHoldPatrol);
+      if (!squad) continue;
+      out.push(patrolShuttle(ai, { planetId: planet.id }, squad.id, planet.position, true));
       report.push({ at: state.time, kind: 'watch', node: planet.id });
     }
   }

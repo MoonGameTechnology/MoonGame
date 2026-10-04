@@ -338,23 +338,68 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     // Tick 4: nothing left to protect at H — the driver re-runs to silence.
     expect(stewardGuardOrders(s, 'p1')).toEqual([]);
   });
-  it('ВАХТА СТАВИТСЯ НА СВОЙ МИР с эскадрой в ангаре (SHU-2.2 — раньше на флот)', () => {
-    const s = guardState({ fleets: [] });
+  // SHU-6.6: вахта — удерживаемый патруль над своим миром (дежурного вылета больше нет).
+  // Порт обязателен: ангар живёт в нём, и без него ядро патруль не поднимет.
+  const withPort = (s: GameState, patch: Partial<Planet>): void => {
     s.planets.H = {
       ...s.planets.H!,
+      buildings: [{ type: 'spaceport', level: 1, hp: 25 }],
       hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }] }],
+      ...patch,
     };
+  };
+
+  it('ВАХТА — УДЕРЖИВАЕМЫЙ ПАТРУЛЬ НАД СВОИМ МИРОМ, и ядро его принимает', () => {
+    let s = guardState({ fleets: [] });
+    withPort(s, {});
     const active = stewardGuardOrders(s, 'p1', 'active_defend');
-    expect(active.map((a) => a.type)).toEqual(['order.scramble', 'steward.report']);
-    expect(active[0]!.payload).toMatchObject({ planetId: 'H', on: true });
+    expect(active.map((a) => a.type)).toEqual(['shuttle.patrol', 'steward.report']);
+    expect(active[0]!.payload).toEqual({
+      planetId: 'H',
+      squadronId: 'sq:p1:1',
+      at: { x: 100, y: 0 },
+      hold: true,
+    });
     expect(reportEntries(active)).toMatchObject([{ kind: 'watch', node: 'H' }]);
+    for (const a of active) {
+      const r = order(s, a, s.time);
+      expect(r.error).toBeUndefined();
+      s = r.state;
+    }
+    expect(s.strikes?.[0]?.patrol?.hold).toBe(true);
+    expect(s.players.p1!.stewardLog).toMatchObject([{ kind: 'watch', node: 'H' }]);
+    // Мир уже держит патруль — второй приказ и вторая строка журнала не нужны.
+    expect(stewardGuardOrders(s, 'p1', 'active_defend')).toEqual([]);
     // Вне «Активной обороны» вахта не ставится вовсе.
-    expect(stewardGuardOrders(s, 'p1', 'defend')).toEqual([]);
+    const calm = guardState({ fleets: [] });
+    withPort(calm, {});
+    expect(stewardGuardOrders(calm, 'p1', 'defend')).toEqual([]);
   });
 
-  it('ПУСТОЙ АНГАР ВАХТЫ НЕ ПОЛУЧАЕТ: дежурить нечем', () => {
+  it('ПУСТОЙ АНГАР ВАХТЫ НЕ ПОЛУЧАЕТ: патрулировать нечем', () => {
     const s = guardState({ fleets: [] });
     expect(stewardGuardOrders(s, 'p1', 'active_defend')).toEqual([]);
+  });
+
+  it('ВАХТЫ НЕТ, ГДЕ ЯДРО ОТБИЛО БЫ ПАТРУЛЬ: журнал не врёт, отказ не повторяется каждый тик', () => {
+    const cases: Array<[string, Partial<Planet>]> = [
+      ['нет порта', { buildings: [] }],
+      ['порт подбит', { buildings: [{ type: 'spaceport', level: 1, hp: 10 }] }],
+      ['перезарядка', { sortie: { fuel: 0, rearming: 2 } }],
+      [
+        'десантный челнок не висит',
+        { hangar: [{ id: 'sq:p1:1', units: [{ unit: 'landing_shuttle', count: 1 }] }] },
+      ],
+      [
+        'дома уже ждёт эскадра с удержанием',
+        { hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }], hold: { at: { x: 100, y: 0 } } }] },
+      ],
+    ];
+    for (const [why, patch] of cases) {
+      const s = guardState({ fleets: [] });
+      withPort(s, patch);
+      expect(stewardGuardOrders(s, 'p1', 'active_defend'), why).toEqual([]);
+    }
   });
 
   it('точка удержания (ST-2.1): якорь НИКОГДА не эвакуируется — без подмоги это вынужденный hold', () => {

@@ -744,18 +744,6 @@ function project(
     }
     if (Object.keys(map).length === 0) delete host[key];
   }
-  // Дежурный вылет — то же будущее намерение, но с SHU-2.2 он армится на БАЗУ, поэтому
-  // хозяин ищется по СВОЕМУ виду: у флота — свой, у мира — свой. Раньше здесь стоял
-  // общий проход по `state.fleets`, и после переезда он снимал бы ВСЕ мировые дежурства
-  // (мира в `fleets` нет) — то есть игрок перестал бы видеть собственное.
-  if (view.patrols) {
-    for (const [baseId, ref] of Object.entries(view.patrols)) {
-      const owner =
-        ref.kind === 'fleet' ? state.fleets[baseId]?.owner : state.planets[baseId]?.owner;
-      if (owner !== viewerId) delete view.patrols[baseId];
-    }
-    if (Object.keys(view.patrols).length === 0) delete view.patrols;
-  }
   // A rival's capital designation is their hero-respawn anchor — the same
   // targeting intel as steward hold points («вот его якорь»). Keep only the
   // viewer's own entry; an empty map is removed (delta hygiene, as above).
@@ -795,6 +783,10 @@ function project(
     // мир не отдаёт очередь, даже когда ты смотришь на него в упор.
     if (planet.owner !== viewerId) {
       delete planet.buildQueue;
+      // SHU-6.6. «Держать патруль» — постоянный приказ эскадры, то же намерение, что
+      // цепочки и авто-штурм: точка, где хозяин снова встанет кругом, — разведка планов.
+      // Ангар опознанного мира виден, флаг удержания в нём — нет.
+      for (const squad of planet.hangar ?? []) delete squad.hold;
       // FOG-9. Приостановленная стройка — то же НАМЕРЕНИЕ, только с паузой: вид, уровень
       // и остаток цены рассказывают, что хозяин собирался тут поставить и сколько уже
       // вложил. Резалось всё вокруг (`scheduled`, цепочки приказов, очередь), а это
@@ -927,6 +919,13 @@ function project(
     if (at && mineCircles.some((c) => inRadius(at, c, c.identify))) continue;
     if (node !== null && identify.has(node)) continue; // fully identified
     delete view.fleets[id];
+  }
+  // SHU-6.6: удержание патруля у чужого корабля — намерение, как и у мира выше. Режется у
+  // всех оставшихся чужих флотов разом: опознанный, вскрытый шпионом и стоящий в моём бою
+  // показывают ангар, но не планы.
+  for (const fleet of Object.values(view.fleets)) {
+    if (fleet.owner === viewerId) continue;
+    for (const squad of fleet.hangar ?? []) delete squad.hold;
   }
   // Battles you cannot see, and enemy timers from the schedule (it leaks future
   // events) — but KEEP the viewer's own pending events: their construction/production/

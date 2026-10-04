@@ -3,10 +3,14 @@
 /**
  * SHU-6.3 — патруль шаттлов в ИНТЕРФЕЙСЕ, проверенный настоящим браузером.
  *
- * Правила патруля покрыты в ядре (`shuttlePatrol.test.ts`), метки — в
- * `decisions/patrolMarks.test.ts`. Здесь вопрос другой — «игрок может поставить и снять
+ * Правила патруля покрыты в ядре (`shuttlePatrol.test.ts`, `shuttleHold.test.ts`), метки —
+ * в `decisions/patrolMarks.test.ts`. Здесь вопрос другой — «игрок может поставить и снять
  * патруль»: кнопка у эскадры, тап по точке карты кладёт в состояние патруль, панель базы
  * показывает его остаток и «Вернуть», и «Вернуть» разворачивает эскадру домой.
+ *
+ * SHU-6.6 — «Держать патруль»: переключатель в строке патруля ставит и снимает удержание,
+ * удерживаемый патруль после посадки встаёт снова без единого нажатия, а эскадру, которая
+ * ждёт дома с удержанием, карточка отпускает своей кнопкой.
  *
  * Базы обе (резолюция владельца 2026-10-04, §0.7): мир с портом и корабль, у которого
  * эскадры в трюме. Экраны обе: ПК и телефон — у пальца нет наведения, и прицел обязан
@@ -70,7 +74,13 @@ const hooks = `window.__patrolTest = {
   patrols: () =>
     (s.strikes ?? [])
       .filter((st) => st.target.kind === 'point')
-      .map((st) => ({ id: st.id, leg: st.leg, to: st.to, base: st.base })),
+      .map((st) => ({
+        id: st.id,
+        leg: st.leg,
+        to: st.to,
+        base: st.base,
+        hold: st.patrol?.hold === true,
+      })),
   // Мир доходит до точки: патруль повисает, у круга появляется отсчёт.
   arrive: () => {
     const st = s.strikes.find((x) => x.target.kind === 'point');
@@ -79,6 +89,33 @@ const hooks = `window.__patrolTest = {
     renderPanel();
   },
   marks: () => patrolMarks(s.strikes, { me: ME, now: s.time }),
+  // Мир доходит до конца ЭТОЙ ноги вылета: висение кончилось — разворот, вернулся — посадка
+  // (и у удерживаемого патруля — новый взлёт в ту же минуту).
+  leg: (id) => {
+    const st = s.strikes.find((x) => x.id === id);
+    apply(advance(s, st.arrivesAt));
+    lastPanelHtml = '';
+    renderPanel();
+  },
+  // Id эскадры, которую положил prepare.
+  squadron: (kind) => 'sq:' + ME + ':' + kind,
+  // Эскадра дома и держит патруль — так она ждёт конца перезарядки или боя корабля.
+  // Ждать их на живой карте значило бы проверять часы, а не кнопку.
+  holdAtHome: (sqId) => {
+    const host = [...Object.values(s.planets), ...Object.values(s.fleets)].find((x) =>
+      (x.hangar ?? []).some((q) => q.id === sqId),
+    );
+    host.hangar.find((q) => q.id === sqId).hold = {};
+    lastPanelHtml = '';
+    renderPanel();
+  },
+  homeHold: (sqId) => {
+    for (const x of [...Object.values(s.planets), ...Object.values(s.fleets)]) {
+      const q = (x.hangar ?? []).find((y) => y.id === sqId);
+      if (q) return q.hold ?? null;
+    }
+    return undefined;
+  },
 };`;
 
 const site = await serve(await instrumentedGame(hooks));
@@ -135,26 +172,61 @@ try {
         const [mark] = await page.evaluate(() => window.__patrolTest.marks());
         assert.equal(mark?.active, true, 'патруль висит над точкой');
         assert.ok((mark?.leftMs ?? 0) > 0, 'отсчёт идёт');
-        const recall = page.locator(`[data-act="wingrecall"][data-arg="${flight.id}"]`);
-        await recall.waitFor({ state: 'visible' });
+        await page.locator(`[data-act="wingrecall"][data-arg="${flight.id}"]`).waitFor({
+          state: 'visible',
+        });
         if (process.env.PATROL_SHOTS) {
           const shot = `${process.env.PATROL_SHOTS}/patrol-${kind}-${viewport.width}.png`;
           await page.screenshot({ path: shot });
         }
 
-        // «Вернуть» разворачивает эскадру домой, и строка уходит из панели.
+        // «Держать патруль» (SHU-6.6) — переключатель в той же строке: ставит и снимает.
+        const keep = page.locator(`[data-act="wingkeep"][data-arg="${flight.id}"]`);
+        const held = async () => (await page.evaluate(() => window.__patrolTest.patrols()))[0]?.hold;
+        await press(keep);
+        assert.equal(await held(), true, 'патруль держится');
+        await press(keep);
+        assert.equal(await held(), false, 'удержание снято тем же переключателем');
+        await press(keep);
+        assert.equal(await held(), true, 'и поставлено снова');
+
+        // Висение кончилось — домой; сел — и встал снова сам, игрок ничего не нажимал.
+        await page.evaluate((id) => window.__patrolTest.leg(id), flight.id);
+        await page.evaluate((id) => window.__patrolTest.leg(id), flight.id);
+        const [again] = await page.evaluate(() => window.__patrolTest.patrols());
+        assert.ok(again && again.id !== flight.id, 'удерживаемый патруль встал снова');
+        assert.equal(again.leg, 'out');
+        assert.equal(again.hold, true, 'и держится дальше');
+        assert.deepEqual(again.base, base);
+
+        // «Вернуть» разворачивает эскадру домой, снимает удержание, и строка уходит из панели.
+        const recall = page.locator(`[data-act="wingrecall"][data-arg="${again.id}"]`);
         await press(recall);
         const [back] = await page.evaluate(() => window.__patrolTest.patrols());
         assert.equal(back?.leg, 'back', 'патруль повернул домой');
+        assert.equal(back?.hold, false, 'вернул игрок — встать снова сам патруль не должен');
         assert.deepEqual(await page.evaluate(() => window.__patrolTest.marks()), []);
         await recall.waitFor({ state: 'detached' });
+
+        // Эскадра дома и ждёт с удержанием — карточка отпускает её своей кнопкой.
+        await page.evaluate((id) => window.__patrolTest.leg(id), back.id);
+        const sqId = await page.evaluate((k) => window.__patrolTest.squadron(k), kind);
+        await page.evaluate((q) => window.__patrolTest.holdAtHome(q), sqId);
+        const release = page.locator(`[data-act="wingrelease"][data-arg="${sqId}"]`);
+        await press(release);
+        assert.equal(
+          await page.evaluate((q) => window.__patrolTest.homeHold(q), sqId),
+          null,
+          'удержание снято с эскадры дома',
+        );
+        await release.waitFor({ state: 'detached' });
       });
       console.log(`Patrol UI ${kind} ${viewport.width}px passed.`);
       await context.close();
     }
   }
   console.log(
-    'Patrol UI smoke passed: port and hold, button, map point, countdown, recall — desktop and phone.',
+    'Patrol UI smoke passed: port and hold, button, map point, countdown, hold patrol, recall — desktop and phone.',
   );
 } finally {
   await browser.close();

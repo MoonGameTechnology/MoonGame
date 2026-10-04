@@ -267,6 +267,8 @@ export {
   // SHU-3.1: интерфейс показывает ангар (порт мира и трюм носителя) и обязан считать
   // вместимость ТОЙ ЖЕ функцией, что и ядро, — своя копия разъехалась бы на первой правке.
   shuttleBayAt,
+  // SHU-6.6: порог подбитого порта — им же Хранитель решает, поставит ли ядро патруль.
+  portDisabled,
   fleetShuttleBay,
   hangarUsed,
   // SHU-5.1: трюм общий с десантом, место меряется `cargoSize`, а не штуками.
@@ -293,15 +295,8 @@ export {
   type SortieState,
 } from './state/shuttle';
 export { chaseRadius, chaseStep, type ChasePoint, type ChaseStep } from './state/chase';
-// SHU-2.2: дежурный вылет армится на БАЗУ, и правило выбора цели у него ОДНО на оба
-// драйвера (прототипный и серверный) — до этого у каждого была своя копия.
-export {
-  patrolTarget,
-  patrolScrambles,
-  type PatrolContact,
-  type PatrolPoint,
-  type PatrolScramble,
-} from './state/patrol';
+// SHU-6.2: по кому бьёт тик патруля — ближайший контакт в круге, правило перехвата.
+export { patrolTarget, type PatrolContact, type PatrolPoint } from './state/patrol';
 export {
   fleetIdle,
   validateChainSteps,

@@ -1,4 +1,4 @@
-import type { ShuttleStrike, StrikeBase } from '../packages/shared-core/src/index';
+import type { ShuttleStrike, Squadron, StrikeBase } from '../packages/shared-core/src/index';
 
 /**
  * ПАТРУЛЬ ГЛАЗАМИ ИГРОКА (SHU-6.3) — что карта и панель базы показывают про свои патрули.
@@ -22,6 +22,13 @@ import type { ShuttleStrike, StrikeBase } from '../packages/shared-core/src/inde
  *    приказа (`id` вылета) есть у каждой метки.
  * 5. **Круг без радиуса не рисуется:** «радиус 0» — не факт о мире (то же правило, что у
  *    круга прицела `aimRing`).
+ * 6. **«Держать патруль» видно у метки** (SHU-6.6): `hold` — тот же флаг, по которому
+ *    ядро поднимет эскадру снова, поэтому переключатель в строке патруля читает его, а
+ *    не свою копию.
+ * 7. **База держит патруль и тогда, когда метки нет** ({@link holdsPatrol}): удержание
+ *    живёт у патруля на ЛЮБОЙ ноге — повернувший домой по сроку сядет с ним — и у
+ *    эскадры, которая ждёт дома перезарядки. Спроси «держит ли база» по меткам, и
+ *    ответ гас бы на каждой обратной ноге, хотя патруль встанет снова.
  */
 
 /** Один свой патруль: где он, какой у него круг и сколько ему ещё висеть. */
@@ -40,6 +47,8 @@ export interface PatrolMark {
   active: boolean;
   /** Сколько ещё висеть, мс; у летящего к точке — `null` (правило 2). */
   leftMs: number | null;
+  /** «Держать патруль» (правило 6): вернувшись, эскадра встанет снова сама. */
+  hold: boolean;
 }
 
 /** Метки своих патрулей (правила 1–3, 5). */
@@ -62,6 +71,7 @@ export function patrolMarks(
       radius,
       active,
       leftMs: active ? Math.max(0, st.arrivesAt - opts.now) : null, // правило 3
+      hold: st.patrol?.hold === true, // правило 6
     });
   }
   return out;
@@ -72,4 +82,22 @@ export function patrolMarks(
  *  сравнивается и вид, и id. */
 export function basePatrols(marks: readonly PatrolMark[], base: StrikeBase): PatrolMark[] {
   return marks.filter((m) => m.base.kind === base.kind && m.base.id === base.id);
+}
+
+/** Держит ли база патруль (правило 7): свой удерживаемый патруль с неё в воздухе на любой
+ *  ноге или эскадра с удержанием в её ангаре. */
+export function holdsPatrol(
+  strikes: readonly ShuttleStrike[] | undefined,
+  hangar: readonly Squadron[] | undefined,
+  base: StrikeBase,
+  me: string,
+): boolean {
+  if ((hangar ?? []).some((sq) => sq.hold !== undefined)) return true;
+  return (strikes ?? []).some(
+    (st) =>
+      st.owner === me &&
+      st.base.kind === base.kind &&
+      st.base.id === base.id &&
+      st.patrol?.hold === true,
+  );
 }

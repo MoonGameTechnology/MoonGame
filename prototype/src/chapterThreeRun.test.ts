@@ -45,8 +45,6 @@ function run(maxHours: number): { state: GameState; endedAtHour?: number; crosse
     applyLocal: apply,
     playerOrder: apply,
     autoAssault: () => false, // игрок пассивен — нижняя граница «что карта делает сама»
-    patrols: () => new Map(),
-    known: () => true,
   });
   for (let hour = 1; hour <= maxHours; hour++) {
     s = advance(s, hour * HOUR).state;

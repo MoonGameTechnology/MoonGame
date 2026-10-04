@@ -59,6 +59,7 @@ import {
   hangarSize,
   hangarUsed,
   freshSortie,
+  portDisabled,
   shuttleBayAt,
   spendSortie,
   squadronFerryRange,
@@ -85,7 +86,6 @@ import {
 } from '../util/combat';
 import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
 import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
-import { buildingLevel } from '../data/schemas';
 import { timeScaleOf, travelSpeedFactorOf, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { dockHullRate, fleetAtOwnDock, fleetHangarRepairRate } from '../util/repair';
@@ -404,24 +404,6 @@ function hourMs(h: HandlerContext): number {
   return MS_PER_HOUR * timeScaleOf(h.ctx);
 }
 
-/** Доля, ниже которой порт перестаёт выпускать челноки: повреждён БОЛЕЕ чем на 30%
- *  (резолюция владельца 2026-09-08). Порог на вылет, не на возврат. */
-const PORT_LAUNCH_HP = 0.7;
-
-/** Не выпускает ли порт челноки из-за повреждений. Считается по САМОМУ ЦЕЛОМУ порту
- *  мира: два порта — вылет идёт из уцелевшего, а не блокируется разрушенным. */
-function portDisabled(planet: Planet, data: GameData): boolean {
-  let best = 0;
-  for (const b of planet.buildings) {
-    const def = data.buildings[b.type];
-    if (!def) continue;
-    const level = buildingLevel(def, b.level);
-    if (level.shuttleBay <= 0 || level.hp <= 0) continue;
-    best = Math.max(best, b.hp / level.hp);
-  }
-  return best < PORT_LAUNCH_HP;
-}
-
 /** Снять `count` челноков `unit` из ангара. */
 // --- ЭСКАДРА (SHU-4.2) ---------------------------------------------------------------
 //
@@ -446,6 +428,16 @@ function requireSquadron(h: HandlerContext, base: BaseView, id: unknown): Squadr
   const sq = base.hangar.find((q) => q.id === id);
   if (!sq) return h.reject('E_NO_SQUADRON');
   return sq;
+}
+
+/** Свой ПАТРУЛЬ по id вылета — или отказ: отзыв и удержание адресуют его одинаково.
+ *  Чужой вылет и несуществующий — один ответ: чужие вылеты скрыты туманом
+ *  (`visibleState`), и различимый отказ выдал бы перебором id, что сейчас в воздухе. */
+function ownPatrol(h: HandlerContext, playerId: string, strikeId: string): ShuttleStrike {
+  const strike = (h.state.strikes ?? []).find((st) => st.id === strikeId);
+  if (!strike || strike.owner !== playerId) return h.reject('E_NO_STRIKE');
+  if (strike.target.kind !== 'point') return h.reject('E_NOT_PATROLLING');
+  return strike;
 }
 
 /** Снять `count` машин юнита из СПИСКА СТЕКОВ. Возвращает остаток; `null` — не хватило. */
@@ -926,18 +918,30 @@ function scheduleChase(h: HandlerContext, strike: ShuttleStrike): void {
  * Проверяется РАНЬШЕ эскадры намеренно: «этот флот вообще не база» — более точный ответ,
  * чем «в нём нет такого соединения», а у обычного корабля его и не бывает.
  */
-function readySquadron(
-  h: HandlerContext,
-  base: BaseView,
-  squadronId: unknown,
-): { squad: Squadron; spec: { maxFuel: number; rearmRounds: number }; sortie: SortieState } {
-  if (base.bay <= 0) return h.reject('E_NO_PORT');
-  if (base.disabled) return h.reject('E_PORT_DAMAGED');
-  const squad = requireSquadron(h, base, squadronId);
-  if (squadronSize(squad) <= 0) return h.reject('E_NOT_ENOUGH');
+function readySquadron(h: HandlerContext, base: BaseView, squadronId: unknown): Ready {
+  const blocked = baseBlock(base);
+  if (blocked) return h.reject(blocked);
+  const ready = squadronReady(h, base, requireSquadron(h, base, squadronId));
+  return typeof ready === 'string' ? h.reject(ready) : ready;
+}
+
+/** Эскадра, готовая к вылету, и запас вылетов её базы. */
+type Ready = { squad: Squadron; spec: { maxFuel: number; rearmRounds: number }; sortie: SortieState };
+
+/** Выпускает ли база вообще: есть, цела. Код отказа, а не бросок — тем же ответом
+ *  удержание патруля (SHU-6.6) решает, ждать ему или снять удержание. */
+function baseBlock(base: BaseView): string | null {
+  if (base.bay <= 0) return 'E_NO_PORT';
+  if (base.disabled) return 'E_PORT_DAMAGED';
+  return null;
+}
+
+/** Готова ли эскадра и есть ли у базы вылет — без бросков, как {@link baseBlock}. */
+function squadronReady(h: HandlerContext, base: BaseView, squad: Squadron): Ready | string {
+  if (squadronSize(squad) <= 0) return 'E_NOT_ENOUGH';
   const spec = baseSortieSpec(base, h.state, h.ctx.data);
   const sortie = base.sortie ?? freshSortie(spec.maxFuel);
-  if (!canSortie(sortie)) return h.reject('E_NO_FUEL');
+  if (!canSortie(sortie)) return 'E_NO_FUEL';
   return { squad, spec, sortie };
 }
 
@@ -949,8 +953,20 @@ function flightTime(
   from: { x: number; y: number },
   to: { x: number; y: number },
 ): number {
+  return flightMs(h, squad, from, to) ?? h.reject('E_NO_SPEED');
+}
+
+/** То же время полёта без броска: `null` — эскадре нечем лететь. Нужно удержанию патруля
+ *  (SHU-6.6), которое поднимает эскадру из события и обязано снять удержание, а не
+ *  уронить событие. */
+function flightMs(
+  h: HandlerContext,
+  squad: Squadron,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): number | null {
   const speed = slowestSpeed(squad.units, h.ctx) * hullShare(squad.units, squad.damage, h.ctx.data);
-  if (speed <= 0) return h.reject('E_NO_SPEED');
+  if (speed <= 0) return null;
   return Math.max(1, Math.round((distance(from, to) / speed) * hourMs(h)));
 }
 
@@ -967,7 +983,7 @@ function launchFlight(
   h: HandlerContext,
   owner: string,
   base: BaseView,
-  ready: ReturnType<typeof readySquadron>,
+  ready: Ready,
   flight: Pick<ShuttleStrike, 'target' | 'to' | 'arrivesAt'> &
     Partial<Pick<ShuttleStrike, 'at' | 'cargo' | 'patrol'>> & { dest?: StrikeBase },
 ): ShuttleStrike {
@@ -1078,13 +1094,151 @@ function schedulePatrolTick(h: HandlerContext, strike: ShuttleStrike): void {
   });
 }
 
+/** Путь патруля: часы и круг эскадры, откуда она взлетит, куда встанет и сколько лететь. */
+type PatrolRoute = {
+  plan: { hours: number; radius: number };
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  flight: number;
+};
+
+/**
+ * Встанет ли эскадра в патруль в точке `to` — путь, или код отказа. Одна проверка на
+ * приказ и на удержание (SHU-6.6): своя копия у удержания разъехалась бы с приказом, и
+ * эскадра вставала бы сама туда, куда игрок её не пустил бы. `to` — `null`, если точки в
+ * приказе нет.
+ */
+function patrolCheck(
+  h: HandlerContext,
+  base: BaseView,
+  squad: Squadron,
+  to: { x: number; y: number } | null,
+): PatrolRoute | string {
+  // Время и круг — по слабому звену; ноль хоть у одной машины — патрулировать нечем
+  // (десантный челнок этих чисел не имеет).
+  const plan = squadronPatrol(squad, h.ctx.data);
+  if (plan.hours <= 0 || plan.radius <= 0) return 'E_CANNOT_PATROL';
+  // Груз в патруль не берут: обратная нога сажает только машины, и боец бы пропал.
+  if ((squad.cargo ?? []).some((st) => st.count > 0)) return 'E_HAS_CARGO';
+  if (!to) return 'E_BAD_PAYLOAD';
+  const from = base.position;
+  if (!from) return 'E_NO_PORT';
+  const range = squadronReach(squad, h.ctx.data);
+  if (range <= 0) return 'E_NO_RANGE';
+  if (distance(from, to) > range) return 'E_OUT_OF_RANGE';
+  const flight = flightMs(h, squad, from, to);
+  if (flight === null) return 'E_NO_SPEED';
+  return { plan, from, to, flight };
+}
+
+/** Поднять патруль — один взлёт на приказ и на удержание (SHU-6.6). */
+function takeOffPatrol(
+  h: HandlerContext,
+  owner: string,
+  base: BaseView,
+  ready: Ready,
+  route: PatrolRoute,
+  hold: boolean,
+): void {
+  const strike = launchFlight(h, owner, base, ready, {
+    target: { kind: 'point' },
+    to: route.to,
+    arrivesAt: h.ctx.now + route.flight,
+    // Путь к неподвижной точке идёт от места взлёта: с идущего носителя начало
+    // отрезка иначе ехало бы вместе с ним (`ShuttleStrike.at`).
+    at: { ...route.from },
+    patrol: hold ? { ...route.plan, hold: true } : route.plan,
+  });
+  h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
+}
+
+/** Как часто удержание пробует поднять патруль снова, когда мешает бой корабля или
+ *  подбитый порт (SHU-6.6): их конец ядро заранее не знает. Час — шаг остальных
+ *  почасовых механик. Конец перезарядки, наоборот, известен, и его ждут точно. */
+const HOLD_RETRY_HOURS = 1;
+
+/**
+ * ДЕРЖАТЬ ПАТРУЛЬ (SHU-6.6, резолюция владельца 2026-10-04) — поднять снова эскадру,
+ * вернувшуюся из удерживаемого патруля. Зовёт только собственное событие
+ * `shuttle.patrol.resume`; посадка назначает его на ту же минуту, а не поднимает эскадру
+ * сама: бросок посреди подъёма отправил бы в dead letter всё событие посадки, и эскадра
+ * повисла бы в воздухе навсегда. Решения, которые легко потерять при правке:
+ *
+ * 1. **Поднимает ЯДРО, а не драйвер хоста.** Дежурный вылет, который удержание заменило,
+ *    жил драйверами — свой у сервера, свой у прототипа — и прикрывал офлайн-игрока только
+ *    там, где хост их крутил. Удержание — событие расписания: та же партия даёт тот же
+ *    патруль на любом хосте и в реплее.
+ * 2. **Проверки — те же, что у приказа** (`baseBlock`, `squadronReady`, `patrolCheck`).
+ * 3. **Ждут только того, что пройдёт само.** Конец перезарядки известен — будим ровно
+ *    тогда. Бой корабля и подбитый порт кончатся неизвестно когда — пробуем раз в час.
+ *    Остальное само не пройдёт (состав больше не висит, точка вне радиуса), и удержание
+ *    снимается громко, событием `shuttle.hold.ended`, а не будит мир вечно.
+ * 4. **Точка у мира прежняя, у корабля — над ним самим.** Корабль ходит, и точка,
+ *    выбранная у прежней стоянки, через сутки похода оказалась бы за радиусом.
+ * 5. **Эскадру ищут по id, а не по базе, где она села.** Ангар корабля уезжает в другой
+ *    флот при слиянии (`fuseFleets`) вместе с удержанием, и проснувшееся по старой базе
+ *    событие не нашло бы её: эскадра держала бы патруль, который больше не встаёт.
+ */
+function resumeHold(h: HandlerContext, owner: string, squadronId: string): void {
+  const base = squadronHome(h, owner, squadronId);
+  const squad = base?.hangar.find((q) => q.id === squadronId);
+  // Эскадра улетела по другому приказу, перегружена, слита — держать нечего.
+  if (!base || !squad?.hold) return;
+  const ref = base.ref;
+  const hold = squad.hold;
+  const notNow = (why: string): void => {
+    const wait = holdWait(h, base, why);
+    if (wait !== null) {
+      h.schedule(h.ctx.now + wait, 'shuttle.patrol.resume', { owner, squadronId });
+      return;
+    }
+    delete squad.hold;
+    h.emit('shuttle.hold.ended', { owner, baseId: ref.id, baseKind: ref.kind, squadronId, code: why });
+  };
+  // Корабль в бою не выпускает — то же правило, что у приказа (`baseFromPayload`).
+  const busy = ref.kind === 'fleet' && h.state.fleets[ref.id]?.battleId ? 'E_FLEET_BUSY' : null;
+  const ready = busy ?? baseBlock(base) ?? squadronReady(h, base, squad);
+  if (typeof ready === 'string') return notNow(ready);
+  const route = patrolCheck(h, base, squad, ref.kind === 'planet' ? (hold.at ?? null) : base.position);
+  if (typeof route === 'string') return notNow(route);
+  takeOffPatrol(h, owner, base, ready, route, true); // удержание уходит с эскадрой на вылет
+}
+
+/** База, в ангаре которой стоит эскадра игрока, — или `null`. Id эскадр не повторяются
+ *  (`nextSquadronId`), поэтому база одна (правило 5 `resumeHold`). */
+function squadronHome(h: HandlerContext, owner: string, squadronId: string): BaseView | null {
+  const has = (hangar: Squadron[] | undefined) => (hangar ?? []).some((q) => q.id === squadronId);
+  for (const planet of Object.values(h.state.planets)) {
+    if (planet.owner === owner && has(planet.hangar)) return planetBase(planet, h.ctx.data);
+  }
+  for (const fleet of Object.values(h.state.fleets)) {
+    if (fleet.owner === owner && has(fleet.hangar)) {
+      return fleetBase(fleet, h.state, h.ctx.data, h.ctx.now);
+    }
+  }
+  return null;
+}
+
+/** Сколько ждать до следующей попытки поднять удерживаемый патруль — или `null`, если
+ *  помеха сама не пройдёт (правило 3 `resumeHold`). */
+function holdWait(h: HandlerContext, base: BaseView, why: string): number | null {
+  const hour = hourMs(h);
+  if (why === 'E_FLEET_BUSY' || why === 'E_PORT_DAMAGED') {
+    return Math.max(1, Math.round(HOLD_RETRY_HOURS * hour));
+  }
+  if (why !== 'E_NO_FUEL' || !base.sortie || base.sortie.rearming <= 0) return null;
+  // Перезарядка кончится, когда отстоит свои часы целиком: остаток сверх целых часов уже
+  // накоплен (`carry`), поэтому срок не зависит от того, как хост нарезал время.
+  return Math.max(1, Math.ceil(base.sortie.rearming * hour - (base.sortie.carry ?? 0)));
+}
+
 /**
  * ТИК ПАТРУЛЯ (SHU-6.2, резолюция владельца 2026-10-04) — по кому и чем бьёт висящая
  * эскадра. Решения, которые легко потерять при правке:
  *
  * 1. **Одна цель за тик — БЛИЖАЙШАЯ к точке**, при равной дистанции меньший id; граница
- *    круга включительна. Правило выбора то же, что у дежурного вылета (`patrolTarget`):
- *    второй прицел у одного оружия объяснить игроку нечем.
+ *    круга включительна (`patrolTarget`). Правило выбора то же, что у перехвата
+ *    (`nearestHostileStrike`): второй прицел у одного оружия объяснить игроку нечем.
  * 2. **Цели — враждебные флоты и враждебные вылеты.** Флот бьётся и стоящий, и идущий
  *    мимо (позиция живая, `fleetPositionAt`), вылет — и летящий, и висящий в своём
  *    патруле. Миры патруль не бомбит (развилка 2а владельца). Враждебность — `isHostile`:
@@ -1244,7 +1398,9 @@ export const shuttleModule: GameModule = {
   //        тик раз в 15 минут; прибытие по устаревшему сроку больше не сажает эскадру.
   // 1.7.0: перелёт и посадка без базы (SHU-6.4) — `shuttle.relocate`, цель `base`,
   //        `origin`/`baseAt`, событие `shuttle.diverted`; опустевшая база снимает счётчик.
-  version: '1.7.0',
+  // 1.8.0: «Держать патруль» (SHU-6.6) — `hold` у патруля и эскадры, `shuttle.hold`,
+  //        событие расписания `shuttle.patrol.resume`; отзыв снимает удержание.
+  version: '1.8.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -1351,6 +1507,8 @@ export const shuttleModule: GameModule = {
      * корабль с трюмом, в том числе идущий. Точка — в радиусе удара эскадры от базы: круг,
      * который игрок видит у базы, обещает ровно то, куда патруль долетит. Тратится одна
      * единица запаса вылетов, как у удара.
+     *
+     * `hold: true` — «Держать патруль» (SHU-6.6): вернувшись, эскадра встанет снова сама.
      */
     api.onAction('shuttle.patrol', (action, h: HandlerContext) => {
       const p = (action.payload ?? {}) as {
@@ -1358,37 +1516,20 @@ export const shuttleModule: GameModule = {
         fleetId?: unknown;
         squadronId?: unknown;
         at?: { x?: unknown; y?: unknown } | null;
+        hold?: unknown;
       };
+      if (p.hold !== undefined && typeof p.hold !== 'boolean') return h.reject('E_BAD_PAYLOAD');
       const base = baseFromPayload(h, action.playerId, p);
       const ready = readySquadron(h, base, p.squadronId);
-      const squad = ready.squad;
-      // Время и круг — по слабому звену; ноль хоть у одной машины — патрулировать нечем
-      // (десантный челнок этих чисел не имеет).
-      const plan = squadronPatrol(squad, h.ctx.data);
-      if (plan.hours <= 0 || plan.radius <= 0) return h.reject('E_CANNOT_PATROL');
-      // Груз в патруль не берут: обратная нога сажает только машины, и боец бы пропал.
-      if ((squad.cargo ?? []).some((st) => st.count > 0)) return h.reject('E_HAS_CARGO');
       const x = p.at?.x;
       const y = p.at?.y;
-      if (typeof x !== 'number' || typeof y !== 'number') return h.reject('E_BAD_PAYLOAD');
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return h.reject('E_BAD_PAYLOAD');
-      const to = { x, y };
-      const from = base.position;
-      if (!from) return h.reject('E_NO_PORT');
-      const range = squadronReach(squad, h.ctx.data);
-      if (range <= 0) return h.reject('E_NO_RANGE');
-      if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
-
-      const strike = launchFlight(h, action.playerId, base, ready, {
-        target: { kind: 'point' },
-        to,
-        arrivesAt: h.ctx.now + flightTime(h, squad, from, to),
-        // Путь к неподвижной точке идёт от места взлёта: с идущего носителя начало
-        // отрезка иначе ехало бы вместе с ним (`ShuttleStrike.at`).
-        at: { ...from },
-        patrol: plan,
-      });
-      h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
+      const to =
+        typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)
+          ? { x, y }
+          : null;
+      const route = patrolCheck(h, base, ready.squad, to);
+      if (typeof route === 'string') return h.reject(route);
+      takeOffPatrol(h, action.playerId, base, ready, route, p.hold === true);
     });
 
     /**
@@ -1398,21 +1539,72 @@ export const shuttleModule: GameModule = {
      *
      * Только патруль: у удара по флоту есть погоня, у десанта — груз, и «вернуть с
      * полпути» для них — отдельные правила, которых владелец не заказывал.
+     *
+     * Отзыв снимает и «Держать патруль» (SHU-6.6): игрок вернул эскадру домой, и встать
+     * снова сама она не должна.
      */
     api.onAction('shuttle.recall', (action, h: HandlerContext) => {
       const p = (action.payload ?? {}) as { strikeId?: unknown };
       if (typeof p.strikeId !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const strike = (h.state.strikes ?? []).find((st) => st.id === p.strikeId);
-      // Чужой вылет и несуществующий — один ответ: чужие вылеты скрыты туманом
-      // (`visibleState`), и различимый отказ выдал бы перебором id, что сейчас в воздухе.
-      if (!strike || strike.owner !== action.playerId) return h.reject('E_NO_STRIKE');
-      if (strike.target.kind !== 'point' || strike.leg === 'back') {
-        return h.reject('E_NOT_PATROLLING');
-      }
+      const strike = ownPatrol(h, action.playerId, p.strikeId);
+      if (strike.leg === 'back') return h.reject('E_NOT_PATROLLING');
       const here = strikePosition(strike, h.state, h.ctx.now);
       if (here) strike.to = here;
       delete strike.at;
+      delete strike.patrol?.hold;
       turnHome(h, strike);
+    });
+
+    /**
+     * `shuttle.hold { strikeId, on }` — «ДЕРЖАТЬ ПАТРУЛЬ» у патруля в воздухе;
+     * `shuttle.hold { planetId | fleetId, squadronId, on: false }` — снять удержание с
+     * эскадры, которая ждёт дома перезарядки (SHU-6.6, резолюция владельца 2026-10-04:
+     * патруль заменяет дежурный вылет).
+     *
+     * Включить можно, пока патруль не повернул домой, — там же, где его можно вернуть:
+     * повернувший по отзыву держать уже нечего, игрок сам вернул его. Снять можно всегда,
+     * в том числе на обратной ноге, дома и на корабле в бою: снять стоячий приказ должно
+     * быть можно в любую минуту, как и любой другой. Дома включить нельзя — там нет
+     * патруля, у которого взять точку: для этого есть сам приказ патруля с `hold`.
+     */
+    api.onAction('shuttle.hold', (action, h: HandlerContext) => {
+      const p = (action.payload ?? {}) as {
+        strikeId?: unknown;
+        planetId?: unknown;
+        fleetId?: unknown;
+        squadronId?: unknown;
+        on?: unknown;
+      };
+      if (typeof p.on !== 'boolean') return h.reject('E_BAD_PAYLOAD');
+      if (p.strikeId !== undefined) {
+        if (typeof p.strikeId !== 'string' || p.squadronId !== undefined) {
+          return h.reject('E_BAD_PAYLOAD');
+        }
+        const strike = ownPatrol(h, action.playerId, p.strikeId);
+        if (!p.on) delete strike.patrol?.hold;
+        else if (strike.leg === 'back' || !strike.patrol) return h.reject('E_NOT_PATROLLING');
+        else strike.patrol.hold = true;
+        return;
+      }
+      if (p.on) return h.reject('E_NOT_PATROLLING');
+      const fromPlanet = typeof p.planetId === 'string';
+      if (fromPlanet === (typeof p.fleetId === 'string')) return h.reject('E_BAD_PAYLOAD');
+      let hangar: Squadron[];
+      if (fromPlanet) {
+        const planet = h.state.planets[p.planetId as string];
+        if (!planet) return h.reject('E_NO_PLANET');
+        if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+        hangar = planet.hangar ?? [];
+      } else {
+        // Чужой и несуществующий корабль — один ответ, как у всех приказов флота (A06).
+        const fleet = ownFleet(h.state, p.fleetId as string);
+        if (!fleet || fleet.owner !== action.playerId) return h.reject('E_NO_FLEET');
+        hangar = fleet.hangar ?? [];
+      }
+      if (typeof p.squadronId !== 'string') return h.reject('E_BAD_PAYLOAD');
+      const squad = hangar.find((q) => q.id === p.squadronId);
+      if (!squad) return h.reject('E_NO_SQUADRON');
+      delete squad.hold;
     });
 
     /**
@@ -1628,6 +1820,8 @@ export const shuttleModule: GameModule = {
       if (!squad) return h.reject('E_NO_SQUADRON');
       if (stacksSize(squad.units, h.ctx.data) > freeSpace) return h.reject('E_NO_CAPACITY');
       from.hangar = (from.hangar ?? []).filter((q) => q.id !== squadronId);
+      // «Держать патруль» (SHU-6.6) держится над СВОЕЙ базой: на новой базе точки нет.
+      delete squad.hold;
       to.hangar = [...(to.hangar ?? []), squad];
       return squad;
     };
@@ -1718,12 +1912,18 @@ export const shuttleModule: GameModule = {
       // по одному на уцелевший борт, как и при высадке.
       trimCargoToSurvivors(strike);
       const cargo = (strike.cargo ?? []).filter((st) => st.count > 0);
+      // Удерживаемый патруль (SHU-6.6) садится с удержанием. Его точка у МИРА — `to`
+      // обратной ноги: удержание живёт только у патруля, повернувшего домой по концу
+      // времени (отзыв его снимает, а потерявший базу перестаёт быть патрулём), и
+      // повернул он ровно из своей точки.
+      const held = strike.target.kind === 'point' && strike.patrol?.hold === true;
       const home: Squadron = {
         id: taken ? nextSquadronId(h, strike.owner) : strike.squadronId,
         units: strike.units.map((st) => ({ ...st })),
         ...(cargo.length > 0 ? { cargo: cargo.map((st) => ({ ...st })) } : {}),
         // Недобитый урон вылета остаётся на машинах (SHU-5.3), а не забывается на посадке.
         ...(strike.damage && strike.damage > 0 ? { damage: strike.damage } : {}),
+        ...(held ? { hold: base.ref.kind === 'planet' ? { at: { ...strike.to } } : {} } : {}),
       };
       base.setHangar(trimHangar([...base.hangar, home], spot.bay, h.ctx.data));
       h.emit('shuttle.landed', {
@@ -1732,6 +1932,18 @@ export const shuttleModule: GameModule = {
         owner: strike.owner,
         strikeId,
       });
+      if (held) h.schedule(h.ctx.now, 'shuttle.patrol.resume', { owner: strike.owner, squadronId: home.id });
+    });
+
+    /**
+     * СНОВА В ПАТРУЛЬ (SHU-6.6): удерживаемый патруль сел — или его база дождалась конца
+     * перезарядки, боя корабля, ремонта порта (`resumeHold`). Своё событие, а не опрос на
+     * `time.advanced`: срок назначает расписание, и нарезка хоста его не сдвигает.
+     */
+    api.on('shuttle.patrol.resume', (event, h: HandlerContext) => {
+      const p = (event.payload ?? {}) as { owner?: unknown; squadronId?: unknown };
+      if (typeof p.owner !== 'string' || typeof p.squadronId !== 'string') return;
+      resumeHold(h, p.owner, p.squadronId);
     });
 
     /**

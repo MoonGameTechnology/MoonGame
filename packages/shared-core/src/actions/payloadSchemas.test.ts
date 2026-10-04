@@ -53,6 +53,7 @@ const CLIENT_ACTION_TYPES = [
   'fleet.merge',
   'fleet.split',
   'fleet.engage',
+  'shuttle.hold',
   'shuttle.load',
   'shuttle.merge',
   'shuttle.patrol',
@@ -67,7 +68,6 @@ const CLIENT_ACTION_TYPES = [
   'steward.holdpoint',
   'order.auto',
   'order.retreat',
-  'order.scramble',
   'order.chain',
   'fleet.forcemarch',
   'fleet.instantRepair',
@@ -138,7 +138,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['steward.recall', {}],
       ['steward.holdpoint', { planetId: 'p1', on: true }],
       ['order.auto', { fleetId: 'f1', on: true }],
-      ['order.scramble', { fleetId: 'f1', on: false }],
       ['fleet.forcemarch', { fleetId: 'f1', on: true }],
       ['fleet.instantRepair', { fleetId: 'f1' }],
       ['fleet.repair', { fleetId: 'f1' }],
@@ -161,6 +160,14 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 100, y: -40.5 } }],
       ['shuttle.patrol', { fleetId: 'f1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 } }],
       ['shuttle.recall', { strikeId: 'strike:p1:0:1' }],
+      // SHU-6.6: «Держать патруль» — флагом при вылете, у вылета и снятие у эскадры дома.
+      [
+        'shuttle.patrol',
+        { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 }, hold: true },
+      ],
+      ['shuttle.hold', { strikeId: 'strike:p1:0:1', on: true }],
+      ['shuttle.hold', { planetId: 'p1', squadronId: 'sq:p1:1', on: false }],
+      ['shuttle.hold', { fleetId: 'f1', squadronId: 'sq:p1:1', on: false }],
       // SHU-6.4: перелёт — с мира на корабль и с корабля на мир.
       ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toFleetId: 'f1' }],
       ['shuttle.relocate', { fleetId: 'f1', squadronId: 'sq:p1:1', toPlanetId: 'p2' }],
@@ -227,6 +234,10 @@ describe('SV-1.2 · action payload schemas', () => {
       ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: NaN, y: 0 } }], // not finite
       ['shuttle.patrol', { planetId: 'p1', at: { x: 0, y: 0 } }], // missing squadronId
       ['shuttle.recall', {}], // missing strikeId
+      // SHU-6.6: флаг удержания — только булев, и без `on` снимать/ставить нечего.
+      ['shuttle.patrol', { planetId: 'p1', squadronId: 'sq:p1:1', at: { x: 0, y: 0 }, hold: 1 }],
+      ['shuttle.hold', { strikeId: 'strike:p1:0:1' }], // missing on
+      ['shuttle.hold', { strikeId: 'strike:p1:0:1', on: 'yes' }], // `on` не булев
       ['shuttle.relocate', { planetId: 'p1', toPlanetId: 'p2' }], // SHU-6.4: missing squadronId
       ['shuttle.relocate', { planetId: 'p1', squadronId: 'sq:p1:1', toPlanetId: 7 }], // not an id
     ];

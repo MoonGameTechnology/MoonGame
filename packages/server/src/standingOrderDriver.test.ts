@@ -8,10 +8,10 @@ import {
   type Player,
 } from '@void/shared-core';
 import { parseGameData, createKernel, type Action, type GameData, type Context } from '@void/shared-core';
-import { autoAssaultActions, patrolActions, standingOrderTickActions } from './standingOrderDriver';
+import { autoAssaultActions, standingOrderTickActions } from './standingOrderDriver';
 import { DEV_MODULES } from './scenario';
 
-// standingOrderDriver — the CC-2/CC-4 "who decides, and when" half of
+// standingOrderDriver — the CC-2/RETR-2 "who decides, and when" half of
 // standingOrdersModule. Pure functions over explicit state: no AI/bot decision
 // loop anywhere — every fixture below is a hand-built GameState.
 
@@ -19,18 +19,6 @@ const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['metal'],
   units: {
-    interceptor: {
-      faction: 'x',
-      domain: 'space',
-      traits: ['shuttle'],
-      stats: { attack: 4, defense: 1, speed: 12, hp: 8, fuel: 3, rearmRounds: 2, strikeRange: 60 },
-    },
-    carrier: {
-      faction: 'x',
-      domain: 'space',
-      traits: ['shuttle'],
-      stats: { attack: 2, defense: 2, speed: 6, hp: 30, fuel: 2, rearmRounds: 3, strikeRange: 50 },
-    },
     cruiser: {
       faction: 'x',
       domain: 'space',
@@ -38,7 +26,7 @@ const data: GameData = parseGameData({
     },
   },
   factions: {},
-  buildings: { spaceport: { name: 'Spaceport', shuttleBay: 4, hp: 100 } },
+  buildings: {},
   events: {},
   sectorKinds: {
     homeworld: { scoreValue: 10, capturable: true, buildable: true, orbit: true },
@@ -83,7 +71,6 @@ function stateWith(opts: {
   planets?: Planet[];
   fleets?: Fleet[];
   autoAssault?: GameState['autoAssault'];
-  patrols?: GameState['patrols'];
 }): GameState {
   const s = createInitialState({ seed: 'sod', version: { data: '0.1.0', manifest: '1' } });
   const players: Record<string, Player> = {};
@@ -98,7 +85,6 @@ function stateWith(opts: {
     planets,
     fleets,
     ...(opts.autoAssault ? { autoAssault: opts.autoAssault } : {}),
-    ...(opts.patrols ? { patrols: opts.patrols } : {}),
   };
 }
 
@@ -188,82 +174,13 @@ describe('autoAssaultActions — CC-2', () => {
     expect(autoAssaultActions(contested, probe)).toEqual([]);
   });
 });
-describe('patrolActions — CC-4 (дежурит БАЗА, SHU-2.2)', () => {
-  /** Мой мир с портом, эскадрой в ангаре и полным запасом вылетов. */
-  function withPatrol(opts: {
-    targets?: Fleet[];
-    stance?: 'war' | 'peace';
-    sortie?: { fuel: number; rearming: number };
-    hangar?: boolean;
-  }) {
-    const s = stateWith({
-      players: [player('p1'), player('p2')],
-      planets: [planet('A', 'p1', 0, 0, ['B']), planet('B', 'p2', 10, 0, ['A'])],
-      fleets: opts.targets ?? [],
-      patrols: { A: { kind: 'planet' } },
-    });
-    s.planets.A = {
-      ...s.planets.A!,
-      buildings: [{ type: 'spaceport', level: 1, hp: 100 }],
-      hangar:
-        opts.hangar === false
-          ? []
-          : [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }] }],
-      ...(opts.sortie ? { sortie: opts.sortie } : {}),
-    };
-    setStance(s, 'p1', 'p2', opts.stance ?? 'war');
-    return s;
-  }
-
-  it('ПОДНИМАЕТ ЭСКАДРУ по опознанному врагу в радиусе — обычным `shuttle.strike`', () => {
-    const s = withPatrol({ targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])] });
-    const out = patrolActions(s, data);
-    expect(out).toHaveLength(1);
-    expect(out[0]!.action.type).toBe('shuttle.strike');
-    expect(out[0]!.action.payload).toEqual({
-      planetId: 'A',
-      squadronId: 'sq:p1:1',
-      targetFleetId: 'f2',
-    });
-  });
-
-  it('МИР — НЕ ЦЕЛЬ: без объявленной войны дежурство молчит', () => {
-    const s = withPatrol({
-      targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])],
-      stance: 'peace',
-    });
-    expect(patrolActions(s, data)).toEqual([]);
-  });
-
-  it('ПУСТОЙ АНГАР — ВЫЛЕТА НЕТ: дежурить нечем', () => {
-    const s = withPatrol({ targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])], hangar: false });
-    expect(patrolActions(s, data)).toEqual([]);
-  });
-
-  it('СУХОЙ БАК — ВЫЛЕТА НЕТ: заведомо отклоняемый приказ не подаём', () => {
-    const s = withPatrol({
-      targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])],
-      sortie: { fuel: 0, rearming: 2 },
-    });
-    expect(patrolActions(s, data)).toEqual([]);
-  });
-
-  it('ЦЕЛЕЙ НЕТ — ВЫЛЕТА НЕТ', () => {
-    expect(patrolActions(withPatrol({}), data)).toEqual([]);
-  });
-});
-
-describe('standingOrderTickActions — combines both drivers in a fixed order', () => {
-  it('runs auto-assault before patrol', () => {
+describe('standingOrderTickActions — combines the drivers in a fixed order', () => {
+  it('issues the auto-storm pair, orbit first', () => {
     const s = stateWith({
       players: [player('p1'), player('p2')],
       planets: [planet('A', 'p2'), planet('B', 'p1', 0, 0)],
-      fleets: [
-        fleet('storm', 'p1', 'A', [['cruiser', 1]]),
-        fleet('wing', 'p1', 'B', [['carrier', 1]]),
-      ],
+      fleets: [fleet('storm', 'p1', 'A', [['cruiser', 1]])],
       autoAssault: { storm: true },
-      patrols: { B: { kind: 'planet' } },
     });
     setStance(s, 'p1', 'p2', 'war');
     const out = standingOrderTickActions(s, data, probe);
@@ -295,31 +212,5 @@ describe('integration — every emitted action is accepted by the REAL kernel', 
       expect(r.ok, `${playerId}: ${action.type} → ${!r.ok ? r.code : 'ok'}`).toBe(true);
       if (r.ok) state = r.state;
     }
-  });
-
-  it('дежурный вылет: `shuttle.strike` принимается настоящим редьюсером', () => {
-    const s = stateWith({
-      players: [player('p1'), player('p2')],
-      planets: [planet('A', 'p1', 0, 0, ['B']), planet('B', 'p2', 10, 0, ['A'])],
-      fleets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])],
-      patrols: { A: { kind: 'planet' } },
-    });
-    s.planets.A = {
-      ...s.planets.A!,
-      buildings: [{ type: 'spaceport', level: 1, hp: 100 }],
-      hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }] }],
-    };
-    setStance(s, 'p1', 'p2', 'war');
-    const out = patrolActions(s, data);
-    expect(out).toHaveLength(1);
-    let state = s;
-    for (const { playerId, action } of out) {
-      const r = kernel.applyAction(state, action, ctx);
-      expect(r.ok, `${playerId}: ${action.type} → ${!r.ok ? r.code : 'ok'}`).toBe(true);
-      if (r.ok) state = r.state;
-    }
-    // Машины ушли из ангара в воздух — вылет состоялся.
-    expect(state.strikes ?? []).toHaveLength(1);
-    expect(state.planets.A!.hangar ?? []).toHaveLength(0);
   });
 });

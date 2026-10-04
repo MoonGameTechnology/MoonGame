@@ -1,12 +1,11 @@
 /**
  * Server-side standing-order drivers: one deterministic tick each for CC-2
- * auto-storm, CC-1 order chains, and CC-4 reactive patrols. Extracted from
+ * auto-storm, CC-1 order chains and RETR-2 auto-retreat. Extracted from
  * `game.ts` (REFP-24): depends on `fleetIdle`/`ChainStep`/`FleetChain`
- * (`chain.ts`, REFP-8), `Patrol`/`scrambleOrder` (`patrol.ts`, REFP-23),
- * `SortieState`/`sortieSpec`/`tickRearm`/`fleetHasShuttle` (ядро,
- * `state/shuttle.ts` — CONV-5,
- * REFP-7), and the action builders `moveFleet`/`orbitFleet`/`assaultFleet`/
- * `castHeroAbility` (`actions.ts`, REFP-22/24). Pure — a host
+ * (`chain.ts`, REFP-8), `autoRetreatDue` (ядро), and the action builders
+ * `moveFleet`/`orbitFleet`/`assaultFleet`/`castHeroAbility`/`retreatFleet`
+ * (`actions.ts`, REFP-22/24). Дежурного вылета (CC-4) здесь больше нет: его заменил
+ * «Держать патруль» (SHU-6.6), который поднимает эскадру событием ядра. Pure — a host
  * (`main.ts`'s frame loop, or NET's `standingOrders`/`chain` modules) applies
  * the returned actions/patches; a rejected action is simply skipped, never
  * retried forever (the CC-2 rejected-churn lesson). `game.ts` imports these
@@ -20,13 +19,12 @@ import {
 import { data } from './gameData';
 import { canOrderAll } from './protoKernel';
 import { fleetIdle, type ChainStep, type FleetChain } from '../../packages/shared-core/src/index';
-import { patrolScrambles, autoRetreatDue } from '../../packages/shared-core/src/index';
+import { autoRetreatDue } from '../../packages/shared-core/src/index';
 import {
   moveFleet,
   orbitFleet,
   assaultFleet,
   castHeroAbility,
-  strikeShuttle,
   retreatFleet,
 } from '../../decisions/actions';
 
@@ -185,30 +183,6 @@ export function serverChainActions(
   }
   return out;
 }
-/**
- * Один тик СЕРВЕРНОГО драйвера дежурного вылета (CC-4, на базе с SHU-2.2) — обёртка.
- *
- * Решение (кому лететь и по кому) целиком в ядре: `patrolScrambles`. Здесь остаётся
- * завернуть его в прототипный `shuttle.strike`. Раньше тут лежала вторая копия правил
- * плюс собственное ведение топлива через `patrol.stamp` — и то и другое ушло вместе с
- * моделью «крыло как флот»: запас вылетов принадлежит БАЗЕ и тратится самим ударом.
- */
-export function serverPatrolActions(
-  state: GameState,
-): Array<{ owner: string; actions: Action[] }> {
-  return patrolScrambles(state, data).map((sc) => ({
-    owner: sc.owner,
-    actions: [
-      strikeShuttle(
-        sc.owner,
-        sc.base.kind === 'planet' ? { planetId: sc.base.id } : { fleetId: sc.base.id },
-        sc.squadronId,
-        { targetFleetId: sc.targetFleetId },
-      ),
-    ],
-  }));
-}
-
 /**
  * RETR-2 — авто-отступление на прототипном хосте. Решение целиком в ЯДРЕ
  * (`autoRetreatDue`), здесь только упаковка в приказ: у серверного драйвера

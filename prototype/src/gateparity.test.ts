@@ -31,7 +31,6 @@ import {
   recallSteward,
   setHoldPoint,
   orderAuto,
-  orderScramble,
   castHeroAbility,
   spawnHero,
   unlockHeroSkill,
@@ -43,6 +42,7 @@ import {
   instantRepairFleet,
   repairFleet,
 } from './game';
+import { holdPatrol, patrolShuttle, releaseHold } from '../../decisions/actions';
 
 // RELEASE gate parity (REL-2): every intent the prototype UI can emit must clear the
 // action-layer payload schemas — otherwise a GATED release server silently locks the
@@ -80,8 +80,11 @@ const CLIENT_ACTIONS: Action[] = [
   setHoldPoint(P, 'C1R1', true),
   setHoldPoint(P, 'C1R1', false),
   orderAuto(P, 'f1', true),
-  orderScramble(P, { planetId: 'C1R1' }, true),
-  orderScramble(P, { fleetId: 'f1' }, false),
+  // SHU-6.6: «Держать патруль» сменил дежурный вылет — все три его приказа с провода.
+  patrolShuttle(P, { planetId: 'C1R1' }, 'sq:p1:1', { x: 10, y: 20 }, true),
+  holdPatrol(P, 'strike:p1:0:1', true),
+  holdPatrol(P, 'strike:p1:0:1', false),
+  releaseHold(P, { fleetId: 'f1' }, 'sq:p1:1'),
   // CONV-1: обе кнопки после сведения обслуживает МОДУЛЬ ЯДРА, а билдеры остались
   // прототипными — значит разъехаться payload'у и схеме теперь есть где, и ловить
   // это должен гейт-паритет, а не удалённые дубли модульных тестов.
@@ -118,6 +121,12 @@ describe('gate parity (REL-2) — the schemas cover every prototype intent', () 
     expect(isValidActionPayload('patrol.stamp', { fleetId: 'f1', sortie: freshSortie(3) })).toBe(
       false,
     );
+  });
+
+  // SHU-6.6: дежурный вылет снят целиком — его приказ с провода не проходит, как и любой
+  // снятый тип.
+  it('снятый order.scramble с провода не проходит', () => {
+    expect(isValidActionPayload('order.scramble', { planetId: 'C1R1', on: true })).toBe(false);
   });
 
   it('steward.report stays server-only — a client must not forge the SITREP (ST-2.4)', () => {

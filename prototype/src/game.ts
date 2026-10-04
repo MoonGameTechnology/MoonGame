@@ -138,7 +138,6 @@ export {
   serverAutoAssaultActions,
   serverAutoRetreatActions,
   serverChainActions,
-  serverPatrolActions,
 } from './serverDrivers';
 
 // --- ground war --------------------------------------------------------------
@@ -204,7 +203,6 @@ export {
   castHeroAbility,
   orderAuto,
   orderRetreat,
-  orderScramble,
   orderChain,
   forceMarchFleet,
   instantRepairFleet,

@@ -405,7 +405,7 @@ export const en: Record<string, string> = {
   'browser.solo.hint': 'No server needed — bots fill the open seats.',
   'browser.taken': 'taken',
 
-  // --- ai — Красный ИИ: условия конца матча и отказы дежурного вылета.
+  // --- ai — Красный ИИ: условия конца матча.
   'ai.end.domination': 'by galactic domination',
   'ai.end.elimination': 'by eliminating rivals',
   'ai.end.over': 'the match has ended',
@@ -554,6 +554,7 @@ export const en: Record<string, string> = {
   'hint.wing-patrol-aim': '◎ pick a patrol point inside the ring: loiters {h}h, hits a target within {r} every 15 min',
   'hint.wing-relocate-aim': '⇄ pick a highlighted base: ferry range {r}',
   'hint.wing-relocate-cancelled': 'relocation cancelled',
+  'hint.wing-keep': '⟳ patrol held: after landing and rearming it takes off again by itself',
   'side.build.open': 'Build',
   'side.fortress.raise': 'Raise fortress',
   'side.fortress.needs-tech': 'Research {tech} first.',
@@ -568,8 +569,6 @@ export const en: Record<string, string> = {
   'side.wing.blocked.busy': 'the ship is in battle — no squadron is launching now',
   'side.wing.blocked.empty': 'the hangar is empty — nothing to launch',
   'side.wing.cargo': 'aboard: {n}',
-  'side.wing.duty.off': '🛩 Stand duty',
-  'side.wing.duty.on': '🛩 Stand down',
   'side.wing.empty': 'the hangar is empty',
   'side.wing.blocked.no-fuel': 'out of fuel — waiting on the rearm',
   'side.wing.blocked.rearming': 'the port is rearming — a sortie must wait',
@@ -592,6 +591,9 @@ export const en: Record<string, string> = {
   'side.wing.patrol.on': 'patrol “{name}”: {left} left',
   'side.wing.patrol.out': 'patrol “{name}”: heading to its point',
   'side.wing.recall': '↩ Recall',
+  'side.wing.keep': '⟳ Hold patrol',
+  'side.wing.keep.off': '⟳ Stop holding',
+  'side.wing.holding': 'holding a patrol',
   'side.wing.unload': '↓ To port',
   'spy.log.empty': 'no attempts yet',
   'spy.log.title': 'Journal',
@@ -1490,7 +1492,6 @@ export const en: Record<string, string> = {
   'hint.engage-in-flight': 'the target is under way — no course to it; wait until it stops',
   'hint.pick-merge': '⛬ pick a fleet to merge with',
   'hint.pick-order': 'select a point on the map — each one adds an order',
-  'hint.standing-sortie': '🛩 standing patrol on — the shuttles strike any enemy in range',
 
   // --- loadout — Ship loadout editor (packages/client): stat-preview labels.
   'loadout.stat.attack': 'Attack damage',
@@ -2786,6 +2787,7 @@ export const en: Record<string, string> = {
   'log.salvage': '🔧 Battlefield stripped: {what}',
   'log.shuttle.repelled.mine': '✳ Flak downed {n} of our craft · {at}',
   'log.shuttle.repelled.theirs': '✳ Our flak downed {n} enemy craft · {at}',
+  'log.shuttle.hold-ended': '⟳ Patrol “{name}” is no longer held: {why}',
   'log.spy.caught': '🛡 Counter-intel: agent {who} caught stealing ({what})!',
   'log.spy.fail': '🕵 Agent failed ({who}) — the fee is gone',
   'log.spy.fail.short': '✖ Failed against {who} — the fee burned',
@@ -3376,7 +3378,7 @@ export const en: Record<string, string> = {
   'effect.in-battle': 'in battle',
   'effect.forced-march': 'forced march',
   'effect.bombarding': 'bombarding',
-  'effect.patrol': 'standing patrol',
+  'effect.patrol': 'holding a patrol',
   'effect.blackout': 'blackout: interdiction/radar −50%',
   'effect.hunger': 'hunger: −25% ground damage',
   'effect.point-defense': 'area defense {n}',
@@ -3524,11 +3526,11 @@ export const en: Record<string, string> = {
   'steward.log.ferry': '🚚 A ferry dispatched to {node} for the garrison',
   'steward.log.held': '🛡 The {node} line held: loss forecast {pct}%',
   'steward.log.reinforce': '🚩 Reinforcement sent to {node}: loss forecast {pct}%',
-  'steward.log.sortie': '🛫 A standing patrol raised at {node}',
+  'steward.log.sortie': '🛫 Patrol posted over {node}',
   'steward.log.title': "Steward's journal",
   'steward.on.active': 'The Steward runs an active defense.',
   'steward.on.active.note':
-    'While you sleep: holds the borders, stands shuttle patrols and counterstrikes at your own worlds when the loss forecast is acceptable.',
+    'While you sleep: holds the borders and shuttle patrols over your worlds, and counterstrikes at your own worlds when the loss forecast is acceptable.',
   'steward.on.defense': 'The Steward holds the line.',
   'steward.on.defense.note':
     'While you sleep: holds the borders and repels attacks, keeps building and trading — no offensives.',
@@ -3541,7 +3543,7 @@ export const en: Record<string, string> = {
   'steward.stance': 'Posture',
   'steward.stance.active': 'Active defense',
   'steward.stance.active.note':
-    'Active defense: everything above, plus a counterstrike at your own worlds when the loss forecast is acceptable (under 35%) and standing shuttle patrols. It never leaves your territory.',
+    'Active defense: everything above, plus a counterstrike at your own worlds when the loss forecast is acceptable (under 35%) and shuttle patrols over your worlds. It never leaves your territory.',
   'steward.stance.defense': 'Defense',
   'steward.stance.defense.note':
     'The “Defend” posture: holds and repels, keeps building and trading — no offensives, no diplomacy. Control returns automatically, with a morning report.',

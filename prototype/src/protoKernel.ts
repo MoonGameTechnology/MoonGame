@@ -148,7 +148,7 @@ export const MODULES: GameModule[] = [
   botDiplomacyModule, // bots: friendly-by-default favour meter → embargo/war only when provoked
   marketModule, // session resource market: two-sided order book (sell/buy lots), embargo-gated
   capitalModule, // designatable capital (hero respawn / module re-fit anchor)
-  standingOrdersModule, // CC-2/CC-4 standing orders (auto-storm / дежурный вылет), server-driven
+  standingOrdersModule, // CC-2/RETR-2/CC-1 standing orders (auto-storm / auto-retreat / chains), server-driven
   shuttleModule, // SQ: free-space movement for shuttles (strike/return off the lane graph)
   forcedMarchModule, // BOOST-1 форс-марш: +50% скорости за 5% max-HP износа в час хода
   instantRepairModule, // платный мгновенный ремонт корпуса (кредиты как премиум-валюта)
