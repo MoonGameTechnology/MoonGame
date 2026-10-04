@@ -179,15 +179,27 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   }),
   // ПАТРУЛЬ (SHU-6.2): та же база и та же эскадра, что у удара, но цель — ТОЧКА карты, а
   // не флот или мир. Радиус точки от базы проверяет обработчик: схема его не знает.
+  // `hold` — «Держать патруль» (SHU-6.6): вернувшись, эскадра встанет снова сама.
   'shuttle.patrol': z.object({
     planetId: id.optional(),
     fleetId: id.optional(),
     squadronId: id,
     at: z.object({ x: z.number().finite(), y: z.number().finite() }),
+    hold: z.boolean().optional(),
   }),
   // Отзыв патруля домой раньше срока (SHU-6.2) — по id вылета: эскадры в ангаре нет, она
   // в воздухе.
   'shuttle.recall': z.object({ strikeId: id }),
+  // «ДЕРЖАТЬ ПАТРУЛЬ» (SHU-6.6): у патруля в воздухе — по id вылета, у эскадры, ждущей
+  // дома, — по базе и эскадре (там удержание можно только снять). Какая из двух форм и
+  // «ровно одна база», схема не выражает — это гейт обработчика.
+  'shuttle.hold': z.object({
+    strikeId: id.optional(),
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id.optional(),
+    on: z.boolean(),
+  }),
   // ПЕРЕЛЁТ на другую свою базу (SHU-6.4). И откуда, и куда — ровно одна база из двух
   // (мир или корабль): «обе или ни одной» схема не выражает, это гейт обработчика, как и
   // дальность перелёта.
@@ -227,7 +239,7 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // ownership/cap. (`steward.report` stays deliberately ABSENT: the SITREP stamp
   // is the SERVER driver's, like `chain.stamp` — a client must not forge it.)
   'steward.holdpoint': z.object({ planetId: id, on: z.boolean() }),
-  // standing orders (CC-2 auto-storm / CC-4 дежурный вылет) — client toggles only.
+  // standing orders (CC-2 auto-storm, RETR-2 auto-retreat) — client toggles only.
   'order.auto': z.object({ fleetId: id, on: z.boolean() }),
   // RETR-2: порог и точка нужны только при включении — снимается приказ одним `on: false`.
   // Ступени порога закрыты списком в самом модуле; здесь достаточно формы.
@@ -236,15 +248,6 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     on: z.boolean(),
     at: z.number().optional(),
     to: id.optional(),
-  }),
-  // CC-4 армит БАЗУ (SHU-2.2): мир с портом ИЛИ носитель — ровно одна из двух, как у
-  // `shuttle.strike`; «обе или ни одной» схема не выражает, это гейт обработчика.
-  // Прежний серверный штамп `patrol.stamp` снят вместе с моделью «крыло как флот»:
-  // запас вылетов принадлежит БАЗЕ и тратится самим `shuttle.strike`, штамповать нечего.
-  'order.scramble': z.object({
-    planetId: id.optional(),
-    fleetId: id.optional(),
-    on: z.boolean(),
   }),
   // BOOST-1 форс-марш: +50% speed for hull wear while in transit — client toggle.
   'fleet.forcemarch': z.object({ fleetId: id, on: z.boolean() }),

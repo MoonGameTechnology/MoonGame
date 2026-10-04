@@ -20,8 +20,9 @@ import { isForkSite } from '../state/forkSite';
  *  repel, drain the build queue, evacuate a doomed wing (ST-3.2); no offensives, no
  *  diplomacy. `active_defend` («Активная оборона», ST-3.3): everything `defend` does,
  *  plus a forecast-gated counterstrike — the wing engages a visible war-stance intruder
- *  AT ITS OWN node when the strike forecast wins under `STEWARD_LOSS_LIMIT`, and stands
- *  shuttle patrols (CC-4) as a fire-watch; it still never leaves own territory.
+ *  AT ITS OWN node when the strike forecast wins under `STEWARD_LOSS_LIMIT`, and holds
+ *  shuttle patrols over own worlds (SHU-6.6) as a fire-watch; it still never leaves own
+ *  territory.
  *  Expansion / offensive postures unlock up the tech tree (later). Data-driven behaviour
  *  lives in the driver; this set just gates what a `steward.delegate` action may request. */
 export const STEWARD_POSTURES = ['defend', 'active_defend'] as const;

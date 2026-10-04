@@ -26,7 +26,6 @@ it('keeps signed RNG words and JSON extensions without consulting wall time', ()
     normalSpeed: 10,
     fastSpeed: 30,
     autoAssault: [],
-    patrols: [],
     memory: [],
   };
   const raw = serializeSoloSave(save, 'rules');

@@ -88,16 +88,35 @@ export const strikeShuttle = (
   target: { targetFleetId: string } | { targetPlanetId: string },
 ) => act(playerId, 'shuttle.strike', { ...base, squadronId, ...target });
 /** Поставить ЭСКАДРУ в патруль над точкой карты (SHU-6.2): та же база, что у удара, а
- *  цель — точка в мировых координатах, а не флот или мир. */
+ *  цель — точка в мировых координатах, а не флот или мир. `hold` — «Держать патруль»
+ *  (SHU-6.6): вернувшись, эскадра встанет снова сама. */
 export const patrolShuttle = (
   playerId: string,
   base: { planetId: string } | { fleetId: string },
   squadronId: string,
   at: { x: number; y: number },
-) => act(playerId, 'shuttle.patrol', { ...base, squadronId, at: { x: at.x, y: at.y } });
+  hold = false,
+) =>
+  act(playerId, 'shuttle.patrol', {
+    ...base,
+    squadronId,
+    at: { x: at.x, y: at.y },
+    ...(hold ? { hold: true } : {}),
+  });
 /** Вернуть патруль домой раньше срока (SHU-6.2) — по id вылета: эскадра в воздухе. */
 export const recallPatrol = (playerId: string, strikeId: string) =>
   act(playerId, 'shuttle.recall', { strikeId });
+/** «Держать патруль» у патруля в воздухе (SHU-6.6) — по id вылета. Включить можно, пока
+ *  патруль не повернул домой, снять — всегда. */
+export const holdPatrol = (playerId: string, strikeId: string, on: boolean) =>
+  act(playerId, 'shuttle.hold', { strikeId, on });
+/** Снять «Держать патруль» с эскадры, которая ждёт дома перезарядки (SHU-6.6). Включить
+ *  дома нечего: точку берут у патруля, для этого есть `patrolShuttle` с `hold`. */
+export const releaseHold = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+) => act(playerId, 'shuttle.hold', { ...base, squadronId, on: false });
 /** ПЕРЕЛЁТ эскадры на другую свою базу (SHU-6.4). Обе базы размечены, как у удара: ядро
  *  ищет мир в `planets`, корабль — в `fleets`, и перепутать их молча нельзя. */
 export const relocateShuttle = (
@@ -258,16 +277,6 @@ export function canTraverse(state: GameState, mover: string, owner: string | nul
 /** Toggle the CC-2 auto-storm stance on an owned fleet (authoritative standing order). */
 export const orderAuto = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'order.auto', { fleetId, on });
-/** Stand (or stand down) a CC-4 reactive patrol on an owned shuttle fleet — the server
- *  computes the patrol itself (center / radius / fresh sortie). */
-/** CC-4: включить/выключить дежурный вылет у БАЗЫ — мира с портом ИЛИ носителя
- *  (SHU-2.2). Ровно одна из двух, как у `shuttle.strike`. */
-export const orderScramble = (
-  playerId: string,
-  base: { planetId: string } | { fleetId: string },
-  on: boolean,
-) => act(playerId, 'order.scramble', { ...base, on });
-
 /** CC-1: set (or [] = cancel) an owned fleet's whole order chain atomically. */
 export const orderChain = (playerId: string, fleetId: string, steps: ChainStep[]) =>
   act(playerId, 'order.chain', { fleetId, steps });

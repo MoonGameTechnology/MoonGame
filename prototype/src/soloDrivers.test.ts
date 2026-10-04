@@ -13,7 +13,6 @@ function harness(over: Partial<SoloHost> = {}, seed: GameState = newGame()) {
   let s = seed;
   const mine: Action[] = [];
   const others: Action[] = [];
-  const patrols = new Map<string, { kind: 'planet' | 'fleet' }>();
   const autoOn = new Set<string>();
   const api = initSoloDrivers({
     state: () => s,
@@ -30,15 +29,12 @@ function harness(over: Partial<SoloHost> = {}, seed: GameState = newGame()) {
       if (!out.error) s = out.state;
     },
     autoAssault: (id) => autoOn.has(id),
-    patrols: () => patrols,
-    known: () => true,
     ...over,
   });
   return {
     api,
     mine,
     others,
-    patrols,
     autoOn,
     state: () => s,
     setState: (next: GameState) => {
@@ -382,37 +378,6 @@ describe('соло-драйверы — столкновения флотов', 
     expect(h.others).toEqual([]);
   });
 });
-describe('соло-драйверы — дежурные вылеты (на БАЗЕ, SHU-2.2)', () => {
-  it('без дежурных баз драйвер ничего не делает', () => {
-    const h = harness();
-    h.api.drivePatrols();
-    expect(h.mine).toEqual([]);
-  });
-
-  it('ПРОПАВШАЯ БАЗА ПРИКАЗА НЕ ДАЁТ — вылету неоткуда взяться', () => {
-    const h = harness();
-    h.patrols.set('no-such-base', { kind: 'planet' });
-    h.api.drivePatrols();
-    expect(h.mine).toEqual([]);
-  });
-
-  it('ЧУЖАЯ БАЗА МОИХ ПРИКАЗОВ НЕ РОЖДАЕТ: драйвер шлёт только за себя', () => {
-    const h = harness();
-    const foreign = Object.values(h.state().planets).find((p) => p.owner && p.owner !== 'p1');
-    if (foreign) h.patrols.set(foreign.id, { kind: 'planet' });
-    h.api.drivePatrols();
-    expect(h.mine).toEqual([]);
-  });
-
-  it('ПУСТОЙ АНГАР — ВЫЛЕТА НЕТ: дежурить нечем', () => {
-    const h = harness();
-    const mine = Object.values(h.state().planets).find((p) => p.owner === 'p1')!;
-    h.patrols.set(mine.id, { kind: 'planet' });
-    h.api.drivePatrols();
-    expect(h.mine).toEqual([]);
-  });
-});
-
 describe('соло-драйверы — цепочки приказов', () => {
   it('без цепочек ничего не выдаётся', () => {
     const h = harness();

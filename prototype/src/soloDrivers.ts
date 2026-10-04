@@ -3,7 +3,8 @@
  *
  * В сетевом матче всё это делает сервер — он владеет часами, боем и каждым соперником.
  * В одиночном матче некому, поэтому кадр прототипа сам подталкивает мир: ходы ИИ,
- * авто-штурм, столкновения флотов, дежурные вылеты и цепочки приказов.
+ * авто-штурм, столкновения флотов, авто-отступление и цепочки приказов. Удерживаемый
+ * патруль шаттлов (SHU-6.6) в этот список не входит: его поднимает событие ядра.
  *
  * Здесь ПОЛИТИКА клиента, а не правила игры. Разница важная и однажды уже стоила
  * дорого (RULES-1): правила — «захватываема ли провинция», «есть ли десант», «что
@@ -35,9 +36,7 @@ import {
   retreatFleet,
   serverChainActions,
   stewardActive,
-  strikeShuttle,
 } from './game';
-import { patrolScrambles } from '../../packages/shared-core/src/index';
 
 /** Как часто ходит локальный ИИ (игровое время). Чаще — только лишние прогоны. */
 export const AI_STEP_MS = 2 * HOUR;
@@ -66,10 +65,6 @@ export interface SoloHost {
   playerOrder(a: Action): void;
   /** Опт-ин авто-штурма для своего флота (CC-2). Чужие штурмуют всегда. */
   autoAssault(fleetId: string): boolean;
-  /** Дежурные вылеты (CC-4): живая карта клиента — драйвер её же и чистит. */
-  patrols(): Map<string, { kind: 'planet' | 'fleet' }>;
-  /** Опознан ли узел (цель дежурного вылета обязана быть видимой). */
-  known(loc: string): boolean;
 }
 
 export interface SoloDrivers {
@@ -82,12 +77,8 @@ export interface SoloDrivers {
   checkFleetClashes(): void;
   /** CC-1: продвинуть цепочки приказов и выдать шаг головы. */
   driveChains(): void;
-  /** CC-4: дежурные вылеты — перезарядка по часам и удар по опознанной цели. */
-  drivePatrols(): void;
   /** RETR-2: авто-отступление — увести флоты, чей корпус просел до порога приказа. */
   driveAutoRetreat(): void;
-  /** Первый вставший дежурный вылет: считать перезарядку ОТСЮДА, а не от эпохи —
-   *  иначе крыло получило бы разом все часы, что матч шёл до него. */
   /** Новый матч: часы ИИ и память проб начинаются заново. */
   reset(): void;
 }
@@ -236,33 +227,6 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     }
   }
   /**
-   * CC-4: дежурная БАЗА (мир с портом или носитель) сама поднимает эскадру навстречу
-   * ближайшему опознанному врагу в её радиусе (SHU-2.2 — раньше дежурил флот челноков).
-   *
-   * Решение целиком в ядре (`patrolScrambles`): и выбор цели, и чтение мира. Здесь
-   * остаётся отдать приказ. Ни топлива, ни перезарядки драйвер больше не ведёт — они
-   * принадлежат базе и тратятся самим `shuttle.strike`.
-   */
-  function drivePatrols(): void {
-    const patrols = host.patrols();
-    if (patrols.size === 0) return;
-    const s = host.state();
-    // Соло держит дежурства в локальной карте — ядру их надо предъявить в его форме.
-    const view = { ...s, patrols: Object.fromEntries(patrols) };
-    for (const sc of patrolScrambles(view, data)) {
-      if (sc.owner !== host.me()) continue;
-      host.playerOrder(
-        strikeShuttle(
-          sc.owner,
-          sc.base.kind === 'planet' ? { planetId: sc.base.id } : { fleetId: sc.base.id },
-          sc.squadronId,
-          { targetFleetId: sc.targetFleetId },
-        ),
-      );
-    }
-  }
-
-  /**
    * RETR-2 — авто-отступление в СОЛО. Кого уводить, решает ядро (`autoRetreatDue`:
    * приказ стоит, флот в бою, корпус просел до порога); здесь только выдача приказа
    * своим путём для своего места и локально для мест под ИИ. Тот же ответ ядра
@@ -281,7 +245,6 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     autoEngage,
     checkFleetClashes,
     driveChains,
-    drivePatrols,
     driveAutoRetreat,
     reset: () => {
       ai.reset(host.state().time);

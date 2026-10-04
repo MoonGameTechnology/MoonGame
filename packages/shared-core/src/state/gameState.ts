@@ -204,7 +204,7 @@ export interface Player {
    *  treasury — both the journal and the autopilot status itself read as «спит»). */
   stewardLog?: StewardLogEntry[];
   /** Hold points (ST-2.1, guard): OWN worlds the player ORDERED held — a standing
-   *  order (the CC-4 family), honored by the Steward under any posture: a hold
+   *  order (the CC-2/RETR-2 family), honored by the Steward under any posture: a hold
    *  point is never auto-evacuated; a threatened one is REINFORCED instead. Set
    *  via `steward.holdpoint` (client-submittable, capped at
    *  `MAX_STEWARD_HOLD_POINTS`). Owner-private — a rival reading your anchors is
@@ -1108,17 +1108,6 @@ export interface GameState {
    *  вместе с погибшим флотом. Туманом фильтруется как остальные стоячие приказы —
    *  будущее намерение видит только хозяин флота. */
   autoRetreat?: Record<FleetId, { at: number; to: PlanetId }>;
-  /** CC-4 дежурный вылет: БАЗЫ (мир с портом или носитель), которым разрешено самим
-   *  поднимать эскадру навстречу опознанному врагу поблизости. Ключ — id базы, значение
-   *  называет, в каком пространстве имён этот id живёт.
-   *
-   *  Это ФЛАГ и только флаг — согласие игрока, а не правило. Центр берётся живой
-   *  (позиция базы сейчас: порт не двигается, а ушедший носитель обязан прикрывать себя
-   *  ТАМ, где он теперь), радиус — `squadronReach` эскадры, которая полетит, топливо и
-   *  перезарядка принадлежат БАЗЕ (SHU-1.2) и тратятся тем же `shuttle.strike`. До
-   *  SHU-2.2 здесь лежал снимок центра, радиуса и СВОЕГО запаса топлива — это осталось
-   *  от модели «крыло как флот», где дежурило подвижное соединение со своим баком. */
-  patrols?: Record<string, { kind: 'planet' | 'fleet' }>;
   /** CC-1 order chains: a fleet's queued plan (`standingOrdersModule`, `order.chain`
    *  sets/replaces it; `chain.stamp` is the server driver's own runtime update of
    *  the consumed head / armed wait deadline — never client-issuable). */
@@ -1576,6 +1565,14 @@ export interface Squadron {
    *  подбитый страйкер падает от второго такого же залпа. Чинится в ангаре у дока.
    *  Undefined = машины целы. */
   damage?: number;
+  /** «ДЕРЖАТЬ ПАТРУЛЬ» (SHU-6.6): эскадра вернулась из удерживаемого патруля и встанет
+   *  снова сама, как только база будет готова к вылету, в том числе пока игрок офлайн
+   *  (событие ядра `shuttle.patrol.resume`). `at` — точка патруля у МИРА; у КОРАБЛЯ её
+   *  нет: корабль ходит, и патруль встаёт над его живой позицией. Снимается вылетом по
+   *  другому приказу, перегрузкой на другую базу, делёжом и слиянием эскадр; при слиянии
+   *  ФЛОТОВ трюм уезжает вместе с ним, и патруль встаёт над новым флотом.
+   *  Undefined = эскадра ничего не держит. */
+  hold?: { at?: { x: number; y: number } };
 }
 
 export interface ShuttleStrike {
@@ -1645,8 +1642,11 @@ export interface ShuttleStrike {
   /** ПАТРУЛЬ (SHU-6.2): сколько игровых часов висеть над точкой и какой круг держать.
    *  Снимается на вылете (`squadronPatrol`, по слабому звену), а не читается заново по
    *  прилёте: сбитая в пути машина не должна ни растягивать патруль, ни раздувать круг,
-   *  который игрок уже видел. Есть ровно у вылета с целью `point`. */
-  patrol?: { hours: number; radius: number };
+   *  который игрок уже видел. Есть ровно у вылета с целью `point`.
+   *
+   *  `hold` — «ДЕРЖАТЬ ПАТРУЛЬ» (SHU-6.6): вернувшись, эскадра встанет снова сама
+   *  ({@link Squadron.hold}). Снимается отзывом: игрок вернул патруль домой. */
+  patrol?: { hours: number; radius: number; hold?: true };
   /** ПЕРЕЛЁТ (SHU-6.4): база, с которой эскадра ушла. Новая база её не приняла (пропала,
    *  сменила хозяина, нет места) — эскадра возвращается сюда. Поле снимается, как только
    *  она повернула назад: вторая неудача ведёт уже к ближайшей своей базе. У остальных

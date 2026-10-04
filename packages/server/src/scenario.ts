@@ -180,7 +180,7 @@ export const DEV_MODULES: GameModule[] = [
   autoRallyModule, // CONV-10: построенный корабль сам уходит на орбиту в RALLY-флот (BF-29)
   shuttleModule, // SQ: free-space movement for shuttles (strike/return off the lane graph)
   capitalModule, // capital.designate: re-point the hero respawn anchor
-  standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
+  standingOrdersModule, // order.auto/order.retreat/order.chain: standing-order intent storage
   instantRepairModule, // fleet.instantRepair: paid-in-credits hull top-up, anywhere
   fleetRepairModule, // fleet.repair: paid-in-metal hull top-up, at an owned dock
   forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
@@ -247,7 +247,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '71'; // PVR-9.5: пленный главы V «Голос Единения».
+export const MODULE_MANIFEST_VERSION = '72'; // SHU-6.6: «Держать патруль» вместо дежурного вылета.
+// Членство и порядок не тронуты; `shuttle` 1.8.0 — флаг `hold` у патруля и эскадры, приказ
+// `shuttle.hold`, событие `shuttle.patrol.resume` поднимает эскадру снова; `standing-orders`
+// 1.2.0 — `order.scramble` снят, поля состояния `patrols` больше нет. Партия на 71 держит
+// дежурства, которых правила 72 не знают.
+// export const MODULE_MANIFEST_VERSION = '71'; // PVR-9.5: пленный главы V «Голос Единения».
 // В ЧЛЕНСТВО вошёл `captive` 1.0.0 перед `auto-merge`, у состояния новое поле `captive`.
 // Партия на 70 не знает правил пленного.
 // export const MODULE_MANIFEST_VERSION = '70'; // SHU-6.4: перелёт шаттлов и посадка без базы.

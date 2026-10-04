@@ -10,7 +10,9 @@
  * 3. пополнение мины не назначает вторую встречу на дороге;
  * 4. мины разных владельцев в одной точке дороги срабатывают одним подрывом с общим
  *    потолком — как на узле;
- * 5. невидимую мину не находят ни дежурный вылет, ни приказ удара челноков.
+ * 5. невидимую мину не находят ни дежурный вылет, ни приказ удара челноков. Дежурный
+ *    вылет снят в SHU-6.6; его наследник, патруль, держит то же правило
+ *    (`shuttlePatrol.test.ts`, «НЕВИДИМАЯ МИНА — НЕ ЦЕЛЬ»).
  *
  * Шестая находка (знак дорожной установки в прототипе) — клиентская, её держит
  * `decisions/minefields.test.ts` (`ownInstallations`).
@@ -31,7 +33,6 @@ import { instantRepairModule } from './instantRepair';
 import { forcedMarchModule } from './forcedMarch';
 import { createInitialState, type Fleet, type GameState, type Planet, type Player } from '../state/gameState';
 import { bombardedPlanets } from '../state/orbit';
-import { patrolScrambles } from '../state/patrol';
 import { forkTAtStart } from '../state/roads';
 import { visibleMinefields } from '../state/minefields';
 import { parseGameData, type GameData } from '../data/schemas';
@@ -298,13 +299,6 @@ describe('невидимую мину не находят челноки', () =>
         hangar: [{ id: 'sq:b', units: [{ unit: 'bomber', count: 3 }] }],
       },
     },
-  });
-
-  it('дежурный вылет с опознанного узла не бьёт мину без своего флота рядом', () => {
-    const hidden = { ...base(world([mine('MINE', 'p2', { location: 'N' })])), patrols: { N: { kind: 'planet' as const } } };
-    expect(patrolScrambles(hidden, data)).toEqual([]);
-    const seen = { ...hidden, fleets: { ...hidden.fleets, F: ships('F', 'p1', 'N') } };
-    expect(patrolScrambles(seen, data).map((sc) => sc.targetFleetId)).toEqual(['MINE']);
   });
 
   it('приказ удара по невидимой мине — `E_NO_TARGET`, как по несуществующему флоту', () => {

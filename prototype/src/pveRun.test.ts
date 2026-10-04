@@ -113,8 +113,6 @@ function runIdlePlayer(maxHours: number): RunOut {
     applyLocal: apply,
     playerOrder: apply,
     autoAssault: () => false, // игрок пассивен: свой флот сам не штурмует
-    patrols: () => new Map(),
-    known: () => true,
   });
 
   for (hour = 1; hour <= maxHours; hour++) {
@@ -316,8 +314,6 @@ describe('глава I: простая оборона доходит до вер
       applyLocal: apply,
       playerOrder: apply,
       autoAssault: () => false,
-      patrols: () => new Map(),
-      known: () => true,
     });
     for (const f of Object.values(s.fleets)) {
       if (f.owner === 'p1' && f.id !== 'sector-zero:flagship') apply(mergeFleet('p1', f.id, 'sector-zero:flagship'));

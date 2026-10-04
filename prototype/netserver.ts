@@ -90,7 +90,6 @@ import {
   HOUR,
   serverAutoAssaultActions,
   serverAutoRetreatActions,
-  serverPatrolActions,
   serverChainActions,
   chainStamp,
   economySnapshot,
@@ -664,11 +663,11 @@ async function createHostedMatch(
     }
   }
 
-  // CC-2 / CC-4: drive the authoritative STANDING orders (auto-storm + дежурный вылет)
-  // server-side. Решения чистые: авто-штурм — в `game.ts`, дежурный вылет — уже в ЯДРЕ
-  // (`patrolScrambles`, SHU-2.2), здесь только применение через авторитетную комнату.
-  // Отклонённый приказ просто пропускается. Запаса вылетов драйвер больше не ведёт: он
-  // принадлежит БАЗЕ и тратится самим `shuttle.strike`.
+  // CC-2 / RETR-2 / CC-1: drive the authoritative STANDING orders (auto-storm, auto-retreat,
+  // order chains) server-side. Решения чистые (`serverDrivers.ts` и ядро), здесь только
+  // применение через авторитетную комнату. Отклонённый приказ просто пропускается.
+  // Дежурного вылета (CC-4) больше нет: «Держать патруль» (SHU-6.6) поднимает эскадру
+  // событием ядра, без драйвера.
   async function runServerStanding(): Promise<void> {
     if (!room.isStarted) return;
     // RETR-2 идёт ПЕРВЫМ: смысл приказа — выйти из боя до следующего раунда, а не
@@ -678,9 +677,6 @@ async function createHostedMatch(
     }
     for (const a of serverAutoAssaultActions(room.state)) {
       for (const act of a.actions) if (!(await room.submitServerAction(a.owner, act)).ok) break;
-    }
-    for (const p of serverPatrolActions(room.state)) {
-      for (const act of p.actions) await room.submitServerAction(p.owner, act);
     }
     // CC-1: advance the authoritative order chains — stamp first (consume-on-issue),
     // then the head step's orders; a rejected order is skipped, the chain moves on.
@@ -700,7 +696,7 @@ async function createHostedMatch(
   async function runStandingPass(): Promise<void> {
     driversBusy = true;
     try {
-      await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
+      await runServerStanding(); // CC-2/RETR-2/CC-1: standing orders (auto-storm, retreat, chains)
       // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
       // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
       // паритет держится общей функцией, а не двумя похожими циклами.
@@ -738,8 +734,8 @@ async function createHostedMatch(
         // Гварда защищает от ВТОРОГО прохода поверх летящего (durable-комната ждёт
         // мейлбокс), но ту же гварду держит цикл ИИ короткими слайсами ~350 раз за
         // цикл. Пока тик просто проверял её и уходил, каждый удар сердца, попавший в
-        // занятое окно, терял свой проход ЦЕЛИКОМ — вместе с авто-штурмом, дежурным
-        // вылетом, цепочками приказов и истечением заявок на места (ENTRY-3). Теперь
+        // занятое окно, терял свой проход ЦЕЛИКОМ — вместе с авто-штурмом, отходом,
+        // цепочками приказов и истечением заявок на места (ENTRY-3). Теперь
         // он не пропускает, а ОТКЛАДЫВАЕТ: `standingDue` отработает тот, кто отпустит.
         if (driversBusy) standingDue = true;
         else {

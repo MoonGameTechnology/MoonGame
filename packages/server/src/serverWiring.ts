@@ -157,7 +157,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     driver = startClockDriver(room, {
       onTick: ({ progressed }) => {
         detach('сохранение снапшота на тике', stores.store.save(snapshotOf(room)));
-        // Standing orders (CC-2 auto-storm / CC-4 patrol, standingOrderDriver.ts): the
+        // Standing orders (CC-2 auto-storm / RETR-2 auto-retreat, standingOrderDriver.ts): the
         // missing "who decides, and when" half of `standingOrdersModule`. Skip on a
         // same-instant stall — submitting would emit `action` observations that
         // reschedule the driver and reset its stall guard into a 0ms spin (the driver's

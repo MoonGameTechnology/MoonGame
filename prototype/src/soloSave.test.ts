@@ -18,7 +18,6 @@ function checkpoint(): SoloSave {
     normalSpeed: 50,
     fastSpeed: 150,
     autoAssault: ['f1'],
-    patrols: [['f1', { kind: 'fleet' }]],
     memory: memory.dump(),
   };
 }
@@ -73,7 +72,7 @@ describe('normal single-player checkpoint', () => {
     for (const patch of [
       { normalSpeed: 0 },
       { ai: [['p2', 'unknown']] },
-      { patrols: [['f1', {}]] },
+      { autoAssault: [7] },
       { memory: [['missing', {}]] },
     ]) {
       expect(

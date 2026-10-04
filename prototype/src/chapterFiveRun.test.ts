@@ -95,8 +95,6 @@ function play(
     applyLocal: apply,
     playerOrder: apply,
     autoAssault: () => false,
-    patrols: () => new Map(),
-    known: () => true,
   });
   for (let q = 1; q <= hours * 4; q++) {
     const step = advance(s, 1 + (q * HOUR) / 4);

@@ -1,39 +1,29 @@
 /**
  * Server-side standing-order drivers — the missing "who decides, and when" half of
- * `standingOrdersModule` (`@void/shared-core`, CC-2 auto-storm / CC-4 дежурный вылет).
+ * `standingOrdersModule` (`@void/shared-core`, CC-2 auto-storm / RETR-2 auto-retreat).
  * The core module only stores/validates a player's INTENT
- * (`state.autoAssault`/`state.patrols`) and garbage-collects it for dead fleets and
- * lost worlds; nothing decided WHEN to act on it in a real multiplayer room —
+ * (`state.autoAssault`/`state.autoRetreat`) and garbage-collects it for dead fleets;
+ * nothing decided WHEN to act on it in a real multiplayer room —
  * `clockDriver.ts`'s own doc comment flags this exact gap ("the prototype host reads
  * [onTick's `progressed`] to skip its AI/standing-order drivers on a stalled tick").
  *
- * Port of the prototype's `serverAutoAssaultActions`/`serverPatrolActions`
- * (`prototype/src/serverDrivers.ts`, REFP-24), adapted to canon's action set.
+ * Port of the prototype's `serverAutoAssaultActions` (`prototype/src/serverDrivers.ts`,
+ * REFP-24), adapted to canon's action set.
  *
- * **CC-4 ПЕРЕЕХАЛ НА БАЗУ (SHU-2.2).** Раньше драйвер гонял ФЛОТ челноков
- * (`fleet.engage`/`fleet.move`) и сам вёл его топливо серверным штампом `patrol.stamp`.
- * Теперь дежурит БАЗА — мир с портом или носитель, — и вылет идёт обычным
- * `shuttle.strike`: топливо, перезарядку, дальность и враждебность цели считает ЯДРО
- * в момент удара, драйверу остаётся только чтение мира (туман + дипломатия) и выбор
- * цели. Само правило выбора живёт в ядре (`patrolTarget`) — до этого кирпича здесь
- * лежала ВТОРАЯ его копия, своя у сервера и своя у прототипа.
+ * **Дежурного вылета (CC-4) здесь больше нет** (SHU-6.6, резолюция владельца
+ * 2026-10-04). Его драйвер поднимал базу навстречу врагу только там, где хост его
+ * крутил; заменивший его «Держать патруль» поднимает эскадру событием ядра
+ * (`shuttle.patrol.resume`), и драйвер ему не нужен.
  *
  * `serverChainActions` (CC-1 order chains) is NOT ported here — a separate,
  * larger follow-up (more step kinds, hero-ability cooldown tracking).
  *
- * Both functions are pure: given `(state, data)` they return the actions to submit —
+ * Every function is pure: given the state (and data) it returns the actions to submit —
  * via `MatchRoom.submitServerAction`, bypassing the ActionGate like the AI/AvA
  * drivers. The caller applies them; a rejected action is simply skipped, never
  * retried forever (the CC-2 rejected-churn lesson the prototype already learned).
  */
-import {
-  autoRetreatDue,
-  patrolScrambles,
-  type Action,
-  type GameData,
-  type GameState,
-  type PatrolScramble,
-} from '@void/shared-core';
+import { autoRetreatDue, type Action, type GameData, type GameState } from '@void/shared-core';
 
 let seq = 0;
 /** A driver-issued action id: deterministic enough to read at a glance in logs,
@@ -93,38 +83,6 @@ export function autoAssaultActions(
   return out;
 }
 /**
- * Один тик драйвера ДЕЖУРНОГО ВЫЛЕТА (CC-4, на базе с SHU-2.2) — обёртка над ядром.
- *
- * Решение целиком в `patrolScrambles` (`shared-core/state/patrol.ts`): и выбор цели, и
- * чтение мира. Здесь остаётся ровно одно — завернуть его в канонический `shuttle.strike`
- * с детерминированным id действия. До SHU-2.2 тут лежала ВТОРАЯ копия правил (своя у
- * сервера, своя у прототипа), и они уже разошлись мелочами.
- */
-export function patrolActions(
-  state: GameState,
-  data: GameData,
-): Array<{ playerId: string; action: Action }> {
-  return patrolScrambles(state, data).map((sc: PatrolScramble) => ({
-    playerId: sc.owner,
-    action: {
-      id: driverActionId('scramble', sc.base.id),
-      type: 'shuttle.strike',
-      playerId: sc.owner,
-      payload: {
-        ...(sc.base.kind === 'planet' ? { planetId: sc.base.id } : { fleetId: sc.base.id }),
-        squadronId: sc.squadronId,
-        targetFleetId: sc.targetFleetId,
-      },
-      issuedAt: state.time,
-    },
-  }));
-}
-
-/** Both drivers for one tick, in a fixed order (auto-storm then patrol) — the
- *  single call site `serverWiring.ts` needs. `probe` is the room's kernel verdict
- *  (`MatchRoom.canApplyAll`): auto-storm asks it instead of re-stating the assault
- *  rules (RULES-3). */
-/**
  * RETR-2 — авто-отступление. Решает ЯДРО (`autoRetreatDue`: приказ стоит, флот в бою,
  * корпус просел до порога), драйвер только оборачивает ответ в приказ. Второй копии
  * порога здесь нет намеренно: посчитай его тут — и он разъедется с прототипным
@@ -146,6 +104,10 @@ export function autoRetreatActions(
   }));
 }
 
+/** Both drivers for one tick, in a fixed order (auto-retreat then auto-storm) — the
+ *  single call site `serverWiring.ts` needs. `probe` is the room's kernel verdict
+ *  (`MatchRoom.canApplyAll`): auto-storm asks it instead of re-stating the assault
+ *  rules (RULES-3). */
 export function standingOrderTickActions(
   state: GameState,
   data: GameData,
@@ -156,6 +118,5 @@ export function standingOrderTickActions(
     // раунда, а не после того, как флот отработает остальные намерения.
     ...autoRetreatActions(state, data),
     ...autoAssaultActions(state, probe),
-    ...patrolActions(state, data),
   ];
 }

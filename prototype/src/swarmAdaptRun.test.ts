@@ -186,8 +186,6 @@ function runMc01(difficulty: RunDifficulty, maxHours: number, chain = true): Mc0
     applyLocal: apply,
     playerOrder: apply,
     autoAssault: () => false,
-    patrols: () => new Map(),
-    known: () => true,
   });
   for (hour = 1; hour <= maxHours; hour++) {
     const step = advance(s, hour * HOUR);

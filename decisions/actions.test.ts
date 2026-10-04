@@ -26,6 +26,7 @@ import {
   extractionStart,
   captiveLoad,
   forceMarchFleet,
+  holdPatrol,
   installHeroModule,
   instantRepairFleet,
   layMinesFleet,
@@ -48,11 +49,11 @@ import {
   orbitFleet,
   orderAuto,
   orderChain,
-  orderScramble,
   patrolShuttle,
   recallPatrol,
   recallSteward,
   relocateShuttle,
+  releaseHold,
   repairFleet,
   researchTech,
   resumeConstruction,
@@ -108,7 +109,11 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['strikeShuttle (носитель)', strikeShuttle(P, { fleetId: 'f1' }, 'sq1', { targetFleetId: 'f2' })],
   ['patrolShuttle', patrolShuttle(P, { planetId: 'alpha' }, 'sq1', { x: 120, y: -40 })],
   ['patrolShuttle (корабль)', patrolShuttle(P, { fleetId: 'f1' }, 'sq1', { x: 0.5, y: 3 })],
+  ['patrolShuttle (держать)', patrolShuttle(P, { planetId: 'alpha' }, 'sq1', { x: 1, y: 2 }, true)],
   ['recallPatrol', recallPatrol(P, 'strike:p1:0:1')],
+  ['holdPatrol', holdPatrol(P, 'strike:p1:0:1', true)],
+  ['releaseHold', releaseHold(P, { planetId: 'alpha' }, 'sq1')],
+  ['releaseHold (корабль)', releaseHold(P, { fleetId: 'f1' }, 'sq1')],
   ['relocateShuttle', relocateShuttle(P, { planetId: 'alpha' }, 'sq1', { toFleetId: 'f1' })],
   ['relocateShuttle (с корабля)', relocateShuttle(P, { fleetId: 'f1' }, 'sq1', { toPlanetId: 'beta' })],
   ['loadShuttle', loadShuttle(P, 'f1', 'sq1')],
@@ -141,7 +146,6 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['castHeroAbility', castHeroAbility(P, 'h1', 'corridor')],
   ['castHeroAbility (по цели)', castHeroAbility(P, 'h1', 'corridor', 'alpha')],
   ['orderAuto', orderAuto(P, 'f1', true)],
-  ['orderScramble', orderScramble(P, { planetId: 'alpha' }, true)],
   ['orderChain', orderChain(P, 'f1', [{ kind: 'move', to: 'beta' }, { kind: 'assault' }])],
   ['forceMarchFleet', forceMarchFleet(P, 'f1', true)],
   ['instantRepairFleet', instantRepairFleet(P, 'f1')],
@@ -278,6 +282,9 @@ describe('необязательное поле ОТСУТСТВУЕТ, а не 
   });
   it('штамп без ожидания не несёт waitUntil', () => {
     expect(keys(chainStamp(P, 'f1', []))).not.toContain('waitUntil');
+  });
+  it('патруль без удержания не несёт hold', () => {
+    expect(keys(patrolShuttle(P, { planetId: 'alpha' }, 'sq1', { x: 1, y: 2 }))).not.toContain('hold');
   });
 });
 
