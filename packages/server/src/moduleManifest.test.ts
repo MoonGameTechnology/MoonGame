@@ -101,7 +101,8 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 // 70: порядок тот же; shuttle 1.7.0 — перелёт шаттлов и посадка без базы (SHU-6.4).
 // 71: ЧЛЕНСТВО — `captive` 1.0.0 перед `auto-merge`, пленный главы V (PVR-9.5).
 // 72: порядок тот же; shuttle 1.8.0, standing-orders 1.2.0 — «Держать патруль» вместо дежурного вылета (SHU-6.6).
-const PINNED_FOR_VERSION = '72';
+// 73: порядок тот же; visibility 2.2.0 — обзор в круге висящего патруля (SHU-6.7).
+const PINNED_FOR_VERSION = '73';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */

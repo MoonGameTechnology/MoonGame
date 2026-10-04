@@ -233,8 +233,9 @@ export function fleetRadarReach(state: GameState, fleet: Fleet, data: GameData):
  */
 export interface SightCircle {
   owner: PlayerId;
-  /** Чей это круг: свой мир, флот или скан героя — клиент выделяет круг выбранного. */
-  source: { kind: 'world' | 'fleet' | 'reveal' | 'mine'; id: string };
+  /** Чей это круг: свой мир, флот, скан героя, ракетная мина или висящий патруль шаттлов
+   *  (SHU-6.7) — клиент выделяет круг выбранного. */
+  source: { kind: 'world' | 'fleet' | 'reveal' | 'mine' | 'patrol'; id: string };
   x: number;
   y: number;
   identify: number;
@@ -287,6 +288,18 @@ function playerCircles(
       identify: def.sightRange, signature: def.radarRange,
     });
   }
+  // SHU-6.7: висящий патруль шаттлов — глаза эскадры над её точкой. Круг тот же, в котором
+  // патруль бьёт (`patrol.radius`), и это глаза, а не радар: опознание и засечка совпадают,
+  // множители радара и блэкаут его не трогают. Только нога `patrol`: эскадра на пути к точке
+  // или домой карту не открывает.
+  for (const strike of state.strikes ?? []) {
+    if (strike.owner !== ownerId || strike.leg !== 'patrol' || !strike.patrol) continue;
+    const r = strike.patrol.radius;
+    if (r > 0) out.push({
+      owner: ownerId, source: { kind: 'patrol', id: strike.id }, ...strike.to,
+      identify: r, signature: r,
+    });
+  }
   // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
   // light a full-identify zone around their target node until it expires.
   for (const hero of Object.values(state.heroes ?? {})) {
@@ -305,6 +318,40 @@ export function sightCircles(state: GameState, viewerId: PlayerId, data: GameDat
   const out: SightCircle[] = [];
   for (const memberId of visionBloc(state, viewerId)) playerCircles(state, memberId, data, rules, out);
   return out;
+}
+
+/** Опознаёт ли круг корабль по его ПОЗИЦИИ, а не по ближайшему узлу: ракетная мина и
+ *  висящий патруль (SHU-6.7) висят над дорогой вдали от миров, и правило «опознан узел —
+ *  виден флот» не видело бы ровно того, что под ними. */
+function seesByPosition(c: SightCircle): boolean {
+  return c.source.kind === 'mine' || c.source.kind === 'patrol';
+}
+
+/** Круги зрителя, опознающие корабль по позиции ({@link seesByPosition}). */
+function positionEyes(state: GameState, viewerId: PlayerId, data: GameData): SightCircle[] {
+  return sightCircles(state, viewerId, data).filter(seesByPosition);
+}
+
+/**
+ * Чужие флоты, которые зритель опознаёт по ПОЗИЦИИ — в круге ракетной мины или висящего
+ * патруля (SHU-6.7), где бы ни стоял их ближайший узел. Мина-флот сюда не входит: у неё
+ * своё правило «только вблизи» (`mineFleetVisible`). Экспорт — для клиента, который
+ * считает туман сам (соло): копия правила разъехалась бы с проекцией.
+ */
+export function fleetsSeenByPosition(
+  state: GameState,
+  viewerId: PlayerId,
+  data: GameData,
+  eyes: readonly SightCircle[] = positionEyes(state, viewerId, data),
+): Set<FleetId> {
+  const seen = new Set<FleetId>();
+  if (eyes.length === 0) return seen;
+  for (const fleet of Object.values(state.fleets)) {
+    if (fleet.owner === viewerId || isMineFleet(fleet, data)) continue;
+    const at = fleetPosition(state, fleet);
+    if (at && eyes.some((c) => inRadius(at, c, c.identify))) seen.add(fleet.id);
+  }
+  return seen;
 }
 
 /** What `viewerId` can sense this instant: an identify range (full detail) and a
@@ -391,6 +438,7 @@ export function radarSignatures(
   viewerId: PlayerId,
   data: GameData,
   identify: ReadonlySet<PlanetId> = identifiedNodes(state, viewerId, data),
+  seenAt: ReadonlySet<FleetId> = fleetsSeenByPosition(state, viewerId, data),
 ): SignatureContact[] {
   const sources = radarSources(state, viewerId, data);
   if (!sources.length) return [];
@@ -411,7 +459,9 @@ export function radarSignatures(
       mineEmitters.push({ location: node, ...at, inTransit: !!fleet.edge, strength: fleetSignalStrength(fleet, data) });
       continue;
     }
-    if (spied.has(fleet.owner) || engaged.has(fleet.id)) continue;
+    // Опознанный кругом мины или патруля виден целиком — отметка поверх была бы вторым
+    // значком одного корабля.
+    if (spied.has(fleet.owner) || engaged.has(fleet.id) || seenAt.has(fleet.id)) continue;
     const location = fleetNode(state, fleet);
     const at = fleetPosition(state, fleet);
     if (location === null || identify.has(location) || !at) continue;
@@ -530,7 +580,7 @@ export function isVisibleTo(
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
   if (battle && fightsIn(battle, new Set(visionBloc(state, viewerId)))) return true;
   const at = fleetPositionAt(state, fleet, state.time);
-  if (at && sightCircles(state, viewerId, data).some((c) => c.source.kind === 'mine' && inRadius(at, c, c.identify))) return true;
+  if (at && positionEyes(state, viewerId, data).some((c) => inRadius(at, c, c.identify))) return true;
   const node = fleetNode(state, fleet);
   return node !== null && (identified ?? identifiedNodes(state, viewerId, data)).has(node);
 }
@@ -899,8 +949,8 @@ function project(
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.
-  view.signatures = radarSignatures(state, viewerId, data, identify);
-  const mineCircles = sightCircles(state, viewerId, data).filter((c) => c.source.kind === 'mine');
+  const seenAt = fleetsSeenByPosition(state, viewerId, data);
+  view.signatures = radarSignatures(state, viewerId, data, identify, seenAt);
   const engaged = engagementOf(state, viewerId);
   for (const id of Object.keys(view.fleets).sort()) {
     const fleet = view.fleets[id];
@@ -914,9 +964,9 @@ function project(
     if (spiedFleets.has(fleet.owner)) continue;
     if (engaged.fleets.has(id)) continue; // the enemy in YOUR battle is not a secret
     const node = fleetNode(view, fleet);
-    // Mines identify nearby ships at their continuous positions, including roads.
-    const at = fleetPosition(state, fleet);
-    if (at && mineCircles.some((c) => inRadius(at, c, c.identify))) continue;
+    // Rocket mines and hanging shuttle patrols (SHU-6.7) identify ships at their
+    // continuous positions, including roads far from any node.
+    if (seenAt.has(id)) continue;
     if (node !== null && identify.has(node)) continue; // fully identified
     delete view.fleets[id];
   }

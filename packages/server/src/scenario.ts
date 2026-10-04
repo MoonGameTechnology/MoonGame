@@ -247,7 +247,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '72'; // SHU-6.6: «Держать патруль» вместо дежурного вылета.
+export const MODULE_MANIFEST_VERSION = '73'; // SHU-6.7: обзор в круге патруля.
+// Членство и порядок не тронуты; сменились ПРАВИЛА зрения (`visibility` 2.2.0): висящий
+// патруль шаттлов открывает владельцу миры в своём круге и опознаёт флоты под собой по
+// позиции. На этом зрении стоят память тумана, места эпизода, сценарный союзник и цели
+// ракетных мин — партия на 72 видела бы по-старому, и её реплей перестал бы сходиться.
+// export const MODULE_MANIFEST_VERSION = '72'; // SHU-6.6: «Держать патруль» вместо дежурного вылета.
 // Членство и порядок не тронуты; `shuttle` 1.8.0 — флаг `hold` у патруля и эскадры, приказ
 // `shuttle.hold`, событие `shuttle.patrol.resume` поднимает эскадру снова; `standing-orders`
 // 1.2.0 — `order.scramble` снят, поля состояния `patrols` больше нет. Партия на 71 держит
