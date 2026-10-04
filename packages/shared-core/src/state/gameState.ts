@@ -1005,6 +1005,11 @@ export interface GameState {
   minefields?: MinefieldState;
   /** Челночные удары в полёте (SHU-1.2). Пусто/отсутствует = никто никуда не летит. */
   strikes?: ShuttleStrike[];
+  /** ЧУЖИЕ ВИСЯЩИЕ ПАТРУЛИ, которые видит зритель (SHU-6.10), — поле ТОЛЬКО ПРОЕКЦИИ:
+   *  его пишет `visibleState`, ядро его не читает, в авторитетном состоянии его нет.
+   *  Чужие вылеты из `strikes` сняты целиком, а висящий патруль приходит сюда тем, что
+   *  видно со стороны ({@link SeenPatrol}). Отсутствует = не видно ни одного. */
+  seenPatrols?: SeenPatrol[];
   /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */
   strikeSeq?: number;
   /** Monotonic counter handing each SQUADRON its id (SHU-4.2) — той же природы, что
@@ -1657,6 +1662,22 @@ export interface ShuttleStrike {
    *  позицию с собой, и без этой точки у вылета не стало бы ни места на карте, ни точки,
    *  откуда искать, где сесть. Читается, только если корабля уже нет. */
   baseAt?: { x: number; y: number };
+}
+
+/**
+ * Чужой висящий патруль глазами зрителя (SHU-6.10, рекомендация карточки владельцу
+ * 2026-10-04: «видно в обзоре», как самолёты в Conflict of Nations). Только то, что видно
+ * со стороны: чей он, где висит, какой круг держит и чем. База, эскадра, удержание и срок
+ * висения — тыл и планы хозяина, их у наблюдателя нет.
+ */
+export interface SeenPatrol {
+  owner: PlayerId;
+  /** Точка патруля — центр круга. */
+  at: { x: number; y: number };
+  /** Круг, в котором патруль бьёт. */
+  radius: number;
+  /** Состав: машины и их число, без лоадаута и здоровья. */
+  units: Array<Pick<UnitStack, 'unit' | 'count'>>;
 }
 
 export interface PlanetSnapshot {

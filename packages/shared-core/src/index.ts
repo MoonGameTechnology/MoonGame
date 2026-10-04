@@ -49,6 +49,8 @@ export {
   // Остаток SHU-3.1: карта рисует ЛЕТЯЩИЕ вылеты, а значит читает их форму.
   type ShuttleStrike,
   type StrikeBase,
+  // SHU-6.10: чужой висящий патруль, каким его видит наблюдатель.
+  type SeenPatrol,
   type UnitStack,
   type BuildingInstance,
   type PausedConstructionSite,
@@ -200,6 +202,8 @@ export {
   sightCircles,
   // SHU-6.7: кого зритель опознаёт по позиции — в круге мины или висящего патруля.
   fleetsSeenByPosition,
+  // SHU-6.10: чужие висящие патрули, которые видит зритель (соло считает их сам).
+  patrolsSeenBy,
   worldRadarReach,
   fleetRadarReach,
 } from './state/visibility';

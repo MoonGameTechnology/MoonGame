@@ -16,6 +16,9 @@
  * эскадры в трюме. Экраны обе: ПК и телефон — у пальца нет наведения, и прицел обязан
  * работать без него.
  *
+ * SHU-6.10 — чужой висящий патруль: тот, что висит в моём обзоре, попадает в зрение
+ * кадра (и рисуется кругом цвета хозяина), дальний — нет.
+ *
  *   node prototype/patroltest.mjs      # или pnpm run smoke:patrol
  *   PATROL_SHOTS=каталог node prototype/patroltest.mjs   # плюс снимки висящего патруля
  */
@@ -116,6 +119,35 @@ const hooks = `window.__patrolTest = {
     }
     return undefined;
   },
+  // SHU-6.10: два чужих висящих патруля — у моего мира (в обзоре) и над самым дальним.
+  foreign: () => {
+    speed = 0;
+    const rival = Object.keys(s.players).find((id) => id !== ME);
+    const home = Object.values(s.planets).find((p) => p.owner === ME);
+    const d = (p) => Math.hypot(p.position.x - home.position.x, p.position.y - home.position.y);
+    const far = Object.values(s.planets).reduce((a, b) => (d(b) > d(a) ? b : a));
+    const hang = (id, at) => ({
+      id,
+      owner: rival,
+      base: { kind: 'planet', id: far.id },
+      squadronId: 'sq:' + rival + ':smoke',
+      units: [{ unit: 'interceptor', count: 3 }],
+      target: { kind: 'point' },
+      to: { x: at.x, y: at.y },
+      departedAt: s.time,
+      arrivesAt: s.time + 4 * HOUR,
+      leg: 'patrol',
+      patrol: { hours: 4, radius: 60 },
+    });
+    s = structuredClone(s);
+    const near = { x: home.position.x + 30, y: home.position.y };
+    s.strikes = [...(s.strikes ?? []), hang('strike:near', near), hang('strike:far', far.position)];
+    visionMemo = null;
+    clearSelection();
+    centerOn(home.position, cam.scale);
+    return { rival, near };
+  },
+  seenPatrols: () => (vision ? vision.seenPatrols : null),
 };`;
 
 const site = await serve(await instrumentedGame(hooks));
@@ -224,9 +256,34 @@ try {
       console.log(`Patrol UI ${kind} ${viewport.width}px passed.`);
       await context.close();
     }
+
+    // SHU-6.10: чужой висящий патруль — в обзоре виден кругом и составом, дальний — нет.
+    const phone = viewport.width < 600;
+    const context = await browser.newContext({ viewport, isMobile: phone, hasTouch: phone });
+    const page = await context.newPage();
+    page.setDefaultTimeout(15000);
+    await withDiagnostics(page, `patrol-foreign-${viewport.width}`, async () => {
+      await page.goto(site.url + '/');
+      await enterSkirmish(page, { tap: phone });
+      await page.waitForFunction(() => window.__patrolTest.prepared());
+      const { rival, near } = await page.evaluate(() => window.__patrolTest.foreign());
+      await page.waitForFunction(() => window.__patrolTest.seenPatrols()?.length > 0);
+      const seen = await page.evaluate(() => window.__patrolTest.seenPatrols());
+      assert.deepEqual(
+        seen,
+        [{ owner: rival, at: near, radius: 60, units: [{ unit: 'interceptor', count: 3 }] }],
+        'виден ровно патруль у моего мира — кругом и составом, дальний скрыт',
+      );
+      if (process.env.PATROL_SHOTS) {
+        await page.waitForTimeout(300);
+        await page.screenshot({ path: `${process.env.PATROL_SHOTS}/patrol-foreign-${viewport.width}.png` });
+      }
+    });
+    console.log(`Foreign patrol ${viewport.width}px passed.`);
+    await context.close();
   }
   console.log(
-    'Patrol UI smoke passed: port and hold, button, map point, countdown, hold patrol, recall — desktop and phone.',
+    'Patrol UI smoke passed: port and hold, button, map point, countdown, hold patrol, recall, foreign patrol in sight — desktop and phone.',
   );
 } finally {
   await browser.close();
