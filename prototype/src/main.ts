@@ -1440,7 +1440,7 @@ let netTicketKey = '';
  *  дозвона; переехало наверх, потому что обработчики клиента теперь переживают сокет. */
 let socketAdmitted = false;
 // M0 net telemetry (dev overlay): smoothed round-trip ms, and a desync check that
-// compares our reconstructed view to the server's hash on every snapshot.
+// compares our reconstructed view to the server's hash on the snapshots that carry one.
 let rttEma: number | null = null;
 // Часы картинки в сети (`netViewClock.ts`): снимок сервера приходит раз в секунду, и без
 // досчёта флоты на карте двигались бы рывками раз в секунду при любом FPS.
@@ -13692,10 +13692,11 @@ function netClientFor(seat: string): MultiplayerClient {
         const rtt = performance.now() - clientTime;
         rttEma = rttEma === null ? rtt : rttEma * 0.7 + rtt * 0.3;
       },
-      // Desync check (M0): the server tags each snapshot with hashState(view) and the
-      // transport compares our rebuilt view with it — in slices over the next frames, so
-      // a verdict lands a little after its snapshot. Mismatch ⇒ the client and server
-      // disagree — the core invariant we most want to catch on a playtest.
+      // Desync check (M0): the server tags every full snapshot, and a delta every few
+      // seconds, with hashState(view); the transport compares our rebuilt view with it —
+      // in slices over the next frames, so a verdict lands a little after its snapshot.
+      // Mismatch ⇒ the client and server disagree — the core invariant we most want to
+      // catch on a playtest.
       onHashCheck: (_seq, match) => {
         netDesync = !match;
         if (netDesync) netDesyncCount++;

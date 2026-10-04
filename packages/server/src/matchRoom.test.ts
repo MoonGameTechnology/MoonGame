@@ -449,6 +449,105 @@ describe('MatchRoom — observation & state hash (M0)', () => {
     // the desync check the overlay runs: our rebuild hashes to the server's tag
     expect(hashState(clientState)).toBe((delta as { hash?: string }).hash);
   });
+
+  /** A hashing room on a wall clock the test moves, with a seat per id. */
+  function hashingRoom(ids: string[]): { r: MatchRoom; at: (wall: number) => void } {
+    let wall = 10;
+    const players = Object.fromEntries(ids.map((id) => [id, player(id, id)]));
+    const r = new MatchRoom({
+      id: 'hash-cadence',
+      initialState: { ...testState(), players },
+      kernel: createKernel([renameModule]),
+      data: testData(),
+      now: () => wall,
+      emitStateHash: true,
+    });
+    return {
+      r,
+      at: (ms) => {
+        wall = ms;
+      },
+    };
+  }
+  const tagOf = (m: ServerMessage | undefined): string | undefined =>
+    m !== undefined && 'hash' in m ? m.hash : undefined;
+
+  it('tags a delta once a period per player, and every full snapshot', async () => {
+    const { r, at } = hashingRoom(['p1']);
+    const p1 = new MemoryPeer();
+    r.addPeer('p1', p1);
+    const welcome = p1.messages[0];
+    if (welcome?.type !== 'welcome') throw new Error('expected a welcome snapshot');
+    expect(welcome.hash).toBe(hashState(welcome.state));
+
+    let clientState = welcome.state;
+    /** Renames at `wall`; whether that delta carried the tag (checked against the rebuild). */
+    const tagged = (wall: number, name: string): boolean => {
+      at(wall);
+      r.submitAction('p1', action(name, 'p1', name), p1);
+      const delta = p1.messages.at(-1);
+      if (delta?.type !== 'delta') throw new Error('expected a delta');
+      clientState = applyDelta(clientState, delta.delta);
+      if (delta.hash !== undefined) expect(hashState(clientState)).toBe(delta.hash);
+      return delta.hash !== undefined;
+    };
+    expect(tagged(10, 'a1')).toBe(true); // the first seat booked is due at once
+    expect(tagged(10, 'a2')).toBe(false);
+    expect(tagged(3_009, 'a3')).toBe(false); // a millisecond before its next point
+    expect(tagged(3_500, 'a4')).toBe(true); // a late broadcast…
+    expect(tagged(6_010, 'a5')).toBe(true); // …does not move the point after it
+    expect(tagged(6_011, 'a6')).toBe(false);
+    expect(tagged(60_000, 'a7')).toBe(true); // an idle spell costs one tag,
+    expect(tagged(60_000, 'a8')).toBe(false); // not one per point it skipped
+
+    // A resync is a full snapshot: tagged whatever the schedule, and it matches the
+    // rebuild that went through the untagged deltas too.
+    await r.receive('p1', p1, JSON.stringify({ type: 'desync', seq: 8, hash: 'stale' }));
+    const resync = p1.messages.at(-1);
+    if (resync?.type !== 'state') throw new Error('expected a resync snapshot');
+    expect(resync.hash).toBe(hashState(clientState));
+  });
+
+  /** A peer per seat, and a heartbeat at `wall` that says which seats its deltas tagged. */
+  function seatedBeats(ids: string[]): (wall: number) => string[] {
+    const { r, at } = hashingRoom(ids);
+    const peers = ids.map((id) => {
+      const peer = new MemoryPeer();
+      r.addPeer(id, peer);
+      return peer;
+    });
+    return (wall) => {
+      at(wall);
+      const seen = peers.map((peer) => peer.messages.length);
+      r.tick();
+      const fresh = peers.map((peer, i) => peer.messages.slice(seen[i]));
+      expect(fresh.every((messages) => messages.some((m) => m.type === 'delta'))).toBe(true);
+      return ids.filter((_, i) => fresh[i]!.some((m) => tagOf(m)));
+    };
+  }
+
+  it('spreads seats that join together over the period', () => {
+    const ids = Array.from({ length: 10 }, (_, i) => `p${i + 1}`);
+    const beat = seatedBeats(ids);
+    // A heartbeat every 100 ms for one period: each seat is tagged once, and no heartbeat
+    // tags two of them (a reconnect wave would otherwise be hashed all on one broadcast).
+    const tagged: string[][] = [];
+    for (let wall = 10; wall < 3_010; wall += 100) tagged.push(beat(wall));
+    expect(Math.max(...tagged.map((seats) => seats.length))).toBe(1);
+    expect(tagged.flat().sort()).toEqual([...ids].sort());
+  });
+
+  it('lets seats that shared a late broadcast part again', () => {
+    const beat = seatedBeats(['p1', 'p2']);
+    // p1's grid starts at 10 and p2's at 10 + 0.618 × 3000 ≈ 1864. The first heartbeat is
+    // late enough to tag both; from then on each is tagged on its own grid again.
+    expect(beat(2_000)).toEqual(['p1', 'p2']);
+    const when: Record<string, number[]> = { p1: [], p2: [] };
+    for (let wall = 2_100; wall <= 8_000; wall += 100) {
+      for (const id of beat(wall)) when[id]!.push(wall);
+    }
+    expect(when).toEqual({ p1: [3_100, 6_100], p2: [4_900, 7_900] });
+  });
 });
 
 describe('MatchRoom — M1 observations (events / broadcast / timing / desync)', () => {
@@ -1407,14 +1506,17 @@ describe('MatchRoom — host fog (hostFog)', () => {
     return { ...rest, opinion: { bot: { [viewer]: opinion.bot![viewer]! } } } as GameState;
   };
 
-  function hostRoom(hostFog?: (view: GameState, viewer: string) => GameState): MatchRoom {
+  function hostRoom(
+    hostFog?: (view: GameState, viewer: string) => GameState,
+    now: () => number = () => 10,
+  ): MatchRoom {
     const initialState = { ...testState(), opinion: { bot: { p1: 60, p2: 60 } } } as OpinionState;
     return new MatchRoom({
       id: 'host-fog',
       initialState,
       kernel: createKernel([opinionModule]),
       data: testData(),
-      now: () => 10,
+      now,
       emitStateHash: true,
       ...(hostFog ? { hostFog } : {}),
     });
@@ -1457,7 +1559,8 @@ describe('MatchRoom — host fog (hostFog)', () => {
   });
 
   it("hashes the narrowed view: the client's rebuild matches every tag, resync included", async () => {
-    const r = hostRoom(ownOpinion);
+    let wall = 10;
+    const r = hostRoom(ownOpinion, () => wall);
     const p1 = new MemoryPeer();
     r.addPeer('p1', p1);
     const welcome = p1.messages[0];
@@ -1474,6 +1577,7 @@ describe('MatchRoom — host fog (hostFog)', () => {
       if (delta?.type !== 'delta') throw new Error('expected a delta');
       clientState = applyDelta(clientState, delta.delta);
       expect(hashState(clientState)).toBe(delta.hash);
+      wall += 3_000; // a delta carries the tag once a period per player
     }
     const {
       signatures: _sig,

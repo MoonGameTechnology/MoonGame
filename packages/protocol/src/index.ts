@@ -289,8 +289,9 @@ export interface LobbyField {
   lobby?: LobbyInfo;
 }
 
-/** Optional `hashState` of the player's authoritative view, attached to snapshots
- *  when the room has `emitStateHash` on. The client hashes its reconstructed state
+/** Optional `hashState` of the player's authoritative view, attached when the room has
+ *  `emitStateHash` on: to every full snapshot, and to a player's delta once every few
+ *  seconds, so a delta without it is normal. The client hashes its reconstructed state
  *  and compares — a mismatch is a desync (a metrics signal, not a wire requirement). */
 export interface HashField {
   hash?: string;
