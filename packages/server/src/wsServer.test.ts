@@ -1,5 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { describe, expect, it } from 'vitest';
+import { connect, type Socket } from 'node:net';
+import type { Duplex } from 'node:stream';
+import { describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import {
   createInitialState,
@@ -9,6 +12,7 @@ import {
   type Player,
 } from '@void/shared-core';
 import { MatchRoom } from './matchRoom';
+import type { RoomRegistry } from './roomRegistry';
 import { createMultiplayerServer } from './wsServer';
 import { inlineHashes } from './securityHeaders';
 import { MemoryAccountStore } from './store';
@@ -222,6 +226,142 @@ describe('createMultiplayerServer · сбой обработки сообщен�
       expect(ws.readyState).toBe(WebSocket.OPEN);
       ws.close();
     } finally {
+      await server.close();
+    }
+  });
+});
+
+/** Сырой TCP-клиент: просит апгрейд по адресу `url` и сразу за запросом, в той же записи,
+ *  шлёт `after` — то, чего клиент `ws` не пошлёт никогда. */
+function rawUpgrade(url: string, after: Buffer = Buffer.alloc(0)): Socket {
+  const { hostname, port, pathname, search } = new URL(url);
+  const socket = connect(Number(port), hostname);
+  socket.on('error', () => {
+    /* обрыв на стороне клиента — не предмет этих тестов */
+  });
+  // Ответ сервера здесь никто не читает; без потока не пришли бы и `end`/`close` за ним.
+  socket.resume();
+  const request =
+    `GET ${pathname}${search} HTTP/1.1\r\nHost: ${hostname}:${port}\r\n` +
+    'Upgrade: websocket\r\nConnection: Upgrade\r\n' +
+    `Sec-WebSocket-Key: ${randomBytes(16).toString('base64')}\r\nSec-WebSocket-Version: 13\r\n\r\n`;
+  socket.write(Buffer.concat([Buffer.from(request), after]));
+  return socket;
+}
+
+/** Кадр клиента на 40 000 байт, больше `maxPayload`. Маска у него есть, как положено
+ *  клиенту; содержимое `ws` не читает: отказ случается на заголовке. */
+function oversizedFrame(): Buffer {
+  const head = Buffer.alloc(10);
+  head[0] = 0x81; // FIN, text
+  head[1] = 0x80 | 127; // masked, 64-bit length
+  head.writeBigUInt64BE(40_000n, 2);
+  return Buffer.concat([head, randomBytes(4), Buffer.alloc(40_000)]);
+}
+
+// Тот же класс на уровне сокета. Кадр, который `ws` отвергает (больше `maxPayload`, битый),
+// он закрывает сам и потом шлёт сокету событие `error`; сброс соединения посреди асинхронного
+// рукопожатия даёт `error` на голом TCP-сокете. Без слушателя это uncaught exception, а фатал
+// хостов (`fatal.ts`) на нём завершает процесс со всеми матчами, то есть одному клиенту
+// хватало одного кадра. Vitest валит прогон на таком исключении, так что пропавший слушатель
+// роняет гейт, даже если сам тест успел пройти.
+describe('createMultiplayerServer · один клиент не роняет сервер', () => {
+  it('сообщение больше 32 КБ закрывает только свой сокет (1009), оператору остаётся строка', async () => {
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const server = createMultiplayerServer({ room: makeRoom() });
+    const url = await server.listen();
+    try {
+      const p1 = new WebSocket(`${url}?player=p1`, { perMessageDeflate: false });
+      await nextMessage(p1); // приветствие
+      const closed = once(p1, 'close');
+      p1.send('x'.repeat(40_000));
+      expect((await closed)[0]).toBe(1009); // message too big
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining('[ws] socket error for p1 in match ws-room'),
+      );
+      const p2 = new WebSocket(`${url}?player=p2`);
+      expect(await nextMessage(p2)).toMatchObject({ type: 'welcome' });
+      p2.close();
+    } finally {
+      write.mockRestore();
+      await server.close();
+    }
+  });
+
+  it('битый кадр закрывает только свой сокет', async () => {
+    const write = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const server = createMultiplayerServer({ room: makeRoom() });
+    const url = await server.listen();
+    try {
+      const p1 = rawUpgrade(`${url}?player=p1`);
+      await once(p1, 'data'); // 101 Switching Protocols
+      const closed = new Promise((r) => p1.once('close', r));
+      p1.write(Buffer.from([0x81, 0x02, 0x68, 0x69])); // «hi» без маски, а кадр клиента обязан её нести
+      await closed;
+      expect(write).toHaveBeenCalledWith(
+        expect.stringContaining('[ws] socket error for p1 in match ws-room'),
+      );
+      const p2 = new WebSocket(`${url}?player=p2`);
+      expect(await nextMessage(p2)).toMatchObject({ type: 'welcome' });
+      p2.close();
+    } finally {
+      write.mockRestore();
+      await server.close();
+    }
+  });
+
+  it('тот же кадр от того, кому отказано во входе, тоже остаётся при его сокете', async () => {
+    const server = createMultiplayerServer({
+      room: makeRoom(),
+      accountStore: new MemoryAccountStore(),
+    });
+    const url = await server.listen();
+    try {
+      const alice = new WebSocket(`${url}?nick=alice`);
+      const bob = new WebSocket(`${url}?nick=bob`);
+      await Promise.all([nextMessage(alice), nextMessage(bob)]); // оба места заняты
+      // Кадр едет в одной записи с запросом и потому доходит до сокета, как бы быстро
+      // сервер ни закрывал его отказом.
+      const carol = rawUpgrade(`${url}?nick=carol`, oversizedFrame());
+      await new Promise((r) => carol.once('close', r));
+      alice.close();
+      bob.close();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('сброс соединения, пока рукопожатие ждёт загрузки матча, процесс не трогает', async () => {
+    const room = makeRoom();
+    let release = (): void => {};
+    const loading = new Promise<void>((r) => (release = r));
+    const registry: RoomRegistry = {
+      get: (id) => (id === room.id ? room : undefined),
+      ids: () => [room.id],
+      resolve: async (id) => {
+        await loading;
+        return id === room.id ? room : undefined;
+      },
+    };
+    const server = createMultiplayerServer({ registry });
+    const url = await server.listen();
+    try {
+      // Слушатель встаёт после серверного, так что к его вызову рукопожатие уже ждёт `resolve`.
+      const serverSide = new Promise<Duplex>((r) =>
+        server.httpServer.once('upgrade', (_req, socket: Duplex) => r(socket)),
+      );
+      const client = rawUpgrade(`${url}?player=p1`);
+      const socket = await serverSide;
+      // Не `once` из node:events: он сам вешает слушатель `error` и спрятал бы ошибку.
+      const gone = new Promise((r) => socket.once('close', r));
+      client.resetAndDestroy(); // RST, а не FIN: чтение на сервере падает с ECONNRESET
+      await gone;
+      release();
+      const p2 = new WebSocket(`${url}?player=p2`);
+      expect(await nextMessage(p2)).toMatchObject({ type: 'welcome' });
+      p2.close();
+    } finally {
+      release();
       await server.close();
     }
   });

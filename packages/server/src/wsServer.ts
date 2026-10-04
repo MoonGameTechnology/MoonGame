@@ -382,6 +382,15 @@ export function createMultiplayerServer(
   const accountStore = options.accountStore;
   const auth = options.auth;
   app.server.on('upgrade', (request, socket, head) => {
+    // Node's http server takes its own 'error' listener off the socket before handing it
+    // over, and ws adds one only in `handleUpgrade`. A peer that resets the connection while
+    // the handshake below awaits (the join token, the account store, a match loading) would
+    // raise ECONNRESET with nobody listening: an uncaught exception, on which the hosts'
+    // fatal handler (`fatal.ts`) ends the process with every match in it. Nothing is left to
+    // do about such an error: the socket is gone, and the handshake finds it destroyed.
+    socket.on('error', () => {
+      /* see above */
+    });
     // Async because auth/nick-login resolve identity through the join-token verifier or
     // the (possibly DB-backed) account store before we accept the upgrade. Отказ этого
     // промиса содержан (`detach`): рукопожатие идёт от кого угодно из сети, и уронить им
@@ -397,6 +406,11 @@ export function createMultiplayerServer(
       // `rejectUpgrade` — no socket for an unauthenticated/cross-origin peer, no leak.
       const refuseWithReason = (id: string, code: ServerErrorCode): void => {
         wss.handleUpgrade(request, socket, head, (ws) => {
+          // The refused peer can still send a frame ws rejects: the same 'error' as on an
+          // admitted socket (see the connection handler), with nothing to report.
+          ws.on('error', () => {
+            /* refused anyway */
+          });
           try {
             ws.send(serializeServerMessage({ type: 'error', matchId: id, code }));
           } catch {
@@ -617,6 +631,15 @@ export function createMultiplayerServer(
       sockets.add(ws);
       alive.set(ws, true);
       ws.on('pong', () => alive.set(ws, true));
+      // A frame ws rejects (over `maxPayload`, malformed) makes it close the socket (1009,
+      // 1002) and then emit 'error'. Unheard, that error is an uncaught exception, on which
+      // the hosts' fatal handler (`fatal.ts`) ends the process with every match in it: one
+      // client could stop the server. The socket is closing already; the operator gets a line.
+      ws.on('error', (err) => {
+        process.stderr.write(
+          `[ws] socket error for ${playerId} in match ${room.id}: ${String(err)}\n`,
+        );
+      });
       // Only retain when the peer actually joined — addPeer rejects (and closes the socket)
       // for an unknown player or a duplicate on a single-seat slot, and a spurious retain
       // would disarm a legitimate hibernation countdown, starving eviction under reconnects.
