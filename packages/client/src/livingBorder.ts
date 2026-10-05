@@ -29,6 +29,7 @@
  * ЗАМИРАЕТ видимой, а не пропадает (скилл `mobile-game-feel`, §4).
  */
 import { strokeBorders, type BorderSegment, type ClassifiedBorders, type TerritoryPalette } from './territory';
+import type { ShapePlacement } from './territoryGeometry';
 
 /** Голографическая рамка карты в экранных пикселях — та, что несёт `drawGlassRim`. */
 export interface LivingFrame {
@@ -80,6 +81,11 @@ export function livingOffset(
  * (`strokeBorders` — один дом для цветов и толщин), но каждая точка сдвинута полем
  * {@link livingOffset}. Отрезок, целиком ушедший за край экрана, не считается вовсе:
  * граница рисуется каждый кадр, и платить за невидимое нельзя.
+ *
+ * `place` — границы пришли в локальных координатах мозаики (`territoryGeometry.ts`, их там
+ * классифицируют раз на смену владельцев): каждая точка сперва встаёт на место той же
+ * формулой, что и полигоны (`placePoly`), и отбор с полем считаются уже от неё. Без `place`
+ * точки уже на месте.
  */
 export function drawLivingBorders(
   g: CanvasRenderingContext2D,
@@ -88,6 +94,7 @@ export function drawLivingBorders(
   frame: LivingFrame,
   clock: number,
   view: { x?: number; y?: number; width: number; height: number },
+  place?: ShapePlacement,
 ): void {
   if (!(frame.width > 0 && frame.height > 0)) return;
   // Запас на сдвиг и толщину самой широкой линии (свечение фронтира — 3 пикселя).
@@ -98,20 +105,30 @@ export function drawLivingBorders(
   const y0 = (view.y ?? 0) - pad;
   const x1 = (view.x ?? 0) + view.width + pad;
   const y1 = (view.y ?? 0) + view.height + pad;
-  const keep = (sg: BorderSegment): boolean =>
-    !(
-      (sg[0] < x0 && sg[2] < x0) ||
-      (sg[0] > x1 && sg[2] > x1) ||
-      (sg[1] < y0 && sg[3] < y0) ||
-      (sg[1] > y1 && sg[3] > y1)
+  const k = place?.scale ?? 1;
+  const ox = place?.x ?? 0;
+  const oy = place?.y ?? 0;
+  const keep = (sg: BorderSegment): boolean => {
+    const ax = sg[0] * k + ox;
+    const ay = sg[1] * k + oy;
+    const bx = sg[2] * k + ox;
+    const by = sg[3] * k + oy;
+    return !(
+      (ax < x0 && bx < x0) ||
+      (ax > x1 && bx > x1) ||
+      (ay < y0 && by < y0) ||
+      (ay > y1 && by > y1)
     );
+  };
   strokeBorders(
     g,
     borders,
     palette,
     (x, y) => {
-      const [dx, dy] = livingOffset(x, y, frame, clock);
-      return [x + dx, y + dy];
+      const px = x * k + ox;
+      const py = y * k + oy;
+      const [dx, dy] = livingOffset(px, py, frame, clock);
+      return [px + dx, py + dy];
     },
     keep,
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as territory from './territory';
-import { TerritoryGeometryCache } from './territoryGeometry';
+import { placePoly, TerritoryGeometryCache, type ShapePlacement } from './territoryGeometry';
 
 const seeds: territory.TerritorySeed[] = [
   { x: 10, y: 10, w: 500, owner: 'p1', kind: 'planet' },
@@ -114,5 +114,111 @@ describe('camera-independent province geometry', () => {
     expect(cache.project(seeds, clip, 1).map((c) => c.poly)).toEqual(
       straight.map((c) => c.poly),
     );
+  });
+});
+
+describe('форма в координатах мозаики: выпечка ставит её на место сама', () => {
+  // Двенадцать провинций трёх владельцев и ничьи: есть фронтиры, внутренние и ничьи грани.
+  const many: territory.TerritorySeed[] = Array.from({ length: 12 }, (_, i) => ({
+    x: 15 + ((i * 37) % 80),
+    y: 12 + ((i * 53) % 77),
+    w: 60 + ((i * 71) % 300),
+    owner: i % 4 === 3 ? null : `p${i % 3}`,
+    kind: 'planet',
+  }));
+  // Камера, как у выпечки: зум и сдвиг с неудобными дробями.
+  const camera = (scale: number, dx: number, dy: number) => {
+    const point = ([x, y]: readonly [number, number]): [number, number] => [
+      x * scale + dx,
+      y * scale + dy,
+    ];
+    return {
+      seeds: many.map((s) => {
+        const [x, y] = point([s.x, s.y]);
+        return { ...s, x, y, w: s.w * scale * scale };
+      }),
+      clip: clip.map(point),
+      scale,
+    };
+  };
+  const wave = { amp: 3, wavelength: 50, segment: 9 };
+  const placeSegments = (
+    segs: territory.BorderSegment[],
+    at: ShapePlacement,
+  ): territory.BorderSegment[] =>
+    segs.map(([x0, y0, x1, y1]) => [
+      x0 * at.scale + at.x,
+      y0 * at.scale + at.y,
+      x1 * at.scale + at.x,
+      y1 * at.scale + at.y,
+    ]);
+
+  it('одна форма на все камеры, а `project` — ровно она, поставленная `placePoly`', () => {
+    const cache = new TerritoryGeometryCache();
+    const first = cache.shape(many, clip, 1, wave).shape;
+    for (const [scale, dx, dy] of [
+      [1.37, 51.125, -127.8],
+      [6.02, -1033.3, 410.7],
+      [23.9, 4410.1, -2207.45],
+    ] as const) {
+      const c = camera(scale, dx, dy);
+      const { shape, place } = cache.shape(c.seeds, c.clip, c.scale, wave);
+      expect(shape).toBe(first);
+      expect(place).toEqual({ scale, x: c.clip[0]![0], y: c.clip[0]![1] });
+      const cells = cache.project(c.seeds, c.clip, c.scale, wave);
+      cells.forEach((cell, i) => expect(cell.poly).toEqual(placePoly(shape.cells[i]!.poly, place)));
+    }
+  });
+
+  it('рамка клетки, поставленная на место, — та же до бита, что рамка поставленного полигона', () => {
+    const cache = new TerritoryGeometryCache();
+    const c = camera(7.31, -2911.77, 1503.03);
+    const { shape, place } = cache.shape(c.seeds, c.clip, c.scale, wave);
+    shape.cells.forEach((cell, i) => {
+      const poly = placePoly(cell.poly, place);
+      const xs = poly.map((p) => p[0]);
+      const ys = poly.map((p) => p[1]);
+      expect(shape.boxes[i * 4]! * place.scale + place.x).toBe(Math.min(...xs));
+      expect(shape.boxes[i * 4 + 1]! * place.scale + place.y).toBe(Math.min(...ys));
+      expect(shape.boxes[i * 4 + 2]! * place.scale + place.x).toBe(Math.max(...xs));
+      expect(shape.boxes[i * 4 + 3]! * place.scale + place.y).toBe(Math.max(...ys));
+    });
+  });
+
+  it('границы: классы те же, что у поставленных клеток, и живут, пока живы форма и владельцы', () => {
+    const cache = new TerritoryGeometryCache();
+    const near = camera(4.4, 77.7, -31.3);
+    const { shape, place } = cache.shape(near.seeds, near.clip, near.scale, wave);
+    const borders = cache.borders(shape, near.seeds);
+    // Поставленные точки — ровно те, что дала бы классификация клеток выпечки.
+    const baked = territory.classifyBorders(
+      cache.project(near.seeds, near.clip, near.scale, wave),
+      near.seeds,
+    );
+    expect(placeSegments(borders.neutralEdge, place)).toEqual(baked.neutralEdge);
+    for (const kind of ['ownedFront', 'ownedInner'] as const) {
+      expect([...borders[kind].keys()]).toEqual([...baked[kind].keys()]);
+      for (const [owner, segs] of borders[kind])
+        expect(placeSegments(segs, place)).toEqual(baked[kind].get(owner));
+    }
+    // Камера ушла — классы те же, тот же объект.
+    const far = camera(1.9, -406.2, 12.5);
+    expect(cache.shape(far.seeds, far.clip, far.scale, wave).shape).toBe(shape);
+    expect(cache.borders(shape, far.seeds)).toBe(borders);
+  });
+
+  it('смена владельца — и туман другого игрока — классифицирует заново, а не несёт прежние классы', () => {
+    const cache = new TerritoryGeometryCache();
+    const { shape } = cache.shape(many, clip, 1);
+    const before = cache.borders(shape, many);
+    const captured = many.map((s, i) => (i === 0 ? { ...s, owner: 'p2' } : s));
+    const after = cache.borders(shape, captured);
+    expect(after).not.toBe(before);
+    expect(after).toEqual(territory.classifyBorders(cache.project(captured, clip, 1), captured));
+    const fog = many.map((s) => ({ ...s, owner: null }));
+    const blind = cache.borders(shape, fog);
+    expect(blind.ownedFront.size).toBe(0);
+    expect(blind.ownedInner.size).toBe(0);
+    expect(blind).toEqual(territory.classifyBorders(cache.project(fog, clip, 1), fog));
   });
 });

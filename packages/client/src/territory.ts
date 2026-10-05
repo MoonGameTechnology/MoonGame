@@ -15,6 +15,7 @@
 import { clampPowerWeights, clipHalfPlaneTagged } from '@void/shared-core';
 
 import { rgba } from './holoDraw';
+import type { ShapePlacement } from './territoryGeometry';
 
 // MAP-MOSAIC (M4.3): the weight clamp and the tagged clipper live in `@void/shared-core`,
 // because the CORE now derives the lane graph from this very tessellation. Two copies of
@@ -155,12 +156,20 @@ export function computePowerCell(
   return powerCellAt(seeds, clampedWork(seeds), clip, idx);
 }
 
+/** Points left where they are: `v·1 + 0` is `v` itself. */
+const UNPLACED: ShapePlacement = { scale: 1, x: 0, y: 0 };
+
 /** Paint the political territory map into `g`: filled province cells (owner colour, or a
  *  faint neutral wash) with a terrain accent, then classified borders — same-owner inner
  *  hairlines, neutral divisions, and glowing owner frontiers. Fog is the caller's concern
  *  (it bakes `owner` as last-known); this just draws what the seeds say. Owned land is
  *  read through a restrained tint and precise frontiers; dark space remains visible
- *  through the projection, including on dense whole-map views. */
+ *  through the projection, including on dense whole-map views.
+ *
+ *  `place` — the cells are in a shape's local space (`territoryGeometry.ts`): every point is
+ *  placed as it is traced, by `placePoly`'s own expression, so the canvas gets the very
+ *  numbers a placed copy would hold, without the copy (a bake of the whole map would
+ *  otherwise copy nearly every vertex of it). `view` is in the placed space. */
 export function drawTerritory(
   g: CanvasRenderingContext2D,
   seeds: TerritorySeed[],
@@ -168,12 +177,15 @@ export function drawTerritory(
   palette: TerritoryPalette,
   cells: TerritoryCell[] = computePowerCells(seeds, clip),
   view?: TerritoryView,
+  place: ShapePlacement = UNPLACED,
 ): TerritoryCell[] {
   const detail = palette.provinceDetail ?? 1;
+  const { scale, x: ox, y: oy } = place;
   const trace = (poly: Array<[number, number]>): void => {
     g.beginPath();
-    g.moveTo(poly[0]![0], poly[0]![1]);
-    for (let k = 1; k < poly.length; k++) g.lineTo(poly[k]![0], poly[k]![1]);
+    g.moveTo(poly[0]![0] * scale + ox, poly[0]![1] * scale + oy);
+    for (let k = 1; k < poly.length; k++)
+      g.lineTo(poly[k]![0] * scale + ox, poly[k]![1] * scale + oy);
     g.closePath();
   };
 
@@ -182,7 +194,7 @@ export function drawTerritory(
   // A cell wholly outside `view` covers no pixel there: tracing it would cost path
   // building for nothing (most of a big map is off screen at a playing zoom).
   for (const cell of cells) {
-    if (view && !polyMeets(cell.poly, view, 1)) continue;
+    if (view && !polyMeets(cell.poly, view, 1, place)) continue;
     trace(cell.poly);
     g.fillStyle = rgba(
       cell.owner ? palette.ownerColor(cell.owner) : palette.neutralFill,
@@ -203,14 +215,14 @@ export function drawTerritory(
       g,
       classifyBorders(cells, seeds),
       palette,
-      undefined,
+      place === UNPLACED ? undefined : (x, y) => [x * scale + ox, y * scale + oy],
       // Pad by the widest stroke (the frontier glow) so a line along the edge survives.
-      view ? (sg) => segmentMeets(sg, view, 4) : undefined,
+      view ? (sg) => segmentMeets(sg, view, 4, place) : undefined,
     );
   return cells;
 }
 
-/** The part of the canvas a draw call is for, in the same coordinates as the cells. */
+/** The part of the canvas a draw call is for, where the cells land (placed, if they are). */
 export interface TerritoryView {
   x0: number;
   y0: number;
@@ -218,8 +230,14 @@ export interface TerritoryView {
   y1: number;
 }
 
-/** Can `poly`, grown by `pad`, touch `view`? A cheap box test — never a false «no». */
-function polyMeets(poly: Array<[number, number]>, view: TerritoryView, pad: number): boolean {
+/** Can `poly`, placed by `at` and grown by `pad`, touch `view`? A cheap box test — never a
+ *  false «no». The placement is a positive scale, so the placed box is the local one placed. */
+function polyMeets(
+  poly: Array<[number, number]>,
+  view: TerritoryView,
+  pad: number,
+  at: ShapePlacement,
+): boolean {
   let x0 = Infinity;
   let y0 = Infinity;
   let x1 = -Infinity;
@@ -230,15 +248,29 @@ function polyMeets(poly: Array<[number, number]>, view: TerritoryView, pad: numb
     if (y < y0) y0 = y;
     if (y > y1) y1 = y;
   }
-  return x1 >= view.x0 - pad && x0 <= view.x1 + pad && y1 >= view.y0 - pad && y0 <= view.y1 + pad;
+  return (
+    x1 * at.scale + at.x >= view.x0 - pad &&
+    x0 * at.scale + at.x <= view.x1 + pad &&
+    y1 * at.scale + at.y >= view.y0 - pad &&
+    y0 * at.scale + at.y <= view.y1 + pad
+  );
 }
 
-function segmentMeets(sg: BorderSegment, view: TerritoryView, pad: number): boolean {
+function segmentMeets(
+  sg: BorderSegment,
+  view: TerritoryView,
+  pad: number,
+  at: ShapePlacement,
+): boolean {
+  const ax = sg[0] * at.scale + at.x;
+  const ay = sg[1] * at.scale + at.y;
+  const bx = sg[2] * at.scale + at.x;
+  const by = sg[3] * at.scale + at.y;
   return !(
-    (sg[0] < view.x0 - pad && sg[2] < view.x0 - pad) ||
-    (sg[0] > view.x1 + pad && sg[2] > view.x1 + pad) ||
-    (sg[1] < view.y0 - pad && sg[3] < view.y0 - pad) ||
-    (sg[1] > view.y1 + pad && sg[3] > view.y1 + pad)
+    (ax < view.x0 - pad && bx < view.x0 - pad) ||
+    (ax > view.x1 + pad && bx > view.x1 + pad) ||
+    (ay < view.y0 - pad && by < view.y0 - pad) ||
+    (ay > view.y1 + pad && by > view.y1 + pad)
   );
 }
 
