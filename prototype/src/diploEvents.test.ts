@@ -128,3 +128,32 @@ describe('дипломатия — пустые снимки', () => {
     );
   });
 });
+
+describe('дипломатия — снимок без перемен (шаг 9 плавности)', () => {
+  it('те же карты в обоих снимках — их даже не обходят', () => {
+    let walks = 0;
+    const counted = <T extends object>(o: T): T =>
+      new Proxy(o, {
+        ownKeys(target) {
+          walks++;
+          return Reflect.ownKeys(target);
+        },
+      });
+    const diplomacy = counted<Record<string, DiplomaticStance>>({
+      'p1|p2': 'peace',
+      'p2|p3': 'war',
+    });
+    const offers = counted<Record<string, DiplomaticStance>>({ 'p2>p1': 'pact' });
+    // Дельта без дипломатии: мир — новый объект, а карты в нём те же (`applyDelta`).
+    const prev = snap(diplomacy, offers);
+    const next = { ...prev, time: 1 } as GameState;
+    expect(diffDiplomacy(prev, next, 'p1')).toEqual([]);
+    expect(walks).toBe(0);
+  });
+
+  it('карта стоек та же, а предложений новая — новая всё равно сравнивается', () => {
+    const diplomacy: Record<string, DiplomaticStance> = { 'p1|p2': 'war' };
+    const evs = diffDiplomacy(snap(diplomacy, {}), snap(diplomacy, { 'p2>p1': 'peace' }), 'p1');
+    expect(evs).toEqual([{ kind: 'offer-in', other: 'p2', stance: 'peace' }]);
+  });
+});

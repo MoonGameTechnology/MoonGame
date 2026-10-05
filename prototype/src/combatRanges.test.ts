@@ -3,10 +3,10 @@
 // Смысл файла не в том, что круги рисуются, а в том, что их РАДИУС берётся из ядра.
 // Заведи кто-нибудь свою формулу в клиенте — и игрок целится по одному кругу, а огонь
 // идёт по другому; поймать это глазами нельзя, а тестом — можно.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { shuttleStrikeRange } from '../../packages/shared-core/src/index';
 import { newGame, data } from './game';
-import { aimRing, combatRanges, ringLook, type RangeKind } from './combatRanges';
+import { aaRings, aimRing, combatRanges, ringLook, type RangeKind } from './combatRanges';
 import { squadronFerryRange, squadronReach } from '../../packages/shared-core/src/index';
 import type { Squadron } from '../../packages/shared-core/src/index';
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
@@ -133,6 +133,35 @@ describe('RANGE-UX — ПВО: отметка, а не область; и оно
     // под полным туманом остаются ТОЛЬКО свои миры
     expect(fogged.length).toBeLessThan(visible.length);
     for (const r of fogged) expect(s.planets[r.sourceId]?.owner).toBe(ME);
+  });
+});
+
+describe('RANGE-UX — отметки ПКО из памяти по миру (шаг 9 плавности)', () => {
+  it('aaRings даёт ровно те отметки, что оверлей, и в том же порядке', () => {
+    const s = withAa();
+    for (const visible of [seen, () => false]) {
+      const fromOverlay = combatRanges(s, data, [], ME, locate, visible).rings;
+      expect(aaRings(s, data, ME, visible)).toEqual(fromOverlay);
+    }
+  });
+
+  it('готовые отметки берутся как есть — мир заново не обходится', () => {
+    const s = withAa();
+    const ready = aaRings(s, data, ME, seen).slice(0, 1);
+    expect(ready.length).toBe(1);
+    const visible = vi.fn(seen);
+    const { rings } = combatRanges(s, data, [], ME, locate, visible, null, ready);
+    expect(rings).toEqual(ready);
+    expect(visible).not.toHaveBeenCalled();
+  });
+
+  it('круг вылета остаётся первым, отметки ПКО идут за ним', () => {
+    const { s, fleet } = withFleet([{ unit: 'shuttle_carrier', count: 1 }]);
+    const carrier: Fleet = { ...fleet, hangar: [squad('interceptor', 2)] };
+    const state: GameState = { ...s, fleets: { ...s.fleets, [carrier.id]: carrier } };
+    const aa = aaRings(withAa(), data, ME, seen);
+    const { rings } = combatRanges(state, data, [carrier.id], ME, locate, seen, null, aa);
+    expect(rings.map((r) => r.kind)).toEqual(['shuttle', ...aa.map(() => 'aa')]);
   });
 });
 

@@ -222,6 +222,7 @@ import {
   type Engagement,
   type SignatureContact,
   sightCircles,
+  type SightCircle,
   fleetsSeenByPosition,
   patrolsSeenBy,
   type SeenPatrol,
@@ -1122,7 +1123,7 @@ import { GOTO_MIN_ZOOM, jumpStep, type JumpKind } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
-import { aimRing, combatRanges, ringLook } from './combatRanges';
+import { aaRings, aimRing, combatRanges, ringLook, type RangeRing } from './combatRanges';
 // Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
 import { strikeHome, strikeLeg, strikeProgress, strikeTrails } from './strikeTrail';
 import { corridorLines } from './corridorView';
@@ -2056,6 +2057,27 @@ function sweepGlow(c: { x: number; y: number }): number {
   return sweepOn ? armsGlow(sweepArms, c, sweepAng, TAU) : 0;
 }
 
+/** Свои источники радарной развёртки с дальностью: миры и флоты, у которых радар есть. */
+interface RadarSources {
+  worlds: Array<{ at: { x: number; y: number }; reach: number }>;
+  fleets: Array<{ fleet: Fleet; reach: number }>;
+}
+function ownRadarSources(): RadarSources {
+  const worlds: RadarSources['worlds'] = [];
+  for (const p of Object.values(s.planets)) {
+    if (p.owner !== ME) continue;
+    const reach = planetRadar(p);
+    if (reach > 0) worlds.push({ at: p.position, reach });
+  }
+  const fleets: RadarSources['fleets'] = [];
+  for (const f of Object.values(s.fleets)) {
+    if (f.owner !== ME) continue;
+    const reach = fleetRadar(f);
+    if (reach > 0) fleets.push({ fleet: f, reach });
+  }
+  return { worlds, fleets };
+}
+
 function drawScanSweep(now: number) {
   sweepArms = [];
   sweepOn = false;
@@ -2069,16 +2091,12 @@ function drawScanSweep(now: number) {
     const r = worldDist(reach); // uniform projection ⇒ true circle (`mapRadius.ts`)
     raw.push({ x: c.x, y: c.y, r });
   };
-  for (const p of Object.values(s.planets)) {
-    if (p.owner !== ME) continue;
-    const r = planetRadar(p);
-    if (r > 0) add(p.position, r);
-  }
-  for (const f of Object.values(s.fleets)) {
-    if (f.owner !== ME) continue;
-    const r = fleetRadar(f);
-    const pos = r > 0 ? fleetPos(f) : null;
-    if (pos) add(pos, r);
+  // Дальности — из памяти по миру (шаг 9 плавности), а положение флота — каждым кадром.
+  const radar = perWorld('radar', ownRadarSources);
+  for (const w of radar.worlds) add(w.at, w.reach);
+  for (const { fleet, reach } of radar.fleets) {
+    const pos = fleetPos(fleet);
+    if (pos) add(pos, reach);
   }
   // Слияние совпавших по месту источников (остаётся ДАЛЬНИЙ) — `radarSources.ts`
   // (REFM-119): радарный корабль у радарного мира иначе дал бы два луча из одной точки.
@@ -3041,6 +3059,40 @@ function currentVision(): Vision {
   updateMemory(fresh.identify); // variant B: remember what we see
   visionMemo = { state: s, me: ME, net: NET, contacts: netSignatures, vision: fresh };
   return fresh;
+}
+
+/** Производные мира для кадра (шаг 9 плавности) — по тому же договору, что `visionMemo`.
+ *  Доход в шапке, круги обзора, отметки ПКО, дальности радарной развёртки и союзник главы
+ *  читают только мир, игрока и данные, а отметки ПКО — ещё и туман кадра. Пока мир, игрок
+ *  и зрение — те же объекты, прежний ответ верен: в сети он считается раз на снимок, на
+ *  паузе соло — после действия игрока. На 1675 провинциях эти обходы всех миров и флотов
+ *  каждым кадром были половиной скрипта сетевого кадра. Сбрасывает память тот, кто правит
+ *  мир на месте (песочница, dev-хуки), и смена матча. Что читает ещё что-то — выделение,
+ *  камеру, часы вида, — сюда не кладётся: положение флота (`fleetPos` идёт по часам вида)
+ *  кадр берёт сам. */
+interface WorldDerived {
+  income: Record<string, number>;
+  sight: SightCircle[];
+  aa: RangeRing[];
+  radar: RadarSources;
+  ally: string | null;
+}
+let worldMemo: {
+  state: GameState;
+  me: string;
+  vision: Vision | null;
+  got: Partial<WorldDerived>;
+} | null = null;
+/** `key` для мира этого кадра: считается раз на мир, дальше берётся из памяти. */
+function perWorld<K extends keyof WorldDerived>(
+  key: K,
+  compute: () => WorldDerived[K],
+): WorldDerived[K] {
+  let memo = worldMemo;
+  if (!memo || memo.state !== s || memo.me !== ME || memo.vision !== vision)
+    memo = worldMemo = { state: s, me: ME, vision, got: {} };
+  if (!(key in memo.got)) memo.got[key] = compute();
+  return memo.got[key] as WorldDerived[K];
 }
 
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
@@ -4779,7 +4831,7 @@ function drawRadarCoverage() {
   // свои и союзные (блок зрения); у мира и флота есть базовый круг обзора и без радара.
   // Раньше граница собиралась из радаров одного игрока без множителя технологий, а туман
   // считался иначе — мир светился за нарисованной границей.
-  const circles = sightCircles(s, ME, data);
+  const circles = perWorld('sight', () => sightCircles(s, ME, data));
   if (circles.length === 0) return;
   const selFleetSet = new Set(selectedFleetIds());
   // Project map circles to screen circles (uniform projection ⇒ true circles) — радиус
@@ -5184,6 +5236,7 @@ function drawCombatRanges(): void {
     },
     known,
     selPlanet,
+    perWorld('aa', () => aaRings(s, data, ME, known)),
   );
   // Круг ВЗВЕДЁННОГО прицела (остаток SHU-3.1) — рядом с пассивными радиусами, потому
   // что это тот же вопрос «докуда дотянется», только про конкретное звено и здесь и
@@ -12274,7 +12327,7 @@ const allyScreen = initAllyScreen({
 });
 /** Кадровый такт окна союзника: связи нет — окно закрыто и прицел снят. */
 function tickAlly(): void {
-  if (!linkedAlly(s, ME)) {
+  if (!perWorld('ally', () => linkedAlly(s, ME))) {
     if (allyScreen.isOpen()) allyScreen.close();
     drop('allyAim');
     return;
@@ -13811,6 +13864,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   myBattleLocs.clear();
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
   visionMemo = null; // its vision was written into the memory just cleared
+  worldMemo = null;
   radarMemory.clear();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
   threatScanAt = -1;
@@ -15529,6 +15583,7 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
         startAt: s.time,
         doneAt: s.time + HOUR,
       });
+      worldMemo = null; // edited in place: the top bar must count the new wing's upkeep
       return f.id;
     },
     // Open a hero corridor between two nodes so its overlay (blinking one-shot vs
@@ -17300,10 +17355,11 @@ function frame(nowReal: number) {
   // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
   // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.
   // The sandbox edits the world in place (here and from its panel), so the same world
-  // object no longer means the same world: a sandboxed match keeps no vision memo.
+  // object no longer means the same world: a sandboxed match keeps no vision or world memo.
   if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) {
     enforceSandbox(s, ME, sandboxHomeId);
     visionMemo = null;
+    worldMemo = null;
   }
   // SANDBOX — fenced hook. The "fog of war" toggle defaults ON; turning it OFF drops the
   // fog projection (null vision ⇒ everything is `known`, mirroring the dev reveal).
@@ -17496,7 +17552,7 @@ function frame(nowReal: number) {
   // Flow under the stock: the tested netIncome() (production − upkeep, per hour)
   // finally shown to the player. A resource with no stock AND no flow is dimmed —
   // it plays no part in the current match yet.
-  const inc = netIncome(s, ME);
+  const inc = perWorld('income', () => netIncome(s, ME));
   const myArrears = s.players[ME]?.arrears ?? [];
   // Как число на фишке говорит правду — `resourceChip.ts` (REFM-190): поток меньше
   // единицы округляется до ДЕСЯТОЙ (содержание даёт доли за час, и целое врало бы «0»),
