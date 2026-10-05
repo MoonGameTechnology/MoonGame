@@ -69,6 +69,9 @@ export type Locate = (id: string) => { x: number; y: number } | null;
  * мира с эскадрами в порту. Круг считается по составу ангара, а состав чужого ангара —
  * закрытые сведения: кольцо вокруг чужого носителя выдало бы, что и сколько у него на
  * борту.
+ *
+ * `aa` — отметки ПКО, уже посчитанные `aaRings` для этого мира и тумана; без него они
+ * считаются здесь же.
  */
 export function combatRanges(
   state: GameState,
@@ -78,6 +81,7 @@ export function combatRanges(
   locate: Locate,
   visible: (planetId: string) => boolean,
   selectedPlanetId: string | null = null,
+  aa: readonly RangeRing[] = aaRings(state, data, me, visible),
 ): RangeOverlay {
   const rings: RangeRing[] = [];
 
@@ -108,7 +112,26 @@ export function combatRanges(
     }
   }
 
-  // Зубы ПКО — на мирах, а не у флотов, и без радиуса (см. шапку файла).
+  for (const ring of aa) rings.push(ring);
+
+  return { rings };
+}
+
+/**
+ * Зубы ПКО — на мирах, а не у флотов, и без радиуса (см. шапку файла). Свои миры видны
+ * всегда, чужие — только опознанные (`visible`).
+ *
+ * Отдельно от `combatRanges`, потому что от выделения отметки не зависят — только от мира
+ * и тумана. Кадр берёт их из памяти по миру (шаг 9 плавности): обход каждой провинции на
+ * каждом кадре стоил на большой карте больше, чем рисование самих колец.
+ */
+export function aaRings(
+  state: GameState,
+  data: GameData,
+  me: string,
+  visible: (planetId: string) => boolean,
+): RangeRing[] {
+  const rings: RangeRing[] = [];
   for (const planet of Object.values(state.planets)) {
     if (aaStrength(planet, data) <= 0) continue;
     if (planet.owner !== me && !visible(planet.id)) continue;
@@ -120,8 +143,7 @@ export function combatRanges(
       sourceId: planet.id,
     });
   }
-
-  return { rings };
+  return rings;
 }
 
 /**

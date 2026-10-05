@@ -58,6 +58,11 @@ function offerSides(key: string): { from: string; to: string } | null {
  * затем предложения — так игрок читает «что стало» раньше, чем «что предлагают».
  */
 export function diffDiplomacy(prev: GameState, next: GameState, me: string): DiploEvent[] {
+  // Снимок, в котором дипломатия не менялась, несёт ТЕ ЖЕ объекты обеих карт: `applyDelta`
+  // заменяет только то, что пришло в дельте. Сравнивать тогда нечего, а полный обход стоил
+  // дорого: на 124 игроках в карте стоек 7626 пар, и разбор снимка при ЦП вчетверо
+  // медленнее занимал 18–19 мс вместо 1 (шаг 9 плавности).
+  if (prev.diplomacy === next.diplomacy && prev.diplomacyOffers === next.diplomacyOffers) return [];
   const out: DiploEvent[] = [];
   const pairKeys = new Set([
     ...Object.keys(prev.diplomacy ?? {}),
