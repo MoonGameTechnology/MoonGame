@@ -280,13 +280,104 @@ function segmentMeets(
  *  get the same answer back, or the line splits into two. */
 export type BorderProjection = (x: number, y: number) => readonly [number, number];
 
+/** Border runs laid out for the stroke in progress ({@link strokeBorders}): each run is its
+ *  point count followed by its points, already moved. One buffer for every call, grown when
+ *  a call needs more — the living border lays out thousands of points a frame, and fresh
+ *  arrays for them were that frame's garbage. */
+let runs = new Float64Array(4096);
+
+function roomFor(n: number): void {
+  if (n <= runs.length) return;
+  const grown = new Float64Array(Math.max(n, runs.length * 2));
+  grown.set(runs);
+  runs = grown;
+}
+
+/**
+ * Lay `segs` out as runs from `from` in {@link runs}; returns where they end. A segment that
+ * begins where the kept segment before it ended continues that segment's run, so a chain of
+ * cell edges becomes one polyline whose every point is moved once, where it used to be a
+ * capped stroke per segment with each shared point moved twice.
+ *
+ * The polyline covers the same ground: its joins are round like the caps were, and a round-
+ * joined polyline is exactly the union of its round-capped segments (both are the segments
+ * swept by the pen's disc). A segment dropped by `keep` ends the run, so what is drawn is
+ * still exactly the kept segments.
+ */
+function layRuns(
+  segs: readonly BorderSegment[],
+  at: BorderProjection | undefined,
+  keep: ((seg: BorderSegment) => boolean) | undefined,
+  from: number,
+): number {
+  let end = from;
+  let head = -1; // where the open run keeps its count; -1 — no run is open
+  let lastX = NaN; // the end of the last kept segment, as it came in
+  let lastY = NaN;
+  for (const sg of segs) {
+    if (keep && !keep(sg)) {
+      head = -1;
+      continue;
+    }
+    const goesOn = head >= 0 && sg[0] === lastX && sg[1] === lastY;
+    roomFor(end + (goesOn ? 2 : 5));
+    const r = runs;
+    if (goesOn) {
+      r[head] = r[head]! + 1;
+    } else {
+      head = end;
+      r[end++] = 2;
+      if (at) {
+        const [x, y] = at(sg[0], sg[1]);
+        r[end++] = x;
+        r[end++] = y;
+      } else {
+        r[end++] = sg[0];
+        r[end++] = sg[1];
+      }
+    }
+    if (at) {
+      const [x, y] = at(sg[2], sg[3]);
+      r[end++] = x;
+      r[end++] = y;
+    } else {
+      r[end++] = sg[2];
+      r[end++] = sg[3];
+    }
+    lastX = sg[2];
+    lastY = sg[3];
+  }
+  return end;
+}
+
+/** Stroke the runs laid out in [`from`, `to`) as one path. Nothing laid out — no call at all. */
+function strokeRuns(
+  g: CanvasRenderingContext2D,
+  from: number,
+  to: number,
+  style: string,
+  width: number,
+): void {
+  if (to === from) return;
+  g.strokeStyle = style;
+  g.lineWidth = width;
+  g.beginPath();
+  for (let i = from; i < to; ) {
+    const n = runs[i++]!;
+    g.moveTo(runs[i]!, runs[i + 1]!);
+    i += 2;
+    for (let k = 1; k < n; k++, i += 2) g.lineTo(runs[i]!, runs[i + 1]!);
+  }
+  g.stroke();
+}
+
 /** Stroke classified borders: same-owner inner hairlines, neutral divisions and glowing
  *  owner frontiers. The political STYLES live here and only here, so the baked
  *  map and the living border cannot drift apart in colour or weight.
  *
  *  `at` moves every point (omit — they stay put), `keep` drops a segment before it costs
- *  anything (omit — all are drawn). Each class is prepared once and stroked from that,
- *  so the frontier's two passes do not project the same points twice. */
+ *  anything (omit — all are drawn). Each class is laid out once as polylines and stroked
+ *  from that (`layRuns`), so the frontier's two passes do not move the same points twice. */
 export function strokeBorders(
   g: CanvasRenderingContext2D,
   borders: ClassifiedBorders,
@@ -296,45 +387,27 @@ export function strokeBorders(
 ): void {
   const detail = palette.provinceDetail ?? 1;
   const { ownedFront, ownedInner, neutralEdge } = borders;
-  const prepare = (segs: BorderSegment[]): BorderSegment[] => {
-    if (!at && !keep) return segs;
-    const out: BorderSegment[] = [];
-    for (const sg of segs) {
-      if (keep && !keep(sg)) continue;
-      if (!at) {
-        out.push(sg);
-        continue;
-      }
-      const [x0, y0] = at(sg[0], sg[1]);
-      const [x1, y1] = at(sg[2], sg[3]);
-      out.push([x0, y0, x1, y1]);
-    }
-    return out;
-  };
-  const strokeSegs = (segs: BorderSegment[], style: string, width: number): void => {
-    if (segs.length === 0) return;
-    g.strokeStyle = style;
-    g.lineWidth = width;
-    g.beginPath();
-    for (const sg of segs) {
-      g.moveTo(sg[0], sg[1]);
-      g.lineTo(sg[2], sg[3]);
-    }
-    g.stroke();
-  };
   g.save();
   g.lineJoin = 'round';
   g.lineCap = 'round';
   if (!palette.hideOwnedInner && detail > 0) {
     for (const [owner, segs] of ownedInner)
-      strokeSegs(prepare(segs), rgba(palette.ownerColor(owner), 0.3 * detail), 0.65); // inner hairlines
+      strokeRuns(g, 0, layRuns(segs, at, keep, 0), rgba(palette.ownerColor(owner), 0.3 * detail), 0.65); // inner hairlines
   }
-  if (detail > 0) strokeSegs(prepare(neutralEdge), rgba('#5fb0c5', 0.55 * detail), 0.75);
-  const fronts = [...ownedFront].map(([owner, segs]) => [owner, prepare(segs)] as const);
-  for (const [owner, segs] of fronts)
-    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
-  for (const [owner, segs] of fronts)
-    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.85), 1.15); // frontier crisp
+  if (detail > 0) strokeRuns(g, 0, layRuns(neutralEdge, at, keep, 0), rgba('#5fb0c5', 0.55 * detail), 0.75);
+  // Every owner's frontier is laid out before any is stroked: all the glows go under all the
+  // crisp lines, so where two frontiers meet neither glow veils the other's line.
+  const fronts: Array<[string, number, number]> = [];
+  let laid = 0;
+  for (const [owner, segs] of ownedFront) {
+    const from = laid;
+    laid = layRuns(segs, at, keep, from);
+    fronts.push([owner, from, laid]);
+  }
+  for (const [owner, from, to] of fronts)
+    strokeRuns(g, from, to, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
+  for (const [owner, from, to] of fronts)
+    strokeRuns(g, from, to, rgba(palette.ownerColor(owner), 0.85), 1.15); // frontier crisp
   g.restore();
 }
 
