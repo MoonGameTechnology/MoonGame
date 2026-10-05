@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { drawLivingBorders, LIVING_AMP, LIVING_MAX_PX, livingOffset, type LivingFrame } from './livingBorder';
 import {
+  computePowerCells,
   drawTerritory,
   strokeBorders,
+  type BorderSegment,
   type ClassifiedBorders,
   type TerritoryCell,
   type TerritorySeed,
 } from './territory';
+import { placePoly } from './territoryGeometry';
 
 /** A recording context: every call as `name(args)`, properties as `name=value`. */
 function recorder(): { g: CanvasRenderingContext2D; log: string[] } {
@@ -142,6 +145,47 @@ describe('M2.11 — живая граница провинций', () => {
     expect(Number(moves[0]!.slice(7).split(',')[0])).toBeGreaterThan(4000);
   });
 
+  it('границы в координатах мозаики встают на место формулой полигонов: кадр тот же, что по поставленным', () => {
+    // Выпечка держит классы границ в координатах мозаики (`territoryGeometry.ts`) и говорит,
+    // куда их поставить. Отбор у края экрана и сдвиг поля считаются от поставленной точки,
+    // поэтому журнал холста обязан совпасть с журналом по заранее поставленным точкам.
+    const place = { scale: 2.75, x: -431.5, y: 77.25 };
+    const local: ClassifiedBorders = {
+      ownedFront: new Map([
+        ['p1', [[200.1, 100.3, 260.7, 160.9]]],
+        ['p2', [[260.7, 160.9, 200.1, 100.3]]],
+      ]),
+      ownedInner: new Map([['p1', [[300, 50, 330.5, 70.25]]]]),
+      neutralEdge: [
+        [10, 10, 40, 40], // левее экрана после постановки
+        [5000, 10, 5100, 40], // далеко правее
+        [180, 20, 175.5, 60.5],
+      ],
+    };
+    const at = (x: number, y: number): [number, number] => placePoly([[x, y]], place)[0]!;
+    const put = (segs: BorderSegment[]): BorderSegment[] =>
+      segs.map(([x0, y0, x1, y1]) => {
+        const [ax, ay] = at(x0, y0);
+        const [bx, by] = at(x1, y1);
+        return [ax, ay, bx, by];
+      });
+    const placed: ClassifiedBorders = {
+      ownedFront: new Map([...local.ownedFront].map(([o, segs]) => [o, put(segs)])),
+      ownedInner: new Map([...local.ownedInner].map(([o, segs]) => [o, put(segs)])),
+      neutralEdge: put(local.neutralEdge),
+    };
+    const view = { x: 50, y: -20, width: 1000, height: 800 };
+    const all = { ...palette, hideOwnedInner: false };
+    const fromLocal = recorder();
+    drawLivingBorders(fromLocal.g, local, all, frame, 2500, view, place);
+    const fromPlaced = recorder();
+    drawLivingBorders(fromPlaced.g, placed, all, frame, 2500, view);
+    expect(fromLocal.log).toEqual(fromPlaced.log);
+    // Две ничьи грани за краем отброшены, остальное нарисовано: фронтир — двумя проходами
+    // по обе стороны, внутренняя и ничья грани — по разу.
+    expect(fromLocal.log.filter((l) => l.startsWith('moveTo('))).toHaveLength(2 * 2 + 1 + 1);
+  });
+
   it('стили общие с запечённой картой: те же проходы и толщины, что без сдвига', () => {
     const borders: ClassifiedBorders = {
       ownedFront: new Map([['p1', [[300, 200, 360, 260]]]]),
@@ -188,5 +232,36 @@ describe('drawTerritory — обводку можно отдать живой г
     expect(cells).toHaveLength(2);
     expect(log.some((l) => l.startsWith('fill('))).toBe(true);
     expect(log.some((l) => l.startsWith('stroke('))).toBe(false);
+  });
+
+  it('`place`: клетки формы, поставленные при обводке, — тот же журнал холста, что поставленные заранее', () => {
+    // Выпечка не копирует клетки в свои координаты: каждую точку ставит сама обводка той же
+    // формулой, что `placePoly`, — холст обязан получить те же числа, а отбор по `view` (он в
+    // координатах холста) — отбросить те же клетки и отрезки.
+    const shape: TerritorySeed[] = [
+      { x: 60, y: 50, w: 1, owner: 'p1', kind: 'planet' },
+      { x: 160, y: 60, w: 1, owner: 'p1', kind: 'asteroid' },
+      { x: 260, y: 40, w: 1, owner: null, kind: 'planet' },
+      { x: 340, y: 150, w: 1, owner: 'p2', kind: 'asteroid' },
+      { x: 120, y: 160, w: 1, owner: null, kind: 'asteroid' },
+    ];
+    const local = computePowerCells(shape, clip);
+    const place = { scale: 2.75, x: -431.5, y: 77.25 };
+    const placed = local.map((c) => ({ ...c, poly: placePoly(c.poly, place) }));
+    const accent = (k: string): string | undefined => (k === 'asteroid' ? '#71879d' : undefined);
+    const accented = { ...fullPalette, kindAccent: accent };
+    const view = { x0: 0, y0: 100, x1: 500, y1: 520 };
+    const fromLocal = recorder();
+    drawTerritory(fromLocal.g, shape, clip, accented, local, view, place);
+    const fromPlaced = recorder();
+    drawTerritory(fromPlaced.g, shape, clip, accented, placed, view);
+    expect(fromLocal.log).toEqual(fromPlaced.log);
+    // Отбор действительно работал: без `view` заливок и отрезков больше.
+    const whole = recorder();
+    drawTerritory(whole.g, shape, clip, accented, placed);
+    const count = (log: string[], call: string) => log.filter((l) => l.startsWith(call)).length;
+    expect(count(fromLocal.log, 'fill(')).toBeLessThan(count(whole.log, 'fill('));
+    expect(count(fromLocal.log, 'fill(')).toBeGreaterThan(0);
+    expect(count(fromLocal.log, 'lineTo(')).toBeLessThan(count(whole.log, 'lineTo('));
   });
 });

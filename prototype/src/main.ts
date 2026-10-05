@@ -269,9 +269,9 @@ import {
   blitSphere as hdBlitSphere,
   clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
-import { classifyBorders, drawTerritory, type ClassifiedBorders, type TerritoryCell } from '../../packages/client/src/territory';
+import { drawTerritory, strokeBorders, type ClassifiedBorders, type TerritoryCell, type TerritoryPalette } from '../../packages/client/src/territory';
 import { drawLivingBorders } from '../../packages/client/src/livingBorder';
-import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
+import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryShape } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
@@ -2362,7 +2362,7 @@ function worldDist(d: number): number {
  * Волна на границах провинций (M2.9, решение владельца: «в космосе нет прямых углов»).
  *
  * Числа заданы в МИРОВЫХ единицах и переводятся в локальные координаты мозаики умножением
- * на подгон карты под экран: `territoryGeometry.project` уже поделил экранные на зум, но
+ * на подгон карты под экран: `territoryGeometry.shape` уже поделил экранные на зум, но
  * не на подгон. Из-за этого изгиб не зависит от приближения — правило кирпича.
  *
  * Амплитуда взята долей от шага между провинциями (~260 мировых единиц на шипнутых
@@ -5603,9 +5603,13 @@ const MAX_OWED_STRIPS = 8;
 let bgComposite = ''; // what `bg` holds: which map bake, at which offset, over which sky
 let camSeen = ''; // projection of the previous frame, to notice the camera moving
 let camMovedAt = -Infinity;
-let provincePolygons = new Map<string, ProvincePolygon>();
+/** Provinces as the frame and input read them: the geometry of the last bake handed over
+ *  ({@link publishMapGeometry}), polygons through {@link provincePolygon} and
+ *  {@link provinceAt}. `null` — no bake yet. */
+let provinceGeometry: MapLayerGeometry | null = null;
 /** M2.11: границы провинций с последней выпечки — рисуются КАЖДЫЙ кадр живыми, а не
- *  запекаются. `null` — плоская карта: там граница стоит в статичном слое, как и рамка. */
+ *  запекаются. Они в координатах мозаики: на место их ставит `provinceGeometry.place`.
+ *  `null` — плоская карта: там граница стоит в статичном слое, как и рамка. */
 let provinceBorders: ClassifiedBorders | null = null;
 let terrainFields: TerrainField[] = [];
 let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
@@ -5665,8 +5669,8 @@ function holographicMapOn(): boolean {
 /** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
  *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
  *  (`territoryGeometry.ts`) нормализует вход по первой точке клипа и масштабу сам,
- *  поэтому панорама и зум из его подписи сокращаются, а на выход он отдаёт ячейки в том
- *  же экранном пространстве, в котором их рисуют и по которым потом бьют хит-тестом. */
+ *  поэтому панорама и зум из его подписи сокращаются, а на выход он отдаёт форму в этих
+ *  нормализованных координатах и место, куда её поставить в экранные (`placePoly`). */
 function provinceClip(): Array<[number, number]> {
   if (galaxyOutline.length)
     return galaxyOutline.map((pt): [number, number] => {
@@ -5747,8 +5751,9 @@ interface ScreenRect {
 
 /**
  * A bake's province geometry, in its own space. It costs O(provinces) whatever the view
- * (the seeds, the reprojected power diagram), so a bake computes it once and the strips a
- * scroll later paints into the same bake reuse it (rule 3, `decisions/mapLayerView.ts`).
+ * (the seeds, the shape cache's signature, the cells' boxes placed in the bake), so a bake
+ * computes it once and the strips a scroll later paints into the same bake reuse it (rule 3,
+ * `decisions/mapLayerView.ts`).
  */
 interface MapLayerGeometry {
   /** The bake's space: map point `p` lies at `at.a·p + (at.x, at.y)` in it. */
@@ -5757,11 +5762,18 @@ interface MapLayerGeometry {
   readonly seeds: ProvinceSeed[];
   /** The province of `seeds[i]`. */
   readonly nodes: readonly MapNode[];
-  readonly cells: TerritoryCell[];
-  /** The box of `cells[i]` at `4i` (x0, y0, x1, y1): a strip finds its few provinces by
-   *  these, where walking every vertex of the map would cost it as much as a bake's cull. */
+  /** The provinces' shape in the map's own space — one object for every bake while the
+   *  shape holds (`territoryGeometry.ts`) — and where it lands in this bake's space. */
+  readonly shape: TerritoryShape;
+  readonly place: ShapePlacement;
+  /** The box of `shape.cells[i]` in the bake's space at `4i` (x0, y0, x1, y1): a strip finds
+   *  its few provinces by these, where walking every vertex of the map would cost it as much
+   *  as a bake's cull. */
   readonly boxes: Float64Array;
-  readonly polys: Map<string, ProvincePolygon>;
+  /** `shape.cells[i]` in the bake's space, placed when first needed ({@link cellPoly}). */
+  readonly polys: Array<Array<[number, number]> | undefined>;
+  /** The cell of each province, built when first asked ({@link provincePolygon}). */
+  index: Map<string, number> | null;
   readonly clip: Array<[number, number]>;
   readonly frame: { x: number; y: number; width: number; height: number };
 }
@@ -5801,32 +5813,32 @@ function measureMapLayer(): MapLayerGeometry {
   // перепекается и посреди жеста (растянут зумом) — ровно тогда, когда кадр и так
   // дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
   // нормализованных по первой точке клипа и масштабу, поэтому панорама и зум из неё
-  // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
-  // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
-  // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
-  const cells = territoryGeometry.project(seeds, clip, cam.scale, provinceWave());
-  const boxes = new Float64Array(cells.length * 4);
-  cells.forEach((cell, i) => {
-    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
-    for (const [x, y] of cell.poly) {
-      if (x < x0) x0 = x;
-      if (x > x1) x1 = x;
-      if (y < y0) y0 = y;
-      if (y > y1) y1 = y;
-    }
-    boxes[i * 4] = x0;
-    boxes[i * 4 + 1] = y0;
-    boxes[i * 4 + 2] = x1;
-    boxes[i * 4 + 3] = y1;
-  });
+  // СОКРАЩАЮТСЯ: форма не изменилась — выпечка берёт ту же и только ставит её на место.
+  // Копий в своих координатах выпечка не делает: заливка ставит каждую точку на место
+  // прямо при обводке пути (`drawTerritory` с `place`), а копию клетки получает только
+  // тот, кто о ней спрашивает (`cellPoly`: выделение, тап, местность, вспышка захвата).
+  // Перепроекция всех вершин карты стоила почти половину выпечки, хотя у дома на экран
+  // попадают десятки клеток из сотен. Владельца и тип выпечка берёт из СВЕЖИХ семян,
+  // поэтому кэш не может донести чужой туман: `knownOwner` остаётся единственным
+  // источником видимой принадлежности.
+  const { shape, place } = territoryGeometry.shape(seeds, clip, cam.scale, provinceWave());
+  // Рамки клеток — те же числа, что дал бы обход поставленных вершин: проекция —
+  // положительный масштаб, минимум и максимум остаются на своих вершинах (`placePoly`).
+  const boxes = new Float64Array(shape.boxes.length);
+  for (let i = 0; i < boxes.length; i += 2) {
+    boxes[i] = shape.boxes[i]! * place.scale + place.x;
+    boxes[i + 1] = shape.boxes[i + 1]! * place.scale + place.y;
+  }
   return {
     at: camProjection(cam, insets(), mapBounds()),
     lod: currentMapLod(),
     seeds,
     nodes,
-    cells,
+    shape,
+    place,
     boxes,
-    polys: new Map(cells.map((cell) => [nodes[cell.idx]!.id, cell.poly])),
+    polys: new Array(shape.cells.length),
+    index: null,
     clip,
     frame: { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y },
   };
@@ -5834,9 +5846,39 @@ function measureMapLayer(): MapLayerGeometry {
 
 /** Hand a bake's geometry to the frame and input: they read the provinces in its space. */
 function publishMapGeometry(geo: MapLayerGeometry): void {
-  provincePolygons = geo.polys;
-  provinceBorders = holographicMapOn() ? classifyBorders(geo.cells, geo.seeds) : null;
+  provinceGeometry = geo;
+  // Классы границ зависят только от владельцев: выпечка с того же места или после жеста
+  // камеры берёт прежние (`territoryGeometry.borders`).
+  provinceBorders = holographicMapOn() ? territoryGeometry.borders(geo.shape, geo.seeds) : null;
   holographicFrame = geo.frame;
+}
+
+/** `shape.cells[i]` of `geo` in its bake's space, placed once per bake when first needed. */
+function cellPoly(geo: MapLayerGeometry, i: number): Array<[number, number]> {
+  return (geo.polys[i] ??= placePoly(geo.shape.cells[i]!.poly, geo.place));
+}
+
+/** The painted polygon of province `id` in the bake's space; `undefined` — not on the map. */
+function provincePolygon(id: string): ProvincePolygon | undefined {
+  const geo = provinceGeometry;
+  if (!geo) return undefined;
+  const index = (geo.index ??= new Map(geo.shape.cells.map((cell, i) => [geo.nodes[cell.idx]!.id, i])));
+  const i = index.get(id);
+  return i === undefined ? undefined : cellPoly(geo, i);
+}
+
+/** The province under point (x, y) of the bake's space: the first cell, in the map's order,
+ *  whose painted polygon holds it (`insideProvince`). A cell whose box misses the point by
+ *  more than a pixel cannot hold it, so only the cells around the point are placed. */
+function provinceAt(x: number, y: number): string | undefined {
+  const geo = provinceGeometry;
+  if (!geo) return undefined;
+  const b = geo.boxes;
+  for (let i = 0; i < geo.shape.cells.length; i++) {
+    if (x < b[i * 4]! - 1 || x > b[i * 4 + 2]! + 1 || y < b[i * 4 + 1]! - 1 || y > b[i * 4 + 3]! + 1) continue;
+    if (insideProvince(cellPoly(geo, i), x, y)) return geo.nodes[geo.shape.cells[i]!.idx]!.id;
+  }
+  return undefined;
 }
 
 /**
@@ -5865,7 +5907,7 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
-  drawTerritory(g, geo.seeds, geo.clip, {
+  const palette: TerritoryPalette = {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
@@ -5873,12 +5915,39 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
     hideOwnedInner: holographicMapOn(),
     provinceDetail: lod.provinceDetail,
     // M2.11: на голографической карте граница живёт, как рамка, — её рисует кадр, а не
-    // выпечка. Запеки её и здесь — линия легла бы дважды, одна из них застывшей.
-    strokeBorders: !holographicMapOn(),
-    // The glass map gets only the cells its view meets — the same test, by box, that the
-    // renderer makes by vertices (pad 1). The flat one strokes borders as well, and
-    // classifying them takes every cell: a shared edge is drawn from one side only.
-  }, holographicMapOn() ? geo.cells.filter((_, i) => meets(i, 1)) : geo.cells, view);
+    // выпечка. Запеки её и здесь — линия легла бы дважды, одна из них застывшей. Плоская
+    // карта запекает её ниже, из классов, общих для всех выпечек.
+    strokeBorders: false,
+  };
+  // Only the cells the view meets — the renderer's own test (by vertices, pad 1), made here
+  // by box — with the owner and kind the viewer knows. They stay in the shape's space: the
+  // fill places each point as it traces it (`geo.place`), no placed copy is made.
+  const cells: TerritoryCell[] = [];
+  geo.shape.cells.forEach((cell, i) => {
+    if (!meets(i, 1)) return;
+    const seed = geo.seeds[cell.idx]!;
+    cells.push({ poly: cell.poly, tags: cell.tags, owner: seed.owner, kind: seed.kind, idx: cell.idx });
+  });
+  drawTerritory(g, geo.seeds, geo.clip, palette, cells, undefined, geo.place);
+  if (!holographicMapOn()) {
+    // A shared edge is stroked from one side only, so the classes take every cell; they come
+    // from the shape's cache (an owner change alone classifies them again). A segment is placed
+    // by the polygons' own formula (`placePoly`), and one that misses the view by more than
+    // the widest stroke (the frontier glow) is dropped before it is placed.
+    const { scale: k, x: ox, y: oy } = geo.place;
+    const x0 = view.x0 - 4;
+    const y0 = view.y0 - 4;
+    const x1 = view.x1 + 4;
+    const y1 = view.y1 + 4;
+    strokeBorders(g, territoryGeometry.borders(geo.shape, geo.seeds), palette, (x, y) => [x * k + ox, y * k + oy],
+      (sg) => {
+        const ax = sg[0] * k + ox;
+        const ay = sg[1] * k + oy;
+        const bx = sg[2] * k + ox;
+        const by = sg[3] * k + oy;
+        return !((ax < x0 && bx < x0) || (ax > x1 && bx > x1) || (ay < y0 && by < y0) || (ay > y1 && by > y1));
+      });
+  }
   const fields: TerrainField[] = [];
   if (holographicMapOn() && lod.art > 0) {
     g.save();
@@ -5891,12 +5960,11 @@ function paintMapLayer(g: CanvasRenderingContext2D, view: ScreenRect, zooming: b
     const y0 = view.y0 - reach;
     const y1 = view.y1 + reach;
     // Cells keep the map's order, so the fields overlap as they always did.
-    for (let i = 0; i < geo.cells.length; i++) {
+    for (let i = 0; i < geo.shape.cells.length; i++) {
       // Cull by the province's box BEFORE constructing rock geometry.
       if (!meets(i, reach)) continue;
-      const cell = geo.cells[i]!;
-      const n = geo.nodes[cell.idx]!;
-      const field = terrainGeometry.project(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain), sectorTypeOf(n.id)?.color ?? '#9fb6bd', cell.poly,
+      const n = geo.nodes[geo.shape.cells[i]!.idx]!;
+      const field = terrainGeometry.project(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain), sectorTypeOf(n.id)?.color ?? '#9fb6bd', cellPoly(geo, i),
         known(n.id) || memory.has(n.id), inBake(n));
       if (!field || field.box.x > x1 || field.box.y > y1 ||
         field.box.x + field.box.width < x0 || field.box.y + field.box.height < y0) continue;
@@ -6310,7 +6378,7 @@ function prepareEnteringMap(): boolean {
       ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
         // Prepare known geometry beyond the first screen, in cooperative loading
         // slices. Unexplored provinces never enter either terrain cache.
-        const poly = provincePolygons.get(n.id);
+        const poly = provincePolygon(n.id);
         if (holographicMapOn() && poly) terrainGeometry.prepare(n.id, terrainArtKind(n.sector, s.planets[n.id]?.terrain),
           sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly, known(n.id) || memory.has(n.id), world(n));
         const field = terrainFields.find(f => f.id === n.id);
@@ -6417,12 +6485,12 @@ function render(now: number) {
     // M2.11: границы провинций — живые, как рамка карты, и на тех же часах голограммы
     // (под reduced motion стоят — линия замирает видимой). Сразу над заливкой, чтобы
     // порядок слоёв остался прежним, когда граница жила в выпечке.
-    if (provinceBorders) {
+    if (provinceBorders && provinceGeometry) {
       drawLivingBorders(cx, provinceBorders, {
         ownerColor,
         hideOwnedInner: true,
         provinceDetail: lod.provinceDetail,
-      }, holographicFrame, hologramTime, sight);
+      }, holographicFrame, hologramTime, sight, provinceGeometry.place);
     }
     if (detail > 0) {
       cx.save(); cx.globalAlpha *= detail;
@@ -6441,7 +6509,7 @@ function render(now: number) {
     paintedSelection = selPlanet;
     selectionStarted = now;
   }
-  const selectedPoly = selPlanet ? provincePolygons.get(selPlanet) : undefined;
+  const selectedPoly = selPlanet ? provincePolygon(selPlanet) : undefined;
   if (selectedPoly) drawProvinceSelection(cx, selectedPoly, selectionPulse(now - selectionStarted, motionOn()), LOCK);
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
   if (holographicMapOn()) {
@@ -11536,7 +11604,7 @@ function selectAt(mx: number, my: number) {
   // Контур берём из уже нарисованных ячеек. Этот запасной выбор касается только
   // обычного тапа: приказы выше сохраняют свои прежние цели, флоты — приоритет ниже.
   const bakeAt = toBake(mapLayerForInput(), mx, my); // ячейки живут в пространстве выпечки
-  const provinceId = [...provincePolygons].find(([, poly]) => insideProvince(poly, bakeAt.x, bakeAt.y))?.[0];
+  const provinceId = provinceAt(bakeAt.x, bakeAt.y);
   // FORT-6.1: крепость на развилке не узел карты, но выбирается тапом как мир — прямым
   // попаданием, раньше запасного выбора по площади провинции (развилка лежит внутри неё).
   const direct = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
@@ -18534,7 +18602,7 @@ function drawCaptureFlashes(now: number): void {
       captureFlashes.delete(node);
       continue;
     }
-    const poly = provincePolygons.get(node);
+    const poly = provincePolygon(node);
     const planet = s.planets[node];
     if (!poly || !planet) continue;
     const cell = { poly };
