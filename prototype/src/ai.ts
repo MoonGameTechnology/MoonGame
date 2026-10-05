@@ -22,6 +22,8 @@ import {
   fleetPositionAt,
   fleetHoldFree,
   fleetShuttleBay,
+  shuttleBayAt,
+  squadronReach,
   stacksSize,
   squadronSize,
   beaconCallouts,
@@ -41,6 +43,7 @@ import {
   type StewardPosture,
   type Planet,
   type Squadron,
+  type StrikeBase,
   type Fleet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
@@ -72,6 +75,10 @@ import {
   splitFleet,
   strikeShuttle,
   loadShuttle,
+  patrolShuttle,
+  holdPatrol,
+  releaseHold,
+  relocateShuttle,
   spawnHero,
   unlockHeroSkill,
   installHeroModule,
@@ -92,6 +99,8 @@ import {
 import { freshIntel, knownGarrison } from '../../decisions/garrisonIntel';
 import { planDrop } from '../../decisions/dropPlan';
 import { pickHoldFleet } from '../../decisions/holdPick';
+import { holdsPatrol } from '../../decisions/patrolMarks';
+import { frontRebase } from '../../decisions/frontRebase';
 import { isLander, landerTroopCandidates } from '../../decisions/landerTroops';
 import { botEmbargoes } from './botFavour';
 import { netIncome } from './economy';
@@ -190,8 +199,9 @@ const SIEGE_MODULE = 'siege_platform';
 const REPAIR_BAY_CAP = 2;
 const REPAIR_MODULE = 'repair_bay';
 /** Предел челноков КАЖДОГО рода — картонные, дорогие по микроэлектронике, конкурируют
- *  с крейсерами за тот же дефицитный ресурс. Считается по АНГАРУ порта, а не по флотам:
- *  челнок с SHU-1.1 живёт в `planet.hangar` и во флот не попадает никогда. */
+ *  с крейсерами за тот же дефицитный ресурс. Считаются все машины места: в ангарах
+ *  портов и кораблей и в воздухе (`shuttlesOwned`), но не в составе флотов — челнок с
+ *  SHU-1.1 живёт в ангаре базы и во флот не попадает никогда. */
 const SHUTTLE_CAP = 3;
 
 /** Носителей — два (решение владельца 2026-09-26 слило авианосец и десантный корабль в
@@ -203,9 +213,9 @@ const CARRIER_CAP = 2;
  * Ударный ростер челноков (SHU-3.2) — кого бот СТРОИТ и кого ПОСЫЛАЕТ.
  *
  * Перехватчика в списке нет намеренно, и это не пропуск: его работа — встречать чужие
- * вылеты, и она идёт БЕЗ приказа (база поднимает звено сама, SHU-1.3). Строит его бот
- * отдельным правилом ниже; послать его бить корпуса значило бы измерить не ту роль —
- * у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
+ * вылеты (база поднимает звено сама, SHU-1.3) и держать патруль над базой (SHU-6.8,
+ * `PATROL_WING`). Строит его бот отдельным правилом ниже; послать его бить корпуса
+ * значило бы измерить не ту роль — у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
  *
  * Тяжёлый страйкер (SHU-5.6) стоит ПЕРВЫМ: заказы идут по порядку списка, и дефицитная
  * микроэлектроника достаётся сперва ему — его `strikeRange` 260 против 150 у ударного
@@ -216,6 +226,10 @@ const STRIKE_SHUTTLES = ['heavy_striker', 'bomber', 'landing_shuttle'] as const;
 /** Ударные машины вылета «по корпусам и мирам» — в порядке дальности: тяжёлый достаёт
  *  дальше, поэтому поднимается первым; нечем или некого — очередь ударного. */
 const STRIKERS = ['heavy_striker', 'bomber'] as const;
+/** Кем бот держит патруль над своей базой (SHU-6.8): перехватчиками. Патруль бьёт и
+ *  флоты, и чужие вылеты, но ударные машины нужнее в ударе с базы у фронта, а дело
+ *  перехватчика — чужие вылеты, которые идут к его базе. */
+const PATROL_WING = ['interceptor'] as const;
 /** Кандидаты в бойцы десантного челнока (SHU-5.2), от самого ударного — общее правило
  *  `/decisions/landerTroops.ts`. Строить ли их на ЭТОМ мире — спрашивается у ядра
  *  (`canOrder`) в момент заказа. */
@@ -1559,23 +1573,25 @@ function baseAiOrders(
       // Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём, поэтому цепочка
       // короткая — порт у бота и так есть под корабли.
       //
-      // СЧЁТ ИДЁТ ПО АНГАРУ, а не по флотам. `shipsOwned` смотрит во флоты и в
-      // гарнизон, а челнок с SHU-1.1 не бывает ни там, ни там — он лежит в
-      // `planet.hangar`. Пока предел считался тем счётчиком, он не срабатывал НИКОГДА:
-      // бот заказывал челнок каждый тик до упора в `E_HANGAR_FULL` и платил за это
-      // отказами весь матч.
-      const hangarOwned = (unit: string): number =>
-        Object.values(state.planets).reduce(
-          (n, p) =>
-            n +
-            (p.owner === ai
-              ? hangarMachines(p).reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0)
-              : 0),
-          0,
-        );
+      // СЧЁТ ИДЁТ ПО АНГАРАМ И ВОЗДУХУ, а не по флотам. `shipsOwned` смотрит в состав
+      // флотов и в гарнизон, а челнок с SHU-1.1 не бывает ни там, ни там — он лежит в
+      // ангаре базы. Пока предел считался тем счётчиком, он не срабатывал НИКОГДА: бот
+      // заказывал челнок каждый тик до упора в `E_HANGAR_FULL` и платил за это отказами
+      // весь матч. SHU-6.8: в счёт входят и ангары кораблей, и эскадры в воздухе.
+      // Перехватчики теперь держат патруль, а ударные эскадры перелетают к фронту, и предел
+      // по одному ангару порта стал бы конвейером: эскадра ушла — порт заказывает новую.
+      const shuttlesOwned = (unit: string): number => {
+        const count = (stacks: readonly UnitStack[]): number =>
+          stacks.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0);
+        let n = 0;
+        for (const p of Object.values(state.planets)) if (p.owner === ai) n += count(hangarMachines(p));
+        for (const f of Object.values(state.fleets)) if (f.owner === ai) n += count(hangarMachines(f));
+        for (const st of state.strikes ?? []) if (st.owner === ai) n += count(st.units);
+        return n;
+      };
       const orderShuttle = (unit: string): void => {
         if (pirate) return; // This roster has ships and ground troops, no shuttle wing.
-        if (hangarOwned(unit) >= SHUTTLE_CAP) return;
+        if (shuttlesOwned(unit) >= SHUTTLE_CAP) return;
         if (pendingUnit(base.id, unit)) return;
         if (!affordableUnit(unit, 1)) return;
         // ВОРОТА СПРАШИВАЮТСЯ У ЯДРА, а не подразумеваются. Раньше здесь стояло
@@ -1658,17 +1674,51 @@ function baseAiOrders(
         }),
       );
       if (holdPick) out.push(loadShuttle(ai, holdPick.id, holdPick.squadronId));
+      // Что уже занято в этот тик (SHU-6.8): эскадры с приказом и базы, откуда был вылет.
+      // Топливо у базы общее, поэтому вылет с базы — один за тик на удар, перелёт и патруль
+      // вместе; эскадра — один приказ. Проба `canOrder` видит мир на начало тика, а не после
+      // приказов выше, и без этой памяти второй приказ отбивался бы ядром.
+      const launched = new Set<string>();
+      const taken = new Set<string>(holdPick ? [holdPick.squadronId] : []);
       // ═══ ОТКУДА ПОДНИМАТЬ ═══
-      // БАЗ У ВЫЛЕТА ДВЕ, а не одна. Пока бот умел только домашний порт, удар не доезжал
-      // до войны вовсе: радиус челнока 120–150, а чужие миры так близко к дому не стоят —
-      // замер давал ноль вылетов при живой постройке машин. Носитель и есть ответ
-      // («плавучий космопорт», SHU-2.1), поэтому базы перебираются по порядку: сперва
-      // дом, потом носители по id. Порядок фиксированный — от него зависит выбор, а
-      // решение бота обязано быть чистой функцией состояния (инвариант №1).
-      const launchpads: Array<{ base: { planetId: string } | { fleetId: string }; at: { x: number; y: number }; hangar: Squadron[] }> = [];
+      // БАЗА ВЫЛЕТА — ЛЮБАЯ СВОЯ, а не один дом. Пока бот умел только домашний порт, удар
+      // не доезжал до войны вовсе: радиус челнока 120–150, а чужие миры так близко к дому
+      // не стоят — замер давал ноль вылетов при живой постройке машин. Носитель и есть
+      // ответ («плавучий космопорт», SHU-2.1). С SHU-6.8 эскадры ещё и перелетают к фронту,
+      // в том числе на свой порт у фронта, и база, с которой бот не поднимает удар, держала
+      // бы их там без дела. Поэтому базы — все свои обеих форм (уточнение владельца
+      // 2026-10-04: «учти наши базы, в виде трюмов»): сперва дом, потом другие миры с
+      // ангаром по id, потом корабли по id. Порядок фиксированный — от него зависит выбор,
+      // а решение бота обязано быть чистой функцией состояния (инвариант №1).
+      const byId = (a: { id: string }, b: { id: string }): number =>
+        a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      const basePos = (b: StrikeBase): { x: number; y: number } | null => {
+        if (b.kind === 'planet') return state.planets[b.id]?.position ?? null;
+        const f = state.fleets[b.id];
+        return f ? fleetPositionAt(state, f, state.time) : null;
+      };
+      const launchpads: Array<{
+        key: string;
+        ref: StrikeBase;
+        base: { planetId: string } | { fleetId: string };
+        at: { x: number; y: number };
+        hangar: Squadron[];
+      }> = [];
+      const addPad = (ref: StrikeBase, at: { x: number; y: number }, hangar: Squadron[]): void => {
+        const id = ref.id;
+        launchpads.push({
+          key: `${ref.kind}:${id}`,
+          ref,
+          base: ref.kind === 'planet' ? { planetId: id } : { fleetId: id },
+          at,
+          hangar,
+        });
+      };
       const homePort = state.planets[base.id];
-      if (homePort) {
-        launchpads.push({ base: { planetId: homePort.id }, at: homePort.position, hangar: homePort.hangar ?? [] });
+      if (homePort) addPad({ kind: 'planet', id: homePort.id }, homePort.position, homePort.hangar ?? []);
+      for (const p of Object.values(state.planets).sort(byId)) {
+        if (p.id === base.id || p.owner !== ai || (p.hangar ?? []).length === 0) continue;
+        if (shuttleBayAt(p, data) > 0) addPad({ kind: 'planet', id: p.id }, p.position, p.hangar!);
       }
       // СТОЯНКА НОСИТЕЛЮ БОЛЬШЕ НЕ НУЖНА (решение владельца 2026-09-16): ядро пускает
       // вылет с хода, и бот идёт следом. Пока фильтр требовал неподвижности, новое
@@ -1677,9 +1727,9 @@ function baseAiOrders(
       // у идущего флота `location` пуст, и узел под ним спрашивать не у чего.
       for (const f of Object.values(state.fleets)
         .filter((fl) => fl.owner === ai && !fl.battleId && (fl.hangar ?? []).length > 0)
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
-        const at = fleetPositionAt(state, f, state.time);
-        if (at) launchpads.push({ base: { fleetId: f.id }, at, hangar: f.hangar ?? [] });
+        .sort(byId)) {
+        const at = basePos({ kind: 'fleet', id: f.id });
+        if (at) addPad({ kind: 'fleet', id: f.id }, at, f.hangar ?? []);
       }
       // ═══ ЧЕМ ПОДНИМАТЬ: УДАР И ВЫСАДКА — РАЗНЫЕ ПРИКАЗЫ ═══
       // Раньше машина выбиралась ОДНА на фиксированном ростере `['bomber',
@@ -1726,10 +1776,33 @@ function baseAiOrders(
           foeFleetAt.add(fl.location);
         }
       }
+      // Цели удара — чужие флоты и миры на войне. Списки общие у удара и перелёта к фронту
+      // (SHU-6.8): эскадра, которой со своей базы есть по кому бить, не улетает.
+      const foeFleets = Object.values(state.fleets).filter(
+        (fl) =>
+          fl.owner !== ai &&
+          getStance(state, ai, fl.owner) === 'war' &&
+          fl.location !== null &&
+          fl.units.some((st) => st.count > 0) &&
+          // Мину бот бьёт челноками, только когда видит её — вблизи (SM-3.6).
+          (!isMineFleet(fl, data) || mineFleetVisible(state, fl, ai, data)),
+      );
+      const foeFleetPos = (fl: Fleet): { x: number; y: number } =>
+        state.planets[fl.location!]?.position ?? { x: 1e9, y: 1e9 };
+      const foeWorlds = Object.values(state.planets).filter(
+        (p) => p.owner !== null && p.owner !== ai && getStance(state, ai, p.owner) === 'war',
+      );
+      // Эскадры базы, которые этой машиной можно поднять: та, что в этот тик уже грузится
+      // в трюм, не в счёт — второй приказ ей ядро отбило бы.
+      const freeSquads = (hangar: Squadron[], unit: string): Squadron[] =>
+        squadsWith(hangar, unit).filter((sq) => !taken.has(sq.id));
       let sortied = false;
-      const dropPad = launchpads.find((lp) => squadsWith(lp.hangar, 'landing_shuttle').length > 0);
-      if (dropPad) {
-        const from = dropPad.base;
+      // Высадка поднимается с ПЕРВОЙ базы, у которой есть и десант, и цель, и наряд, — не
+      // с первой, где лежит десантный челнок: иначе челнок дома без цели держал бы на
+      // земле десант, перелетевший к фронту (SHU-6.8).
+      for (const pad of launchpads) {
+        const landers = freeSquads(pad.hangar, 'landing_shuttle');
+        if (landers.length === 0) continue;
         // Десант уже в трюме: челнок строится с бойцом внутри (SHU-5.2), поэтому источника
         // войск у вылета больше нет — гарнизон базы под операцию не трогается.
         const reach = reachOf('landing_shuttle');
@@ -1738,21 +1811,22 @@ function baseAiOrders(
             if (p.owner === null || p.owner === ai) return false;
             if (getStance(state, ai, p.owner) !== 'war') return false;
             if (!capturable(p)) return false;
-            if (d(dropPad.at, p.position) > reach) return false;
+            if (d(pad.at, p.position) > reach) return false;
             if (ownNearOrbit.has(p.id)) return false; // №2: возьмём штурмом, челноки целы
             if (foeFleetAt.has(p.id)) return false; // №3: под чужим флотом высадка не идёт
             return freshIntel(knownGarrison(state, ai, p.id, data, identified), state.time);
           }),
-          dropPad.at,
+          pad.at,
           (p) => p.position,
         );
         const intel = target ? knownGarrison(state, ai, target.id, data, identified) : null;
-        const plan = target && intel
-          ? planDrop(squadsWith(dropPad.hangar, 'landing_shuttle'), intel.units, data)
-          : null;
+        const plan = target && intel ? planDrop(landers, intel.units, data) : null;
         if (target && plan) {
-          out.push(strikeShuttle(ai, from, plan.squadronId, { targetPlanetId: target.id }));
+          out.push(strikeShuttle(ai, pad.base, plan.squadronId, { targetPlanetId: target.id }));
           sortied = true;
+          launched.add(pad.key);
+          taken.add(plan.squadronId);
+          break;
         }
       }
 
@@ -1762,45 +1836,150 @@ function baseAiOrders(
       // радиусе, тай-брейк по id: иначе выбор зависел бы от порядка ключей объекта.
       // SHU-5.6: машин две — тяжёлый и ударный страйкер (`STRIKERS`), и пробуются они
       // по порядку: первая, у которой есть и эскадра на базе, и цель в СВОЁМ радиусе,
-      // поднимается, остальные ждут следующего тика.
-      for (const unit of sortied ? [] : STRIKERS) {
-        const bombPad = launchpads.find((lp) => squadsWith(lp.hangar, unit).length > 0);
-        if (!bombPad) continue;
-        const squad = squadsWith(bombPad.hangar, unit)[0]!;
+      // поднимается, остальные ждут следующего тика. Базы перебираются все по порядку
+      // (SHU-6.8): эскадра в тылу без цели не держит удар эскадры у фронта.
+      strike: for (const unit of sortied ? [] : STRIKERS) {
         const reach = reachOf(unit);
-        const inReach = (at: { x: number; y: number }): boolean => d(bombPad.at, at) <= reach;
-        const foeFleet = nearestBy(
-          Object.values(state.fleets).filter(
-            (fl) =>
-              fl.owner !== ai &&
-              getStance(state, ai, fl.owner) === 'war' &&
-              fl.location !== null &&
-              fl.units.some((st) => st.count > 0) &&
-              // Мину бот бьёт челноками, только когда видит её — вблизи (SM-3.6).
-              (!isMineFleet(fl, data) || mineFleetVisible(state, fl, ai, data)) &&
-              inReach(state.planets[fl.location]?.position ?? { x: 1e9, y: 1e9 }),
-          ),
-          bombPad.at,
-          (fl) => state.planets[fl.location!]!.position,
-        );
-        const foeWorld = nearestBy(
-          Object.values(state.planets).filter(
-            (p) =>
-              p.owner !== null &&
-              p.owner !== ai &&
-              getStance(state, ai, p.owner) === 'war' &&
-              inReach(p.position),
-          ),
-          bombPad.at,
-          (p) => p.position,
-        );
-        if (foeFleet) {
-          out.push(strikeShuttle(ai, bombPad.base, squad.id, { targetFleetId: foeFleet.id }));
-          break;
+        for (const pad of launchpads) {
+          const squad = freeSquads(pad.hangar, unit)[0];
+          if (!squad) continue;
+          const inReach = (at: { x: number; y: number }): boolean => d(pad.at, at) <= reach;
+          const foeFleet = nearestBy(
+            foeFleets.filter((fl) => inReach(foeFleetPos(fl))),
+            pad.at,
+            foeFleetPos,
+          );
+          const foeWorld = nearestBy(
+            foeWorlds.filter((p) => inReach(p.position)),
+            pad.at,
+            (p) => p.position,
+          );
+          const target = foeFleet
+            ? { targetFleetId: foeFleet.id }
+            : foeWorld
+              ? { targetPlanetId: foeWorld.id }
+              : null;
+          if (!target) continue;
+          out.push(strikeShuttle(ai, pad.base, squad.id, target));
+          launched.add(pad.key);
+          taken.add(squad.id);
+          break strike;
         }
-        if (foeWorld) {
-          out.push(strikeShuttle(ai, bombPad.base, squad.id, { targetPlanetId: foeWorld.id }));
-          break;
+      }
+
+      // ═══ ПЕРЕЛЁТ К ФРОНТУ (SHU-6.8) ═══
+      // Ударная эскадра, которой со своей базы бить некого, перелетает на свою базу ближе к
+      // фронту — решение `frontRebase` (`/decisions`): фронт — чужие миры на войне, база —
+      // любой формы, шаг не короче половины радиуса удара. Цели страйкера — те же списки,
+      // что у удара выше; у десантного челнока — миры, которые можно взять. Один перелёт
+      // за тик. Перехватчики не перелетают: их дело — патруль над своей базой (ниже).
+      // Приказ уходит, только если его примет ядро (`canOrder`), иначе бот платил бы
+      // отказом каждый тик. «Оборона» Хранителя к фронту не летит: она держит своё.
+      if (!defensive && foeWorlds.length > 0) {
+        const front = foeWorlds.map((p) => p.position);
+        const strikerTargets = [...front, ...foeFleets.map(foeFleetPos)];
+        const landerTargets = foeWorlds.filter(capturable).map((p) => p.position);
+        rebase: for (const pad of launchpads) {
+          if (launched.has(pad.key)) continue;
+          for (const sq of pad.hangar) {
+            if (taken.has(sq.id) || sq.hold !== undefined) continue;
+            const machines = sq.units.filter((st) => st.count > 0);
+            if (!machines.some((st) => STRIKE_SHUTTLES.includes(st.unit as never))) continue;
+            const lander = machines.some((st) => isLander(data.units[st.unit]));
+            const dest = frontRebase(state, {
+              me: ai,
+              from: pad.ref,
+              squadron: sq,
+              data,
+              pos: basePos,
+              targets: lander ? landerTargets : strikerTargets,
+              front,
+            });
+            // В трюм, куда в этот тик грузится эскадра из порта, места может не хватить.
+            if (!dest || (dest.base.kind === 'fleet' && dest.base.id === holdPick?.id)) continue;
+            const order = relocateShuttle(
+              ai,
+              pad.base,
+              sq.id,
+              dest.base.kind === 'planet' ? { toPlanetId: dest.base.id } : { toFleetId: dest.base.id },
+            );
+            if (canOrder(state, order) !== null) continue;
+            out.push(order);
+            launched.add(pad.key);
+            taken.add(sq.id);
+            break rebase;
+          }
+        }
+      }
+
+      // ═══ ПАТРУЛЬ НАД БАЗАМИ (SHU-6.8) ═══
+      // База держит патруль, ПОКА РЯДОМ ВРАГ: чужой флот на войне (идущий тоже, мина —
+      // если видна) в радиусе удара её перехватчиков — в том круге, что игрок видит у базы
+      // (SHU-6.1). Тогда база поднимает удерживаемый патруль над собой первой эскадрой
+      // перехватчиков (`PATROL_WING`), и дальше её после каждой перезарядки снова поднимает
+      // само ядро (SHU-6.6), в том числе между ходами бота. Врага не стало — удержание
+      // снимается: и у патруля в воздухе (он довисит своё и сядет), и у эскадры, ждущей
+      // дома перезарядки. Почему не всегда: перехватчики в ангаре сами встречают чужие
+      // вылеты во всём этом круге (SHU-1.3), а патруль закрывает только свой круг (60).
+      // Патруль в тылу без цели жёг бы топливо базы, нужное удару и перелёту, — замер
+      // `selfplay 8` с патрулём всегда: 69 урона патрулями за 961 вылет и на треть меньше
+      // перелётов. Точка у мира — сам мир, у корабля — его живая позиция: ядро и потом
+      // встаёт над кораблём, а не над прежней стоянкой. «Активная оборона» Хранителя
+      // держит свою вахту (`stewardGuardOrders`), «Оборона» патрулей не ставит.
+      if (!defensive) {
+        const foesLive: Array<{ x: number; y: number }> = [];
+        for (const fl of Object.values(state.fleets)) {
+          if (fl.owner === ai || getStance(state, ai, fl.owner) !== 'war') continue;
+          if (!fl.units.some((st) => st.count > 0)) continue;
+          if (isMineFleet(fl, data) && !mineFleetVisible(state, fl, ai, data)) continue;
+          const at = fleetPositionAt(state, fl, state.time);
+          if (at) foesLive.push(at);
+        }
+        const threatened = (at: { x: number; y: number }, wing: Pick<Squadron, 'units'>): boolean => {
+          const reach = squadronReach(wing, data);
+          return foesLive.some((p) => d(at, p) <= reach);
+        };
+        const patrolWing = (sq: Squadron): boolean => {
+          const machines = sq.units.filter((st) => st.count > 0);
+          return machines.length > 0 && machines.every((st) => PATROL_WING.includes(st.unit as never));
+        };
+        const issue = (order: Action): boolean => {
+          if (canOrder(state, order) !== null) return false;
+          out.push(order);
+          return true;
+        };
+        // Правило трогает только патруль НАД БАЗОЙ. У мира это точка самого мира: патруль
+        // над другой точкой (игрок поставил его над развилкой, а потом место занял
+        // заместитель) бот не снимает. У корабля точку не сверить — она осталась там, где
+        // корабль был на подъёме, а удержание ядро и так поднимает над самим кораблём
+        // (SHU-6.6), — поэтому патруль корабля считается патрулём над базой.
+        const overBase = (b: StrikeBase, point: { x: number; y: number }, at: { x: number; y: number }): boolean =>
+          b.kind === 'fleet' || d(point, at) < 1;
+        for (const pad of launchpads) {
+          // Удержание у эскадры, ждущей дома перезарядки, снимается, когда врага не стало.
+          for (const sq of pad.hangar) {
+            if (sq.hold === undefined || taken.has(sq.id)) continue;
+            if (!overBase(pad.ref, sq.hold.at ?? pad.at, pad.at)) continue;
+            if (!threatened(pad.at, sq)) issue(releaseHold(ai, pad.base, sq.id));
+          }
+          if (launched.has(pad.key) || holdsPatrol(state.strikes, pad.hangar, pad.ref, ai)) continue;
+          const wing = pad.hangar.find((sq) => !taken.has(sq.id) && patrolWing(sq));
+          if (!wing || !threatened(pad.at, wing)) continue;
+          if (issue(patrolShuttle(ai, pad.base, wing.id, pad.at, true))) {
+            launched.add(pad.key);
+            taken.add(wing.id);
+          }
+        }
+        // …и у патруля в воздухе: врага не стало — довисит своё и сядет, не поднимаясь
+        // снова; враг вернулся, пока патруль ещё висит или летит к точке, — удержание
+        // ставится обратно, без нового вылета.
+        for (const st of state.strikes ?? []) {
+          if (st.owner !== ai || st.target.kind !== 'point' || !st.patrol) continue;
+          const at = basePos(st.base);
+          if (!at || !overBase(st.base, st.to, at)) continue;
+          const want = threatened(at, st);
+          if (st.patrol.hold === true && !want) issue(holdPatrol(ai, st.id, false));
+          else if (st.patrol.hold !== true && want && st.leg !== 'back') issue(holdPatrol(ai, st.id, true));
         }
       }
     }

@@ -211,6 +211,25 @@ function runMatch(i) {
   let fleetSorties = 0;
   let landersBuilt = 0;
   let repairBaysBuilt = 0;
+  // SHU-6.8 — АВИАЦИЯ ФАЗЫ 6 у сильного бота: удерживаемые патрули над своими базами,
+  // пока рядом враг, и перелёты эскадр к фронту. Приказы (поставить патруль, снять
+  // удержание, перелететь) считаются по принятым действиям бота; вылеты в
+  // патруль — по самим вылетам (`patrol` у вылета), потому что удерживаемый патруль снова
+  // поднимает ядро, без приказа. Попадания патруля — его удары по флотам (`shuttle.hit`
+  // этого вылета) и перехваты (`shuttle.intercepted` с `patrolId`). Вылет-патруль узнаётся
+  // по состоянию после каждого шага: событие взлёта вид вылета не несёт.
+  let patrolOrders = 0;
+  let holdReleases = 0;
+  let patrolHits = 0;
+  let patrolDamage = 0;
+  let relocations = 0;
+  let rebased = 0;
+  let diverted = 0;
+  const patrolIds = new Set();
+  const rebaseIds = new Set();
+  const notePatrols = (s) => {
+    for (const st of s.strikes ?? []) if (st.patrol) patrolIds.add(st.id);
+  };
   const consume = (events, now) => {
     for (const e of events) {
       if (e.type === 'unit.built') {
@@ -263,15 +282,29 @@ function runMatch(i) {
         sorties++;
         if ((e.payload ?? {}).fromKind === 'fleet') fleetSorties++;
       } else if (e.type === 'shuttle.hit') {
+        const p = e.payload ?? {};
         strikeHits++;
-        strikeDamage += (e.payload ?? {}).damage ?? 0;
+        strikeDamage += p.damage ?? 0;
+        if (patrolIds.has(p.strikeId)) {
+          patrolHits++;
+          patrolDamage += p.damage ?? 0;
+        }
       } else if (e.type === 'shuttle.repelled' || e.type === 'shuttle.intercepted') {
         // Обе контрмеры считаются одним числом НАРОЧНО: вопрос замера — «сбивают ли
         // челноки вообще», а не «чем именно». Разведёт их отдельный кирпич, когда
         // станет что сравнивать.
-        shuttlesDowned += (e.payload ?? {}).downed ?? 0;
+        const p = e.payload ?? {};
+        shuttlesDowned += p.downed ?? 0;
+        if (e.type === 'shuttle.intercepted' && p.patrolId) {
+          patrolHits++;
+          patrolDamage += p.damage ?? 0;
+        }
       } else if (e.type === 'shuttle.landed') {
-        if (((e.payload ?? {}).landed ?? 0) > 0) dropsLanded++;
+        const p = e.payload ?? {};
+        if ((p.landed ?? 0) > 0) dropsLanded++;
+        else if (rebaseIds.has(p.strikeId)) rebased++;
+      } else if (e.type === 'shuttle.diverted') {
+        diverted++;
       } else if (e.type === 'battle.started' && firstCombatAt === null) firstCombatAt = now;
     }
   };
@@ -299,6 +332,7 @@ function runMatch(i) {
       const r = kernel.advanceTo(state, ctx(now));
       if (!r.ok) return { error: r.code };
       state = r.state;
+      notePatrols(state);
       consume(r.events, now);
       if (!r.partial) break;
       if (r.state.time <= state.time && c > 0) break; // same-instant runaway — bail
@@ -316,7 +350,15 @@ function runMatch(i) {
       for (const a of aiOrders(state, seat, 'expand', 'strong')) {
         const r = kernel.applyAction(state, a, ctx(now));
         if (r.ok) {
+          if (a.type === 'shuttle.patrol') patrolOrders++;
+          if (a.type === 'shuttle.hold' && (a.payload ?? {}).on === false) holdReleases++;
+          if (a.type === 'shuttle.relocate') {
+            relocations++;
+            const before = new Set((state.strikes ?? []).map((st) => st.id));
+            for (const st of r.state.strikes ?? []) if (!before.has(st.id)) rebaseIds.add(st.id);
+          }
           state = r.state;
+          notePatrols(state);
           consume(r.events, now);
         }
       }
@@ -388,6 +430,14 @@ function runMatch(i) {
     landersBuilt,
     heavyStrikersBuilt: usage.get('heavy_striker') ?? 0,
     repairBaysBuilt,
+    patrolOrders,
+    holdReleases,
+    patrolSorties: patrolIds.size,
+    patrolHits,
+    patrolDamage,
+    relocations,
+    rebased,
+    diverted,
     heroSpawns,
     heroSkills,
     heroFits,
@@ -455,6 +505,14 @@ let fleetSortiesTotal = 0;
 let landersBuiltTotal = 0;
 let heavyStrikersTotal = 0;
 let repairBaysTotal = 0;
+let patrolOrdersTotal = 0;
+let holdReleasesTotal = 0;
+let patrolSortiesTotal = 0;
+let patrolHitsTotal = 0;
+let patrolDamageTotal = 0;
+let relocationsTotal = 0;
+let rebasedTotal = 0;
+let divertedTotal = 0;
 let heroSpawnsTotal = 0;
 let heroSkillsTotal = 0;
 let heroFitsTotal = 0;
@@ -507,6 +565,14 @@ for (let i = 0; i < N; i++) {
   landersBuiltTotal += r.landersBuilt;
   heavyStrikersTotal += r.heavyStrikersBuilt;
   repairBaysTotal += r.repairBaysBuilt;
+  patrolOrdersTotal += r.patrolOrders;
+  holdReleasesTotal += r.holdReleases;
+  patrolSortiesTotal += r.patrolSorties;
+  patrolHitsTotal += r.patrolHits;
+  patrolDamageTotal += r.patrolDamage;
+  relocationsTotal += r.relocations;
+  rebasedTotal += r.rebased;
+  divertedTotal += r.diverted;
   heroSpawnsTotal += r.heroSpawns;
   heroSkillsTotal += r.heroSkills;
   heroFitsTotal += r.heroFits;
@@ -727,6 +793,7 @@ console.log(
     `  рынок      : сделок ${tradesTotal} на ${tradeCreditsTotal.toFixed(0)} credits (сгорело комиссией ${tradeFeesTotal.toFixed(0)})  ← AI-BAL-9; лоты выставлялись и раньше, доказывают только СДЕЛКИ`,
     `  челноки    : вылетов ${sortiesTotal} · попаданий ${strikeHitsTotal} на ${strikeDamageTotal.toFixed(0)} урона · сбито машин ${shuttlesDownedTotal} · высадок ${dropsLandedTotal}  ← SHU-3.2; «построено» в мёртвом контенте НЕ доказывает механику: машина может пролежать весь матч в порту. Ноль вылетов при ненулевой постройке — ровно этот случай`,
     `  фаза 5     : в трюм погружено эскадр ${holdLoadsTotal} (вылетов с корабля ${fleetSortiesTotal}) · челноков с бойцом ${landersBuiltTotal} · тяжёлых страйкеров ${heavyStrikersTotal} · кораблей с ремонтным ангаром ${repairBaysTotal}  ← SHU-5.6; 0 = действие вне игры бота`,
+    `  фаза 6     : патрулей поставлено ${patrolOrdersTotal} (вылетов в патруль ${patrolSortiesTotal} · попаданий из патруля ${patrolHitsTotal} на ${patrolDamageTotal.toFixed(0)} урона · снято удержаний ${holdReleasesTotal}) · перелётов к фронту ${relocationsTotal} (село на новой базе ${rebasedTotal}) · посадок без базы ${divertedTotal}  ← SHU-6.8; вылетов в патруль больше, чем поставлено, — удерживаемый патруль поднимает снова ядро. 0 = действие вне игры бота`,
     `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
       [...heroCastsTotal.entries()]
         .sort()
@@ -868,6 +935,14 @@ console.log(
         landersBuilt: landersBuiltTotal,
         heavyStrikersBuilt: heavyStrikersTotal,
         repairBaysBuilt: repairBaysTotal,
+        patrolOrders: patrolOrdersTotal,
+        holdReleases: holdReleasesTotal,
+        patrolSorties: patrolSortiesTotal,
+        patrolHits: patrolHitsTotal,
+        patrolDamage: patrolDamageTotal,
+        relocations: relocationsTotal,
+        rebased: rebasedTotal,
+        diverted: divertedTotal,
         heroSpawns: heroSpawnsTotal,
         heroSkills: heroSkillsTotal,
         heroFits: heroFitsTotal,
