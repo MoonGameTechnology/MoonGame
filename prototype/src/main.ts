@@ -368,6 +368,7 @@ import {
 } from '../../decisions/profileSeal';
 import { chapterBlueprint } from '../../decisions/moduleRarity';
 import { battleStance } from '../../decisions/battleStance';
+import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
 import { runAiSeats } from '../../decisions/runAiSeats';
 import { swarmNetMarks } from '../../decisions/swarmNetMarks';
 import { swarmLoreKnown } from '../../decisions/swarmLore';
@@ -2673,6 +2674,15 @@ function orbitAngle(idx: number, nPeers: number): number {
   return slotAngle(idx, nPeers, orbitPhase, orbitsLive());
 }
 
+/** Строй боя раскладывается раз на строй: строй — массив из раскладки мира (`orbitSeats`),
+ *  новый мир даёт новые массивы, а смотрящий входит в ключ памяти мира. */
+const stances = new WeakMap<readonly Fleet[], ReturnType<typeof battleStance>>();
+function stanceOf(fighting: readonly Fleet[]): ReturnType<typeof battleStance> {
+  let stance = stances.get(fighting);
+  if (!stance) stances.set(fighting, (stance = battleStance(fighting, ME)));
+  return stance;
+}
+
 /** Screen anchor (+ heading) for a fleet's chevron: the interpolated lane
  *  position while moving, or a slot on the orbit ring while stationed
  *  (fleets sharing the ring are fanned out so they don't overlap).
@@ -2711,14 +2721,13 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   const pl = s.planets[f.location];
   if (!pl) return null;
   const pc = world(pl.position);
+  // Кольца и строи всех миров — одним проходом на мир, а не проходом по всем флотам на
+  // каждый флот (`orbitSeats.ts`).
+  const seats = perWorld('orbits', () => orbitSeats(Object.values(s.fleets), (g) => isEmplacementFleet(g, data)));
   // Боевая стойка (заказ владельца 2026-09-23): флот в бою не кружит — стоит в строю своей
   // стороны лицом к противнику (`decisions/battleStance.ts`).
   if (f.battleId) {
-    const fighting = Object.values(s.fleets).filter(
-      (g) =>
-        g.battleId === f.battleId && g.location === f.location && !g.movement && !isEmplacementFleet(g, data),
-    );
-    const slot = battleStance(fighting, ME).get(f.id);
+    const slot = stanceOf(seats.fight(f.battleId, f.location)).get(f.id);
     if (slot) {
       const r = orbitRingRadius(pl);
       return { x: pc.x + Math.cos(slot.angle) * r, y: pc.y + Math.sin(slot.angle) * r, ang: slot.heading };
@@ -2726,14 +2735,8 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   }
   // a single orbit: every stationed (non-transit, not fighting) fleet here shares the one ring
   // Крепость слота на кольце не занимает (`emplacement.ts`, правило 3).
-  const peers = Object.values(s.fleets).filter(
-    (g) => g.location === f.location && !g.movement && !g.battleId && !isEmplacementFleet(g, data),
-  );
-  const idx = Math.max(
-    0,
-    peers.findIndex((g) => g.id === f.id),
-  );
-  const a0 = orbitAngle(idx, peers.length);
+  const { idx, peers } = seats.ring(f.id, f.location);
+  const a0 = orbitAngle(idx, peers);
   const r = orbitRingRadius(pl);
   // when circling, the chevron faces along its travel (tangent); static = radial as before
   const ang = chevronAngle(a0, orbitsLive());
@@ -3076,6 +3079,8 @@ interface WorldDerived {
   aa: RangeRing[];
   radar: RadarSources;
   ally: string | null;
+  /** Кто где стоит у мира: кольца и строи боёв (`orbitSeats.ts`). */
+  orbits: OrbitSeats<Fleet>;
 }
 let worldMemo: {
   state: GameState;
