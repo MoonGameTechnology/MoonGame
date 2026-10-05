@@ -49,7 +49,7 @@ const BUILD_GATE_SOURCE = readFileSync(
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.62'); // площадка крепости на развилке (FORT-6.1) поверх 0.1.61: ракетная мина — только корабль героя, мины — только фрегаты (утилитарный слот) поверх 0.1.60: защита построек мира: форт 15/30/45%, прочие по 5%, потолок 90% поверх 0.1.59: улучшения НПЗ дешевле (решение владельца 2026-09-29) поверх 0.1.58: уровни налоговой и кредитного НПЗ (ECON-8)
+    expect(data.version).toBe('0.1.63'); // круг патруля шаттлов 60 → 90 (SHU-6.9) поверх 0.1.62: площадка крепости на развилке (FORT-6.1) поверх 0.1.61: ракетная мина — только корабль героя, мины — только фрегаты (утилитарный слот) поверх 0.1.60: защита построек мира: форт 15/30/45%, прочие по 5%, потолок 90% поверх 0.1.59: улучшения НПЗ дешевле (решение владельца 2026-09-29) поверх 0.1.58: уровни налоговой и кредитного НПЗ (ECON-8)
     expect(data.resources).toContain('microelectronics');
     // PERK-3.1: надбавка ветерана В ШИПНУТОМ каталоге включена. Числом не прибиваем —
     // ставка на то и в данных, чтобы её крутили без правки кода; сторожим ровно то, что
@@ -130,12 +130,12 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.interceptor?.stats.fuel).toBe(3); // sorties before rearm
     expect(data.units.interceptor?.stats.rearmRounds).toBe(2);
     expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a shuttle)
-    // SHU-6.2: patrol hours and circle (owner resolution 2026-10-04). The landing shuttle
-    // has neither, so it cannot patrol.
+    // SHU-6.2: patrol hours and circle (owner resolution 2026-10-04; the self-play run of
+    // SHU-6.9 raised the circle 60 → 90). The landing shuttle has neither, so it cannot patrol.
     expect(data.units.interceptor?.stats.patrolHours).toBe(4);
     expect(data.units.bomber?.stats.patrolHours).toBe(3);
     expect(data.units.heavy_striker?.stats.patrolHours).toBe(2);
-    expect(data.units.interceptor?.stats.patrolRadius).toBe(60);
+    expect(data.units.interceptor?.stats.patrolRadius).toBe(90);
     expect(data.units.landing_shuttle?.stats.patrolHours).toBe(0); // schema default
     expect(data.units.cruiser?.stats.patrolRadius).toBe(0); // schema default
     // reanimate_on_kill/Necromancer cut (designer-role) → assert a surviving event instead.

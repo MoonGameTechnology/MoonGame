@@ -222,6 +222,10 @@ function runMatch(i) {
   let holdReleases = 0;
   let patrolHits = 0;
   let patrolDamage = 0;
+  // SHU-6.9 — из попаданий патруля отдельно перехваты чужих шаттлов и сбитые ими машины:
+  // перехватчик в патруле — прежде всего ПВО против вылетов, и баланс круга меряется этим.
+  let patrolIntercepts = 0;
+  let patrolDowned = 0;
   let relocations = 0;
   let rebased = 0;
   let diverted = 0;
@@ -298,6 +302,8 @@ function runMatch(i) {
         if (e.type === 'shuttle.intercepted' && p.patrolId) {
           patrolHits++;
           patrolDamage += p.damage ?? 0;
+          patrolIntercepts++;
+          patrolDowned += p.downed ?? 0;
         }
       } else if (e.type === 'shuttle.landed') {
         const p = e.payload ?? {};
@@ -435,6 +441,8 @@ function runMatch(i) {
     patrolSorties: patrolIds.size,
     patrolHits,
     patrolDamage,
+    patrolIntercepts,
+    patrolDowned,
     relocations,
     rebased,
     diverted,
@@ -510,6 +518,8 @@ let holdReleasesTotal = 0;
 let patrolSortiesTotal = 0;
 let patrolHitsTotal = 0;
 let patrolDamageTotal = 0;
+let patrolInterceptsTotal = 0;
+let patrolDownedTotal = 0;
 let relocationsTotal = 0;
 let rebasedTotal = 0;
 let divertedTotal = 0;
@@ -570,6 +580,8 @@ for (let i = 0; i < N; i++) {
   patrolSortiesTotal += r.patrolSorties;
   patrolHitsTotal += r.patrolHits;
   patrolDamageTotal += r.patrolDamage;
+  patrolInterceptsTotal += r.patrolIntercepts;
+  patrolDownedTotal += r.patrolDowned;
   relocationsTotal += r.relocations;
   rebasedTotal += r.rebased;
   divertedTotal += r.diverted;
@@ -793,7 +805,7 @@ console.log(
     `  рынок      : сделок ${tradesTotal} на ${tradeCreditsTotal.toFixed(0)} credits (сгорело комиссией ${tradeFeesTotal.toFixed(0)})  ← AI-BAL-9; лоты выставлялись и раньше, доказывают только СДЕЛКИ`,
     `  челноки    : вылетов ${sortiesTotal} · попаданий ${strikeHitsTotal} на ${strikeDamageTotal.toFixed(0)} урона · сбито машин ${shuttlesDownedTotal} · высадок ${dropsLandedTotal}  ← SHU-3.2; «построено» в мёртвом контенте НЕ доказывает механику: машина может пролежать весь матч в порту. Ноль вылетов при ненулевой постройке — ровно этот случай`,
     `  фаза 5     : в трюм погружено эскадр ${holdLoadsTotal} (вылетов с корабля ${fleetSortiesTotal}) · челноков с бойцом ${landersBuiltTotal} · тяжёлых страйкеров ${heavyStrikersTotal} · кораблей с ремонтным ангаром ${repairBaysTotal}  ← SHU-5.6; 0 = действие вне игры бота`,
-    `  фаза 6     : патрулей поставлено ${patrolOrdersTotal} (вылетов в патруль ${patrolSortiesTotal} · попаданий из патруля ${patrolHitsTotal} на ${patrolDamageTotal.toFixed(0)} урона · снято удержаний ${holdReleasesTotal}) · перелётов к фронту ${relocationsTotal} (село на новой базе ${rebasedTotal}) · посадок без базы ${divertedTotal}  ← SHU-6.8; вылетов в патруль больше, чем поставлено, — удерживаемый патруль поднимает снова ядро. 0 = действие вне игры бота`,
+    `  фаза 6     : патрулей поставлено ${patrolOrdersTotal} (вылетов в патруль ${patrolSortiesTotal} · попаданий из патруля ${patrolHitsTotal} на ${patrolDamageTotal.toFixed(0)} урона, из них перехватов шаттлов ${patrolInterceptsTotal} со сбитыми ${patrolDownedTotal} · снято удержаний ${holdReleasesTotal}) · перелётов к фронту ${relocationsTotal} (село на новой базе ${rebasedTotal}) · посадок без базы ${divertedTotal}  ← SHU-6.8; вылетов в патруль больше, чем поставлено, — удерживаемый патруль поднимает снова ядро. 0 = действие вне игры бота`,
     `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
       [...heroCastsTotal.entries()]
         .sort()
@@ -940,6 +952,8 @@ console.log(
         patrolSorties: patrolSortiesTotal,
         patrolHits: patrolHitsTotal,
         patrolDamage: patrolDamageTotal,
+        patrolIntercepts: patrolInterceptsTotal,
+        patrolDowned: patrolDownedTotal,
         relocations: relocationsTotal,
         rebased: rebasedTotal,
         diverted: divertedTotal,
