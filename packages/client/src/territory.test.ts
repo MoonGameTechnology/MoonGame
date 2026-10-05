@@ -7,8 +7,12 @@ import {
   clampPowerWeights,
   computePowerCells,
   computePowerCell,
+  strokeBorders,
+  type BorderSegment,
+  type ClassifiedBorders,
   type TerritorySeed,
 } from './territory';
+import { waveCells } from './territoryWave';
 
 // The unit square, CCW — the reusable clip fixture for the half-plane primitives.
 const SQUARE: Array<[number, number]> = [
@@ -231,5 +235,163 @@ describe('classifyBorders — край карты не граница прови
       expect(alongX || alongY).toBe(false);
       expect(onClip((x0 + x1) / 2, (y0 + y1) / 2)).toBe(false);
     }
+  });
+});
+
+/** A recording context: every call as `name(args)`, properties as `name=value`. */
+function recorder(): { g: CanvasRenderingContext2D; log: string[] } {
+  const log: string[] = [];
+  const g = new Proxy({} as Record<string, unknown>, {
+    get:
+      (_t, key) =>
+      (...args: unknown[]) =>
+        log.push(`${String(key)}(${args.join(',')})`),
+    set: (_t, key, value) => (log.push(`${String(key)}=${String(value)}`), true),
+  }) as unknown as CanvasRenderingContext2D;
+  return { g, log };
+}
+
+/** Every stroke of the log as the segments it covers, `x0,y0,x1,y1`, in path order. */
+function strokedSegments(log: readonly string[]): string[][] {
+  const strokes: string[][] = [];
+  let segs: string[] = [];
+  let at = '';
+  for (const line of log) {
+    const xy = /^(moveTo|lineTo)\((.*)\)$/.exec(line);
+    if (line === 'beginPath()') segs = [];
+    else if (line === 'stroke()') strokes.push(segs);
+    else if (xy?.[1] === 'moveTo') at = xy[2]!;
+    else if (xy) {
+      segs.push(`${at},${xy[2]}`);
+      at = xy[2]!;
+    }
+  }
+  return strokes;
+}
+
+describe('strokeBorders — цепочка граней одной ломаной (плавность 7.4)', () => {
+  const palette = { ownerColor: (o: string) => (o === 'p1' ? '#40c0e0' : '#e07040'), provinceDetail: 1 };
+
+  it('отрезки, идущие друг за другом, — одна ломаная; разрыв начинает новую', () => {
+    const borders: ClassifiedBorders = {
+      ownedFront: new Map(),
+      ownedInner: new Map(),
+      neutralEdge: [
+        [0, 0, 10, 0],
+        [10, 0, 20, 5],
+        [20, 5, 30, 5],
+        [100, 100, 110, 100],
+      ],
+    };
+    const { g, log } = recorder();
+    strokeBorders(g, borders, palette);
+    expect(log.filter((l) => /^(beginPath|moveTo|lineTo|stroke)\(/.test(l))).toEqual([
+      'beginPath()',
+      'moveTo(0,0)',
+      'lineTo(10,0)',
+      'lineTo(20,5)',
+      'lineTo(30,5)',
+      'moveTo(100,100)',
+      'lineTo(110,100)',
+      'stroke()',
+    ]);
+  });
+
+  it('отрезок, не прошедший отбор, рвёт цепочку: нарисовано ровно то, что прошло', () => {
+    const borders: ClassifiedBorders = {
+      ownedFront: new Map(),
+      ownedInner: new Map(),
+      neutralEdge: [
+        [0, 0, 10, 0],
+        [10, 0, 20, 5],
+        [20, 5, 30, 5],
+      ],
+    };
+    const { g, log } = recorder();
+    strokeBorders(g, borders, palette, undefined, (sg) => sg[0] !== 10);
+    expect(strokedSegments(log)).toEqual([['0,0,10,0', '20,5,30,5']]);
+    expect(log.filter((l) => l.startsWith('moveTo('))).toHaveLength(2);
+  });
+
+  it('на волнистой карте: те же отрезки, что по одному, а каждая точка сдвинута один раз', () => {
+    // Волна режет каждую грань на короткие отрезки — так выглядит настоящая карта. Ломаная
+    // обязана пройти ровно по отрезкам, прошедшим отбор, в том же порядке, а каждую точку
+    // сдвинуть один раз, даже если фронтир обводится дважды (свечение и линия).
+    const seeds: TerritorySeed[] = [
+      { x: 60, y: 50, w: 4000, owner: 'p1', kind: 'planet' },
+      { x: 200, y: 60, w: 4000, owner: 'p1', kind: 'planet' },
+      { x: 340, y: 40, w: 4000, owner: null, kind: 'planet' },
+      { x: 120, y: 200, w: 4000, owner: 'p2', kind: 'planet' },
+      { x: 300, y: 210, w: 4000, owner: null, kind: 'planet' },
+      { x: 420, y: 160, w: 4000, owner: null, kind: 'planet' },
+    ];
+    const clip: Array<[number, number]> = [
+      [0, 0],
+      [480, 0],
+      [480, 280],
+      [0, 280],
+    ];
+    const cells = waveCells(computePowerCells(seeds, clip), { amp: 6, wavelength: 90, segment: 12 });
+    const borders = classifyBorders(cells, seeds);
+    const move = (x: number, y: number): [number, number] => [x * 1.5 + 3, y * 0.75 - 2];
+    let moved = 0;
+    const at = (x: number, y: number): [number, number] => (moved++, move(x, y));
+    // Отбор с прорехой посреди карты: цепочки обязаны рваться на ней.
+    const keep = (sg: BorderSegment): boolean => Math.abs((sg[0] + sg[2]) / 2 - 240) > 25;
+    const { g, log } = recorder();
+    strokeBorders(g, borders, palette, at, keep);
+
+    const one = (sg: BorderSegment): string => [...move(sg[0], sg[1]), ...move(sg[2], sg[3])].join(',');
+    const each = (segs: BorderSegment[]): string[] => segs.filter(keep).map(one);
+    const fronts = [...borders.ownedFront.values()].map(each);
+    const expected = [
+      ...[...borders.ownedInner.values()].map(each),
+      each(borders.neutralEdge),
+      ...fronts, // свечение под всеми фронтирами
+      ...fronts, // и линия поверх всех
+    ].filter((segs) => segs.length > 0);
+    const drawn = strokedSegments(log);
+    expect(drawn).toEqual(expected);
+
+    // Цепочки действительно склеились: подпутей много меньше, чем отрезков.
+    const total = expected.flat().length;
+    const starts = log.filter((l) => l.startsWith('moveTo(')).length;
+    expect(starts).toBeLessThan(total / 3);
+    // Точек сдвинуто ровно столько, сколько их легло в ломаные: второй проход фронтира
+    // (линия поверх свечения) берёт уже сдвинутые. По одному отрезку их было бы вдвое больше.
+    const beforeCrisp = log.slice(0, log.indexOf('lineWidth=1.15'));
+    const laid = beforeCrisp.filter((l) => /^(moveTo|lineTo)\(/.test(l)).length;
+    const segments = beforeCrisp.filter((l) => l.startsWith('lineTo(')).length;
+    expect(moved).toBe(laid);
+    expect(moved).toBeLessThan(1.4 * segments);
+  });
+
+  it('фронтир: сперва свечение всех владельцев, потом их линии — по одним и тем же ломаным', () => {
+    const borders: ClassifiedBorders = {
+      ownedFront: new Map([
+        [
+          'p1',
+          [
+            [0, 0, 10, 0],
+            [10, 0, 20, 5],
+          ],
+        ],
+        ['p2', [[20, 5, 10, 0]]],
+      ]),
+      ownedInner: new Map(),
+      neutralEdge: [],
+    };
+    const { g, log } = recorder();
+    strokeBorders(g, borders, palette);
+    expect(log.filter((l) => l.startsWith('lineWidth='))).toEqual([
+      'lineWidth=3',
+      'lineWidth=3',
+      'lineWidth=1.15',
+      'lineWidth=1.15',
+    ]);
+    const [glow1, glow2, crisp1, crisp2] = strokedSegments(log);
+    expect(crisp1).toEqual(glow1);
+    expect(crisp2).toEqual(glow2);
+    expect(glow1).toEqual(['0,0,10,0', '10,0,20,5']);
   });
 });

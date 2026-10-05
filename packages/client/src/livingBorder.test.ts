@@ -186,6 +186,33 @@ describe('M2.11 — живая граница провинций', () => {
     expect(fromLocal.log.filter((l) => l.startsWith('moveTo('))).toHaveLength(2 * 2 + 1 + 1);
   });
 
+  it('цепочка граней — одна живая ломаная: общая точка сдвинута один раз и туда же, куда её ведёт поле', () => {
+    const place = { scale: 2.5, x: -120.25, y: 33.5 };
+    const chain: BorderSegment[] = [
+      [150, 80, 162.5, 86],
+      [162.5, 86, 171, 99.75],
+      [171, 99.75, 186.25, 104],
+    ];
+    const borders: ClassifiedBorders = { ownedFront: new Map([['p1', chain]]), ownedInner: new Map(), neutralEdge: [] };
+    const { g, log } = recorder();
+    drawLivingBorders(g, borders, palette, frame, 4321, { width: 1000, height: 800 }, place);
+    const point = (x: number, y: number): string => {
+      const [px, py] = placePoly([[x, y]], place)[0]!;
+      const [dx, dy] = livingOffset(px, py, frame, 4321);
+      return `${px + dx},${py + dy}`;
+    };
+    const path = (l: string) => /^(moveTo|lineTo)\(/.test(l);
+    const glow = log.slice(0, log.indexOf('lineWidth=1.15')).filter(path);
+    expect(glow).toEqual([
+      `moveTo(${point(150, 80)})`,
+      `lineTo(${point(162.5, 86)})`,
+      `lineTo(${point(171, 99.75)})`,
+      `lineTo(${point(186.25, 104)})`,
+    ]);
+    // Линия поверх свечения идёт по той же ломаной.
+    expect(log.slice(log.indexOf('lineWidth=1.15')).filter(path)).toEqual(glow);
+  });
+
   it('стили общие с запечённой картой: те же проходы и толщины, что без сдвига', () => {
     const borders: ClassifiedBorders = {
       ownedFront: new Map([['p1', [[300, 200, 360, 260]]]]),

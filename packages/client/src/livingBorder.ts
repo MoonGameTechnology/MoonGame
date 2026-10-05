@@ -62,25 +62,38 @@ export function livingOffset(
   frame: LivingFrame,
   clock: number,
 ): [number, number] {
+  return livingField(frame, clock)(x, y);
+}
+
+/**
+ * Поле {@link livingOffset} в момент `clock`: функция одной ТОЧКИ (правило 1). Всё, что от
+ * точки не зависит, — масштаб рамки, время, размах — считается здесь один раз: кадр сдвигает
+ * тысячи точек, и каждая платит только за свои синусы.
+ */
+function livingField(frame: LivingFrame, clock: number): (x: number, y: number) => [number, number] {
   const scale = Math.min(frame.width, frame.height);
-  if (!(scale > 0)) return [0, 0];
-  const u = (x - frame.x) / scale;
-  const v = (y - frame.y) / scale;
+  if (!(scale > 0)) return () => [0, 0];
+  const { x: fx, y: fy } = frame;
   const t = Math.max(0, clock) / 1000;
-  // Доли подобраны так, что сумма не выходит за 1: зыбь ≤ 1/3, кипение ≤ 2/3.
-  const swellX = Math.sin(v * 11 + t * 0.8) * Math.cos(u * 13 - t * 0.6);
-  const swellY = Math.sin(u * 11 - t * 0.7) * Math.cos(v * 13 + t * 0.5);
-  const boilX = Math.sin(u * 53 + t * 1.6) * Math.sin(v * 47 - t * 1.1);
-  const boilY = Math.sin(v * 53 - t * 1.4) * Math.sin(u * 41 + t * 1.2);
   const amp = livingAmp(frame);
-  return [amp * (swellX / 3 + (2 * boilX) / 3), amp * (swellY / 3 + (2 * boilY) / 3)];
+  return (x, y) => {
+    const u = (x - fx) / scale;
+    const v = (y - fy) / scale;
+    // Доли подобраны так, что сумма не выходит за 1: зыбь ≤ 1/3, кипение ≤ 2/3.
+    const swellX = Math.sin(v * 11 + t * 0.8) * Math.cos(u * 13 - t * 0.6);
+    const swellY = Math.sin(u * 11 - t * 0.7) * Math.cos(v * 13 + t * 0.5);
+    const boilX = Math.sin(u * 53 + t * 1.6) * Math.sin(v * 47 - t * 1.1);
+    const boilY = Math.sin(v * 53 - t * 1.4) * Math.sin(u * 41 + t * 1.2);
+    return [amp * (swellX / 3 + (2 * boilX) / 3), amp * (swellY / 3 + (2 * boilY) / 3)];
+  };
 }
 
 /**
  * Нарисовать классифицированные границы живыми: те же стили, что у запечённой карты
  * (`strokeBorders` — один дом для цветов и толщин), но каждая точка сдвинута полем
- * {@link livingOffset}. Отрезок, целиком ушедший за край экрана, не считается вовсе:
- * граница рисуется каждый кадр, и платить за невидимое нельзя.
+ * {@link livingOffset}. Цепочка граней идёт одной ломаной, так что общая точка соседних
+ * отрезков сдвигается один раз, а не дважды. Отрезок, целиком ушедший за край экрана, не
+ * считается вовсе: граница рисуется каждый кадр, и платить за невидимое нельзя.
  *
  * `place` — границы пришли в локальных координатах мозаики (`territoryGeometry.ts`, их там
  * классифицируют раз на смену владельцев): каждая точка сперва встаёт на место той же
@@ -108,6 +121,7 @@ export function drawLivingBorders(
   const k = place?.scale ?? 1;
   const ox = place?.x ?? 0;
   const oy = place?.y ?? 0;
+  const shift = livingField(frame, clock);
   const keep = (sg: BorderSegment): boolean => {
     const ax = sg[0] * k + ox;
     const ay = sg[1] * k + oy;
@@ -127,7 +141,7 @@ export function drawLivingBorders(
     (x, y) => {
       const px = x * k + ox;
       const py = y * k + oy;
-      const [dx, dy] = livingOffset(px, py, frame, clock);
+      const [dx, dy] = shift(px, py);
       return [px + dx, py + dy];
     },
     keep,
