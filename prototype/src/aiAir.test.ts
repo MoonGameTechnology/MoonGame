@@ -233,6 +233,10 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
       { type: 'spaceport', level: 1, hp: data.buildings.spaceport!.hp },
     ];
     home.hangar = over.hangar ?? [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }];
+    // Свои флоты уходят из дома: стоя у порта с трюмом, они забирали бы эскадру правилом
+    // погрузки (SHU-2.1), а эскадра за тик получает один приказ (SHU-6.8) — удар ею после
+    // погрузки ядро отбило бы. Здесь проверяется удар, погрузку проверяет SHU-2.1 ниже.
+    for (const f of Object.values(s.fleets)) if (f.owner === 'p2') delete s.fleets[f.id];
     const near = Object.values(s.planets)
       .filter((p) => p.id !== home.id && p.owner === null)
       .sort(

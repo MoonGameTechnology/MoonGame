@@ -1384,8 +1384,8 @@
 | SHU-6.6 | ✅ | core proto srv | `docs/shuttles-roadmap.md` | «Держать патруль» вместо дежурного вылета |
 | SHU-6.7 | ✅ | core | `docs/shuttles-roadmap.md` | Обзор в круге патруля |
 | SHU-6.10 | ✅ | core proto | `docs/shuttles-roadmap.md` | Чужой патруль в обзоре |
-| SHU-6.8 | ⏳ | proto | `docs/shuttles-roadmap.md` | Бот: патруль и перелёт |
-| SHU-6.9 | 🔒 | data | `docs/shuttles-roadmap.md` | Баланс фазы 6 |
+| SHU-6.8 | ✅ | proto | `docs/shuttles-roadmap.md` | Бот: патруль и перелёт |
+| SHU-6.9 | ⏳ | data | `docs/shuttles-roadmap.md` | Баланс фазы 6 |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md` | Поза «Активная оборона» — контрудар при приемлемых потерях |
