@@ -54,7 +54,9 @@ describe('⌂ в экспедиции спрашивает, а не уходит
   it('карточка называет сумму «Завершить» тем же профилем и главой, что засчёт', () => {
     // Превью и засчёт — одна формула (`runPayout`); разойтись они могут только входами.
     expect(SRC).toContain('abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data)');
-    expect(RUN).toContain('settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission), data)');
+    expect(RUN).toMatch(
+      /settleSectorZeroRun\(\s*sectorProgress,\s*sectorAttempt,\s*s,\s*chapterForSettle\(sectorMission\),\s*data,?\s*\)/,
+    );
     expect(RUN).toMatch(/export function awardSectorRun\(\): number \{\n\s+if \(sectorDevActive\) return 0;\n\s+const s = game\.world\(\);/);
     // Стенд разработчика не платит — и суммы не обещает.
     expect(SRC).toContain('reward.hidden = sectorDevActive;');
