@@ -1,6 +1,6 @@
 /**
- * Сторож проводки «одна вкладка — один писатель» (`AUD-29`) — статический: `main.ts` живёт
- * на DOM. Правило хозяйки — `decisions/tabLock.test.ts`, запрет записи в хранилище —
+ * Сторож проводки «одна вкладка — один писатель» (`AUD-29`) — статический: `main.ts` и
+ * владелец профиля `sectorProfile.ts` (REFM-209) живут на DOM. Правило хозяйки — `decisions/tabLock.test.ts`, запрет записи в хранилище —
  * `runSaveLocal.test.ts`, две вкладки на собранном архиве — робот `yandextest.mjs`.
  *
  * Стык ломается молча тремя способами:
@@ -14,34 +14,43 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-const body = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Хранилища, отметка облака и перехват вкладки — у владельца профиля (REFM-209); вход в
+// Sector Zero и слух о перехвате остались в `main.ts`.
+const PROFILE = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
+const body = (src: string, name: string): string =>
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
+/** Ответы игры владельцу профиля: чем он снимает забег и останавливает мир. */
+const wiring = /initSectorProfile\(\{[\s\S]*?\n\}\);/.exec(MAIN)?.[0] ?? '';
 
 describe('AUD-29 — пишет только вкладка-хозяйка', () => {
   it('все четыре хранилища Sector Zero спрашивают замок', () => {
-    expect(SRC).toContain('localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero)');
-    expect(SRC).toContain('localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero)');
-    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero)');
+    expect(PROFILE).toContain('localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero)');
+    expect(PROFILE).toContain('localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero)');
+    expect(PROFILE).toContain('localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero)');
     // Теневая копия профиля (`YAG-4.4`) — тоже: вытесненная вкладка затёрла бы ею целую.
-    expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero)');
-    // Ни одного хранилища Sector Zero мимо замка.
-    expect(SRC.match(/localRunSaveStore\(/g)).toHaveLength(4);
+    expect(PROFILE).toContain('localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero)');
+    // Ни одного хранилища Sector Zero мимо замка — ни у владельца, ни в `main.ts`.
+    expect((MAIN + PROFILE).match(/localRunSaveStore\(/g)).toHaveLength(4);
   });
 
   it('отметка облака и само облако — тоже', () => {
-    expect(body('writeSyncMark')).toContain('if (ownsSectorZero())');
-    expect(body('pushCloud')).toContain("if (cloudState !== 'on' || !ownsSectorZero()) return;");
+    expect(body(PROFILE, 'writeSyncMark')).toContain('if (ownsSectorZero())');
+    expect(body(PROFILE, 'pushCloud')).toContain("if (cloudState !== 'on' || !ownsSectorZero()) return;");
   });
 
   it('вход в Sector Zero делает вкладку хозяйкой — первым делом', () => {
-    expect(body('openSectorZero').trimStart().startsWith('claimSectorZero();')).toBe(true);
+    expect(body(MAIN, 'openSectorZero').trimStart().startsWith('claimSectorZero();')).toBe(true);
   });
 
   it('перехват у другой вкладки перечитывает профиль и отметку, а забег берёт из журнала', () => {
-    const claim = body('claimSectorZero');
+    const claim = body(PROFILE, 'claimSectorZero');
     expect(claim).toContain('if (!tabSuperseded(TAB_ID, previous)) return;');
-    expect(claim).toContain('if (runInProgress()) setRunActive(false);');
+    // Забег в памяти снимается и забывается — ответами игры, которые делают ровно это.
+    expect(claim).toContain('game.stopRun();');
+    expect(claim).toContain('game.forgetRun();');
+    expect(wiring).toMatch(/stopRun: \(\) => \{\s+if \(runInProgress\(\)\) setRunActive\(false\);\s+\}/);
+    expect(wiring).toMatch(/forgetRun: \(\) => \{\s+savedRun = null;\s+savedPortable = null;\s+\}/);
     expect(claim).toContain('syncMark = parseSyncMark(mark);');
     // Перечитывает тем же правилом печати, что и старт (`YAG-4.4`).
     expect(claim).toContain('progressWrite = progressWrite.then(loadSectorProfile)');
@@ -51,7 +60,8 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
   });
 
   it('вытесненная вкладка слышит перехват и встаёт', () => {
-    expect(SRC).toContain('if (event.key === TAB_OWNER_KEY) checkTabOwner();');
-    expect(body('checkTabOwner')).toContain("runPauseEvent('hidden');");
+    expect(MAIN).toContain('if (event.key === TAB_OWNER_KEY) checkTabOwner();');
+    expect(body(PROFILE, 'checkTabOwner')).toContain('game.pause();');
+    expect(wiring).toContain("pause: () => runPauseEvent('hidden'),");
   });
 });

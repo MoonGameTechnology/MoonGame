@@ -1,5 +1,6 @@
 /**
- * Сторож проводки облачного сейва (`YAG-2.2`) — статический: `main.ts` живёт на DOM.
+ * Сторож проводки облачного сейва (`YAG-2.2`) — статический: облако живёт у владельца
+ * профиля `sectorProfile.ts` (REFM-209), забег и уход со страницы — в `main.ts`, оба на DOM.
  * Правила сверки покрыты в `decisions/cloudSync.test.ts`, адаптер — в `yandex.test.ts`,
  * поведение на собранном архиве — робот `yandextest.mjs`. Здесь стык, и у него три
  * способа сломаться молча:
@@ -33,58 +34,65 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-const body = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const PROFILE = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
+const body = (src: string, name: string): string =>
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
+/** Функция владельца профиля (REFM-209): облако, сверка и вход. */
+const own = (name: string): string => body(PROFILE, name);
+/** Ответы игры владельцу профиля: чем он снимает забег. */
+const wiring = /initSectorProfile\(\{[\s\S]*?\n\}\);/.exec(MAIN)?.[0] ?? '';
 
 describe('YAG-2.2 — каждое изменение профиля — новая правка облака', () => {
   it('сохранение профиля двигает правку', () => {
-    expect(body('saveSectorProgress')).toContain('bumpCloudRev();');
+    expect(own('saveSectorProgress')).toContain('bumpCloudRev();');
   });
 
   it('смена дескриптора забега двигает правку, повтор того же — нет', () => {
-    const save = body('saveRun');
-    expect(save).toContain('if (portable !== lastPortableRaw || worldDue) {');
-    expect(save).toContain('bumpCloudRev();');
+    // Забег отдаёт снимок владельцу, а правку решает тот: переменные облака — его.
+    expect(body(MAIN, 'saveRun')).toContain('offerRunToCloud(portable, blob);');
+    const offer = own('offerRunToCloud');
+    expect(offer).toContain('if (portable !== lastPortableRaw || worldDue) {');
+    expect(offer).toContain('bumpCloudRev();');
   });
 
   it('AUD-24: мир забега тоже двигает правку — только изменившийся и не чаще окна', () => {
     // Повтор того же мира (пауза) облако не пишет, а изменившийся — не чаще
     // `CLOUD_RUN_EVERY_MS`: снимок главы — до 36 КБ, и каждая запись — трафик игрока.
-    expect(body('saveRun')).toContain(
+    expect(own('offerRunToCloud')).toContain(
       'const worldDue = blob !== lastCloudRunBlob && now - cloudRunAt >= CLOUD_RUN_EVERY_MS;',
     );
   });
 
   it('AUD-24: облако везёт точный мир, принятое облако кладёт его в локальный снимок', () => {
-    const push = body('pushCloud');
+    const push = own('pushCloud');
     expect(push).toContain('const state = await runSaveStore.load();');
     expect(push).toContain('cloudEnvelope(');
-    expect(body('adoptCloud')).toContain('if (cloud.state) await runSaveStore.save(cloud.state);');
+    expect(own('adoptCloud')).toContain('if (cloud.state) await runSaveStore.save(cloud.state);');
   });
 
   it('правка отправляется в облако, а отправка отмечает сверку', () => {
-    expect(body('bumpCloudRev')).toContain('pushCloud();');
-    expect(body('pushCloud')).toContain('syncedRev: syncMark.rev');
+    expect(own('bumpCloudRev')).toContain('pushCloud();');
+    expect(own('pushCloud')).toContain('syncedRev: syncMark.rev');
   });
 });
 
 describe('YAG-2.2 — сверка на старте', () => {
   it('цепляется к записи профиля — меню её дожидается', () => {
-    expect(SRC).toContain('progressWrite = progressWrite.then(syncCloud)');
+    expect(own('initSectorProfile')).toContain('progressWrite = progressWrite.then(syncCloud)');
   });
 
   it('решение принимает общее правило, развилка облако не трогает', () => {
-    const sync = body('syncCloud');
+    const sync = own('syncCloud');
     expect(sync).toContain('planCloudSync(');
     expect(sync).toMatch(
       /if \(plan === 'choose'[^)]*\) \{\s+cloudState = 'held';\s+cloudFork = [^;]+;\s+return;/,
     );
-    expect(body('pushCloud')).toContain("if (cloudState !== 'on' || !ownsSectorZero()) return;");
+    expect(own('pushCloud')).toContain("if (cloudState !== 'on' || !ownsSectorZero()) return;");
   });
 
   it('облако не ответило вовремя — в этой сессии его нет, а не зависшее меню', () => {
-    const sync = body('syncCloud');
+    const sync = own('syncCloud');
     expect(sync).toContain('Promise.race([host.save.load(), late])');
     expect(sync).toContain('if (raw === undefined) return;');
   });
@@ -92,7 +100,7 @@ describe('YAG-2.2 — сверка на старте', () => {
   it('AUD-33: вопрос «кто играет» — под тем же сроком: молчащий getPlayer не запирает меню', () => {
     // Срок стоял только на чтении облака, а `auth.player()` перед ним ждал SDK без
     // потолка — меню висело на «Проверяем сохранение…» навсегда (прогон архива).
-    const sync = body('syncCloud');
+    const sync = own('syncCloud');
     expect(sync).toContain('const player = await Promise.race([host.auth.player(), late]);');
     expect(sync).toMatch(/if \(!player\) return;/);
   });
@@ -100,17 +108,17 @@ describe('YAG-2.2 — сверка на старте', () => {
 
 describe('YAG-2.2 — уход со страницы', () => {
   it('отправляет копию сразу, а не в окно квоты', () => {
-    expect(SRC).toContain("addEventListener('pagehide', () => pushCloud(true));");
-    expect(SRC).toMatch(/if \(document\.visibilityState === 'hidden'\) pushCloud\(true\);/);
+    expect(MAIN).toContain("addEventListener('pagehide', () => pushCloud(true));");
+    expect(MAIN).toMatch(/if \(document\.visibilityState === 'hidden'\) pushCloud\(true\);/);
   });
 });
 
 /** Объект меню `sectorZeroAccount` — от объявления до закрывающей скобки. */
-const account = /const sectorZeroAccount[\s\S]*?\n\};/.exec(SRC)?.[0] ?? '';
+const account = /const sectorZeroAccount[\s\S]*?\n\};/.exec(PROFILE)?.[0] ?? '';
 
 describe('YAG-1.4 — вход и развилка', () => {
   it('гость видит «Войти» только там, где облако есть, а вход площадка умеет', () => {
-    expect(body('syncCloud')).toMatch(/\.authenticated\) \{\s+cloudState = 'guest';/);
+    expect(own('syncCloud')).toMatch(/\.authenticated\) \{\s+cloudState = 'guest';/);
     expect(account).toContain(
       "canSignIn: () => cloudState === 'guest' && getPlatform().auth.canSignIn",
     );
@@ -124,7 +132,8 @@ describe('YAG-1.4 — вход и развилка', () => {
   });
 
   it('облачный профиль снимает забег, стоящий на паузе в этой вкладке', () => {
-    expect(body('adoptCloud')).toContain('if (runInProgress()) setRunActive(false);');
+    expect(own('adoptCloud')).toContain('game.stopRun();');
+    expect(wiring).toMatch(/stopRun: \(\) => \{\s+if \(runInProgress\(\)\) setRunActive\(false\);\s+\}/);
   });
 
   it('«Оставить этот» — номер правки по общему правилу, и облако получает профиль', () => {
@@ -136,9 +145,9 @@ describe('YAG-1.4 — вход и развилка', () => {
   it('родословная проведена насквозь: правка, запись, сверка, взятие облака', () => {
     // Без неё сверка откатывается к номерам разных устройств как одной истории — и молча
     // теряет прогресс, если оптимистичная отметка записи не дошла (ревью Sector Zero).
-    expect(body('bumpCloudRev')).toContain('syncMark = bumpMark(syncMark);');
-    expect(body('pushCloud')).toContain('lineage: syncMark.lineage');
-    expect(body('syncCloud')).toContain('lineage: syncMark.lineage');
-    expect(body('adoptCloud')).toContain('syncMark = adoptMark(syncMark, cloud);');
+    expect(own('bumpCloudRev')).toContain('syncMark = bumpMark(syncMark);');
+    expect(own('pushCloud')).toContain('lineage: syncMark.lineage');
+    expect(own('syncCloud')).toContain('lineage: syncMark.lineage');
+    expect(own('adoptCloud')).toContain('syncMark = adoptMark(syncMark, cloud);');
   });
 });

@@ -1,5 +1,6 @@
 /**
- * Сторож проводки печати профиля (`YAG-4.4`) — статический: `main.ts` живёт на DOM.
+ * Сторож проводки печати профиля (`YAG-4.4`) — статический: профиль живёт у владельца
+ * `sectorProfile.ts` (REFM-209), а тот — на DOM.
  * Правила печати покрыты в `decisions/profileSeal.test.ts`, поведение на собранном архиве —
  * робот `yandextest.mjs`. Здесь стык, и у него четыре способа сломаться молча:
  *
@@ -15,21 +16,25 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Чтение, запись и перехват профиля — у владельца (REFM-209); `main.ts` его только стартует.
+const PROFILE = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
+/** Пути в хранилище профиля ищутся по ОБОИМ файлам: обход печати опасен где угодно. */
+const ALL = MAIN + PROFILE;
 const body = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(PROFILE)?.[1] ?? '';
 
 describe('YAG-4.4 — профиль пишется только с печатью', () => {
   it('в хранилище профиля пишет одна функция — основную копию и сразу теневую', () => {
-    expect(SRC.match(/sectorProgressStore\.save\(/g)).toHaveLength(1);
-    expect(SRC.match(/sectorShadowStore\.save\(/g)).toHaveLength(1);
+    expect(ALL.match(/sectorProgressStore\.save\(/g)).toHaveLength(1);
+    expect(ALL.match(/sectorShadowStore\.save\(/g)).toHaveLength(1);
     const write = body('writeSectorProgress');
     expect(write).toContain('await sectorProgressStore.save(blob);');
     expect(write).toContain('await sectorShadowStore.save(blob);');
   });
 
   it('каждый её вызов несёт запечатанный профиль', () => {
-    const calls = [...SRC.matchAll(/(?<!function )writeSectorProgress\(([^;]*)\);/g)].map(
+    const calls = [...ALL.matchAll(/(?<!function )writeSectorProgress\(([^;]*)\);/g)].map(
       (m) => m[1],
     );
     expect(calls.length).toBeGreaterThanOrEqual(4);
@@ -46,15 +51,18 @@ describe('YAG-4.4 — профиль пишется только с печать
 
 describe('YAG-4.4 — профиль читается только по правилу печати', () => {
   it('основную копию читает одна функция — и отдаёт выбор правилу', () => {
-    expect(SRC.match(/sectorProgressStore\.load\(\)/g)).toHaveLength(2); // чтение и проверка записи
+    expect(ALL.match(/sectorProgressStore\.load\(\)/g)).toHaveLength(2); // чтение и проверка записи
     expect(body('loadSectorProfile')).toContain(
       'const pick = pickLocalProfile(main, shadow, syncMark.sealed === true);',
     );
   });
 
   it('старт и перехват вкладки идут через неё, а велено — переписывают профиль', () => {
-    expect(SRC).toContain('let progressWrite = loadSectorProfile().then(');
-    expect(SRC).toContain('if (granted.progress === sectorProgress && !pick.rewrite) return;');
+    // Старт — один, из `main.ts`, и цепочка записей начинается с чтения по правилу.
+    expect(MAIN.match(/initSectorProfile\(/g)).toHaveLength(1);
+    const init = body('initSectorProfile');
+    expect(init).toContain('progressWrite = loadSectorProfile().then(');
+    expect(init).toContain('if (granted.progress === sectorProgress && !pick.rewrite) return;');
     const claim = body('claimSectorZero');
     expect(claim).toContain('progressWrite.then(loadSectorProfile)');
     expect(claim).toContain('if (pick.rewrite) await writeSectorProgress(');

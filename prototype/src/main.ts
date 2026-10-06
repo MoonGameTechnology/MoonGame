@@ -249,7 +249,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, pveRescues, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
+import { pveState, pveModeId, pveMissionOfMap, pveMissionIndex, pveChapter, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
@@ -336,36 +336,13 @@ import { engageOrders } from '../../decisions/engageOrders';
 import { engageRoster } from '../../decisions/engageRoster';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
-import { shownObjectives } from '../../decisions/missionObjectives';
 import { bossMissionRow, missionBriefs, missionRows, type MissionRow } from '../../decisions/missionView';
 import { initMissionPanel } from './missionPanel';
 import { bossTask } from '../../decisions/runBoss';
 import { devourSieges } from '../../decisions/devourSiege';
 import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
 import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
-import { chapterHero, grantChapterHeroes } from '../../decisions/heroRecruits';
-import { grantTokenHeroes } from '../../decisions/heroTokens';
-import {
-  adoptMark,
-  bumpMark,
-  keepLocalMark,
-  parseCloudProfile,
-  parseSyncMark,
-  planCloudSync,
-  profileNumbers,
-  profileHasProgress,
-  cloudEnvelope,
-  type CloudProfile,
-} from '../../decisions/cloudSync';
-import {
-  LOCAL_SEAL,
-  SECTOR_ZERO_SHADOW_KEY,
-  cloudSeal,
-  pickLocalProfile,
-  sealProgress,
-  wholeCloud,
-  type LocalProfile,
-} from '../../decisions/profileSeal';
+import { chapterHero } from '../../decisions/heroRecruits';
 import { chapterBlueprint } from '../../decisions/moduleRarity';
 import { battleStance } from '../../decisions/battleStance';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
@@ -375,7 +352,6 @@ import { swarmLoreKnown } from '../../decisions/swarmLore';
 import { missionRingFrame, missionRingPhase, RING_R, RING_W } from '../../decisions/missionRing';
 import { pirateEncounter } from '../../decisions/pirateEncounter';
 import { abandonPromise, fleetLostPrompt, shipCount } from '../../decisions/fleetLost';
-import { retireDoneEncounters } from '../../decisions/retiredEncounters';
 import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
@@ -396,10 +372,8 @@ import {
   parseRunSave,
   serializeRunSave,
   type RunSave,
-  type RunSaveStore,
 } from '../../decisions/runSave';
-import { localRunSaveStore, PORTABLE_RUN_KEY, RUN_SAVE_KEY } from './runSaveLocal';
-import { TAB_OWNER_KEY, tabSuperseded } from '../../decisions/tabLock';
+import { TAB_OWNER_KEY } from '../../decisions/tabLock';
 import { portableRunPreview, sectorZeroRunPreview } from '../../decisions/sectorZeroMenu';
 import {
   describeRun,
@@ -416,7 +390,27 @@ import {
   toolShown,
   type SessionTool,
 } from '../../decisions/sectorZeroTools';
-import { initSectorZeroMenu, type SectorZeroAccount } from './sectorZeroMenu';
+import { initSectorZeroMenu } from './sectorZeroMenu';
+// Профиль Sector Zero, его облачная копия и вкладка-хозяйка — у владельца (REFM-209).
+import {
+  changeSectorProgress,
+  chapterLater,
+  chapterShown,
+  chapterWorld,
+  checkTabOwner,
+  claimSectorZero,
+  holdProgressFor,
+  initSectorProfile,
+  offerRunToCloud,
+  portableRunStore,
+  progressWrite,
+  pushCloud,
+  runSaveStore,
+  saveSectorProgress,
+  sectorChapterIds,
+  sectorProgress,
+  sectorZeroAccount,
+} from './sectorProfile';
 import { initSectorZeroPreparation } from './sectorZeroPreparation';
 import { initRunWallet } from './runWallet';
 import { getPlatform, type PlatformHost } from './platform/host';
@@ -429,10 +423,9 @@ import {
 } from '../../decisions/sectorZeroShop';
 import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
 import {
-  SECTOR_ZERO_PROGRESS_KEY, freshSectorZeroProgress, parseSectorZeroProgress,
+  freshSectorZeroProgress,
   changeSectorZeroProgress, prepareSectorZeroRun, settleSectorZeroRun, sovereignRepairCost,
   REPAIR_HP_PER_SOVEREIGN, WARRANTS_PER_REWARD, abandonRunReward,
-  type SectorZeroProgress, type SectorProgressAction,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL, RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
@@ -636,7 +629,7 @@ import {
 } from './format';
 import { runClockText } from '../../decisions/runClock';
 import { terrainArtKind } from '../../decisions/terrainArt';
-import { metaUnlocks, pveOutcomeEvent } from '../../decisions/runAnalytics';
+import { pveOutcomeEvent } from '../../decisions/runAnalytics';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
   BUILD_ICON,
@@ -16102,38 +16095,6 @@ function restoreSolo(): void {
   note(t('solo.save.restored'));
 }
 
-/**
- * Сохранение забега (PVR-0.3).
- *
- * Бэкенд подставляется ЗДЕСЬ и только здесь: забег о нём не знает, он знает интерфейс
- * `RunSaveStore`. В релизной сборке площадки сюда встанет облачное хранилище, и код
- * ниже не изменится — в этом и была цена асинхронного интерфейса.
- */
-/**
- * Одна вкладка — один писатель Sector Zero (`AUD-29`, `decisions/tabLock.ts`). Две вкладки
- * одной игры держали по копии профиля в памяти и молча затирали записи друг друга, а
- * облако этого не видело: имя устройства и номера правок у них общие. Хозяйка — вкладка,
- * последней открывшая Sector Zero (`claimSectorZero`); профиль, журнал забега, отметку и
- * облако пишет только она, и спрашивает об этом хранилище в момент записи.
- */
-const TAB_ID =
-  globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-function ownsSectorZero(): boolean {
-  return !tabSuperseded(TAB_ID, readRaw(TAB_OWNER_KEY));
-}
-const runSaveStore: RunSaveStore = localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero);
-// Дескриптор забега (`YAG-2.1`) — рядом с полным снимком. Снимок точнее, дескриптор живучее:
-// шесть полей переживают смену формы мира после обновления игры, блоб — нет.
-const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero);
-const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero);
-// Теневая копия профиля (`YAG-4.4`) — последний целый профиль: правленый руками основной
-// игра не берёт, а берёт её.
-const sectorShadowStore = localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero);
-// Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
-// Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
-// он один раз — у сохранённого профиля свой сид, и разбор его сохраняет.
-const sectorSeed = `${Date.now().toString(36)}.${Math.random().toString(36).slice(2, 10)}`;
-let sectorProgress = freshSectorZeroProgress(data, sectorSeed);
 let sectorAttempt = 0;
 let sectorRunActive = false;
 
@@ -16237,44 +16198,20 @@ let nextSectorDifficulty = parseRunDifficulty(readRaw('void.pveDifficulty'));
 let nextSectorMission = pveMissionIndex(Number(readRaw('void.pveMission') ?? 0));
 let runWrite = Promise.resolve();
 
-/**
- * Профиль из хранилища по правилу печати (`YAG-4.4`, `pickLocalProfile`): целый основной,
- * иначе теневая копия, иначе профиль старой версии — один раз. Флаг «уже запечатывало»
- * лежит в отметке сверки, а она объявлена ниже по файлу: читается он после ожидания
- * хранилища, когда модуль уже исполнен.
- */
-async function loadSectorProfile(): Promise<LocalProfile> {
-  const main = await sectorProgressStore.load();
-  const shadow = await sectorShadowStore.load();
-  const pick = pickLocalProfile(main, shadow, syncMark.sealed === true);
-  // Правка руками не прощается молча: причина — в журнал, а игроку ничего (наказаний нет).
-  if (pick.from === 'shadow' || (pick.from === 'none' && main)) console.warn('E_PROFILE_SEAL', pick.from);
-  return pick;
-}
-
-/**
- * Запечатанный профиль (`sealProgress`) — в основную копию и сразу в теневую. Флаг «уже
- * запечатывало» встаёт, только когда запись правда легла. Иначе переполненное хранилище
- * оставило бы рядом с флагом старый профиль без печати, и следующий старт принял бы
- * честный профиль за правленый.
- */
-async function writeSectorProgress(blob: string): Promise<void> {
-  await sectorProgressStore.save(blob);
-  await sectorShadowStore.save(blob);
-  if (syncMark.sealed || (await sectorProgressStore.load()) !== blob) return;
-  syncMark = { ...syncMark, sealed: true };
-  writeSyncMark();
-}
-
-let progressWrite = loadSectorProfile().then(pick => {
-  sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
-  // Профиль с главами, выигранными до наград-героев, и с уже засчитанными спасениями
-  // догоняет их при чтении (heroRecruits §3, §4).
-  const granted = grantChapterHeroes(sectorProgress, sectorChapterIds(), data, pveRescues());
-  // Запись и тогда, когда печать велит: подделка стирается, старый профиль запечатывается.
-  if (granted.progress === sectorProgress && !pick.rewrite) return;
-  sectorProgress = granted.progress;
-  return writeSectorProgress(sealProgress(granted.progress, LOCAL_SEAL));
+// Профиль Sector Zero — у своего владельца (`sectorProfile.ts`, REFM-209): забег, экран и
+// лента остаются здесь, и профиль спрашивает о них через эти ответы.
+initSectorProfile({
+  note,
+  runWrite: () => runWrite,
+  stopRun: () => {
+    if (runInProgress()) setRunActive(false);
+  },
+  forgetRun: () => {
+    savedRun = null;
+    savedPortable = null;
+  },
+  shown: () => sectorZeroMenu.isOpen() || (sectorRunActive && !NET),
+  pause: () => runPauseEvent('hidden'),
 });
 
 /** Глава для засчёта забега: карта и задачи плюс гарантированный чертёж за первую
@@ -16286,34 +16223,7 @@ function chapterForSettle(mission: number) {
   return { ...pveChapter(index), blueprint: chapterBlueprint(index) };
 }
 
-/** Id глав по номерам — для правила «герой за главу» (`heroRecruits.ts`). */
-function sectorChapterIds(): string[] {
-  return Array.from({ length: PVE_MISSION_COUNT }, (_, i) => pveChapter(i).id);
-}
 let clearedAttempt = 0;
-
-/** Задачи главы, видимые в забеге по текущему профилю (PVR-5.3). Профиль меняется только
- *  засчётом, поэтому набор стоит неизменным весь забег. */
-function chapterShown(mission: number) {
-  const chapter = pveChapter(mission);
-  return shownObjectives(chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? [], chapter.slots);
-}
-
-/** Мир главы на старт забега: карта минус встречи, чьи задачи уже закрыты в профиле
- *  (`retiredEncounters.ts`) — взятое логово пиратов не встаёт заново. Старт — под
- *  сложность забега (PVR-6.32): новая попытка и восстановленная получают одну карту. */
-function chapterWorld(mission: number, difficulty: RunDifficulty): GameState {
-  const chapter = pveChapter(mission);
-  return retireDoneEncounters(pveState(data, mission, difficulty), chapter.objectives, sectorProgress.objectivesDone[chapter.id] ?? []);
-}
-
-/** Задачи главы, что откроются позже: запас минус видимые и выполненные. */
-function chapterLater(mission: number) {
-  const chapter = pveChapter(mission);
-  const shown = new Set(chapterShown(mission).map((o) => o.id));
-  const done = new Set(sectorProgress.objectivesDone[chapter.id] ?? []);
-  return chapter.objectives.filter((o) => !shown.has(o.id) && !done.has(o.id));
-}
 
 /** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */
 function runMissionRows(): MissionRow[] {
@@ -16568,223 +16478,6 @@ function drawDevourSieges(): void {
   cx.restore();
 }
 
-function saveSectorProgress(next: SectorZeroProgress): void {
-  // Победа в главе приводит её героя (решение владельца 2026-09-23), спасение задачей главы —
-  // спасённого (баг-репорт 2026-09-27) — на любом пути засчёта.
-  const granted = grantChapterHeroes(next, sectorChapterIds(), data, pveRescues());
-  // Герой, для которого набралось 10 жетонов (`heroTokens.ts`), — тоже на любом пути:
-  // жетоны приходят и с итогов забега, и из магазина.
-  const byTokens = grantTokenHeroes(granted.progress, data);
-  next = byTokens.progress;
-  for (const id of [...granted.joined, ...byTokens.joined])
-    note(t('sector-zero.hero.joined', { name: tData(data.heroes[id]?.name ?? id) }));
-  // Что открыла эта запись (`YAG-5.1`). Облако и загрузка кладут профиль мимо этой функции,
-  // поэтому принесённое с другого устройства за открытие здесь не считается.
-  for (const unlock of metaUnlocks(sectorProgress, next)) getPlatform().analytics.emit('meta_unlock', unlock);
-  sectorProgress = next;
-  const blob = sealProgress(next, LOCAL_SEAL);
-  progressWrite = progressWrite.then(() => writeSectorProgress(blob));
-  bumpCloudRev();
-}
-
-// --- облачный сейв профиля (YAG-2.2) ------------------------------------------
-// Облако есть только у ВОШЕДШЕГО игрока; гость живёт локально (`YAG-1.4`). Источник
-// прогресса — по-прежнему локальное хранилище, облако — его копия, которая переезжает
-// между устройствами. Что делать на старте, решает `decisions/cloudSync.ts`; здесь только
-// проводка: сверка на старте, номер правки на каждое сохранение, запись по событию.
-const CLOUD_MARK_KEY = 'sector-zero.cloud.v1';
-/** Сколько ждать сверку с облаком на старте — ВСЮ: и вопрос «кто играет», и чтение облака
- *  (AUD-33; раньше срок стоял только на чтении, и молчащий `getPlayer` запирал меню
- *  навсегда). Не ответило — в этой сессии облака нет: писать поверх того, чего мы не
- *  видели, нельзя, а держать меню дольше незачем. */
-const CLOUD_LOAD_TIMEOUT_MS = 4000;
-let syncMark = parseSyncMark(readRaw(CLOUD_MARK_KEY));
-// Имя устройства для родословной профиля (`cloudSync.ts`): случайное, выдаётся один раз и
-// живёт в отметке. Решения случайности не держат — её даёт хост.
-if (!syncMark.device)
-  syncMark = {
-    ...syncMark,
-    device:
-      globalThis.crypto?.randomUUID?.() ??
-      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-  };
-/** `off` — облака нет; `guest` — облако у площадки есть, а игрок не вошёл (кнопка «Войти»);
- *  `on` — сверено, пишем; `held` — прогресс разошёлся с облачным, и до выбора игрока
- *  облако не трогаем (экран выбора в меню, `YAG-1.4`). */
-let cloudState: 'off' | 'guest' | 'on' | 'held' = 'off';
-/** Id вошедшего игрока площадки — привязка печати облачной копии (`YAG-4.4`, `cloudSeal`).
- *  Ставит сверка до того, как облако станет `on`, — раньше в облако никто не пишет. */
-let cloudPlayer = '';
-/** Облачный профиль на развилке — ждёт выбора игрока (`held`). */
-let cloudFork: { cloud: CloudProfile; progress: SectorZeroProgress } | null = null;
-let cloudWrite: Promise<void> = Promise.resolve();
-let lastCloudEnvelope = '';
-let lastCloudFlushed = '';
-let lastPortableRaw: string | null = null;
-/** Мир забега, последним поставленный в облако, и когда (AUD-24). */
-let lastCloudRunBlob: string | null = null;
-let cloudRunAt = 0;
-/**
- * Как часто мир идущего забега уходит в облако (AUD-24). Реже локального автосейва: снимок
- * главы — до 36 КБ, и в окно писателя (раз в 6 с) это ~12 МБ трафика за главу на телефоне,
- * а раз в 30 с — ~2 МБ. Цена — другое устройство может получить мир давностью до 30 секунд
- * реального времени: откат на полминуты, а не пересборка главы с карты. Уход со страницы
- * и выход площадки отправляют последний мир сразу (`pushCloud(true)`).
- */
-const CLOUD_RUN_EVERY_MS = 30_000;
-
-function writeSyncMark(): void {
-  if (ownsSectorZero()) writeRaw(CLOUD_MARK_KEY, JSON.stringify(syncMark));
-}
-/** Профиль или дескриптор забега изменился — новая правка, и облако её получит. */
-function bumpCloudRev(): void {
-  syncMark = bumpMark(syncMark);
-  writeSyncMark();
-  pushCloud();
-}
-/** Отправить текущий профиль в облако. Частоту держит адаптер (квота), здесь — только
- *  «есть ли что отправлять». `flush` — страница уходит: сразу, а не в окно квоты. */
-function pushCloud(flush = false): void {
-  cloudWrite = cloudWrite.then(async () => {
-    // Облако пишет та же вкладка, что и хранилище (AUD-29): копия вытесненной отстаёт.
-    if (cloudState !== 'on' || !ownsSectorZero()) return;
-    await progressWrite;
-    await runWrite;
-    const run = await portableRunStore.load();
-    // AUD-24: вместе с дескриптором едет ТОЧНЫЙ мир забега. Без него другое устройство
-    // пересобирало мир с карты главы, и «Продолжить» там стирало поражение. Не влез в
-    // лимит площадки — уходит без мира, профиль всё равно доезжает (`cloudEnvelope`).
-    const state = await runSaveStore.load();
-    const platform = getPlatform();
-    const envelope = cloudEnvelope(
-      {
-        v: 1,
-        seed: sectorProgress.seed,
-        rev: syncMark.rev,
-        // Облачная копия запечатана для этого игрока (`YAG-4.4`): чужое облако её не примет.
-        progress: sealProgress(sectorProgress, cloudSeal(cloudPlayer)),
-        ...(run ? { run } : {}),
-        ...(state ? { state } : {}),
-        ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
-      },
-      (candidate) => platform.save.fits?.(candidate) ?? true,
-    );
-    if (envelope === (flush ? lastCloudFlushed : lastCloudEnvelope)) return;
-    lastCloudEnvelope = envelope;
-    if (flush) lastCloudFlushed = envelope;
-    // Отмечаем сверку сразу: не дойди запись — облако окажется ПОЗАДИ отметки, и
-    // следующий старт отправит профиль снова (`planCloudSync`, «наша запись не дошла»).
-    syncMark = { ...syncMark, syncedRev: syncMark.rev };
-    writeSyncMark();
-    detach('облако: запись профиля', getPlatform().save.save(envelope, { flush }));
-  });
-}
-/** Сверка на старте. Цепляется к записи профиля — меню ждёт её и сразу показывает
- *  правильный прогресс. Любой сбой — «облака в этой сессии нет», а не сломанное меню. */
-async function syncCloud(): Promise<void> {
-  const host = getPlatform();
-  if (!host.capabilities.cloudSave) return;
-  const late = new Promise<undefined>((resolve) => setTimeout(resolve, CLOUD_LOAD_TIMEOUT_MS));
-  const player = await Promise.race([host.auth.player(), late]);
-  if (!player) return;
-  if (!player.authenticated) {
-    cloudState = 'guest';
-    return;
-  }
-  cloudPlayer = player.id;
-  const raw = await Promise.race([host.save.load(), late]);
-  if (raw === undefined) return;
-  // Замок 3 (`YAG-4.4`): облачная копия без целой печати ЭТОГО игрока — как «облака нет»,
-  // и сверка отправит туда целый локальный профиль.
-  const found = parseCloudProfile(raw);
-  const cloud = wholeCloud(found, player.id);
-  if (found && !cloud) console.warn('E_PROFILE_SEAL', 'cloud');
-  const cloudProgress = cloud ? parseSectorZeroProgress(cloud.progress, data, cloud.seed) : null;
-  const plan = planCloudSync(
-    {
-      seed: sectorProgress.seed,
-      rev: syncMark.rev,
-      syncedRev: syncMark.syncedRev,
-      hasProgress: profileHasProgress(sectorProgress),
-      ...(syncMark.lineage ? { lineage: syncMark.lineage } : {}),
-    },
-    cloud,
-    cloudProgress ? profileHasProgress(cloudProgress) : false,
-  );
-  if (plan === 'choose' && cloud && cloudProgress) {
-    cloudState = 'held';
-    cloudFork = { cloud, progress: cloudProgress };
-    return;
-  }
-  if (plan === 'adopt' && cloud && cloudProgress) {
-    await adoptCloud(cloud, cloudProgress);
-    note(t('sector-zero.cloud.adopted'));
-    return;
-  }
-  cloudState = 'on';
-  if (plan === 'upload') pushCloud();
-}
-/** Облачный профиль становится единственным: молча на старте или выбором на развилке. */
-async function adoptCloud(cloud: CloudProfile, cloudProgress: SectorZeroProgress): Promise<void> {
-  await runWrite;
-  // Забег, стоящий на паузе в этой вкладке, принадлежит прежнему профилю — выбор на
-  // развилке делается и после него. Меню иначе предложило бы «Продолжить» его и засчитало
-  // бы облачному профилю чужой забег.
-  if (runInProgress()) setRunActive(false);
-  sectorProgress = grantChapterHeroes(cloudProgress, sectorChapterIds(), data, pveRescues()).progress;
-  await writeSectorProgress(sealProgress(sectorProgress, LOCAL_SEAL));
-  // Снимок забега принадлежит прежнему профилю — забег продолжается по облачному: ТОЧНЫМ
-  // миром, если облако его привезло (AUD-24), иначе по дескриптору (или его нет вовсе).
-  // Именно мир, а не дескриптор: пересборка по дескриптору начинает мир с карты главы, и
-  // вход с другого устройства превращался в бесплатную перемотку поражения.
-  await runSaveStore.clear();
-  if (cloud.state) await runSaveStore.save(cloud.state);
-  if (cloud.run) await portableRunStore.save(cloud.run);
-  else await portableRunStore.clear();
-  savedRun = null;
-  savedPortable = null;
-  syncMark = adoptMark(syncMark, cloud);
-  writeSyncMark();
-  cloudFork = null;
-  cloudState = 'on';
-}
-const cloudSyncFailed = (error: unknown): void => {
-  console.error('E_CLOUD_SYNC', error);
-};
-progressWrite = progressWrite.then(syncCloud).catch(cloudSyncFailed);
-
-/** Меню: вход площадки и развилка профилей (`YAG-1.4`). Вход — только по нажатию игрока
- *  (требование 1.2.1), и польза названа рядом с кнопкой ДО окна. */
-const sectorZeroAccount: SectorZeroAccount = {
-  canSignIn: () => cloudState === 'guest' && getPlatform().auth.canSignIn,
-  async signIn() {
-    // Отказ — не ошибка: кнопка остаётся, игрок продолжает гостем.
-    if ((await getPlatform().auth.signIn()).status !== 'ok') return;
-    progressWrite = progressWrite.then(syncCloud).catch(cloudSyncFailed);
-    await progressWrite;
-  },
-  fork: () =>
-    cloudFork ? { here: profileNumbers(sectorProgress), cloud: profileNumbers(cloudFork.progress) } : null,
-  async choose(pick) {
-    const fork = cloudFork;
-    if (!fork) return;
-    if (pick === 'cloud') {
-      progressWrite = progressWrite
-        .then(() => adoptCloud(fork.cloud, fork.progress))
-        .catch(cloudSyncFailed);
-      await progressWrite;
-      return;
-    }
-    // «Оставить этот»: облако получит локальный профиль с номером ВПЕРЕДИ облачного
-    // (`keepLocalMark` — почему именно так).
-    syncMark = keepLocalMark(syncMark, fork.cloud);
-    writeSyncMark();
-    cloudFork = null;
-    cloudState = 'on';
-    pushCloud();
-  },
-};
-
 // Площадка (`YAG-1.1a`/`YAG-1.1b`). КАКАЯ именно — решает хост ДО импорта этого модуля
 // (`bootstrap.ts`): здесь площадка уже готова, и игра про её имя ничего не знает. В
 // обычном браузере это веб-адаптер: rewarded-рекламы и платежей там нет, и `capabilities`
@@ -16837,14 +16530,6 @@ async function watchAd(placement: AdPlacement, props?: Record<string, string>): 
   const shown = await platform.ads.showRewardedAd({ placement });
   if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement, ...props });
   return shown.status;
-}
-
-/** Действие игрока над профилем Sector Zero; `false` — действие не прошло правила. */
-function changeSectorProgress(action: SectorProgressAction): boolean {
-  const next = changeSectorZeroProgress(sectorProgress, action, data);
-  if (!next) return false;
-  saveSectorProgress(next);
-  return true;
 }
 
 // Кошелёк профиля в шапке забега и «+» у Суверенов (`run.sovereigns`, решение владельца
@@ -17069,53 +16754,6 @@ function launchSectorRun(): void {
   playChapterComic(pveChapter(nextSectorMission).id, 'intro', () => startPvEMatch());
 }
 
-/**
- * Эта вкладка становится хозяйкой Sector Zero (AUD-29). Хозяйкой до неё была другая —
- * значит, память этой могла отстать от хранилища (вкладка хаба грузила профиль давно,
- * а другая с тех пор играла): профиль и отметка облака перечитываются, а забег в памяти
- * снимается — меню возьмёт его журнал из хранилища, где лежит самый свежий.
- */
-function claimSectorZero(): void {
-  const previous = readRaw(TAB_OWNER_KEY);
-  writeRaw(TAB_OWNER_KEY, TAB_ID);
-  if (!tabSuperseded(TAB_ID, previous)) return;
-  if (runInProgress()) setRunActive(false);
-  savedRun = null;
-  savedPortable = null;
-  const mark = readRaw(CLOUD_MARK_KEY);
-  if (mark !== null) syncMark = parseSyncMark(mark);
-  // Перечитывается тем же правилом печати, что и на старте (`YAG-4.4`): правленый за это
-  // время профиль не берётся, а стирается целой копией.
-  progressWrite = progressWrite.then(loadSectorProfile).then(async (pick) => {
-    if (!pick.raw) return;
-    sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
-    if (pick.rewrite) await writeSectorProgress(sealProgress(sectorProgress, LOCAL_SEAL));
-  });
-}
-
-/** Sector Zero перехватила другая вкладка, а эта его показывает: мир встаёт, экран
- *  закрывается заставкой. «Играть здесь» перезагружает вкладку — та перехватит его обратно
- *  и прочтёт свежее хранилище, а не свою отставшую память. */
-let tabTaken: HTMLElement | null = null;
-function checkTabOwner(): void {
-  if (ownsSectorZero() || !(sectorZeroMenu.isOpen() || (sectorRunActive && !NET))) return;
-  runPauseEvent('hidden');
-  if (tabTaken) return;
-  tabTaken = document.createElement('div');
-  tabTaken.id = 'tab-taken';
-  tabTaken.setAttribute('role', 'alertdialog');
-  const title = document.createElement('h1');
-  title.textContent = t('sector-zero.tab-taken.title');
-  const text = document.createElement('p');
-  text.textContent = t('sector-zero.tab-taken.text');
-  const here = document.createElement('button');
-  here.type = 'button';
-  here.textContent = t('sector-zero.tab-taken.here');
-  here.addEventListener('click', () => location.reload());
-  tabTaken.append(title, text, here);
-  document.body.append(tabTaken);
-  here.focus({ preventScroll: true });
-}
 addEventListener('storage', (event) => {
   if (event.key === TAB_OWNER_KEY) checkTabOwner();
 });
@@ -17189,17 +16827,8 @@ function saveRun(): void {
     }),
   );
   runWrite = runWrite.then(() => runSaveStore.save(blob)).then(() => portableRunStore.save(portable));
-  // Дескриптор — часть облачного профиля: сменился (волна, усиление) — новая правка. Мир
-  // забега (AUD-24) — тоже, но не чаще `CLOUD_RUN_EVERY_MS` и только изменившийся: на паузе
-  // облако не пишется.
-  const now = performance.now();
-  const worldDue = blob !== lastCloudRunBlob && now - cloudRunAt >= CLOUD_RUN_EVERY_MS;
-  if (portable !== lastPortableRaw || worldDue) {
-    lastPortableRaw = portable;
-    lastCloudRunBlob = blob;
-    cloudRunAt = now;
-    bumpCloudRev();
-  }
+  // Дескриптор и мир забега — часть облачного профиля: новая ли это правка, решает владелец.
+  offerRunToCloud(portable, blob);
 }
 
 function awardSectorRun(): number {
@@ -17211,8 +16840,7 @@ function awardSectorRun(): number {
     // Journal the terminal run before its award. If the page closes between the
     // two writes, opening the menu settles the same serial exactly once.
     saveRun();
-    const terminalWrite = runWrite;
-    progressWrite = progressWrite.then(() => terminalWrite);
+    holdProgressFor(runWrite);
     saveSectorProgress(next);
   }
   return sectorProgress.lastReward;
