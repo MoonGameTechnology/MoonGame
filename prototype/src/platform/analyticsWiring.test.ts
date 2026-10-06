@@ -19,11 +19,12 @@ const PENDING = ['iap_started', 'iap_completed'];
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(path.join(here, rel), 'utf8');
-/** Места эмиссии: проводка клиента, владелец профиля Sector Zero (`meta_unlock` — его запись)
- *  и чистые решения, которые называют событие. */
+/** Места эмиссии: проводка клиента, владелец профиля Sector Zero (`meta_unlock` — его запись),
+ *  оболочка Sector Zero (ролики площадки) и чистые решения, которые называют событие. */
 const sites = [
   read('../main.ts'),
   read('../sectorProfile.ts'),
+  read('../sectorZeroShell.ts'),
   read('../../../decisions/runAnalytics.ts'),
 ].join('\n');
 
