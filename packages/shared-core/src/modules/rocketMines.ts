@@ -1,5 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { RocketMineDef } from '../data/schemas';
+import type { GameData, RocketMineDef } from '../data/schemas';
 import type { Fleet } from '../state/gameState';
 import { hoursToMs, travelSpeedFactorOf } from '../action/types';
 import {
@@ -102,6 +102,15 @@ function targetPoint(
       (a, b) => distance(a, position) - distance(b, position) || a.x - b.x || a.y - b.y,
     );
   return points[0] ?? null;
+}
+
+/** The hull of the missile this layer would launch. Zero means point defense has nothing
+ *  to shoot at: the missile would vanish with neither a hit nor an interception (Codex,
+ *  #1503) — so the deployment is refused instead. */
+function missileHull(data: GameData, layerId: string): number {
+  const unit = data.units[MISSILE_UNIT];
+  if (!unit) return 0;
+  return effectiveStats(unit, { modules: [layerId] }, data).hp ?? 0;
 }
 
 /** A standing rocket mine of `owner` under `id` — its own fleet, never a prototype key. */
@@ -257,13 +266,15 @@ export const rocketMinesModule: GameModule = {
       // Без юнита мины в данных мине негде стоять, а без общего трейта `mine` отряд не был бы
       // миной: воевал бы, мешал захвату и сам ставил мины. Ошибка данных отклоняет установку,
       // а не меняет правила (fail-secure, замечание Codex на #1499).
-      // То же для ракеты (SM-3.7b): без юнита с трейтом `missile` ей не стать отрядом.
+      // То же для ракеты (SM-3.7b): без юнита с трейтом `missile` ей не стать отрядом, а без
+      // корпуса её нечем сбить.
       const unit = h.ctx.data.units[ROCKET_MINE_UNIT];
       if (
         !layer ||
         !defHasTrait(unit, ROCKET_MINE_TRAIT) ||
         !defHasTrait(unit, MINE_TRAIT) ||
-        !defHasTrait(h.ctx.data.units[MISSILE_UNIT], MISSILE_TRAIT)
+        !defHasTrait(h.ctx.data.units[MISSILE_UNIT], MISSILE_TRAIT) ||
+        !(missileHull(h.ctx.data, layer.id) > 0)
       )
         return h.reject('E_NO_ROCKET_MINELAYER');
       const edge = fleet.edge;

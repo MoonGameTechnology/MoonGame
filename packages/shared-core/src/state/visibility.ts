@@ -362,11 +362,13 @@ export function fleetsSeenByPosition(
 
 /**
  * Видна ли ракета (SM-3.7b; резолюция владельца 2026-10-06: «по обычному туману: глаза и
- * радар по её позиции»). Своя — всегда. Чужая — целиком, когда её точка внутри опознания
- * хоть одного круга зрителя с его блоком зрения; ракета летит вне дорог, поэтому узел тут не
- * мерка. Под одним радаром — только безымянная отметка (`radarSignatures`). Особого
- * предупреждения цели нет: цель без глаз узнаёт о ракете по попаданию. `circles` —
- * для вызывающего, который проверяет много ракет одним проходом.
+ * радар по её позиции»). Своя — всегда. Чужая — в живом окне шпионажа по флотам её хозяина
+ * и целиком, когда её точка внутри опознания хоть одного круга зрителя с его блоком зрения;
+ * ракета летит вне дорог, поэтому узел тут не мерка. Под одним радаром — только безымянная
+ * отметка (`radarSignatures`). Особого предупреждения цели нет: цель без глаз узнаёт о
+ * ракете по попаданию. Одно правило на проекцию, `isVisibleTo` и удар челноков: ракету,
+ * которую зритель видит, он может и бить (замечание Codex на #1503). `circles` — для
+ * вызывающего, который проверяет много ракет одним проходом.
  */
 export function missileVisible(
   state: GameState,
@@ -376,6 +378,10 @@ export function missileVisible(
   circles: readonly SightCircle[] = sightCircles(state, viewerId, data),
 ): boolean {
   if (fleet.owner === viewerId) return true;
+  const spied = (state.intel?.[viewerId] ?? []).some(
+    (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
+  );
+  if (spied) return true;
   const at = fleetPosition(state, fleet);
   return !!at && circles.some((c) => inRadius(at, c, c.identify));
 }
@@ -675,13 +681,8 @@ export function isVisibleTo(
   if (fleet.owner === viewerId) return true;
   // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
   if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
-  // Ракета — по своей позиции, глазами блока зрения (SM-3.7b), и в окне шпионажа.
-  if (isMissileFleet(fleet, data)) {
-    const spied = (state.intel?.[viewerId] ?? []).some(
-      (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
-    );
-    return spied || missileVisible(state, fleet, viewerId, data);
-  }
+  // Ракета — по своей позиции, глазами блока зрения, и в окне шпионажа (SM-3.7b).
+  if (isMissileFleet(fleet, data)) return missileVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
   if (battle && fightsIn(battle, new Set(visionBloc(state, viewerId)))) return true;
   const at = fleetPositionAt(state, fleet, state.time);

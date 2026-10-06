@@ -38,7 +38,7 @@ import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, loadoutKey } from '../util/stacks';
 import { emplacedFleet, fuseFleets } from '../util/fleetMerge';
 import { hangarSize, strikesReserved } from '../state/shuttle';
-import { isMineFleet } from '../state/minefields';
+import { isMineFleet, isMissileFleet } from '../state/minefields';
 import type { BattlePullIn } from './combat';
 
 export const fleetOpsModule: GameModule = {
@@ -51,7 +51,8 @@ export const fleetOpsModule: GameModule = {
   // (ATK-3).
   // 1.9.0: «разминулись» решает прибытие — конец боя или высадки не снимает намерение
   // слияния с догоняющего в пути (ревью #1417).
-  version: '1.9.0',
+  // 1.10.0: «Атака» по ракете — отказ `E_NO_FLEET`, как по несуществующему флоту (SM-3.7b).
+  version: '1.10.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -490,7 +491,10 @@ export const fleetOpsModule: GameModule = {
       }
       const f = ownFleet(h.state, payload.fleetId);
       const target = ownFleet(h.state, payload.targetId);
-      if (!f || !target) {
+      // Ракету корабли не бьют (решение владельца 2026-10-06, SM-3.7b), а её id предсказуем:
+      // цель-ракета — тот же отказ, что несуществующий флот, иначе код отказа выдал бы пуск,
+      // скрытый туманом (замечание Codex на #1503).
+      if (!f || !target || isMissileFleet(target, h.ctx.data)) {
         return h.reject('E_NO_FLEET');
       }
       if (f.owner !== action.playerId) {

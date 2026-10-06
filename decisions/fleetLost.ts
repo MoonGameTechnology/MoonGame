@@ -1,4 +1,5 @@
-import type { GameState } from '../packages/shared-core/src/index';
+import type { GameData, GameState } from '../packages/shared-core/src/index';
+import { isOrdnanceFleet } from '../packages/shared-core/src/index';
 
 /**
  * «Флот потерян» (PVR-6.29, решение владельца 2026-09-25). Без флота игрок минутами
@@ -6,11 +7,14 @@ import type { GameState } from '../packages/shared-core/src/index';
  * отстроиться или завершить экспедицию.
  */
 
-/** Сколько кораблей у игрока во всех его флотах (флагман героя — тоже корабль). */
-export function shipCount(state: GameState, me: string): number {
+/** Сколько кораблей у игрока во всех его флотах (флагман героя — тоже корабль). Мина и
+ *  летящая ракета — отряды, но не корабли (SM-3.6, SM-3.7b): флот, от которого остались одни
+ *  боеприпасы, потерян, и карточка встаёт сразу, а не когда ракета долетит (замечание Codex
+ *  на #1503). */
+export function shipCount(state: GameState, me: string, data: GameData): number {
   let n = 0;
   for (const f of Object.values(state.fleets)) {
-    if (f.owner !== me) continue;
+    if (f.owner !== me || isOrdnanceFleet(f, data)) continue;
     for (const st of f.units) n += Math.max(0, st.count);
   }
   return n;

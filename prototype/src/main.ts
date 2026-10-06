@@ -1708,7 +1708,7 @@ $('abandon-go').addEventListener('click', () => {
  *  к нулю кораблей и уходит сама, если забег кончился иначе. */
 function tickAbandon(): void {
   const live = inMatch() && runInProgress();
-  const ships = live ? shipCount(s, ME) : null;
+  const ships = live ? shipCount(s, ME, data) : null;
   if (ships !== null && fleetLostPrompt(lastRunShips, ships)) openAbandon('lost');
   lastRunShips = ships;
   const shown = live ? '' : 'none';

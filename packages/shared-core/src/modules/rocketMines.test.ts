@@ -12,6 +12,7 @@ import { radarSignatures, isVisibleTo } from '../state/visibility';
 import { isMissileFleet, isRocketMineFleet, rocketMinelayer } from '../state/ordnance';
 import { fleetPositionAt } from '../state/fleetPosition';
 import { shuttleModule } from './shuttle';
+import { fleetOpsModule } from './fleetOps';
 import type { GameModule } from '../kernel/module';
 
 const HOUR = 3_600_000;
@@ -824,8 +825,52 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       return r.ok ? 'ok' : r.code;
     };
     // На полпути (240, 0): в радиусе удара от B (160 ≤ 180), но цель её не видит.
-    expect(strike(advance(launch, (fl.departedAt + fl.arrivesAt) / 2))).toBe('E_NO_TARGET');
+    const mid = (fl.departedAt + fl.arrivesAt) / 2;
+    expect(strike(advance(launch, mid))).toBe('E_NO_TARGET');
     // У самой цели (276, 0) — видна, удар уходит.
     expect(strike(advance(launch, fl.departedAt + 0.95 * (fl.arrivesAt - fl.departedAt)))).toBe('ok');
+    // Окно шпионажа по флотам хозяина открывает ракету и в проекции, и для удара: что видно,
+    // по тому и бьют (замечание Codex на #1503).
+    const spied = advance(launch, mid);
+    spied.intel = { q: [{ kind: 'fleets', target: 'p', until: spied.time + HOUR }] };
+    expect(visibleState(spied, 'q', data).fleets[m.id]).toBeDefined();
+    expect(strike(spied)).toBe('ok');
+  });
+
+  it('«Attack» on a missile is the same refusal as on a missing fleet (Codex, #1503)', () => {
+    // Корабли ракету не бьют, а её id предсказуем: иной код отказа выдал бы скрытый пуск.
+    const launch = armed();
+    const m = missiles(launch)[0]!;
+    launch.fleets.picket = {
+      id: 'picket',
+      owner: 'q',
+      location: 'A',
+      movement: null,
+      units: [{ unit: 'ship', count: 1 }],
+      traits: [],
+    };
+    const k = createKernel([movementModule, fleetOpsModule, rocketMinesModule]);
+    const engage = (targetId: string) => {
+      const r = k.applyAction(
+        launch,
+        { id: 's:q:1', playerId: 'q', type: 'fleet.engage', payload: { fleetId: 'picket', targetId }, issuedAt: launch.time },
+        { now: launch.time, data },
+      );
+      return r.ok ? 'ok' : r.code;
+    };
+    expect(engage(m.id)).toBe('E_NO_FLEET');
+    expect(engage('fleet:missile:0:999')).toBe('E_NO_FLEET');
+  });
+
+  it('a missile without a hull is refused at deployment: nothing to shoot down (Codex, #1503)', () => {
+    const missile = data.units.missile!;
+    const hollow = { ...data, units: { ...data.units, missile: { ...missile, stats: { ...missile.stats, hp: 0 } } } };
+    const s = world();
+    const r = kernel.applyAction(
+      s,
+      { id: 's:p:1', playerId: 'p', type: 'fleet.deployRocketMine', payload: { fleetId: 'layer', mode: 'any' }, issuedAt: s.time },
+      { now: s.time, data: hollow },
+    );
+    expect(r).toMatchObject({ ok: false, code: 'E_NO_ROCKET_MINELAYER' });
   });
 });
