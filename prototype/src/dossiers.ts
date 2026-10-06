@@ -106,7 +106,7 @@ export function buildingDossier(id: string, level: number): Dossier | null {
     case 'barracks':
       return {
         name,
-        body: t('dossier.building.barracks'),
+        body: t('dossier.building.barracks', { hp: hl(lv.hp) }),
       };
     case 'radar':
       return {
