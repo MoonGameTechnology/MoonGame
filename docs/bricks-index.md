@@ -49,7 +49,7 @@
 | REFM-209 | ✅ | proto | `docs/backlog.md` | Профиль Sector Zero: хранение, облако, вкладка-хозяйка |
 | REFM-210 | ✅ | proto | `docs/backlog.md` | Забег: сохранение, восстановление, флаги |
 | REFM-211 | ✅ | proto | `docs/backlog.md` | Оболочка Sector Zero |
-| REFM-212 | ⏳ | proto | `docs/backlog.md` | Экран настройки схватки |
+| REFM-212 | ✅ | proto | `docs/backlog.md` | Экран настройки схватки |
 | REFM-213 | ✅ | proto | `docs/backlog.md` | Сохранение схватки |
 | REFM-214 | ⏳ | proto | `docs/backlog.md` | Дипломатия и связь |
 | REFM-215 | ⏳ | proto | `docs/backlog.md` | Сессия аккаунта |
@@ -58,7 +58,7 @@
 | REFM-218 | 🔒 | proto | `docs/backlog.md` | Страницы входа |
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
-| REFM-221 | 🔒 | proto | `docs/backlog.md` | Обучение и справка |
+| REFM-221 | ⏳ | proto | `docs/backlog.md` | Обучение и справка |
 | REFM-222 | ⏳ | proto | `docs/backlog.md` | Верхняя полоса |
 | REFM-223 | ⏳ | proto | `docs/backlog.md` | Карточка мира |
 | REFM-224 | ⏳ | proto | `docs/backlog.md` | Карточка флота |
