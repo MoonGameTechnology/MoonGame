@@ -41,10 +41,11 @@ const ROUTABLE = new Set<string>([...AUDIENCE, ...PLACE, ...OWNERSHIP, ...BATTLE
 const isBroadcast = (type: string): boolean =>
   type === 'time.advanced' || type.startsWith('match.');
 
-/** `hero.*` and construction/production (`OWNER_ONLY_EVENTS`, imported so the filter and
- *  this check cannot drift) short-circuit to `p.owner === playerId`, so for those the
- *  audience list is NOT consulted — only `owner` will do. */
-const isOwnerOnly = (type: string): boolean => type.startsWith('hero.') || OWNER_ONLY_EVENTS.has(type);
+/** `hero.*` and intel (`OWNER_ONLY_EVENTS`, imported so the filter and this check cannot
+ *  drift) short-circuit to one key — `owner` for heroes, the key the list names for intel —
+ *  so for those the audience list is NOT consulted: only that key will do. */
+const ownerKeyOf = (type: string): string | undefined =>
+  type.startsWith('hero.') ? 'owner' : OWNER_ONLY_EVENTS.get(type);
 
 /**
  * Known, deliberate exceptions. Format follows the `.trivyignore` convention in this repo:
@@ -257,7 +258,10 @@ describe('fog routing contract — every emitted event must be addressable', () 
     const unroutable = sites
       .filter((s) => !isBroadcast(s.type))
       .filter((s) => !ALLOWLIST.has(s.type))
-      .filter((s) => (isOwnerOnly(s.type) ? !s.keys.includes('owner') : !s.keys.some((k) => ROUTABLE.has(k))))
+      .filter((s) => {
+        const ownerKey = ownerKeyOf(s.type);
+        return ownerKey !== undefined ? !s.keys.includes(ownerKey) : !s.keys.some((k) => ROUTABLE.has(k));
+      })
       .map((s) => `${s.file}: ${s.type} { ${s.keys.join(', ')} }`);
 
     expect(unroutable).toEqual([]);
@@ -269,7 +273,7 @@ describe('fog routing contract — every emitted event must be addressable', () 
   });
 
   it('keeps OWNER_ONLY_EVENTS honest — every entry is emitted by a core module', () => {
-    const stale = [...OWNER_ONLY_EVENTS].filter((type) => !sites.some((s) => s.type === type));
+    const stale = [...OWNER_ONLY_EVENTS.keys()].filter((type) => !sites.some((s) => s.type === type));
     expect(stale).toEqual([]);
   });
 });

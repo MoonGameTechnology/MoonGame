@@ -415,17 +415,42 @@ const PERF_SAMPLE_MIN_MS = 5_000;
  *  lasts is still caught at the next hashed delta. Full snapshots are always hashed. */
 const STATE_HASH_EVERY_MS = 3_000;
 
-/** Construction and production are intel (RECAP-FOG: the `own` class of
- *  `prototype/src/recapGate.ts`). What an owner built, upgraded, produced or dropped from
- *  a loading order, an observer of the world learns from its fogged state (the building,
- *  the garrison), never as news: the client already hides a foreign one, so the server
- *  does not send it either. Every emitter names the acting player in `owner`. */
-export const OWNER_ONLY_EVENTS: ReadonlySet<string> = new Set([
-  'building.constructed',
-  'building.upgraded',
-  'unit.built',
-  'army.load.cancelled',
-  'army.unload.cancelled',
+/** Events that are intel, not news: they reach the player they belong to and nobody else,
+ *  even at a world the observer identifies. Each entry names the payload key that carries
+ *  that player — modules call it `owner` or `playerId`, and `eventFogContract.test.ts` holds
+ *  every emitter to the key written here.
+ *
+ *  · Construction and production (RECAP-FOG: the `own` class of `prototype/src/recapGate.ts`,
+ *    FOG-14). What an owner built, upgraded, produced or dropped from a loading order, an
+ *    observer of the world learns from its fogged state (the building, the garrison), never
+ *    as news: the client already hides a foreign one, so the server does not send it either.
+ *  · Orders, plans and private knowledge (FOG-15). The fog projection strips these from a
+ *    rival even at an identified world, so an event must not retell them: a build order
+ *    queued, started, cancelled, resumed or dropped (`buildQueue`, `pausedConstruction`,
+ *    `scheduled`), a capital designation (the hero-respawn anchor), a steward hold point, a
+ *    mine laid (a rival's mine is seen only up close, SM-3.6), a salvage payout (a rival's
+ *    treasury), a merge waiting for a fleet still in flight (that fleet may be out of sight)
+ *    and a refuge found (what a rival knows, PVR-8.4). */
+export const OWNER_ONLY_EVENTS: ReadonlyMap<string, 'owner' | 'playerId'> = new Map<
+  string,
+  'owner' | 'playerId'
+>([
+  ['building.constructed', 'owner'],
+  ['building.upgraded', 'owner'],
+  ['unit.built', 'owner'],
+  ['army.load.cancelled', 'owner'],
+  ['army.unload.cancelled', 'owner'],
+  ['construction.queued', 'playerId'],
+  ['construction.started', 'playerId'],
+  ['construction.cancelled', 'playerId'],
+  ['construction.resumed', 'playerId'],
+  ['construction.queue.dropped', 'playerId'],
+  ['capital.designated', 'owner'],
+  ['steward.holdpoint', 'playerId'],
+  ['mines.laid', 'owner'],
+  ['salvage.paid', 'playerId'],
+  ['fleet.merge.pending', 'owner'],
+  ['refuge.found', 'owner'],
 ]);
 
 export class MatchRoom {
@@ -1882,8 +1907,8 @@ export class MatchRoom {
   /** Whether a domain event may be revealed to `playerId` — events leak intent
    *  too, so they pass the same fog as state: your own actions, anything at a
    *  world you identify, and global clock/match events; everything else is cut.
-   *  Hero events and construction/production (`OWNER_ONLY_EVENTS`) reach their owner
-   *  only, even at an identified world.
+   *  Hero events and intel (`OWNER_ONLY_EVENTS`: construction, production, orders and
+   *  plans) reach their owner only, even at an identified world.
    *
    *  ⚠ CONVENTION COUPLING: this filter reads the payload KEY NAMES every core
    *  module uses today (audience: `owner`/`playerId`/`a`/`b`/`from`/`to`/
@@ -1906,8 +1931,10 @@ export class MatchRoom {
     // (`at`) and fleet, which the fog projection deliberately hides from everyone
     // else — an identified-node match must NOT reveal them.
     if (event.type.startsWith('hero.')) return p.owner === playerId;
-    // Construction and production: owner-only too, for the same reason (OWNER_ONLY_EVENTS).
-    if (OWNER_ONLY_EVENTS.has(event.type)) return p.owner === playerId;
+    // Intel events: owner-only too, for the same reason. Each names its player under its
+    // own key (OWNER_ONLY_EVENTS).
+    const ownerKey = OWNER_ONLY_EVENTS.get(event.type);
+    if (ownerKey !== undefined) return p[ownerKey] === playerId;
     if (p.owner === playerId) return true;
     // Personal and bilateral events name their audience with these keys (research,
     // steward, elimination, diplomacy offers/changes, market trades) — a named

@@ -174,10 +174,18 @@ computeSpeed(флот):
   свой бой всегда — `engagementOf`), в том числе кадром раньше: `battle.resolved`
   приходит, когда боя в состоянии уже нет;
 - `time.advanced` и `match.*` — глобальные (видны всем); `hero.*` — строго owner-only;
-  стройка и производство (`OWNER_ONLY_EVENTS` в `matchRoom.ts`: `building.constructed`,
-  `building.upgraded`, `unit.built`, `army.load.cancelled`, `army.unload.cancelled`) — тоже
-  только владельцу, даже на опознанном мире: это разведданные, результат наблюдатель
-  видит в состоянии. Такие события обязаны нести `owner`.
+  разведданные (`OWNER_ONLY_EVENTS` в `matchRoom.ts`) — тоже только владельцу, даже на
+  опознанном мире. Это стройка и производство (`building.constructed`, `building.upgraded`,
+  `unit.built`, `army.load.cancelled`, `army.unload.cancelled`): результат наблюдатель видит
+  в состоянии. И это события, пересказывающие то, что проекция режет у соперника даже на
+  опознанном мире: приказы стройки (`construction.*`), `capital.designated`,
+  `steward.holdpoint`, `mines.laid`, `salvage.paid`, `fleet.merge.pending`, `refuge.found`.
+  У каждого записан ключ, которым событие называет хозяина (`owner` или `playerId`), и
+  эмиттер обязан нести именно его.
+
+Заводя событие, спроси: не пересказывает ли оно то, что `visibleState` прячет у
+соперника? Если да, это разведданные: внеси событие в `OWNER_ONLY_EVENTS`. Иначе ключ
+места (`planetId`/`at`/`location`) отдаст его каждому, кто опознаёт мир.
 
 Новый модуль обязан называть ключи payload по этой конвенции. Ключ вне списка
 (например `target` или `recipient`) фильтр не читает — событие будет **молча скрыто**
