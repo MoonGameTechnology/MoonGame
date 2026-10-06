@@ -136,9 +136,13 @@ const sameWarhead = (a: UnitStack, b: UnitStack): boolean =>
 /** Поставить мину: добавить заряды своей мине в той же точке или завести новый отряд.
  *  `created` — отряд новый: только о нём модулю перехвата есть что сказать. */
 function placeMine(h: HandlerContext, job: MinelayingJob): { mine: Fleet; created: boolean } {
+  // Заряды вливаются только в отряд таких же мин. Ракетная мина в той же точке — тоже
+  // мина-отряд (SM-3.7a), но с чужим стеком она перестала бы быть ракетной и замолчала
+  // навсегда (замечание Codex на #1499).
   const own = Object.keys(h.state.fleets).sort()
     .map((id) => h.state.fleets[id]!)
-    .find((f) => f.owner === job.owner && !f.movement && isMineFleet(f, h.ctx.data) && samePlace(f, job));
+    .find((f) => f.owner === job.owner && !f.movement && isMineFleet(f, h.ctx.data) && samePlace(f, job) &&
+      f.units.every((st) => st.unit === job.stack.unit));
   if (own) {
     const match = own.units.find((st) => sameWarhead(st, job.stack));
     if (match) match.count += job.stack.count;
@@ -300,7 +304,8 @@ export const minefieldModule: GameModule = {
   // 2.0.0: мина — неподвижный отряд; подрыв при встрече, флот летит дальше (SM-3.6).
   // 2.1.0: ревью #1411 — мина не ставит мины; мины одной точки дороги срабатывают одним
   // подрывом с общим потолком; пополнение не назначает вторую встречу.
-  version: '2.1.0',
+  // 2.2.0: заряды не вливаются в ракетную мину той же точки — она тоже отряд (SM-3.7a).
+  version: '2.2.0',
   setup(api) {
     api.onAction('fleet.layMines', (action, h) => {
       const { fleetId } = (action.payload ?? {}) as { fleetId?: unknown };

@@ -14,7 +14,7 @@ import { emblemTally } from '../../../decisions/fleetTally';
 import { forkMarks, roadStrokes } from '../../../decisions/roadNetwork';
 import { ambushOf } from '../../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from './forkMark';
-import { effectiveStats, fleetPositionAt, isForkSite, type GameData, type GameState, type PlayerId } from '@void/shared-core';
+import { effectiveStats, fleetPositionAt, isForkSite, isMineFleet, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
@@ -23,6 +23,7 @@ import { drawSpaceBackdrop } from './spaceBackdrop';
 import { drawProvinceSelection } from './provinceSelection';
 import { dominantUnit, glyphHalo, glyphScale, unitArchetype, unitShape, unitSizeClass } from './shipGlyphs';
 import { drawShipShape } from './shipShapes';
+import { drawMineShape } from './mineShape';
 import { mapLod, mapSpacing, drawSchematicNode } from './mapLod';
 import { TerritoryGeometryCache } from './territoryGeometry';
 
@@ -247,6 +248,17 @@ export function renderMap(
     const c = worldToScreen(pt, cam, vp, bounds);
     if (!inView(c, vw, vh, 24)) continue;
     const col = colors.get(f.owner) ?? theme.cyan;
+    // A mine is a fleet (SM-3.6, SM-3.7a) but not a ship: its own sign, no hull and no ship
+    // count. The server projection already hides a foreign mine beyond its detection range.
+    if (isMineFleet(f, opts.data)) {
+      g.save();
+      g.translate(c.x - 12, c.y - 12);
+      g.strokeStyle = col;
+      g.fillStyle = rgba(col, 0.24);
+      drawMineShape(g, lod.detail > 0.5);
+      g.restore();
+      continue;
+    }
     if (ambushOf(state, f)) drawAmbushMark(g, c.x, c.y, col);
     if (lod.detail > 0) blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5 * lod.detail);
     const dom = dominantUnit(f.units, opts.data);

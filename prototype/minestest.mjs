@@ -26,10 +26,24 @@ const hooks = `window.__minesTest = {
     lastPanelHtml = ''; lastCmdHtml = ''; renderPanel(); renderCmdBar();
   },
   ord: () => s.ordnance,
+  // SM-3.7a: the standing rocket mine is a fleet; its doctrine lives in \`ordnance.controls\`.
+  rockets: () => Object.values(s.fleets).filter((f) => isRocketMineFleet(f, data)).map((f) => f.id),
+  mode: (id) => s.ordnance.controls?.[id]?.mode ?? null,
   arm: () => { apply(advance(s, s.ordnance.installations[0].readyAt)); mineControls.refresh(); },
+  // Selected the common way, the rocket mine shows its own card and takes no orders.
+  rocketCard: () => {
+    const id = Object.keys(s.fleets).find((id) => isRocketMineFleet(s.fleets[id], data));
+    if (!id) return null;
+    setFleetSelection([id]);
+    lastPanelHtml = ''; renderPanel();
+    return { card: lastPanelHtml.includes(t('mine.card.rocket-rule')), orderable: selectedFleetIds().length };
+  },
   ordinary: () => {
     s = structuredClone(s);
-    s.fleets[selFleet].units[0].modules = ['mine_layer'];
+    // The carrier again: the rocket mine card above left the (now lifted) mine selected.
+    const f = Object.values(s.fleets).find((f) => f.owner === ME && !isMineFleet(f, data));
+    f.units[0].modules = ['mine_layer'];
+    setFleetSelection([f.id]);
     lastPanelHtml = ''; renderPanel();
   },
   fields: () => s.minefields,
@@ -71,12 +85,26 @@ try {
       assert.equal(await page.evaluate(() => window.__minesTest.ord().installations.length), 1);
       assert.equal(await deploy.isEnabled(), false);
       await page.evaluate(() => window.__minesTest.arm());
-      assert.equal(await page.evaluate(() => window.__minesTest.ord().mines.length), 1);
+      const [mineId] = await page.evaluate(() => window.__minesTest.rockets());
+      assert.ok(mineId);
       await page.locator('[data-rm="mode"][data-mode="any"]').click();
-      assert.equal(await page.evaluate(() => window.__minesTest.ord().mines[0].mode), 'any');
-      await page.locator('[data-rm="disarm"]').click();
-      assert.equal(await page.evaluate(() => window.__minesTest.ord().mines.length), 0);
-      await page.locator('#codex .cx-close').click();
+      assert.equal(await page.evaluate((id) => window.__minesTest.mode(id), mineId), 'any');
+      if (viewport.width > 600) {
+        // The mine card in the side panel drives the same mine: mode, then disarm.
+        await page.locator('#codex .cx-close').click();
+        assert.deepEqual(await page.evaluate(() => window.__minesTest.rocketCard()), {
+          card: true,
+          orderable: 0,
+        });
+        await page.locator('[data-act="rmmode"][data-arg="confirmed"]').click();
+        assert.equal(await page.evaluate((id) => window.__minesTest.mode(id), mineId), 'confirmed');
+        await page.locator('[data-act="rmdisarm"]').click();
+        assert.deepEqual(await page.evaluate(() => window.__minesTest.rockets()), []);
+      } else {
+        await page.locator('[data-rm="disarm"]').click();
+        assert.deepEqual(await page.evaluate(() => window.__minesTest.rockets()), []);
+        await page.locator('#codex .cx-close').click();
+      }
       if (viewport.width > 600) {
         await page.evaluate(() => window.__minesTest.ordinary());
         await page.locator('[data-act="laymines"]').click();
@@ -94,7 +122,7 @@ try {
     await context.close();
   }
   console.log(
-    'Mines UI smoke passed: desktop/mobile deployment, modes, disarm, ordinary minelayer, mine card.',
+    'Mines UI smoke passed: desktop/mobile deployment, modes, disarm, rocket mine card, ordinary minelayer, mine card.',
   );
 } finally {
   await browser.close();

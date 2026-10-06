@@ -247,7 +247,12 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '74'; // Ревью #1417. Членство и порядок не тронуты;
+export const MODULE_MANIFEST_VERSION = '75'; // SM-3.7a: ракетная мина — отряд. Членство и
+// порядок не тронуты; `rocketMines` 2.0.0 ставит стоящую мину отрядом во `fleets` (юнит
+// `rocket_mine`), а её режим и боевую часть — в `ordnance.controls`; из `state.ordnance`
+// ушёл список `mines` — партия на 74 не знает мин-отрядов. `minefield` 2.2.0 не вливает
+// заряды контактной мины в ракетную той же точки.
+// export const MODULE_MANIFEST_VERSION = '74'; // Ревью #1417. Членство и порядок не тронуты;
 // `fleet-ops` 1.9.0: «разминулись» решает прибытие — конец боя или высадки не снимает
 // намерение слияния с догоняющего, который ещё в пути.
 // export const MODULE_MANIFEST_VERSION = '73'; // SHU-6.7: обзор в круге патруля.

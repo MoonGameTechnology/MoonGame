@@ -7,7 +7,8 @@
  * 1. встреча с миной — не бой: боя нет, флот летит дальше;
  * 2. мина захвату не мешает;
  * 3. «Атака» по мине — подрыв по атакующему; сама мина не атакует;
- * 4. челноки уничтожают мину ударом по корпусу и не теряют ни одной машины;
+ * 4. челноки уничтожают мину ударом по корпусу и не теряют ни одной машины — и ракетную
+ *    мину тоже (SM-3.7a: «сбивают только ПРО и челноки»);
  * 5. мину нельзя слить, разделить и сдвинуть.
  */
 import { describe, expect, it } from 'vitest';
@@ -43,9 +44,28 @@ const data: GameData = parseGameData({
       traits: ['shuttle'],
       stats: { attack: 20, defense: 4, speed: 100, hp: 16, strikeRange: 180, fuel: 4, rearmRounds: 2 },
     },
+    // SM-3.7a: ракетная мина — тоже мина-отряд, у неё свой юнит.
+    rocket_mine: {
+      faction: 'neutral',
+      domain: 'space',
+      stats: { attack: 0, defense: 0, speed: 0, hp: 20 },
+      signature: 0.1,
+      traits: ['immobile', 'issued', 'mine', 'rocketMine'],
+    },
   },
   modules: {
     mine_layer: { name: 'Mine Layer', slot: 'utility', tag: 'vertical', effects: { stats: { mineCharge: 3, mineHit: 0.2 } } },
+    rocket_mine_layer: {
+      name: 'Rocket Mine',
+      slot: 'utility',
+      tag: 'horizontal',
+      rarity: 'legendary',
+      rocketMine: {
+        armHours: 0.25, cooldownHours: 1, scanHours: 1 / 60, maxActive: 6, radarRange: 120, radarLevel: 3,
+        sightRange: 24, detectionRange: 24, speed: 240, minFlightHours: 1 / 60, hp: 12, damage: 80,
+        blastRadius: 10, mineSignature: 0.1, missileSignature: 13, cost: { metal: 40 },
+      },
+    },
   },
   factions: {},
   buildings: {
@@ -200,5 +220,32 @@ describe('челноки уничтожают мину безопасно', () =
     const back = (done.state.planets.N!.hangar ?? []).reduce((n, sq) => n + sq.units.reduce((m, u) => m + u.count, 0), 0);
     expect(back).toBe(3);
     expect(done.events.some((e) => e.type === 'shuttle.repelled')).toBe(false);
+  });
+
+  it('ракетную мину на дороге — тем же ударом и тоже без потерь (SM-3.7a)', () => {
+    // Ракетная мина стоит только на дороге; свой флот рядом — иначе её не видно (24).
+    const rocket: Fleet = {
+      id: 'ROCKET',
+      owner: 'p2',
+      location: null,
+      edge: { from: 'N', to: 'M', t: 0.5 },
+      movement: null,
+      units: [{ unit: 'rocket_mine', count: 1, modules: ['rocket_mine_layer'] }],
+      landing: [],
+      traits: [],
+      battleId: null,
+    };
+    const scout: Fleet = { ...ships('SCOUT', 'p1', null, 1), edge: { from: 'N', to: 'M', t: 0.6 } };
+    const s0 = world([rocket, scout]);
+    s0.planets.N = { ...s0.planets.N!, owner: 'p1', buildings: [{ type: 'spaceport', level: 1, hp: 30 }],
+      hangar: [{ id: 'sq:b', units: [{ unit: 'bomber', count: 3 }] }] };
+    const k = createKernel([constructionModule, shuttleModule]);
+    const applied = k.applyAction(s0, act('shuttle.strike', 'p1', { planetId: 'N', squadronId: 'sq:b', targetFleetId: 'ROCKET' }), ctx(0));
+    if (!applied.ok) throw new Error(applied.code);
+    const done = k.advanceTo(applied.state, ctx(3 * HOUR));
+    if (!done.ok) throw new Error(done.code);
+    expect(done.state.fleets.ROCKET).toBeUndefined();
+    const back = (done.state.planets.N!.hangar ?? []).reduce((n, sq) => n + sq.units.reduce((m, u) => m + u.count, 0), 0);
+    expect(back).toBe(3);
   });
 });

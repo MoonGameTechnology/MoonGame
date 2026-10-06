@@ -1357,6 +1357,9 @@
 | SM-3.5 | ✅ | proto | `docs/ship-modules-roadmap.md` | Мины на карте прототипа |
 | SM-3.6 | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Мина — неподвижный отряд: выделяется, подрыв при встрече, флот летит дальше |
 | SM-3.7 | ⏳ | core proto | `docs/ship-modules-roadmap.md` | Ракетная мина и её ракета — тоже отряды |
+| SM-3.7a | ✅ | core data proto | `docs/ship-modules-roadmap.md` | Ракетная мина — неподвижный отряд |
+| SM-3.7b | ⏳ | core proto | `docs/ship-modules-roadmap.md` | Ракета — отряд без приказов, полёт по прямой, обычный туман |
+| SM-3.7c | ⏳ | core | `docs/ship-modules-roadmap.md` | Челноки бьют ракету |
 | SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md` | Переименование: эскадрильи → челноки |
 | SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md` | Ангар космопорта |
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар и возврат |

@@ -424,7 +424,14 @@ function maximalState(): GameState {
       CANARY_fleet: { steps: [{ kind: 'move', to: 'CANARY_dest' }] },
     },
     forcedMarch: { mine: true, CANARY_fleet: true },
-    ordnance: { serials: { [RIVAL]: 7 }, cooldowns: { [RIVAL]: 900 }, installations: [], mines: [], missiles: [] },
+    // SM-3.7a: стоящая ракетная мина — отряд во `fleets`; здесь только её управление.
+    ordnance: {
+      serials: { [RIVAL]: 7 },
+      cooldowns: { [RIVAL]: 900 },
+      installations: [],
+      controls: { CANARY_fleet: { mode: 'any', nextScanAt: 9, damage: 80 } },
+      missiles: [],
+    },
     // EVT-2: котёл трофеев. Канарейка на чужом узле — вырезаться обязано ВСЁ поле
     // целиком, так что своей записи тут не нужно: она снимется вместе с чужой.
     salvage: { CANARY_target: { pool: { metal: 100 }, winners: ['CANARY_third'] } },

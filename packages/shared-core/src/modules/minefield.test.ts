@@ -37,6 +37,13 @@ const data: GameData = parseGameData({
       signature: 0.1,
       traits: ['immobile', 'issued', 'mine'],
     },
+    // Ракетная мина (SM-3.7a) — тоже мина-отряд, но заряды контактной в неё не вливаются.
+    rocket_mine: {
+      faction: 'neutral',
+      stats: { attack: 0, defense: 0, speed: 0, hp: 20 },
+      signature: 0.1,
+      traits: ['immobile', 'issued', 'mine', 'rocketMine'],
+    },
   },
   modules: {
     mine_layer: {
@@ -169,6 +176,20 @@ describe('SM-3.6 — мина на дороге: отряд, встреча вп
     expect(arrived.fleets.E!.location).toBe('M');
     expect(arrived.fleets.E!.units[0]!.hp).toBe(80);
     expect(advance(JSON.parse(JSON.stringify(moving)), meet.at)).toEqual(hit);
+  });
+  it('заряды не вливаются в свою ракетную мину той же точки: она остаётся собой (Codex на #1499)', () => {
+    const s = road();
+    const rocket = { unit: 'rocket_mine', count: 1 };
+    s.fleets.R = { ...fleet('R', 'p1', null), edge: { from: 'N', to: 'M', t: 0.5 }, units: [rocket] };
+    const armed = advance(ok(kernel.applyAction(deepFreeze(s), lay('L'), ctx(0))).state, HOUR / 4);
+    expect(armed.fleets.R!.units).toEqual([rocket]);
+    const contact = Object.values(armed.fleets).filter((f) => f.id !== 'R' && isMineFleet(f, data));
+    expect(contact).toHaveLength(1);
+    expect(contact[0]).toMatchObject({
+      owner: 'p1',
+      edge: { from: 'N', to: 'M', t: 0.5 },
+      units: [{ unit: 'mine', count: 3, modules: ['mine_layer'] }],
+    });
   });
   it('флот, вставший на мину, подрывается один раз и не повторно при отъезде', () => {
     const armed = advance(ok(kernel.applyAction(road(), lay('L'), ctx(0))).state, HOUR / 4);
