@@ -3031,10 +3031,11 @@ function currentVision(): Vision {
 /**
  * Туман, по которому судят кадр и журнал (FOG-13). `null` значит «туман выключен», и
  * выключить его может только тумблер песочницы. Поэтому `vision` переписывается этой
- * функцией везде, где появляется НОВЫЙ мир (`installMatch`, смена карты в сети), а не
- * только кадром: шаг мира, которым партия засевается, идёт до первого кадра, и его
- * события журнал проверял по зрению прошлой партии, а после загрузки страницы — по
- * `null`, то есть «видно всё».
+ * функцией везде, где появляется НОВЫЙ мир (конец `installMatch`, каждый сетевой
+ * снимок), а не только кадром: шаг мира, которым партия засевается, идёт до первого
+ * кадра, и его события журнал проверял по зрению прошлой партии, а после загрузки
+ * страницы — по `null`, то есть «видно всё»; события сетевой дельты идут сразу после
+ * снимка и сверялись со зрением прошлого снимка.
  */
 function fogVision(): Vision | null {
   // SANDBOX — fenced hook. The "fog of war" toggle defaults ON; turning it OFF drops the
@@ -13930,9 +13931,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   engagedBattleIds.clear(); // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417)
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
   visionMemo = null; // its vision was written into the memory just cleared
-  // FOG-13: зрение ЭТОЙ партии — до засевающего шага мира, который вызывающий делает
-  // сразу следом, ещё до первого кадра. `s` и `ME` выше уже новые.
-  vision = fogVision();
   worldMemo = null;
   radarMemory.clear();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
@@ -13964,6 +13962,11 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
     sandboxConfig.enabled = false;
     setSandboxButton(false);
   }
+  // FOG-13: зрение ЭТОЙ партии — до засевающего шага мира, который вызывающий делает
+  // сразу следом, ещё до первого кадра. `s` и `ME` уже новые, а песочница прошлой
+  // партии уже снята: её выключенный туман не должен стать «видно всё» новой
+  // (замечание Codex на #1490).
+  vision = fogVision();
   // Start the queued tour after the prepared HUD is actually visible.
   snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
@@ -14420,9 +14423,11 @@ function netClientFor(seat: string): MultiplayerClient {
         // stance chips and offer affordances (✓ accept / ⏳ pending) paint fresh.
         if (diploShift && diploOpen && diploTab === 'diplo') renderDiplo();
         if (snap.playerId) ME = snap.playerId;
-        // FOG-13: новый мир — зрение его партии, а не прошлой. События дельты едут в
-        // журнал сразу после снимка, раньше первого кадра (`onEvents`).
-        if (changedMap) vision = fogVision();
+        // FOG-13: зрение этого снимка, а не прошлого. События дельты едут в журнал сразу
+        // после снимка, раньше первого кадра (`onEvents`), а сервер пропустил их по
+        // опознанным узлам ЭТОГО снимка: и новая карта, и мир, открывшийся обычной
+        // дельтой (замечание Codex на #1490). Кадр следом возьмёт то же зрение из памяти.
+        vision = fogVision(); // every snapshot: its delta's events follow
         if (changedMap && plan.fanfare) defaultView();
         // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
         // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
