@@ -18,6 +18,8 @@ import { readFileSync } from 'node:fs';
 // забега — в `main.ts`.
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const SRC = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
+// Забег снимает его владелец (REFM-210).
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const bodyIn = (src: string, name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
 const body = (name: string): string => bodyIn(SRC, name);
@@ -48,9 +50,8 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
     expect(claim).toContain('if (!tabSuperseded(TAB_ID, previous)) return;');
     expect(claim).toContain('game.stopRun();');
     expect(claim).toContain('game.forgetRun();');
-    expect(MAIN).toMatch(
-      /stopRun: \(\) => \{\s+if \(runInProgress\(\)\) setRunActive\(false\);\s+\},/,
-    );
+    expect(MAIN).toMatch(/\n {2}stopRun,\n/);
+    expect(bodyIn(RUN, 'stopRun')).toContain('if (runInProgress()) setRunActive(false);');
     expect(claim).toContain('syncMark = parseSyncMark(mark);');
     // Перечитывает тем же правилом печати, что и старт (`YAG-4.4`).
     expect(claim).toContain('progressWrite = progressWrite.then(loadSectorProfile)');

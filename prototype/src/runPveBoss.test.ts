@@ -20,6 +20,8 @@ import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Дверь забега живёт у его владельца (REFM-210).
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const HOUR = 3_600_000;
 
 afterEach(() => {
@@ -67,13 +69,13 @@ describe('ядро прототипа зовёт Левиафана только
 
 describe('Левиафана зовёт только дверь забега и только для сильного Роя', () => {
   it('`setRunActive` зовёт его вместе с забегом, по сложности забега', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1];
+    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(RUN)?.[1];
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain("setMatchPveBoss(on && pveDifficulty === 'strong')");
   });
 
-  it('больше никто в `main.ts` босса не трогает', () => {
-    expect(SRC.match(/\bsetMatchPveBoss\(/g) ?? []).toHaveLength(1);
+  it('больше никто — ни `main.ts`, ни модуль забега — босса не трогает', () => {
+    expect(`${SRC}\n${RUN}`.match(/\bsetMatchPveBoss\(/g) ?? []).toHaveLength(1);
   });
 });
 

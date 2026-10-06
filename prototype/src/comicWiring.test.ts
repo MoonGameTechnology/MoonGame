@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Конец забега и его комиксы зовёт владелец забега (REFM-210), комиксы рисует `main.ts`.
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 
 describe('комиксы глав — проводка', () => {
   it('новый забег — из меню и с итогов — идёт через комикс главы', () => {
@@ -24,10 +26,11 @@ describe('комиксы глав — проводка', () => {
   it('финал главы — только после победы, один раз на попытку, поверх итогов', () => {
     const block =
       /if \(sectorAttempt > 0 && clearedAttempt !== sectorAttempt\) \{[\s\S]*?\n {4}\}/.exec(
-        MAIN,
+        RUN,
       )?.[0] ?? '';
-    expect(block).toContain(
-      "if (won) playChapterComic(pveChapter(sectorMission).id, 'outro', () => {});",
+    expect(block).toContain("if (won) game.comic(pveChapter(sectorMission).id, 'outro');");
+    expect(MAIN).toContain(
+      'comic: (chapter, moment) => playChapterComic(chapter, moment, () => {}),',
     );
   });
 
@@ -49,9 +52,10 @@ describe('комиксы глав — проводка', () => {
     // Победный кадр: сцена и задача встают в очередь раньше финала главы.
     const block =
       /if \(sectorAttempt > 0 && clearedAttempt !== sectorAttempt\) \{[\s\S]*?\n {4}\}/.exec(
-        MAIN,
+        RUN,
       )?.[0] ?? '';
-    const scenes = block.indexOf('playTaskComic(runMissionRows(), runChain());');
+    const scenes = block.indexOf('game.taskComics();');
+    expect(MAIN).toContain('taskComics: () => playTaskComic(runMissionRows(), runChain()),');
     expect(scenes).toBeGreaterThan(-1);
     expect(scenes).toBeLessThan(block.indexOf("'outro'"));
   });

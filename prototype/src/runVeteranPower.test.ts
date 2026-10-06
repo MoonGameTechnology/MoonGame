@@ -25,6 +25,8 @@ import {
 } from '../../packages/shared-core/src/index';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Дверь забега живёт у его владельца (REFM-210).
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 
 afterEach(() => setMatchVeteranPower(false));
 
@@ -73,13 +75,13 @@ describe('ядро прототипа получает силу ветерана
 
 describe('силу ветерана включает только дверь забега', () => {
   it('`setRunActive` включает её вместе с забегом и снимает вместе с ним', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1];
+    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(RUN)?.[1];
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain('setMatchVeteranPower(on)');
   });
 
-  it('больше никто в `main.ts` силу ветерана не трогает', () => {
-    const calls = SRC.match(/\bsetMatchVeteranPower\(/g) ?? [];
+  it('больше никто — ни `main.ts`, ни модуль забега — силу ветерана не трогает', () => {
+    const calls = `${SRC}\n${RUN}`.match(/\bsetMatchVeteranPower\(/g) ?? [];
     expect(calls).toHaveLength(1);
   });
 });

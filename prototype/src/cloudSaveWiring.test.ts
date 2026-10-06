@@ -38,10 +38,12 @@ import { readFileSync } from 'node:fs';
 // облаку снимок, уход со страницы отправляет копию, хуки снимают забег прежнего профиля.
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const PROFILE = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
+// Журнал забега и его флаги — у владельца забега (REFM-210).
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const bodyIn = (src: string, name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
 const body = (name: string): string => bodyIn(PROFILE, name);
-const mainBody = (name: string): string => bodyIn(SRC, name);
+const runBody = (name: string): string => bodyIn(RUN, name);
 
 describe('YAG-2.2 — каждое изменение профиля — новая правка облака', () => {
   it('сохранение профиля двигает правку', () => {
@@ -50,7 +52,7 @@ describe('YAG-2.2 — каждое изменение профиля — нов�
 
   it('смена дескриптора забега двигает правку, повтор того же — нет', () => {
     // Каждая запись журнала отдаётся облаку, а решает о правке владелец профиля.
-    expect(mainBody('saveRun')).toContain('offerRunToCloud(portable, blob);');
+    expect(runBody('saveRun')).toContain('offerRunToCloud(portable, blob);');
     const offer = body('offerRunToCloud');
     expect(offer).toContain('if (portable !== lastPortableRaw || worldDue) {');
     expect(offer).toContain('bumpCloudRev();');
@@ -139,11 +141,11 @@ describe('YAG-1.4 — вход и развилка', () => {
     const adopt = body('adoptCloud');
     expect(adopt).toContain('game.stopRun();');
     expect(adopt).toContain('game.forgetRun();');
-    // Хуки игры: забег выходит из забега, «Продолжить» забывает его журнал.
-    expect(SRC).toMatch(
-      /stopRun: \(\) => \{\s+if \(runInProgress\(\)\) setRunActive\(false\);\s+\},/,
-    );
-    expect(SRC).toMatch(/forgetRun: \(\) => \{\s+savedRun = null;\s+savedPortable = null;\s+\},/);
+    // Хуки игры — функции владельца забега: забег выходит из забега, «Продолжить» забывает
+    // его журнал.
+    expect(SRC).toMatch(/\n {2}stopRun,\n {2}forgetRun: forgetSavedRun,\n/);
+    expect(runBody('stopRun')).toContain('if (runInProgress()) setRunActive(false);');
+    expect(runBody('forgetSavedRun')).toMatch(/savedRun = null;\s+savedPortable = null;/);
   });
 
   it('«Оставить этот» — номер правки по общему правилу, и облако получает профиль', () => {

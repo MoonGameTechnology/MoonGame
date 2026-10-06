@@ -23,6 +23,8 @@ import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 
 const HOUR = 3_600_000;
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Дверь забега живёт у его владельца (REFM-210).
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 
 afterEach(() => {
   setMatchMode(undefined);
@@ -59,13 +61,13 @@ describe('ядро прототипа исполняет темп забега',
 
 describe('темп включает только дверь забега', () => {
   it('`setRunActive` включает ×5 вместе с забегом и снимает вместе с ним', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1];
+    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(RUN)?.[1];
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain('setMatchTravelSpeed(on ? RUN_TRAVEL_SPEED : 1)');
   });
 
-  it('больше никто в `main.ts` темп не трогает', () => {
-    const calls = SRC.match(/\bsetMatchTravelSpeed\(/g) ?? [];
+  it('больше никто — ни `main.ts`, ни модуль забега — темп не трогает', () => {
+    const calls = `${SRC}\n${RUN}`.match(/\bsetMatchTravelSpeed\(/g) ?? [];
     expect(calls).toHaveLength(1);
   });
 });
