@@ -205,12 +205,17 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
     case 'pirate_marauder':
       return {
         name: displayUnit(id),
-        body: t('dossier.unit.pirate-marauder.desc', { hp: hl(st.hp), d: hl(st.defense) }),
+        body: t('dossier.unit.pirate-marauder.desc', { hp: hl(st.hp), d: hl(st.defenseVsInfantry ?? st.defense) }),
       };
     case 'pirate_tank':
       return {
         name: displayUnit(id),
-        body: t('dossier.unit.pirate-tank.desc', { hp: hl(st.hp), a: hl(st.attack), cs: hl(st.cargoSize ?? 1) }),
+        body: t('dossier.unit.pirate-tank.desc', {
+          hp: hl(st.hp),
+          a: hl(st.attackVsInfantry ?? st.attack),
+          v: hl(st.attackVsVehicle ?? st.attack),
+          cs: hl(st.cargoSize ?? 1),
+        }),
       };
     case 'scout':
       return {

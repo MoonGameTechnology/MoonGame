@@ -80,7 +80,7 @@
 | SHIPART-5 | ✅ | data proto cli | `docs/backlog.md` | Наземные портреты и отдельный состав пиратов |
 | SHIPART-4 | ✅ | proto cli | `docs/backlog.md` | Отдельные корпуса четырёх юнитов Sector Zero |
 | TXT-1 | ✅ | proto | `docs/backlog.md` | Досье зданий: 14 ключей, 2505 → 1064 симв., проза вместо |
-| TXT-2 | ⏳ | proto | `docs/backlog.md` | Досье юнитов: 10 ключей, 3046 симв. — самый раздутый домен |
+| TXT-2 | ✅ | proto | `docs/backlog.md` | Досье юнитов: самый раздутый домен локали. |
 | TXT-4 | ⏳ | proto | `docs/backlog.md` | Герои: описание способности не называет величину — 10 из |
 | TXT-5 | ⏳ | proto | `docs/backlog.md` | Онбординг: 36 ключей, 5019 симв. — учит законно, но |
 | TXT-7 | ⏳ | proto docs | `docs/backlog.md` | Сторож в гейте: чтобы вода не вернулась. |
