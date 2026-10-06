@@ -13,7 +13,7 @@ import {
   type GameState,
   type Player,
 } from '@void/shared-core';
-import { MatchRoom, type RoomObservation, type RoomPeer } from './matchRoom';
+import { MatchRoom, OWNER_ONLY_EVENTS, type RoomObservation, type RoomPeer } from './matchRoom';
 import type { ServerMessage } from './protocol';
 
 class MemoryPeer implements RoomPeer {
@@ -1443,15 +1443,28 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         const { at } = action.payload as { at: string };
         h.emit('hero.spawned', { owner: action.playerId, heroId: 'h1', fleetId: 'f1', at });
       });
-      // Construction and production by p1 at `node1`, a world p2 identifies (RECAP-FOG),
-      // plus a wreck there — a map event, not intel.
+      // Intel by p1 at `node1`, a world p2 identifies: construction and production
+      // (RECAP-FOG), orders and plans (FOG-15) — plus a wreck there, a map event, not intel.
+      // Payloads copy the real emitters: the build orders name p1 `playerId`, not `owner`.
       api.onAction('test.economy', (action, h) => {
         const owner = action.playerId;
+        const playerId = action.playerId;
         h.emit('building.constructed', { planetId: 'node1', building: 'mine', owner });
         h.emit('building.upgraded', { planetId: 'node1', building: 'mine', level: 2, owner });
         h.emit('unit.built', { planetId: 'node1', unit: 'fighter', count: 3, owner });
         h.emit('army.load.cancelled', { fleetId: 'f1', planetId: 'node1', unit: 'infantry', count: 2, owner });
         h.emit('army.unload.cancelled', { fleetId: 'f1', planetId: 'node1', unit: 'infantry', count: 2, owner });
+        h.emit('construction.queued', { planetId: 'node1', id: 7, kind: 'unit', playerId, unit: 'fighter', count: 3 });
+        h.emit('construction.started', { kind: 'building', planetId: 'node1', building: 'mine', playerId });
+        h.emit('construction.cancelled', { planetId: 'node1', seq: 8, kind: 'building', progress: 0.5, playerId });
+        h.emit('construction.resumed', { planetId: 'node1', id: 8, kind: 'building', playerId });
+        h.emit('construction.queue.dropped', { planetId: 'node1', id: 7, kind: 'unit', playerId });
+        h.emit('capital.designated', { owner, planetId: 'node1' });
+        h.emit('steward.holdpoint', { playerId, planetId: 'node1', on: true });
+        h.emit('mines.laid', { owner, fleetId: 'mine:1', at: 'node1', charge: 4 });
+        h.emit('salvage.paid', { playerId, location: 'node1', resources: { metal: 40 } });
+        h.emit('fleet.merge.pending', { from: 'f9', into: 'f1', owner, at: 'node1' });
+        h.emit('refuge.found', { owner, at: 'node1' });
         h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
       });
       // Бой p1 против p3 в мире `far`, которого не опознаёт никто.
@@ -1573,7 +1586,7 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     expect(lastEvents(p3)).not.toContain('hero.spawned');
   });
 
-  it('construction and production are owner-only: an identified world does not reveal them', () => {
+  it('intel is owner-only: an identified world reveals no construction, production, orders or plans', () => {
     const { r, p1, p2, p3 } = fogRoom();
     r.submitAction('p1', { id: 'e9', type: 'test.economy', playerId: 'p1', issuedAt: 1, payload: {} }, p1);
     const intel = [
@@ -1582,7 +1595,22 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
       'unit.built',
       'army.load.cancelled',
       'army.unload.cancelled',
+      // FOG-15: the projection strips these from a rival's identified world, so the event
+      // must not retell them (Codex review on #1491).
+      'construction.queued',
+      'construction.started',
+      'construction.cancelled',
+      'construction.resumed',
+      'construction.queue.dropped',
+      'capital.designated',
+      'steward.holdpoint',
+      'mines.laid',
+      'salvage.paid',
+      'fleet.merge.pending',
+      'refuge.found',
     ];
+    // Every entry of the server's list is exercised here, so a new one can't skip this test.
+    expect([...OWNER_ONLY_EVENTS.keys()].sort()).toEqual([...intel].sort());
     for (const type of intel) {
       expect(lastEvents(p1), type).toContain(type);
       expect(lastEvents(p2), type).not.toContain(type); // p2 identifies node1, still not news for p2
