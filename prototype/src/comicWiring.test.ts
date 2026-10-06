@@ -8,6 +8,13 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Конец забега засчитывает его владелец (`sectorRun.ts`, REFM-210) и зовёт комиксы хуками.
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
+/** Засчёт попытки — один раз на попытку, в кадровом такте журнала забега. */
+const settleBlock = (): string =>
+  /if \(sectorAttempt > 0 && clearedAttempt !== sectorAttempt\) \{[\s\S]*?\n {4}\}/.exec(
+    RUN,
+  )?.[0] ?? '';
 
 describe('комиксы глав — проводка', () => {
   it('новый забег — из меню и с итогов — идёт через комикс главы', () => {
@@ -22,12 +29,9 @@ describe('комиксы глав — проводка', () => {
   });
 
   it('финал главы — только после победы, один раз на попытку, поверх итогов', () => {
-    const block =
-      /if \(sectorAttempt > 0 && clearedAttempt !== sectorAttempt\) \{[\s\S]*?\n {4}\}/.exec(
-        MAIN,
-      )?.[0] ?? '';
-    expect(block).toContain(
-      "if (won) playChapterComic(pveChapter(sectorMission).id, 'outro', () => {});",
+    expect(settleBlock()).toContain('if (won) game.chapterWon();');
+    expect(MAIN).toContain(
+      "chapterWon: () => playChapterComic(pveChapter(sectorMission).id, 'outro', () => {}),",
     );
   });
 
@@ -47,13 +51,11 @@ describe('комиксы глав — проводка', () => {
       /for \(const moment of comicsTriggered\(sectorProgress, comicArt\.registry, COMIC_TRIGGERS, chapter, complete\)\)\n\s+playChapterComic\(chapter, moment, \(\) => \{\}\);/,
     );
     // Победный кадр: сцена и задача встают в очередь раньше финала главы.
-    const block =
-      /if \(sectorAttempt > 0 && clearedAttempt !== sectorAttempt\) \{[\s\S]*?\n {4}\}/.exec(
-        MAIN,
-      )?.[0] ?? '';
-    const scenes = block.indexOf('playTaskComic(runMissionRows(), runChain());');
+    const block = settleBlock();
+    const scenes = block.indexOf('game.finalScenes();');
     expect(scenes).toBeGreaterThan(-1);
-    expect(scenes).toBeLessThan(block.indexOf("'outro'"));
+    expect(scenes).toBeLessThan(block.indexOf('game.chapterWon();'));
+    expect(MAIN).toContain('finalScenes: () => playTaskComic(runMissionRows(), runChain()),');
   });
 
   it('«назад» и Escape закрывают комикс первым — он верхняя ступень лестницы', () => {
