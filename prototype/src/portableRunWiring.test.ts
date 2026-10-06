@@ -16,13 +16,16 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const PROFILE = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
 const body = (name: string): string =>
   new RegExp(`function ${name}\\(\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
 
 describe('YAG-2.1 — дескриптор живёт и умирает вместе со снимком', () => {
   it('каждая очистка снимка стирает и дескриптор', () => {
-    const snapshot = SRC.match(/runSaveStore\.clear\(\)/g)?.length ?? 0;
-    const portable = SRC.match(/portableRunStore\.clear\(\)/g)?.length ?? 0;
+    // Снимок стирают и забег (`main.ts`), и взятие облачного профиля (`sectorProfile.ts`).
+    const both = `${SRC}\n${PROFILE}`;
+    const snapshot = both.match(/runSaveStore\.clear\(\)/g)?.length ?? 0;
+    const portable = both.match(/portableRunStore\.clear\(\)/g)?.length ?? 0;
     expect(snapshot).toBeGreaterThan(0);
     expect(portable).toBe(snapshot);
   });
@@ -51,7 +54,7 @@ describe('YAG-2.1 — дескриптор живёт и умирает вмес
     // главы зависит от сложности — иначе восстановленная попытка ехала бы на чужом старте).
     expect(portable).toContain('chapterWorld(mission, parseRunDifficulty(save.difficulty))');
     expect(
-      /function chapterWorld\(mission: number, difficulty: RunDifficulty\)[^{]*\{[^}]*pveState\(data, mission, difficulty\)/.test(SRC),
+      /function chapterWorld\(mission: number, difficulty: RunDifficulty\)[^{]*\{[^}]*pveState\(data, mission, difficulty\)/.test(PROFILE),
     ).toBe(true);
     expect(portable).toContain('resumePortableRun(');
   });
