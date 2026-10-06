@@ -49,7 +49,9 @@ export const fleetOpsModule: GameModule = {
   // 1.6.0: слияние, приостановленное высадкой, созревает по её концу (замечание Codex на #1415).
   // 1.8.0: бой «Атаки» втягивает ждавших у мира, «Атака» по дерущейся цели вступает в её бой
   // (ATK-3).
-  version: '1.8.0',
+  // 1.9.0: «разминулись» решает прибытие — конец боя или высадки не снимает намерение
+  // слияния с догоняющего в пути (ревью #1417).
+  version: '1.9.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -204,11 +206,17 @@ export const fleetOpsModule: GameModule = {
      * нет, и «догонять» здесь было бы новым приказом на движение, которого игрок не
      * отдавал. Живой бой намерение НЕ снимает: `fusable` его просто не пропустит, а
      * после боя уцелевшие, скорее всего, всё ещё рядом.
+     *
+     * «Разминулись» решает ПРИБЫТИЕ (`conclusive`). Конец боя или высадки застаёт
+     * догоняющего ещё в пути — цель отбилась раньше, чем он долетел, или его самого
+     * перехватили на дороге, и после боя он летит дальше. Это ещё не промах: на таких
+     * поводах сливается только то, что уже стоит вместе, а намерение летящего ждёт
+     * прилёта (замечание Codex на #1417). Не летящего и не стоящего рядом — снимается:
+     * его прилёта не будет (#1418).
      */
-    const settleMerges = (event: { payload: unknown }, h: HandlerContext): void => {
-      const p = event.payload as { fleetId?: string };
-      if (typeof p?.fleetId !== 'string') return;
-      const arrived = h.state.fleets[p.fleetId];
+    const settleMerges = (fleetId: unknown, h: HandlerContext, conclusive: boolean): void => {
+      if (typeof fleetId !== 'string') return;
+      const arrived = h.state.fleets[fleetId];
       if (!arrived) return;
       // Пары «кто с кем» — прилетевший со своей целью и все, кто ждал ЭТОГО прилёта.
       const pairs: Array<[string, string]> = [];
@@ -230,7 +238,10 @@ export const fleetOpsModule: GameModule = {
         // Высадка приостанавливает намерение, как бой: трюм заморожен до её конца (см. приказ).
         if (from.assaultLanding || into.assaultLanding) continue;
         if (!fusable(from, into)) {
-          delete from.mergeInto; // разминулись
+          // Разминулись. На прибытии это ясно сразу; на конце боя или высадки — только если
+          // догоняющий больше никуда не летит (ничья на дороге сняла его марш, `settleMarch`):
+          // прилёта, который решил бы иначе, уже не будет (замечание Codex на #1418).
+          if (conclusive || !from.movement) delete from.mergeInto;
           continue;
         }
         if (heroByFleet(h.state, fromId) && heroByFleet(h.state, intoId)) {
@@ -245,13 +256,14 @@ export const fleetOpsModule: GameModule = {
         fuseFleets(h, fromId, intoId, from.owner);
       }
     };
-    api.on('fleet.arrived', settleMerges);
+    const fleetOf = (event: { payload: unknown }): unknown => (event.payload as { fleetId?: unknown })?.fleetId;
+    api.on('fleet.arrived', (event, h) => settleMerges(fleetOf(event), h, true));
     // Высадка кончилась (сошла, снялась по сроку или сорвана) — намерение, которое она
     // приостановила, созревает сейчас: нового прибытия у стоящих рядом флотов не будет
     // (замечание Codex на #1415). `combat` идёт в манифесте раньше, поэтому к этому
     // обработчику высадка по сроку уже снята.
-    api.on('assault.landed', settleMerges);
-    api.on('assault.interrupted', settleMerges);
+    api.on('assault.landed', (event, h) => settleMerges(fleetOf(event), h, false));
+    api.on('assault.interrupted', (event, h) => settleMerges(fleetOf(event), h, false));
     // Бой кончился — намерения, которые он приостановил, созревают сейчас. Прерванный
     // штурм вступает в бой раньше, чем `assault.interrupted` дойдёт сюда (`combat` идёт в
     // манифесте раньше), и без этого повтора `mergeInto` висел бы вечно (замечание Codex
@@ -259,9 +271,7 @@ export const fleetOpsModule: GameModule = {
     api.on('battle.resolved', (event, h) => {
       const p = event.payload as { fleets?: unknown };
       if (!Array.isArray(p?.fleets)) return;
-      for (const fleetId of p.fleets) {
-        if (typeof fleetId === 'string') settleMerges({ payload: { fleetId } }, h);
-      }
+      for (const fleetId of p.fleets) settleMerges(fleetId, h, false);
     });
 
     // Peel a chosen set of ships off a fleet that is not in battle into a fresh fleet

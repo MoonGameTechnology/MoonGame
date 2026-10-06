@@ -34,6 +34,8 @@ const data: GameData = parseGameData({
   resources: ['metal'],
   units: {
     fighter: { faction: 'x', stats: { attack: 10, defense: 0, speed: 10, hp: 20 }, line: 'front' },
+    // Без урона: бой из них кончается ничьей по предохранителю `MAX_COMBAT_ROUNDS`.
+    decoy: { faction: 'x', stats: { attack: 0, defense: 0, speed: 10, hp: 20 }, line: 'front' },
     marine: { faction: 'x', domain: 'ground', stats: { attack: 10, defense: 4, speed: 1, hp: 20 } },
     militia: { faction: 'x', domain: 'ground', stats: { attack: 3, defense: 0, speed: 1, hp: 10 } },
     guard: { faction: 'x', domain: 'ground', stats: { attack: 40, defense: 40, speed: 1, hp: 900 } },
@@ -194,6 +196,92 @@ describe('флот на высадке не сливается (замечани
     expect(r.events.some((x) => x.type === 'battle.resolved')).toBe(true);
     expect(r.state.fleets.B).toBeUndefined();
     expect(r.events.some((x) => x.type === 'fleet.merged')).toBe(true);
+  });
+
+  // «Разминулись» решает только прибытие (замечание Codex на #1417): конец боя или высадки
+  // застаёт догоняющего ещё в пути, и это ещё не промах.
+  const chaser = (id: string, into: string): Fleet => ({
+    ...fleet(id, 'p1', [['fighter', 1]], []),
+    location: null,
+    movement: { from: 'Q', to: 'P', departedAt: 0, arrivesAt: 100 * HOUR },
+    mergeInto: into,
+  });
+  const withQ = (st: GameState): GameState => ({
+    ...st,
+    planets: { ...st.planets, Q: { ...st.planets.P!, id: 'Q', owner: 'p1', garrison: [], position: { x: 100, y: 0 } } },
+  });
+
+  it('бой цели кончился, а догоняющий ещё в пути — намерение ждёт его прилёта', () => {
+    const b = { ...fleet('B', 'p1', [['fighter', 3]], []), battleId: 'b1' };
+    const e = { ...fleet('E', 'p2', [['fighter', 1]], []), battleId: 'b1' };
+    const st = withQ(world([chaser('A', 'B'), b, e], []));
+    setStance(st, 'p1', 'p2', 'war');
+    const s: GameState = {
+      ...st,
+      battles: {
+        b1: {
+          id: 'b1',
+          location: 'P',
+          phase: 'orbital',
+          sides: [
+            { ref: { kind: 'fleet', fleetId: 'B' }, owner: 'p1', role: 'attacker' },
+            { ref: { kind: 'fleet', fleetId: 'E' }, owner: 'p2', role: 'defender' },
+          ],
+          round: 0,
+        },
+      },
+      scheduled: [{ id: 'evt:0', at: 0, type: 'combat.tick', payload: { battleId: 'b1' }, seq: 0 }],
+      scheduleSeq: 1,
+    };
+    const r = okAdvance(kernel.advanceTo(s, ctx(4 * HOUR)));
+    expect(r.events.some((x) => x.type === 'battle.resolved')).toBe(true);
+    expect(r.state.fleets.A?.mergeInto).toBe('B');
+    // Долетел — намерение созрело.
+    const docked = structuredClone(r.state);
+    docked.fleets.A = { ...docked.fleets.A!, location: 'P', movement: null };
+    const m = okApply(kernel.applyAction(docked, act('arrive', { fleetId: 'A' }), ctx(4 * HOUR)));
+    expect(m.state.fleets.A).toBeUndefined();
+    expect(m.events.some((x) => x.type === 'fleet.merged')).toBe(true);
+  });
+
+  it('ничья на дороге сняла марш догоняющего — намерение снимается: прилёта не будет', () => {
+    // `settleMarch` после ничьей марш не возобновляет: флот остаётся, где его застал бой, и
+    // `fleet.arrived` для него уже не придёт (замечание Codex на #1418).
+    const a: Fleet = { ...fleet('A', 'p1', [['decoy', 1]], []), battleId: 'b1', resume: { to: 'Q' }, mergeInto: 'B' };
+    const e = { ...fleet('E', 'p2', [['decoy', 1]], []), battleId: 'b1' };
+    const b = { ...fleet('B', 'p1', [['fighter', 1]], []), location: 'Q' };
+    const st = withQ(world([a, b, e], []));
+    setStance(st, 'p1', 'p2', 'war');
+    const s: GameState = {
+      ...st,
+      battles: {
+        b1: {
+          id: 'b1',
+          location: 'P',
+          phase: 'orbital',
+          sides: [
+            { ref: { kind: 'fleet', fleetId: 'A' }, owner: 'p1', role: 'attacker' },
+            { ref: { kind: 'fleet', fleetId: 'E' }, owner: 'p2', role: 'defender' },
+          ],
+          round: 0,
+        },
+      },
+      scheduled: [{ id: 'evt:0', at: 0, type: 'combat.tick', payload: { battleId: 'b1' }, seq: 0 }],
+      scheduleSeq: 1,
+    };
+    const r = okAdvance(kernel.advanceTo(s, ctx(250 * HOUR)));
+    const end = r.events.find((x) => x.type === 'battle.resolved');
+    expect((end?.payload as { end?: string } | undefined)?.end).toBe('stalemate');
+    expect(r.state.fleets.A?.movement).toBeNull();
+    expect(r.state.fleets.A?.mergeInto).toBeUndefined();
+  });
+
+  it('высадка цели кончилась, а догоняющий ещё в пути — намерение ждёт его прилёта', () => {
+    const s = withQ(structuredClone(started()));
+    s.fleets.C = chaser('C', 'A');
+    const r = okAdvance(kernel.advanceTo(s, ctx(LANDED)));
+    expect(r.events.some((x) => x.type === 'assault.landed')).toBe(true);
+    expect(r.state.fleets.C?.mergeInto).toBe('A');
   });
 });
 

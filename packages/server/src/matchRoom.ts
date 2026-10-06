@@ -12,6 +12,7 @@ import type {
 } from '@void/shared-core';
 import {
   diffState,
+  flashBattles,
   getStance,
   hashState,
   identifiedNodes,
@@ -2162,25 +2163,4 @@ export class MatchRoom {
       peer.close?.();
     }
   }
-}
-
-/** Стороны боёв, которых в итоговом состоянии уже нет, — по событиям пакета: `battle.started`
- *  называет атакующего и обороняющегося, `battle.joined` — каждого вступившего. */
-function flashBattles(events: readonly DomainEvent[], state: GameState): Map<string, Array<PlayerId | null>> {
-  const out = new Map<string, Array<PlayerId | null>>();
-  for (const e of events) {
-    const p = (e.payload ?? {}) as Record<string, unknown>;
-    const id = p.battleId;
-    if (typeof id !== 'string' || Object.hasOwn(state.battles, id)) continue;
-    const owners = out.get(id) ?? [];
-    if (e.type === 'battle.started') owners.push(ownerOf(p.attacker), ownerOf(p.defender));
-    else if (e.type === 'battle.joined') owners.push(ownerOf(p.owner));
-    else continue;
-    out.set(id, owners);
-  }
-  return out;
-}
-
-function ownerOf(v: unknown): PlayerId | null {
-  return typeof v === 'string' ? v : null;
 }

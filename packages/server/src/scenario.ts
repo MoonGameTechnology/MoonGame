@@ -247,7 +247,10 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '73'; // SHU-6.7: обзор в круге патруля.
+export const MODULE_MANIFEST_VERSION = '74'; // Ревью #1417. Членство и порядок не тронуты;
+// `fleet-ops` 1.9.0: «разминулись» решает прибытие — конец боя или высадки не снимает
+// намерение слияния с догоняющего, который ещё в пути.
+// export const MODULE_MANIFEST_VERSION = '73'; // SHU-6.7: обзор в круге патруля.
 // Членство и порядок не тронуты; сменились ПРАВИЛА зрения (`visibility` 2.2.0): висящий
 // патруль шаттлов открывает владельцу миры в своём круге и опознаёт флоты под собой по
 // позиции. На этом зрении стоят память тумана, места эпизода, сценарный союзник и цели
