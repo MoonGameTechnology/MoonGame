@@ -17,9 +17,21 @@ import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility
 import { rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
 import { drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { rocketMinesUi } from './rocketMinesUi';
-import { parseSoloSave, serializeSoloSave, type SoloSave } from '../../decisions/soloSave';
-import { soloSaveStore } from './soloSaveLocal';
-import { fleetBaseSpeed, fleetNodeAt, forkSiteId, hashJson, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
+import type { SoloSave } from '../../decisions/soloSave';
+import {
+  askReplace,
+  closeSoloReplace,
+  enterSolo,
+  initSoloCheckpoint,
+  leaveSolo,
+  refreshHubDoor,
+  restoreSolo,
+  saveSolo,
+  soloSaveActive,
+  suspendSolo,
+  tickSoloSave,
+} from './soloCheckpoint';
+import { fleetBaseSpeed, fleetNodeAt, forkSiteId, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierBadge, swarmDossierHtml } from './swarmDossier';
@@ -1053,7 +1065,6 @@ import {
   shareAddress,
 } from '../../decisions/matchAddress';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
-import { hubDoor } from '../../decisions/hubDoor';
 import {
   entryOffer,
   reconcileSelection,
@@ -13894,8 +13905,7 @@ topEl.addEventListener('click', (ev) => {
 });
 
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
-  saveSolo();
-  soloSaveActive = false;
+  leaveSolo();
   autoAssault.clear();
   leaveRun();
   mapNeedsPreparation = true;
@@ -13989,8 +13999,7 @@ function startMatch(setup: SetupConfig, persist = true): void {
     sandboxHomeId = setup.seats[0]?.start ?? null;
     setSandboxButton(sandboxConfig.enabled);
   }
-  soloSaveActive = persist && !NET && (__PLAYER_BUILD__ || !sandboxConfig.enabled);
-  saveSolo();
+  enterSolo(persist);
 }
 
 /** Запуск ЗАБЕГА: игрок против Роя, плюс неподвижный пиратский гарнизон карты. */
@@ -14247,13 +14256,8 @@ setupGoEl.addEventListener('click', () => {
     );
     return;
   }
-  const stored = soloStore.load();
   const sandbox = !__PLAYER_BUILD__ && ($('setupsandbox') as HTMLInputElement).checked;
-  if (!sandbox && (!stored.ok || stored.raw !== null)) {
-    $('solo-replace').style.display = 'flex';
-    $('solo-replace-cancel').focus({ preventScroll: true });
-    return;
-  }
+  if (!sandbox && askReplace()) return;
   startMatch(buildSetupConfig());
 });
 $('setupcancel').addEventListener('click', () => {
@@ -14534,8 +14538,7 @@ function netClientFor(seat: string): MultiplayerClient {
 }
 
 function connect(): void {
-  saveSolo();
-  soloSaveActive = false;
+  leaveSolo();
   setRunActive(false);
   const srv = resolveServer();
   if (!srv) return;
@@ -16000,13 +16003,9 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// The normal skirmish slot is independent of Sector Zero and the tutorial.
-const soloStore = soloSaveStore();
-const soloRules = hashJson({ data, modules: soloKernel.manifest });
-let soloSaveActive = false;
-let soloSavedAtReal = 0;
-let soloSaveFailed = false;
-
+// Слот обычной схватки — такт записи, пауза на уходе, «Продолжить» и замена сохранения —
+// `soloCheckpoint.ts` (REFM-213). Здесь только снимок политик хоста и проводка к миру, темпу
+// и экранам.
 function currentSoloSave(): SoloSave {
   return {
     state: s, ai: [...AI_PLAYERS],
@@ -16015,90 +16014,40 @@ function currentSoloSave(): SoloSave {
     autoAssault: [...autoAssault], memory: memory.dump(),
   };
 }
-function saveSolo(explicit = false): void {
-  if (!soloSaveActive || NET || s.pve || (!__PLAYER_BUILD__ && sandboxConfig.enabled)) return;
-  let ok = false;
-  try {
-    ok = s.match.status === 'ended' ? soloStore.clear() : soloStore.save(serializeSoloSave(currentSoloSave(), soloRules));
-  } catch { /* Serialization/storage failure leaves the previous checkpoint intact. */ }
-  if (!ok && (!soloSaveFailed || explicit)) note(t('solo.save.failed'));
-  if (ok && explicit) note(t('solo.save.saved'));
-  soloSaveFailed = !ok;
-  if (s.match.status === 'ended' && ok) soloSaveActive = false;
-}
-function suspendSolo(): void {
-  if (!soloSaveActive || NET) return;
-  saveSolo();
-  speed = 0;
-  // Мир стоит, пока игрок не нажмёт ▶, — ряд скорости показывает паузу, а не прежний темп.
-  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
-    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === 0);
-}
-function tickSoloSave(now: number): void {
-  if (!soloSaveActive || !inMatch()) return;
-  if (s.match.status === 'ended') { saveSolo(); return; }
-  if (now - soloSavedAtReal < 15000) return;
-  soloSavedAtReal = now;
-  saveSolo();
-}
-/**
- * Главная дверь хаба (UIX-10.1): «Продолжить» с картой и днём сохранённой партии или, новичку
- * (ONB-0), «Начать обучение» — какая из двух, решает `decisions/hubDoor.ts`. Строка под
- * дверью — только беда со слотом: не сохранилось или сохранение не читается.
- */
-function refreshHubDoor(): void {
-  const stored = soloStore.load();
-  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
-  const door = hubDoor(
-    // Сохранение без карты — «Нексус»: так его читает и `mapPreset` при загрузке.
-    save ? { mapId: save.state.mapId ?? 'nexus', time: save.state.time } : stored.ok && stored.raw === null ? 'empty' : 'unreadable',
-    welcomeMode(loadOnboard()) === 'new',
-  );
-  const button = $('hub-solo-continue') as HTMLButtonElement;
-  button.hidden = door.kind !== 'continue' && door.kind !== 'broken';
-  button.disabled = door.kind !== 'continue';
-  $('hub-continue-sub').textContent =
-    door.kind === 'continue' ? t('solo.save.continue.sub', { map: mapLabel(door.mapId), day: gameDay(door.time) }) : '';
-  $('onboard-nudge').style.display = door.kind === 'tutorial' ? 'flex' : 'none';
-  $('solo-save-status').textContent =
-    !stored.ok || soloSaveFailed ? t('solo.save.failed') : door.kind === 'broken' ? t('solo.save.invalid') : '';
-}
-function closeSoloReplace(): void {
-  $('solo-replace').style.display = 'none';
-  $('setupgo').focus({ preventScroll: true });
-}
-$('solo-replace-cancel').addEventListener('click', closeSoloReplace);
-$('solo-replace-confirm').addEventListener('click', () => {
-  closeSoloReplace();
-  startMatch(buildSetupConfig());
+initSoloCheckpoint({
+  world: () => s,
+  net: () => NET,
+  practice: () => !__PLAYER_BUILD__ && sandboxConfig.enabled,
+  inMatch,
+  snapshot: currentSoloSave,
+  halt: () => {
+    speed = 0;
+    // Мир стоит, пока игрок не нажмёт ▶, — ряд скорости показывает паузу, а не прежний темп.
+    for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+      x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === 0);
+  },
+  install: (save) => {
+    leaveNetwork(); // схватка из сохранения — не сетевая партия: из сети той же дверью
+    cameFromLink = false;
+    installMatch(save.state, new Map(save.ai));
+    for (const id of save.autoAssault) autoAssault.add(id);
+    memory.restore(save.memory);
+    applyTimeSpeed(save.normalSpeed, save.fastSpeed);
+    speed = 0;
+    for (const x of Array.from(document.querySelectorAll('[data-speed]')))
+      x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === 0);
+    lastReal = performance.now(); // never catch up the wall time spent away
+  },
+  show: () => {
+    sectorZeroMenu.hide();
+    showConnect(false);
+    showHub(false);
+  },
+  startNew: () => startMatch(buildSetupConfig()),
+  newcomer: () => welcomeMode(loadOnboard()) === 'new',
+  mapLabel,
+  note,
 });
-function restoreSolo(): void {
-  if (NET) return;
-  const stored = soloStore.load();
-  const save = stored.ok ? parseSoloSave(stored.raw, soloRules) : null;
-  if (!save) { refreshHubDoor(); return; }
-  // Verify the map before replacing the in-memory match; future maps need an
-  // explicit migration, not an accidental fallback to another board.
-  try { mapPreset(save.state.mapId); mapNodesFromState(save.state); }
-  catch { $('solo-save-status').textContent = t('solo.save.invalid'); return; }
-  soloSaveActive = false; // installMatch must not overwrite the checkpoint being read
-  leaveNetwork(); // схватка из сохранения — не сетевая партия: из сети той же дверью
-  cameFromLink = false;
-  installMatch(save.state, new Map(save.ai));
-  for (const id of save.autoAssault) autoAssault.add(id);
-  memory.restore(save.memory);
-  applyTimeSpeed(save.normalSpeed, save.fastSpeed);
-  speed = 0;
-  for (const x of Array.from(document.querySelectorAll('[data-speed]')))
-    x.classList.toggle('on', Number((x as HTMLElement).dataset.speed) === 0);
-  lastReal = performance.now(); // never catch up the wall time spent away
-  soloSaveActive = true;
-  soloSaveFailed = false;
-  sectorZeroMenu.hide();
-  showConnect(false);
-  showHub(false);
-  note(t('solo.save.restored'));
-}
 
 // Забег Sector Zero — флаги, журнал, засчёт и «Продолжить» — `sectorRun.ts` (REFM-210).
 // Здесь только проводка к миру, экранам и комиксам. Хуки зовутся позже — из кадра, кнопок

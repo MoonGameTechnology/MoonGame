@@ -11,6 +11,8 @@ import { en } from '../../localization/en';
 import { ru } from '../../localization/ru';
 
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Дверь «Продолжить» рисует владелец слота схватки (REFM-213), подпись карты — `main.ts`.
+const SOLO = readFileSync(new URL('./soloCheckpoint.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 const between = (from: string, to: string): string => {
   const start = BUILD.indexOf(from);
@@ -71,9 +73,11 @@ describe('главный экран хаба (UIX-10.1)', () => {
   });
 
   it('«Продолжить» называет партию: режим, карта и день', () => {
-    expect(MAIN).toContain(
-      "t('solo.save.continue.sub', { map: mapLabel(door.mapId), day: gameDay(door.time) })",
+    expect(SOLO).toContain(
+      "t('solo.save.continue.sub', { map: game.mapLabel(door.mapId), day: gameDay(door.time) })",
     );
+    // Хук подписи — та же `mapLabel`, что у списков партий.
+    expect(MAIN).toMatch(/initSoloCheckpoint\(\{[\s\S]*?\n {2}mapLabel,\n[\s\S]*?\n\}\);/);
     expect(ru['solo.save.continue.sub']).toBe('Одиночная игра · {map} · день {day}');
     expect(en['solo.save.continue.sub']).toBe('Solo game · {map} · day {day}');
     // «Нексус» — именем, а не id карты, как и Фронтир.
