@@ -772,6 +772,19 @@ fs)` и `Vuln — built image base OS (Trivy image)` — последний из
 `pnpm update -r --depth Infinity ip-address` до 10.7.2. Вердикт — _true positive_,
 подавлять нечего.
 
+**Запись триажа (2026-10-06) — HIGH в `source-map-js`, починено апдейтом.** Между
+последним сканом `main` (`5fc19e5`, 2026-10-05) и прогоном PR #1418 в фиде появился
+`CVE-2026-93749` (GHSA-68fv-2mgg-jv7q, HIGH) в `source-map-js` 1.2.1, фикс — 1.2.2. Упали
+три чека: шаг `Dependency audit (OSV-Scanner)` джобы `lint · typecheck · test · audit`
+(шаг `Gate (…)` в ней зелёный), `SCA — osv.dev (OSV-Scanner)` и `Vuln — built image base
+OS (Trivy image)` — тот же пакет в `app/node_modules/.pnpm/source-map-js@1.2.1` образа.
+
+Зависимость транзитивная: её берут `postcss` (через `vite`) и `magicast` (через
+`@vitest/coverage-v8`), оба с диапазоном `^1.2.1`. Фикс в диапазон входит, поэтому
+override не нужен (прецедент `ip-address` выше): lockfile обновлён
+`pnpm update -r --depth Infinity source-map-js` до 1.2.2, хеш сверен с реестром. Вердикт —
+_true positive_, подавлять нечего.
+
 **Запись триажа (SEC-22, 2026-08-11) — две LOW в glibc закрыли очередь мержа целиком.**
 Между 2026-08-10 04:07 и 2026-08-11 09:09 UTC в фиде появились `CVE-2026-6368` и
 `CVE-2026-6791` — обе в `wordexp()` пакета `libc6` базового образа. Код репозитория при
