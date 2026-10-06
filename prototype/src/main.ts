@@ -3028,6 +3028,21 @@ function currentVision(): Vision {
   return fresh;
 }
 
+/**
+ * Туман, по которому судят кадр и журнал (FOG-13). `null` значит «туман выключен», и
+ * выключить его может только тумблер песочницы. Поэтому `vision` переписывается этой
+ * функцией везде, где появляется НОВЫЙ мир (конец `installMatch`, каждый сетевой
+ * снимок), а не только кадром: шаг мира, которым партия засевается, идёт до первого
+ * кадра, и его события журнал проверял по зрению прошлой партии, а после загрузки
+ * страницы — по `null`, то есть «видно всё»; события сетевой дельты идут сразу после
+ * снимка и сверялись со зрением прошлого снимка.
+ */
+function fogVision(): Vision | null {
+  // SANDBOX — fenced hook. The "fog of war" toggle defaults ON; turning it OFF drops the
+  // fog projection (null vision ⇒ everything is `known`, mirroring the dev reveal).
+  return !__PLAYER_BUILD__ && !NET && sandboxConfig.enabled && !sandboxConfig.fog ? null : currentVision();
+}
+
 /** Производные мира для кадра (шаг 9 плавности) — по тому же договору, что `visionMemo`.
  *  Доход в шапке, круги обзора, отметки ПКО, дальности радарной развёртки и союзник главы
  *  читают только мир, игрока и данные, а отметки ПКО — ещё и туман кадра. Пока мир, игрок
@@ -13947,6 +13962,11 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
     sandboxConfig.enabled = false;
     setSandboxButton(false);
   }
+  // FOG-13: зрение ЭТОЙ партии — до засевающего шага мира, который вызывающий делает
+  // сразу следом, ещё до первого кадра. `s` и `ME` уже новые, а песочница прошлой
+  // партии уже снята: её выключенный туман не должен стать «видно всё» новой
+  // (замечание Codex на #1490).
+  vision = fogVision();
   // Start the queued tour after the prepared HUD is actually visible.
   snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
@@ -14403,6 +14423,11 @@ function netClientFor(seat: string): MultiplayerClient {
         // stance chips and offer affordances (✓ accept / ⏳ pending) paint fresh.
         if (diploShift && diploOpen && diploTab === 'diplo') renderDiplo();
         if (snap.playerId) ME = snap.playerId;
+        // FOG-13: зрение этого снимка, а не прошлого. События дельты едут в журнал сразу
+        // после снимка, раньше первого кадра (`onEvents`), а сервер пропустил их по
+        // опознанным узлам ЭТОГО снимка: и новая карта, и мир, открывшийся обычной
+        // дельтой (замечание Codex на #1490). Кадр следом возьмёт то же зрение из памяти.
+        vision = fogVision(); // every snapshot: its delta's events follow
         if (changedMap && plan.fanfare) defaultView();
         // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
         // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
@@ -16563,12 +16588,7 @@ function frame(nowReal: number) {
     visionMemo = null;
     worldMemo = null;
   }
-  // SANDBOX — fenced hook. The "fog of war" toggle defaults ON; turning it OFF drops the
-  // fog projection (null vision ⇒ everything is `known`, mirroring the dev reveal).
-  vision =
-    !__PLAYER_BUILD__ && !NET && sandboxConfig.enabled && !sandboxConfig.fog
-      ? null
-      : currentVision(); // fog projection for this frame; recomputed only when the world changes
+  vision = fogVision(); // fog projection for this frame; recomputed only when the world changes
   const preparingMap = prepareEnteringMap();
   // Памятка клавиш ПК (UIX-9.1) ждёт конца подготовки карты: в кадре входа подготовка ещё
   // не началась, и памятка встала бы под заставку, отсчитывая свои секунды впустую.
