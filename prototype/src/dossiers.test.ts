@@ -60,6 +60,27 @@ describe('dossiers — здания', () => {
     expect(l2.body).toContain('<em class="hl">'); // живое число подсвечено
   });
 
+  it('TXT-1: каждое досье здания печатает свою величину, а не одну прозу', () => {
+    const ids = [
+      'mine',
+      'refinery',
+      'barracks',
+      'radar',
+      'fort',
+      'starfort',
+      'orbital_aa',
+      'zonal_aa',
+      'metal_station',
+      'tax_office',
+      'farm',
+      'power_plant',
+      'fabricator',
+    ];
+    for (const id of ids) {
+      expect(buildingDossier(id, 1)?.body, id).toMatch(/<em class="hl">[^<]*\d/);
+    }
+  });
+
   it('уровень ниже первого подтягивается к первому (нулевой не запрашивается)', () => {
     expect(buildingDossier('mine', 0)).toEqual(buildingDossier('mine', 1));
   });
