@@ -66,6 +66,14 @@ describe('fleetOrigin', () => {
     expect(fleetOrigin(f, 0, at)).toBeNull();
   });
 
+  it('ракета летит по прямой мимо линий — доля времени полёта, зажатая в [0,1] (правило 5)', () => {
+    // Как у ядра (`flightPointAt`, SM-3.7b): ни узла, ни лейна у ракеты нет.
+    const f = { location: null, flight: { from: { x: 0, y: 0 }, to: { x: 80, y: 40 }, departedAt: 1_000, arrivesAt: 2_000 } };
+    expect(fleetOrigin(f, 1_500, at)).toEqual({ x: 40, y: 20 });
+    expect(fleetOrigin(f, 9_000, at)).toEqual({ x: 80, y: 40 });
+    expect(fleetOrigin(f, 0, at)).toEqual({ x: 0, y: 0 });
+  });
+
   it('флот без места — null', () => {
     expect(fleetOrigin({}, 0, at)).toBeNull();
     expect(fleetOrigin({ location: null, movement: null }, 0, at)).toBeNull();

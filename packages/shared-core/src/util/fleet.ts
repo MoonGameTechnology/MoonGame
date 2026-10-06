@@ -2,6 +2,7 @@ import type { Fleet, GameState, PlanetId } from '../state/gameState';
 import type { HandlerContext } from '../kernel/module';
 import { ownFleet } from './combat';
 import { isMineFleet } from '../state/minefields';
+import { isMissileFleet } from '../state/ordnance';
 
 /** A fleet that has been validated as stationed at a planet and idle (not
  *  moving, not in battle). The `location` is guaranteed non-null. */
@@ -15,9 +16,12 @@ export interface IdleFleet extends Fleet {
  * `fleet.orbit` и `fleet.bombard` морозили вражеское производство безоружной миной,
  * `fleet.layMines` перезаряжал её самой собой. Правило стоит здесь, в общем пропуске
  * приказов флота, и по трейту: модулю, который принимает приказ, мина не известна.
+ * Ракета — тоже отряд без приказов («его невозможно контролировать», решение владельца
+ * 2026-09-30, SM-3.7b): тот же пропуск отбивает её своим кодом.
  */
 export function rejectMine(h: HandlerContext, fleet: Fleet): void {
   if (isMineFleet(fleet, h.ctx.data)) h.reject('E_MINE_PASSIVE');
+  if (isMissileFleet(fleet, h.ctx.data)) h.reject('E_MISSILE_PASSIVE');
 }
 
 /** Resolves a fleet the player owns and that is idle (docked, not moving, not

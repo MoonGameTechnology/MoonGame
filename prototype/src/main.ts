@@ -14,11 +14,12 @@ import { inspectBattle } from '../../packages/shared-core/src/state/battleReadou
 import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
 import { rocketMineCard } from '../../decisions/rocketMineCard';
+import { missileCard } from '../../decisions/missileCard';
 import { EMPLACEMENT_HEADING, isEmplacementFleet } from '../../decisions/emplacement';
 import { drawMineShape } from '../../packages/client/src/mineShape';
-import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
-import { isRocketMineFleet, rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
-import { drawOrdnance } from '../../packages/client/src/ordnanceView';
+import { missileVisible, visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
+import { isMissileFleet, isOrdnanceFleet, isRocketMineFleet, rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
+import { drawMissile, drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { HINT_KEY, MINE_MODES, MODE_KEY, rocketMinesUi } from './rocketMinesUi';
 import type { SoloSave } from '../../decisions/soloSave';
 import {
@@ -2561,10 +2562,10 @@ function fleetTitleOf(id: string): string {
 
 /** The fleets the command bar / move order currently act on (mine only). */
 function selectedFleetIds(): string[] {
-  // Мина (SM-3.6) и крепость (`emplacement.ts`, правило 4) — не флоты под приказ: в выбор
-  // для приказов они не попадают.
+  // Мина (SM-3.6), ракета (SM-3.7b) и крепость (`emplacement.ts`, правило 4) — не флоты
+  // под приказ: в выбор для приказов они не попадают.
   const orderable = (id: string): boolean =>
-    s.fleets[id]?.owner === ME && !isMineFleet(s.fleets[id]!, data) && !isEmplacementFleet(s.fleets[id]!, data);
+    s.fleets[id]?.owner === ME && !isOrdnanceFleet(s.fleets[id]!, data) && !isEmplacementFleet(s.fleets[id]!, data);
   if (selFleets.size) return [...selFleets].filter(orderable);
   return selFleet && orderable(selFleet) ? [selFleet] : [];
 }
@@ -3049,6 +3050,12 @@ function perWorld<K extends keyof WorldDerived>(
 function fleetSeen(f: Fleet): boolean {
   // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
   if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
+  // Ракета (SM-3.7b) — по обычному туману, но по своей ПОЗИЦИИ: узла у неё нет. Своя, окно
+  // шпионажа или глаза блока зрения — то же правило, что у ядра (`isVisibleTo`); туман,
+  // выключенный в песочнице (`vision` пуст), открывает её, как и любой флот.
+  if (isMissileFleet(f, data))
+    return !vision || f.owner === ME || intelFleetOwners.has(f.owner) ||
+      missileVisible(s, f, ME, data, perWorld('sight', () => sightCircles(s, ME, data)));
   // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
   return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
 }
@@ -5052,6 +5059,8 @@ function engageCandidates(): Array<EngageCandidate & { fleet: Fleet }> {
   const out: Array<EngageCandidate & { fleet: Fleet }> = [];
   for (const g of Object.values(s.fleets)) {
     if (g.owner === ME || sumUnits(g.units) <= 0) continue;
+    // Ракету корабли не бьют (решение владельца 2026-10-06): её сбивают ПРО и челноки.
+    if (isMissileFleet(g, data)) continue;
     if (!fleetSeen(g)) continue;
     const at = fleetAnchor(g);
     if (!at) continue;
@@ -6485,7 +6494,8 @@ function render(now: number) {
   drawPatrolRings(); // SHU-6.3: круг патруля и остаток висения — под значками вылетов
   drawSeenPatrols(); // SHU-6.10: чужой висящий патруль в моём обзоре — круг и состав
   drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
-  drawOrdnance(cx, mineView(), ME, mapNow(), world, cam.scale);
+  drawOrdnance(cx, mineView(), ME, world, cam.scale);
+  drawMissiles(); // SM-3.7b: летящая ракета — отряд, но рисуется стрелкой с курсом
   mineControls.refresh();
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
   drawNoticeFlashes(now); // UIX-4.1: своя постройка готова, свой флот дошёл
@@ -7205,7 +7215,8 @@ function render(now: number) {
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
   for (const f of Object.values(s.fleets)) {
-    if (isMineFleet(f, data)) continue; // мину рисует `drawMinefields` своим знаком (SM-3.6)
+    // Мину рисует `drawMinefields` своим знаком (SM-3.6), ракету — `drawMissiles` (SM-3.7b).
+    if (isOrdnanceFleet(f, data)) continue;
     if (!fleetSeen(f)) {
       // not identified and no intel window: a radar contact is shown only as a
       // swept signature (drawRadarContacts), painted by the arm — never live here.
@@ -7443,6 +7454,20 @@ function rocketMineCardHtml(f: Fleet): string {
     html += `<button class="chip" data-act="rmdisarm">${esc(t('mine.disarm'))}</button></div>`;
   }
   return html;
+}
+
+/** Карточка летящей ракеты (SM-3.7b): что показать — `decisions/missileCard.ts`. Приказов у
+ *  ракеты нет, поэтому и кнопок нет: «невозможно контролировать» (решение владельца). */
+function missileCardHtml(f: Fleet): string {
+  const card = missileCard(f, mineView()?.warheads?.[f.id], ME, mapNow(), data);
+  if (!card) return '';
+  const pct = card.hull.max > 0 ? Math.round((100 * card.hull.cur) / card.hull.max) : 0;
+  let html =
+    cardHeader(ownerColor(f.owner), t('data.missile'), t('missile.card.eta', { in: countdownHMS(card.leftMs) })) +
+    `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar"><i style="width:${pct}%"></i></span><b>${kfmt(card.hull.cur)}/${kfmt(card.hull.max)}</b></div>` +
+    `<div class="row"><b>💥 ${esc(t('missile.card.blast', { r: card.blast }))}</b></div>`;
+  if (card.damage !== null) html += `<div class="row"><b>💥 ${esc(t('mine.card.rocket-hit', { damage: card.damage }))}</b></div>`;
+  return html + `<div class="hint">${esc(t('missile.card.rule'))}</div>`;
 }
 
 function cardHeader(color: string, title: string, sub: string, titleAct?: string, badge?: string): string {
@@ -7876,6 +7901,8 @@ function fleetPanelHtml(f: Fleet): string {
   // Мина (SM-3.6): свой короткий паспорт — заряды, доля за подрыв, прочность. Ракетная
   // (SM-3.7a) — радар, обзор и прочность, а хозяину ещё режим, удар и управление.
   if (isMineFleet(f, data)) return isRocketMineFleet(f, data) ? rocketMineCardHtml(f) : mineCardHtml(f);
+  // Ракета (SM-3.7b): приказов нет — прочность, остаток полёта, взрыв, а хозяину и удар.
+  if (isMissileFleet(f, data)) return missileCardHtml(f);
   // Окно флота на ПК — консоль по макету владельца (`fleetConsole.ts`): те же куски
   // карточки, своя раскладка. Карточка ниже остаётся телефону, группе и чужому флоту.
   if (consoleFleet() === f) return fleetConsoleHtml(f);
@@ -8988,7 +9015,7 @@ function playerCardHtml(): string {
   // garrison on your worlds.
   let units = 0;
   for (const f of Object.values(s.fleets))
-    if (f.owner === ME && !isMineFleet(f, data)) units += sumUnits(f.units) + sumUnits(f.landing ?? []);
+    if (f.owner === ME && !isOrdnanceFleet(f, data)) units += sumUnits(f.units) + sumUnits(f.landing ?? []);
   for (const pp of Object.values(s.planets)) if (pp.owner === ME) units += sumUnits(pp.garrison);
   const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
   const need = Math.max(0, SCORE_LIMIT - score);
@@ -9539,7 +9566,7 @@ let mineViewCache: ReturnType<typeof visibleOrdnance>;
 function mineView(): ReturnType<typeof visibleOrdnance> {
   if (mineViewState !== s || mineViewOwner !== ME) {
     mineViewState = s; mineViewOwner = ME;
-    mineViewCache = visibleOrdnance(s, ME, data);
+    mineViewCache = visibleOrdnance(s, ME);
   }
   return mineViewCache;
 }
@@ -10256,7 +10283,7 @@ function renderCmdBar() {
         ),
       );
   // Merge: a group fuses in one tap; a lone fleet arms target-pick (needs a partner).
-  const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)).length;
+  const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME && !isOrdnanceFleet(f, data)).length;
   const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
@@ -11603,9 +11630,9 @@ function selectAt(mx: number, my: number) {
   const fleetIds = fleetsUnderTap(
     Object.values(s.fleets).map((f) => ({
       id: f.id,
-      // Своя мина (SM-3.6) и крепость (`emplacement.ts`, правило 4) — осмотр, а не выбор
-      // под приказ: у них нет приказов.
-      mine: f.owner === ME && !isMineFleet(f, data) && !isEmplacementFleet(f, data),
+      // Своя мина (SM-3.6), ракета (SM-3.7b) и крепость (`emplacement.ts`, правило 4) —
+      // осмотр, а не выбор под приказ: у них нет приказов.
+      mine: f.owner === ME && !isOrdnanceFleet(f, data) && !isEmplacementFleet(f, data),
       visible: fleetSeen(f),
       anchor: fleetAnchor(f),
     })),
@@ -11746,7 +11773,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     // Кто из троих претендентов забирает этот жест — решает `pressIntent.ts`
     // (REFM-55): там же правило «Shift над своим флотом — добор, а не рамка».
     const overOwnFleet = !!nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)),
+      Object.values(s.fleets).filter((f) => f.owner === ME && !isOrdnanceFleet(f, data)),
       fleetAnchor,
       p.x,
       p.y,
@@ -11779,7 +11806,7 @@ canvas.addEventListener('pointerdown', (ev) => {
         if (!mapHold.matured) return;
         navigator.vibrate?.(25);
         const mine = nearestHit(
-          Object.values(s.fleets).filter((f) => f.owner === ME && !isMineFleet(f, data)),
+          Object.values(s.fleets).filter((f) => f.owner === ME && !isOrdnanceFleet(f, data)),
           fleetAnchor,
           p.x,
           p.y,
@@ -11848,7 +11875,7 @@ function endPointer(ev: PointerEvent) {
   if (single && boxSelecting && selectionBox) {
     const picked: string[] = [];
     for (const f of Object.values(s.fleets)) {
-      if (f.owner !== ME || isMineFleet(f, data) || isEmplacementFleet(f, data)) continue;
+      if (f.owner !== ME || isOrdnanceFleet(f, data) || isEmplacementFleet(f, data)) continue;
       const a = fleetAnchor(f);
       if (a && insideBox(selectionBox, a)) picked.push(f.id);
     }
@@ -15808,6 +15835,21 @@ function drawAllyMarks(): void {
 /** Осада «Поглощения мира» над своим миром (PVR-4.7): красное кольцо-часы — дуга тает к
  *  гибели мира — и отсчёт над ним в тех же часах, что у волн (`decisions/devourSiege.ts`).
  *  Текста нет: знак и время, поэтому и локали не нужно. */
+/** Летящие ракеты (SM-3.7b) — отряды, но не корабли: стрелка по курсу и пунктир к точке
+ *  цели в цвете владельца (`drawMissile`), без корпуса и счётчика. Видна по обычному туману
+ *  (`fleetSeen`); чужую подписывает «Входящая ракета», когда карта крупна для подписи. */
+function drawMissiles(): void {
+  for (const f of Object.values(s.fleets)) {
+    if (!f.flight || !isMissileFleet(f, data) || !fleetSeen(f)) continue;
+    const at = fleetPos(f);
+    if (!at) continue;
+    const c = world(at);
+    if (!visible(c, 120)) continue;
+    const label = f.owner !== ME && cam.scale >= 0.8 ? t('mine.incoming') : undefined;
+    drawMissile(cx, c, world(f.flight.to), ownerColor(f.owner), label);
+  }
+}
+
 const MINE_FLASH_MS = 1200;
 function drawMinefields(now: number): void {
   for (const [node, flash] of mineFlashes) {

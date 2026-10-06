@@ -1,21 +1,18 @@
 import type { GameState } from '@void/shared-core';
-import { missilePositionAt } from '@void/shared-core';
 import { drawMineShape } from './mineShape';
-import { t } from '../../../localization/core';
 
 /** Input MUST be the server projection or visibleOrdnance, never unfiltered state. */
 export function drawOrdnance(
   g: CanvasRenderingContext2D,
   ord: GameState['ordnance'],
   viewer: string,
-  now: number,
   project: (p: { x: number; y: number }) => { x: number; y: number },
   scale: number,
 ): void {
   if (!ord) return;
   g.save();
-  // Only a charge still being installed is drawn here: a standing mine is a fleet (SM-3.7a)
-  // and is drawn with the other mines, wherever the fleet fog lets the viewer see it.
+  // Only a charge still being installed is drawn here: a standing mine (SM-3.7a) and a
+  // flying missile (SM-3.7b) are fleets, drawn wherever the fleet fog lets the viewer see them.
   for (const mine of ord.installations) {
     const p = project(mine.position);
     const color = mine.owner === viewer ? '#60dbe8' : '#ffac62';
@@ -31,40 +28,51 @@ export function drawOrdnance(
     drawMineShape(g, scale >= 0.9);
     g.restore();
   }
-  for (const missile of ord.missiles) {
-    const p = project(missilePositionAt(missile, now));
-    const target = project(missile.to);
-    const own = missile.owner === viewer;
-    g.save();
-    g.strokeStyle = own ? '#60dbe8' : '#ffac62';
-    g.fillStyle = g.strokeStyle;
-    g.lineWidth = 1.4;
-    g.setLineDash([3, 4]);
-    g.beginPath();
-    g.moveTo(p.x, p.y);
-    g.lineTo(target.x, target.y);
-    g.stroke();
-    g.setLineDash([]);
-    g.translate(p.x, p.y);
-    g.rotate(Math.atan2(target.y - p.y, target.x - p.x));
-    g.beginPath();
-    g.moveTo(9, 0);
-    g.lineTo(-5, -3);
-    g.lineTo(-3, 0);
-    g.lineTo(-5, 3);
-    g.closePath();
-    g.fill();
-    g.beginPath();
-    g.moveTo(-6, 0);
-    g.lineTo(-13, 0);
-    g.stroke();
-    g.restore();
-    if (!own && scale >= 0.8) {
-      g.fillStyle = '#ffac62';
-      g.font = '11px sans-serif';
-      g.textAlign = 'center';
-      g.fillText(t('mine.incoming'), p.x, p.y - 14);
-    }
-  }
   g.restore();
+}
+
+/**
+ * A flying missile (SM-3.7b) is a fleet but not a ship: an arrow along its course and a
+ * dashed line to the point it flies at — no hull and no ship count. `at` and `to` are
+ * screen points, `color` is its owner's; `label`, when given, is written above it.
+ */
+export function drawMissile(
+  g: CanvasRenderingContext2D,
+  at: { x: number; y: number },
+  to: { x: number; y: number },
+  color: string,
+  label?: string,
+): void {
+  g.save();
+  g.strokeStyle = color;
+  g.fillStyle = color;
+  g.lineWidth = 1.4;
+  g.setLineDash([3, 4]);
+  g.beginPath();
+  g.moveTo(at.x, at.y);
+  g.lineTo(to.x, to.y);
+  g.stroke();
+  g.setLineDash([]);
+  g.translate(at.x, at.y);
+  g.rotate(Math.atan2(to.y - at.y, to.x - at.x));
+  g.beginPath();
+  g.moveTo(9, 0);
+  g.lineTo(-5, -3);
+  g.lineTo(-3, 0);
+  g.lineTo(-5, 3);
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.moveTo(-6, 0);
+  g.lineTo(-13, 0);
+  g.stroke();
+  g.restore();
+  if (label) {
+    g.save();
+    g.fillStyle = color;
+    g.font = '11px sans-serif';
+    g.textAlign = 'center';
+    g.fillText(label, at.x, at.y - 14);
+    g.restore();
+  }
 }

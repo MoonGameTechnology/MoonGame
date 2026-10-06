@@ -695,6 +695,16 @@ export interface FleetEdge {
   t: number;
 }
 
+/** A missile's straight flight (SM-3.7b): from the launching mine to the signal's
+ *  point, off the lane graph — a missile needs no lanes. Evenly from `departedAt` to
+ *  `arrivesAt`; the position is clamped to the ends outside that window. */
+export interface FleetFlight {
+  from: RoadPoint;
+  to: RoadPoint;
+  departedAt: number;
+  arrivesAt: number;
+}
+
 /** The target of an interrupted march (`Fleet.resume`, ROADS-8) — the same two shapes a
  *  `fleet.move` aims at: a node, or a point on a lane. */
 export type FleetResume = { to: PlanetId } | { toEdge: FleetEdge };
@@ -755,6 +765,9 @@ export interface Fleet {
   /** Parked at a continuous point on a lane (stopped mid-march or marched to a
    *  point on the path). Set only while `location` and `movement` are both null. */
   edge?: FleetEdge | null;
+  /** Straight flight of a missile (SM-3.7b) — a fleet without orders. Set only while
+   *  `location`, `movement` and `edge` are all empty. */
+  flight?: FleetFlight;
   units: UnitStack[];
   /** Ground army carried as cargo (the landing force of a ground assault),
    *  bounded by the ships' transport capacity — see the `army` module. */

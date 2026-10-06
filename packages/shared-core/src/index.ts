@@ -34,6 +34,7 @@ export {
   type Fleet,
   type FleetMovement,
   type FleetEdge,
+  type FleetFlight,
   type FleetResume,
   type PlanetRoads,
   type RoadPoint,
@@ -160,7 +161,7 @@ export { isBombarded, bombardedPlanets, isActivelyBombarding } from './state/orb
 export { sidesOf, attackerOf, defenderOf, shipsEngaged, landingBattleOf } from './state/battle';
 // MSB-2: правило деления залпа между врагами — одно на живой бой и на прогноз.
 export { volleyShare, splitVolley, type VolleyShare, type VolleyTarget } from './util/volley';
-export { fleetPositionAt, fleetNodeAt, legT } from './state/fleetPosition';
+export { fleetPositionAt, fleetNodeAt, flightPointAt, legT } from './state/fleetPosition';
 export {
   DEFAULT_STANCE,
   STANCE_RANK,
@@ -758,13 +759,16 @@ export {
   rocketMinelayer,
   rocketMineModule,
   isRocketMineFleet,
-  missilePositionAt,
+  isMissileFleet,
+  isOrdnanceFleet,
+  missileModule,
   ROCKET_MINE_UNIT,
   ROCKET_MINE_TRAIT,
+  MISSILE_UNIT,
+  MISSILE_TRAIT,
 } from './state/ordnance';
 export type {
   RocketMineControl,
-  MineMissile,
   MineInstallation,
   RocketMineMode,
   OrdnanceState,

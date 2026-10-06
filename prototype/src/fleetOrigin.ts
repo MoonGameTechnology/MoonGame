@@ -27,10 +27,10 @@
  *    приписать ему прибытие, которого не было.
  * 4. **Нет позиции — нет точки.** Неизвестный узел (туман обогнал состояние) или флот
  *    без места даёт `null`, а не подставной ноль: рисующий просто пропускает его.
- *
- * Правила «свободного полёта» (`freePosition`/`freeMovement`) здесь БЫЛО пятым — оно
- * снято в SHU-2.2 вместе с самими полями: флота, идущего мимо графа линий, в модели
- * больше нет, челнок летает вылетом из ангара (`strikeTrail.ts`), а не флотом.
+ * 5. **Летит по прямой → точка полёта.** Мимо графа линий летает один отряд — ракета
+ *    ракетной мины (SM-3.7b): от точки пуска к точке цели, равномерно по времени, как у
+ *    ядра (`flightPointAt`). Прежнее «свободное движение» флотов (`freePosition`) снято
+ *    в SHU-2.2: челнок летает вылетом из ангара (`strikeTrail.ts`), а не флотом.
  *
  * Доля времени зажимается в [0,1]: кадр может прийти после `arrivesAt`, пока ядро ещё
  * не перевело флот в узел, и без зажима точка уехала бы за конец дороги.
@@ -59,11 +59,20 @@ export interface OriginEdge {
   t: number;
 }
 
+/** Прямой полёт ракеты (правило 5): от точки пуска к точке цели. */
+export interface OriginFlight {
+  from: OriginPoint;
+  to: OriginPoint;
+  departedAt: number;
+  arrivesAt: number;
+}
+
 /** Флот глазами этой модели — только поля, определяющие место. */
 export interface OriginFleet {
   location?: string | null;
   movement?: OriginMovement | null;
   edge?: OriginEdge | null;
+  flight?: OriginFlight;
 }
 
 /** Доля пройденного пути на момент `now`, зажатая в [0,1]. */
@@ -104,6 +113,8 @@ export function fleetOrigin(
     const p = nodeAt(f.location);
     return p ? { x: p.x, y: p.y } : null;
   }
+  // Правило 5: ракета летит по прямой мимо графа линий.
+  if (f.flight) return lerp(f.flight.from, f.flight.to, progress(f.flight.departedAt, f.flight.arrivesAt, now));
   // Правило 3: стоянка в точке на лейне.
   if (f.edge) return along(f.edge.from, f.edge.to, f.edge.t);
   // Правило 2: в пути — доля внутри границ ноги.

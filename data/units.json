@@ -617,6 +617,33 @@
       "utility": 0
     }
   },
+  "missile": {
+    "name": "Missile",
+    "faction": "neutral",
+    "domain": "space",
+    "stats": {
+      "attack": 0,
+      "defense": 0,
+      "speed": 0,
+      "hp": 12
+    },
+    "cost": {
+      "metal": 0
+    },
+    "buildTimeHours": 0,
+    "signature": 13,
+    "upkeep": {},
+    "traits": [
+      "immobile",
+      "issued",
+      "missile"
+    ],
+    "slots": {
+      "weapon": 0,
+      "defense": 0,
+      "utility": 0
+    }
+  },
   "garrison": {
     "name": "Garrison",
     "faction": "neutral",

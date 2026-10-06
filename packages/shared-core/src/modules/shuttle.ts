@@ -47,6 +47,8 @@ import { distance } from '../state/route';
 import { chaseRadius, chaseStep } from '../state/chase';
 import { fleetPositionAt } from '../state/fleetPosition';
 import { isMineFleet, mineFleetVisible } from '../state/minefields';
+import { isMissileFleet } from '../state/ordnance';
+import { missileVisible } from '../state/visibility';
 import { hasMapShare } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
 import { isForkSite } from '../state/forkSite';
@@ -1400,7 +1402,8 @@ export const shuttleModule: GameModule = {
   //        `origin`/`baseAt`, событие `shuttle.diverted`; опустевшая база снимает счётчик.
   // 1.8.0: «Держать патруль» (SHU-6.6) — `hold` у патруля и эскадры, `shuttle.hold`,
   //        событие расписания `shuttle.patrol.resume`; отзыв снимает удержание.
-  version: '1.8.0',
+  // 1.9.0: ракета — отряд (SM-3.7b): удар приказом бьёт её только видимой.
+  version: '1.9.0',
   setup(api) {
     /**
      * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
@@ -1437,11 +1440,15 @@ export const shuttleModule: GameModule = {
       // Чужую мину видно только своим флотом вблизи (SM-3.6); невидимая мина — тот же
       // `E_NO_TARGET`, что и отсутствующий флот, иначе перебором id её нашёл бы любой
       // клиент (A06). Ревью #1411: правило видимости мин — во всех путях к цели челнока.
+      // Ракету (SM-3.7b) — тоже только видимую: её id предсказуем, и перебор нашёл бы ракету,
+      // которой зритель не видит. Бить её челноками — правило владельца 2026-10-06.
       if (
         targetFleet &&
         targetFleet.owner !== action.playerId &&
-        isMineFleet(targetFleet, h.ctx.data) &&
-        !mineFleetVisible(h.state, targetFleet, action.playerId, h.ctx.data)
+        ((isMineFleet(targetFleet, h.ctx.data) &&
+          !mineFleetVisible(h.state, targetFleet, action.playerId, h.ctx.data)) ||
+          (isMissileFleet(targetFleet, h.ctx.data) &&
+            !missileVisible(h.state, targetFleet, action.playerId, h.ctx.data)))
       ) {
         return h.reject('E_NO_TARGET');
       }

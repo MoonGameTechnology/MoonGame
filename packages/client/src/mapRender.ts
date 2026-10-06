@@ -14,7 +14,7 @@ import { emblemTally } from '../../../decisions/fleetTally';
 import { forkMarks, roadStrokes } from '../../../decisions/roadNetwork';
 import { ambushOf } from '../../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from './forkMark';
-import { effectiveStats, fleetPositionAt, isForkSite, isMineFleet, type GameData, type GameState, type PlayerId } from '@void/shared-core';
+import { effectiveStats, fleetPositionAt, isForkSite, isMineFleet, isMissileFleet, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
@@ -24,6 +24,7 @@ import { drawProvinceSelection } from './provinceSelection';
 import { dominantUnit, glyphHalo, glyphScale, unitArchetype, unitShape, unitSizeClass } from './shipGlyphs';
 import { drawShipShape } from './shipShapes';
 import { drawMineShape } from './mineShape';
+import { drawMissile } from './ordnanceView';
 import { mapLod, mapSpacing, drawSchematicNode } from './mapLod';
 import { TerritoryGeometryCache } from './territoryGeometry';
 
@@ -257,6 +258,12 @@ export function renderMap(
       g.fillStyle = rgba(col, 0.24);
       drawMineShape(g, lod.detail > 0.5);
       g.restore();
+      continue;
+    }
+    // A flying missile is a fleet too (SM-3.7b), flying straight at a point: an arrow on
+    // its course, no hull and no ship count.
+    if (isMissileFleet(f, opts.data)) {
+      if (f.flight) drawMissile(g, c, worldToScreen(f.flight.to, cam, vp, bounds), col);
       continue;
     }
     if (ambushOf(state, f)) drawAmbushMark(g, c.x, c.y, col);
