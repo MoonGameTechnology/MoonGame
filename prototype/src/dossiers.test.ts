@@ -14,6 +14,8 @@ import {
 import type { ActiveBuild } from './buildQueue';
 import { setRunClock } from './format';
 import { runClockText } from '../../decisions/runClock';
+import { ru } from '../../localization/ru';
+import { en } from '../../localization/en';
 
 // REFM-4: first tests over the dossier/codex corpus. Locale pinned RU for the same
 // reason as format.test.ts — under Node there is no browser language, so the runtime
@@ -105,6 +107,16 @@ describe('dossiers — юниты', () => {
 
   it('у прописанного юнита раскладка на текст не влияет', () => {
     expect(unitDossier('scout', true)).toEqual(unitDossier('scout', false));
+  });
+
+  it('TXT-2: досье юнита — справка, а не проза (средняя ≤ 120 симв., без хвостов после тире)', () => {
+    for (const [locale, messages] of [['ru', ru], ['en', en]] as const) {
+      const descs = Object.entries(messages).filter(([k]) => /^dossier\.unit\.[a-z-]+\.desc$/.test(k));
+      expect(descs.length, locale).toBeGreaterThan(10);
+      const avg = descs.reduce((sum, [, v]) => sum + v.length, 0) / descs.length;
+      expect(avg, locale).toBeLessThanOrEqual(120);
+      expect(descs.filter(([, v]) => v.includes(' — ')).map(([k]) => k), locale).toEqual([]);
+    }
   });
 });
 

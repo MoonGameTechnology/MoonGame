@@ -549,7 +549,7 @@ export const en: Record<string, string> = {
   'data.landing-shuttle': 'landing shuttle',
   'donate.aria': 'Sovereigns: {n}. Top up',
   'donate.soon': 'Sovereign store — coming soon',
-  'dossier.unit.landing-shuttle.desc': 'Landing shuttle: an unarmed hull carrying one ground unit, chosen when ordered; the price is the shuttle plus that unit. It cannot strike ships at all, and the order is refused outright. One-way: it lands and becomes that unit. An empty enemy world falls at once; a defended one gets a beachhead that opens a ground battle with no ship in sight; your own worlds get reinforcements. Area defense shreds both the craft and what they carried ({hp} hull, range {r}). Hold places: {cs}, whatever unit it carries.',
+  'dossier.unit.landing-shuttle.desc': 'An unarmed shuttle carrying a ground unit chosen when ordered. It lands and becomes that unit: takes an empty enemy world at once, starts a ground battle on a defended one. {hp} hull, reach {r}, hold places: {cs}. Area defense downs it with the unit.',
   'dossier.unit.landing-shuttle.name': 'Landing Shuttle',
   'hint.wing-aim': '✳ pick the strike target on the map',
   'hint.wing-cancelled': 'strike cancelled',
@@ -1408,35 +1408,35 @@ export const en: Record<string, string> = {
   'dossier.task.title': 'Building',
   'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
   'dossier.unit.cruiser.desc':
-    "The battle line's workhorse: {a} attack, {hp} hull and a {c}-place hold for troops and shuttles. A general-purpose warship, equally solid on offense and defense.",
+    'Line warship: {a} attack, {hp} hull, a {c}-place hold for troops and shuttles.',
   'dossier.unit.cruiser.name': 'Cruiser',
   'dossier.unit.heavy-cruiser.desc':
-    'A heavy line hull: {a} attack, {d} defense, {hp} hull, speed {sp}, a {c}-place hold. Universal bays: {n}, each takes a module of any type.',
+    'Heavy line warship: {a} attack, {d} defense, {hp} hull, speed {sp}, a {c}-place hold. {n} universal bays for any module.',
   'dossier.unit.heavy-cruiser.name': 'Heavy Cruiser',
   'dossier.unit.default': 'A combat unit.',
   'dossier.unit.bomber.desc':
-    "A striker: the shuttle built for hulls — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home. Hold places: {cs}.",
+    'Anti-ship shuttle: {a} damage to a ship, {s} per hour to buildings, {hp} hull, reach {r}. Strikes and returns, never joins the battle. Hold places: {cs}.',
   'dossier.unit.bomber.name': 'Striker',
   'dossier.unit.heavy-striker.desc':
-    'Heavy striker: {a} damage to a ship, {s} per hour to buildings, {r} reach — enough for the next province. Slower than the striker, {hp} hull, longer to rearm. Hold places: {cs}. Unlocked by Strike Vectors.',
+    'Heavy anti-ship shuttle: {a} damage to a ship, {s} per hour to buildings, {hp} hull, reach {r} to the next province. Hold places: {cs}. Unlocked by Strike Vectors.',
   'dossier.unit.heavy-striker.name': 'Heavy Striker',
   'dossier.unit.interceptor.desc':
-    "An interceptor: a hunter of enemy shuttles — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles on its own, without an order, whenever a hostile strike passes near its port or ship — and burns the base's fuel doing it. Hold places: {cs}.",
+    'Hunts enemy shuttles: {s} damage to them, {a} to ships. Speed {sp}, {hp} hull, reach {r}. Scrambles on its own at a hostile strike near its base, burning the base fuel. Hold places: {cs}.',
   'dossier.unit.interceptor.name': 'Interceptor',
   'dossier.unit.frigate.desc':
-    "A frigate: a support hull. It barely fights on its own ({a} attack, {d} defense) and lives off what you bolt onto it — {n} {n|module bay|module bays}, more than any other hull carries. Tougher than a scout ({hp} hull), it stands in the mid line.",
+    'Support hull: {a} attack, {d} defense, {hp} hull. The most module bays of any hull: {n}. Stands in the mid line.',
   'dossier.unit.frigate.name': 'Frigate',
   'dossier.unit.hero.desc':
-    "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the shuttle together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
+    "The commander's flagship: {a} attack, {hp} hull, {b} attack and defense to nearby ships. A lost flagship is rebuilt at the home world.",
   'dossier.unit.hero.name': 'Flagship',
   'dossier.unit.picket-frigate.desc':
-    'A picket frigate: the eyes of the fleet. Its own antenna reaches {r}, and the radar module (+{m}) fits this hull only. It barely fights ({a} attack, {d} defense, {hp} hull) and keeps to the rear line. Module bays: {n}.',
+    'Fleet recon: antenna {r}, the radar module +{m} fits this hull only. {a} attack, {d} defense, {hp} hull, {n} bays.',
   'dossier.unit.picket-frigate.name': 'Picket Frigate',
   'dossier.unit.scout.desc':
-    'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go. It carries its own compact radar (+{m}).',
+    'Light recon hull: speed {sp}, signature {sig}, its own compact radar +{m}.',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
-    'A spaceport under way: a {bay}-place hold for shuttles and troops, {d} defense, {hp} hull, {a} attack. Carries both the landing army and the shuttles. Stands in the support line. Shuttles launch from it on the move and land back; lose the hull and you lose everything aboard.',
+    'Carrier: a {bay}-place hold for shuttles and troops, {a} attack, {d} defense, {hp} hull. Shuttles launch and land on the move. Lose the hull, lose everything aboard.',
   'dossier.unit.shuttle-carrier.name': 'Carrier',
 
   // --- faction — Фракции: пассивный бонус дома.
