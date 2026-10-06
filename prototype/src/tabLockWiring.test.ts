@@ -1,6 +1,6 @@
 /**
  * Сторож проводки «одна вкладка — один писатель» (`AUD-29`) — статический: `main.ts` живёт
- * на DOM. Правило хозяйки — `decisions/tabLock.test.ts`, запрет записи в хранилище —
+ * на DOM, а владелец профиля (`sectorProfile.ts`, REFM-209) — на его хуках. Правило хозяйки — `decisions/tabLock.test.ts`, запрет записи в хранилище —
  * `runSaveLocal.test.ts`, две вкладки на собранном архиве — робот `yandextest.mjs`.
  *
  * Стык ломается молча тремя способами:
@@ -14,9 +14,13 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-const body = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+// Замок держит владелец профиля (`sectorProfile.ts`, REFM-209); вход в Sector Zero и хуки
+// забега — в `main.ts`.
+const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const SRC = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
+const bodyIn = (src: string, name: string): string =>
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
+const body = (name: string): string => bodyIn(SRC, name);
 
 describe('AUD-29 — пишет только вкладка-хозяйка', () => {
   it('все четыре хранилища Sector Zero спрашивают замок', () => {
@@ -25,8 +29,9 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
     expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero)');
     // Теневая копия профиля (`YAG-4.4`) — тоже: вытесненная вкладка затёрла бы ею целую.
     expect(SRC).toContain('localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero)');
-    // Ни одного хранилища Sector Zero мимо замка.
+    // Ни одного хранилища Sector Zero мимо замка — и ни одного у игры мимо владельца.
     expect(SRC.match(/localRunSaveStore\(/g)).toHaveLength(4);
+    expect(MAIN).not.toMatch(/localRunSaveStore\(/);
   });
 
   it('отметка облака и само облако — тоже', () => {
@@ -35,13 +40,17 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
   });
 
   it('вход в Sector Zero делает вкладку хозяйкой — первым делом', () => {
-    expect(body('openSectorZero').trimStart().startsWith('claimSectorZero();')).toBe(true);
+    expect(bodyIn(MAIN, 'openSectorZero').trimStart().startsWith('claimSectorZero();')).toBe(true);
   });
 
   it('перехват у другой вкладки перечитывает профиль и отметку, а забег берёт из журнала', () => {
     const claim = body('claimSectorZero');
     expect(claim).toContain('if (!tabSuperseded(TAB_ID, previous)) return;');
-    expect(claim).toContain('if (runInProgress()) setRunActive(false);');
+    expect(claim).toContain('game.stopRun();');
+    expect(claim).toContain('game.forgetRun();');
+    expect(MAIN).toMatch(
+      /stopRun: \(\) => \{\s+if \(runInProgress\(\)\) setRunActive\(false\);\s+\},/,
+    );
     expect(claim).toContain('syncMark = parseSyncMark(mark);');
     // Перечитывает тем же правилом печати, что и старт (`YAG-4.4`).
     expect(claim).toContain('progressWrite = progressWrite.then(loadSectorProfile)');
@@ -51,7 +60,14 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
   });
 
   it('вытесненная вкладка слышит перехват и встаёт', () => {
-    expect(SRC).toContain('if (event.key === TAB_OWNER_KEY) checkTabOwner();');
-    expect(body('checkTabOwner')).toContain("runPauseEvent('hidden');");
+    expect(body('initSectorProfile')).toContain(
+      'if (event.key === TAB_OWNER_KEY) checkTabOwner();',
+    );
+    const check = body('checkTabOwner');
+    expect(check).toContain('if (ownsSectorZero() || !game.shown()) return;');
+    expect(check).toContain('game.pause();');
+    // Хуки игры: «показывает» — меню или забег вне сети, «встаёт» — пауза ухода со страницы.
+    expect(MAIN).toContain('shown: () => sectorZeroMenu.isOpen() || (sectorRunActive && !NET),');
+    expect(MAIN).toContain("pause: () => runPauseEvent('hidden'),");
   });
 });
