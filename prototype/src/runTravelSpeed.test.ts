@@ -7,10 +7,12 @@
  * 1. **Ядро прототипа честно исполняет множитель.** Поведенческая проверка через те же
  *    `ctx`/`order`, что гоняет кадр: флот на карте первой главы доходит впятеро быстрее,
  *    а оценка пути говорит то же самое.
- * 2. **Включает его только дверь забега.** `main.ts` не поднять в vitest (DOM, канвас,
- *    живое ядро), поэтому стык держит статическая проверка — той же формы, что сторож
- *    разметки геймплея (`platform/gameplayMarking.test.ts`): `setMatchTravelSpeed` зовут
- *    только внутри `setRunActive`. Иначе ×5 пережил бы выход из забега и утёк в песочницу.
+ * 2. **Включает его только дверь забега.** Дверь живёт у владельца забега (`sectorRun.ts`,
+ *    REFM-210), и что она зовёт, проверяет прямой тест `sectorRun.test.ts`. Здесь —
+ *    статическая проверка той же формы, что сторож разметки геймплея
+ *    (`platform/gameplayMarking.test.ts`): `setMatchTravelSpeed` зовут только внутри
+ *    `setRunActive`, ни модуль, ни `main.ts` больше нигде. Иначе ×5 пережил бы выход из
+ *    забега и утёк в песочницу.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -22,7 +24,8 @@ import { estimateTravelHours } from '../../packages/shared-core/src/index';
 import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 
 const HOUR = 3_600_000;
-const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
+const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 
 afterEach(() => {
   setMatchMode(undefined);
@@ -59,13 +62,13 @@ describe('ядро прототипа исполняет темп забега',
 
 describe('темп включает только дверь забега', () => {
   it('`setRunActive` включает ×5 вместе с забегом и снимает вместе с ним', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1];
+    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(RUN)?.[1];
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain('setMatchTravelSpeed(on ? RUN_TRAVEL_SPEED : 1)');
   });
 
-  it('больше никто в `main.ts` темп не трогает', () => {
-    const calls = SRC.match(/\bsetMatchTravelSpeed\(/g) ?? [];
-    expect(calls).toHaveLength(1);
+  it('больше никто — ни модуль забега, ни `main.ts` — темп не трогает', () => {
+    expect(RUN.match(/\bsetMatchTravelSpeed\(/g) ?? []).toHaveLength(1);
+    expect(MAIN.match(/\bsetMatchTravelSpeed\(/g) ?? []).toHaveLength(0);
   });
 });

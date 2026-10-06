@@ -7,8 +7,9 @@
  *
  * 1. **Ядро прототипа получает флаг из `ctx`**, и на шипнутой главе босс выходит из улья
  *    с десятой волной — а без флага не выходит.
- * 2. **Включает его только дверь забега, и только для сильного Роя.** `main.ts` в vitest
- *    не поднять, поэтому стык держит статическая проверка.
+ * 2. **Включает его только дверь забега, и только для сильного Роя.** Дверь живёт у владельца
+ *    забега (`sectorRun.ts`, REFM-210); что она зовёт, проверяет и прямой тест
+ *    `sectorRun.test.ts`, а здесь — что больше никто, ни модуль, ни `main.ts`, флаг не трогает.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -19,7 +20,8 @@ import { pveModeId, pveState } from '../../packages/client/src/gameData';
 import { RUN_TRAVEL_SPEED } from '../../decisions/runTempo';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 
-const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
+const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const HOUR = 3_600_000;
 
 afterEach(() => {
@@ -67,13 +69,14 @@ describe('ядро прототипа зовёт Левиафана только
 
 describe('Левиафана зовёт только дверь забега и только для сильного Роя', () => {
   it('`setRunActive` зовёт его вместе с забегом, по сложности забега', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1];
+    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(RUN)?.[1];
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain("setMatchPveBoss(on && pveDifficulty === 'strong')");
   });
 
-  it('больше никто в `main.ts` босса не трогает', () => {
-    expect(SRC.match(/\bsetMatchPveBoss\(/g) ?? []).toHaveLength(1);
+  it('больше никто — ни модуль забега, ни `main.ts` — босса не трогает', () => {
+    expect(RUN.match(/\bsetMatchPveBoss\(/g) ?? []).toHaveLength(1);
+    expect(MAIN.match(/\bsetMatchPveBoss\(/g) ?? []).toHaveLength(0);
   });
 });
 

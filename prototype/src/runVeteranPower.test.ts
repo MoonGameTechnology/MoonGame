@@ -7,9 +7,11 @@
  *
  * 1. **Ядро прототипа получает флаг из `ctx`.** Без забега конфиг его не несёт, и
  *    правило ветерана отвечает «надбавки нет» — песочница играет по сетевым правилам.
- * 2. **Включает его только дверь забега.** `main.ts` в vitest не поднять, поэтому стык
- *    держит статическая проверка: `setMatchVeteranPower` зовут только внутри
- *    `setRunActive`. Иначе сила ветерана пережила бы выход из забега и утекла в песочницу.
+ * 2. **Включает его только дверь забега.** Дверь живёт у владельца забега (`sectorRun.ts`,
+ *    REFM-210), и что она зовёт, проверяет прямой тест `sectorRun.test.ts`. Здесь —
+ *    статическая проверка: `setMatchVeteranPower` зовут только внутри `setRunActive`, ни
+ *    модуль, ни `main.ts` больше нигде. Иначе сила ветерана пережила бы выход из забега и
+ *    утекла в песочницу.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -24,7 +26,8 @@ import {
   type GameState,
 } from '../../packages/shared-core/src/index';
 
-const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
+const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 
 afterEach(() => setMatchVeteranPower(false));
 
@@ -73,13 +76,13 @@ describe('ядро прототипа получает силу ветерана
 
 describe('силу ветерана включает только дверь забега', () => {
   it('`setRunActive` включает её вместе с забегом и снимает вместе с ним', () => {
-    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(SRC)?.[1];
+    const body = /function setRunActive\(on: boolean\): void \{([\s\S]*?)\n\}/.exec(RUN)?.[1];
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain('setMatchVeteranPower(on)');
   });
 
-  it('больше никто в `main.ts` силу ветерана не трогает', () => {
-    const calls = SRC.match(/\bsetMatchVeteranPower\(/g) ?? [];
-    expect(calls).toHaveLength(1);
+  it('больше никто — ни модуль забега, ни `main.ts` — силу ветерана не трогает', () => {
+    expect(RUN.match(/\bsetMatchVeteranPower\(/g) ?? []).toHaveLength(1);
+    expect(MAIN.match(/\bsetMatchVeteranPower\(/g) ?? []).toHaveLength(0);
   });
 });

@@ -5,6 +5,10 @@
  * зовёт `gameplayStart`/`gameplayStop`. Тогда «забег идёт» и «площадка знает, что забег
  * идёт» не могут разойтись — это одно и то же действие.
  *
+ * Флаг и сеттер живут у владельца забега (`sectorRun.ts`, REFM-210), а дверь разметки — в
+ * `main.ts`: сеттер зовёт её хуком `runChanged`. Поэтому сторож читает оба файла и держит
+ * обе стороны стыка — вызов хука в сеттере и сам хук в проводке.
+ *
  * Почему не поведенческий тест. `main.ts` — 14 тысяч строк, которым нужен DOM, канвас,
  * данные и живое ядро; поднять его в vitest ради одного флага невозможно без мока
  * половины браузера, а такой тест проверял бы мок. Поведение САМОГО адаптера при этом уже
@@ -21,20 +25,29 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('../main.ts', import.meta.url), 'utf8');
+const RUN = readFileSync(new URL('../sectorRun.ts', import.meta.url), 'utf8');
 
-/** Строки файла без пустых — номера сохраняются для внятного сообщения об ошибке. */
-const lines = SRC.split('\n');
+/** Строки обоих файлов — с именем файла и номером для внятного сообщения об ошибке. */
+const lines = [
+  ...SRC.split('\n').map((line, i) => ({ file: 'main.ts', line, no: i + 1 })),
+  ...RUN.split('\n').map((line, i) => ({ file: 'sectorRun.ts', line, no: i + 1 })),
+];
 
-/** Тело функции `main.ts` по имени — пусто, если её нет (проверки ниже тогда падают). */
-const fnBody = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+/** Тело функции по имени — пусто, если её нет (проверки ниже тогда падают). */
+const bodyIn = (src: string, name: string): string =>
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
+const fnBody = (name: string): string => bodyIn(SRC, name);
 
 describe('YAG-1.2a — разметка геймплея не может разойтись с состоянием забега', () => {
   it('сеттер существует и зовёт дверь разметки, а дверь — ОБА её конца', () => {
-    const body = fnBody('setRunActive');
+    const body = bodyIn(RUN, 'setRunActive');
     expect(body, 'функция setRunActive не найдена — сторож проверял бы пустоту').toBeTruthy();
     expect(body).toContain('sectorRunActive = on');
-    expect(body).toContain('markGameplay()');
+    expect(body).toContain('game.runChanged();');
+    // Хук сеттера в проводке `main.ts` — это и есть дверь разметки (и инструменты рельса).
+    expect(SRC).toMatch(
+      /runChanged: \(\) => \{\s+syncSectorZeroTools\(\);\s+markGameplay\(\);\s+\},/,
+    );
     const mark = fnBody('markGameplay');
     expect(mark).toContain('gameplayStart');
     expect(mark).toContain('gameplayStop');
@@ -55,23 +68,29 @@ describe('YAG-1.2a — разметка геймплея не может раз�
   it('звать площадку напрямую, мимо двери, нельзя', () => {
     const direct = SRC.match(/\.gameplay(Start|Stop)\?\.\(\)/g) ?? [];
     expect(direct).toHaveLength(2);
+    expect(RUN).not.toMatch(/\.gameplay(Start|Stop)\b/);
     const mark = fnBody('markGameplay');
     expect(mark.match(/\.gameplay(Start|Stop)\?\.\(\)/g)).toHaveLength(2);
   });
 
   it('`sectorRunActive` присваивают только внутри сеттера', () => {
     const offenders = lines
-      .map((line, i) => ({ line: line.trim(), no: i + 1 }))
+      .map(({ file, line, no }) => ({ file, line: line.trim(), no }))
       .filter(({ line }) => /^sectorRunActive\s*=/.test(line))
       // Единственное законное присваивание — внутри `setRunActive` (`sectorRunActive = on`).
       .filter(({ line }) => line !== 'sectorRunActive = on;');
     expect(offenders).toEqual([]);
+    expect(bodyIn(RUN, 'setRunActive')).toContain('sectorRunActive = on;');
+    expect(RUN.match(/^\s*sectorRunActive = on;/gm)).toHaveLength(1);
   });
 
   it('объявление одно, и оно с начальным значением — а не присваивание в общем счёте', () => {
-    const declarations = lines.filter((l) => /^let sectorRunActive\b/.test(l.trim()));
+    const declarations = lines.filter(({ line }) =>
+      /^(export )?let sectorRunActive\b/.test(line.trim()),
+    );
     expect(declarations).toHaveLength(1);
-    expect(declarations[0]).toContain('= false');
+    expect(declarations[0]!.file).toBe('sectorRun.ts');
+    expect(declarations[0]!.line).toContain('= false');
   });
 
   it('сеттер зовут отовсюду, где забег начинается или кончается — не меньше пяти точек', () => {
@@ -82,7 +101,9 @@ describe('YAG-1.2a — разметка геймплея не может раз�
     // считала `\bsetRunActive\(` по всему файлу, ловила заодно `function setRunActive(`
     // и потому пропускала мутацию «убрать один вызов» — пять оставшихся совпадений её
     // устраивали. Сторож был слеп ровно к той потере, ради которой заведён.
-    const calls = SRC.match(/(?<!function )\bsetRunActive\(/g) ?? [];
+    // Точки живут в обоих файлах: запуск, полигон, уход в сеть и хук профиля — в `main.ts`,
+    // установка партии (`leaveRun`), подъём и его откат — у владельца забега.
+    const calls = `${SRC}\n${RUN}`.match(/(?<!function )\bsetRunActive\(/g) ?? [];
     expect(calls.length).toBeGreaterThanOrEqual(5);
   });
 

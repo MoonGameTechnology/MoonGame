@@ -1,5 +1,7 @@
 /**
- * Сторож проводки дескриптора забега (`YAG-2.1`) — статический: `main.ts` живёт на DOM.
+ * Сторож проводки дескриптора забега (`YAG-2.1`) — статический. Журнал забега живёт у его
+ * владельца (`sectorRun.ts`, REFM-210), его поведение проверяет `sectorRun.test.ts`; здесь —
+ * форма кода, которую поведенческий тест не перебирает.
  * Правила дескриптора покрыты там, где они живут (`decisions/portableRun*.test.ts`), здесь —
  * стык с хостом, и у него три способа сломаться молча:
  *
@@ -16,14 +18,16 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const PROFILE = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
 const body = (name: string): string =>
-  new RegExp(`function ${name}\\(\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+  new RegExp(`function ${name}\\(\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(RUN)?.[1] ?? '';
 
 describe('YAG-2.1 — дескриптор живёт и умирает вместе со снимком', () => {
   it('каждая очистка снимка стирает и дескриптор', () => {
-    // Снимок стирают и забег (`main.ts`), и взятие облачного профиля (`sectorProfile.ts`).
-    const both = `${SRC}\n${PROFILE}`;
+    // Снимок стирают забег (`sectorRun.ts`) и взятие облачного профиля (`sectorProfile.ts`);
+    // `main.ts` в счёте — чтобы стирание, вернувшееся в проводку, тоже было видно.
+    const both = `${SRC}\n${RUN}\n${PROFILE}`;
     const snapshot = both.match(/runSaveStore\.clear\(\)/g)?.length ?? 0;
     const portable = both.match(/portableRunStore\.clear\(\)/g)?.length ?? 0;
     expect(snapshot).toBeGreaterThan(0);
@@ -42,7 +46,9 @@ describe('YAG-2.1 — дескриптор живёт и умирает вмес
     // Единственный законный отказ без запасного пути — пришедший по ссылке или сеть.
     const refusals = restore.match(/return false;/g)?.length ?? 0;
     expect(refusals).toBe(1);
-    expect(restore).toMatch(/if \(cameFromLink \|\| NET\) return false;/);
+    expect(restore).toMatch(/if \(game\.cameFromLink\(\) \|\| game\.net\(\)\) return false;/);
+    expect(SRC).toContain('cameFromLink: () => cameFromLink,');
+    expect(SRC).toContain('net: () => NET,');
     expect(restore.match(/return restorePortable\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 

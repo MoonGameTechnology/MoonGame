@@ -14,6 +14,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Засчёт конца забега живёт у его владельца (`sectorRun.ts`, REFM-210).
+const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 
 /** Тело обработчика клика по элементу с этим id. */
@@ -52,7 +54,8 @@ describe('⌂ в экспедиции спрашивает, а не уходит
   it('карточка называет сумму «Завершить» тем же профилем и главой, что засчёт', () => {
     // Превью и засчёт — одна формула (`runPayout`); разойтись они могут только входами.
     expect(SRC).toContain('abandonRunReward(sectorProgress, s, chapterForSettle(sectorMission), data)');
-    expect(SRC).toContain('settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission), data)');
+    expect(RUN).toContain('settleSectorZeroRun(sectorProgress, sectorAttempt, s, chapterForSettle(sectorMission), data)');
+    expect(RUN).toMatch(/export function awardSectorRun\(\): number \{\n\s+if \(sectorDevActive\) return 0;\n\s+const s = game\.world\(\);/);
     // Стенд разработчика не платит — и суммы не обещает.
     expect(SRC).toContain('reward.hidden = sectorDevActive;');
     // Сдача до первой волны не платит (2026-09-28): ×2 и «забрать награду» — по той же сумме.
