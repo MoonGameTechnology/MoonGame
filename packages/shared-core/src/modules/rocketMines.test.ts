@@ -5,6 +5,7 @@ import { parseGameData } from '../data/schemas';
 import { deepFreeze } from '../util/clone';
 import { rocketMinesModule } from './rocketMines';
 import { movementModule } from './movement';
+import { minefieldModule } from './minefield';
 import { visibleState } from '../state/visibility';
 import { setStance } from '../state/diplomacy';
 import { radarSignatures, isVisibleTo } from '../state/visibility';
@@ -64,6 +65,13 @@ const data = parseGameData({
         missileSignature: 13,
         cost: { metal: 20 },
       },
+    },
+    // Контактный заградитель (SM-3.4): его мина в той же точке встаёт своим отрядом.
+    contact: {
+      name: 'Mine Layer',
+      slot: 'weapon',
+      tag: 'vertical',
+      effects: { stats: { mineCharge: 3, mineHit: 0.2 } },
     },
   },
 });
@@ -524,6 +532,42 @@ describe('legendary rocket mine', () => {
     const placed = armed(old, 'confirmed');
     expect(mines(placed)).toHaveLength(1);
     expect(Object.keys(placed.ordnance!.controls!)).toEqual([mines(placed)[0]!.id]);
+  });
+
+  it('a contact mine laid at its point stands apart, and the rocket mine still launches (Codex, #1499)', () => {
+    const k = createKernel([movementModule, minefieldModule, rocketMinesModule]);
+    const step = (s: GameState, type: string, payload: unknown) => {
+      const r = k.applyAction(
+        s,
+        { id: `s:p:${type}`, playerId: 'p', type, payload, issuedAt: s.time },
+        { now: s.time, data },
+      );
+      if (!r.ok) throw new Error(r.code);
+      return r.state;
+    };
+    const run = (s: GameState, now: number) => {
+      const r = k.advanceTo(s, { now, data });
+      if (!r.ok) throw new Error(r.code);
+      expect(r.failures).toEqual([]);
+      return r.state;
+    };
+    const s = world();
+    s.fleets.layer!.units.push({ unit: 'ship', count: 1, modules: ['contact'] });
+    s.fleets.target!.edge = { from: 'A', to: 'B', t: 0.95 }; // 180 от мины — вне её радара
+    const rocket = run(step(s, 'fleet.deployRocketMine', { fleetId: 'layer', mode: 'any' }), HOUR / 4);
+    const both = run(step(rocket, 'fleet.layMines', { fleetId: 'layer' }), HOUR / 2);
+    expect(mines(both).map((f) => f.units)).toEqual([
+      [{ unit: 'rocket_mine', count: 1, modules: ['mine'] }],
+    ]);
+    expect(
+      Object.values(both.fleets).filter((f) => f.units.some((st) => st.unit === 'mine')),
+    ).toHaveLength(1);
+    // Цель входит в радар — ракетная мина, не испорченная соседкой, пускает ракету.
+    const near = structuredClone(both);
+    near.fleets.target!.edge = { from: 'A', to: 'B', t: 0.7 };
+    const launched = run(near, HOUR / 2 + 60_000);
+    expect(launched.ordnance!.missiles).toHaveLength(1);
+    expect(mines(launched)).toHaveLength(0);
   });
 
   it("is its owner's radar: a contact beyond its sight shows as a blip", () => {
