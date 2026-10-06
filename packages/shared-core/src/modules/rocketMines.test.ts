@@ -165,6 +165,15 @@ describe('legendary rocket mine', () => {
       code: 'E_NO_ROCKET_MINELAYER',
     });
     s.fleets.layer!.units[0]!.modules = ['mine'];
+    // A content error must reject the action, not change the rules: a `rocket_mine` without
+    // the shared `mine` trait would stand as a fighting fleet (Codex, #1499).
+    const loose = { ...data, units: { ...data.units, rocket_mine: { ...data.units.rocket_mine!, traits: ['immobile', 'issued', 'rocketMine'] } } };
+    const r = kernel.applyAction(
+      s,
+      { id: 's:p:1', playerId: 'p', type: 'fleet.deployRocketMine', payload: { fleetId: 'layer', mode: 'any' }, issuedAt: s.time },
+      { now: s.time, data: loose },
+    );
+    expect(r).toMatchObject({ ok: false, code: 'E_NO_ROCKET_MINELAYER' });
     s.fleets.layer!.edge = null;
     s.fleets.layer!.location = 'A';
     expect(act(s, 'fleet.deployRocketMine', { fleetId: 'layer', mode: 'any' })).toMatchObject({
@@ -240,6 +249,26 @@ describe('legendary rocket mine', () => {
     expect(hit.fleets.target!.units[0]!.hp).toBe(20);
     launch.fleets.target!.edge!.t = 0.9;
     expect(advance(launch, m.arrivesAt).fleets.target!.units[0]!.hp).toBeUndefined();
+  });
+  it('the blast spares mines in its radius: shuttles remove mines, not missiles (Codex, #1499)', () => {
+    const s = world();
+    // q's contact and rocket mines 4 from the target, well inside the blast radius of 10.
+    for (const [id, unit] of [['qmine', 'mine'], ['qrocket', 'rocket_mine']] as const)
+      s.fleets[id] = {
+        id,
+        owner: 'q',
+        location: null,
+        movement: null,
+        edge: { from: 'A', to: 'B', t: 0.71 },
+        units: [{ unit, count: 1, ...(unit === 'rocket_mine' ? { modules: ['mine'] } : {}) }],
+        traits: [],
+      };
+    const launch = armed(s);
+    const m = launch.ordnance!.missiles[0]!;
+    const hit = advance(launch, m.arrivesAt);
+    expect(hit.fleets.target!.units[0]!.hp).toBe(20);
+    expect(hit.fleets.qmine!.units[0]).not.toHaveProperty('hp');
+    expect(hit.fleets.qrocket!.units[0]).not.toHaveProperty('hp');
   });
   it('allows point defense to destroy the missile before damage', () => {
     const s = world();

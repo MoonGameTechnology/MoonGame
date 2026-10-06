@@ -14,7 +14,7 @@ import {
   type MineMissile,
   type RocketMineMode,
 } from '../state/ordnance';
-import { isMineFleet } from '../state/minefields';
+import { isMineFleet, MINE_TRAIT } from '../state/minefields';
 import { defHasTrait } from '../data/traits';
 import { fleetNodeAt, fleetPositionAt } from '../state/fleetPosition';
 import { isCorridorEdge } from '../state/corridor';
@@ -215,7 +215,7 @@ function scheduleFlight(h: HandlerContext, missile: MineMissile): void {
 export const rocketMinesModule: GameModule = {
   id: 'rocketMines',
   // 2.0.0: стоящая мина — отряд во `fleets` (юнит `rocket_mine`, SM-3.7a); её режим и боевая
-  // часть — в `ordnance.controls`; мина не целится в мины.
+  // часть — в `ordnance.controls`; мина не целится в мины, и взрыв их не задевает.
   version: '2.0.0',
   setup(api) {
     api.onAction('fleet.deployRocketMine', (action, h) => {
@@ -224,8 +224,11 @@ export const rocketMinesModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       const fleet = requireOwnedUnengagedFleet(h, p.fleetId, action.playerId);
       const layer = rocketMinelayer(fleet, h.ctx.data);
-      // Без юнита мины в данных мине негде стоять: установка не начинается (fail-secure).
-      if (!layer || !defHasTrait(h.ctx.data.units[ROCKET_MINE_UNIT], ROCKET_MINE_TRAIT))
+      // Без юнита мины в данных мине негде стоять, а без общего трейта `mine` отряд не был бы
+      // миной: воевал бы, мешал захвату и сам ставил мины. Ошибка данных отклоняет установку,
+      // а не меняет правила (fail-secure, замечание Codex на #1499).
+      const unit = h.ctx.data.units[ROCKET_MINE_UNIT];
+      if (!layer || !defHasTrait(unit, ROCKET_MINE_TRAIT) || !defHasTrait(unit, MINE_TRAIT))
         return h.reject('E_NO_ROCKET_MINELAYER');
       const edge = fleet.edge;
       if (
@@ -358,6 +361,8 @@ export const rocketMinesModule: GameModule = {
       const def = h.ctx.data.modules[missile.moduleId]?.rocketMine;
       if (!def || intercepted(h, missile)) return;
       for (const fleet of Object.values(h.state.fleets).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+        // Мина взрывом не ранится, как и прицелом не выбирается: её снимают челноки (SM-3.6).
+        if (isMineFleet(fleet, h.ctx.data)) continue;
         if (getStance(h.state, missile.owner, fleet.owner) !== 'war') continue;
         const at = fleetPositionAt(h.state, fleet, h.ctx.now);
         if (!at || !inRadius(at, missile.to, def.blastRadius)) continue;
