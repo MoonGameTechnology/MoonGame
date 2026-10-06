@@ -893,7 +893,7 @@ import {
   goalsTrayHtml,
   rewardDue,
 } from './goalsPanel';
-import { gainRepaint, researchHeard } from './gainNews';
+import { captureHeard, gainRepaint, researchHeard } from './gainNews';
 import { cmdShown } from '../../decisions/cmdPresence';
 import { allOn } from '../../decisions/cmdHighlight';
 import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from '../../decisions/aimTargets';
@@ -4216,7 +4216,11 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'planet.captured':
-        if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
+        // Строку слышит только участник — взявший мир или тот, у кого его взяли
+        // (`gainNews.ts`, правило 1, решение владельца 2026-10-06): чужой захват даже на
+        // видимом мире — раскрытие информации, ему нет места ни в журнале, ни во
+        // всплывающем сообщении, ни в сводке возвращения.
+        if (captureHeard(p.owner, p.from, ME))
           note(
             t('log.capture', {
               who: NAME[p.owner as string] ?? (p.owner as string),
@@ -4224,6 +4228,9 @@ function handleEvents(events: DomainEvent[]) {
             }),
             p.planetId as string,
           );
+        // Вспышка и память разведки — по видимости, а не по участию (правило 3):
+        // перекраска видимого мира — наблюдение на карте, за туманом не мигает ничего.
+        if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
           // light the flipped province up in its new owner's colour (fog-gated: only
           // a capture we may see flashes) — re-capture restarts the wave.
           captureFlashes.set(p.planetId as string, {
@@ -4585,10 +4592,9 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'fleet.destroyed':
-        // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
-        // разобрано в шапке `fleetNews.ts`: в сети событие едет без места, и сервер
-        // отдаёт его только владельцу. Поведение НЕ меняю, вопрос владельцу.
-        if (destroyHeard(p))
+        // Слышит только владелец флота, как в сети (`fleetNews.ts`, правило 4, решение
+        // владельца 2026-10-06): чужая гибель — раскрытие информации.
+        if (destroyHeard(p, ME))
           note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       // Тёмное событие (`data/events.json`). Гейт СВОЙ, а не общий `admits()`: тот читает
