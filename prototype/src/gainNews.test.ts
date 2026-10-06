@@ -1,8 +1,47 @@
 import { describe, it, expect } from 'vitest';
-import { researchHeard, gainRepaint } from './gainNews';
+import { readFileSync } from 'node:fs';
+import { captureHeard, researchHeard, gainRepaint } from './gainNews';
 
 const ME = 'p1';
 const FOE = 'p2';
+
+describe('gainNews — кто слышит о захвате', () => {
+  it('взявший мир слышит (правило 1)', () => {
+    expect(captureHeard(ME, FOE, ME)).toBe(true);
+    expect(captureHeard(ME, null, ME)).toBe(true);
+  });
+
+  it('тот, у кого мир взяли, слышит — потеря своего не проходит молча', () => {
+    expect(captureHeard(FOE, ME, ME)).toBe(true);
+  });
+
+  // Решение владельца 2026-10-06: чужой захват даже на видимом мире — раскрытие
+  // информации. Прежде строку пускал фог-вердикт, и печатался любой захват в обзоре.
+  it('чужой захват не слышен — ни между двумя чужими, ни ничейного мира', () => {
+    expect(captureHeard(FOE, 'p3', ME)).toBe(false);
+    expect(captureHeard(FOE, null, ME)).toBe(false);
+  });
+
+  it('безымянные стороны — не я (fail-secure)', () => {
+    expect(captureHeard(undefined, undefined, ME)).toBe(false);
+    expect(captureHeard(null, null, ME)).toBe(false);
+  });
+
+  // Сторож места вызова: строку захвата пускает `captureHeard`, а не фог-вердикт. Если
+  // её снова занесут под `seen(...)` вместе со вспышкой, чужой захват на видимом мире
+  // опять поедет в журнал, тосты и сводку — и увидит это только игрок.
+  it('в main.ts строка захвата стоит под captureHeard, а не под фог-вердиктом', () => {
+    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    const at = src.indexOf("case 'planet.captured':");
+    expect(at).toBeGreaterThan(-1);
+    const body = src.slice(at, src.indexOf("      case '", at + 10));
+    const gate = body.indexOf('if (captureHeard(p.owner, p.from, ME))');
+    const line = body.indexOf("t('log.capture'");
+    expect(gate).toBeGreaterThan(-1);
+    expect(line).toBeGreaterThan(gate);
+    expect(body.slice(gate, line)).not.toContain('seen(');
+  });
+});
 
 describe('gainNews — кто слышит об открытии', () => {
   it('только исследователь (правило 4)', () => {

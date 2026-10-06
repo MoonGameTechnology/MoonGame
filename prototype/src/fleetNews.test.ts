@@ -23,15 +23,24 @@ describe('fleetNews — реорганизация флотов', () => {
 });
 
 describe('fleetNews — гибель флота', () => {
-  // Сторож РАСХОЖДЕНИЯ, описанного в шапке: сегодня гибель слышна всем. Тест
-  // фиксирует именно текущее поведение — если правило поменяют осознанно,
-  // покраснеет он, а не живой прогон через неделю.
-  it('слышна всегда и всем — текущее поведение, расхождение задокументировано', () => {
-    expect(destroyHeard({ fleetId: 'f', owner: FOE })).toBe(true);
+  it('слышит владелец погибшего флота (правило 4)', () => {
+    expect(destroyHeard({ fleetId: 'f', owner: ME }, ME)).toBe(true);
+  });
+
+  // Решение владельца 2026-10-06: чужое «флот уничтожен» — раскрытие информации. Прежде
+  // соло объявляло гибель всем, включая драку ботов за туманом, а сеть — только владельцу.
+  it('чужая гибель не слышна — как в сети', () => {
+    expect(destroyHeard({ fleetId: 'f', owner: FOE }, ME)).toBe(false);
+    expect(destroyHeard({ fleetId: 'f', owner: 'p3' }, ME)).toBe(false);
+  });
+
+  it('безымянный владелец — не я (fail-secure)', () => {
+    expect(destroyHeard({ fleetId: 'f' }, ME)).toBe(false);
+    expect(destroyHeard({ fleetId: 'f', owner: null }, ME)).toBe(false);
   });
 
   it('израсходованная мина — не гибель: после строки о подрыве журнал молчит (SM-3.6)', () => {
-    expect(destroyHeard({ fleetId: 'm', owner: ME, spent: true })).toBe(false);
+    expect(destroyHeard({ fleetId: 'm', owner: ME, spent: true }, ME)).toBe(false);
   });
 });
 

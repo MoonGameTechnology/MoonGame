@@ -219,6 +219,8 @@ import {
   sensorCoverage,
   radarSignatures,
   engagementOf,
+  flashBattles,
+  inVisionBloc,
   type Engagement,
   type SignatureContact,
   sightCircles,
@@ -884,7 +886,7 @@ import {
   goalsTrayHtml,
   rewardDue,
 } from './goalsPanel';
-import { gainRepaint, researchHeard } from './gainNews';
+import { captureHeard, gainRepaint, researchHeard } from './gainNews';
 import { cmdShown } from '../../decisions/cmdPresence';
 import { allOn } from '../../decisions/cmdHighlight';
 import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from '../../decisions/aimTargets';
@@ -4073,6 +4075,11 @@ function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
   else note(text);
 }
 function handleEvents(events: DomainEvent[]) {
+  // Бои, начавшиеся и кончившиеся в этом пакете: в `s` их уже нет, и «мой ли он» отвечают
+  // стороны из самих событий — тем же правилом, что сервер раздаёт их (замечание Codex на
+  // #1417: мгновенный бой союзника на неопознанном узле журнал отбрасывал целиком).
+  const flash = flashBattles(events, s);
+  const flashSeen = (id: unknown): boolean => typeof id === 'string' && inVisionBloc(s, ME, flash.get(id) ?? []);
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
     if (e.type.startsWith('rocketMine.') && (p.owner === ME || p.playerId === ME)) {
@@ -4092,7 +4099,7 @@ function handleEvents(events: DomainEvent[]) {
         if (
           seen(
             isMine([p.attacker as string, p.defender as string], ME),
-            known(p.location as string) || battleEngaged(p.battleId),
+            known(p.location as string) || battleEngaged(p.battleId) || flashSeen(p.battleId),
           )
         )
           // Чем названы строки боя — `battleLog.ts` (REFM-179): фаза называется ВСЕГДА,
@@ -4108,7 +4115,8 @@ function handleEvents(events: DomainEvent[]) {
         // уйдёт под туман по ходу схватки (правило 3).
         if (isMine([p.attacker as string, p.defender as string], ME))
           myBattleLocs.add(p.location as string);
-        if (typeof p.battleId === 'string' && battleEngaged(p.battleId)) engagedBattleIds.add(p.battleId);
+        if (typeof p.battleId === 'string' && (battleEngaged(p.battleId) || flashSeen(p.battleId)))
+          engagedBattleIds.add(p.battleId);
         break;
       case 'battle.resolved': {
         const loc = p.location as string;
@@ -4201,7 +4209,11 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'planet.captured':
-        if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
+        // Строку слышит только участник — взявший мир или тот, у кого его взяли
+        // (`gainNews.ts`, правило 1, решение владельца 2026-10-06): чужой захват даже на
+        // видимом мире — раскрытие информации, ему нет места ни в журнале, ни во
+        // всплывающем сообщении, ни в сводке возвращения.
+        if (captureHeard(p.owner, p.from, ME))
           note(
             t('log.capture', {
               who: NAME[p.owner as string] ?? (p.owner as string),
@@ -4209,6 +4221,9 @@ function handleEvents(events: DomainEvent[]) {
             }),
             p.planetId as string,
           );
+        // Вспышка и память разведки — по видимости, а не по участию (правило 3):
+        // перекраска видимого мира — наблюдение на карте, за туманом не мигает ничего.
+        if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
           // light the flipped province up in its new owner's colour (fog-gated: only
           // a capture we may see flashes) — re-capture restarts the wave.
           captureFlashes.set(p.planetId as string, {
@@ -4570,10 +4585,9 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'fleet.destroyed':
-        // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
-        // разобрано в шапке `fleetNews.ts`: в сети событие едет без места, и сервер
-        // отдаёт его только владельцу. Поведение НЕ меняю, вопрос владельцу.
-        if (destroyHeard(p))
+        // Слышит только владелец флота, как в сети (`fleetNews.ts`, правило 4, решение
+        // владельца 2026-10-06): чужая гибель — раскрытие информации.
+        if (destroyHeard(p, ME))
           note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       // Тёмное событие (`data/events.json`). Гейт СВОЙ, а не общий `admits()`: тот читает
@@ -4626,7 +4640,11 @@ function handleEvents(events: DomainEvent[]) {
         // а чужой бой на опознанном узле игрок видит и о цене исхода читает.
         const at = p.at as string;
         if (myBattleLocs.has(at)) killStats = tallyDeath(killStats, p.owner, ME, p.count);
-        if (seenTail(myBattleLocs.has(at), known(at))) {
+        // Бой блока зрения на неопознанном узле — и мгновенный — платит ведомость той же
+        // видимостью, что его начало и итог, иначе строка итога выходит без потерь
+        // (замечание Codex на #1418).
+        const lossSeen = battleEngaged(p.battleId) || flashSeen(p.battleId);
+        if (seenTail(myBattleLocs.has(at), known(at) || lossSeen)) {
           battleLosses.set(
             at,
             recordLoss(battleLosses.get(at), p.owner, p.unit as string, p.count),
@@ -13928,6 +13946,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   chainRouteCache.clear(); // маршруты принадлежат карте СТАРОГО матча
   killStats = { destroyed: 0, lost: 0 };
   myBattleLocs.clear();
+  engagedBattleIds.clear(); // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417)
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
   visionMemo = null; // its vision was written into the memory just cleared
   worldMemo = null;
