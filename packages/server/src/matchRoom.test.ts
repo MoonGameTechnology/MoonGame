@@ -1443,6 +1443,17 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
         const { at } = action.payload as { at: string };
         h.emit('hero.spawned', { owner: action.playerId, heroId: 'h1', fleetId: 'f1', at });
       });
+      // Construction and production by p1 at `node1`, a world p2 identifies (RECAP-FOG),
+      // plus a wreck there — a map event, not intel.
+      api.onAction('test.economy', (action, h) => {
+        const owner = action.playerId;
+        h.emit('building.constructed', { planetId: 'node1', building: 'mine', owner });
+        h.emit('building.upgraded', { planetId: 'node1', building: 'mine', level: 2, owner });
+        h.emit('unit.built', { planetId: 'node1', unit: 'fighter', count: 3, owner });
+        h.emit('army.load.cancelled', { fleetId: 'f1', planetId: 'node1', unit: 'infantry', count: 2, owner });
+        h.emit('army.unload.cancelled', { fleetId: 'f1', planetId: 'node1', unit: 'infantry', count: 2, owner });
+        h.emit('building.destroyed', { planetId: 'node1', building: 'mine', owner });
+      });
       // Бой p1 против p3 в мире `far`, которого не опознаёт никто.
       api.onAction('test.battle', (_action, h) => {
         h.state.battles['battle:9'] = {
@@ -1560,6 +1571,26 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     expect(lastEvents(p1)).toContain('hero.spawned');
     expect(lastEvents(p2)).not.toContain('hero.spawned'); // the leak BF-16 plugged
     expect(lastEvents(p3)).not.toContain('hero.spawned');
+  });
+
+  it('construction and production are owner-only: an identified world does not reveal them', () => {
+    const { r, p1, p2, p3 } = fogRoom();
+    r.submitAction('p1', { id: 'e9', type: 'test.economy', playerId: 'p1', issuedAt: 1, payload: {} }, p1);
+    const intel = [
+      'building.constructed',
+      'building.upgraded',
+      'unit.built',
+      'army.load.cancelled',
+      'army.unload.cancelled',
+    ];
+    for (const type of intel) {
+      expect(lastEvents(p1), type).toContain(type);
+      expect(lastEvents(p2), type).not.toContain(type); // p2 identifies node1, still not news for p2
+      expect(lastEvents(p3), type).not.toContain(type);
+    }
+    // A wreck stays a map event: whoever identifies the world sees it.
+    expect(lastEvents(p2)).toContain('building.destroyed');
+    expect(lastEvents(p3)).not.toContain('building.destroyed');
   });
 
   it('a battle reports to its own sides even where nobody identifies the world — start and end', () => {

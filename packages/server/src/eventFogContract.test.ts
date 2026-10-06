@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { OWNER_ONLY_EVENTS } from './matchRoom';
 
 /**
  * AUD-2 — the fog-routing contract, enforced.
@@ -40,9 +41,10 @@ const ROUTABLE = new Set<string>([...AUDIENCE, ...PLACE, ...OWNERSHIP, ...BATTLE
 const isBroadcast = (type: string): boolean =>
   type === 'time.advanced' || type.startsWith('match.');
 
-/** `hero.*` short-circuits to `p.owner === playerId`, so for those the audience list is
- *  NOT consulted — only `owner` will do. */
-const isHeroOnly = (type: string): boolean => type.startsWith('hero.');
+/** `hero.*` and construction/production (`OWNER_ONLY_EVENTS`, imported so the filter and
+ *  this check cannot drift) short-circuit to `p.owner === playerId`, so for those the
+ *  audience list is NOT consulted — only `owner` will do. */
+const isOwnerOnly = (type: string): boolean => type.startsWith('hero.') || OWNER_ONLY_EVENTS.has(type);
 
 /**
  * Known, deliberate exceptions. Format follows the `.trivyignore` convention in this repo:
@@ -255,7 +257,7 @@ describe('fog routing contract — every emitted event must be addressable', () 
     const unroutable = sites
       .filter((s) => !isBroadcast(s.type))
       .filter((s) => !ALLOWLIST.has(s.type))
-      .filter((s) => (isHeroOnly(s.type) ? !s.keys.includes('owner') : !s.keys.some((k) => ROUTABLE.has(k))))
+      .filter((s) => (isOwnerOnly(s.type) ? !s.keys.includes('owner') : !s.keys.some((k) => ROUTABLE.has(k))))
       .map((s) => `${s.file}: ${s.type} { ${s.keys.join(', ')} }`);
 
     expect(unroutable).toEqual([]);
@@ -263,6 +265,11 @@ describe('fog routing contract — every emitted event must be addressable', () 
 
   it('keeps the allowlist honest — no stale entries', () => {
     const stale = [...ALLOWLIST.keys()].filter((type) => !sites.some((s) => s.type === type));
+    expect(stale).toEqual([]);
+  });
+
+  it('keeps OWNER_ONLY_EVENTS honest — every entry is emitted by a core module', () => {
+    const stale = [...OWNER_ONLY_EVENTS].filter((type) => !sites.some((s) => s.type === type));
     expect(stale).toEqual([]);
   });
 });
