@@ -6,14 +6,14 @@
  * и робот `sectorzerotest.mjs`. Здесь — две функции модуля, которым DOM не нужен: дверь к
  * ролику площадки и сутки магазина. Каждый тест — свежая загрузка модулей над своим хранилищем.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GamePlatform } from './platform/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 let cell: Map<string, string>;
 
-beforeEach(() => {
+function stubPage(): void {
   cell = new Map();
   vi.stubGlobal('localStorage', {
     getItem: (k: string) => cell.get(k) ?? null,
@@ -21,6 +21,18 @@ beforeEach(() => {
     removeItem: (k: string) => void cell.delete(k),
   });
   vi.stubGlobal('addEventListener', () => {});
+}
+
+// Первая загрузка оболочки трансформирует меню, подготовку и комиксы — это секунды, и под
+// нагрузкой полного гейта первый тест не укладывался в свои 5 с. Граф греется здесь один
+// раз; тесты после `vi.resetModules()` загружают его заново, но уже из кеша трансформаций.
+beforeAll(async () => {
+  stubPage();
+  await import('./sectorZeroShell');
+  vi.unstubAllGlobals();
+}, 60_000);
+beforeEach(() => {
+  stubPage();
   vi.resetModules();
 });
 afterEach(() => {
