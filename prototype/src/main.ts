@@ -248,7 +248,7 @@ import {
   type MultiplayerChatMessage,
   createBattleModel,
 } from '../../packages/client/src/index';
-import { pveState, pveModeId, pveChapter, PVE_MISSION_COUNT, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
+import { pveModeId, pveChapter, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
@@ -330,13 +330,10 @@ import { engageOrders } from '../../decisions/engageOrders';
 import { engageRoster } from '../../decisions/engageRoster';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
-import { bossMissionRow, missionBriefs, missionRows, type MissionRow } from '../../decisions/missionView';
+import { bossMissionRow, missionRows, type MissionRow } from '../../decisions/missionView';
 import { initMissionPanel } from './missionPanel';
 import { bossTask } from '../../decisions/runBoss';
 import { devourSieges } from '../../decisions/devourSiege';
-import { chapterMapView, chapterTargets } from '../../decisions/chapterMap';
-import { swarmCatalog, swarmCodexView } from '../../decisions/swarmCodex';
-import { chapterHero } from '../../decisions/heroRecruits';
 import { battleStance } from '../../decisions/battleStance';
 import { orbitSeats, type OrbitSeats } from '../../decisions/orbitSeats';
 import { runAiSeats } from '../../decisions/runAiSeats';
@@ -349,17 +346,8 @@ import { tileHp } from '../../decisions/unitTile';
 import { initPirateIntro } from './pirateIntro';
 import { initComicPlayer } from './comicPlayer';
 import { createComicQueue } from './comicQueue';
-import { CHAPTER_COMICS, COMIC_TRIGGERS } from './comicArt';
-import {
-  comicDue,
-  comicId,
-  comicsTriggered,
-  echoComicMoment,
-  markComicSeen,
-  storyFacts,
-  type ComicMoment,
-  type ComicRegistry,
-} from '../../decisions/chapterComics';
+import { CHAPTER_COMICS } from './comicArt';
+import type { ComicRegistry } from '../../decisions/chapterComics';
 import {
   SECTOR_ZERO_ABSENT_HUD,
   SECTOR_ZERO_ABSENT_TOOLS,
@@ -368,38 +356,26 @@ import {
   toolShown,
   type SessionTool,
 } from '../../decisions/sectorZeroTools';
-import { initSectorZeroMenu } from './sectorZeroMenu';
 import {
   changeSectorProgress,
-  chapterLater,
   chapterShown,
   chapterWorld,
-  claimSectorZero,
   initSectorProfile,
   pushCloud,
   saveSectorProgress,
-  sectorChapterIds,
   sectorProgress,
-  sectorZeroAccount,
 } from './sectorProfile';
 import {
   awardSectorRun,
   beginAttempt,
   chapterForSettle,
-  chooseDifficulty,
-  chooseMission,
   enterRun,
   forgetSavedRun,
   initSectorRun,
   isSectorZeroRun,
   isTraining,
   leaveRun,
-  loadSavedRun,
-  nextSectorDifficulty,
-  nextSectorMission,
   pveDifficulty,
-  resetSectorZero,
-  restoreRun,
   runInProgress,
   runShipLoadouts,
   runWrite,
@@ -411,20 +387,22 @@ import {
   setRunActive,
   tickRunSave,
 } from './sectorRun';
-import { initSectorZeroPreparation } from './sectorZeroPreparation';
-import { initRunWallet } from './runWallet';
+import {
+  initSectorZeroShell,
+  openSectorZero,
+  playChapterComic,
+  playTaskComic,
+  runWallet,
+  sectorZeroMenu,
+  watchAd,
+} from './sectorZeroShell';
 import { getPlatform, type PlatformHost } from './platform/host';
+import { doubleReward, shopCapabilities } from '../../decisions/sectorZeroShop';
 import {
-  adSovereigns,
-  advanceShopDay,
-  doubleReward,
-  localShopDay,
-  shopCapabilities,
-} from '../../decisions/sectorZeroShop';
-import type { AdOutcome, AdPlacement } from '../../decisions/adPlacements';
-import {
-  changeSectorZeroProgress, prepareSectorZeroRun, sovereignRepairCost,
-  REPAIR_HP_PER_SOVEREIGN, WARRANTS_PER_REWARD, abandonRunReward,
+  changeSectorZeroProgress,
+  prepareSectorZeroRun,
+  sovereignRepairCost,
+  abandonRunReward,
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
@@ -16476,238 +16454,39 @@ const host = platform as Partial<PlatformHost>;
 // вернётся в тишину, которую не просил и которую надо чинить руками.
 host.onPlatformPause?.((paused) => snd.setPaused(paused));
 
-// Витрина магазина ротируется посуточно (`SZE-3.2`). Единственные часы у офлайнового
-// клиента — часы игрока, поэтому номер дня МОНОТОНЕН: `advanceShopDay` никогда его не
-// уменьшает. Часы назад не откатывают витрину, часы вперёд двигают её навсегда и сжигают
-// промотанные дни вместе с товаром — накрутка наказывает сама себя.
-function syncShopDay(): void {
-  const next = advanceShopDay(sectorProgress, localShopDay(Date.now()));
-  if (next !== sectorProgress) saveSectorProgress(next);
-}
-
-const sectorPreparation = initSectorZeroPreparation({
-  data,
-  // Решения UI принимаются по capability, а не по имени площадки (`platform-adapters.md`).
-  // Суверены тратятся там, где у них есть кран — покупка ИЛИ ролик (`SZE-3.5`).
-  platform: shopCapabilities(platform.capabilities),
-  sync: syncShopDay,
-  watchAd,
-  progress: () => sectorProgress,
-  change: changeSectorProgress,
-});
-
-/** Дверь к ролику площадки (`YAG-3.2`) — единственный вызов `showRewardedAd` в игре. Её
- *  получают оба экрана с рекламой — подготовка и итоги забега, — и оба зовут её только
- *  по нажатию (`platform/adPlacementGuard.test.ts`). */
-async function watchAd(placement: AdPlacement, props?: Record<string, string>): Promise<AdOutcome> {
-  platform.analytics.emit('rewarded_ad_offered', { placement, ...props });
-  const shown = await platform.ads.showRewardedAd({ placement });
-  if (shown.status === 'ok') platform.analytics.emit('rewarded_ad_completed', { placement, ...props });
-  return shown.status;
-}
-
-// Кошелёк профиля в шапке забега и «+» у Суверенов (`run.sovereigns`, решение владельца
-// 2026-09-24): тот же кран, что кнопка магазина — одна порция, один дневной лимит. Сутки
-// сверяются до предложения, иначе вчерашний исчерпанный лимит прятал бы «+» до выхода в меню.
-const runWallet = initRunWallet({
-  root: $('tbwallet'),
-  wallet: () => (sectorZeroToolsHidden() ? sectorProgress : null),
-  offer: () => {
-    syncShopDay();
-    const ad = adSovereigns(sectorProgress, data, shopCapabilities(platform.capabilities));
-    return ad.state === 'ready' ? { amount: ad.amount, left: ad.left } : null;
-  },
-  // Числа описаний валют — из тех же правил, по которым профиль платит и списывает.
-  rules: () => ({
-    warrantsPerReward: WARRANTS_PER_REWARD,
-    repairHp: REPAIR_HP_PER_SOVEREIGN,
-    supplyPrice: data.sectorZeroShop.runSupply.price,
-    adAmount: data.sectorZeroShop.adSovereigns.amount,
-    adPerDay: data.sectorZeroShop.adSovereigns.perDay,
-  }),
-  watchAd,
-  apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),
-  note,
-});
-const sectorZeroMenu = initSectorZeroMenu({
-  root: $('sector-zero'),
-  standalone: document.body.dataset.entry === 'sector-zero',
-  preparation: sectorPreparation,
-  account: sectorZeroAccount,
-  // Карточка «Продолжить» — хранимый забег у его владельца (`sectorRun.ts`, REFM-210).
-  load: loadSavedRun,
-  difficulty: () => nextSectorDifficulty,
-  setDifficulty: chooseDifficulty,
-  mission: () => nextSectorMission,
-  chapters: PVE_MISSION_COUNT,
-  chapterInfo: index => ({
-    waves: data.modes[pveModeId(index) ?? '']?.pve?.waves ?? 0,
-    tasks: chapterShown(index).length,
-    pool: pveChapter(index).objectives.length,
-    cleared: sectorProgress.chaptersWon.includes(pveChapter(index).id),
-    ...heroReward(index),
-    briefs: missionBriefs(chapterShown(index), pveChapter(index).slots?.base),
-    // Остаток запаса — подписи меток «позже» на карте главы (их награду не показываем:
-    // номинал считается от набора, который будет виден, когда задача откроется).
-    laterBriefs: missionBriefs(chapterLater(index), pveChapter(index).slots?.base),
-  }),
-  // Карта главы: мир на старте главы + память тумана прошлых забегов из профиля.
-  chapterMap: index => {
-    const chapter = pveChapter(index);
-    const start = pveState(data, index);
-    const scouted = sectorProgress.chapterScouted[chapter.id] ?? [];
-    // Цели задач: активные — видимые в следующем забеге, «позже» — остаток запаса главы;
-    // выполненные закрыты навсегда и на карту не зовут (`chapterTargets`).
-    const done = new Set(sectorProgress.objectivesDone[chapter.id] ?? []);
-    const known = new Set([...scouted, ...Object.values(start.planets).filter(p => p.owner === 'p1').map(p => p.id)]);
-    return chapterMapView(
-      start,
-      scouted,
-      'p1',
-      chapterTargets(
-        start,
-        chapter.objectives.filter(o => !done.has(o.id)),
-        new Set(chapterShown(index).map(o => o.id)),
-        known,
-      ),
-    );
-  },
-  // Досье Роя (заказ владельца 2026-09-24): память профиля против каталога игры.
-  swarmCodex: () => {
-    const view = swarmCodexView(
-      sectorProgress.swarmCodex,
-      swarmCatalog(data, sectorChapterIds().map((_, i) => pveState(data, i))),
-      data,
-    );
-    return {
-      known: view.known,
-      total: view.total,
-      units: view.units.map(u => {
-        const def = data.units[u.id]!;
-        return {
-          name: displayUnit(u.id),
-          known: u.known,
-          max: u.max,
-          runs: u.runs,
-          stats: {
-            attack: def.stats.attack ?? 0,
-            defense: def.stats.defense ?? 0,
-            hp: def.stats.hp ?? 0,
-            speed: def.stats.speed ?? 0,
-          },
-        };
-      }),
-      modules: view.modules.map(m => {
-        const def = data.modules[m.id]!;
-        return { name: tData(def.name), desc: def.description ? t(def.description) : '', known: m.known, evidence: m.evidence, n: m.n };
-      }),
-      buildings: view.buildings.map(b => ({ name: tData(data.buildings[b.id]?.name ?? b.id), known: b.known })),
-    };
-  },
-  setMission: chooseMission,
-  start: () => launchSectorRun(),
-  startTraining: () => playChapterComic('training-1', 'intro', () => startTraining()),
+// Оболочка Sector Zero — `sectorZeroShell.ts` (REFM-211): меню, подготовка, кошелёк, сутки
+// магазина, ролики, комиксы глав и вход. Здесь только проводка к миру, виджетам комиксов,
+// партиям и экранам хаба; хуки зовутся по нажатиям и событиям, а не при загрузке.
+initSectorZeroShell({
+  menuRoot: $('sector-zero'),
+  walletRoot: $('tbwallet'),
+  runOnScreen: () => sectorZeroToolsHidden(),
+  world: () => s,
+  me: () => ME,
+  comics: { player: comicPlayer, queue: comicQueue, art: comicArt },
+  startRun: () => startPvEMatch(),
   startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),
-  resume: restoreRun,
-  // ВРЕМЕННО (заказ владельца 2026-09-27): «Начать всё заново» — `resetSectorZero`.
-  resetAll: resetSectorZero,
-  settings: () => settings.open(),
+  startTraining: () => startTraining(),
+  leaveWorld: () => {
+    saveSolo();
+    leaveMatch();
+    cameFromLink = false; // explicit local entry after a network visit may resume its own run
+    hideMapLoading();
+  },
+  closeScreens: () => {
+    setupEl.style.display = 'none';
+    for (const layer of BACK_LAYERS) if (layer.id !== 'setup' && layer.isOpen()) layer.close();
+    showConnect(false);
+    showHub(false);
+    endscreenEl.style.display = 'none';
+  },
   back: () => {
     openHub();
     $('hub-sector-zero').focus({ preventScroll: true });
   },
+  openSettings: () => settings.open(),
+  note,
 });
-
-/** Герой-награда главы для карточки на маршруте: кто придёт и пришёл ли уже. */
-function heroReward(index: number): { hero?: { name: string; joined: boolean } } {
-  const id = chapterHero(index);
-  const def = id ? data.heroes[id] : undefined;
-  return id && def ? { hero: { name: tData(def.name), joined: !!sectorProgress.heroes[id] } } : {};
-}
-
-/**
- * Комикс главы, если он положен (`decisions/chapterComics.ts`), и затем `then`. Показ —
- * один раз на профиль; отметка пишется, когда игрок комикс закрыл (досмотрел или
- * пропустил), поэтому вкладка, закрытая посреди комикса, покажет его снова, а не потеряет.
- */
-function playChapterComic(chapter: string, moment: ComicMoment, then: () => void): void {
-  const panels = comicDue(sectorProgress, comicArt.registry, chapter, moment);
-  if (!panels) {
-    then();
-    return;
-  }
-  detach(
-    'Sector Zero: комикс главы',
-    comicQueue.enqueue(comicId(chapter, moment), async () => {
-      // Предыдущая страница могла записать ту же отметку (живая/архивная версия Эхо).
-      const current = comicDue(sectorProgress, comicArt.registry, chapter, moment);
-      if (current) {
-        await comicPlayer.play(current, moment === 'intro' ? 'battle' : moment === 'outro' ? 'results' : 'resume');
-        saveSectorProgress(markComicSeen(sectorProgress, comicId(chapter, moment)));
-      }
-      then();
-    }),
-  );
-}
-
-/** Комиксы главы по событиям (`COMIC_TRIGGERS`): один раз на профиль, в тот кадр, когда
- *  триггер впервые засчитан. Триггером может быть и шаг главной цепочки главы: встреча с
- *  союзником в IV (`chain.contact`), доки и основная эвакуация в VI (`chain.docks`,
- *  `chain.evacuate`), — и факт мира (`storyFacts`): разрыв сети Роя в V (`net.cut`).
- *  Дев-забег и полигон комикс не показывают. */
-function playTaskComic(missions: readonly MissionRow[], chain: readonly ChapterStep[] | null): void {
-  if (isTraining() || sectorDevActive || !isSectorZeroRun()) return;
-  const chapter = pveChapter(sectorMission).id;
-  const complete = [
-    ...missions.filter((m) => m.complete).map((m) => m.id),
-    ...(chain ?? []).filter((st) => st.done).map((st) => st.key),
-    ...(sectorProgress.objectivesDone[chapter] ?? []),
-    ...storyFacts(s),
-  ];
-  for (const moment of comicsTriggered(sectorProgress, comicArt.registry, COMIC_TRIGGERS, chapter, complete))
-    playChapterComic(chapter, moment, () => {});
-  if (chapter === 'pve-1') {
-    const scientistAvailable = complete.includes('mission.rescue-scientist')
-      || (s.missionFacts?.recruited?.[ME] ?? []).includes('research_station')
-      || sectorProgress.chaptersWon.includes('pve-1');
-    const moment = echoComicMoment(s, ME, scientistAvailable, complete.includes('mission.claim-colony'));
-    if (moment) playChapterComic(chapter, moment, () => {});
-  }
-}
-
-/** Новая попытка главы — и меню, и «Сыграть главу снова»: сперва комикс главы (в первый
- *  раз), потом забег. Дев-забег комикс не показывает: он не пишет профиль. */
-function launchSectorRun(): void {
-  playChapterComic(pveChapter(nextSectorMission).id, 'intro', () => startPvEMatch());
-}
-
-/** `replay` — сразу новая попытка той же главы (кнопка итогов «Сыграть главу снова»). Идёт
- *  через открытие меню: оно засчитывает и стирает закончившийся забег, и только потом
- *  стартует новый — тем же путём, что кнопка «Новый забег». */
-function openSectorZero(preparation = false, replay = false): void {
-  claimSectorZero();
-  saveSolo();
-  leaveMatch();
-  cameFromLink = false; // explicit local entry after a network visit may resume its own run
-  hideMapLoading();
-  // Close the map's layers before the new screen takes over. Do not route the
-  // setup's Back button through the multiplayer hub on the way here.
-  sectorZeroMenu.hide();
-  setupEl.style.display = 'none';
-  for (const layer of BACK_LAYERS) if (layer.id !== 'setup' && layer.isOpen()) layer.close();
-  showConnect(false);
-  showHub(false);
-  endscreenEl.style.display = 'none';
-  const chapter = sectorMission;
-  detach('Sector Zero menu', sectorZeroMenu.open().then(() => {
-    if (preparation && sectorZeroMenu.isOpen()) sectorPreparation.open();
-    if (replay && sectorZeroMenu.isOpen()) {
-      chooseMission(chapter);
-      sectorZeroMenu.hide();
-      launchSectorRun();
-    }
-  }));
-}
 
 // Часы забега (решение владельца 2026-09-24): пока забег на экране, отсчёты и сроки —
 // реальные минуты и секунды на обычном темпе, приток — в минуту (`format.ts`). Форматтеры

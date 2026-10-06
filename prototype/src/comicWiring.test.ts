@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs';
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 // Конец забега засчитывает его владелец (`sectorRun.ts`, REFM-210) и зовёт комиксы хуками.
 const RUN = readFileSync(new URL('./sectorRun.ts', import.meta.url), 'utf8');
+// Меню, вход и комиксы глав — у оболочки Sector Zero (REFM-211); запуск партии — в `main.ts`.
+const SHELL = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
 /** Засчёт попытки — один раз на попытку, в кадровом такте журнала забега. */
 const settleBlock = (): string =>
   /if \(sectorAttempt > 0 && clearedAttempt !== sectorAttempt\) \{[\s\S]*?\n {4}\}/.exec(
@@ -18,13 +20,17 @@ const settleBlock = (): string =>
 
 describe('комиксы глав — проводка', () => {
   it('новый забег — из меню и с итогов — идёт через комикс главы', () => {
-    expect(MAIN).toContain('start: () => launchSectorRun(),');
-    expect(MAIN).toMatch(/sectorZeroMenu\.hide\(\);\n\s+launchSectorRun\(\);/);
+    expect(SHELL).toContain('start: () => launchSectorRun(),');
+    expect(SHELL).toMatch(/sectorZeroMenu\.hide\(\);\n\s+launchSectorRun\(\);/);
     // Мимо комикса забег стартует только в дев-забеге (он не пишет профиль) и из самого
-    // `launchSectorRun`: объявление + дев-вход + один вызов после комикса.
+    // `launchSectorRun`: объявление + дев-вход + хук запуска, который оболочка зовёт ровно
+    // один раз — после комикса.
     expect(MAIN.match(/\bstartPvEMatch\(/g)).toHaveLength(3);
-    expect(MAIN).toContain(
-      "playChapterComic(pveChapter(nextSectorMission).id, 'intro', () => startPvEMatch());",
+    expect(MAIN).toContain('startRun: () => startPvEMatch(),');
+    expect(MAIN).toContain('startDev: __PLAYER_BUILD__ ? undefined : () => startPvEMatch(true),');
+    expect(SHELL.match(/\bgame\.startRun\(/g)).toHaveLength(1);
+    expect(SHELL).toContain(
+      "playChapterComic(pveChapter(nextSectorMission).id, 'intro', () => game.startRun());",
     );
   });
 
@@ -36,19 +42,19 @@ describe('комиксы глав — проводка', () => {
   });
 
   it('отметка «показан» пишется в профиль, когда игрок комикс закрыл', () => {
-    expect(MAIN).toContain(
+    expect(SHELL).toContain(
       'saveSectorProgress(markComicSeen(sectorProgress, comicId(chapter, moment)));',
     );
   });
 
   it('комикс `task` зовётся и шагом главной цепочки главы (глава IV: встреча с союзником)', () => {
-    expect(MAIN).toContain('...(chain ?? []).filter((st) => st.done).map((st) => st.key),');
+    expect(SHELL).toContain('...(chain ?? []).filter((st) => st.done).map((st) => st.key),');
     expect(MAIN).toContain('if (isSectorZeroRun()) playTaskComic(missions, chain);');
   });
 
   it('комиксы по событиям — каждый момент таблицы, сцены главы VI тоже, и раньше финала', () => {
-    expect(MAIN).toMatch(
-      /for \(const moment of comicsTriggered\(sectorProgress, comicArt\.registry, COMIC_TRIGGERS, chapter, complete\)\)\n\s+playChapterComic\(chapter, moment, \(\) => \{\}\);/,
+    expect(SHELL).toMatch(
+      /for \(const moment of comicsTriggered\(\s*sectorProgress,\s*comicArt\.registry,\s*COMIC_TRIGGERS,\s*chapter,\s*complete,?\s*\)\)\n\s+playChapterComic\(chapter, moment, \(\) => \{\}\);/,
     );
     // Победный кадр: сцена и задача встают в очередь раньше финала главы.
     const block = settleBlock();

@@ -32,6 +32,8 @@ const PREP = read('sectorZeroPreparation.ts');
 const END = read('endScreen.ts');
 const WALLET = read('runWallet.ts');
 const MAIN = read('main.ts');
+// Дверь к ролику — у оболочки Sector Zero (REFM-211), экран итогов получает её из `main.ts`.
+const SHELL = read('sectorZeroShell.ts');
 
 /** Тело обработчика нажатия на панели подготовки — от подписки до возврата API экрана. */
 const clickHandler = (() => {
@@ -67,18 +69,22 @@ describe('YAG-3.2 — реклама показывается только по 
     expect(walletClickHandler.length).toBeGreaterThan(300);
   });
 
-  it('ролик площадки зовёт ровно одно место игры — хост `watchAd`', () => {
+  it('ролик площадки зовёт ровно одно место игры — дверь `watchAd`', () => {
     const callers = gameFiles.filter((f) => /\.showRewardedAd\(/.test(read(f)));
-    expect(callers).toEqual(['main.ts']);
-    expect(MAIN.match(/\.showRewardedAd\(/g)).toHaveLength(1);
-    const door = /async function watchAd\([\s\S]*?\n\}/.exec(MAIN)?.[0] ?? '';
+    expect(callers).toEqual(['sectorZeroShell.ts']);
+    expect(SHELL.match(/\.showRewardedAd\(/g)).toHaveLength(1);
+    const door = /async function watchAd\([\s\S]*?\n\}/.exec(SHELL)?.[0] ?? '';
     expect(door).toContain('.showRewardedAd(');
   });
 
   it('хост сам `watchAd` не зовёт — только отдаёт трём местам', () => {
-    expect(MAIN.match(/\bwatchAd\(/g)).toEqual(['watchAd(']); // одно объявление
-    expect(MAIN).toContain('async function watchAd(');
-    expect(MAIN.match(/^ +watchAd,$/gm)).toHaveLength(3);
+    expect(SHELL.match(/\bwatchAd\(/g)).toEqual(['watchAd(']); // одно объявление
+    expect(MAIN).not.toMatch(/\bwatchAd\(/);
+    expect(SHELL).toContain('export async function watchAd(');
+    // Подготовка и кошелёк — в оболочке, экран итогов — в `main.ts` (строка импорта в
+    // `main.ts` стоит с отступом в два пробела и передачей не считается).
+    expect(SHELL.match(/^ +watchAd,$/gm)).toHaveLength(2);
+    expect(MAIN.match(/^ {4,}watchAd,$/gm)).toHaveLength(1);
   });
 
   it('`watchAd` зовут три места: подготовка — только из помощника `viaAd`', () => {

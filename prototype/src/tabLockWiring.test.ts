@@ -18,6 +18,8 @@ import { readFileSync } from 'node:fs';
 // забега — в `main.ts`.
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const SRC = readFileSync(new URL('./sectorProfile.ts', import.meta.url), 'utf8');
+// Вход в Sector Zero — у оболочки (REFM-211).
+const SHELL = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
 const bodyIn = (src: string, name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
 const body = (name: string): string => bodyIn(SRC, name);
@@ -40,7 +42,7 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
   });
 
   it('вход в Sector Zero делает вкладку хозяйкой — первым делом', () => {
-    expect(bodyIn(MAIN, 'openSectorZero').trimStart().startsWith('claimSectorZero();')).toBe(true);
+    expect(bodyIn(SHELL, 'openSectorZero').trimStart().startsWith('claimSectorZero();')).toBe(true);
   });
 
   it('перехват у другой вкладки перечитывает профиль и отметку, а забег берёт из журнала', () => {

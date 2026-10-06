@@ -16,6 +16,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Вход в Sector Zero — у оболочки (REFM-211); выход из прежнего мира — её хук в `main.ts`.
+const SHELL = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
 const body = (name: string): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
 /** Тело обработчика клика по элементу с этим id (обработчик может стоять с отступом). */
@@ -31,7 +33,12 @@ describe('REFM-205 — выход из партии одной дверью', ()
     }
     const onLeave = /onLeave: \(which, wasNet\) => \{([\s\S]*?)\n {2}\},/.exec(SRC)?.[1] ?? '';
     expect(onLeave, 'итоговый экран').toContain('leaveMatch();');
-    expect(body('openSectorZero'), 'вход в Sector Zero').toContain('leaveMatch();');
+    const enter =
+      new RegExp(`function openSectorZero\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SHELL)?.[1] ??
+      '';
+    expect(enter, 'вход в Sector Zero').toContain('game.leaveWorld();');
+    const leaveWorld = /leaveWorld: \(\) => \{([\s\S]*?)\n {2}\},/.exec(SRC)?.[1] ?? '';
+    expect(leaveWorld, 'вход в Sector Zero').toContain('leaveMatch();');
   });
 
   it('флаги выхода из сети пишет только дверь', () => {

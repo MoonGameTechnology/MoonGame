@@ -47,7 +47,7 @@
 | REFM-208 | ✅ | proto | `docs/backlog.md` | Владелец выбора |
 | REFM-209 | ✅ | proto | `docs/backlog.md` | Профиль Sector Zero: хранение, облако, вкладка-хозяйка |
 | REFM-210 | ✅ | proto | `docs/backlog.md` | Забег: сохранение, восстановление, флаги |
-| REFM-211 | ⏳ | proto | `docs/backlog.md` | Оболочка Sector Zero |
+| REFM-211 | ✅ | proto | `docs/backlog.md` | Оболочка Sector Zero |
 | REFM-212 | ⏳ | proto | `docs/backlog.md` | Экран настройки схватки |
 | REFM-213 | ⏳ | proto | `docs/backlog.md` | Сохранение схватки |
 | REFM-214 | ⏳ | proto | `docs/backlog.md` | Дипломатия и связь |

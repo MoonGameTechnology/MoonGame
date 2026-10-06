@@ -134,6 +134,8 @@ describe('кошелёк: ролик только по раскрытой кно
 describe('шапка забега — проводка в кадре', () => {
   // Кадр — единственное место, где признак забега доходит до шапки.
   const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Кошелёк поднимает оболочка Sector Zero (REFM-211), перерисовывает кадр `main.ts`.
+  const shell = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
 
   it('поля основной игры прячутся в забеге и возвращаются вне его', () => {
     // Каждое поле — вместе со своим дублем в другом месте интерфейса (кнопка «Производство»
@@ -144,15 +146,17 @@ describe('шапка забега — проводка в кадре', () => {
   });
 
   it('кошелёк — только в забеге, из профиля, и кадр перерисовывает его', () => {
-    expect(main).toContain('wallet: () => (sectorZeroToolsHidden() ? sectorProgress : null),');
+    // Признак забега для интерфейса — `sectorZeroToolsHidden` в `main.ts`, оболочка зовёт его хуком.
+    expect(shell).toContain('wallet: () => (game.runOnScreen() ? sectorProgress : null),');
+    expect(main).toContain('runOnScreen: () => sectorZeroToolsHidden(),');
     expect(main).toMatch(/\n {2}runWallet\.render\(\);/);
   });
 
   it('ролик в кошельке — те же порция и дневной лимит, что у магазина, по сегодняшним суткам', () => {
-    expect(main).toMatch(
+    expect(shell).toMatch(
       /offer: \(\) => \{\s*syncShopDay\(\);\s*const ad = adSovereigns\(sectorProgress, data, shopCapabilities\(platform\.capabilities\)\);/,
     );
-    expect(main).toContain("apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),");
+    expect(shell).toContain("apply: () => changeSectorProgress({ kind: 'ad-sovereigns' }),");
   });
 
   it('плашка-заглушка Суверенов в строке статуса в забеге не рисуется', () => {
