@@ -109,6 +109,13 @@ describe('dossiers — юниты', () => {
     expect(unitDossier('scout', true)).toEqual(unitDossier('scout', false));
   });
 
+  it('пиратский танк: атака по технике берётся из своего поля, а не из общей атаки', () => {
+    const st = data.units.pirate_tank!.stats;
+    const body = unitDossier('pirate_tank', true)!.body;
+    expect(body).toContain(`<em class="hl">${st.attackVsVehicle}</em> по технике`);
+    expect(body).toContain(`<em class="hl">${st.attackVsInfantry}</em> атаки по пехоте`);
+  });
+
   it('TXT-2: досье юнита — справка, а не проза (средняя ≤ 120 симв., без хвостов после тире)', () => {
     for (const [locale, messages] of [['ru', ru], ['en', en]] as const) {
       const descs = Object.entries(messages).filter(([k]) => /^dossier\.unit\.[a-z-]+\.desc$/.test(k));
