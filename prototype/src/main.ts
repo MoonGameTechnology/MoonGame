@@ -1,22 +1,25 @@
 import {
   attackBattle,
   deployForkFortress,
+  disarmRocketMine,
   holdPatrol,
   patrolShuttle,
   recallPatrol,
   releaseHold,
   relocateShuttle,
   retreatBattle,
+  setRocketMineMode,
 } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
 import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
+import { rocketMineCard } from '../../decisions/rocketMineCard';
 import { EMPLACEMENT_HEADING, isEmplacementFleet } from '../../decisions/emplacement';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
-import { rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
+import { isRocketMineFleet, rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
 import { drawOrdnance } from '../../packages/client/src/ordnanceView';
-import { rocketMinesUi } from './rocketMinesUi';
+import { HINT_KEY, MINE_MODES, MODE_KEY, rocketMinesUi } from './rocketMinesUi';
 import type { SoloSave } from '../../decisions/soloSave';
 import {
   askReplace,
@@ -7471,6 +7474,28 @@ function mineCardHtml(f: Fleet): string {
   );
 }
 
+/** Карточка ракетной мины (SM-3.7a): что показать — `decisions/rocketMineCard.ts`. Режим и
+ *  снятие — те же действия, что в окне носителя (`rocketMinesUi`), через `data-act`. */
+function rocketMineCardHtml(f: Fleet): string {
+  const card = rocketMineCard(f, mineView()?.controls?.[f.id], ME, data);
+  if (!card) return '';
+  const pct = card.hull.max > 0 ? Math.round((100 * card.hull.cur) / card.hull.max) : 0;
+  const sub = card.mode ? t(MODE_KEY[card.mode]) : t(card.own ? 'mine.ready' : 'mine.detected');
+  let html =
+    cardHeader(ownerColor(f.owner), t('data.rocket-mine'), sub) +
+    `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar"><i style="width:${pct}%"></i></span><b>${kfmt(card.hull.cur)}/${kfmt(card.hull.max)}</b></div>` +
+    `<div class="row"><b>📡 ${esc(t('mine.card.rocket', { radar: card.radar, sight: card.sight }))}</b></div>`;
+  if (card.damage !== null) html += `<div class="row"><b>💥 ${esc(t('mine.card.rocket-hit', { damage: card.damage }))}</b></div>`;
+  html += `<div class="hint">${esc(t('mine.card.rocket-rule'))}</div>`;
+  if (card.own) {
+    html += '<div class="row">';
+    for (const mode of MINE_MODES)
+      html += `<button class="chip" data-act="rmmode" data-arg="${mode}" aria-pressed="${card.mode === mode}" title="${esc(t(HINT_KEY[mode]))}">${esc(t(MODE_KEY[mode]))}</button>`;
+    html += `<button class="chip" data-act="rmdisarm">${esc(t('mine.disarm'))}</button></div>`;
+  }
+  return html;
+}
+
 function cardHeader(color: string, title: string, sub: string, titleAct?: string, badge?: string): string {
   return kitCardHeader(color, title, sub, {
     compact: pcUi(),
@@ -7899,8 +7924,9 @@ function effectTagText(tag: EffectTag): string {
 }
 
 function fleetPanelHtml(f: Fleet): string {
-  // Мина (SM-3.6): свой короткий паспорт — заряды, доля за подрыв, прочность.
-  if (isMineFleet(f, data)) return mineCardHtml(f);
+  // Мина (SM-3.6): свой короткий паспорт — заряды, доля за подрыв, прочность. Ракетная
+  // (SM-3.7a) — радар, обзор и прочность, а хозяину ещё режим, удар и управление.
+  if (isMineFleet(f, data)) return isRocketMineFleet(f, data) ? rocketMineCardHtml(f) : mineCardHtml(f);
   // Окно флота на ПК — консоль по макету владельца (`fleetConsole.ts`): те же куски
   // карточки, своя раскладка. Карточка ниже остаётся телефону, группе и чужому флоту.
   if (consoleFleet() === f) return fleetConsoleHtml(f);
@@ -10836,6 +10862,11 @@ side.addEventListener('click', (ev) => {
     armRetreat(selFleet!);
   } else if (act === 'laymines') {
     playerOrder(layMinesFleet(ME, arg || selFleet!));
+  } else if (act === 'rmmode') {
+    // Ракетная мина (SM-3.7a) выделена общим путём: режим пуска — ей самой.
+    if (selFleet && (arg === 'any' || arg === 'confirmed')) playerOrder(setRocketMineMode(ME, selFleet, arg));
+  } else if (act === 'rmdisarm') {
+    if (selFleet) playerOrder(disarmRocketMine(ME, selFleet));
   } else if (act === 'instantrepair') {
     // Платный мгновенный ремонт: цена и отказы — на сервере; панель перерисуется
     // по факту (полный бар = получилось), нотификаций-обещаний не даём.
@@ -11548,11 +11579,6 @@ function selectAt(mx: number, my: number) {
       return;
     }
   }
-  const mineHit = (mineView()?.mines ?? []).find((m) => {
-    const p = world(m.position);
-    return (p.x - mx) ** 2 + (p.y - my) ** 2 <= 14 ** 2;
-  });
-  if (mineHit) { mineControls.openMine(mineHit.id); return; }
   // Plain tap = selection. Movement happens only when "Move" is armed (aiming), so a
   // fleet selection never blocks picking a planet (and vice versa).
   // A tap on an ally ping marker opens its description popup (takes priority over
@@ -16346,7 +16372,9 @@ function drawMinefields(now: number): void {
   for (const f of Object.values(s.fleets)) {
     if (!isMineFleet(f, data) || !fleetSeen(f)) continue;
     const c = fleetAnchor(f);
-    if (c) marks.push({ c, owner: f.owner, label: `×${mineCard(f, data).charges}`, installing: false });
+    // Ракетная мина — один заряд, счётчик ей ни к чему (SM-3.7a).
+    const label = isRocketMineFleet(f, data) ? '' : `×${mineCard(f, data).charges}`;
+    if (c) marks.push({ c, owner: f.owner, label, installing: false });
   }
   for (const m of marks) {
     if (!visible(m.c, 40)) continue;

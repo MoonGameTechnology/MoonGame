@@ -14,18 +14,19 @@ export function drawOrdnance(
 ): void {
   if (!ord) return;
   g.save();
-  for (const mine of [...ord.mines, ...ord.installations]) {
+  // Only a charge still being installed is drawn here: a standing mine is a fleet (SM-3.7a)
+  // and is drawn with the other mines, wherever the fleet fog lets the viewer see it.
+  for (const mine of ord.installations) {
     const p = project(mine.position);
-    const installing = 'readyAt' in mine;
     const color = mine.owner === viewer ? '#60dbe8' : '#ffac62';
     g.save();
     g.translate(p.x, p.y);
     g.scale(0.8, 0.8);
     g.translate(-12, -12);
     g.strokeStyle = color;
-    g.fillStyle = installing ? 'rgba(20,60,70,.12)' : 'rgba(20,60,70,.72)';
+    g.fillStyle = 'rgba(20,60,70,.12)';
     g.lineWidth = 1.2;
-    g.setLineDash(installing ? [2, 2] : []);
+    g.setLineDash([2, 2]);
     g.shadowBlur = 0;
     drawMineShape(g, scale >= 0.9);
     g.restore();

@@ -8,8 +8,9 @@ import { movementModule } from './movement';
 import { visibleState } from '../state/visibility';
 import { setStance } from '../state/diplomacy';
 import { radarSignatures, isVisibleTo } from '../state/visibility';
-import { rocketMinelayer } from '../state/ordnance';
+import { isRocketMineFleet, rocketMinelayer } from '../state/ordnance';
 import { shuttleModule } from './shuttle';
+import type { GameModule } from '../kernel/module';
 
 const HOUR = 3_600_000;
 const data = parseGameData({
@@ -23,6 +24,20 @@ const data = parseGameData({
     guard: {
       faction: 'x',
       stats: { hp: 100, attack: 1, defense: 1, speed: 100, pointDefense: 90 },
+    },
+    // SM-3.7a: стоящая мина — отряд из этого юнита; `mine` даёт ей правила мины-отряда.
+    rocket_mine: {
+      faction: 'neutral',
+      stats: { hp: 20, attack: 0, defense: 0, speed: 0 },
+      signature: 0.1,
+      traits: ['immobile', 'issued', 'mine', 'rocketMine'],
+    },
+    // Контактная мина (SM-3.6) — в неё ракетная мина не целится.
+    mine: {
+      faction: 'neutral',
+      stats: { hp: 20, attack: 0, defense: 0, speed: 0 },
+      signature: 0.1,
+      traits: ['immobile', 'issued', 'mine'],
     },
   },
   modules: {
@@ -124,6 +139,8 @@ function advance(s: GameState, now: number) {
 function armed(s = world(), mode: 'any' | 'confirmed' = 'any') {
   return advance(deploy(s, mode), HOUR / 4);
 }
+/** Стоящие ракетные мины — отряды во `fleets` (SM-3.7a). */
+const mines = (s: GameState) => Object.values(s.fleets).filter((f) => isRocketMineFleet(f, data));
 
 describe('legendary rocket mine', () => {
   it('requires a fitted module and a parked real road, charges once, and takes time', () => {
@@ -131,7 +148,7 @@ describe('legendary rocket mine', () => {
     const start = deploy(s);
     expect(s.ordnance).toBeUndefined();
     expect(start.players.p!.resources.metal).toBe(180);
-    expect(start.ordnance!.mines).toHaveLength(0);
+    expect(mines(start)).toHaveLength(0);
     expect(start.ordnance!.installations).toHaveLength(1);
     expect(advance(start, HOUR / 4 - 1).ordnance!.missiles).toHaveLength(0);
     s.fleets.layer!.units[0]!.modules = [];
@@ -157,7 +174,8 @@ describe('legendary rocket mine', () => {
     expect(
       act(world(), 'fleet.deployRocketMine', { fleetId: 'layer', mode: 'omniscient' }),
     ).toMatchObject({ ok: false, code: 'E_BAD_PAYLOAD' });
-    for (const mineId of ['missing', '__proto__'])
+    // Ни чужой флот, ни свой корабль, ни ключ прототипа — не мина.
+    for (const mineId of ['missing', '__proto__', 'constructor', 'target', 'layer'])
       expect(act(world(), 'rocketMine.mode', { mineId, mode: 'any' })).toMatchObject({
         ok: false,
         code: 'E_NO_ROCKET_MINE',
@@ -169,16 +187,17 @@ describe('legendary rocket mine', () => {
     if (!moved.ok) throw new Error(moved.code);
     const end = advance(moved.state, HOUR / 4);
     expect(end.ordnance!.installations).toHaveLength(0);
-    expect(end.ordnance!.mines).toHaveLength(0);
+    expect(mines(end)).toHaveLength(0);
     expect(end.ordnance!.missiles).toHaveLength(0);
   });
   it('launches on an anonymous signal only in any-signal mode', () => {
     const any = armed();
-    expect(any.ordnance!.mines).toHaveLength(0);
+    expect(mines(any)).toHaveLength(0);
+    expect(any.ordnance!.controls ?? {}).toEqual({});
     expect(any.ordnance!.missiles).toHaveLength(1);
     expect(any.ordnance!.missiles[0]).not.toHaveProperty('targetId');
     const confirmed = armed(world(), 'confirmed');
-    expect(confirmed.ordnance!.mines).toHaveLength(1);
+    expect(mines(confirmed)).toHaveLength(1);
     expect(confirmed.ordnance!.missiles).toHaveLength(0);
   });
   it('accepts own direct sight and current shared illumination, never stale memory', () => {
@@ -307,34 +326,47 @@ describe('legendary rocket mine', () => {
       code: 'E_MINES_COOLDOWN',
     });
     s.ordnance!.cooldowns.p = 0;
-    s.ordnance!.mines = Array.from({ length: 6 }, (_, n) => ({
-      id: `m${n}`,
-      owner: 'p',
-      moduleId: 'mine',
-      position: { x: n, y: 0 },
-    }));
+    // Пять стоящих мин и одна ставится — шестая установка упирается в лимит.
+    for (let n = 0; n < 5; n++)
+      s.fleets[`m${n}`] = {
+        id: `m${n}`,
+        owner: 'p',
+        location: null,
+        movement: null,
+        edge: { from: 'A', to: 'B', t: 0.1 + n / 10 },
+        units: [{ unit: 'rocket_mine', count: 1, modules: ['mine'] }],
+        traits: [],
+      };
     expect(act(s, 'fleet.deployRocketMine', { fleetId: 'second', mode: 'any' })).toMatchObject({
       code: 'E_MINE_LIMIT',
     });
   });
   it('changing mode fires at most once and disarm invalidates pending timers', () => {
     const s = armed(world(), 'confirmed');
-    const mineId = s.ordnance!.mines[0]!.id;
+    const mineId = mines(s)[0]!.id;
     expect(act(s, 'rocketMine.mode', { mineId, mode: 'any' }, 'q')).toMatchObject({
       code: 'E_NO_ROCKET_MINE',
     });
+    expect(act(s, 'rocketMine.disarm', { mineId }, 'q')).toMatchObject({ code: 'E_NO_ROCKET_MINE' });
     const switched = act(s, 'rocketMine.mode', { mineId, mode: 'any' });
     if (!switched.ok) throw new Error(switched.code);
     expect(advance(switched.state, HOUR).fleets.target!.units[0]!.hp).toBe(20);
     const disarmed = act(s, 'rocketMine.disarm', { mineId });
     if (!disarmed.ok) throw new Error(disarmed.code);
-    expect(advance(disarmed.state, HOUR).ordnance!.mines).toEqual([]);
+    // Снятая мина уходит с карты как отработавшая, а не как потеря флота.
+    expect(disarmed.events).toContainEqual({
+      type: 'fleet.destroyed',
+      payload: { fleetId: mineId, owner: 'p', spent: true },
+    });
+    const later = advance(disarmed.state, HOUR);
+    expect(mines(later)).toEqual([]);
+    expect(later.ordnance!.controls ?? {}).toEqual({});
     expect(disarmed.state.players.p!.resources.metal).toBe(180);
   });
   it('cannot finish installation without the module; stars scale the installed warhead', () => {
     const s = deploy();
     s.fleets.layer!.units[0]!.modules = [];
-    expect(advance(s, HOUR / 4).ordnance!.mines).toEqual([]);
+    expect(mines(advance(s, HOUR / 4))).toEqual([]);
     expect(advance(s, HOUR / 4).ordnance!.missiles).toEqual([]);
     const starred = structuredClone(data);
     starred.sectorZeroStars.steps = [{ chance: 1, warrants: 1, bonus: 0.1, pity: 0 }];
@@ -351,14 +383,21 @@ describe('legendary rocket mine', () => {
   });
   it('hides stationary mines until close approach and strips private timers and controls', () => {
     const s = armed(world(), 'confirmed');
+    const mineId = mines(s)[0]!.id;
+    expect(visibleState(s, 'q', data).fleets[mineId]).toBeUndefined();
     expect(visibleState(s, 'q', data).ordnance).toBeUndefined();
     s.fleets.target!.edge!.t = 0.54;
     const near = visibleState(s, 'q', data);
-    expect(near.ordnance!.mines).toHaveLength(1);
-    expect(near.ordnance!.mines[0]).not.toHaveProperty('mode');
-    expect(near.ordnance!.cooldowns).toEqual({});
+    // Вблизи мина видна отрядом, но её режим, следующий скан и боевая часть — нет.
+    expect(near.fleets[mineId]).toBeDefined();
+    expect(near.ordnance).toBeUndefined();
     s.fleets.target!.edge!.t = 0.7;
-    expect(visibleState(s, 'q', data).ordnance).toBeUndefined();
+    expect(visibleState(s, 'q', data).fleets[mineId]).toBeUndefined();
+    // Хозяину — и мина, и её управление.
+    expect(visibleState(s, 'p', data).ordnance!.controls?.[mineId]).toMatchObject({
+      mode: 'confirmed',
+      damage: 80,
+    });
   });
   it('mine emissions are the smallest: only a nearby sensitive radar gets an anonymous S blip', () => {
     const s = armed(world(), 'confirmed');
@@ -377,8 +416,9 @@ describe('legendary rocket mine', () => {
     });
     const mineOnly = structuredClone(s);
     delete mineOnly.fleets.layer;
+    // Отметка мины-отряда привязана к её узлу дороги, как у контактной мины (SM-3.6).
     expect(radarSignatures(mineOnly, 'q', sensorData)).toEqual([
-      { location: 'sensor', size: 'S', position: { x: 200, y: 0 } },
+      { location: 'A', size: 'S', position: { x: 200, y: 0 } },
     ]);
     sensorData.buildings.dish!.radarLevel = 2;
     expect(radarSignatures(mineOnly, 'q', sensorData)).toEqual([]);
@@ -401,5 +441,97 @@ describe('legendary rocket mine', () => {
     expect(seen.missiles[0]).not.toHaveProperty('damage');
     expect(seen.cooldowns).toEqual({});
     expect(visibleState(launch, 'ally', data).ordnance).toBeUndefined();
+  });
+
+  // SM-3.7a: стоящая ракетная мина — неподвижный отряд, как контактная (SM-3.6).
+  it('stands as a rocket_mine fleet at the carrier road point, doctrine and warhead kept apart', () => {
+    const s = armed(world(), 'confirmed');
+    const [mine] = mines(s);
+    expect(mine).toMatchObject({
+      owner: 'p',
+      location: null,
+      movement: null,
+      edge: { from: 'A', to: 'B', t: 0.5 },
+      units: [{ unit: 'rocket_mine', count: 1, modules: ['mine'] }],
+    });
+    expect(s.ordnance!.controls?.[mine!.id]).toMatchObject({ mode: 'confirmed', damage: 80 });
+    expect(s.ordnance!.controls?.[mine!.id]?.nextScanAt).toBeGreaterThan(s.time);
+    // Мина — отряд без приказов: ни хода (трейт `immobile`), ни повторной установки собой.
+    expect(act(s, 'fleet.move', { fleetId: mine!.id, to: 'A' })).toMatchObject({
+      code: 'E_FLEET_IMMOBILE',
+    });
+    expect(act(s, 'fleet.deployRocketMine', { fleetId: mine!.id, mode: 'any' })).toMatchObject({
+      code: 'E_MINE_PASSIVE',
+    });
+    expect(rocketMinelayer(mine!, data)).toBeNull();
+  });
+
+  it('never aims at a mine — contact or rocket — even in the any-signal mode', () => {
+    const s = world();
+    s.fleets.target!.units = [{ unit: 'mine', count: 3 }];
+    s.fleets.rival = {
+      id: 'rival',
+      owner: 'q',
+      location: null,
+      movement: null,
+      edge: { from: 'A', to: 'B', t: 0.6 },
+      units: [{ unit: 'rocket_mine', count: 1, modules: ['mine'] }],
+      traits: [],
+    };
+    const end = armed(s, 'any');
+    expect(end.ordnance!.missiles).toHaveLength(0);
+    expect(mines(end).filter((f) => f.owner === 'p')).toHaveLength(1);
+  });
+
+  it('a mine destroyed by someone else takes its controls with it', () => {
+    const killer: GameModule = {
+      id: 'killer',
+      version: '1.0.0',
+      setup(api) {
+        api.onAction('test.kill', (action, h) => {
+          const { fleetId } = action.payload as { fleetId: string };
+          const owner = h.state.fleets[fleetId]!.owner;
+          delete h.state.fleets[fleetId];
+          h.emit('fleet.destroyed', { fleetId, owner });
+        });
+      },
+    };
+    const both = createKernel([movementModule, rocketMinesModule, killer]);
+    const s = armed(world(), 'confirmed');
+    const mineId = mines(s)[0]!.id;
+    const r = both.applyAction(
+      s,
+      { id: 's:q:1', playerId: 'q', type: 'test.kill', payload: { fleetId: mineId }, issuedAt: s.time },
+      { now: s.time, data },
+    );
+    if (!r.ok) throw new Error(r.code);
+    expect(r.state.ordnance!.controls ?? {}).toEqual({});
+  });
+
+  it('a world saved before SM-3.7a — no controls, a stale mines list — still projects and deploys', () => {
+    // A Sector Zero run snapshot outlives updates: its ordnance has the old shape.
+    const old = world();
+    old.ordnance = {
+      serials: {},
+      cooldowns: {},
+      installations: [],
+      missiles: [],
+      mines: [{ id: 'rocketMine:p:9', owner: 'p', moduleId: 'mine', position: { x: 200, y: 0 }, mode: 'any' }],
+    } as unknown as GameState['ordnance'];
+    expect(() => visibleState(old, 'p', data)).not.toThrow();
+    // The stale record reaches nobody, not even through the opponent's projection.
+    expect(visibleState(old, 'q', data).ordnance).toBeUndefined();
+    const placed = armed(old, 'confirmed');
+    expect(mines(placed)).toHaveLength(1);
+    expect(Object.keys(placed.ordnance!.controls!)).toEqual([mines(placed)[0]!.id]);
+  });
+
+  it("is its owner's radar: a contact beyond its sight shows as a blip", () => {
+    const s = armed(world(), 'confirmed');
+    // Цель в 80 от мины: дальше её глаза (20), но в её радаре (120).
+    expect(isVisibleTo(s, 'p', { fleetId: 'target' }, data)).toBe(false);
+    expect(radarSignatures(s, 'p', data)).toContainEqual(
+      expect.objectContaining({ position: { x: 280, y: 0 } }),
+    );
   });
 });

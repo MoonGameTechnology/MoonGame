@@ -714,6 +714,7 @@ export {
 export {
   isMineFleet,
   mineFleetVisible,
+  mineDetectionRange,
   MINE_UNIT,
   MINE_TRAIT,
   MINE_DETECTION_RANGE,
@@ -753,8 +754,21 @@ export {
 } from './util/pveStaging';
 
 export { rocketMinesModule } from './modules/rocketMines';
-export { rocketMinelayer, missilePositionAt, mineVisibleTo } from './state/ordnance';
-export type { RocketMine, MineMissile, MineInstallation, RocketMineMode, OrdnanceState } from './state/ordnance';
+export {
+  rocketMinelayer,
+  rocketMineModule,
+  isRocketMineFleet,
+  missilePositionAt,
+  ROCKET_MINE_UNIT,
+  ROCKET_MINE_TRAIT,
+} from './state/ordnance';
+export type {
+  RocketMineControl,
+  MineMissile,
+  MineInstallation,
+  RocketMineMode,
+  OrdnanceState,
+} from './state/ordnance';
 
 export { attacks, combatantKey } from './state/battle';
 export { inspectBattle, type BattleReadout, type BattleModifier } from './state/battleReadout';

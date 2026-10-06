@@ -4,8 +4,8 @@ import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
-import { emptyOrdnance, inRadius, mineVisibleTo, missilePositionAt } from './ordnance';
-import { visibleMinefields, isMineFleet, mineFleetVisible, MINE_DETECTION_RANGE } from './minefields';
+import { emptyOrdnance, inRadius, missilePositionAt, rocketMineModule } from './ordnance';
+import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 export type { SignatureContact, SignatureSize } from './radarSignals';
 import type { DomainEvent } from '../action/types';
@@ -277,18 +277,20 @@ function playerCircles(
     circle({ kind: 'world', id: planet.id }, planet.position, worldSightOf(rules, planet.kind), radar);
   }
   for (const fleet of Object.values(state.fleets)) {
-    // Мина не глаз: своих кругов зрения у неё нет (SM-3.6).
-    if (fleet.owner !== ownerId || isMineFleet(fleet, data)) continue;
+    if (fleet.owner !== ownerId) continue;
     // Круг стоит там, где КОРАБЛЬ, а не в узле назначения и не в ближайшем узле.
     const pos = fleetPosition(state, fleet);
+    if (isMineFleet(fleet, data)) {
+      // Контактная мина не глаз (SM-3.6). Ракетная — глаз и радар своего модуля, как и
+      // прежде, когда она лежала вне `fleets` (SM-3.7a): опознаёт по позиции (`seesByPosition`).
+      const rocket = rocketMineModule(fleet, data);
+      if (rocket && pos) out.push({
+        owner: ownerId, source: { kind: 'mine', id: fleet.id }, ...pos,
+        identify: rocket.def.sightRange, signature: rocket.def.radarRange,
+      });
+      continue;
+    }
     if (pos) circle({ kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
-  }
-  for (const mine of state.ordnance?.mines ?? []) {
-    const def = data.modules[mine.moduleId]?.rocketMine;
-    if (mine.owner === ownerId && def) out.push({
-      owner: ownerId, source: { kind: 'mine', id: mine.id }, ...mine.position,
-      identify: def.sightRange, signature: def.radarRange,
-    });
   }
   // SHU-6.7: висящий патруль шаттлов — глаза эскадры над её точкой. Круг тот же, в котором
   // патруль бьёт (`patrol.radius`), и это глаза, а не радар: опознание и засечка совпадают,
@@ -463,17 +465,19 @@ export function radarSources(
       }
     }
     for (const fleet of Object.values(state.fleets)) {
-      if (fleet.owner !== owner || isMineFleet(fleet, data)) continue;
+      if (fleet.owner !== owner) continue;
       const at = fleetPosition(state, fleet);
       if (!at) continue;
+      if (isMineFleet(fleet, data)) {
+        // Радар у мины — только у ракетной, своего модуля (SM-3.7a), без множителей игрока.
+        const rocket = rocketMineModule(fleet, data);
+        if (rocket) sources.push({ ...at, range: rocket.def.radarRange, level: rocket.def.radarLevel });
+        continue;
+      }
       for (const stack of fleet.units) {
         const def = data.units[stack.unit];
         if (def && stack.count > 0) add(at, stackRadarRange(def, stack, data), def.radarLevel);
       }
-    }
-    for (const mine of state.ordnance?.mines ?? []) {
-      const def = data.modules[mine.moduleId]?.rocketMine;
-      if (mine.owner === owner && def) sources.push({ ...mine.position, range: def.radarRange, level: def.radarLevel });
     }
   }
   return sources;
@@ -493,7 +497,7 @@ export function radarSignatures(
   // A fleet in the viewer's own battle is shown in full (`engagementOf`) — no blip on top.
   const engaged = engagementOf(state, viewerId).fleets;
   const emitters: SignalEmitter[] = [];
-  const mineEmitters: SignalEmitter[] = [];
+  const mineEmitters: Array<{ emitter: SignalEmitter; reach: number }> = [];
   for (const fleet of Object.values(state.fleets)) {
     if (fleet.owner === viewerId) continue;
     // Мина (SM-3.6): видимая вблизи — полностью, иначе — слабая отметка, которую ловит
@@ -502,7 +506,13 @@ export function radarSignatures(
       const node = fleetNode(state, fleet);
       const at = fleetPosition(state, fleet);
       if (node === null || !at || mineFleetVisible(state, fleet, viewerId, data)) continue;
-      mineEmitters.push({ location: node, ...at, inTransit: !!fleet.edge, strength: fleetSignalStrength(fleet, data) });
+      // Ракетная мина излучает по своему модулю (`mineSignature`), контактная — по юниту.
+      const rocket = rocketMineModule(fleet, data);
+      const strength = rocket ? rocket.def.mineSignature : fleetSignalStrength(fleet, data);
+      mineEmitters.push({
+        emitter: { location: node, ...at, inTransit: !!fleet.edge, strength },
+        reach: mineDetectionRange(fleet, data),
+      });
       continue;
     }
     // Опознанный кругом мины или патруля виден целиком — отметка поверх была бы вторым
@@ -528,22 +538,8 @@ export function radarSignatures(
   const contacts = detectSignals(emitters, sources);
   // Mines have the lowest emission and can be picked up only at close range.
   // A coarse blip carries no mine id, owner, launch doctrine or module configuration.
-  for (const mine of state.ordnance?.mines ?? []) {
-    if (mine.owner === viewerId || mineVisibleTo(state, mine, viewerId, data)) continue;
-    const def = data.modules[mine.moduleId]?.rocketMine;
-    if (!def) continue;
-    let nearest: Planet | undefined;
-    let best = Infinity;
-    for (const node of Object.values(state.planets)) {
-      const d2 = (node.position.x - mine.position.x) ** 2 + (node.position.y - mine.position.y) ** 2;
-      if (d2 < best) { best = d2; nearest = node; }
-    }
-    if (!nearest) continue;
-    contacts.push(...detectSignals([{ ...mine.position, location: nearest.id, inTransit: true, strength: def.mineSignature }],
-      sources.map((r) => ({ ...r, range: Math.min(r.range, def.detectionRange) }))));
-  }
-  for (const emitter of mineEmitters)
-    contacts.push(...detectSignals([emitter], sources.map((r) => ({ ...r, range: Math.min(r.range, MINE_DETECTION_RANGE) }))));
+  for (const { emitter, reach } of mineEmitters)
+    contacts.push(...detectSignals([emitter], sources.map((r) => ({ ...r, range: Math.min(r.range, reach) }))));
   return contacts;
 }
 
@@ -691,12 +687,10 @@ export function visibleOrdnance(state: GameState, viewerId: PlayerId, data: Game
     if (source.serials[viewerId] !== undefined) ord.serials[viewerId] = source.serials[viewerId]!;
     if (source.cooldowns[viewerId] !== undefined) ord.cooldowns[viewerId] = source.cooldowns[viewerId]!;
     ord.installations = cloned.installations.filter((m) => m.owner === viewerId);
-    ord.mines = cloned.mines.filter((m) => mineVisibleTo(state, m, viewerId, data));
-    for (const m of ord.mines) if (m.owner !== viewerId) {
-      delete m.mode;
-      delete m.nextScanAt;
-      delete m.damage;
-    }
+    // The standing mine itself is a fleet (SM-3.7a) and passes the fleet fog («только
+    // вблизи»); its doctrine, next scan and warhead stay with its owner.
+    for (const [id, control] of Object.entries(cloned.controls ?? {}))
+      if (state.fleets[id]?.owner === viewerId) (ord.controls ??= {})[id] = control;
     const circles = sightCircles(state, viewerId, data);
     const sensors = radarSources(state, viewerId, data);
     ord.missiles = cloned.missiles.filter((m) => {
@@ -720,7 +714,7 @@ export function visibleOrdnance(state: GameState, viewerId: PlayerId, data: Game
       delete m.hp;
       m.id = `incoming:${m.launchedAt}:${m.from.x}:${m.from.y}:${m.to.x}:${m.to.y}:${m.arrivesAt}`;
     }
-    if (ord.mines.length || ord.missiles.length || ord.installations.length || Object.keys(ord.serials).length || Object.keys(ord.cooldowns).length) return ord;
+    if (Object.keys(ord.controls ?? {}).length || ord.missiles.length || ord.installations.length || Object.keys(ord.serials).length || Object.keys(ord.cooldowns).length) return ord;
     return undefined;
   }
 }

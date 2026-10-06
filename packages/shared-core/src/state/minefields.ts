@@ -26,7 +26,23 @@ export function isMineFleet(fleet: Pick<Fleet, 'units'>, data: GameData): boolea
 }
 
 /**
- * Видна ли чужая мина: только если свой флот стоит не дальше `MINE_DETECTION_RANGE` от неё
+ * С какого расстояния чужой флот замечает мину. Контактная — `MINE_DETECTION_RANGE`;
+ * ракетная (SM-3.7a) — дальность из своего модуля (`rocketMine.detectionRange`): её числа
+ * живут в данных модуля, как и прежде, когда она лежала вне `fleets`.
+ */
+export function mineDetectionRange(mine: Pick<Fleet, 'units'>, data: GameData): number {
+  for (const st of mine.units) {
+    if (!(st.count > 0)) continue;
+    for (const id of st.modules ?? []) {
+      const reach = data.modules[id]?.rocketMine?.detectionRange;
+      if (reach !== undefined) return reach;
+    }
+  }
+  return MINE_DETECTION_RANGE;
+}
+
+/**
+ * Видна ли чужая мина: только если свой флот стоит не дальше `mineDetectionRange` от неё
  * (решение владельца 2026-09-30: «только вблизи»). Опознанный узел, окно шпионажа и союзник
  * её не раскрывают — иначе мина перестала бы быть ловушкой. Свои мины сенсором не служат.
  */
@@ -34,10 +50,11 @@ export function mineFleetVisible(state: GameState, mine: Fleet, viewer: string, 
   if (mine.owner === viewer) return true;
   const at = fleetPositionAt(state, mine, state.time);
   if (!at) return false;
+  const reach = mineDetectionRange(mine, data);
   return Object.values(state.fleets).some((f) => {
     if (f.owner !== viewer || !f.units.some((u) => u.count > 0) || isMineFleet(f, data)) return false;
     const pos = fleetPositionAt(state, f, state.time);
-    return !!pos && (pos.x - at.x) ** 2 + (pos.y - at.y) ** 2 <= MINE_DETECTION_RANGE ** 2;
+    return !!pos && (pos.x - at.x) ** 2 + (pos.y - at.y) ** 2 <= reach ** 2;
   });
 }
 
