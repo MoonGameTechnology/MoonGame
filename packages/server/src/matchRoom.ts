@@ -415,6 +415,19 @@ const PERF_SAMPLE_MIN_MS = 5_000;
  *  lasts is still caught at the next hashed delta. Full snapshots are always hashed. */
 const STATE_HASH_EVERY_MS = 3_000;
 
+/** Construction and production are intel (RECAP-FOG: the `own` class of
+ *  `prototype/src/recapGate.ts`). What an owner built, upgraded, produced or dropped from
+ *  a loading order, an observer of the world learns from its fogged state (the building,
+ *  the garrison), never as news: the client already hides a foreign one, so the server
+ *  does not send it either. Every emitter names the acting player in `owner`. */
+export const OWNER_ONLY_EVENTS: ReadonlySet<string> = new Set([
+  'building.constructed',
+  'building.upgraded',
+  'unit.built',
+  'army.load.cancelled',
+  'army.unload.cancelled',
+]);
+
 export class MatchRoom {
   readonly id: string;
 
@@ -1869,6 +1882,8 @@ export class MatchRoom {
   /** Whether a domain event may be revealed to `playerId` — events leak intent
    *  too, so they pass the same fog as state: your own actions, anything at a
    *  world you identify, and global clock/match events; everything else is cut.
+   *  Hero events and construction/production (`OWNER_ONLY_EVENTS`) reach their owner
+   *  only, even at an identified world.
    *
    *  ⚠ CONVENTION COUPLING: this filter reads the payload KEY NAMES every core
    *  module uses today (audience: `owner`/`playerId`/`a`/`b`/`from`/`to`/
@@ -1891,6 +1906,8 @@ export class MatchRoom {
     // (`at`) and fleet, which the fog projection deliberately hides from everyone
     // else — an identified-node match must NOT reveal them.
     if (event.type.startsWith('hero.')) return p.owner === playerId;
+    // Construction and production: owner-only too, for the same reason (OWNER_ONLY_EVENTS).
+    if (OWNER_ONLY_EVENTS.has(event.type)) return p.owner === playerId;
     if (p.owner === playerId) return true;
     // Personal and bilateral events name their audience with these keys (research,
     // steward, elimination, diplomacy offers/changes, market trades) — a named

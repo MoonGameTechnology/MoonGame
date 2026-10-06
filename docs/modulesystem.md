@@ -173,7 +173,11 @@ computeSpeed(флот):
 - **бой** — `battleId`: видно тому, кто видит этот бой в своей проекции (участник видит
   свой бой всегда — `engagementOf`), в том числе кадром раньше: `battle.resolved`
   приходит, когда боя в состоянии уже нет;
-- `time.advanced` и `match.*` — глобальные (видны всем); `hero.*` — строго owner-only.
+- `time.advanced` и `match.*` — глобальные (видны всем); `hero.*` — строго owner-only;
+  стройка и производство (`OWNER_ONLY_EVENTS` в `matchRoom.ts`: `building.constructed`,
+  `building.upgraded`, `unit.built`, `army.load.cancelled`, `army.unload.cancelled`) — тоже
+  только владельцу, даже на опознанном мире: это разведданные, результат наблюдатель
+  видит в состоянии. Такие события обязаны нести `owner`.
 
 Новый модуль обязан называть ключи payload по этой конвенции. Ключ вне списка
 (например `target` или `recipient`) фильтр не читает — событие будет **молча скрыто**
