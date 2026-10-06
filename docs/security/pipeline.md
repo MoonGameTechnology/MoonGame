@@ -785,6 +785,21 @@ override не нужен (прецедент `ip-address` выше): lockfile о
 `pnpm update -r --depth Infinity source-map-js` до 1.2.2, хеш сверен с реестром. Вердикт —
 _true positive_, подавлять нечего.
 
+**Запись триажа (2026-10-06) — HIGH в `sharp` из `mobile/`, починено подъёмом пола
+override.** В фиде появился `CVE-2026-96889` (GHSA-wq5f-xc86-pv6w, CVSS 8.9) в `sharp`
+0.35.4: use-after-free во встроенном librsvg при разборе SVG, фикс — 0.35.5 (внутри
+librsvg 2.63.2). На открытых PR (#1498, #1499) упали два чека: шаг `Dependency audit
+(OSV-Scanner)` джобы `lint · typecheck · test · audit` (шаг `Gate (…)` в ней зелёный) и
+`SCA — osv.dev (OSV-Scanner)`. Образ не задет: `sharp` нет в `pnpm-lock.yaml`, он живёт
+только в dev-дереве `mobile/package-lock.json` (его берёт `@capacitor/assets` для иконок
+APK).
+
+Версию держит сам пол `"sharp": "^0.35.4"` в `overrides` файла `mobile/package.json` — он
+поднимает `sharp` над собственным 0.32.6 у `@capacitor/assets`. Поэтому правка — поднять
+пол до `^0.35.5` и дописать шаг в `comments.overrides` того же файла; lockfile обновлён
+`npm install --package-lock-only`. Переехали ровно `sharp`, его платформенные бинарники
+`@img/sharp-*` и libvips 1.3.3 → 1.3.4. Вердикт — _true positive_, подавлять нечего.
+
 **Запись триажа (SEC-22, 2026-08-11) — две LOW в glibc закрыли очередь мержа целиком.**
 Между 2026-08-10 04:07 и 2026-08-11 09:09 UTC в фиде появились `CVE-2026-6368` и
 `CVE-2026-6791` — обе в `wordexp()` пакета `libc6` базового образа. Код репозитория при
