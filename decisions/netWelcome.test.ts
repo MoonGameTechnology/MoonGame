@@ -10,7 +10,12 @@ const состояние = (over: Partial<WelcomeState> = {}): WelcomeState => (
 
 describe('приветственный снимок', () => {
   it('ПЕРВЫЙ снимок — это вход: место занято, звучит фанфара', () => {
-    expect(welcomePlan(состояние())).toEqual({ admit: true, fanfare: true, banner: null });
+    expect(welcomePlan(состояние())).toEqual({
+      admit: true,
+      fanfare: true,
+      banner: null,
+      catchUp: false,
+    });
   });
 
   it('ВХОД РОВНО ОДИН РАЗ НА СОКЕТ: иначе игра сбрасывалась бы на каждом снимке', () => {
@@ -18,6 +23,7 @@ describe('приветственный снимок', () => {
       admit: false,
       fanfare: false,
       banner: null,
+      catchUp: false,
     });
   });
 
@@ -31,6 +37,22 @@ describe('приветственный снимок', () => {
     expect(welcomePlan(состояние({ admitted: true, banner: '⟳ переподключение…' })).banner).toBe(
       '⟳ переподключение…',
     );
+  });
+});
+
+describe('пропущенное в обрыве досказывает только переподключение', () => {
+  it('ПЕРЕПОДКЛЮЧЕНИЕ сравнивает снимок с миром до обрыва: события обрыва потеряны', () => {
+    expect(welcomePlan(состояние({ reconnecting: true })).catchUp).toBe(true);
+  });
+
+  it('ПЕРВЫЙ ВХОД не сравнивает: прежний мир клиента — хаб или прошлая схватка', () => {
+    // Второй игрок сетевой партии получал «Стойка изменена: Мир» от каждого бота.
+    expect(welcomePlan(состояние()).catchUp).toBe(false);
+  });
+
+  it('ДЕЛЬТА не сравнивает: её события доходят сами, сравнение повторяло бы новость', () => {
+    expect(welcomePlan(состояние({ admitted: true })).catchUp).toBe(false);
+    expect(welcomePlan(состояние({ admitted: true, reconnecting: true })).catchUp).toBe(false);
   });
 });
 
@@ -62,6 +84,7 @@ describe('исход определён на любом сочетании пр�
           const план = welcomePlan({ admitted, reconnecting, banner });
           expect(план.admit).toBe(!admitted);
           expect(план.fanfare && !план.admit).toBe(false); // фанфара — только на входе
+          expect(план.catchUp).toBe(план.admit && !план.fanfare); // досказ — молчаливый вход
           // чужой баннер переживает любой снимок
           if (banner === '⏳ ж…') expect(план.banner).toBe(banner);
         }
