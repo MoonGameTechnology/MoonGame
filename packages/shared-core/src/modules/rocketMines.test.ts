@@ -793,6 +793,16 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     expect(r.state.ordnance!.warheads ?? {}).toEqual({});
     expect(r.events.map((e) => e.type)).not.toContain('rocketMine.hit');
     expect(r.state.fleets.target!.units[0]!.hp).toBeUndefined();
+    // Сбитая ракета уходит отработавшей, как после попадания: «флот уничтожен» о ней не
+    // пишется, конец объявляет своя строка — хозяину ракеты и хозяину челноков.
+    expect(r.events).toContainEqual({
+      type: 'fleet.destroyed',
+      payload: { fleetId: m.id, owner: 'p', spent: true },
+    });
+    expect(r.events).toContainEqual({
+      type: 'shuttle.missileDowned',
+      payload: { owner: 'q', playerId: 'p', missileId: m.id },
+    });
   });
 
   it('a shuttle strike by order finds it only in sight — its id is predictable', () => {

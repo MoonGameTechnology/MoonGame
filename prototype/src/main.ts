@@ -4439,6 +4439,11 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       }
+      // Ракету сбили челноки (SM-3.7b): одна строка обеим сторонам, как у перехвата ПРО.
+      // `fleet.destroyed` следом помечен `spent` — «флот уничтожен» о ней не пишется.
+      case 'shuttle.missileDowned':
+        if (p.owner === ME || p.playerId === ME) note(t('log.shuttle.missile-downed'));
+        break;
       // «Держать патруль» снят ядром (SHU-6.6): помеха сама не пройдёт — эскадра больше не
       // висит, точка за радиусом. Без строки игрок ждал бы патруль над базой, который уже
       // не встанет, и не знал бы почему.
@@ -11344,8 +11349,9 @@ function selectAt(mx: number, my: number) {
     const kind = allyAim;
     drop('allyAim');
     const ally = linkedAlly(s, ME);
-    // Цель — только видимый флот, как у «Атаки» и удара челноков (ревью #1411).
-    const fleets = Object.values(s.fleets).filter(fleetSeen);
+    // Цель — только видимый флот, как у «Атаки» и удара челноков (ревью #1411). Ракета
+    // (SM-3.7b) целью приказа не бывает (`ally.order`): тап по ней ищет мир под ней.
+    const fleets = Object.values(s.fleets).filter((f) => fleetSeen(f) && !isMissileFleet(f, data));
     const pool =
       kind === 'guard'
         ? fleets.filter((f) => f.owner === ME || f.owner === ally)

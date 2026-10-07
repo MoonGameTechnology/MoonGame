@@ -1027,6 +1027,20 @@ function launchFlight(
 }
 
 /**
+ * Сбитая ракета (SM-3.7b) уходит с карты отработавшей — `spent`, как после попадания и
+ * перехвата ПРО: «☠️ флот уничтожен» читался бы потерей флота, которой не было. Конец ракеты
+ * объявляет своя строка, обеим сторонам — как перехват ПРО (`rocketMine.intercepted`):
+ * `owner` — хозяин челноков, как у прочих событий `shuttle.*`, `playerId` — хозяин ракеты.
+ */
+function downMissile(h: HandlerContext, strike: ShuttleStrike, missileId: string): void {
+  const missile = h.state.fleets[missileId];
+  if (!missile || missile.units.length > 0) return;
+  delete h.state.fleets[missileId];
+  h.emit('fleet.destroyed', { fleetId: missileId, owner: missile.owner, spent: true });
+  h.emit('shuttle.missileDowned', { owner: strike.owner, playerId: missile.owner, missileId });
+}
+
+/**
  * УДАР ВЫЛЕТА ПО ФЛОТУ — урон, гибель цели и её ответка. Один на удар по прибытии и на
  * тик патруля (SHU-6.2): `share` — доля обычного удара (у удара 1, у тика ¼), и ответка
  * берётся той же долей. Две копии этих строк разъехались бы на первой правке урона.
@@ -1037,6 +1051,8 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
   // считаются из состояния до отрезка.
   const answer = returnFireAgainstFleet(target, h.ctx.data) * share;
   const power = strikePower(strike, h.ctx.data, 'fleet') * share;
+  // Ракету узнаём ДО удара: у добитого отряда не остаётся юнитов, по которым её узнать.
+  const missile = isMissileFleet(target, h.ctx.data);
   if (power > 0) {
     const dealt = hookedDamage(h, power, {
       phase: 'shuttle',
@@ -1063,7 +1079,8 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
       undefined,
       strike.owner,
     );
-    removeIfWiped(h, target.id);
+    if (missile) downMissile(h, strike, target.id);
+    else removeIfWiped(h, target.id);
   }
   repelStrike(h, strike, answer, {
     kind: 'fleet',
@@ -1402,7 +1419,8 @@ export const shuttleModule: GameModule = {
   //        `origin`/`baseAt`, событие `shuttle.diverted`; опустевшая база снимает счётчик.
   // 1.8.0: «Держать патруль» (SHU-6.6) — `hold` у патруля и эскадры, `shuttle.hold`,
   //        событие расписания `shuttle.patrol.resume`; отзыв снимает удержание.
-  // 1.9.0: ракета — отряд (SM-3.7b): удар приказом бьёт её только видимой.
+  // 1.9.0: ракета — отряд (SM-3.7b): удар приказом бьёт её только видимой; сбитая уходит
+  //        отработавшей (`spent`) со своей строкой `shuttle.missileDowned`.
   version: '1.9.0',
   setup(api) {
     /**
