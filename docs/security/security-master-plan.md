@@ -60,19 +60,14 @@ golden-RNG и **replay-проверкой** (`RPL-1..4`), property/fuzz-тест
 (`SEC-3/5/7`); анти-сговор `E_BOT_ALLIANCE` (коалиции — только люди); A06-контроли
 (opaque reject-коды `SEC-A06-1`, cap ордеров `SEC-A06-2`).
 
-**Разрыв — «построено ≠ включено».** В коде auth, gate, TLS, `SEAT_LOCK` — opt-in:
-`pnpm host` / `prototype/netserver` без переменных пускает по нику **без пароля** и
-принимает bare-actions (readiness-gap #1). Compose-деплой включает `GATE`, `SEAT_LOCK` и
-`PROD=1` по умолчанию, но установщик `deploy/install-ubuntu.sh` ставит `PROD=0`.
-
-**Свежая карта по зонам** (что в проде, где течёт, zero trust, 14 находок со сверкой
-2026-10-07) — [`security-map-2026-10-07.md`](security-map-2026-10-07.md).
+**Разрыв — «построено ≠ включено».** Auth, gate, TLS, `SEAT_LOCK` — **opt-in / off по
+умолчанию**. Реально играбельный путь (`pnpm host` / `prototype/netserver`) пускает по
+нику **без пароля** и принимает bare-actions (readiness-gap #1). Это — приоритет №1.
 
 **Не построено (профиль детекции/инфры):** анти-cheat rate-shaping и аномалия-детект
 (`GI-0.1`,`GI-1.x` 🔴); анти-мультиаккаунт/боты (`GI-2.x` 🔒); durable action-log для
 audit-replay/отката (`RPL-5`/`PE-1.1` 🔒 — квитанции пишутся без type/payload/time);
-секрет-стор/ротация (`SE-2.x`); БД-хардненинг, PITR и DR (`SE-3.x`,`SE-9.x`; шифрованные
-бэкапы с учением восстановления уже есть — `deploy/backup.sh`); алертинг
+секрет-стор/ротация (`SE-2.x`); БД-хардненинг/бэкапы/DR (`SE-3.x`,`SE-9.x`); алертинг
 (`SE-8.x`); OIDC-identity; multi-process scale (pg-boss); CSP/Trusted Types (`SE-7.x`);
 TLS на self-host (`HTTPS-2.x/5.x`).
 
