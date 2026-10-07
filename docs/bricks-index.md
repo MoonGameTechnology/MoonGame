@@ -51,7 +51,7 @@
 | REFM-211 | ✅ | proto | `docs/backlog.md` | Оболочка Sector Zero |
 | REFM-212 | ✅ | proto | `docs/backlog.md` | Экран настройки схватки |
 | REFM-213 | ✅ | proto | `docs/backlog.md` | Сохранение схватки |
-| REFM-214 | ⏳ | proto | `docs/backlog.md` | Дипломатия и связь |
+| REFM-214 | 🔶 | proto | `docs/backlog.md` | Дипломатия и связь |
 | REFM-215 | ✅ | proto | `docs/backlog.md` | Сессия аккаунта |
 | REFM-216 | 🔒 | proto | `docs/backlog.md` | Сетевой жизненный цикл |
 | REFM-217 | 🔒 | proto | `docs/backlog.md` | Обзор партий и выбор места |
