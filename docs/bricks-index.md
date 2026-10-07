@@ -51,9 +51,9 @@
 | REFM-211 | ✅ | proto | `docs/backlog.md` | Оболочка Sector Zero |
 | REFM-212 | ✅ | proto | `docs/backlog.md` | Экран настройки схватки |
 | REFM-213 | ✅ | proto | `docs/backlog.md` | Сохранение схватки |
-| REFM-214 | 🔶 | proto | `docs/backlog.md` | Дипломатия и связь |
+| REFM-214 | ✅ | proto | `docs/backlog.md` | Дипломатия и связь |
 | REFM-215 | ✅ | proto | `docs/backlog.md` | Сессия аккаунта |
-| REFM-216 | 🔒 | proto | `docs/backlog.md` | Сетевой жизненный цикл |
+| REFM-216 | ⏳ | proto | `docs/backlog.md` | Сетевой жизненный цикл |
 | REFM-217 | 🔒 | proto | `docs/backlog.md` | Обзор партий и выбор места |
 | REFM-218 | ⏳ | proto | `docs/backlog.md` | Страницы входа |
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
@@ -67,7 +67,7 @@
 | REFM-227 | 🔒 | proto | `docs/backlog.md` | Ряд команд: нажатия и мобильные приказы |
 | REFM-228 | ⏳ | proto | `docs/backlog.md` | Приказы группе |
 | REFM-229 | ⏳ | proto | `docs/backlog.md` | Композер цепочек «Приказ» |
-| REFM-230 | 🔒 | proto | `docs/backlog.md` | Реакция на события мира и лента |
+| REFM-230 | ⏳ | proto | `docs/backlog.md` | Реакция на события мира и лента |
 | REFM-231 | ⏳ | proto | `docs/backlog.md` | Камера и туман |
 | REFM-232 | 🔒 | proto | `docs/backlog.md` | Статический голографический слой |
 | REFM-233 | 🔒 | proto | `docs/backlog.md` | Наложения |

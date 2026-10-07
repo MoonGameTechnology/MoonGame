@@ -203,7 +203,14 @@ describe('format — имена и время', () => {
 // СЛОВОМ. Скан по исходникам экранов — потому что «забыл про одну поверхность» это
 // ровно тот способ, которым правило и разъезжается (так уже было с ценниками).
 describe('UI-RES2 — сторож: ресурс не печатается словом', () => {
-  const SRC = ['dossiers.ts', 'buildScreen.ts', 'main.ts', 'techTree.ts', 'marketScreen.ts'];
+  const SRC = [
+    'dossiers.ts',
+    'buildScreen.ts',
+    'main.ts',
+    'diploWindow.ts',
+    'techTree.ts',
+    'marketScreen.ts',
+  ];
   const read = (f: string): string => readFileSync(new URL(`./${f}`, import.meta.url), 'utf8');
 
   it('никто не собирает строку выработки/содержания вручную через tData(ресурс)', () => {
