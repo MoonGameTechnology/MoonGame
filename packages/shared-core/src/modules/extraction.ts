@@ -26,7 +26,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { GameState, PlayerId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { getStance } from '../state/diplomacy';
-import { rejectMine } from '../util/fleet';
+import { fleetForOrder, rejectMine } from '../util/fleet';
 
 /** Сколько мс работы нужно на извлечение (часы карты под темп матча). */
 export function extractionNeedMs(
@@ -67,7 +67,8 @@ function deliver(h: HandlerContext): void {
 export const extractionModule: GameModule = {
   id: 'extraction',
   // 1.1.0: мина не берёт груз хранилища — она без приказов (`E_MINE_PASSIVE`, ревью #1411).
-  version: '1.1.0',
+  // 1.2.0: чужая ракета (SM-3.7b) — как отсутствующий флот (`E_NO_FLEET`).
+  version: '1.2.0',
   setup(api) {
     api.onAction('extraction.start', (action, h) => {
       const { fleetId } = (action.payload ?? {}) as { fleetId?: unknown };
@@ -78,7 +79,7 @@ export const extractionModule: GameModule = {
       if (!player || player.npc || player.status !== 'active') return h.reject('E_FORBIDDEN');
       if (ex.carrier !== undefined || ex.deliveredAt !== undefined || ex.lostAt !== undefined)
         return h.reject('E_ALREADY');
-      const fleet = h.state.fleets[fleetId];
+      const fleet = fleetForOrder(h.state, fleetId, action.playerId, h.ctx.data);
       if (!fleet) return h.reject('E_NO_FLEET');
       if (fleet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
       rejectMine(h, fleet);

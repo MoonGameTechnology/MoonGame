@@ -318,6 +318,16 @@ describe('приказ союзнику (PVR-7.4)', () => {
       ok: false,
       code: 'E_BAD_TARGET',
     });
+    // Ракета того, с кем союзник НЕ воюет, — тот же отказ, что несуществующий флот, а не
+    // «не враг»: иначе перебор id находил бы скрытые пуски (замечание Codex на #1503).
+    s.players.p3 = player('p3');
+    setStance(s, 'ally', 'p3', 'peace');
+    s.fleets['fleet:missile:0:3'] = missile('fleet:missile:0:3', 'p3');
+    for (const id of ['fleet:missile:0:3', 'fleet:missile:0:404'])
+      expect(order(s, { kind: 'attack', fleet: id })).toMatchObject({
+        ok: false,
+        code: 'E_BAD_TARGET',
+      });
     expect(s.allyOps).toBeUndefined();
   });
 

@@ -34,7 +34,7 @@ import { defHasTrait } from '../data/traits';
 import { heroByFleet } from '../state/heroes';
 import { shipsEngaged } from '../state/battle';
 import { isHostile, ownFleet } from '../util/combat';
-import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
+import { fleetForOrder, garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, loadoutKey } from '../util/stacks';
 import { emplacedFleet, fuseFleets } from '../util/fleetMerge';
 import { hangarSize, strikesReserved } from '../state/shuttle';
@@ -51,7 +51,8 @@ export const fleetOpsModule: GameModule = {
   // (ATK-3).
   // 1.9.0: «разминулись» решает прибытие — конец боя или высадки не снимает намерение
   // слияния с догоняющего в пути (ревью #1417).
-  // 1.10.0: «Атака» по ракете — отказ `E_NO_FLEET`, как по несуществующему флоту (SM-3.7b).
+  // 1.10.0: «Атака» по ракете — отказ `E_NO_FLEET`, как по несуществующему флоту (SM-3.7b);
+  //         чужая ракета в поле атакующего, слияния и раскола — тот же `E_NO_FLEET`.
   version: '1.10.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
@@ -141,8 +142,8 @@ export const fleetOpsModule: GameModule = {
       if (payload.from === payload.into) {
         return h.reject('E_SAME_FLEET');
       }
-      const from = ownFleet(h.state, payload.from);
-      const into = ownFleet(h.state, payload.into);
+      const from = fleetForOrder(h.state, payload.from, action.playerId, h.ctx.data);
+      const into = fleetForOrder(h.state, payload.into, action.playerId, h.ctx.data);
       if (!from || !into) {
         return h.reject('E_NO_FLEET');
       }
@@ -300,7 +301,7 @@ export const fleetOpsModule: GameModule = {
       if (payload.takeLanding !== undefined && !Array.isArray(payload.takeLanding)) {
         return h.reject('E_BAD_PAYLOAD');
       }
-      const fleet = ownFleet(h.state, payload.fleetId);
+      const fleet = fleetForOrder(h.state, payload.fleetId, action.playerId, h.ctx.data);
       if (!fleet) {
         return h.reject('E_NO_FLEET');
       }
@@ -489,7 +490,7 @@ export const fleetOpsModule: GameModule = {
       if (payload.fleetId === payload.targetId) {
         return h.reject('E_SAME_FLEET');
       }
-      const f = ownFleet(h.state, payload.fleetId);
+      const f = fleetForOrder(h.state, payload.fleetId, action.playerId, h.ctx.data);
       const target = ownFleet(h.state, payload.targetId);
       // Ракету корабли не бьют (решение владельца 2026-10-06, SM-3.7b), а её id предсказуем:
       // цель-ракета — тот же отказ, что несуществующий флот, иначе код отказа выдал бы пуск,

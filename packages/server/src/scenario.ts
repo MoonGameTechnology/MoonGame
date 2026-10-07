@@ -253,7 +253,8 @@ export const MODULE_MANIFEST_VERSION = '76'; // SM-3.7b: ракета — отр
 // `state.ordnance` ушёл список `missiles` — партия на 75 не знает ракет-отрядов. `victory`
 // 1.7.0 не считает ракету войском; `shuttle` 1.9.0 бьёт её приказом только видимой, а
 // сбитую снимает отработавшей; `fleet-ops` 1.10.0 не принимает её целью «Атаки»,
-// `rendezvous` 1.2.0 — целью приказа «Охранять».
+// `rendezvous` 1.2.0 — целью приказа «Охранять»; в любом приказе чужая ракета — как
+// отсутствующий флот (`fleet-ops`, `rendezvous`, `captive` 1.1.0, `extraction` 1.2.0).
 // export const MODULE_MANIFEST_VERSION = '75'; // SM-3.7a: ракетная мина — отряд. Членство и
 // порядок не тронуты; `rocketMines` 2.0.0 ставит стоящую мину отрядом во `fleets` (юнит
 // `rocket_mine`), а её режим и боевую часть — в `ordnance.controls`; из `state.ordnance`

@@ -704,6 +704,20 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       { location: 'A', size: 'L', position: { x: 200, y: 0 } },
     ]);
     expect(visibleState(radar, 'q', sensorData).fleets[m.id]).toBeUndefined();
+    // Площадка крепости в 10 от ракеты отметку не якорит: проекция прячет её от того, кто её
+    // не видел, а id в отметке выдал бы площадку (замечание Codex на #1503).
+    radar.planets.fork1 = {
+      ...structuredClone(radar.planets.A!),
+      id: 'fork1',
+      owner: null,
+      position: { x: 210, y: 0 },
+      links: [],
+      buildings: [],
+      fork: { province: 'A', trail: 0 },
+    };
+    const blips = visibleState(radar, 'q', sensorData).signatures;
+    expect(blips).toEqual([{ location: 'A', size: 'L', position: { x: 200, y: 0 } }]);
+    expect(JSON.stringify(visibleState(radar, 'q', sensorData))).not.toContain('fork1');
   });
 
   it('is no eye: its owner sees neither a mine nor a ship through it', () => {
@@ -809,6 +823,9 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       type: 'shuttle.missileDowned',
       payload: { owner: 'q', playerId: 'p', missileId: m.id },
     });
+    // И юнитом она не «гибнет», как и под ПРО: `unit.died` засчитал бы её потерей и
+    // убийством в счёте PvE, трофеях и опыте героя (замечание Codex на #1503).
+    expect(r.events.map((e) => e.type)).not.toContain('unit.died');
   });
 
   it('a shuttle strike by order finds it only in sight — its id is predictable', () => {
@@ -866,16 +883,25 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
       traits: [],
     };
     const k = createKernel([movementModule, fleetOpsModule, rocketMinesModule]);
-    const engage = (targetId: string) => {
+    const order = (type: string, payload: Record<string, unknown>) => {
       const r = k.applyAction(
         launch,
-        { id: 's:q:1', playerId: 'q', type: 'fleet.engage', payload: { fleetId: 'picket', targetId }, issuedAt: launch.time },
+        { id: 's:q:1', playerId: 'q', type, payload, issuedAt: launch.time },
         { now: launch.time, data },
       );
       return r.ok ? 'ok' : r.code;
     };
+    const engage = (targetId: string) => order('fleet.engage', { fleetId: 'picket', targetId });
     expect(engage(m.id)).toBe('E_NO_FLEET');
     expect(engage('fleet:missile:0:999')).toBe('E_NO_FLEET');
+    // И в любом другом поле приказа чужая ракета — та же пустота, что несуществующий id, а не
+    // «не твой» (`E_FORBIDDEN`): поменять поля местами пуск не выдаёт (Codex, #1503).
+    for (const id of [m.id, 'fleet:missile:0:999']) {
+      expect(order('fleet.engage', { fleetId: id, targetId: 'picket' })).toBe('E_NO_FLEET');
+      expect(order('fleet.merge', { from: id, into: 'picket' })).toBe('E_NO_FLEET');
+      expect(order('fleet.merge', { from: 'picket', into: id })).toBe('E_NO_FLEET');
+      expect(order('fleet.split', { fleetId: id, take: [] })).toBe('E_NO_FLEET');
+    }
   });
 
   it('a missile without a hull is refused at deployment: nothing to shoot down (Codex, #1503)', () => {

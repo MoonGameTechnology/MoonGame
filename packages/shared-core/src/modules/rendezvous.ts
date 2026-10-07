@@ -27,6 +27,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { AllyOperation, GameState, PlayerId } from '../state/gameState';
 import { getStance, setStance } from '../state/diplomacy';
 import { isMissileFleet } from '../state/minefields';
+import { fleetForOrder } from '../util/fleet';
 import { identifiedNodes } from '../state/visibility';
 
 /** С кем игрок уже установил связь: жители из `rendezvous` провинций, где он побывал. */
@@ -100,7 +101,8 @@ function opsOn(state: GameState, match: (op: AllyOperation) => boolean): PlayerI
 
 export const rendezvousModule: GameModule = {
   id: 'rendezvous',
-  // 1.2.0: ракета не цель приказа «Охранять» (SM-3.7b).
+  // 1.2.0: ракета не цель приказа «Охранять» (SM-3.7b); чужая ракета — как отсутствующий
+  //        флот для любого приказа (`E_BAD_TARGET`), а не «не враг».
   version: '1.2.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
@@ -162,7 +164,7 @@ export const rendezvousModule: GameModule = {
         if (kind === 'scout' && (target.owner === me || target.owner === ally))
           return h.reject('E_BAD_TARGET');
       } else {
-        const target = h.state.fleets[fleet as string];
+        const target = fleetForOrder(h.state, fleet as string, me, h.ctx.data);
         if (!target) return h.reject('E_BAD_TARGET');
         if (kind === 'guard' && target.owner !== me && target.owner !== ally)
           return h.reject('E_BAD_TARGET');

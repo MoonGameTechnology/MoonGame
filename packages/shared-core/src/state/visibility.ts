@@ -513,6 +513,33 @@ export function radarSources(
   return sources;
 }
 
+/** Провинции карты — миры, которые проекция не прячет ни от кого (площадку крепости `fork`
+ *  видит только тот, кто её уже видел), в порядке id: равные расстояния решает порядок. */
+function publicProvinces(state: GameState): PlanetId[] {
+  return Object.keys(state.planets)
+    .sort()
+    .filter((id) => !state.planets[id]!.fork);
+}
+
+/** Ближайший к точке мир из `ids`; при равенстве — первый по порядку. */
+function nearestOf(
+  ids: readonly PlanetId[],
+  state: GameState,
+  at: { x: number; y: number },
+): PlanetId | null {
+  let best: PlanetId | null = null;
+  let bestD = Infinity;
+  for (const id of ids) {
+    const p = state.planets[id]!.position;
+    const d = (p.x - at.x) ** 2 + (p.y - at.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = id;
+    }
+  }
+  return best;
+}
+
 export function radarSignatures(
   state: GameState,
   viewerId: PlayerId,
@@ -529,6 +556,7 @@ export function radarSignatures(
   const emitters: SignalEmitter[] = [];
   const mineEmitters: Array<{ emitter: SignalEmitter; reach: number }> = [];
   let eyes: SightCircle[] | undefined;
+  let provinces: PlanetId[] | undefined;
   for (const fleet of Object.values(state.fleets)) {
     if (fleet.owner === viewerId) continue;
     // Мина (SM-3.6): видимая вблизи — полностью, иначе — слабая отметка, которую ловит
@@ -547,12 +575,15 @@ export function radarSignatures(
       continue;
     }
     // Ракета (SM-3.7b): увиденная глазами — целиком, иначе — отметка по её сигнатуре в точке
-    // полёта. Узла у неё нет, поэтому опознанный узел её не раскрывает.
+    // полёта. Узла у неё нет, поэтому опознанный узел её не раскрывает. Якорь отметки —
+    // ближайшая ПРОВИНЦИЯ, а не ближайший мир: площадку крепости (`fork`) проекция прячет
+    // от того, кто её не видел, и её id в отметке выдал бы её (замечание Codex на #1503).
     if (isMissileFleet(fleet, data)) {
       const at = fleetPosition(state, fleet);
-      const location = fleetNode(state, fleet);
-      if (spied.has(fleet.owner) || !at || location === null) continue;
+      if (spied.has(fleet.owner) || !at) continue;
       if (missileVisible(state, fleet, viewerId, data, (eyes ??= sightCircles(state, viewerId, data)))) continue;
+      const location = nearestOf((provinces ??= publicProvinces(state)), state, at);
+      if (location === null) continue;
       emitters.push({ location, ...at, inTransit: true, strength: fleetSignalStrength(fleet, data) });
       continue;
     }
