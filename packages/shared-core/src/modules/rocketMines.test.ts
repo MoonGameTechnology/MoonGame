@@ -669,10 +669,12 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     // Цель без глаз на ракету о ней не знает: ни отряда, ни отметки, ни id где-либо.
     expect(isVisibleTo(launch, 'q', { fleetId: m.id }, data)).toBe(false);
     expect(JSON.stringify(visibleState(launch, 'q', data))).not.toContain(m.id);
-    // Пуск поднял счётчик id флотов, но до цели он не доезжает: прирост без нового флота
-    // в обзоре выдал бы пуск (замечание Codex на #1503).
+    // Пуск поднял счётчики id флотов и таймеров, но до цели они не доезжают: прирост без
+    // нового в обзоре выдал бы пуск, а поминутный шаг полёта — саму ракету (Codex на #1503).
     expect(launch.fleetSeq).toBeGreaterThan(0);
+    expect(launch.scheduleSeq).toBeGreaterThan(0);
     expect(visibleState(launch, 'q', data)).not.toHaveProperty('fleetSeq');
+    expect(visibleState(launch, 'q', data)).not.toHaveProperty('scheduleSeq');
     // Влетела в глаза цели (обзор 10) — видна целиком, с хозяином; боевая часть — нет.
     const fl = m.flight!;
     const close = advance(launch, fl.departedAt + 0.95 * (fl.arrivesAt - fl.departedAt));

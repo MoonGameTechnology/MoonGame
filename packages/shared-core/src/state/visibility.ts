@@ -396,7 +396,8 @@ export function missileVisible(
  *    Это та же граница, что нарисована на карте: видно то, что внутри неё.
  * 3. **Или в круге патруля стоит флот блока.** Обзор флота (40 по умолчанию) меньше
  *    круга патруля (90), и без этого правила патруль бил бы флот, оставаясь невидимым.
- *    Граница круга включительна — та же мерка, по которой патруль выбирает цель.
+ *    Граница круга включительна — та же мерка, по которой патруль выбирает цель. Ракета
+ *    (SM-3.7b) не в счёт: она не глаз, и её пролёт не разведывает патрули по пути.
  * 4. **Со стороны видно круг и состав**, а не базу, эскадру, удержание и срок
  *    ({@link SeenPatrol}). Свой патруль сюда не входит: он целиком в `strikes`.
  */
@@ -410,6 +411,7 @@ export function patrolsSeenBy(state: GameState, viewerId: PlayerId, data: GameDa
   const guarded: Array<{ x: number; y: number }> = [];
   for (const fleet of Object.values(state.fleets)) {
     if (!bloc.has(fleet.owner) || !fleet.units.some((u) => u.count > 0)) continue;
+    if (isMissileFleet(fleet, data)) continue; // правило 3: ракета — не глаз
     const at = fleetPosition(state, fleet);
     if (at) guarded.push(at);
   }
@@ -758,10 +760,13 @@ function project(
   // cannot see — including ones they have never scouted. The player learns what they
   // salvaged from `salvage.paid`, which is addressed to them by name.
   delete view.salvage;
-  // The fleet-id counter is server-side too: it rises for every fleet minted anywhere,
-  // so a rise with no new fleet in sight would tell a blind target that a hidden missile
-  // just launched (Codex on #1503). Ids are minted by the server; no client needs it.
+  // The fleet-id and timeline counters are server-side too: they rise for every fleet
+  // minted and every event scheduled anywhere, so a rise with nothing new in sight would
+  // tell a blind target that a hidden missile just launched and keeps flying — its
+  // minute-by-minute flight step is a timer (Codex on #1503). The server mints ids and
+  // seqs; no client needs either counter.
   delete view.fleetSeq;
+  delete (view as Partial<GameState>).scheduleSeq;
   const fields = visibleMinefields(state, viewerId);
   if (fields) view.minefields = fields;
   else delete view.minefields;

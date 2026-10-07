@@ -94,7 +94,9 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   fleetSeq: 'stripped',
  // счётчик, не факт о мире
   scheduled: 'filtered', // чужие таймеры — это будущие намерения
-  scheduleSeq: 'public',
+  // Счётчик таймеров растёт от любого `schedule`, и от чужих скрытых тоже: пуск и
+  // поминутный полёт ракеты выдали бы себя слепой цели регулярным приростом (Codex на #1503).
+  scheduleSeq: 'stripped',
   swarmIntel: 'filtered', // only the viewer's observed Swarm composition
   fog: 'stripped', // память тумана — серверная кухня
   // EVT-2: котёл трофеев ключуется узлом и считается по тому, кто там погиб, — то есть

@@ -1037,7 +1037,9 @@ export interface GameState {
   fleetSeq?: number;
   /** Pending timeline, processed in (at, seq) order by `advanceTo`. */
   scheduled: ScheduledEvent[];
-  /** Monotonic counter handing each scheduled event its deterministic `seq`. */
+  /** Monotonic counter handing each scheduled event its deterministic `seq`. Как и
+   *  `fleetSeq`, `visibleState` его снимает: его прирост выдал бы чужие скрытые таймеры,
+   *  например пуск и поминутный полёт ракеты (замечание Codex на #1503). */
   scheduleSeq: number;
   /** Per-player fog-of-war memory (variant B): the last identified snapshot of
    *  each seen world. Maintained by `visibilityModule`; read by `visibleState`
