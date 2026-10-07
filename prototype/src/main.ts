@@ -48,6 +48,19 @@ import {
   sessionToken,
   takeJoinToken,
 } from './accountSession';
+import {
+  dispatchChat,
+  dropPing,
+  initMessageLog,
+  markUnread,
+  pushMsg,
+  readMessages,
+  replaceMessages,
+  sessionMessages,
+  takeChat,
+  takePing,
+  unreadMsgs,
+} from './messageLog';
 import { fleetBaseSpeed, fleetNodeAt, forkSiteId, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
@@ -1047,7 +1060,7 @@ import { resolveAddress } from '../../decisions/serverAddress';
 import { revealSignup } from './identityProbe';
 import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
-import { pingRoute, relayIntake } from './relayIntake';
+import { pingRoute } from './relayIntake';
 import { WAIT_MARK, radarContacts, waitingBanner } from './snapshotIngest';
 import {
   FLAK_LIFE_MS,
@@ -1316,13 +1329,17 @@ let allyPulseUntil = 0;
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
 
 // --- session diplomacy & comms menu state ------------------------------------
-// Messages are a prototype-local session log — they don't touch the deterministic
-// core (they don't affect the sim, so they stay out of GameState). Stances DO live
-// in the core (state.diplomacy); the menu drives them through diplomacy.declare.
-// `to` is a conversation key: a seat id (a 1:1 DM) or COALITION (the allies' group
-// chat). `ping` (coalition only) carries a province id → a clickable map marker.
-// `pingId` (net only) is the server-assigned id, so a `ping.removed` can find its line.
-let sessionMessages: SessionMsg[] = [];
+// Лента сообщений сессии и счётчик непрочитанного живут в `messageLog.ts` (REFM-214):
+// `main.ts` читает их живыми привязками, пишут только двери модуля. Окна, часы мира и
+// сеть лента получает хуками; перерисовка — та же, что у снятия метки в `pingUi`.
+initMessageLog({
+  now: () => s.time,
+  me: () => ME,
+  changed: repaintFeeds,
+  chat: () => (NET && netClient ? netClient : null),
+  note,
+  provinceName: placeName,
+});
 // --- floating chat window (desktop only) -------------------------------------
 // REFM-12: окно уехало в `chatWindow.ts` целиком — состояние, разметка, геометрия и
 // кэш настроек живут там. Здесь только сборка, и она стоит ИМЕННО ЗДЕСЬ, а не рядом
@@ -4213,7 +4230,7 @@ function handleEvents(events: DomainEvent[]) {
             }),
           );
         }
-        if (offerUnread(heard)) unreadMsgs++;
+        if (offerUnread(heard)) markUnread();
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
@@ -9118,8 +9135,6 @@ function fmtStamp(at: number, opts?: StampOpts): string {
   return parts.join(' ');
 }
 
-/** Unread social events (war declarations, stance shifts) — badge on the ✉ rail. */
-let unreadMsgs = 0;
 /** Diplomacy events don't pass the server's fog filter (their payload names no
  *  location a client owns), so a NET client would never hear a war being declared
  *  on it or a peace being offered. Diff the stance map AND the offer ledger of
@@ -9138,35 +9153,17 @@ function diffNetDiplomacy(prev: GameState, next: GameState): boolean {
     const d = diploDelivery(ev.kind, ev.stance, ev.other);
     note(d.noteNeedsStance ? t(d.noteKey, { who, stance }) : t(d.noteKey, { who }));
     if (d.message) pushMsg(ev.other, t(d.message.key, { stance }), true, d.message.from);
-    if (d.unread) unreadMsgs++;
+    if (d.unread) markUnread();
   }
   // Перерисовку ростера решает вызывающий — ОДИН раз на всю пачку, а не на событие.
   return events.length > 0;
 }
 
-function pushMsg(to: string, text: string, sys: boolean, from = ME, ping?: string): void {
-  sessionMessages.push({ at: s.time, from, to, text, sys, ping, realAt: Date.now() });
-  if (sessionMessages.length > 300) sessionMessages.shift();
+/** Лента сообщений изменилась (`messageLog.ts`, снятие метки в `pingUi`): перерисовать
+ *  открытый тред окна дипломатии и плавающий чат — строки показывают оба. */
+function repaintFeeds(): void {
   if (diploOpen && diploTab === 'msgs') renderDiploFeed();
   chatWin?.refreshIfVisible();
-}
-
-/** Route an outgoing chat line for conversation key `key` (a group channel const or
- *  a seat id = DM). NET: the server relays it and echoes a `chat.msg` back — the echo
- *  is what appends the line (see onChatMessage), so everyone renders the same
- *  server-stamped message. Solo: append locally. */
-function dispatchChat(key: string, text: string): void {
-  if (NET && netClient) {
-    if (key === CH_GLOBAL) {
-      note(t('comms.global.soon'));
-      return;
-    }
-    if (key === CH_SESSION) netClient.sendChat('session', text);
-    else if (key === COALITION) netClient.sendChat('coalition', text);
-    else netClient.sendChat('dm', text, key);
-    return;
-  }
-  pushMsg(key, text, false);
 }
 
 /** Player-driven stance change toward `target`. Escalation (toward war) is
@@ -13986,62 +13983,17 @@ function netClientFor(seat: string): MultiplayerClient {
       },
       // Server-relayed ally pings (own + allies, hidden from enemies): merge them into
       // the coalition channel so they render as map markers + chat lines, same as solo.
+      // Ретранслированные строки берёт лента (`messageLog.ts`, разбор — `relayIntake.ts`):
+      // личность строки назначает сервер, эхо и повтор при входе её не удваивают.
       onPingAdded: (ping: MultiplayerPing) => {
-        // Что делать с ретранслированной строкой — `relayIntake.ts` (REFM-148): личность
-        // строки назначает сервер, своё эхо (и повтор при входе) не удваивает её, а
-        // строку, которую нечем показать, не берём вовсе.
-        const node = provinceForPing(ping.target, MAP);
-        const intake = relayIntake({
-          known: sessionMessages.some((m) => m.pingId === ping.id),
-          showable: !!node, // prototype markers are province-anchored
-        });
-        if (intake !== 'add' || !node) return; // `!node` — сужение типа, решает intake
-        sessionMessages.push({
-          at: ping.createdAt,
-          from: ping.owner,
-          to: COALITION,
-          text: ping.label ?? t('chat.ping.mark', { node: placeName(node) }),
-          sys: false,
-          ping: node,
-          pingId: ping.id,
-          realAt: Date.now(),
-        });
-        if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        chatWin?.refreshIfVisible();
+        takePing(ping, provinceForPing(ping.target, MAP));
       },
       onPingRemoved: (pingId: string) => {
-        sessionMessages = sessionMessages.filter((m) => m.pingId !== pingId);
+        dropPing(pingId);
         pings?.closePop();
-        if (diploOpen && diploTab === 'msgs') renderDiploFeed();
       },
-      // Server-relayed chat (recipients decided server-side, like fog). Our own lines
-      // render from this echo too; the id dedupes a live line vs the join replay.
       onChatMessage: (m: MultiplayerChatMessage) => {
-        // Тот же разбор, что у меток (`relayIntake.ts`): реплика всегда показуема, но
-        // дедуп по серверному id обязателен — эхо своей строки и повтор при входе.
-        const known = sessionMessages.some((x) => x.chatId === m.id);
-        if (relayIntake({ known, showable: true }) !== 'add') return;
-        // Group lines carry the channel key in `to`; a DM keeps its true addressee —
-        // convoMessages derives the thread from (from, to) like the solo path.
-        const to =
-          m.channel === 'session'
-            ? CH_SESSION
-            : m.channel === 'coalition'
-              ? COALITION
-              : (m.to ?? m.from);
-        sessionMessages.push({
-          at: m.at,
-          from: m.from,
-          to,
-          text: m.text,
-          sys: false,
-          chatId: m.id,
-          realAt: Date.now(),
-        });
-        if (sessionMessages.length > 300) sessionMessages.shift();
-        if (m.from !== ME) unreadMsgs++;
-        if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        chatWin?.refreshIfVisible();
+        takeChat(m);
       },
       onError: (code) => {
         // Где игрок увидит отказ — `errorRoute.ts` (REFM-149): отказ устаревшего сокета
@@ -16391,7 +16343,7 @@ document.getElementById('rail-diplo')?.addEventListener('click', () => {
   maybeIntro('diplomacy');
 });
 document.getElementById('rail-msgs')?.addEventListener('click', () => {
-  unreadMsgs = 0; // reading the tab clears the badge
+  readMessages(); // reading the tab clears the badge
   openDiplo('msgs');
 });
 
@@ -16454,9 +16406,7 @@ const pings = __SECTOR_ZERO_ONLY__
       selected: () => selPlanet,
       hasProvince: (loc) => !!s.planets[loc],
       messages: () => sessionMessages,
-      setMessages: (next) => {
-        sessionMessages = next;
-      },
+      setMessages: replaceMessages,
       push: (to, text, loc) => pushMsg(to, text, false, ME, loc),
       net: () =>
         NET && netClient
@@ -16482,9 +16432,7 @@ const pings = __SECTOR_ZERO_ONLY__
       },
       viewportW: () => window.innerWidth,
       ask: (current) => prompt(t('ping.panel.edit'), current),
-      onFeedChanged: () => {
-        if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-      },
+      onFeedChanged: repaintFeeds,
     });
 
 // --- TGT-1: target-order composer (CC-1 chains rendered target-side) ---------
