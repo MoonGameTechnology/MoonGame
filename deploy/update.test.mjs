@@ -259,6 +259,8 @@ describe('update.sh — добор недостающих ключей server.en
     expect(env).toMatch(/^SEAT_LOCK=1$/m);
     // Секрет генерируется, а не берётся из константы: 32 байта hex.
     expect(env).toMatch(/^AUTH_JWT_SECRET=[0-9a-f]{64}$/m);
+    // Без токена /metrics/* закрыты даже оператору: под Docker хост — не loopback.
+    expect(env).toMatch(/^METRICS_TOKEN=[0-9a-f]{64}$/m);
   });
 
   it('НЕ трогает значение, которое оператор уже выставил', async () => {
@@ -304,6 +306,7 @@ describe('update.sh — добор недостающих ключей server.en
       'GATE=1',
       'SEAT_LOCK=1',
       'AUTH_JWT_SECRET=abc',
+      'METRICS_TOKEN=def',
       'PROD=0',
       'ALLOWED_ORIGINS=http://host:8788',
     ].join('\n');
