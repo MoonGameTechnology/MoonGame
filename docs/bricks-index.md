@@ -74,6 +74,14 @@
 | REFM-234 | 🔒 | proto | `docs/backlog.md` | Эффекты и метки |
 | REFM-235 | 🔒 | proto | `docs/backlog.md` | render() по слоям |
 | REFM-236 | 🔒 | proto | `docs/backlog.md` | Ввод на канвасе |
+| REFM-237 | ⏳ | proto | `docs/backlog.md` | Палитра сторон и константы карты |
+| REFM-238 | ⏳ | proto | `docs/backlog.md` | Геометрия флотов на карте |
+| REFM-239 | ⏳ | proto | `docs/backlog.md` | Радар |
+| REFM-240 | ⏳ | proto | `docs/backlog.md` | Конвейер приказа |
+| REFM-241 | ⏳ | proto | `docs/backlog.md` | Экран загрузки карты |
+| REFM-242 | ⏳ | proto | `docs/backlog.md` | Запросы к миру и очередь стройки |
+| REFM-243 | ⏳ | proto | `docs/backlog.md` | Остатки Sector Zero |
+| REFM-244 | 🔒 | proto | `docs/backlog.md` | Точка сборки |
 | AUD-8 | 🗑 | proto | `docs/backlog.md` | сведён в CONV-12 |
 | AUD-21 | ⏳ | docs proto | `docs/backlog.md` | Цвета редкости героя (HERO-12) расходятся с решением |
 | SHIPART-6 | ✅ | proto cli | `docs/backlog.md` | Портрет и голограмма неподвижной мины |
