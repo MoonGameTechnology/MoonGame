@@ -242,6 +242,11 @@ describe('дерево технологий — условия узла', () => 
     if (withFx) expect(techFx(withFx)).not.toBe('');
     expect(techFx({ effects: {}, unlocks: {} } as never)).toBe('');
   });
+
+  it('урон теха с областью называет свой канал огня (BAL-6)', () => {
+    expect(techFx(TECHS.siege_doctrine!)).toContain(`+8% ${t('tech.fx.damage-space')}`);
+    expect(techFx(TECHS.combined_arms!)).toContain(`+5% ${t('tech.fx.damage-ground')}`);
+  });
 });
 
 describe('дерево технологий — разметка', () => {

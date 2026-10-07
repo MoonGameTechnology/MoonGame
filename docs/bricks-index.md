@@ -33,7 +33,7 @@
 | BAL-3 | 🔶 | proto data | `docs/backlog.md` | Кредиты, энергия и еда — декорации, а не ресурсы. |
 | BAL-4 | 🗑 | core proto | `docs/backlog.md` | Захват прилётом обесценивает армию. |
 | BAL-10 | 🔶 | proto data core | `docs/backlog.md` | Восемь дней сессии ничего не решают — что с этим |
-| BAL-6 | 🔶 | proto data | `docs/backlog.md` | Дерево технологий не даёт выбора — но причина НЕ цена. |
+| BAL-6 | 🔶 | core data proto | `docs/backlog.md` | Ветки дерева технологий были взаимозаменяемы. |
 | BAL-7 | ✅ | proto data | `docs/backlog.md` | У heavyinfantry нет ниши. |
 | SEC-8 | 🔒 |  | `docs/backlog.md` | OWASP Top 10 2021 |
 | SEC-36 | ⏳ | sec ops | `docs/backlog.md` | увести Caddy с root внутри контейнера. |

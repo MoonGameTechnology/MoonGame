@@ -70,6 +70,14 @@ export const TECH_FX_LABEL: Record<string, string> = {
   combatDamageBonus: 'tech.fx.damage',
   radarRangeBonus: 'tech.fx.radar',
 };
+/** Урон теха с областью (`damageScope`, BAL-6) бьёт только в своём канале огня, и строка
+ *  эффекта называет канал: «+8% урон в космосе», а не «+8% урон». */
+export const DAMAGE_SCOPE_LABEL: Record<string, string> = {
+  space: 'tech.fx.damage-space',
+  ground: 'tech.fx.damage-ground',
+  shuttle: 'tech.fx.damage-shuttle',
+  missile: 'tech.fx.damage-missile',
+};
 /** Ярус римской цифрой — как в макете. Ярусов у контента единицы, поэтому таблица. */
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 function roman(n: number): string {
@@ -126,7 +134,13 @@ export function techCondOk(state: GameState, me: string, c: TechCond): boolean {
 export function techFx(td: TechDefLike): string {
   const fx = Object.entries(td.effects ?? {})
     .filter(([, v]) => (v as number) !== 0)
-    .map(([k, v]) => `+${Math.round((v as number) * 100)}% ${t(TECH_FX_LABEL[k] ?? k)}`);
+    .map(([k, v]) => {
+      const label =
+        k === 'combatDamageBonus' && td.damageScope
+          ? DAMAGE_SCOPE_LABEL[td.damageScope]
+          : TECH_FX_LABEL[k];
+      return `+${Math.round((v as number) * 100)}% ${t(label ?? k)}`;
+    });
   for (const u of td.unlocks?.units ?? [])
     // no `name` on unit defs — displayUnit() is the canonical unit label (see has_unit)
     fx.push(t('tech.grants', { x: esc(displayUnit(u)) }));
