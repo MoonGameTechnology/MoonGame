@@ -118,4 +118,5 @@ SBOM/сканеры есть (SEC-0). Контент — `data/*.json` + manifes
 
 `tech-research.md` §9/§10 + пробелы (live-ops/контент/модерация/стоимость) · `secure-environment-roadmap.md`
 SE-1/5/8/9 · `server-roadmap.md` (match-actor/fan-out) · `persistence-roadmap.md` (hot/cold) ·
-`deep-technical-roadmap.md` §10 observability.
+`deep-technical-roadmap.md` §10 observability · `zero-touch-prod-roadmap.md` (автодоставка и
+откат без ручных касаний; ZTP-5.* опирается на OPS-0.2 и OPS-1.1).

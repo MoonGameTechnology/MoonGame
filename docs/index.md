@@ -157,3 +157,10 @@
 | `docs/security/scanner-coverage-2026-07-26.md` | Отчёт: охват сканеров безопасности — 2026-07-26 | Глубокий анализ DevSecOps-пайплайна Void Dominion: инвентаризация сканеров, |
 | `docs/security/security-master-plan.md` | Security Master Plan — «самое безопасное приложение и игра» | Зонтичный план над тремя техническими треками безопасности проекта. Он не |
 | `docs/security/setup-github-secrets.md` | Настройка секретов и переменных в GitHub | Этот гайд поясняет, как правильно настроить CI/CD пайплайн в GitHub для безопасной работы. |
+
+## docs/zero-touch-prod/
+
+| Документ | Заголовок | Про что |
+| --- | --- | --- |
+| `docs/zero-touch-prod/README.md` | Zero Touch Prod — прод без ручных касаний | Папка темы «изменения прода только через автоматизированный, проверенный и записанный |
+| `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Zero Touch Prod — технический roadmap | План перевода сервера Void Dominion на прод без ручных касаний: изменения только через |
