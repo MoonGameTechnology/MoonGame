@@ -89,6 +89,9 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   seenPatrols: 'filtered',
   strikeSeq: 'public', // счётчик id, как battleSeq — предсказывать в нём нечего
   squadronSeq: 'public', // тот же счётчик id для эскадр (SHU-4.2)
+  // Счётчик id флотов растёт от любого нового флота, и от скрытого пуска ракеты тоже:
+  // прирост без нового флота в обзоре выдал бы пуск слепой цели (Codex на #1503).
+  fleetSeq: 'stripped',
  // счётчик, не факт о мире
   scheduled: 'filtered', // чужие таймеры — это будущие намерения
   scheduleSeq: 'public',
@@ -350,6 +353,7 @@ function maximalState(): GameState {
     seenPatrols: [{ owner: 'CANARY_seer', at: { x: 0, y: 0 }, radius: 1, units: [] }],
     strikeSeq: 3,
     squadronSeq: 3,
+    fleetSeq: 7,
     scheduled: [
       { id: 'evt:1', at: 200, type: 'own.timer', payload: { owner: VIEWER }, seq: 0 },
       { id: 'evt:2', at: 300, type: 'CANARY_type', payload: { owner: RIVAL }, seq: 1 },

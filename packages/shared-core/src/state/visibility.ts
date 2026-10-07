@@ -758,6 +758,10 @@ function project(
   // cannot see — including ones they have never scouted. The player learns what they
   // salvaged from `salvage.paid`, which is addressed to them by name.
   delete view.salvage;
+  // The fleet-id counter is server-side too: it rises for every fleet minted anywhere,
+  // so a rise with no new fleet in sight would tell a blind target that a hidden missile
+  // just launched (Codex on #1503). Ids are minted by the server; no client needs it.
+  delete view.fleetSeq;
   const fields = visibleMinefields(state, viewerId);
   if (fields) view.minefields = fields;
   else delete view.minefields;

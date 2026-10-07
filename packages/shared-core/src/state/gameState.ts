@@ -1029,6 +1029,12 @@ export interface GameState {
    *  `battleSeq`/`strikeSeq`: id обязан быть выводим одинаково на сервере и в реплее, а
    *  `Math.random` в ядре запрещён. */
   squadronSeq?: number;
+  /** Monotonic counter handing each FLEET its id (`nextFleetSeq`, BF-25): его поднимают
+   *  вылет, раскол, авто-сбор, мины и пуск ракеты. В отличие от `battleSeq`/`strikeSeq`,
+   *  `visibleState` его снимает: прирост без нового флота в обзоре выдал бы скрытый пуск
+   *  ракеты (замечание Codex на #1503). Нет на старых сохранениях — `nextFleetSeq` сеет
+   *  его числом живых флотов. */
+  fleetSeq?: number;
   /** Pending timeline, processed in (at, seq) order by `advanceTo`. */
   scheduled: ScheduledEvent[];
   /** Monotonic counter handing each scheduled event its deterministic `seq`. */
