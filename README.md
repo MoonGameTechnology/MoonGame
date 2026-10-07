@@ -190,6 +190,7 @@ CI поднимает её как сервис. Счётчики тестов и
 | Найти нужную часть кода | [Карта кода](CODE-MAP.md) |
 | Выбрать следующую задачу | [Роадмап](docs/roadmap.md) · [Бэклог](docs/backlog.md) |
 | Разобраться с сетевой игрой | [Мультиплеер](docs/multiplayer.md) · [Запуск](docs/launch-runbook.md) |
+| Выкатывать сервер без ручных касаний | [Zero Touch Prod](docs/zero-touch-prod/README.md) |
 | Разобраться с клиентами и платформами | [Кросс-платформенный клиент](docs/cross-platform-roadmap.md) |
 | Работать над PvE-игрой | [Sector Zero](docs/sector-zero-roadmap.md) |
 
