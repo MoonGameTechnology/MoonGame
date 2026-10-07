@@ -1191,6 +1191,12 @@ function baseAiOrders(
   if (base && pl) {
     // Keep the lights on first: a bot whose energy/food NET flow is negative (or already
     // in arrears) raises a plant/farm before anything else — brownouts halve its economy.
+    // One plant is not a cap (owner's decision 2026-10-07): the bot used to stop at the
+    // first farm/reactor of the match and then lived in arrears, which no player would
+    // do — so self-play reported a food/energy pressure that only the bot felt. Like a
+    // player, it adds the next one on its first own world that lacks it (home first,
+    // then by id — a stable order, invariant #1), but keeps ONE of a kind in the queue,
+    // so the flow it reads next tick already counts the plant it ordered.
     const flow = netIncome(state, ai);
     const has = (b: string): boolean =>
       Object.values(state.planets).some(
@@ -1201,11 +1207,27 @@ function baseAiOrders(
       ['food', 'farm'],
     ] as const) {
       if ((flow[need] ?? 0) >= 0 && !(pl.arrears ?? []).includes(need)) continue;
-      if (has(b)) continue;
+      const queued = state.scheduled.some((e) => {
+        if (e.type !== 'construction.complete') return false;
+        const q = e.payload as { kind?: string; planetId?: string; building?: string };
+        return (
+          q.kind === 'building' && q.building === b && state.planets[q.planetId ?? '']?.owner === ai
+        );
+      });
+      if (queued) continue;
       const cost = data.buildings[b]?.cost ?? {};
-      if (Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60)) {
-        out.push(buildBuilding(ai, base.id, b));
-      }
+      if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60)) continue;
+      const site = [
+        base,
+        ...Object.values(state.planets)
+          .filter((p) => p.owner === ai && p.id !== base.id)
+          .sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0)),
+      ].find(
+        (p) =>
+          !p.buildings.some((x) => x.type === b) &&
+          canOrder(state, buildBuilding(ai, p.id, b)) === null,
+      );
+      if (site) out.push(buildBuilding(ai, site.id, b));
     }
     // Economy chain (self-play M4: mine/refinery/tax office were DEAD content for the
     // bot — it bought all its metal on the market): raise the first missing credit
