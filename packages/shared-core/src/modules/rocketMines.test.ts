@@ -8,7 +8,7 @@ import { movementModule } from './movement';
 import { minefieldModule } from './minefield';
 import { visibleState } from '../state/visibility';
 import { setStance } from '../state/diplomacy';
-import { radarSignatures, isVisibleTo } from '../state/visibility';
+import { radarSignatures, radarSources, isVisibleTo } from '../state/visibility';
 import { isMissileFleet, isRocketMineFleet, rocketMinelayer } from '../state/ordnance';
 import { fleetPositionAt } from '../state/fleetPosition';
 import { shuttleModule } from './shuttle';
@@ -718,6 +718,25 @@ describe('a flying missile is a fleet without orders (SM-3.7b)', () => {
     const blips = visibleState(radar, 'q', sensorData).signatures;
     expect(blips).toEqual([{ location: 'A', size: 'L', position: { x: 200, y: 0 } }]);
     expect(JSON.stringify(visibleState(radar, 'q', sensorData))).not.toContain('fork1');
+  });
+
+  it('is no radar either, whatever radar the data gives it (Codex, #1503)', () => {
+    const launch = armed();
+    const m = missiles(launch)[0]!;
+    // Радар у юнита ракеты и у модуля заградителя: правило «не радар» держит код, а не данные.
+    const layerId = m.units[0]!.modules![0]!;
+    const layer = data.modules[layerId]!;
+    const radarData = parseGameData({
+      ...data,
+      units: { ...data.units, missile: { ...data.units.missile!, radarRange: 500, radarLevel: 3 } },
+      modules: {
+        ...data.modules,
+        [layerId]: { ...layer, effects: { ...layer.effects, stats: { ...layer.effects.stats, radarRange: 300 } } },
+      },
+    });
+    const without = structuredClone(launch);
+    delete without.fleets[m.id];
+    expect(radarSources(launch, 'p', radarData)).toEqual(radarSources(without, 'p', radarData));
   });
 
   it('is no eye: its owner sees neither a mine nor a ship through it', () => {

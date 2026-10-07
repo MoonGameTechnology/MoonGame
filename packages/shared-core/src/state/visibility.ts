@@ -504,6 +504,9 @@ export function radarSources(
         if (rocket) sources.push({ ...at, range: rocket.def.radarRange, level: rocket.def.radarLevel });
         continue;
       }
+      // Ракета (SM-3.7b) не радар, как и не глаз (`playerCircles`): правило держит код, а не
+      // данные — иначе радар у юнита или модуля заградителя сделал бы её разведчиком.
+      if (isMissileFleet(fleet, data)) continue;
       for (const stack of fleet.units) {
         const def = data.units[stack.unit];
         if (def && stack.count > 0) add(at, stackRadarRange(def, stack, data), def.radarLevel);
