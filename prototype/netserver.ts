@@ -110,6 +110,7 @@ import {
 import { detach } from '../packages/server/src/detach';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
+import { isOperatorRequest, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
 const { Pool } = pgPkg;
 
 // RESIL-3 — ДО всего остального. Этот хост важнее близнеца: именно он собирается в
@@ -170,6 +171,9 @@ const GATE = process.env.GATE === '1' || process.env.GATE === 'true';
 // client stores and must present on every reconnect (`?ticket=`), so knowing a URL
 // or a nick is no longer enough to take someone's seat; `?player=` is refused.
 const SEAT_LOCK = process.env.SEAT_LOCK === '1' || process.env.SEAT_LOCK === 'true';
+// Operator access to /metrics/* from beyond loopback (prod behind Docker). Unset or
+// shorter than 32 chars = loopback only. See `operatorAccess.ts`.
+const METRICS_TOKEN = operatorTokenFromEnv(process.env);
 const TIME_SCALE = Math.max(1, Number(process.env.TIME_SCALE ?? 1) || 1);
 
 // Serve the built prototype HTML so a peer just opens `http://host:port/` (no file
@@ -869,18 +873,24 @@ const server = createMultiplayerServer({
     // колбэк выполняется внутри `createMultiplayerServer` выше по файлу, а сам хук
     // объявлен ниже — прямая ссылка упала бы в TDZ ещё на старте.
     registerBrowserApi(app, registry, AUTH ? (request) => identifySession(request) : undefined);
+    // The /metrics/* family is OPERATOR-ONLY (`operatorAccess.ts`): a direct loopback
+    // peer, or `Authorization: Bearer $METRICS_TOKEN`. The JSONL tail carries pre-fog
+    // domain events (fleet routes, captures) and every player's economy — served to the
+    // internet it was a map hack for every match on the host. Anyone else gets the
+    // ordinary 404, as if the route did not exist.
+    const operator = (req: { socket: { remoteAddress?: string }; headers: Record<string, unknown> }): boolean =>
+      isOperatorRequest({ remoteAddress: req.socket.remoteAddress, headers: req.headers }, METRICS_TOKEN);
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
-    // the on-exit JSONL summary. Process-wide aggregates only, no match ids (F-13), no
-    // PII — public like `/metrics` and `/health`, so a playtest host is one `curl` away
-    // from "is anything going wrong right now?".
-    app.get('/metrics/summary', async () => metrics.summary());
+    // the on-exit JSONL summary, one `curl` from the host.
+    app.get('/metrics/summary', async (req, reply) => (operator(req) ? metrics.summary() : reply.callNotFound()));
     // NETA2-mon operator view: a one-glance "is anything going wrong right now?"
     // derived from the live MetricsAggregator. Returns a compact status with
     // thresholds so a playtest host can `curl /metrics/health` and read a single
-    // line. `ok: false` + `alerts` lists every threshold breach. Public (no
-    // match ids, no PII), same exposure as `/metrics` and `/metrics/summary`.
-    app.get('/metrics/health', async () => {
+    // line. `ok: false` + `alerts` lists every threshold breach. Operator-only, like
+    // `/metrics/summary`.
+    app.get('/metrics/health', async (req, reply) => {
+      if (!operator(req)) return reply.callNotFound();
       const s = metrics.summary();
       const alerts: string[] = [];
       // Hard failures — these should ALWAYS be zero in a healthy match.
@@ -909,9 +919,10 @@ const server = createMultiplayerServer({
       };
     });
     // NETA2-mon tail: the last N anomalous events from the JSONL log (rejects,
-    // desyncs, slow submits, fat deltas). `?n=20` defaults to the last 20. Same
-    // public exposure as the other /metrics/* endpoints (process-wide, no PII).
-    app.get('/metrics/recent', async (req) => {
+    // desyncs, slow submits, fat deltas, raw domain events, economy snapshots).
+    // `?n=20` defaults to the last 20. Operator-only: these lines are pre-fog.
+    app.get('/metrics/recent', async (req, reply) => {
+      if (!operator(req)) return reply.callNotFound();
       const n = Math.min(Number((req.query as { n?: string }).n ?? '20') || 20, 200);
       try {
         const lines = readFileSync(logFile, 'utf8').trimEnd().split('\n');

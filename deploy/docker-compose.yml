@@ -81,6 +81,11 @@ services:
       # игроки открывают игру, через запятую: `https://play.example.com` (для LAN-теста
       # — `http://<ip-хоста>:8788`). TLS-оверлей проставляет его из ${DOMAIN} сам.
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # Operator access to /metrics/* (summary, health, recent). The server answers them
+      # only to a direct loopback peer or to `Authorization: Bearer $METRICS_TOKEN`; from
+      # the host a curl arrives via the Docker bridge, not loopback, so prod needs the
+      # token (≥32 chars, e.g. `openssl rand -hex 32`). Unset ⇒ the routes 404 for everyone.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
       # Production posture (SEC-1 / MP-1): fail-secure — refuses to boot if any of
       # GATE/SEAT_LOCK/AUTH_JWT_SECRET is unset on a public bind. Defaults ON so a
       # plain `docker compose up` against the public interface is safe. Override
