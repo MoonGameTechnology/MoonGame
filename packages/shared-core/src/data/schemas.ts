@@ -625,6 +625,14 @@ export const TechnologyEffectsSchema = z.object({
  *  delegation "Steward", and later order chains and standing postures). */
 const BranchSchema = z.enum(['ground', 'space', 'shuttle', 'missile', 'command']);
 
+/** Where a technology's `combatDamageBonus` applies (BAL-6, owner's decision 2026-10-07):
+ *  a branch's damage feeds only its own channel of fire. Which channels form a scope is
+ *  the technology module's table (`DAMAGE_SCOPE_PHASES`) — the channels live in code, so
+ *  their grouping does too. A node without a scope boosts every channel (meta and run
+ *  boons, which are rewards, not a branch choice). */
+export const DamageScopeSchema = z.enum(['space', 'ground', 'shuttle', 'missile']);
+export type DamageScope = z.infer<typeof DamageScopeSchema>;
+
 /** Shared "at least N" threshold for a condition (default 1 = mere existence). This
  *  single `min` knob is the main data lever for tuning a gate without touching code. */
 const conditionMin = z.number().int().positive().default(1);
@@ -677,6 +685,8 @@ export const TechnologyDefSchema = z.object({
    *  даром в любом матче. Модуль технологий отбивает их `E_GRANT_ONLY`, дерево
    *  технологий не показывает. */
   grantOnly: z.boolean().default(false),
+  /** Channel of fire `effects.combatDamageBonus` applies to; absent = every channel. */
+  damageScope: DamageScopeSchema.optional(),
   prerequisites: z.array(z.string()).default([]),
   // `.prefault({})` re-runs the nested schema, keeping its per-field defaults
   // the single source of truth instead of a duplicate literal that can drift.

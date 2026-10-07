@@ -52,6 +52,7 @@
     "name": "Siege Doctrine",
     "description": "tech.node.siege-doctrine.desc",
     "branch": "space",
+    "damageScope": "space",
     "tier": 2,
     "cost": {
       "credits": 260,
@@ -127,6 +128,7 @@
     "name": "Void Armadas",
     "description": "tech.node.void-armadas.desc",
     "branch": "space",
+    "damageScope": "space",
     "tier": 3,
     "cost": {
       "credits": 420,
@@ -153,6 +155,7 @@
     "name": "Combined Arms",
     "description": "tech.node.combined-arms.desc",
     "branch": "ground",
+    "damageScope": "ground",
     "tier": 1,
     "cost": {
       "credits": 140,
@@ -185,6 +188,7 @@
     "name": "Planetary Bastions",
     "description": "tech.node.planetary-bastions.desc",
     "branch": "ground",
+    "damageScope": "ground",
     "tier": 3,
     "cost": {
       "credits": 480,
@@ -219,6 +223,7 @@
     "name": "Strike Vectors",
     "description": "tech.node.strike-vectors.desc",
     "branch": "shuttle",
+    "damageScope": "shuttle",
     "tier": 2,
     "cost": {
       "credits": 280,
@@ -243,6 +248,7 @@
     "name": "Ace Programs",
     "description": "tech.node.ace-programs.desc",
     "branch": "shuttle",
+    "damageScope": "shuttle",
     "tier": 3,
     "cost": {
       "credits": 500,
@@ -278,6 +284,7 @@
     "name": "Warhead Miniaturization",
     "description": "tech.node.warhead-miniaturization.desc",
     "branch": "missile",
+    "damageScope": "missile",
     "tier": 2,
     "cost": {
       "credits": 260,
@@ -297,6 +304,7 @@
     "name": "Saturation Barrage",
     "description": "tech.node.saturation-barrage.desc",
     "branch": "missile",
+    "damageScope": "missile",
     "tier": 3,
     "cost": {
       "credits": 520,

@@ -3577,14 +3577,18 @@ export const en: Record<string, string> = {
   'tech.branch.space': 'Space',
   'tech.branch.shuttle': 'Shuttles',
   'tech.fx.damage': 'damage',
+  'tech.fx.damage-ground': 'ground combat damage',
+  'tech.fx.damage-missile': 'missile damage',
+  'tech.fx.damage-shuttle': 'shuttle damage',
+  'tech.fx.damage-space': 'damage in space',
   'tech.fx.fleet-speed': 'fleet speed',
   'tech.fx.production': 'production',
   'tech.fx.radar': 'radar range',
   'tech.node.ace-programs.desc':
-    "Ace programmes: elite crews. +6% damage and fleet speed. The Wing Commander's capstone.",
+    "Ace programmes: elite crews. +6% shuttle damage, +6% fleet speed. The Wing Commander's capstone.",
   'tech.node.ai-stewardship.desc':
     'Command automation: hand your seat to a trusted AI while you are offline (asleep) — it holds the line and returns control on time. Powerful, which is why it needs the Overseer scientist and only opens mid-session (day 16).',
-  'tech.node.combined-arms.desc': 'Combined arms: infantry and armour in step. +5% damage.',
+  'tech.node.combined-arms.desc': 'Combined arms: infantry and armour in step. +5% ground combat damage.',
   'tech.node.deep-survey.desc': 'Deep sensor networks: +15% radar range.',
   'tech.node.flight-decks.desc': 'Flight decks: a fast sortie cycle. +6% fleet speed.',
   'tech.node.fortified-infrastructure.desc':
@@ -3612,16 +3616,16 @@ export const en: Record<string, string> = {
     'Orbital defence grid: unlocks the orbital AA emplacement — a battery that fires on fleets in orbit.',
   'tech.node.orbital-logistics.desc': 'Standardised haulage: +12% fleet speed.',
   'tech.node.planetary-bastions.desc':
-    "Planetary bastions: a full-cycle defence industry. +8% damage. The Marshal's capstone.",
+    "Planetary bastions: a full-cycle defence industry. +8% ground combat damage. The Marshal's capstone.",
   'tech.node.saturation-barrage.desc':
-    "Saturation barrage: overwhelms any missile defence. +10% damage. The Missile Chief's capstone.",
-  'tech.node.siege-doctrine.desc': 'Long-range siege crews: +8% damage.',
+    "Saturation barrage: overwhelms any missile defence. +10% missile damage. The Missile Chief's capstone.",
+  'tech.node.siege-doctrine.desc': 'Long-range siege crews: +8% damage in space.',
   'tech.node.signal-corps.desc': 'Signal corps: one picture of the battle. +8% radar range.',
-  'tech.node.strike-vectors.desc': 'Strike vectors: plotted shuttle approaches. +8% damage.',
+  'tech.node.strike-vectors.desc': 'Strike vectors: plotted shuttle approaches. +8% shuttle damage.',
   'tech.node.void-armadas.desc':
-    'Grand-formation doctrine: +6% damage and fleet speed. Requires 5 of your own sectors.',
+    'Grand-formation doctrine: +6% damage in space, +6% fleet speed. Requires 5 of your own sectors.',
   'tech.node.warhead-miniaturization.desc':
-    'Warhead miniaturisation: a denser salvo per tonne. +6% damage.',
+    'Warhead miniaturisation: a denser salvo per tonne. +6% missile damage.',
 
   // --- tech — Дерево технологий: требования узла, рельса дней, состояния и действия.
   'tech.action.done': 'Researched',

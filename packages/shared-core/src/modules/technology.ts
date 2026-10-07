@@ -1,7 +1,13 @@
 import type { Action } from '../action/types';
 import { hoursToMs } from '../action/types';
 import { MS_PER_DAY } from '../util/time';
-import type { GameData, ResourceBag, TechnologyCondition, TechnologyDef } from '../data/schemas';
+import type {
+  DamageScope,
+  GameData,
+  ResourceBag,
+  TechnologyCondition,
+  TechnologyDef,
+} from '../data/schemas';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   ActiveResearch,
@@ -47,7 +53,20 @@ interface SpeedArgs {
 
 interface DamageArgs {
   attacker?: string | null;
+  phase?: string;
 }
+
+/** Каналы огня каждой области боевого теха (BAL-6, решение владельца 2026-10-07): урон
+ *  ветки идёт только своему каналу. Канал — это `phase` в аргументах хука урона, его
+ *  ставит сам канал (`util/combat.ts`, `hookedDamage`). Космос — всё, чем стреляют
+ *  корабли и миры по целям в космосе и воздухе; каждый канал входит ровно в одну
+ *  область, и новый канал без области роняет `techDamageScope.test.ts`. */
+export const DAMAGE_SCOPE_PHASES: Readonly<Record<DamageScope, readonly string[]>> = {
+  space: ['orbital', 'bombard', 'pointDefense', 'returnFire'],
+  ground: ['ground'],
+  shuttle: ['shuttle', 'intercept'],
+  missile: ['missile'],
+};
 
 /** Concurrent research slots: 2 by the base rule, raised via the `research.slots`
  *  hook (e.g. a "+1 slot" scientist) up to a design maximum of 3. */
@@ -84,10 +103,10 @@ function hasCompleted(player: Player | undefined, technology: string): boolean {
 function effectsSum(
   player: Player | undefined,
   data: GameData,
-  key: 'productionBonus' | 'fleetSpeedBonus' | 'combatDamageBonus',
+  key: 'productionBonus' | 'fleetSpeedBonus',
 ): number {
   // Summed inline (no intermediate def array) — this runs from the fleet.speed /
-  // combat.damage / economy.production hooks, i.e. per movement leg and combat round.
+  // economy.production hooks, i.e. per movement leg and production span.
   let bonus = 0;
   for (const id of player?.technologies?.completed ?? []) {
     const def = data.technologies[id];
@@ -481,13 +500,19 @@ export const technologyModule: GameModule = {
     // PERK-1.2: боевые техи — МАССОВЫЙ класс, поэтому очки, а не множитель. Их восемь
     // исследуемых, и лидер берёт все: перемножаясь, они давали ×1.73, а сложившись — ×1.57.
     // Каждый следующий тех теперь обесценивает сам себя, и это ровно то, ради чего
-    // параллельная группа заведена (PERK-0.1 / PERK-1.1, `util/combat.ts`).
+    // параллельная группа заведена (PERK-0.1 / PERK-1.1, `util/combat.ts`). Тех с областью
+    // (`damageScope`) складывается только в каналах своей области (BAL-6).
     api.hook<number>('combat.damage.parallel', (points, args, h) => {
-      const attacker = (args as DamageArgs).attacker;
-      const bonus =
-        typeof attacker === 'string'
-          ? effectsSum(h.state.players[attacker], h.ctx.data, 'combatDamageBonus')
-          : 0;
+      const { attacker, phase } = args as DamageArgs;
+      if (typeof attacker !== 'string') return points;
+      let bonus = 0;
+      for (const id of h.state.players[attacker]?.technologies?.completed ?? []) {
+        const def = h.ctx.data.technologies[id];
+        if (!def) continue;
+        const scope = def.damageScope;
+        if (scope !== undefined && !DAMAGE_SCOPE_PHASES[scope].includes(phase ?? '')) continue;
+        bonus += def.effects.combatDamageBonus ?? 0;
+      }
       return points + bonus;
     });
   },
