@@ -35,5 +35,12 @@
 	# приложение — оно одно знает, что именно отдаёт, и дублировать их здесь значило бы
 	# завести вторую версию политики, которая разъедется с первой.
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	# /metrics/* — только для оператора (prototype/netserver.ts, operatorAccess.ts): хвост
+	# журнала несёт события ДО тумана войны и экономику всех игроков. Сервер и сам
+	# отказывает чужим, а здесь путь закрыт ещё и на краю — второй слой, если первый
+	# когда-нибудь ослабнет. Оператор ходит на хосте: curl 127.0.0.1:8788/metrics/summary
+	# с заголовком Authorization: Bearer $METRICS_TOKEN.
+	@operator path /metrics/*
+	respond @operator 404
 	reverse_proxy server:8788
 }
