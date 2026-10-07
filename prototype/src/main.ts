@@ -34,6 +34,20 @@ import {
   suspendSolo,
   tickSoloSave,
 } from './soloCheckpoint';
+import {
+  askSignIn,
+  authMode,
+  claimDone,
+  ensureSession,
+  fetchJoinToken,
+  holdJoinToken,
+  initAccountSession,
+  pendingJoinAfterAuth,
+  probeAuthMode,
+  sessionRecord,
+  sessionToken,
+  takeJoinToken,
+} from './accountSession';
 import { fleetBaseSpeed, fleetNodeAt, forkSiteId, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
@@ -324,14 +338,7 @@ import {
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import { builtTileHtml, tileLock, type TileLock } from './catalogTile';
-import {
-  anyToken,
-  clearSession,
-  readSession,
-  saveSession,
-  tokenFor,
-  type SessionRec,
-} from '../../decisions/sessionStore';
+import { clearSession, saveSession, tokenFor } from '../../decisions/sessionStore';
 import { medalBadges } from '../../decisions/unitMedals';
 import { forkFortressRaise, fortressRaise } from '../../decisions/fortressRaise';
 import { engageFoeAt, type EngageCandidate } from '../../decisions/engageAim';
@@ -431,21 +438,6 @@ import {
 } from '../../decisions/sectorZeroProgress';
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
-import {
-  authOutcome,
-  shouldRegister,
-  validLogin,
-  validPassword,
-  type AuthOutcome,
-} from '../../decisions/authRules';
-import {
-  dropsSession,
-  joinOutcome,
-  joinQuery,
-  parseJoinPass,
-  type JoinOutcome,
-} from '../../decisions/joinRules';
-import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { cardCovers, leftCardSlackFor, panelSlackFor, type Slack } from './panelSlack';
 import { longPressAction, pressIntent } from '../../decisions/pressIntent';
@@ -525,25 +517,6 @@ import {
   FILTER_STORE_KEY,
   type FilterState,
 } from './matchFilter';
-
-/** Причина отказа во входе в матч → ключ подписи. Текст живёт в /localization. */
-const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
-  'session-expired': 'acc.session-expired',
-  'entry-closed': 'acc.join-closed',
-  'seats-full': 'acc.seats-full',
-  failed: 'acc.join-failed',
-};
-
-/** Причина отказа → ключ подписи в статусной строке. Текст живёт в /localization. */
-const AUTH_REASON: Record<AuthOutcome, string> = {
-  ok: 'acc.created',
-  created: 'acc.created',
-  'wrong-password': 'acc.bad-pass',
-  'mail-taken': 'acc.mail-taken',
-  'rate-limited': 'acc.rate-limited',
-  'register-refused': 'acc.register-refused',
-  'login-refused': 'acc.login-refused',
-};
 import { createScanMemory, type Snapshot } from './scanMemory';
 import { houseDisplayName, seatAiProfile } from './setupSeats';
 import { lanes } from './setupMap';
@@ -1057,18 +1030,12 @@ import { errorTarget, refusalKey } from '../../decisions/errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
 import { detach } from './detach';
-import {
-  claimIntent,
-  matchIdFrom,
-  settledAddress,
-  shareAddress,
-} from '../../decisions/matchAddress';
+import { claimIntent, matchIdFrom, shareAddress } from '../../decisions/matchAddress';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
 import { entryOffer, type MatchSeat as EntrySeat } from '../../decisions/entrySetup';
 import { clearStatusLine, fallbackFor, showServerRow } from '../../decisions/browserFallback';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from '../../decisions/matchQuery';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
-import { mintedToken, passwordFrom, registerExtra } from '../../decisions/authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { mergePlan } from '../../decisions/mergeOrders';
@@ -1077,7 +1044,7 @@ import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from '../../decisions/pickApply';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
-import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './identityProbe';
+import { revealSignup } from './identityProbe';
 import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
@@ -13387,6 +13354,29 @@ $('hub-gear').addEventListener('click', () => settings.open());
 // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
 document.getElementById('rail-settings')?.addEventListener('click', () => settings.open());
 
+// Сессия аккаунта — у своего владельца (`accountSession.ts`). Проводка стоит до
+// загрузочного блока: его ветка по ссылке может попросить войти.
+initAccountSession({
+  status: (text) => {
+    statusEl.textContent = text;
+  },
+  note,
+  welcomePassword: () => wPassInput.value,
+  // Карточка входа живёт ВНУТРИ экрана подключения, поэтому экран показывают, а не прячут.
+  // Прятали — и игрок, которому отказали в билете (сессия истекла), оставался на карте
+  // прошлой партии без карточки и без строки «введите пароль» (нашла живая проверка
+  // REFM-215; та же ошибка, что ADDR-5 вычистил из ветки по ссылке).
+  showSignIn: (srv) => {
+    showConnect(true);
+    showHub(false);
+    showStage('welcome');
+    if (!srv) return;
+    wNickInput.value = srv.nick || suggestCallsign();
+    wPassRowEl.style.display = 'flex';
+    wPassInput.focus();
+  },
+});
+
 // The shared entry always starts at login, including returning commanders with a
 // saved callsign or local Sector Zero run. Identity leads to the main hub; the
 // player chooses a mode there. A save is data to continue, not a navigation request.
@@ -13396,26 +13386,19 @@ document.getElementById('rail-settings')?.addEventListener('click', () => settin
 //  «?join=<id>»     — a new tab spawned by «Войти» in the match list → straight into THAT
 //                     session, reusing this browser's stored identity (nick / session JWT).
 //
-// These four belong to the accounts section below (SES-2.5), but they MUST be declared
+// These two belong to the accounts section below (SES-2.5), but they MUST be declared
 // before this boot block: its async IIFEs read them SYNCHRONOUSLY when resolveServer()
 // yields no server (no await happens before the read) — with the declarations after the
 // block that read is a TDZ, and esbuild's const/let→var lowering turns the crash into a
 // silent `undefined` (the httpBase trap; caught by tsc TS2448 when the prototype gained
-// a typecheck).
-// Что сервер сказал про аккаунты. НЕ булево: «не знаю» (проба ещё не спрошена или не
-// дошла) обязано отличаться от «аккаунтов нет» — иначе незнание читается как разрешение
-// (`joinLanding`, правило 5). До ответа сервера — именно «не знаю».
-let authMode: IdentityMode = 'unknown';
+// a typecheck). `authMode` and `pendingJoinAfterAuth` stood here for the same reason;
+// they now live in `accountSession.ts` (REFM-215), and an import is initialized before
+// the first line of this file runs.
 /** Игрок пришёл ПО ССЫЛКЕ на партию, а не через экран подключения. Решает, куда его
  *  посадить, если войти не дали: у пришедшего по ссылке нет экрана, на который можно
  *  вернуться, — ему его надо дать (ADDR-5). Раньше это выводилось из невидимости
  *  оверлея, но оверлей теперь держится до впуска, и признак стал самостоятельным. */
 let cameFromLink = false;
-/** When a join is attempted without a stored session, we show the welcome card; this
- *  holds the match AND the seat/faction the player already chose, so the sign-in can
- *  resume the join in full. `take()` reads and forgets in one step — see
- *  `pendingJoin.ts` (REFM-51) for why that matters. */
-const pendingJoinAfterAuth = createPendingJoin();
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 // YAG-1.1c: в архиве площадки обе двери по ссылке закрыты — и сброс пароля, и вход в
 // партию ведут в основную игру, которой там нет. Любой адрес открывает Sector Zero.
@@ -14101,9 +14084,8 @@ function connect(): void {
   const url = dialUrl(
     base,
     currentMatchId,
-    dialIdentity(authMode === 'accounts', pendingJoinToken, nick, seatTicket),
+    dialIdentity(authMode === 'accounts', takeJoinToken(), nick, seatTicket),
   );
-  pendingJoinToken = null; // one dial per token fetch — a reconnect mints a fresh one
   statusEl.textContent = t('net.connecting', { nick });
   localStorage.setItem('void.server', base);
   localStorage.setItem('void.nick', nick); // resume this seat next visit
@@ -14222,44 +14204,9 @@ function resolveServer(): { base: string; nick: string } | null {
 // never reached connectToMatch (the seat was never claimed).
 
 // --- accounts (SES-2.5) -------------------------------------------------------
-// With AUTH on the server, the playable path runs the full account flow: the nick
-// is a LOGIN, a password guards it, and joining goes register/login → session JWT →
-// GET /matches/:id/join → short-lived join token → WS `?token=`. The client
-// self-configures from GET /auth/status; without accounts the nick+ticket handshake
-// stays exactly as before. The password is never persisted — only the session JWT
-// (a revocable, expiring credential) lands in localStorage, keyed per server.
-// (`authMode` itself is declared ABOVE the boot block — see the TDZ note there.)
-const passRow = document.getElementById('cpassrow') as HTMLElement | null;
-const passInput = document.getElementById('cpass') as HTMLInputElement | null;
-// Хранилище сессии — в `sessionStore.ts` (REFM-46): там же три правила, каждое из
-// которых стоит за конкретной неприятностью — токен привязан к ПОЗЫВНОМУ (семейный
-// ноутбук), ключ включает адрес сервера, пароль не хранится никогда.
-// Объявления, а не стрелки: обе читаются ВЫШЕ по файлу (boot-блок и рестарт), а
-// `const` дал бы обращение в мёртвой зоне — TDZ.
-function sessionRecord(base: string): SessionRec | null {
-  return readSession(localStorage, base);
-}
-/** The cached session token for ANY identity on this server (best-effort reads:
- *  arsenal refresh, redial). Auth-critical paths use ensureSession, which checks
- *  the login matches. */
-function sessionToken(base: string): string | null {
-  return anyToken(localStorage, base);
-}
-
-/** Probe the server's identity mode and show/hide the password field. */
-async function probeAuthMode(base: string): Promise<IdentityMode> {
-  // Что означает ответ пробы — `identityProbe.ts` (REFM-154): ответ «не 2xx» это не
-  // беда, а «аккаунтов тут нет» (игру часто открывают с обычной раздачи файлов); тело
-  // разбирают только у 2xx (голый `res.json()` на HTML-404 бросал SyntaxError в
-  // консоль); не дошли до сервера — считаем режим позывных, вход и так выдаст
-  // настоящую ошибку. Режим аккаунтов включает ровно живое «да».
-  authMode = await identityMode(() => fetch(authStatusUrl(base)));
-  if (passRow) passRow.style.display = authMode === 'accounts' ? '' : 'none';
-  // Возвращаем то же самое, что положили: после `await` компилятор не видит присвоения
-  // модульной переменной и сужает её до начального «не знаю», а читать её сразу после
-  // пробы нужно именно здесь.
-  return authMode;
-}
+// The account flow itself — the server's identity mode, the stored session, login-or-
+// register and the join token — lives in `accountSession.ts` (REFM-215). What stays
+// here is the welcome card it drives.
 
 // First visit, Bytro-style (SES-2.5 UX): when the server runs accounts, sign-up IS
 // the welcome — probe the same-origin default and surface callsign+password on the
@@ -14285,112 +14232,6 @@ const authProbe: Promise<void> = (async () => {
   wLoginEl.style.display = 'flex';
   wPassRowEl.style.display = 'flex';
 })();
-
-/** A valid session JWT for this server, or null (with the status line explaining).
- *  Zero-friction identity: try LOGIN first; unknown-or-wrong is a uniform 401, so
- *  then try REGISTER — a fresh login creates the account (registration IS the first
- *  login), while a taken one (409) means the password was simply wrong. */
-async function ensureSession(
-  base: string,
-  login: string,
-  passwordArg?: string,
-  emailArg?: string,
-): Promise<string | null> {
-  // Only OUR OWN cached session counts — a token minted for a different callsign
-  // (or a legacy unbound one) is ignored and replaced by a fresh login below.
-  const mine = tokenFor(localStorage, base, login);
-  if (mine) return mine;
-  // Правила логина и пароля — в `authRules.ts` (REFM-47): зеркало серверных, чтобы
-  // игрок увидел ПРИЧИНУ, а не сухой одинаковый отказ.
-  if (!validLogin(login)) {
-    statusEl.textContent = t('acc.nick.rule');
-    return null;
-  }
-  // Откуда берётся пароль — `authRequest.ts` (REFM-156, правила 1–2): полей ДВА
-  // (приветственная карточка и строка браузера матчей), и оба в разметке сразу —
-  // берём заполненное. Явно переданный пароль не перебивается полями даже пустой:
-  // он обязан дойти до проверки и получить внятную причину.
-  const password = passwordFrom(passwordArg, wPassInput.value, passInput?.value ?? '');
-  if (!validPassword(password)) {
-    statusEl.textContent = t('acc.pass.rule');
-    return null;
-  }
-  const call = async (
-    path: string,
-    extra: Record<string, string> = {},
-  ): Promise<{ status: number; token?: string; error?: string }> => {
-    const res = await fetch(`${httpBase(base)}${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ login, password, ...extra }),
-    });
-    const body = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
-    return { status: res.status, token: body.token, error: body.error };
-  };
-  try {
-    const login1 = await call('/auth/login');
-    // Registration carries the optional recovery email (login never needs it).
-    // Почта уходит только в регистрацию и только если её ввели (`authRequest.ts`,
-    // правило 3): `email: ''` записал бы на учётку пустой адрес.
-    const extra = registerExtra(emailArg);
-    const reg = shouldRegister(login1) ? await call('/auth/register', extra) : undefined;
-    // Причину называет `authRules.ts` — там же правило «401 на входе + 409 на
-    // регистрации = неверный пароль», которое иначе свелось бы к «отказу регистрации».
-    const outcome = authOutcome(login1, reg);
-    // Пропуск — у входа, регистрация вторая (`authRequest.ts`, правило 4).
-    const token = mintedToken(login1, reg);
-    if (token) {
-      saveSession(localStorage, base, { login, token });
-      if (outcome === 'created') note('✔ ' + t('acc.created'));
-      return token;
-    }
-    statusEl.textContent = t(AUTH_REASON[outcome]);
-    return null;
-  } catch {
-    statusEl.textContent = t('acc.server-down');
-    return null;
-  }
-}
-
-/** Exchange the session for a seat + join token. Клиент запоминает токен для
- *  немедленного коннекта; протухший (15 мин TTL) реконнект просто запрашивает
- *  новый — сессия живёт днями. 401 ⇒ сессия истекла: чистим её и просим пароль. */
-async function fetchJoinToken(
-  base: string,
-  matchId: string,
-  session: string,
-  slot?: string,
-  faction?: string,
-  scientists?: readonly string[],
-): Promise<{ token: string; playerId: string } | null> {
-  try {
-    // REL-7: pass ?slot= to request a specific seat; ?faction= to override the
-    // seat's default faction (BF-30: faction decoupled from start point).
-    // Сборку запроса и разбор ответа держит `joinRules.ts` (REFM-48) — там же
-    // правило «401 стирает сессию», без которого клиент вечно стучится в дверь
-    // просроченным пропуском.
-    const res = await fetch(
-      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${joinQuery(slot, faction, scientists)}`,
-      {
-        headers: { authorization: `Bearer ${session}` },
-      },
-    );
-    const outcome = joinOutcome(res.status);
-    if (outcome !== 'ok') {
-      if (dropsSession(outcome)) clearSession(localStorage, base);
-      statusEl.textContent = t(JOIN_REASON[outcome]);
-      return null;
-    }
-    return parseJoinPass(await res.json().catch(() => null));
-  } catch {
-    statusEl.textContent = t('acc.server-down');
-    return null;
-  }
-}
-
-/** The join token for the CURRENT dial attempt (auth mode) — consumed by connect(). */
-let pendingJoinToken: string | null = null;
-// (`pendingJoinAfterAuth` is declared above the boot block — see the TDZ note there.)
 
 interface MatchRow {
   matchId: string;
@@ -14473,57 +14314,11 @@ function connectToMatch(
           askSignIn(id, slot, faction, srv, scientists);
         return;
       }
-      pendingJoinToken = join.token;
+      holdJoinToken(join.token);
       claimDone(id);
       connect();
     })(),
   );
-}
-
-/**
- * Захват состоялся — свести строку к адресу партии (ADDR-2 + ADDR-3).
- *
- * В строке остаётся АДРЕС ПАРТИИ (`/game/<id>`), а не просьба занять место: именно её
- * игрок копирует и отдаёт другому, и именно она попадает в закладку. Со `slot`/`faction`
- * внутри отданная ссылка навязывала бы получателю чужой выбор — место ему сервер не
- * отдаст (резолвер откатится на свободное), а вот дом отдаст: для него это НОВЫЙ захват.
- * Чистим ПОСЛЕ захвата, а не до: пока вход не удался, параметры ещё нужны — игрок может
- * уйти логиниться и вернуться доигрывать заход. Тот же приём, что у `?reset=<token>`.
- *
- * `replaceState`, а не `pushState`: аппаратный Back в APK завязан на `history.back()`
- * (см. блок про сигнальную запись ниже), и лишняя запись в истории превратила бы первый
- * Back из выхода в возврат на то же место.
- */
-function claimDone(matchId: string): void {
-  try {
-    const settled = settledAddress(location.href, matchId);
-    if (settled !== location.href) history.replaceState(null, '', settled);
-  } catch {
-    /* history/URL недоступны (не браузер) — чистить нечего */
-  }
-}
-
-/**
- * Отправить игрока на карточку входа, ЗАПОМНИВ его просьбу вступить (`joinGate.ts`,
- * правило 1): после успешного входа `welcomeSignIn` доиграет её сам. Строка пароля
- * показывается только при известном сервере (правило 2) — `srv === null` значит «сначала
- * выбери, куда входишь».
- */
-function askSignIn(
-  id: string,
-  slot: string | undefined,
-  faction: string | undefined,
-  srv: { nick?: string } | null,
-  scientists: readonly string[] = [],
-): void {
-  pendingJoinAfterAuth.remember(id, slot, faction, scientists);
-  showConnect(false);
-  showHub(false);
-  showStage('welcome');
-  if (!srv) return;
-  wNickInput.value = srv.nick || suggestCallsign();
-  wPassRowEl.style.display = 'flex';
-  wPassInput.focus();
 }
 
 // Open a session in its OWN browser tab (deep-link «?join=<id>»): the hub/browser stays in
@@ -15122,7 +14917,7 @@ function scheduleReconnect(): void {
             scheduleReconnect(); // transient (or session expired — status line explains)
             return;
           }
-          pendingJoinToken = join.token;
+          holdJoinToken(join.token);
           connect();
         })(),
       );
