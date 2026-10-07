@@ -31,6 +31,11 @@ const data: GameData = parseGameData({
   resources: ['metal'],
   units: {
     scout: { faction: 'x', stats: { attack: 2, defense: 2, speed: 6, hp: 40 } },
+    missile: {
+      faction: 'x',
+      traits: ['immobile', 'issued', 'missile'],
+      stats: { attack: 0, defense: 0, speed: 0, hp: 12 },
+    },
     interceptor: {
       faction: 'x',
       traits: ['shuttle'],
@@ -155,6 +160,22 @@ describe('SHU-6.10 — кого из чужих патрулей видит зр
     expect(at('N50')).toStrictEqual([{ ...SEEN_AT_Q1, at: Q2 }]);
     expect(at('N60')).toHaveLength(1);
     expect(at('N70')).toEqual([]); // и круг не достаёт, и обзор
+  });
+
+  it('РАКЕТА в круге патруля его не выдаёт: она не глаз (SM-3.7b)', () => {
+    // Ракета p1 сейчас в (380, 0): в 20 от точки Q2, глубоко в круге, вне обзора мира A.
+    const missile: Fleet = {
+      id: 'fleet:missile:0:1',
+      owner: 'p1',
+      location: null,
+      movement: null,
+      flight: { from: { x: 380, y: 0 }, to: { x: 420, y: 0 }, departedAt: 0, arrivesAt: 2 * H },
+      units: [{ unit: 'missile', count: 1 }],
+      traits: [],
+      battleId: null,
+    };
+    const s = world([patrolOf(Q2)], { fleets: { [missile.id]: missile } });
+    expect(patrolsSeenBy(s, 'p1', data)).toEqual([]);
   });
 
   it('СВОЙ — в `strikes`, а не здесь; СОЮЗНЫЙ виден союзнику, но не врагу', () => {

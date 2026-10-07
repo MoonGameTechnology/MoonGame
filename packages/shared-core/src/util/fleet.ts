@@ -1,7 +1,9 @@
 import type { Fleet, GameState, PlanetId } from '../state/gameState';
 import type { HandlerContext } from '../kernel/module';
+import type { GameData } from '../data/schemas';
 import { ownFleet } from './combat';
 import { isMineFleet } from '../state/minefields';
+import { isMissileFleet } from '../state/ordnance';
 
 /** A fleet that has been validated as stationed at a planet and idle (not
  *  moving, not in battle). The `location` is guaranteed non-null. */
@@ -15,9 +17,29 @@ export interface IdleFleet extends Fleet {
  * `fleet.orbit` и `fleet.bombard` морозили вражеское производство безоружной миной,
  * `fleet.layMines` перезаряжал её самой собой. Правило стоит здесь, в общем пропуске
  * приказов флота, и по трейту: модулю, который принимает приказ, мина не известна.
+ * Ракета — тоже отряд без приказов («его невозможно контролировать», решение владельца
+ * 2026-09-30, SM-3.7b): тот же пропуск отбивает её своим кодом.
  */
 export function rejectMine(h: HandlerContext, fleet: Fleet): void {
   if (isMineFleet(fleet, h.ctx.data)) h.reject('E_MINE_PASSIVE');
+  if (isMissileFleet(fleet, h.ctx.data)) h.reject('E_MISSILE_PASSIVE');
+}
+
+/**
+ * Флот по id для приказа игрока, где чужая РАКЕТА (SM-3.7b) читается как отсутствующий флот.
+ * Ракете не приказывает никто, а её пуск скрыт туманом: любой иной отказ («не твой», «не
+ * враг») подтвердил бы пуск перебором id (A06, замечание Codex на #1503). Свой флот и чужой
+ * корабль отдаются как есть — их отказы решает вызывающий. Поиск — по своему ключу
+ * (`ownFleet`): `__proto__` тоже читается как отсутствующий флот.
+ */
+export function fleetForOrder(
+  state: GameState,
+  fleetId: string,
+  playerId: string,
+  data: GameData,
+): Fleet | undefined {
+  const fleet = ownFleet(state, fleetId);
+  return fleet && fleet.owner !== playerId && isMissileFleet(fleet, data) ? undefined : fleet;
 }
 
 /** Resolves a fleet the player owns and that is idle (docked, not moving, not

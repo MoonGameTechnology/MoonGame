@@ -13,6 +13,13 @@ describe('радар — серверные сигнатуры', () => {
     expect(netContacts([{ location: 'C1', size: 'S' }], (id) => id === 'C1')).toEqual([]);
   });
 
+  it('КОНТАКТ В ПУТИ у опознанного узла остаётся: узел ему лишь подпись (ракета, SM-3.7b)', () => {
+    const position = { x: 150, y: 0 };
+    expect(netContacts([{ location: 'C1', size: 'L', position }], (id) => id === 'C1')).toEqual([
+      { key: 'sig:C1:0', node: 'C1', size: 'L', position },
+    ]);
+  });
+
   it('КЛЮЧ РАЗЛИЧАЕТ ДВА КОНТАКТА В ОДНОМ УЗЛЕ: иначе память их склеит', () => {
     const из = netContacts(
       [

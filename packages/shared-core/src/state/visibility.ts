@@ -4,7 +4,7 @@ import { deepClone } from '../util/clone';
 import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
-import { emptyOrdnance, inRadius, missilePositionAt, rocketMineModule } from './ordnance';
+import { emptyOrdnance, inRadius, isMissileFleet, rocketMineModule } from './ordnance';
 import { visibleMinefields, isMineFleet, mineDetectionRange, mineFleetVisible } from './minefields';
 import { detectSignals, fleetSignalStrength, type RadarSource, type SignalEmitter, type SignatureContact } from './radarSignals';
 export type { SignatureContact, SignatureSize } from './radarSignals';
@@ -290,6 +290,8 @@ function playerCircles(
       });
       continue;
     }
+    // Ракета (SM-3.7b) не глаз и не радар: она летит к цели, а не смотрит.
+    if (isMissileFleet(fleet, data)) continue;
     if (pos) circle({ kind: 'fleet', id: fleet.id }, pos, rules.fleet, fleetRadarRange(fleet, data) * mult);
   }
   // SHU-6.7: висящий патруль шаттлов — глаза эскадры над её точкой. Круг тот же, в котором
@@ -351,11 +353,37 @@ export function fleetsSeenByPosition(
   const seen = new Set<FleetId>();
   if (eyes.length === 0) return seen;
   for (const fleet of Object.values(state.fleets)) {
-    if (fleet.owner === viewerId || isMineFleet(fleet, data)) continue;
+    if (fleet.owner === viewerId || isMineFleet(fleet, data) || isMissileFleet(fleet, data)) continue;
     const at = fleetPosition(state, fleet);
     if (at && eyes.some((c) => inRadius(at, c, c.identify))) seen.add(fleet.id);
   }
   return seen;
+}
+
+/**
+ * Видна ли ракета (SM-3.7b; резолюция владельца 2026-10-06: «по обычному туману: глаза и
+ * радар по её позиции»). Своя — всегда. Чужая — в живом окне шпионажа по флотам её хозяина
+ * и целиком, когда её точка внутри опознания хоть одного круга зрителя с его блоком зрения;
+ * ракета летит вне дорог, поэтому узел тут не мерка. Под одним радаром — только безымянная
+ * отметка (`radarSignatures`). Особого предупреждения цели нет: цель без глаз узнаёт о
+ * ракете по попаданию. Одно правило на проекцию, `isVisibleTo` и удар челноков: ракету,
+ * которую зритель видит, он может и бить (замечание Codex на #1503). `circles` — для
+ * вызывающего, который проверяет много ракет одним проходом.
+ */
+export function missileVisible(
+  state: GameState,
+  fleet: Fleet,
+  viewerId: PlayerId,
+  data: GameData,
+  circles: readonly SightCircle[] = sightCircles(state, viewerId, data),
+): boolean {
+  if (fleet.owner === viewerId) return true;
+  const spied = (state.intel?.[viewerId] ?? []).some(
+    (g) => g.kind === 'fleets' && g.target === fleet.owner && g.until > state.time,
+  );
+  if (spied) return true;
+  const at = fleetPosition(state, fleet);
+  return !!at && circles.some((c) => inRadius(at, c, c.identify));
 }
 
 /**
@@ -368,7 +396,8 @@ export function fleetsSeenByPosition(
  *    Это та же граница, что нарисована на карте: видно то, что внутри неё.
  * 3. **Или в круге патруля стоит флот блока.** Обзор флота (40 по умолчанию) меньше
  *    круга патруля (90), и без этого правила патруль бил бы флот, оставаясь невидимым.
- *    Граница круга включительна — та же мерка, по которой патруль выбирает цель.
+ *    Граница круга включительна — та же мерка, по которой патруль выбирает цель. Ракета
+ *    (SM-3.7b) не в счёт: она не глаз, и её пролёт не разведывает патрули по пути.
  * 4. **Со стороны видно круг и состав**, а не базу, эскадру, удержание и срок
  *    ({@link SeenPatrol}). Свой патруль сюда не входит: он целиком в `strikes`.
  */
@@ -382,6 +411,7 @@ export function patrolsSeenBy(state: GameState, viewerId: PlayerId, data: GameDa
   const guarded: Array<{ x: number; y: number }> = [];
   for (const fleet of Object.values(state.fleets)) {
     if (!bloc.has(fleet.owner) || !fleet.units.some((u) => u.count > 0)) continue;
+    if (isMissileFleet(fleet, data)) continue; // правило 3: ракета — не глаз
     const at = fleetPosition(state, fleet);
     if (at) guarded.push(at);
   }
@@ -474,6 +504,9 @@ export function radarSources(
         if (rocket) sources.push({ ...at, range: rocket.def.radarRange, level: rocket.def.radarLevel });
         continue;
       }
+      // Ракета (SM-3.7b) не радар, как и не глаз (`playerCircles`): правило держит код, а не
+      // данные — иначе радар у юнита или модуля заградителя сделал бы её разведчиком.
+      if (isMissileFleet(fleet, data)) continue;
       for (const stack of fleet.units) {
         const def = data.units[stack.unit];
         if (def && stack.count > 0) add(at, stackRadarRange(def, stack, data), def.radarLevel);
@@ -481,6 +514,33 @@ export function radarSources(
     }
   }
   return sources;
+}
+
+/** Провинции карты — миры, которые проекция не прячет ни от кого (площадку крепости `fork`
+ *  видит только тот, кто её уже видел), в порядке id: равные расстояния решает порядок. */
+function publicProvinces(state: GameState): PlanetId[] {
+  return Object.keys(state.planets)
+    .sort()
+    .filter((id) => !state.planets[id]!.fork);
+}
+
+/** Ближайший к точке мир из `ids`; при равенстве — первый по порядку. */
+function nearestOf(
+  ids: readonly PlanetId[],
+  state: GameState,
+  at: { x: number; y: number },
+): PlanetId | null {
+  let best: PlanetId | null = null;
+  let bestD = Infinity;
+  for (const id of ids) {
+    const p = state.planets[id]!.position;
+    const d = (p.x - at.x) ** 2 + (p.y - at.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = id;
+    }
+  }
+  return best;
 }
 
 export function radarSignatures(
@@ -498,6 +558,8 @@ export function radarSignatures(
   const engaged = engagementOf(state, viewerId).fleets;
   const emitters: SignalEmitter[] = [];
   const mineEmitters: Array<{ emitter: SignalEmitter; reach: number }> = [];
+  let eyes: SightCircle[] | undefined;
+  let provinces: PlanetId[] | undefined;
   for (const fleet of Object.values(state.fleets)) {
     if (fleet.owner === viewerId) continue;
     // Мина (SM-3.6): видимая вблизи — полностью, иначе — слабая отметка, которую ловит
@@ -513,6 +575,19 @@ export function radarSignatures(
         emitter: { location: node, ...at, inTransit: !!fleet.edge, strength },
         reach: mineDetectionRange(fleet, data),
       });
+      continue;
+    }
+    // Ракета (SM-3.7b): увиденная глазами — целиком, иначе — отметка по её сигнатуре в точке
+    // полёта. Узла у неё нет, поэтому опознанный узел её не раскрывает. Якорь отметки —
+    // ближайшая ПРОВИНЦИЯ, а не ближайший мир: площадку крепости (`fork`) проекция прячет
+    // от того, кто её не видел, и её id в отметке выдал бы её (замечание Codex на #1503).
+    if (isMissileFleet(fleet, data)) {
+      const at = fleetPosition(state, fleet);
+      if (spied.has(fleet.owner) || !at) continue;
+      if (missileVisible(state, fleet, viewerId, data, (eyes ??= sightCircles(state, viewerId, data)))) continue;
+      const location = nearestOf((provinces ??= publicProvinces(state)), state, at);
+      if (location === null) continue;
+      emitters.push({ location, ...at, inTransit: true, strength: fleetSignalStrength(fleet, data) });
       continue;
     }
     // Опознанный кругом мины или патруля виден целиком — отметка поверх была бы вторым
@@ -642,6 +717,8 @@ export function isVisibleTo(
   if (fleet.owner === viewerId) return true;
   // Мина видна только вблизи — ни опознанный узел, ни круг мины её не раскрывают (SM-3.6).
   if (isMineFleet(fleet, data)) return mineFleetVisible(state, fleet, viewerId, data);
+  // Ракета — по своей позиции, глазами блока зрения, и в окне шпионажа (SM-3.7b).
+  if (isMissileFleet(fleet, data)) return missileVisible(state, fleet, viewerId, data);
   const battle = fleet.battleId ? state.battles[fleet.battleId] : undefined;
   if (battle && fightsIn(battle, new Set(visionBloc(state, viewerId)))) return true;
   const at = fleetPositionAt(state, fleet, state.time);
@@ -678,7 +755,7 @@ export function visibleView(state: GameState, viewerId: PlayerId, data: GameData
 }
 
 /** One visibility boundary reused by networking and the local map/UI. */
-export function visibleOrdnance(state: GameState, viewerId: PlayerId, data: GameData): GameState['ordnance'] {
+export function visibleOrdnance(state: GameState, viewerId: PlayerId): GameState['ordnance'] {
   if (!state.ordnance) return undefined;
   {
     const cloned = deepClone(state.ordnance);
@@ -691,30 +768,12 @@ export function visibleOrdnance(state: GameState, viewerId: PlayerId, data: Game
     // вблизи»); its doctrine, next scan and warhead stay with its owner.
     for (const [id, control] of Object.entries(cloned.controls ?? {}))
       if (state.fleets[id]?.owner === viewerId) (ord.controls ??= {})[id] = control;
-    const circles = sightCircles(state, viewerId, data);
-    const sensors = radarSources(state, viewerId, data);
-    ord.missiles = cloned.missiles.filter((m) => {
-      if (m.owner === viewerId) return true;
-      const def = data.modules[m.moduleId]?.rocketMine;
-      if (!def) return false;
-      const at = missilePositionAt(m, state.time);
-      // An incoming strike warns its potential victims immediately, even if they
-      // have no radar. Otherwise visibility follows the same radar sensitivity.
-      const threatened = Object.values(state.fleets).some((f) => {
-        const pos = f.owner === viewerId && fleetPositionAt(state, f, state.time);
-        return pos && inRadius(pos, m.to, def.blastRadius);
-      });
-      return threatened || circles.some((c) => inRadius(at, c, c.identify)) ||
-        detectSignals([{ ...at, location: '', inTransit: true, strength: def.missileSignature }], sensors).length > 0;
-    });
-    // A radar detects a missile, not the identity of the remote minelayer.
-    for (const m of ord.missiles) if (m.owner !== viewerId) {
-      m.owner = '';
-      delete m.damage;
-      delete m.hp;
-      m.id = `incoming:${m.launchedAt}:${m.from.x}:${m.from.y}:${m.to.x}:${m.to.y}:${m.arrivesAt}`;
-    }
-    if (Object.keys(ord.controls ?? {}).length || ord.missiles.length || ord.installations.length || Object.keys(ord.serials).length || Object.keys(ord.cooldowns).length) return ord;
+    // The flying missile is a fleet too (SM-3.7b) and passes the ordinary fog; its warhead
+    // stays with its owner. No special warning reaches the target (owner's resolution
+    // 2026-10-06): a target without eyes learns of the missile by the hit.
+    for (const [id, warhead] of Object.entries(cloned.warheads ?? {}))
+      if (state.fleets[id]?.owner === viewerId) (ord.warheads ??= {})[id] = warhead;
+    if (Object.keys(ord.controls ?? {}).length || Object.keys(ord.warheads ?? {}).length || ord.installations.length || Object.keys(ord.serials).length || Object.keys(ord.cooldowns).length) return ord;
     return undefined;
   }
 }
@@ -727,7 +786,7 @@ function project(
   { identify }: Coverage,
 ): VisibleState {
   const view = deepClone(state) as VisibleState;
-  const ord = visibleOrdnance(state, viewerId, data);
+  const ord = visibleOrdnance(state, viewerId);
   if (ord) view.ordnance = ord;
   else delete view.ordnance;
   // EVT-2 bookkeeping is SERVER-SIDE ONLY. It is keyed by node and priced from what
@@ -735,6 +794,13 @@ function project(
   // cannot see — including ones they have never scouted. The player learns what they
   // salvaged from `salvage.paid`, which is addressed to them by name.
   delete view.salvage;
+  // The fleet-id and timeline counters are server-side too: they rise for every fleet
+  // minted and every event scheduled anywhere, so a rise with nothing new in sight would
+  // tell a blind target that a hidden missile just launched and keeps flying — its
+  // minute-by-minute flight step is a timer (Codex on #1503). The server mints ids and
+  // seqs; no client needs either counter.
+  delete view.fleetSeq;
+  delete (view as Partial<GameState>).scheduleSeq;
   const fields = visibleMinefields(state, viewerId);
   if (fields) view.minefields = fields;
   else delete view.minefields;
@@ -1029,6 +1095,7 @@ function project(
   const seenAt = fleetsSeenByPosition(state, viewerId, data);
   view.signatures = radarSignatures(state, viewerId, data, identify, seenAt);
   const engaged = engagementOf(state, viewerId);
+  let eyes: SightCircle[] | undefined;
   for (const id of Object.keys(view.fleets).sort()) {
     const fleet = view.fleets[id];
     if (!fleet || fleet.owner === viewerId) continue;
@@ -1039,6 +1106,13 @@ function project(
       continue;
     }
     if (spiedFleets.has(fleet.owner)) continue;
+    // Ракета (SM-3.7b) — глазами по её позиции; под одним радаром она — отметка выше.
+    if (isMissileFleet(fleet, data)) {
+      const original = state.fleets[id];
+      if (!original || !missileVisible(state, original, viewerId, data, (eyes ??= sightCircles(state, viewerId, data))))
+        delete view.fleets[id];
+      continue;
+    }
     if (engaged.fleets.has(id)) continue; // the enemy in YOUR battle is not a secret
     const node = fleetNode(view, fleet);
     // Rocket mines and hanging shuttle patrols (SHU-6.7) identify ships at their

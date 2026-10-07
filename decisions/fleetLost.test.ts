@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { abandonPromise, fleetLostPrompt, shipCount } from './fleetLost';
 import type { GameState } from '../packages/shared-core/src/index';
+import { shippedGameData } from '../data/bundle';
+
+const data = shippedGameData();
 
 const world = (
   fleets: Record<string, { owner: string; units: Array<{ unit: string; count: number }> }>,
@@ -19,8 +22,19 @@ describe('«Флот потерян» (PVR-6.29, решение владельц
       b: { owner: 'p1', units: [{ unit: 'frigate', count: 0 }] },
       c: { owner: 'p3', units: [{ unit: 'frigate', count: 9 }] },
     });
-    expect(shipCount(s, 'p1')).toBe(3);
-    expect(shipCount(world({}), 'p1')).toBe(0);
+    expect(shipCount(s, 'p1', data)).toBe(3);
+    expect(shipCount(world({}), 'p1', data)).toBe(0);
+  });
+
+  it('мины и летящая ракета — не корабли: от флота остались одни боеприпасы — он потерян', () => {
+    // Замечание Codex на #1503: последний корабль погиб, а ракета ещё летит — карточка ждала,
+    // пока ракета долетит; мина, стоящая сколько угодно, не давала ей встать вовсе.
+    const s = world({
+      mine: { owner: 'p1', units: [{ unit: 'mine', count: 3 }] },
+      rocket: { owner: 'p1', units: [{ unit: 'rocket_mine', count: 1 }] },
+      missile: { owner: 'p1', units: [{ unit: 'missile', count: 1 }] },
+    });
+    expect(shipCount(s, 'p1', data)).toBe(0);
   });
 
   it('карточка встаёт на ПЕРЕХОДЕ к нулю, один раз — а не каждый кадр без флота', () => {

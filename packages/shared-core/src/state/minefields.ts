@@ -13,6 +13,8 @@ export const MINE_UNIT = 'mine';
 /** Трейт, по которому ядро узнаёт мину. Правило по трейту, а не по id: модулю боя и
  *  тумана заградитель не известен, а новая мина в данных получит правило сама. */
 export const MINE_TRAIT = 'mine';
+/** Трейт ракеты (SM-3.7b): по нему ядро отличает её от мины и от корабля. */
+export const MISSILE_TRAIT = 'missile';
 
 /**
  * Мина — неподвижный отряд (SM-3.6, решение владельца 2026-09-30: «мина по сущности тоже
@@ -23,6 +25,12 @@ export const MINE_TRAIT = 'mine';
 export function isMineFleet(fleet: Pick<Fleet, 'units'>, data: GameData): boolean {
   const live = fleet.units.filter((s) => s.count > 0);
   return live.length > 0 && live.every((s) => defHasTrait(data.units[s.unit], MINE_TRAIT));
+}
+
+/** Ракета ли отряд (SM-3.7b): в нём живы только ракеты — как `isMineFleet` у мин. */
+export function isMissileFleet(fleet: Pick<Fleet, 'units'>, data: GameData): boolean {
+  const live = fleet.units.filter((s) => s.count > 0);
+  return live.length > 0 && live.every((s) => defHasTrait(data.units[s.unit], MISSILE_TRAIT));
 }
 
 /**
@@ -44,7 +52,8 @@ export function mineDetectionRange(mine: Pick<Fleet, 'units'>, data: GameData): 
 /**
  * Видна ли чужая мина: только если свой флот стоит не дальше `mineDetectionRange` от неё
  * (решение владельца 2026-09-30: «только вблизи»). Опознанный узел, окно шпионажа и союзник
- * её не раскрывают — иначе мина перестала бы быть ловушкой. Свои мины сенсором не служат.
+ * её не раскрывают — иначе мина перестала бы быть ловушкой. Свои мины и ракеты сенсором
+ * не служат: у боеприпаса нет глаз (SM-3.7b).
  */
 export function mineFleetVisible(state: GameState, mine: Fleet, viewer: string, data: GameData): boolean {
   if (mine.owner === viewer) return true;
@@ -52,7 +61,8 @@ export function mineFleetVisible(state: GameState, mine: Fleet, viewer: string, 
   if (!at) return false;
   const reach = mineDetectionRange(mine, data);
   return Object.values(state.fleets).some((f) => {
-    if (f.owner !== viewer || !f.units.some((u) => u.count > 0) || isMineFleet(f, data)) return false;
+    if (f.owner !== viewer || !f.units.some((u) => u.count > 0)) return false;
+    if (isMineFleet(f, data) || isMissileFleet(f, data)) return false;
     const pos = fleetPositionAt(state, f, state.time);
     return !!pos && (pos.x - at.x) ** 2 + (pos.y - at.y) ** 2 <= reach ** 2;
   });

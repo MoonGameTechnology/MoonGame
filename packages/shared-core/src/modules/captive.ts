@@ -24,6 +24,7 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { CaptiveState, GameState, PlayerId } from '../state/gameState';
 import { getStance } from '../state/diplomacy';
+import { fleetForOrder } from '../util/fleet';
 
 /**
  * Сторона людей: человеческие места и жители, с которыми они на связи по месту встречи
@@ -55,7 +56,8 @@ function lose(h: HandlerContext, reason: 'hideout' | 'carrier'): void {
 
 export const captiveModule: GameModule = {
   id: 'captive',
-  version: '1.0.0',
+  // 1.1.0: чужая ракета (SM-3.7b) для `captive.load` — как отсутствующий флот (`E_NO_FLEET`).
+  version: '1.1.0',
   setup(api) {
     // Убежище сменило хозяина. Сторона людей — пленный взят (или остаётся у неё, если мир
     // перешёл от одного её участника к другому); кто-то ещё — пленный потерян.
@@ -89,7 +91,7 @@ export const captiveModule: GameModule = {
       const me = action.playerId;
       const side = captiveSide(h.state);
       if (h.state.players[me]?.status !== 'active' || !side.has(me)) return h.reject('E_FORBIDDEN');
-      const fleet = h.state.fleets[fleetId];
+      const fleet = fleetForOrder(h.state, fleetId, me, h.ctx.data);
       if (!fleet) return h.reject('E_NO_FLEET');
       if (fleet.owner !== me) return h.reject('E_FORBIDDEN');
       if (fleet.movement) return h.reject('E_IN_TRANSIT');

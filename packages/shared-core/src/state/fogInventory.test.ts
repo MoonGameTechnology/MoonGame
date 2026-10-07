@@ -89,9 +89,14 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   seenPatrols: 'filtered',
   strikeSeq: 'public', // счётчик id, как battleSeq — предсказывать в нём нечего
   squadronSeq: 'public', // тот же счётчик id для эскадр (SHU-4.2)
+  // Счётчик id флотов растёт от любого нового флота, и от скрытого пуска ракеты тоже:
+  // прирост без нового флота в обзоре выдал бы пуск слепой цели (Codex на #1503).
+  fleetSeq: 'stripped',
  // счётчик, не факт о мире
   scheduled: 'filtered', // чужие таймеры — это будущие намерения
-  scheduleSeq: 'public',
+  // Счётчик таймеров растёт от любого `schedule`, и от чужих скрытых тоже: пуск и
+  // поминутный полёт ракеты выдали бы себя слепой цели регулярным приростом (Codex на #1503).
+  scheduleSeq: 'stripped',
   swarmIntel: 'filtered', // only the viewer's observed Swarm composition
   fog: 'stripped', // память тумана — серверная кухня
   // EVT-2: котёл трофеев ключуется узлом и считается по тому, кто там погиб, — то есть
@@ -350,6 +355,7 @@ function maximalState(): GameState {
     seenPatrols: [{ owner: 'CANARY_seer', at: { x: 0, y: 0 }, radius: 1, units: [] }],
     strikeSeq: 3,
     squadronSeq: 3,
+    fleetSeq: 7,
     scheduled: [
       { id: 'evt:1', at: 200, type: 'own.timer', payload: { owner: VIEWER }, seq: 0 },
       { id: 'evt:2', at: 300, type: 'CANARY_type', payload: { owner: RIVAL }, seq: 1 },
@@ -424,13 +430,14 @@ function maximalState(): GameState {
       CANARY_fleet: { steps: [{ kind: 'move', to: 'CANARY_dest' }] },
     },
     forcedMarch: { mine: true, CANARY_fleet: true },
-    // SM-3.7a: стоящая ракетная мина — отряд во `fleets`; здесь только её управление.
+    // SM-3.7a/b: стоящая мина и летящая ракета — отряды во `fleets`; здесь только управление
+    // мины и боевая часть ракеты.
     ordnance: {
       serials: { [RIVAL]: 7 },
       cooldowns: { [RIVAL]: 900 },
       installations: [],
       controls: { CANARY_fleet: { mode: 'any', nextScanAt: 9, damage: 80 } },
-      missiles: [],
+      warheads: { CANARY_fleet: 80 },
     },
     // EVT-2: котёл трофеев. Канарейка на чужом узле — вырезаться обязано ВСЁ поле
     // целиком, так что своей записи тут не нужно: она снимется вместе с чужой.

@@ -55,6 +55,20 @@ const hooks = `window.__minesTest = {
     setFleetSelection([id]);
     lastPanelHtml = ''; renderPanel();
     return { card: lastPanelHtml.includes(t('mine.card.rule')), orderable: selectedFleetIds().length };
+  },
+  // SM-3.7b: a flying missile is a fleet without orders — its own card, never an order target.
+  missileCard: () => {
+    s = structuredClone(s);
+    const at = Object.values(s.planets)[0].position;
+    const id = 'fleet:missile:smoke:1';
+    s.fleets[id] = {
+      id, owner: ME, location: null, movement: null, edge: null,
+      flight: { from: { ...at }, to: { x: at.x + 40, y: at.y }, departedAt: s.time, arrivesAt: s.time + 3600000 },
+      units: [{ unit: 'missile', count: 1, modules: ['rocket_mine_layer'] }], landing: [], traits: [], battleId: null,
+    };
+    setFleetSelection([id]);
+    lastPanelHtml = ''; renderPanel();
+    return { card: lastPanelHtml.includes(t('missile.card.rule')), orderable: selectedFleetIds().length };
   }
 };`;
 
@@ -117,12 +131,16 @@ try {
           orderable: 0,
         });
       }
+      assert.deepEqual(await page.evaluate(() => window.__minesTest.missileCard()), {
+        card: true,
+        orderable: 0,
+      });
     });
     console.log(`Mines UI ${viewport.width}px passed.`);
     await context.close();
   }
   console.log(
-    'Mines UI smoke passed: desktop/mobile deployment, modes, disarm, rocket mine card, ordinary minelayer, mine card.',
+    'Mines UI smoke passed: desktop/mobile deployment, modes, disarm, rocket mine card, ordinary minelayer, mine card, missile card.',
   );
 } finally {
   await browser.close();

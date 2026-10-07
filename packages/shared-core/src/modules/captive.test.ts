@@ -26,6 +26,12 @@ const data: GameData = parseGameData({
   units: {
     cruiser: { faction: 'x', domain: 'space', stats: { attack: 5, defense: 5, speed: 5, hp: 40 } },
     marine: { faction: 'x', domain: 'ground', stats: { attack: 2, defense: 2, speed: 0, hp: 10 } },
+    missile: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['immobile', 'issued', 'missile'],
+      stats: { attack: 0, defense: 0, speed: 0, hp: 12 },
+    },
   },
   technologies: {},
   factions: { x: { name: 'X' } },
@@ -210,6 +216,14 @@ describe('пленный — погрузка', () => {
     expect(code(taken, { fleetId: 's1' }, 'swarm')).toBe('E_FORBIDDEN');
     expect(code(taken, { fleetId: 's1' })).toBe('E_FORBIDDEN');
     expect(code(taken, { fleetId: 'ghost' })).toBe('E_NO_FLEET');
+    // Чужая ракета (SM-3.7b) — та же пустота, что несуществующий id, а не «не твой»: иначе
+    // отказ подтвердил бы пуск, скрытый туманом (замечание Codex на #1503).
+    const missile = fleet('fleet:missile:0:1', 'swarm', {
+      location: null,
+      units: [{ unit: 'missile', count: 1 }],
+    });
+    const flying = { ...taken, fleets: { ...taken.fleets, [missile.id]: missile } };
+    expect(code(flying, { fleetId: missile.id })).toBe('E_NO_FLEET');
     expect(code(taken, { fleetId: 'moving' })).toBe('E_IN_TRANSIT');
     expect(code(taken, { fleetId: 'away' })).toBe('E_NOT_AT_HIDEOUT');
     expect(code(taken, { fleetId: 'fight' })).toBe('E_IN_BATTLE');

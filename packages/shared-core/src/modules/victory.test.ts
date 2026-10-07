@@ -36,6 +36,17 @@ const data: GameData = parseGameData({
       stats: { attack: 30, defense: 30, speed: 4, hp: 200 },
       line: 'front',
     },
+    // Ordnance (SM-3.6, SM-3.7b): a fleet, but no army — never in the headcount.
+    mine: {
+      faction: 'neutral',
+      stats: { attack: 0, defense: 0, speed: 0, hp: 20 },
+      traits: ['immobile', 'issued', 'mine'],
+    },
+    missile: {
+      faction: 'neutral',
+      stats: { attack: 0, defense: 0, speed: 0, hp: 12 },
+      traits: ['immobile', 'issued', 'missile'],
+    },
   },
   factions: {},
   buildings: {
@@ -956,5 +967,29 @@ describe('victory — десант на плацдарме в счёте юни�
     const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
     expect(r.state.match.scores?.p1?.units).toBe(3);
     expect(r.state.match.scores?.p2?.units).toBe(0);
+  });
+});
+
+// Мина (SM-3.6) и летящая ракета (SM-3.7b) — отряды, но не войско: ловушка и боеприпас не
+// идут в счёт флотов и юнитов.
+describe('victory — боеприпас не войско', () => {
+  it('ни мина, ни летящая ракета не идут в счёт флотов и юнитов', () => {
+    const kernel = createKernel([victoryModule]);
+    const state: GameState = {
+      ...baseState(),
+      planets: { A: planet('A', 'p1'), B: planet('B', 'p2') },
+      fleets: {
+        F1: fleet('F1', 'p1'),
+        M1: { ...fleet('M1', 'p1'), units: [{ unit: 'mine', count: 3 }] },
+        R1: {
+          ...fleet('R1', 'p1'),
+          location: null,
+          flight: { from: { x: 0, y: 0 }, to: { x: 50, y: 0 }, departedAt: 0, arrivesAt: 2 * HOUR },
+          units: [{ unit: 'missile', count: 1 }],
+        },
+      },
+    };
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match.scores.p1).toMatchObject({ fleets: 1, units: 1 });
   });
 });

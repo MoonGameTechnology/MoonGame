@@ -5,6 +5,8 @@ import { cappedUnitBreakdown, type StackContribution } from './stacks';
 import { TARGET_CLASSES, targetClassOf, type ClassPools } from './groundTargets';
 import { effectiveStats } from './loadout';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
+import { MISSILE_TRAIT } from '../state/minefields';
+import { unitHasTrait } from '../data/traits';
 import { laneTrunks, T_EPS, type TrunkSpan } from '../state/roads';
 
 /**
@@ -447,6 +449,10 @@ export function applyDamage(
 ): UnitStack[] {
   const { survivors, deaths } = damageUnits(units, totalDamage, data);
   for (const d of deaths) {
+    // A missile (SM-3.7b) does not die as a unit: shot down by shuttles it leaves spent,
+    // exactly like a point-defense kill — otherwise the expedition tally, loot drops and
+    // hero XP would score an interception as a kill.
+    if (unitHasTrait(data, d.unit, MISSILE_TRAIT)) continue;
     h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
   }
   return survivors;

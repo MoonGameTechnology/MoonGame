@@ -823,11 +823,10 @@ export const RocketMineSchema = z.object({
   detectionRange: z.number().positive(),
   speed: z.number().positive(),
   minFlightHours: z.number().positive(),
-  hp: z.number().positive(),
+  // The missile's hull and radar signature live on its unit (`missile`, SM-3.7b).
   damage: z.number().positive(),
   blastRadius: z.number().positive(),
   mineSignature: z.number().positive().max(1),
-  missileSignature: z.number().positive(),
   cost: NonnegativeCostSchema,
 }).refine((m) => m.sightRange <= m.radarRange, {
   message: 'mine sight must fit within its radar',

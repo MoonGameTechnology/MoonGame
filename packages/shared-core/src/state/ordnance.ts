@@ -1,7 +1,7 @@
 import type { GameData, RocketMineDef } from '../data/schemas';
 import type { Fleet, FleetEdge, RoadPoint } from './gameState';
 import { defHasTrait } from '../data/traits';
-import { MINE_TRAIT } from './minefields';
+import { isMineFleet, isMissileFleet, MINE_TRAIT } from './minefields';
 import { moduleStarMultiplier } from '../util/loadout';
 
 export type RocketMineMode = 'any' | 'confirmed';
@@ -11,6 +11,12 @@ export const ROCKET_MINE_UNIT = 'rocket_mine';
 /** Трейт, по которому ядро отличает ракетную мину от контактной. У юнита есть и `mine`:
  *  правила мины-отряда (без приказов, не воюет, видна только вблизи) он получает от него. */
 export const ROCKET_MINE_TRAIT = 'rocketMine';
+/** Юнит ракеты (SM-3.7b): летящая ракета — отряд без приказов, летит по прямой
+ *  (`Fleet.flight`). Корпус и сигнатура — у юнита, скорость и боевая часть — у модуля. */
+export const MISSILE_UNIT = 'missile';
+// Трейт и признак ракеты живут в `minefields.ts`: глазам мины надо отличать ракету, а этот
+// файл сам импортирует тот — обратный импорт замкнул бы круг.
+export { isMissileFleet, MISSILE_TRAIT } from './minefields';
 
 /** Private controls of a standing mine, by its fleet id. Absent in an opponent's
  *  projection: the mine itself is visible up close, its doctrine and warhead never. */
@@ -32,17 +38,6 @@ export interface MineInstallation {
   startedAt: number;
   readyAt: number;
 }
-export interface MineMissile {
-  id: string;
-  owner: string;
-  moduleId: string;
-  from: RoadPoint;
-  to: RoadPoint;
-  launchedAt: number;
-  arrivesAt: number;
-  damage?: number;
-  hp?: number;
-}
 export interface OrdnanceState {
   serials: Record<string, number>;
   cooldowns: Record<string, number>;
@@ -50,10 +45,13 @@ export interface OrdnanceState {
   /** Standing mines' controls, by mine fleet id (SM-3.7a). Absent in a world saved before
    *  SM-3.7a (a Sector Zero run snapshot outlives updates): read it as empty. */
   controls?: Record<string, RocketMineControl>;
-  missiles: MineMissile[];
+  /** A flying missile's warhead, by its fleet id (SM-3.7b): fixed at launch, seen by its
+   *  owner only — the missile itself is a fleet and passes the ordinary fog. A world saved
+   *  before SM-3.7b keeps its old `missiles` list, which nothing reads any more. */
+  warheads?: Record<string, number>;
 }
 export function emptyOrdnance(): OrdnanceState {
-  return { serials: {}, cooldowns: {}, installations: [], controls: {}, missiles: [] };
+  return { serials: {}, cooldowns: {}, installations: [], controls: {}, warheads: {} };
 }
 export function inRadius(a: RoadPoint, b: RoadPoint, radius: number): boolean {
   return (a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= radius * radius;
@@ -102,7 +100,23 @@ export function rocketMineModule(
   }
   return null;
 }
-export function missilePositionAt(m: MineMissile, now: number): RoadPoint {
-  const t = Math.max(0, Math.min(1, (now - m.launchedAt) / (m.arrivesAt - m.launchedAt)));
-  return { x: m.from.x + (m.to.x - m.from.x) * t, y: m.from.y + (m.to.y - m.from.y) * t };
+/** Боеприпас ли отряд — мина или ракета: отряд без приказов, не воюет, не держит игрока в
+ *  живых. Свои правила тумана у каждого: мину видно только вблизи, ракету — обычным. */
+export function isOrdnanceFleet(fleet: Pick<Fleet, 'units'>, data: GameData): boolean {
+  return isMineFleet(fleet, data) || isMissileFleet(fleet, data);
+}
+/** The module a missile was launched with — its speed, warhead and blast. */
+export function missileModule(
+  fleet: Pick<Fleet, 'units'>,
+  data: GameData,
+): { id: string; def: RocketMineDef } | null {
+  if (!isMissileFleet(fleet, data)) return null;
+  for (const stack of fleet.units) {
+    if (stack.count <= 0) continue;
+    for (const id of stack.modules ?? []) {
+      const def = data.modules[id]?.rocketMine;
+      if (def) return { id, def };
+    }
+  }
+  return null;
 }

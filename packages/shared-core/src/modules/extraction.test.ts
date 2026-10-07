@@ -27,6 +27,12 @@ const data: GameData = parseGameData({
   units: {
     cruiser: { faction: 'x', domain: 'space', stats: { attack: 5, defense: 5, speed: 5, hp: 40 } },
     marine: { faction: 'x', domain: 'ground', stats: { attack: 2, defense: 2, speed: 0, hp: 10 } },
+    missile: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['immobile', 'issued', 'missile'],
+      stats: { attack: 0, defense: 0, speed: 0, hp: 12 },
+    },
   },
   technologies: {},
   factions: { x: { name: 'X' } },
@@ -157,6 +163,13 @@ describe('накопитель — назначение на извлечени�
       [world([fleet('f1', 'p1')]), { fleetId: 'ghost' }, 'p1', 'E_NO_FLEET'],
       [world([fleet('f1', 'swarm')]), { fleetId: 'f1' }, 'p1', 'E_FORBIDDEN'],
       [world([fleet('f1', 'ally')]), { fleetId: 'f1' }, 'ally', 'E_FORBIDDEN'],
+      // Чужая ракета (SM-3.7b) — как несуществующий флот: «не твой» выдал бы пуск (#1503).
+      [
+        world([fleet('m1', 'swarm', { location: null, units: [{ unit: 'missile', count: 1 }] })]),
+        { fleetId: 'm1' },
+        'p1',
+        'E_NO_FLEET',
+      ],
       [world([fleet('f1', 'p1', { location: 'home' })]), { fleetId: 'f1' }, 'p1', 'E_NOT_AT_VAULT'],
       [
         world([fleet('f1', 'p1', { movement: { to: 'home' } as unknown as Fleet['movement'] })]),

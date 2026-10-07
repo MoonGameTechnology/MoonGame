@@ -25,6 +25,12 @@ const data: GameData = parseGameData({
   units: {
     cruiser: { faction: 'x', domain: 'space', stats: { attack: 5, defense: 5, speed: 5, hp: 40 } },
     marine: { faction: 'x', domain: 'ground', stats: { attack: 2, defense: 2, speed: 0, hp: 10 } },
+    missile: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['immobile', 'issued', 'missile'],
+      stats: { attack: 0, defense: 0, speed: 0, hp: 12 },
+    },
   },
   technologies: {},
   factions: { x: { name: 'X' } },
@@ -293,6 +299,36 @@ describe('приказ союзнику (PVR-7.4)', () => {
       ok: false,
       code: 'E_BAD_TARGET',
     });
+  });
+
+  it('летящая ракета — не цель приказа: ни охранять, ни атаковать (SM-3.7b)', () => {
+    const s = met();
+    const flight = { from: { x: 0, y: 0 }, to: { x: 90, y: 0 }, departedAt: 0, arrivesAt: 60_000 };
+    const missile = (id: string, owner: string) =>
+      fleet(id, owner, { location: null, flight, units: [{ unit: 'missile', count: 1 }] });
+    s.fleets['fleet:missile:0:1'] = missile('fleet:missile:0:1', 'p1');
+    s.fleets['fleet:missile:0:2'] = missile('fleet:missile:0:2', 'swarm');
+    // Своя ракета: охранять в ней нечего — без отказа план союзника встал бы «нет пути»
+    // навсегда, а попадание закрыло бы приказ потерянным.
+    expect(order(s, { kind: 'guard', fleet: 'fleet:missile:0:1' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    expect(order(s, { kind: 'attack', fleet: 'fleet:missile:0:2' })).toMatchObject({
+      ok: false,
+      code: 'E_BAD_TARGET',
+    });
+    // Ракета того, с кем союзник НЕ воюет, — тот же отказ, что несуществующий флот, а не
+    // «не враг»: иначе перебор id находил бы скрытые пуски (замечание Codex на #1503).
+    s.players.p3 = player('p3');
+    setStance(s, 'ally', 'p3', 'peace');
+    s.fleets['fleet:missile:0:3'] = missile('fleet:missile:0:3', 'p3');
+    for (const id of ['fleet:missile:0:3', 'fleet:missile:0:404'])
+      expect(order(s, { kind: 'attack', fleet: id })).toMatchObject({
+        ok: false,
+        code: 'E_BAD_TARGET',
+      });
+    expect(s.allyOps).toBeUndefined();
   });
 
   it('кривой приказ и чужой приказчик — стабильные отказы', () => {

@@ -584,11 +584,9 @@
       "detectionRange": 24,
       "speed": 240,
       "minFlightHours": 0.016666666666666666,
-      "hp": 12,
       "damage": 80,
       "blastRadius": 10,
       "mineSignature": 0.1,
-      "missileSignature": 13,
       "cost": {
         "metal": 40,
         "microelectronics": 20

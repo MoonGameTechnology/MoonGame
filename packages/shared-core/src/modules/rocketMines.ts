@@ -1,29 +1,33 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { RocketMineDef } from '../data/schemas';
+import type { GameData, RocketMineDef } from '../data/schemas';
 import type { Fleet } from '../state/gameState';
 import { hoursToMs, travelSpeedFactorOf } from '../action/types';
 import {
   emptyOrdnance,
   inRadius,
+  isMissileFleet,
+  isOrdnanceFleet,
   isRocketMineFleet,
-  missilePositionAt,
+  missileModule,
+  MISSILE_TRAIT,
+  MISSILE_UNIT,
   rocketMinelayer,
   rocketMineModule,
   ROCKET_MINE_TRAIT,
   ROCKET_MINE_UNIT,
-  type MineMissile,
   type RocketMineMode,
 } from '../state/ordnance';
-import { isMineFleet, MINE_TRAIT } from '../state/minefields';
+import { MINE_TRAIT } from '../state/minefields';
 import { defHasTrait } from '../data/traits';
-import { fleetNodeAt, fleetPositionAt } from '../state/fleetPosition';
+import { flightPointAt, fleetNodeAt, fleetPositionAt } from '../state/fleetPosition';
 import { isCorridorEdge } from '../state/corridor';
 import { laneRoad } from '../state/roads';
 import { distance } from '../state/route';
 import { getStance } from '../state/diplomacy';
 import { sightCircles } from '../state/visibility';
 import { detectSignals, fleetSignalStrength, type SignalEmitter } from '../state/radarSignals';
-import { requireOwnedUnengagedFleet } from '../util/fleet';
+import { nextFleetSeq, requireOwnedUnengagedFleet } from '../util/fleet';
+import { effectiveStats } from '../util/loadout';
 import { applyDamageToSide, hookedDamage, removeIfWiped } from '../util/combat';
 import {
   fleetPointDefense,
@@ -51,8 +55,9 @@ function targetPoint(
     // IFF for own/allied fleets. Other contacts' hidden owner is NOT a radar gate.
     const stance = getStance(h.state, mine.owner, fleet.owner);
     if (stance === 'alliance' || !fleet.units.some((u) => u.count > 0)) continue;
-    // A mine — contact or rocket (SM-3.7a) — is not a target: the warhead is for ships.
-    if (isMineFleet(fleet, h.ctx.data)) continue;
+    // A mine (SM-3.7a) or a missile (SM-3.7b) is not a target: the warhead is for ships, and
+    // a missile is shot down by point defense and shuttles only (owner's resolution 2026-10-06).
+    if (isOrdnanceFleet(fleet, h.ctx.data)) continue;
     const at = fleetPositionAt(h.state, fleet, h.ctx.now);
     const location = fleetNodeAt(h.state, fleet, h.ctx.now);
     if (!at || !location || !inRadius(at, position, def.radarRange)) continue;
@@ -99,10 +104,33 @@ function targetPoint(
   return points[0] ?? null;
 }
 
+/** The hull of the missile this layer would launch. Zero means point defense has nothing
+ *  to shoot at: the missile would vanish with neither a hit nor an interception (Codex,
+ *  #1503) — so the deployment is refused instead. */
+function missileHull(data: GameData, layerId: string): number {
+  const unit = data.units[MISSILE_UNIT];
+  if (!unit) return 0;
+  return effectiveStats(unit, { modules: [layerId] }, data).hp ?? 0;
+}
+
 /** A standing rocket mine of `owner` under `id` — its own fleet, never a prototype key. */
 function ownMine(h: HandlerContext, id: string, owner: string): Fleet | null {
   const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, id) ? h.state.fleets[id] : undefined;
   return fleet && fleet.owner === owner && isRocketMineFleet(fleet, h.ctx.data) ? fleet : null;
+}
+
+/** A flying missile under `id` — a fleet of the missile unit, never a prototype key. */
+function missileFleet(h: HandlerContext, id: string): Fleet | null {
+  const fleet = Object.prototype.hasOwnProperty.call(h.state.fleets, id) ? h.state.fleets[id] : undefined;
+  return fleet && fleet.flight && isMissileFleet(fleet, h.ctx.data) ? fleet : null;
+}
+
+/** The missile leaves the map — it struck or was shot down. Not a lost fleet (`spent`): the
+ *  launch and the outcome are announced by their own events. */
+function endMissile(h: HandlerContext, missile: Fleet): void {
+  delete h.state.fleets[missile.id];
+  if (h.state.ordnance?.warheads) delete h.state.ordnance.warheads[missile.id];
+  h.emit('fleet.destroyed', { fleetId: missile.id, owner: missile.owner, spent: true });
 }
 
 /** The mine leaves the map — launched or disarmed. Not a loss (`spent`, as for a contact
@@ -125,34 +153,43 @@ function scan(h: HandlerContext, mine: Fleet): void {
     // Remove first: a repeated timer/mode action cannot fire this mine a second time.
     liftMine(h, mine);
     const travel = distance(position, target) / (def.speed * travelSpeedFactorOf(h.ctx));
-    const missile: MineMissile = {
-      id: mine.id,
+    const arrivesAt =
+      h.ctx.now + Math.max(1, Math.ceil(hoursToMs(h.ctx, Math.max(def.minFlightHours, travel))));
+    // The missile is a fleet without orders (SM-3.7b): it flies straight to the signal's point
+    // and passes the ordinary fog. Its id names no owner; its warhead stays with the owner.
+    const missile: Fleet = {
+      id: `fleet:missile:${h.ctx.now}:${nextFleetSeq(h.state)}`,
       owner: mine.owner,
-      moduleId: layer.id,
-      from: { ...position },
-      to: { ...target },
-      launchedAt: h.ctx.now,
-      damage: control.damage,
-      hp: def.hp,
-      arrivesAt:
-        h.ctx.now + Math.max(1, Math.ceil(hoursToMs(h.ctx, Math.max(def.minFlightHours, travel)))),
+      location: null,
+      movement: null,
+      edge: null,
+      flight: { from: { ...position }, to: { ...target }, departedAt: h.ctx.now, arrivesAt },
+      units: [{ unit: MISSILE_UNIT, count: 1, modules: [layer.id] }],
+      landing: [],
+      traits: [],
+      battleId: null,
     };
-    ord.missiles.push(missile);
-    h.schedule(missile.arrivesAt, 'rocketMine.impact', { missileId: missile.id });
+    h.state.fleets[missile.id] = missile;
+    (ord.warheads ??= {})[missile.id] = control.damage;
+    h.schedule(arrivesAt, 'rocketMine.impact', { missileId: missile.id });
     scheduleFlight(h, missile);
-    h.emit('rocketMine.launched', { owner: mine.owner, mineId: mine.id });
+    h.emit('rocketMine.launched', { owner: mine.owner, mineId: mine.id, missileId: missile.id });
   } else {
     control.nextScanAt = h.ctx.now + Math.max(1, Math.ceil(hoursToMs(h.ctx, def.scanHours)));
     h.schedule(control.nextScanAt, 'rocketMine.scan', { mineId: mine.id, at: control.nextScanAt });
   }
 }
 
-/** Finite volleys along the flight, with the same reload pool as shuttle PD. */
-function intercepted(h: HandlerContext, m: MineMissile): boolean {
-  const def = h.ctx.data.modules[m.moduleId]?.rocketMine;
-  if (!def) return true;
-  let hp = m.hp ?? def.hp;
-  const position = missilePositionAt(m, h.ctx.now);
+/** Finite volleys along the flight, with the same reload pool as shuttle PD. They wear down
+ *  the missile's hull (its unit, SM-3.7b) — the same hull shuttles hit. */
+function intercepted(h: HandlerContext, m: Fleet): boolean {
+  const flight = m.flight;
+  const stack = m.units.find((st) => st.count > 0);
+  const unit = stack && h.ctx.data.units[stack.unit];
+  const full = unit && stack ? (effectiveStats(unit, stack, h.ctx.data).hp ?? 0) * stack.count : 0;
+  if (!flight || !stack || !(full > 0) || !missileModule(m, h.ctx.data)) return true;
+  let hp = stack.hp ?? full;
+  const position = flightPointAt(flight, h.ctx.now);
   for (const f of Object.values(h.state.fleets).sort((a, b) => (a.id < b.id ? -1 : 1))) {
     if (
       f.battleId ||
@@ -180,14 +217,14 @@ function intercepted(h: HandlerContext, m: MineMissile): boolean {
       return true;
     }
   }
-  m.hp = hp;
+  if (hp < full) stack.hp = hp;
   // Planetary point defense guards the terminal approach, as for shuttles.
-  if (h.ctx.now < m.arrivesAt) return false;
+  if (h.ctx.now < flight.arrivesAt) return false;
   for (const planet of Object.values(h.state.planets)) {
     if (
       !planet.owner ||
       getStance(h.state, m.owner, planet.owner) !== 'war' ||
-      !inRadius(planet.position, m.to, PD_RANGE)
+      !inRadius(planet.position, flight.to, PD_RANGE)
     )
       continue;
     const power = planetPointDefense(planet, h.ctx.data);
@@ -205,9 +242,9 @@ function intercepted(h: HandlerContext, m: MineMissile): boolean {
   return false;
 }
 
-function scheduleFlight(h: HandlerContext, missile: MineMissile): void {
+function scheduleFlight(h: HandlerContext, missile: Fleet): void {
   const step = Math.max(1, Math.ceil(hoursToMs(h.ctx, 1 / 60)));
-  if (h.ctx.now + step < missile.arrivesAt) {
+  if (missile.flight && h.ctx.now + step < missile.flight.arrivesAt) {
     h.schedule(h.ctx.now + step, 'rocketMine.flight', { missileId: missile.id });
   }
 }
@@ -216,7 +253,9 @@ export const rocketMinesModule: GameModule = {
   id: 'rocketMines',
   // 2.0.0: стоящая мина — отряд во `fleets` (юнит `rocket_mine`, SM-3.7a); её режим и боевая
   // часть — в `ordnance.controls`; мина не целится в мины, и взрыв их не задевает.
-  version: '2.0.0',
+  // 3.0.0: ракета — отряд во `fleets` (юнит `missile`, полёт по прямой, SM-3.7b); её боевая
+  // часть — в `ordnance.warheads`; мина не целится в ракеты, и взрыв их не задевает.
+  version: '3.0.0',
   setup(api) {
     api.onAction('fleet.deployRocketMine', (action, h) => {
       const p = action.payload as { fleetId?: string; mode?: string } | null;
@@ -227,8 +266,16 @@ export const rocketMinesModule: GameModule = {
       // Без юнита мины в данных мине негде стоять, а без общего трейта `mine` отряд не был бы
       // миной: воевал бы, мешал захвату и сам ставил мины. Ошибка данных отклоняет установку,
       // а не меняет правила (fail-secure, замечание Codex на #1499).
+      // То же для ракеты (SM-3.7b): без юнита с трейтом `missile` ей не стать отрядом, а без
+      // корпуса её нечем сбить.
       const unit = h.ctx.data.units[ROCKET_MINE_UNIT];
-      if (!layer || !defHasTrait(unit, ROCKET_MINE_TRAIT) || !defHasTrait(unit, MINE_TRAIT))
+      if (
+        !layer ||
+        !defHasTrait(unit, ROCKET_MINE_TRAIT) ||
+        !defHasTrait(unit, MINE_TRAIT) ||
+        !defHasTrait(h.ctx.data.units[MISSILE_UNIT], MISSILE_TRAIT) ||
+        !(missileHull(h.ctx.data, layer.id) > 0)
+      )
         return h.reject('E_NO_ROCKET_MINELAYER');
       const edge = fleet.edge;
       if (
@@ -248,12 +295,15 @@ export const rocketMinesModule: GameModule = {
       if (ord.installations.some((m) => m.fleetId === fleet.id))
         return h.reject('E_MINE_INSTALLING');
       if ((ord.cooldowns[action.playerId] ?? 0) > h.ctx.now) return h.reject('E_MINES_COOLDOWN');
+      // Standing mines and flying missiles are fleets now (SM-3.7a/b); only installations
+      // still live in `ordnance`.
       const standing = Object.values(h.state.fleets).filter(
-        (f) => f.owner === action.playerId && isRocketMineFleet(f, h.ctx.data),
+        (f) =>
+          f.owner === action.playerId &&
+          (isRocketMineFleet(f, h.ctx.data) || isMissileFleet(f, h.ctx.data)),
       ).length;
       const active =
-        standing +
-        [...ord.installations, ...ord.missiles].filter((m) => m.owner === action.playerId).length;
+        standing + ord.installations.filter((m) => m.owner === action.playerId).length;
       if (active >= layer.def.maxActive) return h.reject('E_MINE_LIMIT');
       if (!canAfford(player.resources, layer.def.cost)) return h.reject('E_INSUFFICIENT');
       payCost(player.resources, layer.def.cost);
@@ -346,27 +396,29 @@ export const rocketMinesModule: GameModule = {
     });
     api.on('rocketMine.flight', (event, h) => {
       const { missileId } = event.payload as { missileId: string };
-      const ord = h.state.ordnance;
-      const missile = ord?.missiles.find((m) => m.id === missileId);
-      if (!ord || !missile) return;
-      if (intercepted(h, missile)) ord.missiles = ord.missiles.filter((m) => m.id !== missileId);
+      const missile = missileFleet(h, missileId);
+      if (!missile) return;
+      if (intercepted(h, missile)) endMissile(h, missile);
       else scheduleFlight(h, missile);
     });
     api.on('rocketMine.impact', (event, h) => {
       const { missileId } = event.payload as { missileId: string };
-      const ord = h.state.ordnance;
-      const missile = ord?.missiles.find((m) => m.id === missileId && m.arrivesAt === h.ctx.now);
-      if (!ord || !missile) return;
-      ord.missiles = ord.missiles.filter((m) => m.id !== missileId);
-      const def = h.ctx.data.modules[missile.moduleId]?.rocketMine;
+      const missile = missileFleet(h, missileId);
+      if (!missile || missile.flight!.arrivesAt !== h.ctx.now) return;
+      const to = missile.flight!.to;
+      const def = missileModule(missile, h.ctx.data)?.def;
+      const warhead = h.state.ordnance?.warheads?.[missile.id];
+      // Off the map first: the terminal point defense below hits a missile that is gone.
+      endMissile(h, missile);
       if (!def || intercepted(h, missile)) return;
       for (const fleet of Object.values(h.state.fleets).sort((a, b) => (a.id < b.id ? -1 : 1))) {
-        // Мина взрывом не ранится, как и прицелом не выбирается: её снимают челноки (SM-3.6).
-        if (isMineFleet(fleet, h.ctx.data)) continue;
+        // Мина и ракета взрывом не ранятся, как и прицелом не выбираются: мину снимают
+        // челноки (SM-3.6), ракету — ПРО и челноки (SM-3.7b).
+        if (isOrdnanceFleet(fleet, h.ctx.data)) continue;
         if (getStance(h.state, missile.owner, fleet.owner) !== 'war') continue;
         const at = fleetPositionAt(h.state, fleet, h.ctx.now);
-        if (!at || !inRadius(at, missile.to, def.blastRadius)) continue;
-        const damage = hookedDamage(h, missile.damage ?? def.damage, {
+        if (!at || !inRadius(at, to, def.blastRadius)) continue;
+        const damage = hookedDamage(h, warhead ?? def.damage, {
           phase: 'missile',
           location: fleetNodeAt(h.state, fleet, h.ctx.now) ?? '',
           attacker: missile.owner,
@@ -405,9 +457,10 @@ export const rocketMinesModule: GameModule = {
           if (!keep) h.emit('rocketMine.cancelled', { owner: job.owner, mineId: job.id });
           return !!keep;
         });
-        // A mine destroyed by shuttles leaves its controls behind — the doctrine of a mine
-        // that is gone must not outlive it in the state.
+        // A mine or a missile destroyed by shuttles leaves its controls or warhead behind —
+        // the private record of a fleet that is gone must not outlive it in the state.
         for (const id of Object.keys(ord.controls ?? {})) if (!h.state.fleets[id]) delete ord.controls![id];
+        for (const id of Object.keys(ord.warheads ?? {})) if (!h.state.fleets[id]) delete ord.warheads![id];
       });
   },
 };

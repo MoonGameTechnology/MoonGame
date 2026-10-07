@@ -62,8 +62,8 @@ const data: GameData = parseGameData({
       rarity: 'legendary',
       rocketMine: {
         armHours: 0.25, cooldownHours: 1, scanHours: 1 / 60, maxActive: 6, radarRange: 120, radarLevel: 3,
-        sightRange: 24, detectionRange: 24, speed: 240, minFlightHours: 1 / 60, hp: 12, damage: 80,
-        blastRadius: 10, mineSignature: 0.1, missileSignature: 13, cost: { metal: 40 },
+        sightRange: 24, detectionRange: 24, speed: 240, minFlightHours: 1 / 60, damage: 80,
+        blastRadius: 10, mineSignature: 0.1, cost: { metal: 40 },
       },
     },
   },
