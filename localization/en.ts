@@ -2405,10 +2405,10 @@ export const en: Record<string, string> = {
   'data.scavenger-mastery': "Scavenger Mastery",
   'data.wreck-optics': "Wreck Optics",
   'data.evac-transport': 'refugee transport',
-  'hero.passive.hull-cutters.desc': "A further +2% salvage share — 5% in total.",
-  'hero.passive.master-batteries.desc': "A further +3% damage — 10% in total.",
-  'hero.passive.master-scavenger.desc': "A further +5% salvage share — 10% in total.",
-  'hero.passive.reclaimed-barrels.desc': "A further +2% damage — 7% in total.",
+  'hero.passive.hull-cutters.desc': 'A further +2% salvage share, 5% in total.',
+  'hero.passive.master-batteries.desc': 'A further +3% damage, 10% in total.',
+  'hero.passive.master-scavenger.desc': 'A further +5% salvage share, 10% in total.',
+  'hero.passive.reclaimed-barrels.desc': 'A further +2% damage, 7% in total.',
   'hero.passive.scavenged-guns.desc': "+5% damage for the ship the hero commands.",
   'hero.passive.swarm-instinct.desc': 'Swarm fleets within 42 of the Leviathan fly 10% faster.',
   'hero.passive.wreck-optics.desc': "+3% salvage share in battles this hero fought.",
@@ -2416,11 +2416,11 @@ export const en: Record<string, string> = {
   'data.ballistic-model': 'Ballistic Model',
   'hero.passive.ballistic-model.desc': "In a slot: +10% damage for the hero's fleet.",
   'hero.passive.field-lab.desc': '+10% salvage share in battles this hero fought.',
-  'hero.tree.field-foundry.desc': "Salvaged metal is melted down in the hold and fed to the barrels.",
-  'hero.tree.hull-shears.desc': "Powered shears open plating faster than it can cool.",
-  'hero.tree.salvage-rig.desc': "Grapples and cutters on external mounts: the hero starts stripping more off a battlefield than anyone else.",
-  'hero.tree.scavenged-battery.desc': "What comes off enemy hulls goes straight back into service — the hero’s guns hit harder.",
-  'hero.tree.scavenger-mastery.desc': "The peak of the craft: a battlefield the hero leaves is bare, and the guns are the best in the squadron.",
+  'hero.tree.field-foundry.desc': "Salvaged metal is melted down in the hold and fed to the barrels: a further +2% damage for the hero's ship.",
+  'hero.tree.hull-shears.desc': 'Powered shears open plating faster than it can cool: a further +2% salvage share.',
+  'hero.tree.salvage-rig.desc': "Grapples and cutters on external mounts: +3% salvage share in the hero's battles.",
+  'hero.tree.scavenged-battery.desc': "Guns from salvaged parts: +5% damage for the hero's ship.",
+  'hero.tree.scavenger-mastery.desc': 'The peak of the craft: a further +5% salvage share and +3% damage.',
 
   // --- hero — Герои: грейды, способности (имя + описание).
   "hero.person.commander.name": "Mark Weir",
@@ -2439,34 +2439,34 @@ export const en: Record<string, string> = {
   "hero.person.ships": "Ships in fleet",
   "hero.person.reserve": "Flagship in reserve",
   'hero.person.ship-stats': 'Flagship stats with installed modules',
-  'hero.ability.annihilate.desc': 'Destroys a planet in range — it becomes a dead world.',
+  'hero.ability.annihilate.desc': 'Turns a planet within 500 into a dead world.',
   'hero.ability.annihilate.name': 'Annihilate',
   'hero.ability.boarding-translocation.desc':
-    'The hero arrives where one of your fleets is parked — as a separate fleet alongside it. Every hero leads their own squadron, so they never join another; a fleet in transit is not a landing point. Passive skill: widens the deployment points.',
+    'Passive. The hero deploys as a separate fleet next to any of your fleets. A fleet in transit is not a landing point.',
   'hero.ability.bulwark.desc':
-    'A temporary shield: +15% defense to your fleets within 42 of the hero, for 2 hours. The command net widens it to 220, then 334.',
+    'A temporary shield: +15% defense to your fleets within 42 of the hero for 2 hours. The command net widens the radius to 220, then 334.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
-    'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to your allies — an open corridor is shared, so the enemy may walk in too.',
+    "A corridor to a world within 300: +50% speed for the hero's fleets. Only the hero's army may use it, and it closes once that army arrives. Upgrades keep it for 6 hours, then open it to everyone, the enemy included.",
   'hero.ability.corridor.name': 'Corridor',
   'hero.ability.decoy-signal.desc':
-    'Fakes a radar contact: a node in range starts reading as occupied on rival radar. The phantom only shows where their radar reaches, and it falls apart the moment they get close enough to identify the node.',
+    'Fakes a radar contact: a node within 400 reads as occupied on rival radar, signature 8, for 4 hours. Falls apart when the enemy gets close.',
   'hero.ability.diplomatic-landing.desc':
-    "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
+    "Passive. Allied worlds receive the hero as their own: the hero's ship can rise from an ally's planet.",
   'hero.ability.hive-call.desc':
     '+15% damage for Swarm fleets within 220 of the Leviathan, for 2 hours.',
   'hero.ability.devour.desc':
     'A world under the Leviathan\'s bombardment becomes a dead world after 4 hours. A battle with its fleet or leaving orbit breaks the siege.',
   'hero.ability.rally.desc':
-    'A battle cry: +10% damage for your fleets within 42 of the hero, for 2 hours. The command net widens it to 220, then 334.',
+    'A battle cry: +10% damage to your fleets within 42 of the hero for 2 hours. The command net widens the radius to 220, then 334.',
   'hero.ability.rally.name': 'Rally',
   'hero.ability.recall.desc': 'Instantly recalls the hero ship to the capital.',
   'hero.ability.recall.name': 'Recall',
   'hero.ability.scan.desc':
-    'Reveals an area around the target through the fog for a while. Upgrades turn the lit zone into a combat zone: first it marks the gaps in enemy armour, then it flies your own and allied fleets by the radar picture.',
+    'Clears the fog within 250 around a target up to 400 away, for 3 hours. Upgrades add +5% damage to enemies in the zone, then −5% damage to your own.',
   'hero.ability.scan.name': 'Scan',
   'hero.ability.warp-jump.desc':
-    'A puncture in space: the hero ship and the troops in its hold appear instantly at a node in range. Jumps through fog too. Will not pull a ship out of an active battle.',
+    'A puncture in space: the hero ship and its troops jump instantly to a node within 350, through fog too. Unavailable while the ship is in battle.',
   'hero.arch.commander': 'Commander',
   'hero.arch.destroyer': 'Destroyer',
   'hero.arch.vanguard': 'Vanguard',
@@ -2481,39 +2481,39 @@ export const en: Record<string, string> = {
   'hero.hook.combat-damage': 'damage to nearby fleets',
   'hero.hook.fleet-speed': 'fleet speed',
   'hero.passive.convoy-impulse.desc':
-    'The hero runs the staging: fleets departing nodes within 42 fly 8% faster.',
+    'Fleets starting a leg from a node within 42 of the hero fly that leg 8% faster.',
   'hero.passive.rally-beacon.desc':
-    'Fleets near the hero fight harder: +8% damage for your fleets within 42.',
+    '+8% damage to your fleets within 42 of the hero.',
   'hero.passive.asteroid-pilot.desc':
-    "The hero's ship loses less way among the rocks: +20% speed entering any asteroid terrain.",
+    "+20% speed for the hero's ship in asteroid terrain.",
   'hero.passive.vanguard-impulse.desc':
-    "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
+    "+10% speed for the hero's fleet.",
   'hero.tree.corridor-open.desc':
-    'Opens the corridor to your allies: their fleets use your passage as their own, at the same speed bonus. It becomes a shared road, so a neutral — or the enemy — can step in as well, but for them it is only a road: no bonus.',
+    'Opens the corridor to everyone, the enemy included. Allies travel it at +50% speed.',
   'hero.tree.corridor-sustained.desc':
-    "The corridor lives on a clock instead of closing behind the hero's army.",
+    "The corridor stays open after the hero's army passes and holds for 6 hours from opening.",
   'hero.tree.command-relay.desc':
     'The relay carries an order to the next node: the Rally and Bulwark radius grows from 42 to 220.',
   'hero.tree.command-grid.desc':
     'The grid covers the neighbours outright: the Rally and Bulwark radius grows from 220 to 334.',
   'hero.tree.false-echo.desc':
-    'The other side of psi-sight: the hero learns not only to read a rival radar, but to write into it what is not there.',
+    'Unlocks the Decoy Signal ability.',
   'hero.tree.fleet-uplink.desc':
-    'The neural link spreads to the whole order: not just the hero ship, but nearby fleets get under way faster.',
+    'The neural link spreads to the whole order: fleets starting a leg from a node within 42 of the hero fly that leg 8% faster.',
   'hero.tree.asteroid-navigation.desc':
-    "Dead reckoning between the rocks. Unlocks Asteroid Pilot: +20% speed for the hero's ship in asteroid terrain.",
-  'hero.tree.neural-lace.desc': "A direct brain-to-helm implant: the hero's ship gains +10% speed.",
+    "Finding the way by the debris: +20% speed for the hero's ship in asteroid terrain.",
+  'hero.tree.neural-lace.desc': "A brain-to-helm implant: +10% speed for the hero's fleet.",
   'hero.tree.overclocked-helm.desc':
-    'Overclocking the neural interface lets the hero lay corridors.',
+    'Overclocking the neural interface unlocks the Corridor ability for the hero.',
   'hero.tree.psi-evasion.desc':
-    'The radar picture reaches your own too: your fleets and allied fleets inside the lit zone take 5% less incoming damage.',
-  'hero.tree.psi-veil.desc': 'Honed psi-sight: the hero learns to tear the fog open with a scan.',
+    'Your own and allied fleets in the Scan zone take 5% less damage.',
+  'hero.tree.psi-veil.desc': 'Honed psi-sight: unlocks the Scan ability.',
   'hero.tree.psi-weak-points.desc':
-    'The radar does more than light the dark: it reads the gaps in hostile armour. Enemy fleets inside the lit zone take 5% more damage. Your own, allied and neutral fleets are untouched.',
+    'The radar reads the gaps in hostile armour: enemy fleets in the Scan zone take 5% more damage.',
   'hero.tree.void-attunement.desc':
-    "The hero's psi resonance inspires nearby fleets: +8% damage within 42.",
+    "The hero's psi resonance inspires nearby fleets: +8% damage to your fleets within 42.",
   'hero.tree.void-translocator.desc':
-    'The top of the corridor branch: the hero stops laying a path and simply vanishes at one node to appear at another.',
+    'A corridor fault once threw a ship far past the exit, and it came back intact. Now the fault is triggered on purpose: unlocks the Warp Jump ability.',
   'hero.unit.commander.desc':
     'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
   'hero.unit.leviathan.desc':
