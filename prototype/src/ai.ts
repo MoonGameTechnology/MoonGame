@@ -225,9 +225,9 @@ const CARRIER_CAP = 2;
  * ветка его учёного, и после BAL-6 боевой бонус ветки идёт только своему роду войск
  * (`damageScope`). Поэтому место строит то, что его ветка усиливает, и строит ВМЕСТО
  * крейсера, а не сверх: каждый тик бот заказывает один линейный корабль, и этот слот
- * получает корпус ветки. Добавлять сверх нельзя — казна бота и так упирается в кредиты и
- * микроэлектронику, и лишние войска съели бы её содержанием. Поле, которого нет, —
- * прежнее общее правило.
+ * получает корпус ветки, пока таких корпусов у места меньше, чем крейсеров. Добавлять
+ * сверх нельзя — казна бота и так упирается в кредиты и микроэлектронику, и лишние войска
+ * съели бы её содержанием. Поле, которого нет, — прежнее общее правило.
  *
  * - `lineHulls` — корпус слота линейного корабля, по порядку: первое, что примет ядро
  *   (стапель, казна, ворота техов); `warHulls` — то же, но только на войне и первым.
@@ -247,8 +247,11 @@ interface DoctrineArmy {
   strikeCap?: number;
   minerEveryHero?: true;
 }
-/** Сколько часов дохода бот готов копить на узел своей ветки (копилка доктрины). */
-const DOCTRINE_SAVE_HOURS = 12;
+/** Сколько часов дохода бот готов копить на узел своей ветки (копилка доктрины). Полсуток
+ *  оказались много: космос отдавал стройку узлам и проигрывал середину партии (`selfplay
+ *  200` sp/alt: побед 45/41%). Без копилки вершину ветки брали 8–23% мест, с 4 часами —
+ *  15–56%, а побед у космоса 48/40%. */
+const DOCTRINE_SAVE_HOURS = 4;
 const DOCTRINE_ARMY: Readonly<Record<string, DoctrineArmy>> = {
   // Космос: орбитальный бой и обстрел — тяжёлые крейсеры и третий осадный.
   space: { heavyYard: true, lineHulls: ['heavy_cruiser'], siegeCap: 3 },
@@ -1527,12 +1530,27 @@ function baseAiOrders(
       (pl.resources.microelectronics ?? 0) >= 3 // ECON-7: warships need the hi-tech good
     ) {
       // Корпус ветки в слот линейного корабля (армия под ветку): первое, что примет ядро,
-      // челнок — пока не упёрся в потолок своего рода; иначе крейсер.
+      // пока таких у места меньше, чем крейсеров, — армия выходит смешанной. Целиком своим
+      // родом бот проигрывал: земля на войне строила одни танки, отдавала бой за орбиту и
+      // выигрывала 49/35% партий (`selfplay 200` sp/alt). Челнок вдобавок держит потолок
+      // своего рода. Иначе крейсер.
       const strikeCap = army.strikeCap ?? SHUTTLE_CAP;
+      const owned = (unit: string): number => {
+        if (data.units[unit]?.traits.includes('shuttle')) return shuttlesOwned(unit);
+        const count = (stacks: readonly UnitStack[] = []): number =>
+          stacks.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0);
+        let n = 0;
+        for (const f of Object.values(state.fleets))
+          if (f.owner === ai) n += count(f.units) + count(f.landing);
+        for (const p of Object.values(state.planets)) if (p.owner === ai) n += count(p.garrison);
+        return n;
+      };
+      const cruisers = owned(lineUnit);
       const hull =
         [...(warFooting ? (army.warHulls ?? []) : []), ...(army.lineHulls ?? [])].find(
           (u) =>
-            (!data.units[u]?.traits.includes('shuttle') || shuttlesOwned(u) < strikeCap) &&
+            owned(u) < cruisers &&
+            (!data.units[u]?.traits.includes('shuttle') || owned(u) < strikeCap) &&
             canOrder(state, buildUnit(ai, base.id, u, 1)) === null,
         ) ?? lineUnit;
       out.push(buildUnit(ai, base.id, hull, 1));

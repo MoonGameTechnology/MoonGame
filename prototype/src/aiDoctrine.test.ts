@@ -3,7 +3,8 @@
 // Что здесь закрепляется. Доктрина места — ветка учёного его совета (`botDoctrine.ts`).
 // Бот ведёт эту ветку вперёд цены, копит на её узел, когда доход закроет нехватку, и
 // строит то, что ветка усиливает, ВМЕСТО крейсера: космос — тяжёлый крейсер на улучшенной
-// верфи, на войне шаттлы — ударный челнок, земля — танк; ракеты — минёр у каждого героя.
+// верфи, на войне шаттлы — ударный челнок, земля — танк, пока их меньше, чем крейсеров;
+// ракеты — минёр у каждого героя.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import { data } from './gameData';
@@ -70,10 +71,10 @@ describe('исследования по доктрине', () => {
     expect(researched(game2('polymath'))).toEqual(['industrial_automation']);
   });
 
-  it('на узел ветки, который доход закроет за полсуток, бот копит: ни чужих узлов, ни войск', () => {
-    // «Ударные векторы» стоят 280 кредитов, 220 металла и 30 микроэлектроники; металла
-    // недостаёт сотни, а шахта дома даёт его каждый час.
-    const s = done(game2('wing_commodore', { ...RICH, metal: 150 }), 'flight_decks');
+  it('на узел ветки, который доход закроет за 4 часа, бот копит: ни чужих узлов, ни войск', () => {
+    // «Ударные векторы» стоят 280 кредитов, 220 металла и 30 микроэлектроники; с запасом
+    // заказа металла недостаёт 30, а шахта дома даёт его каждый час.
+    const s = done(game2('wing_commodore', { ...RICH, metal: 250 }), 'flight_decks');
     const acts = orders(s);
     expect(only(acts, 'technology.research')).toEqual([]);
     const metalUnits = only(acts, 'unit.build').filter(
@@ -110,6 +111,36 @@ describe('армия под ветку', () => {
         .filter((u) => u === 'cruiser' || u === 'heavy_cruiser');
     expect(line('void_admiral')[0]).toBe('heavy_cruiser');
     expect(line('ordnance_savant')[0]).toBe('cruiser');
+  });
+
+  it('корпусов ветки не больше, чем крейсеров: дальше слот снова у крейсера', () => {
+    const s = developed(game2('void_admiral'), 3);
+    const count = (unit: string): number =>
+      [
+        ...Object.values(s.fleets)
+          .filter((f) => f.owner === 'p2')
+          .flatMap((f) => [...f.units, ...(f.landing ?? [])]),
+        ...Object.values(s.planets)
+          .filter((p) => p.owner === 'p2')
+          .flatMap((p) => p.garrison),
+      ].reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
+    const cruisers = count('cruiser');
+    expect(cruisers).toBeGreaterThan(0);
+    const fleet = Object.values(s.fleets).find((f) => f.owner === 'p2')!;
+    const evened: GameState = {
+      ...s,
+      fleets: {
+        ...s.fleets,
+        [fleet.id]: {
+          ...fleet,
+          units: [...fleet.units, { unit: 'heavy_cruiser', count: cruisers }],
+        },
+      },
+    };
+    const line = only(orders(evened), 'unit.build')
+      .map((a) => (a.payload as { unit: string }).unit)
+      .filter((u) => u === 'cruiser' || u === 'heavy_cruiser');
+    expect(line[0]).toBe('cruiser');
   });
 
   it('на войне слот крейсера получает ударный челнок у шаттлов и танк у земли', () => {
