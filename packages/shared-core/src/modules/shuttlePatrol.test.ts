@@ -335,6 +335,18 @@ describe('SHU-6.2 — приёмка кирпича', () => {
     expect(hullOf(state, 'E1')).toBe(40);
   });
 
+  it('УДАР НАЗЫВАЕТ ЖЕРТВУ КЛЮЧАМИ АУДИТОРИИ — иначе сервер не донёс бы его до неё', () => {
+    // `MatchRoom.eventVisibleTo` знает `playerId` и место (`location`/`planetId`), но не
+    // `targetOwner`: без этих ключей удар по чужому флоту видел бы только стрелявший.
+    const fleetHit = payloads(run(apply(passingConvoy(), patrol('sq:b')), 6).events, 'shuttle.hit');
+    expect(fleetHit[0]).toMatchObject({ targetId: 'E1', playerId: 'p2', location: '' });
+    const worldHit = payloads(
+      run(apply(until(withRaid(world([])), 0.9), raid()), 3).events,
+      'shuttle.hit',
+    );
+    expect(worldHit[0]).toMatchObject({ targetId: 'B', playerId: 'p1', planetId: 'B' });
+  });
+
   it('ЧЕРЕЗ patrolHours ЭСКАДРА СНОВА В АНГАРЕ БАЗЫ', () => {
     // 1,5 ч туда, 4 ч в круге, 1,5 ч обратно: дома в 7 ч.
     const s = apply(world([sq('sq:i', 'interceptor', 2)]), patrol('sq:i'));

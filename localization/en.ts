@@ -2796,6 +2796,7 @@ export const en: Record<string, string> = {
   'log.shuttle.repelled.mine': '✳ Flak downed {n} of our craft · {at}',
   'log.shuttle.repelled.theirs': '✳ Our flak downed {n} enemy craft · {at}',
   'log.shuttle.hold-ended': '⟳ Patrol “{name}” is no longer held: {why}',
+  'log.shuttle.hit': '✳ Shuttle strike: {what}',
   'log.shuttle.missile-downed': '✳ Missile shot down by shuttles',
   'log.spy.caught': '🛡 Counter-intel: agent {who} caught stealing ({what})!',
   'log.spy.fail': '🕵 Agent failed ({who}) — the fee is gone',

@@ -54,7 +54,7 @@
 | REFM-214 | ✅ | proto | `docs/backlog.md` | Дипломатия и связь |
 | REFM-215 | ✅ | proto | `docs/backlog.md` | Сессия аккаунта |
 | REFM-216 | ✅ | proto | `docs/backlog.md` | Сетевой жизненный цикл |
-| REFM-217 | ⏳ | proto | `docs/backlog.md` | Обзор партий и выбор места |
+| REFM-217 | 🔶 | proto | `docs/backlog.md` | Обзор партий и выбор места |
 | REFM-218 | ✅ | proto | `docs/backlog.md` | Страницы входа |
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
@@ -74,7 +74,7 @@
 | REFM-234 | 🔒 | proto | `docs/backlog.md` | Эффекты и метки |
 | REFM-235 | 🔒 | proto | `docs/backlog.md` | render() по слоям |
 | REFM-236 | 🔒 | proto | `docs/backlog.md` | Ввод на канвасе |
-| REFM-237 | ⏳ | proto | `docs/backlog.md` | Палитра сторон и константы карты |
+| REFM-237 | ✅ | proto | `docs/backlog.md` | Палитра сторон и константы карты |
 | REFM-238 | ⏳ | proto | `docs/backlog.md` | Геометрия флотов на карте |
 | REFM-239 | ⏳ | proto | `docs/backlog.md` | Радар |
 | REFM-240 | ⏳ | proto | `docs/backlog.md` | Конвейер приказа |
@@ -1405,6 +1405,7 @@
 | SHU-6.10 | ✅ | core proto | `docs/shuttles-roadmap.md` | Чужой патруль в обзоре |
 | SHU-6.8 | ✅ | proto | `docs/shuttles-roadmap.md` | Бот: патруль и перелёт |
 | SHU-6.9 | ✅ | data | `docs/shuttles-roadmap.md` | Баланс фазы 6 |
+| SHU-6.11 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар шаттлов на карте и в журнале |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md` | Поза «Активная оборона» — контрудар при приемлемых потерях |

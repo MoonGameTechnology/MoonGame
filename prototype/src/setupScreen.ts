@@ -669,6 +669,9 @@ export function initSetupScreen(host: SetupScreenHost): void {
   });
   $('setupcancel').addEventListener('click', () => {
     setupEl.style.display = 'none';
+    // Опрос мест живёт, пока открыт сетевой экран (ENTRY-2, правило 5). До REFM-217 «Назад»
+    // его не гасил, и хаб переспрашивал места брошенной партии каждые пять секунд.
+    game.stopNetPoll();
     if (setupReturn === 'hub') game.openHub();
     else game.showConnect(true);
   });

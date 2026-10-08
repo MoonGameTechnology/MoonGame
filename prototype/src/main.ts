@@ -37,11 +37,7 @@ import {
   tickSoloSave,
 } from './soloCheckpoint';
 import {
-  askSignIn,
   authMode,
-  claimDone,
-  fetchJoinToken,
-  holdJoinToken,
   initAccountSession,
   pendingJoinAfterAuth,
   probeAuthMode,
@@ -87,7 +83,6 @@ import {
 } from './signInPages';
 import {
   NET,
-  connect,
   countNetFrame,
   initNetSession,
   leaveNetwork,
@@ -98,8 +93,15 @@ import {
   netView,
   reconnecting,
   rttEma,
-  targetMatch,
 } from './netSession';
+import {
+  closeSeatPicker,
+  connectToMatch,
+  initMatchJoin,
+  openSeatPicker,
+  openSessionTab,
+  stopNetSetupPoll,
+} from './matchJoin';
 import { fleetBaseSpeed, fleetNodeAt, forkSiteId, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
@@ -311,6 +313,7 @@ import { createBattleModel } from '../../packages/client/src/index';
 import { pveModeId, pveChapter, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
+import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import {
   worldToScreen as camWorldToScreen,
@@ -322,12 +325,7 @@ import {
   fitTransform as camFitTransform,
   projection as camProjection,
 } from '../../packages/client/src/camera';
-import {
-  rgba,
-  blitGlow as hdBlitGlow,
-  blitSphere as hdBlitSphere,
-  clearHolographicSprites,
-} from '../../packages/client/src/holoDraw';
+import { rgba, clearHolographicSprites } from '../../packages/client/src/holoDraw';
 import { drawTerritory, strokeBorders, type ClassifiedBorders, type TerritoryCell, type TerritoryPalette } from '../../packages/client/src/territory';
 import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryShape } from '../../packages/client/src/territoryGeometry';
@@ -450,7 +448,6 @@ import {
 } from './sectorZeroShell';
 import {
   buildSetupConfig,
-  enterNetSetup,
   initSetupScreen,
   netSetup,
   openSetup,
@@ -460,7 +457,6 @@ import {
   setupMapId,
   setupSlots,
   setupSpeed,
-  updateNetOffer,
 } from './setupScreen';
 import { getPlatform, type PlatformHost } from './platform/host';
 import { doubleReward, shopCapabilities } from '../../decisions/sectorZeroShop';
@@ -738,15 +734,34 @@ import {
 // REFM-201: чей сейчас ход в переговорах — одна формула на оба чипа.
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
+import { COLOR, VOID_COLOR } from './sideColors';
+// REFM-237 — цвета сторон, места матча и константы карты: у владельца, `mapPalette.ts`.
 import {
-  COLOR,
-  VOID_COLOR,
-  isPaletteId,
-  paletteOf,
-  relationColor,
-  safeHexColor,
-  stanceColor,
-} from './sideColors';
+  ABILITY_RING,
+  blitGlow,
+  blitSphere,
+  CARDINAL,
+  CAST_FAR,
+  CAST_REACH,
+  CORR_LIVE,
+  CORR_ONCE,
+  GRID,
+  HOSTILE,
+  initMapPalette,
+  LOCK,
+  neutralColor,
+  ORBIT_COLOR,
+  ownerColor,
+  R_AA,
+  R_ARTY,
+  R_WING,
+  rivalPaletteId,
+  SEAT_META,
+  setSideColors,
+  stanceCol,
+  TAU,
+  youColor,
+} from './mapPalette';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -1036,7 +1051,6 @@ import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
 import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
-import { afterTokenRefused, joinStep } from '../../decisions/joinGate';
 import { assaultSteps } from '../../decisions/assaultOrder';
 import { orderPlan } from '../../decisions/orderRoute';
 import { joinLanding } from '../../decisions/joinLanding';
@@ -1044,9 +1058,8 @@ import { refusalText as errText } from '../../decisions/refusalText';
 import { detach } from './detach';
 import { claimIntent, matchIdFrom, shareAddress } from '../../decisions/matchAddress';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
-import { entryOffer, type MatchSeat as EntrySeat } from '../../decisions/entrySetup';
 import { clearStatusLine, fallbackFor, showServerRow } from '../../decisions/browserFallback';
-import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from '../../decisions/matchQuery';
+import { archiveUrl, httpBase, matchesUrl, queryOutcome } from '../../decisions/matchQuery';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { mergePlan } from '../../decisions/mergeOrders';
@@ -1055,7 +1068,6 @@ import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from '../../decisions/pickApply';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
-import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
 import { radarContacts } from './snapshotIngest';
 import {
@@ -1105,36 +1117,15 @@ import type {
 
 // --- constants ---------------------------------------------------------------
 
-// --- side-colour SCHEMES (client-only, localStorage) --------------------------
-// Палитра и само правило «цвет = отношение» живут в `sideColors.ts` — одной таблицей на
-// оба представления (карта и экран дипломатии). Здесь остаётся только клиентская
-// НАСТРОЙКА: свой цвет, ничейное пространство и выбранная палитра.
-let youColor = safeHexColor(readRaw('void.colorYou'), COLOR.p1!);
-let neutralColor = safeHexColor(readRaw('void.colorNeutral'), COLOR.null!);
-let rivalPaletteId = readRaw('void.rivalPalette') ?? 'classic';
-if (!isPaletteId(rivalPaletteId)) rivalPaletteId = 'classic';
-function setSideColors(you: string, neutral: string, palette: string): void {
-  youColor = safeHexColor(you, COLOR.p1!);
-  neutralColor = safeHexColor(neutral, COLOR.null!);
-  rivalPaletteId = isPaletteId(palette) ? palette : 'classic';
-  writeRaw('void.colorYou', youColor);
-  writeRaw('void.colorNeutral', neutralColor);
-  writeRaw('void.rivalPalette', rivalPaletteId);
-}
-// Political colour is relative to the local commander: YOU are your configured hue,
-// unowned space grey, and every other commander is coloured by your STANCE toward them
-// (enemy red / friendly blue / neutral grey — see relationColor). Works for solo
-// (you = p1) and net (you may be any seat). Stance is public (never fogged), so the
-// client always has the true value.
-function ownerColor(owner: string | null | undefined): string {
-  if (!owner) return neutralColor; // unowned territory (void / no-man's land)
-  if (owner === ME) return youColor; // you
-  return relationColor(getStance(s, ME, owner), paletteOf(rivalPaletteId));
-}
-/** Цвет чипа стойки на экране дипломатии — из той же палитры, что и карта. */
-function stanceCol(st: DiplomaticStance): string {
-  return stanceColor(st, paletteOf(rivalPaletteId));
-}
+// --- side-colour SCHEMES and map constants -----------------------------------
+// Палитра сторон и константы карты — у владельца, `mapPalette.ts` (REFM-237). Отсюда —
+// только то, что принадлежит игре: мир, своё место и канвас карты.
+initMapPalette({
+  world: () => s,
+  me: () => ME,
+  ctx: () => cx,
+  dpr: () => DPR,
+});
 // Build profile. `__PLAYER_BUILD__` is an esbuild define — REQUIRED by every bundler
 // of this file (build.mjs sets it for both artifacts, uitest.mjs pins `false`); a
 // missing define fails loudly at boot with this exact name. `true` bakes the PLAYER
@@ -1168,50 +1159,8 @@ const DEV_UI = ((): boolean => {
     return false;
   }
 })();
-// The ten possible commanders, in stable seat order. Seat 1 is always you (human);
-// seats 2-10 are AI or off in the setup screen. Four faction passives cycle across seats.
-const SEAT_META: Array<{ id: string; name: string; faction: string; color: string }> = [
-  { id: 'p1', name: 'Azure Compact', faction: 'azure', color: COLOR.p1! },
-  { id: 'p2', name: 'Crimson Hegemony', faction: 'crimson', color: COLOR.p2! },
-  { id: 'p3', name: 'Amber Concord', faction: 'amber', color: COLOR.p3! },
-  { id: 'p4', name: 'Violet Ascendancy', faction: 'violet', color: COLOR.p4! },
-  { id: 'p5', name: 'Azure Compact II', faction: 'azure', color: COLOR.p5! },
-  { id: 'p6', name: 'Crimson Hegemony II', faction: 'crimson', color: COLOR.p6! },
-  { id: 'p7', name: 'Amber Concord II', faction: 'amber', color: COLOR.p7! },
-  { id: 'p8', name: 'Violet Ascendancy II', faction: 'violet', color: COLOR.p8! },
-  { id: 'p9', name: 'Azure Compact III', faction: 'azure', color: COLOR.p9! },
-  { id: 'p10', name: 'Crimson Hegemony III', faction: 'crimson', color: COLOR.p10! },
-];
-// Extra seats use the same faction cycle, with stable distinct map colors.
-for (let i = 10; i < 100; i++) {
-  const house = SEAT_META[i % 4]!;
-  const color = '#' + [73, 107, 131].map((k) => (80 + (i * k) % 156).toString(16).padStart(2, '0')).join('');
-  COLOR[`p${i + 1}`] = color;
-  SEAT_META.push({ id: `p${i + 1}`, name: `${house.name} ${Math.floor(i / 4) + 1}`, faction: house.faction, color });
-}
 let MAP = LEGACY_MAP;
 let SCORE_LIMIT = LEGACY_SCORE_LIMIT;
-const GRID = 'rgba(46,150,160,0.07)';
-const LOCK = '#7df0d0'; // selection / targeting reticle accent
-const HOSTILE = '#ff5a4d'; // «Атака»: цели и путь к ним — красным (заказ владельца 2026-09-24)
-// RANGE-UX: три вида оружия — три РАЗНЫХ цвета, чтобы круги не сливались в кашу, когда
-// в выделении и артиллерия, и носитель. Линия огня — того же цвета, что круг стрелка.
-const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
-const R_WING = '#9ad7ff'; // эскадрилья: холодный голубой
-const R_AA = '#c07dff'; // ПКО: сиреневый — это ОТМЕТКА на мире, а не область
-// HERO-CORRIDOR: одноразовый коридор — КРАСНЫЙ мигающий пунктир (он исчезнет с первым
-// же проходом, это не дорога); временный и общий — спокойная бирюза с таймером.
-const CORR_ONCE = '#ff5c5c';
-const CORR_LIVE = '#5ce1d6';
-// CAST-UX: круги прицела каста. Отдельные имена, а не переиспользование LOCK, потому
-// что дальность и область — РАЗНЫЕ сущности, и игрок должен различать их с одного
-// взгляда: тонкий пунктир «докуда достану» против залитого пятна «что накроет».
-const CAST_REACH = '#7df0d0'; // круг дальности способности
-const CAST_FAR = '#ff6b6b'; // цель вне дальности — подсказка, вердикт всё равно за ядром
-// Радиус способности — всегда этот фиолетовый, и всегда пунктиром: на карте уже есть
-// кольца дальности огня и радара, и способность обязана читаться как ДРУГАЯ сущность.
-const ABILITY_RING = '#b78cff';
-const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
 // H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
@@ -1243,31 +1192,9 @@ let ME = 'p1';
 const SOVEREIGNS = 500;
 type PlanetTab = 'ground' | 'ships' | 'shuttle' | 'buildings';
 
-// Holographic draw primitives (rgba tint, cached glow/sphere sprites) now live in the
-// shared render kit (@void/client · holoDraw.ts, CP0.2 — one render implementation). The
-// prototype keeps thin same-named delegators so every call site is unchanged; it passes its
-// canvas ctx (`cx`) + current DPR, and the module owns the dpr-keyed sprite caches. `rgba`
-// is imported directly (a pure colour helper).
-function blitGlow(color: string, x: number, y: number, r: number, a: number): void {
-  if (!glowOn()) return; // graphics pref: glow & haloes off → skip the bloom discs entirely
-  hdBlitGlow(cx, DPR, color, x, y, r, a);
-}
-function blitSphere(color: string, x: number, y: number, r: number, a = 1, clockMs = 0): void {
-  hdBlitSphere(cx, DPR, color, x, y, r, a, clockMs);
-}
-
 /** Total count across a stack of units (ships, garrison or landing troops). */
 const sumUnits = (stacks: ReadonlyArray<{ count: number }>): number =>
   stacks.reduce((a, s) => a + s.count, 0);
-
-// Map-marker geometry / palette, shared so every blip reads the same way.
-const CARDINAL: ReadonlyArray<readonly [number, number]> = [
-  [0, -1],
-  [0, 1],
-  [-1, 0],
-  [1, 0],
-];
-const ORBIT_COLOR = '#7df0d0'; // the single orbit ring (GDD §7.4 — no near/far split)
 
 // --- state -------------------------------------------------------------------
 
@@ -3105,6 +3032,10 @@ function battleKnown(b: Battle): boolean {
  *  состоянии нет, и спросить «мой ли он» тогда уже не у кого. */
 const engagedBattleIds = new Set<string>();
 
+/** Налёты по моим целям, о которых журнал уже написал (`decisions/shuttleHit.ts`, правило 4):
+ *  патруль бьёт каждые 15 минут, а строка нужна одна на налёт. */
+const announcedHits = new Set<string>();
+
 /** Дерётся ли в бое `battleId` мой блок зрения — то же правило, что `battleKnown`, для
  *  событий: узел союзного боя может быть не опознан (замечание Codex на #1408). */
 function battleEngaged(battleId: unknown): boolean {
@@ -4448,6 +4379,62 @@ function handleEvents(events: DomainEvent[]) {
           tier: 'pointDefense',
         });
         capShots(aaShots, AA_SHOTS_MAX);
+        break;
+      }
+      // УДАР ШАТТЛОВ ПО ЦЕЛИ (SHU-6.11, `decisions/shuttleHit.ts`) — и налёт по прибытии, и
+      // каждый тик патруля. Пятый тир огня (`flakTiers.ts`, правило 7): трасса из видимого
+      // источника и вспышка у цели. Концы — СЕЙЧАС, как у зениток (правило 1
+      // `fireEffects.ts`): добитый этим ударом флот из мира уже ушёл, и вспышка встаёт над
+      // узлом, где он стоял. Жертве — строка в журнале, одна на налёт по цели.
+      case 'shuttle.hit': {
+        const hit = {
+          strikeId: p.strikeId as string,
+          owner: p.owner as string,
+          targetId: p.targetId as string,
+          targetOwner: p.targetOwner as string | null | undefined,
+        };
+        const planet = s.planets[hit.targetId];
+        const fleet = planet ? undefined : s.fleets[hit.targetId];
+        const node = planet
+          ? hit.targetId
+          : fleet
+            ? fleetNode(fleet)
+            : (p.location as string) || null;
+        const targetKnown = planet ? known(hit.targetId) : fleet ? fleetKnown(fleet) : known(node);
+        const view = shuttleHitView(hit, ME, targetKnown, announcedHits);
+        if (!view.show) break;
+        // Флот — в его значок на орбите, а не в центр мира: удар пришёлся по кораблям.
+        const anchor = fleet ? fleetAnchor(fleet) : null;
+        const to = planet
+          ? planet.position
+          : anchor
+            ? unworld(anchor)
+            : node
+              ? s.planets[node]?.position
+              : null;
+        if (to) {
+          // Свой вылет — из его точки, чужой — только из патруля, который я вижу (правило 3).
+          const from =
+            hit.owner === ME
+              ? strikeWorldPos(hit.strikeId)
+              : seenPatrolOver(vision?.seenPatrols ?? [], hit.owner, to);
+          aaShots.push({
+            from: { ...(from ?? to) },
+            to: { ...to },
+            at: performance.now(),
+            tier: 'strike',
+          });
+          capShots(aaShots, AA_SHOTS_MAX);
+        }
+        if (view.journal) {
+          announcedHits.add(hitKey(hit));
+          note(
+            t('log.shuttle.hit', {
+              what: planet ? placeName(hit.targetId) : fleetTitleOf(hit.targetId),
+            }),
+            node ?? undefined,
+          );
+        }
         break;
       }
       // ROS-2.2 — ответка по челнокам в момент удара. Две точки зрения на одно
@@ -12439,6 +12426,9 @@ initSignInPages({
   openHub,
   connectToMatch,
 });
+// Вход в партию и выбор места — у своего владельца (`matchJoin.ts`, REFM-217). Подключается
+// до загрузочного блока: ссылка на партию входит в неё прямо оттуда.
+initMatchJoin({ resolveServer });
 $('cback').addEventListener('click', () => {
   showStage('welcome'); // reset #connect's inner stage for next time
   statusEl.textContent = '';
@@ -13083,191 +13073,6 @@ let activeTab: MatchTab = 'available';
  *  `localStorage` рядом с `void.server`/`void.nick`; `null` — ещё не восстанавливали. */
 let matchFilter: FilterState | null = null;
 
-/** Join a chosen match: set it as the (re)connect target, then dial via `connect()`.
- *  Accounts mode (SES-2.5) first exchanges the session for a join token (register/
- *  login happens lazily inside `ensureSession` on the first join).
- *
- *  If `?join=<id>` arrives without a stored session (no cached JWT in localStorage),
- *  `ensureSession` would silently return — the password row is on the welcome card,
- *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
- *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
- *  the join automatically on success. */
-function connectToMatch(
-  id: string,
-  slot?: string,
-  faction?: string,
-  scientists: readonly string[] = [],
-): void {
-  targetMatch(id);
-  // Развилка «пустить или послать на вход» — `joinGate.ts` (REFM-140); там же причины,
-  // почему просьбу запоминают, почему пароль спрашивают только при известном сервере и
-  // почему сессия проверяется наличием, а не совпадением позывного.
-  detach(
-    'заход в партию: билет и подключение',
-    (async () => {
-      const srv = resolveServer();
-      const cached = srv ? sessionRecord(srv.base) : null;
-      const next = joinStep({
-        accountsMode: authMode === 'accounts',
-        serverKnown: !!srv,
-        hasSession: !!cached,
-      });
-      // Сервер без аккаунтов пускает по позывному: билет не нужен, сессии нет. Этот шаг
-      // потерялся, когда режим стал строкой (`IdentityMode`): прежняя проверка
-      // `if (!authMode)` больше никогда не срабатывала, и вход по позывному падал на
-      // `cached!.token` ниже (нашёл `smoke:net`, REFM-204).
-      if (next.step === 'connect') {
-        claimDone(id);
-        connect();
-        return;
-      }
-      if (next.step === 'sign-in') {
-        askSignIn(id, slot, faction, next.password ? srv : null, scientists);
-        return;
-      }
-      const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
-      if (!join) {
-        // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
-        // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
-        if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
-          askSignIn(id, slot, faction, srv, scientists);
-        return;
-      }
-      holdJoinToken(join.token);
-      claimDone(id);
-      connect();
-    })(),
-  );
-}
-
-// Open a session in its OWN browser tab (deep-link «?join=<id>»): the hub/browser stays in
-// THIS tab while the match runs in a fresh one, which boots straight into it from the shared
-// same-origin localStorage identity (nick / session JWT).
-//
-// Audit (2026-07-25): `window.open(..., '_blank')` is silently blocked by most browsers
-// for non-direct user-gestures, and the fallback `connectToMatch` then ran with a stale
-// `nickInput.value` that didn't match the cached session login — so the welcome card
-// re-opened instead of joining. Switch to `location.href` (same-tab navigation): the hub
-// is replaced by the game view, no popup, no silent fallback. The hub is one tab-close away
-// (the match itself is durable on the server). This matches the APK path (one window).
-// REL-7: seat/faction picker — before joining, fetch the match's available seats
-// and show a picker. The player chooses a faction/start, then we navigate to
-// ?join=<id>&slot=<slotId>. Previously openSessionTab went straight to ?join=
-// and the server auto-assigned the first free seat (no choice).
-const seatpickEl = $('seatpick') as HTMLElement | null;
-const seatpickListEl = $('seatpick-list') as HTMLElement | null;
-
-/** Запрос расклада мест, назвавшись (ADDR-6).
- *
- *  Идущую партию сервер отдаёт только её участникам, поэтому запрос обязан сказать, кто
- *  спрашивает. На хосте с учётками это сессионный JWT (через `tokenFor` — «кто ты» ходит
- *  только им, правило 1 `sessionStore.ts`), на безаккаунтном — `?nick=` внутри адреса.
- *  Токена нет — идём как аноним: открытую для входа партию сервер покажет и так, а на
- *  закрытую нам и правда нечего смотреть.
- *
- *  ОДНА точка на оба захода — открытие экрана и его тихий переопрос. Разъехавшись, они
- *  отличались бы правами: переопрос молча слеп бы там, где открытие работает, и игрок
- *  видел бы застывший список вместо живого. */
-function fetchSeats(base: string, matchId: string, nick: string): Promise<Response> {
-  const pass = tokenFor(localStorage, base, nick);
-  return fetch(
-    seatsUrl(base, matchId, nick),
-    pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
-  );
-}
-
-/** Опрос мест, пока открыт сетевой экран (ENTRY-2, правило 5).
- *
- *  Партия живая: пока игрок выбирает, соседний мир могут занять. Узнать об этом на
- *  попытке входа — поздно: игрок уже нажал «Выбрать» и получил отказ вместо мира.
- *  Поэтому список обновляется, а судьбу выбора решает `reconcileSelection`: занятый
- *  мир СБРАСЫВАЕТ выбор, а не переезжает на соседний — иначе человек улетел бы играть
- *  не туда, куда смотрел.
- *
- *  Тихий: неудачный запрос ничего не трогает. Список мест не критичен настолько, чтобы
- *  из-за одного сетевого чиха стирать игроку выбор. */
-let netSetupPoll: ReturnType<typeof setInterval> | null = null;
-const NET_SETUP_POLL_MS = 5000;
-
-function stopNetSetupPoll(): void {
-  if (netSetupPoll !== null) clearInterval(netSetupPoll);
-  netSetupPoll = null;
-}
-
-function startNetSetupPoll(base: string, matchId: string, nick: string): void {
-  stopNetSetupPoll();
-  netSetupPoll = setInterval(() => {
-    if (!netSetup) return stopNetSetupPoll();
-    detach(
-      'сетевой сетап: опрос мест',
-      (async () => {
-        try {
-          const res = await fetchSeats(base, matchId, nick);
-          if (queryOutcome(res) !== 'ok') return;
-          const body = (await res.json()) as { seats: EntrySeat[]; mapId?: MapId };
-          updateNetOffer(matchId, entryOffer(body.seats ?? []));
-        } catch {
-          /* тихий опрос: связь моргнула — выбор игрока не трогаем */
-        }
-      })(),
-    );
-  }, NET_SETUP_POLL_MS);
-}
-
-/** Открыть экран настройки под КОНКРЕТНУЮ сетевую сессию (ENTRY-2).
- *
- *  Экран тот же, что в одиночной игре — игрок просил «как в одиночке, но в сетевой», и
- *  второй экран с той же картой разошёлся бы с первым на первой же правке. Меняется
- *  источник: кандидаты и дома приходят от сервера (`GET /matches/:id/seats`), занятые
- *  миры видны и не выбираются, правая колонка скрыта.
- *
- *  Пока места едут, на экране стоит честная заглушка (`seatList.ts`, правило 1): окно,
- *  которое ждёт ответа за кулисами, выглядит как проваленный тап, и игрок жмёт ещё раз. */
-async function openSeatPicker(matchId: string): Promise<void> {
-  const srv = resolveServer();
-  if (!srv) return;
-  const показать = (view: SeatView): void => {
-    if (!seatpickListEl || view.kind !== 'placeholder') return;
-    const style = view.tone === 'dim' ? 'color:var(--dim);text-align:center' : 'color:var(--red)';
-    seatpickListEl.innerHTML = `<p style="${style}">${t(view.key)}</p>`;
-  };
-  показать(seatView('opening'));
-  if (seatpickEl) seatpickEl.style.display = 'flex';
-  try {
-    const res = await fetchSeats(srv.base, matchId, srv.nick);
-    // Отказ и обрыв это окно показывает одинаково — см. оговорку в шапке `seatList.ts`.
-    if (queryOutcome(res) !== 'ok') {
-      показать(seatView('refused'));
-      return;
-    }
-    const body = (await res.json()) as { seats: EntrySeat[]; mapId?: MapId };
-    const offer = entryOffer(body.seats ?? []);
-    if (seatpickEl) seatpickEl.style.display = 'none';
-    openSetup('hub'); // сбрасывает режим — сетевой ставим сразу после
-    enterNetSetup(matchId, body.mapId, offer);
-    startNetSetupPoll(srv.base, matchId, srv.nick);
-  } catch {
-    показать(seatView('unreachable'));
-  }
-}
-
-
-function openSessionTab(id: string, seated = false): void {
-  // Место УЖЕ твоё — возвращаемся в партию, а не заводим её заново. Без этой развилки
-  // игрок, вернувшийся после обрыва или рестарта сервера, попадал на «Совет учёных» и
-  // выбор родного мира, то есть в создание персонажа поверх идущей партии; при этом
-  // вход по ПРЯМОМУ адресу `/game/<id>` всё это время делал правильно. Признак берётся
-  // не из догадки клиента, а из ответа сервера: вкладка «Активные» — это ровно те
-  // партии, где `seatOf` вернул место (`MatchRegistry.list`).
-  if (seated) {
-    connectToMatch(id);
-    return;
-  }
-  // REL-7: show the seat/faction picker first (if the server supports it),
-  // otherwise fall back to the direct join (no slot).
-  detach('вход в партию: выбор места', openSeatPicker(id));
-}
-
 async function refreshMatches(quiet = false): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
@@ -13298,7 +13103,7 @@ async function loadMatchLists(srv: { base: string; nick: string }): Promise<bool
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
   try {
-    // Личность — тем же способом, что и у запроса мест (`fetchSeats` выше): на хосте с
+    // Личность — тем же способом, что и у запроса мест (`fetchSeats`, `matchJoin.ts`): на хосте с
     // учётками это сессионный JWT в заголовке, `?nick=` там не смотрят. Без него сервер
     // видел анонима, вкладка «мои матчи» приходила пустой, и вернуться в собственную
     // партию из интерфейса было нечем — полный матч уходит и из «Доступных».
@@ -13868,13 +13673,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
   // Оверлей мест остался только заглушкой на время загрузки и на отказ (ENTRY-2):
   // выбор переехал на экран настройки, поэтому закрывать его нечем, кроме как скрыть.
-  {
-    id: 'seatpick',
-    isOpen: () => flexed('seatpick'),
-    close: () => {
-      if (seatpickEl) seatpickEl.style.display = 'none';
-    },
-  }, // z58
+  { id: 'seatpick', isOpen: () => flexed('seatpick'), close: closeSeatPicker }, // z58
   { id: 'recap', isOpen: () => shown('recap'), close: () => hide('recap') }, // z57
   { id: 'profile', isOpen: () => shown('profile'), close: () => profile?.close() }, // z57
   // --- окна и карточки (z51…z44) ---
