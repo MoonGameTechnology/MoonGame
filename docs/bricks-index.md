@@ -1470,7 +1470,7 @@
 | ZTP-3.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Несекретный конфиг в репо |
 | ZTP-3.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Секреты зашифрованными в репо (SOPS + age) |
 | ZTP-3.3 | ⏳ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Ручные операции с БД → админ-команды |
-| ZTP-4.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
+| ZTP-4.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
 | ZTP-4.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Автоматическая проверка дрейфа |
 | ZTP-4.3 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Break-glass доступ |
 | ZTP-5.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Откат по метрикам |
