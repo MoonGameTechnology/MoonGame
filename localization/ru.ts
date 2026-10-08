@@ -2806,6 +2806,7 @@ export const ru: Record<string, string> = {
   'log.shuttle.repelled.mine': '✳ ПВО сбило наших машин: {n} · {at}',
   'log.shuttle.repelled.theirs': '✳ Наше ПВО сбило чужих машин: {n} · {at}',
   'log.shuttle.hold-ended': '⟳ Патруль «{name}» больше не держится: {why}',
+  'log.shuttle.hit': '✳ Удар шаттлов: {what}',
   'log.shuttle.missile-downed': '✳ Ракета сбита челноками',
   'log.spy.caught': '🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!',
   'log.spy.fail': '🕵 Агент провалился ({who}) — плата сгорела',

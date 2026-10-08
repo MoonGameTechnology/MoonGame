@@ -1062,11 +1062,16 @@ function strikeFleet(h: HandlerContext, strike: ShuttleStrike, target: Fleet, sh
       ...strikeAttackerFleet(strike),
       defenderFleet: target.id,
     });
+    // `playerId` — адресат удара (жертва) для фильтра событий сервера, `location` — узел
+    // для того, кто его опознаёт (`MatchRoom.eventVisibleTo`). Под одним `targetOwner`
+    // жертва не узнавала об ударе по своему флоту вовсе: такого ключа аудитории нет.
     h.emit('shuttle.hit', {
       strikeId: strike.id,
       owner: strike.owner,
       targetId: target.id,
       targetOwner: target.owner,
+      playerId: target.owner,
+      location: target.location ?? '',
       damage: dealt,
     });
     applyDamageToSide(
@@ -1373,6 +1378,8 @@ function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
               owner: strike.owner,
               targetId: target.id,
               targetOwner: target.owner,
+              playerId: target.owner,
+              planetId: target.id,
               damage: dealt,
             });
             h.emit('planet.bombarded', {

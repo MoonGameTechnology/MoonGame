@@ -291,7 +291,8 @@ durable, оба — границу in-memory карты и базовый rate-l
   | --- | --- | --- |
   | `aa.fired` | да | в payload есть её `fleetId` |
   | `planet.bombarded` | да | она `owner` мира |
-  | `shuttle.hit` · `pd.fired` · `shuttle.repelled` · `shuttle.intercepted` | нет | адресат назван `targetOwner` — такого ключа в списке аудитории нет |
+  | `shuttle.hit` | да (с SHU-6.11, 2026-10-08) | в payload есть её `playerId` и место (`location`/`planetId`) |
+  | `pd.fired` · `shuttle.repelled` · `shuttle.intercepted` | нет | адресат назван `targetOwner` — такого ключа в списке аудитории нет |
 
   Это ровно та ловушка, о которой предупреждает комментарий в самом фильтре
   («новый модуль, назвавший адресата иначе, молча потеряет доставку»).
