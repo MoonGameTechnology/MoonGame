@@ -64,8 +64,16 @@ class El {
   }
 
   get textContent(): string {
-    if (this.markup) return this.markup.replace(/<[^>]*>/g, '');
-    return this.own + this.children.map((c) => c.textContent).join('');
+    if (!this.markup) return this.own + this.children.map((c) => c.textContent).join('');
+    // Текст разметки — всё вне `<…>`, как его прочтёт игрок.
+    let text = '';
+    let inTag = false;
+    for (const ch of this.markup) {
+      if (ch === '<') inTag = true;
+      else if (ch === '>') inTag = false;
+      else if (!inTag) text += ch;
+    }
+    return text;
   }
   set textContent(v: string) {
     this.own = v;
