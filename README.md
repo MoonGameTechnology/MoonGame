@@ -192,6 +192,7 @@ CI поднимает её как сервис. Счётчики тестов и
 | Разобраться с сетевой игрой | [Мультиплеер](docs/multiplayer.md) · [Запуск](docs/launch-runbook.md) |
 | Выкатывать сервер без ручных касаний | [Zero Touch Prod](docs/zero-touch-prod/README.md) |
 | Разобраться с клиентами и платформами | [Кросс-платформенный клиент](docs/cross-platform-roadmap.md) |
+| Проектировать корабли, персонажей, здания и визуальный стиль | [Художественный фундамент PvP-игры](docs/visual-identity.md) |
 | Работать над PvE-игрой | [Sector Zero](docs/sector-zero-roadmap.md) |
 
 ## Права на проект
