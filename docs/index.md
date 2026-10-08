@@ -155,7 +155,6 @@
 | `docs/security/pipeline-architecture-2026-07-26.md` | Отчёт: архитектура CI/CD-пайплайна — 2026-07-26 | Оценка того, как построен пайплайн (не «что сканирует» — это |
 | `docs/security/pipeline.md` | DevSecOps-пайплайн — зачем эти сканеры и как с ними жить | Учебно-боевой слой безопасности в CI (GitHub Actions, .github/workflows/security.yml; |
 | `docs/security/scanner-coverage-2026-07-26.md` | Отчёт: охват сканеров безопасности — 2026-07-26 | Глубокий анализ DevSecOps-пайплайна Void Dominion: инвентаризация сканеров, |
-| `docs/security/security-map-2026-10-07.md` | Карта безопасности архитектуры — 2026-10-07 | Зоны доверия, защита в глубину и zero trust для Void Dominion, плюс список того, что |
 | `docs/security/security-master-plan.md` | Security Master Plan — «самое безопасное приложение и игра» | Зонтичный план над тремя техническими треками безопасности проекта. Он не |
 | `docs/security/setup-github-secrets.md` | Настройка секретов и переменных в GitHub | Этот гайд поясняет, как правильно настроить CI/CD пайплайн в GitHub для безопасной работы. |
 
