@@ -46,7 +46,8 @@ REUSED_SECRETS=0
 AUTH_JWT_SECRET="$(openssl rand -hex 32)"
 # Токен оператора для /metrics/* (сводка, здоровье, хвост журнала). Без него эти
 # маршруты закрыты для всех: под Docker запрос с хоста приходит не с loopback.
-METRICS_TOKEN="$(openssl rand -hex 32)"
+# Заданный окружением токен берётся как есть (мониторинг, настроенный заранее).
+METRICS_TOKEN="${METRICS_TOKEN:-$(openssl rand -hex 32)}"
 # Origin, по которому игроки открывают игру — идёт в ALLOWED_ORIGINS (CSWSH-allowlist).
 # Браузер присылает РОВНО тот origin, на котором открыта страница, поэтому внешний
 # адрес (если он задан) добавляется вторым: через роутер это другой хост:порт.
@@ -162,15 +163,18 @@ if [ -d "$INSTALL_DIR" ]; then
         # свежесгенерированный пароль дал бы серверу 28P01 и цикл перезапусков — при
         # внешне здоровом postgres (его healthcheck pg_isready пароль не проверяет).
         # AUTH_JWT_SECRET сохраняется по той же причине, что описана в самом server.env:
-        # смена секрета обесценивает все выданные join-токены.
+        # смена секрета обесценивает все выданные join-токены. METRICS_TOKEN — чтобы
+        # переустановка не отозвала токен у операторских скриптов и панелей.
         if [ -f "$ENV_FILE" ]; then
             OLD_PG=$(grep -m1 '^POSTGRES_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)
             OLD_JWT=$(grep -m1 '^AUTH_JWT_SECRET=' "$ENV_FILE" | cut -d= -f2-)
+            OLD_MT=$(grep -m1 '^METRICS_TOKEN=' "$ENV_FILE" | cut -d= -f2-)
             if [ -n "$OLD_PG" ]; then
                 POSTGRES_PASSWORD="$OLD_PG"
                 REUSED_SECRETS=1
             fi
             [ -n "$OLD_JWT" ] && AUTH_JWT_SECRET="$OLD_JWT"
+            [ -n "$OLD_MT" ] && METRICS_TOKEN="$OLD_MT"
             [ -n "$OLD_PG" ] && log_info "Секреты прошлой установки сохранены"
         fi
         rm -rf "$INSTALL_DIR"
@@ -223,7 +227,8 @@ AUTH_JWT_SECRET=$AUTH_JWT_SECRET
 
 # Токен оператора для /metrics/*: данные там под туманом войны, поэтому наружу они не
 # отдаются никогда. Смотреть с хоста:
-#   curl -H "Authorization: Bearer \$METRICS_TOKEN" http://127.0.0.1:8788/metrics/summary
+#   curl -H "Authorization: Bearer \$(sudo grep -m1 '^METRICS_TOKEN=' $ENV_FILE | cut -d= -f2-)" \\
+#     http://127.0.0.1:8788/metrics/summary
 METRICS_TOKEN=$METRICS_TOKEN
 
 # Origin-allowlist против CSWSH: без него браузер отдаст сессию на wss:// с чужой
