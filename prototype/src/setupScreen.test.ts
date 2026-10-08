@@ -291,6 +291,15 @@ describe('REFM-212 — что уезжает в матч', () => {
     el('setupcancel').click();
     expect([env.hubs, env.connect.at(-1)]).toEqual([1, true]);
   });
+
+  it('«Назад» с сетевого экрана гасит опрос мест', async () => {
+    const { screen, env } = await boot();
+    screen.openSetup('hub');
+    screen.enterNetSetup('m1', 'nexus', entryOffer([]));
+    const before = env.polls;
+    el('setupcancel').click();
+    expect(env.polls).toBe(before + 1);
+  });
 });
 
 describe('REFM-212 — двери гида и сети', () => {
@@ -370,8 +379,10 @@ describe('REFM-212 — двери гида и сети', () => {
 
 describe('REFM-212 — стык с main.ts: двери вместо присвоений', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-  const body = (name: string): string =>
-    new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(MAIN)?.[1] ?? '';
+  // Сетевой вход и опрос мест живут у входа в партию (`matchJoin.ts`, REFM-217).
+  const JOIN = readFileSync(new URL('./matchJoin.ts', import.meta.url), 'utf8');
+  const body = (name: string, src = MAIN): string =>
+    new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
 
   it('гид готовит партию дверью экрана до старта', () => {
     const guided = body('startGuidedMatch');
@@ -381,10 +392,10 @@ describe('REFM-212 — стык с main.ts: двери вместо присво
   });
 
   it('сетевой вход открывает экран, затем ставит сетевой режим; опрос отдаёт места владельцу', () => {
-    expect(body('openSeatPicker')).toMatch(
+    expect(body('openSeatPicker', JOIN)).toMatch(
       /openSetup\('hub'\);[^\n]*\n\s+enterNetSetup\(matchId, body\.mapId, offer\);/,
     );
-    expect(body('startNetSetupPoll')).toContain(
+    expect(body('startNetSetupPoll', JOIN)).toContain(
       'updateNetOffer(matchId, entryOffer(body.seats ?? []));',
     );
   });

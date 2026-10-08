@@ -37,11 +37,7 @@ import {
   tickSoloSave,
 } from './soloCheckpoint';
 import {
-  askSignIn,
   authMode,
-  claimDone,
-  fetchJoinToken,
-  holdJoinToken,
   initAccountSession,
   pendingJoinAfterAuth,
   probeAuthMode,
@@ -87,7 +83,6 @@ import {
 } from './signInPages';
 import {
   NET,
-  connect,
   countNetFrame,
   initNetSession,
   leaveNetwork,
@@ -98,8 +93,15 @@ import {
   netView,
   reconnecting,
   rttEma,
-  targetMatch,
 } from './netSession';
+import {
+  closeSeatPicker,
+  connectToMatch,
+  initMatchJoin,
+  openSeatPicker,
+  openSessionTab,
+  stopNetSetupPoll,
+} from './matchJoin';
 import { fleetBaseSpeed, fleetNodeAt, forkSiteId, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
@@ -445,7 +447,6 @@ import {
 } from './sectorZeroShell';
 import {
   buildSetupConfig,
-  enterNetSetup,
   initSetupScreen,
   netSetup,
   openSetup,
@@ -455,7 +456,6 @@ import {
   setupMapId,
   setupSlots,
   setupSpeed,
-  updateNetOffer,
 } from './setupScreen';
 import { getPlatform, type PlatformHost } from './platform/host';
 import { doubleReward, shopCapabilities } from '../../decisions/sectorZeroShop';
@@ -1050,7 +1050,6 @@ import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
 import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
-import { afterTokenRefused, joinStep } from '../../decisions/joinGate';
 import { assaultSteps } from '../../decisions/assaultOrder';
 import { orderPlan } from '../../decisions/orderRoute';
 import { joinLanding } from '../../decisions/joinLanding';
@@ -1058,9 +1057,8 @@ import { refusalText as errText } from '../../decisions/refusalText';
 import { detach } from './detach';
 import { claimIntent, matchIdFrom, shareAddress } from '../../decisions/matchAddress';
 import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
-import { entryOffer, type MatchSeat as EntrySeat } from '../../decisions/entrySetup';
 import { clearStatusLine, fallbackFor, showServerRow } from '../../decisions/browserFallback';
-import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from '../../decisions/matchQuery';
+import { archiveUrl, httpBase, matchesUrl, queryOutcome } from '../../decisions/matchQuery';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { toggleInSelection } from '../../decisions/fleetSelection';
 import { mergePlan } from '../../decisions/mergeOrders';
@@ -1069,7 +1067,6 @@ import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from '../../decisions/pickApply';
 import { fleetsUnderTap } from '../../decisions/tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
-import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
 import { radarContacts } from './snapshotIngest';
 import {
@@ -12368,6 +12365,9 @@ initSignInPages({
   openHub,
   connectToMatch,
 });
+// Вход в партию и выбор места — у своего владельца (`matchJoin.ts`, REFM-217). Подключается
+// до загрузочного блока: ссылка на партию входит в неё прямо оттуда.
+initMatchJoin({ resolveServer });
 $('cback').addEventListener('click', () => {
   showStage('welcome'); // reset #connect's inner stage for next time
   statusEl.textContent = '';
@@ -13012,191 +13012,6 @@ let activeTab: MatchTab = 'available';
  *  `localStorage` рядом с `void.server`/`void.nick`; `null` — ещё не восстанавливали. */
 let matchFilter: FilterState | null = null;
 
-/** Join a chosen match: set it as the (re)connect target, then dial via `connect()`.
- *  Accounts mode (SES-2.5) first exchanges the session for a join token (register/
- *  login happens lazily inside `ensureSession` on the first join).
- *
- *  If `?join=<id>` arrives without a stored session (no cached JWT in localStorage),
- *  `ensureSession` would silently return — the password row is on the welcome card,
- *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
- *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
- *  the join automatically on success. */
-function connectToMatch(
-  id: string,
-  slot?: string,
-  faction?: string,
-  scientists: readonly string[] = [],
-): void {
-  targetMatch(id);
-  // Развилка «пустить или послать на вход» — `joinGate.ts` (REFM-140); там же причины,
-  // почему просьбу запоминают, почему пароль спрашивают только при известном сервере и
-  // почему сессия проверяется наличием, а не совпадением позывного.
-  detach(
-    'заход в партию: билет и подключение',
-    (async () => {
-      const srv = resolveServer();
-      const cached = srv ? sessionRecord(srv.base) : null;
-      const next = joinStep({
-        accountsMode: authMode === 'accounts',
-        serverKnown: !!srv,
-        hasSession: !!cached,
-      });
-      // Сервер без аккаунтов пускает по позывному: билет не нужен, сессии нет. Этот шаг
-      // потерялся, когда режим стал строкой (`IdentityMode`): прежняя проверка
-      // `if (!authMode)` больше никогда не срабатывала, и вход по позывному падал на
-      // `cached!.token` ниже (нашёл `smoke:net`, REFM-204).
-      if (next.step === 'connect') {
-        claimDone(id);
-        connect();
-        return;
-      }
-      if (next.step === 'sign-in') {
-        askSignIn(id, slot, faction, next.password ? srv : null, scientists);
-        return;
-      }
-      const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
-      if (!join) {
-        // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
-        // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
-        if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
-          askSignIn(id, slot, faction, srv, scientists);
-        return;
-      }
-      holdJoinToken(join.token);
-      claimDone(id);
-      connect();
-    })(),
-  );
-}
-
-// Open a session in its OWN browser tab (deep-link «?join=<id>»): the hub/browser stays in
-// THIS tab while the match runs in a fresh one, which boots straight into it from the shared
-// same-origin localStorage identity (nick / session JWT).
-//
-// Audit (2026-07-25): `window.open(..., '_blank')` is silently blocked by most browsers
-// for non-direct user-gestures, and the fallback `connectToMatch` then ran with a stale
-// `nickInput.value` that didn't match the cached session login — so the welcome card
-// re-opened instead of joining. Switch to `location.href` (same-tab navigation): the hub
-// is replaced by the game view, no popup, no silent fallback. The hub is one tab-close away
-// (the match itself is durable on the server). This matches the APK path (one window).
-// REL-7: seat/faction picker — before joining, fetch the match's available seats
-// and show a picker. The player chooses a faction/start, then we navigate to
-// ?join=<id>&slot=<slotId>. Previously openSessionTab went straight to ?join=
-// and the server auto-assigned the first free seat (no choice).
-const seatpickEl = $('seatpick') as HTMLElement | null;
-const seatpickListEl = $('seatpick-list') as HTMLElement | null;
-
-/** Запрос расклада мест, назвавшись (ADDR-6).
- *
- *  Идущую партию сервер отдаёт только её участникам, поэтому запрос обязан сказать, кто
- *  спрашивает. На хосте с учётками это сессионный JWT (через `tokenFor` — «кто ты» ходит
- *  только им, правило 1 `sessionStore.ts`), на безаккаунтном — `?nick=` внутри адреса.
- *  Токена нет — идём как аноним: открытую для входа партию сервер покажет и так, а на
- *  закрытую нам и правда нечего смотреть.
- *
- *  ОДНА точка на оба захода — открытие экрана и его тихий переопрос. Разъехавшись, они
- *  отличались бы правами: переопрос молча слеп бы там, где открытие работает, и игрок
- *  видел бы застывший список вместо живого. */
-function fetchSeats(base: string, matchId: string, nick: string): Promise<Response> {
-  const pass = tokenFor(localStorage, base, nick);
-  return fetch(
-    seatsUrl(base, matchId, nick),
-    pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
-  );
-}
-
-/** Опрос мест, пока открыт сетевой экран (ENTRY-2, правило 5).
- *
- *  Партия живая: пока игрок выбирает, соседний мир могут занять. Узнать об этом на
- *  попытке входа — поздно: игрок уже нажал «Выбрать» и получил отказ вместо мира.
- *  Поэтому список обновляется, а судьбу выбора решает `reconcileSelection`: занятый
- *  мир СБРАСЫВАЕТ выбор, а не переезжает на соседний — иначе человек улетел бы играть
- *  не туда, куда смотрел.
- *
- *  Тихий: неудачный запрос ничего не трогает. Список мест не критичен настолько, чтобы
- *  из-за одного сетевого чиха стирать игроку выбор. */
-let netSetupPoll: ReturnType<typeof setInterval> | null = null;
-const NET_SETUP_POLL_MS = 5000;
-
-function stopNetSetupPoll(): void {
-  if (netSetupPoll !== null) clearInterval(netSetupPoll);
-  netSetupPoll = null;
-}
-
-function startNetSetupPoll(base: string, matchId: string, nick: string): void {
-  stopNetSetupPoll();
-  netSetupPoll = setInterval(() => {
-    if (!netSetup) return stopNetSetupPoll();
-    detach(
-      'сетевой сетап: опрос мест',
-      (async () => {
-        try {
-          const res = await fetchSeats(base, matchId, nick);
-          if (queryOutcome(res) !== 'ok') return;
-          const body = (await res.json()) as { seats: EntrySeat[]; mapId?: MapId };
-          updateNetOffer(matchId, entryOffer(body.seats ?? []));
-        } catch {
-          /* тихий опрос: связь моргнула — выбор игрока не трогаем */
-        }
-      })(),
-    );
-  }, NET_SETUP_POLL_MS);
-}
-
-/** Открыть экран настройки под КОНКРЕТНУЮ сетевую сессию (ENTRY-2).
- *
- *  Экран тот же, что в одиночной игре — игрок просил «как в одиночке, но в сетевой», и
- *  второй экран с той же картой разошёлся бы с первым на первой же правке. Меняется
- *  источник: кандидаты и дома приходят от сервера (`GET /matches/:id/seats`), занятые
- *  миры видны и не выбираются, правая колонка скрыта.
- *
- *  Пока места едут, на экране стоит честная заглушка (`seatList.ts`, правило 1): окно,
- *  которое ждёт ответа за кулисами, выглядит как проваленный тап, и игрок жмёт ещё раз. */
-async function openSeatPicker(matchId: string): Promise<void> {
-  const srv = resolveServer();
-  if (!srv) return;
-  const показать = (view: SeatView): void => {
-    if (!seatpickListEl || view.kind !== 'placeholder') return;
-    const style = view.tone === 'dim' ? 'color:var(--dim);text-align:center' : 'color:var(--red)';
-    seatpickListEl.innerHTML = `<p style="${style}">${t(view.key)}</p>`;
-  };
-  показать(seatView('opening'));
-  if (seatpickEl) seatpickEl.style.display = 'flex';
-  try {
-    const res = await fetchSeats(srv.base, matchId, srv.nick);
-    // Отказ и обрыв это окно показывает одинаково — см. оговорку в шапке `seatList.ts`.
-    if (queryOutcome(res) !== 'ok') {
-      показать(seatView('refused'));
-      return;
-    }
-    const body = (await res.json()) as { seats: EntrySeat[]; mapId?: MapId };
-    const offer = entryOffer(body.seats ?? []);
-    if (seatpickEl) seatpickEl.style.display = 'none';
-    openSetup('hub'); // сбрасывает режим — сетевой ставим сразу после
-    enterNetSetup(matchId, body.mapId, offer);
-    startNetSetupPoll(srv.base, matchId, srv.nick);
-  } catch {
-    показать(seatView('unreachable'));
-  }
-}
-
-
-function openSessionTab(id: string, seated = false): void {
-  // Место УЖЕ твоё — возвращаемся в партию, а не заводим её заново. Без этой развилки
-  // игрок, вернувшийся после обрыва или рестарта сервера, попадал на «Совет учёных» и
-  // выбор родного мира, то есть в создание персонажа поверх идущей партии; при этом
-  // вход по ПРЯМОМУ адресу `/game/<id>` всё это время делал правильно. Признак берётся
-  // не из догадки клиента, а из ответа сервера: вкладка «Активные» — это ровно те
-  // партии, где `seatOf` вернул место (`MatchRegistry.list`).
-  if (seated) {
-    connectToMatch(id);
-    return;
-  }
-  // REL-7: show the seat/faction picker first (if the server supports it),
-  // otherwise fall back to the direct join (no slot).
-  detach('вход в партию: выбор места', openSeatPicker(id));
-}
-
 async function refreshMatches(quiet = false): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
@@ -13227,7 +13042,7 @@ async function loadMatchLists(srv: { base: string; nick: string }): Promise<bool
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
   try {
-    // Личность — тем же способом, что и у запроса мест (`fetchSeats` выше): на хосте с
+    // Личность — тем же способом, что и у запроса мест (`fetchSeats`, `matchJoin.ts`): на хосте с
     // учётками это сессионный JWT в заголовке, `?nick=` там не смотрят. Без него сервер
     // видел анонима, вкладка «мои матчи» приходила пустой, и вернуться в собственную
     // партию из интерфейса было нечем — полный матч уходит и из «Доступных».
@@ -13797,13 +13612,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
   // Оверлей мест остался только заглушкой на время загрузки и на отказ (ENTRY-2):
   // выбор переехал на экран настройки, поэтому закрывать его нечем, кроме как скрыть.
-  {
-    id: 'seatpick',
-    isOpen: () => flexed('seatpick'),
-    close: () => {
-      if (seatpickEl) seatpickEl.style.display = 'none';
-    },
-  }, // z58
+  { id: 'seatpick', isOpen: () => flexed('seatpick'), close: closeSeatPicker }, // z58
   { id: 'recap', isOpen: () => shown('recap'), close: () => hide('recap') }, // z57
   { id: 'profile', isOpen: () => shown('profile'), close: () => profile?.close() }, // z57
   // --- окна и карточки (z51…z44) ---

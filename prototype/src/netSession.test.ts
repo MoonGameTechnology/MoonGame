@@ -719,8 +719,10 @@ describe('REFM-216 — стык с main.ts', () => {
     expect(MAIN).not.toMatch(/\bfunction (connect|scheduleReconnect|netClientFor|dropNetClient)\(/);
     expect(MAIN).toContain('initNetSession({');
     // Свои присваивания в чужих зонах владелец заменил дверями (правило 2 стыка линий).
+    // Вход в партию с тех пор уехал к своему владельцу (`matchJoin.ts`, REFM-217).
+    const JOIN = readFileSync(new URL('./matchJoin.ts', import.meta.url), 'utf8');
     expect(MAIN).toContain('countNetFrame(dt);');
-    expect(MAIN).toContain('targetMatch(id);');
+    expect(JOIN).toContain('targetMatch(id);');
   });
 
   it('впуск сбрасывает хвосты прошлой сессии и прячет экраны', () => {
