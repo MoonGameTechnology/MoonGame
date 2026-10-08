@@ -255,9 +255,12 @@ describe('REFM-214 — проводка в main.ts', () => {
   });
 
   it('сеть отдаёт метки и реплики владельцу целиком', () => {
-    expect(MAIN).toContain('takePing(ping, provinceForPing(ping.target, MAP));');
-    expect(MAIN).toContain('dropPing(pingId);');
-    expect(MAIN).toContain('takeChat(m);');
+    // Обработчики клиента — у сетевого цикла (REFM-216), провинцию метки даёт карта хоста.
+    const NETS = readFileSync(new URL('./netSession.ts', import.meta.url), 'utf8');
+    expect(NETS).toContain('takePing(ping, game.pingProvince(ping.target));');
+    expect(MAIN).toContain('pingProvince: (target) => provinceForPing(target, MAP),');
+    expect(NETS).toContain('dropPing(pingId);');
+    expect(NETS).toContain('takeChat(m);');
   });
 
   it('любая правка ленты перерисовывает и окно дипломатии, и плавающий чат', () => {

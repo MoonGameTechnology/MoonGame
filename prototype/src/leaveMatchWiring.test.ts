@@ -16,10 +16,12 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+// Флаги сети, сокет и дозвон — у владельца сетевого цикла (REFM-216), дверь выхода — его.
+const NETS = readFileSync(new URL('./netSession.ts', import.meta.url), 'utf8');
 // Вход в Sector Zero — у оболочки (REFM-211); выход из прежнего мира — её хук в `main.ts`.
 const SHELL = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
-const body = (name: string): string =>
-  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(SRC)?.[1] ?? '';
+const body = (name: string, src = SRC): string =>
+  new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
 /** Тело обработчика клика по элементу с этим id (обработчик может стоять с отступом). */
 const handler = (id: string): string =>
   new RegExp(
@@ -42,24 +44,27 @@ describe('REFM-205 — выход из партии одной дверью', ()
   });
 
   it('флаги выхода из сети пишет только дверь', () => {
-    expect(SRC.match(/userClosed = true/g)).toHaveLength(1);
-    expect(body('leaveNetwork')).toContain('userClosed = true;');
+    expect(NETS.match(/userClosed = true/g)).toHaveLength(1);
+    expect(body('leaveNetwork', NETS)).toContain('userClosed = true;');
     // Кроме двери их гасит только обрыв связи — и он же заводит дозвон.
-    expect(SRC.match(/^\s+NET = false;/gm)).toHaveLength(2);
-    expect(SRC.match(/^\s+netAdmitted = false;/gm)).toHaveLength(2);
+    expect(NETS.match(/^\s+NET = false;/gm)).toHaveLength(2);
+    expect(NETS.match(/^\s+netAdmitted = false;/gm)).toHaveLength(2);
+    // `main.ts` их только читает: импорт не присвоить, а своей копии там нет.
+    expect(SRC).not.toMatch(/^let (NET|netAdmitted|userClosed|reconnecting)\b/m);
+    expect(SRC).not.toMatch(/\bfunction leaveNetwork\(/);
   });
 
   it('дверь гасит дозвон, забывает сокет до закрытия и выбрасывает очередь', () => {
-    const door = body('leaveNetwork');
+    const door = body('leaveNetwork', NETS);
     expect(door).toContain('clearTimeout(reconnectTimer)');
     expect(door).toContain('reconnecting = false;');
     expect(door).toContain('reconnectAttempts = 0;');
     // Снимает только СВОЙ баннер: «ждём хоста» и итог матча — не её.
-    expect(door).toContain('if (isReconnectBanner(banner)) banner = null;');
+    expect(door).toContain('if (isReconnectBanner(game.banner())) game.setBanner(null);');
     expect(door).toMatch(/netSock = null;\s*sock\?\.close\(\);/);
     expect(door).toContain('dropNetClient();');
     // Билет для дозвона идёт по сети: вышедший за это время игрок назад не дозванивается.
-    expect(SRC).toMatch(
+    expect(NETS).toMatch(
       /await fetchJoinToken\(srv\.base, currentMatchId, session\);[\s\S]{0,300}if \(!reconnecting\) return;/,
     );
   });
