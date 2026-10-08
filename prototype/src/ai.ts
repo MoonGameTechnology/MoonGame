@@ -8,6 +8,8 @@
  */
 import {
   BASE_RESEARCH_SLOTS,
+  buildingLevel,
+  buildingMaxLevel,
   HERO_ACTIVE_CAP,
   abilityRange,
   getStance,
@@ -59,6 +61,7 @@ import {
   moveFleet,
   launchFleet,
   buildBuilding,
+  upgradeBuilding,
   buildUnit,
   buildShip,
   declareWar,
@@ -260,6 +263,13 @@ const TRADE_BOOK: Record<string, { keep: number; bid?: number; ask?: number }> =
 };
 /** Столько кредитов бот НЕ тратит на рынке — казна нужна стройке и войскам. */
 const TRADE_CREDIT_FLOOR = 300;
+/** На сколько часов минуса по кредитам должно хватать казны, чтобы бот заказал новые
+ *  войска: каждое из них добавляет содержание, а кредитов оно не приносит. */
+const CREDIT_RUNWAY_HOURS = 48;
+/** С какого запаса металла не отстающее место вкладывает лишнее в доход (а не в армию). */
+const LEADER_METAL_SURPLUS = 600;
+/** Что ведущее место улучшает дома, по порядку: кредиты, налог, микроэлектроника. */
+const LEADER_UPGRADES = ['refinery', 'tax_office', 'fabricator'] as const;
 
 /** С какого размера кулак сильного бота делится надвое при отплытии (AI-BAL-7). Ниже —
  *  ударная группа и так на пределе: её порог выхода в рейд равен трём корпусам. */
@@ -1298,6 +1308,43 @@ function baseAiOrders(
         break; // одна стройка за тик — как и с шахтой
       }
     }
+    // Ведущее место вкладывает лишний металл в доход (решение владельца 2026-10-08:
+    // «если впереди, может думать, куда ещё потратить, кроме лишней армии»). Металл к
+    // 30-му дню копился до ~44k, а кредитов не было. Порядок: улучшить дома
+    // переработку, налоговую и фабрикатор, потом поставить переработку на своём мире без
+    // неё — она стоит один металл и даёт кредиты. Одна стройка за тик, как у шахт.
+    if (!trailing && (pl.resources.metal ?? 0) >= LEADER_METAL_SURPLUS) {
+      const pendingUpgrade = (planetId: string, b: string): boolean =>
+        state.scheduled.some((e) => {
+          if (e.type !== 'construction.complete') return false;
+          const q = e.payload as { kind?: string; planetId?: string; building?: string };
+          return q.kind === 'upgrade' && q.planetId === planetId && q.building === b;
+        });
+      const invest = (): Action | null => {
+        for (const b of LEADER_UPGRADES) {
+          const def = data.buildings[b];
+          const inst = base.buildings.find((x) => x.type === b);
+          if (!def || !inst || inst.level >= buildingMaxLevel(def)) continue;
+          if (pendingUpgrade(base.id, b)) continue;
+          const cost = buildingLevel(def, inst.level + 1).cost;
+          if (!Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60))
+            continue;
+          const order = upgradeBuilding(ai, base.id, b);
+          if (canOrder(state, order) === null) return order;
+        }
+        if (!affordable('refinery')) return null;
+        for (const p of worldsInOrder(state, ai, 'refinery', skilled)) {
+          if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
+          if (p.buildings.some((x) => x.type === 'refinery') || pendingBuild(p.id, 'refinery'))
+            continue;
+          const order = buildBuilding(ai, p.id, 'refinery');
+          if (canOrder(state, order) === null) return order;
+        }
+        return null;
+      };
+      const order = invest();
+      if (order) out.push(order);
+    }
     // ТОЛЬКО СИЛЬНЫЙ (AI-BAL-1.1): технологии исследует сильный профиль, слабый — нет.
     // Слабый и есть «прежний простой соперник»; сильного игрок выбирает сам в соло
     // (AIDIFF-1), и его же берёт прогон баланса — ему нужна работающая ветка эффектов.
@@ -2266,5 +2313,18 @@ function baseAiOrders(
     }
     if (best !== null) out.push(marketTake(ai, best.id, best.qty));
   }
-  return out;
+  // Ведущий не строит войска в долг (решение владельца 2026-10-08). Лишний металл бот
+  // переводил в ополчение и разведчиков, их содержание съедало кредиты, и после 20-го дня
+  // место жило в долгах треть партии (`econplaytest 30 4 3`: медиана 274 ч из ~721), а в
+  // долге постройки, содержащиеся кредитами, работают вполсилы (`BROWNOUT`). Пока кредиты
+  // в долге или казны не хватит на CREDIT_RUNWAY_HOURS минуса, заказы `unit.build`
+  // снимаются — но только у того, кто не отстаёт: отстающему надо защищаться, и он строит
+  // до последнего. Постройки и рынок правило не трогает.
+  if (trailing) return out;
+  const me = state.players[ai]!;
+  const creditFlow = netIncome(state, ai).credits ?? 0;
+  const creditsDry =
+    (me.arrears ?? []).includes('credits') ||
+    (creditFlow < 0 && (me.resources.credits ?? 0) < -creditFlow * CREDIT_RUNWAY_HOURS);
+  return creditsDry ? out.filter((a) => a.type !== 'unit.build') : out;
 }
