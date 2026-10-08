@@ -6,6 +6,7 @@ import { build } from 'esbuild';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { fogBridge } from './fogBridge.mjs';
 
 const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
@@ -205,11 +206,11 @@ module.exports = {
         { ref: { kind: 'fleet', fleetId: own.id }, owner: own.owner, role: 'attacker' },
         { ref: { kind: 'fleet', fleetId: foe.id }, owner: foe.owner, role: 'defender' },
       ] };
-    const oldVision = vision; vision = null;
+    const oldVision = vision; __fog.vision = null;
     clearSelection();
     const badge = battleBadgePoint(world(battleAnchor(s.battles['ui-battle'])));
     selectAt(badge.x, badge.y);
-    return { own: own.id, foe: foe.id, loc, restore: () => { s = before; vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
+    return { own: own.id, foe: foe.id, loc, restore: () => { s = before; __fog.vision = oldVision; battleWin.classList.remove('show'); clearSelection(); } };
   },
   links: (id) => [...(s.planets[id].links ?? [])],
   tapWorld: (id) => { const p = world(s.planets[id].position); selectAt(p.x, p.y); },
@@ -247,6 +248,7 @@ module.exports = {
   sandboxBack: () => closeTop(BACK_LAYERS.filter(l => l.id === 'sandbox')),
 };`;
 const res = await build({
+  plugins: [fogBridge],
   stdin: {
     contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
     resolveDir: process.cwd() + '/prototype/src',

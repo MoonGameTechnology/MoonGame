@@ -142,7 +142,7 @@ const hooks = `window.__patrolTest = {
     s = structuredClone(s);
     const near = { x: home.position.x + 30, y: home.position.y };
     s.strikes = [...(s.strikes ?? []), hang('strike:near', near), hang('strike:far', far.position)];
-    visionMemo = null;
+    forgetVision();
     clearSelection();
     centerOn(home.position, cam.scale);
     return { rival, near };

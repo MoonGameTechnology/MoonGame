@@ -26,6 +26,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { resolveChromium } from '../scripts/chromium.mjs';
+import { fogBridge } from './fogBridge.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json'))(
@@ -76,6 +77,7 @@ export async function instrumentedGame(hooks, { page = 'void-dominion.html', sim
       '__setPlatform(__webPlatform({ simulate: true }));\n'
     : '';
   const bundle = await build({
+    plugins: [fogBridge],
     stdin: {
       contents: LIFT_BOOT_VEIL + platform + readFileSync('prototype/src/main.ts', 'utf8') + hooks,
       resolveDir: process.cwd() + '/prototype/src',

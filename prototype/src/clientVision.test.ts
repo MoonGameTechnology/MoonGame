@@ -64,7 +64,12 @@ function base(patch: (st: GameState) => void = () => {}): GameState {
     );
   });
   planets.A!.owner = 'p1';
-  const out: GameState = { ...st, time: 1000, planets, players: { p1: player('p1'), p2: player('p2') } };
+  const out: GameState = {
+    ...st,
+    time: 1000,
+    planets,
+    players: { p1: player('p1'), p2: player('p2') },
+  };
   patch(out);
   return out;
 }
@@ -119,7 +124,8 @@ describe('RULES-5 — карта спрашивает ядро, а не выво
     // Проверки выше держат САМО правило; эта — то, что клиент к нему подключён.
     // Без неё сторож остался бы тавтологией: ядро можно чинить сколько угодно, а карта
     // продолжала бы рисовать по своей копии — именно так расхождение и прожило до сих пор.
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    // Зрение кадра живёт у тумана (`mapFog.ts`, REFM-231).
+    const src = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
     const body = src.slice(src.indexOf('function computeVision('));
     const fn = body.slice(0, body.indexOf('\n}\n') + 3);
     expect(fn).toContain('sensorCoverage(s, ME, data)');
@@ -161,14 +167,17 @@ describe('RULES-5 — блэкаут пережил переезд', () => {
 });
 
 describe('SHU-6.10 — чужой висящий патруль на карте — по правилу ядра', () => {
-  const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-  const fnOf = (name: string): string => {
-    const body = src.slice(src.indexOf(`function ${name}(`));
+  // Зрение кадра считает туман (`mapFog.ts`, REFM-231), рисует — `main.ts`.
+  const fnOf = (file: string, name: string): string => {
+    const src = readFileSync(new URL(file, import.meta.url), 'utf8');
+    const at = src.indexOf(`function ${name}(`);
+    expect(at, name).toBeGreaterThan(-1);
+    const body = src.slice(at);
     return body.slice(0, body.indexOf('\n}\n') + 3);
   };
 
   it('зрение кадра берёт список у ядра: в сети — из проекции, в соло — `patrolsSeenBy`', () => {
-    expect(fnOf('computeVision')).toContain(
+    expect(fnOf('./mapFog.ts', 'computeVision')).toContain(
       'seenPatrols: NET ? (s.seenPatrols ?? []) : patrolsSeenBy(s, ME, data),',
     );
   });
@@ -176,7 +185,7 @@ describe('SHU-6.10 — чужой висящий патруль на карте 
   it('drawSeenPatrols рисует этот список и не читает чужие вылеты из `strikes` сам', () => {
     // Чужой вылет в соло лежит в полном мире целиком — с базой, сроком и летящими ногами.
     // Прочти его карта напрямую, и соло показало бы больше сети (правило 1 `strikeTrail.ts`).
-    const fn = fnOf('drawSeenPatrols');
+    const fn = fnOf('./main.ts', 'drawSeenPatrols');
     expect(fn).toContain('vision?.seenPatrols');
     expect(fn).not.toContain('strikes');
   });

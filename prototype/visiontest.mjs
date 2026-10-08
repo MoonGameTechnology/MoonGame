@@ -32,17 +32,17 @@ const hooks = `
 import { snapshotOf as __snapshotOf } from './scanMemory';
 window.__visionTest = (() => {
   const P = { on: false, calls: 0, frames: 0, bad: [] };
-  const fresh = computeVision;
-  computeVision = () => { if (P.on) P.calls++; return fresh(); };
+  const fresh = __fog.computeVision;
+  __fog.computeVision = () => { if (P.on) P.calls++; return fresh(); };
   const same = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
   const check = () => {
     if (!vision) return;
     // The fresh projection rewrites the owners set; put the frame's set back so a stale
     // one is not repaired by the check itself.
-    const owners = intelFleetOwners;
+    const owners = __fog.intelFleetOwners;
     const f = fresh();
-    const freshOwners = intelFleetOwners;
-    intelFleetOwners = owners;
+    const freshOwners = __fog.intelFleetOwners;
+    __fog.intelFleetOwners = owners;
     const bad = [];
     if (!same(vision.identify, f.identify)) bad.push('identify');
     if (!same(vision.radar, f.radar)) bad.push('radar');

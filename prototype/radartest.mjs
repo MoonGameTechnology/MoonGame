@@ -35,7 +35,7 @@ const hooks = `window.__radarTest = {
     return this.read();
   },
   paint() {
-    vision = computeVision();
+    __fog.vision = __fog.computeVision();
     drawScanSweep(performance.now());
     // Targets are due east: one real sweep crossing, without a ten-second sleep.
     sweepPrevAng = TAU - 0.01; sweepAng = 0.01;
