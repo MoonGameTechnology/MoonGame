@@ -8,7 +8,7 @@ import {
   type FlakTier,
 } from './flakTiers';
 
-const ТИРЫ: FlakTier[] = ['orbital', 'close', 'intercept', 'pointDefense'];
+const ТИРЫ: FlakTier[] = ['orbital', 'close', 'intercept', 'pointDefense', 'strike'];
 
 describe('зенитный огонь — какой тир', () => {
   it('признак «ближняя» выбирает тир, а не отдельные свойства', () => {
@@ -129,5 +129,19 @@ describe('зенитный огонь — корабельное ПВО (AUD-17)
     expect(pd.burstGrow).toBe(close.burstGrow);
     // …и потому тише редкого орбитального залпа, как требует правило 2.
     expect(pd.alpha).toBeLessThan(flakLook('orbital').alpha);
+  });
+});
+
+describe('SHU-6.11 — удар шаттлов по цели это пятый тир', () => {
+  it('СВОЙ ЦВЕТ, НЕ ЗАНЯТЫЙ НА КАРТЕ: ни владельцами, ни ПКО, ни голубым эскадрильи', () => {
+    // `R_WING` (mapPalette.ts) добавлен к списку «чего избегать» ПВО: удар идёт ОТ эскадры.
+    const taken = ['#c07dff', '#35d6e6', '#ff5a4d', '#ffb43a', '#b07cff', '#9ad7ff'];
+    expect(taken).not.toContain(flakLook('strike').color);
+  });
+
+  it('ВСПЫШКА У ЦЕЛИ КРУПНЕЕ ВСЕХ: ради неё вылет и шёл', () => {
+    const strike = flakBurstRadius(flakLook('strike'), 1);
+    for (const tier of ТИРЫ.filter((t) => t !== 'strike'))
+      expect(strike).toBeGreaterThan(flakBurstRadius(flakLook(tier), 1));
   });
 });

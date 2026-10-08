@@ -313,6 +313,7 @@ import { createBattleModel } from '../../packages/client/src/index';
 import { pveModeId, pveChapter, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
+import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import {
   worldToScreen as camWorldToScreen,
@@ -3031,6 +3032,10 @@ function battleKnown(b: Battle): boolean {
  *  состоянии нет, и спросить «мой ли он» тогда уже не у кого. */
 const engagedBattleIds = new Set<string>();
 
+/** Налёты по моим целям, о которых журнал уже написал (`decisions/shuttleHit.ts`, правило 4):
+ *  патруль бьёт каждые 15 минут, а строка нужна одна на налёт. */
+const announcedHits = new Set<string>();
+
 /** Дерётся ли в бое `battleId` мой блок зрения — то же правило, что `battleKnown`, для
  *  событий: узел союзного боя может быть не опознан (замечание Codex на #1408). */
 function battleEngaged(battleId: unknown): boolean {
@@ -4374,6 +4379,62 @@ function handleEvents(events: DomainEvent[]) {
           tier: 'pointDefense',
         });
         capShots(aaShots, AA_SHOTS_MAX);
+        break;
+      }
+      // УДАР ШАТТЛОВ ПО ЦЕЛИ (SHU-6.11, `decisions/shuttleHit.ts`) — и налёт по прибытии, и
+      // каждый тик патруля. Пятый тир огня (`flakTiers.ts`, правило 7): трасса из видимого
+      // источника и вспышка у цели. Концы — СЕЙЧАС, как у зениток (правило 1
+      // `fireEffects.ts`): добитый этим ударом флот из мира уже ушёл, и вспышка встаёт над
+      // узлом, где он стоял. Жертве — строка в журнале, одна на налёт по цели.
+      case 'shuttle.hit': {
+        const hit = {
+          strikeId: p.strikeId as string,
+          owner: p.owner as string,
+          targetId: p.targetId as string,
+          targetOwner: p.targetOwner as string | null | undefined,
+        };
+        const planet = s.planets[hit.targetId];
+        const fleet = planet ? undefined : s.fleets[hit.targetId];
+        const node = planet
+          ? hit.targetId
+          : fleet
+            ? fleetNode(fleet)
+            : (p.location as string) || null;
+        const targetKnown = planet ? known(hit.targetId) : fleet ? fleetKnown(fleet) : known(node);
+        const view = shuttleHitView(hit, ME, targetKnown, announcedHits);
+        if (!view.show) break;
+        // Флот — в его значок на орбите, а не в центр мира: удар пришёлся по кораблям.
+        const anchor = fleet ? fleetAnchor(fleet) : null;
+        const to = planet
+          ? planet.position
+          : anchor
+            ? unworld(anchor)
+            : node
+              ? s.planets[node]?.position
+              : null;
+        if (to) {
+          // Свой вылет — из его точки, чужой — только из патруля, который я вижу (правило 3).
+          const from =
+            hit.owner === ME
+              ? strikeWorldPos(hit.strikeId)
+              : seenPatrolOver(vision?.seenPatrols ?? [], hit.owner, to);
+          aaShots.push({
+            from: { ...(from ?? to) },
+            to: { ...to },
+            at: performance.now(),
+            tier: 'strike',
+          });
+          capShots(aaShots, AA_SHOTS_MAX);
+        }
+        if (view.journal) {
+          announcedHits.add(hitKey(hit));
+          note(
+            t('log.shuttle.hit', {
+              what: planet ? placeName(hit.targetId) : fleetTitleOf(hit.targetId),
+            }),
+            node ?? undefined,
+          );
+        }
         break;
       }
       // ROS-2.2 — ответка по челнокам в момент удара. Две точки зрения на одно
