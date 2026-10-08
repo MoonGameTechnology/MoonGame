@@ -743,7 +743,8 @@ describe('REFM-216 — стык с main.ts', () => {
 
   it('мир снимка: зрение этого снимка, радар, чистка выбора, перерисовка', () => {
     const snap = hook('takeSnapshot');
-    expect(snap).toMatch(/s = snap\.state;[\s\S]*vision = fogVision\(\);/);
+    // Зрение переписывает дверь тумана (`mapFog.ts`, REFM-231).
+    expect(snap).toMatch(/s = snap\.state;[\s\S]*refreshVision\(\);/);
     expect(snap).toContain('netSignatures = [...radarContacts(snap.signatures)];');
     expect(snap).toContain('pruneSelection(s.fleets, ME);');
     expect(snap).toContain('invalidatePanel();');
