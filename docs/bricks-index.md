@@ -53,8 +53,8 @@
 | REFM-213 | ✅ | proto | `docs/backlog.md` | Сохранение схватки |
 | REFM-214 | ✅ | proto | `docs/backlog.md` | Дипломатия и связь |
 | REFM-215 | ✅ | proto | `docs/backlog.md` | Сессия аккаунта |
-| REFM-216 | ⏳ | proto | `docs/backlog.md` | Сетевой жизненный цикл |
-| REFM-217 | 🔒 | proto | `docs/backlog.md` | Обзор партий и выбор места |
+| REFM-216 | ✅ | proto | `docs/backlog.md` | Сетевой жизненный цикл |
+| REFM-217 | ⏳ | proto | `docs/backlog.md` | Обзор партий и выбор места |
 | REFM-218 | ✅ | proto | `docs/backlog.md` | Страницы входа |
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
@@ -1470,7 +1470,7 @@
 | ZTP-3.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Несекретный конфиг в репо |
 | ZTP-3.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Секреты зашифрованными в репо (SOPS + age) |
 | ZTP-3.3 | ⏳ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Ручные операции с БД → админ-команды |
-| ZTP-4.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
+| ZTP-4.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
 | ZTP-4.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Автоматическая проверка дрейфа |
 | ZTP-4.3 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Break-glass доступ |
 | ZTP-5.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Откат по метрикам |
