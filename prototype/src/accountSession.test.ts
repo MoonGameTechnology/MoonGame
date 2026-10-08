@@ -335,10 +335,14 @@ describe('REFM-215 — проводка в main.ts', () => {
   });
 
   it('билет дозвона берут только двери владельца', () => {
+    // Дозвон и переподключение — у сетевого цикла (REFM-216), вход в партию — в `main.ts`.
+    const NETS = readFileSync(new URL('./netSession.ts', import.meta.url), 'utf8');
     expect(MAIN).not.toMatch(/\bpendingJoinToken\b/);
-    expect(MAIN).toContain(
+    expect(NETS).not.toMatch(/\bpendingJoinToken\b/);
+    expect(NETS).toContain(
       "dialIdentity(authMode === 'accounts', takeJoinToken(), nick, seatTicket)",
     );
-    expect(MAIN.match(/holdJoinToken\(join\.token\);/g)).toHaveLength(2);
+    expect(MAIN.match(/holdJoinToken\(join\.token\);/g)).toHaveLength(1);
+    expect(NETS.match(/holdJoinToken\(join\.token\);/g)).toHaveLength(1);
   });
 });

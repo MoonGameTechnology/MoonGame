@@ -67,7 +67,7 @@ describe('живой сокет под одним клиентом', () => {
 
 // Сквозная проверка того, ради чего кирпич и затевался: приказ, выданный в момент
 // обрыва, доезжает до сервера и доезжает ЧЕСТНЫМ — под сессией, которую сервер выдал
-// после переподключения. Здесь собран ровно тот узел, что живёт в `main.ts`: ОДИН
+// после переподключения. Здесь собран ровно тот узел, что живёт в `netSession.ts`: ОДИН
 // `MultiplayerClient` поверх `liveSocket`, под которым меняется сокет, и `orderPlan`,
 // решающий судьбу приказа. Пока это собиралось руками в `connect()`, приказ на обрыве
 // оставалось только отвергнуть — очередь уезжала в мусор вместе с клиентом.
@@ -143,34 +143,37 @@ describe('приказ на реконнекте не теряется и не �
   });
 
   it('ПРИКАЗ ПОСЛЕ ВЫХОДА НЕ ДОГОНЯЕТ: с клиентом умирает и его очередь', () => {
-    // `dropNetClient()` в main.ts — это `netClient = null`, после чего маршрут приказа
+    // `dropNetClient()` в netSession.ts — это `netClient = null`, после чего маршрут приказа
     // становится «отказ», а не «очередь»: копить его больше некому.
     expect(orderPlan({ net: false, hasClient: false, reconnecting: true }).route).toBe('refuse');
     expect(clientPlan({ hasClient: false, sameSeat: true })).toBe('fresh');
   });
 });
 
-// Сторож против отката: узел выше проверяет МЕХАНИЗМ, но живёт он в `main.ts`, который
-// тестами не покрыт (браузерный монолит). Тот же приём, что у `aiProfile.test.ts` и
-// `wireParity.test.ts`: утверждение о коде берётся из кода. Проверяется ровно то, что
-// делает очередь возможной, — один клиент на дозвоны и честный сигнал об обрыве.
-describe('main.ts держит один клиент на всё присутствие (NETA2-5)', () => {
+// Сторож против отката: узел выше проверяет МЕХАНИЗМ, а живёт он в `netSession.ts`
+// (REFM-216; до него — в браузерном монолите `main.ts`). Тот же приём, что у
+// `aiProfile.test.ts` и `wireParity.test.ts`: утверждение о коде берётся из кода.
+// Проверяется ровно то, что делает очередь возможной, — один клиент на дозвоны и честный
+// сигнал об обрыве.
+describe('сетевой цикл держит один клиент на всё присутствие (NETA2-5)', () => {
+  const net = readFileSync('prototype/src/netSession.ts', 'utf8');
   const main = readFileSync('prototype/src/main.ts', 'utf8');
 
   it('клиент создаётся В ОДНОМ месте — иначе дозвон снова выбросит очередь', () => {
-    expect(main.match(/new MultiplayerClient\(/g)).toHaveLength(1);
-    expect(main).toMatch(/function netClientFor\(/);
+    expect(net.match(/new MultiplayerClient\(/g)).toHaveLength(1);
+    expect(main).not.toMatch(/new MultiplayerClient\(/);
+    expect(net).toMatch(/function netClientFor\(/);
   });
 
   it('клиент сидит на ЖИВОМ проводе, а не на конкретном сокете', () => {
-    expect(main).toMatch(/new MultiplayerClient\(liveSocket\(\(\) => netSock\)/);
+    expect(net).toMatch(/new MultiplayerClient\(\s*liveSocket\(\(\) => netSock\)/);
   });
 
   it('ОБРЫВ СООБЩАЕТСЯ КЛИЕНТУ: без connectionLost() приказ уйдёт в мёртвый сокет', () => {
-    expect(main).toMatch(/netClient\?\.connectionLost\(\)/);
+    expect(net).toMatch(/netClient\?\.connectionLost\(\)/);
   });
 
   it('выход игрока и сдача цикла роняют клиента вместе с очередью', () => {
-    expect(main.match(/dropNetClient\(\)/g)?.length).toBeGreaterThanOrEqual(3); // объявление + два вызова
+    expect(net.match(/dropNetClient\(\)/g)?.length).toBeGreaterThanOrEqual(3); // объявление + два вызова
   });
 });
