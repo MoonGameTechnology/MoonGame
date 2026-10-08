@@ -20,6 +20,8 @@ import {
   previewBattle,
   slotUsage,
   technologyLock,
+  techInMatch,
+  scientistsOf,
   hangarMachines,
   fleetPositionAt,
   fleetHoldFree,
@@ -58,6 +60,7 @@ import { fleetHangarRepairRate } from '../../packages/shared-core/src/util/repai
 // сенсоров — проход по всему флоту, а спрашивают про него десятки миров подряд.
 import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
 import { canOrder, canOrderAll } from './protoKernel';
+import { doctrineRanks, seatDoctrine } from './botDoctrine';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import { isForkSite } from '../../packages/shared-core/src/state/forkSite';
 import {
@@ -216,6 +219,47 @@ const SHUTTLE_CAP = 3;
  *  один корабль): столько бот держал десантных кораблей, и столько трюма ударной группе
  *  хватало на штурм. */
 const CARRIER_CAP = 2;
+
+/**
+ * АРМИЯ ПОД ВЕТКУ (решение владельца 2026-10-08). Доктрина места (`botDoctrine.ts`) —
+ * ветка его учёного, и после BAL-6 боевой бонус ветки идёт только своему роду войск
+ * (`damageScope`). Поэтому место строит то, что его ветка усиливает, и строит ВМЕСТО
+ * крейсера, а не сверх: каждый тик бот заказывает один линейный корабль, и этот слот
+ * получает корпус ветки. Добавлять сверх нельзя — казна бота и так упирается в кредиты и
+ * микроэлектронику, и лишние войска съели бы её содержанием. Поле, которого нет, —
+ * прежнее общее правило.
+ *
+ * - `lineHulls` — корпус слота линейного корабля, по порядку: первое, что примет ядро
+ *   (стапель, казна, ворота техов); `warHulls` — то же, но только на войне и первым.
+ *   Ничего не принято — крейсер.
+ * - `heavyYard` — улучшить верфь дома до верха: тяжёлый корпус (тяжёлый крейсер,
+ *   носитель) требует стапель третьего уровня, а без улучшения ядро отбивало носитель
+ *   `E_YARD_TOO_SMALL` каждый тик, и его не строил никто.
+ * - `siegeCap`, `strikeCap` — потолки вместо `SIEGE_CAP` и `SHUTTLE_CAP` (у ударных
+ *   челноков; перехватчиков — прежний).
+ * - `minerEveryHero` — ракетный минёр в отсеке у каждого героя, а не у одного.
+ */
+interface DoctrineArmy {
+  lineHulls?: readonly string[];
+  warHulls?: readonly string[];
+  heavyYard?: true;
+  siegeCap?: number;
+  strikeCap?: number;
+  minerEveryHero?: true;
+}
+/** Сколько часов дохода бот готов копить на узел своей ветки (копилка доктрины). */
+const DOCTRINE_SAVE_HOURS = 12;
+const DOCTRINE_ARMY: Readonly<Record<string, DoctrineArmy>> = {
+  // Космос: орбитальный бой и обстрел — тяжёлые крейсеры и третий осадный.
+  space: { heavyYard: true, lineHulls: ['heavy_cruiser'], siegeCap: 3 },
+  // Земля: наземный бой — на войне танк вместо крейсера; носители возят войска.
+  ground: { heavyYard: true, warHulls: ['tank'] },
+  // Шаттлы: удары челноков — на войне ударный челнок вместо крейсера, их вдвое больше;
+  // носители поднимают эскадры у фронта.
+  shuttle: { heavyYard: true, warHulls: ['heavy_striker', 'bomber'], strikeCap: 6 },
+  // Ракеты: урон ракетной ветки идёт только минам.
+  missile: { minerEveryHero: true },
+};
 
 /**
  * Ударный ростер челноков (SHU-3.2) — кого бот СТРОИТ и кого ПОСЫЛАЕТ.
@@ -634,6 +678,13 @@ function baseAiOrders(
   const lineUnit = pirate ? 'pirate_cruiser' : 'cruiser';
   const scoutUnit = pirate ? 'pirate_skiff' : 'scout';
   const militiaUnit = pirate ? 'pirate_boarder' : 'militia';
+  // Доктрина — ветка учёного совета места (`botDoctrine.ts`); у NPC совета нет.
+  const doctrine = skilled
+    ? seatDoctrine(scientistsOf(state.players[ai]), data.scientists, data.technologies)
+    : undefined;
+  const army: DoctrineArmy = (doctrine !== undefined ? DOCTRINE_ARMY[doctrine] : undefined) ?? {};
+  /** Что место копит на узел своей ветки (копилка доктрины, блок исследований). */
+  let saving: ReadonlySet<string> = new Set();
   const groundRoster: readonly string[] = pirate
     ? ['pirate_tank', 'pirate_marauder', 'pirate_boarder'] : GROUND_ROSTER;
   const groundDefenders: readonly string[] = pirate
@@ -1284,10 +1335,30 @@ function baseAiOrders(
     // то есть целый пласт боя выпал бы из измерения. Место в цепочке не случайное:
     // сперва чистые деньги (`refinery`), потом порт, который и торгует, и открывает
     // ангар, и только затем множитель с микроэлектроникой.
-    for (const b of ['refinery', 'spaceport', 'tax_office', 'fabricator'] as const) {
+    const incomeChain = ['refinery', 'spaceport', 'tax_office', 'fabricator'] as const;
+    for (const b of incomeChain) {
       if (has(b)) continue;
       if (affordable(b) && !pendingBuild(base.id, b)) out.push(buildBuilding(ai, base.id, b));
       break; // one link at a time — wait out the current one either way
+    }
+    // Тяжёлый стапель (армия под ветку, `heavyYard`) — звено после цепочки дохода: верфь
+    // дома улучшается до верха. Идущее улучшение ядро отбивает `E_ALREADY_QUEUED`.
+    const yard = base.buildings.find((x) => x.type === 'shipyard' && x.hp > 0);
+    const yardDef = data.buildings['shipyard'];
+    if (
+      army.heavyYard &&
+      yard &&
+      yardDef &&
+      yard.level < buildingMaxLevel(yardDef) &&
+      incomeChain.every(has)
+    ) {
+      const cost = buildingLevel(yardDef, yard.level + 1).cost;
+      const order = upgradeBuilding(ai, base.id, 'shipyard');
+      if (
+        Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60) &&
+        canOrder(state, order) === null
+      )
+        out.push(order);
     }
     for (const p of worldsInOrder(state, ai, 'mine', skilled)) {
       if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
@@ -1373,15 +1444,27 @@ function baseAiOrders(
     const activeTech = techState?.active ?? [];
     const doneTech = techState?.completed ?? [];
     if (skilled && activeTech.length < BASE_RESEARCH_SLOTS) {
-      const affordableTech = (cost: Record<string, number>): boolean =>
-        Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
-      const candidates = Object.keys(data.technologies)
+      const costOf = (id: string): Record<string, number> => data.technologies[id]?.cost ?? {};
+      /** Чего не хватает на узел — с запасом `ORDER_RESERVE`, как у заказов войск. Прежний
+       *  запас 60 на всё держал и микроэлектронику, а её у бота 40–150, и узлы второго
+       *  тира (30–80 микроэлектроники) за 14 дней не брались почти никогда. */
+      const shortOf = (id: string): string[] =>
+        Object.entries(costOf(id))
+          .filter(([r, v]) => (pl.resources[r] ?? 0) < v + (ORDER_RESERVE[r] ?? 0))
+          .map(([r]) => r);
+      // Доктрина: узлы своей ветки идут вперёд цены (ранг `doctrineRanks`). Без доктрины
+      // ранг у всех один, и порядок прежний — по цене.
+      const ranks =
+        doctrine !== undefined
+          ? doctrineRanks(data.technologies, doctrine, (id) => techInMatch(state, id))
+          : undefined;
+      const rank = (id: string): number => ranks?.get(id) ?? 2;
+      const open = Object.keys(data.technologies)
         .filter((id) => {
           const def = data.technologies[id];
           if (!def) return false;
           if (doneTech.includes(id) || activeTech.some((a) => a.technology === id)) return false;
-          if (technologyLock(def, state, ai, data, id) !== null) return false;
-          return affordableTech(def.cost ?? {});
+          return technologyLock(def, state, ai, data, id) === null;
         })
         // Дешёвое и быстрое вперёд — это не «оптимальный порядок», а ДЕТЕРМИНИРОВАННЫЙ:
         // id последним ключом сортировки, чтобы порядок не зависел от перебора объекта
@@ -1392,13 +1475,48 @@ function baseAiOrders(
           const sum = (c: Record<string, number> = {}): number =>
             Object.values(c).reduce((n, v) => n + v, 0);
           return (
+            rank(a) - rank(b) ||
             sum(da.cost) - sum(db.cost) ||
             (da.researchTimeHours ?? 0) - (db.researchTimeHours ?? 0) ||
             (a < b ? -1 : a > b ? 1 : 0)
           );
         });
-      if (candidates[0]) out.push(researchTech(ai, candidates[0]));
+      const pick = open.find((id) => shortOf(id).length === 0);
+      // КОПИЛКА ДОКТРИНЫ. Узел своей ветки, на который не хватает, бот не меняет на дешёвое
+      // чужое, а копит: если доход закрывает нехватку за `DOCTRINE_SAVE_HOURS`, место ничего
+      // другого не исследует, а заказы войск, тратящие недостающее, ждут (конец функции).
+      // Без копилки ветка не шла: стройка съедала металл и кредиты каждый тик, и шаттловое
+      // место за 14 дней не доходило до «Ударных векторов», а с ними и до тяжёлого страйкера.
+      // Доход не закроет нехватку за этот срок — узел не цель, и бот берёт что по карману.
+      const goal = open.find(
+        (id) =>
+          rank(id) < Math.min(2, pick !== undefined ? rank(pick) : 2) &&
+          shortOf(id).every((r) => {
+            const gap = (costOf(id)[r] ?? 0) + (ORDER_RESERVE[r] ?? 0) - (pl.resources[r] ?? 0);
+            return (flow[r] ?? 0) > 0 && gap <= (flow[r] ?? 0) * DOCTRINE_SAVE_HOURS;
+          }),
+      );
+      if (goal !== undefined) saving = new Set(shortOf(goal));
+      else if (pick !== undefined) out.push(researchTech(ai, pick));
     }
+    // Сколько машин рода `unit` у места. Предел спрашивают и слот линейного корабля (армия
+    // под ветку), и заказ челноков ниже.
+    // СЧЁТ ИДЁТ ПО АНГАРАМ И ВОЗДУХУ, а не по флотам. `shipsOwned` смотрит в состав
+    // флотов и в гарнизон, а челнок с SHU-1.1 не бывает ни там, ни там — он лежит в
+    // ангаре базы. Пока предел считался тем счётчиком, он не срабатывал НИКОГДА: бот
+    // заказывал челнок каждый тик до упора в `E_HANGAR_FULL` и платил за это отказами
+    // весь матч. SHU-6.8: в счёт входят и ангары кораблей, и эскадры в воздухе.
+    // Перехватчики теперь держат патруль, а ударные эскадры перелетают к фронту, и предел
+    // по одному ангару порта стал бы конвейером: эскадра ушла — порт заказывает новую.
+    const shuttlesOwned = (unit: string): number => {
+      const count = (stacks: readonly UnitStack[]): number =>
+        stacks.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0);
+      let n = 0;
+      for (const p of Object.values(state.planets)) if (p.owner === ai) n += count(hangarMachines(p));
+      for (const f of Object.values(state.fleets)) if (f.owner === ai) n += count(hangarMachines(f));
+      for (const st of state.strikes ?? []) if (st.owner === ai) n += count(st.units);
+      return n;
+    };
     // Ship production is CAPPED by the fleet count (self-play M4: endless building
     // fed an ever-growing swarm — hundreds of fleets by mid-match). Enough fleets
     // out ⇒ the metal flows to economy/garrisons instead.
@@ -1408,7 +1526,16 @@ function baseAiOrders(
       (pl.resources.credits ?? 0) > 120 &&
       (pl.resources.microelectronics ?? 0) >= 3 // ECON-7: warships need the hi-tech good
     ) {
-      out.push(buildUnit(ai, base.id, lineUnit, 1));
+      // Корпус ветки в слот линейного корабля (армия под ветку): первое, что примет ядро,
+      // челнок — пока не упёрся в потолок своего рода; иначе крейсер.
+      const strikeCap = army.strikeCap ?? SHUTTLE_CAP;
+      const hull =
+        [...(warFooting ? (army.warHulls ?? []) : []), ...(army.lineHulls ?? [])].find(
+          (u) =>
+            (!data.units[u]?.traits.includes('shuttle') || shuttlesOwned(u) < strikeCap) &&
+            canOrder(state, buildUnit(ai, base.id, u, 1)) === null,
+        ) ?? lineUnit;
+      out.push(buildUnit(ai, base.id, hull, 1));
     }
     // Wartime posture (self-play M4: wars were free walk-in raids — the leader had no
     // garrisons, so whoever attacked always came back and won): at war the bot
@@ -1616,7 +1743,7 @@ function baseAiOrders(
       if (
         warFooting &&
         data.modules[SIEGE_MODULE] &&
-        shipsOwned(lineUnit, SIEGE_MODULE) < SIEGE_CAP &&
+        shipsOwned(lineUnit, SIEGE_MODULE) < (army.siegeCap ?? SIEGE_CAP) &&
         !pendingSiege(base.id) &&
         Object.keys({ ...(data.units[lineUnit]?.cost ?? {}), ...siegeCost }).every(
           (r) =>
@@ -1651,25 +1778,12 @@ function baseAiOrders(
       // Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём, поэтому цепочка
       // короткая — порт у бота и так есть под корабли.
       //
-      // СЧЁТ ИДЁТ ПО АНГАРАМ И ВОЗДУХУ, а не по флотам. `shipsOwned` смотрит в состав
-      // флотов и в гарнизон, а челнок с SHU-1.1 не бывает ни там, ни там — он лежит в
-      // ангаре базы. Пока предел считался тем счётчиком, он не срабатывал НИКОГДА: бот
-      // заказывал челнок каждый тик до упора в `E_HANGAR_FULL` и платил за это отказами
-      // весь матч. SHU-6.8: в счёт входят и ангары кораблей, и эскадры в воздухе.
-      // Перехватчики теперь держат патруль, а ударные эскадры перелетают к фронту, и предел
-      // по одному ангару порта стал бы конвейером: эскадра ушла — порт заказывает новую.
-      const shuttlesOwned = (unit: string): number => {
-        const count = (stacks: readonly UnitStack[]): number =>
-          stacks.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0);
-        let n = 0;
-        for (const p of Object.values(state.planets)) if (p.owner === ai) n += count(hangarMachines(p));
-        for (const f of Object.values(state.fleets)) if (f.owner === ai) n += count(hangarMachines(f));
-        for (const st of state.strikes ?? []) if (st.owner === ai) n += count(st.units);
-        return n;
-      };
       const orderShuttle = (unit: string): void => {
         if (pirate) return; // This roster has ships and ground troops, no shuttle wing.
-        if (shuttlesOwned(unit) >= SHUTTLE_CAP) return;
+        const cap = (STRIKE_SHUTTLES as readonly string[]).includes(unit)
+          ? (army.strikeCap ?? SHUTTLE_CAP)
+          : SHUTTLE_CAP;
+        if (shuttlesOwned(unit) >= cap) return;
         if (pendingUnit(base.id, unit)) return;
         if (!affordableUnit(unit, 1)) return;
         // ВОРОТА СПРАШИВАЮТСЯ У ЯДРА, а не подразумеваются. Раньше здесь стояло
@@ -2154,7 +2268,8 @@ function baseAiOrders(
     //    Цены у установки пока нет (её ставит HPR-1.6) — порядок «дешёвое вперёд»
     //    остаётся приоритетом «сначала простое», а не проверкой кошелька.
     //    Исключение — ракетный минёр (решение владельца 2026-10-08): пока его не везёт ни
-    //    один герой места, ставится он. Самый дорогой модуль отсека по правилу «дешёвое
+    //    один герой места, ставится он (при ракетной доктрине — каждому герою,
+    //    `minerEveryHero`). Самый дорогой модуль отсека по правилу «дешёвое
     //    вперёд» не доставался никому, а ветка ракетных техов (`damageScope: missile`)
     //    усиливает только мины — без минёра она для бота пуста. Проба `canOrder` — потому
     //    что на месте игрока (Хранитель) решает его арсенал: без модуля бот ставит прежнее.
@@ -2177,13 +2292,14 @@ function baseAiOrders(
           return used[md.slot] < hullDef.slots[md.slot] + (bonus?.[md.slot] ?? 0);
         })
         .sort(byPrice((id) => data.modules[id]?.cost));
-      const miner = minerAboard
-        ? undefined
-        : fits.find(
-            (id) =>
-              data.modules[id]?.rocketMine !== undefined &&
-              canOrder(state, installHeroModule(ai, x.id, id)) === null,
-          );
+      const miner =
+        minerAboard && !army.minerEveryHero
+          ? undefined
+          : fits.find(
+              (id) =>
+                data.modules[id]?.rocketMine !== undefined &&
+                canOrder(state, installHeroModule(ai, x.id, id)) === null,
+            );
       const mod = miner ?? fits[0];
       if (mod !== undefined) {
         out.push(installHeroModule(ai, x.id, mod));
@@ -2397,6 +2513,20 @@ function baseAiOrders(
     }
     if (best !== null) out.push(marketTake(ai, best.id, best.qty));
   }
+  // Копилка доктрины: войска, которые тратят то, на что место копит узел ветки, ждут.
+  const held =
+    saving.size === 0
+      ? out
+      : out.filter((a) => {
+          if (a.type !== 'unit.build') return true;
+          const p = a.payload as { unit: string; modules?: string[]; troop?: string };
+          const costs = [
+            data.units[p.unit]?.cost,
+            ...(p.modules ?? []).map((m) => data.modules[m]?.cost),
+            p.troop !== undefined ? data.units[p.troop]?.cost : undefined,
+          ];
+          return !costs.some((c) => [...saving].some((r) => (c?.[r] ?? 0) > 0));
+        });
   // Ведущий не строит войска в долг (решение владельца 2026-10-08). Лишний металл бот
   // переводил в ополчение и разведчиков, их содержание съедало кредиты, и после 20-го дня
   // место жило в долгах треть партии (`econplaytest 30 4 3`: медиана 274 ч из ~721), а в
@@ -2404,11 +2534,11 @@ function baseAiOrders(
   // в долге или казны не хватит на CREDIT_RUNWAY_HOURS минуса, заказы `unit.build`
   // снимаются — но только у того, кто не отстаёт: отстающему надо защищаться, и он строит
   // до последнего. Постройки и рынок правило не трогает.
-  if (trailing) return out;
+  if (trailing) return held;
   const me = state.players[ai]!;
   const creditFlow = netIncome(state, ai).credits ?? 0;
   const creditsDry =
     (me.arrears ?? []).includes('credits') ||
     (creditFlow < 0 && (me.resources.credits ?? 0) < -creditFlow * CREDIT_RUNWAY_HOURS);
-  return creditsDry ? out.filter((a) => a.type !== 'unit.build') : out;
+  return creditsDry ? held.filter((a) => a.type !== 'unit.build') : held;
 }
