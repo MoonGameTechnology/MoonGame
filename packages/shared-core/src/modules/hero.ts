@@ -26,6 +26,7 @@ import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
 import { isForkSite } from '../state/forkSite';
 import { isAllied } from '../util/combat';
+import { fleetForOrder } from '../util/fleet';
 import { canInstall } from '../util/fitting';
 import { knownSkillNodes } from '../util/heroSkills';
 import { moduleAllowed, type SlotCounts } from '../util/loadout';
@@ -701,7 +702,8 @@ export const heroModule: GameModule = {
   // «Поглощение мира» (`devour`) — осада мира вместо мгновенной аннигиляции.
   // 4.4.0: map-authored hero rescue on arrival, with one-time persisted recruitment facts.
   // 4.5.0: герой не появляется на крепости у развилки — это не мир (FORT-6.1).
-  version: '4.5.0',
+  // 4.6.0: чужая ракета (SM-3.7b) для `hero.spawn` — как отсутствующая цель (`E_NO_PLANET`).
+  version: '4.6.0',
   setup(api) {
     api.on('fleet.arrived', (event, h) => {
       const p = event.payload as { fleetId?: unknown; at?: unknown };
@@ -1066,7 +1068,9 @@ export const heroModule: GameModule = {
       // Target resolution: a world (own; allied with the `spawn_allied` marker) or —
       // with the `spawn_fleet` marker (HERO-8) — one of the player's own fleets.
       const planet = h.state.planets[at];
-      const host = planet === undefined ? h.state.fleets[at] : undefined;
+      // Чужая ракета (SM-3.7b) — как отсутствующая цель: её id предсказуем, и `E_BAD_SPAWN`
+      // вместо `E_NO_PLANET` подтвердил бы пуск, скрытый туманом (A06, замечание Codex на #1503).
+      const host = planet === undefined ? fleetForOrder(h.state, at, action.playerId, h.ctx.data) : undefined;
       if (!planet && !host) return h.reject('E_NO_PLANET');
       if (planet) {
         // Площадка крепости на развилке — не мир (FORT-6.1): уйти оттуда кораблю некуда.
