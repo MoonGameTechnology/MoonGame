@@ -322,12 +322,7 @@ import {
   fitTransform as camFitTransform,
   projection as camProjection,
 } from '../../packages/client/src/camera';
-import {
-  rgba,
-  blitGlow as hdBlitGlow,
-  blitSphere as hdBlitSphere,
-  clearHolographicSprites,
-} from '../../packages/client/src/holoDraw';
+import { rgba, clearHolographicSprites } from '../../packages/client/src/holoDraw';
 import { drawTerritory, strokeBorders, type ClassifiedBorders, type TerritoryCell, type TerritoryPalette } from '../../packages/client/src/territory';
 import { drawLivingBorders } from '../../packages/client/src/livingBorder';
 import { placePoly, TerritoryGeometryCache, type ShapePlacement, type TerritoryShape } from '../../packages/client/src/territoryGeometry';
@@ -738,15 +733,34 @@ import {
 // REFM-201: чей сейчас ход в переговорах — одна формула на оба чипа.
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
+import { COLOR, VOID_COLOR } from './sideColors';
+// REFM-237 — цвета сторон, места матча и константы карты: у владельца, `mapPalette.ts`.
 import {
-  COLOR,
-  VOID_COLOR,
-  isPaletteId,
-  paletteOf,
-  relationColor,
-  safeHexColor,
-  stanceColor,
-} from './sideColors';
+  ABILITY_RING,
+  blitGlow,
+  blitSphere,
+  CARDINAL,
+  CAST_FAR,
+  CAST_REACH,
+  CORR_LIVE,
+  CORR_ONCE,
+  GRID,
+  HOSTILE,
+  initMapPalette,
+  LOCK,
+  neutralColor,
+  ORBIT_COLOR,
+  ownerColor,
+  R_AA,
+  R_ARTY,
+  R_WING,
+  rivalPaletteId,
+  SEAT_META,
+  setSideColors,
+  stanceCol,
+  TAU,
+  youColor,
+} from './mapPalette';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -1105,36 +1119,15 @@ import type {
 
 // --- constants ---------------------------------------------------------------
 
-// --- side-colour SCHEMES (client-only, localStorage) --------------------------
-// Палитра и само правило «цвет = отношение» живут в `sideColors.ts` — одной таблицей на
-// оба представления (карта и экран дипломатии). Здесь остаётся только клиентская
-// НАСТРОЙКА: свой цвет, ничейное пространство и выбранная палитра.
-let youColor = safeHexColor(readRaw('void.colorYou'), COLOR.p1!);
-let neutralColor = safeHexColor(readRaw('void.colorNeutral'), COLOR.null!);
-let rivalPaletteId = readRaw('void.rivalPalette') ?? 'classic';
-if (!isPaletteId(rivalPaletteId)) rivalPaletteId = 'classic';
-function setSideColors(you: string, neutral: string, palette: string): void {
-  youColor = safeHexColor(you, COLOR.p1!);
-  neutralColor = safeHexColor(neutral, COLOR.null!);
-  rivalPaletteId = isPaletteId(palette) ? palette : 'classic';
-  writeRaw('void.colorYou', youColor);
-  writeRaw('void.colorNeutral', neutralColor);
-  writeRaw('void.rivalPalette', rivalPaletteId);
-}
-// Political colour is relative to the local commander: YOU are your configured hue,
-// unowned space grey, and every other commander is coloured by your STANCE toward them
-// (enemy red / friendly blue / neutral grey — see relationColor). Works for solo
-// (you = p1) and net (you may be any seat). Stance is public (never fogged), so the
-// client always has the true value.
-function ownerColor(owner: string | null | undefined): string {
-  if (!owner) return neutralColor; // unowned territory (void / no-man's land)
-  if (owner === ME) return youColor; // you
-  return relationColor(getStance(s, ME, owner), paletteOf(rivalPaletteId));
-}
-/** Цвет чипа стойки на экране дипломатии — из той же палитры, что и карта. */
-function stanceCol(st: DiplomaticStance): string {
-  return stanceColor(st, paletteOf(rivalPaletteId));
-}
+// --- side-colour SCHEMES and map constants -----------------------------------
+// Палитра сторон и константы карты — у владельца, `mapPalette.ts` (REFM-237). Отсюда —
+// только то, что принадлежит игре: мир, своё место и канвас карты.
+initMapPalette({
+  world: () => s,
+  me: () => ME,
+  ctx: () => cx,
+  dpr: () => DPR,
+});
 // Build profile. `__PLAYER_BUILD__` is an esbuild define — REQUIRED by every bundler
 // of this file (build.mjs sets it for both artifacts, uitest.mjs pins `false`); a
 // missing define fails loudly at boot with this exact name. `true` bakes the PLAYER
@@ -1168,50 +1161,8 @@ const DEV_UI = ((): boolean => {
     return false;
   }
 })();
-// The ten possible commanders, in stable seat order. Seat 1 is always you (human);
-// seats 2-10 are AI or off in the setup screen. Four faction passives cycle across seats.
-const SEAT_META: Array<{ id: string; name: string; faction: string; color: string }> = [
-  { id: 'p1', name: 'Azure Compact', faction: 'azure', color: COLOR.p1! },
-  { id: 'p2', name: 'Crimson Hegemony', faction: 'crimson', color: COLOR.p2! },
-  { id: 'p3', name: 'Amber Concord', faction: 'amber', color: COLOR.p3! },
-  { id: 'p4', name: 'Violet Ascendancy', faction: 'violet', color: COLOR.p4! },
-  { id: 'p5', name: 'Azure Compact II', faction: 'azure', color: COLOR.p5! },
-  { id: 'p6', name: 'Crimson Hegemony II', faction: 'crimson', color: COLOR.p6! },
-  { id: 'p7', name: 'Amber Concord II', faction: 'amber', color: COLOR.p7! },
-  { id: 'p8', name: 'Violet Ascendancy II', faction: 'violet', color: COLOR.p8! },
-  { id: 'p9', name: 'Azure Compact III', faction: 'azure', color: COLOR.p9! },
-  { id: 'p10', name: 'Crimson Hegemony III', faction: 'crimson', color: COLOR.p10! },
-];
-// Extra seats use the same faction cycle, with stable distinct map colors.
-for (let i = 10; i < 100; i++) {
-  const house = SEAT_META[i % 4]!;
-  const color = '#' + [73, 107, 131].map((k) => (80 + (i * k) % 156).toString(16).padStart(2, '0')).join('');
-  COLOR[`p${i + 1}`] = color;
-  SEAT_META.push({ id: `p${i + 1}`, name: `${house.name} ${Math.floor(i / 4) + 1}`, faction: house.faction, color });
-}
 let MAP = LEGACY_MAP;
 let SCORE_LIMIT = LEGACY_SCORE_LIMIT;
-const GRID = 'rgba(46,150,160,0.07)';
-const LOCK = '#7df0d0'; // selection / targeting reticle accent
-const HOSTILE = '#ff5a4d'; // «Атака»: цели и путь к ним — красным (заказ владельца 2026-09-24)
-// RANGE-UX: три вида оружия — три РАЗНЫХ цвета, чтобы круги не сливались в кашу, когда
-// в выделении и артиллерия, и носитель. Линия огня — того же цвета, что круг стрелка.
-const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
-const R_WING = '#9ad7ff'; // эскадрилья: холодный голубой
-const R_AA = '#c07dff'; // ПКО: сиреневый — это ОТМЕТКА на мире, а не область
-// HERO-CORRIDOR: одноразовый коридор — КРАСНЫЙ мигающий пунктир (он исчезнет с первым
-// же проходом, это не дорога); временный и общий — спокойная бирюза с таймером.
-const CORR_ONCE = '#ff5c5c';
-const CORR_LIVE = '#5ce1d6';
-// CAST-UX: круги прицела каста. Отдельные имена, а не переиспользование LOCK, потому
-// что дальность и область — РАЗНЫЕ сущности, и игрок должен различать их с одного
-// взгляда: тонкий пунктир «докуда достану» против залитого пятна «что накроет».
-const CAST_REACH = '#7df0d0'; // круг дальности способности
-const CAST_FAR = '#ff6b6b'; // цель вне дальности — подсказка, вердикт всё равно за ядром
-// Радиус способности — всегда этот фиолетовый, и всегда пунктиром: на карте уже есть
-// кольца дальности огня и радара, и способность обязана читаться как ДРУГАЯ сущность.
-const ABILITY_RING = '#b78cff';
-const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
 // H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
@@ -1243,31 +1194,9 @@ let ME = 'p1';
 const SOVEREIGNS = 500;
 type PlanetTab = 'ground' | 'ships' | 'shuttle' | 'buildings';
 
-// Holographic draw primitives (rgba tint, cached glow/sphere sprites) now live in the
-// shared render kit (@void/client · holoDraw.ts, CP0.2 — one render implementation). The
-// prototype keeps thin same-named delegators so every call site is unchanged; it passes its
-// canvas ctx (`cx`) + current DPR, and the module owns the dpr-keyed sprite caches. `rgba`
-// is imported directly (a pure colour helper).
-function blitGlow(color: string, x: number, y: number, r: number, a: number): void {
-  if (!glowOn()) return; // graphics pref: glow & haloes off → skip the bloom discs entirely
-  hdBlitGlow(cx, DPR, color, x, y, r, a);
-}
-function blitSphere(color: string, x: number, y: number, r: number, a = 1, clockMs = 0): void {
-  hdBlitSphere(cx, DPR, color, x, y, r, a, clockMs);
-}
-
 /** Total count across a stack of units (ships, garrison or landing troops). */
 const sumUnits = (stacks: ReadonlyArray<{ count: number }>): number =>
   stacks.reduce((a, s) => a + s.count, 0);
-
-// Map-marker geometry / palette, shared so every blip reads the same way.
-const CARDINAL: ReadonlyArray<readonly [number, number]> = [
-  [0, -1],
-  [0, 1],
-  [-1, 0],
-  [1, 0],
-];
-const ORBIT_COLOR = '#7df0d0'; // the single orbit ring (GDD §7.4 — no near/far split)
 
 // --- state -------------------------------------------------------------------
 

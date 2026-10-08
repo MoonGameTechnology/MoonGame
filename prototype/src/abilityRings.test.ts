@@ -91,9 +91,12 @@ describe('радиусы способностей — что попадает н
 // Проводка живёт в main.ts без юнит-обвязки — сканом исходника, как в cmdVisibility.test.ts.
 describe('радиусы способностей — подключение к main.ts', () => {
   const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  // Цвет — у палитры карты (REFM-237), рисовалка — в `main.ts`.
+  const palette = readFileSync(new URL('./mapPalette.ts', import.meta.url), 'utf8');
 
   it('цвет один и он фиолетовый, а линия — пунктир', () => {
-    expect(src).toMatch(/const ABILITY_RING = '#b78cff';/);
+    expect(palette).toMatch(/export const ABILITY_RING = '#b78cff';/);
+    expect(src).not.toMatch(/const ABILITY_RING\b/);
     const at = src.indexOf('function drawAbilityCircle');
     const body = src.slice(at, at + 600);
     expect(body).toContain('setLineDash([7, 6])');

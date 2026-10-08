@@ -115,7 +115,7 @@ describe('зенитный огонь — корабельное ПВО (AUD-17)
   });
 
   it('и не повторяет цвета, уже занятые на карте: отметку ПКО и цвета владельцев', () => {
-    // `R_AA` (main.ts) и `OWNER_COLORS` (packages/client/src/mapRender.ts) — копии здесь
+    // `R_AA` (mapPalette.ts) и `OWNER_COLORS` (packages/client/src/mapRender.ts) — копии здесь
     // намеренно: это список «чего избегать», а не источник цвета.
     const taken = ['#c07dff', '#35d6e6', '#ff5a4d', '#ffb43a', '#b07cff'];
     expect(taken).not.toContain(flakLook('pointDefense').color);
