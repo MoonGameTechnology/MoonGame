@@ -68,7 +68,7 @@
 | REFM-228 | ⏳ | proto | `docs/backlog.md` | Приказы группе |
 | REFM-229 | ⏳ | proto | `docs/backlog.md` | Композер цепочек «Приказ» |
 | REFM-230 | ⏳ | proto | `docs/backlog.md` | Реакция на события мира и лента |
-| REFM-231 | ⏳ | proto | `docs/backlog.md` | Камера и туман |
+| REFM-231 | 🔶 | proto | `docs/backlog.md` | Камера и туман |
 | REFM-232 | 🔒 | proto | `docs/backlog.md` | Статический голографический слой |
 | REFM-233 | 🔒 | proto | `docs/backlog.md` | Наложения |
 | REFM-234 | 🔒 | proto | `docs/backlog.md` | Эффекты и метки |

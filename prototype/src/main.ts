@@ -316,12 +316,7 @@ import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMar
 import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import {
-  worldToScreen as camWorldToScreen,
-  screenToWorld as camScreenToWorld,
-  zoomAt as camZoomAt,
   pinchAt as camPinchAt,
-  clampCam as camClampCam,
-  centerOn as camCenterOn,
   fitTransform as camFitTransform,
   projection as camProjection,
 } from '../../packages/client/src/camera';
@@ -469,7 +464,7 @@ import {
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
 import { syncCommanderXp } from './commanderSync';
-import { cardCovers, leftCardSlackFor, panelSlackFor, type Slack } from './panelSlack';
+import { cardCovers } from './panelSlack';
 import { longPressAction, pressIntent } from '../../decisions/pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
@@ -526,7 +521,7 @@ import {
   ringRadius,
   ringWidth,
 } from './pingPulse';
-import { openingView, openingZoom, pickHome } from './openingView';
+import { pickHome } from './openingView';
 import {
   fmtJoinWindow,
   joinWindow,
@@ -762,6 +757,7 @@ import {
   TAU,
   youColor,
 } from './mapPalette';
+import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, panelSlack, pirateIntroRect, setView, unworld, visible, world, worldDist, zoomAt } from './mapCamera';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -1048,7 +1044,6 @@ import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
-import { mapScale, screenRadius } from './mapRadius';
 import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { assaultSteps } from '../../decisions/assaultOrder';
@@ -1080,7 +1075,7 @@ import {
 } from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
-import { GOTO_MIN_ZOOM, jumpStep, type JumpKind } from './mapJump';
+import { GOTO_MIN_ZOOM } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1161,8 +1156,6 @@ const DEV_UI = ((): boolean => {
 })();
 let MAP = LEGACY_MAP;
 let SCORE_LIMIT = LEGACY_SCORE_LIMIT;
-const TOP = 50; // top-bar height
-const RAIL = 50; // left-rail width
 // H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
 // дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
 // бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
@@ -2124,47 +2117,25 @@ function drawRadarContacts(now: number): void {
   }
 }
 
-// Project a map-space point into the on-screen play area (inside the HUD insets).
-let MINX = Infinity;
-let MAXX = -Infinity;
-let MINY = Infinity;
-let MAXY = -Infinity;
-for (const n of MAP) {
-  MINX = Math.min(MINX, n.x);
-  MAXX = Math.max(MAXX, n.x);
-  MINY = Math.min(MINY, n.y);
-  MAXY = Math.max(MAXY, n.y);
-}
-// The play area: the screen rectangle the map lives in, inside the HUD insets. Mobile
-// no longer reserves the left rail (it folds into the drawer) → the map claims that
-// space; desktop keeps the rail + label gutter and the right panel column.
-function insets(): { left: number; right: number; top: number; bottom: number } {
-  if (holographic.active()) {
-    return { left: 20, right: VW - 20, top: VW > 1200 ? 138 : 182, bottom: VH - 76 };
-  }
-  if (MOBILE) {
-    return { left: 14, right: VW - 24, top: VH < 520 ? 86 : TOP + 54, bottom: VH - 96 };
-  }
-  // Wide screens (tablets + landscape): frame the board with reserves that SCALE to the
-  // viewport rather than fixed desktop constants. The old fixed 372px right column and
-  // 80/150 top/bottom bars wasted most of a tablet's width and squeezed a short landscape
-  // screen to a sliver — so the whole-map fit rendered tiny. Clamped so it stays sane
-  // across a 9" tablet up to a desktop window.
-  const rightPad = Math.min(360, Math.max(120, VW * 0.16));
-  const topPad = Math.min(80, Math.max(44, VH * 0.09));
-  const botPad = Math.min(150, Math.max(78, VH * 0.16));
-  return { left: RAIL + 80, right: VW - rightPad, top: TOP + topPad, bottom: VH - botPad };
-}
-// The view transform (fit / zoom / pan / projection) lives in the shared camera module
-// (@void/client · camera.ts, CP0.2 — one render implementation for the prototype and the
-// Stage-4 client). MINX..MAXY (set once from MAP above) are the map bounds it projects.
-const mapBounds = () => ({ minX: MINX, minY: MINY, maxX: MAXX, maxY: MAXY });
-
-// Camera: pan offset + zoom over the base fit (scale range MIN_SCALE..MAX_SCALE lives in
-// the module: 1 = whole-map fit, 6 = one province + neighbours). Node/label sizes stay
-// constant in screen px; only positions transform (node-graph style zoom). On a phone the
-// opening view zooms onto the home region; double-tap resets, pinch out to the overview.
-const cam = { scale: 1, x: 0, y: 0 };
+// Камера карты и рамка — у владельца, `mapCamera.ts` (REFM-231). Отсюда — только то, что
+// принадлежит игре: экран, раскладка, мир, своё место и побочные действия перехода.
+initMapCamera({
+  vw: () => VW,
+  vh: () => VH,
+  mobile: () => MOBILE,
+  console: () => holographic.active(),
+  world: () => s,
+  me: () => ME,
+  select: (id) => {
+    pickWorld(id);
+    invalidatePanel();
+  },
+  closeDiplo: () => closeDiplo(),
+  ring: (id) => {
+    goFlash = { id, at: performance.now() };
+  },
+});
+frameMap(MAP);
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
@@ -2211,10 +2182,7 @@ function installMapGeometry(state: GameState): void {
   galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
-  MINX = Math.min(...MAP.map((n) => n.x));
-  MAXX = Math.max(...MAP.map((n) => n.x));
-  MINY = Math.min(...MAP.map((n) => n.y));
-  MAXY = Math.max(...MAP.map((n) => n.y));
+  frameMap(MAP);
   mapNeedsPreparation = true;
   for (const p of Object.values(state.players)) if (p.npc) COLOR[p.id] = p.npc === 'pirate' ? '#f17457' : '#b79bea';
 }
@@ -2223,20 +2191,6 @@ function installMapGeometry(state: GameState): void {
 function sectorTypeOf(id: string) {
   const kind = SECTOR_OF[id];
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
-}
-function world(p: { x: number; y: number }): { x: number; y: number } {
-  return camWorldToScreen(p, cam, insets(), mapBounds());
-}
-/** Обратный перевод: точка экрана → мировые координаты. Нужен там, где целью служит
- *  САМА ТОЧКА карты, а не мир или флот под пальцем (точка патруля, SHU-6.3). */
-function unworld(p: { x: number; y: number }): { x: number; y: number } {
-  return camScreenToWorld(p, cam, insets(), mapBounds());
-}
-/** Дальность карты в пикселях — ЕДИНСТВЕННЫЙ перевод на весь рендер (`mapRadius.ts`,
- *  REFM-132). Там же причина, почему множитель — подгон карты под экран × зум камеры:
- *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */
-function worldDist(d: number): number {
-  return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
 }
 /**
  * Волна на границах провинций (M2.9, решение владельца: «в космосе нет прямых углов»).
@@ -2255,72 +2209,6 @@ function provinceWave(): { amp: number; wavelength: number; segment: number } {
 
 function currentMapLod(): MapLod {
   return mapLod(worldDist(mapNodeSpacing), cam.scale);
-}
-function visible(c: { x: number; y: number }, pad = 80): boolean {
-  return c.x >= -pad && c.x <= VW + pad && c.y >= -pad && c.y <= VH + pad;
-}
-/** Extra pan slack while the selection panel (#side) covers the play area: let the
- *  camera overshoot the map border by the covered strip, so worlds hidden behind the
- *  open panel can be dragged into the clear part of the screen. The panel is a
- *  full-width bottom sheet on phones (→ slack below) and a right-hand column on wide
- *  screens (→ slack on the right); measure its live rect so both layouts just work. */
-function panelSlack(): Slack {
-  const el = typeof document !== 'undefined' ? document.getElementById(MOBILE ? 'mobile-sheet' : 'side') : null;
-  const open = el && getComputedStyle(el).display !== 'none';
-  // The arithmetic (which side is covered, and by how much) is `panelSlack.ts`
-  // (REFM-54); measuring the live element stays here. YAG-7.2: the first-fight hint is a
-  // left column on PC — the camera may pull the home corner out from under it too.
-  return {
-    ...panelSlackFor(open ? el.getBoundingClientRect() : null, VW, VH),
-    ...leftCardSlackFor(pirateIntroRect(), VW),
-  };
-}
-/** Прямоугольник подсказки первого боя, пока она видна (YAG-7.2), иначе `null`. */
-function pirateIntroRect(): DOMRect | null {
-  const el = typeof document !== 'undefined' ? document.getElementById('pirate-intro') : null;
-  return el && !el.hidden ? el.getBoundingClientRect() : null;
-}
-
-function zoomAt(fx: number, fy: number, factor: number) {
-  // Zoom anchored on the focal point (cursor / pinch centre) — camera.ts clamps scale + pan.
-  const n = camZoomAt(cam, fx, fy, factor, insets(), mapBounds(), panelSlack());
-  cam.scale = n.scale;
-  cam.x = n.x;
-  cam.y = n.y;
-}
-
-/** Keep the map filling the play area with SLACK at the edges (module: PAN_SLACK) so the
- *  outermost provinces don't jam against the border. Delegates to the shared camera;
- *  an open panel widens the range (panelSlack) so it never traps the view. */
-function clampCam(): void {
-  const n = camClampCam(cam, insets(), mapBounds(), panelSlack());
-  cam.x = n.x;
-  cam.y = n.y;
-}
-
-/** Put map-point `p` at the centre of the play area at `scale` (clamped + bounded). */
-function centerOn(p: { x: number; y: number }, scale: number): void {
-  const n = camCenterOn(cam, p, scale, insets(), mapBounds(), panelSlack());
-  cam.scale = n.scale;
-  cam.x = n.x;
-  cam.y = n.y;
-}
-/** The opening / reset view. Phones and the flagship console open on the home region;
- *  the simple desktop view keeps its whole-map fit. Zoom is relative to the screen-fit. */
-function defaultView(): void {
-  // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
-  // Забег узнаётся по режиму матча: `s.pve` ядро заводит только на первом ходе часов.
-  const run = data.modes[matchMode() ?? '']?.pve !== undefined;
-  const zoom = openingZoom({ phone: MOBILE, console: holographic.active(), run });
-  const view = openingView(zoom !== null, pickHome(Object.values(s.planets), ME), zoom ?? undefined);
-  if (view.kind === 'home') {
-    centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
-    return;
-  }
-  cam.scale = 1;
-  cam.x = 0;
-  cam.y = 0;
-  clampCam();
 }
 // Re-validate the camera after a real resize (orientation / window). Attached after
 // `cam` exists so the initial in-module resize() call never touches it (TDZ-safe).
@@ -6228,8 +6116,7 @@ function blitStaticLayer(now: number): void {
     // baking the map again. The camera's shift is a term of the projection, and it is
     // under half a device pixel: nothing on the screen visibly moves.
     const nudge = gridNudge(view, DPR);
-    cam.x += nudge.x;
-    cam.y += nudge.y;
+    panBy(nudge.x, nudge.y);
     here = camProjection(cam, insets(), mapBounds());
     camSeen = seenOf(here); // the camera stays at rest
     view = layerTransform(mapLayerAt, here);
@@ -9413,8 +9300,10 @@ function revealMobileSelection(): void {
   const top = topEl.getBoundingClientRect().bottom + 32;
   const right = VH < 520 ? rect.left - 32 : VW - 28;
   const bottom = VH < 520 ? VH - 28 : rect.top - 32;
-  cam.x += clamp(anchor.x, 28, Math.max(28, right)) - anchor.x;
-  cam.y += clamp(anchor.y, top, Math.max(top, bottom)) - anchor.y;
+  panBy(
+    clamp(anchor.x, 28, Math.max(28, right)) - anchor.x,
+    clamp(anchor.y, top, Math.max(top, bottom)) - anchor.y,
+  );
   clampCam();
 }
 
@@ -11255,7 +11144,7 @@ function flushPinch(): void {
   if (!pinchPending || !pinchStart) return;
   pinchPending = false;
   const [a, b] = [...pointers.values()];
-  if (a && b) Object.assign(cam, camPinchAt(pinchStart.cam, pinchStart.at, pinchOf(a, b), insets(), mapBounds(), panelSlack()));
+  if (a && b) setView(camPinchAt(pinchStart.cam, pinchStart.at, pinchOf(a, b), insets(), mapBounds(), panelSlack()));
 }
 // Был ли в этом жесте второй палец. После щипка нельзя ни выбирать объект,
 // ни ставить цель, ни отправлять приказ в точке отрыва последнего пальца.
@@ -11364,8 +11253,7 @@ canvas.addEventListener('pointermove', (ev) => {
   } else if (intent === 'box' && dragStart) {
     selectionBox = { x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y };
   } else if (cameraFollows(intent)) {
-    cam.x += p.x - prev.x;
-    cam.y += p.y - prev.y;
+    panBy(p.x - prev.x, p.y - prev.y);
     clampCam(); // keep the map from being dragged entirely off-screen
   }
   if (marksDragged(intent, moved)) dragged = true;
@@ -14379,7 +14267,7 @@ function frame(nowReal: number) {
   phoneNav.sync(MOBILE && inMatch());
   if (!MOBILE) { stageDraft(null); offerChoices([]); }
   if (wasHolographic !== holographic.active()) {
-    Object.assign(cam, reframePresentation(cam, previousViewport, insets(), mapBounds()));
+    setView(reframePresentation(cam, previousViewport, insets(), mapBounds()));
     clampCam();
   }
   // Keep the Back sentinel armed while something is closable OR a match is live, so a
@@ -15425,25 +15313,6 @@ function drawChainOverlay(now: number): void {
 }
 const GO_FLASH_MS = 1600;
 let goFlash: { id: string; at: number } | null = null;
-/** Обе дороги к точке карты. Чем прыжок из текста отличается от перехода по ссылке из
- *  панели (масштаб, выделение, диплоокно, вспышка) — `mapJump.ts` (REFM-108). */
-function jumpTo(id: string, kind: JumpKind): void {
-  const pl = s.planets[id];
-  const step = jumpStep(kind, !!pl, cam.scale);
-  if (!pl || step.do !== 'jump') return;
-  centerOn(pl.position, step.scale);
-  if (step.select) {
-    pickWorld(id);
-    invalidatePanel();
-  }
-  if (step.closeDiplo) closeDiplo();
-  if (step.ring) goFlash = { id, at: performance.now() };
-}
-/** Pan the camera to a world referenced from a plan row (data-goto) — selection stays
- *  untouched (the fleet panel must survive the tap) and a short ring marks the spot. */
-function focusWorld(id: string): void {
-  jumpTo(id, 'goto');
-}
 function drawGoFlash(now: number): void {
   if (!goFlash) return;
   if (flashDone(now, goFlash.at, GO_FLASH_MS)) {
@@ -15553,11 +15422,6 @@ function drawCaptureFlashes(now: number): void {
     cx.stroke();
     cx.restore();
   }
-}
-/** Fly to a world referenced from TEXT (toast / recap row / diplo ping): the map is not
- *  in front of the player yet, so this one zooms in and takes over the selection. */
-function jumpToPing(id: string): void {
-  jumpTo(id, 'ping');
 }
 
 requestAnimationFrame(frameLoop);
