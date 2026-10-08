@@ -7,8 +7,9 @@
  * присвоить мимо владельца не даст компилятор. Билет снаружи не виден вовсе — его кладёт
  * {@link holdJoinToken} и забирает {@link takeJoinToken}, ровно один раз.
  *
- * Строка статуса, сообщения игроку, карточка входа и её пароль живут в `main.ts`; модуль
- * получает их хуками {@link initAccountSession} — импорт оттуда был бы циклом.
+ * Строка статуса и сообщения игроку живут в `main.ts`, карточка входа и её пароль — у
+ * страниц входа (`signInPages.ts`), которые сами импортируют сессию; модуль получает их
+ * хуками {@link initAccountSession} — импорт оттуда был бы циклом.
  *
  * With AUTH on the server, the playable path runs the full account flow: the nick
  * is a LOGIN, a password guards it, and joining goes register/login → session JWT →
@@ -46,7 +47,8 @@ import {
 import { authStatusUrl, identityMode, type IdentityMode } from './identityProbe';
 import { createPendingJoin } from './pendingJoin';
 
-/** Что сессии нужно от игры. Строка статуса, лента и карточка входа живут в `main.ts`. */
+/** Что сессии нужно от игры: строка статуса и лента из `main.ts`, карточка входа — со
+ *  страниц входа (`signInPages.ts`). */
 export interface AccountSessionHost {
   /** Строка статуса экрана подключения: почему не пустили. */
   status(text: string): void;

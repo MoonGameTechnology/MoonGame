@@ -2,7 +2,7 @@
  * Как из набранного игроком получается адрес сервера (REFM-162).
  *
  * Первая часть остатка секции `meta-progression`: `resolveServer()` — вход в сеть для
- * ВСЕГО клиента (дозвон, браузер матчей, проба режима аккаунтов, восстановление доступа),
+ * ВСЕГО клиента (дозвон, браузер матчей, проба режима аккаунтов),
  * и до сих пор он держал в себе шесть решений подряд, из которых четыре — правки чужого
  * ввода. Каждая из них закрывает СВОЙ молчаливый провал: адрес выглядит принятым, а
  * соединение не открывается и в консоли пусто.
@@ -26,6 +26,10 @@
  *    адресом `/matches` превратил бы сокет в запрос к несуществующей странице.
  * 6. **Неразбираемый адрес — отказ С ПРИЧИНОЙ, а не молчание.** Опечатка в адресе — самая
  *    частая беда при заходе на чужой сервер; молчаливый отказ не даёт её найти.
+ * 7. **Восстановлению доступа и сбросу пароля позывной не нужен** ({@link resolveBase}).
+ *    Учётку там называет почта или токен ссылки, а пароль вспоминают как раз на новом
+ *    устройстве, где позывного ещё нет. Требование позывного молча гасило просьбу выслать
+ *    ссылку, а ссылку из письма объявляло «недействительной», не спросив сервер.
  */
 
 /** Чем кончился разбор того, что набрано в полях. */
@@ -64,13 +68,25 @@ export function socketBase(typed: string, pageHttps: boolean): string | null {
   }
 }
 
+/** Чем кончился разбор одного адреса, без позывного (правило 7). */
+export type BaseStep =
+  Extract<AddressStep, { kind: 'need-address' | 'bad-address' }> | { kind: 'ok'; base: string };
+
+/** Только адрес сервера (правила 1–6 без позывного) — для запросов, которым позывной не
+ *  нужен (правило 7). */
+export function resolveBase(server: string, pageHttps: boolean): BaseStep {
+  const typed = server.trim();
+  if (!typed) return { kind: 'need-address', key: 'net.need-address' };
+  const base = socketBase(typed, pageHttps);
+  if (base === null) return { kind: 'bad-address', key: 'net.bad-address' };
+  return { kind: 'ok', base };
+}
+
 /** Полный разбор полей входа (правила 1–6). */
 export function resolveAddress(typed: TypedIn): AddressStep {
-  const server = typed.server.trim();
-  if (!server) return { kind: 'need-address', key: 'net.need-address' };
-  const base = socketBase(server, typed.pageHttps);
-  if (base === null) return { kind: 'bad-address', key: 'net.bad-address' };
+  const step = resolveBase(typed.server, typed.pageHttps);
+  if (step.kind !== 'ok') return step;
   const nick = typed.nick.trim();
   if (!nick) return { kind: 'need-nick' };
-  return { kind: 'ok', base, nick };
+  return { kind: 'ok', base: step.base, nick };
 }

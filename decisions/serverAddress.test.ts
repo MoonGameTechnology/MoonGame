@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAddress, socketBase } from './serverAddress';
+import { resolveAddress, resolveBase, socketBase } from './serverAddress';
 
 describe('адрес сокета из набранного', () => {
   it('ws:// и wss:// проходят как есть', () => {
@@ -83,5 +83,19 @@ describe('разбор полей входа', () => {
 
   it('ни того ни другого — жалуются на адрес', () => {
     expect(resolveAddress(поля('', '')).kind).toBe('need-address');
+  });
+});
+
+describe('только адрес — восстановлению и сбросу позывной не нужен (правило 7)', () => {
+  it('адрес разбирается по тем же правилам, позывного не спрашивают', () => {
+    expect(resolveBase(' https://host.test/matches ', true)).toEqual({
+      kind: 'ok',
+      base: 'wss://host.test',
+    });
+  });
+
+  it('пустой и битый адрес называются вслух, как и при входе', () => {
+    expect(resolveBase('  ', false)).toEqual({ kind: 'need-address', key: 'net.need-address' });
+    expect(resolveBase('ws://', false)).toEqual({ kind: 'bad-address', key: 'net.bad-address' });
   });
 });
