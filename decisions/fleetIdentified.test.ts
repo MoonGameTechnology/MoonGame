@@ -123,9 +123,12 @@ describe('fleetIdentified — чужой флот на карте клиента
     expect(fleetIdentified({ net: true, spied: false, local: localSight(view) })).toBe(true);
   });
 
-  it('окно шпионажа показывает флот, но не опознаёт его — и в сети тоже', () => {
-    expect(fleetIdentified({ net: true, spied: true, local: () => false })).toBe(false);
-    expect(fleetIdentified({ net: true, spied: true, local: () => true })).toBe(true);
+  it('окно шпионажа открывает флот целиком — позицию и состав (Codex, #1529)', () => {
+    // Сервер мог опознать флот и глазом, которого проекция не отдаёт; окно на хозяина
+    // не повод откатываться к пересчёту, который этот глаз не видит.
+    expect(fleetIdentified({ net: true, spied: true, local: () => false })).toBe(true);
+    // В соло окно тоже открывает состав: так его описывает ядро (`espionage.ts`).
+    expect(fleetIdentified({ net: false, spied: true, local: () => false })).toBe(true);
   });
 
   it('соло решает зрением клиента по полному миру', () => {
