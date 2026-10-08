@@ -82,9 +82,13 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Сервер считает токен короче 32 символов незаданным (MIN_OPERATOR_TOKEN_LENGTH в
-# operatorAccess.ts) — установка «прошла бы», а /metrics/* отвечал бы 404.
-if [ ${#METRICS_TOKEN} -lt 32 ]; then
-    log_error "METRICS_TOKEN короче 32 символов — сервер его не примет. Задай длиннее или не задавай вовсе."
+# operatorAccess.ts) — установка «прошла бы», а /metrics/* отвечал бы 404. Только
+# ASCII: bash считает байты, а сервер — UTF-16, и «é» разошлись бы в длине.
+metrics_token_ok() {
+    [[ "$1" =~ ^[A-Za-z0-9._~+/=-]{32,}$ ]]
+}
+if ! metrics_token_ok "$METRICS_TOKEN"; then
+    log_error "METRICS_TOKEN должен быть не короче 32 символов из A-Z a-z 0-9 . _ ~ + / = -, иначе сервер его не примет. Задай другой или не задавай вовсе."
     exit 1
 fi
 
@@ -183,7 +187,8 @@ if [ -d "$INSTALL_DIR" ]; then
                 REUSED_SECRETS=1
             fi
             [ -n "$OLD_JWT" ] && AUTH_JWT_SECRET="$OLD_JWT"
-            [ -n "$OLD_MT" ] && [ -z "$METRICS_TOKEN_FROM_ENV" ] && METRICS_TOKEN="$OLD_MT"
+            # Негодный прежний токен сервер всё равно не принимал — берём свежий.
+            [ -z "$METRICS_TOKEN_FROM_ENV" ] && metrics_token_ok "$OLD_MT" && METRICS_TOKEN="$OLD_MT"
             [ -n "$OLD_PG" ] && log_info "Секреты прошлой установки сохранены"
         fi
         rm -rf "$INSTALL_DIR"
