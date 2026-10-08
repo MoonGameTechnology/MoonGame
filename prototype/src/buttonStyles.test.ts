@@ -361,12 +361,13 @@ describe('три стиля кнопок (UIX-11.1)', () => {
         'ctest:—',
       ].sort(),
     );
-    const main = read('./main.ts');
-    expect(main).toContain('<button class="mbtn btn-second" id="msolo-go">');
-    expect(main).toContain("join.className = 'mbtn btn-second';");
-    expect(main).toContain("arch.className = 'mbtn btn-quiet';");
-    expect(main).toContain("open.className = 'mbtn btn-second';");
-    expect(main).toContain("copy.className = 'mbtn btn-quiet';");
+    // Строки обозревателя и «Мои партии» рисует их владелец (REFM-217).
+    const browser = read('./matchBrowser.ts');
+    expect(browser).toContain('<button class="mbtn btn-second" id="msolo-go">');
+    expect(browser).toContain("join.className = 'mbtn btn-second';");
+    expect(browser).toContain("arch.className = 'mbtn btn-quiet';");
+    expect(browser).toContain("open.className = 'mbtn btn-second';");
+    expect(browser).toContain("copy.className = 'mbtn btn-quiet';");
   });
 
   it('выбранная вкладка — токенами, без мятной заливки', () => {

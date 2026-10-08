@@ -46,7 +46,10 @@ import {
 const BASELINE = new URL('./sizeBaseline.json', import.meta.url);
 const WRITE = process.argv.includes('--write');
 
-const hooks = `window.__sizeTest = {
+// Обозреватель партий живёт в своём модуле (REFM-217): ленту ему кладёт дверь `showLists`,
+// импорт стоит прямо в хуках — в `main.ts` она не нужна.
+const hooks = `import { showLists as __showLists } from './matchBrowser';
+window.__sizeTest = {
   layers: () => BACK_LAYERS.filter((l) => l.isOpen()).map((l) => l.id),
   myFleet: () => Object.values(s.fleets).find((f) => f.owner === ME && f.location && f.units.some((u) => u.count > 0))?.id,
   selectFleet: (id) => setFleetSelection([id]),
@@ -69,9 +72,7 @@ const hooks = `window.__sizeTest = {
   browse: (lists) => {
     showStage('browse');
     statusEl.textContent = '';
-    matchLists = lists;
-    activeTab = 'available';
-    renderMatches();
+    __showLists(lists);
   },
   hubTab: (tab) => hubTab(tab),
   openCodex: (key) => openCodex(key),
