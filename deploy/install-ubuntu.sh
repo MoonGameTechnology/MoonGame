@@ -46,7 +46,9 @@ REUSED_SECRETS=0
 AUTH_JWT_SECRET="$(openssl rand -hex 32)"
 # Токен оператора для /metrics/* (сводка, здоровье, хвост журнала). Без него эти
 # маршруты закрыты для всех: под Docker запрос с хоста приходит не с loopback.
-# Заданный окружением токен берётся как есть (мониторинг, настроенный заранее).
+# Заданный окружением токен берётся как есть (мониторинг, настроенный заранее) и
+# побеждает токен прошлой установки — так его можно сменить переустановкой.
+METRICS_TOKEN_FROM_ENV="${METRICS_TOKEN:+1}"
 METRICS_TOKEN="${METRICS_TOKEN:-$(openssl rand -hex 32)}"
 # Origin, по которому игроки открывают игру — идёт в ALLOWED_ORIGINS (CSWSH-allowlist).
 # Браузер присылает РОВНО тот origin, на котором открыта страница, поэтому внешний
@@ -76,6 +78,13 @@ log_error() {
 # Проверка, запущен ли скрипт от root
 if [[ $EUID -ne 0 ]]; then
     log_error "Скрипт должен быть запущен от root (используй: sudo bash deploy/install-ubuntu.sh)"
+    exit 1
+fi
+
+# Сервер считает токен короче 32 символов незаданным (MIN_OPERATOR_TOKEN_LENGTH в
+# operatorAccess.ts) — установка «прошла бы», а /metrics/* отвечал бы 404.
+if [ ${#METRICS_TOKEN} -lt 32 ]; then
+    log_error "METRICS_TOKEN короче 32 символов — сервер его не примет. Задай длиннее или не задавай вовсе."
     exit 1
 fi
 
@@ -174,7 +183,7 @@ if [ -d "$INSTALL_DIR" ]; then
                 REUSED_SECRETS=1
             fi
             [ -n "$OLD_JWT" ] && AUTH_JWT_SECRET="$OLD_JWT"
-            [ -n "$OLD_MT" ] && METRICS_TOKEN="$OLD_MT"
+            [ -n "$OLD_MT" ] && [ -z "$METRICS_TOKEN_FROM_ENV" ] && METRICS_TOKEN="$OLD_MT"
             [ -n "$OLD_PG" ] && log_info "Секреты прошлой установки сохранены"
         fi
         rm -rf "$INSTALL_DIR"
