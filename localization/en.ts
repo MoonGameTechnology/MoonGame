@@ -2513,7 +2513,7 @@ export const en: Record<string, string> = {
   'hero.tree.void-attunement.desc':
     "The hero's psi resonance inspires nearby fleets: +8% damage to your fleets within 42.",
   'hero.tree.void-translocator.desc':
-    'The top of the corridor branch: unlocks the Warp Jump ability.',
+    'A corridor fault once threw a ship far past the exit, and it came back intact. Now the fault is triggered on purpose: unlocks the Warp Jump ability.',
   'hero.unit.commander.desc':
     'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
   'hero.unit.leviathan.desc':
