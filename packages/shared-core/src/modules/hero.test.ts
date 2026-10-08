@@ -33,6 +33,12 @@ const data: GameData = parseGameData({
       traits: ['hero'],
       slots: { weapon: 1, defense: 1, utility: 1 },
     },
+    // SM-3.7b: летящая ракета — отряд из юнита с трейтом `missile`.
+    missile: {
+      faction: 'neutral',
+      stats: { attack: 0, defense: 0, speed: 0, hp: 12 },
+      traits: ['immobile', 'issued', 'missile'],
+    },
   },
   // HPR-1.5.2 module catalog: one per category, a SECOND utility (to prove the bay is
   // bounded and that the main hero's bonus bay opens it), and a hull-locked one.
@@ -1001,6 +1007,27 @@ describe('hero — manual spawn (HERO-3)', () => {
     // A foreign fleet stays off-limits even with the marker; an unknown id is E_NO_PLANET.
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'foe'), ctx(0)))).toBe('E_BAD_SPAWN');
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'nowhere'), ctx(0)))).toBe('E_NO_PLANET');
+  });
+
+  // SM-3.7b: id ракеты предсказуем, а пуск скрыт туманом. «Не та цель» (`E_BAD_SPAWN`)
+  // вместо «нет такой» (`E_NO_PLANET`) подтвердил бы его перебором id (Codex, #1503).
+  it('a foreign missile is the same refusal as an unknown id — with the marker and without', () => {
+    const st = rosterWorld();
+    st.fleets['fleet:missile:0:1'] = {
+      id: 'fleet:missile:0:1',
+      owner: 'p2',
+      location: null,
+      movement: null,
+      edge: null,
+      flight: { from: { x: 0, y: 0 }, to: { x: 50, y: 0 }, departedAt: 0, arrivesAt: HOUR },
+      units: [{ unit: 'missile', count: 1 }],
+      traits: [],
+    };
+    for (const abilities of [[], ['boarding']]) {
+      st.heroes![SECOND]!.abilities = abilities;
+      for (const at of ['fleet:missile:0:1', 'fleet:missile:0:2'])
+        expect(errCode(kernel.applyAction(st, spawn(SECOND, at), ctx(0)))).toBe('E_NO_PLANET');
+    }
   });
 
   it('HERO-8: рядом с флотом В ПУТИ выйти нельзя — там нет узла', () => {

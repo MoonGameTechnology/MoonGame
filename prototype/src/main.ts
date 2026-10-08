@@ -15,9 +15,10 @@ import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/st
 import { mineCard } from '../../decisions/mineCard';
 import { rocketMineCard } from '../../decisions/rocketMineCard';
 import { missileCard } from '../../decisions/missileCard';
+import { missileOnMap } from '../../decisions/missileOnMap';
 import { EMPLACEMENT_HEADING, isEmplacementFleet } from '../../decisions/emplacement';
 import { drawMineShape } from '../../packages/client/src/mineShape';
-import { missileVisible, visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
+import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
 import { isMissileFleet, isOrdnanceFleet, isRocketMineFleet, rocketMinelayer } from '../../packages/shared-core/src/state/ordnance';
 import { drawMissile, drawOrdnance } from '../../packages/client/src/ordnanceView';
 import { HINT_KEY, MINE_MODES, MODE_KEY, rocketMinesUi } from './rocketMinesUi';
@@ -3042,12 +3043,16 @@ function perWorld<K extends keyof WorldDerived>(
 function fleetSeen(f: Fleet): boolean {
   // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
   if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
-  // Ракета (SM-3.7b) — по обычному туману, но по своей ПОЗИЦИИ: узла у неё нет. Своя, окно
-  // шпионажа или глаза блока зрения — то же правило, что у ядра (`isVisibleTo`); туман,
+  // Ракета (SM-3.7b) — по обычному туману, но по своей ПОЗИЦИИ: узла у неё нет. Окно
+  // шпионажа открывает её здесь, остальное решает `missileOnMap`: в сети — присутствие в
+  // проекции сервера, в соло — правило ядра (своя или глаза блока зрения); туман,
   // выключенный в песочнице (`vision` пуст), открывает её, как и любой флот.
   if (isMissileFleet(f, data))
-    return !vision || f.owner === ME || intelFleetOwners.has(f.owner) ||
-      missileVisible(s, f, ME, data, perWorld('sight', () => sightCircles(s, ME, data)));
+    return intelFleetOwners.has(f.owner) || missileOnMap(s, f, ME, data, {
+      net: NET,
+      fogOff: !vision,
+      circles: () => perWorld('sight', () => sightCircles(s, ME, data)),
+    });
   // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
   return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
 }
