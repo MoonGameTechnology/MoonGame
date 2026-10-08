@@ -11,12 +11,10 @@ import {
   setRocketMineMode,
 } from '../../decisions/actions';
 import { inspectBattle } from '../../packages/shared-core/src/state/battleReadout';
-import { isMineFleet, mineFleetVisible } from '../../packages/shared-core/src/state/minefields';
+import { isMineFleet } from '../../packages/shared-core/src/state/minefields';
 import { mineCard } from '../../decisions/mineCard';
 import { rocketMineCard } from '../../decisions/rocketMineCard';
 import { missileCard } from '../../decisions/missileCard';
-import { missileOnMap } from '../../decisions/missileOnMap';
-import { fleetIdentified } from '../../decisions/fleetIdentified';
 import { EMPLACEMENT_HEADING, isEmplacementFleet } from '../../decisions/emplacement';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
@@ -102,7 +100,7 @@ import {
   openSessionTab,
   stopNetSetupPoll,
 } from './matchJoin';
-import { fleetBaseSpeed, fleetNodeAt, forkSiteId, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
+import { fleetBaseSpeed, forkSiteId, isForkSite, laneRoad, laneRoadLength, legEndT, legT, pointAlong, roadAhead, shareRoadNetwork, snapToFork } from '../../packages/shared-core/src/index';
 import { kernel as soloKernel } from './protoKernel';
 import { swarmDossier } from '../../decisions/swarmDossier';
 import { swarmDossierBadge, swarmDossierHtml } from './swarmDossier';
@@ -280,18 +278,12 @@ import {
   previewLossCount,
   scanNodeThreats,
   identifiedNodes,
-  sensorCoverage,
-  radarSignatures,
   engagementOf,
   flashBattles,
   inVisionBloc,
-  type Engagement,
   type SignatureContact,
   sightCircles,
   type SightCircle,
-  fleetsSeenByPosition,
-  patrolsSeenBy,
-  type SeenPatrol,
   sightRulesOf,
   worldRadarReach,
   fleetRadarReach,
@@ -316,12 +308,7 @@ import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMar
 import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import {
-  worldToScreen as camWorldToScreen,
-  screenToWorld as camScreenToWorld,
-  zoomAt as camZoomAt,
   pinchAt as camPinchAt,
-  clampCam as camClampCam,
-  centerOn as camCenterOn,
   fitTransform as camFitTransform,
   projection as camProjection,
 } from '../../packages/client/src/camera';
@@ -469,14 +456,14 @@ import {
 import { RUN_SPEED_DEV, RUN_SPEED_FAST, RUN_SPEED_NORMAL } from '../../decisions/runTempo';
 import { runPauseStep, type RunPauseEvent } from '../../decisions/runPause';
 import { syncCommanderXp } from './commanderSync';
-import { cardCovers, leftCardSlackFor, panelSlackFor, type Slack } from './panelSlack';
+import { cardCovers } from './panelSlack';
 import { longPressAction, pressIntent } from '../../decisions/pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds, type ProvinceSeed } from './provinceMap';
 import { frontierOutline } from './frontierOutline';
-import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
+import { nodeView } from './fogView';
 import {
   mergeArms,
   radarShown,
@@ -526,7 +513,7 @@ import {
   ringRadius,
   ringWidth,
 } from './pingPulse';
-import { openingView, openingZoom, pickHome } from './openingView';
+import { pickHome } from './openingView';
 import {
   fmtJoinWindow,
   joinWindow,
@@ -546,7 +533,7 @@ import {
   FILTER_STORE_KEY,
   type FilterState,
 } from './matchFilter';
-import { createScanMemory, type Snapshot } from './scanMemory';
+import type { Snapshot } from './scanMemory';
 import { houseDisplayName, seatAiProfile } from './setupSeats';
 import { lanes } from './setupMap';
 import {
@@ -580,12 +567,7 @@ import {
 } from './buildProgress';
 import { contactAlpha, contactLost, hourBucket, paintedThisFrame } from './alerts';
 import { threatAlerts, threatScanDue, threatsHeard, type ThreatSighting } from './threatAlerts';
-import {
-  SPY_COST,
-  grantVision,
-  liveGrants,
-  targetsOf,
-} from './intel';
+import { SPY_COST } from './intel';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -762,6 +744,8 @@ import {
   TAU,
   youColor,
 } from './mapPalette';
+import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, panelSlack, pirateIntroRect, setView, unworld, visible, world, worldDist, zoomAt } from './mapCamera';
+import { admits, battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -1048,7 +1032,6 @@ import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
-import { mapScale, screenRadius } from './mapRadius';
 import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { assaultSteps } from '../../decisions/assaultOrder';
@@ -1080,7 +1063,7 @@ import {
 } from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
-import { GOTO_MIN_ZOOM, jumpStep, type JumpKind } from './mapJump';
+import { GOTO_MIN_ZOOM } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1088,7 +1071,6 @@ import { aaRings, aimRing, combatRanges, ringLook, type RangeRing } from './comb
 // Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
 import { strikeHome, strikeLeg, strikeProgress, strikeTrails } from './strikeTrail';
 import { corridorLines } from './corridorView';
-import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
 // ONB-0 — first-run onboarding state + funnel (per-callsign localStorage). Pure
@@ -1111,7 +1093,6 @@ import type {
   Action,
   DiplomaticStance,
   DomainEvent,
-  IntelGrant,
   UnitStack,
 } from '../../packages/shared-core/src/index';
 
@@ -1161,8 +1142,6 @@ const DEV_UI = ((): boolean => {
 })();
 let MAP = LEGACY_MAP;
 let SCORE_LIMIT = LEGACY_SCORE_LIMIT;
-const TOP = 50; // top-bar height
-const RAIL = 50; // left-rail width
 // H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
 // дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
 // бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
@@ -1392,7 +1371,7 @@ initNetSession({
     // после снимка, раньше первого кадра (`onEvents`), а сервер пропустил их по
     // опознанным узлам ЭТОГО снимка: и новая карта, и мир, открывшийся обычной
     // дельтой (замечание Codex на #1490). Кадр следом возьмёт то же зрение из памяти.
-    vision = fogVision(); // every snapshot: its delta's events follow
+    refreshVision(); // every snapshot: its delta's events follow
     if (changedMap && plan.fanfare) defaultView();
     // Та же чистка выбора, что после хода локального мира (REFM-208): `s` заменён здесь
     // напрямую, мимо `apply`. Своя копия правил не закрывала окно деления и ⇅-меню.
@@ -1501,9 +1480,7 @@ let lastAlertText = '';
 let lastRailAlert = '';
 // --- fog of war (renderer projection; always on) -----------------------------
 // Client-side projection just for the renderer — NOT the real security boundary
-// (that is `visibleState` in shared-core). Fog is always on: ships are near-blind,
-// sight comes from owned worlds + radar (see `computeVision`).
-let vision: Vision | null = null; // identify + radar sets for this frame
+// (that is `visibleState` in shared-core). Зрение кадра и память разведки — `mapFog.ts`.
 
 // --- dom ---------------------------------------------------------------------
 
@@ -2124,47 +2101,25 @@ function drawRadarContacts(now: number): void {
   }
 }
 
-// Project a map-space point into the on-screen play area (inside the HUD insets).
-let MINX = Infinity;
-let MAXX = -Infinity;
-let MINY = Infinity;
-let MAXY = -Infinity;
-for (const n of MAP) {
-  MINX = Math.min(MINX, n.x);
-  MAXX = Math.max(MAXX, n.x);
-  MINY = Math.min(MINY, n.y);
-  MAXY = Math.max(MAXY, n.y);
-}
-// The play area: the screen rectangle the map lives in, inside the HUD insets. Mobile
-// no longer reserves the left rail (it folds into the drawer) → the map claims that
-// space; desktop keeps the rail + label gutter and the right panel column.
-function insets(): { left: number; right: number; top: number; bottom: number } {
-  if (holographic.active()) {
-    return { left: 20, right: VW - 20, top: VW > 1200 ? 138 : 182, bottom: VH - 76 };
-  }
-  if (MOBILE) {
-    return { left: 14, right: VW - 24, top: VH < 520 ? 86 : TOP + 54, bottom: VH - 96 };
-  }
-  // Wide screens (tablets + landscape): frame the board with reserves that SCALE to the
-  // viewport rather than fixed desktop constants. The old fixed 372px right column and
-  // 80/150 top/bottom bars wasted most of a tablet's width and squeezed a short landscape
-  // screen to a sliver — so the whole-map fit rendered tiny. Clamped so it stays sane
-  // across a 9" tablet up to a desktop window.
-  const rightPad = Math.min(360, Math.max(120, VW * 0.16));
-  const topPad = Math.min(80, Math.max(44, VH * 0.09));
-  const botPad = Math.min(150, Math.max(78, VH * 0.16));
-  return { left: RAIL + 80, right: VW - rightPad, top: TOP + topPad, bottom: VH - botPad };
-}
-// The view transform (fit / zoom / pan / projection) lives in the shared camera module
-// (@void/client · camera.ts, CP0.2 — one render implementation for the prototype and the
-// Stage-4 client). MINX..MAXY (set once from MAP above) are the map bounds it projects.
-const mapBounds = () => ({ minX: MINX, minY: MINY, maxX: MAXX, maxY: MAXY });
-
-// Camera: pan offset + zoom over the base fit (scale range MIN_SCALE..MAX_SCALE lives in
-// the module: 1 = whole-map fit, 6 = one province + neighbours). Node/label sizes stay
-// constant in screen px; only positions transform (node-graph style zoom). On a phone the
-// opening view zooms onto the home region; double-tap resets, pinch out to the overview.
-const cam = { scale: 1, x: 0, y: 0 };
+// Камера карты и рамка — у владельца, `mapCamera.ts` (REFM-231). Отсюда — только то, что
+// принадлежит игре: экран, раскладка, мир, своё место и побочные действия перехода.
+initMapCamera({
+  vw: () => VW,
+  vh: () => VH,
+  mobile: () => MOBILE,
+  console: () => holographic.active(),
+  world: () => s,
+  me: () => ME,
+  select: (id) => {
+    pickWorld(id);
+    invalidatePanel();
+  },
+  closeDiplo: () => closeDiplo(),
+  ring: (id) => {
+    goFlash = { id, at: performance.now() };
+  },
+});
+frameMap(MAP);
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
@@ -2211,10 +2166,7 @@ function installMapGeometry(state: GameState): void {
   galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
-  MINX = Math.min(...MAP.map((n) => n.x));
-  MAXX = Math.max(...MAP.map((n) => n.x));
-  MINY = Math.min(...MAP.map((n) => n.y));
-  MAXY = Math.max(...MAP.map((n) => n.y));
+  frameMap(MAP);
   mapNeedsPreparation = true;
   for (const p of Object.values(state.players)) if (p.npc) COLOR[p.id] = p.npc === 'pirate' ? '#f17457' : '#b79bea';
 }
@@ -2223,20 +2175,6 @@ function installMapGeometry(state: GameState): void {
 function sectorTypeOf(id: string) {
   const kind = SECTOR_OF[id];
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
-}
-function world(p: { x: number; y: number }): { x: number; y: number } {
-  return camWorldToScreen(p, cam, insets(), mapBounds());
-}
-/** Обратный перевод: точка экрана → мировые координаты. Нужен там, где целью служит
- *  САМА ТОЧКА карты, а не мир или флот под пальцем (точка патруля, SHU-6.3). */
-function unworld(p: { x: number; y: number }): { x: number; y: number } {
-  return camScreenToWorld(p, cam, insets(), mapBounds());
-}
-/** Дальность карты в пикселях — ЕДИНСТВЕННЫЙ перевод на весь рендер (`mapRadius.ts`,
- *  REFM-132). Там же причина, почему множитель — подгон карты под экран × зум камеры:
- *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */
-function worldDist(d: number): number {
-  return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
 }
 /**
  * Волна на границах провинций (M2.9, решение владельца: «в космосе нет прямых углов»).
@@ -2255,72 +2193,6 @@ function provinceWave(): { amp: number; wavelength: number; segment: number } {
 
 function currentMapLod(): MapLod {
   return mapLod(worldDist(mapNodeSpacing), cam.scale);
-}
-function visible(c: { x: number; y: number }, pad = 80): boolean {
-  return c.x >= -pad && c.x <= VW + pad && c.y >= -pad && c.y <= VH + pad;
-}
-/** Extra pan slack while the selection panel (#side) covers the play area: let the
- *  camera overshoot the map border by the covered strip, so worlds hidden behind the
- *  open panel can be dragged into the clear part of the screen. The panel is a
- *  full-width bottom sheet on phones (→ slack below) and a right-hand column on wide
- *  screens (→ slack on the right); measure its live rect so both layouts just work. */
-function panelSlack(): Slack {
-  const el = typeof document !== 'undefined' ? document.getElementById(MOBILE ? 'mobile-sheet' : 'side') : null;
-  const open = el && getComputedStyle(el).display !== 'none';
-  // The arithmetic (which side is covered, and by how much) is `panelSlack.ts`
-  // (REFM-54); measuring the live element stays here. YAG-7.2: the first-fight hint is a
-  // left column on PC — the camera may pull the home corner out from under it too.
-  return {
-    ...panelSlackFor(open ? el.getBoundingClientRect() : null, VW, VH),
-    ...leftCardSlackFor(pirateIntroRect(), VW),
-  };
-}
-/** Прямоугольник подсказки первого боя, пока она видна (YAG-7.2), иначе `null`. */
-function pirateIntroRect(): DOMRect | null {
-  const el = typeof document !== 'undefined' ? document.getElementById('pirate-intro') : null;
-  return el && !el.hidden ? el.getBoundingClientRect() : null;
-}
-
-function zoomAt(fx: number, fy: number, factor: number) {
-  // Zoom anchored on the focal point (cursor / pinch centre) — camera.ts clamps scale + pan.
-  const n = camZoomAt(cam, fx, fy, factor, insets(), mapBounds(), panelSlack());
-  cam.scale = n.scale;
-  cam.x = n.x;
-  cam.y = n.y;
-}
-
-/** Keep the map filling the play area with SLACK at the edges (module: PAN_SLACK) so the
- *  outermost provinces don't jam against the border. Delegates to the shared camera;
- *  an open panel widens the range (panelSlack) so it never traps the view. */
-function clampCam(): void {
-  const n = camClampCam(cam, insets(), mapBounds(), panelSlack());
-  cam.x = n.x;
-  cam.y = n.y;
-}
-
-/** Put map-point `p` at the centre of the play area at `scale` (clamped + bounded). */
-function centerOn(p: { x: number; y: number }, scale: number): void {
-  const n = camCenterOn(cam, p, scale, insets(), mapBounds(), panelSlack());
-  cam.scale = n.scale;
-  cam.x = n.x;
-  cam.y = n.y;
-}
-/** The opening / reset view. Phones and the flagship console open on the home region;
- *  the simple desktop view keeps its whole-map fit. Zoom is relative to the screen-fit. */
-function defaultView(): void {
-  // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
-  // Забег узнаётся по режиму матча: `s.pve` ядро заводит только на первом ходе часов.
-  const run = data.modes[matchMode() ?? '']?.pve !== undefined;
-  const zoom = openingZoom({ phone: MOBILE, console: holographic.active(), run });
-  const view = openingView(zoom !== null, pickHome(Object.values(s.planets), ME), zoom ?? undefined);
-  if (view.kind === 'home') {
-    centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
-    return;
-  }
-  cam.scale = 1;
-  cam.x = 0;
-  cam.y = 0;
-  clampCam();
 }
 // Re-validate the camera after a real resize (orientation / window). Attached after
 // `cam` exists so the initial in-module resize() call never touches it (TDZ-safe).
@@ -2701,16 +2573,6 @@ function toast(msg: string, at?: string): void {
   }, TOAST_LIFE_MS);
 }
 
-/** The map node a fleet occupies / is travelling over / is parked nearest to. */
-function fleetNode(f: Fleet): string | null {
-  // The node the ship is NEAREST to right now — tracks it along the leg, not the
-  // destination (so its radar/identify anchor follows the fleet). The core's rule
-  // (`fleetNodeAt`), not a copy: with roads (ROADS-2) "nearest" is the province the
-  // ship is IN — split by the border crossing, not by half the lane — and a second copy
-  // of that rule would anchor the radar in the wrong province near every fork.
-  return fleetNodeAt(s, f, s.time);
-}
-
 /** The closest point ON a lane to a screen point: which lane (`from`,`to`), the
  *  fraction `t` along it and its screen position — or null if none within `maxPx`.
  *  Lets the player march an army to any point on a road (Bytro continuous order). */
@@ -2831,126 +2693,16 @@ function planetRadar(p: Planet): number {
     ? worldRadarReach(s, p, data)
     : corePlanetRadar(p.buildings, (t) => data.buildings[t]) * sightRulesOf(s).radarScale;
 }
-interface Vision {
-  identify: Set<string>;
-  radar: Set<string>;
-  signatures: SignatureContact[];
-  /** Мои бои и флоты в них — видны, даже где узел не опознан (`engagementOf`). */
-  engaged: Engagement;
-  /** Чужие флоты в круге моей мины или висящего патруля — опознаны по позиции, даже на
-   *  линии вдали от миров (`fleetsSeenByPosition`, SHU-6.7). */
-  seenAt: Set<string>;
-  /** Чужие висящие патрули в моём обзоре — круг и состав (SHU-6.10). В сети их считает
-   *  проекция сервера, в соло — то же правило ядра (`patrolsSeenBy`) по полному миру. */
-  seenPatrols: SeenPatrol[];
-}
 
-// --- espionage (SPY-1 in the prototype) ---------------------------------------
-// The core `espionageModule` grants time-boxed intel windows (`state.intel[ME]`);
-// here the client fog honours them: a `planet` grant identifies that node, a
-// `fleets` grant shows the target's fleets through the fog, a `treasury` grant is
-// read by the diplomacy roster. Mirrors what `visibleState` does server-side.
-// Окна краденой разведки и журнал шпионажа живут в `intel.ts` (REFM-28) — там же
-// правила «истёкшее окно не видно» и «опознание влечёт радар».
-/** Мои ЖИВЫЕ окна разведки на текущий час мира. */
-function myIntel(): IntelGrant[] {
-  return liveGrants(s.intel?.[ME], s.time);
-}
-// Владельцы, чьи флоты этот кадр показаны живым окном `fleets` — набор пересобирается
-// вместе с `vision`, чтобы отрисовка проверяла Set, а не список грантов.
-let intelFleetOwners = new Set<string>();
-
-/** Variant-B visibility: an identify range (full detail, feeds memory) plus a
- *  wider radar range (enemy fleets seen only as coarse signatures). The radar
- *  reach scales with radar-array level and radar-ships. null vision = fog off. */
-/**
- * RULES-5 — туман карты СПРАШИВАЕТСЯ у ядра, а не выводится заново.
- *
- * Здесь стояла рукописная копия `sensorCoverage`: те же обходы своих миров и флотов,
- * те же два кольца (сигнатуры снаружи, опознание внутри). Копия была БЕДНЕЕ оригинала
- * ровно на три правила, и каждое — живое:
- *
- *  · множитель радара от технологий и пассивки фракции (`radarRangeBonus`) копия не
- *    знала вовсе — исследованная дальность расширяла тревоги, но не карту, на которую
- *    игрок смотрит;
- *  · блок зрения (союз + договор об обмене картами) не сводился — разведка союзника
- *    приходила в состояние, но рисовалась туманом;
- *  · активные «сканы» героя (`activeReveals`) карту не подсвечивали.
- *
- * Расхождение было доказуемо на одном экране: ЭТОТ ЖЕ файл уже звал ядро за туманом для
- * тревог (`identifiedNodes` в `updateThreatAlerts`), то есть тревога могла сообщить об
- * угрозе в мире, который карта рядом рисовала неопознанным.
- *
- * Клиентского здесь осталось только то, чего у ядра в этой точке и нет: окна краденой
- * разведки. У ядра они живут в ПРОЕКЦИИ (`visibleState`), которую соло-режим не гоняет —
- * он считает туман сам, по полному состоянию.
- */
-function computeVision(): Vision {
-  const { identify, radar } = sensorCoverage(s, ME, data);
-  // Stolen `planet` windows identify their node (feeds memory too, so the scan
-  // is remembered after the window closes); `fleets` windows fill the owner set
-  // that fleet rendering consults.
-  const grants = myIntel();
-  grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
-  intelFleetOwners = targetsOf(grants, 'fleets');
-  const seenAt = fleetsSeenByPosition(s, ME, data);
-  return {
-    identify,
-    radar,
-    signatures: NET ? netSignatures : radarSignatures(s, ME, data, identify, seenAt),
-    engaged: engagementOf(s, ME),
-    seenAt,
-    seenPatrols: NET ? (s.seenPatrols ?? []) : patrolsSeenBy(s, ME, data),
-  };
-}
-
-/** Зрение этого кадра — по миру, а не по кадру (шаг 3 плавности). `computeVision` читает
- *  только мир, игрока, режим сети и контакты сервера, а мир здесь не правится на месте, а
- *  заменяется целиком: ход соло (`apply`), снимок сервера (`applyDelta` отдаёт новый
- *  объект), загрузка. Значит, пока мир и контакты — те же объекты, а игрок и режим сети
- *  прежние, прежнее зрение верно, и пересчёт вместе с записью в память разведки идёт только
- *  при смене одного из четырёх. В сети это раз на снимок, а не на каждый кадр, на паузе
- *  соло — только после действия игрока; в ходу соло мир новый каждый кадр, и круг радара
- *  летит за флотом, как раньше. Кто правит мир на месте или чистит память разведки, тот
- *  сбрасывает `visionMemo`: песочница — каждым кадром, смена матча — вместе с памятью.
- *  Новый вход у `computeVision` обязан попасть и в эту проверку. */
-let visionMemo: {
-  state: GameState;
-  me: string;
-  net: boolean;
-  contacts: SignatureContact[];
-  vision: Vision;
-} | null = null;
-function currentVision(): Vision {
-  const memo = visionMemo;
-  if (
-    memo &&
-    memo.state === s &&
-    memo.me === ME &&
-    memo.net === NET &&
-    memo.contacts === netSignatures
-  )
-    return memo.vision;
-  const fresh = computeVision();
-  updateMemory(fresh.identify); // variant B: remember what we see
-  visionMemo = { state: s, me: ME, net: NET, contacts: netSignatures, vision: fresh };
-  return fresh;
-}
-
-/**
- * Туман, по которому судят кадр и журнал (FOG-13). `null` значит «туман выключен», и
- * выключить его может только тумблер песочницы. Поэтому `vision` переписывается этой
- * функцией везде, где появляется НОВЫЙ мир (конец `installMatch`, каждый сетевой
- * снимок), а не только кадром: шаг мира, которым партия засевается, идёт до первого
- * кадра, и его события журнал проверял по зрению прошлой партии, а после загрузки
- * страницы — по `null`, то есть «видно всё»; события сетевой дельты идут сразу после
- * снимка и сверялись со зрением прошлого снимка.
- */
-function fogVision(): Vision | null {
-  // SANDBOX — fenced hook. The "fog of war" toggle defaults ON; turning it OFF drops the
-  // fog projection (null vision ⇒ everything is `known`, mirroring the dev reveal).
-  return !__PLAYER_BUILD__ && !NET && sandboxConfig.enabled && !sandboxConfig.fog ? null : currentVision();
-}
+// Туман карты — у владельца, `mapFog.ts` (REFM-231). Отсюда — то, что принадлежит игре:
+// мир, своё место, сеть, контакты радара и круги обзора из кэша кадра.
+initMapFog({
+  world: () => s,
+  me: () => ME,
+  net: () => NET,
+  contacts: () => netSignatures,
+  sight: () => perWorld('sight', () => sightCircles(s, ME, data)),
+});
 
 /** Производные мира для кадра (шаг 9 плавности) — по тому же договору, что `visionMemo`.
  *  Доход в шапке, круги обзора, отметки ПКО, дальности радарной развёртки и союзник главы
@@ -2988,46 +2740,6 @@ function perWorld<K extends keyof WorldDerived>(
   return memo.got[key] as WorldDerived[K];
 }
 
-/** Is this fleet visible? Own always; enemy — when its node is identified OR a
- *  live `fleets` intel window covers its owner. */
-function fleetSeen(f: Fleet): boolean {
-  // Мина (SM-3.6) — только вблизи: ни опознанный узел, ни окно шпионажа её не раскрывают.
-  if (isMineFleet(f, data)) return mineFleetVisible(s, f, ME, data);
-  // Ракета (SM-3.7b) — по обычному туману, но по своей ПОЗИЦИИ: узла у неё нет. Окно
-  // шпионажа открывает её здесь, остальное решает `missileOnMap`: в сети — присутствие в
-  // проекции сервера, в соло — правило ядра (своя или глаза блока зрения); туман,
-  // выключенный в песочнице (`vision` пуст), открывает её, как и любой флот.
-  if (isMissileFleet(f, data))
-    return intelFleetOwners.has(f.owner) || missileOnMap(s, f, ME, data, {
-      net: NET,
-      fogOff: !vision,
-      circles: () => perWorld('sight', () => sightCircles(s, ME, data)),
-    });
-  // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
-  return fleetVisible(f.owner === ME, fleetKnown(f), intelFleetOwners.has(f.owner));
-}
-
-/** Опознан ли флот: стоит у опознанного узла, дерётся в моём бою ИЛИ идёт в круге моей
- *  мины или висящего патруля. Перехват на полпути идёт вдали от миров — без второго
- *  условия флот вставал перед невидимым врагом (владелец 2026-09-29); патруль висит над
- *  дорогой — без третьего он не видел бы того, по кому бьёт (SHU-6.7). Правила те же, что
- *  у ядра, — `engagementOf` и `fleetsSeenByPosition`. В сети флот без окна шпионажа опознан
- *  самим присутствием в проекции сервера (`fleetIdentified`): сервер судит и глазами,
- *  которых проекция не отдаёт, — ракетной миной союзника. */
-function fleetKnown(f: Fleet): boolean {
-  return fleetIdentified({ net: NET, spied: intelFleetOwners.has(f.owner), local: () => fleetSeenHere(f) });
-}
-/** Опознание по зрению, посчитанному клиентом, — единственное место, где узел флота
- *  спрашивается напрямую (сторож `engagedFog.test.ts`). */
-function fleetSeenHere(f: Fleet): boolean {
-  return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
-}
-
-/** Виден ли бой: его узел опознан ИЛИ в нём дерусь я (или мой блок зрения). */
-function battleKnown(b: Battle): boolean {
-  return known(b.location) || !!vision?.engaged.battles.has(b.id);
-}
-
 /** Бои моего блока зрения, начало которых журнал уже показал: итог приходит, когда боя в
  *  состоянии нет, и спросить «мой ли он» тогда уже не у кого. */
 const engagedBattleIds = new Set<string>();
@@ -3042,51 +2754,6 @@ function battleEngaged(battleId: unknown): boolean {
   if (typeof battleId !== 'string') return false;
   if (engagedBattleIds.has(battleId) || vision?.engaged.battles.has(battleId)) return true;
   return Object.hasOwn(s.battles, battleId) && engagementOf(s, ME).battles.has(battleId);
-}
-
-// Per-viewer MEMORY of the last identified state of a node (variant B): once you
-// have seen a system, you remember its last-known state (greyed) when sight lifts.
-// Само хранилище и правила снимка — в `scanMemory.ts` (REFM-43): пишутся только
-// ОПОЗНАННЫЕ узлы (радар состава не выдаёт), снимок — копия, а не ссылка на живой
-// мир, и память принадлежит матчу.
-const memory = createScanMemory();
-/**
- * Записать в память разведки то, что видно СЕЙЧАС, и то, что помнит СЕРВЕР (FOG-10).
- *
- * Клиентская память (`scanMemory.ts`) живёт ровно столько, сколько живёт вкладка. Пока
- * страница открыта, этого хватает; перезагрузил — и разведанные лично миры снова «?».
- * Настоящее хранилище памяти есть в ядре (`state.fog`, пишет `visibilityModule`), и
- * `visibleState` присылает по нему список `remembered`, УЖЕ подставив в эти миры их
- * последний известный снимок. Значит достаточно снять с них снимок тем же вызовом:
- * серверная память становится источником, клиентская — кэшем кадра, и после
- * перезагрузки карта восстанавливается из первого же снапшота.
- *
- * В соло поля нет (проекция там не применяется) — и не нужно: состояние полное, а
- * память набирается из того, что видно.
- */
-function updateMemory(identify: Set<string>): void {
-  memory.remember(identify, s.planets);
-  const remembered = (s as { remembered?: string[] }).remembered;
-  if (remembered?.length) memory.remember(remembered, s.planets);
-}
-
-/** True if node `id` is identified (full detail); fog off ⇒ always true. */
-function known(id: string | null | undefined): boolean {
-  return !vision || (id != null && vision.identify.has(id));
-}
-/** RECAP-FOG: пускать ли событие в журнал (а значит, и в сводку). Правило живёт
- *  чистой функцией в `recapGate.ts` — это правило безопасности, и гейт проверяет
- *  именно его, а не рукописный `if` внутри свитча. */
-function admits(type: string, p: Record<string, unknown>): boolean {
-  return recapAdmits(type, p.owner as string | undefined, ME, known(p.planetId as string));
-}
-/** Fog gate: «этот мир игроку вообще видно в деталях?» — опознан или свой.
- *  Правило живёт ОДНОЙ функцией в `fogView.ts` (REFM-62): оно нужно и панели, и
- *  отрисовке радиусов, а когда было выписано дважды, второе место про него забыло —
- *  тап по неисследованной системе рисовал её радарные окружности с подписями, выдавая
- *  и владельца, и наличие радара, и его радиус, пока панель писала «нет телеметрии». */
-function seesDetails(p: Planet): boolean {
-  return fogSeesDetails({ identified: known(p.id), mine: p.owner === ME });
 }
 
 /** Имя места для игрока — одно на подписи, журнал, окно боя и метки (`planetName.ts`):
@@ -4146,7 +3813,7 @@ function handleEvents(events: DomainEvent[]) {
           // Иначе потерянная провинция тем же кадром уходила в туман, заливка брала
           // владельца из снимка кадром раньше, и мир Роя оставался цвета игрока
           // (замечание владельца 2026-09-25: «прошла анимация перекраски — и всё равно зелёная»).
-          memory.remember([p.planetId as string], s.planets);
+          rememberScan([p.planetId as string]);
         }
         // Тоже ВНЕ проверки видимости (`gainNews.ts`, правило 5): захват за туманом
         // всё равно сдвигает счёт держав, и ростер обязан сходиться с состоянием.
@@ -6228,8 +5895,7 @@ function blitStaticLayer(now: number): void {
     // baking the map again. The camera's shift is a term of the projection, and it is
     // under half a device pixel: nothing on the screen visibly moves.
     const nudge = gridNudge(view, DPR);
-    cam.x += nudge.x;
-    cam.y += nudge.y;
+    panBy(nudge.x, nudge.y);
     here = camProjection(cam, insets(), mapBounds());
     camSeen = seenOf(here); // the camera stays at rest
     view = layerTransform(mapLayerAt, here);
@@ -9413,8 +9079,10 @@ function revealMobileSelection(): void {
   const top = topEl.getBoundingClientRect().bottom + 32;
   const right = VH < 520 ? rect.left - 32 : VW - 28;
   const bottom = VH < 520 ? VH - 28 : rect.top - 32;
-  cam.x += clamp(anchor.x, 28, Math.max(28, right)) - anchor.x;
-  cam.y += clamp(anchor.y, top, Math.max(top, bottom)) - anchor.y;
+  panBy(
+    clamp(anchor.x, 28, Math.max(28, right)) - anchor.x,
+    clamp(anchor.y, top, Math.max(top, bottom)) - anchor.y,
+  );
   clampCam();
 }
 
@@ -11255,7 +10923,7 @@ function flushPinch(): void {
   if (!pinchPending || !pinchStart) return;
   pinchPending = false;
   const [a, b] = [...pointers.values()];
-  if (a && b) Object.assign(cam, camPinchAt(pinchStart.cam, pinchStart.at, pinchOf(a, b), insets(), mapBounds(), panelSlack()));
+  if (a && b) setView(camPinchAt(pinchStart.cam, pinchStart.at, pinchOf(a, b), insets(), mapBounds(), panelSlack()));
 }
 // Был ли в этом жесте второй палец. После щипка нельзя ни выбирать объект,
 // ни ставить цель, ни отправлять приказ в точке отрыва последнего пальца.
@@ -11364,8 +11032,7 @@ canvas.addEventListener('pointermove', (ev) => {
   } else if (intent === 'box' && dragStart) {
     selectionBox = { x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y };
   } else if (cameraFollows(intent)) {
-    cam.x += p.x - prev.x;
-    cam.y += p.y - prev.y;
+    panBy(p.x - prev.x, p.y - prev.y);
     clampCam(); // keep the map from being dragged entirely off-screen
   }
   if (marksDragged(intent, moved)) dragged = true;
@@ -12805,8 +12472,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   killStats = { destroyed: 0, lost: 0 };
   myBattleLocs.clear();
   engagedBattleIds.clear(); // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417)
-  memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
-  visionMemo = null; // its vision was written into the memory just cleared
+  resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
   worldMemo = null;
   radarMemory.clear();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
@@ -12842,7 +12508,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   // сразу следом, ещё до первого кадра. `s` и `ME` уже новые, а песочница прошлой
   // партии уже снята: её выключенный туман не должен стать «видно всё» новой
   // (замечание Codex на #1490).
-  vision = fogVision();
+  refreshVision();
   // Start the queued tour after the prepared HUD is actually visible.
   snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
@@ -13917,7 +13583,7 @@ initSoloCheckpoint({
     cameFromLink = false;
     installMatch(save.state, new Map(save.ai));
     for (const id of save.autoAssault) autoAssault.add(id);
-    memory.restore(save.memory);
+    restoreFogMemory(save.memory);
     applyTimeSpeed(save.normalSpeed, save.fastSpeed);
     speed = 0;
     for (const x of Array.from(document.querySelectorAll('[data-speed]')))
@@ -14379,7 +14045,7 @@ function frame(nowReal: number) {
   phoneNav.sync(MOBILE && inMatch());
   if (!MOBILE) { stageDraft(null); offerChoices([]); }
   if (wasHolographic !== holographic.active()) {
-    Object.assign(cam, reframePresentation(cam, previousViewport, insets(), mapBounds()));
+    setView(reframePresentation(cam, previousViewport, insets(), mapBounds()));
     clampCam();
   }
   // Keep the Back sentinel armed while something is closable OR a match is live, so a
@@ -14437,10 +14103,10 @@ function frame(nowReal: number) {
   // object no longer means the same world: a sandboxed match keeps no vision or world memo.
   if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) {
     enforceSandbox(s, ME, sandboxHomeId);
-    visionMemo = null;
+    forgetVision();
     worldMemo = null;
   }
-  vision = fogVision(); // fog projection for this frame; recomputed only when the world changes
+  refreshVision(); // fog projection for this frame; recomputed only when the world changes
   const preparingMap = prepareEnteringMap();
   // Памятка клавиш ПК (UIX-9.1) ждёт конца подготовки карты: в кадре входа подготовка ещё
   // не началась, и памятка встала бы под заставку, отсчитывая свои секунды впустую.
@@ -15425,25 +15091,6 @@ function drawChainOverlay(now: number): void {
 }
 const GO_FLASH_MS = 1600;
 let goFlash: { id: string; at: number } | null = null;
-/** Обе дороги к точке карты. Чем прыжок из текста отличается от перехода по ссылке из
- *  панели (масштаб, выделение, диплоокно, вспышка) — `mapJump.ts` (REFM-108). */
-function jumpTo(id: string, kind: JumpKind): void {
-  const pl = s.planets[id];
-  const step = jumpStep(kind, !!pl, cam.scale);
-  if (!pl || step.do !== 'jump') return;
-  centerOn(pl.position, step.scale);
-  if (step.select) {
-    pickWorld(id);
-    invalidatePanel();
-  }
-  if (step.closeDiplo) closeDiplo();
-  if (step.ring) goFlash = { id, at: performance.now() };
-}
-/** Pan the camera to a world referenced from a plan row (data-goto) — selection stays
- *  untouched (the fleet panel must survive the tap) and a short ring marks the spot. */
-function focusWorld(id: string): void {
-  jumpTo(id, 'goto');
-}
 function drawGoFlash(now: number): void {
   if (!goFlash) return;
   if (flashDone(now, goFlash.at, GO_FLASH_MS)) {
@@ -15553,11 +15200,6 @@ function drawCaptureFlashes(now: number): void {
     cx.stroke();
     cx.restore();
   }
-}
-/** Fly to a world referenced from TEXT (toast / recap row / diplo ping): the map is not
- *  in front of the player yet, so this one zooms in and takes over the selection. */
-function jumpToPing(id: string): void {
-  jumpTo(id, 'ping');
 }
 
 requestAnimationFrame(frameLoop);
