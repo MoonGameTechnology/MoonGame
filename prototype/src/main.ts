@@ -16,6 +16,7 @@ import { mineCard } from '../../decisions/mineCard';
 import { rocketMineCard } from '../../decisions/rocketMineCard';
 import { missileCard } from '../../decisions/missileCard';
 import { missileOnMap } from '../../decisions/missileOnMap';
+import { fleetIdentified } from '../../decisions/fleetIdentified';
 import { EMPLACEMENT_HEADING, isEmplacementFleet } from '../../decisions/emplacement';
 import { drawMineShape } from '../../packages/client/src/mineShape';
 import { visibleOrdnance } from '../../packages/shared-core/src/state/visibility';
@@ -3061,8 +3062,15 @@ function fleetSeen(f: Fleet): boolean {
  *  мины или висящего патруля. Перехват на полпути идёт вдали от миров — без второго
  *  условия флот вставал перед невидимым врагом (владелец 2026-09-29); патруль висит над
  *  дорогой — без третьего он не видел бы того, по кому бьёт (SHU-6.7). Правила те же, что
- *  у ядра, — `engagementOf` и `fleetsSeenByPosition`. */
+ *  у ядра, — `engagementOf` и `fleetsSeenByPosition`. В сети флот без окна шпионажа опознан
+ *  самим присутствием в проекции сервера (`fleetIdentified`): сервер судит и глазами,
+ *  которых проекция не отдаёт, — ракетной миной союзника. */
 function fleetKnown(f: Fleet): boolean {
+  return fleetIdentified({ net: NET, spied: intelFleetOwners.has(f.owner), local: () => fleetSeenHere(f) });
+}
+/** Опознание по зрению, посчитанному клиентом, — единственное место, где узел флота
+ *  спрашивается напрямую (сторож `engagedFog.test.ts`). */
+function fleetSeenHere(f: Fleet): boolean {
   return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);
 }
 
