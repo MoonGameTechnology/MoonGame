@@ -86,7 +86,7 @@ BF-22 coarse/fine-шаги) — точечными фиксами, без сис
 
 ## Блок B · Автодеплой `[ops]` `[sec]`
 
-> **Продолжение — `zero-touch-prod-roadmap.md` (2026-10-07).** ADEP-1 по сути закрыт
+> **Продолжение — `zero-touch-prod/zero-touch-prod-roadmap.md` (2026-10-07).** ADEP-1 по сути закрыт
 > `image.yml` (GHCR + cosign, SEC-13); ADEP-2…4 поглощены кирпичами ZTP-1.2…1.4 —
 > агент тянет подписанный дайджест и выкатывает через `deploy/update.sh`.
 
