@@ -48,6 +48,9 @@ env_default_for() {
     # Тот же дефолт, что подставляет compose (`${POSTGRES_PASSWORD:-void}`) — правило 4.
     POSTGRES_PASSWORD) echo 'void' ;;
     AUTH_JWT_SECRET) openssl rand -hex 32 ;;
+    # Токен оператора для /metrics/*. Без него маршруты закрыты для всех: под Docker
+    # запрос с хоста приходит с адреса моста, а не с loopback (operatorAccess.ts).
+    METRICS_TOKEN) openssl rand -hex 32 ;;
     *) echo '' ;;
   esac
 }
@@ -57,6 +60,7 @@ env_why_for() {
   case "$1" in
     TIME_SCALE) echo 'без него мир шёл в реальном времени: постройки по 3–24 часа' ;;
     AUTH_JWT_SECRET) echo 'без него сервер стоял БЕЗ АККАУНТОВ — место брал любой, кто знает позывной' ;;
+    METRICS_TOKEN) echo 'без него /metrics/* закрыты даже для оператора на хосте' ;;
     GATE) echo 'без него принимались голые действия, без валидации конвертов' ;;
     SEAT_LOCK) echo 'без него любой позывной занимал любое свободное место' ;;
     PROD) echo 'без него compose подставлял 1, и сервер отказывался стартовать без TLS' ;;
@@ -66,7 +70,7 @@ env_why_for() {
 
 # Ключи, которые обязаны быть в файле. Порядок — как в установщике, чтобы дописанное
 # читалось в том же порядке, что и написанное изначально.
-ENV_REQUIRED_KEYS="PORT TIME_SCALE MATCHES POSTGRES_PASSWORD GATE SEAT_LOCK AUTH_JWT_SECRET PROD"
+ENV_REQUIRED_KEYS="PORT TIME_SCALE MATCHES POSTGRES_PASSWORD GATE SEAT_LOCK AUTH_JWT_SECRET METRICS_TOKEN PROD"
 
 # Ключи без безопасного дефолта: о них только предупреждаем (правило 3).
 ENV_WARN_ONLY_KEYS="ALLOWED_ORIGINS"
