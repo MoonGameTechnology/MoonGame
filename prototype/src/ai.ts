@@ -36,7 +36,10 @@ import {
   musterPlan,
   SWARM_MEMORY_WINDOW,
   isMineFleet,
+  isOrdnanceFleet,
+  isRocketMineFleet,
   mineFleetVisible,
+  rocketMinelayer,
   type GameState,
   type Action,
   type Battle,
@@ -54,7 +57,7 @@ import { fleetHangarRepairRate } from '../../packages/shared-core/src/util/repai
 // Опознанные узлы считаются ОДИН раз на тик и передаются в `knownGarrison`: покрытие
 // сенсоров — проход по всему флоту, а спрашивают про него десятки миров подряд.
 import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
-import { canOrder } from './protoKernel';
+import { canOrder, canOrderAll } from './protoKernel';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import { isForkSite } from '../../packages/shared-core/src/state/forkSite';
 import {
@@ -86,6 +89,8 @@ import {
   unlockHeroSkill,
   installHeroModule,
   castHeroAbility,
+  stopFleet,
+  deployRocketMine,
   swarmAdapt,
 } from '../../decisions/actions';
 // ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ БОТА (решение владельца 2026-09-16) живут в `/decisions`, а не
@@ -720,7 +725,11 @@ function baseAiOrders(
   );
   // Сколько флотов у места СЕЙЧАС — потолок и на постройку кораблей, и на деление кулака
   // (AI-BAL-7). Считается один раз: `state` внутри `aiOrders` не меняется (чистый builder).
-  const ownFleets = Object.values(state.fleets).filter((fl) => fl.owner === ai).length;
+  // Стоящая мина и летящая ракета — тоже отряды во `fleets`, но не флоты: посчитай их —
+  // и шесть мин минёра закрыли бы боту постройку кораблей.
+  const ownFleets = Object.values(state.fleets).filter(
+    (fl) => fl.owner === ai && !isOrdnanceFleet(fl, data),
+  ).length;
   // Consolidate BEFORE moving (self-play M4): two idle fleets sharing a location fuse
   // into one — without this, battle remnants and rally leftovers accumulate into a
   // hundreds-strong swarm of one-ship fleets that grinds the whole sim (and feeds
@@ -2144,6 +2153,14 @@ function baseAiOrders(
     //    здесь их ЗЕРКАЛО ровно в той мере, чтобы приказ был законным.
     //    Цены у установки пока нет (её ставит HPR-1.6) — порядок «дешёвое вперёд»
     //    остаётся приоритетом «сначала простое», а не проверкой кошелька.
+    //    Исключение — ракетный минёр (решение владельца 2026-10-08): пока его не везёт ни
+    //    один герой места, ставится он. Самый дорогой модуль отсека по правилу «дешёвое
+    //    вперёд» не доставался никому, а ветка ракетных техов (`damageScope: missile`)
+    //    усиливает только мины — без минёра она для бота пуста. Проба `canOrder` — потому
+    //    что на месте игрока (Хранитель) решает его арсенал: без модуля бот ставит прежнее.
+    const minerAboard = roster.some((y) =>
+      (y.modules ?? []).some((m) => data.modules[m]?.rocketMine !== undefined),
+    );
     for (const x of roster) {
       if (x.fleetId !== undefined && state.fleets[x.fleetId] !== undefined) continue;
       const hull = (x.archetype !== undefined ? data.heroes[x.archetype]?.ship.unit : undefined) ?? 'hero';
@@ -2152,14 +2169,22 @@ function baseAiOrders(
       const bonus = x.grade !== undefined ? data.heroGrades[x.grade]?.moduleSlots : undefined;
       const installed = (x.modules ?? []).filter((m) => !!data.modules[m]);
       const used = slotUsage(installed, data);
-      const mod = Object.keys(data.modules)
+      const fits = Object.keys(data.modules)
         .filter((id) => {
           const md = data.modules[id];
           if (!md || installed.includes(id)) return false;
           if (!moduleAllowed(hull, hullDef, md)) return false;
           return used[md.slot] < hullDef.slots[md.slot] + (bonus?.[md.slot] ?? 0);
         })
-        .sort(byPrice((id) => data.modules[id]?.cost))[0];
+        .sort(byPrice((id) => data.modules[id]?.cost));
+      const miner = minerAboard
+        ? undefined
+        : fits.find(
+            (id) =>
+              data.modules[id]?.rocketMine !== undefined &&
+              canOrder(state, installHeroModule(ai, x.id, id)) === null,
+          );
+      const mod = miner ?? fits[0];
       if (mod !== undefined) {
         out.push(installHeroModule(ai, x.id, mod));
         break;
@@ -2234,6 +2259,65 @@ function baseAiOrders(
         }
         out.push(castHeroAbility(ai, x.id, id, target));
         break;
+      }
+    }
+
+    // 5. РАКЕТНЫЕ МИНЫ (решение владельца 2026-10-08). Мину ставит носитель минёра,
+    //    стоящий посреди дороги, — и бот ставит её там, где герой и так едет: на дороге
+    //    между своим миром и миром противника, с которым он воюет. Остановка и установка
+    //    уходят ОДНИМ тиком и одной пробой (`canOrderAll`): тик бота — два часа, а мина
+    //    взводится за четверть часа, так что к следующему тику она уже стоит. Тогда
+    //    носитель едет дальше — общий бот ведёт флоты только из узлов, и вставший посреди
+    //    дороги стоял бы там вечно. Режим `confirmed`: мина бьёт только опознанного
+    //    противника, с которым война, — режим `any` стрелял бы по сигналу в тумане, то есть
+    //    и по флоту соседа, с которым мир, и по приманке.
+    //    Одна мина за тик: кулдаун и потолок держит ядро, а одна дорога — одна мина.
+    if (!defensive) {
+      const ord = state.ordnance;
+      const atWarWith = (owner: string | null | undefined): boolean =>
+        typeof owner === 'string' && owner !== ai && getStance(state, ai, owner) === 'war';
+      const frontLane = (a: string, b: string): boolean => {
+        const pa = state.planets[a]?.owner;
+        const pb = state.planets[b]?.owner;
+        return (pa === ai && atWarWith(pb)) || (pb === ai && atWarWith(pa));
+      };
+      const mined = (a: string, b: string): boolean =>
+        Object.values(state.fleets).some((f) => {
+          const e = f.edge;
+          return (
+            f.owner === ai &&
+            !!e &&
+            ((e.from === a && e.to === b) || (e.from === b && e.to === a)) &&
+            isRocketMineFleet(f, data)
+          );
+        });
+      let laid = false;
+      for (const x of roster) {
+        if (!deployed(x)) continue;
+        const fleet = state.fleets[x.fleetId!]!;
+        const layer = rocketMinelayer(fleet, data);
+        if (!layer || fleet.battleId) continue;
+        if (ord?.installations.some((m) => m.fleetId === fleet.id)) continue;
+        const mv = fleet.movement;
+        if (!mv) {
+          const e = fleet.location === null ? fleet.edge : null;
+          const on = e
+            ? [moveFleet(ai, fleet.id, e.to), moveFleet(ai, fleet.id, e.from)].find(
+                (a) => canOrder(state, a) === null,
+              )
+            : undefined;
+          if (on) out.push(on);
+          continue;
+        }
+        if (laid || !frontLane(mv.from, mv.to) || mined(mv.from, mv.to)) continue;
+        if ((ord?.cooldowns[ai] ?? 0) > state.time || !affordableCost(layer.def.cost)) continue;
+        const span = mv.arrivesAt - mv.departedAt;
+        const t = span > 0 ? (state.time - mv.departedAt) / span : 0;
+        if (t < 0.25 || t > 0.75) continue;
+        const pair = [stopFleet(ai, fleet.id), deployRocketMine(ai, fleet.id, 'confirmed')];
+        if (canOrderAll(state, pair) !== null) continue;
+        out.push(...pair);
+        laid = true;
       }
     }
   }

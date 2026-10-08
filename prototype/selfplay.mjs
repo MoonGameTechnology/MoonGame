@@ -186,6 +186,13 @@ function runMatch(i) {
   let heroSkills = 0;
   let heroFits = 0;
   const heroCasts = new Map(); // тип способности → сколько раз кастовали
+  // Ракетные мины (решение владельца 2026-10-08): после BAL-6 ракетная ветка техов
+  // усиливает только их, поэтому без этих чисел замер не отличит «ветка слабая» от «мин нет».
+  let minesLaid = 0;
+  let missiles = 0;
+  let missileHits = 0;
+  let missileDamage = 0;
+  let missilesDowned = 0;
   // AI-BAL-9: рынок. Лоты выставлялись и раньше, поэтому «книга не пуста» ничего не
   // доказывает — считаются именно СДЕЛКИ (`market.traded`), их объём в кредитах и
   // сгоревшая комиссия: она главный кредитный сток сессии, и до первой сделки её не
@@ -268,8 +275,22 @@ function runMatch(i) {
         heroSpawns++;
       } else if (e.type === 'hero.skill.unlocked') {
         heroSkills++;
-      } else if (e.type === 'hero.fitted') {
+      } else if (e.type === 'hero.installed') {
         heroFits++;
+      } else if (e.type === 'rocketMine.ready') {
+        // Мина и ракета не строятся, а появляются — минёр ставит, мина запускает. В `usage`
+        // они идут как постройка, иначе отчёт держал бы их в мёртвом контенте рядом с
+        // сотнями поставленных мин.
+        minesLaid++;
+        usage.set('rocket_mine', (usage.get('rocket_mine') ?? 0) + 1);
+      } else if (e.type === 'rocketMine.launched') {
+        missiles++;
+        usage.set('missile', (usage.get('missile') ?? 0) + 1);
+      } else if (e.type === 'rocketMine.hit') {
+        missileHits++;
+        missileDamage += (e.payload ?? {}).damage ?? 0;
+      } else if (e.type === 'rocketMine.intercepted') {
+        missilesDowned++;
       } else if (e.type === 'hero.ability.used') {
         const t = (e.payload ?? {}).type ?? '?';
         heroCasts.set(t, (heroCasts.get(t) ?? 0) + 1);
@@ -450,6 +471,11 @@ function runMatch(i) {
     heroSkills,
     heroFits,
     heroCasts,
+    minesLaid,
+    missiles,
+    missileHits,
+    missileDamage,
+    missilesDowned,
     trades,
     tradeCredits,
     tradeFees,
@@ -526,6 +552,11 @@ let divertedTotal = 0;
 let heroSpawnsTotal = 0;
 let heroSkillsTotal = 0;
 let heroFitsTotal = 0;
+let minesLaidTotal = 0;
+let missilesTotal = 0;
+let missileHitsTotal = 0;
+let missileDamageTotal = 0;
+let missilesDownedTotal = 0;
 const heroCastsTotal = new Map();
 let tradesTotal = 0;
 let tradeCreditsTotal = 0;
@@ -588,6 +619,11 @@ for (let i = 0; i < N; i++) {
   heroSpawnsTotal += r.heroSpawns;
   heroSkillsTotal += r.heroSkills;
   heroFitsTotal += r.heroFits;
+  minesLaidTotal += r.minesLaid;
+  missilesTotal += r.missiles;
+  missileHitsTotal += r.missileHits;
+  missileDamageTotal += r.missileDamage;
+  missilesDownedTotal += r.missilesDowned;
   for (const [t, n] of r.heroCasts) heroCastsTotal.set(t, (heroCastsTotal.get(t) ?? 0) + n);
   tradesTotal += r.trades;
   tradeCreditsTotal += r.tradeCredits;
@@ -812,6 +848,7 @@ console.log(
         .map(([t, n]) => `${t}=${n}`)
         .join(' ') || '0'
     }  ← AI-BAL-8; каст СЧИТАЕТСЯ ПО ТИПУ, потому что правило бота тоже по типу, а не по id`,
+    `  мины       : поставлено ${minesLaidTotal} · ракет ${missilesTotal} · попаданий ${missileHitsTotal} на ${missileDamageTotal.toFixed(0)} урона · сбито ПВО ${missilesDownedTotal}  ← ракетная ветка техов (BAL-6) усиливает только их; 0 = ветка вне измерения`,
     `  размен     : флотов погибло ${fleetsDestroyedTotal} · из отступлений не донесло ${retreatsFatalTotal}  ← полный размен = флот гибнет всегда; отступления без падения этого числа ничего не меняют`,
     `  очки       : лидер ${avg(winnerScores).toFixed(0)} · отставший ${avg(loserScores).toFixed(0)} · разрыв ${avg(margins).toFixed(0)}  ← сессия одинаковая (${SESSION_DAYS}д), разный только счёт`,
     `  очки/слот    : ${fmtAvg(scoreBySlot, seenBySlot)}`,
@@ -961,6 +998,11 @@ console.log(
         heroSkills: heroSkillsTotal,
         heroFits: heroFitsTotal,
         heroCasts: Object.fromEntries(heroCastsTotal),
+        minesLaid: minesLaidTotal,
+        missiles: missilesTotal,
+        missileHits: missileHitsTotal,
+        missileDamage: missileDamageTotal,
+        missilesDowned: missilesDownedTotal,
         retreats: retreatsTotal,
         retreatsFatalTotal,
         fleetsDestroyedTotal,
