@@ -182,9 +182,6 @@ globalThis.requestAnimationFrame = (cb) => {
 // A benchmark-only bridge; it is absent from both shipped profiles.
 const bridge = `
 let perfPaints = 0;
-let perfSpheres = 0;
-const perfSphere = blitSphere;
-blitSphere = function(...args) { perfSpheres++; perfSphere(...args); };
 const perfRender = render;
 render = function(now) { perfPaints++; perfRender(now); };
 module.exports = {
@@ -204,7 +201,7 @@ module.exports = {
     if (vision) updateMemory(vision.identify);
     clearSelection(); pickWorld(home.id);
     render(2000); // warm static layers and atlases at this density
-    perfSpheres = 0;
+    globalThis.__perfSpheres = 0;
     const rings = [];
     let questions = 0;
     const arc = cx.arc, fillText = cx.fillText;
@@ -223,7 +220,7 @@ module.exports = {
       .map(n => { const p = world(n); return [p.x, p.y, lod.markerRadius]; });
     const a = fleetAnchor(fleet);
     selectAt(a.x, a.y); // same map-tap path as pointer/touch input
-    return { lod, spheres: perfSpheres, terrain: terrainFields.length,
+    return { lod, spheres: globalThis.__perfSpheres, terrain: terrainFields.length,
       allMarkers: JSON.stringify(rings) === JSON.stringify(expected), questions,
       pickedFleet: selFleet === fleet.id || selFleets.has(fleet.id),
       sensing: sweepOn && sweepArms.length > 0,
@@ -241,7 +238,26 @@ module.exports = {
     if (pause) speed = 0;
   }
 };`;
+// `blitSphere` lives in `mapPalette.ts` (REFM-237): an import cannot be reassigned from
+// the bridge, so the sphere counter is spliced into that module at bundle time instead.
+const countSpheres = {
+  name: 'perf-count-spheres',
+  setup(b) {
+    b.onLoad({ filter: /mapPalette\.ts$/ }, ({ path }) => {
+      const src = readFileSync(path, 'utf8');
+      const head = 'export function blitSphere(';
+      if (!src.includes(head)) throw new Error('perf: blitSphere is gone from mapPalette.ts');
+      const counted =
+        'export function blitSphere(...args) {\n' +
+        '  globalThis.__perfSpheres = (globalThis.__perfSpheres ?? 0) + 1;\n' +
+        '  return perfRealSphere(...args);\n' +
+        '}\nfunction perfRealSphere(';
+      return { contents: src.replace(head, counted), loader: 'ts' };
+    });
+  },
+};
 const res = await build({
+  plugins: [countSpheres],
   stdin: { contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
     resolveDir: process.cwd() + '/prototype/src', loader: 'ts' },
   bundle: true,
