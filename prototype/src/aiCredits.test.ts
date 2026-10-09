@@ -97,8 +97,11 @@ describe('ведущий не строит войска в долг, отста�
 });
 
 describe('ведущий вкладывает лишний металл в доход', () => {
+  // Верфь поднимает правило Носителя (стапель 3-го уровня, `aiAir.test.ts`), а не доход.
   const upgrades = (s: GameState) =>
-    ofType(s, 'building.upgrade').map((a) => a.payload as { planetId: string; building: string });
+    ofType(s, 'building.upgrade')
+      .map((a) => a.payload as { planetId: string; building: string })
+      .filter((u) => u.building !== 'shipyard');
 
   it('металла с избытком — улучшает переработку дома', () => {
     const s = seat({ refinery: true });

@@ -1592,13 +1592,40 @@ function baseAiOrders(
       //    корабль). Трюм 16 против 5 у крейсера: без него ударная группа везёт горстку и
       //    штурм захлёбывается на первом же гарнизоне. Тот же трюм возит челноки — вылет
       //    поднимается с борта у фронта, а не с базы, куда радиус 120–150 не дотягивается.
+      //    Носитель — тяжёлый корпус, ему нужен стапель 3-го уровня (FORT-5.5), а верфь
+      //    дома стоит вторая. Заказ без подъёма верфи ядро отбивало `E_YARD_TOO_SMALL`
+      //    каждый тик, и за 96 матчей плейтеста 2026-10-09 не встал ни один Носитель.
+      //    Поэтому сперва спрашиваем ядро; мал стапель — поднимаем верфь.
       if (
         !pirate &&
         shipsOwned('shuttle_carrier') < CARRIER_CAP &&
-        !pendingUnit(base.id, 'shuttle_carrier') &&
-        affordableUnit('shuttle_carrier', 1)
+        !pendingUnit(base.id, 'shuttle_carrier')
       ) {
-        out.push(buildUnit(ai, base.id, 'shuttle_carrier', 1));
+        const carrier = buildUnit(ai, base.id, 'shuttle_carrier', 1);
+        const verdict = canOrder(state, carrier);
+        if (verdict === null) {
+          if (affordableUnit('shuttle_carrier', 1)) out.push(carrier);
+        } else if (verdict === 'E_YARD_TOO_SMALL') {
+          const yard = base.buildings.find((x) => x.type === 'shipyard' && x.hp > 0);
+          const def = data.buildings['shipyard'];
+          const upgrading = state.scheduled.some((e) => {
+            if (e.type !== 'construction.complete') return false;
+            const q = e.payload as { kind?: string; planetId?: string; building?: string };
+            return q.kind === 'upgrade' && q.planetId === base.id && q.building === 'shipyard';
+          });
+          if (yard && def && !upgrading && yard.level < buildingMaxLevel(def)) {
+            const cost = buildingLevel(def, yard.level + 1).cost;
+            const order = upgradeBuilding(ai, base.id, 'shipyard');
+            if (
+              Object.keys(cost).every(
+                (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + (ORDER_RESERVE[r] ?? 0),
+              ) &&
+              canOrder(state, order) === null
+            ) {
+              out.push(order);
+            }
+          }
+        }
       }
       // ═══ 6. АВИАЦИЯ И ЗАДНЯЯ ЛИНИЯ (AI-BAL-4) ═══
       // Правило постройки `artillery` СНЯТО (решение владельца 2026-09-16). Дальний огонь
