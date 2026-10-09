@@ -41,6 +41,13 @@
 # Third-party images are digest-pinned (A08, same rule as the Dockerfile bases): a tag
 # is mutable, a digest names the exact image reviewed. `trivy-deps` in security.yml
 # reads these very lines and scans whatever they point at.
+# Имя проекта ФИКСИРОВАНО (ZTP-1.2). Без него Compose берёт имя из каталога файла, и на
+# хосте автодеплоя, где версии `deploy/` лежат в соседних каталогах, любая версия под
+# другим именем подняла бы ВТОРОЙ стек со своей пустой базой. `deploy` — ровно то имя,
+# которое Compose выводил сам: под ним уже живут контейнеры, сеть и том
+# `deploy_void-pgdata` (его проверяет install-ubuntu.sh), так что ничего не переезжает.
+name: deploy
+
 services:
   server:
     build:

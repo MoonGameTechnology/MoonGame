@@ -1465,16 +1465,16 @@
 | YAG-7.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Карточка обучения закрывает стартовый флот на 1024×576 2026-09-25 |
 | YAG-7.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | На старте забега — служебная строка дипломатии 2026-09-25 |
 | ZTP-1.1 | ✅ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Версия сборки на /health |
-| ZTP-1.2 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Агент автообновления на хосте |
-| ZTP-1.3 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Журнал выкаток |
-| ZTP-1.4 | 🔒 | docs | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Доки и ручные шаги вне репо |
-| ZTP-2.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Закрыть сборку на хосте |
-| ZTP-2.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Желаемая версия в репо (GitOps) |
+| ZTP-1.2 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Агент автообновления на хосте |
+| ZTP-1.3 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Журнал выкаток |
+| ZTP-1.4 | ✅ | docs | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Доки и ручные шаги вне репо |
+| ZTP-2.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Закрыть сборку на хосте |
+| ZTP-2.2 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Желаемая версия в репо (GitOps) |
 | ZTP-2.3 | ⏳ | docs sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Владельцы зон |
-| ZTP-3.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Несекретный конфиг в репо |
+| ZTP-3.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Несекретный конфиг в репо |
 | ZTP-3.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Секреты зашифрованными в репо (SOPS + age) |
 | ZTP-3.3 | ⏳ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Ручные операции с БД → админ-команды |
-| ZTP-4.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
+| ZTP-4.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
 | ZTP-4.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Автоматическая проверка дрейфа |
 | ZTP-4.3 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Break-glass доступ |
 | ZTP-5.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Откат по метрикам |
