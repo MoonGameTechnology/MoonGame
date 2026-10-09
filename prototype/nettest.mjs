@@ -31,10 +31,12 @@
  *  9. дев-клиент `/dev` запускается: сервер отдаёт его с политикой по его же скрипту (с
  *     политикой для JSON скрипт не запускался, и страница была пустой).
  *
- * CSP. Документ отдаётся с настоящей политикой, поэтому смоук видит и её нарушения. Два
- * вида известны и терпятся, остальные валят прогон: атрибуты `style` (политика по хешам
- * их режет — решение о починке за владельцем, смоук печатает их число) и проба `eval`,
- * которой zod выясняет, можно ли ему компилировать схемы (ловит отказ и работает дальше).
+ * CSP. Документ отдаётся с настоящей политикой, поэтому смоук видит и её нарушения. Терпится
+ * один вид — проба `eval`, которой zod выясняет, можно ли ему компилировать схемы (ловит
+ * отказ и работает дальше); любое другое нарушение валит прогон. Атрибуты `style` политика
+ * разрешает (правило 8 `securityHeaders.ts`): раньше она их резала, и игрок на сервере видел
+ * скрытое — поле пароля, раскрытый список карт (плейтест 2026-10-09, PT-02). Поэтому смоук
+ * смотрит, что ВИДНО, а не только что поставил клиент.
  *
  *   node prototype/nettest.mjs     # или pnpm run smoke:net
  */
@@ -214,16 +216,21 @@ try {
     await waitForApp(page);
     if (!(await page.locator('#cwnick').isVisible())) await page.click('#clogin');
     await page.fill('#cwnick', NICK);
+    // Сервер без аккаунтов: пароль новичку не раскрывают. Строка спрятана статичным
+    // `style="display:none"` — его и резала политика (PT-02).
+    assert.equal(
+      await page.locator('#cwpassrow').isVisible(),
+      false,
+      'в режиме позывных поле пароля не видно',
+    );
     await page.click('#cwgo');
     await page.locator('#hub').waitFor({ state: 'visible' });
-    // Сервер без аккаунтов: пароль новичку не раскрывают. Смотрим, что поставил клиент, а не
-    // что видно: видно сейчас и лишнее — CSP режет статичные `style="display:none"`.
-    assert.notEqual(
-      await page.$eval('#cwpassrow', (e) => e.style.display),
-      'flex',
-      'в режиме позывных поле пароля не раскрыто',
-    );
     await page.click('#hub-play');
+    await page.locator('#mlist .mrow .mbtn').first().waitFor({ state: 'visible' });
+    // Список карт фильтра закрыт, пока его не раскрыли, и не лежит поверх фильтра числа
+    // игроков; кнопка обновлений — только в APK (PT-02).
+    assert.equal(await page.locator('#mf-maps').isVisible(), false, 'список карт закрыт');
+    assert.equal(await page.locator('#cupd').isVisible(), false, 'кнопки обновлений нет');
     await page.locator('#mlist .mrow .mbtn').first().click();
     await page.locator('#setup').waitFor({ state: 'visible' });
     // Совет учёных открывается сам и уже собран по умолчанию — подтверждаем как есть.
@@ -339,9 +346,9 @@ try {
       );
       const devCsp = await devPage.evaluate(() => window.__csp);
       assert.deepEqual(
-        devCsp.filter((v) => v !== 'style-src-attr inline' && v !== 'script-src eval'),
+        devCsp.filter((v) => v !== 'script-src eval'),
         [],
-        'дев-клиент запускается без чужих нарушений CSP',
+        'дев-клиент запускается без нарушений CSP',
       );
     } finally {
       await devPage.close();
@@ -352,11 +359,11 @@ try {
     assert.deepEqual(rejections(), [], 'сервер не отверг ни одного нашего приказа');
     assert.deepEqual(pageErrors, [], 'страница не выбросила исключений');
     assert.deepEqual(consoleErrors, [], 'в консоли нет ошибок');
-    const styleAttrs = cspSeen.filter((v) => v === 'style-src-attr inline').length;
-    const unknown = cspSeen.filter((v) => v !== 'style-src-attr inline' && v !== 'script-src eval');
-    assert.deepEqual(unknown, [], 'других нарушений CSP нет');
-    if (styleAttrs > 0)
-      console.log(`· CSP отрезала атрибутов style: ${styleAttrs} (известно, ждёт решения)`);
+    assert.deepEqual(
+      cspSeen.filter((v) => v !== 'script-src eval'),
+      [],
+      'нарушений CSP нет',
+    );
   });
   console.log(
     '\n✓ net smoke: вход позывным, приказ, выход на обрыве, обрыв с дозвоном и очередью, выход в хаб, дев-клиент\n',

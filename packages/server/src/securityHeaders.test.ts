@@ -54,8 +54,16 @@ describe('securityHeaders — документ игры', () => {
     const policy = csp({ inline });
     expect(directive(policy, 'script-src')).toBe(`script-src ${inline.scripts[0]}`);
     expect(directive(policy, 'style-src')).toBe(`style-src ${inline.styles[0]}`);
-    expect(policy).not.toContain('unsafe-inline');
+    expect(directive(policy, 'script-src')).not.toContain('unsafe-inline');
+    expect(directive(policy, 'style-src')).not.toContain('unsafe-inline');
     expect(policy).not.toContain('unsafe-eval');
+  });
+
+  it('атрибуты style разрешены, а блоки и скрипты — нет (правило 8, PT-02)', () => {
+    const policy = csp({ inline: inlineHashes('<style>a{}</style><script>b()</script>') });
+    expect(directive(policy, 'style-src-attr')).toBe("style-src-attr 'unsafe-inline'");
+    // `unsafe-inline` встречается в политике ровно один раз — у атрибутов.
+    expect(policy.match(/'unsafe-inline'/g)).toHaveLength(1);
   });
 
   it('без хешей исполнять НЕЧЕГО — политика не пустеет, а запрещает', () => {

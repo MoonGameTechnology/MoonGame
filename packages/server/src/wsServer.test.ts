@@ -386,7 +386,9 @@ describe('заголовки доставки клиента (SE-7.1)', () => {
       const { scripts, styles } = inlineHashes(CLIENT);
       expect(csp).toContain(`script-src ${scripts[0]}`);
       expect(csp).toContain(`style-src ${styles[0]}`);
-      expect(csp).not.toContain('unsafe-inline');
+      // `unsafe-inline` — только у атрибутов `style` (правило 8 `securityHeaders.ts`).
+      expect(csp.match(/'unsafe-inline'/g)).toHaveLength(1);
+      expect(csp).toContain("style-src-attr 'unsafe-inline'");
       expect(csp).toContain("frame-ancestors 'none'");
       expect(res.headers.get('x-content-type-options')).toBe('nosniff');
       // По http HSTS не ставится: он запомнился бы браузером на весь localhost.
