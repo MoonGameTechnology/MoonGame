@@ -13,7 +13,7 @@ import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { awardMatchDrops, salvageFromEvents } from './dropRoller';
 import { createMultiplayerServer, tlsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
-import { seatClaim, seatClaimAction } from './joinSeat';
+import { admitSeat, seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
 import {
@@ -370,42 +370,35 @@ const matchApi: MatchApiDeps = {
     const claim = seatClaim({
       avaPlayerId: ava?.playerId,
       resolved,
+      // Возврат решает состояние, а не хранилище: бронь без заявки — это всё ещё первый
+      // захват (правило 6 в joinSeat.ts).
+      claimed: resolved ? snap.state.players[resolved.playerId]?.claimedAt !== undefined : undefined,
       preferredFaction,
       // Дома ЭТОГО матча — ровно то, что сервер отдаёт в `/matches/:id/seats` и из чего
       // клиент рисует выбор. Проверять по каталогу данных было бы шире предложенного
       // (см. правило 4 в joinSeat.ts).
       knownFactions: [...new Set(Object.values(snap.state.players).map((p) => p.faction))],
     });
-    if (!claim.ok) return { error: claim.code };
-    if (claim.claim) {
-      // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние.
-      // Мутация мимо редьюсера не попадает в лог реплея — воспроизведение выдавало бы
-      // дом из стартового снимка, то есть другие пассивки и другой радиус радара.
-      // Комнату могло не поднять (снимок недоступен) — тогда вход всё равно состоится,
-      // просто без применённого выбора: отказывать во входе из-за этого нельзя.
-      const room = await registry.resolve?.(matchId);
-      if (room) {
-        await room.submitServerAction(
-          claim.playerId,
-          seatClaimAction(
-            matchId,
-            claim.playerId,
-            room.state.time,
-            {
-              ...claim.claim,
-              ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
-            },
-            // Поколение кресла: без него заявка нового владельца дедуплится квитанцией
-            // предыдущего и молча не применяется (см. joinSeat.ts).
-            room.state.players[claim.playerId]?.freedAt,
-          ),
-        );
-        await stores.store.save(snapshotOf(room));
-      }
-    }
+    // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние.
+    // Мутация мимо редьюсера не попадает в лог реплея — воспроизведение выдавало бы
+    // дом из стартового снимка, то есть другие пассивки и другой радиус радара.
+    // Комнату могло не поднять (снимок недоступен) — тогда вход всё равно состоится,
+    // просто без применённого выбора: отказывать во входе из-за этого нельзя.
+    // Отказ на любом шаге отпускает кресло, которое забронировал этот вход (PT-09).
+    const room = claim.ok && claim.claim ? await registry.resolve?.(matchId) : undefined;
+    const seat = await admitSeat({
+      matchId,
+      claim,
+      reserved: resolved?.isNew === true,
+      release: () => accountStore.releaseSeat(matchId, nick),
+      room,
+      scientists: preferredScientists,
+    });
+    if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
+    if (room) await stores.store.save(snapshotOf(room));
     return {
-      playerId: claim.playerId,
-      token: await signToken(matchId, claim.playerId, accountId),
+      playerId: seat.playerId,
+      token: await signToken(matchId, seat.playerId, accountId),
     };
   },
   // Wired ⇒ create/join require a session from /auth/login — the session's login IS

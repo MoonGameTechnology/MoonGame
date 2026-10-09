@@ -34,7 +34,10 @@ export interface JoinResult {
  *  `E_UNKNOWN_FACTION` (ENTRY-1) is the `faction` query param naming a house the shipped data
  *  does not have: the id is a DATA KEY (`data.factions[...]` feeds passives, starting loadout
  *  and radar range), so an unknown one would silently zero every house bonus instead of
- *  failing — the player would think they play that house while playing none. */
+ *  failing — the player would think they play that house while playing none.
+ *  `E_CLAIM_REFUSED` (PT-09) is the core refusing the seat claim itself (an unknown
+ *  scientist, a duplicate council member); `reason` carries the core's code. The seat this
+ *  join reserved is released first, so a refused join never keeps a chair. */
 export type JoinFailure = {
   error:
     | 'E_NO_MATCH'
@@ -42,7 +45,9 @@ export type JoinFailure = {
     | 'E_AUTH_DISABLED'
     | 'E_NOT_ROSTERED'
     | 'E_ENTRY_CLOSED'
-    | 'E_UNKNOWN_FACTION';
+    | 'E_UNKNOWN_FACTION'
+    | 'E_CLAIM_REFUSED';
+  reason?: string;
 };
 
 /** An authenticated caller, as resolved by the `identify` hook. */
@@ -109,6 +114,8 @@ const STATUS: Record<JoinFailure['error'], number> = {
   // в данных нет. Отличать важно, иначе экран выбора покажет «вас не пускают» там, где
   // на деле разъехались данные клиента и сервера.
   E_UNKNOWN_FACTION: 400,
+  // Тоже «в запросе чушь»: ядро не приняло выбор (совет), кресло уже отпущено.
+  E_CLAIM_REFUSED: 400,
   E_AUTH_DISABLED: 501,
 };
 

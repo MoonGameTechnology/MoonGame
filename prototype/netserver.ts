@@ -100,7 +100,7 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY, SWARM_MEMORY_WINDOW } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
-import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
+import { admitSeat, seatClaim } from '../packages/server/src/joinSeat';
 import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
 import { bootRoster, MAX_HOSTED_MATCHES } from '../packages/server/src/matchRoster';
 import {
@@ -1125,33 +1125,28 @@ const server = createMultiplayerServer({
               );
           const claim = seatClaim({
             resolved,
+            // Возврат решает состояние, а не хранилище: бронь без заявки — это всё ещё
+            // первый захват (правило 6 в joinSeat.ts).
+            claimed: resolved ? room.state.players[resolved.playerId]?.claimedAt !== undefined : undefined,
             preferredFaction,
             // Дома ЭТОГО матча — тот же список, что уходит в `/matches/:id/seats`.
             knownFactions: [...new Set(Object.values(room.state.players).filter((p) => !p.npc).map((p) => p.faction))],
           });
-          if (!claim.ok) return { error: claim.code };
           // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние —
-          // мутация мимо редьюсера не попадает в лог и ломает реплей (см. joinSeat.ts).
-          if (claim.claim) {
-            await room.submitServerAction(
-              claim.playerId,
-              seatClaimAction(
-                id,
-                claim.playerId,
-                room.state.time,
-                {
-                  ...claim.claim,
-                  ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
-                },
-                // Поколение кресла: без него заявка нового владельца дедуплится
-                // квитанцией предыдущего и молча не применяется (см. joinSeat.ts).
-                room.state.players[claim.playerId]?.freedAt,
-              ),
-            );
-          }
+          // мутация мимо редьюсера не попадает в лог и ломает реплей. Отказ на любом шаге
+          // отпускает кресло, которое забронировал этот вход (PT-09, см. joinSeat.ts).
+          const seat = await admitSeat({
+            matchId: id,
+            claim,
+            reserved: resolved?.isNew === true,
+            release: () => accountStore.releaseSeat(id, login),
+            room,
+            scientists: preferredScientists,
+          });
+          if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
           return {
-            playerId: claim.playerId,
-            token: await authCfg.signToken!(id, claim.playerId, accountId),
+            playerId: seat.playerId,
+            token: await authCfg.signToken!(id, seat.playerId, accountId),
           };
         },
       });
