@@ -75,7 +75,7 @@
 | REFM-235 | 🔒 | proto | `docs/backlog.md` | render() по слоям |
 | REFM-236 | ⏳ | proto | `docs/backlog.md` | Ввод на канвасе |
 | REFM-237 | ✅ | proto | `docs/backlog.md` | Палитра сторон и константы карты |
-| REFM-238 | ⏳ | proto | `docs/backlog.md` | Геометрия флотов на карте |
+| REFM-238 | ✅ | proto | `docs/backlog.md` | Геометрия флотов на карте |
 | REFM-239 | ⏳ | proto | `docs/backlog.md` | Радар |
 | REFM-240 | ⏳ | proto | `docs/backlog.md` | Конвейер приказа |
 | REFM-241 | ⏳ | proto | `docs/backlog.md` | Экран загрузки карты |
