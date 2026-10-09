@@ -86,6 +86,8 @@ export function initHolographicUi(host: HolographicHost) {
   let height = 720;
   let scale = 1;
   let selected = '';
+  /** Раскладка окна выбора в прошлом кадре: сменилась — окно возвращают в экран. */
+  let selectionLayout = '';
   /** Where the HUD chrome ends: the resource bar, the tab row and the objectives/wave
    *  line on the right. Windows must not open or be dragged above it. */
   let chromeBottom = 12;
@@ -168,15 +170,21 @@ export function initHolographicUi(host: HolographicHost) {
         const fleetConsole = info && commands && !!host.side.querySelector('.fconsole') &&
           !!host.commands.querySelector('.fc-orders');
         selection.classList.toggle('has-info', info);
-        selection.classList.toggle('details-open', host.side.classList.contains('details-open'));
+        const detailsOpen = host.side.classList.contains('details-open');
+        selection.classList.toggle('details-open', detailsOpen);
         selection.classList.toggle('has-commands', commands);
         selection.classList.toggle('fleet-console', fleetConsole);
         // Пустой трюм колонку «Десант» не рисует (`decisions/landColumn.ts`) — сетка
-        // окна сужается на её ширину, а не держит пустое место. Колонка может появиться
-        // при открытом окне (погрузка пошла), и окно у правого края ушло бы за экран.
+        // окна сужается на её ширину, а не держит пустое место.
         const noLand = fleetConsole && !host.side.querySelector('.fc-land');
-        if (selection.classList.contains('no-land') !== noLand) {
-          selection.classList.toggle('no-land', noLand);
+        selection.classList.toggle('no-land', noLand);
+        // Любая смена раскладки окна (лист, ряд приказов, консоль, колонка «Десант»)
+        // меняет его ширину, и окно у правого края ушло бы за экран. Пример — плейтест
+        // 2026-10-09, PT-08: «Курс» прячет лист, узкую карточку утащили к краю, отмена
+        // прицела вернула консоль шириной 1229 px, крестик оказался за экраном.
+        const layout = [info, detailsOpen, commands, fleetConsole, noLand].join();
+        if (layout !== selectionLayout) {
+          selectionLayout = layout;
           windows.refit('holo-selection-window');
         }
         selection.style.display = inGame && (info || commands) ? (fleetConsole ? 'grid' : 'flex') : 'none';
