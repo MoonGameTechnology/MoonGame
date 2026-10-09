@@ -1,4 +1,4 @@
-import type { Action } from '@void/shared-core';
+import type { Action, GameState } from '@void/shared-core';
 
 /**
  * Что вход делает с МЕСТОМ и ДОМОМ игрока (ENTRY-1).
@@ -49,6 +49,13 @@ import type { Action } from '@void/shared-core';
  *    (`seatClaim.ts`, правило 4) и служит замком: место помечено занятым, переиграть
  *    его больше нельзя. По той же причине заявка идёт и на AvA-месте — пустая, потому
  *    что там решает ростер.
+ * 6. **Возврат на НЕЗАЯВЛЕННОЕ место доводит заявку до конца.** Кресло пишется в двух
+ *    местах — бронь в хранилище и заявка в состоянии матча, — и между ними вход мог
+ *    оборваться: бронь есть, заявки нет. Такое кресло не истекает (`seatExpiry.ts`
+ *    пропускает незаявленные), `seat.confirm` его не закрепляет, а выбор дома
+ *    потерян. Поэтому «возврат» решает не хранилище, а состояние: нет `claimedAt` —
+ *    это всё ещё первый захват. Переписать уже заявленное так нельзя: заявку
+ *    редьюсер принимает ровно один раз.
  */
 
 /** Что известно к моменту решения. */
@@ -57,6 +64,9 @@ export interface JoinSeatInput {
   avaPlayerId?: string | undefined;
   /** Что вернул обычный резолвер мест: место и признак первого захвата. */
   resolved?: { playerId: string; isNew: boolean } | null | undefined;
+  /** Заявлено ли это место В СОСТОЯНИИ матча (`player.claimedAt`). `false` на возврате —
+   *  бронь есть, заявки нет, и вход её доподаёт (правило 6). Не передано — заявлено. */
+  claimed?: boolean | undefined;
   /** Дом, который выбрал игрок (`faction` из запроса). */
   preferredFaction?: string | undefined;
   /** Дома, которые есть В ЭТОМ МАТЧЕ — тот же список, что уходит в `/seats` (правило 4). */
@@ -82,13 +92,88 @@ export function seatClaim(input: JoinSeatInput): SeatClaim {
   }
   const resolved = input.resolved;
   if (!resolved) return { ok: false, code: 'E_MATCH_FULL' };
-  if (!resolved.isNew) return { ok: true, playerId: resolved.playerId, claim: null };
+  if (!resolved.isNew && input.claimed !== false) {
+    return { ok: true, playerId: resolved.playerId, claim: null };
+  }
   const wanted = input.preferredFaction;
   if (!wanted) return { ok: true, playerId: resolved.playerId, claim: {} };
   if (!input.knownFactions.includes(wanted)) {
     return { ok: false, code: 'E_UNKNOWN_FACTION' };
   }
   return { ok: true, playerId: resolved.playerId, claim: { faction: wanted } };
+}
+
+/** Комната, в которую подаётся заявка: ровно то, что нужно подаче (`MatchRoom`). */
+export interface ClaimRoom {
+  readonly state: GameState;
+  canApplyAll(state: GameState, actions: readonly Action[], now: number): string | null;
+  submitServerAction(playerId: string, action: Action): Promise<{ ok: boolean; code?: string }>;
+}
+
+/** Чем кончается посадка: место — или отказ, после которого кресло снова свободно. */
+export type SeatAdmission =
+  | { ok: true; playerId: string }
+  | {
+      ok: false;
+      error: 'E_MATCH_FULL' | 'E_UNKNOWN_FACTION' | 'E_CLAIM_REFUSED';
+      /** Код ядра, которым отбита заявка (`E_UNKNOWN_SCIENTIST` и т.п.). */
+      reason?: string;
+    };
+
+/**
+ * Посадить игрока так, чтобы ОТКАЗ НЕ ОСТАВЛЯЛ ЗАНЯТОГО КРЕСЛА (плейтест 2026-10-09, PT-09).
+ *
+ * Резолвер бронирует кресло в хранилище раньше, чем вход узнаёт, примут ли выбор. Раньше
+ * отказ на этом шаге возвращал ошибку, а бронь оставалась: кресло числилось за логином
+ * навсегда (незаявленное не истекает), а повторный вход считался «возвратом» и выбор
+ * игрока молча терял. Хуже того, отказ ЯДРА (неизвестный учёный) вообще не проверялся —
+ * игрок получал билет на место, которое редьюсер ему не дал.
+ *
+ * 1. **Бронь этого входа снимается при любом отказе.** Только своя: кресло, которое
+ *    логин держал до входа, отказ у него не отнимает.
+ * 2. **Заявку сперва судит ядро на черновике** (`canApplyAll`), и подаётся только
+ *    принятая. Отказ на черновике не оставляет квитанции, а она здесь мешала бы:
+ *    идентификатор заявки детерминирован, и исправленный повтор получил бы из кэша
+ *    прежний отказ.
+ * 3. **Отказ подачи — отказ входа.** Билета без принятой заявки не бывает (fail-secure).
+ * 4. **Комнаты нет — вход без заявки**, как и было на каноническом сервере: отказывать во
+ *    входе из-за непроснувшейся комнаты нельзя, а незаявленное кресло доподаст
+ *    следующий вход (правило 6 выше).
+ */
+export async function admitSeat(args: {
+  matchId: string;
+  claim: SeatClaim;
+  /** Кресло забронировано ЭТИМ входом (резолвер вернул `isNew`). */
+  reserved: boolean;
+  /** Снять бронь этого входа. */
+  release: () => Promise<unknown>;
+  room: ClaimRoom | null | undefined;
+  scientists?: readonly string[] | undefined;
+}): Promise<SeatAdmission> {
+  const refuse = async (
+    error: 'E_MATCH_FULL' | 'E_UNKNOWN_FACTION' | 'E_CLAIM_REFUSED',
+    reason?: string,
+  ): Promise<SeatAdmission> => {
+    if (args.reserved) await args.release();
+    return { ok: false, error, ...(reason !== undefined ? { reason } : {}) };
+  };
+  const { claim, room } = args;
+  if (!claim.ok) return refuse(claim.code);
+  if (!claim.claim || !room) return { ok: true, playerId: claim.playerId };
+  const action = seatClaimAction(
+    args.matchId,
+    claim.playerId,
+    room.state.time,
+    { ...claim.claim, ...(args.scientists !== undefined ? { scientists: args.scientists } : {}) },
+    // Поколение кресла: без него заявка нового владельца дедуплится квитанцией
+    // предыдущего и молча не применяется (см. `seatClaimAction`).
+    room.state.players[claim.playerId]?.freedAt,
+  );
+  const verdict = room.canApplyAll(room.state, [action], room.state.time);
+  if (verdict !== null) return refuse('E_CLAIM_REFUSED', verdict);
+  const submitted = await room.submitServerAction(claim.playerId, action);
+  if (!submitted.ok) return refuse('E_CLAIM_REFUSED', submitted.code ?? 'E_INTERNAL');
+  return { ok: true, playerId: claim.playerId };
 }
 
 /** Заявка как ДЕЙСТВИЕ, а не запись в состояние.
