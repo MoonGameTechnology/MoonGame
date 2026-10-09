@@ -49,6 +49,9 @@ export interface MultiplayerServerOptions {
    *  durable store) is unreachable, so a load balancer stops routing new traffic without
    *  failing liveness. Absent ⇒ always ready. `/ready` also reports 503 while draining. */
   ready?: () => boolean | Promise<boolean>;
+  /** Build id reported by `GET /health` (ZTP-1.1) — a short commit sha, already vetted by
+   *  `buildVersion`. Absent ⇒ `/health` stays `{ ok: true }` (a from-source build). */
+  version?: string;
   /** Require a verified join token at the WS handshake (SE-0.1, closes F-01). When set,
    *  the insecure `?player=` / `?nick=` dev handshakes are REFUSED: the token (carried in
    *  `?token=`) is the sole identity, and its claim's `matchId` must match the routed
@@ -354,7 +357,10 @@ export function createMultiplayerServer(
   // match ids/seqs (audit F-13, which the old node:http `/health` did). Readiness is a
   // SEPARATE signal: NOT-ready while a hard dependency is down or the server is draining,
   // so a load balancer stops sending new traffic before shutdown without failing liveness.
-  app.get('/health', async () => ({ ok: true }));
+  // The one thing it may carry is the build's short commit sha (ZTP-1.1): which image is
+  // running must be answerable without logging into the host.
+  const health = options.version ? { ok: true, version: options.version } : { ok: true };
+  app.get('/health', async () => health);
   app.get('/ready', async (_request: FastifyRequest, reply: FastifyReply) => {
     const ok = !draining && (ready ? await ready() : true);
     void reply.code(ok ? 200 : 503);

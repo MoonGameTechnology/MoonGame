@@ -1464,7 +1464,7 @@
 | YAG-7.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | Долгий тап, меню под сообщениями, единицы в угрозах 2026-09-25 |
 | YAG-7.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Карточка обучения закрывает стартовый флот на 1024×576 2026-09-25 |
 | YAG-7.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | На старте забега — служебная строка дипломатии 2026-09-25 |
-| ZTP-1.1 | ⏳ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Версия сборки на /health |
+| ZTP-1.1 | ✅ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Версия сборки на /health |
 | ZTP-1.2 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Агент автообновления на хосте |
 | ZTP-1.3 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Журнал выкаток |
 | ZTP-1.4 | 🔒 | docs | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Доки и ручные шаги вне репо |

@@ -31,6 +31,18 @@ describe('SV-0.1 · HTTP app', () => {
     }
   });
 
+  it('/health names the build when one is given (ZTP-1.1) — and nothing else', async () => {
+    const server = createMultiplayerServer({ room: createDevMatch(data), version: '70967cf0bdb8' });
+    const url = await server.listen();
+    try {
+      const res = await fetch(`${httpBase(url)}/health`);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ok: true, version: '70967cf0bdb8' });
+    } finally {
+      await server.close();
+    }
+  });
+
   it('/ready is 200 when ready, 503 when the readiness probe fails', async () => {
     let healthy = true;
     const server = createMultiplayerServer({ room: createDevMatch(data), ready: () => healthy });

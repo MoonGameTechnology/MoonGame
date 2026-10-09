@@ -124,6 +124,12 @@ USER nonroot
 
 ENV HOST=0.0.0.0
 ENV PORT=8788
+# ZTP-1.1: the commit this image was built from, reported by GET /health so the running
+# build is visible without logging into the host. image.yml passes it; a local build
+# leaves it empty and /health simply omits the field. Declared this late on purpose: an
+# ARG invalidates the cache of every layer after it, and here nothing follows but metadata.
+ARG GIT_SHA=""
+ENV GIT_SHA=${GIT_SHA}
 EXPOSE 8788
 # Liveness probe (Trivy DS026). Distroless has no shell or curl, so the probe is
 # exec-form node hitting the server's own contentless GET /health. It reads $PORT the
