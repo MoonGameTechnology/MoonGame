@@ -1,0 +1,10 @@
+d86694a9c4aeff0215cfd839874d80f5f68a20cd73e9e742d1df70ec35c0a40b  docs/reviews/2026-10-08-playtest/REPORT.html
+b3ef931e7e03e7e4e75bfd3c7f326f15d44612add1a32d65850012a6502f86e6  docs/reviews/2026-10-08-playtest/REPORT.txt
+8334e081d898ec4ab3e043f891f07b4842250f13c7404e0690829b2d05ffc6f4  docs/reviews/2026-10-08-playtest/README.txt
+547571a3fd07d344b34bf0db8f0093a52ef2659d35bdb78a6f25c766ff94ad17  docs/reviews/2026-10-08-playtest/evidence.zip
+1d8e4d20e6169fe3a4bbe51a776e7f837c4009912dd9410b3591471d4a885db9  docs/reviews/2026-10-09-playtest/REPORT.html
+15238e64850acd3f59fcb7cb0a2f0d4ff58cdbba23603513cb718ef979364995  docs/reviews/2026-10-09-playtest/REPORT.txt
+7986ea96bb3ac4aaa4e6935c2d4e8a59aeccf3189f22a215496be585347bf30d  docs/reviews/2026-10-09-playtest/README.txt
+c11d7e18a5194d6c151ead79699be339770f99fd35e3d4f6343435c1bdeab382  docs/reviews/2026-10-09-playtest/evidence.zip
+8135251edd76b8f8a75b702daf9b02441f419f1763828b61a33dc4a1e6acd670  docs/reviews/2026-10-09-playtest/SHA256SUMS.txt
+3ceaf3d2918a53b1c7a5b54b1d277483f725a07620f0a83094aac8b0560a1744  docs/reviews/2026-10-09-playtest/evidence-manifest.json

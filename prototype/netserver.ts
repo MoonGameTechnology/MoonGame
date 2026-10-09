@@ -100,7 +100,7 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY, SWARM_MEMORY_WINDOW } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
-import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
+import { admitSeat, seatClaim } from '../packages/server/src/joinSeat';
 import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
 import { bootRoster, MAX_HOSTED_MATCHES } from '../packages/server/src/matchRoster';
 import {
@@ -110,6 +110,7 @@ import {
 import { detach } from '../packages/server/src/detach';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
+import { buildVersion } from '../packages/server/src/buildVersion';
 import { isOperatorRequest, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
 const { Pool } = pgPkg;
 
@@ -859,6 +860,9 @@ const server = createMultiplayerServer({
   // RS-5.1: native TLS — TLS_KEY_FILE+TLS_CERT_FILE ⇒ this host serves wss:// itself (no
   // nginx needed for a single-node playtest). Unset ⇒ plain ws (proxy may terminate TLS).
   tls: tlsFromEnv(),
+  // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
+  // This host is what the image runs, so it is the one that has to report it.
+  version: buildVersion(process.env.GIT_SHA),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the
@@ -1125,33 +1129,28 @@ const server = createMultiplayerServer({
               );
           const claim = seatClaim({
             resolved,
+            // Возврат решает состояние, а не хранилище: бронь без заявки — это всё ещё
+            // первый захват (правило 6 в joinSeat.ts).
+            claimed: resolved ? room.state.players[resolved.playerId]?.claimedAt !== undefined : undefined,
             preferredFaction,
             // Дома ЭТОГО матча — тот же список, что уходит в `/matches/:id/seats`.
             knownFactions: [...new Set(Object.values(room.state.players).filter((p) => !p.npc).map((p) => p.faction))],
           });
-          if (!claim.ok) return { error: claim.code };
           // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние —
-          // мутация мимо редьюсера не попадает в лог и ломает реплей (см. joinSeat.ts).
-          if (claim.claim) {
-            await room.submitServerAction(
-              claim.playerId,
-              seatClaimAction(
-                id,
-                claim.playerId,
-                room.state.time,
-                {
-                  ...claim.claim,
-                  ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
-                },
-                // Поколение кресла: без него заявка нового владельца дедуплится
-                // квитанцией предыдущего и молча не применяется (см. joinSeat.ts).
-                room.state.players[claim.playerId]?.freedAt,
-              ),
-            );
-          }
+          // мутация мимо редьюсера не попадает в лог и ломает реплей. Отказ на любом шаге
+          // отпускает кресло, которое забронировал этот вход (PT-09, см. joinSeat.ts).
+          const seat = await admitSeat({
+            matchId: id,
+            claim,
+            reserved: resolved?.isNew === true,
+            release: () => accountStore.releaseSeat(id, login),
+            room,
+            scientists: preferredScientists,
+          });
+          if (!seat.ok) return { error: seat.error, ...(seat.reason !== undefined ? { reason: seat.reason } : {}) };
           return {
-            playerId: claim.playerId,
-            token: await authCfg.signToken!(id, claim.playerId, accountId),
+            playerId: seat.playerId,
+            token: await authCfg.signToken!(id, seat.playerId, accountId),
           };
         },
       });

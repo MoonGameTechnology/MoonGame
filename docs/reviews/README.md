@@ -40,6 +40,8 @@
 | 2026-06-27 | [`2026-06-27-multiplayer-readiness.md`](2026-06-27-multiplayer-readiness.md) | Готовность к мультиплееру: скоркарта по зонам, два серверных входа |
 | 2026-09-17 | [`2026-09-17-sector-zero-observations.md`](2026-09-17-sector-zero-observations.md) | Sector Zero: 17 наблюдений (OBS-01…17) о механиках, сохранении, площадке |
 | 2026-09-24 | [`2026-09-24-sector-zero-readiness.md`](2026-09-24-sector-zero-readiness.md) | Sector Zero: готовность к Яндекс Играм — скоркарта, 10 находок, статус OBS-01…17, порядок до подачи |
+| 2026-10-08 | [Плейтест — текст](2026-10-08-playtest/REPORT.txt) · [HTML со скриншотами](2026-10-08-playtest/REPORT.html) · [Доказательства](2026-10-08-playtest/evidence.zip) | Void Dominion / Averion: Sector Zero: первый проход, PT-01…PT-06; проверен `cbd2a6a` |
+| 2026-10-09 | [Дополнительный плейтест — текст](2026-10-09-playtest/REPORT.txt) · [HTML со скриншотами](2026-10-09-playtest/REPORT.html) · [Доказательства](2026-10-09-playtest/evidence.zip) | Свежая main `29f8608`: 9 замечаний, 3 новых; три движка, 96 self-play, сеть/нагрузка/бэкап/рестарт |
 
 ## Как пополнять
 

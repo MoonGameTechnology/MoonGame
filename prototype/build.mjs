@@ -451,6 +451,16 @@ body.mobile-ui #devline .dl-wave .dl-short{display:inline;}
   box-shadow:0 0 14px rgba(40,200,210,.14);animation:toast-in .18s ease-out;max-width:100%;
   overflow-wrap:anywhere;line-height:1.45;}
 #toasts .toast.jump{border-color:var(--cyan);}
+/* PT-07: хранилище браузера не принимает записи. Плашка — первая в стопке тостов и не
+   гаснет сама: её снимает удачная запись или ✕. */
+/* Ширина своя (max-content под потолком): стопка стоит от середины экрана, и без неё
+   плашка на телефоне сжималась в половину ширины, в шесть строк. */
+#savewarn{pointer-events:auto;display:flex;align-items:center;gap:6px;width:max-content;max-width:min(92vw,520px);
+  background:rgba(24,15,3,.92);border:1px solid var(--amber);border-radius:3px;padding:0 0 0 12px;
+  font:var(--fs-body) var(--sf-font);color:var(--fg);line-height:1.45;overflow-wrap:anywhere;}
+#savewarn span{padding:7px 0;}
+#savewarn button{flex:none;width:44px;min-height:44px;align-self:stretch;border:0;background:transparent;
+  color:var(--amber);font-size:20px;line-height:1;cursor:pointer;}
 #toasts .toast.out{opacity:0;transform:translateY(-6px);transition:opacity .4s ease,transform .4s ease;}
 @keyframes toast-in{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
 #speedbar{position:fixed;right:14px;bottom:14px;z-index:24;display:flex;align-items:center;gap:4px;
@@ -3846,7 +3856,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 <div id="endscreen"></div>
 <div id="connect">
   <div class="cwrap">
-    <button id="clang" class="clang" type="button" data-i18n-aria="locale.pick.aria"></button>
+    <button id="clang" class="clang" type="button"></button>
     <div class="cbox">
       <div id="cwelcome">
         <div class="ccrest">
@@ -4015,7 +4025,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
 </div>
 <section id="sector-zero" aria-labelledby="sz-title"${entry === 'sector-zero' ? ' style="display:flex"' : ''}>
   <div class="sz-shell">
-    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span><div class="sz-topactions"><button id="sz-lang" class="sz-lang" type="button" data-i18n-aria="locale.pick.aria"></button><button id="sz-settings" class="sz-gear" type="button"><span class="sz-gear-ic" aria-hidden="true">⚙</span><span data-i18n="hub.tile.settings"></span></button></div></div>
+    <div class="sz-topline"><span class="sz-mark" data-i18n="sector-zero.title"></span><div class="sz-topactions"><button id="sz-lang" class="sz-lang" type="button"></button><button id="sz-settings" class="sz-gear" type="button"><span class="sz-gear-ic" aria-hidden="true">⚙</span><span data-i18n="hub.tile.settings"></span></button></div></div>
     <div class="sz-main" id="sz-home">
       <div class="sz-content">
         <p class="sz-eyebrow" data-i18n="sector-zero.offline"></p>
@@ -4113,7 +4123,7 @@ const page = (js, entry = 'void-dominion', external = false) => `<!doctype html>
       <div class="hub-st" data-i18n="hub.status.online"></div>
     </div>
     <div class="hub-wallet" id="hubwallet"></div>
-    <button class="hub-lang" id="hub-lang" type="button" data-i18n-aria="locale.pick.aria"></button>
+    <button class="hub-lang" id="hub-lang" type="button"></button>
     <button class="hub-gear" id="hub-gear" type="button" data-i18n-aria="hub.tile.settings"><span class="hg-ic" aria-hidden="true">⚙</span><span class="hg-lbl" data-i18n="hub.tile.settings"></span></button>
     <button class="hub-msg" id="hub-msg" type="button" data-i18n-aria="hub.msgs.aria">✉</button>
   </div>

@@ -17,6 +17,7 @@ import { data } from './gameData';
 import type { Action, GameState, Squadron } from '../../packages/shared-core/src/index';
 import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
 import { atWeakTurn } from './weakTurnFixture';
+import { canOrder } from './protoKernel';
 
 function game2(): GameState {
   return newGame({
@@ -339,9 +340,44 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
     // `frigate` не заказывается осознанно, а не по забывчивости: это глаза, а бот читает
     // состояние целиком и туманом не пользуется. Строить его «чтобы не был мёртвым» —
     // подгонка отчёта.
-    const orders = unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'));
+    const orders = unitsBuilt(aiOrders(bigYard(rich(game2())), 'p2', 'expand', 'strong'));
     expect(orders).toContain('shuttle_carrier');
     expect(orders).not.toContain('frigate');
+  });
+});
+
+/** Верфь дома поднята до 3-го уровня — стапель тяжёлого корпуса (FORT-5.5). Стартовая
+ *  верфь вторая (`matchSetup.ts`), и Носитель на ней не заложить. */
+function bigYard(s: GameState): GameState {
+  const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+  home.buildings = home.buildings.map((b) => (b.type === 'shipyard' ? { ...b, level: 3 } : b));
+  return s;
+}
+
+/**
+ * Носитель — тяжёлый корпус, и бот заказывал его на стапеле 2-го уровня. Ядро отбивало
+ * заказ (`E_YARD_TOO_SMALL`), а тесты выше видели сам ЗАКАЗ и были зелёными. Итог в
+ * плейтесте 2026-10-09: ни одного Носителя за 96 матчей. Здесь мерим то, что видит ядро.
+ */
+describe('Носитель и размер стапеля (плейтест 2026-10-09)', () => {
+  it('стартовая верфь мала — бот поднимает верфь, а не шлёт обречённый заказ', () => {
+    const s = rich(game2());
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    expect(unitsBuilt(orders)).not.toContain('shuttle_carrier');
+    const yard = only(orders, 'building.upgrade').filter(
+      (a) => (a.payload as { building: string }).building === 'shipyard',
+    );
+    expect(yard).toHaveLength(1);
+    expect(canOrder(s, yard[0]!)).toBeNull();
+  });
+
+  it('на стапеле 3-го уровня заказ Носителя ядро принимает', () => {
+    const s = bigYard(rich(game2()));
+    const carrier = only(aiOrders(s, 'p2', 'expand', 'strong'), 'unit.build').find(
+      (a) => (a.payload as { unit: string }).unit === 'shuttle_carrier',
+    );
+    expect(carrier).toBeDefined();
+    expect(canOrder(s, carrier!)).toBeNull();
   });
 });
 
@@ -370,12 +406,12 @@ describe('SHU-2.1 — бот и НОСИТЕЛЬ челноков', () => {
   };
 
   it('на войне с портом бот ЗАКАЗЫВАЕТ носитель', () => {
-    const s = withPort(rich(game2()));
+    const s = bigYard(withPort(rich(game2())));
     expect(unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'))).toContain('shuttle_carrier');
   });
 
   it('носитель строится и в мирное время: его трюм возит ещё и десант (владелец 2026-09-26)', () => {
-    const s = rich(game2(), false);
+    const s = bigYard(rich(game2(), false));
     expect(unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'))).toContain('shuttle_carrier');
   });
 

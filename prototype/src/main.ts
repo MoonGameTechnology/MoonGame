@@ -2565,12 +2565,36 @@ function toast(msg: string, at?: string): void {
     el.remove();
   });
   host.appendChild(el);
-  for (let extra = toastOverflow(host.children.length); extra > 0; extra--)
-    host.firstElementChild?.remove();
+  // Считаются и вытесняются только тосты: предупреждение о сохранении стоит над ними.
+  for (let extra = toastOverflow(host.querySelectorAll('.toast').length); extra > 0; extra--)
+    host.querySelector('.toast')?.remove();
   window.setTimeout(() => {
     el.classList.add('out');
     window.setTimeout(() => el.remove(), TOAST_FADE_MS);
   }, TOAST_LIFE_MS);
+}
+
+/** Хранилище браузера не принимает записи (приватный режим, нет места): прогресс не
+ *  переживёт закрытия вкладки, и игрок узнаёт об этом сразу, а не после перезагрузки
+ *  (плейтест 2026-10-09, PT-07). Плашка стоит над тостами, пока запись не пройдёт снова;
+ *  ✕ прячет её до следующего провала. Тост не годится: он гаснет сам за пять секунд. */
+function saveWarning(failing: boolean): void {
+  const host = document.getElementById('toasts');
+  const shown = document.getElementById('savewarn');
+  if (!failing || !host) return void shown?.remove();
+  if (shown) return;
+  const bar = document.createElement('div');
+  bar.id = 'savewarn';
+  bar.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  text.textContent = t('sector-zero.save-failed');
+  const hide = document.createElement('button');
+  hide.type = 'button';
+  hide.textContent = '×';
+  hide.setAttribute('aria-label', t('card.close'));
+  hide.addEventListener('click', () => bar.remove());
+  bar.append(text, hide);
+  host.prepend(bar);
 }
 
 /** The closest point ON a lane to a screen point: which lane (`from`,`to`), the
@@ -9100,12 +9124,15 @@ function renderPanel() {
   // который закрывал пол-карты (заказ владельца — убирать нижний хаб и на движении).
   const dock: DockState = {
     // Прицел ПАТРУЛЯ (SHU-6.3) и ПЕРЕЛЁТА (SHU-6.5) прячет лист и на ПК: точку и базу
-    // выбирают на карте вокруг базы, а окно мира стоит ровно над ней.
+    // выбирают на карте вокруг базы, а окно мира стоит ровно над ней. Ручной ОТХОД — по
+    // той же причине: точка отхода — сосед узла боя, а карточка флота стоит над ним и
+    // ловила клик вместо карты (плейтест 2026-10-09, PT-01).
     aiming:
       aiming ||
       !!strikeAim?.patrol ||
       !!strikeAim?.relocate ||
-      (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim || !!retreatAim)),
+      !!retreatAim ||
+      (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim)),
     merging,
     picking: pickMode,
     chaining: chainMode !== null,
@@ -9657,7 +9684,10 @@ function renderCmdBar() {
       : ids.length === 0 && pickMode
         ? t('cmd.multiselect')
         : t('cmd.selection.many', { n: ids.length });
-    const sub = lone ? [fleetNode(lone), t('side.fleet.sub.pc', { s: sumUnits(lone.units), tr: sumUnits(lone.landing ?? []) })].filter(Boolean).join(' · ') : '';
+    // Имя места — то же, что на листе (`placeName`): в прицеле «Курса» лист спрятан, и
+    // шапка окна показывала id узла («home_a»), плейтест 2026-10-09, PT-04.
+    const loneNode = lone ? fleetNode(lone) : null;
+    const sub = lone ? [loneNode ? placeName(loneNode) : '', t('side.fleet.sub.pc', { s: sumUnits(lone.units), tr: sumUnits(lone.landing ?? []) })].filter(Boolean).join(' · ') : '';
     html = commandWindowHtml(
       (consoleOn ? `<div class="fc-title fc-orders"><b>${esc(t('fleet.console.orders'))}</b></div>` : '') + html,
       title,
@@ -13701,6 +13731,7 @@ initSectorProfile({
   forgetRun: forgetSavedRun,
   shown: () => sectorZeroMenu.isOpen() || (sectorRunActive && !NET),
   pause: () => runPauseEvent('hidden'),
+  saveFailing: saveWarning,
 });
 
 /** Задачи этого забега для панели, меток и чипа (`missionView.ts`). */

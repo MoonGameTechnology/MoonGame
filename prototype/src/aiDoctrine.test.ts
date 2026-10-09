@@ -96,8 +96,15 @@ describe('исследования по доктрине', () => {
 
 describe('армия под ветку', () => {
   it('космос улучшает верфь дома после цепочки дохода, ракеты — нет', () => {
+    // Оба Носителя уже в гарнизоне: верфь под них поднимает своё правило (#1553), а здесь
+    // проверяется только стапель ветки.
+    const withCarriers = (s: GameState): GameState => {
+      const base = home(s);
+      const garrison = [...base.garrison, { unit: 'shuttle_carrier', count: 2 }];
+      return { ...s, planets: { ...s.planets, [base.id]: { ...base, garrison } } };
+    };
     const upgrades = (sci: string) =>
-      only(orders(developed(game2(sci), 2)), 'building.upgrade').map(
+      only(orders(withCarriers(developed(game2(sci), 2))), 'building.upgrade').map(
         (a) => (a.payload as { building: string }).building,
       );
     expect(upgrades('void_admiral')).toContain('shipyard');

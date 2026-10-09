@@ -170,6 +170,14 @@ try {
       }, staged.mine);
     assert.equal((await fleetNow()).battle, staged.battle, 'пока точка не выбрана, флот в бою');
     const home = await page.evaluate((id) => window.__retreatTest.screen(id), staged.home);
+    // Карточка флота уходит со следующим кадром, поэтому ждём, пока точка отхода окажется
+    // на карте, а не спим наугад. На ПК карточку раньше не прятали вовсе, и клик ловила
+    // она (плейтест 2026-10-09, PT-01).
+    await page
+      .waitForFunction(({ x, y }) => document.elementFromPoint(x, y)?.tagName === 'CANVAS', home, {
+        timeout: 3000,
+      })
+      .catch(() => assert.fail('точка отхода под панелью: клик поймает окно, а не карта'));
     await page.mouse.click(home.x, home.y);
     const after = await fleetNow();
     assert(after, 'флот пережил отход');
