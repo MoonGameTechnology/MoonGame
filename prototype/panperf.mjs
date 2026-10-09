@@ -19,6 +19,8 @@ const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json
   'playwright-core',
 );
 const bridge = `
+// Фаза орбит живёт у геометрии флотов (REFM-238): импорт не присвоить, обнуляет её дверь.
+import { orbitPhase as __orbitPhase } from './fleetGeometry';
 const panSamples = { frame: [], bake: [] };
 const originalRender = render;
 render = function(now) { const at = performance.now(); try { originalRender(now); }
@@ -35,7 +37,7 @@ const panSettle = async () => {
 window.__panBenchmark = {
   async scene(reveal) {
     speed = 0; sandboxConfig.enabled = true; sandboxConfig.fog = !reveal;
-    clearSelection(); hologramTime = 0; orbitPhase = 0;
+    clearSelection(); hologramTime = 0; spinOrbits(-__orbitPhase);
     Object.assign(cam, {x: 0, y: 0, scale: 1.8});
     for (let i = 0; i < 10; i++) await new Promise(requestAnimationFrame);
     return { nodes: MAP.length, known: MAP.filter(n => known(n.id)).length, holo: holographicMapOn() };
