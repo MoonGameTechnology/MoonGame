@@ -110,6 +110,7 @@ import {
 import { detach } from '../packages/server/src/detach';
 import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
+import { buildVersion } from '../packages/server/src/buildVersion';
 import { isOperatorRequest, operatorTokenFromEnv } from '../packages/server/src/operatorAccess';
 const { Pool } = pgPkg;
 
@@ -859,6 +860,9 @@ const server = createMultiplayerServer({
   // RS-5.1: native TLS — TLS_KEY_FILE+TLS_CERT_FILE ⇒ this host serves wss:// itself (no
   // nginx needed for a single-node playtest). Unset ⇒ plain ws (proxy may terminate TLS).
   tls: tlsFromEnv(),
+  // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
+  // This host is what the image runs, so it is the one that has to report it.
+  version: buildVersion(process.env.GIT_SHA),
   // Entry window (SES-2.3): the transport refuses a FIRST-time nick once the session's
   // window has closed (a returning seat-holder always reconnects). Same window the
   // browser feed uses to keep a closed session out of «Доступные». (In AUTH mode the

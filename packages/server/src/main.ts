@@ -52,6 +52,7 @@ import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
 import { LazyRoomRegistry } from './roomRegistry';
 import { installFatalHandlers } from './fatal';
+import { buildVersion } from './buildVersion';
 
 // RESIL-3 — ДО всего остального: от сюда и ниже любое падение обязано оставить в логе
 // строку с именем причины, а не молчаливый перезапуск контейнера.
@@ -475,6 +476,8 @@ const server = createMultiplayerServer({
   // /ready is red while the durable store is unreachable, so a load balancer stops
   // routing new traffic without failing liveness (/health).
   ready: () => stores.store.ping?.() ?? Promise.resolve(true),
+  // ZTP-1.1: /health names the running build (short commit sha baked in by image.yml).
+  version: buildVersion(process.env.GIT_SHA),
   auth,
   allowedOrigins,
   accountStore, // dev ?nick= WS login (when auth is off)

@@ -81,10 +81,13 @@ jobs:
         run: |
           echo "image=ghcr.io/$(echo "$REPO" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      # ZTP-1.1: the commit goes into the image, and GET /health reports it — the running
+      # build is then visible from outside without logging into the host.
       - name: build
         env:
           IMAGE: ${{ steps.img.outputs.image }}
-        run: docker build -t "$IMAGE:ci" .
+          SHA: ${{ github.sha }}
+        run: docker build --build-arg GIT_SHA="$SHA" -t "$IMAGE:ci" .
 
       # BLOCKING gate before the image can exist in the registry. Mirrors the
       # `trivy-image` job in security.yml (same pinned scanner, same .trivyignore
@@ -116,7 +119,8 @@ jobs:
       - name: smoke before push (blocking)
         env:
           IMAGE: ${{ steps.img.outputs.image }}
-        run: .github/scripts/smoke-image.sh "$IMAGE:ci"
+          SHA: ${{ github.sha }}
+        run: SMOKE_VERSION="${SHA:0:12}" .github/scripts/smoke-image.sh "$IMAGE:ci"
 
       - name: push
         id: push
