@@ -9100,12 +9100,15 @@ function renderPanel() {
   // который закрывал пол-карты (заказ владельца — убирать нижний хаб и на движении).
   const dock: DockState = {
     // Прицел ПАТРУЛЯ (SHU-6.3) и ПЕРЕЛЁТА (SHU-6.5) прячет лист и на ПК: точку и базу
-    // выбирают на карте вокруг базы, а окно мира стоит ровно над ней.
+    // выбирают на карте вокруг базы, а окно мира стоит ровно над ней. Ручной ОТХОД — по
+    // той же причине: точка отхода — сосед узла боя, а карточка флота стоит над ним и
+    // ловила клик вместо карты (плейтест 2026-10-09, PT-01).
     aiming:
       aiming ||
       !!strikeAim?.patrol ||
       !!strikeAim?.relocate ||
-      (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim || !!retreatAim)),
+      !!retreatAim ||
+      (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim)),
     merging,
     picking: pickMode,
     chaining: chainMode !== null,
