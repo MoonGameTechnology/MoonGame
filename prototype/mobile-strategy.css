@@ -129,7 +129,7 @@ body.mobile-ui #tech .tt-mbtn {
 body.mobile-ui #constructor .cn-grid {
   grid-template-columns: minmax(0, 1fr);
 }
-body.mobile-ui #constructor :is(.cn-fit, .cn-side) {
+body.mobile-ui #constructor :is(.cn-card, .cn-slot, .cn-side) {
   min-width: 0;
 }
 body.mobile-ui #constructor .cn-tabs {

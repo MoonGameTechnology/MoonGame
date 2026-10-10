@@ -2169,9 +2169,11 @@ export const en: Record<string, string> = {
   'yard.loadout.note':
     'Modules are fitted at build time. A finished ship cannot be refitted.',
   'yard.module.not-allowed': 'not for this hull',
-  'yard.module.remove': 'remove module',
-  'yard.modules.all-taken': 'Available modules — all slots full',
+  'yard.module.take-off': 'Remove',
   'yard.modules.for-slot': 'Available modules — for the «{s}» slot',
+  'yard.modules.none': 'No modules fit',
+  'yard.modules.unfit': "{n} more {n|doesn't|don't} fit this hull",
+  'yard.modules.unfit-hide': "Hide the ones that don't fit",
   'yard.no-place': 'no suitable site',
   'yard.ordered': '⚒ ordered: {n}× {hull}',
   'yard.pick.ally-world': " / ally's world",
@@ -2189,8 +2191,6 @@ export const en: Record<string, string> = {
   'yard.slot.utility': 'System',
   'yard.slot.weapon': 'Weapon',
   'yard.slots.count': '{n} {n|module slot|module slots} (by hull size)',
-  'yard.slots.note':
-    'A module fits a slot of its own type, or a universal one when that is full. <b>Greyed</b> — not for a free slot, or already installed.',
   'yard.tab.heroes': 'Heroes',
   'yard.tab.infantry': 'Infantry',
   'yard.tab.ships': 'Ships',

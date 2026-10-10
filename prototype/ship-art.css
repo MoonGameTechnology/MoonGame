@@ -32,11 +32,22 @@
 .cn-dot.full{background:var(--cyan);}
 .cn-tile{position:absolute;width:44px;height:44px;padding:0;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px dashed var(--cyan-dim);background:rgba(7,16,24,.9);color:var(--dim);font-size:19px;line-height:1;cursor:pointer;}
 .cn-tile.filled{border:1.5px solid var(--rar,var(--cyan));color:var(--rar,var(--cyan));box-shadow:0 0 10px color-mix(in srgb,var(--rar,var(--cyan)) 45%,transparent);}
-/* An empty bay shows its slot type in grey: the slot glyphs are colour emoji and would read as a fitted module. */
-.cn-tile.empty{filter:grayscale(1);}
-.cn-tile.empty:hover{filter:none;border-color:var(--cyan);color:var(--cyan);}
-.cn-tile.filled:hover{border-color:var(--red);}
-.cn-tile:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+/* An empty bay shows its slot type in grey: the slot glyphs are colour emoji and would read as a fitted module. Only the glyph is greyed, so the ring of the open bay keeps its colour. */
+.cn-tile.empty .cn-ti{filter:grayscale(1);}
+.cn-tile.empty:hover{border-color:var(--cyan);}
+.cn-tile.filled:hover{filter:brightness(1.25);}
+/* The tiles carry the bays: of the bay rows under the art only the open one stays, with its module's name and effect, so the stats and (on a phone) the bay's modules come right after the ship. */
+.cn-card.with-tiles .cn-bay:not(.sel){display:none;}
+/* The open bay (step 3): its modules stand next to the art. */
+.cn-tile.sel{border-style:solid;box-shadow:0 0 0 2px #071018,0 0 0 4px var(--cyan);}
+.cn-tile.empty.sel{border-color:var(--cyan);}
+.cn-tile.filled.sel{box-shadow:0 0 0 2px #071018,0 0 0 4px var(--cyan),0 0 14px color-mix(in srgb,var(--rar,var(--cyan)) 45%,transparent);}
+.cn-tile:focus-visible{outline:2px solid var(--cyan);outline-offset:6px;}
+/* PC window: the hull list is a column of rows, a small picture beside the name. */
+@container (min-width:820px){
+  body:not(.mobile-ui) .cn-hulls .cn-hbtn.with-art{flex:none;max-width:none;flex-direction:row;gap:8px;padding:5px 8px 5px 5px;}
+  body:not(.mobile-ui) .cn-hulls .cn-hbtn.with-art .ship-art{width:64px;flex:none;}
+}
 @media(max-width:520px){
   .ship-art--portrait{max-height:190px;}
   .cn-hbtn.with-art{flex-basis:86px;}
