@@ -225,3 +225,40 @@ jobs:
             exit 1
           fi
         continue-on-error: true
+
+      # Отступление и перелёт шаттлов: оба робота кладут игру с крючками в готовую страницу
+      # `void-dominion.html`. Её собирают смоуки выше, а если сборки нет — шаг собирает сам.
+      # Раньше их гоняли только руками: ручное «Отступить» на ПК было сломано, `smoke:retreat`
+      # это видел, но запустил его только плейтест 2026-10-09 (PT-01). Поза та же — не
+      # блокирует, сбой всплывает аннотацией.
+      - name: Retreat smoke (non-blocking)
+        run: |
+          if ! pnpm run smoke:browser:install; then
+            echo "::warning title=Retreat smoke::смоук не смог установиться (Chromium недоступен) — отступление НЕ проверялось"
+            exit 1
+          fi
+          if [ ! -f prototype/dist/void-dominion.html ] && ! pnpm run prototype; then
+            echo "::error title=Retreat smoke::сборка прототипа упала — смотри лог шага"
+            exit 1
+          fi
+          if ! pnpm run smoke:retreat; then
+            echo "::error title=Retreat smoke::робот нашёл ошибку в отступлении — смотри лог шага"
+            exit 1
+          fi
+        continue-on-error: true
+
+      - name: Relocate smoke (non-blocking)
+        run: |
+          if ! pnpm run smoke:browser:install; then
+            echo "::warning title=Relocate smoke::смоук не смог установиться (Chromium недоступен) — перелёт шаттлов НЕ проверялся"
+            exit 1
+          fi
+          if [ ! -f prototype/dist/void-dominion.html ] && ! pnpm run prototype; then
+            echo "::error title=Relocate smoke::сборка прототипа упала — смотри лог шага"
+            exit 1
+          fi
+          if ! pnpm run smoke:relocate; then
+            echo "::error title=Relocate smoke::робот нашёл ошибку в перелёте шаттлов — смотри лог шага"
+            exit 1
+          fi
+        continue-on-error: true
