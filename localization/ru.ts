@@ -450,9 +450,9 @@ export const ru: Record<string, string> = {
   'arsenal.kind.hull': 'Корпуса',
   'arsenal.kind.module': 'Модули',
   'arsenal.origin.auction': 'аукцион',
-  'arsenal.origin.craft': 'крафт',
-  'arsenal.origin.drop': 'дроп',
-  'arsenal.origin.lootbox': 'лутбокс',
+  'arsenal.origin.craft': 'сборка',
+  'arsenal.origin.drop': 'награда',
+  'arsenal.origin.lootbox': 'контейнер',
   'arsenal.origin.rent': 'аренда',
   'arsenal.origin.starter': 'стартовый',
 
@@ -925,24 +925,42 @@ export const ru: Record<string, string> = {
   'codex.term.async.body':
     'Мир идёт в реальном времени и продолжается 24/7 — даже когда вы вышли. Приказы занимают реальные часы: отдали курс, закрыли игру, вернулись к результату.',
   'codex.term.async.title': 'Асинхронный мир',
+  'codex.term.attack.body':
+    'Сила залпа, когда нападает этот флот. Когда нападают на него, он отвечает [[defense|защитой]]. В залпе стреляет только [[fire-line|линия огня]].',
+  'codex.term.attack.title': 'Атака',
   'codex.term.capture.body':
     'Захват мира — двухфазный. Сначала выйдите на орбиту и подавите оборону в космосе; если мир защищён гарнизоном — высадите десант (наземную дивизию из трюма).',
   'codex.term.capture.title': 'Орбита и высадка',
   'codex.term.coalition.body':
     'Дипломатия позволяет заключать пакты и союзы, но коалиция ограничена порогом совокупной силы — нельзя собрать всех против одного. Порог держит баланс сил и не даёт «снежному кому» задавить партию.',
   'codex.term.coalition.title': 'Коалиционный порог',
+  'codex.term.defense.body':
+    'Сила ответного залпа, когда на флот нападают. Урон по флоту защита не снижает: его принимают [[shield|щит]] и [[hull|корпус]].',
+  'codex.term.defense.title': 'Защита',
+  'codex.term.fire-line.body':
+    'В залпе стреляют не больше {n} сильнейших {n|юнита|юнитов|юнитов}. Остальные только принимают урон.',
+  'codex.term.fire-line.title': 'Линия огня',
   'codex.term.fog.body':
     'Вы видите только то, что рядом с вашими силами и радарами; остальное скрыто туманом или показано по памяти (последнее, что вы там видели). Разведчики и радары раздвигают обзор.',
   'codex.term.fog.title': 'Туман войны',
+  'codex.term.hull.body':
+    'Текущая и полная прочность флота. Чинится у своего мира с верфью или сразу за кредиты.',
+  'codex.term.hull.title': 'Корпус',
   'codex.term.lanes.body':
-    'Флоты ходят не напрямую, а по звёздным трассам (лэйнам) между мирами — маршрут строится автоматически. Узлы на трассах можно перехватывать: встречный враг на пути — это бой.',
+    'Флоты ходят не напрямую, а по звёздным трассам между мирами — маршрут строится автоматически. Узлы на трассах можно перехватывать: встречный враг на пути — это бой.',
   'codex.term.lanes.title': 'Звёздные трассы',
   'codex.term.score.body':
     'Очки капают за то, чем вы владеете: мир — 50, прочий сектор — 10, здания добавляют по уровню. Наберите порог очков — победа. Другой путь к победе — уничтожение соперников или доминирование.',
   'codex.term.score.title': 'Очки победы',
+  'codex.term.shield.body':
+    'Принимает урон раньше [[hull|корпуса]] и бесплатно восстанавливается вне боя.',
+  'codex.term.shield.title': 'Щит',
+  'codex.term.speed.body':
+    'Флот идёт со скоростью самого медленного корабля. Корабль с [[hull|корпусом]] ниже 30% идёт медленнее.',
+  'codex.term.speed.title': 'Скорость',
   'codex.term.upkeep.body':
     'Флоты и здания требуют ежедневной платы. Доход от металлодобычи минус содержание = чистый баланс; уйдёте в минус — казна опустеет.',
-  'codex.term.upkeep.title': 'Содержание (upkeep)',
+  'codex.term.upkeep.title': 'Содержание',
   'codex.value.hours': '{n} ч',
   'codex.value.levels-upgradable': '{n} (улучшаемо)',
   'codex.value.per-level': '{n} / уровень',
@@ -1386,8 +1404,6 @@ export const ru: Record<string, string> = {
   'dossier.fleet.name': 'Флот',
   'dossier.hint': 'Наведите на объект слева — здесь появится его досье.',
   'dossier.stat.atk.name': 'Атака',
-  'dossier.stat.cap.desc':
-    'В залпе {n|бьёт|бьют|бьют} максимум {n} {n|юнит|юнита|юнитов} — сильнейшие первыми; все сверх капа только впитывают урон.',
   'dossier.stat.cap.name': 'Линия огня',
   'dossier.stat.datk.name': 'Атака',
   'dossier.stat.ddef.name': 'Защита',
@@ -1397,13 +1413,8 @@ export const ru: Record<string, string> = {
     'Урон по миру при штурме и обстреле с орбиты меньше на эту долю. Крепость даёт {f} по уровню, каждая другая целая постройка — {b}, вместе не больше {cap}. Снесённая постройка перестаёт прикрывать.',
   'dossier.stat.mitigation.name': 'Защита построек',
   'dossier.stat.hp.name': 'Очки здоровья',
-  'dossier.stat.hull.desc':
-    'Текущая/полная прочность армии. Чинится у своего мира с верфью — или мгновенно за кредиты.',
   'dossier.stat.hull.name': 'Корпус',
-  'dossier.stat.shield.desc':
-    'Аблятивный щит: принимает урон первым и бесплатно восстанавливается вне боя.',
   'dossier.stat.shield.name': 'Щит',
-  'dossier.stat.spd.desc': 'Флот движется со скоростью самого медленного корабля.',
   'dossier.stat.spd.name': 'Скорость',
   'dossier.tab.buildings.desc':
     'Постройки мира и строительный конвейер: состояние, уровни и улучшения.',
@@ -1494,7 +1505,7 @@ export const ru: Record<string, string> = {
   'hint.auto-retreat.off': '⮐ авто-отход снят',
   'hint.auto-retreat.nowhere': '⮐ некуда отходить: выбери свой мир или назначь столицу',
   'hint.auto-assault': '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии',
-  'hint.cast-cancelled': '✖ каст отменён',
+  'hint.cast-cancelled': '✖ способность отменена',
   'hint.deploy-cancelled': '✖ развёртывание отменено',
   'hint.forced-march': '⚡ форс-марш: +50% скорости, −5% прочности за час хода',
   'hint.multiselect': '⊕ щёлкайте по своим флотам — соберите группу и отдайте общий приказ',
@@ -1529,6 +1540,8 @@ export const ru: Record<string, string> = {
   // --- map — Значки на карте: фазы боя; кольца радара выбранного мира.
   'map.badge.landing': '⚒ десант',
   'map.badge.orbit': '⚔ орбита',
+  'map.callout.garrison': 'гарнизон {n}',
+  'map.fog.old': '✦ старые данные',
   'map.radar.detect': '◌ засечка {n}',
   'map.radar.identify': '● опознание {n}',
 
@@ -2051,7 +2064,7 @@ export const ru: Record<string, string> = {
   'sandbox.tog.immortal-home.hint': 'Домашний мир нельзя захватить',
   'sandbox.tog.instant-build': 'Моментальная постройка',
   'sandbox.tog.instant-build.hint': 'Стройка завершается мгновенно',
-  'sandbox.tog.instant-cooldown': 'Перезарядка скиллов',
+  'sandbox.tog.instant-cooldown': 'Перезарядка способностей',
   'sandbox.tog.instant-cooldown.hint': 'Умения командиров всегда готовы',
   'sandbox.tog.speed': 'Управление скоростью',
   'sandbox.tog.speed.hint':
@@ -2066,7 +2079,7 @@ export const ru: Record<string, string> = {
   'sci.ordnance-savant.desc':
     'Лидер ракетной ветки: системы наведения, компактные заряды, ковровый залп.',
   'sci.overseer.desc':
-    'Лидер ветки командования (C2): доктрины автоматизации и делегирования. Открывает «Протокол Хранитель» — передачу места ИИ на время сна.',
+    'Лидер ветки командования: доктрины автоматизации и делегирования. Открывает «Протокол Хранитель» — передачу места ИИ на время сна.',
   'sci.polymath.desc': 'Генералист без ветки: +1 слот исследования (2→3) вместо фокуса.',
   'sci.void-admiral.desc': 'Лидер космической ветки: верфи, логистика, осадные доктрины.',
   'sci.wing-commodore.desc':
@@ -2158,7 +2171,7 @@ export const ru: Record<string, string> = {
   'yard.hull.none': 'В арсенале нет корпусов этого класса.',
   'yard.hull.unavailable': 'Корпус недоступен.',
   'yard.loadout.note':
-    'Лоадаут фиксируется при постройке. Готовый корабль не переоснастить — только построить новый с другим набором.',
+    'Модули ставятся при постройке. Готовый корабль не переоснастить.',
   'yard.module.not-allowed': 'не для этого корпуса',
   'yard.module.remove': 'снять модуль',
   'yard.modules.all-taken': 'Доступные модули — все слоты заняты',
@@ -2771,7 +2784,7 @@ export const ru: Record<string, string> = {
   'log.build.cleared': '🧹 {b}: гарнизон зачистил · {at}',
   'log.build.destroyed': '💥 {b}: разрушено · {at}',
   'log.build.done': '🏗️ {b}: построено · {at}',
-  'log.build.upgraded': '⬆️ {b} → L{lvl} · {at}',
+  'log.build.upgraded': '⬆️ {b} → ур. {lvl} · {at}',
   'log.capture': '🚩 {who}: захват · {at}',
   'log.diplo.offer': '🕊 {who} предлагает: {stance} — ответьте тем же в Дипломатии',
   'log.diplo.offer.short': 'Предложение: {stance}',

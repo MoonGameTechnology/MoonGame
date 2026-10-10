@@ -51,6 +51,7 @@ import { buildShip } from '../../decisions/actions';
 import { isLander, landerTroopCandidates, orderableTroops } from '../../decisions/landerTroops';
 import { unitDamageProfile } from '../../decisions/unitDamage';
 import { unitDamageHtml } from './unitDamageView';
+import { termHtml } from './termTip';
 import {
   createLoadoutEditor,
   applyLoadoutAction,
@@ -175,6 +176,16 @@ export function bagText(bag: Record<string, number>): string {
   return parts.length ? parts.join(' · ') : t('yard.free');
 }
 
+/** Статья словаря у строки характеристики (UIX-9.4): подпись строки — слово-термин. «Урон в
+ *  атаке» и «Урон в защите» — те же атака и защита, что в окне флота, и объяснение у них одно. */
+const STAT_TERM: Record<string, string> = {
+  attack: 'attack',
+  defense: 'defense',
+  hp: 'hull',
+  shield: 'shield',
+  speed: 'speed',
+};
+
 /** One live stat row: label · base → effective (+delta) · track bar (base cyan, delta green). */
 export function statBarHtml(line: LoadoutStatLine, max: number): string {
   const basePct = max > 0 ? Math.min(100, (line.base / max) * 100) : 0;
@@ -184,7 +195,7 @@ export function statBarHtml(line: LoadoutStatLine, max: number): string {
       ? `${line.base} <span class="dim">→</span> <b>${line.effective}</b> <span class="cn-up">${line.delta > 0 ? '+' : ''}${line.delta}</span>`
       : `<b>${line.effective}</b>`;
   return (
-    `<div class="cn-stat"><div class="cn-srow"><span class="cn-snm">${esc(line.label)}</span><span class="cn-sval">${val}</span></div>` +
+    `<div class="cn-stat"><div class="cn-srow"><span class="cn-snm">${STAT_TERM[line.stat] ? termHtml(STAT_TERM[line.stat]!, line.label) : esc(line.label)}</span><span class="cn-sval">${val}</span></div>` +
     `<div class="cn-strack"><span class="cn-sbar" style="width:${basePct}%"></span><span class="cn-sdelta" style="width:${deltaPct}%"></span></div></div>`
   );
 }

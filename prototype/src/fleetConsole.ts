@@ -15,8 +15,19 @@ import { t } from '../../localization/runtime';
 import { pctText, type StatTone } from '../../decisions/statModifiers';
 import { esc } from './format';
 import { holoIcon, type HoloIcon } from './holographicIcons';
+import { termTextHtml } from './termTip';
 
 export type ConsoleStat = 'atk' | 'def' | 'cap' | 'spd' | 'hull' | 'shield';
+
+/** Статья словаря у параметра (UIX-9.4): её текст — правило во всплывашке параметра. */
+export const STAT_TERM: Record<ConsoleStat, string> = {
+  atk: 'attack',
+  def: 'defense',
+  cap: 'fire-line',
+  spd: 'speed',
+  hull: 'hull',
+  shield: 'shield',
+};
 
 const toneClass = (tone: StatTone): string => (tone === 'neutral' ? '' : ` ${tone}`);
 
@@ -121,7 +132,7 @@ export interface StatPopView {
   title: string;
   value: string;
   tone: StatTone;
-  /** Правило параметра (досье), если оно есть. */
+  /** Правило параметра — статья словаря; ссылки `[[id|слово]]` в нём становятся терминами. */
   desc: string;
   /** Подзаголовок строк — у корпуса и щита это «входящий урон». */
   sub?: string;
@@ -157,7 +168,7 @@ export function statPopHtml(v: StatPopView): string {
   }
   return (
     `<div class="sp-head"><b>${esc(v.title)}</b><span class="sp-val${toneClass(v.tone)}">${esc(v.value)}</span></div>` +
-    (v.desc ? `<p class="sp-desc">${esc(v.desc)}</p>` : '') +
+    (v.desc ? `<p class="sp-desc">${termTextHtml(v.desc)}</p>` : '') +
     rows
   );
 }

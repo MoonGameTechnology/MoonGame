@@ -1183,6 +1183,23 @@ body.aim-mode #pirate-intro,body.chain-mode #pirate-intro,body.sheet-open #pirat
 .sp-none{margin-top:6px;padding-top:4px;border-top:1px solid var(--line);color:var(--dim);}
 .sp-val.buff,.sp-row.buff b{color:var(--up);}
 .sp-val.debuff,.sp-row.debuff b{color:var(--dn);}
+/* Слово-термин (UIX-9.4): пунктир снизу значит «у слова есть объяснение». Подсказка
+   (.termtip) — свой узел в body, место ставит JS по getBoundingClientRect слова, поэтому,
+   как #statpop, вне списка зума. Стопкой: термин в подсказке открывает следующую поверх,
+   поэтому фон плотный — сквозь стекло читались бы строки нижней подсказки.
+   На сенсорном экране цель касания чуть растёт по вертикали полями — строка от них не растёт.
+   Больше 4 px нельзя: поля термина на следующей строке перекрыли бы термин над ним. */
+.term{text-decoration:underline dotted;text-decoration-color:var(--cyan-dim);text-underline-offset:3px;
+  border-radius:3px;cursor:help;}
+.term:hover,.term:focus-visible,.term[aria-describedby]{color:var(--ink);text-decoration-color:var(--cyan);}
+.term:focus-visible{outline:1px solid var(--cyan);outline-offset:2px;}
+@media (pointer:coarse){.term{padding-block:4px;}}
+.termtip{position:fixed;left:0;top:0;z-index:62;width:max-content;max-width:min(300px,calc(100vw - 16px));
+  overflow:auto;overscroll-behavior:contain;background:var(--sf-panel),var(--void);border:1px solid var(--line-hi);
+  border-radius:8px;padding:8px 11px 9px;box-shadow:0 0 22px rgba(0,0,0,.6);
+  font-size:var(--fs-caption);line-height:1.45;text-align:left;}
+.termtip b{display:block;margin-bottom:3px;font-size:var(--fs-caption);color:var(--cyan);}
+.termtip p{margin:0;color:var(--dim);}
 /* Число с надбавками в листе флота: тот же цвет, что в шапке всплывашки, и курсор-указатель —
    по числу можно тапнуть. */
 #side [data-stat]{cursor:pointer;}

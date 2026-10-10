@@ -40,9 +40,14 @@ describe('UIX-5.3 — надписи холста словами языка иг
       m[2]!.replace(/\$\{[^}]*\}/g, ''),
     );
     expect(literals.length).toBeGreaterThan(5); // разбор не должен молча опустеть
-    // «G:», «B:» и «✦last» в подписях тумана и схемы — словарь терминов (UIX-5.4). Список
-    // обязан сокращаться: починенная подпись уронит тест, и её надо отсюда убрать.
-    expect(literals.filter((l) => /[A-Za-z]{2,}/.test(l))).toEqual(['G:  ✦last']);
+    // Последние такие подписи — «G:4 B:…» и «✦last» тумана и схемы — переведены словарём
+    // терминов (UIX-5.4): теперь это `t('map.callout.garrison')` и `t('map.fog.old')`.
+    expect(literals.filter((l) => /[A-Za-z]{2,}/.test(l))).toEqual([]);
+  });
+
+  it('гарнизон и старые данные на холсте подписаны ключами (UIX-5.4)', () => {
+    expect(MAIN.match(/t\('map\.callout\.garrison'/g)?.length).toBe(2);
+    expect(MAIN).toContain("t('map.fog.old')");
   });
 
   it('кольца радара выбранного мира подписаны ключами', () => {

@@ -231,6 +231,7 @@ import {
 } from '../../decisions/statModifiers';
 import { anchoredPopover } from '../../decisions/anchoredPopover';
 import {
+  STAT_TERM,
   columnTitleHtml,
   statGridHtml,
   statPopHtml,
@@ -243,6 +244,7 @@ import {
   type TroopRow,
   type VitalView,
 } from './fleetConsole';
+import { initTermTips, termBody } from './termTip';
 import { drawFleetHoldBadge, fleetHoldsHtml } from './fleetHoldView';
 import { veteranMark, fleetVeteranGrade } from '../../decisions/veteranMark';
 import { veteranTag } from './veteranChevrons';
@@ -2467,7 +2469,10 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
     cx.fillStyle = 'rgba(120,140,150,0.45)';
     cx.font = '9px ui-monospace,Menlo,monospace';
     const icons = mem.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
-    cx.fillText(`G:${mem.garrison} ${icons} ✦last`, c.x + 13, c.y + 10);
+    // Словами, а не «G:4 ✦last» (UIX-5.4): у холста нет подсказки, которая расшифровала бы
+    // букву, а ✦ — тот же знак, что у «Последних данных» в карточке мира.
+    const stats = [t('map.callout.garrison', { n: mem.garrison }), icons, t('map.fog.old')];
+    cx.fillText(stats.filter(Boolean).join(' '), c.x + 13, c.y + 10);
   } else {
     cx.strokeStyle = 'rgba(125,161,176,0.5)';
     cx.lineWidth = 1;
@@ -6439,7 +6444,7 @@ function render(now: number) {
     // which stay labelled like city names on a globe (your anchor at any zoom).
     // Тир подписи, её чернила и судьба второй строки — `nodeCallout.ts` (REFM-117):
     // мир подписан ярче транзитного сектора, цвет владельца несёт РАЗВЕДДАННЫЕ, а
-    // пустой тихий сектор молчит, чтобы не сорить «G:0 B:—» вдоль всего маршрута.
+    // пустой тихий сектор молчит, чтобы не сорить «гарнизон 0» вдоль всего маршрута.
     // Сюда доходит только ОПОЗНАННЫЙ узел — неопознанный забрал `drawFogMarker` выше
     // по циклу (REFM-117.1), поэтому ветки «нет телеметрии» здесь больше нет.
     const tier = calloutTier(n.sector);
@@ -6466,7 +6471,8 @@ function render(now: number) {
       const icons = p.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
       cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
       cx.font = isWorld ? '10px ui-monospace,Menlo,monospace' : '9px ui-monospace,Menlo,monospace';
-      cx.fillText(`G:${g}  B:${icons || '—'}`, c.x + R + 12, c.y + (isWorld ? 12 : 11));
+      const stats = [t('map.callout.garrison', { n: g }), icons].filter(Boolean).join('  ');
+      cx.fillText(stats, c.x + R + 12, c.y + (isWorld ? 12 : 11));
     }
     cx.restore();
   }
@@ -7270,8 +7276,10 @@ function fleetPanelHtml(f: Fleet): string {
   // У корпуса и щита цвет — по входящему урону. Чужой флот — голые суммы.
   const mods = fleetStatModsOf(f);
   const tone = (x: StatTone | undefined): string => (x && x !== 'neutral' ? ` class="${x}"` : '');
-  const key = mods ? ' role="button" tabindex="0"' : '';
-  const tap = (stat: string): string => (mods ? ` data-stat="${stat}"` : '');
+  // Тап по параметру открывает его всплывашку у ЛЮБОГО флота (UIX-9.4): у чужого в ней одно
+  // правило, без строк надбавок, — но «АТК» и «Ⅹ» расшифрованы и у него.
+  const key = ' role="button" tabindex="0"';
+  const tap = (stat: string): string => ` data-stat="${stat}"`;
   // В строке корпуса живут кнопки ремонта, поэтому кнопкой для клавиатуры служит число,
   // а не вся строка: кнопка внутри кнопки — не кнопка ни для кого.
   if (hull.max > 0) {
@@ -7296,7 +7304,7 @@ function fleetPanelHtml(f: Fleet): string {
         : String(Math.round(spd))
       : '—';
   // Fleet-card blurb removed (feedback: compact panel) — the header + stat chips carry it.
-  h += `<div class="pstats"><span data-desc="stat:atk"${tone(mods?.fire.tone)}${tap('atk')}${key}>⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def"${tone(mods?.fire.tone)}${tap('def')}${key}>🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd"${tone(mods?.speed.tone)}${tap('spd')}${key}>⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
+  h += `<div class="pstats"><span data-desc="stat:atk"${tone(mods?.fire.tone)}${tap('atk')}${key}>⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def"${tone(mods?.fire.tone)}${tap('def')}${key}>🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap"${tap('cap')}${key}>Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd"${tone(mods?.speed.tone)}${tap('spd')}${key}>⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
 
   h += fleetEffectsHtml(f, boosted, nTr);
 
@@ -7701,7 +7709,8 @@ function closeStatPop(): void {
  *  которых ядро не назвало, всплывашка не выдумывает. */
 function statPopModel(f: Fleet, stat: ConsoleStat): StatPopView {
   const d = objDossier(`stat:${stat}`);
-  const head = { title: d?.name ?? '', desc: d?.body ?? '' };
+  // Правило — статья словаря со ссылками: термины в ней раскрываются следующей подсказкой.
+  const head = { title: d?.name ?? '', desc: termBody(STAT_TERM[stat]) };
   const mods = fleetStatModsOf(f);
   const sm = fleetSummary(f, data, s.time);
   const plain = (value: string): StatPopView => ({ ...head, value, tone: 'neutral', rows: [], total: null, plain: true });
@@ -7782,15 +7791,20 @@ function renderStatPop(): void {
 }
 
 // Клик мимо закрывает. Сам параметр не в счёт: его тап — это переключение (делегат листа).
+// Подсказка термина из её текста (`termTip.ts`) тоже не «мимо»: она про ту же всплывашку.
 document.addEventListener(
   'pointerdown',
   (ev) => {
     if (!statPop) return;
-    if ((ev.target as Element | null)?.closest?.('#statpop, [data-stat]')) return;
+    if ((ev.target as Element | null)?.closest?.('#statpop, [data-stat], .termtip')) return;
     closeStatPop();
   },
   true,
 );
+
+// Слова-термины с подсказкой (UIX-9.4): во всплывашке параметра, в окне производства, в
+// справочнике. Подсказки — свои узлы в `body`, слушатели — на документе.
+initTermTips();
 
 /** Окно флота консолью: шапка с корпусом и щитом, «Состав», «Десант», низ окна. «Приказы»
  *  рисует ряд команд (`renderCmdBar`), а раскладывает всё сетка окна (`holographic.css`). */

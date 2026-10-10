@@ -57,7 +57,7 @@ describe('подпись узла — вторая строка', () => {
     expect(calloutLine(вид({ tier: 'world', garrison: 0, buildings: 0 }))).toEqual({ do: 'stats' });
   });
 
-  it('ПУСТОЙ ТИХИЙ СЕКТОР МОЛЧИТ: «G:0 B:—» у путевой точки — шум', () => {
+  it('ПУСТОЙ ТИХИЙ СЕКТОР МОЛЧИТ: «гарнизон 0» у путевой точки — шум', () => {
     expect(calloutLine(вид({ tier: 'sector' }))).toEqual({ do: 'none' });
   });
 
