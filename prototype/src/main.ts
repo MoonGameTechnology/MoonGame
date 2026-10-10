@@ -45,7 +45,6 @@ import {
 import {
   dispatchChat,
   initMessageLog,
-  markUnread,
   pushMsg,
   replaceMessages,
   sessionMessages,
@@ -60,14 +59,11 @@ import {
   diploTab,
   fmtStamp,
   initDiploWindow,
-  isAiSeat,
   openPlayerCard,
   openSeatCard,
-  pushSpyLog,
   renderDiplo,
   renderDiploFeed,
   seatBadge,
-  stanceRu,
   worldsOf,
 } from './diploWindow';
 import {
@@ -279,9 +275,6 @@ import {
   previewLossCount,
   scanNodeThreats,
   identifiedNodes,
-  engagementOf,
-  flashBattles,
-  inVisionBloc,
   type SignatureContact,
   sightCircles,
   type SightCircle,
@@ -305,7 +298,6 @@ import { createBattleModel } from '../../packages/client/src/index';
 import { pveModeId, pveChapter, trainingState, trainingObjectives, trainingModeId, provingGroundState, mapRegions, PROVING_GROUND_PLAYER } from '../../packages/client/src/gameData';
 import { regionLabels, regionLabelAlpha } from '../../decisions/regionName';
 import { basePatrols, holdsPatrol, patrolMarks } from '../../decisions/patrolMarks';
-import { hitKey, seenPatrolOver, shuttleHitView } from '../../decisions/shuttleHit';
 import { relocateTargets, type RelocateTarget } from '../../decisions/relocateTargets';
 import {
   pinchAt as camPinchAt,
@@ -559,10 +551,8 @@ import {
   fmtHrs,
   flowPer,
   flowRate,
-  gameStamp,
   clockHM,
   countdownHMS,
-  costText,
   setRunClock,
 } from './format';
 import { runClockText } from '../../decisions/runClock';
@@ -706,9 +696,10 @@ import {
   youColor,
 } from './mapPalette';
 import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, panelSlack, pirateIntroRect, setView, unworld, visible, world, worldDist, zoomAt } from './mapCamera';
-import { admits, battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
-import { battleAnchor, fleetAnchor, fleetOriginPx, fleetPos, forkFortressAt, forkMarkAt, initFleetGeometry, laneAim, nearestLanePoint, orbitRingRadius, selectedFleetIds, spinOrbits, strikeBasePos, strikeWorldPos } from './fleetGeometry';
+import { battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
+import { battleAnchor, fleetAnchor, fleetOriginPx, fleetPos, forkFortressAt, forkMarkAt, initFleetGeometry, laneAim, nearestLanePoint, orbitRingRadius, selectedFleetIds, spinOrbits, strikeBasePos } from './fleetGeometry';
 import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
+import { eventLog, handleEvents, initEventFeed, killStats, logLines, note, resetEventFeed, toast } from './eventFeed';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -779,7 +770,7 @@ import {
 // ONB-3 — just-in-time mechanic intros (per-nick seen-set, shown once on first contact).
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
-import { buildRecap, type RecapEvent } from './recap';
+import { buildRecap } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
 import {
@@ -790,7 +781,6 @@ import {
   type SplitSlot,
 } from '../../decisions/splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
-import { splitSelectTarget } from '../../decisions/splitFollow';
 import {
   canAssaultAim,
   canAssaultFromOrbit,
@@ -813,18 +803,7 @@ import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
-import { isMine, seen, seenTail } from './eventVisibility';
-import { recordLoss, tallyDeath } from './warTally';
-import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
-import { heroDiedNews, heroRespawnedNews, type HeroNews } from './heroNews';
-import {
-  declineHeard,
-  diploConcernsMe,
-  offerAudience,
-  offerUnread,
-  stanceKey,
-  stanceThread,
-} from './diploAudience';
+import type { HeroNews } from './heroNews';
 import {
   GOALS_BONUS_XP,
   goalsChanged,
@@ -832,7 +811,6 @@ import {
   goalsTrayHtml,
   rewardDue,
 } from './goalsPanel';
-import { captureHeard, gainRepaint, researchHeard } from './gainNews';
 import { cmdShown } from '../../decisions/cmdPresence';
 import { allOn } from '../../decisions/cmdHighlight';
 import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from '../../decisions/aimTargets';
@@ -964,13 +942,10 @@ import { ambushOf } from '../../decisions/forkAmbush';
 import { drawAmbushMark, drawForkMark } from '../../packages/client/src/forkMark';
 import { netContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
-import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
-import { AA_SHOTS_MAX, aaImpact, capShots } from './fireEffects';
-import { battleOutcome, battlePhaseKey, lossTally } from './battleLog';
+import { AA_SHOTS_MAX, capShots } from './fireEffects';
 import {
   decisionsField,
   diffFields,
-  stewardMine,
   stewardReport,
   type StewardEvent,
 } from './stewardLog';
@@ -979,9 +954,7 @@ import { planetRadar as corePlanetRadar } from './sensorScale';
 import { autoStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
-import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded } from './noteLog';
 import { restoresWallet, snapshotWallet } from './freeBuild';
-import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { phaseAt, phaseOfId } from './pulseFx';
@@ -1006,7 +979,6 @@ import {
   flakBurstRadius,
   flakDashOffset,
   flakLook,
-  flakTier,
   type FlakTier,
 } from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
@@ -1039,8 +1011,6 @@ import type {
   Battle,
   Planet,
   Action,
-  DiplomaticStance,
-  DomainEvent,
   UnitStack,
 } from '../../packages/shared-core/src/index';
 
@@ -1351,17 +1321,10 @@ let planetTab: PlanetTab = 'buildings';
 // Bytro-карточка: тап по имени флота открывает сводку армии — какой флот сейчас
 // в режиме сводки (другой флот в панели → обычная карточка сама собой).
 let fleetInfoFor: string | null = null;
-const logLines: string[] = [];
 // Player ids the local sim drives as AI (empty seats become AI), each with the
 // DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
 // «сильный» = the full-heuristics one). Default solo = p2 on weak.
 let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
-// Session war record (from `unit.died` events): enemy units you destroyed vs your own
-// units lost. Cumulative since the match started; reset on a new match. Only battles
-// YOU take part in are counted (tracked by location via battle.started/resolved), so
-// the AI's fights elsewhere don't inflate your tally.
-let killStats = { destroyed: 0, lost: 0 };
-const myBattleLocs = new Set<string>();
 // Orbital-AA volleys to visualize (H2): map-space endpoints captured at event time
 // (the target may die in that very volley), drawn as a fading flak burst ~0.7s.
 const aaShots: Array<{
@@ -1382,9 +1345,6 @@ const captureFlashes = new Map<string, { owner: string; at: number }>();
 // SM-3.5: вспышка срабатывания мин — узел → момент (performance.now). Ставится, только
 // если мины задели меня или сработало моё поле.
 const mineFlashes = new Map<string, { at: number; position?: { x: number; y: number } }>();
-// Casualties per contested location (owner → unit → count), accumulated from
-// unit.died while a battle runs and paid out as a result note on battle.resolved.
-const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // SANDBOX — the home world of the local player (immortal-home target), captured at
 // launch. `sandboxConfig.enabled`/toggles live in ./sandbox; this is the only host var.
 let sandboxHomeId: string | null = null;
@@ -2249,46 +2209,40 @@ function drawBattleTracers(now: number): void {
   }
 }
 
-// ONB-5: a structured, bounded mirror of the event log — feeds the return digest.
-const eventLog: RecapEvent[] = [];
-let lastNoteMsg = '';
-let lastNoteAtMs = 0;
-/** Append a line to the session log (bounded). Patches the feed if it's on screen. */
-function note(msg: string, at?: string) {
-  // Защита от повторов и пределы лент — `noteLog.ts` (REFM-101): повтор глушится по
-  // РЕАЛЬНОМУ времени, а метка ставится ИГРОВОЕ — «День 3, 07:45» (`gameStamp`, UIX-5.3).
-  const nowMs = Date.now();
-  if (isRepeat(msg, lastNoteMsg, nowMs, lastNoteAtMs)) return;
-  lastNoteMsg = msg;
-  lastNoteAtMs = nowMs;
-  pushBounded(logLines, `${gameStamp(s.time)} · ${msg}`, LOG_LINES);
-  pushBounded(eventLog, { at: s.time, text: msg, anchor: at }, EVENT_LOG_MAX);
-  toast(msg, at);
-}
-
-/** Transient event toast over the map — feedback must not live only in a hidden
- *  log window. Tap dismisses; with a map anchor the tap also flies the camera
- *  there (the jumpToPing path). At most 3 stacked, ~5s life each. */
-function toast(msg: string, at?: string): void {
-  const host = document.getElementById('toasts');
-  if (!host) return;
-  // Вид, предел стопки и время жизни — `toastView.ts` (REFM-105).
-  const el = document.createElement('div');
-  el.className = toastClass(!!at);
-  el.textContent = toastText(msg, !!at);
-  el.addEventListener('click', () => {
-    if (at) jumpToPing(at);
-    el.remove();
-  });
-  host.appendChild(el);
-  // Считаются и вытесняются только тосты: предупреждение о сохранении стоит над ними.
-  for (let extra = toastOverflow(host.querySelectorAll('.toast').length); extra > 0; extra--)
-    host.querySelector('.toast')?.remove();
-  window.setTimeout(() => {
-    el.classList.add('out');
-    window.setTimeout(() => el.remove(), TOAST_FADE_MS);
-  }, TOAST_LIFE_MS);
-}
+// Реакция на события мира и лента — у владельца, `eventFeed.ts` (REFM-230). Отсюда — то, что
+// принадлежит игре: мир, своё место, имена, выбор флота и окна, рассказы о вахте, герое и
+// стройке (их зона — конвейер приказа, REFM-240); залпы, вспышки и пульс союзника — двери карты.
+initEventFeed({
+  world: () => s,
+  me: () => ME,
+  names: () => NAME,
+  placeName,
+  fleetTitleOf,
+  setFleetSelection,
+  splitAwait: () => splitAwait,
+  endSplitAwait: () => {
+    splitAwait = null;
+  },
+  techTree: () => techTree,
+  tellSteward,
+  tellHero,
+  tellBuild,
+  battleWindow: () => battleWindow,
+  shot: (shot) => {
+    aaShots.push(shot);
+    capShots(aaShots, AA_SHOTS_MAX);
+  },
+  captureFlash: (node, owner) => {
+    captureFlashes.set(node, { owner, at: performance.now() });
+  },
+  mineFlash: (node, position) => {
+    mineFlashes.set(node, { at: performance.now(), position });
+  },
+  noticeFlash,
+  pulseAlly: () => {
+    allyPulseUntil = performance.now() + 12_000;
+  },
+});
 
 /** Хранилище браузера не принимает записи (приватный режим, нет места): прогресс не
  *  переживёт закрытия вкладки, и игрок узнаёт об этом сразу, а не после перезагрузки
@@ -2385,22 +2339,6 @@ function perWorld<K extends keyof WorldDerived>(
     memo = worldMemo = { state: s, me: ME, vision, got: {} };
   if (!(key in memo.got)) memo.got[key] = compute();
   return memo.got[key] as WorldDerived[K];
-}
-
-/** Бои моего блока зрения, начало которых журнал уже показал: итог приходит, когда боя в
- *  состоянии нет, и спросить «мой ли он» тогда уже не у кого. */
-const engagedBattleIds = new Set<string>();
-
-/** Налёты по моим целям, о которых журнал уже написал (`decisions/shuttleHit.ts`, правило 4):
- *  патруль бьёт каждые 15 минут, а строка нужна одна на налёт. */
-const announcedHits = new Set<string>();
-
-/** Дерётся ли в бое `battleId` мой блок зрения — то же правило, что `battleKnown`, для
- *  событий: узел союзного боя может быть не опознан (замечание Codex на #1408). */
-function battleEngaged(battleId: unknown): boolean {
-  if (typeof battleId !== 'string') return false;
-  if (engagedBattleIds.has(battleId) || vision?.engaged.battles.has(battleId)) return true;
-  return Object.hasOwn(s.battles, battleId) && engagementOf(s, ME).battles.has(battleId);
 }
 
 /** Имя места для игрока — одно на подписи, журнал, окно боя и метки (`planetName.ts`):
@@ -3305,652 +3243,6 @@ function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
   if (line.anchored) note(text, at);
   else note(text);
 }
-function handleEvents(events: DomainEvent[]) {
-  // Бои, начавшиеся и кончившиеся в этом пакете: в `s` их уже нет, и «мой ли он» отвечают
-  // стороны из самих событий — тем же правилом, что сервер раздаёт их (замечание Codex на
-  // #1417: мгновенный бой союзника на неопознанном узле журнал отбрасывал целиком).
-  const flash = flashBattles(events, s);
-  const flashSeen = (id: unknown): boolean => typeof id === 'string' && inVisionBloc(s, ME, flash.get(id) ?? []);
-  for (const e of events) {
-    const p = e.payload as Record<string, unknown>;
-    if (e.type.startsWith('rocketMine.') && (p.owner === ME || p.playerId === ME)) {
-      const keys: Record<string, string> = {
-        'rocketMine.ready': 'mine.ready', 'rocketMine.cancelled': 'mine.cancelled',
-        'rocketMine.launched': 'mine.launched', 'rocketMine.intercepted': 'mine.intercepted',
-        'rocketMine.hit': 'mine.hit', 'rocketMine.disarmed': 'mine.disarmed',
-      };
-      const key = keys[e.type];
-      if (key) note(t(key, { damage: Math.round(Number(p.damage) || 0) }));
-    }
-    switch (e.type) {
-      case 'battle.started':
-        // Видимость события — `eventVisibility.ts` (REFM-86): своё всегда, чужое только
-        // на опознанном узле. Сеть фогует события на сервере, и местная симуляция обязана
-        // повторять тот же фильтр — иначе соло показывает больше, чем сеть.
-        if (
-          seen(
-            isMine([p.attacker as string, p.defender as string], ME),
-            known(p.location as string) || battleEngaged(p.battleId) || flashSeen(p.battleId),
-          )
-        )
-          // Чем названы строки боя — `battleLog.ts` (REFM-179): фаза называется ВСЕГДА,
-          // потому что орбита и десант — разные бои с разными войсками.
-          note(
-            t('log.battle.start', {
-              at: placeName(p.location as string),
-              phase: t(battlePhaseKey(p.phase as string | undefined)),
-            }),
-            p.location as string,
-          );
-        // Свой бой запоминается: его исход обязан доехать до журнала, даже если узел
-        // уйдёт под туман по ходу схватки (правило 3).
-        if (isMine([p.attacker as string, p.defender as string], ME))
-          myBattleLocs.add(p.location as string);
-        if (typeof p.battleId === 'string' && (battleEngaged(p.battleId) || flashSeen(p.battleId)))
-          engagedBattleIds.add(p.battleId);
-        break;
-      case 'battle.resolved': {
-        const loc = p.location as string;
-        // Потери сводятся ПО ИГРОКУ и приписываются, только если они есть (правила
-        // 3–5 в `battleLog.ts`): пустой хвост «· потери:» — строка ни о чём.
-        const tally = lossTally(battleLosses.get(loc), (who) => NAME[who] ?? who);
-        const out = battleOutcome(p.winner as string | undefined);
-        const endText =
-          t('log.battle.end', {
-            at: placeName(loc),
-            res: out.named
-              ? t(out.key, { who: NAME[p.winner as string] ?? (p.winner as string) })
-              : t(out.key),
-          }) + (tally ? t('log.battle.losses', { tally }) : '');
-        if (seenTail(myBattleLocs.has(loc), known(loc) || battleEngaged(p.battleId))) note(endText, loc);
-        // Окно на этом бою держит итог до закрытия (решение владельца 2026-09-25): бой у
-        // планеты при осаде длится раунд-два, и окно пустело сразу после открытия.
-        if (typeof p.battleId === 'string') battleWindow.ended(p.battleId, endText);
-        battleLosses.delete(loc);
-        myBattleLocs.delete(loc);
-        if (typeof p.battleId === 'string') engagedBattleIds.delete(p.battleId);
-        break;
-      }
-      case 'technology.researched':
-        // Открытие слышит ТОЛЬКО исследователь — `gainNews.ts` (REFM-184): чужие
-        // технологии это разведданные, за них в игре платят шпионажем.
-        if (researchHeard(p.playerId, ME))
-          note(
-            t('log.tech.done', {
-              tech: tData(
-                data.technologies[p.technology as string]?.name ?? (p.technology as string),
-              ),
-            }),
-          );
-        // Перерисовка ВНЕ проверки адресата (правило 5): доступность узлов сдвинулась
-        // оттого, что событие случилось, а не оттого, что игрок о нём услышал.
-        if (gainRepaint('research').techTree && techTree.isOpen()) techTree.repaint();
-        break;
-      // «Хранитель» lifecycle: snapshot at delegation, diff on expiry (the morning report).
-      // Что печатает каждое событие вахты и что делается с опорным снимком —
-      // `stewardLog.ts` (REFM-176): всё только про СЕБЯ, поза меняет текст, снимок
-      // берётся при постановке и гаснет и при снятии, и при возврате, ночная разница
-      // печатается только если есть от чего считать, а ресурс несёт ГЛИФ, а не
-      // HTML-чип (тост идёт через textContent, в ленту попадает и чужой текст).
-      case 'steward.delegated':
-        if (stewardMine(p.playerId, ME)) tellSteward('delegated', p);
-        break;
-      case 'steward.recalled':
-        if (stewardMine(p.playerId, ME)) tellSteward('recalled', p);
-        break;
-      case 'steward.expired':
-        if (stewardMine(p.playerId, ME)) tellSteward('expired', p);
-        break;
-      // Both espionage events are addressed to the ACTOR (`owner`); in NET play the
-      // server's fog filter already withholds them from the victim — mirror it here.
-      // Кому адресовано событие, что оно говорит и когда перерисовывается ростер —
-      // `spyLog.ts` (REFM-177). SPY-2: успех и провал читает ИСПОЛНИТЕЛЬ, замеченную
-      // операцию — ЖЕРТВА; пойманный вор называется по имени, неустановленный нет; у
-      // кражи ростер перерисовывается ПОСЛЕ проверки адресата (появилась своя строка
-      // разведки), у обнаружения — ДО неё (расположение бота двигается в любом случае).
-      case 'intel.stolen': {
-        if (p.owner !== ME) break;
-        const b = bootyText(p.kind as string);
-        const what =
-          b.field === 'who'
-            ? t(b.key, { who: NAME[p.target as string] ?? (p.target as string) })
-            : t(b.key, { at: placeName(String(p.intelPlanet ?? p.target)) });
-        note(t('log.spy.success', { what }));
-        pushSpyLog(t('log.spy.success.short', { what }));
-        if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
-        break;
-      }
-      case 'espionage.failed':
-        if (p.owner === ME) {
-          const whoF = NAME[p.target as string] ?? (p.target as string);
-          note(t('log.spy.fail', { who: whoF }));
-          pushSpyLog(t('log.spy.fail.short', { who: whoF }));
-        }
-        break;
-      case 'espionage.detected': {
-        if (spyRepaint('detected') === 'before' && diploOpen && diploTab === 'diplo') renderDiplo();
-        if (p.owner !== ME) break;
-        const what = t(bootyKind(p.kind as string));
-        const c = counterLine(p.spy as string | undefined);
-        const line = c.named
-          ? t(c.key, { who: NAME[p.spy as string] ?? (p.spy as string), what })
-          : t(c.key, { what });
-        note(line);
-        pushSpyLog(line);
-        break;
-      }
-      case 'planet.captured':
-        // Строку слышит только участник — взявший мир или тот, у кого его взяли
-        // (`gainNews.ts`, правило 1, решение владельца 2026-10-06): чужой захват даже на
-        // видимом мире — раскрытие информации, ему нет места ни в журнале, ни во
-        // всплывающем сообщении, ни в сводке возвращения.
-        if (captureHeard(p.owner, p.from, ME))
-          note(
-            t('log.capture', {
-              who: NAME[p.owner as string] ?? (p.owner as string),
-              at: placeName(p.planetId as string),
-            }),
-            p.planetId as string,
-          );
-        // Вспышка и память разведки — по видимости, а не по участию (правило 3):
-        // перекраска видимого мира — наблюдение на карте, за туманом не мигает ничего.
-        if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
-          // light the flipped province up in its new owner's colour (fog-gated: only
-          // a capture we may see flashes) — re-capture restarts the wave.
-          captureFlashes.set(p.planetId as string, {
-            owner: p.owner as string,
-            at: performance.now(),
-          });
-          // Захват, который игрок ВИДЕЛ, — это знание: записать его в память разведки.
-          // Иначе потерянная провинция тем же кадром уходила в туман, заливка брала
-          // владельца из снимка кадром раньше, и мир Роя оставался цвета игрока
-          // (замечание владельца 2026-09-25: «прошла анимация перекраски — и всё равно зелёная»).
-          rememberScan([p.planetId as string]);
-        }
-        // Тоже ВНЕ проверки видимости (`gainNews.ts`, правило 5): захват за туманом
-        // всё равно сдвигает счёт держав, и ростер обязан сходиться с состоянием.
-        if (gainRepaint('capture').roster && diploOpen && diploTab === 'diplo') renderDiplo();
-        break;
-      case 'diplomacy.changed': {
-        const a = p.a as string;
-        const b = p.b as string;
-        const st = p.stance as DiplomaticStance;
-        const na = NAME[a] ?? a;
-        const nb = NAME[b] ?? b;
-        // Кому адресована дипломатия — `diploAudience.ts` (REFM-182): у треда две
-        // стороны, и чужой паре в нём места нет; у войны свой текст. Адрес треда
-        // сохранён как есть — расхождение 2 в шапке модуля.
-        if (diploConcernsMe(a, b, ME)) {
-          const thread = stanceThread(a, b);
-          pushMsg(
-            thread.key,
-            st === 'war'
-              ? t(stanceKey(st), { a: na, b: nb })
-              : t(stanceKey(st), { a: na, b: nb, stance: stanceRu(st).toLowerCase() }),
-            true,
-            thread.from,
-          );
-          // YAG-7.3 (решение владельца 2026-09-25): в забеге Sector Zero строки ленты нет.
-          // Противник там один — Рой, и его объявление войны на старте штурма повторяло
-          // «Экспедиция начата — Рой уже идёт» служебной строкой с именем фракции игрока.
-          // Реплика в треде дипломатии выше остаётся.
-          if (!sectorRunActive) note(`${na} → ${nb}: ${stanceRu(st)}`);
-        }
-        if (diploOpen && diploTab === 'diplo') renderDiplo();
-        break;
-      }
-      case 'diplomacy.offered': {
-        const from = p.from as string;
-        const to = p.to as string;
-        const st = p.stance as DiplomaticStance;
-        // Кому адресовано предложение — `diploAudience.ts` (REFM-182): своё исходящее
-        // объявляется, только если ответа надо ЖДАТЬ (бот отвечает в той же пачке, и
-        // строка «отправлено» у него живёт долю секунды и читается как сбой).
-        const heard = offerAudience(from, to, ME, isAiSeat(to));
-        if (heard === 'incoming') {
-          note(
-            t('log.diplo.offer', {
-              who: NAME[from] ?? from,
-              stance: stanceRu(st),
-            }),
-          );
-          pushMsg(from, t('log.diplo.offer.short', { stance: stanceRu(st) }), true, from);
-        } else if (heard === 'sent') {
-          note(
-            t('log.diplo.sent', {
-              who: NAME[to] ?? to,
-              stance: stanceRu(st),
-            }),
-          );
-        }
-        if (offerUnread(heard)) markUnread();
-        if (diploOpen && diploTab === 'diplo') renderDiplo();
-        break;
-      }
-      case 'diplomacy.declined': {
-        const from = p.from as string;
-        const to = p.to as string;
-        const st = p.stance as DiplomaticStance;
-        // Отказ читает только предлагавший (`diploAudience.ts`, правило 5): отклонившему
-        // сообщать нечего — он сам только что нажал «отказать».
-        if (declineHeard(from, ME)) {
-          pushMsg(
-            to,
-            t('log.diplo.rejected', {
-              who: NAME[to] ?? to,
-              stance: stanceRu(st),
-            }),
-            true,
-            to,
-          );
-          note(t('log.diplo.rejected.short', { who: NAME[to] ?? to, stance: stanceRu(st) }));
-        }
-        if (diploOpen && diploTab === 'diplo') renderDiplo();
-        break;
-      }
-      // RECAP-FOG. Стройка и производство ДРУГОГО игрока в мой журнал не попадают —
-      // а журнал и есть источник сводки возвращения (`buildRecap`), так что чужая
-      // экономика утекала и в дайджест, и в пуш. Сводка — про МОЮ империю; чужое
-      // строительство я узнаю разведкой, а не уведомлением.
-      // Что говорит каждое из трёх событий стройки — `buildLog.ts` (REFM-175): «улучшено»
-      // называет УРОВЕНЬ, якорь на мир несёт только РАЗРУШЕНИЕ (взрыв — происшествие, к
-      // которому игрок прыгнет камерой), а зенитки включает только готовая крепость.
-      // Гейт `admits('<тип>')` намеренно стоит В КАЖДОМ case отдельной строкой: его
-      // сторожит опись в `recapGate.test.ts`, и общий `admits(e.type, …)` её обходит.
-      case 'building.constructed':
-        if (!admits('building.constructed', p)) break;
-        tellBuild('constructed', p);
-        noticeFlash(s.planets[p.planetId as string]?.position); // UIX-4.1: малая вспышка
-        break;
-      case 'building.upgraded':
-        if (!admits('building.upgraded', p)) break;
-        tellBuild('upgraded', p);
-        noticeFlash(s.planets[p.planetId as string]?.position);
-        break;
-      // Разрушение — исключение по туману: своё узнаю всегда, чужое лишь там, где ВИЖУ
-      // (тот же фог-гейт, что у `aa.fired`). Взрыв на наблюдаемом мире — наблюдение, а
-      // не раскрытие.
-      case 'building.destroyed':
-        if (!admits('building.destroyed', p)) break;
-        tellBuild(p.cleared === true ? 'cleared' : 'destroyed', p);
-        break;
-      case 'unit.built':
-        if (!admits('unit.built', p)) break;
-        note(`🛠️ ${p.count}× ${displayUnit(p.unit as string)} · ${placeName(p.planetId as string)}`);
-        break;
-      case 'army.load.cancelled':
-        // AUDM-4: вылет снял идущую погрузку. Своё — чужая погрузка это разведданные.
-        if (!admits('army.load.cancelled', p)) break;
-        note(
-          t('log.army.load-cancelled', {
-            n: String(p.count),
-            u: displayUnit(p.unit as string),
-            at: placeName(p.planetId as string),
-          }),
-          p.planetId as string,
-        );
-        break;
-      case 'army.unload.cancelled':
-        // AUDM-4 и для выгрузки (MSB-9): вылет снял идущую выгрузку, десант остался на борту.
-        if (!admits('army.unload.cancelled', p)) break;
-        note(
-          t('log.army.unload-cancelled', {
-            n: String(p.count),
-            u: displayUnit(p.unit as string),
-            at: placeName(p.planetId as string),
-          }),
-          p.planetId as string,
-        );
-        break;
-      case 'assault.landing':
-        // MSB-9: высадка идёт полтора часа, и прилёт врага её срывает — защитнику нужно
-        // узнать о ней сразу, иначе ответить нечем. Видна всем, кто видит мир.
-        if (!admits('assault.landing', p)) break;
-        note(
-          t('log.assault.landing', {
-            at: placeName(p.planetId as string),
-            t: timeLeft(p.doneAt as number),
-          }),
-          p.planetId as string,
-        );
-        break;
-      case 'assault.interrupted':
-        if (!admits('assault.interrupted', p)) break;
-        note(t('log.assault.interrupted', { at: placeName(p.planetId as string) }), p.planetId as string);
-        break;
-      // UIX-4.1: свой флот дошёл — малая вспышка на месте (скилл `mobile-game-feel`). Стоянка
-      // в точке дороги (`fleet.parked`) — тот же приход, только не в мир. Чужой приход —
-      // не моя новость: его видно по самому флоту.
-      case 'fleet.arrived':
-      case 'fleet.parked': {
-        const fleet = s.fleets[p.fleetId as string];
-        if (fleet?.owner === ME) noticeFlash(fleetPos(fleet));
-        break;
-      }
-      case 'fleet.launched':
-        // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
-        // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).
-        if (!admits('fleet.launched', p)) break;
-        note(
-          t('log.fleet.launched', {
-            who: NAME[p.owner as string] ?? (p.owner as string),
-            at: placeName(p.planetId as string),
-          }),
-        );
-        break;
-      case 'aa.fired': {
-        const planet = s.planets[p.planetId as string];
-        if (!planet || !known(p.planetId as string)) break; // fogged flak stays unseen
-        // Концы дуги и предел очереди — `fireEffects.ts` (REFM-178): жертва могла погибнуть
-        // ЭТИМ же залпом (ядро издаёт событие после урона), и тогда вспышка встаёт над
-        // своей орбитой — беззвучно пропавший залп читался бы как «ПКО не сработало».
-        const target = s.fleets[p.fleetId as string];
-        aaShots.push({
-          from: { ...planet.position },
-          to: aaImpact(target && fleetPos(target), planet.position),
-          at: performance.now(),
-          tier: flakTier(p.tier === 'close'),
-        });
-        capShots(aaShots, AA_SHOTS_MAX);
-        break;
-      }
-      // ВСТРЕЧНЫЙ ПЕРЕХВАТ (SHU-1.3) — база подняла дежурное звено навстречу чужому
-      // вылету. На карте это ТРЕТИЙ тир огня (`flakTiers.ts`), а не зенитка: спутав их,
-      // игрок решит, что его прикрывает пушка, тогда как тратится топливо порта.
-      // Концы берутся СЕЙЧАС (правило 1 `fireEffects.ts`): вылет мог быть сбит этим же
-      // подъёмом, и тогда вспышка встаёт над орбитой самой базы — молча пропавший
-      // перехват читался бы как «звено не взлетело».
-      case 'shuttle.intercepted': {
-        const base = { kind: p.baseKind, id: p.baseId } as StrikeBase;
-        // Перехват ИЗ ПАТРУЛЯ (SHU-6.3) бьёт из круга, а не с базы: `patrolId` — вылет,
-        // который стрелял, и залп выходит из его точки. Иначе — с базы, как подъём звена.
-        const patrol = typeof p.patrolId === 'string' ? strikeWorldPos(p.patrolId) : null;
-        const home = patrol ?? strikeBasePos(base); // одна функция на «где база» — и здесь, и у трассы
-        if (!home) break;
-        const carrier = base.kind === 'fleet' ? s.fleets[base.id] : undefined;
-        const node = base.kind === 'planet' ? base.id : carrier ? fleetNode(carrier) : null;
-        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), known(node))) break;
-        aaShots.push({
-          from: { ...home },
-          to: aaImpact(strikeWorldPos(p.strikeId as string), home),
-          at: performance.now(),
-          tier: 'intercept',
-        });
-        capShots(aaShots, AA_SHOTS_MAX);
-        break;
-      }
-      // КОРАБЕЛЬНОЕ ПВО (AUD-17) — четвёртый тир огня (`flakTiers.ts`, правило 6). Ядро
-      // давно издавало `pd.fired`, но его никто не слушал: зенитка МИРА рисовалась, а
-      // эскорт стрелял невидимо, и сбитые им машины исчезали будто сами. Концы и гейт —
-      // как у перехвата: старт у корабля, удар по вылету СЕЙЧАС (правило 1
-      // `fireEffects.ts` — вылет мог погибнуть этим же залпом, и тогда вспышка встаёт над
-      // самим кораблём), видно своё и чужое на опознанном узле.
-      case 'pd.fired': {
-        const ship = s.fleets[p.fleetId as string];
-        const from = ship ? fleetPos(ship) : null;
-        if (!ship || !from) break;
-        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), fleetKnown(ship)))
-          break;
-        aaShots.push({
-          from: { ...from },
-          to: aaImpact(strikeWorldPos(p.strikeId as string), from),
-          at: performance.now(),
-          tier: 'pointDefense',
-        });
-        capShots(aaShots, AA_SHOTS_MAX);
-        break;
-      }
-      // УДАР ШАТТЛОВ ПО ЦЕЛИ (SHU-6.11, `decisions/shuttleHit.ts`) — и налёт по прибытии, и
-      // каждый тик патруля. Пятый тир огня (`flakTiers.ts`, правило 7): трасса из видимого
-      // источника и вспышка у цели. Концы — СЕЙЧАС, как у зениток (правило 1
-      // `fireEffects.ts`): добитый этим ударом флот из мира уже ушёл, и вспышка встаёт над
-      // узлом, где он стоял. Жертве — строка в журнале, одна на налёт по цели.
-      case 'shuttle.hit': {
-        const hit = {
-          strikeId: p.strikeId as string,
-          owner: p.owner as string,
-          targetId: p.targetId as string,
-          targetOwner: p.targetOwner as string | null | undefined,
-        };
-        const planet = s.planets[hit.targetId];
-        const fleet = planet ? undefined : s.fleets[hit.targetId];
-        const node = planet
-          ? hit.targetId
-          : fleet
-            ? fleetNode(fleet)
-            : (p.location as string) || null;
-        const targetKnown = planet ? known(hit.targetId) : fleet ? fleetKnown(fleet) : known(node);
-        const view = shuttleHitView(hit, ME, targetKnown, announcedHits);
-        if (!view.show) break;
-        // Флот — в его значок на орбите, а не в центр мира: удар пришёлся по кораблям.
-        const anchor = fleet ? fleetAnchor(fleet) : null;
-        const to = planet
-          ? planet.position
-          : anchor
-            ? unworld(anchor)
-            : node
-              ? s.planets[node]?.position
-              : null;
-        if (to) {
-          // Свой вылет — из его точки, чужой — только из патруля, который я вижу (правило 3).
-          const from =
-            hit.owner === ME
-              ? strikeWorldPos(hit.strikeId)
-              : seenPatrolOver(vision?.seenPatrols ?? [], hit.owner, to);
-          aaShots.push({
-            from: { ...(from ?? to) },
-            to: { ...to },
-            at: performance.now(),
-            tier: 'strike',
-          });
-          capShots(aaShots, AA_SHOTS_MAX);
-        }
-        if (view.journal) {
-          announcedHits.add(hitKey(hit));
-          note(
-            t('log.shuttle.hit', {
-              what: planet ? placeName(hit.targetId) : fleetTitleOf(hit.targetId),
-            }),
-            node ?? undefined,
-          );
-        }
-        break;
-      }
-      // ROS-2.2 — ответка по челнокам в момент удара. Две точки зрения на одно
-      // событие, и обе нужны: свои машины сбили — это счёт за налёт, свои зенитки
-      // отработали — это то, ради чего их и строили. Чужую ответку по чужим челнокам
-      // журнал не показывает: она не про меня.
-      case 'shuttle.repelled': {
-        const mine = p.owner === ME;
-        if (!mine && p.targetOwner !== ME) break;
-        if ((p.downed as number) <= 0) break; // залп был, машин не сбил — строка ни о чём
-        note(
-          t(mine ? 'log.shuttle.repelled.mine' : 'log.shuttle.repelled.theirs', {
-            n: p.downed as number,
-            at: placeName(p.targetId as string),
-          }),
-        );
-        break;
-      }
-      // Ракету сбили челноки (SM-3.7b): одна строка обеим сторонам, как у перехвата ПРО.
-      // `fleet.destroyed` следом помечен `spent` — «флот уничтожен» о ней не пишется.
-      case 'shuttle.missileDowned':
-        if (p.owner === ME || p.playerId === ME) note(t('log.shuttle.missile-downed'));
-        break;
-      // «Держать патруль» снят ядром (SHU-6.6): помеха сама не пройдёт — эскадра больше не
-      // висит, точка за радиусом. Без строки игрок ждал бы патруль над базой, который уже
-      // не встанет, и не знал бы почему.
-      case 'shuttle.hold.ended':
-        if (p.owner !== ME) break;
-        note(
-          t('log.shuttle.hold-ended', {
-            name: squadronCallsignOf(p.squadronId as string),
-            why: errText(p.code as string),
-          }),
-          p.baseKind === 'planet' ? (p.baseId as string) : undefined,
-        );
-        break;
-      case 'market.bought':
-        // Сделка слышна обеим сторонам, и сторона выбирает СЛОВО, а не знак числа —
-        // `fleetNews.ts` (REFM-181): «купил» и «продал» это разные события в голове.
-        if (tradeHeard(p.buyer, p.seller, ME))
-          note(
-            t('log.market.trade', {
-              n: String(p.amount),
-              res: TECH_CUR[p.resource as string] ?? tData(p.resource as string),
-              paid: String(p.paid ?? '?'),
-              side: t(tradeSide(p.buyer, ME)),
-            }),
-          );
-        break;
-      case 'fleet.merged':
-        if (reorgHeard(p.owner, ME)) note(t(reorgKey('merged'), { at: placeName(p.at as string) }));
-        break;
-      case 'fleet.split':
-        // Чужую реорганизацию наблюдать нечем — на карте виден значок, а не то, что
-        // два соединения свели в одно (`fleetNews.ts`, правило 2). В пути места нет.
-        if (reorgHeard(p.owner, ME))
-          note(typeof p.at === 'string' ? t(reorgKey('split'), { at: placeName(p.at) }) : t('log.fleet.split-transit'));
-        {
-          const pick = splitSelectTarget(splitAwait, p, ME);
-          if (pick) {
-            splitAwait = null;
-            setFleetSelection([pick]);
-          }
-        }
-        break;
-      // AUD-16: герой больше не гибнет молча. Только свой — в сети геройские события и
-      // так строго адресны владельцу, соло повторяет тот же фильтр (`heroNews.ts`).
-      case 'hero.died':
-        tellHero(
-          heroDiedNews(p, s.heroes?.[p.heroId as string], ME, s.time, (id) => !!s.planets[id]),
-        );
-        break;
-      case 'hero.respawned':
-        tellHero(heroRespawnedNews(p, ME, (id) => !!s.planets[id]));
-        break;
-      // PVR-4.7: босс — часть штурма, и забег объявляет его, как объявляет волны. Имя —
-      // ключом по архетипу: у каждой фразы свой падеж, подстановкой его не собрать.
-      case 'pve.boss.spawned':
-      case 'pve.boss.slain':
-        note(t(`boss.${p.hero as string}.${e.type === 'pve.boss.spawned' ? 'spawned' : 'slain'}`));
-        break;
-      // Глава IV (PVR-7.5): встреча с союзником — связь, общий обзор и приказы. Чип «⬡
-      // Союзник» мигает несколько секунд: сама встреча и есть приглашение открыть связь.
-      case 'ally.contact':
-        if (p.owner !== ME) break;
-        note(t('ally.contact.note'));
-        allyPulseUntil = performance.now() + 12_000;
-        break;
-      // Глава VI (PVR-8.4, §8.4): доки найдены — своим зрением или зрением союзника. Живой
-      // сигнал общины; адресат — тот, кто получил сведения (`owner`).
-      case 'refuge.found':
-        if (p.owner === ME) note(t('refuge.signal'), p.at as string);
-        break;
-      case 'ally.order.done':
-      case 'ally.order.lost':
-        if (p.by !== ME) break;
-        note(t(e.type === 'ally.order.done' ? 'ally.done' : 'ally.lost'));
-        break;
-      case 'extraction.completed':
-        if (p.owner === ME) note(t('chain.carrier-warning'));
-        break;
-      // Глава V (PVR-9.5): пленный взят или потерян. Доставку объявляет страница комикса.
-      case 'captive.taken':
-        note(t(p.by === ME ? 'captive.taken.note' : 'captive.taken.ally'));
-        break;
-      case 'captive.lost':
-        note(t('captive.lost.note'));
-        break;
-      // PVR-4.7: осада «Поглощения мира» над СВОИМ миром — начало, срыв и гибель мира. Фраза —
-      // по архетипу героя, как у появления босса; отсчёт — тем же часам, что у волн.
-      case 'hero.siege.started':
-      case 'hero.siege.broken':
-      case 'hero.siege.done': {
-        if (p.victim !== ME) break;
-        const arch = s.heroes?.[p.heroId as string]?.archetype;
-        if (!arch) break;
-        const phrase =
-          e.type === 'hero.siege.started' ? 'siege' : e.type === 'hero.siege.done' ? 'devoured' : 'siege-broken';
-        const world = placeName(p.target as string);
-        note(t(`boss.${arch}.${phrase}`, { world, in: countdownHMS((p.until as number) - s.time) }));
-        break;
-      }
-      case 'fleet.destroyed':
-        // Слышит только владелец флота, как в сети (`fleetNews.ts`, правило 4, решение
-        // владельца 2026-10-06): чужая гибель — раскрытие информации.
-        if (destroyHeard(p, ME))
-          note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
-        break;
-      // Тёмное событие (`data/events.json`). Гейт СВОЙ, а не общий `admits()`: тот читает
-      // `p.owner`, а здесь адресат приезжает как `playerId` — чужая аномалия прошла бы
-      // мимо проверки и утекла бы ко мне в журнал вместе с чужой экономикой.
-      // Подстановки берутся из `params` правила: карта `resources` даёт по ключу на
-      // ресурс (`{metal}`), одиночная пара — `{n}`. Знак несёт сама строка локали, поэтому
-      // в подстановку едет модуль: «сожгла 60 энергии», а не «сожгла −60».
-      case 'effect.applied': {
-        if (p.playerId !== ME) break;
-        const params = data.events[p.ruleId as string]?.params ?? {};
-        const bundle = params['resources'];
-        const amount = params['amount'];
-        const vars =
-          typeof bundle === 'object' && bundle !== null && !Array.isArray(bundle)
-            ? Object.fromEntries(
-                Object.entries(bundle).map(([res, v]) => [res, Math.abs(Number(v) || 0)]),
-              )
-            : { n: Math.abs(Number(amount) || 0) };
-        note(
-          t(`event.${(p.ruleId as string).replace(/_/g, '-')}`, vars),
-          p.planetId as string | undefined,
-        );
-        break;
-      }
-      // EVT-2: трофеи с поля боя. Гейт тот же, что у тёмного события, и по той же
-      // причине: адресат приезжает как `playerId`, а чужая добыча — чужая экономика.
-      // Мешок печатается значками (`costText`), а не прозой: склонять «20 металла /
-      // 4 кредита» пришлось бы в коде, а ресурсы задаются данными и список открыт.
-      case 'salvage.paid': {
-        if (p.playerId !== ME) break;
-        const bag = p.resources as Record<string, number> | undefined;
-        if (!bag || Object.keys(bag).length === 0) break;
-        note(t('log.salvage', { what: costText(bag) }), p.location as string | undefined);
-        break;
-      }
-      // SM-3.5: мины сработали. Жертва и хозяин поля видят сообщение и вспышку на узле;
-      // остальным поле неизвестно, и срабатывание тоже.
-      case 'mines.triggered': {
-        const at = p.at as string;
-        const victim = p.owner === ME;
-        if (!victim && !(p.by as string[] | undefined)?.includes(ME)) break;
-        note(t(victim ? 'log.mines.hit' : 'log.mines.triggered', { n: Number(p.lost) || 0 }), at);
-        mineFlashes.set(at, { at: performance.now(), position: p.position as { x: number; y: number } | undefined });
-        break;
-      }
-      case 'unit.died': {
-        // Счёт и ведомость наполняются по РАЗНЫМ условиям — `warTally.ts` (REFM-180):
-        // счёт это личная статистика (только мои бои), ведомость питает строку ленты,
-        // а чужой бой на опознанном узле игрок видит и о цене исхода читает.
-        const at = p.at as string;
-        if (myBattleLocs.has(at)) killStats = tallyDeath(killStats, p.owner, ME, p.count);
-        // Бой блока зрения на неопознанном узле — и мгновенный — платит ведомость той же
-        // видимостью, что его начало и итог, иначе строка итога выходит без потерь
-        // (замечание Codex на #1418).
-        const lossSeen = battleEngaged(p.battleId) || flashSeen(p.battleId);
-        if (seenTail(myBattleLocs.has(at), known(at) || lossSeen)) {
-          battleLosses.set(
-            at,
-            recordLoss(battleLosses.get(at), p.owner, p.unit as string, p.count),
-          );
-        }
-        break;
-      }
-    }
-  }
-}
-
-// Walk-in capture (undefended, uncontested, capturable sector) is now a kernel
-// rule — `captureOnArrivalModule` — so it applies on the authoritative server and
-// in single-player alike; the resulting `planet.captured` event is noted above.
 
 // --- red AI ------------------------------------------------------------------
 // Ходы ИИ, авто-штурм, столкновения флотов, авто-отступление и цепочки приказов живут в
@@ -12153,19 +11445,14 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeI
   additive = false;
   if (chainMode) exitChainMode(); // режим «Приказ» не переживает смену матча
   chainRouteCache.clear(); // маршруты принадлежат карте СТАРОГО матча
-  killStats = { destroyed: 0, lost: 0 };
-  myBattleLocs.clear();
-  engagedBattleIds.clear(); // id боёв (`battle:0`…) повторяются от матча к матчу (замечание Codex на #1417)
+  resetEventFeed(); // журнал, сводка возвращения и память боёв — у владельца ленты (REFM-230)
   resetFogMemory(); // fog memory belongs to the OLD match — and its vision was written into it
   worldMemo = null;
   radarMemory.clear();
   threatMemory.clear(); // node ids repeat across matches — a stale episode must not mute a real alert
   threatScanAt = -1;
   refugeReported.clear(); // id флотов карты повторяются от забега к забегу
-  battleLosses.clear();
   aaShots.length = 0;
-  logLines.length = 0; // fresh log — drop notes from the menu-background match
-  eventLog.length = 0; // ONB-5: the return digest belongs to THIS match only
   awayFromGameTime = null; // reset the away-window baseline for the new match
   banner = null; // clear any end-banner left by the menu-background match (else it sticks)
   endScreen = null; // a fresh match must not open into the previous result
