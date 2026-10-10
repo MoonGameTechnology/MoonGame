@@ -1,0 +1,2192 @@
+[
+  {
+    "elapsedSeconds": 11.631,
+    "clients": 40,
+    "open": 40,
+    "commands": 200,
+    "acknowledgements": 200,
+    "hashChecks": 915,
+    "hashMismatches": 0,
+    "bytes": 2656408,
+    "messages": 4720,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 0B",
+      "CPUPerc": "13.47%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "22.84%",
+      "MemUsage": "233.9MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "2.18MB / 80.1MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": true,
+      "alerts": [],
+      "players": {
+        "joins": 40,
+        "leaves": 0,
+        "connected": 40
+      },
+      "actions": {
+        "total": 260,
+        "ok": 260,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 68,
+          "max": 185.0088839999953
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 137.34736899999552
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 23.245,
+    "clients": 40,
+    "open": 40,
+    "commands": 400,
+    "acknowledgements": 400,
+    "hashChecks": 1075,
+    "hashMismatches": 0,
+    "bytes": 3973048,
+    "messages": 7160,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "16.37%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.26%",
+      "MemUsage": "238.2MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "2.47MB / 102MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": true,
+      "alerts": [],
+      "players": {
+        "joins": 40,
+        "leaves": 0,
+        "connected": 40
+      },
+      "actions": {
+        "total": 460,
+        "ok": 460,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 77,
+          "max": 197.45283200000995
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 137.34736899999552
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 34.83,
+    "clients": 40,
+    "open": 40,
+    "commands": 600,
+    "acknowledgements": 600,
+    "hashChecks": 1227,
+    "hashMismatches": 0,
+    "bytes": 5267212,
+    "messages": 9560,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "18.13%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.39%",
+      "MemUsage": "239.5MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "2.76MB / 123MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": true,
+      "alerts": [],
+      "players": {
+        "joins": 40,
+        "leaves": 0,
+        "connected": 40
+      },
+      "actions": {
+        "total": 660,
+        "ok": 660,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 79,
+          "max": 197.45283200000995
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 137.34736899999552
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 46.464,
+    "clients": 40,
+    "open": 40,
+    "commands": 800,
+    "acknowledgements": 800,
+    "hashChecks": 1387,
+    "hashMismatches": 0,
+    "bytes": 6573573,
+    "messages": 11980,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "13.57%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.43%",
+      "MemUsage": "239.9MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "3.05MB / 145MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": true,
+      "alerts": [],
+      "players": {
+        "joins": 40,
+        "leaves": 0,
+        "connected": 40
+      },
+      "actions": {
+        "total": 860,
+        "ok": 860,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 82,
+          "max": 197.45283200000995
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 137.34736899999552
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 58.102,
+    "clients": 40,
+    "open": 40,
+    "commands": 1000,
+    "acknowledgements": 1000,
+    "hashChecks": 1539,
+    "hashMismatches": 0,
+    "bytes": 7892175,
+    "messages": 14420,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "10.96%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.57%",
+      "MemUsage": "241.3MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "3.33MB / 166MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": true,
+      "alerts": [],
+      "players": {
+        "joins": 40,
+        "leaves": 0,
+        "connected": 40
+      },
+      "actions": {
+        "total": 1060,
+        "ok": 1060,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 83,
+          "max": 197.45283200000995
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 137.34736899999552
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 69.659,
+    "clients": 40,
+    "open": 40,
+    "commands": 1200,
+    "acknowledgements": 1200,
+    "hashChecks": 1689,
+    "hashMismatches": 0,
+    "bytes": 9187364,
+    "messages": 16820,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "7.83%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.64%",
+      "MemUsage": "242MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "3.62MB / 188MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 287.92587499998626ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 40,
+        "leaves": 0,
+        "connected": 40
+      },
+      "actions": {
+        "total": 1260,
+        "ok": 1260,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 84,
+          "max": 287.92587499998626
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 81.218,
+    "clients": 40,
+    "open": 40,
+    "commands": 1400,
+    "acknowledgements": 1400,
+    "hashChecks": 1846,
+    "hashMismatches": 0,
+    "bytes": 10505056,
+    "messages": 19260,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "10.04%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.62%",
+      "MemUsage": "241.9MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "3.91MB / 209MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 287.92587499998626ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 40,
+        "leaves": 0,
+        "connected": 40
+      },
+      "actions": {
+        "total": 1460,
+        "ok": 1460,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 82,
+          "max": 287.92587499998626
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 92.775,
+    "clients": 40,
+    "open": 40,
+    "commands": 1600,
+    "acknowledgements": 1600,
+    "hashChecks": 2001,
+    "hashMismatches": 0,
+    "bytes": 11823212,
+    "messages": 21700,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "9.14%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.68%",
+      "MemUsage": "242.4MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "4.21MB / 231MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 287.92587499998626ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 1663,
+        "ok": 1663,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 82,
+          "max": 287.92587499998626
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 104.399,
+    "clients": 40,
+    "open": 40,
+    "commands": 1800,
+    "acknowledgements": 1800,
+    "hashChecks": 2155,
+    "hashMismatches": 0,
+    "bytes": 13142255,
+    "messages": 24140,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "10.76%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.70%",
+      "MemUsage": "242.6MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "4.5MB / 253MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 287.92587499998626ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 1863,
+        "ok": 1863,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 82,
+          "max": 287.92587499998626
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 115.991,
+    "clients": 40,
+    "open": 40,
+    "commands": 2000,
+    "acknowledgements": 2000,
+    "hashChecks": 2307,
+    "hashMismatches": 0,
+    "bytes": 14437644,
+    "messages": 26540,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "24.47%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.67%",
+      "MemUsage": "242.4MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "4.78MB / 275MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 287.92587499998626ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 2063,
+        "ok": 2063,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 83,
+          "max": 287.92587499998626
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 127.642,
+    "clients": 40,
+    "open": 40,
+    "commands": 2200,
+    "acknowledgements": 2200,
+    "hashChecks": 2462,
+    "hashMismatches": 0,
+    "bytes": 15754967,
+    "messages": 28980,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "10.84%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.77%",
+      "MemUsage": "243.4MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "5.07MB / 296MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 287.92587499998626ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 2263,
+        "ok": 2263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 82,
+          "max": 287.92587499998626
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 139.243,
+    "clients": 40,
+    "open": 40,
+    "commands": 2400,
+    "acknowledgements": 2400,
+    "hashChecks": 2619,
+    "hashMismatches": 0,
+    "bytes": 17073871,
+    "messages": 31420,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 197kB",
+      "CPUPerc": "28.74%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.80%",
+      "MemUsage": "243.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "5.36MB / 317MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 287.92587499998626ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 2463,
+        "ok": 2463,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 82,
+          "max": 287.92587499998626
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 150.882,
+    "clients": 40,
+    "open": 40,
+    "commands": 2600,
+    "acknowledgements": 2600,
+    "hashChecks": 2780,
+    "hashMismatches": 0,
+    "bytes": 18393681,
+    "messages": 33860,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "15.01%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.82%",
+      "MemUsage": "243.9MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "5.66MB / 339MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 304.90971399997943ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 2663,
+        "ok": 2663,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 83,
+          "max": 304.90971399997943
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 162.578,
+    "clients": 40,
+    "open": 40,
+    "commands": 2800,
+    "acknowledgements": 2800,
+    "hashChecks": 2932,
+    "hashMismatches": 0,
+    "bytes": 19644325,
+    "messages": 36180,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "11.19%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.77%",
+      "MemUsage": "243.4MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "5.93MB / 361MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 304.90971399997943ms (server is slow under load)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 2863,
+        "ok": 2863,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 84,
+          "max": 304.90971399997943
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 150.3369829999865
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 175.52,
+    "clients": 40,
+    "open": 40,
+    "commands": 3000,
+    "acknowledgements": 3000,
+    "hashChecks": 3107,
+    "hashMismatches": 0,
+    "bytes": 20848250,
+    "messages": 38420,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "141.25%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "23.81%",
+      "MemUsage": "243.8MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "6.2MB / 381MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 353.95756900002016ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 3063,
+        "ok": 3063,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 92,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 353.95756900002016
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 187.23,
+    "clients": 40,
+    "open": 40,
+    "commands": 3200,
+    "acknowledgements": 3200,
+    "hashChecks": 3264,
+    "hashMismatches": 0,
+    "bytes": 22103469,
+    "messages": 40750,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "8.72%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.01%",
+      "MemUsage": "245.8MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "6.5MB / 405MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 353.95756900002016ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 3263,
+        "ok": 3263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 94,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 353.95756900002016
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 198.798,
+    "clients": 40,
+    "open": 40,
+    "commands": 3400,
+    "acknowledgements": 3400,
+    "hashChecks": 3407,
+    "hashMismatches": 0,
+    "bytes": 23422011,
+    "messages": 43190,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "21.03%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.05%",
+      "MemUsage": "246.2MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "6.78MB / 426MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 353.95756900002016ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 3463,
+        "ok": 3463,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 93,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 353.95756900002016
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 210.363,
+    "clients": 40,
+    "open": 40,
+    "commands": 3600,
+    "acknowledgements": 3600,
+    "hashChecks": 3566,
+    "hashMismatches": 0,
+    "bytes": 24740448,
+    "messages": 45630,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "8.70%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.03%",
+      "MemUsage": "246.1MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "7.08MB / 447MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 353.95756900002016ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 3663,
+        "ok": 3663,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 91,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 353.95756900002016
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 221.947,
+    "clients": 40,
+    "open": 40,
+    "commands": 3800,
+    "acknowledgements": 3800,
+    "hashChecks": 3718,
+    "hashMismatches": 0,
+    "bytes": 26059709,
+    "messages": 48070,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "15.33%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.06%",
+      "MemUsage": "246.3MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "7.36MB / 468MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 353.95756900002016ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 3863,
+        "ok": 3863,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 89,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 353.95756900002016
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 233.51,
+    "clients": 40,
+    "open": 40,
+    "commands": 4000,
+    "acknowledgements": 4000,
+    "hashChecks": 3874,
+    "hashMismatches": 0,
+    "bytes": 27356846,
+    "messages": 50470,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "8.99%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.04%",
+      "MemUsage": "246.2MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "7.65MB / 490MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 353.95756900002016ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 4063,
+        "ok": 4063,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 88,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 353.95756900002016
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 245.074,
+    "clients": 40,
+    "open": 40,
+    "commands": 4200,
+    "acknowledgements": 4200,
+    "hashChecks": 4027,
+    "hashMismatches": 0,
+    "bytes": 28632029,
+    "messages": 52830,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "6.99%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.00%",
+      "MemUsage": "245.8MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "7.94MB / 511MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 4263,
+        "ok": 4263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 89,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 256.682,
+    "clients": 40,
+    "open": 40,
+    "commands": 4400,
+    "acknowledgements": 4400,
+    "hashChecks": 4185,
+    "hashMismatches": 0,
+    "bytes": 29930514,
+    "messages": 55230,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 1.32MB",
+      "CPUPerc": "8.10%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.05%",
+      "MemUsage": "246.3MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "8.23MB / 533MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 4463,
+        "ok": 4463,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 89,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 268.25,
+    "clients": 40,
+    "open": 40,
+    "commands": 4600,
+    "acknowledgements": 4600,
+    "hashChecks": 4339,
+    "hashMismatches": 0,
+    "bytes": 31251988,
+    "messages": 57670,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "6.61%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.07%",
+      "MemUsage": "246.4MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "8.51MB / 554MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 4663,
+        "ok": 4663,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 88,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 279.83,
+    "clients": 40,
+    "open": 40,
+    "commands": 4800,
+    "acknowledgements": 4800,
+    "hashChecks": 4487,
+    "hashMismatches": 0,
+    "bytes": 32571549,
+    "messages": 60110,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "17.48%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.04%",
+      "MemUsage": "246.2MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "8.8MB / 576MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 4863,
+        "ok": 4863,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 88,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 291.436,
+    "clients": 40,
+    "open": 40,
+    "commands": 5000,
+    "acknowledgements": 5000,
+    "hashChecks": 4647,
+    "hashMismatches": 0,
+    "bytes": 33891797,
+    "messages": 62550,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "24.61%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.01%",
+      "MemUsage": "245.9MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "9.08MB / 597MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 5063,
+        "ok": 5063,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 87,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 303.049,
+    "clients": 40,
+    "open": 40,
+    "commands": 5200,
+    "acknowledgements": 5200,
+    "hashChecks": 4802,
+    "hashMismatches": 0,
+    "bytes": 35212613,
+    "messages": 64990,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "11.06%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.03%",
+      "MemUsage": "246.1MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "9.37MB / 619MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 5263,
+        "ok": 5263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 86,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 314.717,
+    "clients": 40,
+    "open": 40,
+    "commands": 5400,
+    "acknowledgements": 5400,
+    "hashChecks": 4967,
+    "hashMismatches": 0,
+    "bytes": 36466566,
+    "messages": 67310,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "39.06%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.05%",
+      "MemUsage": "246.3MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "9.66MB / 641MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 5463,
+        "ok": 5463,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 89,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 18,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 326.346,
+    "clients": 40,
+    "open": 40,
+    "commands": 5600,
+    "acknowledgements": 5600,
+    "hashChecks": 5112,
+    "hashMismatches": 0,
+    "bytes": 37702393,
+    "messages": 69590,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "25.87%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.07%",
+      "MemUsage": "246.5MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "9.94MB / 663MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 5663,
+        "ok": 5663,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 92,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 338.047,
+    "clients": 40,
+    "open": 40,
+    "commands": 5800,
+    "acknowledgements": 5800,
+    "hashChecks": 5277,
+    "hashMismatches": 0,
+    "bytes": 38979638,
+    "messages": 71940,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "8.95%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.02%",
+      "MemUsage": "246MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "10.2MB / 685MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 5863,
+        "ok": 5863,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 93,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 349.762,
+    "clients": 40,
+    "open": 40,
+    "commands": 6000,
+    "acknowledgements": 6000,
+    "hashChecks": 5427,
+    "hashMismatches": 0,
+    "bytes": 40267700,
+    "messages": 74310,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "9.80%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.48%",
+      "MemUsage": "250.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "10.5MB / 706MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 6063,
+        "ok": 6063,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 93,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 361.441,
+    "clients": 40,
+    "open": 40,
+    "commands": 6200,
+    "acknowledgements": 6200,
+    "hashChecks": 5587,
+    "hashMismatches": 0,
+    "bytes": 41555766,
+    "messages": 76680,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "12.31%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.47%",
+      "MemUsage": "250.6MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "10.8MB / 728MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 6263,
+        "ok": 6263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 93,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 373.117,
+    "clients": 40,
+    "open": 40,
+    "commands": 6400,
+    "acknowledgements": 6400,
+    "hashChecks": 5742,
+    "hashMismatches": 0,
+    "bytes": 42844171,
+    "messages": 79050,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "17.11%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.50%",
+      "MemUsage": "250.8MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "11.1MB / 749MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 6463,
+        "ok": 6463,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 94,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 384.728,
+    "clients": 40,
+    "open": 40,
+    "commands": 6600,
+    "acknowledgements": 6600,
+    "hashChecks": 5895,
+    "hashMismatches": 0,
+    "bytes": 44149814,
+    "messages": 81450,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 2.44MB",
+      "CPUPerc": "9.25%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.49%",
+      "MemUsage": "250.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "11.4MB / 771MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 6663,
+        "ok": 6663,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 94,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 396.304,
+    "clients": 40,
+    "open": 40,
+    "commands": 6800,
+    "acknowledgements": 6800,
+    "hashChecks": 6046,
+    "hashMismatches": 0,
+    "bytes": 45443401,
+    "messages": 83830,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "10.32%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.48%",
+      "MemUsage": "250.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "11.7MB / 793MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 6863,
+        "ok": 6863,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 93,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 407.911,
+    "clients": 40,
+    "open": 40,
+    "commands": 7000,
+    "acknowledgements": 7000,
+    "hashChecks": 6203,
+    "hashMismatches": 0,
+    "bytes": 46771938,
+    "messages": 86270,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "19.96%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.48%",
+      "MemUsage": "250.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "11.9MB / 814MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 7063,
+        "ok": 7063,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 93,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 419.501,
+    "clients": 40,
+    "open": 40,
+    "commands": 7200,
+    "acknowledgements": 7200,
+    "hashChecks": 6359,
+    "hashMismatches": 0,
+    "bytes": 48048883,
+    "messages": 88620,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "10.74%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.48%",
+      "MemUsage": "250.6MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "12.2MB / 836MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 7263,
+        "ok": 7263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 93,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 431.086,
+    "clients": 40,
+    "open": 40,
+    "commands": 7400,
+    "acknowledgements": 7400,
+    "hashChecks": 6507,
+    "hashMismatches": 0,
+    "bytes": 49377428,
+    "messages": 91060,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "11.16%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.48%",
+      "MemUsage": "250.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "12.5MB / 857MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 7463,
+        "ok": 7463,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 92,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 442.662,
+    "clients": 40,
+    "open": 40,
+    "commands": 7600,
+    "acknowledgements": 7600,
+    "hashChecks": 6667,
+    "hashMismatches": 0,
+    "bytes": 50706502,
+    "messages": 93500,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "6.84%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.49%",
+      "MemUsage": "250.8MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "12.8MB / 879MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 7663,
+        "ok": 7663,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 92,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 454.291,
+    "clients": 40,
+    "open": 40,
+    "commands": 7800,
+    "acknowledgements": 7800,
+    "hashChecks": 6820,
+    "hashMismatches": 0,
+    "bytes": 52035239,
+    "messages": 95940,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "8.60%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.47%",
+      "MemUsage": "250.5MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "13.1MB / 900MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 7863,
+        "ok": 7863,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 92,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 465.855,
+    "clients": 40,
+    "open": 40,
+    "commands": 8000,
+    "acknowledgements": 8000,
+    "hashChecks": 6976,
+    "hashMismatches": 0,
+    "bytes": 53363672,
+    "messages": 98380,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "16.34%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.49%",
+      "MemUsage": "250.8MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "13.4MB / 922MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 8063,
+        "ok": 8063,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 91,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  },
+  {
+    "elapsedSeconds": 477.484,
+    "clients": 40,
+    "open": 40,
+    "commands": 8200,
+    "acknowledgements": 8200,
+    "hashChecks": 7135,
+    "hashMismatches": 0,
+    "bytes": 54692512,
+    "messages": 100820,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "12.22%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.49%",
+      "MemUsage": "250.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "13.7MB / 944MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 8263,
+        "ok": 8263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 91,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    }
+  }
+]

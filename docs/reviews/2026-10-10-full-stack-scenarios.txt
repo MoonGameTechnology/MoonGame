@@ -1,0 +1,660 @@
+ONE-OFF DEDICATED DATABASE ONLY. Adapt absolute paths. No credentials supplied.
+
+
+==================== setup.mjs ====================
+import {execFileSync} from 'node:child_process';
+import {writeFileSync,readFileSync,mkdirSync,chmodSync,readdirSync} from 'node:fs';
+import {randomBytes} from 'node:crypto';
+const out='/workspace/full-stack-audit-2026-10-10', repo='/workspace/MoonGame-stack-audit-2026-10-10';
+const denv={...process.env}; for(const k of ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH'])delete denv[k];
+export function docker(args,opts={}){return execFileSync('docker',['-H','unix:///var/run/docker.sock',...args],{env:denv,encoding:'utf8',stdio:['ignore','pipe','pipe'],...opts});}
+export const names={pg:'mg-stack-pg',server:'mg-stack-server',network:'mg-stack-private',other:'mg-stack-untrusted'};
+export const node='/workspace/playtest-2026-10-09/node22/node_modules/node/bin/node';
+export const pgimage='postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea';
+if(process.argv[2]==='prepare'){
+ mkdirSync(out+'/certs',{mode:0o755});chmodSync(out+'/certs',0o755);
+ const openssl=(args)=>execFileSync('openssl',args,{stdio:'pipe'});
+ openssl(['req','-x509','-newkey','rsa:2048','-nodes','-keyout',out+'/certs/ca.key','-out',out+'/certs/ca.crt','-days','3','-subj','/CN=MoonGame audit temporary CA']);
+ for(const name of ['server','postgres','wrong']){
+  openssl(['req','-newkey','rsa:2048','-nodes','-keyout',out+'/certs/'+name+'.key','-out',out+'/certs/'+name+'.csr','-subj','/CN='+name]);
+  writeFileSync(out+'/certs/'+name+'.ext','subjectAltName=DNS:localhost,DNS:postgres,DNS:mg-stack-pg,IP:127.0.0.1\nextendedKeyUsage=serverAuth\n');
+  openssl(['x509','-req','-in',out+'/certs/'+name+'.csr','-CA',out+'/certs/ca.crt','-CAkey',out+'/certs/ca.key','-CAcreateserial','-out',out+'/certs/'+name+'.crt','-days','2','-extfile',out+'/certs/'+name+'.ext']);
+ }
+ for(const f of readdirSync(out+'/certs').filter(x=>x.endsWith('.crt')))chmodSync(out+'/certs/'+f,0o644);
+ const secret=()=>randomBytes(32).toString('hex');
+ const secrets={admin:secret(),runtime:secret(),migration:secret(),auth:secret(),metrics:secret(),password:secret(),newPassword:secret()};
+ writeFileSync(out+'/secrets.json',JSON.stringify(secrets),{mode:0o600});
+ writeFileSync(out+'/postgres.env',`POSTGRES_USER=void\nPOSTGRES_PASSWORD=${secrets.admin}\nPOSTGRES_DB=void\n`,{mode:0o600});
+ docker(['network','create','mg-stack-edge']);docker(['network','create','--internal',names.network]);docker(['network','create','--internal',names.other]);
+ docker(['run','-d','--name',names.pg,'--network',names.network,'--network-alias','postgres','--env-file',out+'/postgres.env','-p','127.0.0.1:15434:5432','--memory','512m','--pids-limit','256','--security-opt','no-new-privileges:true','--mount','type=volume,src=mg-stack-data,dst=/var/lib/postgresql/data','--mount',`type=bind,src=${out}/certs,dst=/certs`,pgimage]);
+ docker(['exec','-u','0',names.pg,'chown','65532:65532','/certs/server.key']);
+ docker(['exec','-u','0',names.pg,'chown','70:70','/certs/postgres.key']);
+ docker(['exec','-u','0',names.pg,'chmod','600','/certs/server.key','/certs/postgres.key']);docker(['exec','-u','0',names.pg,'sh','-c','cp /certs/server.key /certs/caddy.key && chown 0:0 /certs/caddy.key && chmod 600 /certs/caddy.key']);
+ console.log('Prepared isolated PostgreSQL and temporary certificates; secrets are private.');
+}
+if(process.argv[2]==='provision'){
+ const s=JSON.parse(readFileSync(out+'/secrets.json'));
+ const ip=docker(['inspect',names.pg,'--format','{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}']).trim();
+ writeFileSync(out+'/pg-ip.txt',ip);
+ execFileSync(node,['packages/server/dist/database-admin.mjs','provision'],{cwd:repo,env:{...process.env,DB_ADMIN_URL:`postgres://void:${s.admin}@${ip}:5432/void`,DB_RUNTIME_USER:'vd_app_stack',DB_RUNTIME_PASSWORD:s.runtime,DB_MIGRATION_USER:'vd_migrate_stack',DB_MIGRATION_PASSWORD:s.migration},stdio:'pipe'});
+ const cfg={HOST:'0.0.0.0',PORT:'8788',PROD:'1',GATE:'1',SEAT_LOCK:'1',MATCHES:'5',TIME_SCALE:'24',AUTH_JWT_SECRET:s.auth,METRICS_TOKEN:s.metrics,ALLOWED_ORIGINS:'https://localhost:18888',RESET_BASE_URL:'https://localhost:18888',TLS_KEY_FILE:'/certs/server.key',TLS_CERT_FILE:'/certs/server.crt',DB_AUTO_MIGRATE:'0',DB_REQUIRE_LEAST_PRIVILEGE:'1',DATABASE_URL:`postgres://vd_app_stack:${s.runtime}@postgres:5432/void`,GIT_SHA:execFileSync('git',['rev-parse','HEAD'],{cwd:repo,encoding:'utf8'}).trim()};
+ writeFileSync(out+'/server.env',Object.entries(cfg).map(([k,v])=>`${k}=${v}`).join('\n')+'\n',{mode:0o600});
+ console.log('Provisioned independent runtime/migration roles.');
+}
+export function runServer(name=names.server,envfile=out+'/server.env',port='18888'){
+ docker(['create','--name',name,'--network','mg-stack-edge','--env-file',envfile,'-p',`127.0.0.1:${port}:8788`,'--memory','1g','--pids-limit','512','--cap-drop','ALL','--security-opt','no-new-privileges:true','--restart','unless-stopped','--mount',`type=bind,src=${out}/certs,dst=/certs,readonly`,'--mount',`type=volume,src=mg-stack-logs,dst=/app/playtest-logs`,'moongame-stack-audit:2026-10-10']);
+ docker(['network','connect',names.network,name]);return docker(['start',name]);
+}
+if(process.argv[2]==='start')console.log(runServer());
+
+==================== helpers.mjs ====================
+import https from 'node:https';import tls from 'node:tls';import {readFileSync,writeFileSync} from 'node:fs';import {createRequire} from 'node:module';
+const repo='/workspace/MoonGame-stack-audit-2026-10-10';export const out='/workspace/full-stack-audit-2026-10-10';export const secrets=JSON.parse(readFileSync(out+'/secrets.json'));export const ca=readFileSync(out+'/certs/ca.crt');
+export const require=createRequire(repo+'/package.json'),{WebSocket}=require('ws');export const pg=createRequire(repo+'/packages/server/package.json')('pg');
+export const delay=ms=>new Promise(r=>setTimeout(r,ms));export const results=[];
+export async function waitReady(port=18888){const start=Date.now();while(Date.now()-start<30000){try{if((await request('/ready',{port})).status===200)return Date.now()-start;}catch{}await delay(200);}throw Error('readiness timeout');}
+export async function test(name,fn){try{const evidence=await fn();results.push({name,status:'pass',evidence});console.log('PASS '+name);}catch(e){let detail=String(e.message);for(const v of Object.values(secrets))detail=detail.replaceAll(v,'[REDACTED]');results.push({name,status:'fail',detail});process.exitCode=1;console.log('FAIL '+name+': '+detail);}}
+export function save(name,data=results){writeFileSync(out+'/'+name,JSON.stringify(data,null,2)+'\n');}
+export function request(path,{method='GET',body,token,port=18888,headers={},...options}={}){return new Promise((resolve,reject)=>{const req=https.request({hostname:'localhost',port,path,method,ca,servername:'localhost',headers:{...(body!==undefined?{'content-type':'application/json'}:{}),...(token?{authorization:'Bearer '+token}:{}),...headers},timeout:10000,...options},res=>{let buf='';res.on('data',d=>buf+=d);res.on('end',()=>{let data;try{data=JSON.parse(buf)}catch{data=buf};resolve({status:res.statusCode,headers:res.headers,data});});});req.on('timeout',()=>req.destroy(Error('HTTP timeout')));req.on('error',reject);if(body!==undefined)req.write(JSON.stringify(body));req.end();});}
+const {build}=require('esbuild');const bundle=await build({stdin:{contents:"export {applyDelta} from './packages/shared-core/src/state/delta.ts';export {hashState} from './packages/shared-core/src/state/hash.ts';export {signJoinToken,signSessionToken,signResetToken,verifySessionToken,verifyResetToken,hmacSecret} from './packages/server/src/auth.ts';",resolveDir:repo,loader:'ts'},bundle:true,platform:'node',format:'esm',write:false});writeFileSync(out+'/verifier.mjs',bundle.outputFiles[0].text);export const verify=await import(out+'/verifier.mjs');
+export async function connect(join,matchId='proto',options={}){const c={messages:[],hashes:0,errors:[],seq:0};c.ws=new WebSocket(`wss://localhost:18888/matches/${matchId}?token=${join.token}`,{ca,headers:{Origin:'https://localhost:18888'},...options});await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{c.ws.terminate();reject(Error('WS welcome timeout'))},10000);c.ws.on('error',e=>{clearTimeout(timer);reject(e)});c.ws.on('unexpected-response',(_req,res)=>{clearTimeout(timer);c.ws.terminate();reject(Error('HTTP '+res.statusCode))});c.ws.on('message',d=>{const m=JSON.parse(d);c.messages.push(m);if(m.type==='welcome'||m.type==='state'){c.state=m.state;if(m.type==='welcome'){c.welcome=m;c.playerId=m.playerId??join.playerId;clearTimeout(timer);resolve();}}else if(m.type==='delta')c.state=verify.applyDelta(c.state,m.delta);if(m.seq!==undefined)c.seq=m.seq;if(m.serverTime)c.time=m.serverTime;if(m.hash&&c.state){c.hashes++;if(verify.hashState(c.state)!==m.hash)c.errors.push('hash mismatch');}});});return c;}
+export function action(c,type,payload,{seq,playerId,sessionId,id,matchId,duplicate}={}){const n=seq??++c.clientSeq,id2=id??`${sessionId??c.welcome.sessionId}:${playerId??c.playerId}:${n}`,at=c.time??c.welcome.serverTime;const e={schemaVersion:1,matchId:matchId??c.welcome.matchId??'proto',playerId:playerId??c.playerId,sessionId:sessionId??c.welcome.sessionId,clientSeq:n,actionId:id2,issuedAt:at,action:{id:id2,type,playerId:playerId??c.playerId,payload,issuedAt:at}};c.ws.send(JSON.stringify({type:'action.v1',envelope:e}));if(duplicate)c.ws.send(JSON.stringify({type:'action.v1',envelope:e}));return e;}
+export function handshake(opts={}){return new Promise((resolve,reject)=>{const s=tls.connect({host:'localhost',port:18888,servername:'localhost',ca,...opts},()=>{const r={protocol:s.getProtocol(),cipher:s.getCipher().standardName,alpn:s.alpnProtocol};s.end();resolve(r)});s.setTimeout(5000,()=>s.destroy(Error('TLS timeout')));s.on('error',reject);});}
+
+==================== baseline.mjs ====================
+import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {readFileSync,writeFileSync} from 'node:fs';
+import {out,secrets,ca,pg,test,save,request,connect,action,delay,handshake,verify} from './helpers.mjs';import {docker,names} from './setup.mjs';
+const ip=readFileSync(out+'/pg-ip.txt','utf8').trim(),admin=new pg.Pool({connectionString:`postgres://void:${secrets.admin}@${ip}:5432/void`}),app=new pg.Pool({connectionString:`postgres://vd_app_stack:${secrets.runtime}@${ip}:5432/void`});let a,b,join,c;
+try{
+ await test('production health/version',async()=>{const r=await request('/health');assert.equal(r.status,200);assert.equal(r.data.version,readFileSync(out+'/server.env','utf8').match(/^GIT_SHA=(.*)$/m)[1].slice(0,12));return r.data;});
+ await test('ready probes persistent store',async()=>{const r=await request('/ready');assert.equal(r.status,200);return r.data;});
+ await test('production auth enabled',async()=>{const r=await request('/auth/status');assert.equal(r.data.enabled,true);});
+ for(const v of ['1.3','1.2'])await test('native TLS '+v,()=>handshake({minVersion:'TLSv'+v,maxVersion:'TLSv'+v}));
+ await test('CBC negotiation observation',async()=>{const r=await handshake({minVersion:'TLSv1.2',maxVersion:'TLSv1.2',ciphers:'ECDHE-RSA-AES128-SHA256'});assert.match(r.cipher,/CBC/);return {finding:'native TLS 1.2 CBC accepted',...r};});
+ for(const v of ['1','1.1'])await test('reject TLS '+v,async()=>{await assert.rejects(handshake({minVersion:'TLSv'+v,maxVersion:'TLSv'+v,ciphers:'ALL:@SECLEVEL=0'}));});
+ await test('reject untrusted CA',()=>assert.rejects(handshake({ca:undefined})));
+ await test('reject wrong hostname',()=>assert.rejects(handshake({servername:'wrong.invalid'})));
+ await test('HTTPS security headers',async()=>{const r=await request('/');for(const h of ['content-security-policy','strict-transport-security','x-content-type-options','referrer-policy','cache-control'])assert(r.headers[h],h);return Object.fromEntries(['content-security-policy','strict-transport-security','cache-control'].map(h=>[h,r.headers[h]]));});
+ await test('unauthenticated join rejected',async()=>{const r=await request('/matches/proto/join');assert.equal(r.status,401);});
+ await test('metrics hidden without operator token',async()=>{const r=await request('/metrics/health');assert([401,403,404].includes(r.status));return {status:r.status};});
+ await test('metrics authorized with operator token',async()=>{const r=await request('/metrics/health',{token:secrets.metrics});assert.equal(r.status,200);return r.data;});
+ await test('admin routes absent by default',async()=>assert.equal((await request('/admin/whoami')).status,404));
+ await test('register two real persistent accounts',async()=>{a=(await request('/auth/register',{method:'POST',body:{login:'AuditOwner',password:secrets.password,email:'owner@audit.invalid'}}));b=(await request('/auth/register',{method:'POST',body:{login:'AuditGuest',password:secrets.password,email:'guest@audit.invalid'}}));assert.equal(a.status,201);assert.equal(b.status,201);a=a.data;b=b.data;});
+ await test('case insensitive duplicate account rejected',async()=>assert.equal((await request('/auth/register',{method:'POST',body:{login:'auditowner',password:secrets.password}})).status,409));
+ await test('uniform unknown and wrong password responses',async()=>{const x=await request('/auth/login',{method:'POST',body:{login:'AuditOwner',password:'wrong-password'}}),y=await request('/auth/login',{method:'POST',body:{login:'UnknownAudit',password:'wrong-password'}});assert.equal(x.status,401);assert.deepEqual({status:x.status,body:x.data},{status:y.status,body:y.data});});
+ await test('SQL injection shaped login safely rejected',async()=>{const r=await request('/auth/login',{method:'POST',body:{login:"x' OR 1=1 --",password:'wrong-password'}});assert([400,401].includes(r.status));assert(!JSON.stringify(r.data).includes('SELECT'));});
+ await test('session claim tampering rejected',async()=>{const p=a.token.split('.');const claim=JSON.parse(Buffer.from(p[1],'base64url'));claim.accountId=b.accountId;p[1]=Buffer.from(JSON.stringify(claim)).toString('base64url');assert.equal((await request('/matches/proto/join',{token:p.join('.')})).status,401);});
+ await test('expired signed session rejected',async()=>{const u=(await admin.query('SELECT pass_hash FROM users WHERE id=$1',[a.accountId])).rows[0];const pwfp=createHash('sha256').update(u.pass_hash).digest('base64url').slice(0,22);const cfg={key:verify.hmacSecret(secrets.auth),algorithm:'HS256',issuer:'void-dominion',audience:'session'},claim={accountId:a.accountId,login:a.login,pwfp};const token=await verify.signSessionToken(claim,cfg,{ttlSeconds:-1}),valid=await verify.signSessionToken(claim,cfg,{ttlSeconds:60});assert.equal((await request('/matches/proto/join',{token:valid})).status,200);assert.equal((await request('/matches/proto/join',{token})).status,401);return {validControlStatus:200,expiredStatus:401};});
+ await test('join uses session identity despite nick query',async()=>{join=(await request('/matches/proto/join?nick=AuditGuest',{token:a.token})).data;assert(join.token);const p=JSON.parse(Buffer.from(join.token.split('.')[1],'base64url'));assert.equal(p.accountId,a.accountId);});
+ await test('session bearer cannot replace join bearer',async()=>assert.rejects(connect({token:a.token}),/401/));
+ await test('cross origin WSS denied',async()=>assert.rejects(connect(join,'proto',{headers:{Origin:'https://evil.invalid'}}),/403/));
+ await test('WSS trusted certificate + gated welcome',async()=>{c=await connect(join);assert.equal(c.welcome.gated,true);assert(c.welcome.sessionId);c.clientSeq=0;return {playerId:c.playerId,seq:c.seq};});
+ await test('forged other player action rejected',async()=>{const other=Object.keys(c.state.players).find(x=>x!==c.playerId);action(c,'fleet.orbit',{fleetId:'irrelevant',orbit:'near'},{playerId:other,seq:1});await delay(250);assert(c.messages.some(m=>m.type==='rejection'&&m.code==='E_FORBIDDEN'));return c.messages.filter(m=>m.type==='rejection').map(m=>m.code);});
+ await test('bare action cannot bypass production gate',async()=>{const n=c.messages.length;c.ws.send(JSON.stringify({type:'action',action:{id:'raw',type:'fleet.orbit',playerId:c.playerId,payload:{fleetId:'x',orbit:'near'},issuedAt:c.time}}));await delay(250);assert(c.messages.slice(n).some(m=>m.type==='rejection'||m.type==='error'));});
+ await test('recover known and unknown emails same response',async()=>{const x=await request('/auth/recover',{method:'POST',body:{email:'owner@audit.invalid'}}),y=await request('/auth/recover',{method:'POST',body:{email:'unknown@audit.invalid'}});assert.deepEqual({status:x.status,data:x.data},{status:y.status,data:y.data});return {status:x.status,mailer:'shipping entry logs metadata; no SMTP/API transport wired'};});
+ await test('default mail log does not expose reset bearer',async()=>{await delay(250);const logs=docker(['logs',names.server]);assert(logs.includes('[mail]'));assert(!/\?reset=eyJ/.test(logs));return {recipientMetadataLogged:true,tokenLogged:false};});
+ await test('runtime DB connection baseline',async()=>{const r=(await app.query('SELECT ssl,version,cipher FROM pg_stat_ssl WHERE pid=pg_backend_pid()')).rows[0];assert.equal(r.ssl,false);return r;});
+ for(const [name,sql] of [['DDL','CREATE TABLE audit_forbidden(id int)'],['create role','CREATE ROLE audit_forbidden'],['admin password catalog','SELECT rolpassword FROM pg_authid'],['temporary table','CREATE TEMP TABLE audit_forbidden(id int)'],['schema mutation','ALTER TABLE users ADD COLUMN audit_forbidden int']])await test('runtime cannot '+name,async()=>{await assert.rejects(app.query(sql),e=>e.code==='42501');});
+ await test('runtime credentials excluded from response',async()=>{const r=await request('/health');for(const v of Object.values(secrets))assert(!JSON.stringify(r.data).includes(v));});
+ await test('container hardening effective',async()=>{const v=JSON.parse(docker(['inspect',names.server]))[0];assert.equal(v.Config.User,'nonroot');assert(v.HostConfig.CapDrop.includes('ALL'));assert(v.HostConfig.SecurityOpt.includes('no-new-privileges:true'));assert.equal(v.HostConfig.Memory,1073741824);return {user:v.Config.User,capDrop:v.HostConfig.CapDrop,securityOpt:v.HostConfig.SecurityOpt,memory:v.HostConfig.Memory,pids:v.HostConfig.PidsLimit,health:v.Config.Healthcheck};});
+ await test('untrusted container network blocked from PG',async()=>{const code=`const net=require('net');const s=net.connect({host:'${ip}',port:5432});s.on('connect',()=>{console.log('UNEXPECTED_REACHABLE');process.exit(2)});s.on('error',()=>{console.log('blocked');process.exit(0)});s.setTimeout(1500,()=>{console.log('blocked timeout');s.destroy();process.exit(0)})`;const r=docker(['run','--rm','--network',names.other,'--entrypoint','/nodejs/bin/node','moongame-stack-audit:2026-10-10','-e',code]);assert.match(r,/blocked/);return r.trim();});
+ await test('server runtime version',async()=>JSON.parse(docker(['exec',names.server,'/nodejs/bin/node','-e','console.log(JSON.stringify({node:process.version,openssl:process.versions.openssl,tlsMin:require("tls").DEFAULT_MIN_VERSION}))'])));
+ writeFileSync(out+'/accounts.json',JSON.stringify({a,b,join}),{mode:0o600});
+}finally{c?.ws.close();await app.end();await admin.end();save('baseline-results.json');}
+
+==================== database-tls.mjs ====================
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';import {execFileSync} from 'node:child_process';
+import {out,secrets,ca,pg,test,save,request} from './helpers.mjs';import {docker,names} from './setup.mjs';
+const ip=readFileSync(out+'/pg-ip.txt','utf8').trim();
+docker(['stop',names.server]);
+writeFileSync(out+'/certs/postgres.ext',`subjectAltName=DNS:localhost,DNS:postgres,DNS:mg-stack-pg,IP:127.0.0.1,IP:${ip}\nextendedKeyUsage=serverAuth\n`);
+execFileSync('openssl',['x509','-req','-in',out+'/certs/postgres.csr','-CA',out+'/certs/ca.crt','-CAkey',out+'/certs/ca.key','-CAcreateserial','-out',out+'/certs/postgres.crt','-days','2','-extfile',out+'/certs/postgres.ext'],{stdio:'pipe'});
+const sql=s=>docker(['exec',names.pg,'psql','-U','void','-d','void','-v','ON_ERROR_STOP=1','-c',s]);
+sql("ALTER SYSTEM SET ssl = 'on'");sql("ALTER SYSTEM SET ssl_cert_file = '/certs/postgres.crt'");sql("ALTER SYSTEM SET ssl_key_file = '/certs/postgres.key'");sql("ALTER SYSTEM SET ssl_min_protocol_version = 'TLSv1.3'");
+docker(['exec',names.pg,'sh','-c',"printf '%s\\n' 'local all all trust' 'hostnossl all all 0.0.0.0/0 reject' 'hostnossl all all ::/0 reject' 'hostssl all all 0.0.0.0/0 scram-sha-256' 'hostssl all all ::/0 scram-sha-256' > /var/lib/postgresql/data/pg_hba.conf"]);
+docker(['restart',names.pg]);
+await new Promise(r=>setTimeout(r,1000));
+const url=`postgres://vd_app_stack:${secrets.runtime}@${ip}:5432/void`;
+const app=new pg.Pool({connectionString:url,ssl:{ca,rejectUnauthorized:true},max:1});
+try{
+ await test('PostgreSQL verified TLS 1.3 and SCRAM runtime login',async()=>{const r=(await app.query('SELECT ssl,version,cipher FROM pg_stat_ssl WHERE pid=pg_backend_pid()')).rows[0];assert.equal(r.ssl,true);assert.equal(r.version,'TLSv1.3');return r;});
+ for(const [label,opts] of [['plaintext',{ssl:false}],['wrong CA',{ssl:{rejectUnauthorized:true}}],['wrong hostname',{ssl:{ca,rejectUnauthorized:true,servername:'wrong.invalid'}}],['TLS 1.2',{ssl:{ca,rejectUnauthorized:true,maxVersion:'TLSv1.2'}}]])await test('PostgreSQL rejects '+label,async()=>{const p=new pg.Pool({connectionString:url,...opts,max:1,connectionTimeoutMillis:3000});try{await assert.rejects(p.query('SELECT 1'));}finally{await p.end();}});
+ const env=readFileSync(out+'/server.env','utf8').replace(/^DATABASE_URL=.*$/m,`DATABASE_URL=postgres://vd_app_stack:${secrets.runtime}@postgres:5432/void?sslmode=verify-full&sslrootcert=/certs/ca.crt`)+'ADMIN_LOGINS=AuditOwner\n';
+ writeFileSync(out+'/server-tls.env',env,{mode:0o600});writeFileSync(out+'/server.env',env,{mode:0o600});
+ docker(['rm',names.server]);const {runServer}=await import('./setup.mjs');runServer();
+ await new Promise(r=>setTimeout(r,1500));
+ await test('shipping app starts with verified DB TLS URL',async()=>assert.equal((await request('/ready')).status,200));
+ await test('runtime strict privilege guard still passes over TLS',async()=>{const r=await request('/health');assert.equal(r.status,200);return r.data;});
+ save('database-tls-results.json');
+}finally{await app.end();}
+
+==================== security-runtime.mjs ====================
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';import {spawnSync} from 'node:child_process';
+import {out,secrets,test,request,save,connect,delay,waitReady,ca} from './helpers.mjs';import {docker,names,runServer} from './setup.mjs';
+const {a,b,join}=JSON.parse(readFileSync(out+'/accounts.json'));
+await test('admin identity requires session',async()=>assert.equal((await request('/admin/whoami')).status,401));
+await test('ordinary player denied admin role',async()=>assert.equal((await request('/admin/whoami',{token:b.token})).status,403));
+await test('configured admin recognized',async()=>{const r=await request('/admin/whoami',{token:a.token});assert.equal(r.status,200);assert.equal(r.data.admin,true);return r.data;});
+await test('ordinary player cannot kick another player',async()=>{const r=await request('/admin/matches/proto/kick',{method:'POST',token:b.token,body:{nick:a.login}});assert.equal(r.status,403);});
+await test('admin roster only visible to admin',async()=>{assert.equal((await request('/admin/matches/proto/roster',{token:a.token})).status,200);assert.equal((await request('/admin/matches/proto/roster',{token:b.token})).status,403);});
+await test('join token cannot connect another existing match',async()=>{const created=await request('/matches',{method:'POST',token:a.token,body:{}});assert.equal(created.status,200);const second=created.data.matchId;assert(second&&second!=='proto');const positive=await request('/matches/'+second+'/join',{token:a.token});assert.equal(positive.status,200);const own=await connect(positive.data,second);own.ws.close();await assert.rejects(connect(join,second),/401|403/);return {existingSecondMatch:second,positiveJoinStatus:200,crossMatchRejected:true};});
+await test('oversized real WSS frame closes connection',async()=>{const c=await connect(join);const closed=new Promise(r=>c.ws.once('close',code=>r(code)));c.ws.send(JSON.stringify({type:'chat',text:'x'.repeat(40000)}));const code=await Promise.race([closed,delay(4000).then(()=>0)]);assert.equal(code,1009);return {code};});
+await test('compressed bomb bounded by inflated payload',async()=>{const c=await connect(join);const closed=new Promise(r=>c.ws.once('close',code=>r(code)));c.ws.send(JSON.stringify({type:'chat',text:'x'.repeat(120000)}),{compress:true});const code=await Promise.race([closed,delay(4000).then(()=>0)]);assert.equal(code,1009);return {code};});
+await test('real raw message flood drops excess before parse',async()=>{const c=await connect(join,'proto',{perMessageDeflate:false});try{const n=c.messages.length;for(let i=0;i<220;i++)c.ws.send('not-json',{compress:false});await delay(1000);const parsedErrors=c.messages.slice(n).filter(x=>x.type==='error').length;assert(parsedErrors>0&&parsedErrors<=50);assert.equal(c.ws.readyState,1);return {sent:220,parsedErrors,connectionStillOpen:true};}finally{c.ws.close();}});
+await test('default auth brute force budget is enforced',async()=>{let throttled=0;for(let i=0;i<43;i++){const r=await request('/auth/login',{method:'POST',body:{login:'NoSuchUser',password:'wrong-password'}});if(r.status===429)throttled++;else assert.equal(r.status,401);}assert(throttled>0);return {attempts:43,throttled,configuredBudget:'default 40/minute, shared across auth routes'};});
+await test('native TLS Docker healthcheck observation',async()=>{const h=JSON.parse(docker(['inspect',names.server]))[0];const code=docker(['exec',names.server,'/nodejs/bin/node','-e',"fetch('http://127.0.0.1:8788/health').then(r=>console.log(r.status)).catch(e=>console.log('HTTP_PROBE_REJECTED'))"]);assert.match(code,/HTTP_PROBE_REJECTED/);return {finding:'Dockerfile healthcheck always uses HTTP, incompatible with native TLS',health:h.State.Health?.Status,healthcheck:h.Config.Healthcheck.Test};});
+const env0=readFileSync(out+'/server.env','utf8');
+for(const [name,transform] of [
+ ['missing auth secret',s=>s.replace(/^AUTH_JWT_SECRET=.*$/m,'AUTH_JWT_SECRET=')],
+ ['gate disabled',s=>s.replace(/^GATE=1$/m,'GATE=0')],
+ ['seat lock disabled',s=>s.replace(/^SEAT_LOCK=1$/m,'SEAT_LOCK=0')],
+ ['missing origin allowlist',s=>s.replace(/^ALLOWED_ORIGINS=.*$/m,'ALLOWED_ORIGINS=')],
+ ['half configured TLS',s=>s.replace(/^TLS_CERT_FILE=.*$/m,'TLS_CERT_FILE=')],
+ ['admin DB credentials with strict guard',s=>s.replace(/^DATABASE_URL=.*$/m,`DATABASE_URL=postgres://void:${secrets.admin}@postgres:5432/void?sslmode=verify-full&sslrootcert=/certs/ca.crt`)],
+])await test('fail secure startup: '+name,async()=>{const cn='mg-stack-negative';writeFileSync(out+'/negative.env',transform(env0),{mode:0o600});try{runServer(cn,out+'/negative.env','18890');docker(['update','--restart=no',cn]);const wait=docker(['wait',cn]);assert.notEqual(Number(wait.trim()),0);return {exit:Number(wait.trim())};}finally{docker(['rm','-f',cn]);}});
+docker(['restart',names.server]);await waitReady();save('runtime-security-results.json');
+
+==================== load-users.mjs ====================
+import assert from 'node:assert/strict';import {request,secrets,delay} from './helpers.mjs';for(let i=1;i<40;i++){const r=await request('/auth/register',{method:'POST',body:{login:'LoadAudit'+String(i).padStart(2,'0'),password:secrets.password}});assert([201,409].includes(r.status));await delay(2750);}
+
+==================== load.mjs ====================
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync,appendFileSync} from 'node:fs';
+import {out,secrets,request,connect,action,delay,waitReady} from './helpers.mjs';import {docker,names} from './setup.mjs';
+const clients=[],errors=[],samples=[],rtts=[];let hashChecks=0,commands=0,acknowledgements=0,bytes=0,messages=0,rejects={};const start=Date.now();
+const duration=Number(process.env.AUDIT_LOAD_SECONDS??480)*1000;
+try{
+ console.log('setup started');await waitReady();
+ const owner=JSON.parse(readFileSync(out+'/accounts.json')).a,ids=['proto'];for(let i=0;i<3;i++){const r=await request('/matches',{method:'POST',token:owner.token,body:{}});assert.equal(r.status,200);ids.push(r.data.matchId);}
+ for(let i=0;i<40;i++){
+  let auth;if(i===0)auth=owner;else{const r=await request('/auth/login',{method:'POST',body:{login:'LoadAudit'+String(i).padStart(2,'0'),password:secrets.password}});assert.equal(r.status,200);auth=r.data;}
+  const matchId=ids[Math.floor(i/10)];const j=await request('/matches/'+matchId+'/join',{token:auth.token});assert.equal(j.status,200);
+  const c=await connect(j.data,matchId);c.matchId=matchId;c.clientSeq=0;c.pending=new Map();
+  c.ws.on('message',d=>{bytes+=d.length;messages++;const m=JSON.parse(d);if(m.type==='rejection')rejects[m.code]=(rejects[m.code]??0)+1;if(m.type==='pong'&&typeof m.clientTime==='number'){rtts.push(Date.now()-m.clientTime);acknowledgements++;}if(m.matchId&&m.matchId!==matchId)errors.push('cross-match message');});
+  c.ws.on('error',e=>errors.push(e.code??e.message));clients.push(c);console.log('joined '+clients.length);await delay(2500);
+ }
+ const fullStart=Date.now();let iteration=0;
+ while(Date.now()-fullStart<duration){
+  for(const c of clients){const f=Object.values(c.state.fleets).find(f=>f.owner===c.playerId);if(!f||c.ws.readyState!==1)continue;const e=action(c,'fleet.orbit',{fleetId:f.id,orbit:'near'},{matchId:c.matchId});c.pending.set(e.actionId,Date.now());commands++;c.ws.send(JSON.stringify({type:'ping',clientTime:Date.now()}));}
+  iteration++;
+  await delay(2000);
+  if(iteration%5===0){const stats=JSON.parse(docker(['stats','--no-stream','--format','{{json .}}',names.server]));const health=(await request('/metrics/health',{token:secrets.metrics})).data;
+   hashChecks=clients.reduce((n,c)=>n+c.hashes,0);const mismatches=clients.flatMap(c=>c.errors);const sample={elapsedSeconds:(Date.now()-fullStart)/1000,clients:clients.length,open:clients.filter(c=>c.ws.readyState===1).length,commands,acknowledgements,hashChecks,hashMismatches:mismatches.length,bytes,messages,rejects,stats,health};samples.push(sample);appendFileSync(out+'/load-samples.jsonl',JSON.stringify(sample)+'\n');writeFileSync(out+'/load-progress.json',JSON.stringify(sample,null,2));}
+ }
+ await delay(1000); // Drain final pongs before comparing generated and acknowledged traffic.
+ const sorted=rtts.sort((a,b)=>a-b);const result={...samples.at(-1),setupSeconds:(fullStart-start)/1000,fullCapacitySeconds:(Date.now()-fullStart)/1000,samples:samples.length,pingRoundTripMs:{samples:sorted.length,p50:sorted[Math.floor(sorted.length*.5)]??null,p95:sorted[Math.floor(sorted.length*.95)]??null,max:sorted.at(-1)??null},errors:[...errors,...clients.flatMap(c=>c.errors)]};
+ result.totalCommands=commands;result.totalAcknowledgements=acknowledgements;result.finalRejects={...rejects};result.pass=result.open===40&&result.hashMismatches===0&&result.errors.length===0&&result.commands>0&&Object.keys(rejects).length===0&&acknowledgements>=commands; if(!result.pass)process.exitCode=1;writeFileSync(out+'/load-results.json',JSON.stringify(result,null,2));console.log(JSON.stringify({pass:result.pass,clients:result.clients,commands:result.commands,hashChecks:result.hashChecks,seconds:result.fullCapacitySeconds}));
+}catch(e){writeFileSync(out+'/load-results.json',JSON.stringify({pass:false,clients:clients.length,detail:e.stack??String(e),nested:e.errors?.map(x=>({code:x.code,message:x.message}))},null,2));process.exitCode=1;console.log(e.message);}finally{clients.forEach(c=>c.ws.close());}
+
+==================== mail-fixture.ts ====================
+import Fastify from 'fastify';import {Pool} from 'pg';import {createServer,connect as netConnect} from 'node:net';import {readFileSync} from 'node:fs';import assert from 'node:assert/strict';
+import {registerAuthApi,liveSession,pwFingerprint} from '/workspace/MoonGame-stack-audit-2026-10-10/packages/server/src/authApi';
+import {configFromEnv} from '/workspace/MoonGame-stack-audit-2026-10-10/packages/server/src/serverConfig';
+import {PostgresUserStore} from '/workspace/MoonGame-stack-audit-2026-10-10/packages/server/src/store/postgres';
+import {out,secrets,ca,test,save,request,verify} from '/workspace/full-stack-audit-2026-10-10/helpers.mjs';
+const messages:string[]=[];let deliveryFail=false;
+const sink=createServer(sock=>{sock.write('220 audit.local ESMTP\r\n');let buf='',data=false,message='';sock.on('data',b=>{buf+=b.toString();let n;while((n=buf.indexOf('\r\n'))>=0){const l=buf.slice(0,n);buf=buf.slice(n+2);if(data){if(l==='.') {messages.push(message);message='';data=false;sock.write('250 accepted\r\n');}else message+=l+'\n';}else if(l.startsWith('EHLO'))sock.write('250 audit.local\r\n');else if(l.startsWith('MAIL')||l.startsWith('RCPT'))sock.write('250 OK\r\n');else if(l==='DATA'){data=true;sock.write('354 end with dot\r\n');}else if(l==='QUIT'){sock.write('221 bye\r\n');sock.end();}}});});
+await new Promise<void>(r=>sink.listen(18892,'127.0.0.1',r));
+async function sendMail(m:{to:string,subject:string,text:string}){if(deliveryFail)throw Error('Test delivery failure');await new Promise<void>((resolve,reject)=>{const sock=netConnect(18892,'127.0.0.1');const commands=['EHLO audit.local',`MAIL FROM:<audit@audit.invalid>`,`RCPT TO:<${m.to}>`,'DATA',`To: ${m.to}\r\nSubject: ${m.subject}\r\n\r\n${m.text.replaceAll('\n','\r\n')}\r\n.`,'QUIT'];let i=0; sock.on('data',()=>{if(i<commands.length)sock.write(commands[i++]+'\r\n');else{sock.end();resolve();}});sock.on('error',reject);sock.setTimeout(3000,()=>sock.destroy(Error('SMTP fixture timeout')));});}
+const ip=readFileSync(out+'/pg-ip.txt','utf8').trim();const pool=new Pool({connectionString:`postgres://vd_app_stack:${secrets.runtime}@${ip}:5432/void`,ssl:{ca,rejectUnauthorized:true}});const users=new PostgresUserStore(pool);
+const cfg=configFromEnv({AUTH_JWT_SECRET:secrets.auth,RESET_BASE_URL:'https://localhost:18891'});
+const server=Fastify({https:{key:readFileSync(out+'/certs/wrong.key'),cert:readFileSync(out+'/certs/wrong.crt')},logger:false});
+registerAuthApi(server,{users,signSession:cfg.signSession!,signReset:cfg.signReset!,verifyReset:cfg.verifyReset!,resetBaseUrl:cfg.resetBaseUrl,sendMail});await server.listen({host:'127.0.0.1',port:18891});
+const req=(path:string,body:object)=>request(path,{port:18891,method:'POST',body});let auth:any,token='';
+try{
+await test('persistent shared auth API registers recovery account',async()=>{const r=await req('/auth/register',{login:'MailAudit',email:'mail@audit.invalid',password:secrets.password});assert.equal(r.status,201);auth=r.data;});
+await test('reset delivered to local SMTP fixture',async()=>{assert.equal((await req('/auth/recover',{email:'mail@audit.invalid'})).status,200);assert.equal(messages.length,1);assert(messages[0].includes('To: mail@audit.invalid'));const match=/https:\/\/localhost:18891\/\?reset=([^\s]+)/.exec(messages[0]);assert(match);token=decodeURIComponent(match[1]);return {mailCount:messages.length,transport:'test-injected Mailer to loopback SMTP sink; shipping entry has no SMTP adapter'};});
+await test('unknown email not delivered but uniform response',async()=>{const r=await req('/auth/recover',{email:'absent@audit.invalid'});assert.equal(r.status,200);assert.deepEqual(r.data,{ok:true});assert.equal(messages.length,1);});
+await test('modified reset token rejected',async()=>{const parts=token.split('.');parts[1]=Buffer.from(JSON.stringify({...JSON.parse(Buffer.from(parts[1],'base64url').toString()),accountId:'forged'})).toString('base64url');assert.equal((await req('/auth/reset',{token:parts.join('.'),password:secrets.newPassword})).status,401);});
+await test('expired validly signed reset rejected',async()=>{const u=await users.findById(auth.accountId);const expired=await verify.signResetToken({accountId:auth.accountId,pwfp:pwFingerprint(u!.passHash)},{key:verify.hmacSecret(secrets.auth),algorithm:'HS256',issuer:'void-dominion',audience:'reset'},{ttlSeconds:-1});assert.equal((await req('/auth/reset',{token:expired,password:secrets.newPassword})).status,401);});
+await test('reset bearer cannot log in as session',async()=>{const claim=await cfg.verifySession!(token);assert.equal(claim.ok,false);});
+await test('reset changes password and revokes old session',async()=>{const r=await req('/auth/reset',{token,password:secrets.newPassword});assert.equal(r.status,200);const old=await cfg.verifySession!(auth.token);assert(old.ok);assert.equal(await liveSession(old.claim,users),null);const fresh=await cfg.verifySession!(r.data.token);assert(fresh.ok);assert(await liveSession(fresh.claim,users));});
+await test('spent reset bearer rejected sequentially',async()=>assert.equal((await req('/auth/reset',{token,password:secrets.password})).status,401));
+await test('old password rejected and new password works',async()=>{assert.equal((await req('/auth/login',{login:'MailAudit',password:secrets.password})).status,401);assert.equal((await req('/auth/login',{login:'MailAudit',password:secrets.newPassword})).status,200);});
+await test('delivery failure never exposes account existence',async()=>{deliveryFail=true;const r=await req('/auth/recover',{email:'mail@audit.invalid'});assert.equal(r.status,200);assert.deepEqual(r.data,{ok:true});});
+await test('concurrent reuse of one reset token observation',async()=>{deliveryFail=false;await req('/auth/recover',{email:'mail@audit.invalid'});const t=decodeURIComponent(/\?reset=([^\s]+)/.exec(messages.at(-1)!)![1]);const r=await Promise.all([req('/auth/reset',{token:t,password:secrets.password}),req('/auth/reset',{token:t,password:secrets.newPassword})]);const successes=r.filter(x=>x.status===200).length;return {statuses:r.map(x=>x.status),successes,finding:successes>1?'same token accepted twice concurrently; no atomic fingerprint compare-and-set':'one successful redemption'};});
+}finally{await server.close();await pool.end();await new Promise<void>(r=>sink.close(()=>r()));save('mail-results.json');}
+
+==================== expiry-race.mjs ====================
+import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';import {out,secrets,pg,ca,verify,test,save,request,waitReady,results} from './helpers.mjs';
+const ip=readFileSync(out+'/pg-ip.txt','utf8').trim(),pool=new pg.Pool({connectionString:`postgres://vd_app_stack:${secrets.runtime}@${ip}:5432/void`,ssl:{ca,rejectUnauthorized:true}});const fp=h=>createHash('sha256').update(h).digest('base64url').slice(0,22),sign=aud=>({key:verify.hmacSecret(secrets.auth),algorithm:'HS256',issuer:'void-dominion',audience:aud}),config=aud=>({key:verify.hmacSecret(secrets.auth),algorithms:['HS256'],issuer:'void-dominion',audience:aud});
+await waitReady();
+try{
+ await test('expired session isolated from issuer and fingerprint failures',async()=>{const u=(await pool.query("SELECT id,login,pass_hash FROM users WHERE login='AuditOwner'")).rows[0];const claim={accountId:u.id,login:u.login,pwfp:fp(u.pass_hash)};const valid=await verify.signSessionToken(claim,sign('session'),{ttlSeconds:60}),expired=await verify.signSessionToken(claim,sign('session'),{ttlSeconds:-1});assert.equal((await request('/matches/proto/join',{token:valid})).status,200);assert.equal((await request('/matches/proto/join',{token:expired})).status,401);return {validControlStatus:200,expiredStatus:401,issuer:'void-dominion',audience:'session',fingerprint:'current DB password'};});
+ await test('expired reset isolated from issuer and fingerprint failures',async()=>{const u=(await pool.query("SELECT id,pass_hash FROM users WHERE login='MailAudit'")).rows[0];const claim={accountId:u.id,pwfp:fp(u.pass_hash)};const valid=await verify.signResetToken(claim,sign('reset'),{ttlSeconds:60}),expired=await verify.signResetToken(claim,sign('reset'),{ttlSeconds:-1});assert.equal((await verify.verifyResetToken(valid,config('reset'))).ok,true);assert.equal((await verify.verifyResetToken(expired,config('reset'))).ok,false);assert.equal((await request('/auth/reset',{method:'POST',body:{token:expired,password:secrets.newPassword}})).status,401);return {validSignatureAndClaimsControl:true,expiredStatus:401,issuer:'void-dominion',audience:'reset'};});
+ await test('shipping reset race reproduced in three rounds',async()=>{const statuses=[];for(let i=0;i<3;i++){const u=(await pool.query("SELECT id,pass_hash FROM users WHERE login='MailAudit'")).rows[0];const token=await verify.signResetToken({accountId:u.id,pwfp:fp(u.pass_hash)},sign('reset'),{ttlSeconds:60});const r=await Promise.all([request('/auth/reset',{method:'POST',body:{token,password:secrets.password}}),request('/auth/reset',{method:'POST',body:{token,password:secrets.newPassword}})]);statuses.push(r.map(x=>x.status));assert.deepEqual(statuses.at(-1),[200,200]);}return {statuses,finding:'single-use reset not atomic on shipping HTTPS API with real PostgreSQL'};});
+ const baseline=JSON.parse(readFileSync(out+'/baseline-results.json'));const i=baseline.findIndex(x=>x.name==='expired signed session rejected');baseline[i]={...results[0],harnessCorrection:'proper production issuer plus valid positive control'};save('baseline-results.json',baseline);
+ const mail=JSON.parse(readFileSync(out+'/mail-results.json'));const j=mail.findIndex(x=>x.name==='expired validly signed reset rejected');mail[j]={...results[1],harnessCorrection:'proper production issuer plus valid positive control'};save('mail-results.json',mail);
+}finally{await pool.end();save('expiry-race-results.json');}
+
+==================== review-followup.mjs ====================
+// Incremental evidence, isolated match per run, and abort on any failed prerequisite.
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';import {createHash} from 'node:crypto';
+import {out,secrets,ca,pg,request,connect,action,delay,waitReady} from './helpers.mjs';import {docker,names} from './setup.mjs';
+const {a}=JSON.parse(readFileSync(out+'/accounts.json'));const records=[];let c,matchId,marker,attempt;
+const save=()=>writeFileSync(out+'/review-followup-results.json',JSON.stringify({base:'f1c700c1',results:records},null,2));
+const run=async(name,fn)=>{try{const evidence=await fn();records.push({name,status:'pass',evidence});save();console.log('PASS '+name);}catch(e){records.push({name,status:'fail',detail:e.message});save();throw e;}};
+const sql=async(q,args=[])=>{const ip=docker(['inspect',names.pg,'--format','{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}']).trim();const db=new pg.Pool({connectionString:`postgres://void:${secrets.admin}@${ip}:5432/void`,ssl:{ca,rejectUnauthorized:true,servername:'postgres'},connectionTimeoutMillis:3000});try{return (await db.query(q,args)).rows;}finally{await db.end();}};
+const fields=s=>Object.values(s.fleets).filter(f=>f.owner===c.playerId).map(f=>({id:f.id,owner:f.owner,units:f.units,bombarding:f.bombarding??null})).sort((a,b)=>a.id.localeCompare(b.id));
+const fingerprint=s=>createHash('sha256').update(JSON.stringify(fields(s))).digest('hex');
+const reconnect=async()=>{const r=await request('/matches/'+matchId+'/join',{token:a.token});assert.equal(r.status,200);c=await connect(r.data,matchId);c.clientSeq=0;};
+try{
+ await waitReady();const made=await request('/matches',{method:'POST',token:a.token,body:{}});assert.equal(made.status,200);matchId=made.data.matchId;await reconnect();
+ await run('valid cross-player envelope denied at authorization',async()=>{const other=Object.keys(c.state.players).find(id=>id!==c.playerId);assert(other);const n=c.messages.length;const e=action(c,'fleet.orbit',{fleetId:'irrelevant',orbit:'near'},{matchId,playerId:other,seq:1});assert.equal(e.actionId,`${e.sessionId}:${other}:1`);await delay(250);assert(c.messages.slice(n).some(m=>m.type==='rejection'&&m.code==='E_FORBIDDEN'));return {actionIdMatchesForgedPlayer:true,code:'E_FORBIDDEN'};});
+ await run('cross-match token denied for existing match with positive control',async()=>{const second=(await request('/matches',{method:'POST',token:a.token,body:{}})).data.matchId;assert(second&&second!==matchId);const good=(await request('/matches/'+second+'/join',{token:a.token})).data;const positive=await connect(good,second);positive.ws.close();const own=(await request('/matches/'+matchId+'/join',{token:a.token})).data;await assert.rejects(connect(own,second),/401|403/);return {existingSecondMatch:second,positiveConnection:true,crossMatchRejected:true};});
+ await run('raw flood drops excess and leaves connection open',async()=>{c.ws.close();await reconnect();const n=c.messages.length;for(let i=0;i<220;i++)c.ws.send('not-json',{compress:false});await delay(1000);const parsedErrors=c.messages.slice(n).filter(m=>m.type==='error').length;assert(parsedErrors>0&&parsedErrors<=50);assert.equal(c.ws.readyState,1);return {sent:220,parsedErrors,connectionStillOpen:true};});
+ // Start a fresh connection to avoid reusing the rejected forged action sequence.
+ c.ws.close();await reconnect();
+ await run('state-changing split committed and persisted',async()=>{const f=Object.values(c.state.fleets).find(f=>f.owner===c.playerId&&f.units.some(u=>u.unit==='cruiser'&&u.count===2));assert(f);const before=fingerprint(c.state),seq=c.seq,n=c.messages.length;action(c,'fleet.split',{fleetId:f.id,take:[{unit:'cruiser',count:1}]},{matchId});for(let i=0;i<50&&c.seq===seq;i++)await delay(100);assert(c.seq>seq);assert(!c.messages.slice(n).some(m=>m.type==='rejection'));marker=fingerprint(c.state);assert.notEqual(marker,before);const saved=(await sql('SELECT seq,state FROM matches WHERE id=$1',[matchId]))[0];assert.equal(saved.seq,c.seq);assert.equal(fingerprint(saved.state),marker);return {beforeFingerprint:before,afterFingerprint:marker,seq:c.seq};});
+ for(const kind of ['graceful','SIGKILL'])await run(kind+' preserves committed fleet fingerprint',async()=>{const seq=c.seq;const meta=JSON.parse(docker(['inspect',names.server]))[0];c.ws.close();const start=Date.now();if(kind==='graceful')docker(['restart',names.server]);else{assert(meta.State.Pid>1);docker(['run','--rm','--pid=host','--network=none','--user','0:0','--cap-drop','ALL','--cap-add','KILL','--security-opt','no-new-privileges:true','--entrypoint','/nodejs/bin/node','moongame-stack-audit:2026-10-10','-e',`process.kill(${meta.State.Pid},'SIGKILL')`]);}await waitReady();await reconnect();assert.equal(c.seq,seq);assert.equal(fingerprint(c.state),marker);assert.equal(c.errors.length,0);const after=JSON.parse(docker(['inspect',names.server]))[0];if(kind==='SIGKILL')assert(after.RestartCount>meta.RestartCount);return {beforeSeq:seq,afterSeq:c.seq,beforeFingerprint:marker,afterFingerprint:fingerprint(c.state),recoverySeconds:(Date.now()-start)/1000,restartCount:after.RestartCount};});
+ const saved=(await sql('SELECT seq,state FROM matches WHERE id=$1',[matchId]))[0];
+ await run('database outage refuses attempted state-changing action',async()=>{const f=Object.values(c.state.fleets).find(f=>f.owner===c.playerId&&f.units.some(u=>u.unit==='cruiser'&&u.count===1));assert(f);docker(['stop','-t','1',names.pg]);await delay(500);let ready;try{ready=(await request('/ready')).status;}catch{ready='connection unavailable';}assert.notEqual(ready,200);const n=c.messages.length;attempt=action(c,'fleet.split',{fleetId:f.id,take:[{unit:'cruiser',count:1}]},{matchId});let rejection;for(let i=0;i<100;i++){rejection=c.messages.slice(n).find(m=>m.type==='rejection'&&m.actionId===attempt.actionId);if(rejection||c.ws.readyState>=2)break;await delay(100);}assert(rejection?.code==='E_UNAVAILABLE'||c.ws.readyState>=2);assert.equal(c.seq,saved.seq);assert.equal(fingerprint(c.state),marker);return {ready,transientRejection:rejection?.code??null,transportState:c.ws.readyState,seq:c.seq};});
+ await run('database recovery has no successful outage receipt or effect',async()=>{docker(['start',names.pg]);await delay(1500);await waitReady();const restored=(await sql('SELECT seq,state FROM matches WHERE id=$1',[matchId]))[0];assert.equal(restored.seq,saved.seq);assert.equal(fingerprint(restored.state),marker);const receipts=await sql('SELECT ok FROM receipts WHERE match_id=$1 AND action_id=$2',[matchId,attempt.actionId]);assert(!receipts.some(r=>r.ok));c.ws.close();await reconnect();assert.equal(c.seq,saved.seq);assert.equal(fingerprint(c.state),marker);return {beforeSeq:saved.seq,afterSeq:restored.seq,beforeFingerprint:marker,afterFingerprint:fingerprint(restored.state),successfulOutageReceipts:0};});
+}catch(e){console.log('FAILED '+e.message);process.exitCode=1;}finally{c?.ws.close();docker(['start',names.pg]);save();}
+
+==================== backup-drill.mjs ====================
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync,mkdirSync,readdirSync} from 'node:fs';import {execFileSync,spawnSync} from 'node:child_process';import {createHash} from 'node:crypto';
+import {out,secrets,pg,ca,test,save,waitReady} from './helpers.mjs';import {docker,names,node} from './setup.mjs';
+const repo='/workspace/MoonGame-stack-audit-2026-10-10',ip=readFileSync(out+'/pg-ip.txt','utf8').trim(),url=`postgres://void:${secrets.admin}@${ip}:5432/void`,pool=new pg.Pool({connectionString:url,ssl:{ca,rejectUnauthorized:true}});
+const dir=out+'/backups',keys=out+'/backup-keys';mkdirSync(dir,{mode:0o700});mkdirSync(keys,{mode:0o700});mkdirSync(out+'/game-bin',{mode:0o755});
+const adapter=readFileSync(out+'/bin/psql','utf8').replace('mg-stack-gate-pg','mg-stack-pg').replace("env['PGPASSWORD']=urllib.parse.unquote(u.password or '')", "env['PGPASSWORD']=urllib.parse.unquote(u.password or '');env['PGSSLMODE']='verify-full';env['PGSSLROOTCERT']='/certs/ca.crt'").replace("'--env','PGPASSWORD','mg-stack-pg'", "'--env','PGPASSWORD','--env','PGSSLMODE','--env','PGSSLROOTCERT','mg-stack-pg'");
+for(const n of ['psql','pg_dump','pg_isready'])writeFileSync(out+'/game-bin/'+n,adapter,{mode:0o755});
+const age='/workspace/zta-2026-10-10/age-bin/age',kg='/workspace/zta-2026-10-10/age-bin/age-keygen';execFileSync(kg,['-o',keys+'/correct'],{stdio:'pipe'});execFileSync(kg,['-o',keys+'/wrong'],{stdio:'pipe'});const recipient=execFileSync(kg,['-y',keys+'/correct'],{encoding:'utf8'}).trim();
+const env={...process.env,DATABASE_URL:url,BACKUP_DIR:dir,BACKUP_AGE_RECIPIENT:recipient,BACKUP_AGE_IDENTITY:keys+'/correct',KEEP_DAYS:'0',PATH:out+'/game-bin:/workspace/zta-2026-10-10/age-bin:'+process.env.PATH};
+const run=(script,args=[],extra={})=>execFileSync('bash',[script,...args],{cwd:repo,env:{...env,...extra},stdio:'pipe'});
+async function fingerprint(){const tables=(await pool.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY 1")).rows;const rows=[];for(const {tablename:t} of tables){assert(/^[a-z_]+$/.test(t));const r=(await pool.query(`SELECT count(*)::int AS count,coalesce(md5(string_agg(x::text,'' ORDER BY x::text)),'EMPTY') AS fingerprint FROM public."${t}" x`)).rows[0];rows.push({table:t,...r});}return rows;}
+docker(['stop',names.server]);let archive,before;
+try{
+ await test('backup refuses plaintext without explicit opt-in',async()=>{assert.throws(()=>run('deploy/backup.sh',[],{BACKUP_AGE_RECIPIENT:'',BACKUP_PLAINTEXT:''}));assert.equal(readdirSync(dir).length,0);});
+ await test('encrypted backup captures stopped complete game DB',async()=>{before=await fingerprint();run('deploy/backup.sh');archive=dir+'/'+readdirSync(dir).find(x=>x.endsWith('.age'));assert(archive);const bytes=readFileSync(archive);assert(bytes.subarray(0,22).toString().includes('age-encryption.org'));return {tables:before.length,rows:before.reduce((n,x)=>n+x.count,0),cipherBytes:bytes.length};});
+ await test('correct key decrypts and wrong key fails',async()=>{const valid=execFileSync(age,['-d','-i',keys+'/correct',archive],{stdio:'pipe'});assert(valid.length>0);assert.notEqual(spawnSync(age,['-d','-i',keys+'/wrong',archive],{stdio:'pipe'}).status,0);});
+ await test('tamper with recomputed SHA rejected before SQL',async()=>{const raw=Buffer.from(readFileSync(archive));raw[raw.length-1]^=1;const bad=dir+'/tampered.age';writeFileSync(bad,raw);writeFileSync(bad+'.sha256',createHash('sha256').update(raw).digest('hex')+'  tampered.age\n');assert.throws(()=>run('deploy/restore.sh',[bad]));assert.deepEqual(await fingerprint(),before);});
+ await test('wrong restore identity cannot change DB',async()=>{assert.throws(()=>run('deploy/restore.sh',[archive],{BACKUP_AGE_IDENTITY:keys+'/wrong'}));assert.deepEqual(await fingerprint(),before);});
+ await test('real destructive restore returns every row fingerprint',async()=>{await pool.query('DELETE FROM users; DELETE FROM matches; DELETE FROM receipts; DELETE FROM seats');const start=Date.now();run('deploy/restore.sh',[archive]);assert.deepEqual(await fingerprint(),before);return {restoreSeconds:(Date.now()-start)/1000,tables:before.length,tableFingerprints:before};});
+ await test('restored strict role access observation',async()=>{const app=new pg.Pool({connectionString:`postgres://vd_app_stack:${secrets.runtime}@${ip}:5432/void`,ssl:{ca,rejectUnauthorized:true}});try{let code;try{await app.query('SELECT count(*) FROM users');}catch(e){code=e.code;}assert.equal(code,'42501');return {finding:'restore omits ownership and ACL; runtime SELECT denied after successful data restore',code};}finally{await app.end();}});
+ await test('reprovision roles restores service without losing data',async()=>{const start=Date.now();execFileSync(node,['packages/server/dist/database-admin.mjs','provision'],{cwd:repo,env:{...process.env,DB_ADMIN_URL:url+'?sslmode=verify-full&sslrootcert='+encodeURIComponent(out+'/certs/ca.crt'),DB_RUNTIME_USER:'vd_app_stack',DB_RUNTIME_PASSWORD:secrets.runtime,DB_MIGRATION_USER:'vd_migrate_stack',DB_MIGRATION_PASSWORD:secrets.migration},stdio:'pipe'});assert.deepEqual(await fingerprint(),before);docker(['start',names.server]);await waitReady();return {roleProvisionAndStartupSeconds:(Date.now()-start)/1000};});
+}finally{await pool.end();save('backup-drill-results.json');}
+
+==================== rotation.mjs ====================
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';import {randomBytes} from 'node:crypto';import {out,secrets,test,save,request,connect,waitReady} from './helpers.mjs';import {docker,names,runServer} from './setup.mjs';
+const {a}=JSON.parse(readFileSync(out+'/accounts.json')),base=readFileSync(out+'/server.env','utf8'),next=randomBytes(32).toString('hex');let fresh,oldJoin;
+async function boot(env){docker(['stop',names.server]);docker(['rm',names.server]);writeFileSync(out+'/rotation.env',env,{mode:0o600});runServer(names.server,out+'/rotation.env');await waitReady();}
+try{
+ oldJoin=(await request('/matches/proto/join',{token:a.token})).data;
+ await boot(base.replace(/^AUTH_JWT_SECRET=.*$/m,'AUTH_JWT_SECRET='+next)+`AUTH_JWT_PREVIOUS_SECRET=${secrets.auth}\nAUTH_JWT_PREVIOUS_UNTIL=${Math.floor(Date.now()/1000)+120}\n`);
+ await test('JWT key rotation grace accepts old session',async()=>assert.equal((await request('/matches/proto/join',{token:a.token})).status,200));
+ await test('JWT key rotation grace accepts old join token',async()=>{const c=await connect(oldJoin);c.ws.close();});
+ await test('JWT key rotation new login works',async()=>{const r=await request('/auth/login',{method:'POST',body:{login:'AuditOwner',password:secrets.password}});assert.equal(r.status,200);fresh=r.data;});
+ await boot(base.replace(/^AUTH_JWT_SECRET=.*$/m,'AUTH_JWT_SECRET='+next)+`AUTH_JWT_PREVIOUS_SECRET=${secrets.auth}\nAUTH_JWT_PREVIOUS_UNTIL=${Math.floor(Date.now()/1000)-1}\n`);
+ await test('JWT old session rejected after grace deadline',async()=>assert.equal((await request('/matches/proto/join',{token:a.token})).status,401));
+ await test('JWT old join rejected after grace deadline',async()=>assert.rejects(connect(oldJoin),/401/));
+ await test('JWT newly signed session remains valid',async()=>assert.equal((await request('/matches/proto/join',{token:fresh.token})).status,200));
+}finally{await boot(base);save('rotation-results.json');}
+
+==================== secrets-check.mjs ====================
+import assert from 'node:assert/strict';import {statSync,readFileSync} from 'node:fs';import {spawnSync} from 'node:child_process';import {out,test,save} from './helpers.mjs';import {docker,names} from './setup.mjs';
+await test('private environment and account files have mode 600',async()=>{for(const f of ['secrets.json','postgres.env','server.env','accounts.json','offline-account.json'])assert.equal(statSync(out+'/'+f).mode&0o777,0o600);assert.equal(statSync(out).mode&0o777,0o700);});
+await test('server TLS key only readable by configured service UID',async()=>{const s=statSync(out+'/certs/server.key');assert.equal(s.uid,65532);assert.equal(s.mode&0o777,0o600);const code="try{require('fs').readFileSync('/certs/server.key');console.log('READABLE')}catch(e){console.log(e.code)}";assert.match(docker(['exec','-u','1001:1001',names.server,'/nodejs/bin/node','-e',code]),/EACCES/);return {uid:s.uid,mode:'0600',unrelatedUIDDenied:true};});
+await test('proxy CA build mount absent from runtime image',async()=>assert.equal(docker(['exec',names.server,'/nodejs/bin/node','-e',"console.log(require('fs').existsSync('/run/secrets/proxy_ca'))"]).trim(),'false'));
+await test('runtime has no shell or development compiler',async()=>{const r=JSON.parse(docker(['exec',names.server,'/nodejs/bin/node','-e',"console.log(JSON.stringify({shell:require('fs').existsSync('/bin/sh'),tsc:require('fs').existsSync('/app/node_modules/.bin/tsc')}))"]));assert.deepEqual(r,{shell:false,tsc:false});return r;});
+save('secrets-results.json');
+
+==================== offline-event.mjs ====================
+import assert from 'node:assert/strict';import {writeFileSync,readFileSync} from 'node:fs';import {out,secrets,request,connect,action,delay} from './helpers.mjs';
+const phase=process.argv[2];let c;
+try{if(phase==='prepare'){
+ const auth=(await request('/auth/register',{method:'POST',body:{login:'OfflineAudit',password:secrets.password}})).data;assert(auth.token);
+ const match=(await request('/matches',{method:'POST',token:auth.token,body:{}})).data;assert(match.matchId);
+ const join=(await request('/matches/'+match.matchId+'/join',{token:auth.token})).data;c=await connect(join,match.matchId);c.clientSeq=0;
+ const beforeSeq=c.seq;const e=action(c,'technology.research',{technology:'industrial_automation'},{matchId:match.matchId,duplicate:true});await delay(500);
+ assert(!c.messages.some(m=>m.type==='rejection'));assert(c.state.players[c.playerId].technologies.active?.some(x=>x.technology==='industrial_automation'));
+ writeFileSync(out+'/offline-account.json',JSON.stringify({auth,join,matchId:match.matchId,playerId:c.playerId}),{mode:0o600});
+ writeFileSync(out+'/offline-event-before.json',JSON.stringify({startedWall:Date.now(),matchId:match.matchId,playerId:c.playerId,beforeSeq,afterSeq:c.seq,actionId:e.actionId,technology:c.state.players[c.playerId].technologies},null,2));console.log('Research scheduled once via duplicate envelope; player disconnected.');
+}else{
+ const account=JSON.parse(readFileSync(out+'/offline-account.json'));const j=await request('/matches/'+account.matchId+'/join',{token:account.auth.token});assert.equal(j.status,200);c=await connect(j.data,account.matchId);const prior=JSON.parse(readFileSync(out+'/offline-event-before.json'));const tech=c.state.players[c.playerId].technologies;const completed=tech.completed.includes('industrial_automation');
+ writeFileSync(out+'/offline-event-after.json',JSON.stringify({completed,offlineWallSeconds:(Date.now()-prior.startedWall)/1000,seq:c.seq,hashChecks:c.hashes,hashErrors:c.errors,technology:tech},null,2));console.log(JSON.stringify({completed,offlineWallSeconds:(Date.now()-prior.startedWall)/1000}));
+}}finally{c?.ws.close();}
+
+==================== clock-restart.mjs ====================
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';import {out,request,connect,delay,waitReady} from './helpers.mjs';import {docker,names} from './setup.mjs';
+const {auth,matchId}=JSON.parse(readFileSync(out+'/offline-account.json'));let c=await connect((await request('/matches/'+matchId+'/join',{token:auth.token})).data,matchId);const before={serverTime:c.welcome.serverTime,stateTime:c.state.time,seq:c.seq,wall:Date.now()};c.ws.close();docker(['stop',names.server]);await delay(20000);docker(['start',names.server]);await waitReady();c=await connect((await request('/matches/'+matchId+'/join',{token:auth.token})).data,matchId);const after={serverTime:c.welcome.serverTime,stateTime:c.state.time,seq:c.seq,wall:Date.now()};assert(after.seq>=before.seq);const expected=before.serverTime+(after.wall-before.wall)*24;const r={before,after,timeScale:24,wallSeconds:(after.wall-before.wall)/1000,expectedGameAdvanceMs:(after.wall-before.wall)*24,actualGameAdvanceMs:after.serverTime-before.serverTime,gameTimeLostMs:expected-after.serverTime,finding:after.serverTime<expected-1000?'clock reanchors to saved snapshot; elapsed wall time not recovered':'clock catches up'};writeFileSync(out+'/clock-restart-results.json',JSON.stringify(r,null,2));console.log(JSON.stringify(r));c.ws.close();
+
+==================== proxy-setup.mjs ====================
+import {writeFileSync} from 'node:fs';import {out} from './helpers.mjs';import {docker,names} from './setup.mjs';
+const config=`{\n auto_https disable_certs\n}\nhttps://localhost:18889 {\n tls /certs/server.crt /certs/caddy.key\n encode gzip\n header Strict-Transport-Security "max-age=31536000; includeSubDomains"\n @operator path /metrics/*\n respond @operator 404\n reverse_proxy https://mg-stack-server:8788 {\n  transport http {\n   tls_server_name localhost\n   tls_trusted_ca_certs /certs/ca.crt\n  }\n }\n}\n`;
+writeFileSync(out+'/Caddyfile',config,{mode:0o644});
+docker(['create','--name','mg-stack-caddy','--network','mg-stack-edge','-e','NO_PROXY='+[process.env.NO_PROXY??'','localhost','127.0.0.1','mg-stack-server','postgres'].join(','),'-e','no_proxy='+[process.env.no_proxy??process.env.NO_PROXY??'','localhost','127.0.0.1','mg-stack-server','postgres'].join(','),'-p','127.0.0.1:18889:18889','-p','127.0.0.1:18889:18889/udp','-p','127.0.0.1:18080:80','--memory','512m','--pids-limit','256','--cap-drop','ALL','--cap-add','NET_BIND_SERVICE','--security-opt','no-new-privileges:true','--mount',`type=bind,src=${out}/Caddyfile,dst=/etc/caddy/Caddyfile,readonly`,'--mount',`type=bind,src=${out}/certs,dst=/certs,readonly`,'--mount','type=volume,src=mg-stack-caddy-data,dst=/data','moongame-stack-caddy:2026-10-10']);docker(['network','connect',names.network,'mg-stack-caddy']);docker(['start','mg-stack-caddy']);console.log('Temporary Caddy proxy started with verified TLS upstream.');
+
+==================== proxy-probes.mjs ====================
+import assert from 'node:assert/strict';import http2 from 'node:http2';import tls from 'node:tls';import {out,ca,test,save,request,waitReady} from './helpers.mjs';import {docker} from './setup.mjs';
+await waitReady(18889);
+await test('Caddy HTTPS forwards verified TLS upstream',async()=>{const r=await request('/health',{port:18889});assert.equal(r.status,200);assert(r.headers['strict-transport-security']);return {status:r.status,altSvc:r.headers['alt-svc']};});
+await test('Caddy blocks operator metrics even with bearer',async()=>assert.equal((await request('/metrics/health',{port:18889})).status,404));
+await test('Caddy real HTTP/2 over verified TLS',()=>new Promise((resolve,reject)=>{const c=http2.connect('https://localhost:18889',{ca,servername:'localhost'});c.on('error',reject);const req=c.request({':path':'/health'});let status;req.on('error',reject);req.on('response',h=>status=h[':status']);req.on('data',()=>{});req.on('end',()=>{const alpn=c.socket.alpnProtocol;assert.equal(status,200);assert.equal(alpn,'h2');c.close();resolve({status,alpn});});req.end();}));
+for(const v of ['1.2','1.3'])await test('Caddy TLS '+v,()=>new Promise((resolve,reject)=>{const s=tls.connect({host:'localhost',port:18889,servername:'localhost',ca,minVersion:'TLSv'+v,maxVersion:'TLSv'+v},()=>{const r={protocol:s.getProtocol(),cipher:s.getCipher().standardName};s.end();resolve(r)});s.on('error',reject);}));
+await test('Caddy CBC only offer rejected',async()=>assert.rejects(new Promise((resolve,reject)=>{const s=tls.connect({host:'localhost',port:18889,servername:'localhost',ca,minVersion:'TLSv1.2',maxVersion:'TLSv1.2',ciphers:'ECDHE-RSA-AES128-SHA256'},()=>{s.end();resolve();});s.on('error',reject);})));
+await test('Caddy admin API not published',async()=>{const r=JSON.parse(docker(['inspect','mg-stack-caddy']))[0];assert(!r.NetworkSettings.Ports['2019/tcp']);return {publishedPorts:Object.keys(r.NetworkSettings.Ports)};});save('proxy-results.json');
+
+==================== http3.py ====================
+import asyncio,json,pathlib,ssl
+from aioquic.asyncio.client import connect
+from aioquic.asyncio.protocol import QuicConnectionProtocol
+from aioquic.quic.configuration import QuicConfiguration
+from aioquic.quic.events import ProtocolNegotiated
+from aioquic.h3.connection import H3Connection,H3_ALPN
+from aioquic.h3.events import HeadersReceived,DataReceived
+out=pathlib.Path('/workspace/full-stack-audit-2026-10-10')
+class Probe(QuicConnectionProtocol):
+ def __init__(self,*a,**kw):
+  super().__init__(*a,**kw);self.http=H3Connection(self._quic);self.done=None;self.status=None;self.alpn=None;self.body=b''
+ def quic_event_received(self,event):
+  if isinstance(event,ProtocolNegotiated):self.alpn=event.alpn_protocol
+  for e in self.http.handle_event(event):
+   if isinstance(e,HeadersReceived):self.status=dict(e.headers).get(b':status')
+   if isinstance(e,DataReceived):
+    self.body+=e.data
+    if e.stream_ended and self.done and not self.done.done():self.done.set_result(True)
+ async def get(self):
+  self.done=asyncio.get_running_loop().create_future();sid=self._quic.get_next_available_stream_id();self.http.send_headers(sid,[(b':method',b'GET'),(b':scheme',b'https'),(b':authority',b'localhost:18889'),(b':path',b'/health')],end_stream=True);self.transmit();await asyncio.wait_for(self.done,10)
+async def main():
+ cfg=QuicConfiguration(is_client=True,alpn_protocols=H3_ALPN,server_name='localhost');cfg.load_verify_locations(cafile=str(out/'certs/ca.crt'));cfg.verify_mode=ssl.CERT_REQUIRED
+ async with connect('127.0.0.1',18889,configuration=cfg,create_protocol=Probe) as p:
+  await p.get();assert p.status==b'200';assert p.alpn=='h3';r={'pass':True,'status':200,'alpn':p.alpn,'transport':'QUIC/UDP with TLS 1.3','certificate_verification':'required, temporary trusted CA + localhost name','health':json.loads(p.body)};print(json.dumps(r));(out/'http3-results.json').write_text(json.dumps(r,indent=2)+'\n')
+async def bounded(): await asyncio.wait_for(main(),15)
+try:asyncio.run(bounded())
+except Exception as e:
+ (out/'http3-results.json').write_text(json.dumps({'pass':False,'detail':str(e)},indent=2)+'\n');raise
+
+==================== browser.mjs ====================
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';import {readFileSync,writeFileSync} from 'node:fs';import {execFileSync} from 'node:child_process';import {createHash} from 'node:crypto';
+const repo='/workspace/MoonGame-stack-audit-2026-10-10',out='/workspace/full-stack-audit-2026-10-10';const require=createRequire(repo+'/package.json');const {chromium}=createRequire(require.resolve('@playwright/mcp/package.json'))('playwright-core');const {waitForApp}=await import(repo+'/prototype/harnessKit.mjs');const secret=JSON.parse(readFileSync(out+'/secrets.json'));
+const pub=execFileSync('openssl',['x509','-in',out+'/certs/server.crt','-pubkey','-noout']);const der=execFileSync('openssl',['pkey','-pubin','-outform','DER'],{input:pub});const pin=createHash('sha256').update(der).digest('base64');
+const browser=await chromium.launch({headless:true,executablePath:'/usr/bin/chromium',args:['--no-sandbox','--disable-dev-shm-usage','--ignore-certificate-errors-spki-list='+pin]});const results=[];
+try{for(const viewport of [{width:1440,height:900},{width:390,height:844}]){const ctx=await browser.newContext({viewport,locale:'ru-RU'}),page=await ctx.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(()=>{window.__auditCsp=[];addEventListener('securitypolicyviolation',e=>window.__auditCsp.push({directive:e.violatedDirective,blocked:e.blockedURI}));});
+try{await page.goto('https://localhost:18888/');await waitForApp(page);await page.locator('#cwnick').waitFor({state:'visible'});await page.locator('#cwnick').fill('BrowserAudit');await page.locator('#cwpass').fill(secret.password);await page.locator('#cwgo').click();await page.locator('#hub-play').waitFor({state:'visible',timeout:15000});await page.locator('#hub-play').click();await page.waitForTimeout(1200);await page.screenshot({path:out+'/browser-'+viewport.width+'.png'});const lobbyEvidence=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,csp:window.__auditCsp,body:document.body.innerText.slice(0,2500),storageKeys:Object.keys(localStorage),controls:[...document.querySelectorAll('button')].filter(e=>e.getClientRects().length).map(e=>({id:e.id,text:e.innerText.slice(0,70)}))}));await page.locator('#mlist .mrow .mbtn').first().click();await page.locator('#setup').waitFor({state:'visible'});if(await page.locator('#scipick.show').isVisible())await page.locator('#sp-go').click();const free=await page.locator('#setup-home-id option').evaluateAll(os=>os.filter(o=>o.value&&!o.disabled).map(o=>o.value));if(await page.locator('#setup-home-id').isVisible())await page.selectOption('#setup-home-id',free[0]);else await page.locator('[data-cand=\"'+free[0]+'\"]').first().click();await Promise.all([page.waitForURL(/\/game\//),page.locator('#setupgo').click()]);await page.waitForTimeout(2000);await page.screenshot({path:out+'/browser-game-'+viewport.width+'.png'});const evidence=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,scrollWidth:document.documentElement.scrollWidth,innerWidth,csp:window.__auditCsp}));assert.equal(evidence.overflow,false);assert.equal(errors.length,0);results.push({viewport,status:'pass',errors,lobbyOverflow:lobbyEvidence.overflow,...evidence,gameJoined:true,gameUrl:page.url()});}catch(e){await page.screenshot({path:out+'/browser-failure-'+viewport.width+'.png'});results.push({viewport,status:'fail',detail:e.message,errors});process.exitCode=1;}finally{await ctx.close();}}
+}finally{await browser.close();writeFileSync(out+'/browser-results.json',JSON.stringify({certificateHandling:'explicit pin of temporary server SPKI for UI automation; cryptographic certificate checks are separate verified-CA Node probes',results},null,2));console.log(JSON.stringify(results.map(x=>({viewport:x.viewport,status:x.status,errors:x.errors,csp:x.csp?.length,overflow:x.overflow,detail:x.detail}))));}
+
+==================== Dockerfile.session ====================
+# syntax=docker/dockerfile:1
+# Deploys the Void Dominion prototype multiplayer server — the in-memory proto
+# server that hosts the prototype's own world AND serves the game HTML (the player
+# client at `/`, the dev client at `/dev` — see prototype/build.mjs). One
+# deploy gives a permanent URL: both players just open it (the connect overlay
+# auto-fills the same-origin wss://), pick Azure / Crimson, and play. State is
+# in-memory and the handshake is unauthenticated — this is for testing, not prod.
+#
+#   docker build -t void-dominion . && docker run -p 8788:8788 void-dominion
+#   (or one-click via render.yaml — see docs/multiplayer.md)
+#
+# Multi-stage: a full node:26-slim builder installs deps and bakes the prototype HTML,
+# then a distroless runtime carries only the installed /app and runs `node` as non-root.
+# Distroless drops the entire Debian userland (perl, pam, bsdutils, gpg, apt, …) that the
+# Node-only server never touches — that base-OS layer was the source of nearly all the
+# `trivy image` MEDIUM CVEs (audit SD-5.1 / F-15). It has no shell or package manager,
+# which also removes the npm/corepack tooling the old single-stage image had to delete.
+#
+# Runtime note: the server bundle is BAKED AT BUILD TIME (see the bundle step below) and
+# the runtime stage runs it directly — so the image ships no esbuild and no dev toolchain.
+# The only write the running container needs is playtest-logs/ (event JSONL); that dir is
+# pre-created in the builder and the tree is owned by the non-root user.
+
+# ---- Stage 1: build (full toolchain) ----
+# Both FROM lines are digest-pinned (audit F-15 / CWE-1357): a tag is mutable, a digest
+# names the exact multi-arch index that was reviewed. To bump: re-resolve the tag's
+# current digest (Docker Hub API `/v2/repositories/library/node/tags/26-slim` for node;
+# `gcr.io/v2/distroless/nodejs22-debian13/manifests/nonroot` Docker-Content-Digest for
+# distroless), update the digest + the refreshed-date below, and re-review .trivyignore.
+# The dates live in these comments, not inline: a `#` after FROM's args would be parsed
+# as extra arguments (Dockerfile comments only count at line start) and break the build.
+# node:26-slim digest refreshed 2026-09-13 (SEC-40; the tag had moved on from the 2026-07
+# pin). This stage is NOT shipped, so the bump closes nothing in `trivy image` — it keeps
+# the builder off a stale base and the SEC-34 pin-vs-tag step quiet.
+FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS build
+WORKDIR /app
+# Node ≥25 no longer ships corepack in the distribution (the 22→26 bump, PR #106,
+# silently broke this line — caught by the SEC-1 blocking trivy-image gate), so install
+# it explicitly (version-pinned; it then fetches the exact pnpm from `packageManager`).
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca npm install -g corepack@0.35.0 && corepack enable
+
+# Install deps first (cached unless the lockfile/manifests change), then the source.
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/shared-core/package.json packages/shared-core/
+COPY packages/server/package.json packages/server/
+COPY packages/client/package.json packages/client/
+COPY packages/action-layer/package.json packages/action-layer/
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca pnpm install --frozen-lockfile
+
+COPY . .
+# The base still carries libc6 deb13u3. Stage Debian's fixed package separately:
+# bytes + architecture + version are checked before extraction; no package scripts run.
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca node deploy/runtime/prepare-libc.mjs /runtime-libc
+# Same for libssl3t64 deb13u2 (SEC-42): apt fetches the pinned deb13u3 and accepts it only
+# against Debian's signed index (this digest-pinned builder's keyring); no package scripts run.
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca node deploy/runtime/prepare-libssl.mjs /runtime-libssl
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca pnpm run prototype # bake dist/void-dominion{,-player}.html (player at /, dev at /dev)
+
+# Bake the server bundle HERE instead of at container startup. Two reasons, and the
+# second one is the important one:
+#   1. Startup gets shorter and deterministic — no transpile on every boot.
+#   2. It removes esbuild from the RUNTIME requirements, which is what finally lets the
+#      dev-toolchain drop below happen. The root package.json has NO production
+#      dependencies at all — esbuild, typescript, eslint, vitest and prettier are all
+#      devDependencies — so as long as the server needed esbuild to boot, the image had
+#      to ship the whole dev toolchain into production.
+# What made this concrete: TypeScript 7 started shipping a NATIVE Go-compiled tsc, and
+# Trivy found Go CVEs inside our production image, in
+# `node_modules/.pnpm/@typescript+typescript-linux-x64/.../tsc` (blocked PR #489). The
+# vulnerability was in a compiler that has no business being in production at all.
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca node prototype/bundle-netserver.mjs
+
+# Drop devDependencies from the tree that gets copied into the runtime stage: re-resolve
+# node_modules with --prod, which removes the root's toolchain (esbuild, typescript,
+# eslint, vitest, prettier, …) and keeps every workspace project's real dependencies —
+# `packages/server`'s ws/pg/fastify (left external by the bundle) plus @fastify/rate-limit,
+# jose and web-push, which the bundle inlines but whose native/optional parts resolve at
+# runtime. The baked HTML and the bundle itself are untouched.
+#
+# NOT `pnpm prune --prod`, which is the obvious choice and is wrong here: `prune` operates
+# on ONE project, so at the workspace root it rewrites the modules layout with only the
+# root importer included and leaves every packages/*/node_modules EMPTY. The image still
+# builds and Trivy still scans it clean — nothing runs the server — but the container dies
+# at boot on `Cannot find module 'ws'`. `install --prod` covers all importers.
+#
+# CI=true is load-bearing, not decoration: this purges node_modules, and pnpm 10 asks for
+# interactive confirmation first. `docker build` has no TTY, so pnpm refuses outright
+# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY) and the build dies here. The variable is
+# scoped to this one RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca so it cannot change how any other step behaves.
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca CI=true pnpm install --prod --frozen-lockfile --ignore-scripts
+
+# Pre-create the dir the server writes at runtime so it exists (and, after the
+# COPY --chown below, is owned by the non-root user): playtest-logs/ (event JSONL).
+# packages/server/dist/ already exists — the bundle above lives there.
+RUN --mount=type=secret,id=proxy_ca,required=true NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca SSL_CERT_FILE=/run/secrets/proxy_ca mkdir -p playtest-logs
+
+# ---- Stage 2: runtime (distroless, no shell, non-root by default) ----
+# The :nonroot tag runs as uid 65532. Base is nodejs22-**debian13** (trixie): upstream
+# deprecated the nodejs*-debian12 repos (their digests carry deprecated-public-image-*
+# tags; last rebuild 2026-02), so debian12 is frozen with the libssl3/libc6 CVEs Trivy
+# flags — debian13 is the actively rebuilt line with current trixie-security packages.
+# Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
+# nodejs22-debian13:nonroot digest refreshed 2026-09-08 (SEC-34) and re-checked against the
+# tag on 2026-09-13 (SEC-40) — upstream has not rebuilt, so the pin is still the newest.
+# Read from its amd64 package inventory on 2026-09-13: libssl3t64 3.5.7-1~deb13u2,
+# libc6 2.41-12+deb13u3. The former already fixes the old openssl ignore group.
+# SEC-39 overlays the complete, SHA-256-pinned Debian libc6 deb13u4 package plus its
+# inventory, fixing CVE-2026-5450/5928 while keeping the runtime shell/package-manager free.
+# SEC-42 overlays the complete Debian libssl3t64 3.5.7-1~deb13u3 package too (13 fixable
+# openssl CVEs, two HIGH), verified by apt against Debian's signed index instead of a repo
+# hash. On 2026-09-30 the tag already pointed at a rebuild (sha256:5ef534d3…) with libc6
+# deb13u4 but still libssl3t64 deb13u2 — a bump alone would not have closed them.
+# On a base bump, compare actual package versions and remove each overlay once upstream
+# includes its fix; a scan with old suppressions cannot establish that a CVE was fixed.
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b AS runtime
+COPY --from=build /runtime-libc/ /
+COPY --from=build /runtime-libssl/ /
+# Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
+# bundle) and hand the tree to the non-root user so the one runtime write left
+# (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout, so copying
+# all of /app keeps the links valid.
+COPY --from=build --chown=nonroot:nonroot /app /app
+WORKDIR /app
+USER nonroot
+
+ENV HOST=0.0.0.0
+ENV PORT=8788
+# ZTP-1.1: the commit this image was built from, reported by GET /health so the running
+# build is visible without logging into the host. image.yml passes it; a local build
+# leaves it empty and /health simply omits the field. Declared this late on purpose: an
+# ARG invalidates the cache of every layer after it, and here nothing follows but metadata.
+ARG GIT_SHA=""
+ENV GIT_SHA=${GIT_SHA}
+EXPOSE 8788
+# Liveness probe (Trivy DS026). Distroless has no shell or curl, so the probe is
+# exec-form node hitting the server's own contentless GET /health. It reads $PORT the
+# same way the server does, so a platform-injected PORT moves both together.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
+  CMD ["/nodejs/bin/node", "-e", "fetch(`http://127.0.0.1:${process.env.PORT||8788}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+# distroless/nodejs ENTRYPOINT is already ["/nodejs/bin/node"], so CMD is just the script.
+# Runs the PRE-BUILT bundle, not prototype/netserver.mjs: that one bundles on startup and
+# therefore needs esbuild, which no longer ships in this image. The bundle reads $PORT the
+# same way (platforms like Render/Fly inject their own).
+CMD ["packages/server/dist/proto-server.mjs"]
+
+==================== Dockerfile.caddy-session ====================
+# syntax=docker/dockerfile:1
+# Void Dominion — собственная сборка Caddy (SEC-31).
+#
+# ЗАЧЕМ. Апстримный `caddy:2-alpine` не пересобирали с 2026-06-22, а его Go-бинарь собран
+# go1.26.3. За это время в stdlib набралось 14 находок, и шесть из семи ДОСТИЖИМЫХ у нас
+# (разбор — запись SEC-30 в docs/security/pipeline.md) закрываются одной лишь сменой
+# тулчейна: всем им хватает 1.26.4 / 1.26.5 / 1.26.6. Ждать апстрима оказалось нерабочим
+# планом дважды подряд, поэтому пересобираем сами.
+#
+# ЧТО ЗАКРЫТО СВЕРХ ТУЛЧЕЙНА (SEC-40). Две группы, которые SEC-31 оставил открытыми
+# сознательно, закрыты здесь — обе решением владельца, а не побочным эффектом:
+#   · пакеты базового образа (curl, libcurl, libcrypto3/libssl3, c-ares) — `apk upgrade`
+#     в рантайм-стадии, разбор размена у самой инструкции;
+#   · модули Go поверх `go.mod` caddy (x/crypto, grpc и приехавший с ними x/net) — в
+#     аргументах `xcaddy build` ниже.
+# Ждать апстрима было нечего, и это проверено 2026-09-13 запросом к реестру: теги
+# `2-alpine` = `alpine` = `2.11-alpine` = `2.11.4-alpine` указывают на тот же
+# `sha256:5f5c8640…` от 2026-06-24, а v2.11.4 остаётся последним релизом caddy
+# (`go list -m -versions github.com/caddyserver/caddy/v2`). То есть ни перепин базы, ни
+# бамп версии самого caddy не закрыли бы НИ ОДНОЙ находки — закрывает только то, что ниже.
+#
+# Обе стадии пинены по дайджесту (A08) и попадают под шаг «пин против тега» (SEC-34) —
+# он читает `Dockerfile` любого уровня, так что протухание этих пинов будет видно.
+#
+# КТО ЭТОТ ФАЙЛ СОБИРАЕТ. Три места, и правка здесь задевает все три: джоба `trivy-caddy`
+# (`security.yml`) — сканирует и проверяет приёмку на каждом пуше; джоба `publish-caddy`
+# (`image.yml`, SEC-35) — та же приёмка плюс смоук, потом пуш подписанного дайджеста в
+# GHCR; и `build:` в `deploy/docker-compose.tls.yml` — сборка на хосте для плейтеста.
+# В прод едет только образ из второй: `deploy/docker-compose.release-tls.yml`.
+
+# go1.26.8 + GOTOOLCHAIN=local + CADDY_VERSION=v2.11.4 + xcaddy — всё внутри образа
+# (проверено чтением его конфига). `GOTOOLCHAIN=local` важен: без него go.mod caddy
+# (`go 1.25.1`) мог бы утянуть другой тулчейн, и смысл пересборки бы потерялся.
+FROM caddy:2-builder-alpine@sha256:1a1689db91cfb390b2d856a1b3774e796852822cd723fa54c475b272f82bb4b7 AS builder
+
+# МОДУЛЬНЫЕ БАМПЫ — их три (SEC-40; до этого был один, x/text). Правило SEC-31 «никаких
+# непроверенных апстримом комбинаций в бинаре, терминирующем TLS» пересмотрено владельцем:
+# находки С ОПУБЛИКОВАННЫМ фиксом копились в отчёте быстрее, чем апстрим выпускал релизы,
+# а релиза, который принёс бы их сам, не существует — v2.11.4 последний.
+#
+#   · `x/text@v0.41.0` — CVE-2026-56852 (бесконечный цикл в `unicode/norm` от управляемого
+#     атакующим SNI). Стояло `v0.39.0`, и подняли не «заодно»: grpc v1.83.2 требует
+#     x/text v0.41.0, после чего `go get x/text@v0.39.0` падает с «indirectly requires
+#     golang.org/x/text@v0.41.0, not …@v0.39.0» — поймано прогоном, а не угадано.
+#   · `x/crypto/ocsp@v0.56.0` — бампит МОДУЛЬ x/crypto: CVE-2026-56854 (CRITICAL, фикс
+#     0.55.0) плюс CVE-2026-56855 и CVE-2026-78662 (дедлоки SSH-мультиплексора, фикс
+#     0.56.0). Берём минимум, закрывающий ВСЕ известные находки модуля, а не только
+#     CRITICAL. Аргумент — ПОДПАКЕТ, потому что у `golang.org/x/crypto` в корне нет ни
+#     одного `.go` (проверено по zip модуля с proxy.golang.org), а `--with` обязан быть
+#     импортируемым; `ocsp` в бинарь и так линкуется — его тянет certmagic ради OCSP.
+#   · `grpc@v1.83.2` — CVE-2026-84304, CVE-2026-84445 и GHSA-hrxh-6v49-42gf. Фиксы у них
+#     разъехались по линиям 1.82.x/1.83.x, поэтому берём 1.83.2 — она покрывает все три
+#     (подтверждено приёмкой: ни одного из трёх id в отчёте по собранному образу нет).
+#     Корень модуля импортируем, и пакет в бинаре уже есть
+#     (`go list -deps` на голом caddy+standard показывает и его, и `x/crypto/ocsp`), так
+#     что blank-импорт ничего нового в бинарь не добавляет.
+#
+# ПОБОЧНО приезжает `x/net 0.55.0 → 0.58.0` (требование grpc v1.83.2) и закрывает заодно
+# CVE-2026-46600 в x/net — ту самую, из-за которой приёмка сверяет ПАРУ (id, пакет).
+#
+# Почему `--with` для не-плагина вообще работает: xcaddy подставляет blank-импорт КАЖДОГО
+# `--with` в сгенерированный main.go (`environment.go`, шаблон `mainModuleTemplate`),
+# поэтому аргумент обязан быть импортируемым ПАКЕТОМ, а не просто модулем. У
+# `golang.org/x/text` корень импортируем (`doc.go` объявляет `package text`, `gen.go` под
+# `//go:build ignore`), у `google.golang.org/grpc` — тоже; у `x/crypto` нет, отсюда `ocsp`.
+#
+# ПРОВЕРЕНО СБОРКОЙ, а не рассуждением: ту же последовательность `go get`, которую делает
+# xcaddy, прогнали на тулчейне go1.26.8, и `go version -m` у полученного бинаря даёт
+# caddy v2.11.4, x/crypto v0.56.0, x/text v0.41.0, x/net v0.58.0, grpc v1.83.2 — ровно те
+# версии, которые прочитает Trivy.
+#
+# `xcaddy build` без версии собирает CADDY_VERSION образа (v2.11.4) и кладёт результат в
+# ./caddy при WORKDIR=/usr/bin — отсюда путь в COPY ниже.
+RUN --mount=type=secret,id=proxy_ca,required=true SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca xcaddy build \
+  --with golang.org/x/text@v0.41.0 \
+  --with golang.org/x/crypto/ocsp@v0.56.0 \
+  --with google.golang.org/grpc@v1.83.2
+
+# Рантайм — тот же апстримный образ, что стоял в compose до SEC-31: он несёт конфиг,
+# каталоги данных, entrypoint и штатный curl для пробы здоровья. Меняем в нём две вещи:
+# обновляем пакеты базы и подменяем бинарь (до SEC-40 менялся только бинарь).
+FROM caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+
+# ПАКЕТЫ БАЗЫ (SEC-40). Апстрим не пересобирал этот образ с 2026-06-22, поэтому в нём
+# лежат curl/libcurl 8.19.0-r0 (фикс 8.22.0-r0), libcrypto3/libssl3 3.5.7-r0 (фикс
+# 3.5.8-r0) и c-ares 1.34.6-r0 (фикс 1.34.8-r0) — у всех фикс в бранче Alpine уже
+# опубликован. Перепиновывать нечего (тег указывает на этот же дайджест), так что обновить
+# их можно ровно здесь и никак иначе.
+#
+# ЧЕМ ПЛАТИМ, честно. Образ перестаёт быть побитово воспроизводимым: `apk upgrade` берёт
+# то, что лежит в бранче НА МОМЕНТ СБОРКИ, и две сборки в разные дни дадут разные слои.
+# Размен принят сознательно: в проде не должен жить заведомо дырявый `curl`, который
+# исполняется каждые 10 секунд пробой здоровья ниже. Воспроизводимость при этом держится
+# на другом уровне и не потеряна — в прод едет ОДИН подписанный дайджест из `image.yml`
+# (SEC-35), а не обещание «пересоберём так же».
+#
+# Пины версий пакетов тут не помогли бы: apk-репозиторий бранча хранит только ПОСЛЕДНЮЮ
+# версию пакета, и `apk add curl=8.22.0-r0` сломает сборку в день следующего обновления.
+# `--no-cache` — чтобы индекс не оседал слоем в образе.
+#
+# Порядок важен: upgrade идёт ДО копирования нашего бинаря. `caddy` в этом образе не
+# apk-пакет (апстрим кладёт его из своей сборочной стадии), но если апстрим когда-нибудь
+# переедет на пакет, наш бинарь всё равно ляжет последним.
+RUN --mount=type=secret,id=proxy_ca,required=true SSL_CERT_FILE=/run/secrets/proxy_ca CURL_CA_BUNDLE=/run/secrets/proxy_ca apk upgrade --no-cache
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+
+# Проба живости (Trivy DS026). Та же, что уже стояла у сервиса в `docker-compose.tls.yml`
+# (SEC-20): admin-API Caddy на 127.0.0.1:2019 наружу не публикуется, а `/config/` отвечает
+# только когда конфиг загружен — то есть проба различает «процесс запустился» и «процесс
+# обслуживает». Здесь она нужна ещё и потому, что compose-проба образ не сопровождает: с
+# появлением своего Dockerfile тот же самый образ стал сканируемым, и без HEALTHCHECK
+# внутри него `trivy-fs` был прав. `curl` в базовом образе штатный (apk-пакет).
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS -o /dev/null http://127.0.0.1:2019/config/ || exit 1
+
+# `USER` тут НЕТ намеренно, и это осознанный принятый риск (Trivy DS002), а не недосмотр:
+# контейнер обязан слушать привилегированные 80/443, а под non-root это требует ambient
+# capability, которую docker не выставляет. Полный разбор, чем риск закрыт сейчас
+# (`cap_drop: ALL` + только NET_BIND_SERVICE + `no-new-privileges`) и что нужно, чтобы
+# уйти на non-root, — в `.trivyignore-fs.yaml`; работа заведена кирпичом SEC-36.
+
+==================== bin/psql ====================
+#!/usr/bin/env python3
+import os,sys,subprocess,urllib.parse,pathlib
+args=sys.argv[1:]; env=os.environ.copy()
+for k in ['DOCKER_HOST','DOCKER_CONTEXT','DOCKER_TLS','DOCKER_TLS_VERIFY','DOCKER_CERT_PATH']:env.pop(k,None)
+for i,arg in enumerate(args):
+ if i and args[i-1] in ['-d','--dbname'] and '://' in arg:
+  u=urllib.parse.urlsplit(arg);env['PGPASSWORD']=urllib.parse.unquote(u.password or '')
+  args[i]=u.path.lstrip('/')
+  args.extend(['-h','127.0.0.1','-p','5432','-U',urllib.parse.unquote(u.username or 'void')]);break
+input_bytes=None
+if '-f' in args:
+ index=args.index('-f')
+ input_bytes=pathlib.Path(args[index+1]).read_bytes();args[index+1]='-'
+cmd=['docker','--host=unix:///var/run/docker.sock','exec','-i','--env','PGPASSWORD','mg-stack-gate-pg',pathlib.Path(sys.argv[0]).name]+args
+sys.exit(subprocess.run(cmd,env=env,input=input_bytes).returncode)

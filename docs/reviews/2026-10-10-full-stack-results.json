@@ -1,0 +1,1209 @@
+{
+  "schema": 1,
+  "date": "2026-10-10 UTC",
+  "audited_container_source": "7466e6fc342c71cd565bb12b678226b81d358cbf",
+  "publication_base": "f1c700c12046576dcaa5c6be241bb8d8a863b6dd",
+  "case_records": 115,
+  "assessment": "Observed weaknesses remain; passing observation cases are not security certification.",
+  "cases": {
+    "baseline": [
+      {
+        "name": "production health/version",
+        "status": "pass",
+        "evidence": {
+          "ok": true,
+          "version": "7466e6fc342c"
+        }
+      },
+      {
+        "name": "ready probes persistent store",
+        "status": "pass",
+        "evidence": {
+          "ready": true
+        }
+      },
+      {
+        "name": "production auth enabled",
+        "status": "pass"
+      },
+      {
+        "name": "native TLS 1.3",
+        "status": "pass",
+        "evidence": {
+          "protocol": "TLSv1.3",
+          "cipher": "TLS_AES_256_GCM_SHA384",
+          "alpn": false
+        }
+      },
+      {
+        "name": "native TLS 1.2",
+        "status": "pass",
+        "evidence": {
+          "protocol": "TLSv1.2",
+          "cipher": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+          "alpn": false
+        }
+      },
+      {
+        "name": "CBC negotiation observation",
+        "status": "pass",
+        "evidence": {
+          "finding": "native TLS 1.2 CBC accepted",
+          "protocol": "TLSv1.2",
+          "cipher": "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
+          "alpn": false
+        }
+      },
+      {
+        "name": "reject TLS 1",
+        "status": "pass"
+      },
+      {
+        "name": "reject TLS 1.1",
+        "status": "pass"
+      },
+      {
+        "name": "reject untrusted CA",
+        "status": "pass"
+      },
+      {
+        "name": "reject wrong hostname",
+        "status": "pass"
+      },
+      {
+        "name": "HTTPS security headers",
+        "status": "pass",
+        "evidence": {
+          "content-security-policy": "default-src 'none'; script-src 'sha256-tzmPmvCpGYaFnUvSQJzSG2L1wNzS5b2b0hSCZyvt9BU='; style-src 'sha256-dw7W7FY2sA6oTFdiHQExHHg+fT1H0gCCe5ftYcWMvmw=' 'sha256-Z2FXTfzrykr06rhO7ZE4Ns0ld4BYQ+SBHwJNKr1tBwE='; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' wss:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; worker-src 'none'",
+          "strict-transport-security": "max-age=31536000; includeSubDomains",
+          "cache-control": "no-store, must-revalidate"
+        }
+      },
+      {
+        "name": "unauthenticated join rejected",
+        "status": "pass"
+      },
+      {
+        "name": "metrics hidden without operator token",
+        "status": "pass",
+        "evidence": {
+          "status": 404
+        }
+      },
+      {
+        "name": "metrics authorized with operator token",
+        "status": "pass",
+        "evidence": {
+          "ok": true,
+          "alerts": [],
+          "players": {
+            "joins": 0,
+            "leaves": 0,
+            "connected": 0
+          },
+          "actions": {
+            "total": 0,
+            "ok": 0,
+            "rejected": 0
+          },
+          "domain": {
+            "battles": 0,
+            "captures": 0
+          },
+          "latency": {
+            "submitMs": null,
+            "broadcastMs": null
+          }
+        }
+      },
+      {
+        "name": "admin routes absent by default",
+        "status": "pass"
+      },
+      {
+        "name": "register two real persistent accounts",
+        "status": "pass"
+      },
+      {
+        "name": "case insensitive duplicate account rejected",
+        "status": "pass"
+      },
+      {
+        "name": "uniform unknown and wrong password responses",
+        "status": "pass"
+      },
+      {
+        "name": "SQL injection shaped login safely rejected",
+        "status": "pass"
+      },
+      {
+        "name": "session claim tampering rejected",
+        "status": "pass"
+      },
+      {
+        "name": "expired session isolated from issuer and fingerprint failures",
+        "status": "pass",
+        "evidence": {
+          "validControlStatus": 200,
+          "expiredStatus": 401,
+          "issuer": "void-dominion",
+          "audience": "session",
+          "fingerprint": "current DB password"
+        },
+        "harnessCorrection": "proper production issuer plus valid positive control"
+      },
+      {
+        "name": "join uses session identity despite nick query",
+        "status": "pass"
+      },
+      {
+        "name": "session bearer cannot replace join bearer",
+        "status": "pass"
+      },
+      {
+        "name": "cross origin WSS denied",
+        "status": "pass"
+      },
+      {
+        "name": "WSS trusted certificate + gated welcome",
+        "status": "pass",
+        "evidence": {
+          "playerId": "p1",
+          "seq": 1
+        }
+      },
+      {
+        "name": "malformed cross-player envelope rejected (initial probe)",
+        "status": "pass",
+        "evidence": [
+          "E_BAD_ACTION_ID"
+        ],
+        "coverage_note": "E_BAD_ACTION_ID only; valid envelope authorization is established by review_followup E_FORBIDDEN"
+      },
+      {
+        "name": "bare action cannot bypass production gate",
+        "status": "pass"
+      },
+      {
+        "name": "recover known and unknown emails same response",
+        "status": "pass",
+        "evidence": {
+          "status": 200,
+          "mailer": "shipping entry logs metadata; no SMTP/API transport wired"
+        }
+      },
+      {
+        "name": "default mail log does not expose reset bearer",
+        "status": "pass",
+        "evidence": {
+          "recipientMetadataLogged": true,
+          "tokenLogged": false,
+          "harnessCorrection": "Docker stdout and stderr both captured"
+        }
+      },
+      {
+        "name": "runtime DB connection baseline",
+        "status": "pass",
+        "evidence": {
+          "ssl": false,
+          "version": null,
+          "cipher": null
+        }
+      },
+      {
+        "name": "runtime cannot DDL",
+        "status": "pass"
+      },
+      {
+        "name": "runtime cannot create role",
+        "status": "pass"
+      },
+      {
+        "name": "runtime cannot admin password catalog",
+        "status": "pass"
+      },
+      {
+        "name": "runtime cannot temporary table",
+        "status": "pass"
+      },
+      {
+        "name": "runtime cannot schema mutation",
+        "status": "pass"
+      },
+      {
+        "name": "runtime credentials excluded from response",
+        "status": "pass"
+      },
+      {
+        "name": "container hardening effective",
+        "status": "pass",
+        "evidence": {
+          "user": "nonroot",
+          "capDrop": [
+            "ALL"
+          ],
+          "securityOpt": [
+            "no-new-privileges:true"
+          ],
+          "memory": 1073741824,
+          "pids": 512,
+          "health": {
+            "Test": [
+              "CMD",
+              "/nodejs/bin/node",
+              "-e",
+              "fetch(`http://127.0.0.1:${process.env.PORT||8788}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+            ],
+            "Interval": 30000000000,
+            "Timeout": 3000000000,
+            "StartPeriod": 10000000000
+          }
+        }
+      },
+      {
+        "name": "untrusted container network blocked from PG",
+        "status": "pass",
+        "evidence": "blocked"
+      },
+      {
+        "name": "server runtime version",
+        "status": "pass",
+        "evidence": {
+          "node": "v22.23.2",
+          "openssl": "3.5.7",
+          "tlsMin": "TLSv1.2"
+        }
+      }
+    ],
+    "database-tls": [
+      {
+        "name": "PostgreSQL verified TLS 1.3 and SCRAM runtime login",
+        "status": "pass",
+        "evidence": {
+          "ssl": true,
+          "version": "TLSv1.3",
+          "cipher": "TLS_AES_256_GCM_SHA384"
+        }
+      },
+      {
+        "name": "PostgreSQL rejects plaintext",
+        "status": "pass"
+      },
+      {
+        "name": "PostgreSQL rejects wrong CA",
+        "status": "pass"
+      },
+      {
+        "name": "PostgreSQL rejects wrong hostname",
+        "status": "pass"
+      },
+      {
+        "name": "PostgreSQL rejects TLS 1.2",
+        "status": "pass"
+      },
+      {
+        "name": "shipping app starts with verified DB TLS URL",
+        "status": "pass",
+        "harnessCorrection": "Wait for actual readiness after five durable matches load"
+      },
+      {
+        "name": "runtime strict privilege guard still passes over TLS",
+        "status": "pass",
+        "harnessCorrection": "Wait for actual readiness after five durable matches load"
+      }
+    ],
+    "runtime-security": [
+      {
+        "name": "admin identity requires session",
+        "status": "pass"
+      },
+      {
+        "name": "ordinary player denied admin role",
+        "status": "pass"
+      },
+      {
+        "name": "configured admin recognized",
+        "status": "pass",
+        "evidence": {
+          "login": "AuditOwner",
+          "admin": true
+        }
+      },
+      {
+        "name": "ordinary player cannot kick another player",
+        "status": "pass"
+      },
+      {
+        "name": "admin roster only visible to admin",
+        "status": "pass"
+      },
+      {
+        "name": "join token cannot connect another existing match",
+        "status": "pass",
+        "harnessCorrection": "seeded matches use random IDs, not proto-2"
+      },
+      {
+        "name": "oversized real WSS frame closes connection",
+        "status": "pass",
+        "evidence": {
+          "code": 1009
+        }
+      },
+      {
+        "name": "compressed bomb bounded by inflated payload",
+        "status": "pass",
+        "evidence": {
+          "code": 1009
+        }
+      },
+      {
+        "name": "real raw message flood drops excess before parsing",
+        "status": "pass",
+        "evidence": {
+          "sent": 220,
+          "parsedErrors": 50,
+          "excessDropped": true,
+          "connectionStillOpen": true
+        },
+        "harnessCorrection": "actual contract drops excess, does not close socket"
+      },
+      {
+        "name": "default auth brute force budget is enforced",
+        "status": "pass",
+        "evidence": {
+          "attempts": 43,
+          "throttled": 3,
+          "configuredBudget": "default 40/minute, shared across auth routes"
+        }
+      },
+      {
+        "name": "native TLS Docker healthcheck observation",
+        "status": "pass",
+        "evidence": {
+          "finding": "Dockerfile healthcheck always uses HTTP, incompatible with native TLS",
+          "health": "unhealthy",
+          "healthcheck": [
+            "CMD",
+            "/nodejs/bin/node",
+            "-e",
+            "fetch(`http://127.0.0.1:${process.env.PORT||8788}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+          ]
+        }
+      },
+      {
+        "name": "fail secure startup: missing auth secret",
+        "status": "pass",
+        "evidence": {
+          "exit": 1
+        }
+      },
+      {
+        "name": "fail secure startup: gate disabled",
+        "status": "pass",
+        "evidence": {
+          "exit": 1
+        }
+      },
+      {
+        "name": "fail secure startup: seat lock disabled",
+        "status": "pass",
+        "evidence": {
+          "exit": 1
+        }
+      },
+      {
+        "name": "fail secure startup: missing origin allowlist",
+        "status": "pass",
+        "evidence": {
+          "exit": 1
+        }
+      },
+      {
+        "name": "fail secure startup: half configured TLS",
+        "status": "pass",
+        "evidence": {
+          "exit": 1
+        }
+      },
+      {
+        "name": "fail secure startup: admin DB credentials with strict guard",
+        "status": "pass",
+        "evidence": {
+          "exit": 1
+        }
+      }
+    ],
+    "mail": [
+      {
+        "name": "persistent shared auth API registers recovery account",
+        "status": "pass"
+      },
+      {
+        "name": "reset delivered to local SMTP fixture",
+        "status": "pass",
+        "evidence": {
+          "mailCount": 1,
+          "transport": "test-injected Mailer to loopback SMTP sink; shipping entry has no SMTP adapter"
+        }
+      },
+      {
+        "name": "unknown email not delivered but uniform response",
+        "status": "pass"
+      },
+      {
+        "name": "modified reset token rejected",
+        "status": "pass"
+      },
+      {
+        "name": "expired reset isolated from issuer and fingerprint failures",
+        "status": "pass",
+        "evidence": {
+          "validSignatureAndClaimsControl": true,
+          "expiredStatus": 401,
+          "issuer": "void-dominion",
+          "audience": "reset"
+        },
+        "harnessCorrection": "proper production issuer plus valid positive control"
+      },
+      {
+        "name": "reset bearer cannot log in as session",
+        "status": "pass"
+      },
+      {
+        "name": "reset changes password and revokes old session",
+        "status": "pass"
+      },
+      {
+        "name": "spent reset bearer rejected sequentially",
+        "status": "pass"
+      },
+      {
+        "name": "old password rejected and new password works",
+        "status": "pass"
+      },
+      {
+        "name": "delivery failure never exposes account existence",
+        "status": "pass"
+      },
+      {
+        "name": "concurrent reuse of one reset token observation",
+        "status": "pass",
+        "evidence": {
+          "statuses": [
+            200,
+            200
+          ],
+          "successes": 2,
+          "finding": "same token accepted twice concurrently; no atomic fingerprint compare-and-set"
+        }
+      }
+    ],
+    "backup-drill": [
+      {
+        "name": "backup refuses plaintext without explicit opt-in",
+        "status": "pass"
+      },
+      {
+        "name": "encrypted backup captures stopped complete game DB",
+        "status": "pass",
+        "evidence": {
+          "tables": 30,
+          "rows": 8639,
+          "cipherBytes": 296855
+        }
+      },
+      {
+        "name": "correct key decrypts and wrong key fails",
+        "status": "pass"
+      },
+      {
+        "name": "tamper with recomputed SHA rejected before SQL",
+        "status": "pass"
+      },
+      {
+        "name": "wrong restore identity cannot change DB",
+        "status": "pass"
+      },
+      {
+        "name": "real destructive restore returns every row fingerprint",
+        "status": "pass",
+        "evidence": {
+          "restoreSeconds": 0.724,
+          "tables": 30,
+          "tableFingerprints": [
+            {
+              "table": "arsenal",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "ava_challenges",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "ava_feed",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "ava_results",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "ava_roster",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "ava_sessions",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "commander_credits",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "commander_xp",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "corp_arsenal_rent",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "corp_audit",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "corp_members",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "corp_ready",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "corps",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "drop_claims",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "drop_meta",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "friend_edges",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "matches",
+              "count": 19,
+              "fingerprint": "35f2f76991e00eb30e7ce2fb35b62a52"
+            },
+            {
+              "table": "medals",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "meta_market_ledger",
+              "count": 1,
+              "fingerprint": "9fe5ccf2db79a6ac195f7fb95230e26c"
+            },
+            {
+              "table": "meta_market_listings",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "meta_wallets",
+              "count": 1,
+              "fingerprint": "06e535599725fe6126b0cf9e309c51e4"
+            },
+            {
+              "table": "player_profiles",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "player_ready",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "profile_credits",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "profile_progress",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "push_subscriptions",
+              "count": 0,
+              "fingerprint": "EMPTY"
+            },
+            {
+              "table": "receipts",
+              "count": 8489,
+              "fingerprint": "19814fd0a9dee27fd5e42749eb5a2f84"
+            },
+            {
+              "table": "seats",
+              "count": 84,
+              "fingerprint": "6bb7566ad166f9aa9898542b999eb068"
+            },
+            {
+              "table": "users",
+              "count": 44,
+              "fingerprint": "942ff888533da093f0faa21f9a5f7252"
+            },
+            {
+              "table": "vd_schema_revision",
+              "count": 1,
+              "fingerprint": "386754f101349c6b8fb911c97feaff34"
+            }
+          ]
+        }
+      },
+      {
+        "name": "restored strict role access observation",
+        "status": "pass",
+        "evidence": {
+          "finding": "restore omits ownership and ACL; runtime SELECT denied after successful data restore",
+          "code": "42501"
+        }
+      },
+      {
+        "name": "reprovision roles restores service without losing data",
+        "status": "pass",
+        "evidence": {
+          "roleProvisionAndStartupSeconds": 1.441
+        }
+      }
+    ],
+    "proxy": [
+      {
+        "name": "Caddy HTTPS forwards verified TLS upstream",
+        "status": "pass",
+        "evidence": {
+          "status": 200,
+          "altSvc": "h3=\":18889\"; ma=2592000"
+        }
+      },
+      {
+        "name": "Caddy blocks operator metrics even with bearer",
+        "status": "pass"
+      },
+      {
+        "name": "Caddy real HTTP/2 over verified TLS",
+        "status": "pass",
+        "evidence": {
+          "status": 200,
+          "alpn": "h2"
+        }
+      },
+      {
+        "name": "Caddy TLS 1.2",
+        "status": "pass",
+        "evidence": {
+          "protocol": "TLSv1.2",
+          "cipher": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        }
+      },
+      {
+        "name": "Caddy TLS 1.3",
+        "status": "pass",
+        "evidence": {
+          "protocol": "TLSv1.3",
+          "cipher": "TLS_AES_128_GCM_SHA256"
+        }
+      },
+      {
+        "name": "Caddy CBC only offer rejected",
+        "status": "pass"
+      },
+      {
+        "name": "Caddy admin API not published",
+        "status": "pass",
+        "evidence": {
+          "publishedPorts": [
+            "18889/tcp",
+            "18889/udp",
+            "2019/tcp",
+            "443/tcp",
+            "443/udp",
+            "80/tcp"
+          ]
+        }
+      }
+    ],
+    "chaos": [
+      {
+        "name": "connection resync after client network interruption",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 2100,
+          "reconnectedSeq": 2100,
+          "hashChecks": 1
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
+      },
+      {
+        "name": "graceful server restart preserves account and match",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 2100,
+          "afterSeq": 2100,
+          "recoverySeconds": 2.432
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
+      },
+      {
+        "name": "SIGKILL automatic restart preserves committed state",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 2100,
+          "afterSeq": 2100,
+          "recoverySeconds": 5.964,
+          "restartCount": 1
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
+      },
+      {
+        "name": "database outage removes readiness and refuses action",
+        "status": "pass",
+        "evidence": {
+          "ready": "connection unavailable",
+          "actionRejection": "transport unavailable",
+          "savedSeq": 2100
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
+      },
+      {
+        "name": "database restart recovers service and persisted match",
+        "status": "pass",
+        "evidence": {
+          "savedSeq": 2100,
+          "afterSeq": 2100,
+          "recoverySeconds": 1.675
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
+      }
+    ],
+    "rotation": [
+      {
+        "name": "JWT key rotation grace accepts old session",
+        "status": "pass"
+      },
+      {
+        "name": "JWT key rotation grace accepts old join token",
+        "status": "pass"
+      },
+      {
+        "name": "JWT key rotation new login works",
+        "status": "pass"
+      },
+      {
+        "name": "JWT old session rejected after grace deadline",
+        "status": "pass"
+      },
+      {
+        "name": "JWT old join rejected after grace deadline",
+        "status": "pass"
+      },
+      {
+        "name": "JWT newly signed session remains valid",
+        "status": "pass"
+      }
+    ],
+    "secrets": [
+      {
+        "name": "private environment and account files have mode 600",
+        "status": "pass"
+      },
+      {
+        "name": "server TLS key only readable by configured service UID",
+        "status": "pass",
+        "evidence": {
+          "uid": 65532,
+          "mode": "0600",
+          "unrelatedUIDDenied": true
+        }
+      },
+      {
+        "name": "proxy CA build mount absent from runtime image",
+        "status": "pass"
+      },
+      {
+        "name": "runtime has no shell or development compiler",
+        "status": "pass",
+        "evidence": {
+          "shell": false,
+          "tsc": false
+        }
+      }
+    ],
+    "expiry-race": [
+      {
+        "name": "expired session isolated from issuer and fingerprint failures",
+        "status": "pass",
+        "evidence": {
+          "validControlStatus": 200,
+          "expiredStatus": 401,
+          "issuer": "void-dominion",
+          "audience": "session",
+          "fingerprint": "current DB password"
+        }
+      },
+      {
+        "name": "expired reset isolated from issuer and fingerprint failures",
+        "status": "pass",
+        "evidence": {
+          "validSignatureAndClaimsControl": true,
+          "expiredStatus": 401,
+          "issuer": "void-dominion",
+          "audience": "reset"
+        }
+      },
+      {
+        "name": "shipping reset race reproduced in three rounds",
+        "status": "pass",
+        "evidence": {
+          "statuses": [
+            [
+              200,
+              200
+            ],
+            [
+              200,
+              200
+            ],
+            [
+              200,
+              200
+            ]
+          ],
+          "finding": "single-use reset not atomic on shipping HTTPS API with real PostgreSQL"
+        }
+      }
+    ]
+  },
+  "load": {
+    "elapsedSeconds": 477.484,
+    "clients": 40,
+    "open": 40,
+    "commands": 8200,
+    "acknowledgements": 8200,
+    "hashChecks": 7135,
+    "hashMismatches": 0,
+    "bytes": 54692512,
+    "messages": 100820,
+    "rejects": {},
+    "stats": {
+      "BlockIO": "0B / 3.58MB",
+      "CPUPerc": "12.22%",
+      "Container": "mg-stack-server",
+      "ID": "095e331e6eb2",
+      "MemPerc": "24.49%",
+      "MemUsage": "250.7MiB / 1GiB",
+      "Name": "mg-stack-server",
+      "NetIO": "13.7MB / 944MB",
+      "PIDs": "11"
+    },
+    "health": {
+      "ok": false,
+      "alerts": [
+        "submitMs.max: 1245.7810959999915ms (server is slow under load)",
+        "broadcastMs.max: 463.4795560000348ms (fan-out is slow)"
+      ],
+      "players": {
+        "joins": 41,
+        "leaves": 1,
+        "connected": 40
+      },
+      "actions": {
+        "total": 8263,
+        "ok": 8263,
+        "rejected": 0
+      },
+      "domain": {
+        "battles": 0,
+        "captures": 0
+      },
+      "latency": {
+        "submitMs": {
+          "avg": 91,
+          "max": 1245.7810959999915
+        },
+        "broadcastMs": {
+          "avg": 19,
+          "max": 463.4795560000348
+        }
+      }
+    },
+    "setupSeconds": 107.027,
+    "fullCapacitySeconds": 481.488,
+    "samples": 41,
+    "pingRoundTripMs": {
+      "samples": 8280,
+      "p50": 51,
+      "p95": 312,
+      "max": 1708
+    },
+    "errors": [],
+    "connectionHashPass": true,
+    "recordedTrafficPass": true,
+    "verdict_scope": "Last recorded sample: 8200 commands and 8200 pongs, no rejects. Whole run: 8280 pongs. Final generated-command counter was not exported by the original harness; corrected source exports it. Pongs measure ping liveness, not individual action receipts."
+  },
+  "http3": {
+    "pass": true,
+    "status": 200,
+    "alpn": "h3",
+    "transport": "QUIC/UDP with TLS 1.3",
+    "certificate_verification": "required, temporary trusted CA + localhost name",
+    "health": {
+      "ok": true,
+      "version": "7466e6fc342c"
+    }
+  },
+  "browser": {
+    "certificateHandling": "explicit pin of temporary server SPKI for UI automation; cryptographic certificate checks are separate verified-CA Node probes",
+    "results": [
+      {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "status": "pass",
+        "errors": [],
+        "lobbyOverflow": false,
+        "overflow": false,
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
+        "csp": [
+          {
+            "directive": "script-src",
+            "blocked": "eval"
+          }
+        ],
+        "gameJoined": true,
+        "gameUrl": "https://localhost:18888/game/m-44fb8b11-38e6-4217-b67c-12772535134d"
+      },
+      {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "status": "pass",
+        "errors": [],
+        "lobbyOverflow": false,
+        "overflow": false,
+        "scrollWidth": 390,
+        "innerWidth": 390,
+        "csp": [
+          {
+            "directive": "script-src",
+            "blocked": "eval"
+          }
+        ],
+        "gameJoined": true,
+        "gameUrl": "https://localhost:18888/game/m-245a068d-93dc-4528-bf9a-45dde8bd20bd"
+      }
+    ]
+  },
+  "clock_restart": {
+    "before": {
+      "serverTime": 2386896,
+      "stateTime": 3048,
+      "seq": 3,
+      "wall": 1791656095644
+    },
+    "after": {
+      "serverTime": 11400,
+      "stateTime": 3048,
+      "seq": 3,
+      "wall": 1791656119280
+    },
+    "timeScale": 24,
+    "wallSeconds": 23.636,
+    "expectedGameAdvanceMs": 567264,
+    "actualGameAdvanceMs": -2375496,
+    "gameTimeLostMs": 2942760,
+    "finding": "clock reanchors to saved snapshot; elapsed wall time not recovered"
+  },
+  "offline_event_initial_check": {
+    "completed": false,
+    "offlineWallSeconds": 689.106,
+    "seq": 3,
+    "hashChecks": 1,
+    "hashErrors": [],
+    "technology": {
+      "active": [
+        {
+          "startedAt": 3048,
+          "technology": "industrial_automation",
+          "completesAt": 14403048
+        }
+      ],
+      "completed": []
+    }
+  },
+  "findings": [
+    {
+      "id": "ST-01",
+      "severity": "HIGH",
+      "topic": "restart reanchors game clock"
+    },
+    {
+      "id": "ST-02",
+      "severity": "HIGH",
+      "topic": "restore drops runtime ACL/ownership"
+    },
+    {
+      "id": "ST-03",
+      "severity": "MEDIUM",
+      "topic": "concurrent reset bearer reuse"
+    },
+    {
+      "id": "ST-04",
+      "severity": "MEDIUM",
+      "topic": "HTTP-only native TLS healthcheck"
+    },
+    {
+      "id": "ST-05",
+      "severity": "MEDIUM",
+      "topic": "shipping entry has no mail delivery"
+    }
+  ],
+  "validation": {
+    "audited_container_gate": {
+      "tests": 10815,
+      "skipped": 0,
+      "files": 887,
+      "source": "7466e6fc342c71cd565bb12b678226b81d358cbf"
+    },
+    "fresh_main_gate": {
+      "tests": 10835,
+      "skipped": 0,
+      "files": 888,
+      "source": "f1c700c12046576dcaa5c6be241bb8d8a863b6dd"
+    },
+    "docs_check": "passed after report/index edits",
+    "first_publication_gate": {
+      "tests": 10826,
+      "skipped": 0,
+      "files": 887,
+      "source": "024979918d076c937922e350e1d75da4344fb215"
+    },
+    "environment_correction": "Normal build umask 0022; initial umask 0077 broke Debian package test fixture directory permissions, not product code."
+  },
+  "review_followup": {
+    "base": "f1c700c1",
+    "results": [
+      {
+        "name": "valid cross-player envelope denied at authorization",
+        "status": "pass",
+        "evidence": {
+          "actionIdMatchesForgedPlayer": true,
+          "code": "E_FORBIDDEN"
+        }
+      },
+      {
+        "name": "cross-match token denied for existing match with positive control",
+        "status": "pass",
+        "evidence": {
+          "existingSecondMatch": "m-245a068d-93dc-4528-bf9a-45dde8bd20bd",
+          "positiveConnection": true,
+          "crossMatchRejected": true
+        }
+      },
+      {
+        "name": "raw flood drops excess and leaves connection open",
+        "status": "pass",
+        "evidence": {
+          "sent": 220,
+          "parsedErrors": 50,
+          "connectionStillOpen": true
+        }
+      },
+      {
+        "name": "state-changing split committed and persisted",
+        "status": "pass",
+        "evidence": {
+          "beforeFingerprint": "411befc7df36377ef3eb6c3fe2fc6db396843419dd558e294d28bf01f6f89a15",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "seq": 3
+        }
+      },
+      {
+        "name": "graceful preserves committed fleet fingerprint",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 3,
+          "afterSeq": 3,
+          "beforeFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "recoverySeconds": 2.425,
+          "restartCount": 0
+        }
+      },
+      {
+        "name": "SIGKILL preserves committed fleet fingerprint",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 3,
+          "afterSeq": 3,
+          "beforeFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "recoverySeconds": 11.515,
+          "restartCount": 1
+        }
+      },
+      {
+        "name": "database outage refuses attempted state-changing action",
+        "status": "pass",
+        "evidence": {
+          "ready": "connection unavailable",
+          "transientRejection": null,
+          "transportState": 3,
+          "seq": 3
+        }
+      },
+      {
+        "name": "database recovery has no successful outage receipt or effect",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 3,
+          "afterSeq": 3,
+          "beforeFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "successfulOutageReceipts": 0
+        }
+      }
+    ],
+    "validation_note": "Fresh isolated match; assertions saved incrementally. Direct PostgreSQL probes resolve current container IP on each connection and verify certificate DNS name postgres. Earlier failed harness attempts are excluded."
+  },
+  "harness_exit_check": {
+    "syntheticFailureExitCode": 1,
+    "failureRecordSaved": true
+  }
+}
