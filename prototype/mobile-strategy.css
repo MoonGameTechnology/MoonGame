@@ -62,6 +62,16 @@ body.mobile-ui :is(.tw-close, .cn-close, .mk-close, .dp-close) {
   font-size: 20px;
   border-radius: 11px;
 }
+/* «Как в прошлый раз» on a phone: the hull and count only, the full phrase stays in its label. */
+body.mobile-ui #constructor .cn-again {
+  min-height: 44px;
+}
+body.mobile-ui #constructor .cn-again + .cn-close {
+  margin-left: 0;
+}
+body.mobile-ui #constructor .cn-ag-k {
+  display: none;
+}
 body.mobile-ui :is(#marketbody, #constructorbody, .tt-scroll, .bw-scroll, .dp-list, .dp-feed) {
   min-height: 0;
   overscroll-behavior: contain;

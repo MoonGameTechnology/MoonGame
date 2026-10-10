@@ -2237,6 +2237,9 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 #constructor .cn-head{display:flex;align-items:center;gap:10px;padding:12px 15px;border-bottom:1px solid var(--line);}
 #constructor .cn-head b{font:800 14px var(--sf-font);font-variant-numeric:tabular-nums;color:#eafffb;}
 .cn-close{margin-left:auto;width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
+/* «Как в прошлый раз» (UIX-7.3): rebuilds the last order; a long hull name is cut, not wrapped */
+.cn-again{margin-left:auto;min-width:0;padding:6px 10px;border-radius:8px;font-size:var(--fs-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cn-again+.cn-close{margin-left:0;flex:none;}
 .cn-tabs{display:flex;gap:6px;padding:9px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
 .cn-tab{padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}

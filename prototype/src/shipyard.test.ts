@@ -3,7 +3,7 @@ import { setLocale, t, tData } from '../../localization/runtime';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import { newGame, canOrder, order as applyOrder, HOUR } from './game';
-import { cost as priceHtml, fmtDur, fmtEta } from './format';
+import { cost as priceHtml, fmtDur, fmtEta, displayUnit } from './format';
 import { buildShip } from '../../decisions/actions';
 import { data } from './gameData';
 import { worldName } from './planetName';
@@ -28,6 +28,7 @@ import {
   RES_KEY,
   STAT_KEY,
   selectedBay,
+  repeatOrderHtml,
   type YardDraft,
   type YardHost,
 } from './shipyard';
@@ -1053,5 +1054,54 @@ describe('производство — модули открытого отсе�
     expect(scrolled).toEqual([]); // открыть отсек — не прокрутка: модули рядом с кораблём
     win.fire(click('.cn-mod', { cnmod: 'ablative_plating' }));
     expect(scrolled).toEqual([['#constructor .cn-hull', expect.objectContaining({ block: 'nearest' })]]);
+  });
+});
+
+describe('производство — «Как в прошлый раз» (UIX-7.3)', () => {
+  const cruiser = draftOf({ modules: ['ion_engine'], count: 2, planet: 'home' });
+
+  it('без заказа и пока окно стоит на последнем заказе — кнопки нет', () => {
+    expect(repeatOrderHtml(null, 'ships', cruiser)).toBe('');
+    expect(repeatOrderHtml({ tab: 'ships', draft: cruiser }, 'ships', { ...cruiser })).toBe('');
+  });
+
+  it('окно ушло с последнего заказа — кнопка называет корпус и число', () => {
+    const last = { tab: 'ships' as const, draft: cruiser };
+    const html = repeatOrderHtml(last, 'ships', { ...cruiser, modules: [] });
+    const label = `${t('yard.again')}: ${displayUnit('cruiser')} ×2`;
+    expect(html).toContain('data-cnagain');
+    expect(html).toContain(`aria-label="${label}"`);
+    expect(html).toContain(`<span class="cn-ag-k">${t('yard.again')}:</span> ${displayUnit('cruiser')} ×2</button>`);
+    // Тот же черновик на другой вкладке, другое число или мир — тоже не последний заказ.
+    expect(repeatOrderHtml(last, 'squads', cruiser)).toContain('data-cnagain');
+    expect(repeatOrderHtml(last, 'ships', { ...cruiser, count: 1 })).toContain('data-cnagain');
+    expect(repeatOrderHtml(last, 'ships', { ...cruiser, planet: 'other' })).toContain('data-cnagain');
+  });
+
+  it('кнопка стоит в шапке окна, перед крестиком', () => {
+    const html = yardBoxHtml('ships', '', '', '<button data-cnagain></button>');
+    expect(html).toContain('<b>' + t('yard.title') + '</b><button data-cnagain></button><button class="cn-close">');
+  });
+
+  it('после заказа другой корпус и вкладка — кнопка собирает заказ заново', () => {
+    const win = fakeWin();
+    const sent: Action[] = [];
+    const yard = initShipyard(hostOf({ root: () => win, order: (a) => sent.push(a) }));
+    yard.open();
+    expect(win.html()).not.toContain('data-cnagain');
+    win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
+    win.fire(click('[data-cncount]', { cncount: '+' }));
+    win.fire(click('[data-cnbuild]'));
+    expect(win.html()).not.toContain('data-cnagain'); // окно и так стоит на этом заказе
+    win.fire(click('.cn-tab', { ctab: 'squads' }));
+    expect(win.html()).toContain(`${displayUnit('cruiser')} ×2</button>`);
+    win.fire(click('[data-cnagain]'));
+    const html = win.html();
+    expect(html).toContain('class="cn-tab on" data-ctab="ships"');
+    expect(worn(html)).toEqual([tData(data.modules.ion_engine!.name)]);
+    expect(html).toContain('data-cnbuild');
+    expect(html).not.toContain('data-cnagain');
+    win.fire(click('[data-cnbuild]'));
+    expect(sent.map((a) => (a.payload as { count: number }).count)).toEqual([2, 2]);
   });
 });
