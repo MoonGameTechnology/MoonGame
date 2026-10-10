@@ -22,7 +22,7 @@
  * here decides what a build costs or whether it is legal.
  *
  * Same REFM shape as the other screens: the markup is pure (`yardBoxHtml`,
- * `loadoutPaneHtml`, `statBarHtml`, `bagText`) and the draft is a plain value
+ * `loadoutPaneHtml`, `orderBarHtml`, `statBarHtml`, `bagText`) and the draft is a plain value
  * (`YardDraft`) normalised by a pure `normalizeDraft`; only `initShipyard(host)`
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
@@ -40,7 +40,9 @@ import {
 } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
-import { esc, displayUnit } from './format';
+import { esc, displayUnit, cost as priceHtml, fmtDur, fmtEta } from './format';
+import { activeConstruction, hoursLeft } from './buildProgress';
+import { HOUR } from './time';
 import { unitIconHtml } from './icons';
 import { catalogPortraitHtml } from './shipArt';
 import { SECTOR_TYPES } from './map';
@@ -48,7 +50,12 @@ import { worldName } from './planetName';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
 import { buildShip } from '../../decisions/actions';
-import { isLander, landerTroopCandidates, orderableTroops } from '../../decisions/landerTroops';
+import {
+  isLander,
+  landerTroopCandidates,
+  orderableTroops,
+  orderHours,
+} from '../../decisions/landerTroops';
 import { unitDamageProfile } from '../../decisions/unitDamage';
 import { unitDamageHtml } from './unitDamageView';
 import { termHtml } from './termTip';
@@ -261,6 +268,14 @@ export function normalizeDraft(
   return next;
 }
 
+/** Что телу окна и полосе заказа нужно от игры сверх мира. */
+export interface YardView {
+  youColor: string;
+  arsenalItems: readonly ArsenalItem[];
+  /** Кого ядро примет бойцом десантного челнока на мире черновика (SHU-5.2). */
+  troops?: readonly string[];
+}
+
 /** The loadout constructor pane for a family of hulls (ships or shuttles) — same
  *  `loadoutEditor` view-model, just a different hull list. Expects an already
  *  normalised draft. */
@@ -269,12 +284,7 @@ export function loadoutPaneHtml(
   me: string,
   draft: YardDraft,
   hullList: string[],
-  view: {
-    youColor: string;
-    arsenalItems: readonly ArsenalItem[];
-    /** Кого ядро примет бойцом десантного челнока на мире черновика (SHU-5.2). */
-    troops?: readonly string[];
-  },
+  view: YardView,
 ): string {
   const snap = state.players[me]?.arsenal;
   const ownedHulls = ownedHullsOf(state, me, hullList);
@@ -298,7 +308,7 @@ export function loadoutPaneHtml(
   const portrait = catalogPortraitHtml('u', draft.hull, data);
   const hullCard =
     `<div class="cn-hull${portrait ? ' with-art' : ''}">${portrait}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
-    `<div class="cn-hm">${t('yard.slots.count', { n: String(m.slots.length) })}</div></div></div></div>`;
+    `<div class="cn-hm">${m.hasSlots ? t('yard.slots.count', { n: String(m.slots.length) }) : t('yard.slots.none')}</div></div></div></div>`;
   const bays = m.slots
     .map((sl) => {
       if (sl.moduleId) {
@@ -363,10 +373,13 @@ export function loadoutPaneHtml(
   // bought mid-match shows up here without a new match) — this note is the only
   // thing that needed adding: make the timing honest (built, not instant).
   const liveNote = snap ? `<div class="cn-note">${t('yard.arsenal.note')}</div>` : '';
-  const left =
-    `<div class="cn-fit"><div class="cn-hulls">${hulls}</div>${hullCard}${bays}` +
-    `<div class="cn-ph">${palHead}</div><div class="cn-pal">${palette}</div>` +
-    `<div class="cn-note">${t('yard.slots.note')}</div>${liveNote}</div>`;
+  // Корпус без отсеков (наземные войска, десантный челнок) модулей не несёт: ни отсеков, ни
+  // палитры. Раньше здесь стоял весь каталог серым — 21 модуль, ни один из которых не встанет.
+  const fitting = m.hasSlots
+    ? `${bays}<div class="cn-ph">${palHead}</div><div class="cn-pal">${palette}</div>` +
+      `<div class="cn-note">${t('yard.slots.note')}</div>${liveNote}`
+    : '';
+  const left = `<div class="cn-fit"><div class="cn-hulls">${hulls}</div>${hullCard}${fitting}</div>`;
   // right: live preview + cost + build
   const maxStat = Math.max(1, ...m.preview.map((p) => p.effective));
   const bars = m.preview.map((p) => statBarHtml(p, maxStat)).join('');
@@ -378,70 +391,112 @@ export function loadoutPaneHtml(
         unitDamageProfile(hullDef, effectiveStats(hullDef, { modules: m.modules }, data)),
       )
     : '';
-  const worlds = buildSites(state, me, draft.hull);
-  const planOpts = worlds
-    .map(
-      (p) =>
-        // Мир по имени, как на карте (UIX-5.2); значение опции — id.
-        `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`,
-    )
-    .join('');
-  // ДЕСАНТНЫЙ ЧЕЛНОК (SHU-5.2) строится с бойцом внутри: выбор бойца и его цена — в
-  // том же блоке цены, итог — челнок с модулями ПЛЮС бойцы. Список бойцов считает
-  // хозяин пробой ядра (`orderableTroops`), здесь — только разметка.
-  const lander = isLander(hullDef);
-  const troop =
-    lander && draft.troop && (view.troops ?? []).includes(draft.troop) ? draft.troop : undefined;
-  const troopCost: Record<string, number> = {};
-  for (const [r, n] of Object.entries((troop && data.units[troop]?.cost) || {}))
-    troopCost[r] = n * m.count;
-  const total: Record<string, number> = { ...m.totalCost };
-  for (const [r, n] of Object.entries(troopCost)) total[r] = (total[r] ?? 0) + n;
-  const troopRow = !lander
+  // ДЕСАНТНЫЙ ЧЕЛНОК (SHU-5.2) строится с бойцом внутри: выбор бойца — здесь, его цена и
+  // срок — в полосе заказа. Список бойцов считает хозяин пробой ядра (`orderableTroops`).
+  const troopRow = !isLander(hullDef)
     ? ''
     : (view.troops ?? []).length
-      ? `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.troop', { n: String(m.count) })}</span>` +
+      ? `<div class="cn-trow"><span class="cn-cl">${t('yard.cost.troop', { n: String(m.count) })}</span>` +
         `<select class="cn-plan" id="cn-troop">${(view.troops ?? [])
           .map(
             (g) =>
-              `<option value="${esc(g)}"${g === troop ? ' selected' : ''}>${esc(displayUnit(g))}</option>`,
+              `<option value="${esc(g)}"${g === draft.troop ? ' selected' : ''}>${esc(displayUnit(g))}</option>`,
           )
-          .join('')}</select><span class="cn-cv">${bagText(troopCost)}</span></div>`
+          .join('')}</select></div>`
       : `<div class="cn-noplace">${t('yard.troop.none')}</div>`;
-  const cost =
-    `<div class="cn-cost">` +
-    `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.hull', { n: String(m.count) })}</span><span class="cn-cv">${bagText(m.hullCost)}</span></div>` +
-    (draft.modules.length
-      ? `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.modules', { n: String(m.count) })}</span><span class="cn-cv">${bagText(m.modulesCost)}</span></div>`
-      : '') +
-    troopRow +
-    `<div class="cn-crow total"><span class="cn-cl">${t('yard.cost.total')}</span><span class="cn-cv">${bagText(total)}</span></div></div>`;
-  const affordable = lander
-    ? Object.entries(total).every(([r, n]) => (res[r] ?? 0) >= n)
-    : m.affordable;
-  const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
   const right =
-    `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${damage}${cost}` +
-    `<div class="cn-row2"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
-    // Нет годного мира — вместо селектора ПРЯМАЯ надпись (заказ владельца): пустой
-    // выпадающий список игрок читает как «сейчас загрузится», а не как отказ, и жмёт
-    // кнопку заказа, которой всё равно нечего отправить.
-    (worlds.length
-      ? `<select class="cn-plan" id="cn-planet">${planOpts}</select></div>`
-      : `<div class="cn-noplace">${t('yard.no-place')}</div></div>`) +
-    `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(draft.count) })}</button>` +
-    `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div></div>`;
+    `<div class="cn-side"><div class="cn-ph">${m.hasSlots ? `${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em>` : t('yard.stats')}</div>${bars}${damage}${troopRow}` +
+    (m.hasSlots ? `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div>` : '') +
+    `</div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
 }
 
-/** The window chrome: title, close, the three tabs, and whichever pane is open. */
-export function yardBoxHtml(tab: YardTab, body: string): string {
+/**
+ * Что ждёт заказ юнитов на этом мире (BLD-1): мир строит один заказ юнитов за раз, остальные
+ * стоят в очереди ядра (`Planet.buildQueue`). `null` — полоса свободна, заказ начнётся сразу.
+ * `nextInHours` — когда закончится идущая стройка; ноль — идущей нет, голова очереди ждёт денег.
+ */
+export function unitLaneAhead(
+  state: GameState,
+  planetId: string,
+): { count: number; nextInHours: number } | null {
+  const active = activeConstruction(state, planetId, 'units');
+  // Полоса юнитов — заказы рода `unit`: то же правило полос, что у ядра и `laneOf`.
+  const queued = (state.planets[planetId]?.buildQueue ?? []).filter((q) => q.kind === 'unit');
+  const count = (active ? 1 : 0) + queued.length;
+  if (count === 0) return null;
+  return { count, nextInHours: active ? hoursLeft(active.at, state.time, HOUR) : 0 };
+}
+
+/**
+ * Полоса заказа внизу окна: цена значками с нехваткой, срок постройки, мир с его очередью,
+ * число и «Построить». Стоит ВНЕ прокрутки: раньше цена и кнопка заканчивали длинную колонку —
+ * на телефоне это был пятый экран, на ПК они уезжали вверх, пока листаешь к модулям.
+ * Пустая строка — заказывать нечего (корпусов нет или корпус недоступен). Ожидает уже
+ * нормализованный черновик, как и `loadoutPaneHtml`.
+ */
+export function orderBarHtml(
+  state: GameState,
+  me: string,
+  draft: YardDraft,
+  hullList: string[],
+  view: YardView,
+): string {
+  if (!ownedHullsOf(state, me, hullList).length) return '';
+  const snap = state.players[me]?.arsenal;
+  const res = state.players[me]?.resources ?? {};
+  const ed = createLoadoutEditor(draft.hull, data, res, {
+    modules: draft.modules,
+    count: draft.count,
+    ownedModules: snap ? new Set(snap.modules) : undefined,
+  });
+  if (!ed.ok) return '';
+  // Цена десантного челнока — челнок с модулями ПЛЮС бойцы, срок — дольший из двух (SHU-5.2).
+  const lander = isLander(data.units[draft.hull]);
+  const troop =
+    lander && draft.troop && (view.troops ?? []).includes(draft.troop) ? draft.troop : undefined;
+  const total: Record<string, number> = { ...ed.totalCost };
+  for (const [r, n] of Object.entries((troop && data.units[troop]?.cost) || {}))
+    total[r] = (total[r] ?? 0) + n * ed.count;
+  const affordable = Object.entries(total).every(([r, n]) => (res[r] ?? 0) >= n);
+  const canBuild = affordable && draft.planet !== '' && (!lander || troop !== undefined);
+  const worlds = buildSites(state, me, draft.hull);
+  const ahead = draft.planet ? unitLaneAhead(state, draft.planet) : null;
+  const queue = !ahead
+    ? t('yard.queue.now')
+    : ahead.nextInHours > 0
+      ? t('yard.queue.ahead', { n: ahead.count, eta: fmtEta(ahead.nextInHours) })
+      : t('yard.queue.waiting', { n: ahead.count });
+  // Нет годного мира — вместо селектора ПРЯМАЯ надпись (заказ владельца): пустой
+  // выпадающий список игрок читает как «сейчас загрузится», а не как отказ.
+  const where = worlds.length
+    ? `<select class="cn-plan" id="cn-planet" aria-label="${t('yard.where')}">${worlds
+        .map(
+          (p) =>
+            // Мир по имени, как на карте (UIX-5.2); значение опции — id.
+            `<option value="${p.id}"${p.id === draft.planet ? ' selected' : ''}>${esc(worldName(state, p.id))}</option>`,
+        )
+        .join('')}</select><span class="cn-oq">${queue}</span>`
+    : `<div class="cn-noplace">${t('yard.no-place')}</div>`;
+  return (
+    `<div class="cn-order">` +
+    `<div class="cn-oprice">${priceHtml(total, res)}<span class="cn-otime" title="${t('yard.build-time')}">⏱ ${fmtDur(orderHours(data, draft.hull, troop))}</span></div>` +
+    `<div class="cn-oworld">${where}</div>` +
+    `<div class="cn-ogo"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
+    `<button class="cn-build btn-main" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(draft.count) })}</button></div>` +
+    `</div>`
+  );
+}
+
+/** The window chrome: title, close, the tabs, whichever pane is open and, under it, the
+ *  order bar — outside the scrolling body, so it never leaves the screen. */
+export function yardBoxHtml(tab: YardTab, body: string, order = ''): string {
   const tabBtn = (k: YardTab, label: string): string =>
     `<button class="cn-tab${tab === k ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
   return (
     `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button class="cn-close">✕</button></div>` +
     `<div class="cn-tabs">${YARD_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
-    `<div id="constructorbody">${body}</div></div>`
+    `<div id="constructorbody">${body}</div>${order}</div>`
   );
 }
 
@@ -492,6 +547,8 @@ export function initShipyard(host: YardHost): {
   let heroScrolling = false;
   let heroScrollTimer: ReturnType<typeof setTimeout> | null = null;
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
+  /** Вкладка последней отрисовки: прокрутка переживает перерисовку только внутри вкладки. */
+  let paintedTab: YardTab | null = null;
 
   const hullsOf = (): string[] => hullsOfTab(tab);
   /** Бойцы десантного челнока для черновика (SHU-5.2); `undefined` — корпус не десантный. */
@@ -507,6 +564,7 @@ export function initShipyard(host: YardHost): {
 
   function paint(): void {
     let body: string;
+    let order = '';
     if (tab === 'heroes') {
       body = host.heroPaneHtml();
       renderedHeroBody = body;
@@ -517,13 +575,21 @@ export function initShipyard(host: YardHost): {
       // тем же правилом, каким `normalizeDraft` возвращает на землю мир и корпус.
       if (troops && !(draft.troop && troops.includes(draft.troop)))
         draft = { ...draft, troop: troops[0] };
-      body = loadoutPaneHtml(host.state(), host.me(), draft, hullsOf(), {
+      const view = {
         youColor: host.youColor(),
         arsenalItems: host.arsenalItems(),
         ...(troops ? { troops } : {}),
-      });
+      };
+      body = loadoutPaneHtml(host.state(), host.me(), draft, hullsOf(), view);
+      order = orderBarHtml(host.state(), host.me(), draft, hullsOf(), view);
     }
-    host.root().innerHTML = yardBoxHtml(tab, body);
+    // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
+    const keep =
+      paintedTab === tab ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
+    host.root().innerHTML = yardBoxHtml(tab, body, order);
+    const scroller = host.root().querySelector('#constructorbody');
+    if (scroller && keep) scroller.scrollTop = keep;
+    paintedTab = tab;
   }
 
   /** Equip / unequip a module through the core-validated reducer, then re-render. */
@@ -614,6 +680,7 @@ export function initShipyard(host: YardHost): {
           buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, troop),
         );
         host.note(t('yard.ordered', { n: String(draft.count), hull: displayUnit(draft.hull) }));
+        paint(); // очередь мира и нехватка в полосе — уже с этим заказом
       }
     }
   });
@@ -622,8 +689,8 @@ export function initShipyard(host: YardHost): {
     const sel = e.target as HTMLSelectElement;
     if (sel.id === 'cn-planet') {
       draft = { ...draft, planet: sel.value };
-      // У десантного челнока от мира зависит и список бойцов (казармы/завод здесь).
-      if (isLander(data.units[draft.hull])) paint();
+      // От мира зависят его очередь в полосе заказа и, у десантного челнока, список бойцов.
+      paint();
     }
     // Выбор бойца меняет цену — перерисовка сразу, а не на следующем тике.
     if (sel.id === 'cn-troop') {

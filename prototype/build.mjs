@@ -2323,17 +2323,23 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cn-sdelta{height:100%;background:var(--grn);}
 /* right column: preview + cost + build */
 .cn-side .cn-ph{margin-top:0;}
-.cn-cost{margin:14px 0 4px;border-top:1px solid var(--line);padding-top:12px;}
-.cn-cost .cn-crow{display:flex;align-items:baseline;gap:8px;font-size:var(--fs-body);color:var(--dim);margin-bottom:5px;}
-.cn-cost .cn-crow .cn-cv{margin-left:auto;color:var(--ink);font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
-.cn-cost .cn-crow.total .cn-cl{color:#eafffb;font-weight:700;}
-.cn-cost .cn-crow.total .cn-cv{color:var(--amber);font-size:14px;}
+.cn-trow{display:flex;align-items:center;gap:10px;margin:12px 0 4px;flex-wrap:wrap;font-size:var(--fs-body);color:var(--dim);}
 /* Вид — классом .btn-main (UIX-11.1); здесь только размер и место. */
-.cn-build{width:100%;margin-top:12px;padding:14px;border-radius:10px;font-size:14px;}
+/* Полоса заказа: под прокруткой окна, поэтому цена и «Построить» всегда на экране. Плотная
+   подложка — погашенная кнопка полупрозрачна, и сквозь неё не должны читаться строки. */
+#constructor .cn-order{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px 12px;
+  border-top:1px solid var(--line-hi);background:var(--sf-panel-from);}
+.cn-oprice{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;flex:0 1 auto;min-width:0;
+  font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;}
+.cn-otime{color:var(--dim);white-space:nowrap;}
+.cn-oworld{display:flex;flex-direction:column;gap:3px;flex:1 1 220px;min-width:0;}
+.cn-oworld .cn-plan{flex:none;width:100%;min-width:0;}
+.cn-oq{font-size:var(--fs-caption);color:var(--dim);}
+.cn-ogo{display:flex;align-items:center;gap:10px;flex:0 1 330px;}
+.cn-build{flex:1 1 auto;min-height:44px;padding:12px 14px;border-radius:10px;font-size:14px;}
 .cn-lock{margin-top:12px;display:flex;gap:8px;font-size:var(--fs-caption);color:var(--dim);line-height:1.5;}
 .cn-lock b{color:var(--amber);}
 /* count + planet steppers */
-.cn-row2{display:flex;align-items:center;gap:10px;margin:12px 0 4px;flex-wrap:wrap;}
 .cn-step{display:flex;align-items:center;border:1px solid var(--line-hi);border-radius:8px;overflow:hidden;}
 .cn-step button{width:32px;height:32px;border:0;background:transparent;color:var(--cyan);font-size:16px;cursor:pointer;}
 .cn-step button:disabled{opacity:.35;cursor:not-allowed;}

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseGameData, type GameData } from '../packages/shared-core/src/index';
-import { isLander, landerCost, landerTroopCandidates, orderableTroops } from './landerTroops';
+import {
+  isLander,
+  landerCost,
+  landerTroopCandidates,
+  orderableTroops,
+  orderHours,
+} from './landerTroops';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -12,6 +18,7 @@ const data: GameData = parseGameData({
       kind: 'infantry',
       stats: { attack: 4, defense: 8, hp: 14, speed: 44 },
       cost: { metal: 10 },
+      buildTimeHours: 1,
     },
     tank: {
       faction: 'x',
@@ -19,6 +26,7 @@ const data: GameData = parseGameData({
       kind: 'vehicle',
       stats: { attack: 22, defense: 14, hp: 46, speed: 40 },
       cost: { metal: 50, credits: 5 },
+      buildTimeHours: 6,
     },
     rover: {
       faction: 'x',
@@ -46,6 +54,7 @@ const data: GameData = parseGameData({
       traits: ['shuttle', 'lander'],
       stats: { attack: 0, defense: 1, hp: 24, speed: 60, strikeRange: 300, fuel: 4 },
       cost: { metal: 30 },
+      buildTimeHours: 2,
     },
   },
   factions: {},
@@ -79,5 +88,12 @@ describe('боец десантного челнока (SHU-5.2)', () => {
 
   it('ЦЕНА — челнок ПЛЮС боец', () => {
     expect(landerCost(data, 'lander', 'tank')).toEqual({ metal: 80, credits: 5 });
+  });
+
+  it('СРОК — дольший из челнока и бойца; без бойца — свой', () => {
+    expect(orderHours(data, 'lander', 'tank')).toBe(6);
+    expect(orderHours(data, 'lander', 'militia')).toBe(2);
+    expect(orderHours(data, 'tank')).toBe(6);
+    expect(orderHours(data, 'nobody')).toBe(0);
   });
 });

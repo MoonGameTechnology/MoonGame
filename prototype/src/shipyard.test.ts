@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
-import { newGame, canOrder } from './game';
+import { newGame, canOrder, order as applyOrder, HOUR } from './game';
+import { cost as priceHtml, fmtDur, fmtEta } from './format';
+import { buildShip } from '../../decisions/actions';
 import { data } from './gameData';
 import { worldName } from './planetName';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
@@ -13,6 +15,8 @@ import {
   ownedHullsOf,
   normalizeDraft,
   loadoutPaneHtml,
+  orderBarHtml,
+  unitLaneAhead,
   yardBoxHtml,
   initShipyard,
   YARD_HULLS,
@@ -248,7 +252,10 @@ describe('верфь — панель конструктора', () => {
     expect(html).toContain('data-cnhull="cruiser"');
     expect(html).toContain('cn-bay');
     expect(html).toContain('data-cnmod=');
-    expect(html).toContain('data-cnbuild');
+    // Заказ — не в прокручиваемом теле, а в полосе под ним (переделка окна, шаг 1).
+    expect(html).not.toContain('data-cnbuild');
+    const bar = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
+    expect(bar).toContain('data-cnbuild');
   });
 
   it('поставленный модуль занимает отсек и снимается кликом', () => {
@@ -332,8 +339,11 @@ describe('верфь — панель конструктора', () => {
     const broke = rich();
     broke.players.p1!.resources = { metal: 0, credits: 0, energy: 0, food: 0, microelectronics: 0 };
     const d = normalizeDraft(broke, 'p1', draftOf(), YARD_HULLS);
-    const html = loadoutPaneHtml(broke, 'p1', d, YARD_HULLS, view);
+    const html = orderBarHtml(broke, 'p1', d, YARD_HULLS, view);
     expect(html).toMatch(/data-cnbuild disabled/);
+    // …и цена говорит, чего не хватает, а не просто серая кнопка.
+    expect(html).toContain('rcost');
+    expect(html).toContain('class="lack"');
   });
 
   it('НЕТ ПОДХОДЯЩЕГО МЕСТА — ВМЕСТО СЕЛЕКТОРА НАДПИСЬ, а не пустой выпадающий список', () => {
@@ -342,36 +352,34 @@ describe('верфь — панель конструктора', () => {
     const homeless = rich();
     for (const p of Object.values(homeless.planets)) if (p.owner === 'p1') p.owner = null;
     const d = normalizeDraft(homeless, 'p1', draftOf(), YARD_HULLS);
-    const html = loadoutPaneHtml(homeless, 'p1', d, YARD_HULLS, view);
+    const html = orderBarHtml(homeless, 'p1', d, YARD_HULLS, view);
     expect(html).toContain('cn-noplace');
     expect(html).toContain(t('yard.no-place'));
     expect(html).not.toContain('id="cn-planet"');
     expect(html).toMatch(/data-cnbuild disabled/);
   });
 
-  it('строка цены модулей появляется только когда обвес есть', () => {
-    const bare = loadoutPaneHtml(
-      s,
-      'p1',
-      normalizeDraft(s, 'p1', draftOf(), YARD_HULLS),
-      YARD_HULLS,
-      view,
-    );
-    const fitted = loadoutPaneHtml(
-      s,
-      'p1',
-      normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'] }), YARD_HULLS),
-      YARD_HULLS,
-      view,
-    );
-    expect(bare).toContain('cn-crow');
-    expect((bare.match(/cn-crow/g) ?? []).length).toBeLessThan(
-      (fitted.match(/cn-crow/g) ?? []).length,
-    );
+  it('цена в полосе заказа — корпус с модулями на всё число машин, значками', () => {
+    const res = s.players.p1!.resources;
+    const bare = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
+    expect(bare).toContain(priceHtml(data.units.cruiser!.cost, res));
+    const d = normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'], count: 2 }), YARD_HULLS);
+    const total: Record<string, number> = {};
+    for (const bag of [data.units.cruiser!.cost, data.modules.ion_engine!.cost])
+      for (const [r, n] of Object.entries(bag)) total[r] = (total[r] ?? 0) + n * 2;
+    expect(orderBarHtml(s, 'p1', d, YARD_HULLS, view)).toContain(priceHtml(total, res));
+  });
+
+  it('срок постройки виден до заказа и не зависит от числа машин', () => {
+    const one = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
+    const five = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf({ count: 5 }), YARD_HULLS), YARD_HULLS, view);
+    const hours = fmtDur(data.units.cruiser!.buildTimeHours);
+    expect(one).toContain(`⏱ ${hours}`);
+    expect(five).toContain(`⏱ ${hours}`);
   });
 
   it('шаг количества упирается в границы — «−» на единице выключен', () => {
-    const one = loadoutPaneHtml(
+    const one = orderBarHtml(
       s,
       'p1',
       normalizeDraft(s, 'p1', draftOf(), YARD_HULLS),
@@ -379,7 +387,7 @@ describe('верфь — панель конструктора', () => {
       view,
     );
     expect(one).toContain('data-cncount="-" disabled');
-    const many = loadoutPaneHtml(
+    const many = orderBarHtml(
       s,
       'p1',
       normalizeDraft(s, 'p1', draftOf({ count: 20 }), YARD_HULLS),
@@ -402,6 +410,16 @@ describe('верфь — окно', () => {
     const html = yardBoxHtml('squads', '<i>тело</i>');
     expect(html).toContain('<button class="cn-tab on" data-ctab="squads">');
     expect(html).toContain('<div id="constructorbody"><i>тело</i></div>');
+  });
+
+  it('полоса заказа стоит ПОД прокруткой окна, а не в её конце', () => {
+    const html = yardBoxHtml('ships', '<i>тело</i>', '<div class="cn-order">заказ</div>');
+    expect(html).toContain('<div id="constructorbody"><i>тело</i></div><div class="cn-order">заказ</div>');
+    const win = fakeWin();
+    initShipyard(hostOf({ root: () => win })).open();
+    const out = win.html();
+    expect(out.indexOf('class="cn-order"')).toBeGreaterThan(out.indexOf('id="constructorbody"'));
+    expect(out).toMatch(/<\/div><div class="cn-order">[\s\S]*data-cnbuild[\s\S]*<\/div><\/div>$/);
   });
 
   it('open() показывает окно, красит и дёргает интро один раз', () => {
@@ -504,6 +522,27 @@ describe('верфь — окно', () => {
     expect(payload.count).toBe(2);
     expect(payload.modules).toEqual(['ion_engine']);
     expect(payload.planetId).toBeTruthy();
+  });
+
+  it('после заказа полоса показывает очередь мира уже с ним', () => {
+    const win = fakeWin();
+    let s = rich();
+    const yard = initShipyard(
+      hostOf({
+        root: () => win,
+        state: () => s,
+        order: (a) => {
+          s = applyOrder(s, a, s.time).state;
+        },
+      }),
+    );
+    yard.open();
+    expect(win.html()).toContain(t('yard.queue.now'));
+    win.fire(click('[data-cnbuild]'));
+    expect(win.html()).not.toContain(t('yard.queue.now'));
+    expect(win.html()).toContain(
+      t('yard.queue.ahead', { n: 1, eta: fmtEta(data.units.cruiser!.buildTimeHours) }),
+    );
   });
 
   it('без своего мира заказ не отправляется вовсе', () => {
@@ -639,18 +678,18 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
   it('«нет подходящего места» показывается ИМЕННО ТАМ, где род не производится', () => {
     const s = rich();
     const inf = normalizeDraft(s, 'p1', draftOf({ hull: 'militia' }), hullsOfTab('infantry'));
-    const html = loadoutPaneHtml(s, 'p1', inf, hullsOfTab('infantry'), view);
+    const html = orderBarHtml(s, 'p1', inf, hullsOfTab('infantry'), view);
     expect(html).toContain(t('yard.no-place'));
     expect(html).toMatch(/data-cnbuild disabled/);
     // А на вкладке кораблей тот же экран показывает нормальный выбор мира.
     const ships = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
-    expect(loadoutPaneHtml(s, 'p1', ships, YARD_HULLS, view)).toContain('id="cn-planet"');
+    expect(orderBarHtml(s, 'p1', ships, YARD_HULLS, view)).toContain('id="cn-planet"');
   });
 
   it('мир в выборе места назван именем, как на карте, а не кодом (UIX-5.2)', () => {
     const s = rich();
     const d = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
-    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    const html = orderBarHtml(s, 'p1', d, YARD_HULLS, view);
     const option = new RegExp(`<option value="${d.planet}" selected>([^<]*)</option>`).exec(html);
     expect(option?.[1]).toBe(worldName(s, d.planet));
     expect(option?.[1]).not.toBe(d.planet);
@@ -706,23 +745,26 @@ describe('верфь — десантный челнок с бойцом (SHU-5.
     return s;
   }
 
-  it('ЦЕНА — челнок ПЛЮС боец, и выбор бойца стоит в блоке цены', () => {
+  it('ЦЕНА — челнок ПЛЮС боец: бойца выбирают в окне, итог и срок — в полосе заказа', () => {
     const s = withYards();
     const d = normalizeDraft(s, 'p1', draftOf({ hull: 'landing_shuttle', troop: 'militia' }), YARD_SQUAD_HULLS);
-    const html = loadoutPaneHtml(s, 'p1', d, YARD_SQUAD_HULLS, { ...view, troops: ['militia'] });
-    expect(html).toContain('id="cn-troop"');
+    const lander = { ...view, troops: ['militia'] };
+    expect(loadoutPaneHtml(s, 'p1', d, YARD_SQUAD_HULLS, lander)).toContain('id="cn-troop"');
     const total = { ...data.units.landing_shuttle!.cost };
     for (const [r, n] of Object.entries(data.units.militia!.cost)) total[r] = (total[r] ?? 0) + n;
-    expect(html).toContain(bagText(total));
-    expect(html).not.toMatch(/data-cnbuild disabled/);
+    const bar = orderBarHtml(s, 'p1', d, YARD_SQUAD_HULLS, lander);
+    expect(bar).toContain(priceHtml(total, s.players.p1!.resources));
+    const hours = Math.max(data.units.landing_shuttle!.buildTimeHours, data.units.militia!.buildTimeHours);
+    expect(bar).toContain(`⏱ ${fmtDur(hours)}`);
+    expect(bar).not.toMatch(/data-cnbuild disabled/);
   });
 
   it('НЕКОГО ПОСАДИТЬ — заказать нельзя, и это сказано словами', () => {
     const s = withYards();
     const d = normalizeDraft(s, 'p1', draftOf({ hull: 'landing_shuttle' }), YARD_SQUAD_HULLS);
-    const html = loadoutPaneHtml(s, 'p1', d, YARD_SQUAD_HULLS, { ...view, troops: [] });
-    expect(html).toContain(t('yard.troop.none'));
-    expect(html).toMatch(/data-cnbuild disabled/);
+    const empty = { ...view, troops: [] };
+    expect(loadoutPaneHtml(s, 'p1', d, YARD_SQUAD_HULLS, empty)).toContain(t('yard.troop.none'));
+    expect(orderBarHtml(s, 'p1', d, YARD_SQUAD_HULLS, empty)).toMatch(/data-cnbuild disabled/);
   });
 
   it('заказ уходит с бойцом, которого приняло ядро, и проходит его', () => {
@@ -771,5 +813,59 @@ describe('верфь — подписи статов и ресурсов (UIX-5.
 
   it('цена в биомассе — словом', () => {
     expect(bagText({ biomass: 25 })).toBe('25 биомассы');
+  });
+});
+
+describe('производство — корпус без отсеков и очередь мира (переделка окна, шаг 1)', () => {
+  it.each(['militia', 'tank', 'landing_shuttle'])(
+    '%s модулей не несёт: ни отсеков, ни серого каталога',
+    (hull) => {
+      const s = rich();
+      const html = loadoutPaneHtml(s, 'p1', draftOf({ hull }), [hull], view);
+      expect(Object.values(data.units[hull]!.slots ?? {}).every((n) => !n)).toBe(true);
+      expect(html).toContain(t('yard.slots.none'));
+      expect(html).not.toContain('cn-pal');
+      expect(html).not.toContain('cn-mod');
+      expect(html).not.toContain('cn-bay');
+    },
+  );
+
+  it('у корпуса с отсеками палитра и оговорка про постройку на месте', () => {
+    const s = rich();
+    const html = loadoutPaneHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
+    expect(html).toContain('cn-pal');
+    expect(html).toContain(t('yard.loadout.note'));
+    expect(html).not.toContain(t('yard.slots.none'));
+  });
+
+  it('очередь мира: свободно — null; идёт стройка и ждёт заказ — двое впереди и срок идущей', () => {
+    let s = rich();
+    const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
+    expect(unitLaneAhead(s, home)).toBeNull();
+    s = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
+    s = applyOrder(s, buildShip('p1', home, 'cruiser', 1, []), s.time).state;
+    const ahead = unitLaneAhead(s, home)!;
+    expect(ahead.count).toBe(2);
+    expect(ahead.nextInHours).toBeCloseTo(
+      (s.scheduled.find((e) => e.type === 'construction.complete')!.at - s.time) / HOUR,
+    );
+    const bar = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
+    expect(bar).toContain(t('yard.queue.ahead', { n: 2, eta: fmtEta(ahead.nextInHours) }));
+  });
+
+  it('очередь без идущей стройки (голова ждёт денег) — число без срока', () => {
+    const s = rich();
+    const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
+    s.planets[home]!.buildQueue = [{ id: 99, kind: 'unit', playerId: 'p1', unit: 'cruiser', count: 1 }];
+    expect(unitLaneAhead(s, home)).toEqual({ count: 1, nextInHours: 0 });
+    const bar = orderBarHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(), YARD_HULLS), YARD_HULLS, view);
+    expect(bar).toContain(t('yard.queue.waiting', { n: 1 }));
+  });
+
+  it('заказ здания в той же очереди не считается: юниты и здания строятся параллельно', () => {
+    const s = rich();
+    const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
+    s.planets[home]!.buildQueue = [{ id: 98, kind: 'building', playerId: 'p1', building: 'barracks' }];
+    expect(unitLaneAhead(s, home)).toBeNull();
   });
 });
