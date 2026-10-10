@@ -1,4 +1,5 @@
 import type { MatchRoom } from './matchRoom';
+import { prepareRuntimeDatabase } from './databaseSecurity';
 import { MemoryProfileStore, PostgresProfileStore, type ProfileStore } from './profileStore';
 import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMarket';
 import {
@@ -36,7 +37,6 @@ import {
   PostgresPushStore,
   PostgresReceiptStore,
   PostgresUserStore,
-  migrate,
   type AccountStore,
   type ArsenalStore,
   type AvaChallengeStore,
@@ -64,7 +64,7 @@ import {
  *
  * Memory stores are the default (a restart still loses the match — dev/test). Set
  * `DATABASE_URL` to swap in the Postgres adapters (durable across restart), which
- * also creates the tables on boot. See `docs/infra-sizing-roadmap.md`, blocker #1.
+ * creates tables on boot unless DB_AUTO_MIGRATE=0 selects the separate migration job. See `docs/infra-sizing-roadmap.md`, blocker #1.
  */
 export interface Stores {
   profileStore: ProfileStore;
@@ -147,7 +147,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
   // dev.mjs so the bundler leaves it for Node to resolve at runtime).
   const { Pool } = await import('pg');
   const pool = new Pool({ connectionString: url });
-  await migrate(pool);
+  await prepareRuntimeDatabase(pool, env);
   return {
     profileStore: new PostgresProfileStore(pool),
     store: new PostgresMatchStore(pool),

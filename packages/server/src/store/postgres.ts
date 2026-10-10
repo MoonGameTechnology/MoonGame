@@ -1,7 +1,7 @@
 import type { CorpBuildOrder, CorpInfrastructureResult, CorpInfrastructureState } from '@void/protocol';
 import { updateCorpInfrastructure } from '../corpConstruction';
-import { randomUUID } from 'node:crypto';
-import type { Pool } from 'pg';
+import { createHash, randomUUID } from 'node:crypto';
+import type { Pool, PoolClient } from 'pg';
 import type { ArsenalItem, PlayerId } from '@void/shared-core';
 import type {
   AccountStore,
@@ -55,8 +55,7 @@ import {
 /** Create the tables (idempotent). JSONB discipline: the queryable fields (status,
  *  data_version, seq) are normalized COLUMNS; only the opaque match `state` is JSONB,
  *  so listing/filtering matches never full-scans the blob. See the roadmap PA-1.* */
-export async function migrate(pool: Pool): Promise<void> {
-  await pool.query(`
+const SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS matches (
       id            text PRIMARY KEY,
       data_version  text NOT NULL,
@@ -368,7 +367,12 @@ export async function migrate(pool: Pool): Promise<void> {
       PRIMARY KEY (lo_id, hi_id)
     );
     CREATE INDEX IF NOT EXISTS friend_edges_hi ON friend_edges (hi_id);
-  `);
+  `;
+
+export const schemaFingerprint = (): string => createHash('sha256').update(SCHEMA_SQL).digest('hex');
+
+export async function migrate(pool: Pool | PoolClient): Promise<void> {
+  await pool.query(SCHEMA_SQL);
 }
 
 interface MatchRow {

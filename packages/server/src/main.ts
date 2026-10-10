@@ -1,3 +1,4 @@
+import { securityAuditFromEnv } from './securityAudit';
 import rateLimit from '@fastify/rate-limit';
 import { registerProfileApi } from './profileApi';
 import { creditProfileMatch } from './profileCredit';
@@ -123,12 +124,14 @@ const starterArsenal = loadStarterArsenal(data);
 // ARS-4: the F2P drop loop — chances/pool/pity/salvage are data, validated at boot.
 const dropTables = loadDropTables(data);
 const stores = await createStores();
+const securityAudit = securityAuditFromEnv(process.env);
 
 // The registry's match loader — the persist/observe/driver wiring lives in
 // serverWiring.ts so tests exercise the real composition, not a mirror of it.
 const loadMatch = createMatchLoader({
   stores,
   data,
+  securityAudit,
   onTerminalState: async (matchId, state) => {
     if (!auth || !signSession) return;
     const session = await stores.sessionStore.byMatch(matchId);
@@ -480,6 +483,7 @@ const server = createMultiplayerServer({
   version: buildVersion(process.env.GIT_SHA),
   auth,
   allowedOrigins,
+  securityAudit,
   accountStore, // dev ?nick= WS login (when auth is off)
   seatLock: SEAT_LOCK, // REL-5: nick+ticket identity; `?player=` alone is refused when on
   httpRoutes: (app) => {

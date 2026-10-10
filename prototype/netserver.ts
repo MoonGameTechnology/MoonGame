@@ -1,3 +1,5 @@
+import { securityAuditFromEnv } from '../packages/server/src/securityAudit';
+import { prepareRuntimeDatabase } from '../packages/server/src/databaseSecurity';
 import { registerCorpApi } from '../packages/server/src/corpApi';
 import { CorpService } from '../packages/server/src/corpService';
 import { MemoryCorpStore, PostgresCorpStore, type CorpStore } from '../packages/server/src/store';
@@ -54,7 +56,6 @@ import {
   PostgresReceiptStore,
   PostgresFriendStore,
   PostgresUserStore,
-  migrate,
   registerAuthApi,
   authRateFromEnv,
   registerAdminApi,
@@ -235,7 +236,7 @@ const metaFaucet = Number(process.env.META_MARKET_FAUCET ?? 0) || 0;
 let metaMarket: MetaMarket;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
-  await migrate(pool);
+  await prepareRuntimeDatabase(pool, process.env);
   matchStore = new PostgresMatchStore(pool);
   accountStore = new PostgresAccountStore(pool);
   receiptStore = new PostgresReceiptStore(pool);
@@ -285,6 +286,7 @@ async function creditMatchXp(
 // production entry). Unset ⇒ the nick+ticket flow stays (LAN playtests, zero setup).
 // One env, both worlds; the client self-configures via GET /auth/status.
 const authCfg = configFromEnv(process.env);
+const securityAudit = securityAuditFromEnv(process.env);
 const AUTH = authCfg.auth !== undefined;
 // ADM-1: кто может командовать составом партии (`ADMIN_LOGINS=alice,bob`). Полномочие —
 // на УЧЁТКЕ, а не общий токен: в логе видно, кто снял игрока, а смена пароля отзывает
@@ -512,6 +514,7 @@ async function createHostedMatch(
     // Bot favour (`approval`) is a prototype key the core fog passes through whole:
     // each player gets only the bots' opinion of THEM, not every bot's of every seat.
     hostFog: approvalView,
+    securityAudit,
     observe, // M0: log every room event to JSONL + count for the on-exit summary
     initialReceipts, // rehydrated idempotency (deduped action stays deduped after restart)
     // PVE-5.2: тактика Роя. Для PvP-сессии `pveOrders` возвращает пустой список
@@ -841,6 +844,7 @@ async function hostNewMatch(mapId: MapId = 'nexus', modeId?: string): Promise<Ho
 }
 
 const server = createMultiplayerServer({
+  securityAudit,
   registry,
   host,
   port,

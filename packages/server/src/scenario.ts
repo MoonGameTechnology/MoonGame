@@ -1,3 +1,4 @@
+import type { SecurityAudit } from './securityAudit';
 import { readFileSync, readdirSync } from 'node:fs';
 import {
   type Action,
@@ -564,6 +565,7 @@ export const MODULE_MANIFEST_VERSION = '76'; // SM-3.7b: ракета — отр
 // heroEffects/steward/espionage/effects внесены в граф.)
 
 export interface DevMatchOptions {
+  securityAudit?: SecurityAudit;
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */
   id?: string;
   /** Server clock. Defaults (in `MatchRoom`) to wall time; pinned in tests. */
@@ -725,6 +727,7 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     data,
     now: options.now,
     observe: options.observe,
+    securityAudit: options.securityAudit,
     record: options.record,
     initialReceipts: options.initialReceipts,
     initialSeq: options.initialSeq,

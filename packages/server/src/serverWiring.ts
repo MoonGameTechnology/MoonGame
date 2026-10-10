@@ -1,3 +1,4 @@
+import type { SecurityAudit } from './securityAudit';
 import type { ActionGate } from '@void/action-layer';
 import {
   hashGameDataBundle,
@@ -24,6 +25,7 @@ import { detach } from './detach';
  * Pure assembly over injected deps — no env reads, no listening socket.
  */
 export interface MatchLoaderDeps {
+  securityAudit?: SecurityAudit;
   /** Account cosmetics consume only committed terminal snapshots; also reconciles a restart. */
   onTerminalState?: (matchId: string, state: GameState) => Promise<void>;
   stores: Pick<Stores, 'store' | 'receiptStore'>;
@@ -132,6 +134,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       id: matchId,
       now,
       observe,
+      securityAudit: deps.securityAudit,
       persist,
       initialState: snap.state,
       initialReceipts,

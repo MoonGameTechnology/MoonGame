@@ -1278,7 +1278,7 @@
 | SE-1.3 | 🔒 | sec | `docs/secure-environment-roadmap.md` | Скрытие origin + egress-контроль |
 | SE-2.1 | ⏳ | sec | `docs/secure-environment-roadmap.md` | Секрет-стор + инъекция в рантайме |
 | SE-2.2 | 🔒 | sec | `docs/secure-environment-roadmap.md` | Ротация и аудит доступа к секретам |
-| SE-3.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | Least-privilege роли БД |
+| SE-3.1 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Least-privilege роли БД |
 | SE-3.2 | ⏳ | srv | `docs/secure-environment-roadmap.md` | Шифрование at-rest + in-transit [A02] |
 | SE-3.3 | ⏳ | srv | `docs/secure-environment-roadmap.md` | RLS как defense-in-depth |
 | SE-3.4 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Бэкапы + PITR + проверенный restore |
@@ -1292,7 +1292,7 @@
 | SE-6.5 | ⏳ | srv | `docs/secure-environment-roadmap.md` | Масштаб WS без поломки auth/видимости |
 | SE-7.1 | 🔶 | cli sec | `docs/secure-environment-roadmap.md` | CSP + Trusted Types + HSTS 2026-09-21 |
 | SE-7.2 | ⏳ | cli sec | `docs/secure-environment-roadmap.md` | SRI и безопасные куки |
-| SE-8.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | Структурное аудит-логирование |
+| SE-8.1 | 🔶 | srv sec | `docs/secure-environment-roadmap.md` | Структурное аудит-логирование |
 | SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md` | Алерты на аномалии |
 | SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md` | Метрики и трекинг ошибок |
 | SE-9.1 | ⏳ | srv | `docs/secure-environment-roadmap.md` | Переживание рестарта посреди матча |

@@ -1,3 +1,4 @@
+import type { SecurityAudit } from './securityAudit';
 import type {
   Action,
   Context,
@@ -114,6 +115,7 @@ export interface MatchRoomOptions {
   denyPlayerActions?: (type: string) => string | null | undefined;
   /** Observation-only room-event stream for metrics/playtest logging (M0). */
   observe?: (event: RoomObservation) => void;
+  securityAudit?: SecurityAudit;
   /** Deterministic-replay recorder (RPL-2): receives every advance boundary the room
    *  actually executed (pure `{at}` entries — timer ticks and pre-action catch-ups)
    *  and every SUCCESSFULLY applied action (`{at, action}` at its effective instant,
@@ -480,6 +482,7 @@ export class MatchRoom {
   /** Bytes of the last full snapshot (welcome, resync) sent to each socket, which the
    *  backpressure cap leaves room for (see `send`). `WeakMap` for the same reason. */
   private readonly snapshotBytes = new WeakMap<RoomPeer, number>();
+  private readonly securityAudit?: SecurityAudit;
   private readonly observe?: (event: RoomObservation) => void;
   private readonly record?: (step: { at: number; action?: Action }) => void;
   /** Durable write for strict commit-before-broadcast (see options.persist). */
@@ -610,6 +613,7 @@ export class MatchRoom {
     // telemetry and must NEVER feed back into the room. Wrap it once here so a
     // throwing observer can't escape a commit/broadcast (a metrics bug must not take
     // the match down) — every `this.observe(...)` call site is guarded for free.
+    this.securityAudit = options.securityAudit;
     const raw = options.observe;
     this.observe = raw
       ? (event): void => {
@@ -2172,6 +2176,9 @@ export class MatchRoom {
   }
 
   private send(peer: RoomPeer, message: ServerMessage): void {
+    if (message.type === 'rejection' || message.type === 'error') {
+      this.securityAudit?.record(message.code === 'E_RATE_LIMIT' ? 'rate.limit' : 'action.reject', message.code, this.id);
+    }
     if (!canSend(peer)) return;
     // Backpressure: a peer whose buffer is backing up isn't draining — keep queuing
     // and the server's memory grows without bound (a fast sender flooding a slow
