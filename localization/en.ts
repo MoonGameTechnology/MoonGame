@@ -2873,6 +2873,18 @@ export const en: Record<string, string> = {
   'trader.swap': 'Swap {n}',
 
   // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
+  'onb.gesture.double-click': 'Double-click',
+  'onb.gesture.double-tap': 'Double tap',
+  'onb.gesture.does.group': 'several fleets',
+  'onb.gesture.does.overview': 'overview',
+  'onb.gesture.does.pan': 'move the map',
+  'onb.gesture.does.zoom': 'zoom',
+  'onb.gesture.drag': 'Drag',
+  'onb.gesture.hold': 'Hold',
+  'onb.gesture.pinch': 'Pinch',
+  'onb.gesture.shift-box': 'Shift + box',
+  'onb.gesture.swipe': 'Slide a finger',
+  'onb.gesture.wheel': 'Wheel',
   'onb.goal.capture': 'Capture a world',
   'onb.goal.collapse.title': 'Collapse to tray',
   'onb.goal.fleet': 'Build a ship',
@@ -2912,46 +2924,30 @@ export const en: Record<string, string> = {
   'onb.recap.rest': 'While you were away',
   'onb.recap.title': 'Return digest',
   'onb.tour.done': '✔ Tutorial complete · +{n} XP — now play a real match!',
-  'onb.tour.first.capture':
-    'Take a neutral world: enter orbit, and if it is defended, land troops. Capture is two-phase: sky first, then ground.',
-  'onb.tour.first.course':
-    'Select your fleet (▲) and tap a neighbouring world to set a course. It routes along the star lanes and the fog opens.',
-  'onb.tour.first.done':
-    'First fight won! You ran the whole loop: produce → build → move → capture → score. Next up — a real match.',
+  'onb.tour.first.capture': 'Take the neutral world: orbit first, then the ground.',
+  'onb.tour.first.course': 'Select your fleet ▲, then press a neighbouring world to set a course.',
+  'onb.tour.first.details': 'Open «Details»: the world\'s buildings are there.',
+  'onb.tour.first.done': 'Loop complete: produce, build, move, capture, score.',
   'onb.tour.first.fleet':
-    'Order placed — the ship is under construction. A finished ship flies to orbit on its own and forms a fleet: wait for a «▲» to appear next to your world.',
-  'onb.tour.first.home':
-    'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
-  'onb.tour.first.mine':
-    'Start with economy. Tap «Metal Extractor» in the buildings list — it is highlighted in gold — and press «Upgrade» on its card: metal income funds everything else you build.',
-  'onb.tour.first.nav.mouse':
-    'First, the map. Mouse wheel zooms in and out, drag moves the view, double-click returns to the overview. Ctrl+click adds a fleet to the selection, Shift+drag box-selects several. Try it right now — the map stays live.',
-  'onb.tour.first.nav.touch':
-    'First, the map. Pinch with two fingers to zoom (it moves the view too), drag with one finger to pan, double-tap returns to the overview. A long press adds a fleet to the selection or box-selects. Try it right now — the map stays live.',
-  'onb.tour.first.scan':
-    "Want a ship or fleet's stats? Tap it (hover on PC) — a card opens with damage, armor, speed and troop capacity.",
-  'onb.tour.first.ship':
-    'These are the ships you can order here. Tap the top one — the cruiser: its card opens, then press «Build here».',
-  'onb.tour.first.ships-tab':
-    'Ships are ordered on the «Fleet» tab of this panel. Open it — the tab is highlighted in gold.',
-  'onb.tour.first.score':
-    'World taken — and the score moves! Points come from worlds and sectors; reach the threshold to win.',
+    'The ship is being built. Once done it moves to orbit: wait for a «▲» at your world.',
+  'onb.tour.first.home': 'Select your world to open its panel.',
+  'onb.tour.first.mine': 'Upgrade the Metal Mine: press its row, then «Upgrade».',
+  'onb.tour.first.nav': 'Map controls. They work while this hint is open.',
+  'onb.tour.first.scan': 'Select a fleet: its card shows attack, defense, speed and hold.',
+  'onb.tour.first.ship': 'Press the top ship, then «Build here» on its card.',
+  'onb.tour.first.ships-tab': 'Ships are ordered on the «Fleet» tab. Open it.',
+  'onb.tour.first.score': 'Worlds and sectors give points. Reach the threshold to win.',
   'onb.tour.first.spy':
-    'Scout an enemy world before you attack it: tap it → «Scout world» (or the Diplomacy → Espionage tab) for a 24-hour window into its garrison and fleets. No rivals here, but in a real match it saves you from an ambush.',
-  'onb.tour.first.troops':
-    'Your fleet has a hold for troops: select it at your world and press ⇅ "Troops" on the command bar — it shows who can come aboard and how many. An open world falls to orbit alone; a garrisoned one only falls to a landing — your fleet clears the defense from orbit first, then the troops take the ground.',
+    'Scout an enemy world before attacking: «Spy on the world» shows its garrison for 24 h.',
+  'onb.tour.first.troops': 'A garrisoned world falls only to troops: load them with ⇅ «Troops».',
   'onb.tour.first.welcome':
-    'This is your first world, commander. I will walk you through the core loop — a couple of minutes, calm, no rivals.',
+    'Your first world. We\'ll run the core loop: a couple of minutes, no rivals.',
   'onb.tour.got-it': 'Got it',
-  'onb.tour.hud.clock':
-    'The world runs in real time and keeps going even while you are offline. Pause and speed live here.',
-  'onb.tour.hud.done':
-    'Done! Time to act: upgrade your Metal Mine, raise a fleet, set a course. Good luck, commander.',
-  'onb.tour.hud.purse': 'Your treasury: mine income minus fleet upkeep. Keep it out of the red.',
-  'onb.tour.hud.tools':
-    "The commander's tools: diplomacy, research, production, market and the event log.",
-  'onb.tour.hud.welcome':
-    'A quick tour of the interface — the whole game runs on it. «Skip tutorial» is always available.',
+  'onb.tour.hud.clock': 'The world runs in real time, even offline. Pause and speed are here.',
+  'onb.tour.hud.done': 'Upgrade the Metal Mine, build a fleet and set a course.',
+  'onb.tour.hud.purse': 'Treasury: mining income minus fleet upkeep.',
+  'onb.tour.hud.tools': 'Commander\'s windows: diplomacy, research, production, market and events.',
+  'onb.tour.hud.welcome': 'A short tour of the interface. «Skip tutorial» is on every step.',
   'onb.tour.next': 'Next',
   'onb.tour.skip': 'Skip tutorial',
   'onb.tour.speed':
@@ -3206,24 +3202,24 @@ export const en: Record<string, string> = {
   'training.stage.assault': 'Assault',
   'training.stage.fortify': 'Consolidation',
   'training.stage.finale': 'Finale',
-  'training.tour.prep.fleet': 'Tap your fleet at the base: its card shows the ships and orders. The expedition hero\'s fleet is here too.',
-  'training.tour.economy.mine': 'Build a Metal Mine at the base: 80 metal, 3 h. The stage counts once construction finishes.',
+  'training.tour.prep.fleet': 'Select your fleet at the base to see its ships and orders. The hero\'s fleet is here too.',
+  'training.tour.economy.mine': 'Build a Metal Mine at the base: 80 metal, 3 h. The stage counts once it is finished.',
   'training.tour.economy.ship': 'Order a cruiser on the base\'s Ships tab: 3 h. The finished ship moves to orbit on its own.',
-  'training.tour.research.grid': 'Research Orbital Defense Grid: 5 h. Without it you cannot build Orbital Defense on stage 11.',
+  'training.tour.research.grid': 'Research Orbital Defense Grid: 5 h. Without it you cannot build Orbital Defense.',
   'training.tour.expand.neutral': 'Send a fleet to the neutral planet. A world without a garrison becomes yours on arrival.',
-  'training.tour.missions.beacon': 'Take the observation station with the training beacon. Side missions do not decide victory.',
+  'training.tour.missions.beacon': 'Take the observation station with the training beacon. Side missions don\'t decide victory.',
   'training.tour.fleet.split': 'Detach one ship from a fleet: select the fleet → Split.',
   'training.tour.fleet.merge': 'Merge the fleets back: Merge works while both are in the same province.',
-  'training.tour.battle.patrol': 'Destroy the patrol in the open reach: send a fleet from the base. Battle runs in rounds on its own.',
+  'training.tour.battle.patrol': 'Destroy the patrol in the open reach with a fleet from the base. Battle runs on its own.',
   'training.tour.battle.hero': 'Use a hero ability. It then goes on cooldown.',
-  'training.tour.retreat.retreat': 'Move a fleet to the target planet and press Retreat in battle. Retreating costs 40% of current hull and shield.',
+  'training.tour.retreat.retreat': 'In battle at the target planet, press Retreat: it costs 40% of current hull and shield.',
   'training.tour.retreat.repair': 'Bring the fleet back to the base and repair it at your dock.',
-  'training.tour.carrier.strike': 'Park the carrier on the road to the outpost and launch the squadron: Strike. Strike range is 180.',
+  'training.tour.carrier.strike': 'Park the carrier on the road to the outpost and launch the squadron: Strike, range 180.',
   'training.tour.carrier.home': 'Wait for the squadron to return to the hangar.',
-  'training.tour.assault.load': 'Load troops onto a fleet at the base. Loading takes 1 h; leave earlier and it is cancelled.',
-  'training.tour.assault.outpost': 'Clear the outpost\'s orbit and press Assault. The landing force must outweigh the garrison and fort.',
+  'training.tour.assault.load': 'Load troops onto a fleet at the base: 1 h. Leave earlier and loading is cancelled.',
+  'training.tour.assault.outpost': 'Clear the outpost\'s orbit and press Assault. Troops must outweigh the garrison and fort.',
   'training.tour.fortify.build': 'Build a Fort and Orbital Defense at the outpost; keep the garrison there.',
-  'training.tour.finale.target': 'Take the target planet: fort, orbital defense and 2 frigates. Bring every cruiser in one fleet and 8 heavy infantry from the barracks.',
+  'training.tour.finale.target': 'Take the target: fort, orbital defense, 2 frigates. Bring all cruisers, 8 heavy infantry.',
   'sector-zero.prep.abilities': 'Active skill set',
   'sector-zero.prep.back': 'Main menu',
   'sector-zero.prep.double': 'Double for an ad: +{n} data · +{m} ⌖',

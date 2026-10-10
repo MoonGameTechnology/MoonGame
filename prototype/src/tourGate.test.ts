@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { overlayMode } from './tourGate';
+import { overlayMode, pressCue } from './tourGate';
 
 const тап = { advance: { on: 'tap' } } as const;
 const действие = { advance: { on: 'action' } } as const;
@@ -26,5 +26,30 @@ describe('что обучение позволяет нажимать', () => {
     expect(overlayMode(действие, true)).toBe('free');
     expect(overlayMode(состояние, true)).toBe('free');
     expect(overlayMode(состояние, false)).toBe('free');
+  });
+});
+
+describe('шаг «попробуй руками» не запирает экран (правило 5)', () => {
+  const подсказка = { advance: { on: 'tap' }, hands: true } as const;
+
+  it('пробовать можно сразу: HUD остаётся живым, хотя шаг закрывается «Далее»', () => {
+    expect(overlayMode(подсказка, false)).toBe('free');
+    expect(overlayMode(подсказка, true)).toBe('free');
+  });
+});
+
+describe('жест нажатия над целью (правило 6)', () => {
+  it('только у запертой цели: это и есть место, куда просят нажать', () => {
+    expect(pressCue(overlayMode({ ...действие, gate: true }, true))).toBe(true);
+    expect(pressCue(overlayMode({ ...состояние, gate: true }, true))).toBe(true);
+  });
+
+  it('у модального шага жеста нет: нажимать надо «Далее»', () => {
+    expect(pressCue(overlayMode(тап, true))).toBe(false);
+  });
+
+  it('у свободного шага и у цели, которой нет в кадре, жеста нет', () => {
+    expect(pressCue(overlayMode(действие, true))).toBe(false);
+    expect(pressCue(overlayMode({ ...действие, gate: true }, false))).toBe(false);
   });
 });

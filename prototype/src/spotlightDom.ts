@@ -25,7 +25,9 @@ import {
   type SpotlightView,
   type TourEnd,
 } from './spotlight';
-import { overlayMode } from './tourGate';
+import { overlayMode, pressCue } from './tourGate';
+import { esc } from './format';
+import type { GestureAnim, MapGesture } from '../../decisions/mapGestures';
 
 interface Overlay {
   root: HTMLElement;
@@ -35,6 +37,10 @@ interface Overlay {
   arrow: HTMLElement;
   count: HTMLElement;
   copy: HTMLElement;
+  /** Плитки жестов под строкой шага (UIX-8.1). */
+  gest: HTMLElement;
+  /** Жест нажатия над запертой целью (`tourGate.ts`, правило 6). */
+  press: HTMLElement;
   next: HTMLButtonElement;
   skip: HTMLButtonElement;
   /** Этапное обучение (полигон, TRN-2): пропустить этап и свернуть подсказку. */
@@ -96,6 +102,9 @@ function ensureOverlay(): Overlay {
   const arrow = el('div', 'sl-arrow');
   const count = el('div', 'sl-count');
   const copy = el('div', 'sl-copy');
+  const gest = el('div', 'sl-gest');
+  const press = el('div', 'sl-press');
+  press.innerHTML = PRESS_SVG;
   const btns = el('div', 'sl-btns');
   const skip = el('button', 'sl-skip');
   skip.type = 'button';
@@ -106,14 +115,14 @@ function ensureOverlay(): Overlay {
   const fold = el('button', 'sl-fold');
   fold.type = 'button';
   btns.append(skip, skipStage, fold, next);
-  bubble.append(arrow, count, copy, btns);
-  root.append(...dim, ring, bubble);
+  bubble.append(arrow, count, copy, gest, btns);
+  root.append(...dim, ring, press, bubble);
   const chip = el('button', 'sl-chip');
   chip.type = 'button';
   chip.id = 'spotlight-chip';
   chip.style.display = 'none';
   document.body.append(root, chip);
-  overlay = { root, dim, ring, bubble, arrow, count, copy, next, skip, skipStage, fold, chip };
+  overlay = { root, dim, ring, bubble, arrow, count, copy, gest, press, next, skip, skipStage, fold, chip };
   return overlay;
 }
 
@@ -125,6 +134,49 @@ function place(node: HTMLElement, r: Rect): void {
 }
 
 const HIDDEN: Rect = { left: 0, top: 0, width: 0, height: 0 };
+
+// --- Анимации жестов (UIX-8.1) ---------------------------------------------------------
+// Рисунки — SVG без текста, движение — CSS (`#spotlight .sl-g` в build.mjs). Каждый рисунок
+// и без движения показывает жест: при «уменьшить движение» анимация стоит на этом кадре.
+// Курсор стоит на месте через `<g transform>`, а CSS двигает сам путь: CSS-`transform` на
+// элементе заменил бы его атрибут, и курсор прыгнул бы в угол рисунка.
+const CURSOR = 'M0 0v14l3.6-3.4 2.6 5.8 2.2-1-2.6-5.6H11z';
+const GESTURE_SVG: Record<GestureAnim, string> = {
+  pinch:
+    '<path class="tr" d="M18 27l8-5M46 13l-8 5"/>' +
+    '<circle class="f fa" cx="26" cy="22" r="5"/><circle class="f fb" cx="38" cy="18" r="5"/>',
+  swipe: '<path class="tr" d="M16 20h32"/><circle class="f m" cx="16" cy="20" r="5"/>',
+  'double-tap':
+    '<circle class="rp r1" cx="32" cy="20" r="7"/><circle class="rp r2" cx="32" cy="20" r="7"/>' +
+    '<circle class="f" cx="32" cy="20" r="5"/>',
+  hold:
+    '<circle class="ring" cx="32" cy="20" r="11" pathLength="100"/><circle class="f" cx="32" cy="20" r="5"/>',
+  wheel:
+    '<rect class="body" x="24" y="5" width="16" height="30" rx="8"/>' +
+    '<path class="tr" d="M32 5v10"/><rect class="f wh" x="30.5" y="9" width="3" height="6" rx="1.5"/>',
+  drag: `<path class="tr" d="M14 26h34"/><g transform="translate(14 14)"><path class="cur m" d="${CURSOR}"/></g>`,
+  'double-click':
+    '<circle class="rp r1" cx="30" cy="16" r="6"/><circle class="rp r2" cx="30" cy="16" r="6"/>' +
+    `<path class="cur" transform="translate(30 16)" d="${CURSOR}"/>`,
+  'shift-box':
+    '<rect class="box" x="12" y="7" width="34" height="24" vector-effect="non-scaling-stroke"/>' +
+    `<g transform="translate(12 7)"><path class="cur m" d="${CURSOR}"/></g>`,
+};
+
+/** Жест нажатия над целью: палец на касании, курсор на мыши (выбирает CSS по указателю). */
+const PRESS_SVG =
+  '<svg viewBox="0 0 48 48" aria-hidden="true">' +
+  '<circle class="rp" cx="24" cy="24" r="10"/>' +
+  '<circle class="finger" cx="24" cy="24" r="9"/>' +
+  `<g transform="translate(24 24)"><path class="cur" d="${CURSOR}"/></g></svg>`;
+
+function gestureTile(g: MapGesture): string {
+  return (
+    `<figure class="sl-g" data-anim="${g.anim}">` +
+    `<svg viewBox="0 0 64 40" aria-hidden="true">${GESTURE_SVG[g.anim]}</svg>` +
+    `<figcaption><b>${esc(t(g.name))}</b><span>${esc(t(g.does))}</span></figcaption></figure>`
+  );
+}
 
 function paint(o: Overlay, view: SpotlightView | null): void {
   if (!view) {
@@ -193,6 +245,21 @@ function paint(o: Overlay, view: SpotlightView | null): void {
       })
     : t('onb.tour.step', { k: view.index + 1, n: view.count });
   o.copy.textContent = t(view.step.copy);
+  // Плитки собираются заново только при смене набора: кадр перерисовывается 60 раз в
+  // секунду, и пересборка каждый кадр начинала бы анимацию жеста с нуля.
+  const gestures = view.step.gestures ?? [];
+  const sig = gestures.map((g) => `${g.anim}:${t(g.name)}`).join(' ');
+  if (o.gest.dataset.sig !== sig) {
+    o.gest.dataset.sig = sig;
+    o.gest.innerHTML = gestures.map(gestureTile).join('');
+  }
+  o.gest.style.display = gestures.length ? 'grid' : 'none';
+  // Жест нажатия — над серединой запертой цели (`tourGate.ts`, правило 6).
+  if (view.target && pressCue(mode)) {
+    o.press.style.display = 'block';
+    o.press.style.left = `${view.target.left + view.target.width / 2}px`;
+    o.press.style.top = `${view.target.top + view.target.height / 2}px`;
+  } else o.press.style.display = 'none';
   // Action/state steps have no «Далее» — the player advances by doing the thing.
   o.next.style.display = view.step.advance.on === 'tap' ? 'inline-block' : 'none';
   o.next.textContent = view.index + 1 >= view.count ? t('onb.tour.got-it') : t('onb.tour.next');

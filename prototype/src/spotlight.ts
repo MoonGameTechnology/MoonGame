@@ -22,6 +22,7 @@
  *   - re-query the selector every `refresh()` so a panel that re-renders its
  *     nodes (and moves/recreates the target) keeps the highlight glued to it.
  */
+import type { MapGesture } from '../../decisions/mapGestures';
 
 /** A screen-space rectangle, as produced by `Element.getBoundingClientRect()`. */
 export interface Rect {
@@ -56,6 +57,9 @@ export interface SpotlightStep {
   /** Шаг-подсказка, которую надо попробовать руками: экран остаётся живым, хотя шаг
    *  закрывается кнопкой «Далее». Причины — `tourGate.ts`, правило 5. */
   hands?: boolean;
+  /** Плитки жестов под строкой подсказки — анимация вместо описания жеста (UIX-8.1).
+   *  Какие и в каком порядке, решает `decisions/mapGestures.ts`. */
+  gestures?: readonly MapGesture[];
   /** Этап, к которому шаг относится (учебный полигон, TRN-2): несколько шагов составляют
    *  один этап §14.4. «Пропустить этап» уводит к первому шагу следующего этапа. Нет поля —
    *  обычное обучение без этапов. */

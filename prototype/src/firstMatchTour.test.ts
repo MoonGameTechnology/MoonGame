@@ -14,6 +14,8 @@ describe('buildFirstMatchTour — shape', () => {
     const tour = buildFirstMatchTour({
       mouse: () => true,
       homeOpened: () => false,
+      cardLayout: () => false,
+      panelOpen: () => false,
       shipsTabOpen: () => false,
       hasFleet: () => false,
       capturedWorld: () => false,
@@ -50,6 +52,8 @@ describe('buildFirstMatchTour — shape', () => {
     expect(nav?.advance).toEqual({ on: 'tap' });
     expect(nav?.hands).toBe(true);
     expect(nav?.gate).toBeUndefined();
+    // жесты показаны плитками под устройство (UIX-8.1), строка шага одна на оба
+    expect(nav?.gestures?.[0]?.anim).toBe('wheel');
     // «постройте корабль» — это ДВА нажатия по реальным местам панели, а не пустой шаг:
     // сперва вкладка заказа, потом строка корабля (живой отзыв: «нажимать нечего»)
     // цели должны существовать в реальной разметке: старый селектор улучшения
@@ -75,6 +79,65 @@ describe('buildFirstMatchTour — shape', () => {
     expect(tour.find((s) => s.id === 'capture')?.advance.on).toBe('state');
     expect(tour.find((s) => s.id === 'score')?.advance.on).toBe('state');
   });
+
+  it('на телефоне шаг про карту показывает жесты пальцев, строка та же', () => {
+    const deps = {
+      homeOpened: () => false,
+      cardLayout: () => false,
+      panelOpen: () => false,
+      shipsTabOpen: () => false,
+      hasFleet: () => false,
+      capturedWorld: () => false,
+      scoreRose: () => false,
+    };
+    const pc = buildFirstMatchTour({ ...deps, mouse: () => true }).find((s) => s.id === 'nav');
+    const phone = buildFirstMatchTour({ ...deps, mouse: () => false }).find((s) => s.id === 'nav');
+    expect(phone?.gestures?.map((g) => g.anim)).toEqual(['pinch', 'swipe', 'double-tap', 'hold']);
+    expect(phone?.copy).toBe(pc?.copy);
+  });
+
+  it('карточка мира: шаг «Сведения» между миром и Металлодобычей, на ПК его нет', () => {
+    const deps = {
+      mouse: () => false,
+      homeOpened: () => false,
+      panelOpen: () => false,
+      shipsTabOpen: () => false,
+      hasFleet: () => false,
+      capturedWorld: () => false,
+      scoreRose: () => false,
+    };
+    const card = buildFirstMatchTour({ ...deps, cardLayout: () => true });
+    expect(card.map((s) => s.id).slice(2, 5)).toEqual(['home', 'details', 'mine']);
+    const details = card.find((s) => s.id === 'details');
+    expect(details?.gate).toBe(true);
+    expect(details?.advance.on).toBe('state');
+    expect(details?.target).toBe('#mobile-sheet .mobile-quick [data-mobile="details"]');
+    const pc = buildFirstMatchTour({ ...deps, cardLayout: () => false });
+    expect(pc.find((s) => s.id === 'details')).toBeUndefined();
+  });
+
+  it('карточка мира: шаг ждёт «Сведений», раскрытая карточка ведёт к Металлодобыче', () => {
+    let open = false;
+    const tour = buildFirstMatchTour({
+      mouse: () => false,
+      homeOpened: () => true,
+      cardLayout: () => true,
+      panelOpen: () => open,
+      shipsTabOpen: () => false,
+      hasFleet: () => false,
+      capturedWorld: () => false,
+      scoreRose: () => false,
+    });
+    const t = new SpotlightTour(tour, anyHost());
+    t.start();
+    t.tap(); // welcome → nav
+    t.tap(); // nav → home → (мир уже открыт) → details
+    for (let f = 0; f < 10; f++) t.refresh();
+    expect(tour[t.index]?.id).toBe('details');
+    open = true;
+    t.refresh();
+    expect(tour[t.index]?.id).toBe('mine');
+  });
 });
 
 describe('buildFirstMatchTour — capture is gated on real state', () => {
@@ -87,6 +150,8 @@ describe('buildFirstMatchTour — capture is gated on real state', () => {
     const tour = buildFirstMatchTour({
       mouse: () => true,
       homeOpened: () => homeOpen,
+      cardLayout: () => false,
+      panelOpen: () => false,
       shipsTabOpen: () => shipsTab,
       hasFleet: () => fleetRaised,
       capturedWorld: () => captured,
@@ -149,6 +214,8 @@ describe('buildFirstMatchTour — skippable', () => {
     const tour = buildFirstMatchTour({
       mouse: () => true,
       homeOpened: () => true, // already open — walk straight onto mine
+      cardLayout: () => false,
+      panelOpen: () => false,
       shipsTabOpen: () => false,
       hasFleet: () => false,
       capturedWorld: () => false,
