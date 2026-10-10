@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 10814 зелёных** (1 skip; 887 файлов проверено; прогон 2026-10-10, Node 22 + PostgreSQL 16, собранный прототип). Пропуск age затем закрыт отдельным прогоном `deploy/backup.test.mjs`: 8/8, настоящий age v1.2.1 и шифрованное восстановление ([отчёт](reviews/2026-10-10-zta.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 10815 зелёных** (0 skip; 887 файлов проверено; прогон 2026-10-10, Node 22 + PostgreSQL 16.15 + настоящий age v1.2.1, оба прототипа собраны). Зашифрованное восстановление проверено в полном прогоне ([аудит шифрования](reviews/2026-10-10-encryption-protocols.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть, а без age криптокруг отдельно пропускается.
 
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
@@ -7590,6 +7590,14 @@ JWT-ключей и security JSONL HTTP/WS/game/rate со счётчиками �
 Docker-конфиг без вывода секретов. Живой хост, secret-store, центральный сбор и внешняя
 доставка не подтверждены; агент автодеплоя пока не запускает отдельные миграции.
 [Внедрение/откат](security/zero-trust-rollout.md), [учение 2026-10-10](reviews/2026-10-10-zta.md).
+
+**Шифрование/протоколы — аудит 2026-10-10.** 162 целевые проверки прошли,
+но TLS 1.3 везде не обеспечен: локальный native TLS принимает 1.2/CBC, PostgreSQL
+из compose работает без TLS. scrypt N=32768/r=8/p=1 ниже актуального OWASP-профиля;
+MAILER_LOG_BODY=1 выводит reset bearer даже с PROD=1 (по умолчанию тело скрыто).
+Возраст/назначение/подпись JWT, wire/action gate, отказ legacy TLS/чужой CA и
+подмена зашифрованного бэкапа проверены; живой хост/at-rest не подтверждены.
+[Результаты и приоритеты](reviews/2026-10-10-encryption-protocols.md).
 
 **Бэкапы БД — скрипты, а не строка в runbook'е (SE-3.4, 🔶).** `deploy/backup.sh` +
 `deploy/restore.sh` заменили `pg_dump | gzip > файл` из `deploy/README.md`, из которого

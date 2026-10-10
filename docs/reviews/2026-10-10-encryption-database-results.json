@@ -1,0 +1,19 @@
+{
+  "source": "9d2cf01d5e95e07dcda2a0f197b46297de08ca13",
+  "postgres": {
+    "version": "PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "ssl": "off",
+    "password_encryption": "scram-sha-256"
+  },
+  "runtime_scram": true,
+  "runtime_transport": {
+    "ssl": false,
+    "version": null,
+    "cipher": null
+  },
+  "tls_required_connection": "rejected: server SSL disabled",
+  "real_backup_correct_key": true,
+  "wrong_key_rejected": true,
+  "tampered_ciphertext_rejected_with_recomputed_sha256": true,
+  "database_unchanged_after_rejection": true
+}
