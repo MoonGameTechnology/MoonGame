@@ -290,7 +290,6 @@ import {
   type Squadron,
   type StrikeBase,
   type PausedConstructionSite,
-  type QueuedConstruction,
   missingHull,
   squadronFerryRange,
   squadronPatrol,
@@ -529,19 +528,8 @@ import {
   pickRadius,
   pinchOf,
 } from '../../decisions/pointerPick';
-import {
-  afford as coreAfford,
-  laneOf,
-  queuedAction as coreQueuedAction,
-  queuedCost,
-} from './buildOrders';
-import {
-  activeConstruction as coreActiveConstruction,
-  barPct,
-  buildDurationHours as coreBuildDurationHours,
-  hoursLeft,
-  progressPct as coreProgressPct,
-} from './buildProgress';
+import { laneOf } from './buildOrders';
+import { barPct } from './buildProgress';
 import { contactAlpha, contactLost, hourBucket, paintedThisFrame } from './alerts';
 import { threatAlerts, threatScanDue, threatsHeard, type ThreatSighting } from './threatAlerts';
 import { SPY_COST } from './intel';
@@ -590,13 +578,7 @@ import {
 // that read live match state come out of `createDossiers(hooks)` further down.
 import { buildingDossier, createDossiers, unitTitle, type Dossier } from './dossiers';
 // The client-side build-queue vocabulary, shared with `dossiers.ts`.
-import type {
-  ActiveBuild,
-  BuildKind,
-  BuildLane,
-  ConstructionPayload,
-  QueuedBuild,
-} from './buildQueue';
+import type { BuildKind, BuildLane } from './buildQueue';
 import {
   META_TREE,
   META_BRANCH_RU,
@@ -724,6 +706,7 @@ import {
 import { cam, centerOn, clampCam, defaultView, focusWorld, frameMap, initMapCamera, insets, jumpTo, jumpToPing, mapBounds, panBy, panelSlack, pirateIntroRect, setView, unworld, visible, world, worldDist, zoomAt } from './mapCamera';
 import { admits, battleKnown, fleetKnown, fleetNode, fleetSeen, forgetVision, initMapFog, known, memory, myIntel, refreshVision, rememberScan, resetFogMemory, restoreFogMemory, seesDetails, vision, type Vision } from './mapFog';
 import { battleAnchor, fleetAnchor, fleetOriginPx, fleetPos, forkFortressAt, forkMarkAt, initFleetGeometry, laneAim, nearestLanePoint, orbitRingRadius, selectedFleetIds, spinOrbits, strikeBasePos, strikeWorldPos } from './fleetGeometry';
+import { activeConstruction, afford, buildCost, buildDurationHours, constructionLabel, coreQueue, enqueueBuild, initWorldQueries, myRes, planet, progressPct, timeLeft } from './worldQueries';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -2166,8 +2149,16 @@ if (typeof window !== 'undefined') window.addEventListener('resize', () => {
 
 // --- helpers -----------------------------------------------------------------
 
-const planet = (id: string | null | undefined): Planet | undefined =>
-  id ? s.planets[id] : undefined;
+// Запросы к миру и очередь стройки — у владельца, `worldQueries.ts` (REFM-242). Отсюда —
+// то, что принадлежит игре: мир, своё место, лента, имя места, путь приказа и замок здания.
+initWorldQueries({
+  world: () => s,
+  me: () => ME,
+  note,
+  placeName,
+  playerOrder,
+  buildingLocked,
+});
 // Крыло — это САМИ МАШИНЫ и только они (ROS-3.2): вкладка «Челноки» держит
 // перехватчик, бомбардировщик и десантный челнок, а НОСИТЕЛЬ («Шаттл») — корабль
 // линии и живёт среди кораблей. Он их возит, как авианосец возит авиацию, и от этого
@@ -2182,103 +2173,6 @@ const floor = Math.floor;
 // Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
 /** Та же цена ПЛОСКИМ текстом — для мест, где подпись уходит через `esc()`
  *  (`btn()`, `codexTile()`): там HTML из `cost()` показался бы игроку как разметка. */
-/** Казна текущего игрока — то самое `have`, которым cost() красит нехватку. */
-function myRes(): Record<string, number> {
-  return s.players[ME]?.resources ?? {};
-}
-function afford(bag: Record<string, number> | undefined): boolean {
-  return coreAfford(myRes(), bag);
-}
-/** Ждущие заказы этой полосы — из ЯДРА (BLD-1): очередь больше не локальная. */
-function coreQueue(planetId: string, lane: BuildLane): QueuedConstruction[] {
-  return (s.planets[planetId]?.buildQueue ?? []).filter((q) => laneOf(q.kind) === lane);
-}
-/** Цена ждущего заказа — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
- *  уровней живут в `buildOrders.ts` (REFM-32). */
-function buildCost(planetId: string, q: QueuedConstruction): Record<string, number> | undefined {
-  const id = q.building ?? q.unit;
-  if (id === undefined) return undefined;
-  return queuedCost(s, data, planetId, {
-    kind: q.kind,
-    id,
-    count: q.count ?? 1,
-    ...(q.troop !== undefined ? { troop: q.troop } : {}),
-  });
-}
-/** Приказ, которым голова очереди уедет в ядро. */
-function queuedAction(planetId: string, q: QueuedBuild): Action {
-  return coreQueuedAction(ME, planetId, q);
-}
-/** Стройка, идущая на мире прямо сейчас (голову по `(at, seq)` выбирает
- *  `buildProgress.ts`, REFM-31 — там же и правило порядка). */
-function activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | null {
-  return coreActiveConstruction(s, planetId, lane);
-}
-function constructionLabel(p: ConstructionPayload): string {
-  if (p.kind === 'unit' && p.unit) {
-    return `${p.count ?? 1}× ${unitIcon(p.unit, data)} ${displayUnit(p.unit)}`;
-  }
-  if (p.kind === 'upgrade' && p.building) {
-    return `${BUILD_ICON[p.building] ?? '▣'} ${tData(data.buildings[p.building]?.name ?? p.building)} → L${p.level ?? '?'}`;
-  }
-  if (p.building) {
-    return `${BUILD_ICON[p.building] ?? '▣'} ${tData(data.buildings[p.building]?.name ?? p.building)}`;
-  }
-  return t('queue.unknown');
-}
-function buildDurationHours(p: ConstructionPayload): number {
-  return coreBuildDurationHours(p, data);
-}
-function timeLeft(at: number): string {
-  return fmtEta(hoursLeft(at, s.time, HOUR));
-}
-/** Format a travel-time-remaining in hours as `1.4ч` / `35м` (localized suffixes). */
-function progressPct(active: ActiveBuild): number {
-  return coreProgressPct(active, s.time, data, HOUR);
-}
-function queuedLabel(q: QueuedBuild): string {
-  if (q.kind === 'unit') {
-    // PC: icon·count chips (like the garrison tiles) — the hover dossier names the
-    // unit. Mobile keeps the full name.
-    if (pcUi()) return `${unitIcon(q.id, data)} ${q.count}`;
-    return `${q.count}× ${unitIcon(q.id, data)} ${displayUnit(q.id)}`;
-  }
-  if (q.kind === 'upgrade') {
-    return t('queue.upgrade', {
-      b: `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`,
-    });
-  }
-  return `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`;
-}
-/**
- * BLD-1. Приказ всегда уезжает В ЯДРО — очередь живёт там.
- *
- * Раньше здесь стояла развилка: в сети приказ отправлялся сразу («сервер таймит
- * стройку»), а в соло ложился в ЛОКАЛЬНУЮ очередь прототипа. Из-за неё сеть и соло
- * играли по разным правилам, и на живом плейтесте это вылезло ровно так, как и должно
- * было: в сети каждый тап заводил ЕЩЁ ОДНУ параллельную стройку, экран показывал
- * ближайшую, и игрок видел «постройки заменяют друг друга, ресурсы тратятся».
- *
- * Теперь очередь одна и она в ядре (`Planet.buildQueue`): и сервер, и локальный
- * редьюсер прототипа исполняют одно правило, а клиент её только ПОКАЗЫВАЕТ.
- */
-function enqueueBuild(planetId: string, order: QueuedBuild): void {
-  // Одна точка опоры против дубля одноэкземплярного здания: плитка, кодекс и любой
-  // будущий вход проходят здесь, и серые плитки остаются чистой косметикой.
-  if (order.kind === 'building' && buildingLocked(planetId, order.id)) {
-    note('✖ ' + errText(buildingLocked(planetId, order.id) === 'built' ? 'E_ALREADY_BUILT' : 'E_ALREADY_QUEUED'));
-    return;
-  }
-  // Тост «в очередь» — ПРЕДСКАЗАНИЕ клиента: полоса занята, значит ядро поставит заказ
-  // в ряд, а не начнёт его. Держать это предсказание можно ровно потому, что оно
-  // косметическое: правду показывает панель конвейера, которая читает состояние, и
-  // следующий снимок её поправит. Раньше тост был только в соло — в сети локальной
-  // очереди не было вовсе, и тап не отвечал игроку ничем.
-  if (activeConstruction(planetId, laneOf(order.kind))) {
-    note(t('queue.added', { what: queuedLabel(order), at: placeName(planetId) }));
-  }
-  playerOrder(queuedAction(planetId, order));
-}
 // Геометрия флотов — у владельца, `fleetGeometry.ts` (REFM-238). Отсюда — то, что
 // принадлежит игре: мир, своё место, часы картинки, детализация и кэши дорог и кадра.
 initFleetGeometry({
