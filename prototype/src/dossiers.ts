@@ -25,7 +25,6 @@ import {
   thresholdRamp,
   signatureSize,
   unitTier,
-  COMBAT_UNIT_CAP,
   type GameState,
 } from '../../packages/shared-core/src/index';
 // Straight from the source modules, not through the `game.ts` barrel — same as
@@ -34,6 +33,7 @@ import { data } from './gameData';
 import { HOUR } from './time';
 import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
+import { termBody, termPlain, termTextHtml } from './termTip';
 import { esc, hl, round1, cost, displayUnit, fmtEta, fmtHrs, resChip, resLine } from './format';
 import { BUILD_ICON, unitIcon, unitIconHtml } from './icons';
 import { catalogPortraitHtml } from './shipArt';
@@ -542,23 +542,20 @@ export function createDossiers(host: DossierHost): {
       return d ? { name: d[0], body: d[1] } : null;
     }
     if (key.startsWith('stat:')) {
-      // TXT-3: тело есть только у характеристики, которая несёт СВОЁ правило (лимит
-      // залпа, бесплатная регенерация щита, починка корпуса, «в гарнизоне, не на
-      // орбите», скорость по самому медленному). Остальные пересказывали подпись, и
-      // их тела сняты — как у `res:` выше, остаётся одно имя.
+      // TXT-3: тело есть только у характеристики, которая несёт СВОЁ правило (атака и
+      // защита — залпы разных ролей, лимит залпа, бесплатная регенерация щита, починка
+      // корпуса, скорость по самому медленному). Остальные пересказывали подпись, и их
+      // тела сняты — как у `res:` выше, остаётся одно имя. Правило — статья словаря
+      // (UIX-9.4): то же объяснение показывают подсказка у слова и всплывашка параметра,
+      // здесь оно одними словами, потому что досье под курсором терминов не раскрывает.
       const STAT_DOSSIER: Record<string, [string, string]> = {
-        atk: [t('dossier.stat.atk.name'), ''],
-        def: [t('dossier.stat.def.name'), ''],
+        atk: [t('dossier.stat.atk.name'), termPlain('attack')],
+        def: [t('dossier.stat.def.name'), termPlain('defense')],
         hp: [t('dossier.stat.hp.name'), ''],
-        cap: [
-          t('dossier.stat.cap.name'),
-          t('dossier.stat.cap.desc', {
-            n: COMBAT_UNIT_CAP,
-          }),
-        ],
-        hull: [t('dossier.stat.hull.name'), t('dossier.stat.hull.desc')],
-        shield: [t('dossier.stat.shield.name'), t('dossier.stat.shield.desc')],
-        spd: [t('dossier.stat.spd.name'), t('dossier.stat.spd.desc')],
+        cap: [t('dossier.stat.cap.name'), termPlain('fire-line')],
+        hull: [t('dossier.stat.hull.name'), termPlain('hull')],
+        shield: [t('dossier.stat.shield.name'), termPlain('shield')],
+        spd: [t('dossier.stat.spd.name'), termPlain('speed')],
         // Защита построек мира: правило неочевидно (доли складываются, у крепости своя,
         // снесённая не прикрывает), поэтому тело есть. Числа — из данных, не из текста.
         mitigation: [
@@ -598,12 +595,13 @@ export function createDossiers(host: DossierHost): {
    *  прокачка, ДО того как за неё заплачено. */
   function codexHtml(kind: string, id: string, level = 1): string {
     if (kind === 'm') {
-      // ONB-4 glossary article — a short mechanic/term explainer (plain text copy).
+      // ONB-4 glossary article — a short mechanic/term explainer. Terms named in its
+      // text are live words with their own tooltip (UIX-9.4).
       const g = GLOSSARY.find((x) => x.id === id);
       if (!g) return '';
       return (
         `<div class="cx-head"><span class="cx-ic">?</span><b>${esc(t(g.titleKey))}</b><span class="cx-tag">${t('codex.tag.mechanic')}</span></div>` +
-        `<div class="cx-desc">${esc(t(g.bodyKey))}</div>`
+        `<div class="cx-desc">${termTextHtml(termBody(g.id))}</div>`
       );
     }
     if (kind === 'b') {

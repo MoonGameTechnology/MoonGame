@@ -234,9 +234,10 @@ describe('dossiers — маршрутизация objDossier', () => {
 
   // TXT-3. Досье характеристики, которое лишь пересказывало свою подпись («Атака» /
   // «Суммарная атака кораблей флота»), тела больше не имеет: подпись и число уже сказали
-  // всё. Тело осталось только там, где оно несёт НЕОЧЕВИДНОЕ правило.
+  // всё. Тело осталось только там, где оно несёт НЕОЧЕВИДНОЕ правило. У атаки и защиты
+  // оно есть (UIX-9.4): это залпы разных ролей, и защита урон по флоту не снижает.
   it('характеристика без своего правила отдаёт только подпись', () => {
-    for (const k of ['atk', 'def', 'hp', 'datk', 'ddef', 'dhp']) {
+    for (const k of ['hp', 'datk', 'ddef', 'dhp']) {
       const d = objDossier(`stat:${k}`);
       expect(d?.name, k).toBeTruthy();
       expect(d?.body, k).toBe('');
@@ -244,7 +245,7 @@ describe('dossiers — маршрутизация objDossier', () => {
   });
 
   it('характеристика со своим правилом тело сохраняет', () => {
-    for (const k of ['cap', 'shield', 'hull', 'spd', 'mitigation']) {
+    for (const k of ['atk', 'def', 'cap', 'shield', 'hull', 'spd', 'mitigation']) {
       expect(objDossier(`stat:${k}`)?.body, k).toBeTruthy();
     }
   });

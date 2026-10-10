@@ -446,9 +446,9 @@ export const en: Record<string, string> = {
   'arsenal.kind.hull': 'Hulls',
   'arsenal.kind.module': 'Modules',
   'arsenal.origin.auction': 'auction',
-  'arsenal.origin.craft': 'craft',
-  'arsenal.origin.drop': 'drop',
-  'arsenal.origin.lootbox': 'lootbox',
+  'arsenal.origin.craft': 'crafted',
+  'arsenal.origin.drop': 'reward',
+  'arsenal.origin.lootbox': 'crate',
   'arsenal.origin.rent': 'rent',
   'arsenal.origin.starter': 'starter',
 
@@ -915,21 +915,39 @@ export const en: Record<string, string> = {
   'codex.term.async.body':
     'The world runs in real time and keeps going 24/7 — even after you leave. Orders take real hours: set a course, close the game, come back to the result.',
   'codex.term.async.title': 'Asynchronous world',
+  'codex.term.attack.body':
+    'Volley strength when this fleet attacks. When it is attacked, it answers with [[defense|defense]]. Only the [[fire-line|firing line]] shoots in a volley.',
+  'codex.term.attack.title': 'Attack',
   'codex.term.capture.body':
     'Capturing a world is two-phase. First enter orbit and beat the defenders in space; if the world holds a garrison, land troops (a ground division from the hold).',
   'codex.term.capture.title': 'Orbit and landing',
   'codex.term.coalition.body':
     'Diplomacy lets you sign pacts and alliances, but a coalition is capped by combined strength — you cannot gang everyone up on one player. The cap keeps the balance of power and stops a snowball from crushing the game.',
   'codex.term.coalition.title': 'Coalition cap',
+  'codex.term.defense.body':
+    'Return-fire strength when the fleet is attacked. It does not reduce damage taken: the [[shield|shield]] and [[hull|hull]] absorb it.',
+  'codex.term.defense.title': 'Defense',
+  'codex.term.fire-line.body':
+    'Only the {n} strongest {n|unit fires|units fire} in a volley. The rest only take damage.',
+  'codex.term.fire-line.title': 'Firing line',
   'codex.term.fog.body':
     'You see only what is near your forces and radars; the rest is hidden by fog or shown from memory (the last thing you saw there). Scouts and radar widen your view.',
   'codex.term.fog.title': 'Fog of war',
+  'codex.term.hull.body':
+    'Current and full strength of the fleet. Repairs over your own world with a shipyard, or instantly for credits.',
+  'codex.term.hull.title': 'Hull',
   'codex.term.lanes.body':
     'Fleets travel not in straight lines but along star lanes between worlds — the route is built automatically. Lane nodes can be intercepted: an enemy met on the way is a battle.',
   'codex.term.lanes.title': 'Star lanes',
   'codex.term.score.body':
     'Points accrue from what you hold: a world — 50, any other sector — 10, buildings add per level. Reach the score threshold to win. Other paths to victory: eliminating rivals or domination.',
   'codex.term.score.title': 'Victory points',
+  'codex.term.shield.body':
+    'Takes damage before the [[hull|hull]] and recharges for free out of combat.',
+  'codex.term.shield.title': 'Shield',
+  'codex.term.speed.body':
+    'The fleet moves at the speed of its slowest ship. A ship with [[hull|hull]] below 30% moves slower.',
+  'codex.term.speed.title': 'Speed',
   'codex.term.upkeep.body':
     'Fleets and buildings cost a daily fee. Mine income minus upkeep = your net balance; go negative and the treasury drains.',
   'codex.term.upkeep.title': 'Upkeep',
@@ -1377,8 +1395,6 @@ export const en: Record<string, string> = {
   'dossier.fleet.name': 'Fleet',
   'dossier.hint': 'Hover an object on the left — its dossier appears here.',
   'dossier.stat.atk.name': 'Attack',
-  'dossier.stat.cap.desc':
-    'At most {n} {n|unit fires|units fire} per volley — the strongest first; everyone beyond the cap only soaks damage.',
   'dossier.stat.cap.name': 'Firing line',
   'dossier.stat.datk.name': 'Attack',
   'dossier.stat.ddef.name': 'Defense',
@@ -1388,13 +1404,8 @@ export const en: Record<string, string> = {
     'Damage to the world from ground assault and orbital bombardment is cut by this share. A fort gives {f} by level, every other intact building {b}, up to {cap} in total. A destroyed building stops covering.',
   'dossier.stat.mitigation.name': 'Structure cover',
   'dossier.stat.hp.name': 'Hit points',
-  'dossier.stat.hull.desc':
-    'Current/full army hull. Mends over your world with a repair yard — or instantly for credits.',
   'dossier.stat.hull.name': 'Hull',
-  'dossier.stat.shield.desc':
-    'Ablative shield: takes damage first and recharges for free out of combat.',
   'dossier.stat.shield.name': 'Shield',
-  'dossier.stat.spd.desc': 'The fleet moves at the speed of its slowest ship.',
   'dossier.stat.spd.name': 'Speed',
   'dossier.tab.buildings.desc':
     "The world's buildings and its construction conveyor: condition, levels, upgrades.",
@@ -1487,7 +1498,7 @@ export const en: Record<string, string> = {
   'hint.auto-retreat.nowhere': '⮐ nowhere to fall back to: select your own world or set a capital',
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
-  'hint.cast-cancelled': '✖ cast cancelled',
+  'hint.cast-cancelled': '✖ ability cancelled',
   'hint.deploy-cancelled': '✖ deploy cancelled',
   'hint.forced-march': '⚡ forced march: +50% speed, −5% hull per hour underway',
   'hint.multiselect': '⊕ click your fleets — build the group, then give a common order',
@@ -1522,6 +1533,8 @@ export const en: Record<string, string> = {
   // --- map — Значки на карте: фазы боя; кольца радара выбранного мира.
   'map.badge.landing': '⚒ ground',
   'map.badge.orbit': '⚔ orbital',
+  'map.callout.garrison': 'garrison {n}',
+  'map.fog.old': '✦ old data',
   'map.radar.detect': '◌ detection {n}',
   'map.radar.identify': '● identification {n}',
 
@@ -2044,7 +2057,7 @@ export const en: Record<string, string> = {
   'sandbox.tog.immortal-home.hint': 'The home world cannot be captured',
   'sandbox.tog.instant-build': 'Instant construction',
   'sandbox.tog.instant-build.hint': 'Construction finishes immediately',
-  'sandbox.tog.instant-cooldown': 'Skill cooldowns',
+  'sandbox.tog.instant-cooldown': 'Ability cooldowns',
   'sandbox.tog.instant-cooldown.hint': 'Commander abilities are always ready',
   'sandbox.tog.speed': 'Speed control',
   'sandbox.tog.speed.hint': 'the in-match time bar — pause and speed multipliers (×1 is real time)',
@@ -2058,7 +2071,7 @@ export const en: Record<string, string> = {
   'sci.ordnance-savant.desc':
     'Leader of the missile branch: guidance arrays, compact warheads, saturation barrage.',
   'sci.overseer.desc':
-    'Leader of the command branch (C2): doctrines of automation and delegation. Unlocks the «Steward Protocol» — handing your seat to an AI while you sleep.',
+    'Leader of the command branch: doctrines of automation and delegation. Unlocks the «Steward Protocol» — handing your seat to an AI while you sleep.',
   'sci.polymath.desc': 'A generalist with no branch: +1 research slot (2→3) instead of a focus.',
   'sci.void-admiral.desc': 'Leader of the space branch: shipyards, logistics, siege doctrines.',
   'sci.wing-commodore.desc':
@@ -2150,7 +2163,7 @@ export const en: Record<string, string> = {
   'yard.hull.none': 'The arsenal has no hulls of this class.',
   'yard.hull.unavailable': 'Hull unavailable.',
   'yard.loadout.note':
-    "Loadout locks in on build. A finished ship can't be refitted — build a new one with a different set.",
+    'Modules are fitted at build time. A finished ship cannot be refitted.',
   'yard.module.not-allowed': 'not for this hull',
   'yard.module.remove': 'remove module',
   'yard.modules.all-taken': 'Available modules — all slots full',
@@ -2761,7 +2774,7 @@ export const en: Record<string, string> = {
   'log.build.cleared': '🧹 {b} cleared by the garrison at {at}',
   'log.build.destroyed': '💥 {b} destroyed at {at}',
   'log.build.done': '🏗️ {b} built at {at}',
-  'log.build.upgraded': '⬆️ {b} → L{lvl} at {at}',
+  'log.build.upgraded': '⬆️ {b} → level {lvl} at {at}',
   'log.capture': '🚩 {who} captured {at}',
   'log.diplo.offer': '🕊 {who} offers {stance} — answer in kind in Diplomacy',
   'log.diplo.offer.short': 'Proposal: {stance}',

@@ -632,3 +632,8 @@ body.holo-ui #statpop{width:min(300px,calc(100vw - 16px));padding:11px 13px 12px
 body.holo-ui #statpop .sp-head b{font-size:var(--fs-body);}
 body.holo-ui #statpop .sp-val{font-size:16px;}
 body.holo-ui #statpop .sp-sub{font-size:var(--fs-caption);}
+/* Подсказка термина — кегль и рамка всплывашки параметра, фон плотный: подсказки встают стопкой. */
+body.holo-ui .termtip{padding:11px 13px 12px;font-size:var(--fs-body);
+  background:linear-gradient(155deg,var(--glass-sheen),transparent 42%),var(--sf-panel),var(--void);
+  border:1px solid rgba(140,233,242,.6);box-shadow:0 14px 36px rgba(0,0,0,.55);}
+body.holo-ui .termtip b{font-size:var(--fs-body);}

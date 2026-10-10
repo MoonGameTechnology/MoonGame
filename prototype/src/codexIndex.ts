@@ -92,6 +92,44 @@ export const GLOSSARY: GlossaryArticle[] = [
     bodyKey: 'codex.term.coalition.body',
     tags: ['coalition', 'коалиция', 'alliance', 'союз', 'пакт', 'диплом', 'diplomacy', 'порог'],
   },
+  // UIX-9.4: параметры флота и корабля. Эти статьи — ещё и подсказки к словам-терминам
+  // (`termTip.ts`) и тела досье `stat:` на ПК: одно объяснение на понятие.
+  {
+    id: 'attack',
+    titleKey: 'codex.term.attack.title',
+    bodyKey: 'codex.term.attack.body',
+    tags: ['attack', 'атака', 'атк', 'atk', 'урон', 'damage', 'залп', 'volley'],
+  },
+  {
+    id: 'defense',
+    titleKey: 'codex.term.defense.title',
+    bodyKey: 'codex.term.defense.body',
+    tags: ['defense', 'защита', 'защ', 'def', 'оборона', 'ответный залп', 'return fire'],
+  },
+  {
+    id: 'fire-line',
+    titleKey: 'codex.term.fire-line.title',
+    bodyKey: 'codex.term.fire-line.body',
+    tags: ['fire line', 'firing line', 'линия огня', 'залп', 'volley', 'предел', 'cap'],
+  },
+  {
+    id: 'hull',
+    titleKey: 'codex.term.hull.title',
+    bodyKey: 'codex.term.hull.body',
+    tags: ['hull', 'корпус', 'прочность', 'hp', 'ремонт', 'repair'],
+  },
+  {
+    id: 'shield',
+    titleKey: 'codex.term.shield.title',
+    bodyKey: 'codex.term.shield.body',
+    tags: ['shield', 'щит'],
+  },
+  {
+    id: 'speed',
+    titleKey: 'codex.term.speed.title',
+    bodyKey: 'codex.term.speed.body',
+    tags: ['speed', 'скорость', 'скр', 'spd', 'ход'],
+  },
 ];
 
 interface CodexData {
