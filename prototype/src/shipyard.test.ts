@@ -299,7 +299,7 @@ describe('верфь — панель конструктора', () => {
       view,
     );
     const pal = html.slice(html.indexOf('class="cn-pal"'));
-    const heads = [...pal.matchAll(/class="cn-pg"><span aria-hidden="true">[^<]*<\/span> ([^<]+)</g)].map((x) => x[1]);
+    const heads = [...pal.matchAll(/class="cn-pg" data-slot="[a-z]+"><span aria-hidden="true">[^<]*<\/span> ([^<]+)</g)].map((x) => x[1]);
     expect(heads).toEqual(['Оружие', 'Защита', 'Система']);
     // Щиты пустоты — только для пушек крепости: легендарный щит не заслоняет броню крейсера.
     expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeGreaterThan(0);
@@ -867,5 +867,63 @@ describe('производство — корпус без отсеков и о�
     const home = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS).planet;
     s.planets[home]!.buildQueue = [{ id: 98, kind: 'building', playerId: 'p1', building: 'barracks' }];
     expect(unitLaneAhead(s, home)).toBeNull();
+  });
+});
+
+describe('производство — слоты-выноски на арте (переделка окна, шаг 2)', () => {
+  const slotCount = (hull: string): number =>
+    Object.values(data.units[hull]!.slots ?? {}).reduce<number>((a, n) => a + (n ?? 0), 0);
+
+  it('у каждого корпуса окна с отсеками — точка и плитка на каждый отсек', () => {
+    const s = rich();
+    for (const list of [YARD_HULLS, YARD_SQUAD_HULLS]) {
+      for (const hull of list) {
+        const d = normalizeDraft(s, 'p1', draftOf({ hull }), list);
+        expect(d.hull).toBe(hull);
+        const html = loadoutPaneHtml(s, 'p1', d, list, view);
+        const n = slotCount(hull);
+        expect((html.match(/class="cn-tile /g) ?? []).length, hull).toBe(n);
+        expect((html.match(/class="cn-dot/g) ?? []).length, hull).toBe(n);
+        expect(html.includes('class="cn-art"'), hull).toBe(n > 0);
+      }
+    }
+  });
+
+  it('надетый модуль — плитка с его иконкой и цветом редкости, пустой отсек — тип слота', () => {
+    const s = rich();
+    const d = normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'] }), YARD_HULLS);
+    const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
+    const mod = data.modules.ion_engine!;
+    expect(html).toContain('class="cn-tile filled" data-cnun="ion_engine"');
+    expect(html).toContain(`--rar:var(--rar-${mod.rarity})`);
+    expect(html).toContain(`aria-label="${t('yard.slot.utility')}: ${tData(mod.name)}"`);
+    expect(html).toContain('class="cn-tile empty" data-cnslot="weapon"');
+    expect(html).toContain('class="cn-tile empty" data-cnslot="defense"');
+    expect(html).toContain(`aria-label="${t('yard.slot.weapon')}: ${t('yard.slot.empty')}"`);
+  });
+
+  it('плитка надетого модуля на арте снимает его, как строка отсека', () => {
+    const win = fakeWin();
+    const yard = initShipyard(hostOf({ root: () => win }));
+    yard.open();
+    win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
+    expect(win.html()).toContain('data-cnun="ion_engine"');
+    win.fire(click('.cn-tile.filled', { cnun: 'ion_engine' }));
+    expect(win.html()).not.toContain('data-cnun="ion_engine"');
+  });
+
+  it('пустая плитка ведёт к модулям своего типа', () => {
+    const win = fakeWin();
+    const asked: string[] = [];
+    const scrolled: unknown[] = [];
+    (win as { querySelector: unknown }).querySelector = (q: string) => {
+      asked.push(q);
+      return q.includes('data-slot="weapon"') ? { scrollIntoView: (o: unknown) => scrolled.push(o) } : null;
+    };
+    const yard = initShipyard(hostOf({ root: () => win }));
+    yard.open();
+    win.fire(click('.cn-tile.empty', { cnslot: 'weapon' }));
+    expect(asked).toContain('#constructor .cn-pg[data-slot="weapon"]');
+    expect(scrolled).toEqual([expect.objectContaining({ block: 'start' })]);
   });
 });

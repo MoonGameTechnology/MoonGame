@@ -128,14 +128,14 @@ uniform response и не раскрывает bearer ни в обычных, н�
 | --- | --- |
 | Аккаунты и роли | Реальная регистрация/вход в PostgreSQL, duplicate/invalid login, uniform 401, подмена session claims, корректно подписанные expired session/reset с положительным контролем, session вместо join, чужой Origin и match |
 | Администрирование | При пустом ADMIN_LOGINS маршруты отсутствуют; обычный игрок не видит roster и не может kick; настроенный администратор получает доступ |
-| Гейт и DoS | Чужой player, bare action, invalid frames, inflated deflate bomb, maxPayload; лишние сообщения flood отбрасываются до parse, сокет не обязан закрываться |
+| Гейт и DoS | Корректный envelope с чужим player получает E_FORBIDDEN; bare action, invalid frames, inflated deflate bomb, maxPayload; лишние сообщения flood отбрасываются до parse, сокет не обязан закрываться |
 | Fail secure startup | Отказ без auth secret/Origin, с GATE=0, SEAT_LOCK=0, половинным TLS и admin ролью вместо runtime при strict guard |
 | Секреты | Private directory 0700, env/account files 0600, TLS key UID 65532/0600; посторонний UID получает EACCES; CA build mount отсутствует в runtime |
 | DB permissions | Runtime не может DDL, ALTER TABLE, CREATE ROLE/TEMP или читать pg_authid; после TLS конфигурации приложение реально стартует с strict role guard |
 | Почта/сброс | Локальная доставка, unknown email, expiry/tamper/type isolation, смена пароля, старые сессии, последовательный replay, сбой доставки; конкурентный replay — ST-03 |
 | Ротация JWT | Новая подпись работает; старые session/join работают в переходное окно и отвергаются после deadline |
 | Backup/restore | Без recipient нет plaintext backup; правильный/чужой ключ, tamper с пересчитанным SHA, отказ до SQL, полное разрушение/восстановление данных; восстановление прав — ST-02 |
-| Аварии | Обрыв клиента, graceful restart, настоящий SIGKILL процесса и Docker autorestart, остановка/запуск БД; snapshots/seq сохраняются, clock — ST-01 |
+| Аварии | Обрыв клиента, graceful restart, настоящий SIGKILL процесса и Docker autorestart, остановка/запуск БД; результат разделения флота и seq сохраняются, clock — ST-01 |
 | Браузеры | Chromium, desktop 1440×900 и phone viewport 390×844: login, browser matches, выбор места и HTTPS/WSS вход в игру; JS errors=0, horizontal overflow=0 |
 | Обе игры | Sector Zero/mines smoke, network match, retreat и relocate smoke прошли; Sector Zero/mines повторены после обновления main |
 
@@ -150,13 +150,13 @@ smoke и полный гейт; это не отдельный capacity benchmar
 Контейнер ограничен 1 GiB/512 pids; memory usage между первой/последней выборкой
 233.9→250.7 MiB. Короткий прогон не устанавливает отсутствие утечки памяти.
 
-После restart время readiness: graceful 2.432 с, SIGKILL+autorestart 5.964 с,
+В исходном прогоне после restart время readiness: graceful 2.432 с, SIGKILL+autorestart 5.964 с,
 возврат БД 1.675 с. Это локальные измерения, не production SLA/RTO.
 `docker kill` через API означает ручную остановку и не проверяет autorestart:
 в итоговом сценарии отдельный helper с CAP_KILL сигналил ровно PID игрового
 контейнера; сеть helper отключена, RestartCount проверен.
 
-107 записей сценариев в JSON включают положительные/отрицательные проверки,
+107 исходных записей и 8 уточняющих сценариев в JSON включают положительные/отрицательные проверки,
 контрольные перепроверки и наблюдения найденных слабостей. Первоначальные ошибки
 харнеса (статус create=200, случайные match IDs, drop вместо disconnect, issuer,
 права bind mount и ожидание readiness) исправлены и не выданы за дефекты продукта.
@@ -166,6 +166,43 @@ smoke и полный гейт; это не отдельный capacity benchmar
 CSP в обоих browser viewport блокирует `eval` библиотеки zod; pageerror нет.
 Для UI automation явно пинован SPKI временного сертификата. Проверки подлинности
 CA/hostname выполнены отдельными TLS-клиентами с обязательной проверкой сертификата.
+
+## Уточнение доказательств после автоматического ревью
+
+Повторная сборка контейнера — `f1c700c12046576dcaa5c6be241bb8d8a863b6dd` (между срезами менялся только UI
+кораблестроения). Восемь сценариев выполнены повторно на новом отдельном матче:
+корректный чужой player/actionId отвергнут именно `E_FORBIDDEN`; чужой match token
+проверен на существующем втором матче с успешным положительным контролем;
+220 raw frames дали 50 parse errors, соединение осталось открытым.
+
+До рестартов реально выполнен `fleet.split`: отпечаток принадлежащих игроку
+флотов изменился и совпал с сохранённой БД. После graceful и SIGKILL совпали
+**оба отпечатка и seq=3**. В уточняющем прогоне readiness вернулся за 2.425 и
+11.515 секунды соответственно. Это проверка конкретного эффекта, а не
+тождественности всех полей мира во всех возможных сценариях.
+
+При остановке БД `/ready` недоступен и транспорт уже закрыт. Попытка разделения
+не изменила seq/флоты; после возврата БД нет успешного receipt этой попытки,
+отпечаток состояния и seq остались прежними. Путь `E_UNAVAILABLE` на открытом
+транспорте этим прогоном отдельно не подтверждён.
+
+Overflow повторно измерен **после входа в `/game/`**: `scrollWidth/innerWidth`
+равны 1440/1440 и 390/390; pageerror нет. PNG заменены снимками этого прогона.
+Сохранённые нагрузочные счётчики проверены отдельно: последняя выборка содержит
+8200 команд, 8200 pong и пустой rejects; весь прогон — 8280 pong. Первоначальный
+финальный счётчик отправки не был экспортирован: флаг в JSON теперь назван
+`connectionHashPass`, оценка записанной выборки — `recordedTrafficPass`.
+Pong подтверждает ping, а не receipt конкретного игрового действия.
+
+Исходники исправлены: shared `test()` задаёт ненулевой exit code при ошибках;
+уточняющий сценарий сохраняет результаты после каждого шага и прекращает работу
+при провале. Контрольная искусственная ошибка дала exit=1 и сохранённую запись. Для Docker PG после restart используется актуальный IP с проверкой
+сертификата по DNS-имени `postgres`; статический IP в первых попытках устаревал.
+Ранние варианты сценариев заменены; исходные результаты сохранены с примечаниями
+о границах их доказательств. Дополнительные прогоны не изменили пять находок. Полный гейт на этом свежем main:
+**10835 тестов, 0 skip, 888 файлов**, lint/typecheck/docs-check зелёные.
+Временная umask=0077 мешала упаковочным Debian fixtures; с обычной для сборки
+umask=0022 полный прогон прошёл, тесты/продукт для этого не менялись.
 
 ## Доказательства и воспроизведение
 
@@ -179,11 +216,11 @@ CA/hostname выполнены отдельными TLS-клиентами с о
 Нужно адаптировать абсолютные repo/output пути, собрать проектные образы с trust
 настроенного прокси, подготовить cert/env/network и отдельно provision/migrate.
 Порядок: setup prepare → provision → start → baseline → database-tls →
-runtime-security → load-users → load; затем без активной нагрузки chaos → backup
+runtime-security → load-users → load; затем без активной нагрузки review-followup → backup
 drill → rotation/expiry-race/clock-restart. SMTP fixture собирается esbuild как
 временный ESM bundle в `packages/server/dist`, с external pg/fastify.
 Caddy/protocol и browser сценарии независимы до изменения серверного профиля.
-Backup/chaos/clock сценарии останавливают сервер или изменяют данные своей БД.
+Backup/review-followup/clock сценарии останавливают сервер или изменяют данные своей БД.
 Никогда не направлять их в реальную базу; env, private keys и raw dumps не включены
 в отчёт. Ритуал публикации — только документация и доказательства.
 

@@ -78,10 +78,7 @@ const GROUND_PORTRAITS: Readonly<Record<string, string>> = {
   pirate_tank: pirateTank,
 };
 
-/** Orbital station art belongs to orbital buildings, never a new mobile unit.
- * The owner's faction picks the family, as on the map (`unitShape`): a Swarm-owned
- * cruiser is the Hunter; a catalog entry without an owner falls back to `def.faction`.
- */
+/** The catalogue portrait of an entry, or '' when it has no picture (`portraitArt`). */
 export function catalogPortraitHtml(
   kind: 'b' | 'u' | 'md',
   id: string,
@@ -89,6 +86,25 @@ export function catalogPortraitHtml(
   size: 'thumb' | 'portrait' = 'portrait',
   ownerFaction?: string,
 ): string {
+  const art = portraitArt(kind, id, data, ownerFaction);
+  if (!art) return '';
+  // The adjacent localized title identifies the unit; the artwork adds no duplicate
+  // screen-reader label and contains no language baked into its pixels.
+  return `<span class="ship-art ship-art--${size}" data-ship-art="${art.key}" aria-hidden="true"><img src="${art.src}" alt="" width="768" height="512" loading="lazy" decoding="async" draggable="false"></span>`;
+}
+
+/** Which picture a catalogue entry shows: its key (`data-ship-art`, also the key of the
+ * slot points in `decisions/slotCallouts.ts`) and source; undefined when it has none.
+ * Orbital station art belongs to orbital buildings, never a new mobile unit.
+ * The owner's faction picks the family, as on the map (`unitShape`): a Swarm-owned
+ * cruiser is the Hunter; a catalog entry without an owner falls back to `def.faction`.
+ */
+export function portraitArt(
+  kind: 'b' | 'u' | 'md',
+  id: string,
+  data: GameData,
+  ownerFaction?: string,
+): { key: string; src: string } | undefined {
   // The minelayer is equipment, not the metal-mine building or a mobile hull.
   // Until its catalogue entry is shipped, unknown module pages stay empty.
   const mine = kind === 'md' && (id === 'mine_layer' || id === 'rocket_mine_layer') && !!data.modules[id];
@@ -104,8 +120,6 @@ export function catalogPortraitHtml(
       : undefined;
   const ground = def?.domain === 'ground';
   const src = mine ? roadMine : ground ? GROUND_PORTRAITS[id] : shape && PORTRAITS[shape];
-  if (!src) return '';
-  // The adjacent localized title identifies the unit; the artwork adds no duplicate
-  // screen-reader label and contains no language baked into its pixels.
-  return `<span class="ship-art ship-art--${size}" data-ship-art="${mine ? 'roadMine' : ground ? id : shape}" aria-hidden="true"><img src="${src}" alt="" width="768" height="512" loading="lazy" decoding="async" draggable="false"></span>`;
+  if (!src) return undefined;
+  return { key: mine ? 'roadMine' : ground ? id : shape!, src };
 }

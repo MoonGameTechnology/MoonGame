@@ -2,8 +2,8 @@
   "schema": 1,
   "date": "2026-10-10 UTC",
   "audited_container_source": "7466e6fc342c71cd565bb12b678226b81d358cbf",
-  "publication_base": "024979918d076c937922e350e1d75da4344fb215",
-  "case_records": 107,
+  "publication_base": "f1c700c12046576dcaa5c6be241bb8d8a863b6dd",
+  "case_records": 115,
   "assessment": "Observed weaknesses remain; passing observation cases are not security certification.",
   "cases": {
     "baseline": [
@@ -173,11 +173,12 @@
         }
       },
       {
-        "name": "forged other player action rejected",
+        "name": "malformed cross-player envelope rejected (initial probe)",
         "status": "pass",
         "evidence": [
           "E_BAD_ACTION_ID"
-        ]
+        ],
+        "coverage_note": "E_BAD_ACTION_ID only; valid envelope authorization is established by review_followup E_FORBIDDEN"
       },
       {
         "name": "bare action cannot bypass production gate",
@@ -763,7 +764,8 @@
           "beforeSeq": 2100,
           "reconnectedSeq": 2100,
           "hashChecks": 1
-        }
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
       },
       {
         "name": "graceful server restart preserves account and match",
@@ -772,7 +774,8 @@
           "beforeSeq": 2100,
           "afterSeq": 2100,
           "recoverySeconds": 2.432
-        }
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
       },
       {
         "name": "SIGKILL automatic restart preserves committed state",
@@ -782,7 +785,8 @@
           "afterSeq": 2100,
           "recoverySeconds": 5.964,
           "restartCount": 1
-        }
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
       },
       {
         "name": "database outage removes readiness and refuses action",
@@ -791,7 +795,8 @@
           "ready": "connection unavailable",
           "actionRejection": "transport unavailable",
           "savedSeq": 2100
-        }
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
       },
       {
         "name": "database restart recovers service and persisted match",
@@ -800,7 +805,8 @@
           "savedSeq": 2100,
           "afterSeq": 2100,
           "recoverySeconds": 1.675
-        }
+        },
+        "coverage_note": "Initial sequence/hash/readiness probe; known committed fleet effects and no outage receipt are established by review_followup"
       }
     ],
     "rotation": [
@@ -964,7 +970,9 @@
       "max": 1708
     },
     "errors": [],
-    "pass": true
+    "connectionHashPass": true,
+    "recordedTrafficPass": true,
+    "verdict_scope": "Last recorded sample: 8200 commands and 8200 pongs, no rejects. Whole run: 8280 pongs. Final generated-command counter was not exported by the original harness; corrected source exports it. Pongs measure ping liveness, not individual action receipts."
   },
   "http3": {
     "pass": true,
@@ -987,173 +995,18 @@
         },
         "status": "pass",
         "errors": [],
+        "lobbyOverflow": false,
         "overflow": false,
+        "scrollWidth": 1440,
+        "innerWidth": 1440,
         "csp": [
           {
             "directive": "script-src",
             "blocked": "eval"
           }
         ],
-        "body": "◆\nBrowserAudit\n1-е из 2\n✦ 68/1100\nДень 1\n23:59:55до след. дня\n260\n+22/ч\n320\n+17/ч\n120\n+5/ч\n90\n+2/ч\n40\nТехнологии\nПроизводство\n00:00\n500\n+\nДипломатия\nСообщения\nМетки\nХранитель\nРынок\nКорпорация\nЧат\nСобытия\nСправочник\nНастройки\n🌐\nРусский\n▾\n‹ назад\nМатчи\nПароль\nДоступные\nАктивные\nАрхив\nРежим\nВсе\nPVP\nPVE\nКарта\nВсе карты\nИгроков\n10–10\nКарта\nНексус · 10 игроков\nФронтир · 50 игроков\nСоздать сетевую игру\nНексус m-d746a67c-5856-4f46-9a8d-81abe4de039b\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-5e64f1df-525e-4bfe-afd0-61722c311336\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-08688f62-c66c-490e-a563-fc0f8e83d0f5\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-d50b4f8c-c608-4c3d-ab9c-7cf383212d81\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-d69dde4e-4670-47da-b74b-395962511574\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-25587a3c-eddb-4d91-b887-1be8db56e017\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-14307384-7dc7-4f1e-b022-afea03a77199\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-bed60a14-010a-4ff5-ac17-7c7541618d5f\nДень 0 · 9/10 игроков · ×24 · идёт · вход ещё 3д 23ч\nВойти\nНексус m-641f0fc0-68c7-4cb5-89ff-abd99e3ead47\nДень 0 · 1/10 игроков · ×24 · идёт · вход ещё 3д 23ч\nВойти\nНексус m-269c6949-6052-47f9-a06e-3e3d7d3854fc\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-891d4e93-20eb-492f-8aed-9d94245a5490\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-67c2e5a0-8cbd-4184-82d9-3058f7f0580a\nДень 0 · 4/10 игроков · ×24 · идёт · вход ещё 3д 23ч\nВойти\nВыходные данные\nУсловия\nПолитика конфиденциальности\nПоддержка",
-        "storageKeys": [
-          "void.newcount",
-          "vd.profile.wss://localhost:18888.browseraudit",
-          "void.session.wss://localhost:18888",
-          "void.nick",
-          "void.server"
-        ],
-        "controls": [
-          {
-            "id": "holo-back",
-            "text": ""
-          },
-          {
-            "id": "crestmark",
-            "text": "◆"
-          },
-          {
-            "id": "holo-tech",
-            "text": "Технологии"
-          },
-          {
-            "id": "holo-constructor",
-            "text": "Производство"
-          },
-          {
-            "id": "",
-            "text": "500\n+"
-          },
-          {
-            "id": "rail-diplo",
-            "text": "Дипломатия"
-          },
-          {
-            "id": "rail-msgs",
-            "text": "Сообщения"
-          },
-          {
-            "id": "rail-pings",
-            "text": "Метки"
-          },
-          {
-            "id": "rail-steward",
-            "text": "Хранитель"
-          },
-          {
-            "id": "rail-market",
-            "text": "Рынок"
-          },
-          {
-            "id": "railcorp",
-            "text": "Корпорация"
-          },
-          {
-            "id": "rail-chat",
-            "text": "Чат"
-          },
-          {
-            "id": "rail-log",
-            "text": "События"
-          },
-          {
-            "id": "rail-help",
-            "text": "Справочник"
-          },
-          {
-            "id": "rail-settings",
-            "text": "Настройки"
-          },
-          {
-            "id": "clang",
-            "text": "🌐\nРусский\n▾"
-          },
-          {
-            "id": "cback",
-            "text": "‹ назад"
-          },
-          {
-            "id": "",
-            "text": "Доступные"
-          },
-          {
-            "id": "",
-            "text": "Активные"
-          },
-          {
-            "id": "",
-            "text": "Архив"
-          },
-          {
-            "id": "",
-            "text": "Все"
-          },
-          {
-            "id": "",
-            "text": "PVP"
-          },
-          {
-            "id": "",
-            "text": "PVE"
-          },
-          {
-            "id": "mf-map",
-            "text": "Все карты"
-          },
-          {
-            "id": "match-create-go",
-            "text": "Создать сетевую игру"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          }
-        ],
         "gameJoined": true,
-        "gameUrl": "https://localhost:18888/game/m-d746a67c-5856-4f46-9a8d-81abe4de039b"
+        "gameUrl": "https://localhost:18888/game/m-44fb8b11-38e6-4217-b67c-12772535134d"
       },
       {
         "viewport": {
@@ -1162,157 +1015,18 @@
         },
         "status": "pass",
         "errors": [],
+        "lobbyOverflow": false,
         "overflow": false,
+        "scrollWidth": 390,
+        "innerWidth": 390,
         "csp": [
           {
             "directive": "script-src",
             "blocked": "eval"
           }
         ],
-        "body": "‹\n◆\nBrowserAudit\n1-е из 2\n✦ 68/1100\nДень 1\n23:59:57\n260\n+22/ч\n320\n+17/ч\n120\n+5/ч\n90\n+2/ч\n40\n00:00\n500\n+\n☰\n‖▶▶▶×1×10×50×100\n⌂\n🌐\nРусский\n▾\n‹ назад\nМатчи\nПароль\nДоступные\nАктивные\nАрхив\nРежим\nВсе\nPVP\nPVE\nКарта\nВсе карты\nИгроков\n10–10\nКарта\nНексус · 10 игроков\nФронтир · 50 игроков\nСоздать сетевую игру\nНексус m-5e64f1df-525e-4bfe-afd0-61722c311336\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-08688f62-c66c-490e-a563-fc0f8e83d0f5\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-d50b4f8c-c608-4c3d-ab9c-7cf383212d81\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-d69dde4e-4670-47da-b74b-395962511574\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-25587a3c-eddb-4d91-b887-1be8db56e017\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-14307384-7dc7-4f1e-b022-afea03a77199\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-bed60a14-010a-4ff5-ac17-7c7541618d5f\nДень 0 · 9/10 игроков · ×24 · идёт · вход ещё 3д 23ч\nВойти\nНексус m-641f0fc0-68c7-4cb5-89ff-abd99e3ead47\nДень 0 · 1/10 игроков · ×24 · идёт · вход ещё 3д 23ч\nВойти\nНексус m-269c6949-6052-47f9-a06e-3e3d7d3854fc\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-891d4e93-20eb-492f-8aed-9d94245a5490\nДень 0 · 0/10 игроков · ×24 · идёт · вход ещё 4д 0ч\nВойти\nНексус m-67c2e5a0-8cbd-4184-82d9-3058f7f0580a\nДень 0 · 4/10 игроков · ×24 · идёт · вход ещё 3д 23ч\nВойти\nВыходные данные\nУсловия\nПолитика конфиденциальности\nПоддержка",
-        "storageKeys": [
-          "void.newcount",
-          "vd.profile.wss://localhost:18888.browseraudit",
-          "void.session.wss://localhost:18888",
-          "void.nick",
-          "void.server"
-        ],
-        "controls": [
-          {
-            "id": "topback",
-            "text": "‹"
-          },
-          {
-            "id": "crestmark",
-            "text": "◆"
-          },
-          {
-            "id": "",
-            "text": "500\n+"
-          },
-          {
-            "id": "railtoggle",
-            "text": "☰"
-          },
-          {
-            "id": "spd-pause",
-            "text": "‖"
-          },
-          {
-            "id": "spd-play",
-            "text": "▶"
-          },
-          {
-            "id": "spd-fast",
-            "text": "▶▶"
-          },
-          {
-            "id": "",
-            "text": "×1"
-          },
-          {
-            "id": "",
-            "text": "×10"
-          },
-          {
-            "id": "",
-            "text": "×50"
-          },
-          {
-            "id": "",
-            "text": "×100"
-          },
-          {
-            "id": "tomenu",
-            "text": "⌂"
-          },
-          {
-            "id": "clang",
-            "text": "🌐\nРусский\n▾"
-          },
-          {
-            "id": "cback",
-            "text": "‹ назад"
-          },
-          {
-            "id": "",
-            "text": "Доступные"
-          },
-          {
-            "id": "",
-            "text": "Активные"
-          },
-          {
-            "id": "",
-            "text": "Архив"
-          },
-          {
-            "id": "",
-            "text": "Все"
-          },
-          {
-            "id": "",
-            "text": "PVP"
-          },
-          {
-            "id": "",
-            "text": "PVE"
-          },
-          {
-            "id": "mf-map",
-            "text": "Все карты"
-          },
-          {
-            "id": "match-create-go",
-            "text": "Создать сетевую игру"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          },
-          {
-            "id": "",
-            "text": "Войти"
-          }
-        ],
         "gameJoined": true,
-        "gameUrl": "https://localhost:18888/game/m-5e64f1df-525e-4bfe-afd0-61722c311336"
+        "gameUrl": "https://localhost:18888/game/m-245a068d-93dc-4528-bf9a-45dde8bd20bd"
       }
     ]
   },
@@ -1388,11 +1102,108 @@
       "source": "7466e6fc342c71cd565bb12b678226b81d358cbf"
     },
     "fresh_main_gate": {
+      "tests": 10835,
+      "skipped": 0,
+      "files": 888,
+      "source": "f1c700c12046576dcaa5c6be241bb8d8a863b6dd"
+    },
+    "docs_check": "passed after report/index edits",
+    "first_publication_gate": {
       "tests": 10826,
       "skipped": 0,
       "files": 887,
       "source": "024979918d076c937922e350e1d75da4344fb215"
     },
-    "docs_check": "passed after report/index edits"
+    "environment_correction": "Normal build umask 0022; initial umask 0077 broke Debian package test fixture directory permissions, not product code."
+  },
+  "review_followup": {
+    "base": "f1c700c1",
+    "results": [
+      {
+        "name": "valid cross-player envelope denied at authorization",
+        "status": "pass",
+        "evidence": {
+          "actionIdMatchesForgedPlayer": true,
+          "code": "E_FORBIDDEN"
+        }
+      },
+      {
+        "name": "cross-match token denied for existing match with positive control",
+        "status": "pass",
+        "evidence": {
+          "existingSecondMatch": "m-245a068d-93dc-4528-bf9a-45dde8bd20bd",
+          "positiveConnection": true,
+          "crossMatchRejected": true
+        }
+      },
+      {
+        "name": "raw flood drops excess and leaves connection open",
+        "status": "pass",
+        "evidence": {
+          "sent": 220,
+          "parsedErrors": 50,
+          "connectionStillOpen": true
+        }
+      },
+      {
+        "name": "state-changing split committed and persisted",
+        "status": "pass",
+        "evidence": {
+          "beforeFingerprint": "411befc7df36377ef3eb6c3fe2fc6db396843419dd558e294d28bf01f6f89a15",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "seq": 3
+        }
+      },
+      {
+        "name": "graceful preserves committed fleet fingerprint",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 3,
+          "afterSeq": 3,
+          "beforeFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "recoverySeconds": 2.425,
+          "restartCount": 0
+        }
+      },
+      {
+        "name": "SIGKILL preserves committed fleet fingerprint",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 3,
+          "afterSeq": 3,
+          "beforeFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "recoverySeconds": 11.515,
+          "restartCount": 1
+        }
+      },
+      {
+        "name": "database outage refuses attempted state-changing action",
+        "status": "pass",
+        "evidence": {
+          "ready": "connection unavailable",
+          "transientRejection": null,
+          "transportState": 3,
+          "seq": 3
+        }
+      },
+      {
+        "name": "database recovery has no successful outage receipt or effect",
+        "status": "pass",
+        "evidence": {
+          "beforeSeq": 3,
+          "afterSeq": 3,
+          "beforeFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "afterFingerprint": "8f806b6d994d44201ae722e6eb07079df9dfb7b209b052b1d2c5245188e5a6f2",
+          "successfulOutageReceipts": 0
+        }
+      }
+    ],
+    "validation_note": "Fresh isolated match; assertions saved incrementally. Direct PostgreSQL probes resolve current container IP on each connection and verify certificate DNS name postgres. Earlier failed harness attempts are excluded."
+  },
+  "harness_exit_check": {
+    "syntheticFailureExitCode": 1,
+    "failureRecordSaved": true
   }
 }
