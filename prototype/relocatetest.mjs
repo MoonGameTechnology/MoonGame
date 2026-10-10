@@ -146,6 +146,17 @@ try {
       page.setDefaultTimeout(15000);
       const press = (locator) => (phone ? locator.tap() : locator.click());
       const tapAt = (p) => (phone ? page.touchscreen.tap(p.x, p.y) : page.mouse.click(p.x, p.y));
+      // Ввод меняет состояние сразу, а раскладку (панель прячется под прицел, лист телефона
+      // выходит из режима приказа) игра применяет в своём кадре. Читать DOM до этого кадра —
+      // значит видеть прошлый экран: так смоук падал в плейтестах 2026-10-08 и 2026-10-09
+      // (PT-03), под базой оказывалась кнопка, а лист складывался вслепую.
+      const frame = () =>
+        page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)),
+            ),
+        );
       await withDiagnostics(page, `relocate-${kind}-${viewport.width}`, async () => {
         await page.goto(site.url + '/');
         await enterSkirmish(page, { tap: phone });
@@ -154,12 +165,15 @@ try {
         const { squadronId } = bases;
         const button = page.locator(`[data-act="wingrelocate"][data-arg="${squadronId}"]`);
         // Кнопка у эскадры взводит прицел ПЕРЕЛЁТА с её базы. Телефон показывает сначала
-        // короткую карточку; ангар живёт в подробностях.
+        // короткую карточку; ангар живёт в подробностях. «Подробности» — переключатель,
+        // поэтому жмём его по состоянию листа, а не по видимости кнопки.
         const arm = async () => {
-          if (phone && !(await button.isVisible())) {
+          await frame();
+          if (phone && !(await page.locator('#mobile-sheet.expanded').count())) {
             await page.locator('.mobile-quick [data-mobile="details"]').tap();
           }
           await press(button);
+          await frame();
           const armed = await page.evaluate(() => window.__relocateTest.armed());
           assert.equal(armed?.relocate, true, 'прицел взведён как перелёт');
           assert.equal(armed?.squadronId, squadronId);
