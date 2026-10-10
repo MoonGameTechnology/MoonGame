@@ -20,19 +20,25 @@ const SRC = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 const NETS = readFileSync(new URL('./netSession.ts', import.meta.url), 'utf8');
 // Вход в Sector Zero — у оболочки (REFM-211); выход из прежнего мира — её хук в `main.ts`.
 const SHELL = readFileSync(new URL('./sectorZeroShell.ts', import.meta.url), 'utf8');
+// Путь в соло из обозревателя — у его владельца (REFM-217); дверь выхода ему даёт `main.ts`.
+const BROWSER = readFileSync(new URL('./matchBrowser.ts', import.meta.url), 'utf8');
 const body = (name: string, src = SRC): string =>
   new RegExp(`function ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(src)?.[1] ?? '';
 /** Тело обработчика клика по элементу с этим id (обработчик может стоять с отступом). */
-const handler = (id: string): string =>
+const handler = (id: string, src = SRC): string =>
   new RegExp(
     `(?:\\$\\('${id}'\\)|document\\.getElementById\\('${id}'\\))\\??\\.addEventListener\\('click', \\([^)]*\\) => \\{([\\s\\S]*?)\\n\\s*\\}\\);`,
-  ).exec(SRC)?.[1] ?? '';
+  ).exec(src)?.[1] ?? '';
 
 describe('REFM-205 — выход из партии одной дверью', () => {
   it('каждый выход из партии идёт через дверь', () => {
-    for (const id of ['tomenu', 'hub-solo', 'msolo-go', 'ctest']) {
+    for (const id of ['tomenu', 'hub-solo', 'ctest']) {
       expect(handler(id), id).toContain('leaveMatch();');
     }
+    expect(handler('msolo-go', BROWSER), 'msolo-go').toContain('game.leaveMatch();');
+    expect(SRC, 'msolo-go').toMatch(
+      /initMatchBrowser\(\{[\s\S]*?\n {2}leaveMatch,\n[\s\S]*?\n\}\);/,
+    );
     const onLeave = /onLeave: \(which, wasNet\) => \{([\s\S]*?)\n {2}\},/.exec(SRC)?.[1] ?? '';
     expect(onLeave, 'итоговый экран').toContain('leaveMatch();');
     const enter =
