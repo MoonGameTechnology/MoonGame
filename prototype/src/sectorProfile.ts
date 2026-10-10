@@ -83,6 +83,9 @@ export interface SectorProfileHost {
   shown(): boolean;
   /** Вкладку вытеснили — мир встаёт. */
   pause(): void;
+  /** Хранилище браузера перестало принимать записи (`true`) или снова принимает (`false`):
+   *  игрок должен знать, что прогресс не переживёт закрытия вкладки (PT-07). */
+  saveFailing(failing: boolean): void;
 }
 
 let game: SectorProfileHost;
@@ -107,14 +110,23 @@ const TAB_ID =
 function ownsSectorZero(): boolean {
   return !tabSuperseded(TAB_ID, readRaw(TAB_OWNER_KEY));
 }
-export const runSaveStore: RunSaveStore = localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero);
+/** Последняя запись в хранилище не прошла. Хозяин экрана узнаёт только о смене исхода:
+ *  запись идёт каждые несколько секунд, и сообщать о каждой незачем. */
+let writeFailing = false;
+function noteWrite(ok: boolean): void {
+  if (writeFailing === !ok) return;
+  writeFailing = !ok;
+  // До `initSectorProfile` записей нет, а исход, пойманный раньше, хозяин получит там.
+  game?.saveFailing(writeFailing);
+}
+export const runSaveStore: RunSaveStore = localRunSaveStore(RUN_SAVE_KEY, ownsSectorZero, noteWrite);
 // Дескриптор забега (`YAG-2.1`) — рядом с полным снимком. Снимок точнее, дескриптор живучее:
 // шесть полей переживают смену формы мира после обновления игры, блоб — нет.
-export const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero);
-const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero);
+export const portableRunStore: RunSaveStore = localRunSaveStore(PORTABLE_RUN_KEY, ownsSectorZero, noteWrite);
+const sectorProgressStore = localRunSaveStore(SECTOR_ZERO_PROGRESS_KEY, ownsSectorZero, noteWrite);
 // Теневая копия профиля (`YAG-4.4`) — последний целый профиль: правленый руками основной
 // игра не берёт, а берёт её.
-const sectorShadowStore = localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero);
+const sectorShadowStore = localRunSaveStore(SECTOR_ZERO_SHADOW_KEY, ownsSectorZero, noteWrite);
 // Сид профиля Sector Zero — постоянная часть ключа броска Мастерской (SZE-0.3).
 // Случайность живёт ЗДЕСЬ, а не в `decisions/`: те обязаны оставаться чистыми. Родится
 // он один раз — у сохранённого профиля свой сид, и разбор его сохраняет.
@@ -130,6 +142,7 @@ export let progressWrite: Promise<void> = Promise.resolve();
  */
 export function initSectorProfile(hooks: SectorProfileHost): void {
   game = hooks;
+  if (writeFailing) game.saveFailing(true);
   progressWrite = loadSectorProfile().then((pick) => {
     sectorProgress = parseSectorZeroProgress(pick.raw, data, sectorSeed);
     // Профиль с главами, выигранными до наград-героев, и с уже засчитанными спасениями

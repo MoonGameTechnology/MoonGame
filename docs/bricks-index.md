@@ -54,7 +54,7 @@
 | REFM-214 | ✅ | proto | `docs/backlog.md` | Дипломатия и связь |
 | REFM-215 | ✅ | proto | `docs/backlog.md` | Сессия аккаунта |
 | REFM-216 | ✅ | proto | `docs/backlog.md` | Сетевой жизненный цикл |
-| REFM-217 | 🔶 | proto | `docs/backlog.md` | Обзор партий и выбор места |
+| REFM-217 | ✅ | proto | `docs/backlog.md` | Обзор партий и выбор места |
 | REFM-218 | ✅ | proto | `docs/backlog.md` | Страницы входа |
 | REFM-219 | ⏳ | proto | `docs/backlog.md` | Жизненный цикл матча |
 | REFM-220 | ⏳ | proto | `docs/backlog.md` | Хаб и настройки |
@@ -68,14 +68,14 @@
 | REFM-228 | ⏳ | proto | `docs/backlog.md` | Приказы группе |
 | REFM-229 | ⏳ | proto | `docs/backlog.md` | Композер цепочек «Приказ» |
 | REFM-230 | ⏳ | proto | `docs/backlog.md` | Реакция на события мира и лента |
-| REFM-231 | ⏳ | proto | `docs/backlog.md` | Камера и туман |
-| REFM-232 | 🔒 | proto | `docs/backlog.md` | Статический голографический слой |
-| REFM-233 | 🔒 | proto | `docs/backlog.md` | Наложения |
-| REFM-234 | 🔒 | proto | `docs/backlog.md` | Эффекты и метки |
+| REFM-231 | ✅ | proto | `docs/backlog.md` | Камера и туман |
+| REFM-232 | ⏳ | proto | `docs/backlog.md` | Статический голографический слой |
+| REFM-233 | ⏳ | proto | `docs/backlog.md` | Наложения |
+| REFM-234 | ⏳ | proto | `docs/backlog.md` | Эффекты и метки |
 | REFM-235 | 🔒 | proto | `docs/backlog.md` | render() по слоям |
-| REFM-236 | 🔒 | proto | `docs/backlog.md` | Ввод на канвасе |
+| REFM-236 | ⏳ | proto | `docs/backlog.md` | Ввод на канвасе |
 | REFM-237 | ✅ | proto | `docs/backlog.md` | Палитра сторон и константы карты |
-| REFM-238 | ⏳ | proto | `docs/backlog.md` | Геометрия флотов на карте |
+| REFM-238 | ✅ | proto | `docs/backlog.md` | Геометрия флотов на карте |
 | REFM-239 | ⏳ | proto | `docs/backlog.md` | Радар |
 | REFM-240 | ⏳ | proto | `docs/backlog.md` | Конвейер приказа |
 | REFM-241 | ⏳ | proto | `docs/backlog.md` | Экран загрузки карты |
@@ -1464,17 +1464,17 @@
 | YAG-7.1 | ✅ | proto | `docs/yandex-games-roadmap.md` | Долгий тап, меню под сообщениями, единицы в угрозах 2026-09-25 |
 | YAG-7.2 | ✅ | proto | `docs/yandex-games-roadmap.md` | Карточка обучения закрывает стартовый флот на 1024×576 2026-09-25 |
 | YAG-7.3 | ✅ | proto | `docs/yandex-games-roadmap.md` | На старте забега — служебная строка дипломатии 2026-09-25 |
-| ZTP-1.1 | ⏳ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Версия сборки на /health |
-| ZTP-1.2 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Агент автообновления на хосте |
-| ZTP-1.3 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Журнал выкаток |
-| ZTP-1.4 | 🔒 | docs | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Доки и ручные шаги вне репо |
-| ZTP-2.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Закрыть сборку на хосте |
-| ZTP-2.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Желаемая версия в репо (GitOps) |
+| ZTP-1.1 | ✅ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Версия сборки на /health |
+| ZTP-1.2 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Агент автообновления на хосте |
+| ZTP-1.3 | ✅ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Журнал выкаток |
+| ZTP-1.4 | ✅ | docs | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Доки и ручные шаги вне репо |
+| ZTP-2.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Закрыть сборку на хосте |
+| ZTP-2.2 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Желаемая версия в репо (GitOps) |
 | ZTP-2.3 | ⏳ | docs sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Владельцы зон |
-| ZTP-3.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Несекретный конфиг в репо |
+| ZTP-3.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Несекретный конфиг в репо |
 | ZTP-3.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Секреты зашифрованными в репо (SOPS + age) |
 | ZTP-3.3 | ⏳ | srv | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Ручные операции с БД → админ-команды |
-| ZTP-4.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
+| ZTP-4.1 | ⏳ | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Идемпотентная настройка хоста |
 | ZTP-4.2 | 🔒 | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Автоматическая проверка дрейфа |
 | ZTP-4.3 | ⏳ | ops sec | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Break-glass доступ |
 | ZTP-5.1 | 🔒 | ops | `docs/zero-touch-prod/zero-touch-prod-roadmap.md` | Откат по метрикам |

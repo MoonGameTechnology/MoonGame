@@ -24,7 +24,7 @@ mapLayerX.clearRect = (...args) => { zoomBakes++; zoomClear(...args); };
 window.__zoomTest = {
   settings() { settings.open(); },
   report() { return mapRenderingReport(); },
-  scene(scale) { speed=0; clearSelection(); centerOn({x:(MINX+MAXX)/2,y:(MINY+MAXY)/2},scale); },
+  scene(scale) { speed=0; clearSelection(); const b=mapBounds(); centerOn({x:(b.minX+b.maxX)/2,y:(b.minY+b.maxY)/2},scale); },
   resetBakes() { zoomBakes=0; },
   read() { return { camera:{...cam}, bakes:zoomBakes, pointers:pointers.size, pointerIds:[...pointers.keys()],
     width:canvas.width, height:canvas.height, state:JSON.stringify(s), selected:[selPlanet,selFleet] }; },

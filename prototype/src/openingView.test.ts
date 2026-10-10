@@ -100,8 +100,14 @@ describe('проводка стартового вида', () => {
   it('defaultView спрашивает openingZoom с признаком забега из режима матча', () => {
     // `s.pve` ядро заводит только на первом ходе часов, а стартовый вид ставится раньше:
     // забег узнаётся по режиму. Литерал вместо признака typecheck пропустил бы.
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    // Стартовый вид живёт у камеры (`mapCamera.ts`, REFM-231): телефон и консоль ей
+    // называют хуки `main.ts`.
+    const src = readFileSync(new URL('./mapCamera.ts', import.meta.url), 'utf8');
     expect(src).toContain("const run = data.modes[matchMode() ?? '']?.pve !== undefined;");
-    expect(src).toContain('openingZoom({ phone: MOBILE, console: holographic.active(), run })');
+    expect(src).toContain('openingZoom({ phone: game.mobile(), console: game.console(), run })');
+    const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    const init = /initMapCamera\(\{([\s\S]*?)\n\}\);/.exec(main)?.[1] ?? '';
+    expect(init).toContain('mobile: () => MOBILE,');
+    expect(init).toContain('console: () => holographic.active(),');
   });
 });

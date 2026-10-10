@@ -18,7 +18,9 @@
 #                 а сервер при этом будет «жив»).
 #
 # Использование:  .github/scripts/smoke-image.sh <image-ref>
-# Переменные:     SMOKE_PORT (порт на хосте, 18788), SMOKE_TRIES (секунд ожидания, 40).
+# Переменные:     SMOKE_PORT (порт на хосте, 18788), SMOKE_TRIES (секунд ожидания, 40),
+#                 SMOKE_VERSION (ZTP-1.1: короткий sha, который обязан стоять в /health;
+#                 пусто — версию не проверяем, так собирает security.yml).
 set -uo pipefail
 
 image="${1:?usage: smoke-image.sh <image-ref>}"
@@ -56,5 +58,15 @@ done
 [ "$up" = true ] || fail "/health не ответил за ${tries}s"
 
 curl -fsS -o /dev/null "$base/" || fail "/ не отдал HTML игрока"
+
+# ZTP-1.1: образ, который сам не называет свою сборку, ломает главный вопрос автодеплоя
+# «что сейчас запущено». Проверяем ровно то, что потом прочитает оператор.
+if [ -n "${SMOKE_VERSION:-}" ]; then
+  health=$(curl -fsS "$base/health") || fail "/health перестал отвечать"
+  case "$health" in
+    *"\"version\":\"$SMOKE_VERSION\""*) ;;
+    *) fail "/health не называет сборку $SMOKE_VERSION (ответ: $health)" ;;
+  esac
+fi
 
 echo "smoke ok: $image — /health и / отвечают"

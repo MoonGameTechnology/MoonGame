@@ -38,6 +38,34 @@ ENV_FILE="$DEPLOY_DIR/server.env"
 HEALTH_PORT="${PORT:-8788}"
 HEALTH_TRIES="${HEALTH_TRIES:-30}"
 
+# АВТОДЕПЛОЙ (ZTP-1.2): на таком хосте этот файл — одна из нескольких версий `deploy/`,
+# извлечённых из подписанных образов, а не каталог git-клона. Состояние машины
+# (`server.env`, точка отката) тогда живёт в постоянном каталоге, который передают
+# явно, — иначе каждая версия видела бы свой пустой `server.env`, а точка отката
+# терялась бы при переключении версии.
+STATE_DIR="${STATE_DIR:-}"
+if [ -n "$STATE_DIR" ]; then
+  ENV_FILE="$STATE_DIR/server.env"
+  LAST_GOOD="$STATE_DIR/last-good-image"
+fi
+
+# Подъём стека на подписанном образе. На хосте автодеплоя — тем же stack.sh, которым его
+# поднимает юнит после ребута: два разных способа собрать стек рано или поздно разъехались
+# бы, и перезагрузка поднимала бы не то, что выкатили.
+release_up() {
+  if [ -n "$STATE_DIR" ]; then
+    VOID_IMAGE="$1" STATE_DIR="$STATE_DIR" bash "$DEPLOY_DIR/stack.sh" up
+  else
+    VOID_IMAGE="$1" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
+  fi
+}
+
+# Точку отката читает юнит при каждом старте машины, поэтому запись атомарная: оборванная
+# на полуслове строка подняла бы после ребута образ, которого не существует.
+write_last_good() {
+  printf '%s\n' "$1" > "$LAST_GOOD.tmp" && mv -f "$LAST_GOOD.tmp" "$LAST_GOOD"
+}
+
 # Конфигурация ОТКАТЫВАЕТСЯ ВМЕСТЕ С ОБРАЗОМ.
 #
 # Добор ключей ниже меняет постуру: дописанный `AUTH_JWT_SECRET` переводит сервер с
@@ -91,10 +119,10 @@ if [ -n "${VOID_IMAGE:-}" ]; then
 
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
-  VOID_IMAGE="$VOID_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
+  release_up "$VOID_IMAGE"
 
   if health_ok; then
-    echo "$VOID_IMAGE" > "$LAST_GOOD"
+    write_last_good "$VOID_IMAGE"
     echo "[✓] Обновление завершено, /health отвечает."
     exit 0
   fi
@@ -103,7 +131,7 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   restore_env
   if [ -n "$PREV_IMAGE" ]; then
     echo "[*] Откатываемся на предыдущий проверенный образ: $PREV_IMAGE" >&2
-    VOID_IMAGE="$PREV_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
+    release_up "$PREV_IMAGE"
     health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
       || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2
   else
@@ -113,6 +141,13 @@ if [ -n "${VOID_IMAGE:-}" ]; then
 fi
 
 # ---- путь 2: сборка из исходников (историческое поведение) ----
+# На хосте автодеплоя этого пути нет вовсе: каталог версии не git-клон, собирать в нём
+# нечего, а сборка мимо подписи выкинула бы машину из цепочки, в которой она стоит.
+if [ -n "$STATE_DIR" ]; then
+  echo "[✗] Хост на автодеплое принимает только подписанный образ: передайте VOID_IMAGE=…@sha256:…" >&2
+  echo "    Обычное обновление здесь — moongame update (берёт свежий подписанный :main)." >&2
+  exit 2
+fi
 # У этого пути нет ни сканирования, ни подписи: в прод уезжает то, что собралось на
 # этой машине из текущего main. Оставлен рабочим для плейтест-хостов, но теперь честно
 # об этом говорит и хотя бы проверяет здоровье с откатом.

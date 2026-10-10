@@ -6,6 +6,7 @@
 import { localeChanges, localeOptions } from '../../decisions/localeMenu';
 import type { LocaleId } from '../../localization/index';
 import { LOCALE_LABEL } from '../../localization/index';
+import { t } from '../../localization/runtime';
 
 export interface LocaleMenuHost {
   current: () => LocaleId;
@@ -38,6 +39,10 @@ document.addEventListener('keydown', (e) => {
 /** Подключить кнопку: подпись — текущий язык, клик раскрывает список. */
 export function mountLocaleMenu(button: HTMLElement, host: LocaleMenuHost): void {
   button.innerHTML = `<span class="lm-globe" aria-hidden="true">🌐</span><span class="lm-cur">${LOCALE_LABEL[host.current()]}</span><span class="lm-car" aria-hidden="true">▾</span>`;
+  // Имя кнопки для экранного диктора и голосового управления содержит видимую подпись
+  // («Язык: Русский», WCAG 2.5.3): раньше статичная разметка давала одно «Язык», а видно
+  // было «Русский» (плейтест 2026-10-09, PT-06).
+  button.setAttribute('aria-label', t('locale.pick.aria', { lang: LOCALE_LABEL[host.current()] }));
   button.setAttribute('aria-haspopup', 'listbox');
   button.setAttribute('aria-expanded', 'false');
   button.addEventListener('click', (e) => {

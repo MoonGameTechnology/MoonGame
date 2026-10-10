@@ -14,6 +14,7 @@ import { build } from 'esbuild';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { setImmediate } from 'node:timers';
+import { fogBridge } from './fogBridge.mjs';
 
 const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
@@ -196,9 +197,9 @@ module.exports = {
     const fleet = Object.values(s.fleets).find(f => f.owner === ME);
     const scale = gap / (mapNodeSpacing * camFitTransform(insets(), mapBounds()).scale);
     centerOn(home.position, scale);
-    vision = reveal ? null : computeVision();
-    memory.clear();
-    if (vision) updateMemory(vision.identify);
+    __fog.vision = reveal ? null : __fog.computeVision();
+    __fog.scans.clear();
+    if (vision) __fog.updateMemory(vision.identify);
     clearSelection(); pickWorld(home.id);
     render(2000); // warm static layers and atlases at this density
     globalThis.__perfSpheres = 0;
@@ -257,7 +258,7 @@ const countSpheres = {
   },
 };
 const res = await build({
-  plugins: [countSpheres],
+  plugins: [countSpheres, fogBridge],
   stdin: { contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
     resolveDir: process.cwd() + '/prototype/src', loader: 'ts' },
   bundle: true,

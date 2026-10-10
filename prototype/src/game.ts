@@ -224,6 +224,7 @@ export {
 
 // --- server-side seat AIs ----------------------------------------------------
 export { stewardGuardOrders } from './stewardGuard';
+export { seatDoctrine } from './botDoctrine';
 export {
   seatAiDecision,
   aiOrders,

@@ -13,27 +13,31 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 const main = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
-const count = (needle: string): number => main.split(needle).length - 1;
+// Сами вопросы к туману живут у его владельца (`mapFog.ts`, REFM-231); `main.ts` их задаёт.
+const fog = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
+const count = (needle: string, src = main): number => src.split(needle).length - 1;
 
 describe('туман спрашивает о флоте и бое только через fleetKnown / battleKnown', () => {
   it('узел флота напрямую спрашивает только fleetKnown', () => {
-    expect(count('known(fleetNode(')).toBe(1);
-    expect(main).toContain(
+    expect(count('known(fleetNode(')).toBe(0);
+    expect(count('known(fleetNode(', fog)).toBe(1);
+    expect(fog).toContain(
       'return known(fleetNode(f)) || !!vision?.engaged.fleets.has(f.id) || !!vision?.seenAt.has(f.id);',
     );
   });
 
   it('узел боя напрямую спрашивает только battleKnown', () => {
-    expect(count('known(b.location)')).toBe(1);
-    expect(main).toContain('return known(b.location) || !!vision?.engaged.battles.has(b.id);');
+    expect(count('known(b.location)')).toBe(0);
+    expect(count('known(b.location)', fog)).toBe(1);
+    expect(fog).toContain('return known(b.location) || !!vision?.engaged.battles.has(b.id);');
   });
 
   it('зрение кадра несёт мои бои из ядра', () => {
-    expect(main).toContain('engaged: engagementOf(s, ME),');
+    expect(fog).toContain('engaged: engagementOf(s, ME),');
   });
 
   it('зрение кадра несёт флоты, опознанные по позиции, из ядра (SHU-6.7)', () => {
-    expect(main).toContain('const seenAt = fleetsSeenByPosition(s, ME, data);');
+    expect(fog).toContain('const seenAt = fleetsSeenByPosition(s, ME, data);');
   });
 
   it('мгновенный бой журнал адресует по сторонам из событий — тем же правилом, что сервер', () => {

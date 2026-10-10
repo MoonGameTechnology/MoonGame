@@ -13,6 +13,8 @@ import { ru } from '../../localization/ru';
 const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 // Дверь «Продолжить» рисует владелец слота схватки (REFM-213), подпись карты — `main.ts`.
 const SOLO = readFileSync(new URL('./soloCheckpoint.ts', import.meta.url), 'utf8');
+// «Мои партии» рисует владелец обозревателя (REFM-217), вкладку хаба ему даёт `main.ts`.
+const BROWSER = readFileSync(new URL('./matchBrowser.ts', import.meta.url), 'utf8');
 const BUILD = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
 const between = (from: string, to: string): string => {
   const start = BUILD.indexOf(from);
@@ -85,8 +87,11 @@ describe('главный экран хаба (UIX-10.1)', () => {
   });
 
   it('пустые «Мои партии» — строка и «Начать партию» в обозреватель', () => {
-    expect(MAIN).toContain('<button type="button" class="hm-go">${t(\'hub.mine.start\')}</button>');
-    expect(MAIN).toContain("el.querySelector('.hm-go')?.addEventListener('click', () => hubTab('games'));");
+    expect(BROWSER).toContain('<button type="button" class="hm-go">${t(\'hub.mine.start\')}</button>');
+    expect(BROWSER).toContain(
+      "el.querySelector('.hm-go')?.addEventListener('click', () => game.hubTab('games'));",
+    );
+    expect(MAIN).toMatch(/initMatchBrowser\(\{[\s\S]*?\n {2}hubTab,\n[\s\S]*?\n\}\);/);
   });
 
   it('игра не пошаговая: сводка хаба ждёт «события», а не «ходы»', () => {

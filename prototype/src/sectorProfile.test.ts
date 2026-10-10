@@ -61,6 +61,7 @@ async function boot(platform: Partial<GamePlatform> = {}) {
     forgetRun: vi.fn(),
     shown: vi.fn(() => false),
     pause: vi.fn(),
+    saveFailing: vi.fn(),
   };
   profile.initSectorProfile(game);
   await profile.progressWrite;
@@ -310,5 +311,30 @@ describe('REFM-209 — облачная копия', () => {
     expect(profile.sectorProgress.seed).not.toBe('cloud-seed');
     expect(game.stopRun).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith('E_PROFILE_SEAL', 'cloud');
+  });
+});
+
+describe('PT-07 — игра узнаёт, что хранилище не принимает записи', () => {
+  it('хозяин экрана слышит смену исхода, а не каждую запись', async () => {
+    const { profile, game } = await boot();
+    let full = true;
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => cell.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        if (full) throw new Error('QuotaExceededError');
+        cell.set(k, v);
+      },
+      removeItem: (k: string) => void cell.delete(k),
+    });
+    profile.saveSectorProgress({ ...profile.sectorProgress, sovereigns: 7 });
+    await profile.progressWrite;
+    profile.saveSectorProgress({ ...profile.sectorProgress, sovereigns: 8 });
+    await profile.progressWrite;
+    expect(game.saveFailing.mock.calls).toEqual([[true]]);
+    full = false;
+    profile.saveSectorProgress({ ...profile.sectorProgress, sovereigns: 9 });
+    await profile.progressWrite;
+    expect(game.saveFailing.mock.calls).toEqual([[true], [false]]);
+    expect(cell.has(SECTOR_ZERO_PROGRESS_KEY)).toBe(true);
   });
 });

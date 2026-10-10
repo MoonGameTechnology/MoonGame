@@ -54,6 +54,7 @@ async function boot() {
     forgetRun: run.forgetSavedRun,
     shown: () => false,
     pause: vi.fn(),
+    saveFailing: vi.fn(),
   });
   await profile.progressWrite;
   let world: GameState = game.newGame();

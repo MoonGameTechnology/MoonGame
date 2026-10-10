@@ -80,3 +80,30 @@ describe('AUD-29 — пишет только вкладка-хозяйка', () 
     expect(cell.get(RUN_SAVE_KEY)).toBe(blob);
   });
 });
+
+describe('PT-07 — исход записи не молчит', () => {
+  it('удачная запись — true, отвергнутая и запись без хранилища — false', async () => {
+    const seen: boolean[] = [];
+    const s = localRunSaveStore(RUN_SAVE_KEY, () => true, (ok) => seen.push(ok));
+    await s.save(blob); // хранилища нет
+    let full = true;
+    withStorage({
+      getItem: () => null,
+      setItem: () => {
+        if (full) throw new Error('QuotaExceededError');
+      },
+      removeItem: () => {},
+    });
+    await s.save(blob);
+    full = false; // место освободилось
+    await s.save(blob);
+    expect(seen).toEqual([false, false, true]);
+  });
+
+  it('вытесненная вкладка не пишет — и о провале не сообщает', async () => {
+    const seen: boolean[] = [];
+    const s = localRunSaveStore(RUN_SAVE_KEY, () => false, (ok) => seen.push(ok));
+    await s.save(blob);
+    expect(seen).toEqual([]);
+  });
+});
