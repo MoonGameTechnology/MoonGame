@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 10814 зелёных** (1 skip; 887 файлов проверено; прогон 2026-10-10, Node 22 + PostgreSQL 16, собранный прототип). Пропущен реальный криптокруг age: бинарника в этой среде нет; проводка шифрования проверена stub-тестом. Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть.
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 10814 зелёных** (1 skip; 887 файлов проверено; прогон 2026-10-10, Node 22 + PostgreSQL 16, собранный прототип). Пропуск age затем закрыт отдельным прогоном `deploy/backup.test.mjs`: 8/8, настоящий age v1.2.1 и шифрованное восстановление ([отчёт](reviews/2026-10-10-zta.md)). Без DATABASE_URL durable-тесты и учение бэкапов пропускаются; в CI PostgreSQL есть.
 
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):

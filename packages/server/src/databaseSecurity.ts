@@ -36,7 +36,21 @@ export const APP_TABLES = [
 ] as const;
 const OWNER = 'vd_schema';
 const DML = 'vd_runtime';
-const ident = (value: string): string => `"${value.replaceAll('"', '""')}"`;
+
+/** DDL identifiers cannot be bound as $1. Ask PostgreSQL to quote %I/%L through
+ * parameterized format(), then execute that statement on the SAME transaction client.
+ * Templates are fixed internal literals; no caller SQL or raw value interpolation. */
+async function executeDdl(
+  client: PoolClient,
+  template: string,
+  parameters: readonly string[],
+): Promise<void> {
+  const { rows } = await client.query<{ sql: string }>(
+    'SELECT format($1::text, VARIADIC $2::text[]) AS sql',
+    [template, parameters],
+  );
+  await client.query(rows[0]!.sql);
+}
 
 /** PostgreSQL SCRAM verifier (RFC 5802). Hex credentials are already SASLprep-safe.
  * Keep the plaintext password out of ALTER ROLE statements and database error logs. */
@@ -107,10 +121,13 @@ async function ensureRole(client: PoolClient, name: string, login = false): Prom
   );
   if (rows[0]?.unsafe) throw new Error('E_DB_ROLE_UNSAFE');
   if (!rows.length) {
-    // Identifier is SQL-quoted; the login flag is a local boolean.
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`CREATE ROLE ${ident(name)} ${login ? 'LOGIN' : 'NOLOGIN'}
-    NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
+    await executeDdl(
+      client,
+      login
+        ? 'CREATE ROLE %I LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS'
+        : 'CREATE ROLE %I NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS',
+      [name],
+    );
   }
 }
 
@@ -126,9 +143,10 @@ async function recordSchema(client: PoolClient): Promise<void> {
 
 async function grantData(client: PoolClient): Promise<void> {
   for (const table of APP_TABLES) {
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON public.${ident(table)} TO ${DML}`);
+    await executeDdl(client, 'GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO %I', [
+      table,
+      DML,
+    ]);
   }
   // Only sequences owned by our tables, never sequences belonging to another application.
   const { rows } = await client.query<{ name: string }>(
@@ -141,9 +159,7 @@ async function grantData(client: PoolClient): Promise<void> {
     [APP_TABLES],
   );
   for (const { name } of rows) {
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`GRANT USAGE, SELECT ON SEQUENCE public.${ident(name)} TO ${DML}`);
+    await executeDdl(client, 'GRANT USAGE, SELECT ON SEQUENCE public.%I TO %I', [name, DML]);
   }
 }
 
@@ -180,8 +196,6 @@ export async function provisionDatabase(pool: Pool, env: NodeJS.ProcessEnv): Pro
       [DML, ''],
       [OWNER, ''],
     ] as const) {
-      // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-      // nosemgrep: no-sql-string-interpolation
       const { rows } = await client.query(
         `SELECT 1 FROM pg_auth_members m
         JOIN pg_roles member ON member.oid=m.member JOIN pg_roles parent ON parent.oid=m.roleid
@@ -192,41 +206,32 @@ export async function provisionDatabase(pool: Pool, env: NodeJS.ProcessEnv): Pro
     }
     // Passwords are hex-only, never echoed or put into argv. SQL receives only verifiers;
     // verifiers are sensitive too, so administrative statement logging must stay disabled.
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(
-      `ALTER ROLE ${ident(app)} PASSWORD '${passwordVerifier(env.DB_RUNTIME_PASSWORD!)}'`,
-    );
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(
-      `ALTER ROLE ${ident(migrator)} PASSWORD '${passwordVerifier(env.DB_MIGRATION_PASSWORD!)}'`,
-    );
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`GRANT ${DML} TO ${ident(app)}`);
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`GRANT ${OWNER} TO ${ident(migrator)}`);
+    await executeDdl(client, 'ALTER ROLE %I PASSWORD %L', [
+      app,
+      passwordVerifier(env.DB_RUNTIME_PASSWORD!),
+    ]);
+    await executeDdl(client, 'ALTER ROLE %I PASSWORD %L', [
+      migrator,
+      passwordVerifier(env.DB_MIGRATION_PASSWORD!),
+    ]);
+    await executeDdl(client, 'GRANT %I TO %I', [DML, app]);
+    await executeDdl(client, 'GRANT %I TO %I', [OWNER, migrator]);
     const { rows: db } = await client.query<{ name: string }>('SELECT current_database() AS name');
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`REVOKE ALL ON DATABASE ${ident(db[0]!.name)} FROM PUBLIC`);
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`REVOKE CONNECT ON DATABASE ${ident(db[0]!.name)} FROM ${DML}, ${OWNER}`);
+    await executeDdl(client, 'REVOKE ALL ON DATABASE %I FROM PUBLIC', [db[0]!.name]);
+    await executeDdl(client, 'REVOKE CONNECT ON DATABASE %I FROM %I, %I', [
+      db[0]!.name,
+      DML,
+      OWNER,
+    ]);
     // CONNECT belongs to the per-deployment login, not a shared cluster-wide group.
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(
-      `GRANT CONNECT ON DATABASE ${ident(db[0]!.name)} TO ${ident(app)}, ${ident(migrator)}`,
-    );
+    await executeDdl(client, 'GRANT CONNECT ON DATABASE %I TO %I, %I', [
+      db[0]!.name,
+      app,
+      migrator,
+    ]);
     await client.query('REVOKE ALL ON SCHEMA public FROM PUBLIC');
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`GRANT USAGE ON SCHEMA public TO ${DML}`);
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`GRANT USAGE, CREATE ON SCHEMA public TO ${OWNER}`);
+    await executeDdl(client, 'GRANT USAGE ON SCHEMA public TO %I', [DML]);
+    await executeDdl(client, 'GRANT USAGE, CREATE ON SCHEMA public TO %I', [OWNER]);
     const { rows: existing } = await client.query<{ relname: string }>(
       `
       SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -239,13 +244,9 @@ export async function provisionDatabase(pool: Pool, env: NodeJS.ProcessEnv): Pro
     if (marker[0]?.name)
       await client.query('ALTER TABLE public.vd_schema_revision OWNER TO vd_schema');
     for (const { relname } of existing) {
-      // Identifier is fixed or SQL-quoted; password is validated hex, never caller SQL.
-      // nosemgrep: no-sql-string-interpolation
-      await client.query(`ALTER TABLE public.${ident(relname)} OWNER TO ${OWNER}`);
+      await executeDdl(client, 'ALTER TABLE public.%I OWNER TO %I', [relname, OWNER]);
     }
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`SET LOCAL ROLE ${OWNER}`);
+    await client.query('SET LOCAL ROLE vd_schema');
     await migrate(client);
     await recordSchema(client);
     await grantData(client);
@@ -264,9 +265,7 @@ export async function migrateDatabase(pool: Pool): Promise<void> {
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(144731, 31)');
-    // Identifiers are fixed or SQL-quoted; credentials are validated hex (not SQL).
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`SET LOCAL ROLE ${OWNER}`);
+    await client.query('SET LOCAL ROLE vd_schema');
     await migrate(client);
     await recordSchema(client);
     await grantData(client);
@@ -295,12 +294,8 @@ export async function retireDatabaseLogin(pool: Pool, value: string | undefined)
       [role],
     );
     if (!rows[0]?.ok) throw new Error('E_DB_ROLE_UNSAFE');
-    // The role is restricted to the vd_app_ namespace and quoted as an identifier.
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`ALTER ROLE ${ident(role)} NOLOGIN`);
-    // The role is restricted to the vd_app_ namespace and quoted as an identifier.
-    // nosemgrep: no-sql-string-interpolation
-    await client.query(`REVOKE vd_runtime FROM ${ident(role)}`);
+    await executeDdl(client, 'ALTER ROLE %I NOLOGIN', [role]);
+    await executeDdl(client, 'REVOKE vd_runtime FROM %I', [role]);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');

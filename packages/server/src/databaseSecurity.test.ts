@@ -40,7 +40,7 @@ const base = process.env.DATABASE_URL;
 // Dedicated databases and unique cluster-wide role names: never mutate void_test or a live DB.
 describe.skipIf(!base)('least privilege and expand/contract rotation on real PostgreSQL', () => {
   const suffix = randomBytes(6).toString('hex');
-  const name = `void_zta_${suffix}`;
+  const name = `void_zta_${suffix}_";CREATE ROLE injected;--`;
   const app = `vd_app_${suffix}`;
   const app2 = `vd_app_${suffix}_v2`;
   const migrator = `vd_migrate_${suffix}`;
@@ -69,7 +69,7 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
     DB_MIGRATION_PASSWORD: migrationPass,
   });
   beforeAll(async () => {
-    await root.query(`CREATE DATABASE "${name}"`);
+    await root.query(`CREATE DATABASE "${name.replaceAll('"', '""')}"`);
     admin = connect();
     // Rehearse an upgrade with real pre-existing tables and a durable account.
     await migrate(admin);
@@ -77,6 +77,10 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       ok: true,
     });
     await provisionDatabase(admin, config());
+    expect(
+      (await root.query("SELECT count(*)::int AS n FROM pg_roles WHERE rolname='injected'")).rows[0]
+        .n,
+    ).toBe(0);
   }, 30_000);
   afterAll(async () => {
     for (const pool of pools) await pool.end();
@@ -90,7 +94,7 @@ describe.skipIf(!base)('least privilege and expand/contract rotation on real Pos
       if (rows[0].n === 0) break;
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    await root.query(`DROP DATABASE IF EXISTS "${name}"`);
+    await root.query(`DROP DATABASE IF EXISTS "${name.replaceAll('"', '""')}"`);
     for (const role of [app, app2, migrator]) await root.query(`DROP ROLE IF EXISTS "${role}"`);
     // vd_schema/vd_runtime are shared group roles, owned by the deployment, not this test.
     await root.end();
