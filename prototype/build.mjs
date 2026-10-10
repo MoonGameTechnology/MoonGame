@@ -2227,7 +2227,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .mk-btn{flex:none;padding:6px 11px;border-radius:7px;font-size:var(--fs-caption);white-space:nowrap;}
 .mk-empty{padding:10px 2px;font-size:var(--fs-caption);color:var(--dim);opacity:.8;}
 
-/* === CONSTRUCTOR («Производство») — unified order screen; two-column designer === */
+/* === CONSTRUCTOR («Производство») — unified order screen; three columns on a PC window === */
 #constructor{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #constructor.show{display:flex;}
@@ -2241,13 +2241,33 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cn-tab{padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 .cn-tab.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.1);}
-#constructorbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 16px;}
+#constructorbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 16px;container-type:inline-size;}
 #constructorbody #herobody{padding:0;overflow:visible;}/* folded hero pane: no nested pad/scroll */
-/* two columns: fitting editor (left) + live preview/cost/build (right); stacks on narrow */
-.cn-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
-@media (max-width:760px){.cn-grid{grid-template-columns:1fr;}}
+/* layout (production rework, step 3): one column in the order hulls, ship, the open bay's
+   modules, stats; a PC window gets three columns — hulls, the ship with its stats, the open
+   bay's modules — and two in between. A hull without bays has no modules column. */
+.cn-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;}
+.cn-g3{grid-template-areas:"hulls" "card" "slot" "side";}
+.cn-g2{grid-template-areas:"hulls" "card" "side";}
+.cn-hulls{grid-area:hulls;}
+.cn-card{grid-area:card;min-width:0;}
+.cn-slot{grid-area:slot;min-width:0;}
+.cn-side{grid-area:side;min-width:0;}
+@container (min-width:600px){
+  body:not(.mobile-ui) .cn-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);}
+  body:not(.mobile-ui) .cn-g3{grid-template-rows:auto auto 1fr;grid-template-areas:"hulls hulls" "card slot" "side slot";}
+  body:not(.mobile-ui) .cn-g2{grid-template-areas:"hulls hulls" "card side";}
+}
+@container (min-width:820px){
+  body:not(.mobile-ui) .cn-grid{grid-template-columns:minmax(150px,175px) minmax(0,1fr) minmax(270px,320px);}
+  body:not(.mobile-ui) .cn-g3{grid-template-rows:auto 1fr;grid-template-areas:"hulls card slot" "hulls side slot";}
+  body:not(.mobile-ui) .cn-g2{grid-template-columns:minmax(150px,175px) minmax(0,1fr) minmax(0,1fr);grid-template-areas:"hulls card side";}
+  body:not(.mobile-ui) .cn-hulls{flex-direction:column;flex-wrap:nowrap;}
+  body:not(.mobile-ui) .cn-hulls .cn-hbtn{text-align:left;}
+  body:not(.mobile-ui) .cn-slot .cn-pal{grid-template-columns:minmax(0,1fr);}
+}
 /* hull picker */
-.cn-hulls{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;}
+.cn-hulls{display:flex;gap:7px;flex-wrap:wrap;}
 .cn-hbtn{padding:6px 11px;border-radius:8px;border:1px solid var(--line-hi);background:rgba(53,214,230,.03);color:var(--dim);
   font:700 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;cursor:pointer;}
 .cn-hbtn.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.12);}
@@ -2269,8 +2289,10 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cn-bay .cn-bn{font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--ink);margin-top:2px;}
 .cn-bay.empty .cn-bn{color:var(--dim);font-weight:400;}
 .cn-bay .cn-bd{margin-left:auto;font:700 var(--fs-body) var(--sf-font);font-variant-numeric:tabular-nums;color:var(--grn);}
-.cn-bay.filled{cursor:pointer;}
-.cn-bay.filled:hover{border-color:var(--red);}
+/* a bay row opens its bay, like its tile on the art; the open one is ringed */
+.cn-bay[data-cnsel]{cursor:pointer;}
+.cn-bay[data-cnsel]:hover{border-color:var(--cyan-dim);}
+.cn-bay.sel,.cn-bay.sel:hover{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan);}
 /* palette */
 .cn-ph{font-size:var(--fs-caption);color:var(--cyan);margin:14px 0 8px;}
 .cn-ph em{color:var(--dim);font-style:normal;text-transform:none;letter-spacing:0;}
@@ -2293,6 +2315,13 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
   color:var(--amber,var(--cyan));font:600 var(--fs-caption) var(--sf-font);font-variant-numeric:tabular-nums;vertical-align:middle;}
 .cn-note{margin-top:11px;font-size:var(--fs-caption);color:var(--dim);line-height:1.5;}
 .cn-note b{color:var(--cyan);}
+/* the open bay's modules (step 3): heading with «Снять», fitting modules, the rest folded */
+.cn-sh{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.cn-sh .cn-ph{flex:1;min-width:0;margin:0;}
+.cn-rm{flex:none;min-height:32px;padding:6px 12px;border-radius:8px;font-size:var(--fs-caption);}
+.cn-unfit{display:block;width:100%;margin-top:8px;padding:8px 10px;border-radius:8px;font-size:var(--fs-caption);text-align:left;}
+.cn-unfit+.cn-pal{margin-top:8px;}
+.cn-none{grid-column:1/-1;padding:12px;border:1px dashed var(--line-hi);border-radius:10px;font-size:var(--fs-caption);color:var(--dim);text-align:center;}
 /* live stat preview bars (right column) */
 /* Карточка корабля (заказ владельца 2026-09-24): отсеки стека и надетые модули — языком
    конструктора (.cn-bay, .cn-stat), только без действий: тут ничего не снимают. */
@@ -2366,7 +2395,7 @@ button.b{border-radius:2px;padding:5px 10px;margin:3px 4px 2px 0;font-size:var(-
 .cn-syn{display:flex;gap:7px;align-items:center;padding:7px 10px;margin-bottom:6px;border:1px solid var(--cyan-dim);
   border-radius:8px;background:rgba(53,214,230,.06);font-size:var(--fs-caption);color:var(--cyan);}
 /* --- phone: reclaim width, roomier tap targets, and a 2-col module palette so tiles
-   stop wrapping their names (the .cn-grid already stacks to one column at 760px) --- */
+   stop wrapping their names (the .cn-grid is one column below 600px of window) --- */
 @media (max-width:560px){
   #constructor{padding:9px;}
   #constructorbody{padding:13px 12px;}

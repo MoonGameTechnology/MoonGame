@@ -175,6 +175,18 @@ export interface YardDraft {
   planet: string;
   /** Боец десантного челнока (SHU-5.2) — по одному на каждую машину заказа. */
   troop?: string;
+  /** Открытый в окне отсек (индекс в раскладке ядра) — что смотрит игрок, а не что заказано;
+   *  без него открыт первый пустой ({@link selectedBay}). */
+  slot?: number;
+  /** Развёрнуты ли модули, которые на этот корпус не встают. */
+  unfit?: boolean;
+}
+
+/** Какой отсек открыт: выбранный игроком, пока такой есть; иначе первый пустой; иначе первый. */
+export function selectedBay(slots: readonly { moduleId?: string }[], wanted?: number): number {
+  if (wanted !== undefined && wanted >= 0 && wanted < slots.length) return wanted;
+  const free = slots.findIndex((sl) => !sl.moduleId);
+  return free < 0 ? 0 : free;
 }
 
 /** A price as text: «120 металл · 40 кредиты», or «бесплатно» when nothing is due. */
@@ -306,19 +318,22 @@ export function loadoutPaneHtml(
       return `<button class="cn-hbtn${art ? ' with-art' : ''}${h === draft.hull ? ' on' : ''}" data-cnhull="${h}">${art || unitIconHtml(h, data, view.youColor, 18)} <span>${esc(displayUnit(h))}</span></button>`;
     })
     .join('');
-  const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
+  // Открытый отсек (шаг 3 переделки окна): справа — его модули, а не весь каталог.
+  const sel = selectedBay(m.slots, draft.slot);
   const portrait = catalogPortraitHtml('u', draft.hull, data);
   // Слоты-выноски (шаг 2 переделки окна): точка на корпусе, плитка рядом, линия между ними.
   // Нет точек у этого арта — отсеки остаются только списком под карточкой.
   const callouts = portrait ? slotCallouts(portraitArt('u', draft.hull, data)?.key, m.slots) : null;
   const art = callouts
-    ? `<div class="cn-art">${portrait}${slotLayerHtml(m.slots, callouts)}</div>`
+    ? `<div class="cn-art">${portrait}${slotLayerHtml(m.slots, callouts, sel)}</div>`
     : portrait;
   const hullCard =
     `<div class="cn-hull${portrait ? ' with-art' : ''}">${art}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
     `<div class="cn-hm">${m.hasSlots ? t('yard.slots.count', { n: String(m.slots.length) }) : t('yard.slots.none')}</div></div></div></div>`;
+  // Строка отсека открывает его, как плитка на арте; снять модуль — кнопкой над его модулями.
   const bays = m.slots
-    .map((sl) => {
+    .map((sl, i) => {
+      const on = i === sel ? ' sel' : '';
       if (sl.moduleId) {
         const md = data.modules[sl.moduleId];
         const eff = md
@@ -327,12 +342,12 @@ export function loadoutPaneHtml(
               .join(' ') + (md.description ? `<p>${esc(t(md.description))}</p>` : '')
           : '';
         return (
-          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
+          `<div class="cn-bay filled${on}" data-cnsel="${i}"><div class="cn-bic">${moduleIcon(sl.moduleId)}</div>` +
           `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${originTagHtml(view.arsenalItems, sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
         );
       }
       return (
-        `<div class="cn-bay empty"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
+        `<div class="cn-bay empty${on}" data-cnsel="${i}"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
         `<div><div class="cn-bt">${t(SLOT_KEY[sl.type] ?? sl.type)}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
       );
     })
@@ -359,36 +374,60 @@ export function loadoutPaneHtml(
       `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
     );
   };
-  // Модули группами по типу отсека (заказ владельца 2026-09-26, `moduleGroups.ts`): в том же
-  // порядке, что отсеки выше; внутри группы сначала то, что встаёт на этот корпус, по редкости.
-  const option = new Map(m.palette.map((o) => [o.id, o] as const));
-  const fitDef = data.units[m.unit];
-  const palette = moduleGroups([...option.keys()], data, {
-    fits: (id) => fitDef !== undefined && moduleAllowed(m.unit, fitDef, data.modules[id]!),
-  })
-    .map(
-      ({ slot, ids }) =>
-        `<div class="cn-pg" data-slot="${slot}"><span aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</span> ${t(SLOT_KEY[slot] ?? slot)}</div>` +
-        ids.map((id) => paletteCard(option.get(id)!)).join(''),
-    )
-    .join('');
-  const palHead = freeTypes.length
-    ? t('yard.modules.for-slot', {
-        s: freeTypes.map((ty) => t(SLOT_KEY[ty] ?? ty)).join(' / '),
-      })
-    : t('yard.modules.all-taken');
-  // LARS-4: the palette above already reads the LIVE arsenal snapshot (a module
-  // bought mid-match shows up here without a new match) — this note is the only
-  // thing that needed adding: make the timing honest (built, not instant).
+  // LARS-4: the palette already reads the LIVE arsenal snapshot (a module bought
+  // mid-match shows up here without a new match) — this note is the only thing that
+  // needed adding: make the timing honest (built, not instant).
   const liveNote = snap ? `<div class="cn-note">${t('yard.arsenal.note')}</div>` : '';
-  // Корпус без отсеков (наземные войска, десантный челнок) модулей не несёт: ни отсеков, ни
-  // палитры. Раньше здесь стоял весь каталог серым — 21 модуль, ни один из которых не встанет.
-  const fitting = m.hasSlots
-    ? `${bays}<div class="cn-ph">${palHead}</div><div class="cn-pal">${palette}</div>` +
-      `<div class="cn-note">${t('yard.slots.note')}</div>${liveNote}`
-    : '';
-  const left = `<div class="cn-fit"><div class="cn-hulls">${hulls}</div>${hullCard}${fitting}</div>`;
-  // right: live preview + cost + build
+  // Модули открытого отсека. Надетый в нём модуль на время выбора снят: так его замена
+  // предлагается как годная и встаёт в тот же отсек.
+  const bay = m.slots[sel];
+  let panel = '';
+  if (bay) {
+    const cur = bay.moduleId;
+    const pick = cur
+      ? createLoadoutEditor(draft.hull, data, res, {
+          modules: m.modules.filter((id) => id !== cur),
+          count: draft.count,
+          ownedModules,
+        })
+      : ed;
+    // Модуль уже стоит в другом отсеке (ядро не даёт два одинаковых) — он виден на арте и в
+    // списке отсеков, здесь он не выбор.
+    const option = new Map(
+      (pick.ok ? pick.palette : [])
+        .filter((o) => o.id !== cur && o.code !== 'E_DUP_MODULE')
+        .map((o) => [o.id, o] as const),
+    );
+    const fitDef = data.units[m.unit];
+    // Порядок — группы по типу отсека, внутри по редкости (заказ владельца 2026-09-26,
+    // `moduleGroups.ts`); типизированному отсеку — одна его группа, универсальному — все.
+    const groups = moduleGroups([...option.keys()], data, {
+      fits: (id) => fitDef !== undefined && moduleAllowed(m.unit, fitDef, data.modules[id]!),
+    }).filter((g) => bay.type === 'universal' || g.slot === bay.type);
+    const fitting = groups
+      .map(({ slot, ids }) => {
+        const ok = ids.filter((id) => option.get(id)!.installable);
+        if (!ok.length) return '';
+        const head =
+          bay.type === 'universal'
+            ? `<div class="cn-pg" data-slot="${slot}"><span aria-hidden="true">${SLOT_ICON[slot] ?? '＋'}</span> ${t(SLOT_KEY[slot] ?? slot)}</div>`
+            : '';
+        return head + ok.map((id) => paletteCard(option.get(id)!)).join('');
+      })
+      .join('');
+    // Не встающие на этот корпус модули свёрнуты в одну строку (UIX-13.1): они не выбор,
+    // а справка, и раньше занимали больше места, чем годные.
+    const unfit = groups.flatMap((g) => g.ids).filter((id) => !option.get(id)!.installable);
+    const fold = unfit.length
+      ? `<button class="cn-unfit btn-quiet" data-cnunfit aria-expanded="${draft.unfit ? 'true' : 'false'}">${draft.unfit ? t('yard.modules.unfit-hide') : t('yard.modules.unfit', { n: unfit.length })}</button>` +
+        (draft.unfit ? `<div class="cn-pal">${unfit.map((id) => paletteCard(option.get(id)!)).join('')}</div>` : '')
+      : '';
+    panel =
+      `<div class="cn-sh"><div class="cn-ph"><span aria-hidden="true">${SLOT_ICON[bay.type] ?? '＋'}</span> ${t('yard.modules.for-slot', { s: t(SLOT_KEY[bay.type] ?? bay.type) })}</div>` +
+      (cur ? `<button class="cn-rm btn-second" data-cnrm="${cur}">${t('yard.module.take-off')}</button>` : '') +
+      `</div><div class="cn-pal">${fitting || `<div class="cn-none">${t('yard.modules.none')}</div>`}</div>${fold}${liveNote}`;
+  }
+  // stats: live preview of the fitted hull
   const maxStat = Math.max(1, ...m.preview.map((p) => p.effective));
   const bars = m.preview.map((p) => statBarHtml(p, maxStat)).join('');
   // Урон по целям — с тем же оснащением, что и полосы над ним: надел осадный модуль —
@@ -412,11 +451,16 @@ export function loadoutPaneHtml(
           )
           .join('')}</select></div>`
       : `<div class="cn-noplace">${t('yard.troop.none')}</div>`;
-  const right =
+  const stats =
     `<div class="cn-side"><div class="cn-ph">${m.hasSlots ? `${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em>` : t('yard.stats')}</div>${bars}${damage}${troopRow}` +
     (m.hasSlots ? `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div>` : '') +
     `</div>`;
-  return `<div class="cn-grid">${left}${right}</div>`;
+  // Раскладка (шаг 3): на ПК три колонки — корпуса, корабль с характеристиками, модули
+  // отсека; на телефоне одна колонка в том же порядке, модули сразу под артом. Корпус без
+  // отсеков — без колонки модулей.
+  const card = `<div class="cn-card${callouts ? ' with-tiles' : ''}">${hullCard}${bays}</div>`;
+  const slotCol = panel ? `<div class="cn-slot">${panel}</div>` : '';
+  return `<div class="cn-grid ${slotCol ? 'cn-g3' : 'cn-g2'}"><div class="cn-hulls">${hulls}</div>${card}${slotCol}${stats}</div>`;
 }
 
 /**
@@ -440,12 +484,13 @@ export function unitLaneAhead(
  * Слой выносок поверх арта корпуса: точка на корпусе, плитка слота рядом и линия между ними
  * (форма «Выноска», решение владельца 2026-10-10). Координаты — проценты картинки
  * (`decisions/slotCallouts.ts`), а слой лежит ровно на картинке, поэтому точка стоит на той
- * же детали корабля и на телефоне, и на ПК. Плитка надетого модуля снимает его, как строка
- * отсека под карточкой; пустая ведёт к модулям этого типа.
+ * же детали корабля и на телефоне, и на ПК. Плитка открывает свой отсек: рядом встают его
+ * модули (шаг 3), открытый отсек обведён.
  */
 export function slotLayerHtml(
   slots: LoadoutModel['slots'],
   callouts: readonly SlotCallout[],
+  sel: number,
 ): string {
   // Плитка не вылезает за картинку: центр не ближе половины плитки к краю.
   const at = ([x, y]: readonly [number, number]): string =>
@@ -458,18 +503,20 @@ export function slotLayerHtml(
       const c = callouts[i]!;
       const dot = `left:${c.a[0]}%;top:${c.a[1]}%`;
       const kind = t(SLOT_KEY[sl.type] ?? sl.type);
+      const on = i === sel;
+      const pressed = ` aria-pressed="${on ? 'true' : 'false'}"`;
       if (sl.moduleId) {
         const rar = data.modules[sl.moduleId]?.rarity;
         const label = `${kind}: ${tData(sl.moduleName ?? sl.moduleId)}`;
         return (
           `<span class="cn-dot full" style="${dot}"></span>` +
-          `<button class="cn-tile filled" data-cnun="${sl.moduleId}" style="${at(c.t)}${rar ? `;--rar:var(--rar-${rar})` : ''}" aria-label="${esc(label)}" title="${esc(`${label} · ${t('yard.module.remove')}`)}">${moduleIcon(sl.moduleId)}</button>`
+          `<button class="cn-tile filled${on ? ' sel' : ''}" data-cnsel="${i}"${pressed} style="${at(c.t)}${rar ? `;--rar:var(--rar-${rar})` : ''}" aria-label="${esc(label)}" title="${esc(label)}">${moduleIcon(sl.moduleId)}</button>`
         );
       }
       const label = `${kind}: ${t('yard.slot.empty')}`;
       return (
         `<span class="cn-dot" style="${dot}"></span>` +
-        `<button class="cn-tile empty" data-cnslot="${sl.type}" style="${at(c.t)}" aria-label="${esc(label)}" title="${esc(label)}">${SLOT_ICON[sl.type] ?? '＋'}</button>`
+        `<button class="cn-tile empty${on ? ' sel' : ''}" data-cnsel="${i}"${pressed} style="${at(c.t)}" aria-label="${esc(label)}" title="${esc(label)}"><span class="cn-ti">${SLOT_ICON[sl.type] ?? '＋'}</span></button>`
       );
     })
     .join('');
@@ -640,19 +687,57 @@ export function initShipyard(host: YardHost): {
     paintedTab = tab;
   }
 
-  /** Equip / unequip a module through the core-validated reducer, then re-render. */
-  function fit(moduleId: string, remove: boolean): void {
-    const snap = host.state().players[host.me()]?.arsenal;
-    const res = host.state().players[host.me()]?.resources ?? {};
-    const ed = createLoadoutEditor(draft.hull, data, res, {
-      modules: draft.modules,
+  /** The loadout editor for the current order over `modules` — the core-validated model. */
+  function editorFor(modules: readonly string[]): LoadoutEditorResult {
+    const p = host.state().players[host.me()];
+    return createLoadoutEditor(draft.hull, data, p?.resources ?? {}, {
+      modules: [...modules],
       count: draft.count,
-      ownedModules: snap ? new Set(snap.modules) : undefined,
+      ownedModules: p?.arsenal ? new Set(p.arsenal.modules) : undefined,
     });
+  }
+
+  /** Модуль из колонки открытого отсека. В занятом отсеке он меняет надетый и встаёт на его
+   *  место; потом открывается следующий пустой отсек, а когда пустых нет — отсек с ним. */
+  function pick(moduleId: string): void {
+    const res = host.state().players[host.me()]?.resources ?? {};
+    const ed = editorFor(draft.modules);
     if (!ed.ok) return;
-    const r = applyLoadoutAction({ kind: remove ? 'unequip' : 'equip', moduleId }, ed, data, res);
-    if (r.ok) draft = { ...draft, modules: r.modules };
-    else host.note('✖ ' + host.errText(r.code));
+    const bay = ed.slots[selectedBay(ed.slots, draft.slot)];
+    const cur = bay?.moduleId;
+    const swap =
+      cur !== undefined && (bay!.type === 'universal' || data.modules[moduleId]?.slot === bay!.type);
+    const base = swap ? editorFor(draft.modules.filter((id) => id !== cur)) : ed;
+    if (!base.ok) return;
+    const r = applyLoadoutAction({ kind: 'equip', moduleId }, base, data, res);
+    if (!r.ok) {
+      host.note('✖ ' + host.errText(r.code));
+      return;
+    }
+    // Замена встаёт на место снятого: отсеки одного типа заполняются в порядке обвеса
+    // (`loadoutBays`), а добавленный в конец модуль ушёл бы в последний отсек.
+    const modules = swap ? draft.modules.map((id) => (id === cur ? moduleId : id)) : r.modules;
+    const after = editorFor(modules);
+    const slots = after.ok ? after.slots : [];
+    const full = slots.every((sl) => sl.moduleId);
+    const at = slots.findIndex((sl) => sl.moduleId === moduleId);
+    draft = { ...draft, modules, slot: full && at >= 0 ? at : undefined, unfit: false };
+  }
+
+  /** Снять модуль: открытым остаётся освободившийся отсек. Отсеки одного типа сдвигаются
+   *  (`loadoutBays`), поэтому пустеет последний отсек этого типа, а не тот, где модуль стоял. */
+  function takeOff(moduleId: string): void {
+    const res = host.state().players[host.me()]?.resources ?? {};
+    const ed = editorFor(draft.modules);
+    if (!ed.ok) return;
+    const type = ed.slots.find((sl) => sl.moduleId === moduleId)?.type;
+    const r = applyLoadoutAction({ kind: 'unequip', moduleId }, ed, data, res);
+    if (!r.ok) {
+      host.note('✖ ' + host.errText(r.code));
+      return;
+    }
+    const freed = r.slots.findIndex((sl) => !sl.moduleId && sl.type === type);
+    draft = { ...draft, modules: r.modules, slot: freed < 0 ? undefined : freed };
   }
 
   // Mobile dossier scrolling must stay compositor-cheap. The periodic hero refresh
@@ -682,39 +767,45 @@ export function initShipyard(host: YardHost): {
     const nextTab = (tg.closest('.cn-tab') as HTMLElement | null)?.dataset.ctab;
     if (nextTab) {
       tab = nextTab as YardTab;
+      draft = { ...draft, slot: undefined, unfit: false }; // у корпуса другой вкладки свои отсеки
       paint();
       if (tab === 'heroes') host.onHeroTab(); // ONB-3 remainder
       return;
     }
     const hull = (tg.closest('.cn-hbtn') as HTMLElement | null)?.dataset.cnhull;
     if (hull) {
-      draft = { ...draft, hull, modules: host.preparedModules?.(hull) ?? [] };
+      draft = { ...draft, hull, modules: host.preparedModules?.(hull) ?? [], slot: undefined, unfit: false };
       paint();
       return;
     }
     const mod = (tg.closest('.cn-mod') as HTMLElement | null)?.dataset.cnmod;
     if (mod) {
-      fit(mod, false);
+      pick(mod);
+      paint();
+      // Модуль выбран из глубины списка — вернуть на экран корабль: на нём видно, куда модуль
+      // встал, а под ним (на ПК — рядом) уже модули следующего отсека.
+      host
+        .root()
+        .querySelector('#constructor .cn-hull')
+        ?.scrollIntoView({ block: 'nearest', behavior: motionOn() ? 'smooth' : 'auto' });
+      return;
+    }
+    // Плитка на арте или строка отсека открывает отсек: рядом встают его модули.
+    const sel = (tg.closest('[data-cnsel]') as HTMLElement | null)?.dataset.cnsel;
+    if (sel !== undefined) {
+      draft = { ...draft, slot: Number(sel), unfit: false };
       paint();
       return;
     }
-    // Снять модуль — строкой отсека под карточкой или его плиткой на арте.
-    const un = ((tg.closest('.cn-bay.filled') ?? tg.closest('.cn-tile.filled')) as HTMLElement | null)
-      ?.dataset.cnun;
-    if (un) {
-      fit(un, true);
+    const rm = (tg.closest('[data-cnrm]') as HTMLElement | null)?.dataset.cnrm;
+    if (rm) {
+      takeOff(rm);
       paint();
       return;
     }
-    // Пустая плитка на арте ведёт к модулям своего типа; универсальному слоту годится любой
-    // модуль — к началу палитры.
-    const slot = (tg.closest('.cn-tile.empty') as HTMLElement | null)?.dataset.cnslot;
-    if (slot) {
-      const root = host.root();
-      const to =
-        root.querySelector(`#constructor .cn-pg[data-slot="${slot}"]`) ??
-        root.querySelector('#constructor .cn-ph');
-      to?.scrollIntoView({ block: 'start', behavior: motionOn() ? 'smooth' : 'auto' });
+    if (tg.closest('[data-cnunfit]')) {
+      draft = { ...draft, unfit: !draft.unfit };
+      paint();
       return;
     }
     const step = (tg.closest('[data-cncount]') as HTMLElement | null)?.dataset.cncount;

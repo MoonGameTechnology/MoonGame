@@ -27,6 +27,7 @@ import {
   buildSites,
   RES_KEY,
   STAT_KEY,
+  selectedBay,
   type YardDraft,
   type YardHost,
 } from './shipyard';
@@ -92,6 +93,11 @@ function fakeWin(): HTMLElement & {
 /** A click whose `closest(sel)` answers only for the selector we mean to hit. */
 function click(sel: string, dataset: Record<string, string> = {}): unknown {
   return { closest: (q: string) => (q === sel ? { dataset } : null) };
+}
+
+/** Имена модулей, надетых в отсеки, — по строкам отсеков под карточкой корпуса. */
+function worn(html: string): string[] {
+  return [...html.matchAll(/class="cn-bay filled[^"]*" data-cnsel="\d+">.*?class="cn-bn">([^<]+)/g)].map((x) => x[1]!);
 }
 
 function hostOf(over: Partial<YardHost> = {}): YardHost {
@@ -258,20 +264,24 @@ describe('верфь — панель конструктора', () => {
     expect(bar).toContain('data-cnbuild');
   });
 
-  it('поставленный модуль занимает отсек и снимается кликом', () => {
+  it('поставленный модуль занимает отсек, а снимается кнопкой в открытом отсеке', () => {
     const d = normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'] }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
-    expect(html).toContain('data-cnun="ion_engine"');
+    expect(worn(html)).toEqual([tData(data.modules.ion_engine!.name)]);
+    expect(html).not.toContain('data-cnrm'); // открыт первый пустой отсек — оружие
+    const open = loadoutPaneHtml(s, 'p1', { ...d, slot: 2 }, YARD_HULLS, view);
+    expect(open).toContain(`data-cnrm="ion_engine">${t('yard.module.take-off')}<`);
   });
 
   // Радар — роль ОДНОГО корпуса. Правило живёт в данных (`allowed.units`), а верфь
   // обязана его честно объяснить: на крейсере утилита свободна, и подпись «нужен
   // слот» читалась бы как враньё.
   it('радар предлагается на дозорном фрегате и заперт с внятной причиной на остальных', () => {
+    // Отсек системы открыт явно: по умолчанию открыт первый пустой, у обоих это не система.
     const picket = loadoutPaneHtml(
       s,
       'p1',
-      normalizeDraft(s, 'p1', draftOf({ hull: 'picket_frigate' }), YARD_HULLS),
+      normalizeDraft(s, 'p1', draftOf({ hull: 'picket_frigate', slot: 1 }), YARD_HULLS),
       YARD_HULLS,
       view,
     );
@@ -280,7 +290,7 @@ describe('верфь — панель конструктора', () => {
     const cruiser = loadoutPaneHtml(
       s,
       'p1',
-      normalizeDraft(s, 'p1', draftOf({ hull: 'cruiser' }), YARD_HULLS),
+      normalizeDraft(s, 'p1', draftOf({ hull: 'cruiser', slot: 2, unfit: true }), YARD_HULLS),
       YARD_HULLS,
       view,
     );
@@ -290,11 +300,12 @@ describe('верфь — панель конструктора', () => {
   });
 
   // Заказ владельца 2026-09-26: модули группами по типу отсека, а не вперемешку каталогом.
-  it('модули верфи — группами по отсекам, запертые для корпуса в конце своей группы', () => {
+  // С шага 3 открыт один отсек: универсальному годится любой модуль — группами по типу.
+  it('модули универсального отсека — группами по типу, запертые для корпуса в конце', () => {
     const html = loadoutPaneHtml(
       s,
       'p1',
-      normalizeDraft(s, 'p1', draftOf({ hull: 'cruiser' }), YARD_HULLS),
+      normalizeDraft(s, 'p1', draftOf({ hull: 'heavy_cruiser', unfit: true }), YARD_HULLS),
       YARD_HULLS,
       view,
     );
@@ -304,6 +315,7 @@ describe('верфь — панель конструктора', () => {
     // Щиты пустоты — только для пушек крепости: легендарный щит не заслоняет броню крейсера.
     expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeGreaterThan(0);
     expect(pal.indexOf('data-cnmod="ablative_plating"')).toBeLessThan(pal.indexOf('🔰'));
+    expect(pal.indexOf('data-cnunfit')).toBeLessThan(pal.indexOf('🔰'));
     // Каждый модуль — в группе своего отсека: система после заголовка «Система».
     expect(pal.indexOf('data-cnmod="cargo_bay"')).toBeGreaterThan(pal.indexOf('> Система<'));
   });
@@ -332,7 +344,7 @@ describe('верфь — панель конструктора', () => {
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
     expect((html.match(/class="cn-bay/g) ?? []).length).toBe(4);
     expect((html.match(new RegExp(t('yard.slot.universal'), 'g')) ?? []).length).toBeGreaterThanOrEqual(4);
-    for (const id of mods) expect(html).toContain(`data-cnun="${id}"`);
+    expect(worn(html).sort()).toEqual(mods.map((id) => tData(data.modules[id]!.name)).sort());
   });
 
   it('пустая казна гасит кнопку заказа, а не позволяет отправить отказ', () => {
@@ -401,7 +413,8 @@ describe('верфь — панель конструктора', () => {
     const gated = rich();
     gated.players.p1!.arsenal = { hulls: ['cruiser'], modules: ['ion_engine'] };
     const html = loadoutPaneHtml(gated, 'p1', draftOf(), YARD_HULLS, view);
-    expect((html.match(/cn-note/g) ?? []).length).toBe(2);
+    expect(html).toContain(`<div class="cn-note">${t('yard.arsenal.note')}</div>`);
+    expect(loadoutPaneHtml(rich(), 'p1', draftOf(), YARD_HULLS, view)).not.toContain('cn-note');
   });
 });
 
@@ -466,19 +479,21 @@ describe('верфь — окно', () => {
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open();
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
-    expect(win.html()).toContain('data-cnun="ion_engine"');
+    expect(worn(win.html())).toEqual([tData(data.modules.ion_engine!.name)]);
     win.fire(click('.cn-hbtn', { cnhull: 'scout' }));
-    expect(win.html()).not.toContain('data-cnun="ion_engine"');
+    expect(worn(win.html())).toEqual([]);
   });
 
-  it('модуль ставится и снимается кликом', () => {
+  it('модуль ставится кликом, а снимается кнопкой «Снять» открытого отсека', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open();
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
-    expect(win.html()).toContain('data-cnun="ion_engine"');
-    win.fire(click('.cn-bay.filled', { cnun: 'ion_engine' }));
-    expect(win.html()).not.toContain('data-cnun="ion_engine"');
+    expect(worn(win.html())).toEqual([tData(data.modules.ion_engine!.name)]);
+    win.fire(click('[data-cnsel]', { cnsel: '2' }));
+    expect(win.html()).toContain('data-cnrm="ion_engine"');
+    win.fire(click('[data-cnrm]', { cnrm: 'ion_engine' }));
+    expect(worn(win.html())).toEqual([]);
   });
 
   it('отказ ядра доезжает до игрока текстом кода, а не молча', () => {
@@ -494,7 +509,7 @@ describe('верфь — окно', () => {
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
     expect(notes.length).toBe(1);
     expect(notes[0]).toMatch(/^✖ E_/);
-    expect(win.html()).not.toContain('data-cnun="ion_engine"');
+    expect(worn(win.html())).toEqual([]);
   });
 
   it('счётчик не выходит за границы кликами', () => {
@@ -894,36 +909,149 @@ describe('производство — слоты-выноски на арте (
     const d = normalizeDraft(s, 'p1', draftOf({ modules: ['ion_engine'] }), YARD_HULLS);
     const html = loadoutPaneHtml(s, 'p1', d, YARD_HULLS, view);
     const mod = data.modules.ion_engine!;
-    expect(html).toContain('class="cn-tile filled" data-cnun="ion_engine"');
+    // Плитки идут в порядке отсеков: оружие, защита, система; открыт первый пустой отсек.
+    expect(html).toContain('class="cn-tile filled" data-cnsel="2" aria-pressed="false"');
     expect(html).toContain(`--rar:var(--rar-${mod.rarity})`);
     expect(html).toContain(`aria-label="${t('yard.slot.utility')}: ${tData(mod.name)}"`);
-    expect(html).toContain('class="cn-tile empty" data-cnslot="weapon"');
-    expect(html).toContain('class="cn-tile empty" data-cnslot="defense"');
+    expect(html).toContain('class="cn-tile empty sel" data-cnsel="0" aria-pressed="true"');
+    expect(html).toContain('class="cn-tile empty" data-cnsel="1" aria-pressed="false"');
     expect(html).toContain(`aria-label="${t('yard.slot.weapon')}: ${t('yard.slot.empty')}"`);
   });
 
-  it('плитка надетого модуля на арте снимает его, как строка отсека', () => {
+  it('плитка на арте открывает свой отсек, как строка отсека', () => {
     const win = fakeWin();
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open();
     win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
-    expect(win.html()).toContain('data-cnun="ion_engine"');
-    win.fire(click('.cn-tile.filled', { cnun: 'ion_engine' }));
-    expect(win.html()).not.toContain('data-cnun="ion_engine"');
+    win.fire(click('[data-cnsel]', { cnsel: '2' }));
+    const html = win.html();
+    expect(html).toContain('class="cn-tile filled sel" data-cnsel="2" aria-pressed="true"');
+    expect(html).toContain('class="cn-bay filled sel" data-cnsel="2"');
+    expect(html).toContain(t('yard.modules.for-slot', { s: t('yard.slot.utility') }));
+  });
+});
+
+describe('производство — модули открытого отсека, три колонки (переделка окна, шаг 3)', () => {
+  const s = rich();
+  const pane = (over: Partial<YardDraft>): string =>
+    loadoutPaneHtml(s, 'p1', normalizeDraft(s, 'p1', draftOf(over), YARD_HULLS), YARD_HULLS, view);
+  /** Модули, которые можно поставить в открытый отсек (без свёрнутых неподходящих). */
+  const offered = (html: string): string[] =>
+    [...html.matchAll(/<button class="cn-mod" data-cnmod="([a-z_]+)"/g)].map((x) => x[1]!);
+
+  it('открыт выбранный отсек, пока он есть; иначе первый пустой; все заняты — первый', () => {
+    const bays = [{ moduleId: 'a' }, {}, {}];
+    expect(selectedBay(bays, 2)).toBe(2);
+    expect(selectedBay(bays)).toBe(1);
+    expect(selectedBay(bays, 7)).toBe(1);
+    expect(selectedBay([{ moduleId: 'a' }, { moduleId: 'b' }])).toBe(0);
   });
 
-  it('пустая плитка ведёт к модулям своего типа', () => {
+  it('отсеку предложены модули его типа, без надетых в нём и в соседних отсеках', () => {
+    // Фрегат: защита + три системы; грузовой отсек и ионный двигатель уже стоят.
+    const html = pane({ hull: 'frigate', modules: ['cargo_bay', 'ion_engine'], slot: 3 });
+    const ids = offered(html);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.every((id) => data.modules[id]!.slot === 'utility')).toBe(true);
+    expect(ids).not.toContain('cargo_bay');
+    expect(ids).not.toContain('ion_engine');
+    expect(ids).toContain('mine_layer'); // минный заградитель — для фрегатов
+    expect(html).not.toContain('class="cn-pg"'); // одна группа — без заголовка
+  });
+
+  it('неподходящие корпусу модули свёрнуты в одну строку и разворачиваются', () => {
+    // Защита крейсера: три щита пустоты (для пушек крепости) и завеса роя не встают.
+    const folded = pane({ slot: 1 });
+    expect(folded).toContain(`aria-expanded="false">${t('yard.modules.unfit', { n: 4 })}<`);
+    expect(folded).not.toContain('cn-mod locked');
+    const open = pane({ slot: 1, unfit: true });
+    expect(open).toContain(`aria-expanded="true">${t('yard.modules.unfit-hide')}<`);
+    expect((open.match(/cn-mod locked/g) ?? []).length).toBe(4);
+    // Оружие крейсера встаёт всё — сворачивать нечего.
+    expect(pane({ slot: 0 })).not.toContain('data-cnunfit');
+  });
+
+  it('нет ни одного модуля для отсека — так и сказано, а не пустая колонка', () => {
+    const bare = rich();
+    bare.players.p1!.arsenal = { hulls: ['cruiser'], modules: [] };
+    const html = loadoutPaneHtml(bare, 'p1', normalizeDraft(bare, 'p1', draftOf(), ['cruiser']), ['cruiser'], view);
+    expect(html).toContain(`class="cn-none">${t('yard.modules.none')}<`);
+  });
+
+  it('три колонки — корпуса, корабль, модули отсека; у корпуса без отсеков две', () => {
+    expect(pane({})).toMatch(
+      /^<div class="cn-grid cn-g3"><div class="cn-hulls">.*<div class="cn-card with-tiles">.*<div class="cn-slot">.*<div class="cn-side">/,
+    );
+    const html = loadoutPaneHtml(s, 'p1', draftOf({ hull: 'militia' }), ['militia'], view);
+    expect(html).toMatch(/^<div class="cn-grid cn-g2">/);
+    expect(html).not.toContain('cn-slot');
+  });
+
+  it('модуль в занятом отсеке встаёт на место прежнего, затем открыт следующий пустой', () => {
     const win = fakeWin();
-    const asked: string[] = [];
-    const scrolled: unknown[] = [];
-    (win as { querySelector: unknown }).querySelector = (q: string) => {
-      asked.push(q);
-      return q.includes('data-slot="weapon"') ? { scrollIntoView: (o: unknown) => scrolled.push(o) } : null;
-    };
     const yard = initShipyard(hostOf({ root: () => win }));
     yard.open();
-    win.fire(click('.cn-tile.empty', { cnslot: 'weapon' }));
-    expect(asked).toContain('#constructor .cn-pg[data-slot="weapon"]');
-    expect(scrolled).toEqual([expect.objectContaining({ block: 'start' })]);
+    win.fire(click('.cn-mod', { cnmod: 'targeting_array' })); // в открытый отсек оружия
+    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="1"'); // дальше — защита
+    win.fire(click('[data-cnsel]', { cnsel: '0' }));
+    win.fire(click('.cn-mod', { cnmod: 'tractor_beam' }));
+    expect(worn(win.html())).toEqual([tData(data.modules.tractor_beam!.name)]);
+    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="1"');
+  });
+
+  it('все отсеки заняты — после выбора открыт отсек с новым модулем, замена идёт в нём', () => {
+    const win = fakeWin();
+    const yard = initShipyard(hostOf({ root: () => win }));
+    yard.open();
+    win.fire(click('.cn-tab', { ctab: 'support' }));
+    win.fire(click('.cn-hbtn', { cnhull: 'scout' })); // один отсек системы
+    win.fire(click('.cn-mod', { cnmod: 'cargo_bay' }));
+    expect(win.html()).toContain('data-cnrm="cargo_bay"');
+    win.fire(click('.cn-mod', { cnmod: 'ion_engine' }));
+    expect(worn(win.html())).toEqual([tData(data.modules.ion_engine!.name)]);
+    expect(win.html()).toContain('data-cnrm="ion_engine"');
+  });
+
+  it('«Снять» оставляет открытым освободившийся отсек — последний своего типа', () => {
+    const win = fakeWin();
+    const yard = initShipyard(hostOf({ root: () => win }));
+    yard.open();
+    win.fire(click('.cn-hbtn', { cnhull: 'frigate' }));
+    for (const id of ['cargo_bay', 'ion_engine', 'repair_bay']) win.fire(click('.cn-mod', { cnmod: id }));
+    win.fire(click('[data-cnsel]', { cnsel: '1' }));
+    win.fire(click('[data-cnrm]', { cnrm: 'cargo_bay' }));
+    // Системы сдвинулись: двигатель и ремонт в отсеках 1–2, пуст и открыт третий.
+    expect(worn(win.html())).toEqual(['ion_engine', 'repair_bay'].map((id) => tData(data.modules[id]!.name)));
+    expect(win.html()).toContain('class="cn-bay empty sel" data-cnsel="3"');
+  });
+
+  it('смена корпуса и вкладки закрывает отсек и сворачивает неподходящие', () => {
+    const win = fakeWin();
+    const yard = initShipyard(hostOf({ root: () => win }));
+    yard.open();
+    win.fire(click('[data-cnsel]', { cnsel: '2' }));
+    win.fire(click('[data-cnunfit]'));
+    expect(win.html()).toContain(t('yard.modules.unfit-hide'));
+    win.fire(click('.cn-hbtn', { cnhull: 'heavy_cruiser' }));
+    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="0"');
+    expect(win.html()).not.toContain(t('yard.modules.unfit-hide'));
+    win.fire(click('[data-cnsel]', { cnsel: '3' }));
+    win.fire(click('.cn-tab', { ctab: 'squads' }));
+    win.fire(click('.cn-tab', { ctab: 'ships' }));
+    expect(win.html()).toContain('class="cn-tile empty sel" data-cnsel="0"');
+  });
+
+  it('после выбора модуля корабль возвращается на экран — видно, куда модуль встал', () => {
+    const win = fakeWin();
+    const scrolled: [string, unknown][] = [];
+    (win as { querySelector: unknown }).querySelector = (q: string) => ({
+      scrollIntoView: (o: unknown) => scrolled.push([q, o]),
+    });
+    const yard = initShipyard(hostOf({ root: () => win }));
+    yard.open();
+    win.fire(click('[data-cnsel]', { cnsel: '1' }));
+    expect(scrolled).toEqual([]); // открыть отсек — не прокрутка: модули рядом с кораблём
+    win.fire(click('.cn-mod', { cnmod: 'ablative_plating' }));
+    expect(scrolled).toEqual([['#constructor .cn-hull', expect.objectContaining({ block: 'nearest' })]]);
   });
 });

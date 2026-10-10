@@ -2177,9 +2177,11 @@ export const ru: Record<string, string> = {
   'yard.loadout.note':
     'Модули ставятся при постройке. Готовый корабль не переоснастить.',
   'yard.module.not-allowed': 'не для этого корпуса',
-  'yard.module.remove': 'снять модуль',
-  'yard.modules.all-taken': 'Доступные модули — все слоты заняты',
+  'yard.module.take-off': 'Снять',
   'yard.modules.for-slot': 'Доступные модули — для слота «{s}»',
+  'yard.modules.none': 'Подходящих модулей нет',
+  'yard.modules.unfit': 'Ещё {n} {n|не подходит|не подходят|не подходят} этому корпусу',
+  'yard.modules.unfit-hide': 'Скрыть неподходящие',
   'yard.no-place': 'нет подходящего места',
   'yard.ordered': '⚒ заказано: {n}× {hull}',
   'yard.pick.ally-world': ' / мир союзника',
@@ -2197,8 +2199,6 @@ export const ru: Record<string, string> = {
   'yard.slot.utility': 'Система',
   'yard.slot.weapon': 'Оружие',
   'yard.slots.count': '{n} {n|слот|слота|слотов} под модули (по размеру корпуса)',
-  'yard.slots.note':
-    'Модуль встаёт в слот своего типа, а когда тот занят — в универсальный. <b>Серые</b> — не для свободного слота или уже стоят.',
   'yard.tab.heroes': 'Герои',
   'yard.tab.infantry': 'Пехота',
   'yard.tab.ships': 'Корабли',
