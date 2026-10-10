@@ -47,7 +47,42 @@ const {
   HOUR,
   DAY,
   START_CANDIDATES,
+  seatDoctrine,
 } = mod.exports;
+
+// Доктрина места — ветка учёного его совета (`botDoctrine.ts`): по ней бот качает дерево
+// и собирает армию. Совет у бота свой на каждый сид, так что доктрины в батче смешаны.
+const doctrineFor = (s, seat) =>
+  seatDoctrine(s.players[seat]?.scientists, data.scientists, data.technologies) ?? 'none';
+const DOCTRINES = [
+  ...new Set(Object.values(data.scientists).map((x) => x.branch).filter(Boolean)),
+].sort();
+// Вершина доктрины — её боевой узел высшего тира (у ветки без боевых — высший тир ветки):
+// доходит ли до неё место за партию.
+const DOCTRINE_TOP = Object.fromEntries(
+  DOCTRINES.map((d) => {
+    const own = Object.entries(data.technologies).filter(([, t]) => t.branch === d && !t.grantOnly);
+    const combat = own.filter(([, t]) => t.damageScope === d);
+    const pool = combat.length ? combat : own;
+    const top = Math.max(...pool.map(([, t]) => t.tier ?? 0));
+    return [d, pool.filter(([, t]) => (t.tier ?? 0) === top).map(([id]) => id)];
+  }),
+);
+// Чем мерить армию места: боевые корпуса, войска, челноки и мины.
+const ARMY_KEYS = [
+  'cruiser',
+  'heavy_cruiser',
+  'shuttle_carrier',
+  'tank',
+  'special_forces',
+  'heavy_infantry',
+  'militia',
+  'interceptor',
+  'bomber',
+  'heavy_striker',
+  'landing_shuttle',
+  'rocket_mine',
+];
 
 const STEP = 2 * HOUR; // the AI decision cadence (mirrors the netserver driver)
 
@@ -137,6 +172,10 @@ function runMatch(i) {
     { id: 'p2', name: 'Bot Two', faction: factions[1], start: starts[1], ai: true },
   ];
   let state = newGame({ seats, seed: `${BASE_SEED}-${i}` });
+  const doctrineOf = Object.fromEntries(seats.map((s) => [s.id, doctrineFor(state, s.id)]));
+  const techBySeat = Object.fromEntries(seats.map((s) => [s.id, []]));
+  const armyBySeat = Object.fromEntries(seats.map((s) => [s.id, new Map()]));
+  const armyBump = (seat, k, n) => armyBySeat[seat]?.set(k, (armyBySeat[seat].get(k) ?? 0) + n);
 
   // Юниты, которые матч РАЗДАЁТ на старте, а не строит. Без этого отчёт врал: `hero`
   // числился «мёртвым контентом» — притом что герой у каждого места стоит во флоте с
@@ -246,6 +285,7 @@ function runMatch(i) {
       if (e.type === 'unit.built') {
         const p = e.payload ?? {};
         usage.set(p.unit, (usage.get(p.unit) ?? 0) + (p.count ?? 1));
+        armyBump(p.owner, p.unit, p.count ?? 1);
         if (typeof p.troop === 'string') landersBuilt += p.count ?? 1;
         if ((p.modules ?? []).includes('repair_bay')) repairBaysBuilt += p.count ?? 1;
       } else if (e.type === 'shuttle.loaded') {
@@ -256,6 +296,7 @@ function runMatch(i) {
       } else if (e.type === 'technology.researched') {
         const p = e.payload ?? {};
         if (p.technology) techUsage.set(p.technology, (techUsage.get(p.technology) ?? 0) + 1);
+        if (p.technology) techBySeat[p.playerId]?.push({ id: p.technology, day: now / DAY });
       } else if (e.type === 'battle.resolved') {
         battles++;
         if ((e.payload ?? {}).phase === 'ground') groundBattles++;
@@ -283,6 +324,7 @@ function runMatch(i) {
         // сотнями поставленных мин.
         minesLaid++;
         usage.set('rocket_mine', (usage.get('rocket_mine') ?? 0) + 1);
+        armyBump((e.payload ?? {}).owner, 'rocket_mine', 1);
       } else if (e.type === 'rocketMine.launched') {
         missiles++;
         usage.set('missile', (usage.get('missile') ?? 0) + 1);
@@ -487,6 +529,9 @@ function runMatch(i) {
     usage,
     techUsage,
     seeded,
+    doctrineOf,
+    techBySeat,
+    armyBySeat,
   };
 }
 
@@ -496,6 +541,7 @@ const bump = (m, k, n = 1) => m.set(k, (m.get(k) ?? 0) + n);
 const winsBySlot = new Map();
 const winsByFaction = new Map();
 const winsByStart = new Map();
+const doctrineRows = {};
 const reasons = new Map();
 const usageTotal = new Map();
 const seededTotal = new Set();
@@ -706,6 +752,38 @@ for (let i = 0; i < N; i++) {
   for (const k of r.seeded) seededTotal.add(k);
   for (const [k, v] of r.usage) bump(usageTotal, k, v);
   for (const [k, v] of r.techUsage) bump(techTotal, k, v);
+  for (const [seat, d] of Object.entries(r.doctrineOf)) {
+    const row = (doctrineRows[d] ??= {
+      played: 0,
+      decided: 0,
+      wins: 0,
+      score: 0,
+      techs: 0,
+      top: 0,
+      topDay: [],
+      army: {},
+      vs: {},
+    });
+    row.played++;
+    row.score += r.finalScores[seat] ?? 0;
+    row.techs += r.techBySeat[seat].length;
+    for (const [k, v] of r.armyBySeat[seat]) row.army[k] = (row.army[k] ?? 0) + v;
+    const tops = r.techBySeat[seat].filter((t) => (DOCTRINE_TOP[d] ?? []).includes(t.id));
+    if (tops.length) {
+      row.top++;
+      row.topDay.push(Math.min(...tops.map((t) => t.day)));
+    }
+    if (r.winner !== null) {
+      row.decided++;
+      const foe = Object.keys(r.doctrineOf).find((s2) => s2 !== seat);
+      const vs = (row.vs[r.doctrineOf[foe]] ??= { w: 0, n: 0 });
+      vs.n++;
+      if (r.winner === seat) {
+        row.wins++;
+        vs.w++;
+      }
+    }
+  }
   if ((i + 1) % 10 === 0) process.stderr.write(`  … ${i + 1}/${N}\r`);
 }
 
@@ -1018,4 +1096,42 @@ console.log(
   ]
     .filter((line) => line !== null)
     .join('\n'),
+);
+
+// Доктрины (армия под ветку, 2026-10-08): победы из решённых партий, средний счёт, техов
+// за место, как часто и к какому дню место доходит до вершины своей ветки, и из чего
+// собрана его армия — сколько штук каждого рода оно строит за партию.
+const dpct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : '—');
+const doctrineSeen = [...DOCTRINES, 'none'].filter((d) => doctrineRows[d]);
+console.log(
+  [
+    '  доктрины   : ' +
+      doctrineSeen
+        .map((d) => {
+          const r = doctrineRows[d];
+          const topDay = r.topDay.length
+            ? (r.topDay.reduce((a, b) => a + b, 0) / r.topDay.length).toFixed(1)
+            : '—';
+          return `${d} ×${r.played} побед ${r.wins}/${r.decided} (${dpct(r.wins, r.decided)}) счёт ${(r.score / r.played).toFixed(0)} техов ${(r.techs / r.played).toFixed(1)} вершина ${dpct(r.top, r.played)} д${topDay}`;
+        })
+        .join(' · '),
+    ...doctrineSeen.map((d) => {
+      const r = doctrineRows[d];
+      const per = (k) => ((r.army[k] ?? 0) / r.played).toFixed(1);
+      return `  армия ${d.padEnd(8)}: ` + ARMY_KEYS.map((k) => `${k} ${per(k)}`).join(' ');
+    }),
+    '  доктрина×доктрина (победы строки): ' +
+      doctrineSeen
+        .map(
+          (d) =>
+            `${d}[` +
+            doctrineSeen
+              .map((e) => `${e} ${doctrineRows[d].vs[e]?.w ?? 0}/${doctrineRows[d].vs[e]?.n ?? 0}`)
+              .join(' ') +
+            ']',
+        )
+        .join(' '),
+    'SELFPLAY_DOCTRINE_JSON ' +
+      JSON.stringify({ doctrines: doctrineSeen, top: DOCTRINE_TOP, rows: doctrineRows }),
+  ].join('\n'),
 );
