@@ -585,13 +585,44 @@ export function orderBarHtml(
 
 /** The window chrome: title, close, the tabs, whichever pane is open and, under it, the
  *  order bar — outside the scrolling body, so it never leaves the screen. */
-export function yardBoxHtml(tab: YardTab, body: string, order = ''): string {
+export function yardBoxHtml(tab: YardTab, body: string, order = '', again = ''): string {
   const tabBtn = (k: YardTab, label: string): string =>
     `<button class="cn-tab${tab === k ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
   return (
-    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button class="cn-close">✕</button></div>` +
+    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b>${again}<button class="cn-close">✕</button></div>` +
     `<div class="cn-tabs">${YARD_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
     `<div id="constructorbody">${body}</div>${order}</div>`
+  );
+}
+
+/** Последний отправленный заказ окна: вкладка и черновик, каким он ушёл в ядро. */
+export interface LastOrder {
+  tab: YardTab;
+  draft: YardDraft;
+}
+
+/**
+ * Кнопка «Как в прошлый раз» в шапке окна (UIX-7.3): собирает последний заказ заново —
+ * вкладку, корпус, модули, число и мир. Пока окно и так стоит на этом заказе, кнопки нет:
+ * повторить его можно самой «Построить».
+ */
+export function repeatOrderHtml(last: LastOrder | null, tab: YardTab, draft: YardDraft): string {
+  if (!last) return '';
+  const d = last.draft;
+  const same =
+    last.tab === tab &&
+    d.hull === draft.hull &&
+    d.count === draft.count &&
+    d.planet === draft.planet &&
+    d.troop === draft.troop &&
+    d.modules.length === draft.modules.length &&
+    d.modules.every((id, i) => id === draft.modules[i]);
+  if (same) return '';
+  const what = `${esc(displayUnit(d.hull))} ×${d.count}`;
+  const label = `${t('yard.again')}: ${what}`;
+  return (
+    `<button class="cn-again btn-quiet" data-cnagain aria-label="${label}" title="${label}">` +
+    `<span aria-hidden="true">↻</span> <span class="cn-ag-k">${t('yard.again')}:</span> ${what}</button>`
   );
 }
 
@@ -644,6 +675,8 @@ export function initShipyard(host: YardHost): {
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
   /** Вкладка последней отрисовки: прокрутка переживает перерисовку только внутри вкладки. */
   let paintedTab: YardTab | null = null;
+  /** Последний заказ за эту партию — для «Как в прошлый раз». */
+  let last: LastOrder | null = null;
 
   const hullsOf = (): string[] => hullsOfTab(tab);
   /** Бойцы десантного челнока для черновика (SHU-5.2); `undefined` — корпус не десантный. */
@@ -681,7 +714,7 @@ export function initShipyard(host: YardHost): {
     // Перерисовка не сбрасывает прокрутку: поставил модуль внизу списка — там и остался.
     const keep =
       paintedTab === tab ? (host.root().querySelector('#constructorbody')?.scrollTop ?? 0) : 0;
-    host.root().innerHTML = yardBoxHtml(tab, body, order);
+    host.root().innerHTML = yardBoxHtml(tab, body, order, repeatOrderHtml(last, tab, draft));
     const scroller = host.root().querySelector('#constructorbody');
     if (scroller && keep) scroller.scrollTop = keep;
     paintedTab = tab;
@@ -764,6 +797,12 @@ export function initShipyard(host: YardHost): {
       close();
       return;
     }
+    if (last && tg.closest('[data-cnagain]')) {
+      tab = last.tab;
+      draft = { ...last.draft };
+      paint();
+      return;
+    }
     const nextTab = (tg.closest('.cn-tab') as HTMLElement | null)?.dataset.ctab;
     if (nextTab) {
       tab = nextTab as YardTab;
@@ -832,6 +871,7 @@ export function initShipyard(host: YardHost): {
           buildShip(host.me(), draft.planet, draft.hull, draft.count, draft.modules, troop),
         );
         host.note(t('yard.ordered', { n: String(draft.count), hull: displayUnit(draft.hull) }));
+        last = { tab, draft: { ...draft, slot: undefined, unfit: false } };
         paint(); // очередь мира и нехватка в полосе — уже с этим заказом
       }
     }

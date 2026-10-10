@@ -2149,6 +2149,7 @@ export const en: Record<string, string> = {
 
   // --- yard — «Верфь»: корпус и модули, конструктор дивизий, стоимость и заказ.
   'win.build.title': 'Production',
+  'yard.again': 'Same as last time',
   'yard.arsenal.note':
     '⚡ Live arsenal: anything bought during the match shows up here right away, but it only starts working once you build it — construction and logistics, not instant.',
   'yard.build-time': 'Build time',
