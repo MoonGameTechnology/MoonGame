@@ -1,0 +1,143 @@
+import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import https from 'node:https';
+import http from 'node:http';
+import { once } from 'node:events';
+import { WebSocket } from 'ws';
+import { createInitialState, createKernel, parseGameData } from '@void/shared-core';
+import { MatchRoom } from './matchRoom';
+import { createMultiplayerServer } from './wsServer';
+import { hmacSecret, signJoinToken, verifyJoinToken } from './auth';
+import { randomBytes } from 'node:crypto';
+import Fastify from 'fastify';
+import { registerAuthApi } from './authApi';
+import { MemoryUserStore } from './store';
+
+describe('encryption audit: real native HTTPS/WSS with certificate verification', () => {
+  let dir: string;
+  let ca: Buffer;
+  let server: ReturnType<typeof createMultiplayerServer>;
+  let url: string;
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), 'void-crypto-audit-'));
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+      '-keyout', join(dir, 'key.pem'), '-out', join(dir, 'cert.pem'), '-days', '1',
+      '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1'], { stdio: 'ignore' });
+    ca = readFileSync(join(dir, 'cert.pem'));
+    const initial = createInitialState({ seed: 'crypto-audit', version: { data: 'test', manifest: 'test' } });
+    const room = new MatchRoom({ id: 'crypto-audit',
+      initialState: { ...initial, players: { p1: { id: 'p1', name: 'p1', faction: 'p1', status: 'active', resources: {} } } },
+      kernel: createKernel([]), now: () => 10,
+      data: parseGameData({ version: 'test', resources: ['marker'], units: {}, factions: {}, buildings: {}, events: {}, sectors: {}, planetTypes: {} }) });
+    server = createMultiplayerServer({ room, tls: { key: readFileSync(join(dir, 'key.pem')), cert: ca } });
+    url = await server.listen();
+  });
+  afterAll(async () => { if (server) await server.close(); if (dir) rmSync(dir, { recursive: true, force: true }); });
+  function request(options: https.RequestOptions = {}) {
+    return new Promise<{ protocol: string | null; cipher: string; status: number | undefined }>((resolve, reject) => {
+      const request = https.get(new URL('/health', url.replace('wss:', 'https:')), options, response => {
+        const socket = response.socket as import('node:tls').TLSSocket;
+        const result = { protocol: socket.getProtocol(), cipher: socket.getCipher().standardName, status: response.statusCode };
+        response.resume(); response.once('end', () => resolve(result));
+      });
+      request.on('error', reject);
+    });
+  }
+  it('TLS 1.3 negotiates AEAD with a trusted SAN certificate', async () => {
+    const result = await request({ ca, minVersion: 'TLSv1.3', maxVersion: 'TLSv1.3' });
+    expect(result.status).toBe(200); expect(result.protocol).toBe('TLSv1.3');
+    expect(result.cipher).toMatch(/AES_.*_GCM|CHACHA20_POLY1305/);
+  });
+  it('audit finding: current native configuration also accepts TLS 1.2', async () => {
+    const result = await request({ ca, minVersion: 'TLSv1.2', maxVersion: 'TLSv1.2' });
+    expect(result.protocol).toBe('TLSv1.2'); expect(result.cipher).toMatch(/ECDHE_.*(?:GCM|CHACHA20)/);
+  });
+  for (const version of ['TLSv1', 'TLSv1.1'] as const) {
+    it(`rejects legacy ${version} even when the client permits legacy ciphers`, async () => {
+      await expect(request({ ca, minVersion: version, maxVersion: version, ciphers: 'DEFAULT:@SECLEVEL=0' })).rejects.toThrow(/protocol version|unsupported protocol/i);
+    });
+  }
+  it('records whether TLS 1.2 permits a CBC-only cipher offer', async () => {
+    try {
+      const result = await request({ ca, minVersion: 'TLSv1.2', maxVersion: 'TLSv1.2', ciphers: 'ECDHE-RSA-AES128-SHA256' });
+      expect(result.cipher).toBe('TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256');
+      process.stdout.write('CRYPTO_AUDIT CBC_ACCEPTED '+result.cipher+'\n');
+    } catch (error) {
+      expect(String(error)).toMatch(/handshake failure|no shared cipher/i);
+      process.stdout.write('CRYPTO_AUDIT CBC_REJECTED\n');
+    }
+  });
+  it('rejects an untrusted certificate', async () => {
+    await expect(request()).rejects.toThrow(/self.signed|certificate/i);
+  });
+  it('rejects a wrong hostname even with the issuing CA trusted', async () => {
+    await expect(request({ ca, servername: 'wrong.invalid' })).rejects.toThrow(/altname|hostname|certificate/i);
+  });
+  it('does not accept plaintext HTTP on the TLS listener', async () => {
+    await expect(new Promise((resolve, reject) => {
+      const r = http.get(new URL('/health', url.replace('wss:', 'http:')), response => { response.resume(); resolve(response.statusCode); });
+      r.on('error', reject);
+    })).rejects.toThrow();
+  });
+  it('WSS joins with full CA and hostname verification enabled', async () => {
+    const ws = new WebSocket(`${url}?player=p1`, { ca });
+    try {
+      const welcome = once(ws, 'message');
+      await once(ws, 'open');
+      expect(JSON.parse((await welcome)[0].toString())).toMatchObject({ type: 'welcome', playerId: 'p1' });
+    } finally { ws.close(); }
+  });
+  it('WSS rejects an untrusted CA without opening the socket', async () => {
+    const ws = new WebSocket(`${url}?player=p1`);
+    const error = await once(ws, 'error');
+    expect(String(error[0])).toMatch(/self.signed|certificate/i);
+  });
+});
+
+describe('encryption audit: JWT integrity and actual bearer semantics', () => {
+  const key = hmacSecret(randomBytes(32).toString('hex'));
+  const verify = { key, algorithms: ['HS256'], issuer: 'audit', audience: 'match' };
+  const sign = { key, algorithm: 'HS256', issuer: 'audit', audience: 'match' };
+  const encode = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
+  const token = () => signJoinToken({ matchId: 'audit-room', playerId: 'p1' }, sign, { ttlSeconds: 120 });
+  it('rejects an unsigned alg=none token', async () => {
+    const t = await token(); const [, payload] = t.split('.');
+    expect(await verifyJoinToken(`${encode({ alg: 'none', typ: 'join+jwt' })}.${payload}.`, verify)).toEqual({ ok: false, code: 'E_AUTH' });
+  });
+  it('rejects a modified player claim with the original signature', async () => {
+    const t = await token(); const [head, payload, signature] = t.split('.');
+    const changed = { ...JSON.parse(Buffer.from(payload!, 'base64url').toString()), playerId: 'p2' };
+    expect(await verifyJoinToken(`${head}.${encode(changed)}.${signature}`, verify)).toEqual({ ok: false, code: 'E_AUTH' });
+  });
+  it('records that JWT payloads are readable: signatures do not encrypt claims', async () => {
+    const t = await token();
+    expect(JSON.parse(Buffer.from(t.split('.')[1]!, 'base64url').toString())).toMatchObject({ playerId: 'p1', matchId: 'audit-room' });
+  });
+  it('records that a valid join capability is reusable until expiry, not single-use', async () => {
+    const t = await token();
+    expect((await verifyJoinToken(t, verify)).ok).toBe(true);
+    expect((await verifyJoinToken(t, verify)).ok).toBe(true);
+  });
+});
+
+describe('encryption audit: default recovery logger and production debug override', () => {
+  for (const logBody of ['0', '1']) {
+    it(`records reset-token logging policy with PROD=1, MAILER_LOG_BODY=${logBody}`, async () => {
+      vi.stubEnv('PROD', '1'); vi.stubEnv('MAILER_LOG_BODY', logBody);
+      const sink = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      const app = Fastify();
+      try {
+        registerAuthApi(app, { users: new MemoryUserStore(), signSession: async () => 'audit-session-placeholder',
+          signReset: async () => 'audit-reset-bearer-placeholder', verifyReset: async () => null,
+          resetBaseUrl: 'https://audit.invalid', scryptParams: { N: 1024, r: 8, p: 1 } });
+        expect((await app.inject({ method: 'POST', url: '/auth/register', payload: { login: 'audit', password: 'AuditPassword-2026', email: 'audit@example.invalid' } })).statusCode).toBe(201);
+        expect((await app.inject({ method: 'POST', url: '/auth/recover', payload: { email: 'audit@example.invalid' } })).statusCode).toBe(200);
+        const logged = sink.mock.calls.map(args => String(args[0])).join('');
+        expect(logged.includes('audit-reset-bearer-placeholder')).toBe(logBody === '1');
+      } finally { await app.close(); sink.mockRestore(); vi.unstubAllEnvs(); }
+    });
+  }
+});

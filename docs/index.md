@@ -143,6 +143,7 @@
 | `docs/reviews/2026-06-27-multiplayer-readiness.md` | Готовность к мультиплееру — аудит | Артефакт-ревью. Срез по состоянию origin/main @ e3dff4b (после PR #28 offline- |
 | `docs/reviews/2026-09-17-sector-zero-observations.md` | Void Dominion: Sector Zero — наблюдения, замечания и предложения | Дата: 17 сентября 2026 года. Статус: Draft / ревью для обсуждения. |
 | `docs/reviews/2026-09-24-sector-zero-readiness.md` | Sector Zero — готовность к релизу на Яндекс Играх | Дата: 24 сентября 2026 года. Срез: main @ b9a4d5b плюс открытые PR: |
+| `docs/reviews/2026-10-10-encryption-protocols.md` | Шифрование и протоколы — аудит 2026-10-10 | Проверены обе игры: Void Dominion и Averion: Sector Zero, общий сервер, shipping entry |
 | `docs/reviews/2026-10-10-zta.md` | ZTA и защита в глубину — проверка 2026-10-10 | Проверен свежий main 87af555fcee9fa027eff4b1b23bf8a7b89b31658 и подготовленные |
 | `docs/reviews/README.md` | Журнал ревью и аудитов | Постоянная папка, куда складываются находки роли «поиск багов / стандартизация / |
 
