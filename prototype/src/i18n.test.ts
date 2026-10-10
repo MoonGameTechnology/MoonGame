@@ -20,6 +20,8 @@ import { PHONE_MORE, PHONE_TABS } from '../../decisions/phoneNav';
 const TOUR_DEPS_STUB = {
   mouse: () => true,
   homeOpened: () => false,
+  cardLayout: () => false,
+  panelOpen: () => false,
   shipsTabOpen: () => false,
   hasFleet: () => false,
   capturedWorld: () => false,

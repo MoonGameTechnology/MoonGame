@@ -24,15 +24,20 @@
  * (localization/runtime.ts). Predicates come from the host so this stays pure
  * and unit-testable.
  */
-import { navHintKey } from './navHint';
+import { mapGestures } from '../../decisions/mapGestures';
 import type { SpotlightStep } from './spotlight';
 
 export interface FirstMatchDeps {
-  /** ПК-раскладка: настоящая мышь и широкий экран (`pcUi`) — от неё зависит текст про
-   *  управление картой (`navHint.ts`, правило 1). */
+  /** ПК-раскладка: настоящая мышь и широкий экран (`pcUi`) — от неё зависят жесты карты
+   *  на шаге `nav` (`decisions/mapGestures.ts`, правило 1). */
   mouse: () => boolean;
   /** True once the player has tapped their homeworld and its panel is open. */
   homeOpened: () => boolean;
+  /** Мир открывается карточкой (телефонная раскладка): постройки в ней спрятаны под
+   *  «Сведения». Читается один раз, когда тур собирается. */
+  cardLayout: () => boolean;
+  /** Карточка мира развёрнута «Сведениями». */
+  panelOpen: () => boolean;
   /** True while the world panel shows its «Корабли» tab (where ships are ordered). */
   shipsTabOpen: () => boolean;
   /** True once the player has raised a mobile fleet (a built ship auto-rallies to orbit). */
@@ -53,13 +58,17 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       advance: { on: 'tap' },
     },
     {
-      // Как вообще смотреть на мир: колесо/щипок, перетаскивание, двойной тап. Без
-      // проверок и без запрета экрана — эту подсказку пробуют руками (`navHint.ts`).
+      // Как вообще смотреть на мир (ONB-11) — шаг стоит ПЕРВЫМ, до всех дел: без него
+      // новичок не знает даже, что карту можно приблизить. Жесты показаны анимацией
+      // (UIX-8.1). Проверок нет, шаг закрывает «Далее»: камера — не состояние игры, и шаг
+      // «покрути колесо, я проверю» держал бы игрока там, где жест не распознался. Экран
+      // не заперт — жесты пробуют, пока подсказка на виду (`tourGate.ts`, правило 5).
       id: 'nav',
       target: null,
-      copy: navHintKey(deps.mouse()),
+      copy: 'onb.tour.first.nav',
       advance: { on: 'tap' },
       hands: true,
+      gestures: mapGestures(deps.mouse()),
     },
     {
       id: 'home',
@@ -68,6 +77,22 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       advance: { on: 'state', when: deps.homeOpened },
       placement: 'top',
     },
+    // На телефоне мир открывается карточкой, а постройки — под «Сведениями». Без этого
+    // шага цели следующего (строки Металлодобычи) на экране не было: подсказка звала
+    // нажать строку, которую игрок не видел, и подсветке нечего было обвести. На ПК
+    // панель открыта целиком сразу — там шага нет, и счёт шагов не прыгает через номер.
+    ...(deps.cardLayout()
+      ? [
+          {
+            id: 'details',
+            target: '#mobile-sheet .mobile-quick [data-mobile="details"]',
+            copy: 'onb.tour.first.details',
+            advance: { on: 'state', when: deps.panelOpen },
+            placement: 'top',
+            gate: true,
+          } satisfies SpotlightStep,
+        ]
+      : []),
     {
       // The homeworld starts with a level-1 Mine already built (matchSetup.ts) — a
       // fresh `building.construct` order for it is never possible, so the first

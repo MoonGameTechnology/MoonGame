@@ -686,6 +686,59 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #spotlight .sl-arrow[data-dir=right]{right:-7px;top:calc(50% - 6px);border-left:none;border-bottom:none;}
 #spotlight .sl-count{font-size:var(--fs-caption);font-weight:700;color:var(--cyan);margin-bottom:5px;}
 #spotlight .sl-copy{font-size:14px;line-height:1.42;color:var(--ink);}
+/* UIX-8.1: жесты анимацией вместо абзаца. Плитки (src/spotlightDom.ts, набор —
+   decisions/mapGestures.ts): рисунок жеста, имя, что он делает. Палец и курсор — янтарные,
+   как кольцо цели: это тот же призыв «сделай так». Рисунок без движения тоже читается —
+   при «уменьшить движение» анимация стоит на базовом кадре. */
+#spotlight .sl-gest{display:none;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;}
+#spotlight .sl-g{margin:0;padding:6px 6px 7px;border:1px solid var(--line);border-radius:8px;
+  background:rgba(255,255,255,.03);text-align:center;}
+#spotlight .sl-g svg{display:block;width:64px;height:40px;margin:0 auto 3px;overflow:visible;}
+#spotlight .sl-g figcaption{display:flex;flex-direction:column;gap:1px;line-height:1.25;}
+#spotlight .sl-g b{font-size:var(--fs-body);color:var(--ink);font-weight:600;}
+#spotlight .sl-g span{font-size:var(--fs-caption);color:var(--dim);}
+#spotlight .sl-g .f,#spotlight .sl-press .finger{fill:var(--amber);fill-opacity:.85;}
+#spotlight .sl-g .cur,#spotlight .sl-press .cur{fill:var(--ink);stroke:#04121a;stroke-width:1;stroke-linejoin:round;}
+#spotlight .sl-g .tr{fill:none;stroke:var(--cyan);stroke-width:2;stroke-linecap:round;stroke-dasharray:3 3;opacity:.55;}
+#spotlight .sl-g .rp,#spotlight .sl-press .rp{fill:none;stroke:var(--amber);stroke-width:2;opacity:.45;
+  transform-box:fill-box;transform-origin:center;}
+#spotlight .sl-g .r2{transform:scale(1.6);opacity:.25;}
+#spotlight .sl-g .ring{fill:none;stroke:var(--amber);stroke-width:2.5;stroke-dasharray:100;stroke-dashoffset:25;
+  transform-box:fill-box;transform-origin:center;transform:rotate(-90deg);}
+#spotlight .sl-g .body{fill:none;stroke:var(--ink);stroke-width:2;opacity:.8;}
+#spotlight .sl-g .box{fill:rgba(60,200,230,.08);stroke:var(--cyan);stroke-width:1.5;stroke-dasharray:4 3;
+  transform-box:fill-box;transform-origin:0 0;}
+/* Середина жеста — на 10 px правее и ниже середины цели: палец не закрывает подпись кнопки. */
+#spotlight .sl-press{position:fixed;display:none;width:48px;height:48px;margin:-14px 0 0 -14px;pointer-events:none;}
+#spotlight .sl-press svg{width:48px;height:48px;overflow:visible;}
+#spotlight .sl-press .finger{fill-opacity:.55;stroke:#fff3d6;stroke-width:1.5;transform-box:fill-box;transform-origin:center;}
+#spotlight .sl-press .cur{display:none;}
+@media (hover:hover) and (pointer:fine){
+  #spotlight .sl-press .finger{display:none;}
+  #spotlight .sl-press .cur{display:block;}}
+@media (prefers-reduced-motion:no-preference){
+  #spotlight .sl-g .fa{animation:g-pinch-a 1.8s ease-in-out infinite;}
+  #spotlight .sl-g .fb{animation:g-pinch-b 1.8s ease-in-out infinite;}
+  #spotlight .sl-g[data-anim=swipe] .m,#spotlight .sl-g[data-anim=drag] .m{animation:g-slide 1.8s ease-in-out infinite;}
+  #spotlight .sl-g .r1,#spotlight .sl-g .r2{animation:g-ripple 1.6s ease-out infinite;}
+  #spotlight .sl-g .r2{animation-delay:.22s;}
+  #spotlight .sl-g .ring{animation:g-hold 1.8s linear infinite;}
+  #spotlight .sl-g .wh{animation:g-wheel 1.2s ease-in-out infinite;}
+  #spotlight .sl-g .box{animation:g-box 2s ease-in-out infinite;}
+  #spotlight .sl-g[data-anim=shift-box] .m{animation:g-box-cur 2s ease-in-out infinite;}
+  #spotlight .sl-press .finger,#spotlight .sl-press .cur{animation:g-press 1.4s ease-in-out infinite;}
+  #spotlight .sl-press .rp{animation:g-press-rp 1.4s ease-out infinite;}}
+@keyframes g-pinch-a{0%,15%,100%{transform:translate(0,0);}55%,70%{transform:translate(-9px,5px);}}
+@keyframes g-pinch-b{0%,15%,100%{transform:translate(0,0);}55%,70%{transform:translate(9px,-5px);}}
+@keyframes g-slide{0%,10%{transform:translateX(0);opacity:1;}70%{transform:translateX(32px);opacity:1;}
+  85%{transform:translateX(32px);opacity:0;}100%{transform:translateX(0);opacity:0;}}
+@keyframes g-ripple{0%{transform:scale(.7);opacity:.8;}45%,100%{transform:scale(2.1);opacity:0;}}
+@keyframes g-hold{0%{stroke-dashoffset:100;opacity:1;}65%{stroke-dashoffset:0;opacity:1;}100%{stroke-dashoffset:0;opacity:0;}}
+@keyframes g-wheel{0%,100%{transform:translateY(0);}50%{transform:translateY(5px);}}
+@keyframes g-box{0%,10%{transform:scale(.05);opacity:0;}20%{opacity:1;}70%,90%{transform:scale(1);opacity:1;}100%{transform:scale(1);opacity:0;}}
+@keyframes g-box-cur{0%,10%{transform:translate(0,0);}70%,90%{transform:translate(34px,24px);}100%{transform:translate(34px,24px);opacity:0;}}
+@keyframes g-press{0%,100%{transform:scale(1);}30%{transform:scale(.82);}45%{transform:scale(1);}}
+@keyframes g-press-rp{0%,28%{transform:scale(.6);opacity:0;}32%{opacity:.85;}80%,100%{transform:scale(2.3);opacity:0;}}
 #spotlight .sl-btns{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;}
 #spotlight .sl-skip{background:none;border:none;color:var(--dim);font-size:var(--fs-body);cursor:pointer;padding:4px 2px;}
 #spotlight .sl-skip:hover{color:var(--ink);text-decoration:underline;}

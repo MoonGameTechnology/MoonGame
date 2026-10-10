@@ -2671,6 +2671,8 @@ function startGuidedMatch(): void {
       buildFirstMatchTour({
         mouse: pcUi,
         homeOpened: () => selPlanet !== null && s.planets[selPlanet]?.owner === ME,
+        cardLayout: () => MOBILE,
+        panelOpen: () => mobileHud.expanded(),
         shipsTabOpen: () => planetTab === 'ships',
         hasFleet: () => myFleetCount() > startFleets,
         capturedWorld: () => myWorldCount() > startWorlds,
