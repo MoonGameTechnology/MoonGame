@@ -33,6 +33,7 @@ import {
   landerCost,
   landerTroopCandidates,
   orderableTroops,
+  orderHours,
 } from '../../decisions/landerTroops';
 import { canBuildHere } from '../../decisions/buildGate';
 import { feedsOnBiomass } from '../../packages/shared-core/src/util/infestation';
@@ -385,7 +386,7 @@ function landerRowHtml(
   const pick = troops
     .map((g) => {
       const short = probe(order(g)) !== null; // E_INSUFFICIENT: цена видна, кнопка серая
-      const hours = Math.max(def.buildTimeHours, data.units[g]?.buildTimeHours ?? 0);
+      const hours = orderHours(data, id, g);
       return (
         `<div class="bw-foot"><button class="bw-take btn-main" data-unit-go="${esc(id)}" data-unit-troop="${esc(g)}"${short ? ' disabled' : ''}>▷ ${unitIcon(g, data)} ${esc(displayUnit(g))}</button>` +
         `<span>${cost(landerCost(data, id, g), res)}</span><span class="bw-dur">${fmtDur(hours)}</span></div>`

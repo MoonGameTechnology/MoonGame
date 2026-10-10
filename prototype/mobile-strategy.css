@@ -164,15 +164,16 @@ body.mobile-ui #constructor .cn-plan {
   flex-basis: 100%;
   width: 100%;
 }
-body.mobile-ui #constructor .cn-row2 {
-  gap: 10px;
+/* Полоса заказа на телефоне — три строки: цена со сроком, мир с очередью, число и кнопка. */
+body.mobile-ui #constructor .cn-order {
+  gap: 8px;
+  padding: 8px 10px 10px;
 }
-/* Липкая кнопка едет над списком: под полупрозрачной заливкой .btn-main — плотная подложка
-   окна, иначе сквозь неё читаются строки. */
-body.mobile-ui #constructor .cn-build {
-  position: sticky;
-  bottom: 0;
-  background-color: var(--sf-panel-from);
+body.mobile-ui #constructor .cn-order > * {
+  flex-basis: 100%;
+}
+body.mobile-ui #constructor .cn-otime {
+  margin-left: auto;
 }
 body.mobile-ui #buildwin :is(.bw-row, .bw-top) {
   min-width: 0;

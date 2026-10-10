@@ -53,3 +53,10 @@ export function landerCost(data: GameData, unit: string, troop: string): Record<
   for (const [r, n] of Object.entries(data.units[troop]?.cost ?? {})) out[r] = (out[r] ?? 0) + n;
   return out;
 }
+
+/** Срок ОДНОГО заказа юнита в часах, как считает ядро (`orderSpec`): у десантного челнока —
+ *  дольший из челнока и бойца. Число машин в заказе срок не меняет: партия строится разом. */
+export function orderHours(data: GameData, unit: string, troop?: string): number {
+  const own = data.units[unit]?.buildTimeHours ?? 0;
+  return troop === undefined ? own : Math.max(own, data.units[troop]?.buildTimeHours ?? 0);
+}
