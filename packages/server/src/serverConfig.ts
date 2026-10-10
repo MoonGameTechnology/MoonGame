@@ -57,11 +57,23 @@ const RESET_TOKEN_TTL_SEC = 15 * 60;
 
 export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
   const authSecret = env.AUTH_JWT_SECRET;
+  const previousSecret = env.AUTH_JWT_PREVIOUS_SECRET;
+  const until = env.AUTH_JWT_PREVIOUS_UNTIL;
+  let rotation: Pick<JoinTokenVerifyConfig, 'previousKey' | 'previousKeyUntilSec'> = {};
+  if (previousSecret || until) {
+    const deadline = Number(until);
+    if (!authSecret || !previousSecret || previousSecret.length < 32 || !until ||
+        !/^[0-9]+$/.test(until) || !Number.isSafeInteger(deadline) || deadline <= 0 ||
+        deadline > Math.floor(Date.now() / 1000) + 7 * 24 * 3600 || previousSecret === authSecret) {
+      throw new Error('E_AUTH_ROTATION_CONFIG');
+    }
+    rotation = { previousKey: hmacSecret(previousSecret), previousKeyUntilSec: deadline };
+  }
   const issuer = env.AUTH_ISSUER ?? 'void-dominion';
   const audience = env.AUTH_AUDIENCE ?? 'match';
 
   const auth: JoinTokenVerifyConfig | undefined = authSecret
-    ? { key: hmacSecret(authSecret), algorithms: ['HS256'], issuer, audience, maxTokenAgeSec: JOIN_TOKEN_TTL_SEC }
+    ? { ...rotation, key: hmacSecret(authSecret), algorithms: ['HS256'], issuer, audience, maxTokenAgeSec: JOIN_TOKEN_TTL_SEC }
     : undefined;
   const signToken = authSecret
     ? (matchId: string, playerId: string, accountId?: string): Promise<string> =>
@@ -87,6 +99,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
   const verifySession = authSecret
     ? (token: string): Promise<SessionTokenResult> =>
         verifySessionToken(token, {
+          ...rotation,
           key: hmacSecret(authSecret),
           algorithms: ['HS256'],
           issuer,
@@ -109,6 +122,7 @@ export function configFromEnv(env: NodeJS.ProcessEnv): ServerConfig {
   const verifyReset = authSecret
     ? async (token: string): Promise<{ accountId: string; pwfp: string } | null> => {
         const r = await verifyResetToken(token, {
+          ...rotation,
           key: hmacSecret(authSecret),
           algorithms: ['HS256'],
           issuer,

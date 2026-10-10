@@ -1,5 +1,5 @@
 import type { PlayerId } from '@void/shared-core';
-import { jwtVerify, SignJWT, type CryptoKey, type JWTPayload, type KeyObject } from 'jose';
+import { jwtVerify, SignJWT, type CryptoKey, type JWTPayload, type KeyObject, type JWTVerifyOptions } from 'jose';
 
 /**
  * SE-2.1 — the trust anchor. A join token is a short-lived, match-scoped CAPABILITY
@@ -32,6 +32,21 @@ export interface JoinTokenVerifyConfig {
    *  regardless of the minting side's TTL — a defence-in-depth bound on a leaked token's
    *  window. Absent ⇒ replay is bounded only by `exp`. */
   maxTokenAgeSec?: number;
+  /** Previous signing key: verification only, with an absolute retirement time. */
+  previousKey?: VerifyKey;
+  previousKeyUntilSec?: number;
+}
+
+async function verifyWithRotation(token: string, config: JoinTokenVerifyConfig, options: JWTVerifyOptions) {
+  try {
+    return await jwtVerify(token, config.key, options);
+  } catch (err) {
+    if (!config.previousKey || !config.previousKeyUntilSec || Date.now() / 1000 >= config.previousKeyUntilSec) throw err;
+    const result = await jwtVerify(token, config.previousKey, options);
+    // Do not admit an old key if it expired while verification was in flight.
+    if (Date.now() / 1000 >= config.previousKeyUntilSec) throw new Error('E_AUTH', { cause: err });
+    return result;
+  }
 }
 
 /** JWT `typ` header pinned on every join token: verify rejects any token without it, so a
@@ -57,7 +72,7 @@ export async function verifyJoinToken(
   config: JoinTokenVerifyConfig,
 ): Promise<JoinTokenResult> {
   try {
-    const { payload } = await jwtVerify(token, config.key, {
+    const { payload } = await verifyWithRotation(token, config, {
       algorithms: config.algorithms, // pinned allowlist — rejects `none` / cross-alg
       issuer: config.issuer,
       audience: config.audience,
@@ -148,7 +163,7 @@ export async function verifySessionToken(
   config: JoinTokenVerifyConfig,
 ): Promise<SessionTokenResult> {
   try {
-    const { payload } = await jwtVerify(token, config.key, {
+    const { payload } = await verifyWithRotation(token, config, {
       algorithms: config.algorithms,
       issuer: config.issuer,
       audience: config.audience,
@@ -218,7 +233,7 @@ export async function verifyResetToken(
   config: JoinTokenVerifyConfig,
 ): Promise<ResetTokenResult> {
   try {
-    const { payload } = await jwtVerify(token, config.key, {
+    const { payload } = await verifyWithRotation(token, config, {
       algorithms: config.algorithms,
       issuer: config.issuer,
       audience: config.audience,

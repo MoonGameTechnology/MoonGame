@@ -1,3 +1,4 @@
+import type { SecurityAudit } from './securityAudit';
 import { playablePlayerIds } from '@void/shared-core';
 import { seatConfirmAction } from './joinSeat';
 import { readFileSync } from 'node:fs';
@@ -16,6 +17,7 @@ import { detach } from './detach';
 import { apiSecurityHeaders, inlineHashes, securityHeaders } from './securityHeaders';
 
 export interface MultiplayerServerOptions {
+  securityAudit?: SecurityAudit;
   /** Single-match shortcut. Exactly one of `room` / `registry` must be given; `room`
    *  is sugar for a one-entry registry (backward-compatible with every existing caller). */
   room?: MatchRoom;
@@ -265,6 +267,16 @@ export function createMultiplayerServer(
     ...(options.tls ? { https: options.tls } : {}),
   });
 
+  app.addHook('onResponse', async (request, reply) => {
+    const audit = options.securityAudit;
+    if (!audit) return;
+    if (reply.statusCode === 429) audit.record('rate.limit', 'E_RATE_LIMIT');
+    else if (reply.statusCode === 401 || reply.statusCode === 403) audit.record('auth.reject', 'E_AUTH');
+    else if ([200, 201].includes(reply.statusCode) && ['/auth/login', '/auth/register', '/auth/reset'].includes(request.routeOptions.url ?? '')) {
+      audit.record(request.routeOptions.url === '/auth/reset' ? 'auth.change' : 'auth.success');
+    }
+  });
+
   // Fail-secure (invariant #4): a route handler that throws/rejects (e.g. a store fault in
   // the match API) must return a stable code with NO internal detail — Fastify's default
   // handler would echo err.message on the wire. The detail stays in the logs.
@@ -417,6 +429,10 @@ export function createMultiplayerServer(
   const accountStore = options.accountStore;
   const auth = options.auth;
   app.server.on('upgrade', (request, socket, head) => {
+    const refuseUpgrade = (status: number): void => {
+      if (status === 401 || status === 403) options.securityAudit?.record('ws.reject', 'E_AUTH');
+      rejectUpgrade(socket, status);
+    };
     // Node's http server takes its own 'error' listener off the socket before handing it
     // over, and ws adds one only in `handleUpgrade`. A peer that resets the connection while
     // the handshake below awaits (the join token, the account store, a match loading) would
@@ -466,13 +482,13 @@ export function createMultiplayerServer(
               'Проверьте, что прокси терминирует TLS и ставит X-Forwarded-Proto, а plain-порт ' +
               'сервера не выставлен наружу.\n',
           );
-          rejectUpgrade(socket, 403);
+          refuseUpgrade(403);
           return;
         }
         // Origin allowlist (F-06): reject a cross-site upgrade up front. A missing Origin
         // (a non-browser client) is not on any allowlist, so it is refused when configured.
         if (allowedOrigins && !allowedOrigins.includes(request.headers.origin ?? '')) {
-          rejectUpgrade(socket, 403);
+          refuseUpgrade(403);
           return;
         }
         const url = new URL(request.url ?? '/', baseUrl(request));
@@ -524,16 +540,16 @@ export function createMultiplayerServer(
           // `?token=` (fully browser-settable on the WS URL, unlike request headers).
           const token = url.searchParams.get('token');
           if (!token) {
-            rejectUpgrade(socket, 401);
+            refuseUpgrade(401);
             return;
           }
           const verified = await verifyJoinToken(token, auth);
           if (!verified.ok) {
-            rejectUpgrade(socket, 401); // bad/expired/forged — no reason leaked
+            refuseUpgrade(401); // bad/expired/forged — no reason leaked
             return;
           }
           if (verified.claim.matchId !== matchId) {
-            rejectUpgrade(socket, 403); // a token for a different match
+            refuseUpgrade(403); // a token for a different match
             return;
           }
           playerId = verified.claim.playerId;
@@ -545,7 +561,7 @@ export function createMultiplayerServer(
           // (the same way `auth` refuses both dev handshakes).
           const nick = url.searchParams.get('nick');
           if (!nick || !accountStore) {
-            rejectUpgrade(socket, 401);
+            refuseUpgrade(401);
             return;
           }
           // Entry window (SES-2.3): a nick that does NOT already hold a seat is a
@@ -575,17 +591,17 @@ export function createMultiplayerServer(
             const ticket = randomBytes(24).toString('base64url');
             const winner = await accountStore.bindSeatTicket(room.id, nick, hashTicket(ticket));
             if (winner === null) {
-              rejectUpgrade(socket, 401); // seat vanished under us — fail-secure
+              refuseUpgrade(401); // seat vanished under us — fail-secure
               return;
             }
             if (winner === hashTicket(ticket)) {
               mintedTicket = ticket; // deliver once in welcome — the client stores it
             } else if (!ticketMatches(presented, winner)) {
-              rejectUpgrade(socket, 401);
+              refuseUpgrade(401);
               return;
             }
           } else if (!ticketMatches(presented, stored)) {
-            rejectUpgrade(socket, 401); // locked seat, no/wrong ticket — no detail leaked
+            refuseUpgrade(401); // locked seat, no/wrong ticket — no detail leaked
             return;
           }
           verifiedIdentity = true; // билет предъявлен (или только что выдан этому нику)
@@ -612,7 +628,7 @@ export function createMultiplayerServer(
           }
         }
         if (!room.hasPlayer(playerId) || room.state.players[playerId]?.npc) {
-          rejectUpgrade(socket, 403);
+          refuseUpgrade(403);
           return;
         }
         // Mint a SERVER-owned session id, bound to this connection — never taken from the
@@ -721,7 +737,10 @@ export function createMultiplayerServer(
         }
         c.n += 1;
         inbound.set(ws, c);
-        if (c.n > SOCKET_FLOOD_MAX) return; // drop a raw flood before the parse (cheap)
+        if (c.n > SOCKET_FLOOD_MAX) {
+          options.securityAudit?.record('rate.limit', 'E_RATE_LIMIT', room.id);
+          return;
+        } // drop a raw flood before the parse (cheap)
         const raw = typeof data === 'string' ? data : data.toString('utf8');
         // Pass the server-minted sessionId so a gated room can authorize the envelope's
         // session binding against it (SV-1.1-live-A). Ignored by an un-gated room.

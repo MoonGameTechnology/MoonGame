@@ -33,6 +33,11 @@ export async function bundleNetserver() {
     // TS-исходники и игра) вбандливается. Зеркалит packages/server/dev.mjs.
     external: ['ws', 'pg', 'fastify'],
   });
+  await build({
+    entryPoints: ['packages/server/src/databaseAdmin.ts'],
+    outfile: 'packages/server/dist/database-admin.mjs',
+    bundle: true, format: 'esm', platform: 'node', target: 'node22', external: ['pg'],
+  });
   return outfile;
 }
 

@@ -82,6 +82,8 @@ services:
       # (anyone who knows a nick can take a seat). The server logs a stderr warning
       # if HOST=0.0.0.0 and AUTH_JWT_SECRET is empty.
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      AUTH_JWT_PREVIOUS_SECRET: ${AUTH_JWT_PREVIOUS_SECRET:-}
+      AUTH_JWT_PREVIOUS_UNTIL: ${AUTH_JWT_PREVIOUS_UNTIL:-}
       # Origin-allowlist против CSWSH — ОБЯЗАТЕЛЕН под PROD=1 (сервер откажется
       # стартовать без него). Браузер сам пришлёт сессию на wss:// с чужой страницы,
       # и без allowlist сервер такое соединение примет. Значение — origin, с которого
@@ -98,11 +100,14 @@ services:
       # plain `docker compose up` against the public interface is safe. Override
       # with PROD=0 for explicit dev-mode (loopback / LAN playtest).
       PROD: ${PROD:-1}
+      SECURITY_AUDIT: ${SECURITY_AUDIT:-1}
       # How many independent sessions this ONE process hosts (proto, proto-2, …):
       # all appear in the in-game match browser; each is durable in Postgres.
       MATCHES: ${MATCHES:-1}
       # Durable matches: snapshots to the postgres service over the compose network.
-      DATABASE_URL: postgres://void:${POSTGRES_PASSWORD:-void}@postgres:5432/void
+      DATABASE_URL: postgres://${DB_RUNTIME_USER:-void}:${DB_RUNTIME_PASSWORD:-${POSTGRES_PASSWORD:-void}}@postgres:5432/void
+      DB_AUTO_MIGRATE: ${DB_AUTO_MIGRATE:-1}
+      DB_REQUIRE_LEAST_PRIVILEGE: ${DB_REQUIRE_LEAST_PRIVILEGE:-0}
       # TLS / wss (RS-5.1): point BOTH at PEM files mounted under ./certs (see the
       # `certs` volume below and deploy/README.md for issuing a Let's Encrypt cert) and
       # the server serves wss:// in-process — no reverse proxy needed. Unset ⇒ plain ws
