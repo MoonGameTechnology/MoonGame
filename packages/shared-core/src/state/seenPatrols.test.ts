@@ -22,7 +22,7 @@ import {
   type Player,
   type ShuttleStrike,
 } from './gameState';
-import { patrolsSeenBy, visibleState } from './visibility';
+import { patrolsSeenBy, sensorCoverage, sightCircles, visibleState } from './visibility';
 import type { Action } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 
@@ -199,6 +199,34 @@ describe('SHU-6.10 — кого из чужих патрулей видит зр
     expect(owner.seenPatrols).toBeUndefined();
     // Ничего не видно — поля нет вовсе.
     expect(visibleState(world([patrolOf(Q2)]), 'p1', data).seenPatrols).toBeUndefined();
+  });
+});
+
+describe('SHU-6.12 — патруль союзника — глаза и в спроецированном мире', () => {
+  // Союзник p3 висит над Q2, вдали от миров p1; узел N50 — в его круге и больше ничьём.
+  const allied = world([patrolOf(Q2, { owner: 'p3' })], {
+    diplomacy: { [pairKey('p1', 'p3')]: 'alliance' },
+  });
+
+  it('клиент сети опознаёт глазами союзного патруля то же, что и сервер', () => {
+    const view = visibleState(allied, 'p1', data);
+    expect(view.strikes).toBeUndefined(); // сам вылет союзника снят, пришла только строка
+    expect(sensorCoverage(allied, 'p1', data).identify.has('N50')).toBe(true);
+    expect(sensorCoverage(view, 'p1', data).identify.has('N50')).toBe(true);
+    // Граница обзора на карте получает тот же круг: точка и радиус патруля.
+    const eye = sightCircles(view, 'p1', data).find((c) => c.source.kind === 'patrol');
+    expect(eye).toMatchObject({ owner: 'p3', x: Q2.x, y: Q2.y, identify: 60, signature: 60 });
+  });
+
+  it('видимый ВРАЖЕСКИЙ патруль глазами зрителя не становится', () => {
+    const view = visibleState(world([patrolOf(Q1)]), 'p1', data);
+    expect(view.seenPatrols).toHaveLength(1);
+    expect(sightCircles(view, 'p1', data).some((c) => c.source.kind === 'patrol')).toBe(false);
+  });
+
+  it('в авторитетном мире круг союзника один — из `strikes`, без двойника', () => {
+    const eyes = sightCircles(allied, 'p1', data).filter((c) => c.source.kind === 'patrol');
+    expect(eyes.map((c) => c.source.id)).toEqual(['strike:7']);
   });
 });
 

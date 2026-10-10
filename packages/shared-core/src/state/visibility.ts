@@ -306,6 +306,19 @@ function playerCircles(
       identify: r, signature: r,
     });
   }
+  // SHU-6.12: те же глаза у патруля СОЮЗНИКА в спроецированном мире. Проекция снимает чужие
+  // вылеты целиком, и висящий патруль партнёра по блоку доходит до клиента сети только
+  // строкой `seenPatrols` (точка и круг — ровно то, из чего круг выше и собран). Без этой
+  // ветки клиент сети не видел глазами союзного патруля, хотя сервер по ним уже прислал
+  // опознанные миры. В авторитетном мире поля нет, и ветка молчит: там патруль союзника
+  // уже учтён по `strikes`.
+  (state.seenPatrols ?? []).forEach((p, i) => {
+    if (p.owner !== ownerId || !(p.radius > 0)) return;
+    out.push({
+      owner: ownerId, source: { kind: 'patrol', id: `seen:${ownerId}:${i}` }, x: p.at.x, y: p.at.y,
+      identify: p.radius, signature: p.radius,
+    });
+  });
   // HERO-FX3 `reveal` (scan): the owner's OWN living heroes' active time-boxed reveals
   // light a full-identify zone around their target node until it expires.
   for (const hero of Object.values(state.heroes ?? {})) {
