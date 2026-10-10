@@ -1403,6 +1403,7 @@
 | SHU-6.6 | ✅ | core proto srv | `docs/shuttles-roadmap.md` | «Держать патруль» вместо дежурного вылета |
 | SHU-6.7 | ✅ | core | `docs/shuttles-roadmap.md` | Обзор в круге патруля |
 | SHU-6.10 | ✅ | core proto | `docs/shuttles-roadmap.md` | Чужой патруль в обзоре |
+| SHU-6.12 | ✅ | core | `docs/shuttles-roadmap.md` | Патруль союзника — глаза и в сети |
 | SHU-6.8 | ✅ | proto | `docs/shuttles-roadmap.md` | Бот: патруль и перелёт |
 | SHU-6.9 | ✅ | data | `docs/shuttles-roadmap.md` | Баланс фазы 6 |
 | SHU-6.11 | ✅ | core proto | `docs/shuttles-roadmap.md` | Удар шаттлов на карте и в журнале |
