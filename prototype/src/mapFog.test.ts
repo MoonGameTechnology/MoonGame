@@ -277,6 +277,8 @@ describe('REFM-231 — память разведки', () => {
 describe('REFM-231 — стык с main.ts', () => {
   const MAIN = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
   const FOG = readFileSync(new URL('./mapFog.ts', import.meta.url), 'utf8');
+  // Захват, который игрок видел, пишет в память разведки разбор событий (`eventFeed.ts`).
+  const FEED = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
   const init = /initMapFog\(\{([\s\S]*?)\n\}\);/.exec(MAIN)?.[1] ?? '';
 
   it('хуки тумана — мир, своё место, сеть, контакты радара и круги обзора кадра', () => {
@@ -300,9 +302,9 @@ describe('REFM-231 — стык с main.ts', () => {
       /\bfunction (computeVision|currentVision|fogVision|myIntel|fleetNode|fleetSeen|fleetKnown|fleetSeenHere|battleKnown|updateMemory|known|admits|seesDetails)\(/,
     );
     // Смена матча чистит память вместе с запомненным зрением, песочница — только зрение.
-    expect(MAIN).toMatch(/engagedBattleIds\.clear\(\);[^\n]*\n\s*resetFogMemory\(\);/);
+    expect(MAIN).toMatch(/resetEventFeed\(\);[^\n]*\n\s*resetFogMemory\(\);/);
     expect(MAIN).toMatch(/enforceSandbox\(s, ME, sandboxHomeId\);\n\s*forgetVision\(\);/);
-    expect(MAIN).toContain('rememberScan([p.planetId as string]);');
+    expect(FEED).toContain('rememberScan([p.planetId as string]);');
     expect(MAIN).toContain('restoreFogMemory(save.memory);');
   });
 

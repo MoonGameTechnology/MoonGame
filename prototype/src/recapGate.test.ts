@@ -53,8 +53,8 @@ describe('RECAP-FOG — чужая экономика в мою сводку н�
   // кто-то заведёт новый `case 'building.*'`/`'unit.built'` в свитче событий и позовёт
   // `note()` напрямую, гейт обязан покраснеть — иначе утечка вернётся тихо, ровно так
   // же, как пришла.
-  it('в main.ts каждый экономический case проходит через admits(), а не мимо', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  it('в ленте (`eventFeed.ts`) каждый экономический case проходит через admits(), а не мимо', () => {
+    const src = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
     for (const type of Object.keys(RECAP_POLICY)) {
       const at = src.indexOf(`case '${type}':`);
       expect(at, type).toBeGreaterThan(-1);

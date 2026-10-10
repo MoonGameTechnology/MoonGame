@@ -74,7 +74,7 @@ describe('проводка: ворота стройки клиента спра�
   });
 
   it('снос-зачистка (`cleared`) идёт в журнал своей строкой, а не «разрушено»', () => {
-    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    const src = readFileSync(new URL('./eventFeed.ts', import.meta.url), 'utf8');
     expect(src).toContain("tellBuild(p.cleared === true ? 'cleared' : 'destroyed', p)");
   });
 });
